@@ -1,0 +1,16 @@
+# symlink to windows host
+cleave-resources/
+
+# demuc seperate audio stems
+separated/
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+
+# venv
+venv/
