@@ -1,0 +1,12 @@
+---
+description: Cleave project purpose, phase, layout, and conventions for agents
+alwaysApply: true
+---
+
+# Cleave project context
+
+- Currently in the build out / proof of concept stages.
+- See [docs/cleave-build-plan.md](docs/cleave-build-plan.md) for the build plan.
+- See [README.md](README.md) for the project overview.
+- As the project evolves, update the build plan and README to reflect the current state.
+- Remind the user towards the end of the plan they may need to revisit this project-context rule.
