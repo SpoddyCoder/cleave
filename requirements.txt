@@ -1,5 +1,6 @@
 demucs
 librosa
+matplotlib
 numpy
 soundfile
 torchcodec
