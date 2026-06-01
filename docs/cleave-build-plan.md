@@ -26,23 +26,29 @@ Each libprojectM instance receives its stem's signals injected as Milkdrop unifo
 
 ---
 
-## Phase 1 — Stem Separation Pipeline
+## Phase 1 — Stem Separation Pipeline ✅
 *Goal: get clean stems out of your own tracks. Validate quality before touching visuals.*
 
-**1.1 — Environment setup**
+**1.1 — Environment setup** ✅
 - Python 3.10+ virtual environment
-- Install: `demucs`, `librosa`, `numpy`, `soundfile`
+- Install: `demucs`, `librosa`, `numpy`, `soundfile`, `torchcodec`
+- FFmpeg (system or conda-forge) for Demucs and torchaudio I/O
 - Verify CUDA if you have a GPU (Demucs is ~5–10x faster with one)
 
-**1.2 — Run Demucs on a test track**
-- Use `htdemucs` model (best quality, handles transient-heavy rock well)
+**1.2 — Run Demucs on a test track** ✅
 - Output: `drums.wav`, `bass.wav`, `vocals.wav`, `other.wav` in a named folder per track
 - Test on 2–3 of your own tracks with varying density
 
-**1.3 — Validate drum stem quality**
+**1.3 — Validate drum stem quality** ✅
 - Listen critically: is kick/snare bleed acceptable? Is the transient snap intact?
-- If bleed is bad on a specific track, try `htdemucs_ft` (fine-tuned variant) — slower but cleaner
-- Build a small CLI wrapper: `cleave separate <audiofile>` → outputs stems to `stems/<trackname>/`
+- Compared `htdemucs` (fast, good quality) vs `htdemucs_ft` (slow, higher quality)
+
+**Stem split modes** (to expose via `cleave separate` in Phase 2):
+
+| Mode | Demucs model | CLI flag | Notes |
+| --- | --- | --- | --- |
+| Fast stem split | `htdemucs` | default | Good quality; much faster |
+| Slow stem split | `htdemucs_ft` | `--slow` | Higher quality; use when bleed is unacceptable |
 
 **✅ Milestone: stems folder with clean-ish drum, bass, vocal, other wavs for 3 tracks**
 
@@ -50,6 +56,12 @@ Each libprojectM instance receives its stem's signals injected as Milkdrop unifo
 
 ## Phase 2 — Per-Stem Signal Analysis
 *Goal: extract meaningful numbers from each stem that can drive visuals.*
+
+**2.0 — `cleave separate` CLI**
+- Wrap Demucs: `cleave separate <audiofile>` → outputs stems to `stems/<trackname>/`
+- **Fast stem split** (default): `-n htdemucs`
+- **Slow stem split**: `--slow` → `-n htdemucs_ft`
+- Reuse existing stems when present (skip re-separation unless `--force`)
 
 **2.1 — Drum stem: onset detection**
 - Use `librosa.onset.onset_detect()` on the drum stem
@@ -178,10 +190,12 @@ Grunge/noise rock sits well with: high contrast, monochromatic with occasional c
 
 **7.1 — CLI interface**
 ```
-cleave separate <file>           # run demucs, output stems
+cleave separate <file>           # fast stem split (htdemucs, default)
+cleave separate <file> --slow    # slow stem split (htdemucs_ft)
 cleave analyse <stemsfolder>     # generate signals.json
 cleave play <file>               # full pipeline + launch visualizer
 cleave play <file> --stems-only  # skip separation if stems exist
+cleave play <file> --slow        # use slow stem split when separating
 ```
 
 **7.2 — Config file**
@@ -212,7 +226,7 @@ Ideas to revisit once the core is solid:
 
 | Layer | Tool | Why |
 |---|---|---|
-| Stem separation | `demucs` (htdemucs model) | Best quality on noisy/rock material |
+| Stem separation | `demucs` (`htdemucs` / `htdemucs_ft`) | Fast default; slow mode when bleed is bad |
 | Audio analysis | `librosa` | Industry standard, excellent onset detection |
 | Prototype visuals (Phase 3–4) | `pygame` | Fast to iterate, easy audio sync |
 | Milkdrop renderer (Phase 5+) | `libprojectM` + Python bindings | 50,000+ community presets, ships as embeddable library |
@@ -223,11 +237,11 @@ Ideas to revisit once the core is solid:
 
 ---
 
-## First Session Checklist
+## Completed Phases Checklist
 
-1. `python -m venv cleave-env && source cleave-env/bin/activate`
-2. `pip install demucs librosa soundfile numpy matplotlib pygame`
-3. `python -m demucs -n htdemucs your_track.mp3`
-4. Listen to `separated/htdemucs/<trackname>/drums.wav`
-5. Plot onset strength: mix vs drum stem in matplotlib
-6. If that plot looks good — you have your proof of concept. Build from there.
+### Phase 1 — Stem Separation Pipeline ✅
+
+- [x] Create env, install deps, install FFmpeg
+- [x] Run Demucs: `python -m demucs -n htdemucs your_track.mp3`
+- [x] Listen to `separated/htdemucs/<trackname>/drums.wav`
+- [x] Compare with `htdemucs_ft` on tracks where bleed matters
