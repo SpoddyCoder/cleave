@@ -4,7 +4,7 @@ Stem-separated music visualizer: drums drive the pulse, bass drives the warp, ea
 
 Built on WSL2, but should work on any Linux machine. A GPU with CUDA support is recommended for stem separation (Demucs is roughly 5 to 10 times faster on GPU).
 
-**Current focus:** [Phase 2](docs/cleave-build-plan.md#phase-2--per-stem-signal-analysis) — per-stem signal analysis. Extract time-series signals from stems to drive visuals.
+**Current focus:** Phase 2 complete (separate + analyse); validation on real tracks is pending. Next up: [Phase 3](docs/cleave-build-plan.md#phase-3--first-visual-drum-pulse) (first visual).
 
 ## Requirements
 
@@ -61,43 +61,69 @@ python -c "import torch; print(torch.cuda.is_available())"
 
 If this prints `False`, Demucs still runs on CPU, so separation will be slow (but it will work).
 
-## Stem separation (Phase 1, complete)
+## Stem layout
 
-Until the `cleave separate` CLI lands in Phase 2, run Demucs directly.
+Each track lives under `stems/<trackname>/` with four stem wavs and the analysis output co-located:
 
-| Mode | Command | When to use |
-| --- | --- | --- |
-| Fast stem split (default) | `python -m demucs -n htdemucs <file>` | Good quality; much faster |
-| Slow stem split | `python -m demucs -n htdemucs_ft <file>` | Higher quality; slower, less bleed |
-
-Stems are written to `separated/<model>/<trackname>/`:
-
-| File | Stem |
+| File | Role |
 | --- | --- |
-| `drums.wav` | Drums |
-| `bass.wav` | Bass |
-| `vocals.wav` | Vocals |
+| `drums.wav` | Drum stem |
+| `bass.wav` | Bass stem |
+| `vocals.wav` | Vocal stem |
 | `other.wav` | Everything else |
+| `signals.json` | Per-stem time-series signals (written by analyse) |
 
-Quote paths that contain spaces:
+Run `python -m cleave separate` to write the four stem wavs directly to `stems/<trackname>/` (track name is taken from the source filename).
 
-```bash
-python -m demucs -n htdemucs "cleave-resources/source/sights & sounds.wav"
-```
+## Stem separation (Phase 2, complete)
 
-Phase 2 will wrap this as:
-
-```bash
-cleave separate track.mp3           # fast stem split (htdemucs)
-cleave separate track.mp3 --slow    # slow stem split (htdemucs_ft)
-```
-
-## Phase 2 (in progress)
-
-Extract per-stem signals and write `signals.json` for each track:
+Separate a track into stems under `stems/<trackname>/`:
 
 ```bash
-cleave analyse stems/<trackname>/   # coming in Phase 2
+python -m cleave separate <file>           # fast stem split (htdemucs, default)
+python -m cleave separate <file> --slow    # slow stem split (htdemucs_ft)
+python -m cleave separate <file> --force   # re-separate even if stems already exist
 ```
 
-Goal: drum onsets from the isolated stem should be visibly sharper than onsets from the full mix. See [docs/cleave-build-plan.md](docs/cleave-build-plan.md) for the full roadmap.
+| Flag | Purpose |
+| --- | --- |
+| `--slow` | Use `htdemucs_ft` instead of `htdemucs` (higher quality, slower) |
+| `--force` | Re-run Demucs and overwrite stems even when all four wavs already exist |
+
+If stems are already present, the command exits without re-separating unless you pass `--force`.
+
+End-to-end example (sights & sounds):
+
+```bash
+python -m cleave separate "cleave-resources/source/sights & sounds.wav"
+python -m cleave analyse "stems/sights & sounds" --source "cleave-resources/source/sights & sounds.wav"
+python scripts/plot_onsets.py "stems/sights & sounds"
+```
+
+**Advanced:** Demucs can be run directly (`python -m demucs -n htdemucs <file>`) if you need its default `separated/` layout; copy the four wavs into `stems/<trackname>/` manually before analyse.
+
+## Signal analysis (Phase 2 analyse, complete)
+
+Extract per-stem signals and write `signals.json` beside the stem wavs:
+
+```bash
+python -m cleave analyse "stems/<trackname>" --source "path/to/mix.wav"
+```
+
+| Flag | Purpose |
+| --- | --- |
+| `--source PATH` | Original mixed audio; adds `mix_onset_strength` to `signals.json` for drum vs mix comparison |
+| `--slow` | Use `pyin` instead of `yin` for vocal pitch (slower, more accurate) |
+| `--force` | Regenerate `signals.json` even if it already exists |
+
+Without `--source`, analysis still runs; drum onsets are extracted from the isolated stem only.
+
+Validate that drum onsets are sharper than mix onsets:
+
+```bash
+python scripts/plot_onsets.py "stems/<trackname>"
+```
+
+This writes `onset_comparison.png` next to `signals.json`. Pass `--source` to analyse first so the plot includes the full-mix overlay.
+
+See [docs/cleave-build-plan.md](docs/cleave-build-plan.md) for the full roadmap.

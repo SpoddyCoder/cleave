@@ -1,8 +1,8 @@
 # symlink to windows host
-cleave-resources/
+cleave-resources
 
-# demuc seperate audio stems
-separated/
+# Per-track stem folders (wavs and signals.json; user-managed)
+stems/
 
 # python
 __pycache__/
@@ -14,3 +14,5 @@ __pycache__/
 
 # venv
 venv/
+.venv/
+cleave-env/

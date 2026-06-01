@@ -43,7 +43,7 @@ Each libprojectM instance receives its stem's signals injected as Milkdrop unifo
 - Listen critically: is kick/snare bleed acceptable? Is the transient snap intact?
 - Compared `htdemucs` (fast, good quality) vs `htdemucs_ft` (slow, higher quality)
 
-**Stem split modes** (to expose via `cleave separate` in Phase 2):
+**Stem split modes** (exposed via `python -m cleave separate`):
 
 | Mode | Demucs model | CLI flag | Notes |
 | --- | --- | --- | --- |
@@ -54,18 +54,18 @@ Each libprojectM instance receives its stem's signals injected as Milkdrop unifo
 
 ---
 
-## Phase 2 — Per-Stem Signal Analysis
-*Goal: extract meaningful numbers from each stem that can drive visuals.*
+## Phase 2 — Per-Stem Signal Analysis ✅
+*Goal: extract meaningful numbers from each stem that can drive visuals. Separate + analyse complete.*
 
-**2.0 — `cleave separate` CLI**
+**2.0 — `cleave separate` CLI** ✅
 - Wrap Demucs: `cleave separate <audiofile>` → outputs stems to `stems/<trackname>/`
 - **Fast stem split** (default): `-n htdemucs`
 - **Slow stem split**: `--slow` → `-n htdemucs_ft`
 - Reuse existing stems when present (skip re-separation unless `--force`)
 
 **2.1 — Drum stem: onset detection**
-- Use `librosa.onset.onset_detect()` on the drum stem
-- Extract: onset times, onset strength envelope (continuous signal, not just events)
+- Use `librosa.onset.onset_strength()` on the drum stem
+- Extract: onset strength envelope (continuous signal at native hop rate, resampled to 100 Hz in `signals.json`)
 - Compare against running the same analysis on the *mixed* track — this is your proof of concept moment. The onsets on the drum stem should be dramatically cleaner for dense mixes.
 
 **2.2 — Bass stem: low-frequency envelope**
@@ -245,3 +245,15 @@ Ideas to revisit once the core is solid:
 - [x] Run Demucs: `python -m demucs -n htdemucs your_track.mp3`
 - [x] Listen to `separated/htdemucs/<trackname>/drums.wav`
 - [x] Compare with `htdemucs_ft` on tracks where bleed matters
+
+### Phase 2 — Per-Stem Signal Analysis ✅
+
+- [x] `python -m cleave separate` (2.0): Demucs wrapper, `htdemucs` / `--slow` (`htdemucs_ft`), skip unless `--force`, output to `stems/<trackname>/`
+- [x] Drum stem onset detection and strength envelope (2.1)
+- [x] Bass RMS envelope with sub/mid-bass split at 120 Hz (2.2)
+- [x] Vocal RMS + pitch via `yin` (default) or `pyin` with `--slow` (2.3)
+- [x] Other stem spectral centroid (2.4)
+- [x] `python -m cleave analyse` writes `signals.json` at 100 Hz (2.5)
+- [x] Validation plot: `python scripts/plot_onsets.py` → `onset_comparison.png` (use `--source` on analyse for mix overlay)
+
+**Next (Phase 2 hardening):** see [unit-testing-plan.md](unit-testing-plan.md) for automated test coverage before Phase 3.
