@@ -88,7 +88,7 @@ Each libprojectM instance receives its stem's signals injected as Milkdrop unifo
 
 ---
 
-## Phase 3 — First Visual: Drum Pulse
+## Phase 3 — First Visual: Drum Pulse ✅
 *Goal: the simplest possible visual driven by the drum stem. Prove the concept works.*
 
 **3.1 — Choose your rendering stack**
@@ -256,4 +256,11 @@ Ideas to revisit once the core is solid:
 - [x] `python -m cleave analyse` writes `signals.json` at 100 Hz (2.5)
 - [x] Validation plot: `python scripts/plot_onsets.py` → `onset_comparison.png` (use `--source` on analyse for mix overlay)
 
-**Next (Phase 2 hardening):** see [unit-testing-plan.md](unit-testing-plan.md) for automated test coverage before Phase 3.
+### Phase 3 — First Visual: Drum Pulse ✅
+
+- [x] pygame added to requirements
+- [x] `cleave/signals.py` for loading and sampling signals.json
+- [x] `scripts/pulse_visualizer.py` — glow, ripples, hit flash, audio sync
+- [x] End-to-end example on `sights-and-sounds-26`
+
+**Next:** [Phase 4](docs/cleave-build-plan.md#phase-4--add-layers) (add layers).

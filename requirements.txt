@@ -2,5 +2,6 @@ demucs
 librosa
 matplotlib
 numpy
+pygame
 soundfile
 torchcodec
