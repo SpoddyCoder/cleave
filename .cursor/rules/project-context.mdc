@@ -5,9 +5,9 @@ alwaysApply: true
 
 # Cleave project context
 
-- Currently in the build out / proof of concept stages. Phase 3 complete (pygame drum pulse visualizer); Phase 4 next (add bass, vocal, and other layers).
+- Currently in the build out / proof of concept stages. Phase 4 complete (layered visualizer); Phase 5 next (Milkdrop integration).
 - See [docs/cleave-build-plan.md](docs/cleave-build-plan.md) for the build plan.
 - See [README.md](README.md) for the project overview.
-- Stem layout: `stems/<trackname>/` with four wavs plus `signals.json`. Visualizer: `scripts/pulse_visualizer.py`.
+- Stem layout: `stems/<trackname>/` with four wavs plus `signals.json`. Visualizers: [scripts/pulse_visualizer.py](scripts/pulse_visualizer.py) (objective drum-only baseline), [scripts/layered_visualizer.py](scripts/layered_visualizer.py) (multi-layer compositor).
 - As the project evolves, update the build plan and README to reflect the current state.
 - Remind the user towards the end of the plan they may need to revisit this project-context rule.

@@ -12,7 +12,7 @@ Audio File
     ▼
 [Demucs] ── offline stem separation
     │
-    ├── drums.wav  ──► onset / transient detection  ──► libprojectM (preset A) ──► layer 1
+    ├── drums.wav  ──► onset / transient detection   ──► libprojectM (preset A) ──► layer 1
     ├── bass.wav   ──► low-freq amplitude envelope   ──► libprojectM (preset B) ──► layer 2
     ├── vocals.wav ──► pitch / amplitude             ──► libprojectM (preset C) ──► layer 3
     └── other.wav  ──► spectral content              ──► libprojectM (preset D) ──► layer 4
@@ -109,7 +109,7 @@ Each libprojectM instance receives its stem's signals injected as Milkdrop unifo
 
 ---
 
-## Phase 4 — Add Layers
+## Phase 4 — Add Layers ✅
 *Goal: bring in bass and vocal/other signals as additional visual layers.*
 
 **4.1 — Bass layer**
@@ -263,4 +263,13 @@ Ideas to revisit once the core is solid:
 - [x] `scripts/pulse_visualizer.py` — glow, ripples, hit flash, audio sync
 - [x] End-to-end example on `sights-and-sounds-26`
 
-**Next:** [Phase 4](docs/cleave-build-plan.md#phase-4--add-layers) (add layers).
+### Phase 4 — Add Layers ✅
+
+- [x] `cleave/signals.py` `normalized()` helper for per-stem signal scaling
+- [x] `scripts/layered_visualizer.py` — four-layer compositor (other centroid gradient, bass sub/mid rings, vocal RMS + pitch hue, drum pulse on top); all layers on by default; d/b/v/o toggles
+- [x] `cleave/viz_overlay.py` — reusable controls panel (key, label, state); 10s hold then 2s fade; refresh on keypress
+- [x] `cleave/viz_playback.py` — shared playback clock, pause/resume, Left/Right skip 30s (both visualizers)
+- [x] `scripts/pulse_visualizer.py` — drum-only baseline; overlay and skip wired via shared helpers
+- [x] End-to-end: `layered_visualizer.py` on `sights-and-sounds-26` after separate + analyse
+
+**Next:** [Phase 5 (Milkdrop integration)](docs/cleave-build-plan.md#phase-5--milkdrop-integration).

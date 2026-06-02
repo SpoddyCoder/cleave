@@ -30,7 +30,9 @@ class Signals:
     source: Path | None
     path: Path
     stems: dict[str, dict[str, np.ndarray]] = field(repr=False)
-    _onset_max: float | None = field(default=None, init=False, repr=False)
+    _normalized_cache: dict[tuple[str, str, float], np.ndarray] = field(
+        default_factory=dict, init=False, repr=False
+    )
 
     def array(self, stem: str, key: str) -> np.ndarray:
         return self.stems[stem][key]
@@ -49,16 +51,27 @@ class Signals:
         frac = pos - i
         return float(values[i] * (1.0 - frac) + values[i + 1] * frac)
 
+    def normalized(
+        self, stem: str, key: str, percentile: float = 99.0
+    ) -> np.ndarray:
+        cache_key = (stem, key, percentile)
+        cached = self._normalized_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        values = self.array(stem, key)
+        if len(values) == 0 or percentile <= 0:
+            result = np.zeros_like(values)
+        else:
+            scale = float(np.percentile(values, percentile))
+            result = np.zeros_like(values) if scale <= 0.0 else values / scale
+
+        self._normalized_cache[cache_key] = result
+        return result
+
     @property
     def onset_normalized(self) -> np.ndarray:
-        onset = self.array("drums", "onset_strength")
-        if self._onset_max is None:
-            self._onset_max = (
-                float(np.percentile(onset, 99)) if len(onset) > 0 else 0.0
-            )
-        if self._onset_max <= 0.0:
-            return np.zeros_like(onset)
-        return onset / self._onset_max
+        return self.normalized("drums", "onset_strength")
 
 
 def load_signals(path: Path) -> Signals:
