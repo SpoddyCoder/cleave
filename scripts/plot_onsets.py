@@ -10,10 +10,11 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-def resolve_signals_path(path: Path) -> Path:
-    path = path.resolve()
-    return path / "signals.json" if path.is_dir() else path
+from cleave.signals import resolve_signals_path  # noqa: E402
 
 
 def main() -> None:

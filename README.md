@@ -4,7 +4,7 @@ Stem-separated music visualizer: drums drive the pulse, bass drives the warp, ea
 
 Built on WSL2, but should work on any Linux machine. A GPU with CUDA support is recommended for stem separation (Demucs is roughly 5 to 10 times faster on GPU).
 
-**Current focus:** Phase 2 complete (separate + analyse); validation on real tracks is pending. Next up: [Phase 3](docs/cleave-build-plan.md#phase-3--first-visual-drum-pulse) (first visual).
+**Current focus:** Phase 3 complete (drum pulse visualizer); next up: [Phase 4](docs/cleave-build-plan.md#phase-4--add-layers) (add layers).
 
 ## Requirements
 
@@ -92,12 +92,13 @@ python -m cleave separate <file> --force   # re-separate even if stems already e
 
 If stems are already present, the command exits without re-separating unless you pass `--force`.
 
-End-to-end example (sights & sounds):
+End-to-end example (`sights-and-sounds-26`):
 
 ```bash
-python -m cleave separate "cleave-resources/source/sights & sounds.wav"
-python -m cleave analyse "stems/sights & sounds" --source "cleave-resources/source/sights & sounds.wav"
-python scripts/plot_onsets.py "stems/sights & sounds"
+python -m cleave separate cleave-resources/source/sights-and-sounds-26.wav
+python -m cleave analyse stems/sights-and-sounds-26 --source cleave-resources/source/sights-and-sounds-26.wav
+python scripts/plot_onsets.py stems/sights-and-sounds-26
+python scripts/pulse_visualizer.py stems/sights-and-sounds-26
 ```
 
 **Advanced:** Demucs can be run directly (`python -m demucs -n htdemucs <file>`) if you need its default `separated/` layout; copy the four wavs into `stems/<trackname>/` manually before analyse.
@@ -125,5 +126,24 @@ python scripts/plot_onsets.py "stems/<trackname>"
 ```
 
 This writes `onset_comparison.png` next to `signals.json`. Pass `--source` to analyse first so the plot includes the full-mix overlay.
+
+## Drum pulse visualizer (Phase 3, complete)
+
+Pygame visualizer driven by drum onset strength from `signals.json`. Plays the original mix in sync with a glowing orb, expanding ripples on hits, and a brief full-screen flash on strong transients.
+
+```bash
+python scripts/pulse_visualizer.py stems/sights-and-sounds-26
+```
+
+Pass `--source path/to/mix.wav` to override the mix path stored in `signals.json` (required if analyse ran without `--source`).
+
+| Key | Action |
+| --- | --- |
+| Esc | Quit |
+| Space | Pause / resume playback |
+
+On WSL2, the window needs WSLg or an X11 display server; without one, pygame cannot open a window.
+
+After separate, analyse, and optional onset validation above, run the visualizer as the final step in the end-to-end example.
 
 See [docs/cleave-build-plan.md](docs/cleave-build-plan.md) for the full roadmap.
