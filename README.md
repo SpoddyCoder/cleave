@@ -4,7 +4,7 @@ Stem-separated music visualizer: drums drive the pulse, bass drives the warp, ea
 
 Built on WSL2, but should work on any Linux machine. A GPU with CUDA support is recommended for stem separation (Demucs is roughly 5 to 10 times faster on GPU).
 
-**Current focus:** Phase 3 complete (drum pulse visualizer); next up: [Phase 4](docs/cleave-build-plan.md#phase-4--add-layers) (add layers).
+**Current focus:** Phase 4 complete (layered visualizer); next up: [Phase 5 (Milkdrop)](docs/cleave-build-plan.md#phase-5--milkdrop-integration).
 
 ## Requirements
 
@@ -99,6 +99,7 @@ python -m cleave separate cleave-resources/source/sights-and-sounds-26.wav
 python -m cleave analyse stems/sights-and-sounds-26 --source cleave-resources/source/sights-and-sounds-26.wav
 python scripts/plot_onsets.py stems/sights-and-sounds-26
 python scripts/pulse_visualizer.py stems/sights-and-sounds-26
+python scripts/layered_visualizer.py stems/sights-and-sounds-26
 ```
 
 **Advanced:** Demucs can be run directly (`python -m demucs -n htdemucs <file>`) if you need its default `separated/` layout; copy the four wavs into `stems/<trackname>/` manually before analyse.
@@ -141,9 +142,49 @@ Pass `--source path/to/mix.wav` to override the mix path stored in `signals.json
 | --- | --- |
 | Esc | Quit |
 | Space | Pause / resume playback |
+| Left | Back 30 seconds |
+| Right | Forward 30 seconds |
+
+A controls panel in the top-left lists keys and state (PLAY / PAUSED). It stays visible for 10 seconds, then fades out over 2 seconds; press any key to show it again. Implemented in [cleave/viz_overlay.py](cleave/viz_overlay.py) for reuse across visualizers.
 
 On WSL2, the window needs WSLg or an X11 display server; without one, pygame cannot open a window.
 
-After separate, analyse, and optional onset validation above, run the visualizer as the final step in the end-to-end example.
+## Layered visualizer (Phase 4, complete)
+
+Multi-stem compositor that blends four pygame layers, each driven by its stem in `signals.json`:
+
+| Layer | Signal | Visual |
+| --- | --- | --- |
+| Other | Spectral centroid | Warm horizontal gradient band that shifts with brightness |
+| Bass | `sub_bass` / `mid_bass` | Dual soft rings (deep red sub, amber mid) |
+| Vocals | RMS + pitch | Radial glow sized by amplitude, hue from pitch |
+| Drums | Onset strength | Pulse orb, ripples, and flash (same as drum-only visualizer, drawn on top) |
+
+```bash
+python scripts/layered_visualizer.py stems/sights-and-sounds-26
+```
+
+Pass `--source path/to/mix.wav` to override the mix path stored in `signals.json` (same as pulse visualizer).
+
+| Key | Action |
+| --- | --- |
+| d | Toggle drums layer |
+| b | Toggle bass layer |
+| v | Toggle vocals layer |
+| o | Toggle other layer |
+| Space | Pause / resume playback |
+| Left | Back 30 seconds |
+| Right | Forward 30 seconds |
+| Esc | Quit |
+
+All four layers are on at startup. Toggle **d** / **b** / **v** / **o** during playback to isolate stems.
+
+The same controls overlay as the drum pulse visualizer shows all keys plus layer ON/OFF state; it fades when idle and reappears on any keypress.
+
+`scripts/pulse_visualizer.py` remains the objective drum-only baseline for comparing onset response without other stems in the mix.
+
+On WSL2, same display requirement as the drum pulse visualizer (WSLg or X11).
+
+After separate, analyse, and optional onset validation above, run `pulse_visualizer.py` for the drum baseline, then `layered_visualizer.py` for the full composited view.
 
 See [docs/cleave-build-plan.md](docs/cleave-build-plan.md) for the full roadmap.

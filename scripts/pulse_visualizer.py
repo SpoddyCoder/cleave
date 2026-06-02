@@ -15,6 +15,15 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from cleave.signals import Signals, load_signals, resolve_signals_path  # noqa: E402
+from cleave.viz_overlay import ControlsOverlay, playback_rows  # noqa: E402
+from cleave.viz_playback import (  # noqa: E402
+    SKIP_SEC,
+    current_sec,
+    elapsed_ms,
+    init_playback,
+    seek,
+    toggle_pause,
+)
 
 WIDTH, HEIGHT = 1280, 720
 FPS = 60
@@ -92,15 +101,20 @@ def draw_ripples(
     alive: list[Ripple] = []
     for rip in ripples:
         age = now_ms - rip.born_ms
-        if age >= RIPPLE_MS:
+        if age < 0 or age >= RIPPLE_MS:
             continue
         alive.append(rip)
         prog = age / RIPPLE_MS
         radius = int(50 + prog * 320)
+        if radius < 1:
+            continue
         alpha = int(160 * (1.0 - prog) * rip.strength)
         if alpha < 4:
             continue
-        ring = pygame.Surface((radius * 2 + 4, radius * 2 + 4), pygame.SRCALPHA)
+        size = radius * 2 + 4
+        if size > WIDTH * 2:
+            continue
+        ring = pygame.Surface((size, size), pygame.SRCALPHA)
         pygame.draw.circle(
             ring, (255, 110, 55, alpha), (radius + 2, radius + 2), radius, 2
         )
@@ -116,13 +130,6 @@ def draw_flash(surface: pygame.Surface, alpha: float) -> None:
     surface.blit(overlay, (0, 0))
 
 
-def playback_ms(start_ms: int, paused_ms: int, paused: bool, pause_at: int) -> int:
-    now = pygame.time.get_ticks()
-    if paused:
-        return pause_at - start_ms - paused_ms
-    return now - start_ms - paused_ms
-
-
 def run(signals: Signals, audio_path: Path) -> None:
     pygame.init()
     pygame.mixer.init()
@@ -132,15 +139,14 @@ def run(signals: Signals, audio_path: Path) -> None:
 
     pygame.mixer.music.load(str(audio_path))
     pygame.mixer.music.play()
-    start_ms = pygame.time.get_ticks()
 
+    playback = init_playback()
+    duration_sec = signals.duration_sec
     envelope = 0.0
     prev_envelope = 0.0
     flash = 0.0
     ripples: list[Ripple] = []
-    paused = False
-    paused_ms = 0
-    pause_at = 0
+    overlay = ControlsOverlay(playback_rows(paused=playback.paused))
 
     running = True
     while running:
@@ -148,26 +154,29 @@ def run(signals: Signals, audio_path: Path) -> None:
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
+                overlay.notify_input()
                 if event.key == pygame.K_ESCAPE:
                     running = False
                 elif event.key == pygame.K_SPACE:
-                    if paused:
-                        paused_ms += pygame.time.get_ticks() - pause_at
-                        pygame.mixer.music.unpause()
-                        paused = False
-                    else:
-                        pause_at = pygame.time.get_ticks()
-                        pygame.mixer.music.pause()
-                        paused = True
+                    toggle_pause(playback, duration_sec)
+                elif event.key == pygame.K_LEFT:
+                    seek(playback, -SKIP_SEC, duration_sec)
+                    ripples.clear()
+                    flash = 0.0
+                elif event.key == pygame.K_RIGHT:
+                    seek(playback, SKIP_SEC, duration_sec)
+                    ripples.clear()
+                    flash = 0.0
+                overlay.replace_rows(playback_rows(paused=playback.paused))
 
-        elapsed_ms = playback_ms(start_ms, paused_ms, paused, pause_at)
-        t_sec = min(elapsed_ms / 1000.0, signals.duration_sec)
+        elapsed = elapsed_ms(playback)
+        t_sec = current_sec(playback, duration_sec)
         raw = sample_onset(signals, t_sec)
         envelope = max(envelope * DECAY, raw * GAIN)
 
         delta = envelope - prev_envelope
         if delta > RIPPLE_DELTA:
-            ripples.append(Ripple(born_ms=elapsed_ms, strength=min(1.0, delta * 4.0)))
+            ripples.append(Ripple(born_ms=elapsed, strength=min(1.0, delta * 4.0)))
 
         if envelope > FLASH_THRESHOLD:
             flash = max(flash, (envelope - FLASH_THRESHOLD) * 1.8)
@@ -176,14 +185,15 @@ def run(signals: Signals, audio_path: Path) -> None:
         screen.fill(BG)
         base_r = 40 + envelope * 120
         draw_orb(screen, base_r, min(1.0, envelope * 1.1))
-        ripples = draw_ripples(screen, ripples, elapsed_ms)
+        ripples = draw_ripples(screen, ripples, elapsed)
         draw_flash(screen, flash)
+        overlay.draw(screen)
         pygame.display.flip()
-        clock.tick(FPS)
+        overlay.update(clock.tick(FPS) / 1000.0)
 
         prev_envelope = envelope
-        if not paused and not pygame.mixer.music.get_busy():
-            if t_sec >= signals.duration_sec - 0.05:
+        if not playback.paused and not pygame.mixer.music.get_busy():
+            if t_sec >= duration_sec - 0.05:
                 running = False
 
     pygame.mixer.music.stop()
