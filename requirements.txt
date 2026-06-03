@@ -3,5 +3,7 @@ librosa
 matplotlib
 numpy
 pygame
+PyOpenGL
+PyYAML
 soundfile
 torchcodec
