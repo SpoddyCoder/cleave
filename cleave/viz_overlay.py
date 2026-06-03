@@ -82,6 +82,7 @@ class ControlsOverlay:
         self._idle_sec = 0.0
         self._visibility = 1.0
         self._font: pygame.font.Font | None = None
+        self._panel_rect: tuple[int, int, int, int] | None = None
 
     def replace_rows(self, rows: list[ControlRow]) -> None:
         self._rows = list(rows)
@@ -124,7 +125,13 @@ class ControlsOverlay:
             return _TEXT_DIM
         return _TEXT
 
+    @property
+    def panel_rect(self) -> tuple[int, int, int, int] | None:
+        """Top-left x, y, width, height of the last drawn panel, if any."""
+        return self._panel_rect
+
     def draw(self, surface: pygame.Surface) -> None:
+        self._panel_rect = None
         if self._visibility <= 0.01 or not self._rows:
             return
 
@@ -163,3 +170,4 @@ class ControlsOverlay:
             pos = (mx, surface.get_height() - panel_h - my)
 
         surface.blit(panel, pos)
+        self._panel_rect = (pos[0], pos[1], panel_w, panel_h)

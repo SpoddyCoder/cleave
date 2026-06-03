@@ -1,0 +1,43 @@
+# Cleave Milkdrop configuration
+#
+# Copy to ./cleave.config.yaml (project root) or ~/.config/cleave/cleave.config.yaml
+# Install community presets under paths.preset_root (see README / build plan).
+# Preset paths below are placeholders; install a preset pack (e.g. cream-of-the-crop)
+# and point each layer at real .milk files under preset_root.
+
+paths:
+  preset_root: ~/.local/share/cleave/presets
+  texture_paths:
+    - ~/.local/share/cleave/textures
+
+layers:
+  other:
+    preset: presets-cream-of-the-crop/background/ambient-field.milk
+    enabled: true
+    opacity: 0.6
+    width: 640
+    height: 360
+  bass:
+    preset: presets-cream-of-the-crop/bass/fluid-warp.milk
+    enabled: true
+    opacity: 0.8
+    width: 960
+    height: 540
+  vocals:
+    preset: presets-cream-of-the-crop/vocals/mid-glow.milk
+    enabled: true
+    opacity: 1.0
+    width: 960
+    height: 540
+  drums:
+    preset: presets-cream-of-the-crop/drums/stroby-burst.milk
+    enabled: true
+    opacity: 1.0
+    width: 1280
+    height: 720
+
+visualizer:
+  width: 1280
+  height: 720
+  fps: 60
+  beat_sensitivity: 1.0

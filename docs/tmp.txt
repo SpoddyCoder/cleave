@@ -1,0 +1,76 @@
+We're moving into phase 5. Some early decisions
+
+1) PCM input to libprojectM...
+
+drum stem AUDIO -> librprojectM -> MD visual 1
+bass stem AUDIO -> librprojectM -> MD visual 2
+vocal stem AUDIO -> librprojectM -> MD visual 3
+other stem AUDIO -> librprojectM -> MD visual 4
+
+We'll keep singals.json / analyse functionality around for future use perhaps.
+
+2) Use ctypes for the bridge between python and libprojectM in a small cleave/projectm.py module (or similar), wrapping only what Phase 5 needs:
+
+projectm_create / projectm_destroy
+projectm_set_window_size
+projectm_load_preset_file
+projectm_set_preset_locked
+projectm_pcm_add_float
+projectm_opengl_render_frame
+Maybe beat sensitivity getters/setters for tuning
+
+3) pygame + OpenGL, with moderngl deferred to Phase 6.
+
+4) One shared OpenGL context, one FBO (texture) per layer. Render each projectM instance into its own FBO, then composite. Avoid four separate GL contexts; that gets messy fast on WSL2.
+
+Resolution: full 1280×720 for drums (top layer); 960×540 or 640×360 for bass/vocals/other is fine for Phase 5. Upscale when blitting. Saves a lot of GPU for little visible loss on background layers.
+
+Blend mode: keep Phase 4’s approach at first: alpha over for bass/vocals/other, additive (or high-alpha additive) for drums on top. Match what you already tuned in layered_visualizer.py.
+
+Z-order (bottom → top): other → bass → vocals → drums. Same as Phase 4 (drums on top).
+
+Compositor host: stay on pygame + OpenGL for Phase 5 if you can pull GL textures into a pygame surface; defer moderngl post-FX to Phase 6 unless compositing alone forces you there.
+
+Phase 5 spike: one FBO + one preset + blit to screen. Only add the other three FBOs once that loop is stable.
+
+5) New script scripts/milkdrop_visualizer.py. Keep layered_visualizer and pulse_visualizer as is for now - we can update them later once mildrop visualiser is fully validated.
+
+6) Chage the config.toml to cleave.config.yaml (I'm more familiar with yaml). Suggested shape...
+
+# cleave.config.yaml (project root) or ~/.config/cleave/cleave.config.yaml
+
+paths:
+  preset_root: ~/.local/share/cleave/presets
+  texture_paths:
+    - ~/.local/share/cleave/textures
+
+layers:
+  other:
+    preset: presets-cream-of-the-crop/some/background.milk
+    enabled: true
+    opacity: 0.6
+  bass:
+    preset: presets-cream-of-the-crop/some/fluid.milk
+  vocals:
+    preset: presets-cream-of-the-crop/some/mid.milk
+  drums:
+    preset: presets-cream-of-the-crop/some/stroby.milk
+
+visualizer:
+  width: 1280
+  height: 720
+  fps: 60
+
+7 - Brief recommendation for audio sync...
+
+Keep the mix on pygame.mixer and reuse your existing viz_playback.py clock (t_sec is the single source of truth).
+Preload all four stem wavs into memory at startup (with soundfile or numpy via librosa). At ~5 min per track this is trivial; random access on seek is much simpler than streaming from disk each frame.
+Each frame (60 Hz): from t_sec, slice ~1 frame worth of PCM from each stem (match what the test UI does: a few hundred samples per call, stay under projectm_pcm_get_max_samples()), and call projectm_pcm_add_float on each layer’s instance with mono stem data.
+On seek or pause: stop/unpause the mix as you do now, and flush or reset each projectM instance’s PCM buffer so beat detection doesn’t carry stale audio across jumps (same idea as clearing ripples on skip in Phase 4).
+So: mix for ears, preloaded stems for eyes, shared t_sec for sync.
+
+8 - Suggested milestone sequence: one instance + one preset + mix audio → signal/PCM path validated → four layers + compositor → presets in config.
+
+9 - target 60fps. Validation track: keep using sights-and-sounds-26 as the regression reference
+
+Lets make a plan!

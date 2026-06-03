@@ -1,6 +1,9 @@
 # symlink to windows host
 cleave-resources
 
+# milkdrop presets
+milkdrop-presets
+
 # Per-track stem folders (wavs and signals.json; user-managed)
 stems/
 
