@@ -22,7 +22,7 @@ Audio File
                                                                     final output
 ```
 
-Each libprojectM instance receives its stem's signals injected as Milkdrop uniforms (`bass`, `mid`, `treb`, `vol` etc.), making the full library of community presets stem-aware without modification.
+From Phase 5 onward, each libprojectM instance receives its stem's PCM audio (`projectm_pcm_add_float`), so presets react to isolated drums, bass, vocals, and other without custom uniform wiring. The `signals.json` pipeline from Phase 2 remains for analysis and future use.
 
 ---
 
@@ -129,41 +129,52 @@ Each libprojectM instance receives its stem's signals injected as Milkdrop unifo
 
 ---
 
-## Phase 5 — Milkdrop Integration
+## Phase 5 — Milkdrop Integration ✅
 *Goal: replace pygame placeholder visuals with libprojectM, unlocking the full community preset library.*
 
-By this point you have a working layered system you understand. Milkdrop now becomes load-bearing infrastructure rather than a first-day gamble.
+By this point you have a working layered system you understand. Milkdrop becomes load-bearing infrastructure rather than a first-day gamble. Stem **PCM** drives each libprojectM instance (not `signals.json` uniforms). See [docs/phase-5-plan-part-progressed.md](docs/phase-5-plan-part-progressed.md) for session checkpoint detail.
 
-**5.1 — Embed libprojectM**
-- Install `libprojectm` and its Python bindings (`pyprojectm` or via ctypes wrapper)
-- Confirm it can render to an off-screen framebuffer (it ships as a library specifically for this)
-- Render a single preset to a texture — just prove the pipeline works before wiring up signals
+**Target spec**
 
-**5.2 — Map Cleave signals to Milkdrop uniforms**
-Milkdrop presets expect these standard uniforms on each frame:
-- `bass`, `bass_att` — map from drum stem onset strength
-- `mid`, `mid_att` — map from vocal/other RMS
-- `treb`, `treb_att` — map from spectral centroid of "other"
-- `vol` — overall amplitude
+| Setting | Value |
+| --- | --- |
+| Window | 1280 x 720 |
+| Frame rate | 30 fps |
+| M1 spike stem | drums |
+| Layer FBO sizes | other 640x360, bass/vocals 960x540, drums 1280x720 (upscale on composite) |
+| Z-order (bottom to top) | other, bass, vocals, drums |
+| Blend | alpha-over for bg layers; additive for drums |
+| Config | [cleave.config.yaml](cleave.config.yaml) (YAML) |
+| Entry script | [scripts/milkdrop_visualizer.py](scripts/milkdrop_visualizer.py) |
+| Regression track | `sights-and-sounds-26` |
 
-Feed your `signals.json` values into these each frame. Presets will respond without any modification.
+**5.1 — Embed libprojectM** (M1 done)
+- libprojectM 4.2+ with ctypes bridge in [cleave/projectm.py](cleave/projectm.py)
+- pygame + OpenGL (PyOpenGL); one shared GL context
+- One FBO per layer; render preset to texture, composite, blit to window
+- M1 spike: one `ProjectM` instance, one preset, **drums** stem PCM at target resolution and fps
+
+**5.2 — Stem PCM sync**
+- Preload all four stem wavs at 44100 Hz mono ([cleave/stem_pcm.py](cleave/stem_pcm.py))
+- Mix on `pygame.mixer` for ears; shared `t_sec` from [cleave/viz_playback.py](cleave/viz_playback.py)
+- Each frame: slice PCM per stem, `projectm_pcm_add_float`, render FBO
+- On pause: stop feeding PCM; on seek: flush buffers and reset frame time
 
 **5.3 — One libprojectM instance per layer**
-- Spin up 4 instances, each rendering to its own offscreen framebuffer
-- Each instance receives only its stem's signals (drum instance gets drum signals, etc.)
-- Pull rendered frames as textures into the Cleave compositor
+- Four instances, four FBOs at tiered resolutions ([cleave/gl_compositor.py](cleave/gl_compositor.py))
+- Composite bottom-to-top; layer toggles **d** / **b** / **v** / **o** (reuse overlay from Phase 4)
 
-**5.4 — Preset selection**
-- Assign a preset to each layer via `cleave.toml`
-- Try: a percussive/stroby preset on drums, a slow fluid preset on bass, something abstract on other
-- Keep layers togglable (d/b/v/o keypresses) as before — essential for finding good combinations
+**5.4 — Preset selection via config**
+- Per-layer preset path, size, opacity, beat sensitivity in `cleave.config.yaml`
+- Align config `visualizer` width/height/fps with target spec when fully wired (M4)
+- Percussive preset on drums, fluid on bass, abstract on other; browse community packs
 
 **5.5 — Validate the upgrade**
-- Run the same track that passed Phase 4's milestone
-- The visual should be dramatically richer — you now have access to 50,000+ community presets
-- Spend time here just browsing presets per layer. The combinatorial space is enormous.
+- Run `sights-and-sounds-26` (same regression track as Phase 4)
+- Confirm sync across full track length, clean pause, seek without stale beat energy
+- Sustain **30 fps** at 1280x720 on dev hardware (WSL2); tune bg layer mesh size if needed
 
-**✅ Milestone: 4 Milkdrop presets running simultaneously, each responding to its own stem, composited by Cleave**
+**✅ Milestone: 4 Milkdrop presets running simultaneously, each driven by its own stem PCM, composited by Cleave**
 
 ---
 
@@ -229,7 +240,7 @@ Ideas to revisit once the core is solid:
 | Stem separation | `demucs` (`htdemucs` / `htdemucs_ft`) | Fast default; slow mode when bleed is bad |
 | Audio analysis | `librosa` | Industry standard, excellent onset detection |
 | Prototype visuals (Phase 3–4) | `pygame` | Fast to iterate, easy audio sync |
-| Milkdrop renderer (Phase 5+) | `libprojectM` + Python bindings | 50,000+ community presets, ships as embeddable library |
+| Milkdrop renderer (Phase 5+) | `libprojectM` + ctypes ([cleave/projectm.py](cleave/projectm.py)) | 50,000+ community presets; stem PCM in, FBO out |
 | Compositor post-FX (Phase 6+) | `moderngl` + GLSL | GPU-accelerated grain, bloom, colour grade |
 | Video export | `ffmpeg` via subprocess | Universal, no extra deps |
 | Config | `tomllib` (stdlib in 3.11+) | Simple, readable |
@@ -272,4 +283,16 @@ Ideas to revisit once the core is solid:
 - [x] `scripts/pulse_visualizer.py` — drum-only baseline; overlay and skip wired via shared helpers
 - [x] End-to-end: `layered_visualizer.py` on `sights-and-sounds-26` after separate + analyse
 
-**Next:** [Phase 5 (Milkdrop integration)](docs/cleave-build-plan.md#phase-5--milkdrop-integration).
+### Phase 5 — Milkdrop Integration ✅
+
+- [x] ctypes wrapper for libprojectM 4.2+ ([cleave/projectm.py](cleave/projectm.py))
+- [x] Stem PCM preload and per-frame slicing ([cleave/stem_pcm.py](cleave/stem_pcm.py))
+- [x] OpenGL compositor: FBO per layer, alpha/add blend ([cleave/gl_compositor.py](cleave/gl_compositor.py))
+- [x] YAML config loader ([cleave/config.py](cleave/config.py), [cleave.config.yaml](cleave.config.yaml))
+- [x] M1 spike: [scripts/milkdrop_visualizer.py](scripts/milkdrop_visualizer.py) (drums-only via `--preset`)
+- [x] M2: PCM sync validation on `sights-and-sounds-26` (full track, pause, seek)
+- [x] M3: four layers + compositor + d/b/v/o toggles
+- [x] M4: all layers and visualizer settings from config (fps 30)
+- [x] M5 docs: README Phase 5, preset_root path guidance, project-context
+
+**Next:** Phase 6 compositor aesthetics.
