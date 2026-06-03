@@ -4,13 +4,13 @@ Stem-separated music visualizer: drums drive the pulse, bass drives the warp, ea
 
 Built on WSL2, but should work on any Linux machine. A GPU with CUDA support is recommended for stem separation (Demucs is roughly 5 to 10 times faster on GPU).
 
-**Current focus:** Phase 4 complete (layered visualizer); next up: [Phase 5 (Milkdrop)](docs/cleave-build-plan.md#phase-5--milkdrop-integration).
+**Current focus:** Phase 5 Milkdrop visualizer (four layers at 1280x720 / 30 fps); Phase 4 layered visualizer remains the pygame baseline. See [docs/cleave-build-plan.md](docs/cleave-build-plan.md#phase-5--milkdrop-integration).
 
 ## Requirements
 
 - Python 3.10+
 - FFmpeg - used by Demucs and audio I/O
-- LibprojectM v4.2.0+ (not officially released yet) - used by the layered visualizer
+- LibprojectM v4.2.0+ (not officially released yet) - used by the Milkdrop visualizer
 - Optional: NVIDIA GPU with CUDA for faster audio separation
 - On WSL2, [wsl-builds](https://github.com/spoddycoder/wsl-build) makes all this very easy.
 
@@ -190,6 +190,45 @@ On WSL2, same display requirement as the drum pulse visualizer (WSLg or X11).
 
 After separate, analyse, and optional onset validation above, run `pulse_visualizer.py` for the drum baseline, then `layered_visualizer.py` for the full composited view.
 
-**Phase 5 (M1):** `python scripts/milkdrop_visualizer.py stems/<trackname>` — one libprojectM preset on the drums stem (needs libprojectM, presets, and a display; use `--preset` if config presets are not installed yet).
+## Milkdrop visualizer (Phase 5, complete)
+
+Four libprojectM layers (other, bass, vocals, drums), each fed stem PCM at 44100 Hz mono, composited with OpenGL FBOs at tiered resolutions and upscaled to **1280x720 @ 30 fps**. Requires libprojectM **4.2+**, community presets, and a display (WSLg or X11 on WSL2).
+
+**Preset install:** clone or symlink community packs under `paths.preset_root` in [cleave.config.yaml](cleave.config.yaml). Set `preset_root` to the milkdrop-presets root (the directory that contains `presets-cream-of-the-crop`, not that subfolder alone). Layer `preset` paths are relative to `preset_root` and should include each pack name once, e.g. `presets-cream-of-the-crop/Drawing/foo.milk`. Example layout:
+
+```bash
+ln -s ~/milkdrop-presets ~/cleave/milkdrop-presets   # optional repo symlink
+# cleave.config.yaml: preset_root: ~/milkdrop-presets
+```
+
+**Run** (after separate; mix path from `signals.json` or `--source`):
+
+```bash
+python scripts/milkdrop_visualizer.py stems/sights-and-sounds-26 \
+  --source cleave-resources/source/sights-and-sounds-26.wav
+```
+
+| Key | Action |
+| --- | --- |
+| d | Toggle drums layer |
+| b | Toggle bass layer |
+| v | Toggle vocals layer |
+| o | Toggle other layer |
+| Space | Pause / resume playback |
+| Left | Back 30 seconds |
+| Right | Forward 30 seconds |
+| Esc | Quit |
+
+All four layers are on at startup (per `layers.*.enabled` in config). Pause stops PCM feed; seek flushes projectM buffers. Controls overlay matches the layered pygame visualizer ([cleave/viz_overlay.py](cleave/viz_overlay.py)).
+
+**M1 debug** (single drums preset, skips four-preset validation):
+
+```bash
+python scripts/milkdrop_visualizer.py stems/sights-and-sounds-26 \
+  --source cleave-resources/source/sights-and-sounds-26.wav \
+  --preset ~/milkdrop-presets/presets-cream-of-the-crop/Drawing/some-preset.milk
+```
+
+Override config location with `--config`. Per-layer preset, size, opacity, and beat sensitivity live in [cleave.config.yaml](cleave.config.yaml). Checkpoint detail: [docs/phase-5-plan-part-progressed.md](docs/phase-5-plan-part-progressed.md).
 
 See [docs/cleave-build-plan.md](docs/cleave-build-plan.md) for the full roadmap.
