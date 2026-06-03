@@ -9,15 +9,18 @@ Built on WSL2, but should work on any Linux machine. A GPU with CUDA support is 
 ## Requirements
 
 - Python 3.10+
-- FFmpeg (used by Demucs and audio I/O)
-- Optional: NVIDIA GPU with CUDA for faster separation
-- On WSL2, [wsl-builds](https://github.com/spoddycoder/wsl-builds) can install the base stack (CUDA, Python, and related tools):
+- FFmpeg - used by Demucs and audio I/O
+- LibprojectM v4.2.0+ (not officially released yet) - used by the layered visualizer
+- Optional: NVIDIA GPU with CUDA for faster audio separation
+- On WSL2, [wsl-builds](https://github.com/spoddycoder/wsl-build) makes all this very easy.
 
 ```bash
-# setup a ai development stack: CUDA, Python, Anaconda + others
+# setup an ai development stack: CUDA, Python, Anaconda + others
 ./wsl-stacker.sh spoddycoder dev-ai
 # install ffmpeg system wide
 ./wsl-builder.sh media ffmpeg
+# install libprojectm from latest master branch (apt lags too far behind)
+./wsl-builder.sh media libprojectm
 ```
 
 ## Setup
@@ -186,5 +189,7 @@ The same controls overlay as the drum pulse visualizer shows all keys plus layer
 On WSL2, same display requirement as the drum pulse visualizer (WSLg or X11).
 
 After separate, analyse, and optional onset validation above, run `pulse_visualizer.py` for the drum baseline, then `layered_visualizer.py` for the full composited view.
+
+**Phase 5 (M1):** `python scripts/milkdrop_visualizer.py stems/<trackname>` — one libprojectM preset on the drums stem (needs libprojectM, presets, and a display; use `--preset` if config presets are not installed yet).
 
 See [docs/cleave-build-plan.md](docs/cleave-build-plan.md) for the full roadmap.
