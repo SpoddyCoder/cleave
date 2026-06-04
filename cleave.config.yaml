@@ -1,46 +1,34 @@
-# Cleave Milkdrop configuration
-#
-# Copy to ./cleave.config.yaml (project root) or ~/.config/cleave/cleave.config.yaml
-#
-# paths.preset_root must be the milkdrop-presets root (the folder that contains
-# presets-cream-of-the-crop, presets-milkdrop-original, etc.), not a pack subfolder.
-# Layer preset paths are relative to preset_root; include each pack name once
-# (e.g. presets-cream-of-the-crop/Drawing/foo.milk).
-#
-# Install packs under preset_root. A symlink from the repo works, e.g.:
-#   ln -s ~/milkdrop-presets ~/cleave/milkdrop-presets
-
 paths:
   preset_root: ~/milkdrop-presets
   texture_paths:
-    - ~/milkdrop-presets/presets-milkdrop-texture-pack
-
+  - ~/milkdrop-presets/presets-milkdrop-texture-pack
 layers:
   other:
-    preset: presets-milkdrop-original/Milkdrop-Original/fiShbRaiN - crystal glasses.milk
+    preset: presets-milkdrop-original/Milkdrop-Original/yin - 300 - Daydreamer.milk
     enabled: true
-    opacity: 0.6
+    opacity: 0.4
     width: 640
     height: 360
   bass:
-    preset: presets-milkdrop-original/Milkdrop-Original/shifter - fractal grinder.milk
+    preset: presets-milkdrop-original/Milkdrop-Original/3dRaGoNs & Unchained - Dragon
+      Science.milk
     enabled: true
-    opacity: 0.8
+    opacity: 0.5
     width: 960
     height: 540
   vocals:
-    preset: presets-cream-of-the-crop/Sparkle/Explosions/Stahlregen + Amandio C - Rototranslate difference layers 2 + on dotes5 - flacc roam.milk
+    preset: presets-cream-of-the-crop/Sparkle/Explosions/$$$ Royal - Mashup (244).milk
     enabled: true
-    opacity: 1.0
+    opacity: 0.65
     width: 960
     height: 540
   drums:
-    preset: presets-cream-of-the-crop/Sparkle/Explosions/suksma - mtn,flx - flacc roam3 ye olde rotgasm nz.milk
+    preset: presets-cream-of-the-crop/Dancer/Aurora/suksma - shifter - urchin kali
+      echos - moish dt r3 nz+.milk
     enabled: true
-    opacity: 1.0
+    opacity: 0.3
     width: 1280
     height: 720
-
 visualizer:
   width: 1280
   height: 720

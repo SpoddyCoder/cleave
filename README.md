@@ -12,7 +12,7 @@ Built on WSL2, but should work on any Linux machine. A GPU with CUDA support is 
 - FFmpeg - used by Demucs and audio I/O
 - LibprojectM v4.2.0+ (not officially released yet) - used by the Milkdrop visualizer
 - Optional: NVIDIA GPU with CUDA for faster audio separation
-- On WSL2, [wsl-builds](https://github.com/spoddycoder/wsl-build) makes all this very easy.
+- On WSL2, [wsl-builds](https://github.com/spoddycoder/wsl-build) makes all this very easy
 
 ```bash
 # setup an ai development stack: CUDA, Python, Anaconda + others
@@ -25,44 +25,36 @@ Built on WSL2, but should work on any Linux machine. A GPU with CUDA support is 
 
 ## Setup
 
-Create a virtual environment and install dependencies.
-
-**GPU (CUDA 13.0 example):**
+Create a virtual environment...
 
 ```bash
-python3 -m venv cleave-env
-source cleave-env/bin/activate
+# using venv
+python3 -m venv cleave
+source cleave/bin/activate
 
-pip install torch torchcodec --index-url https://download.pytorch.org/whl/cu130
-pip install -r requirements.txt
-```
-
-**CPU only:**
-
-```bash
-python3 -m venv cleave-env
-source cleave-env/bin/activate
-
-pip install torch torchcodec --index-url https://download.pytorch.org/whl/cpu
-pip install -r requirements.txt
-```
-
-**Or with Conda:**
-
-```bash
+# or using conda
 conda create -n cleave python=3.10
 conda activate cleave
-conda install -c conda-forge ffmpeg
+```
+
+Install dependecies...
+
+```bash
+# install torch with CUDA support
+pip install torch torchcodec --index-url https://download.pytorch.org/whl/cu130
+# or install cpu version
+pip install torch torchcodec --index-url https://download.pytorch.org/whl/cpu
+# install the rest of the deps
 pip install -r requirements.txt
 ```
 
-Verify GPU support:
+If you chose CUDA, verify GPU support...
 
 ```bash
 python -c "import torch; print(torch.cuda.is_available())"
 ```
 
-If this prints `False`, Demucs still runs on CPU, so separation will be slow (but it will work).
+If this prints `False`, Demucs still runs on CPU - separation will be slow, but it will work.
 
 ## Stem layout
 
@@ -194,7 +186,7 @@ After separate, analyse, and optional onset validation above, run `pulse_visuali
 
 Four libprojectM layers (other, bass, vocals, drums), each fed stem PCM at 44100 Hz mono, composited with OpenGL FBOs at tiered resolutions and upscaled to **1280x720 @ 30 fps**. Requires libprojectM **4.2+**, community presets, and a display (WSLg or X11 on WSL2).
 
-**Preset install:** clone or symlink community packs under `paths.preset_root` in [cleave.config.yaml](cleave.config.yaml). Set `preset_root` to the milkdrop-presets root (the directory that contains `presets-cream-of-the-crop`, not that subfolder alone). Layer `preset` paths are relative to `preset_root` and should include each pack name once, e.g. `presets-cream-of-the-crop/Drawing/foo.milk`. Example layout:
+**Preset install:** clone or symlink community packs under `paths.preset_root` in [cleave.config.yaml](cleave.config.yaml). Set `preset_root` to the milkdrop-presets root (the directory that contains `presets-cream-of-the-crop`, not that subfolder alone). Each `layers.*.preset` may be a **single `.milk` file** or a **directory** (recursive `*.milk` scan at startup, before the window opens; stderr reports preset counts per layer). Layer paths are relative to `preset_root` and should include each pack name once, e.g. `presets-cream-of-the-crop/Drawing/foo.milk`. Example layout:
 
 ```bash
 ln -s ~/milkdrop-presets ~/cleave/milkdrop-presets   # optional repo symlink
@@ -210,24 +202,28 @@ python scripts/milkdrop_visualizer.py stems/sights-and-sounds-26 \
 
 | Key | Action |
 | --- | --- |
-| d | Toggle drums layer |
-| b | Toggle bass layer |
-| v | Toggle vocals layer |
-| o | Toggle other layer |
+| d / b / v / o | Toggle drums / bass / vocals / other layer visibility |
+| Shift + d / b / v / o | Next preset for that layer (wrap) |
+| Ctrl + d / b / v / o | Previous preset for that layer (wrap) |
+| Ctrl + W | Save all four layers' current presets to [cleave.config.yaml](cleave.config.yaml) (paths relative to `preset_root`) |
 | Space | Pause / resume playback |
 | Left | Back 30 seconds |
 | Right | Forward 30 seconds |
 | Esc | Quit |
 
-All four layers are on at startup (per `layers.*.enabled` in config). Pause stops PCM feed; seek flushes projectM buffers. Controls overlay matches the layered pygame visualizer ([cleave/viz_overlay.py](cleave/viz_overlay.py)).
+All four layers are on at startup (per `layers.*.enabled` in config). Pause stops PCM feed; seek flushes projectM buffers. The controls overlay ([cleave/viz_overlay.py](cleave/viz_overlay.py)) shows each layer's current preset path (truncated) plus a legend for preset stepping keys; it fades when idle and reappears on any keypress.
 
-**M1 debug** (single drums preset, skips four-preset validation):
+**Ctrl+W write-back:** saves the **individual `.milk` file** currently loaded on each layer, not the directory anchor, so your choices persist across restarts even when you started from a folder playlist.
+
+**M1 debug** (drums layer only, skips four-preset validation):
 
 ```bash
 python scripts/milkdrop_visualizer.py stems/sights-and-sounds-26 \
   --source cleave-resources/source/sights-and-sounds-26.wav \
   --preset ~/milkdrop-presets/presets-cream-of-the-crop/Drawing/some-preset.milk
 ```
+
+`--preset` accepts a `.milk` file or a directory (same recursive scan as layer config). Use **Shift+d** / **Ctrl+d** to step presets on the drums layer. **Ctrl+W** updates `layers.drums.preset` in your config file when one exists (same individual-file write-back as the four-layer run).
 
 Override config location with `--config`. Per-layer preset, size, opacity, and beat sensitivity live in [cleave.config.yaml](cleave.config.yaml). Checkpoint detail: [docs/phase-5-plan-part-progressed.md](docs/phase-5-plan-part-progressed.md).
 

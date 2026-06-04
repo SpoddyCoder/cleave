@@ -24,17 +24,32 @@ if str(ROOT) not in sys.path:
 
 from cleave.config import (  # noqa: E402
     CleaveConfig,
+    DEFAULT_PRESET_ROOT,
     DEFAULT_VISUALIZER_FPS,
     DEFAULT_VISUALIZER_HEIGHT,
     DEFAULT_VISUALIZER_WIDTH,
     find_config_path,
     load_config,
 )
+from cleave.preset_playlist import (  # noqa: E402
+    PresetPlaylist,
+    display_label,
+    scan_all_layers,
+    scan_preset_playlist,
+    write_layer_presets,
+)
 from cleave.gl_compositor import GlCompositor, LayerFbo  # noqa: E402
 from cleave.projectm import ProjectM, ProjectMLibraryError  # noqa: E402
 from cleave.signals import Signals, load_signals  # noqa: E402
 from cleave.stem_pcm import load_stem_pcm, samples_per_frame  # noqa: E402
-from cleave.viz_overlay import ControlsOverlay, layered_rows, playback_rows  # noqa: E402
+from cleave.viz_overlay import (  # noqa: E402
+    ControlRow,
+    ControlsOverlay,
+    format_layer_state,
+    milkdrop_layered_rows,
+    milkdrop_preset_legend_rows,
+    playback_rows,
+)
 from cleave.viz_playback import (  # noqa: E402
     SKIP_SEC,
     current_sec,
@@ -159,17 +174,40 @@ def texture_paths_from_config(config_path: Path | None) -> list[Path]:
     return [Path(os.path.expanduser(str(p))).resolve() for p in raw]
 
 
+def preset_root_from_config(config_path: Path | None) -> Path:
+    """Load preset_root without validating preset files."""
+    path = find_config_path(config_path, ROOT)
+    if path is None or not path.is_file():
+        return Path(os.path.expanduser(str(DEFAULT_PRESET_ROOT))).resolve()
+
+    with path.open(encoding="utf-8") as fh:
+        data = yaml.safe_load(fh)
+    if not isinstance(data, dict):
+        return Path(os.path.expanduser(str(DEFAULT_PRESET_ROOT))).resolve()
+
+    paths_raw = data.get("paths")
+    if not isinstance(paths_raw, dict):
+        return Path(os.path.expanduser(str(DEFAULT_PRESET_ROOT))).resolve()
+
+    raw = paths_raw.get("preset_root", DEFAULT_PRESET_ROOT)
+    return Path(os.path.expanduser(str(raw))).resolve()
+
+
+def _print_playlist_scan(name: str, playlist: PresetPlaylist) -> None:
+    print(
+        f"{name}: {len(playlist.paths)} presets in {playlist.anchor}",
+        file=sys.stderr,
+    )
+
+
 def resolve_m1_preset(
     preset_override: Path,
     config_path: Path | None,
-) -> tuple[Path, list[Path], float]:
-    """Return (preset, texture_paths, beat_sensitivity) for M1 --preset mode."""
-    preset = preset_override.resolve()
-    if not preset.is_file():
-        print(f"error: preset not found: {preset}", file=sys.stderr)
-        sys.exit(1)
+) -> tuple[PresetPlaylist, list[Path], float]:
+    """Return (playlist, texture_paths, beat_sensitivity) for M1 --preset mode."""
+    playlist = scan_preset_playlist(preset_override)
     textures = texture_paths_from_config(config_path)
-    return preset, textures, 1.0
+    return playlist, textures, 1.0
 
 
 @dataclass
@@ -177,6 +215,78 @@ class MilkdropLayer:
     name: str
     pm: ProjectM
     fbo: LayerFbo
+    playlist: PresetPlaylist
+
+
+def _mod_shift(mod: int) -> bool:
+    return bool(mod & pygame.KMOD_SHIFT)
+
+
+def _mod_ctrl(mod: int) -> bool:
+    return bool(mod & (pygame.KMOD_CTRL | pygame.KMOD_LCTRL | pygame.KMOD_RCTRL))
+
+
+def _layer_row_state(layer: MilkdropLayer, playlist: PresetPlaylist) -> str:
+    label = (
+        display_label(playlist.current, playlist.anchor)
+        if layer.fbo.enabled
+        else None
+    )
+    return format_layer_state(layer.fbo.enabled, label)
+
+
+def _four_layer_overlay_rows(
+    layers: list[MilkdropLayer],
+    playlists: dict[str, PresetPlaylist],
+    *,
+    paused: bool,
+) -> list[ControlRow]:
+    by_name = {layer.name: layer for layer in layers}
+    show_drums = by_name["drums"].fbo.enabled
+    show_bass = by_name["bass"].fbo.enabled
+    show_vocals = by_name["vocals"].fbo.enabled
+    show_other = by_name["other"].fbo.enabled
+    return milkdrop_layered_rows(
+        show_drums=show_drums,
+        show_bass=show_bass,
+        show_vocals=show_vocals,
+        show_other=show_other,
+        paused=paused,
+        drums_state=_layer_row_state(by_name["drums"], playlists["drums"]),
+        bass_state=_layer_row_state(by_name["bass"], playlists["bass"]),
+        vocals_state=_layer_row_state(by_name["vocals"], playlists["vocals"]),
+        other_state=_layer_row_state(by_name["other"], playlists["other"]),
+    )
+
+
+def _step_playlist(layer: MilkdropLayer, playlist: PresetPlaylist, *, forward: bool) -> None:
+    if forward:
+        playlist.next()
+    else:
+        playlist.prev()
+    playlist.load_into(layer.pm, smooth=False)
+    layer.pm.lock_preset(True)
+
+
+def _handle_preset_write(
+    cfg: CleaveConfig,
+    playlists: dict[str, PresetPlaylist],
+) -> None:
+    write_layer_presets(cfg.config_path, cfg.paths.preset_root, playlists)
+    print(f"wrote layer presets to {cfg.config_path}", file=sys.stderr)
+
+
+def _handle_m1_preset_write(
+    config_path: Path | None,
+    preset_root: Path,
+    playlist: PresetPlaylist,
+) -> None:
+    path = find_config_path(config_path, ROOT)
+    if path is None or not path.is_file():
+        print("error: no config file found for Ctrl+W write", file=sys.stderr)
+        return
+    write_layer_presets(path, preset_root, {STEM_DRUMS: playlist})
+    print(f"wrote layer presets to {path}", file=sys.stderr)
 
 
 def _beat_sensitivity(cfg: CleaveConfig, layer_name: str) -> float:
@@ -186,7 +296,11 @@ def _beat_sensitivity(cfg: CleaveConfig, layer_name: str) -> float:
     return cfg.visualizer.beat_sensitivity
 
 
-def _build_layers(cfg: CleaveConfig, compositor: GlCompositor) -> list[MilkdropLayer]:
+def _build_layers(
+    cfg: CleaveConfig,
+    compositor: GlCompositor,
+    playlists: dict[str, PresetPlaylist],
+) -> list[MilkdropLayer]:
     texture_paths = list(cfg.paths.texture_paths)
     fps = cfg.visualizer.fps
     runtimes: list[MilkdropLayer] = []
@@ -194,12 +308,13 @@ def _build_layers(cfg: CleaveConfig, compositor: GlCompositor) -> list[MilkdropL
     for name, layer_cfg in cfg.layers_in_z_order():
         w, h = layer_cfg.width, layer_cfg.height
         blend_mode = "add" if name == STEM_DRUMS else "alpha"
+        playlist = playlists[name]
 
         pm = ProjectM()
         pm.set_window_size(w, h)
         if texture_paths:
             pm.set_texture_paths(texture_paths)
-        pm.load_preset(layer_cfg.preset)
+        playlist.load_into(pm)
         pm.lock_preset(True)
         pm.set_hard_cut_enabled(False)
         pm.set_fps(fps)
@@ -213,19 +328,11 @@ def _build_layers(cfg: CleaveConfig, compositor: GlCompositor) -> list[MilkdropL
             blend_mode=blend_mode,
         )
         fbo.enabled = layer_cfg.enabled
-        runtimes.append(MilkdropLayer(name=name, pm=pm, fbo=fbo))
+        runtimes.append(
+            MilkdropLayer(name=name, pm=pm, fbo=fbo, playlist=playlist)
+        )
 
     return runtimes
-
-
-def _layer_visibility(layers: list[MilkdropLayer]) -> tuple[bool, bool, bool, bool]:
-    by_name = {layer.name: layer.fbo.enabled for layer in layers}
-    return (
-        by_name["drums"],
-        by_name["bass"],
-        by_name["vocals"],
-        by_name["other"],
-    )
 
 
 def _render_layer_fbo(layer: MilkdropLayer, pm: ProjectM) -> None:
@@ -247,12 +354,77 @@ def _destroy_layers(layers: list[MilkdropLayer]) -> None:
         layer.pm.destroy()
 
 
+def _m1_overlay_rows(playlist: PresetPlaylist, *, paused: bool) -> list[ControlRow]:
+    label = display_label(playlist.current, playlist.anchor)
+    rows = list(playback_rows(paused=paused))
+    rows.append(
+        ControlRow(
+            "d",
+            "Drums",
+            format_layer_state(True, label),
+        )
+    )
+    rows.extend(milkdrop_preset_legend_rows())
+    return rows
+
+
+def _handle_layer_keydown(
+    event: pygame.event.Event,
+    *,
+    layers_by_name: dict[str, MilkdropLayer],
+    playlists: dict[str, PresetPlaylist],
+    cfg: CleaveConfig | None,
+    config_path: Path | None,
+    preset_root: Path | None,
+) -> bool:
+    """Handle stem / preset keys. Return True if overlay rows should refresh."""
+    if event.key not in LAYER_KEYS and not (
+        event.key == pygame.K_w and _mod_ctrl(event.mod)
+    ):
+        return False
+
+    shift = _mod_shift(event.mod)
+    ctrl = _mod_ctrl(event.mod)
+    if shift and ctrl:
+        return False
+
+    if ctrl and event.key == pygame.K_w:
+        if cfg is not None:
+            _handle_preset_write(cfg, playlists)
+        elif config_path is not None and preset_root is not None:
+            _handle_m1_preset_write(
+                config_path,
+                preset_root,
+                playlists[STEM_DRUMS],
+            )
+        return True
+
+    if event.key not in LAYER_KEYS:
+        return False
+
+    stem = LAYER_KEYS[event.key]
+    layer = layers_by_name[stem]
+    playlist = playlists[stem]
+
+    if shift:
+        _step_playlist(layer, playlist, forward=True)
+        return True
+    if ctrl:
+        _step_playlist(layer, playlist, forward=False)
+        return True
+
+    layer.fbo.enabled = not layer.fbo.enabled
+    return True
+
+
 def run_m1(
     stems_dir: Path,
     audio_path: Path,
-    preset_path: Path,
+    playlist: PresetPlaylist,
     texture_paths: list[Path],
     beat_sensitivity: float,
+    config_path: Path | None,
+    preset_root: Path,
     width: int,
     height: int,
     fps: int,
@@ -288,20 +460,26 @@ def run_m1(
         pm.set_window_size(width, height)
         if texture_paths:
             pm.set_texture_paths(texture_paths)
-        pm.load_preset(preset_path)
+        playlist.load_into(pm)
         pm.lock_preset(True)
         pm.set_hard_cut_enabled(False)
         pm.set_fps(fps)
         pm.set_beat_sensitivity(beat_sensitivity)
 
         fbo = compositor.create_layer_fbo(STEM_DRUMS, width, height, blend_mode="add")
-        layers = [MilkdropLayer(name=STEM_DRUMS, pm=pm, fbo=fbo)]
+        layers = [
+            MilkdropLayer(name=STEM_DRUMS, pm=pm, fbo=fbo, playlist=playlist)
+        ]
+        playlists = {STEM_DRUMS: playlist}
+        layers_by_name = {STEM_DRUMS: layers[0]}
 
         pygame.mixer.music.load(str(audio_path))
         pygame.mixer.music.play()
 
         playback = init_playback()
-        overlay = ControlsOverlay(playback_rows(paused=playback.paused))
+        overlay = ControlsOverlay(
+            _m1_overlay_rows(playlist, paused=playback.paused)
+        )
 
         running = True
         while running:
@@ -320,8 +498,17 @@ def run_m1(
                     elif event.key == pygame.K_RIGHT:
                         seek(playback, SKIP_SEC, duration_sec)
                         _flush_all_pcm(layers)
+                    elif _handle_layer_keydown(
+                        event,
+                        layers_by_name=layers_by_name,
+                        playlists=playlists,
+                        cfg=None,
+                        config_path=config_path,
+                        preset_root=preset_root,
+                    ):
+                        pass
                     overlay.replace_rows(
-                        playback_rows(paused=playback.paused)
+                        _m1_overlay_rows(playlist, paused=playback.paused)
                     )
 
             t_sec = current_sec(playback, duration_sec)
@@ -359,7 +546,12 @@ def run_m1(
         pygame.quit()
 
 
-def run(cfg: CleaveConfig, stems_dir: Path, audio_path: Path) -> None:
+def run(
+    cfg: CleaveConfig,
+    stems_dir: Path,
+    audio_path: Path,
+    playlists: dict[str, PresetPlaylist],
+) -> None:
     """Four config-driven libprojectM layers composited bottom-to-top."""
     pcm_bank = load_stem_pcm(stems_dir)
     duration_sec = pcm_bank.duration_sec
@@ -389,21 +581,14 @@ def run(cfg: CleaveConfig, stems_dir: Path, audio_path: Path) -> None:
     try:
         compositor = GlCompositor(width, height)
         compositor.init()
-        layers = _build_layers(cfg, compositor)
+        layers = _build_layers(cfg, compositor, playlists)
 
         pygame.mixer.music.load(str(audio_path))
         pygame.mixer.music.play()
 
         playback = init_playback()
-        show_drums, show_bass, show_vocals, show_other = _layer_visibility(layers)
         overlay = ControlsOverlay(
-            layered_rows(
-                show_drums=show_drums,
-                show_bass=show_bass,
-                show_vocals=show_vocals,
-                show_other=show_other,
-                paused=playback.paused,
-            )
+            _four_layer_overlay_rows(layers, playlists, paused=playback.paused)
         )
         layers_by_name = {layer.name: layer for layer in layers}
 
@@ -424,20 +609,18 @@ def run(cfg: CleaveConfig, stems_dir: Path, audio_path: Path) -> None:
                     elif event.key == pygame.K_RIGHT:
                         seek(playback, SKIP_SEC, duration_sec)
                         _flush_all_pcm(layers)
-                    elif event.key in LAYER_KEYS:
-                        stem = LAYER_KEYS[event.key]
-                        target = layers_by_name[stem]
-                        target.fbo.enabled = not target.fbo.enabled
-                    show_drums, show_bass, show_vocals, show_other = _layer_visibility(
-                        layers
-                    )
+                    elif _handle_layer_keydown(
+                        event,
+                        layers_by_name=layers_by_name,
+                        playlists=playlists,
+                        cfg=cfg,
+                        config_path=None,
+                        preset_root=None,
+                    ):
+                        pass
                     overlay.replace_rows(
-                        layered_rows(
-                            show_drums=show_drums,
-                            show_bass=show_bass,
-                            show_vocals=show_vocals,
-                            show_other=show_other,
-                            paused=playback.paused,
+                        _four_layer_overlay_rows(
+                            layers, playlists, paused=playback.paused
                         )
                     )
 
@@ -514,28 +697,35 @@ def main() -> None:
 
     try:
         if args.preset is not None:
-            preset_path, texture_paths, beat_sensitivity = resolve_m1_preset(
+            playlist, texture_paths, beat_sensitivity = resolve_m1_preset(
                 args.preset,
                 args.config,
             )
+            _print_playlist_scan(STEM_DRUMS, playlist)
             width, height, fps = visualizer_settings_from_config(args.config)
+            preset_root = preset_root_from_config(args.config)
             run_m1(
                 stems_dir,
                 audio_path,
-                preset_path,
+                playlist,
                 texture_paths,
                 beat_sensitivity,
+                args.config,
+                preset_root,
                 width,
                 height,
                 fps,
             )
         else:
             cfg = load_config(args.config, ROOT)
-            run(cfg, stems_dir, audio_path)
+            playlists = scan_all_layers(cfg)
+            for name, pl in playlists.items():
+                _print_playlist_scan(name, pl)
+            run(cfg, stems_dir, audio_path, playlists)
     except ProjectMLibraryError as exc:
         print(f"error: {exc}", file=sys.stderr)
         sys.exit(1)
-    except FileNotFoundError as exc:
+    except (FileNotFoundError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         sys.exit(1)
 
