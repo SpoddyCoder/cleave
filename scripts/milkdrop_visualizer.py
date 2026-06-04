@@ -264,7 +264,7 @@ def _step_playlist(layer: MilkdropLayer, playlist: PresetPlaylist, *, forward: b
         playlist.next()
     else:
         playlist.prev()
-    playlist.load_into(layer.pm, smooth=True)
+    playlist.load_into(layer.pm, smooth=False)
     layer.pm.lock_preset(True)
 
 

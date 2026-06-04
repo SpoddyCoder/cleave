@@ -23,7 +23,8 @@ layers:
     width: 960
     height: 540
   drums:
-    preset: presets-cream-of-the-crop/Waveform/Spectrum/EVET + flexi - X32 - Astroluxn777.milk
+    preset: presets-cream-of-the-crop/Dancer/Aurora/suksma - shifter - urchin kali
+      echos - moish dt r3 nz+.milk
     enabled: true
     opacity: 0.3
     width: 1280
