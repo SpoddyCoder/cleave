@@ -184,6 +184,8 @@ By this point you have a working layered system you understand. Milkdrop becomes
 **6.1 — Curate presets per layer role**
 The drum layer needs presets that respond well to sharp transients — look for ones that flash, burst or strobe on `bass_att`. The bass layer suits slow, fluid presets. The background/other layer suits ones with continuous motion that's modulated rather than triggered.
 
+Preset curation is supported in-session via [scripts/milkdrop_visualizer.py](scripts/milkdrop_visualizer.py): **Shift/Ctrl+stem** steps presets (file or directory playlist), directory anchors enable recursive browsing, and **Ctrl+W** writes the current choice per layer back to [cleave.config.yaml](cleave.config.yaml).
+
 **6.2 — Compositor aesthetics**
 - Tune blend modes between layers — additive blending works well for grungy/industrial aesthetics
 - Add post-processing in the compositor itself: film grain, scanlines, chromatic aberration, bloom

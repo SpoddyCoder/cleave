@@ -25,6 +25,41 @@ def _on_off(enabled: bool) -> str:
     return "ON" if enabled else "OFF"
 
 
+def truncate_preset_label(label: str, max_len: int = 48) -> str:
+    """Shorten a preset path for overlay; keep the tail (subdir + filename)."""
+    if len(label) <= max_len:
+        return label
+    prefix = "…/"
+    room = max_len - len(prefix)
+    start = len(label) - room
+    slash_pos = label.find("/", start)
+    if slash_pos != -1:
+        start = slash_pos + 1
+    return prefix + label[start:]
+
+
+def format_layer_state(enabled: bool, preset_label: str | None = None) -> str:
+    if not enabled:
+        return "OFF"
+    if preset_label:
+        return f"ON · {truncate_preset_label(preset_label)}"
+    return "ON"
+
+
+def milkdrop_preset_legend_rows() -> list[ControlRow]:
+    return [
+        ControlRow("Shift+stem", "Next preset"),
+        ControlRow("Ctrl+stem", "Prev preset"),
+        ControlRow("Ctrl+W", "Save presets"),
+    ]
+
+
+def milkdrop_playback_rows(*, paused: bool) -> list[ControlRow]:
+    rows = list(playback_rows(paused=paused))
+    rows.extend(milkdrop_preset_legend_rows())
+    return rows
+
+
 def playback_rows(*, paused: bool) -> list[ControlRow]:
     return [
         ControlRow("Esc", "Quit"),
@@ -41,16 +76,63 @@ def layered_rows(
     show_vocals: bool,
     show_other: bool,
     paused: bool,
+    drums_state: str | None = None,
+    bass_state: str | None = None,
+    vocals_state: str | None = None,
+    other_state: str | None = None,
 ) -> list[ControlRow]:
     rows = list(playback_rows(paused=paused))
     rows.extend(
         [
-            ControlRow("d", "Drums", _on_off(show_drums)),
-            ControlRow("b", "Bass", _on_off(show_bass)),
-            ControlRow("v", "Vocals", _on_off(show_vocals)),
-            ControlRow("o", "Other", _on_off(show_other)),
+            ControlRow(
+                "d",
+                "Drums",
+                drums_state if drums_state is not None else _on_off(show_drums),
+            ),
+            ControlRow(
+                "b",
+                "Bass",
+                bass_state if bass_state is not None else _on_off(show_bass),
+            ),
+            ControlRow(
+                "v",
+                "Vocals",
+                vocals_state if vocals_state is not None else _on_off(show_vocals),
+            ),
+            ControlRow(
+                "o",
+                "Other",
+                other_state if other_state is not None else _on_off(show_other),
+            ),
         ]
     )
+    return rows
+
+
+def milkdrop_layered_rows(
+    *,
+    show_drums: bool,
+    show_bass: bool,
+    show_vocals: bool,
+    show_other: bool,
+    paused: bool,
+    drums_state: str | None = None,
+    bass_state: str | None = None,
+    vocals_state: str | None = None,
+    other_state: str | None = None,
+) -> list[ControlRow]:
+    rows = layered_rows(
+        show_drums=show_drums,
+        show_bass=show_bass,
+        show_vocals=show_vocals,
+        show_other=show_other,
+        paused=paused,
+        drums_state=drums_state,
+        bass_state=bass_state,
+        vocals_state=vocals_state,
+        other_state=other_state,
+    )
+    rows.extend(milkdrop_preset_legend_rows())
     return rows
 
 
@@ -117,11 +199,11 @@ class ControlsOverlay:
     def _format_line(self, row: ControlRow) -> str:
         key = f"[{row.key_label}]"
         if row.state is None:
-            return f"{key:<8} {row.name}"
-        return f"{key:<8} {row.name:<8} {row.state}"
+            return f"{key:<14} {row.name}"
+        return f"{key:<14} {row.name:<8} {row.state}"
 
     def _line_color(self, row: ControlRow) -> tuple[int, int, int]:
-        if row.state == "OFF":
+        if row.state is not None and row.state.startswith("OFF"):
             return _TEXT_DIM
         return _TEXT
 
