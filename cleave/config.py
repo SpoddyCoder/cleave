@@ -166,14 +166,30 @@ def _parse_layers(data: dict[str, Any], preset_root: Path) -> dict[str, LayerCon
 
 
 def _validate_presets(layers: dict[str, LayerConfig]) -> None:
-    missing = [
-        f"{name}: {layer.preset}"
-        for name, layer in layers.items()
-        if not layer.preset.is_file()
-    ]
+    missing: list[str] = []
+    invalid: list[str] = []
+
+    for name, layer in layers.items():
+        preset = layer.preset
+        if not preset.exists():
+            missing.append(f"{name}: {preset}")
+            continue
+        if preset.is_dir():
+            continue
+        if preset.is_file():
+            if preset.suffix.lower() != ".milk":
+                invalid.append(f"{name}: {preset}")
+            continue
+        invalid.append(f"{name}: {preset}")
+
     if missing:
         raise FileNotFoundError(
-            "missing preset file(s):\n  " + "\n  ".join(missing)
+            "missing preset anchor(s):\n  " + "\n  ".join(missing)
+        )
+    if invalid:
+        raise ValueError(
+            "preset must be a .milk file or directory:\n  "
+            + "\n  ".join(invalid)
         )
 
 

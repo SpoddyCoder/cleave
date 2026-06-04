@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Cleave project context
 
-- Currently in the build out / proof of concept stages. Phase 5 Milkdrop (M5): [scripts/milkdrop_visualizer.py](scripts/milkdrop_visualizer.py) four libprojectM layers at 1280x720, 30 fps, stem PCM; manual M2 sync sign-off still user-run. Phase 4 pygame baselines: [scripts/layered_visualizer.py](scripts/layered_visualizer.py), [scripts/pulse_visualizer.py](scripts/pulse_visualizer.py).
+- Currently in the build out / proof of concept stages. Phase 5 Milkdrop (M5): [scripts/milkdrop_visualizer.py](scripts/milkdrop_visualizer.py) four libprojectM layers at 1280x720, 30 fps, stem PCM; manual M2 sync sign-off still user-run. Phase 6 preset tuning uses the same visualizer (Shift/Ctrl+stem browse, Ctrl+W write-back to config). Phase 4 pygame baselines: [scripts/layered_visualizer.py](scripts/layered_visualizer.py), [scripts/pulse_visualizer.py](scripts/pulse_visualizer.py).
 - See [docs/cleave-build-plan.md](docs/cleave-build-plan.md) for the build plan.
 - See [README.md](README.md) for the project overview.
 - Stem layout: `stems/<trackname>/` with four wavs plus `signals.json`. Visualizers: pulse and layered (Phase 4 pygame); milkdrop (Phase 5 libprojectM, stem PCM).
