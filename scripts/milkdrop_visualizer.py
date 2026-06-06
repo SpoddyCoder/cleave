@@ -313,14 +313,14 @@ def _session_from_cfg(
 _DIR_COUNTER_SUFFIX = re.compile(r" \((\d+)/(\d+)\)$")
 
 
-def _truncate_dir_label(label: str, max_len: int = 48) -> str:
+def _truncate_dir_label(label: str) -> str:
     """Truncate directory path only; preserve trailing (N/TOTAL) counter."""
     match = _DIR_COUNTER_SUFFIX.search(label)
     if match is None:
-        return truncate_preset_label(label, max_len)
+        return truncate_preset_label(label)
     path_part = label[: match.start()]
     suffix = match.group(0)
-    return truncate_preset_label(path_part, max_len) + suffix
+    return truncate_preset_label(path_part) + suffix
 
 
 def _allow_overwrite_config(config_cli: Path | None, cfg: CleaveConfig) -> bool:
@@ -366,6 +366,7 @@ def build_view_state(
         confirm_message=base.confirm_message,
         confirm_focus_yes=base.confirm_focus_yes,
         allow_overwrite=base.allow_overwrite,
+        active_config_label=base.active_config_label,
     )
 
 
@@ -406,14 +407,14 @@ def _make_tuning_controls(
         seek(playback, delta_sec, duration_sec)
         _flush_all_pcm(layers)
 
-    def on_save_new_config() -> str:
+    def on_save_new_config() -> Path:
         out_path = next_unnamed_path(SAVED_CONFIGS_DIR)
         write_session_snapshot(out_path, cfg=cfg, session=session)
-        return out_path.name
+        return out_path
 
-    def on_overwrite_config() -> str:
-        write_session_snapshot(cfg.config_path, cfg=cfg, session=session)
-        return cfg.config_path.name
+    def on_overwrite_config(path: Path) -> str:
+        write_session_snapshot(path, cfg=cfg, session=session)
+        return path.name
 
     return TuningControls(
         session,

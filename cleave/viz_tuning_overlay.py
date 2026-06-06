@@ -27,8 +27,8 @@ from cleave.viz_theme import (
 Anchor = Literal["topleft", "bottomleft"]
 
 ROWS_PER_TRACK = 6
-FOOTER_ROWS_WITH_OVERWRITE = 3
-FOOTER_ROWS_WITHOUT_OVERWRITE = 2
+FOOTER_ROWS_WITH_OVERWRITE = 4
+FOOTER_ROWS_WITHOUT_OVERWRITE = 3
 TREE_INDENT = 16
 _TRANSPORT_SKIP_UNICODE = ("⏮", "⏭")
 _TRANSPORT_SKIP_ASCII = ("<<", ">>")
@@ -53,6 +53,7 @@ class RowKind(Enum):
     TRACK_BLEND = auto()
     TRACK_OPACITY = auto()
     TRACK_BEAT = auto()
+    CONFIG_HEADER = auto()
     TRANSPORT = auto()
     SAVE_AS_NEW_CONFIG = auto()
     OVERWRITE_CONFIG = auto()
@@ -83,6 +84,7 @@ class TuningViewState:
     confirm_message: str | None = None
     confirm_focus_yes: bool = True
     allow_overwrite: bool = True
+    active_config_label: str = "cleave.config.yaml"
 
 
 def footer_row_count(state: TuningViewState) -> int:
@@ -113,6 +115,8 @@ def navigable_row_indices(state: TuningViewState) -> list[int]:
     indices: list[int] = []
     for index in range(row_count(state)):
         kind = row_kind(state, index)
+        if kind == RowKind.CONFIG_HEADER:
+            continue
         if kind in _SUB_ROW_KINDS:
             stem = row_stem(state, index)
             if stem is not None and not state.tracks[stem].enabled:
@@ -153,14 +157,18 @@ def row_kind(state: TuningViewState, index: int) -> RowKind:
         )[index % ROWS_PER_TRACK]
     footer_index = index - track_rows
     if footer_index == 0:
-        return RowKind.TRANSPORT
+        return RowKind.CONFIG_HEADER
     if footer_index == 1:
+        return RowKind.TRANSPORT
+    if footer_index == 2:
         return RowKind.SAVE_AS_NEW_CONFIG
     return RowKind.OVERWRITE_CONFIG
 
 
 def _row_text(state: TuningViewState, index: int) -> str:
     kind = row_kind(state, index)
+    if kind == RowKind.CONFIG_HEADER:
+        return state.active_config_label
     if kind == RowKind.TRANSPORT:
         return ""
     if kind == RowKind.SAVE_AS_NEW_CONFIG:
@@ -297,6 +305,9 @@ def _unicode_transport_available(size: int = 14) -> bool:
 def _row_text_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
     kind = row_kind(state, index)
     stem = row_stem(state, index)
+    if kind == RowKind.CONFIG_HEADER:
+        return TEXT_DIM
+
     if (
         kind == RowKind.TRACK_PRESET
         and stem is not None
@@ -415,12 +426,13 @@ class TuningOverlay:
                     font_size=self._font_size,
                 )
                 icons_text = f"{prev}  {play}  {nxt}"
+                time_text = f" [{format_mmss(state.position_sec)}]"
                 icons_surf = transport_font.render(icons_text, True, color)
-                time_surf = font.render(format_mmss(state.position_sec), True, color)
+                time_surf = font.render(time_text, True, color)
                 row_surfaces.append(icons_surf)
                 row_time_surfaces.append(time_surf)
                 row_widths.append(
-                    indent + icons_surf.get_width() + 8 + time_surf.get_width()
+                    indent + icons_surf.get_width() + time_surf.get_width()
                 )
             else:
                 text = _row_text(state, index)
@@ -492,8 +504,7 @@ class TuningOverlay:
                 time_surf = row_time_surfaces[index]
                 if time_surf is not None:
                     time_surf.set_alpha(text_alpha)
-                    time_x = self._padding + content_w - time_surf.get_width()
-                    panel.blit(time_surf, (time_x, y))
+                    panel.blit(time_surf, (indent + surf.get_width(), y))
             y += line_h + self._line_gap
 
         if confirm_active and text_alpha >= 2:

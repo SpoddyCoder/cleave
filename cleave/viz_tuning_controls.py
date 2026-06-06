@@ -20,6 +20,7 @@ from cleave.preset_playlist import (
 from cleave.viz_confirm import ConfirmDialog, ConfirmRequest
 from cleave.viz_key_repeat import KeyRepeatController
 from cleave.viz_playback import PlaybackState, current_sec, seek, toggle_pause
+from cleave.viz_overlay import truncate_preset_label
 from cleave.viz_tuning_overlay import (
     RowKind,
     TrackBlock,
@@ -45,6 +46,12 @@ _REPEAT_ROW_KINDS = frozenset(
     }
 )
 _DEFAULT_SAVE_FILENAME = "unnamed-1.cleave.config.yaml"
+
+
+def config_path_display(path: Path | None) -> str:
+    """Truncate active config path for the footer header (tail preserved)."""
+    label = path.as_posix() if path is not None else "cleave.config.yaml"
+    return truncate_preset_label(label)
 
 
 def _mod_ctrl(mod: int) -> bool:
@@ -83,8 +90,8 @@ class TuningControls:
         on_beat_change: Callable[[str, float], None] | None = None,
         on_z_order_change: Callable[[list[str]], None] | None = None,
         on_seek: Callable[[float], None] | None = None,
-        on_save_new_config: Callable[[], str | None] | None = None,
-        on_overwrite_config: Callable[[], str | None] | None = None,
+        on_save_new_config: Callable[[], Path | None] | None = None,
+        on_overwrite_config: Callable[[Path], str | None] | None = None,
         launch_config_path: Path | None = None,
         allow_overwrite: bool = True,
     ) -> None:
@@ -92,7 +99,7 @@ class TuningControls:
         self.preset_root = preset_root
         self.playback = playback
         self.duration_sec = duration_sec
-        self._launch_config_path = launch_config_path
+        self._active_config_path = launch_config_path
         self._on_preset_change = on_preset_change
         self._on_blend_change = on_blend_change
         self._on_opacity_change = on_opacity_change
@@ -262,6 +269,7 @@ class TuningControls:
             confirm_message=confirm_message,
             confirm_focus_yes=confirm_focus_yes,
             allow_overwrite=self._allow_overwrite,
+            active_config_label=config_path_display(self._active_config_path),
         )
 
     def _input_blocked(self) -> bool:
@@ -420,24 +428,25 @@ class TuningControls:
 
     def _trigger_save_new(self) -> None:
         if self._on_save_new_config is not None:
-            filename = self._on_save_new_config()
+            saved_path = self._on_save_new_config()
         else:
+            saved_path = None
+        if saved_path is None:
             filename = _DEFAULT_SAVE_FILENAME
-        if not filename:
-            filename = _DEFAULT_SAVE_FILENAME
+        else:
+            self._active_config_path = saved_path
+            filename = saved_path.name
         self._show_save_toast(f"Config saved to {filename}")
 
     def _prompt_overwrite(self) -> None:
-        basename = (
-            self._launch_config_path.name
-            if self._launch_config_path is not None
-            else "cleave.config.yaml"
-        )
+        active_path = self._active_config_path
+        basename = active_path.name if active_path is not None else "cleave.config.yaml"
         message = f"Overwrite {basename}?"
 
         def on_confirm() -> None:
+            target = active_path or Path("cleave.config.yaml")
             if self._on_overwrite_config is not None:
-                written = self._on_overwrite_config()
+                written = self._on_overwrite_config(target)
             else:
                 written = basename
             if not written:
