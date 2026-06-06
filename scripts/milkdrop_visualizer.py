@@ -23,6 +23,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from cleave.config import (  # noqa: E402
+    CONFIG_FILENAME,
     CleaveConfig,
     DEFAULT_PRESET_ROOT,
     DEFAULT_VISUALIZER_FPS,
@@ -305,6 +306,16 @@ def _session_from_cfg(
     )
 
 
+def _allow_overwrite_config(config_cli: Path | None, cfg: CleaveConfig) -> bool:
+    """Overwrite is hidden only for implicit repo-root cleave.config.yaml."""
+    config_explicit = config_cli is not None
+    implicit_local = (
+        not config_explicit
+        and (ROOT / CONFIG_FILENAME).resolve() == cfg.config_path.resolve()
+    )
+    return not implicit_local
+
+
 def build_view_state(controls: TuningControls, *, paused: bool) -> TuningViewState:
     """Build overlay view state with truncated preset labels."""
     base = controls.build_view_state(paused=paused)
@@ -327,6 +338,9 @@ def build_view_state(controls: TuningControls, *, paused: bool) -> TuningViewSta
         move_mode_stem=base.move_mode_stem,
         toast_message=base.toast_message,
         toast_remaining_sec=base.toast_remaining_sec,
+        confirm_message=base.confirm_message,
+        confirm_focus_yes=base.confirm_focus_yes,
+        allow_overwrite=base.allow_overwrite,
     )
 
 
@@ -338,6 +352,7 @@ def _make_tuning_controls(
     layers: list[MilkdropLayer],
     playback,
     duration_sec: float,
+    allow_overwrite: bool,
 ) -> TuningControls:
     def on_preset_change(stem: str, playlist: PresetPlaylist) -> None:
         layer = layers_by_name[stem]
@@ -389,6 +404,7 @@ def _make_tuning_controls(
         on_save_new_config=on_save_new_config,
         on_overwrite_config=on_overwrite_config,
         launch_config_path=cfg.config_path,
+        allow_overwrite=allow_overwrite,
     )
 
 
@@ -502,6 +518,7 @@ def run_m1(
                 layers=layers,
                 playback=playback,
                 duration_sec=duration_sec,
+                allow_overwrite=_allow_overwrite_config(config_path, cfg),
             )
         else:
 
@@ -593,6 +610,8 @@ def run(
     stems_dir: Path,
     audio_path: Path,
     playlists: dict[str, PresetPlaylist],
+    *,
+    allow_overwrite: bool,
 ) -> None:
     """Four config-driven libprojectM layers composited bottom-to-top."""
     pcm_bank = load_stem_pcm(stems_dir)
@@ -638,6 +657,7 @@ def run(
             layers=layers,
             playback=playback,
             duration_sec=duration_sec,
+            allow_overwrite=allow_overwrite,
         )
         overlay = TuningOverlay()
 
@@ -748,7 +768,13 @@ def main() -> None:
             playlists = scan_all_layers(cfg)
             for name, pl in playlists.items():
                 _print_playlist_scan(name, pl)
-            run(cfg, stems_dir, audio_path, playlists)
+            run(
+                cfg,
+                stems_dir,
+                audio_path,
+                playlists,
+                allow_overwrite=_allow_overwrite_config(args.config, cfg),
+            )
     except ProjectMLibraryError as exc:
         print(f"error: {exc}", file=sys.stderr)
         sys.exit(1)

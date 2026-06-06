@@ -213,14 +213,14 @@ python scripts/milkdrop_visualizer.py stems/sights-and-sounds-26 \
 
 ### Live tuning overlay
 
-A focus-driven tree panel ([cleave/viz_tuning_overlay.py](cleave/viz_tuning_overlay.py), [cleave/viz_tuning_controls.py](cleave/viz_tuning_controls.py)) lists each stem with preset, blend mode, opacity, and beat sensitivity rows, plus transport, SAVE NEW CONFIG, and OVERWRITE CONFIG footer rows. Navigate with the arrow keys; the focused row is highlighted in orange.
+A focus-driven tree panel ([cleave/viz_tuning_overlay.py](cleave/viz_tuning_overlay.py), [cleave/viz_tuning_controls.py](cleave/viz_tuning_controls.py)) lists each stem with preset, blend mode, opacity, and beat sensitivity rows, plus transport and save footer rows. Navigate with the arrow keys; the focused row is highlighted in orange. **SAVE AS NEW CONFIG** is always shown; **OVERWRITE CONFIG** appears only when the launch config was passed explicitly via `--config` or resolved from a non-default path (not the implicit repo-root [cleave.config.yaml](cleave.config.yaml) discovered without `--config`).
 
 | Key | Action |
 | --- | --- |
 | Up / Down | Move focus between rows (per-stem tree, transport, save rows) |
 | Left / Right | Adjust the focused field (see below); hold to repeat on preset, blend, opacity, and beat rows |
 | Ctrl + Left / Right | Larger steps on opacity and beat; on preset row, jump to sibling preset directory |
-| Enter | On track header: enter z-order move mode; on SAVE NEW CONFIG: write snapshot; on OVERWRITE CONFIG: confirm then overwrite launch config |
+| Enter | On track header: enter z-order move mode; on SAVE AS NEW CONFIG: write snapshot; on OVERWRITE CONFIG (when shown): confirm then overwrite launch config |
 | Enter (move mode) | Confirm z-order after Up/Down swaps |
 | Up / Down (move mode) | Swap focused stem up/down in `layer_z_order` |
 | Space | Pause / resume playback (hidden shortcut, not shown in overlay) |
@@ -244,9 +244,9 @@ Pause stops PCM feed; seek flushes projectM buffers. The overlay stays visible f
 
 Per-layer preset, size, opacity, `blend_mode`, and optional beat sensitivity live under `layers.*` in [cleave.config.yaml](cleave.config.yaml). Global compositor stack order is `layer_z_order` (list of stem names, bottom to top). `blend_mode` is `alpha` or `add` per layer.
 
-**SAVE NEW CONFIG** writes a full reproducible snapshot to [saved-cleave-configs/](saved-cleave-configs/) as `unnamed-N.cleave.config.yaml` (next unused N; see [cleave/config_snapshot.py](cleave/config_snapshot.py)). Snapshots include current presets (individual `.milk` paths relative to `preset_root`), opacity, blend modes, beat values, and z-order. The launch config is never touched by save-new.
+**SAVE AS NEW CONFIG** writes a full reproducible snapshot to [saved-cleave-configs/](saved-cleave-configs/) as `unnamed-N.cleave.config.yaml` (next unused N; see [cleave/config_snapshot.py](cleave/config_snapshot.py)). Snapshots include current presets (individual `.milk` paths relative to `preset_root`), opacity, blend modes, beat values, and z-order. The launch config is never touched by save-as-new.
 
-**OVERWRITE CONFIG** writes the same snapshot to the launch config file (`--config` / [cleave.config.yaml](cleave.config.yaml)) after a yes/no confirm. Use it when you want the current tuning session to become the default for the next run.
+**OVERWRITE CONFIG** (when shown) writes the same snapshot to the launch config file (`--config` or global/user config) after a yes/no confirm. Use it when you want the current tuning session to become the default for the next run. It is hidden when you launch without `--config` and the app auto-loads the repo-root [cleave.config.yaml](cleave.config.yaml).
 
 Override config location with `--config`. Checkpoint detail: [docs/phase-5-plan-part-progressed.md](docs/phase-5-plan-part-progressed.md).
 
@@ -258,6 +258,6 @@ python scripts/milkdrop_visualizer.py stems/sights-and-sounds-26 \
   --preset ~/milkdrop-presets/presets-cream-of-the-crop/Drawing/some-preset.milk
 ```
 
-`--preset` accepts a `.milk` file or a directory (same recursive scan as layer config). The same live tuning overlay applies: focus the drums preset row and use Left/Right to step presets (Ctrl+Left/Right for sibling directories). SAVE NEW CONFIG writes to [saved-cleave-configs/](saved-cleave-configs/) when a launch config exists; without `--config`, save-new still uses the default unnamed snapshot path.
+`--preset` accepts a `.milk` file or a directory (same recursive scan as layer config). The same live tuning overlay applies: focus the drums preset row and use Left/Right to step presets (Ctrl+Left/Right for sibling directories). SAVE AS NEW CONFIG writes to [saved-cleave-configs/](saved-cleave-configs/) when a launch config exists; without `--config`, save-as-new still uses the default unnamed snapshot path.
 
 See [docs/cleave-build-plan.md](docs/cleave-build-plan.md) for the full roadmap.

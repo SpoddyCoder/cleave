@@ -26,7 +26,8 @@ from cleave.viz_theme import (
 Anchor = Literal["topleft", "bottomleft"]
 
 ROWS_PER_TRACK = 5
-FOOTER_ROWS = 3
+FOOTER_ROWS_WITH_OVERWRITE = 3
+FOOTER_ROWS_WITHOUT_OVERWRITE = 2
 TREE_INDENT = 16
 _TRANSPORT_SKIP_UNICODE = ("⏮", "⏭")
 _TRANSPORT_SKIP_ASCII = ("<<", ">>")
@@ -51,7 +52,7 @@ class RowKind(Enum):
     TRACK_OPACITY = auto()
     TRACK_BEAT = auto()
     TRANSPORT = auto()
-    SAVE_NEW_CONFIG = auto()
+    SAVE_AS_NEW_CONFIG = auto()
     OVERWRITE_CONFIG = auto()
 
 
@@ -76,10 +77,19 @@ class TuningViewState:
     toast_remaining_sec: float
     confirm_message: str | None = None
     confirm_focus_yes: bool = True
+    allow_overwrite: bool = True
+
+
+def footer_row_count(state: TuningViewState) -> int:
+    return (
+        FOOTER_ROWS_WITH_OVERWRITE
+        if state.allow_overwrite
+        else FOOTER_ROWS_WITHOUT_OVERWRITE
+    )
 
 
 def row_count(state: TuningViewState) -> int:
-    return len(state.layer_z_order) * ROWS_PER_TRACK + FOOTER_ROWS
+    return len(state.layer_z_order) * ROWS_PER_TRACK + footer_row_count(state)
 
 
 _SUB_ROW_KINDS = frozenset(
@@ -102,6 +112,16 @@ def navigable_row_indices(state: TuningViewState) -> list[int]:
             if stem is not None and not state.tracks[stem].enabled:
                 continue
         indices.append(index)
+    return indices
+
+
+def quick_nav_row_indices(state: TuningViewState) -> list[int]:
+    """Row indices for Ctrl+Up/Down: layer headers and transport only."""
+    indices: list[int] = []
+    for index in range(row_count(state)):
+        kind = row_kind(state, index)
+        if kind in (RowKind.TRACK_HEADER, RowKind.TRANSPORT):
+            indices.append(index)
     return indices
 
 
@@ -128,7 +148,7 @@ def row_kind(state: TuningViewState, index: int) -> RowKind:
     if footer_index == 0:
         return RowKind.TRANSPORT
     if footer_index == 1:
-        return RowKind.SAVE_NEW_CONFIG
+        return RowKind.SAVE_AS_NEW_CONFIG
     return RowKind.OVERWRITE_CONFIG
 
 
@@ -136,8 +156,8 @@ def _row_text(state: TuningViewState, index: int) -> str:
     kind = row_kind(state, index)
     if kind == RowKind.TRANSPORT:
         return ""
-    if kind == RowKind.SAVE_NEW_CONFIG:
-        return "SAVE NEW CONFIG"
+    if kind == RowKind.SAVE_AS_NEW_CONFIG:
+        return "SAVE AS NEW CONFIG"
     if kind == RowKind.OVERWRITE_CONFIG:
         return "OVERWRITE CONFIG"
 
