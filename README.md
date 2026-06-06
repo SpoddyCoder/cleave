@@ -1,18 +1,23 @@
 # Cleave
 
-Stem-separated music visualizer: drums drive the pulse, bass drives the warp, each stem gets its own layer.
+Stem-separated music visualizer: drums drive the pulse, bass drives the warp, each stem gets its own visualizer layer.
 
-Built on WSL2, but should work on any Linux machine. A GPU with CUDA support is recommended for stem separation (Demucs is roughly 5 to 10 times faster on GPU).
+Built on the following two awesome open-source projects;
+
+- [projectM](https://github.com/projectM-visualizer/projectM) visualizer, which provides access to thousands of community generated Milkdrop presets.
+- [Demucs](https://github.com/facebookresearch/demucs) audio separation library, which uses AI to split an audio file into its constituent stems.
+
+Built on WSL2, but should work on any Linux machine.
 
 **Current focus:** Phase 5 Milkdrop visualizer (four layers at 1280x720 / 30 fps); Phase 4 layered visualizer remains the pygame baseline. See [docs/cleave-build-plan.md](docs/cleave-build-plan.md#phase-5--milkdrop-integration).
 
 ## Requirements
 
 - Python 3.10+
-- FFmpeg - used by Demucs and audio I/O
-- LibprojectM v4.2.0+ (not officially released yet) - used by the Milkdrop visualizer
-- Optional: NVIDIA GPU with CUDA for faster audio separation
-- On WSL2, [wsl-builds](https://github.com/spoddycoder/wsl-build) makes all this very easy
+- FFmpeg
+- LibprojectM v4.2.0+ (not officially released yet, cleave requires `_opengl_render_frame_fbo` and `_set_frame_time`)
+- Optional: NVIDIA GPU with CUDA for faster audio separation (Demucs is roughly 5 to 10 times faster on GPU)
+- On WSL2, [wsl-builds](https://github.com/spoddycoder/wsl-build) makes installing these dependencies very easy
 
 ```bash
 # setup an ai development stack: CUDA, Python, Anaconda + others
@@ -21,6 +26,12 @@ Built on WSL2, but should work on any Linux machine. A GPU with CUDA support is 
 ./wsl-builder.sh media ffmpeg
 # install libprojectm from latest master branch (apt lags too far behind)
 ./wsl-builder.sh media libprojectm
+```
+
+NOTE: There is a [known issue with WSL2 audio](https://github.com/microsoft/wslg/issues/1257), if you are experiencing glitches / dropouts...
+
+```bash
+sudo systemctl stop systemd-timesyncd
 ```
 
 ## Setup
@@ -54,7 +65,7 @@ If you chose CUDA, verify GPU support...
 python -c "import torch; print(torch.cuda.is_available())"
 ```
 
-If this prints `False`, Demucs still runs on CPU - separation will be slow, but it will work.
+If this prints `False`, Demucs still runs on CPU.
 
 ## Stem layout
 
