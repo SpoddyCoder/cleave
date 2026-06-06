@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -192,7 +193,7 @@ def preset_root_from_config(config_path: Path | None) -> Path:
 
 def _print_playlist_scan(name: str, playlist: PresetPlaylist) -> None:
     print(
-        f"{name}: {len(playlist.paths)} presets in {playlist.anchor}",
+        f"{name}: {len(playlist.paths)} presets in {playlist.current_dir}",
         file=sys.stderr,
     )
 
@@ -309,6 +310,19 @@ def _session_from_cfg(
     )
 
 
+_DIR_COUNTER_SUFFIX = re.compile(r" \((\d+)/(\d+)\)$")
+
+
+def _truncate_dir_label(label: str, max_len: int = 48) -> str:
+    """Truncate directory path only; preserve trailing (N/TOTAL) counter."""
+    match = _DIR_COUNTER_SUFFIX.search(label)
+    if match is None:
+        return truncate_preset_label(label, max_len)
+    path_part = label[: match.start()]
+    suffix = match.group(0)
+    return truncate_preset_label(path_part, max_len) + suffix
+
+
 def _allow_overwrite_config(config_cli: Path | None, cfg: CleaveConfig) -> bool:
     """Overwrite is hidden only for implicit repo-root cleave.config.yaml."""
     config_explicit = config_cli is not None
@@ -330,12 +344,13 @@ def build_view_state(
     tracks = {
         stem: TrackBlock(
             stem=block.stem,
-            preset_dir_label=truncate_preset_label(block.preset_dir_label),
+            preset_dir_label=_truncate_dir_label(block.preset_dir_label),
             preset_label=block.preset_label,
             blend_mode=block.blend_mode,
             opacity_pct=block.opacity_pct,
             beat_sensitivity=block.beat_sensitivity,
             enabled=block.enabled,
+            preset_empty=block.preset_empty,
         )
         for stem, block in base.tracks.items()
     }
@@ -367,8 +382,9 @@ def _make_tuning_controls(
     def on_preset_change(stem: str, playlist: PresetPlaylist) -> None:
         layer = layers_by_name[stem]
         layer.playlist = playlist
-        playlist.load_into(layer.pm, smooth=False)
-        layer.pm.lock_preset(True)
+        if playlist.current is not None:
+            playlist.load_into(layer.pm, smooth=False)
+            layer.pm.lock_preset(True)
 
     def on_blend_change(stem: str, blend_mode) -> None:
         layers_by_name[stem].fbo.blend_mode = blend_mode
@@ -535,8 +551,9 @@ def run_m1(
             def on_preset_change(stem: str, pl: PresetPlaylist) -> None:
                 layer = layers_by_name[stem]
                 layer.playlist = pl
-                pl.load_into(layer.pm, smooth=False)
-                layer.pm.lock_preset(True)
+                if pl.current is not None:
+                    pl.load_into(layer.pm, smooth=False)
+                    layer.pm.lock_preset(True)
 
             controls = TuningControls(
                 session,

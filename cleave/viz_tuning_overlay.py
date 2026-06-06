@@ -67,6 +67,7 @@ class TrackBlock:
     opacity_pct: int
     beat_sensitivity: float
     enabled: bool = True
+    preset_empty: bool = False
 
 
 @dataclass
@@ -294,10 +295,18 @@ def _unicode_transport_available(size: int = 14) -> bool:
 
 
 def _row_text_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
+    kind = row_kind(state, index)
+    stem = row_stem(state, index)
+    if (
+        kind == RowKind.TRACK_PRESET
+        and stem is not None
+        and state.tracks[stem].preset_empty
+    ):
+        return TEXT_DIM
+
     if index == state.focus_index:
         return HIGHLIGHT
 
-    stem = row_stem(state, index)
     if stem is not None:
         if state.move_mode_stem == stem:
             return MOVE_MODE

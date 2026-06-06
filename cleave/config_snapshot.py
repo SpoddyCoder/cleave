@@ -89,7 +89,7 @@ def write_session_snapshot(
         layer_cfg = cfg.layers[name]
         if name in session.layers:
             runtime = session.layers[name]
-            preset = to_config_relative(runtime.playlist.current, preset_root)
+            preset = runtime.playlist.config_preset_path(preset_root)
             opacity = runtime.opacity_pct / 100.0
             enabled = runtime.enabled
             blend_mode = runtime.blend_mode

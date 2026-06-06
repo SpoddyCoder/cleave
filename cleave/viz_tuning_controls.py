@@ -37,6 +37,7 @@ SEEK_LONG = 30
 _BLEND_MODES: tuple[BlendMode, ...] = ("alpha", "add")
 _REPEAT_ROW_KINDS = frozenset(
     {
+        RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
         RowKind.TRACK_BLEND,
         RowKind.TRACK_OPACITY,
@@ -168,9 +169,23 @@ class TuningControls:
                 )
             return True
 
+        if event.key == pygame.K_BACKSPACE:
+            view = self.build_view_state(paused=self.playback.paused)
+            kind = row_kind(view, self.focus_index)
+            if kind == RowKind.TRACK_PRESET_DIR:
+                stem = row_stem(view, self.focus_index)
+                if stem is not None:
+                    self._parent_directory(stem)
+                return True
+
         if event.key == pygame.K_RETURN:
             view = self.build_view_state(paused=self.playback.paused)
             kind = row_kind(view, self.focus_index)
+            if kind == RowKind.TRACK_PRESET_DIR:
+                stem = row_stem(view, self.focus_index)
+                if stem is not None:
+                    self._enter_directory(stem)
+                return True
             if kind == RowKind.TRANSPORT:
                 toggle_pause(self.playback, self.duration_sec)
                 return True
@@ -216,6 +231,7 @@ class TuningControls:
                 opacity_pct=layer.opacity_pct,
                 beat_sensitivity=layer.beat_sensitivity,
                 enabled=layer.enabled,
+                preset_empty=not layer.playlist.paths,
             )
 
         toast_remaining = 0.0
@@ -305,6 +321,10 @@ class TuningControls:
             if stem is None:
                 return
             self._toggle_enabled(stem)
+        elif kind == RowKind.TRACK_PRESET_DIR:
+            if stem is None:
+                return
+            self._step_directory(stem, forward=forward)
         elif kind == RowKind.TRACK_PRESET:
             if stem is None:
                 return
@@ -331,9 +351,30 @@ class TuningControls:
                 delta_sec = -delta_sec
             self._do_seek(delta_sec)
 
+    def _step_directory(self, stem: str, *, forward: bool) -> None:
+        layer = self.session.layers[stem]
+        playlist = layer.playlist
+        delta = 1 if forward else -1
+        if playlist.step_sibling(delta) and self._on_preset_change is not None:
+            self._on_preset_change(stem, playlist)
+
+    def _enter_directory(self, stem: str) -> None:
+        layer = self.session.layers[stem]
+        playlist = layer.playlist
+        if playlist.enter_child(self.preset_root) and self._on_preset_change is not None:
+            self._on_preset_change(stem, playlist)
+
+    def _parent_directory(self, stem: str) -> None:
+        layer = self.session.layers[stem]
+        playlist = layer.playlist
+        if playlist.go_parent(self.preset_root) and self._on_preset_change is not None:
+            self._on_preset_change(stem, playlist)
+
     def _step_preset(self, stem: str, *, forward: bool, ctrl: bool) -> None:
         layer = self.session.layers[stem]
         playlist = layer.playlist
+        if not playlist.paths:
+            return
         if ctrl:
             playlist.step_by(10 if forward else -10)
         elif forward:

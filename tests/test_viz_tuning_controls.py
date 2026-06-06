@@ -14,6 +14,7 @@ import pygame
 from cleave.preset_playlist import (
     PresetPlaylist,
     directory_display,
+    playlist_at_dir,
     preset_filename_display,
     scan_preset_playlist,
 )
@@ -25,13 +26,19 @@ from cleave.viz_tuning_controls import (
     TOAST_DURATION_SEC,
     TuningControls,
     TuningSession,
+    _REPEAT_ROW_KINDS,
 )
+from cleave.viz_theme import HIGHLIGHT, TEXT_DIM
 from cleave.viz_tuning_overlay import (
     RowKind,
+    TrackBlock,
     TuningOverlay,
+    TuningViewState,
     _glyph_renders_real_shape,
     _resolve_transport_icons,
+    _row_bg_color,
     _row_text,
+    _row_text_color,
     _unicode_transport_available,
     navigable_row_indices,
     quick_nav_row_indices,
@@ -46,9 +53,9 @@ def _keydown(key: int, *, mod: int = 0) -> pygame.event.Event:
 
 
 def _make_playlist(name: str, count: int = 3) -> PresetPlaylist:
-    anchor = Path(f"/tmp/presets/{name}")
-    paths = tuple(anchor / f"preset-{i}.milk" for i in range(count))
-    return PresetPlaylist(anchor=anchor, paths=paths, index=0)
+    current_dir = Path(f"/tmp/presets/{name}")
+    paths = tuple(current_dir / f"preset-{i}.milk" for i in range(count))
+    return PresetPlaylist(current_dir=current_dir, paths=paths, index=0)
 
 
 def _make_controls(
@@ -589,13 +596,126 @@ def test_ctrl_quick_nav_does_not_affect_normal_up_down() -> None:
     assert controls.focus_index == preset_dir_row
 
 
+def _write_milk(path: Path) -> None:
+    path.write_text("milk")
+
+
+def _make_sibling_dir_tree(
+    count: int,
+    *,
+    child_name: str = "child",
+    child_preset_count: int = 1,
+) -> tuple[Path, tuple[Path, ...]]:
+    """Return (preset_root, sibling_dirs) each with at least one .milk file."""
+    tmp = tempfile.mkdtemp()
+    root = Path(tmp)
+    siblings: list[Path] = []
+    for i in range(count):
+        sibling = root / f"dir-{i:02d}"
+        sibling.mkdir()
+        for j in range(child_preset_count):
+            _write_milk(sibling / f"preset-{j}.milk")
+        siblings.append(sibling)
+    if child_name:
+        child = siblings[0] / child_name
+        child.mkdir()
+        _write_milk(child / "nested.milk")
+    return root, tuple(siblings)
+
+
+def _controls_with_playlist(
+    root: Path,
+    current_dir: Path,
+    *,
+    index: int = 0,
+) -> TuningControls:
+    session = TuningSession(
+        layer_z_order=["drums"],
+        layers={
+            "drums": LayerRuntime(
+                playlist=playlist_at_dir(current_dir, index=index),
+                opacity_pct=50,
+            )
+        },
+    )
+    return TuningControls(
+        session,
+        preset_root=root,
+        playback=PlaybackState(),
+        duration_sec=120.0,
+    )
+
+
+def _preset_dir_row(controls: TuningControls) -> int:
+    view = controls.build_view_state(paused=False)
+    return next(
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET_DIR
+    )
+
+
+def _preset_row(controls: TuningControls) -> int:
+    view = controls.build_view_state(paused=False)
+    return next(
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET
+    )
+
+
+def test_directory_row_lr_changes_current_dir() -> None:
+    root, siblings = _make_sibling_dir_tree(3)
+    controls = _controls_with_playlist(root, siblings[0])
+    controls.focus_index = _preset_dir_row(controls)
+    playlist = controls.session.layers["drums"].playlist
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert playlist.current_dir.resolve() == siblings[1].resolve()
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert playlist.current_dir.resolve() == siblings[0].resolve()
+
+
+def test_directory_enter_descends_backspace_goes_parent() -> None:
+    root, siblings = _make_sibling_dir_tree(2)
+    controls = _controls_with_playlist(root, siblings[0])
+    controls.focus_index = _preset_dir_row(controls)
+    playlist = controls.session.layers["drums"].playlist
+    child = siblings[0] / "child"
+
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    assert playlist.current_dir.resolve() == child.resolve()
+
+    controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
+    assert playlist.current_dir.resolve() == siblings[0].resolve()
+
+
+def test_preset_lr_noop_when_paths_empty() -> None:
+    root, siblings = _make_sibling_dir_tree(2)
+    empty_dir = root / "empty"
+    empty_dir.mkdir()
+    controls = _controls_with_playlist(root, empty_dir)
+    changed: list[tuple[str, int]] = []
+    controls._on_preset_change = lambda stem, pl: changed.append((stem, pl.index))
+    controls.focus_index = _preset_row(controls)
+    playlist = controls.session.layers["drums"].playlist
+    assert playlist.paths == ()
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert changed == []
+    assert playlist.index == 0
+
+
+def test_track_preset_dir_in_repeat_row_kinds() -> None:
+    assert RowKind.TRACK_PRESET_DIR in _REPEAT_ROW_KINDS
+
+
 def test_ctrl_preset_steps_by_ten_wrapping() -> None:
     changed: list[tuple[str, int]] = []
     controls = _make_controls(("drums",))
-    anchor = Path("/tmp/presets/drums")
-    paths = tuple(anchor / f"preset-{i:02d}.milk" for i in range(12))
+    current_dir = Path("/tmp/presets/drums")
+    paths = tuple(current_dir / f"preset-{i:02d}.milk" for i in range(12))
     controls.session.layers["drums"].playlist = PresetPlaylist(
-        anchor=anchor, paths=paths, index=5
+        current_dir=current_dir, paths=paths, index=5
     )
     controls._on_preset_change = lambda stem, pl: changed.append((stem, pl.index))
 
@@ -615,11 +735,61 @@ def test_ctrl_preset_steps_by_ten_wrapping() -> None:
     assert changed[-1] == ("drums", 5)
 
 
+def test_empty_playlist_view_state() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        empty_dir = root / "empty"
+        empty_dir.mkdir()
+        controls = _controls_with_playlist(root, empty_dir)
+        view = controls.build_view_state(paused=False)
+        block = view.tracks["drums"]
+        assert block.preset_label == "NO PRESETS FOUND"
+        assert block.preset_empty is True
+
+
+def test_row_text_color_dim_for_focused_empty_preset() -> None:
+    state = TuningViewState(
+        layer_z_order=("drums",),
+        tracks={
+            "drums": TrackBlock(
+                stem="drums",
+                preset_dir_label="empty (1/1)",
+                preset_label="NO PRESETS FOUND",
+                blend_mode="alpha",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                preset_empty=True,
+            )
+        },
+        paused=False,
+        position_sec=0.0,
+        focus_index=0,
+        move_mode_stem=None,
+        toast_message=None,
+        toast_remaining_sec=0.0,
+    )
+    preset_row = next(
+        i for i in range(6) if row_kind(state, i) == RowKind.TRACK_PRESET
+    )
+    state = TuningViewState(
+        layer_z_order=state.layer_z_order,
+        tracks=state.tracks,
+        paused=state.paused,
+        position_sec=state.position_sec,
+        focus_index=preset_row,
+        move_mode_stem=state.move_mode_stem,
+        toast_message=state.toast_message,
+        toast_remaining_sec=state.toast_remaining_sec,
+    )
+    assert _row_text_color(state, preset_row) == TEXT_DIM
+    assert _row_bg_color(state, preset_row) == HIGHLIGHT
+
+
 def test_preset_overlay_shows_directory_and_position() -> None:
     controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
     block = view.tracks["drums"]
-    assert block.preset_dir_label == "drums"
+    assert block.preset_dir_label == "drums (1/1)"
     assert block.preset_label == "preset-0.milk (1/3)"
 
     controls.session.layers["drums"].playlist.index = 1
@@ -638,11 +808,11 @@ def test_scan_file_anchor_builds_parent_directory_playlist() -> None:
         second.write_text("milk")
 
         playlist = scan_preset_playlist(second)
-        assert playlist.anchor == preset_dir.resolve()
+        assert playlist.current_dir == preset_dir.resolve()
         assert playlist.paths == (first.resolve(), second.resolve())
         assert playlist.index == 1
         assert preset_filename_display(playlist) == "beta.milk (2/2)"
-        assert directory_display(playlist, root) == "pack/Aurora"
+        assert directory_display(playlist, root) == "pack/Aurora (1/1)"
 
 
 def test_ctrl_quick_nav_blocked_during_move_mode() -> None:
@@ -715,7 +885,13 @@ def main() -> int:
         test_ctrl_quick_nav_from_sub_row_jumps_forward,
         test_ctrl_quick_nav_from_save_row,
         test_ctrl_quick_nav_does_not_affect_normal_up_down,
+        test_directory_row_lr_changes_current_dir,
+        test_directory_enter_descends_backspace_goes_parent,
+        test_preset_lr_noop_when_paths_empty,
+        test_track_preset_dir_in_repeat_row_kinds,
         test_ctrl_preset_steps_by_ten_wrapping,
+        test_empty_playlist_view_state,
+        test_row_text_color_dim_for_focused_empty_preset,
         test_preset_overlay_shows_directory_and_position,
         test_scan_file_anchor_builds_parent_directory_playlist,
         test_ctrl_quick_nav_blocked_during_move_mode,
