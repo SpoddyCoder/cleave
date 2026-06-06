@@ -4,13 +4,19 @@ from __future__ import annotations
 
 import io
 import sys
+import tempfile
 import time
 from pathlib import Path
 from unittest.mock import patch
 
 import pygame
 
-from cleave.preset_playlist import PresetPlaylist
+from cleave.preset_playlist import (
+    PresetPlaylist,
+    directory_display,
+    preset_filename_display,
+    scan_preset_playlist,
+)
 from cleave.viz_playback import PlaybackState, format_mmss
 from cleave.viz_tuning_controls import (
     LayerRuntime,
@@ -40,8 +46,9 @@ def _keydown(key: int, *, mod: int = 0) -> pygame.event.Event:
 
 
 def _make_playlist(name: str, count: int = 3) -> PresetPlaylist:
-    paths = tuple(Path(f"/tmp/{name}/preset-{i}.milk") for i in range(count))
-    return PresetPlaylist(anchor=Path(f"/tmp/{name}"), paths=paths, index=0)
+    anchor = Path(f"/tmp/presets/{name}")
+    paths = tuple(anchor / f"preset-{i}.milk" for i in range(count))
+    return PresetPlaylist(anchor=anchor, paths=paths, index=0)
 
 
 def _make_controls(
@@ -67,7 +74,7 @@ def _make_controls(
 
 def test_focus_navigation_wraps() -> None:
     controls = _make_controls(("a", "b"))
-    total = 2 * 5 + 3
+    total = 2 * 6 + 3
     assert controls.focus_index == 0
 
     for _ in range(total - 1):
@@ -86,7 +93,7 @@ def test_opacity_clamps() -> None:
     view = controls.build_view_state(paused=False)
     opacity_row = next(
         i
-        for i in range(5)
+        for i in range(6)
         if row_kind(view, i) == RowKind.TRACK_OPACITY
     )
     controls.focus_index = opacity_row
@@ -109,7 +116,7 @@ def test_header_toggles_enabled() -> None:
 
     view = controls.build_view_state(paused=False)
     header_row = next(
-        i for i in range(5) if row_kind(view, i) == RowKind.TRACK_HEADER
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
     )
     controls.focus_index = header_row
     assert controls.session.layers["drums"].enabled is True
@@ -132,12 +139,12 @@ def test_navigation_skips_sub_rows_when_disabled() -> None:
 
     drums_header = next(
         i
-        for i in range(10)
+        for i in range(12)
         if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "drums"
     )
     bass_header = next(
         i
-        for i in range(10)
+        for i in range(12)
         if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "bass"
     )
     navigable = navigable_row_indices(view)
@@ -158,13 +165,13 @@ def test_re_enable_allows_sub_row_focus() -> None:
     controls.session.layers["drums"].enabled = False
     view = controls.build_view_state(paused=False)
     header_row = next(
-        i for i in range(5) if row_kind(view, i) == RowKind.TRACK_HEADER
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
     )
-    preset_row = next(
-        i for i in range(5) if row_kind(view, i) == RowKind.TRACK_PRESET
+    preset_dir_row = next(
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET_DIR
     )
     transport_row = next(
-        i for i in range(8) if row_kind(view, i) == RowKind.TRANSPORT
+        i for i in range(9) if row_kind(view, i) == RowKind.TRANSPORT
     )
     controls.focus_index = header_row
 
@@ -176,14 +183,14 @@ def test_re_enable_allows_sub_row_focus() -> None:
     assert controls.session.layers["drums"].enabled is True
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_index == preset_row
+    assert controls.focus_index == preset_dir_row
 
 
 def test_beat_sensitivity_clamps() -> None:
     controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
     beat_row = next(
-        i for i in range(5) if row_kind(view, i) == RowKind.TRACK_BEAT
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_BEAT
     )
     controls.focus_index = beat_row
 
@@ -199,7 +206,7 @@ def test_beat_sensitivity_clamps() -> None:
 def test_opacity_ctrl_step_is_ten_percent() -> None:
     controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
-    opacity_row = next(i for i in range(5) if row_kind(view, i) == RowKind.TRACK_OPACITY)
+    opacity_row = next(i for i in range(6) if row_kind(view, i) == RowKind.TRACK_OPACITY)
     controls.focus_index = opacity_row
     controls.session.layers["drums"].opacity_pct = 50
 
@@ -269,7 +276,7 @@ def test_navigable_rows_without_overwrite() -> None:
     controls = _make_controls(("drums",), allow_overwrite=False)
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is False
-    assert row_count(view) == 7
+    assert row_count(view) == 8
 
     kinds = {row_kind(view, i) for i in range(row_count(view))}
     assert RowKind.SAVE_AS_NEW_CONFIG in kinds
@@ -293,7 +300,7 @@ def test_navigable_rows_with_overwrite() -> None:
     controls = _make_controls(("drums",), allow_overwrite=True)
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is True
-    assert row_count(view) == 8
+    assert row_count(view) == 9
 
     overwrite_row = next(
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
@@ -312,7 +319,7 @@ def test_overwrite_shows_confirm_before_write() -> None:
 
     view = controls.build_view_state(paused=False)
     overwrite_row = next(
-        i for i in range(8) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
+        i for i in range(9) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
     )
     controls.focus_index = overwrite_row
 
@@ -344,7 +351,7 @@ def test_overwrite_confirm_yes_writes_launch_path() -> None:
 
     view = controls.build_view_state(paused=False)
     overwrite_row = next(
-        i for i in range(8) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
+        i for i in range(9) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
     )
     controls.focus_index = overwrite_row
 
@@ -372,7 +379,7 @@ def test_overwrite_confirm_esc_dismisses() -> None:
 
     view = controls.build_view_state(paused=False)
     overwrite_row = next(
-        i for i in range(8) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
+        i for i in range(9) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
     )
     controls.focus_index = overwrite_row
 
@@ -387,7 +394,7 @@ def test_esc_during_confirm_does_not_quit() -> None:
     controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
     overwrite_row = next(
-        i for i in range(8) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
+        i for i in range(9) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
     )
     controls.focus_index = overwrite_row
     controls.handle_keydown(_keydown(pygame.K_RETURN))
@@ -538,7 +545,7 @@ def test_ctrl_quick_nav_from_sub_row_jumps_forward() -> None:
     view = controls.build_view_state(paused=False)
     quick = quick_nav_row_indices(view)
     preset_row = next(
-        i for i in range(10) if row_kind(view, i) == RowKind.TRACK_PRESET
+        i for i in range(12) if row_kind(view, i) == RowKind.TRACK_PRESET
     )
 
     controls.focus_index = preset_row
@@ -571,15 +578,71 @@ def test_ctrl_quick_nav_does_not_affect_normal_up_down() -> None:
     controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
     header_row = next(
-        i for i in range(5) if row_kind(view, i) == RowKind.TRACK_HEADER
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
     )
-    preset_row = next(
-        i for i in range(5) if row_kind(view, i) == RowKind.TRACK_PRESET
+    preset_dir_row = next(
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET_DIR
     )
     controls.focus_index = header_row
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_index == preset_row
+    assert controls.focus_index == preset_dir_row
+
+
+def test_ctrl_preset_steps_by_ten_wrapping() -> None:
+    changed: list[tuple[str, int]] = []
+    controls = _make_controls(("drums",))
+    anchor = Path("/tmp/presets/drums")
+    paths = tuple(anchor / f"preset-{i:02d}.milk" for i in range(12))
+    controls.session.layers["drums"].playlist = PresetPlaylist(
+        anchor=anchor, paths=paths, index=5
+    )
+    controls._on_preset_change = lambda stem, pl: changed.append((stem, pl.index))
+
+    view = controls.build_view_state(paused=False)
+    preset_row = next(
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET
+    )
+    controls.focus_index = preset_row
+    playlist = controls.session.layers["drums"].playlist
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert playlist.index == 3
+    assert changed == [("drums", 3)]
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert playlist.index == 5
+    assert changed[-1] == ("drums", 5)
+
+
+def test_preset_overlay_shows_directory_and_position() -> None:
+    controls = _make_controls(("drums",))
+    view = controls.build_view_state(paused=False)
+    block = view.tracks["drums"]
+    assert block.preset_dir_label == "drums"
+    assert block.preset_label == "preset-0.milk (1/3)"
+
+    controls.session.layers["drums"].playlist.index = 1
+    view = controls.build_view_state(paused=False)
+    assert view.tracks["drums"].preset_label == "preset-1.milk (2/3)"
+
+
+def test_scan_file_anchor_builds_parent_directory_playlist() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        preset_dir = root / "pack" / "Aurora"
+        preset_dir.mkdir(parents=True)
+        first = preset_dir / "alpha.milk"
+        second = preset_dir / "beta.milk"
+        first.write_text("milk")
+        second.write_text("milk")
+
+        playlist = scan_preset_playlist(second)
+        assert playlist.anchor == preset_dir.resolve()
+        assert playlist.paths == (first.resolve(), second.resolve())
+        assert playlist.index == 1
+        assert preset_filename_display(playlist) == "beta.milk (2/2)"
+        assert directory_display(playlist, root) == "pack/Aurora"
 
 
 def test_ctrl_quick_nav_blocked_during_move_mode() -> None:
@@ -605,7 +668,7 @@ def test_transport_seek_constants() -> None:
     controls._on_seek = lambda delta: seeks.append(delta)
 
     view = controls.build_view_state(paused=False)
-    transport_row = next(i for i in range(8) if row_kind(view, i) == RowKind.TRANSPORT)
+    transport_row = next(i for i in range(9) if row_kind(view, i) == RowKind.TRANSPORT)
     controls.focus_index = transport_row
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
@@ -652,6 +715,9 @@ def main() -> int:
         test_ctrl_quick_nav_from_sub_row_jumps_forward,
         test_ctrl_quick_nav_from_save_row,
         test_ctrl_quick_nav_does_not_affect_normal_up_down,
+        test_ctrl_preset_steps_by_ten_wrapping,
+        test_preset_overlay_shows_directory_and_position,
+        test_scan_file_anchor_builds_parent_directory_playlist,
         test_ctrl_quick_nav_blocked_during_move_mode,
     ]
     for test in tests:

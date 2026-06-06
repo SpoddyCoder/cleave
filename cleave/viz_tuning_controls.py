@@ -14,9 +14,8 @@ from cleave.config import clamp_beat_sensitivity
 from cleave.gl_compositor import BlendMode
 from cleave.preset_playlist import (
     PresetPlaylist,
-    display_label,
-    fixed_preset_suffix,
-    step_sibling_directory,
+    directory_display,
+    preset_filename_display,
 )
 from cleave.viz_confirm import ConfirmDialog, ConfirmRequest
 from cleave.viz_key_repeat import KeyRepeatController
@@ -209,10 +208,10 @@ class TuningControls:
             layer = self.session.layers[stem]
             tracks[stem] = TrackBlock(
                 stem=stem,
-                preset_label=(
-                    display_label(layer.playlist.current, layer.playlist.anchor)
-                    + fixed_preset_suffix(layer.playlist)
+                preset_dir_label=directory_display(
+                    layer.playlist, self.preset_root
                 ),
+                preset_label=preset_filename_display(layer.playlist),
                 blend_mode=layer.blend_mode,
                 opacity_pct=layer.opacity_pct,
                 beat_sensitivity=layer.beat_sensitivity,
@@ -336,15 +335,7 @@ class TuningControls:
         layer = self.session.layers[stem]
         playlist = layer.playlist
         if ctrl:
-            replacement = step_sibling_directory(
-                playlist,
-                self.preset_root,
-                forward=forward,
-            )
-            if replacement is None:
-                return
-            layer.playlist = replacement
-            playlist = replacement
+            playlist.step_by(10 if forward else -10)
         elif forward:
             playlist.next()
         else:

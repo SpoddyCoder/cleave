@@ -187,7 +187,7 @@ By this point you have a working layered system you understand. Milkdrop becomes
 - Same idle behaviour as Phase 4 overlay: 10s hold after input, 2s fade ([cleave/viz_theme.py](cleave/viz_theme.py))
 
 **5.6.2 — Per-layer tuning**
-- Preset: Left/Right step within playlist; Ctrl+Left/Right jump to sibling preset directory
+- Preset: Left/Right step within playlist; Ctrl+Left/Right jump ±10 presets in current directory (wraps)
 - Blend mode: cycle `alpha` / `add` per layer (`layers.*.blend_mode` in config)
 - Opacity: 1% steps (10% with Ctrl); 0% disables the layer
 - Beat sensitivity: 0.01 steps (0.1 with Ctrl)
