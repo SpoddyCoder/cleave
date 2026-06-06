@@ -64,6 +64,52 @@ def display_label(path: Path, anchor: Path) -> str:
     return path.relative_to(anchor).as_posix()
 
 
+def is_fixed_anchor(playlist: PresetPlaylist) -> bool:
+    """Return True when the anchor is a single .milk file, not a directory playlist."""
+    return playlist.anchor.is_file()
+
+
+def fixed_preset_suffix(playlist: PresetPlaylist) -> str:
+    """Overlay suffix for fixed single-file anchors; empty for directory playlists."""
+    return " (FIXED)" if is_fixed_anchor(playlist) else ""
+
+
+def _sibling_directories(anchor: Path) -> list[Path]:
+    """Sorted resolved directory siblings under anchor's parent."""
+    parent = anchor.parent
+    return sorted(p.resolve() for p in parent.iterdir() if p.is_dir())
+
+
+def step_sibling_directory(
+    playlist: PresetPlaylist,
+    preset_root: Path,
+    *,
+    forward: bool,
+) -> PresetPlaylist | None:
+    """Step the directory anchor to the next or previous sibling under the same parent.
+
+    Single-file anchors are a no-op (returns None). When the parent has no other
+    directory siblings, returns None. Otherwise wraps forward or backward among
+    sorted sibling directories and rescans with ``scan_preset_playlist``.
+    """
+    del preset_root  # reserved for callers; stepping uses resolved anchor paths
+    if playlist.anchor.is_file():
+        return None
+
+    anchor = playlist.anchor.resolve()
+    siblings = _sibling_directories(anchor)
+    if len(siblings) <= 1:
+        return None
+
+    try:
+        index = siblings.index(anchor)
+    except ValueError:
+        return None
+
+    offset = 1 if forward else -1
+    return scan_preset_playlist(siblings[(index + offset) % len(siblings)])
+
+
 def to_config_relative(path: Path, preset_root: Path) -> str:
     """Preset path relative to preset_root, using forward slashes."""
     return path.resolve().relative_to(preset_root.resolve()).as_posix()

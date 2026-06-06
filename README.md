@@ -9,7 +9,7 @@ Built on the following two awesome open-source projects;
 
 Built on WSL2, but should work on any Linux machine.
 
-**Current focus:** Phase 5 Milkdrop visualizer (four layers at 1280x720 / 30 fps); Phase 4 layered visualizer remains the pygame baseline. See [docs/cleave-build-plan.md](docs/cleave-build-plan.md#phase-5--milkdrop-integration).
+**Current focus:** Phase 5 Milkdrop visualizer with live tuning overlay (four layers at 1280x720 / 30 fps); Phase 6 compositor aesthetics next. Phase 4 layered visualizer remains the pygame baseline. See [docs/cleave-build-plan.md](docs/cleave-build-plan.md#phase-56--live-tuning-console).
 
 ## Requirements
 
@@ -17,7 +17,7 @@ Built on WSL2, but should work on any Linux machine.
 - FFmpeg
 - LibprojectM v4.2.0+ (not officially released yet, cleave requires `_opengl_render_frame_fbo` and `_set_frame_time`)
 - Optional: NVIDIA GPU with CUDA for faster audio separation (Demucs is roughly 5 to 10 times faster on GPU)
-- On WSL2, [wsl-builds](https://github.com/spoddycoder/wsl-build) makes installing these dependencies very easy
+- On WSL2, [wsl-builds](https://github.com/spoddycoder/wsl-builds) makes installing these dependencies very easy
 
 ```bash
 # setup an ai development stack: CUDA, Python, Anaconda + others
@@ -193,9 +193,9 @@ On WSL2, same display requirement as the drum pulse visualizer (WSLg or X11).
 
 After separate, analyse, and optional onset validation above, run `pulse_visualizer.py` for the drum baseline, then `layered_visualizer.py` for the full composited view.
 
-## Milkdrop visualizer (Phase 5, complete)
+## Milkdrop visualizer (Phase 5 + 5.6, complete)
 
-Four libprojectM layers (other, bass, vocals, drums), each fed stem PCM at 44100 Hz mono, composited with OpenGL FBOs at tiered resolutions and upscaled to **1280x720 @ 30 fps**. Requires libprojectM **4.2+**, community presets, and a display (WSLg or X11 on WSL2).
+Four libprojectM layers, each fed stem PCM at 44100 Hz mono, composited with OpenGL FBOs at tiered resolutions and upscaled to **1280x720 @ 30 fps**. Stack order comes from `layer_z_order` in [cleave.config.yaml](cleave.config.yaml) (bottom to top). Requires libprojectM **4.2+**, community presets, and a display (WSLg or X11 on WSL2).
 
 **Preset install:** clone or symlink community packs under `paths.preset_root` in [cleave.config.yaml](cleave.config.yaml). Set `preset_root` to the milkdrop-presets root (the directory that contains `presets-cream-of-the-crop`, not that subfolder alone). Each `layers.*.preset` may be a **single `.milk` file** or a **directory** (recursive `*.milk` scan at startup, before the window opens; stderr reports preset counts per layer). Layer paths are relative to `preset_root` and should include each pack name once, e.g. `presets-cream-of-the-crop/Drawing/foo.milk`. Example layout:
 
@@ -211,20 +211,44 @@ python scripts/milkdrop_visualizer.py stems/sights-and-sounds-26 \
   --source cleave-resources/source/sights-and-sounds-26.wav
 ```
 
+### Live tuning overlay
+
+A focus-driven tree panel ([cleave/viz_tuning_overlay.py](cleave/viz_tuning_overlay.py), [cleave/viz_tuning_controls.py](cleave/viz_tuning_controls.py)) lists each stem with preset, blend mode, opacity, and beat sensitivity rows, plus transport, SAVE NEW CONFIG, and OVERWRITE CONFIG footer rows. Navigate with the arrow keys; the focused row is highlighted in orange.
+
 | Key | Action |
 | --- | --- |
-| d / b / v / o | Toggle drums / bass / vocals / other layer visibility |
-| Shift + d / b / v / o | Next preset for that layer (wrap) |
-| Ctrl + d / b / v / o | Previous preset for that layer (wrap) |
-| Ctrl + W | Save all four layers' current presets to [cleave.config.yaml](cleave.config.yaml) (paths relative to `preset_root`) |
-| Space | Pause / resume playback |
-| Left | Back 30 seconds |
-| Right | Forward 30 seconds |
+| Up / Down | Move focus between rows (per-stem tree, transport, save rows) |
+| Left / Right | Adjust the focused field (see below); hold to repeat on preset, blend, opacity, and beat rows |
+| Ctrl + Left / Right | Larger steps on opacity and beat; on preset row, jump to sibling preset directory |
+| Enter | On track header: enter z-order move mode; on SAVE NEW CONFIG: write snapshot; on OVERWRITE CONFIG: confirm then overwrite launch config |
+| Enter (move mode) | Confirm z-order after Up/Down swaps |
+| Up / Down (move mode) | Swap focused stem up/down in `layer_z_order` |
+| Space | Pause / resume playback (hidden shortcut, not shown in overlay) |
 | Esc | Quit |
 
-All four layers are on at startup (per `layers.*.enabled` in config). Pause stops PCM feed; seek flushes projectM buffers. The controls overlay ([cleave/viz_overlay.py](cleave/viz_overlay.py)) shows each layer's current preset path (truncated) plus a legend for preset stepping keys; it fades when idle and reappears on any keypress.
+**Focused field behaviour**
 
-**Ctrl+W write-back:** saves the **individual `.milk` file** currently loaded on each layer, not the directory anchor, so your choices persist across restarts even when you started from a folder playlist.
+| Row | Left / Right | Ctrl + Left / Right |
+| --- | --- | --- |
+| Preset | Previous / next preset in playlist | Previous / next sibling preset directory |
+| Blend mode | Cycle `alpha` / `add` | (same step size) |
+| Opacity | −1% / +1% | −10% / +10% (0% disables the layer) |
+| Beat sensitivity | −0.01 / +0.01 | −0.1 / +0.1 |
+| Transport | Seek back / forward 10s | Seek back / forward 30s |
+
+Z-order move mode highlights the track header in blue; Up/Down reorders that stem in the compositor stack (bottom-to-top per `layer_z_order`).
+
+Pause stops PCM feed; seek flushes projectM buffers. The overlay stays visible for 10 seconds after input, then fades out over 2 seconds; any keypress shows it again (same timing as Phase 4 [cleave/viz_overlay.py](cleave/viz_overlay.py)).
+
+### Config and save
+
+Per-layer preset, size, opacity, `blend_mode`, and optional beat sensitivity live under `layers.*` in [cleave.config.yaml](cleave.config.yaml). Global compositor stack order is `layer_z_order` (list of stem names, bottom to top). `blend_mode` is `alpha` or `add` per layer.
+
+**SAVE NEW CONFIG** writes a full reproducible snapshot to [saved-cleave-configs/](saved-cleave-configs/) as `unnamed-N.cleave.config.yaml` (next unused N; see [cleave/config_snapshot.py](cleave/config_snapshot.py)). Snapshots include current presets (individual `.milk` paths relative to `preset_root`), opacity, blend modes, beat values, and z-order. The launch config is never touched by save-new.
+
+**OVERWRITE CONFIG** writes the same snapshot to the launch config file (`--config` / [cleave.config.yaml](cleave.config.yaml)) after a yes/no confirm. Use it when you want the current tuning session to become the default for the next run.
+
+Override config location with `--config`. Checkpoint detail: [docs/phase-5-plan-part-progressed.md](docs/phase-5-plan-part-progressed.md).
 
 **M1 debug** (drums layer only, skips four-preset validation):
 
@@ -234,8 +258,6 @@ python scripts/milkdrop_visualizer.py stems/sights-and-sounds-26 \
   --preset ~/milkdrop-presets/presets-cream-of-the-crop/Drawing/some-preset.milk
 ```
 
-`--preset` accepts a `.milk` file or a directory (same recursive scan as layer config). Use **Shift+d** / **Ctrl+d** to step presets on the drums layer. **Ctrl+W** updates `layers.drums.preset` in your config file when one exists (same individual-file write-back as the four-layer run).
-
-Override config location with `--config`. Per-layer preset, size, opacity, and beat sensitivity live in [cleave.config.yaml](cleave.config.yaml). Checkpoint detail: [docs/phase-5-plan-part-progressed.md](docs/phase-5-plan-part-progressed.md).
+`--preset` accepts a `.milk` file or a directory (same recursive scan as layer config). The same live tuning overlay applies: focus the drums preset row and use Left/Right to step presets (Ctrl+Left/Right for sibling directories). SAVE NEW CONFIG writes to [saved-cleave-configs/](saved-cleave-configs/) when a launch config exists; without `--config`, save-new still uses the default unnamed snapshot path.
 
 See [docs/cleave-build-plan.md](docs/cleave-build-plan.md) for the full roadmap.

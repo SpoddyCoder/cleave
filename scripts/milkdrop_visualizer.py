@@ -31,40 +31,35 @@ from cleave.config import (  # noqa: E402
     find_config_path,
     load_config,
 )
+from cleave.config_snapshot import next_unnamed_path, write_session_snapshot  # noqa: E402
 from cleave.preset_playlist import (  # noqa: E402
     PresetPlaylist,
-    display_label,
     scan_all_layers,
     scan_preset_playlist,
-    write_layer_presets,
 )
 from cleave.gl_compositor import GlCompositor, LayerFbo  # noqa: E402
 from cleave.projectm import ProjectM, ProjectMLibraryError  # noqa: E402
 from cleave.signals import Signals, load_signals  # noqa: E402
 from cleave.stem_pcm import load_stem_pcm, samples_per_frame  # noqa: E402
-from cleave.viz_overlay import (  # noqa: E402
-    ControlRow,
-    ControlsOverlay,
-    format_layer_state,
-    milkdrop_layered_rows,
-    milkdrop_preset_legend_rows,
-    playback_rows,
-)
+from cleave.viz_overlay import truncate_preset_label  # noqa: E402
 from cleave.viz_playback import (  # noqa: E402
-    SKIP_SEC,
     current_sec,
     init_playback,
     seek,
-    toggle_pause,
+)
+from cleave.viz_tuning_controls import (  # noqa: E402
+    LayerRuntime,
+    TuningControls,
+    TuningSession,
+)
+from cleave.viz_tuning_overlay import (  # noqa: E402
+    TrackBlock,
+    TuningOverlay,
+    TuningViewState,
 )
 
 STEM_DRUMS = "drums"
-LAYER_KEYS = {
-    pygame.K_d: STEM_DRUMS,
-    pygame.K_b: "bass",
-    pygame.K_v: "vocals",
-    pygame.K_o: "other",
-}
+SAVED_CONFIGS_DIR = ROOT / "saved-cleave-configs"
 
 
 def resolve_stems_dir(path: Path) -> Path:
@@ -207,7 +202,16 @@ def resolve_m1_preset(
     """Return (playlist, texture_paths, beat_sensitivity) for M1 --preset mode."""
     playlist = scan_preset_playlist(preset_override)
     textures = texture_paths_from_config(config_path)
-    return playlist, textures, 1.0
+    beat_sensitivity = 1.0
+    path = find_config_path(config_path, ROOT)
+    if path is not None and path.is_file():
+        with path.open(encoding="utf-8") as fh:
+            data = yaml.safe_load(fh)
+        if isinstance(data, dict):
+            visualizer = data.get("visualizer")
+            if isinstance(visualizer, dict):
+                beat_sensitivity = float(visualizer.get("beat_sensitivity", 1.0))
+    return playlist, textures, beat_sensitivity
 
 
 @dataclass
@@ -216,77 +220,6 @@ class MilkdropLayer:
     pm: ProjectM
     fbo: LayerFbo
     playlist: PresetPlaylist
-
-
-def _mod_shift(mod: int) -> bool:
-    return bool(mod & pygame.KMOD_SHIFT)
-
-
-def _mod_ctrl(mod: int) -> bool:
-    return bool(mod & (pygame.KMOD_CTRL | pygame.KMOD_LCTRL | pygame.KMOD_RCTRL))
-
-
-def _layer_row_state(layer: MilkdropLayer, playlist: PresetPlaylist) -> str:
-    label = (
-        display_label(playlist.current, playlist.anchor)
-        if layer.fbo.enabled
-        else None
-    )
-    return format_layer_state(layer.fbo.enabled, label)
-
-
-def _four_layer_overlay_rows(
-    layers: list[MilkdropLayer],
-    playlists: dict[str, PresetPlaylist],
-    *,
-    paused: bool,
-) -> list[ControlRow]:
-    by_name = {layer.name: layer for layer in layers}
-    show_drums = by_name["drums"].fbo.enabled
-    show_bass = by_name["bass"].fbo.enabled
-    show_vocals = by_name["vocals"].fbo.enabled
-    show_other = by_name["other"].fbo.enabled
-    return milkdrop_layered_rows(
-        show_drums=show_drums,
-        show_bass=show_bass,
-        show_vocals=show_vocals,
-        show_other=show_other,
-        paused=paused,
-        drums_state=_layer_row_state(by_name["drums"], playlists["drums"]),
-        bass_state=_layer_row_state(by_name["bass"], playlists["bass"]),
-        vocals_state=_layer_row_state(by_name["vocals"], playlists["vocals"]),
-        other_state=_layer_row_state(by_name["other"], playlists["other"]),
-    )
-
-
-def _step_playlist(layer: MilkdropLayer, playlist: PresetPlaylist, *, forward: bool) -> None:
-    if forward:
-        playlist.next()
-    else:
-        playlist.prev()
-    playlist.load_into(layer.pm, smooth=False)
-    layer.pm.lock_preset(True)
-
-
-def _handle_preset_write(
-    cfg: CleaveConfig,
-    playlists: dict[str, PresetPlaylist],
-) -> None:
-    write_layer_presets(cfg.config_path, cfg.paths.preset_root, playlists)
-    print(f"wrote layer presets to {cfg.config_path}", file=sys.stderr)
-
-
-def _handle_m1_preset_write(
-    config_path: Path | None,
-    preset_root: Path,
-    playlist: PresetPlaylist,
-) -> None:
-    path = find_config_path(config_path, ROOT)
-    if path is None or not path.is_file():
-        print("error: no config file found for Ctrl+W write", file=sys.stderr)
-        return
-    write_layer_presets(path, preset_root, {STEM_DRUMS: playlist})
-    print(f"wrote layer presets to {path}", file=sys.stderr)
 
 
 def _beat_sensitivity(cfg: CleaveConfig, layer_name: str) -> float:
@@ -307,7 +240,6 @@ def _build_layers(
 
     for name, layer_cfg in cfg.layers_in_z_order():
         w, h = layer_cfg.width, layer_cfg.height
-        blend_mode = "add" if name == STEM_DRUMS else "alpha"
         playlist = playlists[name]
 
         pm = ProjectM()
@@ -325,7 +257,7 @@ def _build_layers(
             w,
             h,
             opacity=layer_cfg.opacity,
-            blend_mode=blend_mode,
+            blend_mode=layer_cfg.blend_mode,
         )
         fbo.enabled = layer_cfg.enabled
         runtimes.append(
@@ -354,67 +286,135 @@ def _destroy_layers(layers: list[MilkdropLayer]) -> None:
         layer.pm.destroy()
 
 
-def _m1_overlay_rows(playlist: PresetPlaylist, *, paused: bool) -> list[ControlRow]:
-    label = display_label(playlist.current, playlist.anchor)
-    rows = list(playback_rows(paused=paused))
-    rows.append(
-        ControlRow(
-            "d",
-            "Drums",
-            format_layer_state(True, label),
-        )
-    )
-    rows.extend(milkdrop_preset_legend_rows())
-    return rows
-
-
-def _handle_layer_keydown(
-    event: pygame.event.Event,
-    *,
-    layers_by_name: dict[str, MilkdropLayer],
+def _session_from_cfg(
+    cfg: CleaveConfig,
     playlists: dict[str, PresetPlaylist],
-    cfg: CleaveConfig | None,
-    config_path: Path | None,
-    preset_root: Path | None,
-) -> bool:
-    """Handle stem / preset keys. Return True if overlay rows should refresh."""
-    if event.key not in LAYER_KEYS and not (
-        event.key == pygame.K_w and _mod_ctrl(event.mod)
-    ):
-        return False
-
-    shift = _mod_shift(event.mod)
-    ctrl = _mod_ctrl(event.mod)
-    if shift and ctrl:
-        return False
-
-    if ctrl and event.key == pygame.K_w:
-        if cfg is not None:
-            _handle_preset_write(cfg, playlists)
-        elif config_path is not None and preset_root is not None:
-            _handle_m1_preset_write(
-                config_path,
-                preset_root,
-                playlists[STEM_DRUMS],
+) -> TuningSession:
+    return TuningSession(
+        layer_z_order=list(cfg.layer_z_order),
+        layers={
+            name: LayerRuntime(
+                playlist=playlists[name],
+                opacity_pct=int(layer_cfg.opacity * 100),
+                blend_mode=layer_cfg.blend_mode,
+                beat_sensitivity=_beat_sensitivity(cfg, name),
+                enabled=layer_cfg.enabled,
             )
-        return True
+            for name, layer_cfg in cfg.layers.items()
+        },
+    )
 
-    if event.key not in LAYER_KEYS:
-        return False
 
-    stem = LAYER_KEYS[event.key]
-    layer = layers_by_name[stem]
-    playlist = playlists[stem]
+def build_view_state(controls: TuningControls, *, paused: bool) -> TuningViewState:
+    """Build overlay view state with truncated preset labels."""
+    base = controls.build_view_state(paused=paused)
+    tracks = {
+        stem: TrackBlock(
+            stem=block.stem,
+            preset_label=truncate_preset_label(block.preset_label),
+            blend_mode=block.blend_mode,
+            opacity_pct=block.opacity_pct,
+            beat_sensitivity=block.beat_sensitivity,
+            enabled=block.enabled,
+        )
+        for stem, block in base.tracks.items()
+    }
+    return TuningViewState(
+        layer_z_order=base.layer_z_order,
+        tracks=tracks,
+        paused=base.paused,
+        focus_index=base.focus_index,
+        move_mode_stem=base.move_mode_stem,
+        toast_message=base.toast_message,
+        toast_remaining_sec=base.toast_remaining_sec,
+    )
 
-    if shift:
-        _step_playlist(layer, playlist, forward=True)
-        return True
-    if ctrl:
-        _step_playlist(layer, playlist, forward=False)
-        return True
 
-    layer.fbo.enabled = not layer.fbo.enabled
-    return True
+def _make_tuning_controls(
+    *,
+    session: TuningSession,
+    cfg: CleaveConfig,
+    layers_by_name: dict[str, MilkdropLayer],
+    layers: list[MilkdropLayer],
+    playback,
+    duration_sec: float,
+) -> TuningControls:
+    def on_preset_change(stem: str, playlist: PresetPlaylist) -> None:
+        layer = layers_by_name[stem]
+        layer.playlist = playlist
+        playlist.load_into(layer.pm, smooth=False)
+        layer.pm.lock_preset(True)
+
+    def on_blend_change(stem: str, blend_mode) -> None:
+        layers_by_name[stem].fbo.blend_mode = blend_mode
+
+    def on_opacity_change(stem: str, pct: int) -> None:
+        fbo = layers_by_name[stem].fbo
+        fbo.opacity = pct / 100.0
+
+    def on_layer_enabled_change(stem: str, enabled: bool) -> None:
+        fbo = layers_by_name[stem].fbo
+        fbo.enabled = enabled
+        if enabled:
+            fbo.opacity = session.layers[stem].opacity_pct / 100.0
+
+    def on_beat_change(stem: str, beat: float) -> None:
+        layers_by_name[stem].pm.set_beat_sensitivity(beat)
+
+    def on_seek(delta_sec: float) -> None:
+        seek(playback, delta_sec, duration_sec)
+        _flush_all_pcm(layers)
+
+    def on_save_new_config() -> str:
+        out_path = next_unnamed_path(SAVED_CONFIGS_DIR)
+        write_session_snapshot(out_path, cfg=cfg, session=session)
+        return out_path.name
+
+    def on_overwrite_config() -> str:
+        write_session_snapshot(cfg.config_path, cfg=cfg, session=session)
+        return cfg.config_path.name
+
+    return TuningControls(
+        session,
+        preset_root=cfg.paths.preset_root,
+        playback=playback,
+        duration_sec=duration_sec,
+        on_preset_change=on_preset_change,
+        on_blend_change=on_blend_change,
+        on_opacity_change=on_opacity_change,
+        on_layer_enabled_change=on_layer_enabled_change,
+        on_beat_change=on_beat_change,
+        on_z_order_change=lambda _order: None,
+        on_seek=on_seek,
+        on_save_new_config=on_save_new_config,
+        on_overwrite_config=on_overwrite_config,
+        launch_config_path=cfg.config_path,
+    )
+
+
+def _composite_ordered(
+    compositor: GlCompositor,
+    layers_by_name: dict[str, MilkdropLayer],
+    session: TuningSession,
+) -> None:
+    ordered = [layers_by_name[name] for name in reversed(session.layer_z_order)]
+    compositor.composite([layer.fbo for layer in ordered])
+
+
+def _draw_tuning_overlay(
+    compositor: GlCompositor,
+    overlay: TuningOverlay,
+    overlay_surface: pygame.Surface,
+    view_state: TuningViewState,
+) -> None:
+    overlay_surface.fill((0, 0, 0, 0))
+    overlay.draw(overlay_surface, view_state)
+    panel = overlay.panel_rect
+    if panel is not None:
+        px, py, pw, ph = panel
+        panel_surface = overlay_surface.subsurface((px, py, pw, ph))
+        tex_id = compositor.upload_overlay_texture(panel_surface)
+        compositor.draw_overlay(tex_id, px, py, pw, ph)
 
 
 def run_m1(
@@ -430,6 +430,12 @@ def run_m1(
     fps: int,
 ) -> None:
     """M1 debug: one drums ProjectM instance and one FBO."""
+    cfg: CleaveConfig | None = None
+    try:
+        cfg = load_config(config_path, ROOT)
+    except (FileNotFoundError, ValueError):
+        pass
+
     pcm_bank = load_stem_pcm(stems_dir)
     duration_sec = pcm_bank.duration_sec
     n_pcm = samples_per_frame(fps)
@@ -470,16 +476,72 @@ def run_m1(
         layers = [
             MilkdropLayer(name=STEM_DRUMS, pm=pm, fbo=fbo, playlist=playlist)
         ]
-        playlists = {STEM_DRUMS: playlist}
         layers_by_name = {STEM_DRUMS: layers[0]}
+
+        session = TuningSession(
+            layer_z_order=[STEM_DRUMS],
+            layers={
+                STEM_DRUMS: LayerRuntime(
+                    playlist=playlist,
+                    opacity_pct=100,
+                    blend_mode="add",
+                    beat_sensitivity=beat_sensitivity,
+                ),
+            },
+        )
 
         pygame.mixer.music.load(str(audio_path))
         pygame.mixer.music.play()
 
         playback = init_playback()
-        overlay = ControlsOverlay(
-            _m1_overlay_rows(playlist, paused=playback.paused)
-        )
+        if cfg is not None:
+            controls = _make_tuning_controls(
+                session=session,
+                cfg=cfg,
+                layers_by_name=layers_by_name,
+                layers=layers,
+                playback=playback,
+                duration_sec=duration_sec,
+            )
+        else:
+
+            def on_preset_change(stem: str, pl: PresetPlaylist) -> None:
+                layer = layers_by_name[stem]
+                layer.playlist = pl
+                pl.load_into(layer.pm, smooth=False)
+                layer.pm.lock_preset(True)
+
+            controls = TuningControls(
+                session,
+                preset_root=preset_root,
+                playback=playback,
+                duration_sec=duration_sec,
+                on_preset_change=on_preset_change,
+                on_blend_change=lambda stem, mode: setattr(
+                    layers_by_name[stem].fbo, "blend_mode", mode
+                ),
+                on_opacity_change=lambda stem, pct: setattr(
+                    layers_by_name[stem].fbo, "opacity", pct / 100.0
+                ),
+                on_layer_enabled_change=lambda stem, on: (
+                    setattr(layers_by_name[stem].fbo, "enabled", on),
+                    setattr(
+                        layers_by_name[stem].fbo,
+                        "opacity",
+                        session.layers[stem].opacity_pct / 100.0,
+                    )
+                    if on
+                    else None,
+                ),
+                on_beat_change=lambda stem, beat: layers_by_name[
+                    stem
+                ].pm.set_beat_sensitivity(beat),
+                on_seek=lambda delta: (
+                    seek(playback, delta, duration_sec),
+                    _flush_all_pcm(layers),
+                ),
+            )
+        overlay = TuningOverlay()
 
         running = True
         while running:
@@ -487,29 +549,15 @@ def run_m1(
                 if event.type == pygame.QUIT:
                     running = False
                 elif event.type == pygame.KEYDOWN:
-                    overlay.notify_input()
-                    if event.key == pygame.K_ESCAPE:
+                    if controls.handle_keydown(event) is False:
                         running = False
-                    elif event.key == pygame.K_SPACE:
-                        toggle_pause(playback, duration_sec)
-                    elif event.key == pygame.K_LEFT:
-                        seek(playback, -SKIP_SEC, duration_sec)
-                        _flush_all_pcm(layers)
-                    elif event.key == pygame.K_RIGHT:
-                        seek(playback, SKIP_SEC, duration_sec)
-                        _flush_all_pcm(layers)
-                    elif _handle_layer_keydown(
-                        event,
-                        layers_by_name=layers_by_name,
-                        playlists=playlists,
-                        cfg=None,
-                        config_path=config_path,
-                        preset_root=preset_root,
-                    ):
-                        pass
-                    overlay.replace_rows(
-                        _m1_overlay_rows(playlist, paused=playback.paused)
-                    )
+                    else:
+                        overlay.notify_input()
+                elif event.type == pygame.KEYUP:
+                    controls.handle_keyup(event)
+
+            dt = clock.tick(fps) / 1000.0
+            controls.tick(dt)
 
             t_sec = current_sec(playback, duration_sec)
             layer = layers[0]
@@ -522,17 +570,11 @@ def run_m1(
             _render_layer_fbo(layer, layer.pm)
             compositor.composite([layer.fbo])
 
-            overlay_surface.fill((0, 0, 0, 0))
-            overlay.draw(overlay_surface)
-            panel = overlay.panel_rect
-            if panel is not None:
-                px, py, pw, ph = panel
-                panel_surface = overlay_surface.subsurface((px, py, pw, ph))
-                tex_id = compositor.upload_overlay_texture(panel_surface)
-                compositor.draw_overlay(tex_id, px, py, pw, ph)
+            view_state = build_view_state(controls, paused=playback.paused)
+            overlay.update(dt)
+            _draw_tuning_overlay(compositor, overlay, overlay_surface, view_state)
 
             pygame.display.flip()
-            overlay.update(clock.tick(fps) / 1000.0)
 
             if not playback.paused and not pygame.mixer.music.get_busy():
                 if t_sec >= duration_sec - 0.05:
@@ -582,15 +624,22 @@ def run(
         compositor = GlCompositor(width, height)
         compositor.init()
         layers = _build_layers(cfg, compositor, playlists)
+        layers_by_name = {layer.name: layer for layer in layers}
+        session = _session_from_cfg(cfg, playlists)
 
         pygame.mixer.music.load(str(audio_path))
         pygame.mixer.music.play()
 
         playback = init_playback()
-        overlay = ControlsOverlay(
-            _four_layer_overlay_rows(layers, playlists, paused=playback.paused)
+        controls = _make_tuning_controls(
+            session=session,
+            cfg=cfg,
+            layers_by_name=layers_by_name,
+            layers=layers,
+            playback=playback,
+            duration_sec=duration_sec,
         )
-        layers_by_name = {layer.name: layer for layer in layers}
+        overlay = TuningOverlay()
 
         running = True
         while running:
@@ -598,31 +647,15 @@ def run(
                 if event.type == pygame.QUIT:
                     running = False
                 elif event.type == pygame.KEYDOWN:
-                    overlay.notify_input()
-                    if event.key == pygame.K_ESCAPE:
+                    if controls.handle_keydown(event) is False:
                         running = False
-                    elif event.key == pygame.K_SPACE:
-                        toggle_pause(playback, duration_sec)
-                    elif event.key == pygame.K_LEFT:
-                        seek(playback, -SKIP_SEC, duration_sec)
-                        _flush_all_pcm(layers)
-                    elif event.key == pygame.K_RIGHT:
-                        seek(playback, SKIP_SEC, duration_sec)
-                        _flush_all_pcm(layers)
-                    elif _handle_layer_keydown(
-                        event,
-                        layers_by_name=layers_by_name,
-                        playlists=playlists,
-                        cfg=cfg,
-                        config_path=None,
-                        preset_root=None,
-                    ):
-                        pass
-                    overlay.replace_rows(
-                        _four_layer_overlay_rows(
-                            layers, playlists, paused=playback.paused
-                        )
-                    )
+                    else:
+                        overlay.notify_input()
+                elif event.type == pygame.KEYUP:
+                    controls.handle_keyup(event)
+
+            dt = clock.tick(fps) / 1000.0
+            controls.tick(dt)
 
             t_sec = current_sec(playback, duration_sec)
             if not playback.paused:
@@ -638,19 +671,13 @@ def run(
                 if layer.fbo.enabled:
                     _render_layer_fbo(layer, layer.pm)
 
-            compositor.composite([layer.fbo for layer in layers])
+            _composite_ordered(compositor, layers_by_name, session)
 
-            overlay_surface.fill((0, 0, 0, 0))
-            overlay.draw(overlay_surface)
-            panel = overlay.panel_rect
-            if panel is not None:
-                px, py, pw, ph = panel
-                panel_surface = overlay_surface.subsurface((px, py, pw, ph))
-                tex_id = compositor.upload_overlay_texture(panel_surface)
-                compositor.draw_overlay(tex_id, px, py, pw, ph)
+            view_state = build_view_state(controls, paused=playback.paused)
+            overlay.update(dt)
+            _draw_tuning_overlay(compositor, overlay, overlay_surface, view_state)
 
             pygame.display.flip()
-            overlay.update(clock.tick(fps) / 1000.0)
 
             if not playback.paused and not pygame.mixer.music.get_busy():
                 if t_sec >= duration_sec - 0.05:

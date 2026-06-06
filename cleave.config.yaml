@@ -1,36 +1,47 @@
-paths:
-  preset_root: ~/milkdrop-presets
-  texture_paths:
-  - ~/milkdrop-presets/presets-milkdrop-texture-pack
-layers:
-  other:
-    preset: presets-milkdrop-original/Milkdrop-Original/yin - 300 - Daydreamer.milk
-    enabled: true
-    opacity: 0.4
-    width: 640
-    height: 360
-  bass:
-    preset: presets-milkdrop-original/Milkdrop-Original/3dRaGoNs & Unchained - Dragon
-      Science.milk
-    enabled: true
-    opacity: 0.5
-    width: 960
-    height: 540
-  vocals:
-    preset: presets-cream-of-the-crop/Sparkle/Explosions/$$$ Royal - Mashup (244).milk
-    enabled: true
-    opacity: 0.65
-    width: 960
-    height: 540
-  drums:
-    preset: presets-cream-of-the-crop/Dancer/Aurora/suksma - shifter - urchin kali
-      echos - moish dt r3 nz+.milk
-    enabled: true
-    opacity: 0.3
-    width: 1280
-    height: 720
 visualizer:
+  name: cleave-explorer
   width: 1280
   height: 720
   fps: 30
   beat_sensitivity: 1.0
+
+paths:
+  preset_root: ~/milkdrop-presets
+  texture_paths:
+    - ~/milkdrop-presets/presets-milkdrop-texture-pack
+
+layer_z_order:
+  - drums
+  - vocals
+  - bass
+  - other
+
+layers:
+  other:
+    preset: presets-milkdrop-original/Milkdrop-Original/
+    enabled: true
+    opacity: 0.4
+    width: 640
+    height: 360
+    blend_mode: alpha
+  bass:
+    preset: presets-milkdrop-original/Milkdrop-Original/
+    enabled: true
+    opacity: 0.5
+    width: 960
+    height: 540
+    blend_mode: alpha
+  vocals:
+    preset: presets-cream-of-the-crop/Sparkle/Explosions/
+    enabled: true
+    opacity: 0.65
+    width: 960
+    height: 540
+    blend_mode: alpha
+  drums:
+    preset: presets-cream-of-the-crop/Dancer/Aurora/
+    enabled: true
+    opacity: 0.3
+    width: 1280
+    height: 720
+    blend_mode: add
