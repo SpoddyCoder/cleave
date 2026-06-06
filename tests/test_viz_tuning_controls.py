@@ -1,0 +1,437 @@
+"""Unit-style tests for live tuning controls (no Milkdrop window)."""
+
+from __future__ import annotations
+
+import io
+import sys
+import time
+from pathlib import Path
+from unittest.mock import patch
+
+import pygame
+
+from cleave.preset_playlist import PresetPlaylist
+from cleave.viz_playback import PlaybackState
+from cleave.viz_tuning_controls import (
+    LayerRuntime,
+    SEEK_LONG,
+    SEEK_SHORT,
+    TOAST_DURATION_SEC,
+    TuningControls,
+    TuningSession,
+)
+from cleave.viz_tuning_overlay import (
+    RowKind,
+    TuningOverlay,
+    _glyph_renders_real_shape,
+    _resolve_transport_icons,
+    _unicode_transport_available,
+    navigable_row_indices,
+    row_kind,
+    row_stem,
+)
+
+
+def _keydown(key: int, *, mod: int = 0) -> pygame.event.Event:
+    return pygame.event.Event(pygame.KEYDOWN, key=key, mod=mod)
+
+
+def _make_playlist(name: str, count: int = 3) -> PresetPlaylist:
+    paths = tuple(Path(f"/tmp/{name}/preset-{i}.milk") for i in range(count))
+    return PresetPlaylist(anchor=Path(f"/tmp/{name}"), paths=paths, index=0)
+
+
+def _make_controls(
+    stems: tuple[str, ...] = ("drums", "bass"),
+) -> TuningControls:
+    session = TuningSession(
+        layer_z_order=list(stems),
+        layers={
+            stem: LayerRuntime(playlist=_make_playlist(stem), opacity_pct=50)
+            for stem in stems
+        },
+    )
+    return TuningControls(
+        session,
+        preset_root=Path("/tmp/presets"),
+        playback=PlaybackState(),
+        duration_sec=120.0,
+    )
+
+
+def test_focus_navigation_wraps() -> None:
+    controls = _make_controls(("a", "b"))
+    total = 2 * 5 + 3
+    assert controls.focus_index == 0
+
+    for _ in range(total - 1):
+        assert controls.handle_keydown(_keydown(pygame.K_DOWN)) is True
+    assert controls.focus_index == total - 1
+
+    assert controls.handle_keydown(_keydown(pygame.K_DOWN)) is True
+    assert controls.focus_index == 0
+
+    assert controls.handle_keydown(_keydown(pygame.K_UP)) is True
+    assert controls.focus_index == total - 1
+
+
+def test_opacity_clamps() -> None:
+    controls = _make_controls(("drums",))
+    view = controls.build_view_state(paused=False)
+    opacity_row = next(
+        i
+        for i in range(5)
+        if row_kind(view, i) == RowKind.TRACK_OPACITY
+    )
+    controls.focus_index = opacity_row
+
+    for _ in range(60):
+        controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["drums"].opacity_pct == 100
+
+    for _ in range(120):
+        controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.layers["drums"].opacity_pct == 0
+
+
+def test_header_toggles_enabled() -> None:
+    enabled_events: list[tuple[str, bool]] = []
+    controls = _make_controls(("drums",))
+    controls._on_layer_enabled_change = lambda stem, on: enabled_events.append(
+        (stem, on)
+    )
+
+    view = controls.build_view_state(paused=False)
+    header_row = next(
+        i for i in range(5) if row_kind(view, i) == RowKind.TRACK_HEADER
+    )
+    controls.focus_index = header_row
+    assert controls.session.layers["drums"].enabled is True
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["drums"].enabled is False
+    assert enabled_events == [("drums", False)]
+    assert controls.session.layers["drums"].opacity_pct == 50
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.layers["drums"].enabled is True
+    assert enabled_events == [("drums", False), ("drums", True)]
+    assert controls.session.layers["drums"].opacity_pct == 50
+
+
+def test_navigation_skips_sub_rows_when_disabled() -> None:
+    controls = _make_controls(("drums", "bass"))
+    controls.session.layers["drums"].enabled = False
+    view = controls.build_view_state(paused=False)
+
+    drums_header = next(
+        i
+        for i in range(10)
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "drums"
+    )
+    bass_header = next(
+        i
+        for i in range(10)
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "bass"
+    )
+    navigable = navigable_row_indices(view)
+    assert drums_header in navigable
+    assert bass_header in navigable
+    for i in navigable:
+        stem = row_stem(view, i)
+        if stem == "drums":
+            assert row_kind(view, i) == RowKind.TRACK_HEADER
+
+    controls.focus_index = drums_header
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_index == bass_header
+
+
+def test_re_enable_allows_sub_row_focus() -> None:
+    controls = _make_controls(("drums",))
+    controls.session.layers["drums"].enabled = False
+    view = controls.build_view_state(paused=False)
+    header_row = next(
+        i for i in range(5) if row_kind(view, i) == RowKind.TRACK_HEADER
+    )
+    preset_row = next(
+        i for i in range(5) if row_kind(view, i) == RowKind.TRACK_PRESET
+    )
+    transport_row = next(
+        i for i in range(8) if row_kind(view, i) == RowKind.TRANSPORT
+    )
+    controls.focus_index = header_row
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_index == transport_row
+
+    controls.focus_index = header_row
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["drums"].enabled is True
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_index == preset_row
+
+
+def test_opacity_ctrl_step_is_ten_percent() -> None:
+    controls = _make_controls(("drums",))
+    view = controls.build_view_state(paused=False)
+    opacity_row = next(i for i in range(5) if row_kind(view, i) == RowKind.TRACK_OPACITY)
+    controls.focus_index = opacity_row
+    controls.session.layers["drums"].opacity_pct = 50
+
+    controls.handle_keydown(
+        _keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL),
+    )
+    assert controls.session.layers["drums"].opacity_pct == 60
+
+    controls.handle_keydown(
+        _keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL),
+    )
+    assert controls.session.layers["drums"].opacity_pct == 50
+
+
+def test_move_mode_swaps_z_order() -> None:
+    z_orders: list[list[str]] = []
+    controls = _make_controls(("drums", "bass", "vocals"))
+    controls._on_z_order_change = lambda order: z_orders.append(list(order))
+
+    view = controls.build_view_state(paused=False)
+    header_row = next(
+        i
+        for i in range(15)
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "bass"
+    )
+    controls.focus_index = header_row
+
+    assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+    assert controls.move_mode_stem == "bass"
+
+    assert controls.handle_keydown(_keydown(pygame.K_UP)) is True
+    assert controls.session.layer_z_order == ["bass", "drums", "vocals"]
+
+    assert controls.handle_keydown(_keydown(pygame.K_DOWN)) is True
+    assert controls.session.layer_z_order == ["drums", "bass", "vocals"]
+
+    assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+    assert controls.move_mode_stem is None
+    assert z_orders == [["drums", "bass", "vocals"]]
+
+
+def test_save_new_triggers_toast_and_blocks_input() -> None:
+    controls = _make_controls(("drums",))
+    view = controls.build_view_state(paused=False)
+    save_row = next(
+        i for i in range(8) if row_kind(view, i) == RowKind.SAVE_NEW_CONFIG
+    )
+    controls.focus_index = save_row
+
+    stderr = io.StringIO()
+    with patch.object(time, "monotonic", return_value=1000.0):
+        with patch("sys.stderr", stderr):
+            assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+
+        assert "Config saved to unnamed-1.cleave.config.yaml" in stderr.getvalue()
+        state = controls.build_view_state(paused=False)
+        assert state.toast_message == "Config saved to unnamed-1.cleave.config.yaml"
+        assert state.toast_remaining_sec == TOAST_DURATION_SEC
+
+        before = controls.focus_index
+        assert controls.handle_keydown(_keydown(pygame.K_DOWN)) is True
+        assert controls.focus_index == before
+
+
+def test_overwrite_shows_confirm_before_write() -> None:
+    launch_path = Path("/tmp/cleave.config.yaml")
+    writes: list[Path] = []
+    controls = _make_controls(("drums",))
+    controls._launch_config_path = launch_path
+    controls._on_overwrite_config = lambda: (
+        writes.append(launch_path) or launch_path.name
+    )
+
+    view = controls.build_view_state(paused=False)
+    overwrite_row = next(
+        i for i in range(8) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
+    )
+    controls.focus_index = overwrite_row
+
+    assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+    state = controls.build_view_state(paused=False)
+    assert state.confirm_message == "Overwrite cleave.config.yaml?"
+    assert writes == []
+
+    assert controls.handle_keydown(_keydown(pygame.K_n)) is True
+    state = controls.build_view_state(paused=False)
+    assert state.confirm_message == "Overwrite cleave.config.yaml?"
+    assert state.confirm_focus_yes is False
+    assert writes == []
+
+    assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+    state = controls.build_view_state(paused=False)
+    assert state.confirm_message is None
+    assert writes == []
+
+
+def test_overwrite_confirm_yes_writes_launch_path() -> None:
+    launch_path = Path("/tmp/my-launch.cleave.config.yaml")
+    writes: list[Path] = []
+    controls = _make_controls(("drums",))
+    controls._launch_config_path = launch_path
+    controls._on_overwrite_config = lambda: (
+        writes.append(launch_path) or launch_path.name
+    )
+
+    view = controls.build_view_state(paused=False)
+    overwrite_row = next(
+        i for i in range(8) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
+    )
+    controls.focus_index = overwrite_row
+
+    stderr = io.StringIO()
+    with patch.object(time, "monotonic", return_value=2000.0):
+        with patch("sys.stderr", stderr):
+            controls.handle_keydown(_keydown(pygame.K_RETURN))
+            controls.handle_keydown(_keydown(pygame.K_RETURN))
+
+        assert writes == [launch_path]
+        state = controls.build_view_state(paused=False)
+        assert state.confirm_message is None
+        assert state.toast_message == "Config overwritten: my-launch.cleave.config.yaml"
+        assert "Config overwritten: my-launch.cleave.config.yaml" in stderr.getvalue()
+
+
+def test_overwrite_confirm_esc_dismisses() -> None:
+    launch_path = Path("/tmp/cleave.config.yaml")
+    writes: list[Path] = []
+    controls = _make_controls(("drums",))
+    controls._launch_config_path = launch_path
+    controls._on_overwrite_config = lambda: (
+        writes.append(launch_path) or launch_path.name
+    )
+
+    view = controls.build_view_state(paused=False)
+    overwrite_row = next(
+        i for i in range(8) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
+    )
+    controls.focus_index = overwrite_row
+
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
+    state = controls.build_view_state(paused=False)
+    assert state.confirm_message is None
+    assert writes == []
+
+
+def test_esc_during_confirm_does_not_quit() -> None:
+    controls = _make_controls(("drums",))
+    view = controls.build_view_state(paused=False)
+    overwrite_row = next(
+        i for i in range(8) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
+    )
+    controls.focus_index = overwrite_row
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
+
+
+def test_esc_requests_quit() -> None:
+    controls = _make_controls()
+    assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is False
+
+
+def _skip_glyph_has_opaque_pixels(font: pygame.font.Font, ch: str) -> bool:
+    """Skip icons must render visible ink, not hollow missing-glyph boxes."""
+    ref_px = pygame.mask.from_surface(font.render("A", True, (255, 255, 255))).count()
+    min_px = max(8, int(ref_px * 0.15))
+    surf = font.render(ch, True, (255, 255, 255))
+    opaque = pygame.mask.from_surface(surf).count()
+    if opaque < min_px:
+        return False
+
+    width, height = surf.get_size()
+    interior_opaque = 0
+    for y in range(height):
+        for x in range(width):
+            if surf.get_at((x, y))[3] > 128 and 1 < x < width - 2 and 2 < y < height - 3:
+                interior_opaque += 1
+    return interior_opaque / opaque >= 0.35
+
+
+def test_transport_row_icons() -> None:
+    overlay = TuningOverlay()
+    font = overlay._transport_font_get()
+    prev_u, play_u, pause_u, nxt_u = _resolve_transport_icons(overlay._font_size)
+
+    if _unicode_transport_available():
+        assert play_u == "▶"
+        assert pause_u == "⏸"
+        if _glyph_renders_real_shape(font, "⏮"):
+            assert prev_u == "⏮"
+        else:
+            assert prev_u == "<<"
+        if _glyph_renders_real_shape(font, "⏭"):
+            assert nxt_u == "⏭"
+        else:
+            assert nxt_u == ">>"
+    else:
+        assert (prev_u, play_u, pause_u, nxt_u) == ("<<", ">", "||", ">>")
+
+    prev, play, nxt = overlay._transport_icon_set(paused=False)
+    assert (prev, play, nxt) == (prev_u, play_u, nxt_u)
+    playing = font.render(f"{prev}  {play}  {nxt}", True, (255, 255, 255))
+    assert playing.get_width() > 0
+    assert _skip_glyph_has_opaque_pixels(font, prev)
+    assert _skip_glyph_has_opaque_pixels(font, nxt)
+
+    prev, play, nxt = overlay._transport_icon_set(paused=True)
+    assert (prev, play, nxt) == (prev_u, pause_u, nxt_u)
+    paused = font.render(f"{prev}  {play}  {nxt}", True, (255, 255, 255))
+    assert paused.get_width() > 0
+    assert _skip_glyph_has_opaque_pixels(font, prev)
+    assert _skip_glyph_has_opaque_pixels(font, nxt)
+
+
+def test_transport_seek_constants() -> None:
+    seeks: list[float] = []
+    controls = _make_controls(("drums",))
+    controls._on_seek = lambda delta: seeks.append(delta)
+
+    view = controls.build_view_state(paused=False)
+    transport_row = next(i for i in range(8) if row_kind(view, i) == RowKind.TRANSPORT)
+    controls.focus_index = transport_row
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+
+    assert seeks == [SEEK_SHORT, -SEEK_SHORT, SEEK_LONG, -SEEK_LONG]
+
+
+def main() -> int:
+    pygame.init()
+    tests = [
+        test_focus_navigation_wraps,
+        test_opacity_clamps,
+        test_header_toggles_enabled,
+        test_navigation_skips_sub_rows_when_disabled,
+        test_re_enable_allows_sub_row_focus,
+        test_opacity_ctrl_step_is_ten_percent,
+        test_move_mode_swaps_z_order,
+        test_save_new_triggers_toast_and_blocks_input,
+        test_overwrite_shows_confirm_before_write,
+        test_overwrite_confirm_yes_writes_launch_path,
+        test_overwrite_confirm_esc_dismisses,
+        test_esc_during_confirm_does_not_quit,
+        test_esc_requests_quit,
+        test_transport_row_icons,
+        test_transport_seek_constants,
+    ]
+    for test in tests:
+        test()
+        print(f"ok {test.__name__}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

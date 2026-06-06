@@ -126,7 +126,7 @@ class GlCompositor:
         self,
         output_width: int = 1280,
         output_height: int = 720,
-        bg: tuple[float, float, float, float] = (10 / 255, 8 / 255, 14 / 255, 1.0),
+        bg: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0),
     ) -> None:
         self.output_width = output_width
         self.output_height = output_height

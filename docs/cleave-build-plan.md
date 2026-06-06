@@ -162,7 +162,7 @@ By this point you have a working layered system you understand. Milkdrop becomes
 
 **5.3 — One libprojectM instance per layer**
 - Four instances, four FBOs at tiered resolutions ([cleave/gl_compositor.py](cleave/gl_compositor.py))
-- Composite bottom-to-top; layer toggles **d** / **b** / **v** / **o** (reuse overlay from Phase 4)
+- Composite bottom-to-top per `layer_z_order`; per-layer opacity gates visibility (Phase 5.6 live tuning overlay)
 
 **5.4 — Preset selection via config**
 - Per-layer preset path, size, opacity, beat sensitivity in `cleave.config.yaml`
@@ -178,13 +178,41 @@ By this point you have a working layered system you understand. Milkdrop becomes
 
 ---
 
+## Phase 5.6 — Live Tuning Console ✅
+*Goal: replace ad-hoc key chords with a focus-driven overlay for in-session preset and compositor tuning.*
+
+**5.6.1 — Focus-driven tree overlay**
+- [cleave/viz_tuning_overlay.py](cleave/viz_tuning_overlay.py): per-stem tree (header, preset, blend, opacity, beat), transport row with seek icons, SAVE CONFIG footer
+- [cleave/viz_tuning_controls.py](cleave/viz_tuning_controls.py): Up/Down row focus; Left/Right adjust the focused field; hold-to-repeat on preset/blend/opacity/beat rows ([cleave/viz_key_repeat.py](cleave/viz_key_repeat.py))
+- Same idle behaviour as Phase 4 overlay: 10s hold after input, 2s fade ([cleave/viz_theme.py](cleave/viz_theme.py))
+
+**5.6.2 — Per-layer tuning**
+- Preset: Left/Right step within playlist; Ctrl+Left/Right jump to sibling preset directory
+- Blend mode: cycle `alpha` / `add` per layer (`layers.*.blend_mode` in config)
+- Opacity: 1% steps (10% with Ctrl); 0% disables the layer
+- Beat sensitivity: 0.01 steps (0.1 with Ctrl)
+
+**5.6.3 — Z-order move mode**
+- Enter on a track header enters move mode (blue highlight); Up/Down swap that stem in `layer_z_order`; Enter confirms
+- Compositor re-orders bottom-to-top from live `layer_z_order` each frame
+
+**5.6.4 — Transport and save**
+- Transport row: Left/Right seek ±10s (±30s with Ctrl); icons show skip back, play, pause, skip forward
+- Space toggles pause/play (not shown in overlay)
+- Enter on SAVE CONFIG writes a full snapshot via [cleave/config_snapshot.py](cleave/config_snapshot.py) to [saved-cleave-configs/](saved-cleave-configs/) as `unnamed-N.cleave.config.yaml` (never overwrites the launch config)
+- Esc quits
+
+**✅ Milestone: tune presets, blend, opacity, beat, and z-order in-session; save reproducible YAML snapshots without touching the launch config**
+
+---
+
 ## Phase 6 — Visual Quality & Aesthetic Pass
 *Goal: make it look like something you'd actually want to watch.*
 
 **6.1 — Curate presets per layer role**
 The drum layer needs presets that respond well to sharp transients — look for ones that flash, burst or strobe on `bass_att`. The bass layer suits slow, fluid presets. The background/other layer suits ones with continuous motion that's modulated rather than triggered.
 
-Preset curation is supported in-session via [scripts/milkdrop_visualizer.py](scripts/milkdrop_visualizer.py): **Shift/Ctrl+stem** steps presets (file or directory playlist), directory anchors enable recursive browsing, and **Ctrl+W** writes the current choice per layer back to [cleave.config.yaml](cleave.config.yaml).
+Preset curation happens in-session via the Phase 5.6 live tuning overlay ([scripts/milkdrop_visualizer.py](scripts/milkdrop_visualizer.py)): browse presets per layer, tune blend/opacity/beat, reorder z-order, and save snapshots to [saved-cleave-configs/](saved-cleave-configs/). Promote a winning snapshot into [cleave.config.yaml](cleave.config.yaml) manually when ready.
 
 **6.2 — Compositor aesthetics**
 - Tune blend modes between layers — additive blending works well for grungy/industrial aesthetics
@@ -293,8 +321,19 @@ Ideas to revisit once the core is solid:
 - [x] YAML config loader ([cleave/config.py](cleave/config.py), [cleave.config.yaml](cleave.config.yaml))
 - [x] M1 spike: [scripts/milkdrop_visualizer.py](scripts/milkdrop_visualizer.py) (drums-only via `--preset`)
 - [x] M2: PCM sync validation on `sights-and-sounds-26` (full track, pause, seek)
-- [x] M3: four layers + compositor + d/b/v/o toggles
+- [x] M3: four layers + compositor + per-layer opacity visibility
 - [x] M4: all layers and visualizer settings from config (fps 30)
 - [x] M5 docs: README Phase 5, preset_root path guidance, project-context
 
-**Next:** Phase 6 compositor aesthetics.
+### Phase 5.6 — Live Tuning Console ✅
+
+- [x] Focus-driven tree overlay ([cleave/viz_tuning_overlay.py](cleave/viz_tuning_overlay.py), [cleave/viz_tuning_controls.py](cleave/viz_tuning_controls.py))
+- [x] Up/Down row navigation; Left/Right field adjust; hold-to-repeat on tuning rows
+- [x] Per-layer preset, blend mode, opacity, beat sensitivity
+- [x] Z-order move mode on track headers (Enter, Up/Down, Enter)
+- [x] Transport row with seek icons (±10s / ±30s with Ctrl)
+- [x] SAVE CONFIG snapshots to `saved-cleave-configs/unnamed-N.cleave.config.yaml` ([cleave/config_snapshot.py](cleave/config_snapshot.py))
+- [x] `layer_z_order` and `layers.*.blend_mode` in [cleave.config.yaml](cleave.config.yaml)
+- [x] Docs: README tuning guide, build plan 5.6, project-context
+
+**Next:** Phase 6 visual quality and compositor aesthetics.

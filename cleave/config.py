@@ -10,11 +10,19 @@ from typing import Any
 import yaml
 
 from cleave.extract import STEM_NAMES
+from cleave.gl_compositor import BlendMode
 
 CONFIG_FILENAME = "cleave.config.yaml"
 GLOBAL_CONFIG_PATH = Path.home() / ".config" / "cleave" / CONFIG_FILENAME
 
-LAYER_Z_ORDER = ("other", "bass", "vocals", "drums")
+DEFAULT_LAYER_Z_ORDER = ("drums", "vocals", "bass", "other")
+
+DEFAULT_BLEND_MODE: dict[str, BlendMode] = {
+    "drums": "add",
+    "other": "alpha",
+    "bass": "alpha",
+    "vocals": "alpha",
+}
 
 LAYER_DEFAULT_SIZE: dict[str, tuple[int, int]] = {
     "other": (640, 360),
@@ -46,6 +54,7 @@ class LayerConfig:
     width: int = 1280
     height: int = 720
     beat_sensitivity: float | None = None
+    blend_mode: BlendMode = "alpha"
 
 
 @dataclass(frozen=True)
@@ -62,10 +71,11 @@ class CleaveConfig:
     layers: dict[str, LayerConfig]
     visualizer: VisualizerConfig
     config_path: Path
+    layer_z_order: tuple[str, ...] = DEFAULT_LAYER_Z_ORDER
 
     def layers_in_z_order(self) -> list[tuple[str, LayerConfig]]:
-        """Return configured layers bottom-to-top: other, bass, vocals, drums."""
-        return [(name, self.layers[name]) for name in LAYER_Z_ORDER]
+        """Return layers in compositor draw order (bottom-to-top)."""
+        return [(name, self.layers[name]) for name in reversed(self.layer_z_order)]
 
 
 def _expand_path(path: Path | str) -> Path:
@@ -120,6 +130,32 @@ def _parse_paths(data: dict[str, Any]) -> PathsConfig:
     return PathsConfig(preset_root=preset_root, texture_paths=texture_paths)
 
 
+def _parse_layer_z_order(data: dict[str, Any]) -> tuple[str, ...]:
+    raw = data.get("layer_z_order")
+    if raw is None:
+        return DEFAULT_LAYER_Z_ORDER
+    if not isinstance(raw, list):
+        raise ValueError("layer_z_order must be a list")
+    if len(raw) != len(STEM_NAMES):
+        raise ValueError(
+            f"layer_z_order must contain exactly {len(STEM_NAMES)} entries"
+        )
+    if set(raw) != set(STEM_NAMES):
+        raise ValueError(
+            f"layer_z_order must contain each of {', '.join(STEM_NAMES)} exactly once"
+        )
+    return tuple(raw)
+
+
+def _parse_blend_mode(name: str, layer_raw: dict[str, Any]) -> BlendMode:
+    raw = layer_raw.get("blend_mode")
+    if raw is None:
+        return DEFAULT_BLEND_MODE[name]
+    if raw not in ("alpha", "add"):
+        raise ValueError(f"layers.{name}.blend_mode must be 'alpha' or 'add'")
+    return raw
+
+
 def _parse_visualizer(data: dict[str, Any]) -> VisualizerConfig:
     visualizer = _as_mapping(data.get("visualizer"), "visualizer")
     return VisualizerConfig(
@@ -161,6 +197,7 @@ def _parse_layers(data: dict[str, Any], preset_root: Path) -> dict[str, LayerCon
             width=int(layer_raw.get("width", default_width)),
             height=int(layer_raw.get("height", default_height)),
             beat_sensitivity=float(beat_raw) if beat_raw is not None else None,
+            blend_mode=_parse_blend_mode(name, layer_raw),
         )
     return layers
 
@@ -215,6 +252,7 @@ def load_config(
 
     paths = _parse_paths(data)
     visualizer = _parse_visualizer(data)
+    layer_z_order = _parse_layer_z_order(data)
     layers = _parse_layers(data, paths.preset_root)
     _validate_presets(layers)
 
@@ -223,4 +261,5 @@ def load_config(
         layers=layers,
         visualizer=visualizer,
         config_path=path,
+        layer_z_order=layer_z_order,
     )

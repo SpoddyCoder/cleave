@@ -1,11 +1,25 @@
-# symlink to windows host
-cleave-resources
+####################################
+# User Source and Generated Files
+#
 
-# milkdrop presets
+# cleave generated files (stem wavs, signals.json, onset_comparison.png)
+stems/*
+!stems/.gitkeep
+
+# saved cleave configs
+saved-cleave-configs/*
+!saved-cleave-configs/.gitkeep
+
+# Add these optional convenience symlinks:
+#  - to windows host - use this to hold original audio source and final renders
+cleave-resources
+#  - to Milkdrop presets - clone community preset repos here
 milkdrop-presets
 
-# Per-track stem folders (wavs and signals.json; user-managed)
-stems/
+
+####################################
+# Project Ignores
+#
 
 # python
 __pycache__/
