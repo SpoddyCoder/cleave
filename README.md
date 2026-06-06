@@ -219,7 +219,7 @@ A focus-driven tree panel ([cleave/viz_tuning_overlay.py](cleave/viz_tuning_over
 | --- | --- |
 | Up / Down | Move focus between rows (per-stem tree, transport, save rows) |
 | Left / Right | Adjust the focused field (see below); hold to repeat on preset, blend, opacity, and beat rows |
-| Ctrl + Left / Right | Larger steps on opacity and beat; on preset row, jump to sibling preset directory |
+| Ctrl + Left / Right | Larger steps on opacity and beat; on preset row, jump ±10 presets in the current directory (wraps) |
 | Enter | On track header: enter z-order move mode; on SAVE AS NEW CONFIG: write snapshot; on OVERWRITE CONFIG (when shown): confirm then overwrite launch config |
 | Enter (move mode) | Confirm z-order after Up/Down swaps |
 | Up / Down (move mode) | Swap focused stem up/down in `layer_z_order` |
@@ -230,7 +230,7 @@ A focus-driven tree panel ([cleave/viz_tuning_overlay.py](cleave/viz_tuning_over
 
 | Row | Left / Right | Ctrl + Left / Right |
 | --- | --- | --- |
-| Preset | Previous / next preset in playlist | Previous / next sibling preset directory |
+| Preset | Previous / next preset in playlist | Previous / next preset ±10 in current directory |
 | Blend mode | Cycle `alpha` / `add` | (same step size) |
 | Opacity | −1% / +1% | −10% / +10% (0% disables the layer) |
 | Beat sensitivity | −0.01 / +0.01 | −0.1 / +0.1 |
@@ -258,6 +258,6 @@ python scripts/milkdrop_visualizer.py stems/sights-and-sounds-26 \
   --preset ~/milkdrop-presets/presets-cream-of-the-crop/Drawing/some-preset.milk
 ```
 
-`--preset` accepts a `.milk` file or a directory (same recursive scan as layer config). The same live tuning overlay applies: focus the drums preset row and use Left/Right to step presets (Ctrl+Left/Right for sibling directories). SAVE AS NEW CONFIG writes to [saved-cleave-configs/](saved-cleave-configs/) when a launch config exists; without `--config`, save-as-new still uses the default unnamed snapshot path.
+`--preset` accepts a `.milk` file or a directory (same recursive scan as layer config). The same live tuning overlay applies: focus the drums preset row and use Left/Right to step presets (Ctrl+Left/Right for ±10). SAVE AS NEW CONFIG writes to [saved-cleave-configs/](saved-cleave-configs/) when a launch config exists; without `--config`, save-as-new still uses the default unnamed snapshot path.
 
 See [docs/cleave-build-plan.md](docs/cleave-build-plan.md) for the full roadmap.

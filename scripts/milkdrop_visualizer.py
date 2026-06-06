@@ -330,7 +330,8 @@ def build_view_state(
     tracks = {
         stem: TrackBlock(
             stem=block.stem,
-            preset_label=truncate_preset_label(block.preset_label),
+            preset_dir_label=truncate_preset_label(block.preset_dir_label),
+            preset_label=block.preset_label,
             blend_mode=block.blend_mode,
             opacity_pct=block.opacity_pct,
             beat_sensitivity=block.beat_sensitivity,

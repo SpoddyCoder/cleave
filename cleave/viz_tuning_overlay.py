@@ -26,7 +26,7 @@ from cleave.viz_theme import (
 
 Anchor = Literal["topleft", "bottomleft"]
 
-ROWS_PER_TRACK = 5
+ROWS_PER_TRACK = 6
 FOOTER_ROWS_WITH_OVERWRITE = 3
 FOOTER_ROWS_WITHOUT_OVERWRITE = 2
 TREE_INDENT = 16
@@ -48,6 +48,7 @@ _transport_font_cache: dict[int, pygame.font.Font | None] = {}
 
 class RowKind(Enum):
     TRACK_HEADER = auto()
+    TRACK_PRESET_DIR = auto()
     TRACK_PRESET = auto()
     TRACK_BLEND = auto()
     TRACK_OPACITY = auto()
@@ -60,6 +61,7 @@ class RowKind(Enum):
 @dataclass
 class TrackBlock:
     stem: str
+    preset_dir_label: str
     preset_label: str
     blend_mode: str
     opacity_pct: int
@@ -96,6 +98,7 @@ def row_count(state: TuningViewState) -> int:
 
 _SUB_ROW_KINDS = frozenset(
     {
+        RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
         RowKind.TRACK_BLEND,
         RowKind.TRACK_OPACITY,
@@ -141,6 +144,7 @@ def row_kind(state: TuningViewState, index: int) -> RowKind:
     if index < track_rows:
         return (
             RowKind.TRACK_HEADER,
+            RowKind.TRACK_PRESET_DIR,
             RowKind.TRACK_PRESET,
             RowKind.TRACK_BLEND,
             RowKind.TRACK_OPACITY,
@@ -170,8 +174,10 @@ def _row_text(state: TuningViewState, index: int) -> str:
         layer_num = state.layer_z_order.index(stem) + 1
         status = "enabled" if block.enabled else "disabled"
         return f"Layer {layer_num}: {stem.upper()} ({status})"
+    if kind == RowKind.TRACK_PRESET_DIR:
+        return f"└─ {truncate_preset_label(block.preset_dir_label)}"
     if kind == RowKind.TRACK_PRESET:
-        return f"└─ {truncate_preset_label(block.preset_label)}"
+        return f"└─ {block.preset_label}"
     if kind == RowKind.TRACK_BLEND:
         return f"└─ blend mode: {block.blend_mode}"
     if kind == RowKind.TRACK_OPACITY:
@@ -184,6 +190,7 @@ def _row_indent(state: TuningViewState, index: int) -> int:
     if kind == RowKind.TRACK_HEADER:
         return 0
     if kind in {
+        RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
         RowKind.TRACK_BLEND,
         RowKind.TRACK_OPACITY,
