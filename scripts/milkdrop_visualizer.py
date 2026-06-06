@@ -25,6 +25,7 @@ if str(ROOT) not in sys.path:
 from cleave.config import (  # noqa: E402
     CONFIG_FILENAME,
     CleaveConfig,
+    clamp_beat_sensitivity,
     DEFAULT_PRESET_ROOT,
     DEFAULT_VISUALIZER_FPS,
     DEFAULT_VISUALIZER_HEIGHT,
@@ -211,7 +212,9 @@ def resolve_m1_preset(
         if isinstance(data, dict):
             visualizer = data.get("visualizer")
             if isinstance(visualizer, dict):
-                beat_sensitivity = float(visualizer.get("beat_sensitivity", 1.0))
+                beat_sensitivity = clamp_beat_sensitivity(
+                    visualizer.get("beat_sensitivity", 1.0)
+                )
     return playlist, textures, beat_sensitivity
 
 
@@ -316,9 +319,14 @@ def _allow_overwrite_config(config_cli: Path | None, cfg: CleaveConfig) -> bool:
     return not implicit_local
 
 
-def build_view_state(controls: TuningControls, *, paused: bool) -> TuningViewState:
+def build_view_state(
+    controls: TuningControls,
+    *,
+    paused: bool,
+    position_sec: float,
+) -> TuningViewState:
     """Build overlay view state with truncated preset labels."""
-    base = controls.build_view_state(paused=paused)
+    base = controls.build_view_state(paused=paused, position_sec=position_sec)
     tracks = {
         stem: TrackBlock(
             stem=block.stem,
@@ -334,6 +342,7 @@ def build_view_state(controls: TuningControls, *, paused: bool) -> TuningViewSta
         layer_z_order=base.layer_z_order,
         tracks=tracks,
         paused=base.paused,
+        position_sec=base.position_sec,
         focus_index=base.focus_index,
         move_mode_stem=base.move_mode_stem,
         toast_message=base.toast_message,
@@ -587,7 +596,11 @@ def run_m1(
             _render_layer_fbo(layer, layer.pm)
             compositor.composite([layer.fbo])
 
-            view_state = build_view_state(controls, paused=playback.paused)
+            view_state = build_view_state(
+                controls,
+                paused=playback.paused,
+                position_sec=t_sec,
+            )
             overlay.update(dt)
             _draw_tuning_overlay(compositor, overlay, overlay_surface, view_state)
 
@@ -693,7 +706,11 @@ def run(
 
             _composite_ordered(compositor, layers_by_name, session)
 
-            view_state = build_view_state(controls, paused=playback.paused)
+            view_state = build_view_state(
+                controls,
+                paused=playback.paused,
+                position_sec=t_sec,
+            )
             overlay.update(dt)
             _draw_tuning_overlay(compositor, overlay, overlay_surface, view_state)
 

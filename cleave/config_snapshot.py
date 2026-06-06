@@ -8,7 +8,7 @@ from typing import Any
 
 import yaml
 
-from cleave.config import CleaveConfig
+from cleave.config import CleaveConfig, clamp_beat_sensitivity
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import to_config_relative
 from cleave.viz_tuning_controls import TuningSession
@@ -69,7 +69,9 @@ def write_session_snapshot(
     visualizer["width"] = cfg.visualizer.width
     visualizer["height"] = cfg.visualizer.height
     visualizer["fps"] = cfg.visualizer.fps
-    visualizer["beat_sensitivity"] = cfg.visualizer.beat_sensitivity
+    visualizer["beat_sensitivity"] = clamp_beat_sensitivity(
+        cfg.visualizer.beat_sensitivity
+    )
 
     orig_paths = original.get("paths")
     if isinstance(orig_paths, dict) and orig_paths:
@@ -111,6 +113,7 @@ def write_session_snapshot(
             "height": layer_cfg.height,
             "blend_mode": blend_mode,
         }
+        beat = clamp_beat_sensitivity(beat)
         if beat != global_beat:
             layer_out["beat_sensitivity"] = beat
         layers_out[name] = layer_out

@@ -10,6 +10,7 @@ import pygame
 
 from cleave.viz_confirm import ConfirmDialog
 from cleave.viz_overlay import truncate_preset_label
+from cleave.viz_playback import format_mmss
 from cleave.viz_theme import (
     BACKGROUND,
     BACKGROUND_ALPHA,
@@ -71,6 +72,7 @@ class TuningViewState:
     layer_z_order: tuple[str, ...]
     tracks: dict[str, TrackBlock]
     paused: bool
+    position_sec: float
     focus_index: int
     move_mode_stem: str | None
     toast_message: str | None
@@ -240,6 +242,24 @@ def _resolve_skip_icon(font: pygame.font.Font | None, *, prev: bool) -> str:
     return ascii_icon
 
 
+def _resolve_play_icon(font: pygame.font.Font | None) -> str:
+    if font is None:
+        return _TRANSPORT_PLAY_ASCII[0]
+    ch = _TRANSPORT_PLAY_UNICODE[0]
+    if _glyph_renders_real_shape(font, ch):
+        return ch
+    return _TRANSPORT_PLAY_ASCII[0]
+
+
+def _resolve_pause_icon(font: pygame.font.Font | None) -> str:
+    if font is None:
+        return _TRANSPORT_PLAY_ASCII[1]
+    ch = _TRANSPORT_PLAY_UNICODE[1]
+    if _glyph_renders_real_shape(font, ch):
+        return ch
+    return _TRANSPORT_PLAY_ASCII[1]
+
+
 def _resolve_transport_icons(
     font_size: int,
 ) -> tuple[str, str, str, str]:
@@ -251,7 +271,8 @@ def _resolve_transport_icons(
         return prev, play, pause, nxt
     prev = _resolve_skip_icon(font, prev=True)
     nxt = _resolve_skip_icon(font, prev=False)
-    play, pause = _TRANSPORT_PLAY_UNICODE
+    play = _resolve_play_icon(font)
+    pause = _resolve_pause_icon(font)
     return prev, play, pause, nxt
 
 
@@ -364,7 +385,8 @@ class TuningOverlay:
         toast_active = bool(state.toast_message and state.toast_remaining_sec > 0)
         confirm_active = state.confirm_message is not None
 
-        row_surfaces: list[pygame.Surface | None] = []
+        row_surfaces: list[pygame.Surface] = []
+        row_time_surfaces: list[pygame.Surface | None] = []
         row_widths: list[int] = []
         for index in range(count):
             kind = row_kind(state, index)
@@ -376,15 +398,20 @@ class TuningOverlay:
                     paused=state.paused,
                     font_size=self._font_size,
                 )
-                text = f"{prev}  {play}  {nxt}"
-                row_font = transport_font
+                icons_text = f"{prev}  {play}  {nxt}"
+                icons_surf = transport_font.render(icons_text, True, color)
+                time_surf = font.render(format_mmss(state.position_sec), True, color)
+                row_surfaces.append(icons_surf)
+                row_time_surfaces.append(time_surf)
+                row_widths.append(
+                    indent + icons_surf.get_width() + 8 + time_surf.get_width()
+                )
             else:
                 text = _row_text(state, index)
-                row_font = font
-
-            surf = row_font.render(text, True, color)
-            row_surfaces.append(surf)
-            row_widths.append(indent + surf.get_width())
+                surf = font.render(text, True, color)
+                row_surfaces.append(surf)
+                row_time_surfaces.append(None)
+                row_widths.append(indent + surf.get_width())
 
         toast_surf: pygame.Surface | None = None
         if toast_active:
@@ -446,6 +473,11 @@ class TuningOverlay:
             if text_alpha >= 2:
                 surf.set_alpha(text_alpha)
                 panel.blit(surf, (indent, y))
+                time_surf = row_time_surfaces[index]
+                if time_surf is not None:
+                    time_surf.set_alpha(text_alpha)
+                    time_x = self._padding + content_w - time_surf.get_width()
+                    panel.blit(time_surf, (time_x, y))
             y += line_h + self._line_gap
 
         if confirm_active and text_alpha >= 2:
