@@ -15,34 +15,130 @@ if TYPE_CHECKING:
     from cleave.projectm import ProjectM
 
 
+def dir_has_presets(path: Path) -> bool:
+    """True when any ``.milk`` preset exists anywhere under ``path``."""
+    return any(path.rglob("*.milk"))
+
+
+def list_navigable_dirs(parent: Path) -> tuple[Path, ...]:
+    """Sorted immediate subdirectories of ``parent`` that contain presets."""
+    if not parent.is_dir():
+        return ()
+    dirs = [
+        child
+        for child in parent.iterdir()
+        if child.is_dir() and not child.name.startswith(".") and dir_has_presets(child)
+    ]
+    return tuple(sorted(dirs, key=lambda p: p.name))
+
+
+def milk_files_in_dir(dir: Path) -> tuple[Path, ...]:
+    """Non-recursive ``*.milk`` files directly in ``dir``."""
+    return tuple(sorted(dir.glob("*.milk")))
+
+
+def playlist_at_dir(dir: Path, *, index: int = 0) -> PresetPlaylist:
+    """Build a playlist for presets directly in ``dir``."""
+    resolved_dir = dir.resolve()
+    paths = tuple(p.resolve() for p in milk_files_in_dir(resolved_dir))
+    if not paths:
+        return PresetPlaylist(current_dir=resolved_dir, paths=(), index=0)
+    clamped = index % len(paths)
+    return PresetPlaylist(current_dir=resolved_dir, paths=paths, index=clamped)
+
+
+def _path_at_or_below(path: Path, root: Path) -> bool:
+    resolved = path.resolve()
+    resolved_root = root.resolve()
+    if resolved == resolved_root:
+        return True
+    try:
+        resolved.relative_to(resolved_root)
+        return True
+    except ValueError:
+        return False
+
+
 @dataclass
 class PresetPlaylist:
-    anchor: Path
+    current_dir: Path
     paths: tuple[Path, ...]
     index: int = 0
 
     @property
-    def current(self) -> Path:
+    def current(self) -> Path | None:
+        if not self.paths:
+            return None
         return self.paths[self.index]
 
-    def next(self) -> Path:
+    def _apply(self, other: PresetPlaylist) -> None:
+        self.current_dir = other.current_dir
+        self.paths = other.paths
+        self.index = other.index
+
+    def next(self) -> Path | None:
+        if not self.paths:
+            return None
         self.index = (self.index + 1) % len(self.paths)
         return self.current
 
-    def prev(self) -> Path:
+    def prev(self) -> Path | None:
+        if not self.paths:
+            return None
         self.index = (self.index - 1) % len(self.paths)
         return self.current
 
-    def step_by(self, delta: int) -> Path:
+    def step_by(self, delta: int) -> Path | None:
+        if not self.paths:
+            return None
         self.index = (self.index + delta) % len(self.paths)
         return self.current
 
+    def step_sibling(self, delta: int = 1) -> bool:
+        siblings = list_navigable_dirs(self.current_dir.parent)
+        if not siblings:
+            return False
+        resolved_current = self.current_dir.resolve()
+        try:
+            idx = next(
+                i for i, sibling in enumerate(siblings) if sibling.resolve() == resolved_current
+            )
+        except StopIteration:
+            idx = 0
+        new_idx = (idx + delta) % len(siblings)
+        self._apply(playlist_at_dir(siblings[new_idx], index=0))
+        return True
+
+    def enter_child(self, preset_root: Path) -> bool:
+        children = list_navigable_dirs(self.current_dir)
+        if not children:
+            return False
+        self._apply(playlist_at_dir(children[0], index=0))
+        return True
+
+    def go_parent(self, preset_root: Path) -> bool:
+        parent = self.current_dir.parent
+        if parent == self.current_dir:
+            return False
+        if not _path_at_or_below(parent, preset_root):
+            return False
+        self._apply(playlist_at_dir(parent, index=0))
+        return True
+
     def load_into(self, pm: ProjectM, smooth: bool = True) -> None:
+        if self.current is None:
+            return
         pm.load_preset(self.current, smooth=smooth)
+
+    def config_preset_path(self, preset_root: Path) -> str:
+        if self.current is not None:
+            return to_config_relative(self.current, preset_root)
+        rel = to_config_relative(self.current_dir, preset_root)
+        return rel if rel.endswith("/") else f"{rel}/"
 
 
 def scan_preset_playlist(anchor: Path) -> PresetPlaylist:
-    """Build a playlist from a .milk file or a directory tree of presets."""
+    """Build a playlist from a .milk file or a directory of presets."""
     resolved = anchor.resolve()
     if not resolved.exists():
         raise FileNotFoundError(f"preset anchor not found: {resolved}")
@@ -50,32 +146,48 @@ def scan_preset_playlist(anchor: Path) -> PresetPlaylist:
     if resolved.is_file():
         if resolved.suffix.lower() != ".milk":
             raise ValueError(f"preset anchor is not a .milk file: {resolved}")
-        dir_anchor = resolved.parent
-        paths = tuple(sorted(dir_anchor.rglob("*.milk")))
-        if not paths:
-            raise ValueError(f"no .milk presets found under: {dir_anchor}")
-        try:
-            index = paths.index(resolved)
-        except ValueError:
+        current_dir = resolved.parent.resolve()
+        paths = tuple(p.resolve() for p in milk_files_in_dir(current_dir))
+        if paths:
+            try:
+                index = paths.index(resolved)
+            except ValueError:
+                index = 0
+        else:
             index = 0
-        return PresetPlaylist(anchor=dir_anchor, paths=paths, index=index)
+        return PresetPlaylist(current_dir=current_dir, paths=paths, index=index)
 
     if resolved.is_dir():
-        paths = tuple(sorted(resolved.rglob("*.milk")))
-        if not paths:
-            raise ValueError(f"no .milk presets found under: {resolved}")
-        return PresetPlaylist(anchor=resolved, paths=paths, index=0)
+        return playlist_at_dir(resolved, index=0)
 
     raise ValueError(f"preset anchor is not a file or directory: {resolved}")
 
 
 def directory_display(playlist: PresetPlaylist, preset_root: Path) -> str:
-    """Directory path for overlay, relative to preset_root (no filename)."""
-    return to_config_relative(playlist.anchor, preset_root)
+    """Directory path for overlay with sibling position among navigable dirs."""
+    rel = to_config_relative(playlist.current_dir, preset_root)
+    siblings = list_navigable_dirs(playlist.current_dir.parent)
+    if not siblings:
+        return f"{rel} (1/1)"
+    resolved_current = playlist.current_dir.resolve()
+    try:
+        position = (
+            next(
+                i
+                for i, sibling in enumerate(siblings)
+                if sibling.resolve() == resolved_current
+            )
+            + 1
+        )
+    except StopIteration:
+        position = 1
+    return f"{rel} ({position}/{len(siblings)})"
 
 
 def preset_filename_display(playlist: PresetPlaylist) -> str:
-    """Current preset filename with position in the active directory playlist."""
+    """Current preset filename with position, or empty-state label."""
+    if playlist.current is None:
+        return "NO PRESETS FOUND"
     total = len(playlist.paths)
     position = playlist.index + 1
     return f"{playlist.current.name} ({position}/{total})"
@@ -128,7 +240,7 @@ def write_layer_presets(
             layers[stem] = layer
         if not isinstance(layer, dict):
             raise ValueError(f"layers.{stem} must be a mapping")
-        layer["preset"] = to_config_relative(playlist.current, root)
+        layer["preset"] = playlist.config_preset_path(root)
 
     data["layers"] = layers
 

@@ -17,27 +17,7 @@ layer_z_order:
   - other
 
 layers:
-  other:
-    preset: presets-milkdrop-original/Milkdrop-Original/
-    enabled: true
-    opacity: 0.4
-    width: 640
-    height: 360
-    blend_mode: alpha
-  bass:
-    preset: presets-milkdrop-original/Milkdrop-Original/
-    enabled: true
-    opacity: 0.5
-    width: 960
-    height: 540
-    blend_mode: alpha
-  vocals:
-    preset: presets-cream-of-the-crop/Sparkle/Explosions/
-    enabled: true
-    opacity: 0.65
-    width: 960
-    height: 540
-    blend_mode: alpha
+
   drums:
     preset: presets-cream-of-the-crop/Dancer/Aurora/
     enabled: true
@@ -45,3 +25,27 @@ layers:
     width: 1280
     height: 720
     blend_mode: add
+
+  bass:
+    preset: presets-milkdrop-original/Milkdrop-Original/
+    enabled: true
+    opacity: 0.5
+    width: 960
+    height: 540
+    blend_mode: alpha
+
+  vocals:
+    preset: presets-cream-of-the-crop/Sparkle/Explosions/
+    enabled: true
+    opacity: 0.65
+    width: 960
+    height: 540
+    blend_mode: alpha
+
+  other:
+    preset: presets-milkdrop-original/Milkdrop-Original/
+    enabled: true
+    opacity: 0.4
+    width: 640
+    height: 360
+    blend_mode: alpha
