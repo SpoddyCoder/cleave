@@ -11,7 +11,7 @@ from unittest.mock import patch
 import pygame
 
 from cleave.preset_playlist import PresetPlaylist
-from cleave.viz_playback import PlaybackState
+from cleave.viz_playback import PlaybackState, format_mmss
 from cleave.viz_tuning_controls import (
     LayerRuntime,
     SEEK_LONG,
@@ -177,6 +177,23 @@ def test_re_enable_allows_sub_row_focus() -> None:
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_index == preset_row
+
+
+def test_beat_sensitivity_clamps() -> None:
+    controls = _make_controls(("drums",))
+    view = controls.build_view_state(paused=False)
+    beat_row = next(
+        i for i in range(5) if row_kind(view, i) == RowKind.TRACK_BEAT
+    )
+    controls.focus_index = beat_row
+
+    for _ in range(300):
+        controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["drums"].beat_sensitivity == 2.0
+
+    for _ in range(300):
+        controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.layers["drums"].beat_sensitivity == 0.0
 
 
 def test_opacity_ctrl_step_is_ten_percent() -> None:
@@ -406,8 +423,14 @@ def test_transport_row_icons() -> None:
     prev_u, play_u, pause_u, nxt_u = _resolve_transport_icons(overlay._font_size)
 
     if _unicode_transport_available():
-        assert play_u == "▶"
-        assert pause_u == "⏸"
+        if _glyph_renders_real_shape(font, "▶"):
+            assert play_u == "▶"
+        else:
+            assert play_u == ">"
+        if _glyph_renders_real_shape(font, "⏸"):
+            assert pause_u == "⏸"
+        else:
+            assert pause_u == "||"
         if _glyph_renders_real_shape(font, "⏮"):
             assert prev_u == "⏮"
         else:
@@ -424,6 +447,7 @@ def test_transport_row_icons() -> None:
     playing = font.render(f"{prev}  {play}  {nxt}", True, (255, 255, 255))
     assert playing.get_width() > 0
     assert _skip_glyph_has_opaque_pixels(font, prev)
+    assert _skip_glyph_has_opaque_pixels(font, play)
     assert _skip_glyph_has_opaque_pixels(font, nxt)
 
     prev, play, nxt = overlay._transport_icon_set(paused=True)
@@ -431,7 +455,36 @@ def test_transport_row_icons() -> None:
     paused = font.render(f"{prev}  {play}  {nxt}", True, (255, 255, 255))
     assert paused.get_width() > 0
     assert _skip_glyph_has_opaque_pixels(font, prev)
+    assert _skip_glyph_has_opaque_pixels(font, play)
     assert _skip_glyph_has_opaque_pixels(font, nxt)
+
+
+def test_transport_enter_toggles_pause() -> None:
+    controls = _make_controls(("drums",))
+    view = controls.build_view_state(paused=False)
+    transport_row = next(
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.TRANSPORT
+    )
+    controls.focus_index = transport_row
+    assert controls.playback.paused is False
+
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    assert controls.playback.paused is True
+
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    assert controls.playback.paused is False
+
+
+def test_space_toggles_pause_from_any_focus() -> None:
+    controls = _make_controls(("drums",))
+    assert controls.playback.paused is False
+    assert controls.focus_index == 0
+
+    controls.handle_keydown(_keydown(pygame.K_SPACE))
+    assert controls.playback.paused is True
+
+    controls.handle_keydown(_keydown(pygame.K_SPACE))
+    assert controls.playback.paused is False
 
 
 def test_quick_nav_row_indices_headers_and_transport_only() -> None:
@@ -563,11 +616,19 @@ def test_transport_seek_constants() -> None:
     assert seeks == [SEEK_SHORT, -SEEK_SHORT, SEEK_LONG, -SEEK_LONG]
 
 
+def test_format_mmss() -> None:
+    assert format_mmss(0) == "00:00"
+    assert format_mmss(42.7) == "00:42"
+    assert format_mmss(222) == "03:42"
+    assert format_mmss(-5) == "00:00"
+
+
 def main() -> int:
     pygame.init()
     tests = [
         test_focus_navigation_wraps,
         test_opacity_clamps,
+        test_beat_sensitivity_clamps,
         test_header_toggles_enabled,
         test_navigation_skips_sub_rows_when_disabled,
         test_re_enable_allows_sub_row_focus,
@@ -582,6 +643,9 @@ def main() -> int:
         test_esc_during_confirm_does_not_quit,
         test_esc_requests_quit,
         test_transport_row_icons,
+        test_format_mmss,
+        test_transport_enter_toggles_pause,
+        test_space_toggles_pause_from_any_focus,
         test_transport_seek_constants,
         test_quick_nav_row_indices_headers_and_transport_only,
         test_ctrl_quick_nav_cycles_headers_and_transport,

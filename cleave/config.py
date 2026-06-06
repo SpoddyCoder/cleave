@@ -38,6 +38,13 @@ DEFAULT_VISUALIZER_WIDTH = 1280
 DEFAULT_VISUALIZER_HEIGHT = 720
 DEFAULT_VISUALIZER_FPS = 30
 DEFAULT_BEAT_SENSITIVITY = 1.0
+BEAT_SENSITIVITY_MIN = 0.0
+BEAT_SENSITIVITY_MAX = 2.0
+
+
+def clamp_beat_sensitivity(value: float) -> float:
+    """Match libprojectM beat sensitivity range (0.0 to 2.0)."""
+    return max(BEAT_SENSITIVITY_MIN, min(BEAT_SENSITIVITY_MAX, float(value)))
 
 
 @dataclass(frozen=True)
@@ -162,7 +169,7 @@ def _parse_visualizer(data: dict[str, Any]) -> VisualizerConfig:
         width=int(visualizer.get("width", DEFAULT_VISUALIZER_WIDTH)),
         height=int(visualizer.get("height", DEFAULT_VISUALIZER_HEIGHT)),
         fps=int(visualizer.get("fps", DEFAULT_VISUALIZER_FPS)),
-        beat_sensitivity=float(
+        beat_sensitivity=clamp_beat_sensitivity(
             visualizer.get("beat_sensitivity", DEFAULT_BEAT_SENSITIVITY)
         ),
     )
@@ -196,7 +203,9 @@ def _parse_layers(data: dict[str, Any], preset_root: Path) -> dict[str, LayerCon
             opacity=float(layer_raw.get("opacity", 1.0)),
             width=int(layer_raw.get("width", default_width)),
             height=int(layer_raw.get("height", default_height)),
-            beat_sensitivity=float(beat_raw) if beat_raw is not None else None,
+            beat_sensitivity=clamp_beat_sensitivity(beat_raw)
+            if beat_raw is not None
+            else None,
             blend_mode=_parse_blend_mode(name, layer_raw),
         )
     return layers

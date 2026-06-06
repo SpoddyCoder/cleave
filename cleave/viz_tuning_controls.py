@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pygame
 
+from cleave.config import clamp_beat_sensitivity
 from cleave.gl_compositor import BlendMode
 from cleave.preset_playlist import (
     PresetPlaylist,
@@ -19,7 +20,7 @@ from cleave.preset_playlist import (
 )
 from cleave.viz_confirm import ConfirmDialog, ConfirmRequest
 from cleave.viz_key_repeat import KeyRepeatController
-from cleave.viz_playback import PlaybackState, seek, toggle_pause
+from cleave.viz_playback import PlaybackState, current_sec, seek, toggle_pause
 from cleave.viz_tuning_overlay import (
     RowKind,
     TrackBlock,
@@ -171,6 +172,9 @@ class TuningControls:
         if event.key == pygame.K_RETURN:
             view = self.build_view_state(paused=self.playback.paused)
             kind = row_kind(view, self.focus_index)
+            if kind == RowKind.TRANSPORT:
+                toggle_pause(self.playback, self.duration_sec)
+                return True
             if kind == RowKind.TRACK_HEADER:
                 stem = row_stem(view, self.focus_index)
                 if stem is not None:
@@ -194,7 +198,12 @@ class TuningControls:
         if self._toast_message is not None and time.monotonic() >= self._toast_deadline:
             self._toast_message = None
 
-    def build_view_state(self, *, paused: bool) -> TuningViewState:
+    def build_view_state(
+        self,
+        *,
+        paused: bool,
+        position_sec: float | None = None,
+    ) -> TuningViewState:
         tracks: dict[str, TrackBlock] = {}
         for stem in self.session.layer_z_order:
             layer = self.session.layers[stem]
@@ -223,10 +232,14 @@ class TuningControls:
             confirm_message = self._confirm.message
             confirm_focus_yes = self._confirm.focus_yes
 
+        if position_sec is None:
+            position_sec = current_sec(self.playback, self.duration_sec)
+
         return TuningViewState(
             layer_z_order=tuple(self.session.layer_z_order),
             tracks=tracks,
             paused=paused,
+            position_sec=position_sec,
             focus_index=self.focus_index,
             move_mode_stem=self.move_mode_stem,
             toast_message=toast_message,
@@ -363,7 +376,7 @@ class TuningControls:
 
     def _set_beat(self, stem: str, value: float) -> None:
         layer = self.session.layers[stem]
-        layer.beat_sensitivity = max(0.0, value)
+        layer.beat_sensitivity = clamp_beat_sensitivity(value)
         if self._on_beat_change is not None:
             self._on_beat_change(stem, layer.beat_sensitivity)
 
