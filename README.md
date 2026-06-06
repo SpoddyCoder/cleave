@@ -213,11 +213,16 @@ python scripts/milkdrop_visualizer.py stems/sights-and-sounds-26 \
 
 ### Live tuning overlay
 
-A focus-driven tree panel ([cleave/viz_tuning_overlay.py](cleave/viz_tuning_overlay.py), [cleave/viz_tuning_controls.py](cleave/viz_tuning_controls.py)) lists each stem with directory and filename preset rows, blend mode, opacity, and beat sensitivity rows, plus transport and save footer rows. Navigate with the arrow keys; the focused row is highlighted in orange. **SAVE AS NEW CONFIG** is always shown; **OVERWRITE CONFIG** appears only when the launch config was passed explicitly via `--config` or resolved from a non-default path (not the implicit repo-root [cleave.config.yaml](cleave.config.yaml) discovered without `--config`).
+A focus-driven tree panel ([cleave/viz_tuning_overlay.py](cleave/viz_tuning_overlay.py), [cleave/viz_tuning_controls.py](cleave/viz_tuning_controls.py)) has two sections:
+
+- **Track rows section** (upper): one six-row block per stem (header, directory, filename, blend, opacity, beat). Headers show as `Layer N: STEM`.
+- **Footer rows section** (lower, separated by a gap): transport (seek icons and elapsed time), **SAVE AS NEW CONFIG**, and **OVERWRITE CONFIG** when the launch config is overwritable.
+
+Navigate with the arrow keys; the focused row is highlighted in orange. **SAVE AS NEW CONFIG** is always shown; **OVERWRITE CONFIG** appears only when the launch config was passed explicitly via `--config` or resolved from a non-default path (not the implicit repo-root [cleave.config.yaml](cleave.config.yaml) discovered without `--config`).
 
 | Key | Action |
 | --- | --- |
-| Up / Down | Move focus between rows (per-stem tree, transport, save rows) |
+| Up / Down | Move focus between rows (track rows section and footer rows section) |
 | Left / Right | Adjust the focused field (see below); hold to repeat on directory, filename, blend, opacity, and beat rows |
 | Ctrl + Left / Right | Larger steps on opacity and beat; on filename row, jump ±10 presets in the current directory (wraps) |
 | Enter | On directory row: descend into first alphabetical child directory with presets; on track header: enter z-order move mode; on SAVE AS NEW CONFIG: write snapshot; on OVERWRITE CONFIG (when shown): confirm then overwrite launch config |

@@ -27,8 +27,9 @@ from cleave.viz_tuning_controls import (
     TuningControls,
     TuningSession,
     _REPEAT_ROW_KINDS,
+    config_path_display,
 )
-from cleave.viz_theme import HIGHLIGHT, TEXT_DIM
+from cleave.viz_theme import HIGHLIGHT, LABEL_MAX_LEN, TEXT_DIM
 from cleave.viz_tuning_overlay import (
     RowKind,
     TrackBlock,
@@ -81,18 +82,19 @@ def _make_controls(
 
 def test_focus_navigation_wraps() -> None:
     controls = _make_controls(("a", "b"))
-    total = 2 * 6 + 3
+    view = controls.build_view_state(paused=False)
+    navigable = navigable_row_indices(view)
     assert controls.focus_index == 0
 
-    for _ in range(total - 1):
+    for _ in range(len(navigable) - 1):
         assert controls.handle_keydown(_keydown(pygame.K_DOWN)) is True
-    assert controls.focus_index == total - 1
+    assert controls.focus_index == navigable[-1]
 
     assert controls.handle_keydown(_keydown(pygame.K_DOWN)) is True
     assert controls.focus_index == 0
 
     assert controls.handle_keydown(_keydown(pygame.K_UP)) is True
-    assert controls.focus_index == total - 1
+    assert controls.focus_index == navigable[-1]
 
 
 def test_opacity_clamps() -> None:
@@ -178,7 +180,7 @@ def test_re_enable_allows_sub_row_focus() -> None:
         i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET_DIR
     )
     transport_row = next(
-        i for i in range(9) if row_kind(view, i) == RowKind.TRANSPORT
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.TRANSPORT
     )
     controls.focus_index = header_row
 
@@ -279,17 +281,95 @@ def test_save_as_new_triggers_toast_and_blocks_input() -> None:
         assert controls.focus_index == before
 
 
+def test_config_header_shows_active_path() -> None:
+    launch_path = Path("/tmp/saved-cleave-configs/my-track.yaml")
+    controls = _make_controls(("drums",))
+    controls._active_config_path = launch_path
+    view = controls.build_view_state(paused=False)
+    header_row = next(
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.CONFIG_HEADER
+    )
+    assert _row_text(view, header_row) == config_path_display(launch_path)
+    assert header_row not in navigable_row_indices(view)
+
+
+def test_config_header_truncates_long_paths() -> None:
+    long_path = Path(
+        "/very/long/root/saved-cleave-configs/nested/deep/unnamed-99.cleave.config.yaml"
+    )
+    controls = _make_controls(("drums",))
+    controls._active_config_path = long_path
+    view = controls.build_view_state(paused=False)
+    header_row = next(
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.CONFIG_HEADER
+    )
+    label = _row_text(view, header_row)
+    assert len(label) <= LABEL_MAX_LEN
+    assert label.startswith("…/")
+
+
+def test_save_as_new_updates_active_config_path() -> None:
+    saved_path = Path("/tmp/saved-cleave-configs/unnamed-2.cleave.config.yaml")
+    controls = _make_controls(("drums",))
+    controls._on_save_new_config = lambda: saved_path
+
+    view = controls.build_view_state(paused=False)
+    save_row = next(
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.SAVE_AS_NEW_CONFIG
+    )
+    controls.focus_index = save_row
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+
+    assert controls._active_config_path == saved_path
+    state = controls.build_view_state(paused=False)
+    header_row = next(
+        i for i in range(row_count(state)) if row_kind(state, i) == RowKind.CONFIG_HEADER
+    )
+    assert _row_text(state, header_row) == config_path_display(saved_path)
+
+
+def test_overwrite_after_save_uses_new_active_path() -> None:
+    launch_path = Path("/tmp/cleave.config.yaml")
+    saved_path = Path("/tmp/saved-cleave-configs/unnamed-1.cleave.config.yaml")
+    writes: list[Path] = []
+    controls = _make_controls(("drums",))
+    controls._active_config_path = launch_path
+    controls._on_save_new_config = lambda: saved_path
+    controls._on_overwrite_config = lambda path: writes.append(path) or path.name
+
+    view = controls.build_view_state(paused=False)
+    save_row = next(
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.SAVE_AS_NEW_CONFIG
+    )
+    overwrite_row = next(
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
+    )
+
+    with patch.object(time, "monotonic", return_value=3000.0):
+        controls.focus_index = save_row
+        controls.handle_keydown(_keydown(pygame.K_RETURN))
+
+    with patch.object(time, "monotonic", return_value=3000.0 + TOAST_DURATION_SEC + 1):
+        controls.focus_index = overwrite_row
+        controls.handle_keydown(_keydown(pygame.K_RETURN))
+        controls.handle_keydown(_keydown(pygame.K_RETURN))
+
+    assert writes == [saved_path]
+
+
 def test_navigable_rows_without_overwrite() -> None:
     controls = _make_controls(("drums",), allow_overwrite=False)
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is False
-    assert row_count(view) == 8
+    assert row_count(view) == 9
 
     kinds = {row_kind(view, i) for i in range(row_count(view))}
+    assert RowKind.CONFIG_HEADER in kinds
     assert RowKind.SAVE_AS_NEW_CONFIG in kinds
     assert RowKind.OVERWRITE_CONFIG not in kinds
 
     navigable = navigable_row_indices(view)
+    assert all(row_kind(view, i) != RowKind.CONFIG_HEADER for i in navigable)
     assert all(row_kind(view, i) != RowKind.OVERWRITE_CONFIG for i in navigable)
 
     transport_row = next(
@@ -307,7 +387,7 @@ def test_navigable_rows_with_overwrite() -> None:
     controls = _make_controls(("drums",), allow_overwrite=True)
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is True
-    assert row_count(view) == 9
+    assert row_count(view) == 10
 
     overwrite_row = next(
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
@@ -319,14 +399,14 @@ def test_overwrite_shows_confirm_before_write() -> None:
     launch_path = Path("/tmp/cleave.config.yaml")
     writes: list[Path] = []
     controls = _make_controls(("drums",))
-    controls._launch_config_path = launch_path
-    controls._on_overwrite_config = lambda: (
-        writes.append(launch_path) or launch_path.name
+    controls._active_config_path = launch_path
+    controls._on_overwrite_config = lambda path: (
+        writes.append(path) or path.name
     )
 
     view = controls.build_view_state(paused=False)
     overwrite_row = next(
-        i for i in range(9) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
     )
     controls.focus_index = overwrite_row
 
@@ -351,14 +431,14 @@ def test_overwrite_confirm_yes_writes_launch_path() -> None:
     launch_path = Path("/tmp/my-launch.cleave.config.yaml")
     writes: list[Path] = []
     controls = _make_controls(("drums",))
-    controls._launch_config_path = launch_path
-    controls._on_overwrite_config = lambda: (
-        writes.append(launch_path) or launch_path.name
+    controls._active_config_path = launch_path
+    controls._on_overwrite_config = lambda path: (
+        writes.append(path) or path.name
     )
 
     view = controls.build_view_state(paused=False)
     overwrite_row = next(
-        i for i in range(9) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
     )
     controls.focus_index = overwrite_row
 
@@ -379,14 +459,14 @@ def test_overwrite_confirm_esc_dismisses() -> None:
     launch_path = Path("/tmp/cleave.config.yaml")
     writes: list[Path] = []
     controls = _make_controls(("drums",))
-    controls._launch_config_path = launch_path
-    controls._on_overwrite_config = lambda: (
-        writes.append(launch_path) or launch_path.name
+    controls._active_config_path = launch_path
+    controls._on_overwrite_config = lambda path: (
+        writes.append(path) or path.name
     )
 
     view = controls.build_view_state(paused=False)
     overwrite_row = next(
-        i for i in range(9) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
     )
     controls.focus_index = overwrite_row
 
@@ -401,7 +481,7 @@ def test_esc_during_confirm_does_not_quit() -> None:
     controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
     overwrite_row = next(
-        i for i in range(9) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
     )
     controls.focus_index = overwrite_row
     controls.handle_keydown(_keydown(pygame.K_RETURN))
@@ -838,7 +918,9 @@ def test_transport_seek_constants() -> None:
     controls._on_seek = lambda delta: seeks.append(delta)
 
     view = controls.build_view_state(paused=False)
-    transport_row = next(i for i in range(9) if row_kind(view, i) == RowKind.TRANSPORT)
+    transport_row = next(
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.TRANSPORT
+    )
     controls.focus_index = transport_row
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
@@ -868,6 +950,10 @@ def main() -> int:
         test_opacity_ctrl_step_is_ten_percent,
         test_move_mode_swaps_z_order,
         test_save_as_new_triggers_toast_and_blocks_input,
+        test_config_header_shows_active_path,
+        test_config_header_truncates_long_paths,
+        test_save_as_new_updates_active_config_path,
+        test_overwrite_after_save_uses_new_active_path,
         test_navigable_rows_without_overwrite,
         test_navigable_rows_with_overwrite,
         test_overwrite_shows_confirm_before_write,

@@ -7,6 +7,8 @@ from typing import Literal
 
 import pygame
 
+from cleave.viz_theme import LABEL_MAX_LEN
+
 Anchor = Literal["topleft", "bottomleft"]
 
 _TEXT = (200, 195, 190)
@@ -25,7 +27,7 @@ def _on_off(enabled: bool) -> str:
     return "ON" if enabled else "OFF"
 
 
-def truncate_preset_label(label: str, max_len: int = 48) -> str:
+def truncate_preset_label(label: str, max_len: int = LABEL_MAX_LEN) -> str:
     """Shorten a preset path for overlay; keep the tail (subdir + filename)."""
     if len(label) <= max_len:
         return label
