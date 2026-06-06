@@ -25,6 +25,7 @@ from cleave.viz_tuning_overlay import (
     TrackBlock,
     TuningViewState,
     navigable_row_indices,
+    quick_nav_row_indices,
     row_kind,
     row_stem,
 )
@@ -84,6 +85,7 @@ class TuningControls:
         on_save_new_config: Callable[[], str | None] | None = None,
         on_overwrite_config: Callable[[], str | None] | None = None,
         launch_config_path: Path | None = None,
+        allow_overwrite: bool = True,
     ) -> None:
         self.session = session
         self.preset_root = preset_root
@@ -99,6 +101,7 @@ class TuningControls:
         self._on_seek = on_seek
         self._on_save_new_config = on_save_new_config
         self._on_overwrite_config = on_overwrite_config
+        self._allow_overwrite = allow_overwrite
 
         self.focus_index = 0
         self.move_mode_stem: str | None = None
@@ -138,6 +141,10 @@ class TuningControls:
                 self._confirm_move_mode()
                 return True
 
+        if event.key in (pygame.K_UP, pygame.K_DOWN) and _mod_ctrl(event.mod):
+            self._move_quick_focus(-1 if event.key == pygame.K_UP else 1)
+            return True
+
         if event.key == pygame.K_UP:
             self._move_focus(-1)
             return True
@@ -169,10 +176,10 @@ class TuningControls:
                 if stem is not None:
                     self.move_mode_stem = stem
                 return True
-            if kind == RowKind.SAVE_NEW_CONFIG:
+            if kind == RowKind.SAVE_AS_NEW_CONFIG:
                 self._trigger_save_new()
                 return True
-            if kind == RowKind.OVERWRITE_CONFIG:
+            if kind == RowKind.OVERWRITE_CONFIG and self._allow_overwrite:
                 self._prompt_overwrite()
                 return True
 
@@ -226,6 +233,7 @@ class TuningControls:
             toast_remaining_sec=toast_remaining,
             confirm_message=confirm_message,
             confirm_focus_yes=confirm_focus_yes,
+            allow_overwrite=self._allow_overwrite,
         )
 
     def _input_blocked(self) -> bool:
@@ -241,6 +249,23 @@ class TuningControls:
         except ValueError:
             pos = 0
         self.focus_index = navigable[(pos + delta) % len(navigable)]
+
+    def _move_quick_focus(self, delta: int) -> None:
+        view = self.build_view_state(paused=self.playback.paused)
+        quick = quick_nav_row_indices(view)
+        if not quick:
+            return
+        current = self.focus_index
+        if current in quick:
+            pos = quick.index(current)
+            self.focus_index = quick[(pos + delta) % len(quick)]
+            return
+        if delta > 0:
+            after = [index for index in quick if index > current]
+            self.focus_index = after[0] if after else quick[0]
+        else:
+            before = [index for index in quick if index < current]
+            self.focus_index = before[-1] if before else quick[-1]
 
     def _swap_stem_in_z_order(self, stem: str, direction: int) -> None:
         order = self.session.layer_z_order

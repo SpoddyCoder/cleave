@@ -25,8 +25,11 @@ from cleave.viz_tuning_overlay import (
     TuningOverlay,
     _glyph_renders_real_shape,
     _resolve_transport_icons,
+    _row_text,
     _unicode_transport_available,
     navigable_row_indices,
+    quick_nav_row_indices,
+    row_count,
     row_kind,
     row_stem,
 )
@@ -43,6 +46,8 @@ def _make_playlist(name: str, count: int = 3) -> PresetPlaylist:
 
 def _make_controls(
     stems: tuple[str, ...] = ("drums", "bass"),
+    *,
+    allow_overwrite: bool = True,
 ) -> TuningControls:
     session = TuningSession(
         layer_z_order=list(stems),
@@ -56,6 +61,7 @@ def _make_controls(
         preset_root=Path("/tmp/presets"),
         playback=PlaybackState(),
         duration_sec=120.0,
+        allow_overwrite=allow_overwrite,
     )
 
 
@@ -218,12 +224,13 @@ def test_move_mode_swaps_z_order() -> None:
     assert z_orders == [["drums", "bass", "vocals"]]
 
 
-def test_save_new_triggers_toast_and_blocks_input() -> None:
+def test_save_as_new_triggers_toast_and_blocks_input() -> None:
     controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
     save_row = next(
-        i for i in range(8) if row_kind(view, i) == RowKind.SAVE_NEW_CONFIG
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.SAVE_AS_NEW_CONFIG
     )
+    assert _row_text(view, save_row) == "SAVE AS NEW CONFIG"
     controls.focus_index = save_row
 
     stderr = io.StringIO()
@@ -239,6 +246,42 @@ def test_save_new_triggers_toast_and_blocks_input() -> None:
         before = controls.focus_index
         assert controls.handle_keydown(_keydown(pygame.K_DOWN)) is True
         assert controls.focus_index == before
+
+
+def test_navigable_rows_without_overwrite() -> None:
+    controls = _make_controls(("drums",), allow_overwrite=False)
+    view = controls.build_view_state(paused=False)
+    assert view.allow_overwrite is False
+    assert row_count(view) == 7
+
+    kinds = {row_kind(view, i) for i in range(row_count(view))}
+    assert RowKind.SAVE_AS_NEW_CONFIG in kinds
+    assert RowKind.OVERWRITE_CONFIG not in kinds
+
+    navigable = navigable_row_indices(view)
+    assert all(row_kind(view, i) != RowKind.OVERWRITE_CONFIG for i in navigable)
+
+    transport_row = next(
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.TRANSPORT
+    )
+    save_row = next(
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.SAVE_AS_NEW_CONFIG
+    )
+    controls.focus_index = transport_row
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_index == save_row
+
+
+def test_navigable_rows_with_overwrite() -> None:
+    controls = _make_controls(("drums",), allow_overwrite=True)
+    view = controls.build_view_state(paused=False)
+    assert view.allow_overwrite is True
+    assert row_count(view) == 8
+
+    overwrite_row = next(
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
+    )
+    assert overwrite_row in navigable_row_indices(view)
 
 
 def test_overwrite_shows_confirm_before_write() -> None:
@@ -391,6 +434,118 @@ def test_transport_row_icons() -> None:
     assert _skip_glyph_has_opaque_pixels(font, nxt)
 
 
+def test_quick_nav_row_indices_headers_and_transport_only() -> None:
+    controls = _make_controls(("drums", "bass"))
+    controls.session.layers["drums"].enabled = False
+    view = controls.build_view_state(paused=False)
+
+    quick = quick_nav_row_indices(view)
+    assert len(quick) == 3
+    for index in quick:
+        kind = row_kind(view, index)
+        assert kind in (RowKind.TRACK_HEADER, RowKind.TRANSPORT)
+
+    drums_header = next(
+        i
+        for i in range(row_count(view))
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "drums"
+    )
+    bass_header = next(
+        i
+        for i in range(row_count(view))
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "bass"
+    )
+    transport_row = next(
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.TRANSPORT
+    )
+    assert quick == [drums_header, bass_header, transport_row]
+
+
+def test_ctrl_quick_nav_cycles_headers_and_transport() -> None:
+    controls = _make_controls(("drums", "bass"))
+    view = controls.build_view_state(paused=False)
+    quick = quick_nav_row_indices(view)
+
+    controls.focus_index = quick[0]
+    controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
+    assert controls.focus_index == quick[1]
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
+    assert controls.focus_index == quick[2]
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
+    assert controls.focus_index == quick[0]
+
+    controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
+    assert controls.focus_index == quick[2]
+
+
+def test_ctrl_quick_nav_from_sub_row_jumps_forward() -> None:
+    controls = _make_controls(("drums", "bass"))
+    view = controls.build_view_state(paused=False)
+    quick = quick_nav_row_indices(view)
+    preset_row = next(
+        i for i in range(10) if row_kind(view, i) == RowKind.TRACK_PRESET
+    )
+
+    controls.focus_index = preset_row
+    controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
+    assert controls.focus_index == quick[1]
+
+    controls.focus_index = preset_row
+    controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
+    assert controls.focus_index == quick[0]
+
+
+def test_ctrl_quick_nav_from_save_row() -> None:
+    controls = _make_controls(("drums",))
+    view = controls.build_view_state(paused=False)
+    quick = quick_nav_row_indices(view)
+    save_row = next(
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.SAVE_AS_NEW_CONFIG
+    )
+
+    controls.focus_index = save_row
+    controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
+    assert controls.focus_index == quick[-1]
+
+    controls.focus_index = save_row
+    controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
+    assert controls.focus_index == quick[0]
+
+
+def test_ctrl_quick_nav_does_not_affect_normal_up_down() -> None:
+    controls = _make_controls(("drums",))
+    view = controls.build_view_state(paused=False)
+    header_row = next(
+        i for i in range(5) if row_kind(view, i) == RowKind.TRACK_HEADER
+    )
+    preset_row = next(
+        i for i in range(5) if row_kind(view, i) == RowKind.TRACK_PRESET
+    )
+    controls.focus_index = header_row
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_index == preset_row
+
+
+def test_ctrl_quick_nav_blocked_during_move_mode() -> None:
+    controls = _make_controls(("drums", "bass", "vocals"))
+    view = controls.build_view_state(paused=False)
+    bass_header = next(
+        i
+        for i in range(15)
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "bass"
+    )
+    controls.focus_index = bass_header
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    assert controls.move_mode_stem == "bass"
+
+    controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
+    assert controls.session.layer_z_order == ["bass", "drums", "vocals"]
+    assert controls.focus_index == bass_header
+
+
 def test_transport_seek_constants() -> None:
     seeks: list[float] = []
     controls = _make_controls(("drums",))
@@ -418,7 +573,9 @@ def main() -> int:
         test_re_enable_allows_sub_row_focus,
         test_opacity_ctrl_step_is_ten_percent,
         test_move_mode_swaps_z_order,
-        test_save_new_triggers_toast_and_blocks_input,
+        test_save_as_new_triggers_toast_and_blocks_input,
+        test_navigable_rows_without_overwrite,
+        test_navigable_rows_with_overwrite,
         test_overwrite_shows_confirm_before_write,
         test_overwrite_confirm_yes_writes_launch_path,
         test_overwrite_confirm_esc_dismisses,
@@ -426,6 +583,12 @@ def main() -> int:
         test_esc_requests_quit,
         test_transport_row_icons,
         test_transport_seek_constants,
+        test_quick_nav_row_indices_headers_and_transport_only,
+        test_ctrl_quick_nav_cycles_headers_and_transport,
+        test_ctrl_quick_nav_from_sub_row_jumps_forward,
+        test_ctrl_quick_nav_from_save_row,
+        test_ctrl_quick_nav_does_not_affect_normal_up_down,
+        test_ctrl_quick_nav_blocked_during_move_mode,
     ]
     for test in tests:
         test()
