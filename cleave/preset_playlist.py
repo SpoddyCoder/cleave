@@ -140,11 +140,11 @@ class PresetPlaylist:
         self._apply(playlist_at_dir(children[0], index=0))
         return True
 
-    def go_parent(self, browse_floor: Path) -> bool:
+    def go_parent(self, preset_root: Path) -> bool:
         parent = self.current_dir.parent
         if parent == self.current_dir:
             return False
-        if not _path_at_or_below(parent, browse_floor):
+        if not _path_at_or_below(parent, preset_root):
             return False
         self._apply(playlist_at_dir(parent, index=0))
         return True

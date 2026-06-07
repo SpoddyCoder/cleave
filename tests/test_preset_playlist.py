@@ -123,7 +123,7 @@ def test_enter_child_first_alphabetical_navigable() -> None:
         assert len(playlist.paths) == 1
 
 
-def test_go_parent_ascends_and_clamps_at_browse_floor() -> None:
+def test_go_parent_ascends_and_clamps_at_preset_root() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         pack = root / "pack-a"
@@ -134,11 +134,14 @@ def test_go_parent_ascends_and_clamps_at_browse_floor() -> None:
         _write_milk(child / "child.milk")
 
         playlist = playlist_at_dir(child)
-        assert playlist.go_parent(pack) is True
+        assert playlist.go_parent(root) is True
         assert playlist.current_dir.resolve() == pack.resolve()
 
-        assert playlist.go_parent(pack) is False
-        assert playlist.current_dir.resolve() == pack.resolve()
+        assert playlist.go_parent(root) is True
+        assert playlist.current_dir.resolve() == root.resolve()
+
+        assert playlist.go_parent(root) is False
+        assert playlist.current_dir.resolve() == root.resolve()
 
 
 def test_go_parent_clamps_at_preset_root_when_browse_floor_is_root() -> None:
@@ -173,7 +176,9 @@ def test_preset_browse_floor_uses_first_configured_path_segment() -> None:
         assert preset_browse_floor(preset, root).resolve() == pack.resolve()
         assert preset_browse_floor(pack, root).resolve() == pack.resolve()
         assert preset_browse_floor(pack / "solo.milk", root).resolve() == pack.resolve()
-        assert preset_browse_floor(root / "solo.milk", root).resolve() == root.resolve()
+        solo = root / "solo.milk"
+        _write_milk(solo)
+        assert preset_browse_floor(solo, root).resolve() == root.resolve()
 
 
 def test_directory_display_clamps_sibling_parent_at_preset_root() -> None:
@@ -229,7 +234,7 @@ def main() -> int:
         test_list_navigable_dirs_filters_and_includes_subtree,
         test_step_sibling_wraps,
         test_enter_child_first_alphabetical_navigable,
-        test_go_parent_ascends_and_clamps_at_browse_floor,
+        test_go_parent_ascends_and_clamps_at_preset_root,
         test_go_parent_clamps_at_preset_root_when_browse_floor_is_root,
         test_preset_browse_floor_uses_first_configured_path_segment,
         test_directory_display_clamps_sibling_parent_at_preset_root,

@@ -227,7 +227,7 @@ Navigate with the arrow keys; the focused row is highlighted in orange. **SAVE A
 | Ctrl + Left / Right | On directory row: go to parent / descend into child (same as Backspace / Enter); larger steps on opacity and beat; on filename row, jump ±10 presets in the current directory (wraps) |
 | Enter | On directory row: descend into first alphabetical child directory with presets; on track header: enter z-order move mode (blocked when layer is locked); on SAVE AS NEW CONFIG: write snapshot; on OVERWRITE CONFIG (when shown): confirm then overwrite launch config |
 | Ctrl + Enter | On track header: toggle layer lock |
-| Backspace | On directory row: go to parent directory (no-op at the layer's configured preset pack root, the first path segment under `preset_root`) |
+| Backspace | On directory row: go to parent directory (no-op at `preset_root`) |
 | Enter (move mode) | Confirm z-order after Up/Down swaps |
 | Esc / Backspace (move mode) | Cancel move mode and restore previous z-order |
 | Up / Down (move mode) | Swap focused stem up/down in `layer_z_order` |
