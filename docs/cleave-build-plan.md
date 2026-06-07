@@ -184,7 +184,7 @@ By this point you have a working layered system you understand. Milkdrop becomes
 **Layout terms:** the overlay panel splits into the **track rows section** (upper: `layer_z_order` × six rows per stem via `ROWS_PER_TRACK` / `TrackBlock`) and the **footer rows section** (lower: transport, save, optional overwrite via `footer_row_count` and `FOOTER_ROWS_*`). A visual `footer_gap` separates the two. On-screen headers say "Layer N"; code uses "track" for the same blocks.
 
 **5.6.1 — Focus-driven tree overlay**
-- [cleave/viz_tuning_overlay.py](cleave/viz_tuning_overlay.py): track rows section (per-stem tree: header, preset dir, preset, blend, opacity, beat); footer rows section (transport with seek icons, SAVE CONFIG, optional OVERWRITE CONFIG)
+- [cleave/viz_tuning_overlay.py](cleave/viz_tuning_overlay.py): track rows section (per-stem tree: header, preset dir, preset, blend, opacity, beat); footer rows section (drawn transport controls (skip / play-pause / skip) and elapsed time, SAVE CONFIG, optional OVERWRITE CONFIG)
 - [cleave/viz_tuning_controls.py](cleave/viz_tuning_controls.py): Up/Down row focus; Left/Right adjust the focused field; hold-to-repeat on preset/blend/opacity/beat rows ([cleave/viz_key_repeat.py](cleave/viz_key_repeat.py))
 - Same idle behaviour as Phase 4 overlay: 10s hold after input, 2s fade ([cleave/viz_theme.py](cleave/viz_theme.py))
 
@@ -200,7 +200,7 @@ By this point you have a working layered system you understand. Milkdrop becomes
 - Compositor re-orders bottom-to-top from live `layer_z_order` each frame
 
 **5.6.4 — Footer rows (transport and save)**
-- Transport row: Left/Right seek ±10s (±30s with Ctrl); icons show skip back, play, pause, skip forward
+- Transport row: Left/Right seek ±10s (±30s with Ctrl); drawn transport controls (skip / play-pause / skip)
 - Space toggles pause/play (not shown in overlay)
 - Enter on SAVE CONFIG writes a full snapshot via [cleave/config_snapshot.py](cleave/config_snapshot.py) to [saved-cleave-configs/](saved-cleave-configs/) as `unnamed-N.cleave.config.yaml` (never overwrites the launch config)
 - Ctrl+Q quits
@@ -334,7 +334,7 @@ Ideas to revisit once the core is solid:
 - [x] Up/Down row navigation; Left/Right field adjust; hold-to-repeat on tuning rows
 - [x] Per-layer preset, blend mode, opacity, beat sensitivity
 - [x] Z-order move mode on track headers (Enter, Up/Down, Enter)
-- [x] Transport row with seek icons (±10s / ±30s with Ctrl)
+- [x] Transport row with drawn transport controls (skip / play-pause / skip; ±10s / ±30s with Ctrl)
 - [x] SAVE CONFIG snapshots to `saved-cleave-configs/unnamed-N.cleave.config.yaml` ([cleave/config_snapshot.py](cleave/config_snapshot.py))
 - [x] `layer_z_order` and `layers.*.blend_mode` in [cleave.config.yaml](cleave.config.yaml)
 - [x] Docs: README tuning guide, build plan 5.6, project-context
