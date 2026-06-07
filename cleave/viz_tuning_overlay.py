@@ -74,6 +74,7 @@ class TrackBlock:
     opacity_pct: int
     beat_sensitivity: float
     enabled: bool = True
+    expanded: bool = True
     preset_empty: bool = False
 
 
@@ -116,8 +117,26 @@ _SUB_ROW_KINDS = frozenset(
 )
 
 
+def track_sub_rows_visible(state: TuningViewState, stem: str) -> bool:
+    return state.tracks[stem].expanded
+
+
+def row_visible(state: TuningViewState, index: int) -> bool:
+    kind = row_kind(state, index)
+    if kind in _SUB_ROW_KINDS:
+        stem = row_stem(state, index)
+        if stem is not None and not track_sub_rows_visible(state, stem):
+            return False
+    return True
+
+
+def visible_row_indices(state: TuningViewState) -> list[int]:
+    """Row indices drawn in the panel (sub-rows hidden when collapsed)."""
+    return [index for index in range(row_count(state)) if row_visible(state, index)]
+
+
 def navigable_row_indices(state: TuningViewState) -> list[int]:
-    """Row indices reachable via Up/Down (sub-rows skipped when track disabled)."""
+    """Row indices reachable via Up/Down (sub-rows skipped when collapsed)."""
     indices: list[int] = []
     for index in range(row_count(state)):
         kind = row_kind(state, index)
@@ -125,7 +144,7 @@ def navigable_row_indices(state: TuningViewState) -> list[int]:
             continue
         if kind in _SUB_ROW_KINDS:
             stem = row_stem(state, index)
-            if stem is not None and not state.tracks[stem].enabled:
+            if stem is not None and not track_sub_rows_visible(state, stem):
                 continue
         indices.append(index)
     return indices
@@ -437,14 +456,20 @@ class TuningOverlay:
         font = self._font_get()
         transport_font = self._transport_font_get()
         line_h = font.get_linesize()
-        count = row_count(state)
+        visible_indices = visible_row_indices(state)
+        visible_count = len(visible_indices)
+        track_rows_boundary = len(state.layer_z_order) * ROWS_PER_TRACK
+        first_footer_visible = next(
+            (index for index in visible_indices if index >= track_rows_boundary),
+            None,
+        )
         toast_active = bool(state.toast_message and state.toast_remaining_sec > 0)
         confirm_active = state.confirm_message is not None
 
         row_surfaces: list[pygame.Surface] = []
         row_time_surfaces: list[pygame.Surface | None] = []
         row_widths: list[int] = []
-        for index in range(count):
+        for index in visible_indices:
             kind = row_kind(state, index)
             indent = self._padding + _row_indent(state, index)
             color = _row_text_color(state, index)
@@ -496,12 +521,11 @@ class TuningOverlay:
             content_w = max(content_w, confirm_w)
         content_w = min(content_w, PANEL_CONTENT_MAX_WIDTH)
         panel_w = content_w + self._padding * 2
-        track_rows = len(state.layer_z_order) * ROWS_PER_TRACK
         footer_gap = line_h + self._line_gap
         panel_h = (
-            count * line_h
-            + (count - 1) * self._line_gap
-            + footer_gap
+            visible_count * line_h
+            + max(0, visible_count - 1) * self._line_gap
+            + (footer_gap if first_footer_visible is not None else 0)
             + self._padding * 2
         )
         if confirm_active:
@@ -518,9 +542,10 @@ class TuningOverlay:
 
         text_alpha = int(255 * self._visibility)
         y = self._padding
-        for index, surf in enumerate(row_surfaces):
-            if index == track_rows:
+        for draw_index, index in enumerate(visible_indices):
+            if index == first_footer_visible:
                 y += footer_gap
+            surf = row_surfaces[draw_index]
             assert surf is not None
             bg = _row_bg_color(state, index)
             if bg is not None:
@@ -534,7 +559,7 @@ class TuningOverlay:
             if text_alpha >= 2:
                 surf.set_alpha(text_alpha)
                 panel.blit(surf, (indent, y))
-                time_surf = row_time_surfaces[index]
+                time_surf = row_time_surfaces[draw_index]
                 if time_surf is not None:
                     time_surf.set_alpha(text_alpha)
                     panel.blit(time_surf, (indent + surf.get_width(), y))

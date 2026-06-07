@@ -238,6 +238,7 @@ The directory row shows the path relative to `preset_root` with `(N/TOTAL)` amon
 
 | Row | Left / Right | Ctrl + Left / Right |
 | --- | --- | --- |
+| Track header | Collapse / expand child rows | Disable / enable layer |
 | Directory | Previous / next sibling directory (wraps) | (same step size) |
 | Filename | Previous / next `.milk` in current directory only (wraps); no-op when empty | Jump ±10 presets in current directory (wraps); no-op when empty |
 | Blend mode | Cycle blend modes (see below) | (same step size) |

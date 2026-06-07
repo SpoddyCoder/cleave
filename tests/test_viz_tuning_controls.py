@@ -48,6 +48,8 @@ from cleave.viz_tuning_overlay import (
     row_count,
     row_kind,
     row_stem,
+    row_visible,
+    visible_row_indices,
 )
 
 
@@ -142,20 +144,21 @@ def test_header_toggles_enabled() -> None:
     controls.focus_index = header_row
     assert controls.session.layers["drums"].enabled is True
 
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
     assert controls.session.layers["drums"].enabled is False
     assert enabled_events == [("drums", False)]
     assert controls.session.layers["drums"].opacity_pct == 50
 
-    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
     assert controls.session.layers["drums"].enabled is True
     assert enabled_events == [("drums", False), ("drums", True)]
     assert controls.session.layers["drums"].opacity_pct == 50
 
 
-def test_navigation_skips_sub_rows_when_disabled() -> None:
+def test_navigation_skips_sub_rows_when_collapsed() -> None:
     controls = _make_controls(("drums", "bass"))
     controls.session.layers["drums"].enabled = False
+    controls.session.layers["drums"].expanded = False
     view = controls.build_view_state(paused=False)
 
     drums_header = next(
@@ -184,6 +187,7 @@ def test_navigation_skips_sub_rows_when_disabled() -> None:
 def test_re_enable_allows_sub_row_focus() -> None:
     controls = _make_controls(("drums",))
     controls.session.layers["drums"].enabled = False
+    controls.session.layers["drums"].expanded = False
     view = controls.build_view_state(paused=False)
     header_row = next(
         i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
@@ -200,8 +204,85 @@ def test_re_enable_allows_sub_row_focus() -> None:
     assert controls.focus_index == transport_row
 
     controls.focus_index = header_row
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
     assert controls.session.layers["drums"].enabled is True
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_index == preset_dir_row
+
+
+def test_header_collapses_and_expands_sub_rows() -> None:
+    controls = _make_controls(("drums",))
+    view = controls.build_view_state(paused=False)
+    header_row = next(
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
+    )
+    preset_dir_row = next(
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET_DIR
+    )
+    controls.focus_index = header_row
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.layers["drums"].expanded is False
+    assert controls.focus_index == header_row
+
+    view = controls.build_view_state(paused=False)
+    assert preset_dir_row not in navigable_row_indices(view)
+    assert preset_dir_row not in visible_row_indices(view)
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["drums"].expanded is True
+
+    view = controls.build_view_state(paused=False)
+    assert preset_dir_row in navigable_row_indices(view)
+    assert preset_dir_row in visible_row_indices(view)
+
+
+def test_disable_auto_collapses_sub_rows() -> None:
+    controls = _make_controls(("drums",))
+    view = controls.build_view_state(paused=False)
+    header_row = next(
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
+    )
+    preset_dir_row = next(
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET_DIR
+    )
+    controls.focus_index = header_row
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_index == preset_dir_row
+
+    controls.focus_index = header_row
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert controls.session.layers["drums"].enabled is False
+    assert controls.session.layers["drums"].expanded is False
+    assert controls.focus_index == header_row
+
+    view = controls.build_view_state(paused=False)
+    assert not row_visible(view, preset_dir_row)
+    assert preset_dir_row not in visible_row_indices(view)
+
+
+def test_disabled_track_can_expand_sub_rows() -> None:
+    controls = _make_controls(("drums",))
+    view = controls.build_view_state(paused=False)
+    header_row = next(
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
+    )
+    preset_dir_row = next(
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET_DIR
+    )
+    controls.focus_index = header_row
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert controls.session.layers["drums"].enabled is False
+    assert controls.session.layers["drums"].expanded is False
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["drums"].enabled is False
+    assert controls.session.layers["drums"].expanded is True
+
+    view = controls.build_view_state(paused=False)
+    assert preset_dir_row in visible_row_indices(view)
+    assert preset_dir_row in navigable_row_indices(view)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_index == preset_dir_row
@@ -1050,8 +1131,11 @@ def main() -> int:
         test_opacity_clamps,
         test_beat_sensitivity_clamps,
         test_header_toggles_enabled,
-        test_navigation_skips_sub_rows_when_disabled,
+        test_navigation_skips_sub_rows_when_collapsed,
+        test_disabled_track_can_expand_sub_rows,
         test_re_enable_allows_sub_row_focus,
+        test_header_collapses_and_expands_sub_rows,
+        test_disable_auto_collapses_sub_rows,
         test_opacity_ctrl_step_is_ten_percent,
         test_move_mode_swaps_z_order,
         test_save_as_new_triggers_toast_and_blocks_input,
