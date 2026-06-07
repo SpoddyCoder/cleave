@@ -247,7 +247,7 @@ The directory row shows the path relative to `preset_root` with `(N/TOTAL)` amon
 
 Z-order move mode highlights the track header in blue; Up/Down reorders that stem in the compositor stack (bottom-to-top per `layer_z_order`).
 
-Pause stops PCM feed; seek flushes projectM buffers. The overlay stays visible for 10 seconds after input, then fades out over 2 seconds; any keypress shows it again (same timing as Phase 4 [cleave/viz_overlay.py](cleave/viz_overlay.py)).
+Pause stops PCM feed and freezes layer FBOs (no projectM render); seek flushes projectM buffers. The overlay stays visible for 10 seconds after input, then fades out over 2 seconds; any keypress shows it again (same timing as Phase 4 [cleave/viz_overlay.py](cleave/viz_overlay.py)).
 
 ### Config and save
 

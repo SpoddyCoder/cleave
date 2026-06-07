@@ -158,7 +158,7 @@ By this point you have a working layered system you understand. Milkdrop becomes
 - Preload all four stem wavs at 44100 Hz mono ([cleave/stem_pcm.py](cleave/stem_pcm.py))
 - Mix on `pygame.mixer` for ears; shared `t_sec` from [cleave/viz_playback.py](cleave/viz_playback.py)
 - Each frame: slice PCM per stem, `projectm_pcm_add_float`, render FBO
-- On pause: stop feeding PCM; on seek: flush buffers and reset frame time
+- On pause: stop feeding PCM and skip projectM render (reuse last FBO); on seek: flush buffers and reset frame time
 
 **5.3 — One libprojectM instance per layer**
 - Four instances, four FBOs at tiered resolutions ([cleave/gl_compositor.py](cleave/gl_compositor.py))
