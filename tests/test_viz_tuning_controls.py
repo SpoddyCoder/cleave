@@ -29,7 +29,7 @@ from cleave.viz_tuning_controls import (
     _REPEAT_ROW_KINDS,
     config_path_display,
 )
-from cleave.viz_theme import HIGHLIGHT, LABEL_MAX_LEN, TEXT_DIM
+from cleave.viz_theme import HIGHLIGHT, PANEL_CONTENT_MAX_WIDTH, TEXT_DIM
 from cleave.viz_tuning_overlay import (
     RowKind,
     TrackBlock,
@@ -41,6 +41,7 @@ from cleave.viz_tuning_overlay import (
     _row_text,
     _row_text_color,
     _unicode_transport_available,
+    fit_row_text,
     navigable_row_indices,
     quick_nav_row_indices,
     row_count,
@@ -51,6 +52,11 @@ from cleave.viz_tuning_overlay import (
 
 def _keydown(key: int, *, mod: int = 0) -> pygame.event.Event:
     return pygame.event.Event(pygame.KEYDOWN, key=key, mod=mod)
+
+
+def _overlay_font() -> pygame.font.Font:
+    pygame.font.init()
+    return pygame.font.SysFont("monospace", 14)
 
 
 def _make_playlist(name: str, count: int = 3) -> PresetPlaylist:
@@ -303,9 +309,11 @@ def test_config_header_truncates_long_paths() -> None:
     header_row = next(
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.CONFIG_HEADER
     )
-    label = _row_text(view, header_row)
-    assert len(label) <= LABEL_MAX_LEN
-    assert label.startswith("…/")
+    font = _overlay_font()
+    label = fit_row_text(font, view, header_row)
+    assert font.size(label)[0] <= PANEL_CONTENT_MAX_WIDTH
+    assert label.startswith("…")
+    assert "…/" not in label
 
 
 def test_preset_row_truncates_long_filenames() -> None:
@@ -337,10 +345,46 @@ def test_preset_row_truncates_long_filenames() -> None:
     preset_row = next(
         i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET
     )
-    label = _row_text(view, preset_row)
-    assert len(label) <= LABEL_MAX_LEN + 11
+    font = _overlay_font()
+    label = fit_row_text(font, view, preset_row)
+    assert font.size(label)[0] <= PANEL_CONTENT_MAX_WIDTH - 16
     assert label.endswith("(1/50)")
-    assert "…/" in label
+    assert label.startswith("└─ …")
+    assert "…/" not in label
+
+
+def test_fit_row_text_config_and_preset_share_panel_width() -> None:
+    long_path = Path(
+        "/very/long/root/saved-cleave-configs/nested/deep/unnamed-99.cleave.config.yaml"
+    )
+    long_name = (
+        "Phat_Zylot_Eo.S. rainbow bubble_mid3-starpoints_spirals_VE "
+        "- Bitcore Tweak.milk (1/50)"
+    )
+    controls = _make_controls(("drums",))
+    controls._active_config_path = long_path
+    view = controls.build_view_state(paused=False)
+    view.tracks["drums"] = TrackBlock(
+        stem="drums",
+        preset_dir_label="short (1/1)",
+        preset_label=long_name,
+        blend_mode="alpha",
+        opacity_pct=50,
+        beat_sensitivity=1.0,
+        enabled=True,
+        preset_empty=False,
+    )
+    header_row = next(
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.CONFIG_HEADER
+    )
+    preset_row = next(
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET
+    )
+    font = _overlay_font()
+    config_label = fit_row_text(font, view, header_row)
+    preset_label = fit_row_text(font, view, preset_row)
+    assert font.size(config_label)[0] + 0 <= PANEL_CONTENT_MAX_WIDTH
+    assert font.size(preset_label)[0] + 16 <= PANEL_CONTENT_MAX_WIDTH
 
 
 def test_save_as_new_updates_active_config_path() -> None:
@@ -904,7 +948,7 @@ def test_preset_overlay_shows_directory_and_position() -> None:
     controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
     block = view.tracks["drums"]
-    assert block.preset_dir_label == "drums (1/1)"
+    assert block.preset_dir_label == "drums/ (1/1)"
     assert block.preset_label == "preset-0.milk (1/3)"
 
     controls.session.layers["drums"].playlist.index = 1
@@ -927,7 +971,7 @@ def test_scan_file_anchor_builds_parent_directory_playlist() -> None:
         assert playlist.paths == (first.resolve(), second.resolve())
         assert playlist.index == 1
         assert preset_filename_display(playlist) == "beta.milk (2/2)"
-        assert directory_display(playlist, root) == "pack/Aurora (1/1)"
+        assert directory_display(playlist, root) == "pack/Aurora/ (1/1)"
 
 
 def test_ctrl_quick_nav_blocked_during_move_mode() -> None:
@@ -987,6 +1031,8 @@ def main() -> int:
         test_save_as_new_triggers_toast_and_blocks_input,
         test_config_header_shows_active_path,
         test_config_header_truncates_long_paths,
+        test_preset_row_truncates_long_filenames,
+        test_fit_row_text_config_and_preset_share_panel_width,
         test_save_as_new_updates_active_config_path,
         test_overwrite_after_save_uses_new_active_path,
         test_navigable_rows_without_overwrite,

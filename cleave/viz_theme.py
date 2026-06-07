@@ -11,7 +11,7 @@ HIGHLIGHT: tuple[int, int, int] = (255, 165, 0)
 MOVE_MODE: tuple[int, int, int] = (60, 120, 255)
 
 BORDER_WIDTH: int = 2
-LABEL_MAX_LEN: int = 60
+PANEL_CONTENT_MAX_WIDTH: int = 440
 
 HOLD_IDLE_SEC: float = 10.0
 FADE_DURATION_SEC: float = 2.0

@@ -9,7 +9,11 @@ from typing import Literal
 import pygame
 
 from cleave.viz_confirm import ConfirmDialog
-from cleave.viz_overlay import truncate_counter_label
+from cleave.viz_overlay import (
+    fit_counter_label_to_width,
+    fit_path_label_to_width,
+    fit_text_to_width,
+)
 from cleave.viz_playback import format_mmss
 from cleave.viz_theme import (
     BACKGROUND,
@@ -20,6 +24,7 @@ from cleave.viz_theme import (
     HIGHLIGHT,
     HOLD_IDLE_SEC,
     MOVE_MODE,
+    PANEL_CONTENT_MAX_WIDTH,
     TEXT,
     TEXT_DIM,
 )
@@ -30,6 +35,7 @@ ROWS_PER_TRACK = 6
 FOOTER_ROWS_WITH_OVERWRITE = 4
 FOOTER_ROWS_WITHOUT_OVERWRITE = 3
 TREE_INDENT = 16
+_TREE_PREFIX = "└─ "
 _TRANSPORT_SKIP_UNICODE = ("⏮", "⏭")
 _TRANSPORT_SKIP_ASCII = ("<<", ">>")
 _TRANSPORT_PLAY_UNICODE = ("▶", "⏸")
@@ -184,14 +190,37 @@ def _row_text(state: TuningViewState, index: int) -> str:
         status = "enabled" if block.enabled else "disabled"
         return f"Layer {layer_num}: {stem.upper()} ({status})"
     if kind == RowKind.TRACK_PRESET_DIR:
-        return f"└─ {truncate_counter_label(block.preset_dir_label)}"
+        return f"{_TREE_PREFIX}{block.preset_dir_label}"
     if kind == RowKind.TRACK_PRESET:
-        return f"└─ {truncate_counter_label(block.preset_label)}"
+        return f"{_TREE_PREFIX}{block.preset_label}"
     if kind == RowKind.TRACK_BLEND:
         return f"└─ blend mode: {block.blend_mode}"
     if kind == RowKind.TRACK_OPACITY:
         return f"└─ opacity: {block.opacity_pct}%"
     return f"└─ beat sensitivity: {block.beat_sensitivity:.2f}"
+
+
+def fit_row_text(
+    font: pygame.font.Font,
+    state: TuningViewState,
+    index: int,
+    *,
+    max_content_width: int = PANEL_CONTENT_MAX_WIDTH,
+) -> str:
+    """Fit row label to the shared panel content width (pixels)."""
+    kind = row_kind(state, index)
+    indent = _row_indent(state, index)
+    budget = max_content_width - indent
+    text = _row_text(state, index)
+
+    if kind == RowKind.CONFIG_HEADER:
+        return fit_path_label_to_width(font, text, budget)
+    if kind in {RowKind.TRACK_PRESET_DIR, RowKind.TRACK_PRESET}:
+        prefix_w = font.size(_TREE_PREFIX)[0]
+        label = text[len(_TREE_PREFIX) :]
+        fitted = fit_counter_label_to_width(font, label, budget - prefix_w)
+        return _TREE_PREFIX + fitted
+    return fit_text_to_width(font, text, budget)
 
 
 def _row_indent(state: TuningViewState, index: int) -> int:
@@ -435,7 +464,7 @@ class TuningOverlay:
                     indent + icons_surf.get_width() + time_surf.get_width()
                 )
             else:
-                text = _row_text(state, index)
+                text = fit_row_text(font, state, index)
                 surf = font.render(text, True, color)
                 row_surfaces.append(surf)
                 row_time_surfaces.append(None)
@@ -444,7 +473,10 @@ class TuningOverlay:
         toast_surf: pygame.Surface | None = None
         if toast_active:
             assert state.toast_message is not None
-            toast_surf = font.render(state.toast_message, True, TEXT_DIM)
+            toast_text = fit_text_to_width(
+                font, state.toast_message, PANEL_CONTENT_MAX_WIDTH
+            )
+            toast_surf = font.render(toast_text, True, TEXT_DIM)
 
         confirm_h = 0
         confirm_w = 0
@@ -462,6 +494,7 @@ class TuningOverlay:
             content_w = max(content_w, toast_surf.get_width())
         if confirm_active:
             content_w = max(content_w, confirm_w)
+        content_w = min(content_w, PANEL_CONTENT_MAX_WIDTH)
         panel_w = content_w + self._padding * 2
         track_rows = len(state.layer_z_order) * ROWS_PER_TRACK
         footer_gap = line_h + self._line_gap

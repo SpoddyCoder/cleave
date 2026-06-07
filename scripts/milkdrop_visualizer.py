@@ -43,7 +43,6 @@ from cleave.gl_compositor import GlCompositor, LayerFbo  # noqa: E402
 from cleave.projectm import ProjectM, ProjectMLibraryError  # noqa: E402
 from cleave.signals import Signals, load_signals  # noqa: E402
 from cleave.stem_pcm import load_stem_pcm, samples_per_frame  # noqa: E402
-from cleave.viz_overlay import truncate_counter_label, truncate_preset_label  # noqa: E402
 from cleave.viz_playback import (  # noqa: E402
     current_sec,
     init_playback,
@@ -55,7 +54,6 @@ from cleave.viz_tuning_controls import (  # noqa: E402
     TuningSession,
 )
 from cleave.viz_tuning_overlay import (  # noqa: E402
-    TrackBlock,
     TuningOverlay,
     TuningViewState,
 )
@@ -326,35 +324,8 @@ def build_view_state(
     paused: bool,
     position_sec: float,
 ) -> TuningViewState:
-    """Build overlay view state with truncated preset labels."""
-    base = controls.build_view_state(paused=paused, position_sec=position_sec)
-    tracks = {
-        stem: TrackBlock(
-            stem=block.stem,
-            preset_dir_label=truncate_counter_label(block.preset_dir_label),
-            preset_label=block.preset_label,
-            blend_mode=block.blend_mode,
-            opacity_pct=block.opacity_pct,
-            beat_sensitivity=block.beat_sensitivity,
-            enabled=block.enabled,
-            preset_empty=block.preset_empty,
-        )
-        for stem, block in base.tracks.items()
-    }
-    return TuningViewState(
-        layer_z_order=base.layer_z_order,
-        tracks=tracks,
-        paused=base.paused,
-        position_sec=base.position_sec,
-        focus_index=base.focus_index,
-        move_mode_stem=base.move_mode_stem,
-        toast_message=base.toast_message,
-        toast_remaining_sec=base.toast_remaining_sec,
-        confirm_message=base.confirm_message,
-        confirm_focus_yes=base.confirm_focus_yes,
-        allow_overwrite=base.allow_overwrite,
-        active_config_label=base.active_config_label,
-    )
+    """Build overlay view state; label width is capped when the panel draws."""
+    return controls.build_view_state(paused=paused, position_sec=position_sec)
 
 
 def _make_tuning_controls(
