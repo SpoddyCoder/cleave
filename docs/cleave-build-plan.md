@@ -203,7 +203,7 @@ By this point you have a working layered system you understand. Milkdrop becomes
 - Transport row: Left/Right seek ±10s (±30s with Ctrl); icons show skip back, play, pause, skip forward
 - Space toggles pause/play (not shown in overlay)
 - Enter on SAVE CONFIG writes a full snapshot via [cleave/config_snapshot.py](cleave/config_snapshot.py) to [saved-cleave-configs/](saved-cleave-configs/) as `unnamed-N.cleave.config.yaml` (never overwrites the launch config)
-- Esc quits
+- Ctrl+Q quits
 
 **✅ Milestone: tune presets, blend, opacity, beat, and z-order in-session; save reproducible YAML snapshots without touching the launch config**
 

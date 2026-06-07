@@ -28,6 +28,7 @@ from cleave.viz_tuning_controls import (
     TuningControls,
     TuningSession,
     _REPEAT_ROW_KINDS,
+    allow_overwrite_for_path,
     config_path_display,
 )
 from cleave.viz_theme import HIGHLIGHT, MOVE_MODE, PANEL_CONTENT_MAX_WIDTH, TEXT_DIM
@@ -68,10 +69,15 @@ def _make_playlist(name: str, count: int = 3) -> PresetPlaylist:
     return PresetPlaylist(current_dir=current_dir, paths=paths, index=0)
 
 
+_REPO_ROOT_EXAMPLE = Path("/tmp/cleave.config.yaml")
+_DEFAULT_ACTIVE_CONFIG = Path("/tmp/saved-cleave-configs/active.yaml")
+
+
 def _make_controls(
     stems: tuple[str, ...] = ("drums", "bass"),
     *,
-    allow_overwrite: bool = True,
+    launch_config_path: Path | None = _DEFAULT_ACTIVE_CONFIG,
+    repo_root_example: Path = _REPO_ROOT_EXAMPLE,
 ) -> TuningControls:
     preset_root = Path("/tmp/presets")
     session = TuningSession(
@@ -90,8 +96,22 @@ def _make_controls(
         preset_root=preset_root,
         playback=PlaybackState(),
         duration_sec=120.0,
-        allow_overwrite=allow_overwrite,
+        launch_config_path=launch_config_path,
+        repo_root_example=repo_root_example,
     )
+
+
+def test_allow_overwrite_for_path_hides_repo_root_template_only() -> None:
+    root = Path("/repo/cleave.config.yaml")
+    assert allow_overwrite_for_path(root, repo_root_example=root) is False
+    assert (
+        allow_overwrite_for_path(
+            Path("/repo/saved-cleave-configs/foo.yaml"),
+            repo_root_example=root,
+        )
+        is True
+    )
+    assert allow_overwrite_for_path(None, repo_root_example=root) is False
 
 
 def test_focus_navigation_wraps() -> None:
@@ -494,12 +514,37 @@ def test_save_as_new_updates_active_config_path() -> None:
     assert _row_text(state, header_row) == config_path_display(saved_path)
 
 
+def test_save_as_new_enables_overwrite_from_root_template() -> None:
+    saved_path = Path("/tmp/saved-cleave-configs/unnamed-2.cleave.config.yaml")
+    controls = _make_controls(
+        ("drums",),
+        launch_config_path=_REPO_ROOT_EXAMPLE,
+        repo_root_example=_REPO_ROOT_EXAMPLE,
+    )
+    assert controls.build_view_state(paused=False).allow_overwrite is False
+
+    controls._on_save_new_config = lambda: saved_path
+    view = controls.build_view_state(paused=False)
+    save_row = next(
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.SAVE_AS_NEW_CONFIG
+    )
+    controls.focus_index = save_row
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+
+    state = controls.build_view_state(paused=False)
+    assert state.allow_overwrite is True
+    kinds = {row_kind(state, i) for i in range(row_count(state))}
+    assert RowKind.OVERWRITE_CONFIG in kinds
+
+
 def test_overwrite_after_save_uses_new_active_path() -> None:
-    launch_path = Path("/tmp/cleave.config.yaml")
     saved_path = Path("/tmp/saved-cleave-configs/unnamed-1.cleave.config.yaml")
     writes: list[Path] = []
-    controls = _make_controls(("drums",))
-    controls._active_config_path = launch_path
+    controls = _make_controls(
+        ("drums",),
+        launch_config_path=_REPO_ROOT_EXAMPLE,
+        repo_root_example=_REPO_ROOT_EXAMPLE,
+    )
     controls._on_save_new_config = lambda: saved_path
     controls._on_overwrite_config = lambda path: writes.append(path) or path.name
 
@@ -507,15 +552,18 @@ def test_overwrite_after_save_uses_new_active_path() -> None:
     save_row = next(
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.SAVE_AS_NEW_CONFIG
     )
-    overwrite_row = next(
-        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
-    )
 
     with patch.object(time, "monotonic", return_value=3000.0):
         controls.focus_index = save_row
         controls.handle_keydown(_keydown(pygame.K_RETURN))
 
     with patch.object(time, "monotonic", return_value=3000.0 + TOAST_DURATION_SEC + 1):
+        state = controls.build_view_state(paused=False)
+        overwrite_row = next(
+            i
+            for i in range(row_count(state))
+            if row_kind(state, i) == RowKind.OVERWRITE_CONFIG
+        )
         controls.focus_index = overwrite_row
         controls.handle_keydown(_keydown(pygame.K_RETURN))
         controls.handle_keydown(_keydown(pygame.K_RETURN))
@@ -524,7 +572,11 @@ def test_overwrite_after_save_uses_new_active_path() -> None:
 
 
 def test_navigable_rows_without_overwrite() -> None:
-    controls = _make_controls(("drums",), allow_overwrite=False)
+    controls = _make_controls(
+        ("drums",),
+        launch_config_path=_REPO_ROOT_EXAMPLE,
+        repo_root_example=_REPO_ROOT_EXAMPLE,
+    )
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is False
     assert row_count(view) == 9
@@ -550,7 +602,7 @@ def test_navigable_rows_without_overwrite() -> None:
 
 
 def test_navigable_rows_with_overwrite() -> None:
-    controls = _make_controls(("drums",), allow_overwrite=True)
+    controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is True
     assert row_count(view) == 10
@@ -562,10 +614,9 @@ def test_navigable_rows_with_overwrite() -> None:
 
 
 def test_overwrite_shows_confirm_before_write() -> None:
-    launch_path = Path("/tmp/cleave.config.yaml")
+    launch_path = Path("/tmp/custom/cleave.config.yaml")
     writes: list[Path] = []
-    controls = _make_controls(("drums",))
-    controls._active_config_path = launch_path
+    controls = _make_controls(("drums",), launch_config_path=launch_path)
     controls._on_overwrite_config = lambda path: (
         writes.append(path) or path.name
     )
@@ -622,10 +673,9 @@ def test_overwrite_confirm_yes_writes_launch_path() -> None:
 
 
 def test_overwrite_confirm_esc_dismisses() -> None:
-    launch_path = Path("/tmp/cleave.config.yaml")
+    launch_path = Path("/tmp/custom/cleave.config.yaml")
     writes: list[Path] = []
-    controls = _make_controls(("drums",))
-    controls._active_config_path = launch_path
+    controls = _make_controls(("drums",), launch_config_path=launch_path)
     controls._on_overwrite_config = lambda path: (
         writes.append(path) or path.name
     )
@@ -654,9 +704,16 @@ def test_esc_during_confirm_does_not_quit() -> None:
     assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
 
 
-def test_esc_requests_quit() -> None:
+def test_ctrl_q_requests_quit() -> None:
     controls = _make_controls()
-    assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is False
+    assert controls.handle_keydown(
+        _keydown(pygame.K_q, mod=pygame.KMOD_CTRL)
+    ) is False
+
+
+def test_q_alone_does_not_quit() -> None:
+    controls = _make_controls()
+    assert controls.handle_keydown(_keydown(pygame.K_q)) is True
 
 
 def _skip_glyph_has_opaque_pixels(font: pygame.font.Font, ch: str) -> bool:
@@ -1146,6 +1203,7 @@ def test_format_mmss() -> None:
 def main() -> int:
     pygame.init()
     tests = [
+        test_allow_overwrite_for_path_hides_repo_root_template_only,
         test_focus_navigation_wraps,
         test_opacity_clamps,
         test_beat_sensitivity_clamps,
@@ -1164,6 +1222,7 @@ def main() -> int:
         test_preset_row_truncates_long_filenames,
         test_fit_row_text_config_and_preset_share_panel_width,
         test_save_as_new_updates_active_config_path,
+        test_save_as_new_enables_overwrite_from_root_template,
         test_overwrite_after_save_uses_new_active_path,
         test_navigable_rows_without_overwrite,
         test_navigable_rows_with_overwrite,
@@ -1171,7 +1230,8 @@ def main() -> int:
         test_overwrite_confirm_yes_writes_launch_path,
         test_overwrite_confirm_esc_dismisses,
         test_esc_during_confirm_does_not_quit,
-        test_esc_requests_quit,
+        test_ctrl_q_requests_quit,
+        test_q_alone_does_not_quit,
         test_transport_row_icons,
         test_format_mmss,
         test_transport_enter_toggles_pause,
