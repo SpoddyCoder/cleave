@@ -8,16 +8,26 @@ from typing import Literal
 import pygame
 from OpenGL.GL import (
     GL_BLEND,
+    GL_BLEND_EQUATION_RGB,
     GL_CLAMP_TO_EDGE,
     GL_COLOR_BUFFER_BIT,
+    GL_COLOR_ATTACHMENT0,
     GL_DEPTH_ATTACHMENT,
     GL_DEPTH_COMPONENT24,
+    GL_DEPTH_TEST,
+    GL_DST_COLOR,
     GL_FRAMEBUFFER,
     GL_FRAMEBUFFER_COMPLETE,
+    GL_FUNC_ADD,
+    GL_FUNC_REVERSE_SUBTRACT,
+    GL_FUNC_SUBTRACT,
     GL_LINEAR,
+    GL_MAX,
     GL_MODELVIEW,
     GL_ONE,
+    GL_ONE_MINUS_DST_COLOR,
     GL_ONE_MINUS_SRC_ALPHA,
+    GL_ONE_MINUS_SRC_COLOR,
     GL_PROJECTION,
     GL_QUADS,
     GL_RGBA,
@@ -30,10 +40,14 @@ from OpenGL.GL import (
     GL_TEXTURE_WRAP_S,
     GL_TEXTURE_WRAP_T,
     GL_UNSIGNED_BYTE,
+    GL_ZERO,
+    GL_BLEND_DST_ALPHA,
+    GL_BLEND_SRC_ALPHA,
     glBegin,
     glBindFramebuffer,
     glBindRenderbuffer,
     glBindTexture,
+    glBlendEquation,
     glBlendFunc,
     glClear,
     glClearColor,
@@ -49,6 +63,8 @@ from OpenGL.GL import (
     glGenFramebuffers,
     glGenRenderbuffers,
     glGenTextures,
+    glGetIntegerv,
+    glIsEnabled,
     glLoadIdentity,
     glMatrixMode,
     glOrtho,
@@ -60,15 +76,31 @@ from OpenGL.GL import (
     glVertex2f,
     glViewport,
     glCheckFramebufferStatus,
-    glGetIntegerv,
-    glIsEnabled,
-    GL_BLEND_DST_ALPHA,
-    GL_BLEND_SRC_ALPHA,
-    GL_COLOR_ATTACHMENT0,
-    GL_DEPTH_TEST,
 )
 
-BlendMode = Literal["alpha", "add"]
+BlendMode = Literal[
+    "alpha",
+    "add",
+    "multiply",
+    "screen",
+    "subtract",
+    "difference",
+    "exclusion",
+    "max",
+    "pure-add",
+]
+
+BLEND_MODES: tuple[BlendMode, ...] = (
+    "alpha",
+    "add",
+    "multiply",
+    "screen",
+    "subtract",
+    "difference",
+    "exclusion",
+    "max",
+    "pure-add",
+)
 
 
 def _gl_name(gen_fn, count: int = 1) -> int:
@@ -159,8 +191,31 @@ class GlCompositor:
     @staticmethod
     def _apply_blend_mode(mode: BlendMode) -> None:
         if mode == "add":
+            glBlendEquation(GL_FUNC_ADD)
             glBlendFunc(GL_SRC_ALPHA, GL_ONE)
+        elif mode == "multiply":
+            glBlendEquation(GL_FUNC_ADD)
+            glBlendFunc(GL_DST_COLOR, GL_ZERO)
+        elif mode == "screen":
+            glBlendEquation(GL_FUNC_ADD)
+            glBlendFunc(GL_ONE, GL_ONE_MINUS_DST_COLOR)
+        elif mode == "subtract":
+            glBlendEquation(GL_FUNC_SUBTRACT)
+            glBlendFunc(GL_ONE, GL_ONE)
+        elif mode == "difference":
+            glBlendEquation(GL_FUNC_REVERSE_SUBTRACT)
+            glBlendFunc(GL_ONE, GL_ONE)
+        elif mode == "exclusion":
+            glBlendEquation(GL_FUNC_ADD)
+            glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_COLOR)
+        elif mode == "max":
+            glBlendEquation(GL_MAX)
+            glBlendFunc(GL_ONE, GL_ONE)
+        elif mode == "pure-add":
+            glBlendEquation(GL_FUNC_ADD)
+            glBlendFunc(GL_ONE, GL_ONE)
         else:
+            glBlendEquation(GL_FUNC_ADD)
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
     @staticmethod
@@ -171,7 +226,7 @@ class GlCompositor:
         would leak into projectM's internal feedback passes if not cleared here.
         """
         glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        GlCompositor._apply_blend_mode("alpha")
 
     @staticmethod
     def _configure_texture_params() -> None:
@@ -276,20 +331,22 @@ class GlCompositor:
             return int(value)
 
     @classmethod
-    def _push_blend_state(cls) -> tuple[bool, int, int]:
+    def _push_blend_state(cls) -> tuple[bool, int, int, int]:
         enabled = bool(glIsEnabled(GL_BLEND))
         return (
             enabled,
             cls._gl_int(GL_BLEND_SRC_ALPHA),
             cls._gl_int(GL_BLEND_DST_ALPHA),
+            cls._gl_int(GL_BLEND_EQUATION_RGB),
         )
 
     @staticmethod
-    def _pop_blend_state(enabled: bool, src: int, dst: int) -> None:
+    def _pop_blend_state(enabled: bool, src: int, dst: int, equation: int) -> None:
         if enabled:
             glEnable(GL_BLEND)
         else:
             glDisable(GL_BLEND)
+        glBlendEquation(equation)
         glBlendFunc(src, dst)
 
     def draw_layer(self, layer: LayerFbo) -> None:
@@ -371,13 +428,13 @@ class GlCompositor:
         """Draw *texture_id* at pixel (*x*, *y*) with alpha blending enabled."""
         self._ensure_init()
         self._bind_default_framebuffer()
-        blend_enabled, blend_src, blend_dst = self._push_blend_state()
+        blend_enabled, blend_src, blend_dst, blend_equation = self._push_blend_state()
         try:
             glEnable(GL_BLEND)
             self._apply_blend_mode("alpha")
             self._draw_textured_quad(texture_id, float(x), float(y), width, height, alpha)
         finally:
-            self._pop_blend_state(blend_enabled, blend_src, blend_dst)
+            self._pop_blend_state(blend_enabled, blend_src, blend_dst, blend_equation)
             glColor4f(1.0, 1.0, 1.0, 1.0)
 
     def destroy(self) -> None:

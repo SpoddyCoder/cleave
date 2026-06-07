@@ -240,7 +240,7 @@ The directory row shows the path relative to `preset_root` with `(N/TOTAL)` amon
 | --- | --- | --- |
 | Directory | Previous / next sibling directory (wraps) | (same step size) |
 | Filename | Previous / next `.milk` in current directory only (wraps); no-op when empty | Jump ±10 presets in current directory (wraps); no-op when empty |
-| Blend mode | Cycle `alpha` / `add` | (same step size) |
+| Blend mode | Cycle blend modes (see below) | (same step size) |
 | Opacity | −1% / +1% | −10% / +10% (0% disables the layer) |
 | Beat sensitivity | −0.01 / +0.01 | −0.1 / +0.1 |
 | Transport | Seek back / forward 10s | Seek back / forward 30s |
@@ -251,7 +251,21 @@ Pause stops PCM feed and freezes layer FBOs (no projectM render); seek flushes p
 
 ### Config and save
 
-Per-layer preset, size, opacity, `blend_mode`, and optional beat sensitivity live under `layers.*` in [cleave.config.yaml](cleave.config.yaml). Global compositor stack order is `layer_z_order` (list of stem names, bottom to top). `blend_mode` is `alpha` or `add` per layer.
+Per-layer preset, size, opacity, `blend_mode`, and optional beat sensitivity live under `layers.*` in [cleave.config.yaml](cleave.config.yaml). Global compositor stack order is `layer_z_order` (list of stem names, bottom to top).
+
+**Blend modes** (`layers.*.blend_mode`): cycled in this order in the live tuning overlay (Left/Right on the blend row):
+
+| Mode | Role |
+| --- | --- |
+| `alpha` | Standard over compositing. Background layers (other, bass, vocals): controlled stacking, readable motion underneath. |
+| `add` | Additive with alpha weighting. Drums / transient layer: flash, strobe, color blow-out. |
+| `multiply` | Darkens the stack. Moody background (often other at low opacity); use sparingly on one layer. |
+| `screen` | Soft lift between alpha and add. Gentle haze on vocal/other without full blow-out. |
+| `subtract` | Source minus destination (clamped). Chaotic with full-color presets and four layers. |
+| `difference` | Destination minus source (clamped). Chaotic; paired inverse of subtract, not true `\|a - b\|`. |
+| `exclusion` | Soft inverted multiply. Chaotic with saturated Milkdrop layers. |
+| `max` | Per-channel max of source and destination. Competing highlights across stems. |
+| `pure-add` | Full-strength additive (`ONE`, `ONE`). Opacity still applies; clips quickly with several bright layers. |
 
 **SAVE AS NEW CONFIG** writes a full reproducible snapshot to [saved-cleave-configs/](saved-cleave-configs/) as `unnamed-N.cleave.config.yaml` (next unused N; see [cleave/config_snapshot.py](cleave/config_snapshot.py)). Snapshots include current presets (individual `.milk` paths relative to `preset_root`), opacity, blend modes, beat values, and z-order. The launch config is never touched by save-as-new.
 
