@@ -307,6 +307,7 @@ def _session_from_cfg(
                 blend_mode=layer_cfg.blend_mode,
                 beat_sensitivity=_beat_sensitivity(cfg, name),
                 enabled=layer_cfg.enabled,
+                locked=layer_cfg.locked,
             )
             for name, layer_cfg in cfg.layers.items()
         },

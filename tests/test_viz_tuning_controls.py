@@ -31,13 +31,25 @@ from cleave.viz_tuning_controls import (
     allow_overwrite_for_path,
     config_path_display,
 )
-from cleave.viz_theme import HIGHLIGHT, MOVE_MODE, PANEL_CONTENT_MAX_WIDTH, TEXT_DIM
+from cleave.viz_theme import (
+    HIGHLIGHT,
+    LOCK_TEXT,
+    MOVE_MODE,
+    PANEL_CONTENT_MAX_WIDTH,
+    TEXT,
+    TEXT_DIM,
+)
 from cleave.viz_material_icons import (
     FILE_GLYPH,
     FOLDER_GLYPH,
+    LOCK_GLYPH,
+    VISIBILITY_GLYPH,
+    VISIBILITY_OFF_GLYPH,
     render_glyph,
     render_transport_icons,
     row_icon_prefix_width,
+    track_header_lock_suffix_width,
+    visibility_icon_prefix_width,
 )
 from cleave.viz_tuning_overlay import (
     RowKind,
@@ -771,11 +783,39 @@ def test_q_alone_does_not_quit() -> None:
 def test_row_icons_render() -> None:
     line_height = 17
     color = (255, 255, 255)
-    for glyph in (FOLDER_GLYPH, FILE_GLYPH):
+    for glyph in (FOLDER_GLYPH, FILE_GLYPH, VISIBILITY_GLYPH, VISIBILITY_OFF_GLYPH):
         surf = render_glyph(glyph, color=color, line_height=line_height)
         assert surf.get_width() > 0
         assert surf.get_height() == line_height
         assert pygame.mask.from_surface(surf).count() > 0
+
+
+def test_track_header_icons_render() -> None:
+    line_height = 17
+    header_color = (170, 210, 255)
+    lock_color = (235, 90, 90)
+    for glyph in (VISIBILITY_GLYPH, VISIBILITY_OFF_GLYPH):
+        surf = render_glyph(glyph, color=header_color, line_height=line_height)
+        assert surf.get_width() > 0
+        assert surf.get_height() == line_height
+        assert pygame.mask.from_surface(surf).count() > 0
+
+    lock = render_glyph(LOCK_GLYPH, color=lock_color, line_height=line_height)
+    assert lock.get_width() > 0
+    assert visibility_icon_prefix_width(line_height) > lock.get_width()
+    assert track_header_lock_suffix_width(line_height) > lock.get_width()
+
+
+def test_track_header_text_omits_enabled_status() -> None:
+    controls = _make_controls()
+    view = controls.build_view_state(paused=False)
+    header_row = next(
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
+    )
+    text = _row_text(view, header_row)
+    assert text.startswith("Layer ")
+    assert "enabled" not in text.lower()
+    assert "disabled" not in text.lower()
 
 
 def test_transport_icons_render() -> None:
@@ -1231,6 +1271,182 @@ def test_scan_file_anchor_builds_parent_directory_playlist() -> None:
         assert directory_display(playlist, root) == "pack/Aurora/ (1/1)"
 
 
+def _header_row(
+    controls: TuningControls,
+    stem: str,
+    *,
+    paused: bool = False,
+) -> int:
+    view = controls.build_view_state(paused=paused)
+    return next(
+        i
+        for i in range(row_count(view))
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == stem
+    )
+
+
+def _sub_rows_for_stem(view: TuningViewState, stem: str) -> list[int]:
+    sub_kinds = (
+        RowKind.TRACK_PRESET_DIR,
+        RowKind.TRACK_PRESET,
+        RowKind.TRACK_BLEND,
+        RowKind.TRACK_OPACITY,
+        RowKind.TRACK_BEAT,
+    )
+    return [
+        i
+        for i in range(row_count(view))
+        if row_stem(view, i) == stem and row_kind(view, i) in sub_kinds
+    ]
+
+
+def test_ctrl_enter_toggles_lock() -> None:
+    controls = _make_controls(("drums",))
+    view = controls.build_view_state(paused=False)
+    header_row = next(
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
+    )
+    controls.focus_index = header_row
+    assert controls.session.layers["drums"].locked is False
+
+    controls.handle_keydown(_keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
+    assert controls.session.layers["drums"].locked is True
+
+    controls.handle_keydown(_keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
+    assert controls.session.layers["drums"].locked is False
+
+
+def test_locked_expanded_skips_sub_rows_in_nav() -> None:
+    controls = _make_controls(("drums",))
+    controls.session.layers["drums"].locked = True
+    controls.session.layers["drums"].expanded = True
+    view = controls.build_view_state(paused=False)
+
+    sub_rows = _sub_rows_for_stem(view, "drums")
+    assert sub_rows
+    visible = visible_row_indices(view)
+    navigable = navigable_row_indices(view)
+    for row in sub_rows:
+        assert row in visible
+        assert row not in navigable
+
+
+def test_locked_blocks_enable_disable() -> None:
+    controls = _make_controls(("drums",))
+    controls.session.layers["drums"].locked = True
+    view = controls.build_view_state(paused=False)
+    header_row = next(
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
+    )
+    controls.focus_index = header_row
+    assert controls.session.layers["drums"].enabled is True
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert controls.session.layers["drums"].enabled is True
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert controls.session.layers["drums"].enabled is True
+
+
+def test_locked_blocks_move_mode() -> None:
+    controls = _make_controls(("drums",))
+    controls.session.layers["drums"].locked = True
+    view = controls.build_view_state(paused=False)
+    header_row = next(
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
+    )
+    controls.focus_index = header_row
+
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    assert controls.move_mode_stem is None
+
+
+def test_locked_header_still_expands() -> None:
+    controls = _make_controls(("drums",))
+    controls.session.layers["drums"].locked = True
+    view = controls.build_view_state(paused=False)
+    header_row = next(
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
+    )
+    preset_dir_row = next(
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET_DIR
+    )
+    controls.focus_index = header_row
+    assert controls.session.layers["drums"].expanded is True
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.layers["drums"].expanded is False
+
+    view = controls.build_view_state(paused=False)
+    assert preset_dir_row not in visible_row_indices(view)
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["drums"].expanded is True
+
+    view = controls.build_view_state(paused=False)
+    assert preset_dir_row in visible_row_indices(view)
+
+
+def test_locked_sub_rows_dimmed() -> None:
+    controls = _make_controls(("drums",))
+    controls.session.layers["drums"].locked = True
+    controls.session.layers["drums"].expanded = True
+    view = controls.build_view_state(paused=False)
+    header_row = next(
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
+    )
+    preset_dir_row = next(
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET_DIR
+    )
+    unfocused = TuningViewState(
+        layer_z_order=view.layer_z_order,
+        tracks=view.tracks,
+        paused=view.paused,
+        position_sec=view.position_sec,
+        focus_index=row_count(view) - 1,
+        move_mode_stem=view.move_mode_stem,
+        toast_message=view.toast_message,
+        toast_remaining_sec=view.toast_remaining_sec,
+        active_config_label=view.active_config_label,
+        allow_overwrite=view.allow_overwrite,
+        confirm_message=view.confirm_message,
+        confirm_focus_yes=view.confirm_focus_yes,
+    )
+    assert _row_text_color(unfocused, header_row) == TEXT
+    assert _row_text_color(unfocused, preset_dir_row) == LOCK_TEXT
+
+    focused_header = TuningViewState(
+        layer_z_order=view.layer_z_order,
+        tracks=view.tracks,
+        paused=view.paused,
+        position_sec=view.position_sec,
+        focus_index=header_row,
+        move_mode_stem=view.move_mode_stem,
+        toast_message=view.toast_message,
+        toast_remaining_sec=view.toast_remaining_sec,
+        active_config_label=view.active_config_label,
+        allow_overwrite=view.allow_overwrite,
+        confirm_message=view.confirm_message,
+        confirm_focus_yes=view.confirm_focus_yes,
+    )
+    assert _row_text_color(focused_header, header_row) == HIGHLIGHT
+    assert _row_text_color(focused_header, preset_dir_row) == LOCK_TEXT
+
+
+def test_locked_not_toggleable_during_move_mode() -> None:
+    controls = _make_controls(("drums", "bass"))
+    view = controls.build_view_state(paused=False)
+    bass_header = _header_row(controls, "bass")
+    controls.focus_index = bass_header
+    assert controls.session.layers["bass"].locked is False
+
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    assert controls.move_mode_stem == "bass"
+
+    controls.handle_keydown(_keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
+    assert controls.session.layers["bass"].locked is False
+
+
 def test_ctrl_quick_nav_blocked_during_move_mode() -> None:
     controls = _make_controls(("drums", "bass", "vocals"))
     view = controls.build_view_state(paused=False)
@@ -1309,6 +1525,8 @@ def main() -> int:
         test_ctrl_q_requests_quit,
         test_q_alone_does_not_quit,
         test_row_icons_render,
+        test_track_header_icons_render,
+        test_track_header_text_omits_enabled_status,
         test_transport_icons_render,
         test_transport_icons_play_vs_pause,
         test_format_mmss,
@@ -1334,6 +1552,13 @@ def main() -> int:
         test_preset_overlay_shows_directory_and_position,
         test_scan_file_anchor_builds_parent_directory_playlist,
         test_ctrl_quick_nav_blocked_during_move_mode,
+        test_ctrl_enter_toggles_lock,
+        test_locked_expanded_skips_sub_rows_in_nav,
+        test_locked_blocks_enable_disable,
+        test_locked_blocks_move_mode,
+        test_locked_header_still_expands,
+        test_locked_sub_rows_dimmed,
+        test_locked_not_toggleable_during_move_mode,
     ]
     for test in tests:
         test()

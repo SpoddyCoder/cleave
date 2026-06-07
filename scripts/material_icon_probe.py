@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Preview Material Icons used by the live tuning overlay.
 
-Renders folder, file, and transport (playing/paused) glyphs at overlay line
-height, saves magnified PNG previews, and prints surface dimensions and opaque
-pixel counts.
+Renders folder, file, lock, visibility, and transport (playing/paused) glyphs at
+overlay line height, saves magnified PNG previews, and prints surface dimensions
+and opaque pixel counts.
 
 Usage:
     python scripts/material_icon_probe.py
@@ -25,10 +25,13 @@ if str(ROOT) not in sys.path:
 from cleave.viz_material_icons import (
     FILE_GLYPH,
     FOLDER_GLYPH,
+    LOCK_GLYPH,
+    VISIBILITY_GLYPH,
+    VISIBILITY_OFF_GLYPH,
     render_glyph,
     render_transport_icons,
 )
-from cleave.viz_theme import PRESET_FILE_ICON, PRESET_ICON
+from cleave.viz_theme import LOCK_ICON, PRESET_FILE_ICON, PRESET_ICON, CONFIG_HEADER_TEXT
 
 _LINE_HEIGHT = 17
 _COLOR = (255, 255, 255)
@@ -82,12 +85,22 @@ def main() -> int:
 
     folder = render_glyph(FOLDER_GLYPH, color=PRESET_ICON, line_height=_LINE_HEIGHT)
     file_icon = render_glyph(FILE_GLYPH, color=PRESET_FILE_ICON, line_height=_LINE_HEIGHT)
+    lock_icon = render_glyph(LOCK_GLYPH, color=LOCK_ICON, line_height=_LINE_HEIGHT)
+    visibility = render_glyph(
+        VISIBILITY_GLYPH, color=CONFIG_HEADER_TEXT, line_height=_LINE_HEIGHT
+    )
+    visibility_off = render_glyph(
+        VISIBILITY_OFF_GLYPH, color=CONFIG_HEADER_TEXT, line_height=_LINE_HEIGHT
+    )
     playing = render_transport_icons(color=_COLOR, line_height=_LINE_HEIGHT, paused=False)
     paused = render_transport_icons(color=_COLOR, line_height=_LINE_HEIGHT, paused=True)
 
     previews = (
         ("folder", folder),
         ("file", file_icon),
+        ("lock", lock_icon),
+        ("visibility", visibility),
+        ("visibility-off", visibility_off),
         ("transport-playing", playing),
         ("transport-paused", paused),
     )
@@ -97,6 +110,9 @@ def main() -> int:
 
     pygame.image.save(_preview_png(folder), out_dir / "folder.png")
     pygame.image.save(_preview_png(file_icon), out_dir / "file.png")
+    pygame.image.save(_preview_png(lock_icon), out_dir / "lock.png")
+    pygame.image.save(_preview_png(visibility), out_dir / "visibility.png")
+    pygame.image.save(_preview_png(visibility_off), out_dir / "visibility-off.png")
     pygame.image.save(_preview_png(playing), out_dir / "transport-playing.png")
     pygame.image.save(_preview_png(paused), out_dir / "transport-paused.png")
     pygame.image.save(_magnified_png(playing), out_dir / "playing.png")

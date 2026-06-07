@@ -225,7 +225,8 @@ Navigate with the arrow keys; the focused row is highlighted in orange. **SAVE A
 | Up / Down | Move focus between rows (track rows section and footer rows section) |
 | Left / Right | Adjust the focused field (see below); hold to repeat on directory, filename, blend, opacity, and beat rows |
 | Ctrl + Left / Right | On directory row: go to parent / descend into child (same as Backspace / Enter); larger steps on opacity and beat; on filename row, jump ±10 presets in the current directory (wraps) |
-| Enter | On directory row: descend into first alphabetical child directory with presets; on track header: enter z-order move mode; on SAVE AS NEW CONFIG: write snapshot; on OVERWRITE CONFIG (when shown): confirm then overwrite launch config |
+| Enter | On directory row: descend into first alphabetical child directory with presets; on track header: enter z-order move mode (blocked when layer is locked); on SAVE AS NEW CONFIG: write snapshot; on OVERWRITE CONFIG (when shown): confirm then overwrite launch config |
+| Ctrl + Enter | On track header: toggle layer lock |
 | Backspace | On directory row: go to parent directory (no-op at the layer's configured preset pack root, the first path segment under `preset_root`) |
 | Enter (move mode) | Confirm z-order after Up/Down swaps |
 | Esc / Backspace (move mode) | Cancel move mode and restore previous z-order |
@@ -249,11 +250,13 @@ The directory row shows the path relative to `preset_root` with `(N/TOTAL)` amon
 
 Z-order move mode highlights the track header in blue; Up/Down reorders that stem in the compositor stack (bottom-to-top per `layer_z_order`).
 
+Locked layers show a red padlock on the track header. Lock blocks enable/disable (Ctrl + Left / Right) and move mode (Enter) on that header. When expanded, sub-rows remain visible but are skipped in Up/Down navigation and drawn dimmed; Left / Right expand/collapse on the header still works.
+
 Pause stops PCM feed and freezes layer FBOs (no projectM render); seek flushes projectM buffers. The overlay stays visible for 10 seconds after input, then fades out over 2 seconds; any keypress shows it again (same timing as Phase 4 [cleave/viz_overlay.py](cleave/viz_overlay.py)).
 
 ### Config and save
 
-Per-layer preset, size, opacity, `blend_mode`, and optional beat sensitivity live under `layers.*` in [cleave.config.yaml](cleave.config.yaml). Global compositor stack order is `layer_z_order` (list of stem names, bottom to top).
+Per-layer preset, size, opacity, `blend_mode`, optional beat sensitivity, and `locked` (bool, default false) live under `layers.*` in [cleave.config.yaml](cleave.config.yaml). Global compositor stack order is `layer_z_order` (list of stem names, bottom to top).
 
 **Blend modes** (`layers.*.blend_mode`): cycled in this order in the live tuning overlay (Left/Right on the blend row):
 
@@ -269,7 +272,7 @@ Per-layer preset, size, opacity, `blend_mode`, and optional beat sensitivity liv
 | `max` | Per-channel max of source and destination. Competing highlights across stems. |
 | `pure-add` | Full-strength additive (`ONE`, `ONE`). Opacity still applies; clips quickly with several bright layers. |
 
-**SAVE AS NEW CONFIG** writes a full reproducible snapshot to [saved-cleave-configs/](saved-cleave-configs/) as `unnamed-N.cleave.config.yaml` (next unused N; see [cleave/config_snapshot.py](cleave/config_snapshot.py)). Snapshots include current presets (individual `.milk` paths relative to `preset_root`), opacity, blend modes, beat values, and z-order. The launch config is never touched by save-as-new.
+**SAVE AS NEW CONFIG** writes a full reproducible snapshot to [saved-cleave-configs/](saved-cleave-configs/) as `unnamed-N.cleave.config.yaml` (next unused N; see [cleave/config_snapshot.py](cleave/config_snapshot.py)). Snapshots include current presets (individual `.milk` paths relative to `preset_root`), opacity, blend modes, beat values, lock state, and z-order. The launch config is never touched by save-as-new.
 
 **OVERWRITE CONFIG** (when shown) writes the same snapshot to the active config file after a yes/no confirm. Use it when you want the current tuning session to become the default for the next run. It is hidden only while the active config is the repo-root [cleave.config.yaml](cleave.config.yaml); save-as-new switches the active path to a snapshot and enables overwrite for that file.
 

@@ -72,6 +72,7 @@ class LayerRuntime:
     beat_sensitivity: float = 1.0
     enabled: bool = True
     expanded: bool = True
+    locked: bool = False
 
 
 @dataclass
@@ -203,6 +204,15 @@ class TuningControls:
                     self._parent_directory(stem)
                 return True
 
+        if event.key == pygame.K_RETURN and mod_ctrl(event.mod):
+            view = self.build_view_state(paused=self.playback.paused)
+            kind = row_kind(view, self.focus_index)
+            if kind == RowKind.TRACK_HEADER:
+                stem = row_stem(view, self.focus_index)
+                if stem is not None:
+                    self._toggle_locked(stem)
+                return True
+
         if event.key == pygame.K_RETURN:
             view = self.build_view_state(paused=self.playback.paused)
             kind = row_kind(view, self.focus_index)
@@ -217,6 +227,8 @@ class TuningControls:
             if kind == RowKind.TRACK_HEADER:
                 stem = row_stem(view, self.focus_index)
                 if stem is not None:
+                    if self.session.layers[stem].locked:
+                        return True
                     self._move_mode_original_z_order = list(
                         self.session.layer_z_order
                     )
@@ -260,6 +272,7 @@ class TuningControls:
                 beat_sensitivity=layer.beat_sensitivity,
                 enabled=layer.enabled,
                 expanded=layer.expanded,
+                locked=layer.locked,
                 preset_empty=not layer.playlist.paths,
             )
 
@@ -360,10 +373,15 @@ class TuningControls:
         ctrl = mod_ctrl(mod)
         forward = key == pygame.K_RIGHT
 
+        if stem is not None and kind in _REPEAT_ROW_KINDS and self.session.layers[stem].locked:
+            return
+
         if kind == RowKind.TRACK_HEADER:
             if stem is None:
                 return
             if ctrl:
+                if self.session.layers[stem].locked:
+                    return
                 self._set_enabled(stem, forward)
                 return
             self._set_expanded(stem, forward)
@@ -448,6 +466,10 @@ class TuningControls:
             layer.blend_mode = BLEND_MODES[(index - 1) % len(BLEND_MODES)]
         if self._on_blend_change is not None:
             self._on_blend_change(stem, layer.blend_mode)
+
+    def _toggle_locked(self, stem: str) -> None:
+        layer = self.session.layers[stem]
+        layer.locked = not layer.locked
 
     def _set_expanded(self, stem: str, expanded: bool) -> None:
         layer = self.session.layers[stem]
