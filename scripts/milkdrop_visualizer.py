@@ -599,7 +599,8 @@ def run_m1(
                 layer.pm.set_frame_time(t_sec)
 
             assert compositor is not None
-            _render_layer_fbo(layer, layer.pm)
+            if not playback.paused:
+                _render_layer_fbo(layer, layer.pm)
             compositor.composite([layer.fbo])
 
             view_state = build_view_state(
@@ -706,9 +707,10 @@ def run(
                     layer.pm.set_frame_time(t_sec)
 
             assert compositor is not None
-            for layer in layers:
-                if layer.fbo.enabled:
-                    _render_layer_fbo(layer, layer.pm)
+            if not playback.paused:
+                for layer in layers:
+                    if layer.fbo.enabled:
+                        _render_layer_fbo(layer, layer.pm)
 
             _composite_ordered(compositor, layers_by_name, session)
 
