@@ -363,24 +363,24 @@ def _row_text_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
     ):
         return TEXT_DIM
 
+    if stem is not None and state.move_mode_stem == stem:
+        return MOVE_MODE
+
     if index == state.focus_index:
         return HIGHLIGHT
 
-    if stem is not None:
-        if state.move_mode_stem == stem:
-            return MOVE_MODE
-        if _track_disabled(state, stem):
-            return TEXT_DIM
+    if stem is not None and _track_disabled(state, stem):
+        return TEXT_DIM
 
     return TEXT
 
 
 def _row_bg_color(state: TuningViewState, index: int) -> tuple[int, int, int] | None:
-    if index == state.focus_index:
-        return HIGHLIGHT
     stem = row_stem(state, index)
     if stem is not None and state.move_mode_stem == stem:
         return MOVE_MODE
+    if index == state.focus_index:
+        return HIGHLIGHT
     return None
 
 
