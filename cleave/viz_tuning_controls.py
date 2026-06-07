@@ -21,6 +21,7 @@ from cleave.viz_confirm import ConfirmDialog, ConfirmRequest
 from cleave.viz_key_repeat import KeyRepeatController
 from cleave.viz_playback import PlaybackState, current_sec, seek, toggle_pause
 from cleave.viz_tuning_overlay import (
+    ROWS_PER_TRACK,
     RowKind,
     TrackBlock,
     TuningViewState,
@@ -63,6 +64,7 @@ class LayerRuntime:
     blend_mode: BlendMode = "alpha"
     beat_sensitivity: float = 1.0
     enabled: bool = True
+    expanded: bool = True
 
 
 @dataclass
@@ -236,6 +238,7 @@ class TuningControls:
                 opacity_pct=layer.opacity_pct,
                 beat_sensitivity=layer.beat_sensitivity,
                 enabled=layer.enabled,
+                expanded=layer.expanded,
                 preset_empty=not layer.playlist.paths,
             )
 
@@ -326,7 +329,10 @@ class TuningControls:
         if kind == RowKind.TRACK_HEADER:
             if stem is None:
                 return
-            self._toggle_enabled(stem)
+            if ctrl:
+                self._set_enabled(stem, forward)
+                return
+            self._set_expanded(stem, forward)
         elif kind == RowKind.TRACK_PRESET_DIR:
             if stem is None:
                 return
@@ -403,9 +409,36 @@ class TuningControls:
         if self._on_blend_change is not None:
             self._on_blend_change(stem, layer.blend_mode)
 
-    def _toggle_enabled(self, stem: str) -> None:
+    def _set_expanded(self, stem: str, expanded: bool) -> None:
         layer = self.session.layers[stem]
-        layer.enabled = not layer.enabled
+        if layer.expanded == expanded:
+            return
+        layer.expanded = expanded
+        if not expanded:
+            self._refocus_track_header_if_sub_row(stem)
+
+    def _track_header_index(self, stem: str) -> int:
+        stem_index = self.session.layer_z_order.index(stem)
+        return stem_index * ROWS_PER_TRACK
+
+    def _refocus_track_header_if_sub_row(self, stem: str) -> None:
+        view = self.build_view_state(paused=self.playback.paused)
+        kind = row_kind(view, self.focus_index)
+        if kind not in _REPEAT_ROW_KINDS:
+            return
+        if row_stem(view, self.focus_index) == stem:
+            self.focus_index = self._track_header_index(stem)
+
+    def _set_enabled(self, stem: str, enabled: bool) -> None:
+        layer = self.session.layers[stem]
+        if layer.enabled == enabled:
+            return
+        layer.enabled = enabled
+        if enabled:
+            layer.expanded = True
+        else:
+            layer.expanded = False
+            self._refocus_track_header_if_sub_row(stem)
         if self._on_layer_enabled_change is not None:
             self._on_layer_enabled_change(stem, layer.enabled)
 
