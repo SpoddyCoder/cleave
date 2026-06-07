@@ -32,6 +32,7 @@ from cleave.viz_tuning_controls import (
     config_path_display,
 )
 from cleave.viz_theme import (
+    CONFIG_HEADER_TEXT,
     HIGHLIGHT,
     LOCK_TEXT,
     MOVE_MODE,
@@ -801,6 +802,40 @@ def test_track_header_text_omits_enabled_status() -> None:
     assert text.startswith("Layer ")
     assert "enabled" not in text.lower()
     assert "disabled" not in text.lower()
+
+
+def test_track_header_expand_arrow() -> None:
+    controls = _make_controls(("drums",))
+    view = controls.build_view_state(paused=False)
+    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
+    assert _row_text(view, header_row).endswith(" ▼")
+
+    controls.session.layers["drums"].expanded = False
+    view = controls.build_view_state(paused=False)
+    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
+    assert _row_text(view, header_row).endswith(" ▶")
+
+
+def test_track_header_visibility_icon_color() -> None:
+    line_height = 17
+    enabled = render_glyph(
+        VISIBILITY_GLYPH, color=CONFIG_HEADER_TEXT, line_height=line_height
+    )
+    disabled = render_glyph(
+        VISIBILITY_OFF_GLYPH, color=TEXT_DIM, line_height=line_height
+    )
+    assert enabled.get_width() > 0
+    assert disabled.get_width() > 0
+    assert enabled.get_at((enabled.get_width() // 2, line_height // 2))[:3] != (
+        0,
+        0,
+        0,
+    )
+    assert disabled.get_at((disabled.get_width() // 2, line_height // 2))[:3] != (
+        0,
+        0,
+        0,
+    )
 
 
 def test_transport_icons_render() -> None:
@@ -1575,6 +1610,8 @@ def main() -> int:
         test_row_icons_render,
         test_track_header_icons_render,
         test_track_header_text_omits_enabled_status,
+        test_track_header_expand_arrow,
+        test_track_header_visibility_icon_color,
         test_transport_icons_render,
         test_transport_icons_play_vs_pause,
         test_format_mmss,
