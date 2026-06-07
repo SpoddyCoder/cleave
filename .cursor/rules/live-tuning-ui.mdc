@@ -10,12 +10,14 @@ The focus-driven tree panel ([cleave/viz_tuning_overlay.py](cleave/viz_tuning_ov
 
 ## Track rows section
 
-The upper block: all rows where `index < track_rows` (`track_rows = len(layer_z_order) * ROWS_PER_TRACK`).
+The upper block: all rows where `index < track_row_count(state)` (`track_row_count` sums non-footer rows from `build_row_layout`).
 
-- One **track block** per stem in `layer_z_order`; six rows each (`ROWS_PER_TRACK`).
-- Row kinds: `RowKind.TRACK_HEADER`, `TRACK_PRESET_DIR`, `TRACK_PRESET`, `TRACK_BLEND`, `TRACK_OPACITY`, `TRACK_BEAT`.
-- Per-stem state: `TrackBlock` in `TuningViewState.tracks`.
+- One **track block** per stem in `layer_z_order`.
+- **Base rows** (always present per stem): header, preset dir, preset, blend, opacity, beat sensitivity, then **cleave effects** header (`RowKind.TRACK_EFFECTS_HEADER`).
+- **Effect sub-rows** (`RowKind.TRACK_EFFECT`): one per entry in [cleave/effects/registry.py](cleave/effects/registry.py) for that stem; visible only when both the track block and `TrackBlock.effects_expanded` are expanded.
+- Per-stem state: `TrackBlock` in `TuningViewState.tracks` (`effects`, `effects_expanded`, plus preset/blend/opacity/beat fields).
 - On-screen header label: `Layer N: STEM` (user-facing "layer"; code often says "track").
+- **cleave effects** header: lowercase label `└─ cleave effects`, light blue `CONFIG_HEADER_TEXT` `(170, 210, 255)` from [cleave/viz_theme.py](cleave/viz_theme.py); collapsed by default; sits after beat sensitivity; Left/Right toggles `effects_expanded`.
 
 Say **track rows section** for the whole upper block; **track row** for a single line.
 
@@ -24,7 +26,7 @@ Say **track rows section** for the whole upper block; **track row** for a single
 The lower block after a visual gap (`footer_gap` in `draw()`): `footer_row_count(state)` rows (3 or 4).
 
 - Row kinds: `RowKind.CONFIG_HEADER` (non-navigable active config path), `RowKind.TRANSPORT`, `SAVE_AS_NEW_CONFIG`, `OVERWRITE_CONFIG` (overwrite when active path is not repo-root `cleave.config.yaml`; recomputed after save-as-new).
-- Constants: `FOOTER_ROWS_WITH_OVERWRITE`, `FOOTER_ROWS_WITHOUT_OVERWRITE`; index via `footer_index = index - track_rows`.
+- Constants: `FOOTER_ROWS_WITH_OVERWRITE`, `FOOTER_ROWS_WITHOUT_OVERWRITE`; index via `footer_index = index - track_row_count(state)`.
 
 ## Whole panel
 

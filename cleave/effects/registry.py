@@ -1,0 +1,105 @@
+"""Per-stem effect roster: fixed effect and driver rows for the live tuning UI."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from cleave.extract import STEM_NAMES
+
+EFFECT_IDS = frozenset({"pulse", "flare", "flash", "hue", "grit"})
+
+DRIVER_SLUGS = frozenset(
+    {"onset", "sub_bass", "mid_bass", "rms", "pitch", "centroid"}
+)
+
+_DRIVER_SIGNAL_KEYS: dict[str, tuple[str, str]] = {
+    "onset": ("drums", "onset_strength"),
+    "sub_bass": ("bass", "sub_bass"),
+    "mid_bass": ("bass", "mid_bass"),
+    "rms": ("vocals", "rms"),
+    "pitch": ("vocals", "pitch_hz"),
+    "centroid": ("other", "spectral_centroid"),
+}
+
+
+@dataclass(frozen=True)
+class EffectDef:
+    effect_id: str
+    driver_slug: str
+    signal_stem: str
+    signal_key: str
+
+    @property
+    def row_label_prefix(self) -> str:
+        return f"{self.effect_id} ({self.driver_slug}): "
+
+
+def _def(effect_id: str, driver_slug: str) -> EffectDef:
+    signal_stem, signal_key = _DRIVER_SIGNAL_KEYS[driver_slug]
+    return EffectDef(
+        effect_id=effect_id,
+        driver_slug=driver_slug,
+        signal_stem=signal_stem,
+        signal_key=signal_key,
+    )
+
+
+_EFFECT_ROSTER: dict[str, tuple[EffectDef, ...]] = {
+    "drums": (
+        _def("pulse", "onset"),
+        _def("flare", "onset"),
+        _def("flash", "onset"),
+        _def("grit", "onset"),
+    ),
+    "bass": (
+        _def("pulse", "sub_bass"),
+        _def("pulse", "mid_bass"),
+        _def("flash", "sub_bass"),
+        _def("grit", "sub_bass"),
+    ),
+    "vocals": (
+        _def("pulse", "rms"),
+        _def("hue", "pitch"),
+        _def("flash", "rms"),
+        _def("grit", "rms"),
+    ),
+    "other": (
+        _def("pulse", "centroid"),
+        _def("flash", "centroid"),
+        _def("grit", "centroid"),
+    ),
+}
+
+
+def effect_roster(stem: str) -> tuple[EffectDef, ...]:
+    return _EFFECT_ROSTER[stem]
+
+
+def effect_row_count(stem: str) -> int:
+    return len(_EFFECT_ROSTER[stem])
+
+
+def validate_effect_entry(stem: str, effect_id: str, driver_slug: str) -> None:
+    if effect_id not in EFFECT_IDS:
+        allowed = ", ".join(sorted(EFFECT_IDS))
+        raise ValueError(
+            f"layers.{stem}.effects.{effect_id}: unknown effect (expected one of: {allowed})"
+        )
+    if driver_slug not in DRIVER_SLUGS:
+        allowed = ", ".join(sorted(DRIVER_SLUGS))
+        raise ValueError(
+            f"layers.{stem}.effects.{effect_id}.{driver_slug}: unknown driver "
+            f"(expected one of: {allowed})"
+        )
+    valid = {
+        (row.effect_id, row.driver_slug)
+        for row in _EFFECT_ROSTER[stem]
+    }
+    if (effect_id, driver_slug) not in valid:
+        raise ValueError(
+            f"layers.{stem}.effects.{effect_id}.{driver_slug}: not in roster for {stem}"
+        )
+
+
+def all_stems() -> tuple[str, ...]:
+    return STEM_NAMES

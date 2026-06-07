@@ -9,7 +9,7 @@ Built on the following two awesome open-source projects;
 
 Built on WSL2, but should work on any Linux machine.
 
-**Current focus:** Phase 5 Milkdrop visualizer with live tuning overlay (four layers at 1280x720 / 30 fps); Phase 6 compositor aesthetics next. Phase 4 layered visualizer remains the pygame baseline. See [docs/cleave-build-plan.md](docs/cleave-build-plan.md#phase-56--live-tuning-console).
+**Current focus:** Phase 5 Milkdrop visualizer with live tuning overlay and cleave effects (four layers at 1280x720 / 30 fps); Phase 7 usability and packaging next. Phase 4 layered visualizer remains the pygame baseline. See [docs/cleave-build-plan.md](docs/cleave-build-plan.md#phase-56--live-tuning-console) and [docs/cleave-effect-plan.md](docs/cleave-effect-plan.md).
 
 ## Requirements
 
@@ -215,7 +215,7 @@ python scripts/milkdrop_visualizer.py stems/sights-and-sounds-26 \
 
 A focus-driven tree panel ([cleave/viz_tuning_overlay.py](cleave/viz_tuning_overlay.py), [cleave/viz_tuning_controls.py](cleave/viz_tuning_controls.py)) has two sections:
 
-- **Track rows section** (upper): one six-row block per stem (header, directory, filename, blend, opacity, beat). Headers show as `Layer N: STEM`.
+- **Track rows section** (upper): one block per stem (header, directory, filename, blend, opacity, beat, then collapsible **cleave effects** with per-effect depth rows when expanded). Headers show as `Layer N: STEM`.
 - **Footer rows section** (lower, separated by a gap): transport (drawn transport controls (skip / play-pause / skip) and elapsed time), **SAVE AS NEW CONFIG**, and **OVERWRITE CONFIG** when the active config is not the repo-root template [cleave.config.yaml](cleave.config.yaml).
 
 Navigate with the arrow keys; the focused row is highlighted in orange. **SAVE AS NEW CONFIG** is always shown. **OVERWRITE CONFIG** is hidden only while the active config is the repo-root [cleave.config.yaml](cleave.config.yaml); it appears for any other active path, including after save-as-new updates the active config to a snapshot under [saved-cleave-configs/](saved-cleave-configs/).
@@ -246,6 +246,8 @@ The directory row shows the path relative to `preset_root` with `(N/TOTAL)` amon
 | Blend mode | Cycle blend modes (see below) | (same step size) |
 | Opacity | −1% / +1% | −10% / +10% (0% disables the layer) |
 | Beat sensitivity | −0.01 / +0.01 | −0.1 / +0.1 |
+| cleave effects header | Collapse / expand effect sub-rows | (no Ctrl variant) |
+| Effect sub-row | −1% / +1% depth | −10% / +10% (0-100%) |
 | Transport | Seek back / forward 10s | Seek back / forward 30s |
 
 Z-order move mode highlights the track header in blue; Up/Down reorders that stem in the compositor stack (bottom-to-top per `layer_z_order`).
@@ -256,7 +258,7 @@ Pause stops PCM feed and freezes layer FBOs (no projectM render); seek flushes p
 
 ### Config and save
 
-Per-layer preset, size, opacity, `blend_mode`, optional beat sensitivity, and `locked` (bool, default false) live under `layers.*` in [cleave.config.yaml](cleave.config.yaml). Global compositor stack order is `layer_z_order` (list of stem names, bottom to top).
+Per-layer preset, size, opacity, `blend_mode`, optional beat sensitivity, `effects` (nested effect and driver depths 0-100%), and `locked` (bool, default false) live under `layers.*` in [cleave.config.yaml](cleave.config.yaml). Global compositor stack order is `layer_z_order` (list of stem names, bottom to top).
 
 **Blend modes** (`layers.*.blend_mode`): cycled in this order in the live tuning overlay (Left/Right on the blend row):
 
@@ -272,7 +274,7 @@ Per-layer preset, size, opacity, `blend_mode`, optional beat sensitivity, and `l
 | `max` | Per-channel max of source and destination. Competing highlights across stems. |
 | `pure-add` | Full-strength additive (`ONE`, `ONE`). Opacity still applies; clips quickly with several bright layers. |
 
-**SAVE AS NEW CONFIG** writes a full reproducible snapshot to [saved-cleave-configs/](saved-cleave-configs/) as `unnamed-N.cleave.config.yaml` (next unused N; see [cleave/config_snapshot.py](cleave/config_snapshot.py)). Snapshots include current presets (individual `.milk` paths relative to `preset_root`), opacity, blend modes, beat values, lock state, and z-order. The launch config is never touched by save-as-new.
+**SAVE AS NEW CONFIG** writes a full reproducible snapshot to [saved-cleave-configs/](saved-cleave-configs/) as `unnamed-N.cleave.config.yaml` (next unused N; see [cleave/config_snapshot.py](cleave/config_snapshot.py)). Snapshots include current presets (individual `.milk` paths relative to `preset_root`), opacity, blend modes, beat values, non-zero effect depths, lock state, and z-order. The launch config is never touched by save-as-new.
 
 **OVERWRITE CONFIG** (when shown) writes the same snapshot to the active config file after a yes/no confirm. Use it when you want the current tuning session to become the default for the next run. It is hidden only while the active config is the repo-root [cleave.config.yaml](cleave.config.yaml); save-as-new switches the active path to a snapshot and enables overwrite for that file.
 
@@ -287,5 +289,20 @@ python scripts/milkdrop_visualizer.py stems/sights-and-sounds-26 \
 ```
 
 `--preset` accepts a `.milk` file or a directory (same recursive scan as layer config). The same live tuning overlay applies: focus the drums directory or filename row to browse sibling directories (Left/Right) and step `.milk` files (Ctrl+Left/Right for ±10 on the filename row); Enter/Backspace or Ctrl+Right/Ctrl+Left on the directory row to descend or ascend. SAVE AS NEW CONFIG writes to [saved-cleave-configs/](saved-cleave-configs/) when a launch config exists; without `--config`, save-as-new still uses the default unnamed snapshot path.
+
+### Cleave effects
+
+Signal-driven compositor modifiers on top of libprojectM layers. Each stem exposes a fixed roster of effect rows under the **cleave effects** header in the live tuning overlay (expand with Left/Right on that row). Depth is 0-100%; drivers are fixed per row and shown in parentheses (not user-selectable). libprojectM beat sensitivity stays separate (PCM-driven preset reactivity).
+
+| Stem | Effect rows (when expanded) |
+| --- | --- |
+| Drums | pulse, flare, flash, grit (all onset-driven) |
+| Bass | pulse (sub_bass, mid_bass), flash, grit |
+| Vocals | pulse, hue (pitch), flash, grit |
+| Other | pulse, flash, grit (centroid-driven) |
+
+Config shape: `layers.<stem>.effects.<effect>.<driver>` with integer 0-100. Snapshots omit zero keys (sparse). Full taxonomy, constants, and per-stem roster: [docs/cleave-effect-plan.md](docs/cleave-effect-plan.md).
+
+**Verify on a dense track:** after separate and analyse, run the Milkdrop visualizer on a track with strong transients (e.g. `stems/buttercup-24`), expand **cleave effects** per stem, tune non-zero depths, save a snapshot, and confirm playback matches the saved YAML. Manual sign-off is user-run.
 
 See [docs/cleave-build-plan.md](docs/cleave-build-plan.md) for the full roadmap.

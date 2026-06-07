@@ -33,7 +33,7 @@ from cleave.config import (  # noqa: E402
     find_config_path,
     load_config,
 )
-from cleave.config_snapshot import next_unnamed_path, write_session_snapshot  # noqa: E402
+from cleave.effects.runtime import EffectRuntime  # noqa: E402
 from cleave.preset_playlist import (  # noqa: E402
     PresetPlaylist,
     preset_browse_floor,
@@ -41,6 +41,7 @@ from cleave.preset_playlist import (  # noqa: E402
     scan_preset_playlist,
 )
 from cleave.gl_compositor import GlCompositor, LayerFbo  # noqa: E402
+from cleave.gl_post_process import GlPostProcess  # noqa: E402
 from cleave.projectm import ProjectM, ProjectMLibraryError  # noqa: E402
 from cleave.signals import Signals, load_signals  # noqa: E402
 from cleave.stem_pcm import load_stem_pcm, samples_per_frame  # noqa: E402
@@ -61,6 +62,38 @@ from cleave.viz_tuning_overlay import (  # noqa: E402
 
 STEM_DRUMS = "drums"
 SAVED_CONFIGS_DIR = ROOT / "saved-cleave-configs"
+
+
+def load_stem_signals(stems_dir: Path) -> Signals | None:
+    signals_path = stems_dir / "signals.json"
+    if not signals_path.is_file():
+        return None
+    return load_signals(signals_path)
+
+
+def _apply_effect_modifiers(
+    session: TuningSession,
+    layers_by_name: dict[str, MilkdropLayer],
+    effect_runtime: EffectRuntime,
+    signals: Signals | None,
+    t_sec: float,
+    *,
+    update: bool = True,
+) -> None:
+    if update:
+        effect_runtime.update(session, signals, t_sec)
+    modifiers = effect_runtime.modifiers(session)
+    for stem, layer in layers_by_name.items():
+        if not session.layers[stem].enabled:
+            continue
+        mod = modifiers[stem]
+        layer.fbo.opacity = mod.opacity
+        layer.fbo.flash_alpha = mod.flash_alpha
+        layer.fbo.bloom_strength = mod.bloom_strength
+        layer.fbo.hue_rgb = mod.hue_rgb
+        layer.fbo.hue_mix = mod.hue_mix
+        layer.fbo.grit_strength = mod.grit_strength
+        layer.fbo.aberration_px = mod.aberration_px
 
 
 def resolve_stems_dir(path: Path) -> Path:
@@ -280,6 +313,35 @@ def _render_layer_fbo(layer: MilkdropLayer, pm: ProjectM) -> None:
         pm.render_to_fbo(fbo.fbo_id)
 
 
+def _apply_layer_bloom(layer: MilkdropLayer, post_process: GlPostProcess | None) -> None:
+    if post_process is None:
+        return
+    fbo = layer.fbo
+    if fbo.bloom_strength <= 0.0:
+        return
+    post_process.apply_bloom(
+        fbo.texture_id,
+        fbo.width,
+        fbo.height,
+        fbo.bloom_strength,
+    )
+
+
+def _apply_layer_grit(layer: MilkdropLayer, post_process: GlPostProcess | None) -> None:
+    if post_process is None:
+        return
+    fbo = layer.fbo
+    if fbo.grit_strength <= 0.0 and fbo.aberration_px <= 0.0:
+        return
+    post_process.apply_grit(
+        fbo.texture_id,
+        fbo.width,
+        fbo.height,
+        fbo.grit_strength,
+        fbo.aberration_px,
+    )
+
+
 def _flush_all_pcm(layers: list[MilkdropLayer]) -> None:
     for layer in layers:
         layer.pm.flush_pcm()
@@ -304,6 +366,10 @@ def _session_from_cfg(
                     cfg.layers[name].preset, preset_root
                 ),
                 opacity_pct=int(layer_cfg.opacity * 100),
+                effects={
+                    effect_id: dict(drivers)
+                    for effect_id, drivers in layer_cfg.effects.items()
+                },
                 blend_mode=layer_cfg.blend_mode,
                 beat_sensitivity=_beat_sensitivity(cfg, name),
                 enabled=layer_cfg.enabled,
@@ -322,6 +388,8 @@ def _make_tuning_controls(
     layers: list[MilkdropLayer],
     playback,
     duration_sec: float,
+    signals: Signals | None,
+    effect_runtime: EffectRuntime,
 ) -> TuningControls:
     def on_preset_change(stem: str, playlist: PresetPlaylist) -> None:
         layer = layers_by_name[stem]
@@ -334,14 +402,27 @@ def _make_tuning_controls(
         layers_by_name[stem].fbo.blend_mode = blend_mode
 
     def on_opacity_change(stem: str, pct: int) -> None:
-        fbo = layers_by_name[stem].fbo
-        fbo.opacity = pct / 100.0
+        _apply_effect_modifiers(
+            session,
+            layers_by_name,
+            effect_runtime,
+            signals,
+            current_sec(playback, duration_sec),
+            update=False,
+        )
 
     def on_layer_enabled_change(stem: str, enabled: bool) -> None:
         fbo = layers_by_name[stem].fbo
         fbo.enabled = enabled
         if enabled:
-            fbo.opacity = session.layers[stem].opacity_pct / 100.0
+            _apply_effect_modifiers(
+                session,
+                layers_by_name,
+                effect_runtime,
+                signals,
+                current_sec(playback, duration_sec),
+                update=False,
+            )
 
     def on_beat_change(stem: str, beat: float) -> None:
         layers_by_name[stem].pm.set_beat_sensitivity(beat)
@@ -452,12 +533,15 @@ def run_m1(
     clock = pygame.time.Clock()
 
     compositor: GlCompositor | None = None
+    post_process: GlPostProcess | None = None
     layers: list[MilkdropLayer] = []
     overlay_surface = pygame.Surface((width, height), pygame.SRCALPHA)
 
     try:
         compositor = GlCompositor(width, height)
         compositor.init()
+        post_process = GlPostProcess()
+        post_process.init()
 
         pm = ProjectM()
         pm.set_window_size(width, height)
@@ -475,18 +559,30 @@ def run_m1(
         ]
         layers_by_name = {STEM_DRUMS: layers[0]}
 
+        drums_cfg = cfg.layers[STEM_DRUMS] if cfg is not None else None
         session = TuningSession(
             layer_z_order=[STEM_DRUMS],
             layers={
                 STEM_DRUMS: LayerRuntime(
                     playlist=playlist,
                     browse_floor=preset_browse_floor(preset_anchor, preset_root),
-                    opacity_pct=100,
+                    opacity_pct=int(
+                        (drums_cfg.opacity if drums_cfg else 1.0) * 100
+                    ),
+                    effects={
+                        effect_id: dict(drivers)
+                        for effect_id, drivers in (
+                            drums_cfg.effects if drums_cfg else {}
+                        ).items()
+                    },
                     blend_mode="add",
                     beat_sensitivity=beat_sensitivity,
                 ),
             },
         )
+
+        signals = load_stem_signals(stems_dir)
+        effect_runtime = EffectRuntime()
 
         pygame.mixer.music.load(str(audio_path))
         pygame.mixer.music.play()
@@ -500,6 +596,8 @@ def run_m1(
                 layers=layers,
                 playback=playback,
                 duration_sec=duration_sec,
+                signals=signals,
+                effect_runtime=effect_runtime,
             )
         else:
 
@@ -519,15 +617,22 @@ def run_m1(
                 on_blend_change=lambda stem, mode: setattr(
                     layers_by_name[stem].fbo, "blend_mode", mode
                 ),
-                on_opacity_change=lambda stem, pct: setattr(
-                    layers_by_name[stem].fbo, "opacity", pct / 100.0
+                on_opacity_change=lambda stem, pct: _apply_effect_modifiers(
+                    session,
+                    layers_by_name,
+                    effect_runtime,
+                    signals,
+                    current_sec(playback, duration_sec),
+                    update=False,
                 ),
                 on_layer_enabled_change=lambda stem, on: (
                     setattr(layers_by_name[stem].fbo, "enabled", on),
-                    setattr(
-                        layers_by_name[stem].fbo,
-                        "opacity",
-                        session.layers[stem].opacity_pct / 100.0,
+                    _apply_effect_modifiers(
+                        session,
+                        layers_by_name,
+                        effect_runtime,
+                        signals,
+                        current_sec(playback, duration_sec),
                     )
                     if on
                     else None,
@@ -565,9 +670,15 @@ def run_m1(
                 layer.pm.feed_pcm(pcm)
                 layer.pm.set_frame_time(t_sec)
 
+            _apply_effect_modifiers(
+                session, layers_by_name, effect_runtime, signals, t_sec
+            )
+
             assert compositor is not None
             if not playback.paused:
                 _render_layer_fbo(layer, layer.pm)
+                _apply_layer_bloom(layer, post_process)
+                _apply_layer_grit(layer, post_process)
             compositor.composite([layer.fbo])
 
             view_state = build_view_state(
@@ -588,6 +699,8 @@ def run_m1(
         _destroy_layers(layers)
         if compositor is not None:
             compositor.destroy()
+        if post_process is not None:
+            post_process.destroy()
         pygame.mixer.music.stop()
         pygame.quit()
 
@@ -621,15 +734,20 @@ def run(
     clock = pygame.time.Clock()
 
     compositor: GlCompositor | None = None
+    post_process: GlPostProcess | None = None
     layers: list[MilkdropLayer] = []
     overlay_surface = pygame.Surface((width, height), pygame.SRCALPHA)
 
     try:
         compositor = GlCompositor(width, height)
         compositor.init()
+        post_process = GlPostProcess()
+        post_process.init()
         layers = _build_layers(cfg, compositor, playlists)
         layers_by_name = {layer.name: layer for layer in layers}
         session = _session_from_cfg(cfg, playlists)
+        signals = load_stem_signals(stems_dir)
+        effect_runtime = EffectRuntime()
 
         pygame.mixer.music.load(str(audio_path))
         pygame.mixer.music.play()
@@ -642,6 +760,8 @@ def run(
             layers=layers,
             playback=playback,
             duration_sec=duration_sec,
+            signals=signals,
+            effect_runtime=effect_runtime,
         )
         overlay = TuningOverlay()
 
@@ -670,11 +790,17 @@ def run(
                     layer.pm.feed_pcm(pcm)
                     layer.pm.set_frame_time(t_sec)
 
+            _apply_effect_modifiers(
+                session, layers_by_name, effect_runtime, signals, t_sec
+            )
+
             assert compositor is not None
             if not playback.paused:
                 for layer in layers:
                     if layer.fbo.enabled:
                         _render_layer_fbo(layer, layer.pm)
+                        _apply_layer_bloom(layer, post_process)
+                        _apply_layer_grit(layer, post_process)
 
             _composite_ordered(compositor, layers_by_name, session)
 
@@ -696,6 +822,8 @@ def run(
         _destroy_layers(layers)
         if compositor is not None:
             compositor.destroy()
+        if post_process is not None:
+            post_process.destroy()
         pygame.mixer.music.stop()
         pygame.quit()
 
