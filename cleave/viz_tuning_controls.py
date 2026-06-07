@@ -437,7 +437,7 @@ class TuningControls:
     def _parent_directory(self, stem: str) -> None:
         layer = self.session.layers[stem]
         playlist = layer.playlist
-        if playlist.go_parent(layer.browse_floor) and self._on_preset_change is not None:
+        if playlist.go_parent(self.preset_root) and self._on_preset_change is not None:
             self._on_preset_change(stem, playlist)
 
     def _step_preset(self, stem: str, *, forward: bool, ctrl: bool) -> None:
