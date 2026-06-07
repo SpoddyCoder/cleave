@@ -30,7 +30,7 @@ from cleave.viz_tuning_controls import (
     _REPEAT_ROW_KINDS,
     config_path_display,
 )
-from cleave.viz_theme import HIGHLIGHT, PANEL_CONTENT_MAX_WIDTH, TEXT_DIM
+from cleave.viz_theme import HIGHLIGHT, MOVE_MODE, PANEL_CONTENT_MAX_WIDTH, TEXT_DIM
 from cleave.viz_tuning_overlay import (
     RowKind,
     TrackBlock,
@@ -1013,6 +1013,25 @@ def test_empty_playlist_view_state() -> None:
         assert block.preset_empty is True
 
 
+def test_move_mode_colors_focused_track_header() -> None:
+    controls = _make_controls(("drums", "bass"))
+    view = controls.build_view_state(paused=False)
+    header_row = next(
+        i
+        for i in range(row_count(view))
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "bass"
+    )
+    controls.focus_index = header_row
+    assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+
+    view = controls.build_view_state(paused=False)
+    child_row = header_row + 1
+    assert _row_text_color(view, header_row) == MOVE_MODE
+    assert _row_bg_color(view, header_row) == MOVE_MODE
+    assert _row_text_color(view, child_row) == MOVE_MODE
+    assert _row_bg_color(view, child_row) == MOVE_MODE
+
+
 def test_row_text_color_dim_for_focused_empty_preset() -> None:
     state = TuningViewState(
         layer_z_order=("drums",),
@@ -1138,6 +1157,7 @@ def main() -> int:
         test_disable_auto_collapses_sub_rows,
         test_opacity_ctrl_step_is_ten_percent,
         test_move_mode_swaps_z_order,
+        test_move_mode_colors_focused_track_header,
         test_save_as_new_triggers_toast_and_blocks_input,
         test_config_header_shows_active_path,
         test_config_header_truncates_long_paths,
