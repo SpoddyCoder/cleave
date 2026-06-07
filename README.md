@@ -146,7 +146,7 @@ Pass `--source path/to/mix.wav` to override the mix path stored in `signals.json
 
 | Key | Action |
 | --- | --- |
-| Esc | Quit |
+| Ctrl + Q | Quit |
 | Space | Pause / resume playback |
 | Left | Back 30 seconds |
 | Right | Forward 30 seconds |
@@ -181,7 +181,7 @@ Pass `--source path/to/mix.wav` to override the mix path stored in `signals.json
 | Space | Pause / resume playback |
 | Left | Back 30 seconds |
 | Right | Forward 30 seconds |
-| Esc | Quit |
+| Ctrl + Q | Quit |
 
 All four layers are on at startup. Toggle **d** / **b** / **v** / **o** during playback to isolate stems.
 
@@ -216,9 +216,9 @@ python scripts/milkdrop_visualizer.py stems/sights-and-sounds-26 \
 A focus-driven tree panel ([cleave/viz_tuning_overlay.py](cleave/viz_tuning_overlay.py), [cleave/viz_tuning_controls.py](cleave/viz_tuning_controls.py)) has two sections:
 
 - **Track rows section** (upper): one six-row block per stem (header, directory, filename, blend, opacity, beat). Headers show as `Layer N: STEM`.
-- **Footer rows section** (lower, separated by a gap): transport (seek icons and elapsed time), **SAVE AS NEW CONFIG**, and **OVERWRITE CONFIG** when the launch config is overwritable.
+- **Footer rows section** (lower, separated by a gap): transport (seek icons and elapsed time), **SAVE AS NEW CONFIG**, and **OVERWRITE CONFIG** when the active config is not the repo-root template [cleave.config.yaml](cleave.config.yaml).
 
-Navigate with the arrow keys; the focused row is highlighted in orange. **SAVE AS NEW CONFIG** is always shown; **OVERWRITE CONFIG** appears only when the launch config was passed explicitly via `--config` or resolved from a non-default path (not the implicit repo-root [cleave.config.yaml](cleave.config.yaml) discovered without `--config`).
+Navigate with the arrow keys; the focused row is highlighted in orange. **SAVE AS NEW CONFIG** is always shown. **OVERWRITE CONFIG** is hidden only while the active config is the repo-root [cleave.config.yaml](cleave.config.yaml); it appears for any other active path, including after save-as-new updates the active config to a snapshot under [saved-cleave-configs/](saved-cleave-configs/).
 
 | Key | Action |
 | --- | --- |
@@ -230,7 +230,7 @@ Navigate with the arrow keys; the focused row is highlighted in orange. **SAVE A
 | Enter (move mode) | Confirm z-order after Up/Down swaps |
 | Up / Down (move mode) | Swap focused stem up/down in `layer_z_order` |
 | Space | Pause / resume playback (hidden shortcut, not shown in overlay) |
-| Esc | Quit |
+| Ctrl + Q | Quit |
 
 **Focused field behaviour**
 
@@ -270,7 +270,7 @@ Per-layer preset, size, opacity, `blend_mode`, and optional beat sensitivity liv
 
 **SAVE AS NEW CONFIG** writes a full reproducible snapshot to [saved-cleave-configs/](saved-cleave-configs/) as `unnamed-N.cleave.config.yaml` (next unused N; see [cleave/config_snapshot.py](cleave/config_snapshot.py)). Snapshots include current presets (individual `.milk` paths relative to `preset_root`), opacity, blend modes, beat values, and z-order. The launch config is never touched by save-as-new.
 
-**OVERWRITE CONFIG** (when shown) writes the same snapshot to the launch config file (`--config` or global/user config) after a yes/no confirm. Use it when you want the current tuning session to become the default for the next run. It is hidden when you launch without `--config` and the app auto-loads the repo-root [cleave.config.yaml](cleave.config.yaml).
+**OVERWRITE CONFIG** (when shown) writes the same snapshot to the active config file after a yes/no confirm. Use it when you want the current tuning session to become the default for the next run. It is hidden only while the active config is the repo-root [cleave.config.yaml](cleave.config.yaml); save-as-new switches the active path to a snapshot and enables overwrite for that file.
 
 Override config location with `--config`. Checkpoint detail: [docs/phase-5-plan-part-progressed.md](docs/phase-5-plan-part-progressed.md).
 

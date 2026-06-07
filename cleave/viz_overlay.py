@@ -145,7 +145,7 @@ def milkdrop_playback_rows(*, paused: bool) -> list[ControlRow]:
 
 def playback_rows(*, paused: bool) -> list[ControlRow]:
     return [
-        ControlRow("Esc", "Quit"),
+        ControlRow("Ctrl+Q", "Quit"),
         ControlRow("Space", "Pause", "PAUSED" if paused else "PLAY"),
         ControlRow("Left", "Back 30s"),
         ControlRow("Right", "Fwd 30s"),

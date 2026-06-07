@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pygame
 
-from cleave.config import clamp_beat_sensitivity
+from cleave.config import CONFIG_FILENAME, clamp_beat_sensitivity
 from cleave.gl_compositor import BLEND_MODES, BlendMode
 from cleave.preset_playlist import (
     PresetPlaylist,
@@ -18,7 +18,7 @@ from cleave.preset_playlist import (
     preset_filename_display,
 )
 from cleave.viz_confirm import ConfirmDialog, ConfirmRequest
-from cleave.viz_key_repeat import KeyRepeatController
+from cleave.viz_key_repeat import KeyRepeatController, mod_ctrl
 from cleave.viz_playback import PlaybackState, current_sec, seek, toggle_pause
 from cleave.viz_tuning_overlay import (
     ROWS_PER_TRACK,
@@ -49,11 +49,18 @@ _DEFAULT_SAVE_FILENAME = "unnamed-1.cleave.config.yaml"
 
 def config_path_display(path: Path | None) -> str:
     """Active config path for the footer header (truncation happens at draw time)."""
-    return path.as_posix() if path is not None else "cleave.config.yaml"
+    return path.as_posix() if path is not None else CONFIG_FILENAME
 
 
-def _mod_ctrl(mod: int) -> bool:
-    return bool(mod & (pygame.KMOD_CTRL | pygame.KMOD_LCTRL | pygame.KMOD_RCTRL))
+def allow_overwrite_for_path(
+    active_path: Path | None,
+    *,
+    repo_root_example: Path,
+) -> bool:
+    """Hide overwrite only for the repo-root template cleave.config.yaml."""
+    if active_path is None:
+        return False
+    return active_path.resolve() != repo_root_example.resolve()
 
 
 @dataclass
@@ -93,13 +100,18 @@ class TuningControls:
         on_save_new_config: Callable[[], Path | None] | None = None,
         on_overwrite_config: Callable[[Path], str | None] | None = None,
         launch_config_path: Path | None = None,
-        allow_overwrite: bool = True,
+        repo_root_example: Path | None = None,
     ) -> None:
         self.session = session
         self.preset_root = preset_root
         self.playback = playback
         self.duration_sec = duration_sec
         self._active_config_path = launch_config_path
+        self._repo_root_example = (
+            repo_root_example
+            if repo_root_example is not None
+            else Path(CONFIG_FILENAME)
+        )
         self._on_preset_change = on_preset_change
         self._on_blend_change = on_blend_change
         self._on_opacity_change = on_opacity_change
@@ -109,7 +121,6 @@ class TuningControls:
         self._on_seek = on_seek
         self._on_save_new_config = on_save_new_config
         self._on_overwrite_config = on_overwrite_config
-        self._allow_overwrite = allow_overwrite
 
         self.focus_index = 0
         self.move_mode_stem: str | None = None
@@ -120,7 +131,7 @@ class TuningControls:
         self._confirm = ConfirmDialog()
 
     def handle_keydown(self, event: pygame.event.Event) -> bool:
-        """Handle a key down event. Return False when the caller should quit (Esc)."""
+        """Handle a key down event. Return False when the caller should quit (Ctrl+Q)."""
         if event.type != pygame.KEYDOWN:
             return True
 
@@ -128,7 +139,7 @@ class TuningControls:
             self._confirm.handle_keydown(event)
             return True
 
-        if event.key == pygame.K_ESCAPE:
+        if event.key == pygame.K_q and mod_ctrl(event.mod):
             return False
 
         if self._input_blocked():
@@ -149,7 +160,7 @@ class TuningControls:
                 self._confirm_move_mode()
                 return True
 
-        if event.key in (pygame.K_UP, pygame.K_DOWN) and _mod_ctrl(event.mod):
+        if event.key in (pygame.K_UP, pygame.K_DOWN) and mod_ctrl(event.mod):
             self._move_quick_focus(-1 if event.key == pygame.K_UP else 1)
             return True
 
@@ -204,7 +215,7 @@ class TuningControls:
             if kind == RowKind.SAVE_AS_NEW_CONFIG:
                 self._trigger_save_new()
                 return True
-            if kind == RowKind.OVERWRITE_CONFIG and self._allow_overwrite:
+            if kind == RowKind.OVERWRITE_CONFIG and self._allow_overwrite():
                 self._prompt_overwrite()
                 return True
 
@@ -269,8 +280,14 @@ class TuningControls:
             toast_remaining_sec=toast_remaining,
             confirm_message=confirm_message,
             confirm_focus_yes=confirm_focus_yes,
-            allow_overwrite=self._allow_overwrite,
+            allow_overwrite=self._allow_overwrite(),
             active_config_label=config_path_display(self._active_config_path),
+        )
+
+    def _allow_overwrite(self) -> bool:
+        return allow_overwrite_for_path(
+            self._active_config_path,
+            repo_root_example=self._repo_root_example,
         )
 
     def _input_blocked(self) -> bool:
@@ -323,7 +340,7 @@ class TuningControls:
     def _apply_horizontal(self, key: int, mod: int, kind: RowKind) -> None:
         view = self.build_view_state(paused=self.playback.paused)
         stem = row_stem(view, self.focus_index)
-        ctrl = _mod_ctrl(mod)
+        ctrl = mod_ctrl(mod)
         forward = key == pygame.K_RIGHT
 
         if kind == RowKind.TRACK_HEADER:

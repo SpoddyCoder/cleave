@@ -15,6 +15,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from cleave.signals import Signals, load_signals, resolve_signals_path  # noqa: E402
+from cleave.viz_key_repeat import mod_ctrl  # noqa: E402
 from cleave.viz_overlay import ControlsOverlay, playback_rows  # noqa: E402
 from cleave.viz_playback import (  # noqa: E402
     SKIP_SEC,
@@ -155,7 +156,7 @@ def run(signals: Signals, audio_path: Path) -> None:
                 running = False
             elif event.type == pygame.KEYDOWN:
                 overlay.notify_input()
-                if event.key == pygame.K_ESCAPE:
+                if event.key == pygame.K_q and mod_ctrl(event.mod):
                     running = False
                 elif event.key == pygame.K_SPACE:
                     toggle_pause(playback, duration_sec)

@@ -23,7 +23,7 @@ Say **track rows section** for the whole upper block; **track row** for a single
 
 The lower block after a visual gap (`footer_gap` in `draw()`): `footer_row_count(state)` rows (3 or 4).
 
-- Row kinds: `RowKind.CONFIG_HEADER` (non-navigable active config path), `RowKind.TRANSPORT`, `SAVE_AS_NEW_CONFIG`, `OVERWRITE_CONFIG` (overwrite only when `allow_overwrite`).
+- Row kinds: `RowKind.CONFIG_HEADER` (non-navigable active config path), `RowKind.TRANSPORT`, `SAVE_AS_NEW_CONFIG`, `OVERWRITE_CONFIG` (overwrite when active path is not repo-root `cleave.config.yaml`; recomputed after save-as-new).
 - Constants: `FOOTER_ROWS_WITH_OVERWRITE`, `FOOTER_ROWS_WITHOUT_OVERWRITE`; index via `footer_index = index - track_rows`.
 
 ## Whole panel
