@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -12,6 +12,8 @@ import yaml
 # Avoid PyYAML folding long preset paths across lines (can corrupt mid-token paths).
 _YAML_DUMP_WIDTH = 2**31 - 1
 
+from cleave.effects.constants import clamp_effect_pct
+from cleave.effects.registry import validate_effect_entry
 from cleave.extract import STEM_NAMES
 from cleave.gl_compositor import BLEND_MODES, BlendMode
 
@@ -64,6 +66,7 @@ class LayerConfig:
     width: int = 1280
     height: int = 720
     beat_sensitivity: float | None = None
+    effects: dict[str, dict[str, int]] = field(default_factory=dict)
     blend_mode: BlendMode = "alpha"
     locked: bool = False
 
@@ -168,6 +171,32 @@ def _parse_blend_mode(name: str, layer_raw: dict[str, Any]) -> BlendMode:
     return raw
 
 
+def _parse_effects(stem: str, layer_raw: dict[str, Any]) -> dict[str, dict[str, int]]:
+    raw = layer_raw.get("effects")
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ValueError(f"layers.{stem}.effects must be a mapping")
+
+    effects: dict[str, dict[str, int]] = {}
+    for effect_id, drivers_raw in raw.items():
+        if not isinstance(effect_id, str):
+            raise ValueError(f"layers.{stem}.effects keys must be strings")
+        if not isinstance(drivers_raw, dict):
+            raise ValueError(f"layers.{stem}.effects.{effect_id} must be a mapping")
+        for driver_slug, value in drivers_raw.items():
+            if not isinstance(driver_slug, str):
+                raise ValueError(
+                    f"layers.{stem}.effects.{effect_id} driver keys must be strings"
+                )
+            validate_effect_entry(stem, effect_id, driver_slug)
+            pct = clamp_effect_pct(value)
+            if pct == 0:
+                continue
+            effects.setdefault(effect_id, {})[driver_slug] = pct
+    return effects
+
+
 def _parse_visualizer(data: dict[str, Any]) -> VisualizerConfig:
     visualizer = _as_mapping(data.get("visualizer"), "visualizer")
     return VisualizerConfig(
@@ -211,6 +240,7 @@ def _parse_layers(data: dict[str, Any], preset_root: Path) -> dict[str, LayerCon
             beat_sensitivity=clamp_beat_sensitivity(beat_raw)
             if beat_raw is not None
             else None,
+            effects=_parse_effects(name, layer_raw),
             blend_mode=_parse_blend_mode(name, layer_raw),
             locked=bool(layer_raw.get("locked", False)),
         )

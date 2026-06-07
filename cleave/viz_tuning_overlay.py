@@ -8,6 +8,7 @@ from typing import Literal
 
 import pygame
 
+from cleave.effects.registry import effect_roster
 from cleave.viz_confirm import ConfirmDialog
 from cleave.viz_overlay import (
     fit_counter_label_to_width,
@@ -48,7 +49,6 @@ from cleave.viz_theme import (
 
 Anchor = Literal["topleft", "bottomleft"]
 
-ROWS_PER_TRACK = 6
 FOOTER_ROWS_WITH_OVERWRITE = 4
 FOOTER_ROWS_WITHOUT_OVERWRITE = 3
 TREE_INDENT = 16
@@ -62,10 +62,20 @@ class RowKind(Enum):
     TRACK_BLEND = auto()
     TRACK_OPACITY = auto()
     TRACK_BEAT = auto()
+    TRACK_EFFECTS_HEADER = auto()
+    TRACK_EFFECT = auto()
     CONFIG_HEADER = auto()
     TRANSPORT = auto()
     SAVE_AS_NEW_CONFIG = auto()
     OVERWRITE_CONFIG = auto()
+
+
+@dataclass(frozen=True)
+class RowDescriptor:
+    kind: RowKind
+    stem: str | None = None
+    effect_id: str | None = None
+    driver_slug: str | None = None
 
 
 @dataclass
@@ -76,6 +86,8 @@ class TrackBlock:
     blend_mode: str
     opacity_pct: int
     beat_sensitivity: float
+    effects: dict[str, dict[str, int]]
+    effects_expanded: bool = False
     enabled: bool = True
     expanded: bool = True
     locked: bool = False
@@ -106,8 +118,80 @@ def footer_row_count(state: TuningViewState) -> int:
     )
 
 
+_FOOTER_ROW_KINDS = frozenset(
+    {
+        RowKind.CONFIG_HEADER,
+        RowKind.TRANSPORT,
+        RowKind.SAVE_AS_NEW_CONFIG,
+        RowKind.OVERWRITE_CONFIG,
+    }
+)
+
+
+def build_row_layout(state: TuningViewState) -> list[RowDescriptor]:
+    rows: list[RowDescriptor] = []
+    for stem in state.layer_z_order:
+        rows.append(RowDescriptor(RowKind.TRACK_HEADER, stem=stem))
+        rows.append(RowDescriptor(RowKind.TRACK_PRESET_DIR, stem=stem))
+        rows.append(RowDescriptor(RowKind.TRACK_PRESET, stem=stem))
+        rows.append(RowDescriptor(RowKind.TRACK_BLEND, stem=stem))
+        rows.append(RowDescriptor(RowKind.TRACK_OPACITY, stem=stem))
+        rows.append(RowDescriptor(RowKind.TRACK_BEAT, stem=stem))
+        rows.append(RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, stem=stem))
+        block = state.tracks[stem]
+        if block.effects_expanded:
+            for effect_def in effect_roster(stem):
+                rows.append(
+                    RowDescriptor(
+                        RowKind.TRACK_EFFECT,
+                        stem=stem,
+                        effect_id=effect_def.effect_id,
+                        driver_slug=effect_def.driver_slug,
+                    )
+                )
+    rows.append(RowDescriptor(RowKind.CONFIG_HEADER))
+    rows.append(RowDescriptor(RowKind.TRANSPORT))
+    rows.append(RowDescriptor(RowKind.SAVE_AS_NEW_CONFIG))
+    if state.allow_overwrite:
+        rows.append(RowDescriptor(RowKind.OVERWRITE_CONFIG))
+    return rows
+
+
+def track_row_count(state: TuningViewState) -> int:
+    return sum(
+        1
+        for row in build_row_layout(state)
+        if row.kind not in _FOOTER_ROW_KINDS
+    )
+
+
+def row_descriptor(state: TuningViewState, index: int) -> RowDescriptor:
+    layout = build_row_layout(state)
+    if index < 0 or index >= len(layout):
+        raise IndexError(index)
+    return layout[index]
+
+
+def find_row(
+    state: TuningViewState,
+    stem: str,
+    kind: RowKind,
+    *,
+    effect_id: str | None = None,
+    driver_slug: str | None = None,
+) -> int:
+    for index, desc in enumerate(build_row_layout(state)):
+        if desc.kind != kind or desc.stem != stem:
+            continue
+        if kind == RowKind.TRACK_EFFECT:
+            if desc.effect_id != effect_id or desc.driver_slug != driver_slug:
+                continue
+        return index
+    raise ValueError(f"no row for stem={stem!r} kind={kind!r}")
+
+
 def row_count(state: TuningViewState) -> int:
-    return len(state.layer_z_order) * ROWS_PER_TRACK + footer_row_count(state)
+    return len(build_row_layout(state))
 
 
 _SUB_ROW_KINDS = frozenset(
@@ -117,14 +201,21 @@ _SUB_ROW_KINDS = frozenset(
         RowKind.TRACK_BLEND,
         RowKind.TRACK_OPACITY,
         RowKind.TRACK_BEAT,
+        RowKind.TRACK_EFFECTS_HEADER,
+        RowKind.TRACK_EFFECT,
     }
 )
+
+_EFFECT_SUB_ROW_KINDS = frozenset({RowKind.TRACK_EFFECT})
+
+_LOCKED_NAVIGABLE_SUB_ROW_KINDS = frozenset({RowKind.TRACK_EFFECTS_HEADER})
 
 _LABELED_SUB_ROW_KINDS = frozenset(
     {
         RowKind.TRACK_BLEND,
         RowKind.TRACK_OPACITY,
         RowKind.TRACK_BEAT,
+        RowKind.TRACK_EFFECT,
     }
 )
 
@@ -138,13 +229,21 @@ def track_sub_rows_navigable(state: TuningViewState, stem: str) -> bool:
     return block.expanded and not block.locked
 
 
-def row_visible(state: TuningViewState, index: int) -> bool:
-    kind = row_kind(state, index)
-    if kind in _SUB_ROW_KINDS:
-        stem = row_stem(state, index)
-        if stem is not None and not track_sub_rows_visible(state, stem):
-            return False
+def _sub_row_visible(state: TuningViewState, index: int) -> bool:
+    desc = row_descriptor(state, index)
+    stem = desc.stem
+    if stem is None or desc.kind not in _SUB_ROW_KINDS:
+        return True
+    block = state.tracks[stem]
+    if not block.expanded:
+        return False
+    if desc.kind in _EFFECT_SUB_ROW_KINDS:
+        return block.effects_expanded
     return True
+
+
+def row_visible(state: TuningViewState, index: int) -> bool:
+    return _sub_row_visible(state, index)
 
 
 def visible_row_indices(state: TuningViewState) -> list[int]:
@@ -156,12 +255,18 @@ def navigable_row_indices(state: TuningViewState) -> list[int]:
     """Row indices reachable via Up/Down (sub-rows skipped when collapsed)."""
     indices: list[int] = []
     for index in range(row_count(state)):
-        kind = row_kind(state, index)
-        if kind == RowKind.CONFIG_HEADER:
+        desc = row_descriptor(state, index)
+        if desc.kind == RowKind.CONFIG_HEADER:
             continue
-        if kind in _SUB_ROW_KINDS:
-            stem = row_stem(state, index)
-            if stem is not None and not track_sub_rows_navigable(state, stem):
+        if desc.kind in _SUB_ROW_KINDS:
+            stem = desc.stem
+            assert stem is not None
+            block = state.tracks[stem]
+            if not block.expanded:
+                continue
+            if block.locked and desc.kind not in _LOCKED_NAVIGABLE_SUB_ROW_KINDS:
+                continue
+            if desc.kind in _EFFECT_SUB_ROW_KINDS and not block.effects_expanded:
                 continue
         indices.append(index)
     return indices
@@ -178,33 +283,25 @@ def quick_nav_row_indices(state: TuningViewState) -> list[int]:
 
 
 def row_stem(state: TuningViewState, index: int) -> str | None:
-    track_rows = len(state.layer_z_order) * ROWS_PER_TRACK
-    if index >= track_rows:
-        return None
-    return state.layer_z_order[index // ROWS_PER_TRACK]
+    return row_descriptor(state, index).stem
 
 
 def row_kind(state: TuningViewState, index: int) -> RowKind:
-    track_rows = len(state.layer_z_order) * ROWS_PER_TRACK
-    if index < 0 or index >= row_count(state):
-        raise IndexError(index)
-    if index < track_rows:
-        return (
-            RowKind.TRACK_HEADER,
-            RowKind.TRACK_PRESET_DIR,
-            RowKind.TRACK_PRESET,
-            RowKind.TRACK_BLEND,
-            RowKind.TRACK_OPACITY,
-            RowKind.TRACK_BEAT,
-        )[index % ROWS_PER_TRACK]
-    footer_index = index - track_rows
-    if footer_index == 0:
-        return RowKind.CONFIG_HEADER
-    if footer_index == 1:
-        return RowKind.TRANSPORT
-    if footer_index == 2:
-        return RowKind.SAVE_AS_NEW_CONFIG
-    return RowKind.OVERWRITE_CONFIG
+    return row_descriptor(state, index).kind
+
+
+def row_effect(
+    state: TuningViewState, index: int
+) -> tuple[str, str] | None:
+    desc = row_descriptor(state, index)
+    if desc.kind != RowKind.TRACK_EFFECT:
+        return None
+    assert desc.effect_id is not None and desc.driver_slug is not None
+    return desc.effect_id, desc.driver_slug
+
+
+def _effect_pct(block: TrackBlock, effect_id: str, driver_slug: str) -> int:
+    return block.effects.get(effect_id, {}).get(driver_slug, 0)
 
 
 def _row_text(state: TuningViewState, index: int) -> str:
@@ -232,7 +329,17 @@ def _row_text(state: TuningViewState, index: int) -> str:
         return f"└─ blend mode: {block.blend_mode}"
     if kind == RowKind.TRACK_OPACITY:
         return f"└─ opacity: {block.opacity_pct}%"
-    return f"└─ beat sensitivity: {block.beat_sensitivity:.2f}"
+    if kind == RowKind.TRACK_BEAT:
+        return f"└─ beat sensitivity: {block.beat_sensitivity:.2f}"
+    if kind == RowKind.TRACK_EFFECTS_HEADER:
+        arrow = "▼" if block.effects_expanded else "▶"
+        return f"└─ cleave effects {arrow}"
+    assert kind == RowKind.TRACK_EFFECT
+    effect = row_effect(state, index)
+    assert effect is not None
+    effect_id, driver_slug = effect
+    pct = _effect_pct(block, effect_id, driver_slug)
+    return f"└─ {effect_id} ({driver_slug}): {pct}%"
 
 
 def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
@@ -241,8 +348,13 @@ def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
         return "└─ blend mode: "
     if kind == RowKind.TRACK_OPACITY:
         return "└─ opacity: "
-    assert kind == RowKind.TRACK_BEAT
-    return "└─ beat sensitivity: "
+    if kind == RowKind.TRACK_BEAT:
+        return "└─ beat sensitivity: "
+    assert kind == RowKind.TRACK_EFFECT
+    effect = row_effect(state, index)
+    assert effect is not None
+    effect_id, driver_slug = effect
+    return f"└─ {effect_id} ({driver_slug}): "
 
 
 def _labeled_sub_row_value(state: TuningViewState, index: int) -> str:
@@ -254,7 +366,13 @@ def _labeled_sub_row_value(state: TuningViewState, index: int) -> str:
         return block.blend_mode
     if kind == RowKind.TRACK_OPACITY:
         return f"{block.opacity_pct}%"
-    return f"{block.beat_sensitivity:.2f}"
+    if kind == RowKind.TRACK_BEAT:
+        return f"{block.beat_sensitivity:.2f}"
+    assert kind == RowKind.TRACK_EFFECT
+    effect = row_effect(state, index)
+    assert effect is not None
+    effect_id, driver_slug = effect
+    return f"{_effect_pct(block, effect_id, driver_slug)}%"
 
 
 def _fit_labeled_sub_row_value(
@@ -379,12 +497,15 @@ def _row_indent(state: TuningViewState, index: int) -> int:
     kind = row_kind(state, index)
     if kind == RowKind.TRACK_HEADER:
         return 0
+    if kind == RowKind.TRACK_EFFECT:
+        return TREE_INDENT * 2
     if kind in {
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
         RowKind.TRACK_BLEND,
         RowKind.TRACK_OPACITY,
         RowKind.TRACK_BEAT,
+        RowKind.TRACK_EFFECTS_HEADER,
     }:
         return TREE_INDENT
     return 0
@@ -398,6 +519,9 @@ def _row_text_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
     kind = row_kind(state, index)
     stem = row_stem(state, index)
     if kind == RowKind.CONFIG_HEADER:
+        return CONFIG_HEADER_TEXT
+
+    if kind == RowKind.TRACK_EFFECTS_HEADER:
         return CONFIG_HEADER_TEXT
 
     if (
@@ -433,6 +557,26 @@ def _row_bg_color(state: TuningViewState, index: int) -> tuple[int, int, int] | 
     if index == state.focus_index:
         return HIGHLIGHT
     return None
+
+
+def _clip_rect_to_surface(
+    rect: tuple[int, int, int, int],
+    surface: pygame.Surface,
+) -> tuple[int, int, int, int] | None:
+    """Intersection of rect with surface bounds (for subsurface-safe panel_rect)."""
+    x, y, w, h = rect
+    if w <= 0 or h <= 0:
+        return None
+    sw, sh = surface.get_width(), surface.get_height()
+    left = max(x, 0)
+    top = max(y, 0)
+    right = min(x + w, sw)
+    bottom = min(y + h, sh)
+    clip_w = right - left
+    clip_h = bottom - top
+    if clip_w <= 0 or clip_h <= 0:
+        return None
+    return (left, top, clip_w, clip_h)
 
 
 class TuningOverlay:
@@ -495,7 +639,7 @@ class TuningOverlay:
         line_h = font.get_linesize()
         visible_indices = visible_row_indices(state)
         visible_count = len(visible_indices)
-        track_rows_boundary = len(state.layer_z_order) * ROWS_PER_TRACK
+        track_rows_boundary = track_row_count(state)
         first_footer_visible = next(
             (index for index in visible_indices if index >= track_rows_boundary),
             None,
@@ -694,4 +838,7 @@ class TuningOverlay:
             pos = (mx, surface.get_height() - panel_h - my)
 
         surface.blit(panel, pos)
-        self._panel_rect = (pos[0], pos[1], panel_w, panel_h)
+        self._panel_rect = _clip_rect_to_surface(
+            (pos[0], pos[1], panel_w, panel_h),
+            surface,
+        )

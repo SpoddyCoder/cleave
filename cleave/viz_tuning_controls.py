@@ -10,7 +10,8 @@ from pathlib import Path
 
 import pygame
 
-from cleave.config import CONFIG_FILENAME, clamp_beat_sensitivity
+from cleave.config import CONFIG_FILENAME, clamp_beat_sensitivity, clamp_effect_pct
+from cleave.effects.registry import effect_row_count
 from cleave.gl_compositor import BLEND_MODES, BlendMode
 from cleave.preset_playlist import (
     PresetPlaylist,
@@ -21,12 +22,13 @@ from cleave.viz_confirm import ConfirmDialog, ConfirmRequest
 from cleave.viz_key_repeat import KeyRepeatController, mod_ctrl
 from cleave.viz_playback import PlaybackState, current_sec, seek, toggle_pause
 from cleave.viz_tuning_overlay import (
-    ROWS_PER_TRACK,
     RowKind,
     TrackBlock,
     TuningViewState,
+    find_row,
     navigable_row_indices,
     quick_nav_row_indices,
+    row_effect,
     row_kind,
     row_stem,
 )
@@ -42,6 +44,7 @@ _REPEAT_ROW_KINDS = frozenset(
         RowKind.TRACK_BLEND,
         RowKind.TRACK_OPACITY,
         RowKind.TRACK_BEAT,
+        RowKind.TRACK_EFFECT,
     }
 )
 _DEFAULT_SAVE_FILENAME = "unnamed-1.cleave.config.yaml"
@@ -68,6 +71,8 @@ class LayerRuntime:
     playlist: PresetPlaylist
     browse_floor: Path
     opacity_pct: int = 100
+    effects: dict[str, dict[str, int]] = field(default_factory=dict)
+    effects_expanded: bool = False
     blend_mode: BlendMode = "alpha"
     beat_sensitivity: float = 1.0
     enabled: bool = True
@@ -269,6 +274,8 @@ class TuningControls:
                 preset_label=preset_filename_display(layer.playlist),
                 blend_mode=layer.blend_mode,
                 opacity_pct=layer.opacity_pct,
+                effects=dict(layer.effects),
+                effects_expanded=layer.effects_expanded,
                 beat_sensitivity=layer.beat_sensitivity,
                 enabled=layer.enabled,
                 expanded=layer.expanded,
@@ -373,6 +380,12 @@ class TuningControls:
         ctrl = mod_ctrl(mod)
         forward = key == pygame.K_RIGHT
 
+        if kind == RowKind.TRACK_EFFECTS_HEADER:
+            if stem is None:
+                return
+            self._set_effects_expanded(stem, forward)
+            return
+
         if stem is not None and kind in _REPEAT_ROW_KINDS and self.session.layers[stem].locked:
             return
 
@@ -409,6 +422,19 @@ class TuningControls:
             step = 10 if ctrl else 1
             delta = step if forward else -step
             self._set_opacity(stem, self.session.layers[stem].opacity_pct + delta)
+        elif kind == RowKind.TRACK_EFFECT:
+            if stem is None:
+                return
+            effect = row_effect(view, self.focus_index)
+            if effect is None:
+                return
+            effect_id, driver_slug = effect
+            step = 10 if ctrl else 1
+            delta = step if forward else -step
+            current = self.session.layers[stem].effects.get(effect_id, {}).get(
+                driver_slug, 0
+            )
+            self._set_effect(stem, effect_id, driver_slug, current + delta)
         elif kind == RowKind.TRACK_BEAT:
             if stem is None:
                 return
@@ -480,8 +506,8 @@ class TuningControls:
             self._refocus_track_header_if_sub_row(stem)
 
     def _track_header_index(self, stem: str) -> int:
-        stem_index = self.session.layer_z_order.index(stem)
-        return stem_index * ROWS_PER_TRACK
+        view = self.build_view_state(paused=self.playback.paused)
+        return find_row(view, stem, RowKind.TRACK_HEADER)
 
     def _refocus_track_header_if_sub_row(self, stem: str) -> None:
         view = self.build_view_state(paused=self.playback.paused)
@@ -509,6 +535,46 @@ class TuningControls:
         layer.opacity_pct = max(0, min(100, pct))
         if self._on_opacity_change is not None:
             self._on_opacity_change(stem, layer.opacity_pct)
+
+    def _set_effect(
+        self, stem: str, effect_id: str, driver_slug: str, pct: int
+    ) -> None:
+        layer = self.session.layers[stem]
+        clamped = clamp_effect_pct(pct)
+        if clamped == 0:
+            drivers = layer.effects.get(effect_id)
+            if drivers is not None:
+                drivers.pop(driver_slug, None)
+                if not drivers:
+                    layer.effects.pop(effect_id, None)
+        else:
+            layer.effects.setdefault(effect_id, {})[driver_slug] = clamped
+        if self._on_opacity_change is not None:
+            self._on_opacity_change(stem, layer.opacity_pct)
+
+    def _set_effects_expanded(self, stem: str, expanded: bool) -> None:
+        layer = self.session.layers[stem]
+        if layer.effects_expanded == expanded:
+            return
+        view = self.build_view_state(paused=self.playback.paused)
+        effects_header_idx = find_row(view, stem, RowKind.TRACK_EFFECTS_HEADER)
+        old_focus = self.focus_index
+        effect_count = effect_row_count(stem)
+        layer.effects_expanded = expanded
+        view_after = self.build_view_state(paused=self.playback.paused)
+        new_header_idx = find_row(view_after, stem, RowKind.TRACK_EFFECTS_HEADER)
+        if not expanded:
+            if old_focus > effects_header_idx and (
+                row_stem(view, old_focus) == stem
+                and row_kind(view, old_focus) == RowKind.TRACK_EFFECT
+            ):
+                self.focus_index = new_header_idx
+            elif old_focus > effects_header_idx + effect_count:
+                self.focus_index = old_focus - effect_count
+            elif effects_header_idx < old_focus <= effects_header_idx + effect_count:
+                self.focus_index = new_header_idx
+        elif old_focus > effects_header_idx:
+            self.focus_index = old_focus + effect_count
 
     def _set_beat(self, stem: str, value: float) -> None:
         layer = self.session.layers[stem]

@@ -16,6 +16,7 @@ layer_z_order:
   - bass
   - other
 
+# layers.*.effects: nested effect -> driver -> 0-100% depth (sparse; see docs/cleave-effect-plan.md)
 layers:
 
   drums:

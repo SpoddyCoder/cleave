@@ -1,6 +1,7 @@
 demucs
 librosa
 matplotlib
+moderngl
 numpy
 pygame
 PyOpenGL

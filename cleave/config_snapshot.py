@@ -8,7 +8,7 @@ from typing import Any
 
 import yaml
 
-from cleave.config import CleaveConfig, clamp_beat_sensitivity, dump_yaml
+from cleave.config import CleaveConfig, clamp_beat_sensitivity, clamp_effect_pct, dump_yaml
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import to_config_relative
 from cleave.viz_tuning_controls import TuningSession
@@ -50,6 +50,21 @@ def _snapshot_layer_z_order(cfg: CleaveConfig, session: TuningSession) -> list[s
     if len(order) == len(STEM_NAMES) and set(order) == set(STEM_NAMES):
         return list(order)
     return list(cfg.layer_z_order)
+
+
+def _sparse_effects(
+    effects: dict[str, dict[str, int]],
+) -> dict[str, dict[str, int]] | None:
+    out: dict[str, dict[str, int]] = {}
+    for effect_id, drivers in effects.items():
+        sparse_drivers: dict[str, int] = {}
+        for driver_slug, pct in drivers.items():
+            clamped = clamp_effect_pct(pct)
+            if clamped != 0:
+                sparse_drivers[driver_slug] = clamped
+        if sparse_drivers:
+            out[effect_id] = sparse_drivers
+    return out or None
 
 
 def write_session_snapshot(
@@ -94,6 +109,7 @@ def write_session_snapshot(
             enabled = runtime.enabled
             blend_mode = runtime.blend_mode
             beat = runtime.beat_sensitivity
+            effects = runtime.effects
             locked = runtime.locked
         else:
             preset = to_config_relative(layer_cfg.preset, preset_root)
@@ -101,6 +117,7 @@ def write_session_snapshot(
             enabled = layer_cfg.enabled
             blend_mode = layer_cfg.blend_mode
             locked = layer_cfg.locked
+            effects = layer_cfg.effects
             beat = (
                 layer_cfg.beat_sensitivity
                 if layer_cfg.beat_sensitivity is not None
@@ -119,6 +136,9 @@ def write_session_snapshot(
         beat = clamp_beat_sensitivity(beat)
         if beat != global_beat:
             layer_out["beat_sensitivity"] = beat
+        sparse_effects = _sparse_effects(effects)
+        if sparse_effects is not None:
+            layer_out["effects"] = sparse_effects
         layers_out[name] = layer_out
 
     data = {

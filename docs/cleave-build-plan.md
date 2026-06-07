@@ -181,7 +181,7 @@ By this point you have a working layered system you understand. Milkdrop becomes
 ## Phase 5.6 — Live Tuning Console ✅
 *Goal: replace ad-hoc key chords with a focus-driven overlay for in-session preset and compositor tuning.*
 
-**Layout terms:** the overlay panel splits into the **track rows section** (upper: `layer_z_order` × six rows per stem via `ROWS_PER_TRACK` / `TrackBlock`) and the **footer rows section** (lower: transport, save, optional overwrite via `footer_row_count` and `FOOTER_ROWS_*`). A visual `footer_gap` separates the two. On-screen headers say "Layer N"; code uses "track" for the same blocks.
+**Layout terms:** the overlay panel splits into the **track rows section** (upper: dynamic rows per stem via `build_row_layout` / `TrackBlock`: base rows plus collapsible **cleave effects** header and variable effect sub-rows) and the **footer rows section** (lower: transport, save, optional overwrite via `footer_row_count` and `FOOTER_ROWS_*`). A visual `footer_gap` separates the two. On-screen headers say "Layer N"; code uses "track" for the same blocks. See [.cursor/rules/live-tuning-ui.mdc](../.cursor/rules/live-tuning-ui.mdc).
 
 **5.6.1 — Focus-driven tree overlay**
 - [cleave/viz_tuning_overlay.py](cleave/viz_tuning_overlay.py): track rows section (per-stem tree: header, preset dir with folder icon, preset with file icon, blend, opacity, beat); footer rows section (Material Icons transport controls (skip / play-pause / skip) and elapsed time, SAVE CONFIG, optional OVERWRITE CONFIG)
@@ -214,23 +214,26 @@ By this point you have a working layered system you understand. Milkdrop becomes
 
 ---
 
-## Phase 6 — Visual Quality & Aesthetic Pass
+## Phase 6 — Visual Quality & Aesthetic Pass ✅
 *Goal: make it look like something you'd actually want to watch.*
 
 **6.1 — Curate presets per layer role**
 The drum layer needs presets that respond well to sharp transients — look for ones that flash, burst or strobe on `bass_att`. The bass layer suits slow, fluid presets. The background/other layer suits ones with continuous motion that's modulated rather than triggered.
 
-Preset curation happens in-session via the Phase 5.6 live tuning overlay ([scripts/milkdrop_visualizer.py](scripts/milkdrop_visualizer.py)): browse presets per layer, tune blend/opacity/beat, reorder z-order, and save snapshots to [saved-cleave-configs/](saved-cleave-configs/). Promote a winning snapshot into [cleave.config.yaml](cleave.config.yaml) manually when ready.
+Preset curation happens in-session via the Phase 5.6 live tuning overlay ([scripts/milkdrop_visualizer.py](scripts/milkdrop_visualizer.py)): browse presets per layer, tune blend/opacity/beat/effects, reorder z-order, and save snapshots to [saved-cleave-configs/](saved-cleave-configs/). Promote a winning snapshot into [cleave.config.yaml](cleave.config.yaml) manually when ready.
 
-**6.2 — Compositor aesthetics**
+**6.2 — Compositor aesthetics / cleave effects** ✅
 - Per-layer blend modes (see README): `alpha` and `add` for everyday stacking; `multiply` / `screen` for mood; experimental modes (`subtract`, `difference`, `exclusion`, `max`, `pure-add`) for chaotic passes
-- Add post-processing in the compositor itself: film grain, scanlines, chromatic aberration, bloom
-- These sit *above* the Milkdrop layers and give Cleave its own visual signature on top of community presets
+- Signal-driven compositor effects per layer: **pulse** (opacity), **flare** (drums bloom), **flash**, **hue** (vocals pitch tint), **grit** (grain + chromatic aberration)
+- Live tuning: collapsible **cleave effects** section in the track tree (after beat sensitivity); depth 0-100% per fixed driver row
+- Config: `layers.*.effects` nested map; sparse snapshots via [cleave/config_snapshot.py](cleave/config_snapshot.py)
+- Implementation: [cleave/effects/](cleave/effects/), compositor hooks in [cleave/gl_post_process.py](cleave/gl_post_process.py)
+- Full plan and roster: [docs/cleave-effect-plan.md](cleave-effect-plan.md)
 
 **6.3 — Aesthetic direction for Cleave**
 Grunge/noise rock sits well with: high contrast, monochromatic with occasional colour blow-out, heavy bloom on transients, desaturated palette that flares on hits. The compositor is where this character lives — presets provide the motion, Cleave's compositor provides the colour grading and grit.
 
-**✅ Milestone: looks intentional. You'd be happy to play it behind a live set.**
+**✅ Milestone: cleave effects stack implemented and documented; preset curation and dense-track tuning remain ongoing in-session.**
 
 ---
 
@@ -345,4 +348,11 @@ Ideas to revisit once the core is solid:
 - [x] `layer_z_order` and `layers.*.blend_mode` in [cleave.config.yaml](cleave.config.yaml)
 - [x] Docs: README tuning guide, build plan 5.6, project-context
 
-**Next:** Phase 6 visual quality and compositor aesthetics.
+### Phase 6 — Cleave effects ✅
+
+- [x] Effect registry and live tuning tree ([cleave/effects/registry.py](cleave/effects/registry.py), [cleave/viz_tuning_overlay.py](cleave/viz_tuning_overlay.py))
+- [x] pulse, flare, flash, hue, grit compositor paths ([cleave/effects/](cleave/effects/), [cleave/gl_post_process.py](cleave/gl_post_process.py))
+- [x] Config parse and sparse snapshot write for `layers.*.effects`
+- [x] Docs: [docs/cleave-effect-plan.md](cleave-effect-plan.md), README cleave effects section, live-tuning-ui rule
+
+**Next:** Phase 7 usability and packaging.

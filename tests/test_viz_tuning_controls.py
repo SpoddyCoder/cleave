@@ -52,11 +52,13 @@ from cleave.viz_material_icons import (
     visibility_icon_prefix_width,
 )
 from cleave.viz_tuning_overlay import (
+    find_row,
     RowKind,
     TrackBlock,
     TuningViewState,
     TREE_INDENT,
     _row_bg_color,
+    _row_indent,
     _row_text,
     _row_text_color,
     fit_row_text,
@@ -117,6 +119,17 @@ def _make_controls(
     )
 
 
+def _row(
+    view: TuningViewState,
+    stem: str,
+    kind: RowKind,
+    *,
+    effect_id: str | None = None,
+    driver_slug: str | None = None,
+) -> int:
+    return find_row(view, stem, kind, effect_id=effect_id, driver_slug=driver_slug)
+
+
 def test_allow_overwrite_for_path_hides_repo_root_template_only() -> None:
     root = Path("/repo/cleave.config.yaml")
     assert allow_overwrite_for_path(root, repo_root_example=root) is False
@@ -150,11 +163,7 @@ def test_focus_navigation_wraps() -> None:
 def test_opacity_clamps() -> None:
     controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
-    opacity_row = next(
-        i
-        for i in range(6)
-        if row_kind(view, i) == RowKind.TRACK_OPACITY
-    )
+    opacity_row = _row(view, "drums", RowKind.TRACK_OPACITY)
     controls.focus_index = opacity_row
 
     for _ in range(60):
@@ -174,9 +183,7 @@ def test_header_toggles_enabled() -> None:
     )
 
     view = controls.build_view_state(paused=False)
-    header_row = next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
-    )
+    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
     controls.focus_index = header_row
     assert controls.session.layers["drums"].enabled is True
 
@@ -225,12 +232,8 @@ def test_re_enable_allows_sub_row_focus() -> None:
     controls.session.layers["drums"].enabled = False
     controls.session.layers["drums"].expanded = False
     view = controls.build_view_state(paused=False)
-    header_row = next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
-    )
-    preset_dir_row = next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET_DIR
-    )
+    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
+    preset_dir_row = _row(view, "drums", RowKind.TRACK_PRESET_DIR)
     transport_row = next(
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.TRANSPORT
     )
@@ -250,12 +253,8 @@ def test_re_enable_allows_sub_row_focus() -> None:
 def test_header_collapses_and_expands_sub_rows() -> None:
     controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
-    header_row = next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
-    )
-    preset_dir_row = next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET_DIR
-    )
+    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
+    preset_dir_row = _row(view, "drums", RowKind.TRACK_PRESET_DIR)
     controls.focus_index = header_row
 
     controls.handle_keydown(_keydown(pygame.K_LEFT))
@@ -277,12 +276,8 @@ def test_header_collapses_and_expands_sub_rows() -> None:
 def test_disable_auto_collapses_sub_rows() -> None:
     controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
-    header_row = next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
-    )
-    preset_dir_row = next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET_DIR
-    )
+    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
+    preset_dir_row = _row(view, "drums", RowKind.TRACK_PRESET_DIR)
     controls.focus_index = header_row
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_index == preset_dir_row
@@ -301,12 +296,8 @@ def test_disable_auto_collapses_sub_rows() -> None:
 def test_disabled_track_can_expand_sub_rows() -> None:
     controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
-    header_row = next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
-    )
-    preset_dir_row = next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET_DIR
-    )
+    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
+    preset_dir_row = _row(view, "drums", RowKind.TRACK_PRESET_DIR)
     controls.focus_index = header_row
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
     assert controls.session.layers["drums"].enabled is False
@@ -327,9 +318,7 @@ def test_disabled_track_can_expand_sub_rows() -> None:
 def test_beat_sensitivity_clamps() -> None:
     controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
-    beat_row = next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_BEAT
-    )
+    beat_row = _row(view, "drums", RowKind.TRACK_BEAT)
     controls.focus_index = beat_row
 
     for _ in range(300):
@@ -344,7 +333,7 @@ def test_beat_sensitivity_clamps() -> None:
 def test_opacity_ctrl_step_is_ten_percent() -> None:
     controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
-    opacity_row = next(i for i in range(6) if row_kind(view, i) == RowKind.TRACK_OPACITY)
+    opacity_row = _row(view, "drums", RowKind.TRACK_OPACITY)
     controls.focus_index = opacity_row
     controls.session.layers["drums"].opacity_pct = 50
 
@@ -501,6 +490,7 @@ def test_preset_row_truncates_long_filenames() -> None:
                 blend_mode="alpha",
                 opacity_pct=50,
                 beat_sensitivity=1.0,
+                effects={},
                 enabled=True,
                 preset_empty=False,
             )
@@ -512,9 +502,7 @@ def test_preset_row_truncates_long_filenames() -> None:
         toast_message=None,
         toast_remaining_sec=0.0,
     )
-    preset_row = next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET
-    )
+    preset_row = _row(view, "drums", RowKind.TRACK_PRESET)
     font = _overlay_font()
     label = fit_row_text(font, view, preset_row)
     assert font.size(label)[0] <= PANEL_CONTENT_MAX_WIDTH - 16
@@ -541,15 +529,14 @@ def test_fit_row_text_config_and_preset_share_panel_width() -> None:
         blend_mode="alpha",
         opacity_pct=50,
         beat_sensitivity=1.0,
+        effects={},
         enabled=True,
         preset_empty=False,
     )
     header_row = next(
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.CONFIG_HEADER
     )
-    preset_row = next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET
-    )
+    preset_row = _row(view, "drums", RowKind.TRACK_PRESET)
     font = _overlay_font()
     config_label = fit_row_text(font, view, header_row)
     preset_label = fit_row_text(font, view, preset_row)
@@ -643,7 +630,7 @@ def test_navigable_rows_without_overwrite() -> None:
     )
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is False
-    assert row_count(view) == 9
+    assert row_count(view) == 10
 
     kinds = {row_kind(view, i) for i in range(row_count(view))}
     assert RowKind.CONFIG_HEADER in kinds
@@ -669,7 +656,7 @@ def test_navigable_rows_with_overwrite() -> None:
     controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is True
-    assert row_count(view) == 10
+    assert row_count(view) == 11
 
     overwrite_row = next(
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
@@ -809,9 +796,7 @@ def test_track_header_icons_render() -> None:
 def test_track_header_text_omits_enabled_status() -> None:
     controls = _make_controls()
     view = controls.build_view_state(paused=False)
-    header_row = next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
-    )
+    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
     text = _row_text(view, header_row)
     assert text.startswith("Layer ")
     assert "enabled" not in text.lower()
@@ -957,12 +942,8 @@ def test_ctrl_quick_nav_from_save_row() -> None:
 def test_ctrl_quick_nav_does_not_affect_normal_up_down() -> None:
     controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
-    header_row = next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
-    )
-    preset_dir_row = next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET_DIR
-    )
+    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
+    preset_dir_row = _row(view, "drums", RowKind.TRACK_PRESET_DIR)
     controls.focus_index = header_row
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
@@ -1027,16 +1008,12 @@ def _controls_with_playlist(
 
 def _preset_dir_row(controls: TuningControls) -> int:
     view = controls.build_view_state(paused=False)
-    return next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET_DIR
-    )
+    return _row(view, "drums", RowKind.TRACK_PRESET_DIR)
 
 
 def _preset_row(controls: TuningControls) -> int:
     view = controls.build_view_state(paused=False)
-    return next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET
-    )
+    return _row(view, "drums", RowKind.TRACK_PRESET)
 
 
 def test_directory_row_lr_changes_current_dir() -> None:
@@ -1175,9 +1152,7 @@ def test_ctrl_preset_steps_by_ten_wrapping() -> None:
     controls._on_preset_change = lambda stem, pl: changed.append((stem, pl.index))
 
     view = controls.build_view_state(paused=False)
-    preset_row = next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET
-    )
+    preset_row = _row(view, "drums", RowKind.TRACK_PRESET)
     controls.focus_index = preset_row
     playlist = controls.session.layers["drums"].playlist
 
@@ -1232,6 +1207,7 @@ def test_row_text_color_dim_for_focused_empty_preset() -> None:
                 blend_mode="alpha",
                 opacity_pct=50,
                 beat_sensitivity=1.0,
+                effects={},
                 preset_empty=True,
             )
         },
@@ -1242,9 +1218,7 @@ def test_row_text_color_dim_for_focused_empty_preset() -> None:
         toast_message=None,
         toast_remaining_sec=0.0,
     )
-    preset_row = next(
-        i for i in range(6) if row_kind(state, i) == RowKind.TRACK_PRESET
-    )
+    preset_row = _row(state, "drums", RowKind.TRACK_PRESET)
     state = TuningViewState(
         layer_z_order=state.layer_z_order,
         tracks=state.tracks,
@@ -1310,6 +1284,8 @@ def _sub_rows_for_stem(view: TuningViewState, stem: str) -> list[int]:
         RowKind.TRACK_BLEND,
         RowKind.TRACK_OPACITY,
         RowKind.TRACK_BEAT,
+        RowKind.TRACK_EFFECTS_HEADER,
+        RowKind.TRACK_EFFECT,
     )
     return [
         i
@@ -1321,9 +1297,7 @@ def _sub_rows_for_stem(view: TuningViewState, stem: str) -> list[int]:
 def test_ctrl_enter_toggles_lock() -> None:
     controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
-    header_row = next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
-    )
+    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
     controls.focus_index = header_row
     assert controls.session.layers["drums"].locked is False
 
@@ -1344,8 +1318,12 @@ def test_locked_expanded_skips_sub_rows_in_nav() -> None:
     assert sub_rows
     visible = visible_row_indices(view)
     navigable = navigable_row_indices(view)
+    effects_header = _row(view, "drums", RowKind.TRACK_EFFECTS_HEADER)
+    assert effects_header in navigable
     for row in sub_rows:
         assert row in visible
+        if row == effects_header:
+            continue
         assert row not in navigable
 
 
@@ -1353,9 +1331,7 @@ def test_locked_blocks_enable_disable() -> None:
     controls = _make_controls(("drums",))
     controls.session.layers["drums"].locked = True
     view = controls.build_view_state(paused=False)
-    header_row = next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
-    )
+    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
     controls.focus_index = header_row
     assert controls.session.layers["drums"].enabled is True
 
@@ -1370,9 +1346,7 @@ def test_locked_blocks_move_mode() -> None:
     controls = _make_controls(("drums",))
     controls.session.layers["drums"].locked = True
     view = controls.build_view_state(paused=False)
-    header_row = next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
-    )
+    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
     controls.focus_index = header_row
 
     controls.handle_keydown(_keydown(pygame.K_RETURN))
@@ -1383,12 +1357,8 @@ def test_locked_header_still_expands() -> None:
     controls = _make_controls(("drums",))
     controls.session.layers["drums"].locked = True
     view = controls.build_view_state(paused=False)
-    header_row = next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
-    )
-    preset_dir_row = next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET_DIR
-    )
+    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
+    preset_dir_row = _row(view, "drums", RowKind.TRACK_PRESET_DIR)
     controls.focus_index = header_row
     assert controls.session.layers["drums"].expanded is True
 
@@ -1410,12 +1380,8 @@ def test_locked_sub_rows_dimmed() -> None:
     controls.session.layers["drums"].locked = True
     controls.session.layers["drums"].expanded = True
     view = controls.build_view_state(paused=False)
-    header_row = next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_HEADER
-    )
-    preset_dir_row = next(
-        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET_DIR
-    )
+    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
+    preset_dir_row = _row(view, "drums", RowKind.TRACK_PRESET_DIR)
     unfocused = TuningViewState(
         layer_z_order=view.layer_z_order,
         tracks=view.tracks,
@@ -1501,6 +1467,68 @@ def test_transport_seek_constants() -> None:
     assert seeks == [SEEK_SHORT, -SEEK_SHORT, SEEK_LONG, -SEEK_LONG]
 
 
+def test_effect_pulse_clamps() -> None:
+    controls = _make_controls(("drums", "bass"))
+    controls.session.layers["drums"].effects_expanded = True
+    controls.session.layers["bass"].effects_expanded = True
+    view = controls.build_view_state(paused=False)
+    pulse_row = _row(
+        view, "drums", RowKind.TRACK_EFFECT, effect_id="pulse", driver_slug="onset"
+    )
+    bass_pulse_row = _row(
+        view, "bass", RowKind.TRACK_EFFECT, effect_id="pulse", driver_slug="sub_bass"
+    )
+    controls.focus_index = pulse_row
+
+    for _ in range(120):
+        controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["drums"].effects["pulse"]["onset"] == 100
+
+    for _ in range(120):
+        controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert "pulse" not in controls.session.layers["drums"].effects
+
+    controls.focus_index = bass_pulse_row
+    for _ in range(20):
+        controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["bass"].effects["pulse"]["sub_bass"] == 20
+
+
+def test_effect_pulse_row_label() -> None:
+    controls = _make_controls(("drums",))
+    controls.session.layers["drums"].effects = {"pulse": {"onset": 35}}
+    controls.session.layers["drums"].effects_expanded = True
+    view = controls.build_view_state(paused=False)
+    pulse_row = _row(
+        view, "drums", RowKind.TRACK_EFFECT, effect_id="pulse", driver_slug="onset"
+    )
+    assert _row_text(view, pulse_row) == "└─ pulse (onset): 35%"
+
+
+def test_effects_header_expand_arrow() -> None:
+    controls = _make_controls(("drums",))
+    view = controls.build_view_state(paused=False)
+    header_row = _row(view, "drums", RowKind.TRACK_EFFECTS_HEADER)
+    assert _row_text(view, header_row) == "└─ cleave effects ▶"
+
+    controls.session.layers["drums"].effects_expanded = True
+    view = controls.build_view_state(paused=False)
+    header_row = _row(view, "drums", RowKind.TRACK_EFFECTS_HEADER)
+    assert _row_text(view, header_row) == "└─ cleave effects ▼"
+
+
+def test_effect_row_nested_indent() -> None:
+    controls = _make_controls(("drums",))
+    controls.session.layers["drums"].effects_expanded = True
+    view = controls.build_view_state(paused=False)
+    effects_header = _row(view, "drums", RowKind.TRACK_EFFECTS_HEADER)
+    pulse_row = _row(
+        view, "drums", RowKind.TRACK_EFFECT, effect_id="pulse", driver_slug="onset"
+    )
+    assert _row_indent(view, effects_header) == TREE_INDENT
+    assert _row_indent(view, pulse_row) == TREE_INDENT * 2
+
+
 def test_format_mmss() -> None:
     assert format_mmss(0) == "00:00"
     assert format_mmss(42.7) == "00:42"
@@ -1522,6 +1550,8 @@ def main() -> int:
         test_header_collapses_and_expands_sub_rows,
         test_disable_auto_collapses_sub_rows,
         test_opacity_ctrl_step_is_ten_percent,
+        test_effect_pulse_clamps,
+        test_effect_pulse_row_label,
         test_move_mode_swaps_z_order,
         test_move_mode_esc_cancels_without_applying,
         test_move_mode_backspace_cancels_without_applying,
