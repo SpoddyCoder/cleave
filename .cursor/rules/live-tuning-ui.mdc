@@ -1,6 +1,6 @@
 ---
 description: Live tuning overlay layout and typography for viz UI work
-globs: cleave/viz_tuning*.py,cleave/viz_confirm.py,cleave/viz_theme.py,scripts/milkdrop_visualizer.py,tests/test_viz_tuning*.py,docs/cleave-build-plan.md,README.md
+globs: cleave/viz_tuning*.py,cleave/viz_confirm.py,cleave/viz_theme.py,cleave/viz_text_fit.py,cleave.py,tests/test_viz_tuning*.py,README.md
 alwaysApply: false
 ---
 

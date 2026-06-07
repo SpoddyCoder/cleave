@@ -59,8 +59,8 @@ def test_draw_effects_expanded_panel_rect_within_surface() -> None:
     surface.subsurface(panel)
 
 
-def test_draw_effects_expanded_matches_milkdrop_subsurface() -> None:
-    """Regression: milkdrop_visualizer subsurfaces panel_rect after draw."""
+def test_draw_effects_expanded_subsurface_panel_rect() -> None:
+    """Regression: cleave.py subsurfaces panel_rect after draw."""
     pygame.init()
     overlay = TuningOverlay()
     state = _effects_expanded_view_state()

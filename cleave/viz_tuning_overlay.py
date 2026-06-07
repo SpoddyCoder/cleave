@@ -1,4 +1,4 @@
-"""Live tuning tree overlay for Milkdrop visualizer.
+"""Live tuning tree overlay for the Cleave visualizer.
 
 Row typography: LABEL prefixes, VALUE defaults, DISABLED/LOCKED state overrides.
 See cleave/viz_theme.py and .cursor/rules/live-tuning-ui.mdc.
@@ -14,7 +14,7 @@ import pygame
 
 from cleave.effects.registry import effect_roster
 from cleave.viz_confirm import ConfirmDialog
-from cleave.viz_overlay import (
+from cleave.viz_text_fit import (
     fit_counter_label_to_width,
     fit_path_label_to_width,
     fit_text_to_width,
