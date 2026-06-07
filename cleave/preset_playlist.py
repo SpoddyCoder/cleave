@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import yaml
 
-from cleave.config import CleaveConfig
+from cleave.config import CleaveConfig, dump_yaml
 from cleave.extract import STEM_NAMES
 
 if TYPE_CHECKING:
@@ -245,4 +245,4 @@ def write_layer_presets(
     data["layers"] = layers
 
     with config_path.open("w", encoding="utf-8") as fh:
-        yaml.safe_dump(data, fh, default_flow_style=False, sort_keys=False)
+        dump_yaml(data, fh)

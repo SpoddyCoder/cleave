@@ -308,6 +308,41 @@ def test_config_header_truncates_long_paths() -> None:
     assert label.startswith("…/")
 
 
+def test_preset_row_truncates_long_filenames() -> None:
+    long_name = (
+        "Phat_Zylot_Eo.S. rainbow bubble_mid3-starpoints_spirals_VE "
+        "- Bitcore Tweak.milk (1/50)"
+    )
+    view = TuningViewState(
+        layer_z_order=("drums",),
+        tracks={
+            "drums": TrackBlock(
+                stem="drums",
+                preset_dir_label="short (1/1)",
+                preset_label=long_name,
+                blend_mode="alpha",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                enabled=True,
+                preset_empty=False,
+            )
+        },
+        paused=False,
+        position_sec=0.0,
+        focus_index=0,
+        move_mode_stem=None,
+        toast_message=None,
+        toast_remaining_sec=0.0,
+    )
+    preset_row = next(
+        i for i in range(6) if row_kind(view, i) == RowKind.TRACK_PRESET
+    )
+    label = _row_text(view, preset_row)
+    assert len(label) <= LABEL_MAX_LEN + 11
+    assert label.endswith("(1/50)")
+    assert "…/" in label
+
+
 def test_save_as_new_updates_active_config_path() -> None:
     saved_path = Path("/tmp/saved-cleave-configs/unnamed-2.cleave.config.yaml")
     controls = _make_controls(("drums",))

@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -44,7 +43,7 @@ from cleave.gl_compositor import GlCompositor, LayerFbo  # noqa: E402
 from cleave.projectm import ProjectM, ProjectMLibraryError  # noqa: E402
 from cleave.signals import Signals, load_signals  # noqa: E402
 from cleave.stem_pcm import load_stem_pcm, samples_per_frame  # noqa: E402
-from cleave.viz_overlay import truncate_preset_label  # noqa: E402
+from cleave.viz_overlay import truncate_counter_label, truncate_preset_label  # noqa: E402
 from cleave.viz_playback import (  # noqa: E402
     current_sec,
     init_playback,
@@ -310,19 +309,6 @@ def _session_from_cfg(
     )
 
 
-_DIR_COUNTER_SUFFIX = re.compile(r" \((\d+)/(\d+)\)$")
-
-
-def _truncate_dir_label(label: str) -> str:
-    """Truncate directory path only; preserve trailing (N/TOTAL) counter."""
-    match = _DIR_COUNTER_SUFFIX.search(label)
-    if match is None:
-        return truncate_preset_label(label)
-    path_part = label[: match.start()]
-    suffix = match.group(0)
-    return truncate_preset_label(path_part) + suffix
-
-
 def _allow_overwrite_config(config_cli: Path | None, cfg: CleaveConfig) -> bool:
     """Overwrite is hidden only for implicit repo-root cleave.config.yaml."""
     config_explicit = config_cli is not None
@@ -344,7 +330,7 @@ def build_view_state(
     tracks = {
         stem: TrackBlock(
             stem=block.stem,
-            preset_dir_label=_truncate_dir_label(block.preset_dir_label),
+            preset_dir_label=truncate_counter_label(block.preset_dir_label),
             preset_label=block.preset_label,
             blend_mode=block.blend_mode,
             opacity_pct=block.opacity_pct,

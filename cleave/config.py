@@ -5,9 +5,12 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
 import yaml
+
+# Avoid PyYAML folding long preset paths across lines (can corrupt mid-token paths).
+_YAML_DUMP_WIDTH = 2**31 - 1
 
 from cleave.extract import STEM_NAMES
 from cleave.gl_compositor import BlendMode
@@ -271,4 +274,15 @@ def load_config(
         visualizer=visualizer,
         config_path=path,
         layer_z_order=layer_z_order,
+    )
+
+
+def dump_yaml(data: Any, fh: TextIO) -> None:
+    """Write Cleave config YAML without folding long scalar values."""
+    yaml.safe_dump(
+        data,
+        fh,
+        default_flow_style=False,
+        sort_keys=False,
+        width=_YAML_DUMP_WIDTH,
     )
