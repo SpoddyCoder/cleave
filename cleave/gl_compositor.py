@@ -164,6 +164,16 @@ class GlCompositor:
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
     @staticmethod
+    def reset_blend_for_external_render() -> None:
+        """Reset global blend func before libprojectM renders into a layer FBO.
+
+        draw_layer sets glBlendFunc for compositing; that state persists and
+        would leak into projectM's internal feedback passes if not cleared here.
+        """
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+    @staticmethod
     def _configure_texture_params() -> None:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
