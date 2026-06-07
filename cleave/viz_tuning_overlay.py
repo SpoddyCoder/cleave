@@ -28,6 +28,7 @@ from cleave.viz_theme import (
     BORDER_COLOR,
     BORDER_WIDTH,
     FADE_DURATION_SEC,
+    CONFIG_HEADER_TEXT,
     HIGHLIGHT,
     HOLD_IDLE_SEC,
     PRESET_FILE_ICON,
@@ -257,7 +258,7 @@ def _row_text_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
     kind = row_kind(state, index)
     stem = row_stem(state, index)
     if kind == RowKind.CONFIG_HEADER:
-        return TEXT_DIM
+        return CONFIG_HEADER_TEXT
 
     if (
         kind == RowKind.TRACK_PRESET

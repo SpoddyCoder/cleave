@@ -374,6 +374,52 @@ def test_move_mode_swaps_z_order() -> None:
     assert z_orders == [["drums", "bass", "vocals"]]
 
 
+def test_move_mode_esc_cancels_without_applying() -> None:
+    z_orders: list[list[str]] = []
+    controls = _make_controls(("drums", "bass", "vocals"))
+    controls._on_z_order_change = lambda order: z_orders.append(list(order))
+
+    view = controls.build_view_state(paused=False)
+    header_row = next(
+        i
+        for i in range(15)
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "bass"
+    )
+    controls.focus_index = header_row
+
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    controls.handle_keydown(_keydown(pygame.K_UP))
+    assert controls.session.layer_z_order == ["bass", "drums", "vocals"]
+
+    assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
+    assert controls.move_mode_stem is None
+    assert controls.session.layer_z_order == ["drums", "bass", "vocals"]
+    assert z_orders == []
+
+
+def test_move_mode_backspace_cancels_without_applying() -> None:
+    z_orders: list[list[str]] = []
+    controls = _make_controls(("drums", "bass", "vocals"))
+    controls._on_z_order_change = lambda order: z_orders.append(list(order))
+
+    view = controls.build_view_state(paused=False)
+    header_row = next(
+        i
+        for i in range(15)
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "bass"
+    )
+    controls.focus_index = header_row
+
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.session.layer_z_order == ["drums", "vocals", "bass"]
+
+    assert controls.handle_keydown(_keydown(pygame.K_BACKSPACE)) is True
+    assert controls.move_mode_stem is None
+    assert controls.session.layer_z_order == ["drums", "bass", "vocals"]
+    assert z_orders == []
+
+
 def test_save_as_new_triggers_toast_and_blocks_input() -> None:
     controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
@@ -1243,6 +1289,8 @@ def main() -> int:
         test_disable_auto_collapses_sub_rows,
         test_opacity_ctrl_step_is_ten_percent,
         test_move_mode_swaps_z_order,
+        test_move_mode_esc_cancels_without_applying,
+        test_move_mode_backspace_cancels_without_applying,
         test_move_mode_colors_focused_track_header,
         test_save_as_new_triggers_toast_and_blocks_input,
         test_config_header_shows_active_path,
