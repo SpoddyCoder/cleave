@@ -1,4 +1,4 @@
-"""OpenGL FBO layer stack and black-key compositing for Phase 5 Milkdrop."""
+"""OpenGL FBO layer stack and black-key compositing."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""ctypes wrapper for libprojectM (Phase 5 Milkdrop integration)."""
+"""ctypes wrapper for libprojectM."""
 
 from __future__ import annotations
 

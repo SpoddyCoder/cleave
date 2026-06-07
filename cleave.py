@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Milkdrop visualizer (Phase 5): four stem-driven libprojectM layers via OpenGL FBOs.
+"""Cleave visualizer: four stem-driven libprojectM layers via OpenGL FBOs.
 
-Default path loads cleave.config.yaml: one ProjectM instance per
-stem (other, bass, vocals, drums), tiered FBO sizes, black-key/add compositing, and stem PCM
-at the visualizer fps (30 by default). Use ``--preset`` for a single drums-layer debug run.
+Loads cleave.config.yaml by default: one ProjectM instance per stem, tiered FBO
+sizes, black-key compositing, and stem PCM at the configured fps (30 by default).
+Use ``--preset`` for a single drums-layer debug run.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import pygame
 import yaml
 from OpenGL.GL import GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, glClear, glClearColor, glViewport
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -32,6 +32,10 @@ from cleave.config import (  # noqa: E402
     DEFAULT_VISUALIZER_WIDTH,
     find_config_path,
     load_config,
+)
+from cleave.config_snapshot import (  # noqa: E402
+    next_unnamed_path,
+    write_session_snapshot,
 )
 from cleave.effects.runtime import EffectRuntime  # noqa: E402
 from cleave.preset_playlist import (  # noqa: E402
@@ -73,7 +77,7 @@ def load_stem_signals(stems_dir: Path) -> Signals | None:
 
 def _apply_effect_modifiers(
     session: TuningSession,
-    layers_by_name: dict[str, MilkdropLayer],
+    layers_by_name: dict[str, StemLayer],
     effect_runtime: EffectRuntime,
     signals: Signals | None,
     t_sec: float,
@@ -229,11 +233,11 @@ def _print_playlist_scan(name: str, playlist: PresetPlaylist) -> None:
     )
 
 
-def resolve_m1_preset(
+def resolve_drums_preset(
     preset_override: Path,
     config_path: Path | None,
 ) -> tuple[PresetPlaylist, list[Path], float]:
-    """Return (playlist, texture_paths, beat_sensitivity) for M1 --preset mode."""
+    """Return (playlist, texture_paths, beat_sensitivity) for --preset drums-only mode."""
     playlist = scan_preset_playlist(preset_override)
     textures = texture_paths_from_config(config_path)
     beat_sensitivity = 1.0
@@ -251,7 +255,7 @@ def resolve_m1_preset(
 
 
 @dataclass
-class MilkdropLayer:
+class StemLayer:
     name: str
     pm: ProjectM
     fbo: LayerFbo
@@ -269,10 +273,10 @@ def _build_layers(
     cfg: CleaveConfig,
     compositor: GlCompositor,
     playlists: dict[str, PresetPlaylist],
-) -> list[MilkdropLayer]:
+) -> list[StemLayer]:
     texture_paths = list(cfg.paths.texture_paths)
     fps = cfg.visualizer.fps
-    runtimes: list[MilkdropLayer] = []
+    runtimes: list[StemLayer] = []
 
     for name, layer_cfg in cfg.layers_in_z_order():
         w, h = layer_cfg.width, layer_cfg.height
@@ -297,13 +301,13 @@ def _build_layers(
         )
         fbo.enabled = layer_cfg.enabled
         runtimes.append(
-            MilkdropLayer(name=name, pm=pm, fbo=fbo, playlist=playlist)
+            StemLayer(name=name, pm=pm, fbo=fbo, playlist=playlist)
         )
 
     return runtimes
 
 
-def _render_layer_fbo(layer: MilkdropLayer, pm: ProjectM) -> None:
+def _render_layer_fbo(layer: StemLayer, pm: ProjectM) -> None:
     fbo = layer.fbo
     with fbo:
         glViewport(0, 0, fbo.width, fbo.height)
@@ -313,7 +317,7 @@ def _render_layer_fbo(layer: MilkdropLayer, pm: ProjectM) -> None:
         pm.render_to_fbo(fbo.fbo_id)
 
 
-def _apply_layer_bloom(layer: MilkdropLayer, post_process: GlPostProcess | None) -> None:
+def _apply_layer_bloom(layer: StemLayer, post_process: GlPostProcess | None) -> None:
     if post_process is None:
         return
     fbo = layer.fbo
@@ -327,7 +331,7 @@ def _apply_layer_bloom(layer: MilkdropLayer, post_process: GlPostProcess | None)
     )
 
 
-def _apply_layer_grit(layer: MilkdropLayer, post_process: GlPostProcess | None) -> None:
+def _apply_layer_grit(layer: StemLayer, post_process: GlPostProcess | None) -> None:
     if post_process is None:
         return
     fbo = layer.fbo
@@ -342,12 +346,12 @@ def _apply_layer_grit(layer: MilkdropLayer, post_process: GlPostProcess | None) 
     )
 
 
-def _flush_all_pcm(layers: list[MilkdropLayer]) -> None:
+def _flush_all_pcm(layers: list[StemLayer]) -> None:
     for layer in layers:
         layer.pm.flush_pcm()
 
 
-def _destroy_layers(layers: list[MilkdropLayer]) -> None:
+def _destroy_layers(layers: list[StemLayer]) -> None:
     for layer in layers:
         layer.pm.destroy()
 
@@ -384,8 +388,8 @@ def _make_tuning_controls(
     *,
     session: TuningSession,
     cfg: CleaveConfig,
-    layers_by_name: dict[str, MilkdropLayer],
-    layers: list[MilkdropLayer],
+    layers_by_name: dict[str, StemLayer],
+    layers: list[StemLayer],
     playback,
     duration_sec: float,
     signals: Signals | None,
@@ -471,7 +475,7 @@ def build_view_state(
 
 def _composite_ordered(
     compositor: GlCompositor,
-    layers_by_name: dict[str, MilkdropLayer],
+    layers_by_name: dict[str, StemLayer],
     session: TuningSession,
 ) -> None:
     ordered = [layers_by_name[name] for name in reversed(session.layer_z_order)]
@@ -494,7 +498,7 @@ def _draw_tuning_overlay(
         compositor.draw_overlay(tex_id, px, py, pw, ph)
 
 
-def run_m1(
+def run_drums_only(
     stems_dir: Path,
     audio_path: Path,
     playlist: PresetPlaylist,
@@ -507,7 +511,7 @@ def run_m1(
     height: int,
     fps: int,
 ) -> None:
-    """M1 debug: one drums ProjectM instance and one FBO."""
+    """Drums-only debug: one ProjectM instance and one FBO."""
     cfg: CleaveConfig | None = None
     try:
         cfg = load_config(config_path, ROOT)
@@ -529,12 +533,12 @@ def run_m1(
         sys.exit(1)
 
     trackname = stems_dir.name
-    pygame.display.set_caption(f"Cleave Milkdrop (M1) — {trackname}")
+    pygame.display.set_caption(f"Cleave (drums) — {trackname}")
     clock = pygame.time.Clock()
 
     compositor: GlCompositor | None = None
     post_process: GlPostProcess | None = None
-    layers: list[MilkdropLayer] = []
+    layers: list[StemLayer] = []
     overlay_surface = pygame.Surface((width, height), pygame.SRCALPHA)
 
     try:
@@ -555,7 +559,7 @@ def run_m1(
 
         fbo = compositor.create_layer_fbo(STEM_DRUMS, width, height, blend_mode="add")
         layers = [
-            MilkdropLayer(name=STEM_DRUMS, pm=pm, fbo=fbo, playlist=playlist)
+            StemLayer(name=STEM_DRUMS, pm=pm, fbo=fbo, playlist=playlist)
         ]
         layers_by_name = {STEM_DRUMS: layers[0]}
 
@@ -730,12 +734,12 @@ def run(
         sys.exit(1)
 
     trackname = stems_dir.name
-    pygame.display.set_caption(f"Cleave Milkdrop — {trackname}")
+    pygame.display.set_caption(f"Cleave — {trackname}")
     clock = pygame.time.Clock()
 
     compositor: GlCompositor | None = None
     post_process: GlPostProcess | None = None
-    layers: list[MilkdropLayer] = []
+    layers: list[StemLayer] = []
     overlay_surface = pygame.Surface((width, height), pygame.SRCALPHA)
 
     try:
@@ -831,8 +835,8 @@ def run(
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Milkdrop visualizer: four stem layers from cleave.config.yaml "
-            "(default), or M1 single drums preset via --preset"
+            "Cleave visualizer: four stem layers from cleave.config.yaml "
+            "(default), or drums-only debug via --preset"
         ),
     )
     parser.add_argument("path", type=Path, help="stems folder for the track")
@@ -850,7 +854,7 @@ def main() -> None:
         "--preset",
         type=Path,
         help=(
-            "M1 debug: load this .milk on drums only (skips four-preset config "
+            "Drums-only debug: load this .milk on drums (skips four-preset config "
             "validation; uses visualizer width/height/fps from config if present)"
         ),
     )
@@ -861,14 +865,14 @@ def main() -> None:
 
     try:
         if args.preset is not None:
-            playlist, texture_paths, beat_sensitivity = resolve_m1_preset(
+            playlist, texture_paths, beat_sensitivity = resolve_drums_preset(
                 args.preset,
                 args.config,
             )
             _print_playlist_scan(STEM_DRUMS, playlist)
             width, height, fps = visualizer_settings_from_config(args.config)
             preset_root = preset_root_from_config(args.config)
-            run_m1(
+            run_drums_only(
                 stems_dir,
                 audio_path,
                 playlist,
