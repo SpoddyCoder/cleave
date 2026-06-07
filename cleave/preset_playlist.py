@@ -165,7 +165,7 @@ def scan_preset_playlist(anchor: Path) -> PresetPlaylist:
 
 def directory_display(playlist: PresetPlaylist, preset_root: Path) -> str:
     """Directory path for overlay with sibling position among navigable dirs."""
-    rel = to_config_relative(playlist.current_dir, preset_root)
+    rel = to_config_relative(playlist.current_dir, preset_root).rstrip("/") + "/"
     siblings = list_navigable_dirs(playlist.current_dir.parent)
     if not siblings:
         return f"{rel} (1/1)"

@@ -20,7 +20,6 @@ from cleave.preset_playlist import (
 from cleave.viz_confirm import ConfirmDialog, ConfirmRequest
 from cleave.viz_key_repeat import KeyRepeatController
 from cleave.viz_playback import PlaybackState, current_sec, seek, toggle_pause
-from cleave.viz_overlay import truncate_preset_label
 from cleave.viz_tuning_overlay import (
     RowKind,
     TrackBlock,
@@ -49,9 +48,8 @@ _DEFAULT_SAVE_FILENAME = "unnamed-1.cleave.config.yaml"
 
 
 def config_path_display(path: Path | None) -> str:
-    """Truncate active config path for the footer header (tail preserved)."""
-    label = path.as_posix() if path is not None else "cleave.config.yaml"
-    return truncate_preset_label(label)
+    """Active config path for the footer header (truncation happens at draw time)."""
+    return path.as_posix() if path is not None else "cleave.config.yaml"
 
 
 def _mod_ctrl(mod: int) -> bool:
