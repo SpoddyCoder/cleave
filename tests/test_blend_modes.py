@@ -9,7 +9,7 @@ from tests.test_viz_tuning_controls import _make_controls
 
 def test_blend_modes_cycle_order() -> None:
     assert BLEND_MODES == (
-        "alpha",
+        "black-key",
         "add",
         "multiply",
         "screen",
@@ -41,7 +41,7 @@ def test_cycle_blend_wraps_forward() -> None:
     layer.blend_mode = "pure-add"
 
     controls._cycle_blend("drums", forward=True)
-    assert layer.blend_mode == "alpha"
+    assert layer.blend_mode == "black-key"
 
 
 def test_cycle_blend_steps_backward() -> None:
@@ -50,7 +50,7 @@ def test_cycle_blend_steps_backward() -> None:
     layer.blend_mode = "add"
 
     controls._cycle_blend("drums", forward=False)
-    assert layer.blend_mode == "alpha"
+    assert layer.blend_mode == "black-key"
 
 
 def test_cycle_blend_recovers_from_unknown_mode() -> None:
