@@ -226,10 +226,10 @@ def fit_row_text(
     budget = max_content_width - indent
     text = _row_text(state, index)
 
-    if kind == RowKind.CONFIG_HEADER:
-        return fit_path_label_to_width(font, text, budget)
-    if kind in {RowKind.TRACK_PRESET_DIR, RowKind.TRACK_PRESET}:
+    if kind in {RowKind.CONFIG_HEADER, RowKind.TRACK_PRESET_DIR, RowKind.TRACK_PRESET}:
         icon_w = row_icon_prefix_width(font.get_linesize())
+        if kind == RowKind.CONFIG_HEADER:
+            return fit_path_label_to_width(font, text, budget - icon_w)
         return fit_counter_label_to_width(font, text, budget - icon_w)
     return fit_text_to_width(font, text, budget)
 
@@ -376,9 +376,17 @@ class TuningOverlay:
                 row_widths.append(
                     indent + icons_surf.get_width() + time_surf.get_width()
                 )
-            elif kind in {RowKind.TRACK_PRESET_DIR, RowKind.TRACK_PRESET}:
-                glyph = FOLDER_GLYPH if kind == RowKind.TRACK_PRESET_DIR else FILE_GLYPH
-                icon_color = PRESET_ICON if kind == RowKind.TRACK_PRESET_DIR else PRESET_FILE_ICON
+            elif kind in {
+                RowKind.CONFIG_HEADER,
+                RowKind.TRACK_PRESET_DIR,
+                RowKind.TRACK_PRESET,
+            }:
+                if kind == RowKind.TRACK_PRESET_DIR:
+                    glyph = FOLDER_GLYPH
+                    icon_color = PRESET_ICON
+                else:
+                    glyph = FILE_GLYPH
+                    icon_color = PRESET_FILE_ICON
                 icon_surf = render_glyph(glyph, color=icon_color, line_height=line_h)
                 label = fit_row_text(font, state, index)
                 label_surf = font.render(label, True, color)

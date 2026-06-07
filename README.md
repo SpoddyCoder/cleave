@@ -224,7 +224,7 @@ Navigate with the arrow keys; the focused row is highlighted in orange. **SAVE A
 | --- | --- |
 | Up / Down | Move focus between rows (track rows section and footer rows section) |
 | Left / Right | Adjust the focused field (see below); hold to repeat on directory, filename, blend, opacity, and beat rows |
-| Ctrl + Left / Right | Larger steps on opacity and beat; on filename row, jump ±10 presets in the current directory (wraps) |
+| Ctrl + Left / Right | On directory row: go to parent / descend into child (same as Backspace / Enter); larger steps on opacity and beat; on filename row, jump ±10 presets in the current directory (wraps) |
 | Enter | On directory row: descend into first alphabetical child directory with presets; on track header: enter z-order move mode; on SAVE AS NEW CONFIG: write snapshot; on OVERWRITE CONFIG (when shown): confirm then overwrite launch config |
 | Backspace | On directory row: go to parent directory (no-op at the layer's configured preset pack root, the first path segment under `preset_root`) |
 | Enter (move mode) | Confirm z-order after Up/Down swaps |
@@ -239,7 +239,7 @@ The directory row shows the path relative to `preset_root` with `(N/TOTAL)` amon
 | Row | Left / Right | Ctrl + Left / Right |
 | --- | --- | --- |
 | Track header | Collapse / expand child rows | Disable / enable layer |
-| Directory | Previous / next sibling directory (wraps) | (same step size) |
+| Directory | Previous / next sibling directory (wraps) | Go to parent / descend into child (same as Backspace / Enter; no hold-to-repeat) |
 | Filename | Previous / next `.milk` in current directory only (wraps); no-op when empty | Jump ±10 presets in current directory (wraps); no-op when empty |
 | Blend mode | Cycle blend modes (see below) | (same step size) |
 | Opacity | −1% / +1% | −10% / +10% (0% disables the layer) |
@@ -282,6 +282,6 @@ python scripts/milkdrop_visualizer.py stems/sights-and-sounds-26 \
   --preset ~/milkdrop-presets/presets-cream-of-the-crop/Drawing/some-preset.milk
 ```
 
-`--preset` accepts a `.milk` file or a directory (same recursive scan as layer config). The same live tuning overlay applies: focus the drums directory or filename row to browse sibling directories (Left/Right) and step `.milk` files (Ctrl+Left/Right for ±10 on the filename row); Enter/Backspace on the directory row to descend or ascend. SAVE AS NEW CONFIG writes to [saved-cleave-configs/](saved-cleave-configs/) when a launch config exists; without `--config`, save-as-new still uses the default unnamed snapshot path.
+`--preset` accepts a `.milk` file or a directory (same recursive scan as layer config). The same live tuning overlay applies: focus the drums directory or filename row to browse sibling directories (Left/Right) and step `.milk` files (Ctrl+Left/Right for ±10 on the filename row); Enter/Backspace or Ctrl+Right/Ctrl+Left on the directory row to descend or ascend. SAVE AS NEW CONFIG writes to [saved-cleave-configs/](saved-cleave-configs/) when a launch config exists; without `--config`, save-as-new still uses the default unnamed snapshot path.
 
 See [docs/cleave-build-plan.md](docs/cleave-build-plan.md) for the full roadmap.
