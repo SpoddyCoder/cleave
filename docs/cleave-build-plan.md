@@ -191,7 +191,7 @@ By this point you have a working layered system you understand. Milkdrop becomes
 **5.6.2 — Per-layer tuning**
 - Directory row: path relative to `preset_root` with `(N/TOTAL)` among sibling dirs (presets in subtree, hidden excluded); Left/Right previous/next sibling (wraps); Enter descends to first alphabetical child with presets; Backspace goes to parent (no-op at `preset_root`)
 - Filename row: Left/Right previous/next `.milk` in current directory only (wraps); Ctrl+Left/Right ±10 presets in directory (wraps); empty dir shows `NO PRESETS FOUND` (dim), L/R no-op
-- Blend mode: cycle `alpha` / `add` per layer (`layers.*.blend_mode` in config)
+- Blend mode: cycle per-layer blend modes in fixed order (`alpha`, `add`, `multiply`, `screen`, `subtract`, `difference`, `exclusion`, `max`, `pure-add`; see README); stored as `layers.*.blend_mode` in config
 - Opacity: 1% steps (10% with Ctrl); 0% disables the layer
 - Beat sensitivity: 0.01 steps (0.1 with Ctrl)
 
@@ -218,7 +218,7 @@ The drum layer needs presets that respond well to sharp transients — look for 
 Preset curation happens in-session via the Phase 5.6 live tuning overlay ([scripts/milkdrop_visualizer.py](scripts/milkdrop_visualizer.py)): browse presets per layer, tune blend/opacity/beat, reorder z-order, and save snapshots to [saved-cleave-configs/](saved-cleave-configs/). Promote a winning snapshot into [cleave.config.yaml](cleave.config.yaml) manually when ready.
 
 **6.2 — Compositor aesthetics**
-- Tune blend modes between layers — additive blending works well for grungy/industrial aesthetics
+- Per-layer blend modes (see README): `alpha` and `add` for everyday stacking; `multiply` / `screen` for mood; experimental modes (`subtract`, `difference`, `exclusion`, `max`, `pure-add`) for chaotic passes
 - Add post-processing in the compositor itself: film grain, scanlines, chromatic aberration, bloom
 - These sit *above* the Milkdrop layers and give Cleave its own visual signature on top of community presets
 

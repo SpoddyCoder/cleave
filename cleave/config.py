@@ -13,7 +13,7 @@ import yaml
 _YAML_DUMP_WIDTH = 2**31 - 1
 
 from cleave.extract import STEM_NAMES
-from cleave.gl_compositor import BlendMode
+from cleave.gl_compositor import BLEND_MODES, BlendMode
 
 CONFIG_FILENAME = "cleave.config.yaml"
 GLOBAL_CONFIG_PATH = Path.home() / ".config" / "cleave" / CONFIG_FILENAME
@@ -161,8 +161,9 @@ def _parse_blend_mode(name: str, layer_raw: dict[str, Any]) -> BlendMode:
     raw = layer_raw.get("blend_mode")
     if raw is None:
         return DEFAULT_BLEND_MODE[name]
-    if raw not in ("alpha", "add"):
-        raise ValueError(f"layers.{name}.blend_mode must be 'alpha' or 'add'")
+    if raw not in BLEND_MODES:
+        allowed = ", ".join(f"'{mode}'" for mode in BLEND_MODES)
+        raise ValueError(f"layers.{name}.blend_mode must be one of: {allowed}")
     return raw
 
 

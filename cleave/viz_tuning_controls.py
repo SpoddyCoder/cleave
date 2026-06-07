@@ -11,7 +11,7 @@ from pathlib import Path
 import pygame
 
 from cleave.config import clamp_beat_sensitivity
-from cleave.gl_compositor import BlendMode
+from cleave.gl_compositor import BLEND_MODES, BlendMode
 from cleave.preset_playlist import (
     PresetPlaylist,
     directory_display,
@@ -34,7 +34,6 @@ TOAST_DURATION_SEC = 5.0
 SEEK_SHORT = 10
 SEEK_LONG = 30
 
-_BLEND_MODES: tuple[BlendMode, ...] = ("alpha", "add")
 _REPEAT_ROW_KINDS = frozenset(
     {
         RowKind.TRACK_PRESET_DIR,
@@ -392,11 +391,14 @@ class TuningControls:
 
     def _cycle_blend(self, stem: str, *, forward: bool) -> None:
         layer = self.session.layers[stem]
-        index = _BLEND_MODES.index(layer.blend_mode)
+        try:
+            index = BLEND_MODES.index(layer.blend_mode)
+        except ValueError:
+            index = 0
         if forward:
-            layer.blend_mode = _BLEND_MODES[(index + 1) % len(_BLEND_MODES)]
+            layer.blend_mode = BLEND_MODES[(index + 1) % len(BLEND_MODES)]
         else:
-            layer.blend_mode = _BLEND_MODES[(index - 1) % len(_BLEND_MODES)]
+            layer.blend_mode = BLEND_MODES[(index - 1) % len(BLEND_MODES)]
         if self._on_blend_change is not None:
             self._on_blend_change(stem, layer.blend_mode)
 
