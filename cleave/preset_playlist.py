@@ -59,6 +59,30 @@ def _path_at_or_below(path: Path, root: Path) -> bool:
         return False
 
 
+def preset_browse_floor(anchor: Path, preset_root: Path) -> Path:
+    """Lowest directory this layer may ascend to when browsing presets."""
+    resolved_root = preset_root.resolve()
+    resolved = anchor.resolve()
+    base = resolved.parent if resolved.is_file() else resolved
+    if not _path_at_or_below(base, resolved_root):
+        return resolved_root
+    try:
+        rel = base.relative_to(resolved_root)
+    except ValueError:
+        return resolved_root
+    if not rel.parts:
+        return resolved_root
+    return (resolved_root / rel.parts[0]).resolve()
+
+
+def navigable_parent(current_dir: Path, preset_root: Path) -> Path:
+    """Parent directory for sibling listing, never above ``preset_root``."""
+    parent = current_dir.parent.resolve()
+    if _path_at_or_below(parent, preset_root):
+        return parent
+    return preset_root.resolve()
+
+
 @dataclass
 class PresetPlaylist:
     current_dir: Path
@@ -94,8 +118,8 @@ class PresetPlaylist:
         self.index = (self.index + delta) % len(self.paths)
         return self.current
 
-    def step_sibling(self, delta: int = 1) -> bool:
-        siblings = list_navigable_dirs(self.current_dir.parent)
+    def step_sibling(self, delta: int = 1, *, preset_root: Path) -> bool:
+        siblings = list_navigable_dirs(navigable_parent(self.current_dir, preset_root))
         if not siblings:
             return False
         resolved_current = self.current_dir.resolve()
@@ -116,11 +140,11 @@ class PresetPlaylist:
         self._apply(playlist_at_dir(children[0], index=0))
         return True
 
-    def go_parent(self, preset_root: Path) -> bool:
+    def go_parent(self, browse_floor: Path) -> bool:
         parent = self.current_dir.parent
         if parent == self.current_dir:
             return False
-        if not _path_at_or_below(parent, preset_root):
+        if not _path_at_or_below(parent, browse_floor):
             return False
         self._apply(playlist_at_dir(parent, index=0))
         return True
@@ -166,7 +190,9 @@ def scan_preset_playlist(anchor: Path) -> PresetPlaylist:
 def directory_display(playlist: PresetPlaylist, preset_root: Path) -> str:
     """Directory path for overlay with sibling position among navigable dirs."""
     rel = to_config_relative(playlist.current_dir, preset_root).rstrip("/") + "/"
-    siblings = list_navigable_dirs(playlist.current_dir.parent)
+    siblings = list_navigable_dirs(
+        navigable_parent(playlist.current_dir, preset_root)
+    )
     if not siblings:
         return f"{rel} (1/1)"
     resolved_current = playlist.current_dir.resolve()

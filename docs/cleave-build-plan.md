@@ -189,7 +189,7 @@ By this point you have a working layered system you understand. Milkdrop becomes
 - Same idle behaviour as Phase 4 overlay: 10s hold after input, 2s fade ([cleave/viz_theme.py](cleave/viz_theme.py))
 
 **5.6.2 — Per-layer tuning**
-- Directory row: path relative to `preset_root` with `(N/TOTAL)` among sibling dirs (presets in subtree, hidden excluded); Left/Right previous/next sibling (wraps); Enter descends to first alphabetical child with presets; Backspace goes to parent (no-op at `preset_root`)
+- Directory row: path relative to `preset_root` with `(N/TOTAL)` among sibling dirs (presets in subtree, hidden excluded); Left/Right previous/next sibling (wraps); Enter descends to first alphabetical child with presets; Backspace goes to parent (no-op at the layer's configured preset pack root, the first path segment under `preset_root`; sibling listing never scans above `preset_root`)
 - Filename row: Left/Right previous/next `.milk` in current directory only (wraps); Ctrl+Left/Right ±10 presets in directory (wraps); empty dir shows `NO PRESETS FOUND` (dim), L/R no-op
 - Blend mode: cycle per-layer blend modes in fixed order (`alpha`, `add`, `multiply`, `screen`, `subtract`, `difference`, `exclusion`, `max`, `pure-add`; see README); stored as `layers.*.blend_mode` in config
 - Opacity: 1% steps (10% with Ctrl); 0% disables the layer

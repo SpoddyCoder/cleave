@@ -7,8 +7,10 @@ import tempfile
 from pathlib import Path
 
 from cleave.preset_playlist import (
+    directory_display,
     list_navigable_dirs,
     playlist_at_dir,
+    preset_browse_floor,
     preset_filename_display,
     scan_preset_playlist,
 )
@@ -92,10 +94,10 @@ def test_step_sibling_wraps() -> None:
             siblings.append(sibling)
 
         playlist = playlist_at_dir(siblings[0])
-        assert playlist.step_sibling(-1) is True
+        assert playlist.step_sibling(-1, preset_root=root) is True
         assert playlist.current_dir.resolve() == siblings[2].resolve()
 
-        assert playlist.step_sibling(1) is True
+        assert playlist.step_sibling(1, preset_root=root) is True
         assert playlist.current_dir.resolve() == siblings[0].resolve()
 
 
@@ -121,7 +123,25 @@ def test_enter_child_first_alphabetical_navigable() -> None:
         assert len(playlist.paths) == 1
 
 
-def test_go_parent_ascends_and_clamps_at_root() -> None:
+def test_go_parent_ascends_and_clamps_at_browse_floor() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        pack = root / "pack-a"
+        pack.mkdir()
+        _write_milk(pack / "pack.milk")
+        child = pack / "child"
+        child.mkdir()
+        _write_milk(child / "child.milk")
+
+        playlist = playlist_at_dir(child)
+        assert playlist.go_parent(pack) is True
+        assert playlist.current_dir.resolve() == pack.resolve()
+
+        assert playlist.go_parent(pack) is False
+        assert playlist.current_dir.resolve() == pack.resolve()
+
+
+def test_go_parent_clamps_at_preset_root_when_browse_floor_is_root() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         parent = root / "parent"
@@ -135,11 +155,40 @@ def test_go_parent_ascends_and_clamps_at_root() -> None:
         assert playlist.go_parent(root) is True
         assert playlist.current_dir.resolve() == parent.resolve()
 
-        at_root = playlist_at_dir(root)
-        _write_milk(root / "root.milk")
         at_root = scan_preset_playlist(root)
         assert at_root.go_parent(root) is False
         assert at_root.current_dir.resolve() == root.resolve()
+
+
+def test_preset_browse_floor_uses_first_configured_path_segment() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        pack = root / "pack-a"
+        pack.mkdir()
+        inner = pack / "inner"
+        inner.mkdir()
+        preset = inner / "preset.milk"
+        _write_milk(preset)
+
+        assert preset_browse_floor(preset, root).resolve() == pack.resolve()
+        assert preset_browse_floor(pack, root).resolve() == pack.resolve()
+        assert preset_browse_floor(pack / "solo.milk", root).resolve() == pack.resolve()
+        assert preset_browse_floor(root / "solo.milk", root).resolve() == root.resolve()
+
+
+def test_directory_display_clamps_sibling_parent_at_preset_root() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        pack_a = root / "pack-a"
+        pack_b = root / "pack-b"
+        pack_a.mkdir()
+        pack_b.mkdir()
+        _write_milk(pack_a / "a.milk")
+        _write_milk(pack_b / "b.milk")
+
+        playlist = scan_preset_playlist(root)
+        label = directory_display(playlist, root)
+        assert label == "./ (1/2)"
 
 
 def test_empty_directory_display_and_config_path() -> None:
@@ -180,7 +229,10 @@ def main() -> int:
         test_list_navigable_dirs_filters_and_includes_subtree,
         test_step_sibling_wraps,
         test_enter_child_first_alphabetical_navigable,
-        test_go_parent_ascends_and_clamps_at_root,
+        test_go_parent_ascends_and_clamps_at_browse_floor,
+        test_go_parent_clamps_at_preset_root_when_browse_floor_is_root,
+        test_preset_browse_floor_uses_first_configured_path_segment,
+        test_directory_display_clamps_sibling_parent_at_preset_root,
         test_empty_directory_display_and_config_path,
         test_container_directory_anchor_no_direct_presets,
     ]
