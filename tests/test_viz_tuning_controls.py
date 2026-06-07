@@ -15,6 +15,7 @@ from cleave.preset_playlist import (
     PresetPlaylist,
     directory_display,
     playlist_at_dir,
+    preset_browse_floor,
     preset_filename_display,
     scan_preset_playlist,
 )
@@ -70,16 +71,21 @@ def _make_controls(
     *,
     allow_overwrite: bool = True,
 ) -> TuningControls:
+    preset_root = Path("/tmp/presets")
     session = TuningSession(
         layer_z_order=list(stems),
         layers={
-            stem: LayerRuntime(playlist=_make_playlist(stem), opacity_pct=50)
+            stem: LayerRuntime(
+                playlist=_make_playlist(stem),
+                browse_floor=preset_root / stem,
+                opacity_pct=50,
+            )
             for stem in stems
         },
     )
     return TuningControls(
         session,
-        preset_root=Path("/tmp/presets"),
+        preset_root=preset_root,
         playback=PlaybackState(),
         duration_sec=120.0,
         allow_overwrite=allow_overwrite,
@@ -787,12 +793,18 @@ def _controls_with_playlist(
     current_dir: Path,
     *,
     index: int = 0,
+    browse_floor: Path | None = None,
 ) -> TuningControls:
+    anchor = current_dir / "preset-0.milk"
+    floor = browse_floor if browse_floor is not None else preset_browse_floor(
+        anchor, root
+    )
     session = TuningSession(
         layer_z_order=["drums"],
         layers={
             "drums": LayerRuntime(
                 playlist=playlist_at_dir(current_dir, index=index),
+                browse_floor=floor,
                 opacity_pct=50,
             )
         },
@@ -841,6 +853,20 @@ def test_directory_enter_descends_backspace_goes_parent() -> None:
 
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     assert playlist.current_dir.resolve() == child.resolve()
+
+    controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
+    assert playlist.current_dir.resolve() == siblings[0].resolve()
+
+
+def test_backspace_at_browse_floor_is_noop() -> None:
+    root, siblings = _make_sibling_dir_tree(2)
+    controls = _controls_with_playlist(root, siblings[0])
+    controls.focus_index = _preset_dir_row(controls)
+    playlist = controls.session.layers["drums"].playlist
+    floor = controls.session.layers["drums"].browse_floor
+
+    assert playlist.current_dir.resolve() == siblings[0].resolve()
+    assert floor.resolve() == siblings[0].resolve()
 
     controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
     assert playlist.current_dir.resolve() == siblings[0].resolve()
@@ -1054,6 +1080,7 @@ def main() -> int:
         test_ctrl_quick_nav_does_not_affect_normal_up_down,
         test_directory_row_lr_changes_current_dir,
         test_directory_enter_descends_backspace_goes_parent,
+        test_backspace_at_browse_floor_is_noop,
         test_preset_lr_noop_when_paths_empty,
         test_track_preset_dir_in_repeat_row_kinds,
         test_ctrl_preset_steps_by_ten_wrapping,

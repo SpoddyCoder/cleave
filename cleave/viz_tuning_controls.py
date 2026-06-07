@@ -58,6 +58,7 @@ def _mod_ctrl(mod: int) -> bool:
 @dataclass
 class LayerRuntime:
     playlist: PresetPlaylist
+    browse_floor: Path
     opacity_pct: int = 100
     blend_mode: BlendMode = "alpha"
     beat_sensitivity: float = 1.0
@@ -360,7 +361,7 @@ class TuningControls:
         layer = self.session.layers[stem]
         playlist = layer.playlist
         delta = 1 if forward else -1
-        if playlist.step_sibling(delta) and self._on_preset_change is not None:
+        if playlist.step_sibling(delta, preset_root=self.preset_root) and self._on_preset_change is not None:
             self._on_preset_change(stem, playlist)
 
     def _enter_directory(self, stem: str) -> None:
@@ -372,7 +373,7 @@ class TuningControls:
     def _parent_directory(self, stem: str) -> None:
         layer = self.session.layers[stem]
         playlist = layer.playlist
-        if playlist.go_parent(self.preset_root) and self._on_preset_change is not None:
+        if playlist.go_parent(layer.browse_floor) and self._on_preset_change is not None:
             self._on_preset_change(stem, playlist)
 
     def _step_preset(self, stem: str, *, forward: bool, ctrl: bool) -> None:

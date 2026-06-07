@@ -36,6 +36,7 @@ from cleave.config import (  # noqa: E402
 from cleave.config_snapshot import next_unnamed_path, write_session_snapshot  # noqa: E402
 from cleave.preset_playlist import (  # noqa: E402
     PresetPlaylist,
+    preset_browse_floor,
     scan_all_layers,
     scan_preset_playlist,
 )
@@ -293,11 +294,15 @@ def _session_from_cfg(
     cfg: CleaveConfig,
     playlists: dict[str, PresetPlaylist],
 ) -> TuningSession:
+    preset_root = cfg.paths.preset_root
     return TuningSession(
         layer_z_order=list(cfg.layer_z_order),
         layers={
             name: LayerRuntime(
                 playlist=playlists[name],
+                browse_floor=preset_browse_floor(
+                    cfg.layers[name].preset, preset_root
+                ),
                 opacity_pct=int(layer_cfg.opacity * 100),
                 blend_mode=layer_cfg.blend_mode,
                 beat_sensitivity=_beat_sensitivity(cfg, name),
@@ -426,6 +431,7 @@ def run_m1(
     beat_sensitivity: float,
     config_path: Path | None,
     preset_root: Path,
+    preset_anchor: Path,
     width: int,
     height: int,
     fps: int,
@@ -484,6 +490,7 @@ def run_m1(
             layers={
                 STEM_DRUMS: LayerRuntime(
                     playlist=playlist,
+                    browse_floor=preset_browse_floor(preset_anchor, preset_root),
                     opacity_pct=100,
                     blend_mode="add",
                     beat_sensitivity=beat_sensitivity,
@@ -755,6 +762,7 @@ def main() -> None:
                 beat_sensitivity,
                 args.config,
                 preset_root,
+                args.preset,
                 width,
                 height,
                 fps,
