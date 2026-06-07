@@ -218,7 +218,7 @@ A focus-driven tree panel ([cleave/viz_tuning_overlay.py](cleave/viz_tuning_over
 - **Track rows section** (upper): one block per stem (header, directory, filename, blend, opacity, beat, then collapsible **cleave effects** with per-effect depth rows when expanded). Headers show as `Layer N: STEM`.
 - **Footer rows section** (lower, separated by a gap): transport (drawn transport controls (skip / play-pause / skip) and elapsed time), **SAVE AS NEW CONFIG**, and **OVERWRITE CONFIG** when the active config is not the repo-root template [cleave.config.yaml](cleave.config.yaml).
 
-Navigate with the arrow keys; the focused row is highlighted in orange. **SAVE AS NEW CONFIG** is always shown. **OVERWRITE CONFIG** is hidden only while the active config is the repo-root [cleave.config.yaml](cleave.config.yaml); it appears for any other active path, including after save-as-new updates the active config to a snapshot under [saved-cleave-configs/](saved-cleave-configs/).
+Navigate with the arrow keys; the focused row is highlighted in orange. Row typography uses light blue labels (`LABEL`), white values (`VALUE`), dimmed inactive text (`DISABLED`), and a locked tint on non-editable sub-rows (`LOCKED`); expand arrows follow value color. See [.cursor/rules/live-tuning-ui.mdc](.cursor/rules/live-tuning-ui.mdc). **SAVE AS NEW CONFIG** is always shown. **OVERWRITE CONFIG** is hidden only while the active config is the repo-root [cleave.config.yaml](cleave.config.yaml); it appears for any other active path, including after save-as-new updates the active config to a snapshot under [saved-cleave-configs/](saved-cleave-configs/).
 
 | Key | Action |
 | --- | --- |
@@ -236,7 +236,7 @@ Navigate with the arrow keys; the focused row is highlighted in orange. **SAVE A
 
 **Focused field behaviour**
 
-The directory row shows the path relative to `preset_root` with `(N/TOTAL)` among sibling directories under the parent (only dirs with presets in their subtree; hidden dirs excluded). The filename row shows the current `.milk` name with `(N/TOTAL)` in the current directory, or `NO PRESETS FOUND` in dim text when the directory has no presets.
+The directory row shows the path relative to `preset_root` with `(N/TOTAL)` among sibling directories under the parent (only dirs with presets in their subtree; hidden dirs excluded). The filename row shows the current `.milk` name with `(N/TOTAL)` in the current directory, or `NO PRESETS FOUND` in `DISABLED` when the directory has no presets.
 
 | Row | Left / Right | Ctrl + Left / Right |
 | --- | --- | --- |
@@ -252,7 +252,7 @@ The directory row shows the path relative to `preset_root` with `(N/TOTAL)` amon
 
 Z-order move mode highlights the track header in blue; Up/Down reorders that stem in the compositor stack (bottom-to-top per `layer_z_order`).
 
-Locked layers show a red padlock on the track header. Lock blocks enable/disable (Ctrl + Left / Right) and move mode (Enter) on that header. When expanded, sub-rows remain visible but are skipped in Up/Down navigation and drawn dimmed; Left / Right expand/collapse on the header still works.
+Locked layers show a red padlock on the track header. Lock blocks enable/disable (Ctrl + Left / Right) and move mode (Enter) on that header. When expanded, sub-rows remain visible but are skipped in Up/Down navigation and drawn `LOCKED`; Left / Right expand/collapse on the header still works.
 
 Pause stops PCM feed and freezes layer FBOs (no projectM render); seek flushes projectM buffers. The overlay stays visible for 10 seconds after input, then fades out over 2 seconds; any keypress shows it again (same timing as Phase 4 [cleave/viz_overlay.py](cleave/viz_overlay.py)).
 

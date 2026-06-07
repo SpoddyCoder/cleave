@@ -1,19 +1,34 @@
-"""Shared colors and layout constants for Milkdrop live tuning UI panels."""
+"""Shared colors and layout constants for Milkdrop live tuning UI panels.
+
+Typography roles for the live tuning overlay:
+  LABEL    — light blue text for row labels and prefixes
+  VALUE    — white text for values and state indicators (default)
+  DISABLED — dimmed text when a row or control is inactive
+  LOCKED   — tinted text for locked sub-rows that cannot be edited
+
+Accent colors for modes and icons (not label/value roles):
+  HIGHLIGHT, MOVE_MODE, LOCK_ICON, PRESET_ICON, PRESET_FILE_ICON
+
+See [.cursor/rules/live-tuning-ui.mdc](../.cursor/rules/live-tuning-ui.mdc) for how
+rows apply these roles, including intentional exceptions.
+"""
 
 from __future__ import annotations
 
 BACKGROUND: tuple[int, int, int] = (0, 0, 0)
 BACKGROUND_ALPHA: int = int(0.8 * 255)
 BORDER_COLOR: tuple[int, int, int] = (255, 255, 255)
-TEXT: tuple[int, int, int] = (255, 255, 255)
-TEXT_DIM: tuple[int, int, int] = (140, 140, 140)
+
+LABEL: tuple[int, int, int] = (170, 210, 255)
+VALUE: tuple[int, int, int] = (255, 255, 255)
+DISABLED: tuple[int, int, int] = (140, 140, 140)
 HIGHLIGHT: tuple[int, int, int] = (255, 165, 0)
-CONFIG_HEADER_TEXT: tuple[int, int, int] = (170, 210, 255)
+
 PRESET_ICON: tuple[int, int, int] = (255, 195, 90)
 PRESET_FILE_ICON: tuple[int, int, int] = (255, 250, 235)
 MOVE_MODE: tuple[int, int, int] = (60, 120, 255)
 LOCK_ICON: tuple[int, int, int] = (235, 90, 90)
-LOCK_TEXT: tuple[int, int, int] = (235, 150, 150)
+LOCKED: tuple[int, int, int] = (235, 150, 150)
 
 BORDER_WIDTH: int = 2
 PANEL_CONTENT_MAX_WIDTH: int = 440

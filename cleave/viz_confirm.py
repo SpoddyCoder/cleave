@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import pygame
 
-from cleave.viz_theme import HIGHLIGHT, TEXT, TEXT_DIM
+from cleave.viz_theme import DISABLED, HIGHLIGHT, VALUE
 
 
 @dataclass
@@ -114,14 +114,14 @@ class ConfirmDialog:
         line_h = font.get_linesize()
         cur_y = y
 
-        msg_surf = font.render(message, True, TEXT)
+        msg_surf = font.render(message, True, VALUE)
         if text_alpha >= 2:
             msg_surf.set_alpha(text_alpha)
             surface.blit(msg_surf, (x, cur_y))
         cur_y += line_h + line_gap
 
-        yes_color = HIGHLIGHT if focus_yes else TEXT_DIM
-        no_color = HIGHLIGHT if not focus_yes else TEXT_DIM
+        yes_color = HIGHLIGHT if focus_yes else DISABLED
+        no_color = HIGHLIGHT if not focus_yes else DISABLED
         yes_prefix = ">" if focus_yes else " "
         no_prefix = ">" if not focus_yes else " "
 

@@ -21,11 +21,11 @@ This plan covers the full stack, delivered in logical phases. No backward compat
 | --- | --- |
 | Delivery | Full stack; implement in phases below |
 | UI parent row | `cleave effects` (lowercase), collapsed by default, bottom of track tree (after beat sensitivity) |
-| UI parent color | Light blue: `CONFIG_HEADER_TEXT` `(170, 210, 255)` in [cleave/viz_theme.py](../cleave/viz_theme.py) |
+| UI parent row typography | Label `└─ cleave effects` in `LABEL`; expand arrow in `VALUE` (see [live-tuning-ui.mdc](../.cursor/rules/live-tuning-ui.mdc)) |
 | Child row pattern | `{effect} ({signal}): N%` e.g. `pulse (onset): 35%` |
 | Config | Nested `layers.*.effects` map reflecting the tree; breaking rename from `cleave_pulse` |
 | Migration | Update [cleave.config.yaml](../cleave.config.yaml) only; no snapshot migration |
-| Locked layers | Normal rules: effects sub-rows dimmed and non-adjustable; expand/collapse still allowed |
+| Locked layers | Normal rules: effects sub-rows `LOCKED` and non-adjustable; expand/collapse still allowed |
 | projectM | No changes to PCM feed or beat sensitivity handling |
 
 ---
@@ -101,7 +101,7 @@ Row counts when **cleave effects** is expanded: drums 4, bass 4, vocals 4, other
 4. Blend mode
 5. Opacity
 6. Beat sensitivity
-7. **cleave effects** (collapsible header, light blue, collapsed by default)
+7. **cleave effects** (collapsible header; label in `LABEL`, arrow in `VALUE`; collapsed by default)
 8. Effect sub-rows (visible only when cleave effects expanded and track expanded)
 
 Track header expand/collapse still hides preset/blend/opacity/beat/effects rows together (existing behavior). **cleave effects** has its own expand/collapse independent of the track header.
@@ -111,7 +111,7 @@ Track header expand/collapse still hides preset/blend/opacity/beat/effects rows 
 - Up/Down: skip collapsed effect sub-rows; include `cleave effects` header when track is navigable.
 - Left/Right on `cleave effects` header: expand/collapse effect sub-rows (same pattern as preset dir).
 - Left/Right on effect sub-rows: adjust N% by 1 (10 with Ctrl), clamped 0-100.
-- Locked track: effect sub-rows dimmed; Left/Right ignored; expand/collapse on `cleave effects` still works.
+- Locked track: effect sub-rows `LOCKED`; Left/Right ignored; expand/collapse on `cleave effects` still works.
 
 ### Row count model
 
@@ -299,7 +299,7 @@ Extend [cleave/gl_compositor.py](../cleave/gl_compositor.py) (or a sibling `clea
 
 - Add `cleave/effects/registry.py` with per-stem effect definitions
 - Replace `TRACK_CLEAVE_PULSE` with `TRACK_EFFECTS_HEADER` + per-effect row kinds (or dynamic effect rows)
-- `cleave effects` header: lowercase, `CONFIG_HEADER_TEXT`, collapsed by default, after beat sensitivity
+- `cleave effects` header: lowercase label + value arrow (`_render_label_value_row`), collapsed by default, after beat sensitivity
 - Config parse/dump for `layers.*.effects`; remove `cleave_pulse` from [cleave/config.py](../cleave/config.py)
 - Update [cleave.config.yaml](../cleave.config.yaml) to new shape (drums `effects.pulse.onset` from current `cleave_pulse`)
 - Rename [cleave/cleave_pulse.py](../cleave/cleave_pulse.py) into `cleave/effects/pulse.py`; keep drums behavior working
@@ -367,7 +367,7 @@ Extend [cleave/gl_compositor.py](../cleave/gl_compositor.py) (or a sibling `clea
 | pulse | `effective_opacity` formula; per-driver decay constants |
 | flash / flare | Threshold trigger, decay toward zero |
 | hue | Pitch map; NaN hold/decay |
-| UI | Row visibility with track + effects collapse; locked layer dims effects; labels match `pulse (onset): N%` |
+| UI | Row visibility with track + effects collapse; locked layer tints effects `LOCKED`; labels match `pulse (onset): N%` |
 | Integration | milkdrop frame loop applies modifiers (mock signals + fixed t_sec) |
 
 ---

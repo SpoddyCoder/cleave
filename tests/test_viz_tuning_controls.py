@@ -32,13 +32,12 @@ from cleave.viz_tuning_controls import (
     config_path_display,
 )
 from cleave.viz_theme import (
-    CONFIG_HEADER_TEXT,
+    DISABLED,
     HIGHLIGHT,
-    LOCK_TEXT,
+    LOCKED,
     MOVE_MODE,
     PANEL_CONTENT_MAX_WIDTH,
-    TEXT,
-    TEXT_DIM,
+    VALUE,
 )
 from cleave.viz_material_icons import (
     FILE_GLYPH,
@@ -61,7 +60,7 @@ from cleave.viz_tuning_overlay import (
     _row_bg_color,
     _row_indent,
     _row_text,
-    _row_text_color,
+    _row_value_color,
     fit_row_text,
     navigable_row_indices,
     quick_nav_row_indices,
@@ -819,10 +818,10 @@ def test_track_header_expand_arrow() -> None:
 def test_track_header_visibility_icon_color() -> None:
     line_height = 17
     enabled = render_glyph(
-        VISIBILITY_GLYPH, color=CONFIG_HEADER_TEXT, line_height=line_height
+        VISIBILITY_GLYPH, color=VALUE, line_height=line_height
     )
     disabled = render_glyph(
-        VISIBILITY_OFF_GLYPH, color=TEXT_DIM, line_height=line_height
+        VISIBILITY_OFF_GLYPH, color=DISABLED, line_height=line_height
     )
     assert enabled.get_width() > 0
     assert disabled.get_width() > 0
@@ -1225,13 +1224,13 @@ def test_move_mode_colors_focused_track_header() -> None:
 
     view = controls.build_view_state(paused=False)
     child_row = header_row + 1
-    assert _row_text_color(view, header_row) == MOVE_MODE
+    assert _row_value_color(view, header_row) == MOVE_MODE
     assert _row_bg_color(view, header_row) == MOVE_MODE
-    assert _row_text_color(view, child_row) == MOVE_MODE
+    assert _row_value_color(view, child_row) == MOVE_MODE
     assert _row_bg_color(view, child_row) == MOVE_MODE
 
 
-def test_row_text_color_dim_for_focused_empty_preset() -> None:
+def test_row_value_color_dim_for_focused_empty_preset() -> None:
     state = TuningViewState(
         layer_z_order=("drums",),
         tracks={
@@ -1264,7 +1263,7 @@ def test_row_text_color_dim_for_focused_empty_preset() -> None:
         toast_message=state.toast_message,
         toast_remaining_sec=state.toast_remaining_sec,
     )
-    assert _row_text_color(state, preset_row) == TEXT_DIM
+    assert _row_value_color(state, preset_row) == DISABLED
     assert _row_bg_color(state, preset_row) == HIGHLIGHT
 
 
@@ -1410,7 +1409,7 @@ def test_locked_header_still_expands() -> None:
     assert preset_dir_row in visible_row_indices(view)
 
 
-def test_locked_sub_rows_dimmed() -> None:
+def test_locked_sub_rows_use_locked_color() -> None:
     controls = _make_controls(("drums",))
     controls.session.layers["drums"].locked = True
     controls.session.layers["drums"].expanded = True
@@ -1431,8 +1430,8 @@ def test_locked_sub_rows_dimmed() -> None:
         confirm_message=view.confirm_message,
         confirm_focus_yes=view.confirm_focus_yes,
     )
-    assert _row_text_color(unfocused, header_row) == TEXT
-    assert _row_text_color(unfocused, preset_dir_row) == LOCK_TEXT
+    assert _row_value_color(unfocused, header_row) == VALUE
+    assert _row_value_color(unfocused, preset_dir_row) == LOCKED
 
     focused_header = TuningViewState(
         layer_z_order=view.layer_z_order,
@@ -1448,8 +1447,8 @@ def test_locked_sub_rows_dimmed() -> None:
         confirm_message=view.confirm_message,
         confirm_focus_yes=view.confirm_focus_yes,
     )
-    assert _row_text_color(focused_header, header_row) == HIGHLIGHT
-    assert _row_text_color(focused_header, preset_dir_row) == LOCK_TEXT
+    assert _row_value_color(focused_header, header_row) == HIGHLIGHT
+    assert _row_value_color(focused_header, preset_dir_row) == LOCKED
 
 
 def test_locked_not_toggleable_during_move_mode() -> None:
@@ -1634,7 +1633,7 @@ def main() -> int:
         test_track_preset_dir_in_repeat_row_kinds,
         test_ctrl_preset_steps_by_ten_wrapping,
         test_empty_playlist_view_state,
-        test_row_text_color_dim_for_focused_empty_preset,
+        test_row_value_color_dim_for_focused_empty_preset,
         test_preset_overlay_shows_directory_and_position,
         test_scan_file_anchor_builds_parent_directory_playlist,
         test_ctrl_quick_nav_blocked_during_move_mode,
@@ -1643,7 +1642,7 @@ def main() -> int:
         test_locked_blocks_enable_disable,
         test_locked_blocks_move_mode,
         test_locked_header_still_expands,
-        test_locked_sub_rows_dimmed,
+        test_locked_sub_rows_use_locked_color,
         test_locked_not_toggleable_during_move_mode,
     ]
     for test in tests:

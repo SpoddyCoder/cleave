@@ -2,8 +2,8 @@
 """Preview Material Icons used by the live tuning overlay.
 
 Renders folder, file, lock, visibility, and transport (playing/paused) glyphs at
-overlay line height, saves magnified PNG previews, and prints surface dimensions
-and opaque pixel counts.
+overlay line height using production theme constants, saves magnified PNG previews,
+and prints surface dimensions and opaque pixel counts.
 
 Usage:
     python scripts/material_icon_probe.py
@@ -31,7 +31,7 @@ from cleave.viz_material_icons import (
     render_glyph,
     render_transport_icons,
 )
-from cleave.viz_theme import LOCK_ICON, PRESET_FILE_ICON, PRESET_ICON, CONFIG_HEADER_TEXT
+from cleave.viz_theme import DISABLED, LOCK_ICON, PRESET_FILE_ICON, PRESET_ICON, VALUE
 
 _LINE_HEIGHT = 17
 _COLOR = (255, 255, 255)
@@ -87,10 +87,10 @@ def main() -> int:
     file_icon = render_glyph(FILE_GLYPH, color=PRESET_FILE_ICON, line_height=_LINE_HEIGHT)
     lock_icon = render_glyph(LOCK_GLYPH, color=LOCK_ICON, line_height=_LINE_HEIGHT)
     visibility = render_glyph(
-        VISIBILITY_GLYPH, color=CONFIG_HEADER_TEXT, line_height=_LINE_HEIGHT
+        VISIBILITY_GLYPH, color=VALUE, line_height=_LINE_HEIGHT
     )
     visibility_off = render_glyph(
-        VISIBILITY_OFF_GLYPH, color=CONFIG_HEADER_TEXT, line_height=_LINE_HEIGHT
+        VISIBILITY_OFF_GLYPH, color=DISABLED, line_height=_LINE_HEIGHT
     )
     playing = render_transport_icons(color=_COLOR, line_height=_LINE_HEIGHT, paused=False)
     paused = render_transport_icons(color=_COLOR, line_height=_LINE_HEIGHT, paused=True)
