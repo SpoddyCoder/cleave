@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Preview drawn transport icons without launching the visualizer.
+"""Preview Material Icons used by the live tuning overlay.
 
-Renders playing and paused transport rows at overlay line height, saves
-magnified PNG previews, and prints surface dimensions and opaque pixel counts.
+Renders folder, file, and transport (playing/paused) glyphs at overlay line
+height, saves magnified PNG previews, and prints surface dimensions and opaque
+pixel counts.
 
 Usage:
-    python scripts/transport_icon_probe.py
-    python scripts/transport_icon_probe.py --out /tmp/transport-icons
+    python scripts/material_icon_probe.py
+    python scripts/material_icon_probe.py --out /tmp/material-icon-probe
 """
 
 from __future__ import annotations
@@ -21,7 +22,13 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from cleave.viz_transport_icons import render_transport_icons
+from cleave.viz_material_icons import (
+    FILE_GLYPH,
+    FOLDER_GLYPH,
+    render_glyph,
+    render_transport_icons,
+)
+from cleave.viz_theme import PRESET_FILE_ICON, PRESET_ICON
 
 _LINE_HEIGHT = 17
 _COLOR = (255, 255, 255)
@@ -64,8 +71,8 @@ def main() -> int:
     parser.add_argument(
         "--out",
         type=Path,
-        default=Path("transport-icon-probe"),
-        help="Directory for PNG previews (default: ./transport-icon-probe)",
+        default=Path("material-icon-probe"),
+        help="Directory for PNG previews (default: ./material-icon-probe)",
     )
     args = parser.parse_args()
     out_dir: Path = args.out
@@ -73,15 +80,25 @@ def main() -> int:
 
     pygame.init()
 
+    folder = render_glyph(FOLDER_GLYPH, color=PRESET_ICON, line_height=_LINE_HEIGHT)
+    file_icon = render_glyph(FILE_GLYPH, color=PRESET_FILE_ICON, line_height=_LINE_HEIGHT)
     playing = render_transport_icons(color=_COLOR, line_height=_LINE_HEIGHT, paused=False)
     paused = render_transport_icons(color=_COLOR, line_height=_LINE_HEIGHT, paused=True)
 
-    for label, surf in (("playing", playing), ("paused", paused)):
+    previews = (
+        ("folder", folder),
+        ("file", file_icon),
+        ("transport-playing", playing),
+        ("transport-paused", paused),
+    )
+    for label, surf in previews:
         w, h = surf.get_size()
         print(f"{label}: size={w}x{h} opaque={_opaque_count(surf)}")
 
-    pygame.image.save(_preview_png(playing), out_dir / "row-playing.png")
-    pygame.image.save(_preview_png(paused), out_dir / "row-paused.png")
+    pygame.image.save(_preview_png(folder), out_dir / "folder.png")
+    pygame.image.save(_preview_png(file_icon), out_dir / "file.png")
+    pygame.image.save(_preview_png(playing), out_dir / "transport-playing.png")
+    pygame.image.save(_preview_png(paused), out_dir / "transport-paused.png")
     pygame.image.save(_magnified_png(playing), out_dir / "playing.png")
     pygame.image.save(_magnified_png(paused), out_dir / "paused.png")
     return 0

@@ -8,6 +8,8 @@ BORDER_COLOR: tuple[int, int, int] = (255, 255, 255)
 TEXT: tuple[int, int, int] = (255, 255, 255)
 TEXT_DIM: tuple[int, int, int] = (140, 140, 140)
 HIGHLIGHT: tuple[int, int, int] = (255, 165, 0)
+PRESET_ICON: tuple[int, int, int] = (255, 195, 90)
+PRESET_FILE_ICON: tuple[int, int, int] = (255, 250, 235)
 MOVE_MODE: tuple[int, int, int] = (60, 120, 255)
 
 BORDER_WIDTH: int = 2
