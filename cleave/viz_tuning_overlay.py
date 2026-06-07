@@ -320,7 +320,8 @@ def _row_text(state: TuningViewState, index: int) -> str:
     block = state.tracks[stem]
     if kind == RowKind.TRACK_HEADER:
         layer_num = state.layer_z_order.index(stem) + 1
-        return f"Layer {layer_num}: {stem.upper()}"
+        arrow = "▼" if block.expanded else "▶"
+        return f"Layer {layer_num}: {stem.upper()} {arrow}"
     if kind == RowKind.TRACK_PRESET_DIR:
         return block.preset_dir_label
     if kind == RowKind.TRACK_PRESET:
@@ -421,6 +422,11 @@ def _track_header_layer_prefix(state: TuningViewState, index: int) -> str:
     return f"Layer {layer_num}: "
 
 
+def _track_header_expand_suffix(expanded: bool) -> str:
+    arrow = "▼" if expanded else "▶"
+    return f" {arrow}"
+
+
 def _fit_track_header_stem(
     font: pygame.font.Font,
     state: TuningViewState,
@@ -430,10 +436,12 @@ def _fit_track_header_stem(
 ) -> str:
     stem = row_stem(state, index)
     assert stem is not None
-    locked = state.tracks[stem].locked
+    block = state.tracks[stem]
+    locked = block.locked
     budget = max_content_width - _row_indent(state, index)
     budget -= visibility_icon_prefix_width(font.get_linesize())
     budget -= font.size(_track_header_layer_prefix(state, index))[0]
+    budget -= font.size(_track_header_expand_suffix(block.expanded))[0]
     if locked:
         budget -= track_header_lock_suffix_width(font.get_linesize())
     return fit_text_to_width(font, stem.upper(), budget)
@@ -445,23 +453,35 @@ def _render_track_header_label(
     layer_prefix: str,
     stem_text: str,
     stem_color: tuple[int, int, int],
+    expanded: bool,
     locked: bool,
     line_height: int,
 ) -> pygame.Surface:
+    arrow = _track_header_expand_suffix(expanded)
+    prefix_surf = font.render(layer_prefix, True, CONFIG_HEADER_TEXT)
+    stem_surf = font.render(stem_text, True, stem_color)
+    arrow_surf = font.render(arrow, True, CONFIG_HEADER_TEXT)
     lock_surf = (
         render_glyph(LOCK_GLYPH, color=LOCK_ICON, line_height=line_height)
         if locked
         else None
     )
-    return _render_two_tone_label(
-        font,
-        prefix=layer_prefix,
-        value=stem_text,
-        value_color=stem_color,
-        line_height=line_height,
-        suffix_surf=lock_surf,
-        suffix_gap=ROW_ICON_SUFFIX_GAP,
-    )
+
+    label_w = prefix_surf.get_width() + stem_surf.get_width() + arrow_surf.get_width()
+    if lock_surf is not None:
+        label_w += ROW_ICON_SUFFIX_GAP + lock_surf.get_width()
+
+    label_surf = pygame.Surface((label_w, line_height), pygame.SRCALPHA)
+    x = 0
+    label_surf.blit(prefix_surf, (x, 0))
+    x += prefix_surf.get_width()
+    label_surf.blit(stem_surf, (x, 0))
+    x += stem_surf.get_width()
+    label_surf.blit(arrow_surf, (x, 0))
+    if lock_surf is not None:
+        x += arrow_surf.get_width() + ROW_ICON_SUFFIX_GAP
+        label_surf.blit(lock_surf, (x, 0))
+    return label_surf
 
 
 def fit_row_text(
@@ -483,8 +503,15 @@ def fit_row_text(
             return fit_path_label_to_width(font, text, budget - icon_w)
         return fit_counter_label_to_width(font, text, budget - icon_w)
     if kind == RowKind.TRACK_HEADER:
-        return _track_header_layer_prefix(state, index) + _fit_track_header_stem(
-            font, state, index, max_content_width=max_content_width
+        stem = row_stem(state, index)
+        assert stem is not None
+        expanded = state.tracks[stem].expanded
+        return (
+            _track_header_layer_prefix(state, index)
+            + _fit_track_header_stem(
+                font, state, index, max_content_width=max_content_width
+            )
+            + _track_header_expand_suffix(expanded)
         )
     if kind in _LABELED_SUB_ROW_KINDS:
         return _labeled_sub_row_prefix(state, index) + _fit_labeled_sub_row_value(
@@ -675,16 +702,18 @@ class TuningOverlay:
                 locked = block.locked if block is not None else False
                 vis_icon = render_glyph(
                     VISIBILITY_GLYPH if enabled else VISIBILITY_OFF_GLYPH,
-                    color=CONFIG_HEADER_TEXT,
+                    color=CONFIG_HEADER_TEXT if enabled else TEXT_DIM,
                     line_height=line_h,
                 )
                 layer_prefix = _track_header_layer_prefix(state, index)
                 stem_text = _fit_track_header_stem(font, state, index)
+                expanded = block.expanded if block is not None else True
                 label_surf = _render_track_header_label(
                     font,
                     layer_prefix=layer_prefix,
                     stem_text=stem_text,
                     stem_color=color,
+                    expanded=expanded,
                     locked=locked,
                     line_height=line_h,
                 )
