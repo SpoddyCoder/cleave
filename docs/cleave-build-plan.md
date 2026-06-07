@@ -190,7 +190,7 @@ By this point you have a working layered system you understand. Milkdrop becomes
 
 **5.6.2 — Per-layer tuning**
 - Directory row: path relative to `preset_root` with `(N/TOTAL)` among sibling dirs (presets in subtree, hidden excluded); Left/Right previous/next sibling (wraps); Enter or Ctrl+Right descends to first alphabetical child with presets; Backspace or Ctrl+Left goes to parent (no-op at `preset_root`; sibling listing never scans above `preset_root`)
-- Filename row: Left/Right previous/next `.milk` in current directory only (wraps); Ctrl+Left/Right ±10 presets in directory (wraps); empty dir shows `NO PRESETS FOUND` (dim), L/R no-op
+- Filename row: Left/Right previous/next `.milk` in current directory only (wraps); Ctrl+Left/Right ±10 presets in directory (wraps); empty dir shows `NO PRESETS FOUND` (`DISABLED`), L/R no-op
 - Blend mode: cycle per-layer blend modes in fixed order (`alpha`, `add`, `multiply`, `screen`, `subtract`, `difference`, `exclusion`, `max`, `pure-add`; see README); stored as `layers.*.blend_mode` in config
 - Opacity: 1% steps (10% with Ctrl); 0% disables the layer
 - Beat sensitivity: 0.01 steps (0.1 with Ctrl)
@@ -202,7 +202,7 @@ By this point you have a working layered system you understand. Milkdrop becomes
 **5.6.4 — Layer lock**
 - Ctrl+Enter on track header toggles lock; red padlock icon when locked
 - `layers.*.locked` (bool, default false) in config; persisted in snapshots
-- Locked header blocks enable/disable (Ctrl+Left/Right) and move mode (Enter); expanded sub-rows are skipped in navigation and dimmed; Left/Right expand/collapse still works
+- Locked header blocks enable/disable (Ctrl+Left/Right) and move mode (Enter); expanded sub-rows are skipped in navigation and drawn `LOCKED`; Left/Right expand/collapse still works
 
 **5.6.5 — Footer rows (transport and save)**
 - Transport row: Left/Right seek ±10s (±30s with Ctrl); Material Icons transport controls (skip / play-pause / skip)

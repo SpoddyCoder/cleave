@@ -1,4 +1,8 @@
-"""Live tuning tree overlay for Milkdrop visualizer."""
+"""Live tuning tree overlay for Milkdrop visualizer.
+
+Row typography: LABEL prefixes, VALUE defaults, DISABLED/LOCKED state overrides.
+See cleave/viz_theme.py and .cursor/rules/live-tuning-ui.mdc.
+"""
 
 from __future__ import annotations
 
@@ -33,18 +37,18 @@ from cleave.viz_theme import (
     BACKGROUND_ALPHA,
     BORDER_COLOR,
     BORDER_WIDTH,
+    DISABLED,
     FADE_DURATION_SEC,
-    CONFIG_HEADER_TEXT,
     HIGHLIGHT,
     HOLD_IDLE_SEC,
-    PRESET_FILE_ICON,
-    PRESET_ICON,
+    LABEL,
+    LOCKED,
     LOCK_ICON,
-    LOCK_TEXT,
     MOVE_MODE,
     PANEL_CONTENT_MAX_WIDTH,
-    TEXT,
-    TEXT_DIM,
+    PRESET_FILE_ICON,
+    PRESET_ICON,
+    VALUE,
 )
 
 Anchor = Literal["topleft", "bottomleft"]
@@ -388,7 +392,7 @@ def _fit_labeled_sub_row_value(
     return fit_text_to_width(font, _labeled_sub_row_value(state, index), budget)
 
 
-def _render_two_tone_label(
+def _render_label_value_row(
     font: pygame.font.Font,
     *,
     prefix: str,
@@ -398,7 +402,7 @@ def _render_two_tone_label(
     suffix_surf: pygame.Surface | None = None,
     suffix_gap: int = 0,
 ) -> pygame.Surface:
-    prefix_surf = font.render(prefix, True, CONFIG_HEADER_TEXT)
+    prefix_surf = font.render(prefix, True, LABEL)
     value_surf = font.render(value, True, value_color)
     label_w = prefix_surf.get_width() + value_surf.get_width()
     if suffix_surf is not None:
@@ -427,6 +431,14 @@ def _track_header_expand_suffix(expanded: bool) -> str:
     return f" {arrow}"
 
 
+def _effects_header_prefix() -> str:
+    return "└─ cleave effects "
+
+
+def _effects_header_expand_value(expanded: bool) -> str:
+    return "▼" if expanded else "▶"
+
+
 def _fit_track_header_stem(
     font: pygame.font.Font,
     state: TuningViewState,
@@ -452,15 +464,15 @@ def _render_track_header_label(
     *,
     layer_prefix: str,
     stem_text: str,
-    stem_color: tuple[int, int, int],
+    value_color: tuple[int, int, int],
     expanded: bool,
     locked: bool,
     line_height: int,
 ) -> pygame.Surface:
     arrow = _track_header_expand_suffix(expanded)
-    prefix_surf = font.render(layer_prefix, True, CONFIG_HEADER_TEXT)
-    stem_surf = font.render(stem_text, True, stem_color)
-    arrow_surf = font.render(arrow, True, CONFIG_HEADER_TEXT)
+    prefix_surf = font.render(layer_prefix, True, LABEL)
+    stem_surf = font.render(stem_text, True, value_color)
+    arrow_surf = font.render(arrow, True, value_color)
     lock_surf = (
         render_glyph(LOCK_GLYPH, color=LOCK_ICON, line_height=line_height)
         if locked
@@ -542,21 +554,19 @@ def _track_disabled(state: TuningViewState, stem: str) -> bool:
     return not state.tracks[stem].enabled
 
 
-def _row_text_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
+def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
+    """Return the VALUE-role color for a row (before label/value split rendering)."""
     kind = row_kind(state, index)
     stem = row_stem(state, index)
     if kind == RowKind.CONFIG_HEADER:
-        return CONFIG_HEADER_TEXT
-
-    if kind == RowKind.TRACK_EFFECTS_HEADER:
-        return CONFIG_HEADER_TEXT
+        return LABEL
 
     if (
         kind == RowKind.TRACK_PRESET
         and stem is not None
         and state.tracks[stem].preset_empty
     ):
-        return TEXT_DIM
+        return DISABLED
 
     if stem is not None and state.move_mode_stem == stem:
         return MOVE_MODE
@@ -565,16 +575,16 @@ def _row_text_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
         return HIGHLIGHT
 
     if stem is not None and _track_disabled(state, stem):
-        return TEXT_DIM
+        return DISABLED
 
     if (
         stem is not None
         and state.tracks[stem].locked
         and kind in _SUB_ROW_KINDS
     ):
-        return LOCK_TEXT
+        return LOCKED
 
-    return TEXT
+    return VALUE
 
 
 def _row_bg_color(state: TuningViewState, index: int) -> tuple[int, int, int] | None:
@@ -680,7 +690,7 @@ class TuningOverlay:
         for index in visible_indices:
             kind = row_kind(state, index)
             indent = self._padding + _row_indent(state, index)
-            color = _row_text_color(state, index)
+            color = _row_value_color(state, index)
 
             if kind == RowKind.TRANSPORT:
                 icons_surf = render_transport_icons(
@@ -702,7 +712,7 @@ class TuningOverlay:
                 locked = block.locked if block is not None else False
                 vis_icon = render_glyph(
                     VISIBILITY_GLYPH if enabled else VISIBILITY_OFF_GLYPH,
-                    color=CONFIG_HEADER_TEXT if enabled else TEXT_DIM,
+                    color=VALUE if enabled else DISABLED,
                     line_height=line_h,
                 )
                 layer_prefix = _track_header_layer_prefix(state, index)
@@ -712,7 +722,7 @@ class TuningOverlay:
                     font,
                     layer_prefix=layer_prefix,
                     stem_text=stem_text,
-                    stem_color=color,
+                    value_color=color,
                     expanded=expanded,
                     locked=locked,
                     line_height=line_h,
@@ -741,10 +751,24 @@ class TuningOverlay:
                 row_widths.append(
                     indent + icon_surf.get_width() + label_surf.get_width()
                 )
+            elif kind == RowKind.TRACK_EFFECTS_HEADER:
+                stem = row_stem(state, index)
+                assert stem is not None
+                block = state.tracks[stem]
+                surf = _render_label_value_row(
+                    font,
+                    prefix=_effects_header_prefix(),
+                    value=_effects_header_expand_value(block.effects_expanded),
+                    value_color=color,
+                    line_height=line_h,
+                )
+                row_surfaces.append(surf)
+                row_time_surfaces.append(None)
+                row_widths.append(indent + surf.get_width())
             elif kind in _LABELED_SUB_ROW_KINDS:
                 prefix = _labeled_sub_row_prefix(state, index)
                 value = _fit_labeled_sub_row_value(font, state, index)
-                surf = _render_two_tone_label(
+                surf = _render_label_value_row(
                     font,
                     prefix=prefix,
                     value=value,
@@ -767,7 +791,7 @@ class TuningOverlay:
             toast_text = fit_text_to_width(
                 font, state.toast_message, PANEL_CONTENT_MAX_WIDTH
             )
-            toast_surf = font.render(toast_text, True, TEXT_DIM)
+            toast_surf = font.render(toast_text, True, DISABLED)
 
         confirm_h = 0
         confirm_w = 0

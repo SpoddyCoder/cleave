@@ -1,5 +1,5 @@
 ---
-description: Live tuning overlay layout terms (track rows, footer rows) for viz UI work
+description: Live tuning overlay layout and typography for viz UI work
 globs: cleave/viz_tuning*.py,cleave/viz_confirm.py,cleave/viz_theme.py,scripts/milkdrop_visualizer.py,tests/test_viz_tuning*.py,docs/cleave-build-plan.md,README.md
 alwaysApply: false
 ---
@@ -17,7 +17,7 @@ The upper block: all rows where `index < track_row_count(state)` (`track_row_cou
 - **Effect sub-rows** (`RowKind.TRACK_EFFECT`): one per entry in [cleave/effects/registry.py](cleave/effects/registry.py) for that stem; visible only when both the track block and `TrackBlock.effects_expanded` are expanded.
 - Per-stem state: `TrackBlock` in `TuningViewState.tracks` (`effects`, `effects_expanded`, plus preset/blend/opacity/beat fields).
 - On-screen header label: `Layer N: STEM` (user-facing "layer"; code often says "track").
-- **cleave effects** header: lowercase label `└─ cleave effects`, light blue `CONFIG_HEADER_TEXT` `(170, 210, 255)` from [cleave/viz_theme.py](cleave/viz_theme.py); collapsed by default; sits after beat sensitivity; Left/Right toggles `effects_expanded`.
+- **cleave effects** header: lowercase label `└─ cleave effects` plus expand arrow; collapsed by default; sits after beat sensitivity; Left/Right toggles `effects_expanded`.
 
 Say **track rows section** for the whole upper block; **track row** for a single line.
 
@@ -31,3 +31,41 @@ The lower block after a visual gap (`footer_gap` in `draw()`): `footer_row_count
 ## Whole panel
 
 `TuningOverlay` draws one panel (`panel_rect`). There are no separate section rectangles; layout is positional from the track-rows / footer-rows split.
+
+## Typography roles
+
+Colors live in [cleave/viz_theme.py](cleave/viz_theme.py). Row drawing uses `_row_value_color` and `_render_label_value_row`.
+
+| Role | Constant | RGB | Use |
+| --- | --- | --- | --- |
+| Label | `LABEL` | `(170, 210, 255)` | Light blue prefixes and section titles |
+| Value | `VALUE` | `(255, 255, 255)` | Default white for values and state indicators |
+| Disabled | `DISABLED` | `(140, 140, 140)` | Inactive rows and controls |
+| Locked | `LOCKED` | `(235, 150, 150)` | Locked sub-rows that cannot be edited |
+
+**Label + value rows** (`_render_label_value_row`): prefix in `LABEL`, value in the row value color. Applies to blend, opacity, beat, effect depth rows, cleave effects header (label + expand arrow), and track headers (`Layer N:` in `LABEL`; stem name and expand arrow in row value color).
+
+**Expand arrows** (`▶` / `▼`): value role, not label. Drawn in the row value color (typically `VALUE`; follows focus, disabled, and locked state like other values).
+
+**Visibility eye** (track header): `VALUE` when enabled, `DISABLED` when off.
+
+### Accent colors (not label/value roles)
+
+| Constant | Use |
+| --- | --- |
+| `HIGHLIGHT` | Focused row text and background tint |
+| `MOVE_MODE` | Z-order move mode text and background tint |
+| `LOCK_ICON` | Red padlock glyph on locked track headers |
+| `PRESET_ICON` / `PRESET_FILE_ICON` | Folder and file glyphs on preset rows |
+
+### Intentional exceptions
+
+These rows do not split label and value; the implementation is deliberate:
+
+- **Active config path** (`CONFIG_HEADER`): entire row drawn in `LABEL`.
+- **Preset dir / preset filename**: single-color row text plus Material Icons (icon colors above).
+- **Transport, save, overwrite**: single-color footer rows in row value color.
+- **Toasts**: `DISABLED`.
+- **Confirm dialog** ([cleave/viz_confirm.py](cleave/viz_confirm.py)): message in `VALUE`; yes/no use `HIGHLIGHT` or `DISABLED` by focus.
+
+When focus, move mode, disabled layer, locked sub-row, or empty preset applies, `_row_value_color` may return an accent or state color instead of `VALUE`. That override is expected.
