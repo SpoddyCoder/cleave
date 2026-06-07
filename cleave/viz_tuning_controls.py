@@ -175,7 +175,10 @@ class TuningControls:
             view = self.build_view_state(paused=self.playback.paused)
             kind = row_kind(view, self.focus_index)
             self._apply_horizontal(event.key, event.mod, kind)
-            if kind in _REPEAT_ROW_KINDS:
+            repeat = kind in _REPEAT_ROW_KINDS
+            if repeat and kind == RowKind.TRACK_PRESET_DIR and mod_ctrl(event.mod):
+                repeat = False
+            if repeat:
                 self._key_repeat.on_keydown(
                     event.key,
                     event.mod,
@@ -352,6 +355,12 @@ class TuningControls:
             self._set_expanded(stem, forward)
         elif kind == RowKind.TRACK_PRESET_DIR:
             if stem is None:
+                return
+            if ctrl:
+                if forward:
+                    self._enter_directory(stem)
+                else:
+                    self._parent_directory(stem)
                 return
             self._step_directory(stem, forward=forward)
         elif kind == RowKind.TRACK_PRESET:

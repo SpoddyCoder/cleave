@@ -422,7 +422,8 @@ def test_config_header_truncates_long_paths() -> None:
     )
     font = _overlay_font()
     label = fit_row_text(font, view, header_row)
-    assert font.size(label)[0] <= PANEL_CONTENT_MAX_WIDTH
+    icon_budget = row_icon_prefix_width(font.get_linesize())
+    assert font.size(label)[0] + icon_budget <= PANEL_CONTENT_MAX_WIDTH
     assert label.startswith("…")
     assert "…/" not in label
 
@@ -494,9 +495,9 @@ def test_fit_row_text_config_and_preset_share_panel_width() -> None:
     font = _overlay_font()
     config_label = fit_row_text(font, view, header_row)
     preset_label = fit_row_text(font, view, preset_row)
-    assert font.size(config_label)[0] + 0 <= PANEL_CONTENT_MAX_WIDTH
-    icon_budget = TREE_INDENT + row_icon_prefix_width(font.get_linesize())
-    assert font.size(preset_label)[0] + icon_budget <= PANEL_CONTENT_MAX_WIDTH
+    icon_budget = row_icon_prefix_width(font.get_linesize())
+    assert font.size(config_label)[0] + icon_budget <= PANEL_CONTENT_MAX_WIDTH
+    assert font.size(preset_label)[0] + TREE_INDENT + icon_budget <= PANEL_CONTENT_MAX_WIDTH
 
 
 def test_save_as_new_updates_active_config_path() -> None:
@@ -979,6 +980,50 @@ def test_directory_enter_descends_backspace_goes_parent() -> None:
     assert playlist.current_dir.resolve() == siblings[0].resolve()
 
 
+def test_directory_ctrl_arrows_descend_and_ascend() -> None:
+    root, siblings = _make_sibling_dir_tree(2)
+    controls = _controls_with_playlist(root, siblings[0])
+    controls.focus_index = _preset_dir_row(controls)
+    playlist = controls.session.layers["drums"].playlist
+    child = siblings[0] / "child"
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert playlist.current_dir.resolve() == child.resolve()
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert playlist.current_dir.resolve() == siblings[0].resolve()
+
+
+def test_ctrl_left_at_browse_floor_is_noop() -> None:
+    root, siblings = _make_sibling_dir_tree(2)
+    controls = _controls_with_playlist(root, siblings[0])
+    controls.focus_index = _preset_dir_row(controls)
+    playlist = controls.session.layers["drums"].playlist
+
+    assert playlist.current_dir.resolve() == siblings[0].resolve()
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert playlist.current_dir.resolve() == siblings[0].resolve()
+
+
+def test_directory_ctrl_arrows_do_not_repeat_parent_climb() -> None:
+    root, siblings = _make_sibling_dir_tree(2)
+    controls = _controls_with_playlist(root, siblings[0])
+    controls.focus_index = _preset_dir_row(controls)
+    playlist = controls.session.layers["drums"].playlist
+    child = siblings[0] / "child"
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert playlist.current_dir.resolve() == child.resolve()
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert playlist.current_dir.resolve() == siblings[0].resolve()
+
+    for _ in range(20):
+        controls.tick(0.5)
+    assert playlist.current_dir.resolve() == siblings[0].resolve()
+
+
 def test_backspace_at_browse_floor_is_noop() -> None:
     root, siblings = _make_sibling_dir_tree(2)
     controls = _controls_with_playlist(root, siblings[0])
@@ -1229,6 +1274,9 @@ def main() -> int:
         test_ctrl_quick_nav_does_not_affect_normal_up_down,
         test_directory_row_lr_changes_current_dir,
         test_directory_enter_descends_backspace_goes_parent,
+        test_directory_ctrl_arrows_descend_and_ascend,
+        test_ctrl_left_at_browse_floor_is_noop,
+        test_directory_ctrl_arrows_do_not_repeat_parent_climb,
         test_backspace_at_browse_floor_is_noop,
         test_preset_lr_noop_when_paths_empty,
         test_track_preset_dir_in_repeat_row_kinds,
