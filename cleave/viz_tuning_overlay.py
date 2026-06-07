@@ -15,6 +15,7 @@ from cleave.viz_overlay import (
     fit_text_to_width,
 )
 from cleave.viz_playback import format_mmss
+from cleave.viz_transport_icons import render_transport_icons
 from cleave.viz_theme import (
     BACKGROUND,
     BACKGROUND_ALPHA,
@@ -36,20 +37,6 @@ FOOTER_ROWS_WITH_OVERWRITE = 4
 FOOTER_ROWS_WITHOUT_OVERWRITE = 3
 TREE_INDENT = 16
 _TREE_PREFIX = "└─ "
-_TRANSPORT_SKIP_UNICODE = ("⏮", "⏭")
-_TRANSPORT_SKIP_ASCII = ("<<", ">>")
-_TRANSPORT_PLAY_UNICODE = ("▶", "⏸")
-_TRANSPORT_PLAY_ASCII = (">", "||")
-_TRANSPORT_FONT_CANDIDATES = (
-    "DejaVu Sans",
-    "Noto Sans",
-    "Liberation Sans",
-    "FreeSans",
-    "Arial Unicode MS",
-    "sans",
-    "monospace",
-)
-_transport_font_cache: dict[int, pygame.font.Font | None] = {}
 
 
 class RowKind(Enum):
@@ -261,95 +248,6 @@ def _track_disabled(state: TuningViewState, stem: str) -> bool:
     return not state.tracks[stem].enabled
 
 
-def _glyph_renders_real_shape(font: pygame.font.Font, ch: str) -> bool:
-    """True when ch renders a visible glyph, not a hollow missing-glyph box."""
-    ref_px = pygame.mask.from_surface(font.render("A", True, (255, 255, 255))).count()
-    min_px = max(8, int(ref_px * 0.15))
-    min_width = max(6, int(font.get_height() * 0.35))
-    surf = font.render(ch, True, (255, 255, 255))
-    if surf.get_width() == 0 or surf.get_height() == 0:
-        return False
-    if surf.get_width() < min_width:
-        return False
-
-    width, height = surf.get_size()
-    opaque = 0
-    interior_opaque = 0
-    for y in range(height):
-        for x in range(width):
-            if surf.get_at((x, y))[3] > 128:
-                opaque += 1
-                if 1 < x < width - 2 and 2 < y < height - 3:
-                    interior_opaque += 1
-    if opaque < min_px:
-        return False
-    if opaque >= 10 and interior_opaque / opaque < 0.35:
-        return False
-    return True
-
-
-def _resolve_transport_font(size: int) -> pygame.font.Font | None:
-    for name in _TRANSPORT_FONT_CANDIDATES:
-        font = pygame.font.SysFont(name, size)
-        if _glyph_renders_real_shape(font, _TRANSPORT_PLAY_UNICODE[0]):
-            return font
-    return None
-
-
-def _resolve_skip_icon(font: pygame.font.Font | None, *, prev: bool) -> str:
-    ascii_icon = _TRANSPORT_SKIP_ASCII[0 if prev else 1]
-    if font is None:
-        return ascii_icon
-    ch = _TRANSPORT_SKIP_UNICODE[0 if prev else 1]
-    if _glyph_renders_real_shape(font, ch):
-        return ch
-    return ascii_icon
-
-
-def _resolve_play_icon(font: pygame.font.Font | None) -> str:
-    if font is None:
-        return _TRANSPORT_PLAY_ASCII[0]
-    ch = _TRANSPORT_PLAY_UNICODE[0]
-    if _glyph_renders_real_shape(font, ch):
-        return ch
-    return _TRANSPORT_PLAY_ASCII[0]
-
-
-def _resolve_pause_icon(font: pygame.font.Font | None) -> str:
-    if font is None:
-        return _TRANSPORT_PLAY_ASCII[1]
-    ch = _TRANSPORT_PLAY_UNICODE[1]
-    if _glyph_renders_real_shape(font, ch):
-        return ch
-    return _TRANSPORT_PLAY_ASCII[1]
-
-
-def _resolve_transport_icons(
-    font_size: int,
-) -> tuple[str, str, str, str]:
-    """Return prev, play, pause, next icons (unicode or ASCII per glyph)."""
-    font = _get_transport_font(font_size)
-    if font is None:
-        prev, nxt = _TRANSPORT_SKIP_ASCII
-        play, pause = _TRANSPORT_PLAY_ASCII
-        return prev, play, pause, nxt
-    prev = _resolve_skip_icon(font, prev=True)
-    nxt = _resolve_skip_icon(font, prev=False)
-    play = _resolve_play_icon(font)
-    pause = _resolve_pause_icon(font)
-    return prev, play, pause, nxt
-
-
-def _get_transport_font(size: int) -> pygame.font.Font | None:
-    if size not in _transport_font_cache:
-        _transport_font_cache[size] = _resolve_transport_font(size)
-    return _transport_font_cache[size]
-
-
-def _unicode_transport_available(size: int = 14) -> bool:
-    return _get_transport_font(size) is not None
-
-
 def _row_text_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
     kind = row_kind(state, index)
     stem = row_stem(state, index)
@@ -406,7 +304,6 @@ class TuningOverlay:
         self._idle_sec = 0.0
         self._visibility = 1.0
         self._font: pygame.font.Font | None = None
-        self._transport_font: pygame.font.Font | None = None
         self._panel_rect: tuple[int, int, int, int] | None = None
         self._confirm = ConfirmDialog()
 
@@ -431,18 +328,6 @@ class TuningOverlay:
             self._font = pygame.font.SysFont("monospace", self._font_size)
         return self._font
 
-    def _transport_font_get(self) -> pygame.font.Font:
-        if self._transport_font is None:
-            resolved = _get_transport_font(self._font_size)
-            self._transport_font = resolved if resolved is not None else self._font_get()
-        return self._transport_font
-
-    @staticmethod
-    def _transport_icon_set(*, paused: bool, font_size: int = 14) -> tuple[str, str, str]:
-        prev, play, pause, nxt = _resolve_transport_icons(font_size)
-        center = pause if paused else play
-        return prev, center, nxt
-
     @property
     def panel_rect(self) -> tuple[int, int, int, int] | None:
         """Top-left x, y, width, height of the last drawn panel, if any."""
@@ -454,7 +339,6 @@ class TuningOverlay:
             return
 
         font = self._font_get()
-        transport_font = self._transport_font_get()
         line_h = font.get_linesize()
         visible_indices = visible_row_indices(state)
         visible_count = len(visible_indices)
@@ -475,13 +359,12 @@ class TuningOverlay:
             color = _row_text_color(state, index)
 
             if kind == RowKind.TRANSPORT:
-                prev, play, nxt = self._transport_icon_set(
+                icons_surf = render_transport_icons(
+                    color=color,
+                    line_height=line_h,
                     paused=state.paused,
-                    font_size=self._font_size,
                 )
-                icons_text = f"{prev}  {play}  {nxt}"
                 time_text = f" [{format_mmss(state.position_sec)}]"
-                icons_surf = transport_font.render(icons_text, True, color)
                 time_surf = font.render(time_text, True, color)
                 row_surfaces.append(icons_surf)
                 row_time_surfaces.append(time_surf)

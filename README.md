@@ -216,7 +216,7 @@ python scripts/milkdrop_visualizer.py stems/sights-and-sounds-26 \
 A focus-driven tree panel ([cleave/viz_tuning_overlay.py](cleave/viz_tuning_overlay.py), [cleave/viz_tuning_controls.py](cleave/viz_tuning_controls.py)) has two sections:
 
 - **Track rows section** (upper): one six-row block per stem (header, directory, filename, blend, opacity, beat). Headers show as `Layer N: STEM`.
-- **Footer rows section** (lower, separated by a gap): transport (seek icons and elapsed time), **SAVE AS NEW CONFIG**, and **OVERWRITE CONFIG** when the active config is not the repo-root template [cleave.config.yaml](cleave.config.yaml).
+- **Footer rows section** (lower, separated by a gap): transport (drawn transport controls (skip / play-pause / skip) and elapsed time), **SAVE AS NEW CONFIG**, and **OVERWRITE CONFIG** when the active config is not the repo-root template [cleave.config.yaml](cleave.config.yaml).
 
 Navigate with the arrow keys; the focused row is highlighted in orange. **SAVE AS NEW CONFIG** is always shown. **OVERWRITE CONFIG** is hidden only while the active config is the repo-root [cleave.config.yaml](cleave.config.yaml); it appears for any other active path, including after save-as-new updates the active config to a snapshot under [saved-cleave-configs/](saved-cleave-configs/).
 

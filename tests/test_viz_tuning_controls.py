@@ -35,14 +35,10 @@ from cleave.viz_theme import HIGHLIGHT, MOVE_MODE, PANEL_CONTENT_MAX_WIDTH, TEXT
 from cleave.viz_tuning_overlay import (
     RowKind,
     TrackBlock,
-    TuningOverlay,
     TuningViewState,
-    _glyph_renders_real_shape,
-    _resolve_transport_icons,
     _row_bg_color,
     _row_text,
     _row_text_color,
-    _unicode_transport_available,
     fit_row_text,
     navigable_row_indices,
     quick_nav_row_indices,
@@ -52,6 +48,7 @@ from cleave.viz_tuning_overlay import (
     row_visible,
     visible_row_indices,
 )
+from cleave.viz_transport_icons import render_transport_icons
 
 
 def _keydown(key: int, *, mod: int = 0) -> pygame.event.Event:
@@ -716,64 +713,32 @@ def test_q_alone_does_not_quit() -> None:
     assert controls.handle_keydown(_keydown(pygame.K_q)) is True
 
 
-def _skip_glyph_has_opaque_pixels(font: pygame.font.Font, ch: str) -> bool:
-    """Skip icons must render visible ink, not hollow missing-glyph boxes."""
-    ref_px = pygame.mask.from_surface(font.render("A", True, (255, 255, 255))).count()
-    min_px = max(8, int(ref_px * 0.15))
-    surf = font.render(ch, True, (255, 255, 255))
-    opaque = pygame.mask.from_surface(surf).count()
-    if opaque < min_px:
-        return False
-
-    width, height = surf.get_size()
-    interior_opaque = 0
-    for y in range(height):
-        for x in range(width):
-            if surf.get_at((x, y))[3] > 128 and 1 < x < width - 2 and 2 < y < height - 3:
-                interior_opaque += 1
-    return interior_opaque / opaque >= 0.35
+def test_transport_icons_render() -> None:
+    s = render_transport_icons(color=(255, 255, 255), line_height=17, paused=False)
+    assert s.get_width() > 0
+    assert s.get_height() == 17
+    assert pygame.mask.from_surface(s).count() > 50
 
 
-def test_transport_row_icons() -> None:
-    overlay = TuningOverlay()
-    font = overlay._transport_font_get()
-    prev_u, play_u, pause_u, nxt_u = _resolve_transport_icons(overlay._font_size)
+def test_transport_icons_play_vs_pause() -> None:
+    playing = render_transport_icons(color=(255, 255, 255), line_height=17, paused=False)
+    paused = render_transport_icons(color=(255, 255, 255), line_height=17, paused=True)
+    assert playing.get_width() == paused.get_width()
 
-    if _unicode_transport_available():
-        if _glyph_renders_real_shape(font, "▶"):
-            assert play_u == "▶"
-        else:
-            assert play_u == ">"
-        if _glyph_renders_real_shape(font, "⏸"):
-            assert pause_u == "⏸"
-        else:
-            assert pause_u == "||"
-        if _glyph_renders_real_shape(font, "⏮"):
-            assert prev_u == "⏮"
-        else:
-            assert prev_u == "<<"
-        if _glyph_renders_real_shape(font, "⏭"):
-            assert nxt_u == "⏭"
-        else:
-            assert nxt_u == ">>"
-    else:
-        assert (prev_u, play_u, pause_u, nxt_u) == ("<<", ">", "||", ">>")
-
-    prev, play, nxt = overlay._transport_icon_set(paused=False)
-    assert (prev, play, nxt) == (prev_u, play_u, nxt_u)
-    playing = font.render(f"{prev}  {play}  {nxt}", True, (255, 255, 255))
-    assert playing.get_width() > 0
-    assert _skip_glyph_has_opaque_pixels(font, prev)
-    assert _skip_glyph_has_opaque_pixels(font, play)
-    assert _skip_glyph_has_opaque_pixels(font, nxt)
-
-    prev, play, nxt = overlay._transport_icon_set(paused=True)
-    assert (prev, play, nxt) == (prev_u, pause_u, nxt_u)
-    paused = font.render(f"{prev}  {play}  {nxt}", True, (255, 255, 255))
-    assert paused.get_width() > 0
-    assert _skip_glyph_has_opaque_pixels(font, prev)
-    assert _skip_glyph_has_opaque_pixels(font, play)
-    assert _skip_glyph_has_opaque_pixels(font, nxt)
+    w, h = playing.get_size()
+    x0 = w // 3
+    x1 = 2 * w // 3
+    region_w = x1 - x0
+    play_middle = pygame.Surface((region_w, h), pygame.SRCALPHA)
+    pause_middle = pygame.Surface((region_w, h), pygame.SRCALPHA)
+    play_middle.blit(playing, (0, 0), (x0, 0, region_w, h))
+    pause_middle.blit(paused, (0, 0), (x0, 0, region_w, h))
+    play_mask = pygame.mask.from_surface(play_middle)
+    pause_mask = pygame.mask.from_surface(pause_middle)
+    assert play_mask.count() > 0
+    assert pause_mask.count() > 0
+    overlap_px = play_mask.overlap_area(pause_mask, (0, 0))
+    assert overlap_px < play_mask.count() or overlap_px < pause_mask.count()
 
 
 def test_transport_enter_toggles_pause() -> None:
@@ -1232,7 +1197,8 @@ def main() -> int:
         test_esc_during_confirm_does_not_quit,
         test_ctrl_q_requests_quit,
         test_q_alone_does_not_quit,
-        test_transport_row_icons,
+        test_transport_icons_render,
+        test_transport_icons_play_vs_pause,
         test_format_mmss,
         test_transport_enter_toggles_pause,
         test_space_toggles_pause_from_any_focus,
