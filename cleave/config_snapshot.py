@@ -8,7 +8,7 @@ from typing import Any
 
 import yaml
 
-from cleave.config import CleaveConfig, clamp_beat_sensitivity
+from cleave.config import CleaveConfig, clamp_beat_sensitivity, dump_yaml
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import to_config_relative
 from cleave.viz_tuning_controls import TuningSession
@@ -127,4 +127,4 @@ def write_session_snapshot(
 
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as fh:
-        yaml.safe_dump(data, fh, default_flow_style=False, sort_keys=False)
+        dump_yaml(data, fh)

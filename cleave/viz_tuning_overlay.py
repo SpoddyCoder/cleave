@@ -9,7 +9,7 @@ from typing import Literal
 import pygame
 
 from cleave.viz_confirm import ConfirmDialog
-from cleave.viz_overlay import truncate_preset_label
+from cleave.viz_overlay import truncate_counter_label
 from cleave.viz_playback import format_mmss
 from cleave.viz_theme import (
     BACKGROUND,
@@ -184,9 +184,9 @@ def _row_text(state: TuningViewState, index: int) -> str:
         status = "enabled" if block.enabled else "disabled"
         return f"Layer {layer_num}: {stem.upper()} ({status})"
     if kind == RowKind.TRACK_PRESET_DIR:
-        return f"└─ {truncate_preset_label(block.preset_dir_label)}"
+        return f"└─ {truncate_counter_label(block.preset_dir_label)}"
     if kind == RowKind.TRACK_PRESET:
-        return f"└─ {block.preset_label}"
+        return f"└─ {truncate_counter_label(block.preset_label)}"
     if kind == RowKind.TRACK_BLEND:
         return f"└─ blend mode: {block.blend_mode}"
     if kind == RowKind.TRACK_OPACITY:

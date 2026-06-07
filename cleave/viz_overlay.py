@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Literal
 
@@ -27,6 +28,9 @@ def _on_off(enabled: bool) -> str:
     return "ON" if enabled else "OFF"
 
 
+_COUNTER_SUFFIX = re.compile(r" \((\d+)/(\d+)\)$")
+
+
 def truncate_preset_label(label: str, max_len: int = LABEL_MAX_LEN) -> str:
     """Shorten a preset path for overlay; keep the tail (subdir + filename)."""
     if len(label) <= max_len:
@@ -38,6 +42,16 @@ def truncate_preset_label(label: str, max_len: int = LABEL_MAX_LEN) -> str:
     if slash_pos != -1:
         start = slash_pos + 1
     return prefix + label[start:]
+
+
+def truncate_counter_label(label: str, max_len: int = LABEL_MAX_LEN) -> str:
+    """Shorten a path or filename; preserve a trailing ``(N/TOTAL)`` counter."""
+    match = _COUNTER_SUFFIX.search(label)
+    if match is None:
+        return truncate_preset_label(label, max_len)
+    head = label[: match.start()]
+    suffix = match.group(0)
+    return truncate_preset_label(head, max_len) + suffix
 
 
 def format_layer_state(enabled: bool, preset_label: str | None = None) -> str:
