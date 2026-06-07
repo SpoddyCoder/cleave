@@ -1,4 +1,4 @@
-"""OpenGL FBO management and layer compositing for Phase 5 Milkdrop integration."""
+"""OpenGL FBO layer stack and black-key compositing for Phase 5 Milkdrop."""
 
 from __future__ import annotations
 
@@ -80,7 +80,7 @@ from OpenGL.GL import (
 )
 
 BlendMode = Literal[
-    "alpha",
+    "black-key",
     "add",
     "multiply",
     "screen",
@@ -92,7 +92,7 @@ BlendMode = Literal[
 ]
 
 BLEND_MODES: tuple[BlendMode, ...] = (
-    "alpha",
+    "black-key",
     "add",
     "multiply",
     "screen",
@@ -131,7 +131,7 @@ class LayerFbo:
     hue_mix: float = 0.0
     grit_strength: float = 0.0
     aberration_px: float = 0.0
-    blend_mode: BlendMode = "alpha"
+    blend_mode: BlendMode = "black-key"
 
     def bind(self) -> None:
         glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
@@ -159,7 +159,11 @@ class LayerFbo:
 
 
 class GlCompositor:
-    """Composite tiered layer FBO textures into the default framebuffer."""
+    """Stack tiered layer FBO textures into the default framebuffer.
+
+    Layer blend mode ``black-key`` treats each pixel's RGB as its compositing
+    weight (black is fully transparent). The tuning overlay uses SRCALPHA blending.
+    """
 
     def __init__(
         self,
@@ -196,8 +200,12 @@ class GlCompositor:
             self.init()
 
     @staticmethod
-    def _apply_blend_mode(mode: BlendMode) -> None:
-        if mode == "add":
+    def _apply_layer_blend_mode(mode: BlendMode) -> None:
+        """Configure GL blend for stacking layer FBOs onto the output framebuffer."""
+        if mode == "black-key":
+            glBlendEquation(GL_FUNC_ADD)
+            glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_COLOR)
+        elif mode == "add":
             glBlendEquation(GL_FUNC_ADD)
             glBlendFunc(GL_SRC_ALPHA, GL_ONE)
         elif mode == "multiply":
@@ -223,17 +231,19 @@ class GlCompositor:
             glBlendFunc(GL_ONE, GL_ONE)
         else:
             glBlendEquation(GL_FUNC_ADD)
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+            glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_COLOR)
+
+    @staticmethod
+    def _apply_src_alpha_blend() -> None:
+        """SRCALPHA blend for pygame overlay textures and libprojectM FBO reset."""
+        glBlendEquation(GL_FUNC_ADD)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
     @staticmethod
     def reset_blend_for_external_render() -> None:
-        """Reset global blend func before libprojectM renders into a layer FBO.
-
-        draw_layer sets glBlendFunc for compositing; that state persists and
-        would leak into projectM's internal feedback passes if not cleared here.
-        """
+        """Reset blend state before libprojectM renders into a layer FBO."""
         glEnable(GL_BLEND)
-        GlCompositor._apply_blend_mode("alpha")
+        GlCompositor._apply_src_alpha_blend()
 
     @staticmethod
     def _configure_texture_params() -> None:
@@ -257,7 +267,7 @@ class GlCompositor:
         width: int,
         height: int,
         opacity: float = 1.0,
-        blend_mode: BlendMode = "alpha",
+        blend_mode: BlendMode = "black-key",
     ) -> LayerFbo:
         self._ensure_init()
 
@@ -391,7 +401,7 @@ class GlCompositor:
         self._ensure_init()
         self._bind_default_framebuffer()
         glEnable(GL_BLEND)
-        self._apply_blend_mode(layer.blend_mode)
+        self._apply_layer_blend_mode(layer.blend_mode)
         tint_rgb = self._lerp_tint_rgb(layer.hue_rgb, layer.hue_mix)
         self._draw_textured_quad(
             layer.texture_id,
@@ -408,7 +418,7 @@ class GlCompositor:
             )
             try:
                 glEnable(GL_BLEND)
-                self._apply_blend_mode("add")
+                self._apply_layer_blend_mode("add")
                 self._draw_solid_quad(
                     0.0,
                     0.0,
@@ -423,7 +433,7 @@ class GlCompositor:
                 glColor4f(1.0, 1.0, 1.0, 1.0)
 
     def composite(self, layers: list[LayerFbo]) -> None:
-        """Clear to background and draw *layers* bottom-to-top."""
+        """Clear to background and stack *layers* bottom-to-top."""
         self._ensure_init()
         self._bind_default_framebuffer()
         glClearColor(*self.bg)
@@ -482,13 +492,13 @@ class GlCompositor:
         height: int,
         alpha: float = 1.0,
     ) -> None:
-        """Draw *texture_id* at pixel (*x*, *y*) with alpha blending enabled."""
+        """Draw *texture_id* at pixel (*x*, *y*) with SRCALPHA blending."""
         self._ensure_init()
         self._bind_default_framebuffer()
         blend_enabled, blend_src, blend_dst, blend_equation = self._push_blend_state()
         try:
             glEnable(GL_BLEND)
-            self._apply_blend_mode("alpha")
+            self._apply_src_alpha_blend()
             self._draw_textured_quad(texture_id, float(x), float(y), width, height, alpha)
         finally:
             self._pop_blend_state(blend_enabled, blend_src, blend_dst, blend_equation)

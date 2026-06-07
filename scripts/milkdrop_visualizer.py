@@ -2,7 +2,7 @@
 """Milkdrop visualizer (Phase 5): four stem-driven libprojectM layers via OpenGL FBOs.
 
 Default path loads cleave.config.yaml: one ProjectM instance per
-stem (other, bass, vocals, drums), tiered FBO sizes, alpha/add compositing, and stem PCM
+stem (other, bass, vocals, drums), tiered FBO sizes, black-key/add compositing, and stem PCM
 at the visualizer fps (30 by default). Use ``--preset`` for a single drums-layer debug run.
 """
 

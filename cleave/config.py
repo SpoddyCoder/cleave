@@ -24,9 +24,9 @@ DEFAULT_LAYER_Z_ORDER = ("drums", "vocals", "bass", "other")
 
 DEFAULT_BLEND_MODE: dict[str, BlendMode] = {
     "drums": "add",
-    "other": "alpha",
-    "bass": "alpha",
-    "vocals": "alpha",
+    "other": "black-key",
+    "bass": "black-key",
+    "vocals": "black-key",
 }
 
 LAYER_DEFAULT_SIZE: dict[str, tuple[int, int]] = {
@@ -67,7 +67,7 @@ class LayerConfig:
     height: int = 720
     beat_sensitivity: float | None = None
     effects: dict[str, dict[str, int]] = field(default_factory=dict)
-    blend_mode: BlendMode = "alpha"
+    blend_mode: BlendMode = "black-key"
     locked: bool = False
 
 

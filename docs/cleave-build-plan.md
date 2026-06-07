@@ -17,12 +17,12 @@ Audio File
     ├── vocals.wav ──► pitch / amplitude             ──► libprojectM (preset C) ──► layer 3
     └── other.wav  ──► spectral content              ──► libprojectM (preset D) ──► layer 4
                                                                                         │
-                                                                 [Cleave compositor] ◄──┘
+                                                                 [Cleave compositor — black-key stack] ◄──┘
                                                                          │
                                                                     final output
 ```
 
-From Phase 5 onward, each libprojectM instance receives its stem's PCM audio (`projectm_pcm_add_float`), so presets react to isolated drums, bass, vocals, and other without custom uniform wiring. The `signals.json` pipeline from Phase 2 remains for analysis and future use.
+From Phase 5 onward, each libprojectM instance receives its stem's PCM audio (`projectm_pcm_add_float`), so presets react to isolated drums, bass, vocals, and other without custom uniform wiring. Layers stack with black-key blending (Milkdrop black is transparent). The `signals.json` pipeline from Phase 2 drives cleave effects and the Phase 4 pygame visualizer.
 
 ---
 
@@ -121,8 +121,7 @@ From Phase 5 onward, each libprojectM instance receives its stem's PCM audio (`p
 - Pitch from vocals (where present) can shift hue — gives the visual a harmonic feel
 
 **4.3 — Compositor**
-- Render each layer to its own surface, blend with alpha
-- Experiment with blend modes: additive blending works well for grungy/industrial aesthetics
+- Render each layer to its own SRCALPHA surface and stack with pygame blits
 - Keep layers togglable with keypresses (d=drums, b=bass, v=vocals, o=other) for live testing
 
 **✅ Milestone: 3–4 visual layers running simultaneously, each noticeably responding to its stem**
@@ -143,7 +142,7 @@ By this point you have a working layered system you understand. Milkdrop becomes
 | M1 spike stem | drums |
 | Layer FBO sizes | other 640x360, bass/vocals 960x540, drums 1280x720 (upscale on composite) |
 | Z-order (bottom to top) | other, bass, vocals, drums |
-| Blend | alpha-over for bg layers; additive for drums |
+| Layer stack | black-key (default); per-layer `blend_mode` in config |
 | Config | [cleave.config.yaml](cleave.config.yaml) (YAML) |
 | Entry script | [scripts/milkdrop_visualizer.py](scripts/milkdrop_visualizer.py) |
 | Regression track | `sights-and-sounds-26` |
@@ -151,7 +150,7 @@ By this point you have a working layered system you understand. Milkdrop becomes
 **5.1 — Embed libprojectM** (M1 done)
 - libprojectM 4.2+ with ctypes bridge in [cleave/projectm.py](cleave/projectm.py)
 - pygame + OpenGL (PyOpenGL); one shared GL context
-- One FBO per layer; render preset to texture, composite, blit to window
+- One FBO per layer; render preset to texture, black-key stack to window
 - M1 spike: one `ProjectM` instance, one preset, **drums** stem PCM at target resolution and fps
 
 **5.2 — Stem PCM sync**
@@ -162,7 +161,8 @@ By this point you have a working layered system you understand. Milkdrop becomes
 
 **5.3 — One libprojectM instance per layer**
 - Four instances, four FBOs at tiered resolutions ([cleave/gl_compositor.py](cleave/gl_compositor.py))
-- Composite bottom-to-top per `layer_z_order`; per-layer opacity gates visibility (Phase 5.6 live tuning overlay)
+- Black-key stack bottom-to-top per `layer_z_order` (Milkdrop black is transparent; brightness is blend weight)
+- Per-layer opacity and `blend_mode` from config (Phase 5.6 live tuning overlay)
 
 **5.4 — Preset selection via config**
 - Per-layer preset path, size, opacity, beat sensitivity in `cleave.config.yaml`
@@ -191,7 +191,7 @@ By this point you have a working layered system you understand. Milkdrop becomes
 **5.6.2 — Per-layer tuning**
 - Directory row: path relative to `preset_root` with `(N/TOTAL)` among sibling dirs (presets in subtree, hidden excluded); Left/Right previous/next sibling (wraps); Enter or Ctrl+Right descends to first alphabetical child with presets; Backspace or Ctrl+Left goes to parent (no-op at `preset_root`; sibling listing never scans above `preset_root`)
 - Filename row: Left/Right previous/next `.milk` in current directory only (wraps); Ctrl+Left/Right ±10 presets in directory (wraps); empty dir shows `NO PRESETS FOUND` (`DISABLED`), L/R no-op
-- Blend mode: cycle per-layer blend modes in fixed order (`alpha`, `add`, `multiply`, `screen`, `subtract`, `difference`, `exclusion`, `max`, `pure-add`; see README); stored as `layers.*.blend_mode` in config
+- Blend mode: cycle per-layer modes (see README compositing); stored as `layers.*.blend_mode`
 - Opacity: 1% steps (10% with Ctrl); 0% disables the layer
 - Beat sensitivity: 0.01 steps (0.1 with Ctrl)
 
@@ -223,7 +223,7 @@ The drum layer needs presets that respond well to sharp transients — look for 
 Preset curation happens in-session via the Phase 5.6 live tuning overlay ([scripts/milkdrop_visualizer.py](scripts/milkdrop_visualizer.py)): browse presets per layer, tune blend/opacity/beat/effects, reorder z-order, and save snapshots to [saved-cleave-configs/](saved-cleave-configs/). Promote a winning snapshot into [cleave.config.yaml](cleave.config.yaml) manually when ready.
 
 **6.2 — Compositor aesthetics / cleave effects** ✅
-- Per-layer blend modes (see README): `alpha` and `add` for everyday stacking; `multiply` / `screen` for mood; experimental modes (`subtract`, `difference`, `exclusion`, `max`, `pure-add`) for chaotic passes
+- Black-key layer stack plus optional per-layer blend modes (see README compositing)
 - Signal-driven compositor effects per layer: **pulse** (opacity), **flare** (drums bloom), **flash**, **hue** (vocals pitch tint), **grit** (grain + chromatic aberration)
 - Live tuning: collapsible **cleave effects** section in the track tree (after beat sensitivity); depth 0-100% per fixed driver row
 - Config: `layers.*.effects` nested map; sparse snapshots via [cleave/config_snapshot.py](cleave/config_snapshot.py)
@@ -328,7 +328,7 @@ Ideas to revisit once the core is solid:
 
 - [x] ctypes wrapper for libprojectM 4.2+ ([cleave/projectm.py](cleave/projectm.py))
 - [x] Stem PCM preload and per-frame slicing ([cleave/stem_pcm.py](cleave/stem_pcm.py))
-- [x] OpenGL compositor: FBO per layer, alpha/add blend ([cleave/gl_compositor.py](cleave/gl_compositor.py))
+- [x] OpenGL compositor: FBO per layer, black-key/add blend ([cleave/gl_compositor.py](cleave/gl_compositor.py))
 - [x] YAML config loader ([cleave/config.py](cleave/config.py), [cleave.config.yaml](cleave.config.yaml))
 - [x] M1 spike: [scripts/milkdrop_visualizer.py](scripts/milkdrop_visualizer.py) (drums-only via `--preset`)
 - [x] M2: PCM sync validation on `sights-and-sounds-26` (full track, pause, seek)

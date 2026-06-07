@@ -73,7 +73,7 @@ class LayerRuntime:
     opacity_pct: int = 100
     effects: dict[str, dict[str, int]] = field(default_factory=dict)
     effects_expanded: bool = False
-    blend_mode: BlendMode = "alpha"
+    blend_mode: BlendMode = "black-key"
     beat_sensitivity: float = 1.0
     enabled: bool = True
     expanded: bool = True

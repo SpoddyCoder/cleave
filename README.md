@@ -9,7 +9,7 @@ Built on the following two awesome open-source projects;
 
 Built on WSL2, but should work on any Linux machine.
 
-**Current focus:** Phase 5 Milkdrop visualizer with live tuning overlay and cleave effects (four layers at 1280x720 / 30 fps); Phase 7 usability and packaging next. Phase 4 layered visualizer remains the pygame baseline. See [docs/cleave-build-plan.md](docs/cleave-build-plan.md#phase-56--live-tuning-console) and [docs/cleave-effect-plan.md](docs/cleave-effect-plan.md).
+**Current focus:** Phase 5 Milkdrop visualizer (four layers, black-key compositing, live tuning overlay, cleave effects at 1280x720 / 30 fps); Phase 7 usability and packaging next. Phase 4 layered visualizer remains the pygame baseline. See [docs/cleave-build-plan.md](docs/cleave-build-plan.md) and [docs/cleave-effect-plan.md](docs/cleave-effect-plan.md).
 
 ## Requirements
 
@@ -31,7 +31,8 @@ Built on WSL2, but should work on any Linux machine.
 NOTE: There is a [known issue with WSL2 audio](https://github.com/microsoft/wslg/issues/1257), if you are experiencing glitches / dropouts...
 
 ```bash
-sudo systemctl stop systemd-timesyncd
+sudo systemctl stop systemd-timesyncd     # disable until next boot
+sudo systemctl disable systemd-timesyncd  # disable permanently
 ```
 
 ## Setup
@@ -157,7 +158,7 @@ On WSL2, the window needs WSLg or an X11 display server; without one, pygame can
 
 ## Layered visualizer (Phase 4, complete)
 
-Multi-stem compositor that blends four pygame layers, each driven by its stem in `signals.json`:
+Four pygame layers stacked with per-surface alpha, each driven by its stem in `signals.json`:
 
 | Layer | Signal | Visual |
 | --- | --- | --- |
@@ -195,7 +196,23 @@ After separate, analyse, and optional onset validation above, run `pulse_visuali
 
 ## Milkdrop visualizer (Phase 5 + 5.6, complete)
 
-Four libprojectM layers, each fed stem PCM at 44100 Hz mono, composited with OpenGL FBOs at tiered resolutions and upscaled to **1280x720 @ 30 fps**. Stack order comes from `layer_z_order` in [cleave.config.yaml](cleave.config.yaml) (bottom to top). Requires libprojectM **4.2+**, community presets, and a display (WSLg or X11 on WSL2).
+Four libprojectM layers, each fed stem PCM at 44100 Hz mono, rendered to tiered OpenGL FBOs and upscaled to **1280x720 @ 30 fps**. Stack order is `layer_z_order` in [cleave.config.yaml](cleave.config.yaml) (bottom to top). Requires libprojectM **4.2+**, community presets, and a display (WSLg or X11 on WSL2).
+
+### Compositing
+
+Milkdrop presets draw on black. Cleave stacks layer textures with **black-key** blending in [cleave/gl_compositor.py](cleave/gl_compositor.py): black pixels are invisible, and each RGB channel's brightness sets how much of that layer contributes. Layer opacity scales the texture before the blend.
+
+Default `blend_mode` is `black-key`. Optional modes per layer:
+
+| Mode | Use |
+| --- | --- |
+| `black-key` | Default stack. Background stems (other, bass, vocals). |
+| `add` | Highlights and transients. Drums. |
+| `multiply` | Darken the stack. One layer at a time. |
+| `screen` | Soft lift / haze. |
+| `subtract`, `difference`, `exclusion`, `max`, `pure-add` | Experimental. |
+
+The live tuning overlay uses SRCALPHA blending separately (real alpha channel, not black-key).
 
 **Preset install:** clone or symlink community packs under `paths.preset_root` in [cleave.config.yaml](cleave.config.yaml). Set `preset_root` to the milkdrop-presets root (the directory that contains `presets-cream-of-the-crop`, not that subfolder alone). Each `layers.*.preset` may be a **single `.milk` file** or a **directory** (recursive `*.milk` scan at startup, before the window opens; stderr reports preset counts per layer). Layer paths are relative to `preset_root` and should include each pack name once, e.g. `presets-cream-of-the-crop/Drawing/foo.milk`. Example layout:
 
@@ -258,21 +275,7 @@ Pause stops PCM feed and freezes layer FBOs (no projectM render); seek flushes p
 
 ### Config and save
 
-Per-layer preset, size, opacity, `blend_mode`, optional beat sensitivity, `effects` (nested effect and driver depths 0-100%), and `locked` (bool, default false) live under `layers.*` in [cleave.config.yaml](cleave.config.yaml). Global compositor stack order is `layer_z_order` (list of stem names, bottom to top).
-
-**Blend modes** (`layers.*.blend_mode`): cycled in this order in the live tuning overlay (Left/Right on the blend row):
-
-| Mode | Role |
-| --- | --- |
-| `alpha` | Standard over compositing. Background layers (other, bass, vocals): controlled stacking, readable motion underneath. |
-| `add` | Additive with alpha weighting. Drums / transient layer: flash, strobe, color blow-out. |
-| `multiply` | Darkens the stack. Moody background (often other at low opacity); use sparingly on one layer. |
-| `screen` | Soft lift between alpha and add. Gentle haze on vocal/other without full blow-out. |
-| `subtract` | Source minus destination (clamped). Chaotic with full-color presets and four layers. |
-| `difference` | Destination minus source (clamped). Chaotic; paired inverse of subtract, not true `\|a - b\|`. |
-| `exclusion` | Soft inverted multiply. Chaotic with saturated Milkdrop layers. |
-| `max` | Per-channel max of source and destination. Competing highlights across stems. |
-| `pure-add` | Full-strength additive (`ONE`, `ONE`). Opacity still applies; clips quickly with several bright layers. |
+Per-layer preset, size, opacity, `blend_mode`, optional beat sensitivity, `effects` (nested effect and driver depths 0-100%), and `locked` (bool, default false) live under `layers.*` in [cleave.config.yaml](cleave.config.yaml). Stack order is `layer_z_order`. Cycle blend modes Left/Right on the blend row (order matches the compositing table above).
 
 **SAVE AS NEW CONFIG** writes a full reproducible snapshot to [saved-cleave-configs/](saved-cleave-configs/) as `unnamed-N.cleave.config.yaml` (next unused N; see [cleave/config_snapshot.py](cleave/config_snapshot.py)). Snapshots include current presets (individual `.milk` paths relative to `preset_root`), opacity, blend modes, beat values, non-zero effect depths, lock state, and z-order. The launch config is never touched by save-as-new.
 

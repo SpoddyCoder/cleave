@@ -275,12 +275,12 @@ cleave/effects/
 
 ### Compositor integration
 
-Extend [cleave/gl_compositor.py](../cleave/gl_compositor.py) (or a sibling `cleave/post_process.py`):
+[cleave/gl_compositor.py](../cleave/gl_compositor.py) black-key stack plus [cleave/gl_post_process.py](../cleave/gl_post_process.py) per-layer passes:
 
-1. Render libprojectM to layer FBO (unchanged)
-2. Apply per-layer post: grit, hue tint, flare bloom on FBO texture
-3. `draw_layer` uses effective opacity from pulse stack and per-layer flash overlay
-4. Composite bottom-to-top (unchanged order)
+1. Render libprojectM to layer FBO
+2. Optional post on FBO texture: bloom (flare), grit, hue tint
+3. `draw_layer` applies effective opacity (pulse), `blend_mode`, and flash overlay
+4. Stack bottom-to-top per `layer_z_order`
 
 `LayerModifiers` (per frame, per layer): `opacity`, `flash_alpha`, `bloom_strength`, `hue_shift`, `grit_strength`, `aberration_px`.
 
@@ -386,7 +386,7 @@ Extend [cleave/gl_compositor.py](../cleave/gl_compositor.py) (or a sibling `clea
 ## Reference: current state
 
 - Drums-only `cleave pulse` row and `cleave_pulse` config key ([cleave/cleave_pulse.py](../cleave/cleave_pulse.py), [cleave/viz_tuning_overlay.py](../cleave/viz_tuning_overlay.py))
-- Compositor: per-layer opacity and blend only ([cleave/gl_compositor.py](../cleave/gl_compositor.py))
+- Compositor: black-key stack, per-layer opacity, blend, and cleave effects ([cleave/gl_compositor.py](../cleave/gl_compositor.py), [cleave/gl_post_process.py](../cleave/gl_post_process.py))
 - Signals available per stem: [cleave/analyse.py](../cleave/analyse.py)
 
 Phase 1 of this plan is the immediate next step after this document is accepted.

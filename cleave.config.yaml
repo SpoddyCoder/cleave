@@ -22,31 +22,31 @@ layers:
   drums:
     preset: presets-cream-of-the-crop/Dancer/Aurora/
     enabled: true
-    opacity: 0.3
+    opacity: 1.0
     width: 1280
     height: 720
-    blend_mode: add
+    blend_mode: black-key
 
   bass:
     preset: presets-milkdrop-original/Milkdrop-Original/
     enabled: true
-    opacity: 0.5
+    opacity: 1.0
     width: 960
     height: 540
-    blend_mode: alpha
+    blend_mode: black-key
 
   vocals:
     preset: presets-cream-of-the-crop/Sparkle/Explosions/
     enabled: true
-    opacity: 0.65
+    opacity: 1.0
     width: 960
     height: 540
-    blend_mode: alpha
+    blend_mode: black-key
 
   other:
     preset: presets-milkdrop-original/Milkdrop-Original/
     enabled: true
-    opacity: 0.4
+    opacity: 1.0
     width: 640
     height: 360
-    blend_mode: alpha
+    blend_mode: black-key
