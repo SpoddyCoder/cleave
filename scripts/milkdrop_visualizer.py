@@ -277,6 +277,7 @@ def _render_layer_fbo(layer: MilkdropLayer, pm: ProjectM) -> None:
         glViewport(0, 0, fbo.width, fbo.height)
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        GlCompositor.reset_blend_for_external_render()
         pm.render_to_fbo(fbo.fbo_id)
 
 
