@@ -124,6 +124,7 @@ class TuningControls:
 
         self.focus_index = 0
         self.move_mode_stem: str | None = None
+        self._move_mode_original_z_order: list[str] | None = None
         self._toast_message: str | None = None
         self._toast_deadline = 0.0
         self._input_blocked_until = 0.0
@@ -150,6 +151,9 @@ class TuningControls:
             return True
 
         if self.move_mode_stem is not None:
+            if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
+                self._cancel_move_mode()
+                return True
             if event.key == pygame.K_UP:
                 self._swap_stem_in_z_order(self.move_mode_stem, -1)
                 return True
@@ -213,6 +217,9 @@ class TuningControls:
             if kind == RowKind.TRACK_HEADER:
                 stem = row_stem(view, self.focus_index)
                 if stem is not None:
+                    self._move_mode_original_z_order = list(
+                        self.session.layer_z_order
+                    )
                     self.move_mode_stem = stem
                 return True
             if kind == RowKind.SAVE_AS_NEW_CONFIG:
@@ -339,6 +346,13 @@ class TuningControls:
         if self._on_z_order_change is not None:
             self._on_z_order_change(list(self.session.layer_z_order))
         self.move_mode_stem = None
+        self._move_mode_original_z_order = None
+
+    def _cancel_move_mode(self) -> None:
+        if self._move_mode_original_z_order is not None:
+            self.session.layer_z_order[:] = self._move_mode_original_z_order
+        self.move_mode_stem = None
+        self._move_mode_original_z_order = None
 
     def _apply_horizontal(self, key: int, mod: int, kind: RowKind) -> None:
         view = self.build_view_state(paused=self.playback.paused)
