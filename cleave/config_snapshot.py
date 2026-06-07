@@ -94,11 +94,13 @@ def write_session_snapshot(
             enabled = runtime.enabled
             blend_mode = runtime.blend_mode
             beat = runtime.beat_sensitivity
+            locked = runtime.locked
         else:
             preset = to_config_relative(layer_cfg.preset, preset_root)
             opacity = layer_cfg.opacity
             enabled = layer_cfg.enabled
             blend_mode = layer_cfg.blend_mode
+            locked = layer_cfg.locked
             beat = (
                 layer_cfg.beat_sensitivity
                 if layer_cfg.beat_sensitivity is not None
@@ -112,6 +114,7 @@ def write_session_snapshot(
             "width": layer_cfg.width,
             "height": layer_cfg.height,
             "blend_mode": blend_mode,
+            "locked": locked,
         }
         beat = clamp_beat_sensitivity(beat)
         if beat != global_beat:

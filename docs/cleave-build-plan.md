@@ -199,7 +199,12 @@ By this point you have a working layered system you understand. Milkdrop becomes
 - Enter on a track header enters move mode (blue highlight); Up/Down swap that stem in `layer_z_order`; Enter confirms
 - Compositor re-orders bottom-to-top from live `layer_z_order` each frame
 
-**5.6.4 — Footer rows (transport and save)**
+**5.6.4 — Layer lock**
+- Ctrl+Enter on track header toggles lock; red padlock icon when locked
+- `layers.*.locked` (bool, default false) in config; persisted in snapshots
+- Locked header blocks enable/disable (Ctrl+Left/Right) and move mode (Enter); expanded sub-rows are skipped in navigation and dimmed; Left/Right expand/collapse still works
+
+**5.6.5 — Footer rows (transport and save)**
 - Transport row: Left/Right seek ±10s (±30s with Ctrl); Material Icons transport controls (skip / play-pause / skip)
 - Space toggles pause/play (not shown in overlay)
 - Enter on SAVE CONFIG writes a full snapshot via [cleave/config_snapshot.py](cleave/config_snapshot.py) to [saved-cleave-configs/](saved-cleave-configs/) as `unnamed-N.cleave.config.yaml` (never overwrites the launch config)
@@ -334,6 +339,7 @@ Ideas to revisit once the core is solid:
 - [x] Up/Down row navigation; Left/Right field adjust; hold-to-repeat on tuning rows
 - [x] Per-layer preset, blend mode, opacity, beat sensitivity
 - [x] Z-order move mode on track headers (Enter, Up/Down, Enter)
+- [x] Layer lock on track headers (Ctrl+Enter; `layers.*.locked` in config and snapshots; navigation and editing guards)
 - [x] Transport row with Material Icons transport controls (skip / play-pause / skip; ±10s / ±30s with Ctrl); folder/file row icons on preset dir and preset rows
 - [x] SAVE CONFIG snapshots to `saved-cleave-configs/unnamed-N.cleave.config.yaml` ([cleave/config_snapshot.py](cleave/config_snapshot.py))
 - [x] `layer_z_order` and `layers.*.blend_mode` in [cleave.config.yaml](cleave.config.yaml)

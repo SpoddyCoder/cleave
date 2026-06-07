@@ -18,9 +18,14 @@ from cleave.viz_playback import format_mmss
 from cleave.viz_material_icons import (
     FILE_GLYPH,
     FOLDER_GLYPH,
+    LOCK_GLYPH,
+    VISIBILITY_GLYPH,
+    VISIBILITY_OFF_GLYPH,
     render_glyph,
     render_transport_icons,
     row_icon_prefix_width,
+    track_header_lock_suffix_width,
+    visibility_icon_prefix_width,
 )
 from cleave.viz_theme import (
     BACKGROUND,
@@ -33,6 +38,8 @@ from cleave.viz_theme import (
     HOLD_IDLE_SEC,
     PRESET_FILE_ICON,
     PRESET_ICON,
+    LOCK_ICON,
+    LOCK_TEXT,
     MOVE_MODE,
     PANEL_CONTENT_MAX_WIDTH,
     TEXT,
@@ -45,6 +52,7 @@ ROWS_PER_TRACK = 6
 FOOTER_ROWS_WITH_OVERWRITE = 4
 FOOTER_ROWS_WITHOUT_OVERWRITE = 3
 TREE_INDENT = 16
+ROW_ICON_SUFFIX_GAP = 4
 
 
 class RowKind(Enum):
@@ -70,6 +78,7 @@ class TrackBlock:
     beat_sensitivity: float
     enabled: bool = True
     expanded: bool = True
+    locked: bool = False
     preset_empty: bool = False
 
 
@@ -111,9 +120,22 @@ _SUB_ROW_KINDS = frozenset(
     }
 )
 
+_LABELED_SUB_ROW_KINDS = frozenset(
+    {
+        RowKind.TRACK_BLEND,
+        RowKind.TRACK_OPACITY,
+        RowKind.TRACK_BEAT,
+    }
+)
+
 
 def track_sub_rows_visible(state: TuningViewState, stem: str) -> bool:
     return state.tracks[stem].expanded
+
+
+def track_sub_rows_navigable(state: TuningViewState, stem: str) -> bool:
+    block = state.tracks[stem]
+    return block.expanded and not block.locked
 
 
 def row_visible(state: TuningViewState, index: int) -> bool:
@@ -139,7 +161,7 @@ def navigable_row_indices(state: TuningViewState) -> list[int]:
             continue
         if kind in _SUB_ROW_KINDS:
             stem = row_stem(state, index)
-            if stem is not None and not track_sub_rows_visible(state, stem):
+            if stem is not None and not track_sub_rows_navigable(state, stem):
                 continue
         indices.append(index)
     return indices
@@ -201,8 +223,7 @@ def _row_text(state: TuningViewState, index: int) -> str:
     block = state.tracks[stem]
     if kind == RowKind.TRACK_HEADER:
         layer_num = state.layer_z_order.index(stem) + 1
-        status = "enabled" if block.enabled else "disabled"
-        return f"Layer {layer_num}: {stem.upper()} ({status})"
+        return f"Layer {layer_num}: {stem.upper()}"
     if kind == RowKind.TRACK_PRESET_DIR:
         return block.preset_dir_label
     if kind == RowKind.TRACK_PRESET:
@@ -212,6 +233,117 @@ def _row_text(state: TuningViewState, index: int) -> str:
     if kind == RowKind.TRACK_OPACITY:
         return f"└─ opacity: {block.opacity_pct}%"
     return f"└─ beat sensitivity: {block.beat_sensitivity:.2f}"
+
+
+def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
+    kind = row_kind(state, index)
+    if kind == RowKind.TRACK_BLEND:
+        return "└─ blend mode: "
+    if kind == RowKind.TRACK_OPACITY:
+        return "└─ opacity: "
+    assert kind == RowKind.TRACK_BEAT
+    return "└─ beat sensitivity: "
+
+
+def _labeled_sub_row_value(state: TuningViewState, index: int) -> str:
+    stem = row_stem(state, index)
+    assert stem is not None
+    block = state.tracks[stem]
+    kind = row_kind(state, index)
+    if kind == RowKind.TRACK_BLEND:
+        return block.blend_mode
+    if kind == RowKind.TRACK_OPACITY:
+        return f"{block.opacity_pct}%"
+    return f"{block.beat_sensitivity:.2f}"
+
+
+def _fit_labeled_sub_row_value(
+    font: pygame.font.Font,
+    state: TuningViewState,
+    index: int,
+    *,
+    max_content_width: int = PANEL_CONTENT_MAX_WIDTH,
+) -> str:
+    budget = max_content_width - _row_indent(state, index)
+    budget -= font.size(_labeled_sub_row_prefix(state, index))[0]
+    return fit_text_to_width(font, _labeled_sub_row_value(state, index), budget)
+
+
+def _render_two_tone_label(
+    font: pygame.font.Font,
+    *,
+    prefix: str,
+    value: str,
+    value_color: tuple[int, int, int],
+    line_height: int,
+    suffix_surf: pygame.Surface | None = None,
+    suffix_gap: int = 0,
+) -> pygame.Surface:
+    prefix_surf = font.render(prefix, True, CONFIG_HEADER_TEXT)
+    value_surf = font.render(value, True, value_color)
+    label_w = prefix_surf.get_width() + value_surf.get_width()
+    if suffix_surf is not None:
+        label_w += suffix_gap + suffix_surf.get_width()
+
+    label_surf = pygame.Surface((label_w, line_height), pygame.SRCALPHA)
+    x = 0
+    label_surf.blit(prefix_surf, (x, 0))
+    x += prefix_surf.get_width()
+    label_surf.blit(value_surf, (x, 0))
+    if suffix_surf is not None:
+        x += value_surf.get_width() + suffix_gap
+        label_surf.blit(suffix_surf, (x, 0))
+    return label_surf
+
+
+def _track_header_layer_prefix(state: TuningViewState, index: int) -> str:
+    stem = row_stem(state, index)
+    assert stem is not None
+    layer_num = state.layer_z_order.index(stem) + 1
+    return f"Layer {layer_num}: "
+
+
+def _fit_track_header_stem(
+    font: pygame.font.Font,
+    state: TuningViewState,
+    index: int,
+    *,
+    max_content_width: int = PANEL_CONTENT_MAX_WIDTH,
+) -> str:
+    stem = row_stem(state, index)
+    assert stem is not None
+    locked = state.tracks[stem].locked
+    budget = max_content_width - _row_indent(state, index)
+    budget -= visibility_icon_prefix_width(font.get_linesize())
+    budget -= font.size(_track_header_layer_prefix(state, index))[0]
+    if locked:
+        budget -= track_header_lock_suffix_width(font.get_linesize())
+    return fit_text_to_width(font, stem.upper(), budget)
+
+
+def _render_track_header_label(
+    font: pygame.font.Font,
+    *,
+    layer_prefix: str,
+    stem_text: str,
+    stem_color: tuple[int, int, int],
+    locked: bool,
+    line_height: int,
+) -> pygame.Surface:
+    lock_surf = (
+        render_glyph(LOCK_GLYPH, color=LOCK_ICON, line_height=line_height)
+        if locked
+        else None
+    )
+    return _render_two_tone_label(
+        font,
+        prefix=layer_prefix,
+        value=stem_text,
+        value_color=stem_color,
+        line_height=line_height,
+        suffix_surf=lock_surf,
+        suffix_gap=ROW_ICON_SUFFIX_GAP,
+    )
 
 
 def fit_row_text(
@@ -232,6 +364,14 @@ def fit_row_text(
         if kind == RowKind.CONFIG_HEADER:
             return fit_path_label_to_width(font, text, budget - icon_w)
         return fit_counter_label_to_width(font, text, budget - icon_w)
+    if kind == RowKind.TRACK_HEADER:
+        return _track_header_layer_prefix(state, index) + _fit_track_header_stem(
+            font, state, index, max_content_width=max_content_width
+        )
+    if kind in _LABELED_SUB_ROW_KINDS:
+        return _labeled_sub_row_prefix(state, index) + _fit_labeled_sub_row_value(
+            font, state, index, max_content_width=max_content_width
+        )
     return fit_text_to_width(font, text, budget)
 
 
@@ -275,6 +415,13 @@ def _row_text_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
 
     if stem is not None and _track_disabled(state, stem):
         return TEXT_DIM
+
+    if (
+        stem is not None
+        and state.tracks[stem].locked
+        and kind in _SUB_ROW_KINDS
+    ):
+        return LOCK_TEXT
 
     return TEXT
 
@@ -377,6 +524,31 @@ class TuningOverlay:
                 row_widths.append(
                     indent + icons_surf.get_width() + time_surf.get_width()
                 )
+            elif kind == RowKind.TRACK_HEADER:
+                stem = row_stem(state, index)
+                block = state.tracks[stem] if stem is not None else None
+                enabled = block.enabled if block is not None else True
+                locked = block.locked if block is not None else False
+                vis_icon = render_glyph(
+                    VISIBILITY_GLYPH if enabled else VISIBILITY_OFF_GLYPH,
+                    color=CONFIG_HEADER_TEXT,
+                    line_height=line_h,
+                )
+                layer_prefix = _track_header_layer_prefix(state, index)
+                stem_text = _fit_track_header_stem(font, state, index)
+                label_surf = _render_track_header_label(
+                    font,
+                    layer_prefix=layer_prefix,
+                    stem_text=stem_text,
+                    stem_color=color,
+                    locked=locked,
+                    line_height=line_h,
+                )
+                row_surfaces.append(vis_icon)
+                row_time_surfaces.append(label_surf)
+                row_widths.append(
+                    indent + vis_icon.get_width() + label_surf.get_width()
+                )
             elif kind in {
                 RowKind.CONFIG_HEADER,
                 RowKind.TRACK_PRESET_DIR,
@@ -396,6 +568,19 @@ class TuningOverlay:
                 row_widths.append(
                     indent + icon_surf.get_width() + label_surf.get_width()
                 )
+            elif kind in _LABELED_SUB_ROW_KINDS:
+                prefix = _labeled_sub_row_prefix(state, index)
+                value = _fit_labeled_sub_row_value(font, state, index)
+                surf = _render_two_tone_label(
+                    font,
+                    prefix=prefix,
+                    value=value,
+                    value_color=color,
+                    line_height=line_h,
+                )
+                row_surfaces.append(surf)
+                row_time_surfaces.append(None)
+                row_widths.append(indent + surf.get_width())
             else:
                 text = fit_row_text(font, state, index)
                 surf = font.render(text, True, color)

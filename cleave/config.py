@@ -65,6 +65,7 @@ class LayerConfig:
     height: int = 720
     beat_sensitivity: float | None = None
     blend_mode: BlendMode = "alpha"
+    locked: bool = False
 
 
 @dataclass(frozen=True)
@@ -211,6 +212,7 @@ def _parse_layers(data: dict[str, Any], preset_root: Path) -> dict[str, LayerCon
             if beat_raw is not None
             else None,
             blend_mode=_parse_blend_mode(name, layer_raw),
+            locked=bool(layer_raw.get("locked", False)),
         )
     return layers
 

@@ -14,6 +14,12 @@ SKIP_PREVIOUS_GLYPH = "\ue045"
 PLAY_GLYPH = "\ue037"
 PAUSE_GLYPH = "\ue034"
 SKIP_NEXT_GLYPH = "\ue044"
+LOCK_GLYPH = "\ue897"
+VISIBILITY_GLYPH = "\ue8f4"
+VISIBILITY_OFF_GLYPH = "\ue8f5"
+
+_SUFFIX_ICON_GAP = 4
+_LABEL_SUFFIX_GAP = 4
 
 _font_cache: dict[int, pygame.font.Font] = {}
 
@@ -86,4 +92,18 @@ def render_transport_icons(
 def row_icon_prefix_width(line_height: int) -> int:
     icon_h = _icon_height(line_height)
     font = material_font(icon_h)
-    return font.size(FOLDER_GLYPH)[0] + 4
+    return font.size(FOLDER_GLYPH)[0] + _LABEL_SUFFIX_GAP
+
+
+def _suffix_icon_width(line_height: int, glyph: str) -> int:
+    icon_h = _icon_height(line_height)
+    font = material_font(icon_h)
+    return font.size(glyph)[0]
+
+
+def visibility_icon_prefix_width(line_height: int) -> int:
+    return _suffix_icon_width(line_height, VISIBILITY_GLYPH) + _LABEL_SUFFIX_GAP
+
+
+def track_header_lock_suffix_width(line_height: int) -> int:
+    return _SUFFIX_ICON_GAP + _suffix_icon_width(line_height, LOCK_GLYPH)
