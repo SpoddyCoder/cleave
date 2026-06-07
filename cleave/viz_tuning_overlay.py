@@ -15,7 +15,13 @@ from cleave.viz_overlay import (
     fit_text_to_width,
 )
 from cleave.viz_playback import format_mmss
-from cleave.viz_transport_icons import render_transport_icons
+from cleave.viz_material_icons import (
+    FILE_GLYPH,
+    FOLDER_GLYPH,
+    render_glyph,
+    render_transport_icons,
+    row_icon_prefix_width,
+)
 from cleave.viz_theme import (
     BACKGROUND,
     BACKGROUND_ALPHA,
@@ -24,6 +30,8 @@ from cleave.viz_theme import (
     FADE_DURATION_SEC,
     HIGHLIGHT,
     HOLD_IDLE_SEC,
+    PRESET_FILE_ICON,
+    PRESET_ICON,
     MOVE_MODE,
     PANEL_CONTENT_MAX_WIDTH,
     TEXT,
@@ -36,7 +44,6 @@ ROWS_PER_TRACK = 6
 FOOTER_ROWS_WITH_OVERWRITE = 4
 FOOTER_ROWS_WITHOUT_OVERWRITE = 3
 TREE_INDENT = 16
-_TREE_PREFIX = "└─ "
 
 
 class RowKind(Enum):
@@ -196,9 +203,9 @@ def _row_text(state: TuningViewState, index: int) -> str:
         status = "enabled" if block.enabled else "disabled"
         return f"Layer {layer_num}: {stem.upper()} ({status})"
     if kind == RowKind.TRACK_PRESET_DIR:
-        return f"{_TREE_PREFIX}{block.preset_dir_label}"
+        return block.preset_dir_label
     if kind == RowKind.TRACK_PRESET:
-        return f"{_TREE_PREFIX}{block.preset_label}"
+        return block.preset_label
     if kind == RowKind.TRACK_BLEND:
         return f"└─ blend mode: {block.blend_mode}"
     if kind == RowKind.TRACK_OPACITY:
@@ -222,10 +229,8 @@ def fit_row_text(
     if kind == RowKind.CONFIG_HEADER:
         return fit_path_label_to_width(font, text, budget)
     if kind in {RowKind.TRACK_PRESET_DIR, RowKind.TRACK_PRESET}:
-        prefix_w = font.size(_TREE_PREFIX)[0]
-        label = text[len(_TREE_PREFIX) :]
-        fitted = fit_counter_label_to_width(font, label, budget - prefix_w)
-        return _TREE_PREFIX + fitted
+        icon_w = row_icon_prefix_width(font.get_linesize())
+        return fit_counter_label_to_width(font, text, budget - icon_w)
     return fit_text_to_width(font, text, budget)
 
 
@@ -370,6 +375,17 @@ class TuningOverlay:
                 row_time_surfaces.append(time_surf)
                 row_widths.append(
                     indent + icons_surf.get_width() + time_surf.get_width()
+                )
+            elif kind in {RowKind.TRACK_PRESET_DIR, RowKind.TRACK_PRESET}:
+                glyph = FOLDER_GLYPH if kind == RowKind.TRACK_PRESET_DIR else FILE_GLYPH
+                icon_color = PRESET_ICON if kind == RowKind.TRACK_PRESET_DIR else PRESET_FILE_ICON
+                icon_surf = render_glyph(glyph, color=icon_color, line_height=line_h)
+                label = fit_row_text(font, state, index)
+                label_surf = font.render(label, True, color)
+                row_surfaces.append(icon_surf)
+                row_time_surfaces.append(label_surf)
+                row_widths.append(
+                    indent + icon_surf.get_width() + label_surf.get_width()
                 )
             else:
                 text = fit_row_text(font, state, index)

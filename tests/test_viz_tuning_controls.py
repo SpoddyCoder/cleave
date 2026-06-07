@@ -32,10 +32,18 @@ from cleave.viz_tuning_controls import (
     config_path_display,
 )
 from cleave.viz_theme import HIGHLIGHT, MOVE_MODE, PANEL_CONTENT_MAX_WIDTH, TEXT_DIM
+from cleave.viz_material_icons import (
+    FILE_GLYPH,
+    FOLDER_GLYPH,
+    render_glyph,
+    render_transport_icons,
+    row_icon_prefix_width,
+)
 from cleave.viz_tuning_overlay import (
     RowKind,
     TrackBlock,
     TuningViewState,
+    TREE_INDENT,
     _row_bg_color,
     _row_text,
     _row_text_color,
@@ -48,7 +56,6 @@ from cleave.viz_tuning_overlay import (
     row_visible,
     visible_row_indices,
 )
-from cleave.viz_transport_icons import render_transport_icons
 
 
 def _keydown(key: int, *, mod: int = 0) -> pygame.event.Event:
@@ -453,7 +460,7 @@ def test_preset_row_truncates_long_filenames() -> None:
     label = fit_row_text(font, view, preset_row)
     assert font.size(label)[0] <= PANEL_CONTENT_MAX_WIDTH - 16
     assert label.endswith("(1/50)")
-    assert label.startswith("└─ …")
+    assert label.startswith("…")
     assert "…/" not in label
 
 
@@ -488,7 +495,8 @@ def test_fit_row_text_config_and_preset_share_panel_width() -> None:
     config_label = fit_row_text(font, view, header_row)
     preset_label = fit_row_text(font, view, preset_row)
     assert font.size(config_label)[0] + 0 <= PANEL_CONTENT_MAX_WIDTH
-    assert font.size(preset_label)[0] + 16 <= PANEL_CONTENT_MAX_WIDTH
+    icon_budget = TREE_INDENT + row_icon_prefix_width(font.get_linesize())
+    assert font.size(preset_label)[0] + icon_budget <= PANEL_CONTENT_MAX_WIDTH
 
 
 def test_save_as_new_updates_active_config_path() -> None:
@@ -711,6 +719,16 @@ def test_ctrl_q_requests_quit() -> None:
 def test_q_alone_does_not_quit() -> None:
     controls = _make_controls()
     assert controls.handle_keydown(_keydown(pygame.K_q)) is True
+
+
+def test_row_icons_render() -> None:
+    line_height = 17
+    color = (255, 255, 255)
+    for glyph in (FOLDER_GLYPH, FILE_GLYPH):
+        surf = render_glyph(glyph, color=color, line_height=line_height)
+        assert surf.get_width() > 0
+        assert surf.get_height() == line_height
+        assert pygame.mask.from_surface(surf).count() > 0
 
 
 def test_transport_icons_render() -> None:
@@ -1197,6 +1215,7 @@ def main() -> int:
         test_esc_during_confirm_does_not_quit,
         test_ctrl_q_requests_quit,
         test_q_alone_does_not_quit,
+        test_row_icons_render,
         test_transport_icons_render,
         test_transport_icons_play_vs_pause,
         test_format_mmss,
