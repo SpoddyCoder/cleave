@@ -14,19 +14,6 @@ Auto-pick or cycle Milkdrop presets per layer on a timer, at section boundaries,
 
 Port playback and compositing to the browser. `signals.json` is already portable JSON; [Butterchurn](https://github.com/jberg/butterchurn) is a JS Milkdrop renderer that could replace libprojectM for a shareable viewer.
 
-## Audio performance
-
-Today heard audio goes through `pygame.mixer.music` on the same process and main thread as OpenGL/projectM rendering. Heavy presets can cause clicks or dropouts even when average CPU and GPU use stay low (tail latency and small default mixer buffers, not sustained overload).
-
-**Target design:**
-
-- Preload the mix to PCM at startup (same idea as stem PCM for libprojectM).
-- Play out via `sounddevice` or an SDL audio callback on a dedicated thread, with a ring buffer and a larger device buffer.
-- Drive the visual loop from the audio clock: `t_sec = samples_played / sample_rate` instead of wall-clock `pygame.time.get_ticks()`.
-- Drop `pygame.mixer` entirely once the new path covers play, pause, and seek.
-
-This decouples frame rate from playback and should eliminate preset-dependent glitches without sacrificing A/V sync.
-
 ## Deeper stem separation with Demucs
 
 Cleave today uses the standard four-stem split: drums, bass, vocals, other. Demucs can do more if you want finer control later.

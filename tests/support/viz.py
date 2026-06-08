@@ -10,6 +10,32 @@ from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.controls import LayerRuntime, TuningControls, TuningSession
 from cleave.viz.playback import PlaybackState
 
+
+class StubMixPlayer:
+    """Minimal MixPlayer stand-in for control tests (no SDL audio)."""
+
+    def __init__(self, position_sec: float = 0.0) -> None:
+        self._position_sec = position_sec
+
+    def start(self) -> None:
+        pass
+
+    def stop(self) -> None:
+        pass
+
+    def pause(self, on: bool) -> None:
+        pass
+
+    def seek(self, position_sec: float) -> None:
+        self._position_sec = position_sec
+
+    def current_sec(self) -> float:
+        return self._position_sec
+
+    def finished(self) -> bool:
+        return False
+
+
 REPO_ROOT_EXAMPLE = Path("/tmp/cleave.config.yaml")
 DEFAULT_ACTIVE_CONFIG = Path("/tmp/projects/my-track/active.yaml")
 
@@ -27,6 +53,10 @@ def make_playlist(name: str, count: int = 3) -> PresetPlaylist:
     current_dir = Path(f"/tmp/presets/{name}")
     paths = tuple(current_dir / f"preset-{i}.milk" for i in range(count))
     return PresetPlaylist(current_dir=current_dir, paths=paths, index=0)
+
+
+def stub_playback_state() -> PlaybackState:
+    return PlaybackState(player=StubMixPlayer())
 
 
 def make_controls(
@@ -50,7 +80,7 @@ def make_controls(
     return TuningControls(
         session,
         preset_root=preset_root,
-        playback=PlaybackState(),
+        playback=stub_playback_state(),
         duration_sec=120.0,
         launch_config_path=launch_config_path,
         repo_root_example=repo_root_example,
