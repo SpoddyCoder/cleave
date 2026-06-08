@@ -9,20 +9,48 @@ from unittest.mock import patch
 
 import pytest
 
-from cleave.cli import build_parser, cmd_analyse, cmd_play, cmd_separate
+from cleave.cli import build_parser, cmd_play, cmd_separate
 from cleave.extract import STEM_NAMES
 from cleave.project import write_manifest
-from cleave.separate import ProjectStemsExist
 
 
-def test_analyse_parser_uses_project_arg() -> None:
+def test_separate_parser_uses_target_arg() -> None:
     parser = build_parser()
-    args = parser.parse_args(["analyse", "my-track"])
-    assert args.project == "my-track"
-    assert not hasattr(args, "stems_dir")
+    args = parser.parse_args(["separate", "my-track.flac"])
+    assert args.target == "my-track.flac"
+    assert not args.slow
+    assert not args.force
 
 
-def test_cmd_analyse_resolves_project_slug(
+def test_cmd_separate_noop_when_complete(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = tmp_path / "projects" / "song"
+    project.mkdir(parents=True)
+    for name in STEM_NAMES:
+        (project / f"{name}.wav").write_bytes(b"wav")
+    mix = project / "song.flac"
+    mix.write_bytes(b"mix")
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=tmp_path / "song.flac",
+        demucs_model="htdemucs",
+    )
+    (project / "signals.json").write_text("{}")
+
+    with patch("cleave.cli.run_separate") as run_separate:
+        cmd_separate(build_parser().parse_args(["separate", "song"]))
+
+    run_separate.assert_not_called()
+    out = capsys.readouterr().out
+    assert "has stems and signals" in out
+    assert "--force" in out
+
+
+def test_cmd_separate_analyse_only_message(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
@@ -39,49 +67,39 @@ def test_cmd_analyse_resolves_project_slug(
         original_path=tmp_path / "my-track.flac",
         demucs_model="htdemucs",
     )
-
     signals_path = project / "signals.json"
 
-    with patch("cleave.cli.run_analyse", return_value=signals_path) as run_analyse:
-        cmd_analyse(build_parser().parse_args(["analyse", "my-track"]))
+    with patch("cleave.cli.run_separate", return_value=project.resolve()):
+        cmd_separate(build_parser().parse_args(["separate", "my-track"]))
 
-    run_analyse.assert_called_once_with(project.resolve(), slow=False)
-    assert f"Wrote signals to {signals_path}" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert f"Wrote signals to {signals_path}" in out
 
 
-def test_cmd_analyse_requires_project_manifest(
+def test_cmd_separate_force_message(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
-    project = tmp_path / "projects" / "my-track"
+    project = tmp_path / "projects" / "song"
     project.mkdir(parents=True)
     for name in STEM_NAMES:
         (project / f"{name}.wav").write_bytes(b"wav")
+    mix = project / "song.flac"
+    mix.write_bytes(b"mix")
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=tmp_path / "song.flac",
+        demucs_model="htdemucs",
+    )
+    (project / "signals.json").write_text("{}")
 
-    with pytest.raises(SystemExit) as exc_info:
-        cmd_analyse(build_parser().parse_args(["analyse", "my-track"]))
-
-    assert exc_info.value.code == 1
-    assert "project manifest not found" in capsys.readouterr().err
-
-
-def test_cmd_separate_handles_project_stems_exist(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
-    audio = tmp_path / "song.flac"
-    audio.write_bytes(b"audio")
-    project = tmp_path / "projects" / "song"
-
-    with patch(
-        "cleave.cli.run_separate",
-        side_effect=ProjectStemsExist(project.resolve()),
-    ):
-        cmd_separate(build_parser().parse_args(["separate", str(audio)]))
+    with patch("cleave.cli.run_separate", return_value=project.resolve()):
+        cmd_separate(build_parser().parse_args(["separate", "song", "--force"]))
 
     out = capsys.readouterr().out
-    assert "stem wavs already exist in project" in out
-    assert "--force" in out
+    assert "Re-separated and analysed" in out
 
 
 def test_play_parser_uses_project_arg() -> None:
@@ -141,6 +159,6 @@ def test_module_help_lists_subcommands() -> None:
     )
     out = result.stdout
     assert "separate" in out
-    assert "analyse" in out
+    assert "analyse" not in out
     assert "play" in out
     assert "pygame" not in out.lower()
