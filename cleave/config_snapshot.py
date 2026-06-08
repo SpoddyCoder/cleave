@@ -13,20 +13,20 @@ from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import to_config_relative
 from cleave.viz_tuning_controls import TuningSession
 
-_UNNAMED_PATTERN = re.compile(r"^unnamed-(\d+)\.cleave\.config\.yaml$")
+_UNNAMED_PATTERN = re.compile(r"^unnamed-(\d+)\.yaml$")
 
 
-def next_unnamed_path(saved_dir: Path) -> Path:
-    """Return the next unused ``unnamed-N.cleave.config.yaml`` under ``saved_dir``."""
-    saved_dir.mkdir(parents=True, exist_ok=True)
+def next_unnamed_path(project_dir: Path) -> Path:
+    """Return the next unused ``unnamed-N.yaml`` in ``project_dir``."""
+    project_dir.mkdir(parents=True, exist_ok=True)
     max_n = 0
-    for entry in saved_dir.iterdir():
+    for entry in project_dir.iterdir():
         if not entry.is_file():
             continue
         match = _UNNAMED_PATTERN.match(entry.name)
         if match is not None:
             max_n = max(max_n, int(match.group(1)))
-    return saved_dir / f"unnamed-{max_n + 1}.cleave.config.yaml"
+    return project_dir / f"unnamed-{max_n + 1}.yaml"
 
 
 def _load_original_dict(cfg: CleaveConfig) -> dict[str, Any]:

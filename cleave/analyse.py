@@ -27,8 +27,8 @@ def _nan_to_null(values: np.ndarray) -> list[float | None]:
     return [None if np.isnan(v) else float(v) for v in values]
 
 
-def run_analyse(stems_dir: Path, *, source: Path | None, slow: bool) -> Path:
-    paths = stem_paths(stems_dir)
+def run_analyse(project_dir: Path, *, source: Path | None, slow: bool) -> Path:
+    paths = stem_paths(project_dir)
     duration_sec = max(_stem_duration_sec(path) for path in paths.values())
 
     drums_onset = extract_drums_onset(paths["drums"])
@@ -68,7 +68,7 @@ def run_analyse(stems_dir: Path, *, source: Path | None, slow: bool) -> Path:
             *mix_onset, duration_sec
         ).tolist()
 
-    signals_path = stems_dir / "signals.json"
+    signals_path = project_dir / "signals.json"
     with signals_path.open("w", encoding="utf-8") as handle:
         json.dump(output, handle, indent=2)
         handle.write("\n")

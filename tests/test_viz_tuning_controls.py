@@ -88,7 +88,7 @@ def _make_playlist(name: str, count: int = 3) -> PresetPlaylist:
 
 
 _REPO_ROOT_EXAMPLE = Path("/tmp/cleave.config.yaml")
-_DEFAULT_ACTIVE_CONFIG = Path("/tmp/saved-cleave-configs/active.yaml")
+_DEFAULT_ACTIVE_CONFIG = Path("/tmp/projects/my-track/active.yaml")
 
 
 def _make_controls(
@@ -135,7 +135,7 @@ def test_allow_overwrite_for_path_hides_repo_root_template_only() -> None:
     assert allow_overwrite_for_path(root, repo_root_example=root) is False
     assert (
         allow_overwrite_for_path(
-            Path("/repo/saved-cleave-configs/foo.yaml"),
+            Path("/repo/projects/my-track/foo.yaml"),
             repo_root_example=root,
         )
         is True
@@ -435,9 +435,9 @@ def test_save_as_new_triggers_toast_and_blocks_input() -> None:
         with patch("sys.stderr", stderr):
             assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
 
-        assert "Config saved to unnamed-1.cleave.config.yaml" in stderr.getvalue()
+        assert "Config saved to unnamed-1.yaml" in stderr.getvalue()
         state = controls.build_view_state(paused=False)
-        assert state.toast_message == "Config saved to unnamed-1.cleave.config.yaml"
+        assert state.toast_message == "Config saved to unnamed-1.yaml"
         assert state.toast_remaining_sec == TOAST_DURATION_SEC
 
         before = controls.focus_index
@@ -446,7 +446,7 @@ def test_save_as_new_triggers_toast_and_blocks_input() -> None:
 
 
 def test_config_header_shows_active_path() -> None:
-    launch_path = Path("/tmp/saved-cleave-configs/my-track.yaml")
+    launch_path = Path("/tmp/projects/my-track/my-track.yaml")
     controls = _make_controls(("drums",))
     controls._active_config_path = launch_path
     view = controls.build_view_state(paused=False)
@@ -459,7 +459,7 @@ def test_config_header_shows_active_path() -> None:
 
 def test_config_header_truncates_long_paths() -> None:
     long_path = Path(
-        "/very/long/root/saved-cleave-configs/nested/deep/unnamed-99.cleave.config.yaml"
+        "/very/long/root/projects/my-track/nested/deep/unnamed-99.yaml"
     )
     controls = _make_controls(("drums",))
     controls._active_config_path = long_path
@@ -513,7 +513,7 @@ def test_preset_row_truncates_long_filenames() -> None:
 
 def test_fit_row_text_config_and_preset_share_panel_width() -> None:
     long_path = Path(
-        "/very/long/root/saved-cleave-configs/nested/deep/unnamed-99.cleave.config.yaml"
+        "/very/long/root/projects/my-track/nested/deep/unnamed-99.yaml"
     )
     long_name = (
         "Phat_Zylot_Eo.S. rainbow bubble_mid3-starpoints_spirals_VE "
@@ -546,7 +546,7 @@ def test_fit_row_text_config_and_preset_share_panel_width() -> None:
 
 
 def test_save_as_new_updates_active_config_path() -> None:
-    saved_path = Path("/tmp/saved-cleave-configs/unnamed-2.cleave.config.yaml")
+    saved_path = Path("/tmp/projects/my-track/unnamed-2.yaml")
     controls = _make_controls(("drums",))
     controls._on_save_new_config = lambda: saved_path
 
@@ -566,7 +566,7 @@ def test_save_as_new_updates_active_config_path() -> None:
 
 
 def test_save_as_new_enables_overwrite_from_root_template() -> None:
-    saved_path = Path("/tmp/saved-cleave-configs/unnamed-2.cleave.config.yaml")
+    saved_path = Path("/tmp/projects/my-track/unnamed-2.yaml")
     controls = _make_controls(
         ("drums",),
         launch_config_path=_REPO_ROOT_EXAMPLE,
@@ -589,7 +589,7 @@ def test_save_as_new_enables_overwrite_from_root_template() -> None:
 
 
 def test_overwrite_after_save_uses_new_active_path() -> None:
-    saved_path = Path("/tmp/saved-cleave-configs/unnamed-1.cleave.config.yaml")
+    saved_path = Path("/tmp/projects/my-track/unnamed-1.yaml")
     writes: list[Path] = []
     controls = _make_controls(
         ("drums",),

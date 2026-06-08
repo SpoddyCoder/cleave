@@ -1,21 +1,9 @@
 ####################################
-# User Source and Generated Files
+# User-generated project data (default: projects/ under repo root)
 #
-
-# cleave generated files (stem wavs, signals.json, onset_comparison.png)
-stems/*
-!stems/.gitkeep
-
-# saved cleave configs
-saved-cleave-configs/*
-!saved-cleave-configs/.gitkeep
-
-# Add these optional convenience symlinks:
-#  - to windows host - use this to hold original audio source and final renders
-cleave-resources
-#  - to Milkdrop presets - clone community preset repos here
-milkdrop-presets
-
+# Override with CLEAVE_DATA=~/.local/share/cleave for XDG layout (see cleave/paths.py).
+projects/*
+!projects/.gitkeep
 
 ####################################
 # Project Ignores
@@ -28,6 +16,7 @@ __pycache__/
 *.pyd
 *.pyw
 *.pyz
+.pytest_cache/
 
 # venv
 venv/

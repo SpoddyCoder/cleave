@@ -12,10 +12,10 @@ import yaml
 # Avoid PyYAML folding long preset paths across lines (can corrupt mid-token paths).
 _YAML_DUMP_WIDTH = 2**31 - 1
 
+from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.effects.constants import clamp_effect_pct
 from cleave.effects.registry import validate_effect_entry
 from cleave.extract import STEM_NAMES
-from cleave.gl_compositor import BLEND_MODES, BlendMode
 
 CONFIG_FILENAME = "cleave.config.yaml"
 GLOBAL_CONFIG_PATH = Path.home() / ".config" / "cleave" / CONFIG_FILENAME

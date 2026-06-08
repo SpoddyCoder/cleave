@@ -12,7 +12,7 @@ import pygame
 
 from cleave.config import CONFIG_FILENAME, clamp_beat_sensitivity, clamp_effect_pct
 from cleave.effects.registry import effect_row_count
-from cleave.gl_compositor import BLEND_MODES, BlendMode
+from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.preset_playlist import (
     PresetPlaylist,
     directory_display,
@@ -47,7 +47,7 @@ _REPEAT_ROW_KINDS = frozenset(
         RowKind.TRACK_EFFECT,
     }
 )
-_DEFAULT_SAVE_FILENAME = "unnamed-1.cleave.config.yaml"
+_DEFAULT_SAVE_FILENAME = "unnamed-1.yaml"
 
 
 def config_path_display(path: Path | None) -> str:

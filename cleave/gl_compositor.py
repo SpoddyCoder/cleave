@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
 
 import pygame
+
+from cleave.blend_modes import BlendMode
 from OpenGL.GL import (
     GL_BLEND,
     GL_BLEND_EQUATION_RGB,
@@ -77,30 +78,6 @@ from OpenGL.GL import (
     glViewport,
     glUseProgram,
     glCheckFramebufferStatus,
-)
-
-BlendMode = Literal[
-    "black-key",
-    "add",
-    "multiply",
-    "screen",
-    "subtract",
-    "difference",
-    "exclusion",
-    "max",
-    "pure-add",
-]
-
-BLEND_MODES: tuple[BlendMode, ...] = (
-    "black-key",
-    "add",
-    "multiply",
-    "screen",
-    "subtract",
-    "difference",
-    "exclusion",
-    "max",
-    "pure-add",
 )
 
 

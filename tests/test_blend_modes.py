@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from cleave.config import _parse_blend_mode
-from cleave.gl_compositor import BLEND_MODES
+from cleave.blend_modes import BLEND_MODES
 from tests.test_viz_tuning_controls import _make_controls
 
 

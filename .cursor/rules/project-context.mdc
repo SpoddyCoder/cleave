@@ -5,8 +5,8 @@ alwaysApply: true
 
 # Cleave project context
 
-- BAU iterative development. Entry point: [cleave.py](cleave.py) (four libprojectM layers, 1280x720 / 30 fps default, stem PCM). Black-key stack in [cleave/gl_compositor.py](cleave/gl_compositor.py). Live tuning overlay: [cleave/viz_tuning_overlay.py](cleave/viz_tuning_overlay.py), [cleave/viz_tuning_controls.py](cleave/viz_tuning_controls.py). Cleave effects: [cleave/effects/](cleave/effects/). Config: [cleave.config.yaml](cleave.config.yaml); snapshots in [saved-cleave-configs/](saved-cleave-configs/) via [cleave/config_snapshot.py](cleave/config_snapshot.py).
+- BAU iterative development. Entry point: [cleave.py](cleave.py) (four libprojectM layers, 1280x720 / 30 fps default, stem PCM). Black-key stack in [cleave/gl_compositor.py](cleave/gl_compositor.py). Live tuning overlay: [cleave/viz_tuning_overlay.py](cleave/viz_tuning_overlay.py), [cleave/viz_tuning_controls.py](cleave/viz_tuning_controls.py). Cleave effects: [cleave/effects/](cleave/effects/). Paths: [cleave/paths.py](cleave/paths.py) (repo-root data dir by default, `projects/<slug>/`; `CLEAVE_DATA` override). Config: repo-root [cleave.config.yaml](cleave.config.yaml) as template; per-project `cleave.config.yaml` and `unnamed-N.yaml` snapshots via [cleave/config_snapshot.py](cleave/config_snapshot.py).
 - Must-do list: [docs/todos.md](docs/todos.md). Aspirational: [docs/roadmap.md](docs/roadmap.md).
 - See [README.md](README.md) for usage.
-- Stem layout: `stems/<trackname>/` with four wavs plus `signals.json`. CLI: `python -m cleave separate|analyse`; visualizer: `python cleave.py`.
+- Project layout: `projects/<slug>/` under repo root (or `CLEAVE_DATA` override) with four stem wavs, `signals.json`, and optional configs. CLI: `python -m cleave separate|analyse`; visualizer: `python cleave.py <slug|path>`.
 - Overlay layout and typography: [.cursor/rules/live-tuning-ui.mdc](.cursor/rules/live-tuning-ui.mdc).

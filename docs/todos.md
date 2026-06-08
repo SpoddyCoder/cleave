@@ -12,7 +12,7 @@ python -m cleave play <file> --stems-only   # skip separation when stems exist
 python -m cleave play <file> --slow         # slow stem split when separating
 ```
 
-Should run separate (if needed), analyse (if needed), then launch [cleave.py](../cleave.py) with the right stems folder and mix path.
+Should run separate (if needed), analyse (if needed), then launch [cleave.py](../cleave.py) with the right project and mix path.
 
 ## Video export
 
