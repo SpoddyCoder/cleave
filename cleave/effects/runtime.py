@@ -11,7 +11,7 @@ from cleave.effects.hue import HueState, hue_mix_pct, hue_rgb
 from cleave.effects.pulse import PulseEnvelopeState, effective_opacity
 from cleave.effects.registry import effect_roster
 from cleave.signals import Signals
-from cleave.viz_tuning_controls import TuningSession
+from cleave.viz.controls import TuningSession
 
 
 @dataclass

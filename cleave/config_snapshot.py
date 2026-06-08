@@ -11,7 +11,7 @@ import yaml
 from cleave.config import CleaveConfig, clamp_beat_sensitivity, clamp_effect_pct, dump_yaml
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import to_config_relative
-from cleave.viz_tuning_controls import TuningSession
+from cleave.viz.controls import TuningSession
 
 _UNNAMED_PATTERN = re.compile(r"^unnamed-(\d+)\.yaml$")
 

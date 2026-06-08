@@ -11,6 +11,11 @@ from cleave.config import CONFIG_FILENAME
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
+def repo_root() -> Path:
+    """Return the repository root directory."""
+    return _REPO_ROOT.resolve()
+
+
 def data_dir() -> Path:
     """Return Cleave data root (``CLEAVE_DATA`` or the repo / package root)."""
     override = os.environ.get("CLEAVE_DATA")

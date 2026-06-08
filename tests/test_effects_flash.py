@@ -18,7 +18,7 @@ from cleave.effects.runtime import EffectRuntime
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import playlist_at_dir
 from cleave.signals import Signals
-from cleave.viz_tuning_controls import LayerRuntime, TuningSession
+from cleave.viz.controls import LayerRuntime, TuningSession
 from pathlib import Path
 
 

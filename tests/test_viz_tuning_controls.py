@@ -19,8 +19,8 @@ from cleave.preset_playlist import (
     preset_filename_display,
     scan_preset_playlist,
 )
-from cleave.viz_playback import PlaybackState, format_mmss
-from cleave.viz_tuning_controls import (
+from cleave.viz.playback import PlaybackState, format_mmss
+from cleave.viz.controls import (
     LayerRuntime,
     SEEK_LONG,
     SEEK_SHORT,
@@ -31,7 +31,7 @@ from cleave.viz_tuning_controls import (
     allow_overwrite_for_path,
     config_path_display,
 )
-from cleave.viz_theme import (
+from cleave.viz.theme import (
     DISABLED,
     HIGHLIGHT,
     LOCKED,
@@ -39,7 +39,7 @@ from cleave.viz_theme import (
     PANEL_CONTENT_MAX_WIDTH,
     VALUE,
 )
-from cleave.viz_material_icons import (
+from cleave.viz.material_icons import (
     FILE_GLYPH,
     FOLDER_GLYPH,
     LOCK_GLYPH,
@@ -51,7 +51,7 @@ from cleave.viz_material_icons import (
     track_header_lock_suffix_width,
     visibility_icon_prefix_width,
 )
-from cleave.viz_tuning_overlay import (
+from cleave.viz.overlay import (
     find_row,
     RowKind,
     TrackBlock,

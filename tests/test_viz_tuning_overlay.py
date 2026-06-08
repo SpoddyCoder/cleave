@@ -5,7 +5,7 @@ from __future__ import annotations
 import pygame
 
 from cleave.extract import STEM_NAMES
-from cleave.viz_tuning_overlay import (
+from cleave.viz.overlay import (
     TrackBlock,
     TuningOverlay,
     TuningViewState,
@@ -60,7 +60,7 @@ def test_draw_effects_expanded_panel_rect_within_surface() -> None:
 
 
 def test_draw_effects_expanded_subsurface_panel_rect() -> None:
-    """Regression: cleave.py subsurfaces panel_rect after draw."""
+    """Regression: overlay subsurfaces panel_rect after draw."""
     pygame.init()
     overlay = TuningOverlay()
     state = _effects_expanded_view_state()

@@ -73,6 +73,8 @@ To store projects under XDG instead, set `CLEAVE_DATA=~/.local/share/cleave`.
 
 ## Visualizer
 
+User-facing entry: `python cleave.py` (thin shim). Implementation lives under [cleave/viz/](cleave/viz/) (`VisualizerApp` loop, live overlay, bootstrap). Programmatic entry: `cleave.viz.launch(project_dir, ...)` (used by the shim and the planned `play` command).
+
 Four libprojectM layers at tiered resolutions, composited to **1280x720 @ 30 fps** by default. Stack order is `layer_z_order` in [cleave.config.yaml](cleave.config.yaml).
 
 **Presets:** set `paths.preset_root` to your presets root (the folder that contains packs like `presets-cream-of-the-crop`). Each `layers.*.preset` is a `.milk` file or directory (recursive scan).
@@ -87,7 +89,7 @@ Four libprojectM layers at tiered resolutions, composited to **1280x720 @ 30 fps
 
 ### Live tuning overlay
 
-Arrow-key tree panel ([cleave/viz_tuning_overlay.py](cleave/viz_tuning_overlay.py)): browse presets, blend, opacity, beat, cleave effects, z-order, layer lock, transport, save.
+Arrow-key tree panel ([cleave/viz/overlay.py](cleave/viz/overlay.py)): browse presets, blend, opacity, beat, cleave effects, z-order, layer lock, transport, save.
 
 - **Track rows:** one block per stem (header, preset dir/file, blend, opacity, beat, collapsible cleave effects).
 - **Footer rows:** transport, **SAVE AS NEW CONFIG**, **OVERWRITE CONFIG** (when active config is not repo-root [cleave.config.yaml](cleave.config.yaml)).
