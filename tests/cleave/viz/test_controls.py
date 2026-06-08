@@ -19,7 +19,8 @@ from cleave.preset_playlist import (
     preset_filename_display,
     scan_preset_playlist,
 )
-from cleave.viz.playback import PlaybackState, format_mmss
+from cleave.viz.playback import format_mmss
+from tests.support.viz import stub_playback_state
 from cleave.viz.controls import (
     LayerRuntime,
     SEEK_LONG,
@@ -112,7 +113,7 @@ def _make_controls(
     return TuningControls(
         session,
         preset_root=preset_root,
-        playback=PlaybackState(),
+        playback=stub_playback_state(),
         duration_sec=120.0,
         launch_config_path=launch_config_path,
         repo_root_example=repo_root_example,
@@ -1035,7 +1036,7 @@ def _controls_with_playlist(
     return TuningControls(
         session,
         preset_root=root,
-        playback=PlaybackState(),
+        playback=stub_playback_state(),
         duration_sec=120.0,
     )
 

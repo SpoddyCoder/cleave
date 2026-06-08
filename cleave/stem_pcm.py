@@ -5,30 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import librosa
 import numpy as np
-import soundfile as sf
 
 from cleave.extract import STEM_NAMES, stem_paths
-
-SAMPLE_RATE_HZ = 44100
-
-
-def _to_mono_float32(data: np.ndarray) -> np.ndarray:
-    if data.ndim == 1:
-        mono = data
-    else:
-        mono = data.mean(axis=1)
-    return np.ascontiguousarray(mono, dtype=np.float32)
-
-
-def _load_stem_wav(path: Path) -> np.ndarray:
-    data, sr = sf.read(path, dtype="float32", always_2d=True)
-    mono = _to_mono_float32(data)
-    if sr != SAMPLE_RATE_HZ:
-        mono = librosa.resample(mono, orig_sr=sr, target_sr=SAMPLE_RATE_HZ)
-        mono = np.ascontiguousarray(mono, dtype=np.float32)
-    return mono
+from cleave.pcm_io import SAMPLE_RATE_HZ, load_wav_mono_44k
 
 
 @dataclass
@@ -81,7 +61,7 @@ def load_stem_pcm(project_dir: Path) -> StemPcmBank:
 
     pcm: dict[str, np.ndarray] = {}
     for name in STEM_NAMES:
-        pcm[name] = _load_stem_wav(paths[name])
+        pcm[name] = load_wav_mono_44k(paths[name])
 
     duration_sec = max(len(arr) for arr in pcm.values()) / SAMPLE_RATE_HZ
     return StemPcmBank(

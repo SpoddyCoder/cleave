@@ -14,9 +14,11 @@ from cleave.gl_compositor import GlCompositor
 from cleave.gl_post_process import GlPostProcess
 from cleave.preset_playlist import PresetPlaylist
 from cleave.signals import Signals
+from cleave.pcm_io import load_mix_pcm
 from cleave.stem_pcm import StemPcmBank, load_stem_pcm, samples_per_frame
 from cleave.viz.bootstrap import load_stem_signals
 from cleave.viz.controls import TuningControls, TuningSession
+from cleave.viz.mix_player import MixPlayer
 from cleave.viz.layer import (
     StemLayer,
     _apply_layer_bloom,
@@ -58,6 +60,7 @@ class VisualizerRuntime:
     controls: TuningControls | None = None
     overlay: TuningOverlay | None = None
     overlay_surface: pygame.Surface | None = None
+    mix_player: MixPlayer | None = None
     playback: PlaybackState | None = None
 
 
@@ -98,7 +101,10 @@ def _init_gl_resources(runtime: VisualizerRuntime) -> None:
     layers = _build_layers(runtime.cfg, compositor, runtime.playlists)
 
     layers_by_name = {layer.name: layer for layer in layers}
-    playback = init_playback()
+    mix_pcm, sample_rate = load_mix_pcm(runtime.audio_path)
+    mix_player = MixPlayer(mix_pcm, sample_rate)
+    runtime.mix_player = mix_player
+    playback = init_playback(mix_player)
     controls = make_tuning_controls(
         session=runtime.session,
         cfg=runtime.cfg,
@@ -173,7 +179,6 @@ class VisualizerApp:
         rt = self._runtime
 
         pygame.init()
-        pygame.mixer.init()
 
         try:
             pygame.display.set_mode(
@@ -191,9 +196,8 @@ class VisualizerApp:
             _init_gl_resources(rt)
             assert rt.controls is not None
             assert rt.playback is not None
-
-            pygame.mixer.music.load(str(rt.audio_path))
-            pygame.mixer.music.play()
+            assert rt.mix_player is not None
+            rt.mix_player.start()
 
             running = True
             while running:
@@ -217,9 +221,10 @@ class VisualizerApp:
 
                 pygame.display.flip()
 
-                if not rt.playback.paused and not pygame.mixer.music.get_busy():
-                    if t_sec >= rt.duration_sec - 0.05:
-                        running = False
+                if not rt.playback.paused and (
+                    rt.mix_player.finished() or t_sec >= rt.duration_sec - 0.05
+                ):
+                    running = False
 
         finally:
             _destroy_layers(rt.layers)
@@ -227,5 +232,6 @@ class VisualizerApp:
                 rt.compositor.destroy()
             if rt.post_process is not None:
                 rt.post_process.destroy()
-            pygame.mixer.music.stop()
+            if rt.mix_player is not None:
+                rt.mix_player.stop()
             pygame.quit()

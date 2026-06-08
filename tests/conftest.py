@@ -18,11 +18,9 @@ _FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 
 @pytest.fixture(scope="session", autouse=True)
 def _pygame_session() -> None:
-    """Initialize pygame (including mixer) once for tests that toggle playback."""
+    """Initialize pygame once for control and overlay tests."""
     if not pygame.get_init():
         pygame.init()
-    if not pygame.mixer.get_init():
-        pygame.mixer.init()
 
 
 @pytest.fixture

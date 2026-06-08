@@ -9,7 +9,8 @@ import numpy as np
 import pytest
 
 from cleave.extract import STEM_NAMES
-from cleave.stem_pcm import SAMPLE_RATE_HZ, StemPcmBank, _to_mono_float32, samples_per_frame
+from cleave.pcm_io import SAMPLE_RATE_HZ, _to_mono_float32
+from cleave.stem_pcm import StemPcmBank, samples_per_frame
 
 
 def _make_bank(*, duration_samples: int = 4410) -> StemPcmBank:
