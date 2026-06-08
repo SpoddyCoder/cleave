@@ -5,31 +5,27 @@ from __future__ import annotations
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
 
 import pygame
 
-from cleave.config import CleaveConfig, load_config
+from cleave.config import CleaveConfig
 from cleave.effects.runtime import EffectRuntime
 from cleave.gl_compositor import GlCompositor
 from cleave.gl_post_process import GlPostProcess
-from cleave.paths import repo_root
 from cleave.preset_playlist import PresetPlaylist
 from cleave.signals import Signals
 from cleave.stem_pcm import StemPcmBank, load_stem_pcm, samples_per_frame
-from cleave.viz.bootstrap import STEM_DRUMS, load_stem_signals
+from cleave.viz.bootstrap import load_stem_signals
 from cleave.viz.controls import TuningControls, TuningSession
 from cleave.viz.layer import (
     StemLayer,
     _apply_layer_bloom,
     _apply_layer_grit,
-    _build_drums_layer,
     _build_layers,
     _composite_ordered,
     _destroy_layers,
     _draw_tuning_overlay,
     _render_layer_fbo,
-    _session_for_drums,
     _session_from_cfg,
     apply_effect_modifiers,
 )
@@ -54,12 +50,7 @@ class VisualizerRuntime:
     signals: Signals | None
     effect_runtime: EffectRuntime
     preset_root: Path
-    mode: Literal["full", "drums"] = "full"
     playlists: dict[str, PresetPlaylist] = field(default_factory=dict)
-    drums_playlist: PresetPlaylist | None = None
-    drums_texture_paths: list[Path] = field(default_factory=list)
-    drums_beat_sensitivity: float = 1.0
-    drums_preset_anchor: Path | None = None
     layers: list[StemLayer] = field(default_factory=list)
     layers_by_name: dict[str, StemLayer] = field(default_factory=dict)
     compositor: GlCompositor | None = None
@@ -93,58 +84,7 @@ def build_runtime_full(
         signals=load_stem_signals(project_dir),
         effect_runtime=EffectRuntime(),
         preset_root=cfg.paths.preset_root,
-        mode="full",
         playlists=playlists,
-    )
-
-
-def build_runtime_drums_only(
-    project_dir: Path,
-    audio_path: Path,
-    playlist: PresetPlaylist,
-    texture_paths: list[Path],
-    beat_sensitivity: float,
-    config_path: Path | None,
-    preset_root: Path,
-    preset_anchor: Path,
-    width: int,
-    height: int,
-    fps: int,
-) -> VisualizerRuntime:
-    cfg: CleaveConfig | None = None
-    try:
-        cfg = load_config(config_path, repo_root())
-    except (FileNotFoundError, ValueError):
-        pass
-
-    pcm_bank = load_stem_pcm(project_dir)
-    drums_cfg = cfg.layers[STEM_DRUMS] if cfg is not None else None
-    return VisualizerRuntime(
-        project_dir=project_dir,
-        audio_path=audio_path,
-        width=width,
-        height=height,
-        fps=fps,
-        window_title=f"Cleave (drums) — {project_dir.name}",
-        session=_session_for_drums(
-            playlist,
-            preset_anchor,
-            preset_root,
-            beat_sensitivity,
-            drums_cfg,
-        ),
-        cfg=cfg,
-        pcm_bank=pcm_bank,
-        duration_sec=pcm_bank.duration_sec,
-        n_pcm=samples_per_frame(fps),
-        signals=load_stem_signals(project_dir),
-        effect_runtime=EffectRuntime(),
-        preset_root=preset_root,
-        mode="drums",
-        drums_playlist=playlist,
-        drums_texture_paths=texture_paths,
-        drums_beat_sensitivity=beat_sensitivity,
-        drums_preset_anchor=preset_anchor,
     )
 
 
@@ -154,22 +94,8 @@ def _init_gl_resources(runtime: VisualizerRuntime) -> None:
     post_process = GlPostProcess()
     post_process.init()
 
-    if runtime.mode == "full":
-        assert runtime.cfg is not None
-        layers = _build_layers(runtime.cfg, compositor, runtime.playlists)
-    else:
-        assert runtime.drums_playlist is not None
-        layers = [
-            _build_drums_layer(
-                compositor,
-                runtime.drums_playlist,
-                runtime.drums_texture_paths,
-                runtime.drums_beat_sensitivity,
-                runtime.width,
-                runtime.height,
-                runtime.fps,
-            )
-        ]
+    assert runtime.cfg is not None
+    layers = _build_layers(runtime.cfg, compositor, runtime.playlists)
 
     layers_by_name = {layer.name: layer for layer in layers}
     playback = init_playback()

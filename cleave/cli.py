@@ -3,8 +3,7 @@ import os
 import sys
 from pathlib import Path
 
-from cleave.paths import repo_root, resolve_project
-from cleave.project import manifest_path, mix_path
+from cleave.paths import repo_root
 from cleave.separate import (
     project_stems_complete,
     resolve_separate_target,
@@ -18,24 +17,6 @@ SIGNALS_FILENAME = "signals.json"
 def _exit_error(message: str) -> None:
     print(message, file=sys.stderr)
     sys.exit(1)
-
-
-def validate_project(path_or_slug: str) -> Path:
-    try:
-        return resolve_project(path_or_slug)
-    except (FileNotFoundError, ValueError) as e:
-        _exit_error(f"error: {e}")
-
-
-def validate_project_manifest(project_dir: Path) -> None:
-    if not manifest_path(project_dir).is_file():
-        _exit_error(
-            f"error: project manifest not found: {manifest_path(project_dir)}; "
-            "run separate first"
-        )
-    mix = mix_path(project_dir)
-    if not mix.is_file():
-        _exit_error(f"error: project mix not found: {mix}")
 
 
 def cmd_separate(args: argparse.Namespace) -> None:
@@ -74,8 +55,11 @@ def cmd_separate(args: argparse.Namespace) -> None:
 
 
 def cmd_play(args: argparse.Namespace) -> None:
-    project_dir = validate_project(args.project)
-    validate_project_manifest(project_dir)
+    target = Path(args.target)
+    try:
+        project_dir = run_separate(target, slow=args.slow)
+    except (FileNotFoundError, ValueError, RuntimeError) as e:
+        _exit_error(f"error: {e}")
 
     os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
     from cleave.viz import launch
@@ -83,7 +67,6 @@ def cmd_play(args: argparse.Namespace) -> None:
     launch(
         project_dir,
         config=args.config,
-        preset=args.preset,
     )
 
 
@@ -116,24 +99,21 @@ def build_parser() -> argparse.ArgumentParser:
 
     play = subparsers.add_parser(
         "play",
-        help="Run the live visualizer for a project",
+        help="Run the live visualizer (separates first if needed)",
     )
     play.add_argument(
-        "project",
-        help="Cleave project (path or slug)",
+        "target",
+        help="Source audio file or Cleave project (path or slug)",
+    )
+    play.add_argument(
+        "--slow",
+        action="store_true",
+        help="htdemucs_ft for separation; pyin for vocal pitch (default: fast)",
     )
     play.add_argument(
         "--config",
         type=Path,
         help=f"Config path (default: {repo_root() / 'cleave.config.yaml'})",
-    )
-    play.add_argument(
-        "--preset",
-        type=Path,
-        help=(
-            "Drums-only debug: load this .milk on drums (skips four-preset config "
-            "validation; uses visualizer width/height/fps from config if present)"
-        ),
     )
     play.set_defaults(func=cmd_play)
 

@@ -102,20 +102,55 @@ def test_cmd_separate_force_message(
     assert "Re-separated and analysed" in out
 
 
-def test_play_parser_uses_project_arg() -> None:
+def test_play_parser_uses_target_arg() -> None:
     parser = build_parser()
-    args = parser.parse_args(["play", "my-track"])
-    assert args.project == "my-track"
+    args = parser.parse_args(["play", "my-track.flac"])
+    assert args.target == "my-track.flac"
+    assert not args.slow
     assert args.config is None
-    assert args.preset is None
+
+
+def _complete_project(tmp_path: Path, slug: str = "my-track") -> Path:
+    project = tmp_path / "projects" / slug
+    project.mkdir(parents=True)
+    for name in STEM_NAMES:
+        (project / f"{name}.wav").write_bytes(b"wav")
+    mix = project / f"{slug}.flac"
+    mix.write_bytes(b"mix")
+    write_manifest(
+        project,
+        slug=slug,
+        mix_filename=f"{slug}.flac",
+        original_path=tmp_path / f"{slug}.flac",
+        demucs_model="htdemucs",
+    )
+    (project / "signals.json").write_text("{}")
+    return project
 
 
 def test_cmd_play_calls_launch(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = _complete_project(tmp_path)
+
+    with patch("cleave.viz.launch") as launch:
+        cmd_play(build_parser().parse_args(["play", "my-track"]))
+
+    launch.assert_called_once_with(
+        project.resolve(),
+        config=None,
+    )
+
+
+def test_cmd_play_calls_run_separate_when_incomplete(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     project = tmp_path / "projects" / "my-track"
     project.mkdir(parents=True)
+    for name in STEM_NAMES:
+        (project / f"{name}.wav").write_bytes(b"wav")
     mix = project / "my-track.flac"
     mix.write_bytes(b"mix")
     write_manifest(
@@ -126,28 +161,28 @@ def test_cmd_play_calls_launch(
         demucs_model="htdemucs",
     )
 
-    with patch("cleave.viz.launch") as launch:
+    with (
+        patch("cleave.cli.run_separate", return_value=project.resolve()) as run_separate,
+        patch("cleave.viz.launch"),
+    ):
         cmd_play(build_parser().parse_args(["play", "my-track"]))
 
-    launch.assert_called_once_with(
-        project.resolve(),
-        config=None,
-        preset=None,
-    )
+    run_separate.assert_called_once_with(Path("my-track"), slow=False)
 
 
-def test_cmd_play_requires_project_manifest(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+def test_cmd_play_forwards_slow_to_run_separate(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
-    project = tmp_path / "projects" / "my-track"
-    project.mkdir(parents=True)
+    project = _complete_project(tmp_path)
 
-    with pytest.raises(SystemExit) as exc_info:
-        cmd_play(build_parser().parse_args(["play", "my-track"]))
+    with (
+        patch("cleave.cli.run_separate", return_value=project.resolve()) as run_separate,
+        patch("cleave.viz.launch"),
+    ):
+        cmd_play(build_parser().parse_args(["play", "my-track", "--slow"]))
 
-    assert exc_info.value.code == 1
-    assert "project manifest not found" in capsys.readouterr().err
+    run_separate.assert_called_once_with(Path("my-track"), slow=True)
 
 
 def test_module_help_lists_subcommands() -> None:
