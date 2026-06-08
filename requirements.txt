@@ -6,5 +6,6 @@ numpy
 pygame
 PyOpenGL
 PyYAML
+pytest
 soundfile
 torchcodec

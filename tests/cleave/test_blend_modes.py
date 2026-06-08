@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from cleave.config import _parse_blend_mode
 from cleave.blend_modes import BLEND_MODES
-from tests.test_viz_tuning_controls import _make_controls
+from tests.support.viz import make_controls
 
 
 def test_blend_modes_cycle_order() -> None:
@@ -36,7 +36,7 @@ def test_parse_blend_mode_rejects_unknown() -> None:
 
 
 def test_cycle_blend_wraps_forward() -> None:
-    controls = _make_controls(("drums",))
+    controls = make_controls(("drums",))
     layer = controls.session.layers["drums"]
     layer.blend_mode = "pure-add"
 
@@ -45,7 +45,7 @@ def test_cycle_blend_wraps_forward() -> None:
 
 
 def test_cycle_blend_steps_backward() -> None:
-    controls = _make_controls(("drums",))
+    controls = make_controls(("drums",))
     layer = controls.session.layers["drums"]
     layer.blend_mode = "add"
 
@@ -54,28 +54,9 @@ def test_cycle_blend_steps_backward() -> None:
 
 
 def test_cycle_blend_recovers_from_unknown_mode() -> None:
-    controls = _make_controls(("drums",))
+    controls = make_controls(("drums",))
     layer = controls.session.layers["drums"]
     layer.blend_mode = "legacy"  # type: ignore[assignment]
 
     controls._cycle_blend("drums", forward=True)
     assert layer.blend_mode == "add"
-
-
-def main() -> int:
-    tests = [
-        test_blend_modes_cycle_order,
-        test_parse_blend_mode_accepts_all_modes,
-        test_parse_blend_mode_rejects_unknown,
-        test_cycle_blend_wraps_forward,
-        test_cycle_blend_steps_backward,
-        test_cycle_blend_recovers_from_unknown_mode,
-    ]
-    for test in tests:
-        test()
-        print(f"ok {test.__name__}")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
