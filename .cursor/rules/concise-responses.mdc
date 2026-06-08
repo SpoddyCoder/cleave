@@ -1,0 +1,38 @@
+---
+description: Keep agent replies short; lead with what matters
+alwaysApply: true
+---
+
+# Concise responses
+
+Default to brief replies. Assume the user will ask for more detail if they need it.
+
+## Lead with the answer
+
+- Put the outcome, decision, or direct answer first.
+- Skip preamble ("Sure!", "Great question", "Here's what I found").
+- Skip postamble recap of work you just did unless the user asked for a summary.
+
+## Cut filler
+
+Do not add unless the user asked or it is required for a correct answer:
+
+- "This is what X does" when they did not ask for an explanation.
+- "This is a good idea because..." justification for obvious or requested work.
+- Step-by-step narration of tool use ("First I'll search...", "Now I'll read...").
+- Repeated restatement of the user's question.
+
+## Keep what matters
+
+Still include when relevant:
+
+- Blockers, errors, or ambiguities that need a decision.
+- Real trade-offs or options (short list, not an essay).
+- Commands, paths, or code the user needs to act on.
+- Warnings about destructive or risky actions.
+
+## Scale length to the task
+
+- Simple question: a few sentences or a short list.
+- Implementation done: what changed and where; skip the tour.
+- Complex topic only when asked: structure helps, but stay tight; no padding between sections.
