@@ -55,9 +55,10 @@ Each track is a **project** under `projects/<slug>/` with the original mix audio
 
 ```bash
 python -m cleave separate ~/music/sights-and-sounds-26.flac
-python -m cleave analyse sights-and-sounds-26
 python -m cleave play sights-and-sounds-26
 ```
+
+`separate` runs Demucs stem separation and writes `signals.json` in one step. Re-run on an existing project slug to analyse only (when stems exist but `signals.json` is missing). Use `--force` to redo both.
 
 `python cleave.py` is an alias for `python -m cleave` (same subcommands).
 
@@ -67,11 +68,10 @@ To store projects under XDG instead, set `CLEAVE_DATA=~/.local/share/cleave`.
 
 | Command | Purpose |
 | --- | --- |
-| `python -m cleave separate <file>` | Copy mix into `projects/<slug>/`, write `project.yaml`, Demucs split (`--slow`, `--force`) |
-| `python -m cleave analyse <slug or path>` | Write `signals.json` from stems and project mix (`--force` to redo) |
+| `python -m cleave separate <file or slug>` | Demucs split + `signals.json` (`--slow`, `--force`; idempotent when outputs exist) |
 | `python -m cleave play <slug or path>` | Run the visualizer (`--config`, `--preset` for drums-only debug) |
 
-`analyse` extracts per-stem signals at 100 Hz (onsets, bass envelopes, vocal pitch, spectral centroid). The visualizer uses stem PCM for Milkdrop reactivity and `signals.json` for cleave effects.
+`separate` extracts per-stem signals at 100 Hz (onsets, bass envelopes, vocal pitch, spectral centroid) into `signals.json`. The visualizer uses stem PCM for Milkdrop reactivity and `signals.json` for cleave effects.
 
 ## Visualizer
 
