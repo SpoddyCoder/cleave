@@ -54,11 +54,17 @@ Clone Milkdrop preset packs into `~/.local/share/cleave/presets/` (see [cleave.c
 Each track is a **project** under `projects/<slug>/` with the original mix audio, four stem wavs (`drums.wav`, `bass.wav`, `vocals.wav`, `other.wav`), `project.yaml`, and `signals.json`. The slug is the audio filename stem (e.g. `sights-and-sounds-26.flac` becomes `sights-and-sounds-26`). `separate` copies the source file into the project (no transcode) and writes `project.yaml`.
 
 ```bash
+python -m cleave play ~/music/sights-and-sounds-26.flac
+```
+
+`play` accepts a source audio file or project slug/path. It runs separation and signal extraction when anything is missing, then launches the visualizer. You can still run `separate` on its own:
+
+```bash
 python -m cleave separate ~/music/sights-and-sounds-26.flac
 python -m cleave play sights-and-sounds-26
 ```
 
-`separate` runs Demucs stem separation and writes `signals.json` in one step. Re-run on an existing project slug to analyse only (when stems exist but `signals.json` is missing). Use `--force` to redo both.
+`separate` is idempotent: re-run on an existing project slug to analyse only (when stems exist but `signals.json` is missing). Use `--force` to redo both. Pass `--slow` to either command for higher-quality separation.
 
 `python cleave.py` is an alias for `python -m cleave` (same subcommands).
 
@@ -69,7 +75,7 @@ To store projects under XDG instead, set `CLEAVE_DATA=~/.local/share/cleave`.
 | Command | Purpose |
 | --- | --- |
 | `python -m cleave separate <file or slug>` | Demucs split + `signals.json` (`--slow`, `--force`; idempotent when outputs exist) |
-| `python -m cleave play <slug or path>` | Run the visualizer (`--config`, `--preset` for drums-only debug) |
+| `python -m cleave play <file or slug>` | Run the visualizer; separates first if needed (`--slow`, `--config`) |
 
 `separate` extracts per-stem signals at 100 Hz (onsets, bass envelopes, vocal pitch, spectral centroid) into `signals.json`. The visualizer uses stem PCM for Milkdrop reactivity and `signals.json` for cleave effects.
 
@@ -110,11 +116,7 @@ Full row behaviour: [.cursor/rules/live-tuning-ui.mdc](.cursor/rules/live-tuning
 
 **Save:** **SAVE AS NEW CONFIG** writes `unnamed-N.yaml` in the project directory. **OVERWRITE CONFIG** updates the active config file (hidden when the active file is the repo-root template). A project can also hold `cleave.config.yaml` as its default launch config.
 
-Pass `--config` to use a different YAML. Drums-only debug:
-
-```bash
-python -m cleave play sights-and-sounds-26 --preset ~/.local/share/cleave/presets/.../some.milk
-```
+Pass `--config` to use a different YAML.
 
 ### Cleave effects
 

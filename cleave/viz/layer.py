@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 
 import pygame
 from OpenGL.GL import GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, glClear, glClearColor, glViewport
 
-from cleave.config import CleaveConfig, LayerConfig
+from cleave.config import CleaveConfig
 from cleave.effects.runtime import EffectRuntime
 from cleave.gl_compositor import GlCompositor, LayerFbo
 from cleave.gl_post_process import GlPostProcess
@@ -95,62 +94,6 @@ def _build_layers(
         )
 
     return runtimes
-
-
-def _build_drums_layer(
-    compositor: GlCompositor,
-    playlist: PresetPlaylist,
-    texture_paths: list[Path],
-    beat_sensitivity: float,
-    width: int,
-    height: int,
-    fps: int,
-    *,
-    blend_mode: str = "add",
-) -> StemLayer:
-    from cleave.viz.bootstrap import STEM_DRUMS
-
-    pm = ProjectM()
-    pm.set_window_size(width, height)
-    if texture_paths:
-        pm.set_texture_paths(texture_paths)
-    playlist.load_into(pm)
-    pm.lock_preset(True)
-    pm.set_hard_cut_enabled(False)
-    pm.set_fps(fps)
-    pm.set_beat_sensitivity(beat_sensitivity)
-
-    fbo = compositor.create_layer_fbo(STEM_DRUMS, width, height, blend_mode=blend_mode)
-    return StemLayer(name=STEM_DRUMS, pm=pm, fbo=fbo, playlist=playlist)
-
-
-def _session_for_drums(
-    playlist: PresetPlaylist,
-    preset_anchor: Path,
-    preset_root: Path,
-    beat_sensitivity: float,
-    drums_cfg: LayerConfig | None,
-) -> TuningSession:
-    from cleave.viz.bootstrap import STEM_DRUMS
-
-    return TuningSession(
-        layer_z_order=[STEM_DRUMS],
-        layers={
-            STEM_DRUMS: LayerRuntime(
-                playlist=playlist,
-                browse_floor=preset_browse_floor(preset_anchor, preset_root),
-                opacity_pct=int((drums_cfg.opacity if drums_cfg else 1.0) * 100),
-                effects={
-                    effect_id: dict(drivers)
-                    for effect_id, drivers in (
-                        drums_cfg.effects if drums_cfg else {}
-                    ).items()
-                },
-                blend_mode="add",
-                beat_sensitivity=beat_sensitivity,
-            ),
-        },
-    )
 
 
 def _render_layer_fbo(layer: StemLayer, pm: ProjectM) -> None:
