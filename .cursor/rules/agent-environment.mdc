@@ -1,0 +1,33 @@
+---
+description: Canonical Python env, commands, and verification for agents on this machine
+alwaysApply: true
+---
+
+# Agent environment (WSL dev machine)
+
+## Python
+
+- Canonical env: conda `cleave` at `/home/fernpa/anaconda3/envs/cleave/`.
+- Always invoke `/home/fernpa/anaconda3/envs/cleave/bin/python` (and `/home/fernpa/anaconda3/envs/cleave/bin/pip` when pip is needed).
+- Never use bare `python`, `python3`, or `pip` without the full path.
+- Never create a venv or a second Python environment.
+
+## Dependencies
+
+- Do not run `pip install` unless the user explicitly asked or `requirements.txt` changed in the current task.
+- FFmpeg and libprojectM are already installed on this WSL machine; do not attempt to install system deps.
+
+## Verification
+
+- Default test command:
+
+  `/home/fernpa/anaconda3/envs/cleave/bin/python tests/run_unit_tests.py`
+
+- The visualizer ([cleave.py](cleave.py) / `cleave.viz.launch`) needs display and OpenGL; do not launch it for routine agent verification. Use unit tests unless the user asks to run the visualizer.
+
+## Optional activation
+
+When a shell session needs an activated env instead of full paths:
+
+- `source /home/fernpa/anaconda3/etc/profile.d/conda.sh && conda activate cleave`
+- `conda run -n cleave ...`
