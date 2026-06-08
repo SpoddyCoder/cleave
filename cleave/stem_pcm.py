@@ -33,7 +33,7 @@ def _load_stem_wav(path: Path) -> np.ndarray:
 
 @dataclass
 class StemPcmBank:
-    stems_dir: Path
+    project_dir: Path
     duration_sec: float
     _pcm: dict[str, np.ndarray] = field(repr=False)
     sample_rate_hz: int = SAMPLE_RATE_HZ
@@ -69,14 +69,14 @@ def samples_per_frame(fps: int = 60) -> int:
     return n
 
 
-def load_stem_pcm(stems_dir: Path) -> StemPcmBank:
-    """Load all four stem wavs from *stems_dir* into memory."""
-    stems_dir = stems_dir.resolve()
-    paths = stem_paths(stems_dir)
+def load_stem_pcm(project_dir: Path) -> StemPcmBank:
+    """Load all four stem wavs from *project_dir* into memory."""
+    project_dir = project_dir.resolve()
+    paths = stem_paths(project_dir)
     missing = [name for name, path in paths.items() if not path.is_file()]
     if missing:
         raise FileNotFoundError(
-            f"missing stem wav(s) in {stems_dir}: {', '.join(missing)}"
+            f"missing stem wav(s) in {project_dir}: {', '.join(missing)}"
         )
 
     pcm: dict[str, np.ndarray] = {}
@@ -85,7 +85,7 @@ def load_stem_pcm(stems_dir: Path) -> StemPcmBank:
 
     duration_sec = max(len(arr) for arr in pcm.values()) / SAMPLE_RATE_HZ
     return StemPcmBank(
-        stems_dir=stems_dir,
+        project_dir=project_dir,
         duration_sec=duration_sec,
         _pcm=pcm,
     )

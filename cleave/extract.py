@@ -27,9 +27,9 @@ class VocalSignals(TypedDict):
     pitch_hz: tuple[np.ndarray, np.ndarray]
 
 
-def stem_paths(stems_dir: Path) -> dict[str, Path]:
-    """Map stem names to expected wav paths under *stems_dir*."""
-    return {name: stems_dir / f"{name}.wav" for name in STEM_NAMES}
+def stem_paths(project_dir: Path) -> dict[str, Path]:
+    """Map stem names to wav paths under a Cleave project."""
+    return {name: project_dir / f"{name}.wav" for name in STEM_NAMES}
 
 
 def _load(path: Path | str) -> tuple[np.ndarray, float]:

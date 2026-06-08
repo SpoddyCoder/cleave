@@ -4,7 +4,8 @@ from pathlib import Path
 
 from cleave.analyse import run_analyse
 from cleave.extract import STEM_NAMES
-from cleave.separate import StemsAlreadyExist, run_separate
+from cleave.paths import resolve_project
+from cleave.separate import ProjectStemsExist, run_separate
 
 SIGNALS_FILENAME = "signals.json"
 
@@ -14,22 +15,22 @@ def _exit_error(message: str) -> None:
     sys.exit(1)
 
 
-def validate_stems_dir(stems_dir: Path) -> None:
-    if not stems_dir.exists():
-        _exit_error(f"error: stems directory not found: {stems_dir}")
-    if not stems_dir.is_dir():
-        _exit_error(f"error: not a directory: {stems_dir}")
+def validate_project(path_or_slug: str) -> Path:
+    try:
+        return resolve_project(path_or_slug)
+    except (FileNotFoundError, ValueError) as e:
+        _exit_error(f"error: {e}")
 
 
-def validate_stem_files(stems_dir: Path) -> None:
+def validate_stem_files(project_dir: Path) -> None:
     missing = [
         f"{name}.wav"
         for name in STEM_NAMES
-        if not (stems_dir / f"{name}.wav").is_file()
+        if not (project_dir / f"{name}.wav").is_file()
     ]
     if missing:
         _exit_error(
-            f"error: missing stem files in {stems_dir}: {', '.join(missing)}"
+            f"error: missing stem files in {project_dir}: {', '.join(missing)}"
         )
 
 
@@ -39,14 +40,13 @@ def validate_source(source: Path) -> None:
 
 
 def cmd_analyse(args: argparse.Namespace) -> None:
-    stems_dir = Path(args.stems_dir)
-    validate_stems_dir(stems_dir)
-    validate_stem_files(stems_dir)
+    project_dir = validate_project(args.project)
+    validate_stem_files(project_dir)
 
     if args.source is not None:
         validate_source(Path(args.source))
 
-    signals_path = stems_dir / SIGNALS_FILENAME
+    signals_path = project_dir / SIGNALS_FILENAME
     if signals_path.exists() and not args.force:
         print(
             f"signals.json already exists at {signals_path}; "
@@ -55,25 +55,25 @@ def cmd_analyse(args: argparse.Namespace) -> None:
         return
 
     source = Path(args.source) if args.source is not None else None
-    signals_path = run_analyse(stems_dir, source=source, slow=args.slow)
+    signals_path = run_analyse(project_dir, source=source, slow=args.slow)
     print(f"Wrote signals to {signals_path}")
 
 
 def cmd_separate(args: argparse.Namespace) -> None:
     try:
-        stems_dir = run_separate(
+        project_dir = run_separate(
             Path(args.audiofile), slow=args.slow, force=args.force
         )
-    except StemsAlreadyExist as e:
+    except ProjectStemsExist as e:
         print(
-            f"stems already exist at {e.stems_dir}; "
+            f"stem wavs already exist in project {e.project_dir}; "
             "use --force to re-separate"
         )
         return
     except (FileNotFoundError, ValueError, RuntimeError) as e:
         _exit_error(f"error: {e}")
 
-    print(f"Wrote stems to {stems_dir}")
+    print(f"Wrote project to {project_dir}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -88,8 +88,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Extract per-stem signals to signals.json",
     )
     analyse.add_argument(
-        "stems_dir",
-        help="Directory containing drums.wav, bass.wav, vocals.wav, other.wav",
+        "project",
+        help="Cleave project (path or slug)",
     )
     analyse.add_argument(
         "--source",

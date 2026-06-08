@@ -37,6 +37,7 @@ from cleave.config_snapshot import (  # noqa: E402
     next_unnamed_path,
     write_session_snapshot,
 )
+from cleave.paths import default_project_config, resolve_project  # noqa: E402
 from cleave.effects.runtime import EffectRuntime  # noqa: E402
 from cleave.preset_playlist import (  # noqa: E402
     PresetPlaylist,
@@ -65,11 +66,10 @@ from cleave.viz_tuning_overlay import (  # noqa: E402
 )
 
 STEM_DRUMS = "drums"
-SAVED_CONFIGS_DIR = ROOT / "saved-cleave-configs"
 
 
-def load_stem_signals(stems_dir: Path) -> Signals | None:
-    signals_path = stems_dir / "signals.json"
+def load_stem_signals(project_dir: Path) -> Signals | None:
+    signals_path = project_dir / "signals.json"
     if not signals_path.is_file():
         return None
     return load_signals(signals_path)
@@ -100,14 +100,17 @@ def _apply_effect_modifiers(
         layer.fbo.aberration_px = mod.aberration_px
 
 
-def resolve_stems_dir(path: Path) -> Path:
-    p = path.resolve()
-    if p.is_file() and p.name == "signals.json":
-        p = p.parent
-    if not p.is_dir():
-        print(f"error: stems folder not found: {p}", file=sys.stderr)
-        sys.exit(1)
-    return p
+def resolve_config_path(
+    config_override: Path | None,
+    project_dir: Path,
+) -> Path | None:
+    """Resolve config: CLI override, project default, then global search."""
+    if config_override is not None:
+        return config_override
+    default_cfg = default_project_config(project_dir)
+    if default_cfg.is_file():
+        return default_cfg
+    return find_config_path(None, ROOT)
 
 
 def resolve_audio_path(signals: Signals, override: Path | None) -> Path:
@@ -129,7 +132,7 @@ def resolve_audio_path(signals: Signals, override: Path | None) -> Path:
     return path
 
 
-def resolve_mix_path(stems_dir: Path, source_override: Path | None) -> Path:
+def resolve_mix_path(project_dir: Path, source_override: Path | None) -> Path:
     if source_override is not None:
         path = source_override.resolve()
         if not path.is_file():
@@ -137,7 +140,7 @@ def resolve_mix_path(stems_dir: Path, source_override: Path | None) -> Path:
             sys.exit(1)
         return path
 
-    signals_path = stems_dir / "signals.json"
+    signals_path = project_dir / "signals.json"
     if signals_path.is_file():
         signals = load_signals(signals_path)
         return resolve_audio_path(signals, None)
@@ -388,6 +391,7 @@ def _make_tuning_controls(
     *,
     session: TuningSession,
     cfg: CleaveConfig,
+    project_dir: Path,
     layers_by_name: dict[str, StemLayer],
     layers: list[StemLayer],
     playback,
@@ -436,7 +440,7 @@ def _make_tuning_controls(
         _flush_all_pcm(layers)
 
     def on_save_new_config() -> Path:
-        out_path = next_unnamed_path(SAVED_CONFIGS_DIR)
+        out_path = next_unnamed_path(project_dir)
         write_session_snapshot(out_path, cfg=cfg, session=session)
         return out_path
 
@@ -499,7 +503,7 @@ def _draw_tuning_overlay(
 
 
 def run_drums_only(
-    stems_dir: Path,
+    project_dir: Path,
     audio_path: Path,
     playlist: PresetPlaylist,
     texture_paths: list[Path],
@@ -518,7 +522,7 @@ def run_drums_only(
     except (FileNotFoundError, ValueError):
         pass
 
-    pcm_bank = load_stem_pcm(stems_dir)
+    pcm_bank = load_stem_pcm(project_dir)
     duration_sec = pcm_bank.duration_sec
     n_pcm = samples_per_frame(fps)
 
@@ -532,7 +536,7 @@ def run_drums_only(
         pygame.quit()
         sys.exit(1)
 
-    trackname = stems_dir.name
+    trackname = project_dir.name
     pygame.display.set_caption(f"Cleave (drums) — {trackname}")
     clock = pygame.time.Clock()
 
@@ -585,7 +589,7 @@ def run_drums_only(
             },
         )
 
-        signals = load_stem_signals(stems_dir)
+        signals = load_stem_signals(project_dir)
         effect_runtime = EffectRuntime()
 
         pygame.mixer.music.load(str(audio_path))
@@ -596,6 +600,7 @@ def run_drums_only(
             controls = _make_tuning_controls(
                 session=session,
                 cfg=cfg,
+                project_dir=project_dir,
                 layers_by_name=layers_by_name,
                 layers=layers,
                 playback=playback,
@@ -711,12 +716,12 @@ def run_drums_only(
 
 def run(
     cfg: CleaveConfig,
-    stems_dir: Path,
+    project_dir: Path,
     audio_path: Path,
     playlists: dict[str, PresetPlaylist],
 ) -> None:
     """Four config-driven libprojectM layers composited bottom-to-top."""
-    pcm_bank = load_stem_pcm(stems_dir)
+    pcm_bank = load_stem_pcm(project_dir)
     duration_sec = pcm_bank.duration_sec
     width = cfg.visualizer.width
     height = cfg.visualizer.height
@@ -733,7 +738,7 @@ def run(
         pygame.quit()
         sys.exit(1)
 
-    trackname = stems_dir.name
+    trackname = project_dir.name
     pygame.display.set_caption(f"Cleave — {trackname}")
     clock = pygame.time.Clock()
 
@@ -750,7 +755,7 @@ def run(
         layers = _build_layers(cfg, compositor, playlists)
         layers_by_name = {layer.name: layer for layer in layers}
         session = _session_from_cfg(cfg, playlists)
-        signals = load_stem_signals(stems_dir)
+        signals = load_stem_signals(project_dir)
         effect_runtime = EffectRuntime()
 
         pygame.mixer.music.load(str(audio_path))
@@ -760,6 +765,7 @@ def run(
         controls = _make_tuning_controls(
             session=session,
             cfg=cfg,
+            project_dir=project_dir,
             layers_by_name=layers_by_name,
             layers=layers,
             playback=playback,
@@ -839,7 +845,7 @@ def main() -> None:
             "(default), or drums-only debug via --preset"
         ),
     )
-    parser.add_argument("path", type=Path, help="stems folder for the track")
+    parser.add_argument("path", type=Path, help="project path or slug")
     parser.add_argument(
         "--source",
         type=Path,
@@ -860,25 +866,31 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    stems_dir = resolve_stems_dir(args.path)
-    audio_path = resolve_mix_path(stems_dir, args.source)
+    try:
+        project_dir = resolve_project(args.path)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    audio_path = resolve_mix_path(project_dir, args.source)
+    config_path = resolve_config_path(args.config, project_dir)
 
     try:
         if args.preset is not None:
             playlist, texture_paths, beat_sensitivity = resolve_drums_preset(
                 args.preset,
-                args.config,
+                config_path,
             )
             _print_playlist_scan(STEM_DRUMS, playlist)
-            width, height, fps = visualizer_settings_from_config(args.config)
-            preset_root = preset_root_from_config(args.config)
+            width, height, fps = visualizer_settings_from_config(config_path)
+            preset_root = preset_root_from_config(config_path)
             run_drums_only(
-                stems_dir,
+                project_dir,
                 audio_path,
                 playlist,
                 texture_paths,
                 beat_sensitivity,
-                args.config,
+                config_path,
                 preset_root,
                 args.preset,
                 width,
@@ -886,13 +898,13 @@ def main() -> None:
                 fps,
             )
         else:
-            cfg = load_config(args.config, ROOT)
+            cfg = load_config(config_path, ROOT)
             playlists = scan_all_layers(cfg)
             for name, pl in playlists.items():
                 _print_playlist_scan(name, pl)
             run(
                 cfg,
-                stems_dir,
+                project_dir,
                 audio_path,
                 playlists,
             )

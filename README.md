@@ -47,23 +47,27 @@ pip install torch torchcodec --index-url https://download.pytorch.org/whl/cpu
 pip install -r requirements.txt
 ```
 
+Clone Milkdrop preset packs into `~/.local/share/cleave/presets/` (see [cleave.config.yaml](cleave.config.yaml) `paths.preset_root`). Optional texture pack: `~/.local/share/cleave/textures/`.
+
 ## Quick start
 
+Each track is a **project** under `projects/<slug>/` with `drums.wav`, `bass.wav`, `vocals.wav`, `other.wav`, and `signals.json`. The slug is the audio filename stem (e.g. `sights-and-sounds-26.wav` becomes `sights-and-sounds-26`).
+
 ```bash
-python -m cleave separate cleave-resources/source/sights-and-sounds-26.wav
-python -m cleave analyse stems/sights-and-sounds-26 --source cleave-resources/source/sights-and-sounds-26.wav
-python cleave.py stems/sights-and-sounds-26 --source cleave-resources/source/sights-and-sounds-26.wav
+python -m cleave separate ~/music/sights-and-sounds-26.wav
+python -m cleave analyse sights-and-sounds-26 --source ~/music/sights-and-sounds-26.wav
+python cleave.py sights-and-sounds-26 --source ~/music/sights-and-sounds-26.wav
 ```
 
-Each track lives under `stems/<trackname>/` with `drums.wav`, `bass.wav`, `vocals.wav`, `other.wav`, and `signals.json`.
+To store projects under XDG instead, set `CLEAVE_DATA=~/.local/share/cleave`.
 
 ## CLI
 
 | Command | Purpose |
 | --- | --- |
-| `python -m cleave separate <file>` | Demucs split to `stems/<trackname>/` (`--slow` for higher quality, `--force` to redo) |
-| `python -m cleave analyse <stemsfolder>` | Write `signals.json` (`--source` for mix comparison, `--force` to redo) |
-| `python cleave.py <stemsfolder>` | Run the visualizer |
+| `python -m cleave separate <file>` | Demucs split into `projects/<slug>/` (`--slow` for higher quality, `--force` to redo) |
+| `python -m cleave analyse <slug or path>` | Write `signals.json` (`--source` for mix comparison, `--force` to redo) |
+| `python cleave.py <slug or path>` | Run the visualizer |
 
 `analyse` extracts per-stem signals at 100 Hz (onsets, bass envelopes, vocal pitch, spectral centroid). The visualizer uses stem PCM for Milkdrop reactivity and `signals.json` for cleave effects.
 
@@ -71,7 +75,7 @@ Each track lives under `stems/<trackname>/` with `drums.wav`, `bass.wav`, `vocal
 
 Four libprojectM layers at tiered resolutions, composited to **1280x720 @ 30 fps** by default. Stack order is `layer_z_order` in [cleave.config.yaml](cleave.config.yaml).
 
-**Presets:** set `paths.preset_root` to your milkdrop-presets root (the folder that contains packs like `presets-cream-of-the-crop`). Each `layers.*.preset` is a `.milk` file or directory (recursive scan).
+**Presets:** set `paths.preset_root` to your presets root (the folder that contains packs like `presets-cream-of-the-crop`). Each `layers.*.preset` is a `.milk` file or directory (recursive scan).
 
 **Compositing:** Milkdrop draws on black. Cleave treats black as transparent and uses pixel brightness as blend weight (`black-key` default). Per-layer `blend_mode`, opacity, and beat sensitivity live in config.
 
@@ -86,7 +90,7 @@ Four libprojectM layers at tiered resolutions, composited to **1280x720 @ 30 fps
 Arrow-key tree panel ([cleave/viz_tuning_overlay.py](cleave/viz_tuning_overlay.py)): browse presets, blend, opacity, beat, cleave effects, z-order, layer lock, transport, save.
 
 - **Track rows:** one block per stem (header, preset dir/file, blend, opacity, beat, collapsible cleave effects).
-- **Footer rows:** transport, **SAVE AS NEW CONFIG**, **OVERWRITE CONFIG** (when active config is not repo-root `cleave.config.yaml`).
+- **Footer rows:** transport, **SAVE AS NEW CONFIG**, **OVERWRITE CONFIG** (when active config is not repo-root [cleave.config.yaml](cleave.config.yaml)).
 
 | Key | Action |
 | --- | --- |
@@ -100,12 +104,12 @@ Arrow-key tree panel ([cleave/viz_tuning_overlay.py](cleave/viz_tuning_overlay.p
 
 Full row behaviour: [.cursor/rules/live-tuning-ui.mdc](.cursor/rules/live-tuning-ui.mdc).
 
-**Save:** snapshots go to [saved-cleave-configs/](saved-cleave-configs/) as `unnamed-N.cleave.config.yaml`. Launch config is never overwritten by save-as-new. Use **OVERWRITE CONFIG** to update the active file.
+**Save:** **SAVE AS NEW CONFIG** writes `unnamed-N.yaml` in the project directory. **OVERWRITE CONFIG** updates the active config file (hidden when the active file is the repo-root template). A project can also hold `cleave.config.yaml` as its default launch config.
 
 Pass `--config` to use a different YAML. Drums-only debug:
 
 ```bash
-python cleave.py stems/sights-and-sounds-26 --preset ~/milkdrop-presets/.../some.milk
+python cleave.py sights-and-sounds-26 --preset ~/.local/share/cleave/presets/.../some.milk
 ```
 
 ### Cleave effects
@@ -123,4 +127,6 @@ Config: `layers.<stem>.effects.<effect>.<driver>` (integers 0-100; zero keys omi
 
 ## Config
 
-[cleave.config.yaml](cleave.config.yaml) holds visualizer size/fps, `preset_root`, `layer_z_order`, and per-layer preset paths, sizes, opacity, `blend_mode`, `effects`, and `locked`.
+[cleave.config.yaml](cleave.config.yaml) is the repo template. At launch, config resolution is: `--config` override, then `cleave.config.yaml` in the project directory, then `~/.config/cleave/cleave.config.yaml`, then the repo template.
+
+Default preset paths match [cleave/config.py](cleave/config.py): `~/.local/share/cleave/presets` and `~/.local/share/cleave/textures`.

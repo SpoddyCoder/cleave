@@ -1,4 +1,4 @@
-"""Run Demucs stem separation and copy outputs to stems/<trackname>/."""
+"""Run Demucs stem separation and write stem wavs into a Cleave project."""
 
 from __future__ import annotations
 
@@ -9,19 +9,22 @@ import tempfile
 from pathlib import Path
 
 from cleave.extract import stem_paths
+from cleave.paths import project_dir, project_slug
 
 
-class StemsAlreadyExist(Exception):
-    """All expected stem wavs already exist under *stems_dir*."""
+class ProjectStemsExist(Exception):
+    """All expected stem wavs already exist in *project_dir*."""
 
-    def __init__(self, stems_dir: Path) -> None:
-        self.stems_dir = stems_dir
-        super().__init__(f"stems already exist: {stems_dir}")
+    def __init__(self, project_dir: Path) -> None:
+        self.project_dir = project_dir
+        super().__init__(
+            f"stem wavs already exist in project: {project_dir}"
+        )
 
 
-def stems_complete(stems_dir: Path) -> bool:
+def project_stems_complete(project_dir: Path) -> bool:
     """Return True when every stem wav from :func:`stem_paths` exists."""
-    paths = stem_paths(stems_dir)
+    paths = stem_paths(project_dir)
     return all(path.is_file() for path in paths.values())
 
 
@@ -35,18 +38,18 @@ def _validate_audio_path(audio_path: Path) -> None:
 def run_separate(
     audio_path: Path, *, slow: bool = False, force: bool = False
 ) -> Path:
-    """Separate *audio_path* with Demucs and copy stems into ``stems/<track>/``.
+    """Separate *audio_path* with Demucs and copy stems into the project directory.
 
-    Raises :class:`StemsAlreadyExist` when stems are complete and *force* is False.
+    Raises :class:`ProjectStemsExist` when stems are complete and *force* is False.
     """
     audio_path = Path(audio_path)
     _validate_audio_path(audio_path)
 
-    track_name = audio_path.stem
-    stems_dir = Path("stems") / track_name
+    slug = project_slug(audio_path)
+    out_dir = project_dir(slug)
 
-    if stems_complete(stems_dir) and not force:
-        raise StemsAlreadyExist(stems_dir)
+    if project_stems_complete(out_dir) and not force:
+        raise ProjectStemsExist(out_dir)
 
     model = "htdemucs_ft" if slow else "htdemucs"
 
@@ -71,11 +74,11 @@ def run_separate(
                 f"demucs failed (exit {exc.returncode}) for {audio_path}"
             ) from exc
 
-        demucs_out = tmp_dir / model / track_name
+        demucs_out = tmp_dir / model / slug
         if not demucs_out.is_dir():
             raise RuntimeError(f"demucs output directory missing: {demucs_out}")
 
-        paths = stem_paths(stems_dir)
+        paths = stem_paths(out_dir)
         missing_src = [
             name
             for name in paths
@@ -87,8 +90,9 @@ def run_separate(
                 f"{', '.join(missing_src)}"
             )
 
-        stems_dir.mkdir(parents=True, exist_ok=True)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "renders").mkdir(exist_ok=True)
         for name, dst in paths.items():
             shutil.copy2(demucs_out / f"{name}.wav", dst)
 
-    return stems_dir
+    return out_dir
