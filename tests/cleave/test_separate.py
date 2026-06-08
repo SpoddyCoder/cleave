@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from cleave.extract import STEM_NAMES
+from cleave.extract import STEM_NAMES, stems_dir
 from cleave.project import PROJECT_FILENAME, load_manifest, write_manifest
 from cleave.separate import (
     project_stems_complete,
@@ -15,6 +15,13 @@ from cleave.separate import (
     run_separate,
     signals_complete,
 )
+
+
+def _write_stub_stems(project: Path) -> None:
+    base = stems_dir(project)
+    base.mkdir(parents=True, exist_ok=True)
+    for name in STEM_NAMES:
+        (base / f"{name}.wav").write_bytes(b"wav")
 
 
 def test_project_stems_complete_false_when_missing(tmp_path: Path) -> None:
@@ -26,8 +33,7 @@ def test_project_stems_complete_false_when_missing(tmp_path: Path) -> None:
 def test_project_stems_complete_true_when_all_present(tmp_path: Path) -> None:
     project = tmp_path / "my-track"
     project.mkdir()
-    for name in STEM_NAMES:
-        (project / f"{name}.wav").write_bytes(b"wav")
+    _write_stub_stems(project)
     assert project_stems_complete(project) is True
 
 
@@ -88,8 +94,7 @@ def test_run_separate_noop_when_stems_and_signals_exist(
 
     project = tmp_path / "projects" / "my-track"
     project.mkdir(parents=True)
-    for name in STEM_NAMES:
-        (project / f"{name}.wav").write_bytes(b"wav")
+    _write_stub_stems(project)
     (project / "signals.json").write_text("{}")
 
     with patch("cleave.separate._run_demucs") as run_demucs, patch(
@@ -108,8 +113,7 @@ def test_run_separate_analyse_only_when_stems_exist_no_signals(
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     project = tmp_path / "projects" / "my-track"
     project.mkdir(parents=True)
-    for name in STEM_NAMES:
-        (project / f"{name}.wav").write_bytes(b"wav")
+    _write_stub_stems(project)
     mix = project / "my-track.flac"
     mix.write_bytes(b"mix")
     write_manifest(
@@ -136,8 +140,7 @@ def test_run_separate_force_runs_demucs_and_analyse(
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     project = tmp_path / "projects" / "my-track"
     project.mkdir(parents=True)
-    for name in STEM_NAMES:
-        (project / f"{name}.wav").write_bytes(b"wav")
+    _write_stub_stems(project)
     mix = project / "my-track.flac"
     mix.write_bytes(b"mix")
     write_manifest(
@@ -192,6 +195,7 @@ def test_run_separate_creates_project_and_renders(
     assert result == project.resolve()
     assert project.is_dir()
     assert (project / "renders").is_dir()
+    assert stems_dir(project).is_dir()
     assert (project / "song.flac").read_bytes() == b"audio"
     assert (project / PROJECT_FILENAME).is_file()
     manifest = load_manifest(project)
@@ -199,7 +203,7 @@ def test_run_separate_creates_project_and_renders(
     assert manifest.mix_filename == "song.flac"
     assert manifest.demucs_model == "htdemucs"
     for name in STEM_NAMES:
-        assert (project / f"{name}.wav").is_file()
+        assert (stems_dir(project) / f"{name}.wav").is_file()
 
 
 def test_run_separate_force_deletes_stale_mix(
@@ -209,8 +213,7 @@ def test_run_separate_force_deletes_stale_mix(
     project = tmp_path / "projects" / "song"
     project.mkdir(parents=True)
     (project / "renders").mkdir()
-    for name in STEM_NAMES:
-        (project / f"{name}.wav").write_bytes(b"wav")
+    _write_stub_stems(project)
     (project / "old-name.flac").write_bytes(b"old")
     write_manifest(
         project,

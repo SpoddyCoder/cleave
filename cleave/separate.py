@@ -9,7 +9,7 @@ import tempfile
 from pathlib import Path
 
 from cleave.analyse import run_analyse
-from cleave.extract import stem_paths
+from cleave.extract import stem_paths, stems_dir
 from cleave.paths import project_dir, project_slug, resolve_project
 from cleave.project import load_manifest, manifest_path, mix_path, write_manifest
 
@@ -68,6 +68,7 @@ def _run_demucs(
 
     project_dir.mkdir(parents=True, exist_ok=True)
     (project_dir / "renders").mkdir(exist_ok=True)
+    stems_dir(project_dir).mkdir(exist_ok=True)
 
     if force and manifest_path(project_dir).is_file():
         old_manifest = load_manifest(project_dir)

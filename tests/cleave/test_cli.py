@@ -10,8 +10,15 @@ from unittest.mock import patch
 import pytest
 
 from cleave.cli import build_parser, cmd_play, cmd_separate
-from cleave.extract import STEM_NAMES
+from cleave.extract import STEM_NAMES, stems_dir
 from cleave.project import write_manifest
+
+
+def _write_stub_stems(project: Path) -> None:
+    base = stems_dir(project)
+    base.mkdir(parents=True, exist_ok=True)
+    for name in STEM_NAMES:
+        (base / f"{name}.wav").write_bytes(b"wav")
 
 
 def test_separate_parser_uses_target_arg() -> None:
@@ -28,8 +35,7 @@ def test_cmd_separate_noop_when_complete(
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     project = tmp_path / "projects" / "song"
     project.mkdir(parents=True)
-    for name in STEM_NAMES:
-        (project / f"{name}.wav").write_bytes(b"wav")
+    _write_stub_stems(project)
     mix = project / "song.flac"
     mix.write_bytes(b"mix")
     write_manifest(
@@ -56,8 +62,7 @@ def test_cmd_separate_analyse_only_message(
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     project = tmp_path / "projects" / "my-track"
     project.mkdir(parents=True)
-    for name in STEM_NAMES:
-        (project / f"{name}.wav").write_bytes(b"wav")
+    _write_stub_stems(project)
     mix = project / "my-track.flac"
     mix.write_bytes(b"mix")
     write_manifest(
@@ -82,8 +87,7 @@ def test_cmd_separate_force_message(
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     project = tmp_path / "projects" / "song"
     project.mkdir(parents=True)
-    for name in STEM_NAMES:
-        (project / f"{name}.wav").write_bytes(b"wav")
+    _write_stub_stems(project)
     mix = project / "song.flac"
     mix.write_bytes(b"mix")
     write_manifest(
@@ -113,8 +117,7 @@ def test_play_parser_uses_target_arg() -> None:
 def _complete_project(tmp_path: Path, slug: str = "my-track") -> Path:
     project = tmp_path / "projects" / slug
     project.mkdir(parents=True)
-    for name in STEM_NAMES:
-        (project / f"{name}.wav").write_bytes(b"wav")
+    _write_stub_stems(project)
     mix = project / f"{slug}.flac"
     mix.write_bytes(b"mix")
     write_manifest(
@@ -149,8 +152,7 @@ def test_cmd_play_calls_run_separate_when_incomplete(
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     project = tmp_path / "projects" / "my-track"
     project.mkdir(parents=True)
-    for name in STEM_NAMES:
-        (project / f"{name}.wav").write_bytes(b"wav")
+    _write_stub_stems(project)
     mix = project / "my-track.flac"
     mix.write_bytes(b"mix")
     write_manifest(
