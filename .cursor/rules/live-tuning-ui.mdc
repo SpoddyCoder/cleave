@@ -1,12 +1,12 @@
 ---
 description: Live tuning overlay layout and typography for viz UI work
-globs: cleave/viz_tuning*.py,cleave/viz_confirm.py,cleave/viz_theme.py,cleave/viz_text_fit.py,cleave.py,tests/test_viz_tuning*.py,README.md
+globs: cleave/viz/*.py,cleave.py,tests/test_viz_tuning*.py,README.md
 alwaysApply: false
 ---
 
 # Live tuning overlay layout
 
-The focus-driven tree panel ([cleave/viz_tuning_overlay.py](cleave/viz_tuning_overlay.py), [cleave/viz_tuning_controls.py](cleave/viz_tuning_controls.py)) splits into two vertical sections. Use these names in docs, issues, and UI work.
+The focus-driven tree panel ([cleave/viz/overlay.py](cleave/viz/overlay.py), [cleave/viz/controls.py](cleave/viz/controls.py)) splits into two vertical sections. Use these names in docs, issues, and UI work.
 
 ## Track rows section
 
@@ -34,7 +34,7 @@ The lower block after a visual gap (`footer_gap` in `draw()`): `footer_row_count
 
 ## Typography roles
 
-Colors live in [cleave/viz_theme.py](cleave/viz_theme.py). Row drawing uses `_row_value_color` and `_render_label_value_row`.
+Colors live in [cleave/viz/theme.py](cleave/viz/theme.py). Label truncation uses [cleave/viz/text_fit.py](cleave/viz/text_fit.py). Row drawing uses `_row_value_color` and `_render_label_value_row`.
 
 | Role | Constant | RGB | Use |
 | --- | --- | --- | --- |
@@ -66,6 +66,6 @@ These rows do not split label and value; the implementation is deliberate:
 - **Preset dir / preset filename**: single-color row text plus Material Icons (icon colors above).
 - **Transport, save, overwrite**: single-color footer rows in row value color.
 - **Toasts**: `DISABLED`.
-- **Confirm dialog** ([cleave/viz_confirm.py](cleave/viz_confirm.py)): message in `VALUE`; yes/no use `HIGHLIGHT` or `DISABLED` by focus.
+- **Confirm dialog** ([cleave/viz/confirm.py](cleave/viz/confirm.py)): message in `VALUE`; yes/no use `HIGHLIGHT` or `DISABLED` by focus.
 
 When focus, move mode, disabled layer, locked sub-row, or empty preset applies, `_row_value_color` may return an accent or state color instead of `VALUE`. That override is expected.

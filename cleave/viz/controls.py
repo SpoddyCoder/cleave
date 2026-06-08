@@ -18,10 +18,10 @@ from cleave.preset_playlist import (
     directory_display,
     preset_filename_display,
 )
-from cleave.viz_confirm import ConfirmDialog, ConfirmRequest
-from cleave.viz_key_repeat import KeyRepeatController, mod_ctrl
-from cleave.viz_playback import PlaybackState, current_sec, seek, toggle_pause
-from cleave.viz_tuning_overlay import (
+from cleave.viz.confirm import ConfirmDialog, ConfirmRequest
+from cleave.viz.key_repeat import KeyRepeatController, mod_ctrl
+from cleave.viz.playback import PlaybackState, current_sec, seek, toggle_pause
+from cleave.viz.overlay import (
     RowKind,
     TrackBlock,
     TuningViewState,

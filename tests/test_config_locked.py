@@ -17,7 +17,7 @@ from cleave.config import (
 from cleave.config_snapshot import write_session_snapshot
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import PresetPlaylist, playlist_at_dir
-from cleave.viz_tuning_controls import LayerRuntime, TuningSession
+from cleave.viz.controls import LayerRuntime, TuningSession
 
 
 def _minimal_layers_raw(*, locked_stem: str | None = None) -> dict:

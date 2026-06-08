@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import pygame
 
-from cleave.viz_theme import DISABLED, HIGHLIGHT, VALUE
+from cleave.viz.theme import DISABLED, HIGHLIGHT, VALUE
 
 
 @dataclass

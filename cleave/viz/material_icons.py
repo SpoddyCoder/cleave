@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pygame
 
-FONT_PATH = Path(__file__).resolve().parent.parent / "assets/fonts/MaterialIcons-Regular.ttf"
+from cleave.paths import repo_root
+
+FONT_PATH = repo_root() / "assets/fonts/MaterialIcons-Regular.ttf"
 
 FOLDER_GLYPH = "\ue2c7"
 FILE_GLYPH = "\ue24d"
