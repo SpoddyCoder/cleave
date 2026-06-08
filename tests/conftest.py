@@ -8,7 +8,7 @@ import pygame
 import pytest
 
 import cleave.viz.controls  # noqa: F401 - preload before effects.runtime imports
-from cleave.extract import STEM_NAMES
+from cleave.extract import STEM_NAMES, stems_dir
 from cleave.signals import Signals
 from tests.support.config import write_minimal_config
 from tests.support.signals import make_onset_signals, make_signals
@@ -45,6 +45,8 @@ def minimal_project(tmp_path: Path) -> Path:
     preset_root = tmp_path / "presets"
     project_dir = tmp_path / "project"
     write_minimal_config(project_dir, preset_root)
+    stem_root = stems_dir(project_dir)
+    stem_root.mkdir(parents=True, exist_ok=True)
     for stem in STEM_NAMES:
-        (project_dir / f"{stem}.wav").write_bytes(b"wav")
+        (stem_root / f"{stem}.wav").write_bytes(b"wav")
     return project_dir

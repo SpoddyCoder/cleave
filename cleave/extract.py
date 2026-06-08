@@ -14,6 +14,18 @@ BASS_SPLIT_HZ = 120.0
 N_FFT = 2048
 
 STEM_NAMES = ("drums", "bass", "vocals", "other")
+STEMS_DIR = "stems"
+
+
+def stems_dir(project_dir: Path) -> Path:
+    """Return the stem wav directory inside a Cleave project."""
+    return project_dir / STEMS_DIR
+
+
+def stem_paths(project_dir: Path) -> dict[str, Path]:
+    """Map stem names to wav paths under a Cleave project."""
+    base = stems_dir(project_dir)
+    return {name: base / f"{name}.wav" for name in STEM_NAMES}
 
 
 class BassSignals(TypedDict):
@@ -25,11 +37,6 @@ class BassSignals(TypedDict):
 class VocalSignals(TypedDict):
     rms: tuple[np.ndarray, np.ndarray]
     pitch_hz: tuple[np.ndarray, np.ndarray]
-
-
-def stem_paths(project_dir: Path) -> dict[str, Path]:
-    """Map stem names to wav paths under a Cleave project."""
-    return {name: project_dir / f"{name}.wav" for name in STEM_NAMES}
 
 
 def _load(path: Path | str) -> tuple[np.ndarray, float]:

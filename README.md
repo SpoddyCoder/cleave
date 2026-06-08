@@ -51,7 +51,7 @@ Clone Milkdrop preset packs into `~/.local/share/cleave/presets/` (see [cleave.c
 
 ## Quick start
 
-Each track is a **project** under `projects/<slug>/` with the original mix audio, four stem wavs (`drums.wav`, `bass.wav`, `vocals.wav`, `other.wav`), `project.yaml`, and `signals.json`. The slug is the audio filename stem (e.g. `sights-and-sounds-26.flac` becomes `sights-and-sounds-26`). `separate` copies the source file into the project (no transcode) and writes `project.yaml`.
+Each track is a **project** under `projects/<slug>/` with the original mix audio, `project.yaml`, `signals.json`, and four stem wavs under `stems/` (`drums.wav`, `bass.wav`, `vocals.wav`, `other.wav`). The slug is the audio filename stem (e.g. `sights-and-sounds-26.flac` becomes `sights-and-sounds-26`). `separate` copies the source file into the project (no transcode) and writes `project.yaml`.
 
 ```bash
 python -m cleave play ~/music/sights-and-sounds-26.flac
