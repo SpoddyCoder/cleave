@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sys
 import tempfile
 from pathlib import Path
 
@@ -225,27 +224,3 @@ def test_container_directory_anchor_no_direct_presets() -> None:
         assert playlist.current is None
         assert preset_filename_display(playlist) == "NO PRESETS FOUND"
         assert playlist.config_preset_path(root) == "container/"
-
-
-def main() -> int:
-    tests = [
-        test_scan_file_anchor_non_recursive,
-        test_scan_directory_anchor_non_recursive,
-        test_list_navigable_dirs_filters_and_includes_subtree,
-        test_step_sibling_wraps,
-        test_enter_child_first_alphabetical_navigable,
-        test_go_parent_ascends_and_clamps_at_preset_root,
-        test_go_parent_clamps_at_preset_root_when_browse_floor_is_root,
-        test_preset_browse_floor_uses_first_configured_path_segment,
-        test_directory_display_clamps_sibling_parent_at_preset_root,
-        test_empty_directory_display_and_config_path,
-        test_container_directory_anchor_no_direct_presets,
-    ]
-    for test in tests:
-        test()
-        print(f"ok {test.__name__}")
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

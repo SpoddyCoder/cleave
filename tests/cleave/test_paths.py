@@ -11,6 +11,7 @@ from cleave.paths import (
     data_dir,
     default_project_config,
     project_slug,
+    repo_root,
     resolve_project,
 )
 
@@ -23,8 +24,7 @@ def test_data_dir_uses_cleave_data_env(monkeypatch: pytest.MonkeyPatch, tmp_path
 
 def test_data_dir_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("CLEAVE_DATA", raising=False)
-    repo_root = Path(__file__).resolve().parent.parent
-    assert data_dir() == repo_root.resolve()
+    assert data_dir() == repo_root().resolve()
 
 
 def test_resolve_project_by_slug(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
