@@ -34,7 +34,6 @@ def _signals_with_pitch(values: list[float]) -> Signals:
     return Signals(
         sample_rate_hz=100.0,
         duration_sec=(len(values) - 1) / 100.0,
-        source=None,
         path=__file__,
         stems={"vocals": {"pitch_hz": arr}},
     )

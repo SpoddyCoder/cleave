@@ -92,7 +92,6 @@ def test_effect_runtime_all_stems_pulse_modulate() -> None:
     signals = Signals(
         sample_rate_hz=100.0,
         duration_sec=0.02,
-        source=None,
         path=__file__,
         stems={
             "drums": {"onset_strength": np.array([0.0, 1.0, 0.0])},
@@ -132,7 +131,6 @@ def test_effect_runtime_bass_multi_pulse_stacking() -> None:
     signals = Signals(
         sample_rate_hz=100.0,
         duration_sec=0.03,
-        source=None,
         path=__file__,
         stems={
             "bass": {

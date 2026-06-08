@@ -22,7 +22,6 @@ def make_signals(
     return Signals(
         sample_rate_hz=_SAMPLE_RATE_HZ,
         duration_sec=(len(values) - 1) / _SAMPLE_RATE_HZ,
-        source=None,
         path=path or Path(__file__),
         stems={stem: {key: arr}},
     )

@@ -38,7 +38,6 @@ def test_load_signals_minimal_fixture(
     assert signals.path == minimal_signals_json_path.resolve()
     assert signals.sample_rate_hz == 100.0
     assert signals.duration_sec == pytest.approx(0.14)
-    assert signals.source is None
 
     pitch = signals.array("vocals", "pitch_hz")
     assert math.isnan(pitch[2])
