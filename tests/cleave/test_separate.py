@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from cleave.extract import STEM_NAMES
+from cleave.project import PROJECT_FILENAME, load_manifest
 from cleave.separate import (
     ProjectStemsExist,
     project_stems_complete,
@@ -76,5 +77,56 @@ def test_run_separate_creates_project_and_renders(
     assert result == project.resolve()
     assert project.is_dir()
     assert (project / "renders").is_dir()
+    assert (project / "song.flac").read_bytes() == b"audio"
+    assert (project / PROJECT_FILENAME).is_file()
+    manifest = load_manifest(project)
+    assert manifest.slug == "song"
+    assert manifest.mix_filename == "song.flac"
+    assert manifest.demucs_model == "htdemucs"
     for name in STEM_NAMES:
         assert (project / f"{name}.wav").is_file()
+
+
+def test_run_separate_force_deletes_stale_mix(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = tmp_path / "projects" / "song"
+    project.mkdir(parents=True)
+    (project / "renders").mkdir()
+    for name in STEM_NAMES:
+        (project / f"{name}.wav").write_bytes(b"wav")
+    (project / "old-name.flac").write_bytes(b"old")
+    from cleave.project import write_manifest
+
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="old-name.flac",
+        original_path=tmp_path / "old-name.flac",
+        demucs_model="htdemucs",
+    )
+
+    new_audio = tmp_path / "song.wav"
+    new_audio.write_bytes(b"new")
+
+    demucs_out = tmp_path / "demucs-out" / "htdemucs" / "song"
+    demucs_out.mkdir(parents=True)
+    for name in STEM_NAMES:
+        (demucs_out / f"{name}.wav").write_bytes(b"wav")
+
+    def fake_run(cmd: list[str], *, check: bool) -> None:
+        out_flag = cmd.index("-o")
+        out_root = Path(cmd[out_flag + 1])
+        target = out_root / "htdemucs" / "song"
+        target.mkdir(parents=True, exist_ok=True)
+        for name in STEM_NAMES:
+            (target / f"{name}.wav").write_bytes(b"wav")
+
+    with patch("cleave.separate.subprocess.run", side_effect=fake_run):
+        run_separate(new_audio, force=True)
+
+    assert not (project / "old-name.flac").exists()
+    assert (project / "song.wav").read_bytes() == b"new"
+    manifest = load_manifest(project)
+    assert manifest.mix_filename == "song.wav"

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from cleave.extract import stem_paths
 from cleave.paths import project_dir, project_slug
+from cleave.project import load_manifest, manifest_path, write_manifest
 
 
 class ProjectStemsExist(Exception):
@@ -52,6 +53,26 @@ def run_separate(
         raise ProjectStemsExist(out_dir)
 
     model = "htdemucs_ft" if slow else "htdemucs"
+    mix_filename = audio_path.name
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "renders").mkdir(exist_ok=True)
+
+    if force and manifest_path(out_dir).is_file():
+        old_manifest = load_manifest(out_dir)
+        if old_manifest.mix_filename != mix_filename:
+            stale = out_dir / old_manifest.mix_filename
+            if stale.is_file():
+                stale.unlink()
+
+    shutil.copy2(audio_path, out_dir / mix_filename)
+    write_manifest(
+        out_dir,
+        slug=slug,
+        mix_filename=mix_filename,
+        original_path=audio_path,
+        demucs_model=model,
+    )
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp_dir = Path(tmp)
@@ -90,8 +111,6 @@ def run_separate(
                 f"{', '.join(missing_src)}"
             )
 
-        out_dir.mkdir(parents=True, exist_ok=True)
-        (out_dir / "renders").mkdir(exist_ok=True)
         for name, dst in paths.items():
             shutil.copy2(demucs_out / f"{name}.wav", dst)
 

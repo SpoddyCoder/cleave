@@ -16,6 +16,7 @@ from cleave.extract import (
     extract_vocals,
     stem_paths,
 )
+from cleave.project import mix_path
 from cleave.resample import TARGET_HZ, resample_to_100hz
 
 
@@ -27,7 +28,7 @@ def _nan_to_null(values: np.ndarray) -> list[float | None]:
     return [None if np.isnan(v) else float(v) for v in values]
 
 
-def run_analyse(project_dir: Path, *, source: Path | None, slow: bool) -> Path:
+def run_analyse(project_dir: Path, *, slow: bool) -> Path:
     paths = stem_paths(project_dir)
     duration_sec = max(_stem_duration_sec(path) for path in paths.values())
 
@@ -35,16 +36,18 @@ def run_analyse(project_dir: Path, *, source: Path | None, slow: bool) -> Path:
     bass = extract_bass(paths["bass"])
     vocals = extract_vocals(paths["vocals"], slow=slow)
     other = extract_other(paths["other"])
-    mix_onset = extract_mix_onset(source) if source is not None else None
+    mix_onset = extract_mix_onset(mix_path(project_dir))
 
     output: dict = {
         "version": 1,
         "sample_rate_hz": int(TARGET_HZ),
         "duration_sec": duration_sec,
-        "source": str(source) if source is not None else None,
         "drums": {
             "onset_strength": resample_to_100hz(
                 *drums_onset, duration_sec
+            ).tolist(),
+            "mix_onset_strength": resample_to_100hz(
+                *mix_onset, duration_sec
             ).tolist(),
         },
         "bass": {
@@ -62,11 +65,6 @@ def run_analyse(project_dir: Path, *, source: Path | None, slow: bool) -> Path:
             "spectral_centroid": resample_to_100hz(*other, duration_sec).tolist(),
         },
     }
-
-    if mix_onset is not None:
-        output["drums"]["mix_onset_strength"] = resample_to_100hz(
-            *mix_onset, duration_sec
-        ).tolist()
 
     signals_path = project_dir / "signals.json"
     with signals_path.open("w", encoding="utf-8") as handle:

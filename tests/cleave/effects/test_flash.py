@@ -27,7 +27,6 @@ def _signals_with_stem_key(stem: str, key: str, values: list[float]) -> Signals:
     return Signals(
         sample_rate_hz=100.0,
         duration_sec=(len(values) - 1) / 100.0,
-        source=None,
         path=__file__,
         stems={stem: {key: arr}},
     )
@@ -95,7 +94,6 @@ def test_effect_runtime_flash_per_layer_isolation() -> None:
     signals = Signals(
         sample_rate_hz=100.0,
         duration_sec=0.02,
-        source=None,
         path=__file__,
         stems={
             "drums": {"onset_strength": np.array([0.0, 1.0, 0.0])},
@@ -156,7 +154,6 @@ def test_effect_runtime_all_stems_expose_flash_modifier() -> None:
     signals = Signals(
         sample_rate_hz=100.0,
         duration_sec=0.02,
-        source=None,
         path=__file__,
         stems={
             "drums": {"onset_strength": np.array([0.0, 1.0, 0.0])},

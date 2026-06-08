@@ -17,6 +17,7 @@ from cleave.config import (
     find_config_path,
 )
 from cleave.paths import default_project_config, repo_root
+from cleave.project import resolve_mix_path as _resolve_mix_path
 from cleave.preset_playlist import PresetPlaylist, scan_preset_playlist
 from cleave.signals import Signals, load_signals
 
@@ -43,43 +44,8 @@ def resolve_config_path(
     return find_config_path(None, repo_root())
 
 
-def resolve_audio_path(signals: Signals, override: Path | None) -> Path:
-    if override is not None:
-        path = override.resolve()
-    elif signals.source is None:
-        print(
-            "error: signals.json has no source; pass --source path/to/mix.wav",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    else:
-        path = Path(signals.source)
-        if not path.is_file():
-            path = repo_root() / signals.source
-    if not path.is_file():
-        print(f"error: audio not found: {path}", file=sys.stderr)
-        sys.exit(1)
-    return path
-
-
-def resolve_mix_path(project_dir: Path, source_override: Path | None) -> Path:
-    if source_override is not None:
-        path = source_override.resolve()
-        if not path.is_file():
-            print(f"error: audio not found: {path}", file=sys.stderr)
-            sys.exit(1)
-        return path
-
-    signals_path = project_dir / "signals.json"
-    if signals_path.is_file():
-        signals = load_signals(signals_path)
-        return resolve_audio_path(signals, None)
-
-    print(
-        "error: no signals.json source; pass --source path/to/mix.wav",
-        file=sys.stderr,
-    )
-    sys.exit(1)
+def resolve_mix_path(project_dir: Path) -> Path:
+    return _resolve_mix_path(project_dir)
 
 
 def visualizer_settings_from_config(

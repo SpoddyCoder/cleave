@@ -1,0 +1,111 @@
+"""Project manifest (project.yaml) for Cleave projects."""
+
+from __future__ import annotations
+
+import sys
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+
+import yaml
+
+PROJECT_FILENAME = "project.yaml"
+
+
+@dataclass(frozen=True)
+class ProjectManifest:
+    version: int
+    slug: str
+    mix_filename: str
+    original_path: str
+    separated_at: str
+    demucs_model: str
+
+    @classmethod
+    def from_dict(cls, data: dict) -> ProjectManifest:
+        mix = data.get("mix")
+        ingest = data.get("ingest")
+        if not isinstance(mix, dict) or not isinstance(ingest, dict):
+            raise ValueError("invalid project manifest: missing mix or ingest")
+        filename = mix.get("filename")
+        if not isinstance(filename, str) or not filename:
+            raise ValueError("invalid project manifest: mix.filename")
+        return cls(
+            version=int(data["version"]),
+            slug=str(data["slug"]),
+            mix_filename=filename,
+            original_path=str(ingest["original_path"]),
+            separated_at=str(ingest["separated_at"]),
+            demucs_model=str(ingest["demucs_model"]),
+        )
+
+    def to_dict(self) -> dict:
+        return {
+            "version": self.version,
+            "slug": self.slug,
+            "mix": {"filename": self.mix_filename},
+            "ingest": {
+                "original_path": self.original_path,
+                "separated_at": self.separated_at,
+                "demucs_model": self.demucs_model,
+            },
+        }
+
+
+def manifest_path(project_dir: Path) -> Path:
+    return project_dir / PROJECT_FILENAME
+
+
+def load_manifest(project_dir: Path) -> ProjectManifest:
+    path = manifest_path(project_dir)
+    if not path.is_file():
+        raise FileNotFoundError(f"project manifest not found: {path}")
+    with path.open(encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+    if not isinstance(data, dict):
+        raise ValueError(f"invalid project manifest: {path}")
+    return ProjectManifest.from_dict(data)
+
+
+def write_manifest(
+    project_dir: Path,
+    *,
+    slug: str,
+    mix_filename: str,
+    original_path: Path,
+    demucs_model: str,
+    separated_at: datetime | None = None,
+) -> Path:
+    when = separated_at or datetime.now(timezone.utc)
+    manifest = ProjectManifest(
+        version=1,
+        slug=slug,
+        mix_filename=mix_filename,
+        original_path=str(original_path.resolve()),
+        separated_at=when.isoformat(),
+        demucs_model=demucs_model,
+    )
+    path = manifest_path(project_dir)
+    with path.open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(manifest.to_dict(), handle, sort_keys=False)
+    return path
+
+
+def mix_path(project_dir: Path) -> Path:
+    manifest = load_manifest(project_dir)
+    return project_dir / manifest.mix_filename
+
+
+def resolve_mix_path(project_dir: Path) -> Path:
+    if not manifest_path(project_dir).is_file():
+        print(
+            "error: no project mix; run separate first",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    path = mix_path(project_dir)
+    if not path.is_file():
+        print(f"error: audio not found: {path}", file=sys.stderr)
+        sys.exit(1)
+    return path

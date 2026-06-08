@@ -31,12 +31,11 @@ __all__ = [
 def launch(
     project_dir: Path,
     *,
-    source: Path | None = None,
     config: Path | None = None,
     preset: Path | None = None,
 ) -> None:
-    """Entry for cleave.py shim and future `python -m cleave play`."""
-    audio_path = resolve_mix_path(project_dir, source)
+    """Entry for `python -m cleave play` and programmatic launch."""
+    audio_path = resolve_mix_path(project_dir)
     config_path = resolve_config_path(config, project_dir)
 
     try:

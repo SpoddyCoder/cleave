@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 
-_META_KEYS = frozenset({"version", "sample_rate_hz", "duration_sec", "source"})
+_META_KEYS = frozenset({"version", "sample_rate_hz", "duration_sec"})
 
 
 def resolve_signals_path(path: Path) -> Path:
@@ -27,7 +27,6 @@ def _list_to_array(values: list[float | None]) -> np.ndarray:
 class Signals:
     sample_rate_hz: float
     duration_sec: float
-    source: Path | None
     path: Path
     stems: dict[str, dict[str, np.ndarray]] = field(repr=False)
     _normalized_cache: dict[tuple[str, str, float], np.ndarray] = field(
@@ -82,7 +81,6 @@ def load_signals(path: Path) -> Signals:
     with signals_path.open(encoding="utf-8") as handle:
         data = json.load(handle)
 
-    source_raw = data.get("source")
     stems: dict[str, dict[str, np.ndarray]] = {}
     for stem_name, signals in data.items():
         if stem_name in _META_KEYS or not isinstance(signals, dict):
@@ -94,7 +92,6 @@ def load_signals(path: Path) -> Signals:
     return Signals(
         sample_rate_hz=float(data["sample_rate_hz"]),
         duration_sec=float(data["duration_sec"]),
-        source=Path(source_raw) if source_raw is not None else None,
         path=signals_path,
         stems=stems,
     )

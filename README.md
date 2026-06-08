@@ -51,13 +51,15 @@ Clone Milkdrop preset packs into `~/.local/share/cleave/presets/` (see [cleave.c
 
 ## Quick start
 
-Each track is a **project** under `projects/<slug>/` with `drums.wav`, `bass.wav`, `vocals.wav`, `other.wav`, and `signals.json`. The slug is the audio filename stem (e.g. `sights-and-sounds-26.wav` becomes `sights-and-sounds-26`).
+Each track is a **project** under `projects/<slug>/` with the original mix audio, four stem wavs (`drums.wav`, `bass.wav`, `vocals.wav`, `other.wav`), `project.yaml`, and `signals.json`. The slug is the audio filename stem (e.g. `sights-and-sounds-26.flac` becomes `sights-and-sounds-26`). `separate` copies the source file into the project (no transcode) and writes `project.yaml`.
 
 ```bash
-python -m cleave separate ~/music/sights-and-sounds-26.wav
-python -m cleave analyse sights-and-sounds-26 --source ~/music/sights-and-sounds-26.wav
-python cleave.py sights-and-sounds-26 --source ~/music/sights-and-sounds-26.wav
+python -m cleave separate ~/music/sights-and-sounds-26.flac
+python -m cleave analyse sights-and-sounds-26
+python -m cleave play sights-and-sounds-26
 ```
+
+`python cleave.py` is an alias for `python -m cleave` (same subcommands).
 
 To store projects under XDG instead, set `CLEAVE_DATA=~/.local/share/cleave`.
 
@@ -65,15 +67,15 @@ To store projects under XDG instead, set `CLEAVE_DATA=~/.local/share/cleave`.
 
 | Command | Purpose |
 | --- | --- |
-| `python -m cleave separate <file>` | Demucs split into `projects/<slug>/` (`--slow` for higher quality, `--force` to redo) |
-| `python -m cleave analyse <slug or path>` | Write `signals.json` (`--source` for mix comparison, `--force` to redo) |
-| `python cleave.py <slug or path>` | Run the visualizer |
+| `python -m cleave separate <file>` | Copy mix into `projects/<slug>/`, write `project.yaml`, Demucs split (`--slow`, `--force`) |
+| `python -m cleave analyse <slug or path>` | Write `signals.json` from stems and project mix (`--force` to redo) |
+| `python -m cleave play <slug or path>` | Run the visualizer (`--config`, `--preset` for drums-only debug) |
 
 `analyse` extracts per-stem signals at 100 Hz (onsets, bass envelopes, vocal pitch, spectral centroid). The visualizer uses stem PCM for Milkdrop reactivity and `signals.json` for cleave effects.
 
 ## Visualizer
 
-User-facing entry: `python cleave.py` (thin shim). Implementation lives under [cleave/viz/](cleave/viz/) (`VisualizerApp` loop, live overlay, bootstrap). Programmatic entry: `cleave.viz.launch(project_dir, ...)` (used by the shim and the planned `play` command).
+User-facing entry: `python -m cleave play` (or `python cleave.py play`, same CLI). Implementation lives under [cleave/viz/](cleave/viz/) (`VisualizerApp` loop, live overlay, bootstrap). Programmatic entry: `cleave.viz.launch(project_dir, ...)`.
 
 Four libprojectM layers at tiered resolutions, composited to **1280x720 @ 30 fps** by default. Stack order is `layer_z_order` in [cleave.config.yaml](cleave.config.yaml).
 
@@ -111,7 +113,7 @@ Full row behaviour: [.cursor/rules/live-tuning-ui.mdc](.cursor/rules/live-tuning
 Pass `--config` to use a different YAML. Drums-only debug:
 
 ```bash
-python cleave.py sights-and-sounds-26 --preset ~/.local/share/cleave/presets/.../some.milk
+python -m cleave play sights-and-sounds-26 --preset ~/.local/share/cleave/presets/.../some.milk
 ```
 
 ### Cleave effects
