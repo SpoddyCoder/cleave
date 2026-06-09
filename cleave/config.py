@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, TextIO
@@ -17,8 +18,11 @@ from cleave.effects.constants import clamp_effect_pct
 from cleave.effects.registry import validate_effect_entry
 from cleave.extract import STEM_NAMES
 
-CONFIG_FILENAME = "cleave.config.yaml"
-GLOBAL_CONFIG_PATH = Path.home() / ".config" / "cleave" / CONFIG_FILENAME
+DEFAULT_VIZ_CONFIG_FILENAME = "cleave-viz-default.yaml"
+PROJECT_VIZ_CONFIG_FILENAME = "cleave-viz.yaml"
+GLOBAL_CONFIG_PATH = (
+    Path.home() / ".config" / "cleave" / DEFAULT_VIZ_CONFIG_FILENAME
+)
 
 DEFAULT_LAYER_Z_ORDER = ("drums", "vocals", "bass", "other")
 
@@ -96,21 +100,49 @@ def _expand_path(path: Path | str) -> Path:
     return Path(os.path.expanduser(str(path))).resolve()
 
 
+def project_viz_config_path(project_dir: Path) -> Path:
+    """Return the default per-project visualizer config path."""
+    return project_dir.resolve() / PROJECT_VIZ_CONFIG_FILENAME
+
+
+def ensure_project_viz_config(project_dir: Path) -> Path:
+    """Copy the repo template into *project_dir* when cleave-viz.yaml is missing."""
+    from cleave.paths import repo_root
+
+    dst = project_viz_config_path(project_dir)
+    if dst.is_file():
+        return dst
+
+    src = repo_root() / DEFAULT_VIZ_CONFIG_FILENAME
+    if not src.is_file():
+        raise FileNotFoundError(f"config template not found: {src}")
+
+    project_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dst)
+    return dst
+
+
 def find_config_path(
     config_path: Path | None = None,
     project_root: Path | None = None,
 ) -> Path | None:
-    """Locate cleave.config.yaml using CLI override, project root, then global path."""
+    """Locate config: CLI override, project cleave-viz.yaml, global, then repo template."""
     if config_path is not None:
         return _expand_path(config_path)
 
     root = project_root.resolve() if project_root is not None else Path.cwd()
-    local_path = root / CONFIG_FILENAME
+    local_path = root / PROJECT_VIZ_CONFIG_FILENAME
     if local_path.is_file():
         return local_path.resolve()
 
     if GLOBAL_CONFIG_PATH.is_file():
         return GLOBAL_CONFIG_PATH.resolve()
+
+    from cleave.paths import repo_root
+
+    template = repo_root() / DEFAULT_VIZ_CONFIG_FILENAME
+    if template.is_file():
+        return template.resolve()
 
     return None
 
@@ -283,8 +315,8 @@ def load_config(
     path = find_config_path(config_path, project_root)
     if path is None:
         raise FileNotFoundError(
-            f"no {CONFIG_FILENAME} found; create one in the project root or at "
-            f"{GLOBAL_CONFIG_PATH}"
+            f"no {PROJECT_VIZ_CONFIG_FILENAME} found; create one in the project "
+            f"directory or at {GLOBAL_CONFIG_PATH}"
         )
     if not path.is_file():
         raise FileNotFoundError(f"config file not found: {path}")

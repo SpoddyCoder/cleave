@@ -243,7 +243,7 @@ def write_layer_presets(
     preset_root: Path,
     playlists: dict[str, PresetPlaylist],
 ) -> None:
-    """Write each layer's current preset path back to cleave.config.yaml."""
+    """Write each layer's current preset path back to the active config file."""
     with config_path.open(encoding="utf-8") as fh:
         data = yaml.safe_load(fh)
 

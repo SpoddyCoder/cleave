@@ -47,7 +47,7 @@ pip install torch torchcodec --index-url https://download.pytorch.org/whl/cpu
 pip install -r requirements.txt
 ```
 
-Clone Milkdrop preset packs into `~/.local/share/cleave/presets/` (see [cleave.config.yaml](cleave.config.yaml) `paths.preset_root`). Optional texture pack: `~/.local/share/cleave/textures/`.
+Clone Milkdrop preset packs into `~/.local/share/cleave/presets/` (see [cleave-viz-default.yaml](cleave-viz-default.yaml) `paths.preset_root`). Optional texture pack: `~/.local/share/cleave/textures/`.
 
 ## Quick start
 
@@ -83,7 +83,7 @@ To store projects under XDG instead, set `CLEAVE_DATA=~/.local/share/cleave`.
 
 User-facing entry: `python -m cleave play` (or `python cleave.py play`, same CLI). Implementation lives under [cleave/viz/](cleave/viz/) (`VisualizerApp` loop, live overlay, bootstrap). Programmatic entry: `cleave.viz.launch(project_dir, ...)`.
 
-Four libprojectM layers at tiered resolutions, composited to **1280x720 @ 30 fps** by default. Stack order is `layer_z_order` in [cleave.config.yaml](cleave.config.yaml).
+Four libprojectM layers at tiered resolutions, composited to **1280x720 @ 30 fps** by default. Stack order is `layer_z_order` in [cleave-viz-default.yaml](cleave-viz-default.yaml).
 
 **Presets:** set `paths.preset_root` to your presets root (the folder that contains packs like `presets-cream-of-the-crop`). Each `layers.*.preset` is a `.milk` file or directory (recursive scan).
 
@@ -100,7 +100,7 @@ Four libprojectM layers at tiered resolutions, composited to **1280x720 @ 30 fps
 Arrow-key tree panel ([cleave/viz/overlay.py](cleave/viz/overlay.py)): browse presets, blend, opacity, beat, cleave effects, z-order, layer lock, transport, save.
 
 - **Track rows:** one block per stem (header, preset dir/file, blend, opacity, beat, collapsible cleave effects).
-- **Footer rows:** transport, **SAVE AS NEW CONFIG**, **OVERWRITE CONFIG** (when active config is not repo-root [cleave.config.yaml](cleave.config.yaml)).
+- **Footer rows:** transport, **SAVE AS NEW CONFIG**, **OVERWRITE CONFIG** (when active config is not repo-root [cleave-viz-default.yaml](cleave-viz-default.yaml)).
 
 | Key | Action |
 | --- | --- |
@@ -114,7 +114,7 @@ Arrow-key tree panel ([cleave/viz/overlay.py](cleave/viz/overlay.py)): browse pr
 
 Full row behaviour: [.cursor/rules/live-tuning-ui.mdc](.cursor/rules/live-tuning-ui.mdc).
 
-**Save:** **SAVE AS NEW CONFIG** writes `unnamed-N.yaml` in the project directory. **OVERWRITE CONFIG** updates the active config file (hidden when the active file is the repo-root template). A project can also hold `cleave.config.yaml` as its default launch config.
+**Save:** **SAVE AS NEW CONFIG** writes `unnamed-N.yaml` in the project directory. **OVERWRITE CONFIG** updates the active config file (hidden when the active file is the repo-root template). `separate` seeds each project with `cleave-viz.yaml` copied from the repo template.
 
 Pass `--config` to use a different YAML.
 
@@ -133,6 +133,6 @@ Config: `layers.<stem>.effects.<effect>.<driver>` (integers 0-100; zero keys omi
 
 ## Config
 
-[cleave.config.yaml](cleave.config.yaml) is the repo template. At launch, config resolution is: `--config` override, then `cleave.config.yaml` in the project directory, then `~/.config/cleave/cleave.config.yaml`, then the repo template.
+[cleave-viz-default.yaml](cleave-viz-default.yaml) is the repo template. At launch, config resolution is: `--config` override, then `cleave-viz.yaml` in the project directory, then `~/.config/cleave/cleave-viz-default.yaml`, then the repo template.
 
 Default preset paths match [cleave/config.py](cleave/config.py): `~/.local/share/cleave/presets` and `~/.local/share/cleave/textures`.

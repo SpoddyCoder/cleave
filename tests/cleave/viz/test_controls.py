@@ -54,6 +54,7 @@ from cleave.viz.material_icons import (
 )
 from cleave.viz.overlay import (
     find_row,
+    find_row_by_kind,
     RowKind,
     TrackBlock,
     TuningViewState,
@@ -88,7 +89,7 @@ def _make_playlist(name: str, count: int = 3) -> PresetPlaylist:
     return PresetPlaylist(current_dir=current_dir, paths=paths, index=0)
 
 
-_REPO_ROOT_EXAMPLE = Path("/tmp/cleave.config.yaml")
+_REPO_ROOT_EXAMPLE = Path("/tmp/cleave-viz-default.yaml")
 _DEFAULT_ACTIVE_CONFIG = Path("/tmp/projects/my-track/active.yaml")
 
 
@@ -132,7 +133,7 @@ def _row(
 
 
 def test_allow_overwrite_for_path_hides_repo_root_template_only() -> None:
-    root = Path("/repo/cleave.config.yaml")
+    root = Path("/repo/cleave-viz-default.yaml")
     assert allow_overwrite_for_path(root, repo_root_example=root) is False
     assert (
         allow_overwrite_for_path(
@@ -148,17 +149,19 @@ def test_focus_navigation_wraps() -> None:
     controls = _make_controls(("a", "b"))
     view = controls.build_view_state(paused=False)
     navigable = navigable_row_indices(view)
-    assert controls.focus_index == 0
+    transport_row = find_row_by_kind(view, RowKind.TRANSPORT)
+    start_pos = navigable.index(transport_row)
+    assert controls.focus_index == transport_row
 
-    for _ in range(len(navigable) - 1):
+    for step in range(1, len(navigable)):
         assert controls.handle_keydown(_keydown(pygame.K_DOWN)) is True
-    assert controls.focus_index == navigable[-1]
+        assert controls.focus_index == navigable[(start_pos + step) % len(navigable)]
 
     assert controls.handle_keydown(_keydown(pygame.K_DOWN)) is True
-    assert controls.focus_index == 0
+    assert controls.focus_index == transport_row
 
     assert controls.handle_keydown(_keydown(pygame.K_UP)) is True
-    assert controls.focus_index == navigable[-1]
+    assert controls.focus_index == navigable[start_pos - 1]
 
 
 def test_opacity_clamps() -> None:
@@ -258,11 +261,7 @@ def test_header_collapses_and_expands_sub_rows() -> None:
     preset_dir_row = _row(view, "drums", RowKind.TRACK_PRESET_DIR)
     controls.focus_index = header_row
 
-    controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert controls.session.layers["drums"].expanded is False
-    assert controls.focus_index == header_row
-
-    view = controls.build_view_state(paused=False)
     assert preset_dir_row not in navigable_row_indices(view)
     assert preset_dir_row not in visible_row_indices(view)
 
@@ -280,6 +279,7 @@ def test_disable_auto_collapses_sub_rows() -> None:
     header_row = _row(view, "drums", RowKind.TRACK_HEADER)
     preset_dir_row = _row(view, "drums", RowKind.TRACK_PRESET_DIR)
     controls.focus_index = header_row
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_index == preset_dir_row
 
@@ -808,12 +808,12 @@ def test_track_header_expand_arrow() -> None:
     controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "drums", RowKind.TRACK_HEADER)
-    assert _row_text(view, header_row).endswith(" ▼")
+    assert _row_text(view, header_row).endswith(" ▶")
 
-    controls.session.layers["drums"].expanded = False
+    controls.session.layers["drums"].expanded = True
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "drums", RowKind.TRACK_HEADER)
-    assert _row_text(view, header_row).endswith(" ▶")
+    assert _row_text(view, header_row).endswith(" ▼")
 
 
 def test_track_header_visibility_icon_color() -> None:
@@ -884,8 +884,9 @@ def test_transport_enter_toggles_pause() -> None:
 
 def test_space_toggles_pause_from_any_focus() -> None:
     controls = _make_controls(("drums",))
+    view = controls.build_view_state(paused=False)
     assert controls.playback.paused is False
-    assert controls.focus_index == 0
+    assert controls.focus_index == find_row_by_kind(view, RowKind.TRANSPORT)
 
     controls.handle_keydown(_keydown(pygame.K_SPACE))
     assert controls.playback.paused is True
@@ -980,6 +981,7 @@ def test_ctrl_quick_nav_does_not_affect_normal_up_down() -> None:
     header_row = _row(view, "drums", RowKind.TRACK_HEADER)
     preset_dir_row = _row(view, "drums", RowKind.TRACK_PRESET_DIR)
     controls.focus_index = header_row
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_index == preset_dir_row
@@ -1395,19 +1397,19 @@ def test_locked_header_still_expands() -> None:
     header_row = _row(view, "drums", RowKind.TRACK_HEADER)
     preset_dir_row = _row(view, "drums", RowKind.TRACK_PRESET_DIR)
     controls.focus_index = header_row
-    assert controls.session.layers["drums"].expanded is True
-
-    controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert controls.session.layers["drums"].expanded is False
-
-    view = controls.build_view_state(paused=False)
-    assert preset_dir_row not in visible_row_indices(view)
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.layers["drums"].expanded is True
 
     view = controls.build_view_state(paused=False)
     assert preset_dir_row in visible_row_indices(view)
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.layers["drums"].expanded is False
+
+    view = controls.build_view_state(paused=False)
+    assert preset_dir_row not in visible_row_indices(view)
 
 
 def test_locked_sub_rows_use_locked_color() -> None:

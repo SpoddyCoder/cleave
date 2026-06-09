@@ -221,11 +221,6 @@ class VisualizerApp:
 
                 pygame.display.flip()
 
-                if not rt.playback.paused and (
-                    rt.mix_player.finished() or t_sec >= rt.duration_sec - 0.05
-                ):
-                    running = False
-
         finally:
             _destroy_layers(rt.layers)
             if rt.compositor is not None:
