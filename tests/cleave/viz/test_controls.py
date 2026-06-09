@@ -235,13 +235,12 @@ def test_navigation_skips_sub_rows_when_collapsed() -> None:
     assert controls.focus_index == bass_header
 
 
-def test_re_enable_allows_sub_row_focus() -> None:
+def test_re_enable_without_expanding() -> None:
     controls = _make_controls(("drums",))
     controls.session.layers["drums"].enabled = False
     controls.session.layers["drums"].expanded = False
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "drums", RowKind.TRACK_HEADER)
-    preset_dir_row = _row(view, "drums", RowKind.TRACK_PRESET_DIR)
     transport_row = next(
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.TRANSPORT
     )
@@ -253,9 +252,10 @@ def test_re_enable_allows_sub_row_focus() -> None:
     controls.focus_index = header_row
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
     assert controls.session.layers["drums"].enabled is True
+    assert controls.session.layers["drums"].expanded is False
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_index == preset_dir_row
+    assert controls.focus_index == transport_row
 
 
 def test_header_collapses_and_expands_sub_rows() -> None:

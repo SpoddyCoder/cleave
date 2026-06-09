@@ -103,7 +103,7 @@ def extract_bass(path: Path | str) -> BassSignals:
     }
 
 
-def extract_vocals(path: Path | str, *, slow: bool = False) -> VocalSignals:
+def extract_vocals(path: Path | str, *, high_quality: bool = False) -> VocalSignals:
     """RMS envelope and pitch (Hz); unvoiced frames are NaN."""
     y, sr = _load(path)
     rms = _rms_envelope(y, sr, HOP_LENGTH)
@@ -111,7 +111,7 @@ def extract_vocals(path: Path | str, *, slow: bool = False) -> VocalSignals:
     fmin = librosa.note_to_hz("C2")
     fmax = librosa.note_to_hz("C7")
 
-    if slow:
+    if high_quality:
         f0, voiced_flag, _ = librosa.pyin(
             y,
             fmin=fmin,

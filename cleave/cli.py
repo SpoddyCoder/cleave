@@ -12,6 +12,14 @@ from cleave.separate import (
 )
 
 SIGNALS_FILENAME = "signals.json"
+_TARGET_HELP = "Source audio file or cleave project (path or slug)"
+
+
+class _CleaveHelpFormatter(argparse.RawDescriptionHelpFormatter):
+    def _format_action(self, action):
+        if isinstance(action, argparse._SubParsersAction):
+            return "".join(self._format_action(sub) for sub in action._get_subactions())
+        return super()._format_action(action)
 
 
 def _exit_error(message: str) -> None:
@@ -43,7 +51,9 @@ def cmd_separate(args: argparse.Namespace) -> None:
     signals_before = signals_complete(project_dir)
 
     try:
-        result = run_separate(target, slow=args.slow, force=args.force)
+        result = run_separate(
+            target, high_quality=args.high_quality, force=args.force
+        )
     except (FileNotFoundError, ValueError, RuntimeError) as e:
         _exit_error(f"error: {e}")
 
@@ -59,7 +69,7 @@ def cmd_separate(args: argparse.Namespace) -> None:
 def cmd_play(args: argparse.Namespace) -> None:
     target = Path(args.target)
     try:
-        project_dir = run_separate(target, slow=args.slow)
+        project_dir = run_separate(target, high_quality=args.high_quality)
     except (FileNotFoundError, ValueError, RuntimeError) as e:
         _exit_error(f"error: {e}")
 
@@ -75,24 +85,35 @@ def cmd_play(args: argparse.Namespace) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="cleave",
-        description="Stem-driven music visualizer",
+        description=(
+            "Stem-driven music visualizer\n\n"
+            "positional arguments:\n"
+            f"  target                {_TARGET_HELP}"
+        ),
+        usage="%(prog)s [-h] <command> target",
+        formatter_class=_CleaveHelpFormatter,
     )
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(
+        dest="command", required=True, title="commands"
+    )
 
     separate = subparsers.add_parser(
         "separate",
+        prog="cleave separate",
         help="Separate audio into stems and extract signals",
     )
     separate.add_argument(
         "target",
-        help="Source audio file or Cleave project (path or slug)",
+        help=_TARGET_HELP,
     )
     separate.add_argument(
-        "--slow",
+        "-hq",
+        "--high-quality",
         action="store_true",
-        help="htdemucs_ft for separation; pyin for vocal pitch (default: fast)",
+        help="htdemucs_ft for separation; pyin for vocal pitch (slower)",
     )
     separate.add_argument(
+        "-f",
         "--force",
         action="store_true",
         help="Re-run Demucs and signal extraction even when outputs exist",
@@ -101,18 +122,21 @@ def build_parser() -> argparse.ArgumentParser:
 
     play = subparsers.add_parser(
         "play",
+        prog="cleave play",
         help="Run the live visualizer (separates first if needed)",
     )
     play.add_argument(
         "target",
-        help="Source audio file or Cleave project (path or slug)",
+        help=_TARGET_HELP,
     )
     play.add_argument(
-        "--slow",
+        "-hq",
+        "--high-quality",
         action="store_true",
-        help="htdemucs_ft for separation; pyin for vocal pitch (default: fast)",
+        help="htdemucs_ft for separation; pyin for vocal pitch (slower)",
     )
     play.add_argument(
+        "-c",
         "--config",
         type=Path,
         help=f"Config path (default: <project>/{PROJECT_VIZ_CONFIG_FILENAME})",

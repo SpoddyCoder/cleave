@@ -91,7 +91,7 @@ This will separate the track into its component stem tracks (bass, drums, vocals
   * It will only re-run the seperation and analysis if they're not already in the project directory
     * Use `--force` if you want to redo these.
 * `separate` can be run on its own without launching the visualizer
-* Pass `--slow` to either command for higher-quality separation.
+* Pass `--high-quality` to either command for higher-quality separation.
 * To store projects under XDG instead, set `CLEAVE_DATA=~/.local/share/cleave`.
 * `python cleave.py` is an alias for `python -m cleave` (same subcommands).
 
