@@ -1,10 +1,8 @@
-# Cleave
+# `cleave`
 
 Stem-separated music visualizer: drums drive the pulse, bass drives the warp, each stem gets its own visualizer layer.
 
 Built on [projectM](https://github.com/projectM-visualizer/projectM) and [Demucs](https://github.com/facebookresearch/demucs). Developed on WSL2; should run on any Linux with a display.
-
-**Next up:** see [docs/todos.md](docs/todos.md). **Later ideas:** [docs/roadmap.md](docs/roadmap.md).
 
 ## Requirements
 
@@ -36,7 +34,7 @@ conda create -n cleave python=3.10
 conda activate cleave
 ```
 
-Install dependecies...
+Install dependencies...
 
 ```bash
 # install torch with CUDA support
@@ -47,47 +45,86 @@ pip install torch torchcodec --index-url https://download.pytorch.org/whl/cpu
 pip install -r requirements.txt
 ```
 
-Clone Milkdrop preset packs into `~/.local/share/cleave/presets/` (see [cleave-viz-default.yaml](cleave-viz-default.yaml) `paths.preset_root`). Optional texture pack: `~/.local/share/cleave/textures/`.
+## Quick Start
 
-## Quick start
-
-Each track is a **project** under `projects/<slug>/` with the original mix audio, `project.yaml`, `signals.json`, and four stem wavs under `stems/` (`drums.wav`, `bass.wav`, `vocals.wav`, `other.wav`). The slug is the audio filename stem (e.g. `sights-and-sounds-26.flac` becomes `sights-and-sounds-26`). `separate` copies the source file into the project (no transcode) and writes `project.yaml`.
+### Download Some Milkdrop Presets
 
 ```bash
-python -m cleave play ~/music/sights-and-sounds-26.flac
+# make a preset_root
+mkdir ~/milkdrop-presets
+cd ~/milkdrop-presets
+
+# there are thousands of community written presets to choose from...
+git clone https://github.com/projectM-visualizer/presets-cream-of-the-crop
+git clone https://github.com/projectM-visualizer/presets-milkdrop-original
+git clone https://github.com/projectM-visualizer/presets-milkdrop-texture-pack
 ```
 
-`play` accepts a source audio file or project slug/path. It runs separation and signal extraction when anything is missing, then launches the visualizer. You can still run `separate` on its own:
+`preset_root` is defined in [cleave-viz-default.yaml](./cleave-viz-default.yaml)
+
+### `cleave` a track
 
 ```bash
-python -m cleave separate ~/music/sights-and-sounds-26.flac
-python -m cleave play sights-and-sounds-26
+python -m cleave play ~/music/mysong.wav
 ```
 
-`separate` is idempotent: re-run on an existing project slug to analyse only (when stems exist but `signals.json` is missing). Use `--force` to redo both. Pass `--slow` to either command for higher-quality separation.
+This will separate the track into its component stem tracks (bass, drums, vocals, other), perform some audio analysis, then launch the visualizer.
 
-`python cleave.py` is an alias for `python -m cleave` (same subcommands).
+---
 
-To store projects under XDG instead, set `CLEAVE_DATA=~/.local/share/cleave`.
+## Using `cleave`
 
-## CLI
+### Project Directory
 
-| Command | Purpose |
-| --- | --- |
-| `python -m cleave separate <file or slug>` | Demucs split + `signals.json` (`--slow`, `--force`; idempotent when outputs exist) |
-| `python -m cleave play <file or slug>` | Run the visualizer; separates first if needed (`--slow`, `--config`) |
+`cleave` creates a new directory under `projects/` for each song, containing...
+* `project.yaml` - project metadata
+* `cleave-viz.yaml` - visualizer configuration. Not everything in here is surfaced in the visualizer UI just yet
+* `signals.json` - audio analysis data used by `cleave effects`
+* `mysong.wav` - original source audio is copied into the project (makes a project self contained)
+* `stems/` - separated audio stems
+* `renders/` - final renders
 
-`separate` extracts per-stem signals at 100 Hz (onsets, bass envelopes, vocal pitch, spectral centroid) into `signals.json`. The visualizer uses stem PCM for Milkdrop reactivity and `signals.json` for cleave effects.
+### CLI
 
-## Visualizer
+* `python -m cleave --help`
+* `play` accepts a source audio file or project slug/path.
+  * It will only re-run the seperation and analysis if they're not already in the project directory
+    * Use `--force` if you want to redo these.
+* `separate` can be run on its own without launching the visualizer
+* Pass `--slow` to either command for higher-quality separation.
+* To store projects under XDG instead, set `CLEAVE_DATA=~/.local/share/cleave`.
+* `python cleave.py` is an alias for `python -m cleave` (same subcommands).
 
-User-facing entry: `python -m cleave play` (or `python cleave.py play`, same CLI). Implementation lives under [cleave/viz/](cleave/viz/) (`VisualizerApp` loop, live overlay, bootstrap). Programmatic entry: `cleave.viz.launch(project_dir, ...)`.
+### Visualizer
+Controls...
 
-Four libprojectM layers at tiered resolutions, composited to **1280x720 @ 30 fps** by default. Stack order is `layer_z_order` in [cleave-viz-default.yaml](cleave-viz-default.yaml).
+* `Up` / `Down`
+  * move up / down menu items
+* `CTRL` + `Up` / `Down`
+  * move up / down layers
+* `Right` / `Left`
+  * expand / collapse
+  * increment / decrement value by 1
+  * forward / back 10 secs
+  * next / previous milkdrop preset
+* `CTRL` + `Right` / `Left`
+  * enable / disable layer
+  * increment / decrement value by 10
+  * forward / back 30 secs
+  * up / down the preset directory tree 
+* `SHIFT` + `Right` / `Left`
+  * Solo / unsolo layer
+* `Enter`
+  * move a layer up or down the z-order
+* `CTRL` + `Enter`
+  * lock / unlock layer
+* `CTRL` + `q`
+  * quit
 
-**Presets:** set `paths.preset_root` to your presets root (the folder that contains packs like `presets-cream-of-the-crop`). Each `layers.*.preset` is a `.milk` file or directory (recursive scan).
+#### Compositing
 
-**Compositing:** Milkdrop draws on black. Cleave treats black as transparent and uses pixel brightness as blend weight (`black-key` default). Per-layer `blend_mode`, opacity, and beat sensitivity live in config.
+* The visualizer is four libprojectM layers at tiered resolutions, composited to **1280x720 @ 30 fps** by default (editable `cleave-viz.yaml`)
+* Milkdrop draws on black, so cleave treats black as transparent and uses pixel brightness as blend weight (`black-key` default).
 
 | Mode | Typical use |
 | --- | --- |
@@ -95,36 +132,9 @@ Four libprojectM layers at tiered resolutions, composited to **1280x720 @ 30 fps
 | `add` | Drums / highlights |
 | `multiply`, `screen`, others | Experimental |
 
-### Live tuning overlay
+#### Cleave effects
 
-Arrow-key tree panel ([cleave/viz/overlay.py](cleave/viz/overlay.py)): browse presets, blend, opacity, beat, cleave effects, z-order, layer lock, transport, save.
-
-- **Track rows:** one block per stem (header, preset dir/file, blend, opacity, beat, collapsible cleave effects).
-- **Footer rows:** transport, **SAVE AS NEW CONFIG**, **OVERWRITE CONFIG** (when active config is not repo-root [cleave-viz-default.yaml](cleave-viz-default.yaml)).
-
-| Key | Action |
-| --- | --- |
-| Up / Down | Move focus |
-| Left / Right | Adjust field; hold to repeat on tuning rows |
-| Enter | Descend preset dir / confirm z-order move / save |
-| Shift + Right | Solo focused layer (visual + audio; not saved to YAML) |
-| Shift + Left | Exit solo on focused layer when it is the solo target |
-| Ctrl + Enter | Toggle layer lock |
-| Backspace | Parent preset dir |
-| Space | Pause / resume (hidden) |
-| Ctrl + Q | Quit |
-
-Full row behaviour: [.cursor/rules/live-tuning-ui.mdc](.cursor/rules/live-tuning-ui.mdc).
-
-**Solo:** **Shift + Right** on a layer header solos that stem (only its Milkdrop layer composites; speakers play that stem). **Shift + Left** clears solo when that layer is the solo target. The visibility eye gets a red background when that stem is soloed. Save rows are disabled while solo is active.
-
-**Save:** **SAVE AS NEW CONFIG** writes `unnamed-N.yaml` in the project directory. **OVERWRITE CONFIG** updates the active config file (hidden when the active file is the repo-root template). `separate` seeds each project with `cleave-viz.yaml` copied from the repo template.
-
-Pass `--config` to use a different YAML.
-
-### Cleave effects
-
-Signal-driven compositor modifiers on top of each layer. Tune depths (0-100%) under the **cleave effects** header in the overlay.
+Signal-driven compositor modifiers on top of each layer. Tune depths (0-100%).
 
 | Stem | Effects |
 | --- | --- |
@@ -132,11 +142,3 @@ Signal-driven compositor modifiers on top of each layer. Tune depths (0-100%) un
 | Bass | pulse (sub_bass, mid_bass), flash, grit |
 | Vocals | pulse, hue (pitch), flash, grit |
 | Other | pulse, flash, grit |
-
-Config: `layers.<stem>.effects.<effect>.<driver>` (integers 0-100; zero keys omitted in snapshots).
-
-## Config
-
-[cleave-viz-default.yaml](cleave-viz-default.yaml) is the repo template. At launch, config resolution is: `--config` override, then `cleave-viz.yaml` in the project directory, then `~/.config/cleave/cleave-viz-default.yaml`, then the repo template.
-
-Default preset paths match [cleave/config.py](cleave/config.py): `~/.local/share/cleave/presets` and `~/.local/share/cleave/textures`.
