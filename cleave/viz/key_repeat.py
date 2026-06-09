@@ -19,6 +19,10 @@ def mod_ctrl(mod: int) -> bool:
     return bool(mod & (pygame.KMOD_CTRL | pygame.KMOD_LCTRL | pygame.KMOD_RCTRL))
 
 
+def mod_shift(mod: int) -> bool:
+    return bool(mod & (pygame.KMOD_SHIFT | pygame.KMOD_LSHIFT | pygame.KMOD_RSHIFT))
+
+
 @dataclass
 class _ActiveRepeat:
     key: int

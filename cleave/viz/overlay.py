@@ -26,11 +26,12 @@ from cleave.viz.material_icons import (
     LOCK_GLYPH,
     VISIBILITY_GLYPH,
     VISIBILITY_OFF_GLYPH,
+    VISIBILITY_ICON_PAD_X,
     render_glyph,
     render_transport_icons,
     row_icon_prefix_width,
     track_header_lock_suffix_width,
-    visibility_icon_prefix_width,
+    visibility_icon_slot_width,
 )
 from cleave.viz.theme import (
     BACKGROUND,
@@ -48,6 +49,7 @@ from cleave.viz.theme import (
     PANEL_CONTENT_MAX_WIDTH,
     PRESET_FILE_ICON,
     PRESET_ICON,
+    SOLO_BG,
     VALUE,
 )
 
@@ -112,6 +114,8 @@ class TuningViewState:
     confirm_focus_yes: bool = True
     allow_overwrite: bool = True
     active_config_label: str = "cleave-viz.yaml"
+    solo_stem: str | None = None
+    solo_active: bool = False
 
 
 def footer_row_count(state: TuningViewState) -> int:
@@ -438,6 +442,31 @@ def _track_header_expand_suffix(expanded: bool) -> str:
     return f" {arrow}"
 
 
+def render_visibility_icon(
+    *,
+    enabled: bool,
+    solo: bool,
+    line_height: int,
+) -> pygame.Surface:
+    glyph = VISIBILITY_GLYPH if enabled else VISIBILITY_OFF_GLYPH
+    color = VALUE if (enabled or solo) else DISABLED
+    glyph_surf = render_glyph(glyph, color=color, line_height=line_height)
+    slot_w = visibility_icon_slot_width(line_height)
+    surf = pygame.Surface((slot_w, line_height), pygame.SRCALPHA)
+    if solo:
+        pygame.draw.rect(surf, SOLO_BG, (0, 0, slot_w, line_height))
+    surf.blit(glyph_surf, (VISIBILITY_ICON_PAD_X, 0))
+    return surf
+
+
+def track_header_prefix_width(font: pygame.font.Font) -> int:
+    line_h = font.get_linesize()
+    icon_w = render_visibility_icon(
+        enabled=True, solo=False, line_height=line_h
+    ).get_width()
+    return icon_w + ROW_ICON_SUFFIX_GAP
+
+
 def _effects_header_prefix() -> str:
     return "└─ cleave effects "
 
@@ -458,7 +487,7 @@ def _fit_track_header_stem(
     block = state.tracks[stem]
     locked = block.locked
     budget = max_content_width - _row_indent(state, index)
-    budget -= visibility_icon_prefix_width(font.get_linesize())
+    budget -= track_header_prefix_width(font)
     budget -= font.size(_track_header_layer_prefix(state, index))[0]
     budget -= font.size(_track_header_expand_suffix(block.expanded))[0]
     if locked:
@@ -567,6 +596,12 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
     stem = row_stem(state, index)
     if kind == RowKind.CONFIG_HEADER:
         return LABEL
+
+    if state.solo_active and kind in (
+        RowKind.SAVE_AS_NEW_CONFIG,
+        RowKind.OVERWRITE_CONFIG,
+    ):
+        return DISABLED
 
     if (
         kind == RowKind.TRACK_PRESET
@@ -716,11 +751,10 @@ class TuningOverlay:
                 stem = row_stem(state, index)
                 block = state.tracks[stem] if stem is not None else None
                 enabled = block.enabled if block is not None else True
+                solo = stem is not None and state.solo_stem == stem
                 locked = block.locked if block is not None else False
-                vis_icon = render_glyph(
-                    VISIBILITY_GLYPH if enabled else VISIBILITY_OFF_GLYPH,
-                    color=VALUE if enabled else DISABLED,
-                    line_height=line_h,
+                prefix_surf = render_visibility_icon(
+                    enabled=enabled, solo=solo, line_height=line_h
                 )
                 layer_prefix = _track_header_layer_prefix(state, index)
                 stem_text = _fit_track_header_stem(font, state, index)
@@ -734,10 +768,10 @@ class TuningOverlay:
                     locked=locked,
                     line_height=line_h,
                 )
-                row_surfaces.append(vis_icon)
+                row_surfaces.append(prefix_surf)
                 row_time_surfaces.append(label_surf)
                 row_widths.append(
-                    indent + vis_icon.get_width() + label_surf.get_width()
+                    indent + prefix_surf.get_width() + label_surf.get_width()
                 )
             elif kind in {
                 RowKind.CONFIG_HEADER,

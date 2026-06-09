@@ -116,6 +116,8 @@ def _init_gl_resources(runtime: VisualizerRuntime) -> None:
         duration_sec=runtime.duration_sec,
         signals=runtime.signals,
         effect_runtime=runtime.effect_runtime,
+        pcm_bank=runtime.pcm_bank,
+        mix_player=mix_player,
     )
 
     runtime.compositor = compositor

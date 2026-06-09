@@ -26,6 +26,20 @@ class StemLayer:
     playlist: PresetPlaylist
 
 
+def effective_layer_enabled(session: TuningSession, stem: str) -> bool:
+    if session.solo_stem is not None:
+        return stem == session.solo_stem
+    return session.layers[stem].enabled
+
+
+def apply_layer_visibility(
+    session: TuningSession,
+    layers_by_name: dict[str, StemLayer],
+) -> None:
+    for stem, layer in layers_by_name.items():
+        layer.fbo.enabled = effective_layer_enabled(session, stem)
+
+
 def apply_effect_modifiers(
     session: TuningSession,
     layers_by_name: dict[str, StemLayer],
@@ -39,7 +53,7 @@ def apply_effect_modifiers(
         effect_runtime.update(session, signals, t_sec)
     modifiers = effect_runtime.modifiers(session)
     for stem, layer in layers_by_name.items():
-        if not session.layers[stem].enabled:
+        if not effective_layer_enabled(session, stem):
             continue
         mod = modifiers[stem]
         layer.fbo.opacity = mod.opacity
