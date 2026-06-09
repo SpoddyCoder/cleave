@@ -9,6 +9,7 @@ import tempfile
 from pathlib import Path
 
 from cleave.analyse import run_analyse
+from cleave.config import ensure_project_viz_config
 from cleave.extract import stem_paths, stems_dir
 from cleave.paths import project_dir, project_slug, resolve_project
 from cleave.project import load_manifest, manifest_path, mix_path, write_manifest
@@ -132,6 +133,7 @@ def run_separate(
 ) -> Path:
     """Separate and/or analyse a Cleave project from an audio file or project slug."""
     project_dir, audio_path = resolve_separate_target(target)
+    ensure_project_viz_config(project_dir)
 
     stems_complete = project_stems_complete(project_dir)
     signals_done = signals_complete(project_dir)

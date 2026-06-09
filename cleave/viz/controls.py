@@ -10,7 +10,12 @@ from pathlib import Path
 
 import pygame
 
-from cleave.config import CONFIG_FILENAME, clamp_beat_sensitivity, clamp_effect_pct
+from cleave.config import (
+    DEFAULT_VIZ_CONFIG_FILENAME,
+    PROJECT_VIZ_CONFIG_FILENAME,
+    clamp_beat_sensitivity,
+    clamp_effect_pct,
+)
 from cleave.effects.registry import effect_row_count
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.preset_playlist import (
@@ -26,6 +31,7 @@ from cleave.viz.overlay import (
     TrackBlock,
     TuningViewState,
     find_row,
+    find_row_by_kind,
     navigable_row_indices,
     quick_nav_row_indices,
     row_effect,
@@ -52,7 +58,7 @@ _DEFAULT_SAVE_FILENAME = "unnamed-1.yaml"
 
 def config_path_display(path: Path | None) -> str:
     """Active config path for the footer header (truncation happens at draw time)."""
-    return path.as_posix() if path is not None else CONFIG_FILENAME
+    return path.as_posix() if path is not None else PROJECT_VIZ_CONFIG_FILENAME
 
 
 def allow_overwrite_for_path(
@@ -60,7 +66,7 @@ def allow_overwrite_for_path(
     *,
     repo_root_example: Path,
 ) -> bool:
-    """Hide overwrite only for the repo-root template cleave.config.yaml."""
+    """Hide overwrite only for the repo-root template cleave-viz-default.yaml."""
     if active_path is None:
         return False
     return active_path.resolve() != repo_root_example.resolve()
@@ -76,7 +82,7 @@ class LayerRuntime:
     blend_mode: BlendMode = "black-key"
     beat_sensitivity: float = 1.0
     enabled: bool = True
-    expanded: bool = True
+    expanded: bool = False
     locked: bool = False
 
 
@@ -116,7 +122,7 @@ class TuningControls:
         self._repo_root_example = (
             repo_root_example
             if repo_root_example is not None
-            else Path(CONFIG_FILENAME)
+            else Path(DEFAULT_VIZ_CONFIG_FILENAME)
         )
         self._on_preset_change = on_preset_change
         self._on_blend_change = on_blend_change
@@ -136,6 +142,8 @@ class TuningControls:
         self._input_blocked_until = 0.0
         self._key_repeat = KeyRepeatController()
         self._confirm = ConfirmDialog()
+        view = self.build_view_state(paused=self.playback.paused)
+        self.focus_index = find_row_by_kind(view, RowKind.TRANSPORT)
 
     def handle_keydown(self, event: pygame.event.Event) -> bool:
         """Handle a key down event. Return False when the caller should quit (Ctrl+Q)."""
@@ -602,11 +610,15 @@ class TuningControls:
 
     def _prompt_overwrite(self) -> None:
         active_path = self._active_config_path
-        basename = active_path.name if active_path is not None else "cleave.config.yaml"
+        basename = (
+            active_path.name
+            if active_path is not None
+            else PROJECT_VIZ_CONFIG_FILENAME
+        )
         message = f"Overwrite {basename}?"
 
         def on_confirm() -> None:
-            target = active_path or Path("cleave.config.yaml")
+            target = active_path or Path(PROJECT_VIZ_CONFIG_FILENAME)
             if self._on_overwrite_config is not None:
                 written = self._on_overwrite_config(target)
             else:

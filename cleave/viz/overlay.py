@@ -93,7 +93,7 @@ class TrackBlock:
     effects: dict[str, dict[str, int]]
     effects_expanded: bool = False
     enabled: bool = True
-    expanded: bool = True
+    expanded: bool = False
     locked: bool = False
     preset_empty: bool = False
 
@@ -111,7 +111,7 @@ class TuningViewState:
     confirm_message: str | None = None
     confirm_focus_yes: bool = True
     allow_overwrite: bool = True
-    active_config_label: str = "cleave.config.yaml"
+    active_config_label: str = "cleave-viz.yaml"
 
 
 def footer_row_count(state: TuningViewState) -> int:
@@ -192,6 +192,13 @@ def find_row(
                 continue
         return index
     raise ValueError(f"no row for stem={stem!r} kind={kind!r}")
+
+
+def find_row_by_kind(state: TuningViewState, kind: RowKind) -> int:
+    for index, desc in enumerate(build_row_layout(state)):
+        if desc.kind == kind:
+            return index
+    raise ValueError(f"no row for kind={kind!r}")
 
 
 def row_count(state: TuningViewState) -> int:
@@ -717,7 +724,7 @@ class TuningOverlay:
                 )
                 layer_prefix = _track_header_layer_prefix(state, index)
                 stem_text = _fit_track_header_stem(font, state, index)
-                expanded = block.expanded if block is not None else True
+                expanded = block.expanded if block is not None else False
                 label_surf = _render_track_header_label(
                     font,
                     layer_prefix=layer_prefix,

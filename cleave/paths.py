@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from cleave.config import CONFIG_FILENAME
+from cleave.config import PROJECT_VIZ_CONFIG_FILENAME
 
 # Repo root when running from a checkout (`cleave/` package lives here).
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -65,5 +65,5 @@ def project_slug(audio_path: Path) -> str:
 
 
 def default_project_config(project: Path) -> Path:
-    """Return the default per-project config path inside *project*."""
-    return project / CONFIG_FILENAME
+    """Return the default per-project visualizer config path inside *project*."""
+    return project / PROJECT_VIZ_CONFIG_FILENAME

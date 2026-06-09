@@ -7,7 +7,9 @@ from unittest.mock import patch
 
 import pytest
 
+from cleave.config import DEFAULT_VIZ_CONFIG_FILENAME, PROJECT_VIZ_CONFIG_FILENAME
 from cleave.extract import STEM_NAMES, stems_dir
+from cleave.paths import repo_root
 from cleave.project import PROJECT_FILENAME, load_manifest, write_manifest
 from cleave.separate import (
     project_stems_complete,
@@ -83,6 +85,32 @@ def test_resolve_separate_target_project_slug(
 
     assert project_dir == project.resolve()
     assert audio_path == mix.resolve()
+
+
+def test_run_separate_writes_project_viz_config(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    audio = tmp_path / "my-track.flac"
+    audio.write_bytes(b"audio")
+
+    project = tmp_path / "projects" / "my-track"
+    project.mkdir(parents=True)
+    _write_stub_stems(project)
+    (project / "signals.json").write_text("{}")
+
+    with patch("cleave.separate._run_demucs") as run_demucs, patch(
+        "cleave.separate.run_analyse"
+    ) as run_analyse:
+        run_separate(audio)
+
+    viz_config = project / PROJECT_VIZ_CONFIG_FILENAME
+    assert viz_config.is_file()
+    assert viz_config.read_text(encoding="utf-8") == (
+        repo_root() / DEFAULT_VIZ_CONFIG_FILENAME
+    ).read_text(encoding="utf-8")
+    run_demucs.assert_not_called()
+    run_analyse.assert_not_called()
 
 
 def test_run_separate_noop_when_stems_and_signals_exist(

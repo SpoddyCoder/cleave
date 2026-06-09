@@ -17,7 +17,6 @@ layer_z_order:
   - other
   
 layers:
-
   drums:
     preset: presets-cream-of-the-crop/Dancer/Aurora/
     enabled: true

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from cleave.config import CONFIG_FILENAME
+from cleave.config import PROJECT_VIZ_CONFIG_FILENAME
 from cleave.paths import (
     data_dir,
     default_project_config,
@@ -69,4 +69,4 @@ def test_project_slug() -> None:
 
 def test_default_project_config() -> None:
     project = Path("/tmp/my-project")
-    assert default_project_config(project) == project / CONFIG_FILENAME
+    assert default_project_config(project) == project / PROJECT_VIZ_CONFIG_FILENAME

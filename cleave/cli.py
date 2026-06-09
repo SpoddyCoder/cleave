@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 
-from cleave.paths import repo_root
+from cleave.config import PROJECT_VIZ_CONFIG_FILENAME, ensure_project_viz_config
 from cleave.separate import (
     project_stems_complete,
     resolve_separate_target,
@@ -25,6 +25,8 @@ def cmd_separate(args: argparse.Namespace) -> None:
         project_dir, _ = resolve_separate_target(target)
     except (FileNotFoundError, ValueError) as e:
         _exit_error(f"error: {e}")
+
+    ensure_project_viz_config(project_dir)
 
     if (
         project_stems_complete(project_dir)
@@ -113,7 +115,7 @@ def build_parser() -> argparse.ArgumentParser:
     play.add_argument(
         "--config",
         type=Path,
-        help=f"Config path (default: {repo_root() / 'cleave.config.yaml'})",
+        help=f"Config path (default: <project>/{PROJECT_VIZ_CONFIG_FILENAME})",
     )
     play.set_defaults(func=cmd_play)
 
