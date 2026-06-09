@@ -25,7 +25,7 @@ def test_separate_parser_uses_target_arg() -> None:
     parser = build_parser()
     args = parser.parse_args(["separate", "my-track.flac"])
     assert args.target == "my-track.flac"
-    assert not args.slow
+    assert not args.high_quality
     assert not args.force
 
 
@@ -110,7 +110,7 @@ def test_play_parser_uses_target_arg() -> None:
     parser = build_parser()
     args = parser.parse_args(["play", "my-track.flac"])
     assert args.target == "my-track.flac"
-    assert not args.slow
+    assert not args.high_quality
     assert args.config is None
 
 
@@ -169,10 +169,10 @@ def test_cmd_play_calls_run_separate_when_incomplete(
     ):
         cmd_play(build_parser().parse_args(["play", "my-track"]))
 
-    run_separate.assert_called_once_with(Path("my-track"), slow=False)
+    run_separate.assert_called_once_with(Path("my-track"), high_quality=False)
 
 
-def test_cmd_play_forwards_slow_to_run_separate(
+def test_cmd_play_forwards_high_quality_to_run_separate(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
@@ -182,20 +182,41 @@ def test_cmd_play_forwards_slow_to_run_separate(
         patch("cleave.cli.run_separate", return_value=project.resolve()) as run_separate,
         patch("cleave.viz.launch"),
     ):
-        cmd_play(build_parser().parse_args(["play", "my-track", "--slow"]))
+        cmd_play(build_parser().parse_args(["play", "my-track", "--high-quality"]))
 
-    run_separate.assert_called_once_with(Path("my-track"), slow=True)
+    run_separate.assert_called_once_with(Path("my-track"), high_quality=True)
+
+
+def test_shortcut_flags() -> None:
+    parser = build_parser()
+    assert parser.parse_args(["separate", "song", "-hq", "-f"]).high_quality
+    assert parser.parse_args(["separate", "song", "-hq", "-f"]).force
+    assert parser.parse_args(["play", "song", "-hq"]).high_quality
+    assert parser.parse_args(["play", "song", "-c", "cfg.yaml"]).config == Path(
+        "cfg.yaml"
+    )
 
 
 def test_module_help_lists_subcommands() -> None:
-    result = subprocess.run(
+    root = subprocess.run(
         [sys.executable, "-m", "cleave", "--help"],
         capture_output=True,
         text=True,
         check=True,
     )
-    out = result.stdout
+    out = root.stdout
     assert "separate" in out
     assert "analyse" not in out
     assert "play" in out
+    assert out.startswith("usage: cleave [-h] <command> target")
+    assert "target                Source audio file or cleave project" in out
+    assert "{separate,play}" not in out
     assert "pygame" not in out.lower()
+
+    play = subprocess.run(
+        [sys.executable, "-m", "cleave", "play", "--help"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert play.stdout.startswith("usage: cleave play [-h] [-hq] [-c CONFIG] target")

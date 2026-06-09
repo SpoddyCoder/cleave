@@ -159,7 +159,7 @@ def test_run_separate_analyse_only_when_stems_exist_no_signals(
 
     assert result == project.resolve()
     run_demucs.assert_not_called()
-    run_analyse.assert_called_once_with(project.resolve(), slow=False)
+    run_analyse.assert_called_once_with(project.resolve(), high_quality=False)
 
 
 def test_run_separate_force_runs_demucs_and_analyse(
@@ -187,9 +187,9 @@ def test_run_separate_force_runs_demucs_and_analyse(
 
     assert result == project.resolve()
     run_demucs.assert_called_once_with(
-        mix.resolve(), project.resolve(), slow=False, force=True
+        mix.resolve(), project.resolve(), high_quality=False, force=True
     )
-    run_analyse.assert_called_once_with(project.resolve(), slow=False)
+    run_analyse.assert_called_once_with(project.resolve(), high_quality=False)
 
 
 def test_run_separate_creates_project_and_renders(

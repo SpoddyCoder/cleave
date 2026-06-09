@@ -559,9 +559,7 @@ class TuningControls:
         if layer.enabled == enabled:
             return
         layer.enabled = enabled
-        if enabled:
-            layer.expanded = True
-        else:
+        if not enabled:
             layer.expanded = False
             self._refocus_track_header_if_sub_row(stem)
         if self._on_layer_enabled_change is not None:

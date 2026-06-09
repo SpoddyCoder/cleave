@@ -52,7 +52,7 @@ def _run_demucs(
     audio_path: Path,
     project_dir: Path,
     *,
-    slow: bool,
+    high_quality: bool,
     force: bool,
 ) -> None:
     """Separate *audio_path* with Demucs and copy stems into *project_dir*."""
@@ -64,7 +64,7 @@ def _run_demucs(
     else:
         slug = project_slug(audio_path)
 
-    model = "htdemucs_ft" if slow else "htdemucs"
+    model = "htdemucs_ft" if high_quality else "htdemucs"
     mix_filename = audio_path.name
 
     project_dir.mkdir(parents=True, exist_ok=True)
@@ -129,7 +129,7 @@ def _run_demucs(
 
 
 def run_separate(
-    target: Path | str, *, slow: bool = False, force: bool = False
+    target: Path | str, *, high_quality: bool = False, force: bool = False
 ) -> Path:
     """Separate and/or analyse a Cleave project from an audio file or project slug."""
     project_dir, audio_path = resolve_separate_target(target)
@@ -143,10 +143,10 @@ def run_separate(
 
     run_demucs = force or not stems_complete
     if run_demucs:
-        _run_demucs(audio_path, project_dir, slow=slow, force=force)
+        _run_demucs(audio_path, project_dir, high_quality=high_quality, force=force)
 
     if run_demucs or not signals_done:
         print("Extracting signals (may take a while on longer tracks)...", flush=True)
-        run_analyse(project_dir, slow=slow)
+        run_analyse(project_dir, high_quality=high_quality)
 
     return project_dir

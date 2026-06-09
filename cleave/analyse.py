@@ -28,13 +28,13 @@ def _nan_to_null(values: np.ndarray) -> list[float | None]:
     return [None if np.isnan(v) else float(v) for v in values]
 
 
-def run_analyse(project_dir: Path, *, slow: bool) -> Path:
+def run_analyse(project_dir: Path, *, high_quality: bool) -> Path:
     paths = stem_paths(project_dir)
     duration_sec = max(_stem_duration_sec(path) for path in paths.values())
 
     drums_onset = extract_drums_onset(paths["drums"])
     bass = extract_bass(paths["bass"])
-    vocals = extract_vocals(paths["vocals"], slow=slow)
+    vocals = extract_vocals(paths["vocals"], high_quality=high_quality)
     other = extract_other(paths["other"])
     mix_onset = extract_mix_onset(mix_path(project_dir))
 
