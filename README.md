@@ -107,12 +107,16 @@ Arrow-key tree panel ([cleave/viz/overlay.py](cleave/viz/overlay.py)): browse pr
 | Up / Down | Move focus |
 | Left / Right | Adjust field; hold to repeat on tuning rows |
 | Enter | Descend preset dir / confirm z-order move / save |
+| Shift + Right | Solo focused layer (visual + audio; not saved to YAML) |
+| Shift + Left | Exit solo on focused layer when it is the solo target |
 | Ctrl + Enter | Toggle layer lock |
 | Backspace | Parent preset dir |
 | Space | Pause / resume (hidden) |
 | Ctrl + Q | Quit |
 
 Full row behaviour: [.cursor/rules/live-tuning-ui.mdc](.cursor/rules/live-tuning-ui.mdc).
+
+**Solo:** **Shift + Right** on a layer header solos that stem (only its Milkdrop layer composites; speakers play that stem). **Shift + Left** clears solo when that layer is the solo target. The visibility eye gets a red background when that stem is soloed. Save rows are disabled while solo is active.
 
 **Save:** **SAVE AS NEW CONFIG** writes `unnamed-N.yaml` in the project directory. **OVERWRITE CONFIG** updates the active config file (hidden when the active file is the repo-root template). `separate` seeds each project with `cleave-viz.yaml` copied from the repo template.
 

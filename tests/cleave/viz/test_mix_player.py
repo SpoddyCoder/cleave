@@ -9,6 +9,7 @@ from cleave.viz.mix_player import (
     DEFAULT_CHUNKSIZE,
     FREQUENCY_HZ,
     MixPlayer,
+    copy_mono_pcm_chunk_as_stereo,
     copy_stereo_pcm_chunk,
 )
 
@@ -34,6 +35,50 @@ def test_copy_stereo_pcm_chunk_zero_pads_past_end() -> None:
     assert new_index == 2
     np.testing.assert_array_equal(out[:2], pcm[2:4])
     assert np.all(out[2:] == 0.0)
+
+
+def test_copy_mono_pcm_chunk_as_stereo_duplicates_channels() -> None:
+    pcm_mono = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+    out = np.zeros(6, dtype=np.float32)
+    frames_written, new_index = copy_mono_pcm_chunk_as_stereo(
+        pcm_mono, read_index=1, out=out, total_frames=4
+    )
+    assert frames_written == 3
+    assert new_index == 4
+    np.testing.assert_array_equal(out[:6], [2.0, 2.0, 3.0, 3.0, 4.0, 4.0])
+
+
+def test_copy_mono_pcm_chunk_as_stereo_zero_pads_past_end() -> None:
+    pcm_mono = np.array([1.0, 2.0], dtype=np.float32)
+    out = np.zeros(6, dtype=np.float32)
+    frames_written, new_index = copy_mono_pcm_chunk_as_stereo(
+        pcm_mono, read_index=1, out=out, total_frames=2
+    )
+    assert frames_written == 1
+    assert new_index == 2
+    np.testing.assert_array_equal(out[:2], [2.0, 2.0])
+    assert np.all(out[2:] == 0.0)
+
+
+def test_mix_player_solo_stem_routes_mono_pcm() -> None:
+    mix = np.array([9.0, 9.0, 9.0, 9.0], dtype=np.float32)
+    drums = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+    player = MixPlayer(mix, FREQUENCY_HZ)
+    player.set_stem_pcm({"drums": drums})
+    player.set_solo_stem("drums")
+    player.seek(0.0)
+
+    out = np.zeros(4, dtype=np.float32)
+    with player._lock:
+        read_index = player._read_index
+        solo_stem = player._solo_stem
+        stem_pcm = player._stem_pcm.get(solo_stem) if solo_stem else None
+    assert stem_pcm is not None
+    frames_written, _ = copy_mono_pcm_chunk_as_stereo(
+        stem_pcm, read_index, out, total_frames=len(drums)
+    )
+    assert frames_written == 2
+    np.testing.assert_array_equal(out, [1.0, 1.0, 2.0, 2.0])
 
 
 def test_copy_stereo_pcm_chunk_at_end_writes_silence() -> None:

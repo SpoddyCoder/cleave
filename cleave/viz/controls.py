@@ -24,7 +24,7 @@ from cleave.preset_playlist import (
     preset_filename_display,
 )
 from cleave.viz.confirm import ConfirmDialog, ConfirmRequest
-from cleave.viz.key_repeat import KeyRepeatController, mod_ctrl
+from cleave.viz.key_repeat import KeyRepeatController, mod_ctrl, mod_shift
 from cleave.viz.playback import PlaybackState, current_sec, seek, toggle_pause
 from cleave.viz.overlay import (
     RowKind,
@@ -90,6 +90,7 @@ class LayerRuntime:
 class TuningSession:
     layer_z_order: list[str]
     layers: dict[str, LayerRuntime] = field(default_factory=dict)
+    solo_stem: str | None = None
 
 
 class TuningControls:
@@ -106,6 +107,7 @@ class TuningControls:
         on_blend_change: Callable[[str, BlendMode], None] | None = None,
         on_opacity_change: Callable[[str, int], None] | None = None,
         on_layer_enabled_change: Callable[[str, bool], None] | None = None,
+        on_solo_change: Callable[[], None] | None = None,
         on_beat_change: Callable[[str, float], None] | None = None,
         on_z_order_change: Callable[[list[str]], None] | None = None,
         on_seek: Callable[[float], None] | None = None,
@@ -128,6 +130,7 @@ class TuningControls:
         self._on_blend_change = on_blend_change
         self._on_opacity_change = on_opacity_change
         self._on_layer_enabled_change = on_layer_enabled_change
+        self._on_solo_change = on_solo_change
         self._on_beat_change = on_beat_change
         self._on_z_order_change = on_z_order_change
         self._on_seek = on_seek
@@ -248,9 +251,13 @@ class TuningControls:
                     self.move_mode_stem = stem
                 return True
             if kind == RowKind.SAVE_AS_NEW_CONFIG:
+                if self.session.solo_stem is not None:
+                    return True
                 self._trigger_save_new()
                 return True
             if kind == RowKind.OVERWRITE_CONFIG and self._allow_overwrite():
+                if self.session.solo_stem is not None:
+                    return True
                 self._prompt_overwrite()
                 return True
 
@@ -320,6 +327,8 @@ class TuningControls:
             confirm_focus_yes=confirm_focus_yes,
             allow_overwrite=self._allow_overwrite(),
             active_config_label=config_path_display(self._active_config_path),
+            solo_stem=self.session.solo_stem,
+            solo_active=self.session.solo_stem is not None,
         )
 
     def _allow_overwrite(self) -> bool:
@@ -399,6 +408,12 @@ class TuningControls:
 
         if kind == RowKind.TRACK_HEADER:
             if stem is None:
+                return
+            if mod_shift(mod):
+                if forward:
+                    self._enter_solo(stem)
+                else:
+                    self._exit_solo(stem)
                 return
             if ctrl:
                 if self.session.layers[stem].locked:
@@ -524,6 +539,20 @@ class TuningControls:
             return
         if row_stem(view, self.focus_index) == stem:
             self.focus_index = self._track_header_index(stem)
+
+    def _enter_solo(self, stem: str) -> None:
+        if self.session.solo_stem == stem:
+            return
+        self.session.solo_stem = stem
+        if self._on_solo_change is not None:
+            self._on_solo_change()
+
+    def _exit_solo(self, stem: str) -> None:
+        if self.session.solo_stem != stem:
+            return
+        self.session.solo_stem = None
+        if self._on_solo_change is not None:
+            self._on_solo_change()
 
     def _set_enabled(self, stem: str, enabled: bool) -> None:
         layer = self.session.layers[stem]

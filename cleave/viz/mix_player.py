@@ -42,6 +42,32 @@ def copy_stereo_pcm_chunk(
     return frames_written, read_index + frames_written
 
 
+def copy_mono_pcm_chunk_as_stereo(
+    pcm_mono: np.ndarray,
+    read_index: int,
+    out: np.ndarray,
+    *,
+    total_frames: int,
+) -> tuple[int, int]:
+    """Fill interleaved stereo *out* from mono *pcm_mono* at frame *read_index*.
+
+    Returns ``(frames_written, new_read_index)``.
+    """
+    frames_requested = len(out) // 2
+    frames_available = total_frames - read_index
+    frames_written = min(frames_requested, max(0, frames_available))
+
+    if frames_written > 0:
+        mono = pcm_mono[read_index : read_index + frames_written]
+        out[: frames_written * 2 : 2] = mono
+        out[1 : frames_written * 2 : 2] = mono
+
+    if frames_written < frames_requested:
+        out[frames_written * 2 :] = 0.0
+
+    return frames_written, read_index + frames_written
+
+
 def _default_output_device() -> str:
     names = get_audio_device_names(False)
     return names[0] if names else ""
@@ -56,6 +82,8 @@ class MixPlayer:
         chunksize: int = DEFAULT_CHUNKSIZE,
     ) -> None:
         self._pcm = np.ascontiguousarray(pcm, dtype=np.float32)
+        self._stem_pcm: dict[str, np.ndarray] = {}
+        self._solo_stem: str | None = None
         self._sample_rate = sample_rate
         self._chunksize = chunksize
         self._total_frames = len(self._pcm) // NUM_CHANNELS
@@ -64,6 +92,16 @@ class MixPlayer:
         self._samples_played = 0
         self._device: AudioDevice | None = None
         self._callback: Callable[[AudioDevice, memoryview], None] | None = None
+
+    def set_stem_pcm(self, stems: dict[str, np.ndarray]) -> None:
+        self._stem_pcm = {
+            name: np.ascontiguousarray(pcm, dtype=np.float32)
+            for name, pcm in stems.items()
+        }
+
+    def set_solo_stem(self, stem: str | None) -> None:
+        with self._lock:
+            self._solo_stem = stem
 
     def start(self) -> None:
         if self._device is not None:
@@ -74,12 +112,23 @@ class MixPlayer:
             out = np.frombuffer(memview, dtype=np.float32, count=n_samples)
             with self._lock:
                 read_index = self._read_index
-            frames_written, new_index = copy_stereo_pcm_chunk(
-                self._pcm,
-                read_index,
-                out,
-                total_frames=self._total_frames,
-            )
+                solo_stem = self._solo_stem
+                stem_pcm = self._stem_pcm.get(solo_stem) if solo_stem else None
+            if stem_pcm is not None:
+                total_frames = len(stem_pcm)
+                frames_written, new_index = copy_mono_pcm_chunk_as_stereo(
+                    stem_pcm,
+                    read_index,
+                    out,
+                    total_frames=total_frames,
+                )
+            else:
+                frames_written, new_index = copy_stereo_pcm_chunk(
+                    self._pcm,
+                    read_index,
+                    out,
+                    total_frames=self._total_frames,
+                )
             with self._lock:
                 self._read_index = new_index
                 self._samples_played = new_index

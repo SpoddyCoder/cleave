@@ -47,7 +47,7 @@ Colors live in [cleave/viz/theme.py](cleave/viz/theme.py). Label truncation uses
 
 **Expand arrows** (`▶` / `▼`): value role, not label. Drawn in the row value color (typically `VALUE`; follows focus, disabled, and locked state like other values).
 
-**Visibility eye** (track header): `VALUE` when enabled, `DISABLED` when off.
+**Visibility eye** (track header): `VALUE` when enabled, `DISABLED` when off. When that stem is soloed (`TuningSession.solo_stem`, not persisted), the eye glyph stays white on a solid `SOLO_BG` rectangle (solo overrides the disabled grey even if YAML `enabled` is false). **Shift + Right** on header enters solo; **Shift + Left** exits solo only when that stem is the active target.
 
 ### Accent colors (not label/value roles)
 
@@ -56,6 +56,7 @@ Colors live in [cleave/viz/theme.py](cleave/viz/theme.py). Label truncation uses
 | `HIGHLIGHT` | Focused row text and background tint |
 | `MOVE_MODE` | Z-order move mode text and background tint |
 | `LOCK_ICON` | Red padlock glyph on locked track headers |
+| `SOLO_BG` | Solid red background behind the visibility eye when that stem is soloed |
 | `PRESET_ICON` / `PRESET_FILE_ICON` | Folder and file glyphs on preset rows |
 
 ### Intentional exceptions
@@ -64,7 +65,7 @@ These rows do not split label and value; the implementation is deliberate:
 
 - **Active config path** (`CONFIG_HEADER`): entire row drawn in `LABEL`.
 - **Preset dir / preset filename**: single-color row text plus Material Icons (icon colors above).
-- **Transport, save, overwrite**: single-color footer rows in row value color.
+- **Transport, save, overwrite**: single-color footer rows in row value color. Save rows use `DISABLED` while `solo_active` (Enter blocked in controls).
 - **Toasts**: `DISABLED`.
 - **Confirm dialog** ([cleave/viz/confirm.py](cleave/viz/confirm.py)): message in `VALUE`; yes/no use `HIGHLIGHT` or `DISABLED` by focus.
 

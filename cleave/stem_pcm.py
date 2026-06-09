@@ -18,6 +18,10 @@ class StemPcmBank:
     _pcm: dict[str, np.ndarray] = field(repr=False)
     sample_rate_hz: int = SAMPLE_RATE_HZ
 
+    def mono_pcm(self, stem: str) -> np.ndarray:
+        """Preloaded mono float32 PCM for *stem*."""
+        return self._pcm[stem]
+
     def slice_pcm(self, stem: str, t_sec: float, n_samples: int) -> np.ndarray:
         """Return *n_samples* of mono float32 PCM from *t_sec*, zero-padded past end."""
         pcm = self._pcm[stem]

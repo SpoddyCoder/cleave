@@ -19,6 +19,7 @@ from cleave.preset_playlist import (
     preset_filename_display,
     scan_preset_playlist,
 )
+from cleave.viz.key_repeat import mod_shift
 from cleave.viz.playback import format_mmss
 from tests.support.viz import stub_playback_state
 from cleave.viz.controls import (
@@ -38,6 +39,7 @@ from cleave.viz.theme import (
     LOCKED,
     MOVE_MODE,
     PANEL_CONTENT_MAX_WIDTH,
+    SOLO_BG,
     VALUE,
 )
 from cleave.viz.material_icons import (
@@ -63,7 +65,9 @@ from cleave.viz.overlay import (
     _row_indent,
     _row_text,
     _row_value_color,
+    render_visibility_icon,
     fit_row_text,
+    track_header_prefix_width,
     navigable_row_indices,
     quick_nav_row_indices,
     row_count,
@@ -1571,3 +1575,108 @@ def test_format_mmss() -> None:
     assert format_mmss(42.7) == "00:42"
     assert format_mmss(222) == "03:42"
     assert format_mmss(-5) == "00:00"
+
+
+def test_mod_shift_detects_shift_modifier() -> None:
+    assert mod_shift(pygame.KMOD_SHIFT)
+    assert mod_shift(pygame.KMOD_LSHIFT)
+    assert not mod_shift(0)
+    assert not mod_shift(pygame.KMOD_CTRL)
+
+
+def test_shift_right_enters_solo() -> None:
+    solo_calls: list[str | None] = []
+    controls = _make_controls(("drums", "bass"))
+    controls._on_solo_change = lambda: solo_calls.append(controls.session.solo_stem)
+
+    view = controls.build_view_state(paused=False)
+    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
+    controls.focus_index = header_row
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
+    assert controls.session.solo_stem == "drums"
+    assert solo_calls == ["drums"]
+    state = controls.build_view_state(paused=False)
+    assert state.solo_active is True
+    assert state.solo_stem == "drums"
+
+
+def test_shift_right_switches_solo_target() -> None:
+    controls = _make_controls(("drums", "bass"))
+    drums_header = _row(controls.build_view_state(paused=False), "drums", RowKind.TRACK_HEADER)
+    bass_header = _row(controls.build_view_state(paused=False), "bass", RowKind.TRACK_HEADER)
+
+    controls.focus_index = drums_header
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
+    assert controls.session.solo_stem == "drums"
+
+    controls.focus_index = bass_header
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
+    assert controls.session.solo_stem == "bass"
+
+
+def test_shift_left_exits_solo_only_for_active_target() -> None:
+    controls = _make_controls(("drums", "bass"))
+    drums_header = _row(controls.build_view_state(paused=False), "drums", RowKind.TRACK_HEADER)
+    bass_header = _row(controls.build_view_state(paused=False), "bass", RowKind.TRACK_HEADER)
+
+    controls.focus_index = drums_header
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
+    assert controls.session.solo_stem == "drums"
+
+    controls.focus_index = bass_header
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_SHIFT))
+    assert controls.session.solo_stem == "drums"
+
+    controls.focus_index = drums_header
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_SHIFT))
+    assert controls.session.solo_stem is None
+
+
+def test_save_blocked_while_solo_active() -> None:
+    controls = _make_controls(("drums",))
+    view = controls.build_view_state(paused=False)
+    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
+    save_row = next(
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.SAVE_AS_NEW_CONFIG
+    )
+    controls.focus_index = header_row
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
+
+    controls.focus_index = save_row
+    stderr = io.StringIO()
+    with patch("sys.stderr", stderr):
+        controls.handle_keydown(_keydown(pygame.K_RETURN))
+    assert stderr.getvalue() == ""
+    assert controls.build_view_state(paused=False).solo_active is True
+
+
+def test_save_rows_greyed_while_solo_active() -> None:
+    controls = _make_controls(("drums",))
+    controls.session.solo_stem = "drums"
+    view = controls.build_view_state(paused=False)
+    save_row = next(
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.SAVE_AS_NEW_CONFIG
+    )
+    overwrite_row = next(
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
+    )
+    assert _row_value_color(view, save_row) == DISABLED
+    assert _row_value_color(view, overwrite_row) == DISABLED
+
+
+def test_solo_visibility_icon_same_width_as_normal() -> None:
+    line_h = 17
+    soloed = render_visibility_icon(enabled=True, solo=True, line_height=line_h)
+    normal = render_visibility_icon(enabled=True, solo=False, line_height=line_h)
+    assert soloed.get_width() == normal.get_width()
+    assert soloed.get_at((1, line_h // 2))[:3] == SOLO_BG
+
+
+def test_track_header_prefix_width_matches_visibility_icon() -> None:
+    font = _overlay_font()
+    line_h = font.get_linesize()
+    assert track_header_prefix_width(font) == visibility_icon_prefix_width(line_h)
+    soloed = render_visibility_icon(enabled=True, solo=True, line_height=line_h)
+    normal = render_visibility_icon(enabled=True, solo=False, line_height=line_h)
+    assert soloed.get_width() == normal.get_width()

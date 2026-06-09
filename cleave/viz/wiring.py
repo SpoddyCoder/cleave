@@ -11,7 +11,15 @@ from cleave.paths import repo_root
 from cleave.preset_playlist import PresetPlaylist
 from cleave.signals import Signals
 from cleave.viz.controls import TuningControls, TuningSession
-from cleave.viz.layer import StemLayer, _flush_all_pcm, apply_effect_modifiers
+from cleave.viz.layer import (
+    StemLayer,
+    _flush_all_pcm,
+    apply_effect_modifiers,
+    apply_layer_visibility,
+    effective_layer_enabled,
+)
+from cleave.viz.mix_player import MixPlayer
+from cleave.stem_pcm import StemPcmBank
 from cleave.viz.playback import current_sec, seek
 
 
@@ -27,6 +35,8 @@ def make_tuning_controls(
     duration_sec: float,
     signals: Signals | None,
     effect_runtime: EffectRuntime,
+    pcm_bank: StemPcmBank | None = None,
+    mix_player: MixPlayer | None = None,
 ) -> TuningControls:
     def on_preset_change(stem: str, playlist: PresetPlaylist) -> None:
         layer = layers_by_name[stem]
@@ -49,9 +59,8 @@ def make_tuning_controls(
         )
 
     def on_layer_enabled_change(stem: str, enabled: bool) -> None:
-        fbo = layers_by_name[stem].fbo
-        fbo.enabled = enabled
-        if enabled:
+        apply_layer_visibility(session, layers_by_name)
+        if effective_layer_enabled(session, stem):
             apply_effect_modifiers(
                 session,
                 layers_by_name,
@@ -60,6 +69,19 @@ def make_tuning_controls(
                 current_sec(playback, duration_sec),
                 update=False,
             )
+
+    def on_solo_change() -> None:
+        apply_layer_visibility(session, layers_by_name)
+        if mix_player is not None:
+            mix_player.set_solo_stem(session.solo_stem)
+        apply_effect_modifiers(
+            session,
+            layers_by_name,
+            effect_runtime,
+            signals,
+            current_sec(playback, duration_sec),
+            update=False,
+        )
 
     def on_beat_change(stem: str, beat: float) -> None:
         layers_by_name[stem].pm.set_beat_sensitivity(beat)
@@ -77,6 +99,7 @@ def make_tuning_controls(
         "on_blend_change": on_blend_change,
         "on_opacity_change": on_opacity_change,
         "on_layer_enabled_change": on_layer_enabled_change,
+        "on_solo_change": on_solo_change,
         "on_beat_change": on_beat_change,
         "on_seek": on_seek,
     }
@@ -99,4 +122,11 @@ def make_tuning_controls(
             repo_root_example=repo_root() / DEFAULT_VIZ_CONFIG_FILENAME,
         )
 
-    return TuningControls(**kwargs)
+    controls = TuningControls(**kwargs)
+    if pcm_bank is not None and mix_player is not None:
+        mix_player.set_stem_pcm(
+            {stem: pcm_bank.mono_pcm(stem) for stem in session.layer_z_order}
+        )
+        apply_layer_visibility(session, layers_by_name)
+        mix_player.set_solo_stem(session.solo_stem)
+    return controls

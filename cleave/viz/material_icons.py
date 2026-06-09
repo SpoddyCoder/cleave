@@ -101,8 +101,16 @@ def _suffix_icon_width(line_height: int, glyph: str) -> int:
     return font.size(glyph)[0]
 
 
+VISIBILITY_ICON_PAD_X = 2
+
+
+def visibility_icon_slot_width(line_height: int) -> int:
+    """Fixed eye slot width (glyph plus horizontal pad for solo background)."""
+    return _suffix_icon_width(line_height, VISIBILITY_GLYPH) + VISIBILITY_ICON_PAD_X * 2
+
+
 def visibility_icon_prefix_width(line_height: int) -> int:
-    return _suffix_icon_width(line_height, VISIBILITY_GLYPH) + _LABEL_SUFFIX_GAP
+    return visibility_icon_slot_width(line_height) + _LABEL_SUFFIX_GAP
 
 
 def track_header_lock_suffix_width(line_height: int) -> int:
