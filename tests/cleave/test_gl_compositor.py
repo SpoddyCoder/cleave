@@ -62,3 +62,29 @@ def test_flash_rgba_puts_strength_in_alpha_for_add_blend() -> None:
     rgba = (240 / 255.0, 235 / 255.0, 230 / 255.0, flash_alpha)
     assert rgba[3] == pytest.approx(flash_alpha)
     assert rgba[:3] == pytest.approx((240 / 255.0, 235 / 255.0, 230 / 255.0))
+
+
+@pytest.mark.parametrize(
+    ("hue_rgb", "hue_mix", "expected"),
+    [
+        ((0.5, 0.7, 0.9), 0.0, (1.0, 1.0, 1.0)),
+        ((0.5, 0.7, 0.9), 1.0, (0.5, 0.7, 0.9)),
+        ((1.2, 0.8, 0.6), 0.5, (1.1, 0.9, 0.8)),
+    ],
+)
+def test_lerp_tint_rgb_scales_hue_mix(
+    hue_rgb: tuple[float, float, float],
+    hue_mix: float,
+    expected: tuple[float, float, float],
+) -> None:
+    result = GlCompositor._lerp_tint_rgb(hue_rgb, hue_mix)
+    assert result == pytest.approx(expected)
+
+
+def test_pulse_zero_opacity_can_still_leave_flash_visible() -> None:
+    """Flash burst can outlast a pulse envelope; flash must not require layer opacity."""
+    from cleave.effects.flash import flash_alpha
+    from cleave.effects.pulse import effective_opacity
+
+    assert effective_opacity(1.0, 100, 0.0) == 0.0
+    assert flash_alpha(100, 0.15) >= 0.01
