@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, TextIO
@@ -117,8 +116,20 @@ def ensure_project_viz_config(project_dir: Path) -> Path:
     if not src.is_file():
         raise FileNotFoundError(f"config template not found: {src}")
 
+    with src.open(encoding="utf-8") as fh:
+        data = yaml.safe_load(fh)
+    if not isinstance(data, dict):
+        raise ValueError(f"config template root must be a mapping: {src}")
+
+    visualizer = data.get("visualizer")
+    if not isinstance(visualizer, dict):
+        visualizer = {}
+        data["visualizer"] = visualizer
+    visualizer["name"] = project_dir.name
+
     project_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dst)
+    with dst.open("w", encoding="utf-8") as fh:
+        dump_yaml(data, fh)
     return dst
 
 

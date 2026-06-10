@@ -6,10 +6,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+import yaml
 
-from cleave.config import DEFAULT_VIZ_CONFIG_FILENAME, PROJECT_VIZ_CONFIG_FILENAME
+from cleave.config import PROJECT_VIZ_CONFIG_FILENAME
 from cleave.extract import STEM_NAMES, stems_dir
-from cleave.paths import repo_root
 from cleave.project import PROJECT_FILENAME, load_manifest, write_manifest
 from cleave.separate import (
     project_stems_complete,
@@ -106,9 +106,8 @@ def test_run_separate_writes_project_viz_config(
 
     viz_config = project / PROJECT_VIZ_CONFIG_FILENAME
     assert viz_config.is_file()
-    assert viz_config.read_text(encoding="utf-8") == (
-        repo_root() / DEFAULT_VIZ_CONFIG_FILENAME
-    ).read_text(encoding="utf-8")
+    data = yaml.safe_load(viz_config.read_text(encoding="utf-8"))
+    assert data["visualizer"]["name"] == "my-track"
     run_demucs.assert_not_called()
     run_analyse.assert_not_called()
 
