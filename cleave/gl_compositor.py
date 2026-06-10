@@ -390,22 +390,25 @@ class GlCompositor:
         glBlendFunc(src, dst)
 
     def draw_layer(self, layer: LayerFbo) -> None:
-        if not layer.enabled or layer.opacity <= 0.0:
+        if not layer.enabled:
+            return
+        if layer.opacity <= 0.0 and layer.flash_alpha < 0.01:
             return
         self._ensure_init()
         self._bind_default_framebuffer()
-        glEnable(GL_BLEND)
-        self._apply_layer_blend_mode(layer.blend_mode)
-        tint_rgb = self._lerp_tint_rgb(layer.hue_rgb, layer.hue_mix)
-        rgba = self._layer_gl_color(tint_rgb, layer.opacity, layer.blend_mode)
-        self._draw_textured_quad(
-            layer.texture_id,
-            0.0,
-            0.0,
-            self.output_width,
-            self.output_height,
-            rgba,
-        )
+        if layer.opacity > 0.0:
+            glEnable(GL_BLEND)
+            self._apply_layer_blend_mode(layer.blend_mode)
+            tint_rgb = self._lerp_tint_rgb(layer.hue_rgb, layer.hue_mix)
+            rgba = self._layer_gl_color(tint_rgb, layer.opacity, layer.blend_mode)
+            self._draw_textured_quad(
+                layer.texture_id,
+                0.0,
+                0.0,
+                self.output_width,
+                self.output_height,
+                rgba,
+            )
         if layer.flash_alpha >= 0.01:
             blend_enabled, blend_src, blend_dst, blend_equation = (
                 self._push_blend_state()

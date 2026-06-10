@@ -79,6 +79,13 @@ def test_flash_alpha_scales_with_depth_and_burst() -> None:
     assert flash_alpha(50, 0.4) == pytest.approx(0.2)
 
 
+def test_flash_burst_can_remain_after_pulse_opacity_fades() -> None:
+    from cleave.effects.pulse import effective_opacity
+
+    assert effective_opacity(1.0, 100, 0.0) == 0.0
+    assert flash_alpha(100, 0.12) > 0.0
+
+
 def test_flash_burst_state_decays_toward_zero() -> None:
     signals = _signals_with_stem_key("drums", "onset_strength", [0.0, 0.0, 0.0])
     state = FlashBurstState(burst=1.0)
