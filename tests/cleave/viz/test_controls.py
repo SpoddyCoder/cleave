@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pygame
+import pytest
 
 from cleave.preset_playlist import (
     PresetPlaylist,
@@ -326,13 +327,13 @@ def test_beat_sensitivity_clamps() -> None:
     beat_row = _row(view, "drums", RowKind.TRACK_BEAT)
     controls.focus_index = beat_row
 
-    for _ in range(300):
+    for _ in range(400):
         controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.session.layers["drums"].beat_sensitivity == 2.0
+    assert controls.session.layers["drums"].beat_sensitivity == pytest.approx(5.0)
 
-    for _ in range(300):
+    for _ in range(500):
         controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert controls.session.layers["drums"].beat_sensitivity == 0.0
+    assert controls.session.layers["drums"].beat_sensitivity == pytest.approx(0.0)
 
 
 def test_opacity_ctrl_step_is_ten_percent() -> None:

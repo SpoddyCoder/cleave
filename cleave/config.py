@@ -48,11 +48,11 @@ DEFAULT_VISUALIZER_HEIGHT = 720
 DEFAULT_VISUALIZER_FPS = 30
 DEFAULT_BEAT_SENSITIVITY = 1.0
 BEAT_SENSITIVITY_MIN = 0.0
-BEAT_SENSITIVITY_MAX = 2.0
+BEAT_SENSITIVITY_MAX = 5.0
 
 
 def clamp_beat_sensitivity(value: float) -> float:
-    """Match libprojectM beat sensitivity range (0.0 to 2.0)."""
+    """Beat sensitivity range for PCM scaling into projectM (0.0 to 5.0)."""
     return max(BEAT_SENSITIVITY_MIN, min(BEAT_SENSITIVITY_MAX, float(value)))
 
 

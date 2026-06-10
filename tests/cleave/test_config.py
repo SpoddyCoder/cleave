@@ -89,7 +89,8 @@ def test_clamp_effect_pct() -> None:
 
 def test_clamp_beat_sensitivity() -> None:
     assert clamp_beat_sensitivity(-1) == 0
-    assert clamp_beat_sensitivity(3.0) == 2.0
+    assert clamp_beat_sensitivity(3.0) == 3.0
+    assert clamp_beat_sensitivity(6.0) == 5.0
     assert clamp_beat_sensitivity(1.25) == 1.25
 
 
@@ -118,13 +119,13 @@ def test_load_config_clamps_beat_sensitivity(tmp_path: Path) -> None:
     write_minimal_config(project_dir, preset_root)
     cfg_path = project_dir / PROJECT_VIZ_CONFIG_FILENAME
     data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
-    data["visualizer"]["beat_sensitivity"] = 3.0
+    data["visualizer"]["beat_sensitivity"] = 6.0
     data["layers"]["drums"]["beat_sensitivity"] = -1
     with cfg_path.open("w", encoding="utf-8") as handle:
         dump_yaml(data, handle)
 
     cfg = load_config(project_root=project_dir)
-    assert cfg.visualizer.beat_sensitivity == 2.0
+    assert cfg.visualizer.beat_sensitivity == 5.0
     assert cfg.layers["drums"].beat_sensitivity == 0.0
 
 

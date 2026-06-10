@@ -70,6 +70,11 @@ def test_set_beat_sensitivity_clamps_and_stores() -> None:
 
     with patch("cleave.projectm._get_lib", return_value=lib):
         pm.set_beat_sensitivity(3.0)
-        assert pm.get_beat_sensitivity() == 2.0
+        assert pm.get_beat_sensitivity() == 3.0
         lib.projectm_set_beat_sensitivity.assert_called_once()
-        assert lib.projectm_set_beat_sensitivity.call_args.args[1].value == 2.0
+        assert lib.projectm_set_beat_sensitivity.call_args.args[1].value == 3.0
+
+        lib.projectm_set_beat_sensitivity.reset_mock()
+        pm.set_beat_sensitivity(6.0)
+        assert pm.get_beat_sensitivity() == 5.0
+        assert lib.projectm_set_beat_sensitivity.call_args.args[1].value == 5.0
