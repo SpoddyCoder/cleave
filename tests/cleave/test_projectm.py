@@ -19,6 +19,7 @@ def test_feed_pcm_chunks_above_max_samples() -> None:
     lib = _mock_lib(max_samples=480)
     pm = ProjectM.__new__(ProjectM)
     pm._handle = MagicMock()
+    pm._beat_sensitivity = 1.0
     samples = np.ones(1470, dtype=np.float32)
 
     with patch("cleave.projectm._get_lib", return_value=lib):
@@ -35,8 +36,40 @@ def test_feed_pcm_skips_empty() -> None:
     lib = _mock_lib()
     pm = ProjectM.__new__(ProjectM)
     pm._handle = MagicMock()
+    pm._beat_sensitivity = 1.0
 
     with patch("cleave.projectm._get_lib", return_value=lib):
         pm.feed_pcm(np.array([], dtype=np.float32))
 
     lib.projectm_pcm_add_float.assert_not_called()
+
+
+def test_feed_pcm_scales_by_beat_sensitivity() -> None:
+    lib = _mock_lib(max_samples=480)
+    pm = ProjectM.__new__(ProjectM)
+    pm._handle = MagicMock()
+    pm._beat_sensitivity = 2.0
+    samples = np.full(4, 0.5, dtype=np.float32)
+
+    with patch("cleave.projectm._get_lib", return_value=lib):
+        pm.feed_pcm(samples)
+
+    sent = lib.projectm_pcm_add_float.call_args.args[1]
+    expected = np.full(4, 1.0, dtype=np.float32)
+    np.testing.assert_array_almost_equal(
+        np.ctypeslib.as_array(sent, shape=(4,)),
+        expected,
+    )
+
+
+def test_set_beat_sensitivity_clamps_and_stores() -> None:
+    lib = _mock_lib()
+    pm = ProjectM.__new__(ProjectM)
+    pm._handle = MagicMock()
+    pm._beat_sensitivity = 1.0
+
+    with patch("cleave.projectm._get_lib", return_value=lib):
+        pm.set_beat_sensitivity(3.0)
+        assert pm.get_beat_sensitivity() == 2.0
+        lib.projectm_set_beat_sensitivity.assert_called_once()
+        assert lib.projectm_set_beat_sensitivity.call_args.args[1].value == 2.0
