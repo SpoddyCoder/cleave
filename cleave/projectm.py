@@ -243,10 +243,16 @@ class ProjectM:
         if samples.size == 0:
             return
         arr = np.ascontiguousarray(samples, dtype=np.float32).ravel()
-        data = arr.ctypes.data_as(POINTER(c_float))
-        _get_lib().projectm_pcm_add_float(
-            self._handle, data, c_uint(len(arr)), c_int32(PROJECTM_MONO)
-        )
+        lib = _get_lib()
+        max_n = int(lib.projectm_pcm_get_max_samples())
+        if max_n <= 0:
+            max_n = len(arr)
+        for offset in range(0, len(arr), max_n):
+            chunk = arr[offset : offset + max_n]
+            data = chunk.ctypes.data_as(POINTER(c_float))
+            lib.projectm_pcm_add_float(
+                self._handle, data, c_uint(len(chunk)), c_int32(PROJECTM_MONO)
+            )
 
     def flush_pcm(self) -> None:
         n = int(_get_lib().projectm_pcm_get_max_samples())

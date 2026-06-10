@@ -60,6 +60,7 @@ def make_tuning_controls(
 
     def on_layer_enabled_change(stem: str, enabled: bool) -> None:
         apply_layer_visibility(session, layers_by_name)
+        _flush_all_pcm(layers)
         if effective_layer_enabled(session, stem):
             apply_effect_modifiers(
                 session,
@@ -74,6 +75,7 @@ def make_tuning_controls(
         apply_layer_visibility(session, layers_by_name)
         if mix_player is not None:
             mix_player.set_solo_stem(session.solo_stem)
+        _flush_all_pcm(layers)
         apply_effect_modifiers(
             session,
             layers_by_name,
