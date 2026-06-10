@@ -178,14 +178,13 @@ def test_find_config_path_repo_template_fallback(tmp_path: Path) -> None:
     assert found == (repo_root() / DEFAULT_VIZ_CONFIG_FILENAME).resolve()
 
 
-def test_ensure_project_viz_config_copies_template(tmp_path: Path) -> None:
+def test_ensure_project_viz_config_sets_project_name(tmp_path: Path) -> None:
     project = tmp_path / "projects" / "song"
     dst = ensure_project_viz_config(project)
     assert dst == project_viz_config_path(project)
     assert dst.is_file()
-    assert dst.read_text(encoding="utf-8") == (
-        repo_root() / DEFAULT_VIZ_CONFIG_FILENAME
-    ).read_text(encoding="utf-8")
+    data = yaml.safe_load(dst.read_text(encoding="utf-8"))
+    assert data["visualizer"]["name"] == "song"
 
 
 def test_ensure_project_viz_config_skips_existing(tmp_path: Path) -> None:
