@@ -304,17 +304,33 @@ class GlCompositor:
         return tuple(1.0 + (c - 1.0) * hue_mix for c in hue_rgb)
 
     @staticmethod
+    def _layer_gl_color(
+        tint_rgb: tuple[float, float, float],
+        opacity: float,
+        blend_mode: BlendMode,
+    ) -> tuple[float, float, float, float]:
+        """Map layer opacity to glColor4f for the active layer blend mode.
+
+        GL_MODULATE only multiplies texture RGB by glColor RGB; glColor alpha
+        affects fragment alpha. Modes that blend on SRC_COLOR need opacity baked
+        into RGB. ``add`` uses GL_SRC_ALPHA and keeps opacity in the alpha channel.
+        """
+        if blend_mode == "add":
+            return (tint_rgb[0], tint_rgb[1], tint_rgb[2], opacity)
+        scaled = tuple(c * opacity for c in tint_rgb)
+        return (scaled[0], scaled[1], scaled[2], 1.0)
+
+    @staticmethod
     def _draw_textured_quad(
         texture_id: int,
         x: float,
         y: float,
         width: int,
         height: int,
-        opacity: float,
-        tint_rgb: tuple[float, float, float] = (1.0, 1.0, 1.0),
+        rgba: tuple[float, float, float, float],
     ) -> None:
         glBindTexture(GL_TEXTURE_2D, texture_id)
-        glColor4f(tint_rgb[0], tint_rgb[1], tint_rgb[2], opacity)
+        glColor4f(*rgba)
         glBegin(GL_QUADS)
         # Flip V: OpenGL textures are bottom-origin; ortho uses top-left origin.
         glTexCoord2f(0.0, 1.0)
@@ -336,7 +352,7 @@ class GlCompositor:
         height: int,
         rgba: tuple[float, float, float, float],
     ) -> None:
-        glBindTexture(GL_TEXTURE_2D, 0)
+        glDisable(GL_TEXTURE_2D)
         glColor4f(*rgba)
         glBegin(GL_QUADS)
         glVertex2f(x, y)
@@ -344,6 +360,7 @@ class GlCompositor:
         glVertex2f(x + float(width), y + float(height))
         glVertex2f(x, y + float(height))
         glEnd()
+        glEnable(GL_TEXTURE_2D)
 
     @staticmethod
     def _gl_int(param: int) -> int:
@@ -380,14 +397,14 @@ class GlCompositor:
         glEnable(GL_BLEND)
         self._apply_layer_blend_mode(layer.blend_mode)
         tint_rgb = self._lerp_tint_rgb(layer.hue_rgb, layer.hue_mix)
+        rgba = self._layer_gl_color(tint_rgb, layer.opacity, layer.blend_mode)
         self._draw_textured_quad(
             layer.texture_id,
             0.0,
             0.0,
             self.output_width,
             self.output_height,
-            layer.opacity,
-            tint_rgb=tint_rgb,
+            rgba,
         )
         if layer.flash_alpha >= 0.01:
             blend_enabled, blend_src, blend_dst, blend_equation = (
@@ -476,7 +493,9 @@ class GlCompositor:
         try:
             glEnable(GL_BLEND)
             self._apply_src_alpha_blend()
-            self._draw_textured_quad(texture_id, float(x), float(y), width, height, alpha)
+            self._draw_textured_quad(
+                texture_id, float(x), float(y), width, height, (1.0, 1.0, 1.0, alpha)
+            )
         finally:
             self._pop_blend_state(blend_enabled, blend_src, blend_dst, blend_equation)
             glColor4f(1.0, 1.0, 1.0, 1.0)
