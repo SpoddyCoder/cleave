@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 from cleave.config import PROJECT_VIZ_CONFIG_FILENAME, ensure_project_viz_config
+from cleave.paths import resolve_project
 from cleave.separate import (
     project_stems_complete,
     resolve_separate_target,
@@ -13,6 +14,7 @@ from cleave.separate import (
 
 SIGNALS_FILENAME = "signals.json"
 _TARGET_HELP = "Source audio file or cleave project (path or slug)"
+_PROJECT_DIR_HELP = "Cleave project directory (path or slug)"
 
 
 class _CleaveHelpFormatter(argparse.RawDescriptionHelpFormatter):
@@ -82,6 +84,28 @@ def cmd_play(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_render(args: argparse.Namespace) -> None:
+    try:
+        project_dir = resolve_project(Path(args.project_dir))
+    except (FileNotFoundError, ValueError) as e:
+        _exit_error(f"error: {e}")
+
+    from cleave.viz.render import render
+
+    try:
+        output_path = render(
+            project_dir,
+            config=args.config,
+            output=args.output,
+            fade_in=args.fade_in,
+            fade_out=args.fade_out,
+        )
+    except (FileNotFoundError, ValueError, RuntimeError) as e:
+        _exit_error(f"error: {e}")
+
+    print(f"Rendered to {output_path}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="cleave",
@@ -142,6 +166,45 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"Config path (default: <project>/{PROJECT_VIZ_CONFIG_FILENAME})",
     )
     play.set_defaults(func=cmd_play)
+
+    render = subparsers.add_parser(
+        "render",
+        prog="cleave render",
+        help="Render project visuals to MP4",
+    )
+    render.add_argument(
+        "project_dir",
+        help=_PROJECT_DIR_HELP,
+    )
+    render.add_argument(
+        "-c",
+        "--config",
+        type=Path,
+        help=f"Config path (default: <project>/{PROJECT_VIZ_CONFIG_FILENAME})",
+    )
+    render.add_argument(
+        "-o",
+        "--output",
+        type=Path,
+        help="Output MP4 path (default: <project>/renders/<visualizer.name>.mp4)",
+    )
+    render.add_argument(
+        "-fi",
+        "--fade-in",
+        type=float,
+        default=0.0,
+        metavar="SECONDS",
+        help="Visual fade-in duration in seconds (default: 0)",
+    )
+    render.add_argument(
+        "-fo",
+        "--fade-out",
+        type=float,
+        default=0.0,
+        metavar="SECONDS",
+        help="Visual fade-out duration in seconds (default: 0)",
+    )
+    render.set_defaults(func=cmd_render)
 
     return parser
 

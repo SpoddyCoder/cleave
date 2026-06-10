@@ -15,11 +15,13 @@ from cleave.viz.bootstrap import (
     resolve_config_path,
     resolve_mix_path,
 )
+from cleave.viz.render import render
 
 __all__ = [
     "VisualizerApp",
     "build_runtime_full",
     "launch",
+    "render",
 ]
 
 

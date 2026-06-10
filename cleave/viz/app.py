@@ -133,19 +133,38 @@ def _init_gl_resources(runtime: VisualizerRuntime) -> None:
     runtime.playback = playback
 
 
+def _init_gl_resources_render(runtime: VisualizerRuntime) -> None:
+    compositor = GlCompositor(runtime.width, runtime.height)
+    compositor.init()
+    post_process = GlPostProcess()
+    post_process.init()
+
+    assert runtime.cfg is not None
+    layers = _build_layers(runtime.cfg, compositor, runtime.playlists)
+    layers_by_name = {layer.name: layer for layer in layers}
+
+    runtime.compositor = compositor
+    runtime.post_process = post_process
+    runtime.layers = layers
+    runtime.layers_by_name = layers_by_name
+
+
 class VisualizerApp:
     def __init__(self, runtime: VisualizerRuntime) -> None:
         self._runtime = runtime
         self._overlay_dt = 0.0
         self._was_paused: bool | None = None
 
-    def tick_frame(self, t_sec: float, *, paused: bool) -> None:
+    def tick_frame(
+        self, t_sec: float, *, paused: bool, draw_overlay: bool = True
+    ) -> None:
         rt = self._runtime
         assert rt.compositor is not None
         assert rt.post_process is not None
-        assert rt.controls is not None
-        assert rt.overlay is not None
-        assert rt.overlay_surface is not None
+        if draw_overlay:
+            assert rt.controls is not None
+            assert rt.overlay is not None
+            assert rt.overlay_surface is not None
 
         if self._was_paused is not None and paused != self._was_paused:
             _flush_all_pcm(rt.layers)
@@ -176,12 +195,15 @@ class VisualizerApp:
 
         _composite_ordered(rt.compositor, rt.layers_by_name, rt.session)
 
-        view_state = rt.controls.build_view_state(
-            paused=paused,
-            position_sec=t_sec,
-        )
-        rt.overlay.update(self._overlay_dt)
-        _draw_tuning_overlay(rt.compositor, rt.overlay, rt.overlay_surface, view_state)
+        if draw_overlay:
+            view_state = rt.controls.build_view_state(
+                paused=paused,
+                position_sec=t_sec,
+            )
+            rt.overlay.update(self._overlay_dt)
+            _draw_tuning_overlay(
+                rt.compositor, rt.overlay, rt.overlay_surface, view_state
+            )
 
     def run(self) -> None:
         rt = self._runtime
