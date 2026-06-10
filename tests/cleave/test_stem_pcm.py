@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
@@ -82,7 +82,13 @@ def test_to_mono_float32_output_is_float32_contiguous() -> None:
     assert out.flags["C_CONTIGUOUS"]
 
 
-def test_samples_per_frame_default_without_libprojectm() -> None:
-    with patch("cleave.projectm._get_lib", side_effect=OSError("no lib")):
+def test_samples_per_frame_matches_sample_rate_over_fps() -> None:
+    assert samples_per_frame(fps=30) == SAMPLE_RATE_HZ // 30
+    assert samples_per_frame(fps=60) == SAMPLE_RATE_HZ // 60
+
+
+def test_samples_per_frame_ignores_libprojectm_max_chunk() -> None:
+    mock_lib = MagicMock()
+    mock_lib.projectm_pcm_get_max_samples.return_value = 480
+    with patch("cleave.projectm._get_lib", return_value=mock_lib):
         assert samples_per_frame(fps=30) == SAMPLE_RATE_HZ // 30
-        assert samples_per_frame(fps=60) == SAMPLE_RATE_HZ // 60

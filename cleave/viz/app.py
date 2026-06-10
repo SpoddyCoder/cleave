@@ -27,6 +27,7 @@ from cleave.viz.layer import (
     _composite_ordered,
     _destroy_layers,
     _draw_tuning_overlay,
+    _flush_all_pcm,
     _render_layer_fbo,
     _session_from_cfg,
     apply_effect_modifiers,
@@ -136,6 +137,7 @@ class VisualizerApp:
     def __init__(self, runtime: VisualizerRuntime) -> None:
         self._runtime = runtime
         self._overlay_dt = 0.0
+        self._was_paused: bool | None = None
 
     def tick_frame(self, t_sec: float, *, paused: bool) -> None:
         rt = self._runtime
@@ -144,6 +146,10 @@ class VisualizerApp:
         assert rt.controls is not None
         assert rt.overlay is not None
         assert rt.overlay_surface is not None
+
+        if self._was_paused is not None and paused != self._was_paused:
+            _flush_all_pcm(rt.layers)
+        self._was_paused = paused
 
         if not paused:
             for layer in rt.layers:

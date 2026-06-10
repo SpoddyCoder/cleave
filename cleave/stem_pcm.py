@@ -41,16 +41,7 @@ class StemPcmBank:
 
 def samples_per_frame(fps: int = 60) -> int:
     """PCM samples to feed libprojectM per visual frame at *fps*."""
-    n = SAMPLE_RATE_HZ // fps
-    try:
-        from cleave.projectm import _get_lib
-
-        max_n = int(_get_lib().projectm_pcm_get_max_samples())
-        if max_n > 0:
-            n = min(n, max_n)
-    except OSError:
-        pass
-    return n
+    return SAMPLE_RATE_HZ // fps
 
 
 def load_stem_pcm(project_dir: Path) -> StemPcmBank:
