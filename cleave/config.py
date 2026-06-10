@@ -76,6 +76,7 @@ class LayerConfig:
 
 @dataclass(frozen=True)
 class VisualizerConfig:
+    name: str = "render"
     width: int = DEFAULT_VISUALIZER_WIDTH
     height: int = DEFAULT_VISUALIZER_HEIGHT
     fps: int = DEFAULT_VISUALIZER_FPS
@@ -243,6 +244,7 @@ def _parse_effects(stem: str, layer_raw: dict[str, Any]) -> dict[str, dict[str, 
 def _parse_visualizer(data: dict[str, Any]) -> VisualizerConfig:
     visualizer = _as_mapping(data.get("visualizer"), "visualizer")
     return VisualizerConfig(
+        name=str(visualizer.get("name", "render")),
         width=int(visualizer.get("width", DEFAULT_VISUALIZER_WIDTH)),
         height=int(visualizer.get("height", DEFAULT_VISUALIZER_HEIGHT)),
         fps=int(visualizer.get("fps", DEFAULT_VISUALIZER_FPS)),

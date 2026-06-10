@@ -23,6 +23,7 @@ from cleave.config import (
     load_config,
     project_viz_config_path,
     _parse_layers,
+    _parse_visualizer,
 )
 from cleave.paths import repo_root
 from cleave.extract import STEM_NAMES
@@ -92,6 +93,21 @@ def test_clamp_beat_sensitivity() -> None:
     assert clamp_beat_sensitivity(3.0) == 3.0
     assert clamp_beat_sensitivity(6.0) == 5.0
     assert clamp_beat_sensitivity(1.25) == 1.25
+
+
+def test_parse_visualizer_name_defaults_to_render() -> None:
+    cfg = _parse_visualizer({})
+    assert cfg.name == "render"
+
+
+def test_parse_visualizer_reads_name() -> None:
+    cfg = _parse_visualizer({"visualizer": {"name": "buttercup-24"}})
+    assert cfg.name == "buttercup-24"
+
+
+def test_load_config_reads_visualizer_name(minimal_project: Path) -> None:
+    cfg = load_config(project_root=minimal_project)
+    assert cfg.visualizer.name == "cleave-test"
 
 
 def test_layers_in_z_order_matches_reversed_layer_z_order() -> None:

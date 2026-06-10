@@ -2,16 +2,6 @@
 
 Must-do items for Cleave. Everything else is iterative tuning in-session or listed in [roadmap.md](roadmap.md).
 
-## Video export
-
-Offline render to MP4 for uploads:
-
-```bash
-python -m cleave render <file> --output video.mp4
-```
-
-Drive frames at the configured resolution and fps via `VisualizerApp.tick_frame()` in [cleave/viz/app.py](../cleave/viz/app.py), then mux with the original audio via ffmpeg.
-
 ## CI
 
 GitHub Actions workflow on push and pull request:

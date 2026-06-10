@@ -91,6 +91,11 @@ This will separate the track into its component stem tracks (bass, drums, vocals
   * It will only re-run the seperation and analysis if they're not already in the project directory
     * Use `--force` if you want to redo these.
 * `separate` can be run on its own without launching the visualizer
+* `render` accepts a project slug or path (not a source audio file). 
+  * `-o` for output (`.mp4` only)
+    * If omitted outputs to `projects/<slug>/renders/<visualizer.name>.mp4`
+  * `-c` for config
+  * `-fi` / `-fo` for visual fade-in and fade-out.
 * Pass `--high-quality` to either command for higher-quality separation.
 * To store projects under XDG instead, set `CLEAVE_DATA=~/.local/share/cleave`.
 * `python cleave.py` is an alias for `python -m cleave` (same subcommands).

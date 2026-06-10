@@ -69,6 +69,7 @@ from OpenGL.GL import (
     glLoadIdentity,
     glMatrixMode,
     glOrtho,
+    glReadPixels,
     glRenderbufferStorage,
     glTexCoord2f,
     glTexImage2D,
@@ -437,6 +438,18 @@ class GlCompositor:
         glClear(GL_COLOR_BUFFER_BIT)
         for layer in layers:
             self.draw_layer(layer)
+
+    def read_rgba_frame(self) -> bytes:
+        """Read RGBA pixels from the default framebuffer for ffmpeg rawvideo."""
+        self._ensure_init()
+        width = self.output_width
+        height = self.output_height
+        raw = glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE)
+        row_stride = width * 4
+        rows = [
+            raw[row * row_stride : (row + 1) * row_stride] for row in range(height)
+        ]
+        return b"".join(reversed(rows))
 
     def upload_overlay_texture(self, surface: pygame.Surface) -> int:
         """Upload a pygame SRCALPHA surface as a GL texture (Y-flipped for GL)."""
