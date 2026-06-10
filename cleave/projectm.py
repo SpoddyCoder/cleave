@@ -21,6 +21,8 @@ from pathlib import Path
 
 import numpy as np
 
+from cleave.config import clamp_beat_sensitivity
+
 PROJECTM_MONO = 1
 PROJECTM_STEREO = 2
 
@@ -198,6 +200,7 @@ class ProjectM:
             )
         self._handle = handle
         self._texture_path_storage: list[bytes] = []
+        self._beat_sensitivity = 1.0
 
     @property
     def handle(self) -> c_void_p:
@@ -243,6 +246,10 @@ class ProjectM:
         if samples.size == 0:
             return
         arr = np.ascontiguousarray(samples, dtype=np.float32).ravel()
+        scale = self._beat_sensitivity
+        if scale != 1.0:
+            arr = arr * scale
+            arr = np.ascontiguousarray(arr, dtype=np.float32)
         lib = _get_lib()
         max_n = int(lib.projectm_pcm_get_max_samples())
         if max_n <= 0:
@@ -266,10 +273,12 @@ class ProjectM:
         )
 
     def set_beat_sensitivity(self, val: float) -> None:
-        _get_lib().projectm_set_beat_sensitivity(self._handle, c_float(val))
+        sensitivity = clamp_beat_sensitivity(val)
+        self._beat_sensitivity = sensitivity
+        _get_lib().projectm_set_beat_sensitivity(self._handle, c_float(sensitivity))
 
     def get_beat_sensitivity(self) -> float:
-        return float(_get_lib().projectm_get_beat_sensitivity(self._handle))
+        return self._beat_sensitivity
 
     def set_frame_time(self, t_sec: float) -> None:
         _get_lib().projectm_set_frame_time(self._handle, c_double(t_sec))
