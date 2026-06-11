@@ -193,8 +193,118 @@ def test_render_frame_count_and_ffmpeg_args(
     assert cmd[0] == "/usr/bin/ffmpeg"
     assert "-s" in cmd and f"{width}x{height}" in cmd
     assert "-r" in cmd and str(fps) in cmd
+    assert "-preset" not in cmd
     assert str(project / "my-track.flac") in cmd
     assert str(expected_output) in cmd
+
+
+@patch.object(render_mod, "pygame")
+@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "subprocess")
+@patch.object(render_mod, "_init_gl_resources_render")
+@patch.object(render_mod, "build_runtime_full")
+@patch.object(render_mod, "scan_all_layers", return_value={})
+@patch.object(render_mod, "VisualizerApp")
+def test_render_ffmpeg_preset_veryslow_when_high_quality(
+    mock_app_cls: MagicMock,
+    _mock_scan: MagicMock,
+    mock_build: MagicMock,
+    mock_init_gl: MagicMock,
+    mock_subprocess: MagicMock,
+    mock_shutil: MagicMock,
+    _mock_pygame: MagicMock,
+    tmp_path: Path,
+) -> None:
+    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
+    project = _setup_render_project(tmp_path)
+    width, height, fps = 4, 4, 10
+    duration_sec = 2.0
+
+    compositor = MagicMock()
+    compositor.read_rgba_frame.return_value = b"\xff" * (width * height * 4)
+
+    runtime = MagicMock()
+    runtime.width = width
+    runtime.height = height
+    runtime.fps = fps
+    runtime.duration_sec = duration_sec
+    runtime.layers = []
+    runtime.compositor = None
+    runtime.post_process = MagicMock()
+    mock_build.return_value = runtime
+
+    def _attach_compositor(rt: MagicMock) -> None:
+        rt.compositor = compositor
+
+    mock_init_gl.side_effect = _attach_compositor
+    mock_app_cls.return_value = MagicMock()
+
+    proc = MagicMock()
+    proc.stdin = MagicMock()
+    proc.wait.return_value = 0
+    mock_subprocess.Popen.return_value = proc
+
+    render_mod.render(project, high_quality=True)
+
+    cmd = mock_subprocess.Popen.call_args[0][0]
+    preset_idx = cmd.index("-preset")
+    assert cmd[preset_idx + 1] == "veryslow"
+
+
+@patch.object(render_mod, "fade_alpha", side_effect=lambda t, d, fi, fo: 0.5)
+@patch.object(render_mod, "pygame")
+@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "subprocess")
+@patch.object(render_mod, "_init_gl_resources_render")
+@patch.object(render_mod, "build_runtime_full")
+@patch.object(render_mod, "scan_all_layers", return_value={})
+@patch.object(render_mod, "VisualizerApp")
+def test_render_applies_fade_via_compositor(
+    mock_app_cls: MagicMock,
+    _mock_scan: MagicMock,
+    mock_build: MagicMock,
+    mock_init_gl: MagicMock,
+    mock_subprocess: MagicMock,
+    mock_shutil: MagicMock,
+    _mock_pygame: MagicMock,
+    _mock_fade_alpha: MagicMock,
+    tmp_path: Path,
+) -> None:
+    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
+    project = _setup_render_project(tmp_path)
+    width, height, fps = 4, 4, 10
+    duration_sec = 2.0
+    frame_count = math.ceil(duration_sec * fps)
+
+    compositor = MagicMock()
+    compositor.read_rgba_frame.return_value = b"\xff" * (width * height * 4)
+
+    runtime = MagicMock()
+    runtime.width = width
+    runtime.height = height
+    runtime.fps = fps
+    runtime.duration_sec = duration_sec
+    runtime.layers = []
+    runtime.compositor = None
+    runtime.post_process = MagicMock()
+    mock_build.return_value = runtime
+
+    def _attach_compositor(rt: MagicMock) -> None:
+        rt.compositor = compositor
+
+    mock_init_gl.side_effect = _attach_compositor
+    mock_app_cls.return_value = MagicMock()
+
+    proc = MagicMock()
+    proc.stdin = MagicMock()
+    proc.wait.return_value = 0
+    mock_subprocess.Popen.return_value = proc
+
+    render_mod.render(project, fade_in=1.0, fade_out=1.0)
+
+    assert compositor.apply_frame_fade.call_count == frame_count
+    for call in compositor.apply_frame_fade.call_args_list:
+        assert call.args == (0.5,)
 
 
 def test_render_output_must_be_mp4(tmp_path: Path) -> None:
