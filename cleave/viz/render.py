@@ -11,6 +11,7 @@ from pathlib import Path
 import pygame
 
 from cleave.config import PROJECT_VIZ_CONFIG_FILENAME, load_config
+from cleave.easing import fade_alpha
 from cleave.paths import default_project_config, repo_root, resolve_project
 from cleave.preset_playlist import scan_all_layers
 from cleave.project import manifest_path, mix_path
@@ -21,31 +22,9 @@ from cleave.viz.app import (
     build_runtime_full,
 )
 from cleave.viz.layer import _destroy_layers
+from cleave.viz.render_overlay import build_panel_surface, composite_render_overlay
 
 _PREPARE_HINT = "run `cleave separate` or `cleave play` first"
-
-
-def _smoothstep(u: float) -> float:
-    u = max(0.0, min(1.0, u))
-    return u * u * (3.0 - 2.0 * u)
-
-
-def visual_fade_alpha(
-    t_sec: float, duration_sec: float, fade_in: float, fade_out: float
-) -> float:
-    """Return combined fade multiplier in [0, 1] using smoothstep easing."""
-    alpha_in = 1.0
-    if fade_in > 0.0:
-        alpha_in = _smoothstep(t_sec / fade_in) if t_sec < fade_in else 1.0
-
-    alpha_out = 1.0
-    if fade_out > 0.0:
-        fade_start = duration_sec - fade_out
-        if t_sec > fade_start:
-            u = (duration_sec - t_sec) / fade_out
-            alpha_out = _smoothstep(u)
-
-    return alpha_in * alpha_out
 
 
 def _resolve_render_config_path(
@@ -189,15 +168,28 @@ def render(
         assert proc.stdin is not None
 
         assert runtime.compositor is not None
+        overlay_panel = None
+        if cfg.render is not None and cfg.render.enabled:
+            overlay_panel = build_panel_surface(cfg.render)
+
         for frame_idx in range(frame_count):
             t_sec = frame_idx / fps
             app.tick_frame(t_sec, paused=False, draw_overlay=False)
+            if cfg.render is not None and cfg.render.enabled:
+                composite_render_overlay(
+                    runtime.compositor,
+                    cfg.render,
+                    t_sec,
+                    width,
+                    height,
+                    panel=overlay_panel,
+                )
             frame = runtime.compositor.read_rgba_frame()
             if len(frame) != frame_bytes:
                 raise RuntimeError(
                     f"expected {frame_bytes} frame bytes, got {len(frame)}"
                 )
-            alpha = visual_fade_alpha(t_sec, duration_sec, fade_in, fade_out)
+            alpha = fade_alpha(t_sec, duration_sec, fade_in, fade_out)
             proc.stdin.write(_apply_fade_to_rgba(frame, alpha))
 
         proc.stdin.close()
