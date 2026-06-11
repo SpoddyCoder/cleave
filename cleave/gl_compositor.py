@@ -35,6 +35,7 @@ from OpenGL.GL import (
     GL_RGBA8,
     GL_RENDERBUFFER,
     GL_SRC_ALPHA,
+    GL_SRC_COLOR,
     GL_TEXTURE_2D,
     GL_TEXTURE_MAG_FILTER,
     GL_TEXTURE_MIN_FILTER,
@@ -438,6 +439,32 @@ class GlCompositor:
         glClear(GL_COLOR_BUFFER_BIT)
         for layer in layers:
             self.draw_layer(layer)
+
+    def apply_frame_fade(self, alpha: float) -> None:
+        """Multiply default-FBO RGB by *alpha* (render fade in/out)."""
+        if alpha >= 1.0:
+            return
+        self._ensure_init()
+        self._bind_default_framebuffer()
+        if alpha <= 0.0:
+            glClearColor(0.0, 0.0, 0.0, 1.0)
+            glClear(GL_COLOR_BUFFER_BIT)
+            return
+        blend_enabled, blend_src, blend_dst, blend_equation = self._push_blend_state()
+        try:
+            glEnable(GL_BLEND)
+            glBlendEquation(GL_FUNC_ADD)
+            glBlendFunc(GL_ZERO, GL_SRC_COLOR)
+            self._draw_solid_quad(
+                0.0,
+                0.0,
+                self.output_width,
+                self.output_height,
+                (alpha, alpha, alpha, 1.0),
+            )
+        finally:
+            self._pop_blend_state(blend_enabled, blend_src, blend_dst, blend_equation)
+            glColor4f(1.0, 1.0, 1.0, 1.0)
 
     def read_rgba_frame(self) -> bytes:
         """Read RGBA pixels from the default framebuffer for ffmpeg rawvideo."""

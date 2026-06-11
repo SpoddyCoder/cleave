@@ -203,9 +203,25 @@ def test_cmd_render_calls_render(
         output=Path("video.mp4"),
         fade_in=1.0,
         fade_out=0.5,
+        high_quality=False,
     )
     out = capsys.readouterr().out
     assert f"Rendered to {output.resolve()}" in out
+
+
+def test_cmd_render_passes_high_quality_flag(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    _complete_project(tmp_path)
+
+    with patch.object(
+        importlib.import_module("cleave.viz.render"), "render", return_value=tmp_path / "out.mp4"
+    ) as render:
+        cmd_render(build_parser().parse_args(["render", "my-track", "--hq"]))
+
+    render.assert_called_once()
+    assert render.call_args.kwargs["high_quality"] is True
 
 
 def test_cmd_render_errors_when_project_incomplete(

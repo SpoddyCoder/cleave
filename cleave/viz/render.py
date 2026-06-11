@@ -70,21 +70,6 @@ def validate_render_project(
     return project
 
 
-def _apply_fade_to_rgba(frame: bytes, alpha: float) -> bytes:
-    if alpha >= 1.0:
-        return frame
-    if alpha <= 0.0:
-        return b"\x00" * len(frame)
-
-    scale = alpha
-    out = bytearray(frame)
-    for i in range(0, len(out), 4):
-        out[i] = int(out[i] * scale)
-        out[i + 1] = int(out[i + 1] * scale)
-        out[i + 2] = int(out[i + 2] * scale)
-    return bytes(out)
-
-
 def render(
     project_dir: Path | str,
     *,
@@ -92,6 +77,7 @@ def render(
     output: Path | None = None,
     fade_in: float = 0.0,
     fade_out: float = 0.0,
+    high_quality: bool = False,
 ) -> Path:
     """Render project visuals to an MP4 muxed with the project mix audio."""
     if fade_in < 0.0 or fade_out < 0.0:
@@ -157,13 +143,19 @@ def render(
             str(audio_path),
             "-c:v",
             "libx264",
-            "-pix_fmt",
-            "yuv420p",
-            "-c:a",
-            "aac",
-            "-shortest",
-            str(output_path),
         ]
+        if high_quality:
+            cmd.extend(["-preset", "veryslow"])
+        cmd.extend(
+            [
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
+                "-shortest",
+                str(output_path),
+            ]
+        )
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
         assert proc.stdin is not None
 
@@ -184,13 +176,14 @@ def render(
                     height,
                     panel=overlay_panel,
                 )
+            alpha = fade_alpha(t_sec, duration_sec, fade_in, fade_out)
+            runtime.compositor.apply_frame_fade(alpha)
             frame = runtime.compositor.read_rgba_frame()
             if len(frame) != frame_bytes:
                 raise RuntimeError(
                     f"expected {frame_bytes} frame bytes, got {len(frame)}"
                 )
-            alpha = fade_alpha(t_sec, duration_sec, fade_in, fade_out)
-            proc.stdin.write(_apply_fade_to_rgba(frame, alpha))
+            proc.stdin.write(frame)
 
         proc.stdin.close()
         proc.stdin = None

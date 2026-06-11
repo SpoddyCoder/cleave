@@ -95,8 +95,9 @@ This will separate the track into its component stem tracks (bass, drums, vocals
   * `-o` for output (`.mp4` only)
     * If omitted outputs to `projects/<slug>/renders/<visualizer.name>.mp4`
   * `-c` for config
-  * `-fi` / `-fo` for whole-video visual fade-in and fade-out (applied after the render overlay).
-* Pass `--high-quality` to either command for higher-quality separation.
+  * `-fi` / `-fo` for whole-video visual fade-in and fade-out (GL fade after the render overlay).
+  * `-hq` / `--high-quality` for `veryslow` libx264 encode (default uses ffmpeg's libx264 preset).
+* Pass `-hq` / `--high-quality` to `separate` or `play` for higher-quality Demucs separation.
 * To store projects under XDG instead, set `CLEAVE_DATA=~/.local/share/cleave`.
 * `python cleave.py` is an alias for `python -m cleave` (same subcommands).
 

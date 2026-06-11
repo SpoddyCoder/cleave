@@ -99,6 +99,7 @@ def cmd_render(args: argparse.Namespace) -> None:
             output=args.output,
             fade_in=args.fade_in,
             fade_out=args.fade_out,
+            high_quality=args.high_quality,
         )
     except (FileNotFoundError, ValueError, RuntimeError) as e:
         _exit_error(f"error: {e}")
@@ -203,6 +204,14 @@ def build_parser() -> argparse.ArgumentParser:
         default=0.0,
         metavar="SECONDS",
         help="Visual fade-out duration in seconds (default: 0)",
+    )
+    render.add_argument(
+        "-hq",
+        "--hq",
+        "--high-quality",
+        dest="high_quality",
+        action="store_true",
+        help="veryslow libx264 preset for best encode quality (slower)",
     )
     render.set_defaults(func=cmd_render)
 
