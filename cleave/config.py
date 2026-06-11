@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, TextIO
+from typing import Any, Literal, TextIO
 
 import yaml
 
@@ -83,6 +83,69 @@ class VisualizerConfig:
     beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
 
 
+RenderOverlayPosition = Literal[
+    "top-left", "top-right", "centre", "bottom-left", "bottom-right"
+]
+
+RENDER_OVERLAY_POSITIONS: tuple[RenderOverlayPosition, ...] = (
+    "top-left",
+    "top-right",
+    "centre",
+    "bottom-left",
+    "bottom-right",
+)
+
+DEFAULT_RENDER_OVERLAY_TITLE = "Cleave Final Render"
+DEFAULT_RENDER_OVERLAY_BODY = (
+    "Place anything you like here\n"
+    "Like musician names, year of release etc.\n"
+    "As many lines as you like\n"
+)
+DEFAULT_RENDER_OVERLAY_START = 10.0
+DEFAULT_RENDER_OVERLAY_DISPLAY_TIME = 30.0
+DEFAULT_RENDER_OVERLAY_POSITION: RenderOverlayPosition = "bottom-left"
+DEFAULT_RENDER_OVERLAY_FONT_SIZE = 10
+DEFAULT_RENDER_OVERLAY_FONT_COLOUR = (255, 170, 0)
+DEFAULT_RENDER_OVERLAY_BACKGROUND_MARGIN = 10
+DEFAULT_RENDER_OVERLAY_BACKGROUND_PADDING = 10
+DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR = (34, 51, 68)
+DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY = 1.0
+DEFAULT_RENDER_OVERLAY_BORDER_WIDTH = 2
+
+
+@dataclass(frozen=True)
+class RenderOverlayFontConfig:
+    size: int
+    colour: tuple[int, int, int]
+
+
+@dataclass(frozen=True)
+class RenderOverlayBorderConfig:
+    colour: tuple[int, int, int]
+    width: int
+
+
+@dataclass(frozen=True)
+class RenderOverlayBackgroundConfig:
+    margin: int
+    padding: int
+    colour: tuple[int, int, int]
+    opacity: float
+    border: RenderOverlayBorderConfig
+
+
+@dataclass(frozen=True)
+class RenderOverlayConfig:
+    enabled: bool
+    title: str
+    body: str
+    start: float
+    display_time: float
+    position: RenderOverlayPosition
+    font: RenderOverlayFontConfig
+    background: RenderOverlayBackgroundConfig
+
+
 @dataclass(frozen=True)
 class CleaveConfig:
     paths: PathsConfig
@@ -90,6 +153,7 @@ class CleaveConfig:
     visualizer: VisualizerConfig
     config_path: Path
     layer_z_order: tuple[str, ...] = DEFAULT_LAYER_Z_ORDER
+    render: RenderOverlayConfig | None = None
 
     def layers_in_z_order(self) -> list[tuple[str, LayerConfig]]:
         """Return layers in compositor draw order (bottom-to-top)."""
@@ -241,6 +305,145 @@ def _parse_effects(stem: str, layer_raw: dict[str, Any]) -> dict[str, dict[str, 
     return effects
 
 
+def _parse_hex_colour(value: Any, label: str) -> tuple[int, int, int]:
+    if not isinstance(value, str):
+        raise ValueError(f"{label} must be a string")
+    raw = value.strip()
+    if not raw.startswith("#"):
+        raise ValueError(f"{label} must be a hex colour starting with #")
+    digits = raw[1:]
+    if len(digits) == 3:
+        digits = "".join(ch * 2 for ch in digits)
+    elif len(digits) != 6:
+        raise ValueError(f"{label} must be #rgb or #rrggbb")
+    try:
+        return (
+            int(digits[0:2], 16),
+            int(digits[2:4], 16),
+            int(digits[4:6], 16),
+        )
+    except ValueError as exc:
+        raise ValueError(f"{label} must be a valid hex colour") from exc
+
+
+def _require_non_negative_number(
+    value: Any, label: str, *, as_int: bool = False
+) -> float | int:
+    try:
+        number = int(value) if as_int else float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{label} must be a number") from exc
+    if number < 0:
+        raise ValueError(f"{label} must be non-negative")
+    return number
+
+
+def _parse_render_overlay_position(
+    value: Any, label: str = "render.overlay.position"
+) -> RenderOverlayPosition:
+    if not isinstance(value, str):
+        raise ValueError(f"{label} must be a string")
+    if value not in RENDER_OVERLAY_POSITIONS:
+        allowed = ", ".join(f"'{pos}'" for pos in RENDER_OVERLAY_POSITIONS)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return value
+
+
+def _parse_render_overlay_font(data: dict[str, Any]) -> RenderOverlayFontConfig:
+    font = _as_mapping(data.get("font"), "render.overlay.font")
+    size = _require_non_negative_number(
+        font.get("size", DEFAULT_RENDER_OVERLAY_FONT_SIZE),
+        "render.overlay.font.size",
+        as_int=True,
+    )
+    colour_raw = font.get("colour", "#ffaa00")
+    colour = _parse_hex_colour(
+        "#ffaa00" if colour_raw is None else colour_raw,
+        "render.overlay.font.colour",
+    )
+    return RenderOverlayFontConfig(size=int(size), colour=colour)
+
+
+def _parse_render_overlay_border(data: dict[str, Any]) -> RenderOverlayBorderConfig:
+    border = _as_mapping(data.get("border"), "render.overlay.background.border")
+    border_colour_raw = border.get("colour", "#223344")
+    colour = _parse_hex_colour(
+        "#223344" if border_colour_raw is None else border_colour_raw,
+        "render.overlay.background.border.colour",
+    )
+    width = _require_non_negative_number(
+        border.get("width", DEFAULT_RENDER_OVERLAY_BORDER_WIDTH),
+        "render.overlay.background.border.width",
+        as_int=True,
+    )
+    return RenderOverlayBorderConfig(colour=colour, width=int(width))
+
+
+def _parse_render_overlay_background(
+    data: dict[str, Any],
+) -> RenderOverlayBackgroundConfig:
+    background = _as_mapping(data.get("background"), "render.overlay.background")
+    margin = _require_non_negative_number(
+        background.get("margin", DEFAULT_RENDER_OVERLAY_BACKGROUND_MARGIN),
+        "render.overlay.background.margin",
+        as_int=True,
+    )
+    padding = _require_non_negative_number(
+        background.get("padding", DEFAULT_RENDER_OVERLAY_BACKGROUND_PADDING),
+        "render.overlay.background.padding",
+        as_int=True,
+    )
+    background_colour_raw = background.get("colour", "#223344")
+    colour = _parse_hex_colour(
+        "#223344" if background_colour_raw is None else background_colour_raw,
+        "render.overlay.background.colour",
+    )
+    opacity = _require_non_negative_number(
+        background.get("opacity", DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY),
+        "render.overlay.background.opacity",
+    )
+    return RenderOverlayBackgroundConfig(
+        margin=int(margin),
+        padding=int(padding),
+        colour=colour,
+        opacity=float(opacity),
+        border=_parse_render_overlay_border(background),
+    )
+
+
+def _parse_render_overlay(data: dict[str, Any]) -> RenderOverlayConfig | None:
+    render = data.get("render")
+    if render is None:
+        return None
+    render_map = _as_mapping(render, "render")
+    overlay = render_map.get("overlay")
+    if overlay is None:
+        return None
+    overlay_map = _as_mapping(overlay, "render.overlay")
+    return RenderOverlayConfig(
+        enabled=bool(overlay_map.get("enabled", True)),
+        title=str(overlay_map.get("title", DEFAULT_RENDER_OVERLAY_TITLE)),
+        body=str(overlay_map.get("body", DEFAULT_RENDER_OVERLAY_BODY)),
+        start=float(
+            _require_non_negative_number(
+                overlay_map.get("start", DEFAULT_RENDER_OVERLAY_START),
+                "render.overlay.start",
+            )
+        ),
+        display_time=float(
+            _require_non_negative_number(
+                overlay_map.get("display_time", DEFAULT_RENDER_OVERLAY_DISPLAY_TIME),
+                "render.overlay.display_time",
+            )
+        ),
+        position=_parse_render_overlay_position(
+            overlay_map.get("position", DEFAULT_RENDER_OVERLAY_POSITION)
+        ),
+        font=_parse_render_overlay_font(overlay_map),
+        background=_parse_render_overlay_background(overlay_map),
+    )
+
+
 def _parse_visualizer(data: dict[str, Any]) -> VisualizerConfig:
     visualizer = _as_mapping(data.get("visualizer"), "visualizer")
     return VisualizerConfig(
@@ -342,6 +545,7 @@ def load_config(
 
     paths = _parse_paths(data)
     visualizer = _parse_visualizer(data)
+    render = _parse_render_overlay(data)
     layer_z_order = _parse_layer_z_order(data)
     layers = _parse_layers(data, paths.preset_root)
     _validate_presets(layers)
@@ -352,6 +556,7 @@ def load_config(
         visualizer=visualizer,
         config_path=path,
         layer_z_order=layer_z_order,
+        render=render,
     )
 
 

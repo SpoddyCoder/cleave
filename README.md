@@ -95,10 +95,25 @@ This will separate the track into its component stem tracks (bass, drums, vocals
   * `-o` for output (`.mp4` only)
     * If omitted outputs to `projects/<slug>/renders/<visualizer.name>.mp4`
   * `-c` for config
-  * `-fi` / `-fo` for visual fade-in and fade-out.
+  * `-fi` / `-fo` for whole-video visual fade-in and fade-out (applied after the render overlay).
 * Pass `--high-quality` to either command for higher-quality separation.
 * To store projects under XDG instead, set `CLEAVE_DATA=~/.local/share/cleave`.
 * `python cleave.py` is an alias for `python -m cleave` (same subcommands).
+
+#### Render overlay
+
+Optional title and body text burned into the MP4. Configure under `render.overlay` in [cleave-viz-default.yaml](cleave-viz-default.yaml) (copied to each project's `cleave-viz.yaml` on first `separate` / `play`).
+
+* `enabled` — turn the overlay on or off.
+* `start` — when the overlay begins fading in (seconds).
+* `display_time` — how long the overlay is on screen, including the 2s fade-in and fade-out.
+* `position` — `top-left`, `top-right`, `centre`, `bottom-left`, or `bottom-right`.
+* `font.size` / `font.colour` — body text in pixels and hex colour; title is bold at 1.2x size.
+* `background.margin` — gap from the frame edge to the panel (ignored when `position: centre`).
+* `background.padding` — gap from the panel edge to the text.
+* `background.colour`, `background.opacity`, `background.border` — panel fill and border (border opacity matches background).
+
+Fade easing uses the same smoothstep curve as whole-video `-fi` / `-fo`. Render-only; not shown in the live visualizer.
 
 ### Visualizer
 Controls...

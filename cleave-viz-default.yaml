@@ -5,6 +5,29 @@ visualizer:
   fps: 30
   beat_sensitivity: 1.0
 
+render:
+  overlay:
+    enabled: true
+    title: Cleave Final Render
+    body: |
+      Place anything you like here
+      Like musician names, year of release etc.
+      As many lines as you like
+    start: 10
+    display_time: 30
+    position: bottom-left
+    font:
+      size: 10
+      colour: "#ffaa00"
+    background:
+      margin: 10
+      padding: 10
+      colour: "#223344"
+      opacity: 1.0
+      border:
+        colour: "#223344"
+        width: 2
+
 paths:
   preset_root: ~/milkdrop-presets
   texture_paths:

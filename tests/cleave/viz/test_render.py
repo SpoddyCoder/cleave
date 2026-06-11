@@ -4,22 +4,21 @@ from __future__ import annotations
 
 import importlib
 import math
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cleave.config import PROJECT_VIZ_CONFIG_FILENAME
+from cleave.config import PROJECT_VIZ_CONFIG_FILENAME, load_config
+from cleave.paths import repo_root
 from cleave.extract import STEM_NAMES, stems_dir
 from cleave.project import write_manifest
 from cleave.separate import project_stems_complete
 
 render_mod = importlib.import_module("cleave.viz.render")
-from cleave.viz.render import (  # noqa: E402
-    _smoothstep,
-    validate_render_project,
-    visual_fade_alpha,
-)
+from cleave.viz.render import validate_render_project  # noqa: E402
+from tests.cleave.viz.test_render_overlay import _overlay_cfg
 from tests.support.config import write_minimal_config
 
 
@@ -46,39 +45,6 @@ def _setup_render_project(tmp_path: Path) -> Path:
         demucs_model="htdemucs",
     )
     return project
-
-
-def test_smoothstep_endpoints() -> None:
-    assert _smoothstep(0.0) == 0.0
-    assert _smoothstep(1.0) == 1.0
-
-
-def test_visual_fade_alpha_no_fades() -> None:
-    assert visual_fade_alpha(0.0, 10.0, 0.0, 0.0) == 1.0
-    assert visual_fade_alpha(5.0, 10.0, 0.0, 0.0) == 1.0
-    assert visual_fade_alpha(10.0, 10.0, 0.0, 0.0) == 1.0
-
-
-def test_visual_fade_alpha_fade_in() -> None:
-    assert visual_fade_alpha(0.0, 10.0, 2.0, 0.0) == 0.0
-    assert visual_fade_alpha(1.0, 10.0, 2.0, 0.0) == _smoothstep(0.5)
-    assert visual_fade_alpha(2.0, 10.0, 2.0, 0.0) == 1.0
-    assert visual_fade_alpha(5.0, 10.0, 2.0, 0.0) == 1.0
-
-
-def test_visual_fade_alpha_fade_out() -> None:
-    assert visual_fade_alpha(8.0, 10.0, 0.0, 2.0) == 1.0
-    assert visual_fade_alpha(9.0, 10.0, 0.0, 2.0) == _smoothstep(0.5)
-    assert visual_fade_alpha(10.0, 10.0, 0.0, 2.0) == 0.0
-
-
-def test_visual_fade_alpha_combined() -> None:
-    duration = 10.0
-    fade_in = 2.0
-    fade_out = 2.0
-    assert visual_fade_alpha(1.0, duration, fade_in, fade_out) == _smoothstep(0.5)
-    assert visual_fade_alpha(5.0, duration, fade_in, fade_out) == 1.0
-    assert visual_fade_alpha(9.0, duration, fade_in, fade_out) == _smoothstep(0.5)
 
 
 def test_validate_render_project_missing_dir(tmp_path: Path) -> None:
@@ -235,3 +201,134 @@ def test_render_output_must_be_mp4(tmp_path: Path) -> None:
     project = _setup_render_project(tmp_path)
     with pytest.raises(ValueError, match="\\.mp4"):
         render_mod.render(project, output=tmp_path / "out.mkv")
+
+
+@patch.object(render_mod, "build_panel_surface")
+@patch.object(render_mod, "composite_render_overlay")
+@patch.object(render_mod, "pygame")
+@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "subprocess")
+@patch.object(render_mod, "_init_gl_resources_render")
+@patch.object(render_mod, "build_runtime_full")
+@patch.object(render_mod, "scan_all_layers", return_value={})
+@patch.object(render_mod, "VisualizerApp")
+@patch.object(render_mod, "load_config")
+def test_render_calls_overlay_compositing_when_enabled(
+    mock_load_config: MagicMock,
+    mock_app_cls: MagicMock,
+    _mock_scan: MagicMock,
+    mock_build: MagicMock,
+    mock_init_gl: MagicMock,
+    mock_subprocess: MagicMock,
+    mock_shutil: MagicMock,
+    _mock_pygame: MagicMock,
+    mock_composite: MagicMock,
+    mock_build_panel: MagicMock,
+    tmp_path: Path,
+) -> None:
+    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
+    project = _setup_render_project(tmp_path)
+    width, height, fps = 4, 4, 10
+    duration_sec = 2.0
+    frame_count = math.ceil(duration_sec * fps)
+
+    overlay_cfg = _overlay_cfg()
+    base_cfg = load_config(project / PROJECT_VIZ_CONFIG_FILENAME, repo_root())
+    mock_load_config.return_value = replace(base_cfg, render=overlay_cfg)
+
+    overlay_panel = MagicMock()
+    mock_build_panel.return_value = overlay_panel
+
+    compositor = MagicMock()
+    compositor.read_rgba_frame.return_value = b"\xff" * (width * height * 4)
+
+    runtime = MagicMock()
+    runtime.width = width
+    runtime.height = height
+    runtime.fps = fps
+    runtime.duration_sec = duration_sec
+    runtime.layers = []
+    runtime.compositor = None
+    runtime.post_process = MagicMock()
+    mock_build.return_value = runtime
+
+    def _attach_compositor(rt: MagicMock) -> None:
+        rt.compositor = compositor
+
+    mock_init_gl.side_effect = _attach_compositor
+
+    mock_app_cls.return_value = MagicMock()
+
+    proc = MagicMock()
+    proc.stdin = MagicMock()
+    proc.wait.return_value = 0
+    mock_subprocess.Popen.return_value = proc
+
+    render_mod.render(project)
+
+    mock_build_panel.assert_called_once_with(overlay_cfg)
+    assert mock_composite.call_count == frame_count
+    for call in mock_composite.call_args_list:
+        assert call.args[:2] == (compositor, overlay_cfg)
+        assert call.kwargs == {"panel": overlay_panel}
+
+
+@patch.object(render_mod, "build_panel_surface")
+@patch.object(render_mod, "composite_render_overlay")
+@patch.object(render_mod, "pygame")
+@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "subprocess")
+@patch.object(render_mod, "_init_gl_resources_render")
+@patch.object(render_mod, "build_runtime_full")
+@patch.object(render_mod, "scan_all_layers", return_value={})
+@patch.object(render_mod, "VisualizerApp")
+@patch.object(render_mod, "load_config")
+def test_render_skips_overlay_when_disabled(
+    mock_load_config: MagicMock,
+    mock_app_cls: MagicMock,
+    _mock_scan: MagicMock,
+    mock_build: MagicMock,
+    mock_init_gl: MagicMock,
+    mock_subprocess: MagicMock,
+    mock_shutil: MagicMock,
+    _mock_pygame: MagicMock,
+    mock_composite: MagicMock,
+    mock_build_panel: MagicMock,
+    tmp_path: Path,
+) -> None:
+    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
+    project = _setup_render_project(tmp_path)
+
+    overlay_cfg = _overlay_cfg(enabled=False)
+    base_cfg = load_config(project / PROJECT_VIZ_CONFIG_FILENAME, repo_root())
+    mock_load_config.return_value = replace(base_cfg, render=overlay_cfg)
+
+    width, height = 4, 4
+    compositor = MagicMock()
+    compositor.read_rgba_frame.return_value = b"\xff" * (width * height * 4)
+
+    runtime = MagicMock()
+    runtime.width = width
+    runtime.height = height
+    runtime.fps = 10
+    runtime.duration_sec = 2.0
+    runtime.layers = []
+    runtime.compositor = None
+    runtime.post_process = MagicMock()
+    mock_build.return_value = runtime
+
+    def _attach_compositor(rt: MagicMock) -> None:
+        rt.compositor = compositor
+
+    mock_init_gl.side_effect = _attach_compositor
+    mock_app_cls.return_value = MagicMock()
+
+    proc = MagicMock()
+    proc.stdin = MagicMock()
+    proc.wait.return_value = 0
+    mock_subprocess.Popen.return_value = proc
+
+    render_mod.render(project)
+
+    mock_build_panel.assert_not_called()
+    mock_composite.assert_not_called()

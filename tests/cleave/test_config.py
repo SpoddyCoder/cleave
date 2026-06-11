@@ -14,6 +14,10 @@ from cleave.config import (
     CleaveConfig,
     LayerConfig,
     PathsConfig,
+    RenderOverlayBackgroundConfig,
+    RenderOverlayBorderConfig,
+    RenderOverlayConfig,
+    RenderOverlayFontConfig,
     VisualizerConfig,
     clamp_beat_sensitivity,
     clamp_effect_pct,
@@ -22,7 +26,9 @@ from cleave.config import (
     find_config_path,
     load_config,
     project_viz_config_path,
+    _parse_hex_colour,
     _parse_layers,
+    _parse_render_overlay,
     _parse_visualizer,
 )
 from cleave.paths import repo_root
@@ -309,6 +315,83 @@ def test_load_config_validation_errors(
     _write_invalid_config(project_dir, preset_root, **overrides)
     with pytest.raises(ValueError, match=match):
         load_config(project_root=project_dir)
+
+
+_OVERLAY_YAML = """\
+render:
+  overlay:
+    enabled: true
+    title: Cleave Final Render
+    body: |
+      Place anything you like here
+      Like musician names, year of release etc.
+      As many lines as you like
+    start: 10
+    display_time: 30
+    position: bottom-left
+    font:
+      size: 10
+      colour: "#ffaa00"
+    background:
+      margin: 10
+      padding: 10
+      colour: "#223344"
+      opacity: 1.0
+      border:
+        colour: "#223344"
+        width: 2
+"""
+
+
+def test_parse_render_overlay_full_template() -> None:
+    data = yaml.safe_load(_OVERLAY_YAML)
+    overlay = _parse_render_overlay(data)
+    assert overlay == RenderOverlayConfig(
+        enabled=True,
+        title="Cleave Final Render",
+        body=(
+            "Place anything you like here\n"
+            "Like musician names, year of release etc.\n"
+            "As many lines as you like\n"
+        ),
+        start=10.0,
+        display_time=30.0,
+        position="bottom-left",
+        font=RenderOverlayFontConfig(size=10, colour=(255, 170, 0)),
+        background=RenderOverlayBackgroundConfig(
+            margin=10,
+            padding=10,
+            colour=(34, 51, 68),
+            opacity=1.0,
+            border=RenderOverlayBorderConfig(colour=(34, 51, 68), width=2),
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("#123", (0x11, 0x22, 0x33)),
+        ("#ffaa00", (255, 170, 0)),
+        ("#223344", (34, 51, 68)),
+    ],
+)
+def test_parse_hex_colour(value: str, expected: tuple[int, int, int]) -> None:
+    assert _parse_hex_colour(value, "test.colour") == expected
+
+
+def test_parse_render_overlay_rejects_invalid_position() -> None:
+    data = yaml.safe_load(_OVERLAY_YAML)
+    data["render"]["overlay"]["position"] = "middle"
+    with pytest.raises(ValueError, match="render.overlay.position must be one of"):
+        _parse_render_overlay(data)
+
+
+def test_load_config_render_none_without_overlay_section(
+    minimal_project: Path,
+) -> None:
+    cfg = load_config(project_root=minimal_project)
+    assert cfg.render is None
 
 
 def test_load_config_missing_preset_file(tmp_path: Path) -> None:
