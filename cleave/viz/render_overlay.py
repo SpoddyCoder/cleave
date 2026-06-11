@@ -4,13 +4,117 @@ from __future__ import annotations
 
 import pygame
 
-from cleave.config import RenderOverlayConfig
+from cleave.config import (
+    DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR,
+    DEFAULT_RENDER_OVERLAY_BACKGROUND_MARGIN,
+    DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
+    DEFAULT_RENDER_OVERLAY_BACKGROUND_PADDING,
+    DEFAULT_RENDER_OVERLAY_BODY,
+    DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
+    DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
+    DEFAULT_RENDER_OVERLAY_FONT_COLOUR,
+    DEFAULT_RENDER_OVERLAY_FONT_SIZE,
+    DEFAULT_RENDER_OVERLAY_POSITION,
+    DEFAULT_RENDER_OVERLAY_START,
+    DEFAULT_RENDER_OVERLAY_TITLE,
+    RenderOverlayBackgroundConfig,
+    RenderOverlayBorderConfig,
+    RenderOverlayConfig,
+    RenderOverlayFontConfig,
+)
+from cleave.viz.controls import RenderOverlayRuntime
 from cleave.easing import fade_alpha
 from cleave.gl_compositor import GlCompositor
 from cleave.viz.theme import FADE_DURATION_SEC
 
 LINE_GAP = 3
 _ALPHA_EPSILON = 0.01
+
+
+def default_render_overlay_config() -> RenderOverlayConfig:
+    """Static overlay fields when ``cfg.render`` is absent."""
+    return RenderOverlayConfig(
+        enabled=True,
+        title=DEFAULT_RENDER_OVERLAY_TITLE,
+        body=DEFAULT_RENDER_OVERLAY_BODY,
+        start=DEFAULT_RENDER_OVERLAY_START,
+        display_time=DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
+        position=DEFAULT_RENDER_OVERLAY_POSITION,
+        font=RenderOverlayFontConfig(
+            size=DEFAULT_RENDER_OVERLAY_FONT_SIZE,
+            colour=DEFAULT_RENDER_OVERLAY_FONT_COLOUR,
+        ),
+        background=RenderOverlayBackgroundConfig(
+            margin=DEFAULT_RENDER_OVERLAY_BACKGROUND_MARGIN,
+            padding=DEFAULT_RENDER_OVERLAY_BACKGROUND_PADDING,
+            colour=DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR,
+            opacity=DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
+            border=RenderOverlayBorderConfig(
+                colour=DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR,
+                width=DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
+            ),
+        ),
+    )
+
+
+def panel_surface_key(cfg: RenderOverlayConfig) -> tuple:
+    """Hashable key for cached panel surfaces (appearance only, not placement)."""
+    bg = cfg.background
+    return (
+        cfg.title,
+        cfg.body,
+        cfg.font.size,
+        cfg.font.colour,
+        bg.margin,
+        bg.padding,
+        bg.colour,
+        bg.opacity,
+        bg.border.colour,
+        bg.border.width,
+    )
+
+
+def build_live_overlay_config(
+    base: RenderOverlayConfig, runtime: RenderOverlayRuntime
+) -> RenderOverlayConfig:
+    """Merge static YAML fields with live-tuned runtime overrides."""
+    return RenderOverlayConfig(
+        enabled=runtime.enabled,
+        title=base.title,
+        body=base.body,
+        start=runtime.start,
+        display_time=runtime.display_time,
+        position=runtime.position,
+        font=RenderOverlayFontConfig(
+            size=runtime.font_size,
+            colour=base.font.colour,
+        ),
+        background=RenderOverlayBackgroundConfig(
+            margin=base.background.margin,
+            padding=base.background.padding,
+            colour=base.background.colour,
+            opacity=runtime.opacity_pct / 100.0,
+            border=RenderOverlayBorderConfig(
+                colour=base.background.border.colour,
+                width=runtime.border_width,
+            ),
+        ),
+    )
+
+
+def live_overlay_alpha(
+    t_sec: float,
+    cfg: RenderOverlayConfig,
+    *,
+    enabled: bool,
+    solo: bool,
+) -> float:
+    """Visibility multiplier for the live render overlay at *t_sec*."""
+    if not enabled:
+        return 0.0
+    if solo:
+        return 1.0
+    return overlay_visible_alpha(t_sec, cfg)
 
 
 def overlay_visible_alpha(t_sec: float, cfg: RenderOverlayConfig) -> float:
@@ -85,30 +189,44 @@ def build_panel_surface(cfg: RenderOverlayConfig) -> pygame.Surface:
     if body_surfs:
         content_h += LINE_GAP + body_block_h
 
-    panel_w = content_w + padding * 2
-    panel_h = content_h + padding * 2
+    border_width = cfg.background.border.width
+    inner_w = content_w + padding * 2
+    inner_h = content_h + padding * 2
+    panel_w = inner_w + border_width * 2
+    panel_h = inner_h + border_width * 2
 
     bg_alpha = _background_pixel_alpha(cfg)
     panel = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
-    if bg_alpha >= 1:
-        panel.fill((*cfg.background.colour, bg_alpha))
+    border_colour = (*cfg.background.border.colour, bg_alpha)
 
-    border_width = cfg.background.border.width
     if border_width > 0 and bg_alpha >= 1:
+        pygame.draw.rect(panel, border_colour, (0, 0, panel_w, border_width))
         pygame.draw.rect(
             panel,
-            (*cfg.background.border.colour, bg_alpha),
-            panel.get_rect(),
-            width=border_width,
+            border_colour,
+            (0, panel_h - border_width, panel_w, border_width),
+        )
+        pygame.draw.rect(
+            panel, border_colour, (0, border_width, border_width, inner_h)
+        )
+        pygame.draw.rect(
+            panel,
+            border_colour,
+            (panel_w - border_width, border_width, border_width, inner_h),
         )
 
-    y = padding
-    panel.blit(title_surf, (padding, y))
+    if bg_alpha >= 1:
+        bg_rect = pygame.Rect(border_width, border_width, inner_w, inner_h)
+        panel.fill((*cfg.background.colour, bg_alpha), bg_rect)
+
+    content_x = border_width + padding
+    y = border_width + padding
+    panel.blit(title_surf, (content_x, y))
     y += line_h_title
     if body_surfs:
         y += LINE_GAP
         for index, surf in enumerate(body_surfs):
-            panel.blit(surf, (padding, y))
+            panel.blit(surf, (content_x, y))
             y += line_h_body
             if index < len(body_surfs) - 1:
                 y += LINE_GAP
@@ -136,17 +254,16 @@ def _clip_rect_to_bounds(
     return (left, top, clip_w, clip_h)
 
 
-def composite_render_overlay(
+def composite_render_overlay_with_alpha(
     compositor: GlCompositor,
     cfg: RenderOverlayConfig,
-    t_sec: float,
+    alpha: float,
     width: int,
     height: int,
     *,
     panel: pygame.Surface | None = None,
 ) -> None:
-    """Upload and draw the render overlay when visible at *t_sec*."""
-    alpha = overlay_visible_alpha(t_sec, cfg)
+    """Upload and draw the render overlay at *alpha* visibility."""
     if alpha <= _ALPHA_EPSILON:
         return
 
@@ -168,3 +285,23 @@ def composite_render_overlay(
 
     texture_id = compositor.upload_overlay_texture(draw_surface)
     compositor.draw_overlay(texture_id, clip_x, clip_y, clip_w, clip_h, alpha=alpha)
+
+
+def composite_render_overlay(
+    compositor: GlCompositor,
+    cfg: RenderOverlayConfig,
+    t_sec: float,
+    width: int,
+    height: int,
+    *,
+    panel: pygame.Surface | None = None,
+) -> None:
+    """Upload and draw the render overlay when visible at *t_sec*."""
+    composite_render_overlay_with_alpha(
+        compositor,
+        cfg,
+        overlay_visible_alpha(t_sec, cfg),
+        width,
+        height,
+        panel=panel,
+    )

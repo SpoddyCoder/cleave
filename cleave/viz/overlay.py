@@ -6,12 +6,13 @@ See cleave/viz/theme.py and .cursor/rules/live-tuning-ui.mdc.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Literal
 
 import pygame
 
+from cleave.config import RenderOverlayPosition
 from cleave.effects.registry import effect_roster
 from cleave.viz.confirm import ConfirmDialog
 from cleave.viz.text_fit import (
@@ -70,6 +71,13 @@ class RowKind(Enum):
     TRACK_BEAT = auto()
     TRACK_EFFECTS_HEADER = auto()
     TRACK_EFFECT = auto()
+    RENDER_OVERLAY_HEADER = auto()
+    RENDER_OVERLAY_POSITION = auto()
+    RENDER_OVERLAY_FONT_SIZE = auto()
+    RENDER_OVERLAY_OPACITY = auto()
+    RENDER_OVERLAY_BORDER_WIDTH = auto()
+    RENDER_OVERLAY_START = auto()
+    RENDER_OVERLAY_DISPLAY_TIME = auto()
     CONFIG_HEADER = auto()
     TRANSPORT = auto()
     SAVE_AS_NEW_CONFIG = auto()
@@ -101,6 +109,19 @@ class TrackBlock:
 
 
 @dataclass
+class RenderOverlayBlock:
+    enabled: bool = True
+    expanded: bool = False
+    position: RenderOverlayPosition = "bottom-left"
+    font_size: int = 10
+    opacity_pct: int = 100
+    border_width: int = 2
+    start: float = 10.0
+    display_time: float = 30.0
+    solo: bool = False
+
+
+@dataclass
 class TuningViewState:
     layer_z_order: tuple[str, ...]
     tracks: dict[str, TrackBlock]
@@ -116,6 +137,7 @@ class TuningViewState:
     active_config_label: str = "cleave-viz.yaml"
     solo_stem: str | None = None
     solo_active: bool = False
+    render_overlay: RenderOverlayBlock = field(default_factory=RenderOverlayBlock)
 
 
 def footer_row_count(state: TuningViewState) -> int:
@@ -157,6 +179,14 @@ def build_row_layout(state: TuningViewState) -> list[RowDescriptor]:
                         driver_slug=effect_def.driver_slug,
                     )
                 )
+    rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_HEADER))
+    if state.render_overlay.expanded:
+        rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_POSITION))
+        rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_FONT_SIZE))
+        rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_OPACITY))
+        rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_BORDER_WIDTH))
+        rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_START))
+        rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_DISPLAY_TIME))
     rows.append(RowDescriptor(RowKind.CONFIG_HEADER))
     rows.append(RowDescriptor(RowKind.TRANSPORT))
     rows.append(RowDescriptor(RowKind.SAVE_AS_NEW_CONFIG))
@@ -223,6 +253,17 @@ _SUB_ROW_KINDS = frozenset(
 
 _EFFECT_SUB_ROW_KINDS = frozenset({RowKind.TRACK_EFFECT})
 
+_RENDER_OVERLAY_SUB_ROW_KINDS = frozenset(
+    {
+        RowKind.RENDER_OVERLAY_POSITION,
+        RowKind.RENDER_OVERLAY_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_OPACITY,
+        RowKind.RENDER_OVERLAY_BORDER_WIDTH,
+        RowKind.RENDER_OVERLAY_START,
+        RowKind.RENDER_OVERLAY_DISPLAY_TIME,
+    }
+)
+
 _LOCKED_NAVIGABLE_SUB_ROW_KINDS = frozenset({RowKind.TRACK_EFFECTS_HEADER})
 
 _LABELED_SUB_ROW_KINDS = frozenset(
@@ -231,6 +272,12 @@ _LABELED_SUB_ROW_KINDS = frozenset(
         RowKind.TRACK_OPACITY,
         RowKind.TRACK_BEAT,
         RowKind.TRACK_EFFECT,
+        RowKind.RENDER_OVERLAY_POSITION,
+        RowKind.RENDER_OVERLAY_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_OPACITY,
+        RowKind.RENDER_OVERLAY_BORDER_WIDTH,
+        RowKind.RENDER_OVERLAY_START,
+        RowKind.RENDER_OVERLAY_DISPLAY_TIME,
     }
 )
 
@@ -246,6 +293,8 @@ def track_sub_rows_navigable(state: TuningViewState, stem: str) -> bool:
 
 def _sub_row_visible(state: TuningViewState, index: int) -> bool:
     desc = row_descriptor(state, index)
+    if desc.kind in _RENDER_OVERLAY_SUB_ROW_KINDS:
+        return state.render_overlay.expanded
     stem = desc.stem
     if stem is None or desc.kind not in _SUB_ROW_KINDS:
         return True
@@ -273,7 +322,10 @@ def navigable_row_indices(state: TuningViewState) -> list[int]:
         desc = row_descriptor(state, index)
         if desc.kind == RowKind.CONFIG_HEADER:
             continue
-        if desc.kind in _SUB_ROW_KINDS:
+        if desc.kind in _RENDER_OVERLAY_SUB_ROW_KINDS:
+            if not state.render_overlay.expanded:
+                continue
+        elif desc.kind in _SUB_ROW_KINDS:
             stem = desc.stem
             assert stem is not None
             block = state.tracks[stem]
@@ -292,7 +344,11 @@ def quick_nav_row_indices(state: TuningViewState) -> list[int]:
     indices: list[int] = []
     for index in range(row_count(state)):
         kind = row_kind(state, index)
-        if kind in (RowKind.TRACK_HEADER, RowKind.TRANSPORT):
+        if kind in (
+            RowKind.TRACK_HEADER,
+            RowKind.RENDER_OVERLAY_HEADER,
+            RowKind.TRANSPORT,
+        ):
             indices.append(index)
     return indices
 
@@ -330,6 +386,24 @@ def _row_text(state: TuningViewState, index: int) -> str:
     if kind == RowKind.OVERWRITE_CONFIG:
         return "OVERWRITE CONFIG"
 
+    if kind == RowKind.RENDER_OVERLAY_HEADER:
+        arrow = "▼" if state.render_overlay.expanded else "▶"
+        return f"Render: OVERLAY {arrow}"
+
+    block_ro = state.render_overlay
+    if kind == RowKind.RENDER_OVERLAY_POSITION:
+        return f"└─ position: {block_ro.position}"
+    if kind == RowKind.RENDER_OVERLAY_FONT_SIZE:
+        return f"└─ font size: {block_ro.font_size}"
+    if kind == RowKind.RENDER_OVERLAY_OPACITY:
+        return f"└─ background opacity: {block_ro.opacity_pct}%"
+    if kind == RowKind.RENDER_OVERLAY_BORDER_WIDTH:
+        return f"└─ border width: {block_ro.border_width}"
+    if kind == RowKind.RENDER_OVERLAY_START:
+        return f"└─ start time: {block_ro.start:.1f}"
+    if kind == RowKind.RENDER_OVERLAY_DISPLAY_TIME:
+        return f"└─ display time: {block_ro.display_time:.1f}"
+
     stem = row_stem(state, index)
     assert stem is not None
     block = state.tracks[stem]
@@ -366,6 +440,18 @@ def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
         return "└─ opacity: "
     if kind == RowKind.TRACK_BEAT:
         return "└─ beat sensitivity: "
+    if kind == RowKind.RENDER_OVERLAY_POSITION:
+        return "└─ position: "
+    if kind == RowKind.RENDER_OVERLAY_FONT_SIZE:
+        return "└─ font size: "
+    if kind == RowKind.RENDER_OVERLAY_OPACITY:
+        return "└─ background opacity: "
+    if kind == RowKind.RENDER_OVERLAY_BORDER_WIDTH:
+        return "└─ border width: "
+    if kind == RowKind.RENDER_OVERLAY_START:
+        return "└─ start time: "
+    if kind == RowKind.RENDER_OVERLAY_DISPLAY_TIME:
+        return "└─ display time: "
     assert kind == RowKind.TRACK_EFFECT
     effect = row_effect(state, index)
     assert effect is not None
@@ -374,10 +460,23 @@ def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
 
 
 def _labeled_sub_row_value(state: TuningViewState, index: int) -> str:
+    kind = row_kind(state, index)
+    block_ro = state.render_overlay
+    if kind == RowKind.RENDER_OVERLAY_POSITION:
+        return block_ro.position
+    if kind == RowKind.RENDER_OVERLAY_FONT_SIZE:
+        return str(block_ro.font_size)
+    if kind == RowKind.RENDER_OVERLAY_OPACITY:
+        return f"{block_ro.opacity_pct}%"
+    if kind == RowKind.RENDER_OVERLAY_BORDER_WIDTH:
+        return str(block_ro.border_width)
+    if kind == RowKind.RENDER_OVERLAY_START:
+        return f"{block_ro.start:.1f}"
+    if kind == RowKind.RENDER_OVERLAY_DISPLAY_TIME:
+        return f"{block_ro.display_time:.1f}"
     stem = row_stem(state, index)
     assert stem is not None
     block = state.tracks[stem]
-    kind = row_kind(state, index)
     if kind == RowKind.TRACK_BLEND:
         return block.blend_mode
     if kind == RowKind.TRACK_OPACITY:
@@ -440,6 +539,10 @@ def _track_header_layer_prefix(state: TuningViewState, index: int) -> str:
 def _track_header_expand_suffix(expanded: bool) -> str:
     arrow = "▼" if expanded else "▶"
     return f" {arrow}"
+
+
+def _render_overlay_header_prefix() -> str:
+    return "Render: "
 
 
 def render_visibility_icon(
@@ -561,6 +664,13 @@ def fit_row_text(
             )
             + _track_header_expand_suffix(expanded)
         )
+    if kind == RowKind.RENDER_OVERLAY_HEADER:
+        expanded = state.render_overlay.expanded
+        return (
+            _render_overlay_header_prefix()
+            + "OVERLAY"
+            + _track_header_expand_suffix(expanded)
+        )
     if kind in _LABELED_SUB_ROW_KINDS:
         return _labeled_sub_row_prefix(state, index) + _fit_labeled_sub_row_value(
             font, state, index, max_content_width=max_content_width
@@ -570,7 +680,7 @@ def fit_row_text(
 
 def _row_indent(state: TuningViewState, index: int) -> int:
     kind = row_kind(state, index)
-    if kind == RowKind.TRACK_HEADER:
+    if kind in {RowKind.TRACK_HEADER, RowKind.RENDER_OVERLAY_HEADER}:
         return 0
     if kind == RowKind.TRACK_EFFECT:
         return TREE_INDENT * 2
@@ -581,7 +691,7 @@ def _row_indent(state: TuningViewState, index: int) -> int:
         RowKind.TRACK_OPACITY,
         RowKind.TRACK_BEAT,
         RowKind.TRACK_EFFECTS_HEADER,
-    }:
+    } | _RENDER_OVERLAY_SUB_ROW_KINDS:
         return TREE_INDENT
     return 0
 
@@ -596,6 +706,10 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
     stem = row_stem(state, index)
     if kind == RowKind.CONFIG_HEADER:
         return LABEL
+
+    if kind in {RowKind.RENDER_OVERLAY_HEADER, *_RENDER_OVERLAY_SUB_ROW_KINDS}:
+        if not state.render_overlay.enabled:
+            return DISABLED
 
     if state.solo_active and kind in (
         RowKind.SAVE_AS_NEW_CONFIG,
@@ -766,6 +880,27 @@ class TuningOverlay:
                     value_color=color,
                     expanded=expanded,
                     locked=locked,
+                    line_height=line_h,
+                )
+                row_surfaces.append(prefix_surf)
+                row_time_surfaces.append(label_surf)
+                row_widths.append(
+                    indent + prefix_surf.get_width() + label_surf.get_width()
+                )
+            elif kind == RowKind.RENDER_OVERLAY_HEADER:
+                block_ro = state.render_overlay
+                prefix_surf = render_visibility_icon(
+                    enabled=block_ro.enabled,
+                    solo=block_ro.solo,
+                    line_height=line_h,
+                )
+                label_surf = _render_track_header_label(
+                    font,
+                    layer_prefix=_render_overlay_header_prefix(),
+                    stem_text="OVERLAY",
+                    value_color=color,
+                    expanded=block_ro.expanded,
+                    locked=False,
                     line_height=line_h,
                 )
                 row_surfaces.append(prefix_surf)

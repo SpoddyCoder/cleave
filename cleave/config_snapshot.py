@@ -8,10 +8,11 @@ from typing import Any
 
 import yaml
 
-from cleave.config import CleaveConfig, clamp_beat_sensitivity, clamp_effect_pct, dump_yaml
+from cleave.config import CleaveConfig, RenderOverlayConfig, clamp_beat_sensitivity, clamp_effect_pct, dump_yaml
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import to_config_relative
 from cleave.viz.controls import TuningSession
+from cleave.viz.render_overlay import default_render_overlay_config
 
 _UNNAMED_PATTERN = re.compile(r"^unnamed-(\d+)\.yaml$")
 
@@ -65,6 +66,69 @@ def _sparse_effects(
         if sparse_drivers:
             out[effect_id] = sparse_drivers
     return out or None
+
+
+def _rgb_to_hex(rgb: tuple[int, int, int]) -> str:
+    return f"#{rgb[0]:02x}{rgb[1]:02x}{rgb[2]:02x}"
+
+
+def _render_overlay_base(cfg: CleaveConfig) -> RenderOverlayConfig:
+    if cfg.render is not None:
+        return cfg.render
+    return default_render_overlay_config()
+
+
+def _snapshot_render_overlay(
+    cfg: CleaveConfig,
+    session: TuningSession,
+    original: dict[str, Any],
+) -> dict[str, Any]:
+    runtime = session.render_overlay
+    base = _render_overlay_base(cfg)
+    bg = base.background
+
+    orig_render = original.get("render")
+    orig_overlay: dict[str, Any] = {}
+    if isinstance(orig_render, dict):
+        orig_overlay_raw = orig_render.get("overlay")
+        if isinstance(orig_overlay_raw, dict):
+            orig_overlay = dict(orig_overlay_raw)
+
+    overlay: dict[str, Any] = dict(orig_overlay)
+    overlay["enabled"] = runtime.enabled or session.render_overlay_solo
+    overlay["title"] = base.title
+    overlay["body"] = base.body
+    overlay["start"] = runtime.start
+    overlay["display_time"] = runtime.display_time
+    overlay["position"] = runtime.position
+
+    font = orig_overlay.get("font")
+    font_out: dict[str, Any] = dict(font) if isinstance(font, dict) else {}
+    font_out["size"] = runtime.font_size
+    font_out["colour"] = _rgb_to_hex(base.font.colour)
+    overlay["font"] = font_out
+
+    background = orig_overlay.get("background")
+    background_out: dict[str, Any] = (
+        dict(background) if isinstance(background, dict) else {}
+    )
+    background_out["margin"] = bg.margin
+    background_out["padding"] = bg.padding
+    background_out["colour"] = _rgb_to_hex(bg.colour)
+    background_out["opacity"] = runtime.opacity_pct / 100.0
+
+    border = background_out.get("border")
+    border_out: dict[str, Any] = dict(border) if isinstance(border, dict) else {}
+    border_out["colour"] = _rgb_to_hex(bg.border.colour)
+    border_out["width"] = runtime.border_width
+    background_out["border"] = border_out
+    overlay["background"] = background_out
+
+    render_out: dict[str, Any] = {}
+    if isinstance(orig_render, dict):
+        render_out = {key: value for key, value in orig_render.items() if key != "overlay"}
+    render_out["overlay"] = overlay
+    return render_out
 
 
 def write_session_snapshot(
@@ -146,6 +210,7 @@ def write_session_snapshot(
         "paths": paths,
         "layer_z_order": _snapshot_layer_z_order(cfg, session),
         "layers": layers_out,
+        "render": _snapshot_render_overlay(cfg, session, original),
     }
 
     path.parent.mkdir(parents=True, exist_ok=True)
