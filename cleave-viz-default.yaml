@@ -1,5 +1,5 @@
 visualizer:
-  name: cleave-explorer
+  name: cleave-viz-default
   width: 1280
   height: 720
   fps: 30
@@ -12,21 +12,21 @@ render:
     body: |
       Place anything you like here
       Like musician names, year of release etc.
-      As many lines as you like
+      Edit the cleave-viz.yaml to modify this message, colours etc.
     start: 10
     display_time: 30
     position: bottom-left
     font:
-      size: 10
-      colour: "#ffaa00"
+      size: 18
+      colour: "#ffffff"
     background:
-      margin: 10
-      padding: 10
-      colour: "#223344"
-      opacity: 1.0
+      margin: 40
+      padding: 20
+      colour: "#000000"
+      opacity: 0.7
       border:
-        colour: "#223344"
-        width: 2
+        colour: "#ffffff"
+        width: 4
 
 paths:
   preset_root: ~/milkdrop-presets

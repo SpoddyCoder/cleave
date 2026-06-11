@@ -6,10 +6,13 @@ import pygame
 
 from cleave.extract import STEM_NAMES
 from cleave.viz.overlay import (
+    RenderOverlayBlock,
     RowKind,
     TrackBlock,
     TuningOverlay,
     TuningViewState,
+    build_row_layout,
+    find_row_by_kind,
     render_visibility_icon,
     row_kind,
     row_stem,
@@ -98,6 +101,80 @@ def test_solo_visibility_icon_disabled_stem_uses_value_not_disabled() -> None:
     assert pygame.mask.from_surface(soloed_off).count() != pygame.mask.from_surface(
         disabled
     ).count()
+
+
+def _minimal_view_state(**kwargs: object) -> TuningViewState:
+    defaults: dict[str, object] = {
+        "layer_z_order": ("drums",),
+        "tracks": {
+            "drums": TrackBlock(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+            )
+        },
+        "paused": False,
+        "position_sec": 0.0,
+        "focus_index": 0,
+        "move_mode_stem": None,
+        "toast_message": None,
+        "toast_remaining_sec": 0.0,
+    }
+    defaults.update(kwargs)
+    return TuningViewState(**defaults)  # type: ignore[arg-type]
+
+
+def test_render_overlay_row_layout_includes_header_and_sub_rows_when_expanded() -> None:
+    state = _minimal_view_state(
+        render_overlay=RenderOverlayBlock(expanded=True),
+    )
+    kinds = [row.kind for row in build_row_layout(state)]
+    assert RowKind.RENDER_OVERLAY_HEADER in kinds
+    assert RowKind.RENDER_OVERLAY_POSITION in kinds
+    assert RowKind.RENDER_OVERLAY_FONT_SIZE in kinds
+    assert RowKind.RENDER_OVERLAY_OPACITY in kinds
+    assert RowKind.RENDER_OVERLAY_BORDER_WIDTH in kinds
+    assert RowKind.RENDER_OVERLAY_START in kinds
+    assert RowKind.RENDER_OVERLAY_DISPLAY_TIME in kinds
+    header_idx = find_row_by_kind(state, RowKind.RENDER_OVERLAY_HEADER)
+    config_idx = find_row_by_kind(state, RowKind.CONFIG_HEADER)
+    assert header_idx < config_idx
+
+
+def test_render_overlay_collapsed_hides_sub_rows() -> None:
+    collapsed = _minimal_view_state(
+        render_overlay=RenderOverlayBlock(expanded=False),
+    )
+    expanded = _minimal_view_state(
+        render_overlay=RenderOverlayBlock(expanded=True),
+    )
+    collapsed_kinds = {row.kind for row in build_row_layout(collapsed)}
+    expanded_kinds = {row.kind for row in build_row_layout(expanded)}
+    assert RowKind.RENDER_OVERLAY_HEADER in collapsed_kinds
+    assert RowKind.RENDER_OVERLAY_POSITION not in collapsed_kinds
+    assert RowKind.RENDER_OVERLAY_FONT_SIZE not in collapsed_kinds
+    assert len(visible_row_indices(collapsed)) + 6 == len(visible_row_indices(expanded))
+
+
+def test_draw_render_overlay_header_without_error() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    state = _minimal_view_state(
+        render_overlay=RenderOverlayBlock(
+            enabled=True,
+            expanded=False,
+            solo=True,
+        ),
+    )
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.draw(surface, state)
+    assert overlay.panel_rect is not None
+    header_row = find_row_by_kind(state, RowKind.RENDER_OVERLAY_HEADER)
+    assert header_row in visible_row_indices(state)
 
 
 def test_draw_track_header_with_solo_eye() -> None:

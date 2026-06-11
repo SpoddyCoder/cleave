@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pygame
 
-from cleave.config import CleaveConfig
+from cleave.config import CleaveConfig, RenderOverlayConfig
 from cleave.effects.runtime import EffectRuntime
 from cleave.gl_compositor import GlCompositor
 from cleave.gl_post_process import GlPostProcess
@@ -34,6 +34,14 @@ from cleave.viz.layer import (
 )
 from cleave.viz.overlay import TuningOverlay
 from cleave.viz.playback import PlaybackState, current_sec, init_playback
+from cleave.viz.render_overlay import (
+    build_live_overlay_config,
+    build_panel_surface,
+    composite_render_overlay_with_alpha,
+    default_render_overlay_config,
+    live_overlay_alpha,
+    panel_surface_key,
+)
 from cleave.viz.wiring import make_tuning_controls
 
 
@@ -61,6 +69,8 @@ class VisualizerRuntime:
     controls: TuningControls | None = None
     overlay: TuningOverlay | None = None
     overlay_surface: pygame.Surface | None = None
+    render_overlay_panel: pygame.Surface | None = None
+    render_overlay_panel_key: tuple | None = None
     mix_player: MixPlayer | None = None
     playback: PlaybackState | None = None
 
@@ -149,6 +159,48 @@ def _init_gl_resources_render(runtime: VisualizerRuntime) -> None:
     runtime.layers_by_name = layers_by_name
 
 
+def _ensure_render_overlay_panel(
+    runtime: VisualizerRuntime, cfg: RenderOverlayConfig
+) -> pygame.Surface:
+    key = panel_surface_key(cfg)
+    if (
+        runtime.render_overlay_panel is not None
+        and runtime.render_overlay_panel_key == key
+    ):
+        return runtime.render_overlay_panel
+    runtime.render_overlay_panel = build_panel_surface(cfg)
+    runtime.render_overlay_panel_key = key
+    return runtime.render_overlay_panel
+
+
+def _composite_live_render_overlay(runtime: VisualizerRuntime, t_sec: float) -> None:
+    assert runtime.compositor is not None
+    assert runtime.cfg is not None
+    base = (
+        runtime.cfg.render
+        if runtime.cfg.render is not None
+        else default_render_overlay_config()
+    )
+    cfg = build_live_overlay_config(base, runtime.session.render_overlay)
+    alpha = live_overlay_alpha(
+        t_sec,
+        cfg,
+        enabled=runtime.session.render_overlay.enabled,
+        solo=runtime.session.render_overlay_solo,
+    )
+    if alpha <= 0.01:
+        return
+    panel = _ensure_render_overlay_panel(runtime, cfg)
+    composite_render_overlay_with_alpha(
+        runtime.compositor,
+        cfg,
+        alpha,
+        runtime.width,
+        runtime.height,
+        panel=panel,
+    )
+
+
 class VisualizerApp:
     def __init__(self, runtime: VisualizerRuntime) -> None:
         self._runtime = runtime
@@ -196,6 +248,7 @@ class VisualizerApp:
         _composite_ordered(rt.compositor, rt.layers_by_name, rt.session)
 
         if draw_overlay:
+            _composite_live_render_overlay(rt, t_sec)
             view_state = rt.controls.build_view_state(
                 paused=paused,
                 position_sec=t_sec,

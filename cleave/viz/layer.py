@@ -7,14 +7,22 @@ from dataclasses import dataclass
 import pygame
 from OpenGL.GL import GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, glClear, glClearColor, glViewport
 
-from cleave.config import CleaveConfig
+from cleave.config import (
+    DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
+    DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
+    DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
+    DEFAULT_RENDER_OVERLAY_FONT_SIZE,
+    DEFAULT_RENDER_OVERLAY_POSITION,
+    DEFAULT_RENDER_OVERLAY_START,
+    CleaveConfig,
+)
 from cleave.effects.runtime import EffectRuntime
 from cleave.gl_compositor import GlCompositor, LayerFbo
 from cleave.gl_post_process import GlPostProcess
 from cleave.preset_playlist import PresetPlaylist, preset_browse_floor
 from cleave.projectm import ProjectM
 from cleave.signals import Signals
-from cleave.viz.controls import LayerRuntime, TuningSession
+from cleave.viz.controls import LayerRuntime, RenderOverlayRuntime, TuningSession
 from cleave.viz.overlay import TuningOverlay, TuningViewState
 
 
@@ -159,6 +167,31 @@ def _destroy_layers(layers: list[StemLayer]) -> None:
         layer.pm.destroy()
 
 
+def _render_overlay_runtime_from_cfg(cfg: CleaveConfig) -> RenderOverlayRuntime:
+    render = cfg.render
+    if render is not None:
+        return RenderOverlayRuntime(
+            enabled=render.enabled,
+            expanded=False,
+            position=render.position,
+            font_size=render.font.size,
+            opacity_pct=int(round(render.background.opacity * 100)),
+            border_width=render.background.border.width,
+            start=render.start,
+            display_time=render.display_time,
+        )
+    return RenderOverlayRuntime(
+        enabled=True,
+        expanded=False,
+        position=DEFAULT_RENDER_OVERLAY_POSITION,
+        font_size=DEFAULT_RENDER_OVERLAY_FONT_SIZE,
+        opacity_pct=int(round(DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY * 100)),
+        border_width=DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
+        start=DEFAULT_RENDER_OVERLAY_START,
+        display_time=DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
+    )
+
+
 def _session_from_cfg(
     cfg: CleaveConfig,
     playlists: dict[str, PresetPlaylist],
@@ -166,6 +199,7 @@ def _session_from_cfg(
     preset_root = cfg.paths.preset_root
     return TuningSession(
         layer_z_order=list(cfg.layer_z_order),
+        render_overlay=_render_overlay_runtime_from_cfg(cfg),
         layers={
             name: LayerRuntime(
                 playlist=playlists[name],

@@ -15,11 +15,16 @@ from cleave.config import (
 from cleave.easing import smoothstep
 from cleave.viz.render_overlay import (
     _background_pixel_alpha,
+    build_live_overlay_config,
     build_panel_surface,
     composite_render_overlay,
+    composite_render_overlay_with_alpha,
+    live_overlay_alpha,
     overlay_visible_alpha,
     panel_position,
+    panel_surface_key,
 )
+from cleave.viz.controls import RenderOverlayRuntime
 from cleave.viz.theme import FADE_DURATION_SEC
 
 
@@ -90,6 +95,64 @@ def test_overlay_visible_alpha_disabled() -> None:
     assert overlay_visible_alpha(25.0, cfg) == 0.0
 
 
+def test_live_overlay_alpha_disabled() -> None:
+    cfg = _overlay_cfg(start=10.0, display_time=30.0)
+    assert live_overlay_alpha(25.0, cfg, enabled=False, solo=False) == 0.0
+    assert live_overlay_alpha(25.0, cfg, enabled=False, solo=True) == 0.0
+
+
+def test_live_overlay_alpha_solo_always_on() -> None:
+    cfg = _overlay_cfg(start=10.0, display_time=30.0)
+    assert live_overlay_alpha(0.0, cfg, enabled=True, solo=True) == 1.0
+    assert live_overlay_alpha(9.9, cfg, enabled=True, solo=True) == 1.0
+    assert live_overlay_alpha(41.0, cfg, enabled=True, solo=True) == 1.0
+
+
+def test_live_overlay_alpha_timed_window_unchanged() -> None:
+    cfg = _overlay_cfg(start=10.0, display_time=30.0)
+    for t_sec in (9.9, 10.0, 15.0, 25.0, 40.0, 41.0):
+        assert live_overlay_alpha(t_sec, cfg, enabled=True, solo=False) == overlay_visible_alpha(
+            t_sec, cfg
+        )
+
+
+def test_build_live_overlay_config_overrides_runtime_fields() -> None:
+    base = _overlay_cfg(
+        enabled=False,
+        start=1.0,
+        display_time=2.0,
+        position="top-left",
+        font_size=8,
+        opacity=0.25,
+        border_width=1,
+    )
+    runtime = RenderOverlayRuntime(
+        enabled=True,
+        expanded=False,
+        position="bottom-right",
+        font_size=14,
+        opacity_pct=75,
+        border_width=4,
+        start=20.0,
+        display_time=40.0,
+    )
+    merged = build_live_overlay_config(base, runtime)
+    assert merged.enabled is True
+    assert merged.title == base.title
+    assert merged.body == base.body
+    assert merged.start == 20.0
+    assert merged.display_time == 40.0
+    assert merged.position == "bottom-right"
+    assert merged.font.size == 14
+    assert merged.font.colour == base.font.colour
+    assert merged.background.margin == base.background.margin
+    assert merged.background.padding == base.background.padding
+    assert merged.background.colour == base.background.colour
+    assert merged.background.opacity == 0.75
+    assert merged.background.border.colour == base.background.border.colour
+    assert merged.background.border.width == 4
+
+
 def test_panel_position_corners() -> None:
     cfg = _overlay_cfg(margin=20, position="top-left")
     assert panel_position(cfg, 100, 50, 1280, 720) == (20, 20)
@@ -139,6 +202,7 @@ def test_border_alpha_matches_background() -> None:
     found_border = False
     border_colour = cfg.background.border.colour
     width, height = panel.get_size()
+    border_width = cfg.background.border.width
 
     for y in range(height):
         for x in range(width):
@@ -151,6 +215,20 @@ def test_border_alpha_matches_background() -> None:
     assert expected_alpha == int(round(255 * 0.5))
     assert found_bg
     assert found_border
+    assert panel.get_at((0, 0))[:3] == border_colour
+    assert panel.get_at((border_width, border_width))[:3] == bg_colour
+
+
+def test_border_grows_outward_not_inward() -> None:
+    pygame.init()
+    cfg_no_border = _overlay_cfg(border_width=0)
+    cfg_border = _overlay_cfg(border_width=4)
+    panel_none = build_panel_surface(cfg_no_border)
+    panel_border = build_panel_surface(cfg_border)
+    w0, h0 = panel_none.get_size()
+    w1, h1 = panel_border.get_size()
+    assert w1 == w0 + 8
+    assert h1 == h0 + 8
 
 
 def test_composite_render_overlay_noop_before_start() -> None:
@@ -181,3 +259,24 @@ def test_composite_render_overlay_draws_when_visible() -> None:
         panel.get_height(),
         alpha=1.0,
     )
+
+
+def test_composite_render_overlay_with_alpha_uses_precomputed_alpha() -> None:
+    pygame.init()
+    compositor = MagicMock()
+    compositor.upload_overlay_texture.return_value = 42
+    cfg = _overlay_cfg(start=10.0, display_time=30.0)
+    panel = build_panel_surface(cfg)
+
+    composite_render_overlay_with_alpha(
+        compositor, cfg, 0.5, 1280, 720, panel=panel
+    )
+
+    compositor.draw_overlay.assert_called_once()
+    assert compositor.draw_overlay.call_args.kwargs["alpha"] == 0.5
+
+
+def test_panel_surface_key_ignores_position() -> None:
+    cfg_a = _overlay_cfg(position="top-left")
+    cfg_b = _overlay_cfg(position="bottom-right")
+    assert panel_surface_key(cfg_a) == panel_surface_key(cfg_b)

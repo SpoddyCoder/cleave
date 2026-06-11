@@ -11,13 +11,18 @@ from cleave.config import (
     CleaveConfig,
     LayerConfig,
     PathsConfig,
+    RenderOverlayBackgroundConfig,
+    RenderOverlayBorderConfig,
+    RenderOverlayConfig,
+    RenderOverlayFontConfig,
     VisualizerConfig,
     _parse_layers,
+    _parse_render_overlay,
 )
 from cleave.config_snapshot import next_unnamed_path, write_session_snapshot
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import playlist_at_dir
-from cleave.viz.controls import LayerRuntime, TuningSession
+from cleave.viz.controls import LayerRuntime, RenderOverlayRuntime, TuningSession
 
 
 def test_next_unnamed_path_empty_dir(tmp_path: Path) -> None:
@@ -374,3 +379,150 @@ def test_write_session_snapshot_omits_all_zero_effects() -> None:
 
         data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
         assert "effects" not in data["layers"]["vocals"]
+
+
+def _render_overlay_cfg() -> RenderOverlayConfig:
+    return RenderOverlayConfig(
+        enabled=True,
+        title="My Title",
+        body="Line one\nLine two",
+        start=10.0,
+        display_time=30.0,
+        position="bottom-left",
+        font=RenderOverlayFontConfig(size=10, colour=(255, 170, 0)),
+        background=RenderOverlayBackgroundConfig(
+            margin=10,
+            padding=10,
+            colour=(34, 51, 68),
+            opacity=1.0,
+            border=RenderOverlayBorderConfig(colour=(34, 51, 68), width=2),
+        ),
+    )
+
+
+def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path]:
+    root = tmp_path
+    preset_root = root / "presets"
+    for name in STEM_NAMES:
+        stem_dir = preset_root / name
+        stem_dir.mkdir(parents=True)
+        (stem_dir / "anchor.milk").write_text("milk")
+
+    config_path = root / "cleave.config.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "layers": {name: {"preset": f"presets/{name}/anchor.milk"} for name in STEM_NAMES},
+                "render": {
+                    "overlay": {
+                        "enabled": True,
+                        "title": "My Title",
+                        "body": "Line one\nLine two",
+                        "start": 10,
+                        "display_time": 30,
+                        "position": "bottom-left",
+                        "font": {"size": 10, "colour": "#ffaa00"},
+                        "background": {
+                            "margin": 10,
+                            "padding": 10,
+                            "colour": "#223344",
+                            "opacity": 1.0,
+                            "border": {"colour": "#223344", "width": 2},
+                        },
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    cfg = CleaveConfig(
+        paths=PathsConfig(preset_root=preset_root, texture_paths=(root / "tex",)),
+        layers={
+            name: LayerConfig(preset=preset_root / name / "anchor.milk")
+            for name in STEM_NAMES
+        },
+        visualizer=VisualizerConfig(),
+        config_path=config_path,
+        render=_render_overlay_cfg(),
+    )
+    session = TuningSession(
+        layer_z_order=list(STEM_NAMES),
+        render_overlay=RenderOverlayRuntime(
+            enabled=True,
+            expanded=False,
+            position="top-right",
+            font_size=14,
+            opacity_pct=75,
+            border_width=4,
+            start=20.0,
+            display_time=40.0,
+        ),
+        layers={
+            name: LayerRuntime(
+                playlist=playlist_at_dir(preset_root / name, index=0),
+                browse_floor=preset_root / name,
+            )
+            for name in STEM_NAMES
+        },
+    )
+    return cfg, session, root / "snapshot.yaml"
+
+
+def test_write_session_snapshot_persists_render_overlay(tmp_path: Path) -> None:
+    cfg, session, out_path = _snapshot_fixture(tmp_path)
+    write_session_snapshot(out_path, cfg=cfg, session=session)
+
+    data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    overlay = data["render"]["overlay"]
+    assert overlay["enabled"] is True
+    assert overlay["title"] == "My Title"
+    assert overlay["body"] == "Line one\nLine two"
+    assert overlay["start"] == 20.0
+    assert overlay["display_time"] == 40.0
+    assert overlay["position"] == "top-right"
+    assert overlay["font"]["size"] == 14
+    assert overlay["font"]["colour"] == "#ffaa00"
+    assert overlay["background"]["margin"] == 10
+    assert overlay["background"]["padding"] == 10
+    assert overlay["background"]["colour"] == "#223344"
+    assert overlay["background"]["opacity"] == 0.75
+    assert overlay["background"]["border"]["colour"] == "#223344"
+    assert overlay["background"]["border"]["width"] == 4
+
+    round_trip = _parse_render_overlay(data)
+    assert round_trip is not None
+    assert round_trip.enabled is True
+    assert round_trip.start == 20.0
+    assert round_trip.font.size == 14
+    assert round_trip.background.opacity == 0.75
+    assert round_trip.background.border.width == 4
+
+
+def test_write_session_snapshot_render_overlay_solo_saves_enabled(tmp_path: Path) -> None:
+    cfg, session, out_path = _snapshot_fixture(tmp_path)
+    session.render_overlay.enabled = False
+    session.render_overlay_solo = True
+    write_session_snapshot(out_path, cfg=cfg, session=session)
+
+    data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    assert data["render"]["overlay"]["enabled"] is True
+    assert "render_overlay_solo" not in yaml.safe_dump(data)
+
+
+def test_write_session_snapshot_render_overlay_without_cfg_render(tmp_path: Path) -> None:
+    cfg, session, out_path = _snapshot_fixture(tmp_path)
+    cfg = CleaveConfig(
+        paths=cfg.paths,
+        layers=cfg.layers,
+        visualizer=cfg.visualizer,
+        config_path=cfg.config_path,
+        render=None,
+    )
+    write_session_snapshot(out_path, cfg=cfg, session=session)
+
+    data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    overlay = data["render"]["overlay"]
+    assert overlay["title"] == "Cleave Final Render"
+    assert overlay["position"] == "top-right"
+    assert overlay["font"]["size"] == 14

@@ -11,8 +11,16 @@ from pathlib import Path
 import pygame
 
 from cleave.config import (
+    DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
+    DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
+    DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
+    DEFAULT_RENDER_OVERLAY_FONT_SIZE,
+    DEFAULT_RENDER_OVERLAY_POSITION,
+    DEFAULT_RENDER_OVERLAY_START,
     DEFAULT_VIZ_CONFIG_FILENAME,
     PROJECT_VIZ_CONFIG_FILENAME,
+    RENDER_OVERLAY_POSITIONS,
+    RenderOverlayPosition,
     clamp_beat_sensitivity,
     clamp_effect_pct,
 )
@@ -27,6 +35,7 @@ from cleave.viz.confirm import ConfirmDialog, ConfirmRequest
 from cleave.viz.key_repeat import KeyRepeatController, mod_ctrl, mod_shift
 from cleave.viz.playback import PlaybackState, current_sec, seek, toggle_pause
 from cleave.viz.overlay import (
+    RenderOverlayBlock,
     RowKind,
     TrackBlock,
     TuningViewState,
@@ -51,6 +60,23 @@ _REPEAT_ROW_KINDS = frozenset(
         RowKind.TRACK_OPACITY,
         RowKind.TRACK_BEAT,
         RowKind.TRACK_EFFECT,
+        RowKind.RENDER_OVERLAY_POSITION,
+        RowKind.RENDER_OVERLAY_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_OPACITY,
+        RowKind.RENDER_OVERLAY_BORDER_WIDTH,
+        RowKind.RENDER_OVERLAY_START,
+        RowKind.RENDER_OVERLAY_DISPLAY_TIME,
+    }
+)
+
+_RENDER_OVERLAY_SUB_ROW_KINDS = frozenset(
+    {
+        RowKind.RENDER_OVERLAY_POSITION,
+        RowKind.RENDER_OVERLAY_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_OPACITY,
+        RowKind.RENDER_OVERLAY_BORDER_WIDTH,
+        RowKind.RENDER_OVERLAY_START,
+        RowKind.RENDER_OVERLAY_DISPLAY_TIME,
     }
 )
 _DEFAULT_SAVE_FILENAME = "unnamed-1.yaml"
@@ -73,6 +99,31 @@ def allow_overwrite_for_path(
 
 
 @dataclass
+class RenderOverlayRuntime:
+    enabled: bool
+    expanded: bool
+    position: RenderOverlayPosition
+    font_size: int
+    opacity_pct: int
+    border_width: int
+    start: float
+    display_time: float
+
+
+def default_render_overlay_runtime() -> RenderOverlayRuntime:
+    return RenderOverlayRuntime(
+        enabled=True,
+        expanded=False,
+        position=DEFAULT_RENDER_OVERLAY_POSITION,
+        font_size=DEFAULT_RENDER_OVERLAY_FONT_SIZE,
+        opacity_pct=int(round(DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY * 100)),
+        border_width=DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
+        start=DEFAULT_RENDER_OVERLAY_START,
+        display_time=DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
+    )
+
+
+@dataclass
 class LayerRuntime:
     playlist: PresetPlaylist
     browse_floor: Path
@@ -91,6 +142,8 @@ class TuningSession:
     layer_z_order: list[str]
     layers: dict[str, LayerRuntime] = field(default_factory=dict)
     solo_stem: str | None = None
+    render_overlay: RenderOverlayRuntime = field(default_factory=default_render_overlay_runtime)
+    render_overlay_solo: bool = False
 
 
 class TuningControls:
@@ -314,6 +367,7 @@ class TuningControls:
         if position_sec is None:
             position_sec = current_sec(self.playback, self.duration_sec)
 
+        ro = self.session.render_overlay
         return TuningViewState(
             layer_z_order=tuple(self.session.layer_z_order),
             tracks=tracks,
@@ -329,6 +383,17 @@ class TuningControls:
             active_config_label=config_path_display(self._active_config_path),
             solo_stem=self.session.solo_stem,
             solo_active=self.session.solo_stem is not None,
+            render_overlay=RenderOverlayBlock(
+                enabled=ro.enabled,
+                expanded=ro.expanded,
+                position=ro.position,
+                font_size=ro.font_size,
+                opacity_pct=ro.opacity_pct,
+                border_width=ro.border_width,
+                start=ro.start,
+                display_time=ro.display_time,
+                solo=self.session.render_overlay_solo,
+            ),
         )
 
     def _allow_overwrite(self) -> bool:
@@ -469,6 +534,47 @@ class TuningControls:
             if not forward:
                 delta_sec = -delta_sec
             self._do_seek(delta_sec)
+        elif kind == RowKind.RENDER_OVERLAY_HEADER:
+            if mod_shift(mod):
+                if forward:
+                    self._enter_render_overlay_solo()
+                else:
+                    self._exit_render_overlay_solo()
+                return
+            if ctrl:
+                self._set_render_overlay_enabled(forward)
+                return
+            self._set_render_overlay_expanded(forward)
+        elif kind == RowKind.RENDER_OVERLAY_POSITION:
+            self._cycle_render_overlay_position(forward=forward)
+        elif kind == RowKind.RENDER_OVERLAY_FONT_SIZE:
+            step = 10 if ctrl else 1
+            delta = step if forward else -step
+            self._set_render_overlay_font_size(
+                self.session.render_overlay.font_size + delta
+            )
+        elif kind == RowKind.RENDER_OVERLAY_OPACITY:
+            step = 10 if ctrl else 1
+            delta = step if forward else -step
+            self._set_render_overlay_opacity(
+                self.session.render_overlay.opacity_pct + delta
+            )
+        elif kind == RowKind.RENDER_OVERLAY_BORDER_WIDTH:
+            step = 10 if ctrl else 1
+            delta = step if forward else -step
+            self._set_render_overlay_border_width(
+                self.session.render_overlay.border_width + delta
+            )
+        elif kind == RowKind.RENDER_OVERLAY_START:
+            step = 30.0 if ctrl else 1.0
+            delta = step if forward else -step
+            self._set_render_overlay_start(self.session.render_overlay.start + delta)
+        elif kind == RowKind.RENDER_OVERLAY_DISPLAY_TIME:
+            step = 30.0 if ctrl else 1.0
+            delta = step if forward else -step
+            self._set_render_overlay_display_time(
+                self.session.render_overlay.display_time + delta
+            )
 
     def _step_directory(self, stem: str, *, forward: bool) -> None:
         layer = self.session.layers[stem]
@@ -539,6 +645,70 @@ class TuningControls:
             return
         if row_stem(view, self.focus_index) == stem:
             self.focus_index = self._track_header_index(stem)
+
+    def _render_overlay_header_index(self) -> int:
+        view = self.build_view_state(paused=self.playback.paused)
+        return find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
+
+    def _refocus_render_overlay_header_if_sub_row(self) -> None:
+        view = self.build_view_state(paused=self.playback.paused)
+        if row_kind(view, self.focus_index) in _RENDER_OVERLAY_SUB_ROW_KINDS:
+            self.focus_index = self._render_overlay_header_index()
+
+    def _set_render_overlay_expanded(self, expanded: bool) -> None:
+        ro = self.session.render_overlay
+        if ro.expanded == expanded:
+            return
+        ro.expanded = expanded
+        if not expanded:
+            self._refocus_render_overlay_header_if_sub_row()
+
+    def _set_render_overlay_enabled(self, enabled: bool) -> None:
+        ro = self.session.render_overlay
+        if ro.enabled == enabled:
+            return
+        ro.enabled = enabled
+        if not enabled:
+            self.session.render_overlay_solo = False
+            ro.expanded = False
+            self._refocus_render_overlay_header_if_sub_row()
+
+    def _enter_render_overlay_solo(self) -> None:
+        if self.session.render_overlay_solo:
+            return
+        self.session.render_overlay_solo = True
+
+    def _exit_render_overlay_solo(self) -> None:
+        if not self.session.render_overlay_solo:
+            return
+        self.session.render_overlay_solo = False
+
+    def _cycle_render_overlay_position(self, *, forward: bool) -> None:
+        ro = self.session.render_overlay
+        positions = RENDER_OVERLAY_POSITIONS
+        try:
+            index = positions.index(ro.position)
+        except ValueError:
+            index = 0
+        if forward:
+            ro.position = positions[(index + 1) % len(positions)]
+        else:
+            ro.position = positions[(index - 1) % len(positions)]
+
+    def _set_render_overlay_font_size(self, size: int) -> None:
+        self.session.render_overlay.font_size = max(1, size)
+
+    def _set_render_overlay_opacity(self, pct: int) -> None:
+        self.session.render_overlay.opacity_pct = max(0, min(100, pct))
+
+    def _set_render_overlay_border_width(self, width: int) -> None:
+        self.session.render_overlay.border_width = max(0, width)
+
+    def _set_render_overlay_start(self, start: float) -> None:
+        self.session.render_overlay.start = max(0.0, start)
+
+    def _set_render_overlay_display_time(self, display_time: float) -> None:
+        self.session.render_overlay.display_time = max(0.0, display_time)
 
     def _enter_solo(self, stem: str) -> None:
         if self.session.solo_stem == stem:
