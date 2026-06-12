@@ -3,9 +3,13 @@ visualizer:
   width: 1280
   height: 720
   fps: 30
-  beat_sensitivity: 1.0
+  beat_sensitivity: 1.0   # overall beat sensitivty, can be overidden on a per layer basis
 
 render:
+  post_fx:
+    enabled: true
+    fade_in: 30     # counted from start, 0 = disabled
+    fade_out: 4     # counted from end, 0 = disable
   overlay:
     enabled: true
     title: Cleave Final Render
@@ -13,7 +17,7 @@ render:
       Place anything you like here
       Like musician names, year of release etc.
       Edit the cleave-viz.yaml to modify this message, colours etc.
-    start: 10
+    start_delay: 10
     display_time: 30
     position: bottom-left
     font:

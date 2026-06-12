@@ -34,6 +34,7 @@ from cleave.viz.layer import (
 )
 from cleave.viz.overlay import TuningOverlay
 from cleave.viz.playback import PlaybackState, current_sec, init_playback
+from cleave.viz.post_fx import live_frame_fade_alpha
 from cleave.viz.render_overlay import (
     build_live_overlay_config,
     build_panel_surface,
@@ -177,8 +178,8 @@ def _composite_live_render_overlay(runtime: VisualizerRuntime, t_sec: float) -> 
     assert runtime.compositor is not None
     assert runtime.cfg is not None
     base = (
-        runtime.cfg.render
-        if runtime.cfg.render is not None
+        runtime.cfg.render.overlay
+        if runtime.cfg.render is not None and runtime.cfg.render.overlay is not None
         else default_render_overlay_config()
     )
     cfg = build_live_overlay_config(base, runtime.session.render_overlay)
@@ -249,6 +250,16 @@ class VisualizerApp:
 
         if draw_overlay:
             _composite_live_render_overlay(rt, t_sec)
+            pp = rt.session.render_post_fx
+            frame_fade_alpha = live_frame_fade_alpha(
+                t_sec,
+                rt.duration_sec,
+                pp.fade_in,
+                pp.fade_out,
+                enabled=pp.enabled,
+                solo=rt.session.render_post_fx_solo,
+            )
+            rt.compositor.apply_frame_fade(frame_fade_alpha)
             view_state = rt.controls.build_view_state(
                 paused=paused,
                 position_sec=t_sec,

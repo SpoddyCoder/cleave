@@ -140,7 +140,7 @@ def test_render_overlay_row_layout_includes_header_and_sub_rows_when_expanded() 
     assert RowKind.RENDER_OVERLAY_FONT_SIZE in kinds
     assert RowKind.RENDER_OVERLAY_OPACITY in kinds
     assert RowKind.RENDER_OVERLAY_BORDER_WIDTH in kinds
-    assert RowKind.RENDER_OVERLAY_START in kinds
+    assert RowKind.RENDER_OVERLAY_START_DELAY in kinds
     assert RowKind.RENDER_OVERLAY_DISPLAY_TIME in kinds
     header_idx = find_row_by_kind(state, RowKind.RENDER_OVERLAY_HEADER)
     config_idx = find_row_by_kind(state, RowKind.CONFIG_HEADER)

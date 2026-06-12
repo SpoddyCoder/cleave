@@ -95,7 +95,6 @@ This will separate the track into its component stem tracks (bass, drums, vocals
   * `-o` for output (`.mp4` only)
     * If omitted outputs to `projects/<slug>/renders/<visualizer.name>.mp4`
   * `-c` for config
-  * `-fi` / `-fo` for whole-video visual fade-in and fade-out (GL fade after the render overlay).
   * `-hq` / `--high-quality` for `veryslow` libx264 encode (default uses ffmpeg's libx264 preset).
 * Pass `-hq` / `--high-quality` to `separate` or `play` for higher-quality Demucs separation.
 * To store projects under XDG instead, set `CLEAVE_DATA=~/.local/share/cleave`.
@@ -106,7 +105,7 @@ This will separate the track into its component stem tracks (bass, drums, vocals
 Optional title and body text burned into the MP4. Configure under `render.overlay` in [cleave-viz-default.yaml](cleave-viz-default.yaml) (copied to each project's `cleave-viz.yaml` on first `separate` / `play`).
 
 * `enabled` — turn the overlay on or off.
-* `start` — when the overlay begins fading in (seconds).
+* `start_delay` — when the overlay begins fading in (seconds).
 * `display_time` — how long the overlay is on screen, including the 2s fade-in and fade-out.
 * `position` — `top-left`, `top-right`, `centre`, `bottom-left`, or `bottom-right`.
 * `font.size` / `font.colour` — body text in pixels and hex colour; title is bold at 1.2x size.
@@ -114,9 +113,19 @@ Optional title and body text burned into the MP4. Configure under `render.overla
 * `background.padding` — gap from the panel edge to the text.
 * `background.colour`, `background.opacity`, `background.border` — panel fill and border (border opacity matches background; border grows outward from the fill, margin is measured to the outer border edge).
 
-Fade easing uses the same smoothstep curve as whole-video `-fi` / `-fo`.
+In the live visualizer, a blank gap row separates the four stem layers from **Render: OVERLAY**. Same eye / expand / solo semantics as stem layers (solo forces the overlay on; solo is not saved). Tunable in the panel: position, font size, opacity, border width, start delay, display time. Title, body, colours, margin, and padding are YAML-only. Saved with **SAVE AS NEW CONFIG** / **OVERWRITE CONFIG**.
 
-In the live visualizer, **Render: OVERLAY** sits below the four stem layers. Same eye / expand / solo semantics as stem layers (solo forces the overlay on; solo is not saved). Tunable in the panel: position, font size, opacity, border width, start time, display time. Title, body, colours, margin, and padding are YAML-only. Saved with **SAVE AS NEW CONFIG** / **OVERWRITE CONFIG**.
+#### Post-processing fade
+
+Whole-frame fade applied after the render overlay (GL fade on the composited image). Configure under `render.post_fx` in [cleave-viz-default.yaml](cleave-viz-default.yaml).
+
+* `enabled` — turn whole-frame fade on or off.
+* `fade_in` — seconds to fade from black at the start of the video.
+* `fade_out` — seconds to fade to black at the end.
+
+Fade easing uses a smoothstep curve.
+
+In the live visualizer, **Render: POST FX** sits below overlay with the same eye / expand / solo semantics (solo forces fade on; solo is not saved). Tunable in the panel: fade in, fade out. Saved with **SAVE AS NEW CONFIG** / **OVERWRITE CONFIG**.
 
 ### Visualizer
 Controls...

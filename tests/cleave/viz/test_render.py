@@ -10,7 +10,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cleave.config import PROJECT_VIZ_CONFIG_FILENAME, load_config
+from cleave.config import PROJECT_VIZ_CONFIG_FILENAME, RenderConfig, load_config
+from cleave.viz.controls import RenderPostFxRuntime
 from cleave.paths import repo_root
 from cleave.extract import STEM_NAMES, stems_dir
 from cleave.project import write_manifest
@@ -20,6 +21,22 @@ render_mod = importlib.import_module("cleave.viz.render")
 from cleave.viz.render import validate_render_project  # noqa: E402
 from tests.cleave.viz.test_render_overlay import _overlay_cfg
 from tests.support.config import write_minimal_config
+
+
+def _attach_render_post_fx_session(
+    runtime: MagicMock,
+    *,
+    enabled: bool = False,
+    fade_in: float = 0.0,
+    fade_out: float = 0.0,
+) -> None:
+    runtime.session = MagicMock()
+    runtime.session.render_post_fx = RenderPostFxRuntime(
+        enabled=enabled,
+        expanded=False,
+        fade_in=fade_in,
+        fade_out=fade_out,
+    )
 
 
 def _write_stub_stems(project: Path) -> None:
@@ -179,7 +196,9 @@ def test_render_frame_count_and_ffmpeg_args(
     proc.wait.return_value = 0
     mock_subprocess.Popen.return_value = proc
 
-    output = render_mod.render(project, fade_in=0.0, fade_out=0.0)
+    _attach_render_post_fx_session(runtime)
+
+    output = render_mod.render(project)
 
     expected_output = project / "renders" / "cleave-test.mp4"
     assert output == expected_output.resolve()
@@ -244,6 +263,8 @@ def test_render_ffmpeg_preset_veryslow_when_high_quality(
     proc.wait.return_value = 0
     mock_subprocess.Popen.return_value = proc
 
+    _attach_render_post_fx_session(runtime)
+
     render_mod.render(project, high_quality=True)
 
     cmd = mock_subprocess.Popen.call_args[0][0]
@@ -300,7 +321,11 @@ def test_render_applies_fade_via_compositor(
     proc.wait.return_value = 0
     mock_subprocess.Popen.return_value = proc
 
-    render_mod.render(project, fade_in=1.0, fade_out=1.0)
+    _attach_render_post_fx_session(
+        runtime, enabled=True, fade_in=1.0, fade_out=1.0
+    )
+
+    render_mod.render(project)
 
     assert compositor.apply_frame_fade.call_count == frame_count
     for call in compositor.apply_frame_fade.call_args_list:
@@ -344,7 +369,9 @@ def test_render_calls_overlay_compositing_when_enabled(
 
     overlay_cfg = _overlay_cfg()
     base_cfg = load_config(project / PROJECT_VIZ_CONFIG_FILENAME, repo_root())
-    mock_load_config.return_value = replace(base_cfg, render=overlay_cfg)
+    mock_load_config.return_value = replace(
+        base_cfg, render=RenderConfig(overlay=overlay_cfg, post_fx=None)
+    )
 
     overlay_panel = MagicMock()
     mock_build_panel.return_value = overlay_panel
@@ -373,6 +400,8 @@ def test_render_calls_overlay_compositing_when_enabled(
     proc.stdin = MagicMock()
     proc.wait.return_value = 0
     mock_subprocess.Popen.return_value = proc
+
+    _attach_render_post_fx_session(runtime)
 
     render_mod.render(project)
 
@@ -411,7 +440,9 @@ def test_render_skips_overlay_when_disabled(
 
     overlay_cfg = _overlay_cfg(enabled=False)
     base_cfg = load_config(project / PROJECT_VIZ_CONFIG_FILENAME, repo_root())
-    mock_load_config.return_value = replace(base_cfg, render=overlay_cfg)
+    mock_load_config.return_value = replace(
+        base_cfg, render=RenderConfig(overlay=overlay_cfg, post_fx=None)
+    )
 
     width, height = 4, 4
     compositor = MagicMock()
@@ -437,6 +468,8 @@ def test_render_skips_overlay_when_disabled(
     proc.stdin = MagicMock()
     proc.wait.return_value = 0
     mock_subprocess.Popen.return_value = proc
+
+    _attach_render_post_fx_session(runtime)
 
     render_mod.render(project)
 

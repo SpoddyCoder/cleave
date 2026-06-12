@@ -75,14 +75,9 @@ def render(
     *,
     config: Path | None = None,
     output: Path | None = None,
-    fade_in: float = 0.0,
-    fade_out: float = 0.0,
     high_quality: bool = False,
 ) -> Path:
     """Render project visuals to an MP4 muxed with the project mix audio."""
-    if fade_in < 0.0 or fade_out < 0.0:
-        raise ValueError("fade_in and fade_out must be non-negative")
-
     project = validate_render_project(project_dir, config=config)
     config_path = _resolve_render_config_path(config, project)
     cfg = load_config(config_path, repo_root())
@@ -160,17 +155,30 @@ def render(
         assert proc.stdin is not None
 
         assert runtime.compositor is not None
+        overlay_cfg = (
+            cfg.render.overlay
+            if cfg.render is not None and cfg.render.overlay is not None
+            else None
+        )
         overlay_panel = None
-        if cfg.render is not None and cfg.render.enabled:
-            overlay_panel = build_panel_surface(cfg.render)
+        if overlay_cfg is not None and overlay_cfg.enabled:
+            overlay_panel = build_panel_surface(overlay_cfg)
+
+        pp = runtime.session.render_post_fx
+        if pp.enabled:
+            fade_in = pp.fade_in
+            fade_out = pp.fade_out
+        else:
+            fade_in = 0.0
+            fade_out = 0.0
 
         for frame_idx in range(frame_count):
             t_sec = frame_idx / fps
             app.tick_frame(t_sec, paused=False, draw_overlay=False)
-            if cfg.render is not None and cfg.render.enabled:
+            if overlay_cfg is not None and overlay_cfg.enabled:
                 composite_render_overlay(
                     runtime.compositor,
-                    cfg.render,
+                    overlay_cfg,
                     t_sec,
                     width,
                     height,
