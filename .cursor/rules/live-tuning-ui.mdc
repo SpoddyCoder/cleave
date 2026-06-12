@@ -21,7 +21,7 @@ The upper block: all rows where `index < track_row_count(state)` (`track_row_cou
 
 Say **track rows section** for the whole upper block; **track row** for a single line.
 
-After the four stem blocks, **Render: OVERLAY** (`RowKind.RENDER_OVERLAY_HEADER`) is always present. It is not reorderable (Enter does not enter move mode). Header label: `Render:` in `LABEL`, `OVERLAY` and expand arrow in value color. Sub-rows when expanded: position, font size, opacity, border width, start time, display time. State: `RenderOverlayBlock` / `RenderOverlayRuntime` on session; solo via `render_overlay_solo` (no audio impact). Disable clears solo and collapses.
+After the four stem blocks, **Render : OVERLAY** (`RowKind.RENDER_OVERLAY_HEADER`) is always present. It is not reorderable (Enter does not enter move mode). Header label: `Render :` in `LABEL`, `OVERLAY` and expand arrow in value color. Sub-rows when expanded: position, font size, opacity, border width, start time, display time. State: `RenderOverlayBlock` / `RenderOverlayRuntime` on session; solo via `render_overlay_solo` (no audio impact). Disable clears solo and collapses.
 
 ## Footer rows section
 

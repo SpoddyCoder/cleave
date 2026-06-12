@@ -292,7 +292,10 @@ class VisualizerApp:
                             running = False
                         else:
                             assert rt.overlay is not None
-                            rt.overlay.notify_input()
+                            if rt.controls.consume_hide_overlay():
+                                rt.overlay.hide_immediately()
+                            else:
+                                rt.overlay.notify_input()
                     elif event.type == pygame.KEYUP:
                         rt.controls.handle_keyup(event)
 
