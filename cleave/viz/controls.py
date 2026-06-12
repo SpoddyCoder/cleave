@@ -16,7 +16,9 @@ from cleave.config import (
     DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
     DEFAULT_RENDER_OVERLAY_FONT_SIZE,
     DEFAULT_RENDER_OVERLAY_POSITION,
-    DEFAULT_RENDER_OVERLAY_START,
+    DEFAULT_RENDER_OVERLAY_START_DELAY,
+    DEFAULT_RENDER_POST_FX_FADE_IN,
+    DEFAULT_RENDER_POST_FX_FADE_OUT,
     DEFAULT_VIZ_CONFIG_FILENAME,
     PROJECT_VIZ_CONFIG_FILENAME,
     RENDER_OVERLAY_POSITIONS,
@@ -36,6 +38,7 @@ from cleave.viz.key_repeat import KeyRepeatController, mod_ctrl, mod_shift
 from cleave.viz.playback import PlaybackState, current_sec, seek, toggle_pause
 from cleave.viz.overlay import (
     RenderOverlayBlock,
+    RenderPostFxBlock,
     RowKind,
     TrackBlock,
     TuningViewState,
@@ -64,8 +67,10 @@ _REPEAT_ROW_KINDS = frozenset(
         RowKind.RENDER_OVERLAY_FONT_SIZE,
         RowKind.RENDER_OVERLAY_OPACITY,
         RowKind.RENDER_OVERLAY_BORDER_WIDTH,
-        RowKind.RENDER_OVERLAY_START,
+        RowKind.RENDER_OVERLAY_START_DELAY,
         RowKind.RENDER_OVERLAY_DISPLAY_TIME,
+        RowKind.RENDER_POST_FX_FADE_IN,
+        RowKind.RENDER_POST_FX_FADE_OUT,
     }
 )
 
@@ -75,8 +80,15 @@ _RENDER_OVERLAY_SUB_ROW_KINDS = frozenset(
         RowKind.RENDER_OVERLAY_FONT_SIZE,
         RowKind.RENDER_OVERLAY_OPACITY,
         RowKind.RENDER_OVERLAY_BORDER_WIDTH,
-        RowKind.RENDER_OVERLAY_START,
+        RowKind.RENDER_OVERLAY_START_DELAY,
         RowKind.RENDER_OVERLAY_DISPLAY_TIME,
+    }
+)
+
+_RENDER_POST_FX_SUB_ROW_KINDS = frozenset(
+    {
+        RowKind.RENDER_POST_FX_FADE_IN,
+        RowKind.RENDER_POST_FX_FADE_OUT,
     }
 )
 _DEFAULT_SAVE_FILENAME = "unnamed-1.yaml"
@@ -106,7 +118,7 @@ class RenderOverlayRuntime:
     font_size: int
     opacity_pct: int
     border_width: int
-    start: float
+    start_delay: float
     display_time: float
 
 
@@ -118,8 +130,25 @@ def default_render_overlay_runtime() -> RenderOverlayRuntime:
         font_size=DEFAULT_RENDER_OVERLAY_FONT_SIZE,
         opacity_pct=int(round(DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY * 100)),
         border_width=DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
-        start=DEFAULT_RENDER_OVERLAY_START,
+        start_delay=DEFAULT_RENDER_OVERLAY_START_DELAY,
         display_time=DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
+    )
+
+
+@dataclass
+class RenderPostFxRuntime:
+    enabled: bool
+    expanded: bool
+    fade_in: float
+    fade_out: float
+
+
+def default_render_post_fx_runtime() -> RenderPostFxRuntime:
+    return RenderPostFxRuntime(
+        enabled=True,
+        expanded=False,
+        fade_in=DEFAULT_RENDER_POST_FX_FADE_IN,
+        fade_out=DEFAULT_RENDER_POST_FX_FADE_OUT,
     )
 
 
@@ -144,6 +173,10 @@ class TuningSession:
     solo_stem: str | None = None
     render_overlay: RenderOverlayRuntime = field(default_factory=default_render_overlay_runtime)
     render_overlay_solo: bool = False
+    render_post_fx: RenderPostFxRuntime = field(
+        default_factory=default_render_post_fx_runtime
+    )
+    render_post_fx_solo: bool = False
 
 
 class TuningControls:
@@ -378,6 +411,7 @@ class TuningControls:
             position_sec = current_sec(self.playback, self.duration_sec)
 
         ro = self.session.render_overlay
+        pp = self.session.render_post_fx
         return TuningViewState(
             layer_z_order=tuple(self.session.layer_z_order),
             tracks=tracks,
@@ -400,9 +434,16 @@ class TuningControls:
                 font_size=ro.font_size,
                 opacity_pct=ro.opacity_pct,
                 border_width=ro.border_width,
-                start=ro.start,
+                start_delay=ro.start_delay,
                 display_time=ro.display_time,
                 solo=self.session.render_overlay_solo,
+            ),
+            render_post_fx=RenderPostFxBlock(
+                enabled=pp.enabled,
+                expanded=pp.expanded,
+                fade_in=pp.fade_in,
+                fade_out=pp.fade_out,
+                solo=self.session.render_post_fx_solo,
             ),
         )
 
@@ -575,15 +616,40 @@ class TuningControls:
             self._set_render_overlay_border_width(
                 self.session.render_overlay.border_width + delta
             )
-        elif kind == RowKind.RENDER_OVERLAY_START:
+        elif kind == RowKind.RENDER_OVERLAY_START_DELAY:
             step = 30.0 if ctrl else 1.0
             delta = step if forward else -step
-            self._set_render_overlay_start(self.session.render_overlay.start + delta)
+            self._set_render_overlay_start_delay(
+                self.session.render_overlay.start_delay + delta
+            )
         elif kind == RowKind.RENDER_OVERLAY_DISPLAY_TIME:
             step = 30.0 if ctrl else 1.0
             delta = step if forward else -step
             self._set_render_overlay_display_time(
                 self.session.render_overlay.display_time + delta
+            )
+        elif kind == RowKind.RENDER_POST_FX_HEADER:
+            if mod_shift(mod):
+                if forward:
+                    self._enter_render_post_fx_solo()
+                else:
+                    self._exit_render_post_fx_solo()
+                return
+            if ctrl:
+                self._set_render_post_fx_enabled(forward)
+                return
+            self._set_render_post_fx_expanded(forward)
+        elif kind == RowKind.RENDER_POST_FX_FADE_IN:
+            step = 10.0 if ctrl else 1.0
+            delta = step if forward else -step
+            self._set_render_post_fx_fade_in(
+                self.session.render_post_fx.fade_in + delta
+            )
+        elif kind == RowKind.RENDER_POST_FX_FADE_OUT:
+            step = 10.0 if ctrl else 1.0
+            delta = step if forward else -step
+            self._set_render_post_fx_fade_out(
+                self.session.render_post_fx.fade_out + delta
             )
 
     def _step_directory(self, stem: str, *, forward: bool) -> None:
@@ -714,11 +780,54 @@ class TuningControls:
     def _set_render_overlay_border_width(self, width: int) -> None:
         self.session.render_overlay.border_width = max(0, width)
 
-    def _set_render_overlay_start(self, start: float) -> None:
-        self.session.render_overlay.start = max(0.0, start)
+    def _set_render_overlay_start_delay(self, start_delay: float) -> None:
+        self.session.render_overlay.start_delay = max(0.0, start_delay)
 
     def _set_render_overlay_display_time(self, display_time: float) -> None:
         self.session.render_overlay.display_time = max(0.0, display_time)
+
+    def _render_post_fx_header_index(self) -> int:
+        view = self.build_view_state(paused=self.playback.paused)
+        return find_row_by_kind(view, RowKind.RENDER_POST_FX_HEADER)
+
+    def _refocus_render_post_fx_header_if_sub_row(self) -> None:
+        view = self.build_view_state(paused=self.playback.paused)
+        if row_kind(view, self.focus_index) in _RENDER_POST_FX_SUB_ROW_KINDS:
+            self.focus_index = self._render_post_fx_header_index()
+
+    def _set_render_post_fx_expanded(self, expanded: bool) -> None:
+        pp = self.session.render_post_fx
+        if pp.expanded == expanded:
+            return
+        pp.expanded = expanded
+        if not expanded:
+            self._refocus_render_post_fx_header_if_sub_row()
+
+    def _set_render_post_fx_enabled(self, enabled: bool) -> None:
+        pp = self.session.render_post_fx
+        if pp.enabled == enabled:
+            return
+        pp.enabled = enabled
+        if not enabled:
+            self.session.render_post_fx_solo = False
+            pp.expanded = False
+            self._refocus_render_post_fx_header_if_sub_row()
+
+    def _enter_render_post_fx_solo(self) -> None:
+        if self.session.render_post_fx_solo:
+            return
+        self.session.render_post_fx_solo = True
+
+    def _exit_render_post_fx_solo(self) -> None:
+        if not self.session.render_post_fx_solo:
+            return
+        self.session.render_post_fx_solo = False
+
+    def _set_render_post_fx_fade_in(self, fade_in: float) -> None:
+        self.session.render_post_fx.fade_in = max(0.0, fade_in)
+
+    def _set_render_post_fx_fade_out(self, fade_out: float) -> None:
+        self.session.render_post_fx.fade_out = max(0.0, fade_out)
 
     def _enter_solo(self, stem: str) -> None:
         if self.session.solo_stem == stem:

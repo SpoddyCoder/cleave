@@ -71,13 +71,17 @@ class RowKind(Enum):
     TRACK_BEAT = auto()
     TRACK_EFFECTS_HEADER = auto()
     TRACK_EFFECT = auto()
+    RENDER_SECTION_GAP = auto()
     RENDER_OVERLAY_HEADER = auto()
     RENDER_OVERLAY_POSITION = auto()
     RENDER_OVERLAY_FONT_SIZE = auto()
     RENDER_OVERLAY_OPACITY = auto()
     RENDER_OVERLAY_BORDER_WIDTH = auto()
-    RENDER_OVERLAY_START = auto()
+    RENDER_OVERLAY_START_DELAY = auto()
     RENDER_OVERLAY_DISPLAY_TIME = auto()
+    RENDER_POST_FX_HEADER = auto()
+    RENDER_POST_FX_FADE_IN = auto()
+    RENDER_POST_FX_FADE_OUT = auto()
     CONFIG_HEADER = auto()
     TRANSPORT = auto()
     SAVE_AS_NEW_CONFIG = auto()
@@ -116,8 +120,17 @@ class RenderOverlayBlock:
     font_size: int = 10
     opacity_pct: int = 100
     border_width: int = 2
-    start: float = 10.0
+    start_delay: float = 10.0
     display_time: float = 30.0
+    solo: bool = False
+
+
+@dataclass
+class RenderPostFxBlock:
+    enabled: bool = True
+    expanded: bool = False
+    fade_in: float = 30.0
+    fade_out: float = 4.0
     solo: bool = False
 
 
@@ -138,6 +151,9 @@ class TuningViewState:
     solo_stem: str | None = None
     solo_active: bool = False
     render_overlay: RenderOverlayBlock = field(default_factory=RenderOverlayBlock)
+    render_post_fx: RenderPostFxBlock = field(
+        default_factory=RenderPostFxBlock
+    )
 
 
 def footer_row_count(state: TuningViewState) -> int:
@@ -179,14 +195,19 @@ def build_row_layout(state: TuningViewState) -> list[RowDescriptor]:
                         driver_slug=effect_def.driver_slug,
                     )
                 )
+    rows.append(RowDescriptor(RowKind.RENDER_SECTION_GAP))
     rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_HEADER))
     if state.render_overlay.expanded:
         rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_POSITION))
         rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_FONT_SIZE))
         rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_OPACITY))
         rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_BORDER_WIDTH))
-        rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_START))
+        rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_START_DELAY))
         rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_DISPLAY_TIME))
+    rows.append(RowDescriptor(RowKind.RENDER_POST_FX_HEADER))
+    if state.render_post_fx.expanded:
+        rows.append(RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN))
+        rows.append(RowDescriptor(RowKind.RENDER_POST_FX_FADE_OUT))
     rows.append(RowDescriptor(RowKind.CONFIG_HEADER))
     rows.append(RowDescriptor(RowKind.TRANSPORT))
     rows.append(RowDescriptor(RowKind.SAVE_AS_NEW_CONFIG))
@@ -259,8 +280,15 @@ _RENDER_OVERLAY_SUB_ROW_KINDS = frozenset(
         RowKind.RENDER_OVERLAY_FONT_SIZE,
         RowKind.RENDER_OVERLAY_OPACITY,
         RowKind.RENDER_OVERLAY_BORDER_WIDTH,
-        RowKind.RENDER_OVERLAY_START,
+        RowKind.RENDER_OVERLAY_START_DELAY,
         RowKind.RENDER_OVERLAY_DISPLAY_TIME,
+    }
+)
+
+_RENDER_POST_FX_SUB_ROW_KINDS = frozenset(
+    {
+        RowKind.RENDER_POST_FX_FADE_IN,
+        RowKind.RENDER_POST_FX_FADE_OUT,
     }
 )
 
@@ -276,8 +304,10 @@ _LABELED_SUB_ROW_KINDS = frozenset(
         RowKind.RENDER_OVERLAY_FONT_SIZE,
         RowKind.RENDER_OVERLAY_OPACITY,
         RowKind.RENDER_OVERLAY_BORDER_WIDTH,
-        RowKind.RENDER_OVERLAY_START,
+        RowKind.RENDER_OVERLAY_START_DELAY,
         RowKind.RENDER_OVERLAY_DISPLAY_TIME,
+        RowKind.RENDER_POST_FX_FADE_IN,
+        RowKind.RENDER_POST_FX_FADE_OUT,
     }
 )
 
@@ -293,8 +323,12 @@ def track_sub_rows_navigable(state: TuningViewState, stem: str) -> bool:
 
 def _sub_row_visible(state: TuningViewState, index: int) -> bool:
     desc = row_descriptor(state, index)
+    if desc.kind == RowKind.RENDER_SECTION_GAP:
+        return True
     if desc.kind in _RENDER_OVERLAY_SUB_ROW_KINDS:
         return state.render_overlay.expanded
+    if desc.kind in _RENDER_POST_FX_SUB_ROW_KINDS:
+        return state.render_post_fx.expanded
     stem = desc.stem
     if stem is None or desc.kind not in _SUB_ROW_KINDS:
         return True
@@ -320,10 +354,13 @@ def navigable_row_indices(state: TuningViewState) -> list[int]:
     indices: list[int] = []
     for index in range(row_count(state)):
         desc = row_descriptor(state, index)
-        if desc.kind == RowKind.CONFIG_HEADER:
+        if desc.kind in {RowKind.CONFIG_HEADER, RowKind.RENDER_SECTION_GAP}:
             continue
         if desc.kind in _RENDER_OVERLAY_SUB_ROW_KINDS:
             if not state.render_overlay.expanded:
+                continue
+        elif desc.kind in _RENDER_POST_FX_SUB_ROW_KINDS:
+            if not state.render_post_fx.expanded:
                 continue
         elif desc.kind in _SUB_ROW_KINDS:
             stem = desc.stem
@@ -347,6 +384,7 @@ def quick_nav_row_indices(state: TuningViewState) -> list[int]:
         if kind in (
             RowKind.TRACK_HEADER,
             RowKind.RENDER_OVERLAY_HEADER,
+            RowKind.RENDER_POST_FX_HEADER,
             RowKind.TRANSPORT,
         ):
             indices.append(index)
@@ -386,23 +424,36 @@ def _row_text(state: TuningViewState, index: int) -> str:
     if kind == RowKind.OVERWRITE_CONFIG:
         return "OVERWRITE CONFIG"
 
+    if kind == RowKind.RENDER_SECTION_GAP:
+        return ""
+
     if kind == RowKind.RENDER_OVERLAY_HEADER:
         arrow = "▼" if state.render_overlay.expanded else "▶"
         return f"Render : OVERLAY {arrow}"
+
+    if kind == RowKind.RENDER_POST_FX_HEADER:
+        arrow = "▼" if state.render_post_fx.expanded else "▶"
+        return f"Render : POST FX {arrow}"
 
     block_ro = state.render_overlay
     if kind == RowKind.RENDER_OVERLAY_POSITION:
         return f"└─ position: {block_ro.position}"
     if kind == RowKind.RENDER_OVERLAY_FONT_SIZE:
-        return f"└─ font size: {block_ro.font_size}"
+        return f"└─ font size: {block_ro.font_size}px"
     if kind == RowKind.RENDER_OVERLAY_OPACITY:
         return f"└─ background opacity: {block_ro.opacity_pct}%"
     if kind == RowKind.RENDER_OVERLAY_BORDER_WIDTH:
-        return f"└─ border width: {block_ro.border_width}"
-    if kind == RowKind.RENDER_OVERLAY_START:
-        return f"└─ start time: {block_ro.start:.1f}"
+        return f"└─ border width: {block_ro.border_width}px"
+    if kind == RowKind.RENDER_OVERLAY_START_DELAY:
+        return f"└─ start delay: {block_ro.start_delay:.1f}s"
     if kind == RowKind.RENDER_OVERLAY_DISPLAY_TIME:
-        return f"└─ display time: {block_ro.display_time:.1f}"
+        return f"└─ display time: {block_ro.display_time:.1f}s"
+
+    block_pp = state.render_post_fx
+    if kind == RowKind.RENDER_POST_FX_FADE_IN:
+        return f"└─ fade in: {block_pp.fade_in:.1f}s"
+    if kind == RowKind.RENDER_POST_FX_FADE_OUT:
+        return f"└─ fade out: {block_pp.fade_out:.1f}s"
 
     stem = row_stem(state, index)
     assert stem is not None
@@ -448,10 +499,14 @@ def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
         return "└─ background opacity: "
     if kind == RowKind.RENDER_OVERLAY_BORDER_WIDTH:
         return "└─ border width: "
-    if kind == RowKind.RENDER_OVERLAY_START:
-        return "└─ start time: "
+    if kind == RowKind.RENDER_OVERLAY_START_DELAY:
+        return "└─ start delay: "
     if kind == RowKind.RENDER_OVERLAY_DISPLAY_TIME:
         return "└─ display time: "
+    if kind == RowKind.RENDER_POST_FX_FADE_IN:
+        return "└─ fade in: "
+    if kind == RowKind.RENDER_POST_FX_FADE_OUT:
+        return "└─ fade out: "
     assert kind == RowKind.TRACK_EFFECT
     effect = row_effect(state, index)
     assert effect is not None
@@ -465,15 +520,20 @@ def _labeled_sub_row_value(state: TuningViewState, index: int) -> str:
     if kind == RowKind.RENDER_OVERLAY_POSITION:
         return block_ro.position
     if kind == RowKind.RENDER_OVERLAY_FONT_SIZE:
-        return str(block_ro.font_size)
+        return f"{block_ro.font_size}px"
     if kind == RowKind.RENDER_OVERLAY_OPACITY:
         return f"{block_ro.opacity_pct}%"
     if kind == RowKind.RENDER_OVERLAY_BORDER_WIDTH:
-        return str(block_ro.border_width)
-    if kind == RowKind.RENDER_OVERLAY_START:
-        return f"{block_ro.start:.1f}"
+        return f"{block_ro.border_width}px"
+    if kind == RowKind.RENDER_OVERLAY_START_DELAY:
+        return f"{block_ro.start_delay:.1f}s"
     if kind == RowKind.RENDER_OVERLAY_DISPLAY_TIME:
-        return f"{block_ro.display_time:.1f}"
+        return f"{block_ro.display_time:.1f}s"
+    block_pp = state.render_post_fx
+    if kind == RowKind.RENDER_POST_FX_FADE_IN:
+        return f"{block_pp.fade_in:.1f}s"
+    if kind == RowKind.RENDER_POST_FX_FADE_OUT:
+        return f"{block_pp.fade_out:.1f}s"
     stem = row_stem(state, index)
     assert stem is not None
     block = state.tracks[stem]
@@ -542,6 +602,10 @@ def _track_header_expand_suffix(expanded: bool) -> str:
 
 
 def _render_overlay_header_prefix() -> str:
+    return "Render : "
+
+
+def _render_post_fx_header_prefix() -> str:
     return "Render : "
 
 
@@ -664,11 +728,20 @@ def fit_row_text(
             )
             + _track_header_expand_suffix(expanded)
         )
+    if kind == RowKind.RENDER_SECTION_GAP:
+        return ""
     if kind == RowKind.RENDER_OVERLAY_HEADER:
         expanded = state.render_overlay.expanded
         return (
             _render_overlay_header_prefix()
             + "OVERLAY"
+            + _track_header_expand_suffix(expanded)
+        )
+    if kind == RowKind.RENDER_POST_FX_HEADER:
+        expanded = state.render_post_fx.expanded
+        return (
+            _render_post_fx_header_prefix()
+            + "POST FX"
             + _track_header_expand_suffix(expanded)
         )
     if kind in _LABELED_SUB_ROW_KINDS:
@@ -680,7 +753,13 @@ def fit_row_text(
 
 def _row_indent(state: TuningViewState, index: int) -> int:
     kind = row_kind(state, index)
-    if kind in {RowKind.TRACK_HEADER, RowKind.RENDER_OVERLAY_HEADER}:
+    if kind in {
+        RowKind.TRACK_HEADER,
+        RowKind.RENDER_OVERLAY_HEADER,
+        RowKind.RENDER_POST_FX_HEADER,
+    }:
+        return 0
+    if kind == RowKind.RENDER_SECTION_GAP:
         return 0
     if kind == RowKind.TRACK_EFFECT:
         return TREE_INDENT * 2
@@ -691,7 +770,7 @@ def _row_indent(state: TuningViewState, index: int) -> int:
         RowKind.TRACK_OPACITY,
         RowKind.TRACK_BEAT,
         RowKind.TRACK_EFFECTS_HEADER,
-    } | _RENDER_OVERLAY_SUB_ROW_KINDS:
+    } | _RENDER_OVERLAY_SUB_ROW_KINDS | _RENDER_POST_FX_SUB_ROW_KINDS:
         return TREE_INDENT
     return 0
 
@@ -709,6 +788,13 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
 
     if kind in {RowKind.RENDER_OVERLAY_HEADER, *_RENDER_OVERLAY_SUB_ROW_KINDS}:
         if not state.render_overlay.enabled:
+            return DISABLED
+
+    if kind in {
+        RowKind.RENDER_POST_FX_HEADER,
+        *_RENDER_POST_FX_SUB_ROW_KINDS,
+    }:
+        if not state.render_post_fx.enabled:
             return DISABLED
 
     if state.solo_active and kind in (
@@ -912,6 +998,32 @@ class TuningOverlay:
                 row_widths.append(
                     indent + prefix_surf.get_width() + label_surf.get_width()
                 )
+            elif kind == RowKind.RENDER_POST_FX_HEADER:
+                block_pp = state.render_post_fx
+                prefix_surf = render_visibility_icon(
+                    enabled=block_pp.enabled,
+                    solo=block_pp.solo,
+                    line_height=line_h,
+                )
+                label_surf = _render_track_header_label(
+                    font,
+                    layer_prefix=_render_post_fx_header_prefix(),
+                    stem_text="POST FX",
+                    value_color=color,
+                    expanded=block_pp.expanded,
+                    locked=False,
+                    line_height=line_h,
+                )
+                row_surfaces.append(prefix_surf)
+                row_time_surfaces.append(label_surf)
+                row_widths.append(
+                    indent + prefix_surf.get_width() + label_surf.get_width()
+                )
+            elif kind == RowKind.RENDER_SECTION_GAP:
+                gap_surf = pygame.Surface((1, line_h), pygame.SRCALPHA)
+                row_surfaces.append(gap_surf)
+                row_time_surfaces.append(None)
+                row_widths.append(indent + gap_surf.get_width())
             elif kind in {
                 RowKind.CONFIG_HEADER,
                 RowKind.TRACK_PRESET_DIR,

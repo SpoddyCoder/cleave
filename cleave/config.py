@@ -101,7 +101,7 @@ DEFAULT_RENDER_OVERLAY_BODY = (
     "Like musician names, year of release etc.\n"
     "As many lines as you like\n"
 )
-DEFAULT_RENDER_OVERLAY_START = 10.0
+DEFAULT_RENDER_OVERLAY_START_DELAY = 10.0
 DEFAULT_RENDER_OVERLAY_DISPLAY_TIME = 30.0
 DEFAULT_RENDER_OVERLAY_POSITION: RenderOverlayPosition = "bottom-left"
 DEFAULT_RENDER_OVERLAY_FONT_SIZE = 10
@@ -111,6 +111,9 @@ DEFAULT_RENDER_OVERLAY_BACKGROUND_PADDING = 10
 DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR = (34, 51, 68)
 DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY = 1.0
 DEFAULT_RENDER_OVERLAY_BORDER_WIDTH = 2
+
+DEFAULT_RENDER_POST_FX_FADE_IN = 30.0
+DEFAULT_RENDER_POST_FX_FADE_OUT = 4.0
 
 
 @dataclass(frozen=True)
@@ -139,11 +142,24 @@ class RenderOverlayConfig:
     enabled: bool
     title: str
     body: str
-    start: float
+    start_delay: float
     display_time: float
     position: RenderOverlayPosition
     font: RenderOverlayFontConfig
     background: RenderOverlayBackgroundConfig
+
+
+@dataclass(frozen=True)
+class RenderPostFxConfig:
+    enabled: bool
+    fade_in: float
+    fade_out: float
+
+
+@dataclass(frozen=True)
+class RenderConfig:
+    overlay: RenderOverlayConfig | None
+    post_fx: RenderPostFxConfig | None
 
 
 @dataclass(frozen=True)
@@ -153,7 +169,7 @@ class CleaveConfig:
     visualizer: VisualizerConfig
     config_path: Path
     layer_z_order: tuple[str, ...] = DEFAULT_LAYER_Z_ORDER
-    render: RenderOverlayConfig | None = None
+    render: RenderConfig | None = None
 
     def layers_in_z_order(self) -> list[tuple[str, LayerConfig]]:
         """Return layers in compositor draw order (bottom-to-top)."""
@@ -411,23 +427,15 @@ def _parse_render_overlay_background(
     )
 
 
-def _parse_render_overlay(data: dict[str, Any]) -> RenderOverlayConfig | None:
-    render = data.get("render")
-    if render is None:
-        return None
-    render_map = _as_mapping(render, "render")
-    overlay = render_map.get("overlay")
-    if overlay is None:
-        return None
-    overlay_map = _as_mapping(overlay, "render.overlay")
+def _parse_render_overlay_section(overlay_map: dict[str, Any]) -> RenderOverlayConfig:
     return RenderOverlayConfig(
         enabled=bool(overlay_map.get("enabled", True)),
         title=str(overlay_map.get("title", DEFAULT_RENDER_OVERLAY_TITLE)),
         body=str(overlay_map.get("body", DEFAULT_RENDER_OVERLAY_BODY)),
-        start=float(
+        start_delay=float(
             _require_non_negative_number(
-                overlay_map.get("start", DEFAULT_RENDER_OVERLAY_START),
-                "render.overlay.start",
+                overlay_map.get("start_delay", DEFAULT_RENDER_OVERLAY_START_DELAY),
+                "render.overlay.start_delay",
             )
         ),
         display_time=float(
@@ -442,6 +450,48 @@ def _parse_render_overlay(data: dict[str, Any]) -> RenderOverlayConfig | None:
         font=_parse_render_overlay_font(overlay_map),
         background=_parse_render_overlay_background(overlay_map),
     )
+
+
+def _parse_render_post_fx_section(
+    post_fx_map: dict[str, Any],
+) -> RenderPostFxConfig:
+    return RenderPostFxConfig(
+        enabled=bool(post_fx_map.get("enabled", True)),
+        fade_in=float(
+            _require_non_negative_number(
+                post_fx_map.get("fade_in", DEFAULT_RENDER_POST_FX_FADE_IN),
+                "render.post_fx.fade_in",
+            )
+        ),
+        fade_out=float(
+            _require_non_negative_number(
+                post_fx_map.get("fade_out", DEFAULT_RENDER_POST_FX_FADE_OUT),
+                "render.post_fx.fade_out",
+            )
+        ),
+    )
+
+
+def _parse_render(data: dict[str, Any]) -> RenderConfig | None:
+    render = data.get("render")
+    if render is None:
+        return None
+    render_map = _as_mapping(render, "render")
+    overlay_raw = render_map.get("overlay")
+    post_fx_raw = render_map.get("post_fx")
+    if overlay_raw is None and post_fx_raw is None:
+        return None
+    overlay = (
+        _parse_render_overlay_section(_as_mapping(overlay_raw, "render.overlay"))
+        if overlay_raw is not None
+        else None
+    )
+    post_fx = (
+        _parse_render_post_fx_section(_as_mapping(post_fx_raw, "render.post_fx"))
+        if post_fx_raw is not None
+        else None
+    )
+    return RenderConfig(overlay=overlay, post_fx=post_fx)
 
 
 def _parse_visualizer(data: dict[str, Any]) -> VisualizerConfig:
@@ -545,7 +595,7 @@ def load_config(
 
     paths = _parse_paths(data)
     visualizer = _parse_visualizer(data)
-    render = _parse_render_overlay(data)
+    render = _parse_render(data)
     layer_z_order = _parse_layer_z_order(data)
     layers = _parse_layers(data, paths.preset_root)
     _validate_presets(layers)

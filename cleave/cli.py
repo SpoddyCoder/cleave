@@ -97,8 +97,6 @@ def cmd_render(args: argparse.Namespace) -> None:
             project_dir,
             config=args.config,
             output=args.output,
-            fade_in=args.fade_in,
-            fade_out=args.fade_out,
             high_quality=args.high_quality,
         )
     except (FileNotFoundError, ValueError, RuntimeError) as e:
@@ -188,22 +186,6 @@ def build_parser() -> argparse.ArgumentParser:
         "--output",
         type=Path,
         help="Output MP4 path (default: <project>/renders/<visualizer.name>.mp4)",
-    )
-    render.add_argument(
-        "-fi",
-        "--fade-in",
-        type=float,
-        default=0.0,
-        metavar="SECONDS",
-        help="Visual fade-in duration in seconds (default: 0)",
-    )
-    render.add_argument(
-        "-fo",
-        "--fade-out",
-        type=float,
-        default=0.0,
-        metavar="SECONDS",
-        help="Visual fade-out duration in seconds (default: 0)",
     )
     render.add_argument(
         "-hq",

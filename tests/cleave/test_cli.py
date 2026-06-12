@@ -125,17 +125,11 @@ def test_render_parser_uses_project_dir_and_options() -> None:
             "cfg.yaml",
             "-o",
             "out.mp4",
-            "-fi",
-            "1.5",
-            "-fo",
-            "2.0",
         ]
     )
     assert args.project_dir == "my-project"
     assert args.config == Path("cfg.yaml")
     assert args.output == Path("out.mp4")
-    assert args.fade_in == 1.5
-    assert args.fade_out == 2.0
 
 
 def _complete_project(tmp_path: Path, slug: str = "my-track") -> Path:
@@ -189,10 +183,6 @@ def test_cmd_render_calls_render(
                     "cfg.yaml",
                     "-o",
                     "video.mp4",
-                    "-fi",
-                    "1.0",
-                    "-fo",
-                    "0.5",
                 ]
             )
         )
@@ -201,8 +191,6 @@ def test_cmd_render_calls_render(
         project.resolve(),
         config=Path("cfg.yaml"),
         output=Path("video.mp4"),
-        fade_in=1.0,
-        fade_out=0.5,
         high_quality=False,
     )
     out = capsys.readouterr().out
@@ -298,12 +286,10 @@ def test_shortcut_flags() -> None:
         "cfg.yaml"
     )
     render_args = parser.parse_args(
-        ["render", "song", "-c", "cfg.yaml", "-o", "out.mp4", "-fi", "1", "-fo", "2"]
+        ["render", "song", "-c", "cfg.yaml", "-o", "out.mp4"]
     )
     assert render_args.config == Path("cfg.yaml")
     assert render_args.output == Path("out.mp4")
-    assert render_args.fade_in == 1.0
-    assert render_args.fade_out == 2.0
 
 
 def test_module_help_lists_subcommands() -> None:
@@ -338,14 +324,10 @@ def test_module_help_lists_subcommands() -> None:
         check=True,
     )
     render_usage = render.stdout.split("positional arguments:")[0]
-    assert (
-        "usage: cleave render [-h] [-c CONFIG] [-o OUTPUT] [-fi SECONDS] [-fo SECONDS]"
-        in render_usage
-    )
+    assert "usage: cleave render [-h] [-c CONFIG] [-o OUTPUT]" in render_usage
     assert "project_dir" in render_usage
     assert "project_dir" in render.stdout
     assert "Cleave project directory" in render.stdout
     assert "-c CONFIG, --config CONFIG" in render.stdout
     assert "-o OUTPUT, --output OUTPUT" in render.stdout
-    assert "-fi SECONDS, --fade-in SECONDS" in render.stdout
-    assert "-fo SECONDS, --fade-out SECONDS" in render.stdout
+    assert "-hq" in render.stdout

@@ -248,8 +248,15 @@ def test_re_enable_without_expanding() -> None:
     )
     controls.focus_index = header_row
 
+    render_post_fx_row = find_row_by_kind(
+        view, RowKind.RENDER_POST_FX_HEADER
+    )
+
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_index == render_overlay_row
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_index == render_post_fx_row
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_index == transport_row
@@ -640,7 +647,7 @@ def test_navigable_rows_without_overwrite() -> None:
     )
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is False
-    assert row_count(view) == 11
+    assert row_count(view) == 13
 
     kinds = {row_kind(view, i) for i in range(row_count(view))}
     assert RowKind.CONFIG_HEADER in kinds
@@ -666,7 +673,7 @@ def test_navigable_rows_with_overwrite() -> None:
     controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is True
-    assert row_count(view) == 12
+    assert row_count(view) == 14
 
     overwrite_row = next(
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.OVERWRITE_CONFIG
@@ -937,12 +944,13 @@ def test_quick_nav_row_indices_headers_and_transport_only() -> None:
     view = controls.build_view_state(paused=False)
 
     quick = quick_nav_row_indices(view)
-    assert len(quick) == 4
+    assert len(quick) == 5
     for index in quick:
         kind = row_kind(view, index)
         assert kind in (
             RowKind.TRACK_HEADER,
             RowKind.RENDER_OVERLAY_HEADER,
+            RowKind.RENDER_POST_FX_HEADER,
             RowKind.TRANSPORT,
         )
 
@@ -957,10 +965,19 @@ def test_quick_nav_row_indices_headers_and_transport_only() -> None:
         if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "bass"
     )
     render_overlay_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
+    render_post_fx_row = find_row_by_kind(
+        view, RowKind.RENDER_POST_FX_HEADER
+    )
     transport_row = next(
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.TRANSPORT
     )
-    assert quick == [drums_header, bass_header, render_overlay_row, transport_row]
+    assert quick == [
+        drums_header,
+        bass_header,
+        render_overlay_row,
+        render_post_fx_row,
+        transport_row,
+    ]
 
 
 def test_ctrl_quick_nav_cycles_headers_and_transport() -> None:
@@ -979,10 +996,13 @@ def test_ctrl_quick_nav_cycles_headers_and_transport() -> None:
     assert controls.focus_index == quick[3]
 
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
+    assert controls.focus_index == quick[4]
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
     assert controls.focus_index == quick[0]
 
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
-    assert controls.focus_index == quick[3]
+    assert controls.focus_index == quick[4]
 
 
 def test_ctrl_quick_nav_from_sub_row_jumps_forward() -> None:

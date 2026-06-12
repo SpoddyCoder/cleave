@@ -16,8 +16,10 @@ from cleave.config import (
     PathsConfig,
     RenderOverlayBackgroundConfig,
     RenderOverlayBorderConfig,
+    RenderConfig,
     RenderOverlayConfig,
     RenderOverlayFontConfig,
+    RenderPostFxConfig,
     VisualizerConfig,
     clamp_beat_sensitivity,
     clamp_effect_pct,
@@ -28,7 +30,7 @@ from cleave.config import (
     project_viz_config_path,
     _parse_hex_colour,
     _parse_layers,
-    _parse_render_overlay,
+    _parse_render,
     _parse_visualizer,
 )
 from cleave.paths import repo_root
@@ -326,7 +328,7 @@ render:
       Place anything you like here
       Like musician names, year of release etc.
       As many lines as you like
-    start: 10
+    start_delay: 10
     display_time: 30
     position: bottom-left
     font:
@@ -345,7 +347,9 @@ render:
 
 def test_parse_render_overlay_full_template() -> None:
     data = yaml.safe_load(_OVERLAY_YAML)
-    overlay = _parse_render_overlay(data)
+    render = _parse_render(data)
+    assert render is not None
+    overlay = render.overlay
     assert overlay == RenderOverlayConfig(
         enabled=True,
         title="Cleave Final Render",
@@ -354,7 +358,7 @@ def test_parse_render_overlay_full_template() -> None:
             "Like musician names, year of release etc.\n"
             "As many lines as you like\n"
         ),
-        start=10.0,
+        start_delay=10.0,
         display_time=30.0,
         position="bottom-left",
         font=RenderOverlayFontConfig(size=10, colour=(255, 170, 0)),
@@ -384,7 +388,27 @@ def test_parse_render_overlay_rejects_invalid_position() -> None:
     data = yaml.safe_load(_OVERLAY_YAML)
     data["render"]["overlay"]["position"] = "middle"
     with pytest.raises(ValueError, match="render.overlay.position must be one of"):
-        _parse_render_overlay(data)
+        _parse_render(data)
+
+
+def test_parse_render_post_fx_defaults() -> None:
+    data = yaml.safe_load(
+        """\
+render:
+  post_fx:
+    fade_in: 12
+    fade_out: 3
+"""
+    )
+    render = _parse_render(data)
+    assert render == RenderConfig(
+        overlay=None,
+        post_fx=RenderPostFxConfig(
+            enabled=True,
+            fade_in=12.0,
+            fade_out=3.0,
+        ),
+    )
 
 
 def test_load_config_render_none_without_overlay_section(

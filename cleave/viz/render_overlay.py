@@ -15,7 +15,7 @@ from cleave.config import (
     DEFAULT_RENDER_OVERLAY_FONT_COLOUR,
     DEFAULT_RENDER_OVERLAY_FONT_SIZE,
     DEFAULT_RENDER_OVERLAY_POSITION,
-    DEFAULT_RENDER_OVERLAY_START,
+    DEFAULT_RENDER_OVERLAY_START_DELAY,
     DEFAULT_RENDER_OVERLAY_TITLE,
     RenderOverlayBackgroundConfig,
     RenderOverlayBorderConfig,
@@ -37,7 +37,7 @@ def default_render_overlay_config() -> RenderOverlayConfig:
         enabled=True,
         title=DEFAULT_RENDER_OVERLAY_TITLE,
         body=DEFAULT_RENDER_OVERLAY_BODY,
-        start=DEFAULT_RENDER_OVERLAY_START,
+        start_delay=DEFAULT_RENDER_OVERLAY_START_DELAY,
         display_time=DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
         position=DEFAULT_RENDER_OVERLAY_POSITION,
         font=RenderOverlayFontConfig(
@@ -82,7 +82,7 @@ def build_live_overlay_config(
         enabled=runtime.enabled,
         title=base.title,
         body=base.body,
-        start=runtime.start,
+        start_delay=runtime.start_delay,
         display_time=runtime.display_time,
         position=runtime.position,
         font=RenderOverlayFontConfig(
@@ -121,7 +121,7 @@ def overlay_visible_alpha(t_sec: float, cfg: RenderOverlayConfig) -> float:
     """Combined fade multiplier for the render overlay at *t_sec*."""
     if not cfg.enabled:
         return 0.0
-    local_t = t_sec - cfg.start
+    local_t = t_sec - cfg.start_delay
     if local_t < 0.0 or local_t > cfg.display_time:
         return 0.0
     return fade_alpha(

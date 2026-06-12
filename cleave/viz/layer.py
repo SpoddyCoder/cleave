@@ -13,7 +13,9 @@ from cleave.config import (
     DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
     DEFAULT_RENDER_OVERLAY_FONT_SIZE,
     DEFAULT_RENDER_OVERLAY_POSITION,
-    DEFAULT_RENDER_OVERLAY_START,
+    DEFAULT_RENDER_OVERLAY_START_DELAY,
+    DEFAULT_RENDER_POST_FX_FADE_IN,
+    DEFAULT_RENDER_POST_FX_FADE_OUT,
     CleaveConfig,
 )
 from cleave.effects.runtime import EffectRuntime
@@ -22,7 +24,12 @@ from cleave.gl_post_process import GlPostProcess
 from cleave.preset_playlist import PresetPlaylist, preset_browse_floor
 from cleave.projectm import ProjectM
 from cleave.signals import Signals
-from cleave.viz.controls import LayerRuntime, RenderOverlayRuntime, TuningSession
+from cleave.viz.controls import (
+    LayerRuntime,
+    RenderOverlayRuntime,
+    RenderPostFxRuntime,
+    TuningSession,
+)
 from cleave.viz.overlay import TuningOverlay, TuningViewState
 
 
@@ -168,17 +175,17 @@ def _destroy_layers(layers: list[StemLayer]) -> None:
 
 
 def _render_overlay_runtime_from_cfg(cfg: CleaveConfig) -> RenderOverlayRuntime:
-    render = cfg.render
-    if render is not None:
+    overlay = cfg.render.overlay if cfg.render is not None else None
+    if overlay is not None:
         return RenderOverlayRuntime(
-            enabled=render.enabled,
+            enabled=overlay.enabled,
             expanded=False,
-            position=render.position,
-            font_size=render.font.size,
-            opacity_pct=int(round(render.background.opacity * 100)),
-            border_width=render.background.border.width,
-            start=render.start,
-            display_time=render.display_time,
+            position=overlay.position,
+            font_size=overlay.font.size,
+            opacity_pct=int(round(overlay.background.opacity * 100)),
+            border_width=overlay.background.border.width,
+            start_delay=overlay.start_delay,
+            display_time=overlay.display_time,
         )
     return RenderOverlayRuntime(
         enabled=True,
@@ -187,8 +194,27 @@ def _render_overlay_runtime_from_cfg(cfg: CleaveConfig) -> RenderOverlayRuntime:
         font_size=DEFAULT_RENDER_OVERLAY_FONT_SIZE,
         opacity_pct=int(round(DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY * 100)),
         border_width=DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
-        start=DEFAULT_RENDER_OVERLAY_START,
+        start_delay=DEFAULT_RENDER_OVERLAY_START_DELAY,
         display_time=DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
+    )
+
+
+def _render_post_fx_runtime_from_cfg(
+    cfg: CleaveConfig,
+) -> RenderPostFxRuntime:
+    post_fx = cfg.render.post_fx if cfg.render is not None else None
+    if post_fx is not None:
+        return RenderPostFxRuntime(
+            enabled=post_fx.enabled,
+            expanded=False,
+            fade_in=post_fx.fade_in,
+            fade_out=post_fx.fade_out,
+        )
+    return RenderPostFxRuntime(
+        enabled=True,
+        expanded=False,
+        fade_in=DEFAULT_RENDER_POST_FX_FADE_IN,
+        fade_out=DEFAULT_RENDER_POST_FX_FADE_OUT,
     )
 
 
@@ -200,6 +226,7 @@ def _session_from_cfg(
     return TuningSession(
         layer_z_order=list(cfg.layer_z_order),
         render_overlay=_render_overlay_runtime_from_cfg(cfg),
+        render_post_fx=_render_post_fx_runtime_from_cfg(cfg),
         layers={
             name: LayerRuntime(
                 playlist=playlists[name],

@@ -13,16 +13,23 @@ from cleave.config import (
     PathsConfig,
     RenderOverlayBackgroundConfig,
     RenderOverlayBorderConfig,
+    RenderConfig,
     RenderOverlayConfig,
     RenderOverlayFontConfig,
+    RenderPostFxConfig,
     VisualizerConfig,
     _parse_layers,
-    _parse_render_overlay,
+    _parse_render,
 )
 from cleave.config_snapshot import next_unnamed_path, write_session_snapshot
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import playlist_at_dir
-from cleave.viz.controls import LayerRuntime, RenderOverlayRuntime, TuningSession
+from cleave.viz.controls import (
+    LayerRuntime,
+    RenderOverlayRuntime,
+    RenderPostFxRuntime,
+    TuningSession,
+)
 
 
 def test_next_unnamed_path_empty_dir(tmp_path: Path) -> None:
@@ -386,7 +393,7 @@ def _render_overlay_cfg() -> RenderOverlayConfig:
         enabled=True,
         title="My Title",
         body="Line one\nLine two",
-        start=10.0,
+        start_delay=10.0,
         display_time=30.0,
         position="bottom-left",
         font=RenderOverlayFontConfig(size=10, colour=(255, 170, 0)),
@@ -414,11 +421,16 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
             {
                 "layers": {name: {"preset": f"presets/{name}/anchor.milk"} for name in STEM_NAMES},
                 "render": {
+                    "post_fx": {
+                        "enabled": True,
+                        "fade_in": 30,
+                        "fade_out": 4,
+                    },
                     "overlay": {
                         "enabled": True,
                         "title": "My Title",
                         "body": "Line one\nLine two",
-                        "start": 10,
+                        "start_delay": 10,
                         "display_time": 30,
                         "position": "bottom-left",
                         "font": {"size": 10, "colour": "#ffaa00"},
@@ -429,7 +441,7 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
                             "opacity": 1.0,
                             "border": {"colour": "#223344", "width": 2},
                         },
-                    }
+                    },
                 },
             }
         ),
@@ -444,10 +456,21 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
         },
         visualizer=VisualizerConfig(),
         config_path=config_path,
-        render=_render_overlay_cfg(),
+        render=RenderConfig(
+            overlay=_render_overlay_cfg(),
+            post_fx=RenderPostFxConfig(
+                enabled=True, fade_in=30.0, fade_out=4.0
+            ),
+        ),
     )
     session = TuningSession(
         layer_z_order=list(STEM_NAMES),
+        render_post_fx=RenderPostFxRuntime(
+            enabled=True,
+            expanded=False,
+            fade_in=12.0,
+            fade_out=3.0,
+        ),
         render_overlay=RenderOverlayRuntime(
             enabled=True,
             expanded=False,
@@ -455,7 +478,7 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
             font_size=14,
             opacity_pct=75,
             border_width=4,
-            start=20.0,
+            start_delay=20.0,
             display_time=40.0,
         ),
         layers={
@@ -478,7 +501,7 @@ def test_write_session_snapshot_persists_render_overlay(tmp_path: Path) -> None:
     assert overlay["enabled"] is True
     assert overlay["title"] == "My Title"
     assert overlay["body"] == "Line one\nLine two"
-    assert overlay["start"] == 20.0
+    assert overlay["start_delay"] == 20.0
     assert overlay["display_time"] == 40.0
     assert overlay["position"] == "top-right"
     assert overlay["font"]["size"] == 14
@@ -490,13 +513,45 @@ def test_write_session_snapshot_persists_render_overlay(tmp_path: Path) -> None:
     assert overlay["background"]["border"]["colour"] == "#223344"
     assert overlay["background"]["border"]["width"] == 4
 
-    round_trip = _parse_render_overlay(data)
+    round_trip = _parse_render(data)
     assert round_trip is not None
-    assert round_trip.enabled is True
-    assert round_trip.start == 20.0
-    assert round_trip.font.size == 14
-    assert round_trip.background.opacity == 0.75
-    assert round_trip.background.border.width == 4
+    assert round_trip.overlay is not None
+    assert round_trip.overlay.enabled is True
+    assert round_trip.overlay.start_delay == 20.0
+    assert round_trip.overlay.font.size == 14
+    assert round_trip.overlay.background.opacity == 0.75
+    assert round_trip.overlay.background.border.width == 4
+
+
+def test_write_session_snapshot_persists_render_post_fx(tmp_path: Path) -> None:
+    cfg, session, out_path = _snapshot_fixture(tmp_path)
+    write_session_snapshot(out_path, cfg=cfg, session=session)
+
+    data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    post_fx = data["render"]["post_fx"]
+    assert post_fx["enabled"] is True
+    assert post_fx["fade_in"] == 12.0
+    assert post_fx["fade_out"] == 3.0
+
+    round_trip = _parse_render(data)
+    assert round_trip is not None
+    assert round_trip.post_fx is not None
+    assert round_trip.post_fx.enabled is True
+    assert round_trip.post_fx.fade_in == 12.0
+    assert round_trip.post_fx.fade_out == 3.0
+
+
+def test_write_session_snapshot_render_post_fx_solo_saves_enabled(
+    tmp_path: Path,
+) -> None:
+    cfg, session, out_path = _snapshot_fixture(tmp_path)
+    session.render_post_fx.enabled = False
+    session.render_post_fx_solo = True
+    write_session_snapshot(out_path, cfg=cfg, session=session)
+
+    data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    assert data["render"]["post_fx"]["enabled"] is True
+    assert "render_post_fx_solo" not in yaml.safe_dump(data)
 
 
 def test_write_session_snapshot_render_overlay_solo_saves_enabled(tmp_path: Path) -> None:

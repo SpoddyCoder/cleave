@@ -73,8 +73,8 @@ def _rgb_to_hex(rgb: tuple[int, int, int]) -> str:
 
 
 def _render_overlay_base(cfg: CleaveConfig) -> RenderOverlayConfig:
-    if cfg.render is not None:
-        return cfg.render
+    if cfg.render is not None and cfg.render.overlay is not None:
+        return cfg.render.overlay
     return default_render_overlay_config()
 
 
@@ -98,7 +98,7 @@ def _snapshot_render_overlay(
     overlay["enabled"] = runtime.enabled or session.render_overlay_solo
     overlay["title"] = base.title
     overlay["body"] = base.body
-    overlay["start"] = runtime.start
+    overlay["start_delay"] = runtime.start_delay
     overlay["display_time"] = runtime.display_time
     overlay["position"] = runtime.position
 
@@ -124,10 +124,27 @@ def _snapshot_render_overlay(
     background_out["border"] = border_out
     overlay["background"] = background_out
 
+    runtime_pp = session.render_post_fx
+    orig_pp: dict[str, Any] = {}
+    if isinstance(orig_render, dict):
+        orig_pp_raw = orig_render.get("post_fx")
+        if isinstance(orig_pp_raw, dict):
+            orig_pp = dict(orig_pp_raw)
+
+    post_fx: dict[str, Any] = dict(orig_pp)
+    post_fx["enabled"] = runtime_pp.enabled or session.render_post_fx_solo
+    post_fx["fade_in"] = runtime_pp.fade_in
+    post_fx["fade_out"] = runtime_pp.fade_out
+
     render_out: dict[str, Any] = {}
     if isinstance(orig_render, dict):
-        render_out = {key: value for key, value in orig_render.items() if key != "overlay"}
+        render_out = {
+            key: value
+            for key, value in orig_render.items()
+            if key not in ("overlay", "post_fx")
+        }
     render_out["overlay"] = overlay
+    render_out["post_fx"] = post_fx
     return render_out
 
 
