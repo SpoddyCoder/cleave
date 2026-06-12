@@ -56,6 +56,7 @@ def test_draw_effects_expanded_panel_rect_within_surface() -> None:
     assert len(visible_row_indices(state)) > 30
 
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.notify_input()
     overlay.draw(surface, state)
 
     panel = overlay.panel_rect
@@ -75,6 +76,7 @@ def test_draw_effects_expanded_subsurface_panel_rect() -> None:
     width, height = 1280, 720
     overlay_surface = pygame.Surface((width, height), pygame.SRCALPHA)
     overlay_surface.fill((0, 0, 0, 0))
+    overlay.notify_input()
     overlay.draw(overlay_surface, state)
     panel = overlay.panel_rect
     assert panel is not None
@@ -171,6 +173,7 @@ def test_draw_render_overlay_header_without_error() -> None:
         ),
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.notify_input()
     overlay.draw(surface, state)
     assert overlay.panel_rect is not None
     header_row = find_row_by_kind(state, RowKind.RENDER_OVERLAY_HEADER)
@@ -205,6 +208,7 @@ def test_draw_track_header_with_solo_eye() -> None:
         solo_active=True,
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.notify_input()
     overlay.draw(surface, state)
     assert overlay.panel_rect is not None
 
@@ -215,3 +219,25 @@ def test_draw_track_header_with_solo_eye() -> None:
     )
     assert state.solo_stem == "drums"
     assert header_row == 0
+
+
+def test_overlay_starts_hidden() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    state = _effects_expanded_view_state()
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.draw(surface, state)
+    assert overlay.panel_rect is None
+
+
+def test_hide_immediately_hides_overlay() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    state = _effects_expanded_view_state()
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.notify_input()
+    overlay.draw(surface, state)
+    assert overlay.panel_rect is not None
+    overlay.hide_immediately()
+    overlay.draw(surface, state)
+    assert overlay.panel_rect is None

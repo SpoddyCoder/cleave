@@ -763,6 +763,26 @@ def test_esc_during_confirm_does_not_quit() -> None:
     controls.focus_index = overwrite_row
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
+    assert controls.consume_hide_overlay() is False
+
+
+def test_esc_requests_overlay_hide() -> None:
+    controls = _make_controls()
+    assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
+    assert controls.consume_hide_overlay() is True
+    assert controls.consume_hide_overlay() is False
+
+
+def test_esc_in_move_mode_does_not_request_overlay_hide() -> None:
+    controls = _make_controls(("drums", "bass"))
+    view = controls.build_view_state(paused=False)
+    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
+    controls.focus_index = header_row
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    assert controls.move_mode_stem == "drums"
+    assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
+    assert controls.move_mode_stem is None
+    assert controls.consume_hide_overlay() is False
 
 
 def test_ctrl_q_requests_quit() -> None:
@@ -823,6 +843,13 @@ def test_track_header_expand_arrow() -> None:
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "drums", RowKind.TRACK_HEADER)
     assert _row_text(view, header_row).endswith(" ▼")
+
+
+def test_render_overlay_header_label_spacing() -> None:
+    controls = _make_controls()
+    view = controls.build_view_state(paused=False)
+    header_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
+    assert _row_text(view, header_row) == "Render : OVERLAY ▶"
 
 
 def test_track_header_visibility_icon_color() -> None:

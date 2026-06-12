@@ -198,8 +198,14 @@ class TuningControls:
         self._input_blocked_until = 0.0
         self._key_repeat = KeyRepeatController()
         self._confirm = ConfirmDialog()
+        self._hide_overlay_requested = False
         view = self.build_view_state(paused=self.playback.paused)
         self.focus_index = find_row_by_kind(view, RowKind.TRANSPORT)
+
+    def consume_hide_overlay(self) -> bool:
+        requested = self._hide_overlay_requested
+        self._hide_overlay_requested = False
+        return requested
 
     def handle_keydown(self, event: pygame.event.Event) -> bool:
         """Handle a key down event. Return False when the caller should quit (Ctrl+Q)."""
@@ -233,6 +239,10 @@ class TuningControls:
             if event.key == pygame.K_RETURN:
                 self._confirm_move_mode()
                 return True
+
+        if event.key == pygame.K_ESCAPE:
+            self._hide_overlay_requested = True
+            return True
 
         if event.key in (pygame.K_UP, pygame.K_DOWN) and mod_ctrl(event.mod):
             self._move_quick_focus(-1 if event.key == pygame.K_UP else 1)

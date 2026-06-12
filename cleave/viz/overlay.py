@@ -388,7 +388,7 @@ def _row_text(state: TuningViewState, index: int) -> str:
 
     if kind == RowKind.RENDER_OVERLAY_HEADER:
         arrow = "▼" if state.render_overlay.expanded else "▶"
-        return f"Render: OVERLAY {arrow}"
+        return f"Render : OVERLAY {arrow}"
 
     block_ro = state.render_overlay
     if kind == RowKind.RENDER_OVERLAY_POSITION:
@@ -542,7 +542,7 @@ def _track_header_expand_suffix(expanded: bool) -> str:
 
 
 def _render_overlay_header_prefix() -> str:
-    return "Render: "
+    return "Render : "
 
 
 def render_visibility_icon(
@@ -791,8 +791,8 @@ class TuningOverlay:
         self._line_gap = line_gap
         self._hold_idle_sec = HOLD_IDLE_SEC
         self._fade_duration_sec = FADE_DURATION_SEC
-        self._idle_sec = 0.0
-        self._visibility = 1.0
+        self._idle_sec = self._hold_idle_sec + self._fade_duration_sec + 1.0
+        self._visibility = 0.0
         self._font: pygame.font.Font | None = None
         self._panel_rect: tuple[int, int, int, int] | None = None
         self._confirm = ConfirmDialog()
@@ -800,6 +800,10 @@ class TuningOverlay:
     def notify_input(self) -> None:
         self._idle_sec = 0.0
         self._visibility = 1.0
+
+    def hide_immediately(self) -> None:
+        self._idle_sec = self._hold_idle_sec + self._fade_duration_sec + 1.0
+        self._visibility = 0.0
 
     def update(self, dt_sec: float) -> None:
         self._idle_sec += dt_sec
