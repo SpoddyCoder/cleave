@@ -10,8 +10,11 @@ from cleave.viz.timeline_overlay import (
     TimelineOverlay,
     TimelineViewState,
     cue_times_for_stem,
+    layer_num_prefix,
     playhead_x,
+    stem_abbrev_label,
     stem_label_text,
+    transport_time_text,
     time_to_x,
     unique_cue_times,
     visibility_segments,
@@ -96,8 +99,10 @@ def test_stem_labels_use_abbreviations() -> None:
     assert stem_abbreviation("bass") == "B"
     assert stem_abbreviation("vocals") == "V"
     assert stem_abbreviation("other") == "O"
-    assert stem_label_text("drums") == " D "
-    assert stem_label_text("bass") == " B "
+    assert layer_num_prefix(1) == "1 "
+    assert stem_abbrev_label("drums") == " D "
+    assert stem_label_text(1, "drums") == "1  D "
+    assert stem_label_text(4, "bass") == "4  B "
 
 
 def test_playhead_x_at_known_position() -> None:
@@ -174,17 +179,38 @@ def test_focus_row_index_matches_stem() -> None:
     assert overlay.panel_rect is not None
 
 
-def test_rec_badge_rect_is_above_panel() -> None:
+def test_transport_time_text_matches_main_ui_format() -> None:
+    assert transport_time_text(0.0) == " [00:00]"
+    assert transport_time_text(65.0) == " [01:05]"
+    assert transport_time_text(3725.9) == " [62:05]"
+
+
+def test_header_badge_rect_is_above_panel() -> None:
     pygame.init()
     overlay = TimelineOverlay()
-    state = _view_state(recording=True)
+    state = _view_state(position_sec=30.0)
     surface = pygame.Surface((800, 400), pygame.SRCALPHA)
     overlay.draw(surface, state)
 
     panel = overlay.panel_rect
-    badge = overlay.rec_badge_rect
+    header = overlay.header_badge_rect
     assert panel is not None
-    assert badge is not None
-    _, panel_y, _, panel_h = panel
-    _, badge_y, _, badge_h = badge
-    assert badge_y + badge_h <= panel_y
+    assert header is not None
+    _, panel_y, _, _ = panel
+    _, header_y, _, header_h = header
+    assert header_y + header_h <= panel_y
+
+
+def test_header_badge_wider_when_recording() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    surface = pygame.Surface((800, 400), pygame.SRCALPHA)
+
+    overlay.draw(surface, _view_state(position_sec=0.0, recording=False))
+    idle_w = overlay.header_badge_rect
+    assert idle_w is not None
+
+    overlay.draw(surface, _view_state(position_sec=0.0, recording=True))
+    rec_w = overlay.header_badge_rect
+    assert rec_w is not None
+    assert rec_w[2] > idle_w[2]

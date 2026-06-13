@@ -9,6 +9,7 @@ import pygame
 from cleave.timeline import TimelineCue, layer_visible_at, stem_abbreviation
 from cleave.viz.material_icons import visibility_icon_slot_width
 from cleave.viz.overlay import _clip_rect_to_surface, render_visibility_icon
+from cleave.viz.playback import format_mmss
 from cleave.viz.theme import (
     ARMED_BG,
     BACKGROUND,
@@ -31,6 +32,7 @@ PLAYHEAD_WIDTH: int = 2
 REC_BADGE_GAP: int = 4
 REC_BADGE_PAD_X: int = 8
 REC_BADGE_PAD_Y: int = 4
+REC_TIME_GAP: int = 2
 REC_FLASH_MS: int = 500
 
 
@@ -107,8 +109,20 @@ def playhead_x(
     return time_to_x(position_sec, bar_left, bar_width, duration_sec)
 
 
-def stem_label_text(stem: str) -> str:
+def layer_num_prefix(layer_num: int) -> str:
+    return f"{layer_num} "
+
+
+def stem_abbrev_label(stem: str) -> str:
     return f" {stem_abbreviation(stem)} "
+
+
+def transport_time_text(position_sec: float) -> str:
+    return f" [{format_mmss(position_sec)}]"
+
+
+def stem_label_text(layer_num: int, stem: str) -> str:
+    return f"{layer_num_prefix(layer_num)}{stem_abbrev_label(stem)}"
 
 
 class TimelineOverlay:
@@ -128,8 +142,9 @@ class TimelineOverlay:
         self._row_gap = row_gap
         self._font: pygame.font.Font | None = None
         self._panel_rect: tuple[int, int, int, int] | None = None
-        self._rec_badge_rect: tuple[int, int, int, int] | None = None
-        self._stem_label_width: int = 0
+        self._header_badge_rect: tuple[int, int, int, int] | None = None
+        self._layer_num_width: int = 0
+        self._stem_abbrev_width: int = 0
         self._row_layout: list[tuple[int, int, int, int, str, int]] = []
 
     def _font_get(self) -> pygame.font.Font:
@@ -142,8 +157,8 @@ class TimelineOverlay:
         return self._panel_rect
 
     @property
-    def rec_badge_rect(self) -> tuple[int, int, int, int] | None:
-        return self._rec_badge_rect
+    def header_badge_rect(self) -> tuple[int, int, int, int] | None:
+        return self._header_badge_rect
 
     @property
     def row_layout(self) -> list[tuple[int, int, int, int, str, int]]:
@@ -152,7 +167,7 @@ class TimelineOverlay:
 
     def draw(self, surface: pygame.Surface, state: TimelineViewState) -> None:
         self._panel_rect = None
-        self._rec_badge_rect = None
+        self._header_badge_rect = None
         self._row_layout = []
         if not state.enabled:
             return
@@ -164,8 +179,10 @@ class TimelineOverlay:
         panel_y = height - panel_h - self._margin
 
         font = self._font_get()
-        label_sample = font.render(stem_label_text("drums"), True, LABEL)
-        self._stem_label_width = label_sample.get_width()
+        num_sample = font.render(layer_num_prefix(4), True, LABEL)
+        abbrev_sample = font.render(stem_abbrev_label("drums"), True, LABEL)
+        self._layer_num_width = num_sample.get_width()
+        self._stem_abbrev_width = abbrev_sample.get_width()
         row_count = len(state.layer_z_order)
         if row_count == 0:
             return
@@ -173,7 +190,7 @@ class TimelineOverlay:
         inner_h = panel_h - self._padding * 2
         row_h = max(1, (inner_h - self._row_gap * (row_count - 1)) // row_count)
         eye_slot_w = visibility_icon_slot_width(row_h)
-        prefix_width = self._stem_label_width + eye_slot_w
+        prefix_width = self._layer_num_width + self._stem_abbrev_width + eye_slot_w
         bar_left = self._padding + prefix_width
         bar_width = max(1, panel_w - self._padding * 2 - prefix_width)
 
@@ -197,22 +214,31 @@ class TimelineOverlay:
                 (row_index, row_rect.x, row_rect.y, row_rect.w, row_rect.h, stem)
             )
 
+            layer_num = row_index + 1
+            layer_num_x = self._padding
+            stem_abbrev_x = layer_num_x + self._layer_num_width
+            eye_x = stem_abbrev_x + self._stem_abbrev_width
+
             if focused:
                 focus_surf = pygame.Surface((row_rect.w, row_rect.h), pygame.SRCALPHA)
                 focus_surf.fill((*TIMELINE_FOCUS_BG, FOCUS_BG_ALPHA))
                 panel.blit(focus_surf, row_rect.topleft)
 
-            label_rect = pygame.Rect(self._padding, row_y, self._stem_label_width, row_h)
+            abbrev_rect = pygame.Rect(
+                stem_abbrev_x, row_y, self._stem_abbrev_width, row_h
+            )
             if armed:
-                armed_surf = pygame.Surface((label_rect.w, label_rect.h), pygame.SRCALPHA)
+                armed_surf = pygame.Surface((abbrev_rect.w, abbrev_rect.h), pygame.SRCALPHA)
                 armed_surf.fill((*ARMED_BG, ARMED_BG_ALPHA))
-                panel.blit(armed_surf, label_rect.topleft)
+                panel.blit(armed_surf, abbrev_rect.topleft)
 
-            label = stem_label_text(stem)
             label_color = VALUE if (armed or focused) else LABEL
-            label_surf = font.render(label, True, label_color)
-            label_y = row_y + max(0, (row_h - label_surf.get_height()) // 2)
-            panel.blit(label_surf, (self._padding, label_y))
+            num_surf = font.render(layer_num_prefix(layer_num), True, label_color)
+            abbrev_surf = font.render(stem_abbrev_label(stem), True, label_color)
+            num_y = row_y + max(0, (row_h - num_surf.get_height()) // 2)
+            abbrev_y = row_y + max(0, (row_h - abbrev_surf.get_height()) // 2)
+            panel.blit(num_surf, (layer_num_x, num_y))
+            panel.blit(abbrev_surf, (stem_abbrev_x, abbrev_y))
 
             visible_now = layer_visible_at(
                 state.cues, state.defaults, stem, state.position_sec
@@ -220,7 +246,7 @@ class TimelineOverlay:
             icon_surf = render_visibility_icon(
                 enabled=visible_now, solo=False, line_height=row_h
             )
-            panel.blit(icon_surf, (self._padding + self._stem_label_width, row_y))
+            panel.blit(icon_surf, (eye_x, row_y))
 
             for start_t, end_t, visible in visibility_segments(
                 state.cues, state.defaults, stem, state.duration_sec
@@ -268,29 +294,57 @@ class TimelineOverlay:
             surface,
         )
 
-        if state.recording:
-            self._rec_badge_rect = self._draw_rec_badge(
-                surface, font, panel_x, panel_y, panel_w
-            )
+        self._header_badge_rect = self._draw_header_badges(
+            surface,
+            font,
+            panel_x,
+            panel_y,
+            panel_w,
+            state.position_sec,
+            state.recording,
+        )
 
-    def _draw_rec_badge(
+    def _draw_header_badges(
         self,
         surface: pygame.Surface,
         font: pygame.font.Font,
         panel_x: int,
         panel_y: int,
         panel_w: int,
+        position_sec: float,
+        recording: bool,
     ) -> tuple[int, int, int, int]:
-        text_surf = font.render("REC", True, VALUE)
-        badge_w = text_surf.get_width() + REC_BADGE_PAD_X * 2
-        badge_h = text_surf.get_height() + REC_BADGE_PAD_Y * 2
-        badge_x = panel_x + panel_w - badge_w
+        time_surf = font.render(transport_time_text(position_sec), True, VALUE)
+        time_w = time_surf.get_width() + REC_BADGE_PAD_X * 2
+        time_h = time_surf.get_height() + REC_BADGE_PAD_Y * 2
+
+        rec_w = 0
+        rec_surf: pygame.Surface | None = None
+        if recording:
+            rec_surf = font.render("REC", True, VALUE)
+            rec_w = rec_surf.get_width() + REC_BADGE_PAD_X * 2
+
+        badge_h = time_h
+        gap = REC_TIME_GAP if recording else 0
+        total_w = time_w + gap + rec_w
+        time_x = panel_x + panel_w - time_w
         badge_y = panel_y - REC_BADGE_GAP - badge_h
-        badge_rect = (badge_x, badge_y, badge_w, badge_h)
-        if _rec_flash_visible():
-            pygame.draw.rect(surface, REC_BG, badge_rect)
+
+        pygame.draw.rect(surface, BACKGROUND, (time_x, badge_y, time_w, badge_h))
+        surface.blit(
+            time_surf,
+            (time_x + REC_BADGE_PAD_X, badge_y + REC_BADGE_PAD_Y),
+        )
+
+        header_x = time_x
+        if recording and rec_surf is not None:
+            rec_x = time_x - gap - rec_w
+            header_x = rec_x
+            if _rec_flash_visible():
+                pygame.draw.rect(surface, REC_BG, (rec_x, badge_y, rec_w, badge_h))
             surface.blit(
-                text_surf,
-                (badge_x + REC_BADGE_PAD_X, badge_y + REC_BADGE_PAD_Y),
+                rec_surf,
+                (rec_x + REC_BADGE_PAD_X, badge_y + REC_BADGE_PAD_Y),
             )
-        return _clip_rect_to_surface(badge_rect, surface)
+
+        return _clip_rect_to_surface((header_x, badge_y, total_w, badge_h), surface)
