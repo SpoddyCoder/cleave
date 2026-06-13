@@ -366,7 +366,7 @@ def _draw_timeline_overlay(
     panel = overlay.panel_rect
     if panel is not None:
         upload_rect = panel
-        badge = overlay.rec_badge_rect
+        badge = overlay.header_badge_rect
         if badge is not None:
             upload_rect = _union_rect(panel, badge)
         px, py, pw, ph = upload_rect
