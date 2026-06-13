@@ -855,7 +855,7 @@ def test_render_overlay_header_label_spacing() -> None:
     controls = _make_controls()
     view = controls.build_view_state(paused=False)
     header_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
-    assert _row_text(view, header_row) == "Render : OVERLAY ▶"
+    assert _row_text(view, header_row) == "Render: OVERLAY ▶"
 
 
 def test_render_overlay_title_header_expand_arrow() -> None:
