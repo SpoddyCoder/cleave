@@ -99,27 +99,33 @@ DEFAULT_RENDER_OVERLAY_TITLE = "Cleave Final Render"
 DEFAULT_RENDER_OVERLAY_BODY = (
     "Place anything you like here\n"
     "Like musician names, year of release etc.\n"
-    "As many lines as you like\n"
+    "Edit the cleave-viz.yaml to modify this message, colours etc."
 )
 DEFAULT_RENDER_OVERLAY_START_DELAY = 10.0
 DEFAULT_RENDER_OVERLAY_DISPLAY_TIME = 30.0
 DEFAULT_RENDER_OVERLAY_POSITION: RenderOverlayPosition = "bottom-left"
-DEFAULT_RENDER_OVERLAY_FONT_SIZE = 10
-DEFAULT_RENDER_OVERLAY_FONT_COLOUR = (255, 170, 0)
-DEFAULT_RENDER_OVERLAY_BACKGROUND_MARGIN = 10
-DEFAULT_RENDER_OVERLAY_BACKGROUND_PADDING = 10
-DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR = (34, 51, 68)
-DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY = 1.0
-DEFAULT_RENDER_OVERLAY_BORDER_WIDTH = 2
+DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE = 24
+DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM = 10
+DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE = 18
+DEFAULT_RENDER_OVERLAY_TEXT_COLOUR = (255, 255, 255)
+DEFAULT_RENDER_OVERLAY_BACKGROUND_MARGIN = 40
+DEFAULT_RENDER_OVERLAY_BACKGROUND_PADDING = 20
+DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR = (0, 0, 0)
+DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY = 0.7
+DEFAULT_RENDER_OVERLAY_BORDER_COLOUR = (255, 255, 255)
+DEFAULT_RENDER_OVERLAY_BORDER_WIDTH = 4
 
 DEFAULT_RENDER_POST_FX_FADE_IN = 30.0
 DEFAULT_RENDER_POST_FX_FADE_OUT = 4.0
 
 
 @dataclass(frozen=True)
-class RenderOverlayFontConfig:
-    size: int
+class RenderOverlayTextBlockConfig:
+    content: str
+    font_size: int
     colour: tuple[int, int, int]
+    background_colour: tuple[int, int, int] | None = None
+    margin_bottom: int = 0
 
 
 @dataclass(frozen=True)
@@ -140,12 +146,11 @@ class RenderOverlayBackgroundConfig:
 @dataclass(frozen=True)
 class RenderOverlayConfig:
     enabled: bool
-    title: str
-    body: str
+    title: RenderOverlayTextBlockConfig
+    body: RenderOverlayTextBlockConfig
     start_delay: float
     display_time: float
     position: RenderOverlayPosition
-    font: RenderOverlayFontConfig
     background: RenderOverlayBackgroundConfig
 
 
@@ -365,26 +370,88 @@ def _parse_render_overlay_position(
     return value
 
 
-def _parse_render_overlay_font(data: dict[str, Any]) -> RenderOverlayFontConfig:
-    font = _as_mapping(data.get("font"), "render.overlay.font")
-    size = _require_non_negative_number(
-        font.get("size", DEFAULT_RENDER_OVERLAY_FONT_SIZE),
-        "render.overlay.font.size",
+def _default_render_overlay_title_block() -> RenderOverlayTextBlockConfig:
+    return RenderOverlayTextBlockConfig(
+        content=DEFAULT_RENDER_OVERLAY_TITLE,
+        font_size=DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
+        colour=DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
+        margin_bottom=DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
+    )
+
+
+def _default_render_overlay_body_block() -> RenderOverlayTextBlockConfig:
+    return RenderOverlayTextBlockConfig(
+        content=DEFAULT_RENDER_OVERLAY_BODY,
+        font_size=DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
+        colour=DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
+    )
+
+
+def _parse_render_overlay_text_block_colour(
+    block: dict[str, Any], label_prefix: str
+) -> tuple[int, int, int]:
+    colour_raw = block.get("font-colour")
+    if colour_raw is None:
+        colour_raw = block.get("colour")
+    if colour_raw is None:
+        return DEFAULT_RENDER_OVERLAY_TEXT_COLOUR
+    return _parse_hex_colour(colour_raw, f"{label_prefix}.font-colour")
+
+
+def _parse_render_overlay_text_block_background_colour(
+    block: dict[str, Any], label_prefix: str
+) -> tuple[int, int, int] | None:
+    if "background-colour" not in block:
+        return None
+    raw = block.get("background-colour")
+    if raw is None:
+        return None
+    if isinstance(raw, str) and raw.strip() == "":
+        return None
+    return _parse_hex_colour(raw, f"{label_prefix}.background-colour")
+
+
+def _parse_render_overlay_text_block(
+    overlay_map: dict[str, Any],
+    key: str,
+    label_prefix: str,
+    *,
+    default_font_size: int,
+    default_margin_bottom: int = 0,
+) -> RenderOverlayTextBlockConfig:
+    block = _as_mapping(overlay_map.get(key), label_prefix)
+    content_raw = block.get("content", "")
+    content = str(content_raw)
+    if content.endswith("\n"):
+        content = content[:-1]
+    font_size = _require_non_negative_number(
+        block.get("font-size", default_font_size),
+        f"{label_prefix}.font-size",
         as_int=True,
     )
-    colour_raw = font.get("colour", "#ffaa00")
-    colour = _parse_hex_colour(
-        "#ffaa00" if colour_raw is None else colour_raw,
-        "render.overlay.font.colour",
+    colour = _parse_render_overlay_text_block_colour(block, label_prefix)
+    background_colour = _parse_render_overlay_text_block_background_colour(
+        block, label_prefix
     )
-    return RenderOverlayFontConfig(size=int(size), colour=colour)
+    margin_bottom = _require_non_negative_number(
+        block.get("margin-bottom", default_margin_bottom),
+        f"{label_prefix}.margin-bottom",
+        as_int=True,
+    )
+    return RenderOverlayTextBlockConfig(
+        content=content,
+        font_size=int(font_size),
+        colour=colour,
+        background_colour=background_colour,
+        margin_bottom=int(margin_bottom),
+    )
 
 
 def _parse_render_overlay_border(data: dict[str, Any]) -> RenderOverlayBorderConfig:
     border = _as_mapping(data.get("border"), "render.overlay.background.border")
-    border_colour_raw = border.get("colour", "#223344")
+    border_colour_raw = border.get("colour", "#ffffff")
     colour = _parse_hex_colour(
-        "#223344" if border_colour_raw is None else border_colour_raw,
+        "#ffffff" if border_colour_raw is None else border_colour_raw,
         "render.overlay.background.border.colour",
     )
     width = _require_non_negative_number(
@@ -409,9 +476,9 @@ def _parse_render_overlay_background(
         "render.overlay.background.padding",
         as_int=True,
     )
-    background_colour_raw = background.get("colour", "#223344")
+    background_colour_raw = background.get("colour", "#000000")
     colour = _parse_hex_colour(
-        "#223344" if background_colour_raw is None else background_colour_raw,
+        "#000000" if background_colour_raw is None else background_colour_raw,
         "render.overlay.background.colour",
     )
     opacity = _require_non_negative_number(
@@ -428,10 +495,31 @@ def _parse_render_overlay_background(
 
 
 def _parse_render_overlay_section(overlay_map: dict[str, Any]) -> RenderOverlayConfig:
+    title = (
+        _parse_render_overlay_text_block(
+            overlay_map,
+            "title",
+            "render.overlay.title",
+            default_font_size=DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
+            default_margin_bottom=DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
+        )
+        if overlay_map.get("title") is not None
+        else _default_render_overlay_title_block()
+    )
+    body = (
+        _parse_render_overlay_text_block(
+            overlay_map,
+            "body",
+            "render.overlay.body",
+            default_font_size=DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
+        )
+        if overlay_map.get("body") is not None
+        else _default_render_overlay_body_block()
+    )
     return RenderOverlayConfig(
         enabled=bool(overlay_map.get("enabled", True)),
-        title=str(overlay_map.get("title", DEFAULT_RENDER_OVERLAY_TITLE)),
-        body=str(overlay_map.get("body", DEFAULT_RENDER_OVERLAY_BODY)),
+        title=title,
+        body=body,
         start_delay=float(
             _require_non_negative_number(
                 overlay_map.get("start_delay", DEFAULT_RENDER_OVERLAY_START_DELAY),
@@ -447,7 +535,6 @@ def _parse_render_overlay_section(overlay_map: dict[str, Any]) -> RenderOverlayC
         position=_parse_render_overlay_position(
             overlay_map.get("position", DEFAULT_RENDER_OVERLAY_POSITION)
         ),
-        font=_parse_render_overlay_font(overlay_map),
         background=_parse_render_overlay_background(overlay_map),
     )
 

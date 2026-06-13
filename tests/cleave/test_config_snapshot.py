@@ -15,7 +15,7 @@ from cleave.config import (
     RenderOverlayBorderConfig,
     RenderConfig,
     RenderOverlayConfig,
-    RenderOverlayFontConfig,
+    RenderOverlayTextBlockConfig,
     RenderPostFxConfig,
     VisualizerConfig,
     _parse_layers,
@@ -391,12 +391,22 @@ def test_write_session_snapshot_omits_all_zero_effects() -> None:
 def _render_overlay_cfg() -> RenderOverlayConfig:
     return RenderOverlayConfig(
         enabled=True,
-        title="My Title",
-        body="Line one\nLine two",
+        title=RenderOverlayTextBlockConfig(
+            content="My Title",
+            font_size=24,
+            colour=(255, 255, 255),
+            background_colour=(51, 51, 255),
+            margin_bottom=10,
+        ),
+        body=RenderOverlayTextBlockConfig(
+            content="Line one\nLine two",
+            font_size=18,
+            colour=(255, 255, 255),
+            background_colour=(51, 51, 255),
+        ),
         start_delay=10.0,
         display_time=30.0,
         position="bottom-left",
-        font=RenderOverlayFontConfig(size=10, colour=(255, 170, 0)),
         background=RenderOverlayBackgroundConfig(
             margin=10,
             padding=10,
@@ -428,12 +438,22 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
                     },
                     "overlay": {
                         "enabled": True,
-                        "title": "My Title",
-                        "body": "Line one\nLine two",
+                        "title": {
+                            "content": "My Title",
+                            "font-size": 24,
+                            "font-colour": "#ffffff",
+                            "background-colour": "#3333ff",
+                            "margin-bottom": 10,
+                        },
+                        "body": {
+                            "content": "Line one\nLine two\n",
+                            "font-size": 18,
+                            "colour": "#ffffff",
+                            "background-colour": "#3333ff",
+                        },
                         "start_delay": 10,
                         "display_time": 30,
                         "position": "bottom-left",
-                        "font": {"size": 10, "colour": "#ffaa00"},
                         "background": {
                             "margin": 10,
                             "padding": 10,
@@ -475,7 +495,11 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
             enabled=True,
             expanded=False,
             position="top-right",
-            font_size=14,
+            title_expanded=False,
+            body_expanded=False,
+            title_font_size=14,
+            title_margin_bottom=6,
+            body_font_size=18,
             opacity_pct=75,
             border_width=4,
             start_delay=20.0,
@@ -499,13 +523,16 @@ def test_write_session_snapshot_persists_render_overlay(tmp_path: Path) -> None:
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
     overlay = data["render"]["overlay"]
     assert overlay["enabled"] is True
-    assert overlay["title"] == "My Title"
-    assert overlay["body"] == "Line one\nLine two"
+    assert overlay["title"]["content"] == "My Title"
+    assert overlay["body"]["content"] == "Line one\nLine two\n"
     assert overlay["start_delay"] == 20.0
     assert overlay["display_time"] == 40.0
     assert overlay["position"] == "top-right"
-    assert overlay["font"]["size"] == 14
-    assert overlay["font"]["colour"] == "#ffaa00"
+    assert overlay["title"]["font-size"] == 14
+    assert overlay["title"]["margin-bottom"] == 6
+    assert overlay["body"]["font-size"] == 18
+    assert overlay["title"]["font-colour"] == "#ffffff"
+    assert overlay["body"]["colour"] == "#ffffff"
     assert overlay["background"]["margin"] == 10
     assert overlay["background"]["padding"] == 10
     assert overlay["background"]["colour"] == "#223344"
@@ -518,9 +545,23 @@ def test_write_session_snapshot_persists_render_overlay(tmp_path: Path) -> None:
     assert round_trip.overlay is not None
     assert round_trip.overlay.enabled is True
     assert round_trip.overlay.start_delay == 20.0
-    assert round_trip.overlay.font.size == 14
+    assert round_trip.overlay.title.font_size == 14
+    assert round_trip.overlay.title.margin_bottom == 6
+    assert round_trip.overlay.body.font_size == 18
     assert round_trip.overlay.background.opacity == 0.75
     assert round_trip.overlay.background.border.width == 4
+
+
+def test_write_session_snapshot_strips_legacy_overlay_font(tmp_path: Path) -> None:
+    cfg, session, out_path = _snapshot_fixture(tmp_path)
+    config_path = tmp_path / "cleave.config.yaml"
+    data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    data["render"]["overlay"]["font"] = {"size": 10, "colour": "#ffaa00"}
+    config_path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    write_session_snapshot(out_path, cfg=cfg, session=session)
+
+    snapshot = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    assert "font" not in snapshot["render"]["overlay"]
 
 
 def test_write_session_snapshot_persists_render_post_fx(tmp_path: Path) -> None:
@@ -578,6 +619,6 @@ def test_write_session_snapshot_render_overlay_without_cfg_render(tmp_path: Path
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
     overlay = data["render"]["overlay"]
-    assert overlay["title"] == "Cleave Final Render"
+    assert overlay["title"]["content"] == "Cleave Final Render"
     assert overlay["position"] == "top-right"
-    assert overlay["font"]["size"] == 14
+    assert overlay["title"]["font-size"] == 14

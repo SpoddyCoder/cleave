@@ -108,12 +108,17 @@ Optional title and body text burned into the MP4. Configure under `render.overla
 * `start_delay` — when the overlay begins fading in (seconds).
 * `display_time` — how long the overlay is on screen, including the 2s fade-in and fade-out.
 * `position` — `top-left`, `top-right`, `centre`, `bottom-left`, or `bottom-right`.
-* `font.size` / `font.colour` — body text in pixels and hex colour; title is bold at 1.2x size.
+* `title` / `body` — nested text blocks, each with:
+  * `content` — multiline string (`|` block scalar).
+  * `font-size` — text size in pixels (title is rendered bold).
+  * `font-colour` (title) or `colour` (body) — hex text colour.
+  * `background-colour` — optional hex fill behind each line of text only (stops at the glyph width). Omit the key or leave empty for no text background.
+  * `margin-bottom` (title only) — gap in pixels between the title and body blocks.
 * `background.margin` — gap from the frame edge to the panel (ignored when `position: centre`).
 * `background.padding` — gap from the panel edge to the text.
-* `background.colour`, `background.opacity`, `background.border` — panel fill and border (border opacity matches background; border grows outward from the fill, margin is measured to the outer border edge).
+* `background.colour`, `background.opacity`, `background.border` — outer panel fill and border (border opacity matches background; border grows outward from the fill, margin is measured to the outer border edge).
 
-In the live visualizer, a blank gap row separates the four stem layers from **Render: OVERLAY**. Same eye / expand / solo semantics as stem layers (solo forces the overlay on; solo is not saved). Tunable in the panel: position, font size, opacity, border width, start delay, display time. Title, body, colours, margin, and padding are YAML-only. Saved with **SAVE AS NEW CONFIG** / **OVERWRITE CONFIG**.
+In the live visualizer, a blank gap row separates the four stem layers from **Render: OVERLAY**. Same eye / expand / solo semantics as stem layers (solo forces the overlay on; solo is not saved). Tunable in the panel: position, opacity, border width, start delay, display time, and per-block font size and title margin-bottom under expandable **title** / **body** submenus. Content, colours, margin, and padding are YAML-only. Saved with **SAVE AS NEW CONFIG** / **OVERWRITE CONFIG**.
 
 #### Post-processing fade
 

@@ -18,7 +18,7 @@ from cleave.config import (
     RenderOverlayBorderConfig,
     RenderConfig,
     RenderOverlayConfig,
-    RenderOverlayFontConfig,
+    RenderOverlayTextBlockConfig,
     RenderPostFxConfig,
     VisualizerConfig,
     clamp_beat_sensitivity,
@@ -323,25 +323,32 @@ _OVERLAY_YAML = """\
 render:
   overlay:
     enabled: true
-    title: Cleave Final Render
-    body: |
-      Place anything you like here
-      Like musician names, year of release etc.
-      As many lines as you like
+    title:
+      content: |
+        Cleave Final Render
+      font-size: 24
+      font-colour: "#ffffff"
+      background-colour: "#3333ff"
+      margin-bottom: 10
+    body:
+      content: |
+        Place anything you like here
+        Like musician names, year of release etc.
+        Edit the cleave-viz.yaml to modify this message, colours etc.
+      font-size: 18
+      colour: "#ffffff"
+      background-colour: "#3333ff"
     start_delay: 10
     display_time: 30
     position: bottom-left
-    font:
-      size: 10
-      colour: "#ffaa00"
     background:
-      margin: 10
-      padding: 10
-      colour: "#223344"
-      opacity: 1.0
+      margin: 40
+      padding: 20
+      colour: "#000000"
+      opacity: 0.7
       border:
-        colour: "#223344"
-        width: 2
+        colour: "#ffffff"
+        width: 4
 """
 
 
@@ -352,22 +359,32 @@ def test_parse_render_overlay_full_template() -> None:
     overlay = render.overlay
     assert overlay == RenderOverlayConfig(
         enabled=True,
-        title="Cleave Final Render",
-        body=(
-            "Place anything you like here\n"
-            "Like musician names, year of release etc.\n"
-            "As many lines as you like\n"
+        title=RenderOverlayTextBlockConfig(
+            content="Cleave Final Render",
+            font_size=24,
+            colour=(255, 255, 255),
+            background_colour=(51, 51, 255),
+            margin_bottom=10,
+        ),
+        body=RenderOverlayTextBlockConfig(
+            content=(
+                "Place anything you like here\n"
+                "Like musician names, year of release etc.\n"
+                "Edit the cleave-viz.yaml to modify this message, colours etc."
+            ),
+            font_size=18,
+            colour=(255, 255, 255),
+            background_colour=(51, 51, 255),
         ),
         start_delay=10.0,
         display_time=30.0,
         position="bottom-left",
-        font=RenderOverlayFontConfig(size=10, colour=(255, 170, 0)),
         background=RenderOverlayBackgroundConfig(
-            margin=10,
-            padding=10,
-            colour=(34, 51, 68),
-            opacity=1.0,
-            border=RenderOverlayBorderConfig(colour=(34, 51, 68), width=2),
+            margin=40,
+            padding=20,
+            colour=(0, 0, 0),
+            opacity=0.7,
+            border=RenderOverlayBorderConfig(colour=(255, 255, 255), width=4),
         ),
     )
 
@@ -382,6 +399,25 @@ def test_parse_render_overlay_full_template() -> None:
 )
 def test_parse_hex_colour(value: str, expected: tuple[int, int, int]) -> None:
     assert _parse_hex_colour(value, "test.colour") == expected
+
+
+def test_parse_render_overlay_empty_background_colour() -> None:
+    data = yaml.safe_load(_OVERLAY_YAML)
+    data["render"]["overlay"]["body"]["background-colour"] = ""
+    render = _parse_render(data)
+    assert render is not None
+    assert render.overlay is not None
+    assert render.overlay.body.background_colour is None
+    assert render.overlay.title.background_colour == (51, 51, 255)
+
+
+def test_parse_render_overlay_missing_background_colour() -> None:
+    data = yaml.safe_load(_OVERLAY_YAML)
+    del data["render"]["overlay"]["title"]["background-colour"]
+    render = _parse_render(data)
+    assert render is not None
+    assert render.overlay is not None
+    assert render.overlay.title.background_colour is None
 
 
 def test_parse_render_overlay_rejects_invalid_position() -> None:

@@ -10,19 +10,27 @@ render:
     enabled: true
     fade_in: 30     # counted from start, 0 = disabled
     fade_out: 4     # counted from end, 0 = disable
+
   overlay:
     enabled: true
-    title: Cleave Final Render
-    body: |
-      Place anything you like here
-      Like musician names, year of release etc.
-      Edit the cleave-viz.yaml to modify this message, colours etc.
     start_delay: 10
     display_time: 30
     position: bottom-left
-    font:
-      size: 18
+    title: 
+      content: |
+        Cleave Final Render
+      font-size: 24
+      font-colour: "#ffffff"
+      background-colour: "#3333ff"
+      margin-bottom: 10
+    body: 
+      content: |
+        Place anything you like here
+        Like musician names, year of release etc.
+        Edit the cleave-viz.yaml to modify this message, colours etc.
+      font-size: 18
       colour: "#ffffff"
+      background-colour: "#3333ff"
     background:
       margin: 40
       padding: 20
