@@ -7,6 +7,8 @@ from dataclasses import dataclass
 import pygame
 from OpenGL.GL import GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, glClear, glClearColor, glViewport
 
+from cleave.extract import STEM_NAMES
+from cleave.timeline import layer_visible_at
 from cleave.config import (
     DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
     DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
@@ -31,9 +33,11 @@ from cleave.viz.controls import (
     LayerRuntime,
     RenderOverlayRuntime,
     RenderPostFxRuntime,
+    TimelineRuntime,
     TuningSession,
 )
 from cleave.viz.overlay import TuningOverlay, TuningViewState
+from cleave.viz.timeline_overlay import TimelineOverlay, TimelineViewState
 
 
 @dataclass
@@ -44,18 +48,37 @@ class StemLayer:
     playlist: PresetPlaylist
 
 
-def effective_layer_enabled(session: TuningSession, stem: str) -> bool:
+def timeline_defaults(session: TuningSession) -> dict[str, bool]:
+    return {name: session.layers[name].enabled for name in STEM_NAMES}
+
+
+def timeline_cues_for_eval(session: TuningSession) -> list[TimelineCue]:
+    tl = session.timeline
+    if tl.recording:
+        return tl.cues + tl.record_buffer
+    return tl.cues
+
+
+def effective_layer_enabled(session: TuningSession, stem: str, t_sec: float) -> bool:
     if session.solo_stem is not None:
         return stem == session.solo_stem
+    if session.timeline.enabled:
+        return layer_visible_at(
+            timeline_cues_for_eval(session),
+            timeline_defaults(session),
+            stem,
+            t_sec,
+        )
     return session.layers[stem].enabled
 
 
 def apply_layer_visibility(
     session: TuningSession,
     layers_by_name: dict[str, StemLayer],
+    t_sec: float,
 ) -> None:
     for stem, layer in layers_by_name.items():
-        layer.fbo.enabled = effective_layer_enabled(session, stem)
+        layer.fbo.enabled = effective_layer_enabled(session, stem, t_sec)
 
 
 def apply_effect_modifiers(
@@ -71,7 +94,7 @@ def apply_effect_modifiers(
         effect_runtime.update(session, signals, t_sec)
     modifiers = effect_runtime.modifiers(session)
     for stem, layer in layers_by_name.items():
-        if not effective_layer_enabled(session, stem):
+        if not effective_layer_enabled(session, stem, t_sec):
             continue
         mod = modifiers[stem]
         layer.fbo.opacity = mod.opacity
@@ -233,6 +256,17 @@ def _render_post_fx_runtime_from_cfg(
     )
 
 
+def _timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
+    timeline = cfg.timeline
+    if timeline is None:
+        return TimelineRuntime()
+    return TimelineRuntime(
+        enabled=timeline.enabled,
+        expanded=False,
+        cues=list(timeline.cues),
+    )
+
+
 def _session_from_cfg(
     cfg: CleaveConfig,
     playlists: dict[str, PresetPlaylist],
@@ -242,6 +276,7 @@ def _session_from_cfg(
         layer_z_order=list(cfg.layer_z_order),
         render_overlay=_render_overlay_runtime_from_cfg(cfg),
         render_post_fx=_render_post_fx_runtime_from_cfg(cfg),
+        timeline=_timeline_runtime_from_cfg(cfg),
         layers={
             name: LayerRuntime(
                 playlist=playlists[name],
@@ -277,6 +312,41 @@ def _draw_tuning_overlay(
     overlay: TuningOverlay,
     overlay_surface: pygame.Surface,
     view_state: TuningViewState,
+) -> None:
+    overlay_surface.fill((0, 0, 0, 0))
+    overlay.draw(overlay_surface, view_state)
+    panel = overlay.panel_rect
+    if panel is not None:
+        px, py, pw, ph = panel
+        panel_surface = overlay_surface.subsurface((px, py, pw, ph))
+        tex_id = compositor.upload_overlay_texture(panel_surface)
+        compositor.draw_overlay(tex_id, px, py, pw, ph)
+
+
+def _build_timeline_view_state(
+    session: TuningSession,
+    position_sec: float,
+    duration_sec: float,
+) -> TimelineViewState:
+    tl = session.timeline
+    return TimelineViewState(
+        layer_z_order=list(session.layer_z_order),
+        cues=list(tl.cues),
+        defaults=timeline_defaults(session),
+        position_sec=position_sec,
+        duration_sec=duration_sec,
+        focus_row=tl.focus_row,
+        armed_stems=set(tl.armed_stems),
+        recording=tl.recording,
+        enabled=tl.enabled,
+    )
+
+
+def _draw_timeline_overlay(
+    compositor: GlCompositor,
+    overlay: TimelineOverlay,
+    overlay_surface: pygame.Surface,
+    view_state: TimelineViewState,
 ) -> None:
     overlay_surface.fill((0, 0, 0, 0))
     overlay.draw(overlay_surface, view_state)

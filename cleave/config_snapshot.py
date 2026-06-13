@@ -178,6 +178,19 @@ def _snapshot_render_overlay(
     return render_out
 
 
+def _snapshot_timeline(session: TuningSession) -> dict[str, Any] | None:
+    runtime = session.timeline
+    if not runtime.enabled and not runtime.cues:
+        return None
+    out: dict[str, Any] = {"enabled": runtime.enabled}
+    if runtime.cues:
+        out["cues"] = [
+            {"t": cue.t, "layers": dict(cue.layers)}
+            for cue in sorted(runtime.cues, key=lambda cue: cue.t)
+        ]
+    return out
+
+
 def write_session_snapshot(
     path: Path,
     *,
@@ -259,6 +272,9 @@ def write_session_snapshot(
         "layers": layers_out,
         "render": _snapshot_render_overlay(cfg, session, original),
     }
+    timeline_out = _snapshot_timeline(session)
+    if timeline_out is not None:
+        data["timeline"] = timeline_out
 
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as fh:

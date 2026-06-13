@@ -16,6 +16,7 @@ from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.effects.constants import clamp_effect_pct
 from cleave.effects.registry import validate_effect_entry
 from cleave.extract import STEM_NAMES
+from cleave.timeline import TimelineCue
 
 DEFAULT_VIZ_CONFIG_FILENAME = "cleave-viz-default.yaml"
 PROJECT_VIZ_CONFIG_FILENAME = "cleave-viz.yaml"
@@ -179,6 +180,15 @@ class RenderConfig:
     post_fx: RenderPostFxConfig | None
 
 
+DEFAULT_TIMELINE_ENABLED = False
+
+
+@dataclass(frozen=True)
+class TimelineConfig:
+    enabled: bool
+    cues: tuple[TimelineCue, ...]
+
+
 @dataclass(frozen=True)
 class CleaveConfig:
     paths: PathsConfig
@@ -187,6 +197,7 @@ class CleaveConfig:
     config_path: Path
     layer_z_order: tuple[str, ...] = DEFAULT_LAYER_Z_ORDER
     render: RenderConfig | None = None
+    timeline: TimelineConfig | None = None
 
     def layers_in_z_order(self) -> list[tuple[str, LayerConfig]]:
         """Return layers in compositor draw order (bottom-to-top)."""
@@ -611,6 +622,43 @@ def _parse_render(data: dict[str, Any]) -> RenderConfig | None:
     return RenderConfig(overlay=overlay, post_fx=post_fx)
 
 
+def _parse_timeline(data: dict[str, Any]) -> TimelineConfig | None:
+    timeline = data.get("timeline")
+    if timeline is None:
+        return None
+    timeline_map = _as_mapping(timeline, "timeline")
+    enabled = bool(timeline_map.get("enabled", DEFAULT_TIMELINE_ENABLED))
+    cues_raw = timeline_map.get("cues", [])
+    if cues_raw is None:
+        cues_raw = []
+    if not isinstance(cues_raw, list):
+        raise ValueError("timeline.cues must be a list")
+    cues: list[TimelineCue] = []
+    for index, item in enumerate(cues_raw):
+        cue_map = _as_mapping(item, f"timeline.cues[{index}]")
+        t = float(
+            _require_non_negative_number(
+                cue_map.get("t"),
+                f"timeline.cues[{index}].t",
+            )
+        )
+        layers_raw = _as_mapping(
+            cue_map.get("layers"),
+            f"timeline.cues[{index}].layers",
+        )
+        unknown = sorted(set(layers_raw) - set(STEM_NAMES))
+        if unknown:
+            raise ValueError(
+                f"unknown layer keys in timeline.cues[{index}].layers "
+                f"(expected {', '.join(STEM_NAMES)}): "
+                + ", ".join(unknown)
+            )
+        layers = {stem: bool(layers_raw[stem]) for stem in layers_raw}
+        cues.append(TimelineCue(t=t, layers=layers))
+    cues.sort(key=lambda cue: cue.t)
+    return TimelineConfig(enabled=enabled, cues=tuple(cues))
+
+
 def _parse_visualizer(data: dict[str, Any]) -> VisualizerConfig:
     visualizer = _as_mapping(data.get("visualizer"), "visualizer")
     return VisualizerConfig(
@@ -713,6 +761,7 @@ def load_config(
     paths = _parse_paths(data)
     visualizer = _parse_visualizer(data)
     render = _parse_render(data)
+    timeline = _parse_timeline(data)
     layer_z_order = _parse_layer_z_order(data)
     layers = _parse_layers(data, paths.preset_root)
     _validate_presets(layers)
@@ -724,6 +773,7 @@ def load_config(
         config_path=path,
         layer_z_order=layer_z_order,
         render=render,
+        timeline=timeline,
     )
 
 

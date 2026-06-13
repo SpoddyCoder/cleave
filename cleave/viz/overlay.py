@@ -98,6 +98,7 @@ class RowKind(Enum):
     RENDER_POST_FX_HEADER = auto()
     RENDER_POST_FX_FADE_IN = auto()
     RENDER_POST_FX_FADE_OUT = auto()
+    RENDER_TIMELINE_HEADER = auto()
     CONFIG_HEADER = auto()
     TRANSPORT = auto()
     SAVE_CONFIG = auto()
@@ -156,6 +157,12 @@ class RenderPostFxBlock:
 
 
 @dataclass
+class RenderTimelineBlock:
+    enabled: bool = False
+    expanded: bool = False
+
+
+@dataclass
 class TuningViewState:
     layer_z_order: tuple[str, ...]
     tracks: dict[str, TrackBlock]
@@ -176,6 +183,9 @@ class TuningViewState:
     render_overlay: RenderOverlayBlock = field(default_factory=RenderOverlayBlock)
     render_post_fx: RenderPostFxBlock = field(
         default_factory=RenderPostFxBlock
+    )
+    render_timeline: RenderTimelineBlock = field(
+        default_factory=RenderTimelineBlock
     )
 
 
@@ -234,6 +244,7 @@ def build_row_layout(state: TuningViewState) -> list[RowDescriptor]:
     if state.render_post_fx.expanded:
         rows.append(RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN))
         rows.append(RowDescriptor(RowKind.RENDER_POST_FX_FADE_OUT))
+    rows.append(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
     rows.append(RowDescriptor(RowKind.TRANSPORT))
     rows.append(RowDescriptor(RowKind.CONFIG_HEADER))
     rows.append(RowDescriptor(RowKind.SAVE_CONFIG))
@@ -336,6 +347,8 @@ _RENDER_POST_FX_SUB_ROW_KINDS = frozenset(
         RowKind.RENDER_POST_FX_FADE_OUT,
     }
 )
+
+_RENDER_TIMELINE_SUB_ROW_KINDS: frozenset[RowKind] = frozenset()
 
 _LOCKED_NAVIGABLE_SUB_ROW_KINDS = frozenset({RowKind.TRACK_EFFECTS_HEADER})
 
@@ -444,6 +457,7 @@ def quick_nav_row_indices(state: TuningViewState) -> list[int]:
             RowKind.TRACK_HEADER,
             RowKind.RENDER_OVERLAY_HEADER,
             RowKind.RENDER_POST_FX_HEADER,
+            RowKind.RENDER_TIMELINE_HEADER,
             RowKind.TRANSPORT,
         ):
             indices.append(index)
@@ -491,6 +505,10 @@ def _row_text(state: TuningViewState, index: int) -> str:
     if kind == RowKind.RENDER_POST_FX_HEADER:
         arrow = "▼" if state.render_post_fx.expanded else "▶"
         return f"Render: POST FX {arrow}"
+
+    if kind == RowKind.RENDER_TIMELINE_HEADER:
+        arrow = "▼" if state.render_timeline.expanded else "▶"
+        return f"Render: TIMELINE {arrow}"
 
     block_ro = state.render_overlay
     if kind == RowKind.RENDER_OVERLAY_POSITION:
@@ -696,6 +714,10 @@ def _render_post_fx_header_prefix() -> str:
     return "Render: "
 
 
+def _render_timeline_header_prefix() -> str:
+    return "Render: "
+
+
 def render_visibility_icon(
     *,
     enabled: bool,
@@ -839,6 +861,13 @@ def fit_row_text(
             + "POST FX"
             + _track_header_expand_suffix(expanded)
         )
+    if kind == RowKind.RENDER_TIMELINE_HEADER:
+        expanded = state.render_timeline.expanded
+        return (
+            _render_timeline_header_prefix()
+            + "TIMELINE"
+            + _track_header_expand_suffix(expanded)
+        )
     if kind in _LABELED_SUB_ROW_KINDS:
         return _labeled_sub_row_prefix(state, index) + _fit_labeled_sub_row_value(
             font, state, index, max_content_width=max_content_width
@@ -852,6 +881,7 @@ def _row_indent(state: TuningViewState, index: int) -> int:
         RowKind.TRACK_HEADER,
         RowKind.RENDER_OVERLAY_HEADER,
         RowKind.RENDER_POST_FX_HEADER,
+        RowKind.RENDER_TIMELINE_HEADER,
     }:
         return 0
     if kind == RowKind.RENDER_SECTION_GAP:
@@ -892,6 +922,10 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
         *_RENDER_POST_FX_SUB_ROW_KINDS,
     }:
         if not state.render_post_fx.enabled:
+            return DISABLED
+
+    if kind == RowKind.RENDER_TIMELINE_HEADER:
+        if not state.render_timeline.enabled:
             return DISABLED
 
     if state.solo_active and kind == RowKind.SAVE_CONFIG:
@@ -1107,6 +1141,27 @@ class TuningOverlay:
                     stem_text="POST FX",
                     value_color=color,
                     expanded=block_pp.expanded,
+                    locked=False,
+                    line_height=line_h,
+                )
+                row_surfaces.append(prefix_surf)
+                row_time_surfaces.append(label_surf)
+                row_widths.append(
+                    indent + prefix_surf.get_width() + label_surf.get_width()
+                )
+            elif kind == RowKind.RENDER_TIMELINE_HEADER:
+                block_tl = state.render_timeline
+                prefix_surf = render_visibility_icon(
+                    enabled=block_tl.enabled,
+                    solo=False,
+                    line_height=line_h,
+                )
+                label_surf = _render_track_header_label(
+                    font,
+                    layer_prefix=_render_timeline_header_prefix(),
+                    stem_text="TIMELINE",
+                    value_color=color,
+                    expanded=block_tl.expanded,
                     locked=False,
                     line_height=line_h,
                 )

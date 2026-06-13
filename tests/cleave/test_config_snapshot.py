@@ -20,16 +20,19 @@ from cleave.config import (
     VisualizerConfig,
     _parse_layers,
     _parse_render,
+    _parse_timeline,
 )
 from cleave.config_snapshot import next_unnamed_path, write_session_snapshot
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import playlist_at_dir
+from cleave.timeline import TimelineCue
 from cleave.viz.controls import (
     LayerRuntime,
     RenderOverlayRuntime,
     RenderPostFxRuntime,
     TuningSession,
 )
+from cleave.viz.layer import _session_from_cfg
 
 
 def test_next_unnamed_path_empty_dir(tmp_path: Path) -> None:
@@ -630,3 +633,52 @@ def test_write_session_snapshot_render_overlay_without_cfg_render(tmp_path: Path
     assert overlay["title"]["content"] == "Cleave Final Render"
     assert overlay["position"] == "top-right"
     assert overlay["title"]["font-size"] == 14
+
+
+def test_write_session_snapshot_persists_timeline_at_bottom(tmp_path: Path) -> None:
+    cfg, session, out_path = _snapshot_fixture(tmp_path)
+    session.timeline.enabled = True
+    session.timeline.cues = [
+        TimelineCue(t=2.5, layers={"drums": False, "bass": True}),
+        TimelineCue(t=10.0, layers={"vocals": False}),
+    ]
+    write_session_snapshot(out_path, cfg=cfg, session=session)
+
+    raw = out_path.read_text(encoding="utf-8")
+    data = yaml.safe_load(raw)
+    assert list(data.keys())[-1] == "timeline"
+    assert data["timeline"]["enabled"] is True
+    assert data["timeline"]["cues"] == [
+        {"t": 2.5, "layers": {"drums": False, "bass": True}},
+        {"t": 10.0, "layers": {"vocals": False}},
+    ]
+
+    timeline = _parse_timeline(data)
+    assert timeline is not None
+    playlists = {
+        name: playlist_at_dir(cfg.paths.preset_root / name, index=0)
+        for name in STEM_NAMES
+    }
+    cfg_with_timeline = CleaveConfig(
+        paths=cfg.paths,
+        layers=cfg.layers,
+        visualizer=cfg.visualizer,
+        config_path=out_path,
+        render=cfg.render,
+        timeline=timeline,
+    )
+    session2 = _session_from_cfg(cfg_with_timeline, playlists)
+    assert session2.timeline.enabled is True
+    assert session2.timeline.cues == list(timeline.cues)
+
+
+def test_write_session_snapshot_omits_timeline_when_disabled_and_empty(
+    tmp_path: Path,
+) -> None:
+    cfg, session, out_path = _snapshot_fixture(tmp_path)
+    session.timeline.enabled = False
+    session.timeline.cues = []
+    write_session_snapshot(out_path, cfg=cfg, session=session)
+
+    data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    assert "timeline" not in data
