@@ -118,7 +118,7 @@ def stem_abbrev_label(stem: str) -> str:
 
 
 def transport_time_text(position_sec: float) -> str:
-    return f" [{format_mmss(position_sec)}]"
+    return f"[{format_mmss(position_sec)}]"
 
 
 def stem_label_text(layer_num: int, stem: str) -> str:

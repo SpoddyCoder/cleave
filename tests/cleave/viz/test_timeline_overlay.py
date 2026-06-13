@@ -180,9 +180,9 @@ def test_focus_row_index_matches_stem() -> None:
 
 
 def test_transport_time_text_matches_main_ui_format() -> None:
-    assert transport_time_text(0.0) == " [00:00]"
-    assert transport_time_text(65.0) == " [01:05]"
-    assert transport_time_text(3725.9) == " [62:05]"
+    assert transport_time_text(0.0) == "[00:00]"
+    assert transport_time_text(65.0) == "[01:05]"
+    assert transport_time_text(3725.9) == "[62:05]"
 
 
 def test_header_badge_rect_is_above_panel() -> None:

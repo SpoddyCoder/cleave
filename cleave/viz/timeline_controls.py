@@ -63,9 +63,12 @@ class TimelineControls:
             toggle_pause(self.playback, self.duration_sec)
             return True
 
-        if event.key in (pygame.K_LEFT, pygame.K_RIGHT) and mod_ctrl(event.mod):
+        if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
             if not self.session.timeline.recording:
-                self._do_seek(event.key == pygame.K_RIGHT, long=mod_ctrl(event.mod))
+                self._do_seek(
+                    event.key == pygame.K_RIGHT,
+                    long=mod_ctrl(event.mod),
+                )
             return True
 
         if self.session.timeline.recording and event.key in _LAYER_KEYS:
@@ -81,10 +84,6 @@ class TimelineControls:
             return True
         if event.key == pygame.K_DOWN:
             self._move_focus_row(1)
-            return True
-
-        if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
-            self._navigate_cue(forward=event.key == pygame.K_RIGHT)
             return True
 
         if event.key == pygame.K_RETURN and mod_ctrl(event.mod):
@@ -137,17 +136,6 @@ class TimelineControls:
 
     def _sorted_cues(self) -> list[TimelineCue]:
         return sorted(self.session.timeline.cues, key=lambda cue: cue.t)
-
-    def _navigate_cue(self, *, forward: bool) -> None:
-        sorted_cues = self._sorted_cues()
-        if not sorted_cues:
-            return
-        if self.focused_cue_index is None:
-            self.focused_cue_index = 0 if forward else len(sorted_cues) - 1
-            return
-        next_index = self.focused_cue_index + (1 if forward else -1)
-        if 0 <= next_index < len(sorted_cues):
-            self.focused_cue_index = next_index
 
     def _nearest_cue_index(self, t_sec: float) -> int | None:
         sorted_cues = self._sorted_cues()

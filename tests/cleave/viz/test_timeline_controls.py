@@ -8,7 +8,7 @@ import pygame
 
 from cleave.extract import STEM_NAMES
 from cleave.timeline import TimelineCue
-from cleave.viz.controls import LayerRuntime, SEEK_LONG, TuningSession
+from cleave.viz.controls import LayerRuntime, SEEK_LONG, SEEK_SHORT, TuningSession
 from cleave.viz.timeline_controls import TimelineControls
 from tests.support.viz import keydown, make_playlist, stub_playback_state
 
@@ -100,24 +100,14 @@ def test_up_down_change_focus_row() -> None:
     assert session.timeline.focus_row == 3
 
 
-def test_left_right_navigate_cues_by_time() -> None:
-    cues = [
-        TimelineCue(t=30.0, layers={"drums": False}),
-        TimelineCue(t=10.0, layers={"bass": False}),
-        TimelineCue(t=50.0, layers={"vocals": False}),
-    ]
-    controls, _, _, _, _, _ = _make_timeline_controls(cues=cues)
+def test_left_right_seek_short_when_not_recording() -> None:
+    controls, _, _, _, seeks, _ = _make_timeline_controls()
 
     controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert controls.focused_cue_index == 0
-    assert controls._sorted_cues()[0].t == 10.0
-
-    controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert controls.focused_cue_index == 1
-    assert controls._sorted_cues()[1].t == 30.0
+    assert seeks == [SEEK_SHORT]
 
     controls.handle_keydown(keydown(pygame.K_LEFT))
-    assert controls.focused_cue_index == 0
+    assert seeks == [SEEK_SHORT, -SEEK_SHORT]
 
 
 def test_backspace_deletes_focused_cue() -> None:
@@ -127,9 +117,7 @@ def test_backspace_deletes_focused_cue() -> None:
         cues=[cue_a, cue_b]
     )
 
-    controls.handle_keydown(keydown(pygame.K_RIGHT))
-    controls.handle_keydown(keydown(pygame.K_RIGHT))
-    assert controls.focused_cue_index == 1
+    controls.focused_cue_index = 1
 
     controls.handle_keydown(keydown(pygame.K_BACKSPACE))
     assert session.timeline.cues == [cue_a]
@@ -272,7 +260,7 @@ def test_layer_key_debounce_ignores_rapid_press() -> None:
     assert len(session.timeline.record_buffer) == 1
 
 
-def test_ctrl_seek_blocked_while_recording() -> None:
+def test_seek_blocked_while_recording() -> None:
     controls, session, _, _, seeks, _ = _make_timeline_controls(
         armed_stems={"drums"},
     )
@@ -280,6 +268,8 @@ def test_ctrl_seek_blocked_while_recording() -> None:
     controls.handle_keydown(keydown(pygame.K_r))
     assert session.timeline.recording is True
 
+    controls.handle_keydown(keydown(pygame.K_RIGHT))
+    controls.handle_keydown(keydown(pygame.K_LEFT))
     controls.handle_keydown(keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
     controls.handle_keydown(keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
     assert seeks == []
