@@ -104,6 +104,17 @@ DEFAULT_RENDER_OVERLAY_BODY = (
 DEFAULT_RENDER_OVERLAY_START_DELAY = 10.0
 DEFAULT_RENDER_OVERLAY_DISPLAY_TIME = 30.0
 DEFAULT_RENDER_OVERLAY_POSITION: RenderOverlayPosition = "bottom-left"
+DEFAULT_RENDER_OVERLAY_FONT = "monospace"
+RENDER_OVERLAY_FONTS: tuple[str, ...] = (
+    "monospace",
+    "sans",
+    "serif",
+    "dejavusans",
+    "dejavusansmono",
+    "dejavuserif",
+    "ubuntusans",
+    "ubuntumono",
+)
 DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE = 24
 DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM = 10
 DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE = 18
@@ -122,6 +133,7 @@ DEFAULT_RENDER_POST_FX_FADE_OUT = 4.0
 @dataclass(frozen=True)
 class RenderOverlayTextBlockConfig:
     content: str
+    font: str
     font_size: int
     colour: tuple[int, int, int]
     background_colour: tuple[int, int, int] | None = None
@@ -370,9 +382,21 @@ def _parse_render_overlay_position(
     return value
 
 
+def cycle_render_overlay_font(current: str, *, forward: bool) -> str:
+    fonts = RENDER_OVERLAY_FONTS
+    try:
+        index = fonts.index(current)
+    except ValueError:
+        index = 0
+    if forward:
+        return fonts[(index + 1) % len(fonts)]
+    return fonts[(index - 1) % len(fonts)]
+
+
 def _default_render_overlay_title_block() -> RenderOverlayTextBlockConfig:
     return RenderOverlayTextBlockConfig(
         content=DEFAULT_RENDER_OVERLAY_TITLE,
+        font=DEFAULT_RENDER_OVERLAY_FONT,
         font_size=DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
         colour=DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
         margin_bottom=DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
@@ -382,6 +406,7 @@ def _default_render_overlay_title_block() -> RenderOverlayTextBlockConfig:
 def _default_render_overlay_body_block() -> RenderOverlayTextBlockConfig:
     return RenderOverlayTextBlockConfig(
         content=DEFAULT_RENDER_OVERLAY_BODY,
+        font=DEFAULT_RENDER_OVERLAY_FONT,
         font_size=DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
         colour=DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
     )
@@ -424,6 +449,10 @@ def _parse_render_overlay_text_block(
     content = str(content_raw)
     if content.endswith("\n"):
         content = content[:-1]
+    font_raw = block.get("font", DEFAULT_RENDER_OVERLAY_FONT)
+    if not isinstance(font_raw, str) or not font_raw.strip():
+        raise ValueError(f"{label_prefix}.font must be a non-empty string")
+    font = font_raw.strip()
     font_size = _require_non_negative_number(
         block.get("font-size", default_font_size),
         f"{label_prefix}.font-size",
@@ -440,6 +469,7 @@ def _parse_render_overlay_text_block(
     )
     return RenderOverlayTextBlockConfig(
         content=content,
+        font=font,
         font_size=int(font_size),
         colour=colour,
         background_colour=background_colour,

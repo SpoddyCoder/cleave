@@ -17,6 +17,7 @@ from cleave.config import (
     DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
     DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
     DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
+    DEFAULT_RENDER_OVERLAY_FONT,
     DEFAULT_RENDER_OVERLAY_POSITION,
     DEFAULT_RENDER_OVERLAY_START_DELAY,
     DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
@@ -85,9 +86,11 @@ class RowKind(Enum):
     RENDER_OVERLAY_POSITION = auto()
     RENDER_OVERLAY_TITLE_HEADER = auto()
     RENDER_OVERLAY_TITLE_FONT_SIZE = auto()
+    RENDER_OVERLAY_TITLE_FONT = auto()
     RENDER_OVERLAY_TITLE_MARGIN_BOTTOM = auto()
     RENDER_OVERLAY_BODY_HEADER = auto()
     RENDER_OVERLAY_BODY_FONT_SIZE = auto()
+    RENDER_OVERLAY_BODY_FONT = auto()
     RENDER_OVERLAY_OPACITY = auto()
     RENDER_OVERLAY_BORDER_WIDTH = auto()
     RENDER_OVERLAY_START_DELAY = auto()
@@ -132,8 +135,10 @@ class RenderOverlayBlock:
     title_expanded: bool = False
     body_expanded: bool = False
     title_font_size: int = DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE
+    title_font: str = DEFAULT_RENDER_OVERLAY_FONT
     title_margin_bottom: int = DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM
     body_font_size: int = DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE
+    body_font: str = DEFAULT_RENDER_OVERLAY_FONT
     opacity_pct: int = int(round(DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY * 100))
     border_width: int = DEFAULT_RENDER_OVERLAY_BORDER_WIDTH
     start_delay: float = DEFAULT_RENDER_OVERLAY_START_DELAY
@@ -218,10 +223,12 @@ def build_row_layout(state: TuningViewState) -> list[RowDescriptor]:
         rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_DISPLAY_TIME))
         rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_HEADER))
         if state.render_overlay.title_expanded:
+            rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_FONT))
             rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE))
             rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM))
         rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_BODY_HEADER))
         if state.render_overlay.body_expanded:
+            rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_BODY_FONT))
             rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_BODY_FONT_SIZE))
     rows.append(RowDescriptor(RowKind.RENDER_POST_FX_HEADER))
     if state.render_post_fx.expanded:
@@ -306,10 +313,16 @@ _RENDER_OVERLAY_SUB_ROW_KINDS = frozenset(
 _RENDER_OVERLAY_TITLE_NESTED_KINDS = frozenset(
     {
         RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_TITLE_FONT,
         RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
     }
 )
-_RENDER_OVERLAY_BODY_NESTED_KINDS = frozenset({RowKind.RENDER_OVERLAY_BODY_FONT_SIZE})
+_RENDER_OVERLAY_BODY_NESTED_KINDS = frozenset(
+    {
+        RowKind.RENDER_OVERLAY_BODY_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_BODY_FONT,
+    }
+)
 
 _RENDER_OVERLAY_ALL_SUB_ROW_KINDS = (
     _RENDER_OVERLAY_SUB_ROW_KINDS
@@ -334,8 +347,10 @@ _LABELED_SUB_ROW_KINDS = frozenset(
         RowKind.TRACK_EFFECT,
         RowKind.RENDER_OVERLAY_POSITION,
         RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_TITLE_FONT,
         RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
         RowKind.RENDER_OVERLAY_BODY_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_BODY_FONT,
         RowKind.RENDER_OVERLAY_OPACITY,
         RowKind.RENDER_OVERLAY_BORDER_WIDTH,
         RowKind.RENDER_OVERLAY_START_DELAY,
@@ -485,6 +500,8 @@ def _row_text(state: TuningViewState, index: int) -> str:
         return f"└─ title {arrow}"
     if kind == RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE:
         return f"└─ font size: {block_ro.title_font_size}px"
+    if kind == RowKind.RENDER_OVERLAY_TITLE_FONT:
+        return f"└─ font: {block_ro.title_font}"
     if kind == RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM:
         return f"└─ margin bottom: {block_ro.title_margin_bottom}px"
     if kind == RowKind.RENDER_OVERLAY_BODY_HEADER:
@@ -492,6 +509,8 @@ def _row_text(state: TuningViewState, index: int) -> str:
         return f"└─ body {arrow}"
     if kind == RowKind.RENDER_OVERLAY_BODY_FONT_SIZE:
         return f"└─ font size: {block_ro.body_font_size}px"
+    if kind == RowKind.RENDER_OVERLAY_BODY_FONT:
+        return f"└─ font: {block_ro.body_font}"
     if kind == RowKind.RENDER_OVERLAY_OPACITY:
         return f"└─ background opacity: {block_ro.opacity_pct}%"
     if kind == RowKind.RENDER_OVERLAY_BORDER_WIDTH:
@@ -547,10 +566,14 @@ def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
         return "└─ position: "
     if kind == RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE:
         return "└─ font size: "
+    if kind == RowKind.RENDER_OVERLAY_TITLE_FONT:
+        return "└─ font: "
     if kind == RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM:
         return "└─ margin bottom: "
     if kind == RowKind.RENDER_OVERLAY_BODY_FONT_SIZE:
         return "└─ font size: "
+    if kind == RowKind.RENDER_OVERLAY_BODY_FONT:
+        return "└─ font: "
     if kind == RowKind.RENDER_OVERLAY_OPACITY:
         return "└─ background opacity: "
     if kind == RowKind.RENDER_OVERLAY_BORDER_WIDTH:
@@ -577,10 +600,14 @@ def _labeled_sub_row_value(state: TuningViewState, index: int) -> str:
         return block_ro.position
     if kind == RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE:
         return f"{block_ro.title_font_size}px"
+    if kind == RowKind.RENDER_OVERLAY_TITLE_FONT:
+        return block_ro.title_font
     if kind == RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM:
         return f"{block_ro.title_margin_bottom}px"
     if kind == RowKind.RENDER_OVERLAY_BODY_FONT_SIZE:
         return f"{block_ro.body_font_size}px"
+    if kind == RowKind.RENDER_OVERLAY_BODY_FONT:
+        return block_ro.body_font
     if kind == RowKind.RENDER_OVERLAY_OPACITY:
         return f"{block_ro.opacity_pct}%"
     if kind == RowKind.RENDER_OVERLAY_BORDER_WIDTH:

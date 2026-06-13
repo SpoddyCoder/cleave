@@ -393,6 +393,7 @@ def _render_overlay_cfg() -> RenderOverlayConfig:
         enabled=True,
         title=RenderOverlayTextBlockConfig(
             content="My Title",
+            font="monospace",
             font_size=24,
             colour=(255, 255, 255),
             background_colour=(51, 51, 255),
@@ -400,6 +401,7 @@ def _render_overlay_cfg() -> RenderOverlayConfig:
         ),
         body=RenderOverlayTextBlockConfig(
             content="Line one\nLine two",
+            font="monospace",
             font_size=18,
             colour=(255, 255, 255),
             background_colour=(51, 51, 255),
@@ -498,8 +500,10 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
             title_expanded=False,
             body_expanded=False,
             title_font_size=14,
+            title_font="dejavusans",
             title_margin_bottom=6,
             body_font_size=18,
+            body_font="ubuntumono",
             opacity_pct=75,
             border_width=4,
             start_delay=20.0,
@@ -529,8 +533,10 @@ def test_write_session_snapshot_persists_render_overlay(tmp_path: Path) -> None:
     assert overlay["display_time"] == 40.0
     assert overlay["position"] == "top-right"
     assert overlay["title"]["font-size"] == 14
+    assert overlay["title"]["font"] == "dejavusans"
     assert overlay["title"]["margin-bottom"] == 6
     assert overlay["body"]["font-size"] == 18
+    assert overlay["body"]["font"] == "ubuntumono"
     assert overlay["title"]["font-colour"] == "#ffffff"
     assert overlay["body"]["colour"] == "#ffffff"
     assert overlay["background"]["margin"] == 10
@@ -546,8 +552,10 @@ def test_write_session_snapshot_persists_render_overlay(tmp_path: Path) -> None:
     assert round_trip.overlay.enabled is True
     assert round_trip.overlay.start_delay == 20.0
     assert round_trip.overlay.title.font_size == 14
+    assert round_trip.overlay.title.font == "dejavusans"
     assert round_trip.overlay.title.margin_bottom == 6
     assert round_trip.overlay.body.font_size == 18
+    assert round_trip.overlay.body.font == "ubuntumono"
     assert round_trip.overlay.background.opacity == 0.75
     assert round_trip.overlay.background.border.width == 4
 

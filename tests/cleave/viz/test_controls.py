@@ -884,6 +884,34 @@ def test_render_overlay_body_header_expand_arrow() -> None:
     assert _row_text(view, body_header) == "└─ body ▼"
 
 
+def test_render_overlay_title_font_row() -> None:
+    controls = _make_controls()
+    controls.session.render_overlay.expanded = True
+    controls.session.render_overlay.title_expanded = True
+    controls.session.render_overlay.title_font = "monospace"
+    view = controls.build_view_state(paused=False)
+    font_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_FONT)
+    assert _row_text(view, font_row) == "└─ font: monospace"
+
+    controls.focus_index = font_row
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.render_overlay.title_font == "sans"
+
+
+def test_render_overlay_body_font_row() -> None:
+    controls = _make_controls()
+    controls.session.render_overlay.expanded = True
+    controls.session.render_overlay.body_expanded = True
+    controls.session.render_overlay.body_font = "sans"
+    view = controls.build_view_state(paused=False)
+    font_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_FONT)
+    assert _row_text(view, font_row) == "└─ font: sans"
+
+    controls.focus_index = font_row
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.render_overlay.body_font == "monospace"
+
+
 def test_render_overlay_title_font_size_row() -> None:
     controls = _make_controls()
     controls.session.render_overlay.expanded = True
@@ -933,12 +961,16 @@ def test_render_overlay_font_rows_nested_indent() -> None:
     controls.session.render_overlay.body_expanded = True
     view = controls.build_view_state(paused=False)
     title_header = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_HEADER)
-    title_font = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
+    title_font_size = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
+    title_font = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_FONT)
     body_header = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_HEADER)
-    body_font = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_FONT_SIZE)
+    body_font_size = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_FONT_SIZE)
+    body_font = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_FONT)
     assert _row_indent(view, title_header) == TREE_INDENT
+    assert _row_indent(view, title_font_size) == TREE_INDENT * 2
     assert _row_indent(view, title_font) == TREE_INDENT * 2
     assert _row_indent(view, body_header) == TREE_INDENT
+    assert _row_indent(view, body_font_size) == TREE_INDENT * 2
     assert _row_indent(view, body_font) == TREE_INDENT * 2
 
 

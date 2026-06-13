@@ -160,8 +160,10 @@ def test_render_overlay_title_and_body_font_rows_when_expanded() -> None:
     )
     kinds = [row.kind for row in build_row_layout(state)]
     assert RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE in kinds
+    assert RowKind.RENDER_OVERLAY_TITLE_FONT in kinds
     assert RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM in kinds
     assert RowKind.RENDER_OVERLAY_BODY_FONT_SIZE in kinds
+    assert RowKind.RENDER_OVERLAY_BODY_FONT in kinds
 
 
 def test_render_overlay_collapsed_hides_sub_rows() -> None:
