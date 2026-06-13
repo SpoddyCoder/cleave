@@ -248,6 +248,22 @@ def test_layer_keys_only_affect_armed_stems() -> None:
     )
 
 
+def test_numpad_layer_keys_work_while_recording() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_stems={"drums"},
+        position_sec=6.0,
+    )
+    session.layers["drums"].enabled = True
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.handle_keydown(keydown(pygame.K_KP1))
+
+    assert len(session.timeline.record_buffer) == 1
+    assert session.timeline.record_buffer[0] == TimelineCue(
+        t=6.0, layers={"drums": False}
+    )
+
+
 def test_layer_key_debounce_ignores_rapid_press() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
         armed_stems={"drums"},
