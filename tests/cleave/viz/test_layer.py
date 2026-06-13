@@ -13,6 +13,7 @@ from cleave.timeline import TimelineCue
 from cleave.viz.controls import LayerRuntime, TimelineRuntime, TuningSession
 from cleave.viz.layer import (
     StemLayer,
+    _build_timeline_view_state,
     apply_layer_visibility,
     effective_layer_enabled,
     timeline_cues_for_eval,
@@ -129,6 +130,18 @@ def test_timeline_cues_for_eval_merges_buffer_while_recording() -> None:
     assert len(merged) == 2
     assert merged[0].t == 0.0
     assert merged[1].t == 1.0
+
+
+def test_build_timeline_view_state_uses_record_buffer_while_recording() -> None:
+    session = _session(
+        timeline_enabled=True,
+        cues=[TimelineCue(t=0.0, layers={"drums": False})],
+    )
+    session.timeline.recording = True
+    session.timeline.record_buffer = [TimelineCue(t=1.0, layers={"bass": False})]
+    state = _build_timeline_view_state(session, position_sec=1.0, duration_sec=60.0)
+    assert len(state.cues) == 2
+    assert state.cues[1].layers == {"bass": False}
 
 
 def test_apply_layer_visibility_sets_fbo_enabled_from_timeline() -> None:

@@ -9,7 +9,9 @@ from cleave.timeline import TimelineCue, stem_abbreviation
 from cleave.viz.timeline_overlay import (
     TimelineOverlay,
     TimelineViewState,
+    cue_times_for_stem,
     playhead_x,
+    stem_label_text,
     time_to_x,
     unique_cue_times,
     visibility_segments,
@@ -77,11 +79,25 @@ def test_unique_cue_times_clamps_to_duration() -> None:
     assert unique_cue_times(cues, 10.0) == [5.0]
 
 
+def test_cue_times_for_stem_only_includes_relevant_layers() -> None:
+    cues = [
+        TimelineCue(t=5.0, layers={"drums": False}),
+        TimelineCue(t=15.0, layers={"bass": False, "vocals": True}),
+        TimelineCue(t=25.0, layers={"other": False}),
+    ]
+    assert cue_times_for_stem(cues, "drums", 30.0) == [5.0]
+    assert cue_times_for_stem(cues, "bass", 30.0) == [15.0]
+    assert cue_times_for_stem(cues, "vocals", 30.0) == [15.0]
+    assert cue_times_for_stem(cues, "other", 30.0) == [25.0]
+
+
 def test_stem_labels_use_abbreviations() -> None:
     assert stem_abbreviation("drums") == "D"
     assert stem_abbreviation("bass") == "B"
     assert stem_abbreviation("vocals") == "V"
     assert stem_abbreviation("other") == "O"
+    assert stem_label_text("drums") == " D "
+    assert stem_label_text("bass") == " B "
 
 
 def test_playhead_x_at_known_position() -> None:
@@ -156,3 +172,19 @@ def test_focus_row_index_matches_stem() -> None:
     vocals_layout = next(row for row in overlay.row_layout if row[5] == "vocals")
     assert vocals_layout[0] == 2
     assert overlay.panel_rect is not None
+
+
+def test_rec_badge_rect_is_above_panel() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    state = _view_state(recording=True)
+    surface = pygame.Surface((800, 400), pygame.SRCALPHA)
+    overlay.draw(surface, state)
+
+    panel = overlay.panel_rect
+    badge = overlay.rec_badge_rect
+    assert panel is not None
+    assert badge is not None
+    _, panel_y, _, panel_h = panel
+    _, badge_y, _, badge_h = badge
+    assert badge_y + badge_h <= panel_y
