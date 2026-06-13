@@ -12,7 +12,17 @@ from typing import Literal
 
 import pygame
 
-from cleave.config import RenderOverlayPosition
+from cleave.config import (
+    DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
+    DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
+    DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
+    DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
+    DEFAULT_RENDER_OVERLAY_POSITION,
+    DEFAULT_RENDER_OVERLAY_START_DELAY,
+    DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
+    DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
+    RenderOverlayPosition,
+)
 from cleave.effects.registry import effect_roster
 from cleave.viz.confirm import ConfirmDialog
 from cleave.viz.text_fit import (
@@ -74,7 +84,11 @@ class RowKind(Enum):
     RENDER_SECTION_GAP = auto()
     RENDER_OVERLAY_HEADER = auto()
     RENDER_OVERLAY_POSITION = auto()
-    RENDER_OVERLAY_FONT_SIZE = auto()
+    RENDER_OVERLAY_TITLE_HEADER = auto()
+    RENDER_OVERLAY_TITLE_FONT_SIZE = auto()
+    RENDER_OVERLAY_TITLE_MARGIN_BOTTOM = auto()
+    RENDER_OVERLAY_BODY_HEADER = auto()
+    RENDER_OVERLAY_BODY_FONT_SIZE = auto()
     RENDER_OVERLAY_OPACITY = auto()
     RENDER_OVERLAY_BORDER_WIDTH = auto()
     RENDER_OVERLAY_START_DELAY = auto()
@@ -116,12 +130,16 @@ class TrackBlock:
 class RenderOverlayBlock:
     enabled: bool = True
     expanded: bool = False
-    position: RenderOverlayPosition = "bottom-left"
-    font_size: int = 10
-    opacity_pct: int = 100
-    border_width: int = 2
-    start_delay: float = 10.0
-    display_time: float = 30.0
+    position: RenderOverlayPosition = DEFAULT_RENDER_OVERLAY_POSITION
+    title_expanded: bool = False
+    body_expanded: bool = False
+    title_font_size: int = DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE
+    title_margin_bottom: int = DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM
+    body_font_size: int = DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE
+    opacity_pct: int = int(round(DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY * 100))
+    border_width: int = DEFAULT_RENDER_OVERLAY_BORDER_WIDTH
+    start_delay: float = DEFAULT_RENDER_OVERLAY_START_DELAY
+    display_time: float = DEFAULT_RENDER_OVERLAY_DISPLAY_TIME
     solo: bool = False
 
 
@@ -199,11 +217,17 @@ def build_row_layout(state: TuningViewState) -> list[RowDescriptor]:
     rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_HEADER))
     if state.render_overlay.expanded:
         rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_POSITION))
-        rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_FONT_SIZE))
         rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_OPACITY))
         rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_BORDER_WIDTH))
         rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_START_DELAY))
         rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_DISPLAY_TIME))
+        rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_HEADER))
+        if state.render_overlay.title_expanded:
+            rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE))
+            rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM))
+        rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_BODY_HEADER))
+        if state.render_overlay.body_expanded:
+            rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_BODY_FONT_SIZE))
     rows.append(RowDescriptor(RowKind.RENDER_POST_FX_HEADER))
     if state.render_post_fx.expanded:
         rows.append(RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN))
@@ -277,12 +301,27 @@ _EFFECT_SUB_ROW_KINDS = frozenset({RowKind.TRACK_EFFECT})
 _RENDER_OVERLAY_SUB_ROW_KINDS = frozenset(
     {
         RowKind.RENDER_OVERLAY_POSITION,
-        RowKind.RENDER_OVERLAY_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_TITLE_HEADER,
+        RowKind.RENDER_OVERLAY_BODY_HEADER,
         RowKind.RENDER_OVERLAY_OPACITY,
         RowKind.RENDER_OVERLAY_BORDER_WIDTH,
         RowKind.RENDER_OVERLAY_START_DELAY,
         RowKind.RENDER_OVERLAY_DISPLAY_TIME,
     }
+)
+
+_RENDER_OVERLAY_TITLE_NESTED_KINDS = frozenset(
+    {
+        RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
+    }
+)
+_RENDER_OVERLAY_BODY_NESTED_KINDS = frozenset({RowKind.RENDER_OVERLAY_BODY_FONT_SIZE})
+
+_RENDER_OVERLAY_ALL_SUB_ROW_KINDS = (
+    _RENDER_OVERLAY_SUB_ROW_KINDS
+    | _RENDER_OVERLAY_TITLE_NESTED_KINDS
+    | _RENDER_OVERLAY_BODY_NESTED_KINDS
 )
 
 _RENDER_POST_FX_SUB_ROW_KINDS = frozenset(
@@ -301,7 +340,9 @@ _LABELED_SUB_ROW_KINDS = frozenset(
         RowKind.TRACK_BEAT,
         RowKind.TRACK_EFFECT,
         RowKind.RENDER_OVERLAY_POSITION,
-        RowKind.RENDER_OVERLAY_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
+        RowKind.RENDER_OVERLAY_BODY_FONT_SIZE,
         RowKind.RENDER_OVERLAY_OPACITY,
         RowKind.RENDER_OVERLAY_BORDER_WIDTH,
         RowKind.RENDER_OVERLAY_START_DELAY,
@@ -327,6 +368,10 @@ def _sub_row_visible(state: TuningViewState, index: int) -> bool:
         return True
     if desc.kind in _RENDER_OVERLAY_SUB_ROW_KINDS:
         return state.render_overlay.expanded
+    if desc.kind in _RENDER_OVERLAY_TITLE_NESTED_KINDS:
+        return state.render_overlay.expanded and state.render_overlay.title_expanded
+    if desc.kind in _RENDER_OVERLAY_BODY_NESTED_KINDS:
+        return state.render_overlay.expanded and state.render_overlay.body_expanded
     if desc.kind in _RENDER_POST_FX_SUB_ROW_KINDS:
         return state.render_post_fx.expanded
     stem = desc.stem
@@ -358,6 +403,12 @@ def navigable_row_indices(state: TuningViewState) -> list[int]:
             continue
         if desc.kind in _RENDER_OVERLAY_SUB_ROW_KINDS:
             if not state.render_overlay.expanded:
+                continue
+        elif desc.kind in _RENDER_OVERLAY_TITLE_NESTED_KINDS:
+            if not state.render_overlay.expanded or not state.render_overlay.title_expanded:
+                continue
+        elif desc.kind in _RENDER_OVERLAY_BODY_NESTED_KINDS:
+            if not state.render_overlay.expanded or not state.render_overlay.body_expanded:
                 continue
         elif desc.kind in _RENDER_POST_FX_SUB_ROW_KINDS:
             if not state.render_post_fx.expanded:
@@ -438,8 +489,18 @@ def _row_text(state: TuningViewState, index: int) -> str:
     block_ro = state.render_overlay
     if kind == RowKind.RENDER_OVERLAY_POSITION:
         return f"└─ position: {block_ro.position}"
-    if kind == RowKind.RENDER_OVERLAY_FONT_SIZE:
-        return f"└─ font size: {block_ro.font_size}px"
+    if kind == RowKind.RENDER_OVERLAY_TITLE_HEADER:
+        arrow = "▼" if block_ro.title_expanded else "▶"
+        return f"└─ title {arrow}"
+    if kind == RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE:
+        return f"└─ font size: {block_ro.title_font_size}px"
+    if kind == RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM:
+        return f"└─ margin bottom: {block_ro.title_margin_bottom}px"
+    if kind == RowKind.RENDER_OVERLAY_BODY_HEADER:
+        arrow = "▼" if block_ro.body_expanded else "▶"
+        return f"└─ body {arrow}"
+    if kind == RowKind.RENDER_OVERLAY_BODY_FONT_SIZE:
+        return f"└─ font size: {block_ro.body_font_size}px"
     if kind == RowKind.RENDER_OVERLAY_OPACITY:
         return f"└─ background opacity: {block_ro.opacity_pct}%"
     if kind == RowKind.RENDER_OVERLAY_BORDER_WIDTH:
@@ -493,7 +554,11 @@ def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
         return "└─ beat sensitivity: "
     if kind == RowKind.RENDER_OVERLAY_POSITION:
         return "└─ position: "
-    if kind == RowKind.RENDER_OVERLAY_FONT_SIZE:
+    if kind == RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE:
+        return "└─ font size: "
+    if kind == RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM:
+        return "└─ margin bottom: "
+    if kind == RowKind.RENDER_OVERLAY_BODY_FONT_SIZE:
         return "└─ font size: "
     if kind == RowKind.RENDER_OVERLAY_OPACITY:
         return "└─ background opacity: "
@@ -519,8 +584,12 @@ def _labeled_sub_row_value(state: TuningViewState, index: int) -> str:
     block_ro = state.render_overlay
     if kind == RowKind.RENDER_OVERLAY_POSITION:
         return block_ro.position
-    if kind == RowKind.RENDER_OVERLAY_FONT_SIZE:
-        return f"{block_ro.font_size}px"
+    if kind == RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE:
+        return f"{block_ro.title_font_size}px"
+    if kind == RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM:
+        return f"{block_ro.title_margin_bottom}px"
+    if kind == RowKind.RENDER_OVERLAY_BODY_FONT_SIZE:
+        return f"{block_ro.body_font_size}px"
     if kind == RowKind.RENDER_OVERLAY_OPACITY:
         return f"{block_ro.opacity_pct}%"
     if kind == RowKind.RENDER_OVERLAY_BORDER_WIDTH:
@@ -640,6 +709,14 @@ def _effects_header_prefix() -> str:
 
 def _effects_header_expand_value(expanded: bool) -> str:
     return "▼" if expanded else "▶"
+
+
+def _render_overlay_text_header_prefix(label: str) -> str:
+    return f"└─ {label} "
+
+
+def _render_overlay_text_header_expand_value(expanded: bool) -> str:
+    return _effects_header_expand_value(expanded)
 
 
 def _fit_track_header_stem(
@@ -763,6 +840,8 @@ def _row_indent(state: TuningViewState, index: int) -> int:
         return 0
     if kind == RowKind.TRACK_EFFECT:
         return TREE_INDENT * 2
+    if kind in _RENDER_OVERLAY_TITLE_NESTED_KINDS | _RENDER_OVERLAY_BODY_NESTED_KINDS:
+        return TREE_INDENT * 2
     if kind in {
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
@@ -786,7 +865,7 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
     if kind == RowKind.CONFIG_HEADER:
         return LABEL
 
-    if kind in {RowKind.RENDER_OVERLAY_HEADER, *_RENDER_OVERLAY_SUB_ROW_KINDS}:
+    if kind in {RowKind.RENDER_OVERLAY_HEADER, *_RENDER_OVERLAY_ALL_SUB_ROW_KINDS}:
         if not state.render_overlay.enabled:
             return DISABLED
 
@@ -1051,6 +1130,27 @@ class TuningOverlay:
                     font,
                     prefix=_effects_header_prefix(),
                     value=_effects_header_expand_value(block.effects_expanded),
+                    value_color=color,
+                    line_height=line_h,
+                )
+                row_surfaces.append(surf)
+                row_time_surfaces.append(None)
+                row_widths.append(indent + surf.get_width())
+            elif kind in {
+                RowKind.RENDER_OVERLAY_TITLE_HEADER,
+                RowKind.RENDER_OVERLAY_BODY_HEADER,
+            }:
+                block_ro = state.render_overlay
+                if kind == RowKind.RENDER_OVERLAY_TITLE_HEADER:
+                    prefix = _render_overlay_text_header_prefix("title")
+                    expanded = block_ro.title_expanded
+                else:
+                    prefix = _render_overlay_text_header_prefix("body")
+                    expanded = block_ro.body_expanded
+                surf = _render_label_value_row(
+                    font,
+                    prefix=prefix,
+                    value=_render_overlay_text_header_expand_value(expanded),
                     value_color=color,
                     line_height=line_h,
                 )

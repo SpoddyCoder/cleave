@@ -859,6 +859,130 @@ def test_render_overlay_header_label_spacing() -> None:
     assert _row_text(view, header_row) == "Render : OVERLAY ▶"
 
 
+def test_render_overlay_title_header_expand_arrow() -> None:
+    controls = _make_controls()
+    controls.session.render_overlay.expanded = True
+    view = controls.build_view_state(paused=False)
+    title_header = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_HEADER)
+    assert _row_text(view, title_header) == "└─ title ▶"
+
+    controls.session.render_overlay.title_expanded = True
+    view = controls.build_view_state(paused=False)
+    title_header = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_HEADER)
+    assert _row_text(view, title_header) == "└─ title ▼"
+
+
+def test_render_overlay_body_header_expand_arrow() -> None:
+    controls = _make_controls()
+    controls.session.render_overlay.expanded = True
+    view = controls.build_view_state(paused=False)
+    body_header = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_HEADER)
+    assert _row_text(view, body_header) == "└─ body ▶"
+
+    controls.session.render_overlay.body_expanded = True
+    view = controls.build_view_state(paused=False)
+    body_header = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_HEADER)
+    assert _row_text(view, body_header) == "└─ body ▼"
+
+
+def test_render_overlay_title_font_size_row() -> None:
+    controls = _make_controls()
+    controls.session.render_overlay.expanded = True
+    controls.session.render_overlay.title_expanded = True
+    controls.session.render_overlay.title_font_size = 12
+    view = controls.build_view_state(paused=False)
+    font_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
+    assert _row_text(view, font_row) == "└─ font size: 12px"
+
+    controls.focus_index = font_row
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.render_overlay.title_font_size == 13
+
+
+def test_render_overlay_title_margin_bottom_row() -> None:
+    controls = _make_controls()
+    controls.session.render_overlay.expanded = True
+    controls.session.render_overlay.title_expanded = True
+    controls.session.render_overlay.title_margin_bottom = 10
+    view = controls.build_view_state(paused=False)
+    margin_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM)
+    assert _row_text(view, margin_row) == "└─ margin bottom: 10px"
+
+    controls.focus_index = margin_row
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.render_overlay.title_margin_bottom == 11
+
+
+def test_render_overlay_body_font_size_row() -> None:
+    controls = _make_controls()
+    controls.session.render_overlay.expanded = True
+    controls.session.render_overlay.body_expanded = True
+    controls.session.render_overlay.body_font_size = 18
+    view = controls.build_view_state(paused=False)
+    font_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_FONT_SIZE)
+    assert _row_text(view, font_row) == "└─ font size: 18px"
+
+    controls.focus_index = font_row
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.render_overlay.body_font_size == 17
+
+
+def test_render_overlay_font_rows_nested_indent() -> None:
+    controls = _make_controls()
+    controls.session.render_overlay.expanded = True
+    controls.session.render_overlay.title_expanded = True
+    controls.session.render_overlay.body_expanded = True
+    view = controls.build_view_state(paused=False)
+    title_header = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_HEADER)
+    title_font = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
+    body_header = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_HEADER)
+    body_font = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_FONT_SIZE)
+    assert _row_indent(view, title_header) == TREE_INDENT
+    assert _row_indent(view, title_font) == TREE_INDENT * 2
+    assert _row_indent(view, body_header) == TREE_INDENT
+    assert _row_indent(view, body_font) == TREE_INDENT * 2
+
+
+def test_render_overlay_title_header_toggles_expansion() -> None:
+    controls = _make_controls()
+    controls.session.render_overlay.expanded = True
+    view = controls.build_view_state(paused=False)
+    title_header = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_HEADER)
+    controls.focus_index = title_header
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.render_overlay.title_expanded is True
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.render_overlay.title_expanded is False
+
+
+def test_render_overlay_collapse_refocuses_from_title_font_row() -> None:
+    controls = _make_controls()
+    controls.session.render_overlay.expanded = True
+    controls.session.render_overlay.title_expanded = True
+    view = controls.build_view_state(paused=False)
+    overlay_header = find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
+    font_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
+    controls.focus_index = font_row
+
+    controls._set_render_overlay_expanded(False)
+    assert controls.focus_index == overlay_header
+
+
+def test_render_overlay_title_collapse_refocuses_from_font_row() -> None:
+    controls = _make_controls()
+    controls.session.render_overlay.expanded = True
+    controls.session.render_overlay.title_expanded = True
+    view = controls.build_view_state(paused=False)
+    title_header = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_HEADER)
+    font_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
+    controls.focus_index = font_row
+
+    controls._set_render_overlay_title_expanded(False)
+    assert controls.focus_index == title_header
+
+
 def test_track_header_visibility_icon_color() -> None:
     line_height = 17
     enabled = render_glyph(

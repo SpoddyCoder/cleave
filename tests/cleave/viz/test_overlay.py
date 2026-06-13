@@ -137,14 +137,31 @@ def test_render_overlay_row_layout_includes_header_and_sub_rows_when_expanded() 
     kinds = [row.kind for row in build_row_layout(state)]
     assert RowKind.RENDER_OVERLAY_HEADER in kinds
     assert RowKind.RENDER_OVERLAY_POSITION in kinds
-    assert RowKind.RENDER_OVERLAY_FONT_SIZE in kinds
+    assert RowKind.RENDER_OVERLAY_TITLE_HEADER in kinds
+    assert RowKind.RENDER_OVERLAY_BODY_HEADER in kinds
     assert RowKind.RENDER_OVERLAY_OPACITY in kinds
     assert RowKind.RENDER_OVERLAY_BORDER_WIDTH in kinds
     assert RowKind.RENDER_OVERLAY_START_DELAY in kinds
     assert RowKind.RENDER_OVERLAY_DISPLAY_TIME in kinds
+    assert RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE not in kinds
+    assert RowKind.RENDER_OVERLAY_BODY_FONT_SIZE not in kinds
     header_idx = find_row_by_kind(state, RowKind.RENDER_OVERLAY_HEADER)
     config_idx = find_row_by_kind(state, RowKind.CONFIG_HEADER)
     assert header_idx < config_idx
+
+
+def test_render_overlay_title_and_body_font_rows_when_expanded() -> None:
+    state = _minimal_view_state(
+        render_overlay=RenderOverlayBlock(
+            expanded=True,
+            title_expanded=True,
+            body_expanded=True,
+        ),
+    )
+    kinds = [row.kind for row in build_row_layout(state)]
+    assert RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE in kinds
+    assert RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM in kinds
+    assert RowKind.RENDER_OVERLAY_BODY_FONT_SIZE in kinds
 
 
 def test_render_overlay_collapsed_hides_sub_rows() -> None:
@@ -158,8 +175,8 @@ def test_render_overlay_collapsed_hides_sub_rows() -> None:
     expanded_kinds = {row.kind for row in build_row_layout(expanded)}
     assert RowKind.RENDER_OVERLAY_HEADER in collapsed_kinds
     assert RowKind.RENDER_OVERLAY_POSITION not in collapsed_kinds
-    assert RowKind.RENDER_OVERLAY_FONT_SIZE not in collapsed_kinds
-    assert len(visible_row_indices(collapsed)) + 6 == len(visible_row_indices(expanded))
+    assert RowKind.RENDER_OVERLAY_TITLE_HEADER not in collapsed_kinds
+    assert len(visible_row_indices(collapsed)) + 7 == len(visible_row_indices(expanded))
 
 
 def test_draw_render_overlay_header_without_error() -> None:

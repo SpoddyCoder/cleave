@@ -12,9 +12,11 @@ import pygame
 
 from cleave.config import (
     DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
+    DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
     DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
     DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
-    DEFAULT_RENDER_OVERLAY_FONT_SIZE,
+    DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
+    DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
     DEFAULT_RENDER_OVERLAY_POSITION,
     DEFAULT_RENDER_OVERLAY_START_DELAY,
     DEFAULT_RENDER_POST_FX_FADE_IN,
@@ -42,6 +44,7 @@ from cleave.viz.overlay import (
     RowKind,
     TrackBlock,
     TuningViewState,
+    _RENDER_OVERLAY_TITLE_NESTED_KINDS,
     find_row,
     find_row_by_kind,
     navigable_row_indices,
@@ -64,7 +67,9 @@ _REPEAT_ROW_KINDS = frozenset(
         RowKind.TRACK_BEAT,
         RowKind.TRACK_EFFECT,
         RowKind.RENDER_OVERLAY_POSITION,
-        RowKind.RENDER_OVERLAY_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
+        RowKind.RENDER_OVERLAY_BODY_FONT_SIZE,
         RowKind.RENDER_OVERLAY_OPACITY,
         RowKind.RENDER_OVERLAY_BORDER_WIDTH,
         RowKind.RENDER_OVERLAY_START_DELAY,
@@ -77,7 +82,11 @@ _REPEAT_ROW_KINDS = frozenset(
 _RENDER_OVERLAY_SUB_ROW_KINDS = frozenset(
     {
         RowKind.RENDER_OVERLAY_POSITION,
-        RowKind.RENDER_OVERLAY_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_TITLE_HEADER,
+        RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
+        RowKind.RENDER_OVERLAY_BODY_HEADER,
+        RowKind.RENDER_OVERLAY_BODY_FONT_SIZE,
         RowKind.RENDER_OVERLAY_OPACITY,
         RowKind.RENDER_OVERLAY_BORDER_WIDTH,
         RowKind.RENDER_OVERLAY_START_DELAY,
@@ -115,7 +124,11 @@ class RenderOverlayRuntime:
     enabled: bool
     expanded: bool
     position: RenderOverlayPosition
-    font_size: int
+    title_expanded: bool
+    body_expanded: bool
+    title_font_size: int
+    title_margin_bottom: int
+    body_font_size: int
     opacity_pct: int
     border_width: int
     start_delay: float
@@ -127,7 +140,11 @@ def default_render_overlay_runtime() -> RenderOverlayRuntime:
         enabled=True,
         expanded=False,
         position=DEFAULT_RENDER_OVERLAY_POSITION,
-        font_size=DEFAULT_RENDER_OVERLAY_FONT_SIZE,
+        title_expanded=False,
+        body_expanded=False,
+        title_font_size=DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
+        title_margin_bottom=DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
+        body_font_size=DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
         opacity_pct=int(round(DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY * 100)),
         border_width=DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
         start_delay=DEFAULT_RENDER_OVERLAY_START_DELAY,
@@ -431,7 +448,11 @@ class TuningControls:
                 enabled=ro.enabled,
                 expanded=ro.expanded,
                 position=ro.position,
-                font_size=ro.font_size,
+                title_expanded=ro.title_expanded,
+                body_expanded=ro.body_expanded,
+                title_font_size=ro.title_font_size,
+                title_margin_bottom=ro.title_margin_bottom,
+                body_font_size=ro.body_font_size,
                 opacity_pct=ro.opacity_pct,
                 border_width=ro.border_width,
                 start_delay=ro.start_delay,
@@ -519,6 +540,14 @@ class TuningControls:
             self._set_effects_expanded(stem, forward)
             return
 
+        if kind == RowKind.RENDER_OVERLAY_TITLE_HEADER:
+            self._set_render_overlay_title_expanded(forward)
+            return
+
+        if kind == RowKind.RENDER_OVERLAY_BODY_HEADER:
+            self._set_render_overlay_body_expanded(forward)
+            return
+
         if stem is not None and kind in _REPEAT_ROW_KINDS and self.session.layers[stem].locked:
             return
 
@@ -598,11 +627,23 @@ class TuningControls:
             self._set_render_overlay_expanded(forward)
         elif kind == RowKind.RENDER_OVERLAY_POSITION:
             self._cycle_render_overlay_position(forward=forward)
-        elif kind == RowKind.RENDER_OVERLAY_FONT_SIZE:
+        elif kind == RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE:
             step = 10 if ctrl else 1
             delta = step if forward else -step
-            self._set_render_overlay_font_size(
-                self.session.render_overlay.font_size + delta
+            self._set_render_overlay_title_font_size(
+                self.session.render_overlay.title_font_size + delta
+            )
+        elif kind == RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM:
+            step = 10 if ctrl else 1
+            delta = step if forward else -step
+            self._set_render_overlay_title_margin_bottom(
+                self.session.render_overlay.title_margin_bottom + delta
+            )
+        elif kind == RowKind.RENDER_OVERLAY_BODY_FONT_SIZE:
+            step = 10 if ctrl else 1
+            delta = step if forward else -step
+            self._set_render_overlay_body_font_size(
+                self.session.render_overlay.body_font_size + delta
             )
         elif kind == RowKind.RENDER_OVERLAY_OPACITY:
             step = 10 if ctrl else 1
@@ -722,32 +763,45 @@ class TuningControls:
         if row_stem(view, self.focus_index) == stem:
             self.focus_index = self._track_header_index(stem)
 
+    def _focused_row_kind(self) -> RowKind | None:
+        view = self.build_view_state(paused=self.playback.paused)
+        try:
+            return row_kind(view, self.focus_index)
+        except IndexError:
+            return None
+
     def _render_overlay_header_index(self) -> int:
         view = self.build_view_state(paused=self.playback.paused)
         return find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
 
-    def _refocus_render_overlay_header_if_sub_row(self) -> None:
+    def _render_overlay_title_header_index(self) -> int:
         view = self.build_view_state(paused=self.playback.paused)
-        if row_kind(view, self.focus_index) in _RENDER_OVERLAY_SUB_ROW_KINDS:
-            self.focus_index = self._render_overlay_header_index()
+        return find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_HEADER)
+
+    def _render_overlay_body_header_index(self) -> int:
+        view = self.build_view_state(paused=self.playback.paused)
+        return find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_HEADER)
 
     def _set_render_overlay_expanded(self, expanded: bool) -> None:
         ro = self.session.render_overlay
         if ro.expanded == expanded:
             return
+        focus_kind = self._focused_row_kind()
         ro.expanded = expanded
-        if not expanded:
-            self._refocus_render_overlay_header_if_sub_row()
+        if not expanded and focus_kind in _RENDER_OVERLAY_SUB_ROW_KINDS:
+            self.focus_index = self._render_overlay_header_index()
 
     def _set_render_overlay_enabled(self, enabled: bool) -> None:
         ro = self.session.render_overlay
         if ro.enabled == enabled:
             return
+        focus_kind = self._focused_row_kind()
         ro.enabled = enabled
         if not enabled:
             self.session.render_overlay_solo = False
             ro.expanded = False
-            self._refocus_render_overlay_header_if_sub_row()
+            if focus_kind in _RENDER_OVERLAY_SUB_ROW_KINDS:
+                self.focus_index = self._render_overlay_header_index()
 
     def _enter_render_overlay_solo(self) -> None:
         if self.session.render_overlay_solo:
@@ -771,8 +825,32 @@ class TuningControls:
         else:
             ro.position = positions[(index - 1) % len(positions)]
 
-    def _set_render_overlay_font_size(self, size: int) -> None:
-        self.session.render_overlay.font_size = max(1, size)
+    def _set_render_overlay_title_expanded(self, expanded: bool) -> None:
+        ro = self.session.render_overlay
+        if ro.title_expanded == expanded:
+            return
+        focus_kind = self._focused_row_kind()
+        ro.title_expanded = expanded
+        if not expanded and focus_kind in _RENDER_OVERLAY_TITLE_NESTED_KINDS:
+            self.focus_index = self._render_overlay_title_header_index()
+
+    def _set_render_overlay_body_expanded(self, expanded: bool) -> None:
+        ro = self.session.render_overlay
+        if ro.body_expanded == expanded:
+            return
+        focus_kind = self._focused_row_kind()
+        ro.body_expanded = expanded
+        if not expanded and focus_kind == RowKind.RENDER_OVERLAY_BODY_FONT_SIZE:
+            self.focus_index = self._render_overlay_body_header_index()
+
+    def _set_render_overlay_title_font_size(self, size: int) -> None:
+        self.session.render_overlay.title_font_size = max(1, size)
+
+    def _set_render_overlay_title_margin_bottom(self, margin: int) -> None:
+        self.session.render_overlay.title_margin_bottom = max(0, margin)
+
+    def _set_render_overlay_body_font_size(self, size: int) -> None:
+        self.session.render_overlay.body_font_size = max(1, size)
 
     def _set_render_overlay_opacity(self, pct: int) -> None:
         self.session.render_overlay.opacity_pct = max(0, min(100, pct))

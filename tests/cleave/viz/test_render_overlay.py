@@ -10,7 +10,7 @@ from cleave.config import (
     RenderOverlayBackgroundConfig,
     RenderOverlayBorderConfig,
     RenderOverlayConfig,
-    RenderOverlayFontConfig,
+    RenderOverlayTextBlockConfig,
 )
 from cleave.easing import smoothstep
 from cleave.viz.render_overlay import (
@@ -28,6 +28,23 @@ from cleave.viz.controls import RenderOverlayRuntime
 from cleave.viz.theme import FADE_DURATION_SEC
 
 
+def _text_block(
+    content: str,
+    *,
+    font_size: int = 10,
+    colour: tuple[int, int, int] = (255, 170, 0),
+    background_colour: tuple[int, int, int] | None = None,
+    margin_bottom: int = 0,
+) -> RenderOverlayTextBlockConfig:
+    return RenderOverlayTextBlockConfig(
+        content=content,
+        font_size=font_size,
+        colour=colour,
+        background_colour=background_colour,
+        margin_bottom=margin_bottom,
+    )
+
+
 def _overlay_cfg(
     *,
     enabled: bool = True,
@@ -36,18 +53,18 @@ def _overlay_cfg(
     position: str = "bottom-left",
     margin: int = 10,
     padding: int = 10,
-    font_size: int = 10,
+    title_font_size: int = 12,
+    body_font_size: int = 10,
     opacity: float = 1.0,
     border_width: int = 2,
 ) -> RenderOverlayConfig:
     return RenderOverlayConfig(
         enabled=enabled,
-        title="Title",
-        body="Line one\nLine two",
+        title=_text_block("Title", font_size=title_font_size),
+        body=_text_block("Line one\nLine two", font_size=body_font_size),
         start_delay=start_delay,
         display_time=display_time,
         position=position,  # type: ignore[arg-type]
-        font=RenderOverlayFontConfig(size=font_size, colour=(255, 170, 0)),
         background=RenderOverlayBackgroundConfig(
             margin=margin,
             padding=padding,
@@ -122,7 +139,8 @@ def test_build_live_overlay_config_overrides_runtime_fields() -> None:
         start_delay=1.0,
         display_time=2.0,
         position="top-left",
-        font_size=8,
+        title_font_size=8,
+        body_font_size=8,
         opacity=0.25,
         border_width=1,
     )
@@ -130,7 +148,11 @@ def test_build_live_overlay_config_overrides_runtime_fields() -> None:
         enabled=True,
         expanded=False,
         position="bottom-right",
-        font_size=14,
+        title_expanded=False,
+        body_expanded=False,
+        title_font_size=14,
+        title_margin_bottom=6,
+        body_font_size=12,
         opacity_pct=75,
         border_width=4,
         start_delay=20.0,
@@ -138,13 +160,16 @@ def test_build_live_overlay_config_overrides_runtime_fields() -> None:
     )
     merged = build_live_overlay_config(base, runtime)
     assert merged.enabled is True
-    assert merged.title == base.title
-    assert merged.body == base.body
+    assert merged.title.content == base.title.content
+    assert merged.body.content == base.body.content
     assert merged.start_delay == 20.0
     assert merged.display_time == 40.0
     assert merged.position == "bottom-right"
-    assert merged.font.size == 14
-    assert merged.font.colour == base.font.colour
+    assert merged.title.font_size == 14
+    assert merged.title.margin_bottom == 6
+    assert merged.body.font_size == 12
+    assert merged.title.colour == base.title.colour
+    assert merged.body.colour == base.body.colour
     assert merged.background.margin == base.background.margin
     assert merged.background.padding == base.background.padding
     assert merged.background.colour == base.background.colour
@@ -174,7 +199,7 @@ def test_panel_position_centre_ignores_margin() -> None:
 
 def test_title_font_size_and_bold() -> None:
     pygame.init()
-    cfg = _overlay_cfg(font_size=10)
+    cfg = _overlay_cfg(title_font_size=12, body_font_size=10)
     with patch("cleave.viz.render_overlay.pygame.font.SysFont") as sys_font:
         body_font = MagicMock()
         title_font = MagicMock()
@@ -189,6 +214,91 @@ def test_title_font_size_and_bold() -> None:
     assert sys_font.call_args_list[0].args == ("monospace", 10)
     assert sys_font.call_args_list[1].args == ("monospace", 12)
     assert sys_font.call_args_list[1].kwargs == {"bold": True}
+
+
+def test_text_line_backgrounds_are_tight_to_glyphs() -> None:
+    pygame.init()
+    cfg = RenderOverlayConfig(
+        enabled=True,
+        title=_text_block("Title", font_size=12, background_colour=(51, 51, 255)),
+        body=_text_block(
+            "Line one\nLine two",
+            font_size=10,
+            background_colour=(255, 51, 51),
+        ),
+        start_delay=10.0,
+        display_time=30.0,
+        position="bottom-left",
+        background=RenderOverlayBackgroundConfig(
+            margin=10,
+            padding=10,
+            colour=(34, 51, 68),
+            opacity=1.0,
+            border=RenderOverlayBorderConfig(colour=(200, 100, 50), width=2),
+        ),
+    )
+    panel = build_panel_surface(cfg)
+    title_bg = cfg.title.background_colour
+    body_bg = cfg.body.background_colour
+    panel_bg = cfg.background.colour
+
+    title_bg_pixels = 0
+    body_bg_pixels = 0
+    panel_bg_pixels = 0
+    width, height = panel.get_size()
+    for y in range(height):
+        for x in range(width):
+            r, g, b, a = panel.get_at((x, y))
+            if a == 0:
+                continue
+            if (r, g, b) == title_bg:
+                title_bg_pixels += 1
+            elif (r, g, b) == body_bg:
+                body_bg_pixels += 1
+            elif (r, g, b) == panel_bg:
+                panel_bg_pixels += 1
+
+    assert title_bg_pixels > 0
+    assert body_bg_pixels > 0
+    assert panel_bg_pixels > title_bg_pixels + body_bg_pixels
+
+
+def test_text_line_without_background_skips_tight_rect() -> None:
+    pygame.init()
+    cfg = RenderOverlayConfig(
+        enabled=True,
+        title=_text_block("Title", font_size=12, background_colour=(51, 51, 255)),
+        body=_text_block("Line one", font_size=10, background_colour=None),
+        start_delay=10.0,
+        display_time=30.0,
+        position="bottom-left",
+        background=RenderOverlayBackgroundConfig(
+            margin=10,
+            padding=10,
+            colour=(34, 51, 68),
+            opacity=1.0,
+            border=RenderOverlayBorderConfig(colour=(200, 100, 50), width=2),
+        ),
+    )
+    panel = build_panel_surface(cfg)
+    title_bg = cfg.title.background_colour
+    assert title_bg is not None
+    stray_bg = (255, 51, 51)
+    title_bg_pixels = 0
+    stray_pixels = 0
+    width, height = panel.get_size()
+    for y in range(height):
+        for x in range(width):
+            r, g, b, a = panel.get_at((x, y))
+            if a == 0:
+                continue
+            if (r, g, b) == title_bg:
+                title_bg_pixels += 1
+            elif (r, g, b) == stray_bg:
+                stray_pixels += 1
+
+    assert title_bg_pixels > 0
+    assert stray_pixels == 0
 
 
 def test_border_alpha_matches_background() -> None:

@@ -8,7 +8,7 @@ from typing import Any
 
 import yaml
 
-from cleave.config import CleaveConfig, RenderOverlayConfig, clamp_beat_sensitivity, clamp_effect_pct, dump_yaml
+from cleave.config import CleaveConfig, RenderOverlayConfig, RenderOverlayTextBlockConfig, clamp_beat_sensitivity, clamp_effect_pct, dump_yaml
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import to_config_relative
 from cleave.viz.controls import TuningSession
@@ -78,6 +78,28 @@ def _render_overlay_base(cfg: CleaveConfig) -> RenderOverlayConfig:
     return default_render_overlay_config()
 
 
+def _text_block_to_yaml(
+    block: RenderOverlayTextBlockConfig,
+    *,
+    font_size: int,
+    colour_key: str,
+    margin_bottom: int | None = None,
+) -> dict[str, Any]:
+    content = block.content
+    if "\n" in content:
+        content = content + "\n"
+    out: dict[str, Any] = {
+        "content": content,
+        "font-size": font_size,
+        colour_key: _rgb_to_hex(block.colour),
+    }
+    if block.background_colour is not None:
+        out["background-colour"] = _rgb_to_hex(block.background_colour)
+    if margin_bottom is not None:
+        out["margin-bottom"] = margin_bottom
+    return out
+
+
 def _snapshot_render_overlay(
     cfg: CleaveConfig,
     session: TuningSession,
@@ -96,17 +118,20 @@ def _snapshot_render_overlay(
 
     overlay: dict[str, Any] = dict(orig_overlay)
     overlay["enabled"] = runtime.enabled or session.render_overlay_solo
-    overlay["title"] = base.title
-    overlay["body"] = base.body
+    overlay["title"] = _text_block_to_yaml(
+        base.title,
+        font_size=runtime.title_font_size,
+        colour_key="font-colour",
+        margin_bottom=runtime.title_margin_bottom,
+    )
+    overlay["body"] = _text_block_to_yaml(
+        base.body,
+        font_size=runtime.body_font_size,
+        colour_key="colour",
+    )
     overlay["start_delay"] = runtime.start_delay
     overlay["display_time"] = runtime.display_time
     overlay["position"] = runtime.position
-
-    font = orig_overlay.get("font")
-    font_out: dict[str, Any] = dict(font) if isinstance(font, dict) else {}
-    font_out["size"] = runtime.font_size
-    font_out["colour"] = _rgb_to_hex(base.font.colour)
-    overlay["font"] = font_out
 
     background = orig_overlay.get("background")
     background_out: dict[str, Any] = (
@@ -123,6 +148,7 @@ def _snapshot_render_overlay(
     border_out["width"] = runtime.border_width
     background_out["border"] = border_out
     overlay["background"] = background_out
+    overlay.pop("font", None)
 
     runtime_pp = session.render_post_fx
     orig_pp: dict[str, Any] = {}

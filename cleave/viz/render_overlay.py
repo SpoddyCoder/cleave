@@ -9,18 +9,21 @@ from cleave.config import (
     DEFAULT_RENDER_OVERLAY_BACKGROUND_MARGIN,
     DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
     DEFAULT_RENDER_OVERLAY_BACKGROUND_PADDING,
-    DEFAULT_RENDER_OVERLAY_BODY,
+    DEFAULT_RENDER_OVERLAY_BORDER_COLOUR,
     DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
     DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
-    DEFAULT_RENDER_OVERLAY_FONT_COLOUR,
-    DEFAULT_RENDER_OVERLAY_FONT_SIZE,
     DEFAULT_RENDER_OVERLAY_POSITION,
     DEFAULT_RENDER_OVERLAY_START_DELAY,
+    DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
     DEFAULT_RENDER_OVERLAY_TITLE,
+    DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
+    DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
+    DEFAULT_RENDER_OVERLAY_BODY,
+    DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
     RenderOverlayBackgroundConfig,
     RenderOverlayBorderConfig,
     RenderOverlayConfig,
-    RenderOverlayFontConfig,
+    RenderOverlayTextBlockConfig,
 )
 from cleave.viz.controls import RenderOverlayRuntime
 from cleave.easing import fade_alpha
@@ -35,25 +38,40 @@ def default_render_overlay_config() -> RenderOverlayConfig:
     """Static overlay fields when ``cfg.render`` is absent."""
     return RenderOverlayConfig(
         enabled=True,
-        title=DEFAULT_RENDER_OVERLAY_TITLE,
-        body=DEFAULT_RENDER_OVERLAY_BODY,
+        title=RenderOverlayTextBlockConfig(
+            content=DEFAULT_RENDER_OVERLAY_TITLE,
+            font_size=DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
+            colour=DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
+            margin_bottom=DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
+        ),
+        body=RenderOverlayTextBlockConfig(
+            content=DEFAULT_RENDER_OVERLAY_BODY,
+            font_size=DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
+            colour=DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
+        ),
         start_delay=DEFAULT_RENDER_OVERLAY_START_DELAY,
         display_time=DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
         position=DEFAULT_RENDER_OVERLAY_POSITION,
-        font=RenderOverlayFontConfig(
-            size=DEFAULT_RENDER_OVERLAY_FONT_SIZE,
-            colour=DEFAULT_RENDER_OVERLAY_FONT_COLOUR,
-        ),
         background=RenderOverlayBackgroundConfig(
             margin=DEFAULT_RENDER_OVERLAY_BACKGROUND_MARGIN,
             padding=DEFAULT_RENDER_OVERLAY_BACKGROUND_PADDING,
             colour=DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR,
             opacity=DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
             border=RenderOverlayBorderConfig(
-                colour=DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR,
+                colour=DEFAULT_RENDER_OVERLAY_BORDER_COLOUR,
                 width=DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
             ),
         ),
+    )
+
+
+def _text_block_surface_key(block: RenderOverlayTextBlockConfig) -> tuple:
+    return (
+        block.content,
+        block.font_size,
+        block.colour,
+        block.background_colour,
+        block.margin_bottom,
     )
 
 
@@ -61,10 +79,8 @@ def panel_surface_key(cfg: RenderOverlayConfig) -> tuple:
     """Hashable key for cached panel surfaces (appearance only, not placement)."""
     bg = cfg.background
     return (
-        cfg.title,
-        cfg.body,
-        cfg.font.size,
-        cfg.font.colour,
+        _text_block_surface_key(cfg.title),
+        _text_block_surface_key(cfg.body),
         bg.margin,
         bg.padding,
         bg.colour,
@@ -80,15 +96,22 @@ def build_live_overlay_config(
     """Merge static YAML fields with live-tuned runtime overrides."""
     return RenderOverlayConfig(
         enabled=runtime.enabled,
-        title=base.title,
-        body=base.body,
+        title=RenderOverlayTextBlockConfig(
+            content=base.title.content,
+            font_size=runtime.title_font_size,
+            colour=base.title.colour,
+            background_colour=base.title.background_colour,
+            margin_bottom=runtime.title_margin_bottom,
+        ),
+        body=RenderOverlayTextBlockConfig(
+            content=base.body.content,
+            font_size=runtime.body_font_size,
+            colour=base.body.colour,
+            background_colour=base.body.background_colour,
+        ),
         start_delay=runtime.start_delay,
         display_time=runtime.display_time,
         position=runtime.position,
-        font=RenderOverlayFontConfig(
-            size=runtime.font_size,
-            colour=base.font.colour,
-        ),
         background=RenderOverlayBackgroundConfig(
             margin=base.background.margin,
             padding=base.background.padding,
@@ -156,15 +179,29 @@ def panel_position(
 
 
 def _body_font(cfg: RenderOverlayConfig) -> pygame.font.Font:
-    return pygame.font.SysFont("monospace", cfg.font.size)
+    return pygame.font.SysFont("monospace", cfg.body.font_size)
 
 
 def _title_font(cfg: RenderOverlayConfig) -> pygame.font.Font:
-    return pygame.font.SysFont("monospace", round(cfg.font.size * 1.2), bold=True)
+    return pygame.font.SysFont("monospace", cfg.title.font_size, bold=True)
 
 
 def _background_pixel_alpha(cfg: RenderOverlayConfig) -> int:
     return int(round(255 * cfg.background.opacity))
+
+
+def _blit_text(
+    panel: pygame.Surface,
+    surf: pygame.Surface,
+    pos: tuple[int, int],
+    background_colour: tuple[int, int, int] | None,
+) -> None:
+    x, y = pos
+    if background_colour is not None:
+        bg = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
+        bg.fill((*background_colour, 255))
+        panel.blit(bg, (x, y))
+    panel.blit(surf, (x, y))
 
 
 def build_panel_surface(cfg: RenderOverlayConfig) -> pygame.Surface:
@@ -173,9 +210,11 @@ def build_panel_surface(cfg: RenderOverlayConfig) -> pygame.Surface:
     title_font = _title_font(cfg)
     padding = cfg.background.padding
 
-    title_surf = title_font.render(cfg.title, True, cfg.font.colour)
-    body_lines = cfg.body.splitlines() or [""]
-    body_surfs = [body_font.render(line, True, cfg.font.colour) for line in body_lines]
+    title_surf = title_font.render(cfg.title.content, True, cfg.title.colour)
+    body_lines = cfg.body.content.splitlines() or [""]
+    body_surfs = [
+        body_font.render(line, True, cfg.body.colour) for line in body_lines
+    ]
 
     line_h_body = body_font.get_linesize()
     line_h_title = title_font.get_linesize()
@@ -187,7 +226,7 @@ def build_panel_surface(cfg: RenderOverlayConfig) -> pygame.Surface:
         )
     content_h = line_h_title
     if body_surfs:
-        content_h += LINE_GAP + body_block_h
+        content_h += cfg.title.margin_bottom + body_block_h
 
     border_width = cfg.background.border.width
     inner_w = content_w + padding * 2
@@ -221,12 +260,16 @@ def build_panel_surface(cfg: RenderOverlayConfig) -> pygame.Surface:
 
     content_x = border_width + padding
     y = border_width + padding
-    panel.blit(title_surf, (content_x, y))
+    _blit_text(
+        panel, title_surf, (content_x, y), cfg.title.background_colour
+    )
     y += line_h_title
     if body_surfs:
-        y += LINE_GAP
+        y += cfg.title.margin_bottom
         for index, surf in enumerate(body_surfs):
-            panel.blit(surf, (content_x, y))
+            _blit_text(
+                panel, surf, (content_x, y), cfg.body.background_colour
+            )
             y += line_h_body
             if index < len(body_surfs) - 1:
                 y += LINE_GAP
