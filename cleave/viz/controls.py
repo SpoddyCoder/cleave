@@ -35,7 +35,7 @@ from cleave.preset_playlist import (
     directory_display,
     preset_filename_display,
 )
-from cleave.viz.confirm import ConfirmDialog, ConfirmRequest
+from cleave.viz.confirm import ConfirmDialog, ConfirmRequest, SaveChoiceDialog, SaveChoiceRequest
 from cleave.viz.key_repeat import KeyRepeatController, mod_ctrl, mod_shift
 from cleave.viz.playback import PlaybackState, current_sec, seek, toggle_pause
 from cleave.viz.overlay import (
@@ -248,6 +248,7 @@ class TuningControls:
         self._input_blocked_until = 0.0
         self._key_repeat = KeyRepeatController()
         self._confirm = ConfirmDialog()
+        self._save_choice = SaveChoiceDialog()
         self._hide_overlay_requested = False
         view = self.build_view_state(paused=self.playback.paused)
         self.focus_index = find_row_by_kind(view, RowKind.TRANSPORT)
@@ -264,6 +265,10 @@ class TuningControls:
 
         if self._confirm.active:
             self._confirm.handle_keydown(event)
+            return True
+
+        if self._save_choice.active:
+            self._save_choice.handle_keydown(event)
             return True
 
         if event.key == pygame.K_q and mod_ctrl(event.mod):
@@ -363,15 +368,10 @@ class TuningControls:
                     )
                     self.move_mode_stem = stem
                 return True
-            if kind == RowKind.SAVE_AS_NEW_CONFIG:
+            if kind == RowKind.SAVE_CONFIG:
                 if self.session.solo_stem is not None:
                     return True
-                self._trigger_save_new()
-                return True
-            if kind == RowKind.OVERWRITE_CONFIG and self._allow_overwrite():
-                if self.session.solo_stem is not None:
-                    return True
-                self._prompt_overwrite()
+                self._prompt_save()
                 return True
 
         return True
@@ -420,9 +420,14 @@ class TuningControls:
 
         confirm_message: str | None = None
         confirm_focus_yes = True
+        save_choice_active = False
+        save_choice_focus_overwrite = True
         if self._confirm.active:
             confirm_message = self._confirm.message
             confirm_focus_yes = self._confirm.focus_yes
+        if self._save_choice.active:
+            save_choice_active = True
+            save_choice_focus_overwrite = self._save_choice.focus_overwrite
 
         if position_sec is None:
             position_sec = current_sec(self.playback, self.duration_sec)
@@ -440,6 +445,8 @@ class TuningControls:
             toast_remaining_sec=toast_remaining,
             confirm_message=confirm_message,
             confirm_focus_yes=confirm_focus_yes,
+            save_choice_active=save_choice_active,
+            save_choice_focus_overwrite=save_choice_focus_overwrite,
             allow_overwrite=self._allow_overwrite(),
             active_config_label=config_path_display(self._active_config_path),
             solo_stem=self.session.solo_stem,
@@ -989,6 +996,18 @@ class TuningControls:
             self._on_seek(delta_sec)
         else:
             seek(self.playback, delta_sec, self.duration_sec)
+
+    def _prompt_save(self) -> None:
+        if not self._allow_overwrite():
+            self._trigger_save_new()
+            return
+
+        self._save_choice.prompt(
+            SaveChoiceRequest(
+                on_overwrite=self._prompt_overwrite,
+                on_save_as_new=self._trigger_save_new,
+            )
+        )
 
     def _trigger_save_new(self) -> None:
         if self._on_save_new_config is not None:
