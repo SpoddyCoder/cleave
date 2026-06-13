@@ -96,7 +96,11 @@ class TimelineControls:
             return True
 
         if event.key == pygame.K_RETURN and mod_ctrl(event.mod):
-            self._toggle_visibility_at_playhead()
+            if self.session.timeline.recording:
+                self._toggle_armed_layer_at(
+                    self._focused_stem(),
+                    current_sec(self.playback, self.duration_sec),
+                )
             return True
 
         if event.key == pygame.K_RETURN:
@@ -192,17 +196,6 @@ class TimelineControls:
             armed.discard(stem)
         else:
             armed.add(stem)
-
-    def _toggle_visibility_at_playhead(self) -> None:
-        tl = self.session.timeline
-        stem = self._focused_stem()
-        t_sec = current_sec(self.playback, self.duration_sec)
-        defaults = timeline_defaults(self.session)
-        current = layer_visible_at(tl.cues, defaults, stem, t_sec)
-        tl.cues.append(TimelineCue(t=t_sec, layers={stem: not current}))
-        tl.cues.sort(key=lambda cue: cue.t)
-        if self._on_visibility_change is not None:
-            self._on_visibility_change()
 
     def _start_record(self) -> None:
         tl = self.session.timeline
