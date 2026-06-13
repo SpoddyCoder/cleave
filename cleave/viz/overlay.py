@@ -24,7 +24,7 @@ from cleave.config import (
     RenderOverlayPosition,
 )
 from cleave.effects.registry import effect_roster
-from cleave.viz.confirm import ConfirmDialog
+from cleave.viz.confirm import ConfirmDialog, SaveChoiceDialog
 from cleave.viz.text_fit import (
     fit_counter_label_to_width,
     fit_path_label_to_width,
@@ -66,8 +66,7 @@ from cleave.viz.theme import (
 
 Anchor = Literal["topleft", "bottomleft"]
 
-FOOTER_ROWS_WITH_OVERWRITE = 4
-FOOTER_ROWS_WITHOUT_OVERWRITE = 3
+FOOTER_ROWS = 3
 TREE_INDENT = 16
 ROW_ICON_SUFFIX_GAP = 4
 
@@ -98,8 +97,7 @@ class RowKind(Enum):
     RENDER_POST_FX_FADE_OUT = auto()
     CONFIG_HEADER = auto()
     TRANSPORT = auto()
-    SAVE_AS_NEW_CONFIG = auto()
-    OVERWRITE_CONFIG = auto()
+    SAVE_CONFIG = auto()
 
 
 @dataclass(frozen=True)
@@ -164,6 +162,8 @@ class TuningViewState:
     toast_remaining_sec: float
     confirm_message: str | None = None
     confirm_focus_yes: bool = True
+    save_choice_active: bool = False
+    save_choice_focus_overwrite: bool = True
     allow_overwrite: bool = True
     active_config_label: str = "cleave-viz.yaml"
     solo_stem: str | None = None
@@ -175,19 +175,14 @@ class TuningViewState:
 
 
 def footer_row_count(state: TuningViewState) -> int:
-    return (
-        FOOTER_ROWS_WITH_OVERWRITE
-        if state.allow_overwrite
-        else FOOTER_ROWS_WITHOUT_OVERWRITE
-    )
+    return FOOTER_ROWS
 
 
 _FOOTER_ROW_KINDS = frozenset(
     {
         RowKind.CONFIG_HEADER,
         RowKind.TRANSPORT,
-        RowKind.SAVE_AS_NEW_CONFIG,
-        RowKind.OVERWRITE_CONFIG,
+        RowKind.SAVE_CONFIG,
     }
 )
 
@@ -232,11 +227,9 @@ def build_row_layout(state: TuningViewState) -> list[RowDescriptor]:
     if state.render_post_fx.expanded:
         rows.append(RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN))
         rows.append(RowDescriptor(RowKind.RENDER_POST_FX_FADE_OUT))
-    rows.append(RowDescriptor(RowKind.CONFIG_HEADER))
     rows.append(RowDescriptor(RowKind.TRANSPORT))
-    rows.append(RowDescriptor(RowKind.SAVE_AS_NEW_CONFIG))
-    if state.allow_overwrite:
-        rows.append(RowDescriptor(RowKind.OVERWRITE_CONFIG))
+    rows.append(RowDescriptor(RowKind.CONFIG_HEADER))
+    rows.append(RowDescriptor(RowKind.SAVE_CONFIG))
     return rows
 
 
@@ -470,10 +463,8 @@ def _row_text(state: TuningViewState, index: int) -> str:
         return state.active_config_label
     if kind == RowKind.TRANSPORT:
         return ""
-    if kind == RowKind.SAVE_AS_NEW_CONFIG:
-        return "SAVE AS NEW CONFIG"
-    if kind == RowKind.OVERWRITE_CONFIG:
-        return "OVERWRITE CONFIG"
+    if kind == RowKind.SAVE_CONFIG:
+        return "SAVE CONFIG"
 
     if kind == RowKind.RENDER_SECTION_GAP:
         return ""
@@ -876,10 +867,7 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
         if not state.render_post_fx.enabled:
             return DISABLED
 
-    if state.solo_active and kind in (
-        RowKind.SAVE_AS_NEW_CONFIG,
-        RowKind.OVERWRITE_CONFIG,
-    ):
+    if state.solo_active and kind == RowKind.SAVE_CONFIG:
         return DISABLED
 
     if (
@@ -961,6 +949,7 @@ class TuningOverlay:
         self._font: pygame.font.Font | None = None
         self._panel_rect: tuple[int, int, int, int] | None = None
         self._confirm = ConfirmDialog()
+        self._save_choice = SaveChoiceDialog()
 
     def notify_input(self) -> None:
         self._idle_sec = 0.0
@@ -1008,6 +997,7 @@ class TuningOverlay:
         )
         toast_active = bool(state.toast_message and state.toast_remaining_sec > 0)
         confirm_active = state.confirm_message is not None
+        save_choice_active = state.save_choice_active
 
         row_surfaces: list[pygame.Surface] = []
         row_time_surfaces: list[pygame.Surface | None] = []
@@ -1196,11 +1186,19 @@ class TuningOverlay:
             )
             confirm_w = self._confirm.measure_width(font, state.confirm_message)
 
+        save_choice_h = 0
+        save_choice_w = 0
+        if save_choice_active:
+            save_choice_h = self._save_choice.measure_height(font)
+            save_choice_w = self._save_choice.measure_width(font)
+
         content_w = max(row_widths) if row_widths else 0
         if toast_surf is not None:
             content_w = max(content_w, toast_surf.get_width())
         if confirm_active:
             content_w = max(content_w, confirm_w)
+        if save_choice_active:
+            content_w = max(content_w, save_choice_w)
         content_w = min(content_w, PANEL_CONTENT_MAX_WIDTH)
         panel_w = content_w + self._padding * 2
         footer_gap = line_h + self._line_gap
@@ -1212,6 +1210,8 @@ class TuningOverlay:
         )
         if confirm_active:
             panel_h += self._line_gap + confirm_h
+        if save_choice_active:
+            panel_h += self._line_gap + save_choice_h
         if toast_surf is not None:
             panel_h += self._line_gap + line_h
 
@@ -1259,6 +1259,17 @@ class TuningOverlay:
                 focus_yes=state.confirm_focus_yes,
                 text_alpha=text_alpha,
                 line_gap=self._line_gap,
+            )
+
+        if save_choice_active and text_alpha >= 2:
+            y += self._line_gap
+            self._save_choice.draw(
+                panel,
+                font,
+                x=self._padding,
+                y=y,
+                focus_overwrite=state.save_choice_focus_overwrite,
+                text_alpha=text_alpha,
             )
 
         if toast_surf is not None and text_alpha >= 2:

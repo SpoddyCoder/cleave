@@ -27,10 +27,11 @@ Below overlay, **Render : POST FX** (`RowKind.RENDER_POST_FX_HEADER`) is always 
 
 ## Footer rows section
 
-The lower block after a visual gap (`footer_gap` in `draw()`): `footer_row_count(state)` rows (3 or 4).
+The lower block after a visual gap (`footer_gap` in `draw()`): `footer_row_count(state)` rows (3).
 
-- Row kinds: `RowKind.CONFIG_HEADER` (non-navigable active config path), `RowKind.TRANSPORT`, `SAVE_AS_NEW_CONFIG`, `OVERWRITE_CONFIG` (overwrite when active path is not repo-root `cleave-viz-default.yaml`; recomputed after save-as-new).
-- Constants: `FOOTER_ROWS_WITH_OVERWRITE`, `FOOTER_ROWS_WITHOUT_OVERWRITE`; index via `footer_index = index - track_row_count(state)`.
+- Row kinds: `RowKind.TRANSPORT`, `RowKind.CONFIG_HEADER` (non-navigable active config path), `SAVE_CONFIG`.
+- Constant: `FOOTER_ROWS` (3); index via `footer_index = index - track_row_count(state)`.
+- Enter on `SAVE_CONFIG` opens an `OVERWRITE` / `SAVE AS NEW` picker when overwrite is allowed (`allow_overwrite`; false for repo-root `cleave-viz-default.yaml`). Otherwise save-as-new runs immediately. Overwrite still uses the yes/no confirm dialog.
 
 ## Whole panel
 
@@ -69,8 +70,9 @@ These rows do not split label and value; the implementation is deliberate:
 
 - **Active config path** (`CONFIG_HEADER`): entire row drawn in `LABEL`.
 - **Preset dir / preset filename**: single-color row text plus Material Icons (icon colors above).
-- **Transport, save, overwrite**: single-color footer rows in row value color. Save rows use `DISABLED` while `solo_active` (Enter blocked in controls).
+- **Transport, save**: single-color footer rows in row value color. Save row uses `DISABLED` while `solo_active` (Enter blocked in controls).
 - **Toasts**: `DISABLED`.
 - **Confirm dialog** ([cleave/viz/confirm.py](cleave/viz/confirm.py)): message in `VALUE`; yes/no use `HIGHLIGHT` or `DISABLED` by focus.
+- **Save choice dialog**: `OVERWRITE` / `SAVE AS NEW` options use the same highlight pattern as confirm yes/no.
 
 When focus, move mode, disabled layer, locked sub-row, or empty preset applies, `_row_value_color` may return an accent or state color instead of `VALUE`. That override is expected.
