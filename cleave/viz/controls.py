@@ -15,6 +15,7 @@ from cleave.config import (
     DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
     DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
     DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
+    DEFAULT_RENDER_OVERLAY_FONT,
     DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
     DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
     DEFAULT_RENDER_OVERLAY_POSITION,
@@ -27,6 +28,7 @@ from cleave.config import (
     RenderOverlayPosition,
     clamp_beat_sensitivity,
     clamp_effect_pct,
+    cycle_render_overlay_font,
 )
 from cleave.effects.registry import effect_row_count
 from cleave.blend_modes import BLEND_MODES, BlendMode
@@ -44,6 +46,7 @@ from cleave.viz.overlay import (
     RowKind,
     TrackBlock,
     TuningViewState,
+    _RENDER_OVERLAY_BODY_NESTED_KINDS,
     _RENDER_OVERLAY_TITLE_NESTED_KINDS,
     find_row,
     find_row_by_kind,
@@ -68,8 +71,10 @@ _REPEAT_ROW_KINDS = frozenset(
         RowKind.TRACK_EFFECT,
         RowKind.RENDER_OVERLAY_POSITION,
         RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_TITLE_FONT,
         RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
         RowKind.RENDER_OVERLAY_BODY_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_BODY_FONT,
         RowKind.RENDER_OVERLAY_OPACITY,
         RowKind.RENDER_OVERLAY_BORDER_WIDTH,
         RowKind.RENDER_OVERLAY_START_DELAY,
@@ -127,8 +132,10 @@ class RenderOverlayRuntime:
     title_expanded: bool
     body_expanded: bool
     title_font_size: int
+    title_font: str
     title_margin_bottom: int
     body_font_size: int
+    body_font: str
     opacity_pct: int
     border_width: int
     start_delay: float
@@ -143,8 +150,10 @@ def default_render_overlay_runtime() -> RenderOverlayRuntime:
         title_expanded=False,
         body_expanded=False,
         title_font_size=DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
+        title_font=DEFAULT_RENDER_OVERLAY_FONT,
         title_margin_bottom=DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
         body_font_size=DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
+        body_font=DEFAULT_RENDER_OVERLAY_FONT,
         opacity_pct=int(round(DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY * 100)),
         border_width=DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
         start_delay=DEFAULT_RENDER_OVERLAY_START_DELAY,
@@ -458,8 +467,10 @@ class TuningControls:
                 title_expanded=ro.title_expanded,
                 body_expanded=ro.body_expanded,
                 title_font_size=ro.title_font_size,
+                title_font=ro.title_font,
                 title_margin_bottom=ro.title_margin_bottom,
                 body_font_size=ro.body_font_size,
+                body_font=ro.body_font,
                 opacity_pct=ro.opacity_pct,
                 border_width=ro.border_width,
                 start_delay=ro.start_delay,
@@ -640,6 +651,8 @@ class TuningControls:
             self._set_render_overlay_title_font_size(
                 self.session.render_overlay.title_font_size + delta
             )
+        elif kind == RowKind.RENDER_OVERLAY_TITLE_FONT:
+            self._cycle_render_overlay_title_font(forward=forward)
         elif kind == RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM:
             step = 10 if ctrl else 1
             delta = step if forward else -step
@@ -652,6 +665,8 @@ class TuningControls:
             self._set_render_overlay_body_font_size(
                 self.session.render_overlay.body_font_size + delta
             )
+        elif kind == RowKind.RENDER_OVERLAY_BODY_FONT:
+            self._cycle_render_overlay_body_font(forward=forward)
         elif kind == RowKind.RENDER_OVERLAY_OPACITY:
             step = 10 if ctrl else 1
             delta = step if forward else -step
@@ -847,17 +862,25 @@ class TuningControls:
             return
         focus_kind = self._focused_row_kind()
         ro.body_expanded = expanded
-        if not expanded and focus_kind == RowKind.RENDER_OVERLAY_BODY_FONT_SIZE:
+        if not expanded and focus_kind in _RENDER_OVERLAY_BODY_NESTED_KINDS:
             self.focus_index = self._render_overlay_body_header_index()
 
     def _set_render_overlay_title_font_size(self, size: int) -> None:
         self.session.render_overlay.title_font_size = max(1, size)
+
+    def _cycle_render_overlay_title_font(self, *, forward: bool) -> None:
+        ro = self.session.render_overlay
+        ro.title_font = cycle_render_overlay_font(ro.title_font, forward=forward)
 
     def _set_render_overlay_title_margin_bottom(self, margin: int) -> None:
         self.session.render_overlay.title_margin_bottom = max(0, margin)
 
     def _set_render_overlay_body_font_size(self, size: int) -> None:
         self.session.render_overlay.body_font_size = max(1, size)
+
+    def _cycle_render_overlay_body_font(self, *, forward: bool) -> None:
+        ro = self.session.render_overlay
+        ro.body_font = cycle_render_overlay_font(ro.body_font, forward=forward)
 
     def _set_render_overlay_opacity(self, pct: int) -> None:
         self.session.render_overlay.opacity_pct = max(0, min(100, pct))

@@ -81,6 +81,7 @@ def _render_overlay_base(cfg: CleaveConfig) -> RenderOverlayConfig:
 def _text_block_to_yaml(
     block: RenderOverlayTextBlockConfig,
     *,
+    font: str,
     font_size: int,
     colour_key: str,
     margin_bottom: int | None = None,
@@ -90,6 +91,7 @@ def _text_block_to_yaml(
         content = content + "\n"
     out: dict[str, Any] = {
         "content": content,
+        "font": font,
         "font-size": font_size,
         colour_key: _rgb_to_hex(block.colour),
     }
@@ -120,12 +122,14 @@ def _snapshot_render_overlay(
     overlay["enabled"] = runtime.enabled or session.render_overlay_solo
     overlay["title"] = _text_block_to_yaml(
         base.title,
+        font=runtime.title_font,
         font_size=runtime.title_font_size,
         colour_key="font-colour",
         margin_bottom=runtime.title_margin_bottom,
     )
     overlay["body"] = _text_block_to_yaml(
         base.body,
+        font=runtime.body_font,
         font_size=runtime.body_font_size,
         colour_key="colour",
     )

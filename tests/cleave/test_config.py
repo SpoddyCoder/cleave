@@ -361,6 +361,7 @@ def test_parse_render_overlay_full_template() -> None:
         enabled=True,
         title=RenderOverlayTextBlockConfig(
             content="Cleave Final Render",
+            font="monospace",
             font_size=24,
             colour=(255, 255, 255),
             background_colour=(51, 51, 255),
@@ -372,6 +373,7 @@ def test_parse_render_overlay_full_template() -> None:
                 "Like musician names, year of release etc.\n"
                 "Edit the cleave-viz.yaml to modify this message, colours etc."
             ),
+            font="monospace",
             font_size=18,
             colour=(255, 255, 255),
             background_colour=(51, 51, 255),
