@@ -17,7 +17,16 @@ from cleave.viz.key_repeat import mod_ctrl
 from cleave.viz.layer import timeline_cues_for_eval, timeline_defaults
 from cleave.viz.playback import PlaybackState, current_sec, seek, toggle_pause
 
-_LAYER_KEYS = (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4)
+_LAYER_KEY_INDEX: dict[int, int] = {
+    pygame.K_1: 0,
+    pygame.K_2: 1,
+    pygame.K_3: 2,
+    pygame.K_4: 3,
+    pygame.K_KP1: 0,
+    pygame.K_KP2: 1,
+    pygame.K_KP3: 2,
+    pygame.K_KP4: 3,
+}
 
 
 class TimelineControls:
@@ -71,8 +80,8 @@ class TimelineControls:
                 )
             return True
 
-        if self.session.timeline.recording and event.key in _LAYER_KEYS:
-            stem = self._stem_for_layer_key(event.key)
+        if self.session.timeline.recording and event.key in _LAYER_KEY_INDEX:
+            stem = self._stem_for_layer_index(_LAYER_KEY_INDEX[event.key])
             if stem is not None:
                 self._toggle_armed_layer_at(
                     stem, current_sec(self.playback, self.duration_sec)
@@ -111,11 +120,7 @@ class TimelineControls:
         if self._on_toast is not None:
             self._on_toast(message)
 
-    def _stem_for_layer_key(self, key: int) -> str | None:
-        try:
-            index = _LAYER_KEYS.index(key)
-        except ValueError:
-            return None
+    def _stem_for_layer_index(self, index: int) -> str | None:
         z_order = self.session.layer_z_order
         if index >= len(z_order):
             return None
