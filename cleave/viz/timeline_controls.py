@@ -226,13 +226,6 @@ class TimelineControls:
         tl.record_buffer = []
         self._last_toggle_t = {}
 
-        defaults = timeline_defaults(self.session)
-        snapshot_layers = {
-            stem: layer_visible_at(tl.cues, defaults, stem, t_sec)
-            for stem in tl.armed_stems
-        }
-        tl.record_buffer.append(TimelineCue(t=t_sec, layers=snapshot_layers))
-
         if self._on_visibility_change is not None:
             self._on_visibility_change()
 
