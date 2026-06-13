@@ -25,6 +25,12 @@ After the four stem blocks, a blank **render section gap** row (`RowKind.RENDER_
 
 Below overlay, **Render: POST FX** (`RowKind.RENDER_POST_FX_HEADER`) is always present. Same eye / expand / solo semantics as overlay (`render_post_fx_solo`; solo is not persisted). Sub-rows when expanded: fade in, fade out (seconds). State: `RenderPostFxBlock` / `RenderPostFxRuntime` on session. Disable clears solo and collapses.
 
+Below post-FX, **Render: TIMELINE** (`RowKind.RENDER_TIMELINE_HEADER`) is always present. Eye / expand semantics match post-FX (no solo in v1). **Ctrl+Right** / **Ctrl+Left** toggles `session.timeline.enabled`; **Right** / **Left** toggles `session.timeline.expanded`. Disable collapses expanded. State: `RenderTimelineBlock` / `TimelineRuntime` on session. `enabled` persists via config snapshot; `expanded` is UI-only. No sub-rows in v1 (expand arrow is cosmetic). Press **t** in the main panel to open the timeline strip when enabled (toast if disabled).
+
+## Timeline panel
+
+Separate bottom overlay ([cleave/viz/timeline_overlay.py](cleave/viz/timeline_overlay.py), [cleave/viz/timeline_controls.py](cleave/viz/timeline_controls.py)). Open with **t** when `timeline.enabled`; **t** or **Esc** closes. While open, keyboard routes to timeline controls (main tree inactive). Rows follow `layer_z_order`; labels use stem abbreviations (D/B/V/O). **Enter** arms a row (`ARMED_BG` red fill, distinct from solo eye). **r** records toggles for armed rows only; keys **1**–**4** map to stack position (bottom = 1). Cue list persists under root `timeline:` in YAML (written last in snapshots). See [docs/timeline-idea.md](docs/timeline-idea.md).
+
 ## Footer rows section
 
 The lower block after a visual gap (`footer_gap` in `draw()`): `footer_row_count(state)` rows (3).
@@ -52,7 +58,7 @@ Colors live in [cleave/viz/theme.py](cleave/viz/theme.py). Label truncation uses
 
 **Expand arrows** (`▶` / `▼`): value role, not label. Drawn in the row value color (typically `VALUE`; follows focus, disabled, and locked state like other values).
 
-**Visibility eye** (track, render overlay, and render post-FX headers): `VALUE` when enabled, `DISABLED` when off. When soloed (`solo_stem` for stems, `render_overlay_solo` / `render_post_fx_solo` for render blocks; neither persisted), the eye stays white on `SOLO_BG`. **Shift + Right** enters solo; **Shift + Left** exits solo for the focused header.
+**Visibility eye** (track, render overlay, render post-FX, and render timeline headers): `VALUE` when enabled, `DISABLED` when off. When soloed (`solo_stem` for stems, `render_overlay_solo` / `render_post_fx_solo` for render blocks; neither persisted), the eye stays white on `SOLO_BG`. **Shift + Right** enters solo; **Shift + Left** exits solo for the focused header (timeline has no solo in v1).
 
 ### Accent colors (not label/value roles)
 
@@ -62,6 +68,7 @@ Colors live in [cleave/viz/theme.py](cleave/viz/theme.py). Label truncation uses
 | `MOVE_MODE` | Z-order move mode text and background tint |
 | `LOCK_ICON` | Red padlock glyph on locked track headers |
 | `SOLO_BG` | Solid red background behind the visibility eye when that stem is soloed |
+| `ARMED_BG` | Solid red row background on armed timeline rows |
 | `PRESET_ICON` / `PRESET_FILE_ICON` | Folder and file glyphs on preset rows |
 
 ### Intentional exceptions

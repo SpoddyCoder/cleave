@@ -268,12 +268,18 @@ def test_re_enable_without_expanding() -> None:
     render_post_fx_row = find_row_by_kind(
         view, RowKind.RENDER_POST_FX_HEADER
     )
+    render_timeline_row = find_row_by_kind(
+        view, RowKind.RENDER_TIMELINE_HEADER
+    )
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_index == render_overlay_row
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_index == render_post_fx_row
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_index == render_timeline_row
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_index == transport_row
@@ -655,7 +661,7 @@ def test_navigable_rows_without_overwrite() -> None:
     )
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is False
-    assert row_count(view) == 13
+    assert row_count(view) == 14
 
     kinds = {row_kind(view, i) for i in range(row_count(view))}
     assert RowKind.CONFIG_HEADER in kinds
@@ -677,7 +683,7 @@ def test_navigable_rows_with_overwrite() -> None:
     controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is True
-    assert row_count(view) == 13
+    assert row_count(view) == 14
 
     save_row = _save_row(view)
     assert save_row in navigable_row_indices(view)
@@ -1064,6 +1070,137 @@ def test_transport_icons_play_vs_pause() -> None:
     assert overlap_px < play_mask.count() or overlap_px < pause_mask.count()
 
 
+def test_render_timeline_header_after_post_fx() -> None:
+    controls = _make_controls()
+    view = controls.build_view_state(paused=False)
+    post_fx_row = find_row_by_kind(view, RowKind.RENDER_POST_FX_HEADER)
+    timeline_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    transport_row = find_row_by_kind(view, RowKind.TRANSPORT)
+    assert post_fx_row < timeline_row < transport_row
+
+
+def test_render_timeline_header_label_spacing() -> None:
+    controls = _make_controls()
+    view = controls.build_view_state(paused=False)
+    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    assert _row_text(view, header_row) == "Render: TIMELINE ▶"
+
+
+def test_render_timeline_header_expand_arrow() -> None:
+    controls = _make_controls()
+    view = controls.build_view_state(paused=False)
+    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    assert _row_text(view, header_row).endswith(" ▶")
+
+    controls.session.timeline.expanded = True
+    view = controls.build_view_state(paused=False)
+    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    assert _row_text(view, header_row).endswith(" ▼")
+
+
+def test_render_timeline_ctrl_right_toggles_enabled() -> None:
+    controls = _make_controls()
+    view = controls.build_view_state(paused=False)
+    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    controls.focus_index = header_row
+    assert controls.session.timeline.enabled is False
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert controls.session.timeline.enabled is True
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert controls.session.timeline.enabled is False
+
+
+def test_render_timeline_right_toggles_expanded() -> None:
+    controls = _make_controls()
+    view = controls.build_view_state(paused=False)
+    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    controls.focus_index = header_row
+    assert controls.session.timeline.expanded is False
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.timeline.expanded is True
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.timeline.expanded is False
+
+
+def test_render_timeline_disable_collapses_expanded() -> None:
+    controls = _make_controls()
+    controls.session.timeline.enabled = True
+    controls.session.timeline.expanded = True
+    view = controls.build_view_state(paused=False)
+    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    controls.focus_index = header_row
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert controls.session.timeline.enabled is False
+    assert controls.session.timeline.expanded is False
+
+
+def test_render_timeline_header_eye_color_when_disabled() -> None:
+    controls = _make_controls()
+    view = controls.build_view_state(paused=False)
+    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    assert _row_value_color(view, header_row) == DISABLED
+
+    controls.session.timeline.enabled = True
+    view = controls.build_view_state(paused=False)
+    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    assert _row_value_color(view, header_row) == VALUE
+
+
+def test_render_timeline_enabled_change_callback() -> None:
+    controls = _make_controls()
+    events: list[bool] = []
+    controls._on_timeline_enabled_change = lambda: events.append(
+        controls.session.timeline.enabled
+    )
+    view = controls.build_view_state(paused=False)
+    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    controls.focus_index = header_row
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert events == [True]
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert events == [True, False]
+
+
+def test_t_opens_timeline_panel_when_enabled() -> None:
+    controls = _make_controls()
+    controls.session.timeline.enabled = True
+    assert controls.session.timeline.panel_open is False
+
+    controls.handle_keydown(_keydown(pygame.K_t))
+    assert controls.session.timeline.panel_open is True
+    assert controls.session.timeline.focus_row == 0
+
+
+def test_t_toast_when_timeline_disabled() -> None:
+    controls = _make_controls()
+    assert controls.session.timeline.enabled is False
+
+    controls.handle_keydown(_keydown(pygame.K_t))
+    assert controls.session.timeline.panel_open is False
+    view = controls.build_view_state(paused=False)
+    assert view.toast_message == "Enable timeline in Render: TIMELINE (Ctrl+Right)"
+
+
+def test_t_ignored_during_move_mode() -> None:
+    controls = _make_controls(("drums",))
+    controls.session.timeline.enabled = True
+    view = controls.build_view_state(paused=False)
+    header_row = find_row_by_kind(view, RowKind.TRACK_HEADER)
+    controls.focus_index = header_row
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    assert controls.move_mode_stem == "drums"
+
+    controls.handle_keydown(_keydown(pygame.K_t))
+    assert controls.session.timeline.panel_open is False
+
+
 def test_transport_enter_toggles_pause() -> None:
     controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
@@ -1099,13 +1236,14 @@ def test_quick_nav_row_indices_headers_and_transport_only() -> None:
     view = controls.build_view_state(paused=False)
 
     quick = quick_nav_row_indices(view)
-    assert len(quick) == 5
+    assert len(quick) == 6
     for index in quick:
         kind = row_kind(view, index)
         assert kind in (
             RowKind.TRACK_HEADER,
             RowKind.RENDER_OVERLAY_HEADER,
             RowKind.RENDER_POST_FX_HEADER,
+            RowKind.RENDER_TIMELINE_HEADER,
             RowKind.TRANSPORT,
         )
 
@@ -1123,6 +1261,9 @@ def test_quick_nav_row_indices_headers_and_transport_only() -> None:
     render_post_fx_row = find_row_by_kind(
         view, RowKind.RENDER_POST_FX_HEADER
     )
+    render_timeline_row = find_row_by_kind(
+        view, RowKind.RENDER_TIMELINE_HEADER
+    )
     transport_row = next(
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.TRANSPORT
     )
@@ -1131,6 +1272,7 @@ def test_quick_nav_row_indices_headers_and_transport_only() -> None:
         bass_header,
         render_overlay_row,
         render_post_fx_row,
+        render_timeline_row,
         transport_row,
     ]
 
@@ -1154,10 +1296,13 @@ def test_ctrl_quick_nav_cycles_headers_and_transport() -> None:
     assert controls.focus_index == quick[4]
 
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
+    assert controls.focus_index == quick[5]
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
     assert controls.focus_index == quick[0]
 
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
-    assert controls.focus_index == quick[4]
+    assert controls.focus_index == quick[5]
 
 
 def test_ctrl_quick_nav_from_sub_row_jumps_forward() -> None:

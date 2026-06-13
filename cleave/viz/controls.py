@@ -37,12 +37,14 @@ from cleave.preset_playlist import (
     directory_display,
     preset_filename_display,
 )
+from cleave.timeline import TimelineCue
 from cleave.viz.confirm import ConfirmDialog, ConfirmRequest, SaveChoiceDialog, SaveChoiceRequest
 from cleave.viz.key_repeat import KeyRepeatController, mod_ctrl, mod_shift
 from cleave.viz.playback import PlaybackState, current_sec, seek, toggle_pause
 from cleave.viz.overlay import (
     RenderOverlayBlock,
     RenderPostFxBlock,
+    RenderTimelineBlock,
     RowKind,
     TrackBlock,
     TuningViewState,
@@ -105,6 +107,8 @@ _RENDER_POST_FX_SUB_ROW_KINDS = frozenset(
         RowKind.RENDER_POST_FX_FADE_OUT,
     }
 )
+
+_RENDER_TIMELINE_SUB_ROW_KINDS: frozenset[RowKind] = frozenset()
 _DEFAULT_SAVE_FILENAME = "unnamed-1.yaml"
 
 
@@ -179,6 +183,23 @@ def default_render_post_fx_runtime() -> RenderPostFxRuntime:
 
 
 @dataclass
+class TimelineRuntime:
+    enabled: bool = False
+    expanded: bool = False
+    cues: list[TimelineCue] = field(default_factory=list)
+    panel_open: bool = False
+    focus_row: int = 0
+    armed_stems: set[str] = field(default_factory=set)
+    recording: bool = False
+    record_buffer: list[TimelineCue] = field(default_factory=list)
+    record_start_sec: float | None = None
+
+
+def default_timeline_runtime() -> TimelineRuntime:
+    return TimelineRuntime()
+
+
+@dataclass
 class LayerRuntime:
     playlist: PresetPlaylist
     browse_floor: Path
@@ -203,6 +224,7 @@ class TuningSession:
         default_factory=default_render_post_fx_runtime
     )
     render_post_fx_solo: bool = False
+    timeline: TimelineRuntime = field(default_factory=default_timeline_runtime)
 
 
 class TuningControls:
@@ -219,6 +241,7 @@ class TuningControls:
         on_blend_change: Callable[[str, BlendMode], None] | None = None,
         on_opacity_change: Callable[[str, int], None] | None = None,
         on_layer_enabled_change: Callable[[str, bool], None] | None = None,
+        on_timeline_enabled_change: Callable[[], None] | None = None,
         on_solo_change: Callable[[], None] | None = None,
         on_beat_change: Callable[[str, float], None] | None = None,
         on_z_order_change: Callable[[list[str]], None] | None = None,
@@ -242,6 +265,7 @@ class TuningControls:
         self._on_blend_change = on_blend_change
         self._on_opacity_change = on_opacity_change
         self._on_layer_enabled_change = on_layer_enabled_change
+        self._on_timeline_enabled_change = on_timeline_enabled_change
         self._on_solo_change = on_solo_change
         self._on_beat_change = on_beat_change
         self._on_z_order_change = on_z_order_change
@@ -288,6 +312,12 @@ class TuningControls:
 
         if event.key == pygame.K_SPACE:
             toggle_pause(self.playback, self.duration_sec)
+            return True
+
+        if event.key == pygame.K_t:
+            if self.move_mode_stem is not None:
+                return True
+            self._open_timeline_panel()
             return True
 
         if self.move_mode_stem is not None:
@@ -443,6 +473,7 @@ class TuningControls:
 
         ro = self.session.render_overlay
         pp = self.session.render_post_fx
+        tl = self.session.timeline
         return TuningViewState(
             layer_z_order=tuple(self.session.layer_z_order),
             tracks=tracks,
@@ -483,6 +514,10 @@ class TuningControls:
                 fade_in=pp.fade_in,
                 fade_out=pp.fade_out,
                 solo=self.session.render_post_fx_solo,
+            ),
+            render_timeline=RenderTimelineBlock(
+                enabled=tl.enabled,
+                expanded=tl.expanded,
             ),
         )
 
@@ -714,6 +749,11 @@ class TuningControls:
             self._set_render_post_fx_fade_out(
                 self.session.render_post_fx.fade_out + delta
             )
+        elif kind == RowKind.RENDER_TIMELINE_HEADER:
+            if ctrl:
+                self._set_render_timeline_enabled(forward)
+                return
+            self._set_render_timeline_expanded(forward)
 
     def _step_directory(self, stem: str, *, forward: bool) -> None:
         layer = self.session.layers[stem]
@@ -937,6 +977,34 @@ class TuningControls:
     def _set_render_post_fx_fade_out(self, fade_out: float) -> None:
         self.session.render_post_fx.fade_out = max(0.0, fade_out)
 
+    def _render_timeline_header_index(self) -> int:
+        view = self.build_view_state(paused=self.playback.paused)
+        return find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+
+    def _refocus_render_timeline_header_if_sub_row(self) -> None:
+        view = self.build_view_state(paused=self.playback.paused)
+        if row_kind(view, self.focus_index) in _RENDER_TIMELINE_SUB_ROW_KINDS:
+            self.focus_index = self._render_timeline_header_index()
+
+    def _set_render_timeline_expanded(self, expanded: bool) -> None:
+        tl = self.session.timeline
+        if tl.expanded == expanded:
+            return
+        tl.expanded = expanded
+        if not expanded:
+            self._refocus_render_timeline_header_if_sub_row()
+
+    def _set_render_timeline_enabled(self, enabled: bool) -> None:
+        tl = self.session.timeline
+        if tl.enabled == enabled:
+            return
+        tl.enabled = enabled
+        if not enabled:
+            tl.expanded = False
+            self._refocus_render_timeline_header_if_sub_row()
+        if self._on_timeline_enabled_change is not None:
+            self._on_timeline_enabled_change()
+
     def _enter_solo(self, stem: str) -> None:
         if self.session.solo_stem == stem:
             return
@@ -952,6 +1020,11 @@ class TuningControls:
             self._on_solo_change()
 
     def _set_enabled(self, stem: str, enabled: bool) -> None:
+        if self.session.timeline.enabled:
+            now = time.monotonic()
+            self._toast_message = "Timeline controls layer visibility"
+            self._toast_deadline = now + TOAST_DURATION_SEC
+            return
         layer = self.session.layers[stem]
         if layer.enabled == enabled:
             return
@@ -1065,9 +1138,20 @@ class TuningControls:
 
         self._confirm.prompt(ConfirmRequest(message=message, on_confirm=on_confirm))
 
-    def _show_save_toast(self, message: str) -> None:
-        print(message, file=sys.stderr)
+    def show_toast(self, message: str) -> None:
         now = time.monotonic()
         self._toast_message = message
         self._toast_deadline = now + TOAST_DURATION_SEC
         self._input_blocked_until = now + TOAST_DURATION_SEC
+
+    def _open_timeline_panel(self) -> None:
+        tl = self.session.timeline
+        if not tl.enabled:
+            self.show_toast("Enable timeline in Render: TIMELINE (Ctrl+Right)")
+            return
+        tl.panel_open = True
+        tl.focus_row = 0
+
+    def _show_save_toast(self, message: str) -> None:
+        print(message, file=sys.stderr)
+        self.show_toast(message)
