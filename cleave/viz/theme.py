@@ -30,7 +30,9 @@ MOVE_MODE: tuple[int, int, int] = (60, 120, 255)
 LOCK_ICON: tuple[int, int, int] = (235, 90, 90)
 LOCKED: tuple[int, int, int] = (235, 150, 150)
 SOLO_BG: tuple[int, int, int] = (200, 40, 40)
-ARMED_BG: tuple[int, int, int] = (140, 30, 30)
+ARMED_BG: tuple[int, int, int] = (220, 50, 50)
+TIMELINE_FOCUS_BG: tuple[int, int, int] = (90, 160, 240)
+REC_BG: tuple[int, int, int] = (220, 0, 0)
 
 BORDER_WIDTH: int = 2
 PANEL_CONTENT_MAX_WIDTH: int = 440

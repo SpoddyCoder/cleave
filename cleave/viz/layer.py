@@ -331,7 +331,7 @@ def _build_timeline_view_state(
     tl = session.timeline
     return TimelineViewState(
         layer_z_order=list(session.layer_z_order),
-        cues=list(tl.cues),
+        cues=list(timeline_cues_for_eval(session)),
         defaults=timeline_defaults(session),
         position_sec=position_sec,
         duration_sec=duration_sec,
@@ -340,6 +340,19 @@ def _build_timeline_view_state(
         recording=tl.recording,
         enabled=tl.enabled,
     )
+
+
+def _union_rect(
+    a: tuple[int, int, int, int],
+    b: tuple[int, int, int, int],
+) -> tuple[int, int, int, int]:
+    ax, ay, aw, ah = a
+    bx, by, bw, bh = b
+    x0 = min(ax, bx)
+    y0 = min(ay, by)
+    x1 = max(ax + aw, bx + bw)
+    y1 = max(ay + ah, by + bh)
+    return (x0, y0, x1 - x0, y1 - y0)
 
 
 def _draw_timeline_overlay(
@@ -352,7 +365,11 @@ def _draw_timeline_overlay(
     overlay.draw(overlay_surface, view_state)
     panel = overlay.panel_rect
     if panel is not None:
-        px, py, pw, ph = panel
-        panel_surface = overlay_surface.subsurface((px, py, pw, ph))
-        tex_id = compositor.upload_overlay_texture(panel_surface)
+        upload_rect = panel
+        badge = overlay.rec_badge_rect
+        if badge is not None:
+            upload_rect = _union_rect(panel, badge)
+        px, py, pw, ph = upload_rect
+        upload_surface = overlay_surface.subsurface((px, py, pw, ph))
+        tex_id = compositor.upload_overlay_texture(upload_surface)
         compositor.draw_overlay(tex_id, px, py, pw, ph)
