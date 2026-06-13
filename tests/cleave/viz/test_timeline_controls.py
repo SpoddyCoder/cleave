@@ -224,7 +224,7 @@ def test_r_starts_recording_and_unpauses() -> None:
     assert visibility_calls == [True]
 
 
-def test_record_start_appends_snapshot_cue() -> None:
+def test_record_start_leaves_buffer_empty() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
         armed_stems={"drums", "bass"},
         position_sec=7.5,
@@ -233,10 +233,7 @@ def test_record_start_appends_snapshot_cue() -> None:
     session.layers["bass"].enabled = False
 
     controls.handle_keydown(keydown(pygame.K_r))
-    assert len(session.timeline.record_buffer) == 1
-    snapshot = session.timeline.record_buffer[0]
-    assert snapshot.t == 7.5
-    assert snapshot.layers == {"drums": True, "bass": False}
+    assert session.timeline.record_buffer == []
 
 
 def test_layer_keys_only_affect_armed_stems() -> None:
@@ -248,14 +245,14 @@ def test_layer_keys_only_affect_armed_stems() -> None:
     session.layers["bass"].enabled = True
 
     controls.handle_keydown(keydown(pygame.K_r))
-    assert len(session.timeline.record_buffer) == 1
+    assert len(session.timeline.record_buffer) == 0
 
     controls.handle_keydown(keydown(pygame.K_2))
-    assert len(session.timeline.record_buffer) == 1
+    assert len(session.timeline.record_buffer) == 0
 
     controls.handle_keydown(keydown(pygame.K_1))
-    assert len(session.timeline.record_buffer) == 2
-    assert session.timeline.record_buffer[1] == TimelineCue(
+    assert len(session.timeline.record_buffer) == 1
+    assert session.timeline.record_buffer[0] == TimelineCue(
         t=2.0, layers={"drums": False}
     )
 
@@ -269,7 +266,7 @@ def test_layer_key_debounce_ignores_rapid_press() -> None:
     controls.handle_keydown(keydown(pygame.K_r))
     controls.handle_keydown(keydown(pygame.K_1))
     controls.handle_keydown(keydown(pygame.K_1))
-    assert len(session.timeline.record_buffer) == 2
+    assert len(session.timeline.record_buffer) == 1
 
 
 def test_ctrl_seek_blocked_while_recording() -> None:
