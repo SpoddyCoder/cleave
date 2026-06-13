@@ -219,10 +219,17 @@ class TimelineOverlay:
             stem_abbrev_x = layer_num_x + self._layer_num_width
             eye_x = stem_abbrev_x + self._stem_abbrev_width
 
+            label_bg_rect = pygame.Rect(
+                layer_num_x,
+                row_y,
+                self._layer_num_width + self._stem_abbrev_width,
+                row_h,
+            )
+
             if focused:
-                focus_surf = pygame.Surface((row_rect.w, row_rect.h), pygame.SRCALPHA)
+                focus_surf = pygame.Surface((label_bg_rect.w, label_bg_rect.h), pygame.SRCALPHA)
                 focus_surf.fill((*TIMELINE_FOCUS_BG, FOCUS_BG_ALPHA))
-                panel.blit(focus_surf, row_rect.topleft)
+                panel.blit(focus_surf, label_bg_rect.topleft)
 
             abbrev_rect = pygame.Rect(
                 stem_abbrev_x, row_y, self._stem_abbrev_width, row_h
