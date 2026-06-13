@@ -20,7 +20,7 @@ Bottom overlay (~20% of window height). Four rows in `layer_z_order` with stem a
 | Left / Right | Previous / next cue |
 | Enter | Arm / disarm focused row (red background when armed) |
 | Backspace | Delete focused cue |
-| Ctrl+Enter | Toggle focused layer at playhead (manual cue) |
+| Ctrl+Enter | Toggle focused row at playhead (record only; armed rows only) |
 | Space | Pause / resume |
 | Ctrl+Left / Right | Seek 10s / 30s (blocked while recording) |
 | `r` | Start / stop record |
@@ -30,7 +30,7 @@ Bottom overlay (~20% of window height). Four rows in `layer_z_order` with stem a
 
 1. Open panel (`t`).
 2. Up/Down to a row; **Enter** to arm (red row). Repeat for each layer to record.
-3. **r** to start record and playback. Press **1**–**4** on the beat for armed layers only.
+3. **r** to start record and playback. Press **1**–**4** (by stack position) or **Ctrl+Enter** (focused row) on the beat for armed layers only.
 4. **r** again to stop. Armed-layer cues in that pass replace the previous take for that time range (punch overwrite). Unarmed stems are untouched.
 5. **SAVE CONFIG** in the main panel writes cues to YAML.
 

@@ -179,18 +179,49 @@ def test_backspace_toast_when_no_cues() -> None:
     assert toasts == ["No cues"]
 
 
-def test_ctrl_enter_writes_visibility_cue_at_playhead() -> None:
+def test_ctrl_enter_writes_to_record_buffer_when_recording() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         focus_row=0,
+        armed_stems={"drums"},
+        position_sec=5.0,
+    )
+    session.layers["drums"].enabled = True
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
+    assert session.timeline.cues == []
+    assert len(session.timeline.record_buffer) == 1
+    assert session.timeline.record_buffer[0] == TimelineCue(
+        t=5.0, layers={"drums": False}
+    )
+    assert visibility_calls[-1] is True
+
+
+def test_ctrl_enter_ignored_when_not_recording() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+        focus_row=0,
+        armed_stems={"drums"},
         position_sec=5.0,
     )
     session.layers["drums"].enabled = True
 
     controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
-    assert len(session.timeline.cues) == 1
-    assert session.timeline.cues[0].t == 5.0
-    assert session.timeline.cues[0].layers == {"drums": False}
-    assert visibility_calls == [True]
+    assert session.timeline.cues == []
+    assert session.timeline.record_buffer == []
+    assert visibility_calls == []
+
+
+def test_ctrl_enter_only_affects_armed_focused_stem() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        focus_row=1,
+        armed_stems={"drums"},
+        position_sec=5.0,
+    )
+    session.layers["bass"].enabled = True
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
+    assert session.timeline.record_buffer == []
 
 
 def test_r_without_armed_layers_shows_toast() -> None:
