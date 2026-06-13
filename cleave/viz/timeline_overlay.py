@@ -41,7 +41,7 @@ class TimelineViewState:
     defaults: dict[str, bool]
     position_sec: float
     duration_sec: float
-    focus_row: int  # 0..3, bottom stem first
+    focus_row: int  # 0..3, index into layer_z_order (0 = bottom stem)
     armed_stems: set[str] = field(default_factory=set)
     recording: bool = False
     enabled: bool = False
@@ -185,7 +185,7 @@ class TimelineOverlay:
         )
 
         for display_i in range(row_count):
-            row_index = row_count - 1 - display_i
+            row_index = display_i
             stem = state.layer_z_order[row_index]
             row_y = self._padding + display_i * (row_h + self._row_gap)
             row_rect = pygame.Rect(self._padding, row_y, panel_w - self._padding * 2, row_h)

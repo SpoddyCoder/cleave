@@ -77,10 +77,10 @@ class TimelineControls:
             return True
 
         if event.key == pygame.K_UP:
-            self._move_focus_row(1)
+            self._move_focus_row(-1)
             return True
         if event.key == pygame.K_DOWN:
-            self._move_focus_row(-1)
+            self._move_focus_row(1)
             return True
 
         if event.key in (pygame.K_LEFT, pygame.K_RIGHT):

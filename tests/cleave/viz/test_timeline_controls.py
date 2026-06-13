@@ -85,16 +85,19 @@ def test_up_down_change_focus_row() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(focus_row=1)
 
     controls.handle_keydown(keydown(pygame.K_UP))
-    assert session.timeline.focus_row == 2
+    assert session.timeline.focus_row == 0
 
     controls.handle_keydown(keydown(pygame.K_DOWN))
     assert session.timeline.focus_row == 1
 
     controls.handle_keydown(keydown(pygame.K_DOWN))
-    assert session.timeline.focus_row == 0
+    assert session.timeline.focus_row == 2
 
     controls.handle_keydown(keydown(pygame.K_DOWN))
-    assert session.timeline.focus_row == 0
+    assert session.timeline.focus_row == 3
+
+    controls.handle_keydown(keydown(pygame.K_DOWN))
+    assert session.timeline.focus_row == 3
 
 
 def test_left_right_navigate_cues_by_time() -> None:
