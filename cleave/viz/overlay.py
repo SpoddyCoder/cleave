@@ -486,11 +486,11 @@ def _row_text(state: TuningViewState, index: int) -> str:
 
     if kind == RowKind.RENDER_OVERLAY_HEADER:
         arrow = "▼" if state.render_overlay.expanded else "▶"
-        return f"Render : OVERLAY {arrow}"
+        return f"Render: OVERLAY {arrow}"
 
     if kind == RowKind.RENDER_POST_FX_HEADER:
         arrow = "▼" if state.render_post_fx.expanded else "▶"
-        return f"Render : POST FX {arrow}"
+        return f"Render: POST FX {arrow}"
 
     block_ro = state.render_overlay
     if kind == RowKind.RENDER_OVERLAY_POSITION:
@@ -689,11 +689,11 @@ def _track_header_expand_suffix(expanded: bool) -> str:
 
 
 def _render_overlay_header_prefix() -> str:
-    return "Render : "
+    return "Render: "
 
 
 def _render_post_fx_header_prefix() -> str:
-    return "Render : "
+    return "Render: "
 
 
 def render_visibility_icon(
