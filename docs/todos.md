@@ -41,3 +41,7 @@ The correct UX is to wait and show a loading bar / spinner while the app is init
 Once everything is ready, the app and audio should start together.
 
 Similarly on render - render no frames until the app is fully initiliased and the projectM instances are confirmed working.
+
+### Disarming track mid-record does unexpected things
+Disarming a track before you stop recording, stops the recording but also make the timeline go solid.
+When the track is subsequently stopped with space bar... all the recorded elements correctly pop-in on the timeline.
