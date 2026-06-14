@@ -16,8 +16,7 @@ Built on [projectM](https://github.com/projectM-visualizer/projectM) and [Demucs
 
 ```bash
 ./wsl-stacker.sh spoddycoder dev-ai
-./wsl-builder.sh media ffmpeg
-./wsl-builder.sh media libprojectm
+./wsl-builder.sh media ffmpeg,libprojectm
 ```
 
 WSL2 audio glitches: see [microsoft/wslg#1257](https://github.com/microsoft/wslg/issues/1257). Disabling `systemd-timesyncd` should help.
@@ -36,15 +35,21 @@ conda create -n cleave python=3.10
 conda activate cleave
 ```
 
-Install dependencies...
+Install dependencies (torch first, then runtime pins)...
 
 ```bash
-# install torch with CUDA support
-pip install torch torchcodec --index-url https://download.pytorch.org/whl/cu130
-# or install cpu version
-pip install torch torchcodec --index-url https://download.pytorch.org/whl/cpu
-# install the rest of the deps
+# CUDA 13.0 (Linux + NVIDIA GPU)
+pip install -r requirements-torch-cu130.txt
+# or CPU-only
+pip install -r requirements-torch-cpu.txt
+# rest of deps...
 pip install -r requirements.txt
+```
+
+For development and tests, also install [requirements-dev.txt](requirements-dev.txt) (`pytest`).
+
+```bash
+pip install -r requirements-dev.txt
 ```
 
 ## Quick Start
