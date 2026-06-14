@@ -13,6 +13,7 @@ from cleave.paths import (
     project_slug,
     repo_root,
     resolve_project,
+    validate_project_slug,
 )
 
 
@@ -70,3 +71,22 @@ def test_project_slug() -> None:
 def test_default_project_config() -> None:
     project = Path("/tmp/my-project")
     assert default_project_config(project) == project / PROJECT_VIZ_CONFIG_FILENAME
+
+
+@pytest.mark.parametrize(
+    "slug",
+    ["foo/bar", r"foo\bar", ".", ".."],
+)
+def test_validate_project_slug_rejects_invalid(slug: str) -> None:
+    with pytest.raises(ValueError, match="invalid project slug"):
+        validate_project_slug(slug)
+
+
+def test_resolve_project_rejects_invalid_slug(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    (tmp_path / "projects").mkdir()
+
+    with pytest.raises(ValueError, match="invalid project slug"):
+        resolve_project("bad/slug")

@@ -105,6 +105,37 @@ def cmd_render(args: argparse.Namespace) -> None:
     print(f"Rendered to {output_path}")
 
 
+def cmd_backup(args: argparse.Namespace) -> None:
+    try:
+        project_dir = resolve_project(Path(args.project_dir))
+    except (FileNotFoundError, ValueError) as e:
+        _exit_error(f"error: {e}")
+
+    from cleave.archive import backup_project
+
+    try:
+        archive_path = backup_project(
+            project_dir, Path(args.destination), force=args.force
+        )
+    except (FileNotFoundError, ValueError, FileExistsError, OSError) as e:
+        _exit_error(f"error: {e}")
+
+    print(f"Backed up to {archive_path}")
+
+
+def cmd_restore(args: argparse.Namespace) -> None:
+    from cleave.archive import restore_project
+
+    try:
+        project_path = restore_project(
+            Path(args.archive), as_slug=args.as_slug, force=args.force
+        )
+    except (FileNotFoundError, ValueError, FileExistsError, OSError) as e:
+        _exit_error(f"error: {e}")
+
+    print(f"Restored to {project_path}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="cleave",
@@ -196,6 +227,50 @@ def build_parser() -> argparse.ArgumentParser:
         help="veryslow libx264 preset for best encode quality (slower)",
     )
     render.set_defaults(func=cmd_render)
+
+    backup = subparsers.add_parser(
+        "backup",
+        prog="cleave backup",
+        help="Backup a project to a .cleave-tar.gz archive",
+    )
+    backup.add_argument(
+        "project_dir",
+        help=_PROJECT_DIR_HELP,
+    )
+    backup.add_argument(
+        "destination",
+        help="Archive file path, directory, or parent path to create",
+    )
+    backup.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help="Overwrite existing archive without prompting",
+    )
+    backup.set_defaults(func=cmd_backup)
+
+    restore = subparsers.add_parser(
+        "restore",
+        prog="cleave restore",
+        help="Restore a project from a .cleave-tar.gz archive",
+    )
+    restore.add_argument(
+        "archive",
+        help="Path to a .cleave-tar.gz archive",
+    )
+    restore.add_argument(
+        "--as",
+        dest="as_slug",
+        metavar="SLUG",
+        help="Restore under a different project slug",
+    )
+    restore.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help="Replace existing project without prompting",
+    )
+    restore.set_defaults(func=cmd_restore)
 
     return parser
 
