@@ -578,3 +578,105 @@ def test_stop_record_preserves_unarmed_cues_in_punch_range() -> None:
     assert not any(
         cue.t == 11.0 and "drums" in cue.layers for cue in session.timeline.cues
     )
+
+
+def test_ctrl_space_starts_record_when_paused() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+        armed_stems={"drums"},
+        position_sec=3.0,
+    )
+    controls.playback.paused = True
+
+    controls.handle_keydown(keydown(pygame.K_SPACE, mod=pygame.KMOD_CTRL))
+    assert session.timeline.recording is True
+    assert controls.playback.paused is False
+    assert visibility_calls == [True]
+
+
+def test_ctrl_space_starts_record_when_playing() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+        armed_stems={"bass"},
+        position_sec=2.0,
+    )
+
+    controls.handle_keydown(keydown(pygame.K_SPACE, mod=pygame.KMOD_CTRL))
+    assert session.timeline.recording is True
+    assert controls.playback.paused is False
+    assert visibility_calls == [True]
+
+
+def test_ctrl_space_stops_record_and_pauses() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+        armed_stems={"drums"},
+        position_sec=10.0,
+    )
+    session.layers["drums"].enabled = True
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.playback.player.seek(15.0)
+    controls.handle_keydown(keydown(pygame.K_SPACE, mod=pygame.KMOD_CTRL))
+
+    assert session.timeline.recording is False
+    assert controls.playback.paused is True
+    assert session.timeline.preview_active is False
+    assert session.timeline.monitor == {}
+    assert visibility_calls == [True, True, True]
+
+
+def test_ctrl_space_stop_stays_paused_if_already_paused() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_stems={"drums"},
+        position_sec=8.0,
+    )
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.playback.paused = True
+
+    controls.handle_keydown(keydown(pygame.K_SPACE, mod=pygame.KMOD_CTRL))
+    assert session.timeline.recording is False
+    assert controls.playback.paused is True
+    assert session.timeline.preview_active is False
+
+
+def test_space_resumes_when_recording_and_paused() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+        armed_stems={"drums"},
+        position_sec=8.0,
+    )
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.playback.paused = True
+
+    controls.handle_keydown(keydown(pygame.K_SPACE))
+    assert session.timeline.recording is True
+    assert controls.playback.paused is False
+    assert visibility_calls == [True, True]
+
+
+def test_space_stops_record_and_pauses_while_playing() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+        armed_stems={"drums"},
+        position_sec=10.0,
+    )
+    session.layers["drums"].enabled = True
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.playback.player.seek(15.0)
+    controls.handle_keydown(keydown(pygame.K_SPACE))
+
+    assert session.timeline.recording is False
+    assert controls.playback.paused is True
+    assert session.timeline.preview_active is False
+    assert session.timeline.monitor == {}
+    assert visibility_calls == [True, True, True]
+
+
+def test_ctrl_space_without_armed_stems_toasts() -> None:
+    controls, session, visibility_calls, _, _, toasts = _make_timeline_controls()
+
+    controls.handle_keydown(keydown(pygame.K_SPACE, mod=pygame.KMOD_CTRL))
+    assert session.timeline.recording is False
+    assert toasts == ["Arm at least one layer to record"]
+    assert visibility_calls == []
