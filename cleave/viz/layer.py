@@ -83,12 +83,20 @@ def snapshot_monitor_from_timeline(
     }
 
 
+def snapshot_monitor_from_output(
+    session: TuningSession,
+    t_sec: float,
+) -> dict[str, bool]:
+    return {
+        stem: effective_layer_enabled(session, stem, t_sec)
+        for stem in session.layer_z_order
+    }
+
+
 def effective_layer_enabled(
     session: TuningSession,
     stem: str,
     t_sec: float,
-    *,
-    playing: bool = True,
 ) -> bool:
     if session.solo_stem is not None:
         return stem == session.solo_stem
@@ -107,7 +115,7 @@ def effective_layer_enabled(
         return layer_visible_at(tl.cues, defaults, stem, t_sec)
     if tl.preview_active:
         return tl.monitor[stem]
-    if playing and stem in tl.override_stems:
+    if stem in tl.override_stems:
         return tl.override_visible.get(stem, True)
     return layer_visible_at(tl.cues, defaults, stem, t_sec)
 
@@ -116,13 +124,9 @@ def apply_layer_visibility(
     session: TuningSession,
     layers_by_name: dict[str, StemLayer],
     t_sec: float,
-    *,
-    playing: bool = True,
 ) -> None:
     for stem, layer in layers_by_name.items():
-        layer.fbo.enabled = effective_layer_enabled(
-            session, stem, t_sec, playing=playing
-        )
+        layer.fbo.enabled = effective_layer_enabled(session, stem, t_sec)
 
 
 def apply_effect_modifiers(
@@ -371,14 +375,10 @@ def _build_timeline_view_state(
     session: TuningSession,
     position_sec: float,
     duration_sec: float,
-    *,
-    playing: bool = True,
 ) -> TimelineViewState:
     tl = session.timeline
     monitor_visible = {
-        stem: effective_layer_enabled(
-            session, stem, position_sec, playing=playing
-        )
+        stem: effective_layer_enabled(session, stem, position_sec)
         for stem in session.layer_z_order
     }
     timeline_visible = {

@@ -16,7 +16,7 @@ from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, TuningSession
 from cleave.viz.key_repeat import mod_ctrl, mod_shift
 from cleave.viz.layer import (
     effective_layer_enabled,
-    snapshot_monitor_from_timeline,
+    snapshot_monitor_from_output,
     timeline_committed_visible,
     timeline_cues_for_eval,
     timeline_defaults,
@@ -83,7 +83,7 @@ class TimelineControls:
                 tl.monitor = {}
             else:
                 t_sec = current_sec(self.playback, self.duration_sec)
-                tl.monitor = snapshot_monitor_from_timeline(self.session, t_sec)
+                tl.monitor = snapshot_monitor_from_output(self.session, t_sec)
                 tl.preview_active = True
             self._refresh_visibility()
             return True
@@ -106,17 +106,17 @@ class TimelineControls:
                     )
                 return True
 
-            if tl.preview_active:
-                stem = self._stem_for_layer_index(_LAYER_KEY_INDEX[event.key])
-                if stem is not None:
-                    self._toggle_monitor_stem(stem)
+            stem = self._stem_for_layer_index(_LAYER_KEY_INDEX[event.key])
+            if stem is None:
                 return True
 
-            if not self.playback.paused:
-                stem = self._stem_for_layer_index(_LAYER_KEY_INDEX[event.key])
-                if stem is not None and stem in tl.override_stems:
-                    tl.override_visible[stem] = not tl.override_visible.get(stem, True)
-                    self._refresh_visibility()
+            if self.playback.paused:
+                self._toggle_paused_stem_visibility(stem)
+                return True
+
+            if stem in tl.override_stems:
+                tl.override_visible[stem] = not tl.override_visible.get(stem, True)
+                self._refresh_visibility()
             return True
 
         if event.key == pygame.K_UP:
@@ -135,10 +135,7 @@ class TimelineControls:
             return True
 
         if event.key == pygame.K_RETURN and mod_shift(event.mod):
-            if (
-                not self.session.timeline.recording
-                and not self.playback.paused
-            ):
+            if not self.session.timeline.recording:
                 self._toggle_override_focused_row()
             return True
 
@@ -248,10 +245,7 @@ class TimelineControls:
         t_sec = current_sec(self.playback, self.duration_sec)
         record_buffer: list[TimelineCue] = []
         for stem in tl.armed_stems:
-            if tl.preview_active:
-                output_visible = tl.monitor[stem]
-            else:
-                output_visible = timeline_committed_visible(self.session, stem, t_sec)
+            output_visible = effective_layer_enabled(self.session, stem, t_sec)
             committed = timeline_committed_visible(self.session, stem, t_sec)
             if output_visible != committed:
                 record_buffer.append(
@@ -308,14 +302,25 @@ class TimelineControls:
         else:
             t_sec = current_sec(self.playback, self.duration_sec)
             tl.override_visible[stem] = effective_layer_enabled(
-                self.session, stem, t_sec, playing=True
+                self.session, stem, t_sec
             )
+            tl.preview_active = False
+            tl.monitor = {}
             tl.override_stems.add(stem)
         self._refresh_visibility()
 
-    def _toggle_monitor_stem(self, stem: str) -> None:
+    def _toggle_paused_stem_visibility(self, stem: str) -> None:
         tl = self.session.timeline
-        tl.monitor[stem] = not tl.monitor[stem]
+        if tl.preview_active:
+            tl.monitor[stem] = not tl.monitor[stem]
+        elif stem in tl.override_stems:
+            tl.override_visible[stem] = not tl.override_visible.get(stem, True)
+        else:
+            t_sec = current_sec(self.playback, self.duration_sec)
+            tl.override_visible[stem] = not effective_layer_enabled(
+                self.session, stem, t_sec
+            )
+            tl.override_stems.add(stem)
         self._refresh_visibility()
 
     def _toggle_armed_layer_at(self, stem: str, t_sec: float) -> None:

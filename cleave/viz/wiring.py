@@ -62,8 +62,7 @@ def make_tuning_controls(
 
     def on_layer_enabled_change(stem: str, enabled: bool) -> None:
         t_sec = current_sec(playback, duration_sec)
-        playing = not playback.paused
-        apply_layer_visibility(session, layers_by_name, t_sec, playing=playing)
+        apply_layer_visibility(session, layers_by_name, t_sec)
         _flush_all_pcm(layers)
         if effective_layer_enabled(session, stem, t_sec):
             apply_effect_modifiers(
@@ -77,8 +76,7 @@ def make_tuning_controls(
 
     def on_timeline_enabled_change() -> None:
         t_sec = current_sec(playback, duration_sec)
-        playing = not playback.paused
-        apply_layer_visibility(session, layers_by_name, t_sec, playing=playing)
+        apply_layer_visibility(session, layers_by_name, t_sec)
         _flush_all_pcm(layers)
         apply_effect_modifiers(
             session,
@@ -91,8 +89,7 @@ def make_tuning_controls(
 
     def on_solo_change() -> None:
         t_sec = current_sec(playback, duration_sec)
-        playing = not playback.paused
-        apply_layer_visibility(session, layers_by_name, t_sec, playing=playing)
+        apply_layer_visibility(session, layers_by_name, t_sec)
         if mix_player is not None:
             mix_player.set_solo_stem(session.solo_stem)
         _flush_all_pcm(layers)
@@ -154,7 +151,6 @@ def make_tuning_controls(
             session,
             layers_by_name,
             current_sec(playback, duration_sec),
-            playing=not playback.paused,
         )
         mix_player.set_solo_stem(session.solo_stem)
     return controls
@@ -174,12 +170,7 @@ def make_timeline_controls(
 ) -> TimelineControls:
     def on_visibility_change() -> None:
         t_sec = current_sec(playback, duration_sec)
-        apply_layer_visibility(
-            session,
-            layers_by_name,
-            t_sec,
-            playing=not playback.paused,
-        )
+        apply_layer_visibility(session, layers_by_name, t_sec)
         _flush_all_pcm(layers)
         apply_effect_modifiers(
             session,

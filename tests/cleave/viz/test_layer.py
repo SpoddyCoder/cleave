@@ -110,11 +110,11 @@ def test_effective_layer_enabled_override_manual_override() -> None:
     )
     session.timeline.override_stems = {"bass"}
     session.timeline.override_visible = {"bass": True}
-    assert effective_layer_enabled(session, "drums", 0.0, playing=True) is False
-    assert effective_layer_enabled(session, "bass", 0.0, playing=True) is True
+    assert effective_layer_enabled(session, "drums", 0.0) is False
+    assert effective_layer_enabled(session, "bass", 0.0) is True
 
 
-def test_effective_layer_enabled_override_ignored_when_paused() -> None:
+def test_effective_layer_enabled_override_when_paused() -> None:
     session = _session(
         layer_enabled={"drums": True, "bass": True, "vocals": True, "other": True},
         timeline_enabled=True,
@@ -122,7 +122,20 @@ def test_effective_layer_enabled_override_ignored_when_paused() -> None:
     )
     session.timeline.override_stems = {"bass"}
     session.timeline.override_visible = {"bass": True}
-    assert effective_layer_enabled(session, "bass", 0.0, playing=False) is False
+    assert effective_layer_enabled(session, "bass", 0.0) is True
+
+
+def test_effective_layer_enabled_override_ignored_when_preview_active() -> None:
+    session = _session(
+        layer_enabled={"drums": True, "bass": True, "vocals": True, "other": True},
+        timeline_enabled=True,
+        cues=[TimelineCue(t=0.0, layers={"bass": False})],
+    )
+    session.timeline.preview_active = True
+    session.timeline.monitor = {"bass": False}
+    session.timeline.override_stems = {"bass"}
+    session.timeline.override_visible = {"bass": True}
+    assert effective_layer_enabled(session, "bass", 0.0) is False
 
 
 def test_effective_layer_enabled_multiple_override_stems() -> None:
@@ -133,9 +146,9 @@ def test_effective_layer_enabled_multiple_override_stems() -> None:
     )
     session.timeline.override_stems = {"drums", "bass"}
     session.timeline.override_visible = {"drums": True, "bass": False}
-    assert effective_layer_enabled(session, "drums", 0.0, playing=True) is True
-    assert effective_layer_enabled(session, "bass", 0.0, playing=True) is False
-    assert effective_layer_enabled(session, "vocals", 0.0, playing=True) is False
+    assert effective_layer_enabled(session, "drums", 0.0) is True
+    assert effective_layer_enabled(session, "bass", 0.0) is False
+    assert effective_layer_enabled(session, "vocals", 0.0) is False
 
 
 def test_effective_layer_enabled_solo_overrides_timeline() -> None:
