@@ -154,9 +154,7 @@ def build_record_punch_cues(
     punch.extend(tl.record_buffer)
     for stem in tl.armed_stems:
         end_visible = armed_recording_visible(session, stem, record_stop)
-        committed_at_stop = committed_visible_outside_punch(
-            session, stem, record_start, record_stop
-        )
+        committed_at_stop = timeline_committed_visible(session, stem, record_stop)
         if end_visible != committed_at_stop:
             punch.append(
                 TimelineCue(
