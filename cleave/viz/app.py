@@ -26,13 +26,18 @@ from cleave.viz.layer import (
     _build_layers,
     _composite_ordered,
     _destroy_layers,
+    _draw_timeline_overlay,
     _draw_tuning_overlay,
+    _build_timeline_view_state,
     _flush_all_pcm,
     _render_layer_fbo,
     _session_from_cfg,
     apply_effect_modifiers,
+    apply_layer_visibility,
 )
 from cleave.viz.overlay import TuningOverlay
+from cleave.viz.timeline_controls import TimelineControls
+from cleave.viz.timeline_overlay import TimelineOverlay
 from cleave.viz.playback import PlaybackState, current_sec, init_playback
 from cleave.viz.post_fx import live_frame_fade_alpha
 from cleave.viz.render_overlay import (
@@ -43,7 +48,7 @@ from cleave.viz.render_overlay import (
     live_overlay_alpha,
     panel_surface_key,
 )
-from cleave.viz.wiring import make_tuning_controls
+from cleave.viz.wiring import make_timeline_controls, make_tuning_controls
 
 
 @dataclass
@@ -68,7 +73,9 @@ class VisualizerRuntime:
     compositor: GlCompositor | None = None
     post_process: GlPostProcess | None = None
     controls: TuningControls | None = None
+    timeline_controls: TimelineControls | None = None
     overlay: TuningOverlay | None = None
+    timeline_overlay: TimelineOverlay | None = None
     overlay_surface: pygame.Surface | None = None
     render_overlay_panel: pygame.Surface | None = None
     render_overlay_panel_key: tuple | None = None
@@ -131,13 +138,26 @@ def _init_gl_resources(runtime: VisualizerRuntime) -> None:
         pcm_bank=runtime.pcm_bank,
         mix_player=mix_player,
     )
+    timeline_controls = make_timeline_controls(
+        session=runtime.session,
+        playback=playback,
+        duration_sec=runtime.duration_sec,
+        layers_by_name=layers_by_name,
+        layers=layers,
+        signals=runtime.signals,
+        effect_runtime=runtime.effect_runtime,
+        mix_player=mix_player,
+        on_toast=controls.show_toast,
+    )
 
     runtime.compositor = compositor
     runtime.post_process = post_process
     runtime.layers = layers
     runtime.layers_by_name = layers_by_name
     runtime.controls = controls
+    runtime.timeline_controls = timeline_controls
     runtime.overlay = TuningOverlay()
+    runtime.timeline_overlay = TimelineOverlay()
     runtime.overlay_surface = pygame.Surface(
         (runtime.width, runtime.height), pygame.SRCALPHA
     )
@@ -223,6 +243,8 @@ class VisualizerApp:
             _flush_all_pcm(rt.layers)
         self._was_paused = paused
 
+        apply_layer_visibility(rt.session, rt.layers_by_name, t_sec)
+
         if not paused:
             for layer in rt.layers:
                 if not layer.fbo.enabled:
@@ -269,6 +291,24 @@ class VisualizerApp:
                 rt.compositor, rt.overlay, rt.overlay_surface, view_state
             )
 
+        tl = rt.session.timeline
+        if (
+            draw_overlay
+            and tl.enabled
+            and tl.panel_open
+            and rt.timeline_overlay is not None
+            and rt.overlay_surface is not None
+        ):
+            timeline_state = _build_timeline_view_state(
+                rt.session, t_sec, rt.duration_sec
+            )
+            _draw_timeline_overlay(
+                rt.compositor,
+                rt.timeline_overlay,
+                rt.overlay_surface,
+                timeline_state,
+            )
+
     def run(self) -> None:
         rt = self._runtime
 
@@ -289,6 +329,7 @@ class VisualizerApp:
         try:
             _init_gl_resources(rt)
             assert rt.controls is not None
+            assert rt.timeline_controls is not None
             assert rt.playback is not None
             assert rt.mix_player is not None
             rt.mix_player.start()
@@ -299,16 +340,39 @@ class VisualizerApp:
                     if event.type == pygame.QUIT:
                         running = False
                     elif event.type == pygame.KEYDOWN:
-                        if rt.controls.handle_keydown(event) is False:
-                            running = False
+                        tl = rt.session.timeline
+                        if (
+                            tl.panel_open
+                            and tl.enabled
+                            and rt.timeline_controls is not None
+                        ):
+                            key_handler = rt.timeline_controls
                         else:
+                            key_handler = rt.controls
+                        if key_handler.handle_keydown(event) is False:
+                            running = False
+                        elif key_handler is rt.controls:
                             assert rt.overlay is not None
+                            if (
+                                event.key == pygame.K_t
+                                and rt.session.timeline.panel_open
+                                and rt.timeline_controls is not None
+                            ):
+                                rt.timeline_controls.focused_cue_index = None
                             if rt.controls.consume_hide_overlay():
                                 rt.overlay.hide_immediately()
                             else:
                                 rt.overlay.notify_input()
                     elif event.type == pygame.KEYUP:
-                        rt.controls.handle_keyup(event)
+                        tl = rt.session.timeline
+                        if (
+                            tl.panel_open
+                            and tl.enabled
+                            and rt.timeline_controls is not None
+                        ):
+                            rt.timeline_controls.handle_keyup(event)
+                        else:
+                            rt.controls.handle_keyup(event)
 
                 self._overlay_dt = clock.tick(rt.fps) / 1000.0
                 rt.controls.tick(self._overlay_dt)

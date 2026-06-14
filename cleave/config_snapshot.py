@@ -81,6 +81,7 @@ def _render_overlay_base(cfg: CleaveConfig) -> RenderOverlayConfig:
 def _text_block_to_yaml(
     block: RenderOverlayTextBlockConfig,
     *,
+    font: str,
     font_size: int,
     colour_key: str,
     margin_bottom: int | None = None,
@@ -90,6 +91,7 @@ def _text_block_to_yaml(
         content = content + "\n"
     out: dict[str, Any] = {
         "content": content,
+        "font": font,
         "font-size": font_size,
         colour_key: _rgb_to_hex(block.colour),
     }
@@ -117,15 +119,17 @@ def _snapshot_render_overlay(
             orig_overlay = dict(orig_overlay_raw)
 
     overlay: dict[str, Any] = dict(orig_overlay)
-    overlay["enabled"] = runtime.enabled or session.render_overlay_solo
+    overlay["enabled"] = runtime.enabled
     overlay["title"] = _text_block_to_yaml(
         base.title,
+        font=runtime.title_font,
         font_size=runtime.title_font_size,
         colour_key="font-colour",
         margin_bottom=runtime.title_margin_bottom,
     )
     overlay["body"] = _text_block_to_yaml(
         base.body,
+        font=runtime.body_font,
         font_size=runtime.body_font_size,
         colour_key="colour",
     )
@@ -158,7 +162,7 @@ def _snapshot_render_overlay(
             orig_pp = dict(orig_pp_raw)
 
     post_fx: dict[str, Any] = dict(orig_pp)
-    post_fx["enabled"] = runtime_pp.enabled or session.render_post_fx_solo
+    post_fx["enabled"] = runtime_pp.enabled
     post_fx["fade_in"] = runtime_pp.fade_in
     post_fx["fade_out"] = runtime_pp.fade_out
 
@@ -172,6 +176,17 @@ def _snapshot_render_overlay(
     render_out["overlay"] = overlay
     render_out["post_fx"] = post_fx
     return render_out
+
+
+def _snapshot_timeline(session: TuningSession) -> dict[str, Any]:
+    runtime = session.timeline
+    out: dict[str, Any] = {"enabled": runtime.enabled}
+    if runtime.cues:
+        out["cues"] = [
+            {"t": cue.t, "layers": dict(cue.layers)}
+            for cue in sorted(runtime.cues, key=lambda cue: cue.t)
+        ]
+    return out
 
 
 def write_session_snapshot(
@@ -254,6 +269,7 @@ def write_session_snapshot(
         "layer_z_order": _snapshot_layer_z_order(cfg, session),
         "layers": layers_out,
         "render": _snapshot_render_overlay(cfg, session, original),
+        "timeline": _snapshot_timeline(session),
     }
 
     path.parent.mkdir(parents=True, exist_ok=True)

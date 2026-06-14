@@ -20,6 +20,7 @@ from cleave.config import (
     RenderOverlayConfig,
     RenderOverlayTextBlockConfig,
     RenderPostFxConfig,
+    TimelineConfig,
     VisualizerConfig,
     clamp_beat_sensitivity,
     clamp_effect_pct,
@@ -31,10 +32,12 @@ from cleave.config import (
     _parse_hex_colour,
     _parse_layers,
     _parse_render,
+    _parse_timeline,
     _parse_visualizer,
 )
 from cleave.paths import repo_root
 from cleave.extract import STEM_NAMES
+from cleave.timeline import TimelineCue
 from tests.support.config import write_minimal_config
 
 _LONG_PRESET = (
@@ -361,6 +364,7 @@ def test_parse_render_overlay_full_template() -> None:
         enabled=True,
         title=RenderOverlayTextBlockConfig(
             content="Cleave Final Render",
+            font="monospace",
             font_size=24,
             colour=(255, 255, 255),
             background_colour=(51, 51, 255),
@@ -372,6 +376,7 @@ def test_parse_render_overlay_full_template() -> None:
                 "Like musician names, year of release etc.\n"
                 "Edit the cleave-viz.yaml to modify this message, colours etc."
             ),
+            font="monospace",
             font_size=18,
             colour=(255, 255, 255),
             background_colour=(51, 51, 255),
@@ -465,3 +470,66 @@ def test_load_config_missing_preset_file(tmp_path: Path) -> None:
     cfg_path.write_text(text, encoding="utf-8")
     with pytest.raises(FileNotFoundError, match="missing preset"):
         load_config(project_root=project_dir)
+
+
+def test_parse_timeline_defaults_enabled_true() -> None:
+    timeline = _parse_timeline({"timeline": {}})
+    assert timeline == TimelineConfig(enabled=True, cues=())
+
+
+def test_parse_timeline_reads_cues_sorted_by_t() -> None:
+    timeline = _parse_timeline(
+        {
+            "timeline": {
+                "enabled": True,
+                "cues": [
+                    {"t": 10.0, "layers": {"drums": False}},
+                    {"t": 2.5, "layers": {"bass": True}},
+                ],
+            }
+        }
+    )
+    assert timeline is not None
+    assert timeline.enabled is True
+    assert timeline.cues == (
+        TimelineCue(t=2.5, layers={"bass": True}),
+        TimelineCue(t=10.0, layers={"drums": False}),
+    )
+
+
+def test_parse_timeline_rejects_unknown_stem() -> None:
+    with pytest.raises(ValueError, match="unknown layer keys in timeline.cues"):
+        _parse_timeline(
+            {
+                "timeline": {
+                    "cues": [{"t": 1.0, "layers": {"synth": True}}],
+                }
+            }
+        )
+
+
+def test_parse_timeline_clamps_negative_t() -> None:
+    with pytest.raises(ValueError, match="timeline.cues\\[0\\].t must be non-negative"):
+        _parse_timeline(
+            {
+                "timeline": {
+                    "cues": [{"t": -1.0, "layers": {"drums": False}}],
+                }
+            }
+        )
+
+
+def test_load_config_reads_timeline(minimal_project: Path) -> None:
+    cfg_path = minimal_project / PROJECT_VIZ_CONFIG_FILENAME
+    data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    data["timeline"] = {
+        "enabled": True,
+        "cues": [{"t": 3.0, "layers": {"vocals": False}}],
+    }
+    with cfg_path.open("w", encoding="utf-8") as handle:
+        dump_yaml(data, handle)
+
+    cfg = load_config(project_root=minimal_project)
+    assert cfg.timeline is not None
+    assert cfg.timeline.enabled is True
+    assert cfg.timeline.cues == (TimelineCue(t=3.0, layers={"vocals": False}),)
