@@ -55,6 +55,7 @@ from cleave.viz.theme import (
     FOCUS_ROW_BG_ALPHA,
     HIGHLIGHT,
     HOLD_IDLE_SEC,
+    TIMELINE_PANEL_HOLD_IDLE_SEC,
     LABEL,
     LOCKED,
     LOCK_ICON,
@@ -1032,14 +1033,19 @@ class TuningOverlay:
         self._idle_sec = self._hold_idle_sec + self._fade_duration_sec + 1.0
         self._visibility = 0.0
 
-    def update(self, dt_sec: float) -> None:
+    def update(self, dt_sec: float, *, timeline_panel_open: bool = False) -> None:
         self._idle_sec += dt_sec
-        if self._idle_sec <= self._hold_idle_sec:
+        hold_idle_sec = (
+            TIMELINE_PANEL_HOLD_IDLE_SEC
+            if timeline_panel_open
+            else self._hold_idle_sec
+        )
+        if self._idle_sec <= hold_idle_sec:
             self._visibility = 1.0
         elif self._fade_duration_sec <= 0:
             self._visibility = 0.0
-        elif self._idle_sec <= self._hold_idle_sec + self._fade_duration_sec:
-            fade_t = (self._idle_sec - self._hold_idle_sec) / self._fade_duration_sec
+        elif self._idle_sec <= hold_idle_sec + self._fade_duration_sec:
+            fade_t = (self._idle_sec - hold_idle_sec) / self._fade_duration_sec
             self._visibility = 1.0 - fade_t
         else:
             self._visibility = 0.0
