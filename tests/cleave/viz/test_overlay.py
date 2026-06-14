@@ -7,6 +7,7 @@ import pygame
 from cleave.extract import STEM_NAMES
 from cleave.viz.overlay import (
     RenderOverlayBlock,
+    RenderTimelineBlock,
     RowKind,
     TrackBlock,
     TuningOverlay,
@@ -160,8 +161,10 @@ def test_render_overlay_title_and_body_font_rows_when_expanded() -> None:
     )
     kinds = [row.kind for row in build_row_layout(state)]
     assert RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE in kinds
+    assert RowKind.RENDER_OVERLAY_TITLE_FONT in kinds
     assert RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM in kinds
     assert RowKind.RENDER_OVERLAY_BODY_FONT_SIZE in kinds
+    assert RowKind.RENDER_OVERLAY_BODY_FONT in kinds
 
 
 def test_render_overlay_collapsed_hides_sub_rows() -> None:
@@ -236,6 +239,23 @@ def test_draw_track_header_with_solo_eye() -> None:
     )
     assert state.solo_stem == "drums"
     assert header_row == 0
+
+
+def test_draw_render_timeline_header_without_error() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    state = _minimal_view_state(
+        render_timeline=RenderTimelineBlock(
+            enabled=True,
+            expanded=False,
+        ),
+    )
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.notify_input()
+    overlay.draw(surface, state)
+    assert overlay.panel_rect is not None
+    header_row = find_row_by_kind(state, RowKind.RENDER_TIMELINE_HEADER)
+    assert header_row in visible_row_indices(state)
 
 
 def test_overlay_starts_hidden() -> None:

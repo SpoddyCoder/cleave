@@ -83,3 +83,6 @@ layers:
     width: 640
     height: 360
     blend_mode: black-key
+
+timeline:
+  enabled: true

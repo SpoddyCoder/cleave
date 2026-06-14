@@ -17,6 +17,7 @@ from cleave.config import (
     DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
     DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
     DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
+    DEFAULT_RENDER_OVERLAY_FONT,
     DEFAULT_RENDER_OVERLAY_POSITION,
     DEFAULT_RENDER_OVERLAY_START_DELAY,
     DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
@@ -51,6 +52,7 @@ from cleave.viz.theme import (
     BORDER_WIDTH,
     DISABLED,
     FADE_DURATION_SEC,
+    FOCUS_ROW_BG_ALPHA,
     HIGHLIGHT,
     HOLD_IDLE_SEC,
     LABEL,
@@ -60,6 +62,9 @@ from cleave.viz.theme import (
     PANEL_CONTENT_MAX_WIDTH,
     PRESET_FILE_ICON,
     PRESET_ICON,
+    OVERRIDE_BG,
+    OVERRIDE_GLYPH,
+    OVERRIDE_GLYPH_OFF,
     SOLO_BG,
     VALUE,
 )
@@ -85,9 +90,11 @@ class RowKind(Enum):
     RENDER_OVERLAY_POSITION = auto()
     RENDER_OVERLAY_TITLE_HEADER = auto()
     RENDER_OVERLAY_TITLE_FONT_SIZE = auto()
+    RENDER_OVERLAY_TITLE_FONT = auto()
     RENDER_OVERLAY_TITLE_MARGIN_BOTTOM = auto()
     RENDER_OVERLAY_BODY_HEADER = auto()
     RENDER_OVERLAY_BODY_FONT_SIZE = auto()
+    RENDER_OVERLAY_BODY_FONT = auto()
     RENDER_OVERLAY_OPACITY = auto()
     RENDER_OVERLAY_BORDER_WIDTH = auto()
     RENDER_OVERLAY_START_DELAY = auto()
@@ -95,6 +102,7 @@ class RowKind(Enum):
     RENDER_POST_FX_HEADER = auto()
     RENDER_POST_FX_FADE_IN = auto()
     RENDER_POST_FX_FADE_OUT = auto()
+    RENDER_TIMELINE_HEADER = auto()
     CONFIG_HEADER = auto()
     TRANSPORT = auto()
     SAVE_CONFIG = auto()
@@ -132,8 +140,10 @@ class RenderOverlayBlock:
     title_expanded: bool = False
     body_expanded: bool = False
     title_font_size: int = DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE
+    title_font: str = DEFAULT_RENDER_OVERLAY_FONT
     title_margin_bottom: int = DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM
     body_font_size: int = DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE
+    body_font: str = DEFAULT_RENDER_OVERLAY_FONT
     opacity_pct: int = int(round(DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY * 100))
     border_width: int = DEFAULT_RENDER_OVERLAY_BORDER_WIDTH
     start_delay: float = DEFAULT_RENDER_OVERLAY_START_DELAY
@@ -148,6 +158,12 @@ class RenderPostFxBlock:
     fade_in: float = 30.0
     fade_out: float = 4.0
     solo: bool = False
+
+
+@dataclass
+class RenderTimelineBlock:
+    enabled: bool = False
+    expanded: bool = False
 
 
 @dataclass
@@ -171,6 +187,9 @@ class TuningViewState:
     render_overlay: RenderOverlayBlock = field(default_factory=RenderOverlayBlock)
     render_post_fx: RenderPostFxBlock = field(
         default_factory=RenderPostFxBlock
+    )
+    render_timeline: RenderTimelineBlock = field(
+        default_factory=RenderTimelineBlock
     )
 
 
@@ -218,15 +237,18 @@ def build_row_layout(state: TuningViewState) -> list[RowDescriptor]:
         rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_DISPLAY_TIME))
         rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_HEADER))
         if state.render_overlay.title_expanded:
+            rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_FONT))
             rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE))
             rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM))
         rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_BODY_HEADER))
         if state.render_overlay.body_expanded:
+            rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_BODY_FONT))
             rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_BODY_FONT_SIZE))
     rows.append(RowDescriptor(RowKind.RENDER_POST_FX_HEADER))
     if state.render_post_fx.expanded:
         rows.append(RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN))
         rows.append(RowDescriptor(RowKind.RENDER_POST_FX_FADE_OUT))
+    rows.append(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
     rows.append(RowDescriptor(RowKind.TRANSPORT))
     rows.append(RowDescriptor(RowKind.CONFIG_HEADER))
     rows.append(RowDescriptor(RowKind.SAVE_CONFIG))
@@ -306,10 +328,16 @@ _RENDER_OVERLAY_SUB_ROW_KINDS = frozenset(
 _RENDER_OVERLAY_TITLE_NESTED_KINDS = frozenset(
     {
         RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_TITLE_FONT,
         RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
     }
 )
-_RENDER_OVERLAY_BODY_NESTED_KINDS = frozenset({RowKind.RENDER_OVERLAY_BODY_FONT_SIZE})
+_RENDER_OVERLAY_BODY_NESTED_KINDS = frozenset(
+    {
+        RowKind.RENDER_OVERLAY_BODY_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_BODY_FONT,
+    }
+)
 
 _RENDER_OVERLAY_ALL_SUB_ROW_KINDS = (
     _RENDER_OVERLAY_SUB_ROW_KINDS
@@ -324,6 +352,8 @@ _RENDER_POST_FX_SUB_ROW_KINDS = frozenset(
     }
 )
 
+_RENDER_TIMELINE_SUB_ROW_KINDS: frozenset[RowKind] = frozenset()
+
 _LOCKED_NAVIGABLE_SUB_ROW_KINDS = frozenset({RowKind.TRACK_EFFECTS_HEADER})
 
 _LABELED_SUB_ROW_KINDS = frozenset(
@@ -334,8 +364,10 @@ _LABELED_SUB_ROW_KINDS = frozenset(
         RowKind.TRACK_EFFECT,
         RowKind.RENDER_OVERLAY_POSITION,
         RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_TITLE_FONT,
         RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
         RowKind.RENDER_OVERLAY_BODY_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_BODY_FONT,
         RowKind.RENDER_OVERLAY_OPACITY,
         RowKind.RENDER_OVERLAY_BORDER_WIDTH,
         RowKind.RENDER_OVERLAY_START_DELAY,
@@ -429,6 +461,7 @@ def quick_nav_row_indices(state: TuningViewState) -> list[int]:
             RowKind.TRACK_HEADER,
             RowKind.RENDER_OVERLAY_HEADER,
             RowKind.RENDER_POST_FX_HEADER,
+            RowKind.RENDER_TIMELINE_HEADER,
             RowKind.TRANSPORT,
         ):
             indices.append(index)
@@ -471,11 +504,15 @@ def _row_text(state: TuningViewState, index: int) -> str:
 
     if kind == RowKind.RENDER_OVERLAY_HEADER:
         arrow = "▼" if state.render_overlay.expanded else "▶"
-        return f"Render : OVERLAY {arrow}"
+        return f"Render: OVERLAY {arrow}"
 
     if kind == RowKind.RENDER_POST_FX_HEADER:
         arrow = "▼" if state.render_post_fx.expanded else "▶"
-        return f"Render : POST FX {arrow}"
+        return f"Render: POST FX {arrow}"
+
+    if kind == RowKind.RENDER_TIMELINE_HEADER:
+        arrow = "▼" if state.render_timeline.expanded else "▶"
+        return f"Render: TIMELINE {arrow}"
 
     block_ro = state.render_overlay
     if kind == RowKind.RENDER_OVERLAY_POSITION:
@@ -485,6 +522,8 @@ def _row_text(state: TuningViewState, index: int) -> str:
         return f"└─ title {arrow}"
     if kind == RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE:
         return f"└─ font size: {block_ro.title_font_size}px"
+    if kind == RowKind.RENDER_OVERLAY_TITLE_FONT:
+        return f"└─ font: {block_ro.title_font}"
     if kind == RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM:
         return f"└─ margin bottom: {block_ro.title_margin_bottom}px"
     if kind == RowKind.RENDER_OVERLAY_BODY_HEADER:
@@ -492,6 +531,8 @@ def _row_text(state: TuningViewState, index: int) -> str:
         return f"└─ body {arrow}"
     if kind == RowKind.RENDER_OVERLAY_BODY_FONT_SIZE:
         return f"└─ font size: {block_ro.body_font_size}px"
+    if kind == RowKind.RENDER_OVERLAY_BODY_FONT:
+        return f"└─ font: {block_ro.body_font}"
     if kind == RowKind.RENDER_OVERLAY_OPACITY:
         return f"└─ background opacity: {block_ro.opacity_pct}%"
     if kind == RowKind.RENDER_OVERLAY_BORDER_WIDTH:
@@ -547,10 +588,14 @@ def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
         return "└─ position: "
     if kind == RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE:
         return "└─ font size: "
+    if kind == RowKind.RENDER_OVERLAY_TITLE_FONT:
+        return "└─ font: "
     if kind == RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM:
         return "└─ margin bottom: "
     if kind == RowKind.RENDER_OVERLAY_BODY_FONT_SIZE:
         return "└─ font size: "
+    if kind == RowKind.RENDER_OVERLAY_BODY_FONT:
+        return "└─ font: "
     if kind == RowKind.RENDER_OVERLAY_OPACITY:
         return "└─ background opacity: "
     if kind == RowKind.RENDER_OVERLAY_BORDER_WIDTH:
@@ -577,10 +622,14 @@ def _labeled_sub_row_value(state: TuningViewState, index: int) -> str:
         return block_ro.position
     if kind == RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE:
         return f"{block_ro.title_font_size}px"
+    if kind == RowKind.RENDER_OVERLAY_TITLE_FONT:
+        return block_ro.title_font
     if kind == RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM:
         return f"{block_ro.title_margin_bottom}px"
     if kind == RowKind.RENDER_OVERLAY_BODY_FONT_SIZE:
         return f"{block_ro.body_font_size}px"
+    if kind == RowKind.RENDER_OVERLAY_BODY_FONT:
+        return block_ro.body_font
     if kind == RowKind.RENDER_OVERLAY_OPACITY:
         return f"{block_ro.opacity_pct}%"
     if kind == RowKind.RENDER_OVERLAY_BORDER_WIDTH:
@@ -662,26 +711,38 @@ def _track_header_expand_suffix(expanded: bool) -> str:
 
 
 def _render_overlay_header_prefix() -> str:
-    return "Render : "
+    return "Render: "
 
 
 def _render_post_fx_header_prefix() -> str:
-    return "Render : "
+    return "Render: "
+
+
+def _render_timeline_header_prefix() -> str:
+    return "Render: "
 
 
 def render_visibility_icon(
     *,
     enabled: bool,
-    solo: bool,
+    solo: bool = False,
+    override: bool = False,
     line_height: int,
 ) -> pygame.Surface:
     glyph = VISIBILITY_GLYPH if enabled else VISIBILITY_OFF_GLYPH
-    color = VALUE if (enabled or solo) else DISABLED
+    if override:
+        color = OVERRIDE_GLYPH if enabled else OVERRIDE_GLYPH_OFF
+    elif enabled or solo:
+        color = VALUE
+    else:
+        color = DISABLED
     glyph_surf = render_glyph(glyph, color=color, line_height=line_height)
     slot_w = visibility_icon_slot_width(line_height)
     surf = pygame.Surface((slot_w, line_height), pygame.SRCALPHA)
     if solo:
         pygame.draw.rect(surf, SOLO_BG, (0, 0, slot_w, line_height))
+    elif override:
+        pygame.draw.rect(surf, OVERRIDE_BG, (0, 0, slot_w, line_height))
     surf.blit(glyph_surf, (VISIBILITY_ICON_PAD_X, 0))
     return surf
 
@@ -812,6 +873,13 @@ def fit_row_text(
             + "POST FX"
             + _track_header_expand_suffix(expanded)
         )
+    if kind == RowKind.RENDER_TIMELINE_HEADER:
+        expanded = state.render_timeline.expanded
+        return (
+            _render_timeline_header_prefix()
+            + "TIMELINE"
+            + _track_header_expand_suffix(expanded)
+        )
     if kind in _LABELED_SUB_ROW_KINDS:
         return _labeled_sub_row_prefix(state, index) + _fit_labeled_sub_row_value(
             font, state, index, max_content_width=max_content_width
@@ -825,6 +893,7 @@ def _row_indent(state: TuningViewState, index: int) -> int:
         RowKind.TRACK_HEADER,
         RowKind.RENDER_OVERLAY_HEADER,
         RowKind.RENDER_POST_FX_HEADER,
+        RowKind.RENDER_TIMELINE_HEADER,
     }:
         return 0
     if kind == RowKind.RENDER_SECTION_GAP:
@@ -865,6 +934,10 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
         *_RENDER_POST_FX_SUB_ROW_KINDS,
     }:
         if not state.render_post_fx.enabled:
+            return DISABLED
+
+    if kind == RowKind.RENDER_TIMELINE_HEADER:
+        if not state.render_timeline.enabled:
             return DISABLED
 
     if state.solo_active and kind == RowKind.SAVE_CONFIG:
@@ -1088,6 +1161,27 @@ class TuningOverlay:
                 row_widths.append(
                     indent + prefix_surf.get_width() + label_surf.get_width()
                 )
+            elif kind == RowKind.RENDER_TIMELINE_HEADER:
+                block_tl = state.render_timeline
+                prefix_surf = render_visibility_icon(
+                    enabled=block_tl.enabled,
+                    solo=False,
+                    line_height=line_h,
+                )
+                label_surf = _render_track_header_label(
+                    font,
+                    layer_prefix=_render_timeline_header_prefix(),
+                    stem_text="TIMELINE",
+                    value_color=color,
+                    expanded=block_tl.expanded,
+                    locked=False,
+                    line_height=line_h,
+                )
+                row_surfaces.append(prefix_surf)
+                row_time_surfaces.append(label_surf)
+                row_widths.append(
+                    indent + prefix_surf.get_width() + label_surf.get_width()
+                )
             elif kind == RowKind.RENDER_SECTION_GAP:
                 gap_surf = pygame.Surface((1, line_h), pygame.SRCALPHA)
                 row_surfaces.append(gap_surf)
@@ -1231,7 +1325,7 @@ class TuningOverlay:
             assert surf is not None
             bg = _row_bg_color(state, index)
             if bg is not None:
-                bg_alpha = int(50 * self._visibility)
+                bg_alpha = int(FOCUS_ROW_BG_ALPHA * self._visibility)
                 if bg_alpha >= 2:
                     bg_surf = pygame.Surface((panel_w - self._padding * 2, line_h), pygame.SRCALPHA)
                     bg_surf.fill((*bg, bg_alpha))

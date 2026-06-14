@@ -15,6 +15,7 @@ from cleave.config import (
     DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
     DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
     DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
+    DEFAULT_RENDER_OVERLAY_FONT,
     DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
     DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
     DEFAULT_RENDER_OVERLAY_POSITION,
@@ -27,6 +28,7 @@ from cleave.config import (
     RenderOverlayPosition,
     clamp_beat_sensitivity,
     clamp_effect_pct,
+    cycle_render_overlay_font,
 )
 from cleave.effects.registry import effect_row_count
 from cleave.blend_modes import BLEND_MODES, BlendMode
@@ -35,15 +37,18 @@ from cleave.preset_playlist import (
     directory_display,
     preset_filename_display,
 )
+from cleave.timeline import TimelineCue
 from cleave.viz.confirm import ConfirmDialog, ConfirmRequest, SaveChoiceDialog, SaveChoiceRequest
 from cleave.viz.key_repeat import KeyRepeatController, mod_ctrl, mod_shift
 from cleave.viz.playback import PlaybackState, current_sec, seek, toggle_pause
 from cleave.viz.overlay import (
     RenderOverlayBlock,
     RenderPostFxBlock,
+    RenderTimelineBlock,
     RowKind,
     TrackBlock,
     TuningViewState,
+    _RENDER_OVERLAY_BODY_NESTED_KINDS,
     _RENDER_OVERLAY_TITLE_NESTED_KINDS,
     find_row,
     find_row_by_kind,
@@ -68,8 +73,10 @@ _REPEAT_ROW_KINDS = frozenset(
         RowKind.TRACK_EFFECT,
         RowKind.RENDER_OVERLAY_POSITION,
         RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_TITLE_FONT,
         RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
         RowKind.RENDER_OVERLAY_BODY_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_BODY_FONT,
         RowKind.RENDER_OVERLAY_OPACITY,
         RowKind.RENDER_OVERLAY_BORDER_WIDTH,
         RowKind.RENDER_OVERLAY_START_DELAY,
@@ -100,6 +107,8 @@ _RENDER_POST_FX_SUB_ROW_KINDS = frozenset(
         RowKind.RENDER_POST_FX_FADE_OUT,
     }
 )
+
+_RENDER_TIMELINE_SUB_ROW_KINDS: frozenset[RowKind] = frozenset()
 _DEFAULT_SAVE_FILENAME = "unnamed-1.yaml"
 
 
@@ -127,8 +136,10 @@ class RenderOverlayRuntime:
     title_expanded: bool
     body_expanded: bool
     title_font_size: int
+    title_font: str
     title_margin_bottom: int
     body_font_size: int
+    body_font: str
     opacity_pct: int
     border_width: int
     start_delay: float
@@ -143,8 +154,10 @@ def default_render_overlay_runtime() -> RenderOverlayRuntime:
         title_expanded=False,
         body_expanded=False,
         title_font_size=DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
+        title_font=DEFAULT_RENDER_OVERLAY_FONT,
         title_margin_bottom=DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
         body_font_size=DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
+        body_font=DEFAULT_RENDER_OVERLAY_FONT,
         opacity_pct=int(round(DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY * 100)),
         border_width=DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
         start_delay=DEFAULT_RENDER_OVERLAY_START_DELAY,
@@ -167,6 +180,27 @@ def default_render_post_fx_runtime() -> RenderPostFxRuntime:
         fade_in=DEFAULT_RENDER_POST_FX_FADE_IN,
         fade_out=DEFAULT_RENDER_POST_FX_FADE_OUT,
     )
+
+
+@dataclass
+class TimelineRuntime:
+    enabled: bool = True
+    cues: list[TimelineCue] = field(default_factory=list)
+    panel_open: bool = False
+    focus_row: int = 0
+    armed_stems: set[str] = field(default_factory=set)
+    recording: bool = False
+    record_buffer: list[TimelineCue] = field(default_factory=list)
+    record_baseline: dict[str, bool] = field(default_factory=dict)
+    record_start_sec: float | None = None
+    preview_active: bool = False
+    monitor: dict[str, bool] = field(default_factory=dict)
+    override_stems: set[str] = field(default_factory=set)
+    override_visible: dict[str, bool] = field(default_factory=dict)
+
+
+def default_timeline_runtime() -> TimelineRuntime:
+    return TimelineRuntime()
 
 
 @dataclass
@@ -194,6 +228,7 @@ class TuningSession:
         default_factory=default_render_post_fx_runtime
     )
     render_post_fx_solo: bool = False
+    timeline: TimelineRuntime = field(default_factory=default_timeline_runtime)
 
 
 class TuningControls:
@@ -210,6 +245,7 @@ class TuningControls:
         on_blend_change: Callable[[str, BlendMode], None] | None = None,
         on_opacity_change: Callable[[str, int], None] | None = None,
         on_layer_enabled_change: Callable[[str, bool], None] | None = None,
+        on_timeline_enabled_change: Callable[[], None] | None = None,
         on_solo_change: Callable[[], None] | None = None,
         on_beat_change: Callable[[str, float], None] | None = None,
         on_z_order_change: Callable[[list[str]], None] | None = None,
@@ -233,6 +269,7 @@ class TuningControls:
         self._on_blend_change = on_blend_change
         self._on_opacity_change = on_opacity_change
         self._on_layer_enabled_change = on_layer_enabled_change
+        self._on_timeline_enabled_change = on_timeline_enabled_change
         self._on_solo_change = on_solo_change
         self._on_beat_change = on_beat_change
         self._on_z_order_change = on_z_order_change
@@ -279,6 +316,12 @@ class TuningControls:
 
         if event.key == pygame.K_SPACE:
             toggle_pause(self.playback, self.duration_sec)
+            return True
+
+        if event.key == pygame.K_t:
+            if self.move_mode_stem is not None:
+                return True
+            self._open_timeline_panel()
             return True
 
         if self.move_mode_stem is not None:
@@ -434,6 +477,7 @@ class TuningControls:
 
         ro = self.session.render_overlay
         pp = self.session.render_post_fx
+        tl = self.session.timeline
         return TuningViewState(
             layer_z_order=tuple(self.session.layer_z_order),
             tracks=tracks,
@@ -458,8 +502,10 @@ class TuningControls:
                 title_expanded=ro.title_expanded,
                 body_expanded=ro.body_expanded,
                 title_font_size=ro.title_font_size,
+                title_font=ro.title_font,
                 title_margin_bottom=ro.title_margin_bottom,
                 body_font_size=ro.body_font_size,
+                body_font=ro.body_font,
                 opacity_pct=ro.opacity_pct,
                 border_width=ro.border_width,
                 start_delay=ro.start_delay,
@@ -472,6 +518,10 @@ class TuningControls:
                 fade_in=pp.fade_in,
                 fade_out=pp.fade_out,
                 solo=self.session.render_post_fx_solo,
+            ),
+            render_timeline=RenderTimelineBlock(
+                enabled=tl.enabled,
+                expanded=tl.panel_open,
             ),
         )
 
@@ -640,6 +690,8 @@ class TuningControls:
             self._set_render_overlay_title_font_size(
                 self.session.render_overlay.title_font_size + delta
             )
+        elif kind == RowKind.RENDER_OVERLAY_TITLE_FONT:
+            self._cycle_render_overlay_title_font(forward=forward)
         elif kind == RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM:
             step = 10 if ctrl else 1
             delta = step if forward else -step
@@ -652,6 +704,8 @@ class TuningControls:
             self._set_render_overlay_body_font_size(
                 self.session.render_overlay.body_font_size + delta
             )
+        elif kind == RowKind.RENDER_OVERLAY_BODY_FONT:
+            self._cycle_render_overlay_body_font(forward=forward)
         elif kind == RowKind.RENDER_OVERLAY_OPACITY:
             step = 10 if ctrl else 1
             delta = step if forward else -step
@@ -699,6 +753,14 @@ class TuningControls:
             self._set_render_post_fx_fade_out(
                 self.session.render_post_fx.fade_out + delta
             )
+        elif kind == RowKind.RENDER_TIMELINE_HEADER:
+            if ctrl:
+                self._set_render_timeline_enabled(forward)
+                return
+            if forward:
+                self._open_timeline_panel()
+            else:
+                self._close_timeline_panel()
 
     def _step_directory(self, stem: str, *, forward: bool) -> None:
         layer = self.session.layers[stem]
@@ -847,17 +909,25 @@ class TuningControls:
             return
         focus_kind = self._focused_row_kind()
         ro.body_expanded = expanded
-        if not expanded and focus_kind == RowKind.RENDER_OVERLAY_BODY_FONT_SIZE:
+        if not expanded and focus_kind in _RENDER_OVERLAY_BODY_NESTED_KINDS:
             self.focus_index = self._render_overlay_body_header_index()
 
     def _set_render_overlay_title_font_size(self, size: int) -> None:
         self.session.render_overlay.title_font_size = max(1, size)
+
+    def _cycle_render_overlay_title_font(self, *, forward: bool) -> None:
+        ro = self.session.render_overlay
+        ro.title_font = cycle_render_overlay_font(ro.title_font, forward=forward)
 
     def _set_render_overlay_title_margin_bottom(self, margin: int) -> None:
         self.session.render_overlay.title_margin_bottom = max(0, margin)
 
     def _set_render_overlay_body_font_size(self, size: int) -> None:
         self.session.render_overlay.body_font_size = max(1, size)
+
+    def _cycle_render_overlay_body_font(self, *, forward: bool) -> None:
+        ro = self.session.render_overlay
+        ro.body_font = cycle_render_overlay_font(ro.body_font, forward=forward)
 
     def _set_render_overlay_opacity(self, pct: int) -> None:
         self.session.render_overlay.opacity_pct = max(0, min(100, pct))
@@ -914,6 +984,25 @@ class TuningControls:
     def _set_render_post_fx_fade_out(self, fade_out: float) -> None:
         self.session.render_post_fx.fade_out = max(0.0, fade_out)
 
+    def _render_timeline_header_index(self) -> int:
+        view = self.build_view_state(paused=self.playback.paused)
+        return find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+
+    def _refocus_render_timeline_header_if_sub_row(self) -> None:
+        view = self.build_view_state(paused=self.playback.paused)
+        if row_kind(view, self.focus_index) in _RENDER_TIMELINE_SUB_ROW_KINDS:
+            self.focus_index = self._render_timeline_header_index()
+
+    def _set_render_timeline_enabled(self, enabled: bool) -> None:
+        tl = self.session.timeline
+        if tl.enabled == enabled:
+            return
+        tl.enabled = enabled
+        if not enabled:
+            self._close_timeline_panel()
+        if self._on_timeline_enabled_change is not None:
+            self._on_timeline_enabled_change()
+
     def _enter_solo(self, stem: str) -> None:
         if self.session.solo_stem == stem:
             return
@@ -929,6 +1018,11 @@ class TuningControls:
             self._on_solo_change()
 
     def _set_enabled(self, stem: str, enabled: bool) -> None:
+        if self.session.timeline.enabled:
+            now = time.monotonic()
+            self._toast_message = "Timeline controls layer visibility"
+            self._toast_deadline = now + TOAST_DURATION_SEC
+            return
         layer = self.session.layers[stem]
         if layer.enabled == enabled:
             return
@@ -1042,9 +1136,27 @@ class TuningControls:
 
         self._confirm.prompt(ConfirmRequest(message=message, on_confirm=on_confirm))
 
-    def _show_save_toast(self, message: str) -> None:
-        print(message, file=sys.stderr)
+    def show_toast(self, message: str) -> None:
         now = time.monotonic()
         self._toast_message = message
         self._toast_deadline = now + TOAST_DURATION_SEC
         self._input_blocked_until = now + TOAST_DURATION_SEC
+
+    def _open_timeline_panel(self) -> None:
+        tl = self.session.timeline
+        if not tl.enabled:
+            self.show_toast("Enable timeline in Render: TIMELINE (Ctrl+Right)")
+            return
+        tl.panel_open = True
+        tl.focus_row = 0
+
+    def _close_timeline_panel(self) -> None:
+        tl = self.session.timeline
+        if not tl.panel_open:
+            return
+        tl.panel_open = False
+        self._refocus_render_timeline_header_if_sub_row()
+
+    def _show_save_toast(self, message: str) -> None:
+        print(message, file=sys.stderr)
+        self.show_toast(message)

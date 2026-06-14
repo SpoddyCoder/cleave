@@ -7,11 +7,14 @@ from dataclasses import dataclass
 import pygame
 from OpenGL.GL import GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, glClear, glClearColor, glViewport
 
+from cleave.extract import STEM_NAMES
+from cleave.timeline import TimelineCue, layer_visible_at
 from cleave.config import (
     DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
     DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
     DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
     DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
+    DEFAULT_RENDER_OVERLAY_FONT,
     DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
     DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
     DEFAULT_RENDER_OVERLAY_POSITION,
@@ -30,9 +33,11 @@ from cleave.viz.controls import (
     LayerRuntime,
     RenderOverlayRuntime,
     RenderPostFxRuntime,
+    TimelineRuntime,
     TuningSession,
 )
 from cleave.viz.overlay import TuningOverlay, TuningViewState
+from cleave.viz.timeline_overlay import TimelineOverlay, TimelineViewState
 
 
 @dataclass
@@ -43,18 +48,155 @@ class StemLayer:
     playlist: PresetPlaylist
 
 
-def effective_layer_enabled(session: TuningSession, stem: str) -> bool:
+def timeline_defaults(session: TuningSession) -> dict[str, bool]:
+    return {name: session.layers[name].enabled for name in STEM_NAMES}
+
+
+def timeline_cues_for_eval(session: TuningSession) -> list[TimelineCue]:
+    tl = session.timeline
+    if tl.recording:
+        return tl.cues + tl.record_buffer
+    return tl.cues
+
+
+def timeline_committed_visible(
+    session: TuningSession,
+    stem: str,
+    t_sec: float,
+) -> bool:
+    return layer_visible_at(
+        session.timeline.cues,
+        timeline_defaults(session),
+        stem,
+        t_sec,
+    )
+
+
+def snapshot_monitor_from_timeline(
+    session: TuningSession,
+    t_sec: float,
+) -> dict[str, bool]:
+    defaults = timeline_defaults(session)
+    return {
+        stem: layer_visible_at(session.timeline.cues, defaults, stem, t_sec)
+        for stem in session.layer_z_order
+    }
+
+
+def snapshot_monitor_from_output(
+    session: TuningSession,
+    t_sec: float,
+) -> dict[str, bool]:
+    return {
+        stem: effective_layer_enabled(session, stem, t_sec)
+        for stem in session.layer_z_order
+    }
+
+
+def armed_recording_defaults(session: TuningSession) -> dict[str, bool]:
+    defaults = timeline_defaults(session)
+    defaults.update(session.timeline.record_baseline)
+    return defaults
+
+
+def armed_recording_visible(
+    session: TuningSession,
+    stem: str,
+    t_sec: float,
+) -> bool:
+    """Visibility for an armed stem during an active record pass."""
+    return layer_visible_at(
+        session.timeline.record_buffer,
+        armed_recording_defaults(session),
+        stem,
+        t_sec,
+    )
+
+
+def committed_visible_outside_punch(
+    session: TuningSession,
+    stem: str,
+    record_start: float,
+    record_stop: float,
+) -> bool:
+    """Committed visibility at *record_stop* ignoring armed-stem cues inside the punch."""
+    kept = [
+        cue
+        for cue in session.timeline.cues
+        if not (
+            record_start <= cue.t <= record_stop
+            and stem in cue.layers
+        )
+    ]
+    return layer_visible_at(kept, timeline_defaults(session), stem, record_stop)
+
+
+def build_record_punch_cues(
+    session: TuningSession,
+    record_start: float,
+    record_stop: float,
+) -> list[TimelineCue]:
+    """Cues to punch on record stop: baseline, toggles, and committed restore at stop."""
+    tl = session.timeline
+    punch: list[TimelineCue] = []
+    for stem in tl.armed_stems:
+        baseline = tl.record_baseline.get(stem)
+        if baseline is None:
+            continue
+        if baseline != timeline_committed_visible(session, stem, record_start):
+            punch.append(
+                TimelineCue(
+                    t=record_start,
+                    layers={stem: baseline},
+                    show_tick=False,
+                )
+            )
+    punch.extend(tl.record_buffer)
+    for stem in tl.armed_stems:
+        end_visible = armed_recording_visible(session, stem, record_stop)
+        committed_at_stop = timeline_committed_visible(session, stem, record_stop)
+        if end_visible != committed_at_stop:
+            punch.append(
+                TimelineCue(
+                    t=record_stop,
+                    layers={stem: committed_at_stop},
+                    show_tick=False,
+                )
+            )
+    return punch
+
+
+def effective_layer_enabled(
+    session: TuningSession,
+    stem: str,
+    t_sec: float,
+) -> bool:
     if session.solo_stem is not None:
         return stem == session.solo_stem
-    return session.layers[stem].enabled
+    if not session.timeline.enabled:
+        return session.layers[stem].enabled
+    tl = session.timeline
+    defaults = timeline_defaults(session)
+    if tl.recording:
+        if stem in tl.armed_stems:
+            return armed_recording_visible(session, stem, t_sec)
+        if stem in tl.override_stems:
+            return tl.override_visible.get(stem, True)
+        return layer_visible_at(tl.cues, defaults, stem, t_sec)
+    if tl.preview_active:
+        return tl.monitor[stem]
+    if stem in tl.override_stems:
+        return tl.override_visible.get(stem, True)
+    return layer_visible_at(tl.cues, defaults, stem, t_sec)
 
 
 def apply_layer_visibility(
     session: TuningSession,
     layers_by_name: dict[str, StemLayer],
+    t_sec: float,
 ) -> None:
     for stem, layer in layers_by_name.items():
-        layer.fbo.enabled = effective_layer_enabled(session, stem)
+        layer.fbo.enabled = effective_layer_enabled(session, stem, t_sec)
 
 
 def apply_effect_modifiers(
@@ -70,7 +212,7 @@ def apply_effect_modifiers(
         effect_runtime.update(session, signals, t_sec)
     modifiers = effect_runtime.modifiers(session)
     for stem, layer in layers_by_name.items():
-        if not effective_layer_enabled(session, stem):
+        if not effective_layer_enabled(session, stem, t_sec):
             continue
         mod = modifiers[stem]
         layer.fbo.opacity = mod.opacity
@@ -186,8 +328,10 @@ def _render_overlay_runtime_from_cfg(cfg: CleaveConfig) -> RenderOverlayRuntime:
             title_expanded=False,
             body_expanded=False,
             title_font_size=overlay.title.font_size,
+            title_font=overlay.title.font,
             title_margin_bottom=overlay.title.margin_bottom,
             body_font_size=overlay.body.font_size,
+            body_font=overlay.body.font,
             opacity_pct=int(round(overlay.background.opacity * 100)),
             border_width=overlay.background.border.width,
             start_delay=overlay.start_delay,
@@ -200,8 +344,10 @@ def _render_overlay_runtime_from_cfg(cfg: CleaveConfig) -> RenderOverlayRuntime:
         title_expanded=False,
         body_expanded=False,
         title_font_size=DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
+        title_font=DEFAULT_RENDER_OVERLAY_FONT,
         title_margin_bottom=DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
         body_font_size=DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
+        body_font=DEFAULT_RENDER_OVERLAY_FONT,
         opacity_pct=int(round(DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY * 100)),
         border_width=DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
         start_delay=DEFAULT_RENDER_OVERLAY_START_DELAY,
@@ -228,6 +374,16 @@ def _render_post_fx_runtime_from_cfg(
     )
 
 
+def _timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
+    timeline = cfg.timeline
+    if timeline is None:
+        return TimelineRuntime()
+    return TimelineRuntime(
+        enabled=timeline.enabled,
+        cues=list(timeline.cues),
+    )
+
+
 def _session_from_cfg(
     cfg: CleaveConfig,
     playlists: dict[str, PresetPlaylist],
@@ -237,6 +393,7 @@ def _session_from_cfg(
         layer_z_order=list(cfg.layer_z_order),
         render_overlay=_render_overlay_runtime_from_cfg(cfg),
         render_post_fx=_render_post_fx_runtime_from_cfg(cfg),
+        timeline=_timeline_runtime_from_cfg(cfg),
         layers={
             name: LayerRuntime(
                 playlist=playlists[name],
@@ -280,4 +437,70 @@ def _draw_tuning_overlay(
         px, py, pw, ph = panel
         panel_surface = overlay_surface.subsurface((px, py, pw, ph))
         tex_id = compositor.upload_overlay_texture(panel_surface)
+        compositor.draw_overlay(tex_id, px, py, pw, ph)
+
+
+def _build_timeline_view_state(
+    session: TuningSession,
+    position_sec: float,
+    duration_sec: float,
+) -> TimelineViewState:
+    tl = session.timeline
+    monitor_visible = {
+        stem: effective_layer_enabled(session, stem, position_sec)
+        for stem in session.layer_z_order
+    }
+    timeline_visible = {
+        stem: timeline_committed_visible(session, stem, position_sec)
+        for stem in session.layer_z_order
+    }
+    return TimelineViewState(
+        layer_z_order=list(session.layer_z_order),
+        cues=list(tl.cues),
+        defaults=timeline_defaults(session),
+        position_sec=position_sec,
+        duration_sec=duration_sec,
+        focus_row=tl.focus_row,
+        monitor_visible=monitor_visible,
+        timeline_visible=timeline_visible,
+        override_stems=set(tl.override_stems),
+        armed_stems=set(tl.armed_stems),
+        recording=tl.recording,
+        record_start_sec=tl.record_start_sec,
+        record_baseline=dict(tl.record_baseline),
+        record_buffer=list(tl.record_buffer),
+        enabled=tl.enabled,
+    )
+
+
+def _union_rect(
+    a: tuple[int, int, int, int],
+    b: tuple[int, int, int, int],
+) -> tuple[int, int, int, int]:
+    ax, ay, aw, ah = a
+    bx, by, bw, bh = b
+    x0 = min(ax, bx)
+    y0 = min(ay, by)
+    x1 = max(ax + aw, bx + bw)
+    y1 = max(ay + ah, by + bh)
+    return (x0, y0, x1 - x0, y1 - y0)
+
+
+def _draw_timeline_overlay(
+    compositor: GlCompositor,
+    overlay: TimelineOverlay,
+    overlay_surface: pygame.Surface,
+    view_state: TimelineViewState,
+) -> None:
+    overlay_surface.fill((0, 0, 0, 0))
+    overlay.draw(overlay_surface, view_state)
+    panel = overlay.panel_rect
+    if panel is not None:
+        upload_rect = panel
+        badge = overlay.header_badge_rect
+        if badge is not None:
+            upload_rect = _union_rect(panel, badge)
+        px, py, pw, ph = upload_rect
+        upload_surface = overlay_surface.subsurface((px, py, pw, ph))
+        tex_id = compositor.upload_overlay_texture(upload_surface)
         compositor.draw_overlay(tex_id, px, py, pw, ph)

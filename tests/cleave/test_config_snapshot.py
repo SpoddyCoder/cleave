@@ -20,16 +20,19 @@ from cleave.config import (
     VisualizerConfig,
     _parse_layers,
     _parse_render,
+    _parse_timeline,
 )
 from cleave.config_snapshot import next_unnamed_path, write_session_snapshot
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import playlist_at_dir
+from cleave.timeline import TimelineCue
 from cleave.viz.controls import (
     LayerRuntime,
     RenderOverlayRuntime,
     RenderPostFxRuntime,
     TuningSession,
 )
+from cleave.viz.layer import _session_from_cfg
 
 
 def test_next_unnamed_path_empty_dir(tmp_path: Path) -> None:
@@ -393,6 +396,7 @@ def _render_overlay_cfg() -> RenderOverlayConfig:
         enabled=True,
         title=RenderOverlayTextBlockConfig(
             content="My Title",
+            font="monospace",
             font_size=24,
             colour=(255, 255, 255),
             background_colour=(51, 51, 255),
@@ -400,6 +404,7 @@ def _render_overlay_cfg() -> RenderOverlayConfig:
         ),
         body=RenderOverlayTextBlockConfig(
             content="Line one\nLine two",
+            font="monospace",
             font_size=18,
             colour=(255, 255, 255),
             background_colour=(51, 51, 255),
@@ -498,8 +503,10 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
             title_expanded=False,
             body_expanded=False,
             title_font_size=14,
+            title_font="dejavusans",
             title_margin_bottom=6,
             body_font_size=18,
+            body_font="ubuntumono",
             opacity_pct=75,
             border_width=4,
             start_delay=20.0,
@@ -529,8 +536,10 @@ def test_write_session_snapshot_persists_render_overlay(tmp_path: Path) -> None:
     assert overlay["display_time"] == 40.0
     assert overlay["position"] == "top-right"
     assert overlay["title"]["font-size"] == 14
+    assert overlay["title"]["font"] == "dejavusans"
     assert overlay["title"]["margin-bottom"] == 6
     assert overlay["body"]["font-size"] == 18
+    assert overlay["body"]["font"] == "ubuntumono"
     assert overlay["title"]["font-colour"] == "#ffffff"
     assert overlay["body"]["colour"] == "#ffffff"
     assert overlay["background"]["margin"] == 10
@@ -546,8 +555,10 @@ def test_write_session_snapshot_persists_render_overlay(tmp_path: Path) -> None:
     assert round_trip.overlay.enabled is True
     assert round_trip.overlay.start_delay == 20.0
     assert round_trip.overlay.title.font_size == 14
+    assert round_trip.overlay.title.font == "dejavusans"
     assert round_trip.overlay.title.margin_bottom == 6
     assert round_trip.overlay.body.font_size == 18
+    assert round_trip.overlay.body.font == "ubuntumono"
     assert round_trip.overlay.background.opacity == 0.75
     assert round_trip.overlay.background.border.width == 4
 
@@ -582,7 +593,7 @@ def test_write_session_snapshot_persists_render_post_fx(tmp_path: Path) -> None:
     assert round_trip.post_fx.fade_out == 3.0
 
 
-def test_write_session_snapshot_render_post_fx_solo_saves_enabled(
+def test_write_session_snapshot_render_post_fx_solo_does_not_affect_enabled(
     tmp_path: Path,
 ) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
@@ -591,18 +602,20 @@ def test_write_session_snapshot_render_post_fx_solo_saves_enabled(
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
-    assert data["render"]["post_fx"]["enabled"] is True
+    assert data["render"]["post_fx"]["enabled"] is False
     assert "render_post_fx_solo" not in yaml.safe_dump(data)
 
 
-def test_write_session_snapshot_render_overlay_solo_saves_enabled(tmp_path: Path) -> None:
+def test_write_session_snapshot_render_overlay_solo_does_not_affect_enabled(
+    tmp_path: Path,
+) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
     session.render_overlay.enabled = False
     session.render_overlay_solo = True
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
-    assert data["render"]["overlay"]["enabled"] is True
+    assert data["render"]["overlay"]["enabled"] is False
     assert "render_overlay_solo" not in yaml.safe_dump(data)
 
 
@@ -622,3 +635,52 @@ def test_write_session_snapshot_render_overlay_without_cfg_render(tmp_path: Path
     assert overlay["title"]["content"] == "Cleave Final Render"
     assert overlay["position"] == "top-right"
     assert overlay["title"]["font-size"] == 14
+
+
+def test_write_session_snapshot_persists_timeline_at_bottom(tmp_path: Path) -> None:
+    cfg, session, out_path = _snapshot_fixture(tmp_path)
+    session.timeline.enabled = True
+    session.timeline.cues = [
+        TimelineCue(t=2.5, layers={"drums": False, "bass": True}),
+        TimelineCue(t=10.0, layers={"vocals": False}),
+    ]
+    write_session_snapshot(out_path, cfg=cfg, session=session)
+
+    raw = out_path.read_text(encoding="utf-8")
+    data = yaml.safe_load(raw)
+    assert list(data.keys())[-1] == "timeline"
+    assert data["timeline"]["enabled"] is True
+    assert data["timeline"]["cues"] == [
+        {"t": 2.5, "layers": {"drums": False, "bass": True}},
+        {"t": 10.0, "layers": {"vocals": False}},
+    ]
+
+    timeline = _parse_timeline(data)
+    assert timeline is not None
+    playlists = {
+        name: playlist_at_dir(cfg.paths.preset_root / name, index=0)
+        for name in STEM_NAMES
+    }
+    cfg_with_timeline = CleaveConfig(
+        paths=cfg.paths,
+        layers=cfg.layers,
+        visualizer=cfg.visualizer,
+        config_path=out_path,
+        render=cfg.render,
+        timeline=timeline,
+    )
+    session2 = _session_from_cfg(cfg_with_timeline, playlists)
+    assert session2.timeline.enabled is True
+    assert session2.timeline.cues == list(timeline.cues)
+
+
+def test_write_session_snapshot_persists_timeline_disabled_without_cues(
+    tmp_path: Path,
+) -> None:
+    cfg, session, out_path = _snapshot_fixture(tmp_path)
+    session.timeline.enabled = False
+    session.timeline.cues = []
+    write_session_snapshot(out_path, cfg=cfg, session=session)
+
+    data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    assert data["timeline"] == {"enabled": False}

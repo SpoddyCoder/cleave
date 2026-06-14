@@ -11,7 +11,9 @@ from cleave.config import (
     DEFAULT_RENDER_OVERLAY_BACKGROUND_PADDING,
     DEFAULT_RENDER_OVERLAY_BORDER_COLOUR,
     DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
+    DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
     DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
+    DEFAULT_RENDER_OVERLAY_FONT,
     DEFAULT_RENDER_OVERLAY_POSITION,
     DEFAULT_RENDER_OVERLAY_START_DELAY,
     DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
@@ -19,7 +21,6 @@ from cleave.config import (
     DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
     DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
     DEFAULT_RENDER_OVERLAY_BODY,
-    DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
     RenderOverlayBackgroundConfig,
     RenderOverlayBorderConfig,
     RenderOverlayConfig,
@@ -40,12 +41,14 @@ def default_render_overlay_config() -> RenderOverlayConfig:
         enabled=True,
         title=RenderOverlayTextBlockConfig(
             content=DEFAULT_RENDER_OVERLAY_TITLE,
+            font=DEFAULT_RENDER_OVERLAY_FONT,
             font_size=DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
             colour=DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
             margin_bottom=DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
         ),
         body=RenderOverlayTextBlockConfig(
             content=DEFAULT_RENDER_OVERLAY_BODY,
+            font=DEFAULT_RENDER_OVERLAY_FONT,
             font_size=DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
             colour=DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
         ),
@@ -68,6 +71,7 @@ def default_render_overlay_config() -> RenderOverlayConfig:
 def _text_block_surface_key(block: RenderOverlayTextBlockConfig) -> tuple:
     return (
         block.content,
+        block.font,
         block.font_size,
         block.colour,
         block.background_colour,
@@ -98,6 +102,7 @@ def build_live_overlay_config(
         enabled=runtime.enabled,
         title=RenderOverlayTextBlockConfig(
             content=base.title.content,
+            font=runtime.title_font,
             font_size=runtime.title_font_size,
             colour=base.title.colour,
             background_colour=base.title.background_colour,
@@ -105,6 +110,7 @@ def build_live_overlay_config(
         ),
         body=RenderOverlayTextBlockConfig(
             content=base.body.content,
+            font=runtime.body_font,
             font_size=runtime.body_font_size,
             colour=base.body.colour,
             background_colour=base.body.background_colour,
@@ -179,11 +185,11 @@ def panel_position(
 
 
 def _body_font(cfg: RenderOverlayConfig) -> pygame.font.Font:
-    return pygame.font.SysFont("monospace", cfg.body.font_size)
+    return pygame.font.SysFont(cfg.body.font, cfg.body.font_size)
 
 
 def _title_font(cfg: RenderOverlayConfig) -> pygame.font.Font:
-    return pygame.font.SysFont("monospace", cfg.title.font_size, bold=True)
+    return pygame.font.SysFont(cfg.title.font, cfg.title.font_size, bold=True)
 
 
 def _background_pixel_alpha(cfg: RenderOverlayConfig) -> int:

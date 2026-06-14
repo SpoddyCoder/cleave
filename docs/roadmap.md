@@ -2,6 +2,11 @@
 
 Aspirational ideas. Not scheduled; revisit when the core workflow feels solid.
 
+## Timeline v2
+- Fade in/out on layer transitions
+- Beat snap for cue placement
+- External timeline file for very long cue lists
+
 ## MIDI out
 
 Emit MIDI notes or CC from drum onsets (and other signals in `signals.json`) to drive hardware lighting, drum pads, or synths during playback or export.

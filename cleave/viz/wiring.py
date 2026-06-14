@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from cleave.config import DEFAULT_VIZ_CONFIG_FILENAME, CleaveConfig
@@ -11,6 +12,7 @@ from cleave.paths import repo_root
 from cleave.preset_playlist import PresetPlaylist
 from cleave.signals import Signals
 from cleave.viz.controls import TuningControls, TuningSession
+from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.layer import (
     StemLayer,
     _flush_all_pcm,
@@ -59,9 +61,10 @@ def make_tuning_controls(
         )
 
     def on_layer_enabled_change(stem: str, enabled: bool) -> None:
-        apply_layer_visibility(session, layers_by_name)
+        t_sec = current_sec(playback, duration_sec)
+        apply_layer_visibility(session, layers_by_name, t_sec)
         _flush_all_pcm(layers)
-        if effective_layer_enabled(session, stem):
+        if effective_layer_enabled(session, stem, t_sec):
             apply_effect_modifiers(
                 session,
                 layers_by_name,
@@ -71,8 +74,22 @@ def make_tuning_controls(
                 update=False,
             )
 
+    def on_timeline_enabled_change() -> None:
+        t_sec = current_sec(playback, duration_sec)
+        apply_layer_visibility(session, layers_by_name, t_sec)
+        _flush_all_pcm(layers)
+        apply_effect_modifiers(
+            session,
+            layers_by_name,
+            effect_runtime,
+            signals,
+            current_sec(playback, duration_sec),
+            update=False,
+        )
+
     def on_solo_change() -> None:
-        apply_layer_visibility(session, layers_by_name)
+        t_sec = current_sec(playback, duration_sec)
+        apply_layer_visibility(session, layers_by_name, t_sec)
         if mix_player is not None:
             mix_player.set_solo_stem(session.solo_stem)
         _flush_all_pcm(layers)
@@ -101,6 +118,7 @@ def make_tuning_controls(
         "on_blend_change": on_blend_change,
         "on_opacity_change": on_opacity_change,
         "on_layer_enabled_change": on_layer_enabled_change,
+        "on_timeline_enabled_change": on_timeline_enabled_change,
         "on_solo_change": on_solo_change,
         "on_beat_change": on_beat_change,
         "on_seek": on_seek,
@@ -129,6 +147,53 @@ def make_tuning_controls(
         mix_player.set_stem_pcm(
             {stem: pcm_bank.mono_pcm(stem) for stem in session.layer_z_order}
         )
-        apply_layer_visibility(session, layers_by_name)
+        apply_layer_visibility(
+            session,
+            layers_by_name,
+            current_sec(playback, duration_sec),
+        )
         mix_player.set_solo_stem(session.solo_stem)
     return controls
+
+
+def make_timeline_controls(
+    *,
+    session: TuningSession,
+    playback,
+    duration_sec: float,
+    layers_by_name: dict[str, StemLayer],
+    layers: list[StemLayer],
+    signals: Signals | None,
+    effect_runtime: EffectRuntime,
+    mix_player: MixPlayer | None = None,
+    on_toast: Callable[[str], None] | None = None,
+) -> TimelineControls:
+    def on_visibility_change() -> None:
+        t_sec = current_sec(playback, duration_sec)
+        apply_layer_visibility(session, layers_by_name, t_sec)
+        _flush_all_pcm(layers)
+        apply_effect_modifiers(
+            session,
+            layers_by_name,
+            effect_runtime,
+            signals,
+            current_sec(playback, duration_sec),
+            update=False,
+        )
+
+    def on_close() -> None:
+        session.timeline.panel_open = False
+
+    def on_seek(delta_sec: float) -> None:
+        seek(playback, delta_sec, duration_sec)
+        _flush_all_pcm(layers)
+
+    return TimelineControls(
+        session,
+        playback,
+        duration_sec,
+        on_visibility_change=on_visibility_change,
+        on_close=on_close,
+        on_seek=on_seek,
+        on_toast=on_toast,
+    )

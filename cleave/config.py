@@ -16,6 +16,7 @@ from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.effects.constants import clamp_effect_pct
 from cleave.effects.registry import validate_effect_entry
 from cleave.extract import STEM_NAMES
+from cleave.timeline import TimelineCue
 
 DEFAULT_VIZ_CONFIG_FILENAME = "cleave-viz-default.yaml"
 PROJECT_VIZ_CONFIG_FILENAME = "cleave-viz.yaml"
@@ -104,6 +105,17 @@ DEFAULT_RENDER_OVERLAY_BODY = (
 DEFAULT_RENDER_OVERLAY_START_DELAY = 10.0
 DEFAULT_RENDER_OVERLAY_DISPLAY_TIME = 30.0
 DEFAULT_RENDER_OVERLAY_POSITION: RenderOverlayPosition = "bottom-left"
+DEFAULT_RENDER_OVERLAY_FONT = "monospace"
+RENDER_OVERLAY_FONTS: tuple[str, ...] = (
+    "monospace",
+    "sans",
+    "serif",
+    "dejavusans",
+    "dejavusansmono",
+    "dejavuserif",
+    "ubuntusans",
+    "ubuntumono",
+)
 DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE = 24
 DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM = 10
 DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE = 18
@@ -122,6 +134,7 @@ DEFAULT_RENDER_POST_FX_FADE_OUT = 4.0
 @dataclass(frozen=True)
 class RenderOverlayTextBlockConfig:
     content: str
+    font: str
     font_size: int
     colour: tuple[int, int, int]
     background_colour: tuple[int, int, int] | None = None
@@ -167,6 +180,15 @@ class RenderConfig:
     post_fx: RenderPostFxConfig | None
 
 
+DEFAULT_TIMELINE_ENABLED = True
+
+
+@dataclass(frozen=True)
+class TimelineConfig:
+    enabled: bool
+    cues: tuple[TimelineCue, ...]
+
+
 @dataclass(frozen=True)
 class CleaveConfig:
     paths: PathsConfig
@@ -175,6 +197,7 @@ class CleaveConfig:
     config_path: Path
     layer_z_order: tuple[str, ...] = DEFAULT_LAYER_Z_ORDER
     render: RenderConfig | None = None
+    timeline: TimelineConfig | None = None
 
     def layers_in_z_order(self) -> list[tuple[str, LayerConfig]]:
         """Return layers in compositor draw order (bottom-to-top)."""
@@ -370,9 +393,21 @@ def _parse_render_overlay_position(
     return value
 
 
+def cycle_render_overlay_font(current: str, *, forward: bool) -> str:
+    fonts = RENDER_OVERLAY_FONTS
+    try:
+        index = fonts.index(current)
+    except ValueError:
+        index = 0
+    if forward:
+        return fonts[(index + 1) % len(fonts)]
+    return fonts[(index - 1) % len(fonts)]
+
+
 def _default_render_overlay_title_block() -> RenderOverlayTextBlockConfig:
     return RenderOverlayTextBlockConfig(
         content=DEFAULT_RENDER_OVERLAY_TITLE,
+        font=DEFAULT_RENDER_OVERLAY_FONT,
         font_size=DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
         colour=DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
         margin_bottom=DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
@@ -382,6 +417,7 @@ def _default_render_overlay_title_block() -> RenderOverlayTextBlockConfig:
 def _default_render_overlay_body_block() -> RenderOverlayTextBlockConfig:
     return RenderOverlayTextBlockConfig(
         content=DEFAULT_RENDER_OVERLAY_BODY,
+        font=DEFAULT_RENDER_OVERLAY_FONT,
         font_size=DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
         colour=DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
     )
@@ -424,6 +460,10 @@ def _parse_render_overlay_text_block(
     content = str(content_raw)
     if content.endswith("\n"):
         content = content[:-1]
+    font_raw = block.get("font", DEFAULT_RENDER_OVERLAY_FONT)
+    if not isinstance(font_raw, str) or not font_raw.strip():
+        raise ValueError(f"{label_prefix}.font must be a non-empty string")
+    font = font_raw.strip()
     font_size = _require_non_negative_number(
         block.get("font-size", default_font_size),
         f"{label_prefix}.font-size",
@@ -440,6 +480,7 @@ def _parse_render_overlay_text_block(
     )
     return RenderOverlayTextBlockConfig(
         content=content,
+        font=font,
         font_size=int(font_size),
         colour=colour,
         background_colour=background_colour,
@@ -581,6 +622,43 @@ def _parse_render(data: dict[str, Any]) -> RenderConfig | None:
     return RenderConfig(overlay=overlay, post_fx=post_fx)
 
 
+def _parse_timeline(data: dict[str, Any]) -> TimelineConfig | None:
+    timeline = data.get("timeline")
+    if timeline is None:
+        return None
+    timeline_map = _as_mapping(timeline, "timeline")
+    enabled = bool(timeline_map.get("enabled", DEFAULT_TIMELINE_ENABLED))
+    cues_raw = timeline_map.get("cues", [])
+    if cues_raw is None:
+        cues_raw = []
+    if not isinstance(cues_raw, list):
+        raise ValueError("timeline.cues must be a list")
+    cues: list[TimelineCue] = []
+    for index, item in enumerate(cues_raw):
+        cue_map = _as_mapping(item, f"timeline.cues[{index}]")
+        t = float(
+            _require_non_negative_number(
+                cue_map.get("t"),
+                f"timeline.cues[{index}].t",
+            )
+        )
+        layers_raw = _as_mapping(
+            cue_map.get("layers"),
+            f"timeline.cues[{index}].layers",
+        )
+        unknown = sorted(set(layers_raw) - set(STEM_NAMES))
+        if unknown:
+            raise ValueError(
+                f"unknown layer keys in timeline.cues[{index}].layers "
+                f"(expected {', '.join(STEM_NAMES)}): "
+                + ", ".join(unknown)
+            )
+        layers = {stem: bool(layers_raw[stem]) for stem in layers_raw}
+        cues.append(TimelineCue(t=t, layers=layers))
+    cues.sort(key=lambda cue: cue.t)
+    return TimelineConfig(enabled=enabled, cues=tuple(cues))
+
+
 def _parse_visualizer(data: dict[str, Any]) -> VisualizerConfig:
     visualizer = _as_mapping(data.get("visualizer"), "visualizer")
     return VisualizerConfig(
@@ -683,6 +761,7 @@ def load_config(
     paths = _parse_paths(data)
     visualizer = _parse_visualizer(data)
     render = _parse_render(data)
+    timeline = _parse_timeline(data)
     layer_z_order = _parse_layer_z_order(data)
     layers = _parse_layers(data, paths.preset_root)
     _validate_presets(layers)
@@ -694,6 +773,7 @@ def load_config(
         config_path=path,
         layer_z_order=layer_z_order,
         render=render,
+        timeline=timeline,
     )
 
 

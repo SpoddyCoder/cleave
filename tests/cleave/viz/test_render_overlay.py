@@ -31,6 +31,7 @@ from cleave.viz.theme import FADE_DURATION_SEC
 def _text_block(
     content: str,
     *,
+    font: str = "monospace",
     font_size: int = 10,
     colour: tuple[int, int, int] = (255, 170, 0),
     background_colour: tuple[int, int, int] | None = None,
@@ -38,6 +39,7 @@ def _text_block(
 ) -> RenderOverlayTextBlockConfig:
     return RenderOverlayTextBlockConfig(
         content=content,
+        font=font,
         font_size=font_size,
         colour=colour,
         background_colour=background_colour,
@@ -151,8 +153,10 @@ def test_build_live_overlay_config_overrides_runtime_fields() -> None:
         title_expanded=False,
         body_expanded=False,
         title_font_size=14,
+        title_font="dejavusans",
         title_margin_bottom=6,
         body_font_size=12,
+        body_font="dejavuserif",
         opacity_pct=75,
         border_width=4,
         start_delay=20.0,
@@ -166,8 +170,10 @@ def test_build_live_overlay_config_overrides_runtime_fields() -> None:
     assert merged.display_time == 40.0
     assert merged.position == "bottom-right"
     assert merged.title.font_size == 14
+    assert merged.title.font == "dejavusans"
     assert merged.title.margin_bottom == 6
     assert merged.body.font_size == 12
+    assert merged.body.font == "dejavuserif"
     assert merged.title.colour == base.title.colour
     assert merged.body.colour == base.body.colour
     assert merged.background.margin == base.background.margin
