@@ -25,6 +25,7 @@ from cleave.viz.theme import (
 
 PANEL_HEIGHT_FRACTION: float = 0.2
 OFF_SEGMENT_COLOR: tuple[int, int, int] = (40, 40, 40)
+BAR_VERTICAL_INSET: int = 3
 ARMED_BG_ALPHA: int = 220
 CUE_TICK_ALPHA: int = 120
 PLAYHEAD_WIDTH: int = 2
@@ -33,6 +34,14 @@ REC_BADGE_PAD_X: int = 8
 REC_BADGE_PAD_Y: int = 4
 REC_TIME_GAP: int = 2
 REC_FLASH_MS: int = 500
+
+
+def _blit_focus_tint(panel: pygame.Surface, rect: pygame.Rect) -> None:
+    if rect.w <= 0 or rect.h <= 0:
+        return
+    surf = pygame.Surface((rect.w, rect.h), pygame.SRCALPHA)
+    surf.fill((*HIGHLIGHT, FOCUS_ROW_BG_ALPHA))
+    panel.blit(surf, rect.topleft)
 
 
 @dataclass
@@ -316,7 +325,12 @@ class TimelineOverlay:
             stem = state.layer_z_order[row_index]
             row_y = self._padding + display_i * (row_h + self._row_gap)
             row_rect = pygame.Rect(self._padding, row_y, panel_w - self._padding * 2, row_h)
-            bar_rect = pygame.Rect(bar_left, row_y, bar_width, row_h)
+            bar_rect = pygame.Rect(
+                bar_left,
+                row_y + BAR_VERTICAL_INSET,
+                bar_width,
+                max(1, row_h - BAR_VERTICAL_INSET * 2),
+            )
             armed = stem in state.armed_stems
             focused = row_index == state.focus_row
 
@@ -330,9 +344,7 @@ class TimelineOverlay:
             monitor_eye_x = stem_abbrev_x + self._stem_abbrev_width
 
             if focused:
-                focus_surf = pygame.Surface((row_rect.w, row_rect.h), pygame.SRCALPHA)
-                focus_surf.fill((*HIGHLIGHT, FOCUS_ROW_BG_ALPHA))
-                panel.blit(focus_surf, row_rect.topleft)
+                _blit_focus_tint(panel, row_rect)
 
             abbrev_rect = pygame.Rect(
                 stem_abbrev_x, row_y, self._stem_abbrev_width, row_h
@@ -373,6 +385,10 @@ class TimelineOverlay:
             panel.blit(monitor_icon, (monitor_eye_x, row_y))
             panel.blit(timeline_icon, (timeline_eye_x, row_y))
 
+            bar_column_rect = pygame.Rect(bar_left, row_y, bar_width, row_h)
+            if focused:
+                _blit_focus_tint(panel, bar_column_rect)
+
             for start_t, end_t, visible in bar_segments_for_row(state, stem):
                 x0 = time_to_x(start_t, bar_left, bar_width, state.duration_sec)
                 x1 = time_to_x(end_t, bar_left, bar_width, state.duration_sec)
@@ -390,6 +406,21 @@ class TimelineOverlay:
                     (tick_x, bar_rect.y),
                     (tick_x, bar_rect.bottom - 1),
                     1,
+                )
+
+            if focused and BAR_VERTICAL_INSET > 0:
+                _blit_focus_tint(
+                    panel,
+                    pygame.Rect(bar_left, row_y, bar_width, BAR_VERTICAL_INSET),
+                )
+                _blit_focus_tint(
+                    panel,
+                    pygame.Rect(
+                        bar_left,
+                        bar_rect.bottom,
+                        bar_width,
+                        BAR_VERTICAL_INSET,
+                    ),
                 )
 
         bar_top = self._padding
