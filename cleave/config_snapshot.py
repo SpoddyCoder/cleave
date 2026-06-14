@@ -119,7 +119,7 @@ def _snapshot_render_overlay(
             orig_overlay = dict(orig_overlay_raw)
 
     overlay: dict[str, Any] = dict(orig_overlay)
-    overlay["enabled"] = runtime.enabled or session.render_overlay_solo
+    overlay["enabled"] = runtime.enabled
     overlay["title"] = _text_block_to_yaml(
         base.title,
         font=runtime.title_font,
@@ -162,7 +162,7 @@ def _snapshot_render_overlay(
             orig_pp = dict(orig_pp_raw)
 
     post_fx: dict[str, Any] = dict(orig_pp)
-    post_fx["enabled"] = runtime_pp.enabled or session.render_post_fx_solo
+    post_fx["enabled"] = runtime_pp.enabled
     post_fx["fade_in"] = runtime_pp.fade_in
     post_fx["fade_out"] = runtime_pp.fade_out
 
@@ -178,10 +178,8 @@ def _snapshot_render_overlay(
     return render_out
 
 
-def _snapshot_timeline(session: TuningSession) -> dict[str, Any] | None:
+def _snapshot_timeline(session: TuningSession) -> dict[str, Any]:
     runtime = session.timeline
-    if not runtime.enabled and not runtime.cues:
-        return None
     out: dict[str, Any] = {"enabled": runtime.enabled}
     if runtime.cues:
         out["cues"] = [
@@ -271,10 +269,8 @@ def write_session_snapshot(
         "layer_z_order": _snapshot_layer_z_order(cfg, session),
         "layers": layers_out,
         "render": _snapshot_render_overlay(cfg, session, original),
+        "timeline": _snapshot_timeline(session),
     }
-    timeline_out = _snapshot_timeline(session)
-    if timeline_out is not None:
-        data["timeline"] = timeline_out
 
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as fh:

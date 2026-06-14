@@ -593,7 +593,7 @@ def test_write_session_snapshot_persists_render_post_fx(tmp_path: Path) -> None:
     assert round_trip.post_fx.fade_out == 3.0
 
 
-def test_write_session_snapshot_render_post_fx_solo_saves_enabled(
+def test_write_session_snapshot_render_post_fx_solo_does_not_affect_enabled(
     tmp_path: Path,
 ) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
@@ -602,18 +602,20 @@ def test_write_session_snapshot_render_post_fx_solo_saves_enabled(
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
-    assert data["render"]["post_fx"]["enabled"] is True
+    assert data["render"]["post_fx"]["enabled"] is False
     assert "render_post_fx_solo" not in yaml.safe_dump(data)
 
 
-def test_write_session_snapshot_render_overlay_solo_saves_enabled(tmp_path: Path) -> None:
+def test_write_session_snapshot_render_overlay_solo_does_not_affect_enabled(
+    tmp_path: Path,
+) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
     session.render_overlay.enabled = False
     session.render_overlay_solo = True
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
-    assert data["render"]["overlay"]["enabled"] is True
+    assert data["render"]["overlay"]["enabled"] is False
     assert "render_overlay_solo" not in yaml.safe_dump(data)
 
 
@@ -672,7 +674,7 @@ def test_write_session_snapshot_persists_timeline_at_bottom(tmp_path: Path) -> N
     assert session2.timeline.cues == list(timeline.cues)
 
 
-def test_write_session_snapshot_omits_timeline_when_disabled_and_empty(
+def test_write_session_snapshot_persists_timeline_disabled_without_cues(
     tmp_path: Path,
 ) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
@@ -681,4 +683,4 @@ def test_write_session_snapshot_omits_timeline_when_disabled_and_empty(
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
-    assert "timeline" not in data
+    assert data["timeline"] == {"enabled": False}
