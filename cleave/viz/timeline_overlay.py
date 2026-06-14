@@ -177,8 +177,10 @@ def bar_tick_times_for_row(state: TimelineViewState, stem: str) -> list[float]:
     return sorted(set(committed_ticks) | set(live_ticks))
 
 
-def _rec_flash_visible() -> bool:
-    return (pygame.time.get_ticks() // REC_FLASH_MS) % 2 == 0
+def rec_flash_visible(ticks_ms: int | None = None) -> bool:
+    if ticks_ms is None:
+        ticks_ms = pygame.time.get_ticks()
+    return (ticks_ms // REC_FLASH_MS) % 2 == 0
 
 
 def time_to_x(t_sec: float, bar_left: int, bar_width: int, duration_sec: float) -> int:
@@ -198,7 +200,7 @@ def playhead_x(
 
 
 def layer_num_prefix(layer_num: int) -> str:
-    return f"{layer_num} "
+    return f" {layer_num} "
 
 
 def stem_abbrev_label(stem: str) -> str:
@@ -328,22 +330,24 @@ class TimelineOverlay:
             stem_abbrev_x = layer_num_x + self._layer_num_width
             monitor_eye_x = stem_abbrev_x + self._stem_abbrev_width
 
-            label_bg_rect = pygame.Rect(
+            layer_num_bg_rect = pygame.Rect(
                 layer_num_x,
                 row_y,
-                self._layer_num_width + self._stem_abbrev_width,
+                self._layer_num_width,
                 row_h,
             )
 
             if focused:
-                focus_surf = pygame.Surface((label_bg_rect.w, label_bg_rect.h), pygame.SRCALPHA)
+                focus_surf = pygame.Surface(
+                    (layer_num_bg_rect.w, layer_num_bg_rect.h), pygame.SRCALPHA
+                )
                 focus_surf.fill((*TIMELINE_FOCUS_BG, FOCUS_BG_ALPHA))
-                panel.blit(focus_surf, label_bg_rect.topleft)
+                panel.blit(focus_surf, layer_num_bg_rect.topleft)
 
             abbrev_rect = pygame.Rect(
                 stem_abbrev_x, row_y, self._stem_abbrev_width, row_h
             )
-            if armed:
+            if armed and (not state.recording or rec_flash_visible()):
                 armed_surf = pygame.Surface((abbrev_rect.w, abbrev_rect.h), pygame.SRCALPHA)
                 armed_surf.fill((*ARMED_BG, ARMED_BG_ALPHA))
                 panel.blit(armed_surf, abbrev_rect.topleft)
@@ -358,10 +362,12 @@ class TimelineOverlay:
 
             monitor_enabled = state.monitor_visible.get(stem, True)
             timeline_enabled = state.timeline_visible.get(stem, True)
+            monitor_override = stem in state.override_stems or (
+                state.recording and armed and rec_flash_visible()
+            )
             monitor_icon = render_visibility_icon(
                 enabled=monitor_enabled,
-                override=stem in state.override_stems
-                or (state.recording and armed),
+                override=monitor_override,
                 line_height=row_h,
             )
             timeline_icon = render_visibility_icon(
@@ -462,7 +468,7 @@ class TimelineOverlay:
         if recording and rec_surf is not None:
             rec_x = time_x - gap - rec_w
             header_x = rec_x
-            if _rec_flash_visible():
+            if rec_flash_visible():
                 pygame.draw.rect(surface, REC_BG, (rec_x, badge_y, rec_w, badge_h))
             surface.blit(
                 rec_surf,

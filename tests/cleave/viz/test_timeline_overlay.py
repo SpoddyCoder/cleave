@@ -23,6 +23,7 @@ from cleave.viz.timeline_overlay import (
     cue_times_for_stem,
     layer_num_prefix,
     playhead_x,
+    rec_flash_visible,
     row_prefix_width,
     stem_abbrev_label,
     stem_label_text,
@@ -134,7 +135,18 @@ def test_override_visibility_icon_glyph_colors() -> None:
     assert OVERRIDE_GLYPH_OFF == DISABLED
 
 
-def test_armed_recording_monitor_eye_uses_override_bg() -> None:
+def test_rec_flash_visible_alternates_every_500ms() -> None:
+    assert rec_flash_visible(0) is True
+    assert rec_flash_visible(499) is True
+    assert rec_flash_visible(500) is False
+    assert rec_flash_visible(999) is False
+    assert rec_flash_visible(1000) is True
+
+
+def test_armed_recording_monitor_eye_uses_override_bg_when_flash_on(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: True
+    )
     pygame.init()
     overlay = TimelineOverlay()
     state = _view_state(armed_stems={"bass"}, recording=True, focus_row=1)
@@ -148,6 +160,78 @@ def test_armed_recording_monitor_eye_uses_override_bg() -> None:
     panel_x, panel_y, _, _ = panel
     monitor_eye_x = overlay._padding + overlay._layer_num_width + overlay._stem_abbrev_width
     assert surface.get_at((panel_x + monitor_eye_x + 1, panel_y + row_y + row_h // 2))[:3] == OVERRIDE_BG
+
+
+def test_armed_recording_monitor_eye_hides_override_bg_when_flash_off(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: False
+    )
+    pygame.init()
+    overlay = TimelineOverlay()
+    state = _view_state(armed_stems={"bass"}, recording=True, focus_row=1)
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.draw(surface, state)
+
+    bass_layout = next(row for row in overlay.row_layout if row[5] == "bass")
+    _, _, row_y, _, row_h, _ = bass_layout
+    panel = overlay.panel_rect
+    assert panel is not None
+    panel_x, panel_y, _, _ = panel
+    monitor_eye_x = overlay._padding + overlay._layer_num_width + overlay._stem_abbrev_width
+    assert surface.get_at((panel_x + monitor_eye_x + 1, panel_y + row_y + row_h // 2))[:3] != OVERRIDE_BG
+
+
+def _abbrev_bg_pixel(surface: pygame.Surface, overlay: TimelineOverlay, row_y: int, row_h: int) -> tuple[int, ...]:
+    panel = overlay.panel_rect
+    assert panel is not None
+    panel_x, panel_y, _, _ = panel
+    abbrev_x = overlay._padding + overlay._layer_num_width
+    sample_x = panel_x + abbrev_x + overlay._stem_abbrev_width - 2
+    sample_y = panel_y + row_y + row_h // 2
+    return surface.get_at((sample_x, sample_y))[:3]
+
+
+def test_armed_recording_abbrev_flashes_with_rec(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: True
+    )
+    pygame.init()
+    overlay = TimelineOverlay()
+    state = _view_state(armed_stems={"bass"}, recording=True, focus_row=0)
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.draw(surface, state)
+
+    bass_layout = next(row for row in overlay.row_layout if row[5] == "bass")
+    _, _, row_y, _, row_h, _ = bass_layout
+    flash_on = _abbrev_bg_pixel(surface, overlay, row_y, row_h)
+
+    monkeypatch.setattr(
+        "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: False
+    )
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.draw(surface, state)
+    flash_off = _abbrev_bg_pixel(surface, overlay, row_y, row_h)
+
+    assert flash_on[0] > flash_off[0] + 40
+    assert flash_on[0] > 150
+
+
+def test_armed_not_recording_abbrev_always_red() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    armed_state = _view_state(armed_stems={"bass"}, recording=False, focus_row=0)
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.draw(surface, armed_state)
+
+    bass_layout = next(row for row in overlay.row_layout if row[5] == "bass")
+    _, _, row_y, _, row_h, _ = bass_layout
+    armed_color = _abbrev_bg_pixel(surface, overlay, row_y, row_h)
+
+    overlay.draw(surface, _view_state(armed_stems=set(), recording=False, focus_row=0))
+    unarmed_color = _abbrev_bg_pixel(surface, overlay, row_y, row_h)
+
+    assert armed_color[0] > unarmed_color[0] + 40
+    assert armed_color[0] > 150
 
 
 def test_unarmed_recording_monitor_eye_not_override_bg() -> None:
@@ -279,10 +363,10 @@ def test_stem_labels_use_abbreviations() -> None:
     assert stem_abbreviation("bass") == "B"
     assert stem_abbreviation("vocals") == "V"
     assert stem_abbreviation("other") == "O"
-    assert layer_num_prefix(1) == "1 "
+    assert layer_num_prefix(1) == " 1 "
     assert stem_abbrev_label("drums") == " D "
-    assert stem_label_text(1, "drums") == "1  D "
-    assert stem_label_text(4, "bass") == "4  B "
+    assert stem_label_text(1, "drums") == " 1  D "
+    assert stem_label_text(4, "bass") == " 4  B "
 
 
 def test_playhead_x_at_known_position() -> None:
