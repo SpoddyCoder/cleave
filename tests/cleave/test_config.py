@@ -472,9 +472,9 @@ def test_load_config_missing_preset_file(tmp_path: Path) -> None:
         load_config(project_root=project_dir)
 
 
-def test_parse_timeline_defaults_enabled_false() -> None:
+def test_parse_timeline_defaults_enabled_true() -> None:
     timeline = _parse_timeline({"timeline": {}})
-    assert timeline == TimelineConfig(enabled=False, cues=())
+    assert timeline == TimelineConfig(enabled=True, cues=())
 
 
 def test_parse_timeline_reads_cues_sorted_by_t() -> None:

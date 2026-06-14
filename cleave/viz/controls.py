@@ -184,8 +184,7 @@ def default_render_post_fx_runtime() -> RenderPostFxRuntime:
 
 @dataclass
 class TimelineRuntime:
-    enabled: bool = False
-    expanded: bool = False
+    enabled: bool = True
     cues: list[TimelineCue] = field(default_factory=list)
     panel_open: bool = False
     focus_row: int = 0
@@ -522,7 +521,7 @@ class TuningControls:
             ),
             render_timeline=RenderTimelineBlock(
                 enabled=tl.enabled,
-                expanded=tl.expanded,
+                expanded=tl.panel_open,
             ),
         )
 
@@ -758,7 +757,10 @@ class TuningControls:
             if ctrl:
                 self._set_render_timeline_enabled(forward)
                 return
-            self._set_render_timeline_expanded(forward)
+            if forward:
+                self._open_timeline_panel()
+            else:
+                self._close_timeline_panel()
 
     def _step_directory(self, stem: str, *, forward: bool) -> None:
         layer = self.session.layers[stem]
@@ -991,22 +993,13 @@ class TuningControls:
         if row_kind(view, self.focus_index) in _RENDER_TIMELINE_SUB_ROW_KINDS:
             self.focus_index = self._render_timeline_header_index()
 
-    def _set_render_timeline_expanded(self, expanded: bool) -> None:
-        tl = self.session.timeline
-        if tl.expanded == expanded:
-            return
-        tl.expanded = expanded
-        if not expanded:
-            self._refocus_render_timeline_header_if_sub_row()
-
     def _set_render_timeline_enabled(self, enabled: bool) -> None:
         tl = self.session.timeline
         if tl.enabled == enabled:
             return
         tl.enabled = enabled
         if not enabled:
-            tl.expanded = False
-            self._refocus_render_timeline_header_if_sub_row()
+            self._close_timeline_panel()
         if self._on_timeline_enabled_change is not None:
             self._on_timeline_enabled_change()
 
@@ -1156,6 +1149,13 @@ class TuningControls:
             return
         tl.panel_open = True
         tl.focus_row = 0
+
+    def _close_timeline_panel(self) -> None:
+        tl = self.session.timeline
+        if not tl.panel_open:
+            return
+        tl.panel_open = False
+        self._refocus_render_timeline_header_if_sub_row()
 
     def _show_save_toast(self, message: str) -> None:
         print(message, file=sys.stderr)

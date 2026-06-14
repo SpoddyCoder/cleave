@@ -28,6 +28,7 @@ from cleave.viz.controls import (
     SEEK_LONG,
     SEEK_SHORT,
     TOAST_DURATION_SEC,
+    TimelineRuntime,
     TuningControls,
     TuningSession,
     _REPEAT_ROW_KINDS,
@@ -101,6 +102,7 @@ _DEFAULT_ACTIVE_CONFIG = Path("/tmp/projects/my-track/active.yaml")
 def _make_controls(
     stems: tuple[str, ...] = ("drums", "bass"),
     *,
+    timeline_enabled: bool = False,
     launch_config_path: Path | None = _DEFAULT_ACTIVE_CONFIG,
     repo_root_example: Path = _REPO_ROOT_EXAMPLE,
 ) -> TuningControls:
@@ -115,6 +117,7 @@ def _make_controls(
             )
             for stem in stems
         },
+        timeline=TimelineRuntime(enabled=timeline_enabled),
     )
     return TuningControls(
         session,
@@ -1092,18 +1095,18 @@ def test_render_timeline_header_expand_arrow() -> None:
     header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
     assert _row_text(view, header_row).endswith(" ▶")
 
-    controls.session.timeline.expanded = True
+    controls.session.timeline.panel_open = True
     view = controls.build_view_state(paused=False)
     header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
     assert _row_text(view, header_row).endswith(" ▼")
 
 
 def test_render_timeline_ctrl_right_toggles_enabled() -> None:
-    controls = _make_controls()
+    controls = _make_controls(timeline_enabled=True)
     view = controls.build_view_state(paused=False)
     header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
     controls.focus_index = header_row
-    assert controls.session.timeline.enabled is False
+    assert controls.session.timeline.enabled is True
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
     assert controls.session.timeline.enabled is True
@@ -1111,48 +1114,58 @@ def test_render_timeline_ctrl_right_toggles_enabled() -> None:
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
     assert controls.session.timeline.enabled is False
 
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert controls.session.timeline.enabled is True
 
-def test_render_timeline_right_toggles_expanded() -> None:
-    controls = _make_controls()
+
+def test_render_timeline_right_opens_panel() -> None:
+    controls = _make_controls(timeline_enabled=True)
     view = controls.build_view_state(paused=False)
     header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
     controls.focus_index = header_row
-    assert controls.session.timeline.expanded is False
+    assert controls.session.timeline.panel_open is False
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.session.timeline.expanded is True
+    assert controls.session.timeline.panel_open is True
+    assert controls.session.timeline.focus_row == 0
+    view = controls.build_view_state(paused=False)
+    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    assert _row_text(view, header_row).endswith(" ▼")
 
     controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert controls.session.timeline.expanded is False
+    assert controls.session.timeline.panel_open is False
+    view = controls.build_view_state(paused=False)
+    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    assert _row_text(view, header_row).endswith(" ▶")
 
 
-def test_render_timeline_disable_collapses_expanded() -> None:
+def test_render_timeline_disable_closes_panel() -> None:
     controls = _make_controls()
     controls.session.timeline.enabled = True
-    controls.session.timeline.expanded = True
+    controls.session.timeline.panel_open = True
     view = controls.build_view_state(paused=False)
     header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
     controls.focus_index = header_row
 
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
     assert controls.session.timeline.enabled is False
-    assert controls.session.timeline.expanded is False
+    assert controls.session.timeline.panel_open is False
 
 
 def test_render_timeline_header_eye_color_when_disabled() -> None:
-    controls = _make_controls()
-    view = controls.build_view_state(paused=False)
-    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
-    assert _row_value_color(view, header_row) == DISABLED
-
-    controls.session.timeline.enabled = True
+    controls = _make_controls(timeline_enabled=True)
     view = controls.build_view_state(paused=False)
     header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
     assert _row_value_color(view, header_row) == VALUE
 
+    controls.session.timeline.enabled = False
+    view = controls.build_view_state(paused=False)
+    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    assert _row_value_color(view, header_row) == DISABLED
+
 
 def test_render_timeline_enabled_change_callback() -> None:
-    controls = _make_controls()
+    controls = _make_controls(timeline_enabled=True)
     events: list[bool] = []
     controls._on_timeline_enabled_change = lambda: events.append(
         controls.session.timeline.enabled
@@ -1162,10 +1175,13 @@ def test_render_timeline_enabled_change_callback() -> None:
     controls.focus_index = header_row
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
-    assert events == [True]
+    assert events == []
 
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
-    assert events == [True, False]
+    assert events == [False]
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert events == [False, True]
 
 
 def test_t_opens_timeline_panel_when_enabled() -> None:
@@ -1180,7 +1196,7 @@ def test_t_opens_timeline_panel_when_enabled() -> None:
 
 def test_t_toast_when_timeline_disabled() -> None:
     controls = _make_controls()
-    assert controls.session.timeline.enabled is False
+    controls.session.timeline.enabled = False
 
     controls.handle_keydown(_keydown(pygame.K_t))
     assert controls.session.timeline.panel_open is False

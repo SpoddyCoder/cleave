@@ -380,7 +380,6 @@ def _timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
         return TimelineRuntime()
     return TimelineRuntime(
         enabled=timeline.enabled,
-        expanded=False,
         cues=list(timeline.cues),
     )
 

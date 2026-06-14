@@ -180,7 +180,7 @@ class RenderConfig:
     post_fx: RenderPostFxConfig | None
 
 
-DEFAULT_TIMELINE_ENABLED = False
+DEFAULT_TIMELINE_ENABLED = True
 
 
 @dataclass(frozen=True)
