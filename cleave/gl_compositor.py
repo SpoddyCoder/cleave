@@ -626,18 +626,15 @@ class GlCompositor:
         self._overlay_texture_size = (width, height)
         return texture_id
 
-    def draw_overlay(
+    def _draw_overlay_quad(
         self,
         texture_id: int,
         x: int,
         y: int,
         width: int,
         height: int,
-        alpha: float = 1.0,
+        alpha: float,
     ) -> None:
-        """Draw *texture_id* at pixel (*x*, *y*) with SRCALPHA blending."""
-        self._ensure_init()
-        self._bind_default_framebuffer()
         blend_enabled, blend_src, blend_dst, blend_equation = self._push_blend_state()
         try:
             glEnable(GL_BLEND)
@@ -648,6 +645,34 @@ class GlCompositor:
         finally:
             self._pop_blend_state(blend_enabled, blend_src, blend_dst, blend_equation)
             glColor4f(1.0, 1.0, 1.0, 1.0)
+
+    def draw_content_overlay(
+        self,
+        texture_id: int,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+        alpha: float = 1.0,
+    ) -> None:
+        """Draw *texture_id* onto the content FBO with SRCALPHA blending."""
+        self._ensure_init()
+        self._bind_content_target()
+        self._draw_overlay_quad(texture_id, x, y, width, height, alpha)
+
+    def draw_overlay(
+        self,
+        texture_id: int,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+        alpha: float = 1.0,
+    ) -> None:
+        """Draw *texture_id* onto the display framebuffer with SRCALPHA blending."""
+        self._ensure_init()
+        self._bind_default_framebuffer()
+        self._draw_overlay_quad(texture_id, x, y, width, height, alpha)
 
     def destroy(self) -> None:
         for layer in self._layers:

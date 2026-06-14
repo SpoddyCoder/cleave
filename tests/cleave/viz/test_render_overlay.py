@@ -6,6 +6,8 @@ from unittest.mock import MagicMock, patch
 
 import pygame
 
+from tests.support.compositor_mock import recording_compositor
+
 from cleave.config import (
     RenderOverlayBackgroundConfig,
     RenderOverlayBorderConfig,
@@ -348,18 +350,19 @@ def test_border_grows_outward_not_inward() -> None:
 
 
 def test_composite_render_overlay_noop_before_start() -> None:
-    compositor = MagicMock()
+    compositor = recording_compositor()
     cfg = _overlay_cfg(start_delay=10.0)
     composite_render_overlay(
         compositor, cfg, 5.0, 1280, 720, panel=MagicMock()
     )
     compositor.upload_overlay_texture.assert_not_called()
+    compositor.draw_content_overlay.assert_not_called()
     compositor.draw_overlay.assert_not_called()
 
 
 def test_composite_render_overlay_draws_when_visible() -> None:
     pygame.init()
-    compositor = MagicMock()
+    compositor = recording_compositor()
     compositor.upload_overlay_texture.return_value = 99
     cfg = _overlay_cfg(start_delay=0.0, display_time=30.0)
     panel = build_panel_surface(cfg)
@@ -367,7 +370,7 @@ def test_composite_render_overlay_draws_when_visible() -> None:
     composite_render_overlay(compositor, cfg, 15.0, 1280, 720, panel=panel)
 
     compositor.upload_overlay_texture.assert_called_once()
-    compositor.draw_overlay.assert_called_once_with(
+    compositor.draw_content_overlay.assert_called_once_with(
         99,
         panel_position(cfg, panel.get_width(), panel.get_height(), 1280, 720)[0],
         panel_position(cfg, panel.get_width(), panel.get_height(), 1280, 720)[1],
@@ -375,11 +378,12 @@ def test_composite_render_overlay_draws_when_visible() -> None:
         panel.get_height(),
         alpha=1.0,
     )
+    compositor.draw_overlay.assert_not_called()
 
 
 def test_composite_render_overlay_with_alpha_uses_precomputed_alpha() -> None:
     pygame.init()
-    compositor = MagicMock()
+    compositor = recording_compositor()
     compositor.upload_overlay_texture.return_value = 42
     cfg = _overlay_cfg(start_delay=10.0, display_time=30.0)
     panel = build_panel_surface(cfg)
@@ -388,8 +392,29 @@ def test_composite_render_overlay_with_alpha_uses_precomputed_alpha() -> None:
         compositor, cfg, 0.5, 1280, 720, panel=panel
     )
 
-    compositor.draw_overlay.assert_called_once()
-    assert compositor.draw_overlay.call_args.kwargs["alpha"] == 0.5
+    compositor.draw_content_overlay.assert_called_once()
+    assert compositor.draw_content_overlay.call_args.kwargs["alpha"] == 0.5
+    compositor.draw_overlay.assert_not_called()
+
+
+def test_composite_render_overlay_uses_content_not_display_target() -> None:
+    pygame.init()
+    compositor = recording_compositor()
+    compositor.upload_overlay_texture.return_value = 7
+    cfg = _overlay_cfg(start_delay=0.0, display_time=30.0, position="bottom-right")
+    panel = build_panel_surface(cfg)
+    content_w, content_h = 1280, 720
+
+    composite_render_overlay_with_alpha(
+        compositor, cfg, 1.0, content_w, content_h, panel=panel
+    )
+
+    compositor.draw_content_overlay.assert_called_once()
+    compositor.draw_overlay.assert_not_called()
+    pos = panel_position(cfg, panel.get_width(), panel.get_height(), content_w, content_h)
+    compositor.draw_content_overlay.assert_called_with(
+        7, pos[0], pos[1], panel.get_width(), panel.get_height(), alpha=1.0
+    )
 
 
 def test_panel_surface_key_ignores_position() -> None:
