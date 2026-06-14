@@ -98,6 +98,15 @@ This will separate the track into its component stem tracks (bass, drums, vocals
     * If omitted outputs to `projects/<slug>/renders/<visualizer.name>.mp4`
   * `-c` for config
   * `-hq` / `--high-quality` for `veryslow` libx264 encode (default uses ffmpeg's libx264 preset).
+* `backup` archives a full project directory (mix, stems, configs, renders) to a `.cleave-tar.gz` file.
+  * First argument: project slug or path.
+  * Second argument: destination directory, parent path, or explicit archive file path.
+    * Directory (or path without a `.tar.gz` suffix): writes `<slug>.cleave-tar.gz` inside.
+    * Path ending in `.tar.gz` or `.cleave-tar.gz`: uses that filename.
+  * Prompts before overwriting an existing archive; `-f` / `--force` skips the prompt.
+* `restore` unpacks a `.cleave-tar.gz` archive into `projects/<slug>/` (slug from `project.yaml`).
+  * Prompts before replacing an existing project directory; `-f` / `--force` skips the prompt.
+  * `--as <slug>` restores under a different slug, rewrites `project.yaml`, and records `restored-from: <original-slug>`.
 * Pass `-hq` / `--high-quality` to `separate` or `play` for higher-quality Demucs separation.
 * To store projects under XDG instead, set `CLEAVE_DATA=~/.local/share/cleave`.
 * `python cleave.py` is an alias for `python -m cleave` (same subcommands).

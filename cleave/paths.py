@@ -34,6 +34,12 @@ def project_dir(slug: str) -> Path:
     return projects_dir() / slug
 
 
+def validate_project_slug(slug: str) -> None:
+    """Raise :class:`ValueError` when *slug* is not a safe project identifier."""
+    if "/" in slug or "\\" in slug or slug in (".", ".."):
+        raise ValueError(f"invalid project slug: {slug!r}")
+
+
 def resolve_project(path_or_slug: Path | str) -> Path:
     """Resolve a project slug or path to an existing project directory.
 
@@ -49,8 +55,7 @@ def resolve_project(path_or_slug: Path | str) -> Path:
         candidate = (data_dir() / raw).resolve()
     else:
         slug = os.fspath(path_or_slug)
-        if "/" in slug or "\\" in slug or slug in (".", ".."):
-            raise ValueError(f"invalid project slug: {slug!r}")
+        validate_project_slug(slug)
         candidate = project_dir(slug).resolve()
 
     if not candidate.is_dir():

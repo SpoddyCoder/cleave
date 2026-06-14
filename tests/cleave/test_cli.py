@@ -10,7 +10,14 @@ from unittest.mock import patch
 
 import pytest
 
-from cleave.cli import build_parser, cmd_play, cmd_render, cmd_separate
+from cleave.cli import (
+    build_parser,
+    cmd_backup,
+    cmd_play,
+    cmd_render,
+    cmd_restore,
+    cmd_separate,
+)
 from cleave.extract import STEM_NAMES, stems_dir
 from cleave.project import write_manifest
 
@@ -277,6 +284,91 @@ def test_cmd_play_forwards_high_quality_to_run_separate(
     run_separate.assert_called_once_with(Path("my-track"), high_quality=True)
 
 
+def test_backup_parser_uses_project_dir_destination_and_options() -> None:
+    parser = build_parser()
+    args = parser.parse_args(
+        ["backup", "my-project", "/tmp/backups", "--force"]
+    )
+    assert args.project_dir == "my-project"
+    assert args.destination == "/tmp/backups"
+    assert args.force
+
+
+def test_restore_parser_uses_archive_and_options() -> None:
+    parser = build_parser()
+    args = parser.parse_args(
+        ["restore", "song.cleave-tar.gz", "--as", "song-copy", "--force"]
+    )
+    assert args.archive == "song.cleave-tar.gz"
+    assert args.as_slug == "song-copy"
+    assert args.force
+
+
+def test_cmd_backup_calls_backup_project(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = _complete_project(tmp_path)
+    archive = tmp_path / "song.cleave-tar.gz"
+
+    with patch("cleave.archive.backup_project", return_value=archive.resolve()) as backup:
+        cmd_backup(
+            build_parser().parse_args(["backup", "my-track", str(tmp_path / "backups")])
+        )
+
+    backup.assert_called_once_with(
+        project.resolve(),
+        Path(tmp_path / "backups"),
+        force=False,
+    )
+    out = capsys.readouterr().out
+    assert f"Backed up to {archive.resolve()}" in out
+
+
+def test_cmd_backup_passes_force_flag(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = _complete_project(tmp_path)
+    archive = tmp_path / "song.cleave-tar.gz"
+
+    with patch("cleave.archive.backup_project", return_value=archive) as backup:
+        cmd_backup(
+            build_parser().parse_args(
+                ["backup", "my-track", str(tmp_path / "backups"), "--force"]
+            )
+        )
+
+    backup.assert_called_once_with(
+        project.resolve(),
+        Path(tmp_path / "backups"),
+        force=True,
+    )
+
+
+def test_cmd_restore_calls_restore_project(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    archive = tmp_path / "song.cleave-tar.gz"
+    restored = tmp_path / "projects" / "song"
+
+    with patch("cleave.archive.restore_project", return_value=restored.resolve()) as restore:
+        cmd_restore(
+            build_parser().parse_args(
+                ["restore", str(archive), "--as", "song-copy", "--force"]
+            )
+        )
+
+    restore.assert_called_once_with(
+        Path(archive),
+        as_slug="song-copy",
+        force=True,
+    )
+    out = capsys.readouterr().out
+    assert f"Restored to {restored.resolve()}" in out
+
+
 def test_shortcut_flags() -> None:
     parser = build_parser()
     assert parser.parse_args(["separate", "song", "-hq", "-f"]).high_quality
@@ -304,6 +396,8 @@ def test_module_help_lists_subcommands() -> None:
     assert "analyse" not in out
     assert "play" in out
     assert "render" in out
+    assert "backup" in out
+    assert "restore" in out
     assert out.startswith("usage: cleave [-h] <command> target")
     assert "target                Source audio file or cleave project" in out
     assert "{separate,play}" not in out

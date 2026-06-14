@@ -20,6 +20,7 @@ class ProjectManifest:
     original_path: str
     separated_at: str
     demucs_model: str
+    restored_from: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict) -> ProjectManifest:
@@ -30,6 +31,8 @@ class ProjectManifest:
         filename = mix.get("filename")
         if not isinstance(filename, str) or not filename:
             raise ValueError("invalid project manifest: mix.filename")
+        restored = data.get("restored-from")
+        restored_from = None if restored is None else str(restored)
         return cls(
             version=int(data["version"]),
             slug=str(data["slug"]),
@@ -37,10 +40,11 @@ class ProjectManifest:
             original_path=str(ingest["original_path"]),
             separated_at=str(ingest["separated_at"]),
             demucs_model=str(ingest["demucs_model"]),
+            restored_from=restored_from,
         )
 
     def to_dict(self) -> dict:
-        return {
+        data = {
             "version": self.version,
             "slug": self.slug,
             "mix": {"filename": self.mix_filename},
@@ -50,10 +54,36 @@ class ProjectManifest:
                 "demucs_model": self.demucs_model,
             },
         }
+        if self.restored_from is not None:
+            data["restored-from"] = self.restored_from
+        return data
 
 
 def manifest_path(project_dir: Path) -> Path:
     return project_dir / PROJECT_FILENAME
+
+
+def rewrite_manifest_slug(
+    project_dir: Path,
+    slug: str,
+    *,
+    restored_from: str | None = None,
+) -> Path:
+    """Update ``project.yaml`` *slug* and optional ``restored-from`` provenance."""
+    manifest = load_manifest(project_dir)
+    updated = ProjectManifest(
+        version=manifest.version,
+        slug=slug,
+        mix_filename=manifest.mix_filename,
+        original_path=manifest.original_path,
+        separated_at=manifest.separated_at,
+        demucs_model=manifest.demucs_model,
+        restored_from=restored_from,
+    )
+    path = manifest_path(project_dir)
+    with path.open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(updated.to_dict(), handle, sort_keys=False)
+    return path
 
 
 def load_manifest(project_dir: Path) -> ProjectManifest:
