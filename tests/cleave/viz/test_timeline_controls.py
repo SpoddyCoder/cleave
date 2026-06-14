@@ -162,6 +162,186 @@ def test_space_toggles_pause() -> None:
     assert playback.paused is False
 
 
+def test_pause_snapshots_monitor_and_sets_preview_active() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+        position_sec=5.0,
+        cues=[TimelineCue(t=0.0, layers={"drums": False})],
+    )
+    session.layers["drums"].enabled = True
+
+    controls.handle_keydown(keydown(pygame.K_SPACE))
+    assert session.timeline.preview_active is True
+    assert session.timeline.monitor == {
+        "drums": False,
+        "bass": True,
+        "vocals": True,
+        "other": True,
+    }
+    assert visibility_calls == [True]
+
+
+def test_resume_clears_preview() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls()
+    session.timeline.preview_active = True
+    session.timeline.monitor = {"drums": False}
+    controls.playback.paused = True
+
+    controls.handle_keydown(keydown(pygame.K_SPACE))
+    assert session.timeline.preview_active is False
+    assert session.timeline.monitor == {}
+    assert visibility_calls == [True]
+
+
+def test_num_keys_toggle_monitor_when_paused() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+        position_sec=3.0,
+    )
+    session.layers["drums"].enabled = True
+
+    controls.handle_keydown(keydown(pygame.K_SPACE))
+    assert session.timeline.monitor["drums"] is True
+
+    controls.handle_keydown(keydown(pygame.K_1))
+    assert session.timeline.monitor["drums"] is False
+    assert session.timeline.cues == []
+    assert session.timeline.record_buffer == []
+    assert visibility_calls == [True, True]
+
+
+def test_num_keys_ignored_when_playing_not_in_override() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls()
+    session.layers["drums"].enabled = True
+
+    controls.handle_keydown(keydown(pygame.K_1))
+    assert session.timeline.preview_active is False
+    assert session.timeline.monitor == {}
+    assert session.timeline.cues == []
+    assert session.timeline.override_stems == set()
+    assert visibility_calls == []
+
+
+def test_num_keys_toggle_override_visible_when_playing() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+        cues=[TimelineCue(t=0.0, layers={"drums": True})],
+    )
+    session.timeline.override_stems = {"drums"}
+    session.timeline.override_visible = {"drums": True}
+
+    controls.handle_keydown(keydown(pygame.K_1))
+    assert session.timeline.override_visible["drums"] is False
+    assert visibility_calls == [True]
+
+
+def test_record_from_pause_writes_wysiwyg_buffer_when_monitor_differs() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_stems={"drums"},
+        position_sec=7.0,
+    )
+    session.layers["drums"].enabled = True
+
+    controls.handle_keydown(keydown(pygame.K_SPACE))
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.handle_keydown(keydown(pygame.K_r))
+
+    assert session.timeline.recording is True
+    assert session.timeline.preview_active is False
+    assert session.timeline.monitor == {}
+    assert session.timeline.record_buffer == [
+        TimelineCue(t=7.0, layers={"drums": False})
+    ]
+
+
+def test_record_clears_override() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+        armed_stems={"drums"},
+    )
+    session.timeline.override_stems = {"bass"}
+    session.timeline.override_visible = {"bass": True}
+    session.solo_stem = "bass"
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    assert session.timeline.override_stems == set()
+    assert session.timeline.override_visible == {}
+    assert session.solo_stem == "bass"
+    assert visibility_calls == [True]
+
+
+def test_shift_enter_override_when_playing() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+        focus_row=1,
+        cues=[TimelineCue(t=0.0, layers={"bass": False})],
+    )
+
+    controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
+    assert session.solo_stem is None
+    assert session.timeline.override_stems == {"bass"}
+    assert session.timeline.override_visible == {"bass": False}
+    assert visibility_calls == [True]
+
+
+def test_shift_enter_clears_override_on_same_focused_row() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(focus_row=1)
+    session.timeline.override_stems = {"bass"}
+    session.timeline.override_visible = {"bass": True}
+
+    controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
+    assert session.timeline.override_stems == set()
+    assert session.timeline.override_visible == {}
+    assert visibility_calls == [True]
+
+
+def test_shift_enter_ignored_when_paused() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(focus_row=1)
+    controls.playback.paused = True
+
+    controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
+    assert session.timeline.override_stems == set()
+    assert visibility_calls == []
+
+
+def test_shift_enter_ignored_when_recording() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+        focus_row=1,
+        armed_stems={"drums"},
+    )
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
+    assert session.timeline.override_stems == set()
+    assert visibility_calls == [True]
+
+
+def test_shift_enter_does_not_set_session_solo_stem() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(focus_row=1)
+
+    controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
+    assert session.solo_stem is None
+    assert session.timeline.override_stems == {"bass"}
+
+
+def test_multiple_override_stems() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+        focus_row=0,
+        cues=[TimelineCue(t=0.0, layers={"drums": False, "bass": False})],
+    )
+
+    controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
+    session.timeline.focus_row = 1
+    controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
+
+    assert session.timeline.override_stems == {"drums", "bass"}
+    assert session.timeline.override_visible == {"drums": False, "bass": False}
+    assert visibility_calls == [True, True]
+
+
+def test_shift_enter_does_not_arm_focused_row() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(focus_row=1)
+
+    controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
+    assert session.timeline.override_stems == {"bass"}
+    assert session.timeline.armed_stems == set()
+
+
 def test_ctrl_seek_when_not_recording() -> None:
     controls, _, _, _, seeks, _ = _make_timeline_controls()
 

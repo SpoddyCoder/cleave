@@ -5,13 +5,24 @@ from __future__ import annotations
 import pygame
 
 from cleave.extract import STEM_NAMES
-from cleave.timeline import TimelineCue, stem_abbreviation
+from cleave.timeline import TimelineCue, layer_visible_at, stem_abbreviation
+from cleave.viz.material_icons import visibility_icon_slot_width
+from cleave.viz.overlay import render_visibility_icon
+from cleave.viz.theme import (
+    ARMED_BG,
+    DISABLED,
+    OVERRIDE_BG,
+    OVERRIDE_GLYPH,
+    OVERRIDE_GLYPH_OFF,
+    SOLO_BG,
+)
 from cleave.viz.timeline_overlay import (
     TimelineOverlay,
     TimelineViewState,
     cue_times_for_stem,
     layer_num_prefix,
     playhead_x,
+    row_prefix_width,
     stem_abbrev_label,
     stem_label_text,
     transport_time_text,
@@ -32,18 +43,122 @@ def _view_state(
     recording: bool = False,
     enabled: bool = True,
     layer_z_order: list[str] | None = None,
+    monitor_visible: dict[str, bool] | None = None,
+    timeline_visible: dict[str, bool] | None = None,
+    override_stems: set[str] | None = None,
 ) -> TimelineViewState:
+    order = list(layer_z_order or STEM_NAMES)
+    cue_list = list(cues or [])
+    default_map = dict(defaults or {stem: True for stem in STEM_NAMES})
+    if monitor_visible is None:
+        monitor_visible = {
+            stem: layer_visible_at(cue_list, default_map, stem, position_sec)
+            for stem in order
+        }
+    if timeline_visible is None:
+        timeline_visible = dict(monitor_visible)
     return TimelineViewState(
-        layer_z_order=list(layer_z_order or STEM_NAMES),
-        cues=list(cues or []),
-        defaults=dict(defaults or {stem: True for stem in STEM_NAMES}),
+        layer_z_order=order,
+        cues=cue_list,
+        defaults=default_map,
         position_sec=position_sec,
         duration_sec=duration_sec,
         focus_row=focus_row,
+        monitor_visible=monitor_visible,
+        timeline_visible=timeline_visible,
+        override_stems=set(override_stems or ()),
         armed_stems=set(armed_stems or ()),
         recording=recording,
         enabled=enabled,
     )
+
+
+def test_row_prefix_width_includes_monitor_eye_slot() -> None:
+    pygame.init()
+    font = pygame.font.SysFont("monospace", 14)
+    layer_num_w = font.render(layer_num_prefix(4), True, (255, 255, 255)).get_width()
+    abbrev_w = font.render(stem_abbrev_label("drums"), True, (255, 255, 255)).get_width()
+    row_h = 20
+    eye_slot_w = visibility_icon_slot_width(row_h)
+    assert row_prefix_width(layer_num_w, abbrev_w, row_h) == layer_num_w + abbrev_w + eye_slot_w
+
+
+def test_dual_eye_positions_monitor_left_committed_right() -> None:
+    pygame.init()
+    margin = 10
+    padding = 8
+    overlay = TimelineOverlay(margin=margin, padding=padding)
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.draw(surface, _view_state())
+
+    panel = overlay.panel_rect
+    bar_layout = overlay.bar_layout
+    assert panel is not None
+    assert bar_layout is not None
+    panel_w = panel[2]
+    bar_left, bar_width, eye_slot_w = bar_layout
+
+    monitor_eye_x = padding + overlay._layer_num_width + overlay._stem_abbrev_width
+    committed_eye_x = panel_w - padding - eye_slot_w
+    row_h = overlay.row_layout[0][4]
+
+    assert bar_left == padding + row_prefix_width(
+        overlay._layer_num_width, overlay._stem_abbrev_width, row_h
+    )
+    assert bar_width == panel_w - padding * 2 - (bar_left - padding) - eye_slot_w
+    assert committed_eye_x > monitor_eye_x + eye_slot_w
+    assert committed_eye_x + eye_slot_w <= panel_w - padding
+
+
+def test_armed_bg_matches_solo_bg() -> None:
+    assert ARMED_BG == SOLO_BG
+
+
+def test_override_visibility_icon_glyph_colors() -> None:
+    pygame.init()
+    line_h = 20
+    enabled = render_visibility_icon(enabled=True, override=True, line_height=line_h)
+    disabled = render_visibility_icon(enabled=False, override=True, line_height=line_h)
+    assert enabled.get_at((1, line_h // 2))[:3] == OVERRIDE_BG
+    assert disabled.get_at((1, line_h // 2))[:3] == OVERRIDE_BG
+    glyph_x = enabled.get_width() // 2
+    assert enabled.get_at((glyph_x, line_h // 2))[:3] == OVERRIDE_GLYPH
+    assert disabled.get_at((glyph_x, line_h // 2))[:3] == OVERRIDE_GLYPH_OFF
+    assert OVERRIDE_GLYPH_OFF == DISABLED
+
+
+def test_override_stems_use_override_bg_on_monitor_eye() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    state = _view_state(override_stems={"bass"}, focus_row=1)
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.draw(surface, state)
+
+    bass_layout = next(row for row in overlay.row_layout if row[5] == "bass")
+    _, _, row_y, _, row_h, _ = bass_layout
+    panel = overlay.panel_rect
+    assert panel is not None
+    panel_x, panel_y, _, _ = panel
+    monitor_eye_x = overlay._padding + overlay._layer_num_width + overlay._stem_abbrev_width
+    assert surface.get_at((panel_x + monitor_eye_x + 1, panel_y + row_y + row_h // 2))[:3] == OVERRIDE_BG
+
+
+def test_draw_dual_eye_state_does_not_crash() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    state = _view_state(
+        cues=[TimelineCue(t=25.0, layers={"drums": False})],
+        position_sec=25.0,
+        focus_row=1,
+        armed_stems={"bass"},
+        recording=True,
+        monitor_visible={"drums": True, "bass": False, "vocals": True, "other": True},
+        timeline_visible={"drums": False, "bass": True, "vocals": True, "other": True},
+        override_stems={"drums"},
+    )
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.draw(surface, state)
+    assert overlay.panel_rect is not None
 
 
 def test_visibility_segments_default_only() -> None:

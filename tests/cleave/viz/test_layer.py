@@ -16,6 +16,8 @@ from cleave.viz.layer import (
     _build_timeline_view_state,
     apply_layer_visibility,
     effective_layer_enabled,
+    snapshot_monitor_from_timeline,
+    timeline_committed_visible,
     timeline_cues_for_eval,
     timeline_defaults,
 )
@@ -100,6 +102,42 @@ def test_effective_layer_enabled_defaults_before_first_cue() -> None:
     assert effective_layer_enabled(session, "bass", 9.9) is True
 
 
+def test_effective_layer_enabled_override_manual_override() -> None:
+    session = _session(
+        layer_enabled={"drums": True, "bass": True, "vocals": True, "other": True},
+        timeline_enabled=True,
+        cues=[TimelineCue(t=0.0, layers={"drums": False, "bass": False})],
+    )
+    session.timeline.override_stems = {"bass"}
+    session.timeline.override_visible = {"bass": True}
+    assert effective_layer_enabled(session, "drums", 0.0, playing=True) is False
+    assert effective_layer_enabled(session, "bass", 0.0, playing=True) is True
+
+
+def test_effective_layer_enabled_override_ignored_when_paused() -> None:
+    session = _session(
+        layer_enabled={"drums": True, "bass": True, "vocals": True, "other": True},
+        timeline_enabled=True,
+        cues=[TimelineCue(t=0.0, layers={"bass": False})],
+    )
+    session.timeline.override_stems = {"bass"}
+    session.timeline.override_visible = {"bass": True}
+    assert effective_layer_enabled(session, "bass", 0.0, playing=False) is False
+
+
+def test_effective_layer_enabled_multiple_override_stems() -> None:
+    session = _session(
+        layer_enabled={"drums": True, "bass": True, "vocals": True, "other": True},
+        timeline_enabled=True,
+        cues=[TimelineCue(t=0.0, layers={"drums": False, "bass": False, "vocals": False})],
+    )
+    session.timeline.override_stems = {"drums", "bass"}
+    session.timeline.override_visible = {"drums": True, "bass": False}
+    assert effective_layer_enabled(session, "drums", 0.0, playing=True) is True
+    assert effective_layer_enabled(session, "bass", 0.0, playing=True) is False
+    assert effective_layer_enabled(session, "vocals", 0.0, playing=True) is False
+
+
 def test_effective_layer_enabled_solo_overrides_timeline() -> None:
     session = _session(
         layer_enabled={"drums": True, "bass": True, "vocals": True, "other": True},
@@ -117,6 +155,7 @@ def test_effective_layer_enabled_uses_record_buffer_while_recording() -> None:
         timeline_enabled=True,
     )
     session.timeline.recording = True
+    session.timeline.armed_stems = {"drums"}
     session.timeline.record_buffer = [TimelineCue(t=1.0, layers={"drums": False})]
     assert effective_layer_enabled(session, "drums", 1.0) is False
     assert effective_layer_enabled(session, "bass", 1.0) is True
@@ -171,3 +210,104 @@ def test_header_toggle_blocked_when_timeline_enabled() -> None:
     assert controls.session.layers["drums"].enabled is True
     view = controls.build_view_state(paused=False)
     assert view.toast_message == "Timeline controls layer visibility"
+
+
+def test_effective_layer_enabled_preview_active_uses_monitor() -> None:
+    session = _session(
+        layer_enabled={"drums": True, "bass": True, "vocals": True, "other": True},
+        timeline_enabled=True,
+        cues=[TimelineCue(t=0.0, layers={"drums": False, "bass": True})],
+    )
+    session.timeline.preview_active = True
+    session.timeline.monitor = {
+        "drums": True,
+        "bass": False,
+        "vocals": True,
+        "other": False,
+    }
+    assert effective_layer_enabled(session, "drums", 0.0) is True
+    assert effective_layer_enabled(session, "bass", 0.0) is False
+    assert effective_layer_enabled(session, "vocals", 0.0) is True
+    assert effective_layer_enabled(session, "other", 0.0) is False
+
+
+def test_effective_layer_enabled_recording_armed_vs_unarmed() -> None:
+    session = _session(
+        layer_enabled={"drums": True, "bass": True, "vocals": True, "other": True},
+        timeline_enabled=True,
+        cues=[TimelineCue(t=0.0, layers={"drums": True, "bass": False})],
+    )
+    session.timeline.recording = True
+    session.timeline.armed_stems = {"drums"}
+    session.timeline.record_buffer = [
+        TimelineCue(t=1.0, layers={"drums": False, "bass": True}),
+    ]
+    assert effective_layer_enabled(session, "drums", 1.0) is False
+    assert effective_layer_enabled(session, "bass", 1.0) is False
+
+
+def test_timeline_committed_visible_ignores_record_buffer() -> None:
+    session = _session(
+        layer_enabled={"drums": True, "bass": True, "vocals": True, "other": True},
+        timeline_enabled=True,
+        cues=[TimelineCue(t=0.0, layers={"drums": True, "bass": False})],
+    )
+    session.timeline.recording = True
+    session.timeline.armed_stems = {"drums"}
+    session.timeline.record_buffer = [
+        TimelineCue(t=1.0, layers={"drums": False, "bass": True}),
+    ]
+    assert timeline_committed_visible(session, "drums", 1.0) is True
+    assert timeline_committed_visible(session, "bass", 1.0) is False
+
+
+def test_build_timeline_view_state_populates_visibility_playing() -> None:
+    session = _session(
+        layer_enabled={"drums": True, "bass": True, "vocals": True, "other": True},
+        timeline_enabled=True,
+        cues=[TimelineCue(t=5.0, layers={"drums": False})],
+    )
+    session.timeline.override_stems = {"bass"}
+    session.timeline.override_visible = {"bass": True}
+    state = _build_timeline_view_state(session, position_sec=5.0, duration_sec=60.0)
+    assert state.monitor_visible["drums"] is False
+    assert state.monitor_visible["bass"] is True
+    assert state.timeline_visible["drums"] is False
+    assert state.timeline_visible["bass"] is True
+    assert state.override_stems == {"bass"}
+
+
+def test_build_timeline_view_state_monitor_preview_active() -> None:
+    session = _session(
+        layer_enabled={"drums": True, "bass": True, "vocals": True, "other": True},
+        timeline_enabled=True,
+        cues=[TimelineCue(t=0.0, layers={"drums": False, "bass": True})],
+    )
+    session.timeline.preview_active = True
+    session.timeline.monitor = {
+        "drums": True,
+        "bass": False,
+        "vocals": True,
+        "other": False,
+    }
+    state = _build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
+    assert state.monitor_visible == session.timeline.monitor
+    assert state.timeline_visible["drums"] is False
+    assert state.timeline_visible["bass"] is True
+
+
+def test_snapshot_monitor_from_timeline_populates_from_committed() -> None:
+    session = _session(
+        layer_enabled={"drums": False, "bass": True, "vocals": True, "other": False},
+        timeline_enabled=True,
+        cues=[
+            TimelineCue(t=2.0, layers={"drums": True, "vocals": False}),
+        ],
+    )
+    monitor = snapshot_monitor_from_timeline(session, 2.5)
+    assert monitor == {
+        "drums": True,
+        "bass": True,
+        "vocals": False,
+        "other": False,
+    }

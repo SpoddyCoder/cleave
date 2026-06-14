@@ -13,8 +13,14 @@ from cleave.timeline import (
     should_accept_toggle,
 )
 from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, TuningSession
-from cleave.viz.key_repeat import mod_ctrl
-from cleave.viz.layer import timeline_cues_for_eval, timeline_defaults
+from cleave.viz.key_repeat import mod_ctrl, mod_shift
+from cleave.viz.layer import (
+    effective_layer_enabled,
+    snapshot_monitor_from_timeline,
+    timeline_committed_visible,
+    timeline_cues_for_eval,
+    timeline_defaults,
+)
 from cleave.viz.playback import PlaybackState, current_sec, seek, toggle_pause
 
 _LAYER_KEY_INDEX: dict[int, int] = {
@@ -69,7 +75,17 @@ class TimelineControls:
             return True
 
         if event.key == pygame.K_SPACE:
+            was_paused = self.playback.paused
             toggle_pause(self.playback, self.duration_sec)
+            tl = self.session.timeline
+            if was_paused:
+                tl.preview_active = False
+                tl.monitor = {}
+            else:
+                t_sec = current_sec(self.playback, self.duration_sec)
+                tl.monitor = snapshot_monitor_from_timeline(self.session, t_sec)
+                tl.preview_active = True
+            self._refresh_visibility()
             return True
 
         if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
@@ -80,12 +96,27 @@ class TimelineControls:
                 )
             return True
 
-        if self.session.timeline.recording and event.key in _LAYER_KEY_INDEX:
-            stem = self._stem_for_layer_index(_LAYER_KEY_INDEX[event.key])
-            if stem is not None:
-                self._toggle_armed_layer_at(
-                    stem, current_sec(self.playback, self.duration_sec)
-                )
+        if event.key in _LAYER_KEY_INDEX:
+            tl = self.session.timeline
+            if tl.recording:
+                stem = self._stem_for_layer_index(_LAYER_KEY_INDEX[event.key])
+                if stem is not None:
+                    self._toggle_armed_layer_at(
+                        stem, current_sec(self.playback, self.duration_sec)
+                    )
+                return True
+
+            if tl.preview_active:
+                stem = self._stem_for_layer_index(_LAYER_KEY_INDEX[event.key])
+                if stem is not None:
+                    self._toggle_monitor_stem(stem)
+                return True
+
+            if not self.playback.paused:
+                stem = self._stem_for_layer_index(_LAYER_KEY_INDEX[event.key])
+                if stem is not None and stem in tl.override_stems:
+                    tl.override_visible[stem] = not tl.override_visible.get(stem, True)
+                    self._refresh_visibility()
             return True
 
         if event.key == pygame.K_UP:
@@ -101,6 +132,14 @@ class TimelineControls:
                     self._focused_stem(),
                     current_sec(self.playback, self.duration_sec),
                 )
+            return True
+
+        if event.key == pygame.K_RETURN and mod_shift(event.mod):
+            if (
+                not self.session.timeline.recording
+                and not self.playback.paused
+            ):
+                self._toggle_override_focused_row()
             return True
 
         if event.key == pygame.K_RETURN:
@@ -203,17 +242,34 @@ class TimelineControls:
             self._toast("Arm at least one layer to record")
             return
 
+        tl.override_stems.clear()
+        tl.override_visible.clear()
+
         t_sec = current_sec(self.playback, self.duration_sec)
+        record_buffer: list[TimelineCue] = []
+        for stem in tl.armed_stems:
+            if tl.preview_active:
+                output_visible = tl.monitor[stem]
+            else:
+                output_visible = timeline_committed_visible(self.session, stem, t_sec)
+            committed = timeline_committed_visible(self.session, stem, t_sec)
+            if output_visible != committed:
+                record_buffer.append(
+                    TimelineCue(t=t_sec, layers={stem: output_visible})
+                )
+
+        tl.preview_active = False
+        tl.monitor = {}
+
         if self.playback.paused:
             toggle_pause(self.playback, self.duration_sec)
 
         tl.recording = True
         tl.record_start_sec = t_sec
-        tl.record_buffer = []
+        tl.record_buffer = record_buffer
         self._last_toggle_t = {}
 
-        if self._on_visibility_change is not None:
-            self._on_visibility_change()
+        self._refresh_visibility()
 
     def _stop_record(self) -> None:
         tl = self.session.timeline
@@ -238,6 +294,29 @@ class TimelineControls:
 
         if self._on_visibility_change is not None:
             self._on_visibility_change()
+
+    def _refresh_visibility(self) -> None:
+        if self._on_visibility_change is not None:
+            self._on_visibility_change()
+
+    def _toggle_override_focused_row(self) -> None:
+        stem = self._focused_stem()
+        tl = self.session.timeline
+        if stem in tl.override_stems:
+            tl.override_stems.discard(stem)
+            tl.override_visible.pop(stem, None)
+        else:
+            t_sec = current_sec(self.playback, self.duration_sec)
+            tl.override_visible[stem] = effective_layer_enabled(
+                self.session, stem, t_sec, playing=True
+            )
+            tl.override_stems.add(stem)
+        self._refresh_visibility()
+
+    def _toggle_monitor_stem(self, stem: str) -> None:
+        tl = self.session.timeline
+        tl.monitor[stem] = not tl.monitor[stem]
+        self._refresh_visibility()
 
     def _toggle_armed_layer_at(self, stem: str, t_sec: float) -> None:
         tl = self.session.timeline

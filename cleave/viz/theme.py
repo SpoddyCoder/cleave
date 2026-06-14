@@ -30,7 +30,10 @@ MOVE_MODE: tuple[int, int, int] = (60, 120, 255)
 LOCK_ICON: tuple[int, int, int] = (235, 90, 90)
 LOCKED: tuple[int, int, int] = (235, 150, 150)
 SOLO_BG: tuple[int, int, int] = (200, 40, 40)
-ARMED_BG: tuple[int, int, int] = (220, 50, 50)
+OVERRIDE_BG: tuple[int, int, int] = (255, 200, 60)
+ARMED_BG: tuple[int, int, int] = SOLO_BG
+OVERRIDE_GLYPH: tuple[int, int, int] = (0, 0, 0)
+OVERRIDE_GLYPH_OFF: tuple[int, int, int] = DISABLED
 TIMELINE_FOCUS_BG: tuple[int, int, int] = (90, 160, 240)
 REC_BG: tuple[int, int, int] = (220, 0, 0)
 

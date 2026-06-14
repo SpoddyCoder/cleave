@@ -61,6 +61,9 @@ from cleave.viz.theme import (
     PANEL_CONTENT_MAX_WIDTH,
     PRESET_FILE_ICON,
     PRESET_ICON,
+    OVERRIDE_BG,
+    OVERRIDE_GLYPH,
+    OVERRIDE_GLYPH_OFF,
     SOLO_BG,
     VALUE,
 )
@@ -721,16 +724,24 @@ def _render_timeline_header_prefix() -> str:
 def render_visibility_icon(
     *,
     enabled: bool,
-    solo: bool,
+    solo: bool = False,
+    override: bool = False,
     line_height: int,
 ) -> pygame.Surface:
     glyph = VISIBILITY_GLYPH if enabled else VISIBILITY_OFF_GLYPH
-    color = VALUE if (enabled or solo) else DISABLED
+    if override:
+        color = OVERRIDE_GLYPH if enabled else OVERRIDE_GLYPH_OFF
+    elif enabled or solo:
+        color = VALUE
+    else:
+        color = DISABLED
     glyph_surf = render_glyph(glyph, color=color, line_height=line_height)
     slot_w = visibility_icon_slot_width(line_height)
     surf = pygame.Surface((slot_w, line_height), pygame.SRCALPHA)
     if solo:
         pygame.draw.rect(surf, SOLO_BG, (0, 0, slot_w, line_height))
+    elif override:
+        pygame.draw.rect(surf, OVERRIDE_BG, (0, 0, slot_w, line_height))
     surf.blit(glyph_surf, (VISIBILITY_ICON_PAD_X, 0))
     return surf
 

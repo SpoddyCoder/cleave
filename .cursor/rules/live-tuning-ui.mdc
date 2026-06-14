@@ -29,7 +29,7 @@ Below post-FX, **Render: TIMELINE** (`RowKind.RENDER_TIMELINE_HEADER`) is always
 
 ## Timeline panel
 
-Separate bottom overlay ([cleave/viz/timeline_overlay.py](cleave/viz/timeline_overlay.py), [cleave/viz/timeline_controls.py](cleave/viz/timeline_controls.py)). Open with **t** when `timeline.enabled`; **t** or **Esc** closes. While open, keyboard routes to timeline controls (main tree inactive). Rows follow `layer_z_order`; labels use stem abbreviations (D/B/V/O). **Enter** arms a row (`ARMED_BG` red fill, distinct from solo eye). **r** records toggles for armed rows only; keys **1**–**4** map to stack position (bottom = 1). Cue list persists under root `timeline:` in YAML (written last in snapshots). See [docs/timeline-idea.md](docs/timeline-idea.md).
+Separate bottom overlay ([cleave/viz/timeline_overlay.py](cleave/viz/timeline_overlay.py), [cleave/viz/timeline_controls.py](cleave/viz/timeline_controls.py)). Open with **t** when `timeline.enabled`; **t** or **Esc** closes. While open, keyboard routes to timeline controls (main tree inactive). Rows follow `layer_z_order`; labels use stem abbreviations (D/B/V/O). Each row shows a monitor eye beside the label, the cue bar, and a committed-timeline eye at the far right: **left** = monitor/output (`effective_layer_enabled`; gold `OVERRIDE_BG` when stem is in `TimelineRuntime.override_stems`), **right** = committed cues at playhead only (`timeline_committed_visible`; updates on seek while paused preview leaves left eye on `TimelineRuntime.monitor`). **Enter** arms a row (`ARMED_BG` red fill, distinct from override eye). **Space** pause copies committed timeline at playhead into `monitor` and sets `preview_active`; resume clears both. Num keys **1**-**4** toggle `monitor` while paused (all stems), write record buffer when recording (armed only), toggle `override_visible` while playing for stems in `override_stems` only. **Shift+Enter** toggles override on the focused row while playing (manual override via `override_stems` / `override_visible`; distinct from main-panel `session.solo_stem`; ignored when paused or recording). **Ctrl+Enter** toggles focused armed row at playhead during record only. Timeline strip does not use **Shift+Left** / **Shift+Right** for solo (transport seek). **r** start clears override, WYSIWYG-seeds `record_buffer` from monitor vs committed for armed stems, clears preview, unpauses if needed; stop punch-overwrites armed range. `preview_active` / `monitor` / `override_stems` / `override_visible` are session-only on `TimelineRuntime`. Cue list persists under root `timeline:` in YAML (written last in snapshots). See [docs/timeline-idea.md](docs/timeline-idea.md).
 
 ## Footer rows section
 
@@ -58,7 +58,7 @@ Colors live in [cleave/viz/theme.py](cleave/viz/theme.py). Label truncation uses
 
 **Expand arrows** (`▶` / `▼`): value role, not label. Drawn in the row value color (typically `VALUE`; follows focus, disabled, and locked state like other values).
 
-**Visibility eye** (track, render overlay, render post-FX, and render timeline headers): `VALUE` when enabled, `DISABLED` when off. When soloed (`solo_stem` for stems, `render_overlay_solo` / `render_post_fx_solo` for render blocks; neither persisted), the eye stays white on `SOLO_BG`. **Shift + Right** enters solo; **Shift + Left** exits solo for the focused header (timeline has no solo in v1).
+**Visibility eye** (track, render overlay, render post-FX, and render timeline headers): `VALUE` when enabled, `DISABLED` when off. When soloed (`solo_stem` for main-panel stems, `render_overlay_solo` / `render_post_fx_solo` for render blocks; neither persisted), the eye stays white on `SOLO_BG`. **Shift + Right** enters solo; **Shift + Left** exits solo for the focused header. **Render: TIMELINE** header has no solo; the timeline strip uses **Shift+Enter** on the focused row for override while playing (`override_stems` on `TimelineRuntime`; left eye `OVERRIDE_BG`). Timeline strip eyes use the same icon helper ([render_visibility_icon](cleave/viz/overlay.py)).
 
 ### Accent colors (not label/value roles)
 
@@ -68,6 +68,7 @@ Colors live in [cleave/viz/theme.py](cleave/viz/theme.py). Label truncation uses
 | `MOVE_MODE` | Z-order move mode text and background tint |
 | `LOCK_ICON` | Red padlock glyph on locked track headers |
 | `SOLO_BG` | Solid red background behind the visibility eye when that stem is soloed |
+| `OVERRIDE_BG` | Solid gold background behind the timeline monitor eye when that stem is in override |
 | `ARMED_BG` | Solid red row background on armed timeline rows |
 | `PRESET_ICON` / `PRESET_FILE_ICON` | Folder and file glyphs on preset rows |
 
