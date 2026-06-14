@@ -243,7 +243,7 @@ class VisualizerApp:
             _flush_all_pcm(rt.layers)
         self._was_paused = paused
 
-        apply_layer_visibility(rt.session, rt.layers_by_name, t_sec, playing=not paused)
+        apply_layer_visibility(rt.session, rt.layers_by_name, t_sec)
 
         if not paused:
             for layer in rt.layers:
@@ -300,7 +300,7 @@ class VisualizerApp:
             and rt.overlay_surface is not None
         ):
             timeline_state = _build_timeline_view_state(
-                rt.session, t_sec, rt.duration_sec, playing=not paused
+                rt.session, t_sec, rt.duration_sec
             )
             _draw_timeline_overlay(
                 rt.compositor,
