@@ -119,16 +119,6 @@ DEFAULT_RENDER_OVERLAY_START_DELAY = 10.0
 DEFAULT_RENDER_OVERLAY_DISPLAY_TIME = 30.0
 DEFAULT_RENDER_OVERLAY_POSITION: RenderOverlayPosition = "bottom-left"
 DEFAULT_RENDER_OVERLAY_FONT = "monospace"
-RENDER_OVERLAY_FONTS: tuple[str, ...] = (
-    "monospace",
-    "sans",
-    "serif",
-    "dejavusans",
-    "dejavusansmono",
-    "dejavuserif",
-    "ubuntusans",
-    "ubuntumono",
-)
 DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE = 24
 DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM = 10
 DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE = 18
@@ -404,17 +394,6 @@ def _parse_render_overlay_position(
         allowed = ", ".join(f"'{pos}'" for pos in RENDER_OVERLAY_POSITIONS)
         raise ValueError(f"{label} must be one of: {allowed}")
     return value
-
-
-def cycle_render_overlay_font(current: str, *, forward: bool) -> str:
-    fonts = RENDER_OVERLAY_FONTS
-    try:
-        index = fonts.index(current)
-    except ValueError:
-        index = 0
-    if forward:
-        return fonts[(index + 1) % len(fonts)]
-    return fonts[(index - 1) % len(fonts)]
 
 
 def _default_render_overlay_title_block() -> RenderOverlayTextBlockConfig:

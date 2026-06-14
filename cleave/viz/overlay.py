@@ -25,6 +25,7 @@ from cleave.config import (
     RenderOverlayPosition,
 )
 from cleave.effects.registry import effect_roster
+from cleave.viz.fonts import render_overlay_font_display
 from cleave.viz.confirm import ConfirmDialog, SaveChoiceDialog
 from cleave.viz.text_fit import (
     fit_counter_label_to_width,
@@ -524,7 +525,7 @@ def _row_text(state: TuningViewState, index: int) -> str:
     if kind == RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE:
         return f"└─ font size: {block_ro.title_font_size}px"
     if kind == RowKind.RENDER_OVERLAY_TITLE_FONT:
-        return f"└─ font: {block_ro.title_font}"
+        return f"└─ font: {render_overlay_font_display(block_ro.title_font)}"
     if kind == RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM:
         return f"└─ margin bottom: {block_ro.title_margin_bottom}px"
     if kind == RowKind.RENDER_OVERLAY_BODY_HEADER:
@@ -533,7 +534,7 @@ def _row_text(state: TuningViewState, index: int) -> str:
     if kind == RowKind.RENDER_OVERLAY_BODY_FONT_SIZE:
         return f"└─ font size: {block_ro.body_font_size}px"
     if kind == RowKind.RENDER_OVERLAY_BODY_FONT:
-        return f"└─ font: {block_ro.body_font}"
+        return f"└─ font: {render_overlay_font_display(block_ro.body_font)}"
     if kind == RowKind.RENDER_OVERLAY_OPACITY:
         return f"└─ background opacity: {block_ro.opacity_pct}%"
     if kind == RowKind.RENDER_OVERLAY_BORDER_WIDTH:
@@ -624,13 +625,13 @@ def _labeled_sub_row_value(state: TuningViewState, index: int) -> str:
     if kind == RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE:
         return f"{block_ro.title_font_size}px"
     if kind == RowKind.RENDER_OVERLAY_TITLE_FONT:
-        return block_ro.title_font
+        return render_overlay_font_display(block_ro.title_font)
     if kind == RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM:
         return f"{block_ro.title_margin_bottom}px"
     if kind == RowKind.RENDER_OVERLAY_BODY_FONT_SIZE:
         return f"{block_ro.body_font_size}px"
     if kind == RowKind.RENDER_OVERLAY_BODY_FONT:
-        return block_ro.body_font
+        return render_overlay_font_display(block_ro.body_font)
     if kind == RowKind.RENDER_OVERLAY_OPACITY:
         return f"{block_ro.opacity_pct}%"
     if kind == RowKind.RENDER_OVERLAY_BORDER_WIDTH:
@@ -667,9 +668,16 @@ def _fit_labeled_sub_row_value(
     *,
     max_content_width: int = PANEL_CONTENT_MAX_WIDTH,
 ) -> str:
+    kind = row_kind(state, index)
     budget = max_content_width - _row_indent(state, index)
     budget -= font.size(_labeled_sub_row_prefix(state, index))[0]
-    return fit_text_to_width(font, _labeled_sub_row_value(state, index), budget)
+    value = _labeled_sub_row_value(state, index)
+    if kind in {
+        RowKind.RENDER_OVERLAY_TITLE_FONT,
+        RowKind.RENDER_OVERLAY_BODY_FONT,
+    }:
+        return fit_counter_label_to_width(font, value, budget)
+    return fit_text_to_width(font, value, budget)
 
 
 def _render_label_value_row(

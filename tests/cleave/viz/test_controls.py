@@ -893,32 +893,43 @@ def test_render_overlay_body_header_expand_arrow() -> None:
     assert _row_text(view, body_header) == "└─ body ▼"
 
 
-def test_render_overlay_title_font_row() -> None:
+_OVERLAY_TEST_FONTS = ("alpha", "bravo", "charlie")
+
+
+@patch(
+    "cleave.viz.fonts.render_overlay_system_fonts",
+    return_value=_OVERLAY_TEST_FONTS,
+)
+def test_render_overlay_title_font_row(_mock_fonts) -> None:
     controls = _make_controls()
     controls.session.render_overlay.expanded = True
     controls.session.render_overlay.title_expanded = True
-    controls.session.render_overlay.title_font = "monospace"
+    controls.session.render_overlay.title_font = "alpha"
     view = controls.build_view_state(paused=False)
     font_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_FONT)
-    assert _row_text(view, font_row) == "└─ font: monospace"
+    assert _row_text(view, font_row) == "└─ font: alpha (1/3)"
 
     controls.focus_index = font_row
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.session.render_overlay.title_font == "sans"
+    assert controls.session.render_overlay.title_font == "bravo"
 
 
-def test_render_overlay_body_font_row() -> None:
+@patch(
+    "cleave.viz.fonts.render_overlay_system_fonts",
+    return_value=_OVERLAY_TEST_FONTS,
+)
+def test_render_overlay_body_font_row(_mock_fonts) -> None:
     controls = _make_controls()
     controls.session.render_overlay.expanded = True
     controls.session.render_overlay.body_expanded = True
-    controls.session.render_overlay.body_font = "sans"
+    controls.session.render_overlay.body_font = "bravo"
     view = controls.build_view_state(paused=False)
     font_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_FONT)
-    assert _row_text(view, font_row) == "└─ font: sans"
+    assert _row_text(view, font_row) == "└─ font: bravo (2/3)"
 
     controls.focus_index = font_row
     controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert controls.session.render_overlay.body_font == "monospace"
+    assert controls.session.render_overlay.body_font == "alpha"
 
 
 def test_render_overlay_title_font_size_row() -> None:
