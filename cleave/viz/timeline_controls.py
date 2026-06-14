@@ -8,18 +8,16 @@ import pygame
 
 from cleave.timeline import (
     TimelineCue,
-    layer_visible_at,
     punch_replace,
     should_accept_toggle,
 )
 from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, TuningSession
 from cleave.viz.key_repeat import mod_ctrl, mod_shift
 from cleave.viz.layer import (
+    armed_recording_visible,
+    build_record_punch_cues,
     effective_layer_enabled,
     snapshot_monitor_from_output,
-    timeline_committed_visible,
-    timeline_cues_for_eval,
-    timeline_defaults,
 )
 from cleave.viz.playback import PlaybackState, current_sec, seek, toggle_pause
 
@@ -253,14 +251,10 @@ class TimelineControls:
         tl.override_visible.clear()
 
         t_sec = current_sec(self.playback, self.duration_sec)
-        record_buffer: list[TimelineCue] = []
-        for stem in tl.armed_stems:
-            output_visible = effective_layer_enabled(self.session, stem, t_sec)
-            committed = timeline_committed_visible(self.session, stem, t_sec)
-            if output_visible != committed:
-                record_buffer.append(
-                    TimelineCue(t=t_sec, layers={stem: output_visible})
-                )
+        tl.record_baseline = {
+            stem: effective_layer_enabled(self.session, stem, t_sec)
+            for stem in tl.armed_stems
+        }
 
         tl.preview_active = False
         tl.monitor = {}
@@ -270,7 +264,7 @@ class TimelineControls:
 
         tl.recording = True
         tl.record_start_sec = t_sec
-        tl.record_buffer = record_buffer
+        tl.record_buffer = []
         self._last_toggle_t = {}
 
         self._refresh_visibility()
@@ -281,6 +275,7 @@ class TimelineControls:
         if record_start is None:
             tl.recording = False
             tl.record_buffer = []
+            tl.record_baseline = {}
             return
 
         record_stop = current_sec(self.playback, self.duration_sec)
@@ -289,11 +284,12 @@ class TimelineControls:
             tl.armed_stems,
             record_start,
             record_stop,
-            tl.record_buffer,
+            build_record_punch_cues(self.session, record_start),
         )
         tl.recording = False
         tl.record_start_sec = None
         tl.record_buffer = []
+        tl.record_baseline = {}
         self._last_toggle_t = {}
 
         if self._on_visibility_change is not None:
@@ -348,9 +344,7 @@ class TimelineControls:
         if not should_accept_toggle(self._last_toggle_t.get(stem), t_sec):
             return
 
-        defaults = timeline_defaults(self.session)
-        cues = timeline_cues_for_eval(self.session)
-        current = layer_visible_at(cues, defaults, stem, t_sec)
+        current = armed_recording_visible(self.session, stem, t_sec)
         tl.record_buffer.append(TimelineCue(t=t_sec, layers={stem: not current}))
         self._last_toggle_t[stem] = t_sec
 

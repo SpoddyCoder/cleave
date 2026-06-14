@@ -15,12 +15,15 @@ from cleave.viz.layer import (
     StemLayer,
     _build_timeline_view_state,
     apply_layer_visibility,
+    armed_recording_visible,
+    build_record_punch_cues,
     effective_layer_enabled,
     snapshot_monitor_from_timeline,
     timeline_committed_visible,
     timeline_cues_for_eval,
     timeline_defaults,
 )
+from cleave.viz.timeline_overlay import cue_times_for_stem
 from tests.support.viz import keydown, make_controls
 
 
@@ -242,6 +245,81 @@ def test_effective_layer_enabled_preview_active_uses_monitor() -> None:
     assert effective_layer_enabled(session, "bass", 0.0) is False
     assert effective_layer_enabled(session, "vocals", 0.0) is True
     assert effective_layer_enabled(session, "other", 0.0) is False
+
+
+def test_build_record_punch_cues_writes_baseline_only_when_it_differs() -> None:
+    session = _session(
+        layer_enabled={"drums": True, "bass": True, "vocals": True, "other": True},
+        timeline_enabled=True,
+        cues=[TimelineCue(t=0.0, layers={"drums": False})],
+    )
+    session.timeline.armed_stems = {"drums"}
+    session.timeline.record_baseline = {"drums": True}
+    session.timeline.record_buffer = [TimelineCue(t=12.0, layers={"drums": False})]
+
+    punch = build_record_punch_cues(session, record_start=10.0)
+    assert TimelineCue(t=10.0, layers={"drums": True}) in punch
+    assert TimelineCue(t=12.0, layers={"drums": False}) in punch
+
+    session.timeline.record_baseline = {"drums": False}
+    session.timeline.record_buffer = []
+    assert build_record_punch_cues(session, record_start=10.0) == []
+
+
+def test_effective_layer_enabled_recording_armed_ignores_committed_cues() -> None:
+    session = _session(
+        layer_enabled={"drums": True, "bass": True, "vocals": True, "other": True},
+        timeline_enabled=True,
+        cues=[
+            TimelineCue(t=0.0, layers={"drums": False}),
+            TimelineCue(t=11.0, layers={"drums": False}),
+        ],
+    )
+    session.timeline.recording = True
+    session.timeline.record_start_sec = 10.0
+    session.timeline.armed_stems = {"drums"}
+    session.timeline.record_baseline = {"drums": True}
+    session.timeline.record_buffer = []
+
+    assert effective_layer_enabled(session, "drums", 11.5) is True
+    assert armed_recording_visible(session, "drums", 11.5) is True
+    assert timeline_committed_visible(session, "drums", 11.5) is False
+
+
+def test_build_timeline_view_state_recording_baseline_not_in_cue_ticks() -> None:
+    session = _session(
+        layer_enabled={"drums": True, "bass": True, "vocals": True, "other": True},
+        timeline_enabled=True,
+        cues=[TimelineCue(t=0.0, layers={"drums": False})],
+    )
+    session.timeline.recording = True
+    session.timeline.record_start_sec = 10.0
+    session.timeline.armed_stems = {"drums"}
+    session.timeline.record_baseline = {"drums": True}
+    session.timeline.record_buffer = []
+
+    state = _build_timeline_view_state(session, position_sec=10.0, duration_sec=60.0)
+    assert cue_times_for_stem(state.cues, "drums", state.duration_sec) == [0.0]
+
+
+def test_build_timeline_view_state_armed_recording_monitor_ignores_committed() -> None:
+    session = _session(
+        layer_enabled={"drums": True, "bass": True, "vocals": True, "other": True},
+        timeline_enabled=True,
+        cues=[
+            TimelineCue(t=0.0, layers={"drums": False}),
+            TimelineCue(t=11.0, layers={"drums": False}),
+        ],
+    )
+    session.timeline.recording = True
+    session.timeline.record_start_sec = 10.0
+    session.timeline.armed_stems = {"drums"}
+    session.timeline.record_baseline = {"drums": True}
+    session.timeline.record_buffer = []
+
+    state = _build_timeline_view_state(session, position_sec=11.5, duration_sec=60.0)
+    assert state.monitor_visible["drums"] is True
+    assert state.timeline_visible["drums"] is False
 
 
 def test_effective_layer_enabled_recording_armed_vs_unarmed() -> None:

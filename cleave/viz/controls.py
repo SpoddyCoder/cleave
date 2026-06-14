@@ -192,6 +192,7 @@ class TimelineRuntime:
     armed_stems: set[str] = field(default_factory=set)
     recording: bool = False
     record_buffer: list[TimelineCue] = field(default_factory=list)
+    record_baseline: dict[str, bool] = field(default_factory=dict)
     record_start_sec: float | None = None
     preview_active: bool = False
     monitor: dict[str, bool] = field(default_factory=dict)

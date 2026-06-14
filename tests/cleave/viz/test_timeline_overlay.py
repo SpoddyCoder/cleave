@@ -127,6 +127,38 @@ def test_override_visibility_icon_glyph_colors() -> None:
     assert OVERRIDE_GLYPH_OFF == DISABLED
 
 
+def test_armed_recording_monitor_eye_uses_override_bg() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    state = _view_state(armed_stems={"bass"}, recording=True, focus_row=1)
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.draw(surface, state)
+
+    bass_layout = next(row for row in overlay.row_layout if row[5] == "bass")
+    _, _, row_y, _, row_h, _ = bass_layout
+    panel = overlay.panel_rect
+    assert panel is not None
+    panel_x, panel_y, _, _ = panel
+    monitor_eye_x = overlay._padding + overlay._layer_num_width + overlay._stem_abbrev_width
+    assert surface.get_at((panel_x + monitor_eye_x + 1, panel_y + row_y + row_h // 2))[:3] == OVERRIDE_BG
+
+
+def test_unarmed_recording_monitor_eye_not_override_bg() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    state = _view_state(armed_stems={"bass"}, recording=True)
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.draw(surface, state)
+
+    drums_layout = next(row for row in overlay.row_layout if row[5] == "drums")
+    _, _, row_y, _, row_h, _ = drums_layout
+    panel = overlay.panel_rect
+    assert panel is not None
+    panel_x, panel_y, _, _ = panel
+    monitor_eye_x = overlay._padding + overlay._layer_num_width + overlay._stem_abbrev_width
+    assert surface.get_at((panel_x + monitor_eye_x + 1, panel_y + row_y + row_h // 2))[:3] != OVERRIDE_BG
+
+
 def test_override_stems_use_override_bg_on_monitor_eye() -> None:
     pygame.init()
     overlay = TimelineOverlay()
@@ -141,6 +173,22 @@ def test_override_stems_use_override_bg_on_monitor_eye() -> None:
     panel_x, panel_y, _, _ = panel
     monitor_eye_x = overlay._padding + overlay._layer_num_width + overlay._stem_abbrev_width
     assert surface.get_at((panel_x + monitor_eye_x + 1, panel_y + row_y + row_h // 2))[:3] == OVERRIDE_BG
+
+
+def test_recording_baseline_does_not_draw_cue_tick() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    state = _view_state(
+        cues=[TimelineCue(t=0.0, layers={"drums": False})],
+        position_sec=10.0,
+        armed_stems={"drums"},
+        recording=True,
+        monitor_visible={"drums": True, "bass": True, "vocals": True, "other": True},
+    )
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.draw(surface, state)
+
+    assert cue_times_for_stem(state.cues, "drums", state.duration_sec) == [0.0]
 
 
 def test_draw_dual_eye_state_does_not_crash() -> None:

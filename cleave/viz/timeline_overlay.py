@@ -275,7 +275,8 @@ class TimelineOverlay:
             timeline_enabled = state.timeline_visible.get(stem, True)
             monitor_icon = render_visibility_icon(
                 enabled=monitor_enabled,
-                override=stem in state.override_stems,
+                override=stem in state.override_stems
+                or (state.recording and armed),
                 line_height=row_h,
             )
             timeline_icon = render_visibility_icon(
