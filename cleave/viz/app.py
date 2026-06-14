@@ -286,28 +286,30 @@ class VisualizerApp:
                 paused=paused,
                 position_sec=t_sec,
             )
-            rt.overlay.update(self._overlay_dt)
+            tl = rt.session.timeline
+            rt.overlay.update(
+                self._overlay_dt,
+                timeline_panel_open=tl.enabled and tl.panel_open,
+            )
             _draw_tuning_overlay(
                 rt.compositor, rt.overlay, rt.overlay_surface, view_state
             )
 
-        tl = rt.session.timeline
-        if (
-            draw_overlay
-            and tl.enabled
-            and tl.panel_open
-            and rt.timeline_overlay is not None
-            and rt.overlay_surface is not None
-        ):
-            timeline_state = _build_timeline_view_state(
-                rt.session, t_sec, rt.duration_sec
-            )
-            _draw_timeline_overlay(
-                rt.compositor,
-                rt.timeline_overlay,
-                rt.overlay_surface,
-                timeline_state,
-            )
+            if (
+                tl.enabled
+                and tl.panel_open
+                and rt.timeline_overlay is not None
+                and rt.overlay_surface is not None
+            ):
+                timeline_state = _build_timeline_view_state(
+                    rt.session, t_sec, rt.duration_sec
+                )
+                _draw_timeline_overlay(
+                    rt.compositor,
+                    rt.timeline_overlay,
+                    rt.overlay_surface,
+                    timeline_state,
+                )
 
     def run(self) -> None:
         rt = self._runtime
@@ -361,7 +363,7 @@ class VisualizerApp:
                                 rt.timeline_controls.focused_cue_index = None
                             if rt.controls.consume_hide_overlay():
                                 rt.overlay.hide_immediately()
-                            else:
+                            elif event.key != pygame.K_t:
                                 rt.overlay.notify_input()
                     elif event.type == pygame.KEYUP:
                         tl = rt.session.timeline

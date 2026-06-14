@@ -19,7 +19,7 @@ from cleave.viz.overlay import (
     row_stem,
     visible_row_indices,
 )
-from cleave.viz.theme import DISABLED, SOLO_BG, VALUE
+from cleave.viz.theme import DISABLED, HOLD_IDLE_SEC, SOLO_BG, TIMELINE_PANEL_HOLD_IDLE_SEC, VALUE
 
 
 def _effects_expanded_view_state() -> TuningViewState:
@@ -278,3 +278,21 @@ def test_hide_immediately_hides_overlay() -> None:
     overlay.hide_immediately()
     overlay.draw(surface, state)
     assert overlay.panel_rect is None
+
+
+def test_overlay_normal_hold_idle_without_timeline_panel() -> None:
+    overlay = TuningOverlay()
+    overlay.notify_input()
+    overlay.update(HOLD_IDLE_SEC - 0.1)
+    assert overlay._visibility == 1.0
+    overlay.update(0.2)
+    assert overlay._visibility < 1.0
+
+
+def test_overlay_short_hold_idle_with_timeline_panel_open() -> None:
+    overlay = TuningOverlay()
+    overlay.notify_input()
+    overlay.update(TIMELINE_PANEL_HOLD_IDLE_SEC - 0.1, timeline_panel_open=True)
+    assert overlay._visibility == 1.0
+    overlay.update(0.2, timeline_panel_open=True)
+    assert overlay._visibility < 1.0
