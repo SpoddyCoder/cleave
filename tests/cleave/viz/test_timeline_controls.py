@@ -563,6 +563,38 @@ def test_r_stop_punches_cues_and_clears_record_state() -> None:
     assert visibility_calls[-1] is True
 
 
+def test_stop_record_restores_committed_after_punch_range() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_stems={"drums"},
+        position_sec=10.0,
+        cues=[
+            TimelineCue(t=0.0, layers={"drums": False}),
+            TimelineCue(t=30.0, layers={"drums": True}),
+        ],
+    )
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.playback.player.seek(20.0)
+    controls.handle_keydown(keydown(pygame.K_r))
+
+    from cleave.timeline import layer_visible_at
+    from cleave.viz.layer import timeline_defaults
+
+    defaults = timeline_defaults(session)
+    assert layer_visible_at(session.timeline.cues, defaults, "drums", 14.9) is True
+    assert layer_visible_at(session.timeline.cues, defaults, "drums", 15.0) is True
+    assert layer_visible_at(session.timeline.cues, defaults, "drums", 19.9) is True
+    assert layer_visible_at(session.timeline.cues, defaults, "drums", 20.0) is False
+    assert layer_visible_at(session.timeline.cues, defaults, "drums", 29.9) is False
+    assert layer_visible_at(session.timeline.cues, defaults, "drums", 30.0) is True
+    restore_cues = [
+        cue for cue in session.timeline.cues if cue.t == 20.0 and "drums" in cue.layers
+    ]
+    assert len(restore_cues) == 1
+    assert restore_cues[0].show_tick is False
+
+
 def test_stop_record_preserves_unarmed_cues_in_punch_range() -> None:
     bass_cue = TimelineCue(t=12.0, layers={"bass": False})
     controls, session, _, _, _, _ = _make_timeline_controls(

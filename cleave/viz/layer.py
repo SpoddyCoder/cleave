@@ -113,11 +113,30 @@ def armed_recording_visible(
     )
 
 
+def committed_visible_outside_punch(
+    session: TuningSession,
+    stem: str,
+    record_start: float,
+    record_stop: float,
+) -> bool:
+    """Committed visibility at *record_stop* ignoring armed-stem cues inside the punch."""
+    kept = [
+        cue
+        for cue in session.timeline.cues
+        if not (
+            record_start <= cue.t <= record_stop
+            and stem in cue.layers
+        )
+    ]
+    return layer_visible_at(kept, timeline_defaults(session), stem, record_stop)
+
+
 def build_record_punch_cues(
     session: TuningSession,
     record_start: float,
+    record_stop: float,
 ) -> list[TimelineCue]:
-    """Cues to punch on record stop: baseline deltas at record start plus toggles."""
+    """Cues to punch on record stop: baseline, toggles, and committed restore at stop."""
     tl = session.timeline
     punch: list[TimelineCue] = []
     for stem in tl.armed_stems:
@@ -125,8 +144,27 @@ def build_record_punch_cues(
         if baseline is None:
             continue
         if baseline != timeline_committed_visible(session, stem, record_start):
-            punch.append(TimelineCue(t=record_start, layers={stem: baseline}))
+            punch.append(
+                TimelineCue(
+                    t=record_start,
+                    layers={stem: baseline},
+                    show_tick=False,
+                )
+            )
     punch.extend(tl.record_buffer)
+    for stem in tl.armed_stems:
+        end_visible = armed_recording_visible(session, stem, record_stop)
+        committed_at_stop = committed_visible_outside_punch(
+            session, stem, record_start, record_stop
+        )
+        if end_visible != committed_at_stop:
+            punch.append(
+                TimelineCue(
+                    t=record_stop,
+                    layers={stem: committed_at_stop},
+                    show_tick=False,
+                )
+            )
     return punch
 
 
@@ -419,7 +457,7 @@ def _build_timeline_view_state(
     }
     return TimelineViewState(
         layer_z_order=list(session.layer_z_order),
-        cues=list(timeline_cues_for_eval(session)),
+        cues=list(tl.cues),
         defaults=timeline_defaults(session),
         position_sec=position_sec,
         duration_sec=duration_sec,
@@ -429,6 +467,9 @@ def _build_timeline_view_state(
         override_stems=set(tl.override_stems),
         armed_stems=set(tl.armed_stems),
         recording=tl.recording,
+        record_start_sec=tl.record_start_sec,
+        record_baseline=dict(tl.record_baseline),
+        record_buffer=list(tl.record_buffer),
         enabled=tl.enabled,
     )
 
