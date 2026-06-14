@@ -143,6 +143,38 @@ def test_rec_flash_visible_alternates_every_500ms() -> None:
     assert rec_flash_visible(1000) is True
 
 
+def test_armed_recording_monitor_eye_flashes_when_focused(monkeypatch) -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    state = _view_state(armed_stems={"bass"}, recording=True, focus_row=1)
+
+    monkeypatch.setattr(
+        "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: True
+    )
+    surface_on = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.draw(surface_on, state)
+
+    monkeypatch.setattr(
+        "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: False
+    )
+    surface_off = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.draw(surface_off, state)
+
+    bass_layout = next(row for row in overlay.row_layout if row[5] == "bass")
+    _, _, row_y, _, row_h, _ = bass_layout
+    panel = overlay.panel_rect
+    assert panel is not None
+    panel_x, panel_y, _, _ = panel
+    monitor_eye_x = overlay._padding + overlay._layer_num_width + overlay._stem_abbrev_width
+    sample = (panel_x + monitor_eye_x + 1, panel_y + row_y + row_h // 2)
+    flash_on = surface_on.get_at(sample)[:3]
+    flash_off = surface_off.get_at(sample)[:3]
+
+    assert flash_on == OVERRIDE_BG
+    assert flash_off != OVERRIDE_BG
+    assert flash_on != flash_off
+
+
 def test_armed_recording_monitor_eye_uses_override_bg_when_flash_on(monkeypatch) -> None:
     monkeypatch.setattr(
         "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: True

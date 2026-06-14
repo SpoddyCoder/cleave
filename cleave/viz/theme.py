@@ -34,7 +34,7 @@ OVERRIDE_BG: tuple[int, int, int] = (255, 200, 60)
 ARMED_BG: tuple[int, int, int] = SOLO_BG
 OVERRIDE_GLYPH: tuple[int, int, int] = (0, 0, 0)
 OVERRIDE_GLYPH_OFF: tuple[int, int, int] = DISABLED
-TIMELINE_FOCUS_BG: tuple[int, int, int] = (90, 160, 240)
+FOCUS_ROW_BG_ALPHA: int = 50
 REC_BG: tuple[int, int, int] = (220, 0, 0)
 
 BORDER_WIDTH: int = 2

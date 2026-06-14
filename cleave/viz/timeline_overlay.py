@@ -16,16 +16,15 @@ from cleave.viz.theme import (
     BACKGROUND_ALPHA,
     BORDER_COLOR,
     BORDER_WIDTH,
+    FOCUS_ROW_BG_ALPHA,
     HIGHLIGHT,
     LABEL,
     REC_BG,
-    TIMELINE_FOCUS_BG,
     VALUE,
 )
 
 PANEL_HEIGHT_FRACTION: float = 0.2
 OFF_SEGMENT_COLOR: tuple[int, int, int] = (40, 40, 40)
-FOCUS_BG_ALPHA: int = 160
 ARMED_BG_ALPHA: int = 220
 CUE_TICK_ALPHA: int = 120
 PLAYHEAD_WIDTH: int = 2
@@ -330,19 +329,10 @@ class TimelineOverlay:
             stem_abbrev_x = layer_num_x + self._layer_num_width
             monitor_eye_x = stem_abbrev_x + self._stem_abbrev_width
 
-            layer_num_bg_rect = pygame.Rect(
-                layer_num_x,
-                row_y,
-                self._layer_num_width,
-                row_h,
-            )
-
             if focused:
-                focus_surf = pygame.Surface(
-                    (layer_num_bg_rect.w, layer_num_bg_rect.h), pygame.SRCALPHA
-                )
-                focus_surf.fill((*TIMELINE_FOCUS_BG, FOCUS_BG_ALPHA))
-                panel.blit(focus_surf, layer_num_bg_rect.topleft)
+                focus_surf = pygame.Surface((row_rect.w, row_rect.h), pygame.SRCALPHA)
+                focus_surf.fill((*HIGHLIGHT, FOCUS_ROW_BG_ALPHA))
+                panel.blit(focus_surf, row_rect.topleft)
 
             abbrev_rect = pygame.Rect(
                 stem_abbrev_x, row_y, self._stem_abbrev_width, row_h
@@ -352,7 +342,12 @@ class TimelineOverlay:
                 armed_surf.fill((*ARMED_BG, ARMED_BG_ALPHA))
                 panel.blit(armed_surf, abbrev_rect.topleft)
 
-            label_color = VALUE if (armed or focused) else LABEL
+            if focused:
+                label_color = HIGHLIGHT
+            elif armed:
+                label_color = VALUE
+            else:
+                label_color = LABEL
             num_surf = font.render(layer_num_prefix(layer_num), True, label_color)
             abbrev_surf = font.render(stem_abbrev_label(stem), True, label_color)
             num_y = row_y + max(0, (row_h - num_surf.get_height()) // 2)

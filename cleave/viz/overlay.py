@@ -52,6 +52,7 @@ from cleave.viz.theme import (
     BORDER_WIDTH,
     DISABLED,
     FADE_DURATION_SEC,
+    FOCUS_ROW_BG_ALPHA,
     HIGHLIGHT,
     HOLD_IDLE_SEC,
     LABEL,
@@ -1324,7 +1325,7 @@ class TuningOverlay:
             assert surf is not None
             bg = _row_bg_color(state, index)
             if bg is not None:
-                bg_alpha = int(50 * self._visibility)
+                bg_alpha = int(FOCUS_ROW_BG_ALPHA * self._visibility)
                 if bg_alpha >= 2:
                     bg_surf = pygame.Surface((panel_w - self._padding * 2, line_h), pygame.SRCALPHA)
                     bg_surf.fill((*bg, bg_alpha))
