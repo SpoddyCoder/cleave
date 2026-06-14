@@ -142,37 +142,115 @@ class GlCompositor:
 
     Layer blend mode ``black-key`` treats each pixel's RGB as its compositing
     weight (black is fully transparent). The tuning overlay uses SRCALPHA blending.
+
+    When display dimensions differ from content (upscale > 1), stem composite and
+    post-FX render into a content FBO; ``present_content()`` blits to the window.
     """
 
     def __init__(
         self,
-        output_width: int = 1280,
-        output_height: int = 720,
+        content_width: int = 1280,
+        content_height: int = 720,
+        *,
+        display_width: int | None = None,
+        display_height: int | None = None,
         bg: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0),
     ) -> None:
-        self.output_width = output_width
-        self.output_height = output_height
+        self.content_width = content_width
+        self.content_height = content_height
+        self.display_width = (
+            display_width if display_width is not None else content_width
+        )
+        self.display_height = (
+            display_height if display_height is not None else content_height
+        )
         self.bg = bg
         self._initialized = False
         self._layers: list[LayerFbo] = []
         self._overlay_texture_id: int = 0
         self._overlay_texture_size: tuple[int, int] | None = None
+        self._content_fbo_id: int = 0
+        self._content_texture_id: int = 0
+        self._content_depth_rbo_id: int = 0
+
+    @property
+    def _uses_content_fbo(self) -> bool:
+        return (self.display_width, self.display_height) != (
+            self.content_width,
+            self.content_height,
+        )
 
     def init(self) -> None:
         """Initialize GL state after a pygame OPENGL context exists."""
         self.setup_gl_state()
+        if self._uses_content_fbo:
+            self._allocate_content_fbo()
         self._initialized = True
 
     def setup_gl_state(self) -> None:
         glEnable(GL_BLEND)
         glEnable(GL_TEXTURE_2D)
         glDisable(GL_DEPTH_TEST)
-        glViewport(0, 0, self.output_width, self.output_height)
+        self._set_display_projection()
+        glViewport(0, 0, self.display_width, self.display_height)
+
+    def _set_content_projection(self) -> None:
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
-        glOrtho(0, self.output_width, self.output_height, 0, -1, 1)
+        glOrtho(0, self.content_width, self.content_height, 0, -1, 1)
         glMatrixMode(GL_MODELVIEW)
         glLoadIdentity()
+
+    def _set_display_projection(self) -> None:
+        glMatrixMode(GL_PROJECTION)
+        glLoadIdentity()
+        glOrtho(0, self.display_width, self.display_height, 0, -1, 1)
+        glMatrixMode(GL_MODELVIEW)
+        glLoadIdentity()
+
+    def _allocate_content_fbo(self) -> None:
+        width = self.content_width
+        height = self.content_height
+        texture_id = self._create_rgba_texture(width, height)
+        depth_rbo_id = _gl_name(glGenRenderbuffers)
+        glBindRenderbuffer(GL_RENDERBUFFER, depth_rbo_id)
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height)
+
+        fbo_id = _gl_name(glGenFramebuffers)
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo_id)
+        glFramebufferTexture2D(
+            GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture_id, 0
+        )
+        glFramebufferRenderbuffer(
+            GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth_rbo_id
+        )
+        status = glCheckFramebufferStatus(GL_FRAMEBUFFER)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        glBindRenderbuffer(GL_RENDERBUFFER, 0)
+        glBindTexture(GL_TEXTURE_2D, 0)
+
+        if status != GL_FRAMEBUFFER_COMPLETE:
+            glDeleteTextures(1, [texture_id])
+            glDeleteRenderbuffers(1, [depth_rbo_id])
+            glDeleteFramebuffers(1, [fbo_id])
+            raise RuntimeError(
+                f"content FBO incomplete ({width}x{height}): status 0x{status:x}"
+            )
+
+        self._content_fbo_id = fbo_id
+        self._content_texture_id = texture_id
+        self._content_depth_rbo_id = depth_rbo_id
+
+    def _destroy_content_fbo(self) -> None:
+        if self._content_texture_id:
+            glDeleteTextures(1, [self._content_texture_id])
+            self._content_texture_id = 0
+        if self._content_depth_rbo_id:
+            glDeleteRenderbuffers(1, [self._content_depth_rbo_id])
+            self._content_depth_rbo_id = 0
+        if self._content_fbo_id:
+            glDeleteFramebuffers(1, [self._content_fbo_id])
+            self._content_fbo_id = 0
 
     def _ensure_init(self) -> None:
         if not self._initialized:
@@ -290,11 +368,22 @@ class GlCompositor:
         self._layers.append(layer)
         return layer
 
+    def _bind_content_target(self) -> None:
+        if self._uses_content_fbo:
+            glBindFramebuffer(GL_FRAMEBUFFER, self._content_fbo_id)
+            glUseProgram(0)
+            glEnable(GL_TEXTURE_2D)
+            glViewport(0, 0, self.content_width, self.content_height)
+            self._set_content_projection()
+        else:
+            self._bind_default_framebuffer()
+
     def _bind_default_framebuffer(self) -> None:
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glUseProgram(0)
         glEnable(GL_TEXTURE_2D)
-        glViewport(0, 0, self.output_width, self.output_height)
+        glViewport(0, 0, self.display_width, self.display_height)
+        self._set_display_projection()
 
     @staticmethod
     def _lerp_tint_rgb(
@@ -397,7 +486,7 @@ class GlCompositor:
         if layer.opacity <= 0.0 and layer.flash_alpha < 0.01:
             return
         self._ensure_init()
-        self._bind_default_framebuffer()
+        self._bind_content_target()
         if layer.opacity > 0.0:
             glEnable(GL_BLEND)
             self._apply_layer_blend_mode(layer.blend_mode)
@@ -407,8 +496,8 @@ class GlCompositor:
                 layer.texture_id,
                 0.0,
                 0.0,
-                self.output_width,
-                self.output_height,
+                self.content_width,
+                self.content_height,
                 rgba,
             )
         if layer.flash_alpha >= 0.01:
@@ -421,8 +510,8 @@ class GlCompositor:
                 self._draw_solid_quad(
                     0.0,
                     0.0,
-                    self.output_width,
-                    self.output_height,
+                    self.content_width,
+                    self.content_height,
                     (240 / 255.0, 235 / 255.0, 230 / 255.0, layer.flash_alpha),
                 )
             finally:
@@ -434,18 +523,18 @@ class GlCompositor:
     def composite(self, layers: list[LayerFbo]) -> None:
         """Clear to background and stack *layers* bottom-to-top."""
         self._ensure_init()
-        self._bind_default_framebuffer()
+        self._bind_content_target()
         glClearColor(*self.bg)
         glClear(GL_COLOR_BUFFER_BIT)
         for layer in layers:
             self.draw_layer(layer)
 
     def apply_frame_fade(self, alpha: float) -> None:
-        """Multiply default-FBO RGB by *alpha* (render fade in/out)."""
+        """Multiply content-target RGB by *alpha* (render fade in/out)."""
         if alpha >= 1.0:
             return
         self._ensure_init()
-        self._bind_default_framebuffer()
+        self._bind_content_target()
         if alpha <= 0.0:
             glClearColor(0.0, 0.0, 0.0, 1.0)
             glClear(GL_COLOR_BUFFER_BIT)
@@ -458,19 +547,36 @@ class GlCompositor:
             self._draw_solid_quad(
                 0.0,
                 0.0,
-                self.output_width,
-                self.output_height,
+                self.content_width,
+                self.content_height,
                 (alpha, alpha, alpha, 1.0),
             )
         finally:
             self._pop_blend_state(blend_enabled, blend_src, blend_dst, blend_equation)
             glColor4f(1.0, 1.0, 1.0, 1.0)
 
+    def present_content(self) -> None:
+        """Blit content FBO to the default framebuffer at display size."""
+        self._ensure_init()
+        if not self._uses_content_fbo:
+            return
+        self._bind_default_framebuffer()
+        glDisable(GL_BLEND)
+        self._draw_textured_quad(
+            self._content_texture_id,
+            0.0,
+            0.0,
+            self.display_width,
+            self.display_height,
+            (1.0, 1.0, 1.0, 1.0),
+        )
+        glEnable(GL_BLEND)
+
     def read_rgba_frame(self) -> bytes:
         """Read RGBA pixels from the default framebuffer for ffmpeg rawvideo."""
         self._ensure_init()
-        width = self.output_width
-        height = self.output_height
+        width = self.display_width
+        height = self.display_height
         raw = glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE)
         row_stride = width * 4
         rows = [
@@ -547,6 +653,7 @@ class GlCompositor:
         for layer in self._layers:
             layer.destroy()
         self._layers.clear()
+        self._destroy_content_fbo()
         if self._overlay_texture_id:
             glDeleteTextures(1, [self._overlay_texture_id])
             self._overlay_texture_id = 0

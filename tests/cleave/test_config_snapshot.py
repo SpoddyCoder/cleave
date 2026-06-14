@@ -303,6 +303,46 @@ def test_write_session_snapshot_falls_back_to_cfg_z_order_when_invalid() -> None
         assert data["layer_z_order"] == list(cfg_order)
 
 
+def test_write_session_snapshot_includes_upscale() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        preset_root = root / "presets"
+        for name in STEM_NAMES:
+            stem_dir = preset_root / name
+            stem_dir.mkdir(parents=True)
+            (stem_dir / "anchor.milk").write_text("milk")
+
+        config_path = root / "cleave.config.yaml"
+        config_path.write_text("layers: {}\n")
+
+        cfg = CleaveConfig(
+            paths=PathsConfig(preset_root=preset_root, texture_paths=(root / "tex",)),
+            layers={
+                name: LayerConfig(preset=preset_root / name / "anchor.milk")
+                for name in STEM_NAMES
+            },
+            visualizer=VisualizerConfig(width=1280, height=720, upscale=2.0),
+            config_path=config_path,
+        )
+
+        session = TuningSession(
+            layer_z_order=list(STEM_NAMES),
+            layers={
+                name: LayerRuntime(
+                    playlist=playlist_at_dir(preset_root / name, index=0),
+                    browse_floor=preset_root / name,
+                )
+                for name in STEM_NAMES
+            },
+        )
+
+        out_path = root / "snapshot.yaml"
+        write_session_snapshot(out_path, cfg=cfg, session=session)
+
+        data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+        assert data["visualizer"]["upscale"] == 2.0
+
+
 def test_write_session_snapshot_sparse_beat_sensitivity() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)

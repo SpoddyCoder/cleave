@@ -57,6 +57,9 @@ class VisualizerRuntime:
     audio_path: Path
     width: int
     height: int
+    upscale: float
+    display_width: int
+    display_height: int
     fps: int
     window_title: str
     session: TuningSession
@@ -96,6 +99,9 @@ def build_runtime_full(
         audio_path=audio_path,
         width=cfg.visualizer.width,
         height=cfg.visualizer.height,
+        upscale=cfg.visualizer.upscale,
+        display_width=cfg.visualizer.display_width,
+        display_height=cfg.visualizer.display_height,
         fps=fps,
         window_title=f"Cleave — {project_dir.name}",
         session=_session_from_cfg(cfg, playlists),
@@ -111,7 +117,12 @@ def build_runtime_full(
 
 
 def _init_gl_resources(runtime: VisualizerRuntime) -> None:
-    compositor = GlCompositor(runtime.width, runtime.height)
+    compositor = GlCompositor(
+        runtime.width,
+        runtime.height,
+        display_width=runtime.display_width,
+        display_height=runtime.display_height,
+    )
     compositor.init()
     post_process = GlPostProcess()
     post_process.init()
@@ -159,13 +170,18 @@ def _init_gl_resources(runtime: VisualizerRuntime) -> None:
     runtime.overlay = TuningOverlay()
     runtime.timeline_overlay = TimelineOverlay()
     runtime.overlay_surface = pygame.Surface(
-        (runtime.width, runtime.height), pygame.SRCALPHA
+        (runtime.display_width, runtime.display_height), pygame.SRCALPHA
     )
     runtime.playback = playback
 
 
 def _init_gl_resources_render(runtime: VisualizerRuntime) -> None:
-    compositor = GlCompositor(runtime.width, runtime.height)
+    compositor = GlCompositor(
+        runtime.width,
+        runtime.height,
+        display_width=runtime.display_width,
+        display_height=runtime.display_height,
+    )
     compositor.init()
     post_process = GlPostProcess()
     post_process.init()
@@ -282,6 +298,7 @@ class VisualizerApp:
             )
             rt.compositor.apply_frame_fade(frame_fade_alpha)
             _composite_live_render_overlay(rt, t_sec)
+            rt.compositor.present_content()
             view_state = rt.controls.build_view_state(
                 paused=paused,
                 position_sec=t_sec,
@@ -309,6 +326,7 @@ class VisualizerApp:
                     rt.timeline_overlay,
                     rt.overlay_surface,
                     timeline_state,
+                    rt.height,
                 )
 
     def run(self) -> None:
@@ -318,7 +336,7 @@ class VisualizerApp:
 
         try:
             pygame.display.set_mode(
-                (rt.width, rt.height), pygame.OPENGL | pygame.DOUBLEBUF
+                (rt.display_width, rt.display_height), pygame.OPENGL | pygame.DOUBLEBUF
             )
         except pygame.error as exc:
             print(f"error: failed to open OpenGL window: {exc}", file=sys.stderr)

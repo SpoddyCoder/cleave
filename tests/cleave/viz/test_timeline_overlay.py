@@ -81,6 +81,20 @@ def _view_state(
     )
 
 
+def _draw(
+    overlay: TimelineOverlay,
+    surface: pygame.Surface,
+    state: TimelineViewState,
+    *,
+    content_height: int | None = None,
+) -> None:
+    overlay.draw(
+        surface,
+        state,
+        content_height=content_height if content_height is not None else surface.get_height(),
+    )
+
+
 def test_row_prefix_width_includes_monitor_eye_slot() -> None:
     pygame.init()
     font = pygame.font.SysFont("monospace", 14)
@@ -97,7 +111,7 @@ def test_dual_eye_positions_monitor_left_committed_right() -> None:
     padding = 8
     overlay = TimelineOverlay(margin=margin, padding=padding)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.draw(surface, _view_state())
+    _draw(overlay, surface, _view_state())
 
     panel = overlay.panel_rect
     bar_layout = overlay.bar_layout
@@ -152,13 +166,13 @@ def test_armed_recording_monitor_eye_flashes_when_focused(monkeypatch) -> None:
         "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: True
     )
     surface_on = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.draw(surface_on, state)
+    _draw(overlay, surface_on, state)
 
     monkeypatch.setattr(
         "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: False
     )
     surface_off = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.draw(surface_off, state)
+    _draw(overlay, surface_off, state)
 
     bass_layout = next(row for row in overlay.row_layout if row[5] == "bass")
     _, _, row_y, _, row_h, _ = bass_layout
@@ -183,7 +197,7 @@ def test_armed_recording_monitor_eye_uses_override_bg_when_flash_on(monkeypatch)
     overlay = TimelineOverlay()
     state = _view_state(armed_stems={"bass"}, recording=True, focus_row=1)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.draw(surface, state)
+    _draw(overlay, surface, state)
 
     bass_layout = next(row for row in overlay.row_layout if row[5] == "bass")
     _, _, row_y, _, row_h, _ = bass_layout
@@ -202,7 +216,7 @@ def test_armed_recording_monitor_eye_hides_override_bg_when_flash_off(monkeypatc
     overlay = TimelineOverlay()
     state = _view_state(armed_stems={"bass"}, recording=True, focus_row=1)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.draw(surface, state)
+    _draw(overlay, surface, state)
 
     bass_layout = next(row for row in overlay.row_layout if row[5] == "bass")
     _, _, row_y, _, row_h, _ = bass_layout
@@ -231,7 +245,7 @@ def test_armed_recording_abbrev_flashes_with_rec(monkeypatch) -> None:
     overlay = TimelineOverlay()
     state = _view_state(armed_stems={"bass"}, recording=True, focus_row=0)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.draw(surface, state)
+    _draw(overlay, surface, state)
 
     bass_layout = next(row for row in overlay.row_layout if row[5] == "bass")
     _, _, row_y, _, row_h, _ = bass_layout
@@ -241,7 +255,7 @@ def test_armed_recording_abbrev_flashes_with_rec(monkeypatch) -> None:
         "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: False
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.draw(surface, state)
+    _draw(overlay, surface, state)
     flash_off = _abbrev_bg_pixel(surface, overlay, row_y, row_h)
 
     assert flash_on[0] > flash_off[0] + 40
@@ -253,13 +267,13 @@ def test_armed_not_recording_abbrev_always_red() -> None:
     overlay = TimelineOverlay()
     armed_state = _view_state(armed_stems={"bass"}, recording=False, focus_row=0)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.draw(surface, armed_state)
+    _draw(overlay, surface, armed_state)
 
     bass_layout = next(row for row in overlay.row_layout if row[5] == "bass")
     _, _, row_y, _, row_h, _ = bass_layout
     armed_color = _abbrev_bg_pixel(surface, overlay, row_y, row_h)
 
-    overlay.draw(surface, _view_state(armed_stems=set(), recording=False, focus_row=0))
+    _draw(overlay, surface, _view_state(armed_stems=set(), recording=False, focus_row=0))
     unarmed_color = _abbrev_bg_pixel(surface, overlay, row_y, row_h)
 
     assert armed_color[0] > unarmed_color[0] + 40
@@ -271,7 +285,7 @@ def test_unarmed_recording_monitor_eye_not_override_bg() -> None:
     overlay = TimelineOverlay()
     state = _view_state(armed_stems={"bass"}, recording=True)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.draw(surface, state)
+    _draw(overlay, surface, state)
 
     drums_layout = next(row for row in overlay.row_layout if row[5] == "drums")
     _, _, row_y, _, row_h, _ = drums_layout
@@ -287,7 +301,7 @@ def test_override_stems_use_override_bg_on_monitor_eye() -> None:
     overlay = TimelineOverlay()
     state = _view_state(override_stems={"bass"}, focus_row=1)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.draw(surface, state)
+    _draw(overlay, surface, state)
 
     bass_layout = next(row for row in overlay.row_layout if row[5] == "bass")
     _, _, row_y, _, row_h, _ = bass_layout
@@ -311,7 +325,7 @@ def test_recording_baseline_does_not_draw_cue_tick() -> None:
         monitor_visible={"drums": True, "bass": True, "vocals": True, "other": True},
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.draw(surface, state)
+    _draw(overlay, surface, state)
 
     assert bar_tick_times_for_row(state, "drums") == [0.0]
 
@@ -330,7 +344,7 @@ def test_draw_dual_eye_state_does_not_crash() -> None:
         override_stems={"drums"},
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.draw(surface, state)
+    _draw(overlay, surface, state)
     assert overlay.panel_rect is not None
 
 
@@ -428,7 +442,7 @@ def test_draw_does_not_crash() -> None:
         recording=True,
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.draw(surface, state)
+    _draw(overlay, surface, state)
 
     panel = overlay.panel_rect
     assert panel is not None
@@ -444,7 +458,7 @@ def test_draw_skipped_when_disabled() -> None:
     overlay = TimelineOverlay()
     state = _view_state(enabled=False)
     surface = pygame.Surface((640, 360), pygame.SRCALPHA)
-    overlay.draw(surface, state)
+    _draw(overlay, surface, state)
     assert overlay.panel_rect is None
 
 
@@ -453,7 +467,7 @@ def test_armed_row_layout_recorded() -> None:
     overlay = TimelineOverlay()
     state = _view_state(armed_stems={"drums"}, layer_z_order=list(STEM_NAMES))
     surface = pygame.Surface((800, 400), pygame.SRCALPHA)
-    overlay.draw(surface, state)
+    _draw(overlay, surface, state)
 
     drums_layout = next(row for row in overlay.row_layout if row[5] == "drums")
     row_index, x, y, w, h, stem = drums_layout
@@ -468,7 +482,7 @@ def test_focus_row_index_matches_stem() -> None:
     overlay = TimelineOverlay()
     state = _view_state(focus_row=2, layer_z_order=list(STEM_NAMES))
     surface = pygame.Surface((800, 400), pygame.SRCALPHA)
-    overlay.draw(surface, state)
+    _draw(overlay, surface, state)
 
     vocals_layout = next(row for row in overlay.row_layout if row[5] == "vocals")
     assert vocals_layout[0] == 2
@@ -486,7 +500,7 @@ def test_header_badge_rect_is_above_panel() -> None:
     overlay = TimelineOverlay()
     state = _view_state(position_sec=30.0)
     surface = pygame.Surface((800, 400), pygame.SRCALPHA)
-    overlay.draw(surface, state)
+    _draw(overlay, surface, state)
 
     panel = overlay.panel_rect
     header = overlay.header_badge_rect
@@ -502,11 +516,39 @@ def test_header_badge_wider_when_recording() -> None:
     overlay = TimelineOverlay()
     surface = pygame.Surface((800, 400), pygame.SRCALPHA)
 
-    overlay.draw(surface, _view_state(position_sec=0.0, recording=False))
+    _draw(overlay, surface, _view_state(position_sec=0.0, recording=False))
     idle_w = overlay.header_badge_rect
     assert idle_w is not None
 
-    overlay.draw(surface, _view_state(position_sec=0.0, recording=True))
+    _draw(overlay, surface, _view_state(position_sec=0.0, recording=True))
     rec_w = overlay.header_badge_rect
     assert rec_w is not None
     assert rec_w[2] > idle_w[2]
+
+
+def test_upscale_expands_bar_width_not_row_height() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    state = _view_state()
+    content_height = 720
+
+    baseline_surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    _draw(overlay, baseline_surface, state, content_height=content_height)
+    baseline_panel = overlay.panel_rect
+    baseline_row_h = overlay.row_layout[0][4]
+    _, baseline_bar_width, _ = overlay.bar_layout
+    assert baseline_panel is not None
+    assert overlay.bar_layout is not None
+
+    upscaled_surface = pygame.Surface((2560, 1440), pygame.SRCALPHA)
+    _draw(overlay, upscaled_surface, state, content_height=content_height)
+    upscaled_panel = overlay.panel_rect
+    upscaled_row_h = overlay.row_layout[0][4]
+    _, upscaled_bar_width, _ = overlay.bar_layout
+    assert upscaled_panel is not None
+    assert overlay.bar_layout is not None
+
+    assert upscaled_row_h == baseline_row_h
+    assert upscaled_panel[3] == baseline_panel[3]
+    assert upscaled_bar_width > baseline_bar_width
+    assert upscaled_panel[2] > baseline_panel[2]
