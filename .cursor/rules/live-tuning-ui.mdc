@@ -37,7 +37,7 @@ The lower block after a visual gap (`footer_gap` in `draw()`): `footer_row_count
 
 - Row kinds: `RowKind.TRANSPORT`, `RowKind.CONFIG_HEADER` (non-navigable active config path), `SAVE_CONFIG`.
 - Constant: `FOOTER_ROWS` (3); index via `footer_index = index - track_row_count(state)`.
-- Enter on `SAVE_CONFIG` opens an `OVERWRITE` / `SAVE AS NEW` picker when overwrite is allowed (`allow_overwrite`; false for repo-root `cleave-viz-default.yaml`). Otherwise save-as-new runs immediately. Overwrite still uses the yes/no confirm dialog.
+- Enter on `SAVE_CONFIG` opens an `OVERWRITE` / `SAVE AS NEW` picker when overwrite is allowed (`allow_overwrite`; false for repo-root `cleave-viz.yaml`). Otherwise save-as-new runs immediately. Overwrite still uses the yes/no confirm dialog.
 
 ## Whole panel
 

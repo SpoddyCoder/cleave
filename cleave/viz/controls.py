@@ -22,8 +22,7 @@ from cleave.config import (
     DEFAULT_RENDER_OVERLAY_START_DELAY,
     DEFAULT_RENDER_POST_FX_FADE_IN,
     DEFAULT_RENDER_POST_FX_FADE_OUT,
-    DEFAULT_VIZ_CONFIG_FILENAME,
-    PROJECT_VIZ_CONFIG_FILENAME,
+    VIZ_CONFIG_FILENAME,
     RENDER_OVERLAY_POSITIONS,
     RenderOverlayPosition,
     clamp_beat_sensitivity,
@@ -114,7 +113,7 @@ _DEFAULT_SAVE_FILENAME = "unnamed-1.yaml"
 
 def config_path_display(path: Path | None) -> str:
     """Active config path for the footer header (truncation happens at draw time)."""
-    return path.as_posix() if path is not None else PROJECT_VIZ_CONFIG_FILENAME
+    return path.as_posix() if path is not None else VIZ_CONFIG_FILENAME
 
 
 def allow_overwrite_for_path(
@@ -122,7 +121,7 @@ def allow_overwrite_for_path(
     *,
     repo_root_example: Path,
 ) -> bool:
-    """Hide overwrite only for the repo-root template cleave-viz-default.yaml."""
+    """Hide overwrite only for the repo-root template cleave-viz.yaml."""
     if active_path is None:
         return False
     return active_path.resolve() != repo_root_example.resolve()
@@ -263,7 +262,7 @@ class TuningControls:
         self._repo_root_example = (
             repo_root_example
             if repo_root_example is not None
-            else Path(DEFAULT_VIZ_CONFIG_FILENAME)
+            else Path(VIZ_CONFIG_FILENAME)
         )
         self._on_preset_change = on_preset_change
         self._on_blend_change = on_blend_change
@@ -1120,12 +1119,12 @@ class TuningControls:
         basename = (
             active_path.name
             if active_path is not None
-            else PROJECT_VIZ_CONFIG_FILENAME
+            else VIZ_CONFIG_FILENAME
         )
         message = f"Overwrite {basename}?"
 
         def on_confirm() -> None:
-            target = active_path or Path(PROJECT_VIZ_CONFIG_FILENAME)
+            target = active_path or Path(VIZ_CONFIG_FILENAME)
             if self._on_overwrite_config is not None:
                 written = self._on_overwrite_config(target)
             else:

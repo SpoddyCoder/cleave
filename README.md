@@ -67,7 +67,7 @@ git clone https://github.com/projectM-visualizer/presets-milkdrop-original
 git clone https://github.com/projectM-visualizer/presets-milkdrop-texture-pack
 ```
 
-`preset_root` is defined in [cleave-viz-default.yaml](./cleave-viz-default.yaml)
+`preset_root` is defined in [cleave-viz.yaml](./cleave-viz.yaml)
 
 ### `cleave` a track
 
@@ -118,7 +118,7 @@ This will separate the track into its component stem tracks (bass, drums, vocals
 
 #### Render overlay
 
-Optional title and body text burned into the MP4. Configure under `render.overlay` in [cleave-viz-default.yaml](cleave-viz-default.yaml) (copied to each project's `cleave-viz.yaml` on first `separate` / `play`).
+Optional title and body text burned into the MP4. Configure under `render.overlay` in [cleave-viz.yaml](cleave-viz.yaml) (copied into each project on first `separate` / `play`).
 
 * `enabled` — turn the overlay on or off.
 * `start_delay` — when the overlay begins fading in (seconds).
@@ -138,7 +138,7 @@ In the live visualizer, a blank gap row separates the four stem layers from **Re
 
 #### Post-processing fade
 
-Whole-frame fade applied after the render overlay (GL fade on the composited image). Configure under `render.post_fx` in [cleave-viz-default.yaml](cleave-viz-default.yaml).
+Whole-frame fade applied after the render overlay (GL fade on the composited image). Configure under `render.post_fx` in [cleave-viz.yaml](cleave-viz.yaml).
 
 * `enabled` — turn whole-frame fade on or off.
 * `fade_in` — seconds to fade from black at the start of the video.
@@ -150,7 +150,7 @@ In the live visualizer, **Render: POST FX** sits below overlay with the same eye
 
 #### Layer visibility timeline
 
-Sparse cue list under root `timeline:` in [cleave-viz-default.yaml](cleave-viz-default.yaml) (saved at the bottom of config snapshots). When enabled, cues override per-stem `layers.*.enabled` during playback and offline render.
+Sparse cue list under root `timeline:` in [cleave-viz.yaml](cleave-viz.yaml) (saved at the bottom of config snapshots). When enabled, cues override per-stem `layers.*.enabled` during playback and offline render.
 
 * `enabled` — turn timeline automation on or off.
 * `cues` — list of `{t: seconds, layers: {stem: bool}}` events; partial `layers` maps leave other stems unchanged.

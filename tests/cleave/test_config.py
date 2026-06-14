@@ -9,8 +9,7 @@ import pytest
 import yaml
 
 from cleave.config import (
-    DEFAULT_VIZ_CONFIG_FILENAME,
-    PROJECT_VIZ_CONFIG_FILENAME,
+    VIZ_CONFIG_FILENAME,
     CleaveConfig,
     LayerConfig,
     PathsConfig,
@@ -144,7 +143,7 @@ def test_load_config_clamps_beat_sensitivity(tmp_path: Path) -> None:
     preset_root = tmp_path / "presets"
     project_dir = tmp_path / "project"
     write_minimal_config(project_dir, preset_root)
-    cfg_path = project_dir / PROJECT_VIZ_CONFIG_FILENAME
+    cfg_path = project_dir / VIZ_CONFIG_FILENAME
     data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     data["visualizer"]["beat_sensitivity"] = 6.0
     data["layers"]["drums"]["beat_sensitivity"] = -1
@@ -180,7 +179,7 @@ def test_parse_layers_rejects_invalid_effect() -> None:
 def test_find_config_path_cli_override_wins(tmp_path: Path) -> None:
     project = tmp_path / "project"
     project.mkdir()
-    project_config = project / PROJECT_VIZ_CONFIG_FILENAME
+    project_config = project / VIZ_CONFIG_FILENAME
     project_config.write_text("visualizer: {}\n", encoding="utf-8")
 
     override = tmp_path / "override.yaml"
@@ -193,7 +192,7 @@ def test_find_config_path_cli_override_wins(tmp_path: Path) -> None:
 def test_find_config_path_project_config(tmp_path: Path) -> None:
     project = tmp_path / "project"
     project.mkdir()
-    project_config = project / PROJECT_VIZ_CONFIG_FILENAME
+    project_config = project / VIZ_CONFIG_FILENAME
     project_config.write_text("visualizer: {}\n", encoding="utf-8")
 
     found = find_config_path(project_root=project)
@@ -202,7 +201,7 @@ def test_find_config_path_project_config(tmp_path: Path) -> None:
 
 def test_find_config_path_repo_template_fallback(tmp_path: Path) -> None:
     found = find_config_path(project_root=tmp_path / "no-config-here")
-    assert found == (repo_root() / DEFAULT_VIZ_CONFIG_FILENAME).resolve()
+    assert found == (repo_root() / VIZ_CONFIG_FILENAME).resolve()
 
 
 def test_ensure_project_viz_config_sets_project_name(tmp_path: Path) -> None:
@@ -217,7 +216,7 @@ def test_ensure_project_viz_config_sets_project_name(tmp_path: Path) -> None:
 def test_ensure_project_viz_config_skips_existing(tmp_path: Path) -> None:
     project = tmp_path / "projects" / "song"
     project.mkdir(parents=True)
-    existing = project / PROJECT_VIZ_CONFIG_FILENAME
+    existing = project / VIZ_CONFIG_FILENAME
     existing.write_text("custom: true\n", encoding="utf-8")
 
     dst = ensure_project_viz_config(project)
@@ -228,7 +227,7 @@ def test_ensure_project_viz_config_skips_existing(tmp_path: Path) -> None:
 def test_find_config_path_global_fallback(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    global_config = tmp_path / "global" / DEFAULT_VIZ_CONFIG_FILENAME
+    global_config = tmp_path / "global" / VIZ_CONFIG_FILENAME
     global_config.parent.mkdir(parents=True)
     global_config.write_text("visualizer: {}\n", encoding="utf-8")
     monkeypatch.setattr("cleave.config.GLOBAL_CONFIG_PATH", global_config)
@@ -239,7 +238,7 @@ def test_find_config_path_global_fallback(
 
 def test_load_config_round_trip(minimal_project: Path) -> None:
     cfg = load_config(project_root=minimal_project)
-    assert cfg.config_path == (minimal_project / PROJECT_VIZ_CONFIG_FILENAME).resolve()
+    assert cfg.config_path == (minimal_project / VIZ_CONFIG_FILENAME).resolve()
     assert set(cfg.layers) == set(STEM_NAMES)
     assert cfg.visualizer.width > 0
     assert cfg.paths.preset_root.is_dir()
@@ -463,7 +462,7 @@ def test_load_config_missing_preset_file(tmp_path: Path) -> None:
     preset_root = tmp_path / "presets"
     project_dir = tmp_path / "project"
     write_minimal_config(project_dir, preset_root)
-    cfg_path = project_dir / PROJECT_VIZ_CONFIG_FILENAME
+    cfg_path = project_dir / VIZ_CONFIG_FILENAME
     text = cfg_path.read_text(encoding="utf-8").replace(
         "drums/drums.milk", "drums/missing.milk"
     )
@@ -520,7 +519,7 @@ def test_parse_timeline_clamps_negative_t() -> None:
 
 
 def test_load_config_reads_timeline(minimal_project: Path) -> None:
-    cfg_path = minimal_project / PROJECT_VIZ_CONFIG_FILENAME
+    cfg_path = minimal_project / VIZ_CONFIG_FILENAME
     data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     data["timeline"] = {
         "enabled": True,

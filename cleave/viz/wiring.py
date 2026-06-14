@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from cleave.config import DEFAULT_VIZ_CONFIG_FILENAME, CleaveConfig
+from cleave.config import VIZ_CONFIG_FILENAME, CleaveConfig
 from cleave.config_snapshot import next_unnamed_path, write_session_snapshot
 from cleave.effects.runtime import EffectRuntime
 from cleave.paths import repo_root
@@ -139,7 +139,7 @@ def make_tuning_controls(
             on_save_new_config=on_save_new_config,
             on_overwrite_config=on_overwrite_config,
             launch_config_path=cfg.config_path,
-            repo_root_example=repo_root() / DEFAULT_VIZ_CONFIG_FILENAME,
+            repo_root_example=repo_root() / VIZ_CONFIG_FILENAME,
         )
 
     controls = TuningControls(**kwargs)

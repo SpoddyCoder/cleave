@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cleave.config import PROJECT_VIZ_CONFIG_FILENAME, RenderConfig, load_config
+from cleave.config import VIZ_CONFIG_FILENAME, RenderConfig, load_config
 from cleave.viz.controls import RenderPostFxRuntime
 from cleave.paths import repo_root
 from cleave.extract import STEM_NAMES, stems_dir
@@ -119,7 +119,7 @@ def test_validate_render_project_missing_viz_config(tmp_path: Path) -> None:
         original_path=tmp_path / "source.flac",
         demucs_model="htdemucs",
     )
-    with pytest.raises(FileNotFoundError, match=PROJECT_VIZ_CONFIG_FILENAME):
+    with pytest.raises(FileNotFoundError, match=VIZ_CONFIG_FILENAME):
         validate_render_project(project)
 
 
@@ -368,7 +368,7 @@ def test_render_calls_overlay_compositing_when_enabled(
     frame_count = math.ceil(duration_sec * fps)
 
     overlay_cfg = _overlay_cfg()
-    base_cfg = load_config(project / PROJECT_VIZ_CONFIG_FILENAME, repo_root())
+    base_cfg = load_config(project / VIZ_CONFIG_FILENAME, repo_root())
     mock_load_config.return_value = replace(
         base_cfg, render=RenderConfig(overlay=overlay_cfg, post_fx=None)
     )
@@ -439,7 +439,7 @@ def test_render_skips_overlay_when_disabled(
     project = _setup_render_project(tmp_path)
 
     overlay_cfg = _overlay_cfg(enabled=False)
-    base_cfg = load_config(project / PROJECT_VIZ_CONFIG_FILENAME, repo_root())
+    base_cfg = load_config(project / VIZ_CONFIG_FILENAME, repo_root())
     mock_load_config.return_value = replace(
         base_cfg, render=RenderConfig(overlay=overlay_cfg, post_fx=None)
     )

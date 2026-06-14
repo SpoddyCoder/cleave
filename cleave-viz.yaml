@@ -1,5 +1,5 @@
 visualizer:
-  name: cleave-viz-default
+  name: cleave-viz-example
   width: 1280
   height: 720
   fps: 30
@@ -8,12 +8,12 @@ visualizer:
 render:
   post_fx:
     enabled: true
-    fade_in: 30     # counted from start, 0 = disabled
+    fade_in: 10     # counted from start, 0 = disabled
     fade_out: 4     # counted from end, 0 = disable
 
   overlay:
     enabled: true
-    start_delay: 10
+    start_delay: 5
     display_time: 30
     position: bottom-left
     title: 
