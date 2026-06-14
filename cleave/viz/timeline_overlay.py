@@ -44,6 +44,9 @@ class TimelineViewState:
     position_sec: float
     duration_sec: float
     focus_row: int  # 0..3, index into layer_z_order (0 = bottom stem)
+    monitor_visible: dict[str, bool]
+    timeline_visible: dict[str, bool]
+    override_stems: set[str] = field(default_factory=set)
     armed_stems: set[str] = field(default_factory=set)
     recording: bool = False
     enabled: bool = False
@@ -125,6 +128,16 @@ def stem_label_text(layer_num: int, stem: str) -> str:
     return f"{layer_num_prefix(layer_num)}{stem_abbrev_label(stem)}"
 
 
+def row_prefix_width(
+    layer_num_width: int,
+    stem_abbrev_width: int,
+    row_height: int,
+) -> int:
+    """Width of the row label prefix (num, abbrev, monitor eye slot)."""
+    eye_slot_w = visibility_icon_slot_width(row_height)
+    return layer_num_width + stem_abbrev_width + eye_slot_w
+
+
 class TimelineOverlay:
     """Bottom-anchored timeline panel drawn over the composited frame."""
 
@@ -145,6 +158,7 @@ class TimelineOverlay:
         self._header_badge_rect: tuple[int, int, int, int] | None = None
         self._layer_num_width: int = 0
         self._stem_abbrev_width: int = 0
+        self._bar_layout: tuple[int, int, int] | None = None
         self._row_layout: list[tuple[int, int, int, int, str, int]] = []
 
     def _font_get(self) -> pygame.font.Font:
@@ -161,6 +175,11 @@ class TimelineOverlay:
         return self._header_badge_rect
 
     @property
+    def bar_layout(self) -> tuple[int, int, int] | None:
+        """Last draw bar metrics: ``(bar_left, bar_width, eye_slot_w)`` in panel coordinates."""
+        return self._bar_layout
+
+    @property
     def row_layout(self) -> list[tuple[int, int, int, int, str, int]]:
         """Last draw layout: ``(row_index, x, y, w, h, stem)`` in panel coordinates."""
         return list(self._row_layout)
@@ -168,6 +187,7 @@ class TimelineOverlay:
     def draw(self, surface: pygame.Surface, state: TimelineViewState) -> None:
         self._panel_rect = None
         self._header_badge_rect = None
+        self._bar_layout = None
         self._row_layout = []
         if not state.enabled:
             return
@@ -190,9 +210,13 @@ class TimelineOverlay:
         inner_h = panel_h - self._padding * 2
         row_h = max(1, (inner_h - self._row_gap * (row_count - 1)) // row_count)
         eye_slot_w = visibility_icon_slot_width(row_h)
-        prefix_width = self._layer_num_width + self._stem_abbrev_width + eye_slot_w
+        prefix_width = row_prefix_width(
+            self._layer_num_width, self._stem_abbrev_width, row_h
+        )
         bar_left = self._padding + prefix_width
-        bar_width = max(1, panel_w - self._padding * 2 - prefix_width)
+        bar_width = max(1, panel_w - self._padding * 2 - prefix_width - eye_slot_w)
+        self._bar_layout = (bar_left, bar_width, eye_slot_w)
+        timeline_eye_x = panel_w - self._padding - eye_slot_w
 
         panel = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
         panel.fill((*BACKGROUND, BACKGROUND_ALPHA))
@@ -217,7 +241,7 @@ class TimelineOverlay:
             layer_num = row_index + 1
             layer_num_x = self._padding
             stem_abbrev_x = layer_num_x + self._layer_num_width
-            eye_x = stem_abbrev_x + self._stem_abbrev_width
+            monitor_eye_x = stem_abbrev_x + self._stem_abbrev_width
 
             label_bg_rect = pygame.Rect(
                 layer_num_x,
@@ -247,13 +271,20 @@ class TimelineOverlay:
             panel.blit(num_surf, (layer_num_x, num_y))
             panel.blit(abbrev_surf, (stem_abbrev_x, abbrev_y))
 
-            visible_now = layer_visible_at(
-                state.cues, state.defaults, stem, state.position_sec
+            monitor_enabled = state.monitor_visible.get(stem, True)
+            timeline_enabled = state.timeline_visible.get(stem, True)
+            monitor_icon = render_visibility_icon(
+                enabled=monitor_enabled,
+                override=stem in state.override_stems,
+                line_height=row_h,
             )
-            icon_surf = render_visibility_icon(
-                enabled=visible_now, solo=False, line_height=row_h
+            timeline_icon = render_visibility_icon(
+                enabled=timeline_enabled,
+                solo=False,
+                line_height=row_h,
             )
-            panel.blit(icon_surf, (eye_x, row_y))
+            panel.blit(monitor_icon, (monitor_eye_x, row_y))
+            panel.blit(timeline_icon, (timeline_eye_x, row_y))
 
             for start_t, end_t, visible in visibility_segments(
                 state.cues, state.defaults, stem, state.duration_sec

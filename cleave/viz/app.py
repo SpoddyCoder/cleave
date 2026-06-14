@@ -146,6 +146,7 @@ def _init_gl_resources(runtime: VisualizerRuntime) -> None:
         layers=layers,
         signals=runtime.signals,
         effect_runtime=runtime.effect_runtime,
+        mix_player=mix_player,
         on_toast=controls.show_toast,
     )
 
@@ -242,7 +243,7 @@ class VisualizerApp:
             _flush_all_pcm(rt.layers)
         self._was_paused = paused
 
-        apply_layer_visibility(rt.session, rt.layers_by_name, t_sec)
+        apply_layer_visibility(rt.session, rt.layers_by_name, t_sec, playing=not paused)
 
         if not paused:
             for layer in rt.layers:
@@ -299,7 +300,7 @@ class VisualizerApp:
             and rt.overlay_surface is not None
         ):
             timeline_state = _build_timeline_view_state(
-                rt.session, t_sec, rt.duration_sec
+                rt.session, t_sec, rt.duration_sec, playing=not paused
             )
             _draw_timeline_overlay(
                 rt.compositor,

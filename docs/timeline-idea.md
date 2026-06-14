@@ -7,11 +7,34 @@ Sparse cue list that drives per-stem show/hide over playback time. Saved at the 
 1. In the main tuning panel, focus **Render: TIMELINE** and press **Ctrl+Right** to enable (eye on).
 2. Press **t** to open the bottom timeline strip.
 
-When timeline is enabled, stem layer eyes in the main panel are ignored; visibility follows cues.
+When timeline is enabled, stem layer eyes in the main panel are ignored; visibility follows the rules below.
 
 ## Timeline panel
 
-Bottom overlay (~20% of window height). Four rows in `layer_z_order` with stem abbreviations (D/B/V/O). Horizontal bars show on/off regions; orange playhead tracks playback; ticks mark cue times.
+Bottom overlay (~20% of window height). Four rows in `layer_z_order` with stem abbreviations (D/B/V/O). Each row has a monitor eye beside the label, a cue bar across the middle, and a committed-timeline eye at the far right; orange playhead tracks playback; ticks mark cue times.
+
+| Eye | Position | Meaning |
+| --- | --- | --- |
+| Left | Beside stem label | Monitor / output (what is on screen; gold override styling on the left eye when that stem is in override) |
+| Right | Far right of row | Committed timeline automation at the playhead (saved cues only; ignores record buffer and monitor preview) |
+
+While paused with monitor preview active, seeking updates the right eye only; the left eye stays on the monitor dict until you change it with num keys or resume.
+
+## Transport and visibility
+
+Output priority: main-panel solo (if set) beats recording rules, then paused monitor preview, then timeline manual override while playing, then committed timeline eval.
+
+| Transport | Num keys 1-4 | Layer output | Left eye | Right eye |
+| --- | --- | --- | --- | --- |
+| Playing | Toggle manual on/off for override stems only | Manual override for overridden stems; others follow committed timeline | Same as output; gold override styling when stem is in override | Committed at playhead |
+| Paused (preview) | Toggle monitor preview (all stems) | `monitor` dict | Monitor preview | Committed at playhead |
+| Recording | Armed rows only (record buffer) | Armed: cues + buffer; unarmed: committed only | Live output | Committed at playhead |
+
+Override (`override_stems` / `override_visible` on `TimelineRuntime`) is separate from main-panel global solo (`session.solo_stem`). Multiple stems can be in override at once; others keep following the committed timeline.
+
+Monitor preview state (`preview_active`, `monitor`) is session-only and is not written to YAML.
+
+## Keys
 
 | Key | Action |
 | --- | --- |
@@ -20,19 +43,27 @@ Bottom overlay (~20% of window height). Four rows in `layer_z_order` with stem a
 | Left / Right | Previous / next cue |
 | Enter | Arm / disarm focused row (red background when armed) |
 | Backspace | Delete focused cue |
-| Ctrl+Enter | Toggle focused row at playhead (record only; armed rows only) |
-| Space | Pause / resume |
+| Space | Pause / resume. Pause snapshots committed timeline at the playhead into `monitor` and enables preview. Resume clears preview and `monitor`. |
 | Ctrl+Left / Right | Seek 10s / 30s (blocked while recording) |
-| `r` | Start / stop record |
-| `1`–`4` | Toggle armed layer at stack position (record only; bottom = 1) |
+| `r` | Start / stop record. Start clears override, applies WYSIWYG for armed stems (see below), clears preview, and unpauses if paused. |
+| `1`-`4` | Paused + preview: toggle that stack layer in `monitor` (bottom = 1). Recording: toggle armed layer into record buffer at playhead. Playing (not recording): toggle manual on/off for that layer when it is in override. |
+| Shift+Enter | Toggle override on focused row while playing (manual override; does not write cues). On enter, snapshots current output into `override_visible`. On exit, removes stem from `override_stems`. Ignored when paused or recording. |
+| Ctrl+Enter | Recording only: toggle focused row at playhead (armed rows only) |
 
 ## Record workflow
 
-1. Open panel (`t`).
-2. Up/Down to a row; **Enter** to arm (red row). Repeat for each layer to record.
-3. **r** to start record and playback. Press **1**–**4** (by stack position) or **Ctrl+Enter** (focused row) on the beat for armed layers only.
-4. **r** again to stop. Armed-layer cues in that pass replace the previous take for that time range (punch overwrite). Unarmed stems are untouched.
-5. **SAVE CONFIG** in the main panel writes cues to YAML.
+Typical pass starting from 0:00:
+
+1. Open panel (`t`). Seek to **0:00** if needed (**Ctrl+Left** / **Ctrl+Right**).
+2. **Space** to pause. Committed visibility at the playhead is copied into monitor preview.
+3. Up/Down to each row; **Enter** to arm layers you will record (red row). Repeat for each layer.
+4. Optional: while still paused, **1**-**4** adjust monitor preview so the left eyes match the mix you want at record start (right eyes still show committed cues).
+5. **r** to start record. Override is cleared. For each armed stem, if monitor/output differs from committed at the playhead, that state is written into the record buffer (WYSIWYG; no extra cue when already matching). Preview clears and playback resumes if it was paused.
+6. On the beat, press **1**-**4** (stack position) or **Ctrl+Enter** (focused armed row) to toggle visibility for armed layers only.
+7. **r** again to stop. Armed-layer cues in that pass replace the previous take for that time range (punch overwrite). Unarmed stems are untouched.
+8. **SAVE CONFIG** in the main panel writes cues to YAML.
+
+While playing (not recording), **Shift+Enter** puts the focused row into override (manual override; left monitor eye uses gold override styling). Press again on the same row to exit. **1**-**4** toggle manual on/off for layers already in override. That does not affect cues or main-panel solo. Starting record clears override.
 
 ## YAML shape
 

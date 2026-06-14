@@ -8,7 +8,7 @@ import pygame
 from OpenGL.GL import GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, glClear, glClearColor, glViewport
 
 from cleave.extract import STEM_NAMES
-from cleave.timeline import layer_visible_at
+from cleave.timeline import TimelineCue, layer_visible_at
 from cleave.config import (
     DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
     DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
@@ -59,26 +59,70 @@ def timeline_cues_for_eval(session: TuningSession) -> list[TimelineCue]:
     return tl.cues
 
 
-def effective_layer_enabled(session: TuningSession, stem: str, t_sec: float) -> bool:
+def timeline_committed_visible(
+    session: TuningSession,
+    stem: str,
+    t_sec: float,
+) -> bool:
+    return layer_visible_at(
+        session.timeline.cues,
+        timeline_defaults(session),
+        stem,
+        t_sec,
+    )
+
+
+def snapshot_monitor_from_timeline(
+    session: TuningSession,
+    t_sec: float,
+) -> dict[str, bool]:
+    defaults = timeline_defaults(session)
+    return {
+        stem: layer_visible_at(session.timeline.cues, defaults, stem, t_sec)
+        for stem in session.layer_z_order
+    }
+
+
+def effective_layer_enabled(
+    session: TuningSession,
+    stem: str,
+    t_sec: float,
+    *,
+    playing: bool = True,
+) -> bool:
     if session.solo_stem is not None:
         return stem == session.solo_stem
-    if session.timeline.enabled:
-        return layer_visible_at(
-            timeline_cues_for_eval(session),
-            timeline_defaults(session),
-            stem,
-            t_sec,
-        )
-    return session.layers[stem].enabled
+    if not session.timeline.enabled:
+        return session.layers[stem].enabled
+    tl = session.timeline
+    defaults = timeline_defaults(session)
+    if tl.recording:
+        if stem in tl.armed_stems:
+            return layer_visible_at(
+                tl.cues + tl.record_buffer,
+                defaults,
+                stem,
+                t_sec,
+            )
+        return layer_visible_at(tl.cues, defaults, stem, t_sec)
+    if tl.preview_active:
+        return tl.monitor[stem]
+    if playing and stem in tl.override_stems:
+        return tl.override_visible.get(stem, True)
+    return layer_visible_at(tl.cues, defaults, stem, t_sec)
 
 
 def apply_layer_visibility(
     session: TuningSession,
     layers_by_name: dict[str, StemLayer],
     t_sec: float,
+    *,
+    playing: bool = True,
 ) -> None:
     for stem, layer in layers_by_name.items():
-        layer.fbo.enabled = effective_layer_enabled(session, stem, t_sec)
+        layer.fbo.enabled = effective_layer_enabled(
+            session, stem, t_sec, playing=playing
+        )
 
 
 def apply_effect_modifiers(
@@ -327,8 +371,20 @@ def _build_timeline_view_state(
     session: TuningSession,
     position_sec: float,
     duration_sec: float,
+    *,
+    playing: bool = True,
 ) -> TimelineViewState:
     tl = session.timeline
+    monitor_visible = {
+        stem: effective_layer_enabled(
+            session, stem, position_sec, playing=playing
+        )
+        for stem in session.layer_z_order
+    }
+    timeline_visible = {
+        stem: timeline_committed_visible(session, stem, position_sec)
+        for stem in session.layer_z_order
+    }
     return TimelineViewState(
         layer_z_order=list(session.layer_z_order),
         cues=list(timeline_cues_for_eval(session)),
@@ -336,6 +392,9 @@ def _build_timeline_view_state(
         position_sec=position_sec,
         duration_sec=duration_sec,
         focus_row=tl.focus_row,
+        monitor_visible=monitor_visible,
+        timeline_visible=timeline_visible,
+        override_stems=set(tl.override_stems),
         armed_stems=set(tl.armed_stems),
         recording=tl.recording,
         enabled=tl.enabled,

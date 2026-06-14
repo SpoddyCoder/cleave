@@ -141,7 +141,7 @@ Sparse cue list under root `timeline:` in [cleave-viz-default.yaml](cleave-viz-d
 * `enabled` — turn timeline automation on or off.
 * `cues` — list of `{t: seconds, layers: {stem: bool}}` events; partial `layers` maps leave other stems unchanged.
 
-In the live visualizer, **Render: TIMELINE** sits below post-FX. **Ctrl+Right** / **Ctrl+Left** toggles timeline on or off. Press **t** to open the bottom timeline strip (toast if disabled). Arm rows with **Enter**, record with **r**, toggle armed layers with **1**–**4** (stack position, bottom = 1). **t** or **Esc** closes the strip. Full key map: [docs/timeline-idea.md](docs/timeline-idea.md). Saved with **SAVE AS NEW CONFIG** / **OVERWRITE CONFIG**.
+In the live visualizer, **Render: TIMELINE** sits below post-FX. **Ctrl+Right** / **Ctrl+Left** toggles timeline on or off. Press **t** to open the bottom timeline strip (toast if disabled): dual eyes per row (monitor vs committed cues), pause-to-preview with num keys, **Shift+Enter** override while playing, and WYSIWYG record start. **t** or **Esc** closes the strip. Full key map and transport modes: [docs/timeline-idea.md](docs/timeline-idea.md). Saved with **SAVE AS NEW CONFIG** / **OVERWRITE CONFIG**.
 
 ### Visualizer
 Controls...
