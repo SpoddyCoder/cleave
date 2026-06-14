@@ -44,9 +44,10 @@ Monitor preview state (`preview_active`, `monitor`) is session-only and is not w
 | Left / Right | Previous / next cue |
 | Enter | Arm / disarm focused row (red background when armed) |
 | Backspace | Delete focused cue |
-| Space | Pause / resume. Pause snapshots current output at the playhead into `monitor` and enables preview. Resume clears preview and `monitor`. |
+| Space | Pause / resume. While recording and playing: stop record and pause (no preview). Otherwise pause snapshots current output at the playhead into `monitor` and enables preview; resume clears preview and `monitor`. |
+| Ctrl+Space | Start record (same as `r` start). While recording: stop record, pause at playhead (no preview). |
 | Ctrl+Left / Right | Seek 10s / 30s (blocked while recording) |
-| `r` | Start / stop record. Start clears override, applies WYSIWYG for armed stems (see below), clears preview, and unpauses if paused. |
+| `r` | Start / stop record. Start clears override, applies WYSIWYG for armed stems (see below), clears preview, and unpauses if paused. Stop leaves playback running. |
 | `1`-`4` | Paused + preview: toggle that stack layer in `monitor` (bottom = 1). Paused + override: toggle that layer in `override_visible` (adds stem to override if needed). Recording: toggle armed layer into record buffer at playhead. Playing (not recording): toggle manual on/off for that layer when it is in override. |
 | Shift+Enter | Toggle override on focused row (manual override; does not write cues). On enter, snapshots current output into `override_visible` and clears monitor preview. On exit, removes stem from `override_stems`. Ignored when recording. |
 | Ctrl+Enter | Recording only: toggle focused row at playhead (armed rows only) |
@@ -61,7 +62,7 @@ Typical pass starting from 0:00:
 4. Optional: while still paused, **1**-**4** adjust monitor preview so the left eyes match the mix you want at record start (right eyes still show committed cues).
 5. **r** to start record. Override is cleared. For each armed stem, if monitor/output differs from committed at the playhead, that state is written into the record buffer (WYSIWYG; no extra cue when already matching). Preview clears and playback resumes if it was paused.
 6. On the beat, press **1**-**4** (stack position) or **Ctrl+Enter** (focused armed row) to toggle visibility for armed layers only.
-7. **r** again to stop. Armed-layer cues in that pass replace the previous take for that time range (punch overwrite). Unarmed stems are untouched.
+7. **r** or **Ctrl+Space** again to stop (**Ctrl+Space** also pauses). Armed-layer cues in that pass replace the previous take for that time range (punch overwrite). Unarmed stems are untouched.
 8. **SAVE CONFIG** in the main panel writes cues to YAML.
 
 While playing or paused (not recording), **Shift+Enter** puts the focused row into override (manual override; left monitor eye uses gold override styling; clears monitor preview on enter). Press again on the same row to exit. **1**-**4** toggle manual on/off for layers while paused (preview or override) or for override stems while playing. That does not affect cues or main-panel solo. Starting record clears override.

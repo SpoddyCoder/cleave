@@ -74,7 +74,17 @@ class TimelineControls:
                 self._start_record()
             return True
 
+        if event.key == pygame.K_SPACE and mod_ctrl(event.mod):
+            if self.session.timeline.recording:
+                self._stop_record_and_pause()
+            else:
+                self._start_record()
+            return True
+
         if event.key == pygame.K_SPACE:
+            if self.session.timeline.recording and not self.playback.paused:
+                self._stop_record_and_pause()
+                return True
             was_paused = self.playback.paused
             toggle_pause(self.playback, self.duration_sec)
             tl = self.session.timeline
@@ -288,6 +298,14 @@ class TimelineControls:
 
         if self._on_visibility_change is not None:
             self._on_visibility_change()
+
+    def _stop_record_and_pause(self) -> None:
+        tl = self.session.timeline
+        tl.preview_active = False
+        tl.monitor = {}
+        self._stop_record()
+        if not self.playback.paused:
+            toggle_pause(self.playback, self.duration_sec)
 
     def _refresh_visibility(self) -> None:
         if self._on_visibility_change is not None:
