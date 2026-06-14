@@ -175,6 +175,8 @@ def render(
         for frame_idx in range(frame_count):
             t_sec = frame_idx / fps
             app.tick_frame(t_sec, paused=False, draw_overlay=False)
+            alpha = fade_alpha(t_sec, duration_sec, fade_in, fade_out)
+            runtime.compositor.apply_frame_fade(alpha)
             if overlay_cfg is not None and overlay_cfg.enabled:
                 composite_render_overlay(
                     runtime.compositor,
@@ -184,8 +186,6 @@ def render(
                     height,
                     panel=overlay_panel,
                 )
-            alpha = fade_alpha(t_sec, duration_sec, fade_in, fade_out)
-            runtime.compositor.apply_frame_fade(alpha)
             frame = runtime.compositor.read_rgba_frame()
             if len(frame) != frame_bytes:
                 raise RuntimeError(

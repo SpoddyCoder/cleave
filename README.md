@@ -138,7 +138,7 @@ In the live visualizer, a blank gap row separates the four stem layers from **Re
 
 #### Post-processing fade
 
-Whole-frame fade applied after the render overlay (GL fade on the composited image). Configure under `render.post_fx` in [cleave-viz.yaml](cleave-viz.yaml).
+Whole-frame fade on the composited stems (GL fade on the default framebuffer). The render overlay is composited above it and is not affected by fade in/out. Configure under `render.post_fx` in [cleave-viz.yaml](cleave-viz.yaml).
 
 * `enabled` — turn whole-frame fade on or off.
 * `fade_in` — seconds to fade from black at the start of the video.

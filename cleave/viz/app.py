@@ -271,7 +271,6 @@ class VisualizerApp:
         _composite_ordered(rt.compositor, rt.layers_by_name, rt.session)
 
         if draw_overlay:
-            _composite_live_render_overlay(rt, t_sec)
             pp = rt.session.render_post_fx
             frame_fade_alpha = live_frame_fade_alpha(
                 t_sec,
@@ -282,6 +281,7 @@ class VisualizerApp:
                 solo=rt.session.render_post_fx_solo,
             )
             rt.compositor.apply_frame_fade(frame_fade_alpha)
+            _composite_live_render_overlay(rt, t_sec)
             view_state = rt.controls.build_view_state(
                 paused=paused,
                 position_sec=t_sec,
