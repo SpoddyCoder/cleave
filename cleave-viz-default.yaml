@@ -85,4 +85,4 @@ layers:
     blend_mode: black-key
 
 timeline:
-  enabled: false
+  enabled: true

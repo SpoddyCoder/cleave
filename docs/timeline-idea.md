@@ -4,8 +4,7 @@ Sparse cue list that drives per-stem show/hide over playback time. Saved at the 
 
 ## Enable
 
-1. In the main tuning panel, focus **Render: TIMELINE** and press **Ctrl+Right** to enable (eye on).
-2. Press **t** to open the bottom timeline strip.
+Timeline is on by default. Press **t** or **Right** on **Render: TIMELINE** to open the bottom timeline strip. Close with **t**, **Esc**, or **Left** on that header. To turn timeline automation off, focus **Render: TIMELINE** and press **Ctrl+Left** (eye off).
 
 When timeline is enabled, stem layer eyes in the main panel are ignored; visibility follows the rules below.
 
