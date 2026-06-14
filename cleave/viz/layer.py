@@ -180,6 +180,8 @@ def effective_layer_enabled(
     if tl.recording:
         if stem in tl.armed_stems:
             return armed_recording_visible(session, stem, t_sec)
+        if stem in tl.override_stems:
+            return tl.override_visible.get(stem, True)
         return layer_visible_at(tl.cues, defaults, stem, t_sec)
     if tl.preview_active:
         return tl.monitor[stem]

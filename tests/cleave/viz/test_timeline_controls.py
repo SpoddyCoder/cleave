@@ -250,17 +250,17 @@ def test_record_from_pause_stores_wysiwyg_baseline_when_monitor_differs() -> Non
     assert session.timeline.record_baseline == {"drums": False}
 
 
-def test_record_clears_override() -> None:
+def test_record_preserves_override() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         armed_stems={"drums"},
     )
-    session.timeline.override_stems = {"bass"}
-    session.timeline.override_visible = {"bass": True}
+    session.timeline.override_stems = {"bass", "vocals"}
+    session.timeline.override_visible = {"bass": False, "vocals": False}
     session.solo_stem = "bass"
 
     controls.handle_keydown(keydown(pygame.K_r))
-    assert session.timeline.override_stems == set()
-    assert session.timeline.override_visible == {}
+    assert session.timeline.override_stems == {"bass", "vocals"}
+    assert session.timeline.override_visible == {"bass": False, "vocals": False}
     assert session.solo_stem == "bass"
     assert visibility_calls == [True]
 
@@ -339,10 +339,13 @@ def test_shift_enter_ignored_when_recording() -> None:
         focus_row=1,
         armed_stems={"drums"},
     )
+    session.timeline.override_stems = {"bass"}
+    session.timeline.override_visible = {"bass": False}
 
     controls.handle_keydown(keydown(pygame.K_r))
     controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
-    assert session.timeline.override_stems == set()
+    assert session.timeline.override_stems == {"bass"}
+    assert session.timeline.override_visible == {"bass": False}
     assert visibility_calls == [True]
 
 

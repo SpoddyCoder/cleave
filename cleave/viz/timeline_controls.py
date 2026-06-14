@@ -247,9 +247,6 @@ class TimelineControls:
             self._toast("Arm at least one layer to record")
             return
 
-        tl.override_stems.clear()
-        tl.override_visible.clear()
-
         t_sec = current_sec(self.playback, self.duration_sec)
         tl.record_baseline = {
             stem: effective_layer_enabled(self.session, stem, t_sec)
