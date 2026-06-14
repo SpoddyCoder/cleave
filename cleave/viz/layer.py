@@ -93,6 +93,43 @@ def snapshot_monitor_from_output(
     }
 
 
+def armed_recording_defaults(session: TuningSession) -> dict[str, bool]:
+    defaults = timeline_defaults(session)
+    defaults.update(session.timeline.record_baseline)
+    return defaults
+
+
+def armed_recording_visible(
+    session: TuningSession,
+    stem: str,
+    t_sec: float,
+) -> bool:
+    """Visibility for an armed stem during an active record pass."""
+    return layer_visible_at(
+        session.timeline.record_buffer,
+        armed_recording_defaults(session),
+        stem,
+        t_sec,
+    )
+
+
+def build_record_punch_cues(
+    session: TuningSession,
+    record_start: float,
+) -> list[TimelineCue]:
+    """Cues to punch on record stop: baseline deltas at record start plus toggles."""
+    tl = session.timeline
+    punch: list[TimelineCue] = []
+    for stem in tl.armed_stems:
+        baseline = tl.record_baseline.get(stem)
+        if baseline is None:
+            continue
+        if baseline != timeline_committed_visible(session, stem, record_start):
+            punch.append(TimelineCue(t=record_start, layers={stem: baseline}))
+    punch.extend(tl.record_buffer)
+    return punch
+
+
 def effective_layer_enabled(
     session: TuningSession,
     stem: str,
@@ -106,12 +143,7 @@ def effective_layer_enabled(
     defaults = timeline_defaults(session)
     if tl.recording:
         if stem in tl.armed_stems:
-            return layer_visible_at(
-                tl.cues + tl.record_buffer,
-                defaults,
-                stem,
-                t_sec,
-            )
+            return armed_recording_visible(session, stem, t_sec)
         return layer_visible_at(tl.cues, defaults, stem, t_sec)
     if tl.preview_active:
         return tl.monitor[stem]

@@ -232,7 +232,7 @@ def test_num_keys_toggle_override_visible_when_playing() -> None:
     assert visibility_calls == [True]
 
 
-def test_record_from_pause_writes_wysiwyg_buffer_when_monitor_differs() -> None:
+def test_record_from_pause_stores_wysiwyg_baseline_when_monitor_differs() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
         armed_stems={"drums"},
         position_sec=7.0,
@@ -246,9 +246,8 @@ def test_record_from_pause_writes_wysiwyg_buffer_when_monitor_differs() -> None:
     assert session.timeline.recording is True
     assert session.timeline.preview_active is False
     assert session.timeline.monitor == {}
-    assert session.timeline.record_buffer == [
-        TimelineCue(t=7.0, layers={"drums": False})
-    ]
+    assert session.timeline.record_buffer == []
+    assert session.timeline.record_baseline == {"drums": False}
 
 
 def test_record_clears_override() -> None:
@@ -438,6 +437,7 @@ def test_ctrl_enter_only_affects_armed_focused_stem() -> None:
     controls.handle_keydown(keydown(pygame.K_r))
     controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
     assert session.timeline.record_buffer == []
+    assert session.timeline.record_baseline == {"drums": True}
 
 
 def test_r_without_armed_layers_shows_toast() -> None:
@@ -462,7 +462,7 @@ def test_r_starts_recording_and_unpauses() -> None:
     assert visibility_calls == [True]
 
 
-def test_record_start_leaves_buffer_empty() -> None:
+def test_record_start_stores_baseline_not_buffer() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
         armed_stems={"drums", "bass"},
         position_sec=7.5,
@@ -472,6 +472,7 @@ def test_record_start_leaves_buffer_empty() -> None:
 
     controls.handle_keydown(keydown(pygame.K_r))
     assert session.timeline.record_buffer == []
+    assert session.timeline.record_baseline == {"drums": True, "bass": False}
 
 
 def test_layer_keys_only_affect_armed_stems() -> None:
