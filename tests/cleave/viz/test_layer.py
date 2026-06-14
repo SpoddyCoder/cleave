@@ -453,4 +453,23 @@ def test_build_record_punch_cues_restores_committed_at_stop() -> None:
     punch = build_record_punch_cues(session, record_start=10.0, record_stop=20.0)
     assert TimelineCue(t=15.0, layers={"drums": True}) in punch
     assert TimelineCue(t=20.0, layers={"drums": False}, show_tick=False) in punch
-    assert committed_visible_outside_punch(session, "drums", 10.0, 20.0) is False
+    assert timeline_committed_visible(session, "drums", 20.0) is False
+
+
+def test_build_record_punch_cues_restores_when_disable_only_inside_punch() -> None:
+    session = _session(
+        layer_enabled={"drums": True, "bass": True, "vocals": True, "other": True},
+        timeline_enabled=True,
+        cues=[
+            TimelineCue(t=15.0, layers={"drums": False}),
+            TimelineCue(t=25.0, layers={"drums": True}),
+        ],
+    )
+    session.timeline.armed_stems = {"drums"}
+    session.timeline.record_baseline = {"drums": True}
+    session.timeline.record_buffer = [TimelineCue(t=18.0, layers={"drums": True})]
+
+    punch = build_record_punch_cues(session, record_start=10.0, record_stop=22.0)
+    assert TimelineCue(t=22.0, layers={"drums": False}, show_tick=False) in punch
+    assert committed_visible_outside_punch(session, "drums", 10.0, 22.0) is True
+    assert timeline_committed_visible(session, "drums", 22.0) is False

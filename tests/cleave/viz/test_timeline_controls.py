@@ -595,6 +595,60 @@ def test_stop_record_restores_committed_after_punch_range() -> None:
     assert restore_cues[0].show_tick is False
 
 
+def test_stop_record_restores_disabled_tail_when_disable_inside_punch() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_stems={"drums"},
+        position_sec=10.0,
+        cues=[
+            TimelineCue(t=15.0, layers={"drums": False}),
+            TimelineCue(t=25.0, layers={"drums": True}),
+        ],
+    )
+    session.layers["drums"].enabled = True
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.playback.player.seek(12.0)
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.playback.player.seek(22.0)
+    controls.handle_keydown(keydown(pygame.K_r))
+
+    from cleave.timeline import layer_visible_at
+    from cleave.viz.layer import timeline_defaults
+
+    defaults = timeline_defaults(session)
+    assert layer_visible_at(session.timeline.cues, defaults, "drums", 11.9) is False
+    assert layer_visible_at(session.timeline.cues, defaults, "drums", 12.0) is True
+    assert layer_visible_at(session.timeline.cues, defaults, "drums", 21.9) is True
+    assert layer_visible_at(session.timeline.cues, defaults, "drums", 22.0) is False
+    assert layer_visible_at(session.timeline.cues, defaults, "drums", 24.9) is False
+    assert layer_visible_at(session.timeline.cues, defaults, "drums", 25.0) is True
+
+
+def test_stop_record_restores_enabled_tail_when_injecting_disabled_section() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_stems={"drums"},
+        position_sec=10.0,
+        cues=[TimelineCue(t=5.0, layers={"drums": True})],
+    )
+    session.layers["drums"].enabled = False
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.playback.player.seek(22.0)
+    controls.handle_keydown(keydown(pygame.K_r))
+
+    from cleave.timeline import layer_visible_at
+    from cleave.viz.layer import timeline_defaults
+
+    defaults = timeline_defaults(session)
+    assert layer_visible_at(session.timeline.cues, defaults, "drums", 9.9) is True
+    assert layer_visible_at(session.timeline.cues, defaults, "drums", 10.0) is False
+    assert layer_visible_at(session.timeline.cues, defaults, "drums", 21.9) is False
+    assert layer_visible_at(session.timeline.cues, defaults, "drums", 22.0) is True
+    assert layer_visible_at(session.timeline.cues, defaults, "drums", 40.0) is True
+
+
 def test_stop_record_preserves_unarmed_cues_in_punch_range() -> None:
     bass_cue = TimelineCue(t=12.0, layers={"bass": False})
     controls, session, _, _, _, _ = _make_timeline_controls(
