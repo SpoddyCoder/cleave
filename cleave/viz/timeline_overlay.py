@@ -49,6 +49,9 @@ class TimelineViewState:
     override_stems: set[str] = field(default_factory=set)
     armed_stems: set[str] = field(default_factory=set)
     recording: bool = False
+    record_start_sec: float | None = None
+    record_baseline: dict[str, bool] = field(default_factory=dict)
+    record_buffer: list[TimelineCue] = field(default_factory=list)
     enabled: bool = False
 
 
@@ -87,9 +90,91 @@ def cue_times_for_stem(
         {
             cue.t
             for cue in cues
-            if stem in cue.layers and 0.0 <= cue.t <= duration_sec
+            if (
+                stem in cue.layers
+                and cue.show_tick
+                and 0.0 <= cue.t <= duration_sec
+            )
         }
     )
+
+
+def _clip_segments(
+    segments: list[tuple[float, float, bool]],
+    range_start: float,
+    range_end: float,
+) -> list[tuple[float, float, bool]]:
+    clipped: list[tuple[float, float, bool]] = []
+    for start_t, end_t, visible in segments:
+        clip_start = max(start_t, range_start)
+        clip_end = min(end_t, range_end)
+        if clip_end > clip_start:
+            clipped.append((clip_start, clip_end, visible))
+    return clipped
+
+
+def bar_segments_for_row(
+    state: TimelineViewState,
+    stem: str,
+) -> list[tuple[float, float, bool]]:
+    """Visibility segments for one timeline row, including live record preview."""
+    duration = state.duration_sec
+    if duration <= 0:
+        return []
+    if not (state.recording and stem in state.armed_stems):
+        return visibility_segments(state.cues, state.defaults, stem, duration)
+
+    record_start = state.record_start_sec
+    if record_start is None:
+        record_start = state.position_sec
+    record_start = max(0.0, min(record_start, duration))
+    playhead = max(0.0, min(state.position_sec, duration))
+
+    segments: list[tuple[float, float, bool]] = []
+    committed = visibility_segments(state.cues, state.defaults, stem, duration)
+
+    if record_start > 0.0:
+        segments.extend(_clip_segments(committed, 0.0, record_start))
+
+    if playhead > record_start:
+        armed_defaults = dict(state.defaults)
+        armed_defaults.update(state.record_baseline)
+        segments.extend(
+            _clip_segments(
+                visibility_segments(
+                    state.record_buffer, armed_defaults, stem, playhead
+                ),
+                record_start,
+                playhead,
+            )
+        )
+
+    if playhead < duration:
+        segments.extend(_clip_segments(committed, playhead, duration))
+    return segments
+
+
+def bar_tick_times_for_row(state: TimelineViewState, stem: str) -> list[float]:
+    """Cue tick times for one timeline row."""
+    duration = state.duration_sec
+    if not (state.recording and stem in state.armed_stems):
+        return cue_times_for_stem(state.cues, stem, duration)
+
+    record_start = state.record_start_sec
+    if record_start is None:
+        record_start = state.position_sec
+    playhead = state.position_sec
+    committed_ticks = [
+        t
+        for t in cue_times_for_stem(state.cues, stem, duration)
+        if t < record_start or t > playhead
+    ]
+    live_ticks = [
+        t
+        for t in cue_times_for_stem(state.record_buffer, stem, duration)
+        if record_start <= t <= playhead
+    ]
+    return sorted(set(committed_ticks) | set(live_ticks))
 
 
 def _rec_flash_visible() -> bool:
@@ -287,9 +372,7 @@ class TimelineOverlay:
             panel.blit(monitor_icon, (monitor_eye_x, row_y))
             panel.blit(timeline_icon, (timeline_eye_x, row_y))
 
-            for start_t, end_t, visible in visibility_segments(
-                state.cues, state.defaults, stem, state.duration_sec
-            ):
+            for start_t, end_t, visible in bar_segments_for_row(state, stem):
                 x0 = time_to_x(start_t, bar_left, bar_width, state.duration_sec)
                 x1 = time_to_x(end_t, bar_left, bar_width, state.duration_sec)
                 if x1 <= x0:
@@ -298,7 +381,7 @@ class TimelineOverlay:
                 seg_rect = pygame.Rect(x0, bar_rect.y, max(1, x1 - x0), bar_rect.h)
                 pygame.draw.rect(panel, color, seg_rect)
 
-            for cue_t in cue_times_for_stem(state.cues, stem, state.duration_sec):
+            for cue_t in bar_tick_times_for_row(state, stem):
                 tick_x = time_to_x(cue_t, bar_left, bar_width, state.duration_sec)
                 pygame.draw.line(
                     panel,

@@ -19,6 +19,7 @@ from cleave.viz.theme import (
 from cleave.viz.timeline_overlay import (
     TimelineOverlay,
     TimelineViewState,
+    bar_tick_times_for_row,
     cue_times_for_stem,
     layer_num_prefix,
     playhead_x,
@@ -41,6 +42,9 @@ def _view_state(
     focus_row: int = 0,
     armed_stems: set[str] | None = None,
     recording: bool = False,
+    record_start_sec: float | None = None,
+    record_baseline: dict[str, bool] | None = None,
+    record_buffer: list[TimelineCue] | None = None,
     enabled: bool = True,
     layer_z_order: list[str] | None = None,
     monitor_visible: dict[str, bool] | None = None,
@@ -69,6 +73,9 @@ def _view_state(
         override_stems=set(override_stems or ()),
         armed_stems=set(armed_stems or ()),
         recording=recording,
+        record_start_sec=record_start_sec,
+        record_baseline=dict(record_baseline or ()),
+        record_buffer=list(record_buffer or ()),
         enabled=enabled,
     )
 
@@ -183,12 +190,14 @@ def test_recording_baseline_does_not_draw_cue_tick() -> None:
         position_sec=10.0,
         armed_stems={"drums"},
         recording=True,
+        record_start_sec=10.0,
+        record_baseline={"drums": True},
         monitor_visible={"drums": True, "bass": True, "vocals": True, "other": True},
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     overlay.draw(surface, state)
 
-    assert cue_times_for_stem(state.cues, "drums", state.duration_sec) == [0.0]
+    assert bar_tick_times_for_row(state, "drums") == [0.0]
 
 
 def test_draw_dual_eye_state_does_not_crash() -> None:
@@ -243,6 +252,14 @@ def test_unique_cue_times_clamps_to_duration() -> None:
         TimelineCue(t=50.0, layers={"vocals": False}),
     ]
     assert unique_cue_times(cues, 10.0) == [5.0]
+
+
+def test_cue_times_for_stem_skips_show_tick_false() -> None:
+    cues = [
+        TimelineCue(t=5.0, layers={"drums": False}),
+        TimelineCue(t=10.0, layers={"drums": True}, show_tick=False),
+    ]
+    assert cue_times_for_stem(cues, "drums", 30.0) == [5.0]
 
 
 def test_cue_times_for_stem_only_includes_relevant_layers() -> None:

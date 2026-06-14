@@ -20,6 +20,7 @@ _STEM_ABBREVIATIONS = {
 class TimelineCue:
     t: float
     layers: dict[str, bool]
+    show_tick: bool = True
 
 
 def stem_abbreviation(stem: str) -> str:
@@ -63,16 +64,31 @@ def _merge_cues_at_same_t(cues: list[TimelineCue]) -> list[TimelineCue]:
     merged: list[TimelineCue] = []
     current_t: float | None = None
     current_layers: dict[str, bool] = {}
+    current_show_tick = True
     for cue in sorted(cues, key=lambda c: c.t):
         if current_t is None:
             current_t = cue.t
         elif cue.t != current_t:
-            merged.append(TimelineCue(t=current_t, layers=dict(current_layers)))
+            merged.append(
+                TimelineCue(
+                    t=current_t,
+                    layers=dict(current_layers),
+                    show_tick=current_show_tick,
+                )
+            )
             current_t = cue.t
             current_layers = {}
+            current_show_tick = True
         current_layers.update(cue.layers)
+        current_show_tick = current_show_tick and cue.show_tick
     if current_t is not None:
-        merged.append(TimelineCue(t=current_t, layers=dict(current_layers)))
+        merged.append(
+            TimelineCue(
+                t=current_t,
+                layers=dict(current_layers),
+                show_tick=current_show_tick,
+            )
+        )
     return merged
 
 

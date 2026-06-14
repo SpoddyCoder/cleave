@@ -284,7 +284,7 @@ class TimelineControls:
             tl.armed_stems,
             record_start,
             record_stop,
-            build_record_punch_cues(self.session, record_start),
+            build_record_punch_cues(self.session, record_start, record_stop),
         )
         tl.recording = False
         tl.record_start_sec = None
