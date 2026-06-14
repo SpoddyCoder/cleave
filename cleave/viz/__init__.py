@@ -10,11 +10,7 @@ from cleave.paths import repo_root
 from cleave.preset_playlist import scan_all_layers
 from cleave.projectm import ProjectMLibraryError
 from cleave.viz.app import VisualizerApp, build_runtime_full
-from cleave.viz.bootstrap import (
-    _print_playlist_scan,
-    resolve_config_path,
-    resolve_mix_path,
-)
+from cleave.viz.bootstrap import resolve_config_path, resolve_mix_path
 from cleave.viz.render import render
 
 __all__ = [
@@ -37,8 +33,6 @@ def launch(
     try:
         cfg = load_config(config_path, repo_root())
         playlists = scan_all_layers(cfg)
-        for name, pl in playlists.items():
-            _print_playlist_scan(name, pl)
         runtime = build_runtime_full(cfg, project_dir, audio_path, playlists)
         VisualizerApp(runtime).run()
     except ProjectMLibraryError as exc:
