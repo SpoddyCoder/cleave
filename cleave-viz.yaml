@@ -2,6 +2,7 @@ visualizer:
   name: cleave-viz-example
   width: 1280
   height: 720
+  upscale: 1.0
   fps: 30
   beat_sensitivity: 1.0   # overall beat sensitivity, can be overidden on a per layer basis
 

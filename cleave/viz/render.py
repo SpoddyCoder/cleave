@@ -103,7 +103,8 @@ def render(
     pygame.init()
     try:
         pygame.display.set_mode(
-            (runtime.width, runtime.height), pygame.OPENGL | pygame.HIDDEN
+            (runtime.display_width, runtime.display_height),
+            pygame.OPENGL | pygame.HIDDEN,
         )
     except pygame.error as exc:
         pygame.quit()
@@ -116,8 +117,10 @@ def render(
 
         duration_sec = runtime.duration_sec
         fps = runtime.fps
-        width = runtime.width
-        height = runtime.height
+        width = runtime.display_width
+        height = runtime.display_height
+        content_width = runtime.width
+        content_height = runtime.height
         frame_count = math.ceil(duration_sec * fps)
         frame_bytes = width * height * 4
 
@@ -182,10 +185,11 @@ def render(
                     runtime.compositor,
                     overlay_cfg,
                     t_sec,
-                    width,
-                    height,
+                    content_width,
+                    content_height,
                     panel=overlay_panel,
                 )
+            runtime.compositor.present_content()
             frame = runtime.compositor.read_rgba_frame()
             if len(frame) != frame_bytes:
                 raise RuntimeError(

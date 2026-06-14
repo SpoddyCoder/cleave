@@ -23,6 +23,7 @@ from cleave.config import (
     VisualizerConfig,
     clamp_beat_sensitivity,
     clamp_effect_pct,
+    clamp_upscale,
     dump_yaml,
     ensure_project_viz_config,
     find_config_path,
@@ -103,6 +104,37 @@ def test_clamp_beat_sensitivity() -> None:
     assert clamp_beat_sensitivity(3.0) == 3.0
     assert clamp_beat_sensitivity(6.0) == 5.0
     assert clamp_beat_sensitivity(1.25) == 1.25
+
+
+def test_clamp_upscale() -> None:
+    assert clamp_upscale(1.0) == 1.0
+    assert clamp_upscale(1.5) == 1.5
+    assert clamp_upscale(0.5) == 1.0
+
+
+def test_parse_visualizer_upscale_defaults_to_one() -> None:
+    cfg = _parse_visualizer({})
+    assert cfg.upscale == 1.0
+
+
+def test_parse_visualizer_reads_upscale() -> None:
+    cfg = _parse_visualizer({"visualizer": {"upscale": 2.0}})
+    assert cfg.upscale == 2.0
+
+
+def test_parse_visualizer_rejects_upscale_below_one() -> None:
+    with pytest.raises(ValueError, match="visualizer.upscale must be >= 1.0"):
+        _parse_visualizer({"visualizer": {"upscale": 0.5}})
+
+
+def test_visualizer_display_dimensions() -> None:
+    cfg = VisualizerConfig(width=1280, height=720, upscale=1.5)
+    assert cfg.display_width == 1920
+    assert cfg.display_height == 1080
+
+    cfg_round = VisualizerConfig(width=100, height=100, upscale=1.33)
+    assert cfg_round.display_width == 133
+    assert cfg_round.display_height == 133
 
 
 def test_parse_visualizer_name_defaults_to_render() -> None:

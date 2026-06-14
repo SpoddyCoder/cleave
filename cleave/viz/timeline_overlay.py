@@ -279,7 +279,13 @@ class TimelineOverlay:
         """Last draw layout: ``(row_index, x, y, w, h, stem)`` in panel coordinates."""
         return list(self._row_layout)
 
-    def draw(self, surface: pygame.Surface, state: TimelineViewState) -> None:
+    def draw(
+        self,
+        surface: pygame.Surface,
+        state: TimelineViewState,
+        *,
+        content_height: int,
+    ) -> None:
         self._panel_rect = None
         self._header_badge_rect = None
         self._bar_layout = None
@@ -287,11 +293,11 @@ class TimelineOverlay:
         if not state.enabled:
             return
 
-        width, height = surface.get_size()
-        panel_w = width - self._margin * 2
-        panel_h = max(1, int(height * PANEL_HEIGHT_FRACTION))
+        display_width, display_height = surface.get_size()
+        panel_w = display_width - self._margin * 2
+        panel_h = max(1, int(content_height * PANEL_HEIGHT_FRACTION))
         panel_x = self._margin
-        panel_y = height - panel_h - self._margin
+        panel_y = display_height - panel_h - self._margin
 
         font = self._font_get()
         num_sample = font.render(layer_num_prefix(4), True, LABEL)

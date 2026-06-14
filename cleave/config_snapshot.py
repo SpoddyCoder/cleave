@@ -8,7 +8,7 @@ from typing import Any
 
 import yaml
 
-from cleave.config import CleaveConfig, RenderOverlayConfig, RenderOverlayTextBlockConfig, clamp_beat_sensitivity, clamp_effect_pct, dump_yaml
+from cleave.config import CleaveConfig, RenderOverlayConfig, RenderOverlayTextBlockConfig, clamp_beat_sensitivity, clamp_effect_pct, clamp_upscale, dump_yaml
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import to_config_relative
 from cleave.viz.controls import TuningSession
@@ -205,6 +205,7 @@ def write_session_snapshot(
         visualizer["name"] = orig_vis["name"]
     visualizer["width"] = cfg.visualizer.width
     visualizer["height"] = cfg.visualizer.height
+    visualizer["upscale"] = clamp_upscale(cfg.visualizer.upscale)
     visualizer["fps"] = cfg.visualizer.fps
     visualizer["beat_sensitivity"] = clamp_beat_sensitivity(
         cfg.visualizer.beat_sensitivity

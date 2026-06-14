@@ -491,9 +491,10 @@ def _draw_timeline_overlay(
     overlay: TimelineOverlay,
     overlay_surface: pygame.Surface,
     view_state: TimelineViewState,
+    content_height: int,
 ) -> None:
     overlay_surface.fill((0, 0, 0, 0))
-    overlay.draw(overlay_surface, view_state)
+    overlay.draw(overlay_surface, view_state, content_height=content_height)
     panel = overlay.panel_rect
     if panel is not None:
         upload_rect = panel

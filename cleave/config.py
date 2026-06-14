@@ -43,9 +43,16 @@ DEFAULT_TEXTURE_PATHS = (Path("~/.local/share/cleave/textures"),)
 DEFAULT_VISUALIZER_WIDTH = 1280
 DEFAULT_VISUALIZER_HEIGHT = 720
 DEFAULT_VISUALIZER_FPS = 30
+DEFAULT_VISUALIZER_UPSCALE = 1.0
+UPSCALE_MIN = 1.0
 DEFAULT_BEAT_SENSITIVITY = 1.0
 BEAT_SENSITIVITY_MIN = 0.0
 BEAT_SENSITIVITY_MAX = 5.0
+
+
+def clamp_upscale(value: float) -> float:
+    """Display upscale factor (minimum 1.0)."""
+    return max(UPSCALE_MIN, float(value))
 
 
 def clamp_beat_sensitivity(value: float) -> float:
@@ -77,8 +84,17 @@ class VisualizerConfig:
     name: str = "render"
     width: int = DEFAULT_VISUALIZER_WIDTH
     height: int = DEFAULT_VISUALIZER_HEIGHT
+    upscale: float = DEFAULT_VISUALIZER_UPSCALE
     fps: int = DEFAULT_VISUALIZER_FPS
     beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
+
+    @property
+    def display_width(self) -> int:
+        return max(1, round(self.width * self.upscale))
+
+    @property
+    def display_height(self) -> int:
+        return max(1, round(self.height * self.upscale))
 
 
 RenderOverlayPosition = Literal[
@@ -658,10 +674,18 @@ def _parse_timeline(data: dict[str, Any]) -> TimelineConfig | None:
 
 def _parse_visualizer(data: dict[str, Any]) -> VisualizerConfig:
     visualizer = _as_mapping(data.get("visualizer"), "visualizer")
+    upscale_raw = visualizer.get("upscale", DEFAULT_VISUALIZER_UPSCALE)
+    try:
+        upscale = float(upscale_raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("visualizer.upscale must be a number") from exc
+    if upscale < UPSCALE_MIN:
+        raise ValueError(f"visualizer.upscale must be >= {UPSCALE_MIN}")
     return VisualizerConfig(
         name=str(visualizer.get("name", "render")),
         width=int(visualizer.get("width", DEFAULT_VISUALIZER_WIDTH)),
         height=int(visualizer.get("height", DEFAULT_VISUALIZER_HEIGHT)),
+        upscale=clamp_upscale(upscale),
         fps=int(visualizer.get("fps", DEFAULT_VISUALIZER_FPS)),
         beat_sensitivity=clamp_beat_sensitivity(
             visualizer.get("beat_sensitivity", DEFAULT_BEAT_SENSITIVITY)
