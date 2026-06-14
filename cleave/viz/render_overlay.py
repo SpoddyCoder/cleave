@@ -333,7 +333,9 @@ def composite_render_overlay_with_alpha(
         draw_surface = panel.subsurface((src_x, src_y, clip_w, clip_h))
 
     texture_id = compositor.upload_overlay_texture(draw_surface)
-    compositor.draw_overlay(texture_id, clip_x, clip_y, clip_w, clip_h, alpha=alpha)
+    compositor.draw_content_overlay(
+        texture_id, clip_x, clip_y, clip_w, clip_h, alpha=alpha
+    )
 
 
 def composite_render_overlay(
