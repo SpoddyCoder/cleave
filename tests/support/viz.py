@@ -36,7 +36,7 @@ class StubMixPlayer:
         return False
 
 
-REPO_ROOT_EXAMPLE = Path("/tmp/cleave-viz-default.yaml")
+REPO_ROOT_EXAMPLE = Path("/tmp/cleave-viz.yaml")
 DEFAULT_ACTIVE_CONFIG = Path("/tmp/projects/my-track/active.yaml")
 
 

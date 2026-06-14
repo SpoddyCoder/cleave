@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pygame
 
-from cleave.config import PROJECT_VIZ_CONFIG_FILENAME, load_config
+from cleave.config import VIZ_CONFIG_FILENAME, load_config
 from cleave.easing import fade_alpha
 from cleave.paths import default_project_config, repo_root, resolve_project
 from cleave.preset_playlist import scan_all_layers
@@ -39,7 +39,7 @@ def _resolve_render_config_path(
     path = default_project_config(project_dir)
     if not path.is_file():
         raise FileNotFoundError(
-            f"no {PROJECT_VIZ_CONFIG_FILENAME} in {project_dir}; {_PREPARE_HINT}"
+            f"no {VIZ_CONFIG_FILENAME} in {project_dir}; {_PREPARE_HINT}"
         )
     return path
 

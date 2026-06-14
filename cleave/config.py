@@ -18,11 +18,8 @@ from cleave.effects.registry import validate_effect_entry
 from cleave.extract import STEM_NAMES
 from cleave.timeline import TimelineCue
 
-DEFAULT_VIZ_CONFIG_FILENAME = "cleave-viz-default.yaml"
-PROJECT_VIZ_CONFIG_FILENAME = "cleave-viz.yaml"
-GLOBAL_CONFIG_PATH = (
-    Path.home() / ".config" / "cleave" / DEFAULT_VIZ_CONFIG_FILENAME
-)
+VIZ_CONFIG_FILENAME = "cleave-viz.yaml"
+GLOBAL_CONFIG_PATH = Path.home() / ".config" / "cleave" / VIZ_CONFIG_FILENAME
 
 DEFAULT_LAYER_Z_ORDER = ("drums", "vocals", "bass", "other")
 
@@ -210,7 +207,7 @@ def _expand_path(path: Path | str) -> Path:
 
 def project_viz_config_path(project_dir: Path) -> Path:
     """Return the default per-project visualizer config path."""
-    return project_dir.resolve() / PROJECT_VIZ_CONFIG_FILENAME
+    return project_dir.resolve() / VIZ_CONFIG_FILENAME
 
 
 def ensure_project_viz_config(project_dir: Path) -> Path:
@@ -221,7 +218,7 @@ def ensure_project_viz_config(project_dir: Path) -> Path:
     if dst.is_file():
         return dst
 
-    src = repo_root() / DEFAULT_VIZ_CONFIG_FILENAME
+    src = repo_root() / VIZ_CONFIG_FILENAME
     if not src.is_file():
         raise FileNotFoundError(f"config template not found: {src}")
 
@@ -251,7 +248,7 @@ def find_config_path(
         return _expand_path(config_path)
 
     root = project_root.resolve() if project_root is not None else Path.cwd()
-    local_path = root / PROJECT_VIZ_CONFIG_FILENAME
+    local_path = root / VIZ_CONFIG_FILENAME
     if local_path.is_file():
         return local_path.resolve()
 
@@ -260,7 +257,7 @@ def find_config_path(
 
     from cleave.paths import repo_root
 
-    template = repo_root() / DEFAULT_VIZ_CONFIG_FILENAME
+    template = repo_root() / VIZ_CONFIG_FILENAME
     if template.is_file():
         return template.resolve()
 
@@ -746,7 +743,7 @@ def load_config(
     path = find_config_path(config_path, project_root)
     if path is None:
         raise FileNotFoundError(
-            f"no {PROJECT_VIZ_CONFIG_FILENAME} found; create one in the project "
+            f"no {VIZ_CONFIG_FILENAME} found; create one in the project "
             f"directory or at {GLOBAL_CONFIG_PATH}"
         )
     if not path.is_file():

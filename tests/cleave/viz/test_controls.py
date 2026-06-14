@@ -95,7 +95,7 @@ def _make_playlist(name: str, count: int = 3) -> PresetPlaylist:
     return PresetPlaylist(current_dir=current_dir, paths=paths, index=0)
 
 
-_REPO_ROOT_EXAMPLE = Path("/tmp/cleave-viz-default.yaml")
+_REPO_ROOT_EXAMPLE = Path("/tmp/cleave-viz.yaml")
 _DEFAULT_ACTIVE_CONFIG = Path("/tmp/projects/my-track/active.yaml")
 
 
@@ -158,7 +158,7 @@ def _row(
 
 
 def test_allow_overwrite_for_path_hides_repo_root_template_only() -> None:
-    root = Path("/repo/cleave-viz-default.yaml")
+    root = Path("/repo/cleave-viz.yaml")
     assert allow_overwrite_for_path(root, repo_root_example=root) is False
     assert (
         allow_overwrite_for_path(

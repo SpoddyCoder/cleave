@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 import yaml
 
-from cleave.config import PROJECT_VIZ_CONFIG_FILENAME
+from cleave.config import VIZ_CONFIG_FILENAME
 from cleave.extract import STEM_NAMES, stems_dir
 from cleave.project import PROJECT_FILENAME, load_manifest, write_manifest
 from cleave.separate import (
@@ -104,7 +104,7 @@ def test_run_separate_writes_project_viz_config(
     ) as run_analyse:
         run_separate(audio)
 
-    viz_config = project / PROJECT_VIZ_CONFIG_FILENAME
+    viz_config = project / VIZ_CONFIG_FILENAME
     assert viz_config.is_file()
     data = yaml.safe_load(viz_config.read_text(encoding="utf-8"))
     assert data["visualizer"]["name"] == "my-track"

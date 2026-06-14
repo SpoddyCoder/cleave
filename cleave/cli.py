@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 
-from cleave.config import PROJECT_VIZ_CONFIG_FILENAME, ensure_project_viz_config
+from cleave.config import VIZ_CONFIG_FILENAME, ensure_project_viz_config
 from cleave.paths import resolve_project
 from cleave.separate import (
     project_stems_complete,
@@ -193,7 +193,7 @@ def build_parser() -> argparse.ArgumentParser:
         "-c",
         "--config",
         type=Path,
-        help=f"Config path (default: <project>/{PROJECT_VIZ_CONFIG_FILENAME})",
+        help=f"Config path (default: <project>/{VIZ_CONFIG_FILENAME})",
     )
     play.set_defaults(func=cmd_play)
 
@@ -210,7 +210,7 @@ def build_parser() -> argparse.ArgumentParser:
         "-c",
         "--config",
         type=Path,
-        help=f"Config path (default: <project>/{PROJECT_VIZ_CONFIG_FILENAME})",
+        help=f"Config path (default: <project>/{VIZ_CONFIG_FILENAME})",
     )
     render.add_argument(
         "-o",
