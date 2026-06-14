@@ -182,6 +182,20 @@ def test_effective_layer_enabled_uses_record_buffer_while_recording() -> None:
     assert effective_layer_enabled(session, "bass", 1.0) is True
 
 
+def test_effective_layer_enabled_override_persists_for_unarmed_while_recording() -> None:
+    session = _session(
+        layer_enabled={"drums": True, "bass": True, "vocals": True, "other": True},
+        timeline_enabled=True,
+        cues=[TimelineCue(t=0.0, layers={"bass": True, "vocals": True})],
+    )
+    session.timeline.recording = True
+    session.timeline.armed_stems = {"drums"}
+    session.timeline.override_stems = {"bass", "vocals"}
+    session.timeline.override_visible = {"bass": False, "vocals": False}
+    assert effective_layer_enabled(session, "bass", 1.0) is False
+    assert effective_layer_enabled(session, "vocals", 1.0) is False
+
+
 def test_timeline_cues_for_eval_merges_buffer_while_recording() -> None:
     session = _session(timeline_enabled=True, cues=[TimelineCue(t=0.0, layers={"drums": False})])
     session.timeline.recording = True
