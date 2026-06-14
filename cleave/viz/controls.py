@@ -27,9 +27,9 @@ from cleave.config import (
     RenderOverlayPosition,
     clamp_beat_sensitivity,
     clamp_effect_pct,
-    cycle_render_overlay_font,
 )
 from cleave.effects.registry import effect_row_count
+from cleave.viz.fonts import cycle_render_overlay_font
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.preset_playlist import (
     PresetPlaylist,
