@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 from cleave.config import find_config_path
 from cleave.paths import default_project_config, repo_root
 from cleave.project import resolve_mix_path as _resolve_mix_path
-from cleave.preset_playlist import PresetPlaylist
 from cleave.signals import Signals, load_signals
 
 
@@ -34,10 +32,3 @@ def resolve_config_path(
 
 def resolve_mix_path(project_dir: Path) -> Path:
     return _resolve_mix_path(project_dir)
-
-
-def _print_playlist_scan(name: str, playlist: PresetPlaylist) -> None:
-    print(
-        f"{name}: {len(playlist.paths)} presets in {playlist.current_dir}",
-        file=sys.stderr,
-    )
