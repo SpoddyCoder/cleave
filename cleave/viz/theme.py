@@ -41,6 +41,10 @@ TIMELINE_BAR_ON: tuple[int, int, int] = (200, 225, 255)
 PLAYHEAD: tuple[int, int, int] = (90, 50, 130)
 
 BORDER_WIDTH: int = 2
+SCROLLBAR_WIDTH: int = 15
+SCROLLBAR_CONTENT_GAP: int = 4
+SCROLLBAR_TRACK: tuple[int, int, int] = DISABLED
+SCROLLBAR_THUMB: tuple[int, int, int] = TIMELINE_BAR_ON
 PANEL_CONTENT_MAX_WIDTH: int = 440
 
 HOLD_IDLE_SEC: float = 10.0

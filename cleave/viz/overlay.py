@@ -67,6 +67,10 @@ from cleave.viz.theme import (
     OVERRIDE_BG,
     OVERRIDE_GLYPH,
     OVERRIDE_GLYPH_OFF,
+    SCROLLBAR_CONTENT_GAP,
+    SCROLLBAR_THUMB,
+    SCROLLBAR_TRACK,
+    SCROLLBAR_WIDTH,
     SOLO_BG,
     VALUE,
 )
@@ -987,6 +991,115 @@ def _row_bg_color(state: TuningViewState, index: int) -> tuple[int, int, int] | 
     return None
 
 
+@dataclass(frozen=True)
+class PanelScrollMetrics:
+    scrollable_indices: list[int]
+    footer_indices: list[int]
+    row_stride: int
+    scroll_content_h: int
+    footer_block_h: int
+    max_panel_h: int
+    natural_h: int
+    panel_h: int
+    scroll_viewport_h: int
+    needs_scroll: bool
+    show_scrollbar: bool
+
+
+def scroll_metrics(
+    *,
+    visible_indices: list[int],
+    first_footer_visible: int | None,
+    line_h: int,
+    line_gap: int,
+    padding: int,
+    footer_gap: int,
+    confirm_h: int,
+    confirm_active: bool,
+    save_choice_h: int,
+    save_choice_active: bool,
+    toast_active: bool,
+    max_panel_h: int,
+) -> PanelScrollMetrics:
+    if first_footer_visible is not None:
+        split_pos = visible_indices.index(first_footer_visible)
+        scrollable_indices = visible_indices[:split_pos]
+        footer_indices = visible_indices[split_pos:]
+    else:
+        scrollable_indices = list(visible_indices)
+        footer_indices = []
+
+    row_stride = line_h + line_gap
+    n_scroll = len(scrollable_indices)
+    scroll_content_h = (
+        n_scroll * line_h + max(0, n_scroll - 1) * line_gap if n_scroll else 0
+    )
+
+    n_footer = len(footer_indices)
+    footer_rows_h = (
+        n_footer * line_h + max(0, n_footer - 1) * line_gap if n_footer else 0
+    )
+    footer_block_h = footer_rows_h
+    if footer_indices:
+        footer_block_h += footer_gap
+    if confirm_active:
+        footer_block_h += line_gap + confirm_h
+    if save_choice_active:
+        footer_block_h += line_gap + save_choice_h
+    if toast_active:
+        footer_block_h += line_gap + line_h
+
+    visible_count = len(visible_indices)
+    natural_h = (
+        visible_count * line_h
+        + max(0, visible_count - 1) * line_gap
+        + (footer_gap if first_footer_visible is not None else 0)
+        + padding * 2
+    )
+    if confirm_active:
+        natural_h += line_gap + confirm_h
+    if save_choice_active:
+        natural_h += line_gap + save_choice_h
+    if toast_active:
+        natural_h += line_gap + line_h
+
+    needs_scroll = natural_h > max_panel_h
+    if needs_scroll:
+        scroll_viewport_h = max(0, max_panel_h - padding * 2 - footer_block_h)
+        panel_h = min(natural_h, max_panel_h)
+        show_scrollbar = scroll_content_h > scroll_viewport_h
+    else:
+        scroll_viewport_h = scroll_content_h
+        panel_h = natural_h
+        show_scrollbar = False
+
+    return PanelScrollMetrics(
+        scrollable_indices=scrollable_indices,
+        footer_indices=footer_indices,
+        row_stride=row_stride,
+        scroll_content_h=scroll_content_h,
+        footer_block_h=footer_block_h,
+        max_panel_h=max_panel_h,
+        natural_h=natural_h,
+        panel_h=panel_h,
+        scroll_viewport_h=scroll_viewport_h,
+        needs_scroll=needs_scroll,
+        show_scrollbar=show_scrollbar,
+    )
+
+
+def panel_content_max_width(
+    *,
+    index: int,
+    scrollable_indices: frozenset[int],
+    show_scrollbar: bool,
+) -> int:
+    """Content width budget for a row; scrollable rows reserve the scrollbar column."""
+    if show_scrollbar and index in scrollable_indices:
+        return PANEL_CONTENT_MAX_WIDTH - SCROLLBAR_WIDTH
+    return PANEL_CONTENT_MAX_WIDTH
+
+
 def _clip_rect_to_surface(
     rect: tuple[int, int, int, int],
     surface: pygame.Surface,
@@ -1032,6 +1145,35 @@ class TuningOverlay:
         self._panel_rect: tuple[int, int, int, int] | None = None
         self._confirm = ConfirmDialog()
         self._save_choice = SaveChoiceDialog()
+        self._scroll_y = 0
+
+    def _clamp_scroll(self, scroll_content_h: int, viewport_h: int) -> None:
+        max_scroll = max(0, scroll_content_h - viewport_h)
+        if self._scroll_y < 0:
+            self._scroll_y = 0
+        elif self._scroll_y > max_scroll:
+            self._scroll_y = max_scroll
+
+    def _ensure_focus_visible(
+        self,
+        state: TuningViewState,
+        scrollable_indices: list[int],
+        row_stride: int,
+        viewport_h: int,
+        line_h: int,
+    ) -> None:
+        try:
+            row_index = scrollable_indices.index(state.focus_index)
+        except ValueError:
+            return
+        row_y = row_index * row_stride
+        if row_y < self._scroll_y:
+            self._scroll_y = row_y
+        elif row_y + line_h > self._scroll_y + viewport_h:
+            self._scroll_y = row_y + line_h - viewport_h
+        n = len(scrollable_indices)
+        scroll_content_h = n * row_stride - self._line_gap if n > 0 else 0
+        self._clamp_scroll(scroll_content_h, viewport_h)
 
     def notify_input(self) -> None:
         self._idle_sec = 0.0
@@ -1040,6 +1182,7 @@ class TuningOverlay:
     def hide_immediately(self) -> None:
         self._idle_sec = self._hold_idle_sec + self._fade_duration_sec + 1.0
         self._visibility = 0.0
+        self._scroll_y = 0
 
     def update(self, dt_sec: float, *, timeline_panel_open: bool = False) -> None:
         self._idle_sec += dt_sec
@@ -1068,6 +1211,74 @@ class TuningOverlay:
         """Top-left x, y, width, height of the last drawn panel, if any."""
         return self._panel_rect
 
+    def _blit_row(
+        self,
+        panel: pygame.Surface,
+        *,
+        state: TuningViewState,
+        index: int,
+        draw_index: int,
+        row_surfaces: list[pygame.Surface],
+        row_time_surfaces: list[pygame.Surface | None],
+        y: int,
+        text_alpha: int,
+        panel_w: int,
+        line_h: int,
+    ) -> None:
+        surf = row_surfaces[draw_index]
+        bg = _row_bg_color(state, index)
+        if bg is not None:
+            bg_alpha = int(FOCUS_ROW_BG_ALPHA * self._visibility)
+            if bg_alpha >= 2:
+                bg_surf = pygame.Surface(
+                    (panel_w - self._padding * 2, line_h), pygame.SRCALPHA
+                )
+                bg_surf.fill((*bg, bg_alpha))
+                panel.blit(bg_surf, (self._padding, y))
+
+        indent = self._padding + _row_indent(state, index)
+        if text_alpha >= 2:
+            surf.set_alpha(text_alpha)
+            panel.blit(surf, (indent, y))
+            time_surf = row_time_surfaces[draw_index]
+            if time_surf is not None:
+                time_surf.set_alpha(text_alpha)
+                panel.blit(time_surf, (indent + surf.get_width(), y))
+
+    def _draw_scrollbar(
+        self,
+        panel: pygame.Surface,
+        *,
+        panel_w: int,
+        scroll_viewport_h: int,
+        scroll_content_h: int,
+        border_alpha: int,
+    ) -> None:
+        if border_alpha < 2:
+            return
+        track_x = panel_w - SCROLLBAR_WIDTH
+        track_y = self._padding
+        track_bottom = track_y + scroll_viewport_h
+        track_color = (*SCROLLBAR_TRACK, border_alpha)
+        pygame.draw.line(panel, track_color, (track_x, track_y), (track_x, track_bottom))
+        pygame.draw.line(
+            panel,
+            track_color,
+            (track_x + SCROLLBAR_WIDTH - 1, track_y),
+            (track_x + SCROLLBAR_WIDTH - 1, track_bottom),
+        )
+        max_scroll = scroll_content_h - scroll_viewport_h
+        if max_scroll <= 0:
+            return
+        thumb_h = max(8, int(scroll_viewport_h * scroll_viewport_h / scroll_content_h))
+        thumb_travel = scroll_viewport_h - thumb_h
+        thumb_y = track_y + int(self._scroll_y * thumb_travel / max_scroll)
+        pygame.draw.rect(
+            panel,
+            (*SCROLLBAR_THUMB, border_alpha),
+            (track_x, thumb_y, SCROLLBAR_WIDTH, thumb_h),
+        )
+
     def draw(self, surface: pygame.Surface, state: TuningViewState) -> None:
         self._panel_rect = None
         if self._visibility <= 0.01 or row_count(state) == 0:
@@ -1086,10 +1297,51 @@ class TuningOverlay:
         confirm_active = state.confirm_message is not None
         save_choice_active = state.save_choice_active
 
+        confirm_h = 0
+        confirm_w = 0
+        if confirm_active:
+            assert state.confirm_message is not None
+            confirm_h = self._confirm.measure_height(
+                font,
+                state.confirm_message,
+                line_gap=self._line_gap,
+            )
+            confirm_w = self._confirm.measure_width(font, state.confirm_message)
+
+        save_choice_h = 0
+        save_choice_w = 0
+        if save_choice_active:
+            save_choice_h = self._save_choice.measure_height(font)
+            save_choice_w = self._save_choice.measure_width(font)
+
+        footer_gap = (line_h + self._line_gap) * 2
+        _, margin_y = self._margin
+        max_panel_h = surface.get_height() - margin_y * 2
+        metrics = scroll_metrics(
+            visible_indices=visible_indices,
+            first_footer_visible=first_footer_visible,
+            line_h=line_h,
+            line_gap=self._line_gap,
+            padding=self._padding,
+            footer_gap=footer_gap,
+            confirm_h=confirm_h,
+            confirm_active=confirm_active,
+            save_choice_h=save_choice_h,
+            save_choice_active=save_choice_active,
+            toast_active=toast_active,
+            max_panel_h=max_panel_h,
+        )
+        scrollable_indices = frozenset(metrics.scrollable_indices)
+
         row_surfaces: list[pygame.Surface] = []
         row_time_surfaces: list[pygame.Surface | None] = []
         row_widths: list[int] = []
         for index in visible_indices:
+            max_content_width = panel_content_max_width(
+                index=index,
+                scrollable_indices=scrollable_indices,
+                show_scrollbar=metrics.show_scrollbar,
+            )
             kind = row_kind(state, index)
             indent = self._padding + _row_indent(state, index)
             color = _row_value_color(state, index)
@@ -1117,7 +1369,9 @@ class TuningOverlay:
                     enabled=enabled, solo=solo, line_height=line_h
                 )
                 layer_prefix = _track_header_layer_prefix(state, index)
-                stem_text = _fit_track_header_stem(font, state, index)
+                stem_text = _fit_track_header_stem(
+                    font, state, index, max_content_width=max_content_width
+                )
                 expanded = block.expanded if block is not None else False
                 label_surf = _render_track_header_label(
                     font,
@@ -1213,7 +1467,9 @@ class TuningOverlay:
                     glyph = FILE_GLYPH
                     icon_color = PRESET_FILE_ICON
                 icon_surf = render_glyph(glyph, color=icon_color, line_height=line_h)
-                label = fit_row_text(font, state, index)
+                label = fit_row_text(
+                    font, state, index, max_content_width=max_content_width
+                )
                 label_surf = font.render(label, True, color)
                 row_surfaces.append(icon_surf)
                 row_time_surfaces.append(label_surf)
@@ -1257,7 +1513,9 @@ class TuningOverlay:
                 row_widths.append(indent + surf.get_width())
             elif kind in _LABELED_SUB_ROW_KINDS:
                 prefix = _labeled_sub_row_prefix(state, index)
-                value = _fit_labeled_sub_row_value(font, state, index)
+                value = _fit_labeled_sub_row_value(
+                    font, state, index, max_content_width=max_content_width
+                )
                 surf = _render_label_value_row(
                     font,
                     prefix=prefix,
@@ -1269,7 +1527,9 @@ class TuningOverlay:
                 row_time_surfaces.append(None)
                 row_widths.append(indent + surf.get_width())
             else:
-                text = fit_row_text(font, state, index)
+                text = fit_row_text(
+                    font, state, index, max_content_width=max_content_width
+                )
                 surf = font.render(text, True, color)
                 row_surfaces.append(surf)
                 row_time_surfaces.append(None)
@@ -1283,23 +1543,6 @@ class TuningOverlay:
             )
             toast_surf = font.render(toast_text, True, DISABLED)
 
-        confirm_h = 0
-        confirm_w = 0
-        if confirm_active:
-            assert state.confirm_message is not None
-            confirm_h = self._confirm.measure_height(
-                font,
-                state.confirm_message,
-                line_gap=self._line_gap,
-            )
-            confirm_w = self._confirm.measure_width(font, state.confirm_message)
-
-        save_choice_h = 0
-        save_choice_w = 0
-        if save_choice_active:
-            save_choice_h = self._save_choice.measure_height(font)
-            save_choice_w = self._save_choice.measure_width(font)
-
         content_w = max(row_widths) if row_widths else 0
         if toast_surf is not None:
             content_w = max(content_w, toast_surf.get_width())
@@ -1309,19 +1552,7 @@ class TuningOverlay:
             content_w = max(content_w, save_choice_w)
         content_w = min(content_w, PANEL_CONTENT_MAX_WIDTH)
         panel_w = content_w + self._padding * 2
-        footer_gap = line_h + self._line_gap
-        panel_h = (
-            visible_count * line_h
-            + max(0, visible_count - 1) * self._line_gap
-            + (footer_gap if first_footer_visible is not None else 0)
-            + self._padding * 2
-        )
-        if confirm_active:
-            panel_h += self._line_gap + confirm_h
-        if save_choice_active:
-            panel_h += self._line_gap + save_choice_h
-        if toast_surf is not None:
-            panel_h += self._line_gap + line_h
+        panel_h = metrics.panel_h
 
         alpha = int(BACKGROUND_ALPHA * self._visibility)
         if alpha < 2:
@@ -1331,38 +1562,104 @@ class TuningOverlay:
         panel.fill((*BACKGROUND, alpha))
 
         text_alpha = int(255 * self._visibility)
-        y = self._padding
-        for draw_index, index in enumerate(visible_indices):
-            if index == first_footer_visible:
-                y += footer_gap
-            surf = row_surfaces[draw_index]
-            assert surf is not None
-            bg = _row_bg_color(state, index)
-            if bg is not None:
-                bg_alpha = int(FOCUS_ROW_BG_ALPHA * self._visibility)
-                if bg_alpha >= 2:
-                    bg_surf = pygame.Surface((panel_w - self._padding * 2, line_h), pygame.SRCALPHA)
-                    bg_surf.fill((*bg, bg_alpha))
-                    panel.blit(bg_surf, (self._padding, y))
+        index_to_draw = {index: draw_index for draw_index, index in enumerate(visible_indices)}
 
-            indent = self._padding + _row_indent(state, index)
-            if text_alpha >= 2:
-                surf.set_alpha(text_alpha)
-                panel.blit(surf, (indent, y))
-                time_surf = row_time_surfaces[draw_index]
-                if time_surf is not None:
-                    time_surf.set_alpha(text_alpha)
-                    panel.blit(time_surf, (indent + surf.get_width(), y))
-            y += line_h + self._line_gap
+        if metrics.needs_scroll:
+            self._ensure_focus_visible(
+                state,
+                metrics.scrollable_indices,
+                metrics.row_stride,
+                metrics.scroll_viewport_h,
+                line_h,
+            )
+            scroll_top = self._padding
+            scroll_bottom = scroll_top + metrics.scroll_viewport_h
+            old_clip = panel.get_clip()
+            clip_right_reserve = (
+                SCROLLBAR_WIDTH + SCROLLBAR_CONTENT_GAP
+                if metrics.show_scrollbar
+                else self._padding
+            )
+            clip_w = panel_w - self._padding - clip_right_reserve
+            panel.set_clip(
+                pygame.Rect(self._padding, scroll_top, clip_w, metrics.scroll_viewport_h)
+            )
+            for row_index, index in enumerate(metrics.scrollable_indices):
+                local_y = row_index * metrics.row_stride
+                y = scroll_top + local_y - self._scroll_y
+                if y + line_h <= scroll_top or y >= scroll_bottom:
+                    continue
+                self._blit_row(
+                    panel,
+                    state=state,
+                    index=index,
+                    draw_index=index_to_draw[index],
+                    row_surfaces=row_surfaces,
+                    row_time_surfaces=row_time_surfaces,
+                    y=y,
+                    text_alpha=text_alpha,
+                    panel_w=panel_w,
+                    line_h=line_h,
+                )
+            panel.set_clip(old_clip)
+
+            footer_y = scroll_bottom
+            if metrics.footer_indices:
+                footer_y += footer_gap
+            for row_index, index in enumerate(metrics.footer_indices):
+                y = footer_y + row_index * metrics.row_stride
+                self._blit_row(
+                    panel,
+                    state=state,
+                    index=index,
+                    draw_index=index_to_draw[index],
+                    row_surfaces=row_surfaces,
+                    row_time_surfaces=row_time_surfaces,
+                    y=y,
+                    text_alpha=text_alpha,
+                    panel_w=panel_w,
+                    line_h=line_h,
+                )
+
+            if metrics.show_scrollbar:
+                self._draw_scrollbar(
+                    panel,
+                    panel_w=panel_w,
+                    scroll_viewport_h=metrics.scroll_viewport_h,
+                    scroll_content_h=metrics.scroll_content_h,
+                    border_alpha=int(255 * self._visibility),
+                )
+            if metrics.footer_indices:
+                dialog_y = footer_y + len(metrics.footer_indices) * metrics.row_stride
+            else:
+                dialog_y = scroll_bottom
+        else:
+            dialog_y = self._padding
+            for draw_index, index in enumerate(visible_indices):
+                if index == first_footer_visible:
+                    dialog_y += footer_gap
+                self._blit_row(
+                    panel,
+                    state=state,
+                    index=index,
+                    draw_index=draw_index,
+                    row_surfaces=row_surfaces,
+                    row_time_surfaces=row_time_surfaces,
+                    y=dialog_y,
+                    text_alpha=text_alpha,
+                    panel_w=panel_w,
+                    line_h=line_h,
+                )
+                dialog_y += line_h + self._line_gap
 
         if confirm_active and text_alpha >= 2:
             assert state.confirm_message is not None
-            y += self._line_gap
+            dialog_y += self._line_gap
             self._confirm.draw(
                 panel,
                 font,
                 x=self._padding,
-                y=y,
+                y=dialog_y,
                 message=state.confirm_message,
                 focus_yes=state.confirm_focus_yes,
                 text_alpha=text_alpha,
@@ -1370,12 +1667,12 @@ class TuningOverlay:
             )
 
         if save_choice_active and text_alpha >= 2:
-            y += self._line_gap
+            dialog_y += self._line_gap
             self._save_choice.draw(
                 panel,
                 font,
                 x=self._padding,
-                y=y,
+                y=dialog_y,
                 focus_overwrite=state.save_choice_focus_overwrite,
                 text_alpha=text_alpha,
             )
