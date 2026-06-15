@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pygame
 
@@ -88,6 +88,89 @@ def test_tick_frame_overlay_order_fade_content_present_then_ui(
         "present_content",
         "draw_overlay",
     ]
+
+
+def _heavy_init_side_effect(rt: VisualizerRuntime, on_progress=None) -> None:
+    if on_progress is not None:
+        on_progress("Building layers...")
+    rt.controls = MagicMock()
+    rt.controls.build_view_state.return_value = MagicMock()
+    rt.controls.tick = MagicMock()
+    rt.controls.consume_hide_overlay.return_value = False
+    rt.timeline_controls = MagicMock()
+    rt.playback = MagicMock()
+    rt.playback.paused = False
+    rt.mix_player = MagicMock()
+    rt.overlay = MagicMock()
+    rt.timeline_overlay = MagicMock()
+    rt.layers = []
+
+
+@patch("cleave.viz.app.current_sec", return_value=0.0)
+@patch("cleave.viz.app.pygame")
+@patch("cleave.viz.app._warmup_layers")
+@patch("cleave.viz.app.draw_loading_screen")
+@patch("cleave.viz.app._init_gl_resources_heavy")
+@patch("cleave.viz.app._init_gl_resources_cheap")
+@patch.object(VisualizerApp, "tick_frame")
+def test_run_boot_order_audio_starts_after_first_frame(
+    mock_tick_frame: MagicMock,
+    mock_init_cheap: MagicMock,
+    mock_init_heavy: MagicMock,
+    mock_draw_loading: MagicMock,
+    mock_warmup: MagicMock,
+    mock_pygame: MagicMock,
+    _mock_current_sec: MagicMock,
+) -> None:
+    compositor = recording_compositor()
+    runtime = _minimal_runtime(compositor)
+    runtime.cfg = MagicMock()
+    runtime.cfg.visualizer.warmup_sec = 1.0
+    runtime.mix_player = None
+    runtime.playback = None
+    runtime.controls = None
+    runtime.timeline_controls = None
+
+    call_order: list[str] = []
+
+    def cheap_side_effect(rt: VisualizerRuntime) -> None:
+        call_order.append("init_cheap")
+
+    def heavy_with_start(rt: VisualizerRuntime, on_progress=None) -> None:
+        _heavy_init_side_effect(rt, on_progress)
+        rt.mix_player.start.side_effect = lambda: call_order.append("mix_start")
+
+    mock_init_cheap.side_effect = cheap_side_effect
+    mock_init_heavy.side_effect = heavy_with_start
+    mock_draw_loading.side_effect = lambda *_a, **_k: call_order.append("loading_screen")
+    mock_warmup.side_effect = lambda *_a, **_k: call_order.append("warmup")
+    mock_tick_frame.side_effect = lambda *_a, **_k: call_order.append("tick_frame")
+
+    quit_event = MagicMock()
+    quit_event.type = pygame.QUIT
+    mock_pygame.event.get.side_effect = [[], [quit_event]]
+    mock_pygame.QUIT = pygame.QUIT
+    mock_pygame.K_t = pygame.K_t
+    mock_pygame.time.Clock.return_value.tick.return_value = 33
+
+    VisualizerApp(runtime).run()
+
+    mock_init_cheap.assert_called_once_with(runtime)
+    mock_init_heavy.assert_called_once()
+    mock_warmup.assert_called_once_with(
+        runtime.layers,
+        runtime.pcm_bank,
+        0.0,
+        30,
+        runtime.fps,
+        runtime.n_pcm,
+        session=runtime.session,
+    )
+    mock_tick_frame.assert_called()
+    assert mock_tick_frame.call_args_list[0] == call(0.0, paused=False)
+    runtime.mix_player.start.assert_called_once()
+    assert call_order.index("tick_frame") < call_order.index("mix_start")
+    assert mock_draw_loading.call_count >= 1
 
 
 @patch("cleave.viz.app._draw_tuning_overlay")

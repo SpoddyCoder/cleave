@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -32,9 +33,11 @@ from cleave.viz.layer import (
     _flush_all_pcm,
     _render_layer_fbo,
     _session_from_cfg,
+    _warmup_layers,
     apply_effect_modifiers,
     apply_layer_visibility,
 )
+from cleave.viz.loading import draw_loading_screen
 from cleave.viz.overlay import TuningOverlay
 from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.timeline_overlay import TimelineOverlay
@@ -127,19 +130,44 @@ def _make_compositor(runtime: VisualizerRuntime) -> GlCompositor:
     return c
 
 
-def _init_gl_resources(runtime: VisualizerRuntime) -> None:
+def _init_compositor_and_post(
+    runtime: VisualizerRuntime,
+) -> tuple[GlCompositor, GlPostProcess]:
     compositor = _make_compositor(runtime)
     post_process = GlPostProcess()
     post_process.init()
+    return compositor, post_process
 
+
+def _init_gl_resources_cheap(runtime: VisualizerRuntime) -> None:
+    compositor, post_process = _init_compositor_and_post(runtime)
+    runtime.compositor = compositor
+    runtime.post_process = post_process
+    runtime.overlay_surface = pygame.Surface(
+        (runtime.display_width, runtime.display_height), pygame.SRCALPHA
+    )
+
+
+def _init_gl_resources_heavy(
+    runtime: VisualizerRuntime,
+    on_progress: Callable[[str], None] | None = None,
+) -> None:
+    def report(message: str) -> None:
+        if on_progress is not None:
+            on_progress(message)
+
+    assert runtime.compositor is not None
     assert runtime.cfg is not None
-    layers = _build_layers(runtime.cfg, compositor, runtime.playlists)
 
+    report("Building layers...")
+    layers = _build_layers(runtime.cfg, runtime.compositor, runtime.playlists)
     layers_by_name = {layer.name: layer for layer in layers}
+
     mix_pcm, sample_rate = load_mix_pcm(runtime.audio_path)
     mix_player = MixPlayer(mix_pcm, sample_rate)
     runtime.mix_player = mix_player
     playback = init_playback(mix_player)
+
     controls = make_tuning_controls(
         session=runtime.session,
         cfg=runtime.cfg,
@@ -166,24 +194,22 @@ def _init_gl_resources(runtime: VisualizerRuntime) -> None:
         on_toast=controls.show_toast,
     )
 
-    runtime.compositor = compositor
-    runtime.post_process = post_process
     runtime.layers = layers
     runtime.layers_by_name = layers_by_name
     runtime.controls = controls
     runtime.timeline_controls = timeline_controls
     runtime.overlay = TuningOverlay()
     runtime.timeline_overlay = TimelineOverlay()
-    runtime.overlay_surface = pygame.Surface(
-        (runtime.display_width, runtime.display_height), pygame.SRCALPHA
-    )
     runtime.playback = playback
 
 
+def _init_gl_resources(runtime: VisualizerRuntime) -> None:
+    _init_gl_resources_cheap(runtime)
+    _init_gl_resources_heavy(runtime)
+
+
 def _init_gl_resources_render(runtime: VisualizerRuntime) -> None:
-    compositor = _make_compositor(runtime)
-    post_process = GlPostProcess()
-    post_process.init()
+    compositor, post_process = _init_compositor_and_post(runtime)
 
     assert runtime.cfg is not None
     layers = _build_layers(runtime.cfg, compositor, runtime.playlists)
@@ -346,11 +372,54 @@ class VisualizerApp:
         clock = pygame.time.Clock()
 
         try:
-            _init_gl_resources(rt)
+            _init_gl_resources_cheap(rt)
+            assert rt.compositor is not None
+            draw_loading_screen(
+                rt.compositor, "Loading...", rt.display_width, rt.display_height
+            )
+
+            quit_during_load = False
+
+            def on_progress(message: str) -> None:
+                nonlocal quit_during_load
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        quit_during_load = True
+                        return
+                draw_loading_screen(
+                    rt.compositor, message, rt.display_width, rt.display_height
+                )
+
+            _init_gl_resources_heavy(rt, on_progress=on_progress)
+            if quit_during_load:
+                return
+
             assert rt.controls is not None
             assert rt.timeline_controls is not None
             assert rt.playback is not None
             assert rt.mix_player is not None
+            assert rt.cfg is not None
+
+            warmup_frames = round(rt.cfg.visualizer.warmup_sec * rt.fps)
+            if warmup_frames > 0:
+                draw_loading_screen(
+                    rt.compositor,
+                    "Warming up Milkdrop presets...",
+                    rt.display_width,
+                    rt.display_height,
+                )
+                _warmup_layers(
+                    rt.layers,
+                    rt.pcm_bank,
+                    0.0,
+                    warmup_frames,
+                    rt.fps,
+                    rt.n_pcm,
+                    session=rt.session,
+                )
+
+            self.tick_frame(0.0, paused=False)
+            pygame.display.flip()
             rt.mix_player.start()
 
             running = True

@@ -43,6 +43,7 @@ DEFAULT_TEXTURE_PATHS = (Path("~/.local/share/cleave/textures"),)
 DEFAULT_VISUALIZER_WIDTH = 1280
 DEFAULT_VISUALIZER_HEIGHT = 720
 DEFAULT_VISUALIZER_FPS = 30
+DEFAULT_VISUALIZER_WARMUP_SEC = 3.0
 DEFAULT_VISUALIZER_UPSCALE = 1.0
 UPSCALE_MIN = 1.0
 DEFAULT_BEAT_SENSITIVITY = 1.0
@@ -86,6 +87,7 @@ class VisualizerConfig:
     height: int = DEFAULT_VISUALIZER_HEIGHT
     upscale: float = DEFAULT_VISUALIZER_UPSCALE
     fps: int = DEFAULT_VISUALIZER_FPS
+    warmup_sec: float = DEFAULT_VISUALIZER_WARMUP_SEC
     beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
 
     @property
@@ -660,12 +662,20 @@ def _parse_visualizer(data: dict[str, Any]) -> VisualizerConfig:
         raise ValueError("visualizer.upscale must be a number") from exc
     if upscale < UPSCALE_MIN:
         raise ValueError(f"visualizer.upscale must be >= {UPSCALE_MIN}")
+    warmup_raw = visualizer.get("warmup_sec", DEFAULT_VISUALIZER_WARMUP_SEC)
+    try:
+        warmup_sec = float(warmup_raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("visualizer.warmup_sec must be a number") from exc
+    if warmup_sec < 0:
+        raise ValueError("visualizer.warmup_sec must be >= 0")
     return VisualizerConfig(
         name=str(visualizer.get("name", "render")),
         width=int(visualizer.get("width", DEFAULT_VISUALIZER_WIDTH)),
         height=int(visualizer.get("height", DEFAULT_VISUALIZER_HEIGHT)),
         upscale=clamp_upscale(upscale),
         fps=int(visualizer.get("fps", DEFAULT_VISUALIZER_FPS)),
+        warmup_sec=warmup_sec,
         beat_sensitivity=clamp_beat_sensitivity(
             visualizer.get("beat_sensitivity", DEFAULT_BEAT_SENSITIVITY)
         ),

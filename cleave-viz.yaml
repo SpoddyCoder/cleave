@@ -4,6 +4,7 @@ visualizer:
   height: 720
   upscale: 1.0
   fps: 30
+  warmup_sec: 3.0   # pre-roll seconds to advance projectM past its white init state before the show starts
   beat_sensitivity: 1.0   # overall beat sensitivity, can be overidden on a per layer basis
 
 render:
