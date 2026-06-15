@@ -268,6 +268,8 @@ def test_cmd_render_calls_render(
         config=Path("cfg.yaml"),
         output=Path("video.mp4"),
         high_quality=False,
+        start_sec=None,
+        end_sec=None,
     )
     out = capsys.readouterr().out
     assert f"Rendered to {output.resolve()}" in out
@@ -300,6 +302,74 @@ def test_cmd_render_passes_high_quality_flag(
 
     render.assert_called_once()
     assert render.call_args.kwargs["high_quality"] is True
+
+
+def test_cmd_render_passes_start_and_end(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    _complete_project(tmp_path)
+
+    render_result = RenderResult(
+        output_path=(tmp_path / "out.mp4").resolve(),
+        display_width=1280,
+        display_height=720,
+        mix_filename="my-track.flac",
+    )
+    with patch.object(
+        importlib.import_module("cleave.viz.render"),
+        "render",
+        return_value=render_result,
+    ) as render:
+        cmd_render(
+            build_parser().parse_args(
+                ["render", "my-track", "--start", "10", "--end", "20"]
+            ),
+        )
+
+    render.assert_called_once_with(
+        (tmp_path / "projects" / "my-track").resolve(),
+        config=None,
+        output=None,
+        high_quality=False,
+        start_sec=10,
+        end_sec=20,
+    )
+
+
+def test_cmd_render_segment_completion_message(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from cleave.viz.render import RenderSegment
+
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = _complete_project(tmp_path)
+    render_result = RenderResult(
+        output_path=(project / "renders" / "out.mp4").resolve(),
+        display_width=1280,
+        display_height=720,
+        mix_filename="my-track.flac",
+        segment=RenderSegment(
+            start_sec=10,
+            end_label_sec=20,
+            end_explicit=True,
+            start_frame=300,
+            end_frame_exclusive=600,
+            frame_count=300,
+        ),
+    )
+
+    with patch.object(
+        importlib.import_module("cleave.viz.render"),
+        "render",
+        return_value=render_result,
+    ):
+        cmd_render(
+            build_parser().parse_args(["render", "my-track", "--start", "10", "--end", "20"])
+        )
+
+    out = capsys.readouterr().out
+    assert "my-track.flac segment render 10-20s at 1280x720 completed, in" in out
 
 
 def test_cmd_render_errors_when_project_incomplete(
@@ -461,10 +531,12 @@ def test_shortcut_flags() -> None:
         "cfg.yaml"
     )
     render_args = parser.parse_args(
-        ["render", "song", "-c", "cfg.yaml", "-o", "out.mp4"]
+        ["render", "song", "-c", "cfg.yaml", "-o", "out.mp4", "--start", "5"]
     )
     assert render_args.config == Path("cfg.yaml")
     assert render_args.output == Path("out.mp4")
+    assert render_args.start == 5
+    assert render_args.end is None
 
 
 def test_module_help_lists_subcommands() -> None:
@@ -507,4 +579,6 @@ def test_module_help_lists_subcommands() -> None:
     assert "Cleave project directory" in render.stdout
     assert "-c CONFIG, --config CONFIG" in render.stdout
     assert "-o OUTPUT, --output OUTPUT" in render.stdout
+    assert "--start SEC" in render.stdout
+    assert "--end SEC" in render.stdout
     assert "-hq" in render.stdout

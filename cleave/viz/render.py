@@ -34,6 +34,87 @@ class RenderResult:
     display_width: int
     display_height: int
     mix_filename: str
+    segment: RenderSegment | None = None
+
+
+@dataclass(frozen=True)
+class RenderSegment:
+    start_sec: int
+    end_label_sec: int
+    end_explicit: bool
+    start_frame: int
+    end_frame_exclusive: int
+    frame_count: int
+
+
+def _resolve_segment(
+    start_sec: int | None,
+    end_sec: int | None,
+    *,
+    duration_sec: float,
+    fps: int,
+) -> RenderSegment:
+    start = 0 if start_sec is None else start_sec
+    end_explicit = end_sec is not None
+    duration_ceil = math.ceil(duration_sec)
+
+    if start < 0:
+        raise ValueError("start must be >= 0")
+    if end_explicit and end_sec < 0:
+        raise ValueError("end must be >= 0")
+    if end_explicit:
+        assert end_sec is not None
+        if start >= end_sec:
+            raise ValueError("start must be less than end")
+        if end_sec > duration_ceil:
+            raise ValueError(f"end must be <= {duration_ceil}")
+        end_frame_exclusive = end_sec * fps
+        end_label_sec = end_sec
+    else:
+        end_frame_exclusive = math.ceil(duration_sec * fps)
+        end_label_sec = duration_ceil
+
+    start_frame = start * fps
+    frame_count = end_frame_exclusive - start_frame
+    if start_frame >= end_frame_exclusive:
+        raise ValueError("segment produces no frames")
+
+    return RenderSegment(
+        start_sec=start,
+        end_label_sec=end_label_sec,
+        end_explicit=end_explicit,
+        start_frame=start_frame,
+        end_frame_exclusive=end_frame_exclusive,
+        frame_count=frame_count,
+    )
+
+
+def _is_partial_segment(
+    segment: RenderSegment,
+    *,
+    duration_sec: float,
+) -> bool:
+    if segment.start_sec > 0:
+        return True
+    if segment.end_explicit and segment.end_label_sec < math.ceil(duration_sec):
+        return True
+    return False
+
+
+def _default_output_path(
+    project: Path,
+    name: str,
+    segment: RenderSegment,
+    *,
+    duration_sec: float,
+) -> Path:
+    if _is_partial_segment(segment, duration_sec=duration_sec):
+        return (
+            project
+            / "renders"
+            / f"{name}_{segment.start_sec}-{segment.end_label_sec}s.mp4"
+        )
+    return project / "renders" / f"{name}.mp4"
 
 
 def _resolve_render_config_path(
@@ -85,20 +166,18 @@ def render(
     config: Path | None = None,
     output: Path | None = None,
     high_quality: bool = False,
+    start_sec: int | None = None,
+    end_sec: int | None = None,
 ) -> RenderResult:
     """Render project visuals to an MP4 muxed with the project mix audio."""
     project = validate_render_project(project_dir, config=config)
     config_path = _resolve_render_config_path(config, project)
     cfg = load_config(config_path, repo_root())
 
-    if output is None:
-        output_path = project / "renders" / f"{cfg.visualizer.name}.mp4"
-    else:
+    if output is not None:
         output_path = Path(output).expanduser()
         if output_path.suffix.lower() != ".mp4":
             raise ValueError("output path must end with .mp4")
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     ffmpeg = shutil.which("ffmpeg")
     if ffmpeg is None:
@@ -126,12 +205,25 @@ def render(
 
         duration_sec = runtime.duration_sec
         fps = runtime.fps
+        segment = _resolve_segment(
+            start_sec, end_sec, duration_sec=duration_sec, fps=fps
+        )
+        if output is None:
+            output_path = _default_output_path(
+                project,
+                cfg.visualizer.name,
+                segment,
+                duration_sec=duration_sec,
+            )
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
         width = runtime.display_width
         height = runtime.display_height
         content_width = runtime.width
         content_height = runtime.height
-        frame_count = math.ceil(duration_sec * fps)
+        frame_count = segment.frame_count
         frame_bytes = width * height * 4
+        audio_duration_sec = frame_count / fps
 
         cmd = [
             ffmpeg,
@@ -148,6 +240,10 @@ def render(
             "pipe:0",
             "-i",
             str(audio_path),
+            "-ss",
+            str(segment.start_sec),
+            "-t",
+            str(audio_duration_sec),
             "-c:v",
             "libx264",
         ]
@@ -185,7 +281,7 @@ def render(
             fade_out = 0.0
 
         for frame_idx in range(frame_count):
-            t_sec = frame_idx / fps
+            t_sec = (segment.start_frame + frame_idx) / fps
             app.tick_frame(t_sec, paused=False, draw_overlay=False)
             alpha = fade_alpha(t_sec, duration_sec, fade_in, fade_out)
             runtime.compositor.apply_frame_fade(alpha)
@@ -225,9 +321,11 @@ def render(
         pygame.quit()
 
     manifest = load_manifest(project)
+    partial = _is_partial_segment(segment, duration_sec=duration_sec)
     return RenderResult(
         output_path=output_path.resolve(),
         display_width=width,
         display_height=height,
         mix_filename=manifest.mix_filename,
+        segment=segment if partial else None,
     )

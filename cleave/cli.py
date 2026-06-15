@@ -12,6 +12,7 @@ from cleave.separate import (
     run_separate,
     signals_complete,
 )
+from cleave.viz.render import RenderSegment
 
 SIGNALS_FILENAME = "signals.json"
 _TARGET_HELP = "Source audio file or cleave project (path or slug)"
@@ -38,6 +39,12 @@ def _format_elapsed(seconds: float) -> str:
 
 def _high_quality_clause(high_quality: bool) -> str:
     return ", in high-quality mode" if high_quality else ""
+
+
+def _render_scope_clause(segment: RenderSegment | None) -> str:
+    if segment is None:
+        return "final render"
+    return f"segment render {segment.start_sec}-{segment.end_label_sec}s"
 
 
 def cmd_separate(args: argparse.Namespace) -> None:
@@ -118,6 +125,8 @@ def cmd_render(args: argparse.Namespace) -> None:
             config=args.config,
             output=args.output,
             high_quality=args.high_quality,
+            start_sec=args.start,
+            end_sec=args.end,
         )
     except (FileNotFoundError, ValueError, RuntimeError) as e:
         _exit_error(f"error: {e}")
@@ -126,8 +135,8 @@ def cmd_render(args: argparse.Namespace) -> None:
     print(f"Rendered to {result.output_path}")
     size = f"{result.display_width}x{result.display_height}"
     print(
-        f"{result.mix_filename} final render at {size} completed"
-        f"{_high_quality_clause(args.high_quality)}, in {elapsed}"
+        f"{result.mix_filename} {_render_scope_clause(result.segment)} at {size} "
+        f"completed{_high_quality_clause(args.high_quality)}, in {elapsed}"
     )
 
 
@@ -251,6 +260,18 @@ def build_parser() -> argparse.ArgumentParser:
         dest="high_quality",
         action="store_true",
         help="veryslow libx264 preset for best encode quality (slower)",
+    )
+    render.add_argument(
+        "--start",
+        type=int,
+        metavar="SEC",
+        help="Segment start in whole seconds (default: 0)",
+    )
+    render.add_argument(
+        "--end",
+        type=int,
+        metavar="SEC",
+        help="Segment end in whole seconds, exclusive (default: full track)",
     )
     render.set_defaults(func=cmd_render)
 

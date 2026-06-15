@@ -71,7 +71,7 @@ git clone https://github.com/projectM-visualizer/presets-milkdrop-texture-pack
 ./cleave.py play ~/music/mysong.wav
 ```
 
-This will separate the track into its component stem tracks (bass, drums, vocals, other), perform some audio analysis, then launch the visualizer.
+This will separate the track into its component stem tracks (bass, drums, vocals, other), perform some audio analysis, then launch the visualizer editor.
 
 ---
 
@@ -90,7 +90,7 @@ This will separate the track into its component stem tracks (bass, drums, vocals
 ### CLI
 
 * `./cleave.py --help`
-* `play` accepts a source audio file or project slug/path.
+* `play` accepts a source audio file or project slug/path
 * `separate` can be run on its own without launching the visualizer
 * `render` accepts a project slug or path (not a source audio file).
 * `backup` archives a full project directory (mix, stems, configs, renders) to a `.cleave-tar.gz` file.

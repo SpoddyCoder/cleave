@@ -2,17 +2,6 @@
 
 Must-do items for Cleave. Everything else is iterative tuning in-session or listed in [roadmap.md](roadmap.md).
 
-## Features
-
-### Render section
-New flags for render, both are in seconds...
-```bash
-./cleave.py render ~/music/mysong.wav --start 10 --end 20
-```
-Output filename is appended with `_{start}-{end}s.mp4`, eg: `sights-and-sounds-26_10-20s.mp4`
-
----
-
 ## Bug Fixes
 
 ### Audio starts before visualizer / render is fully booted
