@@ -18,7 +18,13 @@ from cleave.project import write_manifest
 from cleave.separate import project_stems_complete
 
 render_mod = importlib.import_module("cleave.viz.render")
-from cleave.viz.render import validate_render_project  # noqa: E402
+from cleave.viz.render import (  # noqa: E402
+    RenderSegment,
+    _default_output_path,
+    _is_partial_segment,
+    _resolve_segment,
+    validate_render_project,
+)
 from tests.cleave.viz.test_render_overlay import _overlay_cfg
 from tests.support.config import write_minimal_config
 
@@ -146,6 +152,83 @@ def test_validate_render_project_ok(tmp_path: Path) -> None:
     assert project_stems_complete(project)
 
 
+def test_resolve_segment_defaults_to_full_track() -> None:
+    segment = _resolve_segment(None, None, duration_sec=59.5, fps=30)
+    assert segment == RenderSegment(
+        start_sec=0,
+        end_label_sec=60,
+        end_explicit=False,
+        start_frame=0,
+        end_frame_exclusive=math.ceil(59.5 * 30),
+        frame_count=math.ceil(59.5 * 30),
+    )
+
+
+def test_resolve_segment_partial_range() -> None:
+    segment = _resolve_segment(10, 20, duration_sec=60.0, fps=10)
+    assert segment.start_sec == 10
+    assert segment.end_label_sec == 20
+    assert segment.end_explicit is True
+    assert segment.start_frame == 100
+    assert segment.end_frame_exclusive == 200
+    assert segment.frame_count == 100
+
+
+def test_resolve_segment_start_only_uses_full_end_label() -> None:
+    segment = _resolve_segment(10, None, duration_sec=59.5, fps=10)
+    assert segment.end_label_sec == 60
+    assert segment.end_explicit is False
+    assert segment.frame_count == math.ceil(59.5 * 10) - 100
+
+
+@pytest.mark.parametrize(
+    ("start_sec", "end_sec", "match"),
+    [
+        (-1, None, "start must be >= 0"),
+        (0, -1, "end must be >= 0"),
+        (20, 10, "start must be less than end"),
+        (0, 61, "end must be <= 60"),
+        (60, None, "segment produces no frames"),
+    ],
+)
+def test_resolve_segment_validation_errors(
+    start_sec: int | None, end_sec: int | None, match: str
+) -> None:
+    with pytest.raises(ValueError, match=match):
+        _resolve_segment(start_sec, end_sec, duration_sec=59.5, fps=30)
+
+
+def test_is_partial_segment() -> None:
+    full = _resolve_segment(None, None, duration_sec=60.0, fps=30)
+    assert not _is_partial_segment(full, duration_sec=60.0)
+
+    from_start = _resolve_segment(10, None, duration_sec=60.0, fps=30)
+    assert _is_partial_segment(from_start, duration_sec=60.0)
+
+    clipped = _resolve_segment(0, 30, duration_sec=60.0, fps=30)
+    assert _is_partial_segment(clipped, duration_sec=60.0)
+
+    full_end = _resolve_segment(0, 60, duration_sec=59.5, fps=30)
+    assert not _is_partial_segment(full_end, duration_sec=59.5)
+
+
+def test_default_output_path_suffix_only_for_partial_segments(tmp_path: Path) -> None:
+    full = _resolve_segment(None, None, duration_sec=60.0, fps=30)
+    assert _default_output_path(
+        tmp_path, "my-viz", full, duration_sec=60.0
+    ) == tmp_path / "renders" / "my-viz.mp4"
+
+    partial = _resolve_segment(10, 20, duration_sec=60.0, fps=30)
+    assert _default_output_path(
+        tmp_path, "my-viz", partial, duration_sec=60.0
+    ) == tmp_path / "renders" / "my-viz_10-20s.mp4"
+
+    start_only = _resolve_segment(10, None, duration_sec=59.5, fps=30)
+    assert _default_output_path(
+        tmp_path, "my-viz", start_only, duration_sec=59.5
+    ) == tmp_path / "renders" / "my-viz_10-60s.mp4"
+
+
 @patch.object(render_mod, "pygame")
 @patch.object(render_mod, "shutil")
 @patch.object(render_mod, "subprocess")
@@ -217,6 +300,135 @@ def test_render_frame_count_and_ffmpeg_args(
     assert "-preset" not in cmd
     assert str(project / "my-track.flac") in cmd
     assert str(expected_output) in cmd
+
+
+@patch.object(render_mod, "pygame")
+@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "subprocess")
+@patch.object(render_mod, "_init_gl_resources_render")
+@patch.object(render_mod, "build_runtime_full")
+@patch.object(render_mod, "scan_all_layers", return_value={})
+@patch.object(render_mod, "VisualizerApp")
+def test_render_segment_frame_count_tick_times_and_ffmpeg_trim(
+    mock_app_cls: MagicMock,
+    _mock_scan: MagicMock,
+    mock_build: MagicMock,
+    mock_init_gl: MagicMock,
+    mock_subprocess: MagicMock,
+    mock_shutil: MagicMock,
+    _mock_pygame: MagicMock,
+    tmp_path: Path,
+) -> None:
+    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
+    project = _setup_render_project(tmp_path)
+    width, height, fps = 4, 4, 10
+    duration_sec = 60.0
+    start_sec, end_sec = 10, 20
+    frame_count = (end_sec - start_sec) * fps
+
+    compositor = MagicMock()
+    compositor.read_rgba_frame.return_value = b"\xff" * (width * height * 4)
+
+    runtime = MagicMock()
+    runtime.width = width
+    runtime.height = height
+    runtime.display_width = width
+    runtime.display_height = height
+    runtime.fps = fps
+    runtime.duration_sec = duration_sec
+    runtime.layers = []
+    runtime.compositor = None
+    runtime.post_process = MagicMock()
+    mock_build.return_value = runtime
+
+    def _attach_compositor(rt: MagicMock) -> None:
+        rt.compositor = compositor
+
+    mock_init_gl.side_effect = _attach_compositor
+
+    mock_app = MagicMock()
+    mock_app_cls.return_value = mock_app
+
+    proc = MagicMock()
+    proc.stdin = MagicMock()
+    proc.wait.return_value = 0
+    mock_subprocess.Popen.return_value = proc
+
+    _attach_render_post_fx_session(runtime)
+
+    output = render_mod.render(project, start_sec=start_sec, end_sec=end_sec)
+
+    expected_output = project / "renders" / "cleave-test_10-20s.mp4"
+    assert output.output_path == expected_output.resolve()
+    assert mock_app.tick_frame.call_count == frame_count
+    tick_times = [call.args[0] for call in mock_app.tick_frame.call_args_list]
+    assert tick_times[0] == pytest.approx(start_sec)
+    assert tick_times[-1] == pytest.approx(end_sec - 1 / fps)
+
+    cmd = mock_subprocess.Popen.call_args[0][0]
+    ss_idx = cmd.index("-ss")
+    assert cmd[ss_idx + 1] == str(start_sec)
+    t_idx = cmd.index("-t")
+    assert cmd[t_idx + 1] == str(frame_count / fps)
+
+
+@patch.object(render_mod, "fade_alpha")
+@patch.object(render_mod, "pygame")
+@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "subprocess")
+@patch.object(render_mod, "_init_gl_resources_render")
+@patch.object(render_mod, "build_runtime_full")
+@patch.object(render_mod, "scan_all_layers", return_value={})
+@patch.object(render_mod, "VisualizerApp")
+def test_render_segment_fade_alpha_uses_full_duration(
+    mock_app_cls: MagicMock,
+    _mock_scan: MagicMock,
+    mock_build: MagicMock,
+    mock_init_gl: MagicMock,
+    mock_subprocess: MagicMock,
+    mock_shutil: MagicMock,
+    _mock_pygame: MagicMock,
+    mock_fade_alpha: MagicMock,
+    tmp_path: Path,
+) -> None:
+    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
+    project = _setup_render_project(tmp_path)
+    width, height, fps = 4, 4, 10
+    duration_sec = 60.0
+
+    compositor = MagicMock()
+    compositor.read_rgba_frame.return_value = b"\xff" * (width * height * 4)
+
+    runtime = MagicMock()
+    runtime.width = width
+    runtime.height = height
+    runtime.display_width = width
+    runtime.display_height = height
+    runtime.fps = fps
+    runtime.duration_sec = duration_sec
+    runtime.layers = []
+    runtime.compositor = None
+    runtime.post_process = MagicMock()
+    mock_build.return_value = runtime
+
+    def _attach_compositor(rt: MagicMock) -> None:
+        rt.compositor = compositor
+
+    mock_init_gl.side_effect = _attach_compositor
+    mock_app_cls.return_value = MagicMock()
+    mock_fade_alpha.return_value = 1.0
+
+    proc = MagicMock()
+    proc.stdin = MagicMock()
+    proc.wait.return_value = 0
+    mock_subprocess.Popen.return_value = proc
+
+    _attach_render_post_fx_session(runtime, enabled=True, fade_in=5.0, fade_out=5.0)
+
+    render_mod.render(project, start_sec=10, end_sec=20)
+
+    for call in mock_fade_alpha.call_args_list:
+        assert call.args[1] == duration_sec
 
 
 @patch.object(render_mod, "pygame")
