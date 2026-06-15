@@ -548,6 +548,65 @@ def test_render_ffmpeg_uses_display_dimensions_with_upscale(
     assert compositor.present_content.call_count == math.ceil(duration_sec * fps)
 
 
+@patch.object(render_mod, "pygame")
+@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "subprocess")
+@patch.object(render_mod, "_init_gl_resources_render")
+@patch.object(render_mod, "build_runtime_full")
+@patch.object(render_mod, "scan_all_layers", return_value={})
+@patch.object(render_mod, "VisualizerApp")
+def test_render_present_content_every_frame_at_upscale_one(
+    mock_app_cls: MagicMock,
+    _mock_scan: MagicMock,
+    mock_build: MagicMock,
+    mock_init_gl: MagicMock,
+    mock_subprocess: MagicMock,
+    mock_shutil: MagicMock,
+    _mock_pygame: MagicMock,
+    tmp_path: Path,
+) -> None:
+    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
+    project = _setup_render_project(tmp_path)
+    content_w, content_h, fps = 4, 4, 10
+    upscale = 1.0
+    display_w = int(content_w * upscale)
+    display_h = int(content_h * upscale)
+    duration_sec = 2.0
+
+    compositor = MagicMock()
+    compositor.read_rgba_frame.return_value = b"\xff" * (display_w * display_h * 4)
+
+    runtime = MagicMock()
+    runtime.width = content_w
+    runtime.height = content_h
+    runtime.upscale = upscale
+    runtime.display_width = display_w
+    runtime.display_height = display_h
+    runtime.fps = fps
+    runtime.duration_sec = duration_sec
+    runtime.layers = []
+    runtime.compositor = None
+    runtime.post_process = MagicMock()
+    mock_build.return_value = runtime
+
+    def _attach_compositor(rt: MagicMock) -> None:
+        rt.compositor = compositor
+
+    mock_init_gl.side_effect = _attach_compositor
+    mock_app_cls.return_value = MagicMock()
+
+    proc = MagicMock()
+    proc.stdin = MagicMock()
+    proc.wait.return_value = 0
+    mock_subprocess.Popen.return_value = proc
+
+    _attach_render_post_fx_session(runtime)
+
+    render_mod.render(project)
+
+    assert compositor.present_content.call_count == math.ceil(duration_sec * fps)
+
+
 @patch.object(render_mod, "build_panel_surface")
 @patch.object(render_mod, "pygame")
 @patch.object(render_mod, "shutil")

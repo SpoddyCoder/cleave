@@ -138,13 +138,13 @@ class LayerFbo:
 
 
 class GlCompositor:
-    """Stack tiered layer FBO textures into the default framebuffer.
+    """Stack tiered layer FBO textures into a content FBO, then present to display.
 
     Layer blend mode ``black-key`` treats each pixel's RGB as its compositing
-    weight (black is fully transparent). The tuning overlay uses SRCALPHA blending.
-
-    When display dimensions differ from content (upscale > 1), stem composite and
-    post-FX render into a content FBO; ``present_content()`` blits to the window.
+    weight (black is fully transparent). Stem composite and post-FX always render
+    into the content FBO; ``present_content()`` blits to the default framebuffer
+    at display size (1:1 when upscale is 1.0). The tuning overlay uses SRCALPHA
+    blending on the display framebuffer after present.
     """
 
     def __init__(
@@ -173,18 +173,10 @@ class GlCompositor:
         self._content_texture_id: int = 0
         self._content_depth_rbo_id: int = 0
 
-    @property
-    def _uses_content_fbo(self) -> bool:
-        return (self.display_width, self.display_height) != (
-            self.content_width,
-            self.content_height,
-        )
-
     def init(self) -> None:
         """Initialize GL state after a pygame OPENGL context exists."""
         self.setup_gl_state()
-        if self._uses_content_fbo:
-            self._allocate_content_fbo()
+        self._allocate_content_fbo()
         self._initialized = True
 
     def setup_gl_state(self) -> None:
@@ -368,15 +360,12 @@ class GlCompositor:
         self._layers.append(layer)
         return layer
 
-    def _bind_content_target(self) -> None:
-        if self._uses_content_fbo:
-            glBindFramebuffer(GL_FRAMEBUFFER, self._content_fbo_id)
-            glUseProgram(0)
-            glEnable(GL_TEXTURE_2D)
-            glViewport(0, 0, self.content_width, self.content_height)
-            self._set_content_projection()
-        else:
-            self._bind_default_framebuffer()
+    def _bind_content_fbo(self) -> None:
+        glBindFramebuffer(GL_FRAMEBUFFER, self._content_fbo_id)
+        glUseProgram(0)
+        glEnable(GL_TEXTURE_2D)
+        glViewport(0, 0, self.content_width, self.content_height)
+        self._set_content_projection()
 
     def _bind_default_framebuffer(self) -> None:
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
@@ -486,7 +475,7 @@ class GlCompositor:
         if layer.opacity <= 0.0 and layer.flash_alpha < 0.01:
             return
         self._ensure_init()
-        self._bind_content_target()
+        self._bind_content_fbo()
         if layer.opacity > 0.0:
             glEnable(GL_BLEND)
             self._apply_layer_blend_mode(layer.blend_mode)
@@ -523,7 +512,7 @@ class GlCompositor:
     def composite(self, layers: list[LayerFbo]) -> None:
         """Clear to background and stack *layers* bottom-to-top."""
         self._ensure_init()
-        self._bind_content_target()
+        self._bind_content_fbo()
         glClearColor(*self.bg)
         glClear(GL_COLOR_BUFFER_BIT)
         for layer in layers:
@@ -534,7 +523,7 @@ class GlCompositor:
         if alpha >= 1.0:
             return
         self._ensure_init()
-        self._bind_content_target()
+        self._bind_content_fbo()
         if alpha <= 0.0:
             glClearColor(0.0, 0.0, 0.0, 1.0)
             glClear(GL_COLOR_BUFFER_BIT)
@@ -558,8 +547,6 @@ class GlCompositor:
     def present_content(self) -> None:
         """Blit content FBO to the default framebuffer at display size."""
         self._ensure_init()
-        if not self._uses_content_fbo:
-            return
         self._bind_default_framebuffer()
         glDisable(GL_BLEND)
         self._draw_textured_quad(
@@ -657,7 +644,7 @@ class GlCompositor:
     ) -> None:
         """Draw *texture_id* onto the content FBO with SRCALPHA blending."""
         self._ensure_init()
-        self._bind_content_target()
+        self._bind_content_fbo()
         self._draw_overlay_quad(texture_id, x, y, width, height, alpha)
 
     def draw_overlay(
