@@ -43,6 +43,8 @@ The lower block after a visual gap (`footer_gap` in `draw()`): `footer_row_count
 
 `TuningOverlay` draws one panel (`panel_rect`). There are no separate section rectangles; layout is positional from the track-rows / footer-rows split.
 
+When the track/render section is taller than the viewport, only that upper block scrolls; footer rows stay pinned at the bottom. Keyboard focus auto-scrolls the viewport (`_ensure_focus_visible` in `draw()`). The right-edge scrollbar is a visual indicator only (no mouse wheel).
+
 ## Typography roles
 
 Colors live in [cleave/viz/theme.py](cleave/viz/theme.py). Label truncation uses [cleave/viz/text_fit.py](cleave/viz/text_fit.py). Row drawing uses `_row_value_color` and `_render_label_value_row`.
