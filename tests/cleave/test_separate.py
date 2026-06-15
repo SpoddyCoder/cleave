@@ -12,6 +12,7 @@ from cleave.config import VIZ_CONFIG_FILENAME
 from cleave.extract import STEM_NAMES, stems_dir
 from cleave.project import PROJECT_FILENAME, load_manifest, write_manifest
 from cleave.separate import (
+    _run_demucs,
     project_stems_complete,
     resolve_separate_target,
     run_separate,
@@ -159,6 +160,42 @@ def test_run_separate_analyse_only_when_stems_exist_no_signals(
     assert result == project.resolve()
     run_demucs.assert_not_called()
     run_analyse.assert_called_once_with(project.resolve(), high_quality=False)
+
+
+def test_run_demucs_skips_copy_when_mix_in_project(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = tmp_path / "projects" / "my-track"
+    project.mkdir(parents=True)
+    (project / "renders").mkdir()
+    mix = project / "my-track.flac"
+    mix.write_bytes(b"mix")
+    write_manifest(
+        project,
+        slug="my-track",
+        mix_filename="my-track.flac",
+        original_path=mix,
+        demucs_model="htdemucs",
+    )
+
+    demucs_out = tmp_path / "demucs-out" / "htdemucs" / "my-track"
+    demucs_out.mkdir(parents=True)
+    for name in STEM_NAMES:
+        (demucs_out / f"{name}.wav").write_bytes(b"wav")
+
+    def fake_run(cmd: list[str], *, check: bool) -> None:
+        out_flag = cmd.index("-o")
+        out_root = Path(cmd[out_flag + 1])
+        target = out_root / "htdemucs" / "my-track"
+        target.mkdir(parents=True, exist_ok=True)
+        for name in STEM_NAMES:
+            (target / f"{name}.wav").write_bytes(b"wav")
+
+    with patch("cleave.separate.subprocess.run", side_effect=fake_run):
+        _run_demucs(mix, project, high_quality=False, force=True)
+
+    assert mix.read_bytes() == b"mix"
 
 
 def test_run_separate_force_runs_demucs_and_analyse(
