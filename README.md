@@ -35,20 +35,16 @@ conda create -n cleave python=3.10
 conda activate cleave
 ```
 
-Install dependencies (torch first, then runtime pins)...
+Install dependencies...
 
 ```bash
 # CUDA 13.0 (Linux + NVIDIA GPU)
 pip install -r requirements-torch-cu130.txt
 # or CPU-only
 pip install -r requirements-torch-cpu.txt
-# rest of deps...
+# rest of deps
 pip install -r requirements.txt
-```
-
-For development and tests, also install [requirements-dev.txt](requirements-dev.txt) (`pytest`).
-
-```bash
+# for development and tests
 pip install -r requirements-dev.txt
 ```
 
@@ -72,7 +68,7 @@ git clone https://github.com/projectM-visualizer/presets-milkdrop-texture-pack
 ### `cleave` a track
 
 ```bash
-python -m cleave play ~/music/mysong.wav
+./cleave.py play ~/music/mysong.wav
 ```
 
 This will separate the track into its component stem tracks (bass, drums, vocals, other), perform some audio analysis, then launch the visualizer.
@@ -93,69 +89,12 @@ This will separate the track into its component stem tracks (bass, drums, vocals
 
 ### CLI
 
-* `python -m cleave --help`
+* `./cleave.py --help`
 * `play` accepts a source audio file or project slug/path.
-  * It will only re-run the seperation and analysis if they're not already in the project directory
-    * Use `--force` if you want to redo these.
 * `separate` can be run on its own without launching the visualizer
-* `render` accepts a project slug or path (not a source audio file). 
-  * `-o` for output (`.mp4` only)
-    * If omitted outputs to `projects/<slug>/renders/<visualizer.name>.mp4`
-  * `-c` for config
-  * `-hq` / `--high-quality` for `veryslow` libx264 encode (default uses ffmpeg's libx264 preset).
+* `render` accepts a project slug or path (not a source audio file).
 * `backup` archives a full project directory (mix, stems, configs, renders) to a `.cleave-tar.gz` file.
-  * First argument: project slug or path.
-  * Second argument: destination directory, parent path, or explicit archive file path.
-    * Directory (or path without a `.tar.gz` suffix): writes `<slug>.cleave-tar.gz` inside.
-    * Path ending in `.tar.gz` or `.cleave-tar.gz`: uses that filename.
-  * Prompts before overwriting an existing archive; `-f` / `--force` skips the prompt.
 * `restore` unpacks a `.cleave-tar.gz` archive into `projects/<slug>/` (slug from `project.yaml`).
-  * Prompts before replacing an existing project directory; `-f` / `--force` skips the prompt.
-  * `--as <slug>` restores under a different slug, rewrites `project.yaml`, and records `restored-from: <original-slug>`.
-* Pass `-hq` / `--high-quality` to `separate` or `play` for higher-quality Demucs separation.
-* To store projects under XDG instead, set `CLEAVE_DATA=~/.local/share/cleave`.
-* `python cleave.py` is an alias for `python -m cleave` (same subcommands).
-
-#### Render overlay
-
-Optional title and body text burned into the MP4. Configure under `render.overlay` in [cleave-viz.yaml](cleave-viz.yaml) (copied into each project on first `separate` / `play`).
-
-* `enabled` — turn the overlay on or off.
-* `start_delay` — when the overlay begins fading in (seconds).
-* `display_time` — how long the overlay is on screen, including the 2s fade-in and fade-out.
-* `position` — `top-left`, `top-right`, `centre`, `bottom-left`, or `bottom-right`.
-* `title` / `body` — nested text blocks, each with:
-  * `content` — multiline string (`|` block scalar).
-  * `font-size` — text size in pixels (title is rendered bold).
-  * `font-colour` (title) or `colour` (body) — hex text colour.
-  * `background-colour` — optional hex fill behind each line of text only (stops at the glyph width). Omit the key or leave empty for no text background.
-  * `margin-bottom` (title only) — gap in pixels between the title and body blocks.
-* `background.margin` — gap from the frame edge to the panel (ignored when `position: centre`).
-* `background.padding` — gap from the panel edge to the text.
-* `background.colour`, `background.opacity`, `background.border` — outer panel fill and border (border opacity matches background; border grows outward from the fill, margin is measured to the outer border edge).
-
-In the live visualizer, a blank gap row separates the four stem layers from **Render: OVERLAY**. Same eye / expand / solo semantics as stem layers (solo forces the overlay on; solo is not saved). Tunable in the panel: position, opacity, border width, start delay, display time, and per-block font size and title margin-bottom under expandable **title** / **body** submenus. Content, colours, margin, and padding are YAML-only. Saved with **SAVE AS NEW CONFIG** / **OVERWRITE CONFIG**.
-
-#### Post-processing fade
-
-Whole-frame fade on the composited stems (GL fade on the default framebuffer). The render overlay is composited above it and is not affected by fade in/out. Configure under `render.post_fx` in [cleave-viz.yaml](cleave-viz.yaml).
-
-* `enabled` — turn whole-frame fade on or off.
-* `fade_in` — seconds to fade from black at the start of the video.
-* `fade_out` — seconds to fade to black at the end.
-
-Fade easing uses a smoothstep curve.
-
-In the live visualizer, **Render: POST FX** sits below overlay with the same eye / expand / solo semantics (solo forces fade on; solo is not saved). Tunable in the panel: fade in, fade out. Saved with **SAVE AS NEW CONFIG** / **OVERWRITE CONFIG**.
-
-#### Layer visibility timeline
-
-Sparse cue list under root `timeline:` in [cleave-viz.yaml](cleave-viz.yaml) (saved at the bottom of config snapshots). When enabled, cues override per-stem `layers.*.enabled` during playback and offline render.
-
-* `enabled` — turn timeline automation on or off.
-* `cues` — list of `{t: seconds, layers: {stem: bool}}` events; partial `layers` maps leave other stems unchanged.
-
-In the live visualizer, **Render: TIMELINE** sits below post-FX. **Ctrl+Right** / **Ctrl+Left** toggles timeline on or off. Press **t** to open the bottom timeline strip (toast if disabled): dual eyes per row (monitor vs committed cues), pause-to-preview with num keys, **Shift+Enter** override while playing, and WYSIWYG record start. **t** or **Esc** closes the strip. Full key map and transport modes: [docs/timeline-idea.md](docs/timeline-idea.md). Saved with **SAVE AS NEW CONFIG** / **OVERWRITE CONFIG**.
 
 ### Visualizer
 Controls...
@@ -175,7 +114,8 @@ Controls...
   * forward / back 30 secs
   * up / down the preset directory tree 
 * `SHIFT` + `Right` / `Left`
-  * Solo / unsolo layer
+  * layers: solo / unsolo layer
+  * timeline: override mode
 * `Enter`
   * move a stem layer up or down the z-order (not available on **Render: OVERLAY**)
 * `CTRL` + `Enter`
@@ -183,7 +123,7 @@ Controls...
 * `CTRL` + `q`
   * quit
 * `t`
-  * open timeline panel (when **Render: TIMELINE** is enabled)
+  * open timeline panel
 
 #### Compositing
 
@@ -206,3 +146,12 @@ Signal-driven compositor modifiers on top of each layer. Tune depths (0-100%).
 | Bass | pulse (sub_bass, mid_bass), flash, grit |
 | Vocals | pulse, hue (pitch), flash, grit |
 | Other | pulse, flash, grit |
+
+#### Render overlay
+* TODO: Document
+
+#### Post-processing fade
+* TODO: Document
+
+#### Layer visibility timeline
+* TODO: Document
