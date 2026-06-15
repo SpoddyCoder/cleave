@@ -19,7 +19,9 @@ from cleave.viz.theme import (
     FOCUS_ROW_BG_ALPHA,
     HIGHLIGHT,
     LABEL,
+    PLAYHEAD,
     REC_BG,
+    TIMELINE_BAR_ON,
     VALUE,
 )
 
@@ -400,7 +402,7 @@ class TimelineOverlay:
                 x1 = time_to_x(end_t, bar_left, bar_width, state.duration_sec)
                 if x1 <= x0:
                     continue
-                color = VALUE if visible else OFF_SEGMENT_COLOR
+                color = TIMELINE_BAR_ON if visible else OFF_SEGMENT_COLOR
                 seg_rect = pygame.Rect(x0, bar_rect.y, max(1, x1 - x0), bar_rect.h)
                 pygame.draw.rect(panel, color, seg_rect)
 
@@ -434,7 +436,7 @@ class TimelineOverlay:
         playhead_left = max(bar_left, min(bar_left + bar_width - 1, playhead_px))
         pygame.draw.line(
             panel,
-            HIGHLIGHT,
+            PLAYHEAD,
             (playhead_left, bar_top),
             (playhead_left, bar_bottom - 1),
             PLAYHEAD_WIDTH,
