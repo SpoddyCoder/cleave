@@ -7,7 +7,8 @@ Typography roles for the live tuning overlay:
   LOCKED   — tinted text for locked sub-rows that cannot be edited
 
 Accent colors for modes and icons (not label/value roles):
-  HIGHLIGHT, MOVE_MODE, LOCK_ICON, PRESET_ICON, PRESET_FILE_ICON
+  HIGHLIGHT, MOVE_MODE, LOCK_ICON, PRESET_ICON, PRESET_FILE_ICON,
+  TIMELINE_BAR_ON, PLAYHEAD
 
 See [.cursor/rules/live-tuning-ui.mdc](../.cursor/rules/live-tuning-ui.mdc) for how
 rows apply these roles, including intentional exceptions.
@@ -36,6 +37,8 @@ OVERRIDE_GLYPH: tuple[int, int, int] = (0, 0, 0)
 OVERRIDE_GLYPH_OFF: tuple[int, int, int] = DISABLED
 FOCUS_ROW_BG_ALPHA: int = 50
 REC_BG: tuple[int, int, int] = (220, 0, 0)
+TIMELINE_BAR_ON: tuple[int, int, int] = (200, 225, 255)
+PLAYHEAD: tuple[int, int, int] = (90, 50, 130)
 
 BORDER_WIDTH: int = 2
 PANEL_CONTENT_MAX_WIDTH: int = 440
