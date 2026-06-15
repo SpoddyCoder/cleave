@@ -29,6 +29,7 @@ from cleave.gl_post_process import GlPostProcess
 from cleave.preset_playlist import PresetPlaylist, preset_browse_floor
 from cleave.projectm import ProjectM
 from cleave.signals import Signals
+from cleave.stem_pcm import StemPcmBank
 from cleave.viz.controls import (
     LayerRuntime,
     RenderOverlayRuntime,
@@ -267,6 +268,42 @@ def _build_layers(
         )
 
     return runtimes
+
+
+def _warmup_layers(
+    layers: list[StemLayer],
+    pcm_bank: StemPcmBank,
+    start_sec: float,
+    frames: int,
+    fps: int,
+    n_pcm: int,
+    *,
+    session: TuningSession,
+) -> None:
+    """Pre-render projectM FBOs over a pre-roll that flows into *start_sec*.
+
+    Frame time advances monotonically across the pre-roll, from
+    ``start_sec - frames / fps`` up to ``start_sec - 1 / fps``, so projectM's
+    time-driven equations and feedback buffers actually evolve (pinning the
+    frame time leaves projectM in its white frame-0 state). The window ends one
+    frame before *start_sec*, so the first real frame at *start_sec* continues
+    the same ``+1 / fps`` step with no frame-time reset or visible cut.
+
+    For a t=0 show start the pre-roll frame times are negative; that is fine for
+    projectM and PCM is sampled from the show-start region
+    (StemPcmBank.slice_pcm clamps the sample position to t>=0).
+    """
+    layers_by_name = {layer.name: layer for layer in layers}
+    for i in range(frames):
+        t_sec = start_sec - (frames - i) / fps
+        apply_layer_visibility(session, layers_by_name, t_sec)
+        for layer in layers:
+            if not layer.fbo.enabled:
+                continue
+            pcm = pcm_bank.slice_pcm(layer.name, t_sec, n_pcm)
+            layer.pm.feed_pcm(pcm)
+            layer.pm.set_frame_time(t_sec)
+            _render_layer_fbo(layer, layer.pm)
 
 
 def _render_layer_fbo(layer: StemLayer, pm: ProjectM) -> None:

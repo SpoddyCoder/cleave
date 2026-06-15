@@ -305,6 +305,78 @@ def test_render_frame_count_and_ffmpeg_args(
 @patch.object(render_mod, "pygame")
 @patch.object(render_mod, "shutil")
 @patch.object(render_mod, "subprocess")
+@patch.object(render_mod, "_warmup_layers")
+@patch.object(render_mod, "_init_gl_resources_render")
+@patch.object(render_mod, "build_runtime_full")
+@patch.object(render_mod, "scan_all_layers", return_value={})
+@patch.object(render_mod, "VisualizerApp")
+def test_render_warmup_before_emit_loop(
+    mock_app_cls: MagicMock,
+    _mock_scan: MagicMock,
+    mock_build: MagicMock,
+    mock_init_gl: MagicMock,
+    mock_warmup: MagicMock,
+    mock_subprocess: MagicMock,
+    mock_shutil: MagicMock,
+    _mock_pygame: MagicMock,
+    tmp_path: Path,
+) -> None:
+    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
+    project = _setup_render_project(tmp_path)
+    width, height, fps = 4, 4, 30
+    duration_sec = 2.0
+
+    compositor = MagicMock()
+    compositor.read_rgba_frame.return_value = b"\xff" * (width * height * 4)
+
+    runtime = MagicMock()
+    runtime.width = width
+    runtime.height = height
+    runtime.display_width = width
+    runtime.display_height = height
+    runtime.fps = fps
+    runtime.duration_sec = duration_sec
+    runtime.layers = []
+    runtime.pcm_bank = MagicMock()
+    runtime.n_pcm = 1024
+    runtime.compositor = None
+    runtime.post_process = MagicMock()
+    mock_build.return_value = runtime
+
+    def _attach_compositor(rt: MagicMock) -> None:
+        rt.compositor = compositor
+
+    mock_init_gl.side_effect = _attach_compositor
+
+    call_order: list[str] = []
+    mock_warmup.side_effect = lambda *_a, **_k: call_order.append("warmup")
+
+    mock_app = MagicMock()
+    mock_app.tick_frame.side_effect = lambda *_a, **_k: call_order.append("tick")
+    mock_app_cls.return_value = mock_app
+
+    stdin_mock = MagicMock()
+    proc = MagicMock()
+    proc.stdin = stdin_mock
+    proc.wait.return_value = 0
+    mock_subprocess.Popen.return_value = proc
+
+    _attach_render_post_fx_session(runtime)
+
+    render_mod.render(project)
+
+    mock_warmup.assert_called_once()
+    warmup_kwargs = mock_warmup.call_args.kwargs
+    assert warmup_kwargs["session"] is runtime.session
+    assert mock_warmup.call_args.args[2] == 0.0
+    assert mock_warmup.call_args.args[3] == 90
+    assert call_order[0] == "warmup"
+    assert call_order[1] == "tick"
+
+
+@patch.object(render_mod, "pygame")
+@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "_init_gl_resources_render")
 @patch.object(render_mod, "build_runtime_full")
 @patch.object(render_mod, "scan_all_layers", return_value={})

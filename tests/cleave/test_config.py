@@ -147,6 +147,31 @@ def test_parse_visualizer_reads_name() -> None:
     assert cfg.name == "buttercup-24"
 
 
+def test_parse_visualizer_warmup_sec_defaults() -> None:
+    cfg = _parse_visualizer({})
+    assert cfg.warmup_sec == 3.0
+
+
+def test_parse_visualizer_reads_warmup_sec() -> None:
+    cfg = _parse_visualizer({"visualizer": {"warmup_sec": 2.5}})
+    assert cfg.warmup_sec == 2.5
+
+
+def test_parse_visualizer_accepts_zero_warmup_sec() -> None:
+    cfg = _parse_visualizer({"visualizer": {"warmup_sec": 0}})
+    assert cfg.warmup_sec == 0.0
+
+
+def test_parse_visualizer_rejects_negative_warmup_sec() -> None:
+    with pytest.raises(ValueError, match="visualizer.warmup_sec must be >= 0"):
+        _parse_visualizer({"visualizer": {"warmup_sec": -0.1}})
+
+
+def test_parse_visualizer_rejects_non_numeric_warmup_sec() -> None:
+    with pytest.raises(ValueError, match="visualizer.warmup_sec must be a number"):
+        _parse_visualizer({"visualizer": {"warmup_sec": "fast"}})
+
+
 def test_load_config_reads_visualizer_name(minimal_project: Path) -> None:
     cfg = load_config(project_root=minimal_project)
     assert cfg.visualizer.name == "cleave-test"

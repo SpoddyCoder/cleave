@@ -22,7 +22,7 @@ from cleave.viz.app import (
     _init_gl_resources_render,
     build_runtime_full,
 )
-from cleave.viz.layer import _destroy_layers
+from cleave.viz.layer import _destroy_layers, _warmup_layers
 from cleave.viz.render_overlay import build_panel_surface, composite_render_overlay
 
 _PREPARE_HINT = "run `cleave separate` or `cleave play` first"
@@ -279,6 +279,18 @@ def render(
         else:
             fade_in = 0.0
             fade_out = 0.0
+
+        warmup_frames = round(cfg.visualizer.warmup_sec * fps)
+        if warmup_frames > 0:
+            _warmup_layers(
+                runtime.layers,
+                runtime.pcm_bank,
+                segment.start_frame / fps,
+                warmup_frames,
+                fps,
+                runtime.n_pcm,
+                session=runtime.session,
+            )
 
         for frame_idx in range(frame_count):
             t_sec = (segment.start_frame + frame_idx) / fps
