@@ -11,6 +11,7 @@ from unittest.mock import patch
 import pytest
 
 from cleave.cli import (
+    _format_elapsed,
     build_parser,
     cmd_backup,
     cmd_play,
@@ -18,6 +19,7 @@ from cleave.cli import (
     cmd_restore,
     cmd_separate,
 )
+from cleave.viz.render import RenderResult
 from cleave.extract import STEM_NAMES, stems_dir
 from cleave.project import write_manifest
 
@@ -27,6 +29,12 @@ def _write_stub_stems(project: Path) -> None:
     base.mkdir(parents=True, exist_ok=True)
     for name in STEM_NAMES:
         (base / f"{name}.wav").write_bytes(b"wav")
+
+
+def test_format_elapsed() -> None:
+    assert _format_elapsed(0.4) == "0 mins 0 secs"
+    assert _format_elapsed(65.4) == "1 mins 5 secs"
+    assert _format_elapsed(3723.6) == "62 mins 4 secs"
 
 
 def test_separate_parser_uses_target_arg() -> None:
@@ -87,6 +95,8 @@ def test_cmd_separate_analyse_only_message(
 
     out = capsys.readouterr().out
     assert f"Wrote signals to {signals_path}" in out
+    assert "my-track.flac audio separated and analysed, in" in out
+    assert "high-quality mode" not in out
 
 
 def test_cmd_separate_force_message(
@@ -112,6 +122,7 @@ def test_cmd_separate_force_message(
 
     out = capsys.readouterr().out
     assert "Re-separated and analysed" in out
+    assert "song.flac audio separated and analysed, in" in out
 
 
 def test_play_parser_uses_target_arg() -> None:
@@ -171,6 +182,56 @@ def test_cmd_play_calls_launch(
     )
 
 
+def test_cmd_separate_high_quality_completion_message(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = tmp_path / "projects" / "song"
+    project.mkdir(parents=True)
+    _write_stub_stems(project)
+    mix = project / "song.flac"
+    mix.write_bytes(b"mix")
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=tmp_path / "song.flac",
+        demucs_model="htdemucs",
+    )
+
+    with patch("cleave.cli.run_separate", return_value=project.resolve()):
+        cmd_separate(build_parser().parse_args(["separate", "song", "-hq"]))
+
+    out = capsys.readouterr().out
+    assert "song.flac audio separated and analysed, in high-quality mode, in" in out
+
+
+def test_cmd_render_high_quality_completion_message(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = _complete_project(tmp_path)
+    render_result = RenderResult(
+        output_path=(project / "renders" / "out.mp4").resolve(),
+        display_width=2560,
+        display_height=1440,
+        mix_filename="my-track.flac",
+    )
+
+    with patch.object(
+        importlib.import_module("cleave.viz.render"),
+        "render",
+        return_value=render_result,
+    ):
+        cmd_render(build_parser().parse_args(["render", "my-track", "--hq"]))
+
+    out = capsys.readouterr().out
+    assert (
+        "my-track.flac final render at 2560x1440 completed, "
+        "in high-quality mode, in"
+    ) in out
+
+
 def test_cmd_render_calls_render(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -178,8 +239,16 @@ def test_cmd_render_calls_render(
     project = _complete_project(tmp_path)
     output = tmp_path / "video.mp4"
 
+    render_result = RenderResult(
+        output_path=output.resolve(),
+        display_width=1280,
+        display_height=720,
+        mix_filename="my-track.flac",
+    )
     with patch.object(
-        importlib.import_module("cleave.viz.render"), "render", return_value=output.resolve()
+        importlib.import_module("cleave.viz.render"),
+        "render",
+        return_value=render_result,
     ) as render:
         cmd_render(
             build_parser().parse_args(
@@ -202,6 +271,10 @@ def test_cmd_render_calls_render(
     )
     out = capsys.readouterr().out
     assert f"Rendered to {output.resolve()}" in out
+    assert (
+        "my-track.flac final render at 1280x720 completed, in" in out
+    )
+    assert "high-quality mode" not in out
 
 
 def test_cmd_render_passes_high_quality_flag(
@@ -210,10 +283,20 @@ def test_cmd_render_passes_high_quality_flag(
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     _complete_project(tmp_path)
 
+    render_result = RenderResult(
+        output_path=(tmp_path / "out.mp4").resolve(),
+        display_width=2560,
+        display_height=1440,
+        mix_filename="my-track.flac",
+    )
     with patch.object(
-        importlib.import_module("cleave.viz.render"), "render", return_value=tmp_path / "out.mp4"
+        importlib.import_module("cleave.viz.render"),
+        "render",
+        return_value=render_result,
     ) as render:
-        cmd_render(build_parser().parse_args(["render", "my-track", "--hq"]))
+        cmd_render(
+            build_parser().parse_args(["render", "my-track", "--hq"]),
+        )
 
     render.assert_called_once()
     assert render.call_args.kwargs["high_quality"] is True

@@ -6,6 +6,7 @@ import math
 import os
 import shutil
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 
 import pygame
@@ -14,7 +15,7 @@ from cleave.config import VIZ_CONFIG_FILENAME, load_config
 from cleave.easing import fade_alpha
 from cleave.paths import default_project_config, repo_root, resolve_project
 from cleave.preset_playlist import scan_all_layers
-from cleave.project import manifest_path, mix_path
+from cleave.project import load_manifest, manifest_path, mix_path
 from cleave.separate import project_stems_complete, signals_complete
 from cleave.viz.app import (
     VisualizerApp,
@@ -25,6 +26,14 @@ from cleave.viz.layer import _destroy_layers
 from cleave.viz.render_overlay import build_panel_surface, composite_render_overlay
 
 _PREPARE_HINT = "run `cleave separate` or `cleave play` first"
+
+
+@dataclass(frozen=True)
+class RenderResult:
+    output_path: Path
+    display_width: int
+    display_height: int
+    mix_filename: str
 
 
 def _resolve_render_config_path(
@@ -76,7 +85,7 @@ def render(
     config: Path | None = None,
     output: Path | None = None,
     high_quality: bool = False,
-) -> Path:
+) -> RenderResult:
     """Render project visuals to an MP4 muxed with the project mix audio."""
     project = validate_render_project(project_dir, config=config)
     config_path = _resolve_render_config_path(config, project)
@@ -215,4 +224,10 @@ def render(
             proc.wait()
         pygame.quit()
 
-    return output_path.resolve()
+    manifest = load_manifest(project)
+    return RenderResult(
+        output_path=output_path.resolve(),
+        display_width=width,
+        display_height=height,
+        mix_filename=manifest.mix_filename,
+    )

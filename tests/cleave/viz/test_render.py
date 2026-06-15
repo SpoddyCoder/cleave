@@ -203,7 +203,7 @@ def test_render_frame_count_and_ffmpeg_args(
     output = render_mod.render(project)
 
     expected_output = project / "renders" / "cleave-test.mp4"
-    assert output == expected_output.resolve()
+    assert output.output_path == expected_output.resolve()
     assert mock_app.tick_frame.call_count == frame_count
     assert compositor.read_rgba_frame.call_count == frame_count
     assert stdin_mock.write.call_count == frame_count

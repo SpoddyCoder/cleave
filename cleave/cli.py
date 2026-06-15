@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+import time
 from pathlib import Path
 
 from cleave.config import VIZ_CONFIG_FILENAME, ensure_project_viz_config
@@ -29,10 +30,20 @@ def _exit_error(message: str) -> None:
     sys.exit(1)
 
 
+def _format_elapsed(seconds: float) -> str:
+    total = max(0, int(round(seconds)))
+    mins, secs = divmod(total, 60)
+    return f"{mins} mins {secs} secs"
+
+
+def _high_quality_clause(high_quality: bool) -> str:
+    return ", in high-quality mode" if high_quality else ""
+
+
 def cmd_separate(args: argparse.Namespace) -> None:
     target = Path(args.target)
     try:
-        project_dir, _ = resolve_separate_target(target)
+        project_dir, audio_path = resolve_separate_target(target)
     except (FileNotFoundError, ValueError) as e:
         _exit_error(f"error: {e}")
 
@@ -52,12 +63,15 @@ def cmd_separate(args: argparse.Namespace) -> None:
     stems_before = project_stems_complete(project_dir)
     signals_before = signals_complete(project_dir)
 
+    track_name = audio_path.name
+    started = time.perf_counter()
     try:
         result = run_separate(
             target, high_quality=args.high_quality, force=args.force
         )
     except (FileNotFoundError, ValueError, RuntimeError) as e:
         _exit_error(f"error: {e}")
+    elapsed = _format_elapsed(time.perf_counter() - started)
 
     signals_path = result / SIGNALS_FILENAME
     if args.force:
@@ -66,6 +80,11 @@ def cmd_separate(args: argparse.Namespace) -> None:
         print(f"Wrote signals to {signals_path}")
     else:
         print(f"Wrote project to {result}")
+
+    print(
+        f"{track_name} audio separated and analysed"
+        f"{_high_quality_clause(args.high_quality)}, in {elapsed}"
+    )
 
 
 def cmd_play(args: argparse.Namespace) -> None:
@@ -92,8 +111,9 @@ def cmd_render(args: argparse.Namespace) -> None:
 
     from cleave.viz.render import render
 
+    started = time.perf_counter()
     try:
-        output_path = render(
+        result = render(
             project_dir,
             config=args.config,
             output=args.output,
@@ -101,8 +121,14 @@ def cmd_render(args: argparse.Namespace) -> None:
         )
     except (FileNotFoundError, ValueError, RuntimeError) as e:
         _exit_error(f"error: {e}")
+    elapsed = _format_elapsed(time.perf_counter() - started)
 
-    print(f"Rendered to {output_path}")
+    print(f"Rendered to {result.output_path}")
+    size = f"{result.display_width}x{result.display_height}"
+    print(
+        f"{result.mix_filename} final render at {size} completed"
+        f"{_high_quality_clause(args.high_quality)}, in {elapsed}"
+    )
 
 
 def cmd_backup(args: argparse.Namespace) -> None:
