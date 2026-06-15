@@ -2,6 +2,17 @@
 
 Must-do items for Cleave. Everything else is iterative tuning in-session or listed in [roadmap.md](roadmap.md).
 
+## Features
+
+### Render section
+New flags for render, both are in seconds...
+```bash
+./cleave.py render ~/music/mysong.wav --start 10 --end 20
+```
+Output filename is appended with `_{start}-{end}s.mp4`, eg: `sights-and-sounds-26_10-20s.mp4`
+
+---
+
 ## Bug Fixes
 
 ### Audio starts before visualizer / render is fully booted
@@ -24,3 +35,10 @@ And it does not get the user out of recording - it just make it harder for them 
 Suggest solutions...
 1) ESC while recording should stop the recording. 2nd press ESC hides the timeline UI.
 2) pressing t while recording does nothing (doesnt hide timeline).
+
+---
+
+## Architecture
+
+### Unify compositor upscale path
+Upscale > 1 forks the pipeline: `_uses_content_fbo` renders to an offscreen FBO then `present_content()` blits; upscale 1.0 renders direct to the default framebuffer and `present_content()` is a no-op. Boot uses a separate GL path (`LoadingScreen` + `blit_fullscreen_texture` to the display FB only). Target: one compositing path (always content FBO or a unified abstraction), one present handoff, boot and playback sharing the same GL lifecycle; upscale is only the final blit scale factor.
