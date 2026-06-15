@@ -116,14 +116,19 @@ def build_runtime_full(
     )
 
 
-def _init_gl_resources(runtime: VisualizerRuntime) -> None:
-    compositor = GlCompositor(
+def _make_compositor(runtime: VisualizerRuntime) -> GlCompositor:
+    c = GlCompositor(
         runtime.width,
         runtime.height,
         display_width=runtime.display_width,
         display_height=runtime.display_height,
     )
-    compositor.init()
+    c.init()
+    return c
+
+
+def _init_gl_resources(runtime: VisualizerRuntime) -> None:
+    compositor = _make_compositor(runtime)
     post_process = GlPostProcess()
     post_process.init()
 
@@ -176,13 +181,7 @@ def _init_gl_resources(runtime: VisualizerRuntime) -> None:
 
 
 def _init_gl_resources_render(runtime: VisualizerRuntime) -> None:
-    compositor = GlCompositor(
-        runtime.width,
-        runtime.height,
-        display_width=runtime.display_width,
-        display_height=runtime.display_height,
-    )
-    compositor.init()
+    compositor = _make_compositor(runtime)
     post_process = GlPostProcess()
     post_process.init()
 

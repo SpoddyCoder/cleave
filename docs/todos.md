@@ -40,5 +40,3 @@ Suggest solutions...
 
 ## Architecture
 
-### Unify compositor upscale path
-Upscale > 1 forks the pipeline: `_uses_content_fbo` renders to an offscreen FBO then `present_content()` blits; upscale 1.0 renders direct to the default framebuffer and `present_content()` is a no-op. Boot uses a separate GL path (`LoadingScreen` + `blit_fullscreen_texture` to the display FB only). Target: one compositing path (always content FBO or a unified abstraction), one present handoff, boot and playback sharing the same GL lifecycle; upscale is only the final blit scale factor.
