@@ -78,7 +78,9 @@ def _run_demucs(
             if stale.is_file():
                 stale.unlink()
 
-    shutil.copy2(audio_path, project_dir / mix_filename)
+    mix_dst = project_dir / mix_filename
+    if audio_path.resolve() != mix_dst.resolve():
+        shutil.copy2(audio_path, mix_dst)
     write_manifest(
         project_dir,
         slug=slug,
