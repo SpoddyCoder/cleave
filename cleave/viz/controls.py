@@ -438,9 +438,20 @@ class TuningControls:
         paused: bool,
         position_sec: float | None = None,
     ) -> TuningViewState:
+        if position_sec is None:
+            position_sec = current_sec(self.playback, self.duration_sec)
+
+        from cleave.viz.layer import effective_layer_enabled
+
         tracks: dict[str, TrackBlock] = {}
         for stem in self.session.layer_z_order:
             layer = self.session.layers[stem]
+            if self.session.timeline.enabled:
+                visible = effective_layer_enabled(
+                    self.session, stem, position_sec
+                )
+            else:
+                visible = layer.enabled
             tracks[stem] = TrackBlock(
                 stem=stem,
                 preset_dir_label=directory_display(
@@ -453,6 +464,7 @@ class TuningControls:
                 effects_expanded=layer.effects_expanded,
                 beat_sensitivity=layer.beat_sensitivity,
                 enabled=layer.enabled,
+                visible=visible,
                 expanded=layer.expanded,
                 locked=layer.locked,
                 preset_empty=not layer.playlist.paths,
@@ -475,9 +487,6 @@ class TuningControls:
         if self._save_choice.active:
             save_choice_active = True
             save_choice_focus_overwrite = self._save_choice.focus_overwrite
-
-        if position_sec is None:
-            position_sec = current_sec(self.playback, self.duration_sec)
 
         ro = self.session.render_overlay
         pp = self.session.render_post_fx

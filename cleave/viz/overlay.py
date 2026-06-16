@@ -132,6 +132,7 @@ class TrackBlock:
     effects: dict[str, dict[str, int]]
     effects_expanded: bool = False
     enabled: bool = True
+    visible: bool = True
     expanded: bool = False
     locked: bool = False
     preset_empty: bool = False
@@ -930,7 +931,7 @@ def _row_indent(state: TuningViewState, index: int) -> int:
 
 
 def _track_disabled(state: TuningViewState, stem: str) -> bool:
-    return not state.tracks[stem].enabled
+    return not state.tracks[stem].visible
 
 
 def _row_has_tree_focus(state: TuningViewState, index: int) -> bool:
@@ -1446,7 +1447,7 @@ class TuningOverlay:
             elif kind == RowKind.TRACK_HEADER:
                 stem = row_stem(state, index)
                 block = state.tracks[stem] if stem is not None else None
-                enabled = block.enabled if block is not None else True
+                enabled = block.visible if block is not None else True
                 solo = stem is not None and state.solo_stem == stem
                 locked = block.locked if block is not None else False
                 prefix_surf = render_visibility_icon(

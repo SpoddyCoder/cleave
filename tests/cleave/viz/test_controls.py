@@ -20,6 +20,7 @@ from cleave.preset_playlist import (
     preset_filename_display,
     scan_preset_playlist,
 )
+from cleave.timeline import TimelineCue
 from cleave.viz.key_repeat import mod_shift
 from cleave.viz.playback import format_mmss
 from tests.support.viz import stub_playback_state
@@ -1288,6 +1289,27 @@ def test_render_timeline_header_eye_color_when_disabled() -> None:
     view = controls.build_view_state(paused=False)
     header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
     assert _row_value_color(view, header_row) == DISABLED
+
+
+def test_track_header_visible_follows_timeline_at_position() -> None:
+    controls = _make_controls(("drums", "bass"), timeline_enabled=True)
+    controls.session.timeline.cues = [
+        TimelineCue(t=5.0, layers={"drums": False}),
+    ]
+    before = controls.build_view_state(paused=False, position_sec=4.9)
+    after = controls.build_view_state(paused=False, position_sec=5.0)
+    assert before.tracks["drums"].visible is True
+    assert after.tracks["drums"].visible is False
+    assert before.tracks["bass"].visible is True
+    assert after.tracks["bass"].visible is True
+
+
+def test_track_header_visible_uses_layer_enabled_when_timeline_off() -> None:
+    controls = _make_controls(("drums",))
+    controls.session.layers["drums"].enabled = False
+    view = controls.build_view_state(paused=False, position_sec=10.0)
+    assert view.tracks["drums"].visible is False
+    assert view.tracks["drums"].enabled is False
 
 
 def test_render_timeline_enabled_change_callback() -> None:
