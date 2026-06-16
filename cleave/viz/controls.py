@@ -346,15 +346,22 @@ class TuningControls:
             self._hide_overlay_requested = True
             return True
 
-        if event.key in (pygame.K_UP, pygame.K_DOWN) and mod_ctrl(event.mod):
-            self._move_quick_focus(-1 if event.key == pygame.K_UP else 1)
-            return True
-
-        if event.key == pygame.K_UP:
-            self._move_focus(-1)
-            return True
-        if event.key == pygame.K_DOWN:
-            self._move_focus(1)
+        if event.key in (pygame.K_UP, pygame.K_DOWN):
+            delta = -1 if event.key == pygame.K_UP else 1
+            if mod_ctrl(event.mod):
+                self._move_quick_focus(delta)
+            else:
+                self._move_focus(delta)
+            self._key_repeat.on_keydown(
+                event.key,
+                event.mod,
+                accel=False,
+                on_repeat=lambda key, mod: (
+                    self._move_quick_focus(-1 if key == pygame.K_UP else 1)
+                    if mod_ctrl(mod)
+                    else self._move_focus(-1 if key == pygame.K_UP else 1)
+                ),
+            )
             return True
 
         if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
@@ -426,6 +433,10 @@ class TuningControls:
     def handle_keyup(self, event: pygame.event.Event) -> None:
         if event.type == pygame.KEYUP:
             self._key_repeat.on_keyup(event.key)
+
+    @property
+    def key_repeat_armed(self) -> bool:
+        return self._key_repeat.is_armed
 
     def tick(self, dt_sec: float) -> None:
         self._key_repeat.tick(dt_sec)
