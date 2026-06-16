@@ -1259,6 +1259,10 @@ class TuningOverlay:
     def is_visible(self) -> bool:
         return self._visibility > 0.01
 
+    @property
+    def visibility(self) -> float:
+        return self._visibility
+
     def update(self, dt_sec: float) -> None:
         self._idle_sec += dt_sec
         hold_idle_sec = self._hold_idle_sec

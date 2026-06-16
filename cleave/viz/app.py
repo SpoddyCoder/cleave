@@ -18,7 +18,7 @@ from cleave.signals import Signals
 from cleave.pcm_io import load_mix_pcm
 from cleave.stem_pcm import StemPcmBank, load_stem_pcm, samples_per_frame
 from cleave.viz.bootstrap import load_stem_signals
-from cleave.viz.controls import TuningControls, TuningSession
+from cleave.viz.controls import TimelineRuntime, TuningControls, TuningSession
 from cleave.viz.mix_player import MixPlayer
 from cleave.viz.layer import (
     StemLayer,
@@ -264,6 +264,34 @@ def _composite_live_render_overlay(runtime: VisualizerRuntime, t_sec: float) -> 
     )
 
 
+def _timeline_strip_visible(tl: TimelineRuntime, *, overlay_visibility: float) -> bool:
+    """Show the bottom timeline strip while the main panel is visible or a row is focused."""
+    return tl.enabled and tl.panel_open and (
+        tl.submenu_focused or overlay_visibility > 0.01
+    )
+
+
+def _timeline_strip_fade(tl: TimelineRuntime, *, overlay_visibility: float) -> float:
+    if tl.submenu_focused:
+        return 1.0
+    return overlay_visibility
+
+
+def _timeline_submenu_key_routing(
+    tl: TimelineRuntime,
+    *,
+    timeline_controls: TimelineControls | None,
+    key: int,
+) -> bool:
+    return (
+        tl.panel_open
+        and tl.enabled
+        and tl.submenu_focused
+        and timeline_controls is not None
+        and key not in (pygame.K_UP, pygame.K_DOWN)
+    )
+
+
 class VisualizerApp:
     def __init__(self, runtime: VisualizerRuntime) -> None:
         self._runtime = runtime
@@ -330,9 +358,14 @@ class VisualizerApp:
                 position_sec=t_sec,
             )
             tl = rt.session.timeline
-            overlay_visible = rt.overlay.is_visible()
-            timeline_panel_open = tl.enabled and tl.panel_open and overlay_visible
             rt.overlay.update(self._overlay_dt)
+            overlay_visibility = rt.overlay.visibility
+            timeline_strip_visible = _timeline_strip_visible(
+                tl, overlay_visibility=overlay_visibility
+            )
+            timeline_panel_open = (
+                tl.enabled and tl.panel_open and overlay_visibility > 0.01
+            )
             _draw_tuning_overlay(
                 rt.compositor,
                 rt.overlay,
@@ -342,9 +375,7 @@ class VisualizerApp:
             )
 
             if (
-                overlay_visible
-                and tl.enabled
-                and tl.panel_open
+                timeline_strip_visible
                 and rt.timeline_overlay is not None
                 and rt.overlay_surface is not None
             ):
@@ -357,6 +388,9 @@ class VisualizerApp:
                     rt.overlay_surface,
                     timeline_state,
                     rt.height,
+                    visibility=_timeline_strip_fade(
+                        tl, overlay_visibility=overlay_visibility
+                    ),
                 )
 
     def run(self) -> None:
@@ -435,15 +469,10 @@ class VisualizerApp:
                     elif event.type == pygame.KEYDOWN:
                         tl = rt.session.timeline
                         assert rt.overlay is not None
-                        overlay_visible = rt.overlay.is_visible()
-                        timeline_submenu_keys = (
-                            overlay_visible
-                            and tl.panel_open
-                            and tl.enabled
-                            and tl.submenu_focused
-                            and rt.timeline_controls is not None
-                            and event.key
-                            not in (pygame.K_UP, pygame.K_DOWN)
+                        timeline_submenu_keys = _timeline_submenu_key_routing(
+                            tl,
+                            timeline_controls=rt.timeline_controls,
+                            key=event.key,
                         )
                         if timeline_submenu_keys:
                             key_handler = rt.timeline_controls
@@ -461,14 +490,13 @@ class VisualizerApp:
                             if rt.controls.consume_hide_overlay():
                                 rt.overlay.hide_immediately()
                                 tl.submenu_focused = False
-                            elif event.key != pygame.K_t:
+                            elif event.key != pygame.K_t and not tl.submenu_focused:
                                 rt.overlay.notify_input()
                     elif event.type == pygame.KEYUP:
                         tl = rt.session.timeline
                         assert rt.overlay is not None
                         if (
-                            rt.overlay.is_visible()
-                            and tl.panel_open
+                            tl.panel_open
                             and tl.enabled
                             and tl.submenu_focused
                             and rt.timeline_controls is not None

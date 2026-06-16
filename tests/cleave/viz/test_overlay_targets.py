@@ -57,5 +57,44 @@ def test_draw_timeline_overlay_uses_display_target() -> None:
         compositor, overlay, overlay_surface, view_state, content_height=720
     )
 
-    compositor.draw_overlay.assert_called_once_with(22, 0, 600, 1280, 120)
+    compositor.draw_overlay.assert_called_once_with(22, 0, 600, 1280, 120, 1.0)
     compositor.draw_content_overlay.assert_not_called()
+
+
+def test_draw_timeline_overlay_applies_visibility_alpha() -> None:
+    pygame.init()
+    compositor = recording_compositor()
+    compositor.upload_overlay_texture.return_value = 33
+
+    overlay = MagicMock()
+    overlay.panel_rect = (0, 600, 1280, 120)
+    overlay.header_badge_rect = None
+    overlay_surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    view_state = TimelineViewState(
+        layer_z_order=["drums"],
+        cues=[],
+        defaults={},
+        position_sec=0.0,
+        duration_sec=120.0,
+        focus_row=0,
+        monitor_visible={"drums": True},
+        timeline_visible={"drums": True},
+        override_stems=set(),
+        armed_stems=set(),
+        recording=False,
+        record_start_sec=0.0,
+        record_baseline={},
+        record_buffer=[],
+        enabled=True,
+    )
+
+    _draw_timeline_overlay(
+        compositor,
+        overlay,
+        overlay_surface,
+        view_state,
+        content_height=720,
+        visibility=0.4,
+    )
+
+    compositor.draw_overlay.assert_called_once_with(33, 0, 600, 1280, 120, 0.4)
