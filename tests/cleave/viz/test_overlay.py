@@ -14,28 +14,32 @@ from cleave.viz.overlay import (
     TrackBlock,
     TuningOverlay,
     TuningViewState,
+    _row_bg_color,
+    _row_value_color,
     build_row_layout,
     find_row_by_kind,
     fit_row_text,
     panel_content_max_width,
+    panel_header_dialog_layout,
+    panel_toast_layout,
     render_visibility_icon,
     row_kind,
     row_stem,
     scroll_metrics,
-    track_row_count,
     visible_row_indices,
 )
 from cleave.viz.theme import (
     BORDER_WIDTH,
     DISABLED,
+    HIGHLIGHT,
     HOLD_IDLE_SEC,
     PANEL_CONTENT_MAX_WIDTH,
     SCROLLBAR_TRACK,
     SCROLLBAR_WIDTH,
     SOLO_BG,
-    TIMELINE_PANEL_HOLD_IDLE_SEC,
     VALUE,
 )
+from cleave.viz.timeline_overlay import timeline_viewport_reserve_px
 
 
 def _effects_expanded_view_state() -> TuningViewState:
@@ -88,32 +92,97 @@ def test_draw_effects_expanded_panel_rect_within_surface() -> None:
 
 
 def _panel_scroll_metrics(
-    overlay: TuningOverlay, state: TuningViewState, *, surface_height: int = 720
+    overlay: TuningOverlay,
+    state: TuningViewState,
+    *,
+    surface_height: int = 720,
+    timeline_panel_open: bool = False,
 ) -> PanelScrollMetrics:
     font = overlay._font_get()
     line_h = font.get_linesize()
     visible_indices = visible_row_indices(state)
-    track_rows_boundary = track_row_count(state)
-    first_footer_visible = next(
-        (index for index in visible_indices if index >= track_rows_boundary),
+    first_scrollable_visible = next(
+        (
+            index
+            for index in visible_indices
+            if row_kind(state, index) not in {
+                RowKind.CONFIG_HEADER,
+                RowKind.TRANSPORT,
+                RowKind.SAVE_CONFIG,
+            }
+        ),
         None,
     )
-    footer_gap = (line_h + overlay._line_gap) * 2
+    header_gap = line_h + overlay._line_gap
     _, margin_y = overlay._margin
+    max_panel_h = surface_height - margin_y * 2
+    if timeline_panel_open:
+        max_panel_h -= timeline_viewport_reserve_px(surface_height)
+
+    confirm_active = state.confirm_message is not None
+    confirm_h = 0
+    if confirm_active:
+        assert state.confirm_message is not None
+        confirm_h = overlay._confirm.measure_height(
+            font,
+            state.confirm_message,
+            line_gap=overlay._line_gap,
+        )
+
+    save_choice_active = state.save_choice_active
+    save_choice_h = (
+        overlay._save_choice.measure_height(font) if save_choice_active else 0
+    )
+
+    toast_active = bool(state.toast_message and state.toast_remaining_sec > 0)
+
     return scroll_metrics(
         visible_indices=visible_indices,
-        first_footer_visible=first_footer_visible,
+        first_scrollable_visible=first_scrollable_visible,
         line_h=line_h,
         line_gap=overlay._line_gap,
         padding=overlay._padding,
-        footer_gap=footer_gap,
-        confirm_h=0,
-        confirm_active=False,
+        header_gap=header_gap,
+        confirm_h=confirm_h,
+        confirm_active=confirm_active,
+        save_choice_h=save_choice_h,
+        save_choice_active=save_choice_active,
+        toast_active=toast_active,
+        max_panel_h=max_panel_h,
+    )
+
+
+def _confirm_header_y(
+    overlay: TuningOverlay,
+    state: TuningViewState,
+    metrics: PanelScrollMetrics,
+) -> int:
+    font = overlay._font_get()
+    assert state.confirm_message is not None
+    confirm_h = overlay._confirm.measure_height(
+        font,
+        state.confirm_message,
+        line_gap=overlay._line_gap,
+    )
+    header_dialog = panel_header_dialog_layout(
+        padding=overlay._padding,
+        header_row_count=len(metrics.header_indices),
+        row_stride=metrics.row_stride,
+        line_gap=overlay._line_gap,
+        confirm_h=confirm_h,
+        confirm_active=True,
         save_choice_h=0,
         save_choice_active=False,
-        toast_active=False,
-        max_panel_h=surface_height - margin_y * 2,
     )
+    assert header_dialog.confirm_y is not None
+    return header_dialog.confirm_y
+
+
+def _header_rows_bottom_y(overlay: TuningOverlay, metrics: PanelScrollMetrics) -> int:
+    font = overlay._font_get()
+    line_h = font.get_linesize()
+    n_header = len(metrics.header_indices)
+    return overlay._padding + (n_header - 1) * metrics.row_stride + line_h
 
 
 def _copy_panel_surface(overlay: TuningOverlay, state: TuningViewState) -> pygame.Surface:
@@ -144,12 +213,13 @@ def test_scrolled_panel_keeps_focus_row_in_viewport() -> None:
     assert row_y + line_h <= overlay._scroll_y + metrics.scroll_viewport_h
 
 
-def test_footer_rows_pinned_when_scrolled() -> None:
+def test_header_rows_pinned_when_scrolled() -> None:
     pygame.init()
     state_top = _effects_expanded_view_state()
-    state_top.focus_index = 0
+    scroll_focus = find_row_by_kind(state_top, RowKind.RENDER_TIMELINE_HEADER) - 1
+    state_top.focus_index = scroll_focus
     state_bottom = _effects_expanded_view_state()
-    state_bottom.focus_index = find_row_by_kind(state_bottom, RowKind.RENDER_TIMELINE_HEADER) - 1
+    state_bottom.focus_index = scroll_focus
 
     panel_top = _copy_panel_surface(TuningOverlay(), state_top)
     panel_bottom = _copy_panel_surface(TuningOverlay(), state_bottom)
@@ -157,12 +227,11 @@ def test_footer_rows_pinned_when_scrolled() -> None:
     overlay = TuningOverlay()
     metrics = _panel_scroll_metrics(overlay, state_bottom)
     assert metrics.needs_scroll
-    font = overlay._font_get()
-    transport_y = overlay._padding + metrics.scroll_viewport_h + (font.get_linesize() + overlay._line_gap) * 2
-    footer_h = panel_top.get_height() - transport_y
-    top_strip = panel_top.subsurface((0, transport_y, panel_top.get_width(), footer_h))
+    transport_y = overlay._padding
+    header_h = metrics.header_block_h
+    top_strip = panel_top.subsurface((0, transport_y, panel_top.get_width(), header_h))
     bottom_strip = panel_bottom.subsurface(
-        (0, transport_y, panel_bottom.get_width(), footer_h)
+        (0, transport_y, panel_bottom.get_width(), header_h)
     )
     assert pygame.image.tostring(top_strip, "RGBA") == pygame.image.tostring(
         bottom_strip, "RGBA"
@@ -212,6 +281,7 @@ def test_scrollbar_track_is_vertical_channel_only() -> None:
     overlay._draw_scrollbar(
         panel,
         panel_w=panel_w,
+        scroll_top=overlay._padding,
         scroll_viewport_h=scroll_viewport_h,
         scroll_content_h=scroll_viewport_h * 10,
         border_alpha=255,
@@ -340,7 +410,7 @@ def test_render_overlay_row_layout_includes_header_and_sub_rows_when_expanded() 
     assert RowKind.RENDER_OVERLAY_BODY_FONT_SIZE not in kinds
     header_idx = find_row_by_kind(state, RowKind.RENDER_OVERLAY_HEADER)
     config_idx = find_row_by_kind(state, RowKind.CONFIG_HEADER)
-    assert header_idx < config_idx
+    assert config_idx < header_idx
 
 
 def test_render_overlay_title_and_body_font_rows_when_expanded() -> None:
@@ -430,7 +500,33 @@ def test_draw_track_header_with_solo_eye() -> None:
         if row_kind(state, i) == RowKind.TRACK_HEADER and row_stem(state, i) == "drums"
     )
     assert state.solo_stem == "drums"
-    assert header_row == 0
+    assert header_row == find_row_by_kind(state, RowKind.TRACK_HEADER)
+
+
+def test_main_tree_rows_not_highlighted_when_timeline_submenu_focused() -> None:
+    state = _minimal_view_state(
+        render_timeline=RenderTimelineBlock(enabled=True, expanded=True),
+    )
+    for row_kind_target in (RowKind.TRANSPORT, RowKind.TRACK_HEADER):
+        row = find_row_by_kind(state, row_kind_target)
+        state.focus_index = row
+        state.timeline_submenu_focused = False
+        assert _row_value_color(state, row) == HIGHLIGHT
+        assert _row_bg_color(state, row) == HIGHLIGHT
+
+        state.timeline_submenu_focused = True
+        assert _row_value_color(state, row) != HIGHLIGHT
+        assert _row_bg_color(state, row) is None
+
+    timeline_row = find_row_by_kind(state, RowKind.RENDER_TIMELINE_HEADER)
+    state.focus_index = timeline_row
+    state.timeline_submenu_focused = False
+    assert _row_value_color(state, timeline_row) == HIGHLIGHT
+    assert _row_bg_color(state, timeline_row) == HIGHLIGHT
+
+    state.timeline_submenu_focused = True
+    assert _row_value_color(state, timeline_row) == VALUE
+    assert _row_bg_color(state, timeline_row) is None
 
 
 def test_draw_render_timeline_header_without_error() -> None:
@@ -468,8 +564,18 @@ def test_hide_immediately_hides_overlay() -> None:
     overlay.draw(surface, state)
     assert overlay.panel_rect is not None
     overlay.hide_immediately()
+    assert overlay.is_visible() is False
     overlay.draw(surface, state)
     assert overlay.panel_rect is None
+
+
+def test_is_visible_tracks_visibility() -> None:
+    overlay = TuningOverlay()
+    assert overlay.is_visible() is False
+    overlay.notify_input()
+    assert overlay.is_visible() is True
+    overlay.hide_immediately()
+    assert overlay.is_visible() is False
 
 
 def test_overlay_normal_hold_idle_without_timeline_panel() -> None:
@@ -481,10 +587,176 @@ def test_overlay_normal_hold_idle_without_timeline_panel() -> None:
     assert overlay._visibility < 1.0
 
 
-def test_overlay_short_hold_idle_with_timeline_panel_open() -> None:
+def test_max_panel_h_unchanged_when_timeline_closed() -> None:
+    pygame.init()
     overlay = TuningOverlay()
+    state = _effects_expanded_view_state()
+    surface_height = 720
+    closed = _panel_scroll_metrics(
+        overlay, state, surface_height=surface_height, timeline_panel_open=False
+    )
+    _, margin_y = overlay._margin
+    assert closed.max_panel_h == surface_height - margin_y * 2
+
+
+def test_panel_reserves_timeline_viewport_when_open() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    state = _effects_expanded_view_state()
+    surface_height = 720
+    surface = pygame.Surface((1280, surface_height), pygame.SRCALPHA)
     overlay.notify_input()
-    overlay.update(TIMELINE_PANEL_HOLD_IDLE_SEC - 0.1, timeline_panel_open=True)
-    assert overlay._visibility == 1.0
-    overlay.update(0.2, timeline_panel_open=True)
-    assert overlay._visibility < 1.0
+    overlay.draw(surface, state, timeline_panel_open=True)
+
+    panel = overlay.panel_rect
+    assert panel is not None
+    _, py, _, ph = panel
+    _, margin_y = overlay._margin
+    reserve = timeline_viewport_reserve_px(surface_height)
+    assert py + ph + reserve <= surface_height - margin_y
+
+    open_metrics = _panel_scroll_metrics(
+        overlay, state, surface_height=surface_height, timeline_panel_open=True
+    )
+    closed_metrics = _panel_scroll_metrics(
+        overlay, state, surface_height=surface_height, timeline_panel_open=False
+    )
+    assert open_metrics.max_panel_h < closed_metrics.max_panel_h
+    assert open_metrics.max_panel_h == closed_metrics.max_panel_h - reserve
+
+
+def test_confirm_dialog_below_header_with_scroll() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    state = _effects_expanded_view_state()
+    state.confirm_message = "Overwrite cleave-viz.yaml?"
+    state.confirm_focus_yes = True
+
+    metrics = _panel_scroll_metrics(overlay, state)
+    assert metrics.needs_scroll
+
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.notify_input()
+    overlay.draw(surface, state)
+    panel = overlay.panel_rect
+    assert panel is not None
+
+    confirm_y = _confirm_header_y(overlay, state, metrics)
+    header_bottom = _header_rows_bottom_y(overlay, metrics)
+    assert confirm_y == header_bottom + overlay._line_gap
+    assert confirm_y < overlay._padding + metrics.header_block_h
+
+    font = overlay._font_get()
+    confirm_h = overlay._confirm.measure_height(
+        font,
+        state.confirm_message,
+        line_gap=overlay._line_gap,
+    )
+    scroll_top = overlay._padding + metrics.header_block_h
+    assert confirm_y + confirm_h <= scroll_top
+
+
+def test_confirm_dialog_below_header_without_scroll() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    state = _minimal_view_state(confirm_message="Overwrite cleave-viz.yaml?")
+    state.confirm_focus_yes = True
+
+    metrics = _panel_scroll_metrics(overlay, state)
+    assert not metrics.needs_scroll
+
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.notify_input()
+    overlay.draw(surface, state)
+    panel = overlay.panel_rect
+    assert panel is not None
+
+    confirm_y = _confirm_header_y(overlay, state, metrics)
+    header_bottom = _header_rows_bottom_y(overlay, metrics)
+    assert confirm_y == header_bottom + overlay._line_gap
+
+
+def test_confirm_dialog_pinned_below_header_when_scrolled() -> None:
+    pygame.init()
+    state_top = _effects_expanded_view_state()
+    state_top.confirm_message = "Overwrite cleave-viz.yaml?"
+    scroll_focus = find_row_by_kind(state_top, RowKind.RENDER_TIMELINE_HEADER) - 1
+    state_top.focus_index = scroll_focus
+    state_bottom = _effects_expanded_view_state()
+    state_bottom.confirm_message = "Overwrite cleave-viz.yaml?"
+    state_bottom.focus_index = scroll_focus
+
+    panel_top = _copy_panel_surface(TuningOverlay(), state_top)
+    panel_bottom = _copy_panel_surface(TuningOverlay(), state_bottom)
+
+    overlay = TuningOverlay()
+    metrics = _panel_scroll_metrics(overlay, state_bottom)
+    assert metrics.needs_scroll
+    confirm_y = _confirm_header_y(overlay, state_bottom, metrics)
+    font = overlay._font_get()
+    confirm_h = overlay._confirm.measure_height(
+        font,
+        state_bottom.confirm_message,
+        line_gap=overlay._line_gap,
+    )
+    dialog_h = confirm_h + overlay._line_gap
+
+    top_strip = panel_top.subsurface(
+        (0, confirm_y, panel_top.get_width(), dialog_h)
+    )
+    bottom_strip = panel_bottom.subsurface(
+        (0, confirm_y, panel_bottom.get_width(), dialog_h)
+    )
+    assert pygame.image.tostring(top_strip, "RGBA") == pygame.image.tostring(
+        bottom_strip, "RGBA"
+    )
+
+
+def test_toast_stays_at_panel_bottom_with_confirm() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    state = _minimal_view_state(
+        confirm_message="Overwrite cleave-viz.yaml?",
+        toast_message="Saved",
+        toast_remaining_sec=2.0,
+    )
+    metrics = _panel_scroll_metrics(overlay, state)
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.notify_input()
+    overlay.draw(surface, state)
+    panel = overlay.panel_rect
+    assert panel is not None
+    _, _, _, panel_h = panel
+
+    font = overlay._font_get()
+    line_h = font.get_linesize()
+    toast_layout = panel_toast_layout(
+        panel_h=panel_h,
+        padding=overlay._padding,
+        line_h=line_h,
+        toast_active=True,
+    )
+    assert toast_layout.toast_y is not None
+    assert toast_layout.toast_y == panel_h - overlay._padding - line_h
+
+    confirm_y = _confirm_header_y(overlay, state, metrics)
+    assert confirm_y < toast_layout.toast_y
+
+
+def test_header_block_h_includes_confirm_dialog() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    state = _effects_expanded_view_state()
+    base_metrics = _panel_scroll_metrics(overlay, state)
+    state.confirm_message = "Overwrite?"
+    confirm_metrics = _panel_scroll_metrics(overlay, state)
+    font = overlay._font_get()
+    confirm_h = overlay._confirm.measure_height(
+        font,
+        state.confirm_message,
+        line_gap=overlay._line_gap,
+    )
+    assert confirm_metrics.header_block_h == (
+        base_metrics.header_block_h + overlay._line_gap + confirm_h
+    )
+    assert confirm_metrics.footer_block_h == base_metrics.footer_block_h

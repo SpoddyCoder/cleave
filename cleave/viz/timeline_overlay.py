@@ -26,7 +26,13 @@ from cleave.viz.theme import (
 )
 
 PANEL_HEIGHT_FRACTION: float = 0.2
+TIMELINE_PANEL_GAP: int = 16  # visual gap between main panel bottom and timeline strip top
 OFF_SEGMENT_COLOR: tuple[int, int, int] = (40, 40, 40)
+
+
+def timeline_viewport_reserve_px(content_height: int, *, margin: int = 10) -> int:
+    panel_h = max(1, int(content_height * PANEL_HEIGHT_FRACTION))
+    return panel_h + margin + TIMELINE_PANEL_GAP
 BAR_VERTICAL_INSET: int = 3
 ARMED_BG_ALPHA: int = 220
 CUE_TICK_ALPHA: int = 120
@@ -63,6 +69,7 @@ class TimelineViewState:
     record_baseline: dict[str, bool] = field(default_factory=dict)
     record_buffer: list[TimelineCue] = field(default_factory=list)
     enabled: bool = False
+    submenu_focused: bool = False
 
 
 def visibility_segments(
@@ -340,7 +347,7 @@ class TimelineOverlay:
                 max(1, row_h - BAR_VERTICAL_INSET * 2),
             )
             armed = stem in state.armed_stems
-            focused = row_index == state.focus_row
+            focused = state.submenu_focused and row_index == state.focus_row
 
             self._row_layout.append(
                 (row_index, row_rect.x, row_rect.y, row_rect.w, row_rect.h, stem)

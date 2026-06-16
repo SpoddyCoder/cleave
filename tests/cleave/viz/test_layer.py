@@ -14,6 +14,7 @@ from cleave.preset_playlist import PresetPlaylist
 from cleave.stem_pcm import StemPcmBank
 from cleave.timeline import TimelineCue
 from cleave.viz.controls import LayerRuntime, TimelineRuntime, TuningSession
+from cleave.viz.overlay import RowKind, find_row_by_kind
 from cleave.viz.layer import (
     StemLayer,
     _build_timeline_view_state,
@@ -243,7 +244,8 @@ def test_apply_layer_visibility_sets_fbo_enabled_from_timeline() -> None:
 def test_header_toggle_blocked_when_timeline_enabled() -> None:
     controls = make_controls(("drums",))
     controls.session.timeline.enabled = True
-    controls.focus_index = 0
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(view, RowKind.TRACK_HEADER)
     assert controls.session.layers["drums"].enabled is True
 
     controls.handle_keydown(keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))

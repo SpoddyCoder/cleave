@@ -44,6 +44,7 @@ class TimelineControls:
         *,
         on_visibility_change: Callable[[], None] | None = None,
         on_close: Callable[[], None] | None = None,
+        on_exit_submenu: Callable[[], None] | None = None,
         on_seek: Callable[[float], None] | None = None,
         on_toast: Callable[[str], None] | None = None,
     ) -> None:
@@ -52,6 +53,7 @@ class TimelineControls:
         self.duration_sec = duration_sec
         self._on_visibility_change = on_visibility_change
         self._on_close = on_close
+        self._on_exit_submenu = on_exit_submenu
         self._on_seek = on_seek
         self._on_toast = on_toast
         self.focused_cue_index: int | None = None
@@ -127,13 +129,6 @@ class TimelineControls:
                 self._refresh_visibility()
             return True
 
-        if event.key == pygame.K_UP:
-            self._move_focus_row(-1)
-            return True
-        if event.key == pygame.K_DOWN:
-            self._move_focus_row(1)
-            return True
-
         if event.key == pygame.K_RETURN and mod_ctrl(event.mod):
             if self.session.timeline.recording:
                 self._toggle_armed_layer_at(
@@ -174,18 +169,8 @@ class TimelineControls:
             return None
         return z_order[index]
 
-    def _row_count(self) -> int:
-        return len(self.session.layer_z_order)
-
     def _focused_stem(self) -> str:
         return self.session.layer_z_order[self.session.timeline.focus_row]
-
-    def _move_focus_row(self, delta: int) -> None:
-        count = self._row_count()
-        if count == 0:
-            return
-        tl = self.session.timeline
-        tl.focus_row = max(0, min(count - 1, tl.focus_row + delta))
 
     def _sorted_cues(self) -> list[TimelineCue]:
         return sorted(self.session.timeline.cues, key=lambda cue: cue.t)

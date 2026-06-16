@@ -112,7 +112,7 @@ _DEFAULT_SAVE_FILENAME = "unnamed-1.yaml"
 
 
 def config_path_display(path: Path | None) -> str:
-    """Active config path for the footer header (truncation happens at draw time)."""
+    """Active config path for the config header row (truncation happens at draw time)."""
     return path.as_posix() if path is not None else VIZ_CONFIG_FILENAME
 
 
@@ -186,6 +186,7 @@ class TimelineRuntime:
     enabled: bool = True
     cues: list[TimelineCue] = field(default_factory=list)
     panel_open: bool = False
+    submenu_focused: bool = False
     focus_row: int = 0
     armed_stems: set[str] = field(default_factory=set)
     recording: bool = False
@@ -320,7 +321,11 @@ class TuningControls:
         if event.key == pygame.K_t:
             if self.move_mode_stem is not None:
                 return True
-            self._open_timeline_panel()
+            tl = self.session.timeline
+            if tl.panel_open:
+                self._close_timeline_panel()
+            else:
+                self._open_timeline_panel(enter_submenu=True)
             return True
 
         if self.move_mode_stem is not None:
@@ -522,6 +527,7 @@ class TuningControls:
                 enabled=tl.enabled,
                 expanded=tl.panel_open,
             ),
+            timeline_submenu_focused=tl.submenu_focused,
         )
 
     def _allow_overwrite(self) -> bool:
@@ -533,7 +539,35 @@ class TuningControls:
     def _input_blocked(self) -> bool:
         return time.monotonic() < self._input_blocked_until
 
+    def _timeline_row_count(self) -> int:
+        return len(self.session.layer_z_order)
+
+    def _timeline_submenu_active(self) -> bool:
+        tl = self.session.timeline
+        return tl.panel_open and tl.enabled and self._timeline_row_count() > 0
+
     def _move_focus(self, delta: int) -> None:
+        tl = self.session.timeline
+        row_count = self._timeline_row_count()
+
+        if tl.submenu_focused:
+            if row_count == 0:
+                tl.submenu_focused = False
+            elif delta < 0:
+                if tl.focus_row == 0:
+                    self.exit_timeline_submenu()
+                    return
+                tl.focus_row -= 1
+                return
+            elif tl.focus_row >= row_count - 1:
+                tl.submenu_focused = False
+                view = self.build_view_state(paused=self.playback.paused)
+                self.focus_index = find_row_by_kind(view, RowKind.TRANSPORT)
+                return
+            else:
+                tl.focus_row += 1
+                return
+
         view = self.build_view_state(paused=self.playback.paused)
         navigable = navigable_row_indices(view)
         if not navigable:
@@ -542,6 +576,19 @@ class TuningControls:
             pos = navigable.index(self.focus_index)
         except ValueError:
             pos = 0
+
+        if self._timeline_submenu_active():
+            timeline_header = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+            transport = find_row_by_kind(view, RowKind.TRANSPORT)
+            if delta > 0 and self.focus_index == timeline_header:
+                tl.submenu_focused = True
+                tl.focus_row = 0
+                return
+            if delta < 0 and self.focus_index == transport:
+                tl.submenu_focused = True
+                tl.focus_row = row_count - 1
+                return
+
         self.focus_index = navigable[(pos + delta) % len(navigable)]
 
     def _move_quick_focus(self, delta: int) -> None:
@@ -1141,20 +1188,30 @@ class TuningControls:
         self._toast_deadline = now + TOAST_DURATION_SEC
         self._input_blocked_until = now + TOAST_DURATION_SEC
 
-    def _open_timeline_panel(self) -> None:
+    def _open_timeline_panel(self, *, enter_submenu: bool = False) -> None:
         tl = self.session.timeline
         if not tl.enabled:
             self.show_toast("Enable timeline in Render: TIMELINE (Ctrl+Right)")
             return
         tl.panel_open = True
-        tl.focus_row = 0
+        if enter_submenu:
+            tl.submenu_focused = True
+            tl.focus_row = 0
+        else:
+            tl.submenu_focused = False
 
     def _close_timeline_panel(self) -> None:
         tl = self.session.timeline
         if not tl.panel_open:
             return
         tl.panel_open = False
-        self._refocus_render_timeline_header_if_sub_row()
+        tl.submenu_focused = False
+        self.focus_index = self._render_timeline_header_index()
+
+    def exit_timeline_submenu(self) -> None:
+        tl = self.session.timeline
+        tl.submenu_focused = False
+        self.focus_index = self._render_timeline_header_index()
 
     def _show_save_toast(self, message: str) -> None:
         print(message, file=sys.stderr)

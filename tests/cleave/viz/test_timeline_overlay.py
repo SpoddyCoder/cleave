@@ -41,6 +41,7 @@ def _view_state(
     position_sec: float = 0.0,
     duration_sec: float = 100.0,
     focus_row: int = 0,
+    submenu_focused: bool = False,
     armed_stems: set[str] | None = None,
     recording: bool = False,
     record_start_sec: float | None = None,
@@ -78,6 +79,7 @@ def _view_state(
         record_baseline=dict(record_baseline or ()),
         record_buffer=list(record_buffer or ()),
         enabled=enabled,
+        submenu_focused=submenu_focused,
     )
 
 
@@ -160,7 +162,7 @@ def test_rec_flash_visible_alternates_every_500ms() -> None:
 def test_armed_recording_monitor_eye_flashes_when_focused(monkeypatch) -> None:
     pygame.init()
     overlay = TimelineOverlay()
-    state = _view_state(armed_stems={"bass"}, recording=True, focus_row=1)
+    state = _view_state(armed_stems={"bass"}, recording=True, focus_row=1, submenu_focused=True)
 
     monkeypatch.setattr(
         "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: True
@@ -195,7 +197,7 @@ def test_armed_recording_monitor_eye_uses_override_bg_when_flash_on(monkeypatch)
     )
     pygame.init()
     overlay = TimelineOverlay()
-    state = _view_state(armed_stems={"bass"}, recording=True, focus_row=1)
+    state = _view_state(armed_stems={"bass"}, recording=True, focus_row=1, submenu_focused=True)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, state)
 
@@ -214,7 +216,7 @@ def test_armed_recording_monitor_eye_hides_override_bg_when_flash_off(monkeypatc
     )
     pygame.init()
     overlay = TimelineOverlay()
-    state = _view_state(armed_stems={"bass"}, recording=True, focus_row=1)
+    state = _view_state(armed_stems={"bass"}, recording=True, focus_row=1, submenu_focused=True)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, state)
 
@@ -243,7 +245,7 @@ def test_armed_recording_abbrev_flashes_with_rec(monkeypatch) -> None:
     )
     pygame.init()
     overlay = TimelineOverlay()
-    state = _view_state(armed_stems={"bass"}, recording=True, focus_row=0)
+    state = _view_state(armed_stems={"bass"}, recording=True, focus_row=0, submenu_focused=True)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, state)
 

@@ -466,9 +466,13 @@ def _draw_tuning_overlay(
     overlay: TuningOverlay,
     overlay_surface: pygame.Surface,
     view_state: TuningViewState,
+    *,
+    timeline_panel_open: bool = False,
 ) -> None:
     overlay_surface.fill((0, 0, 0, 0))
-    overlay.draw(overlay_surface, view_state)
+    overlay.draw(
+        overlay_surface, view_state, timeline_panel_open=timeline_panel_open
+    )
     panel = overlay.panel_rect
     if panel is not None:
         px, py, pw, ph = panel
@@ -507,6 +511,7 @@ def _build_timeline_view_state(
         record_baseline=dict(tl.record_baseline),
         record_buffer=list(tl.record_buffer),
         enabled=tl.enabled,
+        submenu_focused=tl.submenu_focused,
     )
 
 
