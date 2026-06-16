@@ -1200,6 +1200,97 @@ def test_render_timeline_down_enters_submenu_and_routes_keys() -> None:
     assert controls.session.timeline.focus_row == 1
 
 
+def test_vertical_navigation_repeats_on_hold() -> None:
+    from cleave.viz.key_repeat import INITIAL_DELAY_SEC, SLOW_INTERVAL_SEC
+
+    controls = _make_controls()
+    view = controls.build_view_state(paused=False)
+    transport = find_row_by_kind(view, RowKind.TRANSPORT)
+    controls.focus_index = transport
+    navigable = navigable_row_indices(view)
+    start_pos = navigable.index(transport)
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert navigable.index(controls.focus_index) == (start_pos + 1) % len(navigable)
+
+    controls.tick(INITIAL_DELAY_SEC)
+    assert navigable.index(controls.focus_index) == (start_pos + 2) % len(navigable)
+
+    controls.tick(SLOW_INTERVAL_SEC)
+    assert navigable.index(controls.focus_index) == (start_pos + 3) % len(navigable)
+
+
+def test_timeline_submenu_vertical_navigation_repeats() -> None:
+    from cleave.viz.key_repeat import INITIAL_DELAY_SEC, SLOW_INTERVAL_SEC
+
+    controls = _make_controls(
+        timeline_enabled=True,
+        stems=("drums", "bass", "vocals", "other"),
+    )
+    controls.session.timeline.panel_open = True
+    controls.session.timeline.submenu_focused = True
+    controls.session.timeline.focus_row = 0
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.session.timeline.focus_row == 1
+
+    controls.tick(INITIAL_DELAY_SEC)
+    assert controls.session.timeline.focus_row == 2
+
+    controls.tick(SLOW_INTERVAL_SEC)
+    assert controls.session.timeline.focus_row == 3
+
+
+def test_vertical_navigation_stops_on_keyup() -> None:
+    from cleave.viz.key_repeat import INITIAL_DELAY_SEC
+
+    controls = _make_controls()
+    view = controls.build_view_state(paused=False)
+    transport = find_row_by_kind(view, RowKind.TRANSPORT)
+    controls.focus_index = transport
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    focus_after_keydown = controls.focus_index
+
+    controls.handle_keyup(pygame.event.Event(pygame.KEYUP, key=pygame.K_DOWN))
+    controls.tick(INITIAL_DELAY_SEC + 1.0)
+    assert controls.focus_index == focus_after_keydown
+
+
+def test_key_repeat_armed_while_navigation_key_held() -> None:
+    controls = _make_controls()
+    assert controls.key_repeat_armed is False
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.key_repeat_armed is True
+
+    controls.handle_keyup(pygame.event.Event(pygame.KEYUP, key=pygame.K_DOWN))
+    assert controls.key_repeat_armed is False
+
+
+def test_held_key_repeat_keeps_overlay_visible() -> None:
+    from cleave.viz.overlay import TuningOverlay
+    from cleave.viz.theme import FADE_DURATION_SEC, HOLD_IDLE_SEC
+
+    controls = _make_controls()
+    overlay = TuningOverlay()
+    overlay.notify_input()
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    dt = 0.05
+    for _ in range(int(HOLD_IDLE_SEC / dt) + 5):
+        controls.tick(dt)
+        if controls.key_repeat_armed:
+            overlay.notify_input()
+        overlay.update(dt)
+
+    assert overlay.is_visible() is True
+
+    controls.handle_keyup(pygame.event.Event(pygame.KEYUP, key=pygame.K_DOWN))
+    overlay.update(HOLD_IDLE_SEC + FADE_DURATION_SEC + 0.1)
+    assert overlay.is_visible() is False
+
+
 def test_render_timeline_submenu_up_returns_to_header() -> None:
     controls = _make_controls(timeline_enabled=True)
     view = controls.build_view_state(paused=False)

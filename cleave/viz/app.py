@@ -507,6 +507,8 @@ class VisualizerApp:
 
                 self._overlay_dt = clock.tick(rt.fps) / 1000.0
                 rt.controls.tick(self._overlay_dt)
+                if rt.controls.key_repeat_armed:
+                    rt.overlay.notify_input()
 
                 t_sec = current_sec(rt.playback, rt.duration_sec)
                 self.tick_frame(t_sec, paused=rt.playback.paused)
