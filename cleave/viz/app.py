@@ -499,12 +499,12 @@ class VisualizerApp:
                     elif event.type == pygame.KEYUP:
                         tl = rt.session.timeline
                         assert rt.overlay is not None
-                        if (
-                            tl.panel_open
-                            and tl.enabled
-                            and tl.submenu_focused
-                            and rt.timeline_controls is not None
+                        if _timeline_submenu_key_routing(
+                            tl,
+                            timeline_controls=rt.timeline_controls,
+                            key=event.key,
                         ):
+                            assert rt.timeline_controls is not None
                             rt.timeline_controls.handle_keyup(event)
                         else:
                             rt.controls.handle_keyup(event)

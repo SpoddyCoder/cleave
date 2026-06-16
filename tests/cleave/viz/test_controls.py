@@ -1307,6 +1307,27 @@ def test_render_timeline_submenu_up_returns_to_header() -> None:
     assert controls.focus_index == find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
 
 
+def test_render_timeline_submenu_entry_stops_repeat_on_keyup() -> None:
+    from cleave.viz.key_repeat import INITIAL_DELAY_SEC
+
+    controls = _make_controls(timeline_enabled=True)
+    view = controls.build_view_state(paused=False)
+    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    controls.focus_index = header_row
+    controls.session.timeline.panel_open = True
+    controls.session.timeline.submenu_focused = False
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.session.timeline.submenu_focused is True
+    assert controls.session.timeline.focus_row == 0
+    assert controls.key_repeat_armed is True
+
+    controls.handle_keyup(pygame.event.Event(pygame.KEYUP, key=pygame.K_DOWN))
+    assert controls.key_repeat_armed is False
+    controls.tick(INITIAL_DELAY_SEC + 1.0)
+    assert controls.session.timeline.focus_row == 0
+
+
 def test_render_timeline_submenu_down_from_last_row_wraps_to_transport() -> None:
     stems = ("drums", "bass", "vocals", "other")
     controls = _make_controls(stems, timeline_enabled=True)
