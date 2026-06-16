@@ -7,7 +7,6 @@ from dataclasses import dataclass
 import pygame
 from OpenGL.GL import GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, glClear, glClearColor, glViewport
 
-from cleave.extract import STEM_NAMES
 from cleave.timeline import TimelineCue, layer_visible_at
 from cleave.config import (
     DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
@@ -50,7 +49,7 @@ class StemLayer:
 
 
 def timeline_defaults(session: TuningSession) -> dict[str, bool]:
-    return {name: session.layers[name].enabled for name in STEM_NAMES}
+    return {name: session.layers[name].enabled for name in session.layer_z_order}
 
 
 def timeline_cues_for_eval(session: TuningSession) -> list[TimelineCue]:
