@@ -36,7 +36,8 @@ from cleave.viz.controls import (
     TimelineRuntime,
     TuningSession,
 )
-from cleave.viz.overlay import TuningOverlay, TuningViewState
+from cleave.viz.help_overlay import HelpOverlay
+from cleave.viz.overlay import TuningOverlay, TuningViewState, row_kind
 from cleave.viz.timeline_overlay import TimelineOverlay, TimelineViewState
 
 
@@ -467,17 +468,32 @@ def _draw_tuning_overlay(
     view_state: TuningViewState,
     *,
     timeline_panel_open: bool = False,
+    help_overlay: HelpOverlay | None = None,
 ) -> None:
     overlay_surface.fill((0, 0, 0, 0))
     overlay.draw(
         overlay_surface, view_state, timeline_panel_open=timeline_panel_open
     )
+    if help_overlay is not None and view_state.help_visible:
+        help_overlay.draw(
+            overlay_surface,
+            row_kind(view_state, view_state.focus_index),
+            timeline_enabled=view_state.render_timeline.enabled,
+        )
     panel = overlay.panel_rect
     if panel is not None:
         px, py, pw, ph = panel
         panel_surface = overlay_surface.subsurface((px, py, pw, ph))
         tex_id = compositor.upload_overlay_texture(panel_surface)
         compositor.draw_overlay(tex_id, px, py, pw, ph)
+
+    if help_overlay is not None and view_state.help_visible:
+        help_panel = help_overlay.panel_rect
+        if help_panel is not None:
+            hx, hy, hw, hh = help_panel
+            help_surface = overlay_surface.subsurface((hx, hy, hw, hh))
+            help_tex_id = compositor.upload_overlay_texture(help_surface)
+            compositor.draw_overlay(help_tex_id, hx, hy, hw, hh)
 
 
 def _build_timeline_view_state(

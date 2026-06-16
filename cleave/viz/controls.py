@@ -287,6 +287,7 @@ class TuningControls:
         self._confirm = ConfirmDialog()
         self._save_choice = SaveChoiceDialog()
         self._hide_overlay_requested = False
+        self._help_visible: bool = False
         view = self.build_view_state(paused=self.playback.paused)
         self.focus_index = find_row_by_kind(view, RowKind.TRANSPORT)
 
@@ -326,6 +327,10 @@ class TuningControls:
                 self._close_timeline_panel()
             else:
                 self._open_timeline_panel(enter_submenu=True)
+            return True
+
+        if event.key == pygame.K_h:
+            self._help_visible = not self._help_visible
             return True
 
         if self.move_mode_stem is not None:
@@ -548,6 +553,7 @@ class TuningControls:
                 expanded=tl.panel_open,
             ),
             timeline_submenu_focused=tl.submenu_focused,
+            help_visible=self._help_visible,
         )
 
     def _allow_overwrite(self) -> bool:
