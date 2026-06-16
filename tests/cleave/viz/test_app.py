@@ -246,6 +246,11 @@ def _key_handler_for_session(runtime: VisualizerRuntime, key: int | None = None)
     return runtime.controls
 
 
+def _keyup_handler_for_session(runtime: VisualizerRuntime, key: int):
+    """Mirror VisualizerApp.run KEYUP routing."""
+    return _key_handler_for_session(runtime, key)
+
+
 def test_key_routing_main_when_strip_open_not_in_submenu() -> None:
     compositor = recording_compositor()
     runtime = _minimal_runtime(compositor)
@@ -292,6 +297,22 @@ def test_key_routing_timeline_when_overlay_hidden_and_submenu_focused() -> None:
 
     assert _key_handler_for_session(runtime, pygame.K_RETURN) is timeline
     assert _key_handler_for_session(runtime, pygame.K_UP) is main
+
+
+def test_keyup_routing_main_for_vertical_nav_when_submenu_focused() -> None:
+    compositor = recording_compositor()
+    runtime = _minimal_runtime(compositor)
+    main = MagicMock()
+    timeline = MagicMock()
+    runtime.controls = main
+    runtime.timeline_controls = timeline
+    runtime.session.timeline.enabled = True
+    runtime.session.timeline.panel_open = True
+    runtime.session.timeline.submenu_focused = True
+
+    assert _keyup_handler_for_session(runtime, pygame.K_UP) is main
+    assert _keyup_handler_for_session(runtime, pygame.K_DOWN) is main
+    assert _keyup_handler_for_session(runtime, pygame.K_RETURN) is timeline
 
 
 @patch("cleave.viz.app._draw_timeline_overlay")
