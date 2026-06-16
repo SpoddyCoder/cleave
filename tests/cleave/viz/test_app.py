@@ -7,7 +7,13 @@ from unittest.mock import MagicMock, call, patch
 import pygame
 
 from cleave.extract import STEM_NAMES
-from cleave.viz.app import VisualizerApp, VisualizerRuntime
+from cleave.viz.app import (
+    VisualizerApp,
+    VisualizerRuntime,
+    _timeline_strip_fade,
+    _timeline_strip_visible,
+    _timeline_submenu_key_routing,
+)
 from cleave.viz.controls import LayerRuntime, RenderPostFxRuntime, TuningSession
 from cleave.viz.overlay import TuningOverlay
 from tests.support.compositor_mock import recording_compositor
@@ -229,16 +235,13 @@ def test_tick_frame_overlay_order_at_upscale_one(
 def _key_handler_for_session(runtime: VisualizerRuntime, key: int | None = None):
     """Mirror VisualizerApp.run KEYDOWN routing."""
     tl = runtime.session.timeline
-    overlay_visible = runtime.overlay.is_visible()
-    timeline_submenu_keys = (
-        overlay_visible
-        and tl.panel_open
-        and tl.enabled
-        and tl.submenu_focused
-        and runtime.timeline_controls is not None
-        and key not in (pygame.K_UP, pygame.K_DOWN)
-    )
-    if timeline_submenu_keys:
+    if key is None:
+        key = pygame.K_RETURN
+    if _timeline_submenu_key_routing(
+        tl,
+        timeline_controls=runtime.timeline_controls,
+        key=key,
+    ):
         return runtime.timeline_controls
     return runtime.controls
 
@@ -275,7 +278,7 @@ def test_key_routing_timeline_when_submenu_focused() -> None:
     assert _key_handler_for_session(runtime, pygame.K_DOWN) is main
 
 
-def test_key_routing_main_when_overlay_hidden_despite_submenu() -> None:
+def test_key_routing_timeline_when_overlay_hidden_and_submenu_focused() -> None:
     compositor = recording_compositor()
     runtime = _minimal_runtime(compositor)
     main = MagicMock()
@@ -287,7 +290,8 @@ def test_key_routing_main_when_overlay_hidden_despite_submenu() -> None:
     runtime.session.timeline.panel_open = True
     runtime.session.timeline.submenu_focused = True
 
-    assert _key_handler_for_session(runtime) is main
+    assert _key_handler_for_session(runtime, pygame.K_RETURN) is timeline
+    assert _key_handler_for_session(runtime, pygame.K_UP) is main
 
 
 @patch("cleave.viz.app._draw_timeline_overlay")
@@ -297,7 +301,7 @@ def test_key_routing_main_when_overlay_hidden_despite_submenu() -> None:
 @patch("cleave.viz.app._composite_ordered")
 @patch("cleave.viz.app.apply_effect_modifiers")
 @patch("cleave.viz.app.apply_layer_visibility")
-def test_tick_frame_skips_timeline_when_overlay_hidden(
+def test_tick_frame_skips_timeline_when_overlay_hidden_and_not_in_submenu(
     _mock_visibility: MagicMock,
     _mock_effects: MagicMock,
     _mock_composite: MagicMock,
@@ -309,10 +313,52 @@ def test_tick_frame_skips_timeline_when_overlay_hidden(
     pygame.init()
     compositor = recording_compositor()
     runtime = _timeline_open_runtime(compositor)
+    runtime.session.timeline.submenu_focused = False
 
     app = VisualizerApp(runtime)
     app.tick_frame(1.0, paused=True, draw_overlay=True)
     mock_draw_timeline.assert_not_called()
+
+
+@patch("cleave.viz.app._draw_timeline_overlay")
+@patch("cleave.viz.app._draw_tuning_overlay")
+@patch("cleave.viz.app._composite_live_render_overlay")
+@patch("cleave.viz.app.live_frame_fade_alpha", return_value=1.0)
+@patch("cleave.viz.app._composite_ordered")
+@patch("cleave.viz.app.apply_effect_modifiers")
+@patch("cleave.viz.app.apply_layer_visibility")
+def test_tick_frame_draws_timeline_when_overlay_hidden_but_submenu_focused(
+    _mock_visibility: MagicMock,
+    _mock_effects: MagicMock,
+    _mock_composite: MagicMock,
+    _mock_fade_alpha: MagicMock,
+    _mock_live_overlay: MagicMock,
+    _mock_draw_tuning: MagicMock,
+    mock_draw_timeline: MagicMock,
+) -> None:
+    pygame.init()
+    compositor = recording_compositor()
+    runtime = _timeline_open_runtime(compositor)
+    runtime.session.timeline.submenu_focused = True
+
+    app = VisualizerApp(runtime)
+    app.tick_frame(1.0, paused=True, draw_overlay=True)
+    mock_draw_timeline.assert_called_once()
+
+
+def test_timeline_strip_visible_while_submenu_focused_despite_hidden_overlay() -> None:
+    tl = TuningSession(layer_z_order=[], layers={}).timeline
+    tl.enabled = True
+    tl.panel_open = True
+    tl.submenu_focused = True
+
+    assert _timeline_strip_visible(tl, overlay_visibility=0.0) is True
+    assert _timeline_strip_visible(tl, overlay_visibility=1.0) is True
+    assert _timeline_strip_fade(tl, overlay_visibility=0.0) == 1.0
+
+    tl.submenu_focused = False
+    assert _timeline_strip_visible(tl, overlay_visibility=0.0) is False
+    assert _timeline_strip_fade(tl, overlay_visibility=0.5) == 0.5
 
 
 @patch("cleave.viz.app._draw_timeline_overlay")

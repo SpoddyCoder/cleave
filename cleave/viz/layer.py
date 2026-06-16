@@ -533,11 +533,13 @@ def _draw_timeline_overlay(
     overlay_surface: pygame.Surface,
     view_state: TimelineViewState,
     content_height: int,
+    *,
+    visibility: float = 1.0,
 ) -> None:
     overlay_surface.fill((0, 0, 0, 0))
     overlay.draw(overlay_surface, view_state, content_height=content_height)
     panel = overlay.panel_rect
-    if panel is not None:
+    if panel is not None and visibility > 0.01:
         upload_rect = panel
         badge = overlay.header_badge_rect
         if badge is not None:
@@ -545,4 +547,4 @@ def _draw_timeline_overlay(
         px, py, pw, ph = upload_rect
         upload_surface = overlay_surface.subsurface((px, py, pw, ph))
         tex_id = compositor.upload_overlay_texture(upload_surface)
-        compositor.draw_overlay(tex_id, px, py, pw, ph)
+        compositor.draw_overlay(tex_id, px, py, pw, ph, visibility)

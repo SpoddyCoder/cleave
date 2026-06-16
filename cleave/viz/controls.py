@@ -605,7 +605,16 @@ class TuningControls:
         quick = quick_nav_row_indices(view)
         if not quick:
             return
-        current = self.focus_index
+        tl = self.session.timeline
+        if tl.submenu_focused:
+            tl.submenu_focused = False
+            timeline_header = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+            if delta < 0:
+                self.focus_index = timeline_header
+                return
+            current = timeline_header
+        else:
+            current = self.focus_index
         if current in quick:
             pos = quick.index(current)
             self.focus_index = quick[(pos + delta) % len(quick)]

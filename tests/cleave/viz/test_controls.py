@@ -1552,6 +1552,30 @@ def test_ctrl_quick_nav_does_not_affect_normal_up_down() -> None:
     assert controls.focus_index == preset_dir_row
 
 
+def test_ctrl_quick_nav_from_timeline_submenu_jumps_sections() -> None:
+    controls = _make_controls(("drums", "bass"), timeline_enabled=True)
+    view = controls.build_view_state(paused=False)
+    quick = quick_nav_row_indices(view)
+    timeline_header = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    transport_row = find_row_by_kind(view, RowKind.TRANSPORT)
+
+    controls.session.timeline.panel_open = True
+    controls.session.timeline.submenu_focused = True
+    controls.session.timeline.focus_row = 1
+    controls.focus_index = find_row_by_kind(view, RowKind.TRANSPORT)
+
+    controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
+    assert controls.session.timeline.submenu_focused is False
+    assert controls.focus_index == timeline_header
+
+    controls.session.timeline.submenu_focused = True
+    controls.session.timeline.focus_row = 2
+    controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
+    assert controls.session.timeline.submenu_focused is False
+    assert controls.focus_index == transport_row
+    assert timeline_header in quick
+
+
 def _write_milk(path: Path) -> None:
     path.write_text("milk")
 
