@@ -167,6 +167,7 @@ def make_timeline_controls(
     effect_runtime: EffectRuntime,
     mix_player: MixPlayer | None = None,
     on_toast: Callable[[str], None] | None = None,
+    tuning_controls: TuningControls | None = None,
 ) -> TimelineControls:
     def on_visibility_change() -> None:
         t_sec = current_sec(playback, duration_sec)
@@ -182,7 +183,17 @@ def make_timeline_controls(
         )
 
     def on_close() -> None:
-        session.timeline.panel_open = False
+        if tuning_controls is not None:
+            tuning_controls._close_timeline_panel()
+        else:
+            session.timeline.panel_open = False
+            session.timeline.submenu_focused = False
+
+    def on_exit_submenu() -> None:
+        if tuning_controls is not None:
+            tuning_controls.exit_timeline_submenu()
+        else:
+            session.timeline.submenu_focused = False
 
     def on_seek(delta_sec: float) -> None:
         seek(playback, delta_sec, duration_sec)
@@ -194,6 +205,7 @@ def make_timeline_controls(
         duration_sec,
         on_visibility_change=on_visibility_change,
         on_close=on_close,
+        on_exit_submenu=on_exit_submenu,
         on_seek=on_seek,
         on_toast=on_toast,
     )

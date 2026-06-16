@@ -6,8 +6,10 @@ from unittest.mock import MagicMock, call, patch
 
 import pygame
 
+from cleave.extract import STEM_NAMES
 from cleave.viz.app import VisualizerApp, VisualizerRuntime
-from cleave.viz.controls import RenderPostFxRuntime, TuningSession
+from cleave.viz.controls import LayerRuntime, RenderPostFxRuntime, TuningSession
+from cleave.viz.overlay import TuningOverlay
 from tests.support.compositor_mock import recording_compositor
 
 
@@ -49,6 +51,19 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> Visualiz
     runtime.overlay.update = MagicMock()
     runtime.session.timeline.enabled = False
     runtime.session.timeline.panel_open = False
+    return runtime
+
+
+def _timeline_open_runtime(compositor: MagicMock) -> VisualizerRuntime:
+    runtime = _minimal_runtime(compositor)
+    runtime.overlay = TuningOverlay()
+    runtime.session.layer_z_order = list(STEM_NAMES)
+    runtime.session.layers = {
+        stem: LayerRuntime(playlist=MagicMock(), browse_floor=MagicMock())
+        for stem in STEM_NAMES
+    }
+    runtime.session.timeline.enabled = True
+    runtime.session.timeline.panel_open = True
     return runtime
 
 
@@ -209,3 +224,169 @@ def test_tick_frame_overlay_order_at_upscale_one(
         "present_content",
         "draw_overlay",
     ]
+
+
+def _key_handler_for_session(runtime: VisualizerRuntime, key: int | None = None):
+    """Mirror VisualizerApp.run KEYDOWN routing."""
+    tl = runtime.session.timeline
+    overlay_visible = runtime.overlay.is_visible()
+    timeline_submenu_keys = (
+        overlay_visible
+        and tl.panel_open
+        and tl.enabled
+        and tl.submenu_focused
+        and runtime.timeline_controls is not None
+        and key not in (pygame.K_UP, pygame.K_DOWN)
+    )
+    if timeline_submenu_keys:
+        return runtime.timeline_controls
+    return runtime.controls
+
+
+def test_key_routing_main_when_strip_open_not_in_submenu() -> None:
+    compositor = recording_compositor()
+    runtime = _minimal_runtime(compositor)
+    main = MagicMock()
+    timeline = MagicMock()
+    runtime.controls = main
+    runtime.timeline_controls = timeline
+    runtime.session.timeline.enabled = True
+    runtime.session.timeline.panel_open = True
+    runtime.session.timeline.submenu_focused = False
+
+    assert _key_handler_for_session(runtime) is main
+
+
+def test_key_routing_timeline_when_submenu_focused() -> None:
+    compositor = recording_compositor()
+    runtime = _minimal_runtime(compositor)
+    main = MagicMock()
+    timeline = MagicMock()
+    runtime.controls = main
+    runtime.timeline_controls = timeline
+    runtime.overlay = TuningOverlay()
+    runtime.overlay.notify_input()
+    runtime.session.timeline.enabled = True
+    runtime.session.timeline.panel_open = True
+    runtime.session.timeline.submenu_focused = True
+
+    assert _key_handler_for_session(runtime, pygame.K_RETURN) is timeline
+    assert _key_handler_for_session(runtime, pygame.K_UP) is main
+    assert _key_handler_for_session(runtime, pygame.K_DOWN) is main
+
+
+def test_key_routing_main_when_overlay_hidden_despite_submenu() -> None:
+    compositor = recording_compositor()
+    runtime = _minimal_runtime(compositor)
+    main = MagicMock()
+    timeline = MagicMock()
+    runtime.controls = main
+    runtime.timeline_controls = timeline
+    runtime.overlay = TuningOverlay()
+    runtime.session.timeline.enabled = True
+    runtime.session.timeline.panel_open = True
+    runtime.session.timeline.submenu_focused = True
+
+    assert _key_handler_for_session(runtime) is main
+
+
+@patch("cleave.viz.app._draw_timeline_overlay")
+@patch("cleave.viz.app._draw_tuning_overlay")
+@patch("cleave.viz.app._composite_live_render_overlay")
+@patch("cleave.viz.app.live_frame_fade_alpha", return_value=1.0)
+@patch("cleave.viz.app._composite_ordered")
+@patch("cleave.viz.app.apply_effect_modifiers")
+@patch("cleave.viz.app.apply_layer_visibility")
+def test_tick_frame_skips_timeline_when_overlay_hidden(
+    _mock_visibility: MagicMock,
+    _mock_effects: MagicMock,
+    _mock_composite: MagicMock,
+    _mock_fade_alpha: MagicMock,
+    _mock_live_overlay: MagicMock,
+    _mock_draw_tuning: MagicMock,
+    mock_draw_timeline: MagicMock,
+) -> None:
+    pygame.init()
+    compositor = recording_compositor()
+    runtime = _timeline_open_runtime(compositor)
+
+    app = VisualizerApp(runtime)
+    app.tick_frame(1.0, paused=True, draw_overlay=True)
+    mock_draw_timeline.assert_not_called()
+
+
+@patch("cleave.viz.app._draw_timeline_overlay")
+@patch("cleave.viz.app._draw_tuning_overlay")
+@patch("cleave.viz.app._composite_live_render_overlay")
+@patch("cleave.viz.app.live_frame_fade_alpha", return_value=1.0)
+@patch("cleave.viz.app._composite_ordered")
+@patch("cleave.viz.app.apply_effect_modifiers")
+@patch("cleave.viz.app.apply_layer_visibility")
+def test_tick_frame_draws_timeline_when_overlay_visible_and_panel_open(
+    _mock_visibility: MagicMock,
+    _mock_effects: MagicMock,
+    _mock_composite: MagicMock,
+    _mock_fade_alpha: MagicMock,
+    _mock_live_overlay: MagicMock,
+    _mock_draw_tuning: MagicMock,
+    mock_draw_timeline: MagicMock,
+) -> None:
+    pygame.init()
+    compositor = recording_compositor()
+    runtime = _timeline_open_runtime(compositor)
+    runtime.overlay.notify_input()
+
+    app = VisualizerApp(runtime)
+    app.tick_frame(1.0, paused=True, draw_overlay=True)
+    mock_draw_timeline.assert_called_once()
+
+
+def test_esc_hide_clears_submenu_focus_preserves_panel_open() -> None:
+    compositor = recording_compositor()
+    runtime = _minimal_runtime(compositor)
+    overlay = TuningOverlay()
+    overlay.notify_input()
+    runtime.overlay = overlay
+    runtime.session.timeline.enabled = True
+    runtime.session.timeline.panel_open = True
+    runtime.session.timeline.submenu_focused = True
+
+    runtime.controls.consume_hide_overlay.return_value = True
+    if runtime.controls.consume_hide_overlay():
+        overlay.hide_immediately()
+        runtime.session.timeline.submenu_focused = False
+
+    assert runtime.session.timeline.panel_open is True
+    assert runtime.session.timeline.submenu_focused is False
+    assert overlay.is_visible() is False
+
+
+@patch("cleave.viz.app._draw_timeline_overlay")
+@patch("cleave.viz.app._draw_tuning_overlay")
+@patch("cleave.viz.app._composite_live_render_overlay")
+@patch("cleave.viz.app.live_frame_fade_alpha", return_value=1.0)
+@patch("cleave.viz.app._composite_ordered")
+@patch("cleave.viz.app.apply_effect_modifiers")
+@patch("cleave.viz.app.apply_layer_visibility")
+def test_tick_frame_restores_timeline_after_overlay_shown_again(
+    _mock_visibility: MagicMock,
+    _mock_effects: MagicMock,
+    _mock_composite: MagicMock,
+    _mock_fade_alpha: MagicMock,
+    _mock_live_overlay: MagicMock,
+    _mock_draw_tuning: MagicMock,
+    mock_draw_timeline: MagicMock,
+) -> None:
+    pygame.init()
+    compositor = recording_compositor()
+    runtime = _timeline_open_runtime(compositor)
+    overlay = runtime.overlay
+
+    app = VisualizerApp(runtime)
+    app.tick_frame(1.0, paused=True, draw_overlay=True)
+    mock_draw_timeline.assert_not_called()
+
+    overlay.notify_input()
+    app.tick_frame(1.0, paused=True, draw_overlay=True)
+    mock_draw_timeline.assert_called_once()
+    assert runtime.session.timeline.panel_open is True

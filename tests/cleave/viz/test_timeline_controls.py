@@ -20,6 +20,7 @@ def _make_timeline_controls(
     focus_row: int = 0,
     armed_stems: set[str] | None = None,
     panel_open: bool = True,
+    submenu_focused: bool = True,
     enabled: bool = True,
     position_sec: float = 0.0,
     recording: bool = False,
@@ -45,6 +46,7 @@ def _make_timeline_controls(
     tl = session.timeline
     tl.enabled = enabled
     tl.panel_open = panel_open
+    tl.submenu_focused = submenu_focused
     tl.cues = list(cues or [])
     tl.focus_row = focus_row
     tl.armed_stems = set(armed_stems or ())
@@ -63,7 +65,12 @@ def _make_timeline_controls(
         playback,
         120.0,
         on_visibility_change=lambda: visibility_calls.append(True),
-        on_close=lambda: (close_calls.append(True), setattr(tl, "panel_open", False)),
+        on_close=lambda: (
+            close_calls.append(True),
+            setattr(tl, "panel_open", False),
+            setattr(tl, "submenu_focused", False),
+        ),
+        on_exit_submenu=lambda: setattr(tl, "submenu_focused", False),
         on_seek=lambda delta: seeks.append(delta),
         on_toast=toasts.append,
     )
@@ -79,25 +86,6 @@ def test_enter_toggles_arm_on_focused_stem() -> None:
 
     controls.handle_keydown(keydown(pygame.K_RETURN))
     assert session.timeline.armed_stems == set()
-
-
-def test_up_down_change_focus_row() -> None:
-    controls, session, _, _, _, _ = _make_timeline_controls(focus_row=1)
-
-    controls.handle_keydown(keydown(pygame.K_UP))
-    assert session.timeline.focus_row == 0
-
-    controls.handle_keydown(keydown(pygame.K_DOWN))
-    assert session.timeline.focus_row == 1
-
-    controls.handle_keydown(keydown(pygame.K_DOWN))
-    assert session.timeline.focus_row == 2
-
-    controls.handle_keydown(keydown(pygame.K_DOWN))
-    assert session.timeline.focus_row == 3
-
-    controls.handle_keydown(keydown(pygame.K_DOWN))
-    assert session.timeline.focus_row == 3
 
 
 def test_left_right_seek_short_when_not_recording() -> None:

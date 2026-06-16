@@ -192,6 +192,7 @@ def _init_gl_resources_heavy(
         effect_runtime=runtime.effect_runtime,
         mix_player=mix_player,
         on_toast=controls.show_toast,
+        tuning_controls=controls,
     )
 
     runtime.layers = layers
@@ -329,16 +330,20 @@ class VisualizerApp:
                 position_sec=t_sec,
             )
             tl = rt.session.timeline
-            rt.overlay.update(
-                self._overlay_dt,
-                timeline_panel_open=tl.enabled and tl.panel_open,
-            )
+            overlay_visible = rt.overlay.is_visible()
+            timeline_panel_open = tl.enabled and tl.panel_open and overlay_visible
+            rt.overlay.update(self._overlay_dt)
             _draw_tuning_overlay(
-                rt.compositor, rt.overlay, rt.overlay_surface, view_state
+                rt.compositor,
+                rt.overlay,
+                rt.overlay_surface,
+                view_state,
+                timeline_panel_open=timeline_panel_open,
             )
 
             if (
-                tl.enabled
+                overlay_visible
+                and tl.enabled
                 and tl.panel_open
                 and rt.timeline_overlay is not None
                 and rt.overlay_surface is not None
@@ -429,18 +434,24 @@ class VisualizerApp:
                         running = False
                     elif event.type == pygame.KEYDOWN:
                         tl = rt.session.timeline
-                        if (
-                            tl.panel_open
+                        assert rt.overlay is not None
+                        overlay_visible = rt.overlay.is_visible()
+                        timeline_submenu_keys = (
+                            overlay_visible
+                            and tl.panel_open
                             and tl.enabled
+                            and tl.submenu_focused
                             and rt.timeline_controls is not None
-                        ):
+                            and event.key
+                            not in (pygame.K_UP, pygame.K_DOWN)
+                        )
+                        if timeline_submenu_keys:
                             key_handler = rt.timeline_controls
                         else:
                             key_handler = rt.controls
                         if key_handler.handle_keydown(event) is False:
                             running = False
                         elif key_handler is rt.controls:
-                            assert rt.overlay is not None
                             if (
                                 event.key == pygame.K_t
                                 and rt.session.timeline.panel_open
@@ -449,13 +460,17 @@ class VisualizerApp:
                                 rt.timeline_controls.focused_cue_index = None
                             if rt.controls.consume_hide_overlay():
                                 rt.overlay.hide_immediately()
+                                tl.submenu_focused = False
                             elif event.key != pygame.K_t:
                                 rt.overlay.notify_input()
                     elif event.type == pygame.KEYUP:
                         tl = rt.session.timeline
+                        assert rt.overlay is not None
                         if (
-                            tl.panel_open
+                            rt.overlay.is_visible()
+                            and tl.panel_open
                             and tl.enabled
+                            and tl.submenu_focused
                             and rt.timeline_controls is not None
                         ):
                             rt.timeline_controls.handle_keyup(event)

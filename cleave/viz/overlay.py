@@ -56,7 +56,6 @@ from cleave.viz.theme import (
     FOCUS_ROW_BG_ALPHA,
     HIGHLIGHT,
     HOLD_IDLE_SEC,
-    TIMELINE_PANEL_HOLD_IDLE_SEC,
     LABEL,
     LOCKED,
     LOCK_ICON,
@@ -77,7 +76,7 @@ from cleave.viz.theme import (
 
 Anchor = Literal["topleft", "bottomleft"]
 
-FOOTER_ROWS = 3
+HEADER_ROWS = 3
 TREE_INDENT = 16
 ROW_ICON_SUFFIX_GAP = 4
 
@@ -197,13 +196,14 @@ class TuningViewState:
     render_timeline: RenderTimelineBlock = field(
         default_factory=RenderTimelineBlock
     )
+    timeline_submenu_focused: bool = False
 
 
-def footer_row_count(state: TuningViewState) -> int:
-    return FOOTER_ROWS
+def header_row_count(state: TuningViewState) -> int:
+    return HEADER_ROWS
 
 
-_FOOTER_ROW_KINDS = frozenset(
+_HEADER_ROW_KINDS = frozenset(
     {
         RowKind.CONFIG_HEADER,
         RowKind.TRANSPORT,
@@ -213,7 +213,11 @@ _FOOTER_ROW_KINDS = frozenset(
 
 
 def build_row_layout(state: TuningViewState) -> list[RowDescriptor]:
-    rows: list[RowDescriptor] = []
+    rows: list[RowDescriptor] = [
+        RowDescriptor(RowKind.TRANSPORT),
+        RowDescriptor(RowKind.CONFIG_HEADER),
+        RowDescriptor(RowKind.SAVE_CONFIG),
+    ]
     for stem in state.layer_z_order:
         rows.append(RowDescriptor(RowKind.TRACK_HEADER, stem=stem))
         rows.append(RowDescriptor(RowKind.TRACK_PRESET_DIR, stem=stem))
@@ -255,17 +259,15 @@ def build_row_layout(state: TuningViewState) -> list[RowDescriptor]:
         rows.append(RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN))
         rows.append(RowDescriptor(RowKind.RENDER_POST_FX_FADE_OUT))
     rows.append(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
-    rows.append(RowDescriptor(RowKind.TRANSPORT))
-    rows.append(RowDescriptor(RowKind.CONFIG_HEADER))
-    rows.append(RowDescriptor(RowKind.SAVE_CONFIG))
     return rows
 
 
 def track_row_count(state: TuningViewState) -> int:
+    """Count of scrollable content rows (all rows except pinned header rows)."""
     return sum(
         1
         for row in build_row_layout(state)
-        if row.kind not in _FOOTER_ROW_KINDS
+        if row.kind not in _HEADER_ROW_KINDS
     )
 
 
@@ -931,6 +933,12 @@ def _track_disabled(state: TuningViewState, stem: str) -> bool:
     return not state.tracks[stem].enabled
 
 
+def _row_has_tree_focus(state: TuningViewState, index: int) -> bool:
+    if state.timeline_submenu_focused:
+        return False
+    return index == state.focus_index
+
+
 def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
     """Return the VALUE-role color for a row (before label/value split rendering)."""
     kind = row_kind(state, index)
@@ -966,7 +974,7 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
     if stem is not None and state.move_mode_stem == stem:
         return MOVE_MODE
 
-    if index == state.focus_index:
+    if _row_has_tree_focus(state, index):
         return HIGHLIGHT
 
     if stem is not None and _track_disabled(state, stem):
@@ -986,7 +994,7 @@ def _row_bg_color(state: TuningViewState, index: int) -> tuple[int, int, int] | 
     stem = row_stem(state, index)
     if stem is not None and state.move_mode_stem == stem:
         return MOVE_MODE
-    if index == state.focus_index:
+    if _row_has_tree_focus(state, index):
         return HIGHLIGHT
     return None
 
@@ -994,9 +1002,10 @@ def _row_bg_color(state: TuningViewState, index: int) -> tuple[int, int, int] | 
 @dataclass(frozen=True)
 class PanelScrollMetrics:
     scrollable_indices: list[int]
-    footer_indices: list[int]
+    header_indices: list[int]
     row_stride: int
     scroll_content_h: int
+    header_block_h: int
     footer_block_h: int
     max_panel_h: int
     natural_h: int
@@ -1006,14 +1015,71 @@ class PanelScrollMetrics:
     show_scrollbar: bool
 
 
+@dataclass(frozen=True)
+class PanelHeaderDialogLayout:
+    confirm_y: int | None
+    save_choice_y: int | None
+    dialog_block_h: int
+
+
+def panel_header_dialog_layout(
+    *,
+    padding: int,
+    header_row_count: int,
+    row_stride: int,
+    line_gap: int,
+    confirm_h: int,
+    confirm_active: bool,
+    save_choice_h: int,
+    save_choice_active: bool,
+) -> PanelHeaderDialogLayout:
+    """Stack confirm and save-choice immediately below pinned header rows."""
+    y = padding + header_row_count * row_stride
+    dialog_block_h = 0
+    confirm_y: int | None = None
+    save_choice_y: int | None = None
+
+    if confirm_active:
+        confirm_y = y
+        dialog_block_h += line_gap + confirm_h
+        y += confirm_h
+
+    if save_choice_active:
+        save_choice_y = y + line_gap
+        dialog_block_h += line_gap + save_choice_h
+
+    return PanelHeaderDialogLayout(
+        confirm_y=confirm_y,
+        save_choice_y=save_choice_y,
+        dialog_block_h=dialog_block_h,
+    )
+
+
+@dataclass(frozen=True)
+class PanelToastLayout:
+    toast_y: int | None
+
+
+def panel_toast_layout(
+    *,
+    panel_h: int,
+    padding: int,
+    line_h: int,
+    toast_active: bool,
+) -> PanelToastLayout:
+    """Place toast on the panel bottom."""
+    toast_y = panel_h - padding - line_h if toast_active else None
+    return PanelToastLayout(toast_y=toast_y)
+
+
 def scroll_metrics(
     *,
     visible_indices: list[int],
-    first_footer_visible: int | None,
+    first_scrollable_visible: int | None,
     line_h: int,
     line_gap: int,
     padding: int,
-    footer_gap: int,
+    header_gap: int,
     confirm_h: int,
     confirm_active: bool,
     save_choice_h: int,
@@ -1021,13 +1087,13 @@ def scroll_metrics(
     toast_active: bool,
     max_panel_h: int,
 ) -> PanelScrollMetrics:
-    if first_footer_visible is not None:
-        split_pos = visible_indices.index(first_footer_visible)
-        scrollable_indices = visible_indices[:split_pos]
-        footer_indices = visible_indices[split_pos:]
+    if first_scrollable_visible is not None:
+        split_pos = visible_indices.index(first_scrollable_visible)
+        header_indices = visible_indices[:split_pos]
+        scrollable_indices = visible_indices[split_pos:]
     else:
-        scrollable_indices = list(visible_indices)
-        footer_indices = []
+        header_indices = list(visible_indices)
+        scrollable_indices = []
 
     row_stride = line_h + line_gap
     n_scroll = len(scrollable_indices)
@@ -1035,25 +1101,27 @@ def scroll_metrics(
         n_scroll * line_h + max(0, n_scroll - 1) * line_gap if n_scroll else 0
     )
 
-    n_footer = len(footer_indices)
-    footer_rows_h = (
-        n_footer * line_h + max(0, n_footer - 1) * line_gap if n_footer else 0
+    n_header = len(header_indices)
+    header_rows_h = (
+        n_header * line_h + max(0, n_header - 1) * line_gap if n_header else 0
     )
-    footer_block_h = footer_rows_h
-    if footer_indices:
-        footer_block_h += footer_gap
+    dialog_block_h = 0
     if confirm_active:
-        footer_block_h += line_gap + confirm_h
+        dialog_block_h += line_gap + confirm_h
     if save_choice_active:
-        footer_block_h += line_gap + save_choice_h
-    if toast_active:
-        footer_block_h += line_gap + line_h
+        dialog_block_h += line_gap + save_choice_h
+
+    header_block_h = header_rows_h + dialog_block_h
+    if scrollable_indices:
+        header_block_h += header_gap
+
+    footer_block_h = line_gap + line_h if toast_active else 0
 
     visible_count = len(visible_indices)
     natural_h = (
         visible_count * line_h
         + max(0, visible_count - 1) * line_gap
-        + (footer_gap if first_footer_visible is not None else 0)
+        + (header_gap if first_scrollable_visible is not None else 0)
         + padding * 2
     )
     if confirm_active:
@@ -1065,7 +1133,9 @@ def scroll_metrics(
 
     needs_scroll = natural_h > max_panel_h
     if needs_scroll:
-        scroll_viewport_h = max(0, max_panel_h - padding * 2 - footer_block_h)
+        scroll_viewport_h = max(
+            0, max_panel_h - padding * 2 - header_block_h - footer_block_h
+        )
         panel_h = min(natural_h, max_panel_h)
         show_scrollbar = scroll_content_h > scroll_viewport_h
     else:
@@ -1075,9 +1145,10 @@ def scroll_metrics(
 
     return PanelScrollMetrics(
         scrollable_indices=scrollable_indices,
-        footer_indices=footer_indices,
+        header_indices=header_indices,
         row_stride=row_stride,
         scroll_content_h=scroll_content_h,
+        header_block_h=header_block_h,
         footer_block_h=footer_block_h,
         max_panel_h=max_panel_h,
         natural_h=natural_h,
@@ -1184,13 +1255,12 @@ class TuningOverlay:
         self._visibility = 0.0
         self._scroll_y = 0
 
-    def update(self, dt_sec: float, *, timeline_panel_open: bool = False) -> None:
+    def is_visible(self) -> bool:
+        return self._visibility > 0.01
+
+    def update(self, dt_sec: float) -> None:
         self._idle_sec += dt_sec
-        hold_idle_sec = (
-            TIMELINE_PANEL_HOLD_IDLE_SEC
-            if timeline_panel_open
-            else self._hold_idle_sec
-        )
+        hold_idle_sec = self._hold_idle_sec
         if self._idle_sec <= hold_idle_sec:
             self._visibility = 1.0
         elif self._fade_duration_sec <= 0:
@@ -1250,6 +1320,7 @@ class TuningOverlay:
         panel: pygame.Surface,
         *,
         panel_w: int,
+        scroll_top: int,
         scroll_viewport_h: int,
         scroll_content_h: int,
         border_alpha: int,
@@ -1257,7 +1328,7 @@ class TuningOverlay:
         if border_alpha < 2:
             return
         track_x = panel_w - SCROLLBAR_WIDTH
-        track_y = self._padding
+        track_y = scroll_top
         track_bottom = track_y + scroll_viewport_h
         track_color = (*SCROLLBAR_TRACK, border_alpha)
         pygame.draw.line(panel, track_color, (track_x, track_y), (track_x, track_bottom))
@@ -1279,7 +1350,13 @@ class TuningOverlay:
             (track_x, thumb_y, SCROLLBAR_WIDTH, thumb_h),
         )
 
-    def draw(self, surface: pygame.Surface, state: TuningViewState) -> None:
+    def draw(
+        self,
+        surface: pygame.Surface,
+        state: TuningViewState,
+        *,
+        timeline_panel_open: bool = False,
+    ) -> None:
         self._panel_rect = None
         if self._visibility <= 0.01 or row_count(state) == 0:
             return
@@ -1288,9 +1365,12 @@ class TuningOverlay:
         line_h = font.get_linesize()
         visible_indices = visible_row_indices(state)
         visible_count = len(visible_indices)
-        track_rows_boundary = track_row_count(state)
-        first_footer_visible = next(
-            (index for index in visible_indices if index >= track_rows_boundary),
+        first_scrollable_visible = next(
+            (
+                index
+                for index in visible_indices
+                if row_kind(state, index) not in _HEADER_ROW_KINDS
+            ),
             None,
         )
         toast_active = bool(state.toast_message and state.toast_remaining_sec > 0)
@@ -1314,16 +1394,20 @@ class TuningOverlay:
             save_choice_h = self._save_choice.measure_height(font)
             save_choice_w = self._save_choice.measure_width(font)
 
-        footer_gap = (line_h + self._line_gap) * 2
+        header_gap = line_h + self._line_gap
         _, margin_y = self._margin
         max_panel_h = surface.get_height() - margin_y * 2
+        if timeline_panel_open:
+            from cleave.viz.timeline_overlay import timeline_viewport_reserve_px
+
+            max_panel_h -= timeline_viewport_reserve_px(surface.get_height())
         metrics = scroll_metrics(
             visible_indices=visible_indices,
-            first_footer_visible=first_footer_visible,
+            first_scrollable_visible=first_scrollable_visible,
             line_h=line_h,
             line_gap=self._line_gap,
             padding=self._padding,
-            footer_gap=footer_gap,
+            header_gap=header_gap,
             confirm_h=confirm_h,
             confirm_active=confirm_active,
             save_choice_h=save_choice_h,
@@ -1564,6 +1648,17 @@ class TuningOverlay:
         text_alpha = int(255 * self._visibility)
         index_to_draw = {index: draw_index for draw_index, index in enumerate(visible_indices)}
 
+        header_dialog = panel_header_dialog_layout(
+            padding=self._padding,
+            header_row_count=len(metrics.header_indices),
+            row_stride=metrics.row_stride,
+            line_gap=self._line_gap,
+            confirm_h=confirm_h,
+            confirm_active=confirm_active,
+            save_choice_h=save_choice_h,
+            save_choice_active=save_choice_active,
+        )
+
         if metrics.needs_scroll:
             self._ensure_focus_visible(
                 state,
@@ -1572,7 +1667,23 @@ class TuningOverlay:
                 metrics.scroll_viewport_h,
                 line_h,
             )
-            scroll_top = self._padding
+            header_y = self._padding
+            for row_index, index in enumerate(metrics.header_indices):
+                y = header_y + row_index * metrics.row_stride
+                self._blit_row(
+                    panel,
+                    state=state,
+                    index=index,
+                    draw_index=index_to_draw[index],
+                    row_surfaces=row_surfaces,
+                    row_time_surfaces=row_time_surfaces,
+                    y=y,
+                    text_alpha=text_alpha,
+                    panel_w=panel_w,
+                    line_h=line_h,
+                )
+
+            scroll_top = self._padding + metrics.header_block_h
             scroll_bottom = scroll_top + metrics.scroll_viewport_h
             old_clip = panel.get_clip()
             clip_right_reserve = (
@@ -1603,41 +1714,20 @@ class TuningOverlay:
                 )
             panel.set_clip(old_clip)
 
-            footer_y = scroll_bottom
-            if metrics.footer_indices:
-                footer_y += footer_gap
-            for row_index, index in enumerate(metrics.footer_indices):
-                y = footer_y + row_index * metrics.row_stride
-                self._blit_row(
-                    panel,
-                    state=state,
-                    index=index,
-                    draw_index=index_to_draw[index],
-                    row_surfaces=row_surfaces,
-                    row_time_surfaces=row_time_surfaces,
-                    y=y,
-                    text_alpha=text_alpha,
-                    panel_w=panel_w,
-                    line_h=line_h,
-                )
-
             if metrics.show_scrollbar:
                 self._draw_scrollbar(
                     panel,
                     panel_w=panel_w,
+                    scroll_top=scroll_top,
                     scroll_viewport_h=metrics.scroll_viewport_h,
                     scroll_content_h=metrics.scroll_content_h,
                     border_alpha=int(255 * self._visibility),
                 )
-            if metrics.footer_indices:
-                dialog_y = footer_y + len(metrics.footer_indices) * metrics.row_stride
-            else:
-                dialog_y = scroll_bottom
         else:
-            dialog_y = self._padding
+            row_y = self._padding
             for draw_index, index in enumerate(visible_indices):
-                if index == first_footer_visible:
-                    dialog_y += footer_gap
+                if index == first_scrollable_visible:
+                    row_y += header_dialog.dialog_block_h + header_gap
                 self._blit_row(
                     panel,
                     state=state,
@@ -1645,43 +1735,50 @@ class TuningOverlay:
                     draw_index=draw_index,
                     row_surfaces=row_surfaces,
                     row_time_surfaces=row_time_surfaces,
-                    y=dialog_y,
+                    y=row_y,
                     text_alpha=text_alpha,
                     panel_w=panel_w,
                     line_h=line_h,
                 )
-                dialog_y += line_h + self._line_gap
+                row_y += line_h + self._line_gap
 
-        if confirm_active and text_alpha >= 2:
+        toast_layout = panel_toast_layout(
+            panel_h=panel_h,
+            padding=self._padding,
+            line_h=line_h,
+            toast_active=toast_active,
+        )
+
+        if confirm_active and text_alpha >= 2 and header_dialog.confirm_y is not None:
             assert state.confirm_message is not None
-            dialog_y += self._line_gap
             self._confirm.draw(
                 panel,
                 font,
                 x=self._padding,
-                y=dialog_y,
+                y=header_dialog.confirm_y,
                 message=state.confirm_message,
                 focus_yes=state.confirm_focus_yes,
                 text_alpha=text_alpha,
                 line_gap=self._line_gap,
             )
 
-        if save_choice_active and text_alpha >= 2:
-            dialog_y += self._line_gap
+        if (
+            save_choice_active
+            and text_alpha >= 2
+            and header_dialog.save_choice_y is not None
+        ):
             self._save_choice.draw(
                 panel,
                 font,
                 x=self._padding,
-                y=dialog_y,
+                y=header_dialog.save_choice_y,
                 focus_overwrite=state.save_choice_focus_overwrite,
                 text_alpha=text_alpha,
             )
 
-        if toast_surf is not None and text_alpha >= 2:
+        if toast_surf is not None and text_alpha >= 2 and toast_layout.toast_y is not None:
             toast_surf.set_alpha(text_alpha)
-            toast_x = self._padding
-            toast_y = panel_h - self._padding - line_h
-            panel.blit(toast_surf, (toast_x, toast_y))
+            panel.blit(toast_surf, (self._padding, toast_layout.toast_y))
 
         border_alpha = int(255 * self._visibility)
         if border_alpha >= 2 and BORDER_WIDTH > 0:
