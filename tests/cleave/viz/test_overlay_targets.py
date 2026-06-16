@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pygame
 
+from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.layer import _draw_timeline_overlay, _draw_tuning_overlay
+from cleave.viz.overlay import RowKind
 from cleave.viz.timeline_overlay import TimelineViewState
 from tests.support.compositor_mock import recording_compositor
 
@@ -24,6 +26,35 @@ def test_draw_tuning_overlay_uses_display_target() -> None:
 
     compositor.draw_overlay.assert_called_once_with(11, 10, 20, 100, 50)
     compositor.draw_content_overlay.assert_not_called()
+
+
+@patch("cleave.viz.layer.row_kind", return_value=RowKind.TRANSPORT)
+def test_draw_tuning_overlay_uploads_help_panel(_row_kind: MagicMock) -> None:
+    pygame.init()
+    compositor = recording_compositor()
+    compositor.upload_overlay_texture.side_effect = [11, 22]
+
+    overlay = MagicMock()
+    overlay.panel_rect = (10, 20, 100, 50)
+    help_overlay = HelpOverlay()
+    overlay_surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    view_state = MagicMock()
+    view_state.help_visible = True
+    view_state.focus_index = 0
+
+    _draw_tuning_overlay(
+        compositor,
+        overlay,
+        overlay_surface,
+        view_state,
+        help_overlay=help_overlay,
+    )
+
+    assert compositor.draw_overlay.call_count == 2
+    compositor.draw_overlay.assert_any_call(11, 10, 20, 100, 50)
+    help_panel = help_overlay.panel_rect
+    assert help_panel is not None
+    compositor.draw_overlay.assert_any_call(22, *help_panel)
 
 
 def test_draw_timeline_overlay_uses_display_target() -> None:

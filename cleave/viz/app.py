@@ -38,6 +38,7 @@ from cleave.viz.layer import (
     apply_layer_visibility,
 )
 from cleave.viz.loading import draw_loading_screen
+from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.overlay import TuningOverlay
 from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.timeline_overlay import TimelineOverlay
@@ -81,6 +82,7 @@ class VisualizerRuntime:
     controls: TuningControls | None = None
     timeline_controls: TimelineControls | None = None
     overlay: TuningOverlay | None = None
+    help_overlay: HelpOverlay | None = None
     timeline_overlay: TimelineOverlay | None = None
     overlay_surface: pygame.Surface | None = None
     render_overlay_panel: pygame.Surface | None = None
@@ -200,6 +202,7 @@ def _init_gl_resources_heavy(
     runtime.controls = controls
     runtime.timeline_controls = timeline_controls
     runtime.overlay = TuningOverlay()
+    runtime.help_overlay = HelpOverlay()
     runtime.timeline_overlay = TimelineOverlay()
     runtime.playback = playback
 
@@ -372,6 +375,7 @@ class VisualizerApp:
                 rt.overlay_surface,
                 view_state,
                 timeline_panel_open=timeline_panel_open,
+                help_overlay=rt.help_overlay,
             )
 
             if (

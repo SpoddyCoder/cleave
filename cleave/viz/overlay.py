@@ -198,6 +198,7 @@ class TuningViewState:
         default_factory=RenderTimelineBlock
     )
     timeline_submenu_focused: bool = False
+    help_visible: bool = False
 
 
 def header_row_count(state: TuningViewState) -> int:
@@ -1784,6 +1785,17 @@ class TuningOverlay:
         if toast_surf is not None and text_alpha >= 2 and toast_layout.toast_y is not None:
             toast_surf.set_alpha(text_alpha)
             panel.blit(toast_surf, (self._padding, toast_layout.toast_y))
+
+        if text_alpha >= 2:
+            help_hint = font.render("h - help", True, DISABLED)
+            help_hint.set_alpha(text_alpha)
+            panel.blit(
+                help_hint,
+                (
+                    panel_w - self._padding - help_hint.get_width(),
+                    panel_h - self._padding - line_h,
+                ),
+            )
 
         border_alpha = int(255 * self._visibility)
         if border_alpha >= 2 and BORDER_WIDTH > 0:
