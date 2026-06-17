@@ -1,6 +1,6 @@
 # Todos
 
-Must-do items for Cleave. Everything else is iterative tuning in-session or listed in [roadmap.md](roadmap.md).
+Must-do items for Cleave. Everything else is iterative enhancements or listed in [roadmap.md](roadmap.md).
 
 ## Features
 
@@ -14,7 +14,7 @@ When the track is subsequently stopped with space bar... all the recorded elemen
 
 ### Pressing ESC or t when recording hides the timeline
 This is by design atm, but ESC semantically means get me out of this. 
-And it does not get the user out of recording - it just make it harder for them to stop the recording.
+And it does not get the user out of recording - it just make it harder for them to do so.
 
 Suggest solutions...
 1) ESC while recording should stop the recording. 2nd press ESC hides the timeline UI.

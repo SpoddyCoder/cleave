@@ -112,6 +112,49 @@ _RENDER_TIMELINE_SECTION = HelpSection(
     ),
 )
 
+def _timeline_strip_section(
+    *,
+    paused: bool,
+    recording: bool,
+    override_active: bool,
+) -> HelpSection:
+    entries: list[tuple[str, str]] = [("Enter", "arm row")]
+
+    if not recording:
+        entries.append(("Shift+Enter", "toggle override"))
+        if paused or override_active:
+            entries.append(("1-4", "toggle layer visibility"))
+
+    if recording:
+        entries.append(("Ctrl+Enter", "toggle at playhead"))
+        entries.append(("1-4", "toggle layer visibility"))
+
+    if recording:
+        entries.append(("r", "stop record"))
+        entries.append(("Ctrl+Space / Space", "stop record and pause"))
+    else:
+        entries.append(("Ctrl+Space / r", "start record"))
+        if paused:
+            entries.append(("Space", "play"))
+        else:
+            entries.append(("Space", "pause (preview)"))
+
+    if not recording:
+        entries.extend(
+            (
+                ("Left/Right", "skip 10s"),
+                ("Ctrl+Left/Right", "skip 30s"),
+            )
+        )
+
+    entries.extend(
+        (
+            ("Backspace", "delete cue"),
+            ("Esc", "close timeline"),
+        )
+    )
+    return HelpSection("Timeline", tuple(entries))
+
 _SAVE_SECTION = HelpSection(
     "Save",
     (("Enter", "save config"),),
@@ -167,8 +210,23 @@ _HELP_BY_KIND: dict[RowKind, tuple[HelpSection, ...]] = {
 
 
 def _sections_for(
-    row_kind: RowKind, *, timeline_enabled: bool = False
+    row_kind: RowKind,
+    *,
+    timeline_enabled: bool = False,
+    timeline_submenu_focused: bool = False,
+    paused: bool = False,
+    timeline_recording: bool = False,
+    timeline_override_active: bool = False,
 ) -> tuple[HelpSection, ...]:
+    if timeline_submenu_focused:
+        return (
+            _timeline_strip_section(
+                paused=paused,
+                recording=timeline_recording,
+                override_active=timeline_override_active,
+            ),
+            NAVIGATION_SECTION,
+        )
     if row_kind == RowKind.TRACK_HEADER:
         return (_layer_section(timeline_enabled=timeline_enabled), NAVIGATION_SECTION)
     if row_kind in _HELP_BY_KIND:
@@ -254,11 +312,22 @@ class HelpOverlay:
         row_kind: RowKind,
         *,
         timeline_enabled: bool = False,
+        timeline_submenu_focused: bool = False,
+        paused: bool = False,
+        timeline_recording: bool = False,
+        timeline_override_active: bool = False,
     ) -> None:
         self._panel_rect = None
         font = self._font_get()
         line_h = font.get_linesize()
-        sections = _sections_for(row_kind, timeline_enabled=timeline_enabled)
+        sections = _sections_for(
+            row_kind,
+            timeline_enabled=timeline_enabled,
+            timeline_submenu_focused=timeline_submenu_focused,
+            paused=paused,
+            timeline_recording=timeline_recording,
+            timeline_override_active=timeline_override_active,
+        )
 
         content_w = 0
         for section in sections:

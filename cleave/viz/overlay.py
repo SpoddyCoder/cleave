@@ -198,6 +198,8 @@ class TuningViewState:
         default_factory=RenderTimelineBlock
     )
     timeline_submenu_focused: bool = False
+    timeline_recording: bool = False
+    timeline_override_active: bool = False
     help_visible: bool = False
 
 

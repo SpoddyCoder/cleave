@@ -479,6 +479,10 @@ def _draw_tuning_overlay(
             overlay_surface,
             row_kind(view_state, view_state.focus_index),
             timeline_enabled=view_state.render_timeline.enabled,
+            timeline_submenu_focused=view_state.timeline_submenu_focused,
+            paused=view_state.paused,
+            timeline_recording=view_state.timeline_recording,
+            timeline_override_active=view_state.timeline_override_active,
         )
     panel = overlay.panel_rect
     if panel is not None:
