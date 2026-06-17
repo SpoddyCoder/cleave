@@ -259,9 +259,6 @@ RENDER_OVERLAY_ALL_SUB_ROW_KINDS = (
 RENDER_POST_FX_SUB_ROW_KINDS = frozenset(
     k for k, b in ROW_BEHAVIORS.items() if b.parent_group == "render_post_fx"
 )
-RENDER_TIMELINE_SUB_ROW_KINDS: frozenset[RowKind] = frozenset(
-    k for k, b in ROW_BEHAVIORS.items() if b.parent_group == "render_timeline"
-)
 LOCKED_NAVIGABLE_SUB_ROW_KINDS = frozenset(
     k
     for k, b in ROW_BEHAVIORS.items()

@@ -5,9 +5,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from cleave.config import VIZ_CONFIG_FILENAME, CleaveConfig
+from cleave.config import VIZ_CONFIG_FILENAME, CleaveConfig, LayerConfig, PathsConfig, VisualizerConfig
 from cleave.config_snapshot import next_unnamed_path, write_session_snapshot
 from cleave.effects.runtime import EffectRuntime
+from cleave.extract import STEM_NAMES
 from cleave.paths import repo_root
 from cleave.preset_playlist import PresetPlaylist
 from cleave.signals import Signals
@@ -23,6 +24,23 @@ from cleave.viz.layer import (
 from cleave.viz.mix_player import MixPlayer
 from cleave.stem_pcm import StemPcmBank
 from cleave.viz.playback import current_sec, seek
+
+
+def _stub_cfg_for_session(
+    session: TuningSession,
+    preset_root: Path,
+    project_dir: Path,
+) -> CleaveConfig:
+    return CleaveConfig(
+        paths=PathsConfig(preset_root=preset_root, texture_paths=()),
+        layers={
+            name: LayerConfig(preset=preset_root / name / "stub.milk")
+            for name in STEM_NAMES
+        },
+        visualizer=VisualizerConfig(),
+        config_path=project_dir / VIZ_CONFIG_FILENAME,
+        layer_z_order=tuple(session.layer_z_order),
+    )
 
 
 def make_tuning_controls(
@@ -111,6 +129,9 @@ def make_tuning_controls(
 
     kwargs: dict = {
         "session": session,
+        "cfg": cfg if cfg is not None else _stub_cfg_for_session(
+            session, preset_root, project_dir
+        ),
         "preset_root": preset_root,
         "playback": playback,
         "duration_sec": duration_sec,
@@ -135,7 +156,6 @@ def make_tuning_controls(
             return path.name
 
         kwargs.update(
-            on_z_order_change=lambda _order: None,
             on_save_new_config=on_save_new_config,
             on_overwrite_config=on_overwrite_config,
             launch_config_path=cfg.config_path,
@@ -167,7 +187,6 @@ def make_timeline_controls(
     effect_runtime: EffectRuntime,
     mix_player: MixPlayer | None = None,
     on_toast: Callable[[str], None] | None = None,
-    on_config_dirty: Callable[[], None] | None = None,
     tuning_controls: TuningControls | None = None,
 ) -> TimelineControls:
     def on_visibility_change() -> None:
@@ -209,5 +228,4 @@ def make_timeline_controls(
         on_exit_submenu=on_exit_submenu,
         on_seek=on_seek,
         on_toast=on_toast,
-        on_config_dirty=on_config_dirty,
     )

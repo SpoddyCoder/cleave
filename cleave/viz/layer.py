@@ -53,13 +53,6 @@ def timeline_defaults(session: TuningSession) -> dict[str, bool]:
     return {name: session.layers[name].enabled for name in session.layer_z_order}
 
 
-def timeline_cues_for_eval(session: TuningSession) -> list[TimelineCue]:
-    tl = session.timeline
-    if tl.recording:
-        return tl.cues + tl.record_buffer
-    return tl.cues
-
-
 def timeline_committed_visible(
     session: TuningSession,
     stem: str,

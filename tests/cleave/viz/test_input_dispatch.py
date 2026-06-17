@@ -18,7 +18,7 @@ from cleave.viz.input_dispatch import (
 from cleave.viz.overlay import TuningOverlay
 from cleave.viz.timeline_controls import TimelineControls
 from tests.support.compositor_mock import recording_compositor
-from tests.support.viz import keydown, make_playlist, stub_playback_state
+from tests.support.viz import keydown, make_playlist, make_test_cfg, stub_playback_state
 
 
 def _make_runtime(
@@ -76,6 +76,7 @@ def _make_runtime(
     )
     runtime.controls = TuningControls(
         session,
+        make_test_cfg(tuple(STEM_NAMES), preset_root=preset_root),
         preset_root=preset_root,
         playback=playback,
         duration_sec=120.0,
@@ -113,7 +114,7 @@ def test_ctrl_q_quit_from_timeline_context() -> None:
 
 def test_ctrl_q_dirty_session_blocks_quit() -> None:
     runtime = _make_runtime()
-    runtime.controls.mark_config_dirty()
+    runtime.controls.session.layers["drums"].opacity_pct = 60
     assert (
         dispatch_keydown(
             keydown(pygame.K_q, mod=pygame.KMOD_CTRL),
@@ -127,7 +128,7 @@ def test_ctrl_q_dirty_session_blocks_quit() -> None:
 
 def test_ctrl_q_after_dont_save_exits() -> None:
     runtime = _make_runtime()
-    runtime.controls.mark_config_dirty()
+    runtime.controls.session.layers["drums"].opacity_pct = 60
     dispatch_keydown(keydown(pygame.K_q, mod=pygame.KMOD_CTRL), runtime)
     runtime.controls.handle_modal_keydown(keydown(pygame.K_RIGHT))
     runtime.controls.handle_modal_keydown(keydown(pygame.K_RETURN))

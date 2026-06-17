@@ -87,6 +87,7 @@ class VisualizerConfig:
     height: int = DEFAULT_VISUALIZER_HEIGHT
     upscale: float = DEFAULT_VISUALIZER_UPSCALE
     fps: int = DEFAULT_VISUALIZER_FPS
+    # Launch/render pre-roll; persisted on snapshot save, not a live session field.
     warmup_sec: float = DEFAULT_VISUALIZER_WARMUP_SEC
     beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
 

@@ -6,9 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import yaml
-
-from cleave.config import CleaveConfig, dump_yaml
+from cleave.config import CleaveConfig
 from cleave.extract import STEM_NAMES
 
 if TYPE_CHECKING:
@@ -236,39 +234,3 @@ def scan_all_layers(cfg: CleaveConfig) -> dict[str, PresetPlaylist]:
         name: scan_preset_playlist(cfg.layers[name].preset)
         for name in _layer_names(cfg)
     }
-
-
-def write_layer_presets(
-    config_path: Path,
-    preset_root: Path,
-    playlists: dict[str, PresetPlaylist],
-) -> None:
-    """Write each layer's current preset path back to the active config file."""
-    with config_path.open(encoding="utf-8") as fh:
-        data = yaml.safe_load(fh)
-
-    if data is None:
-        data = {}
-    if not isinstance(data, dict):
-        raise ValueError(f"config root must be a mapping: {config_path}")
-
-    layers = data.get("layers")
-    if layers is None:
-        layers = {}
-    if not isinstance(layers, dict):
-        raise ValueError("layers must be a mapping")
-
-    root = preset_root.resolve()
-    for stem, playlist in playlists.items():
-        layer = layers.get(stem)
-        if layer is None:
-            layer = {}
-            layers[stem] = layer
-        if not isinstance(layer, dict):
-            raise ValueError(f"layers.{stem} must be a mapping")
-        layer["preset"] = playlist.config_preset_path(root)
-
-    data["layers"] = layers
-
-    with config_path.open("w", encoding="utf-8") as fh:
-        dump_yaml(data, fh)

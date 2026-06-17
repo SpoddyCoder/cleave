@@ -23,7 +23,7 @@ from cleave.preset_playlist import (
 from cleave.timeline import TimelineCue
 from cleave.viz.key_repeat import mod_shift
 from cleave.viz.playback import format_mmss
-from tests.support.viz import stub_playback_state
+from tests.support.viz import make_test_cfg, stub_playback_state
 from cleave.viz.controls import (
     LayerRuntime,
     SEEK_LONG,
@@ -100,6 +100,10 @@ _REPO_ROOT_EXAMPLE = Path("/tmp/cleave-viz.yaml")
 _DEFAULT_ACTIVE_CONFIG = Path("/tmp/projects/my-track/active.yaml")
 
 
+def _mutate_dirty(controls: TuningControls) -> None:
+    controls.session.layers["drums"].opacity_pct = 60
+
+
 def _make_controls(
     stems: tuple[str, ...] = ("drums", "bass"),
     *,
@@ -108,6 +112,7 @@ def _make_controls(
     repo_root_example: Path = _REPO_ROOT_EXAMPLE,
 ) -> TuningControls:
     preset_root = Path("/tmp/presets")
+    cfg = make_test_cfg(stems, preset_root=preset_root, config_path=launch_config_path or _DEFAULT_ACTIVE_CONFIG)
     session = TuningSession(
         layer_z_order=list(stems),
         layers={
@@ -122,6 +127,7 @@ def _make_controls(
     )
     return TuningControls(
         session,
+        cfg,
         preset_root=preset_root,
         playback=stub_playback_state(),
         duration_sec=120.0,
@@ -390,9 +396,7 @@ def test_opacity_ctrl_step_is_ten_percent() -> None:
 
 
 def test_move_mode_swaps_z_order() -> None:
-    z_orders: list[list[str]] = []
     controls = _make_controls(("drums", "bass", "vocals"))
-    controls._on_z_order_change = lambda order: z_orders.append(list(order))
 
     view = controls.build_view_state(paused=False)
     header_row = next(
@@ -408,18 +412,14 @@ def test_move_mode_swaps_z_order() -> None:
     assert controls.handle_keydown(_keydown(pygame.K_UP)) is True
     assert controls.session.layer_z_order == ["bass", "drums", "vocals"]
 
-    assert controls.handle_keydown(_keydown(pygame.K_DOWN)) is True
-    assert controls.session.layer_z_order == ["drums", "bass", "vocals"]
-
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
     assert controls.move_mode_stem is None
-    assert z_orders == [["drums", "bass", "vocals"]]
+    assert controls.session.layer_z_order == ["bass", "drums", "vocals"]
+    assert controls.config_dirty
 
 
 def test_move_mode_esc_cancels_without_applying() -> None:
-    z_orders: list[list[str]] = []
     controls = _make_controls(("drums", "bass", "vocals"))
-    controls._on_z_order_change = lambda order: z_orders.append(list(order))
 
     view = controls.build_view_state(paused=False)
     header_row = next(
@@ -436,13 +436,11 @@ def test_move_mode_esc_cancels_without_applying() -> None:
     assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
     assert controls.move_mode_stem is None
     assert controls.session.layer_z_order == ["drums", "bass", "vocals"]
-    assert z_orders == []
+    assert not controls.config_dirty
 
 
 def test_move_mode_backspace_cancels_without_applying() -> None:
-    z_orders: list[list[str]] = []
     controls = _make_controls(("drums", "bass", "vocals"))
-    controls._on_z_order_change = lambda order: z_orders.append(list(order))
 
     view = controls.build_view_state(paused=False)
     header_row = next(
@@ -459,7 +457,7 @@ def test_move_mode_backspace_cancels_without_applying() -> None:
     assert controls.handle_keydown(_keydown(pygame.K_BACKSPACE)) is True
     assert controls.move_mode_stem is None
     assert controls.session.layer_z_order == ["drums", "bass", "vocals"]
-    assert z_orders == []
+    assert not controls.config_dirty
 
 
 def test_save_as_new_triggers_toast_and_blocks_input() -> None:
@@ -503,7 +501,7 @@ def test_config_header_shows_asterisk_when_dirty() -> None:
     launch_path = Path("/tmp/projects/my-track/my-track.yaml")
     controls = _make_controls(("drums",))
     controls._active_config_path = launch_path
-    controls.mark_config_dirty()
+    _mutate_dirty(controls)
     view = controls.build_view_state(paused=False)
     header_row = next(
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.CONFIG_HEADER
@@ -1771,8 +1769,10 @@ def _controls_with_playlist(
             )
         },
     )
+    cfg = make_test_cfg(("drums",), preset_root=root)
     return TuningControls(
         session,
+        cfg,
         preset_root=root,
         playback=stub_playback_state(),
         duration_sec=120.0,
@@ -2413,7 +2413,7 @@ def test_try_quit_clean_session_returns_true_immediately() -> None:
 
 def test_try_quit_dirty_opens_dialog_and_blocks_exit() -> None:
     controls = _make_controls(("drums",))
-    controls.mark_config_dirty()
+    _mutate_dirty(controls)
     assert controls.try_quit() is False
     state = controls.build_view_state(paused=False)
     assert state.unsaved_quit_active is True
@@ -2422,7 +2422,7 @@ def test_try_quit_dirty_opens_dialog_and_blocks_exit() -> None:
 
 def test_try_quit_dont_save_sets_pending_exit() -> None:
     controls = _make_controls(("drums",))
-    controls.mark_config_dirty()
+    _mutate_dirty(controls)
     controls.try_quit()
     controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
@@ -2434,7 +2434,7 @@ def test_try_quit_dont_save_sets_pending_exit() -> None:
 
 def test_try_quit_cancel_and_escape_stay() -> None:
     controls = _make_controls(("drums",))
-    controls.mark_config_dirty()
+    _mutate_dirty(controls)
     controls.try_quit()
 
     controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
@@ -2455,7 +2455,7 @@ def test_try_quit_save_chains_through_save_as_new() -> None:
     saved_path = Path("/tmp/projects/my-track/unnamed-2.yaml")
     controls = _make_controls(("drums",))
     controls._on_save_new_config = lambda: saved_path
-    controls.mark_config_dirty()
+    _mutate_dirty(controls)
 
     controls.try_quit()
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
@@ -2469,7 +2469,7 @@ def test_try_quit_save_chains_through_save_as_new() -> None:
 
 def test_try_quit_save_choice_esc_clears_quit_after_save() -> None:
     controls = _make_controls(("drums",))
-    controls.mark_config_dirty()
+    _mutate_dirty(controls)
     controls.try_quit()
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
     assert controls._quit_after_save is True
@@ -2483,7 +2483,7 @@ def test_try_quit_save_choice_esc_clears_quit_after_save() -> None:
 
 def test_try_quit_overwrite_confirm_esc_clears_quit_after_save() -> None:
     controls = _make_controls(("drums",))
-    controls.mark_config_dirty()
+    _mutate_dirty(controls)
     controls.try_quit()
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
