@@ -111,6 +111,35 @@ def test_ctrl_q_quit_from_timeline_context() -> None:
     )
 
 
+def test_ctrl_q_dirty_session_blocks_quit() -> None:
+    runtime = _make_runtime()
+    runtime.controls.mark_config_dirty()
+    assert (
+        dispatch_keydown(
+            keydown(pygame.K_q, mod=pygame.KMOD_CTRL),
+            runtime,
+        )
+        is True
+    )
+    state = runtime.controls.build_view_state(paused=False)
+    assert state.unsaved_quit_active is True
+
+
+def test_ctrl_q_after_dont_save_exits() -> None:
+    runtime = _make_runtime()
+    runtime.controls.mark_config_dirty()
+    dispatch_keydown(keydown(pygame.K_q, mod=pygame.KMOD_CTRL), runtime)
+    runtime.controls.handle_modal_keydown(keydown(pygame.K_RIGHT))
+    runtime.controls.handle_modal_keydown(keydown(pygame.K_RETURN))
+    assert (
+        dispatch_keydown(
+            keydown(pygame.K_q, mod=pygame.KMOD_CTRL),
+            runtime,
+        )
+        is False
+    )
+
+
 def test_esc_while_recording_stops_take_panel_stays_open() -> None:
     runtime = _make_runtime(recording=True)
     assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True

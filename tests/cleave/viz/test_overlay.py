@@ -137,6 +137,13 @@ def _panel_scroll_metrics(
         overlay._save_choice.measure_height(font) if save_choice_active else 0
     )
 
+    unsaved_quit_active = state.unsaved_quit_active
+    unsaved_quit_h = (
+        overlay._unsaved_quit.measure_height(font, line_gap=overlay._line_gap)
+        if unsaved_quit_active
+        else 0
+    )
+
     toast_active = bool(state.toast_message and state.toast_remaining_sec > 0)
 
     return scroll_metrics(
@@ -150,6 +157,8 @@ def _panel_scroll_metrics(
         confirm_active=confirm_active,
         save_choice_h=save_choice_h,
         save_choice_active=save_choice_active,
+        unsaved_quit_h=unsaved_quit_h,
+        unsaved_quit_active=unsaved_quit_active,
         toast_active=toast_active,
         max_panel_h=max_panel_h,
     )
@@ -176,6 +185,8 @@ def _confirm_header_y(
         confirm_active=True,
         save_choice_h=0,
         save_choice_active=False,
+        unsaved_quit_h=0,
+        unsaved_quit_active=False,
     )
     assert header_dialog.confirm_y is not None
     return header_dialog.confirm_y

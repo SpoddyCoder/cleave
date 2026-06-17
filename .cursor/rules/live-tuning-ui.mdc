@@ -8,6 +8,8 @@ alwaysApply: false
 
 The focus-driven tree panel ([cleave/viz/overlay.py](cleave/viz/overlay.py), [cleave/viz/controls.py](cleave/viz/controls.py)) splits into two vertical sections. Use these names in docs, issues, and UI work.
 
+Unsaved config edits show an asterisk on the active config path row. **Ctrl+Q** and window close route through `TuningControls.try_quit()`; when dirty, a three-option quit dialog (Save / Don't save / Cancel) appears before exit.
+
 ## Track rows section
 
 The scrollable block below the pinned header: all rows where `row_kind` is not in `HEADER_ROW_KINDS` from [cleave/viz/row_semantics.py](cleave/viz/row_semantics.py) (`track_row_count` counts these rows from `build_row_layout`). Row interaction groups (sub-row frozensets, repeat keys, help affordances) are defined in the same module.
@@ -91,7 +93,7 @@ When focus, move mode, disabled layer, locked sub-row, or empty preset applies, 
 
 Layered key handling lives in [cleave/viz/input_dispatch.py](cleave/viz/input_dispatch.py). `dispatch_keydown` runs layers in order:
 
-1. **Global** (`_handle_global_keydown`): **Ctrl+Q** quit, **h** toggle help (`session.help_visible`), and while recording **Esc** stops the take (panel stays open) and **t** is a no-op.
+1. **Global** (`_handle_global_keydown`): **Ctrl+Q** quit via `try_quit()` (blocked while unsaved-changes dialog is open), **h** toggle help (`session.help_visible`), and while recording **Esc** stops the take (panel stays open) and **t** is a no-op.
 2. **Modal** (`TuningControls.handle_modal_keydown`): confirm/save-choice dialogs consume keys before context routing.
 3. **Context router** (`key_handler_for_runtime`): when the timeline strip is open, enabled, and `submenu_focused`, most keys go to `TimelineControls` except **Up**/**Down** (main focus ring). Otherwise keys go to `TuningControls`.
 

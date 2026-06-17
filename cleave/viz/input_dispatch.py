@@ -51,7 +51,8 @@ def _handle_global_keydown(
 ) -> bool | None:
     """Global shortcuts. True = handled, False = quit, None = pass through."""
     if event.key == pygame.K_q and mod_ctrl(event.mod):
-        return False
+        assert runtime.controls is not None
+        return not runtime.controls.try_quit()
 
     if event.key == pygame.K_h:
         runtime.session.help_visible = not runtime.session.help_visible

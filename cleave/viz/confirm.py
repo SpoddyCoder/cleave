@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import pygame
 
-from cleave.viz.theme import DISABLED, HIGHLIGHT, VALUE
+from cleave.viz.theme import DISABLED, FOCUS_ROW_BG_ALPHA, HIGHLIGHT, VALUE
 
 
 @dataclass
@@ -238,3 +238,144 @@ class SaveChoiceDialog:
                 save_as_new_surf, (x + overwrite_surf.get_width() + gap, y)
             )
         return line_h
+
+
+@dataclass
+class UnsavedQuitRequest:
+    on_save: Callable[[], None]
+    on_discard: Callable[[], None]
+    on_cancel: Callable[[], None] | None = None
+
+
+class UnsavedQuitDialog:
+    """Modal SAVE / DON'T SAVE / CANCEL prompt for quitting with dirty config."""
+
+    _MESSAGE = "Unsaved changes - save changes before exit?"
+    _SAVE_LABEL = "SAVE"
+    _DISCARD_LABEL = "DON'T SAVE"
+    _CANCEL_LABEL = "CANCEL"
+    _OPTION_COUNT = 3
+    _MSG_PAD_X = 4
+    _MSG_PAD_Y = 2
+    _MSG_BG_ALPHA = max(FOCUS_ROW_BG_ALPHA, 90)
+
+    def __init__(self) -> None:
+        self._request: UnsavedQuitRequest | None = None
+        self._focus_index = 0
+
+    @property
+    def active(self) -> bool:
+        return self._request is not None
+
+    @property
+    def message(self) -> str:
+        return self._MESSAGE
+
+    @property
+    def focus_index(self) -> int:
+        return self._focus_index
+
+    def prompt(self, request: UnsavedQuitRequest) -> None:
+        self._request = request
+        self._focus_index = 0
+
+    def cancel(self) -> None:
+        if self._request is not None and self._request.on_cancel is not None:
+            self._request.on_cancel()
+        self._request = None
+        self._focus_index = 0
+
+    def handle_keydown(self, event: pygame.event.Event) -> bool:
+        """Return True when the event is consumed (including while blocking)."""
+        if not self.active or event.type != pygame.KEYDOWN:
+            return False
+
+        if event.key == pygame.K_ESCAPE:
+            self.cancel()
+            return True
+
+        if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+            delta = -1 if event.key == pygame.K_LEFT else 1
+            self._focus_index = (self._focus_index + delta) % self._OPTION_COUNT
+            return True
+
+        if event.key == pygame.K_RETURN:
+            request = self._request
+            focus_index = self._focus_index
+            self._request = None
+            self._focus_index = 0
+            if request is not None:
+                if focus_index == 0:
+                    request.on_save()
+                elif focus_index == 1:
+                    request.on_discard()
+                elif request.on_cancel is not None:
+                    request.on_cancel()
+            return True
+
+        return True
+
+    def measure_height(
+        self,
+        font: pygame.font.Font,
+        *,
+        line_gap: int,
+    ) -> int:
+        line_h = font.get_linesize()
+        msg_h = line_h + self._MSG_PAD_Y * 2
+        return msg_h + line_gap + line_h
+
+    def measure_width(self, font: pygame.font.Font) -> int:
+        msg_w = font.size(self._MESSAGE)[0] + self._MSG_PAD_X * 2
+        option_widths = [
+            font.size(f"> {label}")[0]
+            for label in (self._SAVE_LABEL, self._DISCARD_LABEL, self._CANCEL_LABEL)
+        ]
+        options_w = sum(option_widths) + 16 * (self._OPTION_COUNT - 1)
+        return max(msg_w, options_w)
+
+    def draw(
+        self,
+        surface: pygame.Surface,
+        font: pygame.font.Font,
+        *,
+        x: int,
+        y: int,
+        focus_index: int,
+        text_alpha: int,
+        line_gap: int,
+    ) -> int:
+        """Draw unsaved quit prompt at (x, y). Returns total height used."""
+        line_h = font.get_linesize()
+        cur_y = y
+
+        msg_surf = font.render(self._MESSAGE, True, HIGHLIGHT)
+        msg_w, msg_h = msg_surf.get_size()
+        bg_w = msg_w + self._MSG_PAD_X * 2
+        bg_h = msg_h + self._MSG_PAD_Y * 2
+        if text_alpha >= 2:
+            bg_alpha = int(self._MSG_BG_ALPHA * text_alpha / 255)
+            if bg_alpha >= 2:
+                bg_surf = pygame.Surface((bg_w, bg_h), pygame.SRCALPHA)
+                bg_surf.fill((*HIGHLIGHT, bg_alpha))
+                surface.blit(bg_surf, (x, cur_y))
+            msg_surf.set_alpha(text_alpha)
+            surface.blit(
+                msg_surf, (x + self._MSG_PAD_X, cur_y + self._MSG_PAD_Y)
+            )
+        cur_y += bg_h + line_gap
+
+        labels = (self._SAVE_LABEL, self._DISCARD_LABEL, self._CANCEL_LABEL)
+        gap = 16
+        option_x = x
+        for index, label in enumerate(labels):
+            focused = index == focus_index
+            color = HIGHLIGHT if focused else DISABLED
+            prefix = ">" if focused else " "
+            option_surf = font.render(f"{prefix} {label}", True, color)
+            if text_alpha >= 2:
+                option_surf.set_alpha(text_alpha)
+                surface.blit(option_surf, (option_x, cur_y))
+            option_x += option_surf.get_width() + gap
+
+        return (cur_y - y) + line_h

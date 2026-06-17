@@ -499,6 +499,39 @@ def test_config_header_shows_active_path() -> None:
     assert header_row not in navigable_row_indices(view)
 
 
+def test_config_header_shows_asterisk_when_dirty() -> None:
+    launch_path = Path("/tmp/projects/my-track/my-track.yaml")
+    controls = _make_controls(("drums",))
+    controls._active_config_path = launch_path
+    controls.mark_config_dirty()
+    view = controls.build_view_state(paused=False)
+    header_row = next(
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.CONFIG_HEADER
+    )
+    assert _row_text(view, header_row) == config_path_display(launch_path, dirty=True)
+
+
+def test_blend_and_opacity_change_sets_dirty_save_clears() -> None:
+    saved_path = Path("/tmp/projects/my-track/unnamed-2.yaml")
+    controls = _make_controls(("drums",))
+    controls._on_save_new_config = lambda: saved_path
+    assert not controls.config_dirty
+
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = _row(view, "drums", RowKind.TRACK_BLEND)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.config_dirty
+
+    controls.focus_index = _row(view, "drums", RowKind.TRACK_OPACITY)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.config_dirty
+
+    save_row = _save_row(view)
+    controls.focus_index = save_row
+    _choose_save_as_new(controls)
+    assert not controls.config_dirty
+
+
 def test_config_header_truncates_long_paths() -> None:
     long_path = Path(
         "/very/long/root/projects/my-track/nested/deep/unnamed-99.yaml"
@@ -2369,3 +2402,91 @@ def test_track_header_prefix_width_matches_visibility_icon() -> None:
     soloed = render_visibility_icon(enabled=True, solo=True, line_height=line_h)
     normal = render_visibility_icon(enabled=True, solo=False, line_height=line_h)
     assert soloed.get_width() == normal.get_width()
+
+
+def test_try_quit_clean_session_returns_true_immediately() -> None:
+    controls = _make_controls(("drums",))
+    assert controls.try_quit() is True
+
+
+def test_try_quit_dirty_opens_dialog_and_blocks_exit() -> None:
+    controls = _make_controls(("drums",))
+    controls.mark_config_dirty()
+    assert controls.try_quit() is False
+    state = controls.build_view_state(paused=False)
+    assert state.unsaved_quit_active is True
+    assert state.unsaved_quit_focus == 0
+
+
+def test_try_quit_dont_save_sets_pending_exit() -> None:
+    controls = _make_controls(("drums",))
+    controls.mark_config_dirty()
+    controls.try_quit()
+    controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
+    controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
+    assert controls.consume_pending_exit() is True
+    assert controls.consume_pending_exit() is False
+    state = controls.build_view_state(paused=False)
+    assert state.unsaved_quit_active is False
+
+
+def test_try_quit_cancel_and_escape_stay() -> None:
+    controls = _make_controls(("drums",))
+    controls.mark_config_dirty()
+    controls.try_quit()
+
+    controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
+    controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
+    controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
+    assert controls._pending_exit is False
+    assert controls.config_dirty
+    assert not controls._unsaved_quit.active
+
+    controls.try_quit()
+    controls.handle_modal_keydown(_keydown(pygame.K_ESCAPE))
+    assert controls._pending_exit is False
+    assert controls.config_dirty
+    assert not controls._unsaved_quit.active
+
+
+def test_try_quit_save_chains_through_save_as_new() -> None:
+    saved_path = Path("/tmp/projects/my-track/unnamed-2.yaml")
+    controls = _make_controls(("drums",))
+    controls._on_save_new_config = lambda: saved_path
+    controls.mark_config_dirty()
+
+    controls.try_quit()
+    controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
+    assert controls.build_view_state(paused=False).save_choice_active is True
+
+    controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
+    controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
+    assert controls.try_quit() is True
+    assert not controls.config_dirty
+
+
+def test_try_quit_save_choice_esc_clears_quit_after_save() -> None:
+    controls = _make_controls(("drums",))
+    controls.mark_config_dirty()
+    controls.try_quit()
+    controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
+    assert controls._quit_after_save is True
+
+    controls.handle_modal_keydown(_keydown(pygame.K_ESCAPE))
+    assert controls._quit_after_save is False
+    assert controls._pending_exit is False
+    assert controls.config_dirty
+    assert not controls._save_choice.active
+
+
+def test_try_quit_overwrite_confirm_esc_clears_quit_after_save() -> None:
+    controls = _make_controls(("drums",))
+    controls.mark_config_dirty()
+    controls.try_quit()
+    controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
+    controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
+    assert controls._quit_after_save is True
+
+    controls.handle_modal_keydown(_keydown(pygame.K_ESCAPE))
+    assert controls._quit_after_save is False
+    assert controls.build_view_state(paused=False).confirm_message is None

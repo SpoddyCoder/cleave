@@ -37,7 +37,14 @@ from cleave.preset_playlist import (
     preset_filename_display,
 )
 from cleave.timeline import TimelineCue
-from cleave.viz.confirm import ConfirmDialog, ConfirmRequest, SaveChoiceDialog, SaveChoiceRequest
+from cleave.viz.confirm import (
+    ConfirmDialog,
+    ConfirmRequest,
+    SaveChoiceDialog,
+    SaveChoiceRequest,
+    UnsavedQuitDialog,
+    UnsavedQuitRequest,
+)
 from cleave.viz.key_repeat import KeyRepeatController, mod_ctrl, mod_shift
 from cleave.viz.playback import PlaybackState, current_sec, seek, toggle_pause
 from cleave.viz.row_semantics import (
@@ -70,9 +77,12 @@ SEEK_LONG = 30
 _DEFAULT_SAVE_FILENAME = "unnamed-1.yaml"
 
 
-def config_path_display(path: Path | None) -> str:
+def config_path_display(path: Path | None, *, dirty: bool = False) -> str:
     """Active config path for the config header row (truncation happens at draw time)."""
-    return path.as_posix() if path is not None else VIZ_CONFIG_FILENAME
+    label = path.as_posix() if path is not None else VIZ_CONFIG_FILENAME
+    if dirty:
+        label += "*"
+    return label
 
 
 def allow_overwrite_for_path(
@@ -246,9 +256,23 @@ class TuningControls:
         self._key_repeat = KeyRepeatController()
         self._confirm = ConfirmDialog()
         self._save_choice = SaveChoiceDialog()
+        self._unsaved_quit = UnsavedQuitDialog()
         self._hide_overlay_requested = False
+        self._config_dirty = False
+        self._pending_exit = False
+        self._quit_after_save = False
         view = self.build_view_state(paused=self.playback.paused)
         self.focus_index = find_row_by_kind(view, RowKind.TRANSPORT)
+
+    @property
+    def config_dirty(self) -> bool:
+        return self._config_dirty
+
+    def mark_config_dirty(self) -> None:
+        self._config_dirty = True
+
+    def clear_config_dirty(self) -> None:
+        self._config_dirty = False
 
     def consume_hide_overlay(self) -> bool:
         requested = self._hide_overlay_requested
@@ -256,15 +280,46 @@ class TuningControls:
         return requested
 
     def handle_modal_keydown(self, event: pygame.event.Event) -> bool:
-        """Return True when a confirm or save-choice modal consumed the event."""
+        """Return True when a modal dialog consumed the event."""
         if event.type != pygame.KEYDOWN:
             return False
         if self._confirm.active:
             self._confirm.handle_keydown(event)
             return True
         if self._save_choice.active:
+            if event.key == pygame.K_ESCAPE and self._quit_after_save:
+                self._quit_after_save = False
             self._save_choice.handle_keydown(event)
             return True
+        if self._unsaved_quit.active:
+            self._unsaved_quit.handle_keydown(event)
+            return True
+        return False
+
+    @property
+    def pending_exit(self) -> bool:
+        return self._pending_exit
+
+    def consume_pending_exit(self) -> bool:
+        """Return True once when quit was deferred (e.g. Don't save from unsaved dialog)."""
+        if self._pending_exit:
+            self._pending_exit = False
+            return True
+        return False
+
+    def try_quit(self) -> bool:
+        """Handle a quit request. Return True when the app should exit now."""
+        if self._pending_exit:
+            return True
+        if not self._config_dirty:
+            return True
+        if not self._unsaved_quit.active:
+            self._unsaved_quit.prompt(
+                UnsavedQuitRequest(
+                    on_save=self._quit_save,
+                    on_discard=self._quit_discard,
+                )
+            )
         return False
 
     def handle_keydown(self, event: pygame.event.Event) -> bool:
@@ -456,12 +511,17 @@ class TuningControls:
         confirm_focus_yes = True
         save_choice_active = False
         save_choice_focus_overwrite = True
+        unsaved_quit_active = False
+        unsaved_quit_focus = 0
         if self._confirm.active:
             confirm_message = self._confirm.message
             confirm_focus_yes = self._confirm.focus_yes
         if self._save_choice.active:
             save_choice_active = True
             save_choice_focus_overwrite = self._save_choice.focus_overwrite
+        if self._unsaved_quit.active:
+            unsaved_quit_active = True
+            unsaved_quit_focus = self._unsaved_quit.focus_index
 
         ro = self.session.render_overlay
         pp = self.session.render_post_fx
@@ -479,8 +539,12 @@ class TuningControls:
             confirm_focus_yes=confirm_focus_yes,
             save_choice_active=save_choice_active,
             save_choice_focus_overwrite=save_choice_focus_overwrite,
+            unsaved_quit_active=unsaved_quit_active,
+            unsaved_quit_focus=unsaved_quit_focus,
             allow_overwrite=self._allow_overwrite(),
-            active_config_label=config_path_display(self._active_config_path),
+            active_config_label=config_path_display(
+                self._active_config_path, dirty=self._config_dirty
+            ),
             solo_stem=self.session.solo_stem,
             solo_active=self.session.solo_stem is not None,
             render_overlay=RenderOverlayBlock(
@@ -618,6 +682,7 @@ class TuningControls:
     def _confirm_move_mode(self) -> None:
         if self._on_z_order_change is not None:
             self._on_z_order_change(list(self.session.layer_z_order))
+        self.mark_config_dirty()
         self.move_mode_stem = None
         self._move_mode_original_z_order = None
 
@@ -808,20 +873,26 @@ class TuningControls:
         layer = self.session.layers[stem]
         playlist = layer.playlist
         delta = 1 if forward else -1
-        if playlist.step_sibling(delta, preset_root=self.preset_root) and self._on_preset_change is not None:
-            self._on_preset_change(stem, playlist)
+        if playlist.step_sibling(delta, preset_root=self.preset_root):
+            self.mark_config_dirty()
+            if self._on_preset_change is not None:
+                self._on_preset_change(stem, playlist)
 
     def _enter_directory(self, stem: str) -> None:
         layer = self.session.layers[stem]
         playlist = layer.playlist
-        if playlist.enter_child(self.preset_root) and self._on_preset_change is not None:
-            self._on_preset_change(stem, playlist)
+        if playlist.enter_child(self.preset_root):
+            self.mark_config_dirty()
+            if self._on_preset_change is not None:
+                self._on_preset_change(stem, playlist)
 
     def _parent_directory(self, stem: str) -> None:
         layer = self.session.layers[stem]
         playlist = layer.playlist
-        if playlist.go_parent(self.preset_root) and self._on_preset_change is not None:
-            self._on_preset_change(stem, playlist)
+        if playlist.go_parent(self.preset_root):
+            self.mark_config_dirty()
+            if self._on_preset_change is not None:
+                self._on_preset_change(stem, playlist)
 
     def _step_preset(self, stem: str, *, forward: bool, ctrl: bool) -> None:
         layer = self.session.layers[stem]
@@ -834,6 +905,7 @@ class TuningControls:
             playlist.next()
         else:
             playlist.prev()
+        self.mark_config_dirty()
         if self._on_preset_change is not None:
             self._on_preset_change(stem, playlist)
 
@@ -847,12 +919,14 @@ class TuningControls:
             layer.blend_mode = BLEND_MODES[(index + 1) % len(BLEND_MODES)]
         else:
             layer.blend_mode = BLEND_MODES[(index - 1) % len(BLEND_MODES)]
+        self.mark_config_dirty()
         if self._on_blend_change is not None:
             self._on_blend_change(stem, layer.blend_mode)
 
     def _toggle_locked(self, stem: str) -> None:
         layer = self.session.layers[stem]
         layer.locked = not layer.locked
+        self.mark_config_dirty()
 
     def _set_expanded(self, stem: str, expanded: bool) -> None:
         layer = self.session.layers[stem]
@@ -908,6 +982,7 @@ class TuningControls:
             return
         focus_kind = self._focused_row_kind()
         ro.enabled = enabled
+        self.mark_config_dirty()
         if not enabled:
             self.session.render_overlay_solo = False
             ro.expanded = False
@@ -935,6 +1010,7 @@ class TuningControls:
             ro.position = positions[(index + 1) % len(positions)]
         else:
             ro.position = positions[(index - 1) % len(positions)]
+        self.mark_config_dirty()
 
     def _set_render_overlay_title_expanded(self, expanded: bool) -> None:
         ro = self.session.render_overlay
@@ -956,29 +1032,37 @@ class TuningControls:
 
     def _set_render_overlay_title_font_size(self, size: int) -> None:
         self.session.render_overlay.title_font_size = max(1, size)
+        self.mark_config_dirty()
 
     def _cycle_render_overlay_title_font(self, *, forward: bool) -> None:
         ro = self.session.render_overlay
         ro.title_font = cycle_render_overlay_font(ro.title_font, forward=forward)
+        self.mark_config_dirty()
 
     def _set_render_overlay_title_margin_bottom(self, margin: int) -> None:
         self.session.render_overlay.title_margin_bottom = max(0, margin)
+        self.mark_config_dirty()
 
     def _set_render_overlay_body_font_size(self, size: int) -> None:
         self.session.render_overlay.body_font_size = max(1, size)
+        self.mark_config_dirty()
 
     def _cycle_render_overlay_body_font(self, *, forward: bool) -> None:
         ro = self.session.render_overlay
         ro.body_font = cycle_render_overlay_font(ro.body_font, forward=forward)
+        self.mark_config_dirty()
 
     def _set_render_overlay_opacity(self, pct: int) -> None:
         self.session.render_overlay.opacity_pct = max(0, min(100, pct))
+        self.mark_config_dirty()
 
     def _set_render_overlay_border_width(self, width: int) -> None:
         self.session.render_overlay.border_width = max(0, width)
+        self.mark_config_dirty()
 
     def _set_render_overlay_start_delay(self, start_delay: float) -> None:
         self.session.render_overlay.start_delay = max(0.0, start_delay)
+        self.mark_config_dirty()
 
     def _set_render_overlay_display_time(self, display_time: float) -> None:
         self.session.render_overlay.display_time = max(0.0, display_time)
@@ -1005,6 +1089,7 @@ class TuningControls:
         if pp.enabled == enabled:
             return
         pp.enabled = enabled
+        self.mark_config_dirty()
         if not enabled:
             self.session.render_post_fx_solo = False
             pp.expanded = False
@@ -1022,9 +1107,11 @@ class TuningControls:
 
     def _set_render_post_fx_fade_in(self, fade_in: float) -> None:
         self.session.render_post_fx.fade_in = max(0.0, fade_in)
+        self.mark_config_dirty()
 
     def _set_render_post_fx_fade_out(self, fade_out: float) -> None:
         self.session.render_post_fx.fade_out = max(0.0, fade_out)
+        self.mark_config_dirty()
 
     def _render_timeline_header_index(self) -> int:
         view = self.build_view_state(paused=self.playback.paused)
@@ -1040,6 +1127,7 @@ class TuningControls:
         if tl.enabled == enabled:
             return
         tl.enabled = enabled
+        self.mark_config_dirty()
         if not enabled:
             self._close_timeline_panel()
         if self._on_timeline_enabled_change is not None:
@@ -1069,6 +1157,7 @@ class TuningControls:
         if layer.enabled == enabled:
             return
         layer.enabled = enabled
+        self.mark_config_dirty()
         if not enabled:
             layer.expanded = False
             self._refocus_track_header_if_sub_row(stem)
@@ -1078,6 +1167,7 @@ class TuningControls:
     def _set_opacity(self, stem: str, pct: int) -> None:
         layer = self.session.layers[stem]
         layer.opacity_pct = max(0, min(100, pct))
+        self.mark_config_dirty()
         if self._on_opacity_change is not None:
             self._on_opacity_change(stem, layer.opacity_pct)
 
@@ -1094,6 +1184,7 @@ class TuningControls:
                     layer.effects.pop(effect_id, None)
         else:
             layer.effects.setdefault(effect_id, {})[driver_slug] = clamped
+        self.mark_config_dirty()
         if self._on_opacity_change is not None:
             self._on_opacity_change(stem, layer.opacity_pct)
 
@@ -1124,6 +1215,7 @@ class TuningControls:
     def _set_beat(self, stem: str, value: float) -> None:
         layer = self.session.layers[stem]
         layer.beat_sensitivity = clamp_beat_sensitivity(value)
+        self.mark_config_dirty()
         if self._on_beat_change is not None:
             self._on_beat_change(stem, layer.beat_sensitivity)
 
@@ -1155,7 +1247,22 @@ class TuningControls:
         else:
             self._active_config_path = saved_path
             filename = saved_path.name
+            self.clear_config_dirty()
         self._show_save_toast(f"Config saved to {filename}")
+        self._finish_quit_after_save()
+
+    def _quit_save(self) -> None:
+        self._quit_after_save = True
+        self._prompt_save()
+
+    def _quit_discard(self) -> None:
+        self._pending_exit = True
+
+    def _finish_quit_after_save(self) -> None:
+        if self._quit_after_save:
+            self._quit_after_save = False
+            self.clear_config_dirty()
+            self._pending_exit = True
 
     def _prompt_overwrite(self) -> None:
         active_path = self._active_config_path
@@ -1174,9 +1281,17 @@ class TuningControls:
                 written = basename
             if not written:
                 written = basename
+            self.clear_config_dirty()
             self._show_save_toast(f"Config overwritten: {written}")
+            self._finish_quit_after_save()
 
-        self._confirm.prompt(ConfirmRequest(message=message, on_confirm=on_confirm))
+        def on_cancel() -> None:
+            if self._quit_after_save:
+                self._quit_after_save = False
+
+        self._confirm.prompt(
+            ConfirmRequest(message=message, on_confirm=on_confirm, on_cancel=on_cancel)
+        )
 
     def show_toast(self, message: str) -> None:
         now = time.monotonic()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pygame
@@ -24,6 +25,7 @@ def _make_timeline_controls(
     enabled: bool = True,
     position_sec: float = 0.0,
     recording: bool = False,
+    on_config_dirty: Callable[[], None] | None = None,
 ) -> tuple[
     TimelineControls,
     TuningSession,
@@ -73,6 +75,7 @@ def _make_timeline_controls(
         on_exit_submenu=lambda: setattr(tl, "submenu_focused", False),
         on_seek=lambda delta: seeks.append(delta),
         on_toast=toasts.append,
+        on_config_dirty=on_config_dirty,
     )
     return controls, session, visibility_calls, close_calls, seeks, toasts
 
@@ -396,6 +399,19 @@ def test_backspace_toast_when_no_cues() -> None:
 
     controls.handle_keydown(keydown(pygame.K_BACKSPACE))
     assert toasts == ["No cues"]
+
+
+def test_delete_focused_cue_marks_config_dirty() -> None:
+    dirty_calls: list[bool] = []
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        cues=[TimelineCue(t=1.0, layers={"drums": False})],
+        on_config_dirty=lambda: dirty_calls.append(True),
+    )
+
+    controls.handle_keydown(keydown(pygame.K_BACKSPACE))
+
+    assert dirty_calls == [True]
+    assert session.timeline.cues == []
 
 
 def test_ctrl_enter_writes_to_record_buffer_when_recording() -> None:

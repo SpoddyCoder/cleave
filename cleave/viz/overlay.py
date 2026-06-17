@@ -39,7 +39,7 @@ from cleave.viz.row_semantics import (
     TRACK_SUB_ROW_KINDS,
 )
 from cleave.viz.fonts import render_overlay_font_display
-from cleave.viz.confirm import ConfirmDialog, SaveChoiceDialog
+from cleave.viz.confirm import ConfirmDialog, SaveChoiceDialog, UnsavedQuitDialog
 from cleave.viz.text_fit import (
     fit_counter_label_to_width,
     fit_path_label_to_width,
@@ -159,6 +159,8 @@ class TuningViewState:
     confirm_focus_yes: bool = True
     save_choice_active: bool = False
     save_choice_focus_overwrite: bool = True
+    unsaved_quit_active: bool = False
+    unsaved_quit_focus: int = 0
     allow_overwrite: bool = True
     active_config_label: str = "cleave-viz.yaml"
     solo_stem: str | None = None
@@ -908,6 +910,7 @@ class PanelScrollMetrics:
 class PanelHeaderDialogLayout:
     confirm_y: int | None
     save_choice_y: int | None
+    unsaved_quit_y: int | None
     dialog_block_h: int
 
 
@@ -921,12 +924,15 @@ def panel_header_dialog_layout(
     confirm_active: bool,
     save_choice_h: int,
     save_choice_active: bool,
+    unsaved_quit_h: int,
+    unsaved_quit_active: bool,
 ) -> PanelHeaderDialogLayout:
-    """Stack confirm and save-choice immediately below pinned header rows."""
+    """Stack header dialogs immediately below pinned header rows."""
     y = padding + header_row_count * row_stride
     dialog_block_h = 0
     confirm_y: int | None = None
     save_choice_y: int | None = None
+    unsaved_quit_y: int | None = None
 
     if confirm_active:
         confirm_y = y
@@ -936,10 +942,16 @@ def panel_header_dialog_layout(
     if save_choice_active:
         save_choice_y = y + line_gap
         dialog_block_h += line_gap + save_choice_h
+        y += line_gap + save_choice_h
+
+    if unsaved_quit_active:
+        unsaved_quit_y = y + line_gap
+        dialog_block_h += line_gap + unsaved_quit_h
 
     return PanelHeaderDialogLayout(
         confirm_y=confirm_y,
         save_choice_y=save_choice_y,
+        unsaved_quit_y=unsaved_quit_y,
         dialog_block_h=dialog_block_h,
     )
 
@@ -998,6 +1010,8 @@ def scroll_metrics(
     confirm_active: bool,
     save_choice_h: int,
     save_choice_active: bool,
+    unsaved_quit_h: int,
+    unsaved_quit_active: bool,
     toast_active: bool,
     max_panel_h: int,
 ) -> PanelScrollMetrics:
@@ -1024,6 +1038,8 @@ def scroll_metrics(
         dialog_block_h += line_gap + confirm_h
     if save_choice_active:
         dialog_block_h += line_gap + save_choice_h
+    if unsaved_quit_active:
+        dialog_block_h += line_gap + unsaved_quit_h
 
     header_block_h = header_rows_h + dialog_block_h
     if scrollable_indices:
@@ -1042,6 +1058,8 @@ def scroll_metrics(
         natural_h += line_gap + confirm_h
     if save_choice_active:
         natural_h += line_gap + save_choice_h
+    if unsaved_quit_active:
+        natural_h += line_gap + unsaved_quit_h
     if toast_active:
         natural_h += line_gap + line_h
 
@@ -1130,6 +1148,7 @@ class TuningOverlay:
         self._panel_rect: tuple[int, int, int, int] | None = None
         self._confirm = ConfirmDialog()
         self._save_choice = SaveChoiceDialog()
+        self._unsaved_quit = UnsavedQuitDialog()
         self._scroll_y = 0
 
     def _clamp_scroll(self, scroll_content_h: int, viewport_h: int) -> None:
@@ -1294,6 +1313,7 @@ class TuningOverlay:
         toast_active = bool(state.toast_message and state.toast_remaining_sec > 0)
         confirm_active = state.confirm_message is not None
         save_choice_active = state.save_choice_active
+        unsaved_quit_active = state.unsaved_quit_active
 
         confirm_h = 0
         confirm_w = 0
@@ -1311,6 +1331,14 @@ class TuningOverlay:
         if save_choice_active:
             save_choice_h = self._save_choice.measure_height(font)
             save_choice_w = self._save_choice.measure_width(font)
+
+        unsaved_quit_h = 0
+        unsaved_quit_w = 0
+        if unsaved_quit_active:
+            unsaved_quit_h = self._unsaved_quit.measure_height(
+                font, line_gap=self._line_gap
+            )
+            unsaved_quit_w = self._unsaved_quit.measure_width(font)
 
         header_gap = line_h + self._line_gap
         _, margin_y = self._margin
@@ -1330,6 +1358,8 @@ class TuningOverlay:
             confirm_active=confirm_active,
             save_choice_h=save_choice_h,
             save_choice_active=save_choice_active,
+            unsaved_quit_h=unsaved_quit_h,
+            unsaved_quit_active=unsaved_quit_active,
             toast_active=toast_active,
             max_panel_h=max_panel_h,
         )
@@ -1552,6 +1582,8 @@ class TuningOverlay:
             content_w = max(content_w, confirm_w)
         if save_choice_active:
             content_w = max(content_w, save_choice_w)
+        if unsaved_quit_active:
+            content_w = max(content_w, unsaved_quit_w)
         content_w = min(content_w, PANEL_CONTENT_MAX_WIDTH)
         panel_w = content_w + self._padding * 2
         panel_h = metrics.panel_h
@@ -1575,6 +1607,8 @@ class TuningOverlay:
             confirm_active=confirm_active,
             save_choice_h=save_choice_h,
             save_choice_active=save_choice_active,
+            unsaved_quit_h=unsaved_quit_h,
+            unsaved_quit_active=unsaved_quit_active,
         )
 
         if metrics.needs_scroll:
@@ -1692,6 +1726,21 @@ class TuningOverlay:
                 y=header_dialog.save_choice_y,
                 focus_overwrite=state.save_choice_focus_overwrite,
                 text_alpha=text_alpha,
+            )
+
+        if (
+            unsaved_quit_active
+            and text_alpha >= 2
+            and header_dialog.unsaved_quit_y is not None
+        ):
+            self._unsaved_quit.draw(
+                panel,
+                font,
+                x=self._padding,
+                y=header_dialog.unsaved_quit_y,
+                focus_index=state.unsaved_quit_focus,
+                text_alpha=text_alpha,
+                line_gap=self._line_gap,
             )
 
         if toast_surf is not None and text_alpha >= 2 and toast_layout.toast_y is not None:
