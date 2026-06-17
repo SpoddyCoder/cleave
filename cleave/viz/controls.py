@@ -553,6 +553,8 @@ class TuningControls:
                 expanded=tl.panel_open,
             ),
             timeline_submenu_focused=tl.submenu_focused,
+            timeline_recording=tl.recording,
+            timeline_override_active=bool(tl.override_stems),
             help_visible=self._help_visible,
         )
 
