@@ -961,6 +961,31 @@ def panel_toast_layout(
     return PanelToastLayout(toast_y=toast_y)
 
 
+@dataclass(frozen=True)
+class PanelHelpHintLayout:
+    x: int
+    y: int
+
+
+def panel_help_hint_layout(
+    *,
+    panel_w: int,
+    panel_h: int,
+    padding: int,
+    line_h: int,
+    hint_width: int,
+    show_scrollbar: bool,
+) -> PanelHelpHintLayout:
+    """Bottom-right help CTA; shifts left when the scrollbar column is visible."""
+    right_reserve = (
+        SCROLLBAR_WIDTH + SCROLLBAR_CONTENT_GAP if show_scrollbar else 0
+    )
+    return PanelHelpHintLayout(
+        x=panel_w - padding - right_reserve - hint_width,
+        y=panel_h - padding - line_h,
+    )
+
+
 def scroll_metrics(
     *,
     visible_indices: list[int],
@@ -1674,15 +1699,17 @@ class TuningOverlay:
             panel.blit(toast_surf, (self._padding, toast_layout.toast_y))
 
         if text_alpha >= 2:
-            help_hint = font.render("h - help", True, DISABLED)
+            help_hint = font.render("h - help", True, LABEL)
             help_hint.set_alpha(text_alpha)
-            panel.blit(
-                help_hint,
-                (
-                    panel_w - self._padding - help_hint.get_width(),
-                    panel_h - self._padding - line_h,
-                ),
+            hint_layout = panel_help_hint_layout(
+                panel_w=panel_w,
+                panel_h=panel_h,
+                padding=self._padding,
+                line_h=line_h,
+                hint_width=help_hint.get_width(),
+                show_scrollbar=metrics.show_scrollbar,
             )
+            panel.blit(help_hint, (hint_layout.x, hint_layout.y))
 
         border_alpha = int(255 * self._visibility)
         if border_alpha >= 2 and BORDER_WIDTH > 0:

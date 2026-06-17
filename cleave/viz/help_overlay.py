@@ -14,6 +14,7 @@ from cleave.viz.theme import (
     BORDER_COLOR,
     BORDER_WIDTH,
     DISABLED,
+    HIGHLIGHT,
     LABEL,
     VALUE,
 )
@@ -245,11 +246,32 @@ class HelpOverlay:
             self._font = pygame.font.SysFont("monospace", self._font_size)
         return self._font
 
-    def _entry_width(self, font: pygame.font.Font, key: str, description: str) -> int:
-        key_w = font.render(key, True, VALUE).get_width()
-        gap_w = font.size("  ")[0]
-        desc_w = font.render(description, True, DISABLED).get_width()
-        return key_w + gap_w + desc_w
+    def _entry_gap(self, font: pygame.font.Font) -> int:
+        return font.size("  ")[0]
+
+    def _max_key_width(
+        self, font: pygame.font.Font, sections: tuple[HelpSection, ...]
+    ) -> int:
+        return max(
+            (
+                font.render(key, True, LABEL).get_width()
+                for section in sections
+                for key, _ in section.entries
+            ),
+            default=0,
+        )
+
+    def _entry_width(
+        self,
+        font: pygame.font.Font,
+        key: str,
+        description: str,
+        *,
+        key_column_width: int,
+        entry_gap: int,
+    ) -> int:
+        desc_w = font.render(description, True, VALUE).get_width()
+        return key_column_width + entry_gap + desc_w
 
     def _dash_separator(self, font: pygame.font.Font, width: int) -> pygame.Surface:
         dash_w = font.render("-", True, DISABLED).get_width()
@@ -264,12 +286,14 @@ class HelpOverlay:
         description: str,
         x: int,
         y: int,
+        *,
+        key_column_width: int,
+        entry_gap: int,
     ) -> None:
-        key_surf = font.render(key, True, VALUE)
-        desc_surf = font.render(description, True, DISABLED)
-        gap = font.size("  ")[0]
+        key_surf = font.render(key, True, LABEL)
+        desc_surf = font.render(description, True, VALUE)
         target.blit(key_surf, (x, y))
-        target.blit(desc_surf, (x + key_surf.get_width() + gap, y))
+        target.blit(desc_surf, (x + key_column_width + entry_gap, y))
 
     def draw(
         self,
@@ -294,13 +318,23 @@ class HelpOverlay:
             timeline_override_active=timeline_override_active,
         )
 
+        entry_gap = self._entry_gap(font)
+        key_column_width = self._max_key_width(font, sections)
+
         content_w = 0
         for section in sections:
-            title_w = font.render(section.title, True, LABEL).get_width()
+            title_w = font.render(section.title, True, HIGHLIGHT).get_width()
             content_w = max(content_w, title_w)
             for key, description in section.entries:
                 content_w = max(
-                    content_w, self._entry_width(font, key, description)
+                    content_w,
+                    self._entry_width(
+                        font,
+                        key,
+                        description,
+                        key_column_width=key_column_width,
+                        entry_gap=entry_gap,
+                    ),
                 )
 
         row_stride = line_h + self._line_gap
@@ -321,7 +355,7 @@ class HelpOverlay:
 
         y = self._padding
         for section_index, section in enumerate(sections):
-            title_surf = font.render(section.title, True, LABEL)
+            title_surf = font.render(section.title, True, HIGHLIGHT)
             panel.blit(title_surf, (self._padding, y))
             y += row_stride
 
@@ -331,7 +365,14 @@ class HelpOverlay:
 
             for key, description in section.entries:
                 self._blit_entry(
-                    panel, font, key, description, self._padding, y
+                    panel,
+                    font,
+                    key,
+                    description,
+                    self._padding,
+                    y,
+                    key_column_width=key_column_width,
+                    entry_gap=entry_gap,
                 )
                 y += row_stride
 
