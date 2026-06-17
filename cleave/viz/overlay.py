@@ -79,6 +79,7 @@ from cleave.viz.theme import (
     OVERRIDE_BG,
     OVERRIDE_GLYPH,
     OVERRIDE_GLYPH_OFF,
+    CONFIG_DIRTY,
     SCROLLBAR_CONTENT_GAP,
     SCROLLBAR_THUMB,
     SCROLLBAR_TRACK,
@@ -163,6 +164,7 @@ class TuningViewState:
     unsaved_quit_focus: int = 0
     allow_overwrite: bool = True
     active_config_label: str = "cleave-viz.yaml"
+    config_dirty: bool = False
     solo_stem: str | None = None
     solo_active: bool = False
     render_overlay: RenderOverlayBlock = field(default_factory=RenderOverlayBlock)
@@ -750,7 +752,8 @@ def fit_row_text(
     if kind in {RowKind.CONFIG_HEADER, RowKind.TRACK_PRESET_DIR, RowKind.TRACK_PRESET}:
         icon_w = row_icon_prefix_width(font.get_linesize())
         if kind == RowKind.CONFIG_HEADER:
-            return fit_path_label_to_width(font, text, budget - icon_w)
+            suffix_w = font.size("*")[0] if state.config_dirty else 0
+            return fit_path_label_to_width(font, text, budget - icon_w - suffix_w)
         return fit_counter_label_to_width(font, text, budget - icon_w)
     if kind == RowKind.TRACK_HEADER:
         stem = row_stem(state, index)
@@ -1499,10 +1502,22 @@ class TuningOverlay:
                     glyph = FILE_GLYPH
                     icon_color = PRESET_FILE_ICON
                 icon_surf = render_glyph(glyph, color=icon_color, line_height=line_h)
-                label = fit_row_text(
-                    font, state, index, max_content_width=max_content_width
-                )
-                label_surf = font.render(label, True, color)
+                if kind == RowKind.CONFIG_HEADER:
+                    path = fit_row_text(
+                        font, state, index, max_content_width=max_content_width
+                    )
+                    label_surf = _render_label_value_row(
+                        font,
+                        prefix=path,
+                        value="*" if state.config_dirty else "",
+                        value_color=CONFIG_DIRTY,
+                        line_height=line_h,
+                    )
+                else:
+                    label = fit_row_text(
+                        font, state, index, max_content_width=max_content_width
+                    )
+                    label_surf = font.render(label, True, color)
                 row_surfaces.append(icon_surf)
                 row_time_surfaces.append(label_surf)
                 row_widths.append(

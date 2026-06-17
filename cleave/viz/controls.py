@@ -77,12 +77,9 @@ SEEK_LONG = 30
 _DEFAULT_SAVE_FILENAME = "unnamed-1.yaml"
 
 
-def config_path_display(path: Path | None, *, dirty: bool = False) -> str:
+def config_path_display(path: Path | None) -> str:
     """Active config path for the config header row (truncation happens at draw time)."""
-    label = path.as_posix() if path is not None else VIZ_CONFIG_FILENAME
-    if dirty:
-        label += "*"
-    return label
+    return path.as_posix() if path is not None else VIZ_CONFIG_FILENAME
 
 
 def allow_overwrite_for_path(
@@ -542,9 +539,8 @@ class TuningControls:
             unsaved_quit_active=unsaved_quit_active,
             unsaved_quit_focus=unsaved_quit_focus,
             allow_overwrite=self._allow_overwrite(),
-            active_config_label=config_path_display(
-                self._active_config_path, dirty=self._config_dirty
-            ),
+            active_config_label=config_path_display(self._active_config_path),
+            config_dirty=self._config_dirty,
             solo_stem=self.session.solo_stem,
             solo_active=self.session.solo_stem is not None,
             render_overlay=RenderOverlayBlock(

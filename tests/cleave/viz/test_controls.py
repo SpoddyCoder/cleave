@@ -508,7 +508,9 @@ def test_config_header_shows_asterisk_when_dirty() -> None:
     header_row = next(
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.CONFIG_HEADER
     )
-    assert _row_text(view, header_row) == config_path_display(launch_path, dirty=True)
+    assert _row_text(view, header_row) == config_path_display(launch_path)
+    assert view.config_dirty
+    assert header_row not in navigable_row_indices(view)
 
 
 def test_blend_and_opacity_change_sets_dirty_save_clears() -> None:
