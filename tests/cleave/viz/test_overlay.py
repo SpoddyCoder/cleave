@@ -21,6 +21,7 @@ from cleave.viz.overlay import (
     fit_row_text,
     panel_content_max_width,
     panel_header_dialog_layout,
+    panel_help_hint_layout,
     panel_toast_layout,
     render_visibility_icon,
     row_kind,
@@ -33,7 +34,9 @@ from cleave.viz.theme import (
     DISABLED,
     HIGHLIGHT,
     HOLD_IDLE_SEC,
+    LABEL,
     PANEL_CONTENT_MAX_WIDTH,
+    SCROLLBAR_CONTENT_GAP,
     SCROLLBAR_TRACK,
     SCROLLBAR_WIDTH,
     SOLO_BG,
@@ -236,6 +239,33 @@ def test_header_rows_pinned_when_scrolled() -> None:
     assert pygame.image.tostring(top_strip, "RGBA") == pygame.image.tostring(
         bottom_strip, "RGBA"
     )
+
+
+def test_help_hint_layout_avoids_scrollbar_column() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    font = overlay._font_get()
+    hint_w = font.render("h - help", True, LABEL).get_width()
+    panel_w = 320
+    panel_h = 200
+    without_bar = panel_help_hint_layout(
+        panel_w=panel_w,
+        panel_h=panel_h,
+        padding=overlay._padding,
+        line_h=font.get_linesize(),
+        hint_width=hint_w,
+        show_scrollbar=False,
+    )
+    with_bar = panel_help_hint_layout(
+        panel_w=panel_w,
+        panel_h=panel_h,
+        padding=overlay._padding,
+        line_h=font.get_linesize(),
+        hint_width=hint_w,
+        show_scrollbar=True,
+    )
+    assert with_bar.y == without_bar.y
+    assert with_bar.x == without_bar.x - SCROLLBAR_WIDTH - SCROLLBAR_CONTENT_GAP
 
 
 def test_panel_content_max_width_reserves_scrollbar() -> None:

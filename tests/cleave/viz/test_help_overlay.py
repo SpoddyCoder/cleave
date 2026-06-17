@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-from cleave.viz.help_overlay import _layer_section, _sections_for, _timeline_strip_section
+from cleave.viz.help_overlay import (
+    HelpOverlay,
+    NAVIGATION_SECTION,
+    _layer_section,
+    _sections_for,
+    _timeline_strip_section,
+)
+from cleave.viz.theme import LABEL, VALUE
 from cleave.viz.row_semantics import ROW_BEHAVIORS, RowKind
 
 
@@ -13,6 +20,32 @@ def _timeline_keys(**kwargs: object) -> list[str]:
         **kwargs,
     )[0]
     return [key for key, _ in section.entries]
+
+
+def test_help_entry_columns_align_to_widest_key() -> None:
+    overlay = HelpOverlay()
+    font = overlay._font_get()
+    sections = (NAVIGATION_SECTION, _layer_section(timeline_enabled=False))
+    key_column_width = overlay._max_key_width(font, sections)
+    entry_gap = overlay._entry_gap(font)
+
+    widest_key = max(
+        (key for section in sections for key, _ in section.entries),
+        key=lambda key: font.render(key, True, LABEL).get_width(),
+    )
+    assert key_column_width == font.render(widest_key, True, LABEL).get_width()
+
+    for section in sections:
+        for key, description in section.entries:
+            assert overlay._entry_width(
+                font,
+                key,
+                description,
+                key_column_width=key_column_width,
+                entry_gap=entry_gap,
+            ) == key_column_width + entry_gap + font.render(
+                description, True, VALUE
+            ).get_width()
 
 
 def test_layer_section_includes_visibility_when_timeline_disabled() -> None:
