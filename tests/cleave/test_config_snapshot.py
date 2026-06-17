@@ -32,13 +32,13 @@ from cleave.config_snapshot import (
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import playlist_at_dir
 from cleave.timeline import TimelineCue
-from cleave.viz.controls import (
+from cleave.viz.session import (
     LayerRuntime,
     RenderOverlayRuntime,
     RenderPostFxRuntime,
     TuningSession,
+    session_from_cfg,
 )
-from cleave.viz.layer import _session_from_cfg
 
 
 def test_next_unnamed_path_empty_dir(tmp_path: Path) -> None:
@@ -715,7 +715,7 @@ def test_write_session_snapshot_persists_timeline_at_bottom(tmp_path: Path) -> N
         render=cfg.render,
         timeline=timeline,
     )
-    session2 = _session_from_cfg(cfg_with_timeline, playlists)
+    session2 = session_from_cfg(cfg_with_timeline, playlists)
     assert session2.timeline.enabled is True
     assert session2.timeline.cues == list(timeline.cues)
 
@@ -853,7 +853,7 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
 
     cfg = load_config(config_path=config_path)
     playlists = _round_trip_playlists(preset_root)
-    session = _session_from_cfg(cfg, playlists)
+    session = session_from_cfg(cfg, playlists)
 
     session.layer_z_order = ["other", "drums", "bass", "vocals"]
     session.layers["drums"].opacity_pct = 65
@@ -904,7 +904,7 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
     assert snapshot_data["visualizer"]["beat_sensitivity"] == 2.2
 
     cfg2 = load_config(config_path=snapshot_path)
-    session2 = _session_from_cfg(cfg2, _round_trip_playlists(preset_root))
+    session2 = session_from_cfg(cfg2, _round_trip_playlists(preset_root))
     actual = persisted_session_payload(cfg2, session2)
 
     assert actual == expected

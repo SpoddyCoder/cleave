@@ -9,7 +9,8 @@ import pygame
 from cleave.config import CleaveConfig, LayerConfig, PathsConfig, VisualizerConfig
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import PresetPlaylist
-from cleave.viz.controls import LayerRuntime, TuningControls, TuningSession
+from cleave.viz.controls import TuningControls
+from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.playback import PlaybackState
 
 

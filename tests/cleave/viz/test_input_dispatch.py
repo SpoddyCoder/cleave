@@ -9,7 +9,8 @@ import pygame
 
 from cleave.extract import STEM_NAMES
 from cleave.viz.app import VisualizerRuntime
-from cleave.viz.controls import LayerRuntime, TuningControls, TuningSession
+from cleave.viz.controls import TuningControls
+from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.input_dispatch import (
     dispatch_keydown,
     dispatch_should_notify_overlay,

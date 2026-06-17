@@ -8,34 +8,15 @@ import pygame
 from OpenGL.GL import GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, glClear, glClearColor, glViewport
 
 from cleave.timeline import TimelineCue, layer_visible_at
-from cleave.config import (
-    DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
-    DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
-    DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
-    DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
-    DEFAULT_RENDER_OVERLAY_FONT,
-    DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
-    DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
-    DEFAULT_RENDER_OVERLAY_POSITION,
-    DEFAULT_RENDER_OVERLAY_START_DELAY,
-    DEFAULT_RENDER_POST_FX_FADE_IN,
-    DEFAULT_RENDER_POST_FX_FADE_OUT,
-    CleaveConfig,
-)
+from cleave.config import CleaveConfig
 from cleave.effects.runtime import EffectRuntime
 from cleave.gl_compositor import GlCompositor, LayerFbo
 from cleave.gl_post_process import GlPostProcess
-from cleave.preset_playlist import PresetPlaylist, preset_browse_floor
+from cleave.preset_playlist import PresetPlaylist
 from cleave.projectm import ProjectM
 from cleave.signals import Signals
 from cleave.stem_pcm import StemPcmBank
-from cleave.viz.controls import (
-    LayerRuntime,
-    RenderOverlayRuntime,
-    RenderPostFxRuntime,
-    TimelineRuntime,
-    TuningSession,
-)
+from cleave.viz.session import TuningSession
 from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.overlay import TuningOverlay, TuningViewState, row_kind
 from cleave.viz.timeline_overlay import TimelineOverlay, TimelineViewState
@@ -346,103 +327,6 @@ def _flush_all_pcm(layers: list[StemLayer]) -> None:
 def _destroy_layers(layers: list[StemLayer]) -> None:
     for layer in layers:
         layer.pm.destroy()
-
-
-def _render_overlay_runtime_from_cfg(cfg: CleaveConfig) -> RenderOverlayRuntime:
-    overlay = cfg.render.overlay if cfg.render is not None else None
-    if overlay is not None:
-        return RenderOverlayRuntime(
-            enabled=overlay.enabled,
-            expanded=False,
-            position=overlay.position,
-            title_expanded=False,
-            body_expanded=False,
-            title_font_size=overlay.title.font_size,
-            title_font=overlay.title.font,
-            title_margin_bottom=overlay.title.margin_bottom,
-            body_font_size=overlay.body.font_size,
-            body_font=overlay.body.font,
-            opacity_pct=int(round(overlay.background.opacity * 100)),
-            border_width=overlay.background.border.width,
-            start_delay=overlay.start_delay,
-            display_time=overlay.display_time,
-        )
-    return RenderOverlayRuntime(
-        enabled=True,
-        expanded=False,
-        position=DEFAULT_RENDER_OVERLAY_POSITION,
-        title_expanded=False,
-        body_expanded=False,
-        title_font_size=DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
-        title_font=DEFAULT_RENDER_OVERLAY_FONT,
-        title_margin_bottom=DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
-        body_font_size=DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
-        body_font=DEFAULT_RENDER_OVERLAY_FONT,
-        opacity_pct=int(round(DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY * 100)),
-        border_width=DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
-        start_delay=DEFAULT_RENDER_OVERLAY_START_DELAY,
-        display_time=DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
-    )
-
-
-def _render_post_fx_runtime_from_cfg(
-    cfg: CleaveConfig,
-) -> RenderPostFxRuntime:
-    post_fx = cfg.render.post_fx if cfg.render is not None else None
-    if post_fx is not None:
-        return RenderPostFxRuntime(
-            enabled=post_fx.enabled,
-            expanded=False,
-            fade_in=post_fx.fade_in,
-            fade_out=post_fx.fade_out,
-        )
-    return RenderPostFxRuntime(
-        enabled=True,
-        expanded=False,
-        fade_in=DEFAULT_RENDER_POST_FX_FADE_IN,
-        fade_out=DEFAULT_RENDER_POST_FX_FADE_OUT,
-    )
-
-
-def _timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
-    timeline = cfg.timeline
-    if timeline is None:
-        return TimelineRuntime()
-    return TimelineRuntime(
-        enabled=timeline.enabled,
-        cues=list(timeline.cues),
-    )
-
-
-def _session_from_cfg(
-    cfg: CleaveConfig,
-    playlists: dict[str, PresetPlaylist],
-) -> TuningSession:
-    preset_root = cfg.paths.preset_root
-    return TuningSession(
-        layer_z_order=list(cfg.layer_z_order),
-        render_overlay=_render_overlay_runtime_from_cfg(cfg),
-        render_post_fx=_render_post_fx_runtime_from_cfg(cfg),
-        timeline=_timeline_runtime_from_cfg(cfg),
-        layers={
-            name: LayerRuntime(
-                playlist=playlists[name],
-                browse_floor=preset_browse_floor(
-                    cfg.layers[name].preset, preset_root
-                ),
-                opacity_pct=int(layer_cfg.opacity * 100),
-                effects={
-                    effect_id: dict(drivers)
-                    for effect_id, drivers in layer_cfg.effects.items()
-                },
-                blend_mode=layer_cfg.blend_mode,
-                beat_sensitivity=_beat_sensitivity(cfg, name),
-                enabled=layer_cfg.enabled,
-                locked=layer_cfg.locked,
-            )
-            for name, layer_cfg in cfg.layers.items()
-        },
-    )
 
 
 def _composite_ordered(

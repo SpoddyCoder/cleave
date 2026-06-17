@@ -8,7 +8,8 @@ import pygame
 
 from cleave.extract import STEM_NAMES
 from cleave.timeline import TimelineCue
-from cleave.viz.controls import LayerRuntime, SEEK_LONG, SEEK_SHORT, TuningSession
+from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, TuningControls
+from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.timeline_controls import TimelineControls
 from tests.support.viz import keydown, make_playlist, stub_playback_state
 

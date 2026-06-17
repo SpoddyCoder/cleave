@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from cleave.config import VIZ_CONFIG_FILENAME, RenderConfig, load_config
-from cleave.viz.controls import RenderPostFxRuntime
+from cleave.viz.session import RenderPostFxRuntime
 from cleave.paths import repo_root
 from cleave.extract import STEM_NAMES, stems_dir
 from cleave.project import write_manifest

@@ -17,7 +17,7 @@ from cleave.effects.flare import (
 )
 from cleave.effects.runtime import EffectRuntime
 from cleave.signals import Signals
-from cleave.viz.controls import LayerRuntime, TuningSession
+from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.preset_playlist import playlist_at_dir
 from pathlib import Path
 

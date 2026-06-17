@@ -26,7 +26,7 @@ from cleave.config import (
     RenderOverlayConfig,
     RenderOverlayTextBlockConfig,
 )
-from cleave.viz.controls import RenderOverlayRuntime
+from cleave.viz.session import RenderOverlayRuntime
 from cleave.easing import fade_alpha
 from cleave.gl_compositor import GlCompositor
 from cleave.viz.theme import FADE_DURATION_SEC

@@ -14,7 +14,7 @@ from cleave.viz.app import (
     _timeline_strip_visible,
 )
 from cleave.viz.input_dispatch import key_handler_for_runtime
-from cleave.viz.controls import LayerRuntime, RenderPostFxRuntime, TuningSession
+from cleave.viz.session import LayerRuntime, RenderPostFxRuntime, TuningSession
 from cleave.viz.overlay import TuningOverlay
 from tests.support.compositor_mock import recording_compositor
 

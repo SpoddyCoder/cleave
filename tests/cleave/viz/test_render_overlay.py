@@ -26,7 +26,7 @@ from cleave.viz.render_overlay import (
     panel_position,
     panel_surface_key,
 )
-from cleave.viz.controls import RenderOverlayRuntime
+from cleave.viz.session import RenderOverlayRuntime
 from cleave.viz.theme import FADE_DURATION_SEC
 
 
