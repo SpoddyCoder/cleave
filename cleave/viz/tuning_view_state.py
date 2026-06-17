@@ -53,7 +53,7 @@ class TuningViewStateBuilder:
         if position_sec is None:
             position_sec = current_sec(self.playback, self.duration_sec)
 
-        from cleave.viz.layer import effective_layer_enabled
+        from cleave.viz.layer_visibility import effective_layer_enabled
 
         tracks: dict[str, TrackBlock] = {}
         for stem in self.session.layer_z_order:

@@ -25,17 +25,21 @@ remaining duplicated systems.
 
 ## Background: what is wrong today
 
-- [cleave/viz/controls.py](cleave/viz/controls.py) `TuningControls` is a god object
-  (~1100 lines) owning input, focus navigation, ~30 mutation setters, save and quit
-  orchestration, modal dialogs, and view state projection.
+- [cleave/viz/controls.py](cleave/viz/controls.py) `TuningControls` is still large
+  (~800 lines) but Phase 2 split save/quit, render setters, and view state into
+  collaborators; it now focuses on focus and input dispatch.
 - Config dirty tracking: fixed in Phase 1 via snapshot signature compare in
   [cleave/config_snapshot.py](cleave/config_snapshot.py).
-- [cleave/viz/app.py](cleave/viz/app.py) `VisualizerRuntime` is a 32 field bag with
-  most fields `Optional` and filled across several init phases, guarded by
-  `assert ... is not None` rather than types.
-- [cleave/viz/layer.py](cleave/viz/layer.py) mixes four concerns and exposes 12
-  leading underscore functions that [cleave/viz/app.py](cleave/viz/app.py) imports
-  directly, a sign of a missing class.
+- [cleave/viz/app.py](cleave/viz/app.py) `VisualizerRuntime` bag: fixed in Phase 2.
+  `VisualizerSeed`, `VisualizerCore`, `LiveVisualizerRuntime`, and
+  `RenderVisualizerRuntime` enforce readiness by type; `build_live_runtime` and
+  `build_render_runtime` are the entry points.
+- [cleave/viz/layer.py](cleave/viz/layer.py): fixed in Phase 2. `StemLayer` only;
+  frame pipeline, visibility, and overlay drawing live in
+  [cleave/viz/layer_pipeline.py](cleave/viz/layer_pipeline.py),
+  [cleave/viz/layer_visibility.py](cleave/viz/layer_visibility.py), and
+  [cleave/viz/overlay_draw.py](cleave/viz/overlay_draw.py).
+  [cleave/viz/app.py](cleave/viz/app.py) imports public names only.
 - Config schema is hand maintained twice: load in [cleave/config.py](cleave/config.py)
   and save in [cleave/config_snapshot.py](cleave/config_snapshot.py), with defaults
   triplicated across those files and [cleave/viz/controls.py](cleave/viz/controls.py).
@@ -132,12 +136,26 @@ tracking centralized, and a documented config round trip test in place.
 
 ---
 
-## Phase 2: Structural decomposition (medium to high risk)
+## Phase 2: Structural decomposition (medium to high risk, complete)
 
 Goal: break up the two largest structures so adding a feature touches fewer places
 and readiness is enforced by types rather than asserts. Do Phase 1 first.
 
-### Task 2.1: Split `TuningControls`
+**Status:** Complete. User smoke-tested. Task 2.1: session model in
+[cleave/viz/session.py](cleave/viz/session.py); save/quit in
+[cleave/viz/config_save.py](cleave/viz/config_save.py); render overlay and post-FX
+setters in [cleave/viz/render_overlay_controls.py](cleave/viz/render_overlay_controls.py)
+and [cleave/viz/render_post_fx_controls.py](cleave/viz/render_post_fx_controls.py);
+view state in [cleave/viz/tuning_view_state.py](cleave/viz/tuning_view_state.py).
+Task 2.2: `VisualizerSeed`, `VisualizerCore`, `LiveVisualizerRuntime`,
+`RenderVisualizerRuntime`, `build_live_runtime`, `build_render_runtime`,
+`tick_frame_core` in [cleave/viz/app.py](cleave/viz/app.py). Task 2.3:
+`LayerFramePipeline` in [cleave/viz/layer_pipeline.py](cleave/viz/layer_pipeline.py),
+visibility in [cleave/viz/layer_visibility.py](cleave/viz/layer_visibility.py),
+`OverlayDrawer` in [cleave/viz/overlay_draw.py](cleave/viz/overlay_draw.py);
+[cleave/viz/layer.py](cleave/viz/layer.py) is `StemLayer` only.
+
+### Task 2.1: Split `TuningControls` (done)
 
 [cleave/viz/controls.py](cleave/viz/controls.py) `TuningControls` should shrink to a
 focus and input coordinator. Extract cohesive responsibilities into collaborators
@@ -169,7 +187,7 @@ Acceptance: `TuningControls` is materially smaller; each extracted object has a
 single responsibility; unit suite passes; the keyboard dispatch behavior described
 in [.cursor/rules/live-tuning-ui.mdc](.cursor/rules/live-tuning-ui.mdc) is unchanged.
 
-### Task 2.2: Replace the `VisualizerRuntime` bag
+### Task 2.2: Replace the `VisualizerRuntime` bag (done)
 
 [cleave/viz/app.py](cleave/viz/app.py) `VisualizerRuntime` has 32 fields filled
 across `build_runtime_full`, `_init_gl_resources_cheap`, `_init_gl_resources_heavy`,
@@ -191,7 +209,7 @@ Acceptance: no `Optional` field that is always set in practice remains optional;
 asserts in `tick_frame` are gone or justified; live and render paths both construct
 through the new entry points; unit suite passes.
 
-### Task 2.3: Turn `layer.py` helpers into classes
+### Task 2.3: Turn `layer.py` helpers into classes (done)
 
 [cleave/viz/layer.py](cleave/viz/layer.py) exposes 12 leading underscore functions
 that [cleave/viz/app.py](cleave/viz/app.py) imports. Group them into classes and make
@@ -214,12 +232,81 @@ Keep `StemLayer` a thin data class.
 Acceptance: [cleave/viz/app.py](cleave/viz/app.py) imports only public names; each
 new class has a clear responsibility; unit suite passes.
 
-Phase 2 exit criteria: `TuningControls`, `VisualizerRuntime`, and `layer.py` no
-longer concentrate unrelated responsibilities; no behavior change; suite green.
+Phase 2 exit criteria: met. `TuningControls`, runtime types, and `layer.py` no
+longer concentrate unrelated responsibilities; unit suite green; live visualizer
+smoke tested by a human.
+
+---
+
+## Review of phases 1 and 2
+
+Reviewed after both phases landed (800 unit tests green). The work is in line with
+the intent and is having the intended effect.
+
+What went well:
+
+- `TuningControls` dropped from ~1325 to ~792 lines and now delegates to
+  `ConfigSaveController` ([cleave/viz/config_save.py](cleave/viz/config_save.py)),
+  `RenderOverlayControls`, `RenderPostFxControls`, and `TuningViewStateBuilder`
+  ([cleave/viz/tuning_view_state.py](cleave/viz/tuning_view_state.py)).
+- `layer.py` is now `StemLayer` only; the pipeline, visibility, and overlay drawing
+  are focused modules with public classes.
+- The runtime is typed end to end (`VisualizerSeed`, `VisualizerCore`,
+  `LiveVisualizerRuntime`, `RenderVisualizerRuntime`); the old asserts became
+  explicit type errors at the seam.
+- Dirty tracking is now a computed signature over `persisted_session_payload`
+  ([cleave/config_snapshot.py](cleave/config_snapshot.py)), reused by both the
+  snapshot writer and the dirty check. Setters no longer call `mark_config_dirty()`,
+  so the bug class that motivated this work is structurally gone. This anticipates
+  part of Task 3.1.
+
+New rough edges introduced (fold the fixes into Phase 3, see Task 3.0):
+
+- Lambda-bag dependency injection. Sub-controllers receive a `focus_ctx` dict of
+  closures, including `"set_focus_index": lambda index: setattr(self, ...)`. This is
+  stringly typed and will spread as Phase 3 extracts more controllers.
+- Default values for the render overlay runtime are duplicated inside
+  [cleave/viz/session.py](cleave/viz/session.py) (`default_render_overlay_runtime()`
+  and the `else` branch of `render_overlay_runtime_from_cfg()`).
+- `VisualizerSeed` and `VisualizerCore` repeat ~18 fields, bridged by a
+  `_core_fields_from_seed` dict spread; `build_live_runtime` and
+  `build_render_runtime` are currently identical no-op wrappers around
+  `build_runtime_base`.
+- Dead code: `build_tuning_view_state` free function in
+  [cleave/viz/tuning_view_state.py](cleave/viz/tuning_view_state.py) has no callers.
+
+Not a problem (checked): `_snapshot_render_overlay` is built on top of
+`_persisted_render_payload`, so the dirty signature and the written YAML share one
+base and cannot silently diverge.
 
 ---
 
 ## Phase 3: Unify duplicated systems (medium to high risk)
+
+### Task 3.0: Clean up rough edges from Phase 2 (low risk, do first)
+
+Small fixes that pay down the new smells before the larger Phase 3 work builds on
+them.
+
+- Replace the `focus_ctx` lambda bag with a small typed context. Define a
+  `FocusContext` (a `Protocol` or a frozen dataclass holding `get`/`set` focus,
+  `build_view_state`, and `is_paused`) and pass that one object to
+  `RenderOverlayControls`, `RenderPostFxControls`, and any controller Phase 3 adds.
+  No `setattr` by string.
+- Collapse the duplicated render overlay defaults in
+  [cleave/viz/session.py](cleave/viz/session.py): have
+  `render_overlay_runtime_from_cfg()` fall back to `default_render_overlay_runtime()`
+  instead of repeating the default field list. This also feeds Task 3.1.
+- Remove the unused `build_tuning_view_state` free function.
+- Reduce `VisualizerSeed` / `VisualizerCore` duplication: prefer composition (core
+  holds a seed, or seed is the base) over the `_core_fields_from_seed` dict spread.
+  Keep `build_live_runtime` / `build_render_runtime` only if they will diverge in
+  Task 3.3; otherwise call `build_runtime_base` directly.
+
+Acceptance: no closure-bag DI remains; render overlay defaults exist once; no dead
+helper; unit suite passes.
+
+## Phase 3 (continued): Unify duplicated systems (medium to high risk)
 
 Goal: remove the parallel maintenance burdens so a new config key, effect, or render
 tweak changes one place instead of many. Builds on Phases 1 and 2.
@@ -227,8 +314,14 @@ tweak changes one place instead of many. Builds on Phases 1 and 2.
 ### Task 3.1: Single config schema for load, save, and defaults
 
 Today load lives in [cleave/config.py](cleave/config.py) (`_parse_*`), save in
-[cleave/config_snapshot.py](cleave/config_snapshot.py), and defaults are triplicated
-across those files and [cleave/viz/controls.py](cleave/viz/controls.py).
+[cleave/config_snapshot.py](cleave/config_snapshot.py), and defaults are duplicated
+across those files and [cleave/viz/session.py](cleave/viz/session.py) (the
+`default_*_runtime` functions and the `*_from_cfg` fallbacks).
+
+Phase 1 already established `persisted_session_payload` as the single description of
+which fields are persisted, shared by the snapshot writer and the dirty signature.
+Build on that: extend the same single source to cover parse and defaults, rather than
+introducing a third mechanism.
 
 Define one source of truth that drives parse, serialize, and default. Options for
 the agent to weigh: per field descriptors with name, default, parse, and dump; or a
@@ -286,18 +379,87 @@ suite green.
 
 ---
 
+## Phase 4: Capture the principles as rules (low risk)
+
+Goal: turn the patterns established in Phases 1 to 3 into durable, agent facing
+guidance so future work preserves the architecture instead of eroding it. This phase
+edits Cursor rules and skills, not application code.
+
+Use the create-rule skill for format and placement
+([.cursor/rules](.cursor/rules)). Keep entries short and link to the canonical
+example in code, following
+[.cursor/rules/documentation-style.mdc](.cursor/rules/documentation-style.mdc).
+
+### Task 4.1: Add an architecture principles rule
+
+Create [.cursor/rules/architecture-principles.mdc](.cursor/rules/architecture-principles.mdc)
+(always applied, or scoped to `cleave/viz/**` and `cleave/**`). Capture the
+conventions this refactor established, each with a one line rationale and a pointer
+to the reference implementation:
+
+- Single source of truth for persisted config. New persisted fields go through
+  `persisted_session_payload` in [cleave/config_snapshot.py](cleave/config_snapshot.py)
+  so load, save, and dirty tracking stay aligned. Do not add a parallel serializer.
+- Dirty tracking is computed, not marked. Never reintroduce manual
+  `mark_config_dirty()` calls; mutate session state and let the signature compare
+  detect changes.
+- Keep controllers thin and split by feature. `TuningControls` coordinates focus and
+  input and delegates mutations to focused sub controllers
+  ([cleave/viz/config_save.py](cleave/viz/config_save.py),
+  [cleave/viz/render_overlay_controls.py](cleave/viz/render_overlay_controls.py)).
+  Do not let one class accumulate unrelated responsibilities again.
+- Model, controller, and view are separate. Session dataclasses live in
+  [cleave/viz/session.py](cleave/viz/session.py); the view model is built by
+  `TuningViewStateBuilder`; the overlay only draws. Keep that boundary.
+- Enforce readiness with types, not asserts. Prefer typed runtimes
+  (`VisualizerSeed`, `VisualizerCore`, `LiveVisualizerRuntime`) over optional fields
+  guarded by `assert ... is not None`.
+- Inject dependencies as typed objects, not closure bags. Pass a small typed context
+  (Protocol or dataclass), never a dict of lambdas or `setattr` by string.
+- No cross module underscore imports. If another module needs a helper, make it
+  public on a class or module API.
+- Keep defaults in one place per setting.
+
+### Task 4.2: Remind agents to weigh architecture on larger features
+
+Add a short section to the same rule (or to a project workflow rule, or
+[AGENTS.md](AGENTS.md) if the project adopts one) stating: when a change is more than
+a small localized edit (a new feature, a new config or effect type, a new overlay
+section, or anything touching several modules), the agent should first consider the
+architecture, and refactor or introduce an abstraction when it keeps the change
+cohesive, rather than bolting onto an existing class. Point at this document and at
+the architecture principles rule. Note the existing project rules it complements:
+[.cursor/rules/project-context.mdc](.cursor/rules/project-context.mdc) and
+[.cursor/rules/no-backward-compatibility.mdc](.cursor/rules/no-backward-compatibility.mdc).
+
+### Task 4.3: Cross check existing rules
+
+Reread the rules under [.cursor/rules](.cursor/rules) (for example
+[.cursor/rules/live-tuning-ui.mdc](.cursor/rules/live-tuning-ui.mdc)) and update any
+file or symbol references that moved during Phases 1 to 3 (for example session
+dataclasses now in [cleave/viz/session.py](cleave/viz/session.py), not
+`controls.py`). Stale rule references mislead future agents.
+
+Acceptance: a new architecture principles rule exists and is discoverable; the larger
+feature reminder is in place; existing rules point at current file locations.
+
+---
+
 ## Sequencing and effort
 
 | Phase | Theme | Risk | Rough effort | Status |
 | --- | --- | --- | --- | --- |
 | 1 | Correctness and cleanup | Low | Low | Complete |
-| 2 | Structural decomposition | Medium to high | Medium to high | |
+| 2 | Structural decomposition | Medium to high | Medium to high | Complete |
 | 3 | Unify duplicated systems | Medium to high | Medium to high | |
+| 4 | Capture principles as rules | Low | Low | |
 
-Do the phases in order. Phase 1 is complete and safe to ship on its own.
-Phase 2 depends on Phase 1 (centralized dirty tracking and the session module move).
+Do the phases in order. Phases 1 and 2 are complete. Phase 3 starts with Task 3.0
+(clean up the rough edges Phase 2 introduced), then the unification work.
+Phase 2 depended on Phase 1 (centralized dirty tracking and the session module move).
 Phase 3 depends on Phase 2 (the session module and split runtime simplify the schema
-and render unification work).
+and render unification work). Phase 4 should land after Phase 3 so the rules describe
+the final shape, though Task 4.3 (fixing stale references) can be done any time.
 
 ## Definition of done for the whole refactor
 
@@ -305,7 +467,9 @@ and render unification work).
   one setter or sub controller, and the UI row, instead of 6 to 8 files.
 - Dirty tracking cannot be silently bypassed by a new setter.
 - No god object, no partially initialized runtime guarded by asserts, no cross module
-  underscore imports.
+  underscore imports, no closure-bag dependency injection.
 - Live and offline render share their frame finishing logic.
+- The architecture principles are written down as a Cursor rule so future features
+  preserve them.
 - The unit suite passes and the live visualizer is smoke tested by a human after the
   GL touching phases.

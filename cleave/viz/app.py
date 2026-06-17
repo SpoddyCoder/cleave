@@ -21,22 +21,10 @@ from cleave.viz.bootstrap import load_stem_signals
 from cleave.viz.controls import TuningControls
 from cleave.viz.session import TimelineRuntime, TuningSession, session_from_cfg
 from cleave.viz.mix_player import MixPlayer
-from cleave.viz.layer import (
-    StemLayer,
-    _apply_layer_bloom,
-    _apply_layer_grit,
-    _build_layers,
-    _composite_ordered,
-    _destroy_layers,
-    _draw_timeline_overlay,
-    _draw_tuning_overlay,
-    _build_timeline_view_state,
-    _flush_all_pcm,
-    _render_layer_fbo,
-    _warmup_layers,
-    apply_effect_modifiers,
-    apply_layer_visibility,
-)
+from cleave.viz.layer import StemLayer
+from cleave.viz.layer_pipeline import LayerFramePipeline
+from cleave.viz.layer_visibility import apply_layer_visibility, build_timeline_view_state
+from cleave.viz.overlay_draw import OverlayDrawer
 from cleave.viz.loading import draw_loading_screen
 from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.overlay import TuningOverlay
@@ -247,8 +235,9 @@ def _init_gl_resources_heavy(
             on_progress(message)
 
     report("Building layers...")
-    layers = _build_layers(seed.cfg, compositor, seed.playlists)
-    layers_by_name = {layer.name: layer for layer in layers}
+    layers, layers_by_name = LayerFramePipeline.build(
+        seed.cfg, compositor, seed.playlists
+    )
 
     mix_pcm, sample_rate = load_mix_pcm(seed.audio_path)
     mix_player = MixPlayer(mix_pcm, sample_rate)
@@ -300,8 +289,9 @@ def _init_gl_resources_heavy(
 
 def _init_gl_resources_render(seed: VisualizerSeed) -> RenderVisualizerRuntime:
     compositor, post_process = _init_compositor_and_post(seed)
-    layers = _build_layers(seed.cfg, compositor, seed.playlists)
-    layers_by_name = {layer.name: layer for layer in layers}
+    layers, layers_by_name = LayerFramePipeline.build(
+        seed.cfg, compositor, seed.playlists
+    )
 
     return RenderVisualizerRuntime(
         **_core_fields_from_seed(seed),
@@ -374,35 +364,27 @@ def tick_frame_core(
 ) -> bool | None:
     """Shared frame tick for live and render. Returns updated was_paused."""
     if was_paused is not None and paused != was_paused:
-        _flush_all_pcm(runtime.layers)
+        LayerFramePipeline.flush_pcm(runtime.layers)
     was_paused = paused
 
     apply_layer_visibility(runtime.session, runtime.layers_by_name, t_sec)
 
-    if not paused:
-        for layer in runtime.layers:
-            if not layer.fbo.enabled:
-                continue
-            pcm = runtime.pcm_bank.slice_pcm(layer.name, t_sec, runtime.n_pcm)
-            layer.pm.feed_pcm(pcm)
-            layer.pm.set_frame_time(t_sec)
-
-    apply_effect_modifiers(
+    LayerFramePipeline.render_frame(
         runtime.session,
+        runtime.layers,
         runtime.layers_by_name,
+        runtime.pcm_bank,
+        runtime.n_pcm,
+        runtime.post_process,
         runtime.effect_runtime,
         runtime.signals,
         t_sec,
+        paused=paused,
     )
 
-    if not paused:
-        for layer in runtime.layers:
-            if layer.fbo.enabled:
-                _render_layer_fbo(layer, layer.pm)
-                _apply_layer_bloom(layer, runtime.post_process)
-                _apply_layer_grit(layer, runtime.post_process)
-
-    _composite_ordered(runtime.compositor, runtime.layers_by_name, runtime.session)
+    LayerFramePipeline.composite(
+        runtime.compositor, runtime.layers_by_name, runtime.session
+    )
     return was_paused
 
 
@@ -436,7 +418,7 @@ def _tick_frame_live_overlay(
         tl, overlay_visibility=overlay_visibility
     )
     timeline_panel_open = tl.enabled and tl.panel_open and overlay_visibility > 0.01
-    _draw_tuning_overlay(
+    OverlayDrawer.draw_tuning(
         runtime.compositor,
         runtime.overlay,
         runtime.overlay_surface,
@@ -446,10 +428,10 @@ def _tick_frame_live_overlay(
     )
 
     if timeline_strip_visible:
-        timeline_state = _build_timeline_view_state(
+        timeline_state = build_timeline_view_state(
             runtime.session, t_sec, runtime.duration_sec
         )
-        _draw_timeline_overlay(
+        OverlayDrawer.draw_timeline(
             runtime.compositor,
             runtime.timeline_overlay,
             runtime.overlay_surface,
@@ -540,7 +522,7 @@ class VisualizerApp:
                     seed.display_width,
                     seed.display_height,
                 )
-                _warmup_layers(
+                LayerFramePipeline.warmup(
                     rt.layers,
                     rt.pcm_bank,
                     0.0,
@@ -596,7 +578,7 @@ class VisualizerApp:
 
         finally:
             if rt is not None:
-                _destroy_layers(rt.layers)
+                LayerFramePipeline.destroy(rt.layers)
                 rt.compositor.destroy()
                 rt.post_process.destroy()
                 rt.mix_player.stop()

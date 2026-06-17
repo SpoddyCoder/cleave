@@ -15,13 +15,9 @@ from cleave.signals import Signals
 from cleave.viz.controls import TuningControls
 from cleave.viz.session import TuningSession
 from cleave.viz.timeline_controls import TimelineControls
-from cleave.viz.layer import (
-    StemLayer,
-    _flush_all_pcm,
-    apply_effect_modifiers,
-    apply_layer_visibility,
-    effective_layer_enabled,
-)
+from cleave.viz.layer import StemLayer
+from cleave.viz.layer_pipeline import LayerFramePipeline, apply_effect_modifiers
+from cleave.viz.layer_visibility import apply_layer_visibility, effective_layer_enabled
 from cleave.viz.mix_player import MixPlayer
 from cleave.stem_pcm import StemPcmBank
 from cleave.viz.playback import current_sec, seek
@@ -82,7 +78,7 @@ def make_tuning_controls(
     def on_layer_enabled_change(stem: str, enabled: bool) -> None:
         t_sec = current_sec(playback, duration_sec)
         apply_layer_visibility(session, layers_by_name, t_sec)
-        _flush_all_pcm(layers)
+        LayerFramePipeline.flush_pcm(layers)
         if effective_layer_enabled(session, stem, t_sec):
             apply_effect_modifiers(
                 session,
@@ -96,7 +92,7 @@ def make_tuning_controls(
     def on_timeline_enabled_change() -> None:
         t_sec = current_sec(playback, duration_sec)
         apply_layer_visibility(session, layers_by_name, t_sec)
-        _flush_all_pcm(layers)
+        LayerFramePipeline.flush_pcm(layers)
         apply_effect_modifiers(
             session,
             layers_by_name,
@@ -111,7 +107,7 @@ def make_tuning_controls(
         apply_layer_visibility(session, layers_by_name, t_sec)
         if mix_player is not None:
             mix_player.set_solo_stem(session.solo_stem)
-        _flush_all_pcm(layers)
+        LayerFramePipeline.flush_pcm(layers)
         apply_effect_modifiers(
             session,
             layers_by_name,
@@ -126,7 +122,7 @@ def make_tuning_controls(
 
     def on_seek(delta_sec: float) -> None:
         seek(playback, delta_sec, duration_sec)
-        _flush_all_pcm(layers)
+        LayerFramePipeline.flush_pcm(layers)
 
     kwargs: dict = {
         "session": session,
@@ -193,7 +189,7 @@ def make_timeline_controls(
     def on_visibility_change() -> None:
         t_sec = current_sec(playback, duration_sec)
         apply_layer_visibility(session, layers_by_name, t_sec)
-        _flush_all_pcm(layers)
+        LayerFramePipeline.flush_pcm(layers)
         apply_effect_modifiers(
             session,
             layers_by_name,
@@ -218,7 +214,7 @@ def make_timeline_controls(
 
     def on_seek(delta_sec: float) -> None:
         seek(playback, delta_sec, duration_sec)
-        _flush_all_pcm(layers)
+        LayerFramePipeline.flush_pcm(layers)
 
     return TimelineControls(
         session,
