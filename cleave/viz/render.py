@@ -18,9 +18,10 @@ from cleave.preset_playlist import scan_all_layers
 from cleave.project import load_manifest, manifest_path, mix_path
 from cleave.separate import project_stems_complete, signals_complete
 from cleave.viz.app import (
+    RenderVisualizerRuntime,
     VisualizerApp,
     _init_gl_resources_render,
-    build_runtime_full,
+    build_render_runtime,
 )
 from cleave.viz.layer import _destroy_layers, _warmup_layers
 from cleave.viz.render_overlay import build_panel_surface, composite_render_overlay
@@ -185,13 +186,13 @@ def render(
 
     audio_path = mix_path(project)
     playlists = scan_all_layers(cfg)
-    runtime = build_runtime_full(cfg, project, audio_path, playlists)
+    seed = build_render_runtime(cfg, project, audio_path, playlists)
 
     os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
     pygame.init()
     try:
         pygame.display.set_mode(
-            (runtime.display_width, runtime.display_height),
+            (seed.display_width, seed.display_height),
             pygame.OPENGL | pygame.HIDDEN,
         )
     except pygame.error as exc:
@@ -199,8 +200,9 @@ def render(
         raise RuntimeError(f"failed to open OpenGL context: {exc}") from exc
 
     proc: subprocess.Popen[bytes] | None = None
+    runtime: RenderVisualizerRuntime | None = None
     try:
-        _init_gl_resources_render(runtime)
+        runtime = _init_gl_resources_render(seed)
         app = VisualizerApp(runtime)
 
         duration_sec = runtime.duration_sec
@@ -262,7 +264,6 @@ def render(
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
         assert proc.stdin is not None
 
-        assert runtime.compositor is not None
         overlay_cfg = (
             cfg.render.overlay
             if cfg.render is not None and cfg.render.overlay is not None
@@ -321,10 +322,9 @@ def render(
             raise RuntimeError(f"ffmpeg exited with status {rc}")
 
     finally:
-        _destroy_layers(runtime.layers)
-        if runtime.compositor is not None:
+        if runtime is not None:
+            _destroy_layers(runtime.layers)
             runtime.compositor.destroy()
-        if runtime.post_process is not None:
             runtime.post_process.destroy()
         if proc is not None and proc.stdin is not None:
             proc.stdin.close()
