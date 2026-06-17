@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from cleave.viz.help_overlay import _layer_section, _sections_for, _timeline_strip_section
-from cleave.viz.overlay import RowKind
+from cleave.viz.row_semantics import ROW_BEHAVIORS, RowKind
 
 
 def _timeline_keys(**kwargs: object) -> list[str]:
@@ -65,6 +65,28 @@ def test_render_timeline_help_has_no_solo() -> None:
     keys = [key for key, _ in section.entries]
     assert "Shift+Left/Right" not in keys
     assert dict(section.entries)["Left/Right"] == "expand/collapse"
+
+
+def test_render_overlay_sub_header_help_expand_collapse() -> None:
+    for row_kind in (
+        RowKind.RENDER_OVERLAY_TITLE_HEADER,
+        RowKind.RENDER_OVERLAY_BODY_HEADER,
+    ):
+        section = _sections_for(row_kind)[0]
+        entries = dict(section.entries)
+        assert entries["Left/Right"] == "expand/collapse"
+        assert "adjust value" not in entries.values()
+
+
+def test_navigable_row_kinds_have_help_sections() -> None:
+    for row_kind, behavior in ROW_BEHAVIORS.items():
+        if not behavior.navigable:
+            continue
+        sections = _sections_for(row_kind)
+        assert sections, f"{row_kind} returned no help sections"
+        assert any(section.entries for section in sections), (
+            f"{row_kind} returned only empty sections"
+        )
 
 
 def test_timeline_strip_help_paused() -> None:

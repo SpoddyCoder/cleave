@@ -6,7 +6,8 @@ from dataclasses import dataclass
 
 import pygame
 
-from cleave.viz.overlay import RowKind, _clip_rect_to_surface
+from cleave.viz.row_semantics import RowAffordance, RowKind, row_behavior
+from cleave.viz.overlay import _clip_rect_to_surface
 from cleave.viz.theme import (
     BACKGROUND,
     BACKGROUND_ALPHA,
@@ -84,17 +85,6 @@ _PRESET_SECTION = HelpSection(
 )
 
 
-def _cleave_effects_section(row_kind: RowKind) -> HelpSection:
-    if row_kind == RowKind.TRACK_EFFECTS_HEADER:
-        entries = (("Left/Right", "expand/collapse"),)
-    else:
-        entries = (
-            ("Left/Right", "adjust depth"),
-            ("Ctrl+Left/Right", "large step"),
-        )
-    return HelpSection("Cleave Effects", entries)
-
-
 _RENDER_SECTION = HelpSection(
     "Render",
     (
@@ -160,53 +150,17 @@ _SAVE_SECTION = HelpSection(
     (("Enter", "save config"),),
 )
 
-_TRACK_EDIT_KINDS = frozenset(
-    {
-        RowKind.TRACK_BLEND,
-        RowKind.TRACK_OPACITY,
-        RowKind.TRACK_BEAT,
-    }
-)
 
-_TRACK_EFFECT_KINDS = frozenset(
-    {
-        RowKind.TRACK_EFFECTS_HEADER,
-        RowKind.TRACK_EFFECT,
-    }
-)
-
-_RENDER_HEADER_KINDS = frozenset(
-    {
-        RowKind.RENDER_OVERLAY_HEADER,
-        RowKind.RENDER_POST_FX_HEADER,
-    }
-)
-
-_RENDER_SUB_ROW_KINDS = frozenset(
-    {
-        RowKind.RENDER_OVERLAY_POSITION,
-        RowKind.RENDER_OVERLAY_TITLE_HEADER,
-        RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE,
-        RowKind.RENDER_OVERLAY_TITLE_FONT,
-        RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
-        RowKind.RENDER_OVERLAY_BODY_HEADER,
-        RowKind.RENDER_OVERLAY_BODY_FONT_SIZE,
-        RowKind.RENDER_OVERLAY_BODY_FONT,
-        RowKind.RENDER_OVERLAY_OPACITY,
-        RowKind.RENDER_OVERLAY_BORDER_WIDTH,
-        RowKind.RENDER_OVERLAY_START_DELAY,
-        RowKind.RENDER_OVERLAY_DISPLAY_TIME,
-        RowKind.RENDER_POST_FX_FADE_IN,
-        RowKind.RENDER_POST_FX_FADE_OUT,
-    }
-)
-
-_HELP_BY_KIND: dict[RowKind, tuple[HelpSection, ...]] = {
-    RowKind.TRANSPORT: (_TRANSPORT_SECTION, NAVIGATION_SECTION),
-    RowKind.SAVE_CONFIG: (_SAVE_SECTION, NAVIGATION_SECTION),
-    RowKind.CONFIG_HEADER: (NAVIGATION_SECTION,),
-    RowKind.RENDER_TIMELINE_HEADER: (_RENDER_TIMELINE_SECTION, NAVIGATION_SECTION),
-}
+def _value_step_section(row_kind: RowKind) -> HelpSection:
+    behavior = row_behavior(row_kind)
+    if row_kind == RowKind.TRACK_EFFECT:
+        entries = (
+            ("Left/Right", "adjust depth"),
+            ("Ctrl+Left/Right", "large step"),
+        )
+    else:
+        entries = _EDIT_SECTION.entries
+    return HelpSection(behavior.help_title or "Edit", entries)
 
 
 def _sections_for(
@@ -227,23 +181,41 @@ def _sections_for(
             ),
             NAVIGATION_SECTION,
         )
-    if row_kind == RowKind.TRACK_HEADER:
-        return (_layer_section(timeline_enabled=timeline_enabled), NAVIGATION_SECTION)
-    if row_kind in _HELP_BY_KIND:
-        return _HELP_BY_KIND[row_kind]
-    if row_kind == RowKind.TRACK_PRESET_DIR:
-        return (_PRESET_DIR_SECTION, NAVIGATION_SECTION)
-    if row_kind == RowKind.TRACK_PRESET:
-        return (_PRESET_SECTION, NAVIGATION_SECTION)
-    if row_kind in _TRACK_EDIT_KINDS:
-        return (_EDIT_SECTION, NAVIGATION_SECTION)
-    if row_kind in _TRACK_EFFECT_KINDS:
-        return (_cleave_effects_section(row_kind), NAVIGATION_SECTION)
-    if row_kind in _RENDER_HEADER_KINDS:
-        return (_RENDER_SECTION, NAVIGATION_SECTION)
-    if row_kind in _RENDER_SUB_ROW_KINDS:
-        return (_EDIT_SECTION, NAVIGATION_SECTION)
-    return (NAVIGATION_SECTION,)
+
+    behavior = row_behavior(row_kind)
+
+    if not behavior.navigable or behavior.affordance == RowAffordance.DISPLAY:
+        return (NAVIGATION_SECTION,)
+
+    primary: HelpSection | None = None
+
+    if behavior.affordance == RowAffordance.EXPAND:
+        if behavior.is_sub_header:
+            primary = HelpSection(
+                behavior.help_title or "Edit",
+                (("Left/Right", "expand/collapse"),),
+            )
+        elif behavior.can_enter_move_mode:
+            primary = _layer_section(timeline_enabled=timeline_enabled)
+        elif behavior.can_enable_disable and behavior.can_solo:
+            primary = _RENDER_SECTION
+        elif behavior.can_enable_disable:
+            primary = _RENDER_TIMELINE_SECTION
+    elif behavior.affordance == RowAffordance.VALUE_STEP:
+        primary = _value_step_section(row_kind)
+    elif behavior.affordance == RowAffordance.PATH_DIR:
+        primary = _PRESET_DIR_SECTION
+    elif behavior.affordance == RowAffordance.PATH_PRESET:
+        primary = _PRESET_SECTION
+    elif behavior.affordance == RowAffordance.SEEK:
+        primary = _TRANSPORT_SECTION
+    elif behavior.affordance == RowAffordance.ACTION:
+        primary = _SAVE_SECTION
+
+    if primary is None:
+        return (NAVIGATION_SECTION,)
+
+    return (primary, NAVIGATION_SECTION)
 
 
 class HelpOverlay:

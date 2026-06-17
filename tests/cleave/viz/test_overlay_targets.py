@@ -8,7 +8,7 @@ import pygame
 
 from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.layer import _draw_timeline_overlay, _draw_tuning_overlay
-from cleave.viz.overlay import RowKind
+from cleave.viz.row_semantics import RowKind
 from cleave.viz.timeline_overlay import TimelineViewState
 from tests.support.compositor_mock import recording_compositor
 
