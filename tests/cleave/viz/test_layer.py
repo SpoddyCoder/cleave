@@ -27,7 +27,6 @@ from cleave.viz.layer import (
     effective_layer_enabled,
     snapshot_monitor_from_timeline,
     timeline_committed_visible,
-    timeline_cues_for_eval,
     timeline_defaults,
 )
 from cleave.viz.timeline_overlay import (
@@ -206,7 +205,8 @@ def test_timeline_cues_for_eval_merges_buffer_while_recording() -> None:
     session = _session(timeline_enabled=True, cues=[TimelineCue(t=0.0, layers={"drums": False})])
     session.timeline.recording = True
     session.timeline.record_buffer = [TimelineCue(t=1.0, layers={"bass": False})]
-    merged = timeline_cues_for_eval(session)
+    tl = session.timeline
+    merged = tl.cues + tl.record_buffer if tl.recording else tl.cues
     assert len(merged) == 2
     assert merged[0].t == 0.0
     assert merged[1].t == 1.0

@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pygame
 
+from cleave.config import CleaveConfig, LayerConfig, PathsConfig, VisualizerConfig
+from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.controls import LayerRuntime, TuningControls, TuningSession
 from cleave.viz.playback import PlaybackState
@@ -59,6 +61,25 @@ def stub_playback_state() -> PlaybackState:
     return PlaybackState(player=StubMixPlayer())
 
 
+def make_test_cfg(
+    stems: tuple[str, ...] = ("drums", "bass"),
+    *,
+    preset_root: Path | None = None,
+    config_path: Path | None = None,
+) -> CleaveConfig:
+    root = preset_root or Path("/tmp/presets")
+    return CleaveConfig(
+        paths=PathsConfig(preset_root=root, texture_paths=()),
+        layers={
+            name: LayerConfig(preset=root / name / "preset-0.milk")
+            for name in STEM_NAMES
+        },
+        layer_z_order=stems,
+        visualizer=VisualizerConfig(),
+        config_path=config_path or Path("/tmp/test/cleave.config.yaml"),
+    )
+
+
 def make_controls(
     stems: tuple[str, ...] = ("drums", "bass"),
     *,
@@ -66,6 +87,7 @@ def make_controls(
     repo_root_example: Path = REPO_ROOT_EXAMPLE,
 ) -> TuningControls:
     preset_root = Path("/tmp/presets")
+    cfg = make_test_cfg(stems, preset_root=preset_root)
     session = TuningSession(
         layer_z_order=list(stems),
         layers={
@@ -79,6 +101,7 @@ def make_controls(
     )
     return TuningControls(
         session,
+        cfg,
         preset_root=preset_root,
         playback=stub_playback_state(),
         duration_sec=120.0,

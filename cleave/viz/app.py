@@ -200,7 +200,6 @@ def _init_gl_resources_heavy(
         effect_runtime=runtime.effect_runtime,
         mix_player=mix_player,
         on_toast=controls.show_toast,
-        on_config_dirty=controls.mark_config_dirty,
         tuning_controls=controls,
     )
 
@@ -212,11 +211,6 @@ def _init_gl_resources_heavy(
     runtime.help_overlay = HelpOverlay()
     runtime.timeline_overlay = TimelineOverlay()
     runtime.playback = playback
-
-
-def _init_gl_resources(runtime: VisualizerRuntime) -> None:
-    _init_gl_resources_cheap(runtime)
-    _init_gl_resources_heavy(runtime)
 
 
 def _init_gl_resources_render(runtime: VisualizerRuntime) -> None:

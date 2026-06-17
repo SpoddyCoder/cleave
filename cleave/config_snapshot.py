@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -48,9 +49,12 @@ def _path_to_yaml_str(path: Path) -> str:
 
 def _snapshot_layer_z_order(cfg: CleaveConfig, session: TuningSession) -> list[str]:
     order = session.layer_z_order
+    cfg_order = list(cfg.layer_z_order)
+    if len(order) == len(cfg_order) and set(order) == set(cfg_order):
+        return list(order)
     if len(order) == len(STEM_NAMES) and set(order) == set(STEM_NAMES):
         return list(order)
-    return list(cfg.layer_z_order)
+    return cfg_order
 
 
 def _sparse_effects(
@@ -102,14 +106,59 @@ def _text_block_to_yaml(
     return out
 
 
+def _persisted_render_payload(
+    cfg: CleaveConfig,
+    session: TuningSession,
+) -> dict[str, Any]:
+    runtime = session.render_overlay
+    base = _render_overlay_base(cfg)
+    bg = base.background
+    runtime_pp = session.render_post_fx
+    overlay: dict[str, Any] = {
+        "enabled": runtime.enabled,
+        "title": _text_block_to_yaml(
+            base.title,
+            font=runtime.title_font,
+            font_size=runtime.title_font_size,
+            colour_key="font-colour",
+            margin_bottom=runtime.title_margin_bottom,
+        ),
+        "body": _text_block_to_yaml(
+            base.body,
+            font=runtime.body_font,
+            font_size=runtime.body_font_size,
+            colour_key="colour",
+        ),
+        "start_delay": runtime.start_delay,
+        "display_time": runtime.display_time,
+        "position": runtime.position,
+        "background": {
+            "margin": bg.margin,
+            "padding": bg.padding,
+            "colour": _rgb_to_hex(bg.colour),
+            "opacity": runtime.opacity_pct / 100.0,
+            "border": {
+                "colour": _rgb_to_hex(bg.border.colour),
+                "width": runtime.border_width,
+            },
+        },
+    }
+    post_fx: dict[str, Any] = {
+        "enabled": runtime_pp.enabled,
+        "fade_in": runtime_pp.fade_in,
+        "fade_out": runtime_pp.fade_out,
+    }
+    return {"overlay": overlay, "post_fx": post_fx}
+
+
 def _snapshot_render_overlay(
     cfg: CleaveConfig,
     session: TuningSession,
     original: dict[str, Any],
 ) -> dict[str, Any]:
-    runtime = session.render_overlay
-    base = _render_overlay_base(cfg)
-    bg = base.background
+    payload = _persisted_render_payload(cfg, session)
+    overlay_payload = payload["overlay"]
+    post_fx_payload = payload["post_fx"]
 
     orig_render = original.get("render")
     orig_overlay: dict[str, Any] = {}
@@ -119,42 +168,32 @@ def _snapshot_render_overlay(
             orig_overlay = dict(orig_overlay_raw)
 
     overlay: dict[str, Any] = dict(orig_overlay)
-    overlay["enabled"] = runtime.enabled
-    overlay["title"] = _text_block_to_yaml(
-        base.title,
-        font=runtime.title_font,
-        font_size=runtime.title_font_size,
-        colour_key="font-colour",
-        margin_bottom=runtime.title_margin_bottom,
-    )
-    overlay["body"] = _text_block_to_yaml(
-        base.body,
-        font=runtime.body_font,
-        font_size=runtime.body_font_size,
-        colour_key="colour",
-    )
-    overlay["start_delay"] = runtime.start_delay
-    overlay["display_time"] = runtime.display_time
-    overlay["position"] = runtime.position
+    overlay["enabled"] = overlay_payload["enabled"]
+    overlay["title"] = overlay_payload["title"]
+    overlay["body"] = overlay_payload["body"]
+    overlay["start_delay"] = overlay_payload["start_delay"]
+    overlay["display_time"] = overlay_payload["display_time"]
+    overlay["position"] = overlay_payload["position"]
 
     background = orig_overlay.get("background")
     background_out: dict[str, Any] = (
         dict(background) if isinstance(background, dict) else {}
     )
-    background_out["margin"] = bg.margin
-    background_out["padding"] = bg.padding
-    background_out["colour"] = _rgb_to_hex(bg.colour)
-    background_out["opacity"] = runtime.opacity_pct / 100.0
+    bg_payload = overlay_payload["background"]
+    background_out["margin"] = bg_payload["margin"]
+    background_out["padding"] = bg_payload["padding"]
+    background_out["colour"] = bg_payload["colour"]
+    background_out["opacity"] = bg_payload["opacity"]
 
     border = background_out.get("border")
     border_out: dict[str, Any] = dict(border) if isinstance(border, dict) else {}
-    border_out["colour"] = _rgb_to_hex(bg.border.colour)
-    border_out["width"] = runtime.border_width
+    border_payload = bg_payload["border"]
+    border_out["colour"] = border_payload["colour"]
+    border_out["width"] = border_payload["width"]
     background_out["border"] = border_out
     overlay["background"] = background_out
     overlay.pop("font", None)
 
-    runtime_pp = session.render_post_fx
     orig_pp: dict[str, Any] = {}
     if isinstance(orig_render, dict):
         orig_pp_raw = orig_render.get("post_fx")
@@ -162,9 +201,9 @@ def _snapshot_render_overlay(
             orig_pp = dict(orig_pp_raw)
 
     post_fx: dict[str, Any] = dict(orig_pp)
-    post_fx["enabled"] = runtime_pp.enabled
-    post_fx["fade_in"] = runtime_pp.fade_in
-    post_fx["fade_out"] = runtime_pp.fade_out
+    post_fx["enabled"] = post_fx_payload["enabled"]
+    post_fx["fade_in"] = post_fx_payload["fade_in"]
+    post_fx["fade_out"] = post_fx_payload["fade_out"]
 
     render_out: dict[str, Any] = {}
     if isinstance(orig_render, dict):
@@ -189,37 +228,22 @@ def _snapshot_timeline(session: TuningSession) -> dict[str, Any]:
     return out
 
 
-def write_session_snapshot(
-    path: Path,
-    *,
+def _persisted_visualizer_payload(cfg: CleaveConfig) -> dict[str, Any]:
+    return {
+        "width": cfg.visualizer.width,
+        "height": cfg.visualizer.height,
+        "upscale": clamp_upscale(cfg.visualizer.upscale),
+        "fps": cfg.visualizer.fps,
+        "warmup_sec": cfg.visualizer.warmup_sec,
+        "beat_sensitivity": clamp_beat_sensitivity(cfg.visualizer.beat_sensitivity),
+    }
+
+
+def _persisted_layers_payload(
     cfg: CleaveConfig,
     session: TuningSession,
-) -> None:
-    """Write a full reproducible YAML snapshot without modifying the launch config."""
-    original = _load_original_dict(cfg)
+) -> dict[str, dict[str, Any]]:
     preset_root = cfg.paths.preset_root
-
-    orig_vis = original.get("visualizer")
-    visualizer: dict[str, Any] = {}
-    if isinstance(orig_vis, dict) and "name" in orig_vis:
-        visualizer["name"] = orig_vis["name"]
-    visualizer["width"] = cfg.visualizer.width
-    visualizer["height"] = cfg.visualizer.height
-    visualizer["upscale"] = clamp_upscale(cfg.visualizer.upscale)
-    visualizer["fps"] = cfg.visualizer.fps
-    visualizer["beat_sensitivity"] = clamp_beat_sensitivity(
-        cfg.visualizer.beat_sensitivity
-    )
-
-    orig_paths = original.get("paths")
-    if isinstance(orig_paths, dict) and orig_paths:
-        paths = dict(orig_paths)
-    else:
-        paths = {
-            "preset_root": _path_to_yaml_str(cfg.paths.preset_root),
-            "texture_paths": [_path_to_yaml_str(p) for p in cfg.paths.texture_paths],
-        }
-
     layers_out: dict[str, dict[str, Any]] = {}
     global_beat = cfg.visualizer.beat_sensitivity
 
@@ -264,13 +288,64 @@ def write_session_snapshot(
             layer_out["effects"] = sparse_effects
         layers_out[name] = layer_out
 
+    return layers_out
+
+
+def persisted_session_payload(
+    cfg: CleaveConfig,
+    session: TuningSession,
+) -> dict[str, Any]:
+    """Normalized dict of user-tunable fields (same semantics as snapshot write)."""
+    return {
+        "visualizer": _persisted_visualizer_payload(cfg),
+        "layer_z_order": _snapshot_layer_z_order(cfg, session),
+        "layers": _persisted_layers_payload(cfg, session),
+        "render": _persisted_render_payload(cfg, session),
+        "timeline": _snapshot_timeline(session),
+    }
+
+
+def persisted_session_signature(cfg: CleaveConfig, session: TuningSession) -> str:
+    """Stable compare key for persisted session state."""
+    return json.dumps(
+        persisted_session_payload(cfg, session),
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def write_session_snapshot(
+    path: Path,
+    *,
+    cfg: CleaveConfig,
+    session: TuningSession,
+) -> None:
+    """Write a full reproducible YAML snapshot without modifying the launch config."""
+    original = _load_original_dict(cfg)
+    payload = persisted_session_payload(cfg, session)
+
+    orig_vis = original.get("visualizer")
+    visualizer: dict[str, Any] = {}
+    if isinstance(orig_vis, dict) and "name" in orig_vis:
+        visualizer["name"] = orig_vis["name"]
+    visualizer.update(payload["visualizer"])
+
+    orig_paths = original.get("paths")
+    if isinstance(orig_paths, dict) and orig_paths:
+        paths = dict(orig_paths)
+    else:
+        paths = {
+            "preset_root": _path_to_yaml_str(cfg.paths.preset_root),
+            "texture_paths": [_path_to_yaml_str(p) for p in cfg.paths.texture_paths],
+        }
+
     data = {
         "visualizer": visualizer,
         "paths": paths,
-        "layer_z_order": _snapshot_layer_z_order(cfg, session),
-        "layers": layers_out,
+        "layer_z_order": payload["layer_z_order"],
+        "layers": payload["layers"],
         "render": _snapshot_render_overlay(cfg, session, original),
-        "timeline": _snapshot_timeline(session),
+        "timeline": payload["timeline"],
     }
 
     path.parent.mkdir(parents=True, exist_ok=True)
