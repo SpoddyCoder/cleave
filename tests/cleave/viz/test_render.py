@@ -233,7 +233,7 @@ def test_default_output_path_suffix_only_for_partial_segments(tmp_path: Path) ->
 @patch.object(render_mod, "shutil")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "_init_gl_resources_render")
-@patch.object(render_mod, "build_runtime_full")
+@patch.object(render_mod, "build_render_runtime")
 @patch.object(render_mod, "scan_all_layers", return_value={})
 @patch.object(render_mod, "VisualizerApp")
 def test_render_frame_count_and_ffmpeg_args(
@@ -263,14 +263,14 @@ def test_render_frame_count_and_ffmpeg_args(
     runtime.fps = fps
     runtime.duration_sec = duration_sec
     runtime.layers = []
-    runtime.compositor = None
+    runtime.compositor = compositor
     runtime.post_process = MagicMock()
-    mock_build.return_value = runtime
-
-    def _attach_compositor(rt: MagicMock) -> None:
-        rt.compositor = compositor
-
-    mock_init_gl.side_effect = _attach_compositor
+    seed = MagicMock()
+    seed.display_width = runtime.display_width
+    seed.display_height = runtime.display_height
+    mock_build.return_value = seed
+    runtime.compositor = compositor
+    mock_init_gl.return_value = runtime
 
     mock_app = MagicMock()
     mock_app_cls.return_value = mock_app
@@ -307,7 +307,7 @@ def test_render_frame_count_and_ffmpeg_args(
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "_warmup_layers")
 @patch.object(render_mod, "_init_gl_resources_render")
-@patch.object(render_mod, "build_runtime_full")
+@patch.object(render_mod, "build_render_runtime")
 @patch.object(render_mod, "scan_all_layers", return_value={})
 @patch.object(render_mod, "VisualizerApp")
 def test_render_warmup_before_emit_loop(
@@ -339,14 +339,14 @@ def test_render_warmup_before_emit_loop(
     runtime.layers = []
     runtime.pcm_bank = MagicMock()
     runtime.n_pcm = 1024
-    runtime.compositor = None
+    runtime.compositor = compositor
     runtime.post_process = MagicMock()
-    mock_build.return_value = runtime
-
-    def _attach_compositor(rt: MagicMock) -> None:
-        rt.compositor = compositor
-
-    mock_init_gl.side_effect = _attach_compositor
+    seed = MagicMock()
+    seed.display_width = runtime.display_width
+    seed.display_height = runtime.display_height
+    mock_build.return_value = seed
+    runtime.compositor = compositor
+    mock_init_gl.return_value = runtime
 
     call_order: list[str] = []
     mock_warmup.side_effect = lambda *_a, **_k: call_order.append("warmup")
@@ -378,7 +378,7 @@ def test_render_warmup_before_emit_loop(
 @patch.object(render_mod, "shutil")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "_init_gl_resources_render")
-@patch.object(render_mod, "build_runtime_full")
+@patch.object(render_mod, "build_render_runtime")
 @patch.object(render_mod, "scan_all_layers", return_value={})
 @patch.object(render_mod, "VisualizerApp")
 def test_render_segment_frame_count_tick_times_and_ffmpeg_trim(
@@ -409,14 +409,14 @@ def test_render_segment_frame_count_tick_times_and_ffmpeg_trim(
     runtime.fps = fps
     runtime.duration_sec = duration_sec
     runtime.layers = []
-    runtime.compositor = None
+    runtime.compositor = compositor
     runtime.post_process = MagicMock()
-    mock_build.return_value = runtime
-
-    def _attach_compositor(rt: MagicMock) -> None:
-        rt.compositor = compositor
-
-    mock_init_gl.side_effect = _attach_compositor
+    seed = MagicMock()
+    seed.display_width = runtime.display_width
+    seed.display_height = runtime.display_height
+    mock_build.return_value = seed
+    runtime.compositor = compositor
+    mock_init_gl.return_value = runtime
 
     mock_app = MagicMock()
     mock_app_cls.return_value = mock_app
@@ -449,7 +449,7 @@ def test_render_segment_frame_count_tick_times_and_ffmpeg_trim(
 @patch.object(render_mod, "shutil")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "_init_gl_resources_render")
-@patch.object(render_mod, "build_runtime_full")
+@patch.object(render_mod, "build_render_runtime")
 @patch.object(render_mod, "scan_all_layers", return_value={})
 @patch.object(render_mod, "VisualizerApp")
 def test_render_segment_fade_alpha_uses_full_duration(
@@ -479,14 +479,14 @@ def test_render_segment_fade_alpha_uses_full_duration(
     runtime.fps = fps
     runtime.duration_sec = duration_sec
     runtime.layers = []
-    runtime.compositor = None
+    runtime.compositor = compositor
     runtime.post_process = MagicMock()
-    mock_build.return_value = runtime
-
-    def _attach_compositor(rt: MagicMock) -> None:
-        rt.compositor = compositor
-
-    mock_init_gl.side_effect = _attach_compositor
+    seed = MagicMock()
+    seed.display_width = runtime.display_width
+    seed.display_height = runtime.display_height
+    mock_build.return_value = seed
+    runtime.compositor = compositor
+    mock_init_gl.return_value = runtime
     mock_app_cls.return_value = MagicMock()
     mock_fade_alpha.return_value = 1.0
 
@@ -507,7 +507,7 @@ def test_render_segment_fade_alpha_uses_full_duration(
 @patch.object(render_mod, "shutil")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "_init_gl_resources_render")
-@patch.object(render_mod, "build_runtime_full")
+@patch.object(render_mod, "build_render_runtime")
 @patch.object(render_mod, "scan_all_layers", return_value={})
 @patch.object(render_mod, "VisualizerApp")
 def test_render_ffmpeg_preset_veryslow_when_high_quality(
@@ -536,14 +536,14 @@ def test_render_ffmpeg_preset_veryslow_when_high_quality(
     runtime.fps = fps
     runtime.duration_sec = duration_sec
     runtime.layers = []
-    runtime.compositor = None
+    runtime.compositor = compositor
     runtime.post_process = MagicMock()
-    mock_build.return_value = runtime
-
-    def _attach_compositor(rt: MagicMock) -> None:
-        rt.compositor = compositor
-
-    mock_init_gl.side_effect = _attach_compositor
+    seed = MagicMock()
+    seed.display_width = runtime.display_width
+    seed.display_height = runtime.display_height
+    mock_build.return_value = seed
+    runtime.compositor = compositor
+    mock_init_gl.return_value = runtime
     mock_app_cls.return_value = MagicMock()
 
     proc = MagicMock()
@@ -565,7 +565,7 @@ def test_render_ffmpeg_preset_veryslow_when_high_quality(
 @patch.object(render_mod, "shutil")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "_init_gl_resources_render")
-@patch.object(render_mod, "build_runtime_full")
+@patch.object(render_mod, "build_render_runtime")
 @patch.object(render_mod, "scan_all_layers", return_value={})
 @patch.object(render_mod, "VisualizerApp")
 def test_render_applies_fade_via_compositor(
@@ -596,14 +596,14 @@ def test_render_applies_fade_via_compositor(
     runtime.fps = fps
     runtime.duration_sec = duration_sec
     runtime.layers = []
-    runtime.compositor = None
+    runtime.compositor = compositor
     runtime.post_process = MagicMock()
-    mock_build.return_value = runtime
-
-    def _attach_compositor(rt: MagicMock) -> None:
-        rt.compositor = compositor
-
-    mock_init_gl.side_effect = _attach_compositor
+    seed = MagicMock()
+    seed.display_width = runtime.display_width
+    seed.display_height = runtime.display_height
+    mock_build.return_value = seed
+    runtime.compositor = compositor
+    mock_init_gl.return_value = runtime
     mock_app_cls.return_value = MagicMock()
 
     proc = MagicMock()
@@ -634,7 +634,7 @@ def test_render_output_must_be_mp4(tmp_path: Path) -> None:
 @patch.object(render_mod, "shutil")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "_init_gl_resources_render")
-@patch.object(render_mod, "build_runtime_full")
+@patch.object(render_mod, "build_render_runtime")
 @patch.object(render_mod, "scan_all_layers", return_value={})
 @patch.object(render_mod, "VisualizerApp")
 @patch.object(render_mod, "load_config")
@@ -677,14 +677,14 @@ def test_render_calls_overlay_compositing_when_enabled(
     runtime.fps = fps
     runtime.duration_sec = duration_sec
     runtime.layers = []
-    runtime.compositor = None
+    runtime.compositor = compositor
     runtime.post_process = MagicMock()
-    mock_build.return_value = runtime
-
-    def _attach_compositor(rt: MagicMock) -> None:
-        rt.compositor = compositor
-
-    mock_init_gl.side_effect = _attach_compositor
+    seed = MagicMock()
+    seed.display_width = runtime.display_width
+    seed.display_height = runtime.display_height
+    mock_build.return_value = seed
+    runtime.compositor = compositor
+    mock_init_gl.return_value = runtime
 
     mock_app_cls.return_value = MagicMock()
 
@@ -710,7 +710,7 @@ def test_render_calls_overlay_compositing_when_enabled(
 @patch.object(render_mod, "shutil")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "_init_gl_resources_render")
-@patch.object(render_mod, "build_runtime_full")
+@patch.object(render_mod, "build_render_runtime")
 @patch.object(render_mod, "scan_all_layers", return_value={})
 @patch.object(render_mod, "VisualizerApp")
 @patch.object(render_mod, "load_config")
@@ -748,14 +748,14 @@ def test_render_skips_overlay_when_disabled(
     runtime.fps = 10
     runtime.duration_sec = 2.0
     runtime.layers = []
-    runtime.compositor = None
+    runtime.compositor = compositor
     runtime.post_process = MagicMock()
-    mock_build.return_value = runtime
-
-    def _attach_compositor(rt: MagicMock) -> None:
-        rt.compositor = compositor
-
-    mock_init_gl.side_effect = _attach_compositor
+    seed = MagicMock()
+    seed.display_width = runtime.display_width
+    seed.display_height = runtime.display_height
+    mock_build.return_value = seed
+    runtime.compositor = compositor
+    mock_init_gl.return_value = runtime
     mock_app_cls.return_value = MagicMock()
 
     proc = MagicMock()
@@ -775,7 +775,7 @@ def test_render_skips_overlay_when_disabled(
 @patch.object(render_mod, "shutil")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "_init_gl_resources_render")
-@patch.object(render_mod, "build_runtime_full")
+@patch.object(render_mod, "build_render_runtime")
 @patch.object(render_mod, "scan_all_layers", return_value={})
 @patch.object(render_mod, "VisualizerApp")
 def test_render_ffmpeg_uses_display_dimensions_with_upscale(
@@ -808,14 +808,14 @@ def test_render_ffmpeg_uses_display_dimensions_with_upscale(
     runtime.fps = fps
     runtime.duration_sec = duration_sec
     runtime.layers = []
-    runtime.compositor = None
+    runtime.compositor = compositor
     runtime.post_process = MagicMock()
-    mock_build.return_value = runtime
-
-    def _attach_compositor(rt: MagicMock) -> None:
-        rt.compositor = compositor
-
-    mock_init_gl.side_effect = _attach_compositor
+    seed = MagicMock()
+    seed.display_width = runtime.display_width
+    seed.display_height = runtime.display_height
+    mock_build.return_value = seed
+    runtime.compositor = compositor
+    mock_init_gl.return_value = runtime
     mock_app_cls.return_value = MagicMock()
 
     proc = MagicMock()
@@ -836,7 +836,7 @@ def test_render_ffmpeg_uses_display_dimensions_with_upscale(
 @patch.object(render_mod, "shutil")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "_init_gl_resources_render")
-@patch.object(render_mod, "build_runtime_full")
+@patch.object(render_mod, "build_render_runtime")
 @patch.object(render_mod, "scan_all_layers", return_value={})
 @patch.object(render_mod, "VisualizerApp")
 def test_render_present_content_every_frame_at_upscale_one(
@@ -869,14 +869,14 @@ def test_render_present_content_every_frame_at_upscale_one(
     runtime.fps = fps
     runtime.duration_sec = duration_sec
     runtime.layers = []
-    runtime.compositor = None
+    runtime.compositor = compositor
     runtime.post_process = MagicMock()
-    mock_build.return_value = runtime
-
-    def _attach_compositor(rt: MagicMock) -> None:
-        rt.compositor = compositor
-
-    mock_init_gl.side_effect = _attach_compositor
+    seed = MagicMock()
+    seed.display_width = runtime.display_width
+    seed.display_height = runtime.display_height
+    mock_build.return_value = seed
+    runtime.compositor = compositor
+    mock_init_gl.return_value = runtime
     mock_app_cls.return_value = MagicMock()
 
     proc = MagicMock()
@@ -896,7 +896,7 @@ def test_render_present_content_every_frame_at_upscale_one(
 @patch.object(render_mod, "shutil")
 @patch.object(render_mod, "subprocess")
 @patch.object(render_mod, "_init_gl_resources_render")
-@patch.object(render_mod, "build_runtime_full")
+@patch.object(render_mod, "build_render_runtime")
 @patch.object(render_mod, "scan_all_layers", return_value={})
 @patch.object(render_mod, "VisualizerApp")
 @patch.object(render_mod, "load_config")
@@ -955,14 +955,14 @@ def test_render_upscale_overlay_frame_order_uses_content_dims(
     runtime.fps = fps
     runtime.duration_sec = duration_sec
     runtime.layers = []
-    runtime.compositor = None
+    runtime.compositor = compositor
     runtime.post_process = MagicMock()
-    mock_build.return_value = runtime
-
-    def _attach_compositor(rt: MagicMock) -> None:
-        rt.compositor = compositor
-
-    mock_init_gl.side_effect = _attach_compositor
+    seed = MagicMock()
+    seed.display_width = runtime.display_width
+    seed.display_height = runtime.display_height
+    mock_build.return_value = seed
+    runtime.compositor = compositor
+    mock_init_gl.return_value = runtime
     mock_app_cls.return_value = MagicMock()
 
     proc = MagicMock()

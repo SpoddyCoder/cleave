@@ -8,8 +8,9 @@ import pygame
 
 from cleave.extract import STEM_NAMES
 from cleave.viz.app import (
+    LiveVisualizerRuntime,
     VisualizerApp,
-    VisualizerRuntime,
+    VisualizerSeed,
     _timeline_strip_fade,
     _timeline_strip_visible,
 )
@@ -19,14 +20,18 @@ from cleave.viz.overlay import TuningOverlay
 from tests.support.compositor_mock import recording_compositor
 
 
-def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> VisualizerRuntime:
+def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisualizerRuntime:
     display_w = int(1280 * upscale)
     display_h = int(720 * upscale)
     session = TuningSession(layer_z_order=[], layers={})
     session.render_post_fx = RenderPostFxRuntime(
         enabled=False, expanded=False, fade_in=0.0, fade_out=0.0
     )
-    runtime = VisualizerRuntime(
+    controls = MagicMock()
+    controls.build_view_state.return_value = MagicMock()
+    overlay = MagicMock()
+    overlay.update = MagicMock()
+    runtime = LiveVisualizerRuntime(
         project_dir=MagicMock(),
         audio_path=MagicMock(),
         width=1280,
@@ -44,23 +49,53 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> Visualiz
         signals=None,
         effect_runtime=MagicMock(),
         preset_root=MagicMock(),
+        playlists={},
         layers=[],
         layers_by_name={},
         compositor=compositor,
         post_process=MagicMock(),
-        controls=MagicMock(),
-        overlay=MagicMock(),
+        controls=controls,
+        timeline_controls=MagicMock(),
+        mix_player=MagicMock(),
+        playback=MagicMock(),
+        overlay=overlay,
+        help_overlay=MagicMock(),
         timeline_overlay=MagicMock(),
         overlay_surface=pygame.Surface((display_w, display_h), pygame.SRCALPHA),
     )
-    runtime.controls.build_view_state.return_value = MagicMock()
-    runtime.overlay.update = MagicMock()
     runtime.session.timeline.enabled = False
     runtime.session.timeline.panel_open = False
     return runtime
 
 
-def _timeline_open_runtime(compositor: MagicMock) -> VisualizerRuntime:
+def _run_seed(*, upscale: float = 2.0) -> VisualizerSeed:
+    display_w = int(1280 * upscale)
+    display_h = int(720 * upscale)
+    cfg = MagicMock()
+    cfg.visualizer.warmup_sec = 0.0
+    return VisualizerSeed(
+        project_dir=MagicMock(),
+        audio_path=MagicMock(),
+        width=1280,
+        height=720,
+        upscale=upscale,
+        display_width=display_w,
+        display_height=display_h,
+        fps=30,
+        window_title="test",
+        session=MagicMock(),
+        cfg=cfg,
+        pcm_bank=MagicMock(),
+        duration_sec=120.0,
+        n_pcm=1024,
+        signals=None,
+        effect_runtime=MagicMock(),
+        preset_root=MagicMock(),
+        playlists={},
+    )
+
+
+def _timeline_open_runtime(compositor: MagicMock) -> LiveVisualizerRuntime:
     runtime = _minimal_runtime(compositor)
     runtime.overlay = TuningOverlay()
     runtime.session.layer_z_order = list(STEM_NAMES)
@@ -111,20 +146,54 @@ def test_tick_frame_overlay_order_fade_content_present_then_ui(
     ]
 
 
-def _heavy_init_side_effect(rt: VisualizerRuntime, on_progress=None) -> None:
+def _heavy_init_side_effect(
+    seed: VisualizerSeed,
+    compositor: MagicMock,
+    post_process: MagicMock,
+    overlay_surface: pygame.Surface,
+    on_progress=None,
+) -> LiveVisualizerRuntime:
     if on_progress is not None:
         on_progress("Building layers...")
-    rt.controls = MagicMock()
-    rt.controls.build_view_state.return_value = MagicMock()
-    rt.controls.tick = MagicMock()
-    rt.controls.consume_hide_overlay.return_value = False
-    rt.timeline_controls = MagicMock()
-    rt.playback = MagicMock()
-    rt.playback.paused = False
-    rt.mix_player = MagicMock()
-    rt.overlay = MagicMock()
-    rt.timeline_overlay = MagicMock()
-    rt.layers = []
+    controls = MagicMock()
+    controls.build_view_state.return_value = MagicMock()
+    controls.tick = MagicMock()
+    controls.consume_hide_overlay.return_value = False
+    playback = MagicMock()
+    playback.paused = False
+    mix_player = MagicMock()
+    return LiveVisualizerRuntime(
+        project_dir=seed.project_dir,
+        audio_path=seed.audio_path,
+        width=seed.width,
+        height=seed.height,
+        upscale=seed.upscale,
+        display_width=seed.display_width,
+        display_height=seed.display_height,
+        fps=seed.fps,
+        window_title=seed.window_title,
+        session=seed.session,
+        cfg=seed.cfg,
+        pcm_bank=seed.pcm_bank,
+        duration_sec=seed.duration_sec,
+        n_pcm=seed.n_pcm,
+        signals=seed.signals,
+        effect_runtime=seed.effect_runtime,
+        preset_root=seed.preset_root,
+        playlists=seed.playlists,
+        layers=[],
+        layers_by_name={},
+        compositor=compositor,
+        post_process=post_process,
+        controls=controls,
+        timeline_controls=MagicMock(),
+        mix_player=mix_player,
+        playback=playback,
+        overlay=MagicMock(),
+        help_overlay=MagicMock(),
+        timeline_overlay=MagicMock(),
+        overlay_surface=overlay_surface,
+    )
 
 
 @patch("cleave.viz.app.current_sec", return_value=0.0)
@@ -144,22 +213,26 @@ def test_run_boot_order_audio_starts_after_first_frame(
     _mock_current_sec: MagicMock,
 ) -> None:
     compositor = recording_compositor()
-    runtime = _minimal_runtime(compositor)
-    runtime.cfg = MagicMock()
-    runtime.cfg.visualizer.warmup_sec = 1.0
-    runtime.mix_player = None
-    runtime.playback = None
-    runtime.controls = None
-    runtime.timeline_controls = None
+    seed = _run_seed()
+    seed.cfg.visualizer.warmup_sec = 1.0
 
     call_order: list[str] = []
+    overlay_surface = pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA)
 
-    def cheap_side_effect(rt: VisualizerRuntime) -> None:
+    def cheap_side_effect(rt: VisualizerSeed) -> tuple[MagicMock, MagicMock, pygame.Surface]:
         call_order.append("init_cheap")
+        return compositor, MagicMock(), overlay_surface
 
-    def heavy_with_start(rt: VisualizerRuntime, on_progress=None) -> None:
-        _heavy_init_side_effect(rt, on_progress)
-        rt.mix_player.start.side_effect = lambda: call_order.append("mix_start")
+    def heavy_with_start(
+        rt: VisualizerSeed,
+        comp: MagicMock,
+        post: MagicMock,
+        surface: pygame.Surface,
+        on_progress=None,
+    ) -> LiveVisualizerRuntime:
+        live = _heavy_init_side_effect(rt, comp, post, surface, on_progress)
+        live.mix_player.start.side_effect = lambda: call_order.append("mix_start")
+        return live
 
     mock_init_cheap.side_effect = cheap_side_effect
     mock_init_heavy.side_effect = heavy_with_start
@@ -174,22 +247,21 @@ def test_run_boot_order_audio_starts_after_first_frame(
     mock_pygame.K_t = pygame.K_t
     mock_pygame.time.Clock.return_value.tick.return_value = 33
 
-    VisualizerApp(runtime).run()
+    app = VisualizerApp(seed)
+    app.run()
 
-    mock_init_cheap.assert_called_once_with(runtime)
+    mock_init_cheap.assert_called_once_with(seed)
     mock_init_heavy.assert_called_once()
-    mock_warmup.assert_called_once_with(
-        runtime.layers,
-        runtime.pcm_bank,
-        0.0,
-        30,
-        runtime.fps,
-        runtime.n_pcm,
-        session=runtime.session,
-    )
+    mock_warmup.assert_called_once()
+    warmup_args = mock_warmup.call_args.args
+    assert warmup_args[2] == 0.0
+    assert warmup_args[3] == 30
+    assert warmup_args[4] == seed.fps
+    assert warmup_args[5] == seed.n_pcm
     mock_tick_frame.assert_called()
     assert mock_tick_frame.call_args_list[0] == call(0.0, paused=False)
-    runtime.mix_player.start.assert_called_once()
+    assert isinstance(app._runtime, LiveVisualizerRuntime)
+    app._runtime.mix_player.start.assert_called_once()
     assert call_order.index("tick_frame") < call_order.index("mix_start")
     assert mock_draw_loading.call_count >= 1
 
@@ -211,15 +283,13 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
     _mock_current_sec: MagicMock,
 ) -> None:
     compositor = recording_compositor()
-    runtime = _minimal_runtime(compositor)
-    runtime.cfg = MagicMock()
-    runtime.cfg.visualizer.warmup_sec = 0.0
-    runtime.mix_player = None
-    runtime.playback = None
-    runtime.controls = None
-    runtime.timeline_controls = None
+    seed = _run_seed()
 
-    mock_init_cheap.side_effect = lambda rt: None
+    mock_init_cheap.side_effect = lambda rt: (
+        compositor,
+        MagicMock(),
+        pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
+    )
     controls = MagicMock()
     controls.try_quit.return_value = True
     controls.consume_pending_exit.return_value = False
@@ -227,9 +297,16 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
     controls.key_repeat_armed = False
     controls.consume_hide_overlay.return_value = False
 
-    def heavy_with_controls(rt: VisualizerRuntime, on_progress=None) -> None:
-        _heavy_init_side_effect(rt, on_progress)
-        rt.controls = controls
+    def heavy_with_controls(
+        rt: VisualizerSeed,
+        comp: MagicMock,
+        post: MagicMock,
+        surface: pygame.Surface,
+        on_progress=None,
+    ) -> LiveVisualizerRuntime:
+        live = _heavy_init_side_effect(rt, comp, post, surface, on_progress)
+        live.controls = controls
+        return live
 
     mock_init_heavy.side_effect = heavy_with_controls
     mock_tick_frame.side_effect = lambda *_a, **_k: None
@@ -240,11 +317,13 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
     mock_pygame.QUIT = pygame.QUIT
     mock_pygame.time.Clock.return_value.tick.return_value = 33
 
-    VisualizerApp(runtime).run()
+    app = VisualizerApp(seed)
+    app.run()
 
     assert controls.try_quit.call_count == 1
     controls.consume_pending_exit.assert_called()
-    runtime.overlay.notify_input.assert_not_called()
+    assert isinstance(app._runtime, LiveVisualizerRuntime)
+    app._runtime.overlay.notify_input.assert_not_called()
 
 
 @patch("cleave.viz.app.current_sec", return_value=0.0)
@@ -264,15 +343,13 @@ def test_run_ctrl_q_clean_exits(
     _mock_current_sec: MagicMock,
 ) -> None:
     compositor = recording_compositor()
-    runtime = _minimal_runtime(compositor)
-    runtime.cfg = MagicMock()
-    runtime.cfg.visualizer.warmup_sec = 0.0
-    runtime.mix_player = None
-    runtime.playback = None
-    runtime.controls = None
-    runtime.timeline_controls = None
+    seed = _run_seed()
 
-    mock_init_cheap.side_effect = lambda rt: None
+    mock_init_cheap.side_effect = lambda rt: (
+        compositor,
+        MagicMock(),
+        pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
+    )
     controls = MagicMock()
     controls.try_quit.return_value = True
     controls.consume_pending_exit.return_value = False
@@ -280,9 +357,16 @@ def test_run_ctrl_q_clean_exits(
     controls.key_repeat_armed = False
     controls.consume_hide_overlay.return_value = False
 
-    def heavy_with_controls(rt: VisualizerRuntime, on_progress=None) -> None:
-        _heavy_init_side_effect(rt, on_progress)
-        rt.controls = controls
+    def heavy_with_controls(
+        rt: VisualizerSeed,
+        comp: MagicMock,
+        post: MagicMock,
+        surface: pygame.Surface,
+        on_progress=None,
+    ) -> LiveVisualizerRuntime:
+        live = _heavy_init_side_effect(rt, comp, post, surface, on_progress)
+        live.controls = controls
+        return live
 
     mock_init_heavy.side_effect = heavy_with_controls
     mock_tick_frame.side_effect = lambda *_a, **_k: None
@@ -297,7 +381,7 @@ def test_run_ctrl_q_clean_exits(
     mock_pygame.KMOD_CTRL = pygame.KMOD_CTRL
     mock_pygame.time.Clock.return_value.tick.return_value = 33
 
-    VisualizerApp(runtime).run()
+    VisualizerApp(seed).run()
 
     assert controls.try_quit.call_count == 1
 
@@ -319,15 +403,13 @@ def test_run_pygame_quit_dirty_stays_open(
     _mock_current_sec: MagicMock,
 ) -> None:
     compositor = recording_compositor()
-    runtime = _minimal_runtime(compositor)
-    runtime.cfg = MagicMock()
-    runtime.cfg.visualizer.warmup_sec = 0.0
-    runtime.mix_player = None
-    runtime.playback = None
-    runtime.controls = None
-    runtime.timeline_controls = None
+    seed = _run_seed()
 
-    mock_init_cheap.side_effect = lambda rt: None
+    mock_init_cheap.side_effect = lambda rt: (
+        compositor,
+        MagicMock(),
+        pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
+    )
     controls = MagicMock()
     controls.try_quit.return_value = False
     controls.consume_pending_exit.return_value = False
@@ -335,9 +417,16 @@ def test_run_pygame_quit_dirty_stays_open(
     controls.key_repeat_armed = False
     controls.consume_hide_overlay.return_value = False
 
-    def heavy_with_controls(rt: VisualizerRuntime, on_progress=None) -> None:
-        _heavy_init_side_effect(rt, on_progress)
-        rt.controls = controls
+    def heavy_with_controls(
+        rt: VisualizerSeed,
+        comp: MagicMock,
+        post: MagicMock,
+        surface: pygame.Surface,
+        on_progress=None,
+    ) -> LiveVisualizerRuntime:
+        live = _heavy_init_side_effect(rt, comp, post, surface, on_progress)
+        live.controls = controls
+        return live
 
     mock_init_heavy.side_effect = heavy_with_controls
     mock_tick_frame.side_effect = lambda *_a, **_k: None
@@ -348,15 +437,17 @@ def test_run_pygame_quit_dirty_stays_open(
     mock_pygame.QUIT = pygame.QUIT
     mock_pygame.time.Clock.return_value.tick.return_value = 33
 
+    app = VisualizerApp(seed)
     try:
-        VisualizerApp(runtime).run()
+        app.run()
         raise AssertionError("expected main loop to continue")
     except RuntimeError as exc:
         assert str(exc) == "still running"
 
     assert controls.try_quit.call_count == 1
     controls.consume_pending_exit.assert_called()
-    runtime.overlay.notify_input.assert_called_once()
+    assert isinstance(app._runtime, LiveVisualizerRuntime)
+    app._runtime.overlay.notify_input.assert_called_once()
 
 
 @patch("cleave.viz.app.current_sec", return_value=0.0)
@@ -376,15 +467,13 @@ def test_run_main_loop_stays_open_without_quit_event(
     _mock_current_sec: MagicMock,
 ) -> None:
     compositor = recording_compositor()
-    runtime = _minimal_runtime(compositor)
-    runtime.cfg = MagicMock()
-    runtime.cfg.visualizer.warmup_sec = 0.0
-    runtime.mix_player = None
-    runtime.playback = None
-    runtime.controls = None
-    runtime.timeline_controls = None
+    seed = _run_seed()
 
-    mock_init_cheap.side_effect = lambda rt: None
+    mock_init_cheap.side_effect = lambda rt: (
+        compositor,
+        MagicMock(),
+        pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
+    )
     controls = MagicMock()
     controls.try_quit.return_value = True
     controls.consume_pending_exit.return_value = False
@@ -392,9 +481,16 @@ def test_run_main_loop_stays_open_without_quit_event(
     controls.key_repeat_armed = False
     controls.consume_hide_overlay.return_value = False
 
-    def heavy_with_controls(rt: VisualizerRuntime, on_progress=None) -> None:
-        _heavy_init_side_effect(rt, on_progress)
-        rt.controls = controls
+    def heavy_with_controls(
+        rt: VisualizerSeed,
+        comp: MagicMock,
+        post: MagicMock,
+        surface: pygame.Surface,
+        on_progress=None,
+    ) -> LiveVisualizerRuntime:
+        live = _heavy_init_side_effect(rt, comp, post, surface, on_progress)
+        live.controls = controls
+        return live
 
     mock_init_heavy.side_effect = heavy_with_controls
     mock_tick_frame.side_effect = lambda *_a, **_k: None
@@ -404,7 +500,7 @@ def test_run_main_loop_stays_open_without_quit_event(
     mock_pygame.time.Clock.return_value.tick.return_value = 33
 
     try:
-        VisualizerApp(runtime).run()
+        VisualizerApp(seed).run()
         raise AssertionError("expected main loop to continue")
     except RuntimeError as exc:
         assert str(exc) == "still running"
@@ -450,14 +546,14 @@ def test_tick_frame_overlay_order_at_upscale_one(
     ]
 
 
-def _key_handler_for_session(runtime: VisualizerRuntime, key: int | None = None):
+def _key_handler_for_session(runtime: LiveVisualizerRuntime, key: int | None = None):
     """Mirror VisualizerApp.run KEYDOWN/KEYUP routing."""
     if key is None:
         key = pygame.K_RETURN
     return key_handler_for_runtime(runtime, key)
 
 
-def _keyup_handler_for_session(runtime: VisualizerRuntime, key: int):
+def _keyup_handler_for_session(runtime: LiveVisualizerRuntime, key: int):
     return key_handler_for_runtime(runtime, key)
 
 

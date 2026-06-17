@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pygame
 
 from cleave.extract import STEM_NAMES
-from cleave.viz.app import VisualizerRuntime
+from cleave.viz.app import LiveVisualizerRuntime
 from cleave.viz.controls import TuningControls
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.input_dispatch import (
@@ -28,7 +28,7 @@ def _make_runtime(
     panel_open: bool = True,
     recording: bool = False,
     help_visible: bool = False,
-) -> VisualizerRuntime:
+) -> LiveVisualizerRuntime:
     preset_root = Path("/tmp/presets")
     session = TuningSession(
         layer_z_order=list(STEM_NAMES),
@@ -53,7 +53,7 @@ def _make_runtime(
 
     playback = stub_playback_state()
     compositor = recording_compositor()
-    runtime = VisualizerRuntime(
+    runtime = LiveVisualizerRuntime(
         project_dir=MagicMock(),
         audio_path=MagicMock(),
         width=1280,
@@ -71,9 +71,19 @@ def _make_runtime(
         signals=None,
         effect_runtime=MagicMock(),
         preset_root=preset_root,
+        playlists={},
+        layers=[],
+        layers_by_name={},
         compositor=compositor,
         post_process=MagicMock(),
         overlay=TuningOverlay(),
+        help_overlay=MagicMock(),
+        timeline_overlay=MagicMock(),
+        overlay_surface=pygame.Surface((2560, 1440), pygame.SRCALPHA),
+        controls=MagicMock(),
+        timeline_controls=MagicMock(),
+        mix_player=MagicMock(),
+        playback=playback,
     )
     runtime.controls = TuningControls(
         session,
