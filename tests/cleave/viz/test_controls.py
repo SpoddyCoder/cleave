@@ -798,11 +798,11 @@ def test_esc_in_move_mode_does_not_request_overlay_hide() -> None:
     assert controls.consume_hide_overlay() is False
 
 
-def test_ctrl_q_requests_quit() -> None:
+def test_ctrl_q_not_handled_by_main_controls() -> None:
     controls = _make_controls()
     assert controls.handle_keydown(
         _keydown(pygame.K_q, mod=pygame.KMOD_CTRL)
-    ) is False
+    ) is True
 
 
 def test_q_alone_does_not_quit() -> None:

@@ -126,7 +126,7 @@ def test_backspace_without_focus_deletes_nearest_cue() -> None:
     assert visibility_calls == [True]
 
 
-def test_esc_and_t_close_panel() -> None:
+def test_esc_and_t_close_panel_when_not_recording() -> None:
     controls, session, _, close_calls, _, _ = _make_timeline_controls()
 
     controls.handle_keydown(keydown(pygame.K_ESCAPE))
@@ -137,6 +137,19 @@ def test_esc_and_t_close_panel() -> None:
     controls.handle_keydown(keydown(pygame.K_t))
     assert len(close_calls) == 2
     assert session.timeline.panel_open is False
+
+
+def test_esc_and_t_while_recording_do_not_close_panel() -> None:
+    controls, session, _, close_calls, _, _ = _make_timeline_controls(
+        recording=True,
+    )
+    session.timeline.armed_stems = {"drums"}
+    session.timeline.record_start_sec = 0.0
+
+    controls.handle_keydown(keydown(pygame.K_ESCAPE))
+    controls.handle_keydown(keydown(pygame.K_t))
+    assert close_calls == []
+    assert session.timeline.panel_open is True
 
 
 def test_space_toggles_pause() -> None:

@@ -52,6 +52,12 @@ from cleave.viz.render_overlay import (
     live_overlay_alpha,
     panel_surface_key,
 )
+from cleave.viz.input_dispatch import (
+    dispatch_keydown,
+    dispatch_keyup,
+    dispatch_should_notify_overlay,
+    key_handler_for_runtime,
+)
 from cleave.viz.wiring import make_timeline_controls, make_tuning_controls
 
 
@@ -280,21 +286,6 @@ def _timeline_strip_fade(tl: TimelineRuntime, *, overlay_visibility: float) -> f
     return overlay_visibility
 
 
-def _timeline_submenu_key_routing(
-    tl: TimelineRuntime,
-    *,
-    timeline_controls: TimelineControls | None,
-    key: int,
-) -> bool:
-    return (
-        tl.panel_open
-        and tl.enabled
-        and tl.submenu_focused
-        and timeline_controls is not None
-        and key not in (pygame.K_UP, pygame.K_DOWN)
-    )
-
-
 class VisualizerApp:
     def __init__(self, runtime: VisualizerRuntime) -> None:
         self._runtime = runtime
@@ -471,43 +462,26 @@ class VisualizerApp:
                     if event.type == pygame.QUIT:
                         running = False
                     elif event.type == pygame.KEYDOWN:
-                        tl = rt.session.timeline
                         assert rt.overlay is not None
-                        timeline_submenu_keys = _timeline_submenu_key_routing(
-                            tl,
-                            timeline_controls=rt.timeline_controls,
-                            key=event.key,
-                        )
-                        if timeline_submenu_keys:
-                            key_handler = rt.timeline_controls
-                        else:
-                            key_handler = rt.controls
-                        if key_handler.handle_keydown(event) is False:
+                        tl = rt.session.timeline
+                        if dispatch_keydown(event, rt) is False:
                             running = False
-                        elif key_handler is rt.controls:
+                        else:
+                            assert rt.controls is not None
                             if (
-                                event.key == pygame.K_t
-                                and rt.session.timeline.panel_open
+                                key_handler_for_runtime(rt, event.key) is rt.controls
+                                and event.key == pygame.K_t
+                                and tl.panel_open
                                 and rt.timeline_controls is not None
                             ):
                                 rt.timeline_controls.focused_cue_index = None
                             if rt.controls.consume_hide_overlay():
                                 rt.overlay.hide_immediately()
                                 tl.submenu_focused = False
-                            elif event.key != pygame.K_t and not tl.submenu_focused:
+                            elif dispatch_should_notify_overlay(event, rt):
                                 rt.overlay.notify_input()
                     elif event.type == pygame.KEYUP:
-                        tl = rt.session.timeline
-                        assert rt.overlay is not None
-                        if _timeline_submenu_key_routing(
-                            tl,
-                            timeline_controls=rt.timeline_controls,
-                            key=event.key,
-                        ):
-                            assert rt.timeline_controls is not None
-                            rt.timeline_controls.handle_keyup(event)
-                        else:
-                            rt.controls.handle_keyup(event)
+                        dispatch_keyup(event, rt)
 
                 self._overlay_dt = clock.tick(rt.fps) / 1000.0
                 rt.controls.tick(self._overlay_dt)

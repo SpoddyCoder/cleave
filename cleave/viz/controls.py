@@ -229,6 +229,7 @@ class TuningSession:
     )
     render_post_fx_solo: bool = False
     timeline: TimelineRuntime = field(default_factory=default_timeline_runtime)
+    help_visible: bool = False
 
 
 class TuningControls:
@@ -287,7 +288,6 @@ class TuningControls:
         self._confirm = ConfirmDialog()
         self._save_choice = SaveChoiceDialog()
         self._hide_overlay_requested = False
-        self._help_visible: bool = False
         view = self.build_view_state(paused=self.playback.paused)
         self.focus_index = find_row_by_kind(view, RowKind.TRANSPORT)
 
@@ -296,21 +296,25 @@ class TuningControls:
         self._hide_overlay_requested = False
         return requested
 
-    def handle_keydown(self, event: pygame.event.Event) -> bool:
-        """Handle a key down event. Return False when the caller should quit (Ctrl+Q)."""
+    def handle_modal_keydown(self, event: pygame.event.Event) -> bool:
+        """Return True when a confirm or save-choice modal consumed the event."""
         if event.type != pygame.KEYDOWN:
-            return True
-
+            return False
         if self._confirm.active:
             self._confirm.handle_keydown(event)
             return True
-
         if self._save_choice.active:
             self._save_choice.handle_keydown(event)
             return True
+        return False
 
-        if event.key == pygame.K_q and mod_ctrl(event.mod):
-            return False
+    def handle_keydown(self, event: pygame.event.Event) -> bool:
+        """Handle a key down event for the main tuning tree."""
+        if event.type != pygame.KEYDOWN:
+            return True
+
+        if self.handle_modal_keydown(event):
+            return True
 
         if self._input_blocked():
             return True
@@ -327,10 +331,6 @@ class TuningControls:
                 self._close_timeline_panel()
             else:
                 self._open_timeline_panel(enter_submenu=True)
-            return True
-
-        if event.key == pygame.K_h:
-            self._help_visible = not self._help_visible
             return True
 
         if self.move_mode_stem is not None:
@@ -555,7 +555,7 @@ class TuningControls:
             timeline_submenu_focused=tl.submenu_focused,
             timeline_recording=tl.recording,
             timeline_override_active=bool(tl.override_stems),
-            help_visible=self._help_visible,
+            help_visible=self.session.help_visible,
         )
 
     def _allow_overwrite(self) -> bool:
