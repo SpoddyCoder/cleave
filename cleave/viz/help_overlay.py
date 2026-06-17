@@ -247,7 +247,7 @@ def _sections_for(
 
 
 class HelpOverlay:
-    """Read-only help panel anchored top-right; toggled independently of focus."""
+    """Read-only help panel anchored top-right; visibility from session state."""
 
     def __init__(
         self,
@@ -257,7 +257,6 @@ class HelpOverlay:
         line_gap: int = 3,
         font_size: int = 14,
     ) -> None:
-        self._visible = False
         self._margin = margin
         self._padding = padding
         self._line_gap = line_gap
@@ -268,12 +267,6 @@ class HelpOverlay:
     @property
     def panel_rect(self) -> tuple[int, int, int, int] | None:
         return self._panel_rect
-
-    def toggle(self) -> None:
-        self._visible = not self._visible
-
-    def is_visible(self) -> bool:
-        return self._visible
 
     def _font_get(self) -> pygame.font.Font:
         if self._font is None:

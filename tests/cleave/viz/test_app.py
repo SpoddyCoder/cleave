@@ -12,8 +12,8 @@ from cleave.viz.app import (
     VisualizerRuntime,
     _timeline_strip_fade,
     _timeline_strip_visible,
-    _timeline_submenu_key_routing,
 )
+from cleave.viz.input_dispatch import key_handler_for_runtime
 from cleave.viz.controls import LayerRuntime, RenderPostFxRuntime, TuningSession
 from cleave.viz.overlay import TuningOverlay
 from tests.support.compositor_mock import recording_compositor
@@ -233,22 +233,14 @@ def test_tick_frame_overlay_order_at_upscale_one(
 
 
 def _key_handler_for_session(runtime: VisualizerRuntime, key: int | None = None):
-    """Mirror VisualizerApp.run KEYDOWN routing."""
-    tl = runtime.session.timeline
+    """Mirror VisualizerApp.run KEYDOWN/KEYUP routing."""
     if key is None:
         key = pygame.K_RETURN
-    if _timeline_submenu_key_routing(
-        tl,
-        timeline_controls=runtime.timeline_controls,
-        key=key,
-    ):
-        return runtime.timeline_controls
-    return runtime.controls
+    return key_handler_for_runtime(runtime, key)
 
 
 def _keyup_handler_for_session(runtime: VisualizerRuntime, key: int):
-    """Mirror VisualizerApp.run KEYUP routing."""
-    return _key_handler_for_session(runtime, key)
+    return key_handler_for_runtime(runtime, key)
 
 
 def test_key_routing_main_when_strip_open_not_in_submenu() -> None:

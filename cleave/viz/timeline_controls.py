@@ -60,11 +60,9 @@ class TimelineControls:
         self._last_toggle_t: dict[str, float] = {}
 
     def handle_keydown(self, event: pygame.event.Event) -> bool:
-        if event.key == pygame.K_q and mod_ctrl(event.mod):
-            return False
-
         if event.key in (pygame.K_ESCAPE, pygame.K_t):
-            self._close_panel()
+            if not self.session.timeline.recording:
+                self._close_panel()
             return True
 
         if event.key == pygame.K_r:
@@ -154,6 +152,10 @@ class TimelineControls:
 
     def handle_keyup(self, event: pygame.event.Event) -> None:
         del event
+
+    def stop_recording(self) -> None:
+        """Stop an in-progress timeline take without closing the panel."""
+        self._stop_record()
 
     def _close_panel(self) -> None:
         if self._on_close is not None:

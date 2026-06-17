@@ -86,3 +86,13 @@ These rows do not split label and value; the implementation is deliberate:
 - **Save choice dialog**: `OVERWRITE` / `SAVE AS NEW` options use the same highlight pattern as confirm yes/no.
 
 When focus, move mode, disabled layer, locked sub-row, or empty preset applies, `_row_value_color` may return an accent or state color instead of `VALUE`. That override is expected.
+
+## Keyboard dispatch
+
+Layered key handling lives in [cleave/viz/input_dispatch.py](cleave/viz/input_dispatch.py). `dispatch_keydown` runs layers in order:
+
+1. **Global** (`_handle_global_keydown`): **Ctrl+Q** quit, **h** toggle help (`session.help_visible`), and while recording **Esc** stops the take (panel stays open) and **t** is a no-op.
+2. **Modal** (`TuningControls.handle_modal_keydown`): confirm/save-choice dialogs consume keys before context routing.
+3. **Context router** (`key_handler_for_runtime`): when the timeline strip is open, enabled, and `submenu_focused`, most keys go to `TimelineControls` except **Up**/**Down** (main focus ring). Otherwise keys go to `TuningControls`.
+
+Add new **global** shortcuts in `input_dispatch.py` (`_handle_global_keydown` or a new global layer). Add **context** keys in `TuningControls` or `TimelineControls` depending on which panel should own them. **h** is always global and works even when the timeline submenu has focus.
