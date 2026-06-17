@@ -25,12 +25,14 @@ from cleave.viz.key_repeat import mod_shift
 from cleave.viz.playback import format_mmss
 from tests.support.viz import make_test_cfg, stub_playback_state
 from cleave.viz.controls import (
-    LayerRuntime,
     SEEK_LONG,
     SEEK_SHORT,
     TOAST_DURATION_SEC,
-    TimelineRuntime,
     TuningControls,
+)
+from cleave.viz.session import (
+    LayerRuntime,
+    TimelineRuntime,
     TuningSession,
     allow_overwrite_for_path,
     config_path_display,
@@ -488,7 +490,7 @@ def test_save_as_new_triggers_toast_and_blocks_input() -> None:
 def test_config_header_shows_active_path() -> None:
     launch_path = Path("/tmp/projects/my-track/my-track.yaml")
     controls = _make_controls(("drums",))
-    controls._active_config_path = launch_path
+    controls._config_save._active_config_path = launch_path
     view = controls.build_view_state(paused=False)
     header_row = next(
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.CONFIG_HEADER
@@ -500,7 +502,7 @@ def test_config_header_shows_active_path() -> None:
 def test_config_header_shows_asterisk_when_dirty() -> None:
     launch_path = Path("/tmp/projects/my-track/my-track.yaml")
     controls = _make_controls(("drums",))
-    controls._active_config_path = launch_path
+    controls._config_save._active_config_path = launch_path
     _mutate_dirty(controls)
     view = controls.build_view_state(paused=False)
     header_row = next(
@@ -514,7 +516,7 @@ def test_config_header_shows_asterisk_when_dirty() -> None:
 def test_blend_and_opacity_change_sets_dirty_save_clears() -> None:
     saved_path = Path("/tmp/projects/my-track/unnamed-2.yaml")
     controls = _make_controls(("drums",))
-    controls._on_save_new_config = lambda: saved_path
+    controls._config_save._on_save_new_config = lambda: saved_path
     assert not controls.config_dirty
 
     view = controls.build_view_state(paused=False)
@@ -537,7 +539,7 @@ def test_config_header_truncates_long_paths() -> None:
         "/very/long/root/projects/my-track/nested/deep/unnamed-99.yaml"
     )
     controls = _make_controls(("drums",))
-    controls._active_config_path = long_path
+    controls._config_save._active_config_path = long_path
     view = controls.build_view_state(paused=False)
     header_row = next(
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.CONFIG_HEADER
@@ -595,7 +597,7 @@ def test_fit_row_text_config_and_preset_share_panel_width() -> None:
         "- Bitcore Tweak.milk (1/50)"
     )
     controls = _make_controls(("drums",))
-    controls._active_config_path = long_path
+    controls._config_save._active_config_path = long_path
     view = controls.build_view_state(paused=False)
     view.tracks["drums"] = TrackBlock(
         stem="drums",
@@ -623,14 +625,14 @@ def test_fit_row_text_config_and_preset_share_panel_width() -> None:
 def test_save_as_new_updates_active_config_path() -> None:
     saved_path = Path("/tmp/projects/my-track/unnamed-2.yaml")
     controls = _make_controls(("drums",))
-    controls._on_save_new_config = lambda: saved_path
+    controls._config_save._on_save_new_config = lambda: saved_path
 
     view = controls.build_view_state(paused=False)
     save_row = _save_row(view)
     controls.focus_index = save_row
     _choose_save_as_new(controls)
 
-    assert controls._active_config_path == saved_path
+    assert controls._config_save._active_config_path == saved_path
     state = controls.build_view_state(paused=False)
     header_row = next(
         i for i in range(row_count(state)) if row_kind(state, i) == RowKind.CONFIG_HEADER
@@ -647,7 +649,7 @@ def test_save_as_new_enables_overwrite_from_root_template() -> None:
     )
     assert controls.build_view_state(paused=False).allow_overwrite is False
 
-    controls._on_save_new_config = lambda: saved_path
+    controls._config_save._on_save_new_config = lambda: saved_path
     view = controls.build_view_state(paused=False)
     save_row = _save_row(view)
     controls.focus_index = save_row
@@ -667,8 +669,8 @@ def test_overwrite_after_save_uses_new_active_path() -> None:
         launch_config_path=_REPO_ROOT_EXAMPLE,
         repo_root_example=_REPO_ROOT_EXAMPLE,
     )
-    controls._on_save_new_config = lambda: saved_path
-    controls._on_overwrite_config = lambda path: writes.append(path) or path.name
+    controls._config_save._on_save_new_config = lambda: saved_path
+    controls._config_save._on_overwrite_config = lambda path: writes.append(path) or path.name
 
     view = controls.build_view_state(paused=False)
     save_row = _save_row(view)
@@ -727,7 +729,7 @@ def test_overwrite_shows_confirm_before_write() -> None:
     launch_path = Path("/tmp/custom/cleave.config.yaml")
     writes: list[Path] = []
     controls = _make_controls(("drums",), launch_config_path=launch_path)
-    controls._on_overwrite_config = lambda path: (
+    controls._config_save._on_overwrite_config = lambda path: (
         writes.append(path) or path.name
     )
 
@@ -761,8 +763,8 @@ def test_overwrite_confirm_yes_writes_launch_path() -> None:
     launch_path = Path("/tmp/my-launch.cleave.config.yaml")
     writes: list[Path] = []
     controls = _make_controls(("drums",))
-    controls._active_config_path = launch_path
-    controls._on_overwrite_config = lambda path: (
+    controls._config_save._active_config_path = launch_path
+    controls._config_save._on_overwrite_config = lambda path: (
         writes.append(path) or path.name
     )
 
@@ -787,7 +789,7 @@ def test_overwrite_confirm_esc_dismisses() -> None:
     launch_path = Path("/tmp/custom/cleave.config.yaml")
     writes: list[Path] = []
     controls = _make_controls(("drums",), launch_config_path=launch_path)
-    controls._on_overwrite_config = lambda path: (
+    controls._config_save._on_overwrite_config = lambda path: (
         writes.append(path) or path.name
     )
 
@@ -1048,7 +1050,7 @@ def test_render_overlay_collapse_refocuses_from_title_font_row() -> None:
     font_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
     controls.focus_index = font_row
 
-    controls._set_render_overlay_expanded(False)
+    controls._render_overlay.set_expanded(False)
     assert controls.focus_index == overlay_header
 
 
@@ -1061,7 +1063,7 @@ def test_render_overlay_title_collapse_refocuses_from_font_row() -> None:
     font_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
     controls.focus_index = font_row
 
-    controls._set_render_overlay_title_expanded(False)
+    controls._render_overlay.set_title_expanded(False)
     assert controls.focus_index == title_header
 
 
@@ -2440,21 +2442,21 @@ def test_try_quit_cancel_and_escape_stay() -> None:
     controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
     controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
-    assert controls._pending_exit is False
+    assert controls._config_save._pending_exit is False
     assert controls.config_dirty
-    assert not controls._unsaved_quit.active
+    assert not controls._config_save._unsaved_quit.active
 
     controls.try_quit()
     controls.handle_modal_keydown(_keydown(pygame.K_ESCAPE))
-    assert controls._pending_exit is False
+    assert controls._config_save._pending_exit is False
     assert controls.config_dirty
-    assert not controls._unsaved_quit.active
+    assert not controls._config_save._unsaved_quit.active
 
 
 def test_try_quit_save_chains_through_save_as_new() -> None:
     saved_path = Path("/tmp/projects/my-track/unnamed-2.yaml")
     controls = _make_controls(("drums",))
-    controls._on_save_new_config = lambda: saved_path
+    controls._config_save._on_save_new_config = lambda: saved_path
     _mutate_dirty(controls)
 
     controls.try_quit()
@@ -2472,13 +2474,13 @@ def test_try_quit_save_choice_esc_clears_quit_after_save() -> None:
     _mutate_dirty(controls)
     controls.try_quit()
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
-    assert controls._quit_after_save is True
+    assert controls._config_save._quit_after_save is True
 
     controls.handle_modal_keydown(_keydown(pygame.K_ESCAPE))
-    assert controls._quit_after_save is False
-    assert controls._pending_exit is False
+    assert controls._config_save._quit_after_save is False
+    assert controls._config_save._pending_exit is False
     assert controls.config_dirty
-    assert not controls._save_choice.active
+    assert not controls._config_save._save_choice.active
 
 
 def test_try_quit_overwrite_confirm_esc_clears_quit_after_save() -> None:
@@ -2487,8 +2489,8 @@ def test_try_quit_overwrite_confirm_esc_clears_quit_after_save() -> None:
     controls.try_quit()
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
-    assert controls._quit_after_save is True
+    assert controls._config_save._quit_after_save is True
 
     controls.handle_modal_keydown(_keydown(pygame.K_ESCAPE))
-    assert controls._quit_after_save is False
+    assert controls._config_save._quit_after_save is False
     assert controls.build_view_state(paused=False).confirm_message is None

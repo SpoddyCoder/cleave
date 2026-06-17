@@ -13,7 +13,7 @@ from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import PresetPlaylist
 from cleave.stem_pcm import StemPcmBank
 from cleave.timeline import TimelineCue
-from cleave.viz.controls import LayerRuntime, TimelineRuntime, TuningSession
+from cleave.viz.session import LayerRuntime, TimelineRuntime, TuningSession
 from cleave.viz.row_semantics import RowKind
 from cleave.viz.overlay import find_row_by_kind
 from cleave.viz.layer import (

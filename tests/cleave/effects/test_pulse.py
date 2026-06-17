@@ -18,7 +18,7 @@ from cleave.effects.sampling import sample_normalized
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import playlist_at_dir
 from cleave.signals import Signals
-from cleave.viz.controls import LayerRuntime, TuningSession
+from cleave.viz.session import LayerRuntime, TuningSession
 from tests.support.signals import make_onset_signals, make_signals
 
 

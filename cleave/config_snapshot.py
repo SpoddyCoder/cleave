@@ -12,7 +12,7 @@ import yaml
 from cleave.config import CleaveConfig, RenderOverlayConfig, RenderOverlayTextBlockConfig, clamp_beat_sensitivity, clamp_effect_pct, clamp_upscale, dump_yaml
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import to_config_relative
-from cleave.viz.controls import TuningSession
+from cleave.viz.session import TuningSession
 from cleave.viz.render_overlay import default_render_overlay_config
 
 _UNNAMED_PATTERN = re.compile(r"^unnamed-(\d+)\.yaml$")

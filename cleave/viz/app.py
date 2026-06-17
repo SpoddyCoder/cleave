@@ -18,7 +18,8 @@ from cleave.signals import Signals
 from cleave.pcm_io import load_mix_pcm
 from cleave.stem_pcm import StemPcmBank, load_stem_pcm, samples_per_frame
 from cleave.viz.bootstrap import load_stem_signals
-from cleave.viz.controls import TimelineRuntime, TuningControls, TuningSession
+from cleave.viz.controls import TuningControls
+from cleave.viz.session import TimelineRuntime, TuningSession, session_from_cfg
 from cleave.viz.mix_player import MixPlayer
 from cleave.viz.layer import (
     StemLayer,
@@ -32,7 +33,6 @@ from cleave.viz.layer import (
     _build_timeline_view_state,
     _flush_all_pcm,
     _render_layer_fbo,
-    _session_from_cfg,
     _warmup_layers,
     apply_effect_modifiers,
     apply_layer_visibility,
@@ -115,7 +115,7 @@ def build_runtime_full(
         display_height=cfg.visualizer.display_height,
         fps=fps,
         window_title=f"Cleave — {project_dir.name}",
-        session=_session_from_cfg(cfg, playlists),
+        session=session_from_cfg(cfg, playlists),
         cfg=cfg,
         pcm_bank=pcm_bank,
         duration_sec=pcm_bank.duration_sec,

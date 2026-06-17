@@ -12,7 +12,8 @@ from cleave.extract import STEM_NAMES
 from cleave.paths import repo_root
 from cleave.preset_playlist import PresetPlaylist
 from cleave.signals import Signals
-from cleave.viz.controls import TuningControls, TuningSession
+from cleave.viz.controls import TuningControls
+from cleave.viz.session import TuningSession
 from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.layer import (
     StemLayer,

@@ -305,7 +305,7 @@ def test_render_overlay_display_time_keyboard_regression() -> None:
 def test_display_time_mutation_clears_dirty_after_save() -> None:
     saved_path = Path("/tmp/projects/my-track/unnamed-2.yaml")
     controls = _make_controls(("drums",))
-    controls._on_save_new_config = lambda: saved_path
+    controls._config_save._on_save_new_config = lambda: saved_path
     _mutate_render_overlay_display_time(controls)
     assert controls.config_dirty
 

@@ -6,9 +6,9 @@ alwaysApply: false
 
 # Live tuning overlay layout
 
-The focus-driven tree panel ([cleave/viz/overlay.py](cleave/viz/overlay.py), [cleave/viz/controls.py](cleave/viz/controls.py)) splits into two vertical sections. Use these names in docs, issues, and UI work.
+The focus-driven tree panel ([cleave/viz/overlay.py](cleave/viz/overlay.py), [cleave/viz/controls.py](cleave/viz/controls.py), [cleave/viz/session.py](cleave/viz/session.py)) splits into two vertical sections. Use these names in docs, issues, and UI work.
 
-Unsaved config edits show an asterisk on the active config path row. **Ctrl+Q** and window close route through `TuningControls.try_quit()`; when dirty, a three-option quit dialog (Save / Don't save / Cancel) appears before exit.
+Unsaved config edits show an asterisk on the active config path row. **Ctrl+Q** and window close route through `TuningControls.try_quit()` (delegates to [cleave/viz/config_save.py](cleave/viz/config_save.py)); when dirty, a three-option quit dialog (Save / Don't save / Cancel) appears before exit.
 
 ## Track rows section
 
@@ -23,11 +23,11 @@ The scrollable block below the pinned header: all rows where `row_kind` is not i
 
 Say **track rows section** for the whole upper block; **track row** for a single line.
 
-After the four stem blocks, a blank **render section gap** row (`RowKind.RENDER_SECTION_GAP`) separates stems from render blocks. Then **Render: OVERLAY** (`RowKind.RENDER_OVERLAY_HEADER`) is always present. It is not reorderable (Enter does not enter move mode). Header label: `Render:` in `LABEL`, `OVERLAY` and expand arrow in value color. Sub-rows when expanded: position, opacity, border width, start delay, display time, title (expandable; font, font size, and margin-bottom sub-rows when expanded), body (expandable; font and font size sub-rows when expanded). State: `RenderOverlayBlock` / `RenderOverlayRuntime` on session; solo via `render_overlay_solo` (no audio impact). Disable clears solo and collapses.
+After the four stem blocks, a blank **render section gap** row (`RowKind.RENDER_SECTION_GAP`) separates stems from render blocks. Then **Render: OVERLAY** (`RowKind.RENDER_OVERLAY_HEADER`) is always present. It is not reorderable (Enter does not enter move mode). Header label: `Render:` in `LABEL`, `OVERLAY` and expand arrow in value color. Sub-rows when expanded: position, opacity, border width, start delay, display time, title (expandable; font, font size, and margin-bottom sub-rows when expanded), body (expandable; font and font size sub-rows when expanded). State: `RenderOverlayBlock` / `RenderOverlayRuntime` on session ([cleave/viz/session.py](cleave/viz/session.py)); solo via `render_overlay_solo` (no audio impact). Disable clears solo and collapses.
 
-Below overlay, **Render: POST FX** (`RowKind.RENDER_POST_FX_HEADER`) is always present. Same eye / expand / solo semantics as overlay (`render_post_fx_solo`; solo is not persisted). Sub-rows when expanded: fade in, fade out (seconds). State: `RenderPostFxBlock` / `RenderPostFxRuntime` on session. Disable clears solo and collapses.
+Below overlay, **Render: POST FX** (`RowKind.RENDER_POST_FX_HEADER`) is always present. Same eye / expand / solo semantics as overlay (`render_post_fx_solo`; solo is not persisted). Sub-rows when expanded: fade in, fade out (seconds). State: `RenderPostFxBlock` / `RenderPostFxRuntime` on session ([cleave/viz/session.py](cleave/viz/session.py)). Disable clears solo and collapses.
 
-Below post-FX, **Render: TIMELINE** (`RowKind.RENDER_TIMELINE_HEADER`) is always present. Eye semantics match post-FX (no solo in v1). **Ctrl+Right** / **Ctrl+Left** sets `session.timeline.enabled`; **Right** opens the timeline strip without entering the submenu; **Left** closes it. **t** toggles the strip: when closed, opens and enters the submenu on row 0; when open, closes and returns focus to this header. Expand arrow reflects `session.timeline.panel_open` (▼ when open). Disable closes the strip. State: `RenderTimelineBlock` / `TimelineRuntime` on session. `enabled` persists via config snapshot; `panel_open` is UI-only. No sub-rows in v1.
+Below post-FX, **Render: TIMELINE** (`RowKind.RENDER_TIMELINE_HEADER`) is always present. Eye semantics match post-FX (no solo in v1). **Ctrl+Right** / **Ctrl+Left** sets `session.timeline.enabled`; **Right** opens the timeline strip without entering the submenu; **Left** closes it. **t** toggles the strip: when closed, opens and enters the submenu on row 0; when open, closes and returns focus to this header. Expand arrow reflects `session.timeline.panel_open` (▼ when open). Disable closes the strip. State: `RenderTimelineBlock` / `TimelineRuntime` on session ([cleave/viz/session.py](cleave/viz/session.py)). `enabled` persists via config snapshot; `panel_open` is UI-only. No sub-rows in v1.
 
 ## Timeline panel
 
