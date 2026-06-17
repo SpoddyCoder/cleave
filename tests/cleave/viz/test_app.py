@@ -254,6 +254,61 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
 @patch("cleave.viz.app._init_gl_resources_heavy")
 @patch("cleave.viz.app._init_gl_resources_cheap")
 @patch.object(VisualizerApp, "tick_frame")
+def test_run_ctrl_q_clean_exits(
+    mock_tick_frame: MagicMock,
+    mock_init_cheap: MagicMock,
+    mock_init_heavy: MagicMock,
+    mock_draw_loading: MagicMock,
+    mock_warmup: MagicMock,
+    mock_pygame: MagicMock,
+    _mock_current_sec: MagicMock,
+) -> None:
+    compositor = recording_compositor()
+    runtime = _minimal_runtime(compositor)
+    runtime.cfg = MagicMock()
+    runtime.cfg.visualizer.warmup_sec = 0.0
+    runtime.mix_player = None
+    runtime.playback = None
+    runtime.controls = None
+    runtime.timeline_controls = None
+
+    mock_init_cheap.side_effect = lambda rt: None
+    controls = MagicMock()
+    controls.try_quit.return_value = True
+    controls.consume_pending_exit.return_value = False
+    controls.tick = MagicMock()
+    controls.key_repeat_armed = False
+    controls.consume_hide_overlay.return_value = False
+
+    def heavy_with_controls(rt: VisualizerRuntime, on_progress=None) -> None:
+        _heavy_init_side_effect(rt, on_progress)
+        rt.controls = controls
+
+    mock_init_heavy.side_effect = heavy_with_controls
+    mock_tick_frame.side_effect = lambda *_a, **_k: None
+
+    quit_key = pygame.event.Event(
+        pygame.KEYDOWN, key=pygame.K_q, mod=pygame.KMOD_CTRL
+    )
+    mock_pygame.event.get.side_effect = [[], [quit_key]]
+    mock_pygame.QUIT = pygame.QUIT
+    mock_pygame.KEYDOWN = pygame.KEYDOWN
+    mock_pygame.K_q = pygame.K_q
+    mock_pygame.KMOD_CTRL = pygame.KMOD_CTRL
+    mock_pygame.time.Clock.return_value.tick.return_value = 33
+
+    VisualizerApp(runtime).run()
+
+    assert controls.try_quit.call_count == 1
+
+
+@patch("cleave.viz.app.current_sec", return_value=0.0)
+@patch("cleave.viz.app.pygame")
+@patch("cleave.viz.app._warmup_layers")
+@patch("cleave.viz.app.draw_loading_screen")
+@patch("cleave.viz.app._init_gl_resources_heavy")
+@patch("cleave.viz.app._init_gl_resources_cheap")
+@patch.object(VisualizerApp, "tick_frame")
 def test_run_pygame_quit_dirty_stays_open(
     mock_tick_frame: MagicMock,
     mock_init_cheap: MagicMock,

@@ -468,7 +468,9 @@ class VisualizerApp:
                     elif event.type == pygame.KEYDOWN:
                         assert rt.overlay is not None
                         tl = rt.session.timeline
-                        if dispatch_keydown(event, rt) is not False:
+                        if dispatch_keydown(event, rt) is False:
+                            running = False
+                        else:
                             assert rt.controls is not None
                             if (
                                 key_handler_for_runtime(rt, event.key) is rt.controls
