@@ -14,7 +14,8 @@ from cleave.preset_playlist import PresetPlaylist
 from cleave.stem_pcm import StemPcmBank
 from cleave.timeline import TimelineCue
 from cleave.viz.controls import LayerRuntime, TimelineRuntime, TuningSession
-from cleave.viz.overlay import RowKind, find_row_by_kind
+from cleave.viz.row_semantics import RowKind
+from cleave.viz.overlay import find_row_by_kind
 from cleave.viz.layer import (
     StemLayer,
     _build_timeline_view_state,

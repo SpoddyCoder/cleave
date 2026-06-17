@@ -7,7 +7,6 @@ See cleave/viz/theme.py and .cursor/rules/live-tuning-ui.mdc.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum, auto
 from typing import Literal
 
 import pygame
@@ -25,6 +24,20 @@ from cleave.config import (
     RenderOverlayPosition,
 )
 from cleave.effects.registry import effect_roster
+from cleave.viz.row_semantics import (
+    HEADER_ROW_KINDS,
+    LABELED_SUB_ROW_KINDS,
+    LOCKED_NAVIGABLE_SUB_ROW_KINDS,
+    RENDER_OVERLAY_ALL_SUB_ROW_KINDS,
+    RENDER_OVERLAY_BODY_NESTED_KINDS,
+    RENDER_OVERLAY_SUB_ROW_KINDS,
+    RENDER_OVERLAY_TITLE_NESTED_KINDS,
+    RENDER_POST_FX_SUB_ROW_KINDS,
+    RowDescriptor,
+    RowKind,
+    TRACK_EFFECT_SUB_ROW_KINDS,
+    TRACK_SUB_ROW_KINDS,
+)
 from cleave.viz.fonts import render_overlay_font_display
 from cleave.viz.confirm import ConfirmDialog, SaveChoiceDialog
 from cleave.viz.text_fit import (
@@ -79,46 +92,6 @@ Anchor = Literal["topleft", "bottomleft"]
 HEADER_ROWS = 3
 TREE_INDENT = 16
 ROW_ICON_SUFFIX_GAP = 4
-
-
-class RowKind(Enum):
-    TRACK_HEADER = auto()
-    TRACK_PRESET_DIR = auto()
-    TRACK_PRESET = auto()
-    TRACK_BLEND = auto()
-    TRACK_OPACITY = auto()
-    TRACK_BEAT = auto()
-    TRACK_EFFECTS_HEADER = auto()
-    TRACK_EFFECT = auto()
-    RENDER_SECTION_GAP = auto()
-    RENDER_OVERLAY_HEADER = auto()
-    RENDER_OVERLAY_POSITION = auto()
-    RENDER_OVERLAY_TITLE_HEADER = auto()
-    RENDER_OVERLAY_TITLE_FONT_SIZE = auto()
-    RENDER_OVERLAY_TITLE_FONT = auto()
-    RENDER_OVERLAY_TITLE_MARGIN_BOTTOM = auto()
-    RENDER_OVERLAY_BODY_HEADER = auto()
-    RENDER_OVERLAY_BODY_FONT_SIZE = auto()
-    RENDER_OVERLAY_BODY_FONT = auto()
-    RENDER_OVERLAY_OPACITY = auto()
-    RENDER_OVERLAY_BORDER_WIDTH = auto()
-    RENDER_OVERLAY_START_DELAY = auto()
-    RENDER_OVERLAY_DISPLAY_TIME = auto()
-    RENDER_POST_FX_HEADER = auto()
-    RENDER_POST_FX_FADE_IN = auto()
-    RENDER_POST_FX_FADE_OUT = auto()
-    RENDER_TIMELINE_HEADER = auto()
-    CONFIG_HEADER = auto()
-    TRANSPORT = auto()
-    SAVE_CONFIG = auto()
-
-
-@dataclass(frozen=True)
-class RowDescriptor:
-    kind: RowKind
-    stem: str | None = None
-    effect_id: str | None = None
-    driver_slug: str | None = None
 
 
 @dataclass
@@ -207,15 +180,6 @@ def header_row_count(state: TuningViewState) -> int:
     return HEADER_ROWS
 
 
-_HEADER_ROW_KINDS = frozenset(
-    {
-        RowKind.CONFIG_HEADER,
-        RowKind.TRANSPORT,
-        RowKind.SAVE_CONFIG,
-    }
-)
-
-
 def build_row_layout(state: TuningViewState) -> list[RowDescriptor]:
     rows: list[RowDescriptor] = [
         RowDescriptor(RowKind.TRANSPORT),
@@ -271,7 +235,7 @@ def track_row_count(state: TuningViewState) -> int:
     return sum(
         1
         for row in build_row_layout(state)
-        if row.kind not in _HEADER_ROW_KINDS
+        if row.kind not in HEADER_ROW_KINDS
     )
 
 
@@ -311,85 +275,6 @@ def row_count(state: TuningViewState) -> int:
     return len(build_row_layout(state))
 
 
-_SUB_ROW_KINDS = frozenset(
-    {
-        RowKind.TRACK_PRESET_DIR,
-        RowKind.TRACK_PRESET,
-        RowKind.TRACK_BLEND,
-        RowKind.TRACK_OPACITY,
-        RowKind.TRACK_BEAT,
-        RowKind.TRACK_EFFECTS_HEADER,
-        RowKind.TRACK_EFFECT,
-    }
-)
-
-_EFFECT_SUB_ROW_KINDS = frozenset({RowKind.TRACK_EFFECT})
-
-_RENDER_OVERLAY_SUB_ROW_KINDS = frozenset(
-    {
-        RowKind.RENDER_OVERLAY_POSITION,
-        RowKind.RENDER_OVERLAY_TITLE_HEADER,
-        RowKind.RENDER_OVERLAY_BODY_HEADER,
-        RowKind.RENDER_OVERLAY_OPACITY,
-        RowKind.RENDER_OVERLAY_BORDER_WIDTH,
-        RowKind.RENDER_OVERLAY_START_DELAY,
-        RowKind.RENDER_OVERLAY_DISPLAY_TIME,
-    }
-)
-
-_RENDER_OVERLAY_TITLE_NESTED_KINDS = frozenset(
-    {
-        RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE,
-        RowKind.RENDER_OVERLAY_TITLE_FONT,
-        RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
-    }
-)
-_RENDER_OVERLAY_BODY_NESTED_KINDS = frozenset(
-    {
-        RowKind.RENDER_OVERLAY_BODY_FONT_SIZE,
-        RowKind.RENDER_OVERLAY_BODY_FONT,
-    }
-)
-
-_RENDER_OVERLAY_ALL_SUB_ROW_KINDS = (
-    _RENDER_OVERLAY_SUB_ROW_KINDS
-    | _RENDER_OVERLAY_TITLE_NESTED_KINDS
-    | _RENDER_OVERLAY_BODY_NESTED_KINDS
-)
-
-_RENDER_POST_FX_SUB_ROW_KINDS = frozenset(
-    {
-        RowKind.RENDER_POST_FX_FADE_IN,
-        RowKind.RENDER_POST_FX_FADE_OUT,
-    }
-)
-
-_RENDER_TIMELINE_SUB_ROW_KINDS: frozenset[RowKind] = frozenset()
-
-_LOCKED_NAVIGABLE_SUB_ROW_KINDS = frozenset({RowKind.TRACK_EFFECTS_HEADER})
-
-_LABELED_SUB_ROW_KINDS = frozenset(
-    {
-        RowKind.TRACK_BLEND,
-        RowKind.TRACK_OPACITY,
-        RowKind.TRACK_BEAT,
-        RowKind.TRACK_EFFECT,
-        RowKind.RENDER_OVERLAY_POSITION,
-        RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE,
-        RowKind.RENDER_OVERLAY_TITLE_FONT,
-        RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
-        RowKind.RENDER_OVERLAY_BODY_FONT_SIZE,
-        RowKind.RENDER_OVERLAY_BODY_FONT,
-        RowKind.RENDER_OVERLAY_OPACITY,
-        RowKind.RENDER_OVERLAY_BORDER_WIDTH,
-        RowKind.RENDER_OVERLAY_START_DELAY,
-        RowKind.RENDER_OVERLAY_DISPLAY_TIME,
-        RowKind.RENDER_POST_FX_FADE_IN,
-        RowKind.RENDER_POST_FX_FADE_OUT,
-    }
-)
-
-
 def track_sub_rows_visible(state: TuningViewState, stem: str) -> bool:
     return state.tracks[stem].expanded
 
@@ -403,21 +288,21 @@ def _sub_row_visible(state: TuningViewState, index: int) -> bool:
     desc = row_descriptor(state, index)
     if desc.kind == RowKind.RENDER_SECTION_GAP:
         return True
-    if desc.kind in _RENDER_OVERLAY_SUB_ROW_KINDS:
+    if desc.kind in RENDER_OVERLAY_SUB_ROW_KINDS:
         return state.render_overlay.expanded
-    if desc.kind in _RENDER_OVERLAY_TITLE_NESTED_KINDS:
+    if desc.kind in RENDER_OVERLAY_TITLE_NESTED_KINDS:
         return state.render_overlay.expanded and state.render_overlay.title_expanded
-    if desc.kind in _RENDER_OVERLAY_BODY_NESTED_KINDS:
+    if desc.kind in RENDER_OVERLAY_BODY_NESTED_KINDS:
         return state.render_overlay.expanded and state.render_overlay.body_expanded
-    if desc.kind in _RENDER_POST_FX_SUB_ROW_KINDS:
+    if desc.kind in RENDER_POST_FX_SUB_ROW_KINDS:
         return state.render_post_fx.expanded
     stem = desc.stem
-    if stem is None or desc.kind not in _SUB_ROW_KINDS:
+    if stem is None or desc.kind not in TRACK_SUB_ROW_KINDS:
         return True
     block = state.tracks[stem]
     if not block.expanded:
         return False
-    if desc.kind in _EFFECT_SUB_ROW_KINDS:
+    if desc.kind in TRACK_EFFECT_SUB_ROW_KINDS:
         return block.effects_expanded
     return True
 
@@ -438,27 +323,27 @@ def navigable_row_indices(state: TuningViewState) -> list[int]:
         desc = row_descriptor(state, index)
         if desc.kind in {RowKind.CONFIG_HEADER, RowKind.RENDER_SECTION_GAP}:
             continue
-        if desc.kind in _RENDER_OVERLAY_SUB_ROW_KINDS:
+        if desc.kind in RENDER_OVERLAY_SUB_ROW_KINDS:
             if not state.render_overlay.expanded:
                 continue
-        elif desc.kind in _RENDER_OVERLAY_TITLE_NESTED_KINDS:
+        elif desc.kind in RENDER_OVERLAY_TITLE_NESTED_KINDS:
             if not state.render_overlay.expanded or not state.render_overlay.title_expanded:
                 continue
-        elif desc.kind in _RENDER_OVERLAY_BODY_NESTED_KINDS:
+        elif desc.kind in RENDER_OVERLAY_BODY_NESTED_KINDS:
             if not state.render_overlay.expanded or not state.render_overlay.body_expanded:
                 continue
-        elif desc.kind in _RENDER_POST_FX_SUB_ROW_KINDS:
+        elif desc.kind in RENDER_POST_FX_SUB_ROW_KINDS:
             if not state.render_post_fx.expanded:
                 continue
-        elif desc.kind in _SUB_ROW_KINDS:
+        elif desc.kind in TRACK_SUB_ROW_KINDS:
             stem = desc.stem
             assert stem is not None
             block = state.tracks[stem]
             if not block.expanded:
                 continue
-            if block.locked and desc.kind not in _LOCKED_NAVIGABLE_SUB_ROW_KINDS:
+            if block.locked and desc.kind not in LOCKED_NAVIGABLE_SUB_ROW_KINDS:
                 continue
-            if desc.kind in _EFFECT_SUB_ROW_KINDS and not block.effects_expanded:
+            if desc.kind in TRACK_EFFECT_SUB_ROW_KINDS and not block.effects_expanded:
                 continue
         indices.append(index)
     return indices
@@ -899,7 +784,7 @@ def fit_row_text(
             + "TIMELINE"
             + _track_header_expand_suffix(expanded)
         )
-    if kind in _LABELED_SUB_ROW_KINDS:
+    if kind in LABELED_SUB_ROW_KINDS:
         return _labeled_sub_row_prefix(state, index) + _fit_labeled_sub_row_value(
             font, state, index, max_content_width=max_content_width
         )
@@ -919,7 +804,7 @@ def _row_indent(state: TuningViewState, index: int) -> int:
         return 0
     if kind == RowKind.TRACK_EFFECT:
         return TREE_INDENT * 2
-    if kind in _RENDER_OVERLAY_TITLE_NESTED_KINDS | _RENDER_OVERLAY_BODY_NESTED_KINDS:
+    if kind in RENDER_OVERLAY_TITLE_NESTED_KINDS | RENDER_OVERLAY_BODY_NESTED_KINDS:
         return TREE_INDENT * 2
     if kind in {
         RowKind.TRACK_PRESET_DIR,
@@ -928,7 +813,7 @@ def _row_indent(state: TuningViewState, index: int) -> int:
         RowKind.TRACK_OPACITY,
         RowKind.TRACK_BEAT,
         RowKind.TRACK_EFFECTS_HEADER,
-    } | _RENDER_OVERLAY_SUB_ROW_KINDS | _RENDER_POST_FX_SUB_ROW_KINDS:
+    } | RENDER_OVERLAY_SUB_ROW_KINDS | RENDER_POST_FX_SUB_ROW_KINDS:
         return TREE_INDENT
     return 0
 
@@ -950,13 +835,13 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
     if kind == RowKind.CONFIG_HEADER:
         return LABEL
 
-    if kind in {RowKind.RENDER_OVERLAY_HEADER, *_RENDER_OVERLAY_ALL_SUB_ROW_KINDS}:
+    if kind in {RowKind.RENDER_OVERLAY_HEADER, *RENDER_OVERLAY_ALL_SUB_ROW_KINDS}:
         if not state.render_overlay.enabled:
             return DISABLED
 
     if kind in {
         RowKind.RENDER_POST_FX_HEADER,
-        *_RENDER_POST_FX_SUB_ROW_KINDS,
+        *RENDER_POST_FX_SUB_ROW_KINDS,
     }:
         if not state.render_post_fx.enabled:
             return DISABLED
@@ -987,7 +872,7 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
     if (
         stem is not None
         and state.tracks[stem].locked
-        and kind in _SUB_ROW_KINDS
+        and kind in TRACK_SUB_ROW_KINDS
     ):
         return LOCKED
 
@@ -1377,7 +1262,7 @@ class TuningOverlay:
             (
                 index
                 for index in visible_indices
-                if row_kind(state, index) not in _HEADER_ROW_KINDS
+                if row_kind(state, index) not in HEADER_ROW_KINDS
             ),
             None,
         )
@@ -1603,7 +1488,7 @@ class TuningOverlay:
                 row_surfaces.append(surf)
                 row_time_surfaces.append(None)
                 row_widths.append(indent + surf.get_width())
-            elif kind in _LABELED_SUB_ROW_KINDS:
+            elif kind in LABELED_SUB_ROW_KINDS:
                 prefix = _labeled_sub_row_prefix(state, index)
                 value = _fit_labeled_sub_row_value(
                     font, state, index, max_content_width=max_content_width

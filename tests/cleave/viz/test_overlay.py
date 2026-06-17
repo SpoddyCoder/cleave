@@ -6,11 +6,11 @@ import pygame
 
 from cleave.extract import STEM_NAMES
 from cleave.viz.material_icons import row_icon_prefix_width
+from cleave.viz.row_semantics import RowKind
 from cleave.viz.overlay import (
     PanelScrollMetrics,
     RenderOverlayBlock,
     RenderTimelineBlock,
-    RowKind,
     TrackBlock,
     TuningOverlay,
     TuningViewState,

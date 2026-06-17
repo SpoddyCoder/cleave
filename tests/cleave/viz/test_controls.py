@@ -32,10 +32,10 @@ from cleave.viz.controls import (
     TimelineRuntime,
     TuningControls,
     TuningSession,
-    _REPEAT_ROW_KINDS,
     allow_overwrite_for_path,
     config_path_display,
 )
+from cleave.viz.row_semantics import REPEAT_ROW_KINDS
 from cleave.viz.theme import (
     DISABLED,
     HIGHLIGHT,
@@ -57,10 +57,10 @@ from cleave.viz.material_icons import (
     track_header_lock_suffix_width,
     visibility_icon_prefix_width,
 )
+from cleave.viz.row_semantics import RowKind
 from cleave.viz.overlay import (
     find_row,
     find_row_by_kind,
-    RowKind,
     TrackBlock,
     TuningViewState,
     TREE_INDENT,
@@ -1876,7 +1876,7 @@ def test_preset_lr_noop_when_paths_empty() -> None:
 
 
 def test_track_preset_dir_in_repeat_row_kinds() -> None:
-    assert RowKind.TRACK_PRESET_DIR in _REPEAT_ROW_KINDS
+    assert RowKind.TRACK_PRESET_DIR in REPEAT_ROW_KINDS
 
 
 def test_ctrl_preset_steps_by_ten_wrapping() -> None:

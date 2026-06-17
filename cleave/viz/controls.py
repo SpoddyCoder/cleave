@@ -40,15 +40,21 @@ from cleave.timeline import TimelineCue
 from cleave.viz.confirm import ConfirmDialog, ConfirmRequest, SaveChoiceDialog, SaveChoiceRequest
 from cleave.viz.key_repeat import KeyRepeatController, mod_ctrl, mod_shift
 from cleave.viz.playback import PlaybackState, current_sec, seek, toggle_pause
+from cleave.viz.row_semantics import (
+    REPEAT_ROW_KINDS,
+    RENDER_OVERLAY_ALL_SUB_ROW_KINDS,
+    RENDER_OVERLAY_BODY_NESTED_KINDS,
+    RENDER_OVERLAY_TITLE_NESTED_KINDS,
+    RENDER_POST_FX_SUB_ROW_KINDS,
+    RENDER_TIMELINE_SUB_ROW_KINDS,
+    RowKind,
+)
 from cleave.viz.overlay import (
     RenderOverlayBlock,
     RenderPostFxBlock,
     RenderTimelineBlock,
-    RowKind,
     TrackBlock,
     TuningViewState,
-    _RENDER_OVERLAY_BODY_NESTED_KINDS,
-    _RENDER_OVERLAY_TITLE_NESTED_KINDS,
     find_row,
     find_row_by_kind,
     navigable_row_indices,
@@ -61,53 +67,6 @@ from cleave.viz.overlay import (
 TOAST_DURATION_SEC = 5.0
 SEEK_SHORT = 10
 SEEK_LONG = 30
-
-_REPEAT_ROW_KINDS = frozenset(
-    {
-        RowKind.TRACK_PRESET_DIR,
-        RowKind.TRACK_PRESET,
-        RowKind.TRACK_BLEND,
-        RowKind.TRACK_OPACITY,
-        RowKind.TRACK_BEAT,
-        RowKind.TRACK_EFFECT,
-        RowKind.RENDER_OVERLAY_POSITION,
-        RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE,
-        RowKind.RENDER_OVERLAY_TITLE_FONT,
-        RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
-        RowKind.RENDER_OVERLAY_BODY_FONT_SIZE,
-        RowKind.RENDER_OVERLAY_BODY_FONT,
-        RowKind.RENDER_OVERLAY_OPACITY,
-        RowKind.RENDER_OVERLAY_BORDER_WIDTH,
-        RowKind.RENDER_OVERLAY_START_DELAY,
-        RowKind.RENDER_OVERLAY_DISPLAY_TIME,
-        RowKind.RENDER_POST_FX_FADE_IN,
-        RowKind.RENDER_POST_FX_FADE_OUT,
-    }
-)
-
-_RENDER_OVERLAY_SUB_ROW_KINDS = frozenset(
-    {
-        RowKind.RENDER_OVERLAY_POSITION,
-        RowKind.RENDER_OVERLAY_TITLE_HEADER,
-        RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE,
-        RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
-        RowKind.RENDER_OVERLAY_BODY_HEADER,
-        RowKind.RENDER_OVERLAY_BODY_FONT_SIZE,
-        RowKind.RENDER_OVERLAY_OPACITY,
-        RowKind.RENDER_OVERLAY_BORDER_WIDTH,
-        RowKind.RENDER_OVERLAY_START_DELAY,
-        RowKind.RENDER_OVERLAY_DISPLAY_TIME,
-    }
-)
-
-_RENDER_POST_FX_SUB_ROW_KINDS = frozenset(
-    {
-        RowKind.RENDER_POST_FX_FADE_IN,
-        RowKind.RENDER_POST_FX_FADE_OUT,
-    }
-)
-
-_RENDER_TIMELINE_SUB_ROW_KINDS: frozenset[RowKind] = frozenset()
 _DEFAULT_SAVE_FILENAME = "unnamed-1.yaml"
 
 
@@ -373,7 +332,7 @@ class TuningControls:
             view = self.build_view_state(paused=self.playback.paused)
             kind = row_kind(view, self.focus_index)
             self._apply_horizontal(event.key, event.mod, kind)
-            repeat = kind in _REPEAT_ROW_KINDS
+            repeat = kind in REPEAT_ROW_KINDS
             if repeat and kind == RowKind.TRACK_PRESET_DIR and mod_ctrl(event.mod):
                 repeat = False
             if repeat:
@@ -688,7 +647,7 @@ class TuningControls:
             self._set_render_overlay_body_expanded(forward)
             return
 
-        if stem is not None and kind in _REPEAT_ROW_KINDS and self.session.layers[stem].locked:
+        if stem is not None and kind in REPEAT_ROW_KINDS and self.session.layers[stem].locked:
             return
 
         if kind == RowKind.TRACK_HEADER:
@@ -910,7 +869,7 @@ class TuningControls:
     def _refocus_track_header_if_sub_row(self, stem: str) -> None:
         view = self.build_view_state(paused=self.playback.paused)
         kind = row_kind(view, self.focus_index)
-        if kind not in _REPEAT_ROW_KINDS:
+        if kind not in REPEAT_ROW_KINDS:
             return
         if row_stem(view, self.focus_index) == stem:
             self.focus_index = self._track_header_index(stem)
@@ -940,7 +899,7 @@ class TuningControls:
             return
         focus_kind = self._focused_row_kind()
         ro.expanded = expanded
-        if not expanded and focus_kind in _RENDER_OVERLAY_SUB_ROW_KINDS:
+        if not expanded and focus_kind in RENDER_OVERLAY_ALL_SUB_ROW_KINDS:
             self.focus_index = self._render_overlay_header_index()
 
     def _set_render_overlay_enabled(self, enabled: bool) -> None:
@@ -952,7 +911,7 @@ class TuningControls:
         if not enabled:
             self.session.render_overlay_solo = False
             ro.expanded = False
-            if focus_kind in _RENDER_OVERLAY_SUB_ROW_KINDS:
+            if focus_kind in RENDER_OVERLAY_ALL_SUB_ROW_KINDS:
                 self.focus_index = self._render_overlay_header_index()
 
     def _enter_render_overlay_solo(self) -> None:
@@ -983,7 +942,7 @@ class TuningControls:
             return
         focus_kind = self._focused_row_kind()
         ro.title_expanded = expanded
-        if not expanded and focus_kind in _RENDER_OVERLAY_TITLE_NESTED_KINDS:
+        if not expanded and focus_kind in RENDER_OVERLAY_TITLE_NESTED_KINDS:
             self.focus_index = self._render_overlay_title_header_index()
 
     def _set_render_overlay_body_expanded(self, expanded: bool) -> None:
@@ -992,7 +951,7 @@ class TuningControls:
             return
         focus_kind = self._focused_row_kind()
         ro.body_expanded = expanded
-        if not expanded and focus_kind in _RENDER_OVERLAY_BODY_NESTED_KINDS:
+        if not expanded and focus_kind in RENDER_OVERLAY_BODY_NESTED_KINDS:
             self.focus_index = self._render_overlay_body_header_index()
 
     def _set_render_overlay_title_font_size(self, size: int) -> None:
@@ -1030,7 +989,7 @@ class TuningControls:
 
     def _refocus_render_post_fx_header_if_sub_row(self) -> None:
         view = self.build_view_state(paused=self.playback.paused)
-        if row_kind(view, self.focus_index) in _RENDER_POST_FX_SUB_ROW_KINDS:
+        if row_kind(view, self.focus_index) in RENDER_POST_FX_SUB_ROW_KINDS:
             self.focus_index = self._render_post_fx_header_index()
 
     def _set_render_post_fx_expanded(self, expanded: bool) -> None:
@@ -1073,7 +1032,7 @@ class TuningControls:
 
     def _refocus_render_timeline_header_if_sub_row(self) -> None:
         view = self.build_view_state(paused=self.playback.paused)
-        if row_kind(view, self.focus_index) in _RENDER_TIMELINE_SUB_ROW_KINDS:
+        if row_kind(view, self.focus_index) in RENDER_TIMELINE_SUB_ROW_KINDS:
             self.focus_index = self._render_timeline_header_index()
 
     def _set_render_timeline_enabled(self, enabled: bool) -> None:

@@ -10,7 +10,7 @@ The focus-driven tree panel ([cleave/viz/overlay.py](cleave/viz/overlay.py), [cl
 
 ## Track rows section
 
-The scrollable block below the pinned header: all rows where `row_kind` is not in `_HEADER_ROW_KINDS` (`track_row_count` counts these rows from `build_row_layout`).
+The scrollable block below the pinned header: all rows where `row_kind` is not in `HEADER_ROW_KINDS` from [cleave/viz/row_semantics.py](cleave/viz/row_semantics.py) (`track_row_count` counts these rows from `build_row_layout`). Row interaction groups (sub-row frozensets, repeat keys, help affordances) are defined in the same module.
 
 - One **track block** per stem in `layer_z_order`.
 - **Base rows** (always present per stem): header, preset dir, preset, blend, opacity, beat sensitivity, then **cleave effects** header (`RowKind.TRACK_EFFECTS_HEADER`).
