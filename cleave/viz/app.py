@@ -200,6 +200,7 @@ def _init_gl_resources_heavy(
         effect_runtime=runtime.effect_runtime,
         mix_player=mix_player,
         on_toast=controls.show_toast,
+        on_config_dirty=controls.mark_config_dirty,
         tuning_controls=controls,
     )
 
@@ -460,13 +461,14 @@ class VisualizerApp:
             while running:
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
-                        running = False
+                        if rt.controls.try_quit():
+                            running = False
+                        elif rt.overlay is not None:
+                            rt.overlay.notify_input()
                     elif event.type == pygame.KEYDOWN:
                         assert rt.overlay is not None
                         tl = rt.session.timeline
-                        if dispatch_keydown(event, rt) is False:
-                            running = False
-                        else:
+                        if dispatch_keydown(event, rt) is not False:
                             assert rt.controls is not None
                             if (
                                 key_handler_for_runtime(rt, event.key) is rt.controls
@@ -482,6 +484,9 @@ class VisualizerApp:
                                 rt.overlay.notify_input()
                     elif event.type == pygame.KEYUP:
                         dispatch_keyup(event, rt)
+
+                if rt.controls.consume_pending_exit():
+                    running = False
 
                 self._overlay_dt = clock.tick(rt.fps) / 1000.0
                 rt.controls.tick(self._overlay_dt)

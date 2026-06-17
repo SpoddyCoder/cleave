@@ -194,6 +194,169 @@ def test_run_boot_order_audio_starts_after_first_frame(
     assert mock_draw_loading.call_count >= 1
 
 
+@patch("cleave.viz.app.current_sec", return_value=0.0)
+@patch("cleave.viz.app.pygame")
+@patch("cleave.viz.app._warmup_layers")
+@patch("cleave.viz.app.draw_loading_screen")
+@patch("cleave.viz.app._init_gl_resources_heavy")
+@patch("cleave.viz.app._init_gl_resources_cheap")
+@patch.object(VisualizerApp, "tick_frame")
+def test_run_pygame_quit_clean_exits_via_try_quit(
+    mock_tick_frame: MagicMock,
+    mock_init_cheap: MagicMock,
+    mock_init_heavy: MagicMock,
+    mock_draw_loading: MagicMock,
+    mock_warmup: MagicMock,
+    mock_pygame: MagicMock,
+    _mock_current_sec: MagicMock,
+) -> None:
+    compositor = recording_compositor()
+    runtime = _minimal_runtime(compositor)
+    runtime.cfg = MagicMock()
+    runtime.cfg.visualizer.warmup_sec = 0.0
+    runtime.mix_player = None
+    runtime.playback = None
+    runtime.controls = None
+    runtime.timeline_controls = None
+
+    mock_init_cheap.side_effect = lambda rt: None
+    controls = MagicMock()
+    controls.try_quit.return_value = True
+    controls.consume_pending_exit.return_value = False
+    controls.tick = MagicMock()
+    controls.key_repeat_armed = False
+    controls.consume_hide_overlay.return_value = False
+
+    def heavy_with_controls(rt: VisualizerRuntime, on_progress=None) -> None:
+        _heavy_init_side_effect(rt, on_progress)
+        rt.controls = controls
+
+    mock_init_heavy.side_effect = heavy_with_controls
+    mock_tick_frame.side_effect = lambda *_a, **_k: None
+
+    quit_event = MagicMock()
+    quit_event.type = pygame.QUIT
+    mock_pygame.event.get.side_effect = [[], [quit_event]]
+    mock_pygame.QUIT = pygame.QUIT
+    mock_pygame.time.Clock.return_value.tick.return_value = 33
+
+    VisualizerApp(runtime).run()
+
+    assert controls.try_quit.call_count == 1
+    controls.consume_pending_exit.assert_called()
+    runtime.overlay.notify_input.assert_not_called()
+
+
+@patch("cleave.viz.app.current_sec", return_value=0.0)
+@patch("cleave.viz.app.pygame")
+@patch("cleave.viz.app._warmup_layers")
+@patch("cleave.viz.app.draw_loading_screen")
+@patch("cleave.viz.app._init_gl_resources_heavy")
+@patch("cleave.viz.app._init_gl_resources_cheap")
+@patch.object(VisualizerApp, "tick_frame")
+def test_run_pygame_quit_dirty_stays_open(
+    mock_tick_frame: MagicMock,
+    mock_init_cheap: MagicMock,
+    mock_init_heavy: MagicMock,
+    mock_draw_loading: MagicMock,
+    mock_warmup: MagicMock,
+    mock_pygame: MagicMock,
+    _mock_current_sec: MagicMock,
+) -> None:
+    compositor = recording_compositor()
+    runtime = _minimal_runtime(compositor)
+    runtime.cfg = MagicMock()
+    runtime.cfg.visualizer.warmup_sec = 0.0
+    runtime.mix_player = None
+    runtime.playback = None
+    runtime.controls = None
+    runtime.timeline_controls = None
+
+    mock_init_cheap.side_effect = lambda rt: None
+    controls = MagicMock()
+    controls.try_quit.return_value = False
+    controls.consume_pending_exit.return_value = False
+    controls.tick = MagicMock()
+    controls.key_repeat_armed = False
+    controls.consume_hide_overlay.return_value = False
+
+    def heavy_with_controls(rt: VisualizerRuntime, on_progress=None) -> None:
+        _heavy_init_side_effect(rt, on_progress)
+        rt.controls = controls
+
+    mock_init_heavy.side_effect = heavy_with_controls
+    mock_tick_frame.side_effect = lambda *_a, **_k: None
+
+    quit_event = MagicMock()
+    quit_event.type = pygame.QUIT
+    mock_pygame.event.get.side_effect = [[], [quit_event], RuntimeError("still running")]
+    mock_pygame.QUIT = pygame.QUIT
+    mock_pygame.time.Clock.return_value.tick.return_value = 33
+
+    try:
+        VisualizerApp(runtime).run()
+        raise AssertionError("expected main loop to continue")
+    except RuntimeError as exc:
+        assert str(exc) == "still running"
+
+    assert controls.try_quit.call_count == 1
+    controls.consume_pending_exit.assert_called()
+    runtime.overlay.notify_input.assert_called_once()
+
+
+@patch("cleave.viz.app.current_sec", return_value=0.0)
+@patch("cleave.viz.app.pygame")
+@patch("cleave.viz.app._warmup_layers")
+@patch("cleave.viz.app.draw_loading_screen")
+@patch("cleave.viz.app._init_gl_resources_heavy")
+@patch("cleave.viz.app._init_gl_resources_cheap")
+@patch.object(VisualizerApp, "tick_frame")
+def test_run_main_loop_stays_open_without_quit_event(
+    mock_tick_frame: MagicMock,
+    mock_init_cheap: MagicMock,
+    mock_init_heavy: MagicMock,
+    mock_draw_loading: MagicMock,
+    mock_warmup: MagicMock,
+    mock_pygame: MagicMock,
+    _mock_current_sec: MagicMock,
+) -> None:
+    compositor = recording_compositor()
+    runtime = _minimal_runtime(compositor)
+    runtime.cfg = MagicMock()
+    runtime.cfg.visualizer.warmup_sec = 0.0
+    runtime.mix_player = None
+    runtime.playback = None
+    runtime.controls = None
+    runtime.timeline_controls = None
+
+    mock_init_cheap.side_effect = lambda rt: None
+    controls = MagicMock()
+    controls.try_quit.return_value = True
+    controls.consume_pending_exit.return_value = False
+    controls.tick = MagicMock()
+    controls.key_repeat_armed = False
+    controls.consume_hide_overlay.return_value = False
+
+    def heavy_with_controls(rt: VisualizerRuntime, on_progress=None) -> None:
+        _heavy_init_side_effect(rt, on_progress)
+        rt.controls = controls
+
+    mock_init_heavy.side_effect = heavy_with_controls
+    mock_tick_frame.side_effect = lambda *_a, **_k: None
+
+    mock_pygame.event.get.side_effect = [[], RuntimeError("still running")]
+    mock_pygame.QUIT = pygame.QUIT
+    mock_pygame.time.Clock.return_value.tick.return_value = 33
+
+    try:
+        VisualizerApp(runtime).run()
+        raise AssertionError("expected main loop to continue")
+    except RuntimeError as exc:
+        assert str(exc) == "still running"
+
+    controls.try_quit.assert_not_called()
+
+
 @patch("cleave.viz.app._draw_tuning_overlay")
 @patch("cleave.viz.app._composite_live_render_overlay")
 @patch("cleave.viz.app.live_frame_fade_alpha", return_value=1.0)
