@@ -305,7 +305,7 @@ def test_render_frame_count_and_ffmpeg_args(
 @patch.object(render_mod, "pygame")
 @patch.object(render_mod, "shutil")
 @patch.object(render_mod, "subprocess")
-@patch.object(render_mod, "_warmup_layers")
+@patch.object(render_mod.LayerFramePipeline, "warmup")
 @patch.object(render_mod, "_init_gl_resources_render")
 @patch.object(render_mod, "build_render_runtime")
 @patch.object(render_mod, "scan_all_layers", return_value={})

@@ -14,7 +14,7 @@ from cleave.timeline import (
 from cleave.viz.controls import SEEK_LONG, SEEK_SHORT
 from cleave.viz.session import TuningSession
 from cleave.viz.key_repeat import mod_ctrl, mod_shift
-from cleave.viz.layer import (
+from cleave.viz.layer_visibility import (
     armed_recording_visible,
     build_record_punch_cues,
     effective_layer_enabled,

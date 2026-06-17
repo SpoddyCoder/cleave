@@ -604,7 +604,7 @@ def test_stop_record_restores_committed_after_punch_range() -> None:
     controls.handle_keydown(keydown(pygame.K_r))
 
     from cleave.timeline import layer_visible_at
-    from cleave.viz.layer import timeline_defaults
+    from cleave.viz.layer_visibility import timeline_defaults
 
     defaults = timeline_defaults(session)
     assert layer_visible_at(session.timeline.cues, defaults, "drums", 14.9) is True
@@ -639,7 +639,7 @@ def test_stop_record_restores_disabled_tail_when_disable_inside_punch() -> None:
     controls.handle_keydown(keydown(pygame.K_r))
 
     from cleave.timeline import layer_visible_at
-    from cleave.viz.layer import timeline_defaults
+    from cleave.viz.layer_visibility import timeline_defaults
 
     defaults = timeline_defaults(session)
     assert layer_visible_at(session.timeline.cues, defaults, "drums", 11.9) is False
@@ -664,7 +664,7 @@ def test_stop_record_restores_enabled_tail_when_injecting_disabled_section() -> 
     controls.handle_keydown(keydown(pygame.K_r))
 
     from cleave.timeline import layer_visible_at
-    from cleave.viz.layer import timeline_defaults
+    from cleave.viz.layer_visibility import timeline_defaults
 
     defaults = timeline_defaults(session)
     assert layer_visible_at(session.timeline.cues, defaults, "drums", 9.9) is True

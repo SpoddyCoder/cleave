@@ -108,11 +108,11 @@ def _timeline_open_runtime(compositor: MagicMock) -> LiveVisualizerRuntime:
     return runtime
 
 
-@patch("cleave.viz.app._draw_tuning_overlay")
+@patch("cleave.viz.app.OverlayDrawer.draw_tuning")
 @patch("cleave.viz.app._composite_live_render_overlay")
 @patch("cleave.viz.app.live_frame_fade_alpha", return_value=1.0)
-@patch("cleave.viz.app._composite_ordered")
-@patch("cleave.viz.app.apply_effect_modifiers")
+@patch("cleave.viz.app.LayerFramePipeline.composite")
+@patch("cleave.viz.app.LayerFramePipeline.render_frame")
 @patch("cleave.viz.app.apply_layer_visibility")
 def test_tick_frame_overlay_order_fade_content_present_then_ui(
     _mock_visibility: MagicMock,
@@ -198,7 +198,7 @@ def _heavy_init_side_effect(
 
 @patch("cleave.viz.app.current_sec", return_value=0.0)
 @patch("cleave.viz.app.pygame")
-@patch("cleave.viz.app._warmup_layers")
+@patch("cleave.viz.app.LayerFramePipeline.warmup")
 @patch("cleave.viz.app.draw_loading_screen")
 @patch("cleave.viz.app._init_gl_resources_heavy")
 @patch("cleave.viz.app._init_gl_resources_cheap")
@@ -268,7 +268,7 @@ def test_run_boot_order_audio_starts_after_first_frame(
 
 @patch("cleave.viz.app.current_sec", return_value=0.0)
 @patch("cleave.viz.app.pygame")
-@patch("cleave.viz.app._warmup_layers")
+@patch("cleave.viz.app.LayerFramePipeline.warmup")
 @patch("cleave.viz.app.draw_loading_screen")
 @patch("cleave.viz.app._init_gl_resources_heavy")
 @patch("cleave.viz.app._init_gl_resources_cheap")
@@ -328,7 +328,7 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
 
 @patch("cleave.viz.app.current_sec", return_value=0.0)
 @patch("cleave.viz.app.pygame")
-@patch("cleave.viz.app._warmup_layers")
+@patch("cleave.viz.app.LayerFramePipeline.warmup")
 @patch("cleave.viz.app.draw_loading_screen")
 @patch("cleave.viz.app._init_gl_resources_heavy")
 @patch("cleave.viz.app._init_gl_resources_cheap")
@@ -388,7 +388,7 @@ def test_run_ctrl_q_clean_exits(
 
 @patch("cleave.viz.app.current_sec", return_value=0.0)
 @patch("cleave.viz.app.pygame")
-@patch("cleave.viz.app._warmup_layers")
+@patch("cleave.viz.app.LayerFramePipeline.warmup")
 @patch("cleave.viz.app.draw_loading_screen")
 @patch("cleave.viz.app._init_gl_resources_heavy")
 @patch("cleave.viz.app._init_gl_resources_cheap")
@@ -452,7 +452,7 @@ def test_run_pygame_quit_dirty_stays_open(
 
 @patch("cleave.viz.app.current_sec", return_value=0.0)
 @patch("cleave.viz.app.pygame")
-@patch("cleave.viz.app._warmup_layers")
+@patch("cleave.viz.app.LayerFramePipeline.warmup")
 @patch("cleave.viz.app.draw_loading_screen")
 @patch("cleave.viz.app._init_gl_resources_heavy")
 @patch("cleave.viz.app._init_gl_resources_cheap")
@@ -508,11 +508,11 @@ def test_run_main_loop_stays_open_without_quit_event(
     controls.try_quit.assert_not_called()
 
 
-@patch("cleave.viz.app._draw_tuning_overlay")
+@patch("cleave.viz.app.OverlayDrawer.draw_tuning")
 @patch("cleave.viz.app._composite_live_render_overlay")
 @patch("cleave.viz.app.live_frame_fade_alpha", return_value=1.0)
-@patch("cleave.viz.app._composite_ordered")
-@patch("cleave.viz.app.apply_effect_modifiers")
+@patch("cleave.viz.app.LayerFramePipeline.composite")
+@patch("cleave.viz.app.LayerFramePipeline.render_frame")
 @patch("cleave.viz.app.apply_layer_visibility")
 def test_tick_frame_overlay_order_at_upscale_one(
     _mock_visibility: MagicMock,
@@ -621,12 +621,12 @@ def test_keyup_routing_main_for_vertical_nav_when_submenu_focused() -> None:
     assert _keyup_handler_for_session(runtime, pygame.K_RETURN) is timeline
 
 
-@patch("cleave.viz.app._draw_timeline_overlay")
-@patch("cleave.viz.app._draw_tuning_overlay")
+@patch("cleave.viz.app.OverlayDrawer.draw_timeline")
+@patch("cleave.viz.app.OverlayDrawer.draw_tuning")
 @patch("cleave.viz.app._composite_live_render_overlay")
 @patch("cleave.viz.app.live_frame_fade_alpha", return_value=1.0)
-@patch("cleave.viz.app._composite_ordered")
-@patch("cleave.viz.app.apply_effect_modifiers")
+@patch("cleave.viz.app.LayerFramePipeline.composite")
+@patch("cleave.viz.app.LayerFramePipeline.render_frame")
 @patch("cleave.viz.app.apply_layer_visibility")
 def test_tick_frame_skips_timeline_when_overlay_hidden_and_not_in_submenu(
     _mock_visibility: MagicMock,
@@ -647,12 +647,12 @@ def test_tick_frame_skips_timeline_when_overlay_hidden_and_not_in_submenu(
     mock_draw_timeline.assert_not_called()
 
 
-@patch("cleave.viz.app._draw_timeline_overlay")
-@patch("cleave.viz.app._draw_tuning_overlay")
+@patch("cleave.viz.app.OverlayDrawer.draw_timeline")
+@patch("cleave.viz.app.OverlayDrawer.draw_tuning")
 @patch("cleave.viz.app._composite_live_render_overlay")
 @patch("cleave.viz.app.live_frame_fade_alpha", return_value=1.0)
-@patch("cleave.viz.app._composite_ordered")
-@patch("cleave.viz.app.apply_effect_modifiers")
+@patch("cleave.viz.app.LayerFramePipeline.composite")
+@patch("cleave.viz.app.LayerFramePipeline.render_frame")
 @patch("cleave.viz.app.apply_layer_visibility")
 def test_tick_frame_draws_timeline_when_overlay_hidden_but_submenu_focused(
     _mock_visibility: MagicMock,
@@ -688,12 +688,12 @@ def test_timeline_strip_visible_while_submenu_focused_despite_hidden_overlay() -
     assert _timeline_strip_fade(tl, overlay_visibility=0.5) == 0.5
 
 
-@patch("cleave.viz.app._draw_timeline_overlay")
-@patch("cleave.viz.app._draw_tuning_overlay")
+@patch("cleave.viz.app.OverlayDrawer.draw_timeline")
+@patch("cleave.viz.app.OverlayDrawer.draw_tuning")
 @patch("cleave.viz.app._composite_live_render_overlay")
 @patch("cleave.viz.app.live_frame_fade_alpha", return_value=1.0)
-@patch("cleave.viz.app._composite_ordered")
-@patch("cleave.viz.app.apply_effect_modifiers")
+@patch("cleave.viz.app.LayerFramePipeline.composite")
+@patch("cleave.viz.app.LayerFramePipeline.render_frame")
 @patch("cleave.viz.app.apply_layer_visibility")
 def test_tick_frame_draws_timeline_when_overlay_visible_and_panel_open(
     _mock_visibility: MagicMock,
@@ -734,12 +734,12 @@ def test_esc_hide_clears_submenu_focus_preserves_panel_open() -> None:
     assert overlay.is_visible() is False
 
 
-@patch("cleave.viz.app._draw_timeline_overlay")
-@patch("cleave.viz.app._draw_tuning_overlay")
+@patch("cleave.viz.app.OverlayDrawer.draw_timeline")
+@patch("cleave.viz.app.OverlayDrawer.draw_tuning")
 @patch("cleave.viz.app._composite_live_render_overlay")
 @patch("cleave.viz.app.live_frame_fade_alpha", return_value=1.0)
-@patch("cleave.viz.app._composite_ordered")
-@patch("cleave.viz.app.apply_effect_modifiers")
+@patch("cleave.viz.app.LayerFramePipeline.composite")
+@patch("cleave.viz.app.LayerFramePipeline.render_frame")
 @patch("cleave.viz.app.apply_layer_visibility")
 def test_tick_frame_restores_timeline_after_overlay_shown_again(
     _mock_visibility: MagicMock,
