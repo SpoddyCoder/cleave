@@ -9,13 +9,13 @@ visualizer:
 
 render:
   post_fx:
-    enabled: true
+    enabled: false
     fade_in: 30     # counted from start, 0 = disabled
     fade_out: 4     # counted from end, 0 = disable
 
   overlay:
     enabled: true
-    start_delay: 10
+    start_delay: 5
     display_time: 30
     position: bottom-left
     title: 
@@ -32,12 +32,12 @@ render:
         Edit the cleave-viz.yaml to modify this message, colours etc.
       font-size: 18
       colour: "#ffffff"
-      background-colour: "#3333ff"
+      background-colour: 
     background:
       margin: 40
       padding: 20
       colour: "#000000"
-      opacity: 0.7
+      opacity: 0.6
       border:
         colour: "#ffffff"
         width: 4
@@ -87,4 +87,4 @@ layers:
     blend_mode: black-key
 
 timeline:
-  enabled: true
+  enabled: false
