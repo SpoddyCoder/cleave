@@ -30,6 +30,7 @@ from cleave.viz.controls import (
     TOAST_DURATION_SEC,
     TuningControls,
 )
+from cleave.viz.modal import ModalKind
 from cleave.viz.session import (
     LayerRuntime,
     TimelineRuntime,
@@ -473,7 +474,9 @@ def test_save_as_new_triggers_toast_and_blocks_input() -> None:
     with patch.object(time, "monotonic", return_value=1000.0):
         with patch("sys.stderr", stderr):
             controls.handle_keydown(_keydown(pygame.K_RETURN))
-            assert controls.build_view_state(paused=False).save_choice_active is True
+            modal_view = controls.modal_host.view_state()
+            assert modal_view is not None
+            assert modal_view.kind == ModalKind.SAVE_CHOICE
             controls.handle_keydown(_keydown(pygame.K_RIGHT))
             controls.handle_keydown(_keydown(pygame.K_RETURN))
 
@@ -738,24 +741,28 @@ def test_overwrite_shows_confirm_before_write() -> None:
     controls.focus_index = save_row
 
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
-    state = controls.build_view_state(paused=False)
-    assert state.save_choice_active is True
+    modal_view = controls.modal_host.view_state()
+    assert modal_view is not None
+    assert modal_view.kind == ModalKind.SAVE_CHOICE
     assert writes == []
 
     controls.handle_keydown(_keydown(pygame.K_RETURN))
-    state = controls.build_view_state(paused=False)
-    assert state.confirm_message == "Overwrite cleave.config.yaml?"
+    modal_view = controls.modal_host.view_state()
+    assert modal_view is not None
+    assert modal_view.kind == ModalKind.YES_NO
+    assert modal_view.message == "Overwrite cleave.config.yaml?"
     assert writes == []
 
     assert controls.handle_keydown(_keydown(pygame.K_n)) is True
-    state = controls.build_view_state(paused=False)
-    assert state.confirm_message == "Overwrite cleave.config.yaml?"
-    assert state.confirm_focus_yes is False
+    modal_view = controls.modal_host.view_state()
+    assert modal_view is not None
+    assert modal_view.kind == ModalKind.YES_NO
+    assert modal_view.message == "Overwrite cleave.config.yaml?"
+    assert modal_view.focus_index == 1
     assert writes == []
 
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
-    state = controls.build_view_state(paused=False)
-    assert state.confirm_message is None
+    assert not controls.modal_host.active
     assert writes == []
 
 
@@ -779,8 +786,8 @@ def test_overwrite_confirm_yes_writes_launch_path() -> None:
             controls.handle_keydown(_keydown(pygame.K_RETURN))
 
         assert writes == [launch_path]
+        assert not controls.modal_host.active
         state = controls.build_view_state(paused=False)
-        assert state.confirm_message is None
         assert state.toast_message == "Config overwritten: my-launch.cleave.config.yaml"
         assert "Config overwritten: my-launch.cleave.config.yaml" in stderr.getvalue()
 
@@ -799,8 +806,7 @@ def test_overwrite_confirm_esc_dismisses() -> None:
 
     _choose_overwrite(controls)
     assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
-    state = controls.build_view_state(paused=False)
-    assert state.confirm_message is None
+    assert not controls.modal_host.active
     assert writes == []
 
 
@@ -2174,8 +2180,6 @@ def test_locked_sub_rows_use_locked_color() -> None:
         toast_remaining_sec=view.toast_remaining_sec,
         active_config_label=view.active_config_label,
         allow_overwrite=view.allow_overwrite,
-        confirm_message=view.confirm_message,
-        confirm_focus_yes=view.confirm_focus_yes,
     )
     assert _row_value_color(unfocused, header_row) == VALUE
     assert _row_value_color(unfocused, preset_dir_row) == LOCKED
@@ -2191,8 +2195,6 @@ def test_locked_sub_rows_use_locked_color() -> None:
         toast_remaining_sec=view.toast_remaining_sec,
         active_config_label=view.active_config_label,
         allow_overwrite=view.allow_overwrite,
-        confirm_message=view.confirm_message,
-        confirm_focus_yes=view.confirm_focus_yes,
     )
     assert _row_value_color(focused_header, header_row) == HIGHLIGHT
     assert _row_value_color(focused_header, preset_dir_row) == LOCKED
@@ -2427,9 +2429,10 @@ def test_try_quit_dirty_opens_dialog_and_blocks_exit() -> None:
     controls = _make_controls(("drums",))
     _mutate_dirty(controls)
     assert controls.try_quit() is False
-    state = controls.build_view_state(paused=False)
-    assert state.unsaved_quit_active is True
-    assert state.unsaved_quit_focus == 0
+    modal_view = controls.modal_host.view_state()
+    assert modal_view is not None
+    assert modal_view.kind == ModalKind.UNSAVED_QUIT
+    assert modal_view.focus_index == 0
 
 
 def test_try_quit_dont_save_sets_pending_exit() -> None:
@@ -2440,8 +2443,7 @@ def test_try_quit_dont_save_sets_pending_exit() -> None:
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
     assert controls.consume_pending_exit() is True
     assert controls.consume_pending_exit() is False
-    state = controls.build_view_state(paused=False)
-    assert state.unsaved_quit_active is False
+    assert not controls.modal_host.active
 
 
 def test_try_quit_cancel_and_escape_stay() -> None:
@@ -2454,13 +2456,13 @@ def test_try_quit_cancel_and_escape_stay() -> None:
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
     assert controls._config_save._pending_exit is False
     assert controls.config_dirty
-    assert not controls._config_save._unsaved_quit.active
+    assert not controls.modal_host.active
 
     controls.try_quit()
     controls.handle_modal_keydown(_keydown(pygame.K_ESCAPE))
     assert controls._config_save._pending_exit is False
     assert controls.config_dirty
-    assert not controls._config_save._unsaved_quit.active
+    assert not controls.modal_host.active
 
 
 def test_try_quit_save_chains_through_save_as_new() -> None:
@@ -2471,7 +2473,9 @@ def test_try_quit_save_chains_through_save_as_new() -> None:
 
     controls.try_quit()
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
-    assert controls.build_view_state(paused=False).save_choice_active is True
+    modal_view = controls.modal_host.view_state()
+    assert modal_view is not None
+    assert modal_view.kind == ModalKind.SAVE_CHOICE
 
     controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
@@ -2490,7 +2494,7 @@ def test_try_quit_save_choice_esc_clears_quit_after_save() -> None:
     assert controls._config_save._quit_after_save is False
     assert controls._config_save._pending_exit is False
     assert controls.config_dirty
-    assert not controls._config_save._save_choice.active
+    assert not controls.modal_host.active
 
 
 def test_try_quit_overwrite_confirm_esc_clears_quit_after_save() -> None:
@@ -2503,4 +2507,4 @@ def test_try_quit_overwrite_confirm_esc_clears_quit_after_save() -> None:
 
     controls.handle_modal_keydown(_keydown(pygame.K_ESCAPE))
     assert controls._config_save._quit_after_save is False
-    assert controls.build_view_state(paused=False).confirm_message is None
+    assert not controls.modal_host.active

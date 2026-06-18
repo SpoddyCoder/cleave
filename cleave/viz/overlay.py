@@ -32,7 +32,6 @@ from cleave.viz.row_semantics import (
     TRACK_SUB_ROW_KINDS,
 )
 from cleave.viz.fonts import render_overlay_font_display
-from cleave.viz.confirm import ConfirmDialog, SaveChoiceDialog, UnsavedQuitDialog
 from cleave.viz.text_fit import (
     fit_counter_label_to_width,
     fit_path_label_to_width,
@@ -153,12 +152,6 @@ class TuningViewState:
     move_mode_stem: str | None
     toast_message: str | None
     toast_remaining_sec: float
-    confirm_message: str | None = None
-    confirm_focus_yes: bool = True
-    save_choice_active: bool = False
-    save_choice_focus_overwrite: bool = True
-    unsaved_quit_active: bool = False
-    unsaved_quit_focus: int = 0
     allow_overwrite: bool = True
     active_config_label: str = "cleave-viz.yaml"
     config_dirty: bool = False
@@ -907,56 +900,6 @@ class PanelScrollMetrics:
 
 
 @dataclass(frozen=True)
-class PanelHeaderDialogLayout:
-    confirm_y: int | None
-    save_choice_y: int | None
-    unsaved_quit_y: int | None
-    dialog_block_h: int
-
-
-def panel_header_dialog_layout(
-    *,
-    padding: int,
-    header_row_count: int,
-    row_stride: int,
-    line_gap: int,
-    confirm_h: int,
-    confirm_active: bool,
-    save_choice_h: int,
-    save_choice_active: bool,
-    unsaved_quit_h: int,
-    unsaved_quit_active: bool,
-) -> PanelHeaderDialogLayout:
-    """Stack header dialogs immediately below pinned header rows."""
-    y = padding + header_row_count * row_stride
-    dialog_block_h = 0
-    confirm_y: int | None = None
-    save_choice_y: int | None = None
-    unsaved_quit_y: int | None = None
-
-    if confirm_active:
-        confirm_y = y
-        dialog_block_h += line_gap + confirm_h
-        y += confirm_h
-
-    if save_choice_active:
-        save_choice_y = y + line_gap
-        dialog_block_h += line_gap + save_choice_h
-        y += line_gap + save_choice_h
-
-    if unsaved_quit_active:
-        unsaved_quit_y = y + line_gap
-        dialog_block_h += line_gap + unsaved_quit_h
-
-    return PanelHeaderDialogLayout(
-        confirm_y=confirm_y,
-        save_choice_y=save_choice_y,
-        unsaved_quit_y=unsaved_quit_y,
-        dialog_block_h=dialog_block_h,
-    )
-
-
-@dataclass(frozen=True)
 class PanelToastLayout:
     toast_y: int | None
 
@@ -1006,12 +949,6 @@ def scroll_metrics(
     line_gap: int,
     padding: int,
     header_gap: int,
-    confirm_h: int,
-    confirm_active: bool,
-    save_choice_h: int,
-    save_choice_active: bool,
-    unsaved_quit_h: int,
-    unsaved_quit_active: bool,
     toast_active: bool,
     max_panel_h: int,
 ) -> PanelScrollMetrics:
@@ -1033,15 +970,7 @@ def scroll_metrics(
     header_rows_h = (
         n_header * line_h + max(0, n_header - 1) * line_gap if n_header else 0
     )
-    dialog_block_h = 0
-    if confirm_active:
-        dialog_block_h += line_gap + confirm_h
-    if save_choice_active:
-        dialog_block_h += line_gap + save_choice_h
-    if unsaved_quit_active:
-        dialog_block_h += line_gap + unsaved_quit_h
-
-    header_block_h = header_rows_h + dialog_block_h
+    header_block_h = header_rows_h
     if scrollable_indices:
         header_block_h += header_gap
 
@@ -1054,12 +983,6 @@ def scroll_metrics(
         + (header_gap if first_scrollable_visible is not None else 0)
         + padding * 2
     )
-    if confirm_active:
-        natural_h += line_gap + confirm_h
-    if save_choice_active:
-        natural_h += line_gap + save_choice_h
-    if unsaved_quit_active:
-        natural_h += line_gap + unsaved_quit_h
     if toast_active:
         natural_h += line_gap + line_h
 
@@ -1146,9 +1069,6 @@ class TuningOverlay:
         self._visibility = 0.0
         self._font: pygame.font.Font | None = None
         self._panel_rect: tuple[int, int, int, int] | None = None
-        self._confirm = ConfirmDialog()
-        self._save_choice = SaveChoiceDialog()
-        self._unsaved_quit = UnsavedQuitDialog()
         self._scroll_y = 0
 
     def _clamp_scroll(self, scroll_content_h: int, viewport_h: int) -> None:
@@ -1311,34 +1231,6 @@ class TuningOverlay:
             None,
         )
         toast_active = bool(state.toast_message and state.toast_remaining_sec > 0)
-        confirm_active = state.confirm_message is not None
-        save_choice_active = state.save_choice_active
-        unsaved_quit_active = state.unsaved_quit_active
-
-        confirm_h = 0
-        confirm_w = 0
-        if confirm_active:
-            assert state.confirm_message is not None
-            confirm_h = self._confirm.measure_height(
-                font,
-                state.confirm_message,
-                line_gap=self._line_gap,
-            )
-            confirm_w = self._confirm.measure_width(font, state.confirm_message)
-
-        save_choice_h = 0
-        save_choice_w = 0
-        if save_choice_active:
-            save_choice_h = self._save_choice.measure_height(font)
-            save_choice_w = self._save_choice.measure_width(font)
-
-        unsaved_quit_h = 0
-        unsaved_quit_w = 0
-        if unsaved_quit_active:
-            unsaved_quit_h = self._unsaved_quit.measure_height(
-                font, line_gap=self._line_gap
-            )
-            unsaved_quit_w = self._unsaved_quit.measure_width(font)
 
         header_gap = line_h + self._line_gap
         _, margin_y = self._margin
@@ -1354,12 +1246,6 @@ class TuningOverlay:
             line_gap=self._line_gap,
             padding=self._padding,
             header_gap=header_gap,
-            confirm_h=confirm_h,
-            confirm_active=confirm_active,
-            save_choice_h=save_choice_h,
-            save_choice_active=save_choice_active,
-            unsaved_quit_h=unsaved_quit_h,
-            unsaved_quit_active=unsaved_quit_active,
             toast_active=toast_active,
             max_panel_h=max_panel_h,
         )
@@ -1590,12 +1476,6 @@ class TuningOverlay:
         content_w = max(row_widths) if row_widths else 0
         if toast_surf is not None:
             content_w = max(content_w, toast_surf.get_width())
-        if confirm_active:
-            content_w = max(content_w, confirm_w)
-        if save_choice_active:
-            content_w = max(content_w, save_choice_w)
-        if unsaved_quit_active:
-            content_w = max(content_w, unsaved_quit_w)
         content_w = min(content_w, PANEL_CONTENT_MAX_WIDTH)
         panel_w = content_w + self._padding * 2
         panel_h = metrics.panel_h
@@ -1609,19 +1489,6 @@ class TuningOverlay:
 
         text_alpha = int(255 * self._visibility)
         index_to_draw = {index: draw_index for draw_index, index in enumerate(visible_indices)}
-
-        header_dialog = panel_header_dialog_layout(
-            padding=self._padding,
-            header_row_count=len(metrics.header_indices),
-            row_stride=metrics.row_stride,
-            line_gap=self._line_gap,
-            confirm_h=confirm_h,
-            confirm_active=confirm_active,
-            save_choice_h=save_choice_h,
-            save_choice_active=save_choice_active,
-            unsaved_quit_h=unsaved_quit_h,
-            unsaved_quit_active=unsaved_quit_active,
-        )
 
         if metrics.needs_scroll:
             self._ensure_focus_visible(
@@ -1691,7 +1558,7 @@ class TuningOverlay:
             row_y = self._padding
             for draw_index, index in enumerate(visible_indices):
                 if index == first_scrollable_visible:
-                    row_y += header_dialog.dialog_block_h + header_gap
+                    row_y += header_gap
                 self._blit_row(
                     panel,
                     state=state,
@@ -1712,48 +1579,6 @@ class TuningOverlay:
             line_h=line_h,
             toast_active=toast_active,
         )
-
-        if confirm_active and text_alpha >= 2 and header_dialog.confirm_y is not None:
-            assert state.confirm_message is not None
-            self._confirm.draw(
-                panel,
-                font,
-                x=self._padding,
-                y=header_dialog.confirm_y,
-                message=state.confirm_message,
-                focus_yes=state.confirm_focus_yes,
-                text_alpha=text_alpha,
-                line_gap=self._line_gap,
-            )
-
-        if (
-            save_choice_active
-            and text_alpha >= 2
-            and header_dialog.save_choice_y is not None
-        ):
-            self._save_choice.draw(
-                panel,
-                font,
-                x=self._padding,
-                y=header_dialog.save_choice_y,
-                focus_overwrite=state.save_choice_focus_overwrite,
-                text_alpha=text_alpha,
-            )
-
-        if (
-            unsaved_quit_active
-            and text_alpha >= 2
-            and header_dialog.unsaved_quit_y is not None
-        ):
-            self._unsaved_quit.draw(
-                panel,
-                font,
-                x=self._padding,
-                y=header_dialog.unsaved_quit_y,
-                focus_index=state.unsaved_quit_focus,
-                text_alpha=text_alpha,
-                line_gap=self._line_gap,
-            )
 
         if toast_surf is not None and text_alpha >= 2 and toast_layout.toast_y is not None:
             toast_surf.set_alpha(text_alpha)

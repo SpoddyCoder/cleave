@@ -20,7 +20,6 @@ from cleave.viz.overlay import (
     find_row_by_kind,
     fit_row_text,
     panel_content_max_width,
-    panel_header_dialog_layout,
     panel_help_hint_layout,
     panel_toast_layout,
     render_visibility_icon,
@@ -122,28 +121,6 @@ def _panel_scroll_metrics(
     if timeline_panel_open:
         max_panel_h -= timeline_viewport_reserve_px(surface_height)
 
-    confirm_active = state.confirm_message is not None
-    confirm_h = 0
-    if confirm_active:
-        assert state.confirm_message is not None
-        confirm_h = overlay._confirm.measure_height(
-            font,
-            state.confirm_message,
-            line_gap=overlay._line_gap,
-        )
-
-    save_choice_active = state.save_choice_active
-    save_choice_h = (
-        overlay._save_choice.measure_height(font) if save_choice_active else 0
-    )
-
-    unsaved_quit_active = state.unsaved_quit_active
-    unsaved_quit_h = (
-        overlay._unsaved_quit.measure_height(font, line_gap=overlay._line_gap)
-        if unsaved_quit_active
-        else 0
-    )
-
     toast_active = bool(state.toast_message and state.toast_remaining_sec > 0)
 
     return scroll_metrics(
@@ -153,59 +130,9 @@ def _panel_scroll_metrics(
         line_gap=overlay._line_gap,
         padding=overlay._padding,
         header_gap=header_gap,
-        confirm_h=confirm_h,
-        confirm_active=confirm_active,
-        save_choice_h=save_choice_h,
-        save_choice_active=save_choice_active,
-        unsaved_quit_h=unsaved_quit_h,
-        unsaved_quit_active=unsaved_quit_active,
         toast_active=toast_active,
         max_panel_h=max_panel_h,
     )
-
-
-def _confirm_header_y(
-    overlay: TuningOverlay,
-    state: TuningViewState,
-    metrics: PanelScrollMetrics,
-) -> int:
-    font = overlay._font_get()
-    assert state.confirm_message is not None
-    confirm_h = overlay._confirm.measure_height(
-        font,
-        state.confirm_message,
-        line_gap=overlay._line_gap,
-    )
-    header_dialog = panel_header_dialog_layout(
-        padding=overlay._padding,
-        header_row_count=len(metrics.header_indices),
-        row_stride=metrics.row_stride,
-        line_gap=overlay._line_gap,
-        confirm_h=confirm_h,
-        confirm_active=True,
-        save_choice_h=0,
-        save_choice_active=False,
-        unsaved_quit_h=0,
-        unsaved_quit_active=False,
-    )
-    assert header_dialog.confirm_y is not None
-    return header_dialog.confirm_y
-
-
-def _header_rows_bottom_y(overlay: TuningOverlay, metrics: PanelScrollMetrics) -> int:
-    font = overlay._font_get()
-    line_h = font.get_linesize()
-    n_header = len(metrics.header_indices)
-    return overlay._padding + (n_header - 1) * metrics.row_stride + line_h
-
-
-def _copy_panel_surface(overlay: TuningOverlay, state: TuningViewState) -> pygame.Surface:
-    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.notify_input()
-    overlay.draw(surface, state)
-    panel = overlay.panel_rect
-    assert panel is not None
-    return surface.subsurface(panel).copy()
 
 
 def test_scrolled_panel_keeps_focus_row_in_viewport() -> None:
@@ -225,6 +152,15 @@ def test_scrolled_panel_keeps_focus_row_in_viewport() -> None:
     line_h = overlay._font_get().get_linesize()
     assert overlay._scroll_y <= row_y
     assert row_y + line_h <= overlay._scroll_y + metrics.scroll_viewport_h
+
+
+def _copy_panel_surface(overlay: TuningOverlay, state: TuningViewState) -> pygame.Surface:
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.notify_input()
+    overlay.draw(surface, state)
+    panel = overlay.panel_rect
+    assert panel is not None
+    return surface.subsurface(panel).copy()
 
 
 def test_header_rows_pinned_when_scrolled() -> None:
@@ -666,102 +602,13 @@ def test_panel_reserves_timeline_viewport_when_open() -> None:
     assert open_metrics.max_panel_h == closed_metrics.max_panel_h - reserve
 
 
-def test_confirm_dialog_below_header_with_scroll() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    state = _effects_expanded_view_state()
-    state.confirm_message = "Overwrite cleave-viz.yaml?"
-    state.confirm_focus_yes = True
-
-    metrics = _panel_scroll_metrics(overlay, state)
-    assert metrics.needs_scroll
-
-    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.notify_input()
-    overlay.draw(surface, state)
-    panel = overlay.panel_rect
-    assert panel is not None
-
-    confirm_y = _confirm_header_y(overlay, state, metrics)
-    header_bottom = _header_rows_bottom_y(overlay, metrics)
-    assert confirm_y == header_bottom + overlay._line_gap
-    assert confirm_y < overlay._padding + metrics.header_block_h
-
-    font = overlay._font_get()
-    confirm_h = overlay._confirm.measure_height(
-        font,
-        state.confirm_message,
-        line_gap=overlay._line_gap,
-    )
-    scroll_top = overlay._padding + metrics.header_block_h
-    assert confirm_y + confirm_h <= scroll_top
-
-
-def test_confirm_dialog_below_header_without_scroll() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    state = _minimal_view_state(confirm_message="Overwrite cleave-viz.yaml?")
-    state.confirm_focus_yes = True
-
-    metrics = _panel_scroll_metrics(overlay, state)
-    assert not metrics.needs_scroll
-
-    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    overlay.notify_input()
-    overlay.draw(surface, state)
-    panel = overlay.panel_rect
-    assert panel is not None
-
-    confirm_y = _confirm_header_y(overlay, state, metrics)
-    header_bottom = _header_rows_bottom_y(overlay, metrics)
-    assert confirm_y == header_bottom + overlay._line_gap
-
-
-def test_confirm_dialog_pinned_below_header_when_scrolled() -> None:
-    pygame.init()
-    state_top = _effects_expanded_view_state()
-    state_top.confirm_message = "Overwrite cleave-viz.yaml?"
-    scroll_focus = find_row_by_kind(state_top, RowKind.RENDER_TIMELINE_HEADER) - 1
-    state_top.focus_index = scroll_focus
-    state_bottom = _effects_expanded_view_state()
-    state_bottom.confirm_message = "Overwrite cleave-viz.yaml?"
-    state_bottom.focus_index = scroll_focus
-
-    panel_top = _copy_panel_surface(TuningOverlay(), state_top)
-    panel_bottom = _copy_panel_surface(TuningOverlay(), state_bottom)
-
-    overlay = TuningOverlay()
-    metrics = _panel_scroll_metrics(overlay, state_bottom)
-    assert metrics.needs_scroll
-    confirm_y = _confirm_header_y(overlay, state_bottom, metrics)
-    font = overlay._font_get()
-    confirm_h = overlay._confirm.measure_height(
-        font,
-        state_bottom.confirm_message,
-        line_gap=overlay._line_gap,
-    )
-    dialog_h = confirm_h + overlay._line_gap
-
-    top_strip = panel_top.subsurface(
-        (0, confirm_y, panel_top.get_width(), dialog_h)
-    )
-    bottom_strip = panel_bottom.subsurface(
-        (0, confirm_y, panel_bottom.get_width(), dialog_h)
-    )
-    assert pygame.image.tostring(top_strip, "RGBA") == pygame.image.tostring(
-        bottom_strip, "RGBA"
-    )
-
-
-def test_toast_stays_at_panel_bottom_with_confirm() -> None:
+def test_toast_stays_at_panel_bottom() -> None:
     pygame.init()
     overlay = TuningOverlay()
     state = _minimal_view_state(
-        confirm_message="Overwrite cleave-viz.yaml?",
         toast_message="Saved",
         toast_remaining_sec=2.0,
     )
-    metrics = _panel_scroll_metrics(overlay, state)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     overlay.notify_input()
     overlay.draw(surface, state)
@@ -779,25 +626,3 @@ def test_toast_stays_at_panel_bottom_with_confirm() -> None:
     )
     assert toast_layout.toast_y is not None
     assert toast_layout.toast_y == panel_h - overlay._padding - line_h
-
-    confirm_y = _confirm_header_y(overlay, state, metrics)
-    assert confirm_y < toast_layout.toast_y
-
-
-def test_header_block_h_includes_confirm_dialog() -> None:
-    pygame.init()
-    overlay = TuningOverlay()
-    state = _effects_expanded_view_state()
-    base_metrics = _panel_scroll_metrics(overlay, state)
-    state.confirm_message = "Overwrite?"
-    confirm_metrics = _panel_scroll_metrics(overlay, state)
-    font = overlay._font_get()
-    confirm_h = overlay._confirm.measure_height(
-        font,
-        state.confirm_message,
-        line_gap=overlay._line_gap,
-    )
-    assert confirm_metrics.header_block_h == (
-        base_metrics.header_block_h + overlay._line_gap + confirm_h
-    )
-    assert confirm_metrics.footer_block_h == base_metrics.footer_block_h

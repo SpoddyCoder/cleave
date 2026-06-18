@@ -13,6 +13,7 @@ from cleave.effects.registry import effect_row_count
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.key_repeat import KeyRepeatController, mod_ctrl, mod_shift
+from cleave.viz.modal import ModalHost
 from cleave.viz.playback import PlaybackState, seek, toggle_pause
 from cleave.viz.focus_context import FocusContext
 from cleave.viz.live_layer_bindings import LiveLayerBindings
@@ -53,6 +54,7 @@ class TuningControls:
         on_overwrite_config: Callable[[Path], str | None] | None = None,
         launch_config_path: Path | None = None,
         repo_root_example: Path | None = None,
+        modal_host: ModalHost | None = None,
     ) -> None:
         self.session = session
         self.cfg = cfg
@@ -60,6 +62,7 @@ class TuningControls:
         self.playback = playback
         self.duration_sec = duration_sec
         self._layer_bindings = layer_bindings
+        self._modal_host = modal_host if modal_host is not None else ModalHost()
 
         self.focus_index = 0
         self.move_mode_stem: str | None = None
@@ -73,6 +76,7 @@ class TuningControls:
         self._config_save = ConfigSaveController(
             session,
             cfg,
+            self._modal_host,
             launch_config_path=launch_config_path,
             repo_root_example=repo_root_example,
             on_save_new_config=on_save_new_config,
@@ -127,9 +131,17 @@ class TuningControls:
         self._hide_overlay_requested = False
         return requested
 
+    @property
+    def modal_host(self) -> ModalHost:
+        return self._modal_host
+
+    @property
+    def modal_active(self) -> bool:
+        return self._modal_host.active
+
     def handle_modal_keydown(self, event: pygame.event.Event) -> bool:
         """Return True when a modal dialog consumed the event."""
-        return self._config_save.handle_modal_keydown(event)
+        return self._modal_host.handle_keydown(event)
 
     @property
     def pending_exit(self) -> bool:

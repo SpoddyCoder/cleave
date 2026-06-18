@@ -5,7 +5,9 @@ from __future__ import annotations
 import pygame
 
 from cleave.gl_compositor import GlCompositor
+from cleave.viz import modal_overlay
 from cleave.viz.help_overlay import HelpOverlay
+from cleave.viz.modal import ModalHost
 from cleave.viz.overlay import TuningOverlay, TuningViewState, row_kind
 from cleave.viz.timeline_overlay import TimelineOverlay, TimelineViewState
 
@@ -35,6 +37,7 @@ class OverlayDrawer:
         *,
         timeline_panel_open: bool = False,
         help_overlay: HelpOverlay | None = None,
+        modal_host: ModalHost | None = None,
     ) -> None:
         overlay_surface.fill((0, 0, 0, 0))
         overlay.draw(
@@ -50,6 +53,23 @@ class OverlayDrawer:
                 timeline_recording=view_state.timeline_recording,
                 timeline_override_active=view_state.timeline_override_active,
             )
+
+        modal_active = modal_host is not None and modal_host.active
+        if modal_active:
+            modal_view = modal_host.view_state()
+            assert modal_view is not None
+            modal_overlay.draw(
+                overlay_surface,
+                modal_view,
+                font=overlay._font_get(),
+            )
+
+        if modal_active:
+            sw, sh = overlay_surface.get_size()
+            tex_id = compositor.upload_overlay_texture(overlay_surface)
+            compositor.draw_overlay(tex_id, 0, 0, sw, sh)
+            return
+
         panel = overlay.panel_rect
         if panel is not None:
             px, py, pw, ph = panel

@@ -1,89 +1,82 @@
-"""Unit tests for live tuning confirm dialogs."""
+"""Unit tests for live tuning modal host."""
 
 from __future__ import annotations
 
 import pygame
 
-from cleave.viz.confirm import UnsavedQuitDialog, UnsavedQuitRequest
+from cleave.viz.modal import ModalHost
 
 
 def _keydown(key: int) -> pygame.event.Event:
     return pygame.event.Event(pygame.KEYDOWN, key=key, mod=0)
 
 
-def test_unsaved_quit_dialog_left_right_cycles_three_options() -> None:
-    dialog = UnsavedQuitDialog()
-    dialog.prompt(
-        UnsavedQuitRequest(on_save=lambda: None, on_discard=lambda: None)
-    )
-    assert dialog.focus_index == 0
+def test_unsaved_quit_left_right_cycles_three_options() -> None:
+    modal = ModalHost()
+    modal.prompt_unsaved_quit(on_save=lambda: None, on_discard=lambda: None)
+    view = modal.view_state()
+    assert view is not None
+    assert view.focus_index == 0
 
-    dialog.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert dialog.focus_index == 1
+    modal.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert modal.view_state() is not None
+    assert modal.view_state().focus_index == 1
 
-    dialog.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert dialog.focus_index == 2
+    modal.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert modal.view_state().focus_index == 2
 
-    dialog.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert dialog.focus_index == 0
+    modal.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert modal.view_state().focus_index == 0
 
-    dialog.handle_keydown(_keydown(pygame.K_LEFT))
-    assert dialog.focus_index == 2
+    modal.handle_keydown(_keydown(pygame.K_LEFT))
+    assert modal.view_state().focus_index == 2
 
 
-def test_unsaved_quit_dialog_enter_activates_focused_option() -> None:
+def test_unsaved_quit_enter_activates_focused_option() -> None:
     events: list[str] = []
-    dialog = UnsavedQuitDialog()
-    dialog.prompt(
-        UnsavedQuitRequest(
-            on_save=lambda: events.append("save"),
-            on_discard=lambda: events.append("discard"),
-        )
+    modal = ModalHost()
+    modal.prompt_unsaved_quit(
+        on_save=lambda: events.append("save"),
+        on_discard=lambda: events.append("discard"),
     )
 
-    dialog.handle_keydown(_keydown(pygame.K_RIGHT))
-    dialog.handle_keydown(_keydown(pygame.K_RETURN))
+    modal.handle_keydown(_keydown(pygame.K_RIGHT))
+    modal.handle_keydown(_keydown(pygame.K_RETURN))
     assert events == ["discard"]
-    assert not dialog.active
+    assert not modal.active
 
-    dialog.prompt(
-        UnsavedQuitRequest(
-            on_save=lambda: events.append("save"),
-            on_discard=lambda: events.append("discard"),
-        )
+    modal.prompt_unsaved_quit(
+        on_save=lambda: events.append("save"),
+        on_discard=lambda: events.append("discard"),
     )
-    dialog.handle_keydown(_keydown(pygame.K_RETURN))
+    modal.handle_keydown(_keydown(pygame.K_RETURN))
     assert events == ["discard", "save"]
 
 
-def test_unsaved_quit_dialog_escape_cancels() -> None:
+def test_unsaved_quit_escape_cancels() -> None:
     events: list[str] = []
-    dialog = UnsavedQuitDialog()
-    dialog.prompt(
-        UnsavedQuitRequest(
-            on_save=lambda: events.append("save"),
-            on_discard=lambda: events.append("discard"),
-            on_cancel=lambda: events.append("cancel"),
-        )
+    modal = ModalHost()
+    modal.prompt_unsaved_quit(
+        on_save=lambda: events.append("save"),
+        on_discard=lambda: events.append("discard"),
+        on_cancel=lambda: events.append("cancel"),
     )
 
-    dialog.handle_keydown(_keydown(pygame.K_ESCAPE))
+    modal.handle_keydown(_keydown(pygame.K_ESCAPE))
     assert events == ["cancel"]
-    assert not dialog.active
+    assert not modal.active
 
 
-def test_unsaved_quit_dialog_message() -> None:
-    dialog = UnsavedQuitDialog()
-    assert (
-        dialog.message
-        == "Unsaved changes - save changes before exit?"
-    )
+def test_unsaved_quit_message() -> None:
+    modal = ModalHost()
+    modal.prompt_unsaved_quit(on_save=lambda: None, on_discard=lambda: None)
+    view = modal.view_state()
+    assert view is not None
+    assert view.message == "Unsaved changes - save changes before exit?"
 
 
-def test_unsaved_quit_dialog_consumes_keys_while_active() -> None:
-    dialog = UnsavedQuitDialog()
-    dialog.prompt(
-        UnsavedQuitRequest(on_save=lambda: None, on_discard=lambda: None)
-    )
-    assert dialog.handle_keydown(_keydown(pygame.K_a)) is True
-    assert dialog.active
+def test_unsaved_quit_consumes_keys_while_active() -> None:
+    modal = ModalHost()
+    modal.prompt_unsaved_quit(on_save=lambda: None, on_discard=lambda: None)
+    assert modal.handle_keydown(_keydown(pygame.K_a)) is True
+    assert modal.active

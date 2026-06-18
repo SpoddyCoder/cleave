@@ -14,6 +14,7 @@ from cleave.preset_playlist import PresetPlaylist
 from cleave.signals import Signals
 from cleave.viz.controls import TuningControls
 from cleave.viz.live_layer_bindings import LiveLayerBindings
+from cleave.viz.modal import ModalHost
 from cleave.viz.session import TuningSession
 from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.layer import StemLayer
@@ -55,6 +56,7 @@ def make_tuning_controls(
     effect_runtime: EffectRuntime,
     pcm_bank: StemPcmBank | None = None,
     mix_player: MixPlayer | None = None,
+    modal_host: ModalHost | None = None,
 ) -> TuningControls:
     def on_preset_change(stem: str, playlist: PresetPlaylist) -> None:
         layer = layers_by_name[stem]
@@ -146,6 +148,8 @@ def make_tuning_controls(
         "duration_sec": duration_sec,
         "layer_bindings": layer_bindings,
     }
+    if modal_host is not None:
+        kwargs["modal_host"] = modal_host
 
     if cfg is not None:
         def on_save_new_config() -> Path:

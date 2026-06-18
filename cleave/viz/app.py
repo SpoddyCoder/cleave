@@ -24,6 +24,7 @@ from cleave.viz.mix_player import MixPlayer
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline
 from cleave.viz.layer_visibility import apply_layer_visibility, build_timeline_view_state
+from cleave.viz.modal import ModalHost
 from cleave.viz.overlay_draw import OverlayDrawer
 from cleave.viz.loading import draw_loading_screen
 from cleave.viz.help_overlay import HelpOverlay
@@ -82,6 +83,7 @@ class LiveVisualizerRuntime(VisualizerCore):
 
     controls: TuningControls
     timeline_controls: TimelineControls
+    modal_host: ModalHost
     mix_player: MixPlayer
     playback: PlaybackState
     overlay: TuningOverlay
@@ -176,6 +178,7 @@ def init_gl_resources_heavy(
     mix_player = MixPlayer(mix_pcm, sample_rate)
     playback = init_playback(mix_player)
 
+    modal_host = ModalHost()
     controls = make_tuning_controls(
         session=seed.session,
         cfg=seed.cfg,
@@ -189,6 +192,7 @@ def init_gl_resources_heavy(
         effect_runtime=seed.effect_runtime,
         pcm_bank=seed.pcm_bank,
         mix_player=mix_player,
+        modal_host=modal_host,
     )
     timeline_controls = make_timeline_controls(
         session=seed.session,
@@ -211,6 +215,7 @@ def init_gl_resources_heavy(
         post_process=post_process,
         controls=controls,
         timeline_controls=timeline_controls,
+        modal_host=modal_host,
         mix_player=mix_player,
         playback=playback,
         overlay=TuningOverlay(),
@@ -313,6 +318,7 @@ def _tick_frame_live_overlay(
         view_state,
         timeline_panel_open=timeline_panel_open,
         help_overlay=runtime.help_overlay,
+        modal_host=runtime.modal_host,
     )
 
     if timeline_strip_visible:

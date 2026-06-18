@@ -71,12 +71,12 @@ def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) 
     if event.type != pygame.KEYDOWN:
         return True
 
+    if runtime.modal_host.active:
+        return runtime.controls.handle_modal_keydown(event)
+
     global_result = _handle_global_keydown(event, runtime)
     if global_result is not None:
         return global_result
-
-    if runtime.controls.handle_modal_keydown(event):
-        return True
 
     key_handler = key_handler_for_runtime(runtime, event.key)
     return key_handler.handle_keydown(event)

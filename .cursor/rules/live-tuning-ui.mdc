@@ -8,7 +8,11 @@ alwaysApply: false
 
 The focus-driven tree panel ([cleave/viz/overlay.py](cleave/viz/overlay.py) draws; [cleave/viz/controls.py](cleave/viz/controls.py) coordinates input; [cleave/viz/tuning_view_state.py](cleave/viz/tuning_view_state.py) builds `TuningViewState`; [cleave/viz/session.py](cleave/viz/session.py) holds session) splits into two vertical sections. Use these names in docs, issues, and UI work.
 
-Unsaved config edits show an asterisk on the active config path row. **Ctrl+Q** and window close route through `TuningControls.try_quit()` (delegates to [cleave/viz/config_save.py](cleave/viz/config_save.py)); when dirty, a three-option quit dialog (Save / Don't save / Cancel) appears before exit.
+Unsaved config edits show an asterisk on the active config path row. **Ctrl+Q** and window close route through `TuningControls.try_quit()` (delegates to [cleave/viz/config_save.py](cleave/viz/config_save.py)); when dirty, a centered three-option quit modal (Save / Don't save / Cancel) appears before exit.
+
+## Centered modals
+
+Confirm, save-choice, and unsaved-quit prompts are drawn by [cleave/viz/modal_overlay.py](cleave/viz/modal_overlay.py) via [cleave/viz/modal.py](cleave/viz/modal.py) `ModalHost`. They appear centered on the viewport with a full-frame scrim (`MODAL_SCRIM_ALPHA` in [cleave/viz/theme.py](cleave/viz/theme.py)); [cleave/viz/overlay_draw.py](cleave/viz/overlay_draw.py) uploads the full overlay surface while a modal is active. Keys route through `TuningControls.handle_modal_keydown` before context handlers ([cleave/viz/input_dispatch.py](cleave/viz/input_dispatch.py)).
 
 ## Track rows section
 
@@ -39,7 +43,7 @@ The pinned top block before a visual gap (`header_gap` in `draw()`): `header_row
 
 - Row kinds: `RowKind.TRANSPORT`, `RowKind.CONFIG_HEADER` (non-navigable active config path), `SAVE_CONFIG`.
 - Constant: `HEADER_ROWS` (3); layout indices 0-2 in `build_row_layout`.
-- Enter on `SAVE_CONFIG` opens an `OVERWRITE` / `SAVE AS NEW` picker when overwrite is allowed (`allow_overwrite`; false for repo-root `cleave-viz.yaml`). Otherwise save-as-new runs immediately. Overwrite still uses the yes/no confirm dialog.
+- Enter on `SAVE_CONFIG` opens an `OVERWRITE` / `SAVE AS NEW` centered modal when overwrite is allowed (`allow_overwrite`; false for repo-root `cleave-viz.yaml`). Otherwise save-as-new runs immediately. Overwrite still uses the yes/no centered modal.
 
 ## Whole panel
 
@@ -84,8 +88,7 @@ These rows do not split label and value; the implementation is deliberate:
 - **Preset dir / preset filename**: single-color row text plus Material Icons (icon colors above).
 - **Transport, save**: single-color header rows in row value color. Save row uses `DISABLED` while `solo_active` (Enter blocked in controls).
 - **Toasts**: `DISABLED`.
-- **Confirm dialog** ([cleave/viz/confirm.py](cleave/viz/confirm.py)): message in `VALUE`; yes/no use `HIGHLIGHT` or `DISABLED` by focus.
-- **Save choice dialog**: `OVERWRITE` / `SAVE AS NEW` options use the same highlight pattern as confirm yes/no.
+- **Centered modals** ([cleave/viz/modal_overlay.py](cleave/viz/modal_overlay.py)): yes/no message in `VALUE`; options use `HIGHLIGHT` or `DISABLED` by focus. Unsaved-quit message uses `HIGHLIGHT` with a tinted background. Save-choice options follow the same highlight pattern.
 
 When focus, move mode, disabled layer, locked sub-row, or empty preset applies, `_row_value_color` may return an accent or state color instead of `VALUE`. That override is expected.
 
@@ -93,8 +96,8 @@ When focus, move mode, disabled layer, locked sub-row, or empty preset applies, 
 
 Layered key handling lives in [cleave/viz/input_dispatch.py](cleave/viz/input_dispatch.py). `dispatch_keydown` runs layers in order:
 
-1. **Global** (`_handle_global_keydown`): **Ctrl+Q** quit via `try_quit()` (blocked while unsaved-changes dialog is open), **h** toggle help (`session.help_visible`), and while recording **Esc** stops the take (panel stays open) and **t** is a no-op.
-2. **Modal** (`TuningControls.handle_modal_keydown`): confirm/save-choice dialogs consume keys before context routing.
+1. **Global** (`_handle_global_keydown`): **Ctrl+Q** quit via `try_quit()` (blocked while unsaved-changes modal is open), **h** toggle help (`session.help_visible`), and while recording **Esc** stops the take (panel stays open) and **t** is a no-op.
+2. **Modal** (`TuningControls.handle_modal_keydown`): centered confirm/save-choice/quit modals consume keys before context routing.
 3. **Context router** (`key_handler_for_runtime`): when the timeline strip is open, enabled, and `submenu_focused`, most keys go to `TimelineControls` except **Up**/**Down** (main focus ring). Otherwise keys go to `TuningControls`.
 
 Add new **global** shortcuts in `input_dispatch.py` (`_handle_global_keydown` or a new global layer). Add **context** keys in `TuningControls` or `TimelineControls` depending on which panel should own them. **h** is always global and works even when the timeline submenu has focus.

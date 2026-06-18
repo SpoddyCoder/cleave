@@ -16,6 +16,7 @@ from cleave.viz.input_dispatch import (
     dispatch_should_notify_overlay,
     key_handler_for_runtime,
 )
+from cleave.viz.modal import ModalHost, ModalKind
 from cleave.viz.overlay import TuningOverlay
 from cleave.viz.timeline_controls import TimelineControls
 from tests.support.compositor_mock import recording_compositor
@@ -85,6 +86,7 @@ def _make_runtime(
         overlay_surface=pygame.Surface((2560, 1440), pygame.SRCALPHA),
         controls=MagicMock(),
         timeline_controls=MagicMock(),
+        modal_host=ModalHost(),
         mix_player=MagicMock(),
         playback=playback,
     )
@@ -95,6 +97,7 @@ def _make_runtime(
         playback=playback,
         duration_sec=120.0,
     )
+    runtime.modal_host = runtime.controls.modal_host
     runtime.timeline_controls = TimelineControls(
         session,
         playback,
@@ -136,8 +139,9 @@ def test_ctrl_q_dirty_session_blocks_quit() -> None:
         )
         is True
     )
-    state = runtime.controls.build_view_state(paused=False)
-    assert state.unsaved_quit_active is True
+    modal_view = runtime.modal_host.view_state()
+    assert modal_view is not None
+    assert modal_view.kind == ModalKind.UNSAVED_QUIT
 
 
 def test_ctrl_q_after_dont_save_exits() -> None:
