@@ -15,6 +15,7 @@ class RowKind(Enum):
     TRACK_BEAT = auto()
     TRACK_EFFECTS_HEADER = auto()
     TRACK_EFFECT = auto()
+    TIMELINE_LAYER_HINT = auto()
     RENDER_SECTION_GAP = auto()
     RENDER_OVERLAY_HEADER = auto()
     RENDER_OVERLAY_POSITION = auto()
@@ -127,6 +128,10 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         repeatable=True,
         help_title="Cleave Effects",
         parent_group="track",
+    ),
+    RowKind.TIMELINE_LAYER_HINT: RowBehavior(
+        RowAffordance.DISPLAY,
+        navigable=False,
     ),
     RowKind.RENDER_SECTION_GAP: RowBehavior(
         RowAffordance.DISPLAY,

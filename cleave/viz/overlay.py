@@ -84,6 +84,7 @@ Anchor = Literal["topleft", "bottomleft"]
 
 HEADER_ROWS = 3
 TREE_INDENT = 16
+TIMELINE_LAYER_HINT_TEXT = "Timeline is enabled and controlling layer visibility"
 ROW_ICON_SUFFIX_GAP = 4
 
 
@@ -199,6 +200,8 @@ def build_row_layout(state: TuningViewState) -> list[RowDescriptor]:
                         driver_slug=effect_def.driver_slug,
                     )
                 )
+    if state.render_timeline.enabled:
+        rows.append(RowDescriptor(RowKind.TIMELINE_LAYER_HINT))
     rows.append(RowDescriptor(RowKind.RENDER_SECTION_GAP))
     rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_HEADER))
     if state.render_overlay.expanded:
@@ -280,7 +283,7 @@ def track_sub_rows_navigable(state: TuningViewState, stem: str) -> bool:
 
 def _sub_row_visible(state: TuningViewState, index: int) -> bool:
     desc = row_descriptor(state, index)
-    if desc.kind == RowKind.RENDER_SECTION_GAP:
+    if desc.kind in {RowKind.RENDER_SECTION_GAP, RowKind.TIMELINE_LAYER_HINT}:
         return True
     if desc.kind in RENDER_OVERLAY_SUB_ROW_KINDS:
         return state.render_overlay.expanded
@@ -315,7 +318,11 @@ def navigable_row_indices(state: TuningViewState) -> list[int]:
     indices: list[int] = []
     for index in range(row_count(state)):
         desc = row_descriptor(state, index)
-        if desc.kind in {RowKind.CONFIG_HEADER, RowKind.RENDER_SECTION_GAP}:
+        if desc.kind in {
+            RowKind.CONFIG_HEADER,
+            RowKind.RENDER_SECTION_GAP,
+            RowKind.TIMELINE_LAYER_HINT,
+        }:
             continue
         if desc.kind in RENDER_OVERLAY_SUB_ROW_KINDS:
             if not state.render_overlay.expanded:
@@ -392,6 +399,9 @@ def _row_text(state: TuningViewState, index: int) -> str:
 
     if kind == RowKind.RENDER_SECTION_GAP:
         return ""
+
+    if kind == RowKind.TIMELINE_LAYER_HINT:
+        return TIMELINE_LAYER_HINT_TEXT
 
     if kind == RowKind.RENDER_OVERLAY_HEADER:
         arrow = "▼" if state.render_overlay.expanded else "▶"
@@ -758,6 +768,8 @@ def fit_row_text(
         )
     if kind == RowKind.RENDER_SECTION_GAP:
         return ""
+    if kind == RowKind.TIMELINE_LAYER_HINT:
+        return TIMELINE_LAYER_HINT_TEXT
     if kind == RowKind.RENDER_OVERLAY_HEADER:
         expanded = state.render_overlay.expanded
         return (
@@ -797,6 +809,8 @@ def _row_indent(state: TuningViewState, index: int) -> int:
         return 0
     if kind == RowKind.RENDER_SECTION_GAP:
         return 0
+    if kind == RowKind.TIMELINE_LAYER_HINT:
+        return 0
     if kind == RowKind.TRACK_EFFECT:
         return TREE_INDENT * 2
     if kind in RENDER_OVERLAY_TITLE_NESTED_KINDS | RENDER_OVERLAY_BODY_NESTED_KINDS:
@@ -826,6 +840,9 @@ def _row_has_tree_focus(state: TuningViewState, index: int) -> bool:
 def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
     """Return the VALUE-role color for a row (before label/value split rendering)."""
     kind = row_kind(state, index)
+    if kind == RowKind.TIMELINE_LAYER_HINT:
+        return DISABLED
+
     stem = row_stem(state, index)
     if kind == RowKind.CONFIG_HEADER:
         return LABEL

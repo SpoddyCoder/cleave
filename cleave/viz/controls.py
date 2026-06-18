@@ -19,13 +19,16 @@ from cleave.viz.focus_context import FocusContext
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.render_overlay_controls import RenderOverlayControls
 from cleave.viz.render_post_fx_controls import RenderPostFxControls
-from cleave.viz.row_semantics import REPEAT_ROW_KINDS, RowKind
+from cleave.viz.row_semantics import REPEAT_ROW_KINDS, RowDescriptor, RowKind
 from cleave.viz.overlay import (
     TuningViewState,
+    build_row_layout,
     find_row,
     find_row_by_kind,
     navigable_row_indices,
     quick_nav_row_indices,
+    row_count,
+    row_descriptor,
     row_effect,
     row_kind,
     row_stem,
@@ -664,15 +667,34 @@ class TuningControls:
         view = self.build_view_state(paused=self.playback.paused)
         return find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
 
+    def _focused_row_descriptor(self, view: TuningViewState) -> RowDescriptor | None:
+        try:
+            return row_descriptor(view, self.focus_index)
+        except IndexError:
+            return None
+
+    def _restore_focus(self, descriptor: RowDescriptor | None) -> None:
+        if descriptor is None:
+            return
+        view = self.build_view_state(paused=self.playback.paused)
+        for index, row in enumerate(build_row_layout(view)):
+            if row == descriptor:
+                self.focus_index = index
+                return
+        self.focus_index = min(self.focus_index, row_count(view) - 1)
+
     def _set_render_timeline_enabled(self, enabled: bool) -> None:
         tl = self.session.timeline
         if tl.enabled == enabled:
             return
+        view = self.build_view_state(paused=self.playback.paused)
+        focused = self._focused_row_descriptor(view)
         tl.enabled = enabled
         if not enabled:
             self.close_timeline_panel()
         if self._layer_bindings is not None:
             self._layer_bindings.on_timeline_enabled_change()
+        self._restore_focus(focused)
 
     def _enter_solo(self, stem: str) -> None:
         if self.session.solo_stem == stem:
