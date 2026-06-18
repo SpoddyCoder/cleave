@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from pathlib import Path
 
 import pygame
 
 from cleave.extract import STEM_NAMES
 from cleave.timeline import TimelineCue
-from cleave.viz.controls import LayerRuntime, SEEK_LONG, SEEK_SHORT, TuningSession
+from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, TuningControls
+from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.timeline_controls import TimelineControls
 from tests.support.viz import keydown, make_playlist, stub_playback_state
 
@@ -25,7 +25,6 @@ def _make_timeline_controls(
     enabled: bool = True,
     position_sec: float = 0.0,
     recording: bool = False,
-    on_config_dirty: Callable[[], None] | None = None,
 ) -> tuple[
     TimelineControls,
     TuningSession,
@@ -75,7 +74,6 @@ def _make_timeline_controls(
         on_exit_submenu=lambda: setattr(tl, "submenu_focused", False),
         on_seek=lambda delta: seeks.append(delta),
         on_toast=toasts.append,
-        on_config_dirty=on_config_dirty,
     )
     return controls, session, visibility_calls, close_calls, seeks, toasts
 
@@ -402,16 +400,23 @@ def test_backspace_toast_when_no_cues() -> None:
 
 
 def test_delete_focused_cue_marks_config_dirty() -> None:
-    dirty_calls: list[bool] = []
-    controls, session, _, _, _, _ = _make_timeline_controls(
-        cues=[TimelineCue(t=1.0, layers={"drums": False})],
-        on_config_dirty=lambda: dirty_calls.append(True),
-    )
+    from tests.cleave.viz.test_controls import _make_controls
 
+    tuning = _make_controls(("drums",))
+    tuning.session.timeline.cues = [TimelineCue(t=1.0, layers={"drums": False})]
+    tuning.session.timeline.enabled = True
+    tuning.clear_config_dirty()
+    assert not tuning.config_dirty
+
+    controls = TimelineControls(
+        tuning.session,
+        stub_playback_state(),
+        120.0,
+    )
     controls.handle_keydown(keydown(pygame.K_BACKSPACE))
 
-    assert dirty_calls == [True]
-    assert session.timeline.cues == []
+    assert tuning.config_dirty
+    assert tuning.session.timeline.cues == []
 
 
 def test_ctrl_enter_writes_to_record_buffer_when_recording() -> None:
@@ -599,7 +604,7 @@ def test_stop_record_restores_committed_after_punch_range() -> None:
     controls.handle_keydown(keydown(pygame.K_r))
 
     from cleave.timeline import layer_visible_at
-    from cleave.viz.layer import timeline_defaults
+    from cleave.viz.layer_visibility import timeline_defaults
 
     defaults = timeline_defaults(session)
     assert layer_visible_at(session.timeline.cues, defaults, "drums", 14.9) is True
@@ -634,7 +639,7 @@ def test_stop_record_restores_disabled_tail_when_disable_inside_punch() -> None:
     controls.handle_keydown(keydown(pygame.K_r))
 
     from cleave.timeline import layer_visible_at
-    from cleave.viz.layer import timeline_defaults
+    from cleave.viz.layer_visibility import timeline_defaults
 
     defaults = timeline_defaults(session)
     assert layer_visible_at(session.timeline.cues, defaults, "drums", 11.9) is False
@@ -659,7 +664,7 @@ def test_stop_record_restores_enabled_tail_when_injecting_disabled_section() -> 
     controls.handle_keydown(keydown(pygame.K_r))
 
     from cleave.timeline import layer_visible_at
-    from cleave.viz.layer import timeline_defaults
+    from cleave.viz.layer_visibility import timeline_defaults
 
     defaults = timeline_defaults(session)
     assert layer_visible_at(session.timeline.cues, defaults, "drums", 9.9) is True

@@ -11,7 +11,6 @@ from cleave.viz.row_semantics import (
     RENDER_OVERLAY_SUB_ROW_KINDS,
     RENDER_OVERLAY_TITLE_NESTED_KINDS,
     RENDER_POST_FX_SUB_ROW_KINDS,
-    RENDER_TIMELINE_SUB_ROW_KINDS,
     REPEAT_ROW_KINDS,
     ROW_BEHAVIORS,
     TRACK_EFFECT_SUB_ROW_KINDS,
@@ -94,7 +93,6 @@ def test_parent_group_frozensets_match_row_behaviors() -> None:
         ("render_overlay_title", RENDER_OVERLAY_TITLE_NESTED_KINDS),
         ("render_overlay_body", RENDER_OVERLAY_BODY_NESTED_KINDS),
         ("render_post_fx", RENDER_POST_FX_SUB_ROW_KINDS),
-        ("render_timeline", RENDER_TIMELINE_SUB_ROW_KINDS),
     ):
         derived = frozenset(
             k for k, b in ROW_BEHAVIORS.items() if b.parent_group == group
@@ -165,10 +163,6 @@ def test_render_post_fx_sub_row_kinds() -> None:
             RowKind.RENDER_POST_FX_FADE_OUT,
         }
     )
-
-
-def test_render_timeline_sub_row_kinds_empty() -> None:
-    assert RENDER_TIMELINE_SUB_ROW_KINDS == frozenset()
 
 
 def test_locked_navigable_sub_row_kinds() -> None:

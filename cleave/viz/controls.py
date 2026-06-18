@@ -2,65 +2,24 @@
 
 from __future__ import annotations
 
-import sys
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, field
 from pathlib import Path
 
 import pygame
 
-from cleave.config import (
-    DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
-    DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
-    DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
-    DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
-    DEFAULT_RENDER_OVERLAY_FONT,
-    DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
-    DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
-    DEFAULT_RENDER_OVERLAY_POSITION,
-    DEFAULT_RENDER_OVERLAY_START_DELAY,
-    DEFAULT_RENDER_POST_FX_FADE_IN,
-    DEFAULT_RENDER_POST_FX_FADE_OUT,
-    VIZ_CONFIG_FILENAME,
-    RENDER_OVERLAY_POSITIONS,
-    RenderOverlayPosition,
-    clamp_beat_sensitivity,
-    clamp_effect_pct,
-)
+from cleave.config import CleaveConfig, clamp_beat_sensitivity, clamp_effect_pct
 from cleave.effects.registry import effect_row_count
-from cleave.viz.fonts import cycle_render_overlay_font
 from cleave.blend_modes import BLEND_MODES, BlendMode
-from cleave.preset_playlist import (
-    PresetPlaylist,
-    directory_display,
-    preset_filename_display,
-)
-from cleave.timeline import TimelineCue
-from cleave.viz.confirm import (
-    ConfirmDialog,
-    ConfirmRequest,
-    SaveChoiceDialog,
-    SaveChoiceRequest,
-    UnsavedQuitDialog,
-    UnsavedQuitRequest,
-)
+from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.key_repeat import KeyRepeatController, mod_ctrl, mod_shift
-from cleave.viz.playback import PlaybackState, current_sec, seek, toggle_pause
-from cleave.viz.row_semantics import (
-    REPEAT_ROW_KINDS,
-    RENDER_OVERLAY_ALL_SUB_ROW_KINDS,
-    RENDER_OVERLAY_BODY_NESTED_KINDS,
-    RENDER_OVERLAY_TITLE_NESTED_KINDS,
-    RENDER_POST_FX_SUB_ROW_KINDS,
-    RENDER_TIMELINE_SUB_ROW_KINDS,
-    RowKind,
-)
+from cleave.viz.playback import PlaybackState, seek, toggle_pause
+from cleave.viz.focus_context import FocusContext
+from cleave.viz.live_layer_bindings import LiveLayerBindings
+from cleave.viz.render_overlay_controls import RenderOverlayControls
+from cleave.viz.render_post_fx_controls import RenderPostFxControls
+from cleave.viz.row_semantics import REPEAT_ROW_KINDS, RowKind
 from cleave.viz.overlay import (
-    RenderOverlayBlock,
-    RenderPostFxBlock,
-    RenderTimelineBlock,
-    TrackBlock,
     TuningViewState,
     find_row,
     find_row_by_kind,
@@ -70,132 +29,12 @@ from cleave.viz.overlay import (
     row_kind,
     row_stem,
 )
+from cleave.viz.session import TuningSession
+from cleave.viz.tuning_view_state import TuningViewStateBuilder
 
 TOAST_DURATION_SEC = 5.0
 SEEK_SHORT = 10
 SEEK_LONG = 30
-_DEFAULT_SAVE_FILENAME = "unnamed-1.yaml"
-
-
-def config_path_display(path: Path | None) -> str:
-    """Active config path for the config header row (truncation happens at draw time)."""
-    return path.as_posix() if path is not None else VIZ_CONFIG_FILENAME
-
-
-def allow_overwrite_for_path(
-    active_path: Path | None,
-    *,
-    repo_root_example: Path,
-) -> bool:
-    """Hide overwrite only for the repo-root template cleave-viz.yaml."""
-    if active_path is None:
-        return False
-    return active_path.resolve() != repo_root_example.resolve()
-
-
-@dataclass
-class RenderOverlayRuntime:
-    enabled: bool
-    expanded: bool
-    position: RenderOverlayPosition
-    title_expanded: bool
-    body_expanded: bool
-    title_font_size: int
-    title_font: str
-    title_margin_bottom: int
-    body_font_size: int
-    body_font: str
-    opacity_pct: int
-    border_width: int
-    start_delay: float
-    display_time: float
-
-
-def default_render_overlay_runtime() -> RenderOverlayRuntime:
-    return RenderOverlayRuntime(
-        enabled=True,
-        expanded=False,
-        position=DEFAULT_RENDER_OVERLAY_POSITION,
-        title_expanded=False,
-        body_expanded=False,
-        title_font_size=DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
-        title_font=DEFAULT_RENDER_OVERLAY_FONT,
-        title_margin_bottom=DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
-        body_font_size=DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
-        body_font=DEFAULT_RENDER_OVERLAY_FONT,
-        opacity_pct=int(round(DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY * 100)),
-        border_width=DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
-        start_delay=DEFAULT_RENDER_OVERLAY_START_DELAY,
-        display_time=DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
-    )
-
-
-@dataclass
-class RenderPostFxRuntime:
-    enabled: bool
-    expanded: bool
-    fade_in: float
-    fade_out: float
-
-
-def default_render_post_fx_runtime() -> RenderPostFxRuntime:
-    return RenderPostFxRuntime(
-        enabled=True,
-        expanded=False,
-        fade_in=DEFAULT_RENDER_POST_FX_FADE_IN,
-        fade_out=DEFAULT_RENDER_POST_FX_FADE_OUT,
-    )
-
-
-@dataclass
-class TimelineRuntime:
-    enabled: bool = True
-    cues: list[TimelineCue] = field(default_factory=list)
-    panel_open: bool = False
-    submenu_focused: bool = False
-    focus_row: int = 0
-    armed_stems: set[str] = field(default_factory=set)
-    recording: bool = False
-    record_buffer: list[TimelineCue] = field(default_factory=list)
-    record_baseline: dict[str, bool] = field(default_factory=dict)
-    record_start_sec: float | None = None
-    preview_active: bool = False
-    monitor: dict[str, bool] = field(default_factory=dict)
-    override_stems: set[str] = field(default_factory=set)
-    override_visible: dict[str, bool] = field(default_factory=dict)
-
-
-def default_timeline_runtime() -> TimelineRuntime:
-    return TimelineRuntime()
-
-
-@dataclass
-class LayerRuntime:
-    playlist: PresetPlaylist
-    browse_floor: Path
-    opacity_pct: int = 100
-    effects: dict[str, dict[str, int]] = field(default_factory=dict)
-    effects_expanded: bool = False
-    blend_mode: BlendMode = "black-key"
-    beat_sensitivity: float = 1.0
-    enabled: bool = True
-    expanded: bool = False
-    locked: bool = False
-
-
-@dataclass
-class TuningSession:
-    layer_z_order: list[str]
-    layers: dict[str, LayerRuntime] = field(default_factory=dict)
-    solo_stem: str | None = None
-    render_overlay: RenderOverlayRuntime = field(default_factory=default_render_overlay_runtime)
-    render_overlay_solo: bool = False
-    render_post_fx: RenderPostFxRuntime = field(
-        default_factory=default_render_post_fx_runtime
-    )
-    render_post_fx_solo: bool = False
-    timeline: TimelineRuntime = field(default_factory=default_timeline_runtime)
-    help_visible: bool = False
 
 
 class TuningControls:
@@ -204,45 +43,23 @@ class TuningControls:
     def __init__(
         self,
         session: TuningSession,
+        cfg: CleaveConfig,
         preset_root: Path,
         playback: PlaybackState,
         duration_sec: float,
         *,
-        on_preset_change: Callable[[str, PresetPlaylist], None] | None = None,
-        on_blend_change: Callable[[str, BlendMode], None] | None = None,
-        on_opacity_change: Callable[[str, int], None] | None = None,
-        on_layer_enabled_change: Callable[[str, bool], None] | None = None,
-        on_timeline_enabled_change: Callable[[], None] | None = None,
-        on_solo_change: Callable[[], None] | None = None,
-        on_beat_change: Callable[[str, float], None] | None = None,
-        on_z_order_change: Callable[[list[str]], None] | None = None,
-        on_seek: Callable[[float], None] | None = None,
+        layer_bindings: LiveLayerBindings | None = None,
         on_save_new_config: Callable[[], Path | None] | None = None,
         on_overwrite_config: Callable[[Path], str | None] | None = None,
         launch_config_path: Path | None = None,
         repo_root_example: Path | None = None,
     ) -> None:
         self.session = session
+        self.cfg = cfg
         self.preset_root = preset_root
         self.playback = playback
         self.duration_sec = duration_sec
-        self._active_config_path = launch_config_path
-        self._repo_root_example = (
-            repo_root_example
-            if repo_root_example is not None
-            else Path(VIZ_CONFIG_FILENAME)
-        )
-        self._on_preset_change = on_preset_change
-        self._on_blend_change = on_blend_change
-        self._on_opacity_change = on_opacity_change
-        self._on_layer_enabled_change = on_layer_enabled_change
-        self._on_timeline_enabled_change = on_timeline_enabled_change
-        self._on_solo_change = on_solo_change
-        self._on_beat_change = on_beat_change
-        self._on_z_order_change = on_z_order_change
-        self._on_seek = on_seek
-        self._on_save_new_config = on_save_new_config
-        self._on_overwrite_config = on_overwrite_config
+        self._layer_bindings = layer_bindings
 
         self.focus_index = 0
         self.move_mode_stem: str | None = None
@@ -251,25 +68,59 @@ class TuningControls:
         self._toast_deadline = 0.0
         self._input_blocked_until = 0.0
         self._key_repeat = KeyRepeatController()
-        self._confirm = ConfirmDialog()
-        self._save_choice = SaveChoiceDialog()
-        self._unsaved_quit = UnsavedQuitDialog()
         self._hide_overlay_requested = False
-        self._config_dirty = False
-        self._pending_exit = False
-        self._quit_after_save = False
+
+        self._config_save = ConfigSaveController(
+            session,
+            cfg,
+            launch_config_path=launch_config_path,
+            repo_root_example=repo_root_example,
+            on_save_new_config=on_save_new_config,
+            on_overwrite_config=on_overwrite_config,
+            on_toast=self.show_toast,
+            move_mode_signature=self._move_mode_signature_payload,
+        )
+        self._view_state = TuningViewStateBuilder(
+            session,
+            playback,
+            duration_sec,
+            preset_root,
+            get_focus_index=lambda: self.focus_index,
+            get_move_mode_stem=lambda: self.move_mode_stem,
+            config_save=self._config_save,
+            get_toast_message=lambda: self._toast_message,
+            get_toast_deadline=lambda: self._toast_deadline,
+        )
+        def set_focus_index(index: int) -> None:
+            self.focus_index = index
+
+        focus_context = FocusContext(
+            get_focus_index=lambda: self.focus_index,
+            set_focus_index=set_focus_index,
+            build_view_state=self.build_view_state,
+            is_paused=lambda: self.playback.paused,
+        )
+        self._render_overlay = RenderOverlayControls(
+            session,
+            focus_context=focus_context,
+            focused_row_kind=self._focused_row_kind,
+        )
+        self._render_post_fx = RenderPostFxControls(session, focus_context=focus_context)
+
         view = self.build_view_state(paused=self.playback.paused)
         self.focus_index = find_row_by_kind(view, RowKind.TRANSPORT)
 
+    def _move_mode_signature_payload(self) -> dict[str, list[str]] | None:
+        if self.move_mode_stem is not None and self._move_mode_original_z_order is not None:
+            return {"layer_z_order": list(self._move_mode_original_z_order)}
+        return None
+
     @property
     def config_dirty(self) -> bool:
-        return self._config_dirty
-
-    def mark_config_dirty(self) -> None:
-        self._config_dirty = True
+        return self._config_save.config_dirty
 
     def clear_config_dirty(self) -> None:
-        self._config_dirty = False
+        self._config_save.clear_config_dirty()
 
     def consume_hide_overlay(self) -> bool:
         requested = self._hide_overlay_requested
@@ -278,46 +129,17 @@ class TuningControls:
 
     def handle_modal_keydown(self, event: pygame.event.Event) -> bool:
         """Return True when a modal dialog consumed the event."""
-        if event.type != pygame.KEYDOWN:
-            return False
-        if self._confirm.active:
-            self._confirm.handle_keydown(event)
-            return True
-        if self._save_choice.active:
-            if event.key == pygame.K_ESCAPE and self._quit_after_save:
-                self._quit_after_save = False
-            self._save_choice.handle_keydown(event)
-            return True
-        if self._unsaved_quit.active:
-            self._unsaved_quit.handle_keydown(event)
-            return True
-        return False
+        return self._config_save.handle_modal_keydown(event)
 
     @property
     def pending_exit(self) -> bool:
-        return self._pending_exit
+        return self._config_save.pending_exit
 
     def consume_pending_exit(self) -> bool:
-        """Return True once when quit was deferred (e.g. Don't save from unsaved dialog)."""
-        if self._pending_exit:
-            self._pending_exit = False
-            return True
-        return False
+        return self._config_save.consume_pending_exit()
 
     def try_quit(self) -> bool:
-        """Handle a quit request. Return True when the app should exit now."""
-        if self._pending_exit:
-            return True
-        if not self._config_dirty:
-            return True
-        if not self._unsaved_quit.active:
-            self._unsaved_quit.prompt(
-                UnsavedQuitRequest(
-                    on_save=self._quit_save,
-                    on_discard=self._quit_discard,
-                )
-            )
-        return False
+        return self._config_save.try_quit()
 
     def handle_keydown(self, event: pygame.event.Event) -> bool:
         """Handle a key down event for the main tuning tree."""
@@ -339,7 +161,7 @@ class TuningControls:
                 return True
             tl = self.session.timeline
             if tl.panel_open:
-                self._close_timeline_panel()
+                self.close_timeline_panel()
             else:
                 self._open_timeline_panel(enter_submenu=True)
             return True
@@ -441,7 +263,7 @@ class TuningControls:
             if kind == RowKind.SAVE_CONFIG:
                 if self.session.solo_stem is not None:
                     return True
-                self._prompt_save()
+                self._config_save.prompt_save()
                 return True
 
         return True
@@ -465,123 +287,7 @@ class TuningControls:
         paused: bool,
         position_sec: float | None = None,
     ) -> TuningViewState:
-        if position_sec is None:
-            position_sec = current_sec(self.playback, self.duration_sec)
-
-        from cleave.viz.layer import effective_layer_enabled
-
-        tracks: dict[str, TrackBlock] = {}
-        for stem in self.session.layer_z_order:
-            layer = self.session.layers[stem]
-            if self.session.timeline.enabled:
-                visible = effective_layer_enabled(
-                    self.session, stem, position_sec
-                )
-            else:
-                visible = layer.enabled
-            tracks[stem] = TrackBlock(
-                stem=stem,
-                preset_dir_label=directory_display(
-                    layer.playlist, self.preset_root
-                ),
-                preset_label=preset_filename_display(layer.playlist),
-                blend_mode=layer.blend_mode,
-                opacity_pct=layer.opacity_pct,
-                effects=dict(layer.effects),
-                effects_expanded=layer.effects_expanded,
-                beat_sensitivity=layer.beat_sensitivity,
-                enabled=layer.enabled,
-                visible=visible,
-                expanded=layer.expanded,
-                locked=layer.locked,
-                preset_empty=not layer.playlist.paths,
-            )
-
-        toast_remaining = 0.0
-        toast_message: str | None = None
-        if self._toast_message is not None:
-            toast_remaining = max(0.0, self._toast_deadline - time.monotonic())
-            if toast_remaining > 0:
-                toast_message = self._toast_message
-
-        confirm_message: str | None = None
-        confirm_focus_yes = True
-        save_choice_active = False
-        save_choice_focus_overwrite = True
-        unsaved_quit_active = False
-        unsaved_quit_focus = 0
-        if self._confirm.active:
-            confirm_message = self._confirm.message
-            confirm_focus_yes = self._confirm.focus_yes
-        if self._save_choice.active:
-            save_choice_active = True
-            save_choice_focus_overwrite = self._save_choice.focus_overwrite
-        if self._unsaved_quit.active:
-            unsaved_quit_active = True
-            unsaved_quit_focus = self._unsaved_quit.focus_index
-
-        ro = self.session.render_overlay
-        pp = self.session.render_post_fx
-        tl = self.session.timeline
-        return TuningViewState(
-            layer_z_order=tuple(self.session.layer_z_order),
-            tracks=tracks,
-            paused=paused,
-            position_sec=position_sec,
-            focus_index=self.focus_index,
-            move_mode_stem=self.move_mode_stem,
-            toast_message=toast_message,
-            toast_remaining_sec=toast_remaining,
-            confirm_message=confirm_message,
-            confirm_focus_yes=confirm_focus_yes,
-            save_choice_active=save_choice_active,
-            save_choice_focus_overwrite=save_choice_focus_overwrite,
-            unsaved_quit_active=unsaved_quit_active,
-            unsaved_quit_focus=unsaved_quit_focus,
-            allow_overwrite=self._allow_overwrite(),
-            active_config_label=config_path_display(self._active_config_path),
-            config_dirty=self._config_dirty,
-            solo_stem=self.session.solo_stem,
-            solo_active=self.session.solo_stem is not None,
-            render_overlay=RenderOverlayBlock(
-                enabled=ro.enabled,
-                expanded=ro.expanded,
-                position=ro.position,
-                title_expanded=ro.title_expanded,
-                body_expanded=ro.body_expanded,
-                title_font_size=ro.title_font_size,
-                title_font=ro.title_font,
-                title_margin_bottom=ro.title_margin_bottom,
-                body_font_size=ro.body_font_size,
-                body_font=ro.body_font,
-                opacity_pct=ro.opacity_pct,
-                border_width=ro.border_width,
-                start_delay=ro.start_delay,
-                display_time=ro.display_time,
-                solo=self.session.render_overlay_solo,
-            ),
-            render_post_fx=RenderPostFxBlock(
-                enabled=pp.enabled,
-                expanded=pp.expanded,
-                fade_in=pp.fade_in,
-                fade_out=pp.fade_out,
-                solo=self.session.render_post_fx_solo,
-            ),
-            render_timeline=RenderTimelineBlock(
-                enabled=tl.enabled,
-                expanded=tl.panel_open,
-            ),
-            timeline_submenu_focused=tl.submenu_focused,
-            timeline_recording=tl.recording,
-            timeline_override_active=bool(tl.override_stems),
-            help_visible=self.session.help_visible,
-        )
-
-    def _allow_overwrite(self) -> bool:
-        return allow_overwrite_for_path(
-            self._active_config_path,
-            repo_root_example=self._repo_root_example,
-        )
+        return self._view_state.build(paused=paused, position_sec=position_sec)
 
     def _input_blocked(self) -> bool:
         return time.monotonic() < self._input_blocked_until
@@ -676,9 +382,6 @@ class TuningControls:
         order[index], order[target] = order[target], order[index]
 
     def _confirm_move_mode(self) -> None:
-        if self._on_z_order_change is not None:
-            self._on_z_order_change(list(self.session.layer_z_order))
-        self.mark_config_dirty()
         self.move_mode_stem = None
         self._move_mode_original_z_order = None
 
@@ -701,11 +404,11 @@ class TuningControls:
             return
 
         if kind == RowKind.RENDER_OVERLAY_TITLE_HEADER:
-            self._set_render_overlay_title_expanded(forward)
+            self._render_overlay.set_title_expanded(forward)
             return
 
         if kind == RowKind.RENDER_OVERLAY_BODY_HEADER:
-            self._set_render_overlay_body_expanded(forward)
+            self._render_overlay.set_body_expanded(forward)
             return
 
         if stem is not None and kind in REPEAT_ROW_KINDS and self.session.layers[stem].locked:
@@ -777,83 +480,83 @@ class TuningControls:
         elif kind == RowKind.RENDER_OVERLAY_HEADER:
             if mod_shift(mod):
                 if forward:
-                    self._enter_render_overlay_solo()
+                    self._render_overlay.enter_solo()
                 else:
-                    self._exit_render_overlay_solo()
+                    self._render_overlay.exit_solo()
                 return
             if ctrl:
-                self._set_render_overlay_enabled(forward)
+                self._render_overlay.set_enabled(forward)
                 return
-            self._set_render_overlay_expanded(forward)
+            self._render_overlay.set_expanded(forward)
         elif kind == RowKind.RENDER_OVERLAY_POSITION:
-            self._cycle_render_overlay_position(forward=forward)
+            self._render_overlay.cycle_position(forward=forward)
         elif kind == RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE:
             step = 10 if ctrl else 1
             delta = step if forward else -step
-            self._set_render_overlay_title_font_size(
+            self._render_overlay.set_title_font_size(
                 self.session.render_overlay.title_font_size + delta
             )
         elif kind == RowKind.RENDER_OVERLAY_TITLE_FONT:
-            self._cycle_render_overlay_title_font(forward=forward)
+            self._render_overlay.cycle_title_font(forward=forward)
         elif kind == RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM:
             step = 10 if ctrl else 1
             delta = step if forward else -step
-            self._set_render_overlay_title_margin_bottom(
+            self._render_overlay.set_title_margin_bottom(
                 self.session.render_overlay.title_margin_bottom + delta
             )
         elif kind == RowKind.RENDER_OVERLAY_BODY_FONT_SIZE:
             step = 10 if ctrl else 1
             delta = step if forward else -step
-            self._set_render_overlay_body_font_size(
+            self._render_overlay.set_body_font_size(
                 self.session.render_overlay.body_font_size + delta
             )
         elif kind == RowKind.RENDER_OVERLAY_BODY_FONT:
-            self._cycle_render_overlay_body_font(forward=forward)
+            self._render_overlay.cycle_body_font(forward=forward)
         elif kind == RowKind.RENDER_OVERLAY_OPACITY:
             step = 10 if ctrl else 1
             delta = step if forward else -step
-            self._set_render_overlay_opacity(
+            self._render_overlay.set_opacity(
                 self.session.render_overlay.opacity_pct + delta
             )
         elif kind == RowKind.RENDER_OVERLAY_BORDER_WIDTH:
             step = 10 if ctrl else 1
             delta = step if forward else -step
-            self._set_render_overlay_border_width(
+            self._render_overlay.set_border_width(
                 self.session.render_overlay.border_width + delta
             )
         elif kind == RowKind.RENDER_OVERLAY_START_DELAY:
             step = 30.0 if ctrl else 1.0
             delta = step if forward else -step
-            self._set_render_overlay_start_delay(
+            self._render_overlay.set_start_delay(
                 self.session.render_overlay.start_delay + delta
             )
         elif kind == RowKind.RENDER_OVERLAY_DISPLAY_TIME:
             step = 30.0 if ctrl else 1.0
             delta = step if forward else -step
-            self._set_render_overlay_display_time(
+            self._render_overlay.set_display_time(
                 self.session.render_overlay.display_time + delta
             )
         elif kind == RowKind.RENDER_POST_FX_HEADER:
             if mod_shift(mod):
                 if forward:
-                    self._enter_render_post_fx_solo()
+                    self._render_post_fx.enter_solo()
                 else:
-                    self._exit_render_post_fx_solo()
+                    self._render_post_fx.exit_solo()
                 return
             if ctrl:
-                self._set_render_post_fx_enabled(forward)
+                self._render_post_fx.set_enabled(forward)
                 return
-            self._set_render_post_fx_expanded(forward)
+            self._render_post_fx.set_expanded(forward)
         elif kind == RowKind.RENDER_POST_FX_FADE_IN:
             step = 10.0 if ctrl else 1.0
             delta = step if forward else -step
-            self._set_render_post_fx_fade_in(
+            self._render_post_fx.set_fade_in(
                 self.session.render_post_fx.fade_in + delta
             )
         elif kind == RowKind.RENDER_POST_FX_FADE_OUT:
             step = 10.0 if ctrl else 1.0
             delta = step if forward else -step
-            self._set_render_post_fx_fade_out(
+            self._render_post_fx.set_fade_out(
                 self.session.render_post_fx.fade_out + delta
             )
         elif kind == RowKind.RENDER_TIMELINE_HEADER:
@@ -863,32 +566,29 @@ class TuningControls:
             if forward:
                 self._open_timeline_panel()
             else:
-                self._close_timeline_panel()
+                self.close_timeline_panel()
 
     def _step_directory(self, stem: str, *, forward: bool) -> None:
         layer = self.session.layers[stem]
         playlist = layer.playlist
         delta = 1 if forward else -1
         if playlist.step_sibling(delta, preset_root=self.preset_root):
-            self.mark_config_dirty()
-            if self._on_preset_change is not None:
-                self._on_preset_change(stem, playlist)
+            if self._layer_bindings is not None:
+                self._layer_bindings.on_preset_change(stem, playlist)
 
     def _enter_directory(self, stem: str) -> None:
         layer = self.session.layers[stem]
         playlist = layer.playlist
         if playlist.enter_child(self.preset_root):
-            self.mark_config_dirty()
-            if self._on_preset_change is not None:
-                self._on_preset_change(stem, playlist)
+            if self._layer_bindings is not None:
+                self._layer_bindings.on_preset_change(stem, playlist)
 
     def _parent_directory(self, stem: str) -> None:
         layer = self.session.layers[stem]
         playlist = layer.playlist
         if playlist.go_parent(self.preset_root):
-            self.mark_config_dirty()
-            if self._on_preset_change is not None:
-                self._on_preset_change(stem, playlist)
+            if self._layer_bindings is not None:
+                self._layer_bindings.on_preset_change(stem, playlist)
 
     def _step_preset(self, stem: str, *, forward: bool, ctrl: bool) -> None:
         layer = self.session.layers[stem]
@@ -901,9 +601,8 @@ class TuningControls:
             playlist.next()
         else:
             playlist.prev()
-        self.mark_config_dirty()
-        if self._on_preset_change is not None:
-            self._on_preset_change(stem, playlist)
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_preset_change(stem, playlist)
 
     def _cycle_blend(self, stem: str, *, forward: bool) -> None:
         layer = self.session.layers[stem]
@@ -915,14 +614,12 @@ class TuningControls:
             layer.blend_mode = BLEND_MODES[(index + 1) % len(BLEND_MODES)]
         else:
             layer.blend_mode = BLEND_MODES[(index - 1) % len(BLEND_MODES)]
-        self.mark_config_dirty()
-        if self._on_blend_change is not None:
-            self._on_blend_change(stem, layer.blend_mode)
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_blend_change(stem, layer.blend_mode)
 
     def _toggle_locked(self, stem: str) -> None:
         layer = self.session.layers[stem]
         layer.locked = not layer.locked
-        self.mark_config_dirty()
 
     def _set_expanded(self, stem: str, expanded: bool) -> None:
         layer = self.session.layers[stem]
@@ -951,197 +648,33 @@ class TuningControls:
         except IndexError:
             return None
 
-    def _render_overlay_header_index(self) -> int:
-        view = self.build_view_state(paused=self.playback.paused)
-        return find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
-
-    def _render_overlay_title_header_index(self) -> int:
-        view = self.build_view_state(paused=self.playback.paused)
-        return find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_HEADER)
-
-    def _render_overlay_body_header_index(self) -> int:
-        view = self.build_view_state(paused=self.playback.paused)
-        return find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_HEADER)
-
-    def _set_render_overlay_expanded(self, expanded: bool) -> None:
-        ro = self.session.render_overlay
-        if ro.expanded == expanded:
-            return
-        focus_kind = self._focused_row_kind()
-        ro.expanded = expanded
-        if not expanded and focus_kind in RENDER_OVERLAY_ALL_SUB_ROW_KINDS:
-            self.focus_index = self._render_overlay_header_index()
-
-    def _set_render_overlay_enabled(self, enabled: bool) -> None:
-        ro = self.session.render_overlay
-        if ro.enabled == enabled:
-            return
-        focus_kind = self._focused_row_kind()
-        ro.enabled = enabled
-        self.mark_config_dirty()
-        if not enabled:
-            self.session.render_overlay_solo = False
-            ro.expanded = False
-            if focus_kind in RENDER_OVERLAY_ALL_SUB_ROW_KINDS:
-                self.focus_index = self._render_overlay_header_index()
-
-    def _enter_render_overlay_solo(self) -> None:
-        if self.session.render_overlay_solo:
-            return
-        self.session.render_overlay_solo = True
-
-    def _exit_render_overlay_solo(self) -> None:
-        if not self.session.render_overlay_solo:
-            return
-        self.session.render_overlay_solo = False
-
-    def _cycle_render_overlay_position(self, *, forward: bool) -> None:
-        ro = self.session.render_overlay
-        positions = RENDER_OVERLAY_POSITIONS
-        try:
-            index = positions.index(ro.position)
-        except ValueError:
-            index = 0
-        if forward:
-            ro.position = positions[(index + 1) % len(positions)]
-        else:
-            ro.position = positions[(index - 1) % len(positions)]
-        self.mark_config_dirty()
-
-    def _set_render_overlay_title_expanded(self, expanded: bool) -> None:
-        ro = self.session.render_overlay
-        if ro.title_expanded == expanded:
-            return
-        focus_kind = self._focused_row_kind()
-        ro.title_expanded = expanded
-        if not expanded and focus_kind in RENDER_OVERLAY_TITLE_NESTED_KINDS:
-            self.focus_index = self._render_overlay_title_header_index()
-
-    def _set_render_overlay_body_expanded(self, expanded: bool) -> None:
-        ro = self.session.render_overlay
-        if ro.body_expanded == expanded:
-            return
-        focus_kind = self._focused_row_kind()
-        ro.body_expanded = expanded
-        if not expanded and focus_kind in RENDER_OVERLAY_BODY_NESTED_KINDS:
-            self.focus_index = self._render_overlay_body_header_index()
-
-    def _set_render_overlay_title_font_size(self, size: int) -> None:
-        self.session.render_overlay.title_font_size = max(1, size)
-        self.mark_config_dirty()
-
-    def _cycle_render_overlay_title_font(self, *, forward: bool) -> None:
-        ro = self.session.render_overlay
-        ro.title_font = cycle_render_overlay_font(ro.title_font, forward=forward)
-        self.mark_config_dirty()
-
-    def _set_render_overlay_title_margin_bottom(self, margin: int) -> None:
-        self.session.render_overlay.title_margin_bottom = max(0, margin)
-        self.mark_config_dirty()
-
-    def _set_render_overlay_body_font_size(self, size: int) -> None:
-        self.session.render_overlay.body_font_size = max(1, size)
-        self.mark_config_dirty()
-
-    def _cycle_render_overlay_body_font(self, *, forward: bool) -> None:
-        ro = self.session.render_overlay
-        ro.body_font = cycle_render_overlay_font(ro.body_font, forward=forward)
-        self.mark_config_dirty()
-
-    def _set_render_overlay_opacity(self, pct: int) -> None:
-        self.session.render_overlay.opacity_pct = max(0, min(100, pct))
-        self.mark_config_dirty()
-
-    def _set_render_overlay_border_width(self, width: int) -> None:
-        self.session.render_overlay.border_width = max(0, width)
-        self.mark_config_dirty()
-
-    def _set_render_overlay_start_delay(self, start_delay: float) -> None:
-        self.session.render_overlay.start_delay = max(0.0, start_delay)
-        self.mark_config_dirty()
-
-    def _set_render_overlay_display_time(self, display_time: float) -> None:
-        self.session.render_overlay.display_time = max(0.0, display_time)
-
-    def _render_post_fx_header_index(self) -> int:
-        view = self.build_view_state(paused=self.playback.paused)
-        return find_row_by_kind(view, RowKind.RENDER_POST_FX_HEADER)
-
-    def _refocus_render_post_fx_header_if_sub_row(self) -> None:
-        view = self.build_view_state(paused=self.playback.paused)
-        if row_kind(view, self.focus_index) in RENDER_POST_FX_SUB_ROW_KINDS:
-            self.focus_index = self._render_post_fx_header_index()
-
-    def _set_render_post_fx_expanded(self, expanded: bool) -> None:
-        pp = self.session.render_post_fx
-        if pp.expanded == expanded:
-            return
-        pp.expanded = expanded
-        if not expanded:
-            self._refocus_render_post_fx_header_if_sub_row()
-
-    def _set_render_post_fx_enabled(self, enabled: bool) -> None:
-        pp = self.session.render_post_fx
-        if pp.enabled == enabled:
-            return
-        pp.enabled = enabled
-        self.mark_config_dirty()
-        if not enabled:
-            self.session.render_post_fx_solo = False
-            pp.expanded = False
-            self._refocus_render_post_fx_header_if_sub_row()
-
-    def _enter_render_post_fx_solo(self) -> None:
-        if self.session.render_post_fx_solo:
-            return
-        self.session.render_post_fx_solo = True
-
-    def _exit_render_post_fx_solo(self) -> None:
-        if not self.session.render_post_fx_solo:
-            return
-        self.session.render_post_fx_solo = False
-
-    def _set_render_post_fx_fade_in(self, fade_in: float) -> None:
-        self.session.render_post_fx.fade_in = max(0.0, fade_in)
-        self.mark_config_dirty()
-
-    def _set_render_post_fx_fade_out(self, fade_out: float) -> None:
-        self.session.render_post_fx.fade_out = max(0.0, fade_out)
-        self.mark_config_dirty()
-
     def _render_timeline_header_index(self) -> int:
         view = self.build_view_state(paused=self.playback.paused)
         return find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
-
-    def _refocus_render_timeline_header_if_sub_row(self) -> None:
-        view = self.build_view_state(paused=self.playback.paused)
-        if row_kind(view, self.focus_index) in RENDER_TIMELINE_SUB_ROW_KINDS:
-            self.focus_index = self._render_timeline_header_index()
 
     def _set_render_timeline_enabled(self, enabled: bool) -> None:
         tl = self.session.timeline
         if tl.enabled == enabled:
             return
         tl.enabled = enabled
-        self.mark_config_dirty()
         if not enabled:
-            self._close_timeline_panel()
-        if self._on_timeline_enabled_change is not None:
-            self._on_timeline_enabled_change()
+            self.close_timeline_panel()
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_timeline_enabled_change()
 
     def _enter_solo(self, stem: str) -> None:
         if self.session.solo_stem == stem:
             return
         self.session.solo_stem = stem
-        if self._on_solo_change is not None:
-            self._on_solo_change()
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_solo_change()
 
     def _exit_solo(self, stem: str) -> None:
         if self.session.solo_stem != stem:
             return
         self.session.solo_stem = None
-        if self._on_solo_change is not None:
-            self._on_solo_change()
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_solo_change()
 
     def _set_enabled(self, stem: str, enabled: bool) -> None:
         if self.session.timeline.enabled:
@@ -1153,19 +686,17 @@ class TuningControls:
         if layer.enabled == enabled:
             return
         layer.enabled = enabled
-        self.mark_config_dirty()
         if not enabled:
             layer.expanded = False
             self._refocus_track_header_if_sub_row(stem)
-        if self._on_layer_enabled_change is not None:
-            self._on_layer_enabled_change(stem, layer.enabled)
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_layer_enabled_change(stem, layer.enabled)
 
     def _set_opacity(self, stem: str, pct: int) -> None:
         layer = self.session.layers[stem]
         layer.opacity_pct = max(0, min(100, pct))
-        self.mark_config_dirty()
-        if self._on_opacity_change is not None:
-            self._on_opacity_change(stem, layer.opacity_pct)
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_opacity_change(stem, layer.opacity_pct)
 
     def _set_effect(
         self, stem: str, effect_id: str, driver_slug: str, pct: int
@@ -1180,9 +711,8 @@ class TuningControls:
                     layer.effects.pop(effect_id, None)
         else:
             layer.effects.setdefault(effect_id, {})[driver_slug] = clamped
-        self.mark_config_dirty()
-        if self._on_opacity_change is not None:
-            self._on_opacity_change(stem, layer.opacity_pct)
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_opacity_change(stem, layer.opacity_pct)
 
     def _set_effects_expanded(self, stem: str, expanded: bool) -> None:
         layer = self.session.layers[stem]
@@ -1211,83 +741,14 @@ class TuningControls:
     def _set_beat(self, stem: str, value: float) -> None:
         layer = self.session.layers[stem]
         layer.beat_sensitivity = clamp_beat_sensitivity(value)
-        self.mark_config_dirty()
-        if self._on_beat_change is not None:
-            self._on_beat_change(stem, layer.beat_sensitivity)
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_beat_change(stem, layer.beat_sensitivity)
 
     def _do_seek(self, delta_sec: float) -> None:
-        if self._on_seek is not None:
-            self._on_seek(delta_sec)
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_seek(delta_sec)
         else:
             seek(self.playback, delta_sec, self.duration_sec)
-
-    def _prompt_save(self) -> None:
-        if not self._allow_overwrite():
-            self._trigger_save_new()
-            return
-
-        self._save_choice.prompt(
-            SaveChoiceRequest(
-                on_overwrite=self._prompt_overwrite,
-                on_save_as_new=self._trigger_save_new,
-            )
-        )
-
-    def _trigger_save_new(self) -> None:
-        if self._on_save_new_config is not None:
-            saved_path = self._on_save_new_config()
-        else:
-            saved_path = None
-        if saved_path is None:
-            filename = _DEFAULT_SAVE_FILENAME
-        else:
-            self._active_config_path = saved_path
-            filename = saved_path.name
-            self.clear_config_dirty()
-        self._show_save_toast(f"Config saved to {filename}")
-        self._finish_quit_after_save()
-
-    def _quit_save(self) -> None:
-        self._quit_after_save = True
-        self._prompt_save()
-
-    def _quit_discard(self) -> None:
-        self._pending_exit = True
-
-    def _finish_quit_after_save(self) -> None:
-        if self._quit_after_save:
-            self._quit_after_save = False
-            self.clear_config_dirty()
-            self._pending_exit = True
-
-    def _prompt_overwrite(self) -> None:
-        active_path = self._active_config_path
-        basename = (
-            active_path.name
-            if active_path is not None
-            else VIZ_CONFIG_FILENAME
-        )
-        message = f"Overwrite {basename}?"
-
-        def on_confirm() -> None:
-            target = active_path or Path(VIZ_CONFIG_FILENAME)
-            if self._on_overwrite_config is not None:
-                written = self._on_overwrite_config(target)
-            else:
-                written = basename
-            if not written:
-                written = basename
-            self.clear_config_dirty()
-            self._show_save_toast(f"Config overwritten: {written}")
-            self._finish_quit_after_save()
-
-        def on_cancel() -> None:
-            if self._quit_after_save:
-                self._quit_after_save = False
-
-        self._confirm.prompt(
-            ConfirmRequest(message=message, on_confirm=on_confirm, on_cancel=on_cancel)
-        )
 
     def show_toast(self, message: str) -> None:
         now = time.monotonic()
@@ -1307,7 +768,7 @@ class TuningControls:
         else:
             tl.submenu_focused = False
 
-    def _close_timeline_panel(self) -> None:
+    def close_timeline_panel(self) -> None:
         tl = self.session.timeline
         if not tl.panel_open:
             return
@@ -1319,7 +780,3 @@ class TuningControls:
         tl = self.session.timeline
         tl.submenu_focused = False
         self.focus_index = self._render_timeline_header_index()
-
-    def _show_save_toast(self, message: str) -> None:
-        print(message, file=sys.stderr)
-        self.show_toast(message)

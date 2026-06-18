@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from cleave.effects.constants import clamp_effect_pct
+from cleave.effects.handlers import EffectHandler
+from cleave.effects.registry import EffectDef
 from cleave.effects.sampling import sample_normalized
 from cleave.signals import Signals
+
+if TYPE_CHECKING:
+    from cleave.effects.runtime import LayerModifiers
 
 FLARE_DELTA = 0.10
 FLARE_THRESHOLD = 0.55
@@ -51,11 +57,10 @@ class FlareBurstState:
     def sample_and_update(
         self,
         signals: Signals,
-        signal_stem: str,
-        signal_key: str,
+        row: EffectDef,
         t_sec: float,
     ) -> float:
-        raw = sample_normalized(signals, signal_stem, signal_key, t_sec)
+        raw = sample_normalized(signals, row.signal_stem, row.signal_key, t_sec)
         prev_smoothed = self.smoothed
         self.smoothed = update_smoothed(self.smoothed, raw)
         self.burst = update_burst(
@@ -65,3 +70,27 @@ class FlareBurstState:
             prev_smoothed=prev_smoothed,
         )
         return self.burst
+
+
+def _update_flare(
+    state: FlareBurstState,
+    signals: Signals,
+    row: EffectDef,
+    t_sec: float,
+) -> None:
+    state.sample_and_update(signals, row, t_sec)
+
+
+def _apply_flare(
+    mod: LayerModifiers, pct: int, state: FlareBurstState
+) -> LayerModifiers:
+    mod.bloom_strength = max(mod.bloom_strength, bloom_strength(pct, state.burst))
+    return mod
+
+
+FLARE_HANDLER = EffectHandler[FlareBurstState](
+    effect_id="flare",
+    state_factory=FlareBurstState,
+    update=_update_flare,
+    apply=_apply_flare,
+)

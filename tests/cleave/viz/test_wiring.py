@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 from cleave.effects.runtime import EffectRuntime
 from cleave.preset_playlist import PresetPlaylist
-from cleave.viz.controls import LayerRuntime, TuningSession
+from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.layer import StemLayer
 from tests.support.viz import stub_playback_state
 from cleave.viz.wiring import make_tuning_controls

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import pygame
 
 from cleave.viz.row_semantics import RowAffordance, RowKind, row_behavior
-from cleave.viz.overlay import _clip_rect_to_surface
+from cleave.viz.overlay import clip_rect_to_surface
 from cleave.viz.theme import (
     BACKGROUND,
     BACKGROUND_ALPHA,
@@ -390,7 +390,7 @@ class HelpOverlay:
         mx, my = self._margin
         pos = (surface.get_width() - panel_w - mx, my)
         surface.blit(panel, pos)
-        self._panel_rect = _clip_rect_to_surface(
+        self._panel_rect = clip_rect_to_surface(
             (pos[0], pos[1], panel_w, panel_h),
             surface,
         )

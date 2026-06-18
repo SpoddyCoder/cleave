@@ -1,0 +1,436 @@
+"""Config dirty tracking: persisted edits mark dirty; session-only edits do not."""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from unittest.mock import patch
+
+from pathlib import Path
+
+import pygame
+import pytest
+
+from cleave.timeline import TimelineCue
+from cleave.viz.controls import TuningControls
+from cleave.viz.timeline_controls import TimelineControls
+from cleave.viz.overlay import find_row_by_kind
+from cleave.viz.row_semantics import RowKind
+from tests.cleave.viz.test_controls import _choose_save_as_new, _keydown, _make_controls, _row, _save_row
+from tests.cleave.viz.test_timeline_controls import _make_timeline_controls
+from tests.support.viz import keydown, stub_playback_state
+
+
+def _expand_drums(controls: TuningControls) -> None:
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = _row(view, "drums", RowKind.TRACK_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _expand_render_overlay(controls: TuningControls) -> None:
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _expand_render_post_fx(controls: TuningControls) -> None:
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_POST_FX_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_layer_z_order(controls: TuningControls) -> None:
+    view = controls.build_view_state(paused=False)
+    header_row = _row(view, "bass", RowKind.TRACK_HEADER)
+    controls.focus_index = header_row
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    controls.handle_keydown(_keydown(pygame.K_UP))
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+
+
+def _mutate_stem_enabled(controls: TuningControls) -> None:
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = _row(view, "drums", RowKind.TRACK_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+
+
+def _mutate_stem_opacity(controls: TuningControls) -> None:
+    _expand_drums(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = _row(view, "drums", RowKind.TRACK_OPACITY)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_stem_blend_mode(controls: TuningControls) -> None:
+    _expand_drums(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = _row(view, "drums", RowKind.TRACK_BLEND)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_stem_locked(controls: TuningControls) -> None:
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = _row(view, "drums", RowKind.TRACK_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
+
+
+def _mutate_stem_beat_sensitivity(controls: TuningControls) -> None:
+    _expand_drums(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = _row(view, "drums", RowKind.TRACK_BEAT)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_stem_effects(controls: TuningControls) -> None:
+    _expand_drums(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = _row(view, "drums", RowKind.TRACK_EFFECTS_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = _row(
+        view, "drums", RowKind.TRACK_EFFECT, effect_id="pulse", driver_slug="onset"
+    )
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_preset_path(controls: TuningControls) -> None:
+    _expand_drums(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = _row(view, "drums", RowKind.TRACK_PRESET)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_overlay_enabled(controls: TuningControls) -> None:
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+
+
+def _mutate_render_overlay_position(controls: TuningControls) -> None:
+    _expand_render_overlay(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_POSITION)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_overlay_title_font_size(controls: TuningControls) -> None:
+    _expand_render_overlay(controls)
+    controls.session.render_overlay.title_expanded = True
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(
+        view, RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE
+    )
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_overlay_title_font(controls: TuningControls) -> None:
+    _expand_render_overlay(controls)
+    controls.session.render_overlay.title_expanded = True
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_FONT)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_overlay_title_margin_bottom(controls: TuningControls) -> None:
+    _expand_render_overlay(controls)
+    controls.session.render_overlay.title_expanded = True
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(
+        view, RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM
+    )
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_overlay_body_font_size(controls: TuningControls) -> None:
+    _expand_render_overlay(controls)
+    controls.session.render_overlay.body_expanded = True
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(
+        view, RowKind.RENDER_OVERLAY_BODY_FONT_SIZE
+    )
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_overlay_body_font(controls: TuningControls) -> None:
+    _expand_render_overlay(controls)
+    controls.session.render_overlay.body_expanded = True
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_FONT)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_overlay_opacity(controls: TuningControls) -> None:
+    _expand_render_overlay(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_OPACITY)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_overlay_border_width(controls: TuningControls) -> None:
+    _expand_render_overlay(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BORDER_WIDTH)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_overlay_start_delay(controls: TuningControls) -> None:
+    _expand_render_overlay(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_START_DELAY)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_overlay_display_time(controls: TuningControls) -> None:
+    _expand_render_overlay(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(
+        view, RowKind.RENDER_OVERLAY_DISPLAY_TIME
+    )
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_post_fx_enabled(controls: TuningControls) -> None:
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_POST_FX_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+
+
+def _mutate_render_post_fx_fade_in(controls: TuningControls) -> None:
+    _expand_render_post_fx(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_POST_FX_FADE_IN)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_post_fx_fade_out(controls: TuningControls) -> None:
+    _expand_render_post_fx(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_POST_FX_FADE_OUT)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_timeline_enabled(controls: TuningControls) -> None:
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+
+
+def _mutate_timeline_cues_via_delete() -> None:
+    tuning = _make_controls(("drums",))
+    tuning.session.timeline.cues = [TimelineCue(t=1.0, layers={"drums": False})]
+    tuning.session.timeline.enabled = True
+    tuning.clear_config_dirty()
+    assert not tuning.config_dirty
+    controls = TimelineControls(
+        tuning.session,
+        stub_playback_state(),
+        120.0,
+    )
+    controls.handle_keydown(keydown(pygame.K_BACKSPACE))
+    assert tuning.config_dirty
+
+
+_PERSISTED_MUTATIONS: list[
+    tuple[str, Callable[[TuningControls], None], tuple[str, ...], dict[str, object]]
+] = [
+    ("layer_z_order", _mutate_layer_z_order, ("drums", "bass", "vocals"), {}),
+    ("stem.enabled", _mutate_stem_enabled, ("drums",), {}),
+    ("stem.opacity", _mutate_stem_opacity, ("drums",), {}),
+    ("stem.blend_mode", _mutate_stem_blend_mode, ("drums",), {}),
+    ("stem.locked", _mutate_stem_locked, ("drums",), {}),
+    ("stem.beat_sensitivity", _mutate_stem_beat_sensitivity, ("drums",), {}),
+    ("stem.effects", _mutate_stem_effects, ("drums",), {}),
+    ("stem.preset", _mutate_preset_path, ("drums",), {}),
+    ("render_overlay.enabled", _mutate_render_overlay_enabled, ("drums",), {}),
+    ("render_overlay.position", _mutate_render_overlay_position, ("drums",), {}),
+    ("render_overlay.title_font_size", _mutate_render_overlay_title_font_size, ("drums",), {}),
+    ("render_overlay.title_margin_bottom", _mutate_render_overlay_title_margin_bottom, ("drums",), {}),
+    ("render_overlay.body_font_size", _mutate_render_overlay_body_font_size, ("drums",), {}),
+    ("render_overlay.opacity_pct", _mutate_render_overlay_opacity, ("drums",), {}),
+    ("render_overlay.border_width", _mutate_render_overlay_border_width, ("drums",), {}),
+    ("render_overlay.start_delay", _mutate_render_overlay_start_delay, ("drums",), {}),
+    ("render_overlay.display_time", _mutate_render_overlay_display_time, ("drums",), {}),
+    ("render_post_fx.enabled", _mutate_render_post_fx_enabled, ("drums",), {}),
+    ("render_post_fx.fade_in", _mutate_render_post_fx_fade_in, ("drums",), {}),
+    ("render_post_fx.fade_out", _mutate_render_post_fx_fade_out, ("drums",), {}),
+    ("timeline.enabled", _mutate_timeline_enabled, ("drums",), {"timeline_enabled": True}),
+]
+
+
+@pytest.mark.parametrize(
+    "field_id,mutate,stems,make_kwargs",
+    _PERSISTED_MUTATIONS,
+    ids=[item[0] for item in _PERSISTED_MUTATIONS],
+)
+def test_persisted_mutation_marks_config_dirty(
+    field_id: str,
+    mutate: Callable[[TuningControls], None],
+    stems: tuple[str, ...],
+    make_kwargs: dict[str, object],
+) -> None:
+    del field_id
+    controls = _make_controls(stems, **make_kwargs)
+    assert not controls.config_dirty
+    mutate(controls)
+    assert controls.config_dirty
+
+
+@patch("cleave.viz.fonts.render_overlay_system_fonts", return_value=["alpha", "bravo"])
+@pytest.mark.parametrize(
+    "mutate",
+    [_mutate_render_overlay_title_font, _mutate_render_overlay_body_font],
+    ids=["render_overlay.title_font", "render_overlay.body_font"],
+)
+def test_persisted_font_mutation_marks_config_dirty(
+    _mock_fonts: object,
+    mutate: Callable[[TuningControls], None],
+) -> None:
+    controls = _make_controls(("drums",))
+    assert not controls.config_dirty
+    mutate(controls)
+    assert controls.config_dirty
+
+
+def test_persisted_timeline_cue_delete_marks_config_dirty() -> None:
+    _mutate_timeline_cues_via_delete()
+
+
+def test_render_overlay_display_time_keyboard_regression() -> None:
+    controls = _make_controls(("drums",))
+    assert not controls.config_dirty
+    _mutate_render_overlay_display_time(controls)
+    assert controls.config_dirty
+    assert controls.session.render_overlay.display_time > 0.0
+
+
+def test_display_time_mutation_clears_dirty_after_save() -> None:
+    saved_path = Path("/tmp/projects/my-track/unnamed-2.yaml")
+    controls = _make_controls(("drums",))
+    controls._config_save._on_save_new_config = lambda: saved_path
+    _mutate_render_overlay_display_time(controls)
+    assert controls.config_dirty
+
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = _save_row(view)
+    _choose_save_as_new(controls)
+    assert not controls.config_dirty
+
+
+def _mutate_track_expanded(controls: TuningControls) -> None:
+    _expand_drums(controls)
+
+
+def _mutate_effects_expanded(controls: TuningControls) -> None:
+    _expand_drums(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = _row(view, "drums", RowKind.TRACK_EFFECTS_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_solo_stem(controls: TuningControls) -> None:
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = _row(view, "drums", RowKind.TRACK_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
+
+
+def _mutate_timeline_panel_open(controls: TuningControls) -> None:
+    controls.session.timeline.enabled = True
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_overlay_expanded(controls: TuningControls) -> None:
+    _expand_render_overlay(controls)
+
+
+def _mutate_render_overlay_solo(controls: TuningControls) -> None:
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
+
+
+def _mutate_render_post_fx_expanded(controls: TuningControls) -> None:
+    _expand_render_post_fx(controls)
+
+
+def _mutate_render_post_fx_solo(controls: TuningControls) -> None:
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_POST_FX_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
+
+
+def _mutate_move_mode_without_confirm(controls: TuningControls) -> None:
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = _row(view, "bass", RowKind.TRACK_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    controls.handle_keydown(_keydown(pygame.K_UP))
+
+
+def _mutate_help_visible(controls: TuningControls) -> None:
+    controls.session.help_visible = True
+
+
+def _mutate_focus_navigation(controls: TuningControls) -> None:
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+
+
+def _mutate_timeline_arm(controls: TuningControls) -> None:
+    del controls
+    timeline_controls, session, _, _, _, _ = _make_timeline_controls(
+        focus_row=0,
+    )
+    assert "drums" not in session.timeline.armed_stems
+    timeline_controls.handle_keydown(keydown(pygame.K_RETURN))
+    assert "drums" in session.timeline.armed_stems
+
+
+def _mutate_timeline_recording_start(controls: TuningControls) -> None:
+    del controls
+    timeline_controls, session, _, _, _, _ = _make_timeline_controls(
+        focus_row=0,
+        armed_stems={"drums"},
+    )
+    timeline_controls.handle_keydown(keydown(pygame.K_r))
+    assert session.timeline.recording is True
+
+
+def _mutate_timeline_preview_pause(controls: TuningControls) -> None:
+    del controls
+    timeline_controls, session, _, _, _, _ = _make_timeline_controls()
+    timeline_controls.handle_keydown(keydown(pygame.K_SPACE))
+    assert session.timeline.preview_active is True
+
+
+_SESSION_ONLY_MUTATIONS: list[tuple[str, Callable[[TuningControls], None], tuple[str, ...]]] = [
+    ("track.expanded", _mutate_track_expanded, ("drums", "bass")),
+    ("track.effects_expanded", _mutate_effects_expanded, ("drums",)),
+    ("solo_stem", _mutate_solo_stem, ("drums",)),
+    ("timeline.panel_open", _mutate_timeline_panel_open, ("drums",)),
+    ("render_overlay.expanded", _mutate_render_overlay_expanded, ("drums",)),
+    ("render_overlay.solo", _mutate_render_overlay_solo, ("drums",)),
+    ("render_post_fx.expanded", _mutate_render_post_fx_expanded, ("drums",)),
+    ("render_post_fx.solo", _mutate_render_post_fx_solo, ("drums",)),
+    ("move_mode.swap", _mutate_move_mode_without_confirm, ("drums", "bass")),
+    ("help_visible", _mutate_help_visible, ("drums",)),
+    ("focus_navigation", _mutate_focus_navigation, ("drums",)),
+    ("timeline.armed", _mutate_timeline_arm, ("drums",)),
+    ("timeline.recording", _mutate_timeline_recording_start, ("drums",)),
+    ("timeline.preview", _mutate_timeline_preview_pause, ("drums",)),
+]
+
+
+@pytest.mark.parametrize(
+    "field_id,mutate,stems",
+    _SESSION_ONLY_MUTATIONS,
+    ids=[item[0] for item in _SESSION_ONLY_MUTATIONS],
+)
+def test_session_only_mutation_does_not_mark_config_dirty(
+    field_id: str,
+    mutate: Callable[[TuningControls], None],
+    stems: tuple[str, ...],
+) -> None:
+    del field_id
+    controls = _make_controls(stems, timeline_enabled=True)
+    assert not controls.config_dirty
+    mutate(controls)
+    assert not controls.config_dirty

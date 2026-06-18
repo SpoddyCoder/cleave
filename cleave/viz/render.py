@@ -12,18 +12,18 @@ from pathlib import Path
 import pygame
 
 from cleave.config import VIZ_CONFIG_FILENAME, load_config
-from cleave.easing import fade_alpha
 from cleave.paths import default_project_config, repo_root, resolve_project
 from cleave.preset_playlist import scan_all_layers
 from cleave.project import load_manifest, manifest_path, mix_path
 from cleave.separate import project_stems_complete, signals_complete
 from cleave.viz.app import (
+    RenderVisualizerRuntime,
     VisualizerApp,
-    _init_gl_resources_render,
-    build_runtime_full,
+    build_runtime_base,
+    init_gl_resources_render,
 )
-from cleave.viz.layer import _destroy_layers, _warmup_layers
-from cleave.viz.render_overlay import build_panel_surface, composite_render_overlay
+from cleave.viz.frame_finish import RenderOverlayPanelCache, finish_content_frame
+from cleave.viz.layer_pipeline import LayerFramePipeline
 
 _PREPARE_HINT = "run `cleave separate` or `cleave play` first"
 
@@ -185,13 +185,13 @@ def render(
 
     audio_path = mix_path(project)
     playlists = scan_all_layers(cfg)
-    runtime = build_runtime_full(cfg, project, audio_path, playlists)
+    seed = build_runtime_base(cfg, project, audio_path, playlists)
 
     os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
     pygame.init()
     try:
         pygame.display.set_mode(
-            (runtime.display_width, runtime.display_height),
+            (seed.display_width, seed.display_height),
             pygame.OPENGL | pygame.HIDDEN,
         )
     except pygame.error as exc:
@@ -199,12 +199,13 @@ def render(
         raise RuntimeError(f"failed to open OpenGL context: {exc}") from exc
 
     proc: subprocess.Popen[bytes] | None = None
+    runtime: RenderVisualizerRuntime | None = None
     try:
-        _init_gl_resources_render(runtime)
+        runtime = init_gl_resources_render(seed)
         app = VisualizerApp(runtime)
 
-        duration_sec = runtime.duration_sec
-        fps = runtime.fps
+        duration_sec = runtime.seed.duration_sec
+        fps = runtime.seed.fps
         segment = _resolve_segment(
             start_sec, end_sec, duration_sec=duration_sec, fps=fps
         )
@@ -217,10 +218,8 @@ def render(
             )
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        width = runtime.display_width
-        height = runtime.display_height
-        content_width = runtime.width
-        content_height = runtime.height
+        width = runtime.seed.display_width
+        height = runtime.seed.display_height
         frame_count = segment.frame_count
         frame_bytes = width * height * 4
         audio_duration_sec = frame_count / fps
@@ -262,51 +261,28 @@ def render(
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
         assert proc.stdin is not None
 
-        assert runtime.compositor is not None
-        overlay_cfg = (
-            cfg.render.overlay
-            if cfg.render is not None and cfg.render.overlay is not None
-            else None
-        )
-        overlay_panel = None
-        if overlay_cfg is not None and overlay_cfg.enabled:
-            overlay_panel = build_panel_surface(overlay_cfg)
-
-        pp = runtime.session.render_post_fx
-        if pp.enabled:
-            fade_in = pp.fade_in
-            fade_out = pp.fade_out
-        else:
-            fade_in = 0.0
-            fade_out = 0.0
+        panel_cache = RenderOverlayPanelCache()
 
         warmup_frames = round(cfg.visualizer.warmup_sec * fps)
         if warmup_frames > 0:
-            _warmup_layers(
+            LayerFramePipeline.warmup(
                 runtime.layers,
-                runtime.pcm_bank,
+                runtime.seed.pcm_bank,
                 segment.start_frame / fps,
                 warmup_frames,
                 fps,
-                runtime.n_pcm,
-                session=runtime.session,
+                runtime.seed.n_pcm,
+                session=runtime.seed.session,
             )
 
         for frame_idx in range(frame_count):
             t_sec = (segment.start_frame + frame_idx) / fps
             app.tick_frame(t_sec, paused=False, draw_overlay=False)
-            alpha = fade_alpha(t_sec, duration_sec, fade_in, fade_out)
-            runtime.compositor.apply_frame_fade(alpha)
-            if overlay_cfg is not None and overlay_cfg.enabled:
-                composite_render_overlay(
-                    runtime.compositor,
-                    overlay_cfg,
-                    t_sec,
-                    content_width,
-                    content_height,
-                    panel=overlay_panel,
-                )
-            runtime.compositor.present_content()
+            finish_content_frame(
+                runtime,
+                t_sec,
+                panel_cache=panel_cache,
+            )
             frame = runtime.compositor.read_rgba_frame()
             if len(frame) != frame_bytes:
                 raise RuntimeError(
@@ -321,10 +297,9 @@ def render(
             raise RuntimeError(f"ffmpeg exited with status {rc}")
 
     finally:
-        _destroy_layers(runtime.layers)
-        if runtime.compositor is not None:
+        if runtime is not None:
+            LayerFramePipeline.destroy(runtime.layers)
             runtime.compositor.destroy()
-        if runtime.post_process is not None:
             runtime.post_process.destroy()
         if proc is not None and proc.stdin is not None:
             proc.stdin.close()

@@ -11,7 +11,7 @@ from cleave.viz.key_repeat import mod_ctrl
 from cleave.viz.timeline_controls import TimelineControls
 
 if TYPE_CHECKING:
-    from cleave.viz.app import VisualizerRuntime
+    from cleave.viz.app import LiveVisualizerRuntime
 
 
 def timeline_submenu_routes_to_timeline(
@@ -31,37 +31,33 @@ def timeline_submenu_routes_to_timeline(
 
 
 def key_handler_for_runtime(
-    runtime: VisualizerRuntime, key: int
+    runtime: LiveVisualizerRuntime, key: int
 ) -> TuningControls | TimelineControls:
     """Pick the context handler for a key (tests and dispatch)."""
-    tl = runtime.session.timeline
+    tl = runtime.seed.session.timeline
     if timeline_submenu_routes_to_timeline(
         tl,
         timeline_controls=runtime.timeline_controls,
         key=key,
     ):
-        assert runtime.timeline_controls is not None
         return runtime.timeline_controls
-    assert runtime.controls is not None
     return runtime.controls
 
 
 def _handle_global_keydown(
-    event: pygame.event.Event, runtime: VisualizerRuntime
+    event: pygame.event.Event, runtime: LiveVisualizerRuntime
 ) -> bool | None:
     """Global shortcuts. True = handled, False = quit, None = pass through."""
     if event.key == pygame.K_q and mod_ctrl(event.mod):
-        assert runtime.controls is not None
         return not runtime.controls.try_quit()
 
     if event.key == pygame.K_h:
-        runtime.session.help_visible = not runtime.session.help_visible
+        runtime.seed.session.help_visible = not runtime.seed.session.help_visible
         return True
 
-    tl = runtime.session.timeline
+    tl = runtime.seed.session.timeline
     if tl.recording:
         if event.key == pygame.K_ESCAPE:
-            assert runtime.timeline_controls is not None
             runtime.timeline_controls.stop_recording()
             return True
         if event.key == pygame.K_t:
@@ -70,7 +66,7 @@ def _handle_global_keydown(
     return None
 
 
-def dispatch_keydown(event: pygame.event.Event, runtime: VisualizerRuntime) -> bool:
+def dispatch_keydown(event: pygame.event.Event, runtime: LiveVisualizerRuntime) -> bool:
     """Handle a key-down event. Return False when the app should quit."""
     if event.type != pygame.KEYDOWN:
         return True
@@ -79,7 +75,6 @@ def dispatch_keydown(event: pygame.event.Event, runtime: VisualizerRuntime) -> b
     if global_result is not None:
         return global_result
 
-    assert runtime.controls is not None
     if runtime.controls.handle_modal_keydown(event):
         return True
 
@@ -87,7 +82,7 @@ def dispatch_keydown(event: pygame.event.Event, runtime: VisualizerRuntime) -> b
     return key_handler.handle_keydown(event)
 
 
-def dispatch_keyup(event: pygame.event.Event, runtime: VisualizerRuntime) -> None:
+def dispatch_keyup(event: pygame.event.Event, runtime: LiveVisualizerRuntime) -> None:
     if event.type != pygame.KEYUP:
         return
     key_handler = key_handler_for_runtime(runtime, event.key)
@@ -95,12 +90,12 @@ def dispatch_keyup(event: pygame.event.Event, runtime: VisualizerRuntime) -> Non
 
 
 def dispatch_should_notify_overlay(
-    event: pygame.event.Event, runtime: VisualizerRuntime
+    event: pygame.event.Event, runtime: LiveVisualizerRuntime
 ) -> bool:
     """Mirror VisualizerApp.run overlay fade-in on input."""
     if event.type != pygame.KEYDOWN:
         return False
-    tl = runtime.session.timeline
+    tl = runtime.seed.session.timeline
     key_handler = key_handler_for_runtime(runtime, event.key)
     if key_handler is not runtime.controls:
         return False

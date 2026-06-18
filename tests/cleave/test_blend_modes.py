@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from cleave.config import _parse_blend_mode
+from cleave.config_schema import parse_blend_mode
 from cleave.blend_modes import BLEND_MODES
 from tests.support.viz import make_controls
 
@@ -23,12 +23,12 @@ def test_blend_modes_cycle_order() -> None:
 
 def test_parse_blend_mode_accepts_all_modes() -> None:
     for mode in BLEND_MODES:
-        assert _parse_blend_mode("drums", {"blend_mode": mode}) == mode
+        assert parse_blend_mode("drums", {"blend_mode": mode}) == mode
 
 
 def test_parse_blend_mode_rejects_unknown() -> None:
     try:
-        _parse_blend_mode("drums", {"blend_mode": "overlay"})
+        parse_blend_mode("drums", {"blend_mode": "overlay"})
     except ValueError as exc:
         assert "blend_mode must be one of" in str(exc)
     else:

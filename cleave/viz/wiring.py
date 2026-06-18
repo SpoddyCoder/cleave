@@ -5,24 +5,40 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from cleave.config import VIZ_CONFIG_FILENAME, CleaveConfig
+from cleave.config import VIZ_CONFIG_FILENAME, CleaveConfig, LayerConfig, PathsConfig, VisualizerConfig
 from cleave.config_snapshot import next_unnamed_path, write_session_snapshot
 from cleave.effects.runtime import EffectRuntime
+from cleave.extract import STEM_NAMES
 from cleave.paths import repo_root
 from cleave.preset_playlist import PresetPlaylist
 from cleave.signals import Signals
-from cleave.viz.controls import TuningControls, TuningSession
+from cleave.viz.controls import TuningControls
+from cleave.viz.live_layer_bindings import LiveLayerBindings
+from cleave.viz.session import TuningSession
 from cleave.viz.timeline_controls import TimelineControls
-from cleave.viz.layer import (
-    StemLayer,
-    _flush_all_pcm,
-    apply_effect_modifiers,
-    apply_layer_visibility,
-    effective_layer_enabled,
-)
+from cleave.viz.layer import StemLayer
+from cleave.viz.layer_pipeline import LayerFramePipeline, apply_effect_modifiers
+from cleave.viz.layer_visibility import apply_layer_visibility, effective_layer_enabled
 from cleave.viz.mix_player import MixPlayer
 from cleave.stem_pcm import StemPcmBank
 from cleave.viz.playback import current_sec, seek
+
+
+def _stub_cfg_for_session(
+    session: TuningSession,
+    preset_root: Path,
+    project_dir: Path,
+) -> CleaveConfig:
+    return CleaveConfig(
+        paths=PathsConfig(preset_root=preset_root, texture_paths=()),
+        layers={
+            name: LayerConfig(preset=preset_root / name / "stub.milk")
+            for name in STEM_NAMES
+        },
+        visualizer=VisualizerConfig(),
+        config_path=project_dir / VIZ_CONFIG_FILENAME,
+        layer_z_order=tuple(session.layer_z_order),
+    )
 
 
 def make_tuning_controls(
@@ -63,7 +79,7 @@ def make_tuning_controls(
     def on_layer_enabled_change(stem: str, enabled: bool) -> None:
         t_sec = current_sec(playback, duration_sec)
         apply_layer_visibility(session, layers_by_name, t_sec)
-        _flush_all_pcm(layers)
+        LayerFramePipeline.flush_pcm(layers)
         if effective_layer_enabled(session, stem, t_sec):
             apply_effect_modifiers(
                 session,
@@ -77,7 +93,7 @@ def make_tuning_controls(
     def on_timeline_enabled_change() -> None:
         t_sec = current_sec(playback, duration_sec)
         apply_layer_visibility(session, layers_by_name, t_sec)
-        _flush_all_pcm(layers)
+        LayerFramePipeline.flush_pcm(layers)
         apply_effect_modifiers(
             session,
             layers_by_name,
@@ -92,7 +108,7 @@ def make_tuning_controls(
         apply_layer_visibility(session, layers_by_name, t_sec)
         if mix_player is not None:
             mix_player.set_solo_stem(session.solo_stem)
-        _flush_all_pcm(layers)
+        LayerFramePipeline.flush_pcm(layers)
         apply_effect_modifiers(
             session,
             layers_by_name,
@@ -107,21 +123,28 @@ def make_tuning_controls(
 
     def on_seek(delta_sec: float) -> None:
         seek(playback, delta_sec, duration_sec)
-        _flush_all_pcm(layers)
+        LayerFramePipeline.flush_pcm(layers)
+
+    layer_bindings = LiveLayerBindings(
+        on_preset_change=on_preset_change,
+        on_blend_change=on_blend_change,
+        on_opacity_change=on_opacity_change,
+        on_layer_enabled_change=on_layer_enabled_change,
+        on_timeline_enabled_change=on_timeline_enabled_change,
+        on_solo_change=on_solo_change,
+        on_beat_change=on_beat_change,
+        on_seek=on_seek,
+    )
 
     kwargs: dict = {
         "session": session,
+        "cfg": cfg if cfg is not None else _stub_cfg_for_session(
+            session, preset_root, project_dir
+        ),
         "preset_root": preset_root,
         "playback": playback,
         "duration_sec": duration_sec,
-        "on_preset_change": on_preset_change,
-        "on_blend_change": on_blend_change,
-        "on_opacity_change": on_opacity_change,
-        "on_layer_enabled_change": on_layer_enabled_change,
-        "on_timeline_enabled_change": on_timeline_enabled_change,
-        "on_solo_change": on_solo_change,
-        "on_beat_change": on_beat_change,
-        "on_seek": on_seek,
+        "layer_bindings": layer_bindings,
     }
 
     if cfg is not None:
@@ -135,7 +158,6 @@ def make_tuning_controls(
             return path.name
 
         kwargs.update(
-            on_z_order_change=lambda _order: None,
             on_save_new_config=on_save_new_config,
             on_overwrite_config=on_overwrite_config,
             launch_config_path=cfg.config_path,
@@ -167,13 +189,12 @@ def make_timeline_controls(
     effect_runtime: EffectRuntime,
     mix_player: MixPlayer | None = None,
     on_toast: Callable[[str], None] | None = None,
-    on_config_dirty: Callable[[], None] | None = None,
     tuning_controls: TuningControls | None = None,
 ) -> TimelineControls:
     def on_visibility_change() -> None:
         t_sec = current_sec(playback, duration_sec)
         apply_layer_visibility(session, layers_by_name, t_sec)
-        _flush_all_pcm(layers)
+        LayerFramePipeline.flush_pcm(layers)
         apply_effect_modifiers(
             session,
             layers_by_name,
@@ -185,7 +206,7 @@ def make_timeline_controls(
 
     def on_close() -> None:
         if tuning_controls is not None:
-            tuning_controls._close_timeline_panel()
+            tuning_controls.close_timeline_panel()
         else:
             session.timeline.panel_open = False
             session.timeline.submenu_focused = False
@@ -198,7 +219,7 @@ def make_timeline_controls(
 
     def on_seek(delta_sec: float) -> None:
         seek(playback, delta_sec, duration_sec)
-        _flush_all_pcm(layers)
+        LayerFramePipeline.flush_pcm(layers)
 
     return TimelineControls(
         session,
@@ -209,5 +230,4 @@ def make_timeline_controls(
         on_exit_submenu=on_exit_submenu,
         on_seek=on_seek,
         on_toast=on_toast,
-        on_config_dirty=on_config_dirty,
     )

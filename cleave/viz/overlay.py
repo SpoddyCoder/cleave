@@ -11,17 +11,10 @@ from typing import Literal
 
 import pygame
 
-from cleave.config import (
-    DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
-    DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
-    DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
-    DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
-    DEFAULT_RENDER_OVERLAY_FONT,
-    DEFAULT_RENDER_OVERLAY_POSITION,
-    DEFAULT_RENDER_OVERLAY_START_DELAY,
-    DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
-    DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
-    RenderOverlayPosition,
+from cleave.config import RenderOverlayPosition
+from cleave.config_schema import (
+    default_render_overlay_runtime_values,
+    default_render_post_fx_runtime_values,
 )
 from cleave.effects.registry import effect_roster
 from cleave.viz.row_semantics import (
@@ -112,31 +105,35 @@ class TrackBlock:
     preset_empty: bool = False
 
 
+_RO_OVERLAY_DEFAULTS = default_render_overlay_runtime_values()
+_RO_POST_FX_DEFAULTS = default_render_post_fx_runtime_values()
+
+
 @dataclass
 class RenderOverlayBlock:
-    enabled: bool = True
-    expanded: bool = False
-    position: RenderOverlayPosition = DEFAULT_RENDER_OVERLAY_POSITION
-    title_expanded: bool = False
-    body_expanded: bool = False
-    title_font_size: int = DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE
-    title_font: str = DEFAULT_RENDER_OVERLAY_FONT
-    title_margin_bottom: int = DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM
-    body_font_size: int = DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE
-    body_font: str = DEFAULT_RENDER_OVERLAY_FONT
-    opacity_pct: int = int(round(DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY * 100))
-    border_width: int = DEFAULT_RENDER_OVERLAY_BORDER_WIDTH
-    start_delay: float = DEFAULT_RENDER_OVERLAY_START_DELAY
-    display_time: float = DEFAULT_RENDER_OVERLAY_DISPLAY_TIME
+    enabled: bool = _RO_OVERLAY_DEFAULTS["enabled"]
+    expanded: bool = _RO_OVERLAY_DEFAULTS["expanded"]
+    position: RenderOverlayPosition = _RO_OVERLAY_DEFAULTS["position"]
+    title_expanded: bool = _RO_OVERLAY_DEFAULTS["title_expanded"]
+    body_expanded: bool = _RO_OVERLAY_DEFAULTS["body_expanded"]
+    title_font_size: int = _RO_OVERLAY_DEFAULTS["title_font_size"]
+    title_font: str = _RO_OVERLAY_DEFAULTS["title_font"]
+    title_margin_bottom: int = _RO_OVERLAY_DEFAULTS["title_margin_bottom"]
+    body_font_size: int = _RO_OVERLAY_DEFAULTS["body_font_size"]
+    body_font: str = _RO_OVERLAY_DEFAULTS["body_font"]
+    opacity_pct: int = _RO_OVERLAY_DEFAULTS["opacity_pct"]
+    border_width: int = _RO_OVERLAY_DEFAULTS["border_width"]
+    start_delay: float = _RO_OVERLAY_DEFAULTS["start_delay"]
+    display_time: float = _RO_OVERLAY_DEFAULTS["display_time"]
     solo: bool = False
 
 
 @dataclass
 class RenderPostFxBlock:
-    enabled: bool = True
-    expanded: bool = False
-    fade_in: float = 30.0
-    fade_out: float = 4.0
+    enabled: bool = _RO_POST_FX_DEFAULTS["enabled"]
+    expanded: bool = _RO_POST_FX_DEFAULTS["expanded"]
+    fade_in: float = _RO_POST_FX_DEFAULTS["fade_in"]
+    fade_out: float = _RO_POST_FX_DEFAULTS["fade_out"]
     solo: bool = False
 
 
@@ -1106,7 +1103,7 @@ def panel_content_max_width(
     return PANEL_CONTENT_MAX_WIDTH
 
 
-def _clip_rect_to_surface(
+def clip_rect_to_surface(
     rect: tuple[int, int, int, int],
     surface: pygame.Surface,
 ) -> tuple[int, int, int, int] | None:
@@ -1791,7 +1788,7 @@ class TuningOverlay:
             pos = (mx, surface.get_height() - panel_h - my)
 
         surface.blit(panel, pos)
-        self._panel_rect = _clip_rect_to_surface(
+        self._panel_rect = clip_rect_to_surface(
             (pos[0], pos[1], panel_w, panel_h),
             surface,
         )

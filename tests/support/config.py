@@ -4,16 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cleave.config import (
-    VIZ_CONFIG_FILENAME,
-    DEFAULT_BEAT_SENSITIVITY,
-    DEFAULT_BLEND_MODE,
+from cleave.config import VIZ_CONFIG_FILENAME, dump_yaml
+from cleave.config_schema import (
     DEFAULT_LAYER_Z_ORDER,
-    DEFAULT_VISUALIZER_FPS,
-    DEFAULT_VISUALIZER_HEIGHT,
-    DEFAULT_VISUALIZER_WIDTH,
-    LAYER_DEFAULT_SIZE,
-    dump_yaml,
+    template_layer_entry,
+    template_visualizer_section,
 )
 from cleave.extract import STEM_NAMES
 from cleave.paths import repo_root
@@ -36,13 +31,7 @@ def write_minimal_config(project_dir: Path, preset_root: Path, **overrides) -> P
     texture_root.mkdir(parents=True, exist_ok=True)
 
     data: dict = {
-        "visualizer": {
-            "name": "cleave-test",
-            "width": DEFAULT_VISUALIZER_WIDTH,
-            "height": DEFAULT_VISUALIZER_HEIGHT,
-            "fps": DEFAULT_VISUALIZER_FPS,
-            "beat_sensitivity": DEFAULT_BEAT_SENSITIVITY,
-        },
+        "visualizer": template_visualizer_section(name="cleave-test"),
         "paths": {
             "preset_root": str(preset_root),
             "texture_paths": [str(texture_root)],
@@ -50,12 +39,8 @@ def write_minimal_config(project_dir: Path, preset_root: Path, **overrides) -> P
         "layer_z_order": list(DEFAULT_LAYER_Z_ORDER),
         "layers": {
             stem: {
+                **template_layer_entry(stem),
                 "preset": f"{stem}/{stem}.milk",
-                "enabled": True,
-                "opacity": 1.0,
-                "width": LAYER_DEFAULT_SIZE[stem][0],
-                "height": LAYER_DEFAULT_SIZE[stem][1],
-                "blend_mode": DEFAULT_BLEND_MODE[stem],
             }
             for stem in STEM_NAMES
         },

@@ -11,6 +11,7 @@ from cleave.effects.registry import (
     effect_row_count,
     validate_effect_entry,
 )
+from cleave.effects.handlers import EFFECT_HANDLERS
 from cleave.extract import STEM_NAMES
 
 
@@ -90,3 +91,11 @@ def test_validate_effect_entry_rejects_roster_mismatch() -> None:
 def test_all_stems_have_rosters() -> None:
     for stem in STEM_NAMES:
         assert effect_row_count(stem) >= 3
+
+
+def test_every_effect_id_has_handler() -> None:
+    assert EFFECT_HANDLERS.keys() == set(EFFECT_IDS)
+    for effect_id in EFFECT_IDS:
+        assert effect_id in EFFECT_HANDLERS
+        handler = EFFECT_HANDLERS[effect_id]
+        assert handler.effect_id == effect_id

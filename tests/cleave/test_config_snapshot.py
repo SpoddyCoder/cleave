@@ -19,20 +19,28 @@ from cleave.config import (
     RenderPostFxConfig,
     VisualizerConfig,
     _parse_layers,
-    _parse_render,
-    _parse_timeline,
+    load_config,
 )
-from cleave.config_snapshot import next_unnamed_path, write_session_snapshot
+from cleave.config_schema import (
+    parse_render_section,
+    parse_timeline_section,
+)
+from cleave.config_snapshot import (
+    next_unnamed_path,
+    persisted_session_payload,
+    persisted_session_signature,
+    write_session_snapshot,
+)
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import playlist_at_dir
 from cleave.timeline import TimelineCue
-from cleave.viz.controls import (
+from cleave.viz.session import (
     LayerRuntime,
     RenderOverlayRuntime,
     RenderPostFxRuntime,
     TuningSession,
+    session_from_cfg,
 )
-from cleave.viz.layer import _session_from_cfg
 
 
 def test_next_unnamed_path_empty_dir(tmp_path: Path) -> None:
@@ -589,7 +597,7 @@ def test_write_session_snapshot_persists_render_overlay(tmp_path: Path) -> None:
     assert overlay["background"]["border"]["colour"] == "#223344"
     assert overlay["background"]["border"]["width"] == 4
 
-    round_trip = _parse_render(data)
+    round_trip = parse_render_section(data)
     assert round_trip is not None
     assert round_trip.overlay is not None
     assert round_trip.overlay.enabled is True
@@ -625,7 +633,7 @@ def test_write_session_snapshot_persists_render_post_fx(tmp_path: Path) -> None:
     assert post_fx["fade_in"] == 12.0
     assert post_fx["fade_out"] == 3.0
 
-    round_trip = _parse_render(data)
+    round_trip = parse_render_section(data)
     assert round_trip is not None
     assert round_trip.post_fx is not None
     assert round_trip.post_fx.enabled is True
@@ -695,7 +703,7 @@ def test_write_session_snapshot_persists_timeline_at_bottom(tmp_path: Path) -> N
         {"t": 10.0, "layers": {"vocals": False}},
     ]
 
-    timeline = _parse_timeline(data)
+    timeline = parse_timeline_section(data)
     assert timeline is not None
     playlists = {
         name: playlist_at_dir(cfg.paths.preset_root / name, index=0)
@@ -709,7 +717,7 @@ def test_write_session_snapshot_persists_timeline_at_bottom(tmp_path: Path) -> N
         render=cfg.render,
         timeline=timeline,
     )
-    session2 = _session_from_cfg(cfg_with_timeline, playlists)
+    session2 = session_from_cfg(cfg_with_timeline, playlists)
     assert session2.timeline.enabled is True
     assert session2.timeline.cues == list(timeline.cues)
 
@@ -724,3 +732,181 @@ def test_write_session_snapshot_persists_timeline_disabled_without_cues(
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
     assert data["timeline"] == {"enabled": False}
+
+
+def _round_trip_preset_dirs(root: Path) -> Path:
+    preset_root = root / "presets"
+    for name in STEM_NAMES:
+        stem_dir = preset_root / name
+        stem_dir.mkdir(parents=True)
+        (stem_dir / "anchor.milk").write_text("milk")
+    return preset_root
+
+
+def _round_trip_playlists(preset_root: Path) -> dict[str, object]:
+    return {
+        name: playlist_at_dir(preset_root / name, index=0) for name in STEM_NAMES
+    }
+
+
+def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
+    root = tmp_path
+    preset_root = _round_trip_preset_dirs(root)
+    texture_path = root / "textures"
+    texture_path.mkdir()
+
+    config_path = root / "cleave-viz.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "visualizer": {
+                    "name": "round-trip-test",
+                    "width": 1280,
+                    "height": 720,
+                    "upscale": 1.5,
+                    "fps": 30,
+                    "warmup_sec": 5.0,
+                    "beat_sensitivity": 2.2,
+                },
+                "paths": {
+                    "preset_root": str(preset_root),
+                    "texture_paths": [str(texture_path)],
+                },
+                "layer_z_order": ["vocals", "drums", "other", "bass"],
+                "layers": {
+                    "drums": {
+                        "preset": "drums/anchor.milk",
+                        "enabled": True,
+                        "opacity": 0.9,
+                        "width": 1280,
+                        "height": 720,
+                        "blend_mode": "add",
+                        "locked": True,
+                        "effects": {"pulse": {"onset": 40}},
+                    },
+                    "bass": {
+                        "preset": "bass/anchor.milk",
+                        "enabled": True,
+                        "opacity": 1.0,
+                        "width": 960,
+                        "height": 540,
+                        "blend_mode": "black-key",
+                        "beat_sensitivity": 1.8,
+                    },
+                    "vocals": {
+                        "preset": "vocals/anchor.milk",
+                        "enabled": False,
+                        "opacity": 0.5,
+                        "width": 960,
+                        "height": 540,
+                        "blend_mode": "black-key",
+                        "effects": {"hue": {"pitch": 25}},
+                    },
+                    "other": {
+                        "preset": "other/anchor.milk",
+                        "enabled": True,
+                        "opacity": 1.0,
+                        "width": 640,
+                        "height": 360,
+                        "blend_mode": "black-key",
+                    },
+                },
+                "render": {
+                    "post_fx": {
+                        "enabled": True,
+                        "fade_in": 30,
+                        "fade_out": 4,
+                    },
+                    "overlay": {
+                        "enabled": True,
+                        "start_delay": 10,
+                        "display_time": 30,
+                        "position": "bottom-left",
+                        "title": {
+                            "content": "Round Trip Title",
+                            "font-size": 24,
+                            "font-colour": "#ffffff",
+                            "margin-bottom": 10,
+                        },
+                        "body": {
+                            "content": "Round trip body",
+                            "font-size": 18,
+                            "colour": "#ffffff",
+                        },
+                        "background": {
+                            "margin": 40,
+                            "padding": 20,
+                            "colour": "#000000",
+                            "opacity": 0.7,
+                            "border": {"colour": "#ffffff", "width": 4},
+                        },
+                    },
+                },
+                "timeline": {
+                    "enabled": True,
+                    "cues": [
+                        {"t": 1.0, "layers": {"drums": False, "bass": True}},
+                    ],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    cfg = load_config(config_path=config_path)
+    playlists = _round_trip_playlists(preset_root)
+    session = session_from_cfg(cfg, playlists)
+
+    session.layer_z_order = ["other", "drums", "bass", "vocals"]
+    session.layers["drums"].opacity_pct = 65
+    session.layers["drums"].blend_mode = "black-key"
+    session.layers["drums"].locked = False
+    session.layers["bass"].beat_sensitivity = 2.5
+    session.layers["vocals"].enabled = True
+    session.layers["vocals"].effects = {"flash": {"rms": 15}}
+    session.render_overlay.display_time = 55.0
+    session.render_overlay.start_delay = 8.0
+    session.render_overlay.position = "top-right"
+    session.render_overlay.opacity_pct = 80
+    session.render_post_fx.fade_in = 18.0
+    session.render_post_fx.fade_out = 2.0
+    session.timeline.cues = [
+        TimelineCue(t=1.0, layers={"drums": False, "bass": True}),
+        TimelineCue(t=12.5, layers={"vocals": False, "other": True}),
+    ]
+
+    expected = persisted_session_payload(cfg, session)
+    assert expected["visualizer"]["warmup_sec"] == 5.0
+
+    sig_before = persisted_session_signature(cfg, session)
+    cfg_warmup_default = CleaveConfig(
+        paths=cfg.paths,
+        layers=cfg.layers,
+        visualizer=VisualizerConfig(
+            width=cfg.visualizer.width,
+            height=cfg.visualizer.height,
+            upscale=cfg.visualizer.upscale,
+            fps=cfg.visualizer.fps,
+            warmup_sec=3.0,
+            beat_sensitivity=cfg.visualizer.beat_sensitivity,
+        ),
+        config_path=cfg.config_path,
+        layer_z_order=cfg.layer_z_order,
+        render=cfg.render,
+        timeline=cfg.timeline,
+    )
+    assert persisted_session_signature(cfg_warmup_default, session) != sig_before
+
+    snapshot_path = root / "snapshot.yaml"
+    write_session_snapshot(snapshot_path, cfg=cfg, session=session)
+
+    snapshot_data = yaml.safe_load(snapshot_path.read_text(encoding="utf-8"))
+    assert snapshot_data["visualizer"]["warmup_sec"] == 5.0
+    assert snapshot_data["visualizer"]["upscale"] == 1.5
+    assert snapshot_data["visualizer"]["beat_sensitivity"] == 2.2
+
+    cfg2 = load_config(config_path=snapshot_path)
+    session2 = session_from_cfg(cfg2, _round_trip_playlists(preset_root))
+    actual = persisted_session_payload(cfg2, session2)
+
+    assert actual == expected
