@@ -19,6 +19,7 @@ from cleave.viz.overlay import (
     build_row_layout,
     find_row_by_kind,
     fit_row_text,
+    navigable_row_indices,
     panel_content_max_width,
     panel_help_hint_layout,
     panel_toast_layout,
@@ -368,6 +369,39 @@ def _minimal_view_state(**kwargs: object) -> TuningViewState:
     }
     defaults.update(kwargs)
     return TuningViewState(**defaults)  # type: ignore[arg-type]
+
+
+def test_timeline_layer_hint_when_timeline_enabled() -> None:
+    disabled = _minimal_view_state(
+        render_timeline=RenderTimelineBlock(enabled=False),
+    )
+    enabled = _minimal_view_state(
+        render_timeline=RenderTimelineBlock(enabled=True),
+    )
+    disabled_kinds = [row.kind for row in build_row_layout(disabled)]
+    enabled_kinds = [row.kind for row in build_row_layout(enabled)]
+    assert RowKind.TIMELINE_LAYER_HINT not in disabled_kinds
+    assert RowKind.TIMELINE_LAYER_HINT in enabled_kinds
+    hint_idx = find_row_by_kind(enabled, RowKind.TIMELINE_LAYER_HINT)
+    gap_idx = find_row_by_kind(enabled, RowKind.RENDER_SECTION_GAP)
+    overlay_idx = find_row_by_kind(enabled, RowKind.RENDER_OVERLAY_HEADER)
+    assert hint_idx < gap_idx < overlay_idx
+    assert hint_idx not in navigable_row_indices(enabled)
+    assert _row_value_color(enabled, hint_idx) == DISABLED
+
+
+def test_draw_timeline_layer_hint_without_error() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    state = _minimal_view_state(
+        render_timeline=RenderTimelineBlock(enabled=True),
+    )
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.notify_input()
+    overlay.draw(surface, state)
+    assert overlay.panel_rect is not None
+    hint_idx = find_row_by_kind(state, RowKind.TIMELINE_LAYER_HINT)
+    assert hint_idx in visible_row_indices(state)
 
 
 def test_render_overlay_row_layout_includes_header_and_sub_rows_when_expanded() -> None:
