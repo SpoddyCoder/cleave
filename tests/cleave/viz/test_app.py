@@ -16,6 +16,7 @@ from cleave.viz.app import (
 )
 from cleave.viz.input_dispatch import key_handler_for_runtime
 from cleave.viz.session import LayerRuntime, RenderPostFxRuntime, TuningSession
+from cleave.viz.modal import ModalHost
 from cleave.viz.overlay import TuningOverlay
 from tests.support.compositor_mock import recording_compositor
 
@@ -31,6 +32,7 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
     controls.build_view_state.return_value = MagicMock()
     overlay = MagicMock()
     overlay.update = MagicMock()
+    modal_host = ModalHost()
     seed = VisualizerSeed(
         project_dir=MagicMock(),
         audio_path=MagicMock(),
@@ -59,6 +61,7 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
         post_process=MagicMock(),
         controls=controls,
         timeline_controls=MagicMock(),
+        modal_host=modal_host,
         mix_player=MagicMock(),
         playback=MagicMock(),
         overlay=overlay,
@@ -165,6 +168,7 @@ def _heavy_init_side_effect(
     playback = MagicMock()
     playback.paused = False
     mix_player = MagicMock()
+    modal_host = ModalHost()
     return LiveVisualizerRuntime(
         seed=seed,
         layers=[],
@@ -173,6 +177,7 @@ def _heavy_init_side_effect(
         post_process=post_process,
         controls=controls,
         timeline_controls=MagicMock(),
+        modal_host=modal_host,
         mix_player=mix_player,
         playback=playback,
         overlay=MagicMock(),
