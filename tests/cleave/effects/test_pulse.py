@@ -13,12 +13,13 @@ from cleave.effects.pulse import (
     effective_opacity,
     update_envelope,
 )
+from cleave.effects.registry import EffectDef
 from cleave.effects.runtime import EffectRuntime
 from cleave.effects.sampling import sample_normalized
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import playlist_at_dir
 from cleave.signals import Signals
-from cleave.viz.controls import LayerRuntime, TuningSession
+from cleave.viz.session import LayerRuntime, TuningSession
 from tests.support.signals import make_onset_signals, make_signals
 
 
@@ -78,12 +79,9 @@ def test_sample_normalized_interpolates() -> None:
 def test_pulse_envelope_state_tracks_playback() -> None:
     signals = make_onset_signals([0.0, 1.0, 0.0])
     state = PulseEnvelopeState()
-    first = state.sample_and_update(
-        signals, "drums", "onset_strength", "onset", 0.01
-    )
-    second = state.sample_and_update(
-        signals, "drums", "onset_strength", "onset", 0.02
-    )
+    row = EffectDef("pulse", "onset", "drums", "onset_strength")
+    first = state.sample_and_update(signals, row, 0.01)
+    second = state.sample_and_update(signals, row, 0.02)
     assert first > 0.0
     assert second >= first * 0.92 or second > 0.0
 
@@ -151,8 +149,10 @@ def test_effect_runtime_bass_multi_pulse_stacking() -> None:
     )
     runtime = EffectRuntime()
     runtime.tick(session, signals, 0.01)
-    sub_state = runtime._pulse_state("bass", "pulse", "sub_bass")
-    mid_state = runtime._pulse_state("bass", "pulse", "mid_bass")
+    sub_state = runtime._state("bass", "pulse", "sub_bass")
+    mid_state = runtime._state("bass", "pulse", "mid_bass")
+    assert isinstance(sub_state, PulseEnvelopeState)
+    assert isinstance(mid_state, PulseEnvelopeState)
     assert sub_state.envelope != mid_state.envelope
 
     mods = runtime.tick(session, signals, 0.02)

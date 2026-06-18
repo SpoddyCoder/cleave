@@ -11,9 +11,10 @@ from cleave.timeline import (
     punch_replace,
     should_accept_toggle,
 )
-from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, TuningSession
+from cleave.viz.controls import SEEK_LONG, SEEK_SHORT
+from cleave.viz.session import TuningSession
 from cleave.viz.key_repeat import mod_ctrl, mod_shift
-from cleave.viz.layer import (
+from cleave.viz.layer_visibility import (
     armed_recording_visible,
     build_record_punch_cues,
     effective_layer_enabled,
@@ -47,7 +48,6 @@ class TimelineControls:
         on_exit_submenu: Callable[[], None] | None = None,
         on_seek: Callable[[float], None] | None = None,
         on_toast: Callable[[str], None] | None = None,
-        on_config_dirty: Callable[[], None] | None = None,
     ) -> None:
         self.session = session
         self.playback = playback
@@ -57,7 +57,6 @@ class TimelineControls:
         self._on_exit_submenu = on_exit_submenu
         self._on_seek = on_seek
         self._on_toast = on_toast
-        self._on_config_dirty = on_config_dirty
         self.focused_cue_index: int | None = None
         self._last_toggle_t: dict[str, float] = {}
 
@@ -221,8 +220,6 @@ class TimelineControls:
 
         if self._on_visibility_change is not None:
             self._on_visibility_change()
-        if self._on_config_dirty is not None:
-            self._on_config_dirty()
 
     def _toggle_arm(self) -> None:
         stem = self._focused_stem()
@@ -282,8 +279,6 @@ class TimelineControls:
 
         if self._on_visibility_change is not None:
             self._on_visibility_change()
-        if self._on_config_dirty is not None:
-            self._on_config_dirty()
 
     def _stop_record_and_pause(self) -> None:
         tl = self.session.timeline

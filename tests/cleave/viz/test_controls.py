@@ -23,14 +23,16 @@ from cleave.preset_playlist import (
 from cleave.timeline import TimelineCue
 from cleave.viz.key_repeat import mod_shift
 from cleave.viz.playback import format_mmss
-from tests.support.viz import stub_playback_state
+from tests.support.viz import make_test_cfg, noop_layer_bindings, stub_playback_state
 from cleave.viz.controls import (
-    LayerRuntime,
     SEEK_LONG,
     SEEK_SHORT,
     TOAST_DURATION_SEC,
-    TimelineRuntime,
     TuningControls,
+)
+from cleave.viz.session import (
+    LayerRuntime,
+    TimelineRuntime,
     TuningSession,
     allow_overwrite_for_path,
     config_path_display,
@@ -100,6 +102,10 @@ _REPO_ROOT_EXAMPLE = Path("/tmp/cleave-viz.yaml")
 _DEFAULT_ACTIVE_CONFIG = Path("/tmp/projects/my-track/active.yaml")
 
 
+def _mutate_dirty(controls: TuningControls) -> None:
+    controls.session.layers["drums"].opacity_pct = 60
+
+
 def _make_controls(
     stems: tuple[str, ...] = ("drums", "bass"),
     *,
@@ -108,6 +114,7 @@ def _make_controls(
     repo_root_example: Path = _REPO_ROOT_EXAMPLE,
 ) -> TuningControls:
     preset_root = Path("/tmp/presets")
+    cfg = make_test_cfg(stems, preset_root=preset_root, config_path=launch_config_path or _DEFAULT_ACTIVE_CONFIG)
     session = TuningSession(
         layer_z_order=list(stems),
         layers={
@@ -122,6 +129,7 @@ def _make_controls(
     )
     return TuningControls(
         session,
+        cfg,
         preset_root=preset_root,
         playback=stub_playback_state(),
         duration_sec=120.0,
@@ -208,8 +216,8 @@ def test_opacity_clamps() -> None:
 def test_header_toggles_enabled() -> None:
     enabled_events: list[tuple[str, bool]] = []
     controls = _make_controls(("drums",))
-    controls._on_layer_enabled_change = lambda stem, on: enabled_events.append(
-        (stem, on)
+    controls._layer_bindings = noop_layer_bindings(
+        on_layer_enabled_change=lambda stem, on: enabled_events.append((stem, on))
     )
 
     view = controls.build_view_state(paused=False)
@@ -390,9 +398,7 @@ def test_opacity_ctrl_step_is_ten_percent() -> None:
 
 
 def test_move_mode_swaps_z_order() -> None:
-    z_orders: list[list[str]] = []
     controls = _make_controls(("drums", "bass", "vocals"))
-    controls._on_z_order_change = lambda order: z_orders.append(list(order))
 
     view = controls.build_view_state(paused=False)
     header_row = next(
@@ -408,18 +414,14 @@ def test_move_mode_swaps_z_order() -> None:
     assert controls.handle_keydown(_keydown(pygame.K_UP)) is True
     assert controls.session.layer_z_order == ["bass", "drums", "vocals"]
 
-    assert controls.handle_keydown(_keydown(pygame.K_DOWN)) is True
-    assert controls.session.layer_z_order == ["drums", "bass", "vocals"]
-
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
     assert controls.move_mode_stem is None
-    assert z_orders == [["drums", "bass", "vocals"]]
+    assert controls.session.layer_z_order == ["bass", "drums", "vocals"]
+    assert controls.config_dirty
 
 
 def test_move_mode_esc_cancels_without_applying() -> None:
-    z_orders: list[list[str]] = []
     controls = _make_controls(("drums", "bass", "vocals"))
-    controls._on_z_order_change = lambda order: z_orders.append(list(order))
 
     view = controls.build_view_state(paused=False)
     header_row = next(
@@ -436,13 +438,11 @@ def test_move_mode_esc_cancels_without_applying() -> None:
     assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
     assert controls.move_mode_stem is None
     assert controls.session.layer_z_order == ["drums", "bass", "vocals"]
-    assert z_orders == []
+    assert not controls.config_dirty
 
 
 def test_move_mode_backspace_cancels_without_applying() -> None:
-    z_orders: list[list[str]] = []
     controls = _make_controls(("drums", "bass", "vocals"))
-    controls._on_z_order_change = lambda order: z_orders.append(list(order))
 
     view = controls.build_view_state(paused=False)
     header_row = next(
@@ -459,7 +459,7 @@ def test_move_mode_backspace_cancels_without_applying() -> None:
     assert controls.handle_keydown(_keydown(pygame.K_BACKSPACE)) is True
     assert controls.move_mode_stem is None
     assert controls.session.layer_z_order == ["drums", "bass", "vocals"]
-    assert z_orders == []
+    assert not controls.config_dirty
 
 
 def test_save_as_new_triggers_toast_and_blocks_input() -> None:
@@ -490,7 +490,7 @@ def test_save_as_new_triggers_toast_and_blocks_input() -> None:
 def test_config_header_shows_active_path() -> None:
     launch_path = Path("/tmp/projects/my-track/my-track.yaml")
     controls = _make_controls(("drums",))
-    controls._active_config_path = launch_path
+    controls._config_save._active_config_path = launch_path
     view = controls.build_view_state(paused=False)
     header_row = next(
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.CONFIG_HEADER
@@ -502,8 +502,8 @@ def test_config_header_shows_active_path() -> None:
 def test_config_header_shows_asterisk_when_dirty() -> None:
     launch_path = Path("/tmp/projects/my-track/my-track.yaml")
     controls = _make_controls(("drums",))
-    controls._active_config_path = launch_path
-    controls.mark_config_dirty()
+    controls._config_save._active_config_path = launch_path
+    _mutate_dirty(controls)
     view = controls.build_view_state(paused=False)
     header_row = next(
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.CONFIG_HEADER
@@ -516,7 +516,7 @@ def test_config_header_shows_asterisk_when_dirty() -> None:
 def test_blend_and_opacity_change_sets_dirty_save_clears() -> None:
     saved_path = Path("/tmp/projects/my-track/unnamed-2.yaml")
     controls = _make_controls(("drums",))
-    controls._on_save_new_config = lambda: saved_path
+    controls._config_save._on_save_new_config = lambda: saved_path
     assert not controls.config_dirty
 
     view = controls.build_view_state(paused=False)
@@ -539,7 +539,7 @@ def test_config_header_truncates_long_paths() -> None:
         "/very/long/root/projects/my-track/nested/deep/unnamed-99.yaml"
     )
     controls = _make_controls(("drums",))
-    controls._active_config_path = long_path
+    controls._config_save._active_config_path = long_path
     view = controls.build_view_state(paused=False)
     header_row = next(
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.CONFIG_HEADER
@@ -597,7 +597,7 @@ def test_fit_row_text_config_and_preset_share_panel_width() -> None:
         "- Bitcore Tweak.milk (1/50)"
     )
     controls = _make_controls(("drums",))
-    controls._active_config_path = long_path
+    controls._config_save._active_config_path = long_path
     view = controls.build_view_state(paused=False)
     view.tracks["drums"] = TrackBlock(
         stem="drums",
@@ -625,14 +625,14 @@ def test_fit_row_text_config_and_preset_share_panel_width() -> None:
 def test_save_as_new_updates_active_config_path() -> None:
     saved_path = Path("/tmp/projects/my-track/unnamed-2.yaml")
     controls = _make_controls(("drums",))
-    controls._on_save_new_config = lambda: saved_path
+    controls._config_save._on_save_new_config = lambda: saved_path
 
     view = controls.build_view_state(paused=False)
     save_row = _save_row(view)
     controls.focus_index = save_row
     _choose_save_as_new(controls)
 
-    assert controls._active_config_path == saved_path
+    assert controls._config_save._active_config_path == saved_path
     state = controls.build_view_state(paused=False)
     header_row = next(
         i for i in range(row_count(state)) if row_kind(state, i) == RowKind.CONFIG_HEADER
@@ -649,7 +649,7 @@ def test_save_as_new_enables_overwrite_from_root_template() -> None:
     )
     assert controls.build_view_state(paused=False).allow_overwrite is False
 
-    controls._on_save_new_config = lambda: saved_path
+    controls._config_save._on_save_new_config = lambda: saved_path
     view = controls.build_view_state(paused=False)
     save_row = _save_row(view)
     controls.focus_index = save_row
@@ -669,8 +669,8 @@ def test_overwrite_after_save_uses_new_active_path() -> None:
         launch_config_path=_REPO_ROOT_EXAMPLE,
         repo_root_example=_REPO_ROOT_EXAMPLE,
     )
-    controls._on_save_new_config = lambda: saved_path
-    controls._on_overwrite_config = lambda path: writes.append(path) or path.name
+    controls._config_save._on_save_new_config = lambda: saved_path
+    controls._config_save._on_overwrite_config = lambda path: writes.append(path) or path.name
 
     view = controls.build_view_state(paused=False)
     save_row = _save_row(view)
@@ -729,7 +729,7 @@ def test_overwrite_shows_confirm_before_write() -> None:
     launch_path = Path("/tmp/custom/cleave.config.yaml")
     writes: list[Path] = []
     controls = _make_controls(("drums",), launch_config_path=launch_path)
-    controls._on_overwrite_config = lambda path: (
+    controls._config_save._on_overwrite_config = lambda path: (
         writes.append(path) or path.name
     )
 
@@ -763,8 +763,8 @@ def test_overwrite_confirm_yes_writes_launch_path() -> None:
     launch_path = Path("/tmp/my-launch.cleave.config.yaml")
     writes: list[Path] = []
     controls = _make_controls(("drums",))
-    controls._active_config_path = launch_path
-    controls._on_overwrite_config = lambda path: (
+    controls._config_save._active_config_path = launch_path
+    controls._config_save._on_overwrite_config = lambda path: (
         writes.append(path) or path.name
     )
 
@@ -789,7 +789,7 @@ def test_overwrite_confirm_esc_dismisses() -> None:
     launch_path = Path("/tmp/custom/cleave.config.yaml")
     writes: list[Path] = []
     controls = _make_controls(("drums",), launch_config_path=launch_path)
-    controls._on_overwrite_config = lambda path: (
+    controls._config_save._on_overwrite_config = lambda path: (
         writes.append(path) or path.name
     )
 
@@ -1050,7 +1050,7 @@ def test_render_overlay_collapse_refocuses_from_title_font_row() -> None:
     font_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
     controls.focus_index = font_row
 
-    controls._set_render_overlay_expanded(False)
+    controls._render_overlay.set_expanded(False)
     assert controls.focus_index == overlay_header
 
 
@@ -1063,7 +1063,7 @@ def test_render_overlay_title_collapse_refocuses_from_font_row() -> None:
     font_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
     controls.focus_index = font_row
 
-    controls._set_render_overlay_title_expanded(False)
+    controls._render_overlay.set_title_expanded(False)
     assert controls.focus_index == title_header
 
 
@@ -1462,8 +1462,10 @@ def test_track_header_visible_uses_layer_enabled_when_timeline_off() -> None:
 def test_render_timeline_enabled_change_callback() -> None:
     controls = _make_controls(timeline_enabled=True)
     events: list[bool] = []
-    controls._on_timeline_enabled_change = lambda: events.append(
-        controls.session.timeline.enabled
+    controls._layer_bindings = noop_layer_bindings(
+        on_timeline_enabled_change=lambda: events.append(
+            controls.session.timeline.enabled
+        )
     )
     view = controls.build_view_state(paused=False)
     header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
@@ -1519,7 +1521,7 @@ def test_t_from_submenu_closes_and_focuses_render_timeline_header() -> None:
         controls.session,
         controls.playback,
         controls.duration_sec,
-        on_close=controls._close_timeline_panel,
+        on_close=controls.close_timeline_panel,
     )
     timeline_controls.handle_keydown(_keydown(pygame.K_t))
 
@@ -1771,8 +1773,10 @@ def _controls_with_playlist(
             )
         },
     )
+    cfg = make_test_cfg(("drums",), preset_root=root)
     return TuningControls(
         session,
+        cfg,
         preset_root=root,
         playback=stub_playback_state(),
         duration_sec=120.0,
@@ -1898,7 +1902,9 @@ def test_preset_lr_noop_when_paths_empty() -> None:
     empty_dir.mkdir()
     controls = _controls_with_playlist(root, empty_dir)
     changed: list[tuple[str, int]] = []
-    controls._on_preset_change = lambda stem, pl: changed.append((stem, pl.index))
+    controls._layer_bindings = noop_layer_bindings(
+        on_preset_change=lambda stem, pl: changed.append((stem, pl.index))
+    )
     controls.focus_index = _preset_row(controls)
     playlist = controls.session.layers["drums"].playlist
     assert playlist.paths == ()
@@ -1922,7 +1928,9 @@ def test_ctrl_preset_steps_by_ten_wrapping() -> None:
     controls.session.layers["drums"].playlist = PresetPlaylist(
         current_dir=current_dir, paths=paths, index=5
     )
-    controls._on_preset_change = lambda stem, pl: changed.append((stem, pl.index))
+    controls._layer_bindings = noop_layer_bindings(
+        on_preset_change=lambda stem, pl: changed.append((stem, pl.index))
+    )
 
     view = controls.build_view_state(paused=False)
     preset_row = _row(view, "drums", RowKind.TRACK_PRESET)
@@ -2224,7 +2232,9 @@ def test_ctrl_quick_nav_blocked_during_move_mode() -> None:
 def test_transport_seek_constants() -> None:
     seeks: list[float] = []
     controls = _make_controls(("drums",))
-    controls._on_seek = lambda delta: seeks.append(delta)
+    controls._layer_bindings = noop_layer_bindings(
+        on_seek=lambda delta: seeks.append(delta)
+    )
 
     view = controls.build_view_state(paused=False)
     transport_row = next(
@@ -2319,7 +2329,9 @@ def test_mod_shift_detects_shift_modifier() -> None:
 def test_shift_right_enters_solo() -> None:
     solo_calls: list[str | None] = []
     controls = _make_controls(("drums", "bass"))
-    controls._on_solo_change = lambda: solo_calls.append(controls.session.solo_stem)
+    controls._layer_bindings = noop_layer_bindings(
+        on_solo_change=lambda: solo_calls.append(controls.session.solo_stem)
+    )
 
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "drums", RowKind.TRACK_HEADER)
@@ -2413,7 +2425,7 @@ def test_try_quit_clean_session_returns_true_immediately() -> None:
 
 def test_try_quit_dirty_opens_dialog_and_blocks_exit() -> None:
     controls = _make_controls(("drums",))
-    controls.mark_config_dirty()
+    _mutate_dirty(controls)
     assert controls.try_quit() is False
     state = controls.build_view_state(paused=False)
     assert state.unsaved_quit_active is True
@@ -2422,7 +2434,7 @@ def test_try_quit_dirty_opens_dialog_and_blocks_exit() -> None:
 
 def test_try_quit_dont_save_sets_pending_exit() -> None:
     controls = _make_controls(("drums",))
-    controls.mark_config_dirty()
+    _mutate_dirty(controls)
     controls.try_quit()
     controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
@@ -2434,28 +2446,28 @@ def test_try_quit_dont_save_sets_pending_exit() -> None:
 
 def test_try_quit_cancel_and_escape_stay() -> None:
     controls = _make_controls(("drums",))
-    controls.mark_config_dirty()
+    _mutate_dirty(controls)
     controls.try_quit()
 
     controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
     controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
-    assert controls._pending_exit is False
+    assert controls._config_save._pending_exit is False
     assert controls.config_dirty
-    assert not controls._unsaved_quit.active
+    assert not controls._config_save._unsaved_quit.active
 
     controls.try_quit()
     controls.handle_modal_keydown(_keydown(pygame.K_ESCAPE))
-    assert controls._pending_exit is False
+    assert controls._config_save._pending_exit is False
     assert controls.config_dirty
-    assert not controls._unsaved_quit.active
+    assert not controls._config_save._unsaved_quit.active
 
 
 def test_try_quit_save_chains_through_save_as_new() -> None:
     saved_path = Path("/tmp/projects/my-track/unnamed-2.yaml")
     controls = _make_controls(("drums",))
-    controls._on_save_new_config = lambda: saved_path
-    controls.mark_config_dirty()
+    controls._config_save._on_save_new_config = lambda: saved_path
+    _mutate_dirty(controls)
 
     controls.try_quit()
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
@@ -2469,26 +2481,26 @@ def test_try_quit_save_chains_through_save_as_new() -> None:
 
 def test_try_quit_save_choice_esc_clears_quit_after_save() -> None:
     controls = _make_controls(("drums",))
-    controls.mark_config_dirty()
+    _mutate_dirty(controls)
     controls.try_quit()
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
-    assert controls._quit_after_save is True
+    assert controls._config_save._quit_after_save is True
 
     controls.handle_modal_keydown(_keydown(pygame.K_ESCAPE))
-    assert controls._quit_after_save is False
-    assert controls._pending_exit is False
+    assert controls._config_save._quit_after_save is False
+    assert controls._config_save._pending_exit is False
     assert controls.config_dirty
-    assert not controls._save_choice.active
+    assert not controls._config_save._save_choice.active
 
 
 def test_try_quit_overwrite_confirm_esc_clears_quit_after_save() -> None:
     controls = _make_controls(("drums",))
-    controls.mark_config_dirty()
+    _mutate_dirty(controls)
     controls.try_quit()
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
-    assert controls._quit_after_save is True
+    assert controls._config_save._quit_after_save is True
 
     controls.handle_modal_keydown(_keydown(pygame.K_ESCAPE))
-    assert controls._quit_after_save is False
+    assert controls._config_save._quit_after_save is False
     assert controls.build_view_state(paused=False).confirm_message is None

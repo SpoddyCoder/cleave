@@ -14,11 +14,12 @@ from cleave.effects.flash import (
     flash_threshold,
     update_burst,
 )
+from cleave.effects.registry import EffectDef
 from cleave.effects.runtime import EffectRuntime
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import playlist_at_dir
 from cleave.signals import Signals
-from cleave.viz.controls import LayerRuntime, TuningSession
+from cleave.viz.session import LayerRuntime, TuningSession
 from pathlib import Path
 
 
@@ -89,10 +90,9 @@ def test_flash_burst_can_remain_after_pulse_opacity_fades() -> None:
 def test_flash_burst_state_decays_toward_zero() -> None:
     signals = _signals_with_stem_key("drums", "onset_strength", [0.0, 0.0, 0.0])
     state = FlashBurstState(burst=1.0)
+    row = EffectDef("flash", "onset", "drums", "onset_strength")
     for t_sec in (0.0, 0.01):
-        state.sample_and_update(
-            signals, "drums", "onset_strength", "onset", t_sec
-        )
+        state.sample_and_update(signals, row, t_sec)
     assert 0.0 < state.burst < 1.0
     assert state.burst == pytest.approx(FLASH_DECAY**2)
 

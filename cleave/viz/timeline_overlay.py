@@ -8,7 +8,7 @@ import pygame
 
 from cleave.timeline import TimelineCue, layer_visible_at, stem_abbreviation
 from cleave.viz.material_icons import visibility_icon_slot_width
-from cleave.viz.overlay import _clip_rect_to_surface, render_visibility_icon
+from cleave.viz.overlay import clip_rect_to_surface, render_visibility_icon
 from cleave.viz.playback import format_mmss
 from cleave.viz.theme import (
     ARMED_BG,
@@ -458,7 +458,7 @@ class TimelineOverlay:
             )
 
         surface.blit(panel, (panel_x, panel_y))
-        self._panel_rect = _clip_rect_to_surface(
+        self._panel_rect = clip_rect_to_surface(
             (panel_x, panel_y, panel_w, panel_h),
             surface,
         )
@@ -516,4 +516,4 @@ class TimelineOverlay:
                 (rec_x + REC_BADGE_PAD_X, badge_y + REC_BADGE_PAD_Y),
             )
 
-        return _clip_rect_to_surface((header_x, badge_y, total_w, badge_h), surface)
+        return clip_rect_to_surface((header_x, badge_y, total_w, badge_h), surface)

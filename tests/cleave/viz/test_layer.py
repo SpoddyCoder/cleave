@@ -13,21 +13,20 @@ from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import PresetPlaylist
 from cleave.stem_pcm import StemPcmBank
 from cleave.timeline import TimelineCue
-from cleave.viz.controls import LayerRuntime, TimelineRuntime, TuningSession
+from cleave.viz.session import LayerRuntime, TimelineRuntime, TuningSession
 from cleave.viz.row_semantics import RowKind
 from cleave.viz.overlay import find_row_by_kind
-from cleave.viz.layer import (
-    StemLayer,
-    _build_timeline_view_state,
-    _warmup_layers,
+from cleave.viz.layer import StemLayer
+from cleave.viz.layer_pipeline import LayerFramePipeline
+from cleave.viz.layer_visibility import (
     apply_layer_visibility,
     armed_recording_visible,
     build_record_punch_cues,
+    build_timeline_view_state,
     committed_visible_outside_punch,
     effective_layer_enabled,
     snapshot_monitor_from_timeline,
     timeline_committed_visible,
-    timeline_cues_for_eval,
     timeline_defaults,
 )
 from cleave.viz.timeline_overlay import (
@@ -206,7 +205,8 @@ def test_timeline_cues_for_eval_merges_buffer_while_recording() -> None:
     session = _session(timeline_enabled=True, cues=[TimelineCue(t=0.0, layers={"drums": False})])
     session.timeline.recording = True
     session.timeline.record_buffer = [TimelineCue(t=1.0, layers={"bass": False})]
-    merged = timeline_cues_for_eval(session)
+    tl = session.timeline
+    merged = tl.cues + tl.record_buffer if tl.recording else tl.cues
     assert len(merged) == 2
     assert merged[0].t == 0.0
     assert merged[1].t == 1.0
@@ -219,7 +219,7 @@ def test_build_timeline_view_state_uses_record_buffer_while_recording() -> None:
     )
     session.timeline.recording = True
     session.timeline.record_buffer = [TimelineCue(t=1.0, layers={"bass": False})]
-    state = _build_timeline_view_state(session, position_sec=1.0, duration_sec=60.0)
+    state = build_timeline_view_state(session, position_sec=1.0, duration_sec=60.0)
     assert len(state.cues) == 1
     assert state.cues[0].t == 0.0
     assert len(state.record_buffer) == 1
@@ -326,7 +326,7 @@ def test_build_timeline_view_state_recording_baseline_not_in_cue_ticks() -> None
     session.timeline.record_baseline = {"drums": True}
     session.timeline.record_buffer = []
 
-    state = _build_timeline_view_state(session, position_sec=10.0, duration_sec=60.0)
+    state = build_timeline_view_state(session, position_sec=10.0, duration_sec=60.0)
     assert bar_tick_times_for_row(state, "drums") == [0.0]
 
 
@@ -345,7 +345,7 @@ def test_build_timeline_view_state_armed_recording_monitor_ignores_committed() -
     session.timeline.record_baseline = {"drums": True}
     session.timeline.record_buffer = []
 
-    state = _build_timeline_view_state(session, position_sec=11.5, duration_sec=60.0)
+    state = build_timeline_view_state(session, position_sec=11.5, duration_sec=60.0)
     assert state.monitor_visible["drums"] is True
     assert state.timeline_visible["drums"] is False
 
@@ -388,7 +388,7 @@ def test_build_timeline_view_state_populates_visibility_playing() -> None:
     )
     session.timeline.override_stems = {"bass"}
     session.timeline.override_visible = {"bass": True}
-    state = _build_timeline_view_state(session, position_sec=5.0, duration_sec=60.0)
+    state = build_timeline_view_state(session, position_sec=5.0, duration_sec=60.0)
     assert state.monitor_visible["drums"] is False
     assert state.monitor_visible["bass"] is True
     assert state.timeline_visible["drums"] is False
@@ -409,7 +409,7 @@ def test_build_timeline_view_state_monitor_preview_active() -> None:
         "vocals": True,
         "other": False,
     }
-    state = _build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
+    state = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
     assert state.monitor_visible == session.timeline.monitor
     assert state.timeline_visible["drums"] is False
     assert state.timeline_visible["bass"] is True
@@ -448,7 +448,7 @@ def test_armed_recording_bar_blends_committed_and_live() -> None:
     session.timeline.record_baseline = {"drums": True}
     session.timeline.record_buffer = [TimelineCue(t=12.0, layers={"drums": False})]
 
-    state = _build_timeline_view_state(session, position_sec=12.0, duration_sec=60.0)
+    state = build_timeline_view_state(session, position_sec=12.0, duration_sec=60.0)
     segments = bar_segments_for_row(state, "drums")
     assert segments == [
         (0.0, 10.0, False),
@@ -512,8 +512,8 @@ def test_warmup_layers_feeds_pcm_and_frame_times() -> None:
     fps = 30
     n_pcm = 1470
 
-    with patch("cleave.viz.layer._render_layer_fbo") as render_mock:
-        _warmup_layers(
+    with patch("cleave.viz.layer_pipeline._render_layer_fbo") as render_mock:
+        LayerFramePipeline.warmup(
             layers,
             pcm_bank,
             start_sec,
@@ -545,8 +545,8 @@ def test_warmup_layers_skips_disabled_layers() -> None:
     bass = _stem_layer("bass")
     pcm_bank = _pcm_bank()
 
-    with patch("cleave.viz.layer._render_layer_fbo") as render_mock:
-        _warmup_layers(
+    with patch("cleave.viz.layer_pipeline._render_layer_fbo") as render_mock:
+        LayerFramePipeline.warmup(
             [drums, bass],
             pcm_bank,
             start_sec=1.0,
@@ -568,8 +568,8 @@ def test_warmup_layers_advances_frame_time_into_start() -> None:
     fps = 30
     frames = 30
 
-    with patch("cleave.viz.layer._render_layer_fbo"):
-        _warmup_layers(
+    with patch("cleave.viz.layer_pipeline._render_layer_fbo"):
+        LayerFramePipeline.warmup(
             [drums],
             pcm_bank,
             start_sec=0.0,
@@ -592,8 +592,8 @@ def test_warmup_layers_ends_one_frame_before_partial_start() -> None:
     pcm_bank = _pcm_bank()
     fps = 30
 
-    with patch("cleave.viz.layer._render_layer_fbo"):
-        _warmup_layers(
+    with patch("cleave.viz.layer_pipeline._render_layer_fbo"):
+        LayerFramePipeline.warmup(
             [drums],
             pcm_bank,
             start_sec=10.0,
@@ -618,8 +618,8 @@ def test_warmup_layers_respects_timeline_visibility() -> None:
     bass = _stem_layer("bass")
     pcm_bank = _pcm_bank()
 
-    with patch("cleave.viz.layer._render_layer_fbo") as render_mock:
-        _warmup_layers(
+    with patch("cleave.viz.layer_pipeline._render_layer_fbo") as render_mock:
+        LayerFramePipeline.warmup(
             [drums, bass],
             pcm_bank,
             start_sec=1.5,

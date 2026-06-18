@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from cleave.effects.constants import clamp_effect_pct
+from cleave.effects.handlers import EffectHandler
+from cleave.effects.registry import EffectDef
 from cleave.effects.sampling import sample_normalized
 from cleave.signals import Signals
+
+if TYPE_CHECKING:
+    from cleave.effects.runtime import LayerModifiers
 
 FLASH_DECAY = 0.82
 FLASH_PEAK = 1.0
@@ -42,11 +48,33 @@ class FlashBurstState:
     def sample_and_update(
         self,
         signals: Signals,
-        signal_stem: str,
-        signal_key: str,
-        driver_slug: str,
+        row: EffectDef,
         t_sec: float,
     ) -> float:
-        raw = sample_normalized(signals, signal_stem, signal_key, t_sec)
-        self.burst = update_burst(self.burst, raw, driver_slug=driver_slug)
+        raw = sample_normalized(signals, row.signal_stem, row.signal_key, t_sec)
+        self.burst = update_burst(self.burst, raw, driver_slug=row.driver_slug)
         return self.burst
+
+
+def _update_flash(
+    state: FlashBurstState,
+    signals: Signals,
+    row: EffectDef,
+    t_sec: float,
+) -> None:
+    state.sample_and_update(signals, row, t_sec)
+
+
+def _apply_flash(
+    mod: LayerModifiers, pct: int, state: FlashBurstState
+) -> LayerModifiers:
+    mod.flash_alpha = max(mod.flash_alpha, flash_alpha(pct, state.burst))
+    return mod
+
+
+FLASH_HANDLER = EffectHandler[FlashBurstState](
+    effect_id="flash",
+    state_factory=FlashBurstState,
+    update=_update_flash,
+    apply=_apply_flash,
+)
