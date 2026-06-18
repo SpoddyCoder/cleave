@@ -13,6 +13,7 @@ from cleave.paths import repo_root
 from cleave.preset_playlist import PresetPlaylist
 from cleave.signals import Signals
 from cleave.viz.controls import TuningControls
+from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.session import TuningSession
 from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.layer import StemLayer
@@ -124,6 +125,17 @@ def make_tuning_controls(
         seek(playback, delta_sec, duration_sec)
         LayerFramePipeline.flush_pcm(layers)
 
+    layer_bindings = LiveLayerBindings(
+        on_preset_change=on_preset_change,
+        on_blend_change=on_blend_change,
+        on_opacity_change=on_opacity_change,
+        on_layer_enabled_change=on_layer_enabled_change,
+        on_timeline_enabled_change=on_timeline_enabled_change,
+        on_solo_change=on_solo_change,
+        on_beat_change=on_beat_change,
+        on_seek=on_seek,
+    )
+
     kwargs: dict = {
         "session": session,
         "cfg": cfg if cfg is not None else _stub_cfg_for_session(
@@ -132,14 +144,7 @@ def make_tuning_controls(
         "preset_root": preset_root,
         "playback": playback,
         "duration_sec": duration_sec,
-        "on_preset_change": on_preset_change,
-        "on_blend_change": on_blend_change,
-        "on_opacity_change": on_opacity_change,
-        "on_layer_enabled_change": on_layer_enabled_change,
-        "on_timeline_enabled_change": on_timeline_enabled_change,
-        "on_solo_change": on_solo_change,
-        "on_beat_change": on_beat_change,
-        "on_seek": on_seek,
+        "layer_bindings": layer_bindings,
     }
 
     if cfg is not None:
@@ -201,7 +206,7 @@ def make_timeline_controls(
 
     def on_close() -> None:
         if tuning_controls is not None:
-            tuning_controls._close_timeline_panel()
+            tuning_controls.close_timeline_panel()
         else:
             session.timeline.panel_open = False
             session.timeline.submenu_focused = False

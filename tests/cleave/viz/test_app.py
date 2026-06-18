@@ -186,8 +186,8 @@ def _heavy_init_side_effect(
 @patch("cleave.viz.app.pygame")
 @patch("cleave.viz.app.LayerFramePipeline.warmup")
 @patch("cleave.viz.app.draw_loading_screen")
-@patch("cleave.viz.app._init_gl_resources_heavy")
-@patch("cleave.viz.app._init_gl_resources_cheap")
+@patch("cleave.viz.app.init_gl_resources_heavy")
+@patch("cleave.viz.app.init_gl_resources_cheap")
 @patch.object(VisualizerApp, "tick_frame")
 def test_run_boot_order_audio_starts_after_first_frame(
     mock_tick_frame: MagicMock,
@@ -256,8 +256,8 @@ def test_run_boot_order_audio_starts_after_first_frame(
 @patch("cleave.viz.app.pygame")
 @patch("cleave.viz.app.LayerFramePipeline.warmup")
 @patch("cleave.viz.app.draw_loading_screen")
-@patch("cleave.viz.app._init_gl_resources_heavy")
-@patch("cleave.viz.app._init_gl_resources_cheap")
+@patch("cleave.viz.app.init_gl_resources_heavy")
+@patch("cleave.viz.app.init_gl_resources_cheap")
 @patch.object(VisualizerApp, "tick_frame")
 def test_run_pygame_quit_clean_exits_via_try_quit(
     mock_tick_frame: MagicMock,
@@ -316,8 +316,8 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
 @patch("cleave.viz.app.pygame")
 @patch("cleave.viz.app.LayerFramePipeline.warmup")
 @patch("cleave.viz.app.draw_loading_screen")
-@patch("cleave.viz.app._init_gl_resources_heavy")
-@patch("cleave.viz.app._init_gl_resources_cheap")
+@patch("cleave.viz.app.init_gl_resources_heavy")
+@patch("cleave.viz.app.init_gl_resources_cheap")
 @patch.object(VisualizerApp, "tick_frame")
 def test_run_ctrl_q_clean_exits(
     mock_tick_frame: MagicMock,
@@ -376,8 +376,8 @@ def test_run_ctrl_q_clean_exits(
 @patch("cleave.viz.app.pygame")
 @patch("cleave.viz.app.LayerFramePipeline.warmup")
 @patch("cleave.viz.app.draw_loading_screen")
-@patch("cleave.viz.app._init_gl_resources_heavy")
-@patch("cleave.viz.app._init_gl_resources_cheap")
+@patch("cleave.viz.app.init_gl_resources_heavy")
+@patch("cleave.viz.app.init_gl_resources_cheap")
 @patch.object(VisualizerApp, "tick_frame")
 def test_run_pygame_quit_dirty_stays_open(
     mock_tick_frame: MagicMock,
@@ -440,8 +440,8 @@ def test_run_pygame_quit_dirty_stays_open(
 @patch("cleave.viz.app.pygame")
 @patch("cleave.viz.app.LayerFramePipeline.warmup")
 @patch("cleave.viz.app.draw_loading_screen")
-@patch("cleave.viz.app._init_gl_resources_heavy")
-@patch("cleave.viz.app._init_gl_resources_cheap")
+@patch("cleave.viz.app.init_gl_resources_heavy")
+@patch("cleave.viz.app.init_gl_resources_cheap")
 @patch.object(VisualizerApp, "tick_frame")
 def test_run_main_loop_stays_open_without_quit_event(
     mock_tick_frame: MagicMock,

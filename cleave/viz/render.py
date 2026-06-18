@@ -19,8 +19,8 @@ from cleave.separate import project_stems_complete, signals_complete
 from cleave.viz.app import (
     RenderVisualizerRuntime,
     VisualizerApp,
-    _init_gl_resources_render,
     build_runtime_base,
+    init_gl_resources_render,
 )
 from cleave.viz.frame_finish import RenderOverlayPanelCache, finish_content_frame
 from cleave.viz.layer_pipeline import LayerFramePipeline
@@ -201,7 +201,7 @@ def render(
     proc: subprocess.Popen[bytes] | None = None
     runtime: RenderVisualizerRuntime | None = None
     try:
-        runtime = _init_gl_resources_render(seed)
+        runtime = init_gl_resources_render(seed)
         app = VisualizerApp(runtime)
 
         duration_sec = runtime.seed.duration_sec

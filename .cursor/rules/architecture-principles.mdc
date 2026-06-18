@@ -17,6 +17,7 @@ Conventions established by [docs/architecture-refactor.md](docs/architecture-ref
 - **Typed dependency injection.** Pass [cleave/viz/focus_context.py](cleave/viz/focus_context.py) `FocusContext` (or similar small typed context), never a dict of lambdas or `setattr` by string.
 - **Public APIs across modules.** No cross-module underscore imports; expose helpers on a class or module if another package needs them.
 - **One default per setting.** Parse defaults and fallbacks live in [cleave/config_schema.py](cleave/config_schema.py), not duplicated in load, save, or session helpers.
+- **Descriptor-driven config sections.** `visualizer`, `render.post_fx`, and `render.overlay` use field and section descriptors in [cleave/config_schema.py](cleave/config_schema.py). `layers` and `timeline` use bespoke parse and persist (nested per-stem and per-cue structures); defaults stay single-sourced from constants in that module.
 - **Registry-driven effect dispatch.** Adding an effect means a registry entry plus one effect module using [cleave/effects/handlers.py](cleave/effects/handlers.py); do not add per-effect branches in [cleave/effects/runtime.py](cleave/effects/runtime.py).
 - **Shared frame finish.** Live and offline paths call [cleave/viz/frame_finish.py](cleave/viz/frame_finish.py); do not duplicate fade, overlay composite, or present logic.
 

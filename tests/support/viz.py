@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 
 import pygame
@@ -10,6 +12,7 @@ from cleave.config import CleaveConfig, LayerConfig, PathsConfig, VisualizerConf
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.controls import TuningControls
+from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.playback import PlaybackState
 
@@ -60,6 +63,22 @@ def make_playlist(name: str, count: int = 3) -> PresetPlaylist:
 
 def stub_playback_state() -> PlaybackState:
     return PlaybackState(player=StubMixPlayer())
+
+
+def noop_layer_bindings(**overrides: Callable) -> LiveLayerBindings:
+    base = LiveLayerBindings(
+        on_preset_change=lambda _stem, _playlist: None,
+        on_blend_change=lambda _stem, _blend: None,
+        on_opacity_change=lambda _stem, _pct: None,
+        on_layer_enabled_change=lambda _stem, _enabled: None,
+        on_timeline_enabled_change=lambda: None,
+        on_solo_change=lambda: None,
+        on_beat_change=lambda _stem, _beat: None,
+        on_seek=lambda _delta: None,
+    )
+    if overrides:
+        return replace(base, **overrides)
+    return base
 
 
 def make_test_cfg(

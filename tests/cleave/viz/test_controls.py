@@ -23,7 +23,7 @@ from cleave.preset_playlist import (
 from cleave.timeline import TimelineCue
 from cleave.viz.key_repeat import mod_shift
 from cleave.viz.playback import format_mmss
-from tests.support.viz import make_test_cfg, stub_playback_state
+from tests.support.viz import make_test_cfg, noop_layer_bindings, stub_playback_state
 from cleave.viz.controls import (
     SEEK_LONG,
     SEEK_SHORT,
@@ -216,8 +216,8 @@ def test_opacity_clamps() -> None:
 def test_header_toggles_enabled() -> None:
     enabled_events: list[tuple[str, bool]] = []
     controls = _make_controls(("drums",))
-    controls._on_layer_enabled_change = lambda stem, on: enabled_events.append(
-        (stem, on)
+    controls._layer_bindings = noop_layer_bindings(
+        on_layer_enabled_change=lambda stem, on: enabled_events.append((stem, on))
     )
 
     view = controls.build_view_state(paused=False)
@@ -1462,8 +1462,10 @@ def test_track_header_visible_uses_layer_enabled_when_timeline_off() -> None:
 def test_render_timeline_enabled_change_callback() -> None:
     controls = _make_controls(timeline_enabled=True)
     events: list[bool] = []
-    controls._on_timeline_enabled_change = lambda: events.append(
-        controls.session.timeline.enabled
+    controls._layer_bindings = noop_layer_bindings(
+        on_timeline_enabled_change=lambda: events.append(
+            controls.session.timeline.enabled
+        )
     )
     view = controls.build_view_state(paused=False)
     header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
@@ -1519,7 +1521,7 @@ def test_t_from_submenu_closes_and_focuses_render_timeline_header() -> None:
         controls.session,
         controls.playback,
         controls.duration_sec,
-        on_close=controls._close_timeline_panel,
+        on_close=controls.close_timeline_panel,
     )
     timeline_controls.handle_keydown(_keydown(pygame.K_t))
 
@@ -1900,7 +1902,9 @@ def test_preset_lr_noop_when_paths_empty() -> None:
     empty_dir.mkdir()
     controls = _controls_with_playlist(root, empty_dir)
     changed: list[tuple[str, int]] = []
-    controls._on_preset_change = lambda stem, pl: changed.append((stem, pl.index))
+    controls._layer_bindings = noop_layer_bindings(
+        on_preset_change=lambda stem, pl: changed.append((stem, pl.index))
+    )
     controls.focus_index = _preset_row(controls)
     playlist = controls.session.layers["drums"].playlist
     assert playlist.paths == ()
@@ -1924,7 +1928,9 @@ def test_ctrl_preset_steps_by_ten_wrapping() -> None:
     controls.session.layers["drums"].playlist = PresetPlaylist(
         current_dir=current_dir, paths=paths, index=5
     )
-    controls._on_preset_change = lambda stem, pl: changed.append((stem, pl.index))
+    controls._layer_bindings = noop_layer_bindings(
+        on_preset_change=lambda stem, pl: changed.append((stem, pl.index))
+    )
 
     view = controls.build_view_state(paused=False)
     preset_row = _row(view, "drums", RowKind.TRACK_PRESET)
@@ -2226,7 +2232,9 @@ def test_ctrl_quick_nav_blocked_during_move_mode() -> None:
 def test_transport_seek_constants() -> None:
     seeks: list[float] = []
     controls = _make_controls(("drums",))
-    controls._on_seek = lambda delta: seeks.append(delta)
+    controls._layer_bindings = noop_layer_bindings(
+        on_seek=lambda delta: seeks.append(delta)
+    )
 
     view = controls.build_view_state(paused=False)
     transport_row = next(
@@ -2321,7 +2329,9 @@ def test_mod_shift_detects_shift_modifier() -> None:
 def test_shift_right_enters_solo() -> None:
     solo_calls: list[str | None] = []
     controls = _make_controls(("drums", "bass"))
-    controls._on_solo_change = lambda: solo_calls.append(controls.session.solo_stem)
+    controls._layer_bindings = noop_layer_bindings(
+        on_solo_change=lambda: solo_calls.append(controls.session.solo_stem)
+    )
 
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "drums", RowKind.TRACK_HEADER)

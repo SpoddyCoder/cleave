@@ -53,14 +53,12 @@ from cleave.config_schema import (
     as_mapping,
     clamp_beat_sensitivity,
     clamp_upscale,
-    parse_hex_colour,
     parse_layer_z_order_section,
     parse_layers_section,
     parse_render_section,
     parse_timeline_section,
     parse_visualizer_section,
     require_non_negative_number,
-    _parse_blend_mode,
 )
 from cleave.timeline import TimelineCue
 
@@ -280,14 +278,6 @@ def _validate_presets(layers: dict[str, LayerConfig]) -> None:
             "preset must be a .milk file or directory:\n  "
             + "\n  ".join(invalid)
         )
-
-
-# Public aliases for tests and callers that import private parse helpers.
-_parse_hex_colour = parse_hex_colour
-_parse_layer_z_order = parse_layer_z_order_section
-_parse_visualizer = parse_visualizer_section
-_parse_render = parse_render_section
-_parse_timeline = parse_timeline_section
 
 
 def _parse_layers(data: dict[str, Any], preset_root: Path) -> dict[str, LayerConfig]:

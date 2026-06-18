@@ -3,21 +3,26 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable
+from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar
 
 from cleave.effects.registry import EffectDef
 from cleave.signals import Signals
 
+if TYPE_CHECKING:
+    from cleave.effects.runtime import LayerModifiers
+
+StateT = TypeVar("StateT")
+
 
 @dataclass(frozen=True)
-class EffectHandler:
+class EffectHandler(Generic[StateT]):
     effect_id: str
-    state_factory: Callable[[], object]
-    update: Callable[[object, Signals, EffectDef, float], None]
-    apply: Callable[[object, int, object], object]
+    state_factory: Callable[[], StateT]
+    update: Callable[[StateT, Signals, EffectDef, float], None]
+    apply: Callable[[LayerModifiers, int, StateT], LayerModifiers]
 
 
-def _build_handlers() -> dict[str, EffectHandler]:
+def _build_handlers() -> dict[str, EffectHandler[Any]]:
     from cleave.effects.flash import FLASH_HANDLER
     from cleave.effects.flare import FLARE_HANDLER
     from cleave.effects.grit import GRIT_HANDLER
@@ -34,10 +39,10 @@ def _build_handlers() -> dict[str, EffectHandler]:
     return {handler.effect_id: handler for handler in handlers}
 
 
-EFFECT_HANDLERS: dict[str, EffectHandler] = _build_handlers()
+EFFECT_HANDLERS: dict[str, EffectHandler[Any]] = _build_handlers()
 
 
-def handler_for(effect_id: str) -> EffectHandler:
+def handler_for(effect_id: str) -> EffectHandler[Any]:
     try:
         return EFFECT_HANDLERS[effect_id]
     except KeyError as exc:

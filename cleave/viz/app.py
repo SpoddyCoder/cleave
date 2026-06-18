@@ -148,7 +148,7 @@ def _init_compositor_and_post(
     return compositor, post_process
 
 
-def _init_gl_resources_cheap(seed: VisualizerSeed) -> tuple[GlCompositor, GlPostProcess, pygame.Surface]:
+def init_gl_resources_cheap(seed: VisualizerSeed) -> tuple[GlCompositor, GlPostProcess, pygame.Surface]:
     compositor, post_process = _init_compositor_and_post(seed)
     overlay_surface = pygame.Surface(
         (seed.display_width, seed.display_height), pygame.SRCALPHA
@@ -156,7 +156,7 @@ def _init_gl_resources_cheap(seed: VisualizerSeed) -> tuple[GlCompositor, GlPost
     return compositor, post_process, overlay_surface
 
 
-def _init_gl_resources_heavy(
+def init_gl_resources_heavy(
     seed: VisualizerSeed,
     compositor: GlCompositor,
     post_process: GlPostProcess,
@@ -220,7 +220,7 @@ def _init_gl_resources_heavy(
     )
 
 
-def _init_gl_resources_render(seed: VisualizerSeed) -> RenderVisualizerRuntime:
+def init_gl_resources_render(seed: VisualizerSeed) -> RenderVisualizerRuntime:
     compositor, post_process = _init_compositor_and_post(seed)
     layers, layers_by_name = LayerFramePipeline.build(
         seed.cfg, compositor, seed.playlists
@@ -378,7 +378,7 @@ class VisualizerApp:
 
         rt: LiveVisualizerRuntime | None = None
         try:
-            compositor, post_process, overlay_surface = _init_gl_resources_cheap(seed)
+            compositor, post_process, overlay_surface = init_gl_resources_cheap(seed)
             draw_loading_screen(
                 compositor, "Loading...", seed.display_width, seed.display_height
             )
@@ -395,7 +395,7 @@ class VisualizerApp:
                     compositor, message, seed.display_width, seed.display_height
                 )
 
-            rt = _init_gl_resources_heavy(
+            rt = init_gl_resources_heavy(
                 seed, compositor, post_process, overlay_surface, on_progress=on_progress
             )
             self._runtime = rt
