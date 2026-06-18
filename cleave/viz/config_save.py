@@ -10,7 +10,7 @@ from pathlib import Path
 import pygame
 
 from cleave.config import VIZ_CONFIG_FILENAME, CleaveConfig
-from cleave.config_snapshot import persisted_session_payload
+from cleave.config_schema import persisted_session_payload
 from cleave.viz.confirm import (
     ConfirmDialog,
     ConfirmRequest,

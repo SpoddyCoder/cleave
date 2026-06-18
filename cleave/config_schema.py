@@ -112,6 +112,35 @@ class FieldDescriptor:
     parse: Callable[[Any, "ParseCtx", str], Any]
     dump: Callable[[Any, "PersistCtx"], Any]
     yaml_alt_keys: tuple[str, ...] = ()
+    attr_key: str | None = None
+    omit_when: Callable[[Any], bool] | None = None
+
+    @property
+    def key(self) -> str:
+        if self.attr_key is not None:
+            return self.attr_key
+        return self.yaml_key.replace("-", "_")
+
+
+@dataclass(frozen=True)
+class SectionDescriptor:
+    """Nested YAML section built from child field and section descriptors."""
+
+    yaml_key: str
+    fields: tuple["SchemaField", ...]
+    build: Callable[[dict[str, Any]], Any]
+    optional: bool = False
+    default_factory: Callable[[], Any] | None = None
+    attr_key: str | None = None
+
+    @property
+    def key(self) -> str:
+        if self.attr_key is not None:
+            return self.attr_key
+        return self.yaml_key.replace("-", "_")
+
+
+SchemaField = FieldDescriptor | SectionDescriptor
 
 
 @dataclass
@@ -123,10 +152,6 @@ class ParseCtx:
 class PersistCtx:
     cfg: Any
     session: Any
-
-
-def _expand_path(path: Path | str) -> Path:
-    return Path(os.path.expanduser(str(path))).resolve()
 
 
 def as_mapping(data: Any, label: str) -> dict[str, Any]:
@@ -224,6 +249,318 @@ def _parse_render_overlay_position(
     return value
 
 
+def _parse_overlay_content(raw: Any, ctx: ParseCtx, label: str) -> str:
+    content = str(raw if raw is not None else "")
+    if content.endswith("\n"):
+        content = content[:-1]
+    return content
+
+
+def _dump_overlay_content(value: str, ctx: PersistCtx) -> str:
+    if "\n" in value:
+        return value + "\n"
+    return value
+
+
+def _parse_overlay_font(raw: Any, ctx: ParseCtx, label: str) -> str:
+    if not isinstance(raw, str) or not raw.strip():
+        raise ValueError(f"{label} must be a non-empty string")
+    return raw.strip()
+
+
+def _parse_optional_background_colour(
+    raw: Any, ctx: ParseCtx, label: str
+) -> tuple[int, int, int] | None:
+    if raw is None:
+        return None
+    if isinstance(raw, str) and raw.strip() == "":
+        return None
+    return parse_hex_colour(raw, label)
+
+
+def _dump_hex_colour(value: tuple[int, int, int], ctx: PersistCtx) -> str:
+    return rgb_to_hex(value)
+
+
+def _parse_non_negative_int(raw: Any, ctx: ParseCtx, label: str) -> int:
+    return int(require_non_negative_number(raw, label, as_int=True))
+
+
+def _parse_non_negative_float(raw: Any, ctx: ParseCtx, label: str) -> float:
+    return float(require_non_negative_number(raw, label))
+
+
+def _build_render_overlay_text_block(parsed: dict[str, Any]) -> Any:
+    from cleave.config import RenderOverlayTextBlockConfig
+
+    return RenderOverlayTextBlockConfig(
+        content=parsed["content"],
+        font=parsed["font"],
+        font_size=parsed["font_size"],
+        colour=parsed["colour"],
+        background_colour=parsed["background_colour"],
+        margin_bottom=parsed["margin_bottom"],
+    )
+
+
+def _build_render_overlay_border(parsed: dict[str, Any]) -> Any:
+    from cleave.config import RenderOverlayBorderConfig
+
+    return RenderOverlayBorderConfig(
+        colour=parsed["colour"],
+        width=parsed["width"],
+    )
+
+
+def _build_render_overlay_background(parsed: dict[str, Any]) -> Any:
+    from cleave.config import RenderOverlayBackgroundConfig
+
+    return RenderOverlayBackgroundConfig(
+        margin=parsed["margin"],
+        padding=parsed["padding"],
+        colour=parsed["colour"],
+        opacity=parsed["opacity"],
+        border=parsed["border"],
+    )
+
+
+def _build_render_overlay_config(parsed: dict[str, Any]) -> Any:
+    from cleave.config import RenderOverlayConfig
+
+    return RenderOverlayConfig(
+        enabled=parsed["enabled"],
+        title=parsed["title"],
+        body=parsed["body"],
+        start_delay=parsed["start_delay"],
+        display_time=parsed["display_time"],
+        position=parsed["position"],
+        background=parsed["background"],
+    )
+
+
+def _overlay_text_block_fields(
+    *,
+    content_default: str,
+    font_size_default: int,
+    colour_yaml_key: str,
+    colour_alt_keys: tuple[str, ...],
+    margin_bottom_default: int,
+    include_margin_bottom_in_dump: bool,
+) -> tuple[FieldDescriptor, ...]:
+    return (
+        FieldDescriptor(
+            "content",
+            content_default,
+            "cfg",
+            _parse_overlay_content,
+            _dump_overlay_content,
+        ),
+        FieldDescriptor(
+            "font",
+            DEFAULT_RENDER_OVERLAY_FONT,
+            "cfg",
+            _parse_overlay_font,
+            _dump_scalar,
+        ),
+        FieldDescriptor(
+            "font-size",
+            font_size_default,
+            "session",
+            _parse_non_negative_int,
+            _dump_scalar,
+            attr_key="font_size",
+        ),
+        FieldDescriptor(
+            colour_yaml_key,
+            DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
+            "cfg",
+            lambda raw, ctx, label: parse_hex_colour(raw, label),
+            _dump_hex_colour,
+            yaml_alt_keys=colour_alt_keys,
+            attr_key="colour",
+        ),
+        FieldDescriptor(
+            "background-colour",
+            None,
+            "cfg",
+            _parse_optional_background_colour,
+            _dump_hex_colour,
+            attr_key="background_colour",
+            omit_when=lambda value: value is None,
+        ),
+        FieldDescriptor(
+            "margin-bottom",
+            margin_bottom_default,
+            "cfg",
+            _parse_non_negative_int,
+            _dump_scalar,
+            attr_key="margin_bottom",
+            omit_when=(lambda value: value == 0)
+            if not include_margin_bottom_in_dump
+            else None,
+        ),
+    )
+
+
+RENDER_OVERLAY_TITLE_SECTION = SectionDescriptor(
+    yaml_key="title",
+    fields=_overlay_text_block_fields(
+        content_default=DEFAULT_RENDER_OVERLAY_TITLE,
+        font_size_default=DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
+        colour_yaml_key="font-colour",
+        colour_alt_keys=("colour",),
+        margin_bottom_default=DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
+        include_margin_bottom_in_dump=True,
+    ),
+    build=_build_render_overlay_text_block,
+    optional=True,
+    default_factory=lambda: _build_render_overlay_text_block(
+        _section_field_defaults(RENDER_OVERLAY_TITLE_SECTION)
+    ),
+)
+
+RENDER_OVERLAY_BODY_SECTION = SectionDescriptor(
+    yaml_key="body",
+    fields=_overlay_text_block_fields(
+        content_default=DEFAULT_RENDER_OVERLAY_BODY,
+        font_size_default=DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
+        colour_yaml_key="colour",
+        colour_alt_keys=("font-colour",),
+        margin_bottom_default=0,
+        include_margin_bottom_in_dump=False,
+    ),
+    build=_build_render_overlay_text_block,
+    optional=True,
+    default_factory=lambda: _build_render_overlay_text_block(
+        _section_field_defaults(RENDER_OVERLAY_BODY_SECTION)
+    ),
+)
+
+RENDER_OVERLAY_BORDER_SECTION = SectionDescriptor(
+    yaml_key="border",
+    fields=(
+        FieldDescriptor(
+            "colour",
+            DEFAULT_RENDER_OVERLAY_BORDER_COLOUR,
+            "cfg",
+            lambda raw, ctx, label: parse_hex_colour(
+                "#ffffff" if raw is None else raw, label
+            ),
+            _dump_hex_colour,
+        ),
+        FieldDescriptor(
+            "width",
+            DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
+            "session",
+            _parse_non_negative_int,
+            _dump_scalar,
+        ),
+    ),
+    build=_build_render_overlay_border,
+)
+
+RENDER_OVERLAY_BACKGROUND_SECTION = SectionDescriptor(
+    yaml_key="background",
+    fields=(
+        FieldDescriptor(
+            "margin",
+            DEFAULT_RENDER_OVERLAY_BACKGROUND_MARGIN,
+            "cfg",
+            _parse_non_negative_int,
+            _dump_scalar,
+        ),
+        FieldDescriptor(
+            "padding",
+            DEFAULT_RENDER_OVERLAY_BACKGROUND_PADDING,
+            "cfg",
+            _parse_non_negative_int,
+            _dump_scalar,
+        ),
+        FieldDescriptor(
+            "colour",
+            DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR,
+            "cfg",
+            lambda raw, ctx, label: parse_hex_colour(
+                "#000000" if raw is None else raw, label
+            ),
+            _dump_hex_colour,
+        ),
+        FieldDescriptor(
+            "opacity",
+            DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
+            "session",
+            _parse_non_negative_float,
+            _dump_scalar,
+        ),
+        RENDER_OVERLAY_BORDER_SECTION,
+    ),
+    build=_build_render_overlay_background,
+)
+
+RENDER_OVERLAY_FIELDS: tuple[SchemaField, ...] = (
+    FieldDescriptor(
+        "enabled",
+        True,
+        "session",
+        lambda raw, _ctx, _label: bool(raw),
+        _dump_scalar,
+    ),
+    RENDER_OVERLAY_TITLE_SECTION,
+    RENDER_OVERLAY_BODY_SECTION,
+    FieldDescriptor(
+        "start_delay",
+        DEFAULT_RENDER_OVERLAY_START_DELAY,
+        "session",
+        _parse_non_negative_float,
+        _dump_scalar,
+    ),
+    FieldDescriptor(
+        "display_time",
+        DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
+        "session",
+        _parse_non_negative_float,
+        _dump_scalar,
+    ),
+    FieldDescriptor(
+        "position",
+        DEFAULT_RENDER_OVERLAY_POSITION,
+        "session",
+        _parse_render_overlay_position,
+        _dump_scalar,
+    ),
+    RENDER_OVERLAY_BACKGROUND_SECTION,
+)
+
+
+def _parse_overlay_fields(
+    parent: dict[str, Any],
+    fields: tuple[SchemaField, ...],
+    ctx: ParseCtx,
+    label: str,
+) -> dict[str, Any]:
+    parsed: dict[str, Any] = {}
+    for field in fields:
+        if isinstance(field, SectionDescriptor):
+            parsed[field.key] = _parse_section(parent, field, ctx, label)
+        else:
+            parsed[field.key] = _parse_field(parent, field, ctx, label)
+    return parsed
+
+
+def _dump_overlay_fields(
+    fields: tuple[SchemaField, ...],
+    values: dict[str, Any],
+    ctx: PersistCtx,
+) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for field in fields:
+        if isinstance(field, SectionDescriptor):
+            out[field.yaml_key] = _dump_section(field, values, ctx)
+        else:
+            out.update(_dump_field(field, values, ctx))
+    return out
+
+
 VISUALIZER_FIELDS: tuple[FieldDescriptor, ...] = (
     FieldDescriptor(
         "width",
@@ -311,12 +648,78 @@ def _parse_field(
     return field.parse(raw, ctx, f"{label}.{field.yaml_key}")
 
 
+def _dump_field(
+    field: FieldDescriptor,
+    values: dict[str, Any],
+    ctx: PersistCtx,
+) -> dict[str, Any]:
+    value = values[field.key]
+    if field.omit_when is not None and field.omit_when(value):
+        return {}
+    return {field.yaml_key: field.dump(value, ctx)}
+
+
 def _dump_fields(
     fields: tuple[FieldDescriptor, ...],
     values: dict[str, Any],
     ctx: PersistCtx,
 ) -> dict[str, Any]:
-    return {field.yaml_key: field.dump(values[field.yaml_key], ctx) for field in fields}
+    out: dict[str, Any] = {}
+    for field in fields:
+        out.update(_dump_field(field, values, ctx))
+    return out
+
+
+def _parse_section(
+    parent: dict[str, Any],
+    section: SectionDescriptor,
+    ctx: ParseCtx,
+    label: str,
+) -> Any:
+    if section.optional and parent.get(section.yaml_key) is None:
+        if section.default_factory is None:
+            raise ValueError(f"{label}.{section.yaml_key} missing default_factory")
+        return section.default_factory()
+    section_map = as_mapping(
+        parent.get(section.yaml_key),
+        f"{label}.{section.yaml_key}",
+    )
+    parsed: dict[str, Any] = {}
+    for field in section.fields:
+        if isinstance(field, SectionDescriptor):
+            parsed[field.key] = _parse_section(
+                section_map, field, ctx, f"{label}.{section.yaml_key}"
+            )
+        else:
+            parsed[field.key] = _parse_field(
+                section_map, field, ctx, f"{label}.{section.yaml_key}"
+            )
+    return section.build(parsed)
+
+
+def _dump_section(
+    section: SectionDescriptor,
+    values: dict[str, Any],
+    ctx: PersistCtx,
+) -> dict[str, Any]:
+    section_values = values[section.key]
+    out: dict[str, Any] = {}
+    for field in section.fields:
+        if isinstance(field, SectionDescriptor):
+            out[field.yaml_key] = _dump_section(field, section_values, ctx)
+        else:
+            out.update(_dump_field(field, section_values, ctx))
+    return out
+
+
+def _section_field_defaults(section: SectionDescriptor) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for field in section.fields:
+        if isinstance(field, SectionDescriptor):
+            out[field.key] = _section_field_defaults(field)
+        else:
+            out[field.key] = field.default
+    return out
 
 
 def parse_visualizer_section(data: dict[str, Any]) -> Any:
@@ -382,7 +785,7 @@ def persist_layer_z_order(ctx: PersistCtx) -> list[str]:
     return cfg_order
 
 
-def _parse_blend_mode(name: str, layer_raw: dict[str, Any]) -> BlendMode:
+def parse_blend_mode(name: str, layer_raw: dict[str, Any]) -> BlendMode:
     raw = layer_raw.get("blend_mode")
     if raw is None:
         return DEFAULT_BLEND_MODE[name]
@@ -471,7 +874,7 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
             if beat_raw is not None
             else None,
             effects=_parse_effects(name, layer_raw),
-            blend_mode=_parse_blend_mode(name, layer_raw),
+            blend_mode=parse_blend_mode(name, layer_raw),
             locked=bool(layer_raw.get("locked", False)),
         )
     return layers
@@ -528,192 +931,14 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
     return layers_out
 
 
-def _default_render_overlay_title_block() -> Any:
-    from cleave.config import RenderOverlayTextBlockConfig
-
-    return RenderOverlayTextBlockConfig(
-        content=DEFAULT_RENDER_OVERLAY_TITLE,
-        font=DEFAULT_RENDER_OVERLAY_FONT,
-        font_size=DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
-        colour=DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
-        margin_bottom=DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
-    )
-
-
-def _default_render_overlay_body_block() -> Any:
-    from cleave.config import RenderOverlayTextBlockConfig
-
-    return RenderOverlayTextBlockConfig(
-        content=DEFAULT_RENDER_OVERLAY_BODY,
-        font=DEFAULT_RENDER_OVERLAY_FONT,
-        font_size=DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
-        colour=DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
-    )
-
-
-def _parse_render_overlay_text_block_colour(
-    block: dict[str, Any], label_prefix: str
-) -> tuple[int, int, int]:
-    colour_raw = block.get("font-colour")
-    if colour_raw is None:
-        colour_raw = block.get("colour")
-    if colour_raw is None:
-        return DEFAULT_RENDER_OVERLAY_TEXT_COLOUR
-    return parse_hex_colour(colour_raw, f"{label_prefix}.font-colour")
-
-
-def _parse_render_overlay_text_block_background_colour(
-    block: dict[str, Any], label_prefix: str
-) -> tuple[int, int, int] | None:
-    if "background-colour" not in block:
-        return None
-    raw = block.get("background-colour")
-    if raw is None:
-        return None
-    if isinstance(raw, str) and raw.strip() == "":
-        return None
-    return parse_hex_colour(raw, f"{label_prefix}.background-colour")
-
-
-def _parse_render_overlay_text_block(
-    overlay_map: dict[str, Any],
-    key: str,
-    label_prefix: str,
-    *,
-    default_font_size: int,
-    default_margin_bottom: int = 0,
-) -> Any:
-    from cleave.config import RenderOverlayTextBlockConfig
-
-    block = as_mapping(overlay_map.get(key), label_prefix)
-    content_raw = block.get("content", "")
-    content = str(content_raw)
-    if content.endswith("\n"):
-        content = content[:-1]
-    font_raw = block.get("font", DEFAULT_RENDER_OVERLAY_FONT)
-    if not isinstance(font_raw, str) or not font_raw.strip():
-        raise ValueError(f"{label_prefix}.font must be a non-empty string")
-    font = font_raw.strip()
-    font_size = require_non_negative_number(
-        block.get("font-size", default_font_size),
-        f"{label_prefix}.font-size",
-        as_int=True,
-    )
-    colour = _parse_render_overlay_text_block_colour(block, label_prefix)
-    background_colour = _parse_render_overlay_text_block_background_colour(
-        block, label_prefix
-    )
-    margin_bottom = require_non_negative_number(
-        block.get("margin-bottom", default_margin_bottom),
-        f"{label_prefix}.margin-bottom",
-        as_int=True,
-    )
-    return RenderOverlayTextBlockConfig(
-        content=content,
-        font=font,
-        font_size=int(font_size),
-        colour=colour,
-        background_colour=background_colour,
-        margin_bottom=int(margin_bottom),
-    )
-
-
-def _parse_render_overlay_border(data: dict[str, Any]) -> Any:
-    from cleave.config import RenderOverlayBorderConfig
-
-    border = as_mapping(data.get("border"), "render.overlay.background.border")
-    border_colour_raw = border.get("colour", "#ffffff")
-    colour = parse_hex_colour(
-        "#ffffff" if border_colour_raw is None else border_colour_raw,
-        "render.overlay.background.border.colour",
-    )
-    width = require_non_negative_number(
-        border.get("width", DEFAULT_RENDER_OVERLAY_BORDER_WIDTH),
-        "render.overlay.background.border.width",
-        as_int=True,
-    )
-    return RenderOverlayBorderConfig(colour=colour, width=int(width))
-
-
-def _parse_render_overlay_background(data: dict[str, Any]) -> Any:
-    from cleave.config import RenderOverlayBackgroundConfig
-
-    background = as_mapping(data.get("background"), "render.overlay.background")
-    margin = require_non_negative_number(
-        background.get("margin", DEFAULT_RENDER_OVERLAY_BACKGROUND_MARGIN),
-        "render.overlay.background.margin",
-        as_int=True,
-    )
-    padding = require_non_negative_number(
-        background.get("padding", DEFAULT_RENDER_OVERLAY_BACKGROUND_PADDING),
-        "render.overlay.background.padding",
-        as_int=True,
-    )
-    background_colour_raw = background.get("colour", "#000000")
-    colour = parse_hex_colour(
-        "#000000" if background_colour_raw is None else background_colour_raw,
-        "render.overlay.background.colour",
-    )
-    opacity = require_non_negative_number(
-        background.get("opacity", DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY),
-        "render.overlay.background.opacity",
-    )
-    return RenderOverlayBackgroundConfig(
-        margin=int(margin),
-        padding=int(padding),
-        colour=colour,
-        opacity=float(opacity),
-        border=_parse_render_overlay_border(background),
-    )
-
-
 def _parse_render_overlay_section(overlay_map: dict[str, Any]) -> Any:
-    from cleave.config import RenderOverlayConfig
-
-    title = (
-        _parse_render_overlay_text_block(
-            overlay_map,
-            "title",
-            "render.overlay.title",
-            default_font_size=DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
-            default_margin_bottom=DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
-        )
-        if overlay_map.get("title") is not None
-        else _default_render_overlay_title_block()
+    parsed = _parse_overlay_fields(
+        overlay_map,
+        RENDER_OVERLAY_FIELDS,
+        ParseCtx(),
+        "render.overlay",
     )
-    body = (
-        _parse_render_overlay_text_block(
-            overlay_map,
-            "body",
-            "render.overlay.body",
-            default_font_size=DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
-        )
-        if overlay_map.get("body") is not None
-        else _default_render_overlay_body_block()
-    )
-    return RenderOverlayConfig(
-        enabled=bool(overlay_map.get("enabled", True)),
-        title=title,
-        body=body,
-        start_delay=float(
-            require_non_negative_number(
-                overlay_map.get("start_delay", DEFAULT_RENDER_OVERLAY_START_DELAY),
-                "render.overlay.start_delay",
-            )
-        ),
-        display_time=float(
-            require_non_negative_number(
-                overlay_map.get("display_time", DEFAULT_RENDER_OVERLAY_DISPLAY_TIME),
-                "render.overlay.display_time",
-            )
-        ),
-        position=_parse_render_overlay_position(
-            overlay_map.get("position", DEFAULT_RENDER_OVERLAY_POSITION),
-            ParseCtx(),
-            "render.overlay.position",
-        ),
-        background=_parse_render_overlay_background(overlay_map),
-    )
+    return _build_render_overlay_config(parsed)
 
 
 def _parse_render_post_fx_section(post_fx_map: dict[str, Any]) -> Any:
@@ -757,30 +982,7 @@ def parse_render_section(data: dict[str, Any]) -> Any | None:
 
 
 def default_render_overlay_config() -> Any:
-    from cleave.config import (
-        RenderOverlayBackgroundConfig,
-        RenderOverlayBorderConfig,
-        RenderOverlayConfig,
-    )
-
-    return RenderOverlayConfig(
-        enabled=True,
-        title=_default_render_overlay_title_block(),
-        body=_default_render_overlay_body_block(),
-        start_delay=DEFAULT_RENDER_OVERLAY_START_DELAY,
-        display_time=DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
-        position=DEFAULT_RENDER_OVERLAY_POSITION,
-        background=RenderOverlayBackgroundConfig(
-            margin=DEFAULT_RENDER_OVERLAY_BACKGROUND_MARGIN,
-            padding=DEFAULT_RENDER_OVERLAY_BACKGROUND_PADDING,
-            colour=DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR,
-            opacity=DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
-            border=RenderOverlayBorderConfig(
-                colour=DEFAULT_RENDER_OVERLAY_BORDER_COLOUR,
-                width=DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
-            ),
-        ),
-    )
+    return _parse_render_overlay_section({})
 
 
 def render_overlay_base(cfg: Any) -> Any:
@@ -789,64 +991,51 @@ def render_overlay_base(cfg: Any) -> Any:
     return default_render_overlay_config()
 
 
-def _text_block_to_yaml(
-    block: Any,
-    *,
-    font: str,
-    font_size: int,
-    colour_key: str,
-    margin_bottom: int | None = None,
-) -> dict[str, Any]:
-    content = block.content
-    if "\n" in content:
-        content = content + "\n"
-    out: dict[str, Any] = {
-        "content": content,
-        "font": font,
-        "font-size": font_size,
-        colour_key: rgb_to_hex(block.colour),
-    }
-    if block.background_colour is not None:
-        out["background-colour"] = rgb_to_hex(block.background_colour)
-    if margin_bottom is not None:
-        out["margin-bottom"] = margin_bottom
-    return out
-
-
-def persist_render(ctx: PersistCtx) -> dict[str, Any]:
+def _overlay_persist_values(ctx: PersistCtx) -> dict[str, Any]:
     runtime = ctx.session.render_overlay
     base = render_overlay_base(ctx.cfg)
     bg = base.background
-    runtime_pp = ctx.session.render_post_fx
-    overlay: dict[str, Any] = {
+    return {
         "enabled": runtime.enabled,
-        "title": _text_block_to_yaml(
-            base.title,
-            font=runtime.title_font,
-            font_size=runtime.title_font_size,
-            colour_key="font-colour",
-            margin_bottom=runtime.title_margin_bottom,
-        ),
-        "body": _text_block_to_yaml(
-            base.body,
-            font=runtime.body_font,
-            font_size=runtime.body_font_size,
-            colour_key="colour",
-        ),
+        "title": {
+            "content": base.title.content,
+            "font": runtime.title_font,
+            "font_size": runtime.title_font_size,
+            "colour": base.title.colour,
+            "background_colour": base.title.background_colour,
+            "margin_bottom": runtime.title_margin_bottom,
+        },
+        "body": {
+            "content": base.body.content,
+            "font": runtime.body_font,
+            "font_size": runtime.body_font_size,
+            "colour": base.body.colour,
+            "background_colour": base.body.background_colour,
+            "margin_bottom": 0,
+        },
         "start_delay": runtime.start_delay,
         "display_time": runtime.display_time,
         "position": runtime.position,
         "background": {
             "margin": bg.margin,
             "padding": bg.padding,
-            "colour": rgb_to_hex(bg.colour),
+            "colour": bg.colour,
             "opacity": runtime.opacity_pct / 100.0,
             "border": {
-                "colour": rgb_to_hex(bg.border.colour),
+                "colour": bg.border.colour,
                 "width": runtime.border_width,
             },
         },
     }
+
+
+def persist_render(ctx: PersistCtx) -> dict[str, Any]:
+    runtime_pp = ctx.session.render_post_fx
+    overlay = _dump_overlay_fields(
+        RENDER_OVERLAY_FIELDS,
+        _overlay_persist_values(ctx),
+        ctx,
+    )
     post_fx_values = {
         "enabled": runtime_pp.enabled,
         "fade_in": runtime_pp.fade_in,

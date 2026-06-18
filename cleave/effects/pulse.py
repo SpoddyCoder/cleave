@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from cleave.effects.constants import clamp_effect_pct
 from cleave.effects.constants import PULSE_DECAY, PULSE_GAIN
@@ -10,6 +11,9 @@ from cleave.effects.handlers import EffectHandler
 from cleave.effects.registry import EffectDef
 from cleave.effects.sampling import sample_normalized
 from cleave.signals import Signals
+
+if TYPE_CHECKING:
+    from cleave.effects.runtime import LayerModifiers
 
 
 def update_envelope(envelope: float, raw: float, *, driver_slug: str) -> float:
@@ -46,22 +50,22 @@ class PulseEnvelopeState:
 
 
 def _update_pulse(
-    state: object,
+    state: PulseEnvelopeState,
     signals: Signals,
     row: EffectDef,
     t_sec: float,
 ) -> None:
-    assert isinstance(state, PulseEnvelopeState)
     state.sample_and_update(signals, row, t_sec)
 
 
-def _apply_pulse(mod: object, pct: int, state: object) -> object:
-    assert isinstance(state, PulseEnvelopeState)
+def _apply_pulse(
+    mod: LayerModifiers, pct: int, state: PulseEnvelopeState
+) -> LayerModifiers:
     mod.opacity = effective_opacity(mod.opacity, pct, state.envelope)
     return mod
 
 
-PULSE_HANDLER = EffectHandler(
+PULSE_HANDLER = EffectHandler[PulseEnvelopeState](
     effect_id="pulse",
     state_factory=PulseEnvelopeState,
     update=_update_pulse,

@@ -29,11 +29,13 @@ from cleave.config import (
     find_config_path,
     load_config,
     project_viz_config_path,
-    _parse_hex_colour,
     _parse_layers,
-    _parse_render,
-    _parse_timeline,
-    _parse_visualizer,
+)
+from cleave.config_schema import (
+    parse_hex_colour,
+    parse_render_section,
+    parse_timeline_section,
+    parse_visualizer_section,
 )
 from cleave.paths import repo_root
 from cleave.extract import STEM_NAMES
@@ -113,18 +115,18 @@ def test_clamp_upscale() -> None:
 
 
 def test_parse_visualizer_upscale_defaults_to_one() -> None:
-    cfg = _parse_visualizer({})
+    cfg = parse_visualizer_section({})
     assert cfg.upscale == 1.0
 
 
 def test_parse_visualizer_reads_upscale() -> None:
-    cfg = _parse_visualizer({"visualizer": {"upscale": 2.0}})
+    cfg = parse_visualizer_section({"visualizer": {"upscale": 2.0}})
     assert cfg.upscale == 2.0
 
 
 def test_parse_visualizer_rejects_upscale_below_one() -> None:
     with pytest.raises(ValueError, match="visualizer.upscale must be >= 1.0"):
-        _parse_visualizer({"visualizer": {"upscale": 0.5}})
+        parse_visualizer_section({"visualizer": {"upscale": 0.5}})
 
 
 def test_visualizer_display_dimensions() -> None:
@@ -138,38 +140,38 @@ def test_visualizer_display_dimensions() -> None:
 
 
 def test_parse_visualizer_name_defaults_to_render() -> None:
-    cfg = _parse_visualizer({})
+    cfg = parse_visualizer_section({})
     assert cfg.name == "render"
 
 
 def test_parse_visualizer_reads_name() -> None:
-    cfg = _parse_visualizer({"visualizer": {"name": "buttercup-24"}})
+    cfg = parse_visualizer_section({"visualizer": {"name": "buttercup-24"}})
     assert cfg.name == "buttercup-24"
 
 
 def test_parse_visualizer_warmup_sec_defaults() -> None:
-    cfg = _parse_visualizer({})
+    cfg = parse_visualizer_section({})
     assert cfg.warmup_sec == 3.0
 
 
 def test_parse_visualizer_reads_warmup_sec() -> None:
-    cfg = _parse_visualizer({"visualizer": {"warmup_sec": 2.5}})
+    cfg = parse_visualizer_section({"visualizer": {"warmup_sec": 2.5}})
     assert cfg.warmup_sec == 2.5
 
 
 def test_parse_visualizer_accepts_zero_warmup_sec() -> None:
-    cfg = _parse_visualizer({"visualizer": {"warmup_sec": 0}})
+    cfg = parse_visualizer_section({"visualizer": {"warmup_sec": 0}})
     assert cfg.warmup_sec == 0.0
 
 
 def test_parse_visualizer_rejects_negative_warmup_sec() -> None:
     with pytest.raises(ValueError, match="visualizer.warmup_sec must be >= 0"):
-        _parse_visualizer({"visualizer": {"warmup_sec": -0.1}})
+        parse_visualizer_section({"visualizer": {"warmup_sec": -0.1}})
 
 
 def test_parse_visualizer_rejects_non_numeric_warmup_sec() -> None:
     with pytest.raises(ValueError, match="visualizer.warmup_sec must be a number"):
-        _parse_visualizer({"visualizer": {"warmup_sec": "fast"}})
+        parse_visualizer_section({"visualizer": {"warmup_sec": "fast"}})
 
 
 def test_load_config_reads_visualizer_name(minimal_project: Path) -> None:
@@ -413,7 +415,7 @@ render:
 
 def test_parse_render_overlay_full_template() -> None:
     data = yaml.safe_load(_OVERLAY_YAML)
-    render = _parse_render(data)
+    render = parse_render_section(data)
     assert render is not None
     overlay = render.overlay
     assert overlay == RenderOverlayConfig(
@@ -458,14 +460,14 @@ def test_parse_render_overlay_full_template() -> None:
         ("#223344", (34, 51, 68)),
     ],
 )
-def test_parse_hex_colour(value: str, expected: tuple[int, int, int]) -> None:
-    assert _parse_hex_colour(value, "test.colour") == expected
+def testparse_hex_colour(value: str, expected: tuple[int, int, int]) -> None:
+    assert parse_hex_colour(value, "test.colour") == expected
 
 
 def test_parse_render_overlay_empty_background_colour() -> None:
     data = yaml.safe_load(_OVERLAY_YAML)
     data["render"]["overlay"]["body"]["background-colour"] = ""
-    render = _parse_render(data)
+    render = parse_render_section(data)
     assert render is not None
     assert render.overlay is not None
     assert render.overlay.body.background_colour is None
@@ -475,7 +477,7 @@ def test_parse_render_overlay_empty_background_colour() -> None:
 def test_parse_render_overlay_missing_background_colour() -> None:
     data = yaml.safe_load(_OVERLAY_YAML)
     del data["render"]["overlay"]["title"]["background-colour"]
-    render = _parse_render(data)
+    render = parse_render_section(data)
     assert render is not None
     assert render.overlay is not None
     assert render.overlay.title.background_colour is None
@@ -485,7 +487,7 @@ def test_parse_render_overlay_rejects_invalid_position() -> None:
     data = yaml.safe_load(_OVERLAY_YAML)
     data["render"]["overlay"]["position"] = "middle"
     with pytest.raises(ValueError, match="render.overlay.position must be one of"):
-        _parse_render(data)
+        parse_render_section(data)
 
 
 def test_parse_render_post_fx_defaults() -> None:
@@ -497,7 +499,7 @@ render:
     fade_out: 3
 """
     )
-    render = _parse_render(data)
+    render = parse_render_section(data)
     assert render == RenderConfig(
         overlay=None,
         post_fx=RenderPostFxConfig(
@@ -529,12 +531,12 @@ def test_load_config_missing_preset_file(tmp_path: Path) -> None:
 
 
 def test_parse_timeline_defaults_enabled_true() -> None:
-    timeline = _parse_timeline({"timeline": {}})
+    timeline = parse_timeline_section({"timeline": {}})
     assert timeline == TimelineConfig(enabled=True, cues=())
 
 
 def test_parse_timeline_reads_cues_sorted_by_t() -> None:
-    timeline = _parse_timeline(
+    timeline = parse_timeline_section(
         {
             "timeline": {
                 "enabled": True,
@@ -555,7 +557,7 @@ def test_parse_timeline_reads_cues_sorted_by_t() -> None:
 
 def test_parse_timeline_rejects_unknown_stem() -> None:
     with pytest.raises(ValueError, match="unknown layer keys in timeline.cues"):
-        _parse_timeline(
+        parse_timeline_section(
             {
                 "timeline": {
                     "cues": [{"t": 1.0, "layers": {"synth": True}}],
@@ -566,7 +568,7 @@ def test_parse_timeline_rejects_unknown_stem() -> None:
 
 def test_parse_timeline_clamps_negative_t() -> None:
     with pytest.raises(ValueError, match="timeline.cues\\[0\\].t must be non-negative"):
-        _parse_timeline(
+        parse_timeline_section(
             {
                 "timeline": {
                     "cues": [{"t": -1.0, "layers": {"drums": False}}],

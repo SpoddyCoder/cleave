@@ -19,9 +19,11 @@ from cleave.config import (
     RenderPostFxConfig,
     VisualizerConfig,
     _parse_layers,
-    _parse_render,
-    _parse_timeline,
     load_config,
+)
+from cleave.config_schema import (
+    parse_render_section,
+    parse_timeline_section,
 )
 from cleave.config_snapshot import (
     next_unnamed_path,
@@ -595,7 +597,7 @@ def test_write_session_snapshot_persists_render_overlay(tmp_path: Path) -> None:
     assert overlay["background"]["border"]["colour"] == "#223344"
     assert overlay["background"]["border"]["width"] == 4
 
-    round_trip = _parse_render(data)
+    round_trip = parse_render_section(data)
     assert round_trip is not None
     assert round_trip.overlay is not None
     assert round_trip.overlay.enabled is True
@@ -631,7 +633,7 @@ def test_write_session_snapshot_persists_render_post_fx(tmp_path: Path) -> None:
     assert post_fx["fade_in"] == 12.0
     assert post_fx["fade_out"] == 3.0
 
-    round_trip = _parse_render(data)
+    round_trip = parse_render_section(data)
     assert round_trip is not None
     assert round_trip.post_fx is not None
     assert round_trip.post_fx.enabled is True
@@ -701,7 +703,7 @@ def test_write_session_snapshot_persists_timeline_at_bottom(tmp_path: Path) -> N
         {"t": 10.0, "layers": {"vocals": False}},
     ]
 
-    timeline = _parse_timeline(data)
+    timeline = parse_timeline_section(data)
     assert timeline is not None
     playlists = {
         name: playlist_at_dir(cfg.paths.preset_root / name, index=0)

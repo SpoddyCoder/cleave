@@ -450,6 +450,128 @@ feature reminder is in place; existing rules point at current file locations.
 
 ---
 
+## Phase 5: Finish to standard (low to medium risk)
+
+Goal: close the gap between the landed work and the Definition of done, and remove the
+few patterns that now contradict
+[.cursor/rules/architecture-principles.mdc](.cursor/rules/architecture-principles.mdc).
+A post-refactor review found the intent largely met (dirty tracking, decomposition,
+shared frame finish, registry effects, rules) but flagged residual smells. This phase
+pays them down. Tasks are ordered low risk first; verify each with the unit suite.
+
+**Progress so far:** Task 5.1 complete (802 tests green). Tasks 5.2, 5.3, 5.4 not
+started.
+
+### Task 5.1: Remove principle violations (low risk, do first) (done)
+
+Done. Renames landed and all call sites plus tests updated:
+
+- `init_gl_resources_render` / `init_gl_resources_heavy` / `init_gl_resources_cheap` are
+  public in [cleave/viz/app.py](cleave/viz/app.py); [cleave/viz/render.py](cleave/viz/render.py)
+  and [tests/cleave/viz/test_render.py](tests/cleave/viz/test_render.py),
+  [tests/cleave/viz/test_app.py](tests/cleave/viz/test_app.py) use the public names.
+- `clip_rect_to_surface` is public in [cleave/viz/overlay.py](cleave/viz/overlay.py);
+  callers in [cleave/viz/help_overlay.py](cleave/viz/help_overlay.py) and
+  [cleave/viz/timeline_overlay.py](cleave/viz/timeline_overlay.py) updated.
+- `parse_blend_mode` is public in [cleave/config_schema.py](cleave/config_schema.py);
+  [tests/cleave/test_blend_modes.py](tests/cleave/test_blend_modes.py) imports it from
+  there.
+- `close_timeline_panel` is a public method on `TuningControls`
+  ([cleave/viz/controls.py](cleave/viz/controls.py)); [cleave/viz/wiring.py](cleave/viz/wiring.py)
+  and [tests/cleave/viz/test_controls.py](tests/cleave/viz/test_controls.py) updated.
+- Removed the `_parse_*` alias shim from [cleave/config.py](cleave/config.py); tests now
+  import `parse_visualizer_section`, `parse_render_section`, `parse_timeline_section`,
+  `parse_hex_colour` from [cleave/config_schema.py](cleave/config_schema.py). Note
+  `_parse_layers` remains a real private helper in [cleave/config.py](cleave/config.py)
+  (still imported by tests; out of scope here).
+- [cleave/viz/config_save.py](cleave/viz/config_save.py) imports
+  `persisted_session_payload` from [cleave/config_schema.py](cleave/config_schema.py)
+  (its home), not via the snapshot re-export. Dead duplicate `_expand_path` removed from
+  [cleave/config_schema.py](cleave/config_schema.py) (kept the one in
+  [cleave/config.py](cleave/config.py)).
+
+Original task scope (for reference):
+
+- Make cross-module helpers public and update call sites:
+  - `_init_gl_resources_render`, `_init_gl_resources_heavy`, `_init_gl_resources_cheap`
+    in [cleave/viz/app.py](cleave/viz/app.py) (used by [cleave/viz/render.py](cleave/viz/render.py)).
+  - `_clip_rect_to_surface` in [cleave/viz/overlay.py](cleave/viz/overlay.py) (used by
+    [cleave/viz/help_overlay.py](cleave/viz/help_overlay.py) and
+    [cleave/viz/timeline_overlay.py](cleave/viz/timeline_overlay.py)).
+  - `_parse_blend_mode` in [cleave/config_schema.py](cleave/config_schema.py) (used by
+    [cleave/config.py](cleave/config.py)).
+  - `_close_timeline_panel` reached via `tuning_controls._close_timeline_panel()` in
+    [cleave/viz/wiring.py](cleave/viz/wiring.py); expose a public method.
+- Delete the backward-compat alias shim in [cleave/config.py](cleave/config.py)
+  (`_parse_hex_colour`, `_parse_visualizer`, `_parse_render`, `_parse_timeline`,
+  `_parse_layer_z_order`) and update the tests that import them to the public names.
+- Import `persisted_session_payload` from [cleave/config_schema.py](cleave/config_schema.py)
+  (its home) in [cleave/viz/config_save.py](cleave/viz/config_save.py), not via the
+  [cleave/config_snapshot.py](cleave/config_snapshot.py) re-export. Dedupe the duplicated
+  `_expand_path` so it exists once.
+
+Acceptance: no cross-module underscore imports remain; no `_parse_*` aliases; suite green.
+
+### Task 5.2: Complete the single config schema
+
+`visualizer` and `render.post_fx` are descriptor driven, but `render.overlay`, `layers`,
+and `timeline` still have a hand-written parse path separate from their persist path,
+the divergence risk this refactor set out to remove.
+
+- Add a nested section schema on top of `FieldDescriptor` (for example a
+  `SectionDescriptor` with nested fields and kebab and British-spelling key support) and
+  migrate `render.overlay` (title and body blocks, background, border) so parse,
+  serialize, and default derive from one descriptor set.
+- Preserve the Task 3.1 constraints: merge unknown keys in `paths` and `render` with the
+  original file; keep `colour` and `font-colour` keys; keep the content trailing-newline
+  behavior.
+- For `layers` and `timeline`: either migrate them or make a deliberate carve-out
+  documented in
+  [.cursor/rules/architecture-principles.mdc](.cursor/rules/architecture-principles.mdc)
+  (nested cue and layer sections use bespoke parse and persist; defaults stay single
+  sourced from constants in [cleave/config_schema.py](cleave/config_schema.py)).
+
+Note on reach: session-mirrored fields also touch the runtime dataclass in
+[cleave/viz/session.py](cleave/viz/session.py), the view model in
+[cleave/viz/tuning_view_state.py](cleave/viz/tuning_view_state.py), a setter, and a UI
+row. The schema work removes the parse-versus-persist duplication; collapsing the live
+mirror to one place is a larger follow-on and is out of scope here.
+
+Acceptance: adding an overlay cfg field edits one descriptor entry (plus the session
+mirror and UI row); the round-trip test still proves load, mutate, save, reload
+stability; defaults exist once; suite green.
+
+### Task 5.3: Replace the TuningControls callback bag
+
+[cleave/viz/controls.py](cleave/viz/controls.py) `TuningControls` still takes roughly ten
+`on_*` callables wired as closures in [cleave/viz/wiring.py](cleave/viz/wiring.py), the
+closure-bag DI shape the principles warn against.
+
+- Define a typed bindings dataclass (for example `LiveLayerBindings` holding the
+  preset, blend, opacity, enabled, solo, beat, seek, and timeline-enabled handlers),
+  build it in [cleave/viz/wiring.py](cleave/viz/wiring.py), and pass that one object to
+  `TuningControls`.
+
+Acceptance: `TuningControls.__init__` takes typed context objects, not a bag of optional
+callbacks; suite green.
+
+### Task 5.4: Type the effect handler interface
+
+[cleave/effects/handlers.py](cleave/effects/handlers.py) `EffectHandler` uses
+`state: object` and `mod: object` with runtime `assert isinstance` in each effect module.
+
+- Make `EffectHandler` and its `update` and `apply` generic (or a `Protocol` over
+  `LayerModifiers` and a per-effect state type) so the asserts are unnecessary.
+
+Acceptance: no `assert isinstance(state, ...)` in effect modules; effect typing is
+static; suite green.
+
+Phase 5 exit criteria: no cross-module underscore imports, no compat aliases, no
+closure-bag DI; `render.overlay` parse, serialize, and default derive from one schema
+(layers and timeline migrated or documented); effect handlers typed; suite green.
+
+---
+
 ## Sequencing and effort
 
 | Phase | Theme | Risk | Rough effort | Status |
@@ -458,8 +580,9 @@ feature reminder is in place; existing rules point at current file locations.
 | 2 | Structural decomposition | Medium to high | Medium to high | Complete |
 | 3 | Unify duplicated systems | Medium to high | Medium to high | Complete |
 | 4 | Capture principles as rules | Low | Low | Complete |
+| 5 | Finish to standard | Low to medium | Medium | In progress (5.1 done; 5.2-5.4 pending) |
 
-Phases 1 through 4 are complete. Principles live in
+Phases 1 through 4 are complete; Phase 5 finishes the residual smells. Principles live in
 [.cursor/rules/architecture-principles.mdc](.cursor/rules/architecture-principles.mdc).
 
 ## Definition of done for the whole refactor

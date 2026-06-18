@@ -1103,7 +1103,7 @@ def panel_content_max_width(
     return PANEL_CONTENT_MAX_WIDTH
 
 
-def _clip_rect_to_surface(
+def clip_rect_to_surface(
     rect: tuple[int, int, int, int],
     surface: pygame.Surface,
 ) -> tuple[int, int, int, int] | None:
@@ -1788,7 +1788,7 @@ class TuningOverlay:
             pos = (mx, surface.get_height() - panel_h - my)
 
         surface.blit(panel, pos)
-        self._panel_rect = _clip_rect_to_surface(
+        self._panel_rect = clip_rect_to_surface(
             (pos[0], pos[1], panel_w, panel_h),
             surface,
         )

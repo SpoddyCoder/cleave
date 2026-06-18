@@ -5,11 +5,15 @@ from __future__ import annotations
 import colorsys
 import math
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from cleave.effects.constants import clamp_effect_pct
 from cleave.effects.handlers import EffectHandler
 from cleave.effects.registry import EffectDef
 from cleave.signals import Signals
+
+if TYPE_CHECKING:
+    from cleave.effects.runtime import LayerModifiers
 
 PITCH_MIN_HZ = 80.0
 PITCH_MAX_HZ = 800.0
@@ -95,23 +99,21 @@ class HueState:
 
 
 def _update_hue(
-    state: object,
+    state: HueState,
     signals: Signals,
     row: EffectDef,
     t_sec: float,
 ) -> None:
-    assert isinstance(state, HueState)
     state.sample_and_update(signals, row, t_sec)
 
 
-def _apply_hue(mod: object, pct: int, state: object) -> object:
-    assert isinstance(state, HueState)
+def _apply_hue(mod: LayerModifiers, pct: int, state: HueState) -> LayerModifiers:
     mod.hue_rgb = hue_rgb(state.hue_deg)
     mod.hue_mix = hue_mix_pct(pct)
     return mod
 
 
-HUE_HANDLER = EffectHandler(
+HUE_HANDLER = EffectHandler[HueState](
     effect_id="hue",
     state_factory=HueState,
     update=_update_hue,

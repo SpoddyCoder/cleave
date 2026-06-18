@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from cleave.effects.constants import clamp_effect_pct
 from cleave.effects.handlers import EffectHandler
 from cleave.effects.registry import EffectDef
 from cleave.effects.sampling import sample_normalized
 from cleave.signals import Signals
+
+if TYPE_CHECKING:
+    from cleave.effects.runtime import LayerModifiers
 
 FLARE_DELTA = 0.10
 FLARE_THRESHOLD = 0.55
@@ -69,22 +73,22 @@ class FlareBurstState:
 
 
 def _update_flare(
-    state: object,
+    state: FlareBurstState,
     signals: Signals,
     row: EffectDef,
     t_sec: float,
 ) -> None:
-    assert isinstance(state, FlareBurstState)
     state.sample_and_update(signals, row, t_sec)
 
 
-def _apply_flare(mod: object, pct: int, state: object) -> object:
-    assert isinstance(state, FlareBurstState)
+def _apply_flare(
+    mod: LayerModifiers, pct: int, state: FlareBurstState
+) -> LayerModifiers:
     mod.bloom_strength = max(mod.bloom_strength, bloom_strength(pct, state.burst))
     return mod
 
 
-FLARE_HANDLER = EffectHandler(
+FLARE_HANDLER = EffectHandler[FlareBurstState](
     effect_id="flare",
     state_factory=FlareBurstState,
     update=_update_flare,

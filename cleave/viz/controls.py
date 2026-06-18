@@ -11,11 +11,11 @@ import pygame
 from cleave.config import CleaveConfig, clamp_beat_sensitivity, clamp_effect_pct
 from cleave.effects.registry import effect_row_count
 from cleave.blend_modes import BLEND_MODES, BlendMode
-from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.key_repeat import KeyRepeatController, mod_ctrl, mod_shift
 from cleave.viz.playback import PlaybackState, seek, toggle_pause
 from cleave.viz.focus_context import FocusContext
+from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.render_overlay_controls import RenderOverlayControls
 from cleave.viz.render_post_fx_controls import RenderPostFxControls
 from cleave.viz.row_semantics import REPEAT_ROW_KINDS, RowKind
@@ -48,14 +48,7 @@ class TuningControls:
         playback: PlaybackState,
         duration_sec: float,
         *,
-        on_preset_change: Callable[[str, PresetPlaylist], None] | None = None,
-        on_blend_change: Callable[[str, BlendMode], None] | None = None,
-        on_opacity_change: Callable[[str, int], None] | None = None,
-        on_layer_enabled_change: Callable[[str, bool], None] | None = None,
-        on_timeline_enabled_change: Callable[[], None] | None = None,
-        on_solo_change: Callable[[], None] | None = None,
-        on_beat_change: Callable[[str, float], None] | None = None,
-        on_seek: Callable[[float], None] | None = None,
+        layer_bindings: LiveLayerBindings | None = None,
         on_save_new_config: Callable[[], Path | None] | None = None,
         on_overwrite_config: Callable[[Path], str | None] | None = None,
         launch_config_path: Path | None = None,
@@ -66,14 +59,7 @@ class TuningControls:
         self.preset_root = preset_root
         self.playback = playback
         self.duration_sec = duration_sec
-        self._on_preset_change = on_preset_change
-        self._on_blend_change = on_blend_change
-        self._on_opacity_change = on_opacity_change
-        self._on_layer_enabled_change = on_layer_enabled_change
-        self._on_timeline_enabled_change = on_timeline_enabled_change
-        self._on_solo_change = on_solo_change
-        self._on_beat_change = on_beat_change
-        self._on_seek = on_seek
+        self._layer_bindings = layer_bindings
 
         self.focus_index = 0
         self.move_mode_stem: str | None = None
@@ -175,7 +161,7 @@ class TuningControls:
                 return True
             tl = self.session.timeline
             if tl.panel_open:
-                self._close_timeline_panel()
+                self.close_timeline_panel()
             else:
                 self._open_timeline_panel(enter_submenu=True)
             return True
@@ -580,29 +566,29 @@ class TuningControls:
             if forward:
                 self._open_timeline_panel()
             else:
-                self._close_timeline_panel()
+                self.close_timeline_panel()
 
     def _step_directory(self, stem: str, *, forward: bool) -> None:
         layer = self.session.layers[stem]
         playlist = layer.playlist
         delta = 1 if forward else -1
         if playlist.step_sibling(delta, preset_root=self.preset_root):
-            if self._on_preset_change is not None:
-                self._on_preset_change(stem, playlist)
+            if self._layer_bindings is not None:
+                self._layer_bindings.on_preset_change(stem, playlist)
 
     def _enter_directory(self, stem: str) -> None:
         layer = self.session.layers[stem]
         playlist = layer.playlist
         if playlist.enter_child(self.preset_root):
-            if self._on_preset_change is not None:
-                self._on_preset_change(stem, playlist)
+            if self._layer_bindings is not None:
+                self._layer_bindings.on_preset_change(stem, playlist)
 
     def _parent_directory(self, stem: str) -> None:
         layer = self.session.layers[stem]
         playlist = layer.playlist
         if playlist.go_parent(self.preset_root):
-            if self._on_preset_change is not None:
-                self._on_preset_change(stem, playlist)
+            if self._layer_bindings is not None:
+                self._layer_bindings.on_preset_change(stem, playlist)
 
     def _step_preset(self, stem: str, *, forward: bool, ctrl: bool) -> None:
         layer = self.session.layers[stem]
@@ -615,8 +601,8 @@ class TuningControls:
             playlist.next()
         else:
             playlist.prev()
-        if self._on_preset_change is not None:
-            self._on_preset_change(stem, playlist)
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_preset_change(stem, playlist)
 
     def _cycle_blend(self, stem: str, *, forward: bool) -> None:
         layer = self.session.layers[stem]
@@ -628,8 +614,8 @@ class TuningControls:
             layer.blend_mode = BLEND_MODES[(index + 1) % len(BLEND_MODES)]
         else:
             layer.blend_mode = BLEND_MODES[(index - 1) % len(BLEND_MODES)]
-        if self._on_blend_change is not None:
-            self._on_blend_change(stem, layer.blend_mode)
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_blend_change(stem, layer.blend_mode)
 
     def _toggle_locked(self, stem: str) -> None:
         layer = self.session.layers[stem]
@@ -672,23 +658,23 @@ class TuningControls:
             return
         tl.enabled = enabled
         if not enabled:
-            self._close_timeline_panel()
-        if self._on_timeline_enabled_change is not None:
-            self._on_timeline_enabled_change()
+            self.close_timeline_panel()
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_timeline_enabled_change()
 
     def _enter_solo(self, stem: str) -> None:
         if self.session.solo_stem == stem:
             return
         self.session.solo_stem = stem
-        if self._on_solo_change is not None:
-            self._on_solo_change()
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_solo_change()
 
     def _exit_solo(self, stem: str) -> None:
         if self.session.solo_stem != stem:
             return
         self.session.solo_stem = None
-        if self._on_solo_change is not None:
-            self._on_solo_change()
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_solo_change()
 
     def _set_enabled(self, stem: str, enabled: bool) -> None:
         if self.session.timeline.enabled:
@@ -703,14 +689,14 @@ class TuningControls:
         if not enabled:
             layer.expanded = False
             self._refocus_track_header_if_sub_row(stem)
-        if self._on_layer_enabled_change is not None:
-            self._on_layer_enabled_change(stem, layer.enabled)
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_layer_enabled_change(stem, layer.enabled)
 
     def _set_opacity(self, stem: str, pct: int) -> None:
         layer = self.session.layers[stem]
         layer.opacity_pct = max(0, min(100, pct))
-        if self._on_opacity_change is not None:
-            self._on_opacity_change(stem, layer.opacity_pct)
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_opacity_change(stem, layer.opacity_pct)
 
     def _set_effect(
         self, stem: str, effect_id: str, driver_slug: str, pct: int
@@ -725,8 +711,8 @@ class TuningControls:
                     layer.effects.pop(effect_id, None)
         else:
             layer.effects.setdefault(effect_id, {})[driver_slug] = clamped
-        if self._on_opacity_change is not None:
-            self._on_opacity_change(stem, layer.opacity_pct)
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_opacity_change(stem, layer.opacity_pct)
 
     def _set_effects_expanded(self, stem: str, expanded: bool) -> None:
         layer = self.session.layers[stem]
@@ -755,12 +741,12 @@ class TuningControls:
     def _set_beat(self, stem: str, value: float) -> None:
         layer = self.session.layers[stem]
         layer.beat_sensitivity = clamp_beat_sensitivity(value)
-        if self._on_beat_change is not None:
-            self._on_beat_change(stem, layer.beat_sensitivity)
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_beat_change(stem, layer.beat_sensitivity)
 
     def _do_seek(self, delta_sec: float) -> None:
-        if self._on_seek is not None:
-            self._on_seek(delta_sec)
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_seek(delta_sec)
         else:
             seek(self.playback, delta_sec, self.duration_sec)
 
@@ -782,7 +768,7 @@ class TuningControls:
         else:
             tl.submenu_focused = False
 
-    def _close_timeline_panel(self) -> None:
+    def close_timeline_panel(self) -> None:
         tl = self.session.timeline
         if not tl.panel_open:
             return
