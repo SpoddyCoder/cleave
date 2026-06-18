@@ -146,15 +146,3 @@ class TuningViewStateBuilder:
             timeline_override_active=bool(tl.override_stems),
             help_visible=self.session.help_visible,
         )
-
-
-def build_tuning_view_state(
-    builder: TuningViewStateBuilder,
-    *,
-    paused: bool,
-    position_sec: float | None = None,
-) -> TuningViewState:
-    return builder.build(
-        paused=paused,
-        position_sec=position_sec,
-    )

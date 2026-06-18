@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pygame
 
 from cleave.extract import STEM_NAMES
-from cleave.viz.app import LiveVisualizerRuntime
+from cleave.viz.app import LiveVisualizerRuntime, VisualizerSeed
 from cleave.viz.controls import TuningControls
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.input_dispatch import (
@@ -51,9 +51,7 @@ def _make_runtime(
         tl.record_start_sec = 0.0
         tl.record_baseline = {"drums": True}
 
-    playback = stub_playback_state()
-    compositor = recording_compositor()
-    runtime = LiveVisualizerRuntime(
+    seed = VisualizerSeed(
         project_dir=MagicMock(),
         audio_path=MagicMock(),
         width=1280,
@@ -72,6 +70,11 @@ def _make_runtime(
         effect_runtime=MagicMock(),
         preset_root=preset_root,
         playlists={},
+    )
+    playback = stub_playback_state()
+    compositor = recording_compositor()
+    runtime = LiveVisualizerRuntime(
+        seed=seed,
         layers=[],
         layers_by_name={},
         compositor=compositor,
@@ -107,9 +110,9 @@ def _make_runtime(
 def test_h_toggles_help_when_timeline_submenu_focused() -> None:
     runtime = _make_runtime(help_visible=False)
     assert dispatch_keydown(keydown(pygame.K_h), runtime) is True
-    assert runtime.session.help_visible is True
+    assert runtime.seed.session.help_visible is True
     assert dispatch_keydown(keydown(pygame.K_h), runtime) is True
-    assert runtime.session.help_visible is False
+    assert runtime.seed.session.help_visible is False
 
 
 def test_ctrl_q_quit_from_timeline_context() -> None:
@@ -155,36 +158,36 @@ def test_ctrl_q_after_dont_save_exits() -> None:
 def test_esc_while_recording_stops_take_panel_stays_open() -> None:
     runtime = _make_runtime(recording=True)
     assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
-    assert runtime.session.timeline.recording is False
-    assert runtime.session.timeline.panel_open is True
-    assert runtime.session.timeline.submenu_focused is True
+    assert runtime.seed.session.timeline.recording is False
+    assert runtime.seed.session.timeline.panel_open is True
+    assert runtime.seed.session.timeline.submenu_focused is True
 
 
 def test_second_esc_after_stop_closes_submenu_panel() -> None:
     runtime = _make_runtime(recording=True)
     dispatch_keydown(keydown(pygame.K_ESCAPE), runtime)
-    assert runtime.session.timeline.recording is False
+    assert runtime.seed.session.timeline.recording is False
 
     assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
-    assert runtime.session.timeline.panel_open is False
-    assert runtime.session.timeline.submenu_focused is False
+    assert runtime.seed.session.timeline.panel_open is False
+    assert runtime.seed.session.timeline.submenu_focused is False
 
 
 def test_second_esc_after_stop_requests_overlay_hide_on_main() -> None:
     runtime = _make_runtime(submenu_focused=False, panel_open=True, recording=True)
     dispatch_keydown(keydown(pygame.K_ESCAPE), runtime)
-    assert runtime.session.timeline.recording is False
+    assert runtime.seed.session.timeline.recording is False
 
     assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
     assert runtime.controls.consume_hide_overlay() is True
-    assert runtime.session.timeline.panel_open is True
+    assert runtime.seed.session.timeline.panel_open is True
 
 
 def test_t_while_recording_is_noop() -> None:
     runtime = _make_runtime(recording=True)
     assert dispatch_keydown(keydown(pygame.K_t), runtime) is True
-    assert runtime.session.timeline.panel_open is True
-    assert runtime.session.timeline.submenu_focused is True
+    assert runtime.seed.session.timeline.panel_open is True
+    assert runtime.seed.session.timeline.submenu_focused is True
 
 
 def test_submenu_routing_up_down_to_tuning_enter_to_timeline() -> None:

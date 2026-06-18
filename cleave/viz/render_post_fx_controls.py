@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
-from cleave.viz.overlay import TuningViewState, find_row_by_kind, row_kind
+from cleave.viz.focus_context import FocusContext
+from cleave.viz.overlay import find_row_by_kind, row_kind
 from cleave.viz.row_semantics import RENDER_POST_FX_SUB_ROW_KINDS, RowKind
 from cleave.viz.session import TuningSession
 
@@ -16,25 +15,19 @@ class RenderPostFxControls:
         self,
         session: TuningSession,
         *,
-        get_focus_index: Callable[[], int],
-        set_focus_index: Callable[[int], None],
-        build_view_state: Callable[..., TuningViewState],
-        is_paused: Callable[[], bool],
+        focus_context: FocusContext,
     ) -> None:
         self.session = session
-        self._get_focus_index = get_focus_index
-        self._set_focus_index = set_focus_index
-        self._build_view_state = build_view_state
-        self._is_paused = is_paused
+        self._focus = focus_context
 
     def _render_post_fx_header_index(self) -> int:
-        view = self._build_view_state(paused=self._is_paused())
+        view = self._focus.build_view_state(paused=self._focus.is_paused())
         return find_row_by_kind(view, RowKind.RENDER_POST_FX_HEADER)
 
     def _refocus_render_post_fx_header_if_sub_row(self) -> None:
-        view = self._build_view_state(paused=self._is_paused())
-        if row_kind(view, self._get_focus_index()) in RENDER_POST_FX_SUB_ROW_KINDS:
-            self._set_focus_index(self._render_post_fx_header_index())
+        view = self._focus.build_view_state(paused=self._focus.is_paused())
+        if row_kind(view, self._focus.get_focus_index()) in RENDER_POST_FX_SUB_ROW_KINDS:
+            self._focus.set_focus_index(self._render_post_fx_header_index())
 
     def set_expanded(self, expanded: bool) -> None:
         pp = self.session.render_post_fx

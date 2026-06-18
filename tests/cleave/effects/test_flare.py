@@ -15,6 +15,7 @@ from cleave.effects.flare import (
     update_burst,
     update_smoothed,
 )
+from cleave.effects.registry import EffectDef
 from cleave.effects.runtime import EffectRuntime
 from cleave.signals import Signals
 from cleave.viz.session import LayerRuntime, TuningSession
@@ -94,8 +95,9 @@ def test_bloom_strength_scales_with_depth_and_burst() -> None:
 def test_flare_burst_state_decays_toward_zero() -> None:
     signals = _signals_with_stem_key("drums", "onset_strength", [0.0, 0.0, 0.0])
     state = FlareBurstState(burst=1.0, smoothed=0.0)
+    row = EffectDef("flare", "onset", "drums", "onset_strength")
     for t_sec in (0.0, 0.01):
-        state.sample_and_update(signals, "drums", "onset_strength", t_sec)
+        state.sample_and_update(signals, row, t_sec)
     assert 0.0 < state.burst < 1.0
     assert state.burst == pytest.approx(FLARE_DECAY**2)
 

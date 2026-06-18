@@ -6,6 +6,8 @@ from dataclasses import dataclass
 
 from cleave.effects.constants import clamp_effect_pct
 from cleave.effects.constants import PULSE_DECAY, PULSE_GAIN
+from cleave.effects.handlers import EffectHandler
+from cleave.effects.registry import EffectDef
 from cleave.effects.sampling import sample_normalized
 from cleave.signals import Signals
 
@@ -33,13 +35,35 @@ class PulseEnvelopeState:
     def sample_and_update(
         self,
         signals: Signals,
-        signal_stem: str,
-        signal_key: str,
-        driver_slug: str,
+        row: EffectDef,
         t_sec: float,
     ) -> float:
-        raw = sample_normalized(signals, signal_stem, signal_key, t_sec)
+        raw = sample_normalized(signals, row.signal_stem, row.signal_key, t_sec)
         self.envelope = update_envelope(
-            self.envelope, raw, driver_slug=driver_slug
+            self.envelope, raw, driver_slug=row.driver_slug
         )
         return self.envelope
+
+
+def _update_pulse(
+    state: object,
+    signals: Signals,
+    row: EffectDef,
+    t_sec: float,
+) -> None:
+    assert isinstance(state, PulseEnvelopeState)
+    state.sample_and_update(signals, row, t_sec)
+
+
+def _apply_pulse(mod: object, pct: int, state: object) -> object:
+    assert isinstance(state, PulseEnvelopeState)
+    mod.opacity = effective_opacity(mod.opacity, pct, state.envelope)
+    return mod
+
+
+PULSE_HANDLER = EffectHandler(
+    effect_id="pulse",
+    state_factory=PulseEnvelopeState,
+    update=_update_pulse,
+    apply=_apply_pulse,
+)

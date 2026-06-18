@@ -15,6 +15,7 @@ from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.key_repeat import KeyRepeatController, mod_ctrl, mod_shift
 from cleave.viz.playback import PlaybackState, seek, toggle_pause
+from cleave.viz.focus_context import FocusContext
 from cleave.viz.render_overlay_controls import RenderOverlayControls
 from cleave.viz.render_post_fx_controls import RenderPostFxControls
 from cleave.viz.row_semantics import REPEAT_ROW_KINDS, RowKind
@@ -104,18 +105,21 @@ class TuningControls:
             get_toast_message=lambda: self._toast_message,
             get_toast_deadline=lambda: self._toast_deadline,
         )
-        focus_ctx = {
-            "get_focus_index": lambda: self.focus_index,
-            "set_focus_index": lambda index: setattr(self, "focus_index", index),
-            "build_view_state": self.build_view_state,
-            "is_paused": lambda: self.playback.paused,
-        }
+        def set_focus_index(index: int) -> None:
+            self.focus_index = index
+
+        focus_context = FocusContext(
+            get_focus_index=lambda: self.focus_index,
+            set_focus_index=set_focus_index,
+            build_view_state=self.build_view_state,
+            is_paused=lambda: self.playback.paused,
+        )
         self._render_overlay = RenderOverlayControls(
             session,
+            focus_context=focus_context,
             focused_row_kind=self._focused_row_kind,
-            **focus_ctx,
         )
-        self._render_post_fx = RenderPostFxControls(session, **focus_ctx)
+        self._render_post_fx = RenderPostFxControls(session, focus_context=focus_context)
 
         view = self.build_view_state(paused=self.playback.paused)
         self.focus_index = find_row_by_kind(view, RowKind.TRANSPORT)

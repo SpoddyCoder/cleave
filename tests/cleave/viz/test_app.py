@@ -31,7 +31,7 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
     controls.build_view_state.return_value = MagicMock()
     overlay = MagicMock()
     overlay.update = MagicMock()
-    runtime = LiveVisualizerRuntime(
+    seed = VisualizerSeed(
         project_dir=MagicMock(),
         audio_path=MagicMock(),
         width=1280,
@@ -50,6 +50,9 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
         effect_runtime=MagicMock(),
         preset_root=MagicMock(),
         playlists={},
+    )
+    runtime = LiveVisualizerRuntime(
+        seed=seed,
         layers=[],
         layers_by_name={},
         compositor=compositor,
@@ -63,8 +66,8 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
         timeline_overlay=MagicMock(),
         overlay_surface=pygame.Surface((display_w, display_h), pygame.SRCALPHA),
     )
-    runtime.session.timeline.enabled = False
-    runtime.session.timeline.panel_open = False
+    runtime.seed.session.timeline.enabled = False
+    runtime.seed.session.timeline.panel_open = False
     return runtime
 
 
@@ -98,19 +101,19 @@ def _run_seed(*, upscale: float = 2.0) -> VisualizerSeed:
 def _timeline_open_runtime(compositor: MagicMock) -> LiveVisualizerRuntime:
     runtime = _minimal_runtime(compositor)
     runtime.overlay = TuningOverlay()
-    runtime.session.layer_z_order = list(STEM_NAMES)
-    runtime.session.layers = {
+    runtime.seed.session.layer_z_order = list(STEM_NAMES)
+    runtime.seed.session.layers = {
         stem: LayerRuntime(playlist=MagicMock(), browse_floor=MagicMock())
         for stem in STEM_NAMES
     }
-    runtime.session.timeline.enabled = True
-    runtime.session.timeline.panel_open = True
+    runtime.seed.session.timeline.enabled = True
+    runtime.seed.session.timeline.panel_open = True
     return runtime
 
 
 @patch("cleave.viz.app.OverlayDrawer.draw_tuning")
-@patch("cleave.viz.app._composite_live_render_overlay")
-@patch("cleave.viz.app.live_frame_fade_alpha", return_value=1.0)
+@patch("cleave.viz.frame_finish._composite_render_overlay")
+@patch("cleave.viz.frame_finish.live_frame_fade_alpha", return_value=1.0)
 @patch("cleave.viz.app.LayerFramePipeline.composite")
 @patch("cleave.viz.app.LayerFramePipeline.render_frame")
 @patch("cleave.viz.app.apply_layer_visibility")
@@ -163,24 +166,7 @@ def _heavy_init_side_effect(
     playback.paused = False
     mix_player = MagicMock()
     return LiveVisualizerRuntime(
-        project_dir=seed.project_dir,
-        audio_path=seed.audio_path,
-        width=seed.width,
-        height=seed.height,
-        upscale=seed.upscale,
-        display_width=seed.display_width,
-        display_height=seed.display_height,
-        fps=seed.fps,
-        window_title=seed.window_title,
-        session=seed.session,
-        cfg=seed.cfg,
-        pcm_bank=seed.pcm_bank,
-        duration_sec=seed.duration_sec,
-        n_pcm=seed.n_pcm,
-        signals=seed.signals,
-        effect_runtime=seed.effect_runtime,
-        preset_root=seed.preset_root,
-        playlists=seed.playlists,
+        seed=seed,
         layers=[],
         layers_by_name={},
         compositor=compositor,
@@ -509,8 +495,8 @@ def test_run_main_loop_stays_open_without_quit_event(
 
 
 @patch("cleave.viz.app.OverlayDrawer.draw_tuning")
-@patch("cleave.viz.app._composite_live_render_overlay")
-@patch("cleave.viz.app.live_frame_fade_alpha", return_value=1.0)
+@patch("cleave.viz.frame_finish._composite_render_overlay")
+@patch("cleave.viz.frame_finish.live_frame_fade_alpha", return_value=1.0)
 @patch("cleave.viz.app.LayerFramePipeline.composite")
 @patch("cleave.viz.app.LayerFramePipeline.render_frame")
 @patch("cleave.viz.app.apply_layer_visibility")
@@ -564,9 +550,9 @@ def test_key_routing_main_when_strip_open_not_in_submenu() -> None:
     timeline = MagicMock()
     runtime.controls = main
     runtime.timeline_controls = timeline
-    runtime.session.timeline.enabled = True
-    runtime.session.timeline.panel_open = True
-    runtime.session.timeline.submenu_focused = False
+    runtime.seed.session.timeline.enabled = True
+    runtime.seed.session.timeline.panel_open = True
+    runtime.seed.session.timeline.submenu_focused = False
 
     assert _key_handler_for_session(runtime) is main
 
@@ -580,9 +566,9 @@ def test_key_routing_timeline_when_submenu_focused() -> None:
     runtime.timeline_controls = timeline
     runtime.overlay = TuningOverlay()
     runtime.overlay.notify_input()
-    runtime.session.timeline.enabled = True
-    runtime.session.timeline.panel_open = True
-    runtime.session.timeline.submenu_focused = True
+    runtime.seed.session.timeline.enabled = True
+    runtime.seed.session.timeline.panel_open = True
+    runtime.seed.session.timeline.submenu_focused = True
 
     assert _key_handler_for_session(runtime, pygame.K_RETURN) is timeline
     assert _key_handler_for_session(runtime, pygame.K_UP) is main
@@ -597,9 +583,9 @@ def test_key_routing_timeline_when_overlay_hidden_and_submenu_focused() -> None:
     runtime.controls = main
     runtime.timeline_controls = timeline
     runtime.overlay = TuningOverlay()
-    runtime.session.timeline.enabled = True
-    runtime.session.timeline.panel_open = True
-    runtime.session.timeline.submenu_focused = True
+    runtime.seed.session.timeline.enabled = True
+    runtime.seed.session.timeline.panel_open = True
+    runtime.seed.session.timeline.submenu_focused = True
 
     assert _key_handler_for_session(runtime, pygame.K_RETURN) is timeline
     assert _key_handler_for_session(runtime, pygame.K_UP) is main
@@ -612,9 +598,9 @@ def test_keyup_routing_main_for_vertical_nav_when_submenu_focused() -> None:
     timeline = MagicMock()
     runtime.controls = main
     runtime.timeline_controls = timeline
-    runtime.session.timeline.enabled = True
-    runtime.session.timeline.panel_open = True
-    runtime.session.timeline.submenu_focused = True
+    runtime.seed.session.timeline.enabled = True
+    runtime.seed.session.timeline.panel_open = True
+    runtime.seed.session.timeline.submenu_focused = True
 
     assert _keyup_handler_for_session(runtime, pygame.K_UP) is main
     assert _keyup_handler_for_session(runtime, pygame.K_DOWN) is main
@@ -623,8 +609,8 @@ def test_keyup_routing_main_for_vertical_nav_when_submenu_focused() -> None:
 
 @patch("cleave.viz.app.OverlayDrawer.draw_timeline")
 @patch("cleave.viz.app.OverlayDrawer.draw_tuning")
-@patch("cleave.viz.app._composite_live_render_overlay")
-@patch("cleave.viz.app.live_frame_fade_alpha", return_value=1.0)
+@patch("cleave.viz.frame_finish._composite_render_overlay")
+@patch("cleave.viz.frame_finish.live_frame_fade_alpha", return_value=1.0)
 @patch("cleave.viz.app.LayerFramePipeline.composite")
 @patch("cleave.viz.app.LayerFramePipeline.render_frame")
 @patch("cleave.viz.app.apply_layer_visibility")
@@ -640,7 +626,7 @@ def test_tick_frame_skips_timeline_when_overlay_hidden_and_not_in_submenu(
     pygame.init()
     compositor = recording_compositor()
     runtime = _timeline_open_runtime(compositor)
-    runtime.session.timeline.submenu_focused = False
+    runtime.seed.session.timeline.submenu_focused = False
 
     app = VisualizerApp(runtime)
     app.tick_frame(1.0, paused=True, draw_overlay=True)
@@ -649,8 +635,8 @@ def test_tick_frame_skips_timeline_when_overlay_hidden_and_not_in_submenu(
 
 @patch("cleave.viz.app.OverlayDrawer.draw_timeline")
 @patch("cleave.viz.app.OverlayDrawer.draw_tuning")
-@patch("cleave.viz.app._composite_live_render_overlay")
-@patch("cleave.viz.app.live_frame_fade_alpha", return_value=1.0)
+@patch("cleave.viz.frame_finish._composite_render_overlay")
+@patch("cleave.viz.frame_finish.live_frame_fade_alpha", return_value=1.0)
 @patch("cleave.viz.app.LayerFramePipeline.composite")
 @patch("cleave.viz.app.LayerFramePipeline.render_frame")
 @patch("cleave.viz.app.apply_layer_visibility")
@@ -666,7 +652,7 @@ def test_tick_frame_draws_timeline_when_overlay_hidden_but_submenu_focused(
     pygame.init()
     compositor = recording_compositor()
     runtime = _timeline_open_runtime(compositor)
-    runtime.session.timeline.submenu_focused = True
+    runtime.seed.session.timeline.submenu_focused = True
 
     app = VisualizerApp(runtime)
     app.tick_frame(1.0, paused=True, draw_overlay=True)
@@ -690,8 +676,8 @@ def test_timeline_strip_visible_while_submenu_focused_despite_hidden_overlay() -
 
 @patch("cleave.viz.app.OverlayDrawer.draw_timeline")
 @patch("cleave.viz.app.OverlayDrawer.draw_tuning")
-@patch("cleave.viz.app._composite_live_render_overlay")
-@patch("cleave.viz.app.live_frame_fade_alpha", return_value=1.0)
+@patch("cleave.viz.frame_finish._composite_render_overlay")
+@patch("cleave.viz.frame_finish.live_frame_fade_alpha", return_value=1.0)
 @patch("cleave.viz.app.LayerFramePipeline.composite")
 @patch("cleave.viz.app.LayerFramePipeline.render_frame")
 @patch("cleave.viz.app.apply_layer_visibility")
@@ -720,24 +706,24 @@ def test_esc_hide_clears_submenu_focus_preserves_panel_open() -> None:
     overlay = TuningOverlay()
     overlay.notify_input()
     runtime.overlay = overlay
-    runtime.session.timeline.enabled = True
-    runtime.session.timeline.panel_open = True
-    runtime.session.timeline.submenu_focused = True
+    runtime.seed.session.timeline.enabled = True
+    runtime.seed.session.timeline.panel_open = True
+    runtime.seed.session.timeline.submenu_focused = True
 
     runtime.controls.consume_hide_overlay.return_value = True
     if runtime.controls.consume_hide_overlay():
         overlay.hide_immediately()
-        runtime.session.timeline.submenu_focused = False
+        runtime.seed.session.timeline.submenu_focused = False
 
-    assert runtime.session.timeline.panel_open is True
-    assert runtime.session.timeline.submenu_focused is False
+    assert runtime.seed.session.timeline.panel_open is True
+    assert runtime.seed.session.timeline.submenu_focused is False
     assert overlay.is_visible() is False
 
 
 @patch("cleave.viz.app.OverlayDrawer.draw_timeline")
 @patch("cleave.viz.app.OverlayDrawer.draw_tuning")
-@patch("cleave.viz.app._composite_live_render_overlay")
-@patch("cleave.viz.app.live_frame_fade_alpha", return_value=1.0)
+@patch("cleave.viz.frame_finish._composite_render_overlay")
+@patch("cleave.viz.frame_finish.live_frame_fade_alpha", return_value=1.0)
 @patch("cleave.viz.app.LayerFramePipeline.composite")
 @patch("cleave.viz.app.LayerFramePipeline.render_frame")
 @patch("cleave.viz.app.apply_layer_visibility")
@@ -762,4 +748,4 @@ def test_tick_frame_restores_timeline_after_overlay_shown_again(
     overlay.notify_input()
     app.tick_frame(1.0, paused=True, draw_overlay=True)
     mock_draw_timeline.assert_called_once()
-    assert runtime.session.timeline.panel_open is True
+    assert runtime.seed.session.timeline.panel_open is True

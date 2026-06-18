@@ -4,28 +4,8 @@ from __future__ import annotations
 
 import pygame
 
-from cleave.config import (
-    DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR,
-    DEFAULT_RENDER_OVERLAY_BACKGROUND_MARGIN,
-    DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
-    DEFAULT_RENDER_OVERLAY_BACKGROUND_PADDING,
-    DEFAULT_RENDER_OVERLAY_BORDER_COLOUR,
-    DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
-    DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
-    DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
-    DEFAULT_RENDER_OVERLAY_FONT,
-    DEFAULT_RENDER_OVERLAY_POSITION,
-    DEFAULT_RENDER_OVERLAY_START_DELAY,
-    DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
-    DEFAULT_RENDER_OVERLAY_TITLE,
-    DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
-    DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
-    DEFAULT_RENDER_OVERLAY_BODY,
-    RenderOverlayBackgroundConfig,
-    RenderOverlayBorderConfig,
-    RenderOverlayConfig,
-    RenderOverlayTextBlockConfig,
-)
+from cleave.config import RenderOverlayConfig, RenderOverlayTextBlockConfig
+from cleave.config_schema import default_render_overlay_config
 from cleave.viz.session import RenderOverlayRuntime
 from cleave.easing import fade_alpha
 from cleave.gl_compositor import GlCompositor
@@ -33,39 +13,6 @@ from cleave.viz.theme import FADE_DURATION_SEC
 
 LINE_GAP = 3
 _ALPHA_EPSILON = 0.01
-
-
-def default_render_overlay_config() -> RenderOverlayConfig:
-    """Static overlay fields when ``cfg.render`` is absent."""
-    return RenderOverlayConfig(
-        enabled=True,
-        title=RenderOverlayTextBlockConfig(
-            content=DEFAULT_RENDER_OVERLAY_TITLE,
-            font=DEFAULT_RENDER_OVERLAY_FONT,
-            font_size=DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
-            colour=DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
-            margin_bottom=DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
-        ),
-        body=RenderOverlayTextBlockConfig(
-            content=DEFAULT_RENDER_OVERLAY_BODY,
-            font=DEFAULT_RENDER_OVERLAY_FONT,
-            font_size=DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
-            colour=DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
-        ),
-        start_delay=DEFAULT_RENDER_OVERLAY_START_DELAY,
-        display_time=DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
-        position=DEFAULT_RENDER_OVERLAY_POSITION,
-        background=RenderOverlayBackgroundConfig(
-            margin=DEFAULT_RENDER_OVERLAY_BACKGROUND_MARGIN,
-            padding=DEFAULT_RENDER_OVERLAY_BACKGROUND_PADDING,
-            colour=DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR,
-            opacity=DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
-            border=RenderOverlayBorderConfig(
-                colour=DEFAULT_RENDER_OVERLAY_BORDER_COLOUR,
-                width=DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
-            ),
-        ),
-    )
 
 
 def _text_block_surface_key(block: RenderOverlayTextBlockConfig) -> tuple:
@@ -98,6 +45,11 @@ def build_live_overlay_config(
     base: RenderOverlayConfig, runtime: RenderOverlayRuntime
 ) -> RenderOverlayConfig:
     """Merge static YAML fields with live-tuned runtime overrides."""
+    from cleave.config import (
+        RenderOverlayBackgroundConfig,
+        RenderOverlayBorderConfig,
+    )
+
     return RenderOverlayConfig(
         enabled=runtime.enabled,
         title=RenderOverlayTextBlockConfig(

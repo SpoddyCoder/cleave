@@ -15,6 +15,7 @@ from cleave.effects.grit import (
     aberration_px,
     grit_strength,
 )
+from cleave.effects.registry import EffectDef
 from cleave.effects.pulse import update_envelope
 from cleave.effects.runtime import EffectRuntime
 from cleave.extract import STEM_NAMES
@@ -78,12 +79,9 @@ def test_grit_envelope_uses_pulse_decay_gain(
 def test_grit_state_tracks_envelope() -> None:
     signals = _signals_with_stem_key("drums", "onset_strength", [0.0, 1.0, 0.0])
     state = GritState()
-    first = state.sample_and_update(
-        signals, "drums", "onset_strength", "onset", 0.01
-    )
-    second = state.sample_and_update(
-        signals, "drums", "onset_strength", "onset", 0.02
-    )
+    row = EffectDef("grit", "onset", "drums", "onset_strength")
+    first = state.sample_and_update(signals, row, 0.01)
+    second = state.sample_and_update(signals, row, 0.02)
     assert first > 0.0
     assert second >= first * PULSE_DECAY["onset"] or second > 0.0
 

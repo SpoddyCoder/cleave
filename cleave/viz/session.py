@@ -2,24 +2,17 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from cleave.config import (
-    DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
-    DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
-    DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
-    DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
-    DEFAULT_RENDER_OVERLAY_FONT,
-    DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
-    DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
-    DEFAULT_RENDER_OVERLAY_POSITION,
-    DEFAULT_RENDER_OVERLAY_START_DELAY,
-    DEFAULT_RENDER_POST_FX_FADE_IN,
-    DEFAULT_RENDER_POST_FX_FADE_OUT,
-    VIZ_CONFIG_FILENAME,
     CleaveConfig,
     RenderOverlayPosition,
+    VIZ_CONFIG_FILENAME,
+)
+from cleave.config_schema import (
+    default_render_overlay_runtime_values,
+    default_render_post_fx_runtime_values,
 )
 from cleave.preset_playlist import PresetPlaylist, preset_browse_floor
 from cleave.timeline import TimelineCue
@@ -61,22 +54,7 @@ class RenderOverlayRuntime:
 
 
 def default_render_overlay_runtime() -> RenderOverlayRuntime:
-    return RenderOverlayRuntime(
-        enabled=True,
-        expanded=False,
-        position=DEFAULT_RENDER_OVERLAY_POSITION,
-        title_expanded=False,
-        body_expanded=False,
-        title_font_size=DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
-        title_font=DEFAULT_RENDER_OVERLAY_FONT,
-        title_margin_bottom=DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
-        body_font_size=DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
-        body_font=DEFAULT_RENDER_OVERLAY_FONT,
-        opacity_pct=int(round(DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY * 100)),
-        border_width=DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
-        start_delay=DEFAULT_RENDER_OVERLAY_START_DELAY,
-        display_time=DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
-    )
+    return RenderOverlayRuntime(**default_render_overlay_runtime_values())
 
 
 @dataclass
@@ -88,12 +66,7 @@ class RenderPostFxRuntime:
 
 
 def default_render_post_fx_runtime() -> RenderPostFxRuntime:
-    return RenderPostFxRuntime(
-        enabled=True,
-        expanded=False,
-        fade_in=DEFAULT_RENDER_POST_FX_FADE_IN,
-        fade_out=DEFAULT_RENDER_POST_FX_FADE_OUT,
-    )
+    return RenderPostFxRuntime(**default_render_post_fx_runtime_values())
 
 
 @dataclass
@@ -150,12 +123,10 @@ class TuningSession:
 def render_overlay_runtime_from_cfg(cfg: CleaveConfig) -> RenderOverlayRuntime:
     overlay = cfg.render.overlay if cfg.render is not None else None
     if overlay is not None:
-        return RenderOverlayRuntime(
+        return replace(
+            default_render_overlay_runtime(),
             enabled=overlay.enabled,
-            expanded=False,
             position=overlay.position,
-            title_expanded=False,
-            body_expanded=False,
             title_font_size=overlay.title.font_size,
             title_font=overlay.title.font,
             title_margin_bottom=overlay.title.margin_bottom,
@@ -166,22 +137,7 @@ def render_overlay_runtime_from_cfg(cfg: CleaveConfig) -> RenderOverlayRuntime:
             start_delay=overlay.start_delay,
             display_time=overlay.display_time,
         )
-    return RenderOverlayRuntime(
-        enabled=True,
-        expanded=False,
-        position=DEFAULT_RENDER_OVERLAY_POSITION,
-        title_expanded=False,
-        body_expanded=False,
-        title_font_size=DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
-        title_font=DEFAULT_RENDER_OVERLAY_FONT,
-        title_margin_bottom=DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
-        body_font_size=DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
-        body_font=DEFAULT_RENDER_OVERLAY_FONT,
-        opacity_pct=int(round(DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY * 100)),
-        border_width=DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
-        start_delay=DEFAULT_RENDER_OVERLAY_START_DELAY,
-        display_time=DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
-    )
+    return default_render_overlay_runtime()
 
 
 def render_post_fx_runtime_from_cfg(
@@ -189,18 +145,13 @@ def render_post_fx_runtime_from_cfg(
 ) -> RenderPostFxRuntime:
     post_fx = cfg.render.post_fx if cfg.render is not None else None
     if post_fx is not None:
-        return RenderPostFxRuntime(
+        return replace(
+            default_render_post_fx_runtime(),
             enabled=post_fx.enabled,
-            expanded=False,
             fade_in=post_fx.fade_in,
             fade_out=post_fx.fade_out,
         )
-    return RenderPostFxRuntime(
-        enabled=True,
-        expanded=False,
-        fade_in=DEFAULT_RENDER_POST_FX_FADE_IN,
-        fade_out=DEFAULT_RENDER_POST_FX_FADE_OUT,
-    )
+    return default_render_post_fx_runtime()
 
 
 def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:

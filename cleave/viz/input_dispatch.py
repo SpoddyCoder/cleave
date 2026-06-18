@@ -34,7 +34,7 @@ def key_handler_for_runtime(
     runtime: LiveVisualizerRuntime, key: int
 ) -> TuningControls | TimelineControls:
     """Pick the context handler for a key (tests and dispatch)."""
-    tl = runtime.session.timeline
+    tl = runtime.seed.session.timeline
     if timeline_submenu_routes_to_timeline(
         tl,
         timeline_controls=runtime.timeline_controls,
@@ -52,10 +52,10 @@ def _handle_global_keydown(
         return not runtime.controls.try_quit()
 
     if event.key == pygame.K_h:
-        runtime.session.help_visible = not runtime.session.help_visible
+        runtime.seed.session.help_visible = not runtime.seed.session.help_visible
         return True
 
-    tl = runtime.session.timeline
+    tl = runtime.seed.session.timeline
     if tl.recording:
         if event.key == pygame.K_ESCAPE:
             runtime.timeline_controls.stop_recording()
@@ -95,7 +95,7 @@ def dispatch_should_notify_overlay(
     """Mirror VisualizerApp.run overlay fade-in on input."""
     if event.type != pygame.KEYDOWN:
         return False
-    tl = runtime.session.timeline
+    tl = runtime.seed.session.timeline
     key_handler = key_handler_for_runtime(runtime, event.key)
     if key_handler is not runtime.controls:
         return False
