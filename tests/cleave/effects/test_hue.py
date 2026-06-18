@@ -22,6 +22,7 @@ from cleave.effects.hue import (
     sample_pitch_hz,
     update_hue,
 )
+from cleave.effects.registry import EffectDef
 from cleave.effects.runtime import EffectRuntime
 from cleave.preset_playlist import playlist_at_dir
 from cleave.signals import Signals
@@ -104,11 +105,12 @@ def test_unvoiced_holds_last_hue_and_decays_toward_neutral() -> None:
 def test_hue_state_unvoiced_frames_continue_decay() -> None:
     signals = _signals_with_pitch([440.0, float("nan"), float("nan")])
     state = HueState()
-    state.sample_and_update(signals, "vocals", "pitch_hz", 0.0)
+    row = EffectDef("hue", "pitch", "vocals", "pitch_hz")
+    state.sample_and_update(signals, row, 0.0)
     voiced_hue = state.hue_deg
-    state.sample_and_update(signals, "vocals", "pitch_hz", 0.01)
+    state.sample_and_update(signals, row, 0.01)
     after_one = state.hue_deg
-    state.sample_and_update(signals, "vocals", "pitch_hz", 0.02)
+    state.sample_and_update(signals, row, 0.02)
     after_two = state.hue_deg
     assert state.last_hue == pytest.approx(pitch_to_hue(440.0))
     assert after_one != pytest.approx(voiced_hue)

@@ -6,7 +6,7 @@ alwaysApply: false
 
 # Live tuning overlay layout
 
-The focus-driven tree panel ([cleave/viz/overlay.py](cleave/viz/overlay.py), [cleave/viz/controls.py](cleave/viz/controls.py), [cleave/viz/session.py](cleave/viz/session.py)) splits into two vertical sections. Use these names in docs, issues, and UI work.
+The focus-driven tree panel ([cleave/viz/overlay.py](cleave/viz/overlay.py) draws; [cleave/viz/controls.py](cleave/viz/controls.py) coordinates input; [cleave/viz/tuning_view_state.py](cleave/viz/tuning_view_state.py) builds `TuningViewState`; [cleave/viz/session.py](cleave/viz/session.py) holds session) splits into two vertical sections. Use these names in docs, issues, and UI work.
 
 Unsaved config edits show an asterisk on the active config path row. **Ctrl+Q** and window close route through `TuningControls.try_quit()` (delegates to [cleave/viz/config_save.py](cleave/viz/config_save.py)); when dirty, a three-option quit dialog (Save / Don't save / Cancel) appears before exit.
 

@@ -32,20 +32,19 @@ remaining duplicated systems.
   [cleave/config_snapshot.py](cleave/config_snapshot.py).
 - [cleave/viz/app.py](cleave/viz/app.py) `VisualizerRuntime` bag: fixed in Phase 2.
   `VisualizerSeed`, `VisualizerCore`, `LiveVisualizerRuntime`, and
-  `RenderVisualizerRuntime` enforce readiness by type; `build_live_runtime` and
-  `build_render_runtime` are the entry points.
+  `RenderVisualizerRuntime` enforce readiness by type; entry via
+  `build_runtime_base` in [cleave/viz/app.py](cleave/viz/app.py).
 - [cleave/viz/layer.py](cleave/viz/layer.py): fixed in Phase 2. `StemLayer` only;
   frame pipeline, visibility, and overlay drawing live in
   [cleave/viz/layer_pipeline.py](cleave/viz/layer_pipeline.py),
   [cleave/viz/layer_visibility.py](cleave/viz/layer_visibility.py), and
   [cleave/viz/overlay_draw.py](cleave/viz/overlay_draw.py).
   [cleave/viz/app.py](cleave/viz/app.py) imports public names only.
-- Config schema is hand maintained twice: load in [cleave/config.py](cleave/config.py)
-  and save in [cleave/config_snapshot.py](cleave/config_snapshot.py), with defaults
-  triplicated across those files and [cleave/viz/controls.py](cleave/viz/controls.py).
-- The effects runtime in [cleave/effects/runtime.py](cleave/effects/runtime.py)
-  repeats near identical per effect blocks instead of dispatching through the
-  registry.
+- Config schema unified in Phase 3: parse, defaults, and persisted payload in
+  [cleave/config_schema.py](cleave/config_schema.py); snapshots in
+  [cleave/config_snapshot.py](cleave/config_snapshot.py).
+- Effects runtime dispatches through [cleave/effects/handlers.py](cleave/effects/handlers.py)
+  (Phase 3); registry in [cleave/effects/registry.py](cleave/effects/registry.py).
 
 ---
 
@@ -281,7 +280,13 @@ base and cannot silently diverge.
 
 ---
 
-## Phase 3: Unify duplicated systems (medium to high risk)
+## Phase 3: Unify duplicated systems (medium to high risk, complete)
+
+**Status:** Complete. Single config schema in [cleave/config_schema.py](cleave/config_schema.py);
+registry-driven effects in [cleave/effects/handlers.py](cleave/effects/handlers.py);
+shared frame finish in [cleave/viz/frame_finish.py](cleave/viz/frame_finish.py).
+Typed `FocusContext` replaces closure-bag DI; `VisualizerCore` composes
+`VisualizerSeed` via `runtime.seed.*`.
 
 ### Task 3.0: Clean up rough edges from Phase 2 (low risk, do first)
 
@@ -306,10 +311,7 @@ them.
 Acceptance: no closure-bag DI remains; render overlay defaults exist once; no dead
 helper; unit suite passes.
 
-## Phase 3 (continued): Unify duplicated systems (medium to high risk)
-
-Goal: remove the parallel maintenance burdens so a new config key, effect, or render
-tweak changes one place instead of many. Builds on Phases 1 and 2.
+## Phase 3 (continued)
 
 ### Task 3.1: Single config schema for load, save, and defaults
 
@@ -379,11 +381,14 @@ suite green.
 
 ---
 
-## Phase 4: Capture the principles as rules (low risk)
+## Phase 4: Capture the principles as rules (low risk, complete)
 
 Goal: turn the patterns established in Phases 1 to 3 into durable, agent facing
 guidance so future work preserves the architecture instead of eroding it. This phase
 edits Cursor rules and skills, not application code.
+
+**Status:** Complete. [.cursor/rules/architecture-principles.mdc](.cursor/rules/architecture-principles.mdc)
+captures conventions; existing rules cross-checked for post-refactor paths.
 
 Use the create-rule skill for format and placement
 ([.cursor/rules](.cursor/rules)). Keep entries short and link to the canonical
@@ -451,15 +456,11 @@ feature reminder is in place; existing rules point at current file locations.
 | --- | --- | --- | --- | --- |
 | 1 | Correctness and cleanup | Low | Low | Complete |
 | 2 | Structural decomposition | Medium to high | Medium to high | Complete |
-| 3 | Unify duplicated systems | Medium to high | Medium to high | |
-| 4 | Capture principles as rules | Low | Low | |
+| 3 | Unify duplicated systems | Medium to high | Medium to high | Complete |
+| 4 | Capture principles as rules | Low | Low | Complete |
 
-Do the phases in order. Phases 1 and 2 are complete. Phase 3 starts with Task 3.0
-(clean up the rough edges Phase 2 introduced), then the unification work.
-Phase 2 depended on Phase 1 (centralized dirty tracking and the session module move).
-Phase 3 depends on Phase 2 (the session module and split runtime simplify the schema
-and render unification work). Phase 4 should land after Phase 3 so the rules describe
-the final shape, though Task 4.3 (fixing stale references) can be done any time.
+Phases 1 through 4 are complete. Principles live in
+[.cursor/rules/architecture-principles.mdc](.cursor/rules/architecture-principles.mdc).
 
 ## Definition of done for the whole refactor
 

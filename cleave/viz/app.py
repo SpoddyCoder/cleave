@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pygame
 
-from cleave.config import CleaveConfig, RenderOverlayConfig
+from cleave.config import CleaveConfig
 from cleave.effects.runtime import EffectRuntime
 from cleave.gl_compositor import GlCompositor
 from cleave.gl_post_process import GlPostProcess
@@ -31,15 +31,7 @@ from cleave.viz.overlay import TuningOverlay
 from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.timeline_overlay import TimelineOverlay
 from cleave.viz.playback import PlaybackState, current_sec, init_playback
-from cleave.viz.post_fx import live_frame_fade_alpha
-from cleave.viz.render_overlay import (
-    build_live_overlay_config,
-    build_panel_surface,
-    composite_render_overlay_with_alpha,
-    default_render_overlay_config,
-    live_overlay_alpha,
-    panel_surface_key,
-)
+from cleave.viz.frame_finish import RenderOverlayPanelCache, finish_content_frame
 from cleave.viz.input_dispatch import (
     dispatch_keydown,
     dispatch_keyup,
@@ -77,24 +69,7 @@ class VisualizerSeed:
 class VisualizerCore:
     """GL-initialized state shared by live and offline render paths."""
 
-    project_dir: Path
-    audio_path: Path
-    width: int
-    height: int
-    upscale: float
-    display_width: int
-    display_height: int
-    fps: int
-    window_title: str
-    session: TuningSession
-    cfg: CleaveConfig
-    pcm_bank: StemPcmBank
-    duration_sec: float
-    n_pcm: int
-    signals: Signals | None
-    effect_runtime: EffectRuntime
-    preset_root: Path
-    playlists: dict[str, PresetPlaylist]
+    seed: VisualizerSeed
     layers: list[StemLayer]
     layers_by_name: dict[str, StemLayer]
     compositor: GlCompositor
@@ -113,8 +88,9 @@ class LiveVisualizerRuntime(VisualizerCore):
     help_overlay: HelpOverlay
     timeline_overlay: TimelineOverlay
     overlay_surface: pygame.Surface
-    render_overlay_panel: pygame.Surface | None = None
-    render_overlay_panel_key: tuple | None = None
+    render_overlay_panel_cache: RenderOverlayPanelCache = field(
+        default_factory=RenderOverlayPanelCache
+    )
 
 
 @dataclass
@@ -150,49 +126,6 @@ def build_runtime_base(
         preset_root=cfg.paths.preset_root,
         playlists=playlists,
     )
-
-
-def build_live_runtime(
-    cfg: CleaveConfig,
-    project_dir: Path,
-    audio_path: Path,
-    playlists: dict[str, PresetPlaylist],
-) -> VisualizerSeed:
-    """Entry for the live visualizer; GL init completes in VisualizerApp.run()."""
-    return build_runtime_base(cfg, project_dir, audio_path, playlists)
-
-
-def build_render_runtime(
-    cfg: CleaveConfig,
-    project_dir: Path,
-    audio_path: Path,
-    playlists: dict[str, PresetPlaylist],
-) -> VisualizerSeed:
-    """Entry for offline render; GL init completes after opening a hidden context."""
-    return build_runtime_base(cfg, project_dir, audio_path, playlists)
-
-
-def _core_fields_from_seed(seed: VisualizerSeed) -> dict:
-    return {
-        "project_dir": seed.project_dir,
-        "audio_path": seed.audio_path,
-        "width": seed.width,
-        "height": seed.height,
-        "upscale": seed.upscale,
-        "display_width": seed.display_width,
-        "display_height": seed.display_height,
-        "fps": seed.fps,
-        "window_title": seed.window_title,
-        "session": seed.session,
-        "cfg": seed.cfg,
-        "pcm_bank": seed.pcm_bank,
-        "duration_sec": seed.duration_sec,
-        "n_pcm": seed.n_pcm,
-        "signals": seed.signals,
-        "effect_runtime": seed.effect_runtime,
-        "preset_root": seed.preset_root,
-        "playlists": seed.playlists,
-    }
 
 
 def _make_compositor(seed: VisualizerSeed) -> GlCompositor:
@@ -271,7 +204,7 @@ def _init_gl_resources_heavy(
     )
 
     return LiveVisualizerRuntime(
-        **_core_fields_from_seed(seed),
+        seed=seed,
         layers=layers,
         layers_by_name=layers_by_name,
         compositor=compositor,
@@ -294,51 +227,11 @@ def _init_gl_resources_render(seed: VisualizerSeed) -> RenderVisualizerRuntime:
     )
 
     return RenderVisualizerRuntime(
-        **_core_fields_from_seed(seed),
+        seed=seed,
         layers=layers,
         layers_by_name=layers_by_name,
         compositor=compositor,
         post_process=post_process,
-    )
-
-
-def _ensure_render_overlay_panel(
-    runtime: LiveVisualizerRuntime, cfg: RenderOverlayConfig
-) -> pygame.Surface:
-    key = panel_surface_key(cfg)
-    if (
-        runtime.render_overlay_panel is not None
-        and runtime.render_overlay_panel_key == key
-    ):
-        return runtime.render_overlay_panel
-    runtime.render_overlay_panel = build_panel_surface(cfg)
-    runtime.render_overlay_panel_key = key
-    return runtime.render_overlay_panel
-
-
-def _composite_live_render_overlay(runtime: LiveVisualizerRuntime, t_sec: float) -> None:
-    base = (
-        runtime.cfg.render.overlay
-        if runtime.cfg.render is not None and runtime.cfg.render.overlay is not None
-        else default_render_overlay_config()
-    )
-    cfg = build_live_overlay_config(base, runtime.session.render_overlay)
-    alpha = live_overlay_alpha(
-        t_sec,
-        cfg,
-        enabled=runtime.session.render_overlay.enabled,
-        solo=runtime.session.render_overlay_solo,
-    )
-    if alpha <= 0.01:
-        return
-    panel = _ensure_render_overlay_panel(runtime, cfg)
-    composite_render_overlay_with_alpha(
-        runtime.compositor,
-        cfg,
-        alpha,
-        runtime.width,
-        runtime.height,
-        panel=panel,
     )
 
 
@@ -367,23 +260,23 @@ def tick_frame_core(
         LayerFramePipeline.flush_pcm(runtime.layers)
     was_paused = paused
 
-    apply_layer_visibility(runtime.session, runtime.layers_by_name, t_sec)
+    apply_layer_visibility(runtime.seed.session, runtime.layers_by_name, t_sec)
 
     LayerFramePipeline.render_frame(
-        runtime.session,
+        runtime.seed.session,
         runtime.layers,
         runtime.layers_by_name,
-        runtime.pcm_bank,
-        runtime.n_pcm,
+        runtime.seed.pcm_bank,
+        runtime.seed.n_pcm,
         runtime.post_process,
-        runtime.effect_runtime,
-        runtime.signals,
+        runtime.seed.effect_runtime,
+        runtime.seed.signals,
         t_sec,
         paused=paused,
     )
 
     LayerFramePipeline.composite(
-        runtime.compositor, runtime.layers_by_name, runtime.session
+        runtime.compositor, runtime.layers_by_name, runtime.seed.session
     )
     return was_paused
 
@@ -395,23 +288,18 @@ def _tick_frame_live_overlay(
     paused: bool,
     overlay_dt: float,
 ) -> None:
-    pp = runtime.session.render_post_fx
-    frame_fade_alpha = live_frame_fade_alpha(
+    finish_content_frame(
+        runtime,
         t_sec,
-        runtime.duration_sec,
-        pp.fade_in,
-        pp.fade_out,
-        enabled=pp.enabled,
-        solo=runtime.session.render_post_fx_solo,
+        post_fx_solo=runtime.seed.session.render_post_fx_solo,
+        overlay_solo=runtime.seed.session.render_overlay_solo,
+        panel_cache=runtime.render_overlay_panel_cache,
     )
-    runtime.compositor.apply_frame_fade(frame_fade_alpha)
-    _composite_live_render_overlay(runtime, t_sec)
-    runtime.compositor.present_content()
     view_state = runtime.controls.build_view_state(
         paused=paused,
         position_sec=t_sec,
     )
-    tl = runtime.session.timeline
+    tl = runtime.seed.session.timeline
     runtime.overlay.update(overlay_dt)
     overlay_visibility = runtime.overlay.visibility
     timeline_strip_visible = _timeline_strip_visible(
@@ -429,14 +317,14 @@ def _tick_frame_live_overlay(
 
     if timeline_strip_visible:
         timeline_state = build_timeline_view_state(
-            runtime.session, t_sec, runtime.duration_sec
+            runtime.seed.session, t_sec, runtime.seed.duration_sec
         )
         OverlayDrawer.draw_timeline(
             runtime.compositor,
             runtime.timeline_overlay,
             runtime.overlay_surface,
             timeline_state,
-            runtime.height,
+            runtime.seed.height,
             visibility=_timeline_strip_fade(tl, overlay_visibility=overlay_visibility),
         )
 
@@ -470,7 +358,7 @@ class VisualizerApp:
 
     def run(self) -> None:
         if not isinstance(self._runtime, VisualizerSeed):
-            raise TypeError("run() requires a VisualizerSeed from build_live_runtime()")
+            raise TypeError("run() requires a VisualizerSeed from build_runtime_base()")
 
         seed = self._runtime
 
@@ -524,12 +412,12 @@ class VisualizerApp:
                 )
                 LayerFramePipeline.warmup(
                     rt.layers,
-                    rt.pcm_bank,
+                    rt.seed.pcm_bank,
                     0.0,
                     warmup_frames,
-                    rt.fps,
-                    rt.n_pcm,
-                    session=rt.session,
+                    rt.seed.fps,
+                    rt.seed.n_pcm,
+                    session=rt.seed.session,
                 )
 
             self.tick_frame(0.0, paused=False)
@@ -545,7 +433,7 @@ class VisualizerApp:
                         else:
                             rt.overlay.notify_input()
                     elif event.type == pygame.KEYDOWN:
-                        tl = rt.session.timeline
+                        tl = rt.seed.session.timeline
                         if dispatch_keydown(event, rt) is False:
                             running = False
                         else:
@@ -566,12 +454,12 @@ class VisualizerApp:
                 if rt.controls.consume_pending_exit():
                     running = False
 
-                self._overlay_dt = clock.tick(rt.fps) / 1000.0
+                self._overlay_dt = clock.tick(rt.seed.fps) / 1000.0
                 rt.controls.tick(self._overlay_dt)
                 if rt.controls.key_repeat_armed:
                     rt.overlay.notify_input()
 
-                t_sec = current_sec(rt.playback, rt.duration_sec)
+                t_sec = current_sec(rt.playback, rt.seed.duration_sec)
                 self.tick_frame(t_sec, paused=rt.playback.paused)
 
                 pygame.display.flip()

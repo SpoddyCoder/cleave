@@ -7,6 +7,8 @@ import math
 from dataclasses import dataclass
 
 from cleave.effects.constants import clamp_effect_pct
+from cleave.effects.handlers import EffectHandler
+from cleave.effects.registry import EffectDef
 from cleave.signals import Signals
 
 PITCH_MIN_HZ = 80.0
@@ -84,10 +86,34 @@ class HueState:
     def sample_and_update(
         self,
         signals: Signals,
-        signal_stem: str,
-        signal_key: str,
+        row: EffectDef,
         t_sec: float,
     ) -> float:
-        pitch_hz = sample_pitch_hz(signals, signal_stem, signal_key, t_sec)
+        pitch_hz = sample_pitch_hz(signals, row.signal_stem, row.signal_key, t_sec)
         update_hue(self, pitch_hz)
         return self.hue_deg
+
+
+def _update_hue(
+    state: object,
+    signals: Signals,
+    row: EffectDef,
+    t_sec: float,
+) -> None:
+    assert isinstance(state, HueState)
+    state.sample_and_update(signals, row, t_sec)
+
+
+def _apply_hue(mod: object, pct: int, state: object) -> object:
+    assert isinstance(state, HueState)
+    mod.hue_rgb = hue_rgb(state.hue_deg)
+    mod.hue_mix = hue_mix_pct(pct)
+    return mod
+
+
+HUE_HANDLER = EffectHandler(
+    effect_id="hue",
+    state_factory=HueState,
+    update=_update_hue,
+    apply=_apply_hue,
+)
