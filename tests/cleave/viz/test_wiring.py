@@ -16,22 +16,24 @@ from cleave.viz.wiring import make_tuning_controls
 def _make_wired_controls() -> tuple:
     pm = MagicMock()
     layer = StemLayer(
-        name="drums",
+        slot="layer_1",
+        stem="drums",
         pm=pm,
         fbo=MagicMock(),
         playlist=PresetPlaylist(
-            current_dir=Path("/tmp/presets/drums"),
+            current_dir=Path("/tmp/presets/layer_1"),
             paths=(),
             index=0,
         ),
     )
-    layers_by_name = {"drums": layer}
+    layers_by_slot = {"layer_1": layer}
     session = TuningSession(
-        layer_z_order=["drums"],
+        layer_z_order=["layer_1"],
         layers={
-            "drums": LayerRuntime(
+            "layer_1": LayerRuntime(
                 playlist=layer.playlist,
-                browse_floor=Path("/tmp/presets/drums"),
+                browse_floor=Path("/tmp/presets/layer_1"),
+                stem="drums",
                 opacity_pct=100,
                 beat_sensitivity=1.0,
             )
@@ -42,7 +44,7 @@ def _make_wired_controls() -> tuple:
         cfg=None,
         preset_root=Path("/tmp/presets"),
         project_dir=Path("/tmp/projects/test"),
-        layers_by_name=layers_by_name,
+        layers_by_slot=layers_by_slot,
         layers=[layer],
         playback=stub_playback_state(),
         duration_sec=120.0,
@@ -54,9 +56,9 @@ def _make_wired_controls() -> tuple:
 
 def test_on_beat_change_updates_projectm() -> None:
     controls, pm = _make_wired_controls()
-    controls.session.layers["drums"].beat_sensitivity = 1.0
+    controls.session.layers["layer_1"].beat_sensitivity = 1.0
 
-    controls._set_beat("drums", 1.5)
+    controls._set_beat("layer_1", 1.5)
 
-    assert controls.session.layers["drums"].beat_sensitivity == 1.5
+    assert controls.session.layers["layer_1"].beat_sensitivity == 1.5
     pm.set_beat_sensitivity.assert_called_once_with(1.5)

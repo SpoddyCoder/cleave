@@ -72,7 +72,7 @@ class VisualizerCore:
 
     seed: VisualizerSeed
     layers: list[StemLayer]
-    layers_by_name: dict[str, StemLayer]
+    layers_by_slot: dict[str, StemLayer]
     compositor: GlCompositor
     post_process: GlPostProcess
 
@@ -170,7 +170,7 @@ def init_gl_resources_heavy(
             on_progress(message)
 
     report("Building layers...")
-    layers, layers_by_name = LayerFramePipeline.build(
+    layers, layers_by_slot = LayerFramePipeline.build(
         seed.cfg, compositor, seed.playlists
     )
 
@@ -184,7 +184,7 @@ def init_gl_resources_heavy(
         cfg=seed.cfg,
         preset_root=seed.preset_root,
         project_dir=seed.project_dir,
-        layers_by_name=layers_by_name,
+        layers_by_slot=layers_by_slot,
         layers=layers,
         playback=playback,
         duration_sec=seed.duration_sec,
@@ -198,7 +198,7 @@ def init_gl_resources_heavy(
         session=seed.session,
         playback=playback,
         duration_sec=seed.duration_sec,
-        layers_by_name=layers_by_name,
+        layers_by_slot=layers_by_slot,
         layers=layers,
         signals=seed.signals,
         effect_runtime=seed.effect_runtime,
@@ -210,7 +210,7 @@ def init_gl_resources_heavy(
     return LiveVisualizerRuntime(
         seed=seed,
         layers=layers,
-        layers_by_name=layers_by_name,
+        layers_by_slot=layers_by_slot,
         compositor=compositor,
         post_process=post_process,
         controls=controls,
@@ -227,14 +227,14 @@ def init_gl_resources_heavy(
 
 def init_gl_resources_render(seed: VisualizerSeed) -> RenderVisualizerRuntime:
     compositor, post_process = _init_compositor_and_post(seed)
-    layers, layers_by_name = LayerFramePipeline.build(
+    layers, layers_by_slot = LayerFramePipeline.build(
         seed.cfg, compositor, seed.playlists
     )
 
     return RenderVisualizerRuntime(
         seed=seed,
         layers=layers,
-        layers_by_name=layers_by_name,
+        layers_by_slot=layers_by_slot,
         compositor=compositor,
         post_process=post_process,
     )
@@ -265,12 +265,12 @@ def tick_frame_core(
         LayerFramePipeline.flush_pcm(runtime.layers)
     was_paused = paused
 
-    apply_layer_visibility(runtime.seed.session, runtime.layers_by_name, t_sec)
+    apply_layer_visibility(runtime.seed.session, runtime.layers_by_slot, t_sec)
 
     LayerFramePipeline.render_frame(
         runtime.seed.session,
         runtime.layers,
-        runtime.layers_by_name,
+        runtime.layers_by_slot,
         runtime.seed.pcm_bank,
         runtime.seed.n_pcm,
         runtime.post_process,
@@ -281,7 +281,7 @@ def tick_frame_core(
     )
 
     LayerFramePipeline.composite(
-        runtime.compositor, runtime.layers_by_name, runtime.seed.session
+        runtime.compositor, runtime.layers_by_slot, runtime.seed.session
     )
     return was_paused
 

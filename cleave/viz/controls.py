@@ -11,6 +11,7 @@ import pygame
 from cleave.config import CleaveConfig, clamp_beat_sensitivity, clamp_effect_pct
 from cleave.effects.registry import effect_row_count
 from cleave.blend_modes import BLEND_MODES, BlendMode
+from cleave.extract import STEM_SOURCES
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.key_repeat import KeyRepeatController, mod_ctrl, mod_shift
 from cleave.viz.modal import ModalHost
@@ -272,7 +273,7 @@ class TuningControls:
                     self.move_mode_stem = stem
                 return True
             if kind == RowKind.SAVE_CONFIG:
-                if self.session.solo_stem is not None:
+                if self.session.solo_slot is not None:
                     return True
                 self._config_save.prompt_save()
                 return True
@@ -419,7 +420,12 @@ class TuningControls:
             self._render_overlay.set_body_expanded(forward)
             return
 
-        if stem is not None and kind in REPEAT_ROW_KINDS and self.session.layers[stem].locked:
+        if (
+            stem is not None
+            and kind in REPEAT_ROW_KINDS
+            and kind != RowKind.TRACK_STEM
+            and self.session.layers[stem].locked
+        ):
             return
 
         if kind == RowKind.TRACK_HEADER:
@@ -451,6 +457,10 @@ class TuningControls:
             if stem is None:
                 return
             self._step_preset(stem, forward=forward, ctrl=ctrl)
+        elif kind == RowKind.TRACK_STEM:
+            if stem is None:
+                return
+            self._cycle_stem(stem, forward=forward)
         elif kind == RowKind.TRACK_BLEND:
             if stem is None:
                 return
@@ -625,6 +635,20 @@ class TuningControls:
         if self._layer_bindings is not None:
             self._layer_bindings.on_blend_change(stem, layer.blend_mode)
 
+    def _cycle_stem(self, slot: str, *, forward: bool) -> None:
+        layer = self.session.layers[slot]
+        try:
+            index = STEM_SOURCES.index(layer.stem)
+        except ValueError:
+            index = 0
+        if forward:
+            layer.stem = STEM_SOURCES[(index + 1) % len(STEM_SOURCES)]
+        else:
+            layer.stem = STEM_SOURCES[(index - 1) % len(STEM_SOURCES)]
+        layer.effects = {}
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_stem_change(slot, layer.stem)
+
     def _toggle_locked(self, stem: str) -> None:
         layer = self.session.layers[stem]
         layer.locked = not layer.locked
@@ -692,16 +716,16 @@ class TuningControls:
         self._restore_focus(focused)
 
     def _enter_solo(self, stem: str) -> None:
-        if self.session.solo_stem == stem:
+        if self.session.solo_slot == stem:
             return
-        self.session.solo_stem = stem
+        self.session.solo_slot = stem
         if self._layer_bindings is not None:
             self._layer_bindings.on_solo_change()
 
     def _exit_solo(self, stem: str) -> None:
-        if self.session.solo_stem != stem:
+        if self.session.solo_slot != stem:
             return
-        self.session.solo_stem = None
+        self.session.solo_slot = None
         if self._layer_bindings is not None:
             self._layer_bindings.on_solo_change()
 
@@ -750,7 +774,7 @@ class TuningControls:
         view = self.build_view_state(paused=self.playback.paused)
         effects_header_idx = find_row(view, stem, RowKind.TRACK_EFFECTS_HEADER)
         old_focus = self.focus_index
-        effect_count = effect_row_count(stem)
+        effect_count = effect_row_count(layer.stem)
         layer.effects_expanded = expanded
         view_after = self.build_view_state(paused=self.playback.paused)
         new_header_idx = find_row(view_after, stem, RowKind.TRACK_EFFECTS_HEADER)

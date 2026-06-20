@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pygame
 
+from cleave.config_schema import DEFAULT_STEM_FOR_SLOT, LAYER_SLOTS
 from cleave.extract import STEM_NAMES
 from cleave.timeline import TimelineCue
 from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, TuningControls
@@ -16,10 +17,10 @@ from tests.support.viz import keydown, make_playlist, stub_playback_state
 
 def _make_timeline_controls(
     *,
-    stems: tuple[str, ...] = tuple(STEM_NAMES),
+    slots: tuple[str, ...] = tuple(LAYER_SLOTS),
     cues: list[TimelineCue] | None = None,
     focus_row: int = 0,
-    armed_stems: set[str] | None = None,
+    armed_slots: set[str] | None = None,
     panel_open: bool = True,
     submenu_focused: bool = True,
     enabled: bool = True,
@@ -35,13 +36,14 @@ def _make_timeline_controls(
 ]:
     preset_root = Path("/tmp/presets")
     session = TuningSession(
-        layer_z_order=list(stems),
+        layer_z_order=list(slots),
         layers={
-            stem: LayerRuntime(
-                playlist=make_playlist(stem),
-                browse_floor=preset_root / stem,
+            slot: LayerRuntime(
+                playlist=make_playlist(slot),
+                browse_floor=preset_root / slot,
+                stem=DEFAULT_STEM_FOR_SLOT[slot],
             )
-            for stem in stems
+            for slot in slots
         },
     )
     tl = session.timeline
@@ -50,7 +52,7 @@ def _make_timeline_controls(
     tl.submenu_focused = submenu_focused
     tl.cues = list(cues or [])
     tl.focus_row = focus_row
-    tl.armed_stems = set(armed_stems or ())
+    tl.armed_slots = set(armed_slots or ())
     tl.recording = recording
 
     playback = stub_playback_state()
@@ -80,13 +82,13 @@ def _make_timeline_controls(
 
 def test_enter_toggles_arm_on_focused_stem() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(focus_row=1)
-    assert session.timeline.armed_stems == set()
+    assert session.timeline.armed_slots == set()
 
     controls.handle_keydown(keydown(pygame.K_RETURN))
-    assert session.timeline.armed_stems == {"bass"}
+    assert session.timeline.armed_slots == {"layer_2"}
 
     controls.handle_keydown(keydown(pygame.K_RETURN))
-    assert session.timeline.armed_stems == set()
+    assert session.timeline.armed_slots == set()
 
 
 def test_left_right_seek_short_when_not_recording() -> None:
@@ -100,8 +102,8 @@ def test_left_right_seek_short_when_not_recording() -> None:
 
 
 def test_backspace_deletes_focused_cue() -> None:
-    cue_a = TimelineCue(t=10.0, layers={"drums": False})
-    cue_b = TimelineCue(t=30.0, layers={"bass": False})
+    cue_a = TimelineCue(t=10.0, layers={"layer_1": False})
+    cue_b = TimelineCue(t=30.0, layers={"layer_2": False})
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         cues=[cue_a, cue_b]
     )
@@ -115,8 +117,8 @@ def test_backspace_deletes_focused_cue() -> None:
 
 
 def test_backspace_without_focus_deletes_nearest_cue() -> None:
-    cue_near = TimelineCue(t=10.0, layers={"drums": False})
-    cue_far = TimelineCue(t=80.0, layers={"bass": False})
+    cue_near = TimelineCue(t=10.0, layers={"layer_1": False})
+    cue_far = TimelineCue(t=80.0, layers={"layer_2": False})
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         cues=[cue_near, cue_far],
         position_sec=12.0,
@@ -144,7 +146,7 @@ def test_esc_and_t_while_recording_do_not_close_panel() -> None:
     controls, session, _, close_calls, _, _ = _make_timeline_controls(
         recording=True,
     )
-    session.timeline.armed_stems = {"drums"}
+    session.timeline.armed_slots = {"layer_1"}
     session.timeline.record_start_sec = 0.0
 
     controls.handle_keydown(keydown(pygame.K_ESCAPE))
@@ -167,17 +169,17 @@ def test_space_toggles_pause() -> None:
 def test_pause_snapshots_monitor_and_sets_preview_active() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         position_sec=5.0,
-        cues=[TimelineCue(t=0.0, layers={"drums": False})],
+        cues=[TimelineCue(t=0.0, layers={"layer_1": False})],
     )
-    session.layers["drums"].enabled = True
+    session.layers["layer_1"].enabled = True
 
     controls.handle_keydown(keydown(pygame.K_SPACE))
     assert session.timeline.preview_active is True
     assert session.timeline.monitor == {
-        "drums": False,
-        "bass": True,
-        "vocals": True,
-        "other": True,
+        "layer_1": False,
+        "layer_2": True,
+        "layer_3": True,
+        "layer_4": True,
     }
     assert visibility_calls == [True]
 
@@ -185,7 +187,7 @@ def test_pause_snapshots_monitor_and_sets_preview_active() -> None:
 def test_resume_clears_preview() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls()
     session.timeline.preview_active = True
-    session.timeline.monitor = {"drums": False}
+    session.timeline.monitor = {"layer_1": False}
     controls.playback.paused = True
 
     controls.handle_keydown(keydown(pygame.K_SPACE))
@@ -198,13 +200,13 @@ def test_num_keys_toggle_monitor_when_paused() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         position_sec=3.0,
     )
-    session.layers["drums"].enabled = True
+    session.layers["layer_1"].enabled = True
 
     controls.handle_keydown(keydown(pygame.K_SPACE))
-    assert session.timeline.monitor["drums"] is True
+    assert session.timeline.monitor["layer_1"] is True
 
     controls.handle_keydown(keydown(pygame.K_1))
-    assert session.timeline.monitor["drums"] is False
+    assert session.timeline.monitor["layer_1"] is False
     assert session.timeline.cues == []
     assert session.timeline.record_buffer == []
     assert visibility_calls == [True, True]
@@ -212,34 +214,34 @@ def test_num_keys_toggle_monitor_when_paused() -> None:
 
 def test_num_keys_ignored_when_playing_not_in_override() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls()
-    session.layers["drums"].enabled = True
+    session.layers["layer_1"].enabled = True
 
     controls.handle_keydown(keydown(pygame.K_1))
     assert session.timeline.preview_active is False
     assert session.timeline.monitor == {}
     assert session.timeline.cues == []
-    assert session.timeline.override_stems == set()
+    assert session.timeline.override_slots == set()
     assert visibility_calls == []
 
 
 def test_num_keys_toggle_override_visible_when_playing() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
-        cues=[TimelineCue(t=0.0, layers={"drums": True})],
+        cues=[TimelineCue(t=0.0, layers={"layer_1": True})],
     )
-    session.timeline.override_stems = {"drums"}
-    session.timeline.override_visible = {"drums": True}
+    session.timeline.override_slots = {"layer_1"}
+    session.timeline.override_visible = {"layer_1": True}
 
     controls.handle_keydown(keydown(pygame.K_1))
-    assert session.timeline.override_visible["drums"] is False
+    assert session.timeline.override_visible["layer_1"] is False
     assert visibility_calls == [True]
 
 
 def test_record_from_pause_stores_wysiwyg_baseline_when_monitor_differs() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
-        armed_stems={"drums"},
+        armed_slots={"layer_1"},
         position_sec=7.0,
     )
-    session.layers["drums"].enabled = True
+    session.layers["layer_1"].enabled = True
 
     controls.handle_keydown(keydown(pygame.K_SPACE))
     controls.handle_keydown(keydown(pygame.K_1))
@@ -249,44 +251,44 @@ def test_record_from_pause_stores_wysiwyg_baseline_when_monitor_differs() -> Non
     assert session.timeline.preview_active is False
     assert session.timeline.monitor == {}
     assert session.timeline.record_buffer == []
-    assert session.timeline.record_baseline == {"drums": False}
+    assert session.timeline.record_baseline == {"layer_1": False}
 
 
 def test_record_preserves_override() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
-        armed_stems={"drums"},
+        armed_slots={"layer_1"},
     )
-    session.timeline.override_stems = {"bass", "vocals"}
-    session.timeline.override_visible = {"bass": False, "vocals": False}
-    session.solo_stem = "bass"
+    session.timeline.override_slots = {"layer_2", "layer_3"}
+    session.timeline.override_visible = {"layer_2": False, "layer_3": False}
+    session.solo_slot = "layer_2"
 
     controls.handle_keydown(keydown(pygame.K_r))
-    assert session.timeline.override_stems == {"bass", "vocals"}
-    assert session.timeline.override_visible == {"bass": False, "vocals": False}
-    assert session.solo_stem == "bass"
+    assert session.timeline.override_slots == {"layer_2", "layer_3"}
+    assert session.timeline.override_visible == {"layer_2": False, "layer_3": False}
+    assert session.solo_slot == "layer_2"
     assert visibility_calls == [True]
 
 
 def test_shift_enter_override_when_playing() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         focus_row=1,
-        cues=[TimelineCue(t=0.0, layers={"bass": False})],
+        cues=[TimelineCue(t=0.0, layers={"layer_2": False})],
     )
 
     controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
-    assert session.solo_stem is None
-    assert session.timeline.override_stems == {"bass"}
-    assert session.timeline.override_visible == {"bass": False}
+    assert session.solo_slot is None
+    assert session.timeline.override_slots == {"layer_2"}
+    assert session.timeline.override_visible == {"layer_2": False}
     assert visibility_calls == [True]
 
 
 def test_shift_enter_clears_override_on_same_focused_row() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(focus_row=1)
-    session.timeline.override_stems = {"bass"}
-    session.timeline.override_visible = {"bass": True}
+    session.timeline.override_slots = {"layer_2"}
+    session.timeline.override_visible = {"layer_2": True}
 
     controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
-    assert session.timeline.override_stems == set()
+    assert session.timeline.override_slots == set()
     assert session.timeline.override_visible == {}
     assert visibility_calls == [True]
 
@@ -294,13 +296,13 @@ def test_shift_enter_clears_override_on_same_focused_row() -> None:
 def test_shift_enter_override_when_paused() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         focus_row=1,
-        cues=[TimelineCue(t=0.0, layers={"bass": False})],
+        cues=[TimelineCue(t=0.0, layers={"layer_2": False})],
     )
     controls.playback.paused = True
 
     controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
-    assert session.timeline.override_stems == {"bass"}
-    assert session.timeline.override_visible == {"bass": False}
+    assert session.timeline.override_slots == {"layer_2"}
+    assert session.timeline.override_visible == {"layer_2": False}
     assert session.timeline.preview_active is False
     assert session.timeline.monitor == {}
     assert visibility_calls == [True]
@@ -309,45 +311,45 @@ def test_shift_enter_override_when_paused() -> None:
 def test_shift_enter_override_clears_preview_when_paused() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         focus_row=1,
-        cues=[TimelineCue(t=0.0, layers={"bass": False})],
+        cues=[TimelineCue(t=0.0, layers={"layer_2": False})],
     )
     controls.playback.paused = True
     session.timeline.preview_active = True
-    session.timeline.monitor = {"bass": True}
+    session.timeline.monitor = {"layer_2": True}
 
     controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
     assert session.timeline.preview_active is False
     assert session.timeline.monitor == {}
-    assert session.timeline.override_stems == {"bass"}
-    assert session.timeline.override_visible == {"bass": True}
+    assert session.timeline.override_slots == {"layer_2"}
+    assert session.timeline.override_visible == {"layer_2": True}
     assert visibility_calls == [True]
 
 
 def test_num_keys_toggle_override_when_paused() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
-        cues=[TimelineCue(t=0.0, layers={"drums": True})],
+        cues=[TimelineCue(t=0.0, layers={"layer_1": True})],
     )
     controls.playback.paused = True
-    session.timeline.override_stems = {"drums"}
-    session.timeline.override_visible = {"drums": True}
+    session.timeline.override_slots = {"layer_1"}
+    session.timeline.override_visible = {"layer_1": True}
 
     controls.handle_keydown(keydown(pygame.K_1))
-    assert session.timeline.override_visible["drums"] is False
+    assert session.timeline.override_visible["layer_1"] is False
     assert visibility_calls == [True]
 
 
 def test_shift_enter_ignored_when_recording() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         focus_row=1,
-        armed_stems={"drums"},
+        armed_slots={"layer_1"},
     )
-    session.timeline.override_stems = {"bass"}
-    session.timeline.override_visible = {"bass": False}
+    session.timeline.override_slots = {"layer_2"}
+    session.timeline.override_visible = {"layer_2": False}
 
     controls.handle_keydown(keydown(pygame.K_r))
     controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
-    assert session.timeline.override_stems == {"bass"}
-    assert session.timeline.override_visible == {"bass": False}
+    assert session.timeline.override_slots == {"layer_2"}
+    assert session.timeline.override_visible == {"layer_2": False}
     assert visibility_calls == [True]
 
 
@@ -355,22 +357,22 @@ def test_shift_enter_does_not_set_session_solo_stem() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(focus_row=1)
 
     controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
-    assert session.solo_stem is None
-    assert session.timeline.override_stems == {"bass"}
+    assert session.solo_slot is None
+    assert session.timeline.override_slots == {"layer_2"}
 
 
 def test_multiple_override_stems() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         focus_row=0,
-        cues=[TimelineCue(t=0.0, layers={"drums": False, "bass": False})],
+        cues=[TimelineCue(t=0.0, layers={"layer_1": False, "layer_2": False})],
     )
 
     controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
     session.timeline.focus_row = 1
     controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
 
-    assert session.timeline.override_stems == {"drums", "bass"}
-    assert session.timeline.override_visible == {"drums": False, "bass": False}
+    assert session.timeline.override_slots == {"layer_1", "layer_2"}
+    assert session.timeline.override_visible == {"layer_1": False, "layer_2": False}
     assert visibility_calls == [True, True]
 
 
@@ -378,8 +380,8 @@ def test_shift_enter_does_not_arm_focused_row() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(focus_row=1)
 
     controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
-    assert session.timeline.override_stems == {"bass"}
-    assert session.timeline.armed_stems == set()
+    assert session.timeline.override_slots == {"layer_2"}
+    assert session.timeline.armed_slots == set()
 
 
 def test_ctrl_seek_when_not_recording() -> None:
@@ -402,8 +404,8 @@ def test_backspace_toast_when_no_cues() -> None:
 def test_delete_focused_cue_marks_config_dirty() -> None:
     from tests.cleave.viz.test_controls import _make_controls
 
-    tuning = _make_controls(("drums",))
-    tuning.session.timeline.cues = [TimelineCue(t=1.0, layers={"drums": False})]
+    tuning = _make_controls(("layer_1",))
+    tuning.session.timeline.cues = [TimelineCue(t=1.0, layers={"layer_1": False})]
     tuning.session.timeline.enabled = True
     tuning.clear_config_dirty()
     assert not tuning.config_dirty
@@ -422,18 +424,18 @@ def test_delete_focused_cue_marks_config_dirty() -> None:
 def test_ctrl_enter_noop_while_recording() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
         focus_row=0,
-        armed_stems={"drums"},
+        armed_slots={"layer_1"},
         position_sec=5.0,
     )
-    session.layers["drums"].enabled = True
+    session.layers["layer_1"].enabled = True
 
     controls.handle_keydown(keydown(pygame.K_r))
-    assert session.timeline.armed_stems == {"drums"}
+    assert session.timeline.armed_slots == {"layer_1"}
     assert session.timeline.record_buffer == []
 
     controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
 
-    assert session.timeline.armed_stems == {"drums"}
+    assert session.timeline.armed_slots == {"layer_1"}
     assert session.timeline.record_buffer == []
 
 
@@ -447,7 +449,7 @@ def test_r_without_armed_layers_shows_toast() -> None:
 
 def test_r_starts_recording_and_unpauses() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
-        armed_stems={"drums"},
+        armed_slots={"layer_1"},
         position_sec=3.0,
     )
     controls.playback.paused = True
@@ -461,24 +463,24 @@ def test_r_starts_recording_and_unpauses() -> None:
 
 def test_record_start_stores_baseline_not_buffer() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
-        armed_stems={"drums", "bass"},
+        armed_slots={"layer_1", "layer_2"},
         position_sec=7.5,
     )
-    session.layers["drums"].enabled = True
-    session.layers["bass"].enabled = False
+    session.layers["layer_1"].enabled = True
+    session.layers["layer_2"].enabled = False
 
     controls.handle_keydown(keydown(pygame.K_r))
     assert session.timeline.record_buffer == []
-    assert session.timeline.record_baseline == {"drums": True, "bass": False}
+    assert session.timeline.record_baseline == {"layer_1": True, "layer_2": False}
 
 
 def test_layer_keys_only_affect_armed_stems() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
-        armed_stems={"drums"},
+        armed_slots={"layer_1"},
         position_sec=2.0,
     )
-    session.layers["drums"].enabled = True
-    session.layers["bass"].enabled = True
+    session.layers["layer_1"].enabled = True
+    session.layers["layer_2"].enabled = True
 
     controls.handle_keydown(keydown(pygame.K_r))
     assert len(session.timeline.record_buffer) == 0
@@ -489,29 +491,29 @@ def test_layer_keys_only_affect_armed_stems() -> None:
     controls.handle_keydown(keydown(pygame.K_1))
     assert len(session.timeline.record_buffer) == 1
     assert session.timeline.record_buffer[0] == TimelineCue(
-        t=2.0, layers={"drums": False}
+        t=2.0, layers={"layer_1": False}
     )
 
 
 def test_numpad_layer_keys_work_while_recording() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
-        armed_stems={"drums"},
+        armed_slots={"layer_1"},
         position_sec=6.0,
     )
-    session.layers["drums"].enabled = True
+    session.layers["layer_1"].enabled = True
 
     controls.handle_keydown(keydown(pygame.K_r))
     controls.handle_keydown(keydown(pygame.K_KP1))
 
     assert len(session.timeline.record_buffer) == 1
     assert session.timeline.record_buffer[0] == TimelineCue(
-        t=6.0, layers={"drums": False}
+        t=6.0, layers={"layer_1": False}
     )
 
 
 def test_layer_key_debounce_ignores_rapid_press() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
-        armed_stems={"drums"},
+        armed_slots={"layer_1"},
         position_sec=4.0,
     )
 
@@ -523,7 +525,7 @@ def test_layer_key_debounce_ignores_rapid_press() -> None:
 
 def test_seek_blocked_while_recording() -> None:
     controls, session, _, _, seeks, _ = _make_timeline_controls(
-        armed_stems={"drums"},
+        armed_slots={"layer_1"},
     )
 
     controls.handle_keydown(keydown(pygame.K_r))
@@ -538,11 +540,11 @@ def test_seek_blocked_while_recording() -> None:
 
 def test_r_stop_punches_cues_and_clears_record_state() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
-        armed_stems={"drums"},
+        armed_slots={"layer_1"},
         position_sec=10.0,
-        cues=[TimelineCue(t=5.0, layers={"bass": False})],
+        cues=[TimelineCue(t=5.0, layers={"layer_2": False})],
     )
-    session.layers["drums"].enabled = True
+    session.layers["layer_1"].enabled = True
 
     controls.handle_keydown(keydown(pygame.K_r))
     controls.handle_keydown(keydown(pygame.K_1))
@@ -552,9 +554,9 @@ def test_r_stop_punches_cues_and_clears_record_state() -> None:
     assert session.timeline.recording is False
     assert session.timeline.record_buffer == []
     assert session.timeline.record_start_sec is None
-    assert TimelineCue(t=5.0, layers={"bass": False}) in session.timeline.cues
+    assert TimelineCue(t=5.0, layers={"layer_2": False}) in session.timeline.cues
     assert any(
-        cue.t == 10.0 and cue.layers.get("drums") is False
+        cue.t == 10.0 and cue.layers.get("layer_1") is False
         for cue in session.timeline.cues
     )
     assert visibility_calls[-1] is True
@@ -562,11 +564,11 @@ def test_r_stop_punches_cues_and_clears_record_state() -> None:
 
 def test_stop_record_restores_committed_after_punch_range() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
-        armed_stems={"drums"},
+        armed_slots={"layer_1"},
         position_sec=10.0,
         cues=[
-            TimelineCue(t=0.0, layers={"drums": False}),
-            TimelineCue(t=30.0, layers={"drums": True}),
+            TimelineCue(t=0.0, layers={"layer_1": False}),
+            TimelineCue(t=30.0, layers={"layer_1": True}),
         ],
     )
 
@@ -579,14 +581,14 @@ def test_stop_record_restores_committed_after_punch_range() -> None:
     from cleave.viz.layer_visibility import timeline_defaults
 
     defaults = timeline_defaults(session)
-    assert layer_visible_at(session.timeline.cues, defaults, "drums", 14.9) is True
-    assert layer_visible_at(session.timeline.cues, defaults, "drums", 15.0) is True
-    assert layer_visible_at(session.timeline.cues, defaults, "drums", 19.9) is True
-    assert layer_visible_at(session.timeline.cues, defaults, "drums", 20.0) is False
-    assert layer_visible_at(session.timeline.cues, defaults, "drums", 29.9) is False
-    assert layer_visible_at(session.timeline.cues, defaults, "drums", 30.0) is True
+    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 14.9) is True
+    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 15.0) is True
+    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 19.9) is True
+    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 20.0) is False
+    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 29.9) is False
+    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 30.0) is True
     restore_cues = [
-        cue for cue in session.timeline.cues if cue.t == 20.0 and "drums" in cue.layers
+        cue for cue in session.timeline.cues if cue.t == 20.0 and "layer_1" in cue.layers
     ]
     assert len(restore_cues) == 1
     assert restore_cues[0].show_tick is False
@@ -594,14 +596,14 @@ def test_stop_record_restores_committed_after_punch_range() -> None:
 
 def test_stop_record_restores_disabled_tail_when_disable_inside_punch() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
-        armed_stems={"drums"},
+        armed_slots={"layer_1"},
         position_sec=10.0,
         cues=[
-            TimelineCue(t=15.0, layers={"drums": False}),
-            TimelineCue(t=25.0, layers={"drums": True}),
+            TimelineCue(t=15.0, layers={"layer_1": False}),
+            TimelineCue(t=25.0, layers={"layer_1": True}),
         ],
     )
-    session.layers["drums"].enabled = True
+    session.layers["layer_1"].enabled = True
 
     controls.handle_keydown(keydown(pygame.K_r))
     controls.handle_keydown(keydown(pygame.K_1))
@@ -614,21 +616,21 @@ def test_stop_record_restores_disabled_tail_when_disable_inside_punch() -> None:
     from cleave.viz.layer_visibility import timeline_defaults
 
     defaults = timeline_defaults(session)
-    assert layer_visible_at(session.timeline.cues, defaults, "drums", 11.9) is False
-    assert layer_visible_at(session.timeline.cues, defaults, "drums", 12.0) is True
-    assert layer_visible_at(session.timeline.cues, defaults, "drums", 21.9) is True
-    assert layer_visible_at(session.timeline.cues, defaults, "drums", 22.0) is False
-    assert layer_visible_at(session.timeline.cues, defaults, "drums", 24.9) is False
-    assert layer_visible_at(session.timeline.cues, defaults, "drums", 25.0) is True
+    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 11.9) is False
+    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 12.0) is True
+    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 21.9) is True
+    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 22.0) is False
+    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 24.9) is False
+    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 25.0) is True
 
 
 def test_stop_record_restores_enabled_tail_when_injecting_disabled_section() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
-        armed_stems={"drums"},
+        armed_slots={"layer_1"},
         position_sec=10.0,
-        cues=[TimelineCue(t=5.0, layers={"drums": True})],
+        cues=[TimelineCue(t=5.0, layers={"layer_1": True})],
     )
-    session.layers["drums"].enabled = False
+    session.layers["layer_1"].enabled = False
 
     controls.handle_keydown(keydown(pygame.K_r))
     controls.handle_keydown(keydown(pygame.K_1))
@@ -639,19 +641,19 @@ def test_stop_record_restores_enabled_tail_when_injecting_disabled_section() -> 
     from cleave.viz.layer_visibility import timeline_defaults
 
     defaults = timeline_defaults(session)
-    assert layer_visible_at(session.timeline.cues, defaults, "drums", 9.9) is True
-    assert layer_visible_at(session.timeline.cues, defaults, "drums", 10.0) is False
-    assert layer_visible_at(session.timeline.cues, defaults, "drums", 21.9) is False
-    assert layer_visible_at(session.timeline.cues, defaults, "drums", 22.0) is True
-    assert layer_visible_at(session.timeline.cues, defaults, "drums", 40.0) is True
+    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 9.9) is True
+    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 10.0) is False
+    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 21.9) is False
+    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 22.0) is True
+    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 40.0) is True
 
 
 def test_stop_record_preserves_unarmed_cues_in_punch_range() -> None:
-    bass_cue = TimelineCue(t=12.0, layers={"bass": False})
+    bass_cue = TimelineCue(t=12.0, layers={"layer_2": False})
     controls, session, _, _, _, _ = _make_timeline_controls(
-        armed_stems={"drums"},
+        armed_slots={"layer_1"},
         position_sec=10.0,
-        cues=[bass_cue, TimelineCue(t=11.0, layers={"drums": True})],
+        cues=[bass_cue, TimelineCue(t=11.0, layers={"layer_1": True})],
     )
 
     controls.handle_keydown(keydown(pygame.K_r))
@@ -660,13 +662,13 @@ def test_stop_record_preserves_unarmed_cues_in_punch_range() -> None:
 
     assert bass_cue in session.timeline.cues
     assert not any(
-        cue.t == 11.0 and "drums" in cue.layers for cue in session.timeline.cues
+        cue.t == 11.0 and "layer_1" in cue.layers for cue in session.timeline.cues
     )
 
 
 def test_ctrl_space_starts_record_when_paused() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
-        armed_stems={"drums"},
+        armed_slots={"layer_1"},
         position_sec=3.0,
     )
     controls.playback.paused = True
@@ -679,7 +681,7 @@ def test_ctrl_space_starts_record_when_paused() -> None:
 
 def test_ctrl_space_starts_record_when_playing() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
-        armed_stems={"bass"},
+        armed_slots={"layer_2"},
         position_sec=2.0,
     )
 
@@ -691,10 +693,10 @@ def test_ctrl_space_starts_record_when_playing() -> None:
 
 def test_ctrl_space_stops_record_and_pauses() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
-        armed_stems={"drums"},
+        armed_slots={"layer_1"},
         position_sec=10.0,
     )
-    session.layers["drums"].enabled = True
+    session.layers["layer_1"].enabled = True
 
     controls.handle_keydown(keydown(pygame.K_r))
     controls.handle_keydown(keydown(pygame.K_1))
@@ -710,7 +712,7 @@ def test_ctrl_space_stops_record_and_pauses() -> None:
 
 def test_ctrl_space_stop_stays_paused_if_already_paused() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
-        armed_stems={"drums"},
+        armed_slots={"layer_1"},
         position_sec=8.0,
     )
 
@@ -725,7 +727,7 @@ def test_ctrl_space_stop_stays_paused_if_already_paused() -> None:
 
 def test_space_resumes_when_recording_and_paused() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
-        armed_stems={"drums"},
+        armed_slots={"layer_1"},
         position_sec=8.0,
     )
 
@@ -740,10 +742,10 @@ def test_space_resumes_when_recording_and_paused() -> None:
 
 def test_space_stops_record_and_pauses_while_playing() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
-        armed_stems={"drums"},
+        armed_slots={"layer_1"},
         position_sec=10.0,
     )
-    session.layers["drums"].enabled = True
+    session.layers["layer_1"].enabled = True
 
     controls.handle_keydown(keydown(pygame.K_r))
     controls.handle_keydown(keydown(pygame.K_1))

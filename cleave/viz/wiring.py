@@ -8,6 +8,7 @@ from pathlib import Path
 from cleave.config import VIZ_CONFIG_FILENAME, CleaveConfig, LayerConfig, PathsConfig, VisualizerConfig
 from cleave.config_snapshot import next_unnamed_path, write_session_snapshot
 from cleave.effects.runtime import EffectRuntime
+from cleave.config_schema import DEFAULT_STEM_FOR_SLOT, LAYER_SLOTS
 from cleave.extract import STEM_NAMES
 from cleave.paths import repo_root
 from cleave.preset_playlist import PresetPlaylist
@@ -25,6 +26,12 @@ from cleave.stem_pcm import StemPcmBank
 from cleave.viz.playback import current_sec, seek
 
 
+def _solo_audio_source(session: TuningSession) -> str | None:
+    if session.solo_slot is None:
+        return None
+    return session.layers[session.solo_slot].stem
+
+
 def _stub_cfg_for_session(
     session: TuningSession,
     preset_root: Path,
@@ -33,8 +40,11 @@ def _stub_cfg_for_session(
     return CleaveConfig(
         paths=PathsConfig(preset_root=preset_root, texture_paths=()),
         layers={
-            name: LayerConfig(preset=preset_root / name / "stub.milk")
-            for name in STEM_NAMES
+            slot: LayerConfig(
+                preset=preset_root / slot / "stub.milk",
+                stem=DEFAULT_STEM_FOR_SLOT[slot],
+            )
+            for slot in LAYER_SLOTS
         },
         visualizer=VisualizerConfig(),
         config_path=project_dir / VIZ_CONFIG_FILENAME,
@@ -48,7 +58,7 @@ def make_tuning_controls(
     cfg: CleaveConfig | None,
     preset_root: Path,
     project_dir: Path,
-    layers_by_name: dict[str, StemLayer],
+    layers_by_slot: dict[str, StemLayer],
     layers: list[StemLayer],
     playback,
     duration_sec: float,
@@ -59,19 +69,31 @@ def make_tuning_controls(
     modal_host: ModalHost | None = None,
 ) -> TuningControls:
     def on_preset_change(stem: str, playlist: PresetPlaylist) -> None:
-        layer = layers_by_name[stem]
+        layer = layers_by_slot[stem]
         layer.playlist = playlist
         if playlist.current is not None:
             playlist.load_into(layer.pm, smooth=False)
             layer.pm.lock_preset(True)
 
     def on_blend_change(stem: str, blend_mode) -> None:
-        layers_by_name[stem].fbo.blend_mode = blend_mode
+        layers_by_slot[stem].fbo.blend_mode = blend_mode
+
+    def on_stem_change(slot: str, stem) -> None:
+        layers_by_slot[slot].stem = stem
+        LayerFramePipeline.flush_pcm(layers)
+        apply_effect_modifiers(
+            session,
+            layers_by_slot,
+            effect_runtime,
+            signals,
+            current_sec(playback, duration_sec),
+            update=False,
+        )
 
     def on_opacity_change(stem: str, pct: int) -> None:
         apply_effect_modifiers(
             session,
-            layers_by_name,
+            layers_by_slot,
             effect_runtime,
             signals,
             current_sec(playback, duration_sec),
@@ -80,12 +102,12 @@ def make_tuning_controls(
 
     def on_layer_enabled_change(stem: str, enabled: bool) -> None:
         t_sec = current_sec(playback, duration_sec)
-        apply_layer_visibility(session, layers_by_name, t_sec)
+        apply_layer_visibility(session, layers_by_slot, t_sec)
         LayerFramePipeline.flush_pcm(layers)
         if effective_layer_enabled(session, stem, t_sec):
             apply_effect_modifiers(
                 session,
-                layers_by_name,
+                layers_by_slot,
                 effect_runtime,
                 signals,
                 current_sec(playback, duration_sec),
@@ -94,11 +116,11 @@ def make_tuning_controls(
 
     def on_timeline_enabled_change() -> None:
         t_sec = current_sec(playback, duration_sec)
-        apply_layer_visibility(session, layers_by_name, t_sec)
+        apply_layer_visibility(session, layers_by_slot, t_sec)
         LayerFramePipeline.flush_pcm(layers)
         apply_effect_modifiers(
             session,
-            layers_by_name,
+            layers_by_slot,
             effect_runtime,
             signals,
             current_sec(playback, duration_sec),
@@ -107,13 +129,13 @@ def make_tuning_controls(
 
     def on_solo_change() -> None:
         t_sec = current_sec(playback, duration_sec)
-        apply_layer_visibility(session, layers_by_name, t_sec)
+        apply_layer_visibility(session, layers_by_slot, t_sec)
         if mix_player is not None:
-            mix_player.set_solo_stem(session.solo_stem)
+            mix_player.set_solo_stem(_solo_audio_source(session))
         LayerFramePipeline.flush_pcm(layers)
         apply_effect_modifiers(
             session,
-            layers_by_name,
+            layers_by_slot,
             effect_runtime,
             signals,
             current_sec(playback, duration_sec),
@@ -121,7 +143,7 @@ def make_tuning_controls(
         )
 
     def on_beat_change(stem: str, beat: float) -> None:
-        layers_by_name[stem].pm.set_beat_sensitivity(beat)
+        layers_by_slot[stem].pm.set_beat_sensitivity(beat)
 
     def on_seek(delta_sec: float) -> None:
         seek(playback, delta_sec, duration_sec)
@@ -130,6 +152,7 @@ def make_tuning_controls(
     layer_bindings = LiveLayerBindings(
         on_preset_change=on_preset_change,
         on_blend_change=on_blend_change,
+        on_stem_change=on_stem_change,
         on_opacity_change=on_opacity_change,
         on_layer_enabled_change=on_layer_enabled_change,
         on_timeline_enabled_change=on_timeline_enabled_change,
@@ -171,14 +194,19 @@ def make_tuning_controls(
     controls = TuningControls(**kwargs)
     if pcm_bank is not None and mix_player is not None:
         mix_player.set_stem_pcm(
-            {stem: pcm_bank.mono_pcm(stem) for stem in session.layer_z_order}
+            {
+                session.layers[slot].stem: pcm_bank.mono_pcm(
+                    session.layers[slot].stem
+                )
+                for slot in session.layer_z_order
+            }
         )
         apply_layer_visibility(
             session,
-            layers_by_name,
+            layers_by_slot,
             current_sec(playback, duration_sec),
         )
-        mix_player.set_solo_stem(session.solo_stem)
+        mix_player.set_solo_stem(_solo_audio_source(session))
     return controls
 
 
@@ -187,7 +215,7 @@ def make_timeline_controls(
     session: TuningSession,
     playback,
     duration_sec: float,
-    layers_by_name: dict[str, StemLayer],
+    layers_by_slot: dict[str, StemLayer],
     layers: list[StemLayer],
     signals: Signals | None,
     effect_runtime: EffectRuntime,
@@ -197,11 +225,11 @@ def make_timeline_controls(
 ) -> TimelineControls:
     def on_visibility_change() -> None:
         t_sec = current_sec(playback, duration_sec)
-        apply_layer_visibility(session, layers_by_name, t_sec)
+        apply_layer_visibility(session, layers_by_slot, t_sec)
         LayerFramePipeline.flush_pcm(layers)
         apply_effect_modifiers(
             session,
-            layers_by_name,
+            layers_by_slot,
             effect_runtime,
             signals,
             current_sec(playback, duration_sec),

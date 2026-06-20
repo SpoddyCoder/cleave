@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pygame
 
+from cleave.config_schema import DEFAULT_STEM_FOR_SLOT, LAYER_SLOTS
 from cleave.extract import STEM_NAMES
 from cleave.timeline import TimelineCue, layer_visible_at, stem_abbreviation
 from cleave.viz.material_icons import visibility_icon_slot_width
@@ -42,7 +43,7 @@ def _view_state(
     duration_sec: float = 100.0,
     focus_row: int = 0,
     submenu_focused: bool = False,
-    armed_stems: set[str] | None = None,
+    armed_slots: set[str] | None = None,
     recording: bool = False,
     record_start_sec: float | None = None,
     record_baseline: dict[str, bool] | None = None,
@@ -51,11 +52,11 @@ def _view_state(
     layer_z_order: list[str] | None = None,
     monitor_visible: dict[str, bool] | None = None,
     timeline_visible: dict[str, bool] | None = None,
-    override_stems: set[str] | None = None,
+    override_slots: set[str] | None = None,
 ) -> TimelineViewState:
-    order = list(layer_z_order or STEM_NAMES)
+    order = list(layer_z_order or list(LAYER_SLOTS))
     cue_list = list(cues or [])
-    default_map = dict(defaults or {stem: True for stem in STEM_NAMES})
+    default_map = dict(defaults or {slot: True for slot in LAYER_SLOTS})
     if monitor_visible is None:
         monitor_visible = {
             stem: layer_visible_at(cue_list, default_map, stem, position_sec)
@@ -65,6 +66,10 @@ def _view_state(
         timeline_visible = dict(monitor_visible)
     return TimelineViewState(
         layer_z_order=order,
+        slot_stems={
+            slot: DEFAULT_STEM_FOR_SLOT.get(slot, slot)  # type: ignore[arg-type]
+            for slot in order
+        },
         cues=cue_list,
         defaults=default_map,
         position_sec=position_sec,
@@ -72,8 +77,8 @@ def _view_state(
         focus_row=focus_row,
         monitor_visible=monitor_visible,
         timeline_visible=timeline_visible,
-        override_stems=set(override_stems or ()),
-        armed_stems=set(armed_stems or ()),
+        override_slots=set(override_slots or ()),
+        armed_slots=set(armed_slots or ()),
         recording=recording,
         record_start_sec=record_start_sec,
         record_baseline=dict(record_baseline or ()),
@@ -162,7 +167,7 @@ def test_rec_flash_visible_alternates_every_500ms() -> None:
 def test_armed_recording_monitor_eye_flashes_when_focused(monkeypatch) -> None:
     pygame.init()
     overlay = TimelineOverlay()
-    state = _view_state(armed_stems={"bass"}, recording=True, focus_row=1, submenu_focused=True)
+    state = _view_state(armed_slots={"layer_2"}, recording=True, focus_row=1, submenu_focused=True)
 
     monkeypatch.setattr(
         "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: True
@@ -176,7 +181,7 @@ def test_armed_recording_monitor_eye_flashes_when_focused(monkeypatch) -> None:
     surface_off = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface_off, state)
 
-    bass_layout = next(row for row in overlay.row_layout if row[5] == "bass")
+    bass_layout = next(row for row in overlay.row_layout if row[5] == "layer_2")
     _, _, row_y, _, row_h, _ = bass_layout
     panel = overlay.panel_rect
     assert panel is not None
@@ -197,11 +202,11 @@ def test_armed_recording_monitor_eye_uses_override_bg_when_flash_on(monkeypatch)
     )
     pygame.init()
     overlay = TimelineOverlay()
-    state = _view_state(armed_stems={"bass"}, recording=True, focus_row=1, submenu_focused=True)
+    state = _view_state(armed_slots={"layer_2"}, recording=True, focus_row=1, submenu_focused=True)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, state)
 
-    bass_layout = next(row for row in overlay.row_layout if row[5] == "bass")
+    bass_layout = next(row for row in overlay.row_layout if row[5] == "layer_2")
     _, _, row_y, _, row_h, _ = bass_layout
     panel = overlay.panel_rect
     assert panel is not None
@@ -216,11 +221,11 @@ def test_armed_recording_monitor_eye_hides_override_bg_when_flash_off(monkeypatc
     )
     pygame.init()
     overlay = TimelineOverlay()
-    state = _view_state(armed_stems={"bass"}, recording=True, focus_row=1, submenu_focused=True)
+    state = _view_state(armed_slots={"layer_2"}, recording=True, focus_row=1, submenu_focused=True)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, state)
 
-    bass_layout = next(row for row in overlay.row_layout if row[5] == "bass")
+    bass_layout = next(row for row in overlay.row_layout if row[5] == "layer_2")
     _, _, row_y, _, row_h, _ = bass_layout
     panel = overlay.panel_rect
     assert panel is not None
@@ -245,11 +250,11 @@ def test_armed_recording_abbrev_flashes_with_rec(monkeypatch) -> None:
     )
     pygame.init()
     overlay = TimelineOverlay()
-    state = _view_state(armed_stems={"bass"}, recording=True, focus_row=0, submenu_focused=True)
+    state = _view_state(armed_slots={"layer_2"}, recording=True, focus_row=0, submenu_focused=True)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, state)
 
-    bass_layout = next(row for row in overlay.row_layout if row[5] == "bass")
+    bass_layout = next(row for row in overlay.row_layout if row[5] == "layer_2")
     _, _, row_y, _, row_h, _ = bass_layout
     flash_on = _abbrev_bg_pixel(surface, overlay, row_y, row_h)
 
@@ -267,15 +272,15 @@ def test_armed_recording_abbrev_flashes_with_rec(monkeypatch) -> None:
 def test_armed_not_recording_abbrev_always_red() -> None:
     pygame.init()
     overlay = TimelineOverlay()
-    armed_state = _view_state(armed_stems={"bass"}, recording=False, focus_row=0)
+    armed_state = _view_state(armed_slots={"layer_2"}, recording=False, focus_row=0)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, armed_state)
 
-    bass_layout = next(row for row in overlay.row_layout if row[5] == "bass")
+    bass_layout = next(row for row in overlay.row_layout if row[5] == "layer_2")
     _, _, row_y, _, row_h, _ = bass_layout
     armed_color = _abbrev_bg_pixel(surface, overlay, row_y, row_h)
 
-    _draw(overlay, surface, _view_state(armed_stems=set(), recording=False, focus_row=0))
+    _draw(overlay, surface, _view_state(armed_slots=set(), recording=False, focus_row=0))
     unarmed_color = _abbrev_bg_pixel(surface, overlay, row_y, row_h)
 
     assert armed_color[0] > unarmed_color[0] + 40
@@ -285,11 +290,11 @@ def test_armed_not_recording_abbrev_always_red() -> None:
 def test_unarmed_recording_monitor_eye_not_override_bg() -> None:
     pygame.init()
     overlay = TimelineOverlay()
-    state = _view_state(armed_stems={"bass"}, recording=True)
+    state = _view_state(armed_slots={"layer_2"}, recording=True)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, state)
 
-    drums_layout = next(row for row in overlay.row_layout if row[5] == "drums")
+    drums_layout = next(row for row in overlay.row_layout if row[5] == "layer_1")
     _, _, row_y, _, row_h, _ = drums_layout
     panel = overlay.panel_rect
     assert panel is not None
@@ -302,8 +307,8 @@ def test_override_armed_recording_monitor_eye_flashes(monkeypatch) -> None:
     pygame.init()
     overlay = TimelineOverlay()
     state = _view_state(
-        armed_stems={"bass"},
-        override_stems={"bass"},
+        armed_slots={"layer_2"},
+        override_slots={"layer_2"},
         recording=True,
         focus_row=1,
         submenu_focused=True,
@@ -321,7 +326,7 @@ def test_override_armed_recording_monitor_eye_flashes(monkeypatch) -> None:
     surface_off = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface_off, state)
 
-    bass_layout = next(row for row in overlay.row_layout if row[5] == "bass")
+    bass_layout = next(row for row in overlay.row_layout if row[5] == "layer_2")
     _, _, row_y, _, row_h, _ = bass_layout
     panel = overlay.panel_rect
     assert panel is not None
@@ -336,14 +341,14 @@ def test_override_armed_recording_monitor_eye_flashes(monkeypatch) -> None:
     assert flash_on != flash_off
 
 
-def test_override_stems_use_override_bg_on_monitor_eye() -> None:
+def test_override_slots_use_override_bg_on_monitor_eye() -> None:
     pygame.init()
     overlay = TimelineOverlay()
-    state = _view_state(override_stems={"bass"}, focus_row=1)
+    state = _view_state(override_slots={"layer_2"}, focus_row=1)
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, state)
 
-    bass_layout = next(row for row in overlay.row_layout if row[5] == "bass")
+    bass_layout = next(row for row in overlay.row_layout if row[5] == "layer_2")
     _, _, row_y, _, row_h, _ = bass_layout
     panel = overlay.panel_rect
     assert panel is not None
@@ -356,32 +361,32 @@ def test_recording_baseline_does_not_draw_cue_tick() -> None:
     pygame.init()
     overlay = TimelineOverlay()
     state = _view_state(
-        cues=[TimelineCue(t=0.0, layers={"drums": False})],
+        cues=[TimelineCue(t=0.0, layers={"layer_1": False})],
         position_sec=10.0,
-        armed_stems={"drums"},
+        armed_slots={"layer_1"},
         recording=True,
         record_start_sec=10.0,
-        record_baseline={"drums": True},
-        monitor_visible={"drums": True, "bass": True, "vocals": True, "other": True},
+        record_baseline={"layer_1": True},
+        monitor_visible={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, state)
 
-    assert bar_tick_times_for_row(state, "drums") == [0.0]
+    assert bar_tick_times_for_row(state, "layer_1") == [0.0]
 
 
 def test_draw_dual_eye_state_does_not_crash() -> None:
     pygame.init()
     overlay = TimelineOverlay()
     state = _view_state(
-        cues=[TimelineCue(t=25.0, layers={"drums": False})],
+        cues=[TimelineCue(t=25.0, layers={"layer_1": False})],
         position_sec=25.0,
         focus_row=1,
-        armed_stems={"bass"},
+        armed_slots={"layer_2"},
         recording=True,
-        monitor_visible={"drums": True, "bass": False, "vocals": True, "other": True},
-        timeline_visible={"drums": False, "bass": True, "vocals": True, "other": True},
-        override_stems={"drums"},
+        monitor_visible={"layer_1": True, "layer_2": False, "layer_3": True, "layer_4": True},
+        timeline_visible={"layer_1": False, "layer_2": True, "layer_3": True, "layer_4": True},
+        override_slots={"layer_1"},
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, state)
@@ -389,18 +394,18 @@ def test_draw_dual_eye_state_does_not_crash() -> None:
 
 
 def test_visibility_segments_default_only() -> None:
-    defaults = {"drums": True, "bass": False, "vocals": True, "other": True}
-    segments = visibility_segments([], defaults, "bass", 60.0)
+    defaults = {"layer_1": True, "layer_2": False, "layer_3": True, "layer_4": True}
+    segments = visibility_segments([], defaults, "layer_2", 60.0)
     assert segments == [(0.0, 60.0, False)]
 
 
 def test_visibility_segments_from_cues() -> None:
-    defaults = {stem: True for stem in STEM_NAMES}
+    defaults = {slot: True for slot in LAYER_SLOTS}
     cues = [
-        TimelineCue(t=10.0, layers={"drums": False}),
-        TimelineCue(t=30.0, layers={"drums": True}),
+        TimelineCue(t=10.0, layers={"layer_1": False}),
+        TimelineCue(t=30.0, layers={"layer_1": True}),
     ]
-    segments = visibility_segments(cues, defaults, "drums", 60.0)
+    segments = visibility_segments(cues, defaults, "layer_1", 60.0)
     assert segments == [
         (0.0, 10.0, True),
         (10.0, 30.0, False),
@@ -409,39 +414,39 @@ def test_visibility_segments_from_cues() -> None:
 
 
 def test_visibility_segments_other_stem_unchanged_across_unrelated_cue() -> None:
-    defaults = {stem: True for stem in STEM_NAMES}
-    cues = [TimelineCue(t=5.0, layers={"drums": False})]
-    segments = visibility_segments(cues, defaults, "bass", 20.0)
+    defaults = {slot: True for slot in LAYER_SLOTS}
+    cues = [TimelineCue(t=5.0, layers={"layer_1": False})]
+    segments = visibility_segments(cues, defaults, "layer_2", 20.0)
     assert segments == [(0.0, 5.0, True), (5.0, 20.0, True)]
 
 
 def test_unique_cue_times_clamps_to_duration() -> None:
     cues = [
-        TimelineCue(t=-1.0, layers={"drums": False}),
-        TimelineCue(t=5.0, layers={"bass": False}),
-        TimelineCue(t=50.0, layers={"vocals": False}),
+        TimelineCue(t=-1.0, layers={"layer_1": False}),
+        TimelineCue(t=5.0, layers={"layer_2": False}),
+        TimelineCue(t=50.0, layers={"layer_3": False}),
     ]
     assert unique_cue_times(cues, 10.0) == [5.0]
 
 
 def test_cue_times_for_stem_skips_show_tick_false() -> None:
     cues = [
-        TimelineCue(t=5.0, layers={"drums": False}),
-        TimelineCue(t=10.0, layers={"drums": True}, show_tick=False),
+        TimelineCue(t=5.0, layers={"layer_1": False}),
+        TimelineCue(t=10.0, layers={"layer_1": True}, show_tick=False),
     ]
-    assert cue_times_for_stem(cues, "drums", 30.0) == [5.0]
+    assert cue_times_for_stem(cues, "layer_1", 30.0) == [5.0]
 
 
 def test_cue_times_for_stem_only_includes_relevant_layers() -> None:
     cues = [
-        TimelineCue(t=5.0, layers={"drums": False}),
-        TimelineCue(t=15.0, layers={"bass": False, "vocals": True}),
-        TimelineCue(t=25.0, layers={"other": False}),
+        TimelineCue(t=5.0, layers={"layer_1": False}),
+        TimelineCue(t=15.0, layers={"layer_2": False, "layer_3": True}),
+        TimelineCue(t=25.0, layers={"layer_4": False}),
     ]
-    assert cue_times_for_stem(cues, "drums", 30.0) == [5.0]
-    assert cue_times_for_stem(cues, "bass", 30.0) == [15.0]
-    assert cue_times_for_stem(cues, "vocals", 30.0) == [15.0]
-    assert cue_times_for_stem(cues, "other", 30.0) == [25.0]
+    assert cue_times_for_stem(cues, "layer_1", 30.0) == [5.0]
+    assert cue_times_for_stem(cues, "layer_2", 30.0) == [15.0]
+    assert cue_times_for_stem(cues, "layer_3", 30.0) == [15.0]
+    assert cue_times_for_stem(cues, "layer_4", 30.0) == [25.0]
 
 
 def test_stem_labels_use_abbreviations() -> None:
@@ -475,10 +480,10 @@ def test_draw_does_not_crash() -> None:
     pygame.init()
     overlay = TimelineOverlay()
     state = _view_state(
-        cues=[TimelineCue(t=25.0, layers={"drums": False})],
+        cues=[TimelineCue(t=25.0, layers={"layer_1": False})],
         position_sec=25.0,
         focus_row=1,
-        armed_stems={"bass"},
+        armed_slots={"layer_2"},
         recording=True,
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
@@ -505,13 +510,13 @@ def test_draw_skipped_when_disabled() -> None:
 def test_armed_row_layout_recorded() -> None:
     pygame.init()
     overlay = TimelineOverlay()
-    state = _view_state(armed_stems={"drums"}, layer_z_order=list(STEM_NAMES))
+    state = _view_state(armed_slots={"layer_1"}, layer_z_order=list(LAYER_SLOTS))
     surface = pygame.Surface((800, 400), pygame.SRCALPHA)
     _draw(overlay, surface, state)
 
-    drums_layout = next(row for row in overlay.row_layout if row[5] == "drums")
+    drums_layout = next(row for row in overlay.row_layout if row[5] == "layer_1")
     row_index, x, y, w, h, stem = drums_layout
-    assert stem == "drums"
+    assert stem == "layer_1"
     assert row_index == 0
     assert w > 0 and h > 0
     assert overlay.panel_rect is not None
@@ -520,11 +525,11 @@ def test_armed_row_layout_recorded() -> None:
 def test_focus_row_index_matches_stem() -> None:
     pygame.init()
     overlay = TimelineOverlay()
-    state = _view_state(focus_row=2, layer_z_order=list(STEM_NAMES))
+    state = _view_state(focus_row=2, layer_z_order=list(LAYER_SLOTS))
     surface = pygame.Surface((800, 400), pygame.SRCALPHA)
     _draw(overlay, surface, state)
 
-    vocals_layout = next(row for row in overlay.row_layout if row[5] == "vocals")
+    vocals_layout = next(row for row in overlay.row_layout if row[5] == "layer_3")
     assert vocals_layout[0] == 2
     assert overlay.panel_rect is not None
 

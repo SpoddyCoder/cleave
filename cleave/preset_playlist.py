@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from cleave.config import CleaveConfig
-from cleave.extract import STEM_NAMES
+from cleave.config_schema import LAYER_SLOTS
 
 if TYPE_CHECKING:
     from cleave.projectm import ProjectM
@@ -222,15 +222,10 @@ def to_config_relative(path: Path, preset_root: Path) -> str:
     return path.resolve().relative_to(preset_root.resolve()).as_posix()
 
 
-def _layer_names(cfg: CleaveConfig) -> tuple[str, ...]:
-    if all(name in cfg.layers for name in STEM_NAMES):
-        return STEM_NAMES
-    return tuple(cfg.layers.keys())
-
-
 def scan_all_layers(cfg: CleaveConfig) -> dict[str, PresetPlaylist]:
     """Scan one preset playlist per configured layer."""
     return {
-        name: scan_preset_playlist(cfg.layers[name].preset)
-        for name in _layer_names(cfg)
+        slot: scan_preset_playlist(cfg.layers[slot].preset)
+        for slot in LAYER_SLOTS
+        if slot in cfg.layers
     }

@@ -9,6 +9,9 @@ from pathlib import Path
 import numpy as np
 
 _META_KEYS = frozenset({"version", "sample_rate_hz", "duration_sec"})
+SIGNALS_VERSION = 2
+_EXPECTED_STEMS = frozenset({"drums", "bass", "vocals", "other", "full_mix"})
+_FULL_MIX_KEYS = frozenset({"onset_strength", "rms"})
 
 
 def resolve_signals_path(path: Path) -> Path:
@@ -73,6 +76,32 @@ class Signals:
         return self.normalized("drums", "onset_strength")
 
 
+def _validate_signals_data(data: dict, stems: dict[str, dict[str, np.ndarray]]) -> None:
+    version = data.get("version")
+    if version != SIGNALS_VERSION:
+        raise ValueError(
+            f"unsupported signals.json version {version!r}; "
+            f"re-run: python -m cleave analyse <project>"
+        )
+
+    missing_stems = _EXPECTED_STEMS - set(stems)
+    if missing_stems:
+        missing = ", ".join(sorted(missing_stems))
+        raise ValueError(f"signals.json missing stem section(s): {missing}")
+
+    if "mix_onset_strength" in stems.get("drums", {}):
+        raise ValueError(
+            "signals.json drums.mix_onset_strength is obsolete; "
+            "re-run: python -m cleave analyse <project>"
+        )
+
+    full_mix_keys = set(stems.get("full_mix", {}))
+    missing_full_mix = _FULL_MIX_KEYS - full_mix_keys
+    if missing_full_mix:
+        missing = ", ".join(sorted(missing_full_mix))
+        raise ValueError(f"signals.json full_mix missing key(s): {missing}")
+
+
 def load_signals(path: Path) -> Signals:
     signals_path = resolve_signals_path(path)
     if not signals_path.is_file():
@@ -88,6 +117,8 @@ def load_signals(path: Path) -> Signals:
         stems[stem_name] = {
             key: _list_to_array(values) for key, values in signals.items()
         }
+
+    _validate_signals_data(data, stems)
 
     return Signals(
         sample_rate_hz=float(data["sample_rate_hz"]),

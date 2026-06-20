@@ -9,7 +9,7 @@ from pathlib import Path
 import pygame
 
 from cleave.config import CleaveConfig, LayerConfig, PathsConfig, VisualizerConfig
-from cleave.extract import STEM_NAMES
+from cleave.config_schema import DEFAULT_STEM_FOR_SLOT, LAYER_SLOTS
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.controls import TuningControls
 from cleave.viz.live_layer_bindings import LiveLayerBindings
@@ -69,6 +69,7 @@ def noop_layer_bindings(**overrides: Callable) -> LiveLayerBindings:
     base = LiveLayerBindings(
         on_preset_change=lambda _stem, _playlist: None,
         on_blend_change=lambda _stem, _blend: None,
+        on_stem_change=lambda _slot, _stem: None,
         on_opacity_change=lambda _stem, _pct: None,
         on_layer_enabled_change=lambda _stem, _enabled: None,
         on_timeline_enabled_change=lambda: None,
@@ -82,7 +83,7 @@ def noop_layer_bindings(**overrides: Callable) -> LiveLayerBindings:
 
 
 def make_test_cfg(
-    stems: tuple[str, ...] = ("drums", "bass"),
+    slots: tuple[str, ...] = ("layer_1", "layer_2"),
     *,
     preset_root: Path | None = None,
     config_path: Path | None = None,
@@ -91,32 +92,36 @@ def make_test_cfg(
     return CleaveConfig(
         paths=PathsConfig(preset_root=root, texture_paths=()),
         layers={
-            name: LayerConfig(preset=root / name / "preset-0.milk")
-            for name in STEM_NAMES
+            slot: LayerConfig(
+                preset=root / slot / "preset-0.milk",
+                stem=DEFAULT_STEM_FOR_SLOT.get(slot, "drums"),
+            )
+            for slot in LAYER_SLOTS
         },
-        layer_z_order=stems,
+        layer_z_order=slots,
         visualizer=VisualizerConfig(),
         config_path=config_path or Path("/tmp/test/cleave.config.yaml"),
     )
 
 
 def make_controls(
-    stems: tuple[str, ...] = ("drums", "bass"),
+    slots: tuple[str, ...] = ("layer_1", "layer_2"),
     *,
     launch_config_path: Path | None = DEFAULT_ACTIVE_CONFIG,
     repo_root_example: Path = REPO_ROOT_EXAMPLE,
 ) -> TuningControls:
     preset_root = Path("/tmp/presets")
-    cfg = make_test_cfg(stems, preset_root=preset_root)
+    cfg = make_test_cfg(slots, preset_root=preset_root)
     session = TuningSession(
-        layer_z_order=list(stems),
+        layer_z_order=list(slots),
         layers={
-            stem: LayerRuntime(
-                playlist=make_playlist(stem),
-                browse_floor=preset_root / stem,
+            slot: LayerRuntime(
+                playlist=make_playlist(slot),
+                browse_floor=preset_root / slot,
+                stem=DEFAULT_STEM_FOR_SLOT.get(slot, "drums"),
                 opacity_pct=50,
             )
-            for stem in stems
+            for slot in slots
         },
     )
     return TuningControls(

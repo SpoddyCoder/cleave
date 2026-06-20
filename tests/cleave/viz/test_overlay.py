@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pygame
 
+from cleave.config_schema import DEFAULT_STEM_FOR_SLOT, LAYER_SLOTS
 from cleave.extract import STEM_NAMES
 from cleave.viz.material_icons import row_icon_prefix_width
 from cleave.viz.row_semantics import RowKind
@@ -15,8 +16,10 @@ from cleave.viz.overlay import (
     TuningOverlay,
     TuningViewState,
     _row_bg_color,
+    _row_text,
     _row_value_color,
     build_row_layout,
+    find_row,
     find_row_by_kind,
     fit_row_text,
     navigable_row_indices,
@@ -36,6 +39,7 @@ from cleave.viz.theme import (
     HIGHLIGHT_MUTED,
     HOLD_IDLE_SEC,
     LABEL,
+    LOCKED,
     PANEL_CONTENT_MAX_WIDTH,
     SCROLLBAR_CONTENT_GAP,
     SCROLLBAR_TRACK,
@@ -48,10 +52,10 @@ from cleave.viz.timeline_overlay import timeline_viewport_reserve_px
 
 def _effects_expanded_view_state() -> TuningViewState:
     tracks = {
-        stem: TrackBlock(
-            stem=stem,
-            preset_dir_label=f"{stem}/dir",
-            preset_label=f"{stem}/preset.milk",
+        slot: TrackBlock(
+            stem=DEFAULT_STEM_FOR_SLOT[slot],
+            preset_dir_label=f"{slot}/dir",
+            preset_label=f"{slot}/preset.milk",
             blend_mode="add",
             opacity_pct=50,
             beat_sensitivity=1.0,
@@ -59,10 +63,10 @@ def _effects_expanded_view_state() -> TuningViewState:
             effects_expanded=True,
             expanded=True,
         )
-        for stem in STEM_NAMES
+        for slot in LAYER_SLOTS
     }
     return TuningViewState(
-        layer_z_order=STEM_NAMES,
+        layer_z_order=LAYER_SLOTS,
         tracks=tracks,
         paused=False,
         position_sec=0.0,
@@ -284,8 +288,8 @@ def test_preset_rows_fit_within_scrollbar_content_width() -> None:
     state = _effects_expanded_view_state()
     long_dir = "presets/very/long/directory/path/for/testing (12/99)"
     long_preset = "presets/very/long/filename/for/testing-preset.milk (34/99)"
-    state.tracks["drums"].preset_dir_label = long_dir
-    state.tracks["drums"].preset_label = long_preset
+    state.tracks["layer_1"].preset_dir_label = long_dir
+    state.tracks["layer_1"].preset_label = long_preset
 
     metrics = _panel_scroll_metrics(overlay, state)
     assert metrics.show_scrollbar
@@ -349,9 +353,9 @@ def test_solo_visibility_icon_disabled_stem_uses_value_not_disabled() -> None:
 
 def _minimal_view_state(**kwargs: object) -> TuningViewState:
     defaults: dict[str, object] = {
-        "layer_z_order": ("drums",),
+        "layer_z_order": ("layer_1",),
         "tracks": {
-            "drums": TrackBlock(
+            "layer_1": TrackBlock(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -370,6 +374,86 @@ def _minimal_view_state(**kwargs: object) -> TuningViewState:
     }
     defaults.update(kwargs)
     return TuningViewState(**defaults)  # type: ignore[arg-type]
+
+
+def test_track_header_uses_stem_display_not_slot_key() -> None:
+    state = _minimal_view_state(
+        tracks={
+            "layer_1": TrackBlock(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+            )
+        },
+    )
+    header_row = find_row_by_kind(state, RowKind.TRACK_HEADER)
+    text = _row_text(state, header_row)
+    assert "DRUMS" in text
+    assert "LAYER_1" not in text.upper()
+
+
+def test_track_header_full_mix_shows_mix() -> None:
+    state = _minimal_view_state(
+        tracks={
+            "layer_1": TrackBlock(
+                stem="full_mix",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+            )
+        },
+    )
+    header_row = find_row_by_kind(state, RowKind.TRACK_HEADER)
+    text = _row_text(state, header_row)
+    assert "MIX" in text
+    assert "FULL_MIX" not in text.upper()
+
+
+def test_track_stem_row_text() -> None:
+    state = _minimal_view_state(
+        tracks={
+            "layer_1": TrackBlock(
+                stem="full_mix",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                expanded=True,
+            )
+        },
+    )
+    stem_row = find_row(state, "layer_1", RowKind.TRACK_STEM)
+    assert _row_text(state, stem_row) == "└─ stem: full-mix"
+
+
+def test_locked_stem_row_stays_navigable_and_not_locked_color() -> None:
+    state = _minimal_view_state(
+        tracks={
+            "layer_1": TrackBlock(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                expanded=True,
+                locked=True,
+            )
+        },
+    )
+    stem_row = find_row(state, "layer_1", RowKind.TRACK_STEM)
+    assert stem_row in navigable_row_indices(state)
+    assert _row_value_color(state, stem_row) != LOCKED
 
 
 def test_timeline_layer_hint_when_timeline_enabled() -> None:
@@ -478,9 +562,9 @@ def test_draw_track_header_with_solo_eye() -> None:
     pygame.init()
     overlay = TuningOverlay()
     state = TuningViewState(
-        layer_z_order=("drums",),
+        layer_z_order=("layer_1",),
         tracks={
-            "drums": TrackBlock(
+            "layer_1": TrackBlock(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -498,7 +582,7 @@ def test_draw_track_header_with_solo_eye() -> None:
         move_mode_stem=None,
         toast_message=None,
         toast_remaining_sec=0.0,
-        solo_stem="drums",
+        solo_stem="layer_1",
         solo_active=True,
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
@@ -509,16 +593,16 @@ def test_draw_track_header_with_solo_eye() -> None:
     header_row = next(
         i
         for i in visible_row_indices(state)
-        if row_kind(state, i) == RowKind.TRACK_HEADER and row_stem(state, i) == "drums"
+        if row_kind(state, i) == RowKind.TRACK_HEADER and row_stem(state, i) == "layer_1"
     )
-    assert state.solo_stem == "drums"
+    assert state.solo_stem == "layer_1"
     assert header_row == find_row_by_kind(state, RowKind.TRACK_HEADER)
 
 
 def test_disabled_track_focus_uses_muted_highlight() -> None:
     state = _minimal_view_state(
         tracks={
-            "drums": TrackBlock(
+            "layer_1": TrackBlock(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",

@@ -12,6 +12,7 @@ from unittest.mock import MagicMock, patch
 import pygame
 import pytest
 
+from cleave.config_schema import DEFAULT_STEM_FOR_SLOT, LAYER_SLOTS
 from cleave.preset_playlist import (
     PresetPlaylist,
     directory_display,
@@ -104,27 +105,28 @@ _DEFAULT_ACTIVE_CONFIG = Path("/tmp/projects/my-track/active.yaml")
 
 
 def _mutate_dirty(controls: TuningControls) -> None:
-    controls.session.layers["drums"].opacity_pct = 60
+    controls.session.layers["layer_1"].opacity_pct = 60
 
 
 def _make_controls(
-    stems: tuple[str, ...] = ("drums", "bass"),
+    slots: tuple[str, ...] = ("layer_1", "layer_2"),
     *,
     timeline_enabled: bool = False,
     launch_config_path: Path | None = _DEFAULT_ACTIVE_CONFIG,
     repo_root_example: Path = _REPO_ROOT_EXAMPLE,
 ) -> TuningControls:
     preset_root = Path("/tmp/presets")
-    cfg = make_test_cfg(stems, preset_root=preset_root, config_path=launch_config_path or _DEFAULT_ACTIVE_CONFIG)
+    cfg = make_test_cfg(slots, preset_root=preset_root, config_path=launch_config_path or _DEFAULT_ACTIVE_CONFIG)
     session = TuningSession(
-        layer_z_order=list(stems),
+        layer_z_order=list(slots),
         layers={
-            stem: LayerRuntime(
-                playlist=_make_playlist(stem),
-                browse_floor=preset_root / stem,
+            slot: LayerRuntime(
+                playlist=_make_playlist(slot),
+                browse_floor=preset_root / slot,
+                stem=DEFAULT_STEM_FOR_SLOT.get(slot, "drums"),
                 opacity_pct=50,
             )
-            for stem in stems
+            for slot in slots
         },
         timeline=TimelineRuntime(enabled=timeline_enabled),
     )
@@ -181,7 +183,7 @@ def test_allow_overwrite_for_path_hides_repo_root_template_only() -> None:
 
 
 def test_focus_navigation_wraps() -> None:
-    controls = _make_controls(("a", "b"))
+    controls = _make_controls(("layer_1", "layer_2"))
     view = controls.build_view_state(paused=False)
     navigable = navigable_row_indices(view)
     transport_row = find_row_by_kind(view, RowKind.TRANSPORT)
@@ -200,65 +202,65 @@ def test_focus_navigation_wraps() -> None:
 
 
 def test_opacity_clamps() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    opacity_row = _row(view, "drums", RowKind.TRACK_OPACITY)
+    opacity_row = _row(view, "layer_1", RowKind.TRACK_OPACITY)
     controls.focus_index = opacity_row
 
     for _ in range(60):
         controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.session.layers["drums"].opacity_pct == 100
+    assert controls.session.layers["layer_1"].opacity_pct == 100
 
     for _ in range(120):
         controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert controls.session.layers["drums"].opacity_pct == 0
+    assert controls.session.layers["layer_1"].opacity_pct == 0
 
 
 def test_header_toggles_enabled() -> None:
     enabled_events: list[tuple[str, bool]] = []
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     controls._layer_bindings = noop_layer_bindings(
         on_layer_enabled_change=lambda stem, on: enabled_events.append((stem, on))
     )
 
     view = controls.build_view_state(paused=False)
-    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
+    header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     controls.focus_index = header_row
-    assert controls.session.layers["drums"].enabled is True
+    assert controls.session.layers["layer_1"].enabled is True
 
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
-    assert controls.session.layers["drums"].enabled is False
-    assert enabled_events == [("drums", False)]
-    assert controls.session.layers["drums"].opacity_pct == 50
+    assert controls.session.layers["layer_1"].enabled is False
+    assert enabled_events == [("layer_1", False)]
+    assert controls.session.layers["layer_1"].opacity_pct == 50
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
-    assert controls.session.layers["drums"].enabled is True
-    assert enabled_events == [("drums", False), ("drums", True)]
-    assert controls.session.layers["drums"].opacity_pct == 50
+    assert controls.session.layers["layer_1"].enabled is True
+    assert enabled_events == [("layer_1", False), ("layer_1", True)]
+    assert controls.session.layers["layer_1"].opacity_pct == 50
 
 
 def test_navigation_skips_sub_rows_when_collapsed() -> None:
-    controls = _make_controls(("drums", "bass"))
-    controls.session.layers["drums"].enabled = False
-    controls.session.layers["drums"].expanded = False
+    controls = _make_controls(("layer_1", "layer_2"))
+    controls.session.layers["layer_1"].enabled = False
+    controls.session.layers["layer_1"].expanded = False
     view = controls.build_view_state(paused=False)
 
     drums_header = next(
         i
         for i in range(12)
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "drums"
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "layer_1"
     )
     bass_header = next(
         i
         for i in range(12)
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "bass"
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "layer_2"
     )
     navigable = navigable_row_indices(view)
     assert drums_header in navigable
     assert bass_header in navigable
     for i in navigable:
         stem = row_stem(view, i)
-        if stem == "drums":
+        if stem == "layer_1":
             assert row_kind(view, i) == RowKind.TRACK_HEADER
 
     controls.focus_index = drums_header
@@ -267,11 +269,11 @@ def test_navigation_skips_sub_rows_when_collapsed() -> None:
 
 
 def test_re_enable_without_expanding() -> None:
-    controls = _make_controls(("drums",))
-    controls.session.layers["drums"].enabled = False
-    controls.session.layers["drums"].expanded = False
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].enabled = False
+    controls.session.layers["layer_1"].expanded = False
     view = controls.build_view_state(paused=False)
-    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
+    header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     render_overlay_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
     transport_row = next(
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.TRANSPORT
@@ -296,26 +298,26 @@ def test_re_enable_without_expanding() -> None:
 
     controls.focus_index = header_row
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
-    assert controls.session.layers["drums"].enabled is True
-    assert controls.session.layers["drums"].expanded is False
+    assert controls.session.layers["layer_1"].enabled is True
+    assert controls.session.layers["layer_1"].expanded is False
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_index == render_overlay_row
 
 
 def test_header_collapses_and_expands_sub_rows() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
-    preset_dir_row = _row(view, "drums", RowKind.TRACK_PRESET_DIR)
+    header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
+    preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
     controls.focus_index = header_row
 
-    assert controls.session.layers["drums"].expanded is False
+    assert controls.session.layers["layer_1"].expanded is False
     assert preset_dir_row not in navigable_row_indices(view)
     assert preset_dir_row not in visible_row_indices(view)
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.session.layers["drums"].expanded is True
+    assert controls.session.layers["layer_1"].expanded is True
 
     view = controls.build_view_state(paused=False)
     assert preset_dir_row in navigable_row_indices(view)
@@ -323,10 +325,10 @@ def test_header_collapses_and_expands_sub_rows() -> None:
 
 
 def test_disable_auto_collapses_sub_rows() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
-    preset_dir_row = _row(view, "drums", RowKind.TRACK_PRESET_DIR)
+    header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
+    preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
     controls.focus_index = header_row
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     controls.handle_keydown(_keydown(pygame.K_DOWN))
@@ -334,8 +336,8 @@ def test_disable_auto_collapses_sub_rows() -> None:
 
     controls.focus_index = header_row
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
-    assert controls.session.layers["drums"].enabled is False
-    assert controls.session.layers["drums"].expanded is False
+    assert controls.session.layers["layer_1"].enabled is False
+    assert controls.session.layers["layer_1"].expanded is False
     assert controls.focus_index == header_row
 
     view = controls.build_view_state(paused=False)
@@ -344,18 +346,18 @@ def test_disable_auto_collapses_sub_rows() -> None:
 
 
 def test_disabled_track_can_expand_sub_rows() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
-    preset_dir_row = _row(view, "drums", RowKind.TRACK_PRESET_DIR)
+    header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
+    preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
     controls.focus_index = header_row
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
-    assert controls.session.layers["drums"].enabled is False
-    assert controls.session.layers["drums"].expanded is False
+    assert controls.session.layers["layer_1"].enabled is False
+    assert controls.session.layers["layer_1"].expanded is False
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.session.layers["drums"].enabled is False
-    assert controls.session.layers["drums"].expanded is True
+    assert controls.session.layers["layer_1"].enabled is False
+    assert controls.session.layers["layer_1"].expanded is True
 
     view = controls.build_view_state(paused=False)
     assert preset_dir_row in visible_row_indices(view)
@@ -366,105 +368,105 @@ def test_disabled_track_can_expand_sub_rows() -> None:
 
 
 def test_beat_sensitivity_clamps() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    beat_row = _row(view, "drums", RowKind.TRACK_BEAT)
+    beat_row = _row(view, "layer_1", RowKind.TRACK_BEAT)
     controls.focus_index = beat_row
 
     for _ in range(400):
         controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.session.layers["drums"].beat_sensitivity == pytest.approx(5.0)
+    assert controls.session.layers["layer_1"].beat_sensitivity == pytest.approx(5.0)
 
     for _ in range(500):
         controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert controls.session.layers["drums"].beat_sensitivity == pytest.approx(0.0)
+    assert controls.session.layers["layer_1"].beat_sensitivity == pytest.approx(0.0)
 
 
 def test_opacity_ctrl_step_is_ten_percent() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    opacity_row = _row(view, "drums", RowKind.TRACK_OPACITY)
+    opacity_row = _row(view, "layer_1", RowKind.TRACK_OPACITY)
     controls.focus_index = opacity_row
-    controls.session.layers["drums"].opacity_pct = 50
+    controls.session.layers["layer_1"].opacity_pct = 50
 
     controls.handle_keydown(
         _keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL),
     )
-    assert controls.session.layers["drums"].opacity_pct == 60
+    assert controls.session.layers["layer_1"].opacity_pct == 60
 
     controls.handle_keydown(
         _keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL),
     )
-    assert controls.session.layers["drums"].opacity_pct == 50
+    assert controls.session.layers["layer_1"].opacity_pct == 50
 
 
 def test_move_mode_swaps_z_order() -> None:
-    controls = _make_controls(("drums", "bass", "vocals"))
+    controls = _make_controls(("layer_1", "layer_2", "layer_3"))
 
     view = controls.build_view_state(paused=False)
     header_row = next(
         i
         for i in range(15)
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "bass"
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "layer_2"
     )
     controls.focus_index = header_row
 
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
-    assert controls.move_mode_stem == "bass"
+    assert controls.move_mode_stem == "layer_2"
 
     assert controls.handle_keydown(_keydown(pygame.K_UP)) is True
-    assert controls.session.layer_z_order == ["bass", "drums", "vocals"]
+    assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
 
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
     assert controls.move_mode_stem is None
-    assert controls.session.layer_z_order == ["bass", "drums", "vocals"]
+    assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
     assert controls.config_dirty
 
 
 def test_move_mode_esc_cancels_without_applying() -> None:
-    controls = _make_controls(("drums", "bass", "vocals"))
+    controls = _make_controls(("layer_1", "layer_2", "layer_3"))
 
     view = controls.build_view_state(paused=False)
     header_row = next(
         i
         for i in range(15)
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "bass"
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "layer_2"
     )
     controls.focus_index = header_row
 
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     controls.handle_keydown(_keydown(pygame.K_UP))
-    assert controls.session.layer_z_order == ["bass", "drums", "vocals"]
+    assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
 
     assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
     assert controls.move_mode_stem is None
-    assert controls.session.layer_z_order == ["drums", "bass", "vocals"]
+    assert controls.session.layer_z_order == ["layer_1", "layer_2", "layer_3"]
     assert not controls.config_dirty
 
 
 def test_move_mode_backspace_cancels_without_applying() -> None:
-    controls = _make_controls(("drums", "bass", "vocals"))
+    controls = _make_controls(("layer_1", "layer_2", "layer_3"))
 
     view = controls.build_view_state(paused=False)
     header_row = next(
         i
         for i in range(15)
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "bass"
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "layer_2"
     )
     controls.focus_index = header_row
 
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.session.layer_z_order == ["drums", "vocals", "bass"]
+    assert controls.session.layer_z_order == ["layer_1", "layer_3", "layer_2"]
 
     assert controls.handle_keydown(_keydown(pygame.K_BACKSPACE)) is True
     assert controls.move_mode_stem is None
-    assert controls.session.layer_z_order == ["drums", "bass", "vocals"]
+    assert controls.session.layer_z_order == ["layer_1", "layer_2", "layer_3"]
     assert not controls.config_dirty
 
 
 def test_save_as_new_triggers_toast_without_blocking_input() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     save_row = _save_row(view)
     assert _row_text(view, save_row) == "SAVE CONFIG"
@@ -492,7 +494,7 @@ def test_save_as_new_triggers_toast_without_blocking_input() -> None:
 
 def test_config_header_shows_active_path() -> None:
     launch_path = Path("/tmp/projects/my-track/my-track.yaml")
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     controls._config_save._active_config_path = launch_path
     view = controls.build_view_state(paused=False)
     header_row = next(
@@ -504,7 +506,7 @@ def test_config_header_shows_active_path() -> None:
 
 def test_config_header_shows_asterisk_when_dirty() -> None:
     launch_path = Path("/tmp/projects/my-track/my-track.yaml")
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     controls._config_save._active_config_path = launch_path
     _mutate_dirty(controls)
     view = controls.build_view_state(paused=False)
@@ -518,16 +520,16 @@ def test_config_header_shows_asterisk_when_dirty() -> None:
 
 def test_blend_and_opacity_change_sets_dirty_save_clears() -> None:
     saved_path = Path("/tmp/projects/my-track/unnamed-2.yaml")
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     controls._config_save._on_save_new_config = lambda: saved_path
     assert not controls.config_dirty
 
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "drums", RowKind.TRACK_BLEND)
+    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_BLEND)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.config_dirty
 
-    controls.focus_index = _row(view, "drums", RowKind.TRACK_OPACITY)
+    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_OPACITY)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.config_dirty
 
@@ -541,7 +543,7 @@ def test_config_header_truncates_long_paths() -> None:
     long_path = Path(
         "/very/long/root/projects/my-track/nested/deep/unnamed-99.yaml"
     )
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     controls._config_save._active_config_path = long_path
     view = controls.build_view_state(paused=False)
     header_row = next(
@@ -561,9 +563,9 @@ def test_preset_row_truncates_long_filenames() -> None:
         "- Bitcore Tweak.milk (1/50)"
     )
     view = TuningViewState(
-        layer_z_order=("drums",),
+        layer_z_order=("layer_1",),
         tracks={
-            "drums": TrackBlock(
+            "layer_1": TrackBlock(
                 stem="drums",
                 preset_dir_label="short (1/1)",
                 preset_label=long_name,
@@ -582,7 +584,7 @@ def test_preset_row_truncates_long_filenames() -> None:
         toast_message=None,
         toast_remaining_sec=0.0,
     )
-    preset_row = _row(view, "drums", RowKind.TRACK_PRESET)
+    preset_row = _row(view, "layer_1", RowKind.TRACK_PRESET)
     font = _overlay_font()
     label = fit_row_text(font, view, preset_row)
     assert font.size(label)[0] <= PANEL_CONTENT_MAX_WIDTH - 16
@@ -599,11 +601,11 @@ def test_fit_row_text_config_and_preset_share_panel_width() -> None:
         "Phat_Zylot_Eo.S. rainbow bubble_mid3-starpoints_spirals_VE "
         "- Bitcore Tweak.milk (1/50)"
     )
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     controls._config_save._active_config_path = long_path
     view = controls.build_view_state(paused=False)
-    view.tracks["drums"] = TrackBlock(
-        stem="drums",
+    view.tracks["layer_1"] = TrackBlock(
+        stem="layer_1",
         preset_dir_label="short (1/1)",
         preset_label=long_name,
         blend_mode="black-key",
@@ -616,7 +618,7 @@ def test_fit_row_text_config_and_preset_share_panel_width() -> None:
     header_row = next(
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.CONFIG_HEADER
     )
-    preset_row = _row(view, "drums", RowKind.TRACK_PRESET)
+    preset_row = _row(view, "layer_1", RowKind.TRACK_PRESET)
     font = _overlay_font()
     config_label = fit_row_text(font, view, header_row)
     preset_label = fit_row_text(font, view, preset_row)
@@ -627,7 +629,7 @@ def test_fit_row_text_config_and_preset_share_panel_width() -> None:
 
 def test_save_as_new_updates_active_config_path() -> None:
     saved_path = Path("/tmp/projects/my-track/unnamed-2.yaml")
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     controls._config_save._on_save_new_config = lambda: saved_path
 
     view = controls.build_view_state(paused=False)
@@ -646,7 +648,7 @@ def test_save_as_new_updates_active_config_path() -> None:
 def test_save_as_new_enables_overwrite_from_root_template() -> None:
     saved_path = Path("/tmp/projects/my-track/unnamed-2.yaml")
     controls = _make_controls(
-        ("drums",),
+        ("layer_1",),
         launch_config_path=_REPO_ROOT_EXAMPLE,
         repo_root_example=_REPO_ROOT_EXAMPLE,
     )
@@ -668,7 +670,7 @@ def test_overwrite_after_save_uses_new_active_path() -> None:
     saved_path = Path("/tmp/projects/my-track/unnamed-1.yaml")
     writes: list[Path] = []
     controls = _make_controls(
-        ("drums",),
+        ("layer_1",),
         launch_config_path=_REPO_ROOT_EXAMPLE,
         repo_root_example=_REPO_ROOT_EXAMPLE,
     )
@@ -694,13 +696,13 @@ def test_overwrite_after_save_uses_new_active_path() -> None:
 
 def test_navigable_rows_without_overwrite() -> None:
     controls = _make_controls(
-        ("drums",),
+        ("layer_1",),
         launch_config_path=_REPO_ROOT_EXAMPLE,
         repo_root_example=_REPO_ROOT_EXAMPLE,
     )
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is False
-    assert row_count(view) == 14
+    assert row_count(view) == 15
 
     kinds = {row_kind(view, i) for i in range(row_count(view))}
     assert RowKind.CONFIG_HEADER in kinds
@@ -719,10 +721,10 @@ def test_navigable_rows_without_overwrite() -> None:
 
 
 def test_navigable_rows_with_overwrite() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is True
-    assert row_count(view) == 14
+    assert row_count(view) == 15
 
     save_row = _save_row(view)
     assert save_row in navigable_row_indices(view)
@@ -731,7 +733,7 @@ def test_navigable_rows_with_overwrite() -> None:
 def test_overwrite_shows_confirm_before_write() -> None:
     launch_path = Path("/tmp/custom/cleave.config.yaml")
     writes: list[Path] = []
-    controls = _make_controls(("drums",), launch_config_path=launch_path)
+    controls = _make_controls(("layer_1",), launch_config_path=launch_path)
     controls._config_save._on_overwrite_config = lambda path: (
         writes.append(path) or path.name
     )
@@ -769,7 +771,7 @@ def test_overwrite_shows_confirm_before_write() -> None:
 def test_overwrite_confirm_yes_writes_launch_path() -> None:
     launch_path = Path("/tmp/my-launch.cleave.config.yaml")
     writes: list[Path] = []
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     controls._config_save._active_config_path = launch_path
     controls._config_save._on_overwrite_config = lambda path: (
         writes.append(path) or path.name
@@ -795,7 +797,7 @@ def test_overwrite_confirm_yes_writes_launch_path() -> None:
 def test_overwrite_confirm_esc_dismisses() -> None:
     launch_path = Path("/tmp/custom/cleave.config.yaml")
     writes: list[Path] = []
-    controls = _make_controls(("drums",), launch_config_path=launch_path)
+    controls = _make_controls(("layer_1",), launch_config_path=launch_path)
     controls._config_save._on_overwrite_config = lambda path: (
         writes.append(path) or path.name
     )
@@ -811,7 +813,7 @@ def test_overwrite_confirm_esc_dismisses() -> None:
 
 
 def test_esc_during_confirm_does_not_quit() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     save_row = _save_row(view)
     controls.focus_index = save_row
@@ -828,12 +830,12 @@ def test_esc_requests_overlay_hide() -> None:
 
 
 def test_esc_in_move_mode_does_not_request_overlay_hide() -> None:
-    controls = _make_controls(("drums", "bass"))
+    controls = _make_controls(("layer_1", "layer_2"))
     view = controls.build_view_state(paused=False)
-    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
+    header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     controls.focus_index = header_row
     controls.handle_keydown(_keydown(pygame.K_RETURN))
-    assert controls.move_mode_stem == "drums"
+    assert controls.move_mode_stem == "layer_1"
     assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
     assert controls.move_mode_stem is None
     assert controls.consume_hide_overlay() is False
@@ -880,7 +882,7 @@ def test_track_header_icons_render() -> None:
 def test_track_header_text_omits_enabled_status() -> None:
     controls = _make_controls()
     view = controls.build_view_state(paused=False)
-    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
+    header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     text = _row_text(view, header_row)
     assert text.startswith("Layer ")
     assert "enabled" not in text.lower()
@@ -888,14 +890,14 @@ def test_track_header_text_omits_enabled_status() -> None:
 
 
 def test_track_header_expand_arrow() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
+    header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     assert _row_text(view, header_row).endswith(" ▶")
 
-    controls.session.layers["drums"].expanded = True
+    controls.session.layers["layer_1"].expanded = True
     view = controls.build_view_state(paused=False)
-    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
+    header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     assert _row_text(view, header_row).endswith(" ▼")
 
 
@@ -1285,7 +1287,7 @@ def test_timeline_submenu_vertical_navigation_repeats() -> None:
 
     controls = _make_controls(
         timeline_enabled=True,
-        stems=("drums", "bass", "vocals", "other"),
+        slots=("layer_1", "layer_2", "layer_3", "layer_4"),
     )
     controls.session.timeline.panel_open = True
     controls.session.timeline.submenu_focused = True
@@ -1389,7 +1391,7 @@ def test_render_timeline_submenu_entry_stops_repeat_on_keyup() -> None:
 
 
 def test_render_timeline_submenu_down_from_last_row_wraps_to_transport() -> None:
-    stems = ("drums", "bass", "vocals", "other")
+    stems = ("layer_1", "layer_2", "layer_3", "layer_4")
     controls = _make_controls(stems, timeline_enabled=True)
     view = controls.build_view_state(paused=False)
     transport_row = find_row_by_kind(view, RowKind.TRANSPORT)
@@ -1404,7 +1406,7 @@ def test_render_timeline_submenu_down_from_last_row_wraps_to_transport() -> None
 
 
 def test_render_timeline_submenu_up_from_transport_wraps_to_last_row() -> None:
-    stems = ("drums", "bass", "vocals", "other")
+    stems = ("layer_1", "layer_2", "layer_3", "layer_4")
     controls = _make_controls(stems, timeline_enabled=True)
     view = controls.build_view_state(paused=False)
     transport_row = find_row_by_kind(view, RowKind.TRANSPORT)
@@ -1420,7 +1422,7 @@ def test_render_timeline_submenu_up_from_transport_wraps_to_last_row() -> None:
 
 
 def test_render_timeline_panel_closed_wrap_unchanged() -> None:
-    controls = _make_controls(("drums", "bass"), timeline_enabled=True)
+    controls = _make_controls(("layer_1", "layer_2"), timeline_enabled=True)
     view = controls.build_view_state(paused=False)
     navigable = navigable_row_indices(view)
     transport_row = find_row_by_kind(view, RowKind.TRANSPORT)
@@ -1464,24 +1466,24 @@ def test_render_timeline_header_eye_color_when_disabled() -> None:
 
 
 def test_track_header_visible_follows_timeline_at_position() -> None:
-    controls = _make_controls(("drums", "bass"), timeline_enabled=True)
+    controls = _make_controls(("layer_1", "layer_2"), timeline_enabled=True)
     controls.session.timeline.cues = [
-        TimelineCue(t=5.0, layers={"drums": False}),
+        TimelineCue(t=5.0, layers={"layer_1": False}),
     ]
     before = controls.build_view_state(paused=False, position_sec=4.9)
     after = controls.build_view_state(paused=False, position_sec=5.0)
-    assert before.tracks["drums"].visible is True
-    assert after.tracks["drums"].visible is False
-    assert before.tracks["bass"].visible is True
-    assert after.tracks["bass"].visible is True
+    assert before.tracks["layer_1"].visible is True
+    assert after.tracks["layer_1"].visible is False
+    assert before.tracks["layer_2"].visible is True
+    assert after.tracks["layer_2"].visible is True
 
 
 def test_track_header_visible_uses_layer_enabled_when_timeline_off() -> None:
-    controls = _make_controls(("drums",))
-    controls.session.layers["drums"].enabled = False
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].enabled = False
     view = controls.build_view_state(paused=False, position_sec=10.0)
-    assert view.tracks["drums"].visible is False
-    assert view.tracks["drums"].enabled is False
+    assert view.tracks["layer_1"].visible is False
+    assert view.tracks["layer_1"].enabled is False
 
 
 def test_render_timeline_enabled_change_callback() -> None:
@@ -1566,20 +1568,20 @@ def test_t_toast_when_timeline_disabled() -> None:
 
 
 def test_t_ignored_during_move_mode() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     controls.session.timeline.enabled = True
     view = controls.build_view_state(paused=False)
     header_row = find_row_by_kind(view, RowKind.TRACK_HEADER)
     controls.focus_index = header_row
     controls.handle_keydown(_keydown(pygame.K_RETURN))
-    assert controls.move_mode_stem == "drums"
+    assert controls.move_mode_stem == "layer_1"
 
     controls.handle_keydown(_keydown(pygame.K_t))
     assert controls.session.timeline.panel_open is False
 
 
 def test_transport_enter_toggles_pause() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     transport_row = next(
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.TRANSPORT
@@ -1595,7 +1597,7 @@ def test_transport_enter_toggles_pause() -> None:
 
 
 def test_space_toggles_pause_from_any_focus() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     assert controls.playback.paused is False
     assert controls.focus_index == find_row_by_kind(view, RowKind.TRANSPORT)
@@ -1608,8 +1610,8 @@ def test_space_toggles_pause_from_any_focus() -> None:
 
 
 def test_quick_nav_row_indices_headers_and_transport_only() -> None:
-    controls = _make_controls(("drums", "bass"))
-    controls.session.layers["drums"].enabled = False
+    controls = _make_controls(("layer_1", "layer_2"))
+    controls.session.layers["layer_1"].enabled = False
     view = controls.build_view_state(paused=False)
 
     quick = quick_nav_row_indices(view)
@@ -1627,12 +1629,12 @@ def test_quick_nav_row_indices_headers_and_transport_only() -> None:
     drums_header = next(
         i
         for i in range(row_count(view))
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "drums"
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "layer_1"
     )
     bass_header = next(
         i
         for i in range(row_count(view))
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "bass"
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "layer_2"
     )
     render_overlay_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
     render_post_fx_row = find_row_by_kind(
@@ -1655,7 +1657,7 @@ def test_quick_nav_row_indices_headers_and_transport_only() -> None:
 
 
 def test_ctrl_quick_nav_cycles_headers_and_transport() -> None:
-    controls = _make_controls(("drums", "bass"))
+    controls = _make_controls(("layer_1", "layer_2"))
     view = controls.build_view_state(paused=False)
     quick = quick_nav_row_indices(view)
 
@@ -1683,7 +1685,7 @@ def test_ctrl_quick_nav_cycles_headers_and_transport() -> None:
 
 
 def test_ctrl_quick_nav_from_sub_row_jumps_forward() -> None:
-    controls = _make_controls(("drums", "bass"))
+    controls = _make_controls(("layer_1", "layer_2"))
     view = controls.build_view_state(paused=False)
     quick = quick_nav_row_indices(view)
     preset_row = next(
@@ -1700,7 +1702,7 @@ def test_ctrl_quick_nav_from_sub_row_jumps_forward() -> None:
 
 
 def test_ctrl_quick_nav_from_save_row() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     quick = quick_nav_row_indices(view)
     save_row = _save_row(view)
@@ -1715,10 +1717,10 @@ def test_ctrl_quick_nav_from_save_row() -> None:
 
 
 def test_ctrl_quick_nav_does_not_affect_normal_up_down() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
-    preset_dir_row = _row(view, "drums", RowKind.TRACK_PRESET_DIR)
+    header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
+    preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
     controls.focus_index = header_row
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
@@ -1727,7 +1729,7 @@ def test_ctrl_quick_nav_does_not_affect_normal_up_down() -> None:
 
 
 def test_ctrl_quick_nav_from_timeline_submenu_jumps_sections() -> None:
-    controls = _make_controls(("drums", "bass"), timeline_enabled=True)
+    controls = _make_controls(("layer_1", "layer_2"), timeline_enabled=True)
     view = controls.build_view_state(paused=False)
     quick = quick_nav_row_indices(view)
     timeline_header = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
@@ -1789,16 +1791,17 @@ def _controls_with_playlist(
         anchor, root
     )
     session = TuningSession(
-        layer_z_order=["drums"],
+        layer_z_order=["layer_1"],
         layers={
-            "drums": LayerRuntime(
+            "layer_1": LayerRuntime(
                 playlist=playlist_at_dir(current_dir, index=index),
                 browse_floor=floor,
+                stem="layer_1",
                 opacity_pct=50,
             )
         },
     )
-    cfg = make_test_cfg(("drums",), preset_root=root)
+    cfg = make_test_cfg(("layer_1",), preset_root=root)
     return TuningControls(
         session,
         cfg,
@@ -1810,19 +1813,19 @@ def _controls_with_playlist(
 
 def _preset_dir_row(controls: TuningControls) -> int:
     view = controls.build_view_state(paused=False)
-    return _row(view, "drums", RowKind.TRACK_PRESET_DIR)
+    return _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
 
 
 def _preset_row(controls: TuningControls) -> int:
     view = controls.build_view_state(paused=False)
-    return _row(view, "drums", RowKind.TRACK_PRESET)
+    return _row(view, "layer_1", RowKind.TRACK_PRESET)
 
 
 def test_directory_row_lr_changes_current_dir() -> None:
     root, siblings = _make_sibling_dir_tree(3)
     controls = _controls_with_playlist(root, siblings[0])
     controls.focus_index = _preset_dir_row(controls)
-    playlist = controls.session.layers["drums"].playlist
+    playlist = controls.session.layers["layer_1"].playlist
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert playlist.current_dir.resolve() == siblings[1].resolve()
@@ -1835,7 +1838,7 @@ def test_directory_enter_descends_backspace_goes_parent() -> None:
     root, siblings = _make_sibling_dir_tree(2)
     controls = _controls_with_playlist(root, siblings[0])
     controls.focus_index = _preset_dir_row(controls)
-    playlist = controls.session.layers["drums"].playlist
+    playlist = controls.session.layers["layer_1"].playlist
     child = siblings[0] / "child"
 
     controls.handle_keydown(_keydown(pygame.K_RETURN))
@@ -1849,7 +1852,7 @@ def test_directory_ctrl_arrows_descend_and_ascend() -> None:
     root, siblings = _make_sibling_dir_tree(2)
     controls = _controls_with_playlist(root, siblings[0])
     controls.focus_index = _preset_dir_row(controls)
-    playlist = controls.session.layers["drums"].playlist
+    playlist = controls.session.layers["layer_1"].playlist
     child = siblings[0] / "child"
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
@@ -1863,7 +1866,7 @@ def test_ctrl_left_at_preset_root_is_noop() -> None:
     root, siblings = _make_sibling_dir_tree(2)
     controls = _controls_with_playlist(root, siblings[0])
     controls.focus_index = _preset_dir_row(controls)
-    playlist = controls.session.layers["drums"].playlist
+    playlist = controls.session.layers["layer_1"].playlist
 
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
     assert playlist.current_dir.resolve() == root.resolve()
@@ -1876,7 +1879,7 @@ def test_directory_ctrl_arrows_do_not_repeat_parent_climb() -> None:
     root, siblings = _make_sibling_dir_tree(2)
     controls = _controls_with_playlist(root, siblings[0])
     controls.focus_index = _preset_dir_row(controls)
-    playlist = controls.session.layers["drums"].playlist
+    playlist = controls.session.layers["layer_1"].playlist
     child = siblings[0] / "child"
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
@@ -1894,7 +1897,7 @@ def test_backspace_at_preset_root_is_noop() -> None:
     root, siblings = _make_sibling_dir_tree(2)
     controls = _controls_with_playlist(root, siblings[0])
     controls.focus_index = _preset_dir_row(controls)
-    playlist = controls.session.layers["drums"].playlist
+    playlist = controls.session.layers["layer_1"].playlist
 
     controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
     assert playlist.current_dir.resolve() == root.resolve()
@@ -1908,7 +1911,7 @@ def test_directory_parent_round_trip_reaches_preset_root() -> None:
     child = siblings[0] / "child"
     controls = _controls_with_playlist(root, child)
     controls.focus_index = _preset_dir_row(controls)
-    playlist = controls.session.layers["drums"].playlist
+    playlist = controls.session.layers["layer_1"].playlist
 
     for _ in range(3):
         controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
@@ -1931,7 +1934,7 @@ def test_preset_lr_noop_when_paths_empty() -> None:
         on_preset_change=lambda stem, pl: changed.append((stem, pl.index))
     )
     controls.focus_index = _preset_row(controls)
-    playlist = controls.session.layers["drums"].playlist
+    playlist = controls.session.layers["layer_1"].playlist
     assert playlist.paths == ()
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
@@ -1947,10 +1950,10 @@ def test_track_preset_dir_in_repeat_row_kinds() -> None:
 
 def test_ctrl_preset_steps_by_ten_wrapping() -> None:
     changed: list[tuple[str, int]] = []
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     current_dir = Path("/tmp/presets/drums")
     paths = tuple(current_dir / f"preset-{i:02d}.milk" for i in range(12))
-    controls.session.layers["drums"].playlist = PresetPlaylist(
+    controls.session.layers["layer_1"].playlist = PresetPlaylist(
         current_dir=current_dir, paths=paths, index=5
     )
     controls._layer_bindings = noop_layer_bindings(
@@ -1958,17 +1961,17 @@ def test_ctrl_preset_steps_by_ten_wrapping() -> None:
     )
 
     view = controls.build_view_state(paused=False)
-    preset_row = _row(view, "drums", RowKind.TRACK_PRESET)
+    preset_row = _row(view, "layer_1", RowKind.TRACK_PRESET)
     controls.focus_index = preset_row
-    playlist = controls.session.layers["drums"].playlist
+    playlist = controls.session.layers["layer_1"].playlist
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
     assert playlist.index == 3
-    assert changed == [("drums", 3)]
+    assert changed == [("layer_1", 3)]
 
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
     assert playlist.index == 5
-    assert changed[-1] == ("drums", 5)
+    assert changed[-1] == ("layer_1", 5)
 
 
 def test_empty_playlist_view_state() -> None:
@@ -1978,18 +1981,18 @@ def test_empty_playlist_view_state() -> None:
         empty_dir.mkdir()
         controls = _controls_with_playlist(root, empty_dir)
         view = controls.build_view_state(paused=False)
-        block = view.tracks["drums"]
+        block = view.tracks["layer_1"]
         assert block.preset_label == "NO PRESETS FOUND"
         assert block.preset_empty is True
 
 
 def test_move_mode_colors_focused_track_header() -> None:
-    controls = _make_controls(("drums", "bass"))
+    controls = _make_controls(("layer_1", "layer_2"))
     view = controls.build_view_state(paused=False)
     header_row = next(
         i
         for i in range(row_count(view))
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "bass"
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "layer_2"
     )
     controls.focus_index = header_row
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
@@ -2004,9 +2007,9 @@ def test_move_mode_colors_focused_track_header() -> None:
 
 def test_row_value_color_dim_for_focused_empty_preset() -> None:
     state = TuningViewState(
-        layer_z_order=("drums",),
+        layer_z_order=("layer_1",),
         tracks={
-            "drums": TrackBlock(
+            "layer_1": TrackBlock(
                 stem="drums",
                 preset_dir_label="empty (1/1)",
                 preset_label="NO PRESETS FOUND",
@@ -2024,7 +2027,7 @@ def test_row_value_color_dim_for_focused_empty_preset() -> None:
         toast_message=None,
         toast_remaining_sec=0.0,
     )
-    preset_row = _row(state, "drums", RowKind.TRACK_PRESET)
+    preset_row = _row(state, "layer_1", RowKind.TRACK_PRESET)
     state = TuningViewState(
         layer_z_order=state.layer_z_order,
         tracks=state.tracks,
@@ -2040,15 +2043,15 @@ def test_row_value_color_dim_for_focused_empty_preset() -> None:
 
 
 def test_preset_overlay_shows_directory_and_position() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    block = view.tracks["drums"]
-    assert block.preset_dir_label == "drums/ (1/1)"
+    block = view.tracks["layer_1"]
+    assert block.preset_dir_label == "layer_1/ (1/1)"
     assert block.preset_label == "preset-0.milk (1/3)"
 
-    controls.session.layers["drums"].playlist.index = 1
+    controls.session.layers["layer_1"].playlist.index = 1
     view = controls.build_view_state(paused=False)
-    assert view.tracks["drums"].preset_label == "preset-1.milk (2/3)"
+    assert view.tracks["layer_1"].preset_label == "preset-1.milk (2/3)"
 
 
 def test_scan_file_anchor_builds_parent_directory_playlist() -> None:
@@ -2087,6 +2090,7 @@ def _sub_rows_for_stem(view: TuningViewState, stem: str) -> list[int]:
     sub_kinds = (
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
+        RowKind.TRACK_STEM,
         RowKind.TRACK_BLEND,
         RowKind.TRACK_OPACITY,
         RowKind.TRACK_BEAT,
@@ -2101,58 +2105,60 @@ def _sub_rows_for_stem(view: TuningViewState, stem: str) -> list[int]:
 
 
 def test_ctrl_enter_toggles_lock() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
+    header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     controls.focus_index = header_row
-    assert controls.session.layers["drums"].locked is False
+    assert controls.session.layers["layer_1"].locked is False
 
     controls.handle_keydown(_keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
-    assert controls.session.layers["drums"].locked is True
+    assert controls.session.layers["layer_1"].locked is True
 
     controls.handle_keydown(_keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
-    assert controls.session.layers["drums"].locked is False
+    assert controls.session.layers["layer_1"].locked is False
 
 
 def test_locked_expanded_skips_sub_rows_in_nav() -> None:
-    controls = _make_controls(("drums",))
-    controls.session.layers["drums"].locked = True
-    controls.session.layers["drums"].expanded = True
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].locked = True
+    controls.session.layers["layer_1"].expanded = True
     view = controls.build_view_state(paused=False)
 
-    sub_rows = _sub_rows_for_stem(view, "drums")
+    sub_rows = _sub_rows_for_stem(view, "layer_1")
     assert sub_rows
     visible = visible_row_indices(view)
     navigable = navigable_row_indices(view)
-    effects_header = _row(view, "drums", RowKind.TRACK_EFFECTS_HEADER)
+    effects_header = _row(view, "layer_1", RowKind.TRACK_EFFECTS_HEADER)
+    stem_row = _row(view, "layer_1", RowKind.TRACK_STEM)
     assert effects_header in navigable
+    assert stem_row in navigable
     for row in sub_rows:
         assert row in visible
-        if row == effects_header:
+        if row in {effects_header, stem_row}:
             continue
         assert row not in navigable
 
 
 def test_locked_blocks_enable_disable() -> None:
-    controls = _make_controls(("drums",))
-    controls.session.layers["drums"].locked = True
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].locked = True
     view = controls.build_view_state(paused=False)
-    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
+    header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     controls.focus_index = header_row
-    assert controls.session.layers["drums"].enabled is True
+    assert controls.session.layers["layer_1"].enabled is True
 
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
-    assert controls.session.layers["drums"].enabled is True
+    assert controls.session.layers["layer_1"].enabled is True
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
-    assert controls.session.layers["drums"].enabled is True
+    assert controls.session.layers["layer_1"].enabled is True
 
 
 def test_locked_blocks_move_mode() -> None:
-    controls = _make_controls(("drums",))
-    controls.session.layers["drums"].locked = True
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].locked = True
     view = controls.build_view_state(paused=False)
-    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
+    header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     controls.focus_index = header_row
 
     controls.handle_keydown(_keydown(pygame.K_RETURN))
@@ -2160,34 +2166,34 @@ def test_locked_blocks_move_mode() -> None:
 
 
 def test_locked_header_still_expands() -> None:
-    controls = _make_controls(("drums",))
-    controls.session.layers["drums"].locked = True
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].locked = True
     view = controls.build_view_state(paused=False)
-    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
-    preset_dir_row = _row(view, "drums", RowKind.TRACK_PRESET_DIR)
+    header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
+    preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
     controls.focus_index = header_row
-    assert controls.session.layers["drums"].expanded is False
+    assert controls.session.layers["layer_1"].expanded is False
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.session.layers["drums"].expanded is True
+    assert controls.session.layers["layer_1"].expanded is True
 
     view = controls.build_view_state(paused=False)
     assert preset_dir_row in visible_row_indices(view)
 
     controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert controls.session.layers["drums"].expanded is False
+    assert controls.session.layers["layer_1"].expanded is False
 
     view = controls.build_view_state(paused=False)
     assert preset_dir_row not in visible_row_indices(view)
 
 
 def test_locked_sub_rows_use_locked_color() -> None:
-    controls = _make_controls(("drums",))
-    controls.session.layers["drums"].locked = True
-    controls.session.layers["drums"].expanded = True
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].locked = True
+    controls.session.layers["layer_1"].expanded = True
     view = controls.build_view_state(paused=False)
-    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
-    preset_dir_row = _row(view, "drums", RowKind.TRACK_PRESET_DIR)
+    header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
+    preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
     unfocused = TuningViewState(
         layer_z_order=view.layer_z_order,
         tracks=view.tracks,
@@ -2220,39 +2226,39 @@ def test_locked_sub_rows_use_locked_color() -> None:
 
 
 def test_locked_not_toggleable_during_move_mode() -> None:
-    controls = _make_controls(("drums", "bass"))
+    controls = _make_controls(("layer_1", "layer_2"))
     view = controls.build_view_state(paused=False)
-    bass_header = _header_row(controls, "bass")
+    bass_header = _header_row(controls, "layer_2")
     controls.focus_index = bass_header
-    assert controls.session.layers["bass"].locked is False
+    assert controls.session.layers["layer_2"].locked is False
 
     controls.handle_keydown(_keydown(pygame.K_RETURN))
-    assert controls.move_mode_stem == "bass"
+    assert controls.move_mode_stem == "layer_2"
 
     controls.handle_keydown(_keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
-    assert controls.session.layers["bass"].locked is False
+    assert controls.session.layers["layer_2"].locked is False
 
 
 def test_ctrl_quick_nav_blocked_during_move_mode() -> None:
-    controls = _make_controls(("drums", "bass", "vocals"))
+    controls = _make_controls(("layer_1", "layer_2", "layer_3"))
     view = controls.build_view_state(paused=False)
     bass_header = next(
         i
         for i in range(15)
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "bass"
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "layer_2"
     )
     controls.focus_index = bass_header
     controls.handle_keydown(_keydown(pygame.K_RETURN))
-    assert controls.move_mode_stem == "bass"
+    assert controls.move_mode_stem == "layer_2"
 
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
-    assert controls.session.layer_z_order == ["bass", "drums", "vocals"]
+    assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
     assert controls.focus_index == bass_header
 
 
 def test_transport_seek_constants() -> None:
     seeks: list[float] = []
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     controls._layer_bindings = noop_layer_bindings(
         on_seek=lambda delta: seeks.append(delta)
     )
@@ -2272,62 +2278,62 @@ def test_transport_seek_constants() -> None:
 
 
 def test_effect_pulse_clamps() -> None:
-    controls = _make_controls(("drums", "bass"))
-    controls.session.layers["drums"].effects_expanded = True
-    controls.session.layers["bass"].effects_expanded = True
+    controls = _make_controls(("layer_1", "layer_2"))
+    controls.session.layers["layer_1"].effects_expanded = True
+    controls.session.layers["layer_2"].effects_expanded = True
     view = controls.build_view_state(paused=False)
     pulse_row = _row(
-        view, "drums", RowKind.TRACK_EFFECT, effect_id="pulse", driver_slug="onset"
+        view, "layer_1", RowKind.TRACK_EFFECT, effect_id="pulse", driver_slug="onset"
     )
     bass_pulse_row = _row(
-        view, "bass", RowKind.TRACK_EFFECT, effect_id="pulse", driver_slug="sub_bass"
+        view, "layer_2", RowKind.TRACK_EFFECT, effect_id="pulse", driver_slug="sub_bass"
     )
     controls.focus_index = pulse_row
 
     for _ in range(120):
         controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.session.layers["drums"].effects["pulse"]["onset"] == 100
+    assert controls.session.layers["layer_1"].effects["pulse"]["onset"] == 100
 
     for _ in range(120):
         controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert "pulse" not in controls.session.layers["drums"].effects
+    assert "pulse" not in controls.session.layers["layer_1"].effects
 
     controls.focus_index = bass_pulse_row
     for _ in range(20):
         controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.session.layers["bass"].effects["pulse"]["sub_bass"] == 20
+    assert controls.session.layers["layer_2"].effects["pulse"]["sub_bass"] == 20
 
 
 def test_effect_pulse_row_label() -> None:
-    controls = _make_controls(("drums",))
-    controls.session.layers["drums"].effects = {"pulse": {"onset": 35}}
-    controls.session.layers["drums"].effects_expanded = True
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].effects = {"pulse": {"onset": 35}}
+    controls.session.layers["layer_1"].effects_expanded = True
     view = controls.build_view_state(paused=False)
     pulse_row = _row(
-        view, "drums", RowKind.TRACK_EFFECT, effect_id="pulse", driver_slug="onset"
+        view, "layer_1", RowKind.TRACK_EFFECT, effect_id="pulse", driver_slug="onset"
     )
     assert _row_text(view, pulse_row) == "└─ pulse (onset): 35%"
 
 
 def test_effects_header_expand_arrow() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    header_row = _row(view, "drums", RowKind.TRACK_EFFECTS_HEADER)
+    header_row = _row(view, "layer_1", RowKind.TRACK_EFFECTS_HEADER)
     assert _row_text(view, header_row) == "└─ cleave effects ▶"
 
-    controls.session.layers["drums"].effects_expanded = True
+    controls.session.layers["layer_1"].effects_expanded = True
     view = controls.build_view_state(paused=False)
-    header_row = _row(view, "drums", RowKind.TRACK_EFFECTS_HEADER)
+    header_row = _row(view, "layer_1", RowKind.TRACK_EFFECTS_HEADER)
     assert _row_text(view, header_row) == "└─ cleave effects ▼"
 
 
 def test_effect_row_nested_indent() -> None:
-    controls = _make_controls(("drums",))
-    controls.session.layers["drums"].effects_expanded = True
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].effects_expanded = True
     view = controls.build_view_state(paused=False)
-    effects_header = _row(view, "drums", RowKind.TRACK_EFFECTS_HEADER)
+    effects_header = _row(view, "layer_1", RowKind.TRACK_EFFECTS_HEADER)
     pulse_row = _row(
-        view, "drums", RowKind.TRACK_EFFECT, effect_id="pulse", driver_slug="onset"
+        view, "layer_1", RowKind.TRACK_EFFECT, effect_id="pulse", driver_slug="onset"
     )
     assert _row_indent(view, effects_header) == TREE_INDENT
     assert _row_indent(view, pulse_row) == TREE_INDENT * 2
@@ -2349,59 +2355,59 @@ def test_mod_shift_detects_shift_modifier() -> None:
 
 def test_shift_right_enters_solo() -> None:
     solo_calls: list[str | None] = []
-    controls = _make_controls(("drums", "bass"))
+    controls = _make_controls(("layer_1", "layer_2"))
     controls._layer_bindings = noop_layer_bindings(
-        on_solo_change=lambda: solo_calls.append(controls.session.solo_stem)
+        on_solo_change=lambda: solo_calls.append(controls.session.solo_slot)
     )
 
     view = controls.build_view_state(paused=False)
-    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
+    header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     controls.focus_index = header_row
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
-    assert controls.session.solo_stem == "drums"
-    assert solo_calls == ["drums"]
+    assert controls.session.solo_slot == "layer_1"
+    assert solo_calls == ["layer_1"]
     state = controls.build_view_state(paused=False)
     assert state.solo_active is True
-    assert state.solo_stem == "drums"
+    assert state.solo_stem == "layer_1"
 
 
 def test_shift_right_switches_solo_target() -> None:
-    controls = _make_controls(("drums", "bass"))
-    drums_header = _row(controls.build_view_state(paused=False), "drums", RowKind.TRACK_HEADER)
-    bass_header = _row(controls.build_view_state(paused=False), "bass", RowKind.TRACK_HEADER)
+    controls = _make_controls(("layer_1", "layer_2"))
+    drums_header = _row(controls.build_view_state(paused=False), "layer_1", RowKind.TRACK_HEADER)
+    bass_header = _row(controls.build_view_state(paused=False), "layer_2", RowKind.TRACK_HEADER)
 
     controls.focus_index = drums_header
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
-    assert controls.session.solo_stem == "drums"
+    assert controls.session.solo_slot == "layer_1"
 
     controls.focus_index = bass_header
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
-    assert controls.session.solo_stem == "bass"
+    assert controls.session.solo_slot == "layer_2"
 
 
 def test_shift_left_exits_solo_only_for_active_target() -> None:
-    controls = _make_controls(("drums", "bass"))
-    drums_header = _row(controls.build_view_state(paused=False), "drums", RowKind.TRACK_HEADER)
-    bass_header = _row(controls.build_view_state(paused=False), "bass", RowKind.TRACK_HEADER)
+    controls = _make_controls(("layer_1", "layer_2"))
+    drums_header = _row(controls.build_view_state(paused=False), "layer_1", RowKind.TRACK_HEADER)
+    bass_header = _row(controls.build_view_state(paused=False), "layer_2", RowKind.TRACK_HEADER)
 
     controls.focus_index = drums_header
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
-    assert controls.session.solo_stem == "drums"
+    assert controls.session.solo_slot == "layer_1"
 
     controls.focus_index = bass_header
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_SHIFT))
-    assert controls.session.solo_stem == "drums"
+    assert controls.session.solo_slot == "layer_1"
 
     controls.focus_index = drums_header
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_SHIFT))
-    assert controls.session.solo_stem is None
+    assert controls.session.solo_slot is None
 
 
 def test_save_blocked_while_solo_active() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    header_row = _row(view, "drums", RowKind.TRACK_HEADER)
+    header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     save_row = _save_row(view)
     controls.focus_index = header_row
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
@@ -2415,8 +2421,8 @@ def test_save_blocked_while_solo_active() -> None:
 
 
 def test_save_rows_greyed_while_solo_active() -> None:
-    controls = _make_controls(("drums",))
-    controls.session.solo_stem = "drums"
+    controls = _make_controls(("layer_1",))
+    controls.session.solo_slot = "layer_1"
     view = controls.build_view_state(paused=False)
     save_row = _save_row(view)
     assert _row_value_color(view, save_row) == DISABLED
@@ -2440,12 +2446,12 @@ def test_track_header_prefix_width_matches_visibility_icon() -> None:
 
 
 def test_try_quit_clean_session_returns_true_immediately() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     assert controls.try_quit() is True
 
 
 def test_try_quit_dirty_opens_dialog_and_blocks_exit() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     _mutate_dirty(controls)
     assert controls.try_quit() is False
     modal_view = controls.modal_host.view_state()
@@ -2455,7 +2461,7 @@ def test_try_quit_dirty_opens_dialog_and_blocks_exit() -> None:
 
 
 def test_try_quit_dont_save_sets_pending_exit() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     _mutate_dirty(controls)
     controls.try_quit()
     controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
@@ -2466,7 +2472,7 @@ def test_try_quit_dont_save_sets_pending_exit() -> None:
 
 
 def test_try_quit_cancel_and_escape_stay() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     _mutate_dirty(controls)
     controls.try_quit()
 
@@ -2486,7 +2492,7 @@ def test_try_quit_cancel_and_escape_stay() -> None:
 
 def test_try_quit_save_chains_through_save_as_new() -> None:
     saved_path = Path("/tmp/projects/my-track/unnamed-2.yaml")
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     controls._config_save._on_save_new_config = lambda: saved_path
     _mutate_dirty(controls)
 
@@ -2503,7 +2509,7 @@ def test_try_quit_save_chains_through_save_as_new() -> None:
 
 
 def test_try_quit_save_choice_esc_clears_quit_after_save() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     _mutate_dirty(controls)
     controls.try_quit()
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
@@ -2516,8 +2522,60 @@ def test_try_quit_save_choice_esc_clears_quit_after_save() -> None:
     assert not controls.modal_host.active
 
 
+def test_stem_row_cycles_sources() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].expanded = True
+    view = controls.build_view_state(paused=False)
+    stem_row = _row(view, "layer_1", RowKind.TRACK_STEM)
+    controls.focus_index = stem_row
+    assert controls.session.layers["layer_1"].stem == "drums"
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].stem == "bass"
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.layers["layer_1"].stem == "drums"
+
+
+def test_stem_change_clears_effects() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].expanded = True
+    controls.session.layers["layer_1"].effects = {"pulse": {"onset": 50}}
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_STEM)
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].effects == {}
+
+
+def test_stem_row_works_when_layer_locked() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].expanded = True
+    controls.session.layers["layer_1"].locked = True
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_STEM)
+    assert controls.session.layers["layer_1"].stem == "drums"
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].stem == "bass"
+
+
+def test_cycle_stem_to_full_mix() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].expanded = True
+    controls.session.layers["layer_1"].stem = "other"
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_STEM)
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].stem == "full_mix"
+
+    view = controls.build_view_state(paused=False)
+    assert _row_text(view, controls.focus_index) == "└─ stem: full-mix"
+
+
 def test_try_quit_overwrite_confirm_esc_clears_quit_after_save() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     _mutate_dirty(controls)
     controls.try_quit()
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
@@ -2526,4 +2584,6 @@ def test_try_quit_overwrite_confirm_esc_clears_quit_after_save() -> None:
 
     controls.handle_modal_keydown(_keydown(pygame.K_ESCAPE))
     assert controls._config_save._quit_after_save is False
+    assert controls._config_save._pending_exit is False
+    assert controls.config_dirty
     assert not controls.modal_host.active
