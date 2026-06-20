@@ -1543,7 +1543,7 @@ def test_t_toast_when_timeline_disabled() -> None:
     controls.handle_keydown(_keydown(pygame.K_t))
     assert controls.session.timeline.panel_open is False
     view = controls.build_view_state(paused=False)
-    assert view.toast_message == "Enable timeline in Render: TIMELINE (Ctrl+Right)"
+    assert view.toast_message == "Enable timeline first"
 
 
 def test_t_ignored_during_move_mode() -> None:
