@@ -44,7 +44,7 @@ The pinned top block before a visual gap (`header_gap` in `draw()`): `header_row
 
 - Row kinds: `RowKind.TRANSPORT`, `RowKind.CONFIG_HEADER` (active config path; Enter saves).
 - Constant: `HEADER_ROWS` (2); layout indices 0-1 in `build_row_layout`.
-- Enter on `CONFIG_HEADER` opens an `OVERWRITE` / `SAVE AS NEW` centered modal when overwrite is allowed (`allow_overwrite`; false for repo-root `cleave-viz.yaml`). Otherwise save-as-new runs immediately. Overwrite still uses the yes/no centered modal.
+- Enter on `CONFIG_HEADER` opens an `OVERWRITE` / `SAVE AS NEW` centered modal when overwrite is allowed (`allow_overwrite`; false for repo-root `cleave-viz.yaml`). When overwrite is not allowed, a `SAVE AS NEW` / `CANCEL` modal appears (Enter confirms the focused option, Esc dismisses). Overwrite still uses the yes/no centered modal.
 
 ## Whole panel
 

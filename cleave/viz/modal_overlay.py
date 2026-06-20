@@ -11,11 +11,13 @@ from cleave.viz.theme import (
     BORDER_COLOR,
     BORDER_WIDTH,
     DISABLED,
+    FOCUS_ROW_BG_ALPHA,
     HIGHLIGHT,
     MODAL_SCRIM_ALPHA,
     VALUE,
     tuning_ui_metrics,
 )
+from cleave.viz.ui_tint import blit_tint
 
 
 def draw_rect(
@@ -135,12 +137,16 @@ def _measure_panel(
     )
 
 
+def _option_text(label: str) -> str:
+    return f"  {label}  "
+
+
 def _measure_options(
     font: pygame.font.Font,
     labels: tuple[str, ...],
 ) -> tuple[int, int]:
     line_h = font.get_linesize()
-    widths = [font.size(f"> {label}")[0] for label in labels]
+    widths = [font.size(_option_text(label))[0] for label in labels]
     total_w = sum(widths) + _OPTION_GAP * max(0, len(labels) - 1)
     return total_w, line_h
 
@@ -172,11 +178,20 @@ def _draw_options(
     text_alpha: int,
 ) -> None:
     option_x = x
+    line_h = font.get_linesize()
     for index, label in enumerate(labels):
         focused = index == focus_index
         color = HIGHLIGHT if focused else DISABLED
-        prefix = ">" if focused else " "
-        option_surf = font.render(f"{prefix} {label}", True, color)
+        text = _option_text(label)
+        if focused and text_alpha >= 2:
+            tint_alpha = int(FOCUS_ROW_BG_ALPHA * text_alpha / 255)
+            blit_tint(
+                surface,
+                (option_x, y, font.size(text)[0], line_h),
+                HIGHLIGHT,
+                alpha=tint_alpha,
+            )
+        option_surf = font.render(text, True, color)
         if text_alpha >= 2:
             option_surf.set_alpha(text_alpha)
             surface.blit(option_surf, (option_x, y))

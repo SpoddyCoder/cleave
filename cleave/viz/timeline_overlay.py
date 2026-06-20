@@ -17,7 +17,6 @@ from cleave.viz.theme import (
     BACKGROUND_ALPHA,
     BORDER_COLOR,
     BORDER_WIDTH,
-    FOCUS_ROW_BG_ALPHA,
     HIGHLIGHT,
     LABEL,
     PLAYHEAD,
@@ -26,6 +25,7 @@ from cleave.viz.theme import (
     VALUE,
     timeline_ui_metrics,
 )
+from cleave.viz.ui_tint import blit_tint
 
 PANEL_HEIGHT_FRACTION: float = 0.2
 _timeline_ui = timeline_ui_metrics()
@@ -52,14 +52,6 @@ REC_TIME_GAP: int = _timeline_ui.rec_time_gap
 REC_FLASH_MS: int = 500
 ARM_FLASH_HALF_MS: int = 150
 ARM_FLASH_DURATION_MS: int = ARM_FLASH_HALF_MS * 4
-
-
-def _blit_focus_tint(panel: pygame.Surface, rect: pygame.Rect) -> None:
-    if rect.w <= 0 or rect.h <= 0:
-        return
-    surf = pygame.Surface((rect.w, rect.h), pygame.SRCALPHA)
-    surf.fill((*HIGHLIGHT, FOCUS_ROW_BG_ALPHA))
-    panel.blit(surf, rect.topleft)
 
 
 @dataclass
@@ -436,7 +428,7 @@ class TimelineOverlay:
             monitor_eye_x = stem_abbrev_x + self._stem_abbrev_width
 
             if focused:
-                _blit_focus_tint(panel, row_rect)
+                blit_tint(panel, row_rect, HIGHLIGHT)
 
             abbrev_rect = pygame.Rect(
                 stem_abbrev_x, row_y, self._stem_abbrev_width, row_h
@@ -485,7 +477,7 @@ class TimelineOverlay:
 
             bar_column_rect = pygame.Rect(bar_left, row_y, bar_width, row_h)
             if focused:
-                _blit_focus_tint(panel, bar_column_rect)
+                blit_tint(panel, bar_column_rect, HIGHLIGHT)
 
             for start_t, end_t, visible in bar_segments_for_row(state, slot):
                 x0 = time_to_x(start_t, bar_left, bar_width, state.duration_sec)
@@ -507,11 +499,12 @@ class TimelineOverlay:
                 )
 
             if focused and BAR_VERTICAL_INSET > 0:
-                _blit_focus_tint(
+                blit_tint(
                     panel,
                     pygame.Rect(bar_left, row_y, bar_width, BAR_VERTICAL_INSET),
+                    HIGHLIGHT,
                 )
-                _blit_focus_tint(
+                blit_tint(
                     panel,
                     pygame.Rect(
                         bar_left,
@@ -519,6 +512,7 @@ class TimelineOverlay:
                         bar_width,
                         BAR_VERTICAL_INSET,
                     ),
+                    HIGHLIGHT,
                 )
 
         bar_top = self._padding

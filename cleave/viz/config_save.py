@@ -103,7 +103,10 @@ class ConfigSaveController:
 
     def prompt_save(self) -> None:
         if not self.allow_overwrite():
-            self._trigger_save_new()
+            self._modal.prompt_save_as_new(
+                on_save_as_new=self._trigger_save_new,
+                on_dismiss=self._clear_quit_after_save,
+            )
             return
 
         self._modal.prompt_save_choice(
