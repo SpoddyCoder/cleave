@@ -108,23 +108,23 @@ class TimelineControls:
         if event.key in _LAYER_KEY_INDEX:
             tl = self.session.timeline
             if tl.recording:
-                stem = self._stem_for_layer_index(_LAYER_KEY_INDEX[event.key])
-                if stem is not None:
+                slot = self._slot_for_layer_index(_LAYER_KEY_INDEX[event.key])
+                if slot is not None:
                     self._toggle_armed_layer_at(
-                        stem, current_sec(self.playback, self.duration_sec)
+                        slot, current_sec(self.playback, self.duration_sec)
                     )
                 return True
 
-            stem = self._stem_for_layer_index(_LAYER_KEY_INDEX[event.key])
-            if stem is None:
+            slot = self._slot_for_layer_index(_LAYER_KEY_INDEX[event.key])
+            if slot is None:
                 return True
 
             if self.playback.paused:
-                self._toggle_paused_stem_visibility(stem)
+                self._toggle_paused_stem_visibility(slot)
                 return True
 
-            if stem in tl.override_stems:
-                tl.override_visible[stem] = not tl.override_visible.get(stem, True)
+            if slot in tl.override_slots:
+                tl.override_visible[slot] = not tl.override_visible.get(slot, True)
                 self._refresh_visibility()
             return True
 
@@ -161,13 +161,13 @@ class TimelineControls:
         if self._on_toast is not None:
             self._on_toast(message)
 
-    def _stem_for_layer_index(self, index: int) -> str | None:
+    def _slot_for_layer_index(self, index: int) -> str | None:
         z_order = self.session.layer_z_order
         if index >= len(z_order):
             return None
         return z_order[index]
 
-    def _focused_stem(self) -> str:
+    def _focused_slot(self) -> str:
         return self.session.layer_z_order[self.session.timeline.focus_row]
 
     def _sorted_cues(self) -> list[TimelineCue]:
@@ -217,23 +217,23 @@ class TimelineControls:
             self._on_visibility_change()
 
     def _toggle_arm(self) -> None:
-        stem = self._focused_stem()
-        armed = self.session.timeline.armed_stems
-        if stem in armed:
-            armed.discard(stem)
+        slot = self._focused_slot()
+        armed = self.session.timeline.armed_slots
+        if slot in armed:
+            armed.discard(slot)
         else:
-            armed.add(stem)
+            armed.add(slot)
 
     def _start_record(self) -> None:
         tl = self.session.timeline
-        if not tl.armed_stems:
+        if not tl.armed_slots:
             self._toast("Arm at least one layer to record")
             return
 
         t_sec = current_sec(self.playback, self.duration_sec)
         tl.record_baseline = {
             stem: effective_layer_enabled(self.session, stem, t_sec)
-            for stem in tl.armed_stems
+            for stem in tl.armed_slots
         }
 
         tl.preview_active = False
@@ -261,7 +261,7 @@ class TimelineControls:
         record_stop = current_sec(self.playback, self.duration_sec)
         tl.cues = punch_replace(
             tl.cues,
-            tl.armed_stems,
+            tl.armed_slots,
             record_start,
             record_stop,
             build_record_punch_cues(self.session, record_start, record_stop),
@@ -288,38 +288,38 @@ class TimelineControls:
             self._on_visibility_change()
 
     def _toggle_override_focused_row(self) -> None:
-        stem = self._focused_stem()
+        slot = self._focused_slot()
         tl = self.session.timeline
-        if stem in tl.override_stems:
-            tl.override_stems.discard(stem)
-            tl.override_visible.pop(stem, None)
+        if slot in tl.override_slots:
+            tl.override_slots.discard(slot)
+            tl.override_visible.pop(slot, None)
         else:
             t_sec = current_sec(self.playback, self.duration_sec)
-            tl.override_visible[stem] = effective_layer_enabled(
-                self.session, stem, t_sec
+            tl.override_visible[slot] = effective_layer_enabled(
+                self.session, slot, t_sec
             )
             tl.preview_active = False
             tl.monitor = {}
-            tl.override_stems.add(stem)
+            tl.override_slots.add(slot)
         self._refresh_visibility()
 
     def _toggle_paused_stem_visibility(self, stem: str) -> None:
         tl = self.session.timeline
         if tl.preview_active:
             tl.monitor[stem] = not tl.monitor[stem]
-        elif stem in tl.override_stems:
+        elif stem in tl.override_slots:
             tl.override_visible[stem] = not tl.override_visible.get(stem, True)
         else:
             t_sec = current_sec(self.playback, self.duration_sec)
             tl.override_visible[stem] = not effective_layer_enabled(
                 self.session, stem, t_sec
             )
-            tl.override_stems.add(stem)
+            tl.override_slots.add(stem)
         self._refresh_visibility()
 
     def _toggle_armed_layer_at(self, stem: str, t_sec: float) -> None:
         tl = self.session.timeline
-        if stem not in tl.armed_stems:
+        if stem not in tl.armed_slots:
             return
         if not should_accept_toggle(self._last_toggle_t.get(stem), t_sec):
             return

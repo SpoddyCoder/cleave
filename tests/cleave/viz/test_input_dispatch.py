@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 
 import pygame
 
+from cleave.config_schema import DEFAULT_STEM_FOR_SLOT, LAYER_SLOTS
 from cleave.extract import STEM_NAMES
 from cleave.viz.app import LiveVisualizerRuntime, VisualizerSeed
 from cleave.viz.controls import TuningControls
@@ -32,13 +33,14 @@ def _make_runtime(
 ) -> LiveVisualizerRuntime:
     preset_root = Path("/tmp/presets")
     session = TuningSession(
-        layer_z_order=list(STEM_NAMES),
+        layer_z_order=list(LAYER_SLOTS),
         layers={
-            stem: LayerRuntime(
-                playlist=make_playlist(stem),
-                browse_floor=preset_root / stem,
+            slot: LayerRuntime(
+                playlist=make_playlist(slot),
+                browse_floor=preset_root / slot,
+                stem=DEFAULT_STEM_FOR_SLOT[slot],
             )
-            for stem in STEM_NAMES
+            for slot in LAYER_SLOTS
         },
     )
     session.help_visible = help_visible
@@ -48,9 +50,9 @@ def _make_runtime(
     tl.submenu_focused = submenu_focused
     tl.recording = recording
     if recording:
-        tl.armed_stems = {"drums"}
+        tl.armed_slots = {"layer_1"}
         tl.record_start_sec = 0.0
-        tl.record_baseline = {"drums": True}
+        tl.record_baseline = {"layer_1": True}
 
     seed = VisualizerSeed(
         project_dir=MagicMock(),
@@ -77,7 +79,7 @@ def _make_runtime(
     runtime = LiveVisualizerRuntime(
         seed=seed,
         layers=[],
-        layers_by_name={},
+        layers_by_slot={},
         compositor=compositor,
         post_process=MagicMock(),
         overlay=TuningOverlay(),
@@ -131,7 +133,7 @@ def test_ctrl_q_quit_from_timeline_context() -> None:
 
 def test_ctrl_q_dirty_session_blocks_quit() -> None:
     runtime = _make_runtime()
-    runtime.controls.session.layers["drums"].opacity_pct = 60
+    runtime.controls.session.layers["layer_1"].opacity_pct = 60
     assert (
         dispatch_keydown(
             keydown(pygame.K_q, mod=pygame.KMOD_CTRL),
@@ -146,7 +148,7 @@ def test_ctrl_q_dirty_session_blocks_quit() -> None:
 
 def test_ctrl_q_after_dont_save_exits() -> None:
     runtime = _make_runtime()
-    runtime.controls.session.layers["drums"].opacity_pct = 60
+    runtime.controls.session.layers["layer_1"].opacity_pct = 60
     dispatch_keydown(keydown(pygame.K_q, mod=pygame.KMOD_CTRL), runtime)
     runtime.controls.handle_modal_keydown(keydown(pygame.K_RIGHT))
     runtime.controls.handle_modal_keydown(keydown(pygame.K_RETURN))

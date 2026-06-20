@@ -22,6 +22,10 @@ from cleave.signals import Signals
 from cleave.viz.session import LayerRuntime, TuningSession
 from pathlib import Path
 
+from cleave.config_schema import DEFAULT_STEM_FOR_SLOT, LAYER_SLOTS
+
+SLOT_FOR_STEM = {v: k for k, v in DEFAULT_STEM_FOR_SLOT.items()}
+
 
 def _signals_with_stem_key(stem: str, key: str, values: list[float]) -> Signals:
     arr = np.array(values, dtype=np.float64)
@@ -33,11 +37,14 @@ def _signals_with_stem_key(stem: str, key: str, values: list[float]) -> Signals:
     )
 
 
-def _layer_runtime(stem: str, *, effects: dict | None = None) -> LayerRuntime:
+def _layer_runtime(stem: str, *, opacity_pct: int = 50, effects: dict | None = None) -> LayerRuntime:
+    slot = SLOT_FOR_STEM.get(stem, stem)
+    audio = DEFAULT_STEM_FOR_SLOT.get(slot, stem)
     return LayerRuntime(
-        playlist=playlist_at_dir(Path(f"/tmp/presets/{stem}"), index=0),
-        browse_floor=Path(f"/tmp/presets/{stem}"),
-        opacity_pct=50,
+        playlist=playlist_at_dir(Path(f"/tmp/presets/{slot}"), index=0),
+        browse_floor=Path(f"/tmp/presets/{slot}"),
+        stem=audio,
+        opacity_pct=opacity_pct,
         effects=effects or {},
     )
 
@@ -108,16 +115,16 @@ def test_effect_runtime_flash_per_layer_isolation() -> None:
         },
     )
     session = TuningSession(
-        layer_z_order=["drums", "bass"],
+        layer_z_order=["layer_1", "layer_2"],
         layers={
-            "drums": _layer_runtime("drums", effects={"flash": {"onset": 100}}),
-            "bass": _layer_runtime("bass", effects={"flash": {"sub_bass": 100}}),
+            "layer_1": _layer_runtime("drums", effects={"flash": {"onset": 100}}),
+            "layer_2": _layer_runtime("bass", effects={"flash": {"sub_bass": 100}}),
         },
     )
     runtime = EffectRuntime()
     mods = runtime.tick(session, signals, 0.01)
-    assert mods["drums"].flash_alpha > 0.0
-    assert mods["bass"].flash_alpha == 0.0
+    assert mods["layer_1"].flash_alpha > 0.0
+    assert mods["layer_2"].flash_alpha == 0.0
 
 
 @pytest.mark.parametrize(
@@ -133,28 +140,29 @@ def test_effect_runtime_flash_driver_triggers(
     stem: str, key: str, driver_slug: str, values: list[float]
 ) -> None:
     signals = _signals_with_stem_key(stem, key, values)
+    slot = SLOT_FOR_STEM[stem]
     session = TuningSession(
-        layer_z_order=[stem],
+        layer_z_order=[slot],
         layers={
-            stem: _layer_runtime(stem, effects={"flash": {driver_slug: 100}}),
+            slot: _layer_runtime(stem, effects={"flash": {driver_slug: 100}}),
         },
     )
     runtime = EffectRuntime()
     baseline = runtime.tick(session, signals, 0.0)
     triggered = runtime.tick(session, signals, 0.01)
-    assert baseline[stem].flash_alpha == 0.0
-    assert triggered[stem].flash_alpha > 0.0
+    assert baseline[slot].flash_alpha == 0.0
+    assert triggered[slot].flash_alpha > 0.0
 
 
 def test_effect_runtime_flash_zero_depth_is_noop() -> None:
     signals = _signals_with_stem_key("drums", "onset_strength", [0.0, 1.0, 0.0])
     session = TuningSession(
-        layer_z_order=["drums"],
-        layers={"drums": _layer_runtime("drums", effects={"flash": {"onset": 0}})},
+        layer_z_order=["layer_1"],
+        layers={"layer_1": _layer_runtime("drums", effects={"flash": {"onset": 0}})},
     )
     runtime = EffectRuntime()
     mods = runtime.tick(session, signals, 0.01)
-    assert mods["drums"].flash_alpha == 0.0
+    assert mods["layer_1"].flash_alpha == 0.0
 
 
 def test_effect_runtime_all_stems_expose_flash_modifier() -> None:
@@ -176,13 +184,13 @@ def test_effect_runtime_all_stems_expose_flash_modifier() -> None:
         "other": {"flash": {"centroid": 100}},
     }
     session = TuningSession(
-        layer_z_order=list(STEM_NAMES),
+        layer_z_order=list(LAYER_SLOTS),
         layers={
-            stem: _layer_runtime(stem, effects=flash_effects[stem])
-            for stem in STEM_NAMES
+            slot: _layer_runtime(DEFAULT_STEM_FOR_SLOT[slot], effects=flash_effects[DEFAULT_STEM_FOR_SLOT[slot]])
+            for slot in LAYER_SLOTS
         },
     )
     runtime = EffectRuntime()
     mods = runtime.tick(session, signals, 0.01)
-    for stem in STEM_NAMES:
-        assert mods[stem].flash_alpha > 0.0
+    for slot in LAYER_SLOTS:
+        assert mods[slot].flash_alpha > 0.0

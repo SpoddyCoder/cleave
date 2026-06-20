@@ -31,7 +31,7 @@ def test_load_signals_minimal_fixture(
     minimal_signals_json_path: Path,
 ) -> None:
     raw = json.loads(minimal_signals_json_path.read_text(encoding="utf-8"))
-    assert raw["version"] == 1
+    assert raw["version"] == 2
 
     signals = load_signals(minimal_signals_json_path)
 
@@ -42,6 +42,51 @@ def test_load_signals_minimal_fixture(
     pitch = signals.array("vocals", "pitch_hz")
     assert math.isnan(pitch[2])
     assert pitch[0] == pytest.approx(220.0)
+
+    full_mix_onset = signals.array("full_mix", "onset_strength")
+    assert full_mix_onset[3] == pytest.approx(0.7)
+    full_mix_rms = signals.array("full_mix", "rms")
+    assert full_mix_rms[0] == pytest.approx(0.10)
+
+
+def test_load_signals_rejects_version_1(tmp_path: Path) -> None:
+    path = tmp_path / "signals.json"
+    path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "sample_rate_hz": 100,
+                "duration_sec": 0.1,
+                "drums": {"onset_strength": [0.0]},
+                "bass": {"rms": [0.0], "sub_bass": [0.0], "mid_bass": [0.0]},
+                "vocals": {"rms": [0.0], "pitch_hz": [220.0]},
+                "other": {"spectral_centroid": [1000.0]},
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="unsupported signals.json version"):
+        load_signals(path)
+
+
+def test_load_signals_rejects_missing_full_mix(tmp_path: Path) -> None:
+    path = tmp_path / "signals.json"
+    path.write_text(
+        json.dumps(
+            {
+                "version": 2,
+                "sample_rate_hz": 100,
+                "duration_sec": 0.1,
+                "drums": {"onset_strength": [0.0]},
+                "bass": {"rms": [0.0], "sub_bass": [0.0], "mid_bass": [0.0]},
+                "vocals": {"rms": [0.0], "pitch_hz": [220.0]},
+                "other": {"spectral_centroid": [1000.0]},
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="missing stem section"):
+        load_signals(path)
 
 
 def test_sample_clamps_below_zero(minimal_signals: Signals) -> None:

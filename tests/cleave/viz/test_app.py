@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pygame
 
+from cleave.config_schema import DEFAULT_STEM_FOR_SLOT, LAYER_SLOTS
 from cleave.extract import STEM_NAMES
 from cleave.viz.app import (
     LiveVisualizerRuntime,
@@ -56,7 +57,7 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
     runtime = LiveVisualizerRuntime(
         seed=seed,
         layers=[],
-        layers_by_name={},
+        layers_by_slot={},
         compositor=compositor,
         post_process=MagicMock(),
         controls=controls,
@@ -104,10 +105,14 @@ def _run_seed(*, upscale: float = 2.0) -> VisualizerSeed:
 def _timeline_open_runtime(compositor: MagicMock) -> LiveVisualizerRuntime:
     runtime = _minimal_runtime(compositor)
     runtime.overlay = TuningOverlay()
-    runtime.seed.session.layer_z_order = list(STEM_NAMES)
+    runtime.seed.session.layer_z_order = list(LAYER_SLOTS)
     runtime.seed.session.layers = {
-        stem: LayerRuntime(playlist=MagicMock(), browse_floor=MagicMock())
-        for stem in STEM_NAMES
+        slot: LayerRuntime(
+            playlist=MagicMock(),
+            browse_floor=MagicMock(),
+            stem=DEFAULT_STEM_FOR_SLOT[slot],
+        )
+        for slot in LAYER_SLOTS
     }
     runtime.seed.session.timeline.enabled = True
     runtime.seed.session.timeline.panel_open = True
@@ -172,7 +177,7 @@ def _heavy_init_side_effect(
     return LiveVisualizerRuntime(
         seed=seed,
         layers=[],
-        layers_by_name={},
+        layers_by_slot={},
         compositor=compositor,
         post_process=post_process,
         controls=controls,
