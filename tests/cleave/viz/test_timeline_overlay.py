@@ -18,12 +18,18 @@ from cleave.viz.theme import (
     SOLO_BG,
 )
 from cleave.viz.timeline_overlay import (
+    ARM_FLASH_DURATION_MS,
+    ARM_FLASH_HALF_MS,
     TimelineOverlay,
     TimelineViewState,
+    arm_abbrev_flash_active,
+    arm_abbrev_flash_visible,
+    armed_abbrev_bg_visible,
     bar_tick_times_for_row,
     cue_times_for_stem,
     layer_num_prefix,
     playhead_x,
+    prune_expired_arm_flashes,
     rec_flash_visible,
     row_prefix_width,
     stem_abbrev_label,
@@ -53,6 +59,7 @@ def _view_state(
     monitor_visible: dict[str, bool] | None = None,
     timeline_visible: dict[str, bool] | None = None,
     override_slots: set[str] | None = None,
+    arm_flash_start_ms: dict[str, int] | None = None,
 ) -> TimelineViewState:
     order = list(layer_z_order or list(LAYER_SLOTS))
     cue_list = list(cues or [])
@@ -85,6 +92,7 @@ def _view_state(
         record_buffer=list(record_buffer or ()),
         enabled=enabled,
         submenu_focused=submenu_focused,
+        arm_flash_start_ms=dict(arm_flash_start_ms or ()),
     )
 
 
@@ -162,6 +170,77 @@ def test_rec_flash_visible_alternates_every_500ms() -> None:
     assert rec_flash_visible(500) is False
     assert rec_flash_visible(999) is False
     assert rec_flash_visible(1000) is True
+
+
+def test_arm_abbrev_flash_visible_blinks_twice() -> None:
+    start = 1000
+    flash = {"layer_1": start}
+    assert arm_abbrev_flash_active(flash, "layer_1", ticks_ms=start) is True
+    assert arm_abbrev_flash_visible(flash, "layer_1", ticks_ms=start) is True
+    assert arm_abbrev_flash_visible(flash, "layer_1", ticks_ms=start + ARM_FLASH_HALF_MS - 1) is True
+    assert arm_abbrev_flash_visible(flash, "layer_1", ticks_ms=start + ARM_FLASH_HALF_MS) is False
+    assert arm_abbrev_flash_visible(flash, "layer_1", ticks_ms=start + ARM_FLASH_HALF_MS * 2) is True
+    assert arm_abbrev_flash_visible(flash, "layer_1", ticks_ms=start + ARM_FLASH_HALF_MS * 3) is False
+    assert arm_abbrev_flash_active(
+        flash, "layer_1", ticks_ms=start + ARM_FLASH_DURATION_MS - 1
+    ) is True
+    assert arm_abbrev_flash_active(
+        flash, "layer_1", ticks_ms=start + ARM_FLASH_DURATION_MS
+    ) is False
+
+
+def test_prune_expired_arm_flashes() -> None:
+    flash = {"layer_1": 0, "layer_2": 1000}
+    prune_expired_arm_flashes(flash, ticks_ms=ARM_FLASH_DURATION_MS)
+    assert flash == {"layer_2": 1000}
+    prune_expired_arm_flashes(flash, ticks_ms=1000 + ARM_FLASH_DURATION_MS)
+    assert flash == {}
+
+
+def test_armed_abbrev_bg_visible_prefers_arm_flash_over_steady_armed() -> None:
+    start = 5000
+    flash = {"layer_1": start}
+    off_tick = start + ARM_FLASH_HALF_MS
+    assert armed_abbrev_bg_visible(
+        armed=True,
+        recording=False,
+        flash_starts=flash,
+        slot="layer_1",
+        ticks_ms=off_tick,
+    ) is False
+    assert armed_abbrev_bg_visible(
+        armed=True,
+        recording=False,
+        flash_starts={},
+        slot="layer_1",
+        ticks_ms=off_tick,
+    ) is True
+
+
+def test_disarm_flash_draws_armed_abbrev_bg_on_phase(monkeypatch) -> None:
+    start = 5000
+    monkeypatch.setattr("pygame.time.get_ticks", lambda: start + 10)
+    pygame.init()
+    overlay = TimelineOverlay()
+    state = _view_state(
+        armed_slots=set(),
+        arm_flash_start_ms={"layer_2": start},
+        focus_row=1,
+    )
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    _draw(overlay, surface, state)
+
+    bass_layout = next(row for row in overlay.row_layout if row[5] == "layer_2")
+    _, _, row_y, _, row_h, _ = bass_layout
+    flash_on = _abbrev_bg_pixel(surface, overlay, row_y, row_h)
+
+    monkeypatch.setattr("pygame.time.get_ticks", lambda: start + ARM_FLASH_HALF_MS + 10)
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    _draw(overlay, surface, state)
+    flash_off = _abbrev_bg_pixel(surface, overlay, row_y, row_h)
+
+    assert flash_on[0] > flash_off[0] + 40
+    assert flash_on[0] > 150
 
 
 def test_armed_recording_monitor_eye_flashes_when_focused(monkeypatch) -> None:

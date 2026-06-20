@@ -226,6 +226,7 @@ class TimelineControls:
                 self._commit_recording_slot(slot)
         else:
             armed.add(slot)
+        tl.arm_flash_start_ms[slot] = pygame.time.get_ticks()
 
     def _commit_recording_slot(self, slot: str) -> None:
         tl = self.session.timeline

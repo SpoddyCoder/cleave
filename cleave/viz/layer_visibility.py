@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from cleave.timeline import TimelineCue, layer_visible_at
 from cleave.viz.session import TuningSession
-from cleave.viz.timeline_overlay import TimelineViewState
+from cleave.viz.timeline_overlay import TimelineViewState, prune_expired_arm_flashes
 
 if TYPE_CHECKING:
     from cleave.viz.layer import StemLayer
@@ -217,6 +217,7 @@ def build_timeline_view_state(
     duration_sec: float,
 ) -> TimelineViewState:
     tl = session.timeline
+    prune_expired_arm_flashes(tl.arm_flash_start_ms)
     monitor_visible = {
         slot: effective_layer_enabled(session, slot, position_sec)
         for slot in session.layer_z_order
@@ -243,4 +244,5 @@ def build_timeline_view_state(
         record_buffer=list(tl.record_buffer),
         enabled=tl.enabled,
         submenu_focused=tl.submenu_focused,
+        arm_flash_start_ms=dict(tl.arm_flash_start_ms),
     )
