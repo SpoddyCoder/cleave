@@ -20,7 +20,13 @@ from cleave.viz.focus_context import FocusContext
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.render_overlay_controls import RenderOverlayControls
 from cleave.viz.render_post_fx_controls import RenderPostFxControls
-from cleave.viz.row_semantics import REPEAT_ROW_KINDS, RowDescriptor, RowKind
+from cleave.viz.row_semantics import (
+    REPEAT_ROW_KINDS,
+    RowDescriptor,
+    RowKind,
+    layer_lock_blocks_mutation,
+    row_behavior,
+)
 from cleave.viz.overlay import (
     TuningViewState,
     build_row_layout,
@@ -239,6 +245,10 @@ class TuningControls:
             if kind == RowKind.TRACK_PRESET_DIR:
                 slot = row_slot(view, self.focus_index)
                 if slot is not None:
+                    if layer_lock_blocks_mutation(
+                        kind, locked=self.session.layers[slot].locked
+                    ):
+                        return True
                     self._parent_directory(slot)
                 return True
 
@@ -257,6 +267,10 @@ class TuningControls:
             if kind == RowKind.TRACK_PRESET_DIR:
                 slot = row_slot(view, self.focus_index)
                 if slot is not None:
+                    if layer_lock_blocks_mutation(
+                        kind, locked=self.session.layers[slot].locked
+                    ):
+                        return True
                     self._enter_directory(slot)
                 return True
             if kind == RowKind.TRANSPORT:
@@ -265,7 +279,10 @@ class TuningControls:
             if kind == RowKind.TRACK_HEADER:
                 slot = row_slot(view, self.focus_index)
                 if slot is not None:
-                    if self.session.layers[slot].locked:
+                    if (
+                        self.session.layers[slot].locked
+                        and row_behavior(kind).can_enter_move_mode
+                    ):
                         return True
                     self._move_mode_original_z_order = list(
                         self.session.layer_z_order
@@ -422,9 +439,9 @@ class TuningControls:
 
         if (
             slot is not None
-            and kind in REPEAT_ROW_KINDS
-            and kind != RowKind.TRACK_STEM
-            and self.session.layers[slot].locked
+            and layer_lock_blocks_mutation(
+                kind, locked=self.session.layers[slot].locked
+            )
         ):
             return
 
@@ -438,7 +455,10 @@ class TuningControls:
                     self._exit_solo(slot)
                 return
             if ctrl:
-                if self.session.layers[slot].locked:
+                if (
+                    self.session.layers[slot].locked
+                    and row_behavior(kind).can_enable_disable
+                ):
                     return
                 self._set_enabled(slot, forward)
                 return

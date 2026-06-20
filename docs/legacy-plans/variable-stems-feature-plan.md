@@ -265,7 +265,6 @@ cleave effects header
   - Clear `session.layers[slot].effects` (old effects config is invalid for the new
   roster; user starts fresh).
   - Mark config dirty via existing dirty-tracking mechanism.
-- The row is never locked (stem can always be changed).
 - Display: `"Stem: drums"` / `"Stem: full-mix"` in label/value style.
 
 ### `cleave/viz/row_semantics.py`
