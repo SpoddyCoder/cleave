@@ -126,11 +126,16 @@ def build_record_punch_cues(
     session: TuningSession,
     record_start: float,
     record_stop: float,
+    *,
+    slots: set[str] | None = None,
 ) -> list[TimelineCue]:
     """Cues to punch on record stop: baseline, toggles, and committed restore at stop."""
     tl = session.timeline
+    target_slots = set(tl.record_baseline) if slots is None else slots
     punch: list[TimelineCue] = []
-    for slot in tl.record_baseline:
+    for slot in target_slots:
+        if slot not in tl.record_baseline:
+            continue
         if not _slot_has_t0_cue(tl.cues, slot):
             punch.append(
                 TimelineCue(
@@ -142,6 +147,8 @@ def build_record_punch_cues(
                 )
             )
     for slot, baseline in tl.record_baseline.items():
+        if slot not in target_slots:
+            continue
         if baseline != timeline_committed_visible(session, slot, record_start):
             punch.append(
                 TimelineCue(
@@ -150,8 +157,14 @@ def build_record_punch_cues(
                     show_tick=False,
                 )
             )
-    punch.extend(tl.record_buffer)
-    for slot in tl.record_baseline:
+    punch.extend(
+        cue
+        for cue in tl.record_buffer
+        if target_slots.intersection(cue.layers)
+    )
+    for slot in target_slots:
+        if slot not in tl.record_baseline:
+            continue
         end_visible = armed_recording_visible(session, slot, record_stop)
         committed_at_stop = timeline_committed_visible(session, slot, record_stop)
         if end_visible != committed_at_stop:

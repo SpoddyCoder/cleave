@@ -523,7 +523,7 @@ def test_layer_key_debounce_ignores_rapid_press() -> None:
     assert len(session.timeline.record_buffer) == 1
 
 
-def test_disarm_during_recording_still_commits_on_stop() -> None:
+def test_disarm_during_recording_commits_slot_and_exits_recording() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=5.0,
@@ -535,15 +535,34 @@ def test_disarm_during_recording_still_commits_on_stop() -> None:
     controls.handle_keydown(keydown(pygame.K_1))
     controls.handle_keydown(keydown(pygame.K_RETURN))
     assert session.timeline.armed_slots == set()
-    assert session.timeline.recording is True
-    assert len(session.timeline.record_buffer) == 1
-
-    controls.handle_keydown(keydown(pygame.K_r))
     assert session.timeline.recording is False
+    assert session.timeline.record_baseline == {}
+    assert session.timeline.record_buffer == []
     assert any(
         cue.t == 5.0 and cue.layers.get("layer_1") is False
         for cue in session.timeline.cues
     )
+    assert visibility_calls
+
+
+def test_disarm_one_slot_keeps_recording_on_remaining_armed() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1", "layer_2"},
+        focus_row=0,
+        position_sec=8.0,
+        cues=[TimelineCue(t=0.0, layers={"layer_1": False, "layer_2": False})],
+    )
+    session.layers["layer_1"].enabled = True
+    session.layers["layer_2"].enabled = True
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.handle_keydown(keydown(pygame.K_RETURN))
+    assert session.timeline.armed_slots == {"layer_2"}
+    assert session.timeline.recording is True
+    assert session.timeline.record_baseline == {"layer_2": False}
+    assert "layer_1" not in session.timeline.record_baseline
+    assert all("layer_1" not in cue.layers for cue in session.timeline.record_buffer)
     assert visibility_calls
 
 

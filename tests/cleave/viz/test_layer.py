@@ -465,17 +465,20 @@ def test_armed_recording_bar_blends_committed_and_live() -> None:
     ]
 
 
-def test_armed_recording_bar_keeps_live_preview_after_disarm() -> None:
+def test_armed_recording_bar_uses_committed_timeline_after_disarm() -> None:
     session = _session(
         layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
         timeline_enabled=True,
-        cues=[TimelineCue(t=0.0, layers={"layer_1": False})],
+        cues=[
+            TimelineCue(t=0.0, layers={"layer_1": False}),
+            TimelineCue(t=10.0, layers={"layer_1": True}),
+            TimelineCue(t=12.0, layers={"layer_1": False}),
+        ],
     )
-    session.timeline.recording = True
-    session.timeline.record_start_sec = 10.0
+    session.timeline.recording = False
     session.timeline.armed_slots = set()
-    session.timeline.record_baseline = {"layer_1": True}
-    session.timeline.record_buffer = [TimelineCue(t=12.0, layers={"layer_1": False})]
+    session.timeline.record_baseline = {}
+    session.timeline.record_buffer = []
 
     state = build_timeline_view_state(session, position_sec=12.0, duration_sec=60.0)
     segments = bar_segments_for_row(state, "layer_1")

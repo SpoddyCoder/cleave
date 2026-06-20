@@ -218,11 +218,49 @@ class TimelineControls:
 
     def _toggle_arm(self) -> None:
         slot = self._focused_slot()
-        armed = self.session.timeline.armed_slots
+        tl = self.session.timeline
+        armed = tl.armed_slots
         if slot in armed:
             armed.discard(slot)
+            if tl.recording and slot in tl.record_baseline:
+                self._commit_recording_slot(slot)
         else:
             armed.add(slot)
+
+    def _commit_recording_slot(self, slot: str) -> None:
+        tl = self.session.timeline
+        record_start = tl.record_start_sec
+        if record_start is None or slot not in tl.record_baseline:
+            return
+
+        record_stop = current_sec(self.playback, self.duration_sec)
+        tl.cues = punch_replace(
+            tl.cues,
+            {slot},
+            record_start,
+            record_stop,
+            build_record_punch_cues(
+                self.session,
+                record_start,
+                record_stop,
+                slots={slot},
+            ),
+        )
+        tl.record_baseline.pop(slot, None)
+        tl.record_buffer = [
+            cue for cue in tl.record_buffer if slot not in cue.layers
+        ]
+        self._last_toggle_t.pop(slot, None)
+
+        if not tl.armed_slots:
+            tl.recording = False
+            tl.record_start_sec = None
+            tl.record_buffer = []
+            tl.record_baseline = {}
+            self._last_toggle_t = {}
+
+        if self._on_visibility_change is not None:
+            self._on_visibility_change()
 
     def _start_record(self) -> None:
         tl = self.session.timeline
