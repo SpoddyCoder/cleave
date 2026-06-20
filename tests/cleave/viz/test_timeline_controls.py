@@ -790,3 +790,33 @@ def test_ctrl_space_without_armed_stems_toasts() -> None:
     assert session.timeline.recording is False
     assert toasts == ["Arm at least one layer to record"]
     assert visibility_calls == []
+
+
+def test_recorded_timeline_bar_unchanged_after_disable_layer_toggle_reenable() -> None:
+    from cleave.viz.layer_visibility import build_timeline_view_state
+    from cleave.viz.timeline_overlay import bar_segments_for_row
+
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=0.0,
+    )
+    session.layers["layer_1"].enabled = False
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    for t_sec in (3.0, 6.0, 9.0, 12.0, 15.0):
+        controls.playback.player.seek(t_sec)
+        controls.handle_keydown(keydown(pygame.K_1))
+    controls.playback.player.seek(18.0)
+    controls.handle_keydown(keydown(pygame.K_r))
+
+    def segments() -> list[tuple[float, float, bool]]:
+        state = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
+        return bar_segments_for_row(state, "layer_1")
+
+    expected = segments()
+
+    session.timeline.enabled = False
+    session.layers["layer_1"].enabled = True
+    session.timeline.enabled = True
+    assert segments() == expected
+    assert expected[0] == (0.0, 3.0, False)

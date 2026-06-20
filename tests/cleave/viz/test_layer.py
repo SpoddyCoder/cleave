@@ -676,3 +676,75 @@ def test_warmup_layers_respects_timeline_visibility() -> None:
     assert drums.pm.feed_pcm.call_count == 0
     assert bass.pm.feed_pcm.call_count == 2
     assert render_mock.call_count == 2
+
+
+def test_timeline_defaults_tracks_layer_enabled_before_first_record() -> None:
+    session = _session(
+        layer_enabled={"layer_1": False, "layer_2": True, "layer_3": True, "layer_4": True},
+    )
+    assert timeline_defaults(session)["layer_1"] is False
+    session.layers["layer_1"].enabled = True
+    assert timeline_defaults(session)["layer_1"] is True
+
+
+def test_timeline_defaults_stable_after_layer_toggle_when_slot_has_cues() -> None:
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+        cues=[
+            TimelineCue(t=5.0, layers={"layer_1": True}),
+            TimelineCue(t=10.0, layers={"layer_1": False}),
+            TimelineCue(t=15.0, layers={"layer_1": True}),
+        ],
+    )
+    assert timeline_defaults(session)["layer_1"] is False
+    session.layers["layer_1"].enabled = False
+    assert timeline_defaults(session)["layer_1"] is False
+    assert timeline_committed_visible(session, "layer_1", 2.0) is False
+    assert timeline_committed_visible(session, "layer_1", 7.0) is True
+
+
+def test_build_record_punch_cues_adds_t0_anchor_on_first_record() -> None:
+    session = _session(
+        layer_enabled={"layer_1": False, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+        cues=[],
+    )
+    session.timeline.armed_slots = {"layer_1"}
+    session.timeline.record_baseline = {"layer_1": False}
+    session.timeline.record_buffer = [
+        TimelineCue(t=5.0, layers={"layer_1": True}),
+        TimelineCue(t=10.0, layers={"layer_1": False}),
+        TimelineCue(t=15.0, layers={"layer_1": True}),
+    ]
+
+    punch = build_record_punch_cues(session, record_start=2.0, record_stop=20.0)
+    assert TimelineCue(t=0.0, layers={"layer_1": False}, show_tick=False) in punch
+
+
+def test_timeline_bar_preserves_pre_first_cue_after_layer_toggle() -> None:
+    session = _session(
+        layer_enabled={"layer_1": False, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+        cues=[
+            TimelineCue(t=5.0, layers={"layer_1": True}),
+            TimelineCue(t=10.0, layers={"layer_1": False}),
+            TimelineCue(t=15.0, layers={"layer_1": True}),
+        ],
+    )
+    state = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
+    assert bar_segments_for_row(state, "layer_1") == [
+        (0.0, 5.0, False),
+        (5.0, 10.0, True),
+        (10.0, 15.0, False),
+        (15.0, 60.0, True),
+    ]
+
+    session.layers["layer_1"].enabled = True
+    state = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
+    assert bar_segments_for_row(state, "layer_1") == [
+        (0.0, 5.0, False),
+        (5.0, 10.0, True),
+        (10.0, 15.0, False),
+        (15.0, 60.0, True),
+    ]
