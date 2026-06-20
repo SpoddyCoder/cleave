@@ -17,7 +17,7 @@ rows apply these roles, including intentional exceptions.
 from __future__ import annotations
 
 BACKGROUND: tuple[int, int, int] = (0, 0, 0)
-BACKGROUND_ALPHA: int = int(0.8 * 255)
+BACKGROUND_ALPHA: int = int(1.0 * 255)
 MODAL_SCRIM_ALPHA: int = int(0.55 * 255)
 BORDER_COLOR: tuple[int, int, int] = (255, 255, 255)
 
