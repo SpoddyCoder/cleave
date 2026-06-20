@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from cleave.config_schema import DEFAULT_STEM_FOR_SLOT, LAYER_SLOTS
+
+SLOT_FOR_STEM = {v: k for k, v in DEFAULT_STEM_FOR_SLOT.items()}
+
 import numpy as np
 import pytest
 
@@ -34,11 +38,14 @@ def _signals_with_stem_key(stem: str, key: str, values: list[float]) -> Signals:
     )
 
 
-def _layer_runtime(stem: str, *, effects: dict | None = None) -> LayerRuntime:
+def _layer_runtime(stem: str, *, opacity_pct: int = 50, effects: dict | None = None) -> LayerRuntime:
+    slot = SLOT_FOR_STEM.get(stem, stem)
+    audio = DEFAULT_STEM_FOR_SLOT.get(slot, stem)
     return LayerRuntime(
-        playlist=playlist_at_dir(Path(f"/tmp/presets/{stem}"), index=0),
-        browse_floor=Path(f"/tmp/presets/{stem}"),
-        opacity_pct=50,
+        playlist=playlist_at_dir(Path(f"/tmp/presets/{slot}"), index=0),
+        browse_floor=Path(f"/tmp/presets/{slot}"),
+        stem=audio,
+        opacity_pct=opacity_pct,
         effects=effects or {},
     )
 
@@ -89,30 +96,30 @@ def test_grit_state_tracks_envelope() -> None:
 def test_effect_runtime_grit_triggers_on_signal_peak() -> None:
     signals = _signals_with_stem_key("drums", "onset_strength", [0.0, 1.0, 0.0])
     session = TuningSession(
-        layer_z_order=["drums"],
+        layer_z_order=["layer_1"],
         layers={
-            "drums": _layer_runtime("drums", effects={"grit": {"onset": 100}}),
+            "layer_1": _layer_runtime("drums", effects={"grit": {"onset": 100}}),
         },
     )
     runtime = EffectRuntime()
     baseline = runtime.tick(session, signals, 0.0)
     triggered = runtime.tick(session, signals, 0.01)
-    assert baseline["drums"].grit_strength == 0.0
-    assert baseline["drums"].aberration_px == 0.0
-    assert triggered["drums"].grit_strength > 0.0
-    assert triggered["drums"].aberration_px > 0.0
+    assert baseline["layer_1"].grit_strength == 0.0
+    assert baseline["layer_1"].aberration_px == 0.0
+    assert triggered["layer_1"].grit_strength > 0.0
+    assert triggered["layer_1"].aberration_px > 0.0
 
 
 def test_effect_runtime_grit_zero_depth_is_noop() -> None:
     signals = _signals_with_stem_key("drums", "onset_strength", [0.0, 1.0, 0.0])
     session = TuningSession(
-        layer_z_order=["drums"],
-        layers={"drums": _layer_runtime("drums", effects={"grit": {"onset": 0}})},
+        layer_z_order=["layer_1"],
+        layers={"layer_1": _layer_runtime("drums", effects={"grit": {"onset": 0}})},
     )
     runtime = EffectRuntime()
     mods = runtime.tick(session, signals, 0.01)
-    assert mods["drums"].grit_strength == 0.0
-    assert mods["drums"].aberration_px == 0.0
+    assert mods["layer_1"].grit_strength == 0.0
+    assert mods["layer_1"].aberration_px == 0.0
 
 
 @pytest.mark.parametrize(
@@ -128,18 +135,19 @@ def test_effect_runtime_grit_per_stem(
     stem: str, key: str, driver_slug: str, values: list[float]
 ) -> None:
     signals = _signals_with_stem_key(stem, key, values)
+    slot = SLOT_FOR_STEM[stem]
     session = TuningSession(
-        layer_z_order=[stem],
+        layer_z_order=[slot],
         layers={
-            stem: _layer_runtime(stem, effects={"grit": {driver_slug: 100}}),
+            slot: _layer_runtime(stem, effects={"grit": {driver_slug: 100}}),
         },
     )
     runtime = EffectRuntime()
     baseline = runtime.tick(session, signals, 0.0)
     modulated = runtime.tick(session, signals, 0.01)
-    assert baseline[stem].grit_strength == 0.0
-    assert modulated[stem].grit_strength > 0.0
-    assert modulated[stem].aberration_px > 0.0
+    assert baseline[slot].grit_strength == 0.0
+    assert modulated[slot].grit_strength > 0.0
+    assert modulated[slot].aberration_px > 0.0
 
 
 def test_effect_runtime_grit_all_stems() -> None:
@@ -155,16 +163,16 @@ def test_effect_runtime_grit_all_stems() -> None:
         },
     )
     session = TuningSession(
-        layer_z_order=list(STEM_NAMES),
+        layer_z_order=list(LAYER_SLOTS),
         layers={
-            "drums": _layer_runtime("drums", effects={"grit": {"onset": 100}}),
-            "bass": _layer_runtime("bass", effects={"grit": {"sub_bass": 100}}),
-            "vocals": _layer_runtime("vocals", effects={"grit": {"rms": 100}}),
-            "other": _layer_runtime("other", effects={"grit": {"centroid": 100}}),
+            "layer_1": _layer_runtime("drums", effects={"grit": {"onset": 100}}),
+            "layer_2": _layer_runtime("bass", effects={"grit": {"sub_bass": 100}}),
+            "layer_3": _layer_runtime("vocals", effects={"grit": {"rms": 100}}),
+            "layer_4": _layer_runtime("other", effects={"grit": {"centroid": 100}}),
         },
     )
     runtime = EffectRuntime()
     mods = runtime.tick(session, signals, 0.01)
-    for stem in STEM_NAMES:
-        assert mods[stem].grit_strength > 0.0
-        assert mods[stem].aberration_px > 0.0
+    for slot in LAYER_SLOTS:
+        assert mods[slot].grit_strength > 0.0
+        assert mods[slot].aberration_px > 0.0

@@ -13,18 +13,18 @@ if TYPE_CHECKING:
 
 
 def timeline_defaults(session: TuningSession) -> dict[str, bool]:
-    return {name: session.layers[name].enabled for name in session.layer_z_order}
+    return {slot: session.layers[slot].enabled for slot in session.layer_z_order}
 
 
 def timeline_committed_visible(
     session: TuningSession,
-    stem: str,
+    slot: str,
     t_sec: float,
 ) -> bool:
     return layer_visible_at(
         session.timeline.cues,
         timeline_defaults(session),
-        stem,
+        slot,
         t_sec,
     )
 
@@ -35,8 +35,8 @@ def snapshot_monitor_from_timeline(
 ) -> dict[str, bool]:
     defaults = timeline_defaults(session)
     return {
-        stem: layer_visible_at(session.timeline.cues, defaults, stem, t_sec)
-        for stem in session.layer_z_order
+        slot: layer_visible_at(session.timeline.cues, defaults, slot, t_sec)
+        for slot in session.layer_z_order
     }
 
 
@@ -45,8 +45,8 @@ def snapshot_monitor_from_output(
     t_sec: float,
 ) -> dict[str, bool]:
     return {
-        stem: effective_layer_enabled(session, stem, t_sec)
-        for stem in session.layer_z_order
+        slot: effective_layer_enabled(session, slot, t_sec)
+        for slot in session.layer_z_order
     }
 
 
@@ -58,34 +58,34 @@ def armed_recording_defaults(session: TuningSession) -> dict[str, bool]:
 
 def armed_recording_visible(
     session: TuningSession,
-    stem: str,
+    slot: str,
     t_sec: float,
 ) -> bool:
-    """Visibility for an armed stem during an active record pass."""
+    """Visibility for an armed slot during an active record pass."""
     return layer_visible_at(
         session.timeline.record_buffer,
         armed_recording_defaults(session),
-        stem,
+        slot,
         t_sec,
     )
 
 
 def committed_visible_outside_punch(
     session: TuningSession,
-    stem: str,
+    slot: str,
     record_start: float,
     record_stop: float,
 ) -> bool:
-    """Committed visibility at *record_stop* ignoring armed-stem cues inside the punch."""
+    """Committed visibility at *record_stop* ignoring armed-slot cues inside the punch."""
     kept = [
         cue
         for cue in session.timeline.cues
         if not (
             record_start <= cue.t <= record_stop
-            and stem in cue.layers
+            and slot in cue.layers
         )
     ]
-    return layer_visible_at(kept, timeline_defaults(session), stem, record_stop)
+    return layer_visible_at(kept, timeline_defaults(session), slot, record_stop)
 
 
 def build_record_punch_cues(
@@ -96,27 +96,27 @@ def build_record_punch_cues(
     """Cues to punch on record stop: baseline, toggles, and committed restore at stop."""
     tl = session.timeline
     punch: list[TimelineCue] = []
-    for stem in tl.armed_stems:
-        baseline = tl.record_baseline.get(stem)
+    for slot in tl.armed_slots:
+        baseline = tl.record_baseline.get(slot)
         if baseline is None:
             continue
-        if baseline != timeline_committed_visible(session, stem, record_start):
+        if baseline != timeline_committed_visible(session, slot, record_start):
             punch.append(
                 TimelineCue(
                     t=record_start,
-                    layers={stem: baseline},
+                    layers={slot: baseline},
                     show_tick=False,
                 )
             )
     punch.extend(tl.record_buffer)
-    for stem in tl.armed_stems:
-        end_visible = armed_recording_visible(session, stem, record_stop)
-        committed_at_stop = timeline_committed_visible(session, stem, record_stop)
+    for slot in tl.armed_slots:
+        end_visible = armed_recording_visible(session, slot, record_stop)
+        committed_at_stop = timeline_committed_visible(session, slot, record_stop)
         if end_visible != committed_at_stop:
             punch.append(
                 TimelineCue(
                     t=record_stop,
-                    layers={stem: committed_at_stop},
+                    layers={slot: committed_at_stop},
                     show_tick=False,
                 )
             )
@@ -125,35 +125,35 @@ def build_record_punch_cues(
 
 def effective_layer_enabled(
     session: TuningSession,
-    stem: str,
+    slot: str,
     t_sec: float,
 ) -> bool:
-    if session.solo_stem is not None:
-        return stem == session.solo_stem
+    if session.solo_slot is not None:
+        return slot == session.solo_slot
     if not session.timeline.enabled:
-        return session.layers[stem].enabled
+        return session.layers[slot].enabled
     tl = session.timeline
     defaults = timeline_defaults(session)
     if tl.recording:
-        if stem in tl.armed_stems:
-            return armed_recording_visible(session, stem, t_sec)
-        if stem in tl.override_stems:
-            return tl.override_visible.get(stem, True)
-        return layer_visible_at(tl.cues, defaults, stem, t_sec)
+        if slot in tl.armed_slots:
+            return armed_recording_visible(session, slot, t_sec)
+        if slot in tl.override_slots:
+            return tl.override_visible.get(slot, True)
+        return layer_visible_at(tl.cues, defaults, slot, t_sec)
     if tl.preview_active:
-        return tl.monitor[stem]
-    if stem in tl.override_stems:
-        return tl.override_visible.get(stem, True)
-    return layer_visible_at(tl.cues, defaults, stem, t_sec)
+        return tl.monitor[slot]
+    if slot in tl.override_slots:
+        return tl.override_visible.get(slot, True)
+    return layer_visible_at(tl.cues, defaults, slot, t_sec)
 
 
 def apply_layer_visibility(
     session: TuningSession,
-    layers_by_name: dict[str, StemLayer],
+    layers_by_slot: dict[str, StemLayer],
     t_sec: float,
 ) -> None:
-    for stem, layer in layers_by_name.items():
-        layer.fbo.enabled = effective_layer_enabled(session, stem, t_sec)
+    for slot, layer in layers_by_slot.items():
+        layer.fbo.enabled = effective_layer_enabled(session, slot, t_sec)
 
 
 def build_timeline_view_state(
@@ -163,12 +163,12 @@ def build_timeline_view_state(
 ) -> TimelineViewState:
     tl = session.timeline
     monitor_visible = {
-        stem: effective_layer_enabled(session, stem, position_sec)
-        for stem in session.layer_z_order
+        slot: effective_layer_enabled(session, slot, position_sec)
+        for slot in session.layer_z_order
     }
     timeline_visible = {
-        stem: timeline_committed_visible(session, stem, position_sec)
-        for stem in session.layer_z_order
+        slot: timeline_committed_visible(session, slot, position_sec)
+        for slot in session.layer_z_order
     }
     return TimelineViewState(
         layer_z_order=list(session.layer_z_order),
@@ -179,8 +179,9 @@ def build_timeline_view_state(
         focus_row=tl.focus_row,
         monitor_visible=monitor_visible,
         timeline_visible=timeline_visible,
-        override_stems=set(tl.override_stems),
-        armed_stems=set(tl.armed_stems),
+        slot_stems={slot: session.layers[slot].stem for slot in session.layer_z_order},
+        override_slots=set(tl.override_slots),
+        armed_slots=set(tl.armed_slots),
         recording=tl.recording,
         record_start_sec=tl.record_start_sec,
         record_baseline=dict(tl.record_baseline),

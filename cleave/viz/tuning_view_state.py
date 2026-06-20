@@ -56,16 +56,16 @@ class TuningViewStateBuilder:
         from cleave.viz.layer_visibility import effective_layer_enabled
 
         tracks: dict[str, TrackBlock] = {}
-        for stem in self.session.layer_z_order:
-            layer = self.session.layers[stem]
+        for slot in self.session.layer_z_order:
+            layer = self.session.layers[slot]
             if self.session.timeline.enabled:
                 visible = effective_layer_enabled(
-                    self.session, stem, position_sec
+                    self.session, slot, position_sec
                 )
             else:
                 visible = layer.enabled
-            tracks[stem] = TrackBlock(
-                stem=stem,
+            tracks[slot] = TrackBlock(
+                stem=layer.stem,
                 preset_dir_label=directory_display(
                     layer.playlist, self.preset_root
                 ),
@@ -105,8 +105,8 @@ class TuningViewStateBuilder:
             allow_overwrite=self._config_save.allow_overwrite(),
             active_config_label=config_path_display(self._config_save.active_config_path),
             config_dirty=self._config_save.config_dirty,
-            solo_stem=self.session.solo_stem,
-            solo_active=self.session.solo_stem is not None,
+            solo_stem=self.session.solo_slot,
+            solo_active=self.session.solo_slot is not None,
             render_overlay=RenderOverlayBlock(
                 enabled=ro.enabled,
                 expanded=ro.expanded,
@@ -137,6 +137,6 @@ class TuningViewStateBuilder:
             ),
             timeline_submenu_focused=tl.submenu_focused,
             timeline_recording=tl.recording,
-            timeline_override_active=bool(tl.override_stems),
+            timeline_override_active=bool(tl.override_slots),
             help_visible=self.session.help_visible,
         )

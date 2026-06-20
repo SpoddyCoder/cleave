@@ -5,12 +5,15 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
+from cleave.config import load_config
+from cleave.config_schema import LAYER_SLOTS
 from cleave.preset_playlist import (
     directory_display,
     list_navigable_dirs,
     playlist_at_dir,
     preset_browse_floor,
     preset_filename_display,
+    scan_all_layers,
     scan_preset_playlist,
 )
 
@@ -224,3 +227,12 @@ def test_container_directory_anchor_no_direct_presets() -> None:
         assert playlist.current is None
         assert preset_filename_display(playlist) == "NO PRESETS FOUND"
         assert playlist.config_preset_path(root) == "container/"
+
+
+def test_scan_all_layers_uses_slot_keys(minimal_project: Path) -> None:
+    cfg = load_config(project_root=minimal_project)
+    playlists = scan_all_layers(cfg)
+    assert tuple(playlists.keys()) == LAYER_SLOTS
+    for slot in LAYER_SLOTS:
+        assert playlists[slot].current is not None
+        assert len(playlists[slot].paths) >= 1

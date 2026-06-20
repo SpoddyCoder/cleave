@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 import pygame
 
+from cleave.extract import StemSource
 from cleave.timeline import TimelineCue, layer_visible_at, stem_abbreviation
 from cleave.viz.material_icons import visibility_icon_slot_width
 from cleave.viz.overlay import clip_rect_to_surface, render_visibility_icon
@@ -62,8 +63,9 @@ class TimelineViewState:
     focus_row: int  # 0..3, index into layer_z_order (0 = bottom stem)
     monitor_visible: dict[str, bool]
     timeline_visible: dict[str, bool]
-    override_stems: set[str] = field(default_factory=set)
-    armed_stems: set[str] = field(default_factory=set)
+    slot_stems: dict[str, StemSource] = field(default_factory=dict)
+    override_slots: set[str] = field(default_factory=set)
+    armed_slots: set[str] = field(default_factory=set)
     recording: bool = False
     record_start_sec: float | None = None
     record_baseline: dict[str, bool] = field(default_factory=dict)
@@ -138,7 +140,7 @@ def bar_segments_for_row(
     duration = state.duration_sec
     if duration <= 0:
         return []
-    if not (state.recording and stem in state.armed_stems):
+    if not (state.recording and stem in state.armed_slots):
         return visibility_segments(state.cues, state.defaults, stem, duration)
 
     record_start = state.record_start_sec
@@ -174,7 +176,7 @@ def bar_segments_for_row(
 def bar_tick_times_for_row(state: TimelineViewState, stem: str) -> list[float]:
     """Cue tick times for one timeline row."""
     duration = state.duration_sec
-    if not (state.recording and stem in state.armed_stems):
+    if not (state.recording and stem in state.armed_slots):
         return cue_times_for_stem(state.cues, stem, duration)
 
     record_start = state.record_start_sec
@@ -337,7 +339,8 @@ class TimelineOverlay:
 
         for display_i in range(row_count):
             row_index = display_i
-            stem = state.layer_z_order[row_index]
+            slot = state.layer_z_order[row_index]
+            stem_source = state.slot_stems.get(slot, slot)
             row_y = self._padding + display_i * (row_h + self._row_gap)
             row_rect = pygame.Rect(self._padding, row_y, panel_w - self._padding * 2, row_h)
             bar_rect = pygame.Rect(
@@ -346,11 +349,11 @@ class TimelineOverlay:
                 bar_width,
                 max(1, row_h - BAR_VERTICAL_INSET * 2),
             )
-            armed = stem in state.armed_stems
+            armed = slot in state.armed_slots
             focused = state.submenu_focused and row_index == state.focus_row
 
             self._row_layout.append(
-                (row_index, row_rect.x, row_rect.y, row_rect.w, row_rect.h, stem)
+                (row_index, row_rect.x, row_rect.y, row_rect.w, row_rect.h, slot)
             )
 
             layer_num = row_index + 1
@@ -376,16 +379,16 @@ class TimelineOverlay:
             else:
                 label_color = LABEL
             num_surf = font.render(layer_num_prefix(layer_num), True, label_color)
-            abbrev_surf = font.render(stem_abbrev_label(stem), True, label_color)
+            abbrev_surf = font.render(stem_abbrev_label(stem_source), True, label_color)
             num_y = row_y + max(0, (row_h - num_surf.get_height()) // 2)
             abbrev_y = row_y + max(0, (row_h - abbrev_surf.get_height()) // 2)
             panel.blit(num_surf, (layer_num_x, num_y))
             panel.blit(abbrev_surf, (stem_abbrev_x, abbrev_y))
 
-            monitor_enabled = state.monitor_visible.get(stem, True)
-            timeline_enabled = state.timeline_visible.get(stem, True)
+            monitor_enabled = state.monitor_visible.get(slot, True)
+            timeline_enabled = state.timeline_visible.get(slot, True)
             monitor_override = (
-                stem in state.override_stems
+                slot in state.override_slots
                 and not (state.recording and armed)
             ) or (state.recording and armed and rec_flash_visible())
             monitor_icon = render_visibility_icon(
@@ -405,7 +408,7 @@ class TimelineOverlay:
             if focused:
                 _blit_focus_tint(panel, bar_column_rect)
 
-            for start_t, end_t, visible in bar_segments_for_row(state, stem):
+            for start_t, end_t, visible in bar_segments_for_row(state, slot):
                 x0 = time_to_x(start_t, bar_left, bar_width, state.duration_sec)
                 x1 = time_to_x(end_t, bar_left, bar_width, state.duration_sec)
                 if x1 <= x0:
@@ -414,7 +417,7 @@ class TimelineOverlay:
                 seg_rect = pygame.Rect(x0, bar_rect.y, max(1, x1 - x0), bar_rect.h)
                 pygame.draw.rect(panel, color, seg_rect)
 
-            for cue_t in bar_tick_times_for_row(state, stem):
+            for cue_t in bar_tick_times_for_row(state, slot):
                 tick_x = time_to_x(cue_t, bar_left, bar_width, state.duration_sec)
                 pygame.draw.line(
                     panel,

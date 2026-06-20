@@ -14,6 +14,7 @@ from cleave.config_schema import (
     default_render_overlay_runtime_values,
     default_render_post_fx_runtime_values,
 )
+from cleave.extract import StemSource
 from cleave.preset_playlist import PresetPlaylist, preset_browse_floor
 from cleave.timeline import TimelineCue
 from cleave.blend_modes import BlendMode
@@ -76,14 +77,14 @@ class TimelineRuntime:
     panel_open: bool = False
     submenu_focused: bool = False
     focus_row: int = 0
-    armed_stems: set[str] = field(default_factory=set)
+    armed_slots: set[str] = field(default_factory=set)
     recording: bool = False
     record_buffer: list[TimelineCue] = field(default_factory=list)
     record_baseline: dict[str, bool] = field(default_factory=dict)
     record_start_sec: float | None = None
     preview_active: bool = False
     monitor: dict[str, bool] = field(default_factory=dict)
-    override_stems: set[str] = field(default_factory=set)
+    override_slots: set[str] = field(default_factory=set)
     override_visible: dict[str, bool] = field(default_factory=dict)
 
 
@@ -95,6 +96,7 @@ def default_timeline_runtime() -> TimelineRuntime:
 class LayerRuntime:
     playlist: PresetPlaylist
     browse_floor: Path
+    stem: StemSource
     opacity_pct: int = 100
     effects: dict[str, dict[str, int]] = field(default_factory=dict)
     effects_expanded: bool = False
@@ -109,7 +111,7 @@ class LayerRuntime:
 class TuningSession:
     layer_z_order: list[str]
     layers: dict[str, LayerRuntime] = field(default_factory=dict)
-    solo_stem: str | None = None
+    solo_slot: str | None = None
     render_overlay: RenderOverlayRuntime = field(default_factory=default_render_overlay_runtime)
     render_overlay_solo: bool = False
     render_post_fx: RenderPostFxRuntime = field(
@@ -164,8 +166,8 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
     )
 
 
-def _beat_sensitivity(cfg: CleaveConfig, layer_name: str) -> float:
-    layer = cfg.layers[layer_name]
+def _beat_sensitivity(cfg: CleaveConfig, slot: str) -> float:
+    layer = cfg.layers[slot]
     if layer.beat_sensitivity is not None:
         return layer.beat_sensitivity
     return cfg.visualizer.beat_sensitivity
@@ -182,21 +184,22 @@ def session_from_cfg(
         render_post_fx=render_post_fx_runtime_from_cfg(cfg),
         timeline=timeline_runtime_from_cfg(cfg),
         layers={
-            name: LayerRuntime(
-                playlist=playlists[name],
+            slot: LayerRuntime(
+                playlist=playlists[slot],
                 browse_floor=preset_browse_floor(
-                    cfg.layers[name].preset, preset_root
+                    cfg.layers[slot].preset, preset_root
                 ),
+                stem=layer_cfg.stem,
                 opacity_pct=int(layer_cfg.opacity * 100),
                 effects={
                     effect_id: dict(drivers)
                     for effect_id, drivers in layer_cfg.effects.items()
                 },
                 blend_mode=layer_cfg.blend_mode,
-                beat_sensitivity=_beat_sensitivity(cfg, name),
+                beat_sensitivity=_beat_sensitivity(cfg, slot),
                 enabled=layer_cfg.enabled,
                 locked=layer_cfg.locked,
             )
-            for name, layer_cfg in cfg.layers.items()
+            for slot, layer_cfg in cfg.layers.items()
         },
     )

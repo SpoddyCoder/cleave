@@ -12,6 +12,7 @@ from cleave.extract import (
     extract_bass,
     extract_drums_onset,
     extract_mix_onset,
+    extract_mix_rms,
     extract_other,
     extract_vocals,
     stem_paths,
@@ -30,24 +31,25 @@ def _nan_to_null(values: np.ndarray) -> list[float | None]:
 
 def run_analyse(project_dir: Path, *, high_quality: bool) -> Path:
     paths = stem_paths(project_dir)
-    duration_sec = max(_stem_duration_sec(path) for path in paths.values())
+    mix = mix_path(project_dir)
+    duration_sec = max(
+        _stem_duration_sec(path) for path in (*paths.values(), mix)
+    )
 
     drums_onset = extract_drums_onset(paths["drums"])
     bass = extract_bass(paths["bass"])
     vocals = extract_vocals(paths["vocals"], high_quality=high_quality)
     other = extract_other(paths["other"])
-    mix_onset = extract_mix_onset(mix_path(project_dir))
+    mix_onset = extract_mix_onset(mix)
+    mix_rms = extract_mix_rms(mix)
 
     output: dict = {
-        "version": 1,
+        "version": 2,
         "sample_rate_hz": int(TARGET_HZ),
         "duration_sec": duration_sec,
         "drums": {
             "onset_strength": resample_to_100hz(
                 *drums_onset, duration_sec
-            ).tolist(),
-            "mix_onset_strength": resample_to_100hz(
-                *mix_onset, duration_sec
             ).tolist(),
         },
         "bass": {
@@ -63,6 +65,10 @@ def run_analyse(project_dir: Path, *, high_quality: bool) -> Path:
         },
         "other": {
             "spectral_centroid": resample_to_100hz(*other, duration_sec).tolist(),
+        },
+        "full_mix": {
+            "onset_strength": resample_to_100hz(*mix_onset, duration_sec).tolist(),
+            "rms": resample_to_100hz(*mix_rms, duration_sec).tolist(),
         },
     }
 

@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from cleave.config_schema import DEFAULT_STEM_FOR_SLOT, LAYER_SLOTS
+
+SLOT_FOR_STEM = {v: k for k, v in DEFAULT_STEM_FOR_SLOT.items()}
+
 import numpy as np
 import pytest
 
@@ -24,9 +28,12 @@ from tests.support.signals import make_onset_signals, make_signals
 
 
 def _layer_runtime(stem: str, *, opacity_pct: int = 50, effects: dict | None = None) -> LayerRuntime:
+    slot = SLOT_FOR_STEM.get(stem, stem)
+    audio = DEFAULT_STEM_FOR_SLOT.get(slot, stem)
     return LayerRuntime(
-        playlist=playlist_at_dir(Path(f"/tmp/presets/{stem}"), index=0),
-        browse_floor=Path(f"/tmp/presets/{stem}"),
+        playlist=playlist_at_dir(Path(f"/tmp/presets/{slot}"), index=0),
+        browse_floor=Path(f"/tmp/presets/{slot}"),
+        stem=audio,
         opacity_pct=opacity_pct,
         effects=effects or {},
     )
@@ -102,26 +109,26 @@ def test_effect_runtime_all_stems_pulse_modulate() -> None:
         },
     )
     session = TuningSession(
-        layer_z_order=list(STEM_NAMES),
+        layer_z_order=list(LAYER_SLOTS),
         layers={
-            "drums": _layer_runtime(
+            "layer_1": _layer_runtime(
                 "drums", effects={"pulse": {"onset": 100}}
             ),
-            "bass": _layer_runtime(
+            "layer_2": _layer_runtime(
                 "bass", effects={"pulse": {"sub_bass": 100}}
             ),
-            "vocals": _layer_runtime(
+            "layer_3": _layer_runtime(
                 "vocals", effects={"pulse": {"rms": 100}}
             ),
-            "other": _layer_runtime(
+            "layer_4": _layer_runtime(
                 "other", effects={"pulse": {"centroid": 100}}
             ),
         },
     )
     runtime = EffectRuntime()
     mods = runtime.tick(session, signals, 0.02)
-    for stem in STEM_NAMES:
-        assert mods[stem].opacity != 0.5
+    for slot in LAYER_SLOTS:
+        assert mods[slot].opacity != 0.5
 
 
 def test_effect_runtime_bass_multi_pulse_stacking() -> None:
@@ -138,9 +145,9 @@ def test_effect_runtime_bass_multi_pulse_stacking() -> None:
         },
     )
     session = TuningSession(
-        layer_z_order=["bass"],
+        layer_z_order=["layer_2"],
         layers={
-            "bass": _layer_runtime(
+            "layer_2": _layer_runtime(
                 "bass",
                 opacity_pct=100,
                 effects={"pulse": {"sub_bass": 100, "mid_bass": 100}},
@@ -149,8 +156,8 @@ def test_effect_runtime_bass_multi_pulse_stacking() -> None:
     )
     runtime = EffectRuntime()
     runtime.tick(session, signals, 0.01)
-    sub_state = runtime._state("bass", "pulse", "sub_bass")
-    mid_state = runtime._state("bass", "pulse", "mid_bass")
+    sub_state = runtime._state("layer_2", "pulse", "sub_bass")
+    mid_state = runtime._state("layer_2", "pulse", "mid_bass")
     assert isinstance(sub_state, PulseEnvelopeState)
     assert isinstance(mid_state, PulseEnvelopeState)
     assert sub_state.envelope != mid_state.envelope
@@ -160,8 +167,8 @@ def test_effect_runtime_bass_multi_pulse_stacking() -> None:
     mid_env = mid_state.envelope
     expected = effective_opacity(1.0, 100, sub_env)
     expected = effective_opacity(expected, 100, mid_env)
-    assert mods["bass"].opacity == pytest.approx(expected)
-    assert mods["bass"].opacity != effective_opacity(1.0, 100, sub_env)
+    assert mods["layer_2"].opacity == pytest.approx(expected)
+    assert mods["layer_2"].opacity != effective_opacity(1.0, 100, sub_env)
 
 
 @pytest.mark.parametrize(
@@ -178,10 +185,11 @@ def test_effect_runtime_pulse_driver_modulates_opacity(
     stem: str, key: str, driver_slug: str, values: list[float]
 ) -> None:
     signals = make_signals(stem, key, values)
+    slot = SLOT_FOR_STEM[stem]
     session = TuningSession(
-        layer_z_order=[stem],
+        layer_z_order=[slot],
         layers={
-            stem: _layer_runtime(
+            slot: _layer_runtime(
                 stem,
                 opacity_pct=50,
                 effects={"pulse": {driver_slug: 100}},
@@ -191,4 +199,4 @@ def test_effect_runtime_pulse_driver_modulates_opacity(
     runtime = EffectRuntime()
     baseline = runtime.tick(session, signals, 0.0)
     modulated = runtime.tick(session, signals, 0.01)
-    assert modulated[stem].opacity != baseline[stem].opacity
+    assert modulated[slot].opacity != baseline[slot].opacity

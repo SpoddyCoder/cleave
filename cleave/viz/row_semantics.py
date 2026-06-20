@@ -10,6 +10,7 @@ class RowKind(Enum):
     TRACK_HEADER = auto()
     TRACK_PRESET_DIR = auto()
     TRACK_PRESET = auto()
+    TRACK_STEM = auto()
     TRACK_BLEND = auto()
     TRACK_OPACITY = auto()
     TRACK_BEAT = auto()
@@ -100,6 +101,12 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
     RowKind.TRACK_PRESET: RowBehavior(
         RowAffordance.PATH_PRESET,
         repeatable=True,
+        parent_group="track",
+    ),
+    RowKind.TRACK_STEM: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        help_title="Stem",
         parent_group="track",
     ),
     RowKind.TRACK_BLEND: RowBehavior(
@@ -270,7 +277,7 @@ LOCKED_NAVIGABLE_SUB_ROW_KINDS = frozenset(
     if b.parent_group == "track"
     and b.is_sub_header
     and b.affordance == RowAffordance.EXPAND
-)
+) | frozenset({RowKind.TRACK_STEM})
 
 
 def row_behavior(kind: RowKind) -> RowBehavior:

@@ -10,7 +10,7 @@ from typing import Any, Callable, Literal, TypeVar
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.effects.constants import clamp_effect_pct
 from cleave.effects.registry import validate_effect_entry
-from cleave.extract import STEM_NAMES
+from cleave.extract import STEM_SOURCES, StemSource
 from cleave.timeline import TimelineCue
 
 # --- Visualizer defaults ---
@@ -27,20 +27,31 @@ BEAT_SENSITIVITY_MAX = 5.0
 
 # --- Layer defaults ---
 
-DEFAULT_LAYER_Z_ORDER = ("drums", "vocals", "bass", "other")
+LAYER_SLOTS: tuple[str, ...] = ("layer_1", "layer_2", "layer_3", "layer_4")
 
-DEFAULT_BLEND_MODE: dict[str, BlendMode] = {
+DEFAULT_LAYER_Z_ORDER = LAYER_SLOTS
+
+DEFAULT_STEM_FOR_SLOT: dict[str, StemSource] = {
+    "layer_1": "drums",
+    "layer_2": "bass",
+    "layer_3": "vocals",
+    "layer_4": "other",
+}
+
+DEFAULT_BLEND_MODE: dict[StemSource, BlendMode] = {
     "drums": "add",
     "other": "black-key",
     "bass": "black-key",
     "vocals": "black-key",
+    "full_mix": "black-key",
 }
 
-LAYER_DEFAULT_SIZE: dict[str, tuple[int, int]] = {
+LAYER_DEFAULT_SIZE: dict[StemSource, tuple[int, int]] = {
     "other": (640, 360),
     "bass": (960, 540),
     "vocals": (960, 540),
     "drums": (1280, 720),
+    "full_mix": (1280, 720),
 }
 
 DEFAULT_PRESET_ROOT = Path("~/.local/share/cleave/presets")
@@ -762,58 +773,70 @@ def parse_layer_z_order_section(data: dict[str, Any]) -> tuple[str, ...]:
         return DEFAULT_LAYER_Z_ORDER
     if not isinstance(raw, list):
         raise ValueError("layer_z_order must be a list")
-    if len(raw) != len(STEM_NAMES):
+    if len(raw) != len(LAYER_SLOTS):
         raise ValueError(
-            f"layer_z_order must contain exactly {len(STEM_NAMES)} entries"
+            f"layer_z_order must contain exactly {len(LAYER_SLOTS)} entries"
         )
-    if set(raw) != set(STEM_NAMES):
+    if set(raw) != set(LAYER_SLOTS):
         raise ValueError(
-            f"layer_z_order must contain each of {', '.join(STEM_NAMES)} exactly once"
+            f"layer_z_order must contain each of {', '.join(LAYER_SLOTS)} exactly once"
         )
     return tuple(raw)
 
 
 def persist_layer_z_order(ctx: PersistCtx) -> list[str]:
-    from cleave.extract import STEM_NAMES
-
     order = ctx.session.layer_z_order
     cfg_order = list(ctx.cfg.layer_z_order)
     if len(order) == len(cfg_order) and set(order) == set(cfg_order):
         return list(order)
-    if len(order) == len(STEM_NAMES) and set(order) == set(STEM_NAMES):
+    if len(order) == len(LAYER_SLOTS) and set(order) == set(LAYER_SLOTS):
         return list(order)
     return cfg_order
 
 
-def parse_blend_mode(name: str, layer_raw: dict[str, Any]) -> BlendMode:
+def parse_blend_mode(slot: str, stem: StemSource, layer_raw: dict[str, Any]) -> BlendMode:
     raw = layer_raw.get("blend_mode")
     if raw is None:
-        return DEFAULT_BLEND_MODE[name]
+        return DEFAULT_BLEND_MODE[stem]
     if raw not in BLEND_MODES:
         allowed = ", ".join(f"'{mode}'" for mode in BLEND_MODES)
-        raise ValueError(f"layers.{name}.blend_mode must be one of: {allowed}")
+        raise ValueError(f"layers.{slot}.blend_mode must be one of: {allowed}")
     return raw
 
 
-def _parse_effects(stem: str, layer_raw: dict[str, Any]) -> dict[str, dict[str, int]]:
+def _parse_stem(slot: str, layer_raw: dict[str, Any]) -> StemSource:
+    raw = layer_raw.get("stem")
+    if raw is None:
+        return DEFAULT_STEM_FOR_SLOT[slot]
+    if raw not in STEM_SOURCES:
+        allowed = ", ".join(STEM_SOURCES)
+        raise ValueError(f"layers.{slot}.stem must be one of: {allowed}")
+    return raw
+
+
+def _parse_effects(
+    slot: str,
+    stem: StemSource,
+    layer_raw: dict[str, Any],
+) -> dict[str, dict[str, int]]:
     raw = layer_raw.get("effects")
     if raw is None:
         return {}
     if not isinstance(raw, dict):
-        raise ValueError(f"layers.{stem}.effects must be a mapping")
+        raise ValueError(f"layers.{slot}.effects must be a mapping")
 
     effects: dict[str, dict[str, int]] = {}
     for effect_id, drivers_raw in raw.items():
         if not isinstance(effect_id, str):
-            raise ValueError(f"layers.{stem}.effects keys must be strings")
+            raise ValueError(f"layers.{slot}.effects keys must be strings")
         if not isinstance(drivers_raw, dict):
-            raise ValueError(f"layers.{stem}.effects.{effect_id} must be a mapping")
+            raise ValueError(f"layers.{slot}.effects.{effect_id} must be a mapping")
         for driver_slug, value in drivers_raw.items():
             if not isinstance(driver_slug, str):
                 raise ValueError(
-                    f"layers.{stem}.effects.{effect_id} driver keys must be strings"
+                    f"layers.{slot}.effects.{effect_id} driver keys must be strings"
                 )
-            validate_effect_entry(stem, effect_id, driver_slug)
+            validate_effect_entry(slot, stem, effect_id, driver_slug)
             pct = clamp_effect_pct(value)
             if pct == 0:
                 continue
@@ -844,28 +867,30 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
     preset_root = ctx.preset_root
 
     layers_raw = as_mapping(data.get("layers"), "layers")
-    unknown = sorted(set(layers_raw) - set(STEM_NAMES))
+    unknown = sorted(set(layers_raw) - set(LAYER_SLOTS))
     if unknown:
         raise ValueError(
-            f"unknown layer keys in config (expected {', '.join(STEM_NAMES)}): "
+            f"unknown layer keys in config (expected {', '.join(LAYER_SLOTS)}): "
             + ", ".join(unknown)
         )
 
-    missing = [name for name in STEM_NAMES if name not in layers_raw]
+    missing = [slot for slot in LAYER_SLOTS if slot not in layers_raw]
     if missing:
         raise ValueError(f"missing layer config for: {', '.join(missing)}")
 
     layers: dict[str, LayerConfig] = {}
-    for name in STEM_NAMES:
-        layer_raw = as_mapping(layers_raw[name], f"layers.{name}")
+    for slot in LAYER_SLOTS:
+        layer_raw = as_mapping(layers_raw[slot], f"layers.{slot}")
         preset_raw = layer_raw.get("preset")
         if not preset_raw:
-            raise ValueError(f"layers.{name}.preset is required")
+            raise ValueError(f"layers.{slot}.preset is required")
 
-        default_width, default_height = LAYER_DEFAULT_SIZE[name]
+        stem = _parse_stem(slot, layer_raw)
+        default_width, default_height = LAYER_DEFAULT_SIZE[stem]
         beat_raw = layer_raw.get("beat_sensitivity")
-        layers[name] = LayerConfig(
+        layers[slot] = LayerConfig(
             preset=_resolve_preset(preset_raw, preset_root),
+            stem=stem,
             enabled=bool(layer_raw.get("enabled", True)),
             opacity=float(layer_raw.get("opacity", 1.0)),
             width=int(layer_raw.get("width", default_width)),
@@ -873,8 +898,8 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
             beat_sensitivity=clamp_beat_sensitivity(beat_raw)
             if beat_raw is not None
             else None,
-            effects=_parse_effects(name, layer_raw),
-            blend_mode=parse_blend_mode(name, layer_raw),
+            effects=_parse_effects(slot, stem, layer_raw),
+            blend_mode=parse_blend_mode(slot, stem, layer_raw),
             locked=bool(layer_raw.get("locked", False)),
         )
     return layers
@@ -887,10 +912,11 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
     layers_out: dict[str, dict[str, Any]] = {}
     global_beat = ctx.cfg.visualizer.beat_sensitivity
 
-    for name in STEM_NAMES:
-        layer_cfg = ctx.cfg.layers[name]
-        if name in ctx.session.layers:
-            runtime = ctx.session.layers[name]
+    for slot in LAYER_SLOTS:
+        layer_cfg = ctx.cfg.layers[slot]
+        stem = layer_cfg.stem
+        if slot in ctx.session.layers:
+            runtime = ctx.session.layers[slot]
             preset = runtime.playlist.config_preset_path(preset_root)
             opacity = runtime.opacity_pct / 100.0
             enabled = runtime.enabled
@@ -898,6 +924,7 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             beat = runtime.beat_sensitivity
             effects = runtime.effects
             locked = runtime.locked
+            stem = getattr(runtime, "stem", stem)
         else:
             preset = to_config_relative(layer_cfg.preset, preset_root)
             opacity = layer_cfg.opacity
@@ -912,6 +939,7 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             )
 
         layer_out: dict[str, Any] = {
+            "stem": stem,
             "preset": preset,
             "enabled": enabled,
             "opacity": opacity,
@@ -926,7 +954,7 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
         sparse = sparse_effects(effects)
         if sparse is not None:
             layer_out["effects"] = sparse
-        layers_out[name] = layer_out
+        layers_out[slot] = layer_out
 
     return layers_out
 
@@ -1071,11 +1099,11 @@ def parse_timeline_section(data: dict[str, Any]) -> Any | None:
             cue_map.get("layers"),
             f"timeline.cues[{index}].layers",
         )
-        unknown = sorted(set(layers_raw) - set(STEM_NAMES))
+        unknown = sorted(set(layers_raw) - set(LAYER_SLOTS))
         if unknown:
             raise ValueError(
                 f"unknown layer keys in timeline.cues[{index}].layers "
-                f"(expected {', '.join(STEM_NAMES)}): "
+                f"(expected {', '.join(LAYER_SLOTS)}): "
                 + ", ".join(unknown)
             )
         layers = {stem: bool(layers_raw[stem]) for stem in layers_raw}
@@ -1145,9 +1173,11 @@ def template_visualizer_section(*, name: str = "cleave-viz-example") -> dict[str
     return out
 
 
-def template_layer_entry(stem: str) -> dict[str, Any]:
+def template_layer_entry(slot: str) -> dict[str, Any]:
+    stem = DEFAULT_STEM_FOR_SLOT[slot]
     width, height = LAYER_DEFAULT_SIZE[stem]
     return {
+        "stem": stem,
         "preset": f"presets/{stem}/",
         "enabled": True,
         "opacity": 1.0,

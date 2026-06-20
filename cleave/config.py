@@ -14,6 +14,7 @@ _YAML_DUMP_WIDTH = 2**31 - 1
 
 from cleave.blend_modes import BlendMode
 from cleave.effects.constants import clamp_effect_pct
+from cleave.extract import StemSource
 from cleave.config_schema import (
     DEFAULT_BLEND_MODE,
     BEAT_SENSITIVITY_MAX,
@@ -75,6 +76,7 @@ class PathsConfig:
 @dataclass(frozen=True)
 class LayerConfig:
     preset: Path
+    stem: StemSource
     enabled: bool = True
     opacity: float = 1.0
     width: int = 1280
