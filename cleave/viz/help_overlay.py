@@ -30,9 +30,9 @@ NAVIGATION_SECTION = HelpSection(
     "Navigation",
     (
         ("Up/Down", "move row"),
-        ("Ctrl+Up/Down", "jump section"),
+        ("Ctrl + Up/Down", "jump section"),
         ("ESC", "hide UI"),
-        ("Ctrl+Q", "quit"),
+        ("Ctrl + Q", "quit"),
     ),
 )
 
@@ -41,17 +41,17 @@ _TRANSPORT_SECTION = HelpSection(
     (
         ("Enter", "play/pause"),
         ("Left/Right", "skip 10s"),
-        ("Ctrl+Left/Right", "skip 30s"),
+        ("Ctrl + Left/Right", "skip 30s"),
     ),
 )
 
 _LAYER_SECTION_BASE: tuple[tuple[str, str], ...] = (
-    ("Enter", "move mode"),
-    ("Shift+Left/Right", "solo"),
+    ("Enter", "move z-order"),
+    ("Shift + Left/Right", "solo layer"),
     ("Left/Right", "expand/collapse"),
 )
 
-_LAYER_VISIBILITY_ENTRY = ("Ctrl+Left/Right", "enable/disable")
+_LAYER_VISIBILITY_ENTRY = ("Ctrl + Left/Right", "enable/disable layer")
 
 
 def _layer_section(*, timeline_enabled: bool) -> HelpSection:
@@ -65,7 +65,7 @@ _EDIT_SECTION = HelpSection(
     "Edit",
     (
         ("Left/Right", "adjust value"),
-        ("Ctrl+Left/Right", "large step"),
+        ("Ctrl + Left/Right", "large step"),
     ),
 )
 
@@ -73,7 +73,7 @@ _PRESET_DIR_SECTION = HelpSection(
     "Edit",
     (
         ("Left/Right", "next/previous directory"),
-        ("Ctrl+Left/Right", "up/down directory tree"),
+        ("Ctrl + Left/Right", "up/down directory tree"),
     ),
 )
 
@@ -81,7 +81,7 @@ _PRESET_SECTION = HelpSection(
     "Edit",
     (
         ("Left/Right", "next/previous preset"),
-        ("Ctrl+Left/Right", "next/previous large step"),
+        ("Ctrl + Left/Right", "next/previous large step"),
     ),
 )
 
@@ -90,8 +90,8 @@ _RENDER_SECTION = HelpSection(
     "Render",
     (
         ("Left/Right", "expand/collapse"),
-        ("Ctrl+Left/Right", "enable/disable"),
-        ("Shift+Left/Right", "always on"),
+        ("Ctrl + Left/Right", "enable/disable"),
+        ("Shift + Left/Right", "always on"),
     ),
 )
 
@@ -99,7 +99,7 @@ _RENDER_TIMELINE_SECTION = HelpSection(
     "Render",
     (
         ("Left/Right", "expand/collapse"),
-        ("Ctrl+Left/Right", "enable/disable"),
+        ("Ctrl + Left/Right", "enable/disable"),
     ),
 )
 
@@ -112,19 +112,19 @@ def _timeline_strip_section(
     entries: list[tuple[str, str]] = [("Enter", "arm row")]
 
     if not recording:
-        entries.append(("Shift+Enter", "toggle override"))
+        entries.append(("Shift + Enter", "toggle override"))
         if paused or override_active:
             entries.append(("1-4", "toggle layer visibility"))
 
     if recording:
-        entries.append(("Ctrl+Enter", "toggle at playhead"))
+        entries.append(("Ctrl + Enter", "toggle at playhead"))
         entries.append(("1-4", "toggle layer visibility"))
 
     if recording:
         entries.append(("r", "stop record"))
-        entries.append(("Ctrl+Space / Space", "stop record and pause"))
+        entries.append(("Ctrl + Space / Space", "stop record and pause"))
     else:
-        entries.append(("Ctrl+Space / r", "start record"))
+        entries.append(("Ctrl + Space / r", "start record"))
         if paused:
             entries.append(("Space", "play"))
         else:
@@ -134,7 +134,7 @@ def _timeline_strip_section(
         entries.extend(
             (
                 ("Left/Right", "skip 10s"),
-                ("Ctrl+Left/Right", "skip 30s"),
+                ("Ctrl + Left/Right", "skip 30s"),
             )
         )
 
@@ -157,7 +157,7 @@ def _value_step_section(row_kind: RowKind) -> HelpSection:
     if row_kind == RowKind.TRACK_EFFECT:
         entries = (
             ("Left/Right", "adjust depth"),
-            ("Ctrl+Left/Right", "large step"),
+            ("Ctrl + Left/Right", "large step"),
         )
     else:
         entries = _EDIT_SECTION.entries
