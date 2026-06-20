@@ -149,7 +149,11 @@ def _config_header_row(view: TuningViewState) -> int:
 
 def _choose_save_as_new(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_RETURN))
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    modal_view = controls.modal_host.view_state()
+    assert modal_view is not None
+    target = modal_view.options.index("SAVE AS NEW")
+    while controls.modal_host.view_state().focus_index != target:
+        controls.handle_keydown(_keydown(pygame.K_RIGHT))
     controls.handle_keydown(_keydown(pygame.K_RETURN))
 
 
@@ -668,6 +672,50 @@ def test_save_as_new_enables_overwrite_from_root_template() -> None:
     assert RowKind.CONFIG_HEADER in kinds
 
 
+def test_repo_root_save_shows_save_as_new_only_modal() -> None:
+    controls = _make_controls(
+        ("layer_1",),
+        launch_config_path=_REPO_ROOT_EXAMPLE,
+        repo_root_example=_REPO_ROOT_EXAMPLE,
+    )
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = _config_header_row(view)
+
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    modal_view = controls.modal_host.view_state()
+    assert modal_view is not None
+    assert modal_view.kind == ModalKind.SAVE_CHOICE
+    assert modal_view.options == ("SAVE AS NEW", "CANCEL")
+
+    controls.handle_modal_keydown(_keydown(pygame.K_ESCAPE))
+    assert not controls.modal_host.active
+    assert controls._config_save._active_config_path == _REPO_ROOT_EXAMPLE
+
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
+    controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
+    assert not controls.modal_host.active
+    assert controls._config_save._active_config_path == _REPO_ROOT_EXAMPLE
+
+
+def test_repo_root_save_as_new_requires_confirmation() -> None:
+    saved_path = Path("/tmp/projects/my-track/unnamed-1.yaml")
+    controls = _make_controls(
+        ("layer_1",),
+        launch_config_path=_REPO_ROOT_EXAMPLE,
+        repo_root_example=_REPO_ROOT_EXAMPLE,
+    )
+    controls._config_save._on_save_new_config = lambda: saved_path
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = _config_header_row(view)
+
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    assert controls._config_save._active_config_path == _REPO_ROOT_EXAMPLE
+
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    assert controls._config_save._active_config_path == saved_path
+
+
 def test_overwrite_after_save_uses_new_active_path() -> None:
     saved_path = Path("/tmp/projects/my-track/unnamed-1.yaml")
     writes: list[Path] = []
@@ -684,6 +732,7 @@ def test_overwrite_after_save_uses_new_active_path() -> None:
 
     with patch.object(time, "monotonic", return_value=3000.0):
         controls.focus_index = save_row
+        controls.handle_keydown(_keydown(pygame.K_RETURN))
         controls.handle_keydown(_keydown(pygame.K_RETURN))
 
     with patch.object(time, "monotonic", return_value=3000.0 + TOAST_DURATION_SEC + 1):

@@ -6,7 +6,8 @@ import pygame
 
 from cleave.viz import modal_overlay
 from cleave.viz.modal import ModalHost, ModalKind, ModalViewState
-from cleave.viz.theme import MODAL_SCRIM_ALPHA
+from cleave.viz.theme import HIGHLIGHT, MODAL_SCRIM_ALPHA
+from cleave.viz.ui_tint import blit_tint
 
 
 def _font() -> pygame.font.Font:
@@ -89,3 +90,43 @@ def test_message_options_vertical_spacing() -> None:
     )
 
     assert height_with_message - height_options_only == line_h + line_h + line_gap
+
+
+def test_modal_focused_option_has_highlight_background() -> None:
+    pygame.init()
+    font = _font()
+    panel = pygame.Surface((200, 40), pygame.SRCALPHA)
+    panel.fill((0, 0, 0, 255))
+    line_h = font.get_linesize()
+    pad_x = modal_overlay._PANEL_PAD_X
+    pad_y = modal_overlay._PANEL_PAD_Y
+    modal_overlay._draw_options(
+        panel,
+        font,
+        x=pad_x,
+        y=pad_y,
+        labels=("Yes", "No"),
+        focus_index=0,
+        text_alpha=255,
+    )
+
+    yes_w = font.size(modal_overlay._option_text("Yes"))[0]
+    tint_probe = pygame.Surface((4, 4), pygame.SRCALPHA)
+    tint_probe.fill((0, 0, 0, 255))
+    blit_tint(tint_probe, (0, 0, 4, 4), HIGHLIGHT)
+    expected = tint_probe.get_at((2, 2))[:3]
+    focused_pixels = [
+        panel.get_at((pad_x + x, pad_y + y))
+        for x in range(yes_w)
+        for y in range(line_h)
+    ]
+    assert any(pixel[:3] == expected for pixel in focused_pixels)
+
+    no_x = pad_x + yes_w + modal_overlay._OPTION_GAP
+    no_w = font.size(modal_overlay._option_text("No"))[0]
+    unfocused_pixels = [
+        panel.get_at((no_x + x, pad_y + y))
+        for x in range(no_w)
+        for y in range(line_h)
+    ]
+    assert not any(pixel[:3] == expected for pixel in unfocused_pixels)

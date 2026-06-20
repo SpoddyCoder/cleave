@@ -83,6 +83,7 @@ from cleave.viz.theme import (
     VALUE,
     tuning_ui_metrics,
 )
+from cleave.viz.ui_tint import blit_tint
 
 Anchor = Literal["topleft", "bottomleft"]
 
@@ -1191,12 +1192,12 @@ class TuningOverlay:
         bg = _row_bg_color(state, index)
         if bg is not None:
             bg_alpha = int(FOCUS_ROW_BG_ALPHA * self._visibility)
-            if bg_alpha >= 2:
-                bg_surf = pygame.Surface(
-                    (panel_w - self._padding * 2, line_h), pygame.SRCALPHA
-                )
-                bg_surf.fill((*bg, bg_alpha))
-                panel.blit(bg_surf, (self._padding, y))
+            blit_tint(
+                panel,
+                (self._padding, y, panel_w - self._padding * 2, line_h),
+                bg,
+                alpha=bg_alpha,
+            )
 
         indent = self._padding + _row_indent(state, index)
         if text_alpha >= 2:
