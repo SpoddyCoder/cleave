@@ -84,11 +84,14 @@ def test_enter_toggles_arm_on_focused_stem() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(focus_row=1)
     assert session.timeline.armed_slots == set()
 
+    before = pygame.time.get_ticks()
     controls.handle_keydown(keydown(pygame.K_RETURN))
     assert session.timeline.armed_slots == {"layer_2"}
+    assert session.timeline.arm_flash_start_ms["layer_2"] >= before
 
     controls.handle_keydown(keydown(pygame.K_RETURN))
     assert session.timeline.armed_slots == set()
+    assert session.timeline.arm_flash_start_ms["layer_2"] >= before
 
 
 def test_left_right_seek_short_when_not_recording() -> None:

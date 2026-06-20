@@ -43,6 +43,8 @@ REC_BADGE_PAD_X: int = 8
 REC_BADGE_PAD_Y: int = 4
 REC_TIME_GAP: int = 2
 REC_FLASH_MS: int = 500
+ARM_FLASH_HALF_MS: int = 150
+ARM_FLASH_DURATION_MS: int = ARM_FLASH_HALF_MS * 4
 
 
 def _blit_focus_tint(panel: pygame.Surface, rect: pygame.Rect) -> None:
@@ -72,6 +74,7 @@ class TimelineViewState:
     record_buffer: list[TimelineCue] = field(default_factory=list)
     enabled: bool = False
     submenu_focused: bool = False
+    arm_flash_start_ms: dict[str, int] = field(default_factory=dict)
 
 
 def visibility_segments(
@@ -200,6 +203,61 @@ def rec_flash_visible(ticks_ms: int | None = None) -> bool:
     if ticks_ms is None:
         ticks_ms = pygame.time.get_ticks()
     return (ticks_ms // REC_FLASH_MS) % 2 == 0
+
+
+def prune_expired_arm_flashes(
+    flash_starts: dict[str, int],
+    ticks_ms: int | None = None,
+) -> None:
+    if ticks_ms is None:
+        ticks_ms = pygame.time.get_ticks()
+    expired = [
+        slot
+        for slot, start_ms in flash_starts.items()
+        if ticks_ms - start_ms >= ARM_FLASH_DURATION_MS
+    ]
+    for slot in expired:
+        flash_starts.pop(slot, None)
+
+
+def arm_abbrev_flash_active(
+    flash_starts: dict[str, int],
+    slot: str,
+    ticks_ms: int | None = None,
+) -> bool:
+    if ticks_ms is None:
+        ticks_ms = pygame.time.get_ticks()
+    start_ms = flash_starts.get(slot)
+    if start_ms is None:
+        return False
+    return ticks_ms - start_ms < ARM_FLASH_DURATION_MS
+
+
+def arm_abbrev_flash_visible(
+    flash_starts: dict[str, int],
+    slot: str,
+    ticks_ms: int | None = None,
+) -> bool:
+    if not arm_abbrev_flash_active(flash_starts, slot, ticks_ms=ticks_ms):
+        return False
+    if ticks_ms is None:
+        ticks_ms = pygame.time.get_ticks()
+    start_ms = flash_starts[slot]
+    elapsed = ticks_ms - start_ms
+    return (elapsed // ARM_FLASH_HALF_MS) % 2 == 0
+
+
+def armed_abbrev_bg_visible(
+    *,
+    armed: bool,
+    recording: bool,
+    flash_starts: dict[str, int],
+    slot: str,
+    ticks_ms: int | None = None,
+) -> bool:
+    if arm_abbrev_flash_active(flash_starts, slot, ticks_ms=ticks_ms):
+        return arm_abbrev_flash_visible(flash_starts, slot, ticks_ms=ticks_ms)
+    return armed and (not recording or rec_flash_visible(ticks_ms))
 
 
 def time_to_x(t_sec: float, bar_left: int, bar_width: int, duration_sec: float) -> int:
@@ -367,7 +425,12 @@ class TimelineOverlay:
             abbrev_rect = pygame.Rect(
                 stem_abbrev_x, row_y, self._stem_abbrev_width, row_h
             )
-            if armed and (not state.recording or rec_flash_visible()):
+            if armed_abbrev_bg_visible(
+                armed=armed,
+                recording=state.recording,
+                flash_starts=state.arm_flash_start_ms,
+                slot=slot,
+            ):
                 armed_surf = pygame.Surface((abbrev_rect.w, abbrev_rect.h), pygame.SRCALPHA)
                 armed_surf.fill((*ARMED_BG, ARMED_BG_ALPHA))
                 panel.blit(armed_surf, abbrev_rect.topleft)
