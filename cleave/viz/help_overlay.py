@@ -109,7 +109,7 @@ def _timeline_strip_section(
     recording: bool,
     override_active: bool,
 ) -> HelpSection:
-    entries: list[tuple[str, str]] = [("Enter", "arm row")]
+    entries: list[tuple[str, str]] = [("Enter", "toggle arm track")]
 
     if not recording:
         entries.append(("Shift + Enter", "toggle override"))
@@ -117,7 +117,6 @@ def _timeline_strip_section(
             entries.append(("1-4", "toggle layer visibility"))
 
     if recording:
-        entries.append(("Ctrl + Enter", "toggle at playhead"))
         entries.append(("1-4", "toggle layer visibility"))
 
     if recording:
@@ -128,7 +127,7 @@ def _timeline_strip_section(
         if paused:
             entries.append(("Space", "play"))
         else:
-            entries.append(("Space", "pause (preview)"))
+            entries.append(("Space", "pause"))
 
     if not recording:
         entries.extend(

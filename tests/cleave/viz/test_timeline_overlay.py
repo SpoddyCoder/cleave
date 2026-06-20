@@ -298,6 +298,44 @@ def test_unarmed_recording_monitor_eye_not_override_bg() -> None:
     assert surface.get_at((panel_x + monitor_eye_x + 1, panel_y + row_y + row_h // 2))[:3] != OVERRIDE_BG
 
 
+def test_override_armed_recording_monitor_eye_flashes(monkeypatch) -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    state = _view_state(
+        armed_stems={"bass"},
+        override_stems={"bass"},
+        recording=True,
+        focus_row=1,
+        submenu_focused=True,
+    )
+
+    monkeypatch.setattr(
+        "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: True
+    )
+    surface_on = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    _draw(overlay, surface_on, state)
+
+    monkeypatch.setattr(
+        "cleave.viz.timeline_overlay.rec_flash_visible", lambda ticks_ms=None: False
+    )
+    surface_off = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    _draw(overlay, surface_off, state)
+
+    bass_layout = next(row for row in overlay.row_layout if row[5] == "bass")
+    _, _, row_y, _, row_h, _ = bass_layout
+    panel = overlay.panel_rect
+    assert panel is not None
+    panel_x, panel_y, _, _ = panel
+    monitor_eye_x = overlay._padding + overlay._layer_num_width + overlay._stem_abbrev_width
+    sample = (panel_x + monitor_eye_x + 1, panel_y + row_y + row_h // 2)
+    flash_on = surface_on.get_at(sample)[:3]
+    flash_off = surface_off.get_at(sample)[:3]
+
+    assert flash_on == OVERRIDE_BG
+    assert flash_off != OVERRIDE_BG
+    assert flash_on != flash_off
+
+
 def test_override_stems_use_override_bg_on_monitor_eye() -> None:
     pygame.init()
     overlay = TimelineOverlay()

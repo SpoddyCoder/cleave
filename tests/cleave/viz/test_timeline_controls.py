@@ -419,50 +419,22 @@ def test_delete_focused_cue_marks_config_dirty() -> None:
     assert tuning.session.timeline.cues == []
 
 
-def test_ctrl_enter_writes_to_record_buffer_when_recording() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
-        focus_row=0,
-        armed_stems={"drums"},
-        position_sec=5.0,
-    )
-    session.layers["drums"].enabled = True
-
-    controls.handle_keydown(keydown(pygame.K_r))
-    controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
-    assert session.timeline.cues == []
-    assert len(session.timeline.record_buffer) == 1
-    assert session.timeline.record_buffer[0] == TimelineCue(
-        t=5.0, layers={"drums": False}
-    )
-    assert visibility_calls[-1] is True
-
-
-def test_ctrl_enter_ignored_when_not_recording() -> None:
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
-        focus_row=0,
-        armed_stems={"drums"},
-        position_sec=5.0,
-    )
-    session.layers["drums"].enabled = True
-
-    controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
-    assert session.timeline.cues == []
-    assert session.timeline.record_buffer == []
-    assert visibility_calls == []
-
-
-def test_ctrl_enter_only_affects_armed_focused_stem() -> None:
+def test_ctrl_enter_noop_while_recording() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
-        focus_row=1,
+        focus_row=0,
         armed_stems={"drums"},
         position_sec=5.0,
     )
-    session.layers["bass"].enabled = True
+    session.layers["drums"].enabled = True
 
     controls.handle_keydown(keydown(pygame.K_r))
-    controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
+    assert session.timeline.armed_stems == {"drums"}
     assert session.timeline.record_buffer == []
-    assert session.timeline.record_baseline == {"drums": True}
+
+    controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
+
+    assert session.timeline.armed_stems == {"drums"}
+    assert session.timeline.record_buffer == []
 
 
 def test_r_without_armed_layers_shows_toast() -> None:

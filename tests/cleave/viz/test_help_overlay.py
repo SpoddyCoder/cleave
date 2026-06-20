@@ -161,7 +161,7 @@ def test_timeline_strip_help_recording_while_playing() -> None:
     entries = dict(
         _timeline_strip_section(paused=False, recording=True, override_active=False).entries
     )
-    assert entries["Ctrl+Enter"] == "toggle at playhead"
+    assert "Ctrl+Enter" not in entries
     assert entries["1-4"] == "toggle layer visibility"
     assert "Shift+Enter" not in entries
     assert "Left/Right" not in entries
