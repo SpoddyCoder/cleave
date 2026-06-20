@@ -12,8 +12,42 @@ if TYPE_CHECKING:
     from cleave.viz.layer import StemLayer
 
 
+def _slot_has_committed_cues(cues: list[TimelineCue], slot: str) -> bool:
+    return any(slot in cue.layers for cue in cues)
+
+
+def _slot_has_t0_cue(cues: list[TimelineCue], slot: str) -> bool:
+    return any(slot in cue.layers and cue.t == 0.0 for cue in cues)
+
+
+def _anchor_visibility_for_slot(
+    cues: list[TimelineCue],
+    slot: str,
+    layer_enabled_fallback: bool,
+) -> bool:
+    """Pre-first-cue visibility for a slot that already has timeline cues."""
+    for cue in cues:
+        if cue.t == 0.0 and slot in cue.layers:
+            return cue.layers[slot]
+    slot_cues = [cue for cue in cues if slot in cue.layers]
+    if not slot_cues:
+        return layer_enabled_fallback
+    earliest = min(slot_cues, key=lambda cue: cue.t)
+    if earliest.t > 0.0 and earliest.show_tick:
+        return not earliest.layers[slot]
+    return layer_enabled_fallback
+
+
 def timeline_defaults(session: TuningSession) -> dict[str, bool]:
-    return {slot: session.layers[slot].enabled for slot in session.layer_z_order}
+    cues = session.timeline.cues
+    return {
+        slot: (
+            _anchor_visibility_for_slot(cues, slot, session.layers[slot].enabled)
+            if _slot_has_committed_cues(cues, slot)
+            else session.layers[slot].enabled
+        )
+        for slot in session.layer_z_order
+    }
 
 
 def timeline_committed_visible(
@@ -96,6 +130,17 @@ def build_record_punch_cues(
     """Cues to punch on record stop: baseline, toggles, and committed restore at stop."""
     tl = session.timeline
     punch: list[TimelineCue] = []
+    for slot in tl.record_baseline:
+        if not _slot_has_t0_cue(tl.cues, slot):
+            punch.append(
+                TimelineCue(
+                    t=0.0,
+                    layers={
+                        slot: timeline_committed_visible(session, slot, 0.0),
+                    },
+                    show_tick=False,
+                )
+            )
     for slot, baseline in tl.record_baseline.items():
         if baseline != timeline_committed_visible(session, slot, record_start):
             punch.append(
