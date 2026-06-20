@@ -11,6 +11,7 @@ from cleave.config import (
     VIZ_CONFIG_FILENAME,
 )
 from cleave.config_schema import (
+    DEFAULT_BEAT_SENSITIVITY,
     default_render_overlay_runtime_values,
     default_render_post_fx_runtime_values,
 )
@@ -102,7 +103,7 @@ class LayerRuntime:
     effects: dict[str, dict[str, int]] = field(default_factory=dict)
     effects_expanded: bool = False
     blend_mode: BlendMode = "black-key"
-    beat_sensitivity: float = 1.0
+    beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
     enabled: bool = True
     expanded: bool = False
     locked: bool = False
