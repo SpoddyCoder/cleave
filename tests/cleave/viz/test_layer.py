@@ -187,6 +187,7 @@ def test_effective_layer_enabled_uses_record_buffer_while_recording() -> None:
     )
     session.timeline.recording = True
     session.timeline.armed_slots = {"layer_1"}
+    session.timeline.record_baseline = {"layer_1": True}
     session.timeline.record_buffer = [TimelineCue(t=1.0, layers={"layer_1": False})]
     assert effective_layer_enabled(session, "layer_1", 1.0) is False
     assert effective_layer_enabled(session, "layer_2", 1.0) is True
@@ -363,6 +364,7 @@ def test_effective_layer_enabled_recording_armed_vs_unarmed() -> None:
     )
     session.timeline.recording = True
     session.timeline.armed_slots = {"layer_1"}
+    session.timeline.record_baseline = {"layer_1": True}
     session.timeline.record_buffer = [
         TimelineCue(t=1.0, layers={"layer_1": False, "layer_2": True}),
     ]
@@ -461,6 +463,43 @@ def test_armed_recording_bar_blends_committed_and_live() -> None:
         (12.0, 30.0, False),
         (30.0, 60.0, True),
     ]
+
+
+def test_armed_recording_bar_keeps_live_preview_after_disarm() -> None:
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+        cues=[TimelineCue(t=0.0, layers={"layer_1": False})],
+    )
+    session.timeline.recording = True
+    session.timeline.record_start_sec = 10.0
+    session.timeline.armed_slots = set()
+    session.timeline.record_baseline = {"layer_1": True}
+    session.timeline.record_buffer = [TimelineCue(t=12.0, layers={"layer_1": False})]
+
+    state = build_timeline_view_state(session, position_sec=12.0, duration_sec=60.0)
+    segments = bar_segments_for_row(state, "layer_1")
+    assert segments == [
+        (0.0, 10.0, False),
+        (10.0, 12.0, True),
+        (12.0, 60.0, False),
+    ]
+    assert effective_layer_enabled(session, "layer_1", 12.0) is False
+
+
+def test_build_record_punch_cues_uses_record_baseline_when_disarmed() -> None:
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+        cues=[TimelineCue(t=0.0, layers={"layer_1": False})],
+    )
+    session.timeline.recording = True
+    session.timeline.armed_slots = set()
+    session.timeline.record_baseline = {"layer_1": True}
+    session.timeline.record_buffer = [TimelineCue(t=12.0, layers={"layer_1": False})]
+
+    punch = build_record_punch_cues(session, record_start=10.0, record_stop=15.0)
+    assert TimelineCue(t=12.0, layers={"layer_1": False}) in punch
 
 
 def test_build_record_punch_cues_restores_committed_at_stop() -> None:

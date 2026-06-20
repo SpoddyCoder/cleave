@@ -261,7 +261,7 @@ class TimelineControls:
         record_stop = current_sec(self.playback, self.duration_sec)
         tl.cues = punch_replace(
             tl.cues,
-            tl.armed_slots,
+            set(tl.record_baseline),
             record_start,
             record_stop,
             build_record_punch_cues(self.session, record_start, record_stop),

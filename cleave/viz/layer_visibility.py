@@ -61,7 +61,7 @@ def armed_recording_visible(
     slot: str,
     t_sec: float,
 ) -> bool:
-    """Visibility for an armed slot during an active record pass."""
+    """Visibility for a record-pass slot during an active take."""
     return layer_visible_at(
         session.timeline.record_buffer,
         armed_recording_defaults(session),
@@ -96,10 +96,7 @@ def build_record_punch_cues(
     """Cues to punch on record stop: baseline, toggles, and committed restore at stop."""
     tl = session.timeline
     punch: list[TimelineCue] = []
-    for slot in tl.armed_slots:
-        baseline = tl.record_baseline.get(slot)
-        if baseline is None:
-            continue
+    for slot, baseline in tl.record_baseline.items():
         if baseline != timeline_committed_visible(session, slot, record_start):
             punch.append(
                 TimelineCue(
@@ -109,7 +106,7 @@ def build_record_punch_cues(
                 )
             )
     punch.extend(tl.record_buffer)
-    for slot in tl.armed_slots:
+    for slot in tl.record_baseline:
         end_visible = armed_recording_visible(session, slot, record_stop)
         committed_at_stop = timeline_committed_visible(session, slot, record_stop)
         if end_visible != committed_at_stop:
@@ -135,7 +132,7 @@ def effective_layer_enabled(
     tl = session.timeline
     defaults = timeline_defaults(session)
     if tl.recording:
-        if slot in tl.armed_slots:
+        if slot in tl.record_baseline:
             return armed_recording_visible(session, slot, t_sec)
         if slot in tl.override_slots:
             return tl.override_visible.get(slot, True)
