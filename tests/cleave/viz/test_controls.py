@@ -463,7 +463,7 @@ def test_move_mode_backspace_cancels_without_applying() -> None:
     assert not controls.config_dirty
 
 
-def test_save_as_new_triggers_toast_and_blocks_input() -> None:
+def test_save_as_new_triggers_toast_without_blocking_input() -> None:
     controls = _make_controls(("drums",))
     view = controls.build_view_state(paused=False)
     save_row = _save_row(view)
@@ -487,7 +487,7 @@ def test_save_as_new_triggers_toast_and_blocks_input() -> None:
 
         before = controls.focus_index
         assert controls.handle_keydown(_keydown(pygame.K_DOWN)) is True
-        assert controls.focus_index == before
+        assert controls.focus_index != before
 
 
 def test_config_header_shows_active_path() -> None:
@@ -1166,6 +1166,25 @@ def test_render_timeline_ctrl_right_toggles_enabled() -> None:
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
     assert controls.session.timeline.enabled is True
+    assert controls.session.timeline.panel_open is True
+    assert controls.session.timeline.submenu_focused is False
+
+
+def test_render_timeline_enable_opens_panel() -> None:
+    controls = _make_controls()
+    view = controls.build_view_state(paused=False)
+    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    controls.focus_index = header_row
+    assert controls.session.timeline.enabled is False
+    assert controls.session.timeline.panel_open is False
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert controls.session.timeline.enabled is True
+    assert controls.session.timeline.panel_open is True
+    assert controls.session.timeline.submenu_focused is False
+    view = controls.build_view_state(paused=False)
+    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    assert _row_text(view, header_row).endswith(" ▼")
 
 
 def test_render_timeline_right_opens_panel() -> None:
