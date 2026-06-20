@@ -21,7 +21,7 @@ from pathlib import Path
 
 import numpy as np
 
-from cleave.config import clamp_beat_sensitivity
+from cleave.config import DEFAULT_BEAT_SENSITIVITY, clamp_beat_sensitivity
 
 PROJECTM_MONO = 1
 PROJECTM_STEREO = 2
@@ -200,7 +200,7 @@ class ProjectM:
             )
         self._handle = handle
         self._texture_path_storage: list[bytes] = []
-        self._beat_sensitivity = 1.0
+        self._beat_sensitivity = DEFAULT_BEAT_SENSITIVITY
 
     @property
     def handle(self) -> c_void_p:

@@ -391,7 +391,7 @@ def test_write_session_snapshot_sparse_beat_sensitivity() -> None:
             )
             for slot in LAYER_SLOTS
             },
-            visualizer=VisualizerConfig(beat_sensitivity=1.0),
+            visualizer=VisualizerConfig(beat_sensitivity=2.0),
             config_path=config_path,
         )
 
@@ -404,7 +404,7 @@ def test_write_session_snapshot_sparse_beat_sensitivity() -> None:
                         preset_root / DEFAULT_STEM_FOR_SLOT[slot], index=0
                     ),
                     browse_floor=preset_root / DEFAULT_STEM_FOR_SLOT[slot],
-                    beat_sensitivity=1.5 if slot == "layer_2" else 1.0,
+                    beat_sensitivity=1.5 if slot == "layer_2" else 2.0,
                 )
                 for slot in LAYER_SLOTS
             },
@@ -414,7 +414,7 @@ def test_write_session_snapshot_sparse_beat_sensitivity() -> None:
         write_session_snapshot(out_path, cfg=cfg, session=session)
 
         data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
-        assert data["visualizer"]["beat_sensitivity"] == 1.0
+        assert data["visualizer"]["beat_sensitivity"] == 2.0
         assert "beat_sensitivity" not in data["layers"]["layer_1"]
         assert data["layers"]["layer_2"]["beat_sensitivity"] == 1.5
 
