@@ -7,7 +7,7 @@ Typography roles for the live tuning overlay:
   LOCKED   — tinted text for locked sub-rows that cannot be edited
 
 Accent colors for modes and icons (not label/value roles):
-  HIGHLIGHT, MOVE_MODE, LOCK_ICON, PRESET_ICON, PRESET_FILE_ICON,
+  HIGHLIGHT, HIGHLIGHT_MUTED, MOVE_MODE, LOCK_ICON, PRESET_ICON, PRESET_FILE_ICON,
   TIMELINE_BAR_ON, PLAYHEAD
 
 See [.cursor/rules/live-tuning-ui.mdc](../.cursor/rules/live-tuning-ui.mdc) for how
@@ -24,7 +24,8 @@ BORDER_COLOR: tuple[int, int, int] = (255, 255, 255)
 LABEL: tuple[int, int, int] = (170, 210, 255)
 VALUE: tuple[int, int, int] = (255, 255, 255)
 DISABLED: tuple[int, int, int] = (140, 140, 140)
-HIGHLIGHT: tuple[int, int, int] = (255, 165, 0)
+HIGHLIGHT: tuple[int, int, int] = (255, 235, 130)
+HIGHLIGHT_MUTED: tuple[int, int, int] = (175, 160, 95)
 
 PRESET_ICON: tuple[int, int, int] = (255, 195, 90)
 PRESET_FILE_ICON: tuple[int, int, int] = (255, 250, 235)
@@ -37,7 +38,7 @@ CONFIG_DIRTY: tuple[int, int, int] = (255, 255, 0)
 ARMED_BG: tuple[int, int, int] = SOLO_BG
 OVERRIDE_GLYPH: tuple[int, int, int] = (0, 0, 0)
 OVERRIDE_GLYPH_OFF: tuple[int, int, int] = DISABLED
-FOCUS_ROW_BG_ALPHA: int = 50
+FOCUS_ROW_BG_ALPHA: int = 130
 REC_BG: tuple[int, int, int] = (220, 0, 0)
 TIMELINE_BAR_ON: tuple[int, int, int] = (200, 225, 255)
 PLAYHEAD: tuple[int, int, int] = (90, 50, 130)

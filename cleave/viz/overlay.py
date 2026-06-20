@@ -60,6 +60,7 @@ from cleave.viz.theme import (
     FADE_DURATION_SEC,
     FOCUS_ROW_BG_ALPHA,
     HIGHLIGHT,
+    HIGHLIGHT_MUTED,
     HOLD_IDLE_SEC,
     LABEL,
     LOCKED,
@@ -831,6 +832,13 @@ def _track_disabled(state: TuningViewState, stem: str) -> bool:
     return not state.tracks[stem].visible
 
 
+def _row_highlight_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
+    stem = row_stem(state, index)
+    if stem is not None and _track_disabled(state, stem):
+        return HIGHLIGHT_MUTED
+    return HIGHLIGHT
+
+
 def _row_has_tree_focus(state: TuningViewState, index: int) -> bool:
     if state.timeline_submenu_focused:
         return False
@@ -876,7 +884,7 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
         return MOVE_MODE
 
     if _row_has_tree_focus(state, index):
-        return HIGHLIGHT
+        return _row_highlight_color(state, index)
 
     if stem is not None and _track_disabled(state, stem):
         return DISABLED
@@ -896,7 +904,7 @@ def _row_bg_color(state: TuningViewState, index: int) -> tuple[int, int, int] | 
     if stem is not None and state.move_mode_stem == stem:
         return MOVE_MODE
     if _row_has_tree_focus(state, index):
-        return HIGHLIGHT
+        return _row_highlight_color(state, index)
     return None
 
 

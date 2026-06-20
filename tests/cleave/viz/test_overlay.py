@@ -33,6 +33,7 @@ from cleave.viz.theme import (
     BORDER_WIDTH,
     DISABLED,
     HIGHLIGHT,
+    HIGHLIGHT_MUTED,
     HOLD_IDLE_SEC,
     LABEL,
     PANEL_CONTENT_MAX_WIDTH,
@@ -512,6 +513,29 @@ def test_draw_track_header_with_solo_eye() -> None:
     )
     assert state.solo_stem == "drums"
     assert header_row == find_row_by_kind(state, RowKind.TRACK_HEADER)
+
+
+def test_disabled_track_focus_uses_muted_highlight() -> None:
+    state = _minimal_view_state(
+        tracks={
+            "drums": TrackBlock(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                visible=False,
+            )
+        },
+    )
+    header_row = find_row_by_kind(state, RowKind.TRACK_HEADER)
+    state.focus_index = header_row
+    assert _row_value_color(state, header_row) == HIGHLIGHT_MUTED
+    assert _row_bg_color(state, header_row) == HIGHLIGHT_MUTED
+    assert _row_value_color(state, header_row) != HIGHLIGHT
+    assert _row_value_color(state, header_row) != DISABLED
 
 
 def test_main_tree_rows_not_highlighted_when_timeline_submenu_focused() -> None:
