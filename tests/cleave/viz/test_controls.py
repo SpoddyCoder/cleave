@@ -141,9 +141,9 @@ def _make_controls(
     )
 
 
-def _save_row(view: TuningViewState) -> int:
+def _config_header_row(view: TuningViewState) -> int:
     return next(
-        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.SAVE_CONFIG
+        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.CONFIG_HEADER
     )
 
 
@@ -468,9 +468,8 @@ def test_move_mode_backspace_cancels_without_applying() -> None:
 def test_save_as_new_triggers_toast_without_blocking_input() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    save_row = _save_row(view)
-    assert _row_text(view, save_row) == "SAVE CONFIG"
-    controls.focus_index = save_row
+    config_row = _config_header_row(view)
+    controls.focus_index = config_row
 
     stderr = io.StringIO()
     with patch.object(time, "monotonic", return_value=1000.0):
@@ -501,7 +500,7 @@ def test_config_header_shows_active_path() -> None:
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.CONFIG_HEADER
     )
     assert _row_text(view, header_row) == config_path_display(launch_path)
-    assert header_row not in navigable_row_indices(view)
+    assert header_row in navigable_row_indices(view)
 
 
 def test_config_header_shows_asterisk_when_dirty() -> None:
@@ -515,7 +514,7 @@ def test_config_header_shows_asterisk_when_dirty() -> None:
     )
     assert _row_text(view, header_row) == config_path_display(launch_path)
     assert view.config_dirty
-    assert header_row not in navigable_row_indices(view)
+    assert header_row in navigable_row_indices(view)
 
 
 def test_blend_and_opacity_change_sets_dirty_save_clears() -> None:
@@ -533,7 +532,7 @@ def test_blend_and_opacity_change_sets_dirty_save_clears() -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.config_dirty
 
-    save_row = _save_row(view)
+    save_row = _config_header_row(view)
     controls.focus_index = save_row
     _choose_save_as_new(controls)
     assert not controls.config_dirty
@@ -633,7 +632,7 @@ def test_save_as_new_updates_active_config_path() -> None:
     controls._config_save._on_save_new_config = lambda: saved_path
 
     view = controls.build_view_state(paused=False)
-    save_row = _save_row(view)
+    save_row = _config_header_row(view)
     controls.focus_index = save_row
     _choose_save_as_new(controls)
 
@@ -656,14 +655,14 @@ def test_save_as_new_enables_overwrite_from_root_template() -> None:
 
     controls._config_save._on_save_new_config = lambda: saved_path
     view = controls.build_view_state(paused=False)
-    save_row = _save_row(view)
+    save_row = _config_header_row(view)
     controls.focus_index = save_row
     _choose_save_as_new(controls)
 
     state = controls.build_view_state(paused=False)
     assert state.allow_overwrite is True
     kinds = {row_kind(state, i) for i in range(row_count(state))}
-    assert RowKind.SAVE_CONFIG in kinds
+    assert RowKind.CONFIG_HEADER in kinds
 
 
 def test_overwrite_after_save_uses_new_active_path() -> None:
@@ -678,7 +677,7 @@ def test_overwrite_after_save_uses_new_active_path() -> None:
     controls._config_save._on_overwrite_config = lambda path: writes.append(path) or path.name
 
     view = controls.build_view_state(paused=False)
-    save_row = _save_row(view)
+    save_row = _config_header_row(view)
 
     with patch.object(time, "monotonic", return_value=3000.0):
         controls.focus_index = save_row
@@ -686,7 +685,7 @@ def test_overwrite_after_save_uses_new_active_path() -> None:
 
     with patch.object(time, "monotonic", return_value=3000.0 + TOAST_DURATION_SEC + 1):
         state = controls.build_view_state(paused=False)
-        save_row = _save_row(state)
+        save_row = _config_header_row(state)
         controls.focus_index = save_row
         _choose_overwrite(controls)
         controls.handle_keydown(_keydown(pygame.K_RETURN))
@@ -702,32 +701,31 @@ def test_navigable_rows_without_overwrite() -> None:
     )
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is False
-    assert row_count(view) == 15
+    assert row_count(view) == 14
 
     kinds = {row_kind(view, i) for i in range(row_count(view))}
     assert RowKind.CONFIG_HEADER in kinds
-    assert RowKind.SAVE_CONFIG in kinds
 
     navigable = navigable_row_indices(view)
-    assert all(row_kind(view, i) != RowKind.CONFIG_HEADER for i in navigable)
+    assert any(row_kind(view, i) == RowKind.CONFIG_HEADER for i in navigable)
 
     transport_row = next(
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.TRANSPORT
     )
-    save_row = _save_row(view)
+    config_row = _config_header_row(view)
     controls.focus_index = transport_row
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_index == save_row
+    assert controls.focus_index == config_row
 
 
 def test_navigable_rows_with_overwrite() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is True
-    assert row_count(view) == 15
+    assert row_count(view) == 14
 
-    save_row = _save_row(view)
-    assert save_row in navigable_row_indices(view)
+    config_row = _config_header_row(view)
+    assert config_row in navigable_row_indices(view)
 
 
 def test_overwrite_shows_confirm_before_write() -> None:
@@ -739,7 +737,7 @@ def test_overwrite_shows_confirm_before_write() -> None:
     )
 
     view = controls.build_view_state(paused=False)
-    save_row = _save_row(view)
+    save_row = _config_header_row(view)
     controls.focus_index = save_row
 
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
@@ -778,7 +776,7 @@ def test_overwrite_confirm_yes_writes_launch_path() -> None:
     )
 
     view = controls.build_view_state(paused=False)
-    save_row = _save_row(view)
+    save_row = _config_header_row(view)
     controls.focus_index = save_row
 
     stderr = io.StringIO()
@@ -803,7 +801,7 @@ def test_overwrite_confirm_esc_dismisses() -> None:
     )
 
     view = controls.build_view_state(paused=False)
-    save_row = _save_row(view)
+    save_row = _config_header_row(view)
     controls.focus_index = save_row
 
     _choose_overwrite(controls)
@@ -815,7 +813,7 @@ def test_overwrite_confirm_esc_dismisses() -> None:
 def test_esc_during_confirm_does_not_quit() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    save_row = _save_row(view)
+    save_row = _config_header_row(view)
     controls.focus_index = save_row
     _choose_overwrite(controls)
     assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
@@ -1701,17 +1699,17 @@ def test_ctrl_quick_nav_from_sub_row_jumps_forward() -> None:
     assert controls.focus_index == quick[1]
 
 
-def test_ctrl_quick_nav_from_save_row() -> None:
+def test_ctrl_quick_nav_from_config_header_row() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     quick = quick_nav_row_indices(view)
-    save_row = _save_row(view)
+    config_row = _config_header_row(view)
 
-    controls.focus_index = save_row
+    controls.focus_index = config_row
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
     assert controls.focus_index == quick[0]
 
-    controls.focus_index = save_row
+    controls.focus_index = config_row
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
     assert controls.focus_index == quick[1]
 
@@ -2418,11 +2416,11 @@ def test_save_blocked_while_solo_active() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
-    save_row = _save_row(view)
+    config_row = _config_header_row(view)
     controls.focus_index = header_row
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
 
-    controls.focus_index = save_row
+    controls.focus_index = config_row
     stderr = io.StringIO()
     with patch("sys.stderr", stderr):
         controls.handle_keydown(_keydown(pygame.K_RETURN))
@@ -2430,12 +2428,12 @@ def test_save_blocked_while_solo_active() -> None:
     assert controls.build_view_state(paused=False).solo_active is True
 
 
-def test_save_rows_greyed_while_solo_active() -> None:
+def test_config_header_greyed_while_solo_active() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.solo_slot = "layer_1"
     view = controls.build_view_state(paused=False)
-    save_row = _save_row(view)
-    assert _row_value_color(view, save_row) == DISABLED
+    config_row = _config_header_row(view)
+    assert _row_value_color(view, config_row) == DISABLED
 
 
 def test_solo_visibility_icon_same_width_as_normal() -> None:

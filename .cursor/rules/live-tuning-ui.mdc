@@ -39,11 +39,11 @@ Separate bottom overlay ([cleave/viz/timeline_overlay.py](cleave/viz/timeline_ov
 
 ## Header rows section
 
-The pinned top block before a visual gap (`header_gap` in `draw()`): `header_row_count(state)` rows (3).
+The pinned top block before a visual gap (`header_gap` in `draw()`): `header_row_count(state)` rows (2).
 
-- Row kinds: `RowKind.TRANSPORT`, `RowKind.CONFIG_HEADER` (non-navigable active config path), `SAVE_CONFIG`.
-- Constant: `HEADER_ROWS` (3); layout indices 0-2 in `build_row_layout`.
-- Enter on `SAVE_CONFIG` opens an `OVERWRITE` / `SAVE AS NEW` centered modal when overwrite is allowed (`allow_overwrite`; false for repo-root `cleave-viz.yaml`). Otherwise save-as-new runs immediately. Overwrite still uses the yes/no centered modal.
+- Row kinds: `RowKind.TRANSPORT`, `RowKind.CONFIG_HEADER` (active config path; Enter saves).
+- Constant: `HEADER_ROWS` (2); layout indices 0-1 in `build_row_layout`.
+- Enter on `CONFIG_HEADER` opens an `OVERWRITE` / `SAVE AS NEW` centered modal when overwrite is allowed (`allow_overwrite`; false for repo-root `cleave-viz.yaml`). Otherwise save-as-new runs immediately. Overwrite still uses the yes/no centered modal.
 
 ## Whole panel
 
@@ -84,9 +84,9 @@ Colors live in [cleave/viz/theme.py](cleave/viz/theme.py). Label truncation uses
 
 These rows do not split label and value; the implementation is deliberate:
 
-- **Active config path** (`CONFIG_HEADER`): entire row drawn in `LABEL`.
+- **Active config path** (`CONFIG_HEADER`): entire row drawn in `LABEL` (disabled while solo is active).
 - **Preset dir / preset filename**: single-color row text plus Material Icons (icon colors above).
-- **Transport, save**: single-color header rows in row value color. Save row uses `DISABLED` while `solo_active` (Enter blocked in controls).
+- **Transport**: single-color header row in row value color.
 - **Toasts**: `DISABLED`.
 - **Centered modals** ([cleave/viz/modal_overlay.py](cleave/viz/modal_overlay.py)): yes/no message in `VALUE`; options use `HIGHLIGHT` or `DISABLED` by focus. Unsaved-quit message uses `HIGHLIGHT` with a tinted background. Save-choice options follow the same highlight pattern.
 

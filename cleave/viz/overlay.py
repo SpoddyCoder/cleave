@@ -84,7 +84,7 @@ from cleave.viz.theme import (
 
 Anchor = Literal["topleft", "bottomleft"]
 
-HEADER_ROWS = 3
+HEADER_ROWS = 2
 TREE_INDENT = 16
 TIMELINE_LAYER_HINT_TEXT = "Timeline is enabled and controlling layer visibility"
 ROW_ICON_SUFFIX_GAP = 4
@@ -181,7 +181,6 @@ def build_row_layout(state: TuningViewState) -> list[RowDescriptor]:
     rows: list[RowDescriptor] = [
         RowDescriptor(RowKind.TRANSPORT),
         RowDescriptor(RowKind.CONFIG_HEADER),
-        RowDescriptor(RowKind.SAVE_CONFIG),
     ]
     for slot in state.layer_z_order:
         rows.append(RowDescriptor(RowKind.TRACK_HEADER, slot=slot))
@@ -322,7 +321,6 @@ def navigable_row_indices(state: TuningViewState) -> list[int]:
     for index in range(row_count(state)):
         desc = row_descriptor(state, index)
         if desc.kind in {
-            RowKind.CONFIG_HEADER,
             RowKind.RENDER_SECTION_GAP,
             RowKind.TIMELINE_LAYER_HINT,
         }:
@@ -397,9 +395,6 @@ def _row_text(state: TuningViewState, index: int) -> str:
         return state.active_config_label
     if kind == RowKind.TRANSPORT:
         return ""
-    if kind == RowKind.SAVE_CONFIG:
-        return "SAVE CONFIG"
-
     if kind == RowKind.RENDER_SECTION_GAP:
         return ""
 
@@ -862,6 +857,8 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
 
     stem = row_slot(state, index)
     if kind == RowKind.CONFIG_HEADER:
+        if state.solo_active:
+            return DISABLED
         return LABEL
 
     if kind in {RowKind.RENDER_OVERLAY_HEADER, *RENDER_OVERLAY_ALL_SUB_ROW_KINDS}:
@@ -878,9 +875,6 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
     if kind == RowKind.RENDER_TIMELINE_HEADER:
         if not state.render_timeline.enabled:
             return DISABLED
-
-    if state.solo_active and kind == RowKind.SAVE_CONFIG:
-        return DISABLED
 
     if (
         kind == RowKind.TRACK_PRESET

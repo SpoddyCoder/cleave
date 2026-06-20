@@ -15,7 +15,7 @@ from cleave.viz.controls import TuningControls
 from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.overlay import find_row_by_kind
 from cleave.viz.row_semantics import RowKind
-from tests.cleave.viz.test_controls import _choose_save_as_new, _keydown, _make_controls, _row, _save_row
+from tests.cleave.viz.test_controls import _choose_save_as_new, _config_header_row, _keydown, _make_controls, _row
 from tests.cleave.viz.test_timeline_controls import _make_timeline_controls
 from tests.support.viz import keydown, stub_playback_state
 
@@ -310,7 +310,7 @@ def test_display_time_mutation_clears_dirty_after_save() -> None:
     assert controls.config_dirty
 
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _save_row(view)
+    controls.focus_index = _config_header_row(view)
     _choose_save_as_new(controls)
     assert not controls.config_dirty
 

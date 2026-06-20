@@ -272,7 +272,7 @@ class TuningControls:
                     )
                     self.move_mode_slot = slot
                 return True
-            if kind == RowKind.SAVE_CONFIG:
+            if kind == RowKind.CONFIG_HEADER:
                 if self.session.solo_slot is not None:
                     return True
                 self._config_save.prompt_save()

@@ -58,7 +58,6 @@ def test_header_row_kinds() -> None:
         {
             RowKind.TRANSPORT,
             RowKind.CONFIG_HEADER,
-            RowKind.SAVE_CONFIG,
         }
     )
 
