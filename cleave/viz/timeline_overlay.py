@@ -384,9 +384,10 @@ class TimelineOverlay:
 
             monitor_enabled = state.monitor_visible.get(stem, True)
             timeline_enabled = state.timeline_visible.get(stem, True)
-            monitor_override = stem in state.override_stems or (
-                state.recording and armed and rec_flash_visible()
-            )
+            monitor_override = (
+                stem in state.override_stems
+                and not (state.recording and armed)
+            ) or (state.recording and armed and rec_flash_visible())
             monitor_icon = render_visibility_icon(
                 enabled=monitor_enabled,
                 override=monitor_override,

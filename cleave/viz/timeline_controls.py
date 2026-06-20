@@ -129,11 +129,6 @@ class TimelineControls:
             return True
 
         if event.key == pygame.K_RETURN and mod_ctrl(event.mod):
-            if self.session.timeline.recording:
-                self._toggle_armed_layer_at(
-                    self._focused_stem(),
-                    current_sec(self.playback, self.duration_sec),
-                )
             return True
 
         if event.key == pygame.K_RETURN and mod_shift(event.mod):
