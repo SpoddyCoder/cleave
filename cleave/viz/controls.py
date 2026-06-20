@@ -72,7 +72,6 @@ class TuningControls:
         self._move_mode_original_z_order: list[str] | None = None
         self._toast_message: str | None = None
         self._toast_deadline = 0.0
-        self._input_blocked_until = 0.0
         self._key_repeat = KeyRepeatController()
         self._hide_overlay_requested = False
 
@@ -162,9 +161,6 @@ class TuningControls:
             return True
 
         if self.handle_modal_keydown(event):
-            return True
-
-        if self._input_blocked():
             return True
 
         if event.key == pygame.K_SPACE:
@@ -303,9 +299,6 @@ class TuningControls:
         position_sec: float | None = None,
     ) -> TuningViewState:
         return self._view_state.build(paused=paused, position_sec=position_sec)
-
-    def _input_blocked(self) -> bool:
-        return time.monotonic() < self._input_blocked_until
 
     def _timeline_row_count(self) -> int:
         return len(self.session.layer_z_order)
@@ -690,7 +683,9 @@ class TuningControls:
         view = self.build_view_state(paused=self.playback.paused)
         focused = self._focused_row_descriptor(view)
         tl.enabled = enabled
-        if not enabled:
+        if enabled:
+            self._open_timeline_panel()
+        else:
             self.close_timeline_panel()
         if self._layer_bindings is not None:
             self._layer_bindings.on_timeline_enabled_change()
@@ -788,7 +783,6 @@ class TuningControls:
         now = time.monotonic()
         self._toast_message = message
         self._toast_deadline = now + TOAST_DURATION_SEC
-        self._input_blocked_until = now + TOAST_DURATION_SEC
 
     def _open_timeline_panel(self, *, enter_submenu: bool = False) -> None:
         tl = self.session.timeline
