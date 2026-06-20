@@ -5,6 +5,7 @@ from __future__ import annotations
 import pygame
 
 from cleave.paths import repo_root
+from cleave.viz.theme import tuning_ui_metrics
 
 FONT_PATH = repo_root() / "assets/fonts/MaterialIcons-Regular.ttf"
 
@@ -18,8 +19,9 @@ LOCK_GLYPH = "\ue897"
 VISIBILITY_GLYPH = "\ue8f4"
 VISIBILITY_OFF_GLYPH = "\ue8f5"
 
-_SUFFIX_ICON_GAP = 4
-_LABEL_SUFFIX_GAP = 4
+_tuning_ui = tuning_ui_metrics()
+_SUFFIX_ICON_GAP = _tuning_ui.icon_suffix_gap
+_LABEL_SUFFIX_GAP = _tuning_ui.icon_label_gap
 
 _font_cache: dict[int, pygame.font.Font] = {}
 
@@ -101,7 +103,7 @@ def _suffix_icon_width(line_height: int, glyph: str) -> int:
     return font.size(glyph)[0]
 
 
-VISIBILITY_ICON_PAD_X = 2
+VISIBILITY_ICON_PAD_X = _tuning_ui.visibility_icon_pad_x
 
 
 def visibility_icon_slot_width(line_height: int) -> int:

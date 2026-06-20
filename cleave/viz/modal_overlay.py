@@ -14,6 +14,7 @@ from cleave.viz.theme import (
     HIGHLIGHT,
     MODAL_SCRIM_ALPHA,
     VALUE,
+    tuning_ui_metrics,
 )
 
 
@@ -37,9 +38,10 @@ def draw_rect(
     return (left, top, clip_w, clip_h)
 
 
-_OPTION_GAP = 16
-_PANEL_PAD_X = 12
-_PANEL_PAD_Y = 10
+_tuning_ui = tuning_ui_metrics()
+_OPTION_GAP = _tuning_ui.modal_option_gap
+_PANEL_PAD_X = _tuning_ui.modal_panel_pad_x
+_PANEL_PAD_Y = _tuning_ui.modal_panel_pad_y
 
 
 def draw(
@@ -47,12 +49,14 @@ def draw(
     state: ModalViewState,
     *,
     font: pygame.font.Font,
-    line_gap: int = 3,
+    line_gap: int | None = None,
     text_alpha: int = 255,
 ) -> None:
     """Draw a centered modal with full-viewport scrim."""
     if text_alpha < 2:
         return
+    if line_gap is None:
+        line_gap = _tuning_ui.line_gap
 
     sw, sh = surface.get_width(), surface.get_height()
     scrim = pygame.Surface((sw, sh), pygame.SRCALPHA)

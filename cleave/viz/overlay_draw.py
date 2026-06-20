@@ -62,6 +62,7 @@ class OverlayDrawer:
                 overlay_surface,
                 modal_view,
                 font=overlay._font_get(),
+                line_gap=overlay._line_gap,
             )
 
         if modal_active:

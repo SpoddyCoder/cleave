@@ -17,6 +17,7 @@ from cleave.viz.theme import (
     HIGHLIGHT,
     LABEL,
     VALUE,
+    tuning_ui_metrics,
 )
 
 
@@ -232,11 +233,20 @@ class HelpOverlay:
     def __init__(
         self,
         *,
-        margin: tuple[int, int] = (10, 10),
-        padding: int = 8,
-        line_gap: int = 3,
-        font_size: int = 14,
+        margin: tuple[int, int] | None = None,
+        padding: int | None = None,
+        line_gap: int | None = None,
+        font_size: int | None = None,
     ) -> None:
+        metrics = tuning_ui_metrics()
+        if margin is None:
+            margin = (metrics.margin, metrics.margin)
+        if padding is None:
+            padding = metrics.padding
+        if line_gap is None:
+            line_gap = metrics.line_gap
+        if font_size is None:
+            font_size = metrics.font_size
         self._margin = margin
         self._padding = padding
         self._line_gap = line_gap

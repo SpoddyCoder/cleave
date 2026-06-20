@@ -15,6 +15,12 @@ from cleave.viz.controls import TuningControls
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.playback import PlaybackState
+from cleave.viz.theme import TuningUiMetrics, tuning_ui_metrics
+
+
+def baseline_tuning_ui_metrics() -> TuningUiMetrics:
+    """Unscaled tuning metrics for layout tests that assume 14px spacing."""
+    return tuning_ui_metrics(scale=1.0)
 
 
 class StubMixPlayer:
@@ -52,7 +58,7 @@ def keydown(key: int, *, mod: int = 0) -> pygame.event.Event:
 
 def overlay_font() -> pygame.font.Font:
     pygame.font.init()
-    return pygame.font.SysFont("monospace", 14)
+    return pygame.font.SysFont("monospace", baseline_tuning_ui_metrics().font_size)
 
 
 def make_playlist(name: str, count: int = 3) -> PresetPlaylist:

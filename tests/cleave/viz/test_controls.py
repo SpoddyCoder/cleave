@@ -45,7 +45,6 @@ from cleave.viz.theme import (
     HIGHLIGHT,
     LOCKED,
     MOVE_MODE,
-    PANEL_CONTENT_MAX_WIDTH,
     SOLO_BG,
     VALUE,
 )
@@ -83,6 +82,7 @@ from cleave.viz.overlay import (
     row_visible,
     visible_row_indices,
 )
+from tests.support.viz import baseline_tuning_ui_metrics
 
 
 def _keydown(key: int, *, mod: int = 0) -> pygame.event.Event:
@@ -91,7 +91,7 @@ def _keydown(key: int, *, mod: int = 0) -> pygame.event.Event:
 
 def _overlay_font() -> pygame.font.Font:
     pygame.font.init()
-    return pygame.font.SysFont("monospace", 14)
+    return pygame.font.SysFont("monospace", baseline_tuning_ui_metrics().font_size)
 
 
 def _make_playlist(name: str, count: int = 3) -> PresetPlaylist:
@@ -549,9 +549,10 @@ def test_config_header_truncates_long_paths() -> None:
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.CONFIG_HEADER
     )
     font = _overlay_font()
-    label = fit_row_text(font, view, header_row)
+    panel_w = baseline_tuning_ui_metrics().panel_content_max_width
+    label = fit_row_text(font, view, header_row, max_content_width=panel_w)
     icon_budget = row_icon_prefix_width(font.get_linesize())
-    assert font.size(label)[0] + icon_budget <= PANEL_CONTENT_MAX_WIDTH
+    assert font.size(label)[0] + icon_budget <= panel_w
     assert label.startswith("…")
     assert "…/" not in label
 
@@ -585,8 +586,9 @@ def test_preset_row_truncates_long_filenames() -> None:
     )
     preset_row = _row(view, "layer_1", RowKind.TRACK_PRESET)
     font = _overlay_font()
-    label = fit_row_text(font, view, preset_row)
-    assert font.size(label)[0] <= PANEL_CONTENT_MAX_WIDTH - 16
+    panel_w = baseline_tuning_ui_metrics().panel_content_max_width
+    label = fit_row_text(font, view, preset_row, max_content_width=panel_w)
+    assert font.size(label)[0] <= panel_w - TREE_INDENT
     assert label.endswith("(1/50)")
     assert label.startswith("…")
     assert "…/" not in label
@@ -619,11 +621,12 @@ def test_fit_row_text_config_and_preset_share_panel_width() -> None:
     )
     preset_row = _row(view, "layer_1", RowKind.TRACK_PRESET)
     font = _overlay_font()
-    config_label = fit_row_text(font, view, header_row)
-    preset_label = fit_row_text(font, view, preset_row)
+    panel_w = baseline_tuning_ui_metrics().panel_content_max_width
+    config_label = fit_row_text(font, view, header_row, max_content_width=panel_w)
+    preset_label = fit_row_text(font, view, preset_row, max_content_width=panel_w)
     icon_budget = row_icon_prefix_width(font.get_linesize())
-    assert font.size(config_label)[0] + icon_budget <= PANEL_CONTENT_MAX_WIDTH
-    assert font.size(preset_label)[0] + TREE_INDENT + icon_budget <= PANEL_CONTENT_MAX_WIDTH
+    assert font.size(config_label)[0] + icon_budget <= panel_w
+    assert font.size(preset_label)[0] + TREE_INDENT + icon_budget <= panel_w
 
 
 def test_save_as_new_updates_active_config_path() -> None:
