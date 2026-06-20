@@ -140,7 +140,7 @@ def bar_segments_for_row(
     duration = state.duration_sec
     if duration <= 0:
         return []
-    if not (state.recording and slot in state.armed_slots):
+    if not (state.recording and slot in state.record_baseline):
         return visibility_segments(state.cues, state.defaults, slot, duration)
 
     record_start = state.record_start_sec
@@ -176,7 +176,7 @@ def bar_segments_for_row(
 def bar_tick_times_for_row(state: TimelineViewState, slot: str) -> list[float]:
     """Cue tick times for one timeline row."""
     duration = state.duration_sec
-    if not (state.recording and slot in state.armed_slots):
+    if not (state.recording and slot in state.record_baseline):
         return cue_times_for_stem(state.cues, slot, duration)
 
     record_start = state.record_start_sec
