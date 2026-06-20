@@ -37,7 +37,6 @@ class RowKind(Enum):
     RENDER_TIMELINE_HEADER = auto()
     CONFIG_HEADER = auto()
     TRANSPORT = auto()
-    SAVE_CONFIG = auto()
 
 
 @dataclass(frozen=True)
@@ -79,13 +78,9 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         repeatable=True,
     ),
     RowKind.CONFIG_HEADER: RowBehavior(
-        RowAffordance.DISPLAY,
-        is_header=True,
-        navigable=False,
-    ),
-    RowKind.SAVE_CONFIG: RowBehavior(
         RowAffordance.ACTION,
         is_header=True,
+        help_title="Save",
     ),
     RowKind.TRACK_HEADER: RowBehavior(
         RowAffordance.EXPAND,
