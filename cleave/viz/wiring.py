@@ -32,6 +32,10 @@ def _solo_audio_source(session: TuningSession) -> str | None:
     return session.layers[session.solo_slot].stem
 
 
+def _sync_mix_player_solo(session: TuningSession, mix_player: MixPlayer) -> None:
+    mix_player.set_solo_source(_solo_audio_source(session))
+
+
 def _stub_cfg_for_session(
     session: TuningSession,
     preset_root: Path,
@@ -68,21 +72,20 @@ def make_tuning_controls(
     mix_player: MixPlayer | None = None,
     modal_host: ModalHost | None = None,
 ) -> TuningControls:
-    def on_preset_change(stem: str, playlist: PresetPlaylist) -> None:
-        layer = layers_by_slot[stem]
+    def on_preset_change(slot: str, playlist: PresetPlaylist) -> None:
+        layer = layers_by_slot[slot]
         layer.playlist = playlist
         if playlist.current is not None:
             playlist.load_into(layer.pm, smooth=False)
             layer.pm.lock_preset(True)
 
-    def on_blend_change(stem: str, blend_mode) -> None:
-        layers_by_slot[stem].fbo.blend_mode = blend_mode
+    def on_blend_change(slot: str, blend_mode) -> None:
+        layers_by_slot[slot].fbo.blend_mode = blend_mode
 
     def on_stem_change(slot: str, stem) -> None:
-        layers_by_slot[slot].stem = stem
         LayerFramePipeline.flush_pcm(layers)
-        if mix_player is not None and session.solo_slot == slot:
-            mix_player.set_solo_stem(_solo_audio_source(session))
+        if mix_player is not None:
+            _sync_mix_player_solo(session, mix_player)
         apply_effect_modifiers(
             session,
             layers_by_slot,
@@ -92,7 +95,7 @@ def make_tuning_controls(
             update=False,
         )
 
-    def on_opacity_change(stem: str, pct: int) -> None:
+    def on_opacity_change(slot: str, pct: int) -> None:
         apply_effect_modifiers(
             session,
             layers_by_slot,
@@ -102,11 +105,11 @@ def make_tuning_controls(
             update=False,
         )
 
-    def on_layer_enabled_change(stem: str, enabled: bool) -> None:
+    def on_layer_enabled_change(slot: str, enabled: bool) -> None:
         t_sec = current_sec(playback, duration_sec)
         apply_layer_visibility(session, layers_by_slot, t_sec)
         LayerFramePipeline.flush_pcm(layers)
-        if effective_layer_enabled(session, stem, t_sec):
+        if effective_layer_enabled(session, slot, t_sec):
             apply_effect_modifiers(
                 session,
                 layers_by_slot,
@@ -133,7 +136,7 @@ def make_tuning_controls(
         t_sec = current_sec(playback, duration_sec)
         apply_layer_visibility(session, layers_by_slot, t_sec)
         if mix_player is not None:
-            mix_player.set_solo_stem(_solo_audio_source(session))
+            _sync_mix_player_solo(session, mix_player)
         LayerFramePipeline.flush_pcm(layers)
         apply_effect_modifiers(
             session,
@@ -144,8 +147,8 @@ def make_tuning_controls(
             update=False,
         )
 
-    def on_beat_change(stem: str, beat: float) -> None:
-        layers_by_slot[stem].pm.set_beat_sensitivity(beat)
+    def on_beat_change(slot: str, beat: float) -> None:
+        layers_by_slot[slot].pm.set_beat_sensitivity(beat)
 
     def on_seek(delta_sec: float) -> None:
         seek(playback, delta_sec, duration_sec)
@@ -203,7 +206,7 @@ def make_tuning_controls(
             layers_by_slot,
             current_sec(playback, duration_sec),
         )
-        mix_player.set_solo_stem(_solo_audio_source(session))
+        _sync_mix_player_solo(session, mix_player)
     return controls
 
 

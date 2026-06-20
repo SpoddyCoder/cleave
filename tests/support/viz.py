@@ -67,14 +67,14 @@ def stub_playback_state() -> PlaybackState:
 
 def noop_layer_bindings(**overrides: Callable) -> LiveLayerBindings:
     base = LiveLayerBindings(
-        on_preset_change=lambda _stem, _playlist: None,
-        on_blend_change=lambda _stem, _blend: None,
+        on_preset_change=lambda _slot, _playlist: None,
+        on_blend_change=lambda _slot, _blend: None,
         on_stem_change=lambda _slot, _stem: None,
-        on_opacity_change=lambda _stem, _pct: None,
-        on_layer_enabled_change=lambda _stem, _enabled: None,
+        on_opacity_change=lambda _slot, _pct: None,
+        on_layer_enabled_change=lambda _slot, _enabled: None,
         on_timeline_enabled_change=lambda: None,
         on_solo_change=lambda: None,
-        on_beat_change=lambda _stem, _beat: None,
+        on_beat_change=lambda _slot, _beat: None,
         on_seek=lambda _delta: None,
     )
     if overrides:

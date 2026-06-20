@@ -79,7 +79,7 @@ from cleave.viz.overlay import (
     quick_nav_row_indices,
     row_count,
     row_kind,
-    row_stem,
+    row_slot,
     row_visible,
     visible_row_indices,
 )
@@ -248,18 +248,18 @@ def test_navigation_skips_sub_rows_when_collapsed() -> None:
     drums_header = next(
         i
         for i in range(12)
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "layer_1"
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_slot(view, i) == "layer_1"
     )
     bass_header = next(
         i
         for i in range(12)
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "layer_2"
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_slot(view, i) == "layer_2"
     )
     navigable = navigable_row_indices(view)
     assert drums_header in navigable
     assert bass_header in navigable
     for i in navigable:
-        stem = row_stem(view, i)
+        stem = row_slot(view, i)
         if stem == "layer_1":
             assert row_kind(view, i) == RowKind.TRACK_HEADER
 
@@ -407,18 +407,18 @@ def test_move_mode_swaps_z_order() -> None:
     header_row = next(
         i
         for i in range(15)
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "layer_2"
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_slot(view, i) == "layer_2"
     )
     controls.focus_index = header_row
 
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
-    assert controls.move_mode_stem == "layer_2"
+    assert controls.move_mode_slot == "layer_2"
 
     assert controls.handle_keydown(_keydown(pygame.K_UP)) is True
     assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
 
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
-    assert controls.move_mode_stem is None
+    assert controls.move_mode_slot is None
     assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
     assert controls.config_dirty
 
@@ -430,7 +430,7 @@ def test_move_mode_esc_cancels_without_applying() -> None:
     header_row = next(
         i
         for i in range(15)
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "layer_2"
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_slot(view, i) == "layer_2"
     )
     controls.focus_index = header_row
 
@@ -439,7 +439,7 @@ def test_move_mode_esc_cancels_without_applying() -> None:
     assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
 
     assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
-    assert controls.move_mode_stem is None
+    assert controls.move_mode_slot is None
     assert controls.session.layer_z_order == ["layer_1", "layer_2", "layer_3"]
     assert not controls.config_dirty
 
@@ -451,7 +451,7 @@ def test_move_mode_backspace_cancels_without_applying() -> None:
     header_row = next(
         i
         for i in range(15)
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "layer_2"
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_slot(view, i) == "layer_2"
     )
     controls.focus_index = header_row
 
@@ -460,7 +460,7 @@ def test_move_mode_backspace_cancels_without_applying() -> None:
     assert controls.session.layer_z_order == ["layer_1", "layer_3", "layer_2"]
 
     assert controls.handle_keydown(_keydown(pygame.K_BACKSPACE)) is True
-    assert controls.move_mode_stem is None
+    assert controls.move_mode_slot is None
     assert controls.session.layer_z_order == ["layer_1", "layer_2", "layer_3"]
     assert not controls.config_dirty
 
@@ -580,7 +580,7 @@ def test_preset_row_truncates_long_filenames() -> None:
         paused=False,
         position_sec=0.0,
         focus_index=0,
-        move_mode_stem=None,
+        move_mode_slot=None,
         toast_message=None,
         toast_remaining_sec=0.0,
     )
@@ -835,9 +835,9 @@ def test_esc_in_move_mode_does_not_request_overlay_hide() -> None:
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     controls.focus_index = header_row
     controls.handle_keydown(_keydown(pygame.K_RETURN))
-    assert controls.move_mode_stem == "layer_1"
+    assert controls.move_mode_slot == "layer_1"
     assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
-    assert controls.move_mode_stem is None
+    assert controls.move_mode_slot is None
     assert controls.consume_hide_overlay() is False
 
 
@@ -1574,7 +1574,7 @@ def test_t_ignored_during_move_mode() -> None:
     header_row = find_row_by_kind(view, RowKind.TRACK_HEADER)
     controls.focus_index = header_row
     controls.handle_keydown(_keydown(pygame.K_RETURN))
-    assert controls.move_mode_stem == "layer_1"
+    assert controls.move_mode_slot == "layer_1"
 
     controls.handle_keydown(_keydown(pygame.K_t))
     assert controls.session.timeline.panel_open is False
@@ -1629,12 +1629,12 @@ def test_quick_nav_row_indices_headers_and_transport_only() -> None:
     drums_header = next(
         i
         for i in range(row_count(view))
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "layer_1"
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_slot(view, i) == "layer_1"
     )
     bass_header = next(
         i
         for i in range(row_count(view))
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "layer_2"
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_slot(view, i) == "layer_2"
     )
     render_overlay_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
     render_post_fx_row = find_row_by_kind(
@@ -1992,7 +1992,7 @@ def test_move_mode_colors_focused_track_header() -> None:
     header_row = next(
         i
         for i in range(row_count(view))
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "layer_2"
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_slot(view, i) == "layer_2"
     )
     controls.focus_index = header_row
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
@@ -2023,7 +2023,7 @@ def test_row_value_color_dim_for_focused_empty_preset() -> None:
         paused=False,
         position_sec=0.0,
         focus_index=0,
-        move_mode_stem=None,
+        move_mode_slot=None,
         toast_message=None,
         toast_remaining_sec=0.0,
     )
@@ -2034,7 +2034,7 @@ def test_row_value_color_dim_for_focused_empty_preset() -> None:
         paused=state.paused,
         position_sec=state.position_sec,
         focus_index=preset_row,
-        move_mode_stem=state.move_mode_stem,
+        move_mode_slot=state.move_mode_slot,
         toast_message=state.toast_message,
         toast_remaining_sec=state.toast_remaining_sec,
     )
@@ -2082,7 +2082,7 @@ def _header_row(
     return next(
         i
         for i in range(row_count(view))
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == stem
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_slot(view, i) == stem
     )
 
 
@@ -2100,7 +2100,7 @@ def _sub_rows_for_stem(view: TuningViewState, stem: str) -> list[int]:
     return [
         i
         for i in range(row_count(view))
-        if row_stem(view, i) == stem and row_kind(view, i) in sub_kinds
+        if row_slot(view, i) == stem and row_kind(view, i) in sub_kinds
     ]
 
 
@@ -2162,7 +2162,7 @@ def test_locked_blocks_move_mode() -> None:
     controls.focus_index = header_row
 
     controls.handle_keydown(_keydown(pygame.K_RETURN))
-    assert controls.move_mode_stem is None
+    assert controls.move_mode_slot is None
 
 
 def test_locked_header_still_expands() -> None:
@@ -2200,7 +2200,7 @@ def test_locked_sub_rows_use_locked_color() -> None:
         paused=view.paused,
         position_sec=view.position_sec,
         focus_index=row_count(view) - 1,
-        move_mode_stem=view.move_mode_stem,
+        move_mode_slot=view.move_mode_slot,
         toast_message=view.toast_message,
         toast_remaining_sec=view.toast_remaining_sec,
         active_config_label=view.active_config_label,
@@ -2215,7 +2215,7 @@ def test_locked_sub_rows_use_locked_color() -> None:
         paused=view.paused,
         position_sec=view.position_sec,
         focus_index=header_row,
-        move_mode_stem=view.move_mode_stem,
+        move_mode_slot=view.move_mode_slot,
         toast_message=view.toast_message,
         toast_remaining_sec=view.toast_remaining_sec,
         active_config_label=view.active_config_label,
@@ -2233,7 +2233,7 @@ def test_locked_not_toggleable_during_move_mode() -> None:
     assert controls.session.layers["layer_2"].locked is False
 
     controls.handle_keydown(_keydown(pygame.K_RETURN))
-    assert controls.move_mode_stem == "layer_2"
+    assert controls.move_mode_slot == "layer_2"
 
     controls.handle_keydown(_keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
     assert controls.session.layers["layer_2"].locked is False
@@ -2245,11 +2245,11 @@ def test_ctrl_quick_nav_blocked_during_move_mode() -> None:
     bass_header = next(
         i
         for i in range(15)
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_stem(view, i) == "layer_2"
+        if row_kind(view, i) == RowKind.TRACK_HEADER and row_slot(view, i) == "layer_2"
     )
     controls.focus_index = bass_header
     controls.handle_keydown(_keydown(pygame.K_RETURN))
-    assert controls.move_mode_stem == "layer_2"
+    assert controls.move_mode_slot == "layer_2"
 
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
     assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
@@ -2379,7 +2379,7 @@ def test_shift_right_enters_solo() -> None:
     assert solo_calls == ["layer_1"]
     state = controls.build_view_state(paused=False)
     assert state.solo_active is True
-    assert state.solo_stem == "layer_1"
+    assert state.solo_slot == "layer_1"
 
 
 def test_shift_right_switches_solo_target() -> None:

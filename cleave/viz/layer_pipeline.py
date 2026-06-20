@@ -125,7 +125,6 @@ class LayerFramePipeline:
             runtimes.append(
                 StemLayer(
                     slot=slot,
-                    stem=layer_cfg.stem,
                     pm=pm,
                     fbo=fbo,
                     playlist=playlist,
@@ -166,7 +165,8 @@ class LayerFramePipeline:
             for layer in layers:
                 if not layer.fbo.enabled:
                     continue
-                pcm = pcm_bank.slice_pcm(layer.stem, t_sec, n_pcm)
+                stem = session.layers[layer.slot].stem
+                pcm = pcm_bank.slice_pcm(stem, t_sec, n_pcm)
                 layer.pm.feed_pcm(pcm)
                 layer.pm.set_frame_time(t_sec)
                 _render_layer_fbo(layer, layer.pm)
@@ -194,7 +194,8 @@ class LayerFramePipeline:
             for layer in layers:
                 if not layer.fbo.enabled:
                     continue
-                pcm = pcm_bank.slice_pcm(layer.stem, t_sec, n_pcm)
+                stem = session.layers[layer.slot].stem
+                pcm = pcm_bank.slice_pcm(stem, t_sec, n_pcm)
                 layer.pm.feed_pcm(pcm)
                 layer.pm.set_frame_time(t_sec)
 
