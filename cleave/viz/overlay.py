@@ -827,6 +827,7 @@ def _row_indent(state: TuningViewState, index: int) -> int:
     if kind in {
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
+        RowKind.TRACK_STEM,
         RowKind.TRACK_BLEND,
         RowKind.TRACK_OPACITY,
         RowKind.TRACK_BEAT,

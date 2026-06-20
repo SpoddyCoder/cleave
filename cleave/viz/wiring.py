@@ -9,7 +9,7 @@ from cleave.config import VIZ_CONFIG_FILENAME, CleaveConfig, LayerConfig, PathsC
 from cleave.config_snapshot import next_unnamed_path, write_session_snapshot
 from cleave.effects.runtime import EffectRuntime
 from cleave.config_schema import DEFAULT_STEM_FOR_SLOT, LAYER_SLOTS
-from cleave.extract import STEM_NAMES
+from cleave.extract import STEM_NAMES, STEM_SOURCES
 from cleave.paths import repo_root
 from cleave.preset_playlist import PresetPlaylist
 from cleave.signals import Signals
@@ -81,6 +81,8 @@ def make_tuning_controls(
     def on_stem_change(slot: str, stem) -> None:
         layers_by_slot[slot].stem = stem
         LayerFramePipeline.flush_pcm(layers)
+        if mix_player is not None and session.solo_slot == slot:
+            mix_player.set_solo_stem(_solo_audio_source(session))
         apply_effect_modifiers(
             session,
             layers_by_slot,
@@ -194,12 +196,7 @@ def make_tuning_controls(
     controls = TuningControls(**kwargs)
     if pcm_bank is not None and mix_player is not None:
         mix_player.set_stem_pcm(
-            {
-                session.layers[slot].stem: pcm_bank.mono_pcm(
-                    session.layers[slot].stem
-                )
-                for slot in session.layer_z_order
-            }
+            {stem: pcm_bank.mono_pcm(stem) for stem in STEM_SOURCES}
         )
         apply_layer_visibility(
             session,

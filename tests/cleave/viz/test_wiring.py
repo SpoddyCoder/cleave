@@ -5,8 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import numpy as np
+
 from cleave.effects.runtime import EffectRuntime
 from cleave.preset_playlist import PresetPlaylist
+from cleave.stem_pcm import StemPcmBank
+from cleave.viz.mix_player import MixPlayer
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.layer import StemLayer
 from tests.support.viz import stub_playback_state
@@ -62,3 +66,66 @@ def test_on_beat_change_updates_projectm() -> None:
 
     assert controls.session.layers["layer_1"].beat_sensitivity == 1.5
     pm.set_beat_sensitivity.assert_called_once_with(1.5)
+
+
+def test_on_stem_change_updates_mix_player_solo_source() -> None:
+    pm = MagicMock()
+    layer = StemLayer(
+        slot="layer_1",
+        stem="drums",
+        pm=pm,
+        fbo=MagicMock(),
+        playlist=PresetPlaylist(
+            current_dir=Path("/tmp/presets/layer_1"),
+            paths=(),
+            index=0,
+        ),
+    )
+    layers_by_slot = {"layer_1": layer}
+    session = TuningSession(
+        layer_z_order=["layer_1"],
+        layers={
+            "layer_1": LayerRuntime(
+                playlist=layer.playlist,
+                browse_floor=Path("/tmp/presets/layer_1"),
+                stem="drums",
+                opacity_pct=100,
+                beat_sensitivity=1.0,
+            )
+        },
+        solo_slot="layer_1",
+    )
+    mix = np.zeros(8, dtype=np.float32)
+    mix_player = MixPlayer(mix)
+    pcm_bank = StemPcmBank(
+        project_dir=Path("/tmp/projects/test"),
+        duration_sec=1.0,
+        _pcm={
+            "drums": np.array([1.0], dtype=np.float32),
+            "bass": np.array([2.0], dtype=np.float32),
+            "vocals": np.array([3.0], dtype=np.float32),
+            "other": np.array([4.0], dtype=np.float32),
+            "full_mix": np.array([5.0], dtype=np.float32),
+        },
+    )
+    controls = make_tuning_controls(
+        session=session,
+        cfg=None,
+        preset_root=Path("/tmp/presets"),
+        project_dir=Path("/tmp/projects/test"),
+        layers_by_slot=layers_by_slot,
+        layers=[layer],
+        playback=stub_playback_state(),
+        duration_sec=120.0,
+        signals=None,
+        effect_runtime=EffectRuntime(),
+        pcm_bank=pcm_bank,
+        mix_player=mix_player,
+    )
+
+    controls._cycle_stem("layer_1", forward=True)
+
+    assert session.layers["layer_1"].stem == "bass"
+    assert layer.stem == "bass"
+    with mix_player._lock:
+        assert mix_player._solo_stem == "bass"
