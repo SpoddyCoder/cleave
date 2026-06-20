@@ -2339,6 +2339,16 @@ def test_effect_row_nested_indent() -> None:
     assert _row_indent(view, pulse_row) == TREE_INDENT * 2
 
 
+def test_stem_row_indent() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].expanded = True
+    view = controls.build_view_state(paused=False)
+    blend_row = _row(view, "layer_1", RowKind.TRACK_BLEND)
+    stem_row = _row(view, "layer_1", RowKind.TRACK_STEM)
+    assert _row_indent(view, stem_row) == TREE_INDENT
+    assert _row_indent(view, blend_row) == TREE_INDENT
+
+
 def test_format_mmss() -> None:
     assert format_mmss(0) == "00:00"
     assert format_mmss(42.7) == "00:42"
