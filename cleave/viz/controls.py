@@ -793,7 +793,7 @@ class TuningControls:
     def _open_timeline_panel(self, *, enter_submenu: bool = False) -> None:
         tl = self.session.timeline
         if not tl.enabled:
-            self.show_toast("Enable timeline in Render: TIMELINE (Ctrl+Right)")
+            self.show_toast("Enable timeline first")
             return
         tl.panel_open = True
         if enter_submenu:
