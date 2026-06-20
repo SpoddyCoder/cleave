@@ -21,7 +21,6 @@ from cleave.extract import StemSource, stem_control_label, stem_overlay_header
 from cleave.viz.row_semantics import (
     HEADER_ROW_KINDS,
     LABELED_SUB_ROW_KINDS,
-    LOCKED_NAVIGABLE_SUB_ROW_KINDS,
     RENDER_OVERLAY_ALL_SUB_ROW_KINDS,
     RENDER_OVERLAY_BODY_NESTED_KINDS,
     RENDER_OVERLAY_SUB_ROW_KINDS,
@@ -31,6 +30,8 @@ from cleave.viz.row_semantics import (
     RowKind,
     TRACK_EFFECT_SUB_ROW_KINDS,
     TRACK_SUB_ROW_KINDS,
+    row_blocked_by_layer_lock,
+    row_navigable_when_layer_locked,
 )
 from cleave.viz.fonts import render_overlay_font_display
 from cleave.viz.text_fit import (
@@ -280,11 +281,6 @@ def track_sub_rows_visible(state: TuningViewState, slot: str) -> bool:
     return state.tracks[slot].expanded
 
 
-def track_sub_rows_navigable(state: TuningViewState, slot: str) -> bool:
-    block = state.tracks[slot]
-    return block.expanded and not block.locked
-
-
 def _sub_row_visible(state: TuningViewState, index: int) -> bool:
     desc = row_descriptor(state, index)
     if desc.kind in {RowKind.RENDER_SECTION_GAP, RowKind.TIMELINE_LAYER_HINT}:
@@ -345,7 +341,7 @@ def navigable_row_indices(state: TuningViewState) -> list[int]:
             block = state.tracks[slot]
             if not block.expanded:
                 continue
-            if block.locked and desc.kind not in LOCKED_NAVIGABLE_SUB_ROW_KINDS:
+            if block.locked and not row_navigable_when_layer_locked(desc.kind):
                 continue
             if desc.kind in TRACK_EFFECT_SUB_ROW_KINDS and not block.effects_expanded:
                 continue
@@ -897,8 +893,7 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
     if (
         stem is not None
         and state.tracks[stem].locked
-        and kind in TRACK_SUB_ROW_KINDS
-        and kind != RowKind.TRACK_STEM
+        and row_blocked_by_layer_lock(kind)
     ):
         return LOCKED
 

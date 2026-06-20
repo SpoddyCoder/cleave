@@ -69,6 +69,8 @@ class RowBehavior:
     can_enter_move_mode: bool = False
     repeatable: bool = False
     parent_group: str | None = None
+    blocked_by_layer_lock: bool | None = None
+    navigable_when_layer_locked: bool | None = None
 
 
 ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
@@ -266,13 +268,14 @@ RENDER_OVERLAY_ALL_SUB_ROW_KINDS = (
 RENDER_POST_FX_SUB_ROW_KINDS = frozenset(
     k for k, b in ROW_BEHAVIORS.items() if b.parent_group == "render_post_fx"
 )
-LOCKED_NAVIGABLE_SUB_ROW_KINDS = frozenset(
-    k
-    for k, b in ROW_BEHAVIORS.items()
-    if b.parent_group == "track"
-    and b.is_sub_header
-    and b.affordance == RowAffordance.EXPAND
-) | frozenset({RowKind.TRACK_STEM})
+
+_LAYER_LOCK_BLOCKING_AFFORDANCES = frozenset(
+    {
+        RowAffordance.VALUE_STEP,
+        RowAffordance.PATH_DIR,
+        RowAffordance.PATH_PRESET,
+    }
+)
 
 
 def row_behavior(kind: RowKind) -> RowBehavior:
@@ -285,3 +288,34 @@ def expandable_row_kinds() -> frozenset[RowKind]:
     return frozenset(
         k for k, b in ROW_BEHAVIORS.items() if b.affordance == RowAffordance.EXPAND
     )
+
+
+def _derived_blocked_by_layer_lock(behavior: RowBehavior) -> bool:
+    if behavior.blocked_by_layer_lock is not None:
+        return behavior.blocked_by_layer_lock
+    return (
+        behavior.parent_group == "track"
+        and behavior.affordance in _LAYER_LOCK_BLOCKING_AFFORDANCES
+    )
+
+
+def _derived_navigable_when_layer_locked(behavior: RowBehavior) -> bool:
+    if behavior.navigable_when_layer_locked is not None:
+        return behavior.navigable_when_layer_locked
+    return (
+        behavior.parent_group == "track"
+        and behavior.is_sub_header
+        and behavior.affordance == RowAffordance.EXPAND
+    )
+
+
+def row_blocked_by_layer_lock(kind: RowKind) -> bool:
+    return _derived_blocked_by_layer_lock(row_behavior(kind))
+
+
+def row_navigable_when_layer_locked(kind: RowKind) -> bool:
+    return _derived_navigable_when_layer_locked(row_behavior(kind))
+
+
+def layer_lock_blocks_mutation(kind: RowKind, *, locked: bool) -> bool:
+    return locked and row_blocked_by_layer_lock(kind)

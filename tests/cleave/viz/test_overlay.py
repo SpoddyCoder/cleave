@@ -435,7 +435,7 @@ def test_track_stem_row_text() -> None:
     assert _row_text(state, stem_row) == "└─ stem: full-mix"
 
 
-def test_locked_stem_row_stays_navigable_and_not_locked_color() -> None:
+def test_locked_stem_row_not_navigable_and_uses_locked_color() -> None:
     state = _minimal_view_state(
         tracks={
             "layer_1": TrackBlock(
@@ -452,8 +452,8 @@ def test_locked_stem_row_stays_navigable_and_not_locked_color() -> None:
         },
     )
     stem_row = find_row(state, "layer_1", RowKind.TRACK_STEM)
-    assert stem_row in navigable_row_indices(state)
-    assert _row_value_color(state, stem_row) != LOCKED
+    assert stem_row not in navigable_row_indices(state)
+    assert _row_value_color(state, stem_row) == LOCKED
 
 
 def test_timeline_layer_hint_when_timeline_enabled() -> None:

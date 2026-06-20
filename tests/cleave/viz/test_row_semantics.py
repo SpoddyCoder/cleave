@@ -5,7 +5,6 @@ from __future__ import annotations
 from cleave.viz.row_semantics import (
     HEADER_ROW_KINDS,
     LABELED_SUB_ROW_KINDS,
-    LOCKED_NAVIGABLE_SUB_ROW_KINDS,
     RENDER_OVERLAY_ALL_SUB_ROW_KINDS,
     RENDER_OVERLAY_BODY_NESTED_KINDS,
     RENDER_OVERLAY_SUB_ROW_KINDS,
@@ -18,7 +17,10 @@ from cleave.viz.row_semantics import (
     RowAffordance,
     RowKind,
     expandable_row_kinds,
+    layer_lock_blocks_mutation,
+    row_blocked_by_layer_lock,
     row_behavior,
+    row_navigable_when_layer_locked,
 )
 
 _EXPECTED_REPEAT_ROW_KINDS = frozenset(
@@ -167,9 +169,38 @@ def test_render_post_fx_sub_row_kinds() -> None:
 
 
 def test_locked_navigable_sub_row_kinds() -> None:
-    assert LOCKED_NAVIGABLE_SUB_ROW_KINDS == frozenset(
-        {RowKind.TRACK_EFFECTS_HEADER, RowKind.TRACK_STEM}
+    navigable = frozenset(
+        k for k in TRACK_SUB_ROW_KINDS if row_navigable_when_layer_locked(k)
     )
+    assert navigable == frozenset({RowKind.TRACK_EFFECTS_HEADER})
+
+
+def test_track_value_rows_blocked_by_layer_lock() -> None:
+    blocked = frozenset(
+        k for k in TRACK_SUB_ROW_KINDS if row_blocked_by_layer_lock(k)
+    )
+    assert blocked == frozenset(
+        {
+            RowKind.TRACK_PRESET_DIR,
+            RowKind.TRACK_PRESET,
+            RowKind.TRACK_STEM,
+            RowKind.TRACK_BLEND,
+            RowKind.TRACK_OPACITY,
+            RowKind.TRACK_BEAT,
+            RowKind.TRACK_EFFECT,
+        }
+    )
+    for kind in blocked:
+        assert layer_lock_blocks_mutation(kind, locked=True) is True
+        assert layer_lock_blocks_mutation(kind, locked=False) is False
+
+
+def test_only_effects_header_navigable_when_layer_locked() -> None:
+    for kind in TRACK_SUB_ROW_KINDS:
+        if kind == RowKind.TRACK_EFFECTS_HEADER:
+            assert row_navigable_when_layer_locked(kind) is True
+        else:
+            assert row_navigable_when_layer_locked(kind) is False
 
 
 def test_labeled_sub_row_kinds_exclude_headers() -> None:

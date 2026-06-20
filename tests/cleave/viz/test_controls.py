@@ -2132,10 +2132,10 @@ def test_locked_expanded_skips_sub_rows_in_nav() -> None:
     effects_header = _row(view, "layer_1", RowKind.TRACK_EFFECTS_HEADER)
     stem_row = _row(view, "layer_1", RowKind.TRACK_STEM)
     assert effects_header in navigable
-    assert stem_row in navigable
+    assert stem_row not in navigable
     for row in sub_rows:
         assert row in visible
-        if row in {effects_header, stem_row}:
+        if row == effects_header:
             continue
         assert row not in navigable
 
@@ -2559,7 +2559,7 @@ def test_stem_change_clears_effects() -> None:
     assert controls.session.layers["layer_1"].effects == {}
 
 
-def test_stem_row_works_when_layer_locked() -> None:
+def test_locked_blocks_stem_change() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].expanded = True
     controls.session.layers["layer_1"].locked = True
@@ -2568,7 +2568,32 @@ def test_stem_row_works_when_layer_locked() -> None:
     assert controls.session.layers["layer_1"].stem == "drums"
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.session.layers["layer_1"].stem == "bass"
+    assert controls.session.layers["layer_1"].stem == "drums"
+
+
+def test_locked_blocks_preset_dir_enter_and_backspace() -> None:
+    root, siblings = _make_sibling_dir_tree(2)
+    controls = _controls_with_playlist(root, siblings[0])
+    controls.session.layers["layer_1"].expanded = True
+    controls.focus_index = _preset_dir_row(controls)
+    playlist = controls.session.layers["layer_1"].playlist
+    child = siblings[0] / "child"
+
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    assert playlist.current_dir.resolve() == child.resolve()
+
+    controls.session.layers["layer_1"].locked = True
+
+    controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
+    assert playlist.current_dir.resolve() == child.resolve()
+
+    controls.session.layers["layer_1"].locked = False
+    controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
+    assert playlist.current_dir.resolve() == siblings[0].resolve()
+
+    controls.session.layers["layer_1"].locked = True
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    assert playlist.current_dir.resolve() == siblings[0].resolve()
 
 
 def test_cycle_stem_to_full_mix() -> None:
