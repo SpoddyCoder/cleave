@@ -29,7 +29,7 @@ class TuningViewStateBuilder:
         preset_root,
         *,
         get_focus_index: Callable[[], int],
-        get_move_mode_stem: Callable[[], str | None],
+        get_move_mode_slot: Callable[[], str | None],
         config_save: ConfigSaveController,
         get_toast_message: Callable[[], str | None],
         get_toast_deadline: Callable[[], float],
@@ -39,7 +39,7 @@ class TuningViewStateBuilder:
         self.duration_sec = duration_sec
         self.preset_root = preset_root
         self._get_focus_index = get_focus_index
-        self._get_move_mode_stem = get_move_mode_stem
+        self._get_move_mode_slot = get_move_mode_slot
         self._config_save = config_save
         self._get_toast_message = get_toast_message
         self._get_toast_deadline = get_toast_deadline
@@ -99,13 +99,13 @@ class TuningViewStateBuilder:
             paused=paused,
             position_sec=position_sec,
             focus_index=self._get_focus_index(),
-            move_mode_stem=self._get_move_mode_stem(),
+            move_mode_slot=self._get_move_mode_slot(),
             toast_message=toast_message,
             toast_remaining_sec=toast_remaining,
             allow_overwrite=self._config_save.allow_overwrite(),
             active_config_label=config_path_display(self._config_save.active_config_path),
             config_dirty=self._config_save.config_dirty,
-            solo_stem=self.session.solo_slot,
+            solo_slot=self.session.solo_slot,
             solo_active=self.session.solo_slot is not None,
             render_overlay=RenderOverlayBlock(
                 enabled=ro.enabled,

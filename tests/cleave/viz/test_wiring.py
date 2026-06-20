@@ -21,7 +21,6 @@ def _make_wired_controls() -> tuple:
     pm = MagicMock()
     layer = StemLayer(
         slot="layer_1",
-        stem="drums",
         pm=pm,
         fbo=MagicMock(),
         playlist=PresetPlaylist(
@@ -72,7 +71,6 @@ def test_on_stem_change_updates_mix_player_solo_source() -> None:
     pm = MagicMock()
     layer = StemLayer(
         slot="layer_1",
-        stem="drums",
         pm=pm,
         fbo=MagicMock(),
         playlist=PresetPlaylist(
@@ -126,6 +124,5 @@ def test_on_stem_change_updates_mix_player_solo_source() -> None:
     controls._cycle_stem("layer_1", forward=True)
 
     assert session.layers["layer_1"].stem == "bass"
-    assert layer.stem == "bass"
     with mix_player._lock:
-        assert mix_player._solo_stem == "bass"
+        assert mix_player._solo_source == "bass"

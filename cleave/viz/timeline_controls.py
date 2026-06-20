@@ -303,30 +303,30 @@ class TimelineControls:
             tl.override_slots.add(slot)
         self._refresh_visibility()
 
-    def _toggle_paused_stem_visibility(self, stem: str) -> None:
+    def _toggle_paused_stem_visibility(self, slot: str) -> None:
         tl = self.session.timeline
         if tl.preview_active:
-            tl.monitor[stem] = not tl.monitor[stem]
-        elif stem in tl.override_slots:
-            tl.override_visible[stem] = not tl.override_visible.get(stem, True)
+            tl.monitor[slot] = not tl.monitor[slot]
+        elif slot in tl.override_slots:
+            tl.override_visible[slot] = not tl.override_visible.get(slot, True)
         else:
             t_sec = current_sec(self.playback, self.duration_sec)
-            tl.override_visible[stem] = not effective_layer_enabled(
-                self.session, stem, t_sec
+            tl.override_visible[slot] = not effective_layer_enabled(
+                self.session, slot, t_sec
             )
-            tl.override_slots.add(stem)
+            tl.override_slots.add(slot)
         self._refresh_visibility()
 
-    def _toggle_armed_layer_at(self, stem: str, t_sec: float) -> None:
+    def _toggle_armed_layer_at(self, slot: str, t_sec: float) -> None:
         tl = self.session.timeline
-        if stem not in tl.armed_slots:
+        if slot not in tl.armed_slots:
             return
-        if not should_accept_toggle(self._last_toggle_t.get(stem), t_sec):
+        if not should_accept_toggle(self._last_toggle_t.get(slot), t_sec):
             return
 
-        current = armed_recording_visible(self.session, stem, t_sec)
-        tl.record_buffer.append(TimelineCue(t=t_sec, layers={stem: not current}))
-        self._last_toggle_t[stem] = t_sec
+        current = armed_recording_visible(self.session, slot, t_sec)
+        tl.record_buffer.append(TimelineCue(t=t_sec, layers={slot: not current}))
+        self._last_toggle_t[slot] = t_sec
 
         if self._on_visibility_change is not None:
             self._on_visibility_change()

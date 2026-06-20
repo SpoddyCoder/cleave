@@ -43,7 +43,7 @@ class RowKind(Enum):
 @dataclass(frozen=True)
 class RowDescriptor:
     kind: RowKind
-    stem: str | None = None
+    slot: str | None = None
     effect_id: str | None = None
     driver_slug: str | None = None
 

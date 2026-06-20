@@ -77,7 +77,6 @@ def _session(
 def _stem_layer(slot: str) -> StemLayer:
     return StemLayer(
         slot=slot,
-        stem=DEFAULT_STEM_FOR_SLOT[slot],
         pm=MagicMock(),
         fbo=MagicMock(enabled=True),
         playlist=_playlist(slot),

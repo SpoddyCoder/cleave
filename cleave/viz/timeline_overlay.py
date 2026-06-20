@@ -77,10 +77,10 @@ class TimelineViewState:
 def visibility_segments(
     cues: list[TimelineCue],
     defaults: dict[str, bool],
-    stem: str,
+    slot: str,
     duration_sec: float,
 ) -> list[tuple[float, float, bool]]:
-    """Return ``(start_t, end_t, visible)`` segments for *stem* over ``[0, duration_sec]``."""
+    """Return ``(start_t, end_t, visible)`` segments for *slot* over ``[0, duration_sec]``."""
     if duration_sec <= 0:
         return []
     boundaries = sorted({0.0, duration_sec} | {cue.t for cue in cues})
@@ -90,7 +90,7 @@ def visibility_segments(
         end_t = boundaries[index + 1]
         if end_t <= start_t:
             continue
-        visible = layer_visible_at(cues, defaults, stem, start_t)
+        visible = layer_visible_at(cues, defaults, slot, start_t)
         segments.append((start_t, end_t, visible))
     return segments
 
@@ -101,16 +101,16 @@ def unique_cue_times(cues: list[TimelineCue], duration_sec: float) -> list[float
 
 def cue_times_for_stem(
     cues: list[TimelineCue],
-    stem: str,
+    slot: str,
     duration_sec: float,
 ) -> list[float]:
-    """Cue times that change visibility for *stem* within ``[0, duration_sec]``."""
+    """Cue times that change visibility for *slot* within ``[0, duration_sec]``."""
     return sorted(
         {
             cue.t
             for cue in cues
             if (
-                stem in cue.layers
+                slot in cue.layers
                 and cue.show_tick
                 and 0.0 <= cue.t <= duration_sec
             )
@@ -134,14 +134,14 @@ def _clip_segments(
 
 def bar_segments_for_row(
     state: TimelineViewState,
-    stem: str,
+    slot: str,
 ) -> list[tuple[float, float, bool]]:
     """Visibility segments for one timeline row, including live record preview."""
     duration = state.duration_sec
     if duration <= 0:
         return []
-    if not (state.recording and stem in state.armed_slots):
-        return visibility_segments(state.cues, state.defaults, stem, duration)
+    if not (state.recording and slot in state.armed_slots):
+        return visibility_segments(state.cues, state.defaults, slot, duration)
 
     record_start = state.record_start_sec
     if record_start is None:
@@ -150,7 +150,7 @@ def bar_segments_for_row(
     playhead = max(0.0, min(state.position_sec, duration))
 
     segments: list[tuple[float, float, bool]] = []
-    committed = visibility_segments(state.cues, state.defaults, stem, duration)
+    committed = visibility_segments(state.cues, state.defaults, slot, duration)
 
     if record_start > 0.0:
         segments.extend(_clip_segments(committed, 0.0, record_start))
@@ -161,7 +161,7 @@ def bar_segments_for_row(
         segments.extend(
             _clip_segments(
                 visibility_segments(
-                    state.record_buffer, armed_defaults, stem, playhead
+                    state.record_buffer, armed_defaults, slot, playhead
                 ),
                 record_start,
                 playhead,
@@ -173,11 +173,11 @@ def bar_segments_for_row(
     return segments
 
 
-def bar_tick_times_for_row(state: TimelineViewState, stem: str) -> list[float]:
+def bar_tick_times_for_row(state: TimelineViewState, slot: str) -> list[float]:
     """Cue tick times for one timeline row."""
     duration = state.duration_sec
-    if not (state.recording and stem in state.armed_slots):
-        return cue_times_for_stem(state.cues, stem, duration)
+    if not (state.recording and slot in state.armed_slots):
+        return cue_times_for_stem(state.cues, slot, duration)
 
     record_start = state.record_start_sec
     if record_start is None:
@@ -185,12 +185,12 @@ def bar_tick_times_for_row(state: TimelineViewState, stem: str) -> list[float]:
     playhead = state.position_sec
     committed_ticks = [
         t
-        for t in cue_times_for_stem(state.cues, stem, duration)
+        for t in cue_times_for_stem(state.cues, slot, duration)
         if t < record_start or t > playhead
     ]
     live_ticks = [
         t
-        for t in cue_times_for_stem(state.record_buffer, stem, duration)
+        for t in cue_times_for_stem(state.record_buffer, slot, duration)
         if record_start <= t <= playhead
     ]
     return sorted(set(committed_ticks) | set(live_ticks))

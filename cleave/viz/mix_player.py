@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 from pygame._sdl2 import AUDIO_F32, AudioDevice, get_audio_device_names
 
+from cleave.extract import StemSource
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -83,7 +85,7 @@ class MixPlayer:
     ) -> None:
         self._pcm = np.ascontiguousarray(pcm, dtype=np.float32)
         self._stem_pcm: dict[str, np.ndarray] = {}
-        self._solo_stem: str | None = None
+        self._solo_source: StemSource | None = None
         self._sample_rate = sample_rate
         self._chunksize = chunksize
         self._total_frames = len(self._pcm) // NUM_CHANNELS
@@ -99,9 +101,9 @@ class MixPlayer:
             for name, pcm in stems.items()
         }
 
-    def set_solo_stem(self, stem: str | None) -> None:
+    def set_solo_source(self, source: StemSource | None) -> None:
         with self._lock:
-            self._solo_stem = stem
+            self._solo_source = source
 
     def start(self) -> None:
         if self._device is not None:
@@ -112,8 +114,10 @@ class MixPlayer:
             out = np.frombuffer(memview, dtype=np.float32, count=n_samples)
             with self._lock:
                 read_index = self._read_index
-                solo_stem = self._solo_stem
-                stem_pcm = self._stem_pcm.get(solo_stem) if solo_stem else None
+                solo_source = self._solo_source
+                stem_pcm = (
+                    self._stem_pcm.get(solo_source) if solo_source else None
+                )
             if stem_pcm is not None:
                 total_frames = len(stem_pcm)
                 frames_written, new_index = copy_mono_pcm_chunk_as_stereo(

@@ -28,7 +28,7 @@ from cleave.viz.overlay import (
     panel_toast_layout,
     render_visibility_icon,
     row_kind,
-    row_stem,
+    row_slot,
     scroll_metrics,
     visible_row_indices,
 )
@@ -71,7 +71,7 @@ def _effects_expanded_view_state() -> TuningViewState:
         paused=False,
         position_sec=0.0,
         focus_index=0,
-        move_mode_stem=None,
+        move_mode_slot=None,
         toast_message=None,
         toast_remaining_sec=0.0,
         allow_overwrite=False,
@@ -368,7 +368,7 @@ def _minimal_view_state(**kwargs: object) -> TuningViewState:
         "paused": False,
         "position_sec": 0.0,
         "focus_index": 0,
-        "move_mode_stem": None,
+        "move_mode_slot": None,
         "toast_message": None,
         "toast_remaining_sec": 0.0,
     }
@@ -579,10 +579,10 @@ def test_draw_track_header_with_solo_eye() -> None:
         paused=False,
         position_sec=0.0,
         focus_index=0,
-        move_mode_stem=None,
+        move_mode_slot=None,
         toast_message=None,
         toast_remaining_sec=0.0,
-        solo_stem="layer_1",
+        solo_slot="layer_1",
         solo_active=True,
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
@@ -593,9 +593,9 @@ def test_draw_track_header_with_solo_eye() -> None:
     header_row = next(
         i
         for i in visible_row_indices(state)
-        if row_kind(state, i) == RowKind.TRACK_HEADER and row_stem(state, i) == "layer_1"
+        if row_kind(state, i) == RowKind.TRACK_HEADER and row_slot(state, i) == "layer_1"
     )
-    assert state.solo_stem == "layer_1"
+    assert state.solo_slot == "layer_1"
     assert header_row == find_row_by_kind(state, RowKind.TRACK_HEADER)
 
 

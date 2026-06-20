@@ -32,7 +32,7 @@ from cleave.viz.overlay import (
     row_descriptor,
     row_effect,
     row_kind,
-    row_stem,
+    row_slot,
 )
 from cleave.viz.session import TuningSession
 from cleave.viz.tuning_view_state import TuningViewStateBuilder
@@ -69,7 +69,7 @@ class TuningControls:
         self._modal_host = modal_host if modal_host is not None else ModalHost()
 
         self.focus_index = 0
-        self.move_mode_stem: str | None = None
+        self.move_mode_slot: str | None = None
         self._move_mode_original_z_order: list[str] | None = None
         self._toast_message: str | None = None
         self._toast_deadline = 0.0
@@ -93,7 +93,7 @@ class TuningControls:
             duration_sec,
             preset_root,
             get_focus_index=lambda: self.focus_index,
-            get_move_mode_stem=lambda: self.move_mode_stem,
+            get_move_mode_slot=lambda: self.move_mode_slot,
             config_save=self._config_save,
             get_toast_message=lambda: self._toast_message,
             get_toast_deadline=lambda: self._toast_deadline,
@@ -118,7 +118,7 @@ class TuningControls:
         self.focus_index = find_row_by_kind(view, RowKind.TRANSPORT)
 
     def _move_mode_signature_payload(self) -> dict[str, list[str]] | None:
-        if self.move_mode_stem is not None and self._move_mode_original_z_order is not None:
+        if self.move_mode_slot is not None and self._move_mode_original_z_order is not None:
             return {"layer_z_order": list(self._move_mode_original_z_order)}
         return None
 
@@ -169,7 +169,7 @@ class TuningControls:
             return True
 
         if event.key == pygame.K_t:
-            if self.move_mode_stem is not None:
+            if self.move_mode_slot is not None:
                 return True
             tl = self.session.timeline
             if tl.panel_open:
@@ -178,15 +178,15 @@ class TuningControls:
                 self._open_timeline_panel(enter_submenu=True)
             return True
 
-        if self.move_mode_stem is not None:
+        if self.move_mode_slot is not None:
             if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
                 self._cancel_move_mode()
                 return True
             if event.key == pygame.K_UP:
-                self._swap_stem_in_z_order(self.move_mode_stem, -1)
+                self._swap_stem_in_z_order(self.move_mode_slot, -1)
                 return True
             if event.key == pygame.K_DOWN:
-                self._swap_stem_in_z_order(self.move_mode_stem, 1)
+                self._swap_stem_in_z_order(self.move_mode_slot, 1)
                 return True
             if event.key == pygame.K_RETURN:
                 self._confirm_move_mode()
@@ -237,40 +237,40 @@ class TuningControls:
             view = self.build_view_state(paused=self.playback.paused)
             kind = row_kind(view, self.focus_index)
             if kind == RowKind.TRACK_PRESET_DIR:
-                stem = row_stem(view, self.focus_index)
-                if stem is not None:
-                    self._parent_directory(stem)
+                slot = row_slot(view, self.focus_index)
+                if slot is not None:
+                    self._parent_directory(slot)
                 return True
 
         if event.key == pygame.K_RETURN and mod_ctrl(event.mod):
             view = self.build_view_state(paused=self.playback.paused)
             kind = row_kind(view, self.focus_index)
             if kind == RowKind.TRACK_HEADER:
-                stem = row_stem(view, self.focus_index)
-                if stem is not None:
-                    self._toggle_locked(stem)
+                slot = row_slot(view, self.focus_index)
+                if slot is not None:
+                    self._toggle_locked(slot)
                 return True
 
         if event.key == pygame.K_RETURN:
             view = self.build_view_state(paused=self.playback.paused)
             kind = row_kind(view, self.focus_index)
             if kind == RowKind.TRACK_PRESET_DIR:
-                stem = row_stem(view, self.focus_index)
-                if stem is not None:
-                    self._enter_directory(stem)
+                slot = row_slot(view, self.focus_index)
+                if slot is not None:
+                    self._enter_directory(slot)
                 return True
             if kind == RowKind.TRANSPORT:
                 toggle_pause(self.playback, self.duration_sec)
                 return True
             if kind == RowKind.TRACK_HEADER:
-                stem = row_stem(view, self.focus_index)
-                if stem is not None:
-                    if self.session.layers[stem].locked:
+                slot = row_slot(view, self.focus_index)
+                if slot is not None:
+                    if self.session.layers[slot].locked:
                         return True
                     self._move_mode_original_z_order = list(
                         self.session.layer_z_order
                     )
-                    self.move_mode_stem = stem
+                    self.move_mode_slot = slot
                 return True
             if kind == RowKind.SAVE_CONFIG:
                 if self.session.solo_slot is not None:
@@ -391,25 +391,25 @@ class TuningControls:
         order[index], order[target] = order[target], order[index]
 
     def _confirm_move_mode(self) -> None:
-        self.move_mode_stem = None
+        self.move_mode_slot = None
         self._move_mode_original_z_order = None
 
     def _cancel_move_mode(self) -> None:
         if self._move_mode_original_z_order is not None:
             self.session.layer_z_order[:] = self._move_mode_original_z_order
-        self.move_mode_stem = None
+        self.move_mode_slot = None
         self._move_mode_original_z_order = None
 
     def _apply_horizontal(self, key: int, mod: int, kind: RowKind) -> None:
         view = self.build_view_state(paused=self.playback.paused)
-        stem = row_stem(view, self.focus_index)
+        slot = row_slot(view, self.focus_index)
         ctrl = mod_ctrl(mod)
         forward = key == pygame.K_RIGHT
 
         if kind == RowKind.TRACK_EFFECTS_HEADER:
-            if stem is None:
+            if slot is None:
                 return
-            self._set_effects_expanded(stem, forward)
+            self._set_effects_expanded(slot, forward)
             return
 
         if kind == RowKind.RENDER_OVERLAY_TITLE_HEADER:
@@ -421,58 +421,58 @@ class TuningControls:
             return
 
         if (
-            stem is not None
+            slot is not None
             and kind in REPEAT_ROW_KINDS
             and kind != RowKind.TRACK_STEM
-            and self.session.layers[stem].locked
+            and self.session.layers[slot].locked
         ):
             return
 
         if kind == RowKind.TRACK_HEADER:
-            if stem is None:
+            if slot is None:
                 return
             if mod_shift(mod):
                 if forward:
-                    self._enter_solo(stem)
+                    self._enter_solo(slot)
                 else:
-                    self._exit_solo(stem)
+                    self._exit_solo(slot)
                 return
             if ctrl:
-                if self.session.layers[stem].locked:
+                if self.session.layers[slot].locked:
                     return
-                self._set_enabled(stem, forward)
+                self._set_enabled(slot, forward)
                 return
-            self._set_expanded(stem, forward)
+            self._set_expanded(slot, forward)
         elif kind == RowKind.TRACK_PRESET_DIR:
-            if stem is None:
+            if slot is None:
                 return
             if ctrl:
                 if forward:
-                    self._enter_directory(stem)
+                    self._enter_directory(slot)
                 else:
-                    self._parent_directory(stem)
+                    self._parent_directory(slot)
                 return
-            self._step_directory(stem, forward=forward)
+            self._step_directory(slot, forward=forward)
         elif kind == RowKind.TRACK_PRESET:
-            if stem is None:
+            if slot is None:
                 return
-            self._step_preset(stem, forward=forward, ctrl=ctrl)
+            self._step_preset(slot, forward=forward, ctrl=ctrl)
         elif kind == RowKind.TRACK_STEM:
-            if stem is None:
+            if slot is None:
                 return
-            self._cycle_stem(stem, forward=forward)
+            self._cycle_stem(slot, forward=forward)
         elif kind == RowKind.TRACK_BLEND:
-            if stem is None:
+            if slot is None:
                 return
-            self._cycle_blend(stem, forward=forward)
+            self._cycle_blend(slot, forward=forward)
         elif kind == RowKind.TRACK_OPACITY:
-            if stem is None:
+            if slot is None:
                 return
             step = 10 if ctrl else 1
             delta = step if forward else -step
-            self._set_opacity(stem, self.session.layers[stem].opacity_pct + delta)
+            self._set_opacity(slot, self.session.layers[slot].opacity_pct + delta)
         elif kind == RowKind.TRACK_EFFECT:
-            if stem is None:
+            if slot is None:
                 return
             effect = row_effect(view, self.focus_index)
             if effect is None:
@@ -480,16 +480,16 @@ class TuningControls:
             effect_id, driver_slug = effect
             step = 10 if ctrl else 1
             delta = step if forward else -step
-            current = self.session.layers[stem].effects.get(effect_id, {}).get(
+            current = self.session.layers[slot].effects.get(effect_id, {}).get(
                 driver_slug, 0
             )
-            self._set_effect(stem, effect_id, driver_slug, current + delta)
+            self._set_effect(slot, effect_id, driver_slug, current + delta)
         elif kind == RowKind.TRACK_BEAT:
-            if stem is None:
+            if slot is None:
                 return
             step = 0.1 if ctrl else 0.01
             delta = step if forward else -step
-            self._set_beat(stem, self.session.layers[stem].beat_sensitivity + delta)
+            self._set_beat(slot, self.session.layers[slot].beat_sensitivity + delta)
         elif kind == RowKind.TRANSPORT:
             delta_sec = SEEK_LONG if ctrl else SEEK_SHORT
             if not forward:
@@ -586,30 +586,30 @@ class TuningControls:
             else:
                 self.close_timeline_panel()
 
-    def _step_directory(self, stem: str, *, forward: bool) -> None:
-        layer = self.session.layers[stem]
+    def _step_directory(self, slot: str, *, forward: bool) -> None:
+        layer = self.session.layers[slot]
         playlist = layer.playlist
         delta = 1 if forward else -1
         if playlist.step_sibling(delta, preset_root=self.preset_root):
             if self._layer_bindings is not None:
-                self._layer_bindings.on_preset_change(stem, playlist)
+                self._layer_bindings.on_preset_change(slot, playlist)
 
-    def _enter_directory(self, stem: str) -> None:
-        layer = self.session.layers[stem]
+    def _enter_directory(self, slot: str) -> None:
+        layer = self.session.layers[slot]
         playlist = layer.playlist
         if playlist.enter_child(self.preset_root):
             if self._layer_bindings is not None:
-                self._layer_bindings.on_preset_change(stem, playlist)
+                self._layer_bindings.on_preset_change(slot, playlist)
 
-    def _parent_directory(self, stem: str) -> None:
-        layer = self.session.layers[stem]
+    def _parent_directory(self, slot: str) -> None:
+        layer = self.session.layers[slot]
         playlist = layer.playlist
         if playlist.go_parent(self.preset_root):
             if self._layer_bindings is not None:
-                self._layer_bindings.on_preset_change(stem, playlist)
+                self._layer_bindings.on_preset_change(slot, playlist)
 
-    def _step_preset(self, stem: str, *, forward: bool, ctrl: bool) -> None:
-        layer = self.session.layers[stem]
+    def _step_preset(self, slot: str, *, forward: bool, ctrl: bool) -> None:
+        layer = self.session.layers[slot]
         playlist = layer.playlist
         if not playlist.paths:
             return
@@ -620,10 +620,10 @@ class TuningControls:
         else:
             playlist.prev()
         if self._layer_bindings is not None:
-            self._layer_bindings.on_preset_change(stem, playlist)
+            self._layer_bindings.on_preset_change(slot, playlist)
 
-    def _cycle_blend(self, stem: str, *, forward: bool) -> None:
-        layer = self.session.layers[stem]
+    def _cycle_blend(self, slot: str, *, forward: bool) -> None:
+        layer = self.session.layers[slot]
         try:
             index = BLEND_MODES.index(layer.blend_mode)
         except ValueError:
@@ -633,7 +633,7 @@ class TuningControls:
         else:
             layer.blend_mode = BLEND_MODES[(index - 1) % len(BLEND_MODES)]
         if self._layer_bindings is not None:
-            self._layer_bindings.on_blend_change(stem, layer.blend_mode)
+            self._layer_bindings.on_blend_change(slot, layer.blend_mode)
 
     def _cycle_stem(self, slot: str, *, forward: bool) -> None:
         layer = self.session.layers[slot]
@@ -649,29 +649,29 @@ class TuningControls:
         if self._layer_bindings is not None:
             self._layer_bindings.on_stem_change(slot, layer.stem)
 
-    def _toggle_locked(self, stem: str) -> None:
-        layer = self.session.layers[stem]
+    def _toggle_locked(self, slot: str) -> None:
+        layer = self.session.layers[slot]
         layer.locked = not layer.locked
 
-    def _set_expanded(self, stem: str, expanded: bool) -> None:
-        layer = self.session.layers[stem]
+    def _set_expanded(self, slot: str, expanded: bool) -> None:
+        layer = self.session.layers[slot]
         if layer.expanded == expanded:
             return
         layer.expanded = expanded
         if not expanded:
-            self._refocus_track_header_if_sub_row(stem)
+            self._refocus_track_header_if_sub_row(slot)
 
-    def _track_header_index(self, stem: str) -> int:
+    def _track_header_index(self, slot: str) -> int:
         view = self.build_view_state(paused=self.playback.paused)
-        return find_row(view, stem, RowKind.TRACK_HEADER)
+        return find_row(view, slot, RowKind.TRACK_HEADER)
 
-    def _refocus_track_header_if_sub_row(self, stem: str) -> None:
+    def _refocus_track_header_if_sub_row(self, slot: str) -> None:
         view = self.build_view_state(paused=self.playback.paused)
         kind = row_kind(view, self.focus_index)
         if kind not in REPEAT_ROW_KINDS:
             return
-        if row_stem(view, self.focus_index) == stem:
-            self.focus_index = self._track_header_index(stem)
+        if row_slot(view, self.focus_index) == slot:
+            self.focus_index = self._track_header_index(slot)
 
     def _focused_row_kind(self) -> RowKind | None:
         view = self.build_view_state(paused=self.playback.paused)
@@ -715,46 +715,46 @@ class TuningControls:
             self._layer_bindings.on_timeline_enabled_change()
         self._restore_focus(focused)
 
-    def _enter_solo(self, stem: str) -> None:
-        if self.session.solo_slot == stem:
+    def _enter_solo(self, slot: str) -> None:
+        if self.session.solo_slot == slot:
             return
-        self.session.solo_slot = stem
+        self.session.solo_slot = slot
         if self._layer_bindings is not None:
             self._layer_bindings.on_solo_change()
 
-    def _exit_solo(self, stem: str) -> None:
-        if self.session.solo_slot != stem:
+    def _exit_solo(self, slot: str) -> None:
+        if self.session.solo_slot != slot:
             return
         self.session.solo_slot = None
         if self._layer_bindings is not None:
             self._layer_bindings.on_solo_change()
 
-    def _set_enabled(self, stem: str, enabled: bool) -> None:
+    def _set_enabled(self, slot: str, enabled: bool) -> None:
         if self.session.timeline.enabled:
             now = time.monotonic()
             self._toast_message = "Timeline controls layer visibility"
             self._toast_deadline = now + TOAST_DURATION_SEC
             return
-        layer = self.session.layers[stem]
+        layer = self.session.layers[slot]
         if layer.enabled == enabled:
             return
         layer.enabled = enabled
         if not enabled:
             layer.expanded = False
-            self._refocus_track_header_if_sub_row(stem)
+            self._refocus_track_header_if_sub_row(slot)
         if self._layer_bindings is not None:
-            self._layer_bindings.on_layer_enabled_change(stem, layer.enabled)
+            self._layer_bindings.on_layer_enabled_change(slot, layer.enabled)
 
-    def _set_opacity(self, stem: str, pct: int) -> None:
-        layer = self.session.layers[stem]
+    def _set_opacity(self, slot: str, pct: int) -> None:
+        layer = self.session.layers[slot]
         layer.opacity_pct = max(0, min(100, pct))
         if self._layer_bindings is not None:
-            self._layer_bindings.on_opacity_change(stem, layer.opacity_pct)
+            self._layer_bindings.on_opacity_change(slot, layer.opacity_pct)
 
     def _set_effect(
-        self, stem: str, effect_id: str, driver_slug: str, pct: int
+        self, slot: str, effect_id: str, driver_slug: str, pct: int
     ) -> None:
-        layer = self.session.layers[stem]
+        layer = self.session.layers[slot]
         clamped = clamp_effect_pct(pct)
         if clamped == 0:
             drivers = layer.effects.get(effect_id)
@@ -765,22 +765,22 @@ class TuningControls:
         else:
             layer.effects.setdefault(effect_id, {})[driver_slug] = clamped
         if self._layer_bindings is not None:
-            self._layer_bindings.on_opacity_change(stem, layer.opacity_pct)
+            self._layer_bindings.on_opacity_change(slot, layer.opacity_pct)
 
-    def _set_effects_expanded(self, stem: str, expanded: bool) -> None:
-        layer = self.session.layers[stem]
+    def _set_effects_expanded(self, slot: str, expanded: bool) -> None:
+        layer = self.session.layers[slot]
         if layer.effects_expanded == expanded:
             return
         view = self.build_view_state(paused=self.playback.paused)
-        effects_header_idx = find_row(view, stem, RowKind.TRACK_EFFECTS_HEADER)
+        effects_header_idx = find_row(view, slot, RowKind.TRACK_EFFECTS_HEADER)
         old_focus = self.focus_index
         effect_count = effect_row_count(layer.stem)
         layer.effects_expanded = expanded
         view_after = self.build_view_state(paused=self.playback.paused)
-        new_header_idx = find_row(view_after, stem, RowKind.TRACK_EFFECTS_HEADER)
+        new_header_idx = find_row(view_after, slot, RowKind.TRACK_EFFECTS_HEADER)
         if not expanded:
             if old_focus > effects_header_idx and (
-                row_stem(view, old_focus) == stem
+                row_slot(view, old_focus) == slot
                 and row_kind(view, old_focus) == RowKind.TRACK_EFFECT
             ):
                 self.focus_index = new_header_idx
@@ -791,11 +791,11 @@ class TuningControls:
         elif old_focus > effects_header_idx:
             self.focus_index = old_focus + effect_count
 
-    def _set_beat(self, stem: str, value: float) -> None:
-        layer = self.session.layers[stem]
+    def _set_beat(self, slot: str, value: float) -> None:
+        layer = self.session.layers[slot]
         layer.beat_sensitivity = clamp_beat_sensitivity(value)
         if self._layer_bindings is not None:
-            self._layer_bindings.on_beat_change(stem, layer.beat_sensitivity)
+            self._layer_bindings.on_beat_change(slot, layer.beat_sensitivity)
 
     def _do_seek(self, delta_sec: float) -> None:
         if self._layer_bindings is not None:
