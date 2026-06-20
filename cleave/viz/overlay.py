@@ -80,14 +80,16 @@ from cleave.viz.theme import (
     SCROLLBAR_WIDTH,
     SOLO_BG,
     VALUE,
+    tuning_ui_metrics,
 )
 
 Anchor = Literal["topleft", "bottomleft"]
 
 HEADER_ROWS = 2
-TREE_INDENT = 16
+_tuning_ui = tuning_ui_metrics()
+TREE_INDENT = _tuning_ui.tree_indent
 TIMELINE_LAYER_HINT_TEXT = "Timeline is enabled and controlling layer visibility"
-ROW_ICON_SUFFIX_GAP = 4
+ROW_ICON_SUFFIX_GAP = _tuning_ui.row_icon_suffix_gap
 
 
 @dataclass
@@ -1082,11 +1084,20 @@ class TuningOverlay:
         self,
         *,
         anchor: Anchor = "topleft",
-        margin: tuple[int, int] = (10, 10),
-        font_size: int = 14,
-        padding: int = 8,
-        line_gap: int = 3,
+        margin: tuple[int, int] | None = None,
+        font_size: int | None = None,
+        padding: int | None = None,
+        line_gap: int | None = None,
     ) -> None:
+        metrics = tuning_ui_metrics()
+        if margin is None:
+            margin = (metrics.margin, metrics.margin)
+        if font_size is None:
+            font_size = metrics.font_size
+        if padding is None:
+            padding = metrics.padding
+        if line_gap is None:
+            line_gap = metrics.line_gap
         self._anchor = anchor
         self._margin = margin
         self._font_size = font_size

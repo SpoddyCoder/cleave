@@ -24,24 +24,31 @@ from cleave.viz.theme import (
     REC_BG,
     TIMELINE_BAR_ON,
     VALUE,
+    timeline_ui_metrics,
 )
 
 PANEL_HEIGHT_FRACTION: float = 0.2
-TIMELINE_PANEL_GAP: int = 16  # visual gap between main panel bottom and timeline strip top
+_timeline_ui = timeline_ui_metrics()
+TIMELINE_PANEL_GAP: int = _timeline_ui.panel_gap
 OFF_SEGMENT_COLOR: tuple[int, int, int] = (40, 40, 40)
 
 
-def timeline_viewport_reserve_px(content_height: int, *, margin: int = 10) -> int:
+def timeline_viewport_reserve_px(content_height: int, *, margin: int | None = None) -> int:
+    metrics = timeline_ui_metrics()
+    if margin is None:
+        margin = metrics.margin
     panel_h = max(1, int(content_height * PANEL_HEIGHT_FRACTION))
-    return panel_h + margin + TIMELINE_PANEL_GAP
-BAR_VERTICAL_INSET: int = 3
+    return panel_h + margin + metrics.panel_gap
+
+
+BAR_VERTICAL_INSET: int = _timeline_ui.bar_vertical_inset
 ARMED_BG_ALPHA: int = 220
 CUE_TICK_ALPHA: int = 120
-PLAYHEAD_WIDTH: int = 2
-REC_BADGE_GAP: int = 4
-REC_BADGE_PAD_X: int = 8
-REC_BADGE_PAD_Y: int = 4
-REC_TIME_GAP: int = 2
+PLAYHEAD_WIDTH: int = _timeline_ui.playhead_width
+REC_BADGE_GAP: int = _timeline_ui.rec_badge_gap
+REC_BADGE_PAD_X: int = _timeline_ui.rec_badge_pad_x
+REC_BADGE_PAD_Y: int = _timeline_ui.rec_badge_pad_y
+REC_TIME_GAP: int = _timeline_ui.rec_time_gap
 REC_FLASH_MS: int = 500
 ARM_FLASH_HALF_MS: int = 150
 ARM_FLASH_DURATION_MS: int = ARM_FLASH_HALF_MS * 4
@@ -308,11 +315,20 @@ class TimelineOverlay:
     def __init__(
         self,
         *,
-        margin: int = 10,
-        font_size: int = 14,
-        padding: int = 8,
-        row_gap: int = 2,
+        margin: int | None = None,
+        font_size: int | None = None,
+        padding: int | None = None,
+        row_gap: int | None = None,
     ) -> None:
+        metrics = timeline_ui_metrics()
+        if margin is None:
+            margin = metrics.margin
+        if font_size is None:
+            font_size = metrics.font_size
+        if padding is None:
+            padding = metrics.padding
+        if row_gap is None:
+            row_gap = metrics.row_gap
         self._margin = margin
         self._font_size = font_size
         self._padding = padding

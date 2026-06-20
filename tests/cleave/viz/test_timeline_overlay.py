@@ -16,6 +16,7 @@ from cleave.viz.theme import (
     OVERRIDE_GLYPH,
     OVERRIDE_GLYPH_OFF,
     SOLO_BG,
+    timeline_ui_metrics,
 )
 from cleave.viz.timeline_overlay import (
     ARM_FLASH_DURATION_MS,
@@ -112,7 +113,7 @@ def _draw(
 
 def test_row_prefix_width_includes_monitor_eye_slot() -> None:
     pygame.init()
-    font = pygame.font.SysFont("monospace", 14)
+    font = pygame.font.SysFont("monospace", timeline_ui_metrics().font_size)
     layer_num_w = font.render(layer_num_prefix(4), True, (255, 255, 255)).get_width()
     abbrev_w = font.render(stem_abbrev_label("drums"), True, (255, 255, 255)).get_width()
     row_h = 20

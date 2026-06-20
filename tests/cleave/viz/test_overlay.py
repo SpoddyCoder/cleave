@@ -28,6 +28,7 @@ from cleave.viz.overlay import (
     panel_toast_layout,
     render_visibility_icon,
     row_kind,
+    TREE_INDENT,
     row_slot,
     scroll_metrics,
     visible_row_indices,
@@ -309,7 +310,7 @@ def test_preset_rows_fit_within_scrollbar_content_width() -> None:
         label = fit_row_text(font, state, index, max_content_width=max_w)
         assert expected_counter in label
         icon_w = row_icon_prefix_width(font.get_linesize())
-        budget = max_w - 16 - icon_w  # TREE_INDENT
+        budget = max_w - TREE_INDENT - icon_w
         assert font.size(label)[0] <= budget
 
 
