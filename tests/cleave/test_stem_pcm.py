@@ -7,10 +7,12 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
+import soundfile as sf
 
-from cleave.extract import STEM_NAMES
+from cleave.extract import STEM_NAMES, stems_dir
 from cleave.pcm_io import SAMPLE_RATE_HZ, _to_mono_float32
-from cleave.stem_pcm import StemPcmBank, samples_per_frame
+from cleave.project import write_manifest
+from cleave.stem_pcm import StemPcmBank, load_stem_pcm, samples_per_frame
 
 
 def _make_bank(*, duration_samples: int = 4410) -> StemPcmBank:
@@ -92,3 +94,57 @@ def test_samples_per_frame_ignores_libprojectm_max_chunk() -> None:
     mock_lib.projectm_pcm_get_max_samples.return_value = 480
     with patch("cleave.projectm._get_lib", return_value=mock_lib):
         assert samples_per_frame(fps=30) == SAMPLE_RATE_HZ // 30
+
+
+def _write_wav(path: Path, data: np.ndarray) -> None:
+    sf.write(path, data, SAMPLE_RATE_HZ, subtype="FLOAT")
+
+
+def _write_pcm_project(project: Path) -> None:
+    stem_root = stems_dir(project)
+    stem_root.mkdir(parents=True, exist_ok=True)
+    for i, name in enumerate(STEM_NAMES):
+        _write_wav(
+            stem_root / f"{name}.wav",
+            np.full(100, float(i + 1), dtype=np.float32),
+        )
+    mix_path = project / "mix.wav"
+    _write_wav(mix_path, np.full(100, 9.0, dtype=np.float32))
+    write_manifest(
+        project,
+        slug="test-project",
+        mix_filename="mix.wav",
+        original_path=mix_path,
+        demucs_model="htdemucs",
+    )
+
+
+def test_load_stem_pcm_includes_full_mix(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    _write_pcm_project(project)
+
+    bank = load_stem_pcm(project)
+
+    assert "full_mix" in bank._pcm
+    out = bank.slice_pcm("full_mix", t_sec=0.0, n_samples=5)
+    np.testing.assert_array_equal(out, np.full(5, 9.0, dtype=np.float32))
+
+
+def test_load_stem_pcm_missing_mix_raises(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    stem_root = stems_dir(project)
+    stem_root.mkdir(parents=True, exist_ok=True)
+    for name in STEM_NAMES:
+        _write_wav(stem_root / f"{name}.wav", np.zeros(10, dtype=np.float32))
+    write_manifest(
+        project,
+        slug="test-project",
+        mix_filename="missing.wav",
+        original_path=project / "missing.wav",
+        demucs_model="htdemucs",
+    )
+
+    with pytest.raises(FileNotFoundError, match="missing mix wav"):
+        load_stem_pcm(project)

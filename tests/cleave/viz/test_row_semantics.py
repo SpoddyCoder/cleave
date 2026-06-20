@@ -26,6 +26,7 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.TRANSPORT,
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
+        RowKind.TRACK_STEM,
         RowKind.TRACK_BLEND,
         RowKind.TRACK_OPACITY,
         RowKind.TRACK_BEAT,
@@ -105,6 +106,7 @@ def test_track_sub_row_kinds() -> None:
         {
             RowKind.TRACK_PRESET_DIR,
             RowKind.TRACK_PRESET,
+            RowKind.TRACK_STEM,
             RowKind.TRACK_BLEND,
             RowKind.TRACK_OPACITY,
             RowKind.TRACK_BEAT,
@@ -167,7 +169,7 @@ def test_render_post_fx_sub_row_kinds() -> None:
 
 def test_locked_navigable_sub_row_kinds() -> None:
     assert LOCKED_NAVIGABLE_SUB_ROW_KINDS == frozenset(
-        {RowKind.TRACK_EFFECTS_HEADER}
+        {RowKind.TRACK_EFFECTS_HEADER, RowKind.TRACK_STEM}
     )
 
 

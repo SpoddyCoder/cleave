@@ -1,18 +1,19 @@
-"""Timeline cue evaluation and editing for per-stem layer visibility."""
+"""Timeline cue evaluation and editing for per-slot layer visibility."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from cleave.extract import STEM_NAMES
+from cleave.extract import STEM_SOURCES, StemSource
 
 RECORD_DEBOUNCE_SEC = 0.08
 
-_STEM_ABBREVIATIONS = {
+_STEM_SOURCE_ABBREVIATIONS = {
     "drums": "D",
     "bass": "B",
     "vocals": "V",
     "other": "O",
+    "full_mix": "M",
 }
 
 
@@ -23,26 +24,30 @@ class TimelineCue:
     show_tick: bool = True
 
 
-def stem_abbreviation(stem: str) -> str:
-    if stem not in _STEM_ABBREVIATIONS:
-        raise ValueError(f"unknown stem: {stem!r} (expected one of {', '.join(STEM_NAMES)})")
-    return _STEM_ABBREVIATIONS[stem]
+def stem_abbreviation(stem: StemSource) -> str:
+    if stem not in _STEM_SOURCE_ABBREVIATIONS:
+        allowed = ", ".join(STEM_SOURCES)
+        raise ValueError(f"unknown stem: {stem!r} (expected one of: {allowed})")
+    return _STEM_SOURCE_ABBREVIATIONS[stem]
 
 
 def layer_visible_at(
     cues: list[TimelineCue],
     defaults: dict[str, bool],
-    stem: str,
+    slot: str,
     t_sec: float,
 ) -> bool:
-    if stem not in defaults:
-        raise ValueError(f"unknown stem: {stem!r} (expected one of {', '.join(STEM_NAMES)})")
-    visible = defaults[stem]
+    from cleave.config_schema import LAYER_SLOTS
+
+    if slot not in defaults:
+        allowed = ", ".join(LAYER_SLOTS)
+        raise ValueError(f"unknown slot: {slot!r} (expected one of: {allowed})")
+    visible = defaults[slot]
     for cue in sorted(cues, key=lambda c: c.t):
         if cue.t > t_sec:
             break
-        if stem in cue.layers:
-            visible = cue.layers[stem]
+        if slot in cue.layers:
+            visible = cue.layers[slot]
     return visible
 
 
@@ -51,7 +56,11 @@ def visible_state_at(
     defaults: dict[str, bool],
     t_sec: float,
 ) -> dict[str, bool]:
-    return {stem: layer_visible_at(cues, defaults, stem, t_sec) for stem in STEM_NAMES}
+    from cleave.config_schema import LAYER_SLOTS
+
+    return {
+        slot: layer_visible_at(cues, defaults, slot, t_sec) for slot in LAYER_SLOTS
+    }
 
 
 def _cue_modifies_armed_stem(cue: TimelineCue, armed_stems: set[str]) -> bool:

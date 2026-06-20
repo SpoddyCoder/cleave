@@ -85,6 +85,11 @@ _PRESET_SECTION = HelpSection(
     ),
 )
 
+_STEM_SECTION = HelpSection(
+    "Stem",
+    (("Left/Right", "cycle stem source; effects reset on change"),),
+)
+
 
 _RENDER_SECTION = HelpSection(
     "Render",
@@ -201,6 +206,8 @@ def _sections_for(
             primary = _RENDER_SECTION
         elif behavior.can_enable_disable:
             primary = _RENDER_TIMELINE_SECTION
+    elif row_kind == RowKind.TRACK_STEM:
+        primary = _STEM_SECTION
     elif behavior.affordance == RowAffordance.VALUE_STEP:
         primary = _value_step_section(row_kind)
     elif behavior.affordance == RowAffordance.PATH_DIR:

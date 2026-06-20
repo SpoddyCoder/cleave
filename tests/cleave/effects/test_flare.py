@@ -22,6 +22,10 @@ from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.preset_playlist import playlist_at_dir
 from pathlib import Path
 
+from cleave.config_schema import DEFAULT_STEM_FOR_SLOT, LAYER_SLOTS
+
+SLOT_FOR_STEM = {v: k for k, v in DEFAULT_STEM_FOR_SLOT.items()}
+
 
 def _signals_with_stem_key(stem: str, key: str, values: list[float]) -> Signals:
     arr = np.array(values, dtype=np.float64)
@@ -33,11 +37,14 @@ def _signals_with_stem_key(stem: str, key: str, values: list[float]) -> Signals:
     )
 
 
-def _layer_runtime(stem: str, *, effects: dict | None = None) -> LayerRuntime:
+def _layer_runtime(stem: str, *, opacity_pct: int = 50, effects: dict | None = None) -> LayerRuntime:
+    slot = SLOT_FOR_STEM.get(stem, stem)
+    audio = DEFAULT_STEM_FOR_SLOT.get(slot, stem)
     return LayerRuntime(
-        playlist=playlist_at_dir(Path(f"/tmp/presets/{stem}"), index=0),
-        browse_floor=Path(f"/tmp/presets/{stem}"),
-        opacity_pct=50,
+        playlist=playlist_at_dir(Path(f"/tmp/presets/{slot}"), index=0),
+        browse_floor=Path(f"/tmp/presets/{slot}"),
+        stem=audio,
+        opacity_pct=opacity_pct,
         effects=effects or {},
     )
 
@@ -105,27 +112,27 @@ def test_flare_burst_state_decays_toward_zero() -> None:
 def test_effect_runtime_flare_triggers_on_onset_peak() -> None:
     signals = _signals_with_stem_key("drums", "onset_strength", [0.0, 1.0, 0.0])
     session = TuningSession(
-        layer_z_order=["drums"],
+        layer_z_order=["layer_1"],
         layers={
-            "drums": _layer_runtime("drums", effects={"flare": {"onset": 100}}),
+            "layer_1": _layer_runtime("drums", effects={"flare": {"onset": 100}}),
         },
     )
     runtime = EffectRuntime()
     baseline = runtime.tick(session, signals, 0.0)
     triggered = runtime.tick(session, signals, 0.01)
-    assert baseline["drums"].bloom_strength == 0.0
-    assert triggered["drums"].bloom_strength > 0.0
+    assert baseline["layer_1"].bloom_strength == 0.0
+    assert triggered["layer_1"].bloom_strength > 0.0
 
 
 def test_effect_runtime_flare_zero_depth_is_noop() -> None:
     signals = _signals_with_stem_key("drums", "onset_strength", [0.0, 1.0, 0.0])
     session = TuningSession(
-        layer_z_order=["drums"],
-        layers={"drums": _layer_runtime("drums", effects={"flare": {"onset": 0}})},
+        layer_z_order=["layer_1"],
+        layers={"layer_1": _layer_runtime("drums", effects={"flare": {"onset": 0}})},
     )
     runtime = EffectRuntime()
     mods = runtime.tick(session, signals, 0.01)
-    assert mods["drums"].bloom_strength == 0.0
+    assert mods["layer_1"].bloom_strength == 0.0
 
 
 def test_effect_runtime_flare_only_on_drums() -> None:
@@ -139,16 +146,16 @@ def test_effect_runtime_flare_only_on_drums() -> None:
         },
     )
     session = TuningSession(
-        layer_z_order=["drums", "bass"],
+        layer_z_order=["layer_1", "layer_2"],
         layers={
-            "drums": _layer_runtime("drums", effects={"flare": {"onset": 100}}),
-            "bass": _layer_runtime("bass", effects={}),
+            "layer_1": _layer_runtime("drums", effects={"flare": {"onset": 100}}),
+            "layer_2": _layer_runtime("bass", effects={}),
         },
     )
     runtime = EffectRuntime()
     mods = runtime.tick(session, signals, 0.01)
-    assert mods["drums"].bloom_strength > 0.0
-    assert mods["bass"].bloom_strength == 0.0
+    assert mods["layer_1"].bloom_strength > 0.0
+    assert mods["layer_2"].bloom_strength == 0.0
 
 
 def test_flare_threshold_constant() -> None:

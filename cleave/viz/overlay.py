@@ -17,6 +17,7 @@ from cleave.config_schema import (
     default_render_post_fx_runtime_values,
 )
 from cleave.effects.registry import effect_roster
+from cleave.extract import StemSource, stem_control_label, stem_overlay_header
 from cleave.viz.row_semantics import (
     HEADER_ROW_KINDS,
     LABELED_SUB_ROW_KINDS,
@@ -91,7 +92,7 @@ ROW_ICON_SUFFIX_GAP = 4
 
 @dataclass
 class TrackBlock:
-    stem: str
+    stem: StemSource
     preset_dir_label: str
     preset_label: str
     blend_mode: str
@@ -186,13 +187,14 @@ def build_row_layout(state: TuningViewState) -> list[RowDescriptor]:
         rows.append(RowDescriptor(RowKind.TRACK_HEADER, stem=stem))
         rows.append(RowDescriptor(RowKind.TRACK_PRESET_DIR, stem=stem))
         rows.append(RowDescriptor(RowKind.TRACK_PRESET, stem=stem))
+        rows.append(RowDescriptor(RowKind.TRACK_STEM, stem=stem))
         rows.append(RowDescriptor(RowKind.TRACK_BLEND, stem=stem))
         rows.append(RowDescriptor(RowKind.TRACK_OPACITY, stem=stem))
         rows.append(RowDescriptor(RowKind.TRACK_BEAT, stem=stem))
         rows.append(RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, stem=stem))
         block = state.tracks[stem]
         if block.effects_expanded:
-            for effect_def in effect_roster(stem):
+            for effect_def in effect_roster(block.stem):
                 rows.append(
                     RowDescriptor(
                         RowKind.TRACK_EFFECT,
@@ -456,11 +458,13 @@ def _row_text(state: TuningViewState, index: int) -> str:
     if kind == RowKind.TRACK_HEADER:
         layer_num = state.layer_z_order.index(stem) + 1
         arrow = "▼" if block.expanded else "▶"
-        return f"Layer {layer_num}: {stem.upper()} {arrow}"
+        return f"Layer {layer_num}: {stem_overlay_header(block.stem)} {arrow}"
     if kind == RowKind.TRACK_PRESET_DIR:
         return block.preset_dir_label
     if kind == RowKind.TRACK_PRESET:
         return block.preset_label
+    if kind == RowKind.TRACK_STEM:
+        return f"└─ stem: {stem_control_label(block.stem)}"
     if kind == RowKind.TRACK_BLEND:
         return f"└─ blend mode: {block.blend_mode}"
     if kind == RowKind.TRACK_OPACITY:
@@ -482,6 +486,8 @@ def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
     kind = row_kind(state, index)
     if kind == RowKind.TRACK_BLEND:
         return "└─ blend mode: "
+    if kind == RowKind.TRACK_STEM:
+        return "└─ stem: "
     if kind == RowKind.TRACK_OPACITY:
         return "└─ opacity: "
     if kind == RowKind.TRACK_BEAT:
@@ -550,6 +556,8 @@ def _labeled_sub_row_value(state: TuningViewState, index: int) -> str:
     block = state.tracks[stem]
     if kind == RowKind.TRACK_BLEND:
         return block.blend_mode
+    if kind == RowKind.TRACK_STEM:
+        return stem_control_label(block.stem)
     if kind == RowKind.TRACK_OPACITY:
         return f"{block.opacity_pct}%"
     if kind == RowKind.TRACK_BEAT:
@@ -697,7 +705,7 @@ def _fit_track_header_stem(
     budget -= font.size(_track_header_expand_suffix(block.expanded))[0]
     if locked:
         budget -= track_header_lock_suffix_width(font.get_linesize())
-    return fit_text_to_width(font, stem.upper(), budget)
+    return fit_text_to_width(font, stem_overlay_header(block.stem), budget)
 
 
 def _render_track_header_label(
@@ -819,6 +827,7 @@ def _row_indent(state: TuningViewState, index: int) -> int:
     if kind in {
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
+        RowKind.TRACK_STEM,
         RowKind.TRACK_BLEND,
         RowKind.TRACK_OPACITY,
         RowKind.TRACK_BEAT,
@@ -893,6 +902,7 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
         stem is not None
         and state.tracks[stem].locked
         and kind in TRACK_SUB_ROW_KINDS
+        and kind != RowKind.TRACK_STEM
     ):
         return LOCKED
 

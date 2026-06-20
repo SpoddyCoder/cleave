@@ -18,7 +18,7 @@ from OpenGL.GL import GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, glClear, glClear
 
 def apply_effect_modifiers(
     session: TuningSession,
-    layers_by_name: dict[str, StemLayer],
+    layers_by_slot: dict[str, StemLayer],
     effect_runtime: EffectRuntime,
     signals: Signals | None,
     t_sec: float,
@@ -28,10 +28,10 @@ def apply_effect_modifiers(
     if update:
         effect_runtime.update(session, signals, t_sec)
     modifiers = effect_runtime.modifiers(session)
-    for stem, layer in layers_by_name.items():
-        if not effective_layer_enabled(session, stem, t_sec):
+    for slot, layer in layers_by_slot.items():
+        if not effective_layer_enabled(session, slot, t_sec):
             continue
-        mod = modifiers[stem]
+        mod = modifiers[slot]
         layer.fbo.opacity = mod.opacity
         layer.fbo.flash_alpha = mod.flash_alpha
         layer.fbo.bloom_strength = mod.bloom_strength
@@ -41,8 +41,8 @@ def apply_effect_modifiers(
         layer.fbo.aberration_px = mod.aberration_px
 
 
-def _beat_sensitivity(cfg: CleaveConfig, layer_name: str) -> float:
-    layer = cfg.layers[layer_name]
+def _beat_sensitivity(cfg: CleaveConfig, slot: str) -> float:
+    layer = cfg.layers[slot]
     if layer.beat_sensitivity is not None:
         return layer.beat_sensitivity
     return cfg.visualizer.beat_sensitivity
@@ -100,9 +100,9 @@ class LayerFramePipeline:
         fps = cfg.visualizer.fps
         runtimes: list[StemLayer] = []
 
-        for name, layer_cfg in cfg.layers_in_z_order():
+        for slot, layer_cfg in cfg.layers_in_z_order():
             w, h = layer_cfg.width, layer_cfg.height
-            playlist = playlists[name]
+            playlist = playlists[slot]
 
             pm = ProjectM()
             pm.set_window_size(w, h)
@@ -112,10 +112,10 @@ class LayerFramePipeline:
             pm.lock_preset(True)
             pm.set_hard_cut_enabled(False)
             pm.set_fps(fps)
-            pm.set_beat_sensitivity(_beat_sensitivity(cfg, name))
+            pm.set_beat_sensitivity(_beat_sensitivity(cfg, slot))
 
             fbo = compositor.create_layer_fbo(
-                name,
+                slot,
                 w,
                 h,
                 opacity=layer_cfg.opacity,
@@ -123,11 +123,17 @@ class LayerFramePipeline:
             )
             fbo.enabled = layer_cfg.enabled
             runtimes.append(
-                StemLayer(name=name, pm=pm, fbo=fbo, playlist=playlist)
+                StemLayer(
+                    slot=slot,
+                    stem=layer_cfg.stem,
+                    pm=pm,
+                    fbo=fbo,
+                    playlist=playlist,
+                )
             )
 
-        layers_by_name = {layer.name: layer for layer in runtimes}
-        return runtimes, layers_by_name
+        layers_by_slot = {layer.slot: layer for layer in runtimes}
+        return runtimes, layers_by_slot
 
     @staticmethod
     def warmup(
@@ -153,14 +159,14 @@ class LayerFramePipeline:
         projectM and PCM is sampled from the show-start region
         (StemPcmBank.slice_pcm clamps the sample position to t>=0).
         """
-        layers_by_name = {layer.name: layer for layer in layers}
+        layers_by_slot = {layer.slot: layer for layer in layers}
         for i in range(frames):
             t_sec = start_sec - (frames - i) / fps
-            apply_layer_visibility(session, layers_by_name, t_sec)
+            apply_layer_visibility(session, layers_by_slot, t_sec)
             for layer in layers:
                 if not layer.fbo.enabled:
                     continue
-                pcm = pcm_bank.slice_pcm(layer.name, t_sec, n_pcm)
+                pcm = pcm_bank.slice_pcm(layer.stem, t_sec, n_pcm)
                 layer.pm.feed_pcm(pcm)
                 layer.pm.set_frame_time(t_sec)
                 _render_layer_fbo(layer, layer.pm)
@@ -174,7 +180,7 @@ class LayerFramePipeline:
     def render_frame(
         session: TuningSession,
         layers: list[StemLayer],
-        layers_by_name: dict[str, StemLayer],
+        layers_by_slot: dict[str, StemLayer],
         pcm_bank: StemPcmBank,
         n_pcm: int,
         post_process: GlPostProcess,
@@ -188,13 +194,13 @@ class LayerFramePipeline:
             for layer in layers:
                 if not layer.fbo.enabled:
                     continue
-                pcm = pcm_bank.slice_pcm(layer.name, t_sec, n_pcm)
+                pcm = pcm_bank.slice_pcm(layer.stem, t_sec, n_pcm)
                 layer.pm.feed_pcm(pcm)
                 layer.pm.set_frame_time(t_sec)
 
         apply_effect_modifiers(
             session,
-            layers_by_name,
+            layers_by_slot,
             effect_runtime,
             signals,
             t_sec,
@@ -210,10 +216,10 @@ class LayerFramePipeline:
     @staticmethod
     def composite(
         compositor: GlCompositor,
-        layers_by_name: dict[str, StemLayer],
+        layers_by_slot: dict[str, StemLayer],
         session: TuningSession,
     ) -> None:
-        ordered = [layers_by_name[name] for name in reversed(session.layer_z_order)]
+        ordered = [layers_by_slot[name] for name in reversed(session.layer_z_order)]
         compositor.composite([layer.fbo for layer in ordered])
 
     @staticmethod

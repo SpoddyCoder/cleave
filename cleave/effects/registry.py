@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from cleave.extract import STEM_NAMES
+from cleave.extract import STEM_SOURCES, StemSource
 
 EFFECT_IDS = frozenset({"pulse", "flare", "flash", "hue", "grit"})
 
@@ -44,7 +44,7 @@ def _def(effect_id: str, driver_slug: str) -> EffectDef:
     )
 
 
-_EFFECT_ROSTER: dict[str, tuple[EffectDef, ...]] = {
+_EFFECT_ROSTER: dict[StemSource, tuple[EffectDef, ...]] = {
     "drums": (
         _def("pulse", "onset"),
         _def("flare", "onset"),
@@ -68,27 +68,38 @@ _EFFECT_ROSTER: dict[str, tuple[EffectDef, ...]] = {
         _def("flash", "centroid"),
         _def("grit", "centroid"),
     ),
+    "full_mix": (
+        EffectDef("pulse", "onset", "full_mix", "onset_strength"),
+        EffectDef("flare", "onset", "full_mix", "onset_strength"),
+        EffectDef("flash", "onset", "full_mix", "onset_strength"),
+        EffectDef("grit", "onset", "full_mix", "onset_strength"),
+    ),
 }
 
 
-def effect_roster(stem: str) -> tuple[EffectDef, ...]:
+def effect_roster(stem: StemSource) -> tuple[EffectDef, ...]:
     return _EFFECT_ROSTER[stem]
 
 
-def effect_row_count(stem: str) -> int:
+def effect_row_count(stem: StemSource) -> int:
     return len(_EFFECT_ROSTER[stem])
 
 
-def validate_effect_entry(stem: str, effect_id: str, driver_slug: str) -> None:
+def validate_effect_entry(
+    slot: str,
+    stem: StemSource,
+    effect_id: str,
+    driver_slug: str,
+) -> None:
     if effect_id not in EFFECT_IDS:
         allowed = ", ".join(sorted(EFFECT_IDS))
         raise ValueError(
-            f"layers.{stem}.effects.{effect_id}: unknown effect (expected one of: {allowed})"
+            f"layers.{slot}.effects.{effect_id}: unknown effect (expected one of: {allowed})"
         )
     if driver_slug not in DRIVER_SLUGS:
         allowed = ", ".join(sorted(DRIVER_SLUGS))
         raise ValueError(
-            f"layers.{stem}.effects.{effect_id}.{driver_slug}: unknown driver "
+            f"layers.{slot}.effects.{effect_id}.{driver_slug}: unknown driver "
             f"(expected one of: {allowed})"
         )
     valid = {
@@ -97,9 +108,9 @@ def validate_effect_entry(stem: str, effect_id: str, driver_slug: str) -> None:
     }
     if (effect_id, driver_slug) not in valid:
         raise ValueError(
-            f"layers.{stem}.effects.{effect_id}.{driver_slug}: not in roster for {stem}"
+            f"layers.{slot}.effects.{effect_id}.{driver_slug}: not in roster for {stem}"
         )
 
 
-def all_stems() -> tuple[str, ...]:
-    return STEM_NAMES
+def all_stem_sources() -> tuple[StemSource, ...]:
+    return STEM_SOURCES

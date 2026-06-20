@@ -84,6 +84,14 @@ def test_preset_file_help() -> None:
     assert entries["Ctrl + Left/Right"] == "next/previous large step"
 
 
+def test_stem_row_help() -> None:
+    section = _sections_for(RowKind.TRACK_STEM)[0]
+    assert section.title == "Stem"
+    assert dict(section.entries)["Left/Right"] == (
+        "cycle stem source; effects reset on change"
+    )
+
+
 def test_cleave_effects_help() -> None:
     header = _sections_for(RowKind.TRACK_EFFECTS_HEADER)[0]
     effect = _sections_for(RowKind.TRACK_EFFECT)[0]

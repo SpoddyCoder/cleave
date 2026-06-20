@@ -20,9 +20,9 @@ from tests.cleave.viz.test_timeline_controls import _make_timeline_controls
 from tests.support.viz import keydown, stub_playback_state
 
 
-def _expand_drums(controls: TuningControls) -> None:
+def _expand_layer_1(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "drums", RowKind.TRACK_HEADER)
+    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -40,7 +40,7 @@ def _expand_render_post_fx(controls: TuningControls) -> None:
 
 def _mutate_layer_z_order(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    header_row = _row(view, "bass", RowKind.TRACK_HEADER)
+    header_row = _row(view, "layer_2", RowKind.TRACK_HEADER)
     controls.focus_index = header_row
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     controls.handle_keydown(_keydown(pygame.K_UP))
@@ -49,53 +49,53 @@ def _mutate_layer_z_order(controls: TuningControls) -> None:
 
 def _mutate_stem_enabled(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "drums", RowKind.TRACK_HEADER)
+    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_HEADER)
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
 
 
 def _mutate_stem_opacity(controls: TuningControls) -> None:
-    _expand_drums(controls)
+    _expand_layer_1(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "drums", RowKind.TRACK_OPACITY)
+    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_OPACITY)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_stem_blend_mode(controls: TuningControls) -> None:
-    _expand_drums(controls)
+    _expand_layer_1(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "drums", RowKind.TRACK_BLEND)
+    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_BLEND)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_stem_locked(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "drums", RowKind.TRACK_HEADER)
+    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
 
 
 def _mutate_stem_beat_sensitivity(controls: TuningControls) -> None:
-    _expand_drums(controls)
+    _expand_layer_1(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "drums", RowKind.TRACK_BEAT)
+    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_BEAT)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_stem_effects(controls: TuningControls) -> None:
-    _expand_drums(controls)
+    _expand_layer_1(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "drums", RowKind.TRACK_EFFECTS_HEADER)
+    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_EFFECTS_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     view = controls.build_view_state(paused=False)
     controls.focus_index = _row(
-        view, "drums", RowKind.TRACK_EFFECT, effect_id="pulse", driver_slug="onset"
+        view, "layer_1", RowKind.TRACK_EFFECT, effect_id="pulse", driver_slug="onset"
     )
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_preset_path(controls: TuningControls) -> None:
-    _expand_drums(controls)
+    _expand_layer_1(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "drums", RowKind.TRACK_PRESET)
+    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_PRESET)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -215,8 +215,8 @@ def _mutate_timeline_enabled(controls: TuningControls) -> None:
 
 
 def _mutate_timeline_cues_via_delete() -> None:
-    tuning = _make_controls(("drums",))
-    tuning.session.timeline.cues = [TimelineCue(t=1.0, layers={"drums": False})]
+    tuning = _make_controls(("layer_1",))
+    tuning.session.timeline.cues = [TimelineCue(t=1.0, layers={"layer_1": False})]
     tuning.session.timeline.enabled = True
     tuning.clear_config_dirty()
     assert not tuning.config_dirty
@@ -232,27 +232,27 @@ def _mutate_timeline_cues_via_delete() -> None:
 _PERSISTED_MUTATIONS: list[
     tuple[str, Callable[[TuningControls], None], tuple[str, ...], dict[str, object]]
 ] = [
-    ("layer_z_order", _mutate_layer_z_order, ("drums", "bass", "vocals"), {}),
-    ("stem.enabled", _mutate_stem_enabled, ("drums",), {}),
-    ("stem.opacity", _mutate_stem_opacity, ("drums",), {}),
-    ("stem.blend_mode", _mutate_stem_blend_mode, ("drums",), {}),
-    ("stem.locked", _mutate_stem_locked, ("drums",), {}),
-    ("stem.beat_sensitivity", _mutate_stem_beat_sensitivity, ("drums",), {}),
-    ("stem.effects", _mutate_stem_effects, ("drums",), {}),
-    ("stem.preset", _mutate_preset_path, ("drums",), {}),
-    ("render_overlay.enabled", _mutate_render_overlay_enabled, ("drums",), {}),
-    ("render_overlay.position", _mutate_render_overlay_position, ("drums",), {}),
-    ("render_overlay.title_font_size", _mutate_render_overlay_title_font_size, ("drums",), {}),
-    ("render_overlay.title_margin_bottom", _mutate_render_overlay_title_margin_bottom, ("drums",), {}),
-    ("render_overlay.body_font_size", _mutate_render_overlay_body_font_size, ("drums",), {}),
-    ("render_overlay.opacity_pct", _mutate_render_overlay_opacity, ("drums",), {}),
-    ("render_overlay.border_width", _mutate_render_overlay_border_width, ("drums",), {}),
-    ("render_overlay.start_delay", _mutate_render_overlay_start_delay, ("drums",), {}),
-    ("render_overlay.display_time", _mutate_render_overlay_display_time, ("drums",), {}),
-    ("render_post_fx.enabled", _mutate_render_post_fx_enabled, ("drums",), {}),
-    ("render_post_fx.fade_in", _mutate_render_post_fx_fade_in, ("drums",), {}),
-    ("render_post_fx.fade_out", _mutate_render_post_fx_fade_out, ("drums",), {}),
-    ("timeline.enabled", _mutate_timeline_enabled, ("drums",), {"timeline_enabled": True}),
+    ("layer_z_order", _mutate_layer_z_order, ("layer_1", "layer_2", "layer_3"), {}),
+    ("stem.enabled", _mutate_stem_enabled, ("layer_1",), {}),
+    ("stem.opacity", _mutate_stem_opacity, ("layer_1",), {}),
+    ("stem.blend_mode", _mutate_stem_blend_mode, ("layer_1",), {}),
+    ("stem.locked", _mutate_stem_locked, ("layer_1",), {}),
+    ("stem.beat_sensitivity", _mutate_stem_beat_sensitivity, ("layer_1",), {}),
+    ("stem.effects", _mutate_stem_effects, ("layer_1",), {}),
+    ("stem.preset", _mutate_preset_path, ("layer_1",), {}),
+    ("render_overlay.enabled", _mutate_render_overlay_enabled, ("layer_1",), {}),
+    ("render_overlay.position", _mutate_render_overlay_position, ("layer_1",), {}),
+    ("render_overlay.title_font_size", _mutate_render_overlay_title_font_size, ("layer_1",), {}),
+    ("render_overlay.title_margin_bottom", _mutate_render_overlay_title_margin_bottom, ("layer_1",), {}),
+    ("render_overlay.body_font_size", _mutate_render_overlay_body_font_size, ("layer_1",), {}),
+    ("render_overlay.opacity_pct", _mutate_render_overlay_opacity, ("layer_1",), {}),
+    ("render_overlay.border_width", _mutate_render_overlay_border_width, ("layer_1",), {}),
+    ("render_overlay.start_delay", _mutate_render_overlay_start_delay, ("layer_1",), {}),
+    ("render_overlay.display_time", _mutate_render_overlay_display_time, ("layer_1",), {}),
+    ("render_post_fx.enabled", _mutate_render_post_fx_enabled, ("layer_1",), {}),
+    ("render_post_fx.fade_in", _mutate_render_post_fx_fade_in, ("layer_1",), {}),
+    ("render_post_fx.fade_out", _mutate_render_post_fx_fade_out, ("layer_1",), {}),
+    ("timeline.enabled", _mutate_timeline_enabled, ("layer_1",), {"timeline_enabled": True}),
 ]
 
 
@@ -284,7 +284,7 @@ def test_persisted_font_mutation_marks_config_dirty(
     _mock_fonts: object,
     mutate: Callable[[TuningControls], None],
 ) -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     assert not controls.config_dirty
     mutate(controls)
     assert controls.config_dirty
@@ -295,7 +295,7 @@ def test_persisted_timeline_cue_delete_marks_config_dirty() -> None:
 
 
 def test_render_overlay_display_time_keyboard_regression() -> None:
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     assert not controls.config_dirty
     _mutate_render_overlay_display_time(controls)
     assert controls.config_dirty
@@ -304,7 +304,7 @@ def test_render_overlay_display_time_keyboard_regression() -> None:
 
 def test_display_time_mutation_clears_dirty_after_save() -> None:
     saved_path = Path("/tmp/projects/my-track/unnamed-2.yaml")
-    controls = _make_controls(("drums",))
+    controls = _make_controls(("layer_1",))
     controls._config_save._on_save_new_config = lambda: saved_path
     _mutate_render_overlay_display_time(controls)
     assert controls.config_dirty
@@ -316,19 +316,19 @@ def test_display_time_mutation_clears_dirty_after_save() -> None:
 
 
 def _mutate_track_expanded(controls: TuningControls) -> None:
-    _expand_drums(controls)
+    _expand_layer_1(controls)
 
 
 def _mutate_effects_expanded(controls: TuningControls) -> None:
-    _expand_drums(controls)
+    _expand_layer_1(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "drums", RowKind.TRACK_EFFECTS_HEADER)
+    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_EFFECTS_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
-def _mutate_solo_stem(controls: TuningControls) -> None:
+def _mutate_solo_slot(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "drums", RowKind.TRACK_HEADER)
+    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
 
 
@@ -361,7 +361,7 @@ def _mutate_render_post_fx_solo(controls: TuningControls) -> None:
 
 def _mutate_move_mode_without_confirm(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "bass", RowKind.TRACK_HEADER)
+    controls.focus_index = _row(view, "layer_2", RowKind.TRACK_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     controls.handle_keydown(_keydown(pygame.K_UP))
 
@@ -379,16 +379,16 @@ def _mutate_timeline_arm(controls: TuningControls) -> None:
     timeline_controls, session, _, _, _, _ = _make_timeline_controls(
         focus_row=0,
     )
-    assert "drums" not in session.timeline.armed_stems
+    assert "layer_1" not in session.timeline.armed_slots
     timeline_controls.handle_keydown(keydown(pygame.K_RETURN))
-    assert "drums" in session.timeline.armed_stems
+    assert "layer_1" in session.timeline.armed_slots
 
 
 def _mutate_timeline_recording_start(controls: TuningControls) -> None:
     del controls
     timeline_controls, session, _, _, _, _ = _make_timeline_controls(
         focus_row=0,
-        armed_stems={"drums"},
+        armed_slots={"layer_1"},
     )
     timeline_controls.handle_keydown(keydown(pygame.K_r))
     assert session.timeline.recording is True
@@ -402,20 +402,20 @@ def _mutate_timeline_preview_pause(controls: TuningControls) -> None:
 
 
 _SESSION_ONLY_MUTATIONS: list[tuple[str, Callable[[TuningControls], None], tuple[str, ...]]] = [
-    ("track.expanded", _mutate_track_expanded, ("drums", "bass")),
-    ("track.effects_expanded", _mutate_effects_expanded, ("drums",)),
-    ("solo_stem", _mutate_solo_stem, ("drums",)),
-    ("timeline.panel_open", _mutate_timeline_panel_open, ("drums",)),
-    ("render_overlay.expanded", _mutate_render_overlay_expanded, ("drums",)),
-    ("render_overlay.solo", _mutate_render_overlay_solo, ("drums",)),
-    ("render_post_fx.expanded", _mutate_render_post_fx_expanded, ("drums",)),
-    ("render_post_fx.solo", _mutate_render_post_fx_solo, ("drums",)),
-    ("move_mode.swap", _mutate_move_mode_without_confirm, ("drums", "bass")),
-    ("help_visible", _mutate_help_visible, ("drums",)),
-    ("focus_navigation", _mutate_focus_navigation, ("drums",)),
-    ("timeline.armed", _mutate_timeline_arm, ("drums",)),
-    ("timeline.recording", _mutate_timeline_recording_start, ("drums",)),
-    ("timeline.preview", _mutate_timeline_preview_pause, ("drums",)),
+    ("track.expanded", _mutate_track_expanded, ("layer_1", "layer_2")),
+    ("track.effects_expanded", _mutate_effects_expanded, ("layer_1",)),
+    ("solo_slot", _mutate_solo_slot, ("layer_1",)),
+    ("timeline.panel_open", _mutate_timeline_panel_open, ("layer_1",)),
+    ("render_overlay.expanded", _mutate_render_overlay_expanded, ("layer_1",)),
+    ("render_overlay.solo", _mutate_render_overlay_solo, ("layer_1",)),
+    ("render_post_fx.expanded", _mutate_render_post_fx_expanded, ("layer_1",)),
+    ("render_post_fx.solo", _mutate_render_post_fx_solo, ("layer_1",)),
+    ("move_mode.swap", _mutate_move_mode_without_confirm, ("layer_1", "layer_2")),
+    ("help_visible", _mutate_help_visible, ("layer_1",)),
+    ("focus_navigation", _mutate_focus_navigation, ("layer_1",)),
+    ("timeline.armed", _mutate_timeline_arm, ("layer_1",)),
+    ("timeline.recording", _mutate_timeline_recording_start, ("layer_1",)),
+    ("timeline.preview", _mutate_timeline_preview_pause, ("layer_1",)),
 ]
 
 

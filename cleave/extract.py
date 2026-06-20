@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 import librosa
 import numpy as np
@@ -14,7 +14,27 @@ BASS_SPLIT_HZ = 120.0
 N_FFT = 2048
 
 STEM_NAMES = ("drums", "bass", "vocals", "other")
+StemSource = Literal["drums", "bass", "vocals", "other", "full_mix"]
+STEM_SOURCES: tuple[StemSource, ...] = (
+    "drums",
+    "bass",
+    "vocals",
+    "other",
+    "full_mix",
+)
 STEMS_DIR = "stems"
+
+
+def stem_overlay_header(stem: StemSource) -> str:
+    if stem == "full_mix":
+        return "MIX"
+    return stem.upper()
+
+
+def stem_control_label(stem: StemSource) -> str:
+    if stem == "full_mix":
+        return "full-mix"
+    return stem
 
 
 def stems_dir(project_dir: Path) -> Path:
@@ -83,6 +103,13 @@ def extract_drums_onset(path: Path | str) -> tuple[np.ndarray, np.ndarray]:
 def extract_mix_onset(path: Path | str) -> tuple[np.ndarray, np.ndarray]:
     """Onset strength envelope from the mixed source track."""
     return extract_drums_onset(path)
+
+
+def extract_mix_rms(path: Path | str) -> tuple[np.ndarray, np.ndarray]:
+    """RMS envelope from the mixed source track."""
+    y, sr = _load(path)
+    hop = max(1, int(sr * BASS_RMS_HOP_MS))
+    return _rms_envelope(y, sr, hop)
 
 
 def extract_bass(path: Path | str) -> BassSignals:

@@ -48,13 +48,14 @@ paths:
     - ~/milkdrop-presets/presets-milkdrop-texture-pack
 
 layer_z_order:
-  - drums
-  - vocals
-  - bass
-  - other
+  - layer_1
+  - layer_2
+  - layer_3
+  - layer_4
   
 layers:
-  drums:
+  layer_1:
+    stem: drums
     preset: presets-cream-of-the-crop/Dancer/Aurora/
     enabled: true
     opacity: 1.0
@@ -62,7 +63,8 @@ layers:
     height: 720
     blend_mode: add
 
-  bass:
+  layer_2:
+    stem: bass
     preset: presets-milkdrop-original/Milkdrop-Original/
     enabled: true
     opacity: 1.0
@@ -70,7 +72,8 @@ layers:
     height: 540
     blend_mode: black-key
 
-  vocals:
+  layer_3:
+    stem: vocals
     preset: presets-cream-of-the-crop/Sparkle/Explosions/
     enabled: true
     opacity: 1.0
@@ -78,7 +81,8 @@ layers:
     height: 540
     blend_mode: black-key
 
-  other:
+  layer_4:
+    stem: other
     preset: presets-milkdrop-original/Milkdrop-Original/
     enabled: true
     opacity: 1.0
