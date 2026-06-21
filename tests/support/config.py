@@ -6,16 +6,22 @@ from pathlib import Path
 
 from cleave.config import LayerConfig, VIZ_CONFIG_FILENAME, dump_yaml
 from cleave.config_schema import (
+    DEFAULT_LAYER_SLOTS,
     DEFAULT_LAYER_Z_ORDER,
-    DEFAULT_STEM_FOR_SLOT,
-    LAYER_SLOTS,
     template_layer_entry,
     template_visualizer_section,
 )
-from cleave.extract import STEM_NAMES
+from cleave.extract import STEM_NAMES, StemSource
 from cleave.paths import repo_root
 from cleave.preset_playlist import playlist_at_dir
 from cleave.viz.session import LayerRuntime
+
+TEST_LAYER_STEMS: dict[str, StemSource] = {
+    "layer_1": "drums",
+    "layer_2": "bass",
+    "layer_3": "vocals",
+    "layer_4": "other",
+}
 
 
 def repo_root_template_path() -> Path:
@@ -23,7 +29,7 @@ def repo_root_template_path() -> Path:
 
 
 def slot_for_stem(stem: str) -> str:
-    for slot, assigned in DEFAULT_STEM_FOR_SLOT.items():
+    for slot, assigned in TEST_LAYER_STEMS.items():
         if assigned == stem:
             return slot
     raise KeyError(stem)
@@ -39,10 +45,10 @@ def make_preset_dirs(preset_root: Path) -> None:
 def layer_configs(preset_root: Path) -> dict[str, LayerConfig]:
     return {
         slot: LayerConfig(
-            preset=preset_root / DEFAULT_STEM_FOR_SLOT[slot] / "anchor.milk",
-            stem=DEFAULT_STEM_FOR_SLOT[slot],
+            preset=preset_root / TEST_LAYER_STEMS[slot] / "anchor.milk",
+            stem=TEST_LAYER_STEMS[slot],
         )
-        for slot in LAYER_SLOTS
+        for slot in DEFAULT_LAYER_SLOTS
     }
 
 
@@ -51,8 +57,8 @@ def layer_runtimes(
     **per_slot: dict,
 ) -> dict[str, LayerRuntime]:
     runtimes: dict[str, LayerRuntime] = {}
-    for slot in LAYER_SLOTS:
-        stem = DEFAULT_STEM_FOR_SLOT[slot]
+    for slot in DEFAULT_LAYER_SLOTS:
+        stem = TEST_LAYER_STEMS[slot]
         stem_dir = preset_root / stem
         kwargs = per_slot.get(slot, {})
         runtimes[slot] = LayerRuntime(
@@ -84,12 +90,12 @@ def write_minimal_config(project_dir: Path, preset_root: Path, **overrides) -> P
         "layer_z_order": list(DEFAULT_LAYER_Z_ORDER),
         "layers": {
             slot: {
-                **template_layer_entry(slot),
+                **template_layer_entry(slot, stem=TEST_LAYER_STEMS[slot]),
                 "preset": (
-                    f"{DEFAULT_STEM_FOR_SLOT[slot]}/{DEFAULT_STEM_FOR_SLOT[slot]}.milk"
+                    f"{TEST_LAYER_STEMS[slot]}/{TEST_LAYER_STEMS[slot]}.milk"
                 ),
             }
-            for slot in LAYER_SLOTS
+            for slot in DEFAULT_LAYER_SLOTS
         },
     }
     data.update(overrides)

@@ -127,7 +127,7 @@ Controls...
 
 #### Compositing
 
-* The visualizer is four libprojectM layers at tiered resolutions, composited to **1280x720 @ 30 fps** by default (editable `cleave-viz.yaml`)
+* The visualizer supports up to eight libprojectM layers (default four; add/remove in live tuning) at tiered resolutions, composited to **1280x720 @ 30 fps** by default (editable `cleave-viz.yaml`)
 * Each layer's libprojectM instance receives PCM from its assigned stem; stereo stems are fed as stereo (mono sources stay mono).
 * Milkdrop draws on black, so cleave treats black as transparent and uses pixel brightness as blend weight (`black-key` default).
 

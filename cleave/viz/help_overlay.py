@@ -218,6 +218,19 @@ def _sections_for(
         primary = _PRESET_SECTION
     elif behavior.affordance == RowAffordance.SEEK:
         primary = _TRANSPORT_SECTION
+    elif row_kind == RowKind.LAYER_MANAGEMENT_ADD:
+        primary = HelpSection(
+            behavior.help_title or "Add new layer",
+            (("Enter", "confirm add"),),
+        )
+    elif row_kind == RowKind.LAYER_MANAGEMENT_DELETE:
+        primary = HelpSection(
+            behavior.help_title or "Delete layer",
+            (
+                ("Enter", "confirm delete"),
+                ("", "at least 1 layer required"),
+            ),
+        )
     elif behavior.affordance == RowAffordance.ACTION:
         primary = _SAVE_SECTION
 

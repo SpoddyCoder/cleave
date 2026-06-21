@@ -162,13 +162,13 @@ class TimelineConfig:
     cues: tuple[TimelineCue, ...]
 
 
-@dataclass(frozen=True)
+@dataclass
 class CleaveConfig:
     paths: PathsConfig
     layers: dict[str, LayerConfig]
     visualizer: VisualizerConfig
     config_path: Path
-    layer_z_order: tuple[str, ...] = DEFAULT_LAYER_Z_ORDER
+    layer_z_order: list[str] = field(default_factory=lambda: list(DEFAULT_LAYER_Z_ORDER))
     render: RenderConfig | None = None
     timeline: TimelineConfig | None = None
 
@@ -282,10 +282,14 @@ def _validate_presets(layers: dict[str, LayerConfig]) -> None:
         )
 
 
-def _parse_layers(data: dict[str, Any], preset_root: Path) -> dict[str, LayerConfig]:
+def _parse_layers(
+    data: dict[str, Any], preset_root: Path
+) -> tuple[dict[str, LayerConfig], "ParseCtx"]:
     from cleave.config_schema import ParseCtx
 
-    return parse_layers_section(data, ParseCtx(preset_root=preset_root))
+    ctx = ParseCtx(preset_root=preset_root)
+    layers = parse_layers_section(data, ctx)
+    return layers, ctx
 
 
 def load_config(
@@ -311,9 +315,9 @@ def load_config(
     paths = _parse_paths(data)
     visualizer = parse_visualizer_section(data)
     render = parse_render_section(data)
-    timeline = parse_timeline_section(data)
-    layer_z_order = parse_layer_z_order_section(data)
-    layers = _parse_layers(data, paths.preset_root)
+    layers, parse_ctx = _parse_layers(data, paths.preset_root)
+    layer_z_order = parse_layer_z_order_section(data, parse_ctx)
+    timeline = parse_timeline_section(data, parse_ctx)
     _validate_presets(layers)
 
     return CleaveConfig(

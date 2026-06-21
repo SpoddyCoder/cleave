@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import pygame
 
-from cleave.config_schema import DEFAULT_STEM_FOR_SLOT, LAYER_SLOTS
+from cleave.config_schema import DEFAULT_LAYER_SLOTS
+from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
 from cleave.timeline import TimelineCue, layer_visible_at, stem_abbreviation
 from cleave.viz.material_icons import visibility_icon_slot_width
@@ -62,9 +63,11 @@ def _view_state(
     override_slots: set[str] | None = None,
     arm_flash_start_ms: dict[str, int] | None = None,
 ) -> TimelineViewState:
-    order = list(layer_z_order or list(LAYER_SLOTS))
+    order = list(layer_z_order or list(DEFAULT_LAYER_SLOTS))
     cue_list = list(cues or [])
-    default_map = dict(defaults or {slot: True for slot in LAYER_SLOTS})
+    default_map = dict(
+        defaults or {slot: True for slot in (layer_z_order or list(DEFAULT_LAYER_SLOTS))}
+    )
     if monitor_visible is None:
         monitor_visible = {
             stem: layer_visible_at(cue_list, default_map, stem, position_sec)
@@ -75,7 +78,7 @@ def _view_state(
     return TimelineViewState(
         layer_z_order=order,
         slot_stems={
-            slot: DEFAULT_STEM_FOR_SLOT.get(slot, slot)  # type: ignore[arg-type]
+            slot: TEST_LAYER_STEMS.get(slot, "drums")
             for slot in order
         },
         cues=cue_list,
@@ -101,14 +104,8 @@ def _draw(
     overlay: TimelineOverlay,
     surface: pygame.Surface,
     state: TimelineViewState,
-    *,
-    content_height: int | None = None,
 ) -> None:
-    overlay.draw(
-        surface,
-        state,
-        content_height=content_height if content_height is not None else surface.get_height(),
-    )
+    overlay.draw(surface, state)
 
 
 def test_row_prefix_width_includes_monitor_eye_slot() -> None:
@@ -119,6 +116,19 @@ def test_row_prefix_width_includes_monitor_eye_slot() -> None:
     row_h = 20
     eye_slot_w = visibility_icon_slot_width(row_h)
     assert row_prefix_width(layer_num_w, abbrev_w, row_h) == layer_num_w + abbrev_w + eye_slot_w
+
+
+def test_layer_num_width_probe_scales_with_eight_layers() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    order = [f"layer_{i}" for i in range(1, 9)]
+    defaults = {slot: True for slot in order}
+    _draw(overlay, surface, _view_state(layer_z_order=order, defaults=defaults))
+
+    font = pygame.font.SysFont("monospace", timeline_ui_metrics().font_size)
+    expected = font.render(layer_num_prefix(8), True, (255, 255, 255)).get_width()
+    assert overlay._layer_num_width == expected
 
 
 def test_dual_eye_positions_monitor_left_committed_right() -> None:
@@ -480,7 +490,7 @@ def test_visibility_segments_default_only() -> None:
 
 
 def test_visibility_segments_from_cues() -> None:
-    defaults = {slot: True for slot in LAYER_SLOTS}
+    defaults = {slot: True for slot in DEFAULT_LAYER_SLOTS}
     cues = [
         TimelineCue(t=10.0, layers={"layer_1": False}),
         TimelineCue(t=30.0, layers={"layer_1": True}),
@@ -494,7 +504,7 @@ def test_visibility_segments_from_cues() -> None:
 
 
 def test_visibility_segments_other_stem_unchanged_across_unrelated_cue() -> None:
-    defaults = {slot: True for slot in LAYER_SLOTS}
+    defaults = {slot: True for slot in DEFAULT_LAYER_SLOTS}
     cues = [TimelineCue(t=5.0, layers={"layer_1": False})]
     segments = visibility_segments(cues, defaults, "layer_2", 20.0)
     assert segments == [(0.0, 5.0, True), (5.0, 20.0, True)]
@@ -590,7 +600,7 @@ def test_draw_skipped_when_disabled() -> None:
 def test_armed_row_layout_recorded() -> None:
     pygame.init()
     overlay = TimelineOverlay()
-    state = _view_state(armed_slots={"layer_1"}, layer_z_order=list(LAYER_SLOTS))
+    state = _view_state(armed_slots={"layer_1"}, layer_z_order=list(DEFAULT_LAYER_SLOTS))
     surface = pygame.Surface((800, 400), pygame.SRCALPHA)
     _draw(overlay, surface, state)
 
@@ -605,7 +615,7 @@ def test_armed_row_layout_recorded() -> None:
 def test_focus_row_index_matches_stem() -> None:
     pygame.init()
     overlay = TimelineOverlay()
-    state = _view_state(focus_row=2, layer_z_order=list(LAYER_SLOTS))
+    state = _view_state(focus_row=2, layer_z_order=list(DEFAULT_LAYER_SLOTS))
     surface = pygame.Surface((800, 400), pygame.SRCALPHA)
     _draw(overlay, surface, state)
 
@@ -655,10 +665,9 @@ def test_upscale_expands_bar_width_not_row_height() -> None:
     pygame.init()
     overlay = TimelineOverlay()
     state = _view_state()
-    content_height = 720
 
     baseline_surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    _draw(overlay, baseline_surface, state, content_height=content_height)
+    _draw(overlay, baseline_surface, state)
     baseline_panel = overlay.panel_rect
     baseline_row_h = overlay.row_layout[0][4]
     _, baseline_bar_width, _ = overlay.bar_layout
@@ -666,7 +675,7 @@ def test_upscale_expands_bar_width_not_row_height() -> None:
     assert overlay.bar_layout is not None
 
     upscaled_surface = pygame.Surface((2560, 1440), pygame.SRCALPHA)
-    _draw(overlay, upscaled_surface, state, content_height=content_height)
+    _draw(overlay, upscaled_surface, state)
     upscaled_panel = overlay.panel_rect
     upscaled_row_h = overlay.row_layout[0][4]
     _, upscaled_bar_width, _ = overlay.bar_layout
@@ -677,3 +686,23 @@ def test_upscale_expands_bar_width_not_row_height() -> None:
     assert upscaled_panel[3] == baseline_panel[3]
     assert upscaled_bar_width > baseline_bar_width
     assert upscaled_panel[2] > baseline_panel[2]
+
+
+def test_row_height_constant_across_layer_counts() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    expected_row_h = timeline_ui_metrics().row_height
+
+    for row_count in (1, 2, 4, 8):
+        order = [f"layer_{i}" for i in range(1, row_count + 1)]
+        state = _view_state(layer_z_order=order)
+        _draw(overlay, surface, state)
+        assert overlay.row_layout
+        assert overlay.row_layout[0][4] == expected_row_h
+        assert overlay.panel_rect is not None
+        assert overlay.panel_rect[3] == (
+            timeline_ui_metrics().padding * 2
+            + row_count * expected_row_h
+            + max(0, row_count - 1) * timeline_ui_metrics().row_gap
+        )

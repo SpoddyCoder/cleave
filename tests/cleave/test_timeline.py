@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from cleave.config_schema import LAYER_SLOTS
+from cleave.config_schema import DEFAULT_LAYER_SLOTS
 from cleave.timeline import (
     RECORD_DEBOUNCE_SEC,
     TimelineCue,
@@ -17,7 +17,7 @@ from cleave.timeline import (
 
 
 def _defaults(**overrides: bool) -> dict[str, bool]:
-    base = {slot: True for slot in LAYER_SLOTS}
+    base = {slot: True for slot in DEFAULT_LAYER_SLOTS}
     base.update(overrides)
     return base
 
@@ -71,12 +71,25 @@ def test_layer_visible_at_last_write_wins_per_slot() -> None:
 def test_visible_state_at_returns_all_slots() -> None:
     defaults = _defaults(layer_1=False)
     cues = [TimelineCue(t=1.0, layers={"layer_2": False})]
-    state = visible_state_at(cues, defaults, 2.0)
-    assert set(state) == set(LAYER_SLOTS)
+    state = visible_state_at(cues, defaults, list(DEFAULT_LAYER_SLOTS), 2.0)
+    assert set(state) == set(DEFAULT_LAYER_SLOTS)
     assert state["layer_1"] is False
     assert state["layer_2"] is False
     assert state["layer_3"] is True
     assert state["layer_4"] is True
+
+
+def test_visible_state_at_with_six_slots() -> None:
+    slots = [f"layer_{i}" for i in range(1, 7)]
+    defaults = {slot: True for slot in slots}
+    defaults["layer_3"] = False
+    cues = [TimelineCue(t=1.0, layers={"layer_4": False})]
+    state = visible_state_at(cues, defaults, slots, 2.0)
+    assert set(state) == set(slots)
+    assert state["layer_3"] is False
+    assert state["layer_4"] is False
+    assert state["layer_1"] is True
+    assert state["layer_6"] is True
 
 
 def test_punch_replace_removes_armed_cues_in_range() -> None:

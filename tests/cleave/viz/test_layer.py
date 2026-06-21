@@ -9,7 +9,8 @@ import numpy as np
 import pygame
 import pytest
 
-from cleave.config_schema import DEFAULT_STEM_FOR_SLOT, LAYER_SLOTS
+from cleave.config_schema import DEFAULT_LAYER_SLOTS
+from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import PresetPlaylist
 from cleave.stem_pcm import StemPcmBank
@@ -44,7 +45,7 @@ def _playlist(name: str) -> PresetPlaylist:
     return PresetPlaylist(current_dir=current_dir, paths=paths, index=0)
 
 
-LAYER_SLOTS_LIST = list(LAYER_SLOTS)
+DEFAULT_LAYER_SLOTS_LIST = list(DEFAULT_LAYER_SLOTS)
 
 
 def _session(
@@ -54,9 +55,9 @@ def _session(
     cues: list[TimelineCue] | None = None,
     solo_slot: str | None = None,
 ) -> TuningSession:
-    enabled = layer_enabled or {slot: True for slot in LAYER_SLOTS}
+    enabled = layer_enabled or {slot: True for slot in DEFAULT_LAYER_SLOTS}
     return TuningSession(
-        layer_z_order=list(LAYER_SLOTS),
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
         solo_slot=solo_slot,
         timeline=TimelineRuntime(
             enabled=timeline_enabled,
@@ -66,10 +67,10 @@ def _session(
             slot: LayerRuntime(
                 playlist=_playlist(slot),
                 browse_floor=Path(f"/tmp/presets/{slot}"),
-                stem=DEFAULT_STEM_FOR_SLOT[slot],
+                stem=TEST_LAYER_STEMS[slot],
                 enabled=enabled[slot],
             )
-            for slot in LAYER_SLOTS
+            for slot in DEFAULT_LAYER_SLOTS
         },
     )
 
@@ -238,7 +239,7 @@ def test_apply_layer_visibility_sets_fbo_enabled_from_timeline() -> None:
         timeline_enabled=True,
         cues=[TimelineCue(t=3.0, layers={"layer_3": False})],
     )
-    layers_by_slot = {slot: _stem_layer(slot) for slot in LAYER_SLOTS}
+    layers_by_slot = {slot: _stem_layer(slot) for slot in DEFAULT_LAYER_SLOTS}
 
     apply_layer_visibility(session, layers_by_slot, 2.0)
     assert layers_by_slot["layer_3"].fbo.enabled is True

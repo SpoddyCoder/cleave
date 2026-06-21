@@ -18,7 +18,7 @@ from cleave.viz.session import (
     session_from_cfg,
 )
 from cleave.paths import repo_root
-from cleave.config_schema import LAYER_SLOTS
+from cleave.config_schema import DEFAULT_LAYER_SLOTS
 from cleave.extract import STEM_NAMES, stems_dir
 from cleave.project import write_manifest
 from cleave.separate import project_stems_complete
@@ -83,7 +83,7 @@ def _mock_render_runtime(
     seed.cfg = MagicMock()
     seed.cfg.render = None
     seed.session = TuningSession(
-        layer_z_order=list(LAYER_SLOTS),
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
         render_overlay=replace(default_render_overlay_runtime(), enabled=False),
         render_post_fx=RenderPostFxRuntime(
             enabled=False,

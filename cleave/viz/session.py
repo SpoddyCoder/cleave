@@ -205,3 +205,19 @@ def session_from_cfg(
             for slot, layer_cfg in cfg.layers.items()
         },
     )
+
+
+def add_layer_to_session(
+    session: TuningSession,
+    slot: str,
+    runtime: LayerRuntime,
+) -> None:
+    session.layers[slot] = runtime
+    session.layer_z_order.append(slot)
+
+
+def remove_layer_from_session(session: TuningSession, slot: str) -> None:
+    session.layer_z_order.remove(slot)
+    del session.layers[slot]
+    if session.solo_slot == slot:
+        session.solo_slot = None

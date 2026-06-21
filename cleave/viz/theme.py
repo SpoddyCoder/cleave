@@ -11,8 +11,11 @@ Accent colors for modes and icons (not label/value roles):
   TIMELINE_BAR_ON, PLAYHEAD
 
 Layout scales:
-  UI_SCALE (1.5) — main tuning panel, help, modals, and Material Icons spacing
-  TIMELINE_UI_SCALE (1.0) — bottom timeline strip height, typography, and spacing
+  UI_SCALE (1.2) — main tuning panel, help, modals, and Material Icons spacing
+  TIMELINE_UI_SCALE (1.2) — bottom timeline strip typography and spacing
+
+Timeline panel height is derived from a fixed per-row height (BASE_TIMELINE_ROW_HEIGHT)
+times row count plus padding and gaps via timeline_panel_height_px().
 
 Use tuning_ui_metrics(), timeline_ui_metrics(), and timeline_panel_height_px() for
 scaled layout; BORDER_WIDTH is not scaled.
@@ -28,7 +31,7 @@ from dataclasses import dataclass
 BASE_UI_FONT_SIZE: int = 14
 UI_SCALE: float = 1.2
 TIMELINE_UI_SCALE: float = 1.2
-BASE_TIMELINE_PANEL_HEIGHT_FRACTION: float = 0.13
+BASE_TIMELINE_ROW_HEIGHT: int = 25
 
 
 def scale_px(value: float, *, scale: float) -> int:
@@ -58,6 +61,7 @@ class TuningUiMetrics:
 class TimelineUiMetrics:
     font_size: int
     padding: int
+    row_height: int
     row_gap: int
     margin: int
     panel_gap: int
@@ -93,6 +97,7 @@ def timeline_ui_metrics(*, scale: float = TIMELINE_UI_SCALE) -> TimelineUiMetric
     return TimelineUiMetrics(
         font_size=scale_px(14, scale=scale),
         padding=scale_px(8, scale=scale),
+        row_height=scale_px(BASE_TIMELINE_ROW_HEIGHT, scale=scale),
         row_gap=scale_px(2, scale=scale),
         margin=scale_px(10, scale=scale),
         panel_gap=scale_px(16, scale=scale),
@@ -106,15 +111,15 @@ def timeline_ui_metrics(*, scale: float = TIMELINE_UI_SCALE) -> TimelineUiMetric
 
 
 def timeline_panel_height_px(
-    content_height: int,
+    row_count: int,
     *,
     scale: float = TIMELINE_UI_SCALE,
 ) -> int:
     """Scaled bottom timeline strip height in pixels."""
-    return max(
-        1,
-        round(content_height * BASE_TIMELINE_PANEL_HEIGHT_FRACTION * scale),
-    )
+    if row_count <= 0:
+        return 0
+    m = timeline_ui_metrics(scale=scale)
+    return m.padding * 2 + row_count * m.row_height + max(0, row_count - 1) * m.row_gap
 
 
 _tuning_ui = tuning_ui_metrics()

@@ -39,7 +39,7 @@ from cleave.viz.input_dispatch import (
     dispatch_should_notify_overlay,
     key_handler_for_runtime,
 )
-from cleave.viz.wiring import make_timeline_controls, make_tuning_controls
+from cleave.viz.wiring import LayerManager, make_timeline_controls, make_tuning_controls
 
 
 @dataclass
@@ -179,6 +179,18 @@ def init_gl_resources_heavy(
     playback = init_playback(mix_player)
 
     modal_host = ModalHost()
+    layer_manager = LayerManager(
+        cfg=seed.cfg,
+        session=seed.session,
+        compositor=compositor,
+        layers=layers,
+        layers_by_slot=layers_by_slot,
+        playlists=seed.playlists,
+        preset_root=seed.preset_root,
+        project_dir=seed.project_dir,
+        fps=seed.cfg.visualizer.fps,
+        texture_paths=list(seed.cfg.paths.texture_paths),
+    )
     controls = make_tuning_controls(
         session=seed.session,
         cfg=seed.cfg,
@@ -193,6 +205,7 @@ def init_gl_resources_heavy(
         pcm_bank=seed.pcm_bank,
         mix_player=mix_player,
         modal_host=modal_host,
+        layer_manager=layer_manager,
     )
     timeline_controls = make_timeline_controls(
         session=seed.session,
@@ -330,7 +343,6 @@ def _tick_frame_live_overlay(
             runtime.timeline_overlay,
             runtime.overlay_surface,
             timeline_state,
-            runtime.seed.height,
             visibility=_timeline_strip_fade(tl, overlay_visibility=overlay_visibility),
         )
 

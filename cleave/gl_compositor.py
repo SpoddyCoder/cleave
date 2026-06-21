@@ -360,6 +360,15 @@ class GlCompositor:
         self._layers.append(layer)
         return layer
 
+    def remove_layer_fbo(self, name: str) -> None:
+        """Destroy the named FBO and remove it from the compositor stack."""
+        for i, fbo in enumerate(self._layers):
+            if fbo.name == name:
+                fbo.destroy()
+                del self._layers[i]
+                return
+        raise ValueError(f"no layer FBO named {name!r}")
+
     def _bind_content_fbo(self) -> None:
         glBindFramebuffer(GL_FRAMEBUFFER, self._content_fbo_id)
         glUseProgram(0)
