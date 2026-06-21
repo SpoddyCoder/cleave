@@ -10,14 +10,14 @@ from pathlib import Path
 
 import pygame
 
-from cleave.config import CleaveConfig
+from cleave.config import CleaveConfig, render_fps
 from cleave.effects.runtime import EffectRuntime
 from cleave.gl_compositor import GlCompositor
 from cleave.gl_post_process import GlPostProcess
 from cleave.preset_playlist import PresetPlaylist
 from cleave.signals import Signals
 from cleave.pcm_io import load_mix_pcm
-from cleave.stem_pcm import StemPcmBank, load_stem_pcm, samples_per_frame
+from cleave.stem_pcm import StemPcmBank, load_stem_pcm, LIVE_PROJECTM_FPS, samples_for_dt, samples_per_frame
 from cleave.viz.bootstrap import load_stem_signals
 from cleave.viz.controls import TuningControls
 from cleave.viz.session import TimelineRuntime, TuningSession, session_from_cfg
@@ -55,13 +55,11 @@ class VisualizerSeed:
     upscale: float
     display_width: int
     display_height: int
-    fps: int
     window_title: str
     session: TuningSession
     cfg: CleaveConfig
     pcm_bank: StemPcmBank
     duration_sec: float
-    n_pcm: int
     signals: Signals | None
     effect_runtime: EffectRuntime
     preset_root: Path
@@ -109,7 +107,6 @@ def build_runtime_base(
     playlists: dict[str, PresetPlaylist],
 ) -> VisualizerSeed:
     pcm_bank = load_stem_pcm(project_dir)
-    fps = cfg.visualizer.fps
     return VisualizerSeed(
         project_dir=project_dir,
         audio_path=audio_path,
@@ -118,13 +115,11 @@ def build_runtime_base(
         upscale=cfg.visualizer.upscale,
         display_width=cfg.visualizer.display_width,
         display_height=cfg.visualizer.display_height,
-        fps=fps,
         window_title=f"Cleave — {project_dir.name}",
         session=session_from_cfg(cfg, playlists),
         cfg=cfg,
         pcm_bank=pcm_bank,
         duration_sec=pcm_bank.duration_sec,
-        n_pcm=samples_per_frame(fps),
         signals=load_stem_signals(project_dir),
         effect_runtime=EffectRuntime(),
         preset_root=cfg.paths.preset_root,
@@ -173,7 +168,7 @@ def init_gl_resources_heavy(
 
     report("Building layers...")
     layers, layers_by_slot = LayerFramePipeline.build(
-        seed.cfg, compositor, seed.playlists
+        seed.cfg, compositor, seed.playlists, projectm_fps=LIVE_PROJECTM_FPS
     )
 
     mix_pcm, sample_rate = load_mix_pcm(seed.audio_path)
@@ -190,7 +185,7 @@ def init_gl_resources_heavy(
         playlists=seed.playlists,
         preset_root=seed.preset_root,
         project_dir=seed.project_dir,
-        fps=seed.cfg.visualizer.fps,
+        projectm_fps=LIVE_PROJECTM_FPS,
         texture_paths=list(seed.cfg.paths.texture_paths),
     )
     controls = make_tuning_controls(
@@ -243,7 +238,10 @@ def init_gl_resources_heavy(
 def init_gl_resources_render(seed: VisualizerSeed) -> RenderVisualizerRuntime:
     compositor, post_process = _init_compositor_and_post(seed)
     layers, layers_by_slot = LayerFramePipeline.build(
-        seed.cfg, compositor, seed.playlists
+        seed.cfg,
+        compositor,
+        seed.playlists,
+        projectm_fps=render_fps(seed.cfg),
     )
 
     return RenderVisualizerRuntime(
@@ -274,6 +272,7 @@ def tick_frame_core(
     *,
     paused: bool,
     was_paused: bool | None,
+    n_pcm: int,
 ) -> bool | None:
     """Shared frame tick for live and render. Returns updated was_paused."""
     if was_paused is not None and paused != was_paused:
@@ -287,7 +286,7 @@ def tick_frame_core(
         runtime.layers,
         runtime.layers_by_slot,
         runtime.seed.pcm_bank,
-        runtime.seed.n_pcm,
+        n_pcm,
         runtime.post_process,
         runtime.seed.effect_runtime,
         runtime.seed.signals,
@@ -359,7 +358,12 @@ class VisualizerApp:
         self._was_paused: bool | None = None
 
     def tick_frame(
-        self, t_sec: float, *, paused: bool, draw_overlay: bool = True,
+        self,
+        t_sec: float,
+        *,
+        paused: bool,
+        n_pcm: int,
+        draw_overlay: bool = True,
         display_fps: float | None = None,
     ) -> None:
         self._was_paused = tick_frame_core(
@@ -367,6 +371,7 @@ class VisualizerApp:
             t_sec,
             paused=paused,
             was_paused=self._was_paused,
+            n_pcm=n_pcm,
         )
         if draw_overlay:
             if not isinstance(self._runtime, LiveVisualizerRuntime):
@@ -427,7 +432,8 @@ class VisualizerApp:
             if quit_during_load:
                 return
 
-            warmup_frames = round(seed.cfg.visualizer.warmup_sec * seed.fps)
+            warmup_frames = round(seed.cfg.visualizer.warmup_sec * LIVE_PROJECTM_FPS)
+            warmup_n_pcm = samples_per_frame(LIVE_PROJECTM_FPS)
             if warmup_frames > 0:
                 draw_loading_screen(
                     rt.compositor,
@@ -440,12 +446,12 @@ class VisualizerApp:
                     rt.seed.pcm_bank,
                     0.0,
                     warmup_frames,
-                    rt.seed.fps,
-                    rt.seed.n_pcm,
+                    LIVE_PROJECTM_FPS,
+                    warmup_n_pcm,
                     session=rt.seed.session,
                 )
 
-            self.tick_frame(0.0, paused=False)
+            self.tick_frame(0.0, paused=False, n_pcm=warmup_n_pcm)
             pygame.display.flip()
             rt.mix_player.start()
 
@@ -482,16 +488,22 @@ class VisualizerApp:
                 if rt.controls.consume_pending_exit():
                     running = False
 
-                self._overlay_dt = clock.tick(rt.seed.fps) / 1000.0
+                self._overlay_dt = clock.tick() / 1000.0
                 rt.controls.tick(self._overlay_dt)
                 if rt.controls.key_repeat_armed:
                     rt.overlay.notify_input()
+
+                if display_fps is not None:
+                    pm_fps = max(1, round(display_fps))
+                    for layer in rt.layers:
+                        layer.pm.set_fps(pm_fps)
 
                 t_sec = current_sec(rt.playback, rt.seed.duration_sec)
                 self.tick_frame(
                     t_sec,
                     paused=rt.playback.paused,
                     display_fps=display_fps,
+                    n_pcm=samples_for_dt(self._overlay_dt),
                 )
 
                 pygame.display.flip()

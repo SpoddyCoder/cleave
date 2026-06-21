@@ -18,7 +18,7 @@ from cleave.viz.session import (
     session_from_cfg,
 )
 from cleave.paths import repo_root
-from cleave.config_schema import DEFAULT_LAYER_SLOTS
+from cleave.config_schema import DEFAULT_LAYER_SLOTS, DEFAULT_RENDER_FPS
 from cleave.extract import STEM_NAMES, stems_dir
 from cleave.project import write_manifest
 from cleave.separate import project_stems_complete
@@ -76,12 +76,9 @@ def _mock_render_runtime(
     seed.upscale = upscale
     seed.display_width = width if display_width is None else display_width
     seed.display_height = height if display_height is None else display_height
-    seed.fps = fps
     seed.duration_sec = duration_sec
     seed.pcm_bank = MagicMock()
-    seed.n_pcm = 1024
     seed.cfg = MagicMock()
-    seed.cfg.render = None
     seed.session = TuningSession(
         layer_z_order=list(DEFAULT_LAYER_SLOTS),
         render_overlay=replace(default_render_overlay_runtime(), enabled=False),
@@ -108,10 +105,10 @@ def _write_stub_stems(project: Path) -> None:
         (base / f"{name}.wav").write_bytes(b"wav")
 
 
-def _setup_render_project(tmp_path: Path) -> Path:
+def _setup_render_project(tmp_path: Path, *, render_fps: int = 10) -> Path:
     preset_root = tmp_path / "presets"
     project = tmp_path / "my-track"
-    write_minimal_config(project, preset_root)
+    write_minimal_config(project, preset_root, render={"fps": render_fps})
     _write_stub_stems(project)
     (project / "signals.json").write_text("{}")
     mix = project / "my-track.flac"
@@ -368,7 +365,7 @@ def test_render_warmup_before_emit_loop(
     tmp_path: Path,
 ) -> None:
     mock_shutil.which.return_value = "/usr/bin/ffmpeg"
-    project = _setup_render_project(tmp_path)
+    project = _setup_render_project(tmp_path, render_fps=30)
     width, height, fps = 4, 4, 30
     duration_sec = 2.0
 
@@ -655,7 +652,7 @@ def test_render_calls_overlay_compositing_when_enabled(
     overlay_cfg = _overlay_cfg(start_delay=0.0)
     base_cfg = load_config(project / VIZ_CONFIG_FILENAME, repo_root())
     mock_load_config.return_value = replace(
-        base_cfg, render=RenderConfig(overlay=overlay_cfg, post_fx=None)
+        base_cfg, render=RenderConfig(fps=fps, overlay=overlay_cfg, post_fx=None)
     )
 
     overlay_panel = MagicMock()
@@ -722,8 +719,9 @@ def test_render_skips_overlay_when_disabled(
 
     overlay_cfg = _overlay_cfg(enabled=False)
     base_cfg = load_config(project / VIZ_CONFIG_FILENAME, repo_root())
+    fps = base_cfg.render.fps if base_cfg.render is not None else 10
     mock_load_config.return_value = replace(
-        base_cfg, render=RenderConfig(overlay=overlay_cfg, post_fx=None)
+        base_cfg, render=RenderConfig(fps=fps, overlay=overlay_cfg, post_fx=None)
     )
 
     width, height = 4, 4
@@ -776,10 +774,10 @@ def test_render_composites_default_overlay_when_render_absent(
 ) -> None:
     mock_shutil.which.return_value = "/usr/bin/ffmpeg"
     project = _setup_render_project(tmp_path)
-    width, height, fps = 4, 4, 10
+    width, height = 4, 4
     duration_sec = 60.0
     start_sec, end_sec = 10, 12
-    frame_count = (end_sec - start_sec) * fps
+    frame_count = (end_sec - start_sec) * DEFAULT_RENDER_FPS
 
     base_cfg = load_config(project / VIZ_CONFIG_FILENAME, repo_root())
     mock_load_config.return_value = replace(base_cfg, render=None)
@@ -788,7 +786,7 @@ def test_render_composites_default_overlay_when_render_absent(
     compositor.read_rgba_frame.return_value = b"\xff" * (width * height * 4)
 
     seed, runtime = _mock_render_runtime(
-        width=width, height=height, fps=fps, duration_sec=duration_sec
+        width=width, height=height, fps=DEFAULT_RENDER_FPS, duration_sec=duration_sec
     )
     runtime.compositor = compositor
     mock_build.return_value = seed
@@ -952,7 +950,7 @@ def test_render_upscale_overlay_frame_order_uses_content_dims(
     overlay_cfg = _overlay_cfg(start_delay=0.0, display_time=30.0)
     base_cfg = load_config(project / VIZ_CONFIG_FILENAME, repo_root())
     mock_load_config.return_value = replace(
-        base_cfg, render=RenderConfig(overlay=overlay_cfg, post_fx=None)
+        base_cfg, render=RenderConfig(fps=fps, overlay=overlay_cfg, post_fx=None)
     )
     overlay_panel = MagicMock()
     mock_build_panel.return_value = overlay_panel

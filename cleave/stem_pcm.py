@@ -48,9 +48,20 @@ class StemPcmBank:
         return out
 
 
-def samples_per_frame(fps: int = 60) -> int:
+# Nominal projectM frame rate for live preview layer init and warmup stepping.
+LIVE_PROJECTM_FPS = 60
+
+
+def samples_per_frame(fps: int = LIVE_PROJECTM_FPS) -> int:
     """PCM samples to feed libprojectM per visual frame at *fps*."""
     return SAMPLE_RATE_HZ // fps
+
+
+def samples_for_dt(dt_sec: float) -> int:
+    """PCM samples for one live visual frame from elapsed wall time."""
+    if dt_sec <= 0.0:
+        return samples_per_frame(LIVE_PROJECTM_FPS)
+    return max(1, round(dt_sec * SAMPLE_RATE_HZ))
 
 
 def load_stem_pcm(project_dir: Path) -> StemPcmBank:

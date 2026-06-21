@@ -6,12 +6,13 @@ import math
 import os
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 import pygame
 
-from cleave.config import VIZ_CONFIG_FILENAME, load_config
+from cleave.config import VIZ_CONFIG_FILENAME, load_config, render_fps
 from cleave.paths import default_project_config, repo_root, resolve_project
 from cleave.preset_playlist import scan_all_layers
 from cleave.project import load_manifest, manifest_path, mix_path
@@ -22,10 +23,15 @@ from cleave.viz.app import (
     build_runtime_base,
     init_gl_resources_render,
 )
+from cleave.stem_pcm import samples_per_frame
 from cleave.viz.frame_finish import RenderOverlayPanelCache, finish_content_frame
 from cleave.viz.layer_pipeline import LayerFramePipeline
 
 _PREPARE_HINT = "run `cleave separate` or `cleave play` first"
+
+
+def _progress(message: str) -> None:
+    print(message, file=sys.stderr, flush=True)
 
 
 @dataclass(frozen=True)
@@ -205,7 +211,8 @@ def render(
         app = VisualizerApp(runtime)
 
         duration_sec = runtime.seed.duration_sec
-        fps = runtime.seed.fps
+        fps = render_fps(cfg)
+        n_pcm = samples_per_frame(fps)
         segment = _resolve_segment(
             start_sec, end_sec, duration_sec=duration_sec, fps=fps
         )
@@ -258,26 +265,32 @@ def render(
                 str(output_path),
             ]
         )
-        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-        assert proc.stdin is not None
 
         panel_cache = RenderOverlayPanelCache()
 
         warmup_frames = round(cfg.visualizer.warmup_sec * fps)
         if warmup_frames > 0:
+            _progress(f"Warming up Milkdrop ({warmup_frames} frames)...")
             LayerFramePipeline.warmup(
                 runtime.layers,
                 runtime.seed.pcm_bank,
                 segment.start_frame / fps,
                 warmup_frames,
                 fps,
-                runtime.seed.n_pcm,
+                n_pcm,
                 session=runtime.seed.session,
             )
 
+        _progress(
+            f"Encoding {frame_count} frames ({width}x{height} @ {fps} fps) "
+            f"to {output_path.name}..."
+        )
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+        assert proc.stdin is not None
+
         for frame_idx in range(frame_count):
             t_sec = (segment.start_frame + frame_idx) / fps
-            app.tick_frame(t_sec, paused=False, draw_overlay=False)
+            app.tick_frame(t_sec, paused=False, draw_overlay=False, n_pcm=n_pcm)
             finish_content_frame(
                 runtime,
                 t_sec,
@@ -289,6 +302,9 @@ def render(
                     f"expected {frame_bytes} frame bytes, got {len(frame)}"
                 )
             proc.stdin.write(frame)
+            rendered = frame_idx + 1
+            if rendered == 1 or rendered % 30 == 0 or rendered == frame_count:
+                _progress(f"  frame {rendered}/{frame_count}")
 
         proc.stdin.close()
         proc.stdin = None

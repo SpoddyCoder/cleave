@@ -64,7 +64,7 @@ def _manager(
         playlists=playlists,
         preset_root=preset_root,
         project_dir=Path("/tmp/projects/test"),
-        fps=30,
+        projectm_fps=30,
         texture_paths=[],
     )
     return manager, compositor

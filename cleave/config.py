@@ -42,7 +42,7 @@ from cleave.config_schema import (
     DEFAULT_RENDER_POST_FX_FADE_OUT,
     DEFAULT_TEXTURE_PATHS,
     DEFAULT_TIMELINE_ENABLED,
-    DEFAULT_VISUALIZER_FPS,
+    DEFAULT_RENDER_FPS,
     DEFAULT_VISUALIZER_HEIGHT,
     DEFAULT_VISUALIZER_UPSCALE,
     DEFAULT_VISUALIZER_WARMUP_SEC,
@@ -93,7 +93,6 @@ class VisualizerConfig:
     width: int = DEFAULT_VISUALIZER_WIDTH
     height: int = DEFAULT_VISUALIZER_HEIGHT
     upscale: float = DEFAULT_VISUALIZER_UPSCALE
-    fps: int = DEFAULT_VISUALIZER_FPS
     # Launch/render pre-roll; persisted on snapshot save, not a live session field.
     warmup_sec: float = DEFAULT_VISUALIZER_WARMUP_SEC
     beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
@@ -152,8 +151,9 @@ class RenderPostFxConfig:
 
 @dataclass(frozen=True)
 class RenderConfig:
-    overlay: RenderOverlayConfig | None
-    post_fx: RenderPostFxConfig | None
+    fps: int = DEFAULT_RENDER_FPS
+    overlay: RenderOverlayConfig | None = None
+    post_fx: RenderPostFxConfig | None = None
 
 
 @dataclass(frozen=True)
@@ -175,6 +175,13 @@ class CleaveConfig:
     def layers_in_z_order(self) -> list[tuple[str, LayerConfig]]:
         """Return layers in compositor draw order (bottom-to-top)."""
         return [(name, self.layers[name]) for name in reversed(self.layer_z_order)]
+
+
+def render_fps(cfg: CleaveConfig) -> int:
+    """Offline render output frame rate from config."""
+    if cfg.render is not None:
+        return cfg.render.fps
+    return DEFAULT_RENDER_FPS
 
 
 def _expand_path(path: Path | str) -> Path:

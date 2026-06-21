@@ -63,7 +63,7 @@ class LayerManager:
         playlists: dict[str, PresetPlaylist],
         preset_root: Path,
         project_dir: Path,
-        fps: int,
+        projectm_fps: int,
         texture_paths: list[Path],
     ) -> None:
         self.cfg = cfg
@@ -74,7 +74,7 @@ class LayerManager:
         self.playlists = playlists
         self.preset_root = preset_root
         self.project_dir = project_dir
-        self.fps = fps
+        self.projectm_fps = projectm_fps
         self.texture_paths = texture_paths
 
     def can_add(self) -> bool:
@@ -94,7 +94,7 @@ class LayerManager:
             layer_cfg,
             self.compositor,
             playlist,
-            self.fps,
+            self.projectm_fps,
             self.texture_paths,
             beat_sensitivity=self.cfg.visualizer.beat_sensitivity,
         )

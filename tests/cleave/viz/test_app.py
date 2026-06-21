@@ -9,6 +9,7 @@ import pygame
 from cleave.config_schema import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
+from cleave.stem_pcm import LIVE_PROJECTM_FPS, samples_per_frame
 from cleave.viz.app import (
     LiveVisualizerRuntime,
     VisualizerApp,
@@ -43,13 +44,11 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
         upscale=upscale,
         display_width=display_w,
         display_height=display_h,
-        fps=30,
         window_title="test",
         session=session,
         cfg=MagicMock(),
         pcm_bank=MagicMock(),
         duration_sec=120.0,
-        n_pcm=1024,
         signals=None,
         effect_runtime=MagicMock(),
         preset_root=MagicMock(),
@@ -89,13 +88,11 @@ def _run_seed(*, upscale: float = 2.0) -> VisualizerSeed:
         upscale=upscale,
         display_width=display_w,
         display_height=display_h,
-        fps=30,
         window_title="test",
         session=MagicMock(),
         cfg=cfg,
         pcm_bank=MagicMock(),
         duration_sec=120.0,
-        n_pcm=1024,
         signals=None,
         effect_runtime=MagicMock(),
         preset_root=MagicMock(),
@@ -147,7 +144,7 @@ def test_tick_frame_overlay_order_fade_content_present_then_ui(
     mock_draw_tuning.side_effect = lambda *_a, **_k: call_order.append("draw_overlay")
 
     app = VisualizerApp(runtime)
-    app.tick_frame(1.0, paused=True, draw_overlay=True)
+    app.tick_frame(1.0, paused=True, draw_overlay=True, n_pcm=735)
 
     mock_fade_alpha.assert_called_once()
     assert call_order == [
@@ -252,11 +249,13 @@ def test_run_boot_order_audio_starts_after_first_frame(
     mock_warmup.assert_called_once()
     warmup_args = mock_warmup.call_args.args
     assert warmup_args[2] == 0.0
-    assert warmup_args[3] == 30
-    assert warmup_args[4] == seed.fps
-    assert warmup_args[5] == seed.n_pcm
+    assert warmup_args[3] == round(1.0 * LIVE_PROJECTM_FPS)
+    assert warmup_args[4] == LIVE_PROJECTM_FPS
+    assert warmup_args[5] == samples_per_frame(LIVE_PROJECTM_FPS)
     mock_tick_frame.assert_called()
-    assert mock_tick_frame.call_args_list[0] == call(0.0, paused=False)
+    assert mock_tick_frame.call_args_list[0] == call(
+        0.0, paused=False, n_pcm=samples_per_frame(LIVE_PROJECTM_FPS)
+    )
     assert isinstance(app._runtime, LiveVisualizerRuntime)
     app._runtime.mix_player.start.assert_called_once()
     assert call_order.index("tick_frame") < call_order.index("mix_start")
@@ -532,7 +531,7 @@ def test_tick_frame_overlay_order_at_upscale_one(
     mock_draw_tuning.side_effect = lambda *_a, **_k: call_order.append("draw_overlay")
 
     app = VisualizerApp(runtime)
-    app.tick_frame(1.0, paused=True, draw_overlay=True)
+    app.tick_frame(1.0, paused=True, draw_overlay=True, n_pcm=735)
 
     mock_fade_alpha.assert_called_once()
     assert call_order == [
@@ -640,7 +639,7 @@ def test_tick_frame_skips_timeline_when_overlay_hidden_and_not_in_submenu(
     runtime.seed.session.timeline.submenu_focused = False
 
     app = VisualizerApp(runtime)
-    app.tick_frame(1.0, paused=True, draw_overlay=True)
+    app.tick_frame(1.0, paused=True, draw_overlay=True, n_pcm=735)
     mock_draw_timeline.assert_not_called()
 
 
@@ -666,7 +665,7 @@ def test_tick_frame_draws_timeline_when_overlay_hidden_but_submenu_focused(
     runtime.seed.session.timeline.submenu_focused = True
 
     app = VisualizerApp(runtime)
-    app.tick_frame(1.0, paused=True, draw_overlay=True)
+    app.tick_frame(1.0, paused=True, draw_overlay=True, n_pcm=735)
     mock_draw_timeline.assert_called_once()
 
 
@@ -707,7 +706,7 @@ def test_tick_frame_draws_timeline_when_overlay_visible_and_panel_open(
     runtime.overlay.notify_input()
 
     app = VisualizerApp(runtime)
-    app.tick_frame(1.0, paused=True, draw_overlay=True)
+    app.tick_frame(1.0, paused=True, draw_overlay=True, n_pcm=735)
     mock_draw_timeline.assert_called_once()
 
 
@@ -753,10 +752,10 @@ def test_tick_frame_restores_timeline_after_overlay_shown_again(
     overlay = runtime.overlay
 
     app = VisualizerApp(runtime)
-    app.tick_frame(1.0, paused=True, draw_overlay=True)
+    app.tick_frame(1.0, paused=True, draw_overlay=True, n_pcm=735)
     mock_draw_timeline.assert_not_called()
 
     overlay.notify_input()
-    app.tick_frame(1.0, paused=True, draw_overlay=True)
+    app.tick_frame(1.0, paused=True, draw_overlay=True, n_pcm=735)
     mock_draw_timeline.assert_called_once()
     assert runtime.seed.session.timeline.panel_open is True

@@ -146,9 +146,10 @@ class LayerFramePipeline:
         cfg: CleaveConfig,
         compositor: GlCompositor,
         playlists: dict[str, PresetPlaylist],
+        *,
+        projectm_fps: int,
     ) -> tuple[list[StemLayer], dict[str, StemLayer]]:
         texture_paths = list(cfg.paths.texture_paths)
-        fps = cfg.visualizer.fps
         runtimes: list[StemLayer] = []
 
         for slot, layer_cfg in cfg.layers_in_z_order():
@@ -158,7 +159,7 @@ class LayerFramePipeline:
                     layer_cfg,
                     compositor,
                     playlists[slot],
-                    fps,
+                    projectm_fps,
                     texture_paths,
                     _beat_sensitivity(cfg, slot),
                 )
