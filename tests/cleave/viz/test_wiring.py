@@ -105,6 +105,13 @@ def test_on_stem_change_updates_mix_player_solo_source() -> None:
             "other": np.array([4.0], dtype=np.float32),
             "full_mix": np.array([5.0], dtype=np.float32),
         },
+        _channels={
+            "drums": 1,
+            "bass": 1,
+            "vocals": 1,
+            "other": 1,
+            "full_mix": 1,
+        },
     )
     controls = make_tuning_controls(
         session=session,

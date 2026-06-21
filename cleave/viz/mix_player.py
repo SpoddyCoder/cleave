@@ -85,6 +85,7 @@ class MixPlayer:
     ) -> None:
         self._pcm = np.ascontiguousarray(pcm, dtype=np.float32)
         self._stem_pcm: dict[str, np.ndarray] = {}
+        self._stem_channels: dict[str, int] = {}
         self._solo_source: StemSource | None = None
         self._sample_rate = sample_rate
         self._chunksize = chunksize
@@ -95,11 +96,12 @@ class MixPlayer:
         self._device: AudioDevice | None = None
         self._callback: Callable[[AudioDevice, memoryview], None] | None = None
 
-    def set_stem_pcm(self, stems: dict[str, np.ndarray]) -> None:
+    def set_stem_pcm(self, stems: dict[str, tuple[np.ndarray, int]]) -> None:
         self._stem_pcm = {
             name: np.ascontiguousarray(pcm, dtype=np.float32)
-            for name, pcm in stems.items()
+            for name, (pcm, _channels) in stems.items()
         }
+        self._stem_channels = {name: channels for name, (_, channels) in stems.items()}
 
     def set_solo_source(self, source: StemSource | None) -> None:
         with self._lock:
@@ -118,14 +120,28 @@ class MixPlayer:
                 stem_pcm = (
                     self._stem_pcm.get(solo_source) if solo_source else None
                 )
-            if stem_pcm is not None:
-                total_frames = len(stem_pcm)
-                frames_written, new_index = copy_mono_pcm_chunk_as_stereo(
-                    stem_pcm,
-                    read_index,
-                    out,
-                    total_frames=total_frames,
+                stem_channels = (
+                    self._stem_channels.get(solo_source, 1)
+                    if solo_source
+                    else 1
                 )
+            if stem_pcm is not None:
+                if stem_channels == 2:
+                    total_frames = len(stem_pcm) // 2
+                    frames_written, new_index = copy_stereo_pcm_chunk(
+                        stem_pcm,
+                        read_index,
+                        out,
+                        total_frames=total_frames,
+                    )
+                else:
+                    total_frames = len(stem_pcm)
+                    frames_written, new_index = copy_mono_pcm_chunk_as_stereo(
+                        stem_pcm,
+                        read_index,
+                        out,
+                        total_frames=total_frames,
+                    )
             else:
                 frames_written, new_index = copy_stereo_pcm_chunk(
                     self._pcm,

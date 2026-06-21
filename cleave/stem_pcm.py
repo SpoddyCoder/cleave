@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 
 from cleave.extract import STEM_NAMES, StemSource, stem_paths
-from cleave.pcm_io import SAMPLE_RATE_HZ, load_wav_mono_44k
+from cleave.pcm_io import SAMPLE_RATE_HZ, load_wav_pcm_44k
 from cleave.project import mix_path
 
 
@@ -17,25 +17,33 @@ class StemPcmBank:
     project_dir: Path
     duration_sec: float
     _pcm: dict[str, np.ndarray] = field(repr=False)
+    _channels: dict[str, int] = field(repr=False)
     sample_rate_hz: int = SAMPLE_RATE_HZ
 
-    def mono_pcm(self, stem: StemSource) -> np.ndarray:
-        """Preloaded mono float32 PCM for *stem*."""
+    def pcm(self, stem: StemSource) -> np.ndarray:
+        """Preloaded float32 PCM for *stem* (mono 1D or interleaved stereo)."""
         return self._pcm[stem]
 
+    def channels(self, stem: StemSource) -> int:
+        """Channel count for *stem* (1 mono, 2 interleaved stereo)."""
+        return self._channels[stem]
+
     def slice_pcm(self, stem: StemSource, t_sec: float, n_samples: int) -> np.ndarray:
-        """Return *n_samples* of mono float32 PCM from *t_sec*, zero-padded past end."""
+        """Return per-channel *n_samples* of float32 PCM from *t_sec*, zero-padded past end."""
         pcm = self._pcm[stem]
+        ch = self._channels[stem]
         if n_samples <= 0:
             return np.array([], dtype=np.float32)
 
         t_sec = max(t_sec, 0.0)
-        start = int(t_sec * self.sample_rate_hz)
-        out = np.zeros(n_samples, dtype=np.float32)
+        start_frame = int(t_sec * self.sample_rate_hz)
+        n_out = n_samples * ch
+        out = np.zeros(n_out, dtype=np.float32)
+        start = start_frame * ch
         if start >= len(pcm):
             return out
 
-        take = min(n_samples, len(pcm) - start)
+        take = min(n_out, len(pcm) - start)
         out[:take] = pcm[start : start + take]
         return out
 
@@ -60,13 +68,15 @@ def load_stem_pcm(project_dir: Path) -> StemPcmBank:
         raise FileNotFoundError(f"missing mix wav in {project_dir}: {mix.name}")
 
     pcm: dict[str, np.ndarray] = {}
+    channels: dict[str, int] = {}
     for name in STEM_NAMES:
-        pcm[name] = load_wav_mono_44k(paths[name])
-    pcm["full_mix"] = load_wav_mono_44k(mix)
+        pcm[name], channels[name] = load_wav_pcm_44k(paths[name])
+    pcm["full_mix"], channels["full_mix"] = load_wav_pcm_44k(mix)
 
-    duration_sec = max(len(arr) for arr in pcm.values()) / SAMPLE_RATE_HZ
+    duration_sec = max(len(pcm[s]) // channels[s] for s in pcm) / SAMPLE_RATE_HZ
     return StemPcmBank(
         project_dir=project_dir,
         duration_sec=duration_sec,
         _pcm=pcm,
+        _channels=channels,
     )

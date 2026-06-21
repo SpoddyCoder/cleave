@@ -84,7 +84,7 @@ This will separate the track into its component stem tracks (bass, drums, vocals
 * `cleave-viz.yaml` - visualizer configuration. Not everything in here is surfaced in the visualizer UI just yet
 * `signals.json` - audio analysis data used by `cleave effects`
 * `mysong.wav` - original source audio is copied into the project (makes a project self contained)
-* `stems/` - separated audio stems
+* `stems/` - separated audio stems (stereo when the source mix is stereo; preserved for visuals and solo playback)
 * `renders/` - final renders
 
 ### CLI
@@ -128,6 +128,7 @@ Controls...
 #### Compositing
 
 * The visualizer is four libprojectM layers at tiered resolutions, composited to **1280x720 @ 30 fps** by default (editable `cleave-viz.yaml`)
+* Each layer's libprojectM instance receives PCM from its assigned stem; stereo stems are fed as stereo (mono sources stay mono).
 * Milkdrop draws on black, so cleave treats black as transparent and uses pixel brightness as blend weight (`black-key` default).
 
 | Mode | Typical use |

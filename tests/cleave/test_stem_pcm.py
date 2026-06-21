@@ -20,10 +20,12 @@ def _make_bank(*, duration_samples: int = 4410) -> StemPcmBank:
         stem: np.arange(duration_samples, dtype=np.float32) + float(i)
         for i, stem in enumerate(STEM_NAMES)
     }
+    channels = {stem: 1 for stem in STEM_NAMES}
     return StemPcmBank(
         project_dir=Path("/tmp/test-project"),
         duration_sec=duration_samples / SAMPLE_RATE_HZ,
         _pcm=pcm,
+        _channels=channels,
     )
 
 
@@ -148,3 +150,42 @@ def test_load_stem_pcm_missing_mix_raises(tmp_path: Path) -> None:
 
     with pytest.raises(FileNotFoundError, match="missing mix wav"):
         load_stem_pcm(project)
+
+
+def test_slice_pcm_stereo_interleaved() -> None:
+    stereo_pcm = np.array([1.0, 10.0, 2.0, 20.0, 3.0, 30.0], dtype=np.float32)
+    bank = StemPcmBank(
+        project_dir=Path("/tmp/test-project"),
+        duration_sec=3 / SAMPLE_RATE_HZ,
+        _pcm={"drums": stereo_pcm},
+        _channels={"drums": 2},
+    )
+    out = bank.slice_pcm("drums", t_sec=1.0 / SAMPLE_RATE_HZ, n_samples=2)
+    np.testing.assert_array_equal(out, np.array([2.0, 20.0, 3.0, 30.0], dtype=np.float32))
+
+
+def test_load_stem_pcm_stereo_preserves_channels(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    stem_root = stems_dir(project)
+    stem_root.mkdir(parents=True, exist_ok=True)
+    stereo = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+    for name in STEM_NAMES:
+        sf.write(stem_root / f"{name}.wav", stereo, SAMPLE_RATE_HZ, subtype="FLOAT")
+    mix_path = project / "mix.wav"
+    sf.write(mix_path, np.full(100, 9.0, dtype=np.float32), SAMPLE_RATE_HZ, subtype="FLOAT")
+    write_manifest(
+        project,
+        slug="test-project",
+        mix_filename="mix.wav",
+        original_path=mix_path,
+        demucs_model="htdemucs",
+    )
+
+    bank = load_stem_pcm(project)
+
+    assert bank.channels("drums") == 2
+    np.testing.assert_array_equal(
+        bank.pcm("drums"),
+        np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32),
+    )

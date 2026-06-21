@@ -199,7 +199,10 @@ def make_tuning_controls(
     controls = TuningControls(**kwargs)
     if pcm_bank is not None and mix_player is not None:
         mix_player.set_stem_pcm(
-            {stem: pcm_bank.mono_pcm(stem) for stem in STEM_SOURCES}
+            {
+                stem: (pcm_bank.pcm(stem), pcm_bank.channels(stem))
+                for stem in STEM_SOURCES
+            }
         )
         apply_layer_visibility(
             session,
