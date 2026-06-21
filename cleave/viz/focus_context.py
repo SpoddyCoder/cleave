@@ -5,12 +5,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from cleave.viz.overlay import TuningViewState
+from cleave.viz.focus_nav import FocusCursor
+from cleave.viz.tuning_view_state import TuningViewState
 
 
 @dataclass(frozen=True)
 class FocusContext:
-    get_focus_index: Callable[[], int]
-    set_focus_index: Callable[[int], None]
+    get_focus_cursor: Callable[[], FocusCursor]
+    set_focus_cursor: Callable[[FocusCursor], None]
     build_view_state: Callable[..., TuningViewState]
     is_paused: Callable[[], bool]

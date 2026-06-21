@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pygame
 
 from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.overlay_draw import OverlayDrawer
-from cleave.viz.row_semantics import RowKind
+from cleave.viz.row_semantics import RowDescriptor, RowKind
 from cleave.viz.timeline_overlay import TimelineViewState
 from tests.support.compositor_mock import recording_compositor
 
@@ -28,8 +28,7 @@ def test_draw_tuning_overlay_uses_display_target() -> None:
     compositor.draw_content_overlay.assert_not_called()
 
 
-@patch("cleave.viz.overlay_draw.row_kind", return_value=RowKind.TRANSPORT)
-def test_draw_tuning_overlay_uploads_help_panel(_row_kind: MagicMock) -> None:
+def test_draw_tuning_overlay_uploads_help_panel() -> None:
     pygame.init()
     compositor = recording_compositor()
     compositor.upload_overlay_texture.side_effect = [11, 22]
@@ -40,7 +39,8 @@ def test_draw_tuning_overlay_uploads_help_panel(_row_kind: MagicMock) -> None:
     overlay_surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     view_state = MagicMock()
     view_state.help_visible = True
-    view_state.focus_index = 0
+    view_state.focus_descriptor = RowDescriptor(RowKind.TRANSPORT)
+    view_state.layout.kind.return_value = RowKind.TRANSPORT
 
     OverlayDrawer.draw_tuning(
         compositor,

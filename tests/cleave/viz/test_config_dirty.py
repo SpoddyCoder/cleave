@@ -13,35 +13,34 @@ import pytest
 from cleave.timeline import TimelineCue
 from cleave.viz.controls import TuningControls
 from cleave.viz.timeline_controls import TimelineControls
-from cleave.viz.overlay import find_row_by_kind
-from cleave.viz.row_semantics import RowKind
-from tests.cleave.viz.test_controls import _choose_save_as_new, _config_header_row, _keydown, _make_controls, _row
+from cleave.viz.row_semantics import RowDescriptor, RowKind
+from tests.cleave.viz.test_controls import _choose_save_as_new, _config_header_row, _desc, _keydown, _make_controls, _row
 from tests.cleave.viz.test_timeline_controls import _make_timeline_controls
 from tests.support.viz import keydown, stub_playback_state
 
 
 def _expand_layer_1(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_HEADER)
+    controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_HEADER))
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _expand_render_overlay(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _expand_render_post_fx(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_POST_FX_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_layer_z_order(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_2", RowKind.TRACK_HEADER)
-    controls.focus_index = header_row
+    controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     controls.handle_keydown(_keydown(pygame.K_UP))
     controls.handle_keydown(_keydown(pygame.K_RETURN))
@@ -49,66 +48,66 @@ def _mutate_layer_z_order(controls: TuningControls) -> None:
 
 def _mutate_stem_enabled(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_HEADER)
+    controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_HEADER))
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
 
 
 def _mutate_stem_opacity(controls: TuningControls) -> None:
     _expand_layer_1(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_OPACITY)
+    controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_OPACITY))
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_stem_blend_mode(controls: TuningControls) -> None:
     _expand_layer_1(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_BLEND)
+    controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_BLEND))
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_stem_locked(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_HEADER)
+    controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_HEADER))
     controls.handle_keydown(_keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
 
 
 def _mutate_stem_beat_sensitivity(controls: TuningControls) -> None:
     _expand_layer_1(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_BEAT)
+    controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_BEAT))
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_stem_effects(controls: TuningControls) -> None:
     _expand_layer_1(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_EFFECTS_HEADER)
+    controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_EFFECTS_HEADER))
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(
+    controls.focus_descriptor = view.layout.descriptor(_row(
         view, "layer_1", RowKind.TRACK_EFFECT, effect_id="pulse", driver_slug="onset"
-    )
+    ))
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_preset_path(controls: TuningControls) -> None:
     _expand_layer_1(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_PRESET)
+    controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_PRESET))
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_render_overlay_enabled(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_HEADER)
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
 
 
 def _mutate_render_overlay_position(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_POSITION)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_POSITION)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -116,9 +115,7 @@ def _mutate_render_overlay_title_font_size(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     controls.session.render_overlay.title_expanded = True
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(
-        view, RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE
-    )
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -126,7 +123,7 @@ def _mutate_render_overlay_title_font(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     controls.session.render_overlay.title_expanded = True
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_FONT)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_FONT)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -134,9 +131,7 @@ def _mutate_render_overlay_title_margin_bottom(controls: TuningControls) -> None
     _expand_render_overlay(controls)
     controls.session.render_overlay.title_expanded = True
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(
-        view, RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM
-    )
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -144,9 +139,7 @@ def _mutate_render_overlay_body_font_size(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     controls.session.render_overlay.body_expanded = True
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(
-        view, RowKind.RENDER_OVERLAY_BODY_FONT_SIZE
-    )
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_BODY_FONT_SIZE)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -154,76 +147,74 @@ def _mutate_render_overlay_body_font(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     controls.session.render_overlay.body_expanded = True
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_FONT)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_BODY_FONT)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_render_overlay_opacity(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_OPACITY)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_OPACITY)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_render_overlay_border_width(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BORDER_WIDTH)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_BORDER_WIDTH)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_render_overlay_start_delay(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_START_DELAY)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_START_DELAY)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_render_overlay_display_time(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(
-        view, RowKind.RENDER_OVERLAY_DISPLAY_TIME
-    )
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_DISPLAY_TIME)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_render_post_fx_enabled(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_POST_FX_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
 
 
 def _mutate_render_post_fx_fade_in(controls: TuningControls) -> None:
     _expand_render_post_fx(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_POST_FX_FADE_IN)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_render_post_fx_fade_out(controls: TuningControls) -> None:
     _expand_render_post_fx(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_POST_FX_FADE_OUT)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_FADE_OUT)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_timeline_enabled(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
 
 
 def _expand_settings(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.SETTINGS_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_visualizer_render_mode(controls: TuningControls) -> None:
     _expand_settings(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.SETTINGS_RENDER_MODE)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_RENDER_MODE)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -324,7 +315,7 @@ def test_display_time_mutation_clears_dirty_after_save() -> None:
     assert controls.config_dirty
 
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _config_header_row(view)
+    controls.focus_descriptor = _desc(view, _config_header_row(view))
     _choose_save_as_new(controls)
     assert not controls.config_dirty
 
@@ -336,20 +327,20 @@ def _mutate_track_expanded(controls: TuningControls) -> None:
 def _mutate_effects_expanded(controls: TuningControls) -> None:
     _expand_layer_1(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_EFFECTS_HEADER)
+    controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_EFFECTS_HEADER))
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_solo_slot(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_HEADER)
+    controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_HEADER))
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
 
 
 def _mutate_timeline_panel_open(controls: TuningControls) -> None:
     controls.session.timeline.enabled = True
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -359,7 +350,7 @@ def _mutate_render_overlay_expanded(controls: TuningControls) -> None:
 
 def _mutate_render_overlay_solo(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
 
 
@@ -369,13 +360,13 @@ def _mutate_render_post_fx_expanded(controls: TuningControls) -> None:
 
 def _mutate_render_post_fx_solo(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_POST_FX_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
 
 
 def _mutate_move_mode_without_confirm(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "layer_2", RowKind.TRACK_HEADER)
+    controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_2", RowKind.TRACK_HEADER))
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     controls.handle_keydown(_keydown(pygame.K_UP))
 

@@ -11,18 +11,24 @@ import pygame
 
 from cleave.config import CleaveConfig, clamp_beat_sensitivity, clamp_effect_pct
 from cleave.config_schema import MAX_LAYER_COUNT
-from cleave.effects.registry import effect_row_count
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.extract import STEM_SOURCES
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.key_repeat import KeyRepeatController, delete_key_pressed, mod_ctrl, mod_shift
 from cleave.viz.modal import ModalHost
 from cleave.viz.playback import PlaybackState, seek, toggle_pause
-from cleave.viz.focus_context import FocusContext
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.render_overlay_controls import RenderOverlayControls
 from cleave.viz.render_post_fx_controls import RenderPostFxControls
 from cleave.viz.settings_controls import SettingsControls
+from cleave.viz.focus_nav import (
+    FocusCursor,
+    MainFocus,
+    TimelineFocus,
+    cursor_main_descriptor,
+    move_focus,
+    timeline_strip_in_ring,
+)
 from cleave.viz.row_semantics import (
     REPEAT_ROW_KINDS,
     RowDescriptor,
@@ -31,24 +37,11 @@ from cleave.viz.row_semantics import (
     row_behavior,
     row_triggers_layer_delete,
 )
-from cleave.viz.overlay import (
-    TuningViewState,
-    build_row_layout,
-    find_row,
-    find_row_by_kind,
-    navigable_row_indices,
-    quick_nav_row_indices,
-    row_count,
-    row_descriptor,
-    row_effect,
-    row_kind,
-    row_slot,
-)
 from cleave.viz.session import TuningSession
+from cleave.viz.tuning_view_state import TuningViewState, TuningViewStateBuilder
 
 if TYPE_CHECKING:
     from cleave.viz.wiring import LayerManager
-from cleave.viz.tuning_view_state import TuningViewStateBuilder
 
 TOAST_DURATION_SEC = 5.0
 SEEK_SHORT = 10
@@ -83,7 +76,9 @@ class TuningControls:
         self._layer_manager = layer_manager
         self._modal_host = modal_host if modal_host is not None else ModalHost()
 
-        self.focus_index = 0
+        self._focus_cursor: FocusCursor = MainFocus(
+            RowDescriptor(RowKind.TRANSPORT)
+        )
         self.move_mode_slot: str | None = None
         self._move_mode_original_z_order: list[str] | None = None
         self._toast_message: str | None = None
@@ -107,36 +102,15 @@ class TuningControls:
             playback,
             duration_sec,
             preset_root,
-            get_focus_index=lambda: self.focus_index,
+            get_focus_cursor=lambda: self.focus_cursor,
             get_move_mode_slot=lambda: self.move_mode_slot,
             config_save=self._config_save,
             get_toast_message=lambda: self._toast_message,
             get_toast_deadline=lambda: self._toast_deadline,
         )
-        def set_focus_index(index: int) -> None:
-            self.focus_index = index
-
-        focus_context = FocusContext(
-            get_focus_index=lambda: self.focus_index,
-            set_focus_index=set_focus_index,
-            build_view_state=self.build_view_state,
-            is_paused=lambda: self.playback.paused,
-        )
-        self._render_overlay = RenderOverlayControls(
-            session,
-            focus_context=focus_context,
-            focused_row_kind=self._focused_row_kind,
-        )
-        self._render_post_fx = RenderPostFxControls(session, focus_context=focus_context)
-        self._settings = SettingsControls(
-            session,
-            cfg,
-            focus_context=focus_context,
-            focused_row_kind=self._focused_row_kind,
-        )
-
-        view = self.build_view_state(paused=self.playback.paused)
-        self.focus_index = find_row_by_kind(view, RowKind.TRANSPORT)
+        self._render_overlay = RenderOverlayControls(session)
+        self._render_post_fx = RenderPostFxControls(session)
+        self._settings = SettingsControls(session, cfg)
 
     def _move_mode_signature_payload(self) -> dict[str, list[str]] | None:
         if self.move_mode_slot is not None and self._move_mode_original_z_order is not None:
@@ -236,8 +210,7 @@ class TuningControls:
             return True
 
         if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
-            view = self.build_view_state(paused=self.playback.paused)
-            kind = row_kind(view, self.focus_index)
+            kind = self.focus_descriptor.kind
             self._apply_horizontal(event.key, event.mod, kind)
             repeat = kind in REPEAT_ROW_KINDS
             if repeat and kind == RowKind.TRACK_PRESET_DIR and mod_ctrl(event.mod):
@@ -249,16 +222,15 @@ class TuningControls:
                     on_repeat=lambda key, mod: self._apply_horizontal(
                         key,
                         mod,
-                        row_kind(self.build_view_state(paused=self.playback.paused), self.focus_index),
+                        self.focus_descriptor.kind,
                     ),
                 )
             return True
 
         if event.key == pygame.K_BACKSPACE:
-            view = self.build_view_state(paused=self.playback.paused)
-            kind = row_kind(view, self.focus_index)
+            kind = self.focus_descriptor.kind
             if kind == RowKind.TRACK_PRESET_DIR:
-                slot = row_slot(view, self.focus_index)
+                slot = self.focus_descriptor.slot
                 if slot is not None:
                     if layer_lock_blocks_mutation(
                         kind, locked=self.session.layers[slot].locked
@@ -268,36 +240,33 @@ class TuningControls:
                 return True
 
         if delete_key_pressed(event):
-            view = self.build_view_state(paused=self.playback.paused)
-            kind = row_kind(view, self.focus_index)
+            kind = self.focus_descriptor.kind
             if row_triggers_layer_delete(kind):
-                slot = row_slot(view, self.focus_index)
+                slot = self.focus_descriptor.slot
                 if slot is not None:
                     self._delete_layer(slot)
                 return True
 
         if event.key == pygame.K_RETURN and mod_ctrl(event.mod):
-            view = self.build_view_state(paused=self.playback.paused)
-            kind = row_kind(view, self.focus_index)
+            kind = self.focus_descriptor.kind
             if kind == RowKind.TRACK_HEADER:
-                slot = row_slot(view, self.focus_index)
+                slot = self.focus_descriptor.slot
                 if slot is not None:
                     self._toggle_locked(slot)
                 return True
 
         if event.key == pygame.K_RETURN:
-            view = self.build_view_state(paused=self.playback.paused)
-            kind = row_kind(view, self.focus_index)
+            kind = self.focus_descriptor.kind
             if kind == RowKind.LAYER_MANAGEMENT_ADD:
                 self._add_layer()
                 return True
             if kind == RowKind.LAYER_MANAGEMENT_DELETE:
-                slot = row_slot(view, self.focus_index)
+                slot = self.focus_descriptor.slot
                 if slot is not None:
                     self._delete_layer(slot)
                 return True
             if kind == RowKind.TRACK_PRESET_DIR:
-                slot = row_slot(view, self.focus_index)
+                slot = self.focus_descriptor.slot
                 if slot is not None:
                     if layer_lock_blocks_mutation(
                         kind, locked=self.session.layers[slot].locked
@@ -309,7 +278,7 @@ class TuningControls:
                 toggle_pause(self.playback, self.duration_sec)
                 return True
             if kind == RowKind.TRACK_HEADER:
-                slot = row_slot(view, self.focus_index)
+                slot = self.focus_descriptor.slot
                 if slot is not None:
                     if (
                         self.session.layers[slot].locked
@@ -347,86 +316,97 @@ class TuningControls:
         *,
         paused: bool,
         position_sec: float | None = None,
+        fps: float | None = None,
     ) -> TuningViewState:
-        return self._view_state.build(paused=paused, position_sec=position_sec)
+        return self._view_state.build(
+            paused=paused, position_sec=position_sec, fps=fps
+        )
 
-    def _timeline_row_count(self) -> int:
-        return len(self.session.layer_z_order)
+    @property
+    def focus_descriptor(self) -> RowDescriptor:
+        return cursor_main_descriptor(self.focus_cursor)
 
-    def _timeline_submenu_active(self) -> bool:
+    @focus_descriptor.setter
+    def focus_descriptor(self, descriptor: RowDescriptor) -> None:
+        self._apply_focus_cursor(MainFocus(descriptor))
+
+    @property
+    def focus_cursor(self) -> FocusCursor:
+        return self._focus_cursor
+
+    @focus_cursor.setter
+    def focus_cursor(self, cursor: FocusCursor) -> None:
+        self._apply_focus_cursor(cursor)
+
+    def _apply_focus_cursor(self, cursor: FocusCursor) -> None:
+        self._focus_cursor = cursor
+        if isinstance(cursor, TimelineFocus):
+            self.session.timeline.focus_row = cursor.row
+
+    def _normalize_focus_cursor(self) -> None:
+        view = self.build_view_state(paused=self.playback.paused)
         tl = self.session.timeline
-        return tl.panel_open and tl.enabled and self._timeline_row_count() > 0
+        row_count = len(self.session.layer_z_order)
+        if isinstance(self.focus_cursor, TimelineFocus):
+            if not timeline_strip_in_ring(view):
+                self._apply_focus_cursor(
+                    MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+                )
+                return
+            if row_count == 0:
+                self._apply_focus_cursor(
+                    MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+                )
+            elif self.focus_cursor.row >= row_count:
+                self._apply_focus_cursor(TimelineFocus(row_count - 1))
+            return
+        tl = self.session.timeline
+        if tl.focus_row >= row_count:
+            tl.focus_row = row_count - 1
 
     def _move_focus(self, delta: int) -> None:
-        tl = self.session.timeline
-        row_count = self._timeline_row_count()
-
-        if tl.submenu_focused:
-            if row_count == 0:
-                tl.submenu_focused = False
-            elif delta < 0:
-                if tl.focus_row == 0:
-                    self.exit_timeline_submenu()
-                    return
-                tl.focus_row -= 1
-                return
-            elif tl.focus_row >= row_count - 1:
-                tl.submenu_focused = False
-                view = self.build_view_state(paused=self.playback.paused)
-                self.focus_index = find_row_by_kind(view, RowKind.TRANSPORT)
-                return
-            else:
-                tl.focus_row += 1
-                return
-
         view = self.build_view_state(paused=self.playback.paused)
-        navigable = navigable_row_indices(view)
-        if not navigable:
-            return
-        try:
-            pos = navigable.index(self.focus_index)
-        except ValueError:
-            pos = 0
-
-        if self._timeline_submenu_active():
-            timeline_header = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
-            transport = find_row_by_kind(view, RowKind.TRANSPORT)
-            if delta > 0 and self.focus_index == timeline_header:
-                tl.submenu_focused = True
-                tl.focus_row = 0
-                return
-            if delta < 0 and self.focus_index == transport:
-                tl.submenu_focused = True
-                tl.focus_row = row_count - 1
-                return
-
-        self.focus_index = navigable[(pos + delta) % len(navigable)]
+        self._apply_focus_cursor(move_focus(self.focus_cursor, delta, view))
 
     def _move_quick_focus(self, delta: int) -> None:
+        if isinstance(self.focus_cursor, TimelineFocus):
+            self._apply_focus_cursor(
+                MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+            )
+            if delta < 0:
+                return
         view = self.build_view_state(paused=self.playback.paused)
-        quick = quick_nav_row_indices(view)
+        quick_indices = view.layout.quick_nav_indices()
+        quick = [view.layout.descriptor(index) for index in quick_indices]
         if not quick:
             return
-        tl = self.session.timeline
-        if tl.submenu_focused:
-            tl.submenu_focused = False
-            timeline_header = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
-            if delta < 0:
-                self.focus_index = timeline_header
-                return
-            current = timeline_header
+        if view.layout.contains_descriptor(self.focus_descriptor):
+            current_index = view.layout.find_descriptor(self.focus_descriptor)
         else:
-            current = self.focus_index
-        if current in quick:
-            pos = quick.index(current)
-            self.focus_index = quick[(pos + delta) % len(quick)]
+            resolved = view.layout.resolve_navigable(self.focus_descriptor, view)
+            current_index = (
+                view.layout.find_descriptor(resolved)
+                if view.layout.contains_descriptor(resolved)
+                else -1
+            )
+        if self.focus_descriptor in quick:
+            pos = quick.index(self.focus_descriptor)
+            self.focus_descriptor = quick[(pos + delta) % len(quick)]
             return
         if delta > 0:
-            after = [index for index in quick if index > current]
-            self.focus_index = after[0] if after else quick[0]
+            after = [
+                desc
+                for desc in quick
+                if view.layout.find_descriptor(desc) > current_index
+            ]
+            self.focus_descriptor = after[0] if after else quick[0]
         else:
-            before = [index for index in quick if index < current]
-            self.focus_index = before[-1] if before else quick[-1]
+            before = [
+                desc
+                for desc in quick
+                if view.layout.find_descriptor(desc) < current_index
+            ]
+            self.focus_descriptor = before[-1] if before else quick[-1]
 
     def _swap_stem_in_z_order(self, stem: str, direction: int) -> None:
         order = self.session.layer_z_order
@@ -443,19 +423,9 @@ class TuningControls:
         self.move_mode_slot = None
         self._move_mode_original_z_order = None
 
-    def _rebuild_view(self, *, nav_pos: int | None = None) -> None:
+    def _rebuild_view(self) -> None:
         if self.move_mode_slot is not None:
             self._confirm_move_mode()
-        view = self.build_view_state(paused=self.playback.paused)
-        navigable = navigable_row_indices(view)
-        if not navigable:
-            return
-        if nav_pos is None:
-            try:
-                nav_pos = navigable.index(self.focus_index)
-            except ValueError:
-                nav_pos = 0
-        self.focus_index = navigable[min(nav_pos, len(navigable) - 1)]
 
     def _add_layer(self) -> None:
         if self._layer_manager is None:
@@ -489,19 +459,23 @@ class TuningControls:
         if self._layer_manager is None:
             return
         view = self.build_view_state(paused=self.playback.paused)
-        navigable = navigable_row_indices(view)
+        navigable = view.layout.navigable_descriptors(view)
+        current = view.layout.resolve_navigable(self.focus_descriptor, view)
         try:
-            nav_pos = navigable.index(self.focus_index)
+            nav_pos = navigable.index(current)
         except ValueError:
             nav_pos = 0
         self._layer_manager.remove_layer(slot)
-        self._rebuild_view(nav_pos=nav_pos)
-        tl = self.session.timeline
-        row_count = len(self.session.layer_z_order)
-        if row_count == 0:
-            tl.submenu_focused = False
-        elif tl.focus_row >= row_count:
-            tl.focus_row = row_count - 1
+        self._rebuild_view()
+        view_after = self.build_view_state(paused=self.playback.paused)
+        navigable_after = view_after.layout.navigable_descriptors(view_after)
+        if navigable_after:
+            self._apply_focus_cursor(
+                MainFocus(
+                    navigable_after[min(nav_pos, len(navigable_after) - 1)]
+                )
+            )
+        self._normalize_focus_cursor()
 
     def _cancel_move_mode(self) -> None:
         if self._move_mode_original_z_order is not None:
@@ -511,7 +485,7 @@ class TuningControls:
 
     def _apply_horizontal(self, key: int, mod: int, kind: RowKind) -> None:
         view = self.build_view_state(paused=self.playback.paused)
-        slot = row_slot(view, self.focus_index)
+        slot = self.focus_descriptor.slot
         ctrl = mod_ctrl(mod)
         forward = key == pygame.K_RIGHT
 
@@ -586,10 +560,10 @@ class TuningControls:
         elif kind == RowKind.TRACK_EFFECT:
             if slot is None:
                 return
-            effect = row_effect(view, self.focus_index)
-            if effect is None:
+            effect_id = self.focus_descriptor.effect_id
+            driver_slug = self.focus_descriptor.driver_slug
+            if effect_id is None or driver_slug is None:
                 return
-            effect_id, driver_slug = effect
             step = 10 if ctrl else 1
             delta = step if forward else -step
             current = self.session.layers[slot].effects.get(effect_id, {}).get(
@@ -774,54 +748,11 @@ class TuningControls:
         if layer.expanded == expanded:
             return
         layer.expanded = expanded
-        if not expanded:
-            self._refocus_track_header_if_sub_row(slot)
-
-    def _track_header_index(self, slot: str) -> int:
-        view = self.build_view_state(paused=self.playback.paused)
-        return find_row(view, slot, RowKind.TRACK_HEADER)
-
-    def _refocus_track_header_if_sub_row(self, slot: str) -> None:
-        view = self.build_view_state(paused=self.playback.paused)
-        kind = row_kind(view, self.focus_index)
-        if kind not in REPEAT_ROW_KINDS:
-            return
-        if row_slot(view, self.focus_index) == slot:
-            self.focus_index = self._track_header_index(slot)
-
-    def _focused_row_kind(self) -> RowKind | None:
-        view = self.build_view_state(paused=self.playback.paused)
-        try:
-            return row_kind(view, self.focus_index)
-        except IndexError:
-            return None
-
-    def _render_timeline_header_index(self) -> int:
-        view = self.build_view_state(paused=self.playback.paused)
-        return find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
-
-    def _focused_row_descriptor(self, view: TuningViewState) -> RowDescriptor | None:
-        try:
-            return row_descriptor(view, self.focus_index)
-        except IndexError:
-            return None
-
-    def _restore_focus(self, descriptor: RowDescriptor | None) -> None:
-        if descriptor is None:
-            return
-        view = self.build_view_state(paused=self.playback.paused)
-        for index, row in enumerate(build_row_layout(view)):
-            if row == descriptor:
-                self.focus_index = index
-                return
-        self.focus_index = min(self.focus_index, row_count(view) - 1)
 
     def _set_render_timeline_enabled(self, enabled: bool) -> None:
         tl = self.session.timeline
         if tl.enabled == enabled:
             return
-        view = self.build_view_state(paused=self.playback.paused)
-        focused = self._focused_row_descriptor(view)
         tl.enabled = enabled
         if enabled:
             self._open_timeline_panel()
@@ -829,7 +760,6 @@ class TuningControls:
             self.close_timeline_panel()
         if self._layer_bindings is not None:
             self._layer_bindings.on_timeline_enabled_change()
-        self._restore_focus(focused)
 
     def _enter_solo(self, slot: str) -> None:
         if self.session.solo_slot == slot:
@@ -857,7 +787,6 @@ class TuningControls:
         layer.enabled = enabled
         if not enabled:
             layer.expanded = False
-            self._refocus_track_header_if_sub_row(slot)
         if self._layer_bindings is not None:
             self._layer_bindings.on_layer_enabled_change(slot, layer.enabled)
 
@@ -887,25 +816,7 @@ class TuningControls:
         layer = self.session.layers[slot]
         if layer.effects_expanded == expanded:
             return
-        view = self.build_view_state(paused=self.playback.paused)
-        effects_header_idx = find_row(view, slot, RowKind.TRACK_EFFECTS_HEADER)
-        old_focus = self.focus_index
-        effect_count = effect_row_count(layer.stem)
         layer.effects_expanded = expanded
-        view_after = self.build_view_state(paused=self.playback.paused)
-        new_header_idx = find_row(view_after, slot, RowKind.TRACK_EFFECTS_HEADER)
-        if not expanded:
-            if old_focus > effects_header_idx and (
-                row_slot(view, old_focus) == slot
-                and row_kind(view, old_focus) == RowKind.TRACK_EFFECT
-            ):
-                self.focus_index = new_header_idx
-            elif old_focus > effects_header_idx + effect_count:
-                self.focus_index = old_focus - effect_count
-            elif effects_header_idx < old_focus <= effects_header_idx + effect_count:
-                self.focus_index = new_header_idx
-        elif old_focus > effects_header_idx:
-            self.focus_index = old_focus + effect_count
 
     def _set_beat(self, slot: str, value: float) -> None:
         layer = self.session.layers[slot]
@@ -931,20 +842,18 @@ class TuningControls:
             return
         tl.panel_open = True
         if enter_submenu:
-            tl.submenu_focused = True
-            tl.focus_row = 0
-        else:
-            tl.submenu_focused = False
+            self._apply_focus_cursor(TimelineFocus(0))
 
     def close_timeline_panel(self) -> None:
         tl = self.session.timeline
         if not tl.panel_open:
             return
         tl.panel_open = False
-        tl.submenu_focused = False
-        self.focus_index = self._render_timeline_header_index()
+        self._apply_focus_cursor(
+            MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+        )
 
     def exit_timeline_submenu(self) -> None:
-        tl = self.session.timeline
-        tl.submenu_focused = False
-        self.focus_index = self._render_timeline_header_index()
+        self._apply_focus_cursor(
+            MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+        )

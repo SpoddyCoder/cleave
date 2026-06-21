@@ -66,6 +66,7 @@ class RowBehavior:
     affordance: RowAffordance
     help_title: str = ""
     navigable: bool = True
+    quick_nav_target: bool = False
     is_header: bool = False
     is_sub_header: bool = False
     is_pinned: bool = False
@@ -83,6 +84,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.SEEK,
         is_header=True,
         repeatable=True,
+        quick_nav_target=True,
     ),
     RowKind.CONFIG_HEADER: RowBehavior(
         RowAffordance.ACTION,
@@ -94,6 +96,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         can_enter_move_mode=True,
         can_solo=True,
         can_enable_disable=True,
+        quick_nav_target=True,
     ),
     RowKind.TRACK_PRESET_DIR: RowBehavior(
         RowAffordance.PATH_DIR,
@@ -164,6 +167,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         can_enable_disable=True,
         can_solo=True,
         help_title="Render",
+        quick_nav_target=True,
     ),
     RowKind.RENDER_OVERLAY_POSITION: RowBehavior(
         RowAffordance.VALUE_STEP,
@@ -232,6 +236,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         can_enable_disable=True,
         can_solo=True,
         help_title="Render",
+        quick_nav_target=True,
     ),
     RowKind.RENDER_POST_FX_FADE_IN: RowBehavior(
         RowAffordance.VALUE_STEP,
@@ -248,11 +253,13 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         can_enable_disable=True,
         can_solo=False,
         help_title="Render",
+        quick_nav_target=True,
     ),
     RowKind.SETTINGS_HEADER: RowBehavior(
         RowAffordance.EXPAND,
         is_header=True,
         help_title="Settings",
+        quick_nav_target=True,
     ),
     RowKind.SETTINGS_RENDER_MODE: RowBehavior(
         RowAffordance.VALUE_STEP,
@@ -364,3 +371,24 @@ def row_triggers_layer_delete(kind: RowKind) -> bool:
     if kind == RowKind.TRACK_HEADER:
         return True
     return row_behavior(kind).parent_group == "track"
+
+
+def section_header_descriptor(desc: RowDescriptor) -> RowDescriptor:
+    """Map a sub-row descriptor to its section header for focus fallback."""
+    kind = desc.kind
+    if kind == RowKind.SETTINGS_RENDER_MODE:
+        return RowDescriptor(RowKind.SETTINGS_HEADER)
+    if kind in RENDER_OVERLAY_TITLE_NESTED_KINDS:
+        return RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_HEADER)
+    if kind in RENDER_OVERLAY_BODY_NESTED_KINDS:
+        return RowDescriptor(RowKind.RENDER_OVERLAY_BODY_HEADER)
+    if kind in RENDER_OVERLAY_ALL_SUB_ROW_KINDS:
+        return RowDescriptor(RowKind.RENDER_OVERLAY_HEADER)
+    if kind in RENDER_POST_FX_SUB_ROW_KINDS:
+        return RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
+    behavior = row_behavior(kind)
+    if behavior.parent_group == "track":
+        if kind in TRACK_EFFECT_SUB_ROW_KINDS:
+            return RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, slot=desc.slot)
+        return RowDescriptor(RowKind.TRACK_HEADER, slot=desc.slot)
+    return desc

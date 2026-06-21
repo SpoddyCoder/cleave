@@ -29,12 +29,13 @@ from cleave.viz.modal import ModalHost
 from cleave.viz.overlay_draw import OverlayDrawer
 from cleave.viz.loading import draw_loading_screen
 from cleave.viz.help_overlay import HelpOverlay
-from cleave.viz.overlay import TuningOverlay
+from cleave.viz.tuning_panel_draw import TuningOverlay
 from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.timeline_overlay import TimelineOverlay
 from cleave.viz.playback import PlaybackState, current_sec, init_playback
 from cleave.viz.frame_finish import RenderOverlayPanelCache, finish_content_frame
 from cleave.viz.frame_rate import FrameRateMeter
+from cleave.viz.focus_nav import FocusCursor, TimelineFocus
 from cleave.viz.input_dispatch import (
     dispatch_keydown,
     dispatch_keyup,
@@ -263,15 +264,24 @@ def init_gl_resources_render(
     )
 
 
-def _timeline_strip_visible(tl: TimelineRuntime, *, overlay_visibility: float) -> bool:
+def _timeline_strip_visible(
+    tl: TimelineRuntime,
+    *,
+    overlay_visibility: float,
+    focus_cursor: FocusCursor,
+) -> bool:
     """Show the bottom timeline strip while the main panel is visible or a row is focused."""
     return tl.enabled and tl.panel_open and (
-        tl.submenu_focused or overlay_visibility > 0.01
+        isinstance(focus_cursor, TimelineFocus) or overlay_visibility > 0.01
     )
 
 
-def _timeline_strip_fade(tl: TimelineRuntime, *, overlay_visibility: float) -> float:
-    if tl.submenu_focused:
+def _timeline_strip_fade(
+    *,
+    focus_cursor: FocusCursor,
+    overlay_visibility: float,
+) -> float:
+    if isinstance(focus_cursor, TimelineFocus):
         return 1.0
     return overlay_visibility
 
@@ -328,14 +338,15 @@ def _tick_frame_live_overlay(
     view_state = runtime.controls.build_view_state(
         paused=paused,
         position_sec=t_sec,
+        fps=display_fps,
     )
-    if display_fps is not None:
-        view_state = dataclasses.replace(view_state, fps=display_fps)
     tl = runtime.seed.session.timeline
     runtime.overlay.update(overlay_dt)
     overlay_visibility = runtime.overlay.visibility
     timeline_strip_visible = _timeline_strip_visible(
-        tl, overlay_visibility=overlay_visibility
+        tl,
+        overlay_visibility=overlay_visibility,
+        focus_cursor=runtime.controls.focus_cursor,
     )
     timeline_panel_open = tl.enabled and tl.panel_open and overlay_visibility > 0.01
     OverlayDrawer.draw_tuning(
@@ -350,14 +361,20 @@ def _tick_frame_live_overlay(
 
     if timeline_strip_visible:
         timeline_state = build_timeline_view_state(
-            runtime.seed.session, t_sec, runtime.seed.duration_sec
+            runtime.seed.session,
+            t_sec,
+            runtime.seed.duration_sec,
+            focus_cursor=runtime.controls.focus_cursor,
         )
         OverlayDrawer.draw_timeline(
             runtime.compositor,
             runtime.timeline_overlay,
             runtime.overlay_surface,
             timeline_state,
-            visibility=_timeline_strip_fade(tl, overlay_visibility=overlay_visibility),
+            visibility=_timeline_strip_fade(
+                focus_cursor=runtime.controls.focus_cursor,
+                overlay_visibility=overlay_visibility,
+            ),
         )
 
 
@@ -489,7 +506,7 @@ class VisualizerApp:
                                 rt.timeline_controls.focused_cue_index = None
                             if rt.controls.consume_hide_overlay():
                                 rt.overlay.hide_immediately()
-                                tl.submenu_focused = False
+                                rt.controls.exit_timeline_submenu()
                             elif dispatch_should_notify_overlay(event, rt):
                                 rt.overlay.notify_input()
                     elif event.type == pygame.KEYUP:

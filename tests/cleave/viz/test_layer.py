@@ -16,8 +16,7 @@ from cleave.preset_playlist import PresetPlaylist
 from cleave.stem_pcm import StemPcmBank
 from cleave.timeline import TimelineCue
 from cleave.viz.session import LayerRuntime, TimelineRuntime, TuningSession
-from cleave.viz.row_semantics import RowKind
-from cleave.viz.overlay import find_row_by_kind
+from cleave.viz.row_semantics import RowDescriptor, RowKind
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline
 from cleave.viz.layer_visibility import (
@@ -253,7 +252,7 @@ def test_header_toggle_blocked_when_timeline_enabled() -> None:
     controls = make_controls(("layer_1",))
     controls.session.timeline.enabled = True
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.TRACK_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
     assert controls.session.layers["layer_1"].enabled is True
 
     controls.handle_keydown(keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
