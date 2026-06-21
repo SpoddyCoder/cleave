@@ -8,7 +8,6 @@ from cleave.config_schema import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
 from cleave.viz.frame_rate import format_fps_display
-from cleave.viz.material_icons import row_icon_prefix_width
 from cleave.viz.focus_nav import MainFocus
 from cleave.viz.row_semantics import RowDescriptor, RowKind
 from cleave.viz.tuning_panel_draw import (
@@ -22,6 +21,7 @@ from cleave.viz.tuning_panel_draw import (
     panel_fps_layout,
     panel_help_hint_layout,
     panel_toast_layout,
+    preset_row_prefix_width,
     render_visibility_icon,
     TREE_INDENT,
     scroll_metrics,
@@ -384,8 +384,8 @@ def test_preset_rows_fit_within_scrollbar_content_width() -> None:
         )
         label = fit_row_text(font, state, index, max_content_width=max_w)
         assert expected_counter in label
-        icon_w = row_icon_prefix_width(font.get_linesize())
-        budget = max_w - TREE_INDENT - icon_w
+        prefix_w = preset_row_prefix_width(font, font.get_linesize())
+        budget = max_w - TREE_INDENT - prefix_w
         assert font.size(label)[0] <= budget
 
 

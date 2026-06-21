@@ -70,6 +70,7 @@ from cleave.viz.tuning_panel_draw import (
     _row_text,
     _row_value_color,
     fit_row_text,
+    preset_row_prefix_width,
     render_visibility_icon,
     track_header_prefix_width,
 )
@@ -775,7 +776,8 @@ def test_preset_row_truncates_long_filenames() -> None:
     font = _overlay_font()
     panel_w = baseline_tuning_ui_metrics().panel_content_max_width
     label = fit_row_text(font, view, preset_row, max_content_width=panel_w)
-    assert font.size(label)[0] <= panel_w - TREE_INDENT
+    prefix_w = preset_row_prefix_width(font, font.get_linesize())
+    assert font.size(label)[0] <= panel_w - TREE_INDENT - prefix_w
     assert label.endswith("(1/50)")
     assert label.startswith("…")
     assert "…/" not in label
@@ -812,8 +814,9 @@ def test_fit_row_text_config_and_preset_share_panel_width() -> None:
     config_label = fit_row_text(font, view, header_row, max_content_width=panel_w)
     preset_label = fit_row_text(font, view, preset_row, max_content_width=panel_w)
     icon_budget = row_icon_prefix_width(font.get_linesize())
+    preset_prefix_w = preset_row_prefix_width(font, font.get_linesize())
     assert font.size(config_label)[0] + icon_budget <= panel_w
-    assert font.size(preset_label)[0] + TREE_INDENT + icon_budget <= panel_w
+    assert font.size(preset_label)[0] + TREE_INDENT + preset_prefix_w <= panel_w
 
 
 def test_save_as_new_updates_active_config_path() -> None:

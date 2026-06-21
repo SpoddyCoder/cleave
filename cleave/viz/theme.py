@@ -83,7 +83,7 @@ def tuning_ui_metrics(*, scale: float = UI_SCALE) -> TuningUiMetrics:
         panel_content_max_width=scale_px(440, scale=scale),
         scrollbar_width=scale_px(15, scale=scale),
         scrollbar_content_gap=scale_px(4, scale=scale),
-        tree_indent=scale_px(16, scale=scale),
+        tree_indent=scale_px(8, scale=scale),
         row_icon_suffix_gap=scale_px(4, scale=scale),
         icon_label_gap=scale_px(4, scale=scale),
         icon_suffix_gap=scale_px(4, scale=scale),

@@ -15,7 +15,7 @@ def test_tuning_ui_metrics_default_scale() -> None:
     assert metrics.font_size == 21
     assert metrics.padding == 12
     assert metrics.line_gap == 4
-    assert metrics.tree_indent == 24
+    assert metrics.tree_indent == 12
     assert metrics.panel_content_max_width == 660
 
 
@@ -49,4 +49,4 @@ def test_baseline_tuning_ui_metrics() -> None:
     metrics = tuning_ui_metrics(scale=1.0)
     assert metrics.font_size == 14
     assert metrics.padding == 8
-    assert metrics.tree_indent == 16
+    assert metrics.tree_indent == 8
