@@ -8,6 +8,8 @@ Phases 3-5 harden the foundation against recurrence.
 
 ## Phase 1 - Cache `build_row_layout` per frame
 
+**Status:** done. `RowLayout` is built once in `TuningViewState.__post_init__`; callers use `state.layout`.
+
 **Why.** `build_row_layout` rebuilds the full row list on every call: `row_descriptor`, `row_count`, `find_row`, `find_row_by_kind`, `track_row_count`, `_sub_row_visible`, and `visible_row_indices` all call it independently. A single `draw()` + input dispatch cycle can trigger a dozen rebuilds. This scatters allocation cost across the call stack and, more importantly, creates a correctness hazard: if state mutates mid-frame (unlikely now, but possible during timeline or modal transitions), callers within the same tick see different layouts.
 
 **What to do.** Introduce a `RowLayout` wrapper (a frozen list of `RowDescriptor` plus the helpers that operate on it). `TuningViewState` holds one `RowLayout` instead of allowing callers to rebuild on demand. `build_row_layout` becomes an internal constructor; the public surface is `state.layout`. All helpers (`row_descriptor`, `find_row`, `navigable_row_indices`, etc.) become methods or free functions on `RowLayout`. `TuningViewStateBuilder.build()` calls `build_row_layout` exactly once.
@@ -17,6 +19,8 @@ Phases 3-5 harden the foundation against recurrence.
 ---
 
 ## Phase 2 - Decouple FPS from transport color; route fps through the view builder
+
+**Status:** done. FPS draws with `DISABLED`; `TuningViewStateBuilder.build(fps=...)` sets the field; `app.py` no longer patches view state after build.
 
 **Why.** FPS is drawn at `y = padding` (top of the panel, physically on the Settings row), but its color is computed as `_row_value_color(state, transport_index)`. When the transport row is focused the FPS text turns the highlight color despite being in a different region -- this is Bug 1. The coupling exists because FPS was originally on the same Y as transport; after layout moved it, the color callback was not updated. A secondary issue: `TuningViewStateBuilder` does not set `fps`; `app.py` patches it in via `dataclasses.replace` after the builder runs, so the builder does not represent the full view state.
 

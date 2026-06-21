@@ -50,6 +50,7 @@ class TuningViewStateBuilder:
         *,
         paused: bool,
         position_sec: float | None = None,
+        fps: float | None = None,
     ) -> TuningViewState:
         if position_sec is None:
             position_sec = current_sec(self.playback, self.duration_sec)
@@ -144,4 +145,5 @@ class TuningViewStateBuilder:
             timeline_recording=tl.recording,
             timeline_override_active=bool(tl.override_slots),
             help_visible=self.session.help_visible,
+            fps=fps,
         )

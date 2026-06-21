@@ -328,9 +328,8 @@ def _tick_frame_live_overlay(
     view_state = runtime.controls.build_view_state(
         paused=paused,
         position_sec=t_sec,
+        fps=display_fps,
     )
-    if display_fps is not None:
-        view_state = dataclasses.replace(view_state, fps=display_fps)
     tl = runtime.seed.session.timeline
     runtime.overlay.update(overlay_dt)
     overlay_visibility = runtime.overlay.visibility

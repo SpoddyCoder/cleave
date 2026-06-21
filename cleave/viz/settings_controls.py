@@ -8,7 +8,7 @@ from dataclasses import replace
 from cleave.config import CleaveConfig
 from cleave.config_schema import VISUALIZER_RENDER_MODES
 from cleave.viz.focus_context import FocusContext
-from cleave.viz.overlay import find_row_by_kind
+from cleave.viz.overlay import TuningViewState
 from cleave.viz.row_semantics import SETTINGS_SUB_ROW_KINDS, RowKind
 from cleave.viz.session import TuningSession
 
@@ -31,7 +31,7 @@ class SettingsControls:
 
     def _settings_header_index(self) -> int:
         view = self._focus.build_view_state(paused=self._focus.is_paused())
-        return find_row_by_kind(view, RowKind.SETTINGS_HEADER)
+        return view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
 
     def set_expanded(self, expanded: bool) -> None:
         settings = self.session.settings

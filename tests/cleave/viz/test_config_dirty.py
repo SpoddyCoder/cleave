@@ -13,7 +13,6 @@ import pytest
 from cleave.timeline import TimelineCue
 from cleave.viz.controls import TuningControls
 from cleave.viz.timeline_controls import TimelineControls
-from cleave.viz.overlay import find_row_by_kind
 from cleave.viz.row_semantics import RowKind
 from tests.cleave.viz.test_controls import _choose_save_as_new, _config_header_row, _keydown, _make_controls, _row
 from tests.cleave.viz.test_timeline_controls import _make_timeline_controls
@@ -28,13 +27,13 @@ def _expand_layer_1(controls: TuningControls) -> None:
 
 def _expand_render_overlay(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
+    controls.focus_index = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _expand_render_post_fx(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_POST_FX_HEADER)
+    controls.focus_index = view.layout.find_by_kind(RowKind.RENDER_POST_FX_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -101,14 +100,14 @@ def _mutate_preset_path(controls: TuningControls) -> None:
 
 def _mutate_render_overlay_enabled(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
+    controls.focus_index = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_HEADER)
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
 
 
 def _mutate_render_overlay_position(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_POSITION)
+    controls.focus_index = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_POSITION)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -116,9 +115,7 @@ def _mutate_render_overlay_title_font_size(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     controls.session.render_overlay.title_expanded = True
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(
-        view, RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE
-    )
+    controls.focus_index = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -126,7 +123,7 @@ def _mutate_render_overlay_title_font(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     controls.session.render_overlay.title_expanded = True
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_FONT)
+    controls.focus_index = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_FONT)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -134,8 +131,8 @@ def _mutate_render_overlay_title_margin_bottom(controls: TuningControls) -> None
     _expand_render_overlay(controls)
     controls.session.render_overlay.title_expanded = True
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(
-        view, RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM
+    controls.focus_index = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM
     )
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
@@ -144,8 +141,8 @@ def _mutate_render_overlay_body_font_size(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     controls.session.render_overlay.body_expanded = True
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(
-        view, RowKind.RENDER_OVERLAY_BODY_FONT_SIZE
+    controls.focus_index = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_BODY_FONT_SIZE
     )
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
@@ -154,76 +151,76 @@ def _mutate_render_overlay_body_font(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     controls.session.render_overlay.body_expanded = True
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_FONT)
+    controls.focus_index = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_BODY_FONT)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_render_overlay_opacity(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_OPACITY)
+    controls.focus_index = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPACITY)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_render_overlay_border_width(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BORDER_WIDTH)
+    controls.focus_index = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_BORDER_WIDTH)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_render_overlay_start_delay(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_START_DELAY)
+    controls.focus_index = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_START_DELAY)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_render_overlay_display_time(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(
-        view, RowKind.RENDER_OVERLAY_DISPLAY_TIME
+    controls.focus_index = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_DISPLAY_TIME
     )
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_render_post_fx_enabled(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_POST_FX_HEADER)
+    controls.focus_index = view.layout.find_by_kind(RowKind.RENDER_POST_FX_HEADER)
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
 
 
 def _mutate_render_post_fx_fade_in(controls: TuningControls) -> None:
     _expand_render_post_fx(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_POST_FX_FADE_IN)
+    controls.focus_index = view.layout.find_by_kind(RowKind.RENDER_POST_FX_FADE_IN)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_render_post_fx_fade_out(controls: TuningControls) -> None:
     _expand_render_post_fx(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_POST_FX_FADE_OUT)
+    controls.focus_index = view.layout.find_by_kind(RowKind.RENDER_POST_FX_FADE_OUT)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_timeline_enabled(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    controls.focus_index = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
 
 
 def _expand_settings(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.SETTINGS_HEADER)
+    controls.focus_index = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_visualizer_render_mode(controls: TuningControls) -> None:
     _expand_settings(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.SETTINGS_RENDER_MODE)
+    controls.focus_index = view.layout.find_by_kind(RowKind.SETTINGS_RENDER_MODE)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -349,7 +346,7 @@ def _mutate_solo_slot(controls: TuningControls) -> None:
 def _mutate_timeline_panel_open(controls: TuningControls) -> None:
     controls.session.timeline.enabled = True
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    controls.focus_index = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -359,7 +356,7 @@ def _mutate_render_overlay_expanded(controls: TuningControls) -> None:
 
 def _mutate_render_overlay_solo(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
+    controls.focus_index = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
 
 
@@ -369,7 +366,7 @@ def _mutate_render_post_fx_expanded(controls: TuningControls) -> None:
 
 def _mutate_render_post_fx_solo(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.RENDER_POST_FX_HEADER)
+    controls.focus_index = view.layout.find_by_kind(RowKind.RENDER_POST_FX_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
 
 

@@ -20,21 +20,14 @@ from cleave.viz.overlay import (
     _row_bg_color,
     _row_text,
     _row_value_color,
-    build_row_layout,
-    find_row,
-    find_row_by_kind,
     fit_row_text,
-    navigable_row_indices,
     panel_content_max_width,
     panel_fps_layout,
     panel_help_hint_layout,
     panel_toast_layout,
     render_visibility_icon,
-    row_kind,
     TREE_INDENT,
-    row_slot,
     scroll_metrics,
-    visible_row_indices,
 )
 from cleave.viz.theme import (
     ACTION,
@@ -87,7 +80,7 @@ def test_draw_effects_expanded_panel_rect_within_surface() -> None:
     pygame.init()
     overlay = TuningOverlay()
     state = _effects_expanded_view_state()
-    assert len(visible_row_indices(state)) > 30
+    assert len(state.layout.visible_indices(state)) > 30
 
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     overlay.notify_input()
@@ -113,12 +106,12 @@ def _panel_scroll_metrics(
 ) -> PanelScrollMetrics:
     font = overlay._font_get()
     line_h = font.get_linesize()
-    visible_indices = visible_row_indices(state)
+    visible_indices = state.layout.visible_indices(state)
     first_scrollable_visible = next(
         (
             index
             for index in visible_indices
-            if row_kind(state, index) not in {
+            if state.layout.kind( index) not in {
                 RowKind.CONFIG_HEADER,
                 RowKind.TRANSPORT,
                 RowKind.SETTINGS_HEADER,
@@ -151,7 +144,7 @@ def test_scrolled_panel_keeps_focus_row_in_viewport() -> None:
     pygame.init()
     overlay = TuningOverlay()
     state = _effects_expanded_view_state()
-    state.focus_index = find_row_by_kind(state, RowKind.RENDER_TIMELINE_HEADER) - 1
+    state.focus_index = state.layout.find_by_kind( RowKind.RENDER_TIMELINE_HEADER) - 1
 
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     overlay.notify_input()
@@ -178,7 +171,7 @@ def _copy_panel_surface(overlay: TuningOverlay, state: TuningViewState) -> pygam
 def test_header_rows_pinned_when_scrolled() -> None:
     pygame.init()
     state_top = _effects_expanded_view_state()
-    scroll_focus = find_row_by_kind(state_top, RowKind.RENDER_TIMELINE_HEADER) - 1
+    scroll_focus = state_top.layout.find_by_kind( RowKind.RENDER_TIMELINE_HEADER) - 1
     state_top.focus_index = scroll_focus
     state_bottom = _effects_expanded_view_state()
     state_bottom.focus_index = scroll_focus
@@ -263,8 +256,7 @@ def test_draw_fps_counter_when_present() -> None:
 
     font = overlay._font_get()
     fps_text = format_fps_display(28.4)
-    fps_color = _row_value_color(state, find_row_by_kind(state, RowKind.TRANSPORT))
-    fps_surf = font.render(fps_text, True, fps_color)
+    fps_surf = font.render(fps_text, True, DISABLED)
     metrics = _panel_scroll_metrics(overlay, state)
     layout = panel_fps_layout(
         panel_w=with_fps.get_width(),
@@ -273,7 +265,29 @@ def test_draw_fps_counter_when_present() -> None:
         show_scrollbar=metrics.show_scrollbar,
     )
     sampled = with_fps.get_at((layout.x + 2, layout.y + font.get_linesize() // 2))
-    assert sampled[:3] == fps_color
+    assert sampled[:3] == DISABLED
+
+
+def test_fps_color_ignores_transport_focus() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    state = _minimal_view_state(fps=30.0)
+    transport_index = state.layout.find_by_kind(RowKind.TRANSPORT)
+    state = _minimal_view_state(fps=30.0, focus_index=transport_index)
+
+    with_fps = _copy_panel_surface(overlay, state)
+    font = overlay._font_get()
+    fps_surf = font.render(format_fps_display(30.0), True, DISABLED)
+    metrics = _panel_scroll_metrics(overlay, state)
+    layout = panel_fps_layout(
+        panel_w=with_fps.get_width(),
+        padding=overlay._padding,
+        text_width=fps_surf.get_width(),
+        show_scrollbar=metrics.show_scrollbar,
+    )
+    sampled = with_fps.get_at((layout.x + 2, layout.y + font.get_linesize() // 2))
+    assert sampled[:3] == DISABLED
+    assert sampled[:3] != HIGHLIGHT
 
 
 def test_panel_content_max_width_reserves_scrollbar() -> None:
@@ -351,8 +365,8 @@ def test_preset_rows_fit_within_scrollbar_content_width() -> None:
     scrollable = frozenset(metrics.scrollable_indices)
     font = overlay._font_get()
 
-    drums_dir_idx = find_row_by_kind(state, RowKind.TRACK_PRESET_DIR)
-    drums_preset_idx = find_row_by_kind(state, RowKind.TRACK_PRESET)
+    drums_dir_idx = state.layout.find_by_kind( RowKind.TRACK_PRESET_DIR)
+    drums_preset_idx = state.layout.find_by_kind( RowKind.TRACK_PRESET)
     for index, expected_counter in (
         (drums_dir_idx, "(12/99)"),
         (drums_preset_idx, "(34/99)"),
@@ -445,7 +459,7 @@ def test_track_header_uses_stem_display_not_slot_key() -> None:
             )
         },
     )
-    header_row = find_row_by_kind(state, RowKind.TRACK_HEADER)
+    header_row = state.layout.find_by_kind( RowKind.TRACK_HEADER)
     text = _row_text(state, header_row)
     assert "DRUMS" in text
     assert "LAYER_1" not in text.upper()
@@ -465,7 +479,7 @@ def test_track_header_full_mix_shows_mix() -> None:
             )
         },
     )
-    header_row = find_row_by_kind(state, RowKind.TRACK_HEADER)
+    header_row = state.layout.find_by_kind( RowKind.TRACK_HEADER)
     text = _row_text(state, header_row)
     assert "MIX" in text
     assert "FULL_MIX" not in text.upper()
@@ -486,7 +500,7 @@ def test_track_stem_row_text() -> None:
             )
         },
     )
-    stem_row = find_row(state, "layer_1", RowKind.TRACK_STEM)
+    stem_row = state.layout.find( "layer_1", RowKind.TRACK_STEM)
     assert _row_text(state, stem_row) == "└─ driving stem: full-mix"
 
 
@@ -506,8 +520,8 @@ def test_locked_stem_row_not_navigable_and_uses_locked_color() -> None:
             )
         },
     )
-    stem_row = find_row(state, "layer_1", RowKind.TRACK_STEM)
-    assert stem_row not in navigable_row_indices(state)
+    stem_row = state.layout.find( "layer_1", RowKind.TRACK_STEM)
+    assert stem_row not in state.layout.navigable_indices(state)
     assert _row_value_color(state, stem_row) == LOCKED
 
 
@@ -518,15 +532,15 @@ def test_timeline_layer_hint_when_timeline_enabled() -> None:
     enabled = _minimal_view_state(
         render_timeline=RenderTimelineBlock(enabled=True),
     )
-    disabled_kinds = [row.kind for row in build_row_layout(disabled)]
-    enabled_kinds = [row.kind for row in build_row_layout(enabled)]
+    disabled_kinds = [row.kind for row in disabled.layout.rows]
+    enabled_kinds = [row.kind for row in enabled.layout.rows]
     assert RowKind.TIMELINE_LAYER_HINT not in disabled_kinds
     assert RowKind.TIMELINE_LAYER_HINT in enabled_kinds
-    hint_idx = find_row_by_kind(enabled, RowKind.TIMELINE_LAYER_HINT)
-    gap_idx = find_row_by_kind(enabled, RowKind.RENDER_SECTION_GAP)
-    overlay_idx = find_row_by_kind(enabled, RowKind.RENDER_OVERLAY_HEADER)
+    hint_idx = enabled.layout.find_by_kind( RowKind.TIMELINE_LAYER_HINT)
+    gap_idx = enabled.layout.find_by_kind( RowKind.RENDER_SECTION_GAP)
+    overlay_idx = enabled.layout.find_by_kind( RowKind.RENDER_OVERLAY_HEADER)
     assert hint_idx < gap_idx < overlay_idx
-    assert hint_idx not in navigable_row_indices(enabled)
+    assert hint_idx not in enabled.layout.navigable_indices(enabled)
     assert _row_value_color(enabled, hint_idx) == DISABLED
 
 
@@ -540,15 +554,15 @@ def test_draw_timeline_layer_hint_without_error() -> None:
     overlay.notify_input()
     overlay.draw(surface, state)
     assert overlay.panel_rect is not None
-    hint_idx = find_row_by_kind(state, RowKind.TIMELINE_LAYER_HINT)
-    assert hint_idx in visible_row_indices(state)
+    hint_idx = state.layout.find_by_kind( RowKind.TIMELINE_LAYER_HINT)
+    assert hint_idx in state.layout.visible_indices(state)
 
 
 def test_build_row_layout_includes_add_before_render_gap() -> None:
     state = _minimal_view_state()
-    add_idx = find_row_by_kind(state, RowKind.LAYER_MANAGEMENT_ADD)
-    gap_idx = find_row_by_kind(state, RowKind.RENDER_SECTION_GAP)
-    overlay_idx = find_row_by_kind(state, RowKind.RENDER_OVERLAY_HEADER)
+    add_idx = state.layout.find_by_kind( RowKind.LAYER_MANAGEMENT_ADD)
+    gap_idx = state.layout.find_by_kind( RowKind.RENDER_SECTION_GAP)
+    overlay_idx = state.layout.find_by_kind( RowKind.RENDER_OVERLAY_HEADER)
     assert add_idx < gap_idx < overlay_idx
 
 
@@ -568,9 +582,9 @@ def test_delete_row_after_effects_when_expanded() -> None:
             )
         },
     )
-    layout = build_row_layout(state)
-    delete_idx = find_row(state, "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
-    effects_header = find_row(state, "layer_1", RowKind.TRACK_EFFECTS_HEADER)
+    layout = state.layout.rows
+    delete_idx = state.layout.find( "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
+    effects_header = state.layout.find( "layer_1", RowKind.TRACK_EFFECTS_HEADER)
     effect_rows = [
         index
         for index, row in enumerate(layout)
@@ -596,7 +610,7 @@ def test_delete_row_omitted_when_track_collapsed() -> None:
             )
         },
     )
-    kinds = [row.kind for row in build_row_layout(state)]
+    kinds = [row.kind for row in state.layout.rows]
     assert RowKind.LAYER_MANAGEMENT_DELETE not in kinds
 
 
@@ -616,8 +630,8 @@ def test_delete_row_navigable_when_locked() -> None:
             )
         },
     )
-    delete_row = find_row(state, "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
-    assert delete_row in navigable_row_indices(state)
+    delete_row = state.layout.find( "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
+    assert delete_row in state.layout.navigable_indices(state)
 
 
 def test_add_row_always_navigable() -> None:
@@ -650,8 +664,8 @@ def test_add_row_always_navigable() -> None:
         },
     )
     for state in (collapsed, expanded):
-        add_row = find_row_by_kind(state, RowKind.LAYER_MANAGEMENT_ADD)
-        assert add_row in navigable_row_indices(state)
+        add_row = state.layout.find_by_kind( RowKind.LAYER_MANAGEMENT_ADD)
+        assert add_row in state.layout.navigable_indices(state)
 
 
 def test_delete_row_disabled_color_single_layer() -> None:
@@ -669,7 +683,7 @@ def test_delete_row_disabled_color_single_layer() -> None:
             )
         },
     )
-    delete_row = find_row(state, "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
+    delete_row = state.layout.find( "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
     assert _row_value_color(state, delete_row) == DISABLED
 
 
@@ -688,7 +702,7 @@ def test_delete_layer_row_text_has_tree_prefix() -> None:
             )
         },
     )
-    delete_row = find_row(state, "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
+    delete_row = state.layout.find( "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
     assert _row_text(state, delete_row) == "└─ Delete Layer"
 
 
@@ -718,9 +732,9 @@ def test_action_row_value_color() -> None:
         },
         layer_z_order=["layer_1", "layer_2"],
     )
-    config_row = find_row_by_kind(state, RowKind.CONFIG_HEADER)
-    add_row = find_row_by_kind(state, RowKind.LAYER_MANAGEMENT_ADD)
-    delete_row = find_row(state, "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
+    config_row = state.layout.find_by_kind( RowKind.CONFIG_HEADER)
+    add_row = state.layout.find_by_kind( RowKind.LAYER_MANAGEMENT_ADD)
+    delete_row = state.layout.find( "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
     assert _row_value_color(state, config_row) == ACTION
     assert _row_value_color(state, add_row) == ACTION
     assert _row_value_color(state, delete_row) == ACTION
@@ -748,17 +762,17 @@ def test_draw_layer_management_rows_without_error() -> None:
     overlay.notify_input()
     overlay.draw(surface, state)
     assert overlay.panel_rect is not None
-    add_row = find_row_by_kind(state, RowKind.LAYER_MANAGEMENT_ADD)
-    delete_row = find_row(state, "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
-    assert add_row in visible_row_indices(state)
-    assert delete_row in visible_row_indices(state)
+    add_row = state.layout.find_by_kind( RowKind.LAYER_MANAGEMENT_ADD)
+    delete_row = state.layout.find( "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
+    assert add_row in state.layout.visible_indices(state)
+    assert delete_row in state.layout.visible_indices(state)
 
 
 def test_render_overlay_row_layout_includes_header_and_sub_rows_when_expanded() -> None:
     state = _minimal_view_state(
         render_overlay=RenderOverlayBlock(expanded=True),
     )
-    kinds = [row.kind for row in build_row_layout(state)]
+    kinds = [row.kind for row in state.layout.rows]
     assert RowKind.RENDER_OVERLAY_HEADER in kinds
     assert RowKind.RENDER_OVERLAY_POSITION in kinds
     assert RowKind.RENDER_OVERLAY_TITLE_HEADER in kinds
@@ -769,8 +783,8 @@ def test_render_overlay_row_layout_includes_header_and_sub_rows_when_expanded() 
     assert RowKind.RENDER_OVERLAY_DISPLAY_TIME in kinds
     assert RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE not in kinds
     assert RowKind.RENDER_OVERLAY_BODY_FONT_SIZE not in kinds
-    header_idx = find_row_by_kind(state, RowKind.RENDER_OVERLAY_HEADER)
-    config_idx = find_row_by_kind(state, RowKind.CONFIG_HEADER)
+    header_idx = state.layout.find_by_kind( RowKind.RENDER_OVERLAY_HEADER)
+    config_idx = state.layout.find_by_kind( RowKind.CONFIG_HEADER)
     assert config_idx < header_idx
 
 
@@ -782,7 +796,7 @@ def test_render_overlay_title_and_body_font_rows_when_expanded() -> None:
             body_expanded=True,
         ),
     )
-    kinds = [row.kind for row in build_row_layout(state)]
+    kinds = [row.kind for row in state.layout.rows]
     assert RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE in kinds
     assert RowKind.RENDER_OVERLAY_TITLE_FONT in kinds
     assert RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM in kinds
@@ -797,12 +811,12 @@ def test_render_overlay_collapsed_hides_sub_rows() -> None:
     expanded = _minimal_view_state(
         render_overlay=RenderOverlayBlock(expanded=True),
     )
-    collapsed_kinds = {row.kind for row in build_row_layout(collapsed)}
-    expanded_kinds = {row.kind for row in build_row_layout(expanded)}
+    collapsed_kinds = {row.kind for row in collapsed.layout.rows}
+    expanded_kinds = {row.kind for row in expanded.layout.rows}
     assert RowKind.RENDER_OVERLAY_HEADER in collapsed_kinds
     assert RowKind.RENDER_OVERLAY_POSITION not in collapsed_kinds
     assert RowKind.RENDER_OVERLAY_TITLE_HEADER not in collapsed_kinds
-    assert len(visible_row_indices(collapsed)) + 7 == len(visible_row_indices(expanded))
+    assert len(collapsed.layout.visible_indices(collapsed)) + 7 == len(expanded.layout.visible_indices(expanded))
 
 
 def test_draw_render_overlay_header_without_error() -> None:
@@ -819,8 +833,8 @@ def test_draw_render_overlay_header_without_error() -> None:
     overlay.notify_input()
     overlay.draw(surface, state)
     assert overlay.panel_rect is not None
-    header_row = find_row_by_kind(state, RowKind.RENDER_OVERLAY_HEADER)
-    assert header_row in visible_row_indices(state)
+    header_row = state.layout.find_by_kind( RowKind.RENDER_OVERLAY_HEADER)
+    assert header_row in state.layout.visible_indices(state)
 
 
 def test_draw_track_header_with_solo_eye() -> None:
@@ -857,11 +871,11 @@ def test_draw_track_header_with_solo_eye() -> None:
 
     header_row = next(
         i
-        for i in visible_row_indices(state)
-        if row_kind(state, i) == RowKind.TRACK_HEADER and row_slot(state, i) == "layer_1"
+        for i in state.layout.visible_indices(state)
+        if state.layout.kind( i) == RowKind.TRACK_HEADER and state.layout.slot( i) == "layer_1"
     )
     assert state.solo_slot == "layer_1"
-    assert header_row == find_row_by_kind(state, RowKind.TRACK_HEADER)
+    assert header_row == state.layout.find_by_kind( RowKind.TRACK_HEADER)
 
 
 def test_disabled_track_focus_uses_muted_highlight() -> None:
@@ -879,7 +893,7 @@ def test_disabled_track_focus_uses_muted_highlight() -> None:
             )
         },
     )
-    header_row = find_row_by_kind(state, RowKind.TRACK_HEADER)
+    header_row = state.layout.find_by_kind( RowKind.TRACK_HEADER)
     state.focus_index = header_row
     assert _row_value_color(state, header_row) == HIGHLIGHT_MUTED
     assert _row_bg_color(state, header_row) == HIGHLIGHT_MUTED
@@ -892,7 +906,7 @@ def test_main_tree_rows_not_highlighted_when_timeline_submenu_focused() -> None:
         render_timeline=RenderTimelineBlock(enabled=True, expanded=True),
     )
     for row_kind_target in (RowKind.TRANSPORT, RowKind.TRACK_HEADER):
-        row = find_row_by_kind(state, row_kind_target)
+        row = state.layout.find_by_kind(row_kind_target)
         state.focus_index = row
         state.timeline_submenu_focused = False
         assert _row_value_color(state, row) == HIGHLIGHT
@@ -902,7 +916,7 @@ def test_main_tree_rows_not_highlighted_when_timeline_submenu_focused() -> None:
         assert _row_value_color(state, row) != HIGHLIGHT
         assert _row_bg_color(state, row) is None
 
-    timeline_row = find_row_by_kind(state, RowKind.RENDER_TIMELINE_HEADER)
+    timeline_row = state.layout.find_by_kind( RowKind.RENDER_TIMELINE_HEADER)
     state.focus_index = timeline_row
     state.timeline_submenu_focused = False
     assert _row_value_color(state, timeline_row) == HIGHLIGHT
@@ -926,8 +940,8 @@ def test_draw_render_timeline_header_without_error() -> None:
     overlay.notify_input()
     overlay.draw(surface, state)
     assert overlay.panel_rect is not None
-    header_row = find_row_by_kind(state, RowKind.RENDER_TIMELINE_HEADER)
-    assert header_row in visible_row_indices(state)
+    header_row = state.layout.find_by_kind( RowKind.RENDER_TIMELINE_HEADER)
+    assert header_row in state.layout.visible_indices(state)
 
 
 def test_overlay_starts_hidden() -> None:
