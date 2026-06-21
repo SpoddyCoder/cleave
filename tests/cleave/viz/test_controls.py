@@ -63,9 +63,6 @@ from cleave.viz.material_icons import (
 )
 from cleave.viz.row_semantics import RowKind
 from cleave.viz.overlay import (
-    find_row,
-    find_row_by_kind,
-    header_row_count,
     TrackBlock,
     TuningViewState,
     TREE_INDENT,
@@ -76,13 +73,6 @@ from cleave.viz.overlay import (
     render_visibility_icon,
     fit_row_text,
     track_header_prefix_width,
-    navigable_row_indices,
-    quick_nav_row_indices,
-    row_count,
-    row_kind,
-    row_slot,
-    row_visible,
-    visible_row_indices,
 )
 from tests.support.viz import baseline_tuning_ui_metrics
 
@@ -188,7 +178,7 @@ def _confirm_modal_yes(controls: TuningControls) -> None:
 
 def _config_header_row(view: TuningViewState) -> int:
     return next(
-        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.CONFIG_HEADER
+        i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.CONFIG_HEADER
     )
 
 
@@ -207,10 +197,16 @@ def _choose_overwrite(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_RETURN))
 
 
+def test_build_view_state_passes_fps() -> None:
+    controls = _make_controls()
+    view = controls.build_view_state(paused=False, fps=42.0)
+    assert view.fps == 42.0
+
+
 def test_add_layer_at_max_shows_toast() -> None:
     controls, manager = _make_controls_with_manager(("layer_1",), can_add=False)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.LAYER_MANAGEMENT_ADD)
+    controls.focus_index = view.layout.find_by_kind(RowKind.LAYER_MANAGEMENT_ADD)
 
     controls.handle_keydown(_keydown(pygame.K_RETURN))
 
@@ -226,8 +222,8 @@ def test_delete_layer_at_min_shows_toast() -> None:
     controls, manager = _make_controls_with_manager(("layer_1",), can_remove=False)
     controls.session.layers["layer_1"].expanded = True
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row(
-        view, "layer_1", RowKind.LAYER_MANAGEMENT_DELETE
+    controls.focus_index = view.layout.find(
+        "layer_1", RowKind.LAYER_MANAGEMENT_DELETE
     )
 
     controls.handle_keydown(_keydown(pygame.K_RETURN))
@@ -254,14 +250,14 @@ def test_add_layer_confirm_calls_manager() -> None:
 
     manager.add_layer.side_effect = add_layer
     view = controls.build_view_state(paused=False)
-    before_count = row_count(view)
-    controls.focus_index = find_row_by_kind(view, RowKind.LAYER_MANAGEMENT_ADD)
+    before_count = len(view.layout)
+    controls.focus_index = view.layout.find_by_kind(RowKind.LAYER_MANAGEMENT_ADD)
 
     _confirm_modal_yes(controls)
 
     manager.add_layer.assert_called_once()
     view = controls.build_view_state(paused=False)
-    assert row_count(view) > before_count
+    assert len(view.layout) > before_count
     assert "layer_2" in controls.session.layer_z_order
 
 
@@ -276,8 +272,8 @@ def test_delete_layer_confirm_calls_manager(confirm_key: int) -> None:
 
     manager.remove_layer.side_effect = remove_layer
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row(
-        view, "layer_2", RowKind.LAYER_MANAGEMENT_DELETE
+    controls.focus_index = view.layout.find(
+        "layer_2", RowKind.LAYER_MANAGEMENT_DELETE
     )
 
     controls.handle_keydown(_keydown(confirm_key))
@@ -296,7 +292,7 @@ def test_delete_layer_from_header_with_delete_key() -> None:
 
     manager.remove_layer.side_effect = remove_layer
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row(view, "layer_2", RowKind.TRACK_HEADER)
+    controls.focus_index = view.layout.find( "layer_2", RowKind.TRACK_HEADER)
 
     controls.handle_keydown(_keydown(pygame.K_DELETE))
     controls.handle_keydown(_keydown(pygame.K_RETURN))
@@ -354,7 +350,7 @@ def _row(
     effect_id: str | None = None,
     driver_slug: str | None = None,
 ) -> int:
-    return find_row(view, stem, kind, effect_id=effect_id, driver_slug=driver_slug)
+    return view.layout.find(stem, kind, effect_id=effect_id, driver_slug=driver_slug)
 
 
 def test_allow_overwrite_for_path_hides_repo_root_template_only() -> None:
@@ -373,8 +369,8 @@ def test_allow_overwrite_for_path_hides_repo_root_template_only() -> None:
 def test_focus_navigation_wraps() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     view = controls.build_view_state(paused=False)
-    navigable = navigable_row_indices(view)
-    transport_row = find_row_by_kind(view, RowKind.TRANSPORT)
+    navigable = view.layout.navigable_indices(view)
+    transport_row = view.layout.find_by_kind(RowKind.TRANSPORT)
     start_pos = navigable.index(transport_row)
     assert controls.focus_index == transport_row
 
@@ -436,20 +432,20 @@ def test_navigation_skips_sub_rows_when_collapsed() -> None:
     drums_header = next(
         i
         for i in range(12)
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_slot(view, i) == "layer_1"
+        if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_1"
     )
     bass_header = next(
         i
         for i in range(12)
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_slot(view, i) == "layer_2"
+        if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_2"
     )
-    navigable = navigable_row_indices(view)
+    navigable = view.layout.navigable_indices(view)
     assert drums_header in navigable
     assert bass_header in navigable
     for i in navigable:
-        stem = row_slot(view, i)
+        stem = view.layout.slot( i)
         if stem == "layer_1":
-            assert row_kind(view, i) == RowKind.TRACK_HEADER
+            assert view.layout.kind(i) == RowKind.TRACK_HEADER
 
     controls.focus_index = drums_header
     controls.handle_keydown(_keydown(pygame.K_DOWN))
@@ -462,19 +458,15 @@ def test_re_enable_without_expanding() -> None:
     controls.session.layers["layer_1"].expanded = False
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
-    add_layer_row = find_row_by_kind(view, RowKind.LAYER_MANAGEMENT_ADD)
-    render_overlay_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
+    add_layer_row = view.layout.find_by_kind(RowKind.LAYER_MANAGEMENT_ADD)
+    render_overlay_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_HEADER)
     transport_row = next(
-        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.TRANSPORT
+        i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.TRANSPORT
     )
     controls.focus_index = header_row
 
-    render_post_fx_row = find_row_by_kind(
-        view, RowKind.RENDER_POST_FX_HEADER
-    )
-    render_timeline_row = find_row_by_kind(
-        view, RowKind.RENDER_TIMELINE_HEADER
-    )
+    render_post_fx_row = view.layout.find_by_kind(RowKind.RENDER_POST_FX_HEADER)
+    render_timeline_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_index == add_layer_row
@@ -508,15 +500,15 @@ def test_header_collapses_and_expands_sub_rows() -> None:
     controls.focus_index = header_row
 
     assert controls.session.layers["layer_1"].expanded is False
-    assert preset_dir_row not in navigable_row_indices(view)
-    assert preset_dir_row not in visible_row_indices(view)
+    assert preset_dir_row not in view.layout.navigable_indices(view)
+    assert preset_dir_row not in view.layout.visible_indices(view)
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.layers["layer_1"].expanded is True
 
     view = controls.build_view_state(paused=False)
-    assert preset_dir_row in navigable_row_indices(view)
-    assert preset_dir_row in visible_row_indices(view)
+    assert preset_dir_row in view.layout.navigable_indices(view)
+    assert preset_dir_row in view.layout.visible_indices(view)
 
 
 def test_disable_auto_collapses_sub_rows() -> None:
@@ -536,8 +528,8 @@ def test_disable_auto_collapses_sub_rows() -> None:
     assert controls.focus_index == header_row
 
     view = controls.build_view_state(paused=False)
-    assert not row_visible(view, preset_dir_row)
-    assert preset_dir_row not in visible_row_indices(view)
+    assert not view.layout.sub_row_visible(view, preset_dir_row)
+    assert preset_dir_row not in view.layout.visible_indices(view)
 
 
 def test_disabled_track_can_expand_sub_rows() -> None:
@@ -555,8 +547,8 @@ def test_disabled_track_can_expand_sub_rows() -> None:
     assert controls.session.layers["layer_1"].expanded is True
 
     view = controls.build_view_state(paused=False)
-    assert preset_dir_row in visible_row_indices(view)
-    assert preset_dir_row in navigable_row_indices(view)
+    assert preset_dir_row in view.layout.visible_indices(view)
+    assert preset_dir_row in view.layout.navigable_indices(view)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_index == preset_dir_row
@@ -602,7 +594,7 @@ def test_move_mode_swaps_z_order() -> None:
     header_row = next(
         i
         for i in range(15)
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_slot(view, i) == "layer_2"
+        if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_2"
     )
     controls.focus_index = header_row
 
@@ -625,7 +617,7 @@ def test_move_mode_esc_cancels_without_applying() -> None:
     header_row = next(
         i
         for i in range(15)
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_slot(view, i) == "layer_2"
+        if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_2"
     )
     controls.focus_index = header_row
 
@@ -646,7 +638,7 @@ def test_move_mode_backspace_cancels_without_applying() -> None:
     header_row = next(
         i
         for i in range(15)
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_slot(view, i) == "layer_2"
+        if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_2"
     )
     controls.focus_index = header_row
 
@@ -692,10 +684,10 @@ def test_config_header_shows_active_path() -> None:
     controls._config_save._active_config_path = launch_path
     view = controls.build_view_state(paused=False)
     header_row = next(
-        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.CONFIG_HEADER
+        i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.CONFIG_HEADER
     )
     assert _row_text(view, header_row) == config_path_display(launch_path)
-    assert header_row in navigable_row_indices(view)
+    assert header_row in view.layout.navigable_indices(view)
 
 
 def test_config_header_shows_asterisk_when_dirty() -> None:
@@ -705,11 +697,11 @@ def test_config_header_shows_asterisk_when_dirty() -> None:
     _mutate_dirty(controls)
     view = controls.build_view_state(paused=False)
     header_row = next(
-        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.CONFIG_HEADER
+        i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.CONFIG_HEADER
     )
     assert _row_text(view, header_row) == config_path_display(launch_path)
     assert view.config_dirty
-    assert header_row in navigable_row_indices(view)
+    assert header_row in view.layout.navigable_indices(view)
 
 
 def test_blend_and_opacity_change_sets_dirty_save_clears() -> None:
@@ -741,7 +733,7 @@ def test_config_header_truncates_long_paths() -> None:
     controls._config_save._active_config_path = long_path
     view = controls.build_view_state(paused=False)
     header_row = next(
-        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.CONFIG_HEADER
+        i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.CONFIG_HEADER
     )
     font = _overlay_font()
     panel_w = baseline_tuning_ui_metrics().panel_content_max_width
@@ -812,7 +804,7 @@ def test_fit_row_text_config_and_preset_share_panel_width() -> None:
         preset_empty=False,
     )
     header_row = next(
-        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.CONFIG_HEADER
+        i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.CONFIG_HEADER
     )
     preset_row = _row(view, "layer_1", RowKind.TRACK_PRESET)
     font = _overlay_font()
@@ -837,7 +829,7 @@ def test_save_as_new_updates_active_config_path() -> None:
     assert controls._config_save._active_config_path == saved_path
     state = controls.build_view_state(paused=False)
     header_row = next(
-        i for i in range(row_count(state)) if row_kind(state, i) == RowKind.CONFIG_HEADER
+        i for i in range(len(state.layout)) if state.layout.kind( i) == RowKind.CONFIG_HEADER
     )
     assert _row_text(state, header_row) == config_path_display(saved_path)
 
@@ -859,7 +851,7 @@ def test_save_as_new_enables_overwrite_from_root_template() -> None:
 
     state = controls.build_view_state(paused=False)
     assert state.allow_overwrite is True
-    kinds = {row_kind(state, i) for i in range(row_count(state))}
+    kinds = {state.layout.kind( i) for i in range(len(state.layout))}
     assert RowKind.CONFIG_HEADER in kinds
 
 
@@ -944,16 +936,16 @@ def test_navigable_rows_without_overwrite() -> None:
     )
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is False
-    assert row_count(view) == 16
+    assert len(view.layout) == 16
 
-    kinds = {row_kind(view, i) for i in range(row_count(view))}
+    kinds = {view.layout.kind(i) for i in range(len(view.layout))}
     assert RowKind.CONFIG_HEADER in kinds
 
-    navigable = navigable_row_indices(view)
-    assert any(row_kind(view, i) == RowKind.CONFIG_HEADER for i in navigable)
+    navigable = view.layout.navigable_indices(view)
+    assert any(view.layout.kind(i) == RowKind.CONFIG_HEADER for i in navigable)
 
     transport_row = next(
-        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.TRANSPORT
+        i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.TRANSPORT
     )
     config_row = _config_header_row(view)
     controls.focus_index = config_row
@@ -965,10 +957,10 @@ def test_navigable_rows_with_overwrite() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is True
-    assert row_count(view) == 16
+    assert len(view.layout) == 16
 
     config_row = _config_header_row(view)
-    assert config_row in navigable_row_indices(view)
+    assert config_row in view.layout.navigable_indices(view)
 
 
 def test_overwrite_shows_confirm_before_write() -> None:
@@ -1145,7 +1137,7 @@ def test_track_header_expand_arrow() -> None:
 def test_render_overlay_header_label_spacing() -> None:
     controls = _make_controls()
     view = controls.build_view_state(paused=False)
-    header_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_HEADER)
     assert _row_text(view, header_row) == "Render: OVERLAY ▶"
 
 
@@ -1153,12 +1145,12 @@ def test_render_overlay_title_header_expand_arrow() -> None:
     controls = _make_controls()
     controls.session.render_overlay.expanded = True
     view = controls.build_view_state(paused=False)
-    title_header = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_HEADER)
+    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_HEADER)
     assert _row_text(view, title_header) == "└─ title ▶"
 
     controls.session.render_overlay.title_expanded = True
     view = controls.build_view_state(paused=False)
-    title_header = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_HEADER)
+    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_HEADER)
     assert _row_text(view, title_header) == "└─ title ▼"
 
 
@@ -1166,12 +1158,12 @@ def test_render_overlay_body_header_expand_arrow() -> None:
     controls = _make_controls()
     controls.session.render_overlay.expanded = True
     view = controls.build_view_state(paused=False)
-    body_header = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_HEADER)
+    body_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_BODY_HEADER)
     assert _row_text(view, body_header) == "└─ body ▶"
 
     controls.session.render_overlay.body_expanded = True
     view = controls.build_view_state(paused=False)
-    body_header = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_HEADER)
+    body_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_BODY_HEADER)
     assert _row_text(view, body_header) == "└─ body ▼"
 
 
@@ -1188,7 +1180,7 @@ def test_render_overlay_title_font_row(_mock_fonts) -> None:
     controls.session.render_overlay.title_expanded = True
     controls.session.render_overlay.title_font = "alpha"
     view = controls.build_view_state(paused=False)
-    font_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_FONT)
+    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_FONT)
     assert _row_text(view, font_row) == "└─ font: alpha (1/3)"
 
     controls.focus_index = font_row
@@ -1206,7 +1198,7 @@ def test_render_overlay_body_font_row(_mock_fonts) -> None:
     controls.session.render_overlay.body_expanded = True
     controls.session.render_overlay.body_font = "bravo"
     view = controls.build_view_state(paused=False)
-    font_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_FONT)
+    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_BODY_FONT)
     assert _row_text(view, font_row) == "└─ font: bravo (2/3)"
 
     controls.focus_index = font_row
@@ -1220,7 +1212,7 @@ def test_render_overlay_title_font_size_row() -> None:
     controls.session.render_overlay.title_expanded = True
     controls.session.render_overlay.title_font_size = 12
     view = controls.build_view_state(paused=False)
-    font_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
+    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
     assert _row_text(view, font_row) == "└─ font size: 12px"
 
     controls.focus_index = font_row
@@ -1234,7 +1226,7 @@ def test_render_overlay_title_margin_bottom_row() -> None:
     controls.session.render_overlay.title_expanded = True
     controls.session.render_overlay.title_margin_bottom = 10
     view = controls.build_view_state(paused=False)
-    margin_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM)
+    margin_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM)
     assert _row_text(view, margin_row) == "└─ margin bottom: 10px"
 
     controls.focus_index = margin_row
@@ -1248,7 +1240,7 @@ def test_render_overlay_body_font_size_row() -> None:
     controls.session.render_overlay.body_expanded = True
     controls.session.render_overlay.body_font_size = 18
     view = controls.build_view_state(paused=False)
-    font_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_FONT_SIZE)
+    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_BODY_FONT_SIZE)
     assert _row_text(view, font_row) == "└─ font size: 18px"
 
     controls.focus_index = font_row
@@ -1262,12 +1254,12 @@ def test_render_overlay_font_rows_nested_indent() -> None:
     controls.session.render_overlay.title_expanded = True
     controls.session.render_overlay.body_expanded = True
     view = controls.build_view_state(paused=False)
-    title_header = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_HEADER)
-    title_font_size = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
-    title_font = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_FONT)
-    body_header = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_HEADER)
-    body_font_size = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_FONT_SIZE)
-    body_font = find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_FONT)
+    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_HEADER)
+    title_font_size = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
+    title_font = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_FONT)
+    body_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_BODY_HEADER)
+    body_font_size = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_BODY_FONT_SIZE)
+    body_font = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_BODY_FONT)
     assert _row_indent(view, title_header) == TREE_INDENT
     assert _row_indent(view, title_font_size) == TREE_INDENT * 2
     assert _row_indent(view, title_font) == TREE_INDENT * 2
@@ -1280,7 +1272,7 @@ def test_render_overlay_title_header_toggles_expansion() -> None:
     controls = _make_controls()
     controls.session.render_overlay.expanded = True
     view = controls.build_view_state(paused=False)
-    title_header = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_HEADER)
+    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_HEADER)
     controls.focus_index = title_header
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
@@ -1295,8 +1287,8 @@ def test_render_overlay_collapse_refocuses_from_title_font_row() -> None:
     controls.session.render_overlay.expanded = True
     controls.session.render_overlay.title_expanded = True
     view = controls.build_view_state(paused=False)
-    overlay_header = find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
-    font_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
+    overlay_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_HEADER)
+    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
     controls.focus_index = font_row
 
     controls._render_overlay.set_expanded(False)
@@ -1308,8 +1300,8 @@ def test_render_overlay_title_collapse_refocuses_from_font_row() -> None:
     controls.session.render_overlay.expanded = True
     controls.session.render_overlay.title_expanded = True
     view = controls.build_view_state(paused=False)
-    title_header = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_HEADER)
-    font_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
+    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_HEADER)
+    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
     controls.focus_index = font_row
 
     controls._render_overlay.set_title_expanded(False)
@@ -1369,35 +1361,35 @@ def test_transport_icons_play_vs_pause() -> None:
 def test_render_timeline_header_after_post_fx() -> None:
     controls = _make_controls()
     view = controls.build_view_state(paused=False)
-    post_fx_row = find_row_by_kind(view, RowKind.RENDER_POST_FX_HEADER)
-    timeline_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
-    transport_row = find_row_by_kind(view, RowKind.TRANSPORT)
+    post_fx_row = view.layout.find_by_kind(RowKind.RENDER_POST_FX_HEADER)
+    timeline_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
+    transport_row = view.layout.find_by_kind(RowKind.TRANSPORT)
     assert transport_row < post_fx_row < timeline_row
 
 
 def test_render_timeline_header_label_spacing() -> None:
     controls = _make_controls()
     view = controls.build_view_state(paused=False)
-    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     assert _row_text(view, header_row) == "Render: TIMELINE ▶"
 
 
 def test_render_timeline_header_expand_arrow() -> None:
     controls = _make_controls()
     view = controls.build_view_state(paused=False)
-    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     assert _row_text(view, header_row).endswith(" ▶")
 
     controls.session.timeline.panel_open = True
     view = controls.build_view_state(paused=False)
-    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     assert _row_text(view, header_row).endswith(" ▼")
 
 
 def test_render_timeline_ctrl_right_toggles_enabled() -> None:
     controls = _make_controls(timeline_enabled=True)
     view = controls.build_view_state(paused=False)
-    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.focus_index = header_row
     assert controls.session.timeline.enabled is True
 
@@ -1416,7 +1408,7 @@ def test_render_timeline_ctrl_right_toggles_enabled() -> None:
 def test_render_timeline_enable_opens_panel() -> None:
     controls = _make_controls()
     view = controls.build_view_state(paused=False)
-    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.focus_index = header_row
     assert controls.session.timeline.enabled is False
     assert controls.session.timeline.panel_open is False
@@ -1426,14 +1418,14 @@ def test_render_timeline_enable_opens_panel() -> None:
     assert controls.session.timeline.panel_open is True
     assert controls.session.timeline.submenu_focused is False
     view = controls.build_view_state(paused=False)
-    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     assert _row_text(view, header_row).endswith(" ▼")
 
 
 def test_render_timeline_right_opens_panel() -> None:
     controls = _make_controls(timeline_enabled=True)
     view = controls.build_view_state(paused=False)
-    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.focus_index = header_row
     controls.session.timeline.focus_row = 2
     assert controls.session.timeline.panel_open is False
@@ -1444,21 +1436,21 @@ def test_render_timeline_right_opens_panel() -> None:
     assert controls.session.timeline.submenu_focused is False
     assert controls.session.timeline.focus_row == 2
     view = controls.build_view_state(paused=False)
-    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     assert _row_text(view, header_row).endswith(" ▼")
 
     controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert controls.session.timeline.panel_open is False
     assert controls.session.timeline.submenu_focused is False
     view = controls.build_view_state(paused=False)
-    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     assert _row_text(view, header_row).endswith(" ▶")
 
 
 def test_render_timeline_down_enters_submenu() -> None:
     controls = _make_controls(timeline_enabled=True)
     view = controls.build_view_state(paused=False)
-    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.focus_index = header_row
     controls.session.timeline.panel_open = True
     controls.session.timeline.focus_row = 2
@@ -1472,7 +1464,7 @@ def test_render_timeline_down_enters_submenu() -> None:
 def test_render_timeline_down_enters_submenu_and_routes_keys() -> None:
     controls = _make_controls(timeline_enabled=True)
     view = controls.build_view_state(paused=False)
-    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.focus_index = header_row
     controls.session.timeline.panel_open = True
     controls.session.timeline.focus_row = 2
@@ -1508,9 +1500,9 @@ def test_vertical_navigation_repeats_on_hold() -> None:
 
     controls = _make_controls()
     view = controls.build_view_state(paused=False)
-    transport = find_row_by_kind(view, RowKind.TRANSPORT)
+    transport = view.layout.find_by_kind(RowKind.TRANSPORT)
     controls.focus_index = transport
-    navigable = navigable_row_indices(view)
+    navigable = view.layout.navigable_indices(view)
     start_pos = navigable.index(transport)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
@@ -1549,7 +1541,7 @@ def test_vertical_navigation_stops_on_keyup() -> None:
 
     controls = _make_controls()
     view = controls.build_view_state(paused=False)
-    transport = find_row_by_kind(view, RowKind.TRANSPORT)
+    transport = view.layout.find_by_kind(RowKind.TRANSPORT)
     controls.focus_index = transport
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
@@ -1597,7 +1589,7 @@ def test_held_key_repeat_keeps_overlay_visible() -> None:
 def test_render_timeline_submenu_up_returns_to_header() -> None:
     controls = _make_controls(timeline_enabled=True)
     view = controls.build_view_state(paused=False)
-    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.focus_index = header_row
     controls.session.timeline.panel_open = True
     controls.session.timeline.submenu_focused = True
@@ -1607,7 +1599,7 @@ def test_render_timeline_submenu_up_returns_to_header() -> None:
 
     assert controls.session.timeline.submenu_focused is False
     view = controls.build_view_state(paused=False)
-    assert controls.focus_index == find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    assert controls.focus_index == view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
 
 
 def test_render_timeline_submenu_entry_stops_repeat_on_keyup() -> None:
@@ -1615,7 +1607,7 @@ def test_render_timeline_submenu_entry_stops_repeat_on_keyup() -> None:
 
     controls = _make_controls(timeline_enabled=True)
     view = controls.build_view_state(paused=False)
-    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.focus_index = header_row
     controls.session.timeline.panel_open = True
     controls.session.timeline.submenu_focused = False
@@ -1635,7 +1627,7 @@ def test_render_timeline_submenu_down_from_last_row_wraps_to_transport() -> None
     stems = ("layer_1", "layer_2", "layer_3", "layer_4")
     controls = _make_controls(stems, timeline_enabled=True)
     view = controls.build_view_state(paused=False)
-    transport_row = find_row_by_kind(view, RowKind.TRANSPORT)
+    transport_row = view.layout.find_by_kind(RowKind.TRANSPORT)
     controls.session.timeline.panel_open = True
     controls.session.timeline.submenu_focused = True
     controls.session.timeline.focus_row = len(stems) - 1
@@ -1650,7 +1642,7 @@ def test_render_timeline_submenu_up_from_transport_wraps_to_last_row() -> None:
     stems = ("layer_1", "layer_2", "layer_3", "layer_4")
     controls = _make_controls(stems, timeline_enabled=True)
     view = controls.build_view_state(paused=False)
-    transport_row = find_row_by_kind(view, RowKind.TRANSPORT)
+    transport_row = view.layout.find_by_kind(RowKind.TRANSPORT)
     controls.focus_index = transport_row
     controls.session.timeline.panel_open = True
     controls.session.timeline.submenu_focused = False
@@ -1665,10 +1657,10 @@ def test_render_timeline_submenu_up_from_transport_wraps_to_last_row() -> None:
 def test_render_timeline_panel_closed_wrap_unchanged() -> None:
     controls = _make_controls(("layer_1", "layer_2"), timeline_enabled=True)
     view = controls.build_view_state(paused=False)
-    navigable = navigable_row_indices(view)
-    settings_row = find_row_by_kind(view, RowKind.SETTINGS_HEADER)
-    transport_row = find_row_by_kind(view, RowKind.TRANSPORT)
-    timeline_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    navigable = view.layout.navigable_indices(view)
+    settings_row = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
+    transport_row = view.layout.find_by_kind(RowKind.TRANSPORT)
+    timeline_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.focus_index = timeline_row
     controls.session.timeline.panel_open = False
 
@@ -1687,7 +1679,7 @@ def test_render_timeline_disable_closes_panel() -> None:
     controls.session.timeline.enabled = True
     controls.session.timeline.panel_open = True
     view = controls.build_view_state(paused=False)
-    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.focus_index = header_row
 
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
@@ -1698,12 +1690,12 @@ def test_render_timeline_disable_closes_panel() -> None:
 def test_render_timeline_header_eye_color_when_disabled() -> None:
     controls = _make_controls(timeline_enabled=True)
     view = controls.build_view_state(paused=False)
-    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     assert _row_value_color(view, header_row) == VALUE
 
     controls.session.timeline.enabled = False
     view = controls.build_view_state(paused=False)
-    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     assert _row_value_color(view, header_row) == DISABLED
 
 
@@ -1737,7 +1729,7 @@ def test_render_timeline_enabled_change_callback() -> None:
         )
     )
     view = controls.build_view_state(paused=False)
-    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.focus_index = header_row
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
@@ -1765,10 +1757,10 @@ def test_t_opens_timeline_panel_when_enabled() -> None:
 def test_t_closes_timeline_panel_and_focuses_header_when_open() -> None:
     controls = _make_controls(timeline_enabled=True)
     view = controls.build_view_state(paused=False)
-    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.session.timeline.panel_open = True
     controls.session.timeline.submenu_focused = False
-    controls.focus_index = find_row_by_kind(view, RowKind.TRANSPORT)
+    controls.focus_index = view.layout.find_by_kind(RowKind.TRANSPORT)
 
     controls.handle_keydown(_keydown(pygame.K_t))
     assert controls.session.timeline.panel_open is False
@@ -1779,7 +1771,7 @@ def test_t_closes_timeline_panel_and_focuses_header_when_open() -> None:
 def test_t_from_submenu_closes_and_focuses_render_timeline_header() -> None:
     controls = _make_controls(timeline_enabled=True)
     view = controls.build_view_state(paused=False)
-    header_row = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.focus_index = header_row
     controls.session.timeline.panel_open = True
     controls.session.timeline.submenu_focused = True
@@ -1813,7 +1805,7 @@ def test_t_ignored_during_move_mode() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.timeline.enabled = True
     view = controls.build_view_state(paused=False)
-    header_row = find_row_by_kind(view, RowKind.TRACK_HEADER)
+    header_row = view.layout.find_by_kind(RowKind.TRACK_HEADER)
     controls.focus_index = header_row
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     assert controls.move_mode_slot == "layer_1"
@@ -1826,7 +1818,7 @@ def test_transport_enter_toggles_pause() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     transport_row = next(
-        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.TRANSPORT
+        i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.TRANSPORT
     )
     controls.focus_index = transport_row
     assert controls.playback.paused is False
@@ -1842,7 +1834,7 @@ def test_space_toggles_pause_from_any_focus() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     assert controls.playback.paused is False
-    assert controls.focus_index == find_row_by_kind(view, RowKind.TRANSPORT)
+    assert controls.focus_index == view.layout.find_by_kind(RowKind.TRANSPORT)
 
     controls.handle_keydown(_keydown(pygame.K_SPACE))
     assert controls.playback.paused is True
@@ -1856,10 +1848,10 @@ def test_quick_nav_row_indices_headers_and_transport_only() -> None:
     controls.session.layers["layer_1"].enabled = False
     view = controls.build_view_state(paused=False)
 
-    quick = quick_nav_row_indices(view)
+    quick = view.layout.quick_nav_indices()
     assert len(quick) == 6
     for index in quick:
-        kind = row_kind(view, index)
+        kind = view.layout.kind( index)
         assert kind in (
             RowKind.TRACK_HEADER,
             RowKind.RENDER_OVERLAY_HEADER,
@@ -1870,23 +1862,19 @@ def test_quick_nav_row_indices_headers_and_transport_only() -> None:
 
     drums_header = next(
         i
-        for i in range(row_count(view))
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_slot(view, i) == "layer_1"
+        for i in range(len(view.layout))
+        if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_1"
     )
     bass_header = next(
         i
-        for i in range(row_count(view))
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_slot(view, i) == "layer_2"
+        for i in range(len(view.layout))
+        if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_2"
     )
-    render_overlay_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
-    render_post_fx_row = find_row_by_kind(
-        view, RowKind.RENDER_POST_FX_HEADER
-    )
-    render_timeline_row = find_row_by_kind(
-        view, RowKind.RENDER_TIMELINE_HEADER
-    )
+    render_overlay_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_HEADER)
+    render_post_fx_row = view.layout.find_by_kind(RowKind.RENDER_POST_FX_HEADER)
+    render_timeline_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     transport_row = next(
-        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.TRANSPORT
+        i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.TRANSPORT
     )
     assert quick == [
         transport_row,
@@ -1901,7 +1889,7 @@ def test_quick_nav_row_indices_headers_and_transport_only() -> None:
 def test_ctrl_quick_nav_cycles_headers_and_transport() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     view = controls.build_view_state(paused=False)
-    quick = quick_nav_row_indices(view)
+    quick = view.layout.quick_nav_indices()
 
     controls.focus_index = quick[0]
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
@@ -1929,9 +1917,9 @@ def test_ctrl_quick_nav_cycles_headers_and_transport() -> None:
 def test_ctrl_quick_nav_from_sub_row_jumps_forward() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     view = controls.build_view_state(paused=False)
-    quick = quick_nav_row_indices(view)
+    quick = view.layout.quick_nav_indices()
     preset_row = next(
-        i for i in range(12) if row_kind(view, i) == RowKind.TRACK_PRESET
+        i for i in range(12) if view.layout.kind(i) == RowKind.TRACK_PRESET
     )
 
     controls.focus_index = preset_row
@@ -1946,7 +1934,7 @@ def test_ctrl_quick_nav_from_sub_row_jumps_forward() -> None:
 def test_ctrl_quick_nav_from_config_header_row() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    quick = quick_nav_row_indices(view)
+    quick = view.layout.quick_nav_indices()
     config_row = _config_header_row(view)
 
     controls.focus_index = config_row
@@ -1973,14 +1961,14 @@ def test_ctrl_quick_nav_does_not_affect_normal_up_down() -> None:
 def test_ctrl_quick_nav_from_timeline_submenu_jumps_sections() -> None:
     controls = _make_controls(("layer_1", "layer_2"), timeline_enabled=True)
     view = controls.build_view_state(paused=False)
-    quick = quick_nav_row_indices(view)
-    timeline_header = find_row_by_kind(view, RowKind.RENDER_TIMELINE_HEADER)
-    transport_row = find_row_by_kind(view, RowKind.TRANSPORT)
+    quick = view.layout.quick_nav_indices()
+    timeline_header = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
+    transport_row = view.layout.find_by_kind(RowKind.TRANSPORT)
 
     controls.session.timeline.panel_open = True
     controls.session.timeline.submenu_focused = True
     controls.session.timeline.focus_row = 1
-    controls.focus_index = find_row_by_kind(view, RowKind.TRANSPORT)
+    controls.focus_index = view.layout.find_by_kind(RowKind.TRANSPORT)
 
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
     assert controls.session.timeline.submenu_focused is False
@@ -2233,8 +2221,8 @@ def test_move_mode_colors_focused_track_header() -> None:
     view = controls.build_view_state(paused=False)
     header_row = next(
         i
-        for i in range(row_count(view))
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_slot(view, i) == "layer_2"
+        for i in range(len(view.layout))
+        if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_2"
     )
     controls.focus_index = header_row
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
@@ -2323,8 +2311,8 @@ def _header_row(
     view = controls.build_view_state(paused=paused)
     return next(
         i
-        for i in range(row_count(view))
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_slot(view, i) == stem
+        for i in range(len(view.layout))
+        if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == stem
     )
 
 
@@ -2341,8 +2329,8 @@ def _sub_rows_for_stem(view: TuningViewState, stem: str) -> list[int]:
     )
     return [
         i
-        for i in range(row_count(view))
-        if row_slot(view, i) == stem and row_kind(view, i) in sub_kinds
+        for i in range(len(view.layout))
+        if view.layout.slot( i) == stem and view.layout.kind(i) in sub_kinds
     ]
 
 
@@ -2368,8 +2356,8 @@ def test_locked_expanded_skips_sub_rows_in_nav() -> None:
 
     sub_rows = _sub_rows_for_stem(view, "layer_1")
     assert sub_rows
-    visible = visible_row_indices(view)
-    navigable = navigable_row_indices(view)
+    visible = view.layout.visible_indices(view)
+    navigable = view.layout.navigable_indices(view)
     effects_header = _row(view, "layer_1", RowKind.TRACK_EFFECTS_HEADER)
     stem_row = _row(view, "layer_1", RowKind.TRACK_STEM)
     assert effects_header in navigable
@@ -2420,13 +2408,13 @@ def test_locked_header_still_expands() -> None:
     assert controls.session.layers["layer_1"].expanded is True
 
     view = controls.build_view_state(paused=False)
-    assert preset_dir_row in visible_row_indices(view)
+    assert preset_dir_row in view.layout.visible_indices(view)
 
     controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert controls.session.layers["layer_1"].expanded is False
 
     view = controls.build_view_state(paused=False)
-    assert preset_dir_row not in visible_row_indices(view)
+    assert preset_dir_row not in view.layout.visible_indices(view)
 
 
 def test_locked_sub_rows_use_locked_color() -> None:
@@ -2441,7 +2429,7 @@ def test_locked_sub_rows_use_locked_color() -> None:
         tracks=view.tracks,
         paused=view.paused,
         position_sec=view.position_sec,
-        focus_index=row_count(view) - 1,
+        focus_index=len(view.layout) - 1,
         move_mode_slot=view.move_mode_slot,
         toast_message=view.toast_message,
         toast_remaining_sec=view.toast_remaining_sec,
@@ -2487,7 +2475,7 @@ def test_ctrl_quick_nav_blocked_during_move_mode() -> None:
     bass_header = next(
         i
         for i in range(15)
-        if row_kind(view, i) == RowKind.TRACK_HEADER and row_slot(view, i) == "layer_2"
+        if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_2"
     )
     controls.focus_index = bass_header
     controls.handle_keydown(_keydown(pygame.K_RETURN))
@@ -2507,7 +2495,7 @@ def test_transport_seek_constants() -> None:
 
     view = controls.build_view_state(paused=False)
     transport_row = next(
-        i for i in range(row_count(view)) if row_kind(view, i) == RowKind.TRANSPORT
+        i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.TRANSPORT
     )
     controls.focus_index = transport_row
 
@@ -2869,27 +2857,27 @@ def test_try_quit_overwrite_confirm_esc_clears_quit_after_save() -> None:
 def test_settings_header_is_first_row() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    assert row_kind(view, 0) == RowKind.SETTINGS_HEADER
-    assert row_kind(view, 1) == RowKind.CONFIG_HEADER
-    assert row_kind(view, 2) == RowKind.TRANSPORT
+    assert view.layout.kind( 0) == RowKind.SETTINGS_HEADER
+    assert view.layout.kind( 1) == RowKind.CONFIG_HEADER
+    assert view.layout.kind( 2) == RowKind.TRANSPORT
 
 
 def test_settings_expand_collapse_and_sub_row_visibility() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    settings_row = find_row_by_kind(view, RowKind.SETTINGS_HEADER)
+    settings_row = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
     assert RowKind.SETTINGS_RENDER_MODE not in {
-        row_kind(view, i) for i in range(row_count(view))
+        view.layout.kind(i) for i in range(len(view.layout))
     }
 
     controls.focus_index = settings_row
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.settings.expanded is True
     view = controls.build_view_state(paused=False)
-    render_mode_row = find_row_by_kind(view, RowKind.SETTINGS_RENDER_MODE)
+    render_mode_row = view.layout.find_by_kind(RowKind.SETTINGS_RENDER_MODE)
     assert render_mode_row == 1
-    assert render_mode_row in navigable_row_indices(view)
-    assert header_row_count(view) == 4
+    assert render_mode_row in view.layout.navigable_indices(view)
+    assert view.layout.header_row_count() == 4
 
     controls.focus_index = render_mode_row
     controls.handle_keydown(_keydown(pygame.K_LEFT))
@@ -2898,31 +2886,31 @@ def test_settings_expand_collapse_and_sub_row_visibility() -> None:
     assert controls.session.settings.expanded is False
     view = controls.build_view_state(paused=False)
     assert RowKind.SETTINGS_RENDER_MODE not in {
-        row_kind(view, i) for i in range(row_count(view))
+        view.layout.kind(i) for i in range(len(view.layout))
     }
-    assert header_row_count(view) == 3
+    assert view.layout.header_row_count() == 3
 
 
 def test_settings_collapse_from_sub_row_refocuses_header() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.SETTINGS_HEADER)
+    controls.focus_index = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.SETTINGS_RENDER_MODE)
+    controls.focus_index = view.layout.find_by_kind(RowKind.SETTINGS_RENDER_MODE)
     controls._settings.set_expanded(False)
     view = controls.build_view_state(paused=False)
-    assert controls.focus_index == find_row_by_kind(view, RowKind.SETTINGS_HEADER)
+    assert controls.focus_index == view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
 
 
 def test_settings_cycle_render_mode() -> None:
     controls = _make_controls(("layer_1",))
     assert controls.cfg.visualizer.render_mode == "balanced"
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.SETTINGS_HEADER)
+    controls.focus_index = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.SETTINGS_RENDER_MODE)
+    controls.focus_index = view.layout.find_by_kind(RowKind.SETTINGS_RENDER_MODE)
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.cfg.visualizer.render_mode == "performance"
@@ -2937,10 +2925,10 @@ def test_settings_render_mode_change_marks_config_dirty() -> None:
     controls = _make_controls(("layer_1",))
     assert not controls.config_dirty
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.SETTINGS_HEADER)
+    controls.focus_index = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     view = controls.build_view_state(paused=False)
-    controls.focus_index = find_row_by_kind(view, RowKind.SETTINGS_RENDER_MODE)
+    controls.focus_index = view.layout.find_by_kind(RowKind.SETTINGS_RENDER_MODE)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.config_dirty
 
@@ -2948,4 +2936,4 @@ def test_settings_render_mode_change_marks_config_dirty() -> None:
 def test_default_focus_stays_on_transport() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    assert controls.focus_index == find_row_by_kind(view, RowKind.TRANSPORT)
+    assert controls.focus_index == view.layout.find_by_kind(RowKind.TRANSPORT)

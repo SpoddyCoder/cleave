@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pygame
 
@@ -28,8 +28,7 @@ def test_draw_tuning_overlay_uses_display_target() -> None:
     compositor.draw_content_overlay.assert_not_called()
 
 
-@patch("cleave.viz.overlay_draw.row_kind", return_value=RowKind.TRANSPORT)
-def test_draw_tuning_overlay_uploads_help_panel(_row_kind: MagicMock) -> None:
+def test_draw_tuning_overlay_uploads_help_panel() -> None:
     pygame.init()
     compositor = recording_compositor()
     compositor.upload_overlay_texture.side_effect = [11, 22]
@@ -41,6 +40,7 @@ def test_draw_tuning_overlay_uploads_help_panel(_row_kind: MagicMock) -> None:
     view_state = MagicMock()
     view_state.help_visible = True
     view_state.focus_index = 0
+    view_state.layout.kind.return_value = RowKind.TRANSPORT
 
     OverlayDrawer.draw_tuning(
         compositor,

@@ -7,7 +7,7 @@ from collections.abc import Callable
 from cleave.config import RENDER_OVERLAY_POSITIONS
 from cleave.viz.focus_context import FocusContext
 from cleave.viz.fonts import cycle_render_overlay_font
-from cleave.viz.overlay import find_row_by_kind
+from cleave.viz.overlay import TuningViewState
 from cleave.viz.row_semantics import (
     RENDER_OVERLAY_ALL_SUB_ROW_KINDS,
     RENDER_OVERLAY_BODY_NESTED_KINDS,
@@ -33,15 +33,15 @@ class RenderOverlayControls:
 
     def _render_overlay_header_index(self) -> int:
         view = self._focus.build_view_state(paused=self._focus.is_paused())
-        return find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
+        return view.layout.find_by_kind(RowKind.RENDER_OVERLAY_HEADER)
 
     def _render_overlay_title_header_index(self) -> int:
         view = self._focus.build_view_state(paused=self._focus.is_paused())
-        return find_row_by_kind(view, RowKind.RENDER_OVERLAY_TITLE_HEADER)
+        return view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_HEADER)
 
     def _render_overlay_body_header_index(self) -> int:
         view = self._focus.build_view_state(paused=self._focus.is_paused())
-        return find_row_by_kind(view, RowKind.RENDER_OVERLAY_BODY_HEADER)
+        return view.layout.find_by_kind(RowKind.RENDER_OVERLAY_BODY_HEADER)
 
     def set_expanded(self, expanded: bool) -> None:
         ro = self.session.render_overlay

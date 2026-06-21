@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from cleave.viz.focus_context import FocusContext
-from cleave.viz.overlay import find_row_by_kind, row_kind
+from cleave.viz.overlay import TuningViewState
 from cleave.viz.row_semantics import RENDER_POST_FX_SUB_ROW_KINDS, RowKind
 from cleave.viz.session import TuningSession
 
@@ -22,11 +22,11 @@ class RenderPostFxControls:
 
     def _render_post_fx_header_index(self) -> int:
         view = self._focus.build_view_state(paused=self._focus.is_paused())
-        return find_row_by_kind(view, RowKind.RENDER_POST_FX_HEADER)
+        return view.layout.find_by_kind(RowKind.RENDER_POST_FX_HEADER)
 
     def _refocus_render_post_fx_header_if_sub_row(self) -> None:
         view = self._focus.build_view_state(paused=self._focus.is_paused())
-        if row_kind(view, self._focus.get_focus_index()) in RENDER_POST_FX_SUB_ROW_KINDS:
+        if view.layout.kind(self._focus.get_focus_index()) in RENDER_POST_FX_SUB_ROW_KINDS:
             self._focus.set_focus_index(self._render_post_fx_header_index())
 
     def set_expanded(self, expanded: bool) -> None:

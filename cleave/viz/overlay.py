@@ -157,6 +157,215 @@ class SettingsBlock:
     render_mode: str = "balanced"
 
 
+@dataclass(frozen=True)
+class RowLayout:
+    rows: tuple[RowDescriptor, ...]
+
+    @classmethod
+    def build(cls, state: TuningViewState) -> RowLayout:
+        row_list: list[RowDescriptor] = [
+            RowDescriptor(RowKind.SETTINGS_HEADER),
+        ]
+        if state.settings.expanded:
+            row_list.append(RowDescriptor(RowKind.SETTINGS_RENDER_MODE))
+        row_list.extend(
+            [
+                RowDescriptor(RowKind.CONFIG_HEADER),
+                RowDescriptor(RowKind.TRANSPORT),
+            ]
+        )
+        for slot in state.layer_z_order:
+            row_list.append(RowDescriptor(RowKind.TRACK_HEADER, slot=slot))
+            row_list.append(RowDescriptor(RowKind.TRACK_PRESET_DIR, slot=slot))
+            row_list.append(RowDescriptor(RowKind.TRACK_PRESET, slot=slot))
+            row_list.append(RowDescriptor(RowKind.TRACK_STEM, slot=slot))
+            row_list.append(RowDescriptor(RowKind.TRACK_BLEND, slot=slot))
+            row_list.append(RowDescriptor(RowKind.TRACK_OPACITY, slot=slot))
+            row_list.append(RowDescriptor(RowKind.TRACK_BEAT, slot=slot))
+            row_list.append(RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, slot=slot))
+            block = state.tracks[slot]
+            if block.effects_expanded:
+                for effect_def in effect_roster(block.stem):
+                    row_list.append(
+                        RowDescriptor(
+                            RowKind.TRACK_EFFECT,
+                            slot=slot,
+                            effect_id=effect_def.effect_id,
+                            driver_slug=effect_def.driver_slug,
+                        )
+                    )
+            if block.expanded:
+                row_list.append(
+                    RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot=slot)
+                )
+        row_list.append(RowDescriptor(RowKind.LAYER_MANAGEMENT_ADD))
+        if state.render_timeline.enabled:
+            row_list.append(RowDescriptor(RowKind.TIMELINE_LAYER_HINT))
+        row_list.append(RowDescriptor(RowKind.RENDER_SECTION_GAP))
+        row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_HEADER))
+        if state.render_overlay.expanded:
+            row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_POSITION))
+            row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_OPACITY))
+            row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_BORDER_WIDTH))
+            row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_START_DELAY))
+            row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_DISPLAY_TIME))
+            row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_HEADER))
+            if state.render_overlay.title_expanded:
+                row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_FONT))
+                row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE))
+                row_list.append(
+                    RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM)
+                )
+            row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_BODY_HEADER))
+            if state.render_overlay.body_expanded:
+                row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_BODY_FONT))
+                row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_BODY_FONT_SIZE))
+        row_list.append(RowDescriptor(RowKind.RENDER_POST_FX_HEADER))
+        if state.render_post_fx.expanded:
+            row_list.append(RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN))
+            row_list.append(RowDescriptor(RowKind.RENDER_POST_FX_FADE_OUT))
+        row_list.append(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+        return cls(tuple(row_list))
+
+    def __len__(self) -> int:
+        return len(self.rows)
+
+    def count(self) -> int:
+        return len(self.rows)
+
+    def descriptor(self, index: int) -> RowDescriptor:
+        if index < 0 or index >= len(self.rows):
+            raise IndexError(index)
+        return self.rows[index]
+
+    def kind(self, index: int) -> RowKind:
+        return self.descriptor(index).kind
+
+    def slot(self, index: int) -> str | None:
+        return self.descriptor(index).slot
+
+    def find(
+        self,
+        slot: str,
+        kind: RowKind,
+        *,
+        effect_id: str | None = None,
+        driver_slug: str | None = None,
+    ) -> int:
+        for index, desc in enumerate(self.rows):
+            if desc.kind != kind or desc.slot != slot:
+                continue
+            if kind == RowKind.TRACK_EFFECT:
+                if desc.effect_id != effect_id or desc.driver_slug != driver_slug:
+                    continue
+            return index
+        raise ValueError(f"no row for slot={slot!r} kind={kind!r}")
+
+    def find_by_kind(self, kind: RowKind) -> int:
+        for index, desc in enumerate(self.rows):
+            if desc.kind == kind:
+                return index
+        raise ValueError(f"no row for kind={kind!r}")
+
+    def header_row_count(self) -> int:
+        count = 0
+        for row in self.rows:
+            if row_is_pinned(row.kind):
+                count += 1
+            else:
+                break
+        return count
+
+    def track_row_count(self) -> int:
+        """Count of scrollable content rows (all rows except pinned header rows)."""
+        return sum(1 for row in self.rows if not row_is_pinned(row.kind))
+
+    def sub_row_visible(self, state: TuningViewState, index: int) -> bool:
+        desc = self.descriptor(index)
+        if desc.kind in {RowKind.RENDER_SECTION_GAP, RowKind.TIMELINE_LAYER_HINT}:
+            return True
+        if desc.kind in SETTINGS_SUB_ROW_KINDS:
+            return state.settings.expanded
+        if desc.kind in RENDER_OVERLAY_SUB_ROW_KINDS:
+            return state.render_overlay.expanded
+        if desc.kind in RENDER_OVERLAY_TITLE_NESTED_KINDS:
+            return state.render_overlay.expanded and state.render_overlay.title_expanded
+        if desc.kind in RENDER_OVERLAY_BODY_NESTED_KINDS:
+            return state.render_overlay.expanded and state.render_overlay.body_expanded
+        if desc.kind in RENDER_POST_FX_SUB_ROW_KINDS:
+            return state.render_post_fx.expanded
+        slot = desc.slot
+        if slot is None or desc.kind not in TRACK_SUB_ROW_KINDS:
+            return True
+        block = state.tracks[slot]
+        if not block.expanded:
+            return False
+        if desc.kind in TRACK_EFFECT_SUB_ROW_KINDS:
+            return block.effects_expanded
+        return True
+
+    def visible_indices(self, state: TuningViewState) -> list[int]:
+        """Row indices drawn in the panel (sub-rows hidden when collapsed)."""
+        return [
+            index
+            for index in range(len(self))
+            if self.sub_row_visible(state, index)
+        ]
+
+    def navigable_indices(self, state: TuningViewState) -> list[int]:
+        """Row indices reachable via Up/Down (sub-rows skipped when collapsed)."""
+        indices: list[int] = []
+        for index in range(len(self)):
+            desc = self.descriptor(index)
+            if desc.kind in {
+                RowKind.RENDER_SECTION_GAP,
+                RowKind.TIMELINE_LAYER_HINT,
+            }:
+                continue
+            if desc.kind in SETTINGS_SUB_ROW_KINDS:
+                if not state.settings.expanded:
+                    continue
+            elif desc.kind in RENDER_OVERLAY_SUB_ROW_KINDS:
+                if not state.render_overlay.expanded:
+                    continue
+            elif desc.kind in RENDER_OVERLAY_TITLE_NESTED_KINDS:
+                if not state.render_overlay.expanded or not state.render_overlay.title_expanded:
+                    continue
+            elif desc.kind in RENDER_OVERLAY_BODY_NESTED_KINDS:
+                if not state.render_overlay.expanded or not state.render_overlay.body_expanded:
+                    continue
+            elif desc.kind in RENDER_POST_FX_SUB_ROW_KINDS:
+                if not state.render_post_fx.expanded:
+                    continue
+            elif desc.kind in TRACK_SUB_ROW_KINDS:
+                slot = desc.slot
+                assert slot is not None
+                block = state.tracks[slot]
+                if not block.expanded:
+                    continue
+                if block.locked and not row_navigable_when_layer_locked(desc.kind):
+                    continue
+                if desc.kind in TRACK_EFFECT_SUB_ROW_KINDS and not block.effects_expanded:
+                    continue
+            indices.append(index)
+        return indices
+
+    def quick_nav_indices(self) -> list[int]:
+        """Row indices for Ctrl+Up/Down: layer headers and transport only."""
+        indices: list[int] = []
+        for index in range(len(self)):
+            kind = self.kind(index)
+            if kind in (
+                RowKind.TRACK_HEADER,
+                RowKind.RENDER_OVERLAY_HEADER,
+                RowKind.RENDER_POST_FX_HEADER,
+                RowKind.RENDER_TIMELINE_HEADER,
+                RowKind.TRANSPORT,
+            ):
+                indices.append(index)
+        return indices
+
+
 @dataclass
 class TuningViewState:
     layer_z_order: tuple[str, ...]
@@ -185,232 +394,20 @@ class TuningViewState:
     timeline_override_active: bool = False
     help_visible: bool = False
     fps: float | None = None
+    layout: RowLayout = field(init=False, repr=False)
 
-
-def header_row_count(state: TuningViewState) -> int:
-    count = 0
-    for row in build_row_layout(state):
-        if row_is_pinned(row.kind):
-            count += 1
-        else:
-            break
-    return count
-
-
-def build_row_layout(state: TuningViewState) -> list[RowDescriptor]:
-    rows: list[RowDescriptor] = [
-        RowDescriptor(RowKind.SETTINGS_HEADER),
-    ]
-    if state.settings.expanded:
-        rows.append(RowDescriptor(RowKind.SETTINGS_RENDER_MODE))
-    rows.extend(
-        [
-            RowDescriptor(RowKind.CONFIG_HEADER),
-            RowDescriptor(RowKind.TRANSPORT),
-        ]
-    )
-    for slot in state.layer_z_order:
-        rows.append(RowDescriptor(RowKind.TRACK_HEADER, slot=slot))
-        rows.append(RowDescriptor(RowKind.TRACK_PRESET_DIR, slot=slot))
-        rows.append(RowDescriptor(RowKind.TRACK_PRESET, slot=slot))
-        rows.append(RowDescriptor(RowKind.TRACK_STEM, slot=slot))
-        rows.append(RowDescriptor(RowKind.TRACK_BLEND, slot=slot))
-        rows.append(RowDescriptor(RowKind.TRACK_OPACITY, slot=slot))
-        rows.append(RowDescriptor(RowKind.TRACK_BEAT, slot=slot))
-        rows.append(RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, slot=slot))
-        block = state.tracks[slot]
-        if block.effects_expanded:
-            for effect_def in effect_roster(block.stem):
-                rows.append(
-                    RowDescriptor(
-                        RowKind.TRACK_EFFECT,
-                        slot=slot,
-                        effect_id=effect_def.effect_id,
-                        driver_slug=effect_def.driver_slug,
-                    )
-                )
-        if block.expanded:
-            rows.append(
-                RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot=slot)
-            )
-    rows.append(RowDescriptor(RowKind.LAYER_MANAGEMENT_ADD))
-    if state.render_timeline.enabled:
-        rows.append(RowDescriptor(RowKind.TIMELINE_LAYER_HINT))
-    rows.append(RowDescriptor(RowKind.RENDER_SECTION_GAP))
-    rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_HEADER))
-    if state.render_overlay.expanded:
-        rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_POSITION))
-        rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_OPACITY))
-        rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_BORDER_WIDTH))
-        rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_START_DELAY))
-        rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_DISPLAY_TIME))
-        rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_HEADER))
-        if state.render_overlay.title_expanded:
-            rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_FONT))
-            rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE))
-            rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM))
-        rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_BODY_HEADER))
-        if state.render_overlay.body_expanded:
-            rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_BODY_FONT))
-            rows.append(RowDescriptor(RowKind.RENDER_OVERLAY_BODY_FONT_SIZE))
-    rows.append(RowDescriptor(RowKind.RENDER_POST_FX_HEADER))
-    if state.render_post_fx.expanded:
-        rows.append(RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN))
-        rows.append(RowDescriptor(RowKind.RENDER_POST_FX_FADE_OUT))
-    rows.append(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
-    return rows
-
-
-def track_row_count(state: TuningViewState) -> int:
-    """Count of scrollable content rows (all rows except pinned header rows)."""
-    return sum(
-        1
-        for row in build_row_layout(state)
-        if not row_is_pinned(row.kind)
-    )
-
-
-def row_descriptor(state: TuningViewState, index: int) -> RowDescriptor:
-    layout = build_row_layout(state)
-    if index < 0 or index >= len(layout):
-        raise IndexError(index)
-    return layout[index]
-
-
-def find_row(
-    state: TuningViewState,
-    slot: str,
-    kind: RowKind,
-    *,
-    effect_id: str | None = None,
-    driver_slug: str | None = None,
-) -> int:
-    for index, desc in enumerate(build_row_layout(state)):
-        if desc.kind != kind or desc.slot != slot:
-            continue
-        if kind == RowKind.TRACK_EFFECT:
-            if desc.effect_id != effect_id or desc.driver_slug != driver_slug:
-                continue
-        return index
-    raise ValueError(f"no row for slot={slot!r} kind={kind!r}")
-
-
-def find_row_by_kind(state: TuningViewState, kind: RowKind) -> int:
-    for index, desc in enumerate(build_row_layout(state)):
-        if desc.kind == kind:
-            return index
-    raise ValueError(f"no row for kind={kind!r}")
-
-
-def row_count(state: TuningViewState) -> int:
-    return len(build_row_layout(state))
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "layout", RowLayout.build(self))
 
 
 def track_sub_rows_visible(state: TuningViewState, slot: str) -> bool:
     return state.tracks[slot].expanded
 
 
-def _sub_row_visible(state: TuningViewState, index: int) -> bool:
-    desc = row_descriptor(state, index)
-    if desc.kind in {RowKind.RENDER_SECTION_GAP, RowKind.TIMELINE_LAYER_HINT}:
-        return True
-    if desc.kind in SETTINGS_SUB_ROW_KINDS:
-        return state.settings.expanded
-    if desc.kind in RENDER_OVERLAY_SUB_ROW_KINDS:
-        return state.render_overlay.expanded
-    if desc.kind in RENDER_OVERLAY_TITLE_NESTED_KINDS:
-        return state.render_overlay.expanded and state.render_overlay.title_expanded
-    if desc.kind in RENDER_OVERLAY_BODY_NESTED_KINDS:
-        return state.render_overlay.expanded and state.render_overlay.body_expanded
-    if desc.kind in RENDER_POST_FX_SUB_ROW_KINDS:
-        return state.render_post_fx.expanded
-    slot = desc.slot
-    if slot is None or desc.kind not in TRACK_SUB_ROW_KINDS:
-        return True
-    block = state.tracks[slot]
-    if not block.expanded:
-        return False
-    if desc.kind in TRACK_EFFECT_SUB_ROW_KINDS:
-        return block.effects_expanded
-    return True
-
-
-def row_visible(state: TuningViewState, index: int) -> bool:
-    return _sub_row_visible(state, index)
-
-
-def visible_row_indices(state: TuningViewState) -> list[int]:
-    """Row indices drawn in the panel (sub-rows hidden when collapsed)."""
-    return [index for index in range(row_count(state)) if row_visible(state, index)]
-
-
-def navigable_row_indices(state: TuningViewState) -> list[int]:
-    """Row indices reachable via Up/Down (sub-rows skipped when collapsed)."""
-    indices: list[int] = []
-    for index in range(row_count(state)):
-        desc = row_descriptor(state, index)
-        if desc.kind in {
-            RowKind.RENDER_SECTION_GAP,
-            RowKind.TIMELINE_LAYER_HINT,
-        }:
-            continue
-        if desc.kind in SETTINGS_SUB_ROW_KINDS:
-            if not state.settings.expanded:
-                continue
-        elif desc.kind in RENDER_OVERLAY_SUB_ROW_KINDS:
-            if not state.render_overlay.expanded:
-                continue
-        elif desc.kind in RENDER_OVERLAY_TITLE_NESTED_KINDS:
-            if not state.render_overlay.expanded or not state.render_overlay.title_expanded:
-                continue
-        elif desc.kind in RENDER_OVERLAY_BODY_NESTED_KINDS:
-            if not state.render_overlay.expanded or not state.render_overlay.body_expanded:
-                continue
-        elif desc.kind in RENDER_POST_FX_SUB_ROW_KINDS:
-            if not state.render_post_fx.expanded:
-                continue
-        elif desc.kind in TRACK_SUB_ROW_KINDS:
-            slot = desc.slot
-            assert slot is not None
-            block = state.tracks[slot]
-            if not block.expanded:
-                continue
-            if block.locked and not row_navigable_when_layer_locked(desc.kind):
-                continue
-            if desc.kind in TRACK_EFFECT_SUB_ROW_KINDS and not block.effects_expanded:
-                continue
-        indices.append(index)
-    return indices
-
-
-def quick_nav_row_indices(state: TuningViewState) -> list[int]:
-    """Row indices for Ctrl+Up/Down: layer headers and transport only."""
-    indices: list[int] = []
-    for index in range(row_count(state)):
-        kind = row_kind(state, index)
-        if kind in (
-            RowKind.TRACK_HEADER,
-            RowKind.RENDER_OVERLAY_HEADER,
-            RowKind.RENDER_POST_FX_HEADER,
-            RowKind.RENDER_TIMELINE_HEADER,
-            RowKind.TRANSPORT,
-        ):
-            indices.append(index)
-    return indices
-
-
-def row_slot(state: TuningViewState, index: int) -> str | None:
-    return row_descriptor(state, index).slot
-
-
-def row_kind(state: TuningViewState, index: int) -> RowKind:
-    return row_descriptor(state, index).kind
-
-
 def row_effect(
     state: TuningViewState, index: int
 ) -> tuple[str, str] | None:
-    desc = row_descriptor(state, index)
+    desc = state.layout.descriptor(index)
     if desc.kind != RowKind.TRACK_EFFECT:
         return None
     assert desc.effect_id is not None and desc.driver_slug is not None
@@ -422,7 +419,7 @@ def _effect_pct(block: TrackBlock, effect_id: str, driver_slug: str) -> int:
 
 
 def _row_text(state: TuningViewState, index: int) -> str:
-    kind = row_kind(state, index)
+    kind = state.layout.kind(index)
     if kind == RowKind.CONFIG_HEADER:
         return state.active_config_label
     if kind == RowKind.TRANSPORT:
@@ -491,7 +488,7 @@ def _row_text(state: TuningViewState, index: int) -> str:
     if kind == RowKind.RENDER_POST_FX_FADE_OUT:
         return f"└─ fade out: {block_pp.fade_out:.1f}s"
 
-    stem = row_slot(state, index)
+    stem = state.layout.slot(index)
     assert stem is not None
     block = state.tracks[stem]
     if kind == RowKind.TRACK_HEADER:
@@ -522,7 +519,7 @@ def _row_text(state: TuningViewState, index: int) -> str:
 
 
 def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
-    kind = row_kind(state, index)
+    kind = state.layout.kind(index)
     if kind == RowKind.TRACK_BLEND:
         return "└─ blend mode: "
     if kind == RowKind.TRACK_STEM:
@@ -565,7 +562,7 @@ def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
 
 
 def _labeled_sub_row_value(state: TuningViewState, index: int) -> str:
-    kind = row_kind(state, index)
+    kind = state.layout.kind(index)
     block_ro = state.render_overlay
     if kind == RowKind.RENDER_OVERLAY_POSITION:
         return block_ro.position
@@ -594,7 +591,7 @@ def _labeled_sub_row_value(state: TuningViewState, index: int) -> str:
         return f"{block_pp.fade_in:.1f}s"
     if kind == RowKind.RENDER_POST_FX_FADE_OUT:
         return f"{block_pp.fade_out:.1f}s"
-    stem = row_slot(state, index)
+    stem = state.layout.slot(index)
     assert stem is not None
     block = state.tracks[stem]
     if kind == RowKind.TRACK_BLEND:
@@ -619,7 +616,7 @@ def _fit_labeled_sub_row_value(
     *,
     max_content_width: int = PANEL_CONTENT_MAX_WIDTH,
 ) -> str:
-    kind = row_kind(state, index)
+    kind = state.layout.kind(index)
     budget = max_content_width - _row_indent(state, index)
     budget -= font.size(_labeled_sub_row_prefix(state, index))[0]
     value = _labeled_sub_row_value(state, index)
@@ -660,7 +657,7 @@ def _render_label_value_row(
 
 
 def _track_header_layer_prefix(state: TuningViewState, index: int) -> str:
-    stem = row_slot(state, index)
+    stem = state.layout.slot(index)
     assert stem is not None
     layer_num = state.layer_z_order.index(stem) + 1
     return f"Layer {layer_num}: "
@@ -743,7 +740,7 @@ def _fit_track_header_stem(
     *,
     max_content_width: int = PANEL_CONTENT_MAX_WIDTH,
 ) -> str:
-    stem = row_slot(state, index)
+    stem = state.layout.slot(index)
     assert stem is not None
     block = state.tracks[stem]
     locked = block.locked
@@ -801,7 +798,7 @@ def fit_row_text(
     max_content_width: int = PANEL_CONTENT_MAX_WIDTH,
 ) -> str:
     """Fit row label to the shared panel content width (pixels)."""
-    kind = row_kind(state, index)
+    kind = state.layout.kind(index)
     indent = _row_indent(state, index)
     budget = max_content_width - indent
     text = _row_text(state, index)
@@ -813,7 +810,7 @@ def fit_row_text(
             return fit_path_label_to_width(font, text, budget - icon_w - suffix_w)
         return fit_counter_label_to_width(font, text, budget - icon_w)
     if kind == RowKind.TRACK_HEADER:
-        stem = row_slot(state, index)
+        stem = state.layout.slot(index)
         assert stem is not None
         expanded = state.tracks[stem].expanded
         return (
@@ -861,7 +858,7 @@ def fit_row_text(
 
 
 def _row_indent(state: TuningViewState, index: int) -> int:
-    kind = row_kind(state, index)
+    kind = state.layout.kind(index)
     if kind in {
         RowKind.TRACK_HEADER,
         RowKind.RENDER_OVERLAY_HEADER,
@@ -899,7 +896,7 @@ def _track_disabled(state: TuningViewState, slot: str) -> bool:
 
 
 def _row_highlight_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
-    stem = row_slot(state, index)
+    stem = state.layout.slot(index)
     if stem is not None and _track_disabled(state, stem):
         return HIGHLIGHT_MUTED
     return HIGHLIGHT
@@ -913,7 +910,7 @@ def _row_has_tree_focus(state: TuningViewState, index: int) -> bool:
 
 def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
     """Return the VALUE-role color for a row (before label/value split rendering)."""
-    kind = row_kind(state, index)
+    kind = state.layout.kind(index)
     if kind == RowKind.TIMELINE_LAYER_HINT:
         return DISABLED
 
@@ -928,7 +925,7 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
             return DISABLED
         return ACTION
 
-    stem = row_slot(state, index)
+    stem = state.layout.slot(index)
 
     if kind in {RowKind.RENDER_OVERLAY_HEADER, *RENDER_OVERLAY_ALL_SUB_ROW_KINDS}:
         if not state.render_overlay.enabled:
@@ -972,7 +969,7 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
 
 
 def _row_bg_color(state: TuningViewState, index: int) -> tuple[int, int, int] | None:
-    stem = row_slot(state, index)
+    stem = state.layout.slot(index)
     if stem is not None and state.move_mode_slot == stem:
         return MOVE_MODE
     if _row_has_tree_focus(state, index):
@@ -1051,7 +1048,7 @@ def panel_fps_layout(
     text_width: int,
     show_scrollbar: bool,
 ) -> PanelFpsLayout:
-    """Top-right FPS readout on the transport row; shifts left for the scrollbar."""
+    """Top-right FPS readout in the header region; shifts left for the scrollbar."""
     right_reserve = (
         SCROLLBAR_WIDTH + SCROLLBAR_CONTENT_GAP if show_scrollbar else 0
     )
@@ -1344,18 +1341,18 @@ class TuningOverlay:
         timeline_panel_open: bool = False,
     ) -> None:
         self._panel_rect = None
-        if self._visibility <= 0.01 or row_count(state) == 0:
+        if self._visibility <= 0.01 or len(state.layout) == 0:
             return
 
         font = self._font_get()
         line_h = font.get_linesize()
-        visible_indices = visible_row_indices(state)
+        visible_indices = state.layout.visible_indices(state)
         visible_count = len(visible_indices)
         first_scrollable_visible = next(
             (
                 index
                 for index in visible_indices
-                if not row_is_pinned(row_kind(state, index))
+                if not row_is_pinned(state.layout.kind(index))
             ),
             None,
         )
@@ -1389,7 +1386,7 @@ class TuningOverlay:
                 scrollable_indices=scrollable_indices,
                 show_scrollbar=metrics.show_scrollbar,
             )
-            kind = row_kind(state, index)
+            kind = state.layout.kind(index)
             indent = self._padding + _row_indent(state, index)
             color = _row_value_color(state, index)
 
@@ -1407,7 +1404,7 @@ class TuningOverlay:
                     indent + icons_surf.get_width() + time_surf.get_width()
                 )
             elif kind == RowKind.TRACK_HEADER:
-                stem = row_slot(state, index)
+                stem = state.layout.slot(index)
                 block = state.tracks[stem] if stem is not None else None
                 enabled = block.visible if block is not None else True
                 solo = stem is not None and state.solo_slot == stem
@@ -1550,7 +1547,7 @@ class TuningOverlay:
                     indent + icon_surf.get_width() + label_surf.get_width()
                 )
             elif kind == RowKind.TRACK_EFFECTS_HEADER:
-                stem = row_slot(state, index)
+                stem = state.layout.slot(index)
                 assert stem is not None
                 block = state.tracks[stem]
                 surf = _render_label_value_row(
@@ -1754,9 +1751,7 @@ class TuningOverlay:
             panel.blit(toast_surf, (self._padding, toast_layout.toast_y))
 
         if state.fps is not None and text_alpha >= 2:
-            transport_index = find_row_by_kind(state, RowKind.TRANSPORT)
-            fps_color = _row_value_color(state, transport_index)
-            fps_surf = font.render(format_fps_display(state.fps), True, fps_color)
+            fps_surf = font.render(format_fps_display(state.fps), True, DISABLED)
             fps_surf.set_alpha(text_alpha)
             fps_layout = panel_fps_layout(
                 panel_w=panel_w,
