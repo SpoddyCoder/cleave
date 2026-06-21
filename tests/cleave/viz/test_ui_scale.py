@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from cleave.viz.theme import (
     scale_px,
+    timeline_panel_height_px,
     timeline_ui_metrics,
     tuning_ui_metrics,
 )
@@ -24,6 +25,12 @@ def test_timeline_ui_metrics_default_scale() -> None:
     assert metrics.padding == 8
     assert metrics.row_gap == 2
     assert metrics.panel_gap == 16
+
+
+def test_timeline_panel_height_px_scales_with_ui_scale() -> None:
+    assert timeline_panel_height_px(720, scale=1.0) == 144
+    assert timeline_panel_height_px(720, scale=1.2) == 173
+    assert timeline_panel_height_px(720, scale=1.5) == 216
 
 
 def test_scale_px_rounds_and_clamps() -> None:
