@@ -55,6 +55,7 @@ from cleave.viz.material_icons import (
     visibility_icon_slot_width,
 )
 from cleave.viz.theme import (
+    ACTION,
     BACKGROUND,
     BACKGROUND_ALPHA,
     BORDER_COLOR,
@@ -410,7 +411,7 @@ def _row_text(state: TuningViewState, index: int) -> str:
     if kind == RowKind.LAYER_MANAGEMENT_ADD:
         return "ADD NEW LAYER"
     if kind == RowKind.LAYER_MANAGEMENT_DELETE:
-        return "Delete Layer"
+        return f"{_layer_management_delete_prefix()}Delete Layer"
 
     if kind == RowKind.RENDER_OVERLAY_HEADER:
         arrow = "▼" if state.render_overlay.expanded else "▶"
@@ -679,6 +680,10 @@ def track_header_prefix_width(font: pygame.font.Font) -> int:
     return icon_w + ROW_ICON_SUFFIX_GAP
 
 
+def _layer_management_delete_prefix() -> str:
+    return "└─ "
+
+
 def _effects_header_prefix() -> str:
     return "└─ cleave effects "
 
@@ -873,18 +878,18 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
     if kind == RowKind.TIMELINE_LAYER_HINT:
         return DISABLED
 
-    if kind == RowKind.LAYER_MANAGEMENT_ADD:
-        return LABEL
-    if kind == RowKind.LAYER_MANAGEMENT_DELETE:
-        if len(state.layer_z_order) == 1:
+    if kind in {
+        RowKind.CONFIG_HEADER,
+        RowKind.LAYER_MANAGEMENT_ADD,
+        RowKind.LAYER_MANAGEMENT_DELETE,
+    }:
+        if kind == RowKind.CONFIG_HEADER and state.solo_active:
             return DISABLED
-        return LABEL
+        if kind == RowKind.LAYER_MANAGEMENT_DELETE and len(state.layer_z_order) == 1:
+            return DISABLED
+        return ACTION
 
     stem = row_slot(state, index)
-    if kind == RowKind.CONFIG_HEADER:
-        if state.solo_active:
-            return DISABLED
-        return LABEL
 
     if kind in {RowKind.RENDER_OVERLAY_HEADER, *RENDER_OVERLAY_ALL_SUB_ROW_KINDS}:
         if not state.render_overlay.enabled:
@@ -1479,6 +1484,7 @@ class TuningOverlay:
                         prefix=path,
                         value="*" if state.config_dirty else "",
                         value_color=CONFIG_DIRTY,
+                        prefix_color=color,
                         line_height=line_h,
                     )
                 else:
@@ -1541,10 +1547,19 @@ class TuningOverlay:
                 row_surfaces.append(surf)
                 row_time_surfaces.append(None)
                 row_widths.append(indent + surf.get_width())
-            elif kind in {
-                RowKind.LAYER_MANAGEMENT_ADD,
-                RowKind.LAYER_MANAGEMENT_DELETE,
-            }:
+            elif kind == RowKind.LAYER_MANAGEMENT_DELETE:
+                label_color = _row_value_color(state, index)
+                surf = _render_label_value_row(
+                    font,
+                    prefix=_layer_management_delete_prefix(),
+                    value="Delete Layer",
+                    value_color=label_color,
+                    line_height=line_h,
+                )
+                row_surfaces.append(surf)
+                row_time_surfaces.append(None)
+                row_widths.append(indent + surf.get_width())
+            elif kind == RowKind.LAYER_MANAGEMENT_ADD:
                 label = _row_text(state, index)
                 label_color = _row_value_color(state, index)
                 surf = _render_label_value_row(

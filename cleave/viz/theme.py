@@ -3,6 +3,7 @@
 Typography roles for the live tuning overlay:
   LABEL    — light blue text for row labels and prefixes
   VALUE    — white text for values and state indicators (default)
+  ACTION   — dark mint text for rows that open a confirm modal on Enter
   DISABLED — dimmed text when a row or control is inactive
   LOCKED   — tinted text for locked sub-rows that cannot be edited
 
@@ -134,6 +135,7 @@ BORDER_COLOR: tuple[int, int, int] = (255, 255, 255)
 
 LABEL: tuple[int, int, int] = (170, 210, 255)
 VALUE: tuple[int, int, int] = (255, 255, 255)
+ACTION: tuple[int, int, int] = (80, 190, 125)
 DISABLED: tuple[int, int, int] = (140, 140, 140)
 HIGHLIGHT: tuple[int, int, int] = (255, 235, 130)
 HIGHLIGHT_MUTED: tuple[int, int, int] = (175, 160, 95)
