@@ -100,10 +100,12 @@ def test_modal_focused_option_has_highlight_background() -> None:
     line_h = font.get_linesize()
     pad_x = modal_overlay._PANEL_PAD_X
     pad_y = modal_overlay._PANEL_PAD_Y
+    content_w = panel.get_width() - pad_x * 2
     modal_overlay._draw_options(
         panel,
         font,
         x=pad_x,
+        content_width=content_w,
         y=pad_y,
         labels=("Yes", "No"),
         focus_index=0,
@@ -111,18 +113,20 @@ def test_modal_focused_option_has_highlight_background() -> None:
     )
 
     yes_w = font.size(modal_overlay._option_text("Yes"))[0]
+    options_w, _ = modal_overlay._measure_options(font, ("Yes", "No"))
+    option_x = pad_x + (content_w - options_w) // 2
     tint_probe = pygame.Surface((4, 4), pygame.SRCALPHA)
     tint_probe.fill((0, 0, 0, 255))
     blit_tint(tint_probe, (0, 0, 4, 4), HIGHLIGHT)
     expected = tint_probe.get_at((2, 2))[:3]
     focused_pixels = [
-        panel.get_at((pad_x + x, pad_y + y))
+        panel.get_at((option_x + x, pad_y + y))
         for x in range(yes_w)
         for y in range(line_h)
     ]
     assert any(pixel[:3] == expected for pixel in focused_pixels)
 
-    no_x = pad_x + yes_w + modal_overlay._OPTION_GAP
+    no_x = option_x + yes_w + modal_overlay._OPTION_GAP
     no_w = font.size(modal_overlay._option_text("No"))[0]
     unfocused_pixels = [
         panel.get_at((no_x + x, pad_y + y))
@@ -130,3 +134,23 @@ def test_modal_focused_option_has_highlight_background() -> None:
         for y in range(line_h)
     ]
     assert not any(pixel[:3] == expected for pixel in unfocused_pixels)
+
+
+def test_modal_options_centered_when_message_is_wider() -> None:
+    pygame.init()
+    font = _font()
+    line_gap = 3
+    view = ModalViewState(
+        kind=ModalKind.YES_NO,
+        message="Overwrite cleave-viz.yaml?",
+        options=("Yes", "No"),
+        focus_index=0,
+    )
+    panel_w, _ = modal_overlay._measure_panel(font, view, line_gap=line_gap)
+    content_w = panel_w - modal_overlay._PANEL_PAD_X * 2
+    options_w, _ = modal_overlay._measure_options(font, view.options)
+    msg_w = font.size(view.message)[0]
+
+    assert msg_w > options_w
+    assert content_w == msg_w
+    assert modal_overlay._PANEL_PAD_X + (content_w - options_w) // 2 > modal_overlay._PANEL_PAD_X
