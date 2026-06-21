@@ -259,6 +259,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.EXPAND,
         is_header=True,
         help_title="Settings",
+        quick_nav_target=True,
     ),
     RowKind.SETTINGS_RENDER_MODE: RowBehavior(
         RowAffordance.VALUE_STEP,

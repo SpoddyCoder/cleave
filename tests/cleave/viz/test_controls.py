@@ -1843,10 +1843,11 @@ def test_quick_nav_row_indices_headers_and_transport_only() -> None:
     view = controls.build_view_state(paused=False)
 
     quick = view.layout.quick_nav_indices()
-    assert len(quick) == 6
+    assert len(quick) == 7
     for index in quick:
         kind = view.layout.kind( index)
         assert kind in (
+            RowKind.SETTINGS_HEADER,
             RowKind.TRACK_HEADER,
             RowKind.RENDER_OVERLAY_HEADER,
             RowKind.RENDER_POST_FX_HEADER,
@@ -1854,6 +1855,7 @@ def test_quick_nav_row_indices_headers_and_transport_only() -> None:
             RowKind.TRANSPORT,
         )
 
+    settings_row = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
     drums_header = next(
         i
         for i in range(len(view.layout))
@@ -1871,6 +1873,7 @@ def test_quick_nav_row_indices_headers_and_transport_only() -> None:
         i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.TRANSPORT
     )
     assert quick == [
+        settings_row,
         transport_row,
         drums_header,
         bass_header,
@@ -1902,10 +1905,13 @@ def test_ctrl_quick_nav_cycles_headers_and_transport() -> None:
     assert controls.focus_descriptor == _desc(view, quick[5])
 
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
+    assert controls.focus_descriptor == _desc(view, quick[6])
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
     assert controls.focus_descriptor == _desc(view, quick[0])
 
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
-    assert controls.focus_descriptor == _desc(view, quick[5])
+    assert controls.focus_descriptor == _desc(view, quick[6])
 
 
 def test_ctrl_quick_nav_from_sub_row_jumps_forward() -> None:
@@ -1918,11 +1924,11 @@ def test_ctrl_quick_nav_from_sub_row_jumps_forward() -> None:
 
     controls.focus_descriptor = _desc(view, preset_row)
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
-    assert controls.focus_descriptor == _desc(view, quick[2])
+    assert controls.focus_descriptor == _desc(view, quick[3])
 
     controls.focus_descriptor = _desc(view, preset_row)
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
-    assert controls.focus_descriptor == _desc(view, quick[1])
+    assert controls.focus_descriptor == _desc(view, quick[2])
 
 
 def test_ctrl_quick_nav_from_config_header_row() -> None:
@@ -1933,11 +1939,11 @@ def test_ctrl_quick_nav_from_config_header_row() -> None:
 
     controls.focus_descriptor = _desc(view, config_row)
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
-    assert controls.focus_descriptor == _desc(view, quick[-1])
+    assert controls.focus_descriptor == _desc(view, quick[0])
 
     controls.focus_descriptor = _desc(view, config_row)
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
-    assert controls.focus_descriptor == _desc(view, quick[0])
+    assert controls.focus_descriptor == _desc(view, quick[1])
 
 
 def test_ctrl_quick_nav_does_not_affect_normal_up_down() -> None:
@@ -1957,11 +1963,10 @@ def test_ctrl_quick_nav_from_timeline_submenu_jumps_sections() -> None:
     view = controls.build_view_state(paused=False)
     quick = view.layout.quick_nav_indices()
     timeline_header = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
-    transport_row = view.layout.find_by_kind(RowKind.TRANSPORT)
+    settings_row = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
 
     controls.session.timeline.panel_open = True
     controls.focus_cursor = TimelineFocus(1)
-    controls.focus_descriptor = RowDescriptor(RowKind.TRANSPORT)
 
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
     assert not isinstance(controls.focus_cursor, TimelineFocus)
@@ -1970,7 +1975,7 @@ def test_ctrl_quick_nav_from_timeline_submenu_jumps_sections() -> None:
     controls.focus_cursor = TimelineFocus(2)
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
     assert not isinstance(controls.focus_cursor, TimelineFocus)
-    assert controls.focus_descriptor == _desc(view, transport_row)
+    assert controls.focus_descriptor == _desc(view, settings_row)
     assert timeline_header in quick
 
 
