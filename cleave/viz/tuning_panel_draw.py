@@ -84,7 +84,6 @@ Anchor = Literal["topleft", "bottomleft"]
 _tuning_ui = tuning_ui_metrics()
 TREE_INDENT = _tuning_ui.tree_indent
 TREE_BRANCH = "└"
-TIMELINE_LAYER_HINT_TEXT = "Timeline is enabled and controlling layer visibility"
 ROW_ICON_SUFFIX_GAP = _tuning_ui.row_icon_suffix_gap
 
 
@@ -116,7 +115,7 @@ def _row_text(state: TuningViewState, index: int) -> str:
         return ""
 
     if kind == RowKind.TIMELINE_LAYER_HINT:
-        return TIMELINE_LAYER_HINT_TEXT
+        return state.timeline_layer_hint_message or ""
 
     if kind == RowKind.LAYER_MANAGEMENT_ADD:
         return "ADD NEW LAYER"
@@ -537,7 +536,7 @@ def fit_row_text(
     if kind == RowKind.RENDER_SECTION_GAP:
         return ""
     if kind == RowKind.TIMELINE_LAYER_HINT:
-        return TIMELINE_LAYER_HINT_TEXT
+        return state.timeline_layer_hint_message or ""
     if kind in {RowKind.LAYER_MANAGEMENT_ADD, RowKind.LAYER_MANAGEMENT_DELETE}:
         return _row_text(state, index)
     if kind == RowKind.SETTINGS_HEADER:

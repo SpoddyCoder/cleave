@@ -84,6 +84,11 @@ class RowLayout:
                 RowDescriptor(RowKind.TRANSPORT),
             ]
         )
+        if (
+            state.timeline_layer_hint_message
+            and state.timeline_layer_hint_remaining_sec > 0
+        ):
+            row_list.append(RowDescriptor(RowKind.TIMELINE_LAYER_HINT))
         for slot in state.layer_z_order:
             row_list.append(RowDescriptor(RowKind.TRACK_HEADER, slot=slot))
             row_list.append(RowDescriptor(RowKind.TRACK_PRESET_DIR, slot=slot))
@@ -109,8 +114,6 @@ class RowLayout:
                     RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot=slot)
                 )
         row_list.append(RowDescriptor(RowKind.LAYER_MANAGEMENT_ADD))
-        if state.render_timeline.enabled:
-            row_list.append(RowDescriptor(RowKind.TIMELINE_LAYER_HINT))
         row_list.append(RowDescriptor(RowKind.RENDER_SECTION_GAP))
         row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_HEADER))
         if state.render_overlay.expanded:
