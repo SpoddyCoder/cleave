@@ -7,7 +7,8 @@ from unittest.mock import MagicMock
 
 import pygame
 
-from cleave.config_schema import DEFAULT_STEM_FOR_SLOT, LAYER_SLOTS
+from cleave.config_schema import DEFAULT_LAYER_SLOTS
+from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
 from cleave.viz.app import LiveVisualizerRuntime, VisualizerSeed
 from cleave.viz.controls import TuningControls
@@ -33,14 +34,14 @@ def _make_runtime(
 ) -> LiveVisualizerRuntime:
     preset_root = Path("/tmp/presets")
     session = TuningSession(
-        layer_z_order=list(LAYER_SLOTS),
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
         layers={
             slot: LayerRuntime(
                 playlist=make_playlist(slot),
                 browse_floor=preset_root / slot,
-                stem=DEFAULT_STEM_FOR_SLOT[slot],
+                stem=TEST_LAYER_STEMS[slot],
             )
-            for slot in LAYER_SLOTS
+            for slot in DEFAULT_LAYER_SLOTS
         },
     )
     session.help_visible = help_visible

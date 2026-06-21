@@ -12,7 +12,8 @@ from unittest.mock import MagicMock, patch
 import pygame
 import pytest
 
-from cleave.config_schema import DEFAULT_STEM_FOR_SLOT, LAYER_SLOTS
+from cleave.config_schema import DEFAULT_LAYER_SLOTS, MAX_LAYER_COUNT
+from tests.support.config import TEST_LAYER_STEMS
 from cleave.preset_playlist import (
     PresetPlaylist,
     directory_display,
@@ -123,7 +124,7 @@ def _make_controls(
             slot: LayerRuntime(
                 playlist=_make_playlist(slot),
                 browse_floor=preset_root / slot,
-                stem=DEFAULT_STEM_FOR_SLOT.get(slot, "drums"),
+                stem=TEST_LAYER_STEMS.get(slot, "drums"),
                 opacity_pct=50,
             )
             for slot in slots
@@ -139,6 +140,49 @@ def _make_controls(
         launch_config_path=launch_config_path,
         repo_root_example=repo_root_example,
     )
+
+
+def _make_controls_with_manager(
+    slots: tuple[str, ...] = ("layer_1",),
+    *,
+    can_add: bool = True,
+    can_remove: bool = True,
+    launch_config_path: Path | None = _DEFAULT_ACTIVE_CONFIG,
+    repo_root_example: Path = _REPO_ROOT_EXAMPLE,
+) -> tuple[TuningControls, MagicMock]:
+    preset_root = Path("/tmp/presets")
+    cfg = make_test_cfg(slots, preset_root=preset_root, config_path=launch_config_path or _DEFAULT_ACTIVE_CONFIG)
+    session = TuningSession(
+        layer_z_order=list(slots),
+        layers={
+            slot: LayerRuntime(
+                playlist=_make_playlist(slot),
+                browse_floor=preset_root / slot,
+                stem=TEST_LAYER_STEMS.get(slot, "drums"),
+                opacity_pct=50,
+            )
+            for slot in slots
+        },
+    )
+    layer_manager = MagicMock()
+    layer_manager.can_add.return_value = can_add
+    layer_manager.can_remove.return_value = can_remove
+    controls = TuningControls(
+        session,
+        cfg,
+        preset_root=preset_root,
+        playback=stub_playback_state(),
+        duration_sec=120.0,
+        launch_config_path=launch_config_path,
+        repo_root_example=repo_root_example,
+        layer_manager=layer_manager,
+    )
+    return controls, layer_manager
+
+
+def _confirm_modal_yes(controls: TuningControls) -> None:
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
 
 
 def _config_header_row(view: TuningViewState) -> int:
@@ -160,6 +204,125 @@ def _choose_save_as_new(controls: TuningControls) -> None:
 def _choose_overwrite(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     controls.handle_keydown(_keydown(pygame.K_RETURN))
+
+
+def test_add_layer_at_max_shows_toast() -> None:
+    controls, manager = _make_controls_with_manager(("layer_1",), can_add=False)
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(view, RowKind.LAYER_MANAGEMENT_ADD)
+
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+
+    manager.add_layer.assert_not_called()
+    assert controls.modal_host.view_state() is None
+    assert (
+        controls.build_view_state(paused=False).toast_message
+        == f"Maximum {MAX_LAYER_COUNT} layers"
+    )
+
+
+def test_delete_layer_at_min_shows_toast() -> None:
+    controls, manager = _make_controls_with_manager(("layer_1",), can_remove=False)
+    controls.session.layers["layer_1"].expanded = True
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row(
+        view, "layer_1", RowKind.LAYER_MANAGEMENT_DELETE
+    )
+
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+
+    manager.remove_layer.assert_not_called()
+    assert controls.modal_host.view_state() is None
+    assert (
+        controls.build_view_state(paused=False).toast_message
+        == "Must have at least 1 layer"
+    )
+
+
+def test_add_layer_confirm_calls_manager() -> None:
+    controls, manager = _make_controls_with_manager(("layer_1",))
+
+    def add_layer() -> None:
+        controls.session.layer_z_order.append("layer_2")
+        controls.session.layers["layer_2"] = LayerRuntime(
+            playlist=_make_playlist("layer_2"),
+            browse_floor=Path("/tmp/presets/layer_2"),
+            stem="bass",
+            opacity_pct=50,
+        )
+
+    manager.add_layer.side_effect = add_layer
+    view = controls.build_view_state(paused=False)
+    before_count = row_count(view)
+    controls.focus_index = find_row_by_kind(view, RowKind.LAYER_MANAGEMENT_ADD)
+
+    _confirm_modal_yes(controls)
+
+    manager.add_layer.assert_called_once()
+    view = controls.build_view_state(paused=False)
+    assert row_count(view) > before_count
+    assert "layer_2" in controls.session.layer_z_order
+
+
+def test_delete_layer_confirm_calls_manager() -> None:
+    controls, manager = _make_controls_with_manager(("layer_1", "layer_2"))
+    controls.session.layers["layer_2"].expanded = True
+
+    def remove_layer(slot: str) -> None:
+        controls.session.layer_z_order.remove(slot)
+        del controls.session.layers[slot]
+
+    manager.remove_layer.side_effect = remove_layer
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row(
+        view, "layer_2", RowKind.LAYER_MANAGEMENT_DELETE
+    )
+
+    _confirm_modal_yes(controls)
+
+    manager.remove_layer.assert_called_once_with("layer_2")
+    assert "layer_2" not in controls.session.layer_z_order
+
+
+def test_delete_layer_clamps_timeline_focus_row() -> None:
+    slots = ("layer_1", "layer_2", "layer_3", "layer_4")
+    controls, manager = _make_controls_with_manager(slots)
+    controls.session.timeline.enabled = True
+    controls.session.timeline.panel_open = True
+    controls.session.timeline.submenu_focused = True
+    controls.session.timeline.focus_row = 3
+
+    def remove_layer(slot: str) -> None:
+        controls.session.layer_z_order.remove(slot)
+        del controls.session.layers[slot]
+
+    manager.remove_layer.side_effect = remove_layer
+    controls._confirm_delete_layer("layer_4")
+
+    manager.remove_layer.assert_called_once_with("layer_4")
+    assert len(controls.session.layer_z_order) == 3
+    assert controls.session.timeline.focus_row == 2
+
+
+def test_delete_layer_exits_move_mode() -> None:
+    controls, manager = _make_controls_with_manager(("layer_1", "layer_2"))
+    controls.session.layers["layer_2"].expanded = True
+
+    def remove_layer(slot: str) -> None:
+        controls.session.layer_z_order.remove(slot)
+        del controls.session.layers[slot]
+
+    manager.remove_layer.side_effect = remove_layer
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    assert controls.move_mode_slot == "layer_1"
+
+    controls._delete_layer("layer_2")
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+
+    assert controls.move_mode_slot is None
+    manager.remove_layer.assert_called_once_with("layer_2")
 
 
 def _row(
@@ -278,6 +441,7 @@ def test_re_enable_without_expanding() -> None:
     controls.session.layers["layer_1"].expanded = False
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
+    add_layer_row = find_row_by_kind(view, RowKind.LAYER_MANAGEMENT_ADD)
     render_overlay_row = find_row_by_kind(view, RowKind.RENDER_OVERLAY_HEADER)
     transport_row = next(
         i for i in range(row_count(view)) if row_kind(view, i) == RowKind.TRANSPORT
@@ -292,6 +456,9 @@ def test_re_enable_without_expanding() -> None:
     )
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_index == add_layer_row
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_index == render_overlay_row
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
@@ -304,6 +471,9 @@ def test_re_enable_without_expanding() -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
     assert controls.session.layers["layer_1"].enabled is True
     assert controls.session.layers["layer_1"].expanded is False
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_index == add_layer_row
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_index == render_overlay_row
@@ -753,7 +923,7 @@ def test_navigable_rows_without_overwrite() -> None:
     )
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is False
-    assert row_count(view) == 14
+    assert row_count(view) == 15
 
     kinds = {row_kind(view, i) for i in range(row_count(view))}
     assert RowKind.CONFIG_HEADER in kinds
@@ -774,7 +944,7 @@ def test_navigable_rows_with_overwrite() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is True
-    assert row_count(view) == 14
+    assert row_count(view) == 15
 
     config_row = _config_header_row(view)
     assert config_row in navigable_row_indices(view)

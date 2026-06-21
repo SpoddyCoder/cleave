@@ -1,5 +1,7 @@
 # Dynamic layers plan
 
+**Status:** All phases complete as of June 2026.
+
 ## Overview
 
 Remove the hardcoded four-layer ceiling. Layers become first-class runtime objects that can
@@ -34,6 +36,8 @@ The implementation is split into eight phases that can be developed and reviewed
 **Files:** `cleave/config_schema.py`, `cleave/config.py`
 
 ### 1.1 Replace the `LAYER_SLOTS` constant
+
+- [x]
 
 Remove:
 ```python
@@ -80,6 +84,8 @@ remaining reference (only `wiring.py` stub) is updated in Phase 3.
 
 ### 1.2 Relax `parse_layers_section`
 
+- [x]
+
 - Accept any number of `layer_N` keys where 1 ≤ N ≤ 8, so count in range [1, 8].
 - Reject keys not matching `layer_\d+`, N out of [1, 8], or duplicate N.
 - Reject an empty `layers` block.
@@ -110,6 +116,8 @@ if not layers_raw:
 
 ### 1.3 Relax `parse_layer_z_order_section`
 
+- [x]
+
 Currently validates permutation of fixed `LAYER_SLOTS`. Change to validate:
 - Is a list.
 - All entries appear in `layers` keys (the parsed layer set, passed in).
@@ -119,6 +127,8 @@ Currently validates permutation of fixed `LAYER_SLOTS`. Change to validate:
 The parsed layer set is available as `ctx.layer_slots` — add this field to `ParseCtx`.
 
 ### 1.4 Update `persist_layers`
+
+- [x]
 
 Replace the `for slot in LAYER_SLOTS` loop with `for slot in ctx.session.layer_z_order`.
 For newly added layers that have no entry in `ctx.cfg.layers` (see Phase 3), read all values
@@ -130,10 +140,14 @@ session in sync). No special case needed.
 
 ### 1.5 Update `parse_timeline_section`
 
+- [x]
+
 Cue `layers` sub-keys are validated against the actual layer set in the config (not
 `LAYER_SLOTS`). Pass the parsed layer slots through `ParseCtx` and use them here.
 
 ### 1.6 `CleaveConfig` — un-freeze and use `list`
+
+- [x]
 
 `CleaveConfig` is `frozen=True` with `layer_z_order: tuple[str, ...]`. Dynamic add/remove
 requires mutating both fields. Changes:
@@ -154,6 +168,8 @@ requires mutating both fields. Changes:
 
 ### 2.1 `GlCompositor.remove_layer_fbo(name: str)`
 
+- [x]
+
 The compositor's `_layers` list already has no fixed capacity. Add:
 
 ```python
@@ -164,6 +180,8 @@ def remove_layer_fbo(self, name: str) -> None:
 ```
 
 ### 2.2 `LayerFramePipeline.build_single`
+
+- [x]
 
 Build exactly one layer (ProjectM + FBO) and return a `StemLayer`:
 
@@ -184,6 +202,8 @@ layer starts from frame zero (same behaviour as any fresh projectM instance).
 
 ### 2.3 `LayerFramePipeline.destroy_single`
 
+- [x]
+
 ```python
 @staticmethod
 def destroy_single(
@@ -200,6 +220,8 @@ def destroy_single(
 ```
 
 ### 2.4 `scan_single_layer`
+
+- [x]
 
 New function in `preset_playlist.py`:
 
@@ -222,6 +244,8 @@ Same logic as `scan_all_layers` for one slot. Picks a random preset as initial c
 
 ### 3.1 `session.py` — add/remove helpers
 
+- [x]
+
 ```python
 def add_layer_to_session(
     session: TuningSession,
@@ -241,6 +265,8 @@ def remove_layer_from_session(session: TuningSession, slot: str) -> None:
 `session_from_cfg` already iterates `cfg.layers.items()` — no change needed there.
 
 ### 3.2 `wiring.py` — `LayerManager`
+
+- [x]
 
 Add a `LayerManager` class that holds the mutable GL collections and exposes the add/remove
 operations. `TuningControls` receives a `LayerManager` and calls it on modal confirm.
@@ -310,6 +336,8 @@ directly with an explicit slot list.
 
 ### 3.3 `make_tuning_controls` / `make_timeline_controls`
 
+- [x]
+
 Pass `LayerManager` into `make_tuning_controls`; store it on `TuningControls` for use in
 `_add_layer` / `_delete_layer` handlers (Phase 5).
 
@@ -321,6 +349,8 @@ Pass `LayerManager` into `make_tuning_controls`; store it on `TuningControls` fo
 
 ### 4.1 New `RowKind` values
 
+- [x]
+
 ```python
 class RowKind(Enum):
     ...
@@ -329,6 +359,8 @@ class RowKind(Enum):
 ```
 
 ### 4.2 `RowBehavior` entries
+
+- [x]
 
 ```python
 RowKind.LAYER_MANAGEMENT_ADD: RowBehavior(
@@ -352,6 +384,8 @@ appropriate for navigation and group membership.
 
 ### 4.3 `build_row_layout` in `overlay.py`
 
+- [x]
+
 **Delete Layer** row: appended as the last sub-row of each track block, after the cleave
 effects header (and any visible effect sub-rows). It is only included when the track is
 expanded (follows the same expand gate as other sub-rows). Descriptor:
@@ -362,6 +396,8 @@ expanded (follows the same expand gate as other sub-rows). Descriptor:
 visible (not gated on any expand state).
 
 ### 4.4 Drawing in `overlay.py`
+
+- [x]
 
 **ADD NEW LAYER:** Draw with `_render_label_value_row` using label `ADD NEW LAYER` in
 `LABEL` color. No eye, no expand arrow.
@@ -379,9 +415,13 @@ receive the "must have at least 1 layer" notification).
 
 ### 5.1 Constructor
 
+- [x]
+
 Accept `layer_manager: LayerManager` (may be `None` for headless tests).
 
 ### 5.2 `_add_layer`
+
+- [x]
 
 Called when Enter is pressed on `LAYER_MANAGEMENT_ADD`:
 
@@ -405,6 +445,8 @@ def _confirm_add_layer(self) -> None:
 ```
 
 ### 5.3 `_delete_layer`
+
+- [x]
 
 Called when Enter is pressed on `LAYER_MANAGEMENT_DELETE` (slot from `row_slot()`):
 
@@ -432,6 +474,8 @@ def _confirm_delete_layer(self, slot: str) -> None:
 
 ### 5.4 `_rebuild_view`
 
+- [x]
+
 After add/remove, the number of navigable rows changes. Call:
 ```python
 self._state = TuningViewStateBuilder(self._session, self._cfg).build()
@@ -440,6 +484,8 @@ self._state = TuningViewStateBuilder(self._session, self._cfg).build()
 Any z-order move mode is exited before the rebuild.
 
 ### 5.5 Key dispatch
+
+- [x]
 
 In the existing Enter handler, add cases for the two new row kinds before falling through to
 existing cases:
@@ -462,10 +508,14 @@ if kind == RowKind.LAYER_MANAGEMENT_DELETE:
 
 ### 6.1 `timeline.py` — remove `LAYER_SLOTS` dependency
 
+- [x]
+
 `visible_state_at` currently iterates `LAYER_SLOTS`. Change signature to accept
 `slots: list[str]` and iterate that instead. All callers pass `session.layer_z_order`.
 
 ### 6.2 `timeline_controls.py` — extend num keys to 1-8
+
+- [x]
 
 ```python
 _LAYER_KEY_INDEX: dict[int, int] = {
@@ -481,13 +531,24 @@ in `_slot_for_layer_index` — keep that guard).
 
 ### 6.3 `timeline_overlay.py` — dynamic width probe
 
+- [x]
+
 Replace `layer_num_prefix(4)` with `layer_num_prefix(max(len(layer_z_order), 1))`. Since
 max is 8, the column never needs more than one digit plus a space — the probe just needs to
 match the widest label that will actually appear.
 
 ### 6.4 `layer_visibility.py`
 
+- [x]
+
 Any hardcoded slot references are replaced with `session.layer_z_order` iteration.
+
+### 6.5 `controls.py` — clamp timeline focus on delete
+
+- [x]
+
+After `remove_layer`, clamp `timeline.focus_row` to `len(layer_z_order) - 1` (or clear
+`submenu_focused` when no layers remain).
 
 ---
 
@@ -497,6 +558,8 @@ Any hardcoded slot references are replaced with `session.layer_z_order` iteratio
 
 ### 7.1 `persist_layers`
 
+- [x]
+
 The current loop is `for slot in LAYER_SLOTS`. Change to `for slot in ctx.session.layer_z_order`.
 
 Since Phase 3 keeps `cfg.layers` and `session.layer_z_order` in sync (add/remove updates
@@ -505,9 +568,13 @@ needed.
 
 ### 7.2 `persist_layer_z_order`
 
+- [x]
+
 Already reads `session.layer_z_order` — no change.
 
 ### 7.3 Dirty tracking
+
+- [x]
 
 `persisted_session_signature` computes the hash of `persisted_session_payload`. Because that
 payload is built from the actual session + cfg (both updated on add/remove), dirtiness is
@@ -523,6 +590,8 @@ usual.
 
 ### 8.1 Unit tests
 
+- [x]
+
 Update any test that hard-codes `LAYER_SLOTS`, constructs a `CleaveConfig` with exactly
 four layers, or uses `DEFAULT_STEM_FOR_SLOT`:
 
@@ -536,14 +605,20 @@ four layers, or uses `DEFAULT_STEM_FOR_SLOT`:
 
 ### 8.2 `cleave-viz.yaml` template
 
+- [x]
+
 No change to the default content (still four layers). The template is not a constraint; the
 schema now accepts any count. Remove any comment that says "must have exactly four."
 
 ### 8.3 `.cursor/rules/project-context.mdc`
 
+- [x]
+
 Remove "four libprojectM layers". Update to "up to eight Milkdrop layers" or equivalent.
 
 ### 8.4 `.cursor/rules/live-tuning-ui.mdc`
+
+- [x]
 
 - Remove `layer_1`..`layer_4` enumeration where it implies a fixed count.
 - Document the two new row kinds: `LAYER_MANAGEMENT_ADD` and `LAYER_MANAGEMENT_DELETE`.
@@ -551,6 +626,8 @@ Remove "four libprojectM layers". Update to "up to eight Milkdrop layers" or equ
 - Update timeline strip focus-ring `0..3` comment to `0..N-1`.
 
 ### 8.5 `docs/roadmap.md` / `docs/todos.md`
+
+- [x]
 
 Remove or mark done any item about dynamic layers or the four-layer cap. Remove references
 to four layers as the permanent stack size.

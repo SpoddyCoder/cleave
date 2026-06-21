@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import pytest
 
 from cleave.blend_modes import BLEND_MODES
-from cleave.gl_compositor import GlCompositor
+from cleave.gl_compositor import GlCompositor, LayerFbo
 
 # Modes whose GL blend func uses GL_SRC_ALPHA (opacity stays in glColor alpha).
 _OPACITY_VIA_ALPHA = frozenset({"add"})
@@ -88,3 +90,23 @@ def test_pulse_zero_opacity_can_still_leave_flash_visible() -> None:
 
     assert effective_opacity(1.0, 100, 0.0) == 0.0
     assert flash_alpha(100, 0.15) >= 0.01
+
+
+def test_remove_layer_fbo_removes_and_destroys() -> None:
+    compositor = GlCompositor.__new__(GlCompositor)
+    fbo = MagicMock(spec=LayerFbo)
+    fbo.name = "layer_5"
+    compositor._layers = [fbo]
+
+    compositor.remove_layer_fbo("layer_5")
+
+    fbo.destroy.assert_called_once()
+    assert compositor._layers == []
+
+
+def test_remove_layer_fbo_unknown_name_raises() -> None:
+    compositor = GlCompositor.__new__(GlCompositor)
+    compositor._layers = []
+
+    with pytest.raises(ValueError, match="no layer FBO named 'missing'"):
+        compositor.remove_layer_fbo("missing")

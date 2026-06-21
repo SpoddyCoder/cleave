@@ -5,10 +5,12 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pygame
 
 from cleave.config import CleaveConfig, clamp_beat_sensitivity, clamp_effect_pct
+from cleave.config_schema import MAX_LAYER_COUNT
 from cleave.effects.registry import effect_row_count
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.extract import STEM_SOURCES
@@ -41,6 +43,9 @@ from cleave.viz.overlay import (
     row_slot,
 )
 from cleave.viz.session import TuningSession
+
+if TYPE_CHECKING:
+    from cleave.viz.wiring import LayerManager
 from cleave.viz.tuning_view_state import TuningViewStateBuilder
 
 TOAST_DURATION_SEC = 5.0
@@ -65,6 +70,7 @@ class TuningControls:
         launch_config_path: Path | None = None,
         repo_root_example: Path | None = None,
         modal_host: ModalHost | None = None,
+        layer_manager: LayerManager | None = None,
     ) -> None:
         self.session = session
         self.cfg = cfg
@@ -72,6 +78,7 @@ class TuningControls:
         self.playback = playback
         self.duration_sec = duration_sec
         self._layer_bindings = layer_bindings
+        self._layer_manager = layer_manager
         self._modal_host = modal_host if modal_host is not None else ModalHost()
 
         self.focus_index = 0
@@ -264,6 +271,14 @@ class TuningControls:
         if event.key == pygame.K_RETURN:
             view = self.build_view_state(paused=self.playback.paused)
             kind = row_kind(view, self.focus_index)
+            if kind == RowKind.LAYER_MANAGEMENT_ADD:
+                self._add_layer()
+                return True
+            if kind == RowKind.LAYER_MANAGEMENT_DELETE:
+                slot = row_slot(view, self.focus_index)
+                if slot is not None:
+                    self._delete_layer(slot)
+                return True
             if kind == RowKind.TRACK_PRESET_DIR:
                 slot = row_slot(view, self.focus_index)
                 if slot is not None:
@@ -410,6 +425,66 @@ class TuningControls:
     def _confirm_move_mode(self) -> None:
         self.move_mode_slot = None
         self._move_mode_original_z_order = None
+
+    def _rebuild_view(self, *, nav_pos: int | None = None) -> None:
+        if self.move_mode_slot is not None:
+            self._confirm_move_mode()
+        view = self.build_view_state(paused=self.playback.paused)
+        navigable = navigable_row_indices(view)
+        if not navigable:
+            return
+        if nav_pos is None:
+            try:
+                nav_pos = navigable.index(self.focus_index)
+            except ValueError:
+                nav_pos = 0
+        self.focus_index = navigable[min(nav_pos, len(navigable) - 1)]
+
+    def _add_layer(self) -> None:
+        if self._layer_manager is None:
+            return
+        if not self._layer_manager.can_add():
+            self.show_toast(f"Maximum {MAX_LAYER_COUNT} layers")
+            return
+        self._modal_host.prompt_yes_no(
+            "Add new Milkdrop visualisation layer?",
+            on_confirm=self._confirm_add_layer,
+        )
+
+    def _confirm_add_layer(self) -> None:
+        if self._layer_manager is None:
+            return
+        self._layer_manager.add_layer()
+        self._rebuild_view()
+
+    def _delete_layer(self, slot: str) -> None:
+        if self._layer_manager is None:
+            return
+        if not self._layer_manager.can_remove():
+            self.show_toast("Must have at least 1 layer")
+            return
+        self._modal_host.prompt_yes_no(
+            "Delete this Milkdrop visualisation layer?",
+            on_confirm=lambda: self._confirm_delete_layer(slot),
+        )
+
+    def _confirm_delete_layer(self, slot: str) -> None:
+        if self._layer_manager is None:
+            return
+        view = self.build_view_state(paused=self.playback.paused)
+        navigable = navigable_row_indices(view)
+        try:
+            nav_pos = navigable.index(self.focus_index)
+        except ValueError:
+            nav_pos = 0
+        self._layer_manager.remove_layer(slot)
+        self._rebuild_view(nav_pos=nav_pos)
+        tl = self.session.timeline
+        row_count = len(self.session.layer_z_order)
+        if row_count == 0:
+            tl.submenu_focused = False
+        elif tl.focus_row >= row_count:
+            tl.focus_row = row_count - 1
 
     def _cancel_move_mode(self) -> None:
         if self._move_mode_original_z_order is not None:

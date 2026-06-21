@@ -37,10 +37,8 @@ def layer_visible_at(
     slot: str,
     t_sec: float,
 ) -> bool:
-    from cleave.config_schema import LAYER_SLOTS
-
     if slot not in defaults:
-        allowed = ", ".join(LAYER_SLOTS)
+        allowed = ", ".join(sorted(defaults))
         raise ValueError(f"unknown slot: {slot!r} (expected one of: {allowed})")
     visible = defaults[slot]
     for cue in sorted(cues, key=lambda c: c.t):
@@ -54,12 +52,11 @@ def layer_visible_at(
 def visible_state_at(
     cues: list[TimelineCue],
     defaults: dict[str, bool],
+    slots: list[str],
     t_sec: float,
 ) -> dict[str, bool]:
-    from cleave.config_schema import LAYER_SLOTS
-
     return {
-        slot: layer_visible_at(cues, defaults, slot, t_sec) for slot in LAYER_SLOTS
+        slot: layer_visible_at(cues, defaults, slot, t_sec) for slot in slots
     }
 
 

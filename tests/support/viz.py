@@ -9,7 +9,8 @@ from pathlib import Path
 import pygame
 
 from cleave.config import CleaveConfig, LayerConfig, PathsConfig, VisualizerConfig
-from cleave.config_schema import DEFAULT_STEM_FOR_SLOT, LAYER_SLOTS
+from cleave.config_schema import DEFAULT_LAYER_SLOTS
+from tests.support.config import TEST_LAYER_STEMS
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.controls import TuningControls
 from cleave.viz.live_layer_bindings import LiveLayerBindings
@@ -100,11 +101,11 @@ def make_test_cfg(
         layers={
             slot: LayerConfig(
                 preset=root / slot / "preset-0.milk",
-                stem=DEFAULT_STEM_FOR_SLOT.get(slot, "drums"),
+                stem=TEST_LAYER_STEMS.get(slot, "drums"),
             )
-            for slot in LAYER_SLOTS
+            for slot in DEFAULT_LAYER_SLOTS
         },
-        layer_z_order=slots,
+        layer_z_order=list(slots),
         visualizer=VisualizerConfig(),
         config_path=config_path or Path("/tmp/test/cleave.config.yaml"),
     )
@@ -124,7 +125,7 @@ def make_controls(
             slot: LayerRuntime(
                 playlist=make_playlist(slot),
                 browse_floor=preset_root / slot,
-                stem=DEFAULT_STEM_FOR_SLOT.get(slot, "drums"),
+                stem=TEST_LAYER_STEMS.get(slot, "drums"),
                 opacity_pct=50,
             )
             for slot in slots

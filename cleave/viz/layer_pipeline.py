@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from cleave.config import CleaveConfig
+from pathlib import Path
+
+from cleave.config import CleaveConfig, LayerConfig
 from cleave.effects.runtime import EffectRuntime
 from cleave.gl_compositor import GlCompositor
 from cleave.gl_post_process import GlPostProcess
@@ -91,6 +93,55 @@ class LayerFramePipeline:
     """Per-frame GL path for stem layers."""
 
     @staticmethod
+    def build_single(
+        slot: str,
+        layer_cfg: LayerConfig,
+        compositor: GlCompositor,
+        playlist: PresetPlaylist,
+        fps: int,
+        texture_paths: list[Path],
+        beat_sensitivity: float,
+    ) -> StemLayer:
+        w, h = layer_cfg.width, layer_cfg.height
+
+        pm = ProjectM()
+        pm.set_window_size(w, h)
+        if texture_paths:
+            pm.set_texture_paths(texture_paths)
+        playlist.load_into(pm)
+        pm.lock_preset(True)
+        pm.set_hard_cut_enabled(False)
+        pm.set_fps(fps)
+        pm.set_beat_sensitivity(beat_sensitivity)
+
+        fbo = compositor.create_layer_fbo(
+            slot,
+            w,
+            h,
+            opacity=layer_cfg.opacity,
+            blend_mode=layer_cfg.blend_mode,
+        )
+        fbo.enabled = layer_cfg.enabled
+        return StemLayer(
+            slot=slot,
+            pm=pm,
+            fbo=fbo,
+            playlist=playlist,
+        )
+
+    @staticmethod
+    def destroy_single(
+        slot: str,
+        layers: list[StemLayer],
+        layers_by_slot: dict[str, StemLayer],
+        compositor: GlCompositor,
+    ) -> None:
+        layer = layers_by_slot.pop(slot)
+        layers.remove(layer)
+        layer.pm.destroy()
+        compositor.remove_layer_fbo(slot)
+
+    @staticmethod
     def build(
         cfg: CleaveConfig,
         compositor: GlCompositor,
@@ -101,33 +152,15 @@ class LayerFramePipeline:
         runtimes: list[StemLayer] = []
 
         for slot, layer_cfg in cfg.layers_in_z_order():
-            w, h = layer_cfg.width, layer_cfg.height
-            playlist = playlists[slot]
-
-            pm = ProjectM()
-            pm.set_window_size(w, h)
-            if texture_paths:
-                pm.set_texture_paths(texture_paths)
-            playlist.load_into(pm)
-            pm.lock_preset(True)
-            pm.set_hard_cut_enabled(False)
-            pm.set_fps(fps)
-            pm.set_beat_sensitivity(_beat_sensitivity(cfg, slot))
-
-            fbo = compositor.create_layer_fbo(
-                slot,
-                w,
-                h,
-                opacity=layer_cfg.opacity,
-                blend_mode=layer_cfg.blend_mode,
-            )
-            fbo.enabled = layer_cfg.enabled
             runtimes.append(
-                StemLayer(
-                    slot=slot,
-                    pm=pm,
-                    fbo=fbo,
-                    playlist=playlist,
+                LayerFramePipeline.build_single(
+                    slot,
+                    layer_cfg,
+                    compositor,
+                    playlists[slot],
+                    fps,
+                    texture_paths,
+                    _beat_sensitivity(cfg, slot),
                 )
             )
 

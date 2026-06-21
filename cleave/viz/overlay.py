@@ -206,6 +206,11 @@ def build_row_layout(state: TuningViewState) -> list[RowDescriptor]:
                         driver_slug=effect_def.driver_slug,
                     )
                 )
+        if block.expanded:
+            rows.append(
+                RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot=slot)
+            )
+    rows.append(RowDescriptor(RowKind.LAYER_MANAGEMENT_ADD))
     if state.render_timeline.enabled:
         rows.append(RowDescriptor(RowKind.TIMELINE_LAYER_HINT))
     rows.append(RowDescriptor(RowKind.RENDER_SECTION_GAP))
@@ -400,6 +405,11 @@ def _row_text(state: TuningViewState, index: int) -> str:
     if kind == RowKind.TIMELINE_LAYER_HINT:
         return TIMELINE_LAYER_HINT_TEXT
 
+    if kind == RowKind.LAYER_MANAGEMENT_ADD:
+        return "ADD NEW LAYER"
+    if kind == RowKind.LAYER_MANAGEMENT_DELETE:
+        return "Delete Layer"
+
     if kind == RowKind.RENDER_OVERLAY_HEADER:
         arrow = "▼" if state.render_overlay.expanded else "▶"
         return f"Render: OVERLAY {arrow}"
@@ -589,10 +599,11 @@ def _render_label_value_row(
     value: str,
     value_color: tuple[int, int, int],
     line_height: int,
+    prefix_color: tuple[int, int, int] | None = None,
     suffix_surf: pygame.Surface | None = None,
     suffix_gap: int = 0,
 ) -> pygame.Surface:
-    prefix_surf = font.render(prefix, True, LABEL)
+    prefix_surf = font.render(prefix, True, prefix_color if prefix_color is not None else LABEL)
     value_surf = font.render(value, True, value_color)
     label_w = prefix_surf.get_width() + value_surf.get_width()
     if suffix_surf is not None:
@@ -773,6 +784,8 @@ def fit_row_text(
         return ""
     if kind == RowKind.TIMELINE_LAYER_HINT:
         return TIMELINE_LAYER_HINT_TEXT
+    if kind in {RowKind.LAYER_MANAGEMENT_ADD, RowKind.LAYER_MANAGEMENT_DELETE}:
+        return _row_text(state, index)
     if kind == RowKind.RENDER_OVERLAY_HEADER:
         expanded = state.render_overlay.expanded
         return (
@@ -814,6 +827,10 @@ def _row_indent(state: TuningViewState, index: int) -> int:
         return 0
     if kind == RowKind.TIMELINE_LAYER_HINT:
         return 0
+    if kind == RowKind.LAYER_MANAGEMENT_ADD:
+        return 0
+    if kind == RowKind.LAYER_MANAGEMENT_DELETE:
+        return TREE_INDENT
     if kind == RowKind.TRACK_EFFECT:
         return TREE_INDENT * 2
     if kind in RENDER_OVERLAY_TITLE_NESTED_KINDS | RENDER_OVERLAY_BODY_NESTED_KINDS:
@@ -853,6 +870,13 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
     kind = row_kind(state, index)
     if kind == RowKind.TIMELINE_LAYER_HINT:
         return DISABLED
+
+    if kind == RowKind.LAYER_MANAGEMENT_ADD:
+        return LABEL
+    if kind == RowKind.LAYER_MANAGEMENT_DELETE:
+        if len(state.layer_z_order) == 1:
+            return DISABLED
+        return LABEL
 
     stem = row_slot(state, index)
     if kind == RowKind.CONFIG_HEADER:
@@ -1487,6 +1511,23 @@ class TuningOverlay:
                     prefix=prefix,
                     value=value,
                     value_color=color,
+                    line_height=line_h,
+                )
+                row_surfaces.append(surf)
+                row_time_surfaces.append(None)
+                row_widths.append(indent + surf.get_width())
+            elif kind in {
+                RowKind.LAYER_MANAGEMENT_ADD,
+                RowKind.LAYER_MANAGEMENT_DELETE,
+            }:
+                label = _row_text(state, index)
+                label_color = _row_value_color(state, index)
+                surf = _render_label_value_row(
+                    font,
+                    prefix=label,
+                    value="",
+                    value_color=label_color,
+                    prefix_color=label_color,
                     line_height=line_h,
                 )
                 row_surfaces.append(surf)
