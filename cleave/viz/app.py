@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -33,6 +34,7 @@ from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.timeline_overlay import TimelineOverlay
 from cleave.viz.playback import PlaybackState, current_sec, init_playback
 from cleave.viz.frame_finish import RenderOverlayPanelCache, finish_content_frame
+from cleave.viz.frame_rate import FrameRateMeter
 from cleave.viz.input_dispatch import (
     dispatch_keydown,
     dispatch_keyup,
@@ -305,6 +307,7 @@ def _tick_frame_live_overlay(
     *,
     paused: bool,
     overlay_dt: float,
+    display_fps: float | None = None,
 ) -> None:
     finish_content_frame(
         runtime,
@@ -317,6 +320,8 @@ def _tick_frame_live_overlay(
         paused=paused,
         position_sec=t_sec,
     )
+    if display_fps is not None:
+        view_state = dataclasses.replace(view_state, fps=display_fps)
     tl = runtime.seed.session.timeline
     runtime.overlay.update(overlay_dt)
     overlay_visibility = runtime.overlay.visibility
@@ -354,7 +359,8 @@ class VisualizerApp:
         self._was_paused: bool | None = None
 
     def tick_frame(
-        self, t_sec: float, *, paused: bool, draw_overlay: bool = True
+        self, t_sec: float, *, paused: bool, draw_overlay: bool = True,
+        display_fps: float | None = None,
     ) -> None:
         self._was_paused = tick_frame_core(
             self._runtime,
@@ -372,6 +378,7 @@ class VisualizerApp:
                 t_sec,
                 paused=paused,
                 overlay_dt=self._overlay_dt,
+                display_fps=display_fps,
             )
 
     def run(self) -> None:
@@ -443,7 +450,10 @@ class VisualizerApp:
             rt.mix_player.start()
 
             running = True
+            frame_rate = FrameRateMeter()
+            display_fps: float | None = None
             while running:
+                frame_rate.begin_frame()
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         if rt.controls.try_quit():
@@ -478,9 +488,14 @@ class VisualizerApp:
                     rt.overlay.notify_input()
 
                 t_sec = current_sec(rt.playback, rt.seed.duration_sec)
-                self.tick_frame(t_sec, paused=rt.playback.paused)
+                self.tick_frame(
+                    t_sec,
+                    paused=rt.playback.paused,
+                    display_fps=display_fps,
+                )
 
                 pygame.display.flip()
+                display_fps = frame_rate.end_frame()
 
         finally:
             if rt is not None:

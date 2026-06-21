@@ -39,6 +39,7 @@ from cleave.viz.text_fit import (
     fit_path_label_to_width,
     fit_text_to_width,
 )
+from cleave.viz.frame_rate import format_fps_display
 from cleave.viz.playback import format_mmss
 from cleave.viz.material_icons import (
     FILE_GLYPH,
@@ -175,6 +176,7 @@ class TuningViewState:
     timeline_recording: bool = False
     timeline_override_active: bool = False
     help_visible: bool = False
+    fps: float | None = None
 
 
 def header_row_count(state: TuningViewState) -> int:
@@ -992,6 +994,29 @@ def panel_help_hint_layout(
     )
 
 
+@dataclass(frozen=True)
+class PanelFpsLayout:
+    x: int
+    y: int
+
+
+def panel_fps_layout(
+    *,
+    panel_w: int,
+    padding: int,
+    text_width: int,
+    show_scrollbar: bool,
+) -> PanelFpsLayout:
+    """Top-right FPS readout on the transport row; shifts left for the scrollbar."""
+    right_reserve = (
+        SCROLLBAR_WIDTH + SCROLLBAR_CONTENT_GAP if show_scrollbar else 0
+    )
+    return PanelFpsLayout(
+        x=panel_w - padding - right_reserve - text_width,
+        y=padding,
+    )
+
+
 def scroll_metrics(
     *,
     visible_indices: list[int],
@@ -1660,6 +1685,19 @@ class TuningOverlay:
         if toast_surf is not None and text_alpha >= 2 and toast_layout.toast_y is not None:
             toast_surf.set_alpha(text_alpha)
             panel.blit(toast_surf, (self._padding, toast_layout.toast_y))
+
+        if state.fps is not None and text_alpha >= 2:
+            transport_index = find_row_by_kind(state, RowKind.TRANSPORT)
+            fps_color = _row_value_color(state, transport_index)
+            fps_surf = font.render(format_fps_display(state.fps), True, fps_color)
+            fps_surf.set_alpha(text_alpha)
+            fps_layout = panel_fps_layout(
+                panel_w=panel_w,
+                padding=self._padding,
+                text_width=fps_surf.get_width(),
+                show_scrollbar=metrics.show_scrollbar,
+            )
+            panel.blit(fps_surf, (fps_layout.x, fps_layout.y))
 
         if text_alpha >= 2:
             help_hint = font.render("h - help", True, LABEL)
