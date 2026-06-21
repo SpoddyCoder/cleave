@@ -21,6 +21,7 @@ from cleave.viz.row_semantics import (
     row_blocked_by_layer_lock,
     row_behavior,
     row_navigable_when_layer_locked,
+    row_triggers_layer_delete,
 )
 
 _EXPECTED_REPEAT_ROW_KINDS = frozenset(
@@ -217,3 +218,10 @@ def test_labeled_sub_row_kinds_exclude_headers() -> None:
             RowAffordance.PATH_PRESET,
         }
         assert not behavior.is_header
+
+
+def test_row_triggers_layer_delete_for_track_rows_only() -> None:
+    assert row_triggers_layer_delete(RowKind.TRACK_HEADER) is True
+    assert row_triggers_layer_delete(RowKind.LAYER_MANAGEMENT_DELETE) is True
+    assert row_triggers_layer_delete(RowKind.LAYER_MANAGEMENT_ADD) is False
+    assert row_triggers_layer_delete(RowKind.TRANSPORT) is False

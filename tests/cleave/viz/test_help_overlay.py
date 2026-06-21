@@ -54,12 +54,18 @@ def test_layer_section_includes_visibility_when_timeline_disabled() -> None:
     assert entries.get("Ctrl + Enter") == "lock/unlock layer"
     assert entries.get("Shift + Left/Right") == "solo layer"
     assert entries.get("Ctrl + Left/Right") == "enable/disable layer"
+    assert entries.get("Delete") == "delete layer"
 
 
 def test_layer_section_omits_visibility_when_timeline_enabled() -> None:
     section = _layer_section(timeline_enabled=True)
     keys = [entry[0] for entry in section.entries]
     assert "Ctrl + Left/Right" not in keys
+
+
+def test_track_header_help_includes_delete() -> None:
+    section = _sections_for(RowKind.TRACK_HEADER, timeline_enabled=False)[0]
+    assert dict(section.entries)["Delete"] == "delete layer"
 
 
 def test_track_header_help_reflects_timeline_enabled() -> None:
@@ -130,7 +136,7 @@ def test_layer_management_delete_help() -> None:
     section = _sections_for(RowKind.LAYER_MANAGEMENT_DELETE)[0]
     assert section.title == "Delete layer"
     entries = dict(section.entries)
-    assert entries["Enter"] == "confirm delete"
+    assert entries["Enter/Delete"] == "confirm delete"
     assert entries[""] == "at least 1 layer required"
 
 

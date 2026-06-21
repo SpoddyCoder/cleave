@@ -10,6 +10,7 @@ from cleave.viz.key_repeat import (
     INITIAL_DELAY_SEC,
     SLOW_INTERVAL_SEC,
     KeyRepeatController,
+    delete_key_pressed,
 )
 
 
@@ -122,3 +123,18 @@ def test_navigation_repeat_stays_at_constant_interval() -> None:
     assert len(repeats) == count_before
     controller.tick(SLOW_INTERVAL_SEC - FAST_INTERVAL_SEC)
     assert len(repeats) == count_before + 1
+
+
+def test_delete_key_pressed_matches_keysym_and_scancode() -> None:
+    keysym = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_DELETE, scancode=0)
+    assert delete_key_pressed(keysym) is True
+
+    scancode = pygame.event.Event(
+        pygame.KEYDOWN,
+        key=0,
+        scancode=pygame.KSCAN_DELETE,
+    )
+    assert delete_key_pressed(scancode) is True
+
+    backspace = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_BACKSPACE, scancode=0)
+    assert delete_key_pressed(backspace) is False

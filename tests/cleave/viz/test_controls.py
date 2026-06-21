@@ -264,7 +264,8 @@ def test_add_layer_confirm_calls_manager() -> None:
     assert "layer_2" in controls.session.layer_z_order
 
 
-def test_delete_layer_confirm_calls_manager() -> None:
+@pytest.mark.parametrize("confirm_key", (pygame.K_RETURN, pygame.K_DELETE))
+def test_delete_layer_confirm_calls_manager(confirm_key: int) -> None:
     controls, manager = _make_controls_with_manager(("layer_1", "layer_2"))
     controls.session.layers["layer_2"].expanded = True
 
@@ -278,7 +279,26 @@ def test_delete_layer_confirm_calls_manager() -> None:
         view, "layer_2", RowKind.LAYER_MANAGEMENT_DELETE
     )
 
-    _confirm_modal_yes(controls)
+    controls.handle_keydown(_keydown(confirm_key))
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+
+    manager.remove_layer.assert_called_once_with("layer_2")
+    assert "layer_2" not in controls.session.layer_z_order
+
+
+def test_delete_layer_from_header_with_delete_key() -> None:
+    controls, manager = _make_controls_with_manager(("layer_1", "layer_2"))
+
+    def remove_layer(slot: str) -> None:
+        controls.session.layer_z_order.remove(slot)
+        del controls.session.layers[slot]
+
+    manager.remove_layer.side_effect = remove_layer
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row(view, "layer_2", RowKind.TRACK_HEADER)
+
+    controls.handle_keydown(_keydown(pygame.K_DELETE))
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
 
     manager.remove_layer.assert_called_once_with("layer_2")
     assert "layer_2" not in controls.session.layer_z_order
