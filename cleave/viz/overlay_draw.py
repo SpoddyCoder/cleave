@@ -8,7 +8,8 @@ from cleave.gl_compositor import GlCompositor
 from cleave.viz import modal_overlay
 from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.modal import ModalHost
-from cleave.viz.overlay import TuningOverlay, TuningViewState
+from cleave.viz.tuning_panel_draw import TuningOverlay
+from cleave.viz.tuning_view_state import TuningViewState
 from cleave.viz.timeline_overlay import TimelineOverlay, TimelineViewState
 
 

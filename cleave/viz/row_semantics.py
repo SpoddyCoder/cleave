@@ -66,6 +66,7 @@ class RowBehavior:
     affordance: RowAffordance
     help_title: str = ""
     navigable: bool = True
+    quick_nav_target: bool = False
     is_header: bool = False
     is_sub_header: bool = False
     is_pinned: bool = False
@@ -83,6 +84,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.SEEK,
         is_header=True,
         repeatable=True,
+        quick_nav_target=True,
     ),
     RowKind.CONFIG_HEADER: RowBehavior(
         RowAffordance.ACTION,
@@ -94,6 +96,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         can_enter_move_mode=True,
         can_solo=True,
         can_enable_disable=True,
+        quick_nav_target=True,
     ),
     RowKind.TRACK_PRESET_DIR: RowBehavior(
         RowAffordance.PATH_DIR,
@@ -164,6 +167,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         can_enable_disable=True,
         can_solo=True,
         help_title="Render",
+        quick_nav_target=True,
     ),
     RowKind.RENDER_OVERLAY_POSITION: RowBehavior(
         RowAffordance.VALUE_STEP,
@@ -232,6 +236,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         can_enable_disable=True,
         can_solo=True,
         help_title="Render",
+        quick_nav_target=True,
     ),
     RowKind.RENDER_POST_FX_FADE_IN: RowBehavior(
         RowAffordance.VALUE_STEP,
@@ -248,6 +253,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         can_enable_disable=True,
         can_solo=False,
         help_title="Render",
+        quick_nav_target=True,
     ),
     RowKind.SETTINGS_HEADER: RowBehavior(
         RowAffordance.EXPAND,

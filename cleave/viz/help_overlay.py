@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import pygame
 
 from cleave.viz.row_semantics import RowAffordance, RowKind, row_behavior
-from cleave.viz.overlay import clip_rect_to_surface
+from cleave.viz.tuning_panel_draw import clip_rect_to_surface
 from cleave.viz.theme import (
     BACKGROUND,
     BACKGROUND_ALPHA,

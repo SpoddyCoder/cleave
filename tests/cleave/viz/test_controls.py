@@ -63,18 +63,17 @@ from cleave.viz.material_icons import (
     visibility_icon_prefix_width,
 )
 from cleave.viz.row_semantics import RowDescriptor, RowKind
-from cleave.viz.overlay import (
-    TrackBlock,
-    TuningViewState,
+from cleave.viz.tuning_panel_draw import (
     TREE_INDENT,
     _row_bg_color,
     _row_indent,
     _row_text,
     _row_value_color,
-    render_visibility_icon,
     fit_row_text,
+    render_visibility_icon,
     track_header_prefix_width,
 )
+from cleave.viz.tuning_view_state import TrackBlock, TuningViewState
 from tests.support.viz import baseline_tuning_ui_metrics
 
 
@@ -1564,7 +1563,7 @@ def test_key_repeat_armed_while_navigation_key_held() -> None:
 
 
 def test_held_key_repeat_keeps_overlay_visible() -> None:
-    from cleave.viz.overlay import TuningOverlay
+    from cleave.viz.tuning_panel_draw import TuningOverlay
     from cleave.viz.theme import FADE_DURATION_SEC, HOLD_IDLE_SEC
 
     controls = _make_controls()

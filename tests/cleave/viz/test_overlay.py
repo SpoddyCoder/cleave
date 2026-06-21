@@ -11,13 +11,9 @@ from cleave.viz.frame_rate import format_fps_display
 from cleave.viz.material_icons import row_icon_prefix_width
 from cleave.viz.focus_nav import MainFocus
 from cleave.viz.row_semantics import RowDescriptor, RowKind
-from cleave.viz.overlay import (
+from cleave.viz.tuning_panel_draw import (
     PanelScrollMetrics,
-    RenderOverlayBlock,
-    RenderTimelineBlock,
-    TrackBlock,
     TuningOverlay,
-    TuningViewState,
     _row_bg_color,
     _row_text,
     _row_value_color,
@@ -29,6 +25,12 @@ from cleave.viz.overlay import (
     render_visibility_icon,
     TREE_INDENT,
     scroll_metrics,
+)
+from cleave.viz.tuning_view_state import (
+    RenderOverlayBlock,
+    RenderTimelineBlock,
+    TrackBlock,
+    TuningViewState,
 )
 from cleave.viz.theme import (
     ACTION,

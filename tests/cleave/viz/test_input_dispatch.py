@@ -21,7 +21,7 @@ from cleave.viz.input_dispatch import (
     key_handler_for_runtime,
 )
 from cleave.viz.modal import ModalHost, ModalKind
-from cleave.viz.overlay import TuningOverlay
+from cleave.viz.tuning_panel_draw import TuningOverlay
 from cleave.viz.timeline_controls import TimelineControls
 from tests.support.compositor_mock import recording_compositor
 from tests.support.viz import keydown, make_playlist, make_test_cfg, stub_playback_state
