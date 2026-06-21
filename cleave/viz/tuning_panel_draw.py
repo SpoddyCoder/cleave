@@ -82,6 +82,7 @@ Anchor = Literal["topleft", "bottomleft"]
 
 _tuning_ui = tuning_ui_metrics()
 TREE_INDENT = _tuning_ui.tree_indent
+TREE_BRANCH = "└"
 TIMELINE_LAYER_HINT_TEXT = "Timeline is enabled and controlling layer visibility"
 ROW_ICON_SUFFIX_GAP = _tuning_ui.row_icon_suffix_gap
 
@@ -399,6 +400,30 @@ def track_header_prefix_width(font: pygame.font.Font) -> int:
     return icon_w + ROW_ICON_SUFFIX_GAP
 
 
+def tree_branch_prefix_width(font: pygame.font.Font) -> int:
+    return font.size(TREE_BRANCH)[0]
+
+
+def preset_row_prefix_width(font: pygame.font.Font, line_height: int) -> int:
+    return tree_branch_prefix_width(font) + row_icon_prefix_width(line_height)
+
+
+def _render_preset_row_prefix(
+    font: pygame.font.Font,
+    *,
+    glyph: str,
+    icon_color: tuple[int, int, int],
+    line_height: int,
+) -> pygame.Surface:
+    tree_surf = font.render(TREE_BRANCH, True, LABEL)
+    icon_surf = render_glyph(glyph, color=icon_color, line_height=line_height)
+    total_w = tree_surf.get_width() + icon_surf.get_width()
+    surf = pygame.Surface((total_w, line_height), pygame.SRCALPHA)
+    surf.blit(tree_surf, (0, 0))
+    surf.blit(icon_surf, (tree_surf.get_width(), 0))
+    return surf
+
+
 def _layer_management_delete_prefix() -> str:
     return "└─ "
 
@@ -490,11 +515,13 @@ def fit_row_text(
     text = _row_text(state, index)
 
     if kind in {RowKind.CONFIG_HEADER, RowKind.TRACK_PRESET_DIR, RowKind.TRACK_PRESET}:
-        icon_w = row_icon_prefix_width(font.get_linesize())
+        line_h = font.get_linesize()
         if kind == RowKind.CONFIG_HEADER:
+            icon_w = row_icon_prefix_width(line_h)
             suffix_w = font.size("*")[0] if state.config_dirty else 0
             return fit_path_label_to_width(font, text, budget - icon_w - suffix_w)
-        return fit_counter_label_to_width(font, text, budget - icon_w)
+        prefix_w = preset_row_prefix_width(font, line_h)
+        return fit_counter_label_to_width(font, text, budget - prefix_w)
     if kind == RowKind.TRACK_HEADER:
         stem = state.layout.slot(index)
         assert stem is not None
@@ -1206,10 +1233,25 @@ class TuningOverlay:
                 if kind == RowKind.TRACK_PRESET_DIR:
                     glyph = FOLDER_GLYPH
                     icon_color = PRESET_ICON
-                else:
+                    icon_surf = _render_preset_row_prefix(
+                        font,
+                        glyph=glyph,
+                        icon_color=icon_color,
+                        line_height=line_h,
+                    )
+                elif kind == RowKind.TRACK_PRESET:
                     glyph = FILE_GLYPH
                     icon_color = PRESET_FILE_ICON
-                icon_surf = render_glyph(glyph, color=icon_color, line_height=line_h)
+                    icon_surf = _render_preset_row_prefix(
+                        font,
+                        glyph=glyph,
+                        icon_color=icon_color,
+                        line_height=line_h,
+                    )
+                else:
+                    icon_surf = render_glyph(
+                        FILE_GLYPH, color=PRESET_FILE_ICON, line_height=line_h
+                    )
                 if kind == RowKind.CONFIG_HEADER:
                     path = fit_row_text(
                         font, state, index, max_content_width=max_content_width
