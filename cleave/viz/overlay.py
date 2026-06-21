@@ -33,6 +33,7 @@ from cleave.viz.row_semantics import (
     row_blocked_by_layer_lock,
     row_is_pinned,
     row_navigable_when_layer_locked,
+    section_header_descriptor,
 )
 from cleave.viz.fonts import render_overlay_font_display
 from cleave.viz.text_fit import (
@@ -267,6 +268,29 @@ class RowLayout:
                 return index
         raise ValueError(f"no row for kind={kind!r}")
 
+    def find_descriptor(self, desc: RowDescriptor) -> int:
+        for index, row in enumerate(self.rows):
+            if row == desc:
+                return index
+        raise ValueError(f"descriptor not in layout: {desc!r}")
+
+    def contains_descriptor(self, desc: RowDescriptor) -> bool:
+        return desc in self.rows
+
+    def navigable_descriptors(self, state: TuningViewState) -> list[RowDescriptor]:
+        return [self.descriptor(index) for index in self.navigable_indices(state)]
+
+    def resolve_navigable(
+        self, desc: RowDescriptor, state: TuningViewState
+    ) -> RowDescriptor:
+        navigable = self.navigable_descriptors(state)
+        if desc in navigable:
+            return desc
+        header = section_header_descriptor(desc)
+        if header in navigable:
+            return header
+        return RowDescriptor(RowKind.TRANSPORT)
+
     def header_row_count(self) -> int:
         count = 0
         for row in self.rows:
@@ -372,7 +396,7 @@ class TuningViewState:
     tracks: dict[str, TrackBlock]
     paused: bool
     position_sec: float
-    focus_index: int
+    focus_descriptor: RowDescriptor
     move_mode_slot: str | None
     toast_message: str | None
     toast_remaining_sec: float
@@ -398,6 +422,11 @@ class TuningViewState:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "layout", RowLayout.build(self))
+
+    @property
+    def focus_index(self) -> int:
+        resolved = self.layout.resolve_navigable(self.focus_descriptor, self)
+        return self.layout.find_descriptor(resolved)
 
 
 def track_sub_rows_visible(state: TuningViewState, slot: str) -> bool:

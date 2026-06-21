@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
+from dataclasses import replace
 
 from cleave.preset_playlist import directory_display, preset_filename_display
 from cleave.viz.config_save import ConfigSaveController
@@ -16,6 +17,7 @@ from cleave.viz.overlay import (
     TuningViewState,
 )
 from cleave.viz.playback import PlaybackState, current_sec
+from cleave.viz.row_semantics import RowDescriptor, RowKind
 from cleave.viz.session import TuningSession, config_path_display
 
 
@@ -29,7 +31,7 @@ class TuningViewStateBuilder:
         duration_sec: float,
         preset_root,
         *,
-        get_focus_index: Callable[[], int],
+        get_focus_descriptor: Callable[[], RowDescriptor],
         get_move_mode_slot: Callable[[], str | None],
         config_save: ConfigSaveController,
         get_toast_message: Callable[[], str | None],
@@ -39,7 +41,7 @@ class TuningViewStateBuilder:
         self.playback = playback
         self.duration_sec = duration_sec
         self.preset_root = preset_root
-        self._get_focus_index = get_focus_index
+        self._get_focus_descriptor = get_focus_descriptor
         self._get_move_mode_slot = get_move_mode_slot
         self._config_save = config_save
         self._get_toast_message = get_toast_message
@@ -95,12 +97,13 @@ class TuningViewStateBuilder:
         ro = self.session.render_overlay
         pp = self.session.render_post_fx
         tl = self.session.timeline
-        return TuningViewState(
+        resolved = self._get_focus_descriptor()
+        state = TuningViewState(
             layer_z_order=tuple(self.session.layer_z_order),
             tracks=tracks,
             paused=paused,
             position_sec=position_sec,
-            focus_index=self._get_focus_index(),
+            focus_descriptor=RowDescriptor(RowKind.TRANSPORT),
             move_mode_slot=self._get_move_mode_slot(),
             toast_message=toast_message,
             toast_remaining_sec=toast_remaining,
@@ -147,3 +150,5 @@ class TuningViewStateBuilder:
             help_visible=self.session.help_visible,
             fps=fps,
         )
+        resolved = state.layout.resolve_navigable(resolved, state)
+        return replace(state, focus_descriptor=resolved)

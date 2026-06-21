@@ -9,7 +9,7 @@ from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
 from cleave.viz.frame_rate import format_fps_display
 from cleave.viz.material_icons import row_icon_prefix_width
-from cleave.viz.row_semantics import RowKind
+from cleave.viz.row_semantics import RowDescriptor, RowKind
 from cleave.viz.overlay import (
     PanelScrollMetrics,
     RenderOverlayBlock,
@@ -68,7 +68,7 @@ def _effects_expanded_view_state() -> TuningViewState:
         tracks=tracks,
         paused=False,
         position_sec=0.0,
-        focus_index=0,
+        focus_descriptor=RowDescriptor(RowKind.TRANSPORT),
         move_mode_slot=None,
         toast_message=None,
         toast_remaining_sec=0.0,
@@ -144,7 +144,9 @@ def test_scrolled_panel_keeps_focus_row_in_viewport() -> None:
     pygame.init()
     overlay = TuningOverlay()
     state = _effects_expanded_view_state()
-    state.focus_index = state.layout.find_by_kind( RowKind.RENDER_TIMELINE_HEADER) - 1
+    state.focus_descriptor = state.layout.descriptor(
+        state.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER) - 1
+    )
 
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     overlay.notify_input()
@@ -171,10 +173,10 @@ def _copy_panel_surface(overlay: TuningOverlay, state: TuningViewState) -> pygam
 def test_header_rows_pinned_when_scrolled() -> None:
     pygame.init()
     state_top = _effects_expanded_view_state()
-    scroll_focus = state_top.layout.find_by_kind( RowKind.RENDER_TIMELINE_HEADER) - 1
-    state_top.focus_index = scroll_focus
+    scroll_focus = state_top.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER) - 1
+    state_top.focus_descriptor = state_top.layout.descriptor(scroll_focus)
     state_bottom = _effects_expanded_view_state()
-    state_bottom.focus_index = scroll_focus
+    state_bottom.focus_descriptor = state_bottom.layout.descriptor(scroll_focus)
 
     panel_top = _copy_panel_surface(TuningOverlay(), state_top)
     panel_bottom = _copy_panel_surface(TuningOverlay(), state_bottom)
@@ -271,9 +273,10 @@ def test_draw_fps_counter_when_present() -> None:
 def test_fps_color_ignores_transport_focus() -> None:
     pygame.init()
     overlay = TuningOverlay()
-    state = _minimal_view_state(fps=30.0)
-    transport_index = state.layout.find_by_kind(RowKind.TRANSPORT)
-    state = _minimal_view_state(fps=30.0, focus_index=transport_index)
+    state = _minimal_view_state(
+        fps=30.0,
+        focus_descriptor=RowDescriptor(RowKind.TRANSPORT),
+    )
 
     with_fps = _copy_panel_surface(overlay, state)
     font = overlay._font_get()
@@ -436,7 +439,7 @@ def _minimal_view_state(**kwargs: object) -> TuningViewState:
         },
         "paused": False,
         "position_sec": 0.0,
-        "focus_index": 0,
+        "focus_descriptor": RowDescriptor(RowKind.TRANSPORT),
         "move_mode_slot": None,
         "toast_message": None,
         "toast_remaining_sec": 0.0,
@@ -857,7 +860,7 @@ def test_draw_track_header_with_solo_eye() -> None:
         },
         paused=False,
         position_sec=0.0,
-        focus_index=0,
+        focus_descriptor=RowDescriptor(RowKind.TRANSPORT),
         move_mode_slot=None,
         toast_message=None,
         toast_remaining_sec=0.0,
@@ -894,7 +897,7 @@ def test_disabled_track_focus_uses_muted_highlight() -> None:
         },
     )
     header_row = state.layout.find_by_kind( RowKind.TRACK_HEADER)
-    state.focus_index = header_row
+    state.focus_descriptor = state.layout.descriptor(header_row)
     assert _row_value_color(state, header_row) == HIGHLIGHT_MUTED
     assert _row_bg_color(state, header_row) == HIGHLIGHT_MUTED
     assert _row_value_color(state, header_row) != HIGHLIGHT
@@ -907,7 +910,7 @@ def test_main_tree_rows_not_highlighted_when_timeline_submenu_focused() -> None:
     )
     for row_kind_target in (RowKind.TRANSPORT, RowKind.TRACK_HEADER):
         row = state.layout.find_by_kind(row_kind_target)
-        state.focus_index = row
+        state.focus_descriptor = state.layout.descriptor(row)
         state.timeline_submenu_focused = False
         assert _row_value_color(state, row) == HIGHLIGHT
         assert _row_bg_color(state, row) == HIGHLIGHT
@@ -917,7 +920,7 @@ def test_main_tree_rows_not_highlighted_when_timeline_submenu_focused() -> None:
         assert _row_bg_color(state, row) is None
 
     timeline_row = state.layout.find_by_kind( RowKind.RENDER_TIMELINE_HEADER)
-    state.focus_index = timeline_row
+    state.focus_descriptor = state.layout.descriptor(timeline_row)
     state.timeline_submenu_focused = False
     assert _row_value_color(state, timeline_row) == HIGHLIGHT
     assert _row_bg_color(state, timeline_row) == HIGHLIGHT

@@ -2,67 +2,31 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
 from cleave.config import RENDER_OVERLAY_POSITIONS
-from cleave.viz.focus_context import FocusContext
 from cleave.viz.fonts import cycle_render_overlay_font
-from cleave.viz.overlay import TuningViewState
-from cleave.viz.row_semantics import (
-    RENDER_OVERLAY_ALL_SUB_ROW_KINDS,
-    RENDER_OVERLAY_BODY_NESTED_KINDS,
-    RENDER_OVERLAY_TITLE_NESTED_KINDS,
-    RowKind,
-)
 from cleave.viz.session import TuningSession
 
 
 class RenderOverlayControls:
     """Mutations for render overlay rows."""
 
-    def __init__(
-        self,
-        session: TuningSession,
-        *,
-        focus_context: FocusContext,
-        focused_row_kind: Callable[[], RowKind | None],
-    ) -> None:
+    def __init__(self, session: TuningSession) -> None:
         self.session = session
-        self._focus = focus_context
-        self._focused_row_kind = focused_row_kind
-
-    def _render_overlay_header_index(self) -> int:
-        view = self._focus.build_view_state(paused=self._focus.is_paused())
-        return view.layout.find_by_kind(RowKind.RENDER_OVERLAY_HEADER)
-
-    def _render_overlay_title_header_index(self) -> int:
-        view = self._focus.build_view_state(paused=self._focus.is_paused())
-        return view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_HEADER)
-
-    def _render_overlay_body_header_index(self) -> int:
-        view = self._focus.build_view_state(paused=self._focus.is_paused())
-        return view.layout.find_by_kind(RowKind.RENDER_OVERLAY_BODY_HEADER)
 
     def set_expanded(self, expanded: bool) -> None:
         ro = self.session.render_overlay
         if ro.expanded == expanded:
             return
-        focus_kind = self._focused_row_kind()
         ro.expanded = expanded
-        if not expanded and focus_kind in RENDER_OVERLAY_ALL_SUB_ROW_KINDS:
-            self._focus.set_focus_index(self._render_overlay_header_index())
 
     def set_enabled(self, enabled: bool) -> None:
         ro = self.session.render_overlay
         if ro.enabled == enabled:
             return
-        focus_kind = self._focused_row_kind()
         ro.enabled = enabled
         if not enabled:
             self.session.render_overlay_solo = False
             ro.expanded = False
-            if focus_kind in RENDER_OVERLAY_ALL_SUB_ROW_KINDS:
-                self._focus.set_focus_index(self._render_overlay_header_index())
 
     def enter_solo(self) -> None:
         if self.session.render_overlay_solo:
@@ -90,19 +54,13 @@ class RenderOverlayControls:
         ro = self.session.render_overlay
         if ro.title_expanded == expanded:
             return
-        focus_kind = self._focused_row_kind()
         ro.title_expanded = expanded
-        if not expanded and focus_kind in RENDER_OVERLAY_TITLE_NESTED_KINDS:
-            self._focus.set_focus_index(self._render_overlay_title_header_index())
 
     def set_body_expanded(self, expanded: bool) -> None:
         ro = self.session.render_overlay
         if ro.body_expanded == expanded:
             return
-        focus_kind = self._focused_row_kind()
         ro.body_expanded = expanded
-        if not expanded and focus_kind in RENDER_OVERLAY_BODY_NESTED_KINDS:
-            self._focus.set_focus_index(self._render_overlay_body_header_index())
 
     def set_title_font_size(self, size: int) -> None:
         self.session.render_overlay.title_font_size = max(1, size)

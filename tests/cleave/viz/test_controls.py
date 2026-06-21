@@ -61,7 +61,7 @@ from cleave.viz.material_icons import (
     track_header_lock_suffix_width,
     visibility_icon_prefix_width,
 )
-from cleave.viz.row_semantics import RowKind
+from cleave.viz.row_semantics import RowDescriptor, RowKind
 from cleave.viz.overlay import (
     TrackBlock,
     TuningViewState,
@@ -206,7 +206,7 @@ def test_build_view_state_passes_fps() -> None:
 def test_add_layer_at_max_shows_toast() -> None:
     controls, manager = _make_controls_with_manager(("layer_1",), can_add=False)
     view = controls.build_view_state(paused=False)
-    controls.focus_index = view.layout.find_by_kind(RowKind.LAYER_MANAGEMENT_ADD)
+    controls.focus_descriptor = RowDescriptor(RowKind.LAYER_MANAGEMENT_ADD)
 
     controls.handle_keydown(_keydown(pygame.K_RETURN))
 
@@ -222,9 +222,9 @@ def test_delete_layer_at_min_shows_toast() -> None:
     controls, manager = _make_controls_with_manager(("layer_1",), can_remove=False)
     controls.session.layers["layer_1"].expanded = True
     view = controls.build_view_state(paused=False)
-    controls.focus_index = view.layout.find(
+    controls.focus_descriptor = view.layout.descriptor(view.layout.find(
         "layer_1", RowKind.LAYER_MANAGEMENT_DELETE
-    )
+    ))
 
     controls.handle_keydown(_keydown(pygame.K_RETURN))
 
@@ -251,7 +251,7 @@ def test_add_layer_confirm_calls_manager() -> None:
     manager.add_layer.side_effect = add_layer
     view = controls.build_view_state(paused=False)
     before_count = len(view.layout)
-    controls.focus_index = view.layout.find_by_kind(RowKind.LAYER_MANAGEMENT_ADD)
+    controls.focus_descriptor = RowDescriptor(RowKind.LAYER_MANAGEMENT_ADD)
 
     _confirm_modal_yes(controls)
 
@@ -272,9 +272,9 @@ def test_delete_layer_confirm_calls_manager(confirm_key: int) -> None:
 
     manager.remove_layer.side_effect = remove_layer
     view = controls.build_view_state(paused=False)
-    controls.focus_index = view.layout.find(
+    controls.focus_descriptor = view.layout.descriptor(view.layout.find(
         "layer_2", RowKind.LAYER_MANAGEMENT_DELETE
-    )
+    ))
 
     controls.handle_keydown(_keydown(confirm_key))
     controls.handle_keydown(_keydown(pygame.K_RETURN))
@@ -292,7 +292,7 @@ def test_delete_layer_from_header_with_delete_key() -> None:
 
     manager.remove_layer.side_effect = remove_layer
     view = controls.build_view_state(paused=False)
-    controls.focus_index = view.layout.find( "layer_2", RowKind.TRACK_HEADER)
+    controls.focus_descriptor = view.layout.descriptor(view.layout.find( "layer_2", RowKind.TRACK_HEADER))
 
     controls.handle_keydown(_keydown(pygame.K_DELETE))
     controls.handle_keydown(_keydown(pygame.K_RETURN))
@@ -331,7 +331,7 @@ def test_delete_layer_exits_move_mode() -> None:
 
     manager.remove_layer.side_effect = remove_layer
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_HEADER)
+    controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_HEADER))
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     assert controls.move_mode_slot == "layer_1"
 
@@ -353,6 +353,15 @@ def _row(
     return view.layout.find(stem, kind, effect_id=effect_id, driver_slug=driver_slug)
 
 
+def _desc(view: TuningViewState, index: int) -> RowDescriptor:
+    return view.layout.descriptor(index)
+
+
+def _focus_index(controls: TuningControls, *, paused: bool = False) -> int:
+    view = controls.build_view_state(paused=paused)
+    return view.layout.find_descriptor(controls.focus_descriptor)
+
+
 def test_allow_overwrite_for_path_hides_repo_root_template_only() -> None:
     root = Path("/repo/cleave-viz.yaml")
     assert allow_overwrite_for_path(root, repo_root_example=root) is False
@@ -372,25 +381,24 @@ def test_focus_navigation_wraps() -> None:
     navigable = view.layout.navigable_indices(view)
     transport_row = view.layout.find_by_kind(RowKind.TRANSPORT)
     start_pos = navigable.index(transport_row)
-    assert controls.focus_index == transport_row
+    assert controls.focus_descriptor == _desc(view, transport_row)
 
     for step in range(1, len(navigable)):
         assert controls.handle_keydown(_keydown(pygame.K_DOWN)) is True
-        assert controls.focus_index == navigable[(start_pos + step) % len(navigable)]
+        assert controls.focus_descriptor == _desc(view, navigable[(start_pos + step) % len(navigable)])
 
     assert controls.handle_keydown(_keydown(pygame.K_DOWN)) is True
-    assert controls.focus_index == transport_row
+    assert controls.focus_descriptor == _desc(view, transport_row)
 
     assert controls.handle_keydown(_keydown(pygame.K_UP)) is True
-    assert controls.focus_index == navigable[start_pos - 1]
+    assert controls.focus_descriptor == _desc(view, navigable[start_pos - 1])
 
 
 def test_opacity_clamps() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     opacity_row = _row(view, "layer_1", RowKind.TRACK_OPACITY)
-    controls.focus_index = opacity_row
-
+    controls.focus_descriptor = _desc(view, opacity_row)
     for _ in range(60):
         controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.layers["layer_1"].opacity_pct == 100
@@ -409,7 +417,7 @@ def test_header_toggles_enabled() -> None:
 
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
-    controls.focus_index = header_row
+    controls.focus_descriptor = _desc(view, header_row)
     assert controls.session.layers["layer_1"].enabled is True
 
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
@@ -447,9 +455,9 @@ def test_navigation_skips_sub_rows_when_collapsed() -> None:
         if stem == "layer_1":
             assert view.layout.kind(i) == RowKind.TRACK_HEADER
 
-    controls.focus_index = drums_header
+    controls.focus_descriptor = _desc(view, drums_header)
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_index == bass_header
+    assert controls.focus_descriptor == _desc(view, bass_header)
 
 
 def test_re_enable_without_expanding() -> None:
@@ -463,33 +471,32 @@ def test_re_enable_without_expanding() -> None:
     transport_row = next(
         i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.TRANSPORT
     )
-    controls.focus_index = header_row
-
+    controls.focus_descriptor = _desc(view, header_row)
     render_post_fx_row = view.layout.find_by_kind(RowKind.RENDER_POST_FX_HEADER)
     render_timeline_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_index == add_layer_row
+    assert controls.focus_descriptor == _desc(view, add_layer_row)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_index == render_overlay_row
+    assert controls.focus_descriptor == _desc(view, render_overlay_row)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_index == render_post_fx_row
+    assert controls.focus_descriptor == _desc(view, render_post_fx_row)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_index == render_timeline_row
+    assert controls.focus_descriptor == _desc(view, render_timeline_row)
 
-    controls.focus_index = header_row
+    controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
     assert controls.session.layers["layer_1"].enabled is True
     assert controls.session.layers["layer_1"].expanded is False
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_index == add_layer_row
+    assert controls.focus_descriptor == _desc(view, add_layer_row)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_index == render_overlay_row
+    assert controls.focus_descriptor == _desc(view, render_overlay_row)
 
 
 def test_header_collapses_and_expands_sub_rows() -> None:
@@ -497,8 +504,7 @@ def test_header_collapses_and_expands_sub_rows() -> None:
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
-    controls.focus_index = header_row
-
+    controls.focus_descriptor = _desc(view, header_row)
     assert controls.session.layers["layer_1"].expanded is False
     assert preset_dir_row not in view.layout.navigable_indices(view)
     assert preset_dir_row not in view.layout.visible_indices(view)
@@ -516,16 +522,16 @@ def test_disable_auto_collapses_sub_rows() -> None:
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
-    controls.focus_index = header_row
+    controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_index == preset_dir_row
+    assert controls.focus_descriptor == _desc(view, preset_dir_row)
 
-    controls.focus_index = header_row
+    controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
     assert controls.session.layers["layer_1"].enabled is False
     assert controls.session.layers["layer_1"].expanded is False
-    assert controls.focus_index == header_row
+    assert controls.focus_descriptor == _desc(view, header_row)
 
     view = controls.build_view_state(paused=False)
     assert not view.layout.sub_row_visible(view, preset_dir_row)
@@ -537,7 +543,7 @@ def test_disabled_track_can_expand_sub_rows() -> None:
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
-    controls.focus_index = header_row
+    controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
     assert controls.session.layers["layer_1"].enabled is False
     assert controls.session.layers["layer_1"].expanded is False
@@ -551,15 +557,14 @@ def test_disabled_track_can_expand_sub_rows() -> None:
     assert preset_dir_row in view.layout.navigable_indices(view)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_index == preset_dir_row
+    assert controls.focus_descriptor == _desc(view, preset_dir_row)
 
 
 def test_beat_sensitivity_clamps() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     beat_row = _row(view, "layer_1", RowKind.TRACK_BEAT)
-    controls.focus_index = beat_row
-
+    controls.focus_descriptor = _desc(view, beat_row)
     for _ in range(400):
         controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.layers["layer_1"].beat_sensitivity == pytest.approx(5.0)
@@ -573,7 +578,7 @@ def test_opacity_ctrl_step_is_ten_percent() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     opacity_row = _row(view, "layer_1", RowKind.TRACK_OPACITY)
-    controls.focus_index = opacity_row
+    controls.focus_descriptor = _desc(view, opacity_row)
     controls.session.layers["layer_1"].opacity_pct = 50
 
     controls.handle_keydown(
@@ -596,8 +601,7 @@ def test_move_mode_swaps_z_order() -> None:
         for i in range(15)
         if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_2"
     )
-    controls.focus_index = header_row
-
+    controls.focus_descriptor = _desc(view, header_row)
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
     assert controls.move_mode_slot == "layer_2"
 
@@ -619,8 +623,7 @@ def test_move_mode_esc_cancels_without_applying() -> None:
         for i in range(15)
         if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_2"
     )
-    controls.focus_index = header_row
-
+    controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     controls.handle_keydown(_keydown(pygame.K_UP))
     assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
@@ -640,8 +643,7 @@ def test_move_mode_backspace_cancels_without_applying() -> None:
         for i in range(15)
         if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_2"
     )
-    controls.focus_index = header_row
-
+    controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.session.layer_z_order == ["layer_1", "layer_3", "layer_2"]
@@ -656,8 +658,7 @@ def test_save_as_new_triggers_toast_without_blocking_input() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     config_row = _config_header_row(view)
-    controls.focus_index = config_row
-
+    controls.focus_descriptor = _desc(view, config_row)
     stderr = io.StringIO()
     with patch.object(time, "monotonic", return_value=1000.0):
         with patch("sys.stderr", stderr):
@@ -673,9 +674,9 @@ def test_save_as_new_triggers_toast_without_blocking_input() -> None:
         assert state.toast_message == "Config saved to unnamed-1.yaml"
         assert state.toast_remaining_sec == TOAST_DURATION_SEC
 
-        before = controls.focus_index
+        before = controls.focus_descriptor
         assert controls.handle_keydown(_keydown(pygame.K_DOWN)) is True
-        assert controls.focus_index != before
+        assert controls.focus_descriptor != before
 
 
 def test_config_header_shows_active_path() -> None:
@@ -711,16 +712,16 @@ def test_blend_and_opacity_change_sets_dirty_save_clears() -> None:
     assert not controls.config_dirty
 
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_BLEND)
+    controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_BLEND))
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.config_dirty
 
-    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_OPACITY)
+    controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_OPACITY))
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.config_dirty
 
     save_row = _config_header_row(view)
-    controls.focus_index = save_row
+    controls.focus_descriptor = _desc(view, save_row)
     _choose_save_as_new(controls)
     assert not controls.config_dirty
 
@@ -766,7 +767,7 @@ def test_preset_row_truncates_long_filenames() -> None:
         },
         paused=False,
         position_sec=0.0,
-        focus_index=0,
+        focus_descriptor=RowDescriptor(RowKind.TRANSPORT),
         move_mode_slot=None,
         toast_message=None,
         toast_remaining_sec=0.0,
@@ -823,7 +824,7 @@ def test_save_as_new_updates_active_config_path() -> None:
 
     view = controls.build_view_state(paused=False)
     save_row = _config_header_row(view)
-    controls.focus_index = save_row
+    controls.focus_descriptor = _desc(view, save_row)
     _choose_save_as_new(controls)
 
     assert controls._config_save._active_config_path == saved_path
@@ -846,7 +847,7 @@ def test_save_as_new_enables_overwrite_from_root_template() -> None:
     controls._config_save._on_save_new_config = lambda: saved_path
     view = controls.build_view_state(paused=False)
     save_row = _config_header_row(view)
-    controls.focus_index = save_row
+    controls.focus_descriptor = _desc(view, save_row)
     _choose_save_as_new(controls)
 
     state = controls.build_view_state(paused=False)
@@ -862,7 +863,7 @@ def test_repo_root_save_shows_save_as_new_only_modal() -> None:
         repo_root_example=_REPO_ROOT_EXAMPLE,
     )
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _config_header_row(view)
+    controls.focus_descriptor = _desc(view, _config_header_row(view))
 
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     modal_view = controls.modal_host.view_state()
@@ -890,7 +891,7 @@ def test_repo_root_save_as_new_requires_confirmation() -> None:
     )
     controls._config_save._on_save_new_config = lambda: saved_path
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _config_header_row(view)
+    controls.focus_descriptor = _desc(view, _config_header_row(view))
 
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     assert controls._config_save._active_config_path == _REPO_ROOT_EXAMPLE
@@ -914,14 +915,14 @@ def test_overwrite_after_save_uses_new_active_path() -> None:
     save_row = _config_header_row(view)
 
     with patch.object(time, "monotonic", return_value=3000.0):
-        controls.focus_index = save_row
+        controls.focus_descriptor = _desc(view, save_row)
         controls.handle_keydown(_keydown(pygame.K_RETURN))
         controls.handle_keydown(_keydown(pygame.K_RETURN))
 
     with patch.object(time, "monotonic", return_value=3000.0 + TOAST_DURATION_SEC + 1):
         state = controls.build_view_state(paused=False)
         save_row = _config_header_row(state)
-        controls.focus_index = save_row
+        controls.focus_descriptor = _desc(view, save_row)
         _choose_overwrite(controls)
         controls.handle_keydown(_keydown(pygame.K_RETURN))
 
@@ -948,9 +949,9 @@ def test_navigable_rows_without_overwrite() -> None:
         i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.TRANSPORT
     )
     config_row = _config_header_row(view)
-    controls.focus_index = config_row
+    controls.focus_descriptor = _desc(view, config_row)
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_index == transport_row
+    assert controls.focus_descriptor == _desc(view, transport_row)
 
 
 def test_navigable_rows_with_overwrite() -> None:
@@ -973,8 +974,7 @@ def test_overwrite_shows_confirm_before_write() -> None:
 
     view = controls.build_view_state(paused=False)
     save_row = _config_header_row(view)
-    controls.focus_index = save_row
-
+    controls.focus_descriptor = _desc(view, save_row)
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
@@ -1012,8 +1012,7 @@ def test_overwrite_confirm_yes_writes_launch_path() -> None:
 
     view = controls.build_view_state(paused=False)
     save_row = _config_header_row(view)
-    controls.focus_index = save_row
-
+    controls.focus_descriptor = _desc(view, save_row)
     stderr = io.StringIO()
     with patch.object(time, "monotonic", return_value=2000.0):
         with patch("sys.stderr", stderr):
@@ -1037,8 +1036,7 @@ def test_overwrite_confirm_esc_dismisses() -> None:
 
     view = controls.build_view_state(paused=False)
     save_row = _config_header_row(view)
-    controls.focus_index = save_row
-
+    controls.focus_descriptor = _desc(view, save_row)
     _choose_overwrite(controls)
     assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
     assert not controls.modal_host.active
@@ -1049,7 +1047,7 @@ def test_esc_during_confirm_does_not_quit() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     save_row = _config_header_row(view)
-    controls.focus_index = save_row
+    controls.focus_descriptor = _desc(view, save_row)
     _choose_overwrite(controls)
     assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
     assert controls.consume_hide_overlay() is False
@@ -1066,7 +1064,7 @@ def test_esc_in_move_mode_does_not_request_overlay_hide() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
-    controls.focus_index = header_row
+    controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     assert controls.move_mode_slot == "layer_1"
     assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
@@ -1183,7 +1181,7 @@ def test_render_overlay_title_font_row(_mock_fonts) -> None:
     font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_FONT)
     assert _row_text(view, font_row) == "└─ font: alpha (1/3)"
 
-    controls.focus_index = font_row
+    controls.focus_descriptor = _desc(view, font_row)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.render_overlay.title_font == "bravo"
 
@@ -1201,7 +1199,7 @@ def test_render_overlay_body_font_row(_mock_fonts) -> None:
     font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_BODY_FONT)
     assert _row_text(view, font_row) == "└─ font: bravo (2/3)"
 
-    controls.focus_index = font_row
+    controls.focus_descriptor = _desc(view, font_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert controls.session.render_overlay.body_font == "alpha"
 
@@ -1215,7 +1213,7 @@ def test_render_overlay_title_font_size_row() -> None:
     font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
     assert _row_text(view, font_row) == "└─ font size: 12px"
 
-    controls.focus_index = font_row
+    controls.focus_descriptor = _desc(view, font_row)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.render_overlay.title_font_size == 13
 
@@ -1229,7 +1227,7 @@ def test_render_overlay_title_margin_bottom_row() -> None:
     margin_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM)
     assert _row_text(view, margin_row) == "└─ margin bottom: 10px"
 
-    controls.focus_index = margin_row
+    controls.focus_descriptor = _desc(view, margin_row)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.render_overlay.title_margin_bottom == 11
 
@@ -1243,7 +1241,7 @@ def test_render_overlay_body_font_size_row() -> None:
     font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_BODY_FONT_SIZE)
     assert _row_text(view, font_row) == "└─ font size: 18px"
 
-    controls.focus_index = font_row
+    controls.focus_descriptor = _desc(view, font_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert controls.session.render_overlay.body_font_size == 17
 
@@ -1273,8 +1271,7 @@ def test_render_overlay_title_header_toggles_expansion() -> None:
     controls.session.render_overlay.expanded = True
     view = controls.build_view_state(paused=False)
     title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_HEADER)
-    controls.focus_index = title_header
-
+    controls.focus_descriptor = _desc(view, title_header)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.render_overlay.title_expanded is True
 
@@ -1287,12 +1284,15 @@ def test_render_overlay_collapse_refocuses_from_title_font_row() -> None:
     controls.session.render_overlay.expanded = True
     controls.session.render_overlay.title_expanded = True
     view = controls.build_view_state(paused=False)
-    overlay_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_HEADER)
     font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
-    controls.focus_index = font_row
-
+    font_desc = _desc(view, font_row)
+    controls.focus_descriptor = font_desc
     controls._render_overlay.set_expanded(False)
-    assert controls.focus_index == overlay_header
+    assert controls.focus_descriptor == font_desc
+    view = controls.build_view_state(paused=False)
+    assert view.layout.resolve_navigable(
+        controls.focus_descriptor, view
+    ) == RowDescriptor(RowKind.TRANSPORT)
 
 
 def test_render_overlay_title_collapse_refocuses_from_font_row() -> None:
@@ -1302,10 +1302,12 @@ def test_render_overlay_title_collapse_refocuses_from_font_row() -> None:
     view = controls.build_view_state(paused=False)
     title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_HEADER)
     font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
-    controls.focus_index = font_row
-
+    controls.focus_descriptor = _desc(view, font_row)
     controls._render_overlay.set_title_expanded(False)
-    assert controls.focus_index == title_header
+    view = controls.build_view_state(paused=False)
+    assert view.layout.resolve_navigable(
+        controls.focus_descriptor, view
+    ) == RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_HEADER)
 
 
 def test_track_header_visibility_icon_color() -> None:
@@ -1390,7 +1392,7 @@ def test_render_timeline_ctrl_right_toggles_enabled() -> None:
     controls = _make_controls(timeline_enabled=True)
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
-    controls.focus_index = header_row
+    controls.focus_descriptor = _desc(view, header_row)
     assert controls.session.timeline.enabled is True
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
@@ -1409,7 +1411,7 @@ def test_render_timeline_enable_opens_panel() -> None:
     controls = _make_controls()
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
-    controls.focus_index = header_row
+    controls.focus_descriptor = _desc(view, header_row)
     assert controls.session.timeline.enabled is False
     assert controls.session.timeline.panel_open is False
 
@@ -1426,7 +1428,7 @@ def test_render_timeline_right_opens_panel() -> None:
     controls = _make_controls(timeline_enabled=True)
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
-    controls.focus_index = header_row
+    controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.focus_row = 2
     assert controls.session.timeline.panel_open is False
     assert controls.session.timeline.submenu_focused is False
@@ -1451,21 +1453,21 @@ def test_render_timeline_down_enters_submenu() -> None:
     controls = _make_controls(timeline_enabled=True)
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
-    controls.focus_index = header_row
+    controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.panel_open = True
     controls.session.timeline.focus_row = 2
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.session.timeline.submenu_focused is True
     assert controls.session.timeline.focus_row == 0
-    assert controls.focus_index == header_row
+    assert controls.focus_descriptor == _desc(view, header_row)
 
 
 def test_render_timeline_down_enters_submenu_and_routes_keys() -> None:
     controls = _make_controls(timeline_enabled=True)
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
-    controls.focus_index = header_row
+    controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.panel_open = True
     controls.session.timeline.focus_row = 2
 
@@ -1501,18 +1503,18 @@ def test_vertical_navigation_repeats_on_hold() -> None:
     controls = _make_controls()
     view = controls.build_view_state(paused=False)
     transport = view.layout.find_by_kind(RowKind.TRANSPORT)
-    controls.focus_index = transport
+    controls.focus_descriptor = _desc(view, transport)
     navigable = view.layout.navigable_indices(view)
     start_pos = navigable.index(transport)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert navigable.index(controls.focus_index) == (start_pos + 1) % len(navigable)
+    assert navigable.index(_focus_index(controls)) == (start_pos + 1) % len(navigable)
 
     controls.tick(INITIAL_DELAY_SEC)
-    assert navigable.index(controls.focus_index) == (start_pos + 2) % len(navigable)
+    assert navigable.index(_focus_index(controls)) == (start_pos + 2) % len(navigable)
 
     controls.tick(SLOW_INTERVAL_SEC)
-    assert navigable.index(controls.focus_index) == (start_pos + 3) % len(navigable)
+    assert navigable.index(_focus_index(controls)) == (start_pos + 3) % len(navigable)
 
 
 def test_timeline_submenu_vertical_navigation_repeats() -> None:
@@ -1542,14 +1544,13 @@ def test_vertical_navigation_stops_on_keyup() -> None:
     controls = _make_controls()
     view = controls.build_view_state(paused=False)
     transport = view.layout.find_by_kind(RowKind.TRANSPORT)
-    controls.focus_index = transport
-
+    controls.focus_descriptor = _desc(view, transport)
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    focus_after_keydown = controls.focus_index
+    focus_after_keydown = controls.focus_descriptor
 
     controls.handle_keyup(pygame.event.Event(pygame.KEYUP, key=pygame.K_DOWN))
     controls.tick(INITIAL_DELAY_SEC + 1.0)
-    assert controls.focus_index == focus_after_keydown
+    assert controls.focus_descriptor == focus_after_keydown
 
 
 def test_key_repeat_armed_while_navigation_key_held() -> None:
@@ -1590,7 +1591,7 @@ def test_render_timeline_submenu_up_returns_to_header() -> None:
     controls = _make_controls(timeline_enabled=True)
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
-    controls.focus_index = header_row
+    controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.panel_open = True
     controls.session.timeline.submenu_focused = True
     controls.session.timeline.focus_row = 0
@@ -1599,7 +1600,7 @@ def test_render_timeline_submenu_up_returns_to_header() -> None:
 
     assert controls.session.timeline.submenu_focused is False
     view = controls.build_view_state(paused=False)
-    assert controls.focus_index == view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
+    assert controls.focus_descriptor == RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
 
 
 def test_render_timeline_submenu_entry_stops_repeat_on_keyup() -> None:
@@ -1608,7 +1609,7 @@ def test_render_timeline_submenu_entry_stops_repeat_on_keyup() -> None:
     controls = _make_controls(timeline_enabled=True)
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
-    controls.focus_index = header_row
+    controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.panel_open = True
     controls.session.timeline.submenu_focused = False
 
@@ -1635,7 +1636,7 @@ def test_render_timeline_submenu_down_from_last_row_wraps_to_transport() -> None
     controls.handle_keydown(_keydown(pygame.K_DOWN))
 
     assert controls.session.timeline.submenu_focused is False
-    assert controls.focus_index == transport_row
+    assert controls.focus_descriptor == _desc(view, transport_row)
 
 
 def test_render_timeline_submenu_up_from_transport_wraps_to_last_row() -> None:
@@ -1643,7 +1644,7 @@ def test_render_timeline_submenu_up_from_transport_wraps_to_last_row() -> None:
     controls = _make_controls(stems, timeline_enabled=True)
     view = controls.build_view_state(paused=False)
     transport_row = view.layout.find_by_kind(RowKind.TRANSPORT)
-    controls.focus_index = transport_row
+    controls.focus_descriptor = _desc(view, transport_row)
     controls.session.timeline.panel_open = True
     controls.session.timeline.submenu_focused = False
 
@@ -1651,7 +1652,7 @@ def test_render_timeline_submenu_up_from_transport_wraps_to_last_row() -> None:
 
     assert controls.session.timeline.submenu_focused is True
     assert controls.session.timeline.focus_row == len(stems) - 1
-    assert controls.focus_index == transport_row
+    assert controls.focus_descriptor == _desc(view, transport_row)
 
 
 def test_render_timeline_panel_closed_wrap_unchanged() -> None:
@@ -1661,17 +1662,17 @@ def test_render_timeline_panel_closed_wrap_unchanged() -> None:
     settings_row = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
     transport_row = view.layout.find_by_kind(RowKind.TRANSPORT)
     timeline_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
-    controls.focus_index = timeline_row
+    controls.focus_descriptor = _desc(view, timeline_row)
     controls.session.timeline.panel_open = False
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.session.timeline.submenu_focused is False
-    assert controls.focus_index == settings_row
+    assert controls.focus_descriptor == _desc(view, settings_row)
 
-    controls.focus_index = transport_row
+    controls.focus_descriptor = _desc(view, transport_row)
     controls.handle_keydown(_keydown(pygame.K_UP))
     assert controls.session.timeline.submenu_focused is False
-    assert controls.focus_index == navigable[navigable.index(transport_row) - 1]
+    assert controls.focus_descriptor == _desc(view, navigable[navigable.index(transport_row) - 1])
 
 
 def test_render_timeline_disable_closes_panel() -> None:
@@ -1680,8 +1681,7 @@ def test_render_timeline_disable_closes_panel() -> None:
     controls.session.timeline.panel_open = True
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
-    controls.focus_index = header_row
-
+    controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
     assert controls.session.timeline.enabled is False
     assert controls.session.timeline.panel_open is False
@@ -1730,8 +1730,7 @@ def test_render_timeline_enabled_change_callback() -> None:
     )
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
-    controls.focus_index = header_row
-
+    controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
     assert events == []
 
@@ -1760,19 +1759,19 @@ def test_t_closes_timeline_panel_and_focuses_header_when_open() -> None:
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.session.timeline.panel_open = True
     controls.session.timeline.submenu_focused = False
-    controls.focus_index = view.layout.find_by_kind(RowKind.TRANSPORT)
+    controls.focus_descriptor = RowDescriptor(RowKind.TRANSPORT)
 
     controls.handle_keydown(_keydown(pygame.K_t))
     assert controls.session.timeline.panel_open is False
     assert controls.session.timeline.submenu_focused is False
-    assert controls.focus_index == header_row
+    assert controls.focus_descriptor == _desc(view, header_row)
 
 
 def test_t_from_submenu_closes_and_focuses_render_timeline_header() -> None:
     controls = _make_controls(timeline_enabled=True)
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
-    controls.focus_index = header_row
+    controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.panel_open = True
     controls.session.timeline.submenu_focused = True
 
@@ -1788,7 +1787,7 @@ def test_t_from_submenu_closes_and_focuses_render_timeline_header() -> None:
 
     assert controls.session.timeline.panel_open is False
     assert controls.session.timeline.submenu_focused is False
-    assert controls.focus_index == header_row
+    assert controls.focus_descriptor == _desc(view, header_row)
 
 
 def test_t_toast_when_timeline_disabled() -> None:
@@ -1806,7 +1805,7 @@ def test_t_ignored_during_move_mode() -> None:
     controls.session.timeline.enabled = True
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.TRACK_HEADER)
-    controls.focus_index = header_row
+    controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     assert controls.move_mode_slot == "layer_1"
 
@@ -1820,7 +1819,7 @@ def test_transport_enter_toggles_pause() -> None:
     transport_row = next(
         i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.TRANSPORT
     )
-    controls.focus_index = transport_row
+    controls.focus_descriptor = _desc(view, transport_row)
     assert controls.playback.paused is False
 
     controls.handle_keydown(_keydown(pygame.K_RETURN))
@@ -1834,7 +1833,7 @@ def test_space_toggles_pause_from_any_focus() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     assert controls.playback.paused is False
-    assert controls.focus_index == view.layout.find_by_kind(RowKind.TRANSPORT)
+    assert controls.focus_descriptor == RowDescriptor(RowKind.TRANSPORT)
 
     controls.handle_keydown(_keydown(pygame.K_SPACE))
     assert controls.playback.paused is True
@@ -1891,27 +1890,27 @@ def test_ctrl_quick_nav_cycles_headers_and_transport() -> None:
     view = controls.build_view_state(paused=False)
     quick = view.layout.quick_nav_indices()
 
-    controls.focus_index = quick[0]
+    controls.focus_descriptor = _desc(view, quick[0])
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
-    assert controls.focus_index == quick[1]
+    assert controls.focus_descriptor == _desc(view, quick[1])
 
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
-    assert controls.focus_index == quick[2]
+    assert controls.focus_descriptor == _desc(view, quick[2])
 
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
-    assert controls.focus_index == quick[3]
+    assert controls.focus_descriptor == _desc(view, quick[3])
 
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
-    assert controls.focus_index == quick[4]
+    assert controls.focus_descriptor == _desc(view, quick[4])
 
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
-    assert controls.focus_index == quick[5]
+    assert controls.focus_descriptor == _desc(view, quick[5])
 
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
-    assert controls.focus_index == quick[0]
+    assert controls.focus_descriptor == _desc(view, quick[0])
 
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
-    assert controls.focus_index == quick[5]
+    assert controls.focus_descriptor == _desc(view, quick[5])
 
 
 def test_ctrl_quick_nav_from_sub_row_jumps_forward() -> None:
@@ -1922,13 +1921,13 @@ def test_ctrl_quick_nav_from_sub_row_jumps_forward() -> None:
         i for i in range(12) if view.layout.kind(i) == RowKind.TRACK_PRESET
     )
 
-    controls.focus_index = preset_row
+    controls.focus_descriptor = _desc(view, preset_row)
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
-    assert controls.focus_index == quick[2]
+    assert controls.focus_descriptor == _desc(view, quick[2])
 
-    controls.focus_index = preset_row
+    controls.focus_descriptor = _desc(view, preset_row)
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
-    assert controls.focus_index == quick[1]
+    assert controls.focus_descriptor == _desc(view, quick[1])
 
 
 def test_ctrl_quick_nav_from_config_header_row() -> None:
@@ -1937,13 +1936,13 @@ def test_ctrl_quick_nav_from_config_header_row() -> None:
     quick = view.layout.quick_nav_indices()
     config_row = _config_header_row(view)
 
-    controls.focus_index = config_row
+    controls.focus_descriptor = _desc(view, config_row)
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
-    assert controls.focus_index == quick[-1]
+    assert controls.focus_descriptor == _desc(view, quick[-1])
 
-    controls.focus_index = config_row
+    controls.focus_descriptor = _desc(view, config_row)
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
-    assert controls.focus_index == quick[0]
+    assert controls.focus_descriptor == _desc(view, quick[0])
 
 
 def test_ctrl_quick_nav_does_not_affect_normal_up_down() -> None:
@@ -1951,11 +1950,11 @@ def test_ctrl_quick_nav_does_not_affect_normal_up_down() -> None:
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
-    controls.focus_index = header_row
+    controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_index == preset_dir_row
+    assert controls.focus_descriptor == _desc(view, preset_dir_row)
 
 
 def test_ctrl_quick_nav_from_timeline_submenu_jumps_sections() -> None:
@@ -1968,17 +1967,17 @@ def test_ctrl_quick_nav_from_timeline_submenu_jumps_sections() -> None:
     controls.session.timeline.panel_open = True
     controls.session.timeline.submenu_focused = True
     controls.session.timeline.focus_row = 1
-    controls.focus_index = view.layout.find_by_kind(RowKind.TRANSPORT)
+    controls.focus_descriptor = RowDescriptor(RowKind.TRANSPORT)
 
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
     assert controls.session.timeline.submenu_focused is False
-    assert controls.focus_index == timeline_header
+    assert controls.focus_descriptor == _desc(view, timeline_header)
 
     controls.session.timeline.submenu_focused = True
     controls.session.timeline.focus_row = 2
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
     assert controls.session.timeline.submenu_focused is False
-    assert controls.focus_index == transport_row
+    assert controls.focus_descriptor == _desc(view, transport_row)
     assert timeline_header in quick
 
 
@@ -2054,7 +2053,7 @@ def _preset_row(controls: TuningControls) -> int:
 def test_directory_row_lr_changes_current_dir() -> None:
     root, siblings = _make_sibling_dir_tree(3)
     controls = _controls_with_playlist(root, siblings[0])
-    controls.focus_index = _preset_dir_row(controls)
+    controls.focus_descriptor = _desc(controls.build_view_state(paused=False), _preset_dir_row(controls))
     playlist = controls.session.layers["layer_1"].playlist
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
@@ -2067,7 +2066,7 @@ def test_directory_row_lr_changes_current_dir() -> None:
 def test_directory_enter_descends_backspace_goes_parent() -> None:
     root, siblings = _make_sibling_dir_tree(2)
     controls = _controls_with_playlist(root, siblings[0])
-    controls.focus_index = _preset_dir_row(controls)
+    controls.focus_descriptor = _desc(controls.build_view_state(paused=False), _preset_dir_row(controls))
     playlist = controls.session.layers["layer_1"].playlist
     child = siblings[0] / "child"
 
@@ -2081,7 +2080,7 @@ def test_directory_enter_descends_backspace_goes_parent() -> None:
 def test_directory_ctrl_arrows_descend_and_ascend() -> None:
     root, siblings = _make_sibling_dir_tree(2)
     controls = _controls_with_playlist(root, siblings[0])
-    controls.focus_index = _preset_dir_row(controls)
+    controls.focus_descriptor = _desc(controls.build_view_state(paused=False), _preset_dir_row(controls))
     playlist = controls.session.layers["layer_1"].playlist
     child = siblings[0] / "child"
 
@@ -2095,7 +2094,7 @@ def test_directory_ctrl_arrows_descend_and_ascend() -> None:
 def test_ctrl_left_at_preset_root_is_noop() -> None:
     root, siblings = _make_sibling_dir_tree(2)
     controls = _controls_with_playlist(root, siblings[0])
-    controls.focus_index = _preset_dir_row(controls)
+    controls.focus_descriptor = _desc(controls.build_view_state(paused=False), _preset_dir_row(controls))
     playlist = controls.session.layers["layer_1"].playlist
 
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
@@ -2108,7 +2107,7 @@ def test_ctrl_left_at_preset_root_is_noop() -> None:
 def test_directory_ctrl_arrows_do_not_repeat_parent_climb() -> None:
     root, siblings = _make_sibling_dir_tree(2)
     controls = _controls_with_playlist(root, siblings[0])
-    controls.focus_index = _preset_dir_row(controls)
+    controls.focus_descriptor = _desc(controls.build_view_state(paused=False), _preset_dir_row(controls))
     playlist = controls.session.layers["layer_1"].playlist
     child = siblings[0] / "child"
 
@@ -2126,7 +2125,7 @@ def test_directory_ctrl_arrows_do_not_repeat_parent_climb() -> None:
 def test_backspace_at_preset_root_is_noop() -> None:
     root, siblings = _make_sibling_dir_tree(2)
     controls = _controls_with_playlist(root, siblings[0])
-    controls.focus_index = _preset_dir_row(controls)
+    controls.focus_descriptor = _desc(controls.build_view_state(paused=False), _preset_dir_row(controls))
     playlist = controls.session.layers["layer_1"].playlist
 
     controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
@@ -2140,7 +2139,7 @@ def test_directory_parent_round_trip_reaches_preset_root() -> None:
     root, siblings = _make_sibling_dir_tree(2)
     child = siblings[0] / "child"
     controls = _controls_with_playlist(root, child)
-    controls.focus_index = _preset_dir_row(controls)
+    controls.focus_descriptor = _desc(controls.build_view_state(paused=False), _preset_dir_row(controls))
     playlist = controls.session.layers["layer_1"].playlist
 
     for _ in range(3):
@@ -2163,7 +2162,7 @@ def test_preset_lr_noop_when_paths_empty() -> None:
     controls._layer_bindings = noop_layer_bindings(
         on_preset_change=lambda stem, pl: changed.append((stem, pl.index))
     )
-    controls.focus_index = _preset_row(controls)
+    controls.focus_descriptor = _desc(controls.build_view_state(paused=False), _preset_row(controls))
     playlist = controls.session.layers["layer_1"].playlist
     assert playlist.paths == ()
 
@@ -2192,7 +2191,7 @@ def test_ctrl_preset_steps_by_ten_wrapping() -> None:
 
     view = controls.build_view_state(paused=False)
     preset_row = _row(view, "layer_1", RowKind.TRACK_PRESET)
-    controls.focus_index = preset_row
+    controls.focus_descriptor = _desc(view, preset_row)
     playlist = controls.session.layers["layer_1"].playlist
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
@@ -2224,7 +2223,7 @@ def test_move_mode_colors_focused_track_header() -> None:
         for i in range(len(view.layout))
         if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_2"
     )
-    controls.focus_index = header_row
+    controls.focus_descriptor = _desc(view, header_row)
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
 
     view = controls.build_view_state(paused=False)
@@ -2248,11 +2247,12 @@ def test_row_value_color_dim_for_focused_empty_preset() -> None:
                 beat_sensitivity=1.0,
                 effects={},
                 preset_empty=True,
+                expanded=True,
             )
         },
         paused=False,
         position_sec=0.0,
-        focus_index=0,
+        focus_descriptor=RowDescriptor(RowKind.TRANSPORT),
         move_mode_slot=None,
         toast_message=None,
         toast_remaining_sec=0.0,
@@ -2263,7 +2263,7 @@ def test_row_value_color_dim_for_focused_empty_preset() -> None:
         tracks=state.tracks,
         paused=state.paused,
         position_sec=state.position_sec,
-        focus_index=preset_row,
+        focus_descriptor=state.layout.descriptor(preset_row),
         move_mode_slot=state.move_mode_slot,
         toast_message=state.toast_message,
         toast_remaining_sec=state.toast_remaining_sec,
@@ -2338,7 +2338,7 @@ def test_ctrl_enter_toggles_lock() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
-    controls.focus_index = header_row
+    controls.focus_descriptor = _desc(view, header_row)
     assert controls.session.layers["layer_1"].locked is False
 
     controls.handle_keydown(_keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
@@ -2374,7 +2374,7 @@ def test_locked_blocks_enable_disable() -> None:
     controls.session.layers["layer_1"].locked = True
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
-    controls.focus_index = header_row
+    controls.focus_descriptor = _desc(view, header_row)
     assert controls.session.layers["layer_1"].enabled is True
 
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
@@ -2389,8 +2389,7 @@ def test_locked_blocks_move_mode() -> None:
     controls.session.layers["layer_1"].locked = True
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
-    controls.focus_index = header_row
-
+    controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     assert controls.move_mode_slot is None
 
@@ -2401,7 +2400,7 @@ def test_locked_header_still_expands() -> None:
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
-    controls.focus_index = header_row
+    controls.focus_descriptor = _desc(view, header_row)
     assert controls.session.layers["layer_1"].expanded is False
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
@@ -2429,7 +2428,7 @@ def test_locked_sub_rows_use_locked_color() -> None:
         tracks=view.tracks,
         paused=view.paused,
         position_sec=view.position_sec,
-        focus_index=len(view.layout) - 1,
+        focus_descriptor=view.layout.descriptor(len(view.layout) - 1),
         move_mode_slot=view.move_mode_slot,
         toast_message=view.toast_message,
         toast_remaining_sec=view.toast_remaining_sec,
@@ -2444,7 +2443,7 @@ def test_locked_sub_rows_use_locked_color() -> None:
         tracks=view.tracks,
         paused=view.paused,
         position_sec=view.position_sec,
-        focus_index=header_row,
+        focus_descriptor=view.layout.descriptor(header_row),
         move_mode_slot=view.move_mode_slot,
         toast_message=view.toast_message,
         toast_remaining_sec=view.toast_remaining_sec,
@@ -2459,7 +2458,7 @@ def test_locked_not_toggleable_during_move_mode() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     view = controls.build_view_state(paused=False)
     bass_header = _header_row(controls, "layer_2")
-    controls.focus_index = bass_header
+    controls.focus_descriptor = _desc(view, bass_header)
     assert controls.session.layers["layer_2"].locked is False
 
     controls.handle_keydown(_keydown(pygame.K_RETURN))
@@ -2477,13 +2476,13 @@ def test_ctrl_quick_nav_blocked_during_move_mode() -> None:
         for i in range(15)
         if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_2"
     )
-    controls.focus_index = bass_header
+    controls.focus_descriptor = _desc(view, bass_header)
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     assert controls.move_mode_slot == "layer_2"
 
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
     assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
-    assert controls.focus_index == bass_header
+    assert controls.focus_descriptor == _desc(view, bass_header)
 
 
 def test_transport_seek_constants() -> None:
@@ -2497,8 +2496,7 @@ def test_transport_seek_constants() -> None:
     transport_row = next(
         i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.TRANSPORT
     )
-    controls.focus_index = transport_row
-
+    controls.focus_descriptor = _desc(view, transport_row)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     controls.handle_keydown(_keydown(pygame.K_LEFT))
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
@@ -2518,8 +2516,7 @@ def test_effect_pulse_clamps() -> None:
     bass_pulse_row = _row(
         view, "layer_2", RowKind.TRACK_EFFECT, effect_id="pulse", driver_slug="sub_bass"
     )
-    controls.focus_index = pulse_row
-
+    controls.focus_descriptor = _desc(view, pulse_row)
     for _ in range(120):
         controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.layers["layer_1"].effects["pulse"]["onset"] == 100
@@ -2528,7 +2525,7 @@ def test_effect_pulse_clamps() -> None:
         controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert "pulse" not in controls.session.layers["layer_1"].effects
 
-    controls.focus_index = bass_pulse_row
+    controls.focus_descriptor = _desc(view, bass_pulse_row)
     for _ in range(20):
         controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.layers["layer_2"].effects["pulse"]["sub_bass"] == 20
@@ -2602,8 +2599,7 @@ def test_shift_right_enters_solo() -> None:
 
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
-    controls.focus_index = header_row
-
+    controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
     assert controls.session.solo_slot == "layer_1"
     assert solo_calls == ["layer_1"]
@@ -2614,32 +2610,34 @@ def test_shift_right_enters_solo() -> None:
 
 def test_shift_right_switches_solo_target() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
-    drums_header = _row(controls.build_view_state(paused=False), "layer_1", RowKind.TRACK_HEADER)
-    bass_header = _row(controls.build_view_state(paused=False), "layer_2", RowKind.TRACK_HEADER)
+    view = controls.build_view_state(paused=False)
+    drums_header = _row(view, "layer_1", RowKind.TRACK_HEADER)
+    bass_header = _row(view, "layer_2", RowKind.TRACK_HEADER)
 
-    controls.focus_index = drums_header
+    controls.focus_descriptor = _desc(view, drums_header)
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
     assert controls.session.solo_slot == "layer_1"
 
-    controls.focus_index = bass_header
+    controls.focus_descriptor = _desc(view, bass_header)
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
     assert controls.session.solo_slot == "layer_2"
 
 
 def test_shift_left_exits_solo_only_for_active_target() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
-    drums_header = _row(controls.build_view_state(paused=False), "layer_1", RowKind.TRACK_HEADER)
-    bass_header = _row(controls.build_view_state(paused=False), "layer_2", RowKind.TRACK_HEADER)
+    view = controls.build_view_state(paused=False)
+    drums_header = _row(view, "layer_1", RowKind.TRACK_HEADER)
+    bass_header = _row(view, "layer_2", RowKind.TRACK_HEADER)
 
-    controls.focus_index = drums_header
+    controls.focus_descriptor = _desc(view, drums_header)
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
     assert controls.session.solo_slot == "layer_1"
 
-    controls.focus_index = bass_header
+    controls.focus_descriptor = _desc(view, bass_header)
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_SHIFT))
     assert controls.session.solo_slot == "layer_1"
 
-    controls.focus_index = drums_header
+    controls.focus_descriptor = _desc(view, drums_header)
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_SHIFT))
     assert controls.session.solo_slot is None
 
@@ -2649,10 +2647,10 @@ def test_save_blocked_while_solo_active() -> None:
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     config_row = _config_header_row(view)
-    controls.focus_index = header_row
+    controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
 
-    controls.focus_index = config_row
+    controls.focus_descriptor = _desc(view, config_row)
     stderr = io.StringIO()
     with patch("sys.stderr", stderr):
         controls.handle_keydown(_keydown(pygame.K_RETURN))
@@ -2767,7 +2765,7 @@ def test_stem_row_cycles_sources() -> None:
     controls.session.layers["layer_1"].expanded = True
     view = controls.build_view_state(paused=False)
     stem_row = _row(view, "layer_1", RowKind.TRACK_STEM)
-    controls.focus_index = stem_row
+    controls.focus_descriptor = _desc(view, stem_row)
     assert controls.session.layers["layer_1"].stem == "drums"
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
@@ -2782,7 +2780,7 @@ def test_stem_change_clears_effects() -> None:
     controls.session.layers["layer_1"].expanded = True
     controls.session.layers["layer_1"].effects = {"pulse": {"onset": 50}}
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_STEM)
+    controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_STEM))
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.layers["layer_1"].effects == {}
@@ -2793,7 +2791,7 @@ def test_locked_blocks_stem_change() -> None:
     controls.session.layers["layer_1"].expanded = True
     controls.session.layers["layer_1"].locked = True
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_STEM)
+    controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_STEM))
     assert controls.session.layers["layer_1"].stem == "drums"
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
@@ -2804,7 +2802,7 @@ def test_locked_blocks_preset_dir_enter_and_backspace() -> None:
     root, siblings = _make_sibling_dir_tree(2)
     controls = _controls_with_playlist(root, siblings[0])
     controls.session.layers["layer_1"].expanded = True
-    controls.focus_index = _preset_dir_row(controls)
+    controls.focus_descriptor = _desc(controls.build_view_state(paused=False), _preset_dir_row(controls))
     playlist = controls.session.layers["layer_1"].playlist
     child = siblings[0] / "child"
 
@@ -2830,13 +2828,13 @@ def test_cycle_stem_to_full_mix() -> None:
     controls.session.layers["layer_1"].expanded = True
     controls.session.layers["layer_1"].stem = "other"
     view = controls.build_view_state(paused=False)
-    controls.focus_index = _row(view, "layer_1", RowKind.TRACK_STEM)
+    controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_STEM))
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.layers["layer_1"].stem == "full_mix"
 
     view = controls.build_view_state(paused=False)
-    assert _row_text(view, controls.focus_index) == "└─ driving stem: full-mix"
+    assert _row_text(view, _focus_index(controls)) == "└─ driving stem: full-mix"
 
 
 def test_try_quit_overwrite_confirm_esc_clears_quit_after_save() -> None:
@@ -2870,7 +2868,7 @@ def test_settings_expand_collapse_and_sub_row_visibility() -> None:
         view.layout.kind(i) for i in range(len(view.layout))
     }
 
-    controls.focus_index = settings_row
+    controls.focus_descriptor = _desc(view, settings_row)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.settings.expanded is True
     view = controls.build_view_state(paused=False)
@@ -2879,9 +2877,9 @@ def test_settings_expand_collapse_and_sub_row_visibility() -> None:
     assert render_mode_row in view.layout.navigable_indices(view)
     assert view.layout.header_row_count() == 4
 
-    controls.focus_index = render_mode_row
+    controls.focus_descriptor = _desc(view, render_mode_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
-    controls.focus_index = settings_row
+    controls.focus_descriptor = _desc(view, settings_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert controls.session.settings.expanded is False
     view = controls.build_view_state(paused=False)
@@ -2894,28 +2892,30 @@ def test_settings_expand_collapse_and_sub_row_visibility() -> None:
 def test_settings_collapse_from_sub_row_refocuses_header() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    controls.focus_index = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     view = controls.build_view_state(paused=False)
-    controls.focus_index = view.layout.find_by_kind(RowKind.SETTINGS_RENDER_MODE)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_RENDER_MODE)
     controls._settings.set_expanded(False)
     view = controls.build_view_state(paused=False)
-    assert controls.focus_index == view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
+    assert view.layout.resolve_navigable(
+        controls.focus_descriptor, view
+    ) == RowDescriptor(RowKind.SETTINGS_HEADER)
 
 
 def test_settings_cycle_render_mode() -> None:
     controls = _make_controls(("layer_1",))
     assert controls.cfg.visualizer.render_mode == "balanced"
     view = controls.build_view_state(paused=False)
-    controls.focus_index = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     view = controls.build_view_state(paused=False)
-    controls.focus_index = view.layout.find_by_kind(RowKind.SETTINGS_RENDER_MODE)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_RENDER_MODE)
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.cfg.visualizer.render_mode == "performance"
     view = controls.build_view_state(paused=False)
-    assert _row_text(view, controls.focus_index) == "└─ render mode: performance"
+    assert _row_text(view, _focus_index(controls)) == "└─ render mode: performance"
 
     controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert controls.cfg.visualizer.render_mode == "balanced"
@@ -2925,10 +2925,10 @@ def test_settings_render_mode_change_marks_config_dirty() -> None:
     controls = _make_controls(("layer_1",))
     assert not controls.config_dirty
     view = controls.build_view_state(paused=False)
-    controls.focus_index = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     view = controls.build_view_state(paused=False)
-    controls.focus_index = view.layout.find_by_kind(RowKind.SETTINGS_RENDER_MODE)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_RENDER_MODE)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.config_dirty
 
@@ -2936,4 +2936,4 @@ def test_settings_render_mode_change_marks_config_dirty() -> None:
 def test_default_focus_stays_on_transport() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    assert controls.focus_index == view.layout.find_by_kind(RowKind.TRANSPORT)
+    assert controls.focus_descriptor == RowDescriptor(RowKind.TRANSPORT)

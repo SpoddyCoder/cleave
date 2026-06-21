@@ -32,6 +32,8 @@ Phases 3-5 harden the foundation against recurrence.
 
 ## Phase 3 - Use `RowDescriptor` as the focus cursor
 
+**Status:** done. `focus_descriptor` replaces `focus_index` in `TuningControls` and `TuningViewState`; `RowLayout` gains `resolve_navigable` / `navigable_descriptors`; repair paths removed (`_restore_focus`, `_refocus_*`, effects index arithmetic, collapse refocus in sub-controllers); `focus_index` is a derived property on `TuningViewState`.
+
 **Why.** `TuningControls.focus_index` is an integer. Integer indices are unstable: adding a layer, expanding effects, or toggling settings shifts every index below the insertion point. The codebase has accumulated several repair paths to compensate (`_restore_focus`, `_refocus_track_header_if_sub_row`, arithmetic adjustments after add/delete). These are fragile and drift-prone.
 
 **What to do.** Replace `focus_index: int` with `focus_descriptor: RowDescriptor`. `RowDescriptor` is already a frozen dataclass with `__eq__` and identity that survives layout changes (kind + slot + effect_id + driver_slug). Navigation computes the new layout, resolves the current descriptor to its new index, applies delta or modulo, and stores the resulting descriptor. The resolved `int` is needed only for scroll math and highlight -- produce it lazily from the layout for those purposes.
