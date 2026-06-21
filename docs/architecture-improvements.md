@@ -46,7 +46,9 @@ Remove `_restore_focus`, `_refocus_track_header_if_sub_row`, and the index arith
 
 ## Phase 4 - Unified focus model for the timeline bridge
 
-**Why.** There are two parallel focus systems: `TuningControls.focus_index` (main tree) and `session.timeline.focus_row + submenu_focused` (timeline strip). The bridge in `_move_focus` stitches them with special cases for Up-from-TRANSPORT and Down-from-RENDER_TIMELINE_HEADER. The bridge consumes both endpoints of the modulo ring, stranding `SETTINGS_HEADER` at the top of the navigable list: you can never reach Settings by wrapping from below when the timeline is open -- this is Bug 2. The asymmetric exit logic (Down past last timeline row exits to TRANSPORT, not modulo) also means the two systems have different wrap semantics.
+**Status:** done. `FocusCursor` (`MainFocus` / `TimelineFocus`), ring construction, and `move_focus` live in [cleave/viz/focus_nav.py](cleave/viz/focus_nav.py); `_move_focus` delegates there; view state and controls carry `focus_cursor`; `submenu_focused` and `focus_descriptor` derive from the cursor.
+
+**Why.** Main-tree `focus_descriptor` and `session.timeline.focus_row` were separate; `_move_focus` bridged them with special cases for Up-from-TRANSPORT and Down-from-RENDER_TIMELINE_HEADER. That bridge stranded `SETTINGS_HEADER`: Settings was unreachable by wrapping from below when the timeline strip was open (Bug 2). Down past the last timeline row exited to TRANSPORT instead of closing the ring.
 
 **What to do.** Model focus as a discriminated union:
 

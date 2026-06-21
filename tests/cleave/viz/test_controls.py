@@ -23,6 +23,7 @@ from cleave.preset_playlist import (
     scan_preset_playlist,
 )
 from cleave.timeline import TimelineCue
+from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.key_repeat import mod_shift
 from cleave.viz.playback import format_mmss
 from tests.support.viz import make_test_cfg, noop_layer_bindings, stub_playback_state
@@ -306,8 +307,7 @@ def test_delete_layer_clamps_timeline_focus_row() -> None:
     controls, manager = _make_controls_with_manager(slots)
     controls.session.timeline.enabled = True
     controls.session.timeline.panel_open = True
-    controls.session.timeline.submenu_focused = True
-    controls.session.timeline.focus_row = 3
+    controls.focus_cursor = TimelineFocus(3)
 
     def remove_layer(slot: str) -> None:
         controls.session.layer_z_order.remove(slot)
@@ -767,7 +767,7 @@ def test_preset_row_truncates_long_filenames() -> None:
         },
         paused=False,
         position_sec=0.0,
-        focus_descriptor=RowDescriptor(RowKind.TRANSPORT),
+        focus_cursor=MainFocus(RowDescriptor(RowKind.TRANSPORT)),
         move_mode_slot=None,
         toast_message=None,
         toast_remaining_sec=0.0,
@@ -1404,7 +1404,7 @@ def test_render_timeline_ctrl_right_toggles_enabled() -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
     assert controls.session.timeline.enabled is True
     assert controls.session.timeline.panel_open is True
-    assert controls.session.timeline.submenu_focused is False
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
 
 
 def test_render_timeline_enable_opens_panel() -> None:
@@ -1418,7 +1418,7 @@ def test_render_timeline_enable_opens_panel() -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
     assert controls.session.timeline.enabled is True
     assert controls.session.timeline.panel_open is True
-    assert controls.session.timeline.submenu_focused is False
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     assert _row_text(view, header_row).endswith(" ▼")
@@ -1431,11 +1431,11 @@ def test_render_timeline_right_opens_panel() -> None:
     controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.focus_row = 2
     assert controls.session.timeline.panel_open is False
-    assert controls.session.timeline.submenu_focused is False
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.timeline.panel_open is True
-    assert controls.session.timeline.submenu_focused is False
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.session.timeline.focus_row == 2
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
@@ -1443,7 +1443,7 @@ def test_render_timeline_right_opens_panel() -> None:
 
     controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert controls.session.timeline.panel_open is False
-    assert controls.session.timeline.submenu_focused is False
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     assert _row_text(view, header_row).endswith(" ▶")
@@ -1458,7 +1458,7 @@ def test_render_timeline_down_enters_submenu() -> None:
     controls.session.timeline.focus_row = 2
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.session.timeline.submenu_focused is True
+    assert isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.session.timeline.focus_row == 0
     assert controls.focus_descriptor == _desc(view, header_row)
 
@@ -1472,7 +1472,7 @@ def test_render_timeline_down_enters_submenu_and_routes_keys() -> None:
     controls.session.timeline.focus_row = 2
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.session.timeline.submenu_focused is True
+    assert isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.session.timeline.focus_row == 0
 
     tl = controls.session.timeline
@@ -1483,7 +1483,7 @@ def test_render_timeline_down_enters_submenu_and_routes_keys() -> None:
         if (
             tl.panel_open
             and tl.enabled
-            and tl.submenu_focused
+            and isinstance(controls.focus_cursor, TimelineFocus)
             and key not in (pygame.K_UP, pygame.K_DOWN)
         ):
             return timeline_controls
@@ -1525,8 +1525,7 @@ def test_timeline_submenu_vertical_navigation_repeats() -> None:
         slots=("layer_1", "layer_2", "layer_3", "layer_4"),
     )
     controls.session.timeline.panel_open = True
-    controls.session.timeline.submenu_focused = True
-    controls.session.timeline.focus_row = 0
+    controls.focus_cursor = TimelineFocus(0)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.session.timeline.focus_row == 1
@@ -1593,12 +1592,11 @@ def test_render_timeline_submenu_up_returns_to_header() -> None:
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.panel_open = True
-    controls.session.timeline.submenu_focused = True
-    controls.session.timeline.focus_row = 0
+    controls.focus_cursor = TimelineFocus(0)
 
     controls.handle_keydown(_keydown(pygame.K_UP))
 
-    assert controls.session.timeline.submenu_focused is False
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
     view = controls.build_view_state(paused=False)
     assert controls.focus_descriptor == RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
 
@@ -1611,10 +1609,10 @@ def test_render_timeline_submenu_entry_stops_repeat_on_keyup() -> None:
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.panel_open = True
-    controls.session.timeline.submenu_focused = False
+    
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.session.timeline.submenu_focused is True
+    assert isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.session.timeline.focus_row == 0
     assert controls.key_repeat_armed is True
 
@@ -1624,35 +1622,33 @@ def test_render_timeline_submenu_entry_stops_repeat_on_keyup() -> None:
     assert controls.session.timeline.focus_row == 0
 
 
-def test_render_timeline_submenu_down_from_last_row_wraps_to_transport() -> None:
+def test_render_timeline_submenu_down_from_last_row_wraps_to_settings() -> None:
     stems = ("layer_1", "layer_2", "layer_3", "layer_4")
     controls = _make_controls(stems, timeline_enabled=True)
     view = controls.build_view_state(paused=False)
-    transport_row = view.layout.find_by_kind(RowKind.TRANSPORT)
+    settings_row = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
     controls.session.timeline.panel_open = True
-    controls.session.timeline.submenu_focused = True
-    controls.session.timeline.focus_row = len(stems) - 1
+    controls.focus_cursor = TimelineFocus(len(stems) - 1)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
 
-    assert controls.session.timeline.submenu_focused is False
-    assert controls.focus_descriptor == _desc(view, transport_row)
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+    assert controls.focus_descriptor == _desc(view, settings_row)
 
 
-def test_render_timeline_submenu_up_from_transport_wraps_to_last_row() -> None:
+def test_render_timeline_submenu_up_from_transport_wraps_to_config_header() -> None:
     stems = ("layer_1", "layer_2", "layer_3", "layer_4")
     controls = _make_controls(stems, timeline_enabled=True)
     view = controls.build_view_state(paused=False)
     transport_row = view.layout.find_by_kind(RowKind.TRANSPORT)
+    config_row = view.layout.find_by_kind(RowKind.CONFIG_HEADER)
     controls.focus_descriptor = _desc(view, transport_row)
     controls.session.timeline.panel_open = True
-    controls.session.timeline.submenu_focused = False
 
     controls.handle_keydown(_keydown(pygame.K_UP))
 
-    assert controls.session.timeline.submenu_focused is True
-    assert controls.session.timeline.focus_row == len(stems) - 1
-    assert controls.focus_descriptor == _desc(view, transport_row)
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+    assert controls.focus_descriptor == _desc(view, config_row)
 
 
 def test_render_timeline_panel_closed_wrap_unchanged() -> None:
@@ -1666,12 +1662,12 @@ def test_render_timeline_panel_closed_wrap_unchanged() -> None:
     controls.session.timeline.panel_open = False
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.session.timeline.submenu_focused is False
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.focus_descriptor == _desc(view, settings_row)
 
     controls.focus_descriptor = _desc(view, transport_row)
     controls.handle_keydown(_keydown(pygame.K_UP))
-    assert controls.session.timeline.submenu_focused is False
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.focus_descriptor == _desc(view, navigable[navigable.index(transport_row) - 1])
 
 
@@ -1749,7 +1745,7 @@ def test_t_opens_timeline_panel_when_enabled() -> None:
 
     controls.handle_keydown(_keydown(pygame.K_t))
     assert controls.session.timeline.panel_open is True
-    assert controls.session.timeline.submenu_focused is True
+    assert isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.session.timeline.focus_row == 0
 
 
@@ -1758,12 +1754,12 @@ def test_t_closes_timeline_panel_and_focuses_header_when_open() -> None:
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.session.timeline.panel_open = True
-    controls.session.timeline.submenu_focused = False
+    
     controls.focus_descriptor = RowDescriptor(RowKind.TRANSPORT)
 
     controls.handle_keydown(_keydown(pygame.K_t))
     assert controls.session.timeline.panel_open is False
-    assert controls.session.timeline.submenu_focused is False
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.focus_descriptor == _desc(view, header_row)
 
 
@@ -1773,7 +1769,7 @@ def test_t_from_submenu_closes_and_focuses_render_timeline_header() -> None:
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.panel_open = True
-    controls.session.timeline.submenu_focused = True
+    controls.focus_cursor = TimelineFocus(0)
 
     from cleave.viz.timeline_controls import TimelineControls
 
@@ -1786,7 +1782,7 @@ def test_t_from_submenu_closes_and_focuses_render_timeline_header() -> None:
     timeline_controls.handle_keydown(_keydown(pygame.K_t))
 
     assert controls.session.timeline.panel_open is False
-    assert controls.session.timeline.submenu_focused is False
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.focus_descriptor == _desc(view, header_row)
 
 
@@ -1965,18 +1961,16 @@ def test_ctrl_quick_nav_from_timeline_submenu_jumps_sections() -> None:
     transport_row = view.layout.find_by_kind(RowKind.TRANSPORT)
 
     controls.session.timeline.panel_open = True
-    controls.session.timeline.submenu_focused = True
-    controls.session.timeline.focus_row = 1
+    controls.focus_cursor = TimelineFocus(1)
     controls.focus_descriptor = RowDescriptor(RowKind.TRANSPORT)
 
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
-    assert controls.session.timeline.submenu_focused is False
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.focus_descriptor == _desc(view, timeline_header)
 
-    controls.session.timeline.submenu_focused = True
-    controls.session.timeline.focus_row = 2
+    controls.focus_cursor = TimelineFocus(2)
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
-    assert controls.session.timeline.submenu_focused is False
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.focus_descriptor == _desc(view, transport_row)
     assert timeline_header in quick
 
@@ -2252,7 +2246,7 @@ def test_row_value_color_dim_for_focused_empty_preset() -> None:
         },
         paused=False,
         position_sec=0.0,
-        focus_descriptor=RowDescriptor(RowKind.TRANSPORT),
+        focus_cursor=MainFocus(RowDescriptor(RowKind.TRANSPORT)),
         move_mode_slot=None,
         toast_message=None,
         toast_remaining_sec=0.0,
@@ -2263,7 +2257,7 @@ def test_row_value_color_dim_for_focused_empty_preset() -> None:
         tracks=state.tracks,
         paused=state.paused,
         position_sec=state.position_sec,
-        focus_descriptor=state.layout.descriptor(preset_row),
+        focus_cursor=MainFocus(state.layout.descriptor(preset_row)),
         move_mode_slot=state.move_mode_slot,
         toast_message=state.toast_message,
         toast_remaining_sec=state.toast_remaining_sec,
@@ -2428,7 +2422,7 @@ def test_locked_sub_rows_use_locked_color() -> None:
         tracks=view.tracks,
         paused=view.paused,
         position_sec=view.position_sec,
-        focus_descriptor=view.layout.descriptor(len(view.layout) - 1),
+        focus_cursor=MainFocus(view.layout.descriptor(len(view.layout) - 1)),
         move_mode_slot=view.move_mode_slot,
         toast_message=view.toast_message,
         toast_remaining_sec=view.toast_remaining_sec,
@@ -2443,7 +2437,7 @@ def test_locked_sub_rows_use_locked_color() -> None:
         tracks=view.tracks,
         paused=view.paused,
         position_sec=view.position_sec,
-        focus_descriptor=view.layout.descriptor(header_row),
+        focus_cursor=MainFocus(view.layout.descriptor(header_row)),
         move_mode_slot=view.move_mode_slot,
         toast_message=view.toast_message,
         toast_remaining_sec=view.toast_remaining_sec,

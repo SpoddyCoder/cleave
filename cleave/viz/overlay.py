@@ -7,7 +7,10 @@ See cleave/viz/theme.py and .cursor/rules/live-tuning-ui.mdc.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from cleave.viz.focus_nav import FocusCursor
 
 import pygame
 
@@ -396,7 +399,7 @@ class TuningViewState:
     tracks: dict[str, TrackBlock]
     paused: bool
     position_sec: float
-    focus_descriptor: RowDescriptor
+    focus_cursor: FocusCursor
     move_mode_slot: str | None
     toast_message: str | None
     toast_remaining_sec: float
@@ -413,7 +416,6 @@ class TuningViewState:
         default_factory=RenderTimelineBlock
     )
     settings: SettingsBlock = field(default_factory=SettingsBlock)
-    timeline_submenu_focused: bool = False
     timeline_recording: bool = False
     timeline_override_active: bool = False
     help_visible: bool = False
@@ -422,6 +424,48 @@ class TuningViewState:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "layout", RowLayout.build(self))
+
+    @property
+    def focus_descriptor(self) -> RowDescriptor:
+        from cleave.viz.focus_nav import cursor_main_descriptor
+
+        return self.layout.resolve_navigable(
+            cursor_main_descriptor(self.focus_cursor), self
+        )
+
+    @focus_descriptor.setter
+    def focus_descriptor(self, descriptor: RowDescriptor) -> None:
+        from cleave.viz.focus_nav import MainFocus
+
+        object.__setattr__(self, "focus_cursor", MainFocus(descriptor))
+
+    @property
+    def timeline_submenu_focused(self) -> bool:
+        from cleave.viz.focus_nav import cursor_timeline_submenu_focused
+
+        return cursor_timeline_submenu_focused(self.focus_cursor)
+
+    @timeline_submenu_focused.setter
+    def timeline_submenu_focused(self, value: bool) -> None:
+        from cleave.viz.focus_nav import (
+            MainFocus,
+            TimelineFocus,
+            cursor_timeline_row,
+        )
+
+        if value:
+            row = (
+                cursor_timeline_row(self.focus_cursor)
+                if isinstance(self.focus_cursor, TimelineFocus)
+                else 0
+            )
+            object.__setattr__(self, "focus_cursor", TimelineFocus(row))
+        elif isinstance(self.focus_cursor, TimelineFocus):
+            object.__setattr__(
+                self,
+                "focus_cursor",
+                MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)),
+            )
 
     @property
     def focus_index(self) -> int:

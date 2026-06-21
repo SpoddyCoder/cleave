@@ -21,6 +21,14 @@ from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.render_overlay_controls import RenderOverlayControls
 from cleave.viz.render_post_fx_controls import RenderPostFxControls
 from cleave.viz.settings_controls import SettingsControls
+from cleave.viz.focus_nav import (
+    FocusCursor,
+    MainFocus,
+    TimelineFocus,
+    cursor_main_descriptor,
+    move_focus,
+    timeline_strip_in_ring,
+)
 from cleave.viz.row_semantics import (
     REPEAT_ROW_KINDS,
     RowDescriptor,
@@ -69,7 +77,9 @@ class TuningControls:
         self._layer_manager = layer_manager
         self._modal_host = modal_host if modal_host is not None else ModalHost()
 
-        self.focus_descriptor = RowDescriptor(RowKind.TRANSPORT)
+        self._focus_cursor: FocusCursor = MainFocus(
+            RowDescriptor(RowKind.TRANSPORT)
+        )
         self.move_mode_slot: str | None = None
         self._move_mode_original_z_order: list[str] | None = None
         self._toast_message: str | None = None
@@ -93,7 +103,7 @@ class TuningControls:
             playback,
             duration_sec,
             preset_root,
-            get_focus_descriptor=lambda: self.focus_descriptor,
+            get_focus_cursor=lambda: self.focus_cursor,
             get_move_mode_slot=lambda: self.move_mode_slot,
             config_save=self._config_save,
             get_toast_message=lambda: self._toast_message,
@@ -313,73 +323,65 @@ class TuningControls:
             paused=paused, position_sec=position_sec, fps=fps
         )
 
-    def _timeline_row_count(self) -> int:
-        return len(self.session.layer_z_order)
+    @property
+    def focus_descriptor(self) -> RowDescriptor:
+        return cursor_main_descriptor(self.focus_cursor)
 
-    def _timeline_submenu_active(self) -> bool:
+    @focus_descriptor.setter
+    def focus_descriptor(self, descriptor: RowDescriptor) -> None:
+        self._apply_focus_cursor(MainFocus(descriptor))
+
+    @property
+    def focus_cursor(self) -> FocusCursor:
+        return self._focus_cursor
+
+    @focus_cursor.setter
+    def focus_cursor(self, cursor: FocusCursor) -> None:
+        self._apply_focus_cursor(cursor)
+
+    def _apply_focus_cursor(self, cursor: FocusCursor) -> None:
+        self._focus_cursor = cursor
+        if isinstance(cursor, TimelineFocus):
+            self.session.timeline.focus_row = cursor.row
+
+    def _normalize_focus_cursor(self) -> None:
+        view = self.build_view_state(paused=self.playback.paused)
         tl = self.session.timeline
-        return tl.panel_open and tl.enabled and self._timeline_row_count() > 0
+        row_count = len(self.session.layer_z_order)
+        if isinstance(self.focus_cursor, TimelineFocus):
+            if not timeline_strip_in_ring(view):
+                self._apply_focus_cursor(
+                    MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+                )
+                return
+            if row_count == 0:
+                self._apply_focus_cursor(
+                    MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+                )
+            elif self.focus_cursor.row >= row_count:
+                self._apply_focus_cursor(TimelineFocus(row_count - 1))
+            return
+        tl = self.session.timeline
+        if tl.focus_row >= row_count:
+            tl.focus_row = row_count - 1
 
     def _move_focus(self, delta: int) -> None:
-        tl = self.session.timeline
-        row_count = self._timeline_row_count()
-
-        if tl.submenu_focused:
-            if row_count == 0:
-                tl.submenu_focused = False
-            elif delta < 0:
-                if tl.focus_row == 0:
-                    self.exit_timeline_submenu()
-                    return
-                tl.focus_row -= 1
-                return
-            elif tl.focus_row >= row_count - 1:
-                tl.submenu_focused = False
-                self.focus_descriptor = RowDescriptor(RowKind.TRANSPORT)
-                return
-            else:
-                tl.focus_row += 1
-                return
-
         view = self.build_view_state(paused=self.playback.paused)
-        navigable = view.layout.navigable_descriptors(view)
-        if not navigable:
-            return
-        current = view.layout.resolve_navigable(self.focus_descriptor, view)
-        try:
-            pos = navigable.index(current)
-        except ValueError:
-            pos = 0
-
-        if self._timeline_submenu_active():
-            timeline_header = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
-            transport = RowDescriptor(RowKind.TRANSPORT)
-            if delta > 0 and current == timeline_header:
-                tl.submenu_focused = True
-                tl.focus_row = 0
-                return
-            if delta < 0 and current == transport:
-                tl.submenu_focused = True
-                tl.focus_row = row_count - 1
-                return
-
-        self.focus_descriptor = navigable[(pos + delta) % len(navigable)]
+        self._apply_focus_cursor(move_focus(self.focus_cursor, delta, view))
 
     def _move_quick_focus(self, delta: int) -> None:
+        if isinstance(self.focus_cursor, TimelineFocus):
+            self._apply_focus_cursor(
+                MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+            )
+            if delta < 0:
+                return
         view = self.build_view_state(paused=self.playback.paused)
         quick_indices = view.layout.quick_nav_indices()
         quick = [view.layout.descriptor(index) for index in quick_indices]
         if not quick:
             return
-        tl = self.session.timeline
-        if tl.submenu_focused:
-            tl.submenu_focused = False
-            timeline_header = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
-            if delta < 0:
-                self.focus_descriptor = timeline_header
-                return
-            current_index = -1
-        elif view.layout.contains_descriptor(self.focus_descriptor):
+        if view.layout.contains_descriptor(self.focus_descriptor):
             current_index = view.layout.find_descriptor(self.focus_descriptor)
         else:
             resolved = view.layout.resolve_navigable(self.focus_descriptor, view)
@@ -469,15 +471,12 @@ class TuningControls:
         view_after = self.build_view_state(paused=self.playback.paused)
         navigable_after = view_after.layout.navigable_descriptors(view_after)
         if navigable_after:
-            self.focus_descriptor = navigable_after[
-                min(nav_pos, len(navigable_after) - 1)
-            ]
-        tl = self.session.timeline
-        row_count = len(self.session.layer_z_order)
-        if row_count == 0:
-            tl.submenu_focused = False
-        elif tl.focus_row >= row_count:
-            tl.focus_row = row_count - 1
+            self._apply_focus_cursor(
+                MainFocus(
+                    navigable_after[min(nav_pos, len(navigable_after) - 1)]
+                )
+            )
+        self._normalize_focus_cursor()
 
     def _cancel_move_mode(self) -> None:
         if self._move_mode_original_z_order is not None:
@@ -844,20 +843,18 @@ class TuningControls:
             return
         tl.panel_open = True
         if enter_submenu:
-            tl.submenu_focused = True
-            tl.focus_row = 0
-        else:
-            tl.submenu_focused = False
+            self._apply_focus_cursor(TimelineFocus(0))
 
     def close_timeline_panel(self) -> None:
         tl = self.session.timeline
         if not tl.panel_open:
             return
         tl.panel_open = False
-        tl.submenu_focused = False
-        self.focus_descriptor = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+        self._apply_focus_cursor(
+            MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+        )
 
     def exit_timeline_submenu(self) -> None:
-        tl = self.session.timeline
-        tl.submenu_focused = False
-        self.focus_descriptor = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+        self._apply_focus_cursor(
+            MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+        )
