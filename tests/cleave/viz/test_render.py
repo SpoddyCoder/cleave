@@ -459,10 +459,19 @@ def test_render_segment_frame_count_tick_times_and_ffmpeg_trim(
     assert tick_times[-1] == pytest.approx(end_sec - 1 / fps)
 
     cmd = mock_subprocess.Popen.call_args[0][0]
+    audio_path = str(project / "my-track.flac")
+    audio_idx = cmd.index(audio_path)
     ss_idx = cmd.index("-ss")
-    assert cmd[ss_idx + 1] == str(start_sec)
     t_idx = cmd.index("-t")
+    assert ss_idx < audio_idx
+    assert t_idx < audio_idx
+    assert cmd[ss_idx + 1] == str(start_sec)
     assert cmd[t_idx + 1] == str(frame_count / fps)
+    assert cmd[audio_idx - 1] == "-i"
+    assert cmd[audio_idx - 2] == str(frame_count / fps)
+    assert cmd[audio_idx - 3] == "-t"
+    assert cmd[audio_idx - 4] == str(start_sec)
+    assert cmd[audio_idx - 5] == "-ss"
 
 
 @patch("cleave.viz.frame_finish.live_frame_fade_alpha", return_value=1.0)
