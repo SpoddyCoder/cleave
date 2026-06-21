@@ -35,6 +35,7 @@ from cleave.viz.material_icons import (
     FILE_GLYPH,
     FOLDER_GLYPH,
     LOCK_GLYPH,
+    SETTINGS_GLYPH,
     VISIBILITY_GLYPH,
     VISIBILITY_OFF_GLYPH,
     VISIBILITY_ICON_PAD_X,
@@ -1146,17 +1147,22 @@ class TuningOverlay:
                 )
             elif kind == RowKind.SETTINGS_HEADER:
                 block = state.settings
-                surf = _render_label_value_row(
+                icon_surf = render_glyph(
+                    SETTINGS_GLYPH, color=VALUE, line_height=line_h
+                )
+                label_surf = _render_label_value_row(
                     font,
                     prefix="Settings ",
                     value=_effects_header_expand_value(block.expanded),
                     value_color=color,
-                    prefix_color=ACTION,
+                    prefix_color=LABEL,
                     line_height=line_h,
                 )
-                row_surfaces.append(surf)
-                row_time_surfaces.append(None)
-                row_widths.append(indent + surf.get_width())
+                row_surfaces.append(icon_surf)
+                row_time_surfaces.append(label_surf)
+                row_widths.append(
+                    indent + icon_surf.get_width() + label_surf.get_width()
+                )
             elif kind == RowKind.RENDER_OVERLAY_HEADER:
                 block_ro = state.render_overlay
                 prefix_surf = render_visibility_icon(
