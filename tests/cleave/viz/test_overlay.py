@@ -432,7 +432,7 @@ def test_track_stem_row_text() -> None:
         },
     )
     stem_row = find_row(state, "layer_1", RowKind.TRACK_STEM)
-    assert _row_text(state, stem_row) == "└─ stem: full-mix"
+    assert _row_text(state, stem_row) == "└─ driving stem: full-mix"
 
 
 def test_locked_stem_row_not_navigable_and_uses_locked_color() -> None:
