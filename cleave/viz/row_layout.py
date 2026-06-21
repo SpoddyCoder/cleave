@@ -233,7 +233,7 @@ class RowLayout:
         ]
 
     def quick_nav_indices(self) -> list[int]:
-        """Row indices for Ctrl+Up/Down: layer headers and transport only."""
+        """Row indices for Ctrl+Up/Down: settings, transport, layer, and render headers."""
         return [
             index
             for index in range(len(self))
