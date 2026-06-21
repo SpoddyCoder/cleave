@@ -37,6 +37,7 @@ from cleave.viz.overlay import (
     visible_row_indices,
 )
 from cleave.viz.theme import (
+    ACTION,
     BORDER_WIDTH,
     DISABLED,
     HIGHLIGHT,
@@ -668,6 +669,59 @@ def test_delete_row_disabled_color_single_layer() -> None:
     )
     delete_row = find_row(state, "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
     assert _row_value_color(state, delete_row) == DISABLED
+
+
+def test_delete_layer_row_text_has_tree_prefix() -> None:
+    state = _minimal_view_state(
+        tracks={
+            "layer_1": TrackBlock(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                expanded=True,
+            )
+        },
+    )
+    delete_row = find_row(state, "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
+    assert _row_text(state, delete_row) == "└─ Delete Layer"
+
+
+def test_action_row_value_color() -> None:
+    state = _minimal_view_state(
+        tracks={
+            "layer_1": TrackBlock(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                expanded=True,
+            ),
+            "layer_2": TrackBlock(
+                stem="bass",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                expanded=True,
+            ),
+        },
+        layer_z_order=["layer_1", "layer_2"],
+    )
+    config_row = find_row_by_kind(state, RowKind.CONFIG_HEADER)
+    add_row = find_row_by_kind(state, RowKind.LAYER_MANAGEMENT_ADD)
+    delete_row = find_row(state, "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
+    assert _row_value_color(state, config_row) == ACTION
+    assert _row_value_color(state, add_row) == ACTION
+    assert _row_value_color(state, delete_row) == ACTION
 
 
 def test_draw_layer_management_rows_without_error() -> None:

@@ -61,6 +61,7 @@ Colors live in [cleave/viz/theme.py](cleave/viz/theme.py). Label truncation uses
 | --- | --- | --- | --- |
 | Label | `LABEL` | `(170, 210, 255)` | Light blue prefixes and section titles |
 | Value | `VALUE` | `(255, 255, 255)` | Default white for values and state indicators |
+| Action | `ACTION` | `(80, 190, 125)` | Modal confirm rows (save config, add/delete layer) |
 | Disabled | `DISABLED` | `(140, 140, 140)` | Inactive rows and controls |
 | Locked | `LOCKED` | `(235, 150, 150)` | Locked sub-rows that cannot be edited |
 
@@ -86,7 +87,8 @@ Colors live in [cleave/viz/theme.py](cleave/viz/theme.py). Label truncation uses
 
 These rows do not split label and value; the implementation is deliberate:
 
-- **Active config path** (`CONFIG_HEADER`): entire row drawn in `LABEL` (disabled while solo is active).
+- **Active config path** (`CONFIG_HEADER`): path in `ACTION`; dirty asterisk stays `CONFIG_DIRTY` (row uses `DISABLED` while solo is active).
+- **Layer management** (`LAYER_MANAGEMENT_ADD`, `LAYER_MANAGEMENT_DELETE`): entire row in `ACTION` (delete uses `DISABLED` when only one layer remains).
 - **Preset dir / preset filename**: single-color row text plus Material Icons (icon colors above).
 - **Transport**: single-color header row in row value color.
 - **Toasts**: `DISABLED`.
