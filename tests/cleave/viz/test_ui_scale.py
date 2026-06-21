@@ -23,14 +23,19 @@ def test_timeline_ui_metrics_default_scale() -> None:
     metrics = timeline_ui_metrics(scale=1.0)
     assert metrics.font_size == 14
     assert metrics.padding == 8
+    assert metrics.row_height == 25
     assert metrics.row_gap == 2
     assert metrics.panel_gap == 16
 
 
 def test_timeline_panel_height_px_scales_with_ui_scale() -> None:
-    assert timeline_panel_height_px(720, scale=1.0) == 94
-    assert timeline_panel_height_px(720, scale=1.2) == 112
-    assert timeline_panel_height_px(720, scale=1.5) == 140
+    assert timeline_panel_height_px(4, scale=1.0) == 122
+    assert timeline_panel_height_px(4, scale=1.2) == 146
+
+
+def test_timeline_ui_metrics_row_height_scales() -> None:
+    assert timeline_ui_metrics(scale=1.0).row_height == 25
+    assert timeline_ui_metrics(scale=1.2).row_height == 30
 
 
 def test_scale_px_rounds_and_clamps() -> None:

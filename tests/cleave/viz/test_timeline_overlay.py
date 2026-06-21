@@ -104,14 +104,8 @@ def _draw(
     overlay: TimelineOverlay,
     surface: pygame.Surface,
     state: TimelineViewState,
-    *,
-    content_height: int | None = None,
 ) -> None:
-    overlay.draw(
-        surface,
-        state,
-        content_height=content_height if content_height is not None else surface.get_height(),
-    )
+    overlay.draw(surface, state)
 
 
 def test_row_prefix_width_includes_monitor_eye_slot() -> None:
@@ -671,10 +665,9 @@ def test_upscale_expands_bar_width_not_row_height() -> None:
     pygame.init()
     overlay = TimelineOverlay()
     state = _view_state()
-    content_height = 720
 
     baseline_surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
-    _draw(overlay, baseline_surface, state, content_height=content_height)
+    _draw(overlay, baseline_surface, state)
     baseline_panel = overlay.panel_rect
     baseline_row_h = overlay.row_layout[0][4]
     _, baseline_bar_width, _ = overlay.bar_layout
@@ -682,7 +675,7 @@ def test_upscale_expands_bar_width_not_row_height() -> None:
     assert overlay.bar_layout is not None
 
     upscaled_surface = pygame.Surface((2560, 1440), pygame.SRCALPHA)
-    _draw(overlay, upscaled_surface, state, content_height=content_height)
+    _draw(overlay, upscaled_surface, state)
     upscaled_panel = overlay.panel_rect
     upscaled_row_h = overlay.row_layout[0][4]
     _, upscaled_bar_width, _ = overlay.bar_layout
@@ -693,3 +686,23 @@ def test_upscale_expands_bar_width_not_row_height() -> None:
     assert upscaled_panel[3] == baseline_panel[3]
     assert upscaled_bar_width > baseline_bar_width
     assert upscaled_panel[2] > baseline_panel[2]
+
+
+def test_row_height_constant_across_layer_counts() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    expected_row_h = timeline_ui_metrics().row_height
+
+    for row_count in (1, 2, 4, 8):
+        order = [f"layer_{i}" for i in range(1, row_count + 1)]
+        state = _view_state(layer_z_order=order)
+        _draw(overlay, surface, state)
+        assert overlay.row_layout
+        assert overlay.row_layout[0][4] == expected_row_h
+        assert overlay.panel_rect is not None
+        assert overlay.panel_rect[3] == (
+            timeline_ui_metrics().padding * 2
+            + row_count * expected_row_h
+            + max(0, row_count - 1) * timeline_ui_metrics().row_gap
+        )
