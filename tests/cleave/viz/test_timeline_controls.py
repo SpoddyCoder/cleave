@@ -23,7 +23,6 @@ def _make_timeline_controls(
     focus_row: int = 0,
     armed_slots: set[str] | None = None,
     panel_open: bool = True,
-    submenu_focused: bool = True,
     enabled: bool = True,
     position_sec: float = 0.0,
     recording: bool = False,
@@ -50,7 +49,6 @@ def _make_timeline_controls(
     tl = session.timeline
     tl.enabled = enabled
     tl.panel_open = panel_open
-    tl.submenu_focused = submenu_focused
     tl.cues = list(cues or [])
     tl.focus_row = focus_row
     tl.armed_slots = set(armed_slots or ())
@@ -72,9 +70,7 @@ def _make_timeline_controls(
         on_close=lambda: (
             close_calls.append(True),
             setattr(tl, "panel_open", False),
-            setattr(tl, "submenu_focused", False),
         ),
-        on_exit_submenu=lambda: setattr(tl, "submenu_focused", False),
         on_seek=lambda delta: seeks.append(delta),
         on_toast=toasts.append,
     )

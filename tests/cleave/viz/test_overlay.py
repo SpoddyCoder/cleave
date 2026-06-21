@@ -9,6 +9,7 @@ from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
 from cleave.viz.frame_rate import format_fps_display
 from cleave.viz.material_icons import row_icon_prefix_width
+from cleave.viz.focus_nav import MainFocus
 from cleave.viz.row_semantics import RowDescriptor, RowKind
 from cleave.viz.overlay import (
     PanelScrollMetrics,
@@ -68,7 +69,7 @@ def _effects_expanded_view_state() -> TuningViewState:
         tracks=tracks,
         paused=False,
         position_sec=0.0,
-        focus_descriptor=RowDescriptor(RowKind.TRANSPORT),
+        focus_cursor=MainFocus(RowDescriptor(RowKind.TRANSPORT)),
         move_mode_slot=None,
         toast_message=None,
         toast_remaining_sec=0.0,
@@ -275,7 +276,7 @@ def test_fps_color_ignores_transport_focus() -> None:
     overlay = TuningOverlay()
     state = _minimal_view_state(
         fps=30.0,
-        focus_descriptor=RowDescriptor(RowKind.TRANSPORT),
+        focus_cursor=MainFocus(RowDescriptor(RowKind.TRANSPORT)),
     )
 
     with_fps = _copy_panel_surface(overlay, state)
@@ -439,7 +440,7 @@ def _minimal_view_state(**kwargs: object) -> TuningViewState:
         },
         "paused": False,
         "position_sec": 0.0,
-        "focus_descriptor": RowDescriptor(RowKind.TRANSPORT),
+        "focus_cursor": MainFocus(RowDescriptor(RowKind.TRANSPORT)),
         "move_mode_slot": None,
         "toast_message": None,
         "toast_remaining_sec": 0.0,
@@ -860,7 +861,7 @@ def test_draw_track_header_with_solo_eye() -> None:
         },
         paused=False,
         position_sec=0.0,
-        focus_descriptor=RowDescriptor(RowKind.TRANSPORT),
+        focus_cursor=MainFocus(RowDescriptor(RowKind.TRANSPORT)),
         move_mode_slot=None,
         toast_message=None,
         toast_remaining_sec=0.0,

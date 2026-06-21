@@ -76,7 +76,6 @@ class TimelineRuntime:
     enabled: bool = True
     cues: list[TimelineCue] = field(default_factory=list)
     panel_open: bool = False
-    submenu_focused: bool = False
     focus_row: int = 0
     armed_slots: set[str] = field(default_factory=set)
     recording: bool = False

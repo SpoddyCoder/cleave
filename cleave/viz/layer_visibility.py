@@ -5,6 +5,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from cleave.timeline import TimelineCue, layer_visible_at
+from cleave.viz.focus_nav import (
+    FocusCursor,
+    TimelineFocus,
+    cursor_timeline_row,
+    cursor_timeline_submenu_focused,
+)
 from cleave.viz.session import TuningSession
 from cleave.viz.timeline_overlay import TimelineViewState, prune_expired_arm_flashes
 
@@ -215,9 +221,19 @@ def build_timeline_view_state(
     session: TuningSession,
     position_sec: float,
     duration_sec: float,
+    *,
+    focus_cursor: FocusCursor | None = None,
 ) -> TimelineViewState:
     tl = session.timeline
     prune_expired_arm_flashes(tl.arm_flash_start_ms)
+    submenu_focused = (
+        focus_cursor is not None and cursor_timeline_submenu_focused(focus_cursor)
+    )
+    focus_row = (
+        cursor_timeline_row(focus_cursor)
+        if submenu_focused
+        else tl.focus_row
+    )
     monitor_visible = {
         slot: effective_layer_enabled(session, slot, position_sec)
         for slot in session.layer_z_order
@@ -232,7 +248,7 @@ def build_timeline_view_state(
         defaults=timeline_defaults(session),
         position_sec=position_sec,
         duration_sec=duration_sec,
-        focus_row=tl.focus_row,
+        focus_row=focus_row,
         monitor_visible=monitor_visible,
         timeline_visible=timeline_visible,
         slot_stems={slot: session.layers[slot].stem for slot in session.layer_z_order},
@@ -243,6 +259,6 @@ def build_timeline_view_state(
         record_baseline=dict(tl.record_baseline),
         record_buffer=list(tl.record_buffer),
         enabled=tl.enabled,
-        submenu_focused=tl.submenu_focused,
+        submenu_focused=submenu_focused,
         arm_flash_start_ms=dict(tl.arm_flash_start_ms),
     )

@@ -11,7 +11,9 @@ from cleave.config_schema import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
 from cleave.viz.app import LiveVisualizerRuntime, VisualizerSeed
+from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.controls import TuningControls
+from cleave.viz.row_semantics import RowDescriptor, RowKind
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.input_dispatch import (
     dispatch_keydown,
@@ -48,7 +50,6 @@ def _make_runtime(
     tl = session.timeline
     tl.enabled = True
     tl.panel_open = panel_open
-    tl.submenu_focused = submenu_focused
     tl.recording = recording
     if recording:
         tl.armed_slots = {"layer_1"}
@@ -98,15 +99,17 @@ def _make_runtime(
         playback=playback,
         duration_sec=120.0,
     )
+    if submenu_focused:
+        runtime.controls.focus_cursor = TimelineFocus(0)
+    else:
+        runtime.controls.focus_cursor = MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
     runtime.modal_host = runtime.controls.modal_host
     runtime.timeline_controls = TimelineControls(
         session,
         playback,
         120.0,
-        on_close=lambda: (
-            setattr(tl, "panel_open", False),
-            setattr(tl, "submenu_focused", False),
-        ),
+        on_close=runtime.controls.close_timeline_panel,
+        on_exit_submenu=runtime.controls.exit_timeline_submenu,
     )
     return runtime
 
@@ -165,7 +168,7 @@ def test_esc_while_recording_stops_take_panel_stays_open() -> None:
     assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
     assert runtime.seed.session.timeline.recording is False
     assert runtime.seed.session.timeline.panel_open is True
-    assert runtime.seed.session.timeline.submenu_focused is True
+    assert isinstance(runtime.controls.focus_cursor, TimelineFocus)
 
 
 def test_second_esc_after_stop_closes_submenu_panel() -> None:
@@ -175,7 +178,7 @@ def test_second_esc_after_stop_closes_submenu_panel() -> None:
 
     assert dispatch_keydown(keydown(pygame.K_ESCAPE), runtime) is True
     assert runtime.seed.session.timeline.panel_open is False
-    assert runtime.seed.session.timeline.submenu_focused is False
+    assert not isinstance(runtime.controls.focus_cursor, TimelineFocus)
 
 
 def test_second_esc_after_stop_requests_overlay_hide_on_main() -> None:
@@ -192,7 +195,7 @@ def test_t_while_recording_is_noop() -> None:
     runtime = _make_runtime(recording=True)
     assert dispatch_keydown(keydown(pygame.K_t), runtime) is True
     assert runtime.seed.session.timeline.panel_open is True
-    assert runtime.seed.session.timeline.submenu_focused is True
+    assert isinstance(runtime.controls.focus_cursor, TimelineFocus)
 
 
 def test_submenu_routing_up_down_to_tuning_enter_to_timeline() -> None:
