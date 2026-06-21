@@ -6,11 +6,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from cleave.viz.overlay import TuningViewState
+from cleave.viz.row_semantics import RowDescriptor
 
 
 @dataclass(frozen=True)
 class FocusContext:
-    get_focus_index: Callable[[], int]
-    set_focus_index: Callable[[int], None]
+    get_focus_descriptor: Callable[[], RowDescriptor]
+    set_focus_descriptor: Callable[[RowDescriptor], None]
     build_view_state: Callable[..., TuningViewState]
     is_paused: Callable[[], bool]

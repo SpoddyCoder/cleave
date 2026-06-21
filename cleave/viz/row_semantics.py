@@ -364,3 +364,24 @@ def row_triggers_layer_delete(kind: RowKind) -> bool:
     if kind == RowKind.TRACK_HEADER:
         return True
     return row_behavior(kind).parent_group == "track"
+
+
+def section_header_descriptor(desc: RowDescriptor) -> RowDescriptor:
+    """Map a sub-row descriptor to its section header for focus fallback."""
+    kind = desc.kind
+    if kind == RowKind.SETTINGS_RENDER_MODE:
+        return RowDescriptor(RowKind.SETTINGS_HEADER)
+    if kind in RENDER_OVERLAY_TITLE_NESTED_KINDS:
+        return RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_HEADER)
+    if kind in RENDER_OVERLAY_BODY_NESTED_KINDS:
+        return RowDescriptor(RowKind.RENDER_OVERLAY_BODY_HEADER)
+    if kind in RENDER_OVERLAY_ALL_SUB_ROW_KINDS:
+        return RowDescriptor(RowKind.RENDER_OVERLAY_HEADER)
+    if kind in RENDER_POST_FX_SUB_ROW_KINDS:
+        return RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
+    behavior = row_behavior(kind)
+    if behavior.parent_group == "track":
+        if kind in TRACK_EFFECT_SUB_ROW_KINDS:
+            return RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, slot=desc.slot)
+        return RowDescriptor(RowKind.TRACK_HEADER, slot=desc.slot)
+    return desc
