@@ -12,10 +12,10 @@ Accent colors for modes and icons (not label/value roles):
 
 Layout scales:
   UI_SCALE (1.5) — main tuning panel, help, modals, and Material Icons spacing
-  TIMELINE_UI_SCALE (1.0) — bottom timeline strip (base metrics unchanged)
+  TIMELINE_UI_SCALE (1.0) — bottom timeline strip height, typography, and spacing
 
-Use tuning_ui_metrics() and timeline_ui_metrics() for scaled spacing; BORDER_WIDTH
-is not scaled.
+Use tuning_ui_metrics(), timeline_ui_metrics(), and timeline_panel_height_px() for
+scaled layout; BORDER_WIDTH is not scaled.
 
 See [.cursor/rules/live-tuning-ui.mdc](../.cursor/rules/live-tuning-ui.mdc) for how
 rows apply these roles, including intentional exceptions.
@@ -27,7 +27,8 @@ from dataclasses import dataclass
 
 BASE_UI_FONT_SIZE: int = 14
 UI_SCALE: float = 1.2
-TIMELINE_UI_SCALE: float = 1.1
+TIMELINE_UI_SCALE: float = 1.2
+BASE_TIMELINE_PANEL_HEIGHT_FRACTION: float = 0.13
 
 
 def scale_px(value: float, *, scale: float) -> int:
@@ -101,6 +102,18 @@ def timeline_ui_metrics(*, scale: float = TIMELINE_UI_SCALE) -> TimelineUiMetric
         rec_badge_pad_x=scale_px(8, scale=scale),
         rec_badge_pad_y=scale_px(4, scale=scale),
         rec_time_gap=scale_px(2, scale=scale),
+    )
+
+
+def timeline_panel_height_px(
+    content_height: int,
+    *,
+    scale: float = TIMELINE_UI_SCALE,
+) -> int:
+    """Scaled bottom timeline strip height in pixels."""
+    return max(
+        1,
+        round(content_height * BASE_TIMELINE_PANEL_HEIGHT_FRACTION * scale),
     )
 
 

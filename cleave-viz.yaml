@@ -1,7 +1,7 @@
 visualizer:
   name: cleave-viz-example
-  width: 1280
-  height: 720
+  width: 1920
+  height: 1080
   upscale: 1.0
   fps: 30
   warmup_sec: 3.0   # pre-roll seconds to advance projectM past its white init state before the show starts
@@ -59,8 +59,8 @@ layers:
     preset: presets-cream-of-the-crop/Dancer/Aurora/
     enabled: true
     opacity: 1.0
-    width: 1280
-    height: 720
+    width: 1920
+    height: 1080
     blend_mode: add
 
   layer_2:
@@ -68,8 +68,8 @@ layers:
     preset: presets-milkdrop-original/Milkdrop-Original/
     enabled: true
     opacity: 1.0
-    width: 960
-    height: 540
+    width: 1920
+    height: 1080
     blend_mode: black-key
 
   layer_3:
@@ -77,8 +77,8 @@ layers:
     preset: presets-cream-of-the-crop/Sparkle/Explosions/
     enabled: true
     opacity: 1.0
-    width: 960
-    height: 540
+    width: 1920
+    height: 1080
     blend_mode: black-key
 
   layer_4:
@@ -86,8 +86,8 @@ layers:
     preset: presets-milkdrop-original/Milkdrop-Original/
     enabled: true
     opacity: 1.0
-    width: 640
-    height: 360
+    width: 1920
+    height: 1080
     blend_mode: black-key
 
 timeline:

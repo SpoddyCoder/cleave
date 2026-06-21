@@ -23,11 +23,11 @@ from cleave.viz.theme import (
     REC_BG,
     TIMELINE_BAR_ON,
     VALUE,
+    timeline_panel_height_px,
     timeline_ui_metrics,
 )
 from cleave.viz.ui_tint import blit_tint
 
-PANEL_HEIGHT_FRACTION: float = 0.2
 _timeline_ui = timeline_ui_metrics()
 TIMELINE_PANEL_GAP: int = _timeline_ui.panel_gap
 OFF_SEGMENT_COLOR: tuple[int, int, int] = (40, 40, 40)
@@ -37,7 +37,7 @@ def timeline_viewport_reserve_px(content_height: int, *, margin: int | None = No
     metrics = timeline_ui_metrics()
     if margin is None:
         margin = metrics.margin
-    panel_h = max(1, int(content_height * PANEL_HEIGHT_FRACTION))
+    panel_h = timeline_panel_height_px(content_height)
     return panel_h + margin + metrics.panel_gap
 
 
@@ -372,7 +372,7 @@ class TimelineOverlay:
 
         display_width, display_height = surface.get_size()
         panel_w = display_width - self._margin * 2
-        panel_h = max(1, int(content_height * PANEL_HEIGHT_FRACTION))
+        panel_h = timeline_panel_height_px(content_height)
         panel_x = self._margin
         panel_y = display_height - panel_h - self._margin
 
