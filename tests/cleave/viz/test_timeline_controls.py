@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pygame
 
-from cleave.config_schema import DEFAULT_STEM_FOR_SLOT, LAYER_SLOTS
+from cleave.config_schema import DEFAULT_LAYER_SLOTS
+from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
 from cleave.timeline import TimelineCue
 from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, TuningControls
@@ -17,7 +18,7 @@ from tests.support.viz import keydown, make_playlist, stub_playback_state
 
 def _make_timeline_controls(
     *,
-    slots: tuple[str, ...] = tuple(LAYER_SLOTS),
+    slots: tuple[str, ...] = tuple(DEFAULT_LAYER_SLOTS),
     cues: list[TimelineCue] | None = None,
     focus_row: int = 0,
     armed_slots: set[str] | None = None,
@@ -41,7 +42,7 @@ def _make_timeline_controls(
             slot: LayerRuntime(
                 playlist=make_playlist(slot),
                 browse_floor=preset_root / slot,
-                stem=DEFAULT_STEM_FOR_SLOT[slot],
+                stem=TEST_LAYER_STEMS.get(slot, "drums"),
             )
             for slot in slots
         },
@@ -213,6 +214,38 @@ def test_num_keys_toggle_monitor_when_paused() -> None:
     assert session.timeline.cues == []
     assert session.timeline.record_buffer == []
     assert visibility_calls == [True, True]
+
+
+def test_num_key_5_toggles_fifth_layer_when_paused() -> None:
+    slots = tuple(f"layer_{i}" for i in range(1, 6))
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+        slots=slots,
+        position_sec=3.0,
+    )
+    controls.playback.paused = True
+    session.timeline.preview_active = True
+    session.timeline.monitor = {slot: True for slot in slots}
+
+    controls.handle_keydown(keydown(pygame.K_5))
+    assert session.timeline.monitor["layer_5"] is False
+    assert session.timeline.monitor["layer_4"] is True
+    assert visibility_calls == [True]
+
+
+def test_num_keys_beyond_layer_count_are_noop() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls()
+    controls.playback.paused = True
+    session.timeline.preview_active = True
+    session.timeline.monitor = {slot: True for slot in DEFAULT_LAYER_SLOTS}
+
+    controls.handle_keydown(keydown(pygame.K_5))
+    assert session.timeline.monitor == {
+        "layer_1": True,
+        "layer_2": True,
+        "layer_3": True,
+        "layer_4": True,
+    }
+    assert visibility_calls == []
 
 
 def test_num_keys_ignored_when_playing_not_in_override() -> None:

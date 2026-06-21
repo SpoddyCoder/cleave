@@ -13,8 +13,8 @@ from cleave.stem_pcm import StemPcmBank
 from cleave.viz.mix_player import MixPlayer
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.layer import StemLayer
-from tests.support.viz import stub_playback_state
 from cleave.viz.wiring import make_tuning_controls
+from tests.support.viz import make_test_cfg, stub_playback_state
 
 
 def _make_wired_controls() -> tuple:
@@ -44,7 +44,7 @@ def _make_wired_controls() -> tuple:
     )
     controls = make_tuning_controls(
         session=session,
-        cfg=None,
+        cfg=make_test_cfg(("layer_1",)),
         preset_root=Path("/tmp/presets"),
         project_dir=Path("/tmp/projects/test"),
         layers_by_slot=layers_by_slot,
@@ -115,7 +115,7 @@ def test_on_stem_change_updates_mix_player_solo_source() -> None:
     )
     controls = make_tuning_controls(
         session=session,
-        cfg=None,
+        cfg=make_test_cfg(("layer_1",)),
         preset_root=Path("/tmp/presets"),
         project_dir=Path("/tmp/projects/test"),
         layers_by_slot=layers_by_slot,

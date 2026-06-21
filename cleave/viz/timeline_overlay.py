@@ -33,11 +33,11 @@ TIMELINE_PANEL_GAP: int = _timeline_ui.panel_gap
 OFF_SEGMENT_COLOR: tuple[int, int, int] = (40, 40, 40)
 
 
-def timeline_viewport_reserve_px(content_height: int, *, margin: int | None = None) -> int:
+def timeline_viewport_reserve_px(row_count: int, *, margin: int | None = None) -> int:
     metrics = timeline_ui_metrics()
     if margin is None:
         margin = metrics.margin
-    panel_h = timeline_panel_height_px(content_height)
+    panel_h = timeline_panel_height_px(row_count)
     return panel_h + margin + metrics.panel_gap
 
 
@@ -61,7 +61,7 @@ class TimelineViewState:
     defaults: dict[str, bool]
     position_sec: float
     duration_sec: float
-    focus_row: int  # 0..3, index into layer_z_order (0 = bottom stem)
+    focus_row: int  # 0..N-1, index into layer_z_order (0 = bottom stem)
     monitor_visible: dict[str, bool]
     timeline_visible: dict[str, bool]
     slot_stems: dict[str, StemSource] = field(default_factory=dict)
@@ -360,8 +360,6 @@ class TimelineOverlay:
         self,
         surface: pygame.Surface,
         state: TimelineViewState,
-        *,
-        content_height: int,
     ) -> None:
         self._panel_rect = None
         self._header_badge_rect = None
@@ -372,21 +370,23 @@ class TimelineOverlay:
 
         display_width, display_height = surface.get_size()
         panel_w = display_width - self._margin * 2
-        panel_h = timeline_panel_height_px(content_height)
-        panel_x = self._margin
-        panel_y = display_height - panel_h - self._margin
-
-        font = self._font_get()
-        num_sample = font.render(layer_num_prefix(4), True, LABEL)
-        abbrev_sample = font.render(stem_abbrev_label("drums"), True, LABEL)
-        self._layer_num_width = num_sample.get_width()
-        self._stem_abbrev_width = abbrev_sample.get_width()
         row_count = len(state.layer_z_order)
         if row_count == 0:
             return
 
-        inner_h = panel_h - self._padding * 2
-        row_h = max(1, (inner_h - self._row_gap * (row_count - 1)) // row_count)
+        metrics = timeline_ui_metrics()
+        row_h = metrics.row_height
+        panel_h = timeline_panel_height_px(row_count)
+        panel_x = self._margin
+        panel_y = display_height - panel_h - self._margin
+
+        font = self._font_get()
+        num_sample = font.render(
+            layer_num_prefix(max(row_count, 1)), True, LABEL
+        )
+        abbrev_sample = font.render(stem_abbrev_label("drums"), True, LABEL)
+        self._layer_num_width = num_sample.get_width()
+        self._stem_abbrev_width = abbrev_sample.get_width()
         eye_slot_w = visibility_icon_slot_width(row_h)
         prefix_width = row_prefix_width(
             self._layer_num_width, self._stem_abbrev_width, row_h

@@ -32,8 +32,10 @@ from cleave.config import (
     _parse_layers,
 )
 from cleave.config_schema import (
-    DEFAULT_STEM_FOR_SLOT,
-    LAYER_SLOTS,
+    DEFAULT_LAYER_SLOTS,
+    MAX_LAYER_COUNT,
+    ParseCtx,
+    next_layer_slot,
     parse_hex_colour,
     parse_render_section,
     parse_timeline_section,
@@ -43,7 +45,7 @@ from cleave.config_schema import (
 from cleave.paths import repo_root
 from cleave.extract import STEM_NAMES
 from cleave.timeline import TimelineCue
-from tests.support.config import slot_for_stem, write_minimal_config
+from tests.support.config import TEST_LAYER_STEMS, slot_for_stem, write_minimal_config
 
 _LONG_PRESET = (
     "presets-cream-of-the-crop/Drawing/Dunes/"
@@ -65,12 +67,44 @@ def _preset_lines(dumped: str) -> list[str]:
     return lines
 
 
+def _timeline_parse_ctx(
+    slots: tuple[str, ...] = DEFAULT_LAYER_SLOTS,
+) -> ParseCtx:
+    return ParseCtx(layer_slots=slots)
+
+
+def _layer_slots_raw(slots: list[str]) -> dict:
+    stem_cycle = ["drums", "bass", "vocals", "other"]
+    layers: dict = {}
+    for slot in slots:
+        stem = TEST_LAYER_STEMS.get(
+            slot, stem_cycle[(int(slot.split("_")[1]) - 1) % len(stem_cycle)]
+        )
+        layers[slot] = {
+            **template_layer_entry(slot, stem=stem),
+            "preset": f"{stem}/{stem}.milk",
+        }
+    return layers
+
+
+def _write_config_with_slots(
+    project_dir: Path, preset_root: Path, slots: list[str], **overrides
+) -> Path:
+    data_overrides = {
+        "layers": _layer_slots_raw(slots),
+        "layer_z_order": list(slots),
+    }
+    data_overrides.update(overrides)
+    return write_minimal_config(project_dir, preset_root, **data_overrides)
+
+
 def _minimal_layers_raw(*, locked_slot: str | None = None) -> dict:
     layers: dict = {}
-    for slot in LAYER_SLOTS:
+    for slot in DEFAULT_LAYER_SLOTS:
+        stem = TEST_LAYER_STEMS[slot]
         entry: dict = {
-            **template_layer_entry(slot),
-            "preset": f"{DEFAULT_STEM_FOR_SLOT[slot]}/anchor.milk",
+            **template_layer_entry(slot, stem=stem),
+            "preset": f"{stem}/anchor.milk",
         }
         if slot == locked_slot:
             entry["locked"] = True
@@ -91,12 +125,12 @@ def test_dump_yaml_keeps_long_preset_on_one_line() -> None:
 
 def test_parse_layers_reads_locked_true() -> None:
     preset_root = Path("/tmp/presets")
-    layers = _parse_layers(
+    layers, _ = _parse_layers(
         {"layers": _minimal_layers_raw(locked_slot="layer_1")},
         preset_root,
     )
     assert layers["layer_1"].locked is True
-    for slot in LAYER_SLOTS:
+    for slot in DEFAULT_LAYER_SLOTS:
         if slot != "layer_1":
             assert layers[slot].locked is False
 
@@ -186,7 +220,7 @@ def test_load_config_reads_visualizer_name(minimal_project: Path) -> None:
 
 
 def test_layers_in_z_order_matches_reversed_layer_z_order() -> None:
-    layer_z_order = ("layer_4", "layer_2", "layer_3", "layer_1")
+    layer_z_order = ["layer_4", "layer_2", "layer_3", "layer_1"]
     cfg = CleaveConfig(
         paths=PathsConfig(
             preset_root=Path("/tmp/presets"),
@@ -195,11 +229,11 @@ def test_layers_in_z_order_matches_reversed_layer_z_order() -> None:
         layers={
             slot: LayerConfig(
                 preset=Path(
-                    f"/tmp/presets/{DEFAULT_STEM_FOR_SLOT[slot]}/anchor.milk"
+                    f"/tmp/presets/{TEST_LAYER_STEMS[slot]}/anchor.milk"
                 ),
-                stem=DEFAULT_STEM_FOR_SLOT[slot],
+                stem=TEST_LAYER_STEMS[slot],
             )
-            for slot in LAYER_SLOTS
+            for slot in DEFAULT_LAYER_SLOTS
         },
         visualizer=VisualizerConfig(),
         config_path=Path("/tmp/cleave.config.yaml"),
@@ -229,7 +263,7 @@ def test_parse_layers_reads_effects() -> None:
     preset_root = Path("/tmp/presets")
     layers_raw = _minimal_layers_raw()
     layers_raw["layer_1"]["effects"] = {"pulse": {"onset": 75}}
-    layers = _parse_layers({"layers": layers_raw}, preset_root)
+    layers, _ = _parse_layers({"layers": layers_raw}, preset_root)
     assert layers["layer_1"].effects == {"pulse": {"onset": 75}}
     assert layers["layer_2"].effects == {}
 
@@ -305,10 +339,10 @@ def test_find_config_path_global_fallback(
 def test_load_config_round_trip(minimal_project: Path) -> None:
     cfg = load_config(project_root=minimal_project)
     assert cfg.config_path == (minimal_project / VIZ_CONFIG_FILENAME).resolve()
-    assert set(cfg.layers) == set(LAYER_SLOTS)
+    assert set(cfg.layers) == set(DEFAULT_LAYER_SLOTS)
     assert cfg.visualizer.width > 0
     assert cfg.paths.preset_root.is_dir()
-    for slot in LAYER_SLOTS:
+    for slot in DEFAULT_LAYER_SLOTS:
         assert cfg.layers[slot].preset.is_file()
 
 
@@ -328,47 +362,57 @@ def _write_invalid_config(project_dir: Path, preset_root: Path, **overrides) -> 
                 "layers": {
                     **{
                         slot: {
-                            **template_layer_entry(slot),
+                            **template_layer_entry(slot, stem=TEST_LAYER_STEMS[slot]),
                             "preset": (
-                                f"{DEFAULT_STEM_FOR_SLOT[slot]}/"
-                                f"{DEFAULT_STEM_FOR_SLOT[slot]}.milk"
+                                f"{TEST_LAYER_STEMS[slot]}/"
+                                f"{TEST_LAYER_STEMS[slot]}.milk"
                             ),
                         }
-                        for slot in LAYER_SLOTS
+                        for slot in DEFAULT_LAYER_SLOTS
                     },
                     "guitars": {"stem": "drums", "preset": "guitars/guitars.milk"},
                 }
             },
-            "unknown layer keys",
+            "invalid layer key",
+        ),
+        (
+            {"layers": {}},
+            "layers section must contain at least one layer",
         ),
         (
             {
                 "layers": {
-                    slot: {
-                        **template_layer_entry(slot),
-                        "preset": (
-                            f"{DEFAULT_STEM_FOR_SLOT[slot]}/"
-                            f"{DEFAULT_STEM_FOR_SLOT[slot]}.milk"
-                        ),
+                    "layer_0": {
+                        **template_layer_entry("layer_1", stem="drums"),
+                        "preset": "drums/drums.milk",
                     }
-                    for slot in LAYER_SLOTS
-                    if slot != "layer_4"
                 }
             },
-            "missing layer config",
+            "invalid layer key 'layer_0'",
+        ),
+        (
+            {
+                "layers": {
+                    "layer_9": {
+                        **template_layer_entry("layer_1", stem="drums"),
+                        "preset": "drums/drums.milk",
+                    }
+                }
+            },
+            "invalid layer key 'layer_9'",
         ),
         (
             {
                 "layers": {
                     slot: {
-                        **template_layer_entry(slot),
+                        **template_layer_entry(slot, stem=TEST_LAYER_STEMS[slot]),
                         "preset": (
-                            f"{DEFAULT_STEM_FOR_SLOT[slot]}/"
-                            f"{DEFAULT_STEM_FOR_SLOT[slot]}.milk"
+                            f"{TEST_LAYER_STEMS[slot]}/"
+                            f"{TEST_LAYER_STEMS[slot]}.milk"
                         ),
                         "blend_mode": "overlay" if slot == "layer_1" else "black-key",
                     }
-                    for slot in LAYER_SLOTS
+                    for slot in DEFAULT_LAYER_SLOTS
                 }
             },
             "blend_mode must be one of",
@@ -536,7 +580,10 @@ def test_load_config_missing_preset_file(tmp_path: Path) -> None:
 
 
 def test_parse_timeline_defaults_enabled_true() -> None:
-    timeline = parse_timeline_section({"timeline": {}})
+    timeline = parse_timeline_section(
+        {"timeline": {}},
+        _timeline_parse_ctx(),
+    )
     assert timeline == TimelineConfig(enabled=True, cues=())
 
 
@@ -550,7 +597,8 @@ def test_parse_timeline_reads_cues_sorted_by_t() -> None:
                     {"t": 2.5, "layers": {"layer_2": True}},
                 ],
             }
-        }
+        },
+        _timeline_parse_ctx(),
     )
     assert timeline is not None
     assert timeline.enabled is True
@@ -567,7 +615,8 @@ def test_parse_timeline_rejects_unknown_stem() -> None:
                 "timeline": {
                     "cues": [{"t": 1.0, "layers": {"synth": True}}],
                 }
-            }
+            },
+            _timeline_parse_ctx(),
         )
 
 
@@ -578,7 +627,8 @@ def test_parse_timeline_clamps_negative_t() -> None:
                 "timeline": {
                     "cues": [{"t": -1.0, "layers": {"layer_1": False}}],
                 }
-            }
+            },
+            _timeline_parse_ctx(),
         )
 
 
@@ -596,3 +646,70 @@ def test_load_config_reads_timeline(minimal_project: Path) -> None:
     assert cfg.timeline is not None
     assert cfg.timeline.enabled is True
     assert cfg.timeline.cues == (TimelineCue(t=3.0, layers={"layer_3": False}),)
+
+
+def test_next_layer_slot_skips_used_slots() -> None:
+    assert next_layer_slot(["layer_1", "layer_2"]) == "layer_3"
+
+
+def test_next_layer_slot_raises_at_capacity() -> None:
+    slots = [f"layer_{i}" for i in range(1, MAX_LAYER_COUNT + 1)]
+    with pytest.raises(ValueError, match=f"Maximum {MAX_LAYER_COUNT} layers"):
+        next_layer_slot(slots)
+
+
+@pytest.mark.parametrize("count", [1, 8])
+def test_load_config_accepts_variable_layer_count(
+    tmp_path: Path, count: int
+) -> None:
+    preset_root = tmp_path / "presets"
+    project_dir = tmp_path / "project"
+    slots = [f"layer_{i}" for i in range(1, count + 1)]
+    _write_config_with_slots(project_dir, preset_root, slots)
+    cfg = load_config(project_root=project_dir)
+    assert list(cfg.layers) == slots
+    assert cfg.layer_z_order == slots
+
+
+def test_load_config_rejects_z_order_for_missing_layer(tmp_path: Path) -> None:
+    preset_root = tmp_path / "presets"
+    project_dir = tmp_path / "project"
+    _write_config_with_slots(
+        project_dir,
+        preset_root,
+        ["layer_1", "layer_2", "layer_3"],
+        layer_z_order=["layer_1", "layer_2", "layer_4"],
+    )
+    with pytest.raises(ValueError, match="layer_z_order must contain each of"):
+        load_config(project_root=project_dir)
+
+
+def test_parse_timeline_rejects_layer_not_in_config(tmp_path: Path) -> None:
+    preset_root = tmp_path / "presets"
+    project_dir = tmp_path / "project"
+    _write_config_with_slots(project_dir, preset_root, ["layer_1", "layer_2"])
+    cfg_path = project_dir / VIZ_CONFIG_FILENAME
+    data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    data["timeline"] = {
+        "cues": [{"t": 1.0, "layers": {"layer_3": True}}],
+    }
+    with cfg_path.open("w", encoding="utf-8") as handle:
+        dump_yaml(data, handle)
+    with pytest.raises(ValueError, match="unknown layer keys in timeline.cues"):
+        load_config(project_root=project_dir)
+
+
+def test_cleave_config_layer_z_order_defaults_to_list() -> None:
+    cfg = CleaveConfig(
+        paths=PathsConfig(
+            preset_root=Path("/tmp/presets"),
+            texture_paths=(Path("/tmp/textures"),),
+        ),
+        layers={},
+        visualizer=VisualizerConfig(),
+        config_path=Path("/tmp/cleave.config.yaml"),
+    )
+    assert isinstance(cfg.layer_z_order, list)
+    cfg.layer_z_order.append("layer_5")
+    assert "layer_5" in cfg.layer_z_order
+

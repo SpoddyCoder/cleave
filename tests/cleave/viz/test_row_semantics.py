@@ -113,6 +113,7 @@ def test_track_sub_row_kinds() -> None:
             RowKind.TRACK_BEAT,
             RowKind.TRACK_EFFECTS_HEADER,
             RowKind.TRACK_EFFECT,
+            RowKind.LAYER_MANAGEMENT_DELETE,
         }
     )
 
@@ -172,7 +173,9 @@ def test_locked_navigable_sub_row_kinds() -> None:
     navigable = frozenset(
         k for k in TRACK_SUB_ROW_KINDS if row_navigable_when_layer_locked(k)
     )
-    assert navigable == frozenset({RowKind.TRACK_EFFECTS_HEADER})
+    assert navigable == frozenset(
+        {RowKind.TRACK_EFFECTS_HEADER, RowKind.LAYER_MANAGEMENT_DELETE}
+    )
 
 
 def test_track_value_rows_blocked_by_layer_lock() -> None:
@@ -196,11 +199,12 @@ def test_track_value_rows_blocked_by_layer_lock() -> None:
 
 
 def test_only_effects_header_navigable_when_layer_locked() -> None:
+    navigable_when_locked = {
+        RowKind.TRACK_EFFECTS_HEADER,
+        RowKind.LAYER_MANAGEMENT_DELETE,
+    }
     for kind in TRACK_SUB_ROW_KINDS:
-        if kind == RowKind.TRACK_EFFECTS_HEADER:
-            assert row_navigable_when_layer_locked(kind) is True
-        else:
-            assert row_navigable_when_layer_locked(kind) is False
+        assert row_navigable_when_layer_locked(kind) == (kind in navigable_when_locked)
 
 
 def test_labeled_sub_row_kinds_exclude_headers() -> None:

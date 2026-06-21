@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import pygame
 
-from cleave.config_schema import DEFAULT_STEM_FOR_SLOT, LAYER_SLOTS
+from cleave.config_schema import DEFAULT_LAYER_SLOTS
+from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
 from cleave.viz.material_icons import row_icon_prefix_width
 from cleave.viz.row_semantics import RowKind
@@ -54,7 +55,7 @@ from cleave.viz.timeline_overlay import timeline_viewport_reserve_px
 def _effects_expanded_view_state() -> TuningViewState:
     tracks = {
         slot: TrackBlock(
-            stem=DEFAULT_STEM_FOR_SLOT[slot],
+            stem=TEST_LAYER_STEMS[slot],
             preset_dir_label=f"{slot}/dir",
             preset_label=f"{slot}/preset.milk",
             blend_mode="add",
@@ -64,10 +65,10 @@ def _effects_expanded_view_state() -> TuningViewState:
             effects_expanded=True,
             expanded=True,
         )
-        for slot in LAYER_SLOTS
+        for slot in DEFAULT_LAYER_SLOTS
     }
     return TuningViewState(
-        layer_z_order=LAYER_SLOTS,
+        layer_z_order=DEFAULT_LAYER_SLOTS,
         tracks=tracks,
         paused=False,
         position_sec=0.0,
@@ -125,7 +126,7 @@ def _panel_scroll_metrics(
     _, margin_y = overlay._margin
     max_panel_h = surface_height - margin_y * 2
     if timeline_panel_open:
-        max_panel_h -= timeline_viewport_reserve_px(surface_height)
+        max_panel_h -= timeline_viewport_reserve_px(len(state.layer_z_order))
 
     toast_active = bool(state.toast_message and state.toast_remaining_sec > 0)
 
@@ -489,6 +490,163 @@ def test_draw_timeline_layer_hint_without_error() -> None:
     assert hint_idx in visible_row_indices(state)
 
 
+def test_build_row_layout_includes_add_before_render_gap() -> None:
+    state = _minimal_view_state()
+    add_idx = find_row_by_kind(state, RowKind.LAYER_MANAGEMENT_ADD)
+    gap_idx = find_row_by_kind(state, RowKind.RENDER_SECTION_GAP)
+    overlay_idx = find_row_by_kind(state, RowKind.RENDER_OVERLAY_HEADER)
+    assert add_idx < gap_idx < overlay_idx
+
+
+def test_delete_row_after_effects_when_expanded() -> None:
+    state = _minimal_view_state(
+        tracks={
+            "layer_1": TrackBlock(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                expanded=True,
+                effects_expanded=True,
+            )
+        },
+    )
+    layout = build_row_layout(state)
+    delete_idx = find_row(state, "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
+    effects_header = find_row(state, "layer_1", RowKind.TRACK_EFFECTS_HEADER)
+    effect_rows = [
+        index
+        for index, row in enumerate(layout)
+        if row.kind == RowKind.TRACK_EFFECT and row.slot == "layer_1"
+    ]
+    assert effect_rows
+    assert delete_idx > effects_header
+    assert delete_idx > max(effect_rows)
+
+
+def test_delete_row_omitted_when_track_collapsed() -> None:
+    state = _minimal_view_state(
+        tracks={
+            "layer_1": TrackBlock(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                expanded=False,
+            )
+        },
+    )
+    kinds = [row.kind for row in build_row_layout(state)]
+    assert RowKind.LAYER_MANAGEMENT_DELETE not in kinds
+
+
+def test_delete_row_navigable_when_locked() -> None:
+    state = _minimal_view_state(
+        tracks={
+            "layer_1": TrackBlock(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                expanded=True,
+                locked=True,
+            )
+        },
+    )
+    delete_row = find_row(state, "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
+    assert delete_row in navigable_row_indices(state)
+
+
+def test_add_row_always_navigable() -> None:
+    collapsed = _minimal_view_state(
+        tracks={
+            "layer_1": TrackBlock(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                expanded=False,
+            )
+        },
+    )
+    expanded = _minimal_view_state(
+        tracks={
+            "layer_1": TrackBlock(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                expanded=True,
+            )
+        },
+    )
+    for state in (collapsed, expanded):
+        add_row = find_row_by_kind(state, RowKind.LAYER_MANAGEMENT_ADD)
+        assert add_row in navigable_row_indices(state)
+
+
+def test_delete_row_disabled_color_single_layer() -> None:
+    state = _minimal_view_state(
+        tracks={
+            "layer_1": TrackBlock(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                expanded=True,
+            )
+        },
+    )
+    delete_row = find_row(state, "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
+    assert _row_value_color(state, delete_row) == DISABLED
+
+
+def test_draw_layer_management_rows_without_error() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    state = _minimal_view_state(
+        tracks={
+            "layer_1": TrackBlock(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                expanded=True,
+                effects_expanded=True,
+            )
+        },
+    )
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    overlay.notify_input()
+    overlay.draw(surface, state)
+    assert overlay.panel_rect is not None
+    add_row = find_row_by_kind(state, RowKind.LAYER_MANAGEMENT_ADD)
+    delete_row = find_row(state, "layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
+    assert add_row in visible_row_indices(state)
+    assert delete_row in visible_row_indices(state)
+
+
 def test_render_overlay_row_layout_includes_header_and_sub_rows_when_expanded() -> None:
     state = _minimal_view_state(
         render_overlay=RenderOverlayBlock(expanded=True),
@@ -731,7 +889,7 @@ def test_panel_reserves_timeline_viewport_when_open() -> None:
     assert panel is not None
     _, py, _, ph = panel
     _, margin_y = overlay._margin
-    reserve = timeline_viewport_reserve_px(surface_height)
+    reserve = timeline_viewport_reserve_px(len(state.layer_z_order))
     assert py + ph + reserve <= surface_height - margin_y
 
     open_metrics = _panel_scroll_metrics(

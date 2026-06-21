@@ -6,7 +6,8 @@ from unittest.mock import MagicMock, call, patch
 
 import pygame
 
-from cleave.config_schema import DEFAULT_STEM_FOR_SLOT, LAYER_SLOTS
+from cleave.config_schema import DEFAULT_LAYER_SLOTS
+from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
 from cleave.viz.app import (
     LiveVisualizerRuntime,
@@ -105,14 +106,14 @@ def _run_seed(*, upscale: float = 2.0) -> VisualizerSeed:
 def _timeline_open_runtime(compositor: MagicMock) -> LiveVisualizerRuntime:
     runtime = _minimal_runtime(compositor)
     runtime.overlay = TuningOverlay()
-    runtime.seed.session.layer_z_order = list(LAYER_SLOTS)
+    runtime.seed.session.layer_z_order = list(DEFAULT_LAYER_SLOTS)
     runtime.seed.session.layers = {
         slot: LayerRuntime(
             playlist=MagicMock(),
             browse_floor=MagicMock(),
-            stem=DEFAULT_STEM_FOR_SLOT[slot],
+            stem=TEST_LAYER_STEMS[slot],
         )
-        for slot in LAYER_SLOTS
+        for slot in DEFAULT_LAYER_SLOTS
     }
     runtime.seed.session.timeline.enabled = True
     runtime.seed.session.timeline.panel_open = True

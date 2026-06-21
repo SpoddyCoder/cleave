@@ -5,6 +5,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
+import pytest
 import yaml
 
 from cleave.config import (
@@ -22,12 +23,13 @@ from cleave.config import (
     load_config,
 )
 from cleave.config_schema import (
-    DEFAULT_STEM_FOR_SLOT,
-    LAYER_SLOTS,
+    DEFAULT_LAYER_SLOTS,
+    ParseCtx,
     parse_render_section,
     parse_timeline_section,
     template_layer_entry,
 )
+from tests.support.config import TEST_LAYER_STEMS
 from cleave.config_snapshot import (
     next_unnamed_path,
     persisted_session_payload,
@@ -73,27 +75,27 @@ def test_write_session_snapshot_includes_locked() -> None:
             paths=PathsConfig(preset_root=preset_root, texture_paths=(root / "tex",)),
             layers={
                 slot: LayerConfig(
-                preset=preset_root / DEFAULT_STEM_FOR_SLOT[slot] / "anchor.milk",
-                stem=DEFAULT_STEM_FOR_SLOT[slot],
+                preset=preset_root / TEST_LAYER_STEMS[slot] / "anchor.milk",
+                stem=TEST_LAYER_STEMS[slot],
             )
-            for slot in LAYER_SLOTS
+            for slot in DEFAULT_LAYER_SLOTS
             },
             visualizer=VisualizerConfig(),
             config_path=config_path,
         )
 
         session = TuningSession(
-            layer_z_order=list(LAYER_SLOTS),
+            layer_z_order=list(DEFAULT_LAYER_SLOTS),
             layers={
                 slot: LayerRuntime(
-                    stem=DEFAULT_STEM_FOR_SLOT[slot],
+                    stem=TEST_LAYER_STEMS[slot],
                     playlist=playlist_at_dir(
-                        preset_root / DEFAULT_STEM_FOR_SLOT[slot], index=0
+                        preset_root / TEST_LAYER_STEMS[slot], index=0
                     ),
-                    browse_floor=preset_root / DEFAULT_STEM_FOR_SLOT[slot],
+                    browse_floor=preset_root / TEST_LAYER_STEMS[slot],
                     locked=(slot == "layer_2"),
                 )
-                for slot in LAYER_SLOTS
+                for slot in DEFAULT_LAYER_SLOTS
             },
         )
 
@@ -102,7 +104,7 @@ def test_write_session_snapshot_includes_locked() -> None:
 
         data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
         assert data["layers"]["layer_2"]["locked"] is True
-        for slot in LAYER_SLOTS:
+        for slot in DEFAULT_LAYER_SLOTS:
             if slot != "layer_2":
                 assert data["layers"][slot]["locked"] is False
 
@@ -120,27 +122,27 @@ def test_write_session_snapshot_sparse_effects() -> None:
             paths=PathsConfig(preset_root=preset_root, texture_paths=(root / "tex",)),
             layers={
                 slot: LayerConfig(
-                preset=preset_root / DEFAULT_STEM_FOR_SLOT[slot] / "anchor.milk",
-                stem=DEFAULT_STEM_FOR_SLOT[slot],
+                preset=preset_root / TEST_LAYER_STEMS[slot] / "anchor.milk",
+                stem=TEST_LAYER_STEMS[slot],
             )
-            for slot in LAYER_SLOTS
+            for slot in DEFAULT_LAYER_SLOTS
             },
             visualizer=VisualizerConfig(),
             config_path=config_path,
         )
 
         session = TuningSession(
-            layer_z_order=list(LAYER_SLOTS),
+            layer_z_order=list(DEFAULT_LAYER_SLOTS),
             layers={
                 slot: LayerRuntime(
-                    stem=DEFAULT_STEM_FOR_SLOT[slot],
+                    stem=TEST_LAYER_STEMS[slot],
                     playlist=playlist_at_dir(
-                        preset_root / DEFAULT_STEM_FOR_SLOT[slot], index=0
+                        preset_root / TEST_LAYER_STEMS[slot], index=0
                     ),
-                    browse_floor=preset_root / DEFAULT_STEM_FOR_SLOT[slot],
+                    browse_floor=preset_root / TEST_LAYER_STEMS[slot],
                     effects={"pulse": {"onset": 60}} if slot == "layer_1" else {},
                 )
-                for slot in LAYER_SLOTS
+                for slot in DEFAULT_LAYER_SLOTS
             },
         )
 
@@ -190,27 +192,27 @@ def test_write_session_snapshot_sparse_all_effect_types() -> None:
             paths=PathsConfig(preset_root=preset_root, texture_paths=(root / "tex",)),
             layers={
                 slot: LayerConfig(
-                preset=preset_root / DEFAULT_STEM_FOR_SLOT[slot] / "anchor.milk",
-                stem=DEFAULT_STEM_FOR_SLOT[slot],
+                preset=preset_root / TEST_LAYER_STEMS[slot] / "anchor.milk",
+                stem=TEST_LAYER_STEMS[slot],
             )
-            for slot in LAYER_SLOTS
+            for slot in DEFAULT_LAYER_SLOTS
             },
             visualizer=VisualizerConfig(),
             config_path=config_path,
         )
 
         session = TuningSession(
-            layer_z_order=list(LAYER_SLOTS),
+            layer_z_order=list(DEFAULT_LAYER_SLOTS),
             layers={
                 slot: LayerRuntime(
-                    stem=DEFAULT_STEM_FOR_SLOT[slot],
+                    stem=TEST_LAYER_STEMS[slot],
                     playlist=playlist_at_dir(
-                        preset_root / DEFAULT_STEM_FOR_SLOT[slot], index=0
+                        preset_root / TEST_LAYER_STEMS[slot], index=0
                     ),
-                    browse_floor=preset_root / DEFAULT_STEM_FOR_SLOT[slot],
+                    browse_floor=preset_root / TEST_LAYER_STEMS[slot],
                     effects=session_effects[slot],
                 )
-                for slot in LAYER_SLOTS
+                for slot in DEFAULT_LAYER_SLOTS
             },
         )
 
@@ -234,10 +236,72 @@ def test_write_session_snapshot_sparse_all_effect_types() -> None:
             "grit": {"centroid": 5},
         }
 
-        round_trip = _parse_layers({"layers": data["layers"]}, preset_root)
+        round_trip, _ = _parse_layers({"layers": data["layers"]}, preset_root)
         assert round_trip["layer_1"].effects == session_effects["layer_1"]
         assert round_trip["layer_2"].effects["pulse"] == {"sub_bass": 40}
         assert round_trip["layer_3"].effects["hue"] == {"pitch": 25}
+
+
+def _stem_for_snapshot_slot(slot: str) -> str:
+    return TEST_LAYER_STEMS.get(slot, "full_mix")
+
+
+def _snapshot_round_trip_layer_count(layer_count: int) -> None:
+    slots = [f"layer_{i}" for i in range(1, layer_count + 1)]
+    session_order = list(reversed(slots))
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        preset_root = root / "presets"
+        make_preset_dirs(preset_root)
+
+        config_path = root / "cleave.config.yaml"
+        config_path.write_text("layers: {}\n")
+
+        cfg = CleaveConfig(
+            paths=PathsConfig(preset_root=preset_root, texture_paths=(root / "tex",)),
+            layers={
+                slot: LayerConfig(
+                    preset=preset_root
+                    / _stem_for_snapshot_slot(slot)
+                    / "anchor.milk",
+                    stem=_stem_for_snapshot_slot(slot),
+                )
+                for slot in slots
+            },
+            visualizer=VisualizerConfig(),
+            config_path=config_path,
+            layer_z_order=list(slots),
+        )
+
+        session = TuningSession(
+            layer_z_order=session_order,
+            layers={
+                slot: LayerRuntime(
+                    stem=_stem_for_snapshot_slot(slot),
+                    playlist=playlist_at_dir(
+                        preset_root / _stem_for_snapshot_slot(slot), index=0
+                    ),
+                    browse_floor=preset_root / _stem_for_snapshot_slot(slot),
+                )
+                for slot in slots
+            },
+        )
+
+        out_path = root / "snapshot.yaml"
+        write_session_snapshot(out_path, cfg=cfg, session=session)
+
+        data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+        assert set(data["layers"]) == set(slots)
+        assert data["layer_z_order"] == session_order
+
+        round_trip, ctx = _parse_layers({"layers": data["layers"]}, preset_root)
+        assert set(round_trip) == set(slots)
+        assert ctx.layer_slots == tuple(sorted(slots, key=lambda s: int(s.split("_")[1])))
+
+
+@pytest.mark.parametrize("layer_count", [3, 6])
+def test_write_session_snapshot_persist_layers_round_trip(layer_count: int) -> None:
+    _snapshot_round_trip_layer_count(layer_count)
 
 
 def test_write_session_snapshot_uses_session_z_order_when_valid() -> None:
@@ -254,27 +318,27 @@ def test_write_session_snapshot_uses_session_z_order_when_valid() -> None:
             paths=PathsConfig(preset_root=preset_root, texture_paths=(root / "tex",)),
             layers={
                 slot: LayerConfig(
-                preset=preset_root / DEFAULT_STEM_FOR_SLOT[slot] / "anchor.milk",
-                stem=DEFAULT_STEM_FOR_SLOT[slot],
+                preset=preset_root / TEST_LAYER_STEMS[slot] / "anchor.milk",
+                stem=TEST_LAYER_STEMS[slot],
             )
-            for slot in LAYER_SLOTS
+            for slot in DEFAULT_LAYER_SLOTS
             },
             visualizer=VisualizerConfig(),
             config_path=config_path,
-            layer_z_order=LAYER_SLOTS,
+            layer_z_order=list(DEFAULT_LAYER_SLOTS),
         )
 
         session = TuningSession(
             layer_z_order=session_order,
             layers={
                 slot: LayerRuntime(
-                    stem=DEFAULT_STEM_FOR_SLOT[slot],
+                    stem=TEST_LAYER_STEMS[slot],
                     playlist=playlist_at_dir(
-                        preset_root / DEFAULT_STEM_FOR_SLOT[slot], index=0
+                        preset_root / TEST_LAYER_STEMS[slot], index=0
                     ),
-                    browse_floor=preset_root / DEFAULT_STEM_FOR_SLOT[slot],
+                    browse_floor=preset_root / TEST_LAYER_STEMS[slot],
                 )
-                for slot in LAYER_SLOTS
+                for slot in DEFAULT_LAYER_SLOTS
             },
         )
 
@@ -286,7 +350,7 @@ def test_write_session_snapshot_uses_session_z_order_when_valid() -> None:
 
 
 def test_write_session_snapshot_falls_back_to_cfg_z_order_when_invalid() -> None:
-    cfg_order = ("layer_1", "layer_3", "layer_2", "layer_4")
+    cfg_order = ["layer_1", "layer_3", "layer_2", "layer_4"]
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         preset_root = root / "presets"
@@ -299,10 +363,10 @@ def test_write_session_snapshot_falls_back_to_cfg_z_order_when_invalid() -> None
             paths=PathsConfig(preset_root=preset_root, texture_paths=(root / "tex",)),
             layers={
                 slot: LayerConfig(
-                preset=preset_root / DEFAULT_STEM_FOR_SLOT[slot] / "anchor.milk",
-                stem=DEFAULT_STEM_FOR_SLOT[slot],
+                preset=preset_root / TEST_LAYER_STEMS[slot] / "anchor.milk",
+                stem=TEST_LAYER_STEMS[slot],
             )
-            for slot in LAYER_SLOTS
+            for slot in DEFAULT_LAYER_SLOTS
             },
             visualizer=VisualizerConfig(),
             config_path=config_path,
@@ -313,13 +377,13 @@ def test_write_session_snapshot_falls_back_to_cfg_z_order_when_invalid() -> None
             layer_z_order=["layer_1", "layer_2"],
             layers={
                 slot: LayerRuntime(
-                    stem=DEFAULT_STEM_FOR_SLOT[slot],
+                    stem=TEST_LAYER_STEMS[slot],
                     playlist=playlist_at_dir(
-                        preset_root / DEFAULT_STEM_FOR_SLOT[slot], index=0
+                        preset_root / TEST_LAYER_STEMS[slot], index=0
                     ),
-                    browse_floor=preset_root / DEFAULT_STEM_FOR_SLOT[slot],
+                    browse_floor=preset_root / TEST_LAYER_STEMS[slot],
                 )
-                for slot in LAYER_SLOTS
+                for slot in DEFAULT_LAYER_SLOTS
             },
         )
 
@@ -343,26 +407,26 @@ def test_write_session_snapshot_includes_upscale() -> None:
             paths=PathsConfig(preset_root=preset_root, texture_paths=(root / "tex",)),
             layers={
                 slot: LayerConfig(
-                preset=preset_root / DEFAULT_STEM_FOR_SLOT[slot] / "anchor.milk",
-                stem=DEFAULT_STEM_FOR_SLOT[slot],
+                preset=preset_root / TEST_LAYER_STEMS[slot] / "anchor.milk",
+                stem=TEST_LAYER_STEMS[slot],
             )
-            for slot in LAYER_SLOTS
+            for slot in DEFAULT_LAYER_SLOTS
             },
             visualizer=VisualizerConfig(width=1280, height=720, upscale=2.0),
             config_path=config_path,
         )
 
         session = TuningSession(
-            layer_z_order=list(LAYER_SLOTS),
+            layer_z_order=list(DEFAULT_LAYER_SLOTS),
             layers={
                 slot: LayerRuntime(
-                    stem=DEFAULT_STEM_FOR_SLOT[slot],
+                    stem=TEST_LAYER_STEMS[slot],
                     playlist=playlist_at_dir(
-                        preset_root / DEFAULT_STEM_FOR_SLOT[slot], index=0
+                        preset_root / TEST_LAYER_STEMS[slot], index=0
                     ),
-                    browse_floor=preset_root / DEFAULT_STEM_FOR_SLOT[slot],
+                    browse_floor=preset_root / TEST_LAYER_STEMS[slot],
                 )
-                for slot in LAYER_SLOTS
+                for slot in DEFAULT_LAYER_SLOTS
             },
         )
 
@@ -386,27 +450,27 @@ def test_write_session_snapshot_sparse_beat_sensitivity() -> None:
             paths=PathsConfig(preset_root=preset_root, texture_paths=(root / "tex",)),
             layers={
                 slot: LayerConfig(
-                preset=preset_root / DEFAULT_STEM_FOR_SLOT[slot] / "anchor.milk",
-                stem=DEFAULT_STEM_FOR_SLOT[slot],
+                preset=preset_root / TEST_LAYER_STEMS[slot] / "anchor.milk",
+                stem=TEST_LAYER_STEMS[slot],
             )
-            for slot in LAYER_SLOTS
+            for slot in DEFAULT_LAYER_SLOTS
             },
             visualizer=VisualizerConfig(beat_sensitivity=2.0),
             config_path=config_path,
         )
 
         session = TuningSession(
-            layer_z_order=list(LAYER_SLOTS),
+            layer_z_order=list(DEFAULT_LAYER_SLOTS),
             layers={
                 slot: LayerRuntime(
-                    stem=DEFAULT_STEM_FOR_SLOT[slot],
+                    stem=TEST_LAYER_STEMS[slot],
                     playlist=playlist_at_dir(
-                        preset_root / DEFAULT_STEM_FOR_SLOT[slot], index=0
+                        preset_root / TEST_LAYER_STEMS[slot], index=0
                     ),
-                    browse_floor=preset_root / DEFAULT_STEM_FOR_SLOT[slot],
+                    browse_floor=preset_root / TEST_LAYER_STEMS[slot],
                     beat_sensitivity=1.5 if slot == "layer_2" else 2.0,
                 )
-                for slot in LAYER_SLOTS
+                for slot in DEFAULT_LAYER_SLOTS
             },
         )
 
@@ -432,31 +496,31 @@ def test_write_session_snapshot_omits_all_zero_effects() -> None:
             paths=PathsConfig(preset_root=preset_root, texture_paths=(root / "tex",)),
             layers={
                 slot: LayerConfig(
-                preset=preset_root / DEFAULT_STEM_FOR_SLOT[slot] / "anchor.milk",
-                stem=DEFAULT_STEM_FOR_SLOT[slot],
+                preset=preset_root / TEST_LAYER_STEMS[slot] / "anchor.milk",
+                stem=TEST_LAYER_STEMS[slot],
             )
-            for slot in LAYER_SLOTS
+            for slot in DEFAULT_LAYER_SLOTS
             },
             visualizer=VisualizerConfig(),
             config_path=config_path,
         )
 
         session = TuningSession(
-            layer_z_order=list(LAYER_SLOTS),
+            layer_z_order=list(DEFAULT_LAYER_SLOTS),
             layers={
                 slot: LayerRuntime(
-                    stem=DEFAULT_STEM_FOR_SLOT[slot],
+                    stem=TEST_LAYER_STEMS[slot],
                     playlist=playlist_at_dir(
-                        preset_root / DEFAULT_STEM_FOR_SLOT[slot], index=0
+                        preset_root / TEST_LAYER_STEMS[slot], index=0
                     ),
-                    browse_floor=preset_root / DEFAULT_STEM_FOR_SLOT[slot],
+                    browse_floor=preset_root / TEST_LAYER_STEMS[slot],
                     effects=(
                         {"pulse": {"onset": 0}, "flare": {"onset": 0}}
                         if slot == "layer_3"
                         else {}
                     ),
                 )
-                for slot in LAYER_SLOTS
+                for slot in DEFAULT_LAYER_SLOTS
             },
         )
 
@@ -507,7 +571,7 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
     config_path.write_text(
         yaml.safe_dump(
             {
-                "layers": {slot: {**template_layer_entry(slot), "preset": f"presets/{DEFAULT_STEM_FOR_SLOT[slot]}/anchor.milk"} for slot in LAYER_SLOTS},
+                "layers": {slot: {**template_layer_entry(slot), "preset": f"presets/{TEST_LAYER_STEMS[slot]}/anchor.milk"} for slot in DEFAULT_LAYER_SLOTS},
                 "render": {
                     "post_fx": {
                         "enabled": True,
@@ -550,10 +614,10 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
         paths=PathsConfig(preset_root=preset_root, texture_paths=(root / "tex",)),
         layers={
             slot: LayerConfig(
-                preset=preset_root / DEFAULT_STEM_FOR_SLOT[slot] / "anchor.milk",
-                stem=DEFAULT_STEM_FOR_SLOT[slot],
+                preset=preset_root / TEST_LAYER_STEMS[slot] / "anchor.milk",
+                stem=TEST_LAYER_STEMS[slot],
             )
-            for slot in LAYER_SLOTS
+            for slot in DEFAULT_LAYER_SLOTS
         },
         visualizer=VisualizerConfig(),
         config_path=config_path,
@@ -565,7 +629,7 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
         ),
     )
     session = TuningSession(
-        layer_z_order=list(LAYER_SLOTS),
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
         render_post_fx=RenderPostFxRuntime(
             enabled=True,
             expanded=False,
@@ -592,9 +656,9 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
             slot: LayerRuntime(
                 playlist=playlist_at_dir(preset_root / slot, index=0),
                 browse_floor=preset_root / slot,
-                stem=DEFAULT_STEM_FOR_SLOT[slot],
+                stem=TEST_LAYER_STEMS[slot],
             )
-            for slot in LAYER_SLOTS
+            for slot in DEFAULT_LAYER_SLOTS
         },
     )
     return cfg, session, root / "snapshot.yaml"
@@ -732,7 +796,10 @@ def test_write_session_snapshot_persists_timeline_at_bottom(tmp_path: Path) -> N
         {"t": 10.0, "layers": {"layer_3": False}},
     ]
 
-    timeline = parse_timeline_section(data)
+    timeline = parse_timeline_section(
+        data,
+        ParseCtx(layer_slots=tuple(cfg.layer_z_order)),
+    )
     assert timeline is not None
     playlists = _round_trip_playlists(cfg.paths.preset_root)
     cfg_with_timeline = CleaveConfig(
@@ -768,8 +835,8 @@ def _round_trip_preset_dirs(root: Path) -> Path:
 
 def _round_trip_playlists(preset_root: Path) -> dict[str, object]:
     return {
-        slot: playlist_at_dir(preset_root / DEFAULT_STEM_FOR_SLOT[slot], index=0)
-        for slot in LAYER_SLOTS
+        slot: playlist_at_dir(preset_root / TEST_LAYER_STEMS[slot], index=0)
+        for slot in DEFAULT_LAYER_SLOTS
     }
 
 
