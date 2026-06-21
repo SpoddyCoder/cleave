@@ -41,20 +41,27 @@ def _resample_stereo_interleaved(
     return np.ascontiguousarray(stereo.reshape(-1), dtype=np.float32)
 
 
-def load_wav_mono_44k(path: Path) -> np.ndarray:
-    """Load a wav as mono float32 PCM at 44.1 kHz."""
+def load_wav_pcm_44k(path: Path) -> tuple[np.ndarray, int]:
+    """Load a wav as float32 PCM at 44.1 kHz in native channel layout."""
     data, sr = sf.read(path, dtype="float32", always_2d=True)
-    mono = _to_mono_float32(data)
-    if sr != SAMPLE_RATE_HZ:
-        mono = librosa.resample(mono, orig_sr=sr, target_sr=SAMPLE_RATE_HZ)
-        mono = np.ascontiguousarray(mono, dtype=np.float32)
-    return mono
+    if data.shape[1] == 1:
+        pcm = _to_mono_float32(data)
+        channels = 1
+        if sr != SAMPLE_RATE_HZ:
+            pcm = librosa.resample(pcm, orig_sr=sr, target_sr=SAMPLE_RATE_HZ)
+            pcm = np.ascontiguousarray(pcm, dtype=np.float32)
+    else:
+        stereo = data[:, :2]
+        pcm = np.ascontiguousarray(stereo.reshape(-1), dtype=np.float32)
+        channels = 2
+        if sr != SAMPLE_RATE_HZ:
+            pcm = _resample_stereo_interleaved(pcm, orig_sr=sr, target_sr=SAMPLE_RATE_HZ)
+    return pcm, channels
 
 
 def load_mix_pcm(path: Path) -> tuple[np.ndarray, int]:
     """Load mix audio as interleaved stereo float32 at 44.1 kHz."""
-    data, sr = sf.read(path, dtype="float32", always_2d=True)
-    pcm = _to_stereo_interleaved(data)
-    if sr != SAMPLE_RATE_HZ:
-        pcm = _resample_stereo_interleaved(pcm, orig_sr=sr, target_sr=SAMPLE_RATE_HZ)
+    pcm, channels = load_wav_pcm_44k(path)
+    if channels == 1:
+        pcm = _to_stereo_interleaved(pcm)
     return pcm, SAMPLE_RATE_HZ

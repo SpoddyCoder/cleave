@@ -9,4 +9,5 @@ alwaysApply: true
 - Must-do list: [docs/todos.md](docs/todos.md). Aspirational: [docs/roadmap.md](docs/roadmap.md).
 - See [README.md](README.md) for usage.
 - Project layout: `projects/<slug>/` under repo root (or `CLEAVE_DATA` override) with copied mix audio, `project.yaml`, `signals.json`, `stems/` (four stem wavs), and optional configs. `separate` copies the source file, writes the manifest, runs Demucs, and writes `signals.json`; the visualizer reads the mix from `project.yaml`. CLI: `python -m cleave separate|play` (or `python cleave.py`, same entry point).
+- Stem PCM ([cleave/stem_pcm.py](cleave/stem_pcm.py), [cleave/pcm_io.py](cleave/pcm_io.py)) preserves native mono or stereo from WAV files; [cleave/projectm.py](cleave/projectm.py) feeds libprojectM with matching channel layout. Mix playback and solo use stereo SDL output. Analysis for `signals.json` ([cleave/extract.py](cleave/extract.py)) stays mono.
 - Overlay layout and typography: [.cursor/rules/live-tuning-ui.mdc](.cursor/rules/live-tuning-ui.mdc).

@@ -201,6 +201,7 @@ class ProjectM:
         self._handle = handle
         self._texture_path_storage: list[bytes] = []
         self._beat_sensitivity = DEFAULT_BEAT_SENSITIVITY
+        self._pcm_channels = 1
 
     @property
     def handle(self) -> c_void_p:
@@ -242,9 +243,10 @@ class ProjectM:
                 self._handle, POINTER(c_char_p)(), c_size_t(0)
             )
 
-    def feed_pcm(self, samples: np.ndarray) -> None:
+    def feed_pcm(self, samples: np.ndarray, *, channels: int = 1) -> None:
         if samples.size == 0:
             return
+        self._pcm_channels = channels
         arr = np.ascontiguousarray(samples, dtype=np.float32).ravel()
         scale = self._beat_sensitivity
         if scale != 1.0:
@@ -254,18 +256,34 @@ class ProjectM:
         max_n = int(lib.projectm_pcm_get_max_samples())
         if max_n <= 0:
             max_n = len(arr)
-        for offset in range(0, len(arr), max_n):
-            chunk = arr[offset : offset + max_n]
+        step = max_n
+        if channels == 2:
+            step = max_n - (max_n % 2)
+            if step <= 0:
+                step = 2
+        channel_type = PROJECTM_MONO if channels == 1 else PROJECTM_STEREO
+        for offset in range(0, len(arr), step):
+            chunk = arr[offset : offset + step]
+            if channels == 2:
+                chunk = chunk[: len(chunk) - (len(chunk) % 2)]
+                if chunk.size == 0:
+                    continue
+                count = len(chunk) // 2
+            else:
+                count = len(chunk)
             data = chunk.ctypes.data_as(POINTER(c_float))
             lib.projectm_pcm_add_float(
-                self._handle, data, c_uint(len(chunk)), c_int32(PROJECTM_MONO)
+                self._handle, data, c_uint(count), c_int32(channel_type)
             )
 
     def flush_pcm(self) -> None:
         n = int(_get_lib().projectm_pcm_get_max_samples())
         if n <= 0:
             return
-        self.feed_pcm(np.zeros(n, dtype=np.float32))
+        channels = self._pcm_channels
+        if channels == 2:
+            n = n - (n % 2)
+        self.feed_pcm(np.zeros(n, dtype=np.float32), channels=channels)
 
     def render_to_fbo(self, fbo_id: int) -> None:
         _get_lib().projectm_opengl_render_frame_fbo(

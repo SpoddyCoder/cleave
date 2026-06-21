@@ -64,7 +64,7 @@ def test_mix_player_solo_source_routes_mono_pcm() -> None:
     mix = np.array([9.0, 9.0, 9.0, 9.0], dtype=np.float32)
     drums = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
     player = MixPlayer(mix, FREQUENCY_HZ)
-    player.set_stem_pcm({"drums": drums})
+    player.set_stem_pcm({"drums": (drums, 1)})
     player.set_solo_source("drums")
     player.seek(0.0)
 
@@ -79,6 +79,29 @@ def test_mix_player_solo_source_routes_mono_pcm() -> None:
     )
     assert frames_written == 2
     np.testing.assert_array_equal(out, [1.0, 1.0, 2.0, 2.0])
+
+
+def test_mix_player_solo_source_routes_stereo_pcm() -> None:
+    mix = np.array([9.0, 9.0, 9.0, 9.0], dtype=np.float32)
+    drums = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+    player = MixPlayer(mix, FREQUENCY_HZ)
+    player.set_stem_pcm({"drums": (drums, 2)})
+    player.set_solo_source("drums")
+    player.seek(0.0)
+
+    out = np.zeros(4, dtype=np.float32)
+    with player._lock:
+        read_index = player._read_index
+        solo_source = player._solo_source
+        stem_pcm = player._stem_pcm.get(solo_source) if solo_source else None
+        stem_channels = player._stem_channels.get(solo_source, 1) if solo_source else 1
+    assert stem_pcm is not None
+    assert stem_channels == 2
+    frames_written, _ = copy_stereo_pcm_chunk(
+        stem_pcm, read_index, out, total_frames=len(drums) // 2
+    )
+    assert frames_written == 2
+    np.testing.assert_array_equal(out, drums)
 
 
 def test_copy_stereo_pcm_chunk_at_end_writes_silence() -> None:

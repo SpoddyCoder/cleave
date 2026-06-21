@@ -545,7 +545,13 @@ def test_build_record_punch_cues_restores_when_disable_only_inside_punch() -> No
 
 def _pcm_bank() -> StemPcmBank:
     pcm = {name: np.zeros(44100, dtype=np.float32) for name in STEM_NAMES}
-    return StemPcmBank(project_dir=Path("/tmp/project"), duration_sec=1.0, _pcm=pcm)
+    channels = {name: 1 for name in STEM_NAMES}
+    return StemPcmBank(
+        project_dir=Path("/tmp/project"),
+        duration_sec=1.0,
+        _pcm=pcm,
+        _channels=channels,
+    )
 
 
 def test_warmup_layers_feeds_pcm_and_frame_times() -> None:

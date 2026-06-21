@@ -167,7 +167,7 @@ class LayerFramePipeline:
                     continue
                 stem = session.layers[layer.slot].stem
                 pcm = pcm_bank.slice_pcm(stem, t_sec, n_pcm)
-                layer.pm.feed_pcm(pcm)
+                layer.pm.feed_pcm(pcm, channels=pcm_bank.channels(stem))
                 layer.pm.set_frame_time(t_sec)
                 _render_layer_fbo(layer, layer.pm)
 
@@ -196,7 +196,7 @@ class LayerFramePipeline:
                     continue
                 stem = session.layers[layer.slot].stem
                 pcm = pcm_bank.slice_pcm(stem, t_sec, n_pcm)
-                layer.pm.feed_pcm(pcm)
+                layer.pm.feed_pcm(pcm, channels=pcm_bank.channels(stem))
                 layer.pm.set_frame_time(t_sec)
 
         apply_effect_modifiers(
