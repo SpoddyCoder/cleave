@@ -1298,7 +1298,7 @@ class TuningOverlay:
         if timeline_panel_open:
             from cleave.viz.timeline_overlay import timeline_viewport_reserve_px
 
-            max_panel_h -= timeline_viewport_reserve_px(surface.get_height())
+            max_panel_h -= timeline_viewport_reserve_px(len(state.layer_z_order))
         metrics = scroll_metrics(
             visible_indices=visible_indices,
             first_scrollable_visible=first_scrollable_visible,

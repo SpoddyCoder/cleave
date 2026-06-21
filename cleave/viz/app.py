@@ -343,7 +343,6 @@ def _tick_frame_live_overlay(
             runtime.timeline_overlay,
             runtime.overlay_surface,
             timeline_state,
-            runtime.seed.height,
             visibility=_timeline_strip_fade(tl, overlay_visibility=overlay_visibility),
         )
 

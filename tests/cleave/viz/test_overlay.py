@@ -126,7 +126,7 @@ def _panel_scroll_metrics(
     _, margin_y = overlay._margin
     max_panel_h = surface_height - margin_y * 2
     if timeline_panel_open:
-        max_panel_h -= timeline_viewport_reserve_px(surface_height)
+        max_panel_h -= timeline_viewport_reserve_px(len(state.layer_z_order))
 
     toast_active = bool(state.toast_message and state.toast_remaining_sec > 0)
 
@@ -889,7 +889,7 @@ def test_panel_reserves_timeline_viewport_when_open() -> None:
     assert panel is not None
     _, py, _, ph = panel
     _, margin_y = overlay._margin
-    reserve = timeline_viewport_reserve_px(surface_height)
+    reserve = timeline_viewport_reserve_px(len(state.layer_z_order))
     assert py + ph + reserve <= surface_height - margin_y
 
     open_metrics = _panel_scroll_metrics(

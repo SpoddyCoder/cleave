@@ -85,7 +85,7 @@ def test_draw_timeline_overlay_uses_display_target() -> None:
     )
 
     OverlayDrawer.draw_timeline(
-        compositor, overlay, overlay_surface, view_state, content_height=720
+        compositor, overlay, overlay_surface, view_state
     )
 
     compositor.draw_overlay.assert_called_once_with(22, 0, 600, 1280, 120, 1.0)
@@ -124,7 +124,6 @@ def test_draw_timeline_overlay_applies_visibility_alpha() -> None:
         overlay,
         overlay_surface,
         view_state,
-        content_height=720,
         visibility=0.4,
     )
 
