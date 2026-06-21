@@ -7,6 +7,7 @@ import pygame
 from cleave.config_schema import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
+from cleave.viz.frame_rate import format_fps_display
 from cleave.viz.material_icons import row_icon_prefix_width
 from cleave.viz.row_semantics import RowKind
 from cleave.viz.overlay import (
@@ -25,6 +26,7 @@ from cleave.viz.overlay import (
     fit_row_text,
     navigable_row_indices,
     panel_content_max_width,
+    panel_fps_layout,
     panel_help_hint_layout,
     panel_toast_layout,
     render_visibility_icon,
@@ -220,6 +222,55 @@ def test_help_hint_layout_avoids_scrollbar_column() -> None:
     )
     assert with_bar.y == without_bar.y
     assert with_bar.x == without_bar.x - SCROLLBAR_WIDTH - SCROLLBAR_CONTENT_GAP
+
+
+def test_fps_layout_top_right_on_transport_row() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    font = overlay._font_get()
+    fps_w = font.render(format_fps_display(30.0), True, (255, 255, 255)).get_width()
+    panel_w = 320
+    without_bar = panel_fps_layout(
+        panel_w=panel_w,
+        padding=overlay._padding,
+        text_width=fps_w,
+        show_scrollbar=False,
+    )
+    with_bar = panel_fps_layout(
+        panel_w=panel_w,
+        padding=overlay._padding,
+        text_width=fps_w,
+        show_scrollbar=True,
+    )
+    assert without_bar.y == overlay._padding
+    assert with_bar.y == overlay._padding
+    assert with_bar.x == without_bar.x - SCROLLBAR_WIDTH - SCROLLBAR_CONTENT_GAP
+
+
+def test_draw_fps_counter_when_present() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    state = _minimal_view_state(fps=28.4)
+
+    without_fps = _copy_panel_surface(overlay, _minimal_view_state())
+    with_fps = _copy_panel_surface(overlay, state)
+    assert pygame.image.tostring(without_fps, "RGBA") != pygame.image.tostring(
+        with_fps, "RGBA"
+    )
+
+    font = overlay._font_get()
+    fps_text = format_fps_display(28.4)
+    fps_color = _row_value_color(state, find_row_by_kind(state, RowKind.TRANSPORT))
+    fps_surf = font.render(fps_text, True, fps_color)
+    metrics = _panel_scroll_metrics(overlay, state)
+    layout = panel_fps_layout(
+        panel_w=with_fps.get_width(),
+        padding=overlay._padding,
+        text_width=fps_surf.get_width(),
+        show_scrollbar=metrics.show_scrollbar,
+    )
+    sampled = with_fps.get_at((layout.x + 2, layout.y + font.get_linesize() // 2))
+    assert sampled[:3] == fps_color
 
 
 def test_panel_content_max_width_reserves_scrollbar() -> None:
