@@ -22,9 +22,10 @@ from cleave.signals import Signals
 from cleave.viz.session import LayerRuntime, TuningSession
 from pathlib import Path
 
-from cleave.config_schema import DEFAULT_STEM_FOR_SLOT, LAYER_SLOTS
+from cleave.config_schema import DEFAULT_LAYER_SLOTS
+from tests.support.config import TEST_LAYER_STEMS
 
-SLOT_FOR_STEM = {v: k for k, v in DEFAULT_STEM_FOR_SLOT.items()}
+SLOT_FOR_STEM = {v: k for k, v in TEST_LAYER_STEMS.items()}
 
 
 def _signals_with_stem_key(stem: str, key: str, values: list[float]) -> Signals:
@@ -39,7 +40,7 @@ def _signals_with_stem_key(stem: str, key: str, values: list[float]) -> Signals:
 
 def _layer_runtime(stem: str, *, opacity_pct: int = 50, effects: dict | None = None) -> LayerRuntime:
     slot = SLOT_FOR_STEM.get(stem, stem)
-    audio = DEFAULT_STEM_FOR_SLOT.get(slot, stem)
+    audio = TEST_LAYER_STEMS.get(slot, stem)
     return LayerRuntime(
         playlist=playlist_at_dir(Path(f"/tmp/presets/{slot}"), index=0),
         browse_floor=Path(f"/tmp/presets/{slot}"),
@@ -184,13 +185,13 @@ def test_effect_runtime_all_stems_expose_flash_modifier() -> None:
         "other": {"flash": {"centroid": 100}},
     }
     session = TuningSession(
-        layer_z_order=list(LAYER_SLOTS),
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
         layers={
-            slot: _layer_runtime(DEFAULT_STEM_FOR_SLOT[slot], effects=flash_effects[DEFAULT_STEM_FOR_SLOT[slot]])
-            for slot in LAYER_SLOTS
+            slot: _layer_runtime(TEST_LAYER_STEMS[slot], effects=flash_effects[TEST_LAYER_STEMS[slot]])
+            for slot in DEFAULT_LAYER_SLOTS
         },
     )
     runtime = EffectRuntime()
     mods = runtime.tick(session, signals, 0.01)
-    for slot in LAYER_SLOTS:
+    for slot in DEFAULT_LAYER_SLOTS:
         assert mods[slot].flash_alpha > 0.0

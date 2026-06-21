@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from cleave.config import CleaveConfig
-from cleave.config_schema import LAYER_SLOTS
 
 if TYPE_CHECKING:
     from cleave.projectm import ProjectM
@@ -159,6 +159,19 @@ class PresetPlaylist:
         return rel if rel.endswith("/") else f"{rel}/"
 
 
+def scan_single_layer(
+    slot: str,
+    preset_root: Path,
+    project_dir: Path,
+) -> PresetPlaylist:
+    resolved_root = preset_root.resolve()
+    paths = list(resolved_root.rglob("*.milk"))
+    if paths:
+        anchor = random.choice(paths)
+        return scan_preset_playlist(anchor)
+    return scan_preset_playlist(resolved_root)
+
+
 def scan_preset_playlist(anchor: Path) -> PresetPlaylist:
     """Build a playlist from a .milk file or a directory of presets."""
     resolved = anchor.resolve()
@@ -226,6 +239,6 @@ def scan_all_layers(cfg: CleaveConfig) -> dict[str, PresetPlaylist]:
     """Scan one preset playlist per configured layer."""
     return {
         slot: scan_preset_playlist(cfg.layers[slot].preset)
-        for slot in LAYER_SLOTS
+        for slot in cfg.layer_z_order
         if slot in cfg.layers
     }

@@ -16,6 +16,8 @@ class RowKind(Enum):
     TRACK_BEAT = auto()
     TRACK_EFFECTS_HEADER = auto()
     TRACK_EFFECT = auto()
+    LAYER_MANAGEMENT_ADD = auto()
+    LAYER_MANAGEMENT_DELETE = auto()
     TIMELINE_LAYER_HINT = auto()
     RENDER_SECTION_GAP = auto()
     RENDER_OVERLAY_HEADER = auto()
@@ -132,6 +134,19 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         repeatable=True,
         help_title="Cleave Effects",
         parent_group="track",
+    ),
+    RowKind.LAYER_MANAGEMENT_ADD: RowBehavior(
+        RowAffordance.ACTION,
+        help_title="Add new layer",
+        navigable=True,
+    ),
+    RowKind.LAYER_MANAGEMENT_DELETE: RowBehavior(
+        RowAffordance.ACTION,
+        help_title="Delete layer",
+        navigable=True,
+        parent_group="track",
+        blocked_by_layer_lock=False,
+        navigable_when_layer_locked=True,
     ),
     RowKind.TIMELINE_LAYER_HINT: RowBehavior(
         RowAffordance.DISPLAY,

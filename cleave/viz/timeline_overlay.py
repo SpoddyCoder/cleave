@@ -61,7 +61,7 @@ class TimelineViewState:
     defaults: dict[str, bool]
     position_sec: float
     duration_sec: float
-    focus_row: int  # 0..3, index into layer_z_order (0 = bottom stem)
+    focus_row: int  # 0..N-1, index into layer_z_order (0 = bottom stem)
     monitor_visible: dict[str, bool]
     timeline_visible: dict[str, bool]
     slot_stems: dict[str, StemSource] = field(default_factory=dict)
@@ -377,7 +377,9 @@ class TimelineOverlay:
         panel_y = display_height - panel_h - self._margin
 
         font = self._font_get()
-        num_sample = font.render(layer_num_prefix(4), True, LABEL)
+        num_sample = font.render(
+            layer_num_prefix(max(len(state.layer_z_order), 1)), True, LABEL
+        )
         abbrev_sample = font.render(stem_abbrev_label("drums"), True, LABEL)
         self._layer_num_width = num_sample.get_width()
         self._stem_abbrev_width = abbrev_sample.get_width()

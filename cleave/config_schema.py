@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Literal, TypeVar
@@ -27,16 +28,47 @@ BEAT_SENSITIVITY_MAX = 5.0
 
 # --- Layer defaults ---
 
-LAYER_SLOTS: tuple[str, ...] = ("layer_1", "layer_2", "layer_3", "layer_4")
+MAX_LAYER_COUNT = 8
+MIN_LAYER_COUNT = 1
+DEFAULT_LAYER_SLOTS = ("layer_1", "layer_2", "layer_3", "layer_4")
+DEFAULT_LAYER_Z_ORDER: list[str] = list(DEFAULT_LAYER_SLOTS)
+DEFAULT_NEW_LAYER_STEM: StemSource = "full_mix"
 
-DEFAULT_LAYER_Z_ORDER = LAYER_SLOTS
+_SLOT_RE = re.compile(r"^layer_(\d+)$")
 
-DEFAULT_STEM_FOR_SLOT: dict[str, StemSource] = {
-    "layer_1": "drums",
-    "layer_2": "bass",
-    "layer_3": "vocals",
-    "layer_4": "other",
-}
+
+def _valid_slot(key: str) -> int | None:
+    m = _SLOT_RE.match(key)
+    if m:
+        n = int(m.group(1))
+        if 1 <= n <= MAX_LAYER_COUNT:
+            return n
+    return None
+
+
+def next_layer_slot(existing_slots: list[str]) -> str:
+    used = set(existing_slots)
+    for i in range(1, MAX_LAYER_COUNT + 1):
+        candidate = f"layer_{i}"
+        if candidate not in used:
+            return candidate
+    raise ValueError(f"Maximum {MAX_LAYER_COUNT} layers already present")
+
+
+def new_layer_config(slot: str, preset: Path, preset_root: Path) -> Any:
+    from cleave.config import LayerConfig
+
+    w, h = LAYER_DEFAULT_SIZE[DEFAULT_NEW_LAYER_STEM]
+    return LayerConfig(
+        preset=preset,
+        stem=DEFAULT_NEW_LAYER_STEM,
+        enabled=True,
+        opacity=1.0,
+        width=w,
+        height=h,
+        blend_mode=DEFAULT_BLEND_MODE[DEFAULT_NEW_LAYER_STEM],
+        locked=False,
+    )
 
 DEFAULT_BLEND_MODE: dict[StemSource, BlendMode] = {
     "drums": "add",
@@ -157,6 +189,7 @@ SchemaField = FieldDescriptor | SectionDescriptor
 @dataclass
 class ParseCtx:
     preset_root: Path | None = None
+    layer_slots: tuple[str, ...] | None = None
 
 
 @dataclass
@@ -767,29 +800,30 @@ def persist_visualizer(ctx: PersistCtx) -> dict[str, Any]:
     return _dump_fields(VISUALIZER_FIELDS, values, ctx)
 
 
-def parse_layer_z_order_section(data: dict[str, Any]) -> tuple[str, ...]:
+def parse_layer_z_order_section(data: dict[str, Any], ctx: ParseCtx) -> list[str]:
+    if ctx.layer_slots is None:
+        raise ValueError("layer_slots required to parse layer_z_order")
+    layer_slots = ctx.layer_slots
     raw = data.get("layer_z_order")
     if raw is None:
-        return DEFAULT_LAYER_Z_ORDER
+        return list(layer_slots)
     if not isinstance(raw, list):
         raise ValueError("layer_z_order must be a list")
-    if len(raw) != len(LAYER_SLOTS):
+    if len(raw) != len(layer_slots):
         raise ValueError(
-            f"layer_z_order must contain exactly {len(LAYER_SLOTS)} entries"
+            f"layer_z_order must contain exactly {len(layer_slots)} entries"
         )
-    if set(raw) != set(LAYER_SLOTS):
+    if set(raw) != set(layer_slots):
         raise ValueError(
-            f"layer_z_order must contain each of {', '.join(LAYER_SLOTS)} exactly once"
+            f"layer_z_order must contain each of {', '.join(layer_slots)} exactly once"
         )
-    return tuple(raw)
+    return list(raw)
 
 
 def persist_layer_z_order(ctx: PersistCtx) -> list[str]:
     order = ctx.session.layer_z_order
     cfg_order = list(ctx.cfg.layer_z_order)
     if len(order) == len(cfg_order) and set(order) == set(cfg_order):
-        return list(order)
-    if len(order) == len(LAYER_SLOTS) and set(order) == set(LAYER_SLOTS):
         return list(order)
     return cfg_order
 
@@ -807,7 +841,7 @@ def parse_blend_mode(slot: str, stem: StemSource, layer_raw: dict[str, Any]) -> 
 def _parse_stem(slot: str, layer_raw: dict[str, Any]) -> StemSource:
     raw = layer_raw.get("stem")
     if raw is None:
-        return DEFAULT_STEM_FOR_SLOT[slot]
+        return DEFAULT_NEW_LAYER_STEM
     if raw not in STEM_SOURCES:
         allowed = ", ".join(STEM_SOURCES)
         raise ValueError(f"layers.{slot}.stem must be one of: {allowed}")
@@ -867,19 +901,23 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
     preset_root = ctx.preset_root
 
     layers_raw = as_mapping(data.get("layers"), "layers")
-    unknown = sorted(set(layers_raw) - set(LAYER_SLOTS))
-    if unknown:
-        raise ValueError(
-            f"unknown layer keys in config (expected {', '.join(LAYER_SLOTS)}): "
-            + ", ".join(unknown)
-        )
+    if not layers_raw:
+        raise ValueError("layers section must contain at least one layer")
+    for key in layers_raw:
+        if _valid_slot(key) is None:
+            raise ValueError(
+                f"invalid layer key '{key}': must be layer_1 .. layer_{MAX_LAYER_COUNT}"
+            )
+    if len(layers_raw) < MIN_LAYER_COUNT:
+        raise ValueError("layers section must contain at least one layer")
+    if len(layers_raw) > MAX_LAYER_COUNT:
+        raise ValueError(f"layers section must contain at most {MAX_LAYER_COUNT} layers")
 
-    missing = [slot for slot in LAYER_SLOTS if slot not in layers_raw]
-    if missing:
-        raise ValueError(f"missing layer config for: {', '.join(missing)}")
+    layer_keys = sorted(layers_raw, key=lambda k: _valid_slot(k) or 0)
+    ctx.layer_slots = tuple(layer_keys)
 
     layers: dict[str, LayerConfig] = {}
-    for slot in LAYER_SLOTS:
+    for slot in layer_keys:
         layer_raw = as_mapping(layers_raw[slot], f"layers.{slot}")
         preset_raw = layer_raw.get("preset")
         if not preset_raw:
@@ -912,7 +950,7 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
     layers_out: dict[str, dict[str, Any]] = {}
     global_beat = ctx.cfg.visualizer.beat_sensitivity
 
-    for slot in LAYER_SLOTS:
+    for slot in ctx.session.layer_z_order:
         layer_cfg = ctx.cfg.layers[slot]
         stem = layer_cfg.stem
         if slot in ctx.session.layers:
@@ -1073,7 +1111,7 @@ def persist_render(ctx: PersistCtx) -> dict[str, Any]:
     return {"overlay": overlay, "post_fx": post_fx}
 
 
-def parse_timeline_section(data: dict[str, Any]) -> Any | None:
+def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
     from cleave.config import TimelineConfig
 
     timeline = data.get("timeline")
@@ -1099,11 +1137,14 @@ def parse_timeline_section(data: dict[str, Any]) -> Any | None:
             cue_map.get("layers"),
             f"timeline.cues[{index}].layers",
         )
-        unknown = sorted(set(layers_raw) - set(LAYER_SLOTS))
+        if ctx.layer_slots is None:
+            raise ValueError("layer_slots required to parse timeline")
+        allowed_slots = ctx.layer_slots
+        unknown = sorted(set(layers_raw) - set(allowed_slots))
         if unknown:
             raise ValueError(
                 f"unknown layer keys in timeline.cues[{index}].layers "
-                f"(expected {', '.join(LAYER_SLOTS)}): "
+                f"(expected {', '.join(allowed_slots)}): "
                 + ", ".join(unknown)
             )
         layers = {stem: bool(layers_raw[stem]) for stem in layers_raw}
@@ -1173,8 +1214,9 @@ def template_visualizer_section(*, name: str = "cleave-viz-example") -> dict[str
     return out
 
 
-def template_layer_entry(slot: str) -> dict[str, Any]:
-    stem = DEFAULT_STEM_FOR_SLOT[slot]
+def template_layer_entry(
+    slot: str, stem: StemSource = DEFAULT_NEW_LAYER_STEM
+) -> dict[str, Any]:
     width, height = LAYER_DEFAULT_SIZE[stem]
     return {
         "stem": stem,

@@ -120,6 +120,20 @@ def test_render_overlay_sub_header_help_expand_collapse() -> None:
         assert "adjust value" not in entries.values()
 
 
+def test_layer_management_add_help() -> None:
+    section = _sections_for(RowKind.LAYER_MANAGEMENT_ADD)[0]
+    assert section.title == "Add new layer"
+    assert dict(section.entries)["Enter"] == "confirm add"
+
+
+def test_layer_management_delete_help() -> None:
+    section = _sections_for(RowKind.LAYER_MANAGEMENT_DELETE)[0]
+    assert section.title == "Delete layer"
+    entries = dict(section.entries)
+    assert entries["Enter"] == "confirm delete"
+    assert entries[""] == "at least 1 layer required"
+
+
 def test_navigable_row_kinds_have_help_sections() -> None:
     for row_kind, behavior in ROW_BEHAVIORS.items():
         if not behavior.navigable:

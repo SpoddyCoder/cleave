@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 
 from cleave.config import load_config
-from cleave.config_schema import LAYER_SLOTS
+from cleave.config_schema import DEFAULT_LAYER_SLOTS
 from cleave.preset_playlist import (
     directory_display,
     list_navigable_dirs,
@@ -15,6 +15,7 @@ from cleave.preset_playlist import (
     preset_filename_display,
     scan_all_layers,
     scan_preset_playlist,
+    scan_single_layer,
 )
 
 
@@ -232,7 +233,33 @@ def test_container_directory_anchor_no_direct_presets() -> None:
 def test_scan_all_layers_uses_slot_keys(minimal_project: Path) -> None:
     cfg = load_config(project_root=minimal_project)
     playlists = scan_all_layers(cfg)
-    assert tuple(playlists.keys()) == LAYER_SLOTS
-    for slot in LAYER_SLOTS:
+    assert tuple(playlists.keys()) == DEFAULT_LAYER_SLOTS
+    for slot in DEFAULT_LAYER_SLOTS:
         assert playlists[slot].current is not None
         assert len(playlists[slot].paths) >= 1
+
+
+def test_scan_single_layer_picks_from_available_presets() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        preset_dir = root / "pack"
+        preset_dir.mkdir()
+        milk_paths = []
+        for name in ("alpha.milk", "beta.milk", "gamma.milk"):
+            path = preset_dir / name
+            _write_milk(path)
+            milk_paths.append(path.resolve())
+
+        playlist = scan_single_layer("layer_5", preset_dir, root)
+        assert playlist.current in milk_paths
+
+
+def test_scan_single_layer_empty_root_returns_empty_playlist() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        empty = root / "empty"
+        empty.mkdir()
+
+        playlist = scan_single_layer("layer_5", empty, root)
+        assert playlist.current is None
+        assert playlist.paths == ()
