@@ -41,10 +41,11 @@ Separate bottom overlay ([cleave/viz/timeline_overlay.py](cleave/viz/timeline_ov
 
 ## Header rows section
 
-The pinned top block before a visual gap (`header_gap` in `draw()`): `header_row_count(state)` rows (2).
+The pinned top block before a visual gap (`header_gap` in `draw()`): `header_row_count(state)` rows (3 when settings collapsed, 4 when expanded).
 
-- Row kinds: `RowKind.TRANSPORT`, `RowKind.CONFIG_HEADER` (active config path; Enter saves).
-- Constant: `HEADER_ROWS` (2); layout indices 0-1 in `build_row_layout`.
+- Row kinds: `RowKind.SETTINGS_HEADER`, optional `RowKind.SETTINGS_RENDER_MODE` when `session.settings.expanded`, `RowKind.CONFIG_HEADER` (active config path; Enter saves), `RowKind.TRANSPORT`.
+- Layout order in `build_row_layout`: settings header, optional render-mode sub-row, config header, transport.
+- **Settings** header: label `Settings` in `ACTION`, expand arrow in value color; Left/Right toggles `session.settings.expanded` (UI-only). Sub-row when expanded: `└─ render mode: {mode}` cycles `visualizer.render_mode` in config (`full-quality`, `balanced`, `performance`; default `balanced`).
 - Enter on `CONFIG_HEADER` opens an `OVERWRITE` / `SAVE AS NEW` centered modal when overwrite is allowed (`allow_overwrite`; false for repo-root `cleave-viz.yaml`). When overwrite is not allowed, a `SAVE AS NEW` / `CANCEL` modal appears (Enter confirms the focused option, Esc dismisses). Overwrite still uses the yes/no centered modal.
 
 ## Whole panel
@@ -87,6 +88,7 @@ Colors live in [cleave/viz/theme.py](cleave/viz/theme.py). Label truncation uses
 
 These rows do not split label and value; the implementation is deliberate:
 
+- **Settings** header (`SETTINGS_HEADER`): `Settings` prefix in `ACTION`; expand arrow in row value color.
 - **Active config path** (`CONFIG_HEADER`): path in `ACTION`; dirty asterisk stays `CONFIG_DIRTY` (row uses `DISABLED` while solo is active).
 - **Layer management** (`LAYER_MANAGEMENT_ADD`, `LAYER_MANAGEMENT_DELETE`): entire row in `ACTION` (delete uses `DISABLED` when only one layer remains).
 - **Preset dir / preset filename**: single-color row text plus Material Icons (icon colors above).

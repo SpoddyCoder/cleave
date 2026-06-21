@@ -28,6 +28,16 @@ DEFAULT_BEAT_SENSITIVITY = 2.0
 BEAT_SENSITIVITY_MIN = 0.0
 BEAT_SENSITIVITY_MAX = 5.0
 
+VisualizerRenderMode = Literal["full-quality", "balanced", "performance"]
+
+VISUALIZER_RENDER_MODES: tuple[VisualizerRenderMode, ...] = (
+    "full-quality",
+    "balanced",
+    "performance",
+)
+
+DEFAULT_VISUALIZER_RENDER_MODE: VisualizerRenderMode = "balanced"
+
 # --- Layer defaults ---
 
 MAX_LAYER_COUNT = 8
@@ -291,6 +301,17 @@ def _parse_render_overlay_position(
         raise ValueError(f"{label} must be a string")
     if value not in RENDER_OVERLAY_POSITIONS:
         allowed = ", ".join(f"'{pos}'" for pos in RENDER_OVERLAY_POSITIONS)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return value
+
+
+def _parse_visualizer_render_mode(
+    value: Any, ctx: ParseCtx, label: str = "visualizer.render_mode"
+) -> VisualizerRenderMode:
+    if not isinstance(value, str):
+        raise ValueError(f"{label} must be a string")
+    if value not in VISUALIZER_RENDER_MODES:
+        allowed = ", ".join(f"'{mode}'" for mode in VISUALIZER_RENDER_MODES)
         raise ValueError(f"{label} must be one of: {allowed}")
     return value
 
@@ -643,6 +664,13 @@ VISUALIZER_FIELDS: tuple[FieldDescriptor, ...] = (
         _parse_beat_sensitivity,
         lambda value, _ctx: clamp_beat_sensitivity(value),
     ),
+    FieldDescriptor(
+        "render_mode",
+        DEFAULT_VISUALIZER_RENDER_MODE,
+        "cfg",
+        _parse_visualizer_render_mode,
+        _dump_scalar,
+    ),
 )
 
 RENDER_POST_FX_FIELDS: tuple[FieldDescriptor, ...] = (
@@ -778,6 +806,7 @@ def parse_visualizer_section(data: dict[str, Any]) -> Any:
         upscale=parsed["upscale"],
         warmup_sec=parsed["warmup_sec"],
         beat_sensitivity=parsed["beat_sensitivity"],
+        render_mode=parsed["render_mode"],
     )
 
 
@@ -789,6 +818,7 @@ def persist_visualizer(ctx: PersistCtx) -> dict[str, Any]:
         "upscale": vis.upscale,
         "warmup_sec": vis.warmup_sec,
         "beat_sensitivity": vis.beat_sensitivity,
+        "render_mode": vis.render_mode,
     }
     return _dump_fields(VISUALIZER_FIELDS, values, ctx)
 

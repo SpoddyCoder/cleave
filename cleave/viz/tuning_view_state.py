@@ -11,6 +11,7 @@ from cleave.viz.overlay import (
     RenderOverlayBlock,
     RenderPostFxBlock,
     RenderTimelineBlock,
+    SettingsBlock,
     TrackBlock,
     TuningViewState,
 )
@@ -134,6 +135,10 @@ class TuningViewStateBuilder:
             render_timeline=RenderTimelineBlock(
                 enabled=tl.enabled,
                 expanded=tl.panel_open,
+            ),
+            settings=SettingsBlock(
+                expanded=self.session.settings.expanded,
+                render_mode=self._config_save.cfg.visualizer.render_mode,
             ),
             timeline_submenu_focused=tl.submenu_focused,
             timeline_recording=tl.recording,

@@ -22,6 +22,7 @@ from cleave.viz.focus_context import FocusContext
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.render_overlay_controls import RenderOverlayControls
 from cleave.viz.render_post_fx_controls import RenderPostFxControls
+from cleave.viz.settings_controls import SettingsControls
 from cleave.viz.row_semantics import (
     REPEAT_ROW_KINDS,
     RowDescriptor,
@@ -127,6 +128,12 @@ class TuningControls:
             focused_row_kind=self._focused_row_kind,
         )
         self._render_post_fx = RenderPostFxControls(session, focus_context=focus_context)
+        self._settings = SettingsControls(
+            session,
+            cfg,
+            focus_context=focus_context,
+            focused_row_kind=self._focused_row_kind,
+        )
 
         view = self.build_view_state(paused=self.playback.paused)
         self.focus_index = find_row_by_kind(view, RowKind.TRANSPORT)
@@ -690,6 +697,10 @@ class TuningControls:
                 self._open_timeline_panel()
             else:
                 self.close_timeline_panel()
+        elif kind == RowKind.SETTINGS_HEADER:
+            self._settings.set_expanded(forward)
+        elif kind == RowKind.SETTINGS_RENDER_MODE:
+            self._settings.cycle_render_mode(forward=forward)
 
     def _step_directory(self, slot: str, *, forward: bool) -> None:
         layer = self.session.layers[slot]

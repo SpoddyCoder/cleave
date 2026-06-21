@@ -37,6 +37,8 @@ class RowKind(Enum):
     RENDER_POST_FX_FADE_IN = auto()
     RENDER_POST_FX_FADE_OUT = auto()
     RENDER_TIMELINE_HEADER = auto()
+    SETTINGS_HEADER = auto()
+    SETTINGS_RENDER_MODE = auto()
     CONFIG_HEADER = auto()
     TRANSPORT = auto()
 
@@ -66,6 +68,7 @@ class RowBehavior:
     navigable: bool = True
     is_header: bool = False
     is_sub_header: bool = False
+    is_pinned: bool = False
     can_enable_disable: bool = False
     can_solo: bool = False
     can_enter_move_mode: bool = False
@@ -246,6 +249,18 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         can_solo=False,
         help_title="Render",
     ),
+    RowKind.SETTINGS_HEADER: RowBehavior(
+        RowAffordance.EXPAND,
+        is_header=True,
+        help_title="Settings",
+    ),
+    RowKind.SETTINGS_RENDER_MODE: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        is_pinned=True,
+        repeatable=True,
+        parent_group="settings",
+        help_title="Render mode",
+    ),
 }
 
 HEADER_ROW_KINDS = frozenset(k for k, b in ROW_BEHAVIORS.items() if b.is_header)
@@ -283,6 +298,9 @@ RENDER_OVERLAY_ALL_SUB_ROW_KINDS = (
 RENDER_POST_FX_SUB_ROW_KINDS = frozenset(
     k for k, b in ROW_BEHAVIORS.items() if b.parent_group == "render_post_fx"
 )
+SETTINGS_SUB_ROW_KINDS = frozenset(
+    k for k, b in ROW_BEHAVIORS.items() if b.parent_group == "settings"
+)
 
 _LAYER_LOCK_BLOCKING_AFFORDANCES = frozenset(
     {
@@ -297,6 +315,11 @@ def row_behavior(kind: RowKind) -> RowBehavior:
     behavior = ROW_BEHAVIORS.get(kind)
     assert behavior is not None, f"missing RowBehavior for {kind!r}"
     return behavior
+
+
+def row_is_pinned(kind: RowKind) -> bool:
+    behavior = row_behavior(kind)
+    return behavior.is_header or behavior.is_pinned
 
 
 def expandable_row_kinds() -> frozenset[RowKind]:

@@ -12,6 +12,7 @@ from cleave.viz.row_semantics import (
     RENDER_POST_FX_SUB_ROW_KINDS,
     REPEAT_ROW_KINDS,
     ROW_BEHAVIORS,
+    SETTINGS_SUB_ROW_KINDS,
     TRACK_EFFECT_SUB_ROW_KINDS,
     TRACK_SUB_ROW_KINDS,
     RowAffordance,
@@ -20,6 +21,7 @@ from cleave.viz.row_semantics import (
     layer_lock_blocks_mutation,
     row_blocked_by_layer_lock,
     row_behavior,
+    row_is_pinned,
     row_navigable_when_layer_locked,
     row_triggers_layer_delete,
 )
@@ -46,6 +48,7 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.RENDER_OVERLAY_DISPLAY_TIME,
         RowKind.RENDER_POST_FX_FADE_IN,
         RowKind.RENDER_POST_FX_FADE_OUT,
+        RowKind.SETTINGS_RENDER_MODE,
     }
 )
 
@@ -61,8 +64,22 @@ def test_header_row_kinds() -> None:
         {
             RowKind.TRANSPORT,
             RowKind.CONFIG_HEADER,
+            RowKind.SETTINGS_HEADER,
         }
     )
+
+
+def test_row_is_pinned() -> None:
+    assert row_is_pinned(RowKind.TRANSPORT) is True
+    assert row_is_pinned(RowKind.CONFIG_HEADER) is True
+    assert row_is_pinned(RowKind.SETTINGS_HEADER) is True
+    assert row_is_pinned(RowKind.SETTINGS_RENDER_MODE) is True
+    assert row_is_pinned(RowKind.TRACK_HEADER) is False
+    assert row_is_pinned(RowKind.RENDER_OVERLAY_HEADER) is False
+
+
+def test_settings_sub_row_kinds() -> None:
+    assert SETTINGS_SUB_ROW_KINDS == frozenset({RowKind.SETTINGS_RENDER_MODE})
 
 
 def test_repeat_row_kinds() -> None:
@@ -96,6 +113,7 @@ def test_parent_group_frozensets_match_row_behaviors() -> None:
         ("render_overlay_title", RENDER_OVERLAY_TITLE_NESTED_KINDS),
         ("render_overlay_body", RENDER_OVERLAY_BODY_NESTED_KINDS),
         ("render_post_fx", RENDER_POST_FX_SUB_ROW_KINDS),
+        ("settings", SETTINGS_SUB_ROW_KINDS),
     ):
         derived = frozenset(
             k for k, b in ROW_BEHAVIORS.items() if b.parent_group == group

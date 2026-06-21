@@ -19,18 +19,19 @@ from cleave.config_schema import (
 from cleave.effects.registry import effect_roster
 from cleave.extract import StemSource, stem_control_label, stem_overlay_header
 from cleave.viz.row_semantics import (
-    HEADER_ROW_KINDS,
     LABELED_SUB_ROW_KINDS,
     RENDER_OVERLAY_ALL_SUB_ROW_KINDS,
     RENDER_OVERLAY_BODY_NESTED_KINDS,
     RENDER_OVERLAY_SUB_ROW_KINDS,
     RENDER_OVERLAY_TITLE_NESTED_KINDS,
     RENDER_POST_FX_SUB_ROW_KINDS,
+    SETTINGS_SUB_ROW_KINDS,
     RowDescriptor,
     RowKind,
     TRACK_EFFECT_SUB_ROW_KINDS,
     TRACK_SUB_ROW_KINDS,
     row_blocked_by_layer_lock,
+    row_is_pinned,
     row_navigable_when_layer_locked,
 )
 from cleave.viz.fonts import render_overlay_font_display
@@ -89,7 +90,6 @@ from cleave.viz.ui_tint import blit_tint
 
 Anchor = Literal["topleft", "bottomleft"]
 
-HEADER_ROWS = 2
 _tuning_ui = tuning_ui_metrics()
 TREE_INDENT = _tuning_ui.tree_indent
 TIMELINE_LAYER_HINT_TEXT = "Timeline is enabled and controlling layer visibility"
@@ -152,6 +152,12 @@ class RenderTimelineBlock:
 
 
 @dataclass
+class SettingsBlock:
+    expanded: bool = False
+    render_mode: str = "balanced"
+
+
+@dataclass
 class TuningViewState:
     layer_z_order: tuple[str, ...]
     tracks: dict[str, TrackBlock]
@@ -173,6 +179,7 @@ class TuningViewState:
     render_timeline: RenderTimelineBlock = field(
         default_factory=RenderTimelineBlock
     )
+    settings: SettingsBlock = field(default_factory=SettingsBlock)
     timeline_submenu_focused: bool = False
     timeline_recording: bool = False
     timeline_override_active: bool = False
@@ -181,14 +188,27 @@ class TuningViewState:
 
 
 def header_row_count(state: TuningViewState) -> int:
-    return HEADER_ROWS
+    count = 0
+    for row in build_row_layout(state):
+        if row_is_pinned(row.kind):
+            count += 1
+        else:
+            break
+    return count
 
 
 def build_row_layout(state: TuningViewState) -> list[RowDescriptor]:
     rows: list[RowDescriptor] = [
-        RowDescriptor(RowKind.TRANSPORT),
-        RowDescriptor(RowKind.CONFIG_HEADER),
+        RowDescriptor(RowKind.SETTINGS_HEADER),
     ]
+    if state.settings.expanded:
+        rows.append(RowDescriptor(RowKind.SETTINGS_RENDER_MODE))
+    rows.extend(
+        [
+            RowDescriptor(RowKind.CONFIG_HEADER),
+            RowDescriptor(RowKind.TRANSPORT),
+        ]
+    )
     for slot in state.layer_z_order:
         rows.append(RowDescriptor(RowKind.TRACK_HEADER, slot=slot))
         rows.append(RowDescriptor(RowKind.TRACK_PRESET_DIR, slot=slot))
@@ -246,7 +266,7 @@ def track_row_count(state: TuningViewState) -> int:
     return sum(
         1
         for row in build_row_layout(state)
-        if row.kind not in HEADER_ROW_KINDS
+        if not row_is_pinned(row.kind)
     )
 
 
@@ -294,6 +314,8 @@ def _sub_row_visible(state: TuningViewState, index: int) -> bool:
     desc = row_descriptor(state, index)
     if desc.kind in {RowKind.RENDER_SECTION_GAP, RowKind.TIMELINE_LAYER_HINT}:
         return True
+    if desc.kind in SETTINGS_SUB_ROW_KINDS:
+        return state.settings.expanded
     if desc.kind in RENDER_OVERLAY_SUB_ROW_KINDS:
         return state.render_overlay.expanded
     if desc.kind in RENDER_OVERLAY_TITLE_NESTED_KINDS:
@@ -332,7 +354,10 @@ def navigable_row_indices(state: TuningViewState) -> list[int]:
             RowKind.TIMELINE_LAYER_HINT,
         }:
             continue
-        if desc.kind in RENDER_OVERLAY_SUB_ROW_KINDS:
+        if desc.kind in SETTINGS_SUB_ROW_KINDS:
+            if not state.settings.expanded:
+                continue
+        elif desc.kind in RENDER_OVERLAY_SUB_ROW_KINDS:
             if not state.render_overlay.expanded:
                 continue
         elif desc.kind in RENDER_OVERLAY_TITLE_NESTED_KINDS:
@@ -412,6 +437,13 @@ def _row_text(state: TuningViewState, index: int) -> str:
         return "ADD NEW LAYER"
     if kind == RowKind.LAYER_MANAGEMENT_DELETE:
         return f"{_layer_management_delete_prefix()}Delete Layer"
+
+    if kind == RowKind.SETTINGS_HEADER:
+        arrow = "▼" if state.settings.expanded else "▶"
+        return f"Settings {arrow}"
+
+    if kind == RowKind.SETTINGS_RENDER_MODE:
+        return f"└─ render mode: {state.settings.render_mode}"
 
     if kind == RowKind.RENDER_OVERLAY_HEADER:
         arrow = "▼" if state.render_overlay.expanded else "▶"
@@ -519,6 +551,8 @@ def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
         return "└─ start delay: "
     if kind == RowKind.RENDER_OVERLAY_DISPLAY_TIME:
         return "└─ display time: "
+    if kind == RowKind.SETTINGS_RENDER_MODE:
+        return "└─ render mode: "
     if kind == RowKind.RENDER_POST_FX_FADE_IN:
         return "└─ fade in: "
     if kind == RowKind.RENDER_POST_FX_FADE_OUT:
@@ -553,6 +587,8 @@ def _labeled_sub_row_value(state: TuningViewState, index: int) -> str:
         return f"{block_ro.start_delay:.1f}s"
     if kind == RowKind.RENDER_OVERLAY_DISPLAY_TIME:
         return f"{block_ro.display_time:.1f}s"
+    if kind == RowKind.SETTINGS_RENDER_MODE:
+        return state.settings.render_mode
     block_pp = state.render_post_fx
     if kind == RowKind.RENDER_POST_FX_FADE_IN:
         return f"{block_pp.fade_in:.1f}s"
@@ -793,6 +829,9 @@ def fit_row_text(
         return TIMELINE_LAYER_HINT_TEXT
     if kind in {RowKind.LAYER_MANAGEMENT_ADD, RowKind.LAYER_MANAGEMENT_DELETE}:
         return _row_text(state, index)
+    if kind == RowKind.SETTINGS_HEADER:
+        expanded = state.settings.expanded
+        return "Settings " + _track_header_expand_suffix(expanded)
     if kind == RowKind.RENDER_OVERLAY_HEADER:
         expanded = state.render_overlay.expanded
         return (
@@ -850,7 +889,7 @@ def _row_indent(state: TuningViewState, index: int) -> int:
         RowKind.TRACK_OPACITY,
         RowKind.TRACK_BEAT,
         RowKind.TRACK_EFFECTS_HEADER,
-    } | RENDER_OVERLAY_SUB_ROW_KINDS | RENDER_POST_FX_SUB_ROW_KINDS:
+    } | RENDER_OVERLAY_SUB_ROW_KINDS | RENDER_POST_FX_SUB_ROW_KINDS | {RowKind.SETTINGS_RENDER_MODE}:
         return TREE_INDENT
     return 0
 
@@ -1316,7 +1355,7 @@ class TuningOverlay:
             (
                 index
                 for index in visible_indices
-                if row_kind(state, index) not in HEADER_ROW_KINDS
+                if not row_is_pinned(row_kind(state, index))
             ),
             None,
         )
@@ -1395,6 +1434,19 @@ class TuningOverlay:
                 row_widths.append(
                     indent + prefix_surf.get_width() + label_surf.get_width()
                 )
+            elif kind == RowKind.SETTINGS_HEADER:
+                block = state.settings
+                surf = _render_label_value_row(
+                    font,
+                    prefix="Settings ",
+                    value=_effects_header_expand_value(block.expanded),
+                    value_color=color,
+                    prefix_color=ACTION,
+                    line_height=line_h,
+                )
+                row_surfaces.append(surf)
+                row_time_surfaces.append(None)
+                row_widths.append(indent + surf.get_width())
             elif kind == RowKind.RENDER_OVERLAY_HEADER:
                 block_ro = state.render_overlay
                 prefix_surf = render_visibility_icon(

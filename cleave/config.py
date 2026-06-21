@@ -46,13 +46,16 @@ from cleave.config_schema import (
     DEFAULT_RENDER_HEIGHT,
     DEFAULT_RENDER_WIDTH,
     DEFAULT_VISUALIZER_HEIGHT,
+    DEFAULT_VISUALIZER_RENDER_MODE,
     DEFAULT_VISUALIZER_UPSCALE,
     DEFAULT_VISUALIZER_WARMUP_SEC,
     DEFAULT_VISUALIZER_WIDTH,
     LAYER_DEFAULT_SIZE,
     RENDER_OVERLAY_POSITIONS,
     UPSCALE_MIN,
+    VISUALIZER_RENDER_MODES,
     RenderOverlayPosition,
+    VisualizerRenderMode,
     as_mapping,
     clamp_beat_sensitivity,
     clamp_upscale,
@@ -98,6 +101,7 @@ class VisualizerConfig:
     # Launch/render pre-roll; persisted on snapshot save, not a live session field.
     warmup_sec: float = DEFAULT_VISUALIZER_WARMUP_SEC
     beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
+    render_mode: VisualizerRenderMode = DEFAULT_VISUALIZER_RENDER_MODE
 
     @property
     def display_width(self) -> int:
