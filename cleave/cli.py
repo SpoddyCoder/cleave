@@ -133,7 +133,7 @@ def cmd_render(args: argparse.Namespace) -> None:
     elapsed = _format_elapsed(time.perf_counter() - started)
 
     print(f"Rendered to {result.output_path}")
-    size = f"{result.display_width}x{result.display_height}"
+    size = f"{result.output_width}x{result.output_height}"
     print(
         f"{result.mix_filename} {_render_scope_clause(result.segment)} at {size} "
         f"completed{_high_quality_clause(args.high_quality)}, in {elapsed}"

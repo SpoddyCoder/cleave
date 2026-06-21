@@ -18,7 +18,13 @@ from cleave.viz.session import (
     session_from_cfg,
 )
 from cleave.paths import repo_root
-from cleave.config_schema import DEFAULT_LAYER_SLOTS, DEFAULT_RENDER_FPS
+from cleave.config_schema import (
+    DEFAULT_LAYER_SLOTS,
+    DEFAULT_RENDER_FPS,
+    DEFAULT_RENDER_HEIGHT,
+    DEFAULT_RENDER_WIDTH,
+    template_visualizer_section,
+)
 from cleave.extract import STEM_NAMES, stems_dir
 from cleave.project import write_manifest
 from cleave.separate import project_stems_complete
@@ -34,6 +40,12 @@ from cleave.viz.render import (  # noqa: E402
 )
 from tests.cleave.viz.test_render_overlay import _overlay_cfg
 from tests.support.config import write_minimal_config
+
+
+def _render_frame_bytes(
+    width: int = DEFAULT_RENDER_WIDTH, height: int = DEFAULT_RENDER_HEIGHT
+) -> bytes:
+    return b"\xff" * (width * height * 4)
 
 
 def _attach_render_post_fx_session(
@@ -69,6 +81,8 @@ def _mock_render_runtime(
     upscale: float = 1.0,
     display_width: int | None = None,
     display_height: int | None = None,
+    output_width: int | None = None,
+    output_height: int | None = None,
 ) -> tuple[MagicMock, MagicMock]:
     seed = MagicMock()
     seed.width = width
@@ -79,6 +93,9 @@ def _mock_render_runtime(
     seed.duration_sec = duration_sec
     seed.pcm_bank = MagicMock()
     seed.cfg = MagicMock()
+    render_w = DEFAULT_RENDER_WIDTH if output_width is None else output_width
+    render_h = DEFAULT_RENDER_HEIGHT if output_height is None else output_height
+    seed.cfg.render = RenderConfig(fps=fps, width=render_w, height=render_h)
     seed.session = TuningSession(
         layer_z_order=list(DEFAULT_LAYER_SLOTS),
         render_overlay=replace(default_render_overlay_runtime(), enabled=False),
@@ -105,10 +122,25 @@ def _write_stub_stems(project: Path) -> None:
         (base / f"{name}.wav").write_bytes(b"wav")
 
 
-def _setup_render_project(tmp_path: Path, *, render_fps: int = 10) -> Path:
+def _setup_render_project(
+    tmp_path: Path,
+    *,
+    render_fps: int = 10,
+    render_width: int | None = None,
+    render_height: int | None = None,
+    visualizer: dict | None = None,
+) -> Path:
     preset_root = tmp_path / "presets"
     project = tmp_path / "my-track"
-    write_minimal_config(project, preset_root, render={"fps": render_fps})
+    render: dict[str, int] = {"fps": render_fps}
+    if render_width is not None:
+        render["width"] = render_width
+    if render_height is not None:
+        render["height"] = render_height
+    overrides: dict = {"render": render}
+    if visualizer is not None:
+        overrides["visualizer"] = visualizer
+    write_minimal_config(project, preset_root, **overrides)
     _write_stub_stems(project)
     (project / "signals.json").write_text("{}")
     mix = project / "my-track.flac"
@@ -306,7 +338,7 @@ def test_render_frame_count_and_ffmpeg_args(
     frame_count = math.ceil(duration_sec * fps)
 
     compositor = MagicMock()
-    compositor.read_rgba_frame.return_value = b"\xff" * (width * height * 4)
+    compositor.read_rgba_frame.return_value = _render_frame_bytes()
 
     seed, runtime = _mock_render_runtime(
         width=width, height=height, fps=fps, duration_sec=duration_sec
@@ -338,7 +370,7 @@ def test_render_frame_count_and_ffmpeg_args(
 
     cmd = mock_subprocess.Popen.call_args[0][0]
     assert cmd[0] == "/usr/bin/ffmpeg"
-    assert "-s" in cmd and f"{width}x{height}" in cmd
+    assert "-s" in cmd and f"{DEFAULT_RENDER_WIDTH}x{DEFAULT_RENDER_HEIGHT}" in cmd
     assert "-r" in cmd and str(fps) in cmd
     assert "-preset" not in cmd
     assert str(project / "my-track.flac") in cmd
@@ -370,7 +402,7 @@ def test_render_warmup_before_emit_loop(
     duration_sec = 2.0
 
     compositor = MagicMock()
-    compositor.read_rgba_frame.return_value = b"\xff" * (width * height * 4)
+    compositor.read_rgba_frame.return_value = _render_frame_bytes()
 
     seed, runtime = _mock_render_runtime(
         width=width, height=height, fps=fps, duration_sec=duration_sec
@@ -430,7 +462,7 @@ def test_render_segment_frame_count_tick_times_and_ffmpeg_trim(
     frame_count = (end_sec - start_sec) * fps
 
     compositor = MagicMock()
-    compositor.read_rgba_frame.return_value = b"\xff" * (width * height * 4)
+    compositor.read_rgba_frame.return_value = _render_frame_bytes()
 
     seed, runtime = _mock_render_runtime(
         width=width, height=height, fps=fps, duration_sec=duration_sec
@@ -499,7 +531,7 @@ def test_render_segment_fade_alpha_uses_full_duration(
     duration_sec = 60.0
 
     compositor = MagicMock()
-    compositor.read_rgba_frame.return_value = b"\xff" * (width * height * 4)
+    compositor.read_rgba_frame.return_value = _render_frame_bytes()
 
     seed, runtime = _mock_render_runtime(
         width=width, height=height, fps=fps, duration_sec=duration_sec
@@ -545,7 +577,7 @@ def test_render_ffmpeg_preset_veryslow_when_high_quality(
     duration_sec = 2.0
 
     compositor = MagicMock()
-    compositor.read_rgba_frame.return_value = b"\xff" * (width * height * 4)
+    compositor.read_rgba_frame.return_value = _render_frame_bytes()
 
     seed, runtime = _mock_render_runtime(
         width=width, height=height, fps=fps, duration_sec=duration_sec
@@ -595,7 +627,7 @@ def test_render_applies_fade_via_compositor(
     frame_count = math.ceil(duration_sec * fps)
 
     compositor = MagicMock()
-    compositor.read_rgba_frame.return_value = b"\xff" * (width * height * 4)
+    compositor.read_rgba_frame.return_value = _render_frame_bytes()
 
     seed, runtime = _mock_render_runtime(
         width=width, height=height, fps=fps, duration_sec=duration_sec
@@ -668,7 +700,7 @@ def test_render_calls_overlay_compositing_when_enabled(
     mock_build_panel.return_value = overlay_panel
 
     compositor = MagicMock()
-    compositor.read_rgba_frame.return_value = b"\xff" * (width * height * 4)
+    compositor.read_rgba_frame.return_value = _render_frame_bytes()
 
     seed, runtime = _mock_render_runtime(
         width=width, height=height, fps=fps, duration_sec=duration_sec
@@ -735,7 +767,7 @@ def test_render_skips_overlay_when_disabled(
 
     width, height = 4, 4
     compositor = MagicMock()
-    compositor.read_rgba_frame.return_value = b"\xff" * (width * height * 4)
+    compositor.read_rgba_frame.return_value = _render_frame_bytes()
 
     seed, runtime = _mock_render_runtime(
         width=width, height=height, fps=10, duration_sec=2.0
@@ -792,7 +824,7 @@ def test_render_composites_default_overlay_when_render_absent(
     mock_load_config.return_value = replace(base_cfg, render=None)
 
     compositor = MagicMock()
-    compositor.read_rgba_frame.return_value = b"\xff" * (width * height * 4)
+    compositor.read_rgba_frame.return_value = _render_frame_bytes()
 
     seed, runtime = _mock_render_runtime(
         width=width, height=height, fps=DEFAULT_RENDER_FPS, duration_sec=duration_sec
@@ -821,7 +853,7 @@ def test_render_composites_default_overlay_when_render_absent(
 @patch.object(render_mod, "build_runtime_base")
 @patch.object(render_mod, "scan_all_layers", return_value={})
 @patch.object(render_mod, "VisualizerApp")
-def test_render_ffmpeg_uses_display_dimensions_with_upscale(
+def test_render_ffmpeg_ignores_upscale_uses_render_resolution(
     mock_app_cls: MagicMock,
     _mock_scan: MagicMock,
     mock_build: MagicMock,
@@ -832,15 +864,27 @@ def test_render_ffmpeg_uses_display_dimensions_with_upscale(
     tmp_path: Path,
 ) -> None:
     mock_shutil.which.return_value = "/usr/bin/ffmpeg"
-    project = _setup_render_project(tmp_path)
-    content_w, content_h, fps = 4, 4, 10
+    project = _setup_render_project(
+        tmp_path,
+        render_fps=10,
+        render_width=1280,
+        render_height=720,
+        visualizer={
+            **template_visualizer_section(name="cleave-test"),
+            "width": 640,
+            "height": 360,
+            "upscale": 2.0,
+        },
+    )
+    content_w, content_h, fps = 640, 360, 10
     upscale = 2.0
-    display_w = int(content_w * upscale)
-    display_h = int(content_h * upscale)
+    live_display_w = int(content_w * upscale)
+    live_display_h = int(content_h * upscale)
+    render_w, render_h = 1280, 720
     duration_sec = 2.0
 
     compositor = MagicMock()
-    compositor.read_rgba_frame.return_value = b"\xff" * (display_w * display_h * 4)
+    compositor.read_rgba_frame.return_value = b"\xff" * (render_w * render_h * 4)
 
     seed, runtime = _mock_render_runtime(
         width=content_w,
@@ -848,8 +892,10 @@ def test_render_ffmpeg_uses_display_dimensions_with_upscale(
         fps=fps,
         duration_sec=duration_sec,
         upscale=upscale,
-        display_width=display_w,
-        display_height=display_h,
+        display_width=live_display_w,
+        display_height=live_display_h,
+        output_width=render_w,
+        output_height=render_h,
     )
     runtime.compositor = compositor
     mock_build.return_value = seed
@@ -866,8 +912,68 @@ def test_render_ffmpeg_uses_display_dimensions_with_upscale(
     render_mod.render(project)
 
     cmd = mock_subprocess.Popen.call_args[0][0]
-    assert "-s" in cmd and f"{display_w}x{display_h}" in cmd
+    assert "-s" in cmd and f"{render_w}x{render_h}" in cmd
+    mock_init_gl.assert_called_once_with(
+        seed, output_width=render_w, output_height=render_h
+    )
     assert compositor.present_content.call_count == math.ceil(duration_sec * fps)
+
+
+@patch.object(render_mod, "pygame")
+@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "subprocess")
+@patch.object(render_mod, "init_gl_resources_render")
+@patch.object(render_mod, "build_runtime_base")
+@patch.object(render_mod, "scan_all_layers", return_value={})
+@patch.object(render_mod, "VisualizerApp")
+def test_render_ffmpeg_uses_explicit_render_resolution(
+    mock_app_cls: MagicMock,
+    _mock_scan: MagicMock,
+    mock_build: MagicMock,
+    mock_init_gl: MagicMock,
+    mock_subprocess: MagicMock,
+    mock_shutil: MagicMock,
+    _mock_pygame: MagicMock,
+    tmp_path: Path,
+) -> None:
+    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
+    project = _setup_render_project(
+        tmp_path, render_fps=10, render_width=1920, render_height=1080
+    )
+    content_w, content_h, fps = 4, 4, 10
+    render_w, render_h = 1920, 1080
+    duration_sec = 2.0
+
+    compositor = MagicMock()
+    compositor.read_rgba_frame.return_value = b"\xff" * (render_w * render_h * 4)
+
+    seed, runtime = _mock_render_runtime(
+        width=content_w,
+        height=content_h,
+        fps=fps,
+        duration_sec=duration_sec,
+        output_width=render_w,
+        output_height=render_h,
+    )
+    runtime.compositor = compositor
+    mock_build.return_value = seed
+    mock_init_gl.return_value = runtime
+    mock_app_cls.return_value = MagicMock()
+
+    proc = MagicMock()
+    proc.stdin = MagicMock()
+    proc.wait.return_value = 0
+    mock_subprocess.Popen.return_value = proc
+
+    _attach_render_post_fx_session(runtime)
+
+    render_mod.render(project)
+
+    cmd = mock_subprocess.Popen.call_args[0][0]
+    assert "-s" in cmd and f"{render_w}x{render_h}" in cmd
+    mock_init_gl.assert_called_once_with(
+        seed, output_width=render_w, output_height=render_h
+    )
 
 
 @patch.object(render_mod, "pygame")
@@ -891,12 +997,11 @@ def test_render_present_content_every_frame_at_upscale_one(
     project = _setup_render_project(tmp_path)
     content_w, content_h, fps = 4, 4, 10
     upscale = 1.0
-    display_w = int(content_w * upscale)
-    display_h = int(content_h * upscale)
+    render_w, render_h = DEFAULT_RENDER_WIDTH, DEFAULT_RENDER_HEIGHT
     duration_sec = 2.0
 
     compositor = MagicMock()
-    compositor.read_rgba_frame.return_value = b"\xff" * (display_w * display_h * 4)
+    compositor.read_rgba_frame.return_value = b"\xff" * (render_w * render_h * 4)
 
     seed, runtime = _mock_render_runtime(
         width=content_w,
@@ -904,8 +1009,8 @@ def test_render_present_content_every_frame_at_upscale_one(
         fps=fps,
         duration_sec=duration_sec,
         upscale=upscale,
-        display_width=display_w,
-        display_height=display_h,
+        output_width=render_w,
+        output_height=render_h,
     )
     runtime.compositor = compositor
     mock_build.return_value = seed
@@ -951,21 +1056,25 @@ def test_render_upscale_overlay_frame_order_uses_content_dims(
     project = _setup_render_project(tmp_path)
     content_w, content_h, fps = 4, 4, 10
     upscale = 2.0
-    display_w = int(content_w * upscale)
-    display_h = int(content_h * upscale)
+    live_display_w = int(content_w * upscale)
+    live_display_h = int(content_h * upscale)
+    render_w, render_h = 1280, 720
     duration_sec = 2.0
     frame_count = math.ceil(duration_sec * fps)
 
     overlay_cfg = _overlay_cfg(start_delay=0.0, display_time=30.0)
     base_cfg = load_config(project / VIZ_CONFIG_FILENAME, repo_root())
     mock_load_config.return_value = replace(
-        base_cfg, render=RenderConfig(fps=fps, overlay=overlay_cfg, post_fx=None)
+        base_cfg,
+        render=RenderConfig(
+            fps=fps, width=render_w, height=render_h, overlay=overlay_cfg, post_fx=None
+        ),
     )
     overlay_panel = MagicMock()
     mock_build_panel.return_value = overlay_panel
 
     compositor = MagicMock()
-    compositor.read_rgba_frame.return_value = b"\xff" * (display_w * display_h * 4)
+    compositor.read_rgba_frame.return_value = b"\xff" * (render_w * render_h * 4)
     call_order: list[str] = []
 
     def _track(name: str):
@@ -987,8 +1096,10 @@ def test_render_upscale_overlay_frame_order_uses_content_dims(
         fps=fps,
         duration_sec=duration_sec,
         upscale=upscale,
-        display_width=display_w,
-        display_height=display_h,
+        display_width=live_display_w,
+        display_height=live_display_h,
+        output_width=render_w,
+        output_height=render_h,
     )
     runtime.compositor = compositor
     mock_build.return_value = seed

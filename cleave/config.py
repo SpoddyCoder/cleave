@@ -43,6 +43,8 @@ from cleave.config_schema import (
     DEFAULT_TEXTURE_PATHS,
     DEFAULT_TIMELINE_ENABLED,
     DEFAULT_RENDER_FPS,
+    DEFAULT_RENDER_HEIGHT,
+    DEFAULT_RENDER_WIDTH,
     DEFAULT_VISUALIZER_HEIGHT,
     DEFAULT_VISUALIZER_UPSCALE,
     DEFAULT_VISUALIZER_WARMUP_SEC,
@@ -152,6 +154,8 @@ class RenderPostFxConfig:
 @dataclass(frozen=True)
 class RenderConfig:
     fps: int = DEFAULT_RENDER_FPS
+    width: int = DEFAULT_RENDER_WIDTH
+    height: int = DEFAULT_RENDER_HEIGHT
     overlay: RenderOverlayConfig | None = None
     post_fx: RenderPostFxConfig | None = None
 
@@ -182,6 +186,13 @@ def render_fps(cfg: CleaveConfig) -> int:
     if cfg.render is not None:
         return cfg.render.fps
     return DEFAULT_RENDER_FPS
+
+
+def render_output_size(cfg: CleaveConfig) -> tuple[int, int]:
+    """Offline render output resolution from config."""
+    if cfg.render is not None:
+        return cfg.render.width, cfg.render.height
+    return DEFAULT_RENDER_WIDTH, DEFAULT_RENDER_HEIGHT
 
 
 def _expand_path(path: Path | str) -> Path:
