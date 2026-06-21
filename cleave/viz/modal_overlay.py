@@ -86,10 +86,12 @@ def draw(
     if state.options:
         if state.message is not None:
             cur_y += line_h + line_gap
+        content_w = panel_w - _PANEL_PAD_X * 2
         _draw_options(
             panel,
             font,
             x=_PANEL_PAD_X,
+            content_width=content_w,
             y=cur_y,
             labels=state.options,
             focus_index=state.focus_index,
@@ -172,12 +174,14 @@ def _draw_options(
     font: pygame.font.Font,
     *,
     x: int,
+    content_width: int,
     y: int,
     labels: tuple[str, ...],
     focus_index: int,
     text_alpha: int,
 ) -> None:
-    option_x = x
+    options_w, _ = _measure_options(font, labels)
+    option_x = x + max(0, (content_width - options_w) // 2)
     line_h = font.get_linesize()
     for index, label in enumerate(labels):
         focused = index == focus_index
