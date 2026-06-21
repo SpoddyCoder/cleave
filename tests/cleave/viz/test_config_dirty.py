@@ -214,6 +214,19 @@ def _mutate_timeline_enabled(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
 
 
+def _expand_settings(controls: TuningControls) -> None:
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(view, RowKind.SETTINGS_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_visualizer_render_mode(controls: TuningControls) -> None:
+    _expand_settings(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_index = find_row_by_kind(view, RowKind.SETTINGS_RENDER_MODE)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
 def _mutate_timeline_cues_via_delete() -> None:
     tuning = _make_controls(("layer_1",))
     tuning.session.timeline.cues = [TimelineCue(t=1.0, layers={"layer_1": False})]
@@ -253,6 +266,7 @@ _PERSISTED_MUTATIONS: list[
     ("render_post_fx.fade_in", _mutate_render_post_fx_fade_in, ("layer_1",), {}),
     ("render_post_fx.fade_out", _mutate_render_post_fx_fade_out, ("layer_1",), {}),
     ("timeline.enabled", _mutate_timeline_enabled, ("layer_1",), {"timeline_enabled": True}),
+    ("visualizer.render_mode", _mutate_visualizer_render_mode, ("layer_1",), {}),
 ]
 
 

@@ -95,6 +95,11 @@ def default_timeline_runtime() -> TimelineRuntime:
 
 
 @dataclass
+class SettingsRuntime:
+    expanded: bool = False
+
+
+@dataclass
 class LayerRuntime:
     playlist: PresetPlaylist
     browse_floor: Path
@@ -121,6 +126,7 @@ class TuningSession:
     )
     render_post_fx_solo: bool = False
     timeline: TimelineRuntime = field(default_factory=default_timeline_runtime)
+    settings: SettingsRuntime = field(default_factory=SettingsRuntime)
     help_visible: bool = False
 
 

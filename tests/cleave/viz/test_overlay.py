@@ -121,6 +121,8 @@ def _panel_scroll_metrics(
             if row_kind(state, index) not in {
                 RowKind.CONFIG_HEADER,
                 RowKind.TRANSPORT,
+                RowKind.SETTINGS_HEADER,
+                RowKind.SETTINGS_RENDER_MODE,
             }
         ),
         None,

@@ -217,6 +217,25 @@ def test_parse_visualizer_rejects_non_numeric_warmup_sec() -> None:
         parse_visualizer_section({"visualizer": {"warmup_sec": "fast"}})
 
 
+def test_parse_visualizer_render_mode_defaults_to_balanced() -> None:
+    cfg = parse_visualizer_section({})
+    assert cfg.render_mode == "balanced"
+
+
+@pytest.mark.parametrize(
+    "render_mode",
+    ["full-quality", "balanced", "performance"],
+)
+def test_parse_visualizer_reads_render_mode(render_mode: str) -> None:
+    cfg = parse_visualizer_section({"visualizer": {"render_mode": render_mode}})
+    assert cfg.render_mode == render_mode
+
+
+def test_parse_visualizer_rejects_invalid_render_mode() -> None:
+    with pytest.raises(ValueError, match="visualizer.render_mode must be one of"):
+        parse_visualizer_section({"visualizer": {"render_mode": "ultra"}})
+
+
 def test_load_config_reads_visualizer_name(minimal_project: Path) -> None:
     cfg = load_config(project_root=minimal_project)
     assert cfg.visualizer.name == "cleave-test"

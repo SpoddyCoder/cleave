@@ -209,6 +209,11 @@ def _sections_for(
             primary = _RENDER_SECTION
         elif behavior.can_enable_disable:
             primary = _RENDER_TIMELINE_SECTION
+        elif behavior.is_header:
+            primary = HelpSection(
+                behavior.help_title or "Settings",
+                (("Left/Right", "expand/collapse"),),
+            )
     elif row_kind == RowKind.TRACK_STEM:
         primary = _STEM_SECTION
     elif behavior.affordance == RowAffordance.VALUE_STEP:
