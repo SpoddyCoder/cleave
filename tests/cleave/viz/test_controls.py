@@ -2656,7 +2656,7 @@ def test_cycle_stem_to_full_mix() -> None:
     assert controls.session.layers["layer_1"].stem == "full_mix"
 
     view = controls.build_view_state(paused=False)
-    assert _row_text(view, controls.focus_index) == "└─ stem: full-mix"
+    assert _row_text(view, controls.focus_index) == "└─ driving stem: full-mix"
 
 
 def test_try_quit_overwrite_confirm_esc_clears_quit_after_save() -> None:

@@ -458,7 +458,7 @@ def _row_text(state: TuningViewState, index: int) -> str:
     if kind == RowKind.TRACK_PRESET:
         return block.preset_label
     if kind == RowKind.TRACK_STEM:
-        return f"└─ stem: {stem_control_label(block.stem)}"
+        return f"└─ driving stem: {stem_control_label(block.stem)}"
     if kind == RowKind.TRACK_BLEND:
         return f"└─ blend mode: {block.blend_mode}"
     if kind == RowKind.TRACK_OPACITY:
@@ -481,7 +481,7 @@ def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
     if kind == RowKind.TRACK_BLEND:
         return "└─ blend mode: "
     if kind == RowKind.TRACK_STEM:
-        return "└─ stem: "
+        return "└─ driving stem: "
     if kind == RowKind.TRACK_OPACITY:
         return "└─ opacity: "
     if kind == RowKind.TRACK_BEAT:
