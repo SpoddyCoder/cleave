@@ -334,3 +334,10 @@ def row_navigable_when_layer_locked(kind: RowKind) -> bool:
 
 def layer_lock_blocks_mutation(kind: RowKind, *, locked: bool) -> bool:
     return locked and row_blocked_by_layer_lock(kind)
+
+
+def row_triggers_layer_delete(kind: RowKind) -> bool:
+    """True when Delete should prompt to remove the focused track block's layer."""
+    if kind == RowKind.TRACK_HEADER:
+        return True
+    return row_behavior(kind).parent_group == "track"

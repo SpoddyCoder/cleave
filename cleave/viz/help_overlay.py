@@ -51,6 +51,7 @@ _LAYER_SECTION_BASE: tuple[tuple[str, str], ...] = (
     ("Ctrl + Enter", "lock/unlock layer"),
     ("Shift + Left/Right", "solo layer"),
     ("Left/Right", "expand/collapse"),
+    ("Delete", "delete layer"),
 )
 
 _LAYER_VISIBILITY_ENTRY = ("Ctrl + Left/Right", "enable/disable layer")
@@ -227,7 +228,7 @@ def _sections_for(
         primary = HelpSection(
             behavior.help_title or "Delete layer",
             (
-                ("Enter", "confirm delete"),
+                ("Enter/Delete", "confirm delete"),
                 ("", "at least 1 layer required"),
             ),
         )

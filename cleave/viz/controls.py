@@ -15,7 +15,7 @@ from cleave.effects.registry import effect_row_count
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.extract import STEM_SOURCES
 from cleave.viz.config_save import ConfigSaveController
-from cleave.viz.key_repeat import KeyRepeatController, mod_ctrl, mod_shift
+from cleave.viz.key_repeat import KeyRepeatController, delete_key_pressed, mod_ctrl, mod_shift
 from cleave.viz.modal import ModalHost
 from cleave.viz.playback import PlaybackState, seek, toggle_pause
 from cleave.viz.focus_context import FocusContext
@@ -28,6 +28,7 @@ from cleave.viz.row_semantics import (
     RowKind,
     layer_lock_blocks_mutation,
     row_behavior,
+    row_triggers_layer_delete,
 )
 from cleave.viz.overlay import (
     TuningViewState,
@@ -257,6 +258,15 @@ class TuningControls:
                     ):
                         return True
                     self._parent_directory(slot)
+                return True
+
+        if delete_key_pressed(event):
+            view = self.build_view_state(paused=self.playback.paused)
+            kind = row_kind(view, self.focus_index)
+            if row_triggers_layer_delete(kind):
+                slot = row_slot(view, self.focus_index)
+                if slot is not None:
+                    self._delete_layer(slot)
                 return True
 
         if event.key == pygame.K_RETURN and mod_ctrl(event.mod):
