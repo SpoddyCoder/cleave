@@ -28,9 +28,9 @@ def test_timeline_ui_metrics_default_scale() -> None:
 
 
 def test_timeline_panel_height_px_scales_with_ui_scale() -> None:
-    assert timeline_panel_height_px(720, scale=1.0) == 144
-    assert timeline_panel_height_px(720, scale=1.2) == 173
-    assert timeline_panel_height_px(720, scale=1.5) == 216
+    assert timeline_panel_height_px(720, scale=1.0) == 94
+    assert timeline_panel_height_px(720, scale=1.2) == 112
+    assert timeline_panel_height_px(720, scale=1.5) == 140
 
 
 def test_scale_px_rounds_and_clamps() -> None:
