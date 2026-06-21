@@ -11,9 +11,18 @@ Aspirational ideas. Not scheduled; revisit when the core workflow feels solid.
 
 Emit MIDI notes or CC from drum onsets (and other signals in `signals.json`) to drive hardware lighting, drum pads, or synths during playback or export.
 
-## Preset randomiser
+## Preset cycling
 
-Auto-pick or cycle Milkdrop presets per layer on a timer, at section boundaries, or when beat energy crosses a threshold. Useful for long sessions without manual browsing.
+
+Per-layer preset cycling so a layer can advance through its preset tree without manual browsing. New sub-row under the preset controls (alongside preset dir / preset file).
+
+| Mode | Behaviour |
+| --- | --- |
+| **off** (default) | Current behaviour: preset stays fixed until the user picks another. |
+| **directory-only** | Cycle presets in the layer's current preset directory only (siblings at the same folder level). |
+| **full-tree** | Cycle across the full preset tree rooted at the layer's browse floor (respecting playlist navigation rules). |
+
+Trigger mechanism (timer, beat-driven, or both) TBD when implementing; modes above define *scope* of the cycle, not when to advance.
 
 ## Web / browser port
 
