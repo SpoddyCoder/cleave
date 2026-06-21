@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import pygame
 
 from cleave.viz.controls import TuningControls
+from cleave.viz.focus_nav import FocusCursor, TimelineFocus
 from cleave.viz.key_repeat import mod_ctrl
 from cleave.viz.timeline_controls import TimelineControls
 
@@ -19,12 +20,13 @@ def timeline_submenu_routes_to_timeline(
     *,
     timeline_controls: TimelineControls | None,
     key: int,
+    focus_cursor: FocusCursor,
 ) -> bool:
     """True when the key should route to timeline controls (submenu focused)."""
     return (
         tl.panel_open
         and tl.enabled
-        and tl.submenu_focused
+        and isinstance(focus_cursor, TimelineFocus)
         and timeline_controls is not None
         and key not in (pygame.K_UP, pygame.K_DOWN)
     )
@@ -39,6 +41,7 @@ def key_handler_for_runtime(
         tl,
         timeline_controls=runtime.timeline_controls,
         key=key,
+        focus_cursor=runtime.controls.focus_cursor,
     ):
         return runtime.timeline_controls
     return runtime.controls
@@ -99,4 +102,6 @@ def dispatch_should_notify_overlay(
     key_handler = key_handler_for_runtime(runtime, event.key)
     if key_handler is not runtime.controls:
         return False
-    return event.key != pygame.K_t and not tl.submenu_focused
+    return event.key != pygame.K_t and not isinstance(
+        runtime.controls.focus_cursor, TimelineFocus
+    )

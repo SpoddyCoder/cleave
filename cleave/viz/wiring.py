@@ -319,13 +319,10 @@ def make_timeline_controls(
             tuning_controls.close_timeline_panel()
         else:
             session.timeline.panel_open = False
-            session.timeline.submenu_focused = False
 
     def on_exit_submenu() -> None:
         if tuning_controls is not None:
             tuning_controls.exit_timeline_submenu()
-        else:
-            session.timeline.submenu_focused = False
 
     def on_seek(delta_sec: float) -> None:
         seek(playback, delta_sec, duration_sec)

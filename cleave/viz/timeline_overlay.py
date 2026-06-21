@@ -9,7 +9,7 @@ import pygame
 from cleave.extract import StemSource
 from cleave.timeline import TimelineCue, layer_visible_at, stem_abbreviation
 from cleave.viz.material_icons import visibility_icon_slot_width
-from cleave.viz.overlay import clip_rect_to_surface, render_visibility_icon
+from cleave.viz.tuning_panel_draw import clip_rect_to_surface, render_visibility_icon
 from cleave.viz.playback import format_mmss
 from cleave.viz.theme import (
     ARMED_BG,

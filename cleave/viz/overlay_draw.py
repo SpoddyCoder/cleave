@@ -8,7 +8,8 @@ from cleave.gl_compositor import GlCompositor
 from cleave.viz import modal_overlay
 from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.modal import ModalHost
-from cleave.viz.overlay import TuningOverlay, TuningViewState, row_kind
+from cleave.viz.tuning_panel_draw import TuningOverlay
+from cleave.viz.tuning_view_state import TuningViewState
 from cleave.viz.timeline_overlay import TimelineOverlay, TimelineViewState
 
 
@@ -46,7 +47,7 @@ class OverlayDrawer:
         if help_overlay is not None and view_state.help_visible:
             help_overlay.draw(
                 overlay_surface,
-                row_kind(view_state, view_state.focus_index),
+                view_state.focus_descriptor.kind,
                 timeline_enabled=view_state.render_timeline.enabled,
                 timeline_submenu_focused=view_state.timeline_submenu_focused,
                 paused=view_state.paused,
