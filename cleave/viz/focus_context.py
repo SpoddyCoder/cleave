@@ -6,7 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from cleave.viz.focus_nav import FocusCursor
-from cleave.viz.overlay import TuningViewState
+from cleave.viz.tuning_view_state import TuningViewState
 
 
 @dataclass(frozen=True)

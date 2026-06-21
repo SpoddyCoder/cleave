@@ -12,7 +12,7 @@ from cleave.viz.focus_nav import (
     resolve_cursor,
     timeline_strip_in_ring,
 )
-from cleave.viz.overlay import RenderTimelineBlock, TrackBlock, TuningViewState
+from cleave.viz.tuning_view_state import RenderTimelineBlock, TrackBlock, TuningViewState
 from cleave.viz.row_semantics import RowDescriptor, RowKind
 from tests.cleave.viz.test_controls import (
     _desc,

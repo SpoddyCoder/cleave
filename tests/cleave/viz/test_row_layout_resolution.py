@@ -4,7 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from cleave.viz.overlay import RenderOverlayBlock, RenderPostFxBlock, SettingsBlock, TrackBlock, TuningViewState
+from cleave.viz.tuning_view_state import (
+    RenderOverlayBlock,
+    RenderPostFxBlock,
+    SettingsBlock,
+    TrackBlock,
+    TuningViewState,
+)
 from cleave.viz.row_semantics import RowDescriptor, RowKind, section_header_descriptor
 from tests.cleave.viz.test_overlay import _minimal_view_state
 

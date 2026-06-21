@@ -37,12 +37,11 @@ from cleave.viz.row_semantics import (
     row_behavior,
     row_triggers_layer_delete,
 )
-from cleave.viz.overlay import TuningViewState
 from cleave.viz.session import TuningSession
+from cleave.viz.tuning_view_state import TuningViewState, TuningViewStateBuilder
 
 if TYPE_CHECKING:
     from cleave.viz.wiring import LayerManager
-from cleave.viz.tuning_view_state import TuningViewStateBuilder
 
 TOAST_DURATION_SEC = 5.0
 SEEK_SHORT = 10

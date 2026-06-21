@@ -22,7 +22,7 @@ from cleave.viz.input_dispatch import key_handler_for_runtime
 from cleave.viz.row_semantics import RowDescriptor, RowKind
 from cleave.viz.session import LayerRuntime, RenderPostFxRuntime, TuningSession
 from cleave.viz.modal import ModalHost
-from cleave.viz.overlay import TuningOverlay
+from cleave.viz.tuning_panel_draw import TuningOverlay
 from tests.support.compositor_mock import recording_compositor
 
 

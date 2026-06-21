@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from cleave.viz.overlay import TuningViewState
+from cleave.viz.tuning_view_state import TuningViewState
 from cleave.viz.row_semantics import RowDescriptor, RowKind
 
 

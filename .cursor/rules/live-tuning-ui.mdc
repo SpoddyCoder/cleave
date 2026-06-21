@@ -6,7 +6,7 @@ alwaysApply: false
 
 # Live tuning overlay layout
 
-The focus-driven tree panel ([cleave/viz/overlay.py](cleave/viz/overlay.py) draws; [cleave/viz/controls.py](cleave/viz/controls.py) coordinates input; [cleave/viz/tuning_view_state.py](cleave/viz/tuning_view_state.py) builds `TuningViewState`; [cleave/viz/session.py](cleave/viz/session.py) holds session) splits into two vertical sections. Use these names in docs, issues, and UI work.
+The focus-driven tree panel ([cleave/viz/tuning_panel_draw.py](cleave/viz/tuning_panel_draw.py) draws; [cleave/viz/controls.py](cleave/viz/controls.py) coordinates input; [cleave/viz/tuning_view_state.py](cleave/viz/tuning_view_state.py) builds `TuningViewState`; [cleave/viz/row_layout.py](cleave/viz/row_layout.py) builds `RowLayout`; [cleave/viz/session.py](cleave/viz/session.py) holds session) splits into two vertical sections. Use these names in docs, issues, and UI work.
 
 Unsaved config edits show an asterisk on the active config path row. **Ctrl+Q** and window close route through `TuningControls.try_quit()` (delegates to [cleave/viz/config_save.py](cleave/viz/config_save.py)); when dirty, a centered three-option quit modal (Save / Don't save / Cancel) appears before exit.
 
@@ -16,9 +16,9 @@ Confirm, save-choice, and unsaved-quit prompts are drawn by [cleave/viz/modal_ov
 
 ## Track rows section
 
-The scrollable block below the pinned header: all rows where `row_kind` is not in `HEADER_ROW_KINDS` from [cleave/viz/row_semantics.py](cleave/viz/row_semantics.py) (`track_row_count` counts these rows from `build_row_layout`). Row interaction groups (sub-row frozensets, repeat keys, help affordances) are defined in the same module.
+The scrollable block below the pinned header: all rows where `row_kind` is not in `HEADER_ROW_KINDS` from [cleave/viz/row_semantics.py](cleave/viz/row_semantics.py) (`state.layout.track_row_count()` counts these rows). Row interaction groups (sub-row frozensets, repeat keys, help affordances) are defined in the same module.
 
-- One **track block** per slot in `layer_z_order` (dynamic slots `layer_1`..`layer_8`; default four; use `row_slot()` in [cleave/viz/overlay.py](cleave/viz/overlay.py) to read the slot from a row index).
+- One **track block** per slot in `layer_z_order` (dynamic slots `layer_1`..`layer_8`; default four; use `state.layout.slot(index)` in [cleave/viz/row_layout.py](cleave/viz/row_layout.py) to read the slot from a row index).
 - **Base rows** (always present per stem): header, preset dir, preset, stem, blend, opacity, beat sensitivity, then **cleave effects** header (`RowKind.TRACK_EFFECTS_HEADER`).
 - **Stem row** (`RowKind.TRACK_STEM`): Left/Right cycles `STEM_SOURCES`; follows standard locked sub-row rules (blocked when layer locked; only **cleave effects** header remains navigable among locked sub-rows).
 - **Effect sub-rows** (`RowKind.TRACK_EFFECT`): one per entry in [cleave/effects/registry.py](cleave/effects/registry.py) for that stem; visible only when both the track block and `TrackBlock.effects_expanded` are expanded.
@@ -44,7 +44,7 @@ Separate bottom overlay ([cleave/viz/timeline_overlay.py](cleave/viz/timeline_ov
 The pinned top block before a visual gap (`header_gap` in `draw()`): `header_row_count(state)` rows (3 when settings collapsed, 4 when expanded).
 
 - Row kinds: `RowKind.SETTINGS_HEADER`, optional `RowKind.SETTINGS_RENDER_MODE` when `session.settings.expanded`, `RowKind.CONFIG_HEADER` (active config path; Enter saves), `RowKind.TRANSPORT`.
-- Layout order in `build_row_layout`: settings header, optional render-mode sub-row, config header, transport.
+- Layout order in `RowLayout.build`: settings header, optional render-mode sub-row, config header, transport.
 - **Settings** header: label `Settings` in `ACTION`, expand arrow in value color; Left/Right toggles `session.settings.expanded` (UI-only). Sub-row when expanded: `└─ render mode: {mode}` cycles `visualizer.render_mode` in config (`full-quality`, `balanced`, `performance`; default `balanced`).
 - Enter on `CONFIG_HEADER` opens an `OVERWRITE` / `SAVE AS NEW` centered modal when overwrite is allowed (`allow_overwrite`; false for repo-root `cleave-viz.yaml`). When overwrite is not allowed, a `SAVE AS NEW` / `CANCEL` modal appears (Enter confirms the focused option, Esc dismisses). Overwrite still uses the yes/no centered modal.
 
@@ -70,7 +70,7 @@ Colors live in [cleave/viz/theme.py](cleave/viz/theme.py). Label truncation uses
 
 **Expand arrows** (`▶` / `▼`): value role, not label. Drawn in the row value color (typically `VALUE`; follows focus, disabled, and locked state like other values).
 
-**Visibility eye** (track, render overlay, render post-FX, and render timeline headers): `VALUE` when enabled, `DISABLED` when off. When soloed (`solo_slot` for main-panel layer slots via `TuningViewState.solo_slot`, `render_overlay_solo` / `render_post_fx_solo` for render blocks; neither persisted), the eye stays white on `SOLO_BG`. **Shift + Right** enters solo; **Shift + Left** exits solo for the focused header. **Render: TIMELINE** header has no solo; the timeline strip uses **Shift+Enter** on the focused row for override (`override_stems` on `TimelineRuntime`; left eye `OVERRIDE_BG`). Timeline strip eyes use the same icon helper ([render_visibility_icon](cleave/viz/overlay.py)).
+**Visibility eye** (track, render overlay, render post-FX, and render timeline headers): `VALUE` when enabled, `DISABLED` when off. When soloed (`solo_slot` for main-panel layer slots via `TuningViewState.solo_slot`, `render_overlay_solo` / `render_post_fx_solo` for render blocks; neither persisted), the eye stays white on `SOLO_BG`. **Shift + Right** enters solo; **Shift + Left** exits solo for the focused header. **Render: TIMELINE** header has no solo; the timeline strip uses **Shift+Enter** on the focused row for override (`override_stems` on `TimelineRuntime`; left eye `OVERRIDE_BG`). Timeline strip eyes use the same icon helper ([render_visibility_icon](cleave/viz/tuning_panel_draw.py)).
 
 ### Accent colors (not label/value roles)
 
