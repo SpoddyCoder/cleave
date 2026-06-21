@@ -106,6 +106,10 @@ def _snapshot_render_overlay(
             for key, value in orig_render.items()
             if key not in ("overlay", "post_fx")
         }
+    render_payload = payload["render"]
+    render_out["fps"] = render_payload["fps"]
+    render_out["width"] = render_payload["width"]
+    render_out["height"] = render_payload["height"]
     render_out["overlay"] = overlay
     render_out["post_fx"] = post_fx
     return render_out

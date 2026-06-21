@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pygame
 
-from cleave.config import VIZ_CONFIG_FILENAME, load_config, render_fps
+from cleave.config import VIZ_CONFIG_FILENAME, load_config, render_fps, render_output_size
 from cleave.paths import default_project_config, repo_root, resolve_project
 from cleave.preset_playlist import scan_all_layers
 from cleave.project import load_manifest, manifest_path, mix_path
@@ -37,8 +37,8 @@ def _progress(message: str) -> None:
 @dataclass(frozen=True)
 class RenderResult:
     output_path: Path
-    display_width: int
-    display_height: int
+    output_width: int
+    output_height: int
     mix_filename: str
     segment: RenderSegment | None = None
 
@@ -193,11 +193,13 @@ def render(
     playlists = scan_all_layers(cfg)
     seed = build_runtime_base(cfg, project, audio_path, playlists)
 
+    output_width, output_height = render_output_size(cfg)
+
     os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
     pygame.init()
     try:
         pygame.display.set_mode(
-            (seed.display_width, seed.display_height),
+            (output_width, output_height),
             pygame.OPENGL | pygame.HIDDEN,
         )
     except pygame.error as exc:
@@ -207,7 +209,9 @@ def render(
     proc: subprocess.Popen[bytes] | None = None
     runtime: RenderVisualizerRuntime | None = None
     try:
-        runtime = init_gl_resources_render(seed)
+        runtime = init_gl_resources_render(
+            seed, output_width=output_width, output_height=output_height
+        )
         app = VisualizerApp(runtime)
 
         duration_sec = runtime.seed.duration_sec
@@ -225,8 +229,8 @@ def render(
             )
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        width = runtime.seed.display_width
-        height = runtime.seed.display_height
+        width = output_width
+        height = output_height
         frame_count = segment.frame_count
         frame_bytes = width * height * 4
         audio_duration_sec = frame_count / fps
@@ -327,8 +331,8 @@ def render(
     partial = _is_partial_segment(segment, duration_sec=duration_sec)
     return RenderResult(
         output_path=output_path.resolve(),
-        display_width=width,
-        display_height=height,
+        output_width=width,
+        output_height=height,
         mix_filename=manifest.mix_filename,
         segment=segment if partial else None,
     )

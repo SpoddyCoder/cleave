@@ -24,6 +24,8 @@ from cleave.config import (
 )
 from cleave.config_schema import (
     DEFAULT_LAYER_SLOTS,
+    DEFAULT_RENDER_HEIGHT,
+    DEFAULT_RENDER_WIDTH,
     ParseCtx,
     parse_render_section,
     parse_timeline_section,
@@ -670,6 +672,8 @@ def test_write_session_snapshot_persists_render_overlay(tmp_path: Path) -> None:
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    assert data["render"]["width"] == DEFAULT_RENDER_WIDTH
+    assert data["render"]["height"] == DEFAULT_RENDER_HEIGHT
     overlay = data["render"]["overlay"]
     assert overlay["enabled"] is True
     assert overlay["title"]["content"] == "My Title"

@@ -235,8 +235,18 @@ def init_gl_resources_heavy(
     )
 
 
-def init_gl_resources_render(seed: VisualizerSeed) -> RenderVisualizerRuntime:
-    compositor, post_process = _init_compositor_and_post(seed)
+def init_gl_resources_render(
+    seed: VisualizerSeed, *, output_width: int, output_height: int
+) -> RenderVisualizerRuntime:
+    compositor = GlCompositor(
+        seed.width,
+        seed.height,
+        display_width=output_width,
+        display_height=output_height,
+    )
+    compositor.init()
+    post_process = GlPostProcess()
+    post_process.init()
     layers, layers_by_slot = LayerFramePipeline.build(
         seed.cfg,
         compositor,

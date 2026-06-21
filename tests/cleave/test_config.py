@@ -29,10 +29,13 @@ from cleave.config import (
     find_config_path,
     load_config,
     project_viz_config_path,
+    render_output_size,
     _parse_layers,
 )
 from cleave.config_schema import (
     DEFAULT_LAYER_SLOTS,
+    DEFAULT_RENDER_HEIGHT,
+    DEFAULT_RENDER_WIDTH,
     MAX_LAYER_COUNT,
     ParseCtx,
     next_layer_slot,
@@ -537,6 +540,40 @@ def test_parse_render_overlay_rejects_invalid_position() -> None:
     data["render"]["overlay"]["position"] = "middle"
     with pytest.raises(ValueError, match="render.overlay.position must be one of"):
         parse_render_section(data)
+
+
+def test_parse_render_width_height_defaults() -> None:
+    render = parse_render_section({"render": {"fps": 24}})
+    assert render is not None
+    assert render.width == DEFAULT_RENDER_WIDTH
+    assert render.height == DEFAULT_RENDER_HEIGHT
+
+
+def test_parse_render_width_height_explicit() -> None:
+    render = parse_render_section({"render": {"width": 1920, "height": 1080}})
+    assert render is not None
+    assert render.width == 1920
+    assert render.height == 1080
+
+
+def test_render_output_size_defaults_without_render_section(
+    minimal_project: Path,
+) -> None:
+    cfg = load_config(project_root=minimal_project)
+    assert render_output_size(cfg) == (DEFAULT_RENDER_WIDTH, DEFAULT_RENDER_HEIGHT)
+
+
+def test_render_output_size_reads_render_section() -> None:
+    render = parse_render_section({"render": {"width": 3840, "height": 2160}})
+    assert render is not None
+    cfg = CleaveConfig(
+        paths=PathsConfig(preset_root=Path("/tmp"), texture_paths=()),
+        layers={},
+        visualizer=VisualizerConfig(),
+        config_path=Path("/tmp/cleave-viz.yaml"),
+        render=render,
+    )
+    assert render_output_size(cfg) == (3840, 2160)
 
 
 def test_parse_render_post_fx_defaults() -> None:

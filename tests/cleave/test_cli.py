@@ -213,8 +213,8 @@ def test_cmd_render_high_quality_completion_message(
     project = _complete_project(tmp_path)
     render_result = RenderResult(
         output_path=(project / "renders" / "out.mp4").resolve(),
-        display_width=2560,
-        display_height=1440,
+        output_width=2560,
+        output_height=1440,
         mix_filename="my-track.flac",
     )
 
@@ -241,8 +241,8 @@ def test_cmd_render_calls_render(
 
     render_result = RenderResult(
         output_path=output.resolve(),
-        display_width=1280,
-        display_height=720,
+        output_width=1280,
+        output_height=720,
         mix_filename="my-track.flac",
     )
     with patch.object(
@@ -287,8 +287,8 @@ def test_cmd_render_passes_high_quality_flag(
 
     render_result = RenderResult(
         output_path=(tmp_path / "out.mp4").resolve(),
-        display_width=2560,
-        display_height=1440,
+        output_width=2560,
+        output_height=1440,
         mix_filename="my-track.flac",
     )
     with patch.object(
@@ -312,8 +312,8 @@ def test_cmd_render_passes_start_and_end(
 
     render_result = RenderResult(
         output_path=(tmp_path / "out.mp4").resolve(),
-        display_width=1280,
-        display_height=720,
+        output_width=1280,
+        output_height=720,
         mix_filename="my-track.flac",
     )
     with patch.object(
@@ -346,8 +346,8 @@ def test_cmd_render_segment_completion_message(
     project = _complete_project(tmp_path)
     render_result = RenderResult(
         output_path=(project / "renders" / "out.mp4").resolve(),
-        display_width=1280,
-        display_height=720,
+        output_width=1280,
+        output_height=720,
         mix_filename="my-track.flac",
         segment=RenderSegment(
             start_sec=10,

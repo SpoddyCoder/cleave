@@ -19,6 +19,8 @@ from cleave.timeline import TimelineCue
 DEFAULT_VISUALIZER_WIDTH = 1280
 DEFAULT_VISUALIZER_HEIGHT = 720
 DEFAULT_RENDER_FPS = 30
+DEFAULT_RENDER_WIDTH = 1280
+DEFAULT_RENDER_HEIGHT = 720
 DEFAULT_VISUALIZER_WARMUP_SEC = 3.0
 DEFAULT_VISUALIZER_UPSCALE = 1.0
 UPSCALE_MIN = 1.0
@@ -1023,6 +1025,10 @@ def parse_render_section(data: dict[str, Any]) -> Any | None:
     render_map = as_mapping(render, "render")
     fps_raw = render_map.get("fps")
     fps = DEFAULT_RENDER_FPS if fps_raw is None else int(fps_raw)
+    width_raw = render_map.get("width")
+    width = DEFAULT_RENDER_WIDTH if width_raw is None else int(width_raw)
+    height_raw = render_map.get("height")
+    height = DEFAULT_RENDER_HEIGHT if height_raw is None else int(height_raw)
     overlay_raw = render_map.get("overlay")
     post_fx_raw = render_map.get("post_fx")
     overlay = (
@@ -1035,7 +1041,9 @@ def parse_render_section(data: dict[str, Any]) -> Any | None:
         if post_fx_raw is not None
         else None
     )
-    return RenderConfig(fps=fps, overlay=overlay, post_fx=post_fx)
+    return RenderConfig(
+        fps=fps, width=width, height=height, overlay=overlay, post_fx=post_fx
+    )
 
 
 def default_render_overlay_config() -> Any:
@@ -1099,9 +1107,16 @@ def persist_render(ctx: PersistCtx) -> dict[str, Any]:
         "fade_out": runtime_pp.fade_out,
     }
     post_fx = _dump_fields(RENDER_POST_FX_FIELDS, post_fx_values, ctx)
-    from cleave.config import render_fps
+    from cleave.config import render_fps, render_output_size
 
-    return {"fps": render_fps(ctx.cfg), "overlay": overlay, "post_fx": post_fx}
+    width, height = render_output_size(ctx.cfg)
+    return {
+        "fps": render_fps(ctx.cfg),
+        "width": width,
+        "height": height,
+        "overlay": overlay,
+        "post_fx": post_fx,
+    }
 
 
 def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
