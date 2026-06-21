@@ -94,6 +94,8 @@ class TuningViewState:
     move_mode_slot: str | None
     toast_message: str | None
     toast_remaining_sec: float
+    timeline_layer_hint_message: str | None = None
+    timeline_layer_hint_remaining_sec: float = 0.0
     allow_overwrite: bool = True
     active_config_label: str = "cleave-viz.yaml"
     config_dirty: bool = False
@@ -181,6 +183,8 @@ class TuningViewStateBuilder:
         config_save: ConfigSaveController,
         get_toast_message: Callable[[], str | None],
         get_toast_deadline: Callable[[], float],
+        get_timeline_layer_hint_message: Callable[[], str | None],
+        get_timeline_layer_hint_deadline: Callable[[], float],
     ) -> None:
         self.session = session
         self.playback = playback
@@ -191,6 +195,8 @@ class TuningViewStateBuilder:
         self._config_save = config_save
         self._get_toast_message = get_toast_message
         self._get_toast_deadline = get_toast_deadline
+        self._get_timeline_layer_hint_message = get_timeline_layer_hint_message
+        self._get_timeline_layer_hint_deadline = get_timeline_layer_hint_deadline
 
     def build(
         self,
@@ -239,6 +245,17 @@ class TuningViewStateBuilder:
             if toast_remaining > 0:
                 toast_message = toast
 
+        timeline_layer_hint_remaining = 0.0
+        timeline_layer_hint_message: str | None = None
+        hint = self._get_timeline_layer_hint_message()
+        if hint is not None:
+            timeline_layer_hint_remaining = max(
+                0.0,
+                self._get_timeline_layer_hint_deadline() - time.monotonic(),
+            )
+            if timeline_layer_hint_remaining > 0:
+                timeline_layer_hint_message = hint
+
         ro = self.session.render_overlay
         pp = self.session.render_post_fx
         tl = self.session.timeline
@@ -251,6 +268,8 @@ class TuningViewStateBuilder:
             move_mode_slot=self._get_move_mode_slot(),
             toast_message=toast_message,
             toast_remaining_sec=toast_remaining,
+            timeline_layer_hint_message=timeline_layer_hint_message,
+            timeline_layer_hint_remaining_sec=timeline_layer_hint_remaining,
             allow_overwrite=self._config_save.allow_overwrite(),
             active_config_label=config_path_display(self._config_save.active_config_path),
             config_dirty=self._config_save.config_dirty,

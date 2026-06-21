@@ -26,6 +26,10 @@ from cleave.viz.tuning_panel_draw import (
     TREE_INDENT,
     scroll_metrics,
 )
+from cleave.viz.controls import (
+    TIMELINE_LAYER_HINT_DISABLED_TEXT,
+    TIMELINE_LAYER_HINT_ENABLED_TEXT,
+)
 from cleave.viz.tuning_view_state import (
     RenderOverlayBlock,
     RenderTimelineBlock,
@@ -531,23 +535,28 @@ def test_locked_stem_row_not_navigable_and_uses_locked_color() -> None:
     assert _row_value_color(state, stem_row) == LOCKED
 
 
-def test_timeline_layer_hint_when_timeline_enabled() -> None:
-    disabled = _minimal_view_state(
-        render_timeline=RenderTimelineBlock(enabled=False),
-    )
-    enabled = _minimal_view_state(
+def test_timeline_layer_hint_transient_above_first_layer() -> None:
+    inactive = _minimal_view_state(
         render_timeline=RenderTimelineBlock(enabled=True),
+        timeline_layer_hint_message=None,
+        timeline_layer_hint_remaining_sec=0.0,
     )
-    disabled_kinds = [row.kind for row in disabled.layout.rows]
-    enabled_kinds = [row.kind for row in enabled.layout.rows]
-    assert RowKind.TIMELINE_LAYER_HINT not in disabled_kinds
-    assert RowKind.TIMELINE_LAYER_HINT in enabled_kinds
-    hint_idx = enabled.layout.find_by_kind( RowKind.TIMELINE_LAYER_HINT)
-    gap_idx = enabled.layout.find_by_kind( RowKind.RENDER_SECTION_GAP)
-    overlay_idx = enabled.layout.find_by_kind( RowKind.RENDER_OVERLAY_HEADER)
-    assert hint_idx < gap_idx < overlay_idx
-    assert hint_idx not in enabled.layout.navigable_indices(enabled)
-    assert _row_value_color(enabled, hint_idx) == DISABLED
+    active = _minimal_view_state(
+        render_timeline=RenderTimelineBlock(enabled=True),
+        timeline_layer_hint_message=TIMELINE_LAYER_HINT_ENABLED_TEXT,
+        timeline_layer_hint_remaining_sec=10.0,
+    )
+    inactive_kinds = [row.kind for row in inactive.layout.rows]
+    active_kinds = [row.kind for row in active.layout.rows]
+    assert RowKind.TIMELINE_LAYER_HINT not in inactive_kinds
+    assert RowKind.TIMELINE_LAYER_HINT in active_kinds
+    hint_idx = active.layout.find_by_kind(RowKind.TIMELINE_LAYER_HINT)
+    transport_idx = active.layout.find_by_kind(RowKind.TRANSPORT)
+    header_idx = active.layout.find("layer_1", RowKind.TRACK_HEADER)
+    assert transport_idx < hint_idx < header_idx
+    assert hint_idx not in active.layout.navigable_indices(active)
+    assert _row_value_color(active, hint_idx) == DISABLED
+    assert _row_text(active, hint_idx) == TIMELINE_LAYER_HINT_ENABLED_TEXT
 
 
 def test_draw_timeline_layer_hint_without_error() -> None:
@@ -555,6 +564,8 @@ def test_draw_timeline_layer_hint_without_error() -> None:
     overlay = TuningOverlay()
     state = _minimal_view_state(
         render_timeline=RenderTimelineBlock(enabled=True),
+        timeline_layer_hint_message=TIMELINE_LAYER_HINT_ENABLED_TEXT,
+        timeline_layer_hint_remaining_sec=10.0,
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     overlay.notify_input()

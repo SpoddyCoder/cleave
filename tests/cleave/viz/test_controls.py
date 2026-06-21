@@ -30,6 +30,9 @@ from tests.support.viz import make_test_cfg, noop_layer_bindings, stub_playback_
 from cleave.viz.controls import (
     SEEK_LONG,
     SEEK_SHORT,
+    TIMELINE_LAYER_HINT_DISABLED_TEXT,
+    TIMELINE_LAYER_HINT_DURATION_SEC,
+    TIMELINE_LAYER_HINT_ENABLED_TEXT,
     TOAST_DURATION_SEC,
     TuningControls,
 )
@@ -1407,6 +1410,49 @@ def test_render_timeline_ctrl_right_toggles_enabled() -> None:
     assert controls.session.timeline.enabled is True
     assert controls.session.timeline.panel_open is True
     assert not isinstance(controls.focus_cursor, TimelineFocus)
+
+
+def test_timeline_enabled_startup_shows_layer_hint() -> None:
+    with patch.object(time, "monotonic", return_value=1000.0):
+        controls = _make_controls(timeline_enabled=True)
+        view = controls.build_view_state(paused=False)
+    assert view.timeline_layer_hint_message == TIMELINE_LAYER_HINT_ENABLED_TEXT
+    assert view.timeline_layer_hint_remaining_sec == pytest.approx(
+        TIMELINE_LAYER_HINT_DURATION_SEC, abs=0.01
+    )
+    assert RowKind.TIMELINE_LAYER_HINT in [row.kind for row in view.layout.rows]
+
+
+def test_render_timeline_toggle_shows_layer_hint() -> None:
+    with patch.object(time, "monotonic", return_value=1000.0):
+        controls = _make_controls(timeline_enabled=True)
+        view = controls.build_view_state(paused=False)
+        header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
+        controls.focus_descriptor = _desc(view, header_row)
+        controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+        view = controls.build_view_state(paused=False)
+        assert view.timeline_layer_hint_message == TIMELINE_LAYER_HINT_DISABLED_TEXT
+
+        controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+        view = controls.build_view_state(paused=False)
+        assert view.timeline_layer_hint_message == TIMELINE_LAYER_HINT_ENABLED_TEXT
+
+
+def test_timeline_layer_hint_expires_after_duration() -> None:
+    with patch.object(time, "monotonic", return_value=5000.0):
+        controls = _make_controls(timeline_enabled=True)
+        view = controls.build_view_state(paused=False)
+        assert view.timeline_layer_hint_message == TIMELINE_LAYER_HINT_ENABLED_TEXT
+
+    with patch.object(
+        time,
+        "monotonic",
+        return_value=5000.0 + TIMELINE_LAYER_HINT_DURATION_SEC + 0.1,
+    ):
+        controls.tick(0.0)
+        view = controls.build_view_state(paused=False)
+        assert view.timeline_layer_hint_message is None
+        assert view.timeline_layer_hint_remaining_sec == 0.0
 
 
 def test_render_timeline_enable_opens_panel() -> None:

@@ -44,6 +44,11 @@ if TYPE_CHECKING:
     from cleave.viz.wiring import LayerManager
 
 TOAST_DURATION_SEC = 5.0
+TIMELINE_LAYER_HINT_DURATION_SEC = 10.0
+TIMELINE_LAYER_HINT_ENABLED_TEXT = "Layer visibility now controlled by Timeline"
+TIMELINE_LAYER_HINT_DISABLED_TEXT = (
+    "Timeline no longer controlling layer visibility"
+)
 SEEK_SHORT = 10
 SEEK_LONG = 30
 
@@ -83,6 +88,8 @@ class TuningControls:
         self._move_mode_original_z_order: list[str] | None = None
         self._toast_message: str | None = None
         self._toast_deadline = 0.0
+        self._timeline_layer_hint_message: str | None = None
+        self._timeline_layer_hint_deadline = 0.0
         self._key_repeat = KeyRepeatController()
         self._hide_overlay_requested = False
 
@@ -107,10 +114,14 @@ class TuningControls:
             config_save=self._config_save,
             get_toast_message=lambda: self._toast_message,
             get_toast_deadline=lambda: self._toast_deadline,
+            get_timeline_layer_hint_message=lambda: self._timeline_layer_hint_message,
+            get_timeline_layer_hint_deadline=lambda: self._timeline_layer_hint_deadline,
         )
         self._render_overlay = RenderOverlayControls(session)
         self._render_post_fx = RenderPostFxControls(session)
         self._settings = SettingsControls(session, cfg)
+        if session.timeline.enabled:
+            self._show_timeline_layer_hint(enabled=True)
 
     def _move_mode_signature_payload(self) -> dict[str, list[str]] | None:
         if self.move_mode_slot is not None and self._move_mode_original_z_order is not None:
@@ -308,8 +319,14 @@ class TuningControls:
 
     def tick(self, dt_sec: float) -> None:
         self._key_repeat.tick(dt_sec)
-        if self._toast_message is not None and time.monotonic() >= self._toast_deadline:
+        now = time.monotonic()
+        if self._toast_message is not None and now >= self._toast_deadline:
             self._toast_message = None
+        if (
+            self._timeline_layer_hint_message is not None
+            and now >= self._timeline_layer_hint_deadline
+        ):
+            self._timeline_layer_hint_message = None
 
     def build_view_state(
         self,
@@ -760,6 +777,16 @@ class TuningControls:
             self.close_timeline_panel()
         if self._layer_bindings is not None:
             self._layer_bindings.on_timeline_enabled_change()
+        self._show_timeline_layer_hint(enabled=enabled)
+
+    def _show_timeline_layer_hint(self, *, enabled: bool) -> None:
+        now = time.monotonic()
+        self._timeline_layer_hint_message = (
+            TIMELINE_LAYER_HINT_ENABLED_TEXT
+            if enabled
+            else TIMELINE_LAYER_HINT_DISABLED_TEXT
+        )
+        self._timeline_layer_hint_deadline = now + TIMELINE_LAYER_HINT_DURATION_SEC
 
     def _enter_solo(self, slot: str) -> None:
         if self.session.solo_slot == slot:
