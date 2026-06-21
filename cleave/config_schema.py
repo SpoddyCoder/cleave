@@ -18,7 +18,7 @@ from cleave.timeline import TimelineCue
 
 DEFAULT_VISUALIZER_WIDTH = 1280
 DEFAULT_VISUALIZER_HEIGHT = 720
-DEFAULT_VISUALIZER_FPS = 30
+DEFAULT_RENDER_FPS = 30
 DEFAULT_VISUALIZER_WARMUP_SEC = 3.0
 DEFAULT_VISUALIZER_UPSCALE = 1.0
 UPSCALE_MIN = 1.0
@@ -628,13 +628,6 @@ VISUALIZER_FIELDS: tuple[FieldDescriptor, ...] = (
         lambda value, _ctx: clamp_upscale(value),
     ),
     FieldDescriptor(
-        "fps",
-        DEFAULT_VISUALIZER_FPS,
-        "cfg",
-        lambda raw, _ctx, _label: int(raw),
-        _dump_scalar,
-    ),
-    FieldDescriptor(
         "warmup_sec",
         DEFAULT_VISUALIZER_WARMUP_SEC,
         "cfg",
@@ -781,7 +774,6 @@ def parse_visualizer_section(data: dict[str, Any]) -> Any:
         width=parsed["width"],
         height=parsed["height"],
         upscale=parsed["upscale"],
-        fps=parsed["fps"],
         warmup_sec=parsed["warmup_sec"],
         beat_sensitivity=parsed["beat_sensitivity"],
     )
@@ -793,7 +785,6 @@ def persist_visualizer(ctx: PersistCtx) -> dict[str, Any]:
         "width": vis.width,
         "height": vis.height,
         "upscale": vis.upscale,
-        "fps": vis.fps,
         "warmup_sec": vis.warmup_sec,
         "beat_sensitivity": vis.beat_sensitivity,
     }
@@ -1030,10 +1021,10 @@ def parse_render_section(data: dict[str, Any]) -> Any | None:
     if render is None:
         return None
     render_map = as_mapping(render, "render")
+    fps_raw = render_map.get("fps")
+    fps = DEFAULT_RENDER_FPS if fps_raw is None else int(fps_raw)
     overlay_raw = render_map.get("overlay")
     post_fx_raw = render_map.get("post_fx")
-    if overlay_raw is None and post_fx_raw is None:
-        return None
     overlay = (
         _parse_render_overlay_section(as_mapping(overlay_raw, "render.overlay"))
         if overlay_raw is not None
@@ -1044,7 +1035,7 @@ def parse_render_section(data: dict[str, Any]) -> Any | None:
         if post_fx_raw is not None
         else None
     )
-    return RenderConfig(overlay=overlay, post_fx=post_fx)
+    return RenderConfig(fps=fps, overlay=overlay, post_fx=post_fx)
 
 
 def default_render_overlay_config() -> Any:
@@ -1108,7 +1099,9 @@ def persist_render(ctx: PersistCtx) -> dict[str, Any]:
         "fade_out": runtime_pp.fade_out,
     }
     post_fx = _dump_fields(RENDER_POST_FX_FIELDS, post_fx_values, ctx)
-    return {"overlay": overlay, "post_fx": post_fx}
+    from cleave.config import render_fps
+
+    return {"fps": render_fps(ctx.cfg), "overlay": overlay, "post_fx": post_fx}
 
 
 def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:

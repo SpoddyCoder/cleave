@@ -573,6 +573,7 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
             {
                 "layers": {slot: {**template_layer_entry(slot), "preset": f"presets/{TEST_LAYER_STEMS[slot]}/anchor.milk"} for slot in DEFAULT_LAYER_SLOTS},
                 "render": {
+                    "fps": 30,
                     "post_fx": {
                         "enabled": True,
                         "fade_in": 30,
@@ -855,7 +856,6 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
                     "width": 1280,
                     "height": 720,
                     "upscale": 1.5,
-                    "fps": 30,
                     "warmup_sec": 5.0,
                     "beat_sensitivity": 2.2,
                 },
@@ -907,6 +907,7 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
                     },
                 },
                 "render": {
+                    "fps": 30,
                     "post_fx": {
                         "enabled": True,
                         "fade_in": 30,
@@ -981,7 +982,6 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
             width=cfg.visualizer.width,
             height=cfg.visualizer.height,
             upscale=cfg.visualizer.upscale,
-            fps=cfg.visualizer.fps,
             warmup_sec=3.0,
             beat_sensitivity=cfg.visualizer.beat_sensitivity,
         ),
