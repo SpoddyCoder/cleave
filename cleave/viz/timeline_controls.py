@@ -105,11 +105,10 @@ class TimelineControls:
             return True
 
         if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
-            if not self.session.timeline.recording:
-                self._do_seek(
-                    event.key == pygame.K_RIGHT,
-                    long=mod_ctrl(event.mod),
-                )
+            self._do_seek(
+                event.key == pygame.K_RIGHT,
+                long=mod_ctrl(event.mod),
+            )
             return True
 
         if event.key in _LAYER_KEY_INDEX:
@@ -327,10 +326,42 @@ class TimelineControls:
         if self._on_visibility_change is not None:
             self._on_visibility_change()
 
+    def _fill_record_at_seek(self, old_t: float, new_t: float) -> None:
+        tl = self.session.timeline
+        skip_start = min(old_t, new_t)
+        skip_end = max(old_t, new_t)
+        for slot in list(tl.armed_slots):
+            if slot not in tl.record_baseline:
+                continue
+            v = armed_recording_visible(self.session, slot, old_t)
+            cleaned: list[TimelineCue] = []
+            for cue in tl.record_buffer:
+                if skip_start <= cue.t <= skip_end and slot in cue.layers:
+                    remaining = {k: val for k, val in cue.layers.items() if k != slot}
+                    if remaining:
+                        cleaned.append(
+                            TimelineCue(t=cue.t, layers=remaining, show_tick=cue.show_tick)
+                        )
+                else:
+                    cleaned.append(cue)
+            tl.record_buffer = cleaned
+            tl.record_buffer.append(
+                TimelineCue(t=skip_start, layers={slot: v}, show_tick=False)
+            )
+            self._last_toggle_t.pop(slot, None)
+        tl.record_buffer.sort(key=lambda c: c.t)
+        if tl.record_start_sec is not None and new_t < tl.record_start_sec:
+            tl.record_start_sec = new_t
+
     def _do_seek(self, forward: bool, *, long: bool) -> None:
         delta_sec = SEEK_LONG if long else SEEK_SHORT
         if not forward:
             delta_sec = -delta_sec
+        if self.session.timeline.recording:
+            old_t = current_sec(self.playback, self.duration_sec)
+            new_t = max(0.0, min(self.duration_sec, old_t + delta_sec))
+            self._fill_record_at_seek(old_t, new_t)
+            self._refresh_visibility()
         if self._on_seek is not None:
             self._on_seek(delta_sec)
         else:
