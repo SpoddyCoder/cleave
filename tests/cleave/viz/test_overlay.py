@@ -9,7 +9,7 @@ from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
 from cleave.viz.frame_rate import format_fps_display
 from cleave.viz.focus_nav import MainFocus
-from cleave.viz.row_semantics import RowDescriptor, RowKind
+from cleave.viz.row_semantics import RowDescriptor, RowKind, row_is_pinned
 from cleave.viz.tuning_panel_draw import (
     PanelScrollMetrics,
     TuningOverlay,
@@ -20,15 +20,13 @@ from cleave.viz.tuning_panel_draw import (
     panel_content_max_width,
     panel_fps_layout,
     panel_help_hint_layout,
-    panel_toast_layout,
     preset_row_prefix_width,
     render_visibility_icon,
     TREE_INDENT,
     scroll_metrics,
 )
 from cleave.viz.controls import (
-    TIMELINE_LAYER_HINT_DISABLED_TEXT,
-    TIMELINE_LAYER_HINT_ENABLED_TEXT,
+    NOTIFICATION_TIMELINE_ENABLED_TEXT,
 )
 from cleave.viz.tuning_view_state import (
     RenderOverlayBlock,
@@ -77,8 +75,8 @@ def _effects_expanded_view_state() -> TuningViewState:
         position_sec=0.0,
         focus_cursor=MainFocus(RowDescriptor(RowKind.TRANSPORT)),
         move_mode_slot=None,
-        toast_message=None,
-        toast_remaining_sec=0.0,
+        notification_message=None,
+        notification_remaining_sec=0.0,
         allow_overwrite=False,
     )
 
@@ -118,12 +116,7 @@ def _panel_scroll_metrics(
         (
             index
             for index in visible_indices
-            if state.layout.kind( index) not in {
-                RowKind.CONFIG_HEADER,
-                RowKind.TRANSPORT,
-                RowKind.SETTINGS_HEADER,
-                RowKind.SETTINGS_RENDER_MODE,
-            }
+            if not row_is_pinned(state.layout.kind(index))
         ),
         None,
     )
@@ -133,8 +126,6 @@ def _panel_scroll_metrics(
     if timeline_panel_open:
         max_panel_h -= timeline_viewport_reserve_px(len(state.layer_z_order))
 
-    toast_active = bool(state.toast_message and state.toast_remaining_sec > 0)
-
     return scroll_metrics(
         visible_indices=visible_indices,
         first_scrollable_visible=first_scrollable_visible,
@@ -142,7 +133,6 @@ def _panel_scroll_metrics(
         line_gap=overlay._line_gap,
         padding=overlay._padding,
         header_gap=header_gap,
-        toast_active=toast_active,
         max_panel_h=max_panel_h,
     )
 
@@ -448,8 +438,8 @@ def _minimal_view_state(**kwargs: object) -> TuningViewState:
         "position_sec": 0.0,
         "focus_cursor": MainFocus(RowDescriptor(RowKind.TRANSPORT)),
         "move_mode_slot": None,
-        "toast_message": None,
-        "toast_remaining_sec": 0.0,
+        "notification_message": None,
+        "notification_remaining_sec": 0.0,
     }
     defaults.update(kwargs)
     return TuningViewState(**defaults)  # type: ignore[arg-type]
@@ -535,44 +525,45 @@ def test_locked_stem_row_not_navigable_and_uses_locked_color() -> None:
     assert _row_value_color(state, stem_row) == LOCKED
 
 
-def test_timeline_layer_hint_transient_above_first_layer() -> None:
+def test_panel_notification_pinned_under_transport() -> None:
     inactive = _minimal_view_state(
         render_timeline=RenderTimelineBlock(enabled=True),
-        timeline_layer_hint_message=None,
-        timeline_layer_hint_remaining_sec=0.0,
+        notification_message=None,
+        notification_remaining_sec=0.0,
     )
     active = _minimal_view_state(
         render_timeline=RenderTimelineBlock(enabled=True),
-        timeline_layer_hint_message=TIMELINE_LAYER_HINT_ENABLED_TEXT,
-        timeline_layer_hint_remaining_sec=10.0,
+        notification_message=NOTIFICATION_TIMELINE_ENABLED_TEXT,
+        notification_remaining_sec=5.0,
     )
     inactive_kinds = [row.kind for row in inactive.layout.rows]
     active_kinds = [row.kind for row in active.layout.rows]
-    assert RowKind.TIMELINE_LAYER_HINT not in inactive_kinds
-    assert RowKind.TIMELINE_LAYER_HINT in active_kinds
-    hint_idx = active.layout.find_by_kind(RowKind.TIMELINE_LAYER_HINT)
+    assert RowKind.PANEL_NOTIFICATION not in inactive_kinds
+    assert RowKind.PANEL_NOTIFICATION in active_kinds
+    notification_idx = active.layout.find_by_kind(RowKind.PANEL_NOTIFICATION)
     transport_idx = active.layout.find_by_kind(RowKind.TRANSPORT)
     header_idx = active.layout.find("layer_1", RowKind.TRACK_HEADER)
-    assert transport_idx < hint_idx < header_idx
-    assert hint_idx not in active.layout.navigable_indices(active)
-    assert _row_value_color(active, hint_idx) == DISABLED
-    assert _row_text(active, hint_idx) == TIMELINE_LAYER_HINT_ENABLED_TEXT
+    assert transport_idx < notification_idx < header_idx
+    assert row_is_pinned(RowKind.PANEL_NOTIFICATION)
+    assert notification_idx not in active.layout.navigable_indices(active)
+    assert _row_value_color(active, notification_idx) == HIGHLIGHT
+    assert _row_text(active, notification_idx) == NOTIFICATION_TIMELINE_ENABLED_TEXT
 
 
-def test_draw_timeline_layer_hint_without_error() -> None:
+def test_draw_panel_notification_without_error() -> None:
     pygame.init()
     overlay = TuningOverlay()
     state = _minimal_view_state(
         render_timeline=RenderTimelineBlock(enabled=True),
-        timeline_layer_hint_message=TIMELINE_LAYER_HINT_ENABLED_TEXT,
-        timeline_layer_hint_remaining_sec=10.0,
+        notification_message=NOTIFICATION_TIMELINE_ENABLED_TEXT,
+        notification_remaining_sec=5.0,
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     overlay.notify_input()
     overlay.draw(surface, state)
     assert overlay.panel_rect is not None
-    hint_idx = state.layout.find_by_kind( RowKind.TIMELINE_LAYER_HINT)
-    assert hint_idx in state.layout.visible_indices(state)
+    notification_idx = state.layout.find_by_kind(RowKind.PANEL_NOTIFICATION)
+    assert notification_idx in state.layout.visible_indices(state)
 
 
 def test_build_row_layout_includes_add_before_render_gap() -> None:
@@ -876,8 +867,8 @@ def test_draw_track_header_with_solo_eye() -> None:
         position_sec=0.0,
         focus_cursor=MainFocus(RowDescriptor(RowKind.TRANSPORT)),
         move_mode_slot=None,
-        toast_message=None,
-        toast_remaining_sec=0.0,
+        notification_message=None,
+        notification_remaining_sec=0.0,
         solo_slot="layer_1",
         solo_active=True,
     )
@@ -1040,27 +1031,22 @@ def test_panel_reserves_timeline_viewport_when_open() -> None:
     assert open_metrics.max_panel_h == closed_metrics.max_panel_h - reserve
 
 
-def test_toast_stays_at_panel_bottom() -> None:
+def test_panel_notification_in_pinned_header_block() -> None:
     pygame.init()
     overlay = TuningOverlay()
     state = _minimal_view_state(
-        toast_message="Saved",
-        toast_remaining_sec=2.0,
+        notification_message="Saved",
+        notification_remaining_sec=2.0,
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     overlay.notify_input()
     overlay.draw(surface, state)
     panel = overlay.panel_rect
     assert panel is not None
-    _, _, _, panel_h = panel
 
-    font = overlay._font_get()
-    line_h = font.get_linesize()
-    toast_layout = panel_toast_layout(
-        panel_h=panel_h,
-        padding=overlay._padding,
-        line_h=line_h,
-        toast_active=True,
+    metrics = _panel_scroll_metrics(overlay, state)
+    notification_idx = state.layout.find_by_kind(RowKind.PANEL_NOTIFICATION)
+    assert notification_idx in metrics.header_indices
+    assert metrics.header_indices.index(notification_idx) > metrics.header_indices.index(
+        state.layout.find_by_kind(RowKind.TRANSPORT)
     )
-    assert toast_layout.toast_y is not None
-    assert toast_layout.toast_y == panel_h - overlay._padding - line_h

@@ -18,7 +18,7 @@ class RowKind(Enum):
     TRACK_EFFECT = auto()
     LAYER_MANAGEMENT_ADD = auto()
     LAYER_MANAGEMENT_DELETE = auto()
-    TIMELINE_LAYER_HINT = auto()
+    PANEL_NOTIFICATION = auto()
     RENDER_SECTION_GAP = auto()
     RENDER_OVERLAY_HEADER = auto()
     RENDER_OVERLAY_POSITION = auto()
@@ -155,9 +155,10 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         blocked_by_layer_lock=False,
         navigable_when_layer_locked=True,
     ),
-    RowKind.TIMELINE_LAYER_HINT: RowBehavior(
+    RowKind.PANEL_NOTIFICATION: RowBehavior(
         RowAffordance.DISPLAY,
         navigable=False,
+        is_pinned=True,
     ),
     RowKind.RENDER_SECTION_GAP: RowBehavior(
         RowAffordance.DISPLAY,

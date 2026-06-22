@@ -307,7 +307,7 @@ def make_timeline_controls(
     signals: Signals | None,
     effect_runtime: EffectRuntime,
     mix_player: MixPlayer | None = None,
-    on_toast: Callable[[str], None] | None = None,
+    on_notification: Callable[[str], None] | None = None,
     tuning_controls: TuningControls | None = None,
 ) -> TimelineControls:
     def on_visibility_change() -> None:
@@ -345,5 +345,5 @@ def make_timeline_controls(
         on_close=on_close,
         on_exit_submenu=on_exit_submenu,
         on_seek=on_seek,
-        on_toast=on_toast,
+        on_notification=on_notification,
     )

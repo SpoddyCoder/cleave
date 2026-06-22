@@ -55,7 +55,7 @@ class TimelineControls:
         on_close: Callable[[], None] | None = None,
         on_exit_submenu: Callable[[], None] | None = None,
         on_seek: Callable[[float], None] | None = None,
-        on_toast: Callable[[str], None] | None = None,
+        on_notification: Callable[[str], None] | None = None,
     ) -> None:
         self.session = session
         self.playback = playback
@@ -64,7 +64,7 @@ class TimelineControls:
         self._on_close = on_close
         self._on_exit_submenu = on_exit_submenu
         self._on_seek = on_seek
-        self._on_toast = on_toast
+        self._on_notification = on_notification
         self.focused_cue_index: int | None = None
         self._last_toggle_t: dict[str, float] = {}
 
@@ -165,9 +165,9 @@ class TimelineControls:
         if self._on_close is not None:
             self._on_close()
 
-    def _toast(self, message: str) -> None:
-        if self._on_toast is not None:
-            self._on_toast(message)
+    def _notify(self, message: str) -> None:
+        if self._on_notification is not None:
+            self._on_notification(message)
 
     def _slot_for_layer_index(self, index: int) -> str | None:
         z_order = self.session.layer_z_order
@@ -194,7 +194,7 @@ class TimelineControls:
         tl = self.session.timeline
         sorted_cues = self._sorted_cues()
         if not sorted_cues:
-            self._toast("No cues")
+            self._notify("No cues")
             return
 
         delete_index = self.focused_cue_index
@@ -203,7 +203,7 @@ class TimelineControls:
                 current_sec(self.playback, self.duration_sec)
             )
         if delete_index is None:
-            self._toast("No cues")
+            self._notify("No cues")
             return
 
         cue_to_remove = sorted_cues[delete_index]
@@ -274,7 +274,7 @@ class TimelineControls:
     def _start_record(self) -> None:
         tl = self.session.timeline
         if not tl.armed_slots:
-            self._toast("Arm at least one layer to record")
+            self._notify("Arm at least one layer to record")
             return
 
         t_sec = current_sec(self.playback, self.duration_sec)

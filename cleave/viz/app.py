@@ -219,7 +219,7 @@ def init_gl_resources_heavy(
         signals=seed.signals,
         effect_runtime=seed.effect_runtime,
         mix_player=mix_player,
-        on_toast=controls.show_toast,
+        on_notification=controls.show_notification,
         tuning_controls=controls,
     )
 

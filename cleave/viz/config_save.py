@@ -30,7 +30,7 @@ class ConfigSaveController:
         repo_root_example: Path | None = None,
         on_save_new_config: Callable[[], Path | None] | None = None,
         on_overwrite_config: Callable[[Path], str | None] | None = None,
-        on_toast: Callable[[str], None] | None = None,
+        on_notification: Callable[[str], None] | None = None,
         move_mode_signature: Callable[[], dict[str, list[str]] | None] | None = None,
     ) -> None:
         self.session = session
@@ -44,7 +44,7 @@ class ConfigSaveController:
         )
         self._on_save_new_config = on_save_new_config
         self._on_overwrite_config = on_overwrite_config
-        self._on_toast = on_toast
+        self._on_notification = on_notification
         self._move_mode_signature = move_mode_signature
 
         self._saved_signature = self._persisted_signature()
@@ -130,7 +130,7 @@ class ConfigSaveController:
             self._active_config_path = saved_path
             filename = saved_path.name
             self.clear_config_dirty()
-        self._show_save_toast(f"Config saved to {filename}")
+        self._show_save_notification(f"Config saved to {filename}")
         self._finish_quit_after_save()
 
     def _quit_save(self) -> None:
@@ -164,7 +164,7 @@ class ConfigSaveController:
             if not written:
                 written = basename
             self.clear_config_dirty()
-            self._show_save_toast(f"Config overwritten: {written}")
+            self._show_save_notification(f"Config overwritten: {written}")
             self._finish_quit_after_save()
 
         def on_cancel() -> None:
@@ -176,7 +176,7 @@ class ConfigSaveController:
             on_cancel=on_cancel,
         )
 
-    def _show_save_toast(self, message: str) -> None:
+    def _show_save_notification(self, message: str) -> None:
         print(message, file=sys.stderr)
-        if self._on_toast is not None:
-            self._on_toast(message)
+        if self._on_notification is not None:
+            self._on_notification(message)
