@@ -65,7 +65,6 @@ class TimelineControls:
         self._on_exit_submenu = on_exit_submenu
         self._on_seek = on_seek
         self._on_notification = on_notification
-        self.focused_cue_index: int | None = None
         self._last_toggle_t: dict[str, float] = {}
 
     def handle_keydown(self, event: pygame.event.Event) -> bool:
@@ -148,10 +147,6 @@ class TimelineControls:
             self._toggle_arm()
             return True
 
-        if event.key == pygame.K_BACKSPACE:
-            self._delete_focused_cue()
-            return True
-
         return True
 
     def handle_keyup(self, event: pygame.event.Event) -> None:
@@ -177,52 +172,6 @@ class TimelineControls:
 
     def _focused_slot(self) -> str:
         return self.session.layer_z_order[self.session.timeline.focus_row]
-
-    def _sorted_cues(self) -> list[TimelineCue]:
-        return sorted(self.session.timeline.cues, key=lambda cue: cue.t)
-
-    def _nearest_cue_index(self, t_sec: float) -> int | None:
-        sorted_cues = self._sorted_cues()
-        if not sorted_cues:
-            return None
-        return min(
-            range(len(sorted_cues)),
-            key=lambda index: abs(sorted_cues[index].t - t_sec),
-        )
-
-    def _delete_focused_cue(self) -> None:
-        tl = self.session.timeline
-        sorted_cues = self._sorted_cues()
-        if not sorted_cues:
-            self._notify("No cues")
-            return
-
-        delete_index = self.focused_cue_index
-        if delete_index is None:
-            delete_index = self._nearest_cue_index(
-                current_sec(self.playback, self.duration_sec)
-            )
-        if delete_index is None:
-            self._notify("No cues")
-            return
-
-        cue_to_remove = sorted_cues[delete_index]
-        tl.cues = [cue for cue in tl.cues if cue is not cue_to_remove]
-        tl.cues.sort(key=lambda cue: cue.t)
-
-        if self.focused_cue_index is not None:
-            if delete_index < self.focused_cue_index:
-                self.focused_cue_index -= 1
-            elif delete_index == self.focused_cue_index:
-                if tl.cues:
-                    self.focused_cue_index = min(
-                        delete_index, len(self._sorted_cues()) - 1
-                    )
-                else:
-                    self.focused_cue_index = None
-
-        if self._on_visibility_change is not None:
-            self._on_visibility_change()
 
     def _toggle_arm(self) -> None:
         slot = self._focused_slot()

@@ -145,12 +145,7 @@ def _timeline_strip_section(
             )
         )
 
-    entries.extend(
-        (
-            ("Backspace", "delete cue"),
-            ("Esc", "close timeline"),
-        )
-    )
+    entries.append(("Esc", "close timeline"))
     return HelpSection("Timeline", tuple(entries))
 
 _SAVE_SECTION = HelpSection(

@@ -101,34 +101,6 @@ def test_left_right_seek_short_when_not_recording() -> None:
     assert seeks == [SEEK_SHORT, -SEEK_SHORT]
 
 
-def test_backspace_deletes_focused_cue() -> None:
-    cue_a = TimelineCue(t=10.0, layers={"layer_1": False})
-    cue_b = TimelineCue(t=30.0, layers={"layer_2": False})
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
-        cues=[cue_a, cue_b]
-    )
-
-    controls.focused_cue_index = 1
-
-    controls.handle_keydown(keydown(pygame.K_BACKSPACE))
-    assert session.timeline.cues == [cue_a]
-    assert controls.focused_cue_index == 0
-    assert visibility_calls == [True]
-
-
-def test_backspace_without_focus_deletes_nearest_cue() -> None:
-    cue_near = TimelineCue(t=10.0, layers={"layer_1": False})
-    cue_far = TimelineCue(t=80.0, layers={"layer_2": False})
-    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
-        cues=[cue_near, cue_far],
-        position_sec=12.0,
-    )
-
-    controls.handle_keydown(keydown(pygame.K_BACKSPACE))
-    assert session.timeline.cues == [cue_far]
-    assert visibility_calls == [True]
-
-
 def test_esc_and_t_close_panel_when_not_recording() -> None:
     controls, session, _, close_calls, _, _ = _make_timeline_controls()
 
@@ -424,33 +396,6 @@ def test_ctrl_seek_when_not_recording() -> None:
 
     controls.handle_keydown(keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
     assert seeks == [SEEK_LONG, -SEEK_LONG]
-
-
-def test_backspace_notification_when_no_cues() -> None:
-    controls, _, _, _, _, notifications = _make_timeline_controls()
-
-    controls.handle_keydown(keydown(pygame.K_BACKSPACE))
-    assert notifications == ["No cues"]
-
-
-def test_delete_focused_cue_marks_config_dirty() -> None:
-    from tests.cleave.viz.test_controls import _make_controls
-
-    tuning = _make_controls(("layer_1",))
-    tuning.session.timeline.cues = [TimelineCue(t=1.0, layers={"layer_1": False})]
-    tuning.session.timeline.enabled = True
-    tuning.clear_config_dirty()
-    assert not tuning.config_dirty
-
-    controls = TimelineControls(
-        tuning.session,
-        stub_playback_state(),
-        120.0,
-    )
-    controls.handle_keydown(keydown(pygame.K_BACKSPACE))
-
-    assert tuning.config_dirty
-    assert tuning.session.timeline.cues == []
 
 
 def test_ctrl_enter_noop_while_recording() -> None:

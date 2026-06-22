@@ -40,7 +40,6 @@ from cleave.viz.input_dispatch import (
     dispatch_keydown,
     dispatch_keyup,
     dispatch_should_notify_overlay,
-    key_handler_for_runtime,
 )
 from cleave.viz.wiring import LayerManager, make_timeline_controls, make_tuning_controls
 
@@ -500,16 +499,9 @@ class VisualizerApp:
                         else:
                             rt.overlay.notify_input()
                     elif event.type == pygame.KEYDOWN:
-                        tl = rt.seed.session.timeline
                         if dispatch_keydown(event, rt) is False:
                             running = False
                         else:
-                            if (
-                                key_handler_for_runtime(rt, event.key) is rt.controls
-                                and event.key == pygame.K_t
-                                and tl.panel_open
-                            ):
-                                rt.timeline_controls.focused_cue_index = None
                             if rt.controls.consume_hide_overlay():
                                 rt.overlay.hide_immediately()
                                 rt.controls.exit_timeline_submenu()
