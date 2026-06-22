@@ -28,14 +28,13 @@ from cleave.viz.key_repeat import mod_shift
 from cleave.viz.playback import format_mmss
 from tests.support.viz import make_test_cfg, noop_layer_bindings, stub_playback_state
 from cleave.viz.controls import (
+    NOTIFICATION_TIMELINE_DISABLED_TEXT,
+    NOTIFICATION_TIMELINE_ENABLED_TEXT,
     SEEK_LONG,
     SEEK_SHORT,
-    TIMELINE_LAYER_HINT_DISABLED_TEXT,
-    TIMELINE_LAYER_HINT_DURATION_SEC,
-    TIMELINE_LAYER_HINT_ENABLED_TEXT,
-    TOAST_DURATION_SEC,
     TuningControls,
 )
+from cleave.viz.panel_notification import NOTIFICATION_DURATION_SEC
 from cleave.viz.modal import ModalKind
 from cleave.viz.session import (
     LayerRuntime,
@@ -207,19 +206,20 @@ def test_build_view_state_passes_fps() -> None:
     assert view.fps == 42.0
 
 
-def test_add_layer_at_max_shows_toast() -> None:
+def test_add_layer_at_max_is_disabled_no_op() -> None:
     controls, manager = _make_controls_with_manager(("layer_1",), can_add=False)
-    view = controls.build_view_state(paused=False)
+    add_row = controls.build_view_state(paused=False).layout.find_by_kind(
+        RowKind.LAYER_MANAGEMENT_ADD
+    )
+    with patch("cleave.viz.tuning_panel_draw.MAX_LAYER_COUNT", 1):
+        view = controls.build_view_state(paused=False)
+        assert _row_value_color(view, add_row) == DISABLED
     controls.focus_descriptor = RowDescriptor(RowKind.LAYER_MANAGEMENT_ADD)
 
     controls.handle_keydown(_keydown(pygame.K_RETURN))
 
     manager.add_layer.assert_not_called()
     assert controls.modal_host.view_state() is None
-    assert (
-        controls.build_view_state(paused=False).toast_message
-        == f"Maximum {MAX_LAYER_COUNT} layers"
-    )
 
 
 def test_delete_layer_at_min_shows_toast() -> None:
@@ -235,7 +235,7 @@ def test_delete_layer_at_min_shows_toast() -> None:
     manager.remove_layer.assert_not_called()
     assert controls.modal_host.view_state() is None
     assert (
-        controls.build_view_state(paused=False).toast_message
+        controls.build_view_state(paused=False).notification_message
         == "Must have at least 1 layer"
     )
 
@@ -657,7 +657,7 @@ def test_move_mode_backspace_cancels_without_applying() -> None:
     assert not controls.config_dirty
 
 
-def test_save_as_new_triggers_toast_without_blocking_input() -> None:
+def test_save_as_new_triggers_notification_without_blocking_input() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     config_row = _config_header_row(view)
@@ -674,8 +674,8 @@ def test_save_as_new_triggers_toast_without_blocking_input() -> None:
 
         assert "Config saved to unnamed-1.yaml" in stderr.getvalue()
         state = controls.build_view_state(paused=False)
-        assert state.toast_message == "Config saved to unnamed-1.yaml"
-        assert state.toast_remaining_sec == TOAST_DURATION_SEC
+        assert state.notification_message == "Config saved to unnamed-1.yaml"
+        assert state.notification_remaining_sec == NOTIFICATION_DURATION_SEC
 
         before = controls.focus_descriptor
         assert controls.handle_keydown(_keydown(pygame.K_DOWN)) is True
@@ -772,8 +772,8 @@ def test_preset_row_truncates_long_filenames() -> None:
         position_sec=0.0,
         focus_cursor=MainFocus(RowDescriptor(RowKind.TRANSPORT)),
         move_mode_slot=None,
-        toast_message=None,
-        toast_remaining_sec=0.0,
+        notification_message=None,
+        notification_remaining_sec=0.0,
     )
     preset_row = _row(view, "layer_1", RowKind.TRACK_PRESET)
     font = _overlay_font()
@@ -924,7 +924,7 @@ def test_overwrite_after_save_uses_new_active_path() -> None:
         controls.handle_keydown(_keydown(pygame.K_RETURN))
         controls.handle_keydown(_keydown(pygame.K_RETURN))
 
-    with patch.object(time, "monotonic", return_value=3000.0 + TOAST_DURATION_SEC + 1):
+    with patch.object(time, "monotonic", return_value=3000.0 + NOTIFICATION_DURATION_SEC + 1):
         state = controls.build_view_state(paused=False)
         save_row = _config_header_row(state)
         controls.focus_descriptor = _desc(view, save_row)
@@ -1027,7 +1027,7 @@ def test_overwrite_confirm_yes_writes_launch_path() -> None:
         assert writes == [launch_path]
         assert not controls.modal_host.active
         state = controls.build_view_state(paused=False)
-        assert state.toast_message == "Config overwritten: my-launch.cleave.config.yaml"
+        assert state.notification_message == "Config overwritten: my-launch.cleave.config.yaml"
         assert "Config overwritten: my-launch.cleave.config.yaml" in stderr.getvalue()
 
 
@@ -1412,18 +1412,18 @@ def test_render_timeline_ctrl_right_toggles_enabled() -> None:
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
 
-def test_timeline_enabled_startup_shows_layer_hint() -> None:
+def test_timeline_enabled_startup_shows_notification() -> None:
     with patch.object(time, "monotonic", return_value=1000.0):
         controls = _make_controls(timeline_enabled=True)
         view = controls.build_view_state(paused=False)
-    assert view.timeline_layer_hint_message == TIMELINE_LAYER_HINT_ENABLED_TEXT
-    assert view.timeline_layer_hint_remaining_sec == pytest.approx(
-        TIMELINE_LAYER_HINT_DURATION_SEC, abs=0.01
+    assert view.notification_message == NOTIFICATION_TIMELINE_ENABLED_TEXT
+    assert view.notification_remaining_sec == pytest.approx(
+        NOTIFICATION_DURATION_SEC, abs=0.01
     )
-    assert RowKind.TIMELINE_LAYER_HINT in [row.kind for row in view.layout.rows]
+    assert RowKind.PANEL_NOTIFICATION in [row.kind for row in view.layout.rows]
 
 
-def test_render_timeline_toggle_shows_layer_hint() -> None:
+def test_render_timeline_toggle_shows_notification() -> None:
     with patch.object(time, "monotonic", return_value=1000.0):
         controls = _make_controls(timeline_enabled=True)
         view = controls.build_view_state(paused=False)
@@ -1431,28 +1431,28 @@ def test_render_timeline_toggle_shows_layer_hint() -> None:
         controls.focus_descriptor = _desc(view, header_row)
         controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
         view = controls.build_view_state(paused=False)
-        assert view.timeline_layer_hint_message == TIMELINE_LAYER_HINT_DISABLED_TEXT
+        assert view.notification_message == NOTIFICATION_TIMELINE_DISABLED_TEXT
 
         controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
         view = controls.build_view_state(paused=False)
-        assert view.timeline_layer_hint_message == TIMELINE_LAYER_HINT_ENABLED_TEXT
+        assert view.notification_message == NOTIFICATION_TIMELINE_ENABLED_TEXT
 
 
-def test_timeline_layer_hint_expires_after_duration() -> None:
+def test_panel_notification_expires_after_duration() -> None:
     with patch.object(time, "monotonic", return_value=5000.0):
         controls = _make_controls(timeline_enabled=True)
         view = controls.build_view_state(paused=False)
-        assert view.timeline_layer_hint_message == TIMELINE_LAYER_HINT_ENABLED_TEXT
+        assert view.notification_message == NOTIFICATION_TIMELINE_ENABLED_TEXT
 
     with patch.object(
         time,
         "monotonic",
-        return_value=5000.0 + TIMELINE_LAYER_HINT_DURATION_SEC + 0.1,
+        return_value=5000.0 + NOTIFICATION_DURATION_SEC + 0.1,
     ):
         controls.tick(0.0)
         view = controls.build_view_state(paused=False)
-        assert view.timeline_layer_hint_message is None
-        assert view.timeline_layer_hint_remaining_sec == 0.0
+        assert view.notification_message is None
+        assert view.notification_remaining_sec == 0.0
 
 
 def test_render_timeline_enable_opens_panel() -> None:
@@ -1834,14 +1834,14 @@ def test_t_from_submenu_closes_and_focuses_render_timeline_header() -> None:
     assert controls.focus_descriptor == _desc(view, header_row)
 
 
-def test_t_toast_when_timeline_disabled() -> None:
+def test_t_notification_when_timeline_disabled() -> None:
     controls = _make_controls()
     controls.session.timeline.enabled = False
 
     controls.handle_keydown(_keydown(pygame.K_t))
     assert controls.session.timeline.panel_open is False
     view = controls.build_view_state(paused=False)
-    assert view.toast_message == "Enable timeline first"
+    assert view.notification_message == "Enable timeline first"
 
 
 def test_t_ignored_during_move_mode() -> None:
@@ -2301,8 +2301,8 @@ def test_row_value_color_dim_for_focused_empty_preset() -> None:
         position_sec=0.0,
         focus_cursor=MainFocus(RowDescriptor(RowKind.TRANSPORT)),
         move_mode_slot=None,
-        toast_message=None,
-        toast_remaining_sec=0.0,
+        notification_message=None,
+        notification_remaining_sec=0.0,
     )
     preset_row = _row(state, "layer_1", RowKind.TRACK_PRESET)
     state = TuningViewState(
@@ -2312,8 +2312,8 @@ def test_row_value_color_dim_for_focused_empty_preset() -> None:
         position_sec=state.position_sec,
         focus_cursor=MainFocus(state.layout.descriptor(preset_row)),
         move_mode_slot=state.move_mode_slot,
-        toast_message=state.toast_message,
-        toast_remaining_sec=state.toast_remaining_sec,
+        notification_message=state.notification_message,
+        notification_remaining_sec=state.notification_remaining_sec,
     )
     assert _row_value_color(state, preset_row) == DISABLED
     assert _row_bg_color(state, preset_row) == HIGHLIGHT
@@ -2477,8 +2477,8 @@ def test_locked_sub_rows_use_locked_color() -> None:
         position_sec=view.position_sec,
         focus_cursor=MainFocus(view.layout.descriptor(len(view.layout) - 1)),
         move_mode_slot=view.move_mode_slot,
-        toast_message=view.toast_message,
-        toast_remaining_sec=view.toast_remaining_sec,
+        notification_message=view.notification_message,
+        notification_remaining_sec=view.notification_remaining_sec,
         active_config_label=view.active_config_label,
         allow_overwrite=view.allow_overwrite,
     )
@@ -2492,8 +2492,8 @@ def test_locked_sub_rows_use_locked_color() -> None:
         position_sec=view.position_sec,
         focus_cursor=MainFocus(view.layout.descriptor(header_row)),
         move_mode_slot=view.move_mode_slot,
-        toast_message=view.toast_message,
-        toast_remaining_sec=view.toast_remaining_sec,
+        notification_message=view.notification_message,
+        notification_remaining_sec=view.notification_remaining_sec,
         active_config_label=view.active_config_label,
         allow_overwrite=view.allow_overwrite,
     )

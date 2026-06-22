@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -92,10 +91,8 @@ class TuningViewState:
     position_sec: float
     focus_cursor: FocusCursor
     move_mode_slot: str | None
-    toast_message: str | None
-    toast_remaining_sec: float
-    timeline_layer_hint_message: str | None = None
-    timeline_layer_hint_remaining_sec: float = 0.0
+    notification_message: str | None = None
+    notification_remaining_sec: float = 0.0
     allow_overwrite: bool = True
     active_config_label: str = "cleave-viz.yaml"
     config_dirty: bool = False
@@ -181,10 +178,7 @@ class TuningViewStateBuilder:
         get_focus_cursor: Callable[[], FocusCursor],
         get_move_mode_slot: Callable[[], str | None],
         config_save: ConfigSaveController,
-        get_toast_message: Callable[[], str | None],
-        get_toast_deadline: Callable[[], float],
-        get_timeline_layer_hint_message: Callable[[], str | None],
-        get_timeline_layer_hint_deadline: Callable[[], float],
+        get_notification: Callable[[], tuple[str | None, float]],
     ) -> None:
         self.session = session
         self.playback = playback
@@ -193,10 +187,7 @@ class TuningViewStateBuilder:
         self._get_focus_cursor = get_focus_cursor
         self._get_move_mode_slot = get_move_mode_slot
         self._config_save = config_save
-        self._get_toast_message = get_toast_message
-        self._get_toast_deadline = get_toast_deadline
-        self._get_timeline_layer_hint_message = get_timeline_layer_hint_message
-        self._get_timeline_layer_hint_deadline = get_timeline_layer_hint_deadline
+        self._get_notification = get_notification
 
     def build(
         self,
@@ -237,24 +228,7 @@ class TuningViewStateBuilder:
                 preset_empty=not layer.playlist.paths,
             )
 
-        toast_remaining = 0.0
-        toast_message: str | None = None
-        toast = self._get_toast_message()
-        if toast is not None:
-            toast_remaining = max(0.0, self._get_toast_deadline() - time.monotonic())
-            if toast_remaining > 0:
-                toast_message = toast
-
-        timeline_layer_hint_remaining = 0.0
-        timeline_layer_hint_message: str | None = None
-        hint = self._get_timeline_layer_hint_message()
-        if hint is not None:
-            timeline_layer_hint_remaining = max(
-                0.0,
-                self._get_timeline_layer_hint_deadline() - time.monotonic(),
-            )
-            if timeline_layer_hint_remaining > 0:
-                timeline_layer_hint_message = hint
+        notification_message, notification_remaining_sec = self._get_notification()
 
         ro = self.session.render_overlay
         pp = self.session.render_post_fx
@@ -266,10 +240,8 @@ class TuningViewStateBuilder:
             position_sec=position_sec,
             focus_cursor=self._get_focus_cursor(),
             move_mode_slot=self._get_move_mode_slot(),
-            toast_message=toast_message,
-            toast_remaining_sec=toast_remaining,
-            timeline_layer_hint_message=timeline_layer_hint_message,
-            timeline_layer_hint_remaining_sec=timeline_layer_hint_remaining,
+            notification_message=notification_message,
+            notification_remaining_sec=notification_remaining_sec,
             allow_overwrite=self._config_save.allow_overwrite(),
             active_config_label=config_path_display(self._config_save.active_config_path),
             config_dirty=self._config_save.config_dirty,

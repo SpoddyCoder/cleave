@@ -11,6 +11,7 @@ from typing import Literal
 
 import pygame
 
+from cleave.config_schema import MAX_LAYER_COUNT
 from cleave.extract import stem_control_label, stem_overlay_header
 from cleave.viz.row_semantics import (
     LABELED_SUB_ROW_KINDS,
@@ -114,8 +115,8 @@ def _row_text(state: TuningViewState, index: int) -> str:
     if kind == RowKind.RENDER_SECTION_GAP:
         return ""
 
-    if kind == RowKind.TIMELINE_LAYER_HINT:
-        return state.timeline_layer_hint_message or ""
+    if kind == RowKind.PANEL_NOTIFICATION:
+        return state.notification_message or ""
 
     if kind == RowKind.LAYER_MANAGEMENT_ADD:
         return "ADD NEW LAYER"
@@ -535,8 +536,10 @@ def fit_row_text(
         )
     if kind == RowKind.RENDER_SECTION_GAP:
         return ""
-    if kind == RowKind.TIMELINE_LAYER_HINT:
-        return state.timeline_layer_hint_message or ""
+    if kind == RowKind.PANEL_NOTIFICATION:
+        return fit_text_to_width(
+            font, state.notification_message or "", budget
+        )
     if kind in {RowKind.LAYER_MANAGEMENT_ADD, RowKind.LAYER_MANAGEMENT_DELETE}:
         return _row_text(state, index)
     if kind == RowKind.SETTINGS_HEADER:
@@ -581,7 +584,7 @@ def _row_indent(state: TuningViewState, index: int) -> int:
         return 0
     if kind == RowKind.RENDER_SECTION_GAP:
         return 0
-    if kind == RowKind.TIMELINE_LAYER_HINT:
+    if kind == RowKind.PANEL_NOTIFICATION:
         return 0
     if kind == RowKind.LAYER_MANAGEMENT_ADD:
         return 0
@@ -624,8 +627,8 @@ def _row_has_tree_focus(state: TuningViewState, index: int) -> bool:
 def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
     """Return the VALUE-role color for a row (before label/value split rendering)."""
     kind = state.layout.kind(index)
-    if kind == RowKind.TIMELINE_LAYER_HINT:
-        return DISABLED
+    if kind == RowKind.PANEL_NOTIFICATION:
+        return HIGHLIGHT
 
     if kind in {
         RowKind.CONFIG_HEADER,
@@ -635,6 +638,11 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
         if kind == RowKind.CONFIG_HEADER and state.solo_active:
             return DISABLED
         if kind == RowKind.LAYER_MANAGEMENT_DELETE and len(state.layer_z_order) == 1:
+            return DISABLED
+        if (
+            kind == RowKind.LAYER_MANAGEMENT_ADD
+            and len(state.layer_z_order) >= MAX_LAYER_COUNT
+        ):
             return DISABLED
         return ACTION
 
@@ -697,30 +705,12 @@ class PanelScrollMetrics:
     row_stride: int
     scroll_content_h: int
     header_block_h: int
-    footer_block_h: int
     max_panel_h: int
     natural_h: int
     panel_h: int
     scroll_viewport_h: int
     needs_scroll: bool
     show_scrollbar: bool
-
-
-@dataclass(frozen=True)
-class PanelToastLayout:
-    toast_y: int | None
-
-
-def panel_toast_layout(
-    *,
-    panel_h: int,
-    padding: int,
-    line_h: int,
-    toast_active: bool,
-) -> PanelToastLayout:
-    """Place toast on the panel bottom."""
-    toast_y = panel_h - padding - line_h if toast_active else None
-    return PanelToastLayout(toast_y=toast_y)
 
 
 @dataclass(frozen=True)
@@ -779,7 +769,6 @@ def scroll_metrics(
     line_gap: int,
     padding: int,
     header_gap: int,
-    toast_active: bool,
     max_panel_h: int,
 ) -> PanelScrollMetrics:
     if first_scrollable_visible is not None:
@@ -804,8 +793,6 @@ def scroll_metrics(
     if scrollable_indices:
         header_block_h += header_gap
 
-    footer_block_h = line_gap + line_h if toast_active else 0
-
     visible_count = len(visible_indices)
     natural_h = (
         visible_count * line_h
@@ -813,13 +800,11 @@ def scroll_metrics(
         + (header_gap if first_scrollable_visible is not None else 0)
         + padding * 2
     )
-    if toast_active:
-        natural_h += line_gap + line_h
 
     needs_scroll = natural_h > max_panel_h
     if needs_scroll:
         scroll_viewport_h = max(
-            0, max_panel_h - padding * 2 - header_block_h - footer_block_h
+            0, max_panel_h - padding * 2 - header_block_h
         )
         panel_h = min(natural_h, max_panel_h)
         show_scrollbar = scroll_content_h > scroll_viewport_h
@@ -834,7 +819,6 @@ def scroll_metrics(
         row_stride=row_stride,
         scroll_content_h=scroll_content_h,
         header_block_h=header_block_h,
-        footer_block_h=footer_block_h,
         max_panel_h=max_panel_h,
         natural_h=natural_h,
         panel_h=panel_h,
@@ -1069,8 +1053,6 @@ class TuningOverlay:
             ),
             None,
         )
-        toast_active = bool(state.toast_message and state.toast_remaining_sec > 0)
-
         header_gap = line_h + self._line_gap
         _, margin_y = self._margin
         max_panel_h = surface.get_height() - margin_y * 2
@@ -1085,7 +1067,6 @@ class TuningOverlay:
             line_gap=self._line_gap,
             padding=self._padding,
             header_gap=header_gap,
-            toast_active=toast_active,
             max_panel_h=max_panel_h,
         )
         scrollable_indices = frozenset(metrics.scrollable_indices)
@@ -1364,17 +1345,7 @@ class TuningOverlay:
                 row_time_surfaces.append(None)
                 row_widths.append(indent + surf.get_width())
 
-        toast_surf: pygame.Surface | None = None
-        if toast_active:
-            assert state.toast_message is not None
-            toast_text = fit_text_to_width(
-                font, state.toast_message, PANEL_CONTENT_MAX_WIDTH
-            )
-            toast_surf = font.render(toast_text, True, DISABLED)
-
         content_w = max(row_widths) if row_widths else 0
-        if toast_surf is not None:
-            content_w = max(content_w, toast_surf.get_width())
         content_w = min(content_w, PANEL_CONTENT_MAX_WIDTH)
         panel_w = content_w + self._padding * 2
         panel_h = metrics.panel_h
@@ -1471,17 +1442,6 @@ class TuningOverlay:
                     line_h=line_h,
                 )
                 row_y += line_h + self._line_gap
-
-        toast_layout = panel_toast_layout(
-            panel_h=panel_h,
-            padding=self._padding,
-            line_h=line_h,
-            toast_active=toast_active,
-        )
-
-        if toast_surf is not None and text_alpha >= 2 and toast_layout.toast_y is not None:
-            toast_surf.set_alpha(text_alpha)
-            panel.blit(toast_surf, (self._padding, toast_layout.toast_y))
 
         if state.fps is not None and text_alpha >= 2:
             fps_surf = font.render(format_fps_display(state.fps), True, DISABLED)

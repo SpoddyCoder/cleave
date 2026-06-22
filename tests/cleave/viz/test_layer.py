@@ -259,7 +259,7 @@ def test_header_toggle_blocked_when_timeline_enabled() -> None:
 
     assert controls.session.layers["layer_1"].enabled is True
     view = controls.build_view_state(paused=False)
-    assert view.toast_message == "Timeline controls layer visibility"
+    assert view.notification_message == "Timeline controls layer visibility"
 
 
 def test_effective_layer_enabled_preview_active_uses_monitor() -> None:

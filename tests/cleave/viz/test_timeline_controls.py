@@ -60,7 +60,7 @@ def _make_timeline_controls(
     visibility_calls: list[bool] = []
     close_calls: list[bool] = []
     seeks: list[float] = []
-    toasts: list[str] = []
+    notifications: list[str] = []
 
     controls = TimelineControls(
         session,
@@ -72,9 +72,9 @@ def _make_timeline_controls(
             setattr(tl, "panel_open", False),
         ),
         on_seek=lambda delta: seeks.append(delta),
-        on_toast=toasts.append,
+        on_notification=notifications.append,
     )
-    return controls, session, visibility_calls, close_calls, seeks, toasts
+    return controls, session, visibility_calls, close_calls, seeks, notifications
 
 
 def test_enter_toggles_arm_on_focused_stem() -> None:
@@ -426,11 +426,11 @@ def test_ctrl_seek_when_not_recording() -> None:
     assert seeks == [SEEK_LONG, -SEEK_LONG]
 
 
-def test_backspace_toast_when_no_cues() -> None:
-    controls, _, _, _, _, toasts = _make_timeline_controls()
+def test_backspace_notification_when_no_cues() -> None:
+    controls, _, _, _, _, notifications = _make_timeline_controls()
 
     controls.handle_keydown(keydown(pygame.K_BACKSPACE))
-    assert toasts == ["No cues"]
+    assert notifications == ["No cues"]
 
 
 def test_delete_focused_cue_marks_config_dirty() -> None:
@@ -471,11 +471,11 @@ def test_ctrl_enter_noop_while_recording() -> None:
     assert session.timeline.record_buffer == []
 
 
-def test_r_without_armed_layers_shows_toast() -> None:
-    controls, session, _, _, _, toasts = _make_timeline_controls()
+def test_r_without_armed_layers_shows_notification() -> None:
+    controls, session, _, _, _, notifications = _make_timeline_controls()
 
     controls.handle_keydown(keydown(pygame.K_r))
-    assert toasts == ["Arm at least one layer to record"]
+    assert notifications == ["Arm at least one layer to record"]
     assert session.timeline.recording is False
 
 
@@ -834,12 +834,12 @@ def test_space_stops_record_and_pauses_while_playing() -> None:
     assert visibility_calls == [True, True, True]
 
 
-def test_ctrl_space_without_armed_stems_toasts() -> None:
-    controls, session, visibility_calls, _, _, toasts = _make_timeline_controls()
+def test_ctrl_space_without_armed_stems_notifies() -> None:
+    controls, session, visibility_calls, _, _, notifications = _make_timeline_controls()
 
     controls.handle_keydown(keydown(pygame.K_SPACE, mod=pygame.KMOD_CTRL))
     assert session.timeline.recording is False
-    assert toasts == ["Arm at least one layer to record"]
+    assert notifications == ["Arm at least one layer to record"]
     assert visibility_calls == []
 
 

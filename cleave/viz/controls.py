@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -10,12 +9,12 @@ from typing import TYPE_CHECKING
 import pygame
 
 from cleave.config import CleaveConfig, clamp_beat_sensitivity, clamp_effect_pct
-from cleave.config_schema import MAX_LAYER_COUNT
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.extract import STEM_SOURCES
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.key_repeat import KeyRepeatController, delete_key_pressed, mod_ctrl, mod_shift
 from cleave.viz.modal import ModalHost
+from cleave.viz.panel_notification import PanelNotificationHost
 from cleave.viz.playback import PlaybackState, seek, toggle_pause
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.render_overlay_controls import RenderOverlayControls
@@ -43,10 +42,8 @@ from cleave.viz.tuning_view_state import TuningViewState, TuningViewStateBuilder
 if TYPE_CHECKING:
     from cleave.viz.wiring import LayerManager
 
-TOAST_DURATION_SEC = 5.0
-TIMELINE_LAYER_HINT_DURATION_SEC = 10.0
-TIMELINE_LAYER_HINT_ENABLED_TEXT = "Layer visibility now controlled by Timeline"
-TIMELINE_LAYER_HINT_DISABLED_TEXT = (
+NOTIFICATION_TIMELINE_ENABLED_TEXT = "Layer visibility now controlled by Timeline"
+NOTIFICATION_TIMELINE_DISABLED_TEXT = (
     "Timeline no longer controlling layer visibility"
 )
 SEEK_SHORT = 10
@@ -86,10 +83,7 @@ class TuningControls:
         )
         self.move_mode_slot: str | None = None
         self._move_mode_original_z_order: list[str] | None = None
-        self._toast_message: str | None = None
-        self._toast_deadline = 0.0
-        self._timeline_layer_hint_message: str | None = None
-        self._timeline_layer_hint_deadline = 0.0
+        self._notification_host = PanelNotificationHost()
         self._key_repeat = KeyRepeatController()
         self._hide_overlay_requested = False
 
@@ -101,7 +95,7 @@ class TuningControls:
             repo_root_example=repo_root_example,
             on_save_new_config=on_save_new_config,
             on_overwrite_config=on_overwrite_config,
-            on_toast=self.show_toast,
+            on_notification=self.show_notification,
             move_mode_signature=self._move_mode_signature_payload,
         )
         self._view_state = TuningViewStateBuilder(
@@ -112,16 +106,13 @@ class TuningControls:
             get_focus_cursor=lambda: self.focus_cursor,
             get_move_mode_slot=lambda: self.move_mode_slot,
             config_save=self._config_save,
-            get_toast_message=lambda: self._toast_message,
-            get_toast_deadline=lambda: self._toast_deadline,
-            get_timeline_layer_hint_message=lambda: self._timeline_layer_hint_message,
-            get_timeline_layer_hint_deadline=lambda: self._timeline_layer_hint_deadline,
+            get_notification=self._notification_host.active,
         )
         self._render_overlay = RenderOverlayControls(session)
         self._render_post_fx = RenderPostFxControls(session)
         self._settings = SettingsControls(session, cfg)
         if session.timeline.enabled:
-            self._show_timeline_layer_hint(enabled=True)
+            self.show_notification(NOTIFICATION_TIMELINE_ENABLED_TEXT)
 
     def _move_mode_signature_payload(self) -> dict[str, list[str]] | None:
         if self.move_mode_slot is not None and self._move_mode_original_z_order is not None:
@@ -319,14 +310,7 @@ class TuningControls:
 
     def tick(self, dt_sec: float) -> None:
         self._key_repeat.tick(dt_sec)
-        now = time.monotonic()
-        if self._toast_message is not None and now >= self._toast_deadline:
-            self._toast_message = None
-        if (
-            self._timeline_layer_hint_message is not None
-            and now >= self._timeline_layer_hint_deadline
-        ):
-            self._timeline_layer_hint_message = None
+        self._notification_host.clear_expired()
 
     def build_view_state(
         self,
@@ -453,7 +437,6 @@ class TuningControls:
         if self._layer_manager is None:
             return
         if not self._layer_manager.can_add():
-            self.show_toast(f"Maximum {MAX_LAYER_COUNT} layers")
             return
         self._modal_host.prompt_yes_no(
             "Add new Milkdrop visualisation layer?",
@@ -470,7 +453,7 @@ class TuningControls:
         if self._layer_manager is None:
             return
         if not self._layer_manager.can_remove():
-            self.show_toast("Must have at least 1 layer")
+            self.show_notification("Must have at least 1 layer")
             return
         self._modal_host.prompt_yes_no(
             "Delete this Milkdrop visualisation layer?",
@@ -784,16 +767,11 @@ class TuningControls:
             self.close_timeline_panel()
         if self._layer_bindings is not None:
             self._layer_bindings.on_timeline_enabled_change()
-        self._show_timeline_layer_hint(enabled=enabled)
-
-    def _show_timeline_layer_hint(self, *, enabled: bool) -> None:
-        now = time.monotonic()
-        self._timeline_layer_hint_message = (
-            TIMELINE_LAYER_HINT_ENABLED_TEXT
+        self.show_notification(
+            NOTIFICATION_TIMELINE_ENABLED_TEXT
             if enabled
-            else TIMELINE_LAYER_HINT_DISABLED_TEXT
+            else NOTIFICATION_TIMELINE_DISABLED_TEXT
         )
-        self._timeline_layer_hint_deadline = now + TIMELINE_LAYER_HINT_DURATION_SEC
 
     def _enter_solo(self, slot: str) -> None:
         if self.session.solo_slot == slot:
@@ -811,9 +789,7 @@ class TuningControls:
 
     def _set_enabled(self, slot: str, enabled: bool) -> None:
         if self.session.timeline.enabled:
-            now = time.monotonic()
-            self._toast_message = "Timeline controls layer visibility"
-            self._toast_deadline = now + TOAST_DURATION_SEC
+            self.show_notification("Timeline controls layer visibility")
             return
         layer = self.session.layers[slot]
         if layer.enabled == enabled:
@@ -864,15 +840,13 @@ class TuningControls:
         else:
             seek(self.playback, delta_sec, self.duration_sec)
 
-    def show_toast(self, message: str) -> None:
-        now = time.monotonic()
-        self._toast_message = message
-        self._toast_deadline = now + TOAST_DURATION_SEC
+    def show_notification(self, message: str) -> None:
+        self._notification_host.show(message)
 
     def _open_timeline_panel(self, *, enter_submenu: bool = False) -> None:
         tl = self.session.timeline
         if not tl.enabled:
-            self.show_toast("Enable timeline first")
+            self.show_notification("Enable timeline first")
             return
         tl.panel_open = True
         if enter_submenu:

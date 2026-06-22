@@ -49,7 +49,7 @@ def _sub_row_expanded(state: TuningViewState, desc: RowDescriptor) -> bool:
 
 
 def row_draw_visible(state: TuningViewState, desc: RowDescriptor) -> bool:
-    if desc.kind in {RowKind.TIMELINE_LAYER_HINT, RowKind.RENDER_SECTION_GAP}:
+    if desc.kind in {RowKind.PANEL_NOTIFICATION, RowKind.RENDER_SECTION_GAP}:
         return True
     return _sub_row_expanded(state, desc)
 
@@ -84,11 +84,8 @@ class RowLayout:
                 RowDescriptor(RowKind.TRANSPORT),
             ]
         )
-        if (
-            state.timeline_layer_hint_message
-            and state.timeline_layer_hint_remaining_sec > 0
-        ):
-            row_list.append(RowDescriptor(RowKind.TIMELINE_LAYER_HINT))
+        if state.notification_message and state.notification_remaining_sec > 0:
+            row_list.append(RowDescriptor(RowKind.PANEL_NOTIFICATION))
         for slot in state.layer_z_order:
             row_list.append(RowDescriptor(RowKind.TRACK_HEADER, slot=slot))
             row_list.append(RowDescriptor(RowKind.TRACK_PRESET_DIR, slot=slot))
