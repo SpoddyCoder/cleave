@@ -27,6 +27,7 @@ from cleave.viz.timeline_overlay import (
     arm_abbrev_flash_active,
     arm_abbrev_flash_visible,
     armed_abbrev_bg_visible,
+    bar_segments_for_row,
     bar_tick_times_for_row,
     cue_times_for_stem,
     layer_num_prefix,
@@ -56,6 +57,7 @@ def _view_state(
     record_start_sec: float | None = None,
     record_baseline: dict[str, bool] | None = None,
     record_buffer: list[TimelineCue] | None = None,
+    record_high_water_mark: float | None = None,
     enabled: bool = True,
     layer_z_order: list[str] | None = None,
     monitor_visible: dict[str, bool] | None = None,
@@ -94,6 +96,7 @@ def _view_state(
         record_start_sec=record_start_sec,
         record_baseline=dict(record_baseline or ()),
         record_buffer=list(record_buffer or ()),
+        record_high_water_mark=record_high_water_mark,
         enabled=enabled,
         submenu_focused=submenu_focused,
         arm_flash_start_ms=dict(arm_flash_start_ms or ()),
@@ -686,6 +689,76 @@ def test_upscale_expands_bar_width_not_row_height() -> None:
     assert upscaled_panel[3] == baseline_panel[3]
     assert upscaled_bar_width > baseline_bar_width
     assert upscaled_panel[2] > baseline_panel[2]
+
+
+def _bar_visible_at(
+    state: TimelineViewState,
+    slot: str,
+    t: float,
+) -> bool:
+    """Return the bar's visibility value for a slot at time t."""
+    segs = bar_segments_for_row(state, slot)
+    visible = False
+    for seg_start, seg_end, seg_visible in segs:
+        if seg_start <= t < seg_end:
+            visible = seg_visible
+    return visible
+
+
+def test_bar_shows_fill_for_backward_skipped_range() -> None:
+    """After a backward seek during recording, the bar shows the fill state."""
+    slot = "layer_1"
+    state = _view_state(
+        layer_z_order=["layer_1"],
+        defaults={"layer_1": True},
+        position_sec=20.0,
+        duration_sec=100.0,
+        recording=True,
+        record_start_sec=20.0,
+        record_baseline={"layer_1": True},
+        record_buffer=[TimelineCue(t=20.0, layers={"layer_1": False}, show_tick=False)],
+        record_high_water_mark=30.0,
+    )
+    assert _bar_visible_at(state, slot, 25.0) is False
+    assert _bar_visible_at(state, slot, 20.0) is False
+    assert _bar_visible_at(state, slot, 10.0) is True
+
+
+def test_bar_shows_fill_for_backward_seek_with_expanded_punch_start() -> None:
+    """Backward seek past record_start: bar still shows fill for skipped range."""
+    slot = "layer_1"
+    state = _view_state(
+        layer_z_order=["layer_1"],
+        defaults={"layer_1": False},
+        position_sec=10.0,
+        duration_sec=100.0,
+        recording=True,
+        record_start_sec=10.0,
+        record_baseline={"layer_1": False},
+        record_buffer=[TimelineCue(t=10.0, layers={"layer_1": True}, show_tick=False)],
+        record_high_water_mark=20.0,
+    )
+    assert _bar_visible_at(state, slot, 15.0) is True
+    assert _bar_visible_at(state, slot, 10.0) is True
+    assert _bar_visible_at(state, slot, 5.0) is False
+
+
+def test_bar_without_high_water_mark_behaves_as_before() -> None:
+    """No backward seek: bar shows record_buffer only up to playhead."""
+    slot = "layer_1"
+    state = _view_state(
+        layer_z_order=["layer_1"],
+        defaults={"layer_1": True},
+        position_sec=25.0,
+        duration_sec=100.0,
+        recording=True,
+        record_start_sec=20.0,
+        record_baseline={"layer_1": True},
+        record_buffer=[TimelineCue(t=20.0, layers={"layer_1": False}, show_tick=False)],
+        record_high_water_mark=None,
+    )
+    assert _bar_visible_at(state, slot, 22.0) is False
+    assert _bar_visible_at(state, slot, 30.0) is True
 
 
 def test_row_height_constant_across_layer_counts() -> None:

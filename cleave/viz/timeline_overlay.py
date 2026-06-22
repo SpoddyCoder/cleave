@@ -71,6 +71,7 @@ class TimelineViewState:
     record_start_sec: float | None = None
     record_baseline: dict[str, bool] = field(default_factory=dict)
     record_buffer: list[TimelineCue] = field(default_factory=list)
+    record_high_water_mark: float | None = None
     enabled: bool = False
     submenu_focused: bool = False
     arm_flash_start_ms: dict[str, int] = field(default_factory=dict)
@@ -157,21 +158,22 @@ def bar_segments_for_row(
     if record_start > 0.0:
         segments.extend(_clip_segments(committed, 0.0, record_start))
 
-    if playhead > record_start:
+    effective_end = max(playhead, state.record_high_water_mark or 0.0)
+    if effective_end > record_start:
         armed_defaults = dict(state.defaults)
         armed_defaults.update(state.record_baseline)
         segments.extend(
             _clip_segments(
                 visibility_segments(
-                    state.record_buffer, armed_defaults, slot, playhead
+                    state.record_buffer, armed_defaults, slot, effective_end
                 ),
                 record_start,
-                playhead,
+                effective_end,
             )
         )
 
-    if playhead < duration:
-        segments.extend(_clip_segments(committed, playhead, duration))
+    if effective_end < duration:
+        segments.extend(_clip_segments(committed, effective_end, duration))
     return segments
 
 
@@ -185,15 +187,16 @@ def bar_tick_times_for_row(state: TimelineViewState, slot: str) -> list[float]:
     if record_start is None:
         record_start = state.position_sec
     playhead = state.position_sec
+    effective_end = max(playhead, state.record_high_water_mark or 0.0)
     committed_ticks = [
         t
         for t in cue_times_for_stem(state.cues, slot, duration)
-        if t < record_start or t > playhead
+        if t < record_start or t > effective_end
     ]
     live_ticks = [
         t
         for t in cue_times_for_stem(state.record_buffer, slot, duration)
-        if record_start <= t <= playhead
+        if record_start <= t <= effective_end
     ]
     return sorted(set(committed_ticks) | set(live_ticks))
 

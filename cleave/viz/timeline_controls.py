@@ -214,6 +214,7 @@ class TimelineControls:
             tl.record_start_sec = None
             tl.record_buffer = []
             tl.record_baseline = {}
+            tl.record_high_water_mark = None
             self._last_toggle_t = {}
 
         if self._on_visibility_change is not None:
@@ -240,6 +241,7 @@ class TimelineControls:
         tl.recording = True
         tl.record_start_sec = t_sec
         tl.record_buffer = []
+        tl.record_high_water_mark = None
         self._last_toggle_t = {}
 
         self._refresh_visibility()
@@ -251,6 +253,7 @@ class TimelineControls:
             tl.recording = False
             tl.record_buffer = []
             tl.record_baseline = {}
+            tl.record_high_water_mark = None
             return
 
         record_stop = current_sec(self.playback, self.duration_sec)
@@ -265,6 +268,7 @@ class TimelineControls:
         tl.record_start_sec = None
         tl.record_buffer = []
         tl.record_baseline = {}
+        tl.record_high_water_mark = None
         self._last_toggle_t = {}
 
         if self._on_visibility_change is not None:
@@ -350,6 +354,7 @@ class TimelineControls:
             )
             self._last_toggle_t.pop(slot, None)
         tl.record_buffer.sort(key=lambda c: c.t)
+        tl.record_high_water_mark = max(tl.record_high_water_mark or 0.0, old_t)
         if tl.record_start_sec is not None and new_t < tl.record_start_sec:
             tl.record_start_sec = new_t
 
