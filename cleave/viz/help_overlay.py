@@ -161,6 +161,8 @@ _SAVE_SECTION = HelpSection(
 
 def _value_step_section(row_kind: RowKind) -> HelpSection:
     behavior = row_behavior(row_kind)
+    if behavior.help_entries is not None:
+        return HelpSection(behavior.help_title or "Edit", behavior.help_entries)
     if row_kind == RowKind.TRACK_EFFECT:
         entries = (
             ("Left/Right", "adjust depth"),

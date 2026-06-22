@@ -310,16 +310,12 @@ class GlCompositor:
         self._configure_texture_params()
         return texture_id
 
-    def create_layer_fbo(
+    def _allocate_layer_framebuffer(
         self,
         name: str,
         width: int,
         height: int,
-        opacity: float = 1.0,
-        blend_mode: BlendMode = "black-key",
-    ) -> LayerFbo:
-        self._ensure_init()
-
+    ) -> tuple[int, int, int]:
         texture_id = self._create_rgba_texture(width, height)
         depth_rbo_id = _gl_name(glGenRenderbuffers)
         glBindRenderbuffer(GL_RENDERBUFFER, depth_rbo_id)
@@ -346,6 +342,22 @@ class GlCompositor:
                 f"FBO incomplete for layer {name!r} ({width}x{height}): status 0x{status:x}"
             )
 
+        return fbo_id, texture_id, depth_rbo_id
+
+    def create_layer_fbo(
+        self,
+        name: str,
+        width: int,
+        height: int,
+        opacity: float = 1.0,
+        blend_mode: BlendMode = "black-key",
+    ) -> LayerFbo:
+        self._ensure_init()
+
+        fbo_id, texture_id, depth_rbo_id = self._allocate_layer_framebuffer(
+            name, width, height
+        )
+
         layer = LayerFbo(
             name=name,
             width=width,
@@ -359,6 +371,47 @@ class GlCompositor:
         )
         self._layers.append(layer)
         return layer
+
+    def resize_layer_fbo(self, name: str, width: int, height: int) -> None:
+        """Resize an existing layer FBO, preserving compositor state fields."""
+        for layer in self._layers:
+            if layer.name != name:
+                continue
+            if layer.width == width and layer.height == height:
+                return
+
+            enabled = layer.enabled
+            opacity = layer.opacity
+            blend_mode = layer.blend_mode
+            flash_alpha = layer.flash_alpha
+            bloom_strength = layer.bloom_strength
+            hue_rgb = layer.hue_rgb
+            hue_mix = layer.hue_mix
+            grit_strength = layer.grit_strength
+            aberration_px = layer.aberration_px
+
+            layer.destroy()
+            fbo_id, texture_id, depth_rbo_id = self._allocate_layer_framebuffer(
+                name, width, height
+            )
+
+            layer.width = width
+            layer.height = height
+            layer.fbo_id = fbo_id
+            layer.texture_id = texture_id
+            layer.depth_rbo_id = depth_rbo_id
+            layer.enabled = enabled
+            layer.opacity = opacity
+            layer.blend_mode = blend_mode
+            layer.flash_alpha = flash_alpha
+            layer.bloom_strength = bloom_strength
+            layer.hue_rgb = hue_rgb
+            layer.hue_mix = hue_mix
+            layer.grit_strength = grit_strength
+            layer.aberration_px = aberration_px
+            return
+
+        raise ValueError(f"no layer FBO named {name!r}")
 
     def remove_layer_fbo(self, name: str) -> None:
         """Destroy the named FBO and remove it from the compositor stack."""

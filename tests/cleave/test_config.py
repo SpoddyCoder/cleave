@@ -224,7 +224,7 @@ def test_parse_visualizer_render_mode_defaults_to_balanced() -> None:
 
 @pytest.mark.parametrize(
     "render_mode",
-    ["full-quality", "balanced", "performance"],
+    ["full-quality", "balanced", "performance", "ultra-performance"],
 )
 def test_parse_visualizer_reads_render_mode(render_mode: str) -> None:
     cfg = parse_visualizer_section({"visualizer": {"render_mode": render_mode}})

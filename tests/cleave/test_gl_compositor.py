@@ -110,3 +110,66 @@ def test_remove_layer_fbo_unknown_name_raises() -> None:
 
     with pytest.raises(ValueError, match="no layer FBO named 'missing'"):
         compositor.remove_layer_fbo("missing")
+
+
+def test_resize_layer_fbo_noop_when_same_size() -> None:
+    compositor = GlCompositor.__new__(GlCompositor)
+    fbo = MagicMock(spec=LayerFbo)
+    fbo.name = "layer_1"
+    fbo.width = 640
+    fbo.height = 360
+    compositor._layers = [fbo]
+
+    compositor.resize_layer_fbo("layer_1", 640, 360)
+
+    fbo.destroy.assert_not_called()
+
+
+def test_resize_layer_fbo_unknown_name_raises() -> None:
+    compositor = GlCompositor.__new__(GlCompositor)
+    compositor._layers = []
+
+    with pytest.raises(ValueError, match="no layer FBO named 'missing'"):
+        compositor.resize_layer_fbo("missing", 640, 360)
+
+
+def test_resize_layer_fbo_reallocates_and_preserves_state() -> None:
+    compositor = GlCompositor.__new__(GlCompositor)
+    compositor._allocate_layer_framebuffer = MagicMock(return_value=(11, 22, 33))
+
+    fbo = MagicMock(spec=LayerFbo)
+    fbo.name = "layer_1"
+    fbo.width = 1280
+    fbo.height = 720
+    fbo.fbo_id = 1
+    fbo.texture_id = 2
+    fbo.depth_rbo_id = 3
+    fbo.enabled = False
+    fbo.opacity = 0.42
+    fbo.flash_alpha = 0.15
+    fbo.bloom_strength = 0.8
+    fbo.hue_rgb = (0.5, 0.6, 0.7)
+    fbo.hue_mix = 0.25
+    fbo.grit_strength = 0.33
+    fbo.aberration_px = 2.5
+    fbo.blend_mode = "add"
+    compositor._layers = [fbo]
+
+    compositor.resize_layer_fbo("layer_1", 640, 360)
+
+    fbo.destroy.assert_called_once()
+    compositor._allocate_layer_framebuffer.assert_called_once_with("layer_1", 640, 360)
+    assert fbo.width == 640
+    assert fbo.height == 360
+    assert fbo.fbo_id == 11
+    assert fbo.texture_id == 22
+    assert fbo.depth_rbo_id == 33
+    assert fbo.enabled is False
+    assert fbo.opacity == 0.42
+    assert fbo.blend_mode == "add"
+    assert fbo.flash_alpha == 0.15
+    assert fbo.bloom_strength == 0.8
+    assert fbo.hue_rgb == (0.5, 0.6, 0.7)
+    assert fbo.hue_mix == 0.25
+    assert fbo.grit_strength == 0.33
+    assert fbo.aberration_px == 2.5
