@@ -306,9 +306,6 @@ def render(
                     f"expected {frame_bytes} frame bytes, got {len(frame)}"
                 )
             proc.stdin.write(frame)
-            rendered = frame_idx + 1
-            if rendered == 1 or rendered % 30 == 0 or rendered == frame_count:
-                _progress(f"  frame {rendered}/{frame_count}")
 
         proc.stdin.close()
         proc.stdin = None
