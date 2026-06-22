@@ -144,7 +144,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
     ),
     RowKind.LAYER_MANAGEMENT_ADD: RowBehavior(
         RowAffordance.ACTION,
-        help_title="Add new layer",
+        help_title="Add Layer",
         navigable=True,
     ),
     RowKind.LAYER_MANAGEMENT_DELETE: RowBehavior(

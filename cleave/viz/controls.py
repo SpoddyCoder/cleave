@@ -42,10 +42,8 @@ from cleave.viz.tuning_view_state import TuningViewState, TuningViewStateBuilder
 if TYPE_CHECKING:
     from cleave.viz.wiring import LayerManager
 
-NOTIFICATION_TIMELINE_ENABLED_TEXT = "Layer visibility now controlled by Timeline"
-NOTIFICATION_TIMELINE_DISABLED_TEXT = (
-    "Timeline no longer controlling layer visibility"
-)
+NOTIFICATION_TIMELINE_ENABLED_TEXT = "Timeline controls layer visibility"
+NOTIFICATION_TIMELINE_DISABLED_TEXT = "Layer panel controls visibility"
 SEEK_SHORT = 10
 SEEK_LONG = 30
 
@@ -448,6 +446,14 @@ class TuningControls:
             return
         self._layer_manager.add_layer()
         self._rebuild_view()
+        view_after = self.build_view_state(paused=self.playback.paused)
+        if (
+            self.focus_descriptor.kind == RowKind.LAYER_MANAGEMENT_ADD
+            and not view_after.layout.contains_descriptor(self.focus_descriptor)
+        ):
+            self._apply_focus_cursor(
+                MainFocus(RowDescriptor(RowKind.RENDER_OVERLAY_HEADER))
+            )
 
     def _delete_layer(self, slot: str) -> None:
         if self._layer_manager is None:

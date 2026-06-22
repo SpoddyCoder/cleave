@@ -11,7 +11,6 @@ from typing import Literal
 
 import pygame
 
-from cleave.config_schema import MAX_LAYER_COUNT
 from cleave.extract import stem_control_label, stem_overlay_header
 from cleave.viz.row_semantics import (
     LABELED_SUB_ROW_KINDS,
@@ -119,7 +118,7 @@ def _row_text(state: TuningViewState, index: int) -> str:
         return state.notification_message or ""
 
     if kind == RowKind.LAYER_MANAGEMENT_ADD:
-        return "ADD NEW LAYER"
+        return "Add Layer"
     if kind == RowKind.LAYER_MANAGEMENT_DELETE:
         return f"{_layer_management_delete_prefix()}Delete Layer"
 
@@ -638,11 +637,6 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
         if kind == RowKind.CONFIG_HEADER and state.solo_active:
             return DISABLED
         if kind == RowKind.LAYER_MANAGEMENT_DELETE and len(state.layer_z_order) == 1:
-            return DISABLED
-        if (
-            kind == RowKind.LAYER_MANAGEMENT_ADD
-            and len(state.layer_z_order) >= MAX_LAYER_COUNT
-        ):
             return DISABLED
         return ACTION
 
@@ -1444,7 +1438,7 @@ class TuningOverlay:
                 row_y += line_h + self._line_gap
 
         if state.fps is not None and text_alpha >= 2:
-            fps_surf = font.render(format_fps_display(state.fps), True, DISABLED)
+            fps_surf = font.render(format_fps_display(state.fps), True, VALUE)
             fps_surf.set_alpha(text_alpha)
             fps_layout = panel_fps_layout(
                 panel_w=panel_w,

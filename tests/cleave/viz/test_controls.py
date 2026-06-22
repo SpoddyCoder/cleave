@@ -206,14 +206,12 @@ def test_build_view_state_passes_fps() -> None:
     assert view.fps == 42.0
 
 
-def test_add_layer_at_max_is_disabled_no_op() -> None:
+def test_add_layer_row_omitted_at_max() -> None:
     controls, manager = _make_controls_with_manager(("layer_1",), can_add=False)
-    add_row = controls.build_view_state(paused=False).layout.find_by_kind(
-        RowKind.LAYER_MANAGEMENT_ADD
-    )
-    with patch("cleave.viz.tuning_panel_draw.MAX_LAYER_COUNT", 1):
+    with patch("cleave.viz.row_layout.MAX_LAYER_COUNT", 1):
         view = controls.build_view_state(paused=False)
-        assert _row_value_color(view, add_row) == DISABLED
+        with pytest.raises(ValueError, match="no row for kind"):
+            view.layout.find_by_kind(RowKind.LAYER_MANAGEMENT_ADD)
     controls.focus_descriptor = RowDescriptor(RowKind.LAYER_MANAGEMENT_ADD)
 
     controls.handle_keydown(_keydown(pygame.K_RETURN))

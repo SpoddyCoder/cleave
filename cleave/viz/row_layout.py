@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from cleave.config_schema import MAX_LAYER_COUNT
 from cleave.effects.registry import effect_roster
 from cleave.viz.row_semantics import (
     RENDER_OVERLAY_BODY_NESTED_KINDS,
@@ -110,7 +111,8 @@ class RowLayout:
                 row_list.append(
                     RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot=slot)
                 )
-        row_list.append(RowDescriptor(RowKind.LAYER_MANAGEMENT_ADD))
+        if len(state.layer_z_order) < MAX_LAYER_COUNT:
+            row_list.append(RowDescriptor(RowKind.LAYER_MANAGEMENT_ADD))
         row_list.append(RowDescriptor(RowKind.RENDER_SECTION_GAP))
         row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_HEADER))
         if state.render_overlay.expanded:

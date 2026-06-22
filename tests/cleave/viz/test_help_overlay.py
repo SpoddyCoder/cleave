@@ -128,7 +128,7 @@ def test_render_overlay_sub_header_help_expand_collapse() -> None:
 
 def test_layer_management_add_help() -> None:
     section = _sections_for(RowKind.LAYER_MANAGEMENT_ADD)[0]
-    assert section.title == "Add new layer"
+    assert section.title == "Add Layer"
     assert dict(section.entries)["Enter"] == "confirm add"
 
 
