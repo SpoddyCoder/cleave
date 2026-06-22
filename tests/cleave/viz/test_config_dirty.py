@@ -10,7 +10,6 @@ from pathlib import Path
 import pygame
 import pytest
 
-from cleave.timeline import TimelineCue
 from cleave.viz.controls import TuningControls
 from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.row_semantics import RowDescriptor, RowKind
@@ -218,18 +217,23 @@ def _mutate_visualizer_render_mode(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
-def _mutate_timeline_cues_via_delete() -> None:
+def _mutate_timeline_cues_via_record() -> None:
     tuning = _make_controls(("layer_1",))
-    tuning.session.timeline.cues = [TimelineCue(t=1.0, layers={"layer_1": False})]
     tuning.session.timeline.enabled = True
+    tuning.session.layers["layer_1"].enabled = True
     tuning.clear_config_dirty()
     assert not tuning.config_dirty
+    playback = stub_playback_state()
+    playback.player.seek(5.0)
     controls = TimelineControls(
         tuning.session,
-        stub_playback_state(),
+        playback,
         120.0,
     )
-    controls.handle_keydown(keydown(pygame.K_BACKSPACE))
+    tuning.session.timeline.armed_slots = {"layer_1"}
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.handle_keydown(keydown(pygame.K_r))
     assert tuning.config_dirty
 
 
@@ -295,8 +299,8 @@ def test_persisted_font_mutation_marks_config_dirty(
     assert controls.config_dirty
 
 
-def test_persisted_timeline_cue_delete_marks_config_dirty() -> None:
-    _mutate_timeline_cues_via_delete()
+def test_persisted_timeline_cue_record_marks_config_dirty() -> None:
+    _mutate_timeline_cues_via_record()
 
 
 def test_render_overlay_display_time_keyboard_regression() -> None:
