@@ -228,7 +228,7 @@ def _sections_for(
         primary = _TRANSPORT_SECTION
     elif row_kind == RowKind.LAYER_MANAGEMENT_ADD:
         primary = HelpSection(
-            behavior.help_title or "Add new layer",
+            behavior.help_title or "Add Layer",
             (("Enter", "confirm add"),),
         )
     elif row_kind == RowKind.LAYER_MANAGEMENT_DELETE:

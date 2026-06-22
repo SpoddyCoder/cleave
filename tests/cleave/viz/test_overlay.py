@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import pygame
+import pytest
 
-from cleave.config_schema import DEFAULT_LAYER_SLOTS
+from cleave.config_schema import DEFAULT_LAYER_SLOTS, MAX_LAYER_COUNT
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
 from cleave.viz.frame_rate import format_fps_display
@@ -255,7 +256,7 @@ def test_draw_fps_counter_when_present() -> None:
 
     font = overlay._font_get()
     fps_text = format_fps_display(28.4)
-    fps_surf = font.render(fps_text, True, DISABLED)
+    fps_surf = font.render(fps_text, True, VALUE)
     metrics = _panel_scroll_metrics(overlay, state)
     layout = panel_fps_layout(
         panel_w=with_fps.get_width(),
@@ -264,7 +265,7 @@ def test_draw_fps_counter_when_present() -> None:
         show_scrollbar=metrics.show_scrollbar,
     )
     sampled = with_fps.get_at((layout.x + 2, layout.y + font.get_linesize() // 2))
-    assert sampled[:3] == DISABLED
+    assert sampled[:3] == VALUE
 
 
 def test_fps_color_ignores_transport_focus() -> None:
@@ -277,7 +278,7 @@ def test_fps_color_ignores_transport_focus() -> None:
 
     with_fps = _copy_panel_surface(overlay, state)
     font = overlay._font_get()
-    fps_surf = font.render(format_fps_display(30.0), True, DISABLED)
+    fps_surf = font.render(format_fps_display(30.0), True, VALUE)
     metrics = _panel_scroll_metrics(overlay, state)
     layout = panel_fps_layout(
         panel_w=with_fps.get_width(),
@@ -286,7 +287,7 @@ def test_fps_color_ignores_transport_focus() -> None:
         show_scrollbar=metrics.show_scrollbar,
     )
     sampled = with_fps.get_at((layout.x + 2, layout.y + font.get_linesize() // 2))
-    assert sampled[:3] == DISABLED
+    assert sampled[:3] == VALUE
     assert sampled[:3] != HIGHLIGHT
 
 
@@ -572,6 +573,25 @@ def test_build_row_layout_includes_add_before_render_gap() -> None:
     gap_idx = state.layout.find_by_kind( RowKind.RENDER_SECTION_GAP)
     overlay_idx = state.layout.find_by_kind( RowKind.RENDER_OVERLAY_HEADER)
     assert add_idx < gap_idx < overlay_idx
+
+
+def test_build_row_layout_omits_add_at_max_layers() -> None:
+    slots = tuple(f"layer_{i}" for i in range(1, MAX_LAYER_COUNT + 1))
+    tracks = {
+        slot: TrackBlock(
+            stem="drums",
+            preset_dir_label="dir",
+            preset_label="preset.milk",
+            blend_mode="black-key",
+            opacity_pct=50,
+            beat_sensitivity=1.0,
+            effects={},
+        )
+        for slot in slots
+    }
+    state = _minimal_view_state(layer_z_order=slots, tracks=tracks)
+    with pytest.raises(ValueError, match="no row for kind"):
+        state.layout.find_by_kind(RowKind.LAYER_MANAGEMENT_ADD)
 
 
 def test_delete_row_after_effects_when_expanded() -> None:
