@@ -116,6 +116,7 @@ def test_add_layer_updates_cfg_session_and_collections(
     assert stem_layer in manager.layers
     build_single.assert_called_once()
     assert build_single.call_args.kwargs["beat_sensitivity"] == manager.cfg.visualizer.beat_sensitivity
+    compositor.resize_layer_fbo.assert_called()
 
 
 @patch("cleave.viz.wiring.LayerFramePipeline.destroy_single")

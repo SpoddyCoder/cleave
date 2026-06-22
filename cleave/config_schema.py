@@ -28,12 +28,15 @@ DEFAULT_BEAT_SENSITIVITY = 2.0
 BEAT_SENSITIVITY_MIN = 0.0
 BEAT_SENSITIVITY_MAX = 5.0
 
-VisualizerRenderMode = Literal["full-quality", "balanced", "performance"]
+VisualizerRenderMode = Literal[
+    "full-quality", "balanced", "performance", "ultra-performance"
+]
 
 VISUALIZER_RENDER_MODES: tuple[VisualizerRenderMode, ...] = (
     "full-quality",
     "balanced",
     "performance",
+    "ultra-performance",
 )
 
 DEFAULT_VISUALIZER_RENDER_MODE: VisualizerRenderMode = "balanced"

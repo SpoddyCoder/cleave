@@ -2964,8 +2964,21 @@ def test_settings_cycle_render_mode() -> None:
     view = controls.build_view_state(paused=False)
     assert _row_text(view, _focus_index(controls)) == "└─ render mode: performance"
 
-    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.cfg.visualizer.render_mode == "ultra-performance"
+    view = controls.build_view_state(paused=False)
+    assert _row_text(view, _focus_index(controls)) == "└─ render mode: ultra-performance"
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.cfg.visualizer.render_mode == "full-quality"
+    view = controls.build_view_state(paused=False)
+    assert _row_text(view, _focus_index(controls)) == "└─ render mode: full-quality"
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.cfg.visualizer.render_mode == "balanced"
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.cfg.visualizer.render_mode == "full-quality"
 
 
 def test_settings_render_mode_change_marks_config_dirty() -> None:
@@ -2978,6 +2991,34 @@ def test_settings_render_mode_change_marks_config_dirty() -> None:
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_RENDER_MODE)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.config_dirty
+
+
+def test_cycle_render_mode_calls_apply_preview_resolutions() -> None:
+    controls, layer_manager = _make_controls_with_manager(("layer_1",))
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_RENDER_MODE)
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+    layer_manager.apply_preview_resolutions.assert_called_once()
+
+
+def test_move_mode_swap_calls_apply_preview_resolutions() -> None:
+    controls, layer_manager = _make_controls_with_manager(("layer_1", "layer_2", "layer_3"))
+    view = controls.build_view_state(paused=False)
+    header_row = next(
+        i
+        for i in range(15)
+        if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot(i) == "layer_2"
+    )
+    controls.focus_descriptor = _desc(view, header_row)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    layer_manager.apply_preview_resolutions.reset_mock()
+
+    controls.handle_keydown(_keydown(pygame.K_UP))
+
+    layer_manager.apply_preview_resolutions.assert_called_once()
 
 
 def test_default_focus_stays_on_transport() -> None:

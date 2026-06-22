@@ -13,6 +13,7 @@ from cleave.projectm import ProjectM
 from cleave.signals import Signals
 from cleave.stem_pcm import StemPcmBank
 from cleave.viz.layer import StemLayer
+from cleave.viz.layer_preview_resolution import preview_sizes_for_session
 from cleave.viz.layer_visibility import apply_layer_visibility, effective_layer_enabled
 from cleave.viz.session import TuningSession
 from OpenGL.GL import GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, glClear, glClearColor, glViewport
@@ -93,6 +94,31 @@ class LayerFramePipeline:
     """Per-frame GL path for stem layers."""
 
     @staticmethod
+    def resize_layer(
+        layer: StemLayer,
+        compositor: GlCompositor,
+        width: int,
+        height: int,
+    ) -> None:
+        layer.pm.set_window_size(width, height)
+        compositor.resize_layer_fbo(layer.slot, width, height)
+
+    @staticmethod
+    def apply_preview_resolutions(
+        cfg: CleaveConfig,
+        session: TuningSession,
+        layers_by_slot: dict[str, StemLayer],
+        compositor: GlCompositor,
+    ) -> None:
+        sizes = preview_sizes_for_session(cfg, session)
+        for slot, (width, height) in sizes.items():
+            layer = layers_by_slot[slot]
+            fbo = layer.fbo
+            if fbo.width == width and fbo.height == height:
+                continue
+            LayerFramePipeline.resize_layer(layer, compositor, width, height)
+
+    @staticmethod
     def build_single(
         slot: str,
         layer_cfg: LayerConfig,
@@ -148,6 +174,8 @@ class LayerFramePipeline:
         playlists: dict[str, PresetPlaylist],
         *,
         projectm_fps: int,
+        preview_resolutions: bool = True,
+        session: TuningSession | None = None,
     ) -> tuple[list[StemLayer], dict[str, StemLayer]]:
         texture_paths = list(cfg.paths.texture_paths)
         runtimes: list[StemLayer] = []
@@ -166,6 +194,12 @@ class LayerFramePipeline:
             )
 
         layers_by_slot = {layer.slot: layer for layer in runtimes}
+        if preview_resolutions:
+            if session is None:
+                raise ValueError("session is required when preview_resolutions=True")
+            LayerFramePipeline.apply_preview_resolutions(
+                cfg, session, layers_by_slot, compositor
+            )
         return runtimes, layers_by_slot
 
     @staticmethod

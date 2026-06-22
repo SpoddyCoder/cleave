@@ -65,6 +65,7 @@ class RowAffordance(Enum):
 class RowBehavior:
     affordance: RowAffordance
     help_title: str = ""
+    help_entries: tuple[tuple[str, str], ...] | None = None
     navigable: bool = True
     quick_nav_target: bool = False
     is_header: bool = False
@@ -267,6 +268,10 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         repeatable=True,
         parent_group="settings",
         help_title="Render mode",
+        help_entries=(
+            ("Left/Right", "cycle mode"),
+            ("", "live preview only; layers scale by z-order"),
+        ),
     ),
 }
 

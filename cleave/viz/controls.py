@@ -435,6 +435,11 @@ class TuningControls:
         if target < 0 or target >= len(order):
             return
         order[index], order[target] = order[target], order[index]
+        self._apply_preview_resolutions()
+
+    def _apply_preview_resolutions(self) -> None:
+        if self._layer_manager is not None:
+            self._layer_manager.apply_preview_resolutions()
 
     def _confirm_move_mode(self) -> None:
         self.move_mode_slot = None
@@ -497,6 +502,7 @@ class TuningControls:
     def _cancel_move_mode(self) -> None:
         if self._move_mode_original_z_order is not None:
             self.session.layer_z_order[:] = self._move_mode_original_z_order
+            self._apply_preview_resolutions()
         self.move_mode_slot = None
         self._move_mode_original_z_order = None
 
@@ -692,6 +698,7 @@ class TuningControls:
             self._settings.set_expanded(forward)
         elif kind == RowKind.SETTINGS_RENDER_MODE:
             self._settings.cycle_render_mode(forward=forward)
+            self._apply_preview_resolutions()
 
     def _step_directory(self, slot: str, *, forward: bool) -> None:
         layer = self.session.layers[slot]

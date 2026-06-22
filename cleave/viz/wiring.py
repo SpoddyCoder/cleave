@@ -109,7 +109,16 @@ class LayerManager:
         )
         add_layer_to_session(self.session, slot, runtime)
         self.cfg.layer_z_order.append(slot)
+        self.apply_preview_resolutions()
         return slot
+
+    def apply_preview_resolutions(self) -> None:
+        LayerFramePipeline.apply_preview_resolutions(
+            self.cfg,
+            self.session,
+            self.layers_by_slot,
+            self.compositor,
+        )
 
     def remove_layer(self, slot: str) -> None:
         _discard_timeline_slot(self.session, slot)

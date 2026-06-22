@@ -169,7 +169,12 @@ def init_gl_resources_heavy(
 
     report("Building layers...")
     layers, layers_by_slot = LayerFramePipeline.build(
-        seed.cfg, compositor, seed.playlists, projectm_fps=LIVE_PROJECTM_FPS
+        seed.cfg,
+        compositor,
+        seed.playlists,
+        projectm_fps=LIVE_PROJECTM_FPS,
+        preview_resolutions=True,
+        session=seed.session,
     )
 
     mix_pcm, sample_rate = load_mix_pcm(seed.audio_path)
@@ -253,6 +258,7 @@ def init_gl_resources_render(
         compositor,
         seed.playlists,
         projectm_fps=render_fps(seed.cfg),
+        preview_resolutions=False,
     )
 
     return RenderVisualizerRuntime(
