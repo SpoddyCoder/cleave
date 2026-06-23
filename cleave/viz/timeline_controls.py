@@ -191,15 +191,16 @@ class TimelineControls:
             return
 
         record_stop = current_sec(self.playback, self.duration_sec)
+        punch_end = max(record_stop, tl.record_high_water_mark or record_stop)
         tl.cues = punch_replace(
             tl.cues,
             {slot},
             record_start,
-            record_stop,
+            punch_end,
             build_record_punch_cues(
                 self.session,
                 record_start,
-                record_stop,
+                punch_end,
                 slots={slot},
             ),
         )
@@ -257,12 +258,13 @@ class TimelineControls:
             return
 
         record_stop = current_sec(self.playback, self.duration_sec)
+        punch_end = max(record_stop, tl.record_high_water_mark or record_stop)
         tl.cues = punch_replace(
             tl.cues,
             set(tl.record_baseline),
             record_start,
-            record_stop,
-            build_record_punch_cues(self.session, record_start, record_stop),
+            punch_end,
+            build_record_punch_cues(self.session, record_start, punch_end),
         )
         tl.recording = False
         tl.record_start_sec = None
