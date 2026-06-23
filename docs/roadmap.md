@@ -24,6 +24,21 @@ Per-layer preset cycling so a layer can advance through its preset tree without 
 
 Trigger mechanism (timer, beat-driven, or both) TBD when implementing; modes above define *scope* of the cycle, not when to advance.
 
+## projectM PCM feeding
+
+Investigate PCM feeding strategy for the projectM buffer. Only the last ~11 ms (480 samples at 44.1 kHz) is actively used per render; at low FPS Cleave feeds a much longer timeslice per frame. Explore whether sampling or aggregating across the full frame timeslice (not just the tail) improves visual matchup with audio. Uncertain payoff; worth exploring.
+
+## Auto-switching presets (projectM mode)
+
+Optional per-layer mode that unlocks projectM's native preset switching (soft cuts, hard cuts, preset duration) instead of Cleave's default locked single-preset behavior.
+
+| Revision | Scope |
+| --- | --- |
+| **v1** | Layer toggle into auto-switch mode; projectM drives transitions from its playlist and beat/hard-cut settings. |
+| **v2** | Curate which presets participate in rotation (whitelist or filter), not only directory or full-tree scope. |
+
+Distinct from [Preset cycling](#preset-cycling) above, which is Cleave-native browsing scope; this mode delegates transition timing and blending to libprojectM.
+
 ## Web / browser port
 
 Port playback and compositing to the browser. `signals.json` is already portable JSON; [Butterchurn](https://github.com/jberg/butterchurn) is a JS Milkdrop renderer that could replace libprojectM for a shareable viewer.
