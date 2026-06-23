@@ -82,6 +82,7 @@ class TimelineRuntime:
     record_buffer: list[TimelineCue] = field(default_factory=list)
     record_baseline: dict[str, bool] = field(default_factory=dict)
     record_start_sec: float | None = None
+    record_high_water_mark: float | None = None
     preview_active: bool = False
     monitor: dict[str, bool] = field(default_factory=dict)
     override_slots: set[str] = field(default_factory=set)
