@@ -137,7 +137,14 @@ def _timeline_strip_section(
         else:
             entries.append(("Space", "pause"))
 
-    if not recording:
+    if recording:
+        entries.extend(
+            (
+                ("Left/Right", "skip 10s, fills range"),
+                ("Ctrl + Left/Right", "skip 30s, fills range"),
+            )
+        )
+    else:
         entries.extend(
             (
                 ("Left/Right", "skip 10s"),

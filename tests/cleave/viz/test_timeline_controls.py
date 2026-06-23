@@ -12,6 +12,7 @@ from cleave.extract import STEM_NAMES
 from cleave.timeline import TimelineCue
 from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, TuningControls
 from cleave.viz.session import LayerRuntime, TuningSession
+from cleave.viz.layer_visibility import armed_recording_visible, effective_layer_enabled
 from cleave.viz.timeline_controls import TimelineControls
 from tests.support.viz import keydown, make_playlist, stub_playback_state
 
@@ -543,7 +544,7 @@ def test_disarm_one_slot_keeps_recording_on_remaining_armed() -> None:
     assert visibility_calls
 
 
-def test_seek_blocked_while_recording() -> None:
+def test_seek_allowed_while_recording() -> None:
     controls, session, _, _, seeks, _ = _make_timeline_controls(
         armed_slots={"layer_1"},
     )
@@ -555,7 +556,67 @@ def test_seek_blocked_while_recording() -> None:
     controls.handle_keydown(keydown(pygame.K_LEFT))
     controls.handle_keydown(keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
     controls.handle_keydown(keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
-    assert seeks == []
+    assert seeks == [SEEK_SHORT, -SEEK_SHORT, SEEK_LONG, -SEEK_LONG]
+
+
+def test_forward_seek_during_record_fills_with_active_state() -> None:
+    controls, session, visibility_calls, _, seeks, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=10.0,
+    )
+    session.layers["layer_1"].enabled = True
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    assert session.timeline.record_baseline == {"layer_1": True}
+    active_at_start = armed_recording_visible(session, "layer_1", 10.0)
+
+    controls.handle_keydown(keydown(pygame.K_RIGHT))
+    assert seeks == [SEEK_SHORT]
+
+    assert any(
+        cue.t == 10.0
+        and cue.layers.get("layer_1") is True
+        and cue.show_tick is False
+        for cue in session.timeline.record_buffer
+    )
+    assert armed_recording_visible(session, "layer_1", 15.0) == active_at_start
+    assert visibility_calls
+
+
+def test_backward_seek_during_record_fills_and_expands_punch_start() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=20.0,
+    )
+    session.layers["layer_1"].enabled = True
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    active_before_seek = armed_recording_visible(session, "layer_1", 20.0)
+    assert session.timeline.record_start_sec == 20.0
+
+    controls.handle_keydown(keydown(pygame.K_LEFT))
+
+    assert session.timeline.record_start_sec == 10.0
+    assert armed_recording_visible(session, "layer_1", 15.0) == active_before_seek
+    assert visibility_calls
+
+
+def test_seek_during_record_active_state_not_overwritten_by_committed_cues() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=10.0,
+        cues=[TimelineCue(t=0.0, layers={"layer_1": False})],
+    )
+    session.layers["layer_1"].enabled = True
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.handle_keydown(keydown(pygame.K_1))
+    assert effective_layer_enabled(session, "layer_1", 10.0) is True
+
+    controls.handle_keydown(keydown(pygame.K_RIGHT))
+
+    assert effective_layer_enabled(session, "layer_1", 15.0) is True
+    assert visibility_calls
 
 
 def test_r_stop_punches_cues_and_clears_record_state() -> None:

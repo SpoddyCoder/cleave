@@ -258,6 +258,7 @@ def build_timeline_view_state(
         record_start_sec=tl.record_start_sec,
         record_baseline=dict(tl.record_baseline),
         record_buffer=list(tl.record_buffer),
+        record_high_water_mark=tl.record_high_water_mark,
         enabled=tl.enabled,
         submenu_focused=submenu_focused,
         arm_flash_start_ms=dict(tl.arm_flash_start_ms),

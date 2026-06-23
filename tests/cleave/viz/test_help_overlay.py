@@ -193,7 +193,8 @@ def test_timeline_strip_help_recording_while_playing() -> None:
     assert "Ctrl + Enter" not in entries
     assert entries["1-4"] == "toggle layer visibility"
     assert "Shift + Enter" not in entries
-    assert "Left/Right" not in entries
+    assert entries["Left/Right"] == "skip 10s, fills range"
+    assert entries["Ctrl + Left/Right"] == "skip 30s, fills range"
     assert entries["r"] == "stop record"
     assert entries["Ctrl + Space / Space"] == "stop record and pause"
     assert "Space" not in entries
