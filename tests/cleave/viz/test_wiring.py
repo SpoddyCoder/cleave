@@ -69,3 +69,38 @@ def test_on_preset_change_skips_relock_in_projectm_mode() -> None:
 
     playlist.load_into.assert_not_called()
     pm.lock_preset.assert_not_called()
+
+
+def test_on_seek_reapplies_projectm_preset_switching() -> None:
+    session = _session_with_mode("projectm")
+    cfg = make_test_cfg(("layer_1",))
+    pm = ProjectM.__new__(ProjectM)
+    layer = StemLayer(
+        slot="layer_1",
+        pm=pm,
+        fbo=MagicMock(),
+        playlist=session.layers["layer_1"].playlist,
+    )
+
+    with (
+        patch("cleave.viz.wiring.reapply_projectm_preset_switching") as mock_reapply,
+        patch("cleave.viz.wiring.LayerFramePipeline.flush_pcm"),
+        patch("cleave.viz.wiring.seek"),
+    ):
+        controls = make_tuning_controls(
+            session=session,
+            cfg=cfg,
+            preset_root=cfg.paths.preset_root,
+            project_dir=Path("/tmp/project"),
+            layers_by_slot={"layer_1": layer},
+            layers=[layer],
+            playback=stub_playback_state(),
+            duration_sec=120.0,
+            signals=None,
+            effect_runtime=MagicMock(),
+        )
+        bindings = controls._layer_bindings
+        assert bindings is not None
+        bindings.on_seek(5.0)
+
+    mock_reapply.assert_called_once()

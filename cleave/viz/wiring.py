@@ -34,7 +34,11 @@ from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline, apply_effect_modifiers
 from cleave.viz.layer_visibility import apply_layer_visibility, effective_layer_enabled
 from cleave.viz.mix_player import MixPlayer
-from cleave.viz.preset_switching import EMPTY_ROTATION_NOTIFICATION, apply_preset_switching
+from cleave.viz.preset_switching import (
+    EMPTY_ROTATION_NOTIFICATION,
+    apply_preset_switching,
+    reapply_projectm_preset_switching,
+)
 from cleave.stem_pcm import StemPcmBank
 from cleave.viz.playback import current_sec, seek
 from cleave.config import VIZ_CONFIG_FILENAME
@@ -260,6 +264,17 @@ def make_tuning_controls(
     def on_seek(delta_sec: float) -> None:
         seek(playback, delta_sec, duration_sec)
         LayerFramePipeline.flush_pcm(layers)
+        notify = notification_sink.get("fn")
+
+        def on_empty() -> None:
+            if notify is not None:
+                notify(EMPTY_ROTATION_NOTIFICATION)
+
+        reapply_projectm_preset_switching(
+            session,
+            layers_by_slot,
+            on_empty=on_empty if notify is not None else None,
+        )
 
     layer_bindings = LiveLayerBindings(
         on_preset_change=on_preset_change,
@@ -359,6 +374,15 @@ def make_timeline_controls(
     def on_seek(delta_sec: float) -> None:
         seek(playback, delta_sec, duration_sec)
         LayerFramePipeline.flush_pcm(layers)
+        reapply_projectm_preset_switching(
+            session,
+            layers_by_slot,
+            on_empty=(
+                (lambda: on_notification(EMPTY_ROTATION_NOTIFICATION))
+                if on_notification is not None
+                else None
+            ),
+        )
 
     return TimelineControls(
         session,

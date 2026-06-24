@@ -15,8 +15,28 @@ PresetSwitchingScope = Literal["directory"]
 EMPTY_ROTATION_NOTIFICATION = "No presets in directory for auto switching"
 
 # libprojectM default soft-cut crossfade is 3s; blending shows a white flash in Cleave.
-# Match manual preset browse (smooth=False) by disabling the crossfade duration.
+# Auto switches load via instant preset callback (smooth=False); keep duration at zero so any
+# remaining soft-cut path from beat spikes also skips crossfade blending.
 PROJECTM_AUTO_SOFT_CUT_DURATION_SEC = 0.0
+
+
+def reapply_projectm_preset_switching(
+    session,
+    layers_by_slot: dict[str, StemLayer],
+    *,
+    on_empty: Callable[[], None] | None = None,
+) -> None:
+    """Re-attach projectM playlist switching (e.g. after seek resets the preset timer)."""
+    for slot, layer in layers_by_slot.items():
+        runtime = session.layers[slot]
+        if runtime.preset_switching != "projectm":
+            continue
+        apply_preset_switching(
+            layer,
+            mode=runtime.preset_switching,
+            scope=runtime.preset_switching_scope,
+            on_empty=on_empty,
+        )
 
 
 def apply_preset_switching(
