@@ -104,3 +104,4 @@ def test_on_seek_reapplies_projectm_preset_switching() -> None:
         bindings.on_seek(5.0)
 
     mock_reapply.assert_called_once()
+    assert mock_reapply.call_args.kwargs["delta_sec"] == 5.0

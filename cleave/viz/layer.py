@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from cleave.gl_compositor import LayerFbo
 from cleave.preset_playlist import PresetPlaylist
@@ -17,3 +18,4 @@ class StemLayer:
     fbo: LayerFbo
     playlist: PresetPlaylist
     projectm_playlist: ProjectMPlaylist | None = None
+    auto_preset_path: Path | None = None

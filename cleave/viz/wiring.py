@@ -273,6 +273,7 @@ def make_tuning_controls(
         reapply_projectm_preset_switching(
             session,
             layers_by_slot,
+            delta_sec=delta_sec,
             on_empty=on_empty if notify is not None else None,
         )
 
@@ -377,6 +378,7 @@ def make_timeline_controls(
         reapply_projectm_preset_switching(
             session,
             layers_by_slot,
+            delta_sec=delta_sec,
             on_empty=(
                 (lambda: on_notification(EMPTY_ROTATION_NOTIFICATION))
                 if on_notification is not None
