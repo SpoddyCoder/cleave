@@ -34,6 +34,7 @@ from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline, apply_effect_modifiers
 from cleave.viz.layer_visibility import apply_layer_visibility, effective_layer_enabled
 from cleave.viz.mix_player import MixPlayer
+from cleave.viz.preset_switching import EMPTY_ROTATION_NOTIFICATION, apply_preset_switching
 from cleave.stem_pcm import StemPcmBank
 from cleave.viz.playback import current_sec, seek
 from cleave.config import VIZ_CONFIG_FILENAME
@@ -161,9 +162,29 @@ def make_tuning_controls(
     def on_preset_change(slot: str, playlist: PresetPlaylist) -> None:
         layer = layers_by_slot[slot]
         layer.playlist = playlist
+        if session.layers[slot].preset_switching != "none":
+            return
         if playlist.current is not None:
             playlist.load_into(layer.pm, smooth=False)
             layer.pm.lock_preset(True)
+
+    def on_preset_switching_change(slot: str) -> None:
+        layer = layers_by_slot[slot]
+        runtime = session.layers[slot]
+
+        def on_empty() -> None:
+            notify = notification_sink.get("fn")
+            if notify is not None:
+                notify(EMPTY_ROTATION_NOTIFICATION)
+
+        apply_preset_switching(
+            layer,
+            mode=runtime.preset_switching,
+            scope=runtime.preset_switching_scope,
+            on_empty=on_empty,
+        )
+
+    notification_sink: dict[str, Callable[[str], None] | None] = {"fn": None}
 
     def on_blend_change(slot: str, blend_mode) -> None:
         layers_by_slot[slot].fbo.blend_mode = blend_mode
@@ -242,6 +263,7 @@ def make_tuning_controls(
 
     layer_bindings = LiveLayerBindings(
         on_preset_change=on_preset_change,
+        on_preset_switching_change=on_preset_switching_change,
         on_blend_change=on_blend_change,
         on_stem_change=on_stem_change,
         on_opacity_change=on_opacity_change,
@@ -281,6 +303,7 @@ def make_tuning_controls(
     )
 
     controls = TuningControls(**kwargs)
+    notification_sink["fn"] = controls.show_notification
     if pcm_bank is not None and mix_player is not None:
         mix_player.set_stem_pcm(
             {

@@ -91,12 +91,17 @@ class RowLayout:
             row_list.append(RowDescriptor(RowKind.TRACK_HEADER, slot=slot))
             row_list.append(RowDescriptor(RowKind.TRACK_PRESET_DIR, slot=slot))
             row_list.append(RowDescriptor(RowKind.TRACK_PRESET, slot=slot))
+            block = state.tracks[slot]
+            row_list.append(RowDescriptor(RowKind.TRACK_PRESET_SWITCHING, slot=slot))
+            if block.preset_switching == "projectm":
+                row_list.append(
+                    RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_SCOPE, slot=slot)
+                )
             row_list.append(RowDescriptor(RowKind.TRACK_STEM, slot=slot))
             row_list.append(RowDescriptor(RowKind.TRACK_BLEND, slot=slot))
             row_list.append(RowDescriptor(RowKind.TRACK_OPACITY, slot=slot))
             row_list.append(RowDescriptor(RowKind.TRACK_BEAT, slot=slot))
             row_list.append(RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, slot=slot))
-            block = state.tracks[slot]
             if block.effects_expanded:
                 for effect_def in effect_roster(block.stem):
                     row_list.append(

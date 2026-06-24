@@ -28,6 +28,13 @@ DEFAULT_BEAT_SENSITIVITY = 2.0
 BEAT_SENSITIVITY_MIN = 0.0
 BEAT_SENSITIVITY_MAX = 5.0
 
+PresetSwitchingMode = Literal["none", "projectm"]
+PresetSwitchingScope = Literal["directory"]
+PRESET_SWITCHING_MODES: tuple[PresetSwitchingMode, ...] = ("none", "projectm")
+PRESET_SWITCHING_SCOPES: tuple[PresetSwitchingScope, ...] = ("directory",)
+DEFAULT_PRESET_SWITCHING: PresetSwitchingMode = "none"
+DEFAULT_PRESET_SWITCHING_SCOPE: PresetSwitchingScope = "directory"
+
 VisualizerRenderMode = Literal[
     "full-quality", "balanced", "performance", "ultra-performance"
 ]
@@ -83,6 +90,8 @@ def new_layer_config(slot: str, preset: Path, preset_root: Path) -> Any:
         height=h,
         blend_mode=DEFAULT_BLEND_MODE[DEFAULT_NEW_LAYER_STEM],
         locked=False,
+        preset_switching=DEFAULT_PRESET_SWITCHING,
+        preset_switching_scope=DEFAULT_PRESET_SWITCHING_SCOPE,
     )
 
 DEFAULT_BLEND_MODE: dict[StemSource, BlendMode] = {
@@ -158,6 +167,26 @@ def clamp_upscale(value: float) -> float:
 
 def clamp_beat_sensitivity(value: float) -> float:
     return max(BEAT_SENSITIVITY_MIN, min(BEAT_SENSITIVITY_MAX, float(value)))
+
+
+def _parse_preset_switching(raw: Any, label: str) -> PresetSwitchingMode:
+    mode = str(raw)
+    if mode not in PRESET_SWITCHING_MODES:
+        allowed = ", ".join(PRESET_SWITCHING_MODES)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return mode
+
+
+def _parse_preset_switching_scope(raw: Any, label: str) -> PresetSwitchingScope:
+    scope = str(raw)
+    if scope not in PRESET_SWITCHING_SCOPES:
+        allowed = ", ".join(PRESET_SWITCHING_SCOPES)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return scope
+
+
+def preset_switching_display(mode: PresetSwitchingMode) -> str:
+    return "projectM" if mode == "projectm" else "none"
 
 
 @dataclass(frozen=True)
@@ -952,6 +981,14 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
         stem = _parse_stem(slot, layer_raw)
         default_width, default_height = LAYER_DEFAULT_SIZE[stem]
         beat_raw = layer_raw.get("beat_sensitivity")
+        preset_switching = _parse_preset_switching(
+            layer_raw.get("preset_switching", DEFAULT_PRESET_SWITCHING),
+            f"layers.{slot}.preset_switching",
+        )
+        preset_switching_scope = _parse_preset_switching_scope(
+            layer_raw.get("preset_switching_scope", DEFAULT_PRESET_SWITCHING_SCOPE),
+            f"layers.{slot}.preset_switching_scope",
+        )
         layers[slot] = LayerConfig(
             preset=_resolve_preset(preset_raw, preset_root),
             stem=stem,
@@ -965,6 +1002,8 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
             effects=_parse_effects(slot, stem, layer_raw),
             blend_mode=parse_blend_mode(slot, stem, layer_raw),
             locked=bool(layer_raw.get("locked", False)),
+            preset_switching=preset_switching,
+            preset_switching_scope=preset_switching_scope,
         )
     return layers
 
@@ -988,6 +1027,8 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             beat = runtime.beat_sensitivity
             effects = runtime.effects
             locked = runtime.locked
+            preset_switching = runtime.preset_switching
+            preset_switching_scope = runtime.preset_switching_scope
             stem = getattr(runtime, "stem", stem)
         else:
             preset = to_config_relative(layer_cfg.preset, preset_root)
@@ -995,6 +1036,8 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             enabled = layer_cfg.enabled
             blend_mode = layer_cfg.blend_mode
             locked = layer_cfg.locked
+            preset_switching = layer_cfg.preset_switching
+            preset_switching_scope = layer_cfg.preset_switching_scope
             effects = layer_cfg.effects
             beat = (
                 layer_cfg.beat_sensitivity
@@ -1018,6 +1061,10 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
         sparse = sparse_effects(effects)
         if sparse is not None:
             layer_out["effects"] = sparse
+        if preset_switching != DEFAULT_PRESET_SWITCHING:
+            layer_out["preset_switching"] = preset_switching
+        if preset_switching_scope != DEFAULT_PRESET_SWITCHING_SCOPE:
+            layer_out["preset_switching_scope"] = preset_switching_scope
         layers_out[slot] = layer_out
 
     return layers_out

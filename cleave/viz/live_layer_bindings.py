@@ -13,6 +13,7 @@ from cleave.preset_playlist import PresetPlaylist
 @dataclass(frozen=True)
 class LiveLayerBindings:
     on_preset_change: Callable[[str, PresetPlaylist], None]
+    on_preset_switching_change: Callable[[str], None]
     on_blend_change: Callable[[str, BlendMode], None]
     on_stem_change: Callable[[str, StemSource], None]
     on_opacity_change: Callable[[str, int], None]

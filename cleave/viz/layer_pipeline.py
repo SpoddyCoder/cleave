@@ -15,6 +15,7 @@ from cleave.stem_pcm import StemPcmBank
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_preview_resolution import preview_sizes_for_session
 from cleave.viz.layer_visibility import apply_layer_visibility, effective_layer_enabled
+from cleave.viz.preset_switching import apply_preset_switching
 from cleave.viz.session import TuningSession
 from OpenGL.GL import GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, glClear, glClearColor, glViewport
 
@@ -135,8 +136,6 @@ class LayerFramePipeline:
         if texture_paths:
             pm.set_texture_paths(texture_paths)
         playlist.load_into(pm)
-        pm.lock_preset(True)
-        pm.set_hard_cut_enabled(False)
         pm.set_fps(fps)
         pm.set_beat_sensitivity(beat_sensitivity)
 
@@ -148,12 +147,18 @@ class LayerFramePipeline:
             blend_mode=layer_cfg.blend_mode,
         )
         fbo.enabled = layer_cfg.enabled
-        return StemLayer(
+        layer = StemLayer(
             slot=slot,
             pm=pm,
             fbo=fbo,
             playlist=playlist,
         )
+        apply_preset_switching(
+            layer,
+            mode=layer_cfg.preset_switching,
+            scope=layer_cfg.preset_switching_scope,
+        )
+        return layer
 
     @staticmethod
     def destroy_single(
@@ -164,6 +169,8 @@ class LayerFramePipeline:
     ) -> None:
         layer = layers_by_slot.pop(slot)
         layers.remove(layer)
+        if layer.projectm_playlist is not None:
+            layer.projectm_playlist.destroy()
         layer.pm.destroy()
         compositor.remove_layer_fbo(slot)
 

@@ -31,6 +31,7 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.TRANSPORT,
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
+        RowKind.TRACK_PRESET_SWITCHING,
         RowKind.TRACK_STEM,
         RowKind.TRACK_BLEND,
         RowKind.TRACK_OPACITY,
@@ -126,6 +127,8 @@ def test_track_sub_row_kinds() -> None:
         {
             RowKind.TRACK_PRESET_DIR,
             RowKind.TRACK_PRESET,
+            RowKind.TRACK_PRESET_SWITCHING,
+            RowKind.TRACK_PRESET_SWITCHING_SCOPE,
             RowKind.TRACK_STEM,
             RowKind.TRACK_BLEND,
             RowKind.TRACK_OPACITY,
@@ -205,6 +208,8 @@ def test_track_value_rows_blocked_by_layer_lock() -> None:
         {
             RowKind.TRACK_PRESET_DIR,
             RowKind.TRACK_PRESET,
+            RowKind.TRACK_PRESET_SWITCHING,
+            RowKind.TRACK_PRESET_SWITCHING_SCOPE,
             RowKind.TRACK_STEM,
             RowKind.TRACK_BLEND,
             RowKind.TRACK_OPACITY,

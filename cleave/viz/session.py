@@ -12,6 +12,10 @@ from cleave.config import (
 )
 from cleave.config_schema import (
     DEFAULT_BEAT_SENSITIVITY,
+    DEFAULT_PRESET_SWITCHING,
+    DEFAULT_PRESET_SWITCHING_SCOPE,
+    PresetSwitchingMode,
+    PresetSwitchingScope,
     default_render_overlay_runtime_values,
     default_render_post_fx_runtime_values,
 )
@@ -112,6 +116,8 @@ class LayerRuntime:
     enabled: bool = True
     expanded: bool = False
     locked: bool = False
+    preset_switching: PresetSwitchingMode = DEFAULT_PRESET_SWITCHING
+    preset_switching_scope: PresetSwitchingScope = DEFAULT_PRESET_SWITCHING_SCOPE
 
 
 @dataclass
@@ -207,6 +213,8 @@ def session_from_cfg(
                 beat_sensitivity=_beat_sensitivity(cfg, slot),
                 enabled=layer_cfg.enabled,
                 locked=layer_cfg.locked,
+                preset_switching=layer_cfg.preset_switching,
+                preset_switching_scope=layer_cfg.preset_switching_scope,
             )
             for slot, layer_cfg in cfg.layers.items()
         },
