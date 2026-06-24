@@ -8,7 +8,12 @@ from unittest.mock import MagicMock, patch
 from cleave.preset_playlist import PresetPlaylist
 from cleave.projectm import ProjectM
 from cleave.viz.layer import StemLayer
-from cleave.viz.preset_switching import EMPTY_ROTATION_NOTIFICATION, apply_preset_switching
+from cleave.viz.preset_switching import (
+    EMPTY_ROTATION_NOTIFICATION,
+    apply_preset_switching,
+    reapply_projectm_preset_switching,
+)
+from cleave.viz.session import LayerRuntime, TuningSession
 
 _MILK = (Path("/tmp/presets/drums/a.milk"),)
 
@@ -79,3 +84,37 @@ def test_apply_projectm_empty_dir_falls_back(mock_playlist_cls: MagicMock) -> No
 
 def test_empty_rotation_notification_text() -> None:
     assert "No presets" in EMPTY_ROTATION_NOTIFICATION
+
+
+def test_reapply_projectm_preset_switching_only_projectm_layers() -> None:
+    layer_projectm = _stem_layer(paths=_MILK)
+    layer_none = _stem_layer(paths=_MILK)
+    session = TuningSession(
+        layer_z_order=["layer_1", "layer_2"],
+        layers={
+            "layer_1": LayerRuntime(
+                playlist=layer_projectm.playlist,
+                browse_floor=layer_projectm.playlist.current_dir,
+                stem="drums",
+                preset_switching="projectm",
+            ),
+            "layer_2": LayerRuntime(
+                playlist=layer_none.playlist,
+                browse_floor=layer_none.playlist.current_dir,
+                stem="bass",
+                preset_switching="none",
+            ),
+        },
+    )
+
+    with (
+        patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK),
+        patch("cleave.viz.preset_switching.apply_preset_switching") as mock_apply,
+    ):
+        reapply_projectm_preset_switching(
+            session,
+            {"layer_1": layer_projectm, "layer_2": layer_none},
+        )
+
+    mock_apply.assert_called_once()
+    assert mock_apply.call_args.args[0] is layer_projectm

@@ -5,7 +5,7 @@ from __future__ import annotations
 import ctypes
 import os
 import subprocess
-from ctypes import c_bool, c_char_p, c_void_p
+from ctypes import CFUNCTYPE, c_bool, c_char_p, c_uint32, c_void_p
 from pathlib import Path
 
 from cleave.projectm import ProjectM
@@ -88,6 +88,8 @@ _REQUIRED_SYMBOLS = (
     "projectm_playlist_set_shuffle",
 )
 
+PresetLoadEvent = CFUNCTYPE(c_bool, c_uint32, c_char_p, c_bool, c_void_p)
+
 
 def _bind_functions(lib: ctypes.CDLL, path: str) -> None:
     missing = [name for name in _REQUIRED_SYMBOLS if not hasattr(lib, name)]
@@ -116,6 +118,14 @@ def _bind_functions(lib: ctypes.CDLL, path: str) -> None:
 
     lib.projectm_playlist_set_shuffle.argtypes = [c_void_p, c_bool]
     lib.projectm_playlist_set_shuffle.restype = None
+
+    if hasattr(lib, "projectm_playlist_set_preset_load_event_callback"):
+        lib.projectm_playlist_set_preset_load_event_callback.argtypes = [
+            c_void_p,
+            c_void_p,
+            c_void_p,
+        ]
+        lib.projectm_playlist_set_preset_load_event_callback.restype = None
 
 
 def _get_lib() -> ctypes.CDLL:
@@ -148,6 +158,7 @@ class ProjectMPlaylist:
     def __init__(self, handle: c_void_p, *, pm: ProjectM | None = None) -> None:
         self._handle = handle
         self._pm = pm
+        self._preset_load_callback: PresetLoadEvent | None = None
 
     @classmethod
     def create(cls, pm: ProjectM | None = None) -> ProjectMPlaylist:
@@ -163,9 +174,42 @@ class ProjectMPlaylist:
         return self._handle
 
     def connect(self, pm: ProjectM | None) -> None:
+        self._clear_instant_load_callback()
         pm_handle = pm.handle if pm is not None else c_void_p()
         _get_lib().projectm_playlist_connect(self._handle, pm_handle)
         self._pm = pm
+        if pm is not None:
+            self._install_instant_load_callback()
+
+    def _clear_instant_load_callback(self) -> None:
+        lib = _get_lib()
+        if not hasattr(lib, "projectm_playlist_set_preset_load_event_callback"):
+            return
+        if self._handle:
+            lib.projectm_playlist_set_preset_load_event_callback(
+                self._handle, c_void_p(), c_void_p()
+            )
+        self._preset_load_callback = None
+
+    def _install_instant_load_callback(self) -> None:
+        lib = _get_lib()
+        if not hasattr(lib, "projectm_playlist_set_preset_load_event_callback"):
+            return
+        pm = self._pm
+        if pm is None:
+            return
+
+        def _on_preset_load(
+            _index: int, filename: bytes, _hard_cut: bool, _user_data: c_void_p
+        ) -> bool:
+            if filename:
+                pm.load_preset(filename.decode("utf-8"), smooth=False)
+            return True
+
+        self._preset_load_callback = PresetLoadEvent(_on_preset_load)
+        lib.projectm_playlist_set_preset_load_event_callback(
+            self._handle, self._preset_load_callback, c_void_p()
+        )
 
     def add_path(
         self,
@@ -187,6 +231,7 @@ class ProjectMPlaylist:
 
     def destroy(self) -> None:
         if self._handle:
+            self._clear_instant_load_callback()
             _get_lib().projectm_playlist_connect(self._handle, c_void_p())
             _get_lib().projectm_playlist_destroy(self._handle)
             self._handle = c_void_p()

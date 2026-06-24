@@ -22,6 +22,7 @@ def _mock_lib() -> MagicMock:
         "projectm_playlist_connect",
         "projectm_playlist_add_path",
         "projectm_playlist_set_shuffle",
+        "projectm_playlist_set_preset_load_event_callback",
     ):
         setattr(lib, name, MagicMock())
     lib.projectm_playlist_create.return_value = MagicMock()
@@ -62,3 +63,49 @@ def test_destroy_disconnects_before_free() -> None:
 
     lib.projectm_playlist_connect.assert_called()
     lib.projectm_playlist_destroy.assert_called_once()
+
+
+def test_connect_installs_instant_load_callback() -> None:
+    lib = _mock_lib()
+    pm = ProjectM.__new__(ProjectM)
+    pm._handle = MagicMock()
+    pm.load_preset = MagicMock()
+
+    with patch("cleave.projectm_playlist._get_lib", return_value=lib):
+        playlist = ProjectMPlaylist.create()
+        playlist.connect(pm)
+
+    lib.projectm_playlist_set_preset_load_event_callback.assert_called()
+    install_call = lib.projectm_playlist_set_preset_load_event_callback.call_args
+    callback = install_call.args[1]
+    assert callback is not None
+    assert callback(0, b"/tmp/a.milk", True, None) is True
+    pm.load_preset.assert_called_once_with("/tmp/a.milk", smooth=False)
+
+
+def test_instant_load_callback_ignores_hard_cut_flag() -> None:
+    lib = _mock_lib()
+    pm = ProjectM.__new__(ProjectM)
+    pm._handle = MagicMock()
+    pm.load_preset = MagicMock()
+
+    with patch("cleave.projectm_playlist._get_lib", return_value=lib):
+        playlist = ProjectMPlaylist.create()
+        playlist.connect(pm)
+
+    callback = lib.projectm_playlist_set_preset_load_event_callback.call_args.args[1]
+    callback(1, b"/tmp/b.milk", False, None)
+    pm.load_preset.assert_called_once_with("/tmp/b.milk", smooth=False)
+
+
+def test_destroy_clears_preset_load_callback() -> None:
+    lib = _mock_lib()
+    pm = ProjectM.__new__(ProjectM)
+    pm._handle = MagicMock()
+    with patch("cleave.projectm_playlist._get_lib", return_value=lib):
+        playlist = ProjectMPlaylist.create()
+        playlist.connect(pm)
+        playlist.destroy()
+
+    clear_call = lib.projectm_playlist_set_preset_load_event_callback.call_args_list[-1]
+    assert not clear_call.args[1]
