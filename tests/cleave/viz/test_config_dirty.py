@@ -97,6 +97,15 @@ def _mutate_preset_path(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
+def _mutate_preset_switching(controls: TuningControls) -> None:
+    _expand_layer_1(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = view.layout.descriptor(
+        _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING)
+    )
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
 def _mutate_render_overlay_enabled(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_HEADER)
@@ -248,6 +257,7 @@ _PERSISTED_MUTATIONS: list[
     ("stem.beat_sensitivity", _mutate_stem_beat_sensitivity, ("layer_1",), {}),
     ("stem.effects", _mutate_stem_effects, ("layer_1",), {}),
     ("stem.preset", _mutate_preset_path, ("layer_1",), {}),
+    ("stem.preset_switching", _mutate_preset_switching, ("layer_1",), {}),
     ("render_overlay.enabled", _mutate_render_overlay_enabled, ("layer_1",), {}),
     ("render_overlay.position", _mutate_render_overlay_position, ("layer_1",), {}),
     ("render_overlay.title_font_size", _mutate_render_overlay_title_font_size, ("layer_1",), {}),

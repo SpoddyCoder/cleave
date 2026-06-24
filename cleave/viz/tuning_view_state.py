@@ -41,6 +41,8 @@ class TrackBlock:
     expanded: bool = False
     locked: bool = False
     preset_empty: bool = False
+    preset_switching: str = "none"
+    preset_switching_scope: str = "directory"
 
 
 @dataclass
@@ -226,6 +228,8 @@ class TuningViewStateBuilder:
                 expanded=layer.expanded,
                 locked=layer.locked,
                 preset_empty=not layer.playlist.paths,
+                preset_switching=layer.preset_switching,
+                preset_switching_scope=layer.preset_switching_scope,
             )
 
         notification_message, notification_remaining_sec = self._get_notification()

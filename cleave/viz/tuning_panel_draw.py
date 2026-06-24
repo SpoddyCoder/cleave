@@ -11,6 +11,7 @@ from typing import Literal
 
 import pygame
 
+from cleave.config_schema import preset_switching_display
 from cleave.extract import stem_control_label, stem_overlay_header
 from cleave.viz.row_semantics import (
     LABELED_SUB_ROW_KINDS,
@@ -186,6 +187,10 @@ def _row_text(state: TuningViewState, index: int) -> str:
         return block.preset_dir_label
     if kind == RowKind.TRACK_PRESET:
         return block.preset_label
+    if kind == RowKind.TRACK_PRESET_SWITCHING:
+        return f"└─ preset switching: {preset_switching_display(block.preset_switching)}"
+    if kind == RowKind.TRACK_PRESET_SWITCHING_SCOPE:
+        return f"└─ scope: {block.preset_switching_scope}"
     if kind == RowKind.TRACK_STEM:
         return f"└─ driving stem: {stem_control_label(block.stem)}"
     if kind == RowKind.TRACK_BLEND:
@@ -215,6 +220,10 @@ def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
         return "└─ opacity: "
     if kind == RowKind.TRACK_BEAT:
         return "└─ beat sensitivity: "
+    if kind == RowKind.TRACK_PRESET_SWITCHING:
+        return "└─ preset switching: "
+    if kind == RowKind.TRACK_PRESET_SWITCHING_SCOPE:
+        return "└─ scope: "
     if kind == RowKind.RENDER_OVERLAY_POSITION:
         return "└─ position: "
     if kind == RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE:
@@ -289,6 +298,10 @@ def _labeled_sub_row_value(state: TuningViewState, index: int) -> str:
         return f"{block.opacity_pct}%"
     if kind == RowKind.TRACK_BEAT:
         return f"{block.beat_sensitivity:.2f}"
+    if kind == RowKind.TRACK_PRESET_SWITCHING:
+        return preset_switching_display(block.preset_switching)
+    if kind == RowKind.TRACK_PRESET_SWITCHING_SCOPE:
+        return block.preset_switching_scope
     assert kind == RowKind.TRACK_EFFECT
     effect = row_effect(state, index)
     assert effect is not None
@@ -596,6 +609,8 @@ def _row_indent(state: TuningViewState, index: int) -> int:
     if kind in {
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
+        RowKind.TRACK_PRESET_SWITCHING,
+        RowKind.TRACK_PRESET_SWITCHING_SCOPE,
         RowKind.TRACK_STEM,
         RowKind.TRACK_BLEND,
         RowKind.TRACK_OPACITY,
@@ -661,6 +676,13 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
         kind == RowKind.TRACK_PRESET
         and stem is not None
         and state.tracks[stem].preset_empty
+    ):
+        return DISABLED
+
+    if (
+        stem is not None
+        and kind in {RowKind.TRACK_PRESET_DIR, RowKind.TRACK_PRESET}
+        and state.tracks[stem].preset_switching != "none"
     ):
         return DISABLED
 

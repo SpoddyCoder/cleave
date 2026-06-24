@@ -10,6 +10,8 @@ class RowKind(Enum):
     TRACK_HEADER = auto()
     TRACK_PRESET_DIR = auto()
     TRACK_PRESET = auto()
+    TRACK_PRESET_SWITCHING = auto()
+    TRACK_PRESET_SWITCHING_SCOPE = auto()
     TRACK_STEM = auto()
     TRACK_BLEND = auto()
     TRACK_OPACITY = auto()
@@ -108,6 +110,19 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.PATH_PRESET,
         repeatable=True,
         parent_group="track",
+    ),
+    RowKind.TRACK_PRESET_SWITCHING: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="track",
+        help_title="Preset switching",
+        help_entries=(("Left/Right", "cycle mode"),),
+    ),
+    RowKind.TRACK_PRESET_SWITCHING_SCOPE: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        parent_group="track",
+        help_title="Preset switching scope",
+        help_entries=(("Left/Right", "directory only in v1"),),
     ),
     RowKind.TRACK_STEM: RowBehavior(
         RowAffordance.VALUE_STEP,

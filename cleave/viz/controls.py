@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 import pygame
 
 from cleave.config import CleaveConfig, clamp_beat_sensitivity, clamp_effect_pct
+from cleave.config_schema import PRESET_SWITCHING_MODES
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.extract import STEM_SOURCES
 from cleave.viz.config_save import ConfigSaveController
@@ -232,6 +233,8 @@ class TuningControls:
             if kind == RowKind.TRACK_PRESET_DIR:
                 slot = self.focus_descriptor.slot
                 if slot is not None:
+                    if self._auto_preset_switching_blocks_browse(slot):
+                        return True
                     if layer_lock_blocks_mutation(
                         kind, locked=self.session.layers[slot].locked
                     ):
@@ -268,6 +271,8 @@ class TuningControls:
             if kind == RowKind.TRACK_PRESET_DIR:
                 slot = self.focus_descriptor.slot
                 if slot is not None:
+                    if self._auto_preset_switching_blocks_browse(slot):
+                        return True
                     if layer_lock_blocks_mutation(
                         kind, locked=self.session.layers[slot].locked
                     ):
@@ -517,6 +522,13 @@ class TuningControls:
 
         if (
             slot is not None
+            and kind in {RowKind.TRACK_PRESET_DIR, RowKind.TRACK_PRESET}
+            and self._auto_preset_switching_blocks_browse(slot)
+        ):
+            return
+
+        if (
+            slot is not None
             and layer_lock_blocks_mutation(
                 kind, locked=self.session.layers[slot].locked
             )
@@ -555,6 +567,12 @@ class TuningControls:
             if slot is None:
                 return
             self._step_preset(slot, forward=forward, ctrl=ctrl)
+        elif kind == RowKind.TRACK_PRESET_SWITCHING:
+            if slot is None:
+                return
+            self._cycle_preset_switching(slot, forward=forward)
+        elif kind == RowKind.TRACK_PRESET_SWITCHING_SCOPE:
+            return
         elif kind == RowKind.TRACK_STEM:
             if slot is None:
                 return
@@ -724,6 +742,23 @@ class TuningControls:
             playlist.prev()
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_change(slot, playlist)
+
+    def _auto_preset_switching_blocks_browse(self, slot: str) -> bool:
+        return self.session.layers[slot].preset_switching != "none"
+
+    def _cycle_preset_switching(self, slot: str, *, forward: bool) -> None:
+        layer = self.session.layers[slot]
+        modes = PRESET_SWITCHING_MODES
+        try:
+            index = modes.index(layer.preset_switching)
+        except ValueError:
+            index = 0
+        if forward:
+            layer.preset_switching = modes[(index + 1) % len(modes)]
+        else:
+            layer.preset_switching = modes[(index - 1) % len(modes)]
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_preset_switching_change(slot)
 
     def _cycle_blend(self, slot: str, *, forward: bool) -> None:
         layer = self.session.layers[slot]

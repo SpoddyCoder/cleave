@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, TextIO
+from typing import Any, Literal, TextIO
 
 import yaml
 
@@ -21,7 +21,11 @@ from cleave.config_schema import (
     BEAT_SENSITIVITY_MIN,
     DEFAULT_BEAT_SENSITIVITY,
     DEFAULT_LAYER_Z_ORDER,
+    DEFAULT_PRESET_SWITCHING,
+    DEFAULT_PRESET_SWITCHING_SCOPE,
     DEFAULT_PRESET_ROOT,
+    PresetSwitchingMode,
+    PresetSwitchingScope,
     DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR,
     DEFAULT_RENDER_OVERLAY_BACKGROUND_MARGIN,
     DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
@@ -90,6 +94,8 @@ class LayerConfig:
     effects: dict[str, dict[str, int]] = field(default_factory=dict)
     blend_mode: BlendMode = "black-key"
     locked: bool = False
+    preset_switching: PresetSwitchingMode = DEFAULT_PRESET_SWITCHING
+    preset_switching_scope: PresetSwitchingScope = DEFAULT_PRESET_SWITCHING_SCOPE
 
 
 @dataclass(frozen=True)
