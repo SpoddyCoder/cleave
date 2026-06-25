@@ -97,6 +97,18 @@ class RowLayout:
                 row_list.append(
                     RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_SCOPE, slot=slot)
                 )
+                row_list.append(
+                    RowDescriptor(RowKind.TRACK_PRESET_DURATION, slot=slot)
+                )
+                row_list.append(
+                    RowDescriptor(RowKind.TRACK_SOFT_CUT_DURATION, slot=slot)
+                )
+                row_list.append(
+                    RowDescriptor(RowKind.TRACK_HARD_CUT_DURATION, slot=slot)
+                )
+                row_list.append(
+                    RowDescriptor(RowKind.TRACK_HARD_CUT_SENSITIVITY, slot=slot)
+                )
             row_list.append(RowDescriptor(RowKind.TRACK_STEM, slot=slot))
             row_list.append(RowDescriptor(RowKind.TRACK_BLEND, slot=slot))
             row_list.append(RowDescriptor(RowKind.TRACK_OPACITY, slot=slot))

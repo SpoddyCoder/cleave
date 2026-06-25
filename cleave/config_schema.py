@@ -34,6 +34,10 @@ PRESET_SWITCHING_MODES: tuple[PresetSwitchingMode, ...] = ("none", "projectm")
 PRESET_SWITCHING_SCOPES: tuple[PresetSwitchingScope, ...] = ("directory",)
 DEFAULT_PRESET_SWITCHING: PresetSwitchingMode = "none"
 DEFAULT_PRESET_SWITCHING_SCOPE: PresetSwitchingScope = "directory"
+DEFAULT_PRESET_DURATION = 30.0
+DEFAULT_SOFT_CUT_DURATION = 0.0
+DEFAULT_HARD_CUT_DURATION = 20.0
+DEFAULT_HARD_CUT_SENSITIVITY = 2.0
 
 VisualizerRenderMode = Literal[
     "full-quality", "balanced", "performance", "ultra-performance"
@@ -989,6 +993,18 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
             layer_raw.get("preset_switching_scope", DEFAULT_PRESET_SWITCHING_SCOPE),
             f"layers.{slot}.preset_switching_scope",
         )
+        preset_duration = float(
+            layer_raw.get("preset_duration", DEFAULT_PRESET_DURATION)
+        )
+        soft_cut_duration = float(
+            layer_raw.get("soft_cut_duration", DEFAULT_SOFT_CUT_DURATION)
+        )
+        hard_cut_duration = float(
+            layer_raw.get("hard_cut_duration", DEFAULT_HARD_CUT_DURATION)
+        )
+        hard_cut_sensitivity = float(
+            layer_raw.get("hard_cut_sensitivity", DEFAULT_HARD_CUT_SENSITIVITY)
+        )
         layers[slot] = LayerConfig(
             preset=_resolve_preset(preset_raw, preset_root),
             stem=stem,
@@ -1004,6 +1020,10 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
             locked=bool(layer_raw.get("locked", False)),
             preset_switching=preset_switching,
             preset_switching_scope=preset_switching_scope,
+            preset_duration=preset_duration,
+            soft_cut_duration=soft_cut_duration,
+            hard_cut_duration=hard_cut_duration,
+            hard_cut_sensitivity=hard_cut_sensitivity,
         )
     return layers
 
@@ -1029,6 +1049,10 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             locked = runtime.locked
             preset_switching = runtime.preset_switching
             preset_switching_scope = runtime.preset_switching_scope
+            preset_duration = runtime.preset_duration
+            soft_cut_duration = runtime.soft_cut_duration
+            hard_cut_duration = runtime.hard_cut_duration
+            hard_cut_sensitivity = runtime.hard_cut_sensitivity
             stem = getattr(runtime, "stem", stem)
         else:
             preset = to_config_relative(layer_cfg.preset, preset_root)
@@ -1038,6 +1062,10 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             locked = layer_cfg.locked
             preset_switching = layer_cfg.preset_switching
             preset_switching_scope = layer_cfg.preset_switching_scope
+            preset_duration = layer_cfg.preset_duration
+            soft_cut_duration = layer_cfg.soft_cut_duration
+            hard_cut_duration = layer_cfg.hard_cut_duration
+            hard_cut_sensitivity = layer_cfg.hard_cut_sensitivity
             effects = layer_cfg.effects
             beat = (
                 layer_cfg.beat_sensitivity
@@ -1065,6 +1093,14 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             layer_out["preset_switching"] = preset_switching
         if preset_switching_scope != DEFAULT_PRESET_SWITCHING_SCOPE:
             layer_out["preset_switching_scope"] = preset_switching_scope
+        if preset_duration != DEFAULT_PRESET_DURATION:
+            layer_out["preset_duration"] = preset_duration
+        if soft_cut_duration != DEFAULT_SOFT_CUT_DURATION:
+            layer_out["soft_cut_duration"] = soft_cut_duration
+        if hard_cut_duration != DEFAULT_HARD_CUT_DURATION:
+            layer_out["hard_cut_duration"] = hard_cut_duration
+        if hard_cut_sensitivity != DEFAULT_HARD_CUT_SENSITIVITY:
+            layer_out["hard_cut_sensitivity"] = hard_cut_sensitivity
         layers_out[slot] = layer_out
 
     return layers_out

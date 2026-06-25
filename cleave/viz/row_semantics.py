@@ -12,6 +12,10 @@ class RowKind(Enum):
     TRACK_PRESET = auto()
     TRACK_PRESET_SWITCHING = auto()
     TRACK_PRESET_SWITCHING_SCOPE = auto()
+    TRACK_PRESET_DURATION = auto()
+    TRACK_SOFT_CUT_DURATION = auto()
+    TRACK_HARD_CUT_DURATION = auto()
+    TRACK_HARD_CUT_SENSITIVITY = auto()
     TRACK_STEM = auto()
     TRACK_BLEND = auto()
     TRACK_OPACITY = auto()
@@ -123,6 +127,30 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         parent_group="track",
         help_title="Preset switching scope",
         help_entries=(("Left/Right", "directory only in v1"),),
+    ),
+    RowKind.TRACK_PRESET_DURATION: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="track",
+        help_entries=(("Left/Right", "step value"),),
+    ),
+    RowKind.TRACK_SOFT_CUT_DURATION: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="track",
+        help_entries=(("Left/Right", "step value"),),
+    ),
+    RowKind.TRACK_HARD_CUT_DURATION: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="track",
+        help_entries=(("Left/Right", "step value"),),
+    ),
+    RowKind.TRACK_HARD_CUT_SENSITIVITY: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="track",
+        help_entries=(("Left/Right", "step value"),),
     ),
     RowKind.TRACK_STEM: RowBehavior(
         RowAffordance.VALUE_STEP,
@@ -309,6 +337,15 @@ TRACK_SUB_ROW_KINDS = frozenset(
     k for k, b in ROW_BEHAVIORS.items() if b.parent_group == "track"
 )
 TRACK_EFFECT_SUB_ROW_KINDS = frozenset({RowKind.TRACK_EFFECT})
+PRESET_SWITCHING_SUBMENU_KINDS = frozenset(
+    {
+        RowKind.TRACK_PRESET_SWITCHING_SCOPE,
+        RowKind.TRACK_PRESET_DURATION,
+        RowKind.TRACK_SOFT_CUT_DURATION,
+        RowKind.TRACK_HARD_CUT_DURATION,
+        RowKind.TRACK_HARD_CUT_SENSITIVITY,
+    }
+)
 RENDER_OVERLAY_SUB_ROW_KINDS = frozenset(
     k for k, b in ROW_BEHAVIORS.items() if b.parent_group == "render_overlay"
 )
@@ -407,6 +444,8 @@ def section_header_descriptor(desc: RowDescriptor) -> RowDescriptor:
         return RowDescriptor(RowKind.RENDER_OVERLAY_HEADER)
     if kind in RENDER_POST_FX_SUB_ROW_KINDS:
         return RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
+    if kind in PRESET_SWITCHING_SUBMENU_KINDS:
+        return RowDescriptor(RowKind.TRACK_PRESET_SWITCHING, slot=desc.slot)
     behavior = row_behavior(kind)
     if behavior.parent_group == "track":
         if kind in TRACK_EFFECT_SUB_ROW_KINDS:

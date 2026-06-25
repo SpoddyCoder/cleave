@@ -15,6 +15,7 @@ from cleave.config_schema import preset_switching_display
 from cleave.extract import stem_control_label, stem_overlay_header
 from cleave.viz.row_semantics import (
     LABELED_SUB_ROW_KINDS,
+    PRESET_SWITCHING_SUBMENU_KINDS,
     RENDER_OVERLAY_ALL_SUB_ROW_KINDS,
     RENDER_OVERLAY_BODY_NESTED_KINDS,
     RENDER_OVERLAY_SUB_ROW_KINDS,
@@ -190,7 +191,25 @@ def _row_text(state: TuningViewState, index: int) -> str:
     if kind == RowKind.TRACK_PRESET_SWITCHING:
         return f"└─ preset switching: {preset_switching_display(block.preset_switching)}"
     if kind == RowKind.TRACK_PRESET_SWITCHING_SCOPE:
-        return f"└─ scope: {block.preset_switching_scope}"
+        return (
+            f"{_preset_switching_submenu_prefix()}scope: {block.preset_switching_scope}"
+        )
+    if kind == RowKind.TRACK_PRESET_DURATION:
+        return (
+            f"{_preset_switching_submenu_prefix()}preset duration: {block.preset_duration:g}s"
+        )
+    if kind == RowKind.TRACK_SOFT_CUT_DURATION:
+        return (
+            f"{_preset_switching_submenu_prefix()}soft cut: {block.soft_cut_duration:g}s"
+        )
+    if kind == RowKind.TRACK_HARD_CUT_DURATION:
+        return (
+            f"{_preset_switching_submenu_prefix()}hard cut min: {block.hard_cut_duration:g}s"
+        )
+    if kind == RowKind.TRACK_HARD_CUT_SENSITIVITY:
+        return (
+            f"{_preset_switching_submenu_prefix()}hard cut sens: {block.hard_cut_sensitivity:.1f}"
+        )
     if kind == RowKind.TRACK_STEM:
         return f"└─ driving stem: {stem_control_label(block.stem)}"
     if kind == RowKind.TRACK_BLEND:
@@ -223,7 +242,15 @@ def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
     if kind == RowKind.TRACK_PRESET_SWITCHING:
         return "└─ preset switching: "
     if kind == RowKind.TRACK_PRESET_SWITCHING_SCOPE:
-        return "└─ scope: "
+        return "  └─ scope: "
+    if kind == RowKind.TRACK_PRESET_DURATION:
+        return "  └─ preset duration: "
+    if kind == RowKind.TRACK_SOFT_CUT_DURATION:
+        return "  └─ soft cut: "
+    if kind == RowKind.TRACK_HARD_CUT_DURATION:
+        return "  └─ hard cut min: "
+    if kind == RowKind.TRACK_HARD_CUT_SENSITIVITY:
+        return "  └─ hard cut sens: "
     if kind == RowKind.RENDER_OVERLAY_POSITION:
         return "└─ position: "
     if kind == RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE:
@@ -302,6 +329,14 @@ def _labeled_sub_row_value(state: TuningViewState, index: int) -> str:
         return preset_switching_display(block.preset_switching)
     if kind == RowKind.TRACK_PRESET_SWITCHING_SCOPE:
         return block.preset_switching_scope
+    if kind == RowKind.TRACK_PRESET_DURATION:
+        return f"{block.preset_duration:g}s"
+    if kind == RowKind.TRACK_SOFT_CUT_DURATION:
+        return f"{block.soft_cut_duration:g}s"
+    if kind == RowKind.TRACK_HARD_CUT_DURATION:
+        return f"{block.hard_cut_duration:g}s"
+    if kind == RowKind.TRACK_HARD_CUT_SENSITIVITY:
+        return f"{block.hard_cut_sensitivity:.1f}"
     assert kind == RowKind.TRACK_EFFECT
     effect = row_effect(state, index)
     assert effect is not None
@@ -439,6 +474,10 @@ def _render_preset_row_prefix(
 
 def _layer_management_delete_prefix() -> str:
     return "└─ "
+
+
+def _preset_switching_submenu_prefix() -> str:
+    return "  └─ "
 
 
 def _effects_header_prefix() -> str:
@@ -604,13 +643,14 @@ def _row_indent(state: TuningViewState, index: int) -> int:
         return TREE_INDENT
     if kind == RowKind.TRACK_EFFECT:
         return TREE_INDENT * 2
+    if kind in PRESET_SWITCHING_SUBMENU_KINDS:
+        return TREE_INDENT * 2
     if kind in RENDER_OVERLAY_TITLE_NESTED_KINDS | RENDER_OVERLAY_BODY_NESTED_KINDS:
         return TREE_INDENT * 2
     if kind in {
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
         RowKind.TRACK_PRESET_SWITCHING,
-        RowKind.TRACK_PRESET_SWITCHING_SCOPE,
         RowKind.TRACK_STEM,
         RowKind.TRACK_BLEND,
         RowKind.TRACK_OPACITY,
