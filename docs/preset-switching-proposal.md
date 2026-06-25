@@ -202,3 +202,7 @@ Defaults: `preset_switching: none`. Omit optional keys when they match defaults.
 9. **Shuffle and repeat.** Strict sequential order when shuffle is off is acceptable. No "no repeat until all played" requirement.
 
 10. **Layer add/remove.** New layers default to **none**. Deleting a layer drops its playlist handle with the `ProjectM` instance; no cross-layer handle leaks.
+
+
+## Persistent hard to solve whitescreen on transition bug
+The white screen was a GL state leak: libprojectM's transition pass left the active texture unit non-zero, and Cleave's fixed-function compositor sampled an empty unit (which reads as white). Fixed by resetting glActiveTexture(GL_TEXTURE0) in the compositor's bind helpers.

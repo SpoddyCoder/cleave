@@ -5,20 +5,15 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import numpy as np
 import pygame
-import pytest
 
 from cleave.config_schema import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
-from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import PresetPlaylist
-from cleave.stem_pcm import StemPcmBank
 from cleave.timeline import TimelineCue
 from cleave.viz.session import LayerRuntime, TimelineRuntime, TuningSession
 from cleave.viz.row_semantics import RowDescriptor, RowKind
 from cleave.viz.layer import StemLayer
-from cleave.viz.layer_pipeline import LayerFramePipeline
 from cleave.viz.layer_visibility import (
     apply_layer_visibility,
     armed_recording_visible,
@@ -541,150 +536,6 @@ def test_build_record_punch_cues_restores_when_disable_only_inside_punch() -> No
     assert TimelineCue(t=22.0, layers={"layer_1": False}, show_tick=False) in punch
     assert committed_visible_outside_punch(session, "layer_1", 10.0, 22.0) is True
     assert timeline_committed_visible(session, "layer_1", 22.0) is False
-
-
-def _pcm_bank() -> StemPcmBank:
-    pcm = {name: np.zeros(44100, dtype=np.float32) for name in STEM_NAMES}
-    channels = {name: 1 for name in STEM_NAMES}
-    return StemPcmBank(
-        project_dir=Path("/tmp/project"),
-        duration_sec=1.0,
-        _pcm=pcm,
-        _channels=channels,
-    )
-
-
-def test_warmup_layers_feeds_pcm_and_frame_times() -> None:
-    session = _session()
-    drums = _stem_layer("layer_1")
-    bass = _stem_layer("layer_2")
-    layers = [drums, bass]
-    pcm_bank = _pcm_bank()
-    start_sec = 2.0
-    frames = 3
-    fps = 30
-    n_pcm = 1470
-
-    with patch("cleave.viz.layer_pipeline._render_layer_fbo") as render_mock:
-        LayerFramePipeline.warmup(
-            layers,
-            pcm_bank,
-            start_sec,
-            frames,
-            fps,
-            n_pcm,
-            session=session,
-        )
-
-    expected_times = [
-        start_sec - (frames - i) / fps for i in range(frames)
-    ]
-    assert drums.pm.set_frame_time.call_args_list == [
-        ((t,),) for t in expected_times
-    ]
-    assert bass.pm.set_frame_time.call_args_list == [
-        ((t,),) for t in expected_times
-    ]
-    assert drums.pm.feed_pcm.call_count == frames
-    assert bass.pm.feed_pcm.call_count == frames
-    assert render_mock.call_count == frames * 2
-
-
-def test_warmup_layers_skips_disabled_layers() -> None:
-    session = _session(
-        layer_enabled={"layer_1": True, "layer_2": False, "layer_3": True, "layer_4": True},
-    )
-    drums = _stem_layer("layer_1")
-    bass = _stem_layer("layer_2")
-    pcm_bank = _pcm_bank()
-
-    with patch("cleave.viz.layer_pipeline._render_layer_fbo") as render_mock:
-        LayerFramePipeline.warmup(
-            [drums, bass],
-            pcm_bank,
-            start_sec=1.0,
-            frames=2,
-            fps=30,
-            n_pcm=1470,
-            session=session,
-        )
-
-    assert drums.pm.feed_pcm.call_count == 2
-    assert bass.pm.feed_pcm.call_count == 0
-    assert render_mock.call_count == 2
-
-
-def test_warmup_layers_advances_frame_time_into_start() -> None:
-    session = _session()
-    drums = _stem_layer("layer_1")
-    pcm_bank = _pcm_bank()
-    fps = 30
-    frames = 30
-
-    with patch("cleave.viz.layer_pipeline._render_layer_fbo"):
-        LayerFramePipeline.warmup(
-            [drums],
-            pcm_bank,
-            start_sec=0.0,
-            frames=frames,
-            fps=fps,
-            n_pcm=1470,
-            session=session,
-        )
-
-    times = [call.args[0] for call in drums.pm.set_frame_time.call_args_list]
-    assert times == sorted(times)
-    assert all(b - a == pytest.approx(1.0 / fps) for a, b in zip(times, times[1:]))
-    assert any(t < 0.0 for t in times)
-    assert times[-1] == pytest.approx(-1.0 / fps)
-
-
-def test_warmup_layers_ends_one_frame_before_partial_start() -> None:
-    session = _session()
-    drums = _stem_layer("layer_1")
-    pcm_bank = _pcm_bank()
-    fps = 30
-
-    with patch("cleave.viz.layer_pipeline._render_layer_fbo"):
-        LayerFramePipeline.warmup(
-            [drums],
-            pcm_bank,
-            start_sec=10.0,
-            frames=4,
-            fps=fps,
-            n_pcm=1470,
-            session=session,
-        )
-
-    times = [call.args[0] for call in drums.pm.set_frame_time.call_args_list]
-    assert times[-1] == pytest.approx(10.0 - 1.0 / fps)
-    assert times[0] == pytest.approx(10.0 - 4.0 / fps)
-
-
-def test_warmup_layers_respects_timeline_visibility() -> None:
-    session = _session(
-        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
-        timeline_enabled=True,
-        cues=[TimelineCue(t=1.0, layers={"layer_1": False})],
-    )
-    drums = _stem_layer("layer_1")
-    bass = _stem_layer("layer_2")
-    pcm_bank = _pcm_bank()
-
-    with patch("cleave.viz.layer_pipeline._render_layer_fbo") as render_mock:
-        LayerFramePipeline.warmup(
-            [drums, bass],
-            pcm_bank,
-            start_sec=1.5,
-            frames=2,
-            fps=30,
-            n_pcm=1470,
-            session=session,
-        )
-
-    assert drums.pm.feed_pcm.call_count == 0
-    assert bass.pm.feed_pcm.call_count == 2
-    assert render_mock.call_count == 2
 
 
 def test_timeline_defaults_tracks_layer_enabled_before_first_record() -> None:

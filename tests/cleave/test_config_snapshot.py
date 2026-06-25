@@ -860,7 +860,6 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
                     "width": 1280,
                     "height": 720,
                     "upscale": 1.5,
-                    "warmup_sec": 5.0,
                     "beat_sensitivity": 2.2,
                 },
                 "paths": {
@@ -976,17 +975,16 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
     ]
 
     expected = persisted_session_payload(cfg, session)
-    assert expected["visualizer"]["warmup_sec"] == 5.0
+    assert expected["visualizer"]["upscale"] == 1.5
 
     sig_before = persisted_session_signature(cfg, session)
-    cfg_warmup_default = CleaveConfig(
+    cfg_upscale_changed = CleaveConfig(
         paths=cfg.paths,
         layers=cfg.layers,
         visualizer=VisualizerConfig(
             width=cfg.visualizer.width,
             height=cfg.visualizer.height,
-            upscale=cfg.visualizer.upscale,
-            warmup_sec=3.0,
+            upscale=2.0,
             beat_sensitivity=cfg.visualizer.beat_sensitivity,
         ),
         config_path=cfg.config_path,
@@ -994,13 +992,12 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
         render=cfg.render,
         timeline=cfg.timeline,
     )
-    assert persisted_session_signature(cfg_warmup_default, session) != sig_before
+    assert persisted_session_signature(cfg_upscale_changed, session) != sig_before
 
     snapshot_path = root / "snapshot.yaml"
     write_session_snapshot(snapshot_path, cfg=cfg, session=session)
 
     snapshot_data = yaml.safe_load(snapshot_path.read_text(encoding="utf-8"))
-    assert snapshot_data["visualizer"]["warmup_sec"] == 5.0
     assert snapshot_data["visualizer"]["upscale"] == 1.5
     assert snapshot_data["visualizer"]["beat_sensitivity"] == 2.2
 

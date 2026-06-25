@@ -81,7 +81,6 @@ def _run_seed(*, upscale: float = 2.0) -> VisualizerSeed:
     display_w = int(1280 * upscale)
     display_h = int(720 * upscale)
     cfg = MagicMock()
-    cfg.visualizer.warmup_sec = 0.0
     return VisualizerSeed(
         project_dir=MagicMock(),
         audio_path=MagicMock(),
@@ -194,7 +193,6 @@ def _heavy_init_side_effect(
 
 @patch("cleave.viz.app.current_sec", return_value=0.0)
 @patch("cleave.viz.app.pygame")
-@patch("cleave.viz.app.LayerFramePipeline.warmup")
 @patch("cleave.viz.app.draw_loading_screen")
 @patch("cleave.viz.app.init_gl_resources_heavy")
 @patch("cleave.viz.app.init_gl_resources_cheap")
@@ -204,13 +202,11 @@ def test_run_boot_order_audio_starts_after_first_frame(
     mock_init_cheap: MagicMock,
     mock_init_heavy: MagicMock,
     mock_draw_loading: MagicMock,
-    mock_warmup: MagicMock,
     mock_pygame: MagicMock,
     _mock_current_sec: MagicMock,
 ) -> None:
     compositor = recording_compositor()
     seed = _run_seed()
-    seed.cfg.visualizer.warmup_sec = 1.0
 
     call_order: list[str] = []
     overlay_surface = pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA)
@@ -233,7 +229,6 @@ def test_run_boot_order_audio_starts_after_first_frame(
     mock_init_cheap.side_effect = cheap_side_effect
     mock_init_heavy.side_effect = heavy_with_start
     mock_draw_loading.side_effect = lambda *_a, **_k: call_order.append("loading_screen")
-    mock_warmup.side_effect = lambda *_a, **_k: call_order.append("warmup")
     mock_tick_frame.side_effect = lambda *_a, **_k: call_order.append("tick_frame")
 
     quit_event = MagicMock()
@@ -248,12 +243,6 @@ def test_run_boot_order_audio_starts_after_first_frame(
 
     mock_init_cheap.assert_called_once_with(seed)
     mock_init_heavy.assert_called_once()
-    mock_warmup.assert_called_once()
-    warmup_args = mock_warmup.call_args.args
-    assert warmup_args[2] == 0.0
-    assert warmup_args[3] == round(1.0 * LIVE_PROJECTM_FPS)
-    assert warmup_args[4] == LIVE_PROJECTM_FPS
-    assert warmup_args[5] == samples_per_frame(LIVE_PROJECTM_FPS)
     mock_tick_frame.assert_called()
     assert mock_tick_frame.call_args_list[0] == call(
         0.0, paused=False, n_pcm=samples_per_frame(LIVE_PROJECTM_FPS)
@@ -266,7 +255,6 @@ def test_run_boot_order_audio_starts_after_first_frame(
 
 @patch("cleave.viz.app.current_sec", return_value=0.0)
 @patch("cleave.viz.app.pygame")
-@patch("cleave.viz.app.LayerFramePipeline.warmup")
 @patch("cleave.viz.app.draw_loading_screen")
 @patch("cleave.viz.app.init_gl_resources_heavy")
 @patch("cleave.viz.app.init_gl_resources_cheap")
@@ -276,7 +264,6 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
     mock_init_cheap: MagicMock,
     mock_init_heavy: MagicMock,
     mock_draw_loading: MagicMock,
-    mock_warmup: MagicMock,
     mock_pygame: MagicMock,
     _mock_current_sec: MagicMock,
 ) -> None:
@@ -326,7 +313,6 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
 
 @patch("cleave.viz.app.current_sec", return_value=0.0)
 @patch("cleave.viz.app.pygame")
-@patch("cleave.viz.app.LayerFramePipeline.warmup")
 @patch("cleave.viz.app.draw_loading_screen")
 @patch("cleave.viz.app.init_gl_resources_heavy")
 @patch("cleave.viz.app.init_gl_resources_cheap")
@@ -336,7 +322,6 @@ def test_run_ctrl_q_clean_exits(
     mock_init_cheap: MagicMock,
     mock_init_heavy: MagicMock,
     mock_draw_loading: MagicMock,
-    mock_warmup: MagicMock,
     mock_pygame: MagicMock,
     _mock_current_sec: MagicMock,
 ) -> None:
@@ -386,7 +371,6 @@ def test_run_ctrl_q_clean_exits(
 
 @patch("cleave.viz.app.current_sec", return_value=0.0)
 @patch("cleave.viz.app.pygame")
-@patch("cleave.viz.app.LayerFramePipeline.warmup")
 @patch("cleave.viz.app.draw_loading_screen")
 @patch("cleave.viz.app.init_gl_resources_heavy")
 @patch("cleave.viz.app.init_gl_resources_cheap")
@@ -396,7 +380,6 @@ def test_run_pygame_quit_dirty_stays_open(
     mock_init_cheap: MagicMock,
     mock_init_heavy: MagicMock,
     mock_draw_loading: MagicMock,
-    mock_warmup: MagicMock,
     mock_pygame: MagicMock,
     _mock_current_sec: MagicMock,
 ) -> None:
@@ -450,7 +433,6 @@ def test_run_pygame_quit_dirty_stays_open(
 
 @patch("cleave.viz.app.current_sec", return_value=0.0)
 @patch("cleave.viz.app.pygame")
-@patch("cleave.viz.app.LayerFramePipeline.warmup")
 @patch("cleave.viz.app.draw_loading_screen")
 @patch("cleave.viz.app.init_gl_resources_heavy")
 @patch("cleave.viz.app.init_gl_resources_cheap")
@@ -460,7 +442,6 @@ def test_run_main_loop_stays_open_without_quit_event(
     mock_init_cheap: MagicMock,
     mock_init_heavy: MagicMock,
     mock_draw_loading: MagicMock,
-    mock_warmup: MagicMock,
     mock_pygame: MagicMock,
     _mock_current_sec: MagicMock,
 ) -> None:

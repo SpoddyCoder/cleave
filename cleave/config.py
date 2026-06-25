@@ -56,7 +56,6 @@ from cleave.config_schema import (
     DEFAULT_VISUALIZER_HEIGHT,
     DEFAULT_VISUALIZER_RENDER_MODE,
     DEFAULT_VISUALIZER_UPSCALE,
-    DEFAULT_VISUALIZER_WARMUP_SEC,
     DEFAULT_VISUALIZER_WIDTH,
     LAYER_DEFAULT_SIZE,
     RENDER_OVERLAY_POSITIONS,
@@ -112,8 +111,6 @@ class VisualizerConfig:
     width: int = DEFAULT_VISUALIZER_WIDTH
     height: int = DEFAULT_VISUALIZER_HEIGHT
     upscale: float = DEFAULT_VISUALIZER_UPSCALE
-    # Launch/render pre-roll; persisted on snapshot save, not a live session field.
-    warmup_sec: float = DEFAULT_VISUALIZER_WARMUP_SEC
     beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
     render_mode: VisualizerRenderMode = DEFAULT_VISUALIZER_RENDER_MODE
 
