@@ -6,7 +6,14 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
+from cleave.config_schema import (
+    DEFAULT_HARD_CUT_DURATION,
+    DEFAULT_HARD_CUT_SENSITIVITY,
+    DEFAULT_PRESET_DURATION,
+    DEFAULT_SOFT_CUT_DURATION,
+)
 from cleave.preset_playlist import milk_files_in_dir
+from cleave.projectm import ProjectM
 from cleave.projectm_playlist import ProjectMPlaylist
 from cleave.viz.layer import StemLayer
 
@@ -15,10 +22,19 @@ PresetSwitchingScope = Literal["directory"]
 
 EMPTY_ROTATION_NOTIFICATION = "No presets in directory for auto switching"
 
-# libprojectM default soft-cut crossfade is 3s; blending shows a white flash in Cleave.
-# Auto switches load via instant preset callback (smooth=False); keep duration at zero so any
-# remaining soft-cut path from beat spikes also skips crossfade blending.
-PROJECTM_AUTO_SOFT_CUT_DURATION_SEC = 0.0
+
+def _apply_projectm_timing(
+    pm: ProjectM,
+    *,
+    preset_duration: float,
+    soft_cut_duration: float,
+    hard_cut_duration: float,
+    hard_cut_sensitivity: float,
+) -> None:
+    pm.set_preset_duration(preset_duration)
+    pm.set_soft_cut_duration(soft_cut_duration)
+    pm.set_hard_cut_duration(hard_cut_duration)
+    pm.set_hard_cut_sensitivity(hard_cut_sensitivity)
 
 
 def reapply_projectm_preset_switching(
@@ -38,10 +54,21 @@ def reapply_projectm_preset_switching(
                 layer,
                 mode=runtime.preset_switching,
                 scope=runtime.preset_switching_scope,
+                preset_duration=runtime.preset_duration,
+                soft_cut_duration=runtime.soft_cut_duration,
+                hard_cut_duration=runtime.hard_cut_duration,
+                hard_cut_sensitivity=runtime.hard_cut_sensitivity,
                 on_empty=on_empty,
             )
             continue
-        _reapply_on_seek(layer, delta_sec)
+        _reapply_on_seek(
+            layer,
+            delta_sec,
+            preset_duration=runtime.preset_duration,
+            soft_cut_duration=runtime.soft_cut_duration,
+            hard_cut_duration=runtime.hard_cut_duration,
+            hard_cut_sensitivity=runtime.hard_cut_sensitivity,
+        )
 
 
 def apply_preset_switching(
@@ -49,6 +76,10 @@ def apply_preset_switching(
     *,
     mode: PresetSwitchingMode,
     scope: PresetSwitchingScope,
+    preset_duration: float = DEFAULT_PRESET_DURATION,
+    soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION,
+    hard_cut_duration: float = DEFAULT_HARD_CUT_DURATION,
+    hard_cut_sensitivity: float = DEFAULT_HARD_CUT_SENSITIVITY,
     on_empty: Callable[[], None] | None = None,
 ) -> None:
     pm = layer.pm
@@ -65,7 +96,13 @@ def apply_preset_switching(
 
     pm.lock_preset(False)
     pm.set_hard_cut_enabled(True)
-    pm.set_soft_cut_duration(PROJECTM_AUTO_SOFT_CUT_DURATION_SEC)
+    _apply_projectm_timing(
+        pm,
+        preset_duration=preset_duration,
+        soft_cut_duration=soft_cut_duration,
+        hard_cut_duration=hard_cut_duration,
+        hard_cut_sensitivity=hard_cut_sensitivity,
+    )
 
     if scope == "directory":
         preset_dir = layer.playlist.current_dir
@@ -94,13 +131,26 @@ def restart_projectm_preset_timer(layer: StemLayer) -> None:
     _record_auto_preset(layer, path)
 
 
-def reset_projectm_preset_timer(layer: StemLayer) -> None:
+def reset_projectm_preset_timer(
+    layer: StemLayer,
+    *,
+    preset_duration: float = DEFAULT_PRESET_DURATION,
+    soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION,
+    hard_cut_duration: float = DEFAULT_HARD_CUT_DURATION,
+    hard_cut_sensitivity: float = DEFAULT_HARD_CUT_SENSITIVITY,
+) -> None:
     """Reset projectM's duration timer without reloading the preset file."""
     pm = layer.pm
     pm.lock_preset(True)
     pm.lock_preset(False)
     pm.set_hard_cut_enabled(True)
-    pm.set_soft_cut_duration(PROJECTM_AUTO_SOFT_CUT_DURATION_SEC)
+    _apply_projectm_timing(
+        pm,
+        preset_duration=preset_duration,
+        soft_cut_duration=soft_cut_duration,
+        hard_cut_duration=hard_cut_duration,
+        hard_cut_sensitivity=hard_cut_sensitivity,
+    )
 
 
 def active_auto_preset_path(layer: StemLayer) -> Path | None:
@@ -112,19 +162,39 @@ def active_auto_preset_path(layer: StemLayer) -> Path | None:
     return current.resolve()
 
 
-def _reapply_on_seek(layer: StemLayer, delta_sec: float) -> None:
+def _reapply_on_seek(
+    layer: StemLayer,
+    delta_sec: float,
+    *,
+    preset_duration: float = DEFAULT_PRESET_DURATION,
+    soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION,
+    hard_cut_duration: float = DEFAULT_HARD_CUT_DURATION,
+    hard_cut_sensitivity: float = DEFAULT_HARD_CUT_SENSITIVITY,
+) -> None:
     playlist = layer.projectm_playlist
     if playlist is None:
         return
     pm = layer.pm
     pm.lock_preset(False)
     pm.set_hard_cut_enabled(True)
-    pm.set_soft_cut_duration(PROJECTM_AUTO_SOFT_CUT_DURATION_SEC)
+    _apply_projectm_timing(
+        pm,
+        preset_duration=preset_duration,
+        soft_cut_duration=soft_cut_duration,
+        hard_cut_duration=hard_cut_duration,
+        hard_cut_sensitivity=hard_cut_sensitivity,
+    )
     playlist.connect(pm, on_preset_loaded=_auto_preset_loaded_callback(layer))
     if delta_sec < 0:
         restart_projectm_preset_timer(layer)
     else:
-        reset_projectm_preset_timer(layer)
+        reset_projectm_preset_timer(
+            layer,
+            preset_duration=preset_duration,
+            soft_cut_duration=soft_cut_duration,
+            hard_cut_duration=hard_cut_duration,
+            hard_cut_sensitivity=hard_cut_sensitivity,
+        )
 
 
 def _auto_preset_loaded_callback(layer: StemLayer) -> Callable[[Path], None]:

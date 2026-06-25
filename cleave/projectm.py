@@ -113,6 +113,9 @@ _REQUIRED_SYMBOLS = (
     "projectm_set_frame_time",
     "projectm_set_hard_cut_enabled",
     "projectm_set_soft_cut_duration",
+    "projectm_set_preset_duration",
+    "projectm_set_hard_cut_duration",
+    "projectm_set_hard_cut_sensitivity",
 )
 
 
@@ -179,6 +182,15 @@ def _bind_functions(lib: ctypes.CDLL, path: str) -> None:
 
     lib.projectm_set_soft_cut_duration.argtypes = [c_void_p, c_double]
     lib.projectm_set_soft_cut_duration.restype = None
+
+    lib.projectm_set_preset_duration.argtypes = [c_void_p, c_double]
+    lib.projectm_set_preset_duration.restype = None
+
+    lib.projectm_set_hard_cut_duration.argtypes = [c_void_p, c_double]
+    lib.projectm_set_hard_cut_duration.restype = None
+
+    lib.projectm_set_hard_cut_sensitivity.argtypes = [c_void_p, c_float]
+    lib.projectm_set_hard_cut_sensitivity.restype = None
 
 
 def _get_lib() -> ctypes.CDLL:
@@ -325,3 +337,12 @@ class ProjectM:
 
     def set_soft_cut_duration(self, seconds: float) -> None:
         _get_lib().projectm_set_soft_cut_duration(self._handle, c_double(seconds))
+
+    def set_preset_duration(self, seconds: float) -> None:
+        _get_lib().projectm_set_preset_duration(self._handle, c_double(seconds))
+
+    def set_hard_cut_duration(self, seconds: float) -> None:
+        _get_lib().projectm_set_hard_cut_duration(self._handle, c_double(seconds))
+
+    def set_hard_cut_sensitivity(self, value: float) -> None:
+        _get_lib().projectm_set_hard_cut_sensitivity(self._handle, c_float(value))

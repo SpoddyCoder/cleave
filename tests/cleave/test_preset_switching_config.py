@@ -8,8 +8,12 @@ import yaml
 
 from cleave.config import CleaveConfig, LayerConfig, PathsConfig, VisualizerConfig, load_config
 from cleave.config_schema import (
+    DEFAULT_HARD_CUT_DURATION,
+    DEFAULT_HARD_CUT_SENSITIVITY,
+    DEFAULT_PRESET_DURATION,
     DEFAULT_PRESET_SWITCHING,
     DEFAULT_PRESET_SWITCHING_SCOPE,
+    DEFAULT_SOFT_CUT_DURATION,
     ParseCtx,
     parse_layers_section,
     persist_layers,
@@ -39,6 +43,10 @@ def test_parse_layers_preset_switching_defaults_omitted() -> None:
     layer = layers["layer_1"]
     assert layer.preset_switching == DEFAULT_PRESET_SWITCHING
     assert layer.preset_switching_scope == DEFAULT_PRESET_SWITCHING_SCOPE
+    assert layer.preset_duration == DEFAULT_PRESET_DURATION
+    assert layer.soft_cut_duration == DEFAULT_SOFT_CUT_DURATION
+    assert layer.hard_cut_duration == DEFAULT_HARD_CUT_DURATION
+    assert layer.hard_cut_sensitivity == DEFAULT_HARD_CUT_SENSITIVITY
 
 
 def test_parse_layers_preset_switching_projectm() -> None:
@@ -47,6 +55,25 @@ def test_parse_layers_preset_switching_projectm() -> None:
     data["layers"]["layer_1"]["preset_switching"] = "projectm"
     layers = parse_layers_section(data, ParseCtx(preset_root=preset_root))
     assert layers["layer_1"].preset_switching == "projectm"
+
+
+def test_parse_layers_preset_switching_timing() -> None:
+    preset_root = Path("/tmp/presets")
+    data = {"layers": _layer_yaml()}
+    data["layers"]["layer_1"].update(
+        {
+            "preset_duration": 45.0,
+            "soft_cut_duration": 1.5,
+            "hard_cut_duration": 30.0,
+            "hard_cut_sensitivity": 3.5,
+        }
+    )
+    layers = parse_layers_section(data, ParseCtx(preset_root=preset_root))
+    layer = layers["layer_1"]
+    assert layer.preset_duration == 45.0
+    assert layer.soft_cut_duration == 1.5
+    assert layer.hard_cut_duration == 30.0
+    assert layer.hard_cut_sensitivity == 3.5
 
 
 def _cfg_and_session(*, preset_switching: str = "none") -> tuple[CleaveConfig, TuningSession]:
@@ -86,6 +113,24 @@ def test_persist_layers_omits_default_preset_switching() -> None:
     out = persist_layers(PersistCtx(cfg=cfg, session=session))
     assert "preset_switching" not in out["layer_1"]
     assert "preset_switching_scope" not in out["layer_1"]
+    assert "preset_duration" not in out["layer_1"]
+    assert "soft_cut_duration" not in out["layer_1"]
+    assert "hard_cut_duration" not in out["layer_1"]
+    assert "hard_cut_sensitivity" not in out["layer_1"]
+
+
+def test_persist_layers_writes_timing_overrides() -> None:
+    cfg, session = _cfg_and_session(preset_switching="projectm")
+    runtime = session.layers["layer_1"]
+    runtime.preset_duration = 45.0
+    runtime.soft_cut_duration = 1.5
+    runtime.hard_cut_duration = 30.0
+    runtime.hard_cut_sensitivity = 3.5
+    out = persist_layers(PersistCtx(cfg=cfg, session=session))
+    assert out["layer_1"]["preset_duration"] == 45.0
+    assert out["layer_1"]["soft_cut_duration"] == 1.5
+    assert out["layer_1"]["hard_cut_duration"] == 30.0
+    assert out["layer_1"]["hard_cut_sensitivity"] == 3.5
 
 
 def test_persist_layers_writes_projectm_mode(tmp_path: Path) -> None:

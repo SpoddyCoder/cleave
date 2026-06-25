@@ -5,6 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
+from cleave.config_schema import (
+    DEFAULT_HARD_CUT_DURATION,
+    DEFAULT_HARD_CUT_SENSITIVITY,
+    DEFAULT_PRESET_DURATION,
+    DEFAULT_SOFT_CUT_DURATION,
+)
 from cleave.preset_playlist import PresetPlaylist
 from cleave.projectm import ProjectM
 from cleave.viz.layer import StemLayer
@@ -32,6 +38,9 @@ def _stem_layer(*, paths: tuple[Path, ...], index: int = 0) -> StemLayer:
     pm.lock_preset = MagicMock()
     pm.set_hard_cut_enabled = MagicMock()
     pm.set_soft_cut_duration = MagicMock()
+    pm.set_preset_duration = MagicMock()
+    pm.set_hard_cut_duration = MagicMock()
+    pm.set_hard_cut_sensitivity = MagicMock()
     pm.load_preset = MagicMock()
     return StemLayer(slot="layer_1", pm=pm, fbo=MagicMock(), playlist=playlist)
 
@@ -70,7 +79,12 @@ def test_apply_projectm_connects_playlist(
 
     layer.pm.lock_preset.assert_called_with(False)
     layer.pm.set_hard_cut_enabled.assert_called_with(True)
-    layer.pm.set_soft_cut_duration.assert_called_once_with(0.0)
+    layer.pm.set_preset_duration.assert_called_once_with(DEFAULT_PRESET_DURATION)
+    layer.pm.set_soft_cut_duration.assert_called_once_with(DEFAULT_SOFT_CUT_DURATION)
+    layer.pm.set_hard_cut_duration.assert_called_once_with(DEFAULT_HARD_CUT_DURATION)
+    layer.pm.set_hard_cut_sensitivity.assert_called_once_with(
+        DEFAULT_HARD_CUT_SENSITIVITY
+    )
     playlist.connect.assert_called_once()
     assert playlist.connect.call_args.kwargs["on_preset_loaded"] is not None
     playlist.add_path.assert_called_once_with(
@@ -168,7 +182,14 @@ def test_reapply_projectm_preset_switching_only_projectm_layers() -> None:
         )
 
     mock_apply.assert_not_called()
-    mock_reapply.assert_called_once_with(layer_projectm, 0.0)
+    mock_reapply.assert_called_once_with(
+        layer_projectm,
+        0.0,
+        preset_duration=DEFAULT_PRESET_DURATION,
+        soft_cut_duration=DEFAULT_SOFT_CUT_DURATION,
+        hard_cut_duration=DEFAULT_HARD_CUT_DURATION,
+        hard_cut_sensitivity=DEFAULT_HARD_CUT_SENSITIVITY,
+    )
 
 
 def test_reapply_without_playlist_falls_back_to_apply() -> None:
