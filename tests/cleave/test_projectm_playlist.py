@@ -94,7 +94,7 @@ def test_connect_installs_instant_load_callback() -> None:
     assert loaded_paths == ["/tmp/a.milk"]
 
 
-def test_instant_load_callback_ignores_hard_cut_flag() -> None:
+def test_load_callback_honors_hard_cut_flag() -> None:
     lib = _mock_lib()
     pm = ProjectM.__new__(ProjectM)
     pm._handle = MagicMock()
@@ -106,7 +106,7 @@ def test_instant_load_callback_ignores_hard_cut_flag() -> None:
 
     callback = lib.projectm_playlist_set_preset_load_event_callback.call_args.args[1]
     callback(1, b"/tmp/b.milk", False, None)
-    pm.load_preset.assert_called_once_with("/tmp/b.milk", smooth=False)
+    pm.load_preset.assert_called_once_with("/tmp/b.milk", smooth=True)
 
 
 def test_preset_switched_callback_notifies_on_preset_loaded() -> None:
