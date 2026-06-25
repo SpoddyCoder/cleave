@@ -251,11 +251,11 @@ class ProjectMPlaylist:
 
         if hasattr(lib, "projectm_playlist_set_preset_load_event_callback"):
             def _on_preset_load(
-                _index: int, filename: bytes, _hard_cut: bool, _user_data: c_void_p
+                _index: int, filename: bytes, hard_cut: bool, _user_data: c_void_p
             ) -> bool:
                 if filename:
                     decoded = filename.decode("utf-8")
-                    pm.load_preset(decoded, smooth=False)
+                    pm.load_preset(decoded, smooth=not hard_cut)
                     self._notify_preset_loaded(Path(decoded))
                 return True
 

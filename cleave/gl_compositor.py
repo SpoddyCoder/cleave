@@ -36,6 +36,7 @@ from OpenGL.GL import (
     GL_RENDERBUFFER,
     GL_SRC_ALPHA,
     GL_SRC_COLOR,
+    GL_TEXTURE0,
     GL_TEXTURE_2D,
     GL_TEXTURE_MAG_FILTER,
     GL_TEXTURE_MIN_FILTER,
@@ -45,6 +46,7 @@ from OpenGL.GL import (
     GL_ZERO,
     GL_BLEND_DST_ALPHA,
     GL_BLEND_SRC_ALPHA,
+    glActiveTexture,
     glBegin,
     glBindFramebuffer,
     glBindRenderbuffer,
@@ -425,6 +427,10 @@ class GlCompositor:
     def _bind_content_fbo(self) -> None:
         glBindFramebuffer(GL_FRAMEBUFFER, self._content_fbo_id)
         glUseProgram(0)
+        # libprojectM leaves the active texture unit on a non-zero unit during
+        # soft-cut transitions; fixed-function compositing samples unit 0, so
+        # reset it or an empty unit reads as white and floods the frame.
+        glActiveTexture(GL_TEXTURE0)
         glEnable(GL_TEXTURE_2D)
         glViewport(0, 0, self.content_width, self.content_height)
         self._set_content_projection()
@@ -432,6 +438,7 @@ class GlCompositor:
     def _bind_default_framebuffer(self) -> None:
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glUseProgram(0)
+        glActiveTexture(GL_TEXTURE0)
         glEnable(GL_TEXTURE_2D)
         glViewport(0, 0, self.display_width, self.display_height)
         self._set_display_projection()
