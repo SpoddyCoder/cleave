@@ -192,31 +192,6 @@ def test_parse_visualizer_reads_name() -> None:
     assert cfg.name == "buttercup-24"
 
 
-def test_parse_visualizer_warmup_sec_defaults() -> None:
-    cfg = parse_visualizer_section({})
-    assert cfg.warmup_sec == 3.0
-
-
-def test_parse_visualizer_reads_warmup_sec() -> None:
-    cfg = parse_visualizer_section({"visualizer": {"warmup_sec": 2.5}})
-    assert cfg.warmup_sec == 2.5
-
-
-def test_parse_visualizer_accepts_zero_warmup_sec() -> None:
-    cfg = parse_visualizer_section({"visualizer": {"warmup_sec": 0}})
-    assert cfg.warmup_sec == 0.0
-
-
-def test_parse_visualizer_rejects_negative_warmup_sec() -> None:
-    with pytest.raises(ValueError, match="visualizer.warmup_sec must be >= 0"):
-        parse_visualizer_section({"visualizer": {"warmup_sec": -0.1}})
-
-
-def test_parse_visualizer_rejects_non_numeric_warmup_sec() -> None:
-    with pytest.raises(ValueError, match="visualizer.warmup_sec must be a number"):
-        parse_visualizer_section({"visualizer": {"warmup_sec": "fast"}})
-
-
 def test_parse_visualizer_render_mode_defaults_to_balanced() -> None:
     cfg = parse_visualizer_section({})
     assert cfg.render_mode == "balanced"

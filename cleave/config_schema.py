@@ -21,7 +21,6 @@ DEFAULT_VISUALIZER_HEIGHT = 720
 DEFAULT_RENDER_FPS = 30
 DEFAULT_RENDER_WIDTH = 1280
 DEFAULT_RENDER_HEIGHT = 720
-DEFAULT_VISUALIZER_WARMUP_SEC = 3.0
 DEFAULT_VISUALIZER_UPSCALE = 1.0
 UPSCALE_MIN = 1.0
 DEFAULT_BEAT_SENSITIVITY = 2.0
@@ -314,16 +313,6 @@ def _parse_upscale(raw: Any, ctx: ParseCtx, label: str) -> float:
     if upscale < UPSCALE_MIN:
         raise ValueError(f"{label} must be >= {UPSCALE_MIN}")
     return clamp_upscale(upscale)
-
-
-def _parse_warmup_sec(raw: Any, ctx: ParseCtx, label: str) -> float:
-    try:
-        warmup_sec = float(raw)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{label} must be a number") from exc
-    if warmup_sec < 0:
-        raise ValueError(f"{label} must be >= 0")
-    return warmup_sec
 
 
 def _parse_beat_sensitivity(raw: Any, ctx: ParseCtx, label: str) -> float:
@@ -687,13 +676,6 @@ VISUALIZER_FIELDS: tuple[FieldDescriptor, ...] = (
         lambda value, _ctx: clamp_upscale(value),
     ),
     FieldDescriptor(
-        "warmup_sec",
-        DEFAULT_VISUALIZER_WARMUP_SEC,
-        "cfg",
-        _parse_warmup_sec,
-        _dump_scalar,
-    ),
-    FieldDescriptor(
         "beat_sensitivity",
         DEFAULT_BEAT_SENSITIVITY,
         "cfg",
@@ -840,7 +822,6 @@ def parse_visualizer_section(data: dict[str, Any]) -> Any:
         width=parsed["width"],
         height=parsed["height"],
         upscale=parsed["upscale"],
-        warmup_sec=parsed["warmup_sec"],
         beat_sensitivity=parsed["beat_sensitivity"],
         render_mode=parsed["render_mode"],
     )
@@ -852,7 +833,6 @@ def persist_visualizer(ctx: PersistCtx) -> dict[str, Any]:
         "width": vis.width,
         "height": vis.height,
         "upscale": vis.upscale,
-        "warmup_sec": vis.warmup_sec,
         "beat_sensitivity": vis.beat_sensitivity,
         "render_mode": vis.render_mode,
     }
