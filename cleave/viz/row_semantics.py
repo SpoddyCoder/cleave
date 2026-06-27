@@ -95,6 +95,7 @@ class RowBehavior:
 ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
     RowKind.TRANSPORT: RowBehavior(
         RowAffordance.SEEK,
+        help_title="Transport",
         help_description=("Scrubber and play/pause for the project audio.",),
         is_header=True,
         repeatable=True,
@@ -111,6 +112,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
     ),
     RowKind.TRACK_HEADER: RowBehavior(
         RowAffordance.EXPAND,
+        help_title="Layer",
         help_description=(
             "Layer header.",
             "Contains blend mode, opacity, stem, and preset controls.",
@@ -171,6 +173,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.VALUE_STEP,
         repeatable=True,
         parent_group="track",
+        help_title="Preset duration",
         help_entries=(("Left/Right", "step value"),),
         help_description=(
             "How long a preset plays before projectM transitions to the next.",
@@ -180,6 +183,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.VALUE_STEP,
         repeatable=True,
         parent_group="track",
+        help_title="Soft cut",
         help_entries=(("Left/Right", "step value"),),
         help_description=(
             "Duration of the crossfade when projectM blends between presets.",
@@ -224,6 +228,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.VALUE_STEP,
         repeatable=True,
         parent_group="track",
+        help_title="Hard cut min",
         help_entries=(("Left/Right", "step value"),),
         help_description=(
             "Time window after a hard cut before another can fire.",
@@ -233,6 +238,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.VALUE_STEP,
         repeatable=True,
         parent_group="track",
+        help_title="Hard cut sens",
         help_entries=(("Left/Right", "step value"),),
         help_description=(
             "Beat energy threshold required to trigger a hard cut.",
@@ -273,12 +279,14 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.VALUE_STEP,
         repeatable=True,
         parent_group="track",
+        help_title="Opacity",
         help_description=("Opacity of this layer.",),
     ),
     RowKind.TRACK_BEAT: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
         parent_group="track",
+        help_title="Beat sensitivity",
         help_description=(
             "Beat sensitivity multiplier for this layer.",
             "Higher values make the visuals more reactive.",
@@ -348,6 +356,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.VALUE_STEP,
         repeatable=True,
         parent_group="render_overlay",
+        help_title="Position",
         help_description=(
             "Screen corner where the credits overlay appears.",
         ),
@@ -363,18 +372,21 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.VALUE_STEP,
         repeatable=True,
         parent_group="render_overlay_title",
+        help_title="Title font size",
         help_description=("Font size of the overlay title.",),
     ),
     RowKind.RENDER_OVERLAY_TITLE_FONT: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
         parent_group="render_overlay_title",
+        help_title="Title font",
         help_description=("Font used for the overlay title.",),
     ),
     RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
         parent_group="render_overlay_title",
+        help_title="Title margin bottom",
         help_description=(
             "Gap between the title and body in the overlay box.",
         ),
@@ -390,24 +402,28 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.VALUE_STEP,
         repeatable=True,
         parent_group="render_overlay_body",
+        help_title="Body font size",
         help_description=("Font size of the overlay body.",),
     ),
     RowKind.RENDER_OVERLAY_BODY_FONT: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
         parent_group="render_overlay_body",
+        help_title="Body font",
         help_description=("Font used for the overlay body.",),
     ),
     RowKind.RENDER_OVERLAY_OPACITY: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
         parent_group="render_overlay",
+        help_title="Background opacity",
         help_description=("Background opacity of the credits overlay box.",),
     ),
     RowKind.RENDER_OVERLAY_BORDER_WIDTH: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
         parent_group="render_overlay",
+        help_title="Border width",
         help_description=(
             "Width of the border drawn around the credits overlay box.",
         ),
@@ -416,6 +432,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.VALUE_STEP,
         repeatable=True,
         parent_group="render_overlay",
+        help_title="Start delay",
         help_description=(
             "Seconds after the render starts before the overlay fades in.",
         ),
@@ -424,6 +441,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.VALUE_STEP,
         repeatable=True,
         parent_group="render_overlay",
+        help_title="Display time",
         help_description=(
             "Duration the overlay stays fully visible before fading out.",
             "0 = stays on.",
@@ -444,6 +462,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.VALUE_STEP,
         repeatable=True,
         parent_group="render_post_fx",
+        help_title="Fade in",
         help_description=(
             "Duration of the fade-in at the start of the render.",
         ),
@@ -452,6 +471,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.VALUE_STEP,
         repeatable=True,
         parent_group="render_post_fx",
+        help_title="Fade out",
         help_description=(
             "Duration of the fade-out at the end of the render.",
         ),
