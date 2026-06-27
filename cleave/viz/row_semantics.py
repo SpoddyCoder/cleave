@@ -106,7 +106,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Save",
         help_description=(
             "Active config file.",
-            "Enter saves the current session settings.",
+            "Enter or Ctrl+S saves the current session settings.",
         ),
         is_header=True,
     ),

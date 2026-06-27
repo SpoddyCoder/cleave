@@ -54,6 +54,10 @@ def _handle_global_keydown(
     if event.key == pygame.K_q and mod_ctrl(event.mod):
         return not runtime.controls.try_quit()
 
+    if event.key == pygame.K_s and mod_ctrl(event.mod):
+        runtime.controls.prompt_save_config()
+        return True
+
     if event.key == pygame.K_h:
         runtime.seed.session.help_visible = not runtime.seed.session.help_visible
         return True
