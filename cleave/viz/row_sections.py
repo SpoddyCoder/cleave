@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
 from cleave.effects.registry import effect_roster
-from cleave.viz.row_semantics import PRESET_SWITCHING_SUBMENU_KINDS, RowDescriptor, RowKind
+from cleave.viz.row_semantics import RowDescriptor, RowKind
 
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
@@ -85,13 +85,6 @@ def _open_timeline_panel(controls: TuningControls, forward: bool) -> None:
         controls.close_timeline_panel()
 
 
-PANEL_ANCHOR_TOGGLE_BY_HEADER: dict[RowKind, PanelAnchorToggleFn] = {
-    RowKind.RENDER_TIMELINE_HEADER: _open_timeline_panel,
-}
-
-PANEL_ANCHOR_HEADER_KINDS = frozenset(PANEL_ANCHOR_TOGGLE_BY_HEADER)
-
-
 def apply_expand_toggle(
     controls: TuningControls,
     header_kind: RowKind,
@@ -117,18 +110,43 @@ def apply_panel_anchor_toggle(
     return True
 
 
+PredicateFn = Callable[["TuningViewState", RowDescriptor], bool]
+
+
+@dataclass(frozen=True)
+class ConditionalRowsDef:
+    """Value-gated sibling rows (no expand arrow or expanded flag)."""
+
+    name: str
+    predicate: PredicateFn
+    children: tuple["SectionNode", ...]
+
+
+@dataclass(frozen=True)
+class PanelAnchorDef:
+    """Header row whose content lives in a separate panel host."""
+
+    header_kind: RowKind
+    content_host: Literal["timeline_strip"]
+    toggle: PanelAnchorToggleFn
+
+
 @dataclass(frozen=True)
 class SectionNode:
-    """Tree node: either a RowKind leaf or a nested ExpandSectionDef."""
+    """Tree node: leaf row, expandable section, conditional group, or panel anchor."""
 
     leaf_kind: RowKind | None = None
     expand: ExpandSectionDef | None = None
+    conditional: ConditionalRowsDef | None = None
+    panel_anchor: PanelAnchorDef | None = None
 
     def __post_init__(self) -> None:
-        if self.leaf_kind is None and self.expand is None:
-            raise ValueError("SectionNode requires leaf_kind or expand")
-        if self.leaf_kind is not None and self.expand is not None:
-            raise ValueError("SectionNode cannot set both leaf_kind and expand")
+        set_count = sum(
+            x is not None
+            for x in (self.leaf_kind, self.expand, self.conditional, self.panel_anchor)
+        )
+        if set_count != 1:
+            raise ValueError("SectionNode requires exactly one child type")
 
 
 @dataclass(frozen=True)
@@ -137,6 +155,25 @@ class ExpandSectionDef:
     context: Literal["global", "per_slot"]
     children: tuple[SectionNode, ...] = ()
     collapse_on_disable: bool = False
+
+
+TIMELINE_PANEL_ANCHOR = PanelAnchorDef(
+    header_kind=RowKind.RENDER_TIMELINE_HEADER,
+    content_host="timeline_strip",
+    toggle=_open_timeline_panel,
+)
+
+PANEL_ANCHORS: tuple[PanelAnchorDef, ...] = (TIMELINE_PANEL_ANCHOR,)
+
+PANEL_ANCHOR_BY_HEADER: dict[RowKind, PanelAnchorDef] = {
+    anchor.header_kind: anchor for anchor in PANEL_ANCHORS
+}
+
+PANEL_ANCHOR_TOGGLE_BY_HEADER: dict[RowKind, PanelAnchorToggleFn] = {
+    anchor.header_kind: anchor.toggle for anchor in PANEL_ANCHORS
+}
+
+PANEL_ANCHOR_HEADER_KINDS = frozenset(PANEL_ANCHOR_BY_HEADER)
 
 
 def _settings_expanded(state: TuningViewState, _slot: str | None) -> bool:
@@ -242,11 +279,52 @@ RENDER_POST_FX_SECTION = ExpandSectionDef(
     ),
 )
 
+def _preset_switching_projectm(state: TuningViewState, desc: RowDescriptor) -> bool:
+    if desc.slot is None:
+        return False
+    return state.tracks[desc.slot].preset_switching == "projectm"
+
+
+def _hard_cut_enabled(state: TuningViewState, desc: RowDescriptor) -> bool:
+    if desc.slot is None:
+        return False
+    return state.tracks[desc.slot].hard_cut_enabled
+
+
+HARD_CUT_ENABLED = ConditionalRowsDef(
+    name="hard_cut_enabled",
+    predicate=_hard_cut_enabled,
+    children=(
+        SectionNode(leaf_kind=RowKind.TRACK_HARD_CUT_DURATION),
+        SectionNode(leaf_kind=RowKind.TRACK_HARD_CUT_SENSITIVITY),
+    ),
+)
+
+PRESET_SWITCHING_PROJECTM = ConditionalRowsDef(
+    name="preset_switching_projectm",
+    predicate=_preset_switching_projectm,
+    children=(
+        SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_SCOPE),
+        SectionNode(leaf_kind=RowKind.TRACK_PRESET_DURATION),
+        SectionNode(leaf_kind=RowKind.TRACK_SOFT_CUT_DURATION),
+        SectionNode(leaf_kind=RowKind.TRACK_EASTER_EGG),
+        SectionNode(leaf_kind=RowKind.TRACK_PRESET_START_CLEAN),
+        SectionNode(leaf_kind=RowKind.TRACK_HARD_CUT_ENABLED),
+        SectionNode(conditional=HARD_CUT_ENABLED),
+    ),
+)
+
+CONDITIONAL_ROWS_BY_NAME: dict[str, ConditionalRowsDef] = {
+    PRESET_SWITCHING_PROJECTM.name: PRESET_SWITCHING_PROJECTM,
+    HARD_CUT_ENABLED.name: HARD_CUT_ENABLED,
+}
+
 TRACK_PRESET_SWITCHING_SECTION = ExpandSectionDef(
     header_kind=RowKind.TRACK_PRESET_SWITCHING,
     context="per_slot",
-    children=tuple(
-        SectionNode(leaf_kind=kind) for kind in sorted(PRESET_SWITCHING_SUBMENU_KINDS, key=lambda k: k.name)
+    children=(
+        SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_MODE),
+        SectionNode(conditional=PRESET_SWITCHING_PROJECTM),
     ),
 )
 
@@ -277,6 +355,7 @@ ROOT_SECTION_NODES: tuple[SectionNode, ...] = (SectionNode(expand=SETTINGS_SECTI
 RENDER_SECTION_NODES: tuple[SectionNode, ...] = (
     SectionNode(expand=RENDER_OVERLAY_SECTION),
     SectionNode(expand=RENDER_POST_FX_SECTION),
+    SectionNode(panel_anchor=TIMELINE_PANEL_ANCHOR),
 )
 
 GLOBAL_EXPAND_SECTIONS: tuple[ExpandSectionDef, ...] = (
@@ -304,6 +383,20 @@ def leaf_kinds_in_expand_section(section: ExpandSectionDef) -> frozenset[RowKind
             kinds.add(child.leaf_kind)
         if child.expand is not None:
             kinds |= leaf_kinds_in_expand_section(child.expand)
+        if child.conditional is not None:
+            kinds |= _leaf_kinds_in_nodes(child.conditional.children)
+    return frozenset(kinds)
+
+
+def _leaf_kinds_in_nodes(nodes: tuple[SectionNode, ...]) -> frozenset[RowKind]:
+    kinds: set[RowKind] = set()
+    for child in nodes:
+        if child.leaf_kind is not None:
+            kinds.add(child.leaf_kind)
+        if child.expand is not None:
+            kinds |= leaf_kinds_in_expand_section(child.expand)
+        if child.conditional is not None:
+            kinds |= _leaf_kinds_in_nodes(child.conditional.children)
     return frozenset(kinds)
 
 
@@ -317,8 +410,15 @@ def _find_expand_ancestor(
     for child in section.children:
         if child.leaf_kind == kind:
             return section
-        if child.expand is not None and _find_expand_ancestor(child.expand, kind) is not None:
-            return child.expand
+        if child.expand is not None:
+            if child.expand.header_kind == kind:
+                return section
+            if _find_expand_ancestor(child.expand, kind) is not None:
+                return child.expand
+        if child.conditional is not None and kind in _leaf_kinds_in_nodes(
+            child.conditional.children
+        ):
+            return section
     return None
 
 
@@ -355,6 +455,28 @@ def sub_row_expand_visible(state: TuningViewState, desc: RowDescriptor) -> bool:
     return True
 
 
+def _append_section_nodes(
+    row_list: list[RowDescriptor],
+    nodes: tuple[SectionNode, ...],
+    state: TuningViewState,
+    slot: str | None,
+    section_slot: str | None,
+) -> None:
+    probe = RowDescriptor(RowKind.TRACK_HEADER, slot=section_slot)
+    for child in nodes:
+        if child.leaf_kind is not None:
+            row_list.append(RowDescriptor(child.leaf_kind, slot=section_slot))
+        elif child.expand is not None:
+            append_expand_section_rows(row_list, child.expand, state, slot)
+        elif child.conditional is not None:
+            if child.conditional.predicate(state, probe):
+                _append_section_nodes(
+                    row_list, child.conditional.children, state, slot, section_slot
+                )
+        elif child.panel_anchor is not None:
+            row_list.append(RowDescriptor(child.panel_anchor.header_kind))
+
+
 def append_expand_section_rows(
     row_list: list[RowDescriptor],
     section: ExpandSectionDef,
@@ -365,11 +487,18 @@ def append_expand_section_rows(
     row_list.append(RowDescriptor(section.header_kind, slot=section_slot))
     if not expand_section_expanded(state, section, slot):
         return
-    for child in section.children:
-        if child.leaf_kind is not None:
-            row_list.append(RowDescriptor(child.leaf_kind, slot=section_slot))
-        elif child.expand is not None:
-            append_expand_section_rows(row_list, child.expand, state, slot)
+    _append_section_nodes(row_list, section.children, state, slot, section_slot)
+
+
+def append_render_section_rows(
+    row_list: list[RowDescriptor],
+    state: TuningViewState,
+) -> None:
+    for node in RENDER_SECTION_NODES:
+        if node.expand is not None:
+            append_expand_section_rows(row_list, node.expand, state)
+        elif node.panel_anchor is not None:
+            row_list.append(RowDescriptor(node.panel_anchor.header_kind))
 
 
 def append_preset_switching_section_rows(
@@ -377,22 +506,7 @@ def append_preset_switching_section_rows(
     state: TuningViewState,
     slot: str,
 ) -> None:
-    block = state.tracks[slot]
-    row_list.append(RowDescriptor(RowKind.TRACK_PRESET_SWITCHING, slot=slot))
-    if not block.preset_switching_expanded:
-        return
-    row_list.append(RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_MODE, slot=slot))
-    if block.preset_switching != "projectm":
-        return
-    row_list.append(RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_SCOPE, slot=slot))
-    row_list.append(RowDescriptor(RowKind.TRACK_PRESET_DURATION, slot=slot))
-    row_list.append(RowDescriptor(RowKind.TRACK_SOFT_CUT_DURATION, slot=slot))
-    row_list.append(RowDescriptor(RowKind.TRACK_EASTER_EGG, slot=slot))
-    row_list.append(RowDescriptor(RowKind.TRACK_PRESET_START_CLEAN, slot=slot))
-    row_list.append(RowDescriptor(RowKind.TRACK_HARD_CUT_ENABLED, slot=slot))
-    if block.hard_cut_enabled:
-        row_list.append(RowDescriptor(RowKind.TRACK_HARD_CUT_DURATION, slot=slot))
-        row_list.append(RowDescriptor(RowKind.TRACK_HARD_CUT_SENSITIVITY, slot=slot))
+    append_expand_section_rows(row_list, TRACK_PRESET_SWITCHING_SECTION, state, slot)
 
 
 def append_effects_section_rows(
@@ -433,3 +547,56 @@ def append_track_section_rows(
     row_list.append(RowDescriptor(RowKind.TRACK_OPACITY, slot=slot))
     append_effects_section_rows(row_list, state, slot)
     row_list.append(RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot=slot))
+
+
+_PER_SLOT_SECTION_HEADERS = frozenset(
+    {
+        RowKind.TRACK_HEADER,
+        RowKind.TRACK_PRESET_SWITCHING,
+        RowKind.TRACK_EFFECTS_HEADER,
+    }
+)
+
+
+def _register_section_header_parent(
+    out: dict[RowKind, RowKind],
+    parent_header: RowKind,
+    nodes: tuple[SectionNode, ...],
+) -> None:
+    for child in nodes:
+        if child.leaf_kind is not None:
+            out[child.leaf_kind] = parent_header
+        elif child.expand is not None:
+            out[child.expand.header_kind] = parent_header
+            _walk_expand_section_for_headers(child.expand, out)
+        elif child.conditional is not None:
+            _register_section_header_parent(out, parent_header, child.conditional.children)
+
+
+def _walk_expand_section_for_headers(
+    section: ExpandSectionDef,
+    out: dict[RowKind, RowKind],
+) -> None:
+    header = section.header_kind
+    _register_section_header_parent(out, header, section.children)
+
+
+def _build_section_header_parent_map() -> dict[RowKind, RowKind]:
+    out: dict[RowKind, RowKind] = {}
+    for section in GLOBAL_EXPAND_SECTIONS:
+        _walk_expand_section_for_headers(section, out)
+    _walk_expand_section_for_headers(TRACK_SECTION, out)
+    return out
+
+
+_SECTION_HEADER_PARENTS = _build_section_header_parent_map()
+
+
+def section_header_from_section_tree(desc: RowDescriptor) -> RowDescriptor | None:
+    """Map a sub-row to its section header using the composition tree."""
+    parent_kind = _SECTION_HEADER_PARENTS.get(desc.kind)
+    if parent_kind is None:
+        return None
+    if parent_kind in _PER_SLOT_SECTION_HEADERS:
+        return RowDescriptor(parent_kind, slot=desc.slot)
+    return RowDescriptor(parent_kind)

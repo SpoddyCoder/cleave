@@ -7,10 +7,9 @@ from typing import TYPE_CHECKING
 
 from cleave.config_schema import MAX_LAYER_COUNT
 from cleave.viz.row_sections import (
-    RENDER_OVERLAY_SECTION,
-    RENDER_POST_FX_SECTION,
     SETTINGS_SECTION,
     append_expand_section_rows,
+    append_render_section_rows,
     append_track_section_rows,
     sub_row_expand_visible,
 )
@@ -72,9 +71,7 @@ class RowLayout:
         if len(state.layer_z_order) < MAX_LAYER_COUNT:
             row_list.append(RowDescriptor(RowKind.LAYER_MANAGEMENT_ADD))
         row_list.append(RowDescriptor(RowKind.RENDER_SECTION_GAP))
-        append_expand_section_rows(row_list, RENDER_OVERLAY_SECTION, state)
-        append_expand_section_rows(row_list, RENDER_POST_FX_SECTION, state)
-        row_list.append(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+        append_render_section_rows(row_list, state)
         return cls(tuple(row_list))
 
     def __len__(self) -> int:
