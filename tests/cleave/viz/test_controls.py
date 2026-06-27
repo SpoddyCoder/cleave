@@ -3067,8 +3067,9 @@ def test_preset_switching_row_cycles_none_and_projectm() -> None:
         on_preset_switching_change=lambda slot: switched.append(slot)
     )
     controls.session.layers["layer_1"].expanded = True
+    controls.session.layers["layer_1"].preset_switching_expanded = True
     view = controls.build_view_state(paused=False)
-    row = _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING)
+    row = _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_MODE)
     controls.focus_descriptor = view.layout.descriptor(row)
     assert controls.session.layers["layer_1"].preset_switching == "none"
 
@@ -3112,6 +3113,7 @@ def test_scope_row_hidden_when_mode_none() -> None:
 def test_scope_row_visible_when_mode_projectm() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].preset_switching_expanded = True
     controls.session.layers["layer_1"].expanded = True
     view = controls.build_view_state(paused=False)
     _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_SCOPE)
@@ -3120,6 +3122,7 @@ def test_scope_row_visible_when_mode_projectm() -> None:
 def test_preset_duration_ctrl_step_is_ten_seconds() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].preset_switching_expanded = True
     controls.session.layers["layer_1"].expanded = True
     view = controls.build_view_state(paused=False)
     row = _row(view, "layer_1", RowKind.TRACK_PRESET_DURATION)
@@ -3136,6 +3139,7 @@ def test_preset_duration_ctrl_step_is_ten_seconds() -> None:
 def test_hard_cut_enabled_cycles_and_hides_child_rows() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].preset_switching_expanded = True
     controls.session.layers["layer_1"].expanded = True
     switched: list[str] = []
     controls._layer_bindings = noop_layer_bindings(
@@ -3166,6 +3170,7 @@ def test_hard_cut_enabled_cycles_and_hides_child_rows() -> None:
 def test_easter_egg_steps_with_standard_and_large_increments() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].preset_switching_expanded = True
     controls.session.layers["layer_1"].expanded = True
     switched: list[str] = []
     controls._layer_bindings = noop_layer_bindings(
@@ -3187,6 +3192,7 @@ def test_easter_egg_steps_with_standard_and_large_increments() -> None:
 def test_preset_start_clean_cycles_yes_no() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].preset_switching_expanded = True
     controls.session.layers["layer_1"].expanded = True
     view = controls.build_view_state(paused=False)
     row = _row(view, "layer_1", RowKind.TRACK_PRESET_START_CLEAN)
@@ -3203,6 +3209,7 @@ def test_preset_start_clean_cycles_yes_no() -> None:
 def test_hard_cut_sensitivity_steps_like_beat_sensitivity() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].preset_switching_expanded = True
     controls.session.layers["layer_1"].expanded = True
     controls.session.layers["layer_1"].hard_cut_enabled = True
     view = controls.build_view_state(paused=False)

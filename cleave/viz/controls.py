@@ -507,6 +507,12 @@ class TuningControls:
         ctrl = mod_ctrl(mod)
         forward = key == pygame.K_RIGHT
 
+        if kind == RowKind.TRACK_PRESET_SWITCHING:
+            if slot is None:
+                return
+            self._set_preset_switching_expanded(slot, forward)
+            return
+
         if kind == RowKind.TRACK_EFFECTS_HEADER:
             if slot is None:
                 return
@@ -568,7 +574,7 @@ class TuningControls:
             if slot is None:
                 return
             self._step_preset(slot, forward=forward, ctrl=ctrl)
-        elif kind == RowKind.TRACK_PRESET_SWITCHING:
+        elif kind == RowKind.TRACK_PRESET_SWITCHING_MODE:
             if slot is None:
                 return
             self._cycle_preset_switching(slot, forward=forward)
@@ -955,6 +961,12 @@ class TuningControls:
             layer.effects.setdefault(effect_id, {})[driver_slug] = clamped
         if self._layer_bindings is not None:
             self._layer_bindings.on_opacity_change(slot, layer.opacity_pct)
+
+    def _set_preset_switching_expanded(self, slot: str, expanded: bool) -> None:
+        layer = self.session.layers[slot]
+        if layer.preset_switching_expanded == expanded:
+            return
+        layer.preset_switching_expanded = expanded
 
     def _set_effects_expanded(self, slot: str, expanded: bool) -> None:
         layer = self.session.layers[slot]
