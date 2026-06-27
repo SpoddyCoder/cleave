@@ -967,6 +967,23 @@ def test_navigable_rows_with_overwrite() -> None:
     assert config_row in view.layout.navigable_indices(view)
 
 
+def test_save_choice_with_overwrite_includes_cancel() -> None:
+    controls = _make_controls(("layer_1",))
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = _desc(view, _config_header_row(view))
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    modal_view = controls.modal_host.view_state()
+    assert modal_view is not None
+    assert modal_view.kind == ModalKind.SAVE_CHOICE
+    assert modal_view.options == ("OVERWRITE", "SAVE AS NEW", "CANCEL")
+
+    controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
+    controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.modal_host.view_state().focus_index == 2
+    controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
+    assert not controls.modal_host.active
+
+
 def test_overwrite_shows_confirm_before_write() -> None:
     launch_path = Path("/tmp/custom/cleave.config.yaml")
     writes: list[Path] = []
@@ -989,6 +1006,7 @@ def test_overwrite_shows_confirm_before_write() -> None:
     assert modal_view is not None
     assert modal_view.kind == ModalKind.YES_NO
     assert modal_view.message == "Overwrite cleave.config.yaml?"
+    assert modal_view.options == ("Yes", "CANCEL")
     assert writes == []
 
     assert controls.handle_keydown(_keydown(pygame.K_n)) is True

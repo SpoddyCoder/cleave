@@ -174,6 +174,7 @@ class ConfigSaveController:
             message=message,
             on_confirm=on_confirm,
             on_cancel=on_cancel,
+            cancel_label="CANCEL",
         )
 
     def _show_save_notification(self, message: str) -> None:
