@@ -544,39 +544,6 @@ TRACK_SUB_ROW_KINDS = frozenset(
     k for k, b in ROW_BEHAVIORS.items() if b.parent_group == "track"
 )
 TRACK_EFFECT_SUB_ROW_KINDS = frozenset({RowKind.TRACK_EFFECT})
-PRESET_SWITCHING_SUBMENU_KINDS = frozenset(
-    {
-        RowKind.TRACK_PRESET_SWITCHING_MODE,
-        RowKind.TRACK_PRESET_SWITCHING_SCOPE,
-        RowKind.TRACK_PRESET_DURATION,
-        RowKind.TRACK_SOFT_CUT_DURATION,
-        RowKind.TRACK_EASTER_EGG,
-        RowKind.TRACK_PRESET_START_CLEAN,
-        RowKind.TRACK_HARD_CUT_ENABLED,
-        RowKind.TRACK_HARD_CUT_DURATION,
-        RowKind.TRACK_HARD_CUT_SENSITIVITY,
-    }
-)
-RENDER_OVERLAY_SUB_ROW_KINDS = frozenset(
-    k for k, b in ROW_BEHAVIORS.items() if b.parent_group == "render_overlay"
-)
-RENDER_OVERLAY_TITLE_NESTED_KINDS = frozenset(
-    k for k, b in ROW_BEHAVIORS.items() if b.parent_group == "render_overlay_title"
-)
-RENDER_OVERLAY_BODY_NESTED_KINDS = frozenset(
-    k for k, b in ROW_BEHAVIORS.items() if b.parent_group == "render_overlay_body"
-)
-RENDER_OVERLAY_ALL_SUB_ROW_KINDS = (
-    RENDER_OVERLAY_SUB_ROW_KINDS
-    | RENDER_OVERLAY_TITLE_NESTED_KINDS
-    | RENDER_OVERLAY_BODY_NESTED_KINDS
-)
-RENDER_POST_FX_SUB_ROW_KINDS = frozenset(
-    k for k, b in ROW_BEHAVIORS.items() if b.parent_group == "render_post_fx"
-)
-SETTINGS_SUB_ROW_KINDS = frozenset(
-    k for k, b in ROW_BEHAVIORS.items() if b.parent_group == "settings"
-)
 
 _LAYER_LOCK_BLOCKING_AFFORDANCES = frozenset(
     {
@@ -642,26 +609,15 @@ def row_triggers_layer_delete(kind: RowKind) -> bool:
     return row_behavior(kind).parent_group == "track"
 
 
+from cleave.viz.row_sections import section_header_from_section_tree
+
+
 def section_header_descriptor(desc: RowDescriptor) -> RowDescriptor:
     """Map a sub-row descriptor to its section header for focus fallback."""
+    from_tree = section_header_from_section_tree(desc)
+    if from_tree is not None:
+        return from_tree
     kind = desc.kind
-    if kind == RowKind.SETTINGS_RENDER_MODE:
-        return RowDescriptor(RowKind.SETTINGS_HEADER)
-    if kind == RowKind.SETTINGS_UI_FADE:
-        return RowDescriptor(RowKind.SETTINGS_HEADER)
-    if kind in RENDER_OVERLAY_TITLE_NESTED_KINDS:
-        return RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_HEADER)
-    if kind in RENDER_OVERLAY_BODY_NESTED_KINDS:
-        return RowDescriptor(RowKind.RENDER_OVERLAY_BODY_HEADER)
-    if kind in RENDER_OVERLAY_ALL_SUB_ROW_KINDS:
-        return RowDescriptor(RowKind.RENDER_OVERLAY_HEADER)
-    if kind in RENDER_POST_FX_SUB_ROW_KINDS:
-        return RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
-    if kind in PRESET_SWITCHING_SUBMENU_KINDS:
-        return RowDescriptor(RowKind.TRACK_PRESET_SWITCHING, slot=desc.slot)
-    behavior = row_behavior(kind)
-    if behavior.parent_group == "track":
-        if kind in TRACK_EFFECT_SUB_ROW_KINDS:
-            return RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, slot=desc.slot)
-        return RowDescriptor(RowKind.TRACK_HEADER, slot=desc.slot)
+    if kind in TRACK_EFFECT_SUB_ROW_KINDS:
+        return RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, slot=desc.slot)
     return desc

@@ -6,16 +6,16 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from cleave.config_schema import MAX_LAYER_COUNT
-from cleave.effects.registry import effect_roster
+from cleave.viz.row_sections import (
+    SETTINGS_SECTION,
+    append_expand_section_rows,
+    append_render_section_rows,
+    append_track_section_rows,
+    sub_row_expand_visible,
+)
 from cleave.viz.row_semantics import (
-    RENDER_OVERLAY_BODY_NESTED_KINDS,
-    RENDER_OVERLAY_SUB_ROW_KINDS,
-    RENDER_OVERLAY_TITLE_NESTED_KINDS,
-    RENDER_POST_FX_SUB_ROW_KINDS,
-    SETTINGS_SUB_ROW_KINDS,
     RowDescriptor,
     RowKind,
-    TRACK_EFFECT_SUB_ROW_KINDS,
     TRACK_SUB_ROW_KINDS,
     row_behavior,
     row_is_pinned,
@@ -28,25 +28,7 @@ if TYPE_CHECKING:
 
 
 def _sub_row_expanded(state: TuningViewState, desc: RowDescriptor) -> bool:
-    kind = desc.kind
-    if kind in SETTINGS_SUB_ROW_KINDS:
-        return state.settings.expanded
-    if kind in RENDER_OVERLAY_SUB_ROW_KINDS:
-        return state.render_overlay.expanded
-    if kind in RENDER_OVERLAY_TITLE_NESTED_KINDS:
-        return state.render_overlay.expanded and state.render_overlay.title_expanded
-    if kind in RENDER_OVERLAY_BODY_NESTED_KINDS:
-        return state.render_overlay.expanded and state.render_overlay.body_expanded
-    if kind in RENDER_POST_FX_SUB_ROW_KINDS:
-        return state.render_post_fx.expanded
-    slot = desc.slot
-    if slot is not None and kind in TRACK_SUB_ROW_KINDS:
-        block = state.tracks[slot]
-        if not block.expanded:
-            return False
-        if kind in TRACK_EFFECT_SUB_ROW_KINDS:
-            return block.effects_expanded
-    return True
+    return sub_row_expand_visible(state, desc)
 
 
 def row_draw_visible(state: TuningViewState, desc: RowDescriptor) -> bool:
@@ -74,12 +56,8 @@ class RowLayout:
 
     @classmethod
     def build(cls, state: TuningViewState) -> RowLayout:
-        row_list: list[RowDescriptor] = [
-            RowDescriptor(RowKind.SETTINGS_HEADER),
-        ]
-        if state.settings.expanded:
-            row_list.append(RowDescriptor(RowKind.SETTINGS_RENDER_MODE))
-            row_list.append(RowDescriptor(RowKind.SETTINGS_UI_FADE))
+        row_list: list[RowDescriptor] = []
+        append_expand_section_rows(row_list, SETTINGS_SECTION, state)
         row_list.extend(
             [
                 RowDescriptor(RowKind.CONFIG_HEADER),
@@ -89,84 +67,11 @@ class RowLayout:
         if state.notification_message and state.notification_remaining_sec > 0:
             row_list.append(RowDescriptor(RowKind.PANEL_NOTIFICATION))
         for slot in state.layer_z_order:
-            row_list.append(RowDescriptor(RowKind.TRACK_HEADER, slot=slot))
-            row_list.append(RowDescriptor(RowKind.TRACK_PRESET_DIR, slot=slot))
-            row_list.append(RowDescriptor(RowKind.TRACK_PRESET, slot=slot))
-            block = state.tracks[slot]
-            row_list.append(RowDescriptor(RowKind.TRACK_PRESET_SWITCHING, slot=slot))
-            if block.preset_switching_expanded:
-                row_list.append(
-                    RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_MODE, slot=slot)
-                )
-                if block.preset_switching == "projectm":
-                    row_list.append(
-                        RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_SCOPE, slot=slot)
-                    )
-                    row_list.append(
-                        RowDescriptor(RowKind.TRACK_PRESET_DURATION, slot=slot)
-                    )
-                    row_list.append(
-                        RowDescriptor(RowKind.TRACK_SOFT_CUT_DURATION, slot=slot)
-                    )
-                    row_list.append(RowDescriptor(RowKind.TRACK_EASTER_EGG, slot=slot))
-                    row_list.append(
-                        RowDescriptor(RowKind.TRACK_PRESET_START_CLEAN, slot=slot)
-                    )
-                    row_list.append(
-                        RowDescriptor(RowKind.TRACK_HARD_CUT_ENABLED, slot=slot)
-                    )
-                    if block.hard_cut_enabled:
-                        row_list.append(
-                            RowDescriptor(RowKind.TRACK_HARD_CUT_DURATION, slot=slot)
-                        )
-                        row_list.append(
-                            RowDescriptor(RowKind.TRACK_HARD_CUT_SENSITIVITY, slot=slot)
-                        )
-            row_list.append(RowDescriptor(RowKind.TRACK_STEM, slot=slot))
-            row_list.append(RowDescriptor(RowKind.TRACK_BEAT, slot=slot))
-            row_list.append(RowDescriptor(RowKind.TRACK_BLEND, slot=slot))
-            row_list.append(RowDescriptor(RowKind.TRACK_OPACITY, slot=slot))
-            row_list.append(RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, slot=slot))
-            if block.effects_expanded:
-                for effect_def in effect_roster(block.stem):
-                    row_list.append(
-                        RowDescriptor(
-                            RowKind.TRACK_EFFECT,
-                            slot=slot,
-                            effect_id=effect_def.effect_id,
-                            driver_slug=effect_def.driver_slug,
-                        )
-                    )
-            if block.expanded:
-                row_list.append(
-                    RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot=slot)
-                )
+            append_track_section_rows(row_list, state, slot)
         if len(state.layer_z_order) < MAX_LAYER_COUNT:
             row_list.append(RowDescriptor(RowKind.LAYER_MANAGEMENT_ADD))
         row_list.append(RowDescriptor(RowKind.RENDER_SECTION_GAP))
-        row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_HEADER))
-        if state.render_overlay.expanded:
-            row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_POSITION))
-            row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_OPACITY))
-            row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_BORDER_WIDTH))
-            row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_START_DELAY))
-            row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_DISPLAY_TIME))
-            row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_HEADER))
-            if state.render_overlay.title_expanded:
-                row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_FONT))
-                row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE))
-                row_list.append(
-                    RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM)
-                )
-            row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_BODY_HEADER))
-            if state.render_overlay.body_expanded:
-                row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_BODY_FONT))
-                row_list.append(RowDescriptor(RowKind.RENDER_OVERLAY_BODY_FONT_SIZE))
-        row_list.append(RowDescriptor(RowKind.RENDER_POST_FX_HEADER))
-        if state.render_post_fx.expanded:
-            row_list.append(RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN))
-            row_list.append(RowDescriptor(RowKind.RENDER_POST_FX_FADE_OUT))
-        row_list.append(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+        append_render_section_rows(row_list, state)
         return cls(tuple(row_list))
 
     def __len__(self) -> int:
