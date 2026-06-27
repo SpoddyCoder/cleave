@@ -159,6 +159,7 @@ class LayerFramePipeline:
             scope=layer_cfg.preset_switching_scope,
             preset_duration=layer_cfg.preset_duration,
             soft_cut_duration=layer_cfg.soft_cut_duration,
+            hard_cut_enabled=layer_cfg.hard_cut_enabled,
             hard_cut_duration=layer_cfg.hard_cut_duration,
             hard_cut_sensitivity=layer_cfg.hard_cut_sensitivity,
         )

@@ -187,6 +187,7 @@ def make_tuning_controls(
             scope=runtime.preset_switching_scope,
             preset_duration=runtime.preset_duration,
             soft_cut_duration=runtime.soft_cut_duration,
+            hard_cut_enabled=runtime.hard_cut_enabled,
             hard_cut_duration=runtime.hard_cut_duration,
             hard_cut_sensitivity=runtime.hard_cut_sensitivity,
             on_empty=on_empty,

@@ -11,11 +11,12 @@ from typing import Literal
 
 import pygame
 
-from cleave.config_schema import preset_switching_display
+from cleave.config_schema import hard_cut_enabled_display, preset_switching_display
 from cleave.extract import stem_control_label, stem_overlay_header
 from cleave.viz.row_semantics import (
     LABELED_SUB_ROW_KINDS,
     PRESET_SWITCHING_SUBMENU_KINDS,
+    PRESET_SWITCHING_HARD_CUT_SUBMENU_KINDS,
     RENDER_OVERLAY_ALL_SUB_ROW_KINDS,
     RENDER_OVERLAY_BODY_NESTED_KINDS,
     RENDER_OVERLAY_SUB_ROW_KINDS,
@@ -202,13 +203,20 @@ def _row_text(state: TuningViewState, index: int) -> str:
         return (
             f"{_preset_switching_submenu_prefix()}soft cut: {block.soft_cut_duration:g}s"
         )
+    if kind == RowKind.TRACK_HARD_CUT_ENABLED:
+        return (
+            f"{_preset_switching_submenu_prefix()}hard cut: "
+            f"{hard_cut_enabled_display(block.hard_cut_enabled)}"
+        )
     if kind == RowKind.TRACK_HARD_CUT_DURATION:
         return (
-            f"{_preset_switching_submenu_prefix()}hard cut min: {block.hard_cut_duration:g}s"
+            f"{_preset_switching_hard_cut_submenu_prefix()}hard cut min: "
+            f"{block.hard_cut_duration:g}s"
         )
     if kind == RowKind.TRACK_HARD_CUT_SENSITIVITY:
         return (
-            f"{_preset_switching_submenu_prefix()}hard cut sens: {block.hard_cut_sensitivity:.2f}"
+            f"{_preset_switching_hard_cut_submenu_prefix()}hard cut sens: "
+            f"{block.hard_cut_sensitivity:.2f}"
         )
     if kind == RowKind.TRACK_STEM:
         return f"└─ driving stem: {stem_control_label(block.stem)}"
@@ -247,10 +255,12 @@ def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
         return "  └─ preset duration: "
     if kind == RowKind.TRACK_SOFT_CUT_DURATION:
         return "  └─ soft cut: "
+    if kind == RowKind.TRACK_HARD_CUT_ENABLED:
+        return "  └─ hard cut: "
     if kind == RowKind.TRACK_HARD_CUT_DURATION:
-        return "  └─ hard cut min: "
+        return "    └─ hard cut min: "
     if kind == RowKind.TRACK_HARD_CUT_SENSITIVITY:
-        return "  └─ hard cut sens: "
+        return "    └─ hard cut sens: "
     if kind == RowKind.RENDER_OVERLAY_POSITION:
         return "└─ position: "
     if kind == RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE:
@@ -333,6 +343,8 @@ def _labeled_sub_row_value(state: TuningViewState, index: int) -> str:
         return f"{block.preset_duration:g}s"
     if kind == RowKind.TRACK_SOFT_CUT_DURATION:
         return f"{block.soft_cut_duration:g}s"
+    if kind == RowKind.TRACK_HARD_CUT_ENABLED:
+        return hard_cut_enabled_display(block.hard_cut_enabled)
     if kind == RowKind.TRACK_HARD_CUT_DURATION:
         return f"{block.hard_cut_duration:g}s"
     if kind == RowKind.TRACK_HARD_CUT_SENSITIVITY:
@@ -478,6 +490,10 @@ def _layer_management_delete_prefix() -> str:
 
 def _preset_switching_submenu_prefix() -> str:
     return "  └─ "
+
+
+def _preset_switching_hard_cut_submenu_prefix() -> str:
+    return "    └─ "
 
 
 def _effects_header_prefix() -> str:
@@ -643,6 +659,8 @@ def _row_indent(state: TuningViewState, index: int) -> int:
         return TREE_INDENT
     if kind == RowKind.TRACK_EFFECT:
         return TREE_INDENT * 2
+    if kind in PRESET_SWITCHING_HARD_CUT_SUBMENU_KINDS:
+        return TREE_INDENT * 3
     if kind in PRESET_SWITCHING_SUBMENU_KINDS:
         return TREE_INDENT * 2
     if kind in RENDER_OVERLAY_TITLE_NESTED_KINDS | RENDER_OVERLAY_BODY_NESTED_KINDS:

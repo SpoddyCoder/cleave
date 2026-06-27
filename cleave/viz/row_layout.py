@@ -104,11 +104,15 @@ class RowLayout:
                     RowDescriptor(RowKind.TRACK_SOFT_CUT_DURATION, slot=slot)
                 )
                 row_list.append(
-                    RowDescriptor(RowKind.TRACK_HARD_CUT_DURATION, slot=slot)
+                    RowDescriptor(RowKind.TRACK_HARD_CUT_ENABLED, slot=slot)
                 )
-                row_list.append(
-                    RowDescriptor(RowKind.TRACK_HARD_CUT_SENSITIVITY, slot=slot)
-                )
+                if block.hard_cut_enabled:
+                    row_list.append(
+                        RowDescriptor(RowKind.TRACK_HARD_CUT_DURATION, slot=slot)
+                    )
+                    row_list.append(
+                        RowDescriptor(RowKind.TRACK_HARD_CUT_SENSITIVITY, slot=slot)
+                    )
             row_list.append(RowDescriptor(RowKind.TRACK_STEM, slot=slot))
             row_list.append(RowDescriptor(RowKind.TRACK_BEAT, slot=slot))
             row_list.append(RowDescriptor(RowKind.TRACK_BLEND, slot=slot))

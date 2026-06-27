@@ -581,6 +581,10 @@ class TuningControls:
             if slot is None:
                 return
             self._step_soft_cut_duration(slot, forward=forward, ctrl=ctrl)
+        elif kind == RowKind.TRACK_HARD_CUT_ENABLED:
+            if slot is None:
+                return
+            self._cycle_hard_cut_enabled(slot, forward=forward)
         elif kind == RowKind.TRACK_HARD_CUT_DURATION:
             if slot is None:
                 return
@@ -797,6 +801,13 @@ class TuningControls:
         step = 10.0 if ctrl else 1.0
         delta = step if forward else -step
         layer.soft_cut_duration = max(0.0, min(60.0, layer.soft_cut_duration + delta))
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_preset_switching_change(slot)
+
+    def _cycle_hard_cut_enabled(self, slot: str, *, forward: bool) -> None:
+        del forward
+        layer = self.session.layers[slot]
+        layer.hard_cut_enabled = not layer.hard_cut_enabled
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)
 

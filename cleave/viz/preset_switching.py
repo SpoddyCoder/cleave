@@ -8,6 +8,7 @@ from typing import Literal
 
 from cleave.config_schema import (
     DEFAULT_HARD_CUT_DURATION,
+    DEFAULT_HARD_CUT_ENABLED,
     DEFAULT_HARD_CUT_SENSITIVITY,
     DEFAULT_PRESET_DURATION,
     DEFAULT_SOFT_CUT_DURATION,
@@ -28,11 +29,13 @@ def _apply_projectm_timing(
     *,
     preset_duration: float,
     soft_cut_duration: float,
+    hard_cut_enabled: bool,
     hard_cut_duration: float,
     hard_cut_sensitivity: float,
 ) -> None:
     pm.set_preset_duration(preset_duration)
     pm.set_soft_cut_duration(soft_cut_duration)
+    pm.set_hard_cut_enabled(hard_cut_enabled)
     pm.set_hard_cut_duration(hard_cut_duration)
     pm.set_hard_cut_sensitivity(hard_cut_sensitivity)
 
@@ -56,6 +59,7 @@ def reapply_projectm_preset_switching(
                 scope=runtime.preset_switching_scope,
                 preset_duration=runtime.preset_duration,
                 soft_cut_duration=runtime.soft_cut_duration,
+                hard_cut_enabled=runtime.hard_cut_enabled,
                 hard_cut_duration=runtime.hard_cut_duration,
                 hard_cut_sensitivity=runtime.hard_cut_sensitivity,
                 on_empty=on_empty,
@@ -66,6 +70,7 @@ def reapply_projectm_preset_switching(
             delta_sec,
             preset_duration=runtime.preset_duration,
             soft_cut_duration=runtime.soft_cut_duration,
+            hard_cut_enabled=runtime.hard_cut_enabled,
             hard_cut_duration=runtime.hard_cut_duration,
             hard_cut_sensitivity=runtime.hard_cut_sensitivity,
         )
@@ -78,6 +83,7 @@ def apply_preset_switching(
     scope: PresetSwitchingScope,
     preset_duration: float = DEFAULT_PRESET_DURATION,
     soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION,
+    hard_cut_enabled: bool = DEFAULT_HARD_CUT_ENABLED,
     hard_cut_duration: float = DEFAULT_HARD_CUT_DURATION,
     hard_cut_sensitivity: float = DEFAULT_HARD_CUT_SENSITIVITY,
     on_empty: Callable[[], None] | None = None,
@@ -95,11 +101,11 @@ def apply_preset_switching(
         return
 
     pm.lock_preset(False)
-    pm.set_hard_cut_enabled(True)
     _apply_projectm_timing(
         pm,
         preset_duration=preset_duration,
         soft_cut_duration=soft_cut_duration,
+        hard_cut_enabled=hard_cut_enabled,
         hard_cut_duration=hard_cut_duration,
         hard_cut_sensitivity=hard_cut_sensitivity,
     )
@@ -136,6 +142,7 @@ def reset_projectm_preset_timer(
     *,
     preset_duration: float = DEFAULT_PRESET_DURATION,
     soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION,
+    hard_cut_enabled: bool = DEFAULT_HARD_CUT_ENABLED,
     hard_cut_duration: float = DEFAULT_HARD_CUT_DURATION,
     hard_cut_sensitivity: float = DEFAULT_HARD_CUT_SENSITIVITY,
 ) -> None:
@@ -143,11 +150,11 @@ def reset_projectm_preset_timer(
     pm = layer.pm
     pm.lock_preset(True)
     pm.lock_preset(False)
-    pm.set_hard_cut_enabled(True)
     _apply_projectm_timing(
         pm,
         preset_duration=preset_duration,
         soft_cut_duration=soft_cut_duration,
+        hard_cut_enabled=hard_cut_enabled,
         hard_cut_duration=hard_cut_duration,
         hard_cut_sensitivity=hard_cut_sensitivity,
     )
@@ -168,6 +175,7 @@ def _reapply_on_seek(
     *,
     preset_duration: float = DEFAULT_PRESET_DURATION,
     soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION,
+    hard_cut_enabled: bool = DEFAULT_HARD_CUT_ENABLED,
     hard_cut_duration: float = DEFAULT_HARD_CUT_DURATION,
     hard_cut_sensitivity: float = DEFAULT_HARD_CUT_SENSITIVITY,
 ) -> None:
@@ -176,11 +184,11 @@ def _reapply_on_seek(
         return
     pm = layer.pm
     pm.lock_preset(False)
-    pm.set_hard_cut_enabled(True)
     _apply_projectm_timing(
         pm,
         preset_duration=preset_duration,
         soft_cut_duration=soft_cut_duration,
+        hard_cut_enabled=hard_cut_enabled,
         hard_cut_duration=hard_cut_duration,
         hard_cut_sensitivity=hard_cut_sensitivity,
     )
@@ -192,6 +200,7 @@ def _reapply_on_seek(
             layer,
             preset_duration=preset_duration,
             soft_cut_duration=soft_cut_duration,
+            hard_cut_enabled=hard_cut_enabled,
             hard_cut_duration=hard_cut_duration,
             hard_cut_sensitivity=hard_cut_sensitivity,
         )

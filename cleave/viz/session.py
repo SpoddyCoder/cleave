@@ -18,6 +18,7 @@ from cleave.config_schema import (
     DEFAULT_SOFT_CUT_DURATION,
     DEFAULT_HARD_CUT_DURATION,
     DEFAULT_HARD_CUT_SENSITIVITY,
+    DEFAULT_HARD_CUT_ENABLED,
     PresetSwitchingMode,
     PresetSwitchingScope,
     default_render_overlay_runtime_values,
@@ -126,6 +127,7 @@ class LayerRuntime:
     soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION
     hard_cut_duration: float = DEFAULT_HARD_CUT_DURATION
     hard_cut_sensitivity: float = DEFAULT_HARD_CUT_SENSITIVITY
+    hard_cut_enabled: bool = DEFAULT_HARD_CUT_ENABLED
 
 
 @dataclass
@@ -227,6 +229,7 @@ def session_from_cfg(
                 soft_cut_duration=layer_cfg.soft_cut_duration,
                 hard_cut_duration=layer_cfg.hard_cut_duration,
                 hard_cut_sensitivity=layer_cfg.hard_cut_sensitivity,
+                hard_cut_enabled=layer_cfg.hard_cut_enabled,
             )
             for slot, layer_cfg in cfg.layers.items()
         },

@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, call, patch
 
 from cleave.config_schema import (
     DEFAULT_HARD_CUT_DURATION,
+    DEFAULT_HARD_CUT_ENABLED,
     DEFAULT_HARD_CUT_SENSITIVITY,
     DEFAULT_PRESET_DURATION,
     DEFAULT_SOFT_CUT_DURATION,
@@ -78,7 +79,7 @@ def test_apply_projectm_connects_playlist(
     )
 
     layer.pm.lock_preset.assert_called_with(False)
-    layer.pm.set_hard_cut_enabled.assert_called_with(True)
+    layer.pm.set_hard_cut_enabled.assert_called_with(DEFAULT_HARD_CUT_ENABLED)
     layer.pm.set_preset_duration.assert_called_once_with(DEFAULT_PRESET_DURATION)
     layer.pm.set_soft_cut_duration.assert_called_once_with(DEFAULT_SOFT_CUT_DURATION)
     layer.pm.set_hard_cut_duration.assert_called_once_with(DEFAULT_HARD_CUT_DURATION)
@@ -96,6 +97,28 @@ def test_apply_projectm_connects_playlist(
     assert layer.auto_preset_path == _MILK[0].resolve()
     playlist.set_position.assert_called_once_with(0, hard_cut=True)
     on_empty.assert_not_called()
+
+
+@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
+@patch("cleave.viz.preset_switching.ProjectMPlaylist")
+def test_apply_projectm_respects_hard_cut_disabled(
+    mock_playlist_cls: MagicMock,
+    _mock_milk: MagicMock,
+) -> None:
+    layer = _stem_layer(paths=_MILK)
+    playlist = MagicMock()
+    playlist.size.return_value = 3
+    playlist.item.side_effect = lambda i: _MILK[i]
+    mock_playlist_cls.create.return_value = playlist
+
+    apply_preset_switching(
+        layer,
+        mode="projectm",
+        scope="directory",
+        hard_cut_enabled=False,
+    )
+
+    layer.pm.set_hard_cut_enabled.assert_called_with(False)
 
 
 def test_restart_projectm_preset_timer_skips_when_no_current() -> None:
@@ -189,6 +212,7 @@ def test_reapply_projectm_preset_switching_only_projectm_layers() -> None:
         soft_cut_duration=DEFAULT_SOFT_CUT_DURATION,
         hard_cut_duration=DEFAULT_HARD_CUT_DURATION,
         hard_cut_sensitivity=DEFAULT_HARD_CUT_SENSITIVITY,
+        hard_cut_enabled=DEFAULT_HARD_CUT_ENABLED,
     )
 
 
