@@ -14,7 +14,8 @@ from cleave.signals import Signals
 from cleave.stem_pcm import StemPcmBank
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_preview_resolution import preview_sizes_for_session
-from cleave.viz.layer_visibility import apply_layer_visibility, effective_layer_enabled
+from cleave.viz.layer_visibility import effective_layer_enabled
+from cleave.viz.preset_switching import apply_preset_switching
 from cleave.viz.session import TuningSession
 from OpenGL.GL import GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, glClear, glClearColor, glViewport
 
@@ -135,8 +136,6 @@ class LayerFramePipeline:
         if texture_paths:
             pm.set_texture_paths(texture_paths)
         playlist.load_into(pm)
-        pm.lock_preset(True)
-        pm.set_hard_cut_enabled(False)
         pm.set_fps(fps)
         pm.set_beat_sensitivity(beat_sensitivity)
 
@@ -148,12 +147,25 @@ class LayerFramePipeline:
             blend_mode=layer_cfg.blend_mode,
         )
         fbo.enabled = layer_cfg.enabled
-        return StemLayer(
+        layer = StemLayer(
             slot=slot,
             pm=pm,
             fbo=fbo,
             playlist=playlist,
         )
+        apply_preset_switching(
+            layer,
+            mode=layer_cfg.preset_switching,
+            scope=layer_cfg.preset_switching_scope,
+            preset_duration=layer_cfg.preset_duration,
+            soft_cut_duration=layer_cfg.soft_cut_duration,
+            easter_egg=layer_cfg.easter_egg,
+            preset_start_clean=layer_cfg.preset_start_clean,
+            hard_cut_enabled=layer_cfg.hard_cut_enabled,
+            hard_cut_duration=layer_cfg.hard_cut_duration,
+            hard_cut_sensitivity=layer_cfg.hard_cut_sensitivity,
+        )
+        return layer
 
     @staticmethod
     def destroy_single(
@@ -164,6 +176,8 @@ class LayerFramePipeline:
     ) -> None:
         layer = layers_by_slot.pop(slot)
         layers.remove(layer)
+        if layer.projectm_playlist is not None:
+            layer.projectm_playlist.destroy()
         layer.pm.destroy()
         compositor.remove_layer_fbo(slot)
 
@@ -201,43 +215,6 @@ class LayerFramePipeline:
                 cfg, session, layers_by_slot, compositor
             )
         return runtimes, layers_by_slot
-
-    @staticmethod
-    def warmup(
-        layers: list[StemLayer],
-        pcm_bank: StemPcmBank,
-        start_sec: float,
-        frames: int,
-        fps: int,
-        n_pcm: int,
-        *,
-        session: TuningSession,
-    ) -> None:
-        """Pre-render projectM FBOs over a pre-roll that flows into *start_sec*.
-
-        Frame time advances monotonically across the pre-roll, from
-        ``start_sec - frames / fps`` up to ``start_sec - 1 / fps``, so projectM's
-        time-driven equations and feedback buffers actually evolve (pinning the
-        frame time leaves projectM in its white frame-0 state). The window ends one
-        frame before *start_sec*, so the first real frame at *start_sec* continues
-        the same ``+1 / fps`` step with no frame-time reset or visible cut.
-
-        For a t=0 show start the pre-roll frame times are negative; that is fine for
-        projectM and PCM is sampled from the show-start region
-        (StemPcmBank.slice_pcm clamps the sample position to t>=0).
-        """
-        layers_by_slot = {layer.slot: layer for layer in layers}
-        for i in range(frames):
-            t_sec = start_sec - (frames - i) / fps
-            apply_layer_visibility(session, layers_by_slot, t_sec)
-            for layer in layers:
-                if not layer.fbo.enabled:
-                    continue
-                stem = session.layers[layer.slot].stem
-                pcm = pcm_bank.slice_pcm(stem, t_sec, n_pcm)
-                layer.pm.feed_pcm(pcm, channels=pcm_bank.channels(stem))
-                layer.pm.set_frame_time(t_sec)
-                _render_layer_fbo(layer, layer.pm)
 
     @staticmethod
     def flush_pcm(layers: list[StemLayer]) -> None:

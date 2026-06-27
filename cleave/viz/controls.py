@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING
 import pygame
 
 from cleave.config import CleaveConfig, clamp_beat_sensitivity, clamp_effect_pct
+from cleave.config_schema import clamp_easter_egg
+from cleave.config_schema import PRESET_SWITCHING_MODES
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.extract import STEM_SOURCES
 from cleave.viz.config_save import ConfigSaveController
@@ -232,6 +234,8 @@ class TuningControls:
             if kind == RowKind.TRACK_PRESET_DIR:
                 slot = self.focus_descriptor.slot
                 if slot is not None:
+                    if self._auto_preset_switching_blocks_browse(slot):
+                        return True
                     if layer_lock_blocks_mutation(
                         kind, locked=self.session.layers[slot].locked
                     ):
@@ -268,6 +272,8 @@ class TuningControls:
             if kind == RowKind.TRACK_PRESET_DIR:
                 slot = self.focus_descriptor.slot
                 if slot is not None:
+                    if self._auto_preset_switching_blocks_browse(slot):
+                        return True
                     if layer_lock_blocks_mutation(
                         kind, locked=self.session.layers[slot].locked
                     ):
@@ -517,6 +523,13 @@ class TuningControls:
 
         if (
             slot is not None
+            and kind in {RowKind.TRACK_PRESET_DIR, RowKind.TRACK_PRESET}
+            and self._auto_preset_switching_blocks_browse(slot)
+        ):
+            return
+
+        if (
+            slot is not None
             and layer_lock_blocks_mutation(
                 kind, locked=self.session.layers[slot].locked
             )
@@ -555,6 +568,44 @@ class TuningControls:
             if slot is None:
                 return
             self._step_preset(slot, forward=forward, ctrl=ctrl)
+        elif kind == RowKind.TRACK_PRESET_SWITCHING:
+            if slot is None:
+                return
+            self._cycle_preset_switching(slot, forward=forward)
+        elif kind == RowKind.TRACK_PRESET_SWITCHING_SCOPE:
+            return
+        elif kind == RowKind.TRACK_PRESET_DURATION:
+            if slot is None:
+                return
+            self._step_preset_duration(slot, forward=forward, ctrl=ctrl)
+        elif kind == RowKind.TRACK_SOFT_CUT_DURATION:
+            if slot is None:
+                return
+            self._step_soft_cut_duration(slot, forward=forward, ctrl=ctrl)
+        elif kind == RowKind.TRACK_EASTER_EGG:
+            if slot is None:
+                return
+            self._step_easter_egg(slot, forward=forward, ctrl=ctrl)
+        elif kind == RowKind.TRACK_PRESET_START_CLEAN:
+            if slot is None:
+                return
+            self._cycle_preset_start_clean(slot, forward=forward)
+        elif kind == RowKind.TRACK_HARD_CUT_ENABLED:
+            if slot is None:
+                return
+            self._cycle_hard_cut_enabled(slot, forward=forward)
+        elif kind == RowKind.TRACK_HARD_CUT_DURATION:
+            if slot is None:
+                return
+            self._step_hard_cut_duration(slot, forward=forward, ctrl=ctrl)
+        elif kind == RowKind.TRACK_HARD_CUT_SENSITIVITY:
+            if slot is None:
+                return
+            step = 0.1 if ctrl else 0.01
+            delta = step if forward else -step
+            self._set_hard_cut_sensitivity(
+                slot, self.session.layers[slot].hard_cut_sensitivity + delta
+            )
         elif kind == RowKind.TRACK_STEM:
             if slot is None:
                 return
@@ -724,6 +775,81 @@ class TuningControls:
             playlist.prev()
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_change(slot, playlist)
+
+    def _auto_preset_switching_blocks_browse(self, slot: str) -> bool:
+        return self.session.layers[slot].preset_switching != "none"
+
+    def _cycle_preset_switching(self, slot: str, *, forward: bool) -> None:
+        layer = self.session.layers[slot]
+        modes = PRESET_SWITCHING_MODES
+        try:
+            index = modes.index(layer.preset_switching)
+        except ValueError:
+            index = 0
+        if forward:
+            layer.preset_switching = modes[(index + 1) % len(modes)]
+        else:
+            layer.preset_switching = modes[(index - 1) % len(modes)]
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_preset_switching_change(slot)
+
+    def _step_preset_duration(
+        self, slot: str, *, forward: bool, ctrl: bool = False
+    ) -> None:
+        layer = self.session.layers[slot]
+        step = 10.0 if ctrl else 1.0
+        delta = step if forward else -step
+        layer.preset_duration = max(5.0, min(300.0, layer.preset_duration + delta))
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_preset_switching_change(slot)
+
+    def _step_soft_cut_duration(
+        self, slot: str, *, forward: bool, ctrl: bool = False
+    ) -> None:
+        layer = self.session.layers[slot]
+        step = 10.0 if ctrl else 1.0
+        delta = step if forward else -step
+        layer.soft_cut_duration = max(0.0, min(60.0, layer.soft_cut_duration + delta))
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_preset_switching_change(slot)
+
+    def _step_easter_egg(self, slot: str, *, forward: bool, ctrl: bool = False) -> None:
+        layer = self.session.layers[slot]
+        step = 0.1 if ctrl else 0.01
+        delta = step if forward else -step
+        layer.easter_egg = clamp_easter_egg(layer.easter_egg + delta)
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_preset_switching_change(slot)
+
+    def _cycle_preset_start_clean(self, slot: str, *, forward: bool) -> None:
+        del forward
+        layer = self.session.layers[slot]
+        layer.preset_start_clean = not layer.preset_start_clean
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_preset_switching_change(slot)
+
+    def _cycle_hard_cut_enabled(self, slot: str, *, forward: bool) -> None:
+        del forward
+        layer = self.session.layers[slot]
+        layer.hard_cut_enabled = not layer.hard_cut_enabled
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_preset_switching_change(slot)
+
+    def _step_hard_cut_duration(
+        self, slot: str, *, forward: bool, ctrl: bool = False
+    ) -> None:
+        layer = self.session.layers[slot]
+        step = 10.0 if ctrl else 1.0
+        delta = step if forward else -step
+        layer.hard_cut_duration = max(5.0, min(300.0, layer.hard_cut_duration + delta))
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_preset_switching_change(slot)
+
+    def _set_hard_cut_sensitivity(self, slot: str, value: float) -> None:
+        layer = self.session.layers[slot]
+        layer.hard_cut_sensitivity = max(0.1, min(2.0, float(value)))
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_preset_switching_change(slot)
 
     def _cycle_blend(self, slot: str, *, forward: bool) -> None:
         layer = self.session.layers[slot]

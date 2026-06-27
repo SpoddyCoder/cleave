@@ -440,12 +440,12 @@ def test_navigation_skips_sub_rows_when_collapsed() -> None:
 
     drums_header = next(
         i
-        for i in range(12)
+        for i in range(len(view.layout))
         if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_1"
     )
     bass_header = next(
         i
-        for i in range(12)
+        for i in range(len(view.layout))
         if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_2"
     )
     navigable = view.layout.navigable_indices(view)
@@ -940,7 +940,7 @@ def test_navigable_rows_without_overwrite() -> None:
     )
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is False
-    assert len(view.layout) == 16
+    assert len(view.layout) == 17
 
     kinds = {view.layout.kind(i) for i in range(len(view.layout))}
     assert RowKind.CONFIG_HEADER in kinds
@@ -961,7 +961,7 @@ def test_navigable_rows_with_overwrite() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is True
-    assert len(view.layout) == 16
+    assert len(view.layout) == 17
 
     config_row = _config_header_row(view)
     assert config_row in view.layout.navigable_indices(view)
@@ -2366,9 +2366,9 @@ def _sub_rows_for_stem(view: TuningViewState, stem: str) -> list[int]:
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
         RowKind.TRACK_STEM,
+        RowKind.TRACK_BEAT,
         RowKind.TRACK_BLEND,
         RowKind.TRACK_OPACITY,
-        RowKind.TRACK_BEAT,
         RowKind.TRACK_EFFECTS_HEADER,
         RowKind.TRACK_EFFECT,
     )
@@ -3023,3 +3023,164 @@ def test_default_focus_stays_on_transport() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     assert controls.focus_descriptor == RowDescriptor(RowKind.TRANSPORT)
+
+
+def test_preset_switching_row_cycles_none_and_projectm() -> None:
+    controls = _make_controls(("layer_1",))
+    switched: list[str] = []
+    controls._layer_bindings = noop_layer_bindings(
+        on_preset_switching_change=lambda slot: switched.append(slot)
+    )
+    controls.session.layers["layer_1"].expanded = True
+    view = controls.build_view_state(paused=False)
+    row = _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING)
+    controls.focus_descriptor = view.layout.descriptor(row)
+    assert controls.session.layers["layer_1"].preset_switching == "none"
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].preset_switching == "projectm"
+    assert switched == ["layer_1"]
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.layers["layer_1"].preset_switching == "none"
+
+
+def test_projectm_mode_blocks_preset_browse() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].expanded = True
+    changed: list[str] = []
+    controls._layer_bindings = noop_layer_bindings(
+        on_preset_change=lambda slot, _pl: changed.append(slot)
+    )
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = view.layout.descriptor(
+        _row(view, "layer_1", RowKind.TRACK_PRESET)
+    )
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert changed == []
+
+    controls.focus_descriptor = view.layout.descriptor(
+        _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
+    )
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert changed == []
+
+
+def test_scope_row_hidden_when_mode_none() -> None:
+    controls = _make_controls(("layer_1",))
+    view = controls.build_view_state(paused=False)
+    with pytest.raises(ValueError, match="TRACK_PRESET_SWITCHING_SCOPE"):
+        _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_SCOPE)
+
+
+def test_scope_row_visible_when_mode_projectm() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].expanded = True
+    view = controls.build_view_state(paused=False)
+    _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_SCOPE)
+
+
+def test_preset_duration_ctrl_step_is_ten_seconds() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].expanded = True
+    view = controls.build_view_state(paused=False)
+    row = _row(view, "layer_1", RowKind.TRACK_PRESET_DURATION)
+    controls.focus_descriptor = view.layout.descriptor(row)
+    controls.session.layers["layer_1"].preset_duration = 30.0
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].preset_duration == 31.0
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert controls.session.layers["layer_1"].preset_duration == 41.0
+
+
+def test_hard_cut_enabled_cycles_and_hides_child_rows() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].expanded = True
+    switched: list[str] = []
+    controls._layer_bindings = noop_layer_bindings(
+        on_preset_switching_change=lambda slot: switched.append(slot)
+    )
+    view = controls.build_view_state(paused=False)
+    _row(view, "layer_1", RowKind.TRACK_HARD_CUT_DURATION)
+    _row(view, "layer_1", RowKind.TRACK_HARD_CUT_SENSITIVITY)
+
+    row = _row(view, "layer_1", RowKind.TRACK_HARD_CUT_ENABLED)
+    controls.focus_descriptor = view.layout.descriptor(row)
+    assert controls.session.layers["layer_1"].hard_cut_enabled is True
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].hard_cut_enabled is False
+    assert switched == ["layer_1"]
+
+    view = controls.build_view_state(paused=False)
+    with pytest.raises(ValueError, match="TRACK_HARD_CUT_DURATION"):
+        _row(view, "layer_1", RowKind.TRACK_HARD_CUT_DURATION)
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.layers["layer_1"].hard_cut_enabled is True
+    view = controls.build_view_state(paused=False)
+    _row(view, "layer_1", RowKind.TRACK_HARD_CUT_DURATION)
+
+
+def test_easter_egg_steps_with_standard_and_large_increments() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].expanded = True
+    switched: list[str] = []
+    controls._layer_bindings = noop_layer_bindings(
+        on_preset_switching_change=lambda slot: switched.append(slot)
+    )
+    view = controls.build_view_state(paused=False)
+    row = _row(view, "layer_1", RowKind.TRACK_EASTER_EGG)
+    controls.focus_descriptor = view.layout.descriptor(row)
+    controls.session.layers["layer_1"].easter_egg = 1.0
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].easter_egg == pytest.approx(1.01)
+    assert switched == ["layer_1"]
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert controls.session.layers["layer_1"].easter_egg == pytest.approx(1.11)
+
+
+def test_preset_start_clean_cycles_yes_no() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].expanded = True
+    view = controls.build_view_state(paused=False)
+    row = _row(view, "layer_1", RowKind.TRACK_PRESET_START_CLEAN)
+    controls.focus_descriptor = view.layout.descriptor(row)
+    assert controls.session.layers["layer_1"].preset_start_clean is False
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].preset_start_clean is True
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.layers["layer_1"].preset_start_clean is False
+
+
+def test_hard_cut_sensitivity_steps_like_beat_sensitivity() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].expanded = True
+    controls.session.layers["layer_1"].hard_cut_enabled = True
+    view = controls.build_view_state(paused=False)
+    row = _row(view, "layer_1", RowKind.TRACK_HARD_CUT_SENSITIVITY)
+    controls.focus_descriptor = view.layout.descriptor(row)
+    controls.session.layers["layer_1"].hard_cut_sensitivity = 1.5
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].hard_cut_sensitivity == pytest.approx(
+        1.51
+    )
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert controls.session.layers["layer_1"].hard_cut_sensitivity == pytest.approx(
+        1.61
+    )

@@ -33,32 +33,42 @@ class ProjectMLibraryError(OSError):
     """libprojectM shared library not found or failed to load."""
 
 
-def _pkg_config_candidates() -> list[str]:
-    try:
-        libdirs = subprocess.run(
-            ["pkg-config", "--libs-only-L", "libprojectM"],
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.split()
-        libnames = subprocess.run(
-            ["pkg-config", "--libs-only-l", "libprojectM"],
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.split()
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        return []
+_PKG_CONFIG_NAMES = ("projectM-4", "libprojectM")
 
-    candidates: list[str] = []
-    for entry in libdirs:
-        if not entry.startswith("-L"):
+
+def _pkg_config_candidates() -> list[str]:
+    for pkg_name in _PKG_CONFIG_NAMES:
+        try:
+            libdirs = subprocess.run(
+                ["pkg-config", "--libs-only-L", pkg_name],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.split()
+            libnames = subprocess.run(
+                ["pkg-config", "--libs-only-l", pkg_name],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.split()
+        except (FileNotFoundError, subprocess.CalledProcessError):
             continue
-        base = Path(entry[2:])
-        for lib in libnames:
-            if lib.startswith("-l"):
-                candidates.append(str(base / f"lib{lib[2:]}.so"))
-    return candidates
+
+        candidates: list[str] = []
+        for entry in libdirs:
+            if not entry.startswith("-L"):
+                continue
+            base = Path(entry[2:])
+            for lib in libnames:
+                if (
+                    lib.startswith("-l")
+                    and "projectM" in lib
+                    and "playlist" not in lib
+                ):
+                    candidates.append(str(base / f"lib{lib[2:]}.so"))
+        if candidates:
+            return candidates
+    return []
 
 
 def _library_candidates() -> list[str]:
@@ -67,8 +77,10 @@ def _library_candidates() -> list[str]:
     if env_path:
         candidates.append(env_path)
     candidates.extend(_pkg_config_candidates())
+    local_lib = Path.home() / ".local/lib"
     candidates.extend(
         [
+            str(local_lib / "libprojectM-4.so"),
             "/usr/local/lib/libprojectM-4.so",
             "/usr/lib/x86_64-linux-gnu/libprojectM-4.so",
             "libprojectM-4.so",
@@ -100,6 +112,12 @@ _REQUIRED_SYMBOLS = (
     "projectm_set_fps",
     "projectm_set_frame_time",
     "projectm_set_hard_cut_enabled",
+    "projectm_set_soft_cut_duration",
+    "projectm_set_preset_duration",
+    "projectm_set_hard_cut_duration",
+    "projectm_set_hard_cut_sensitivity",
+    "projectm_set_easter_egg",
+    "projectm_set_preset_start_clean",
 )
 
 
@@ -163,6 +181,24 @@ def _bind_functions(lib: ctypes.CDLL, path: str) -> None:
 
     lib.projectm_set_hard_cut_enabled.argtypes = [c_void_p, c_bool]
     lib.projectm_set_hard_cut_enabled.restype = None
+
+    lib.projectm_set_soft_cut_duration.argtypes = [c_void_p, c_double]
+    lib.projectm_set_soft_cut_duration.restype = None
+
+    lib.projectm_set_preset_duration.argtypes = [c_void_p, c_double]
+    lib.projectm_set_preset_duration.restype = None
+
+    lib.projectm_set_hard_cut_duration.argtypes = [c_void_p, c_double]
+    lib.projectm_set_hard_cut_duration.restype = None
+
+    lib.projectm_set_hard_cut_sensitivity.argtypes = [c_void_p, c_float]
+    lib.projectm_set_hard_cut_sensitivity.restype = None
+
+    lib.projectm_set_easter_egg.argtypes = [c_void_p, c_float]
+    lib.projectm_set_easter_egg.restype = None
+
+    lib.projectm_set_preset_start_clean.argtypes = [c_void_p, c_bool]
+    lib.projectm_set_preset_start_clean.restype = None
 
 
 def _get_lib() -> ctypes.CDLL:
@@ -306,3 +342,21 @@ class ProjectM:
 
     def set_hard_cut_enabled(self, enabled: bool) -> None:
         _get_lib().projectm_set_hard_cut_enabled(self._handle, c_bool(enabled))
+
+    def set_soft_cut_duration(self, seconds: float) -> None:
+        _get_lib().projectm_set_soft_cut_duration(self._handle, c_double(seconds))
+
+    def set_preset_duration(self, seconds: float) -> None:
+        _get_lib().projectm_set_preset_duration(self._handle, c_double(seconds))
+
+    def set_hard_cut_duration(self, seconds: float) -> None:
+        _get_lib().projectm_set_hard_cut_duration(self._handle, c_double(seconds))
+
+    def set_hard_cut_sensitivity(self, value: float) -> None:
+        _get_lib().projectm_set_hard_cut_sensitivity(self._handle, c_float(value))
+
+    def set_easter_egg(self, value: float) -> None:
+        _get_lib().projectm_set_easter_egg(self._handle, c_float(value))
+
+    def set_preset_start_clean(self, enabled: bool) -> None:
+        _get_lib().projectm_set_preset_start_clean(self._handle, c_bool(enabled))

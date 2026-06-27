@@ -21,12 +21,27 @@ DEFAULT_VISUALIZER_HEIGHT = 720
 DEFAULT_RENDER_FPS = 30
 DEFAULT_RENDER_WIDTH = 1280
 DEFAULT_RENDER_HEIGHT = 720
-DEFAULT_VISUALIZER_WARMUP_SEC = 3.0
 DEFAULT_VISUALIZER_UPSCALE = 1.0
 UPSCALE_MIN = 1.0
 DEFAULT_BEAT_SENSITIVITY = 2.0
 BEAT_SENSITIVITY_MIN = 0.0
 BEAT_SENSITIVITY_MAX = 5.0
+
+PresetSwitchingMode = Literal["none", "projectm"]
+PresetSwitchingScope = Literal["directory"]
+PRESET_SWITCHING_MODES: tuple[PresetSwitchingMode, ...] = ("none", "projectm")
+PRESET_SWITCHING_SCOPES: tuple[PresetSwitchingScope, ...] = ("directory",)
+DEFAULT_PRESET_SWITCHING: PresetSwitchingMode = "none"
+DEFAULT_PRESET_SWITCHING_SCOPE: PresetSwitchingScope = "directory"
+DEFAULT_PRESET_DURATION = 30.0
+DEFAULT_SOFT_CUT_DURATION = 0.0
+DEFAULT_HARD_CUT_DURATION = 20.0
+DEFAULT_HARD_CUT_SENSITIVITY = 2.0
+DEFAULT_HARD_CUT_ENABLED = True
+DEFAULT_EASTER_EGG = 1.0
+EASTER_EGG_MIN = 0.1
+EASTER_EGG_MAX = 5.0
+DEFAULT_PRESET_START_CLEAN = False
 
 VisualizerRenderMode = Literal[
     "full-quality", "balanced", "performance", "ultra-performance"
@@ -83,6 +98,8 @@ def new_layer_config(slot: str, preset: Path, preset_root: Path) -> Any:
         height=h,
         blend_mode=DEFAULT_BLEND_MODE[DEFAULT_NEW_LAYER_STEM],
         locked=False,
+        preset_switching=DEFAULT_PRESET_SWITCHING,
+        preset_switching_scope=DEFAULT_PRESET_SWITCHING_SCOPE,
     )
 
 DEFAULT_BLEND_MODE: dict[StemSource, BlendMode] = {
@@ -158,6 +175,38 @@ def clamp_upscale(value: float) -> float:
 
 def clamp_beat_sensitivity(value: float) -> float:
     return max(BEAT_SENSITIVITY_MIN, min(BEAT_SENSITIVITY_MAX, float(value)))
+
+
+def _parse_preset_switching(raw: Any, label: str) -> PresetSwitchingMode:
+    mode = str(raw)
+    if mode not in PRESET_SWITCHING_MODES:
+        allowed = ", ".join(PRESET_SWITCHING_MODES)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return mode
+
+
+def _parse_preset_switching_scope(raw: Any, label: str) -> PresetSwitchingScope:
+    scope = str(raw)
+    if scope not in PRESET_SWITCHING_SCOPES:
+        allowed = ", ".join(PRESET_SWITCHING_SCOPES)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return scope
+
+
+def hard_cut_enabled_display(enabled: bool) -> str:
+    return "enabled" if enabled else "disabled"
+
+
+def preset_start_clean_display(enabled: bool) -> str:
+    return "yes" if enabled else "no"
+
+
+def clamp_easter_egg(value: float) -> float:
+    return max(EASTER_EGG_MIN, min(EASTER_EGG_MAX, float(value)))
+
+
+def preset_switching_display(mode: PresetSwitchingMode) -> str:
+    return "projectM" if mode == "projectm" else "none"
 
 
 @dataclass(frozen=True)
@@ -281,16 +330,6 @@ def _parse_upscale(raw: Any, ctx: ParseCtx, label: str) -> float:
     if upscale < UPSCALE_MIN:
         raise ValueError(f"{label} must be >= {UPSCALE_MIN}")
     return clamp_upscale(upscale)
-
-
-def _parse_warmup_sec(raw: Any, ctx: ParseCtx, label: str) -> float:
-    try:
-        warmup_sec = float(raw)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{label} must be a number") from exc
-    if warmup_sec < 0:
-        raise ValueError(f"{label} must be >= 0")
-    return warmup_sec
 
 
 def _parse_beat_sensitivity(raw: Any, ctx: ParseCtx, label: str) -> float:
@@ -654,13 +693,6 @@ VISUALIZER_FIELDS: tuple[FieldDescriptor, ...] = (
         lambda value, _ctx: clamp_upscale(value),
     ),
     FieldDescriptor(
-        "warmup_sec",
-        DEFAULT_VISUALIZER_WARMUP_SEC,
-        "cfg",
-        _parse_warmup_sec,
-        _dump_scalar,
-    ),
-    FieldDescriptor(
         "beat_sensitivity",
         DEFAULT_BEAT_SENSITIVITY,
         "cfg",
@@ -807,7 +839,6 @@ def parse_visualizer_section(data: dict[str, Any]) -> Any:
         width=parsed["width"],
         height=parsed["height"],
         upscale=parsed["upscale"],
-        warmup_sec=parsed["warmup_sec"],
         beat_sensitivity=parsed["beat_sensitivity"],
         render_mode=parsed["render_mode"],
     )
@@ -819,7 +850,6 @@ def persist_visualizer(ctx: PersistCtx) -> dict[str, Any]:
         "width": vis.width,
         "height": vis.height,
         "upscale": vis.upscale,
-        "warmup_sec": vis.warmup_sec,
         "beat_sensitivity": vis.beat_sensitivity,
         "render_mode": vis.render_mode,
     }
@@ -952,6 +982,35 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
         stem = _parse_stem(slot, layer_raw)
         default_width, default_height = LAYER_DEFAULT_SIZE[stem]
         beat_raw = layer_raw.get("beat_sensitivity")
+        preset_switching = _parse_preset_switching(
+            layer_raw.get("preset_switching", DEFAULT_PRESET_SWITCHING),
+            f"layers.{slot}.preset_switching",
+        )
+        preset_switching_scope = _parse_preset_switching_scope(
+            layer_raw.get("preset_switching_scope", DEFAULT_PRESET_SWITCHING_SCOPE),
+            f"layers.{slot}.preset_switching_scope",
+        )
+        preset_duration = float(
+            layer_raw.get("preset_duration", DEFAULT_PRESET_DURATION)
+        )
+        soft_cut_duration = float(
+            layer_raw.get("soft_cut_duration", DEFAULT_SOFT_CUT_DURATION)
+        )
+        hard_cut_duration = float(
+            layer_raw.get("hard_cut_duration", DEFAULT_HARD_CUT_DURATION)
+        )
+        hard_cut_sensitivity = float(
+            layer_raw.get("hard_cut_sensitivity", DEFAULT_HARD_CUT_SENSITIVITY)
+        )
+        hard_cut_enabled = bool(
+            layer_raw.get("hard_cut_enabled", DEFAULT_HARD_CUT_ENABLED)
+        )
+        easter_egg = clamp_easter_egg(
+            float(layer_raw.get("easter_egg", DEFAULT_EASTER_EGG))
+        )
+        preset_start_clean = bool(
+            layer_raw.get("preset_start_clean", DEFAULT_PRESET_START_CLEAN)
+        )
         layers[slot] = LayerConfig(
             preset=_resolve_preset(preset_raw, preset_root),
             stem=stem,
@@ -965,6 +1024,15 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
             effects=_parse_effects(slot, stem, layer_raw),
             blend_mode=parse_blend_mode(slot, stem, layer_raw),
             locked=bool(layer_raw.get("locked", False)),
+            preset_switching=preset_switching,
+            preset_switching_scope=preset_switching_scope,
+            preset_duration=preset_duration,
+            soft_cut_duration=soft_cut_duration,
+            hard_cut_duration=hard_cut_duration,
+            hard_cut_sensitivity=hard_cut_sensitivity,
+            hard_cut_enabled=hard_cut_enabled,
+            easter_egg=easter_egg,
+            preset_start_clean=preset_start_clean,
         )
     return layers
 
@@ -988,6 +1056,15 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             beat = runtime.beat_sensitivity
             effects = runtime.effects
             locked = runtime.locked
+            preset_switching = runtime.preset_switching
+            preset_switching_scope = runtime.preset_switching_scope
+            preset_duration = runtime.preset_duration
+            soft_cut_duration = runtime.soft_cut_duration
+            hard_cut_duration = runtime.hard_cut_duration
+            hard_cut_sensitivity = runtime.hard_cut_sensitivity
+            hard_cut_enabled = runtime.hard_cut_enabled
+            easter_egg = runtime.easter_egg
+            preset_start_clean = runtime.preset_start_clean
             stem = getattr(runtime, "stem", stem)
         else:
             preset = to_config_relative(layer_cfg.preset, preset_root)
@@ -995,6 +1072,15 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             enabled = layer_cfg.enabled
             blend_mode = layer_cfg.blend_mode
             locked = layer_cfg.locked
+            preset_switching = layer_cfg.preset_switching
+            preset_switching_scope = layer_cfg.preset_switching_scope
+            preset_duration = layer_cfg.preset_duration
+            soft_cut_duration = layer_cfg.soft_cut_duration
+            hard_cut_duration = layer_cfg.hard_cut_duration
+            hard_cut_sensitivity = layer_cfg.hard_cut_sensitivity
+            hard_cut_enabled = layer_cfg.hard_cut_enabled
+            easter_egg = layer_cfg.easter_egg
+            preset_start_clean = layer_cfg.preset_start_clean
             effects = layer_cfg.effects
             beat = (
                 layer_cfg.beat_sensitivity
@@ -1018,6 +1104,24 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
         sparse = sparse_effects(effects)
         if sparse is not None:
             layer_out["effects"] = sparse
+        if preset_switching != DEFAULT_PRESET_SWITCHING:
+            layer_out["preset_switching"] = preset_switching
+        if preset_switching_scope != DEFAULT_PRESET_SWITCHING_SCOPE:
+            layer_out["preset_switching_scope"] = preset_switching_scope
+        if preset_duration != DEFAULT_PRESET_DURATION:
+            layer_out["preset_duration"] = preset_duration
+        if soft_cut_duration != DEFAULT_SOFT_CUT_DURATION:
+            layer_out["soft_cut_duration"] = soft_cut_duration
+        if hard_cut_duration != DEFAULT_HARD_CUT_DURATION:
+            layer_out["hard_cut_duration"] = hard_cut_duration
+        if hard_cut_sensitivity != DEFAULT_HARD_CUT_SENSITIVITY:
+            layer_out["hard_cut_sensitivity"] = hard_cut_sensitivity
+        if hard_cut_enabled != DEFAULT_HARD_CUT_ENABLED:
+            layer_out["hard_cut_enabled"] = hard_cut_enabled
+        if easter_egg != DEFAULT_EASTER_EGG:
+            layer_out["easter_egg"] = easter_egg
+        if preset_start_clean != DEFAULT_PRESET_START_CLEAN:
+            layer_out["preset_start_clean"] = preset_start_clean
         layers_out[slot] = layer_out
 
     return layers_out

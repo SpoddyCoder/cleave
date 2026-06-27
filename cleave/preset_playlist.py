@@ -147,7 +147,7 @@ class PresetPlaylist:
         self._apply(playlist_at_dir(parent, index=0))
         return True
 
-    def load_into(self, pm: ProjectM, smooth: bool = True) -> None:
+    def load_into(self, pm: ProjectM, smooth: bool = False) -> None:
         if self.current is None:
             return
         pm.load_preset(self.current, smooth=smooth)

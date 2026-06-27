@@ -8,6 +8,13 @@ from typing import TYPE_CHECKING
 
 from cleave.config import RenderOverlayPosition
 from cleave.config_schema import (
+    DEFAULT_HARD_CUT_DURATION,
+    DEFAULT_HARD_CUT_SENSITIVITY,
+    DEFAULT_HARD_CUT_ENABLED,
+    DEFAULT_EASTER_EGG,
+    DEFAULT_PRESET_START_CLEAN,
+    DEFAULT_PRESET_DURATION,
+    DEFAULT_SOFT_CUT_DURATION,
     default_render_overlay_runtime_values,
     default_render_post_fx_runtime_values,
 )
@@ -41,6 +48,15 @@ class TrackBlock:
     expanded: bool = False
     locked: bool = False
     preset_empty: bool = False
+    preset_switching: str = "none"
+    preset_switching_scope: str = "directory"
+    preset_duration: float = DEFAULT_PRESET_DURATION
+    soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION
+    hard_cut_duration: float = DEFAULT_HARD_CUT_DURATION
+    hard_cut_sensitivity: float = DEFAULT_HARD_CUT_SENSITIVITY
+    hard_cut_enabled: bool = DEFAULT_HARD_CUT_ENABLED
+    easter_egg: float = DEFAULT_EASTER_EGG
+    preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN
 
 
 @dataclass
@@ -226,6 +242,15 @@ class TuningViewStateBuilder:
                 expanded=layer.expanded,
                 locked=layer.locked,
                 preset_empty=not layer.playlist.paths,
+                preset_switching=layer.preset_switching,
+                preset_switching_scope=layer.preset_switching_scope,
+                preset_duration=layer.preset_duration,
+                soft_cut_duration=layer.soft_cut_duration,
+                hard_cut_duration=layer.hard_cut_duration,
+                hard_cut_sensitivity=layer.hard_cut_sensitivity,
+                hard_cut_enabled=layer.hard_cut_enabled,
+                easter_egg=layer.easter_egg,
+                preset_start_clean=layer.preset_start_clean,
             )
 
         notification_message, notification_remaining_sec = self._get_notification()

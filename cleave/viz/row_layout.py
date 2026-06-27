@@ -91,12 +91,37 @@ class RowLayout:
             row_list.append(RowDescriptor(RowKind.TRACK_HEADER, slot=slot))
             row_list.append(RowDescriptor(RowKind.TRACK_PRESET_DIR, slot=slot))
             row_list.append(RowDescriptor(RowKind.TRACK_PRESET, slot=slot))
+            block = state.tracks[slot]
+            row_list.append(RowDescriptor(RowKind.TRACK_PRESET_SWITCHING, slot=slot))
+            if block.preset_switching == "projectm":
+                row_list.append(
+                    RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_SCOPE, slot=slot)
+                )
+                row_list.append(
+                    RowDescriptor(RowKind.TRACK_PRESET_DURATION, slot=slot)
+                )
+                row_list.append(
+                    RowDescriptor(RowKind.TRACK_SOFT_CUT_DURATION, slot=slot)
+                )
+                row_list.append(RowDescriptor(RowKind.TRACK_EASTER_EGG, slot=slot))
+                row_list.append(
+                    RowDescriptor(RowKind.TRACK_PRESET_START_CLEAN, slot=slot)
+                )
+                row_list.append(
+                    RowDescriptor(RowKind.TRACK_HARD_CUT_ENABLED, slot=slot)
+                )
+                if block.hard_cut_enabled:
+                    row_list.append(
+                        RowDescriptor(RowKind.TRACK_HARD_CUT_DURATION, slot=slot)
+                    )
+                    row_list.append(
+                        RowDescriptor(RowKind.TRACK_HARD_CUT_SENSITIVITY, slot=slot)
+                    )
             row_list.append(RowDescriptor(RowKind.TRACK_STEM, slot=slot))
+            row_list.append(RowDescriptor(RowKind.TRACK_BEAT, slot=slot))
             row_list.append(RowDescriptor(RowKind.TRACK_BLEND, slot=slot))
             row_list.append(RowDescriptor(RowKind.TRACK_OPACITY, slot=slot))
-            row_list.append(RowDescriptor(RowKind.TRACK_BEAT, slot=slot))
             row_list.append(RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, slot=slot))
-            block = state.tracks[slot]
             if block.effects_expanded:
                 for effect_def in effect_roster(block.stem):
                     row_list.append(

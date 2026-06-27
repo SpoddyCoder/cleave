@@ -48,7 +48,7 @@ class StemPcmBank:
         return out
 
 
-# Nominal projectM frame rate for live preview layer init and warmup stepping.
+# Nominal projectM frame rate for live preview layer init stepping.
 LIVE_PROJECTM_FPS = 60
 
 
