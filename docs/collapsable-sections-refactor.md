@@ -82,10 +82,11 @@ The live tuning panel has **partial** sharing, not a single composition layer.
 | `RowAffordance.EXPAND` | [cleave/viz/row_semantics.py](cleave/viz/row_semantics.py) | Marks arrow headers; `expandable_row_kinds()` |
 | `parent_group` on `RowBehavior` | [cleave/viz/row_semantics.py](cleave/viz/row_semantics.py) | Layer-lock grouping (`TRACK_SUB_ROW_KINDS`) |
 | `sub_row_expand_visible()` | [cleave/viz/row_sections.py](cleave/viz/row_sections.py) | Tree-walk visibility for expand sections |
+| `expand_arrow_for_header()` | [cleave/viz/row_sections.py](cleave/viz/row_sections.py) | Shared expand arrow for `EXPAND_HEADER_KINDS` draw and help text |
 | `RowLayout.build()` | [cleave/viz/row_layout.py](cleave/viz/row_layout.py) | Walks root section tree; build-time omission for collapsed/conditional rows |
 | Per-section bools | [cleave/viz/session.py](cleave/viz/session.py) | `expanded`, `effects_expanded`, `preset_switching_expanded`, `title_expanded`, `body_expanded`, `panel_open`, etc. |
 | Bespoke toggles | [cleave/viz/controls.py](cleave/viz/controls.py) | Long `_apply_horizontal` if-chain per `RowKind` |
-| Duplicated arrow draw | [cleave/viz/tuning_panel_draw.py](cleave/viz/tuning_panel_draw.py) | `_track_header_expand_suffix`, `_effects_header_expand_value`, inline help strings |
+| Duplicated arrow draw | [cleave/viz/tuning_panel_draw.py](cleave/viz/tuning_panel_draw.py) | `_track_header_expand_suffix` for width budgeting; per-kind value labels |
 
 View-state mirrors session expand flags in [cleave/viz/tuning_view_state.py](cleave/viz/tuning_view_state.py) (`TrackBlock`, `RenderOverlayBlock`, `SettingsBlock`, etc.). Timeline `panel_open` is exposed as `RenderTimelineBlock.expanded` for draw only.
 
@@ -196,25 +197,61 @@ Execute in order; keep unit tests green after each step.
 
 ---
 
+## Refinement pass
+
+Phases 1-2 introduced the section tree, registries, and layout walk. Phases 3-5 tighten semantics and draw:
+
+### `append_dynamic_children`
+
+Roster-driven rows (e.g. cleave effects per stem) attach via `ExpandSectionDef.append_dynamic_children` instead of a manual loop in `RowLayout.build`. The callback receives the row list, view state, and slot; `append_expand_section_rows` invokes it after static `children` when the section is expanded.
+
+### `read_expanded` and `toggle` on `ExpandSectionDef`
+
+Each expandable section declares:
+
+- `read_expanded(state, slot?) -> bool` — view-state accessor for the arrow and visibility walk
+- `toggle(controls, slot?, forward)` — Left/Right handler (usually a thin wrapper on existing control methods)
+
+`expand_section_expanded` is the single gate for layout omission, `sub_row_expand_visible`, and draw arrows (via `expand_arrow_for_header`).
+
+### `collapse_on_disable`
+
+When `collapse_on_disable` is true (render overlay and post-FX today), `expand_section_expanded` returns false if the block is disabled, before `read_expanded`. Sub-rows stay hidden and arrows show collapsed even if the session bool is still true. Disable handlers should still clear the bool; this hook covers visibility and draw consistently.
+
+### Draw: labels vs arrows
+
+Row label strings (`_row_text`, `_labeled_sub_row_prefix`, fit helpers) stay per-`RowKind` in [cleave/viz/tuning_panel_draw.py](cleave/viz/tuning_panel_draw.py). Expand arrows for `EXPAND_HEADER_KINDS` use `expand_arrow_for_header(state, kind, slot?)` in [cleave/viz/row_sections.py](cleave/viz/row_sections.py). Panel anchor `RENDER_TIMELINE_HEADER` stays separate (`state.render_timeline.expanded`).
+
+### Root section lists
+
+Top-level global expand sections are derived from `ROOT_SECTION_NODES` and `RENDER_SECTION_NODES` (not a parallel manual tuple). Nested sections are reached through the tree walk.
+
+---
+
 ## How to add new UI
 
 ### New expandable section
 
 1. Add `RowKind` header with `RowAffordance.EXPAND` in [cleave/viz/row_semantics.py](cleave/viz/row_semantics.py).
 2. Add session bool (session-only; list in dirty-test exclusions if applicable) in [cleave/viz/session.py](cleave/viz/session.py).
-3. Register `ExpandSectionDef` with `children` in [cleave/viz/row_sections.py](cleave/viz/row_sections.py).
-4. Add label/indent in draw registry ([cleave/viz/tuning_panel_draw.py](cleave/viz/tuning_panel_draw.py)); indent depth is derived from the section tree via `row_tree_indent_depth()`.
-5. No new `_apply_horizontal` branch (registry handles toggle).
+3. Register `ExpandSectionDef` in [cleave/viz/row_sections.py](cleave/viz/row_sections.py):
+   - `read_expanded` and `toggle` wired to session/view state
+   - `children` as `SectionNode` leaves and nested `expand` / `conditional` nodes
+   - optional `collapse_on_disable` when disable should hide children and show a collapsed arrow
+   - optional `append_dynamic_children` for roster-driven leaf rows
+4. Attach the section under the correct parent in the section tree (`ROOT_SECTION_NODES`, `TRACK_SECTION`, `RENDER_SECTION_NODES`, or a nested `SectionNode(expand=...)`).
+5. Add label and indent strings in [cleave/viz/tuning_panel_draw.py](cleave/viz/tuning_panel_draw.py); indent depth comes from `row_tree_indent_depth()`. Arrows for the new header are automatic via `expand_arrow_for_header` (no per-header arrow branch).
+6. No new `_apply_horizontal` branch (`apply_expand_toggle` handles it).
 
 ### New conditional rows
 
 1. Add `RowKind` leaf rows in `row_semantics.py`.
-2. Register `ConditionalRowsDef` with a named predicate; attach under the correct parent in the section tree.
-3. No arrow, no expanded bool.
+2. Define a `ConditionalRowsDef` with a named predicate; attach as `SectionNode(conditional=...)` under the correct parent in the section tree.
+3. No arrow, no expanded bool, no parallel predicate map.
 
 ### New panel anchor
 
-Rare. Register `PanelAnchorDef` with `content_host`; implement the separate panel host (like timeline strip). Do not add `RowLayout` children for strip content.
+Rare. Register `PanelAnchorDef` in `row_sections.py` with `content_host`; implement the separate panel host (like timeline strip). Add draw label and arrow using `state.render_timeline`-style view field (not `expand_arrow_for_header`). Do not add `RowLayout` children for strip content.
 
 ---
 

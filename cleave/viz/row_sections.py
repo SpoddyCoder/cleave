@@ -19,6 +19,7 @@ def expand_arrow_glyph(expanded: bool) -> str:
 
 
 ExpandToggleFn = Callable[["TuningControls", str | None, bool], None]
+AppendDynamicChildrenFn = Callable[[list[RowDescriptor], "TuningViewState", str | None], None]
 PanelAnchorToggleFn = Callable[["TuningControls", bool], None]
 
 
@@ -64,38 +65,11 @@ def _toggle_effects_header(controls: TuningControls, slot: str | None, forward: 
     controls._set_effects_expanded(slot, forward)
 
 
-EXPAND_TOGGLE_BY_HEADER: dict[RowKind, ExpandToggleFn] = {
-    RowKind.SETTINGS_HEADER: _toggle_settings,
-    RowKind.TRACK_HEADER: _toggle_track_header,
-    RowKind.TRACK_PRESET_SWITCHING: _toggle_preset_switching,
-    RowKind.TRACK_EFFECTS_HEADER: _toggle_effects_header,
-    RowKind.RENDER_OVERLAY_HEADER: _toggle_render_overlay,
-    RowKind.RENDER_OVERLAY_TITLE_HEADER: _toggle_render_overlay_title,
-    RowKind.RENDER_OVERLAY_BODY_HEADER: _toggle_render_overlay_body,
-    RowKind.RENDER_POST_FX_HEADER: _toggle_render_post_fx,
-}
-
-EXPAND_HEADER_KINDS = frozenset(EXPAND_TOGGLE_BY_HEADER)
-
-
 def _open_timeline_panel(controls: TuningControls, forward: bool) -> None:
     if forward:
         controls._open_timeline_panel()
     else:
         controls.close_timeline_panel()
-
-
-def apply_expand_toggle(
-    controls: TuningControls,
-    header_kind: RowKind,
-    slot: str | None,
-    forward: bool,
-) -> bool:
-    handler = EXPAND_TOGGLE_BY_HEADER.get(header_kind)
-    if handler is None:
-        return False
-    handler(controls, slot, forward)
-    return True
 
 
 def apply_panel_anchor_toggle(
@@ -153,8 +127,11 @@ class SectionNode:
 class ExpandSectionDef:
     header_kind: RowKind
     context: Literal["global", "per_slot"]
+    read_expanded: Callable[["TuningViewState", str | None], bool]
+    toggle: ExpandToggleFn
     children: tuple[SectionNode, ...] = ()
     collapse_on_disable: bool = False
+    append_dynamic_children: AppendDynamicChildrenFn | None = None
 
 
 TIMELINE_PANEL_ANCHOR = PanelAnchorDef(
@@ -214,21 +191,30 @@ def _track_effects_expanded(state: TuningViewState, slot: str | None) -> bool:
     return state.tracks[slot].effects_expanded
 
 
-_EXPAND_SECTION_EXPANDED: dict[RowKind, Callable[[TuningViewState, str | None], bool]] = {
-    RowKind.SETTINGS_HEADER: _settings_expanded,
-    RowKind.RENDER_OVERLAY_HEADER: _render_overlay_expanded,
-    RowKind.RENDER_OVERLAY_TITLE_HEADER: _render_overlay_title_expanded,
-    RowKind.RENDER_OVERLAY_BODY_HEADER: _render_overlay_body_expanded,
-    RowKind.RENDER_POST_FX_HEADER: _render_post_fx_expanded,
-    RowKind.TRACK_HEADER: _track_header_expanded,
-    RowKind.TRACK_PRESET_SWITCHING: _track_preset_switching_expanded,
-    RowKind.TRACK_EFFECTS_HEADER: _track_effects_expanded,
-}
+def _append_track_effect_rows(
+    row_list: list[RowDescriptor],
+    state: TuningViewState,
+    slot: str | None,
+) -> None:
+    if slot is None:
+        return
+    block = state.tracks[slot]
+    for effect_def in effect_roster(block.stem):
+        row_list.append(
+            RowDescriptor(
+                RowKind.TRACK_EFFECT,
+                slot=slot,
+                effect_id=effect_def.effect_id,
+                driver_slug=effect_def.driver_slug,
+            )
+        )
 
 
 SETTINGS_SECTION = ExpandSectionDef(
     header_kind=RowKind.SETTINGS_HEADER,
     context="global",
+    read_expanded=_settings_expanded,
+    toggle=_toggle_settings,
     children=(
         SectionNode(leaf_kind=RowKind.SETTINGS_RENDER_MODE),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_FADE),
@@ -238,6 +224,8 @@ SETTINGS_SECTION = ExpandSectionDef(
 RENDER_OVERLAY_TITLE_SECTION = ExpandSectionDef(
     header_kind=RowKind.RENDER_OVERLAY_TITLE_HEADER,
     context="global",
+    read_expanded=_render_overlay_title_expanded,
+    toggle=_toggle_render_overlay_title,
     children=(
         SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_TITLE_FONT),
         SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE),
@@ -248,6 +236,8 @@ RENDER_OVERLAY_TITLE_SECTION = ExpandSectionDef(
 RENDER_OVERLAY_BODY_SECTION = ExpandSectionDef(
     header_kind=RowKind.RENDER_OVERLAY_BODY_HEADER,
     context="global",
+    read_expanded=_render_overlay_body_expanded,
+    toggle=_toggle_render_overlay_body,
     children=(
         SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_BODY_FONT),
         SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_BODY_FONT_SIZE),
@@ -257,6 +247,8 @@ RENDER_OVERLAY_BODY_SECTION = ExpandSectionDef(
 RENDER_OVERLAY_SECTION = ExpandSectionDef(
     header_kind=RowKind.RENDER_OVERLAY_HEADER,
     context="global",
+    read_expanded=_render_overlay_expanded,
+    toggle=_toggle_render_overlay,
     collapse_on_disable=True,
     children=(
         SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_POSITION),
@@ -272,6 +264,8 @@ RENDER_OVERLAY_SECTION = ExpandSectionDef(
 RENDER_POST_FX_SECTION = ExpandSectionDef(
     header_kind=RowKind.RENDER_POST_FX_HEADER,
     context="global",
+    read_expanded=_render_post_fx_expanded,
+    toggle=_toggle_render_post_fx,
     collapse_on_disable=True,
     children=(
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_IN),
@@ -314,14 +308,11 @@ PRESET_SWITCHING_PROJECTM = ConditionalRowsDef(
     ),
 )
 
-CONDITIONAL_ROWS_BY_NAME: dict[str, ConditionalRowsDef] = {
-    PRESET_SWITCHING_PROJECTM.name: PRESET_SWITCHING_PROJECTM,
-    HARD_CUT_ENABLED.name: HARD_CUT_ENABLED,
-}
-
 TRACK_PRESET_SWITCHING_SECTION = ExpandSectionDef(
     header_kind=RowKind.TRACK_PRESET_SWITCHING,
     context="per_slot",
+    read_expanded=_track_preset_switching_expanded,
+    toggle=_toggle_preset_switching,
     children=(
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_MODE),
         SectionNode(conditional=PRESET_SWITCHING_PROJECTM),
@@ -331,12 +322,17 @@ TRACK_PRESET_SWITCHING_SECTION = ExpandSectionDef(
 TRACK_EFFECTS_SECTION = ExpandSectionDef(
     header_kind=RowKind.TRACK_EFFECTS_HEADER,
     context="per_slot",
+    read_expanded=_track_effects_expanded,
+    toggle=_toggle_effects_header,
     children=(),
+    append_dynamic_children=_append_track_effect_rows,
 )
 
 TRACK_SECTION = ExpandSectionDef(
     header_kind=RowKind.TRACK_HEADER,
     context="per_slot",
+    read_expanded=_track_header_expanded,
+    toggle=_toggle_track_header,
     children=(
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_DIR),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET),
@@ -358,11 +354,77 @@ RENDER_SECTION_NODES: tuple[SectionNode, ...] = (
     SectionNode(panel_anchor=TIMELINE_PANEL_ANCHOR),
 )
 
-GLOBAL_EXPAND_SECTIONS: tuple[ExpandSectionDef, ...] = (
+
+def _collect_expand_sections(
+    *roots: ExpandSectionDef,
+    extra_nodes: tuple[SectionNode, ...] = (),
+) -> tuple[ExpandSectionDef, ...]:
+    seen: dict[RowKind, ExpandSectionDef] = {}
+    order: list[ExpandSectionDef] = []
+
+    def walk_section(section: ExpandSectionDef) -> None:
+        if section.header_kind in seen:
+            return
+        seen[section.header_kind] = section
+        order.append(section)
+        walk_nodes(section.children)
+
+    def walk_nodes(nodes: tuple[SectionNode, ...]) -> None:
+        for child in nodes:
+            if child.expand is not None:
+                walk_section(child.expand)
+            elif child.conditional is not None:
+                walk_nodes(child.conditional.children)
+
+    for root in roots:
+        walk_section(root)
+    walk_nodes(extra_nodes)
+    return tuple(order)
+
+
+_ALL_EXPAND_SECTIONS = _collect_expand_sections(
     SETTINGS_SECTION,
-    RENDER_OVERLAY_SECTION,
-    RENDER_POST_FX_SECTION,
+    TRACK_SECTION,
+    extra_nodes=RENDER_SECTION_NODES,
 )
+
+EXPAND_SECTION_BY_HEADER: dict[RowKind, ExpandSectionDef] = {
+    section.header_kind: section for section in _ALL_EXPAND_SECTIONS
+}
+
+EXPAND_TOGGLE_BY_HEADER: dict[RowKind, ExpandToggleFn] = {
+    section.header_kind: section.toggle for section in _ALL_EXPAND_SECTIONS
+}
+
+EXPAND_HEADER_KINDS = frozenset(EXPAND_SECTION_BY_HEADER)
+
+
+def apply_expand_toggle(
+    controls: TuningControls,
+    header_kind: RowKind,
+    slot: str | None,
+    forward: bool,
+) -> bool:
+    section = EXPAND_SECTION_BY_HEADER.get(header_kind)
+    if section is None:
+        return False
+    section.toggle(controls, slot, forward)
+    return True
+
+
+def _root_expand_sections(nodes: tuple[SectionNode, ...]) -> tuple[ExpandSectionDef, ...]:
+    return tuple(node.expand for node in nodes if node.expand is not None)
+
+
+_GLOBAL_ROOT_EXPAND_SECTIONS = _root_expand_sections(ROOT_SECTION_NODES + RENDER_SECTION_NODES)
+
+
+def _section_enabled(state: TuningViewState, section: ExpandSectionDef) -> bool:
+    if section.header_kind == RowKind.RENDER_OVERLAY_HEADER:
+        return state.render_overlay.enabled
+    if section.header_kind == RowKind.RENDER_POST_FX_HEADER:
+        return state.render_post_fx.enabled
+    return True
 
 
 def expand_section_expanded(
@@ -370,10 +432,19 @@ def expand_section_expanded(
     section: ExpandSectionDef,
     slot: str | None,
 ) -> bool:
-    reader = _EXPAND_SECTION_EXPANDED.get(section.header_kind)
-    if reader is None:
-        return True
-    return reader(state, slot)
+    if section.collapse_on_disable and not _section_enabled(state, section):
+        return False
+    return section.read_expanded(state, slot)
+
+
+def expand_arrow_for_header(
+    state: TuningViewState,
+    kind: RowKind,
+    slot: str | None = None,
+) -> str:
+    section = EXPAND_SECTION_BY_HEADER[kind]
+    section_slot = slot if section.context == "per_slot" else None
+    return expand_arrow_glyph(expand_section_expanded(state, section, section_slot))
 
 
 def leaf_kinds_in_expand_section(section: ExpandSectionDef) -> frozenset[RowKind]:
@@ -398,9 +469,6 @@ def _leaf_kinds_in_nodes(nodes: tuple[SectionNode, ...]) -> frozenset[RowKind]:
         if child.conditional is not None:
             kinds |= _leaf_kinds_in_nodes(child.conditional.children)
     return frozenset(kinds)
-
-
-SETTINGS_SECTION_LEAF_KINDS = leaf_kinds_in_expand_section(SETTINGS_SECTION)
 
 
 def kinds_in_expand_section(section: ExpandSectionDef) -> frozenset[RowKind]:
@@ -502,7 +570,7 @@ def expand_section_sub_row_visible(
 
 
 def sub_row_expand_visible(state: TuningViewState, desc: RowDescriptor) -> bool:
-    for section in GLOBAL_EXPAND_SECTIONS:
+    for section in _GLOBAL_ROOT_EXPAND_SECTIONS:
         visible = expand_section_sub_row_visible(state, desc, section)
         if visible is not None:
             return visible
@@ -546,6 +614,8 @@ def append_expand_section_rows(
     if not expand_section_expanded(state, section, slot):
         return
     _append_section_nodes(row_list, section.children, state, slot, section_slot)
+    if section.append_dynamic_children is not None:
+        section.append_dynamic_children(row_list, state, slot)
 
 
 def append_render_section_rows(
@@ -559,52 +629,12 @@ def append_render_section_rows(
             row_list.append(RowDescriptor(node.panel_anchor.header_kind))
 
 
-def append_preset_switching_section_rows(
-    row_list: list[RowDescriptor],
-    state: TuningViewState,
-    slot: str,
-) -> None:
-    append_expand_section_rows(row_list, TRACK_PRESET_SWITCHING_SECTION, state, slot)
-
-
-def append_effects_section_rows(
-    row_list: list[RowDescriptor],
-    state: TuningViewState,
-    slot: str,
-) -> None:
-    block = state.tracks[slot]
-    row_list.append(RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, slot=slot))
-    if not block.effects_expanded:
-        return
-    for effect_def in effect_roster(block.stem):
-        row_list.append(
-            RowDescriptor(
-                RowKind.TRACK_EFFECT,
-                slot=slot,
-                effect_id=effect_def.effect_id,
-                driver_slug=effect_def.driver_slug,
-            )
-        )
-
-
 def append_track_section_rows(
     row_list: list[RowDescriptor],
     state: TuningViewState,
     slot: str,
 ) -> None:
-    block = state.tracks[slot]
-    row_list.append(RowDescriptor(RowKind.TRACK_HEADER, slot=slot))
-    if not block.expanded:
-        return
-    row_list.append(RowDescriptor(RowKind.TRACK_PRESET_DIR, slot=slot))
-    row_list.append(RowDescriptor(RowKind.TRACK_PRESET, slot=slot))
-    append_preset_switching_section_rows(row_list, state, slot)
-    row_list.append(RowDescriptor(RowKind.TRACK_STEM, slot=slot))
-    row_list.append(RowDescriptor(RowKind.TRACK_BEAT, slot=slot))
-    row_list.append(RowDescriptor(RowKind.TRACK_BLEND, slot=slot))
-    row_list.append(RowDescriptor(RowKind.TRACK_OPACITY, slot=slot))
-    append_effects_section_rows(row_list, state, slot)
-    row_list.append(RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot=slot))
+    append_expand_section_rows(row_list, TRACK_SECTION, state, slot)
 
 
 _PER_SLOT_SECTION_HEADERS = frozenset(
@@ -641,7 +671,7 @@ def _walk_expand_section_for_headers(
 
 def _build_section_header_parent_map() -> dict[RowKind, RowKind]:
     out: dict[RowKind, RowKind] = {}
-    for section in GLOBAL_EXPAND_SECTIONS:
+    for section in _GLOBAL_ROOT_EXPAND_SECTIONS:
         _walk_expand_section_for_headers(section, out)
     _walk_expand_section_for_headers(TRACK_SECTION, out)
     return out
