@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from cleave.config import CleaveConfig
-from cleave.config_schema import VISUALIZER_RENDER_MODES
+from cleave.config_schema import VISUALIZER_RENDER_MODES, clamp_ui_fade
 from cleave.viz.session import TuningSession
 
 
@@ -38,3 +38,10 @@ class SettingsControls:
         else:
             new_mode = modes[(index - 1) % len(modes)]
         self.cfg.visualizer = replace(self.cfg.visualizer, render_mode=new_mode)
+
+    def adjust_ui_fade(self, *, forward: bool, ctrl: bool) -> None:
+        step = 5.0 if ctrl else 1.0
+        delta = step if forward else -step
+        current = self.cfg.visualizer.ui_fade
+        new_value = clamp_ui_fade(current + delta)
+        self.cfg.visualizer = replace(self.cfg.visualizer, ui_fade=new_value)

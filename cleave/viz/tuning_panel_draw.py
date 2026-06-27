@@ -15,6 +15,8 @@ from cleave.config_schema import (
     hard_cut_enabled_display,
     preset_start_clean_display,
     preset_switching_display,
+    ui_fade_display,
+    DEFAULT_UI_FADE_SEC,
 )
 from cleave.extract import stem_control_label, stem_overlay_header
 from cleave.viz.row_semantics import (
@@ -63,7 +65,6 @@ from cleave.viz.theme import (
     FOCUS_ROW_BG_ALPHA,
     HIGHLIGHT,
     HIGHLIGHT_MUTED,
-    HOLD_IDLE_SEC,
     LABEL,
     LOCKED,
     LOCK_ICON,
@@ -135,6 +136,9 @@ def _row_text(state: TuningViewState, index: int) -> str:
 
     if kind == RowKind.SETTINGS_RENDER_MODE:
         return f"└─ render mode: {state.settings.render_mode}"
+
+    if kind == RowKind.SETTINGS_UI_FADE:
+        return f"└─ UI fade: {ui_fade_display(state.settings.ui_fade)}"
 
     if kind == RowKind.RENDER_OVERLAY_HEADER:
         arrow = "▼" if state.render_overlay.expanded else "▶"
@@ -247,7 +251,7 @@ def _row_text(state: TuningViewState, index: int) -> str:
     assert effect is not None
     effect_id, driver_slug = effect
     pct = _effect_pct(block, effect_id, driver_slug)
-    return f"└─ {effect_id} ({driver_slug}): {pct}%"
+    return f"{_effects_submenu_prefix()}{effect_id} ({driver_slug}): {pct}%"
 
 
 def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
@@ -300,6 +304,8 @@ def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
         return "└─ display time: "
     if kind == RowKind.SETTINGS_RENDER_MODE:
         return "└─ render mode: "
+    if kind == RowKind.SETTINGS_UI_FADE:
+        return "└─ UI fade: "
     if kind == RowKind.RENDER_POST_FX_FADE_IN:
         return "└─ fade in: "
     if kind == RowKind.RENDER_POST_FX_FADE_OUT:
@@ -308,7 +314,7 @@ def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
     effect = row_effect(state, index)
     assert effect is not None
     effect_id, driver_slug = effect
-    return f"└─ {effect_id} ({driver_slug}): "
+    return f"{_effects_submenu_prefix()}{effect_id} ({driver_slug}): "
 
 
 def _labeled_sub_row_value(state: TuningViewState, index: int) -> str:
@@ -336,6 +342,8 @@ def _labeled_sub_row_value(state: TuningViewState, index: int) -> str:
         return f"{block_ro.display_time:.1f}s"
     if kind == RowKind.SETTINGS_RENDER_MODE:
         return state.settings.render_mode
+    if kind == RowKind.SETTINGS_UI_FADE:
+        return ui_fade_display(state.settings.ui_fade)
     block_pp = state.render_post_fx
     if kind == RowKind.RENDER_POST_FX_FADE_IN:
         return f"{block_pp.fade_in:.1f}s"
@@ -517,6 +525,10 @@ def _preset_switching_hard_cut_submenu_prefix() -> str:
     return "    └─ "
 
 
+def _effects_submenu_prefix() -> str:
+    return "  └─ "
+
+
 def _effects_header_prefix() -> str:
     return "└─ cleave effects "
 
@@ -695,7 +707,10 @@ def _row_indent(state: TuningViewState, index: int) -> int:
         RowKind.TRACK_OPACITY,
         RowKind.TRACK_BEAT,
         RowKind.TRACK_EFFECTS_HEADER,
-    } | RENDER_OVERLAY_SUB_ROW_KINDS | RENDER_POST_FX_SUB_ROW_KINDS | {RowKind.SETTINGS_RENDER_MODE}:
+    } | RENDER_OVERLAY_SUB_ROW_KINDS | RENDER_POST_FX_SUB_ROW_KINDS | {
+        RowKind.SETTINGS_RENDER_MODE,
+        RowKind.SETTINGS_UI_FADE,
+    }:
         return TREE_INDENT
     return 0
 
@@ -966,6 +981,7 @@ class TuningOverlay:
         font_size: int | None = None,
         padding: int | None = None,
         line_gap: int | None = None,
+        hold_idle_sec: float | None = None,
     ) -> None:
         metrics = tuning_ui_metrics()
         if margin is None:
@@ -981,7 +997,9 @@ class TuningOverlay:
         self._font_size = font_size
         self._padding = padding
         self._line_gap = line_gap
-        self._hold_idle_sec = HOLD_IDLE_SEC
+        self._hold_idle_sec = (
+            DEFAULT_UI_FADE_SEC if hold_idle_sec is None else max(0.0, hold_idle_sec)
+        )
         self._fade_duration_sec = FADE_DURATION_SEC
         self._idle_sec = self._hold_idle_sec + self._fade_duration_sec + 1.0
         self._visibility = 0.0
@@ -1017,6 +1035,19 @@ class TuningOverlay:
         scroll_content_h = n * row_stride - self._line_gap if n > 0 else 0
         self._clamp_scroll(scroll_content_h, viewport_h)
 
+    def set_hold_idle_sec(self, sec: float) -> None:
+        if not isinstance(sec, (int, float)):
+            return
+        sec = max(0.0, sec)
+        was_disabled = self._hold_idle_sec <= 0
+        self._hold_idle_sec = sec
+        if sec <= 0:
+            if self._visibility > 0:
+                self._visibility = 1.0
+                self._idle_sec = 0.0
+        elif was_disabled and self._visibility > 0:
+            self._idle_sec = 0.0
+
     def notify_input(self) -> None:
         self._idle_sec = 0.0
         self._visibility = 1.0
@@ -1034,8 +1065,10 @@ class TuningOverlay:
         return self._visibility
 
     def update(self, dt_sec: float) -> None:
-        self._idle_sec += dt_sec
         hold_idle_sec = self._hold_idle_sec
+        if hold_idle_sec <= 0:
+            return
+        self._idle_sec += dt_sec
         if self._idle_sec <= hold_idle_sec:
             self._visibility = 1.0
         elif self._fade_duration_sec <= 0:

@@ -233,7 +233,7 @@ def init_gl_resources_heavy(
         modal_host=modal_host,
         mix_player=mix_player,
         playback=playback,
-        overlay=TuningOverlay(),
+        overlay=TuningOverlay(hold_idle_sec=seed.cfg.visualizer.ui_fade),
         help_overlay=HelpOverlay(),
         timeline_overlay=TimelineOverlay(),
         overlay_surface=overlay_surface,
@@ -346,6 +346,7 @@ def _tick_frame_live_overlay(
         fps=display_fps,
     )
     tl = runtime.seed.session.timeline
+    runtime.overlay.set_hold_idle_sec(runtime.seed.cfg.visualizer.ui_fade)
     runtime.overlay.update(overlay_dt)
     overlay_visibility = runtime.overlay.visibility
     timeline_strip_visible = _timeline_strip_visible(

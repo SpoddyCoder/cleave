@@ -226,6 +226,13 @@ def _mutate_visualizer_render_mode(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
+def _mutate_visualizer_ui_fade(controls: TuningControls) -> None:
+    _expand_settings(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_FADE)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
 def _mutate_timeline_cues_via_record() -> None:
     tuning = _make_controls(("layer_1",))
     tuning.session.timeline.enabled = True
@@ -272,6 +279,7 @@ _PERSISTED_MUTATIONS: list[
     ("render_post_fx.fade_out", _mutate_render_post_fx_fade_out, ("layer_1",), {}),
     ("timeline.enabled", _mutate_timeline_enabled, ("layer_1",), {"timeline_enabled": True}),
     ("visualizer.render_mode", _mutate_visualizer_render_mode, ("layer_1",), {}),
+    ("visualizer.ui_fade", _mutate_visualizer_ui_fade, ("layer_1",), {}),
 ]
 
 

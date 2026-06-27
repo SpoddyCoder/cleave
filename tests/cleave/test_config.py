@@ -197,6 +197,21 @@ def test_parse_visualizer_render_mode_defaults_to_balanced() -> None:
     assert cfg.render_mode == "balanced"
 
 
+def test_parse_visualizer_ui_fade_defaults_to_ten() -> None:
+    cfg = parse_visualizer_section({})
+    assert cfg.ui_fade == 10.0
+
+
+def test_parse_visualizer_reads_ui_fade() -> None:
+    cfg = parse_visualizer_section({"visualizer": {"ui_fade": 25}})
+    assert cfg.ui_fade == 25.0
+
+
+def test_parse_visualizer_clamps_ui_fade_max() -> None:
+    cfg = parse_visualizer_section({"visualizer": {"ui_fade": 90}})
+    assert cfg.ui_fade == 60.0
+
+
 @pytest.mark.parametrize(
     "render_mode",
     ["full-quality", "balanced", "performance", "ultra-performance"],

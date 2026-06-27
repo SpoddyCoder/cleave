@@ -160,5 +160,4 @@ BORDER_WIDTH: int = 2
 SCROLLBAR_TRACK: tuple[int, int, int] = DISABLED
 SCROLLBAR_THUMB: tuple[int, int, int] = TIMELINE_BAR_ON
 
-HOLD_IDLE_SEC: float = 10.0
 FADE_DURATION_SEC: float = 2.0

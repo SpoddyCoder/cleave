@@ -35,13 +35,13 @@ from cleave.viz.tuning_view_state import (
     TrackBlock,
     TuningViewState,
 )
+from cleave.config_schema import DEFAULT_UI_FADE_SEC
 from cleave.viz.theme import (
     ACTION,
     BORDER_WIDTH,
     DISABLED,
     HIGHLIGHT,
     HIGHLIGHT_MUTED,
-    HOLD_IDLE_SEC,
     LABEL,
     LOCKED,
     PANEL_CONTENT_MAX_WIDTH,
@@ -1007,10 +1007,20 @@ def test_is_visible_tracks_visibility() -> None:
 def test_overlay_normal_hold_idle_without_timeline_panel() -> None:
     overlay = TuningOverlay()
     overlay.notify_input()
-    overlay.update(HOLD_IDLE_SEC - 0.1)
+    overlay.update(DEFAULT_UI_FADE_SEC - 0.1)
     assert overlay._visibility == 1.0
     overlay.update(0.2)
     assert overlay._visibility < 1.0
+
+
+def test_overlay_ui_fade_disabled_stays_visible_until_hide() -> None:
+    overlay = TuningOverlay(hold_idle_sec=0.0)
+    overlay.notify_input()
+    for _ in range(200):
+        overlay.update(1.0)
+    assert overlay.is_visible() is True
+    overlay.hide_immediately()
+    assert overlay.is_visible() is False
 
 
 def test_max_panel_h_unchanged_when_timeline_closed() -> None:

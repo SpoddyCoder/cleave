@@ -55,6 +55,8 @@ VISUALIZER_RENDER_MODES: tuple[VisualizerRenderMode, ...] = (
 )
 
 DEFAULT_VISUALIZER_RENDER_MODE: VisualizerRenderMode = "balanced"
+DEFAULT_UI_FADE_SEC = 10.0
+UI_FADE_MAX_SEC = 60.0
 
 # --- Layer defaults ---
 
@@ -345,6 +347,18 @@ def _parse_render_overlay_position(
         allowed = ", ".join(f"'{pos}'" for pos in RENDER_OVERLAY_POSITIONS)
         raise ValueError(f"{label} must be one of: {allowed}")
     return value
+
+
+def clamp_ui_fade(value: float) -> float:
+    return max(0.0, min(UI_FADE_MAX_SEC, float(value)))
+
+
+def ui_fade_display(sec: float) -> str:
+    if sec <= 0:
+        return "disabled"
+    if sec == int(sec):
+        return f"{int(sec)}s"
+    return f"{sec:.1f}s"
 
 
 def _parse_visualizer_render_mode(
@@ -706,6 +720,15 @@ VISUALIZER_FIELDS: tuple[FieldDescriptor, ...] = (
         _parse_visualizer_render_mode,
         _dump_scalar,
     ),
+    FieldDescriptor(
+        "ui_fade",
+        DEFAULT_UI_FADE_SEC,
+        "cfg",
+        lambda raw, ctx, label: clamp_ui_fade(
+            float(require_non_negative_number(raw, label))
+        ),
+        lambda value, _ctx: clamp_ui_fade(value),
+    ),
 )
 
 RENDER_POST_FX_FIELDS: tuple[FieldDescriptor, ...] = (
@@ -841,6 +864,7 @@ def parse_visualizer_section(data: dict[str, Any]) -> Any:
         upscale=parsed["upscale"],
         beat_sensitivity=parsed["beat_sensitivity"],
         render_mode=parsed["render_mode"],
+        ui_fade=parsed["ui_fade"],
     )
 
 
@@ -852,6 +876,7 @@ def persist_visualizer(ctx: PersistCtx) -> dict[str, Any]:
         "upscale": vis.upscale,
         "beat_sensitivity": vis.beat_sensitivity,
         "render_mode": vis.render_mode,
+        "ui_fade": vis.ui_fade,
     }
     return _dump_fields(VISUALIZER_FIELDS, values, ctx)
 

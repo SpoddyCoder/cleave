@@ -57,6 +57,7 @@ from cleave.config_schema import (
     DEFAULT_RENDER_HEIGHT,
     DEFAULT_RENDER_WIDTH,
     DEFAULT_VISUALIZER_HEIGHT,
+    DEFAULT_UI_FADE_SEC,
     DEFAULT_VISUALIZER_RENDER_MODE,
     DEFAULT_VISUALIZER_UPSCALE,
     DEFAULT_VISUALIZER_WIDTH,
@@ -119,6 +120,7 @@ class VisualizerConfig:
     upscale: float = DEFAULT_VISUALIZER_UPSCALE
     beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
     render_mode: VisualizerRenderMode = DEFAULT_VISUALIZER_RENDER_MODE
+    ui_fade: float = DEFAULT_UI_FADE_SEC
 
     @property
     def display_width(self) -> int:
