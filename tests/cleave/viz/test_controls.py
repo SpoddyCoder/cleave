@@ -1204,7 +1204,7 @@ def test_render_overlay_title_font_row(_mock_fonts) -> None:
     controls.session.render_overlay.title_font = "alpha"
     view = controls.build_view_state(paused=False)
     font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_FONT)
-    assert _row_text(view, font_row) == "└─ font: alpha (1/3)"
+    assert _row_text(view, font_row) == "  └─ font: alpha (1/3)"
 
     controls.focus_descriptor = _desc(view, font_row)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
@@ -1222,7 +1222,7 @@ def test_render_overlay_body_font_row(_mock_fonts) -> None:
     controls.session.render_overlay.body_font = "bravo"
     view = controls.build_view_state(paused=False)
     font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_BODY_FONT)
-    assert _row_text(view, font_row) == "└─ font: bravo (2/3)"
+    assert _row_text(view, font_row) == "  └─ font: bravo (2/3)"
 
     controls.focus_descriptor = _desc(view, font_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
@@ -1236,7 +1236,7 @@ def test_render_overlay_title_font_size_row() -> None:
     controls.session.render_overlay.title_font_size = 12
     view = controls.build_view_state(paused=False)
     font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE)
-    assert _row_text(view, font_row) == "└─ font size: 12px"
+    assert _row_text(view, font_row) == "  └─ font size: 12px"
 
     controls.focus_descriptor = _desc(view, font_row)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
@@ -1250,7 +1250,7 @@ def test_render_overlay_title_margin_bottom_row() -> None:
     controls.session.render_overlay.title_margin_bottom = 10
     view = controls.build_view_state(paused=False)
     margin_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM)
-    assert _row_text(view, margin_row) == "└─ margin bottom: 10px"
+    assert _row_text(view, margin_row) == "  └─ margin bottom: 10px"
 
     controls.focus_descriptor = _desc(view, margin_row)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
@@ -1264,7 +1264,7 @@ def test_render_overlay_body_font_size_row() -> None:
     controls.session.render_overlay.body_font_size = 18
     view = controls.build_view_state(paused=False)
     font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_BODY_FONT_SIZE)
-    assert _row_text(view, font_row) == "└─ font size: 18px"
+    assert _row_text(view, font_row) == "  └─ font size: 18px"
 
     controls.focus_descriptor = _desc(view, font_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
