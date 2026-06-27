@@ -30,6 +30,7 @@ NAVIGATION_SECTION = HelpSection(
         ("Ctrl + Up/Down", "jump section"),
         ("ESC", "hide UI"),
         ("Ctrl + Q", "quit"),
+        ("Ctrl + S", "save config"),
     ),
 )
 
@@ -149,7 +150,10 @@ def timeline_strip_section(
 
 _SAVE_SECTION = HelpSection(
     "Save",
-    (("Enter", "save config"),),
+    (
+        ("Enter", "save config"),
+        ("Ctrl + S", "save config"),
+    ),
 )
 
 

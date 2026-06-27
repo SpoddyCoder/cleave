@@ -153,6 +153,11 @@ class TuningControls:
     def try_quit(self) -> bool:
         return self._config_save.try_quit()
 
+    def prompt_save_config(self) -> None:
+        if self.session.solo_slot is not None:
+            return
+        self._config_save.prompt_save()
+
     def handle_keydown(self, event: pygame.event.Event) -> bool:
         """Handle a key down event for the main tuning tree."""
         if event.type != pygame.KEYDOWN:
@@ -297,9 +302,7 @@ class TuningControls:
                     self.move_mode_slot = slot
                 return True
             if kind == RowKind.CONFIG_HEADER:
-                if self.session.solo_slot is not None:
-                    return True
-                self._config_save.prompt_save()
+                self.prompt_save_config()
                 return True
 
         return True
