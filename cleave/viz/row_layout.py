@@ -110,9 +110,9 @@ class RowLayout:
                     RowDescriptor(RowKind.TRACK_HARD_CUT_SENSITIVITY, slot=slot)
                 )
             row_list.append(RowDescriptor(RowKind.TRACK_STEM, slot=slot))
+            row_list.append(RowDescriptor(RowKind.TRACK_BEAT, slot=slot))
             row_list.append(RowDescriptor(RowKind.TRACK_BLEND, slot=slot))
             row_list.append(RowDescriptor(RowKind.TRACK_OPACITY, slot=slot))
-            row_list.append(RowDescriptor(RowKind.TRACK_BEAT, slot=slot))
             row_list.append(RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, slot=slot))
             if block.effects_expanded:
                 for effect_def in effect_roster(block.stem):
