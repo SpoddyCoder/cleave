@@ -492,7 +492,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
     RowKind.SETTINGS_HEADER: RowBehavior(
         RowAffordance.EXPAND,
         is_header=True,
-        help_title="Settings",
+        help_title="Editor Settings",
         help_description=("Global visualizer settings (not per-layer).",),
         quick_nav_target=True,
     ),

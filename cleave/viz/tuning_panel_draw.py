@@ -131,7 +131,7 @@ def _row_text(state: TuningViewState, index: int) -> str:
 
     if kind == RowKind.SETTINGS_HEADER:
         arrow = "▼" if state.settings.expanded else "▶"
-        return f"Settings {arrow}"
+        return f"Editor Settings {arrow}"
 
     if kind == RowKind.SETTINGS_RENDER_MODE:
         return f"└─ render mode: {state.settings.render_mode}"
@@ -645,7 +645,7 @@ def fit_row_text(
         return _row_text(state, index)
     if kind == RowKind.SETTINGS_HEADER:
         expanded = state.settings.expanded
-        return "Settings " + _track_header_expand_suffix(expanded)
+        return "Editor Settings " + _track_header_expand_suffix(expanded)
     if kind == RowKind.RENDER_OVERLAY_HEADER:
         expanded = state.render_overlay.expanded
         return (
@@ -1259,7 +1259,7 @@ class TuningOverlay:
                 )
                 label_surf = _render_label_value_row(
                     font,
-                    prefix="Settings ",
+                    prefix="Editor Settings ",
                     value=_effects_header_expand_value(block.expanded),
                     value_color=color,
                     prefix_color=LABEL,
