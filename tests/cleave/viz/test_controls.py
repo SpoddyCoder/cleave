@@ -1610,8 +1610,9 @@ def test_key_repeat_armed_while_navigation_key_held() -> None:
 
 
 def test_held_key_repeat_keeps_overlay_visible() -> None:
+    from cleave.config_schema import DEFAULT_UI_FADE_SEC
     from cleave.viz.tuning_panel_draw import TuningOverlay
-    from cleave.viz.theme import FADE_DURATION_SEC, HOLD_IDLE_SEC
+    from cleave.viz.theme import FADE_DURATION_SEC
 
     controls = _make_controls()
     overlay = TuningOverlay()
@@ -1619,7 +1620,7 @@ def test_held_key_repeat_keeps_overlay_visible() -> None:
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     dt = 0.05
-    for _ in range(int(HOLD_IDLE_SEC / dt) + 5):
+    for _ in range(int(DEFAULT_UI_FADE_SEC / dt) + 5):
         controls.tick(dt)
         if controls.key_repeat_armed:
             overlay.notify_input()
@@ -1628,7 +1629,7 @@ def test_held_key_repeat_keeps_overlay_visible() -> None:
     assert overlay.is_visible() is True
 
     controls.handle_keyup(pygame.event.Event(pygame.KEYUP, key=pygame.K_DOWN))
-    overlay.update(HOLD_IDLE_SEC + FADE_DURATION_SEC + 0.1)
+    overlay.update(DEFAULT_UI_FADE_SEC + FADE_DURATION_SEC + 0.1)
     assert overlay.is_visible() is False
 
 
@@ -2584,7 +2585,7 @@ def test_effect_pulse_row_label() -> None:
     pulse_row = _row(
         view, "layer_1", RowKind.TRACK_EFFECT, effect_id="pulse", driver_slug="onset"
     )
-    assert _row_text(view, pulse_row) == "└─ pulse (onset): 35%"
+    assert _row_text(view, pulse_row) == "  └─ pulse (onset): 35%"
 
 
 def test_effects_header_expand_arrow() -> None:
@@ -2920,7 +2921,7 @@ def test_settings_expand_collapse_and_sub_row_visibility() -> None:
     render_mode_row = view.layout.find_by_kind(RowKind.SETTINGS_RENDER_MODE)
     assert render_mode_row == 1
     assert render_mode_row in view.layout.navigable_indices(view)
-    assert view.layout.header_row_count() == 4
+    assert view.layout.header_row_count() == 5
 
     controls.focus_descriptor = _desc(view, render_mode_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
@@ -3000,6 +3001,40 @@ def test_cycle_render_mode_calls_apply_preview_resolutions() -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
     layer_manager.apply_preview_resolutions.assert_called_once()
+
+
+def test_settings_adjust_ui_fade() -> None:
+    controls = _make_controls(("layer_1",))
+    assert controls.cfg.visualizer.ui_fade == 10.0
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    view = controls.build_view_state(paused=False)
+    ui_fade_row = view.layout.find_by_kind(RowKind.SETTINGS_UI_FADE)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_FADE)
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.cfg.visualizer.ui_fade == 11.0
+    view = controls.build_view_state(paused=False)
+    assert _row_text(view, ui_fade_row) == "└─ UI fade: 11s"
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert controls.cfg.visualizer.ui_fade == 6.0
+
+    for _ in range(6):
+        controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.cfg.visualizer.ui_fade == 0.0
+    view = controls.build_view_state(paused=False)
+    assert _row_text(view, ui_fade_row) == "└─ UI fade: disabled"
+
+
+def test_settings_ui_fade_change_marks_config_dirty() -> None:
+    controls = _make_controls(("layer_1",))
+    assert not controls.config_dirty
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_FADE)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.config_dirty
 
 
 def test_move_mode_swap_calls_apply_preview_resolutions() -> None:

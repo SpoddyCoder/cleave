@@ -79,6 +79,7 @@ class RowLayout:
         ]
         if state.settings.expanded:
             row_list.append(RowDescriptor(RowKind.SETTINGS_RENDER_MODE))
+            row_list.append(RowDescriptor(RowKind.SETTINGS_UI_FADE))
         row_list.extend(
             [
                 RowDescriptor(RowKind.CONFIG_HEADER),

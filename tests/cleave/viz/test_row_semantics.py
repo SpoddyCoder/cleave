@@ -57,6 +57,7 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.RENDER_POST_FX_FADE_IN,
         RowKind.RENDER_POST_FX_FADE_OUT,
         RowKind.SETTINGS_RENDER_MODE,
+        RowKind.SETTINGS_UI_FADE,
     }
 )
 
@@ -82,12 +83,15 @@ def test_row_is_pinned() -> None:
     assert row_is_pinned(RowKind.CONFIG_HEADER) is True
     assert row_is_pinned(RowKind.SETTINGS_HEADER) is True
     assert row_is_pinned(RowKind.SETTINGS_RENDER_MODE) is True
+    assert row_is_pinned(RowKind.SETTINGS_UI_FADE) is True
     assert row_is_pinned(RowKind.TRACK_HEADER) is False
     assert row_is_pinned(RowKind.RENDER_OVERLAY_HEADER) is False
 
 
 def test_settings_sub_row_kinds() -> None:
-    assert SETTINGS_SUB_ROW_KINDS == frozenset({RowKind.SETTINGS_RENDER_MODE})
+    assert SETTINGS_SUB_ROW_KINDS == frozenset(
+        {RowKind.SETTINGS_RENDER_MODE, RowKind.SETTINGS_UI_FADE}
+    )
 
 
 def test_repeat_row_kinds() -> None:

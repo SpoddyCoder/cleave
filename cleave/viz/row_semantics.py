@@ -48,6 +48,7 @@ class RowKind(Enum):
     RENDER_TIMELINE_HEADER = auto()
     SETTINGS_HEADER = auto()
     SETTINGS_RENDER_MODE = auto()
+    SETTINGS_UI_FADE = auto()
     CONFIG_HEADER = auto()
     TRANSPORT = auto()
 
@@ -344,6 +345,18 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             ("", "live preview only; layers scale by z-order"),
         ),
     ),
+    RowKind.SETTINGS_UI_FADE: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        is_pinned=True,
+        repeatable=True,
+        parent_group="settings",
+        help_title="UI fade",
+        help_entries=(
+            ("Left/Right", "adjust delay before UI fades"),
+            ("Ctrl + Left/Right", "large step"),
+            ("0", "disabled; UI stays until Esc"),
+        ),
+    ),
 }
 
 HEADER_ROW_KINDS = frozenset(k for k, b in ROW_BEHAVIORS.items() if b.is_header)
@@ -469,6 +482,8 @@ def section_header_descriptor(desc: RowDescriptor) -> RowDescriptor:
     """Map a sub-row descriptor to its section header for focus fallback."""
     kind = desc.kind
     if kind == RowKind.SETTINGS_RENDER_MODE:
+        return RowDescriptor(RowKind.SETTINGS_HEADER)
+    if kind == RowKind.SETTINGS_UI_FADE:
         return RowDescriptor(RowKind.SETTINGS_HEADER)
     if kind in RENDER_OVERLAY_TITLE_NESTED_KINDS:
         return RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_HEADER)
