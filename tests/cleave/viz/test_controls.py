@@ -3098,26 +3098,6 @@ def test_preset_duration_ctrl_step_is_ten_seconds() -> None:
     assert controls.session.layers["layer_1"].preset_duration == 41.0
 
 
-def test_hard_cut_sensitivity_steps_like_beat_sensitivity() -> None:
-    controls = _make_controls(("layer_1",))
-    controls.session.layers["layer_1"].preset_switching = "projectm"
-    controls.session.layers["layer_1"].expanded = True
-    view = controls.build_view_state(paused=False)
-    row = _row(view, "layer_1", RowKind.TRACK_HARD_CUT_SENSITIVITY)
-    controls.focus_descriptor = view.layout.descriptor(row)
-    controls.session.layers["layer_1"].hard_cut_sensitivity = 1.5
-
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.session.layers["layer_1"].hard_cut_sensitivity == pytest.approx(
-        1.51
-    )
-
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
-    assert controls.session.layers["layer_1"].hard_cut_sensitivity == pytest.approx(
-        1.61
-    )
-
-
 def test_hard_cut_enabled_cycles_and_hides_child_rows() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_switching = "projectm"
@@ -3146,3 +3126,61 @@ def test_hard_cut_enabled_cycles_and_hides_child_rows() -> None:
     assert controls.session.layers["layer_1"].hard_cut_enabled is True
     view = controls.build_view_state(paused=False)
     _row(view, "layer_1", RowKind.TRACK_HARD_CUT_DURATION)
+
+
+def test_easter_egg_steps_with_standard_and_large_increments() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].expanded = True
+    switched: list[str] = []
+    controls._layer_bindings = noop_layer_bindings(
+        on_preset_switching_change=lambda slot: switched.append(slot)
+    )
+    view = controls.build_view_state(paused=False)
+    row = _row(view, "layer_1", RowKind.TRACK_EASTER_EGG)
+    controls.focus_descriptor = view.layout.descriptor(row)
+    controls.session.layers["layer_1"].easter_egg = 1.0
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].easter_egg == pytest.approx(1.01)
+    assert switched == ["layer_1"]
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert controls.session.layers["layer_1"].easter_egg == pytest.approx(1.11)
+
+
+def test_preset_start_clean_cycles_yes_no() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].expanded = True
+    view = controls.build_view_state(paused=False)
+    row = _row(view, "layer_1", RowKind.TRACK_PRESET_START_CLEAN)
+    controls.focus_descriptor = view.layout.descriptor(row)
+    assert controls.session.layers["layer_1"].preset_start_clean is False
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].preset_start_clean is True
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.layers["layer_1"].preset_start_clean is False
+
+
+def test_hard_cut_sensitivity_steps_like_beat_sensitivity() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].expanded = True
+    controls.session.layers["layer_1"].hard_cut_enabled = True
+    view = controls.build_view_state(paused=False)
+    row = _row(view, "layer_1", RowKind.TRACK_HARD_CUT_SENSITIVITY)
+    controls.focus_descriptor = view.layout.descriptor(row)
+    controls.session.layers["layer_1"].hard_cut_sensitivity = 1.5
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].hard_cut_sensitivity == pytest.approx(
+        1.51
+    )
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert controls.session.layers["layer_1"].hard_cut_sensitivity == pytest.approx(
+        1.61
+    )

@@ -38,6 +38,10 @@ DEFAULT_SOFT_CUT_DURATION = 0.0
 DEFAULT_HARD_CUT_DURATION = 20.0
 DEFAULT_HARD_CUT_SENSITIVITY = 2.0
 DEFAULT_HARD_CUT_ENABLED = True
+DEFAULT_EASTER_EGG = 1.0
+EASTER_EGG_MIN = 0.1
+EASTER_EGG_MAX = 5.0
+DEFAULT_PRESET_START_CLEAN = False
 
 VisualizerRenderMode = Literal[
     "full-quality", "balanced", "performance", "ultra-performance"
@@ -191,6 +195,14 @@ def _parse_preset_switching_scope(raw: Any, label: str) -> PresetSwitchingScope:
 
 def hard_cut_enabled_display(enabled: bool) -> str:
     return "enabled" if enabled else "disabled"
+
+
+def preset_start_clean_display(enabled: bool) -> str:
+    return "yes" if enabled else "no"
+
+
+def clamp_easter_egg(value: float) -> float:
+    return max(EASTER_EGG_MIN, min(EASTER_EGG_MAX, float(value)))
 
 
 def preset_switching_display(mode: PresetSwitchingMode) -> str:
@@ -993,6 +1005,12 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
         hard_cut_enabled = bool(
             layer_raw.get("hard_cut_enabled", DEFAULT_HARD_CUT_ENABLED)
         )
+        easter_egg = clamp_easter_egg(
+            float(layer_raw.get("easter_egg", DEFAULT_EASTER_EGG))
+        )
+        preset_start_clean = bool(
+            layer_raw.get("preset_start_clean", DEFAULT_PRESET_START_CLEAN)
+        )
         layers[slot] = LayerConfig(
             preset=_resolve_preset(preset_raw, preset_root),
             stem=stem,
@@ -1013,6 +1031,8 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
             hard_cut_duration=hard_cut_duration,
             hard_cut_sensitivity=hard_cut_sensitivity,
             hard_cut_enabled=hard_cut_enabled,
+            easter_egg=easter_egg,
+            preset_start_clean=preset_start_clean,
         )
     return layers
 
@@ -1043,6 +1063,8 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             hard_cut_duration = runtime.hard_cut_duration
             hard_cut_sensitivity = runtime.hard_cut_sensitivity
             hard_cut_enabled = runtime.hard_cut_enabled
+            easter_egg = runtime.easter_egg
+            preset_start_clean = runtime.preset_start_clean
             stem = getattr(runtime, "stem", stem)
         else:
             preset = to_config_relative(layer_cfg.preset, preset_root)
@@ -1057,6 +1079,8 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             hard_cut_duration = layer_cfg.hard_cut_duration
             hard_cut_sensitivity = layer_cfg.hard_cut_sensitivity
             hard_cut_enabled = layer_cfg.hard_cut_enabled
+            easter_egg = layer_cfg.easter_egg
+            preset_start_clean = layer_cfg.preset_start_clean
             effects = layer_cfg.effects
             beat = (
                 layer_cfg.beat_sensitivity
@@ -1094,6 +1118,10 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             layer_out["hard_cut_sensitivity"] = hard_cut_sensitivity
         if hard_cut_enabled != DEFAULT_HARD_CUT_ENABLED:
             layer_out["hard_cut_enabled"] = hard_cut_enabled
+        if easter_egg != DEFAULT_EASTER_EGG:
+            layer_out["easter_egg"] = easter_egg
+        if preset_start_clean != DEFAULT_PRESET_START_CLEAN:
+            layer_out["preset_start_clean"] = preset_start_clean
         layers_out[slot] = layer_out
 
     return layers_out

@@ -8,9 +8,11 @@ import yaml
 
 from cleave.config import CleaveConfig, LayerConfig, PathsConfig, VisualizerConfig, load_config
 from cleave.config_schema import (
+    DEFAULT_EASTER_EGG,
     DEFAULT_HARD_CUT_DURATION,
     DEFAULT_HARD_CUT_ENABLED,
     DEFAULT_HARD_CUT_SENSITIVITY,
+    DEFAULT_PRESET_START_CLEAN,
     DEFAULT_PRESET_DURATION,
     DEFAULT_PRESET_SWITCHING,
     DEFAULT_PRESET_SWITCHING_SCOPE,
@@ -49,6 +51,8 @@ def test_parse_layers_preset_switching_defaults_omitted() -> None:
     assert layer.hard_cut_duration == DEFAULT_HARD_CUT_DURATION
     assert layer.hard_cut_sensitivity == DEFAULT_HARD_CUT_SENSITIVITY
     assert layer.hard_cut_enabled == DEFAULT_HARD_CUT_ENABLED
+    assert layer.easter_egg == DEFAULT_EASTER_EGG
+    assert layer.preset_start_clean == DEFAULT_PRESET_START_CLEAN
 
 
 def test_parse_layers_preset_switching_projectm() -> None:
@@ -120,6 +124,8 @@ def test_persist_layers_omits_default_preset_switching() -> None:
     assert "hard_cut_duration" not in out["layer_1"]
     assert "hard_cut_sensitivity" not in out["layer_1"]
     assert "hard_cut_enabled" not in out["layer_1"]
+    assert "easter_egg" not in out["layer_1"]
+    assert "preset_start_clean" not in out["layer_1"]
 
 
 def test_persist_layers_writes_timing_overrides() -> None:
@@ -134,6 +140,29 @@ def test_persist_layers_writes_timing_overrides() -> None:
     assert out["layer_1"]["soft_cut_duration"] == 1.5
     assert out["layer_1"]["hard_cut_duration"] == 30.0
     assert out["layer_1"]["hard_cut_sensitivity"] == 3.5
+
+
+def test_parse_layers_preset_switching_easter_egg_and_start_clean() -> None:
+    preset_root = Path("/tmp/presets")
+    data = {"layers": _layer_yaml()}
+    data["layers"]["layer_1"].update(
+        {
+            "easter_egg": 2.5,
+            "preset_start_clean": True,
+        }
+    )
+    layers = parse_layers_section(data, ParseCtx(preset_root=preset_root))
+    layer = layers["layer_1"]
+    assert layer.easter_egg == 2.5
+    assert layer.preset_start_clean is True
+
+
+def test_parse_layers_easter_egg_clamps() -> None:
+    preset_root = Path("/tmp/presets")
+    data = {"layers": _layer_yaml()}
+    data["layers"]["layer_1"]["easter_egg"] = 99.0
+    layers = parse_layers_section(data, ParseCtx(preset_root=preset_root))
+    assert layers["layer_1"].easter_egg == 5.0
 
 
 def test_persist_layers_writes_hard_cut_disabled() -> None:
