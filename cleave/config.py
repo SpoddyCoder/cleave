@@ -27,6 +27,7 @@ from cleave.config_schema import (
     DEFAULT_SOFT_CUT_DURATION,
     DEFAULT_HARD_CUT_DURATION,
     DEFAULT_HARD_CUT_SENSITIVITY,
+    DEFAULT_HARD_CUT_ENABLED,
     DEFAULT_PRESET_ROOT,
     PresetSwitchingMode,
     PresetSwitchingScope,
@@ -103,6 +104,7 @@ class LayerConfig:
     soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION
     hard_cut_duration: float = DEFAULT_HARD_CUT_DURATION
     hard_cut_sensitivity: float = DEFAULT_HARD_CUT_SENSITIVITY
+    hard_cut_enabled: bool = DEFAULT_HARD_CUT_ENABLED
 
 
 @dataclass(frozen=True)

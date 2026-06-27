@@ -9,6 +9,7 @@ import yaml
 from cleave.config import CleaveConfig, LayerConfig, PathsConfig, VisualizerConfig, load_config
 from cleave.config_schema import (
     DEFAULT_HARD_CUT_DURATION,
+    DEFAULT_HARD_CUT_ENABLED,
     DEFAULT_HARD_CUT_SENSITIVITY,
     DEFAULT_PRESET_DURATION,
     DEFAULT_PRESET_SWITCHING,
@@ -47,6 +48,7 @@ def test_parse_layers_preset_switching_defaults_omitted() -> None:
     assert layer.soft_cut_duration == DEFAULT_SOFT_CUT_DURATION
     assert layer.hard_cut_duration == DEFAULT_HARD_CUT_DURATION
     assert layer.hard_cut_sensitivity == DEFAULT_HARD_CUT_SENSITIVITY
+    assert layer.hard_cut_enabled == DEFAULT_HARD_CUT_ENABLED
 
 
 def test_parse_layers_preset_switching_projectm() -> None:
@@ -117,6 +119,7 @@ def test_persist_layers_omits_default_preset_switching() -> None:
     assert "soft_cut_duration" not in out["layer_1"]
     assert "hard_cut_duration" not in out["layer_1"]
     assert "hard_cut_sensitivity" not in out["layer_1"]
+    assert "hard_cut_enabled" not in out["layer_1"]
 
 
 def test_persist_layers_writes_timing_overrides() -> None:
@@ -131,6 +134,13 @@ def test_persist_layers_writes_timing_overrides() -> None:
     assert out["layer_1"]["soft_cut_duration"] == 1.5
     assert out["layer_1"]["hard_cut_duration"] == 30.0
     assert out["layer_1"]["hard_cut_sensitivity"] == 3.5
+
+
+def test_persist_layers_writes_hard_cut_disabled() -> None:
+    cfg, session = _cfg_and_session(preset_switching="projectm")
+    session.layers["layer_1"].hard_cut_enabled = False
+    out = persist_layers(PersistCtx(cfg=cfg, session=session))
+    assert out["layer_1"]["hard_cut_enabled"] is False
 
 
 def test_persist_layers_writes_projectm_mode(tmp_path: Path) -> None:

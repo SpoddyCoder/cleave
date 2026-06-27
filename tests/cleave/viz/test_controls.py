@@ -3116,3 +3116,33 @@ def test_hard_cut_sensitivity_steps_like_beat_sensitivity() -> None:
     assert controls.session.layers["layer_1"].hard_cut_sensitivity == pytest.approx(
         1.61
     )
+
+
+def test_hard_cut_enabled_cycles_and_hides_child_rows() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].expanded = True
+    switched: list[str] = []
+    controls._layer_bindings = noop_layer_bindings(
+        on_preset_switching_change=lambda slot: switched.append(slot)
+    )
+    view = controls.build_view_state(paused=False)
+    _row(view, "layer_1", RowKind.TRACK_HARD_CUT_DURATION)
+    _row(view, "layer_1", RowKind.TRACK_HARD_CUT_SENSITIVITY)
+
+    row = _row(view, "layer_1", RowKind.TRACK_HARD_CUT_ENABLED)
+    controls.focus_descriptor = view.layout.descriptor(row)
+    assert controls.session.layers["layer_1"].hard_cut_enabled is True
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].hard_cut_enabled is False
+    assert switched == ["layer_1"]
+
+    view = controls.build_view_state(paused=False)
+    with pytest.raises(ValueError, match="TRACK_HARD_CUT_DURATION"):
+        _row(view, "layer_1", RowKind.TRACK_HARD_CUT_DURATION)
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.layers["layer_1"].hard_cut_enabled is True
+    view = controls.build_view_state(paused=False)
+    _row(view, "layer_1", RowKind.TRACK_HARD_CUT_DURATION)

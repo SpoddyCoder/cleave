@@ -14,6 +14,7 @@ class RowKind(Enum):
     TRACK_PRESET_SWITCHING_SCOPE = auto()
     TRACK_PRESET_DURATION = auto()
     TRACK_SOFT_CUT_DURATION = auto()
+    TRACK_HARD_CUT_ENABLED = auto()
     TRACK_HARD_CUT_DURATION = auto()
     TRACK_HARD_CUT_SENSITIVITY = auto()
     TRACK_STEM = auto()
@@ -139,6 +140,13 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         repeatable=True,
         parent_group="track",
         help_entries=(("Left/Right", "step value"),),
+    ),
+    RowKind.TRACK_HARD_CUT_ENABLED: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="track",
+        help_title="Hard cut",
+        help_entries=(("Left/Right", "enabled / disabled"),),
     ),
     RowKind.TRACK_HARD_CUT_DURATION: RowBehavior(
         RowAffordance.VALUE_STEP,
@@ -342,6 +350,11 @@ PRESET_SWITCHING_SUBMENU_KINDS = frozenset(
         RowKind.TRACK_PRESET_SWITCHING_SCOPE,
         RowKind.TRACK_PRESET_DURATION,
         RowKind.TRACK_SOFT_CUT_DURATION,
+        RowKind.TRACK_HARD_CUT_ENABLED,
+    }
+)
+PRESET_SWITCHING_HARD_CUT_SUBMENU_KINDS = frozenset(
+    {
         RowKind.TRACK_HARD_CUT_DURATION,
         RowKind.TRACK_HARD_CUT_SENSITIVITY,
     }
@@ -444,6 +457,8 @@ def section_header_descriptor(desc: RowDescriptor) -> RowDescriptor:
         return RowDescriptor(RowKind.RENDER_OVERLAY_HEADER)
     if kind in RENDER_POST_FX_SUB_ROW_KINDS:
         return RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
+    if kind in PRESET_SWITCHING_HARD_CUT_SUBMENU_KINDS:
+        return RowDescriptor(RowKind.TRACK_HARD_CUT_ENABLED, slot=desc.slot)
     if kind in PRESET_SWITCHING_SUBMENU_KINDS:
         return RowDescriptor(RowKind.TRACK_PRESET_SWITCHING, slot=desc.slot)
     behavior = row_behavior(kind)

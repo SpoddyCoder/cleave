@@ -37,6 +37,7 @@ DEFAULT_PRESET_DURATION = 30.0
 DEFAULT_SOFT_CUT_DURATION = 0.0
 DEFAULT_HARD_CUT_DURATION = 20.0
 DEFAULT_HARD_CUT_SENSITIVITY = 2.0
+DEFAULT_HARD_CUT_ENABLED = True
 
 VisualizerRenderMode = Literal[
     "full-quality", "balanced", "performance", "ultra-performance"
@@ -186,6 +187,10 @@ def _parse_preset_switching_scope(raw: Any, label: str) -> PresetSwitchingScope:
         allowed = ", ".join(PRESET_SWITCHING_SCOPES)
         raise ValueError(f"{label} must be one of: {allowed}")
     return scope
+
+
+def hard_cut_enabled_display(enabled: bool) -> str:
+    return "enabled" if enabled else "disabled"
 
 
 def preset_switching_display(mode: PresetSwitchingMode) -> str:
@@ -985,6 +990,9 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
         hard_cut_sensitivity = float(
             layer_raw.get("hard_cut_sensitivity", DEFAULT_HARD_CUT_SENSITIVITY)
         )
+        hard_cut_enabled = bool(
+            layer_raw.get("hard_cut_enabled", DEFAULT_HARD_CUT_ENABLED)
+        )
         layers[slot] = LayerConfig(
             preset=_resolve_preset(preset_raw, preset_root),
             stem=stem,
@@ -1004,6 +1012,7 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
             soft_cut_duration=soft_cut_duration,
             hard_cut_duration=hard_cut_duration,
             hard_cut_sensitivity=hard_cut_sensitivity,
+            hard_cut_enabled=hard_cut_enabled,
         )
     return layers
 
@@ -1033,6 +1042,7 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             soft_cut_duration = runtime.soft_cut_duration
             hard_cut_duration = runtime.hard_cut_duration
             hard_cut_sensitivity = runtime.hard_cut_sensitivity
+            hard_cut_enabled = runtime.hard_cut_enabled
             stem = getattr(runtime, "stem", stem)
         else:
             preset = to_config_relative(layer_cfg.preset, preset_root)
@@ -1046,6 +1056,7 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             soft_cut_duration = layer_cfg.soft_cut_duration
             hard_cut_duration = layer_cfg.hard_cut_duration
             hard_cut_sensitivity = layer_cfg.hard_cut_sensitivity
+            hard_cut_enabled = layer_cfg.hard_cut_enabled
             effects = layer_cfg.effects
             beat = (
                 layer_cfg.beat_sensitivity
@@ -1081,6 +1092,8 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             layer_out["hard_cut_duration"] = hard_cut_duration
         if hard_cut_sensitivity != DEFAULT_HARD_CUT_SENSITIVITY:
             layer_out["hard_cut_sensitivity"] = hard_cut_sensitivity
+        if hard_cut_enabled != DEFAULT_HARD_CUT_ENABLED:
+            layer_out["hard_cut_enabled"] = hard_cut_enabled
         layers_out[slot] = layer_out
 
     return layers_out
