@@ -11,6 +11,7 @@ class RowKind(Enum):
     TRACK_PRESET_DIR = auto()
     TRACK_PRESET = auto()
     TRACK_PRESET_SWITCHING = auto()
+    TRACK_PRESET_SWITCHING_MODE = auto()
     TRACK_PRESET_SWITCHING_SCOPE = auto()
     TRACK_PRESET_DURATION = auto()
     TRACK_SOFT_CUT_DURATION = auto()
@@ -138,13 +139,21 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         parent_group="track",
     ),
     RowKind.TRACK_PRESET_SWITCHING: RowBehavior(
+        RowAffordance.EXPAND,
+        is_sub_header=True,
+        parent_group="track",
+        help_title="Preset switching",
+        help_description=(
+            "Controls how and when presets change during playback.",
+        ),
+    ),
+    RowKind.TRACK_PRESET_SWITCHING_MODE: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
         parent_group="track",
-        help_title="Preset switching",
+        help_title="Switching mode",
         help_entries=(("Left/Right", "cycle mode"),),
         help_description=(
-            "Controls how and when presets change during playback.",
             "none - keeps the current preset indefinitely.",
             "projectm - libprojectM switches automatically using beat detection.",
         ),
@@ -517,16 +526,13 @@ TRACK_SUB_ROW_KINDS = frozenset(
 TRACK_EFFECT_SUB_ROW_KINDS = frozenset({RowKind.TRACK_EFFECT})
 PRESET_SWITCHING_SUBMENU_KINDS = frozenset(
     {
+        RowKind.TRACK_PRESET_SWITCHING_MODE,
         RowKind.TRACK_PRESET_SWITCHING_SCOPE,
         RowKind.TRACK_PRESET_DURATION,
         RowKind.TRACK_SOFT_CUT_DURATION,
         RowKind.TRACK_EASTER_EGG,
         RowKind.TRACK_PRESET_START_CLEAN,
         RowKind.TRACK_HARD_CUT_ENABLED,
-    }
-)
-PRESET_SWITCHING_HARD_CUT_SUBMENU_KINDS = frozenset(
-    {
         RowKind.TRACK_HARD_CUT_DURATION,
         RowKind.TRACK_HARD_CUT_SENSITIVITY,
     }
@@ -631,8 +637,6 @@ def section_header_descriptor(desc: RowDescriptor) -> RowDescriptor:
         return RowDescriptor(RowKind.RENDER_OVERLAY_HEADER)
     if kind in RENDER_POST_FX_SUB_ROW_KINDS:
         return RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
-    if kind in PRESET_SWITCHING_HARD_CUT_SUBMENU_KINDS:
-        return RowDescriptor(RowKind.TRACK_HARD_CUT_ENABLED, slot=desc.slot)
     if kind in PRESET_SWITCHING_SUBMENU_KINDS:
         return RowDescriptor(RowKind.TRACK_PRESET_SWITCHING, slot=desc.slot)
     behavior = row_behavior(kind)

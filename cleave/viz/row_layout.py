@@ -94,30 +94,34 @@ class RowLayout:
             row_list.append(RowDescriptor(RowKind.TRACK_PRESET, slot=slot))
             block = state.tracks[slot]
             row_list.append(RowDescriptor(RowKind.TRACK_PRESET_SWITCHING, slot=slot))
-            if block.preset_switching == "projectm":
+            if block.preset_switching_expanded:
                 row_list.append(
-                    RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_SCOPE, slot=slot)
+                    RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_MODE, slot=slot)
                 )
-                row_list.append(
-                    RowDescriptor(RowKind.TRACK_PRESET_DURATION, slot=slot)
-                )
-                row_list.append(
-                    RowDescriptor(RowKind.TRACK_SOFT_CUT_DURATION, slot=slot)
-                )
-                row_list.append(RowDescriptor(RowKind.TRACK_EASTER_EGG, slot=slot))
-                row_list.append(
-                    RowDescriptor(RowKind.TRACK_PRESET_START_CLEAN, slot=slot)
-                )
-                row_list.append(
-                    RowDescriptor(RowKind.TRACK_HARD_CUT_ENABLED, slot=slot)
-                )
-                if block.hard_cut_enabled:
+                if block.preset_switching == "projectm":
                     row_list.append(
-                        RowDescriptor(RowKind.TRACK_HARD_CUT_DURATION, slot=slot)
+                        RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_SCOPE, slot=slot)
                     )
                     row_list.append(
-                        RowDescriptor(RowKind.TRACK_HARD_CUT_SENSITIVITY, slot=slot)
+                        RowDescriptor(RowKind.TRACK_PRESET_DURATION, slot=slot)
                     )
+                    row_list.append(
+                        RowDescriptor(RowKind.TRACK_SOFT_CUT_DURATION, slot=slot)
+                    )
+                    row_list.append(RowDescriptor(RowKind.TRACK_EASTER_EGG, slot=slot))
+                    row_list.append(
+                        RowDescriptor(RowKind.TRACK_PRESET_START_CLEAN, slot=slot)
+                    )
+                    row_list.append(
+                        RowDescriptor(RowKind.TRACK_HARD_CUT_ENABLED, slot=slot)
+                    )
+                    if block.hard_cut_enabled:
+                        row_list.append(
+                            RowDescriptor(RowKind.TRACK_HARD_CUT_DURATION, slot=slot)
+                        )
+                        row_list.append(
+                            RowDescriptor(RowKind.TRACK_HARD_CUT_SENSITIVITY, slot=slot)
+                        )
             row_list.append(RowDescriptor(RowKind.TRACK_STEM, slot=slot))
             row_list.append(RowDescriptor(RowKind.TRACK_BEAT, slot=slot))
             row_list.append(RowDescriptor(RowKind.TRACK_BLEND, slot=slot))
