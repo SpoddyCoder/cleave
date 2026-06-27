@@ -576,19 +576,23 @@ class TuningControls:
         elif kind == RowKind.TRACK_PRESET_DURATION:
             if slot is None:
                 return
-            self._step_preset_duration(slot, forward=forward)
+            self._step_preset_duration(slot, forward=forward, ctrl=ctrl)
         elif kind == RowKind.TRACK_SOFT_CUT_DURATION:
             if slot is None:
                 return
-            self._step_soft_cut_duration(slot, forward=forward)
+            self._step_soft_cut_duration(slot, forward=forward, ctrl=ctrl)
         elif kind == RowKind.TRACK_HARD_CUT_DURATION:
             if slot is None:
                 return
-            self._step_hard_cut_duration(slot, forward=forward)
+            self._step_hard_cut_duration(slot, forward=forward, ctrl=ctrl)
         elif kind == RowKind.TRACK_HARD_CUT_SENSITIVITY:
             if slot is None:
                 return
-            self._step_hard_cut_sensitivity(slot, forward=forward)
+            step = 0.1 if ctrl else 0.01
+            delta = step if forward else -step
+            self._set_hard_cut_sensitivity(
+                slot, self.session.layers[slot].hard_cut_sensitivity + delta
+            )
         elif kind == RowKind.TRACK_STEM:
             if slot is None:
                 return
@@ -776,32 +780,39 @@ class TuningControls:
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)
 
-    def _step_preset_duration(self, slot: str, *, forward: bool) -> None:
+    def _step_preset_duration(
+        self, slot: str, *, forward: bool, ctrl: bool = False
+    ) -> None:
         layer = self.session.layers[slot]
-        delta = 5.0 if forward else -5.0
+        step = 10.0 if ctrl else 1.0
+        delta = step if forward else -step
         layer.preset_duration = max(5.0, min(300.0, layer.preset_duration + delta))
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)
 
-    def _step_soft_cut_duration(self, slot: str, *, forward: bool) -> None:
+    def _step_soft_cut_duration(
+        self, slot: str, *, forward: bool, ctrl: bool = False
+    ) -> None:
         layer = self.session.layers[slot]
-        delta = 0.5 if forward else -0.5
-        layer.soft_cut_duration = max(0.0, min(10.0, layer.soft_cut_duration + delta))
+        step = 10.0 if ctrl else 1.0
+        delta = step if forward else -step
+        layer.soft_cut_duration = max(0.0, min(60.0, layer.soft_cut_duration + delta))
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)
 
-    def _step_hard_cut_duration(self, slot: str, *, forward: bool) -> None:
+    def _step_hard_cut_duration(
+        self, slot: str, *, forward: bool, ctrl: bool = False
+    ) -> None:
         layer = self.session.layers[slot]
-        delta = 5.0 if forward else -5.0
+        step = 10.0 if ctrl else 1.0
+        delta = step if forward else -step
         layer.hard_cut_duration = max(5.0, min(300.0, layer.hard_cut_duration + delta))
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)
 
-    def _step_hard_cut_sensitivity(self, slot: str, *, forward: bool) -> None:
+    def _set_hard_cut_sensitivity(self, slot: str, value: float) -> None:
         layer = self.session.layers[slot]
-        delta = 0.1 if forward else -0.1
-        value = max(0.5, min(5.0, layer.hard_cut_sensitivity + delta))
-        layer.hard_cut_sensitivity = round(value, 1)
+        layer.hard_cut_sensitivity = max(0.1, min(2.0, float(value)))
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)
 

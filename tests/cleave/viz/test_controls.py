@@ -3080,3 +3080,39 @@ def test_scope_row_visible_when_mode_projectm() -> None:
     controls.session.layers["layer_1"].expanded = True
     view = controls.build_view_state(paused=False)
     _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_SCOPE)
+
+
+def test_preset_duration_ctrl_step_is_ten_seconds() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].expanded = True
+    view = controls.build_view_state(paused=False)
+    row = _row(view, "layer_1", RowKind.TRACK_PRESET_DURATION)
+    controls.focus_descriptor = view.layout.descriptor(row)
+    controls.session.layers["layer_1"].preset_duration = 30.0
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].preset_duration == 31.0
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert controls.session.layers["layer_1"].preset_duration == 41.0
+
+
+def test_hard_cut_sensitivity_steps_like_beat_sensitivity() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].expanded = True
+    view = controls.build_view_state(paused=False)
+    row = _row(view, "layer_1", RowKind.TRACK_HARD_CUT_SENSITIVITY)
+    controls.focus_descriptor = view.layout.descriptor(row)
+    controls.session.layers["layer_1"].hard_cut_sensitivity = 1.5
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].hard_cut_sensitivity == pytest.approx(
+        1.51
+    )
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert controls.session.layers["layer_1"].hard_cut_sensitivity == pytest.approx(
+        1.61
+    )
