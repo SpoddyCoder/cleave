@@ -208,7 +208,7 @@ def _row_text(state: TuningViewState, index: int) -> str:
         )
     if kind == RowKind.TRACK_HARD_CUT_SENSITIVITY:
         return (
-            f"{_preset_switching_submenu_prefix()}hard cut sens: {block.hard_cut_sensitivity:.1f}"
+            f"{_preset_switching_submenu_prefix()}hard cut sens: {block.hard_cut_sensitivity:.2f}"
         )
     if kind == RowKind.TRACK_STEM:
         return f"└─ driving stem: {stem_control_label(block.stem)}"
@@ -336,7 +336,7 @@ def _labeled_sub_row_value(state: TuningViewState, index: int) -> str:
     if kind == RowKind.TRACK_HARD_CUT_DURATION:
         return f"{block.hard_cut_duration:g}s"
     if kind == RowKind.TRACK_HARD_CUT_SENSITIVITY:
-        return f"{block.hard_cut_sensitivity:.1f}"
+        return f"{block.hard_cut_sensitivity:.2f}"
     assert kind == RowKind.TRACK_EFFECT
     effect = row_effect(state, index)
     assert effect is not None
