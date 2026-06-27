@@ -464,26 +464,9 @@ class VisualizerApp:
             if quit_during_load:
                 return
 
-            warmup_frames = round(seed.cfg.visualizer.warmup_sec * LIVE_PROJECTM_FPS)
-            warmup_n_pcm = samples_per_frame(LIVE_PROJECTM_FPS)
-            if warmup_frames > 0:
-                draw_loading_screen(
-                    rt.compositor,
-                    "Warming up Milkdrop presets...",
-                    seed.display_width,
-                    seed.display_height,
-                )
-                LayerFramePipeline.warmup(
-                    rt.layers,
-                    rt.seed.pcm_bank,
-                    0.0,
-                    warmup_frames,
-                    LIVE_PROJECTM_FPS,
-                    warmup_n_pcm,
-                    session=rt.seed.session,
-                )
-
-            self.tick_frame(0.0, paused=False, n_pcm=warmup_n_pcm)
+            self.tick_frame(
+                0.0, paused=False, n_pcm=samples_per_frame(LIVE_PROJECTM_FPS)
+            )
             pygame.display.flip()
             rt.mix_player.start()
 

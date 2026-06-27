@@ -34,6 +34,11 @@ from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline, apply_effect_modifiers
 from cleave.viz.layer_visibility import apply_layer_visibility, effective_layer_enabled
 from cleave.viz.mix_player import MixPlayer
+from cleave.viz.preset_switching import (
+    EMPTY_ROTATION_NOTIFICATION,
+    apply_preset_switching,
+    reapply_projectm_preset_switching,
+)
 from cleave.stem_pcm import StemPcmBank
 from cleave.viz.playback import current_sec, seek
 from cleave.config import VIZ_CONFIG_FILENAME
@@ -161,9 +166,36 @@ def make_tuning_controls(
     def on_preset_change(slot: str, playlist: PresetPlaylist) -> None:
         layer = layers_by_slot[slot]
         layer.playlist = playlist
+        if session.layers[slot].preset_switching != "none":
+            return
         if playlist.current is not None:
             playlist.load_into(layer.pm, smooth=False)
             layer.pm.lock_preset(True)
+
+    def on_preset_switching_change(slot: str) -> None:
+        layer = layers_by_slot[slot]
+        runtime = session.layers[slot]
+
+        def on_empty() -> None:
+            notify = notification_sink.get("fn")
+            if notify is not None:
+                notify(EMPTY_ROTATION_NOTIFICATION)
+
+        apply_preset_switching(
+            layer,
+            mode=runtime.preset_switching,
+            scope=runtime.preset_switching_scope,
+            preset_duration=runtime.preset_duration,
+            soft_cut_duration=runtime.soft_cut_duration,
+            easter_egg=runtime.easter_egg,
+            preset_start_clean=runtime.preset_start_clean,
+            hard_cut_enabled=runtime.hard_cut_enabled,
+            hard_cut_duration=runtime.hard_cut_duration,
+            hard_cut_sensitivity=runtime.hard_cut_sensitivity,
+            on_empty=on_empty,
+        )
+
+    notification_sink: dict[str, Callable[[str], None] | None] = {"fn": None}
 
     def on_blend_change(slot: str, blend_mode) -> None:
         layers_by_slot[slot].fbo.blend_mode = blend_mode
@@ -239,9 +271,22 @@ def make_tuning_controls(
     def on_seek(delta_sec: float) -> None:
         seek(playback, delta_sec, duration_sec)
         LayerFramePipeline.flush_pcm(layers)
+        notify = notification_sink.get("fn")
+
+        def on_empty() -> None:
+            if notify is not None:
+                notify(EMPTY_ROTATION_NOTIFICATION)
+
+        reapply_projectm_preset_switching(
+            session,
+            layers_by_slot,
+            delta_sec=delta_sec,
+            on_empty=on_empty if notify is not None else None,
+        )
 
     layer_bindings = LiveLayerBindings(
         on_preset_change=on_preset_change,
+        on_preset_switching_change=on_preset_switching_change,
         on_blend_change=on_blend_change,
         on_stem_change=on_stem_change,
         on_opacity_change=on_opacity_change,
@@ -281,6 +326,7 @@ def make_tuning_controls(
     )
 
     controls = TuningControls(**kwargs)
+    notification_sink["fn"] = controls.show_notification
     if pcm_bank is not None and mix_player is not None:
         mix_player.set_stem_pcm(
             {
@@ -336,6 +382,16 @@ def make_timeline_controls(
     def on_seek(delta_sec: float) -> None:
         seek(playback, delta_sec, duration_sec)
         LayerFramePipeline.flush_pcm(layers)
+        reapply_projectm_preset_switching(
+            session,
+            layers_by_slot,
+            delta_sec=delta_sec,
+            on_empty=(
+                (lambda: on_notification(EMPTY_ROTATION_NOTIFICATION))
+                if on_notification is not None
+                else None
+            ),
+        )
 
     return TimelineControls(
         session,

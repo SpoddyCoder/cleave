@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, TextIO
+from typing import Any, Literal, TextIO
 
 import yaml
 
@@ -21,7 +21,18 @@ from cleave.config_schema import (
     BEAT_SENSITIVITY_MIN,
     DEFAULT_BEAT_SENSITIVITY,
     DEFAULT_LAYER_Z_ORDER,
+    DEFAULT_PRESET_SWITCHING,
+    DEFAULT_PRESET_SWITCHING_SCOPE,
+    DEFAULT_PRESET_DURATION,
+    DEFAULT_SOFT_CUT_DURATION,
+    DEFAULT_HARD_CUT_DURATION,
+    DEFAULT_HARD_CUT_SENSITIVITY,
+    DEFAULT_HARD_CUT_ENABLED,
+    DEFAULT_EASTER_EGG,
+    DEFAULT_PRESET_START_CLEAN,
     DEFAULT_PRESET_ROOT,
+    PresetSwitchingMode,
+    PresetSwitchingScope,
     DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR,
     DEFAULT_RENDER_OVERLAY_BACKGROUND_MARGIN,
     DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
@@ -48,7 +59,6 @@ from cleave.config_schema import (
     DEFAULT_VISUALIZER_HEIGHT,
     DEFAULT_VISUALIZER_RENDER_MODE,
     DEFAULT_VISUALIZER_UPSCALE,
-    DEFAULT_VISUALIZER_WARMUP_SEC,
     DEFAULT_VISUALIZER_WIDTH,
     LAYER_DEFAULT_SIZE,
     RENDER_OVERLAY_POSITIONS,
@@ -90,6 +100,15 @@ class LayerConfig:
     effects: dict[str, dict[str, int]] = field(default_factory=dict)
     blend_mode: BlendMode = "black-key"
     locked: bool = False
+    preset_switching: PresetSwitchingMode = DEFAULT_PRESET_SWITCHING
+    preset_switching_scope: PresetSwitchingScope = DEFAULT_PRESET_SWITCHING_SCOPE
+    preset_duration: float = DEFAULT_PRESET_DURATION
+    soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION
+    hard_cut_duration: float = DEFAULT_HARD_CUT_DURATION
+    hard_cut_sensitivity: float = DEFAULT_HARD_CUT_SENSITIVITY
+    hard_cut_enabled: bool = DEFAULT_HARD_CUT_ENABLED
+    easter_egg: float = DEFAULT_EASTER_EGG
+    preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN
 
 
 @dataclass(frozen=True)
@@ -98,8 +117,6 @@ class VisualizerConfig:
     width: int = DEFAULT_VISUALIZER_WIDTH
     height: int = DEFAULT_VISUALIZER_HEIGHT
     upscale: float = DEFAULT_VISUALIZER_UPSCALE
-    # Launch/render pre-roll; persisted on snapshot save, not a live session field.
-    warmup_sec: float = DEFAULT_VISUALIZER_WARMUP_SEC
     beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
     render_mode: VisualizerRenderMode = DEFAULT_VISUALIZER_RENDER_MODE
 

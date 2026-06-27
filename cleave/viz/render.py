@@ -272,19 +272,6 @@ def render(
 
         panel_cache = RenderOverlayPanelCache()
 
-        warmup_frames = round(cfg.visualizer.warmup_sec * fps)
-        if warmup_frames > 0:
-            _progress(f"Warming up Milkdrop ({warmup_frames} frames)...")
-            LayerFramePipeline.warmup(
-                runtime.layers,
-                runtime.seed.pcm_bank,
-                segment.start_frame / fps,
-                warmup_frames,
-                fps,
-                n_pcm,
-                session=runtime.seed.session,
-            )
-
         _progress(
             f"Encoding {frame_count} frames ({width}x{height} @ {fps} fps) "
             f"to {output_path.name}..."
