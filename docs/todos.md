@@ -8,9 +8,6 @@ Must-do items for Cleave. Everything else is iterative enhancements or listed in
 
 Outstanding bugs and issues.
 
-### Increase indent for cleave effects
-Should be underneath the first letter of the title, like the preset switching submenu.
-
 ---
 
 ## Architecture
@@ -22,4 +19,4 @@ Should be underneath the first letter of the title, like the preset switching su
 
 ### Review Child Menus
 
-Look at a consistent shared abstraction for all these.
+Done — see [collapsable-sections-refactor.md](collapsable-sections-refactor.md).
