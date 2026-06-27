@@ -403,6 +403,64 @@ def _leaf_kinds_in_nodes(nodes: tuple[SectionNode, ...]) -> frozenset[RowKind]:
 SETTINGS_SECTION_LEAF_KINDS = leaf_kinds_in_expand_section(SETTINGS_SECTION)
 
 
+def kinds_in_expand_section(section: ExpandSectionDef) -> frozenset[RowKind]:
+    kinds: set[RowKind] = {section.header_kind}
+    for child in section.children:
+        if child.leaf_kind is not None:
+            kinds.add(child.leaf_kind)
+        if child.expand is not None:
+            kinds |= kinds_in_expand_section(child.expand)
+        if child.conditional is not None:
+            kinds |= _leaf_kinds_in_nodes(child.conditional.children)
+    return frozenset(kinds)
+
+
+RENDER_OVERLAY_SECTION_KINDS = kinds_in_expand_section(RENDER_OVERLAY_SECTION)
+RENDER_POST_FX_SECTION_KINDS = kinds_in_expand_section(RENDER_POST_FX_SECTION)
+
+
+def _assign_indent_depth(
+    depths: dict[RowKind, int],
+    nodes: tuple[SectionNode, ...],
+    depth: int,
+) -> None:
+    for child in nodes:
+        if child.leaf_kind is not None:
+            depths[child.leaf_kind] = depth
+        elif child.expand is not None:
+            _assign_expand_indent_depth(depths, child.expand, depth)
+        elif child.conditional is not None:
+            _assign_indent_depth(depths, child.conditional.children, depth)
+
+
+def _assign_expand_indent_depth(
+    depths: dict[RowKind, int],
+    section: ExpandSectionDef,
+    depth: int,
+) -> None:
+    depths[section.header_kind] = depth
+    _assign_indent_depth(depths, section.children, depth + 1)
+
+
+def _build_row_tree_indent_depth() -> dict[RowKind, int]:
+    depths: dict[RowKind, int] = {}
+    _assign_expand_indent_depth(depths, SETTINGS_SECTION, 0)
+    _assign_expand_indent_depth(depths, TRACK_SECTION, 0)
+    for node in RENDER_SECTION_NODES:
+        if node.expand is not None:
+            _assign_expand_indent_depth(depths, node.expand, 0)
+    depths[RowKind.TRACK_EFFECT] = 2
+    return depths
+
+
+ROW_TREE_INDENT_DEPTH = _build_row_tree_indent_depth()
+
+
+def row_tree_indent_depth(kind: RowKind) -> int:
+    """Tree depth for draw indent (0 = no branch prefix, 1 = └─, 2 = nested)."""
+    return ROW_TREE_INDENT_DEPTH.get(kind, 0)
+
+
 def _find_expand_ancestor(
     section: ExpandSectionDef,
     kind: RowKind,

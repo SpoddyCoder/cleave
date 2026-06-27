@@ -544,39 +544,6 @@ TRACK_SUB_ROW_KINDS = frozenset(
     k for k, b in ROW_BEHAVIORS.items() if b.parent_group == "track"
 )
 TRACK_EFFECT_SUB_ROW_KINDS = frozenset({RowKind.TRACK_EFFECT})
-PRESET_SWITCHING_SUBMENU_KINDS = frozenset(
-    {
-        RowKind.TRACK_PRESET_SWITCHING_MODE,
-        RowKind.TRACK_PRESET_SWITCHING_SCOPE,
-        RowKind.TRACK_PRESET_DURATION,
-        RowKind.TRACK_SOFT_CUT_DURATION,
-        RowKind.TRACK_EASTER_EGG,
-        RowKind.TRACK_PRESET_START_CLEAN,
-        RowKind.TRACK_HARD_CUT_ENABLED,
-        RowKind.TRACK_HARD_CUT_DURATION,
-        RowKind.TRACK_HARD_CUT_SENSITIVITY,
-    }
-)
-RENDER_OVERLAY_SUB_ROW_KINDS = frozenset(
-    k for k, b in ROW_BEHAVIORS.items() if b.parent_group == "render_overlay"
-)
-RENDER_OVERLAY_TITLE_NESTED_KINDS = frozenset(
-    k for k, b in ROW_BEHAVIORS.items() if b.parent_group == "render_overlay_title"
-)
-RENDER_OVERLAY_BODY_NESTED_KINDS = frozenset(
-    k for k, b in ROW_BEHAVIORS.items() if b.parent_group == "render_overlay_body"
-)
-RENDER_OVERLAY_ALL_SUB_ROW_KINDS = (
-    RENDER_OVERLAY_SUB_ROW_KINDS
-    | RENDER_OVERLAY_TITLE_NESTED_KINDS
-    | RENDER_OVERLAY_BODY_NESTED_KINDS
-)
-RENDER_POST_FX_SUB_ROW_KINDS = frozenset(
-    k for k, b in ROW_BEHAVIORS.items() if b.parent_group == "render_post_fx"
-)
-SETTINGS_SUB_ROW_KINDS = frozenset(
-    k for k, b in ROW_BEHAVIORS.items() if b.parent_group == "settings"
-)
 
 _LAYER_LOCK_BLOCKING_AFFORDANCES = frozenset(
     {
