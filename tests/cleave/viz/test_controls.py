@@ -2366,9 +2366,9 @@ def _sub_rows_for_stem(view: TuningViewState, stem: str) -> list[int]:
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
         RowKind.TRACK_STEM,
+        RowKind.TRACK_BEAT,
         RowKind.TRACK_BLEND,
         RowKind.TRACK_OPACITY,
-        RowKind.TRACK_BEAT,
         RowKind.TRACK_EFFECTS_HEADER,
         RowKind.TRACK_EFFECT,
     )
