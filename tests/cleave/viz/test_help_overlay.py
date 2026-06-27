@@ -246,6 +246,18 @@ def test_navigable_row_kinds_with_description_have_three_sections() -> None:
         assert sections[2] is NAVIGATION_SECTION
 
 
+def test_description_sections_use_control_name_not_about() -> None:
+    for row_kind, behavior in ROW_BEHAVIORS.items():
+        if not behavior.navigable or behavior.help_description is None:
+            continue
+        if row_kind == RowKind.TRACK_EFFECT:
+            continue
+        description = _description_section(sections_for(row_kind))
+        assert description is not None, row_kind
+        assert description.title != "About", row_kind
+        assert description.title == behavior.help_title, row_kind
+
+
 def test_settings_render_mode_description_separated_from_keyboard() -> None:
     sections = sections_for(RowKind.SETTINGS_RENDER_MODE)
     keyboard = _keyboard_section(sections)
