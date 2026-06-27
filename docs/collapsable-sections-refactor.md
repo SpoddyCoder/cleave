@@ -41,9 +41,9 @@ Every collapsible or gated instance in the live tuning UI today, mapped to the l
 | UI label / row | Type | Session state field | `RowKind` | Depth | Mechanism |
 | --- | --- | --- | --- | --- | --- |
 | Editor Settings | Expandable section | `session.settings.expanded` | `SETTINGS_HEADER` | 0 (pinned header) | Toggle in [cleave/viz/controls.py](cleave/viz/controls.py); children **build-time** omit |
-| render mode | Child (expandable) | (parent gate only) | `SETTINGS_RENDER_MODE` | 1 | Build-time + `_sub_row_expanded` via `SETTINGS_SUB_ROW_KINDS` |
-| UI fade | Child (expandable) | (parent gate only) | `SETTINGS_UI_FADE` | 1 | Build-time + `_sub_row_expanded` via `SETTINGS_SUB_ROW_KINDS` |
-| Layer N: STEM | Expandable section | `LayerRuntime.expanded` | `TRACK_HEADER` | 0 (per slot) | Toggle `_set_expanded`; track sub-rows **runtime** via `_sub_row_expanded` + `TRACK_SUB_ROW_KINDS` |
+| render mode | Child (expandable) | (parent gate only) | `SETTINGS_RENDER_MODE` | 1 | Section tree under `SETTINGS_SECTION` |
+| UI fade | Child (expandable) | (parent gate only) | `SETTINGS_UI_FADE` | 1 | Section tree under `SETTINGS_SECTION` |
+| Layer N: STEM | Expandable section | `LayerRuntime.expanded` | `TRACK_HEADER` | 0 (per slot) | Toggle `_set_expanded`; children via `TRACK_SECTION` tree walk |
 | preset switching | Expandable section | `LayerRuntime.preset_switching_expanded` | `TRACK_PRESET_SWITCHING` | 1 | Toggle `_set_preset_switching_expanded`; submenu **build-time** omit |
 | switching mode | Child (expandable) | (parent gates) | `TRACK_PRESET_SWITCHING_MODE` | 2 | Build-time when `preset_switching_expanded`; runtime track ancestor gate |
 | preset switching scope | Conditional | `LayerRuntime.preset_switching` | `TRACK_PRESET_SWITCHING_SCOPE` | 2 | Build-time `preset_switching == "projectm"` |
@@ -58,16 +58,16 @@ Every collapsible or gated instance in the live tuning UI today, mapped to the l
 | effect depth rows | Child (expandable) | (parent gates) | `TRACK_EFFECT` | 2 | Build-time when `effects_expanded`; runtime track + effects ancestor gate |
 | Delete layer | Child (expandable) | `LayerRuntime.expanded` | `LAYER_MANAGEMENT_DELETE` | 1 | **Build-time** when `block.expanded` |
 | Render: OVERLAY | Expandable section | `RenderOverlayRuntime.expanded` | `RENDER_OVERLAY_HEADER` | 0 (render) | `RenderOverlayControls.set_expanded`; children **build-time** omit |
-| position, opacity, border, delays | Child (expandable) | (parent gate) | `RENDER_OVERLAY_*` (non-title/body) | 1 | Build-time + `RENDER_OVERLAY_SUB_ROW_KINDS` runtime check |
-| title | Expandable section | `RenderOverlayRuntime.title_expanded` | `RENDER_OVERLAY_TITLE_HEADER` | 1 | `set_title_expanded`; font rows **build-time** omit |
-| title font / size / margin | Child (expandable) | (parent gates) | `RENDER_OVERLAY_TITLE_*` | 2 | Build-time + `RENDER_OVERLAY_TITLE_NESTED_KINDS` |
-| body | Expandable section | `RenderOverlayRuntime.body_expanded` | `RENDER_OVERLAY_BODY_HEADER` | 1 | `set_body_expanded`; font rows **build-time** omit |
-| body font / size | Child (expandable) | (parent gates) | `RENDER_OVERLAY_BODY_*` | 2 | Build-time + `RENDER_OVERLAY_BODY_NESTED_KINDS` |
-| Render: POST FX | Expandable section | `RenderPostFxRuntime.expanded` | `RENDER_POST_FX_HEADER` | 0 (render) | `RenderPostFxControls.set_expanded`; children **build-time** omit |
-| fade in / fade out | Child (expandable) | (parent gate) | `RENDER_POST_FX_FADE_IN`, `RENDER_POST_FX_FADE_OUT` | 1 | Build-time + `RENDER_POST_FX_SUB_ROW_KINDS` |
+| position, opacity, border, delays | Child (expandable) | (parent gate) | `RENDER_OVERLAY_*` (non-title/body) | 1 | `RENDER_OVERLAY_SECTION` tree walk |
+| title | Expandable section | `RenderOverlayRuntime.title_expanded` | `RENDER_OVERLAY_TITLE_HEADER` | 1 | `set_title_expanded`; nested rows in section tree |
+| title font / size / margin | Child (expandable) | (parent gates) | `RENDER_OVERLAY_TITLE_*` | 2 | Nested under `RENDER_OVERLAY_TITLE_SECTION` |
+| body | Expandable section | `RenderOverlayRuntime.body_expanded` | `RENDER_OVERLAY_BODY_HEADER` | 1 | `set_body_expanded`; nested rows in section tree |
+| body font / size | Child (expandable) | (parent gates) | `RENDER_OVERLAY_BODY_*` | 2 | Nested under `RENDER_OVERLAY_BODY_SECTION` |
+| Render: POST FX | Expandable section | `RenderPostFxRuntime.expanded` | `RENDER_POST_FX_HEADER` | 0 (render) | `RenderPostFxControls.set_expanded`; `RENDER_POST_FX_SECTION` tree walk |
+| fade in / fade out | Child (expandable) | (parent gate) | `RENDER_POST_FX_FADE_IN`, `RENDER_POST_FX_FADE_OUT` | 1 | `RENDER_POST_FX_SECTION` tree walk |
 | Render: TIMELINE | Panel anchor | `TimelineRuntime.panel_open` (view: `render_timeline.expanded`) | `RENDER_TIMELINE_HEADER` | 0 (render) | `_open_timeline_panel` / `close_timeline_panel`; **no** `RowLayout` children; content in [cleave/viz/timeline_overlay.py](cleave/viz/timeline_overlay.py) |
 
-**`parent_group` frozensets** in [cleave/viz/row_semantics.py](cleave/viz/row_semantics.py) (`track`, `settings`, `render_overlay`, `render_overlay_title`, `render_overlay_body`, `render_post_fx`) parallel the table above for focus fallback and layer-lock rules. **`PRESET_SWITCHING_SUBMENU_KINDS`** groups conditional + expandable preset-switching leaves for `section_header_descriptor()`.
+**`parent_group`** on `RowBehavior` in [cleave/viz/row_semantics.py](cleave/viz/row_semantics.py) remains for layer-lock rules. **`TRACK_SUB_ROW_KINDS`** is still derived from `parent_group == "track"` for lock checks in [cleave/viz/row_layout.py](cleave/viz/row_layout.py). Focus fallback and draw indent come from the section tree in [cleave/viz/row_sections.py](cleave/viz/row_sections.py) (`section_header_from_section_tree`, `row_tree_indent_depth`, `kinds_in_expand_section`).
 
 **Hybrid visibility today:** track-block sub-rows (preset dir through effects header) are always present in `RowLayout.build()` but hidden when the layer is collapsed via `_sub_row_expanded` / `row_draw_visible`. Preset-switching submenu, effect rows, settings/render children, and layer delete use **build-time omission**. Target: one tree walk with **build-time omission** everywhere.
 
@@ -80,9 +80,9 @@ The live tuning panel has **partial** sharing, not a single composition layer.
 | Mechanism | Location | Role today |
 | --- | --- | --- |
 | `RowAffordance.EXPAND` | [cleave/viz/row_semantics.py](cleave/viz/row_semantics.py) | Marks arrow headers; `expandable_row_kinds()` |
-| `parent_group` frozensets | same file | Groups sub-rows for visibility and focus fallback |
-| `_sub_row_expanded()` | [cleave/viz/row_layout.py](cleave/viz/row_layout.py) | Runtime ancestor checks (overlay title/body nesting, layer collapse) |
-| `RowLayout.build()` if-chains | same file | Build-time row omission (preset switching, effects, hard cut, projectm mode, render/settings children) |
+| `parent_group` on `RowBehavior` | [cleave/viz/row_semantics.py](cleave/viz/row_semantics.py) | Layer-lock grouping (`TRACK_SUB_ROW_KINDS`) |
+| `sub_row_expand_visible()` | [cleave/viz/row_sections.py](cleave/viz/row_sections.py) | Tree-walk visibility for expand sections |
+| `RowLayout.build()` | [cleave/viz/row_layout.py](cleave/viz/row_layout.py) | Walks root section tree; build-time omission for collapsed/conditional rows |
 | Per-section bools | [cleave/viz/session.py](cleave/viz/session.py) | `expanded`, `effects_expanded`, `preset_switching_expanded`, `title_expanded`, `body_expanded`, `panel_open`, etc. |
 | Bespoke toggles | [cleave/viz/controls.py](cleave/viz/controls.py) | Long `_apply_horizontal` if-chain per `RowKind` |
 | Duplicated arrow draw | [cleave/viz/tuning_panel_draw.py](cleave/viz/tuning_panel_draw.py) | `_track_header_expand_suffix`, `_effects_header_expand_value`, inline help strings |
@@ -188,10 +188,10 @@ Execute in order; keep unit tests green after each step.
 - [x] **Step 6 — Panel anchor documentation and thin wiring**  
   Register `RENDER_TIMELINE_HEADER` as `PanelAnchorDef`; keep `_open_timeline_panel` / `close_timeline_panel`. Document panel anchor vs expandable section in this doc and [.cursor/rules/live-tuning-ui.mdc](.cursor/rules/live-tuning-ui.mdc). Do **not** move timeline rows into `RowLayout`.
 
-- [ ] **Step 7 — Cleanup and conventions**  
+- [x] **Step 7 — Cleanup and conventions**  
   Remove dead frozensets (`RENDER_OVERLAY_TITLE_NESTED_KINDS`, etc.) once tree is source of truth. Add focused unit tests for `row_sections`: visibility with nested expand + conditional predicates; focus fallback parent resolution. Update [tests/cleave/viz/test_config_dirty.py](tests/cleave/viz/test_config_dirty.py) helpers if expand paths change.
 
-- [ ] **Step 8 — Update project docs**  
+- [x] **Step 8 — Update project docs**  
   Resolve [docs/todos.md](docs/todos.md) "Review Child Menus" (done or link here). Keep how-to recipes in this doc current.
 
 ---
@@ -203,7 +203,7 @@ Execute in order; keep unit tests green after each step.
 1. Add `RowKind` header with `RowAffordance.EXPAND` in [cleave/viz/row_semantics.py](cleave/viz/row_semantics.py).
 2. Add session bool (session-only; list in dirty-test exclusions if applicable) in [cleave/viz/session.py](cleave/viz/session.py).
 3. Register `ExpandSectionDef` with `children` in [cleave/viz/row_sections.py](cleave/viz/row_sections.py).
-4. Add label/indent in draw registry ([cleave/viz/tuning_panel_draw.py](cleave/viz/tuning_panel_draw.py)).
+4. Add label/indent in draw registry ([cleave/viz/tuning_panel_draw.py](cleave/viz/tuning_panel_draw.py)); indent depth is derived from the section tree via `row_tree_indent_depth()`.
 5. No new `_apply_horizontal` branch (registry handles toggle).
 
 ### New conditional rows

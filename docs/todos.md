@@ -19,4 +19,4 @@ Outstanding bugs and issues.
 
 ### Review Child Menus
 
-Look at a consistent shared abstraction for all these.
+Done — see [collapsable-sections-refactor.md](collapsable-sections-refactor.md).

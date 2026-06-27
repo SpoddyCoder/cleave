@@ -5,14 +5,8 @@ from __future__ import annotations
 from cleave.viz.row_semantics import (
     HEADER_ROW_KINDS,
     LABELED_SUB_ROW_KINDS,
-    RENDER_OVERLAY_ALL_SUB_ROW_KINDS,
-    RENDER_OVERLAY_BODY_NESTED_KINDS,
-    RENDER_OVERLAY_SUB_ROW_KINDS,
-    RENDER_OVERLAY_TITLE_NESTED_KINDS,
-    RENDER_POST_FX_SUB_ROW_KINDS,
     REPEAT_ROW_KINDS,
     ROW_BEHAVIORS,
-    SETTINGS_SUB_ROW_KINDS,
     TRACK_EFFECT_SUB_ROW_KINDS,
     TRACK_SUB_ROW_KINDS,
     RowAffordance,
@@ -88,12 +82,6 @@ def test_row_is_pinned() -> None:
     assert row_is_pinned(RowKind.RENDER_OVERLAY_HEADER) is False
 
 
-def test_settings_sub_row_kinds() -> None:
-    assert SETTINGS_SUB_ROW_KINDS == frozenset(
-        {RowKind.SETTINGS_RENDER_MODE, RowKind.SETTINGS_UI_FADE}
-    )
-
-
 def test_repeat_row_kinds() -> None:
     assert REPEAT_ROW_KINDS == _EXPECTED_REPEAT_ROW_KINDS
 
@@ -118,19 +106,13 @@ def test_expandable_row_kinds() -> None:
     )
 
 
-def test_parent_group_frozensets_match_row_behaviors() -> None:
-    for group, expected in (
-        ("track", TRACK_SUB_ROW_KINDS),
-        ("render_overlay", RENDER_OVERLAY_SUB_ROW_KINDS),
-        ("render_overlay_title", RENDER_OVERLAY_TITLE_NESTED_KINDS),
-        ("render_overlay_body", RENDER_OVERLAY_BODY_NESTED_KINDS),
-        ("render_post_fx", RENDER_POST_FX_SUB_ROW_KINDS),
-        ("settings", SETTINGS_SUB_ROW_KINDS),
-    ):
-        derived = frozenset(
-            k for k, b in ROW_BEHAVIORS.items() if b.parent_group == group
-        )
-        assert derived == expected
+def test_parent_group_on_row_behaviors() -> None:
+    assert row_behavior(RowKind.TRACK_STEM).parent_group == "track"
+    assert row_behavior(RowKind.RENDER_OVERLAY_POSITION).parent_group == "render_overlay"
+    assert row_behavior(RowKind.RENDER_OVERLAY_TITLE_FONT).parent_group == "render_overlay_title"
+    assert row_behavior(RowKind.RENDER_OVERLAY_BODY_FONT).parent_group == "render_overlay_body"
+    assert row_behavior(RowKind.RENDER_POST_FX_FADE_IN).parent_group == "render_post_fx"
+    assert row_behavior(RowKind.SETTINGS_RENDER_MODE).parent_group == "settings"
 
 
 def test_track_sub_row_kinds() -> None:
@@ -161,53 +143,6 @@ def test_track_sub_row_kinds() -> None:
 
 def test_track_effect_sub_row_kinds() -> None:
     assert TRACK_EFFECT_SUB_ROW_KINDS == frozenset({RowKind.TRACK_EFFECT})
-
-
-def test_render_overlay_sub_row_kinds() -> None:
-    assert RENDER_OVERLAY_SUB_ROW_KINDS == frozenset(
-        {
-            RowKind.RENDER_OVERLAY_POSITION,
-            RowKind.RENDER_OVERLAY_OPACITY,
-            RowKind.RENDER_OVERLAY_BORDER_WIDTH,
-            RowKind.RENDER_OVERLAY_START_DELAY,
-            RowKind.RENDER_OVERLAY_DISPLAY_TIME,
-            RowKind.RENDER_OVERLAY_TITLE_HEADER,
-            RowKind.RENDER_OVERLAY_BODY_HEADER,
-        }
-    )
-
-
-def test_render_overlay_nested_kinds() -> None:
-    assert RENDER_OVERLAY_TITLE_NESTED_KINDS == frozenset(
-        {
-            RowKind.RENDER_OVERLAY_TITLE_FONT,
-            RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE,
-            RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
-        }
-    )
-    assert RENDER_OVERLAY_BODY_NESTED_KINDS == frozenset(
-        {
-            RowKind.RENDER_OVERLAY_BODY_FONT,
-            RowKind.RENDER_OVERLAY_BODY_FONT_SIZE,
-        }
-    )
-
-
-def test_render_overlay_all_sub_row_kinds() -> None:
-    assert RENDER_OVERLAY_ALL_SUB_ROW_KINDS == (
-        RENDER_OVERLAY_SUB_ROW_KINDS
-        | RENDER_OVERLAY_TITLE_NESTED_KINDS
-        | RENDER_OVERLAY_BODY_NESTED_KINDS
-    )
-
-
-def test_render_post_fx_sub_row_kinds() -> None:
-    assert RENDER_POST_FX_SUB_ROW_KINDS == frozenset(
-        {
-            RowKind.RENDER_POST_FX_FADE_IN,
-            RowKind.RENDER_POST_FX_FADE_OUT,
-        }
-    )
 
 
 def test_locked_navigable_sub_row_kinds() -> None:

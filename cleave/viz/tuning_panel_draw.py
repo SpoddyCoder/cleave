@@ -19,15 +19,14 @@ from cleave.config_schema import (
     DEFAULT_UI_FADE_SEC,
 )
 from cleave.extract import stem_control_label, stem_overlay_header
-from cleave.viz.row_sections import expand_arrow_glyph
+from cleave.viz.row_sections import (
+    RENDER_OVERLAY_SECTION_KINDS,
+    RENDER_POST_FX_SECTION_KINDS,
+    expand_arrow_glyph,
+    row_tree_indent_depth,
+)
 from cleave.viz.row_semantics import (
     LABELED_SUB_ROW_KINDS,
-    PRESET_SWITCHING_SUBMENU_KINDS,
-    RENDER_OVERLAY_ALL_SUB_ROW_KINDS,
-    RENDER_OVERLAY_BODY_NESTED_KINDS,
-    RENDER_OVERLAY_SUB_ROW_KINDS,
-    RENDER_OVERLAY_TITLE_NESTED_KINDS,
-    RENDER_POST_FX_SUB_ROW_KINDS,
     RowKind,
     row_blocked_by_layer_lock,
     row_is_pinned,
@@ -689,29 +688,7 @@ def _row_indent(state: TuningViewState, index: int) -> int:
         return 0
     if kind == RowKind.LAYER_MANAGEMENT_ADD:
         return 0
-    if kind == RowKind.LAYER_MANAGEMENT_DELETE:
-        return TREE_INDENT
-    if kind == RowKind.TRACK_EFFECT:
-        return TREE_INDENT * 2
-    if kind in PRESET_SWITCHING_SUBMENU_KINDS:
-        return TREE_INDENT * 2
-    if kind in RENDER_OVERLAY_TITLE_NESTED_KINDS | RENDER_OVERLAY_BODY_NESTED_KINDS:
-        return TREE_INDENT * 2
-    if kind in {
-        RowKind.TRACK_PRESET_DIR,
-        RowKind.TRACK_PRESET,
-        RowKind.TRACK_PRESET_SWITCHING,
-        RowKind.TRACK_STEM,
-        RowKind.TRACK_BLEND,
-        RowKind.TRACK_OPACITY,
-        RowKind.TRACK_BEAT,
-        RowKind.TRACK_EFFECTS_HEADER,
-    } | RENDER_OVERLAY_SUB_ROW_KINDS | RENDER_POST_FX_SUB_ROW_KINDS | {
-        RowKind.SETTINGS_RENDER_MODE,
-        RowKind.SETTINGS_UI_FADE,
-    }:
-        return TREE_INDENT
-    return 0
+    return TREE_INDENT * row_tree_indent_depth(kind)
 
 
 def _track_disabled(state: TuningViewState, slot: str) -> bool:
@@ -750,14 +727,11 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
 
     stem = state.layout.slot(index)
 
-    if kind in {RowKind.RENDER_OVERLAY_HEADER, *RENDER_OVERLAY_ALL_SUB_ROW_KINDS}:
+    if kind in RENDER_OVERLAY_SECTION_KINDS:
         if not state.render_overlay.enabled:
             return DISABLED
 
-    if kind in {
-        RowKind.RENDER_POST_FX_HEADER,
-        *RENDER_POST_FX_SUB_ROW_KINDS,
-    }:
+    if kind in RENDER_POST_FX_SECTION_KINDS:
         if not state.render_post_fx.enabled:
             return DISABLED
 
