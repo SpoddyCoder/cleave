@@ -218,13 +218,38 @@ Each expandable section declares:
 
 When `collapse_on_disable` is true (render overlay and post-FX today), `expand_section_expanded` returns false if the block is disabled, before `read_expanded`. Sub-rows stay hidden and arrows show collapsed even if the session bool is still true. Disable handlers should still clear the bool; this hook covers visibility and draw consistently.
 
-### Draw: labels vs arrows
+### Draw: panel fields vs expand arrows
 
-Row label strings (`_row_text`, `_labeled_sub_row_prefix`, fit helpers) stay per-`RowKind` in [cleave/viz/tuning_panel_draw.py](cleave/viz/tuning_panel_draw.py). Expand arrows for `EXPAND_HEADER_KINDS` use `expand_arrow_for_header(state, kind, slot?)` in [cleave/viz/row_sections.py](cleave/viz/row_sections.py). Panel anchor `RENDER_TIMELINE_HEADER` stays separate (`state.render_timeline.expanded`).
+Panel labels, value strings, and tree branch glyphs come from [cleave/viz/row_fields.py](cleave/viz/row_fields.py) (`panel_label`, `format_value`, `labeled_row_prefix`). Branch text is `tree_branch_prefix(row_tree_indent_depth(kind))`; `panel_label` holds human text only (no embedded `└─`). Pixel indent comes from `row_tree_indent_depth()` in [cleave/viz/row_sections.py](cleave/viz/row_sections.py). [cleave/viz/tuning_panel_draw.py](cleave/viz/tuning_panel_draw.py) dispatches on `RowPresentStyle`; expand arrows for expandable headers use `expand_arrow_for_header` or `format_value` on `EXPAND_SUBHEADER` kinds. Panel anchor `RENDER_TIMELINE_HEADER` stays separate (`state.render_timeline.expanded`).
 
 ### Root section lists
 
 Top-level global expand sections are derived from `ROOT_SECTION_NODES` and `RENDER_SECTION_NODES` (not a parallel manual tuple). Nested sections are reached through the tree walk.
+
+---
+
+## Panel field manifest
+
+Three registries split tuning panel concerns:
+
+| Registry | Module | Owns |
+| --- | --- | --- |
+| Semantics | [cleave/viz/row_semantics.py](cleave/viz/row_semantics.py) | affordance, navigation, help |
+| Structure | [cleave/viz/row_sections.py](cleave/viz/row_sections.py) | tree nesting, expand/collapse, visibility, `row_tree_indent_depth` |
+| Fields | [cleave/viz/row_fields.py](cleave/viz/row_fields.py) | `panel_label`, `format_value`, `apply_horizontal`, `present_style` |
+
+Each `RowKind` in the layout (except `RENDER_SECTION_GAP`) registers a `RowFieldDef`. Tree chrome is `tree_branch_prefix(row_tree_indent_depth(kind))`; labels in `panel_label` have no embedded `└─`.
+
+`RowPresentStyle` drives draw dispatch:
+
+- **LABELED_VALUE** — branch + label + formatted value (most parameter rows)
+- **EXPAND_SUBHEADER** — branch + label + expand arrow (preset switching, cleave effects, overlay title/body)
+- **COMPOSITE_HEADER** — split-color header with visibility eye (layer, render blocks, Settings)
+- **PATH_ICON** — config path, preset dir/file with Material icons
+- **FULL_LINE** — transport, layer management, notifications
+- **DYNAMIC** — roster-driven rows (`TRACK_EFFECT`; label from descriptor)
+
+Left/Right mutations register `apply_horizontal` on the field def; expand toggles and panel anchors stay in `row_sections.py`.
 
 ---
 
@@ -240,18 +265,29 @@ Top-level global expand sections are derived from `ROOT_SECTION_NODES` and `REND
    - optional `collapse_on_disable` when disable should hide children and show a collapsed arrow
    - optional `append_dynamic_children` for roster-driven leaf rows
 4. Attach the section under the correct parent in the section tree (`ROOT_SECTION_NODES`, `TRACK_SECTION`, `RENDER_SECTION_NODES`, or a nested `SectionNode(expand=...)`).
-5. Add label and indent strings in [cleave/viz/tuning_panel_draw.py](cleave/viz/tuning_panel_draw.py); indent depth comes from `row_tree_indent_depth()`. Arrows for the new header are automatic via `expand_arrow_for_header` (no per-header arrow branch).
-6. No new `_apply_horizontal` branch (`apply_expand_toggle` handles it).
+5. Register `RowFieldDef` in [cleave/viz/row_fields.py](cleave/viz/row_fields.py) with `EXPAND_SUBHEADER` (nested subsection) or `COMPOSITE_HEADER` (top-level render/layer header) as appropriate; set `panel_label` (and `header_prefix` / `header_suffix` for composite headers). Expand arrows are automatic via `format_value` or `expand_arrow_for_header`.
+6. No new branches in [cleave/viz/tuning_panel_draw.py](cleave/viz/tuning_panel_draw.py) or [cleave/viz/controls.py](cleave/viz/controls.py) (`apply_expand_toggle` handles expand input).
 
 ### New conditional rows
 
-1. Add `RowKind` leaf rows in `row_semantics.py`.
+1. Add `RowKind` leaf rows with `RowBehavior` in [cleave/viz/row_semantics.py](cleave/viz/row_semantics.py).
 2. Define a `ConditionalRowsDef` with a named predicate; attach as `SectionNode(conditional=...)` under the correct parent in the section tree.
-3. No arrow, no expanded bool, no parallel predicate map.
+3. Register `RowFieldDef` in [cleave/viz/row_fields.py](cleave/viz/row_fields.py) with `LABELED_VALUE`, `format_value`, and `apply_horizontal`.
+4. No arrow, no expanded bool, no parallel predicate map, no new draw or control branches.
+
+### New value row
+
+Standard leaf row (parameter, toggle display, or step value):
+
+1. Add `RowKind` and `RowBehavior` in [cleave/viz/row_semantics.py](cleave/viz/row_semantics.py).
+2. Add session or config field if persisted ([cleave/viz/session.py](cleave/viz/session.py) / [cleave/config_schema.py](cleave/config_schema.py)).
+3. Attach as a `SectionNode` leaf under the correct parent in [cleave/viz/row_sections.py](cleave/viz/row_sections.py) (or under a `ConditionalRowsDef` when value-gated).
+4. Register `RowFieldDef` in [cleave/viz/row_fields.py](cleave/viz/row_fields.py): `panel_label`, `present_style` (usually `LABELED_VALUE`), `format_value`, `apply_horizontal`.
+5. No new branches in `tuning_panel_draw.py` or `controls.py`.
 
 ### New panel anchor
 
-Rare. Register `PanelAnchorDef` in `row_sections.py` with `content_host`; implement the separate panel host (like timeline strip). Add draw label and arrow using `state.render_timeline`-style view field (not `expand_arrow_for_header`). Do not add `RowLayout` children for strip content.
+Rare. Register `PanelAnchorDef` in `row_sections.py` with `content_host`; implement the separate panel host (like timeline strip). Register `RowFieldDef` with `COMPOSITE_HEADER` or appropriate style; arrow uses view-state open flag (not `expand_arrow_for_header`). Do not add `RowLayout` children for strip content.
 
 ---
 
@@ -273,6 +309,6 @@ Rare. Register `PanelAnchorDef` in `row_sections.py` with `content_host`; implem
 ## Success criteria
 
 1. Shared vocabulary (expandable section, conditional rows, panel anchor) used in docs and rules.
-2. Adding a nested expandable subsection requires registry + session bool + row kinds only (no new control/draw branches).
+2. Adding a nested expandable subsection requires section-tree registry, session bool, row kinds, and `RowFieldDef` in [cleave/viz/row_fields.py](cleave/viz/row_fields.py) only (no new control/draw branches).
 3. Nesting depth limited only by the section tree, not special-case code paths.
 4. Timeline behavior unchanged; documented as panel anchor exception.

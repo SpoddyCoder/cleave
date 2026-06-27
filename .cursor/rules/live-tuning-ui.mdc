@@ -6,13 +6,15 @@ alwaysApply: false
 
 # Live tuning overlay layout
 
-The focus-driven tree panel ([cleave/viz/tuning_panel_draw.py](cleave/viz/tuning_panel_draw.py) draws; [cleave/viz/controls.py](cleave/viz/controls.py) coordinates input; [cleave/viz/tuning_view_state.py](cleave/viz/tuning_view_state.py) builds `TuningViewState`; [cleave/viz/row_layout.py](cleave/viz/row_layout.py) builds `RowLayout`; [cleave/viz/row_sections.py](cleave/viz/row_sections.py) composes expandable sections, conditional rows, and panel anchors; [cleave/viz/session.py](cleave/viz/session.py) holds session) splits into two vertical sections. Use these names in docs, issues, and UI work.
+The focus-driven tree panel ([cleave/viz/tuning_panel_draw.py](cleave/viz/tuning_panel_draw.py) draws; [cleave/viz/controls.py](cleave/viz/controls.py) coordinates input; [cleave/viz/tuning_view_state.py](cleave/viz/tuning_view_state.py) builds `TuningViewState`; [cleave/viz/row_layout.py](cleave/viz/row_layout.py) builds `RowLayout`; [cleave/viz/row_sections.py](cleave/viz/row_sections.py) composes expandable sections, conditional rows, and panel anchors; [cleave/viz/row_fields.py](cleave/viz/row_fields.py) holds the panel field manifest (labels, values, tree chrome, Left/Right mutations); [cleave/viz/session.py](cleave/viz/session.py) holds session) splits into two vertical sections. Use these names in docs, issues, and UI work.
 
-**Collapsible UI lexicon** (full inventory and recipes: [docs/collapsable-sections-refactor.md](docs/collapsable-sections-refactor.md)):
+**Collapsible UI lexicon** (full inventory and recipes: [docs/legacy-plans/collapsable-sections-refactor.md](docs/legacy-plans/collapsable-sections-refactor.md)):
 
 - **Expandable section** — header with expand arrow; Left/Right toggles a session-only `expanded` flag; children live in `RowLayout` and are omitted when collapsed.
 - **Conditional rows** — sibling rows shown or hidden by a value predicate (e.g. `preset_switching_projectm`, `hard_cut_enabled`); no arrow or expanded flag.
 - **Panel anchor** — header looks like an expandable section but content lives in a separate host (timeline strip); registered as `PanelAnchorDef` in `row_sections.py`.
+
+**Panel fields:** new tuning panel rows register `RowFieldDef` in [cleave/viz/row_fields.py](cleave/viz/row_fields.py) (`panel_label`, `format_value`, `apply_horizontal`, `present_style`); tree chrome from `row_tree_indent_depth` in `row_sections.py`. Do not add per-`RowKind` label or mutation branches in `tuning_panel_draw.py` or `controls.py`.
 
 Unsaved config edits show an asterisk on the active config path row. **Ctrl+Q** and window close route through `TuningControls.try_quit()` (delegates to [cleave/viz/config_save.py](cleave/viz/config_save.py)); when dirty, a centered three-option quit modal (Save / Don't save / Cancel) appears before exit.
 

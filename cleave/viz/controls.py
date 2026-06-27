@@ -30,10 +30,10 @@ from cleave.viz.focus_nav import (
     move_focus,
     timeline_strip_in_ring,
 )
-from cleave.viz.row_sections import (
-    EXPAND_HEADER_KINDS,
-    apply_expand_toggle,
-    apply_panel_anchor_toggle,
+from cleave.viz.row_fields import (
+    RowPresentStyle,
+    ROW_FIELDS,
+    apply_field_horizontal,
 )
 from cleave.viz.row_semantics import (
     REPEAT_ROW_KINDS,
@@ -510,17 +510,20 @@ class TuningControls:
         self._move_mode_original_z_order = None
 
     def _apply_horizontal(self, key: int, mod: int, kind: RowKind) -> None:
-        view = self.build_view_state(paused=self.playback.paused)
         slot = self.focus_descriptor.slot
         ctrl = mod_ctrl(mod)
+        shift = mod_shift(mod)
         forward = key == pygame.K_RIGHT
 
-        if kind in EXPAND_HEADER_KINDS and kind not in {
-            RowKind.TRACK_HEADER,
-            RowKind.RENDER_OVERLAY_HEADER,
-            RowKind.RENDER_POST_FX_HEADER,
-        }:
-            apply_expand_toggle(self, kind, slot, forward)
+        field = ROW_FIELDS.get(kind)
+        if (
+            field is not None
+            and field.present_style == RowPresentStyle.EXPAND_SUBHEADER
+            and field.apply_horizontal is not None
+        ):
+            field.apply_horizontal(
+                self, self.focus_descriptor, forward, ctrl, shift
+            )
             return
 
         if (
@@ -538,210 +541,9 @@ class TuningControls:
         ):
             return
 
-        if kind == RowKind.TRACK_HEADER:
-            if slot is None:
-                return
-            if mod_shift(mod):
-                if forward:
-                    self._enter_solo(slot)
-                else:
-                    self._exit_solo(slot)
-                return
-            if ctrl:
-                if (
-                    self.session.layers[slot].locked
-                    and row_behavior(kind).can_enable_disable
-                ):
-                    return
-                self._set_enabled(slot, forward)
-                return
-            apply_expand_toggle(self, kind, slot, forward)
-        elif kind == RowKind.TRACK_PRESET_DIR:
-            if slot is None:
-                return
-            if ctrl:
-                if forward:
-                    self._enter_directory(slot)
-                else:
-                    self._parent_directory(slot)
-                return
-            self._step_directory(slot, forward=forward)
-        elif kind == RowKind.TRACK_PRESET:
-            if slot is None:
-                return
-            self._step_preset(slot, forward=forward, ctrl=ctrl)
-        elif kind == RowKind.TRACK_PRESET_SWITCHING_MODE:
-            if slot is None:
-                return
-            self._cycle_preset_switching(slot, forward=forward)
-        elif kind == RowKind.TRACK_PRESET_SWITCHING_SCOPE:
-            return
-        elif kind == RowKind.TRACK_PRESET_DURATION:
-            if slot is None:
-                return
-            self._step_preset_duration(slot, forward=forward, ctrl=ctrl)
-        elif kind == RowKind.TRACK_SOFT_CUT_DURATION:
-            if slot is None:
-                return
-            self._step_soft_cut_duration(slot, forward=forward, ctrl=ctrl)
-        elif kind == RowKind.TRACK_EASTER_EGG:
-            if slot is None:
-                return
-            self._step_easter_egg(slot, forward=forward, ctrl=ctrl)
-        elif kind == RowKind.TRACK_PRESET_START_CLEAN:
-            if slot is None:
-                return
-            self._cycle_preset_start_clean(slot, forward=forward)
-        elif kind == RowKind.TRACK_HARD_CUT_ENABLED:
-            if slot is None:
-                return
-            self._cycle_hard_cut_enabled(slot, forward=forward)
-        elif kind == RowKind.TRACK_HARD_CUT_DURATION:
-            if slot is None:
-                return
-            self._step_hard_cut_duration(slot, forward=forward, ctrl=ctrl)
-        elif kind == RowKind.TRACK_HARD_CUT_SENSITIVITY:
-            if slot is None:
-                return
-            step = 0.1 if ctrl else 0.01
-            delta = step if forward else -step
-            self._set_hard_cut_sensitivity(
-                slot, self.session.layers[slot].hard_cut_sensitivity + delta
-            )
-        elif kind == RowKind.TRACK_STEM:
-            if slot is None:
-                return
-            self._cycle_stem(slot, forward=forward)
-        elif kind == RowKind.TRACK_BLEND:
-            if slot is None:
-                return
-            self._cycle_blend(slot, forward=forward)
-        elif kind == RowKind.TRACK_OPACITY:
-            if slot is None:
-                return
-            step = 10 if ctrl else 1
-            delta = step if forward else -step
-            self._set_opacity(slot, self.session.layers[slot].opacity_pct + delta)
-        elif kind == RowKind.TRACK_EFFECT:
-            if slot is None:
-                return
-            effect_id = self.focus_descriptor.effect_id
-            driver_slug = self.focus_descriptor.driver_slug
-            if effect_id is None or driver_slug is None:
-                return
-            step = 10 if ctrl else 1
-            delta = step if forward else -step
-            current = self.session.layers[slot].effects.get(effect_id, {}).get(
-                driver_slug, 0
-            )
-            self._set_effect(slot, effect_id, driver_slug, current + delta)
-        elif kind == RowKind.TRACK_BEAT:
-            if slot is None:
-                return
-            step = 0.1 if ctrl else 0.01
-            delta = step if forward else -step
-            self._set_beat(slot, self.session.layers[slot].beat_sensitivity + delta)
-        elif kind == RowKind.TRANSPORT:
-            delta_sec = SEEK_LONG if ctrl else SEEK_SHORT
-            if not forward:
-                delta_sec = -delta_sec
-            self._do_seek(delta_sec)
-        elif kind == RowKind.RENDER_OVERLAY_HEADER:
-            if mod_shift(mod):
-                if forward:
-                    self._render_overlay.enter_solo()
-                else:
-                    self._render_overlay.exit_solo()
-                return
-            if ctrl:
-                self._render_overlay.set_enabled(forward)
-                return
-            apply_expand_toggle(self, kind, slot, forward)
-        elif kind == RowKind.RENDER_OVERLAY_POSITION:
-            self._render_overlay.cycle_position(forward=forward)
-        elif kind == RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE:
-            step = 10 if ctrl else 1
-            delta = step if forward else -step
-            self._render_overlay.set_title_font_size(
-                self.session.render_overlay.title_font_size + delta
-            )
-        elif kind == RowKind.RENDER_OVERLAY_TITLE_FONT:
-            self._render_overlay.cycle_title_font(forward=forward)
-        elif kind == RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM:
-            step = 10 if ctrl else 1
-            delta = step if forward else -step
-            self._render_overlay.set_title_margin_bottom(
-                self.session.render_overlay.title_margin_bottom + delta
-            )
-        elif kind == RowKind.RENDER_OVERLAY_BODY_FONT_SIZE:
-            step = 10 if ctrl else 1
-            delta = step if forward else -step
-            self._render_overlay.set_body_font_size(
-                self.session.render_overlay.body_font_size + delta
-            )
-        elif kind == RowKind.RENDER_OVERLAY_BODY_FONT:
-            self._render_overlay.cycle_body_font(forward=forward)
-        elif kind == RowKind.RENDER_OVERLAY_OPACITY:
-            step = 10 if ctrl else 1
-            delta = step if forward else -step
-            self._render_overlay.set_opacity(
-                self.session.render_overlay.opacity_pct + delta
-            )
-        elif kind == RowKind.RENDER_OVERLAY_BORDER_WIDTH:
-            step = 10 if ctrl else 1
-            delta = step if forward else -step
-            self._render_overlay.set_border_width(
-                self.session.render_overlay.border_width + delta
-            )
-        elif kind == RowKind.RENDER_OVERLAY_START_DELAY:
-            step = 30.0 if ctrl else 1.0
-            delta = step if forward else -step
-            self._render_overlay.set_start_delay(
-                self.session.render_overlay.start_delay + delta
-            )
-        elif kind == RowKind.RENDER_OVERLAY_DISPLAY_TIME:
-            step = 30.0 if ctrl else 1.0
-            delta = step if forward else -step
-            self._render_overlay.set_display_time(
-                self.session.render_overlay.display_time + delta
-            )
-        elif kind == RowKind.RENDER_POST_FX_HEADER:
-            if mod_shift(mod):
-                if forward:
-                    self._render_post_fx.enter_solo()
-                else:
-                    self._render_post_fx.exit_solo()
-                return
-            if ctrl:
-                self._render_post_fx.set_enabled(forward)
-                return
-            apply_expand_toggle(self, kind, slot, forward)
-        elif kind == RowKind.RENDER_POST_FX_FADE_IN:
-            step = 10.0 if ctrl else 1.0
-            delta = step if forward else -step
-            self._render_post_fx.set_fade_in(
-                self.session.render_post_fx.fade_in + delta
-            )
-        elif kind == RowKind.RENDER_POST_FX_FADE_OUT:
-            step = 10.0 if ctrl else 1.0
-            delta = step if forward else -step
-            self._render_post_fx.set_fade_out(
-                self.session.render_post_fx.fade_out + delta
-            )
-        elif kind == RowKind.RENDER_TIMELINE_HEADER:
-            if ctrl:
-                self._set_render_timeline_enabled(forward)
-                return
-            apply_panel_anchor_toggle(self, kind, forward)
-        elif kind == RowKind.SETTINGS_RENDER_MODE:
-            self._settings.cycle_render_mode(forward=forward)
-            self._apply_preview_resolutions()
-        elif kind == RowKind.SETTINGS_UI_WIDTH_MODE:
-            self._settings.cycle_ui_width_mode(forward=forward)
-        elif kind == RowKind.SETTINGS_UI_WIDTH:
-            self._settings.adjust_ui_width(forward=forward, ctrl=ctrl)
-        elif kind == RowKind.SETTINGS_UI_FADE:
-            self._settings.adjust_ui_fade(forward=forward, ctrl=ctrl)
+        apply_field_horizontal(
+            self, self.focus_descriptor, forward, ctrl, shift
+        )
 
     def _step_directory(self, slot: str, *, forward: bool) -> None:
         layer = self.session.layers[slot]

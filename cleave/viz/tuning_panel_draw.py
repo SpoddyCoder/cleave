@@ -11,23 +11,34 @@ from typing import Literal
 
 import pygame
 
-from cleave.config_schema import (
-    hard_cut_enabled_display,
-    preset_start_clean_display,
-    preset_switching_display,
-    ui_fade_display,
-    DEFAULT_UI_FADE_SEC,
+from cleave.config_schema import DEFAULT_UI_FADE_SEC
+from cleave.viz.row_fields import (
+    ROW_FIELDS,
+    RowPresentStyle,
+    composite_header_prefix_part,
+    composite_header_suffix_part,
+    expand_subheader_prefix,
+    format_composite_header_expand_value,
+    format_expand_subheader_value,
+    format_row_value,
+    labeled_row_prefix,
+    row_composite_header_display_text,
+    row_dynamic_labeled_display_text,
+    row_dynamic_labeled_prefix,
+    row_expand_subheader_display_text,
+    row_full_line_display_text,
+    row_labeled_display_text,
 )
-from cleave.extract import stem_control_label, stem_overlay_header
+from cleave.extract import stem_overlay_header
 from cleave.viz.row_sections import (
     RENDER_OVERLAY_SECTION_KINDS,
     RENDER_POST_FX_SECTION_KINDS,
-    expand_arrow_for_header,
     expand_arrow_glyph,
     row_tree_indent_depth,
 )
 from cleave.viz.row_semantics import (
     LABELED_SUB_ROW_KINDS,
+    RowDescriptor,
     RowKind,
     row_blocked_by_layer_lock,
     row_is_pinned,
@@ -85,7 +96,7 @@ from cleave.viz.theme import (
     VALUE,
     tuning_ui_metrics,
 )
-from cleave.viz.tuning_view_state import TrackBlock, TuningViewState
+from cleave.viz.tuning_view_state import TuningViewState
 from cleave.viz.ui_tint import blit_tint
 
 Anchor = Literal["topleft", "bottomleft"]
@@ -100,310 +111,49 @@ def track_sub_rows_visible(state: TuningViewState, slot: str) -> bool:
     return state.tracks[slot].expanded
 
 
-def row_effect(
-    state: TuningViewState, index: int
-) -> tuple[str, str] | None:
-    desc = state.layout.descriptor(index)
-    if desc.kind != RowKind.TRACK_EFFECT:
-        return None
-    assert desc.effect_id is not None and desc.driver_slug is not None
-    return desc.effect_id, desc.driver_slug
-
-
-def _effect_pct(block: TrackBlock, effect_id: str, driver_slug: str) -> int:
-    return block.effects.get(effect_id, {}).get(driver_slug, 0)
-
-
 def _row_text(state: TuningViewState, index: int) -> str:
     kind = state.layout.kind(index)
-    if kind == RowKind.CONFIG_HEADER:
-        return state.active_config_label
-    if kind == RowKind.TRANSPORT:
-        return ""
     if kind == RowKind.RENDER_SECTION_GAP:
         return ""
 
-    if kind == RowKind.PANEL_NOTIFICATION:
-        return state.notification_message or ""
-
-    if kind == RowKind.LAYER_MANAGEMENT_ADD:
-        return "Add Layer"
-    if kind == RowKind.LAYER_MANAGEMENT_DELETE:
-        return f"{_layer_management_delete_prefix()}Delete Layer"
-
-    if kind == RowKind.SETTINGS_HEADER:
-        arrow = expand_arrow_for_header(state, kind)
-        return f"Editor Settings {arrow}"
-
-    if kind == RowKind.SETTINGS_RENDER_MODE:
-        return f"└─ render mode: {state.settings.render_mode}"
-
-    if kind == RowKind.SETTINGS_UI_WIDTH_MODE:
-        return f"└─ UI width mode: {state.settings.ui_width_mode}"
-
-    if kind == RowKind.SETTINGS_UI_WIDTH:
-        return f"└─ UI max width: {state.settings.ui_width}"
-
-    if kind == RowKind.SETTINGS_UI_FADE:
-        return f"└─ UI auto-fade: {ui_fade_display(state.settings.ui_fade)}"
-
-    if kind == RowKind.RENDER_OVERLAY_HEADER:
-        arrow = expand_arrow_for_header(state, kind)
-        return f"Render: OVERLAY {arrow}"
-
-    if kind == RowKind.RENDER_POST_FX_HEADER:
-        arrow = expand_arrow_for_header(state, kind)
-        return f"Render: POST FX {arrow}"
-
-    if kind == RowKind.RENDER_TIMELINE_HEADER:
-        arrow = expand_arrow_glyph(state.render_timeline.expanded)
-        return f"Render: TIMELINE {arrow}"
-
-    block_ro = state.render_overlay
-    if kind == RowKind.RENDER_OVERLAY_POSITION:
-        return f"└─ position: {block_ro.position}"
-    if kind == RowKind.RENDER_OVERLAY_TITLE_HEADER:
-        arrow = expand_arrow_for_header(state, kind)
-        return f"└─ title {arrow}"
-    if kind == RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE:
-        return f"└─ font size: {block_ro.title_font_size}px"
-    if kind == RowKind.RENDER_OVERLAY_TITLE_FONT:
-        return f"└─ font: {render_overlay_font_display(block_ro.title_font)}"
-    if kind == RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM:
-        return f"└─ margin bottom: {block_ro.title_margin_bottom}px"
-    if kind == RowKind.RENDER_OVERLAY_BODY_HEADER:
-        arrow = expand_arrow_for_header(state, kind)
-        return f"└─ body {arrow}"
-    if kind == RowKind.RENDER_OVERLAY_BODY_FONT_SIZE:
-        return f"└─ font size: {block_ro.body_font_size}px"
-    if kind == RowKind.RENDER_OVERLAY_BODY_FONT:
-        return f"└─ font: {render_overlay_font_display(block_ro.body_font)}"
-    if kind == RowKind.RENDER_OVERLAY_OPACITY:
-        return f"└─ background opacity: {block_ro.opacity_pct}%"
-    if kind == RowKind.RENDER_OVERLAY_BORDER_WIDTH:
-        return f"└─ border width: {block_ro.border_width}px"
-    if kind == RowKind.RENDER_OVERLAY_START_DELAY:
-        return f"└─ start delay: {block_ro.start_delay:.1f}s"
-    if kind == RowKind.RENDER_OVERLAY_DISPLAY_TIME:
-        return f"└─ display time: {block_ro.display_time:.1f}s"
-
-    block_pp = state.render_post_fx
-    if kind == RowKind.RENDER_POST_FX_FADE_IN:
-        return f"└─ fade in: {block_pp.fade_in:.1f}s"
-    if kind == RowKind.RENDER_POST_FX_FADE_OUT:
-        return f"└─ fade out: {block_pp.fade_out:.1f}s"
-
-    stem = state.layout.slot(index)
-    assert stem is not None
-    block = state.tracks[stem]
-    if kind == RowKind.TRACK_HEADER:
-        layer_num = state.layer_z_order.index(stem) + 1
-        arrow = expand_arrow_for_header(state, kind, stem)
-        return f"Layer {layer_num}: {stem_overlay_header(block.stem)} {arrow}"
-    if kind == RowKind.TRACK_PRESET_DIR:
-        return block.preset_dir_label
-    if kind == RowKind.TRACK_PRESET:
-        return block.preset_label
-    if kind == RowKind.TRACK_PRESET_SWITCHING:
-        arrow = expand_arrow_for_header(state, kind, stem)
-        return f"└─ preset switching {arrow}"
-    if kind == RowKind.TRACK_PRESET_SWITCHING_MODE:
-        return (
-            f"{_preset_switching_submenu_prefix()}switching mode: "
-            f"{preset_switching_display(block.preset_switching)}"
-        )
-    if kind == RowKind.TRACK_PRESET_SWITCHING_SCOPE:
-        return (
-            f"{_preset_switching_submenu_prefix()}scope: {block.preset_switching_scope}"
-        )
-    if kind == RowKind.TRACK_PRESET_DURATION:
-        return (
-            f"{_preset_switching_submenu_prefix()}preset duration: {block.preset_duration:g}s"
-        )
-    if kind == RowKind.TRACK_SOFT_CUT_DURATION:
-        return (
-            f"{_preset_switching_submenu_prefix()}soft cut: {block.soft_cut_duration:g}s"
-        )
-    if kind == RowKind.TRACK_EASTER_EGG:
-        return (
-            f"{_preset_switching_submenu_prefix()}easter egg: {block.easter_egg:.2f}"
-        )
-    if kind == RowKind.TRACK_PRESET_START_CLEAN:
-        return (
-            f"{_preset_switching_submenu_prefix()}start clean: "
-            f"{preset_start_clean_display(block.preset_start_clean)}"
-        )
-    if kind == RowKind.TRACK_HARD_CUT_ENABLED:
-        return (
-            f"{_preset_switching_submenu_prefix()}hard cut: "
-            f"{hard_cut_enabled_display(block.hard_cut_enabled)}"
-        )
-    if kind == RowKind.TRACK_HARD_CUT_DURATION:
-        return (
-            f"{_preset_switching_submenu_prefix()}hard cut min: "
-            f"{block.hard_cut_duration:g}s"
-        )
-    if kind == RowKind.TRACK_HARD_CUT_SENSITIVITY:
-        return (
-            f"{_preset_switching_submenu_prefix()}hard cut sens: "
-            f"{block.hard_cut_sensitivity:.2f}"
-        )
-    if kind == RowKind.TRACK_STEM:
-        return f"└─ driving stem: {stem_control_label(block.stem)}"
-    if kind == RowKind.TRACK_BLEND:
-        return f"└─ blend mode: {block.blend_mode}"
-    if kind == RowKind.TRACK_OPACITY:
-        return f"└─ opacity: {block.opacity_pct}%"
-    if kind == RowKind.TRACK_BEAT:
-        return f"└─ beat sensitivity: {block.beat_sensitivity:.2f}"
-    if kind == RowKind.TRACK_EFFECTS_HEADER:
-        arrow = expand_arrow_for_header(state, kind, stem)
-        return f"└─ cleave effects {arrow}"
-    assert kind == RowKind.TRACK_EFFECT
-    effect = row_effect(state, index)
-    assert effect is not None
-    effect_id, driver_slug = effect
-    pct = _effect_pct(block, effect_id, driver_slug)
-    return f"{_effects_submenu_prefix()}{effect_id} ({driver_slug}): {pct}%"
+    desc = state.layout.descriptor(index)
+    field = ROW_FIELDS.get(kind)
+    if field is not None:
+        if field.present_style == RowPresentStyle.LABELED_VALUE:
+            return row_labeled_display_text(state, desc)
+        if field.present_style == RowPresentStyle.EXPAND_SUBHEADER:
+            return row_expand_subheader_display_text(state, desc)
+        if field.present_style == RowPresentStyle.COMPOSITE_HEADER:
+            return row_composite_header_display_text(state, desc)
+        if field.present_style == RowPresentStyle.PATH_ICON:
+            return format_row_value(state, desc)
+        if field.present_style == RowPresentStyle.FULL_LINE:
+            return row_full_line_display_text(state, desc)
+        if field.present_style == RowPresentStyle.DYNAMIC:
+            return row_dynamic_labeled_display_text(state, desc)
+    return ""
 
 
 def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
     kind = state.layout.kind(index)
-    if kind == RowKind.TRACK_BLEND:
-        return "└─ blend mode: "
-    if kind == RowKind.TRACK_STEM:
-        return "└─ driving stem: "
-    if kind == RowKind.TRACK_OPACITY:
-        return "└─ opacity: "
-    if kind == RowKind.TRACK_BEAT:
-        return "└─ beat sensitivity: "
-    if kind == RowKind.TRACK_PRESET_SWITCHING_MODE:
-        return "  └─ switching mode: "
-    if kind == RowKind.TRACK_PRESET_SWITCHING_SCOPE:
-        return "  └─ scope: "
-    if kind == RowKind.TRACK_PRESET_DURATION:
-        return "  └─ preset duration: "
-    if kind == RowKind.TRACK_SOFT_CUT_DURATION:
-        return "  └─ soft cut: "
-    if kind == RowKind.TRACK_EASTER_EGG:
-        return "  └─ easter egg: "
-    if kind == RowKind.TRACK_PRESET_START_CLEAN:
-        return "  └─ start clean: "
-    if kind == RowKind.TRACK_HARD_CUT_ENABLED:
-        return "  └─ hard cut: "
-    if kind == RowKind.TRACK_HARD_CUT_DURATION:
-        return "  └─ hard cut min: "
-    if kind == RowKind.TRACK_HARD_CUT_SENSITIVITY:
-        return "  └─ hard cut sens: "
-    if kind == RowKind.RENDER_OVERLAY_POSITION:
-        return "└─ position: "
-    if kind == RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE:
-        return "└─ font size: "
-    if kind == RowKind.RENDER_OVERLAY_TITLE_FONT:
-        return "└─ font: "
-    if kind == RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM:
-        return "└─ margin bottom: "
-    if kind == RowKind.RENDER_OVERLAY_BODY_FONT_SIZE:
-        return "└─ font size: "
-    if kind == RowKind.RENDER_OVERLAY_BODY_FONT:
-        return "└─ font: "
-    if kind == RowKind.RENDER_OVERLAY_OPACITY:
-        return "└─ background opacity: "
-    if kind == RowKind.RENDER_OVERLAY_BORDER_WIDTH:
-        return "└─ border width: "
-    if kind == RowKind.RENDER_OVERLAY_START_DELAY:
-        return "└─ start delay: "
-    if kind == RowKind.RENDER_OVERLAY_DISPLAY_TIME:
-        return "└─ display time: "
-    if kind == RowKind.SETTINGS_RENDER_MODE:
-        return "└─ render mode: "
-    if kind == RowKind.SETTINGS_UI_WIDTH_MODE:
-        return "└─ UI width mode: "
-    if kind == RowKind.SETTINGS_UI_WIDTH:
-        return "└─ UI max width: "
-    if kind == RowKind.SETTINGS_UI_FADE:
-        return "└─ UI auto-fade: "
-    if kind == RowKind.RENDER_POST_FX_FADE_IN:
-        return "└─ fade in: "
-    if kind == RowKind.RENDER_POST_FX_FADE_OUT:
-        return "└─ fade out: "
-    assert kind == RowKind.TRACK_EFFECT
-    effect = row_effect(state, index)
-    assert effect is not None
-    effect_id, driver_slug = effect
-    return f"{_effects_submenu_prefix()}{effect_id} ({driver_slug}): "
+    field = ROW_FIELDS.get(kind)
+    if field is not None:
+        if field.present_style == RowPresentStyle.LABELED_VALUE:
+            return labeled_row_prefix(kind)
+        if field.present_style == RowPresentStyle.DYNAMIC:
+            return row_dynamic_labeled_prefix(state.layout.descriptor(index))
+    return ""
 
 
 def _labeled_sub_row_value(state: TuningViewState, index: int) -> str:
     kind = state.layout.kind(index)
-    block_ro = state.render_overlay
-    if kind == RowKind.RENDER_OVERLAY_POSITION:
-        return block_ro.position
-    if kind == RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE:
-        return f"{block_ro.title_font_size}px"
-    if kind == RowKind.RENDER_OVERLAY_TITLE_FONT:
-        return render_overlay_font_display(block_ro.title_font)
-    if kind == RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM:
-        return f"{block_ro.title_margin_bottom}px"
-    if kind == RowKind.RENDER_OVERLAY_BODY_FONT_SIZE:
-        return f"{block_ro.body_font_size}px"
-    if kind == RowKind.RENDER_OVERLAY_BODY_FONT:
-        return render_overlay_font_display(block_ro.body_font)
-    if kind == RowKind.RENDER_OVERLAY_OPACITY:
-        return f"{block_ro.opacity_pct}%"
-    if kind == RowKind.RENDER_OVERLAY_BORDER_WIDTH:
-        return f"{block_ro.border_width}px"
-    if kind == RowKind.RENDER_OVERLAY_START_DELAY:
-        return f"{block_ro.start_delay:.1f}s"
-    if kind == RowKind.RENDER_OVERLAY_DISPLAY_TIME:
-        return f"{block_ro.display_time:.1f}s"
-    if kind == RowKind.SETTINGS_RENDER_MODE:
-        return state.settings.render_mode
-    if kind == RowKind.SETTINGS_UI_WIDTH_MODE:
-        return state.settings.ui_width_mode
-    if kind == RowKind.SETTINGS_UI_WIDTH:
-        return str(state.settings.ui_width)
-    if kind == RowKind.SETTINGS_UI_FADE:
-        return ui_fade_display(state.settings.ui_fade)
-    block_pp = state.render_post_fx
-    if kind == RowKind.RENDER_POST_FX_FADE_IN:
-        return f"{block_pp.fade_in:.1f}s"
-    if kind == RowKind.RENDER_POST_FX_FADE_OUT:
-        return f"{block_pp.fade_out:.1f}s"
-    stem = state.layout.slot(index)
-    assert stem is not None
-    block = state.tracks[stem]
-    if kind == RowKind.TRACK_BLEND:
-        return block.blend_mode
-    if kind == RowKind.TRACK_STEM:
-        return stem_control_label(block.stem)
-    if kind == RowKind.TRACK_OPACITY:
-        return f"{block.opacity_pct}%"
-    if kind == RowKind.TRACK_BEAT:
-        return f"{block.beat_sensitivity:.2f}"
-    if kind == RowKind.TRACK_PRESET_SWITCHING_MODE:
-        return preset_switching_display(block.preset_switching)
-    if kind == RowKind.TRACK_PRESET_SWITCHING_SCOPE:
-        return block.preset_switching_scope
-    if kind == RowKind.TRACK_PRESET_DURATION:
-        return f"{block.preset_duration:g}s"
-    if kind == RowKind.TRACK_SOFT_CUT_DURATION:
-        return f"{block.soft_cut_duration:g}s"
-    if kind == RowKind.TRACK_EASTER_EGG:
-        return f"{block.easter_egg:.2f}"
-    if kind == RowKind.TRACK_PRESET_START_CLEAN:
-        return preset_start_clean_display(block.preset_start_clean)
-    if kind == RowKind.TRACK_HARD_CUT_ENABLED:
-        return hard_cut_enabled_display(block.hard_cut_enabled)
-    if kind == RowKind.TRACK_HARD_CUT_DURATION:
-        return f"{block.hard_cut_duration:g}s"
-    if kind == RowKind.TRACK_HARD_CUT_SENSITIVITY:
-        return f"{block.hard_cut_sensitivity:.2f}"
-    assert kind == RowKind.TRACK_EFFECT
-    effect = row_effect(state, index)
-    assert effect is not None
-    effect_id, driver_slug = effect
-    return f"{_effect_pct(block, effect_id, driver_slug)}%"
+    field = ROW_FIELDS.get(kind)
+    if field is not None:
+        if field.present_style == RowPresentStyle.LABELED_VALUE:
+            return format_row_value(state, state.layout.descriptor(index))
+        if field.present_style == RowPresentStyle.DYNAMIC:
+            return format_row_value(state, state.layout.descriptor(index))
+    return ""
 
 
 def _fit_labeled_sub_row_value(
@@ -460,20 +210,8 @@ def _track_header_layer_prefix(state: TuningViewState, index: int) -> str:
     return f"Layer {layer_num}: "
 
 
-def _track_header_expand_suffix(state: TuningViewState, kind: RowKind, slot: str | None = None) -> str:
-    return f" {expand_arrow_for_header(state, kind, slot)}"
-
-
-def _render_overlay_header_prefix() -> str:
-    return "Render: "
-
-
-def _render_post_fx_header_prefix() -> str:
-    return "Render: "
-
-
-def _render_timeline_header_prefix() -> str:
-    return "Render: "
+def _track_header_expand_suffix(state: TuningViewState, desc: RowDescriptor) -> str:
+    return f" {format_composite_header_expand_value(state, desc)}"
 
 
 def render_visibility_icon(
@@ -533,30 +271,6 @@ def _render_preset_row_prefix(
     return surf
 
 
-def _layer_management_delete_prefix() -> str:
-    return "└─ "
-
-
-def _preset_switching_submenu_prefix() -> str:
-    return "  └─ "
-
-
-def _effects_submenu_prefix() -> str:
-    return "  └─ "
-
-
-def _effects_header_prefix() -> str:
-    return "└─ cleave effects "
-
-
-def _effects_header_expand_value(state: TuningViewState, kind: RowKind, slot: str | None) -> str:
-    return expand_arrow_for_header(state, kind, slot)
-
-
-def _render_overlay_text_header_prefix(label: str) -> str:
-    return f"└─ {label} "
-
-
 def _fit_track_header_stem(
     font: pygame.font.Font,
     state: TuningViewState,
@@ -568,10 +282,11 @@ def _fit_track_header_stem(
     assert stem is not None
     block = state.tracks[stem]
     locked = block.locked
+    desc = RowDescriptor(RowKind.TRACK_HEADER, slot=stem)
     budget = max_content_width - _row_indent(state, index)
     budget -= track_header_prefix_width(font)
     budget -= font.size(_track_header_layer_prefix(state, index))[0]
-    budget -= font.size(_track_header_expand_suffix(state, RowKind.TRACK_HEADER, stem))[0]
+    budget -= font.size(_track_header_expand_suffix(state, desc))[0]
     if locked:
         budget -= track_header_lock_suffix_width(font.get_linesize())
     return fit_text_to_width(font, stem_overlay_header(block.stem), budget)
@@ -627,7 +342,8 @@ def fit_row_text(
     budget = max_content_width - indent
     text = _row_text(state, index)
 
-    if kind in {RowKind.CONFIG_HEADER, RowKind.TRACK_PRESET_DIR, RowKind.TRACK_PRESET}:
+    field = ROW_FIELDS.get(kind)
+    if field is not None and field.present_style == RowPresentStyle.PATH_ICON:
         line_h = font.get_linesize()
         if kind == RowKind.CONFIG_HEADER:
             icon_w = row_icon_prefix_width(line_h)
@@ -638,12 +354,13 @@ def fit_row_text(
     if kind == RowKind.TRACK_HEADER:
         stem = state.layout.slot(index)
         assert stem is not None
+        desc = RowDescriptor(RowKind.TRACK_HEADER, slot=stem)
         return (
             _track_header_layer_prefix(state, index)
             + _fit_track_header_stem(
                 font, state, index, max_content_width=max_content_width
             )
-            + _track_header_expand_suffix(state, RowKind.TRACK_HEADER, stem)
+            + _track_header_expand_suffix(state, desc)
         )
     if kind == RowKind.RENDER_SECTION_GAP:
         return ""
@@ -651,28 +368,14 @@ def fit_row_text(
         return fit_text_to_width(
             font, state.notification_message or "", budget
         )
-    if kind in {RowKind.LAYER_MANAGEMENT_ADD, RowKind.LAYER_MANAGEMENT_DELETE}:
-        return _row_text(state, index)
-    if kind == RowKind.SETTINGS_HEADER:
-        return "Editor Settings" + _track_header_expand_suffix(state, kind)
-    if kind == RowKind.RENDER_OVERLAY_HEADER:
-        return (
-            _render_overlay_header_prefix()
-            + "OVERLAY"
-            + _track_header_expand_suffix(state, kind)
-        )
-    if kind == RowKind.RENDER_POST_FX_HEADER:
-        return (
-            _render_post_fx_header_prefix()
-            + "POST FX"
-            + _track_header_expand_suffix(state, kind)
-        )
-    if kind == RowKind.RENDER_TIMELINE_HEADER:
-        return (
-            _render_timeline_header_prefix()
-            + "TIMELINE"
-            + f" {expand_arrow_glyph(state.render_timeline.expanded)}"
-        )
+    field = ROW_FIELDS.get(kind)
+    if field is not None and field.present_style == RowPresentStyle.FULL_LINE:
+        if kind in {RowKind.LAYER_MANAGEMENT_ADD, RowKind.LAYER_MANAGEMENT_DELETE}:
+            return _row_text(state, index)
+    if field is not None and field.present_style == RowPresentStyle.COMPOSITE_HEADER:
+        return row_composite_header_display_text(state, state.layout.descriptor(index))
+    if field is not None and field.present_style == RowPresentStyle.EXPAND_SUBHEADER:
+        return row_expand_subheader_display_text(state, state.layout.descriptor(index))
     if kind in LABELED_SUB_ROW_KINDS:
         return _labeled_sub_row_prefix(state, index) + _fit_labeled_sub_row_value(
             font, state, index, max_content_width=max_content_width
@@ -1214,15 +917,16 @@ class TuningOverlay:
                 enabled = block.visible if block is not None else True
                 solo = stem is not None and state.solo_slot == stem
                 locked = block.locked if block is not None else False
+                desc = RowDescriptor(RowKind.TRACK_HEADER, slot=stem)
                 prefix_surf = render_visibility_icon(
                     enabled=enabled, solo=solo, line_height=line_h
                 )
-                layer_prefix = _track_header_layer_prefix(state, index)
+                layer_prefix = composite_header_prefix_part(state, desc)
                 stem_text = _fit_track_header_stem(
                     font, state, index, max_content_width=max_content_width
                 )
                 expand_arrow = (
-                    expand_arrow_for_header(state, RowKind.TRACK_HEADER, stem)
+                    format_composite_header_expand_value(state, desc)
                     if stem is not None
                     else expand_arrow_glyph(False)
                 )
@@ -1241,13 +945,14 @@ class TuningOverlay:
                     indent + prefix_surf.get_width() + label_surf.get_width()
                 )
             elif kind == RowKind.SETTINGS_HEADER:
+                desc = state.layout.descriptor(index)
                 icon_surf = render_glyph(
                     SETTINGS_GLYPH, color=VALUE, line_height=line_h
                 )
                 label_surf = _render_label_value_row(
                     font,
-                    prefix="Editor Settings ",
-                    value=expand_arrow_for_header(state, RowKind.SETTINGS_HEADER),
+                    prefix=composite_header_prefix_part(state, desc),
+                    value=format_composite_header_expand_value(state, desc),
                     value_color=color,
                     prefix_color=LABEL,
                     line_height=line_h,
@@ -1257,61 +962,39 @@ class TuningOverlay:
                 row_widths.append(
                     indent + icon_surf.get_width() + label_surf.get_width()
                 )
-            elif kind == RowKind.RENDER_OVERLAY_HEADER:
-                block_ro = state.render_overlay
-                prefix_surf = render_visibility_icon(
-                    enabled=block_ro.enabled,
-                    solo=block_ro.solo,
-                    line_height=line_h,
-                )
+            elif kind in {
+                RowKind.RENDER_OVERLAY_HEADER,
+                RowKind.RENDER_POST_FX_HEADER,
+                RowKind.RENDER_TIMELINE_HEADER,
+            }:
+                desc = state.layout.descriptor(index)
+                if kind == RowKind.RENDER_OVERLAY_HEADER:
+                    block_ro = state.render_overlay
+                    prefix_surf = render_visibility_icon(
+                        enabled=block_ro.enabled,
+                        solo=block_ro.solo,
+                        line_height=line_h,
+                    )
+                elif kind == RowKind.RENDER_POST_FX_HEADER:
+                    block_pp = state.render_post_fx
+                    prefix_surf = render_visibility_icon(
+                        enabled=block_pp.enabled,
+                        solo=block_pp.solo,
+                        line_height=line_h,
+                    )
+                else:
+                    block_tl = state.render_timeline
+                    prefix_surf = render_visibility_icon(
+                        enabled=block_tl.enabled,
+                        solo=False,
+                        line_height=line_h,
+                    )
                 label_surf = _render_track_header_label(
                     font,
-                    layer_prefix=_render_overlay_header_prefix(),
-                    stem_text="OVERLAY",
+                    layer_prefix=composite_header_prefix_part(state, desc),
+                    stem_text=composite_header_suffix_part(state, desc),
                     value_color=color,
-                    expand_arrow=expand_arrow_for_header(state, RowKind.RENDER_OVERLAY_HEADER),
-                    locked=False,
-                    line_height=line_h,
-                )
-                row_surfaces.append(prefix_surf)
-                row_time_surfaces.append(label_surf)
-                row_widths.append(
-                    indent + prefix_surf.get_width() + label_surf.get_width()
-                )
-            elif kind == RowKind.RENDER_POST_FX_HEADER:
-                block_pp = state.render_post_fx
-                prefix_surf = render_visibility_icon(
-                    enabled=block_pp.enabled,
-                    solo=block_pp.solo,
-                    line_height=line_h,
-                )
-                label_surf = _render_track_header_label(
-                    font,
-                    layer_prefix=_render_post_fx_header_prefix(),
-                    stem_text="POST FX",
-                    value_color=color,
-                    expand_arrow=expand_arrow_for_header(state, RowKind.RENDER_POST_FX_HEADER),
-                    locked=False,
-                    line_height=line_h,
-                )
-                row_surfaces.append(prefix_surf)
-                row_time_surfaces.append(label_surf)
-                row_widths.append(
-                    indent + prefix_surf.get_width() + label_surf.get_width()
-                )
-            elif kind == RowKind.RENDER_TIMELINE_HEADER:
-                block_tl = state.render_timeline
-                prefix_surf = render_visibility_icon(
-                    enabled=block_tl.enabled,
-                    solo=False,
-                    line_height=line_h,
-                )
-                label_surf = _render_track_header_label(
-                    font,
-                    layer_prefix=_render_timeline_header_prefix(),
-                    stem_text="TIMELINE",
-                    value_color=color,
-                    expand_arrow=expand_arrow_glyph(block_tl.expanded),
+                    expand_arrow=format_composite_header_expand_value(state, desc),
                     locked=False,
                     line_height=line_h,
                 )
@@ -1325,11 +1008,10 @@ class TuningOverlay:
                 row_surfaces.append(gap_surf)
                 row_time_surfaces.append(None)
                 row_widths.append(indent + gap_surf.get_width())
-            elif kind in {
-                RowKind.CONFIG_HEADER,
-                RowKind.TRACK_PRESET_DIR,
-                RowKind.TRACK_PRESET,
-            }:
+            elif (
+                ROW_FIELDS.get(kind) is not None
+                and ROW_FIELDS[kind].present_style == RowPresentStyle.PATH_ICON
+            ):
                 if kind == RowKind.TRACK_PRESET_DIR:
                     glyph = FOLDER_GLYPH
                     icon_color = PRESET_ICON
@@ -1374,52 +1056,15 @@ class TuningOverlay:
                 row_widths.append(
                     indent + icon_surf.get_width() + label_surf.get_width()
                 )
-            elif kind == RowKind.TRACK_PRESET_SWITCHING:
-                stem = state.layout.slot(index)
-                assert stem is not None
-                block = state.tracks[stem]
+            elif (
+                ROW_FIELDS.get(kind) is not None
+                and ROW_FIELDS[kind].present_style == RowPresentStyle.EXPAND_SUBHEADER
+            ):
+                desc = state.layout.descriptor(index)
                 surf = _render_label_value_row(
                     font,
-                    prefix="└─ preset switching ",
-                    value=_effects_header_expand_value(
-                        state, RowKind.TRACK_PRESET_SWITCHING, stem
-                    ),
-                    value_color=color,
-                    line_height=line_h,
-                )
-                row_surfaces.append(surf)
-                row_time_surfaces.append(None)
-                row_widths.append(indent + surf.get_width())
-            elif kind == RowKind.TRACK_EFFECTS_HEADER:
-                stem = state.layout.slot(index)
-                assert stem is not None
-                block = state.tracks[stem]
-                surf = _render_label_value_row(
-                    font,
-                    prefix=_effects_header_prefix(),
-                    value=_effects_header_expand_value(
-                        state, RowKind.TRACK_EFFECTS_HEADER, stem
-                    ),
-                    value_color=color,
-                    line_height=line_h,
-                )
-                row_surfaces.append(surf)
-                row_time_surfaces.append(None)
-                row_widths.append(indent + surf.get_width())
-            elif kind in {
-                RowKind.RENDER_OVERLAY_TITLE_HEADER,
-                RowKind.RENDER_OVERLAY_BODY_HEADER,
-            }:
-                if kind == RowKind.RENDER_OVERLAY_TITLE_HEADER:
-                    prefix = _render_overlay_text_header_prefix("title")
-                    header_kind = RowKind.RENDER_OVERLAY_TITLE_HEADER
-                else:
-                    prefix = _render_overlay_text_header_prefix("body")
-                    header_kind = RowKind.RENDER_OVERLAY_BODY_HEADER
-                surf = _render_label_value_row(
-                    font,
-                    prefix=prefix,
-                    value=expand_arrow_for_header(state, header_kind),
+                    prefix=expand_subheader_prefix(kind),
+                    value=format_expand_subheader_value(state, desc),
                     value_color=color,
                     line_height=line_h,
                 )
@@ -1441,29 +1086,15 @@ class TuningOverlay:
                 row_surfaces.append(surf)
                 row_time_surfaces.append(None)
                 row_widths.append(indent + surf.get_width())
-            elif kind == RowKind.LAYER_MANAGEMENT_DELETE:
-                label_color = _row_value_color(state, index)
-                surf = _render_label_value_row(
-                    font,
-                    prefix=_layer_management_delete_prefix(),
-                    value="Delete Layer",
-                    value_color=label_color,
-                    line_height=line_h,
-                )
-                row_surfaces.append(surf)
-                row_time_surfaces.append(None)
-                row_widths.append(indent + surf.get_width())
-            elif kind == RowKind.LAYER_MANAGEMENT_ADD:
+            elif (
+                ROW_FIELDS.get(kind) is not None
+                and ROW_FIELDS[kind].present_style == RowPresentStyle.FULL_LINE
+                and kind
+                in {RowKind.LAYER_MANAGEMENT_ADD, RowKind.LAYER_MANAGEMENT_DELETE}
+            ):
                 label = _row_text(state, index)
                 label_color = _row_value_color(state, index)
-                surf = _render_label_value_row(
-                    font,
-                    prefix=label,
-                    value="",
-                    value_color=label_color,
-                    prefix_color=label_color,
-                    line_height=line_h,
-                )
+                surf = font.render(label, True, label_color)
                 row_surfaces.append(surf)
                 row_time_surfaces.append(None)
                 row_widths.append(indent + surf.get_width())
