@@ -2,30 +2,49 @@
 
 from __future__ import annotations
 
-from cleave.viz.help_overlay import (
-    HelpOverlay,
+from cleave.viz.help_content import (
+    DescriptionSection,
+    HelpSection,
+    KEYBOARD_CONTROLS_SECTION_TITLE,
     NAVIGATION_SECTION,
-    _layer_section,
-    _sections_for,
-    _timeline_strip_section,
+    layer_section,
+    sections_for,
+    timeline_strip_section,
 )
+from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.theme import LABEL, VALUE
 from cleave.viz.row_semantics import ROW_BEHAVIORS, RowKind
 
 
+def _keyboard_section(sections: tuple[object, ...]) -> HelpSection:
+    for section in sections:
+        if isinstance(section, HelpSection) and section is not NAVIGATION_SECTION:
+            return section
+    raise AssertionError("no keyboard help section found")
+
+
+def _description_section(sections: tuple[object, ...]) -> DescriptionSection | None:
+    for section in sections:
+        if isinstance(section, DescriptionSection):
+            return section
+    return None
+
+
 def _timeline_keys(**kwargs: object) -> list[str]:
-    section = _sections_for(
-        RowKind.RENDER_TIMELINE_HEADER,
-        timeline_submenu_focused=True,
-        **kwargs,
-    )[0]
+    section = _keyboard_section(
+        sections_for(
+            RowKind.RENDER_TIMELINE_HEADER,
+            timeline_submenu_focused=True,
+            **kwargs,
+        )
+    )
     return [key for key, _ in section.entries]
 
 
 def test_help_entry_columns_align_to_widest_key() -> None:
     overlay = HelpOverlay()
     font = overlay._font_get()
-    sections = (NAVIGATION_SECTION, _layer_section(timeline_enabled=False))
+    sections = (NAVIGATION_SECTION, layer_section(timeline_enabled=False))
     key_column_width = overlay._max_key_width(font, sections)
     entry_gap = overlay._entry_gap(font)
 
@@ -49,7 +68,7 @@ def test_help_entry_columns_align_to_widest_key() -> None:
 
 
 def test_layer_section_includes_visibility_when_timeline_disabled() -> None:
-    section = _layer_section(timeline_enabled=False)
+    section = layer_section(timeline_enabled=False)
     entries = dict(section.entries)
     assert entries.get("Ctrl + Enter") == "lock/unlock layer"
     assert entries.get("Shift + Left/Right") == "solo layer"
@@ -58,58 +77,103 @@ def test_layer_section_includes_visibility_when_timeline_disabled() -> None:
 
 
 def test_layer_section_omits_visibility_when_timeline_enabled() -> None:
-    section = _layer_section(timeline_enabled=True)
+    section = layer_section(timeline_enabled=True)
     keys = [entry[0] for entry in section.entries]
     assert "Ctrl + Left/Right" not in keys
 
 
 def test_track_header_help_includes_delete() -> None:
-    section = _sections_for(RowKind.TRACK_HEADER, timeline_enabled=False)[0]
+    section = _keyboard_section(
+        sections_for(RowKind.TRACK_HEADER, timeline_enabled=False)
+    )
     assert dict(section.entries)["Delete"] == "delete layer"
 
 
 def test_track_header_help_reflects_timeline_enabled() -> None:
-    disabled = _sections_for(RowKind.TRACK_HEADER, timeline_enabled=False)
-    enabled = _sections_for(RowKind.TRACK_HEADER, timeline_enabled=True)
-    disabled_keys = [key for section in disabled for key, _ in section.entries]
-    enabled_keys = [key for section in enabled for key, _ in section.entries]
+    disabled = sections_for(RowKind.TRACK_HEADER, timeline_enabled=False)
+    enabled = sections_for(RowKind.TRACK_HEADER, timeline_enabled=True)
+    disabled_keys = [
+        key
+        for section in disabled
+        if isinstance(section, HelpSection)
+        for key, _ in section.entries
+    ]
+    enabled_keys = [
+        key
+        for section in enabled
+        if isinstance(section, HelpSection)
+        for key, _ in section.entries
+    ]
     assert "Ctrl + Left/Right" in disabled_keys
     assert "Ctrl + Left/Right" not in enabled_keys
 
 
-def test_preset_dir_help() -> None:
-    section = _sections_for(RowKind.TRACK_PRESET_DIR)[0]
-    entries = dict(section.entries)
+def test_preset_dir_help_titles() -> None:
+    sections = sections_for(RowKind.TRACK_PRESET_DIR)
+    description = _description_section(sections)
+    keyboard = _keyboard_section(sections)
+    assert description is not None
+    assert description.title == "Preset Directory"
+    assert keyboard.title == KEYBOARD_CONTROLS_SECTION_TITLE
+    entries = dict(keyboard.entries)
     assert entries["Left/Right"] == "next/previous directory"
     assert entries["Ctrl + Left/Right"] == "up/down directory tree"
 
 
-def test_preset_file_help() -> None:
-    section = _sections_for(RowKind.TRACK_PRESET)[0]
-    entries = dict(section.entries)
+def test_preset_file_help_titles() -> None:
+    sections = sections_for(RowKind.TRACK_PRESET)
+    description = _description_section(sections)
+    keyboard = _keyboard_section(sections)
+    assert description is not None
+    assert description.title == "Milkdrop Preset File"
+    entries = dict(keyboard.entries)
     assert entries["Left/Right"] == "next/previous preset"
     assert entries["Ctrl + Left/Right"] == "next/previous large step"
 
 
+def test_blend_mode_help_lists_modes() -> None:
+    description = _description_section(sections_for(RowKind.TRACK_BLEND))
+    assert description is not None
+    assert description.title == "Blend mode"
+    assert any("black-key -" in line for line in description.lines)
+
+
+def test_timeline_help_mentions_visibility_handoff() -> None:
+    description = _description_section(sections_for(RowKind.RENDER_TIMELINE_HEADER))
+    assert description is not None
+    assert any("standard layer visibility is disabled" in line for line in description.lines)
+
+
 def test_stem_row_help() -> None:
-    section = _sections_for(RowKind.TRACK_STEM)[0]
-    assert section.title == "Stem"
-    assert dict(section.entries)["Left/Right"] == (
-        "cycle stem source; effects reset on change"
-    )
+    sections = sections_for(RowKind.TRACK_STEM)
+    description = _description_section(sections)
+    section = _keyboard_section(sections)
+    assert description is not None
+    assert description.title == "Stem"
+    assert section.title == KEYBOARD_CONTROLS_SECTION_TITLE
+    assert dict(section.entries)["Left/Right"] == "cycle stem source"
+    assert "Effects reset when the stem changes." in description.lines
 
 
 def test_cleave_effects_help() -> None:
-    header = _sections_for(RowKind.TRACK_EFFECTS_HEADER)[0]
-    effect = _sections_for(RowKind.TRACK_EFFECT)[0]
-    assert header.title == "Cleave Effects"
-    assert effect.title == "Cleave Effects"
+    header = _keyboard_section(sections_for(RowKind.TRACK_EFFECTS_HEADER))
+    effect = _keyboard_section(sections_for(RowKind.TRACK_EFFECT))
+    assert header.title == KEYBOARD_CONTROLS_SECTION_TITLE
+    assert effect.title == KEYBOARD_CONTROLS_SECTION_TITLE
     assert "Ctrl + Left/Right" not in [key for key, _ in header.entries]
     assert dict(effect.entries)["Ctrl + Left/Right"] == "large step"
 
 
+def test_effect_row_help_uses_registry_description() -> None:
+    sections = sections_for(RowKind.TRACK_EFFECT, effect_id="pulse")
+    description = _description_section(sections)
+    assert description is not None
+    assert description.title == "Pulse"
+    assert "Opacity follows the audio driver signal." in description.lines
+
+
 def test_render_timeline_help_has_no_solo() -> None:
-    section = _sections_for(RowKind.RENDER_TIMELINE_HEADER)[0]
+    section = _keyboard_section(sections_for(RowKind.RENDER_TIMELINE_HEADER))
     keys = [key for key, _ in section.entries]
     assert "Shift + Left/Right" not in keys
     assert dict(section.entries)["Left/Right"] == "expand/collapse"
@@ -120,39 +184,93 @@ def test_render_overlay_sub_header_help_expand_collapse() -> None:
         RowKind.RENDER_OVERLAY_TITLE_HEADER,
         RowKind.RENDER_OVERLAY_BODY_HEADER,
     ):
-        section = _sections_for(row_kind)[0]
+        section = _keyboard_section(sections_for(row_kind))
         entries = dict(section.entries)
         assert entries["Left/Right"] == "expand/collapse"
         assert "adjust value" not in entries.values()
 
 
 def test_layer_management_add_help() -> None:
-    section = _sections_for(RowKind.LAYER_MANAGEMENT_ADD)[0]
-    assert section.title == "Add Layer"
+    section = _keyboard_section(sections_for(RowKind.LAYER_MANAGEMENT_ADD))
+    assert section.title == KEYBOARD_CONTROLS_SECTION_TITLE
     assert dict(section.entries)["Enter"] == "confirm add"
 
 
 def test_layer_management_delete_help() -> None:
-    section = _sections_for(RowKind.LAYER_MANAGEMENT_DELETE)[0]
-    assert section.title == "Delete layer"
+    sections = sections_for(RowKind.LAYER_MANAGEMENT_DELETE)
+    section = _keyboard_section(sections)
+    description = _description_section(sections)
+    assert section.title == KEYBOARD_CONTROLS_SECTION_TITLE
     entries = dict(section.entries)
     assert entries["Enter/Delete"] == "confirm delete"
-    assert entries[""] == "at least 1 layer required"
+    assert "" not in entries
+    assert description is not None
+    assert "At least one layer must remain." in description.lines
 
 
 def test_navigable_row_kinds_have_help_sections() -> None:
     for row_kind, behavior in ROW_BEHAVIORS.items():
         if not behavior.navigable:
             continue
-        sections = _sections_for(row_kind)
+        sections = sections_for(row_kind)
         assert sections, f"{row_kind} returned no help sections"
-        assert any(section.entries for section in sections), (
-            f"{row_kind} returned only empty sections"
-        )
+        assert any(
+            (
+                isinstance(section, DescriptionSection) and section.lines
+            )
+            or (
+                isinstance(section, HelpSection) and section.entries
+            )
+            for section in sections
+        ), f"{row_kind} returned only empty sections"
+
+
+def test_navigable_row_kinds_with_description_use_keyboard_controls_title() -> None:
+    for row_kind, behavior in ROW_BEHAVIORS.items():
+        if not behavior.navigable or behavior.help_description is None:
+            continue
+        if row_kind == RowKind.TRACK_EFFECT:
+            continue
+        keyboard = _keyboard_section(sections_for(row_kind))
+        assert keyboard.title == KEYBOARD_CONTROLS_SECTION_TITLE, row_kind
+
+
+def test_navigable_row_kinds_with_description_have_three_sections() -> None:
+    for row_kind, behavior in ROW_BEHAVIORS.items():
+        if not behavior.navigable or behavior.help_description is None:
+            continue
+        sections = sections_for(row_kind)
+        assert len(sections) == 3, f"{row_kind} expected 3 sections, got {len(sections)}"
+        assert isinstance(sections[0], DescriptionSection)
+        assert isinstance(sections[1], HelpSection)
+        assert sections[2] is NAVIGATION_SECTION
+
+
+def test_settings_render_mode_description_separated_from_keyboard() -> None:
+    sections = sections_for(RowKind.SETTINGS_RENDER_MODE)
+    keyboard = _keyboard_section(sections)
+    description = _description_section(sections)
+    assert dict(keyboard.entries) == {"Left/Right": "cycle mode"}
+    assert description is not None
+    assert "live view only" in " ".join(description.lines)
+
+
+def test_timeline_submenu_help_has_three_sections() -> None:
+    sections = sections_for(
+        RowKind.RENDER_TIMELINE_HEADER,
+        timeline_submenu_focused=True,
+        paused=True,
+    )
+    assert len(sections) == 3
+    assert isinstance(sections[0], DescriptionSection)
+    assert sections[0].title == "Timeline"
+    assert isinstance(sections[1], HelpSection)
+    assert sections[1].title == KEYBOARD_CONTROLS_SECTION_TITLE
+    assert sections[2] is NAVIGATION_SECTION
 
 
 def test_timeline_strip_help_paused() -> None:
-    section = _timeline_strip_section(paused=True, recording=False, override_active=False)
+    section = timeline_strip_section(paused=True, recording=False, override_active=False)
     keys = [key for key, _ in section.entries]
     assert keys.index("Shift + Enter") + 1 == keys.index("1-4")
     entries = dict(section.entries)
@@ -171,7 +289,7 @@ def test_timeline_strip_help_playing_without_override() -> None:
     assert "1-4" not in keys
     assert "Shift + Enter" in keys
     assert dict(
-        _timeline_strip_section(
+        timeline_strip_section(
             paused=False, recording=False, override_active=False
         ).entries
     )["Space"] == "pause"
@@ -179,7 +297,7 @@ def test_timeline_strip_help_playing_without_override() -> None:
 
 def test_timeline_strip_help_playing_with_override() -> None:
     entries = dict(
-        _timeline_strip_section(
+        timeline_strip_section(
             paused=False, recording=False, override_active=True
         ).entries
     )
@@ -188,7 +306,7 @@ def test_timeline_strip_help_playing_with_override() -> None:
 
 def test_timeline_strip_help_recording_while_playing() -> None:
     entries = dict(
-        _timeline_strip_section(paused=False, recording=True, override_active=False).entries
+        timeline_strip_section(paused=False, recording=True, override_active=False).entries
     )
     assert "Ctrl + Enter" not in entries
     assert entries["1-4"] == "toggle layer visibility"

@@ -47,7 +47,7 @@ class OverlayDrawer:
         if help_overlay is not None and view_state.help_visible:
             help_overlay.draw(
                 overlay_surface,
-                view_state.focus_descriptor.kind,
+                view_state.focus_descriptor,
                 timeline_enabled=view_state.render_timeline.enabled,
                 timeline_submenu_focused=view_state.timeline_submenu_focused,
                 paused=view_state.paused,

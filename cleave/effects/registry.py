@@ -81,6 +81,44 @@ def effect_roster(stem: StemSource) -> tuple[EffectDef, ...]:
     return _EFFECT_ROSTER[stem]
 
 
+_EFFECT_HELP_TITLES: dict[str, str] = {
+    "pulse": "Pulse",
+    "flare": "Flare",
+    "flash": "Flash",
+    "hue": "Hue",
+    "grit": "Grit",
+}
+
+_EFFECT_HELP_DESCRIPTIONS: dict[str, tuple[str, ...]] = {
+    "pulse": (
+        "Opacity follows the audio driver signal.",
+        "Peaks on transients or sustained energy depending on driver.",
+    ),
+    "flare": (
+        "Bloom burst on drum onsets.",
+        "Drums stem only.",
+    ),
+    "flash": (
+        "Brief white flash when the driver crosses its threshold.",
+    ),
+    "hue": (
+        "Tints the layer from vocal pitch.",
+        "Vocals stem, pitch driver only.",
+    ),
+    "grit": (
+        "Film grain and chromatic aberration driven by the audio envelope.",
+    ),
+}
+
+
+def effect_help_title(effect_id: str) -> str:
+    return _EFFECT_HELP_TITLES.get(effect_id, effect_id)
+
+
+def effect_help_description(effect_id: str) -> tuple[str, ...] | None:
+    return _EFFECT_HELP_DESCRIPTIONS.get(effect_id)
+
+
 def effect_row_count(stem: StemSource) -> int:
     return len(_EFFECT_ROSTER[stem])
 
