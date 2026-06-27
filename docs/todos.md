@@ -8,9 +8,6 @@ Must-do items for Cleave. Everything else is iterative enhancements or listed in
 
 Outstanding bugs and issues.
 
-### Increase indent for cleave effects
-Should be underneath the first letter of the title, like the preset switching submenu.
-
 ---
 
 ## Architecture

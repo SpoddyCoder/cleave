@@ -30,6 +30,11 @@ from cleave.viz.focus_nav import (
     move_focus,
     timeline_strip_in_ring,
 )
+from cleave.viz.row_sections import (
+    EXPAND_HEADER_KINDS,
+    apply_expand_toggle,
+    apply_panel_anchor_toggle,
+)
 from cleave.viz.row_semantics import (
     REPEAT_ROW_KINDS,
     RowDescriptor,
@@ -510,24 +515,12 @@ class TuningControls:
         ctrl = mod_ctrl(mod)
         forward = key == pygame.K_RIGHT
 
-        if kind == RowKind.TRACK_PRESET_SWITCHING:
-            if slot is None:
-                return
-            self._set_preset_switching_expanded(slot, forward)
-            return
-
-        if kind == RowKind.TRACK_EFFECTS_HEADER:
-            if slot is None:
-                return
-            self._set_effects_expanded(slot, forward)
-            return
-
-        if kind == RowKind.RENDER_OVERLAY_TITLE_HEADER:
-            self._render_overlay.set_title_expanded(forward)
-            return
-
-        if kind == RowKind.RENDER_OVERLAY_BODY_HEADER:
-            self._render_overlay.set_body_expanded(forward)
+        if kind in EXPAND_HEADER_KINDS and kind not in {
+            RowKind.TRACK_HEADER,
+            RowKind.RENDER_OVERLAY_HEADER,
+            RowKind.RENDER_POST_FX_HEADER,
+        }:
+            apply_expand_toggle(self, kind, slot, forward)
             return
 
         if (
@@ -562,7 +555,7 @@ class TuningControls:
                     return
                 self._set_enabled(slot, forward)
                 return
-            self._set_expanded(slot, forward)
+            apply_expand_toggle(self, kind, slot, forward)
         elif kind == RowKind.TRACK_PRESET_DIR:
             if slot is None:
                 return
@@ -663,7 +656,7 @@ class TuningControls:
             if ctrl:
                 self._render_overlay.set_enabled(forward)
                 return
-            self._render_overlay.set_expanded(forward)
+            apply_expand_toggle(self, kind, slot, forward)
         elif kind == RowKind.RENDER_OVERLAY_POSITION:
             self._render_overlay.cycle_position(forward=forward)
         elif kind == RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE:
@@ -722,7 +715,7 @@ class TuningControls:
             if ctrl:
                 self._render_post_fx.set_enabled(forward)
                 return
-            self._render_post_fx.set_expanded(forward)
+            apply_expand_toggle(self, kind, slot, forward)
         elif kind == RowKind.RENDER_POST_FX_FADE_IN:
             step = 10.0 if ctrl else 1.0
             delta = step if forward else -step
@@ -739,12 +732,7 @@ class TuningControls:
             if ctrl:
                 self._set_render_timeline_enabled(forward)
                 return
-            if forward:
-                self._open_timeline_panel()
-            else:
-                self.close_timeline_panel()
-        elif kind == RowKind.SETTINGS_HEADER:
-            self._settings.set_expanded(forward)
+            apply_panel_anchor_toggle(self, kind, forward)
         elif kind == RowKind.SETTINGS_RENDER_MODE:
             self._settings.cycle_render_mode(forward=forward)
             self._apply_preview_resolutions()

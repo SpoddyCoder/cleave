@@ -19,6 +19,7 @@ from cleave.config_schema import (
     DEFAULT_UI_FADE_SEC,
 )
 from cleave.extract import stem_control_label, stem_overlay_header
+from cleave.viz.row_sections import expand_arrow_glyph
 from cleave.viz.row_semantics import (
     LABELED_SUB_ROW_KINDS,
     PRESET_SWITCHING_SUBMENU_KINDS,
@@ -130,7 +131,7 @@ def _row_text(state: TuningViewState, index: int) -> str:
         return f"{_layer_management_delete_prefix()}Delete Layer"
 
     if kind == RowKind.SETTINGS_HEADER:
-        arrow = "▼" if state.settings.expanded else "▶"
+        arrow = expand_arrow_glyph(state.settings.expanded)
         return f"Editor Settings {arrow}"
 
     if kind == RowKind.SETTINGS_RENDER_MODE:
@@ -140,22 +141,22 @@ def _row_text(state: TuningViewState, index: int) -> str:
         return f"└─ UI fade: {ui_fade_display(state.settings.ui_fade)}"
 
     if kind == RowKind.RENDER_OVERLAY_HEADER:
-        arrow = "▼" if state.render_overlay.expanded else "▶"
+        arrow = expand_arrow_glyph(state.render_overlay.expanded)
         return f"Render: OVERLAY {arrow}"
 
     if kind == RowKind.RENDER_POST_FX_HEADER:
-        arrow = "▼" if state.render_post_fx.expanded else "▶"
+        arrow = expand_arrow_glyph(state.render_post_fx.expanded)
         return f"Render: POST FX {arrow}"
 
     if kind == RowKind.RENDER_TIMELINE_HEADER:
-        arrow = "▼" if state.render_timeline.expanded else "▶"
+        arrow = expand_arrow_glyph(state.render_timeline.expanded)
         return f"Render: TIMELINE {arrow}"
 
     block_ro = state.render_overlay
     if kind == RowKind.RENDER_OVERLAY_POSITION:
         return f"└─ position: {block_ro.position}"
     if kind == RowKind.RENDER_OVERLAY_TITLE_HEADER:
-        arrow = "▼" if block_ro.title_expanded else "▶"
+        arrow = expand_arrow_glyph(block_ro.title_expanded)
         return f"└─ title {arrow}"
     if kind == RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE:
         return f"└─ font size: {block_ro.title_font_size}px"
@@ -164,7 +165,7 @@ def _row_text(state: TuningViewState, index: int) -> str:
     if kind == RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM:
         return f"└─ margin bottom: {block_ro.title_margin_bottom}px"
     if kind == RowKind.RENDER_OVERLAY_BODY_HEADER:
-        arrow = "▼" if block_ro.body_expanded else "▶"
+        arrow = expand_arrow_glyph(block_ro.body_expanded)
         return f"└─ body {arrow}"
     if kind == RowKind.RENDER_OVERLAY_BODY_FONT_SIZE:
         return f"└─ font size: {block_ro.body_font_size}px"
@@ -190,14 +191,14 @@ def _row_text(state: TuningViewState, index: int) -> str:
     block = state.tracks[stem]
     if kind == RowKind.TRACK_HEADER:
         layer_num = state.layer_z_order.index(stem) + 1
-        arrow = "▼" if block.expanded else "▶"
+        arrow = expand_arrow_glyph(block.expanded)
         return f"Layer {layer_num}: {stem_overlay_header(block.stem)} {arrow}"
     if kind == RowKind.TRACK_PRESET_DIR:
         return block.preset_dir_label
     if kind == RowKind.TRACK_PRESET:
         return block.preset_label
     if kind == RowKind.TRACK_PRESET_SWITCHING:
-        arrow = "▼" if block.preset_switching_expanded else "▶"
+        arrow = expand_arrow_glyph(block.preset_switching_expanded)
         return f"└─ preset switching {arrow}"
     if kind == RowKind.TRACK_PRESET_SWITCHING_MODE:
         return (
@@ -249,7 +250,7 @@ def _row_text(state: TuningViewState, index: int) -> str:
     if kind == RowKind.TRACK_BEAT:
         return f"└─ beat sensitivity: {block.beat_sensitivity:.2f}"
     if kind == RowKind.TRACK_EFFECTS_HEADER:
-        arrow = "▼" if block.effects_expanded else "▶"
+        arrow = expand_arrow_glyph(block.effects_expanded)
         return f"└─ cleave effects {arrow}"
     assert kind == RowKind.TRACK_EFFECT
     effect = row_effect(state, index)
@@ -445,8 +446,7 @@ def _track_header_layer_prefix(state: TuningViewState, index: int) -> str:
 
 
 def _track_header_expand_suffix(expanded: bool) -> str:
-    arrow = "▼" if expanded else "▶"
-    return f" {arrow}"
+    return f" {expand_arrow_glyph(expanded)}"
 
 
 def _render_overlay_header_prefix() -> str:
@@ -535,7 +535,7 @@ def _effects_header_prefix() -> str:
 
 
 def _effects_header_expand_value(expanded: bool) -> str:
-    return "▼" if expanded else "▶"
+    return expand_arrow_glyph(expanded)
 
 
 def _render_overlay_text_header_prefix(label: str) -> str:
@@ -543,7 +543,7 @@ def _render_overlay_text_header_prefix(label: str) -> str:
 
 
 def _render_overlay_text_header_expand_value(expanded: bool) -> str:
-    return _effects_header_expand_value(expanded)
+    return expand_arrow_glyph(expanded)
 
 
 def _fit_track_header_stem(
