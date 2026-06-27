@@ -174,7 +174,7 @@ Execute in order; keep unit tests green after each step.
 - [x] **Step 4 — Migrate layer-scoped expandable sections**  
   Per-slot tree under `TRACK_HEADER`: layer header, preset switching subsection, cleave effects subsection. Remove redundant `if block.effects_expanded` / `if block.preset_switching_expanded` build branches. Confirm layer collapse still cascades (disable layer sets `expanded = False`).
 
-- [ ] **Step 5 — Conditional rows registry**  
+- [x] **Step 5 — Conditional rows registry**  
   Extract predicates:
 
   | Predicate name | Condition |
@@ -185,7 +185,7 @@ Execute in order; keep unit tests green after each step.
 
   Attach to preset switching and hard-cut row groups in the section tree. Delete duplicated `if` blocks in `RowLayout.build`. Extend `section_header_descriptor()` to derive from tree parent pointers where possible.
 
-- [ ] **Step 6 — Panel anchor documentation and thin wiring**  
+- [x] **Step 6 — Panel anchor documentation and thin wiring**  
   Register `RENDER_TIMELINE_HEADER` as `PanelAnchorDef`; keep `_open_timeline_panel` / `close_timeline_panel`. Document panel anchor vs expandable section in this doc and [.cursor/rules/live-tuning-ui.mdc](.cursor/rules/live-tuning-ui.mdc). Do **not** move timeline rows into `RowLayout`.
 
 - [ ] **Step 7 — Cleanup and conventions**  
