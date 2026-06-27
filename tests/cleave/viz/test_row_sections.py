@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
+from cleave.effects.registry import effect_roster
 from cleave.viz.row_layout import row_draw_visible
 from cleave.viz.row_sections import (
+    RENDER_OVERLAY_SECTION,
     RENDER_OVERLAY_SECTION_KINDS,
+    RENDER_POST_FX_SECTION,
+    append_track_section_rows,
+    expand_section_expanded,
     section_header_from_section_tree,
     sub_row_expand_visible,
 )
 from cleave.viz.row_semantics import RowDescriptor, RowKind, section_header_descriptor
 from cleave.viz.tuning_view_state import (
     RenderOverlayBlock,
+    RenderPostFxBlock,
     SettingsBlock,
     TrackBlock,
 )
@@ -33,6 +39,97 @@ def _track_block(**overrides: object) -> TrackBlock:
     )
     base.update(overrides)
     return TrackBlock(**base)  # type: ignore[arg-type]
+
+
+def _track_row_kinds(**overrides: object) -> list[RowKind]:
+    state = _minimal_view_state(tracks={"layer_1": _track_block(**overrides)})
+    rows: list[RowDescriptor] = []
+    append_track_section_rows(rows, state, "layer_1")
+    return [row.kind for row in rows]
+
+
+def test_track_layout_collapsed_layer() -> None:
+    assert _track_row_kinds(expanded=False) == [RowKind.TRACK_HEADER]
+
+
+def test_track_layout_collapsed_preset_switching() -> None:
+    kinds = _track_row_kinds(preset_switching_expanded=False)
+    assert RowKind.TRACK_PRESET_SWITCHING in kinds
+    assert RowKind.TRACK_PRESET_SWITCHING_MODE not in kinds
+    assert RowKind.TRACK_PRESET_DURATION not in kinds
+
+
+def test_track_layout_collapsed_effects() -> None:
+    kinds = _track_row_kinds(effects_expanded=False)
+    assert RowKind.TRACK_EFFECTS_HEADER in kinds
+    assert RowKind.TRACK_EFFECT not in kinds
+
+
+def test_track_layout_conditional_rows_when_predicates_pass() -> None:
+    kinds = _track_row_kinds(
+        preset_switching="projectm",
+        hard_cut_enabled=True,
+        effects_expanded=False,
+    )
+    assert RowKind.TRACK_PRESET_DURATION in kinds
+    assert RowKind.TRACK_HARD_CUT_DURATION in kinds
+
+
+def test_track_layout_omits_conditional_rows_when_predicates_fail() -> None:
+    none_kinds = _track_row_kinds(preset_switching="none")
+    assert RowKind.TRACK_PRESET_DURATION not in none_kinds
+
+    hard_cut_off = _track_row_kinds(hard_cut_enabled=False)
+    assert RowKind.TRACK_HARD_CUT_DURATION not in hard_cut_off
+
+
+def test_track_layout_effect_roster_when_expanded() -> None:
+    kinds = _track_row_kinds(effects_expanded=True)
+    effect_rows = [kind for kind in kinds if kind == RowKind.TRACK_EFFECT]
+    assert len(effect_rows) == len(effect_roster("drums"))
+
+
+def test_track_layout_row_order_when_fully_expanded() -> None:
+    kinds = _track_row_kinds(effects_expanded=True)
+    effects_header = kinds.index(RowKind.TRACK_EFFECTS_HEADER)
+    delete_idx = kinds.index(RowKind.LAYER_MANAGEMENT_DELETE)
+    assert effects_header < delete_idx
+    assert kinds[:effects_header + 1] == [
+        RowKind.TRACK_HEADER,
+        RowKind.TRACK_PRESET_DIR,
+        RowKind.TRACK_PRESET,
+        RowKind.TRACK_PRESET_SWITCHING,
+        RowKind.TRACK_PRESET_SWITCHING_MODE,
+        RowKind.TRACK_PRESET_SWITCHING_SCOPE,
+        RowKind.TRACK_PRESET_DURATION,
+        RowKind.TRACK_SOFT_CUT_DURATION,
+        RowKind.TRACK_EASTER_EGG,
+        RowKind.TRACK_PRESET_START_CLEAN,
+        RowKind.TRACK_HARD_CUT_ENABLED,
+        RowKind.TRACK_HARD_CUT_DURATION,
+        RowKind.TRACK_HARD_CUT_SENSITIVITY,
+        RowKind.TRACK_STEM,
+        RowKind.TRACK_BEAT,
+        RowKind.TRACK_BLEND,
+        RowKind.TRACK_OPACITY,
+        RowKind.TRACK_EFFECTS_HEADER,
+    ]
+    assert kinds[delete_idx] == RowKind.LAYER_MANAGEMENT_DELETE
+    assert all(kind == RowKind.TRACK_EFFECT for kind in kinds[effects_header + 1 : delete_idx])
+
+
+def test_expand_section_collapsed_when_block_disabled() -> None:
+    disabled_overlay = _minimal_view_state(
+        render_overlay=RenderOverlayBlock(enabled=False, expanded=True),
+    )
+    assert expand_section_expanded(disabled_overlay, RENDER_OVERLAY_SECTION, None) is False
+    opacity = RowDescriptor(RowKind.RENDER_OVERLAY_OPACITY)
+    assert sub_row_expand_visible(disabled_overlay, opacity) is False
+
+    disabled_post_fx = _minimal_view_state(
+        render_post_fx=RenderPostFxBlock(enabled=False, expanded=True),
+    )
+    assert expand_section_expanded(disabled_post_fx, RENDER_POST_FX_SECTION, None) is False
 
 
 def test_sub_row_expand_visible_nested_sections() -> None:

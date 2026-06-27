@@ -22,6 +22,7 @@ from cleave.extract import stem_control_label, stem_overlay_header
 from cleave.viz.row_sections import (
     RENDER_OVERLAY_SECTION_KINDS,
     RENDER_POST_FX_SECTION_KINDS,
+    expand_arrow_for_header,
     expand_arrow_glyph,
     row_tree_indent_depth,
 )
@@ -130,7 +131,7 @@ def _row_text(state: TuningViewState, index: int) -> str:
         return f"{_layer_management_delete_prefix()}Delete Layer"
 
     if kind == RowKind.SETTINGS_HEADER:
-        arrow = expand_arrow_glyph(state.settings.expanded)
+        arrow = expand_arrow_for_header(state, kind)
         return f"Editor Settings {arrow}"
 
     if kind == RowKind.SETTINGS_RENDER_MODE:
@@ -140,11 +141,11 @@ def _row_text(state: TuningViewState, index: int) -> str:
         return f"└─ UI fade: {ui_fade_display(state.settings.ui_fade)}"
 
     if kind == RowKind.RENDER_OVERLAY_HEADER:
-        arrow = expand_arrow_glyph(state.render_overlay.expanded)
+        arrow = expand_arrow_for_header(state, kind)
         return f"Render: OVERLAY {arrow}"
 
     if kind == RowKind.RENDER_POST_FX_HEADER:
-        arrow = expand_arrow_glyph(state.render_post_fx.expanded)
+        arrow = expand_arrow_for_header(state, kind)
         return f"Render: POST FX {arrow}"
 
     if kind == RowKind.RENDER_TIMELINE_HEADER:
@@ -155,7 +156,7 @@ def _row_text(state: TuningViewState, index: int) -> str:
     if kind == RowKind.RENDER_OVERLAY_POSITION:
         return f"└─ position: {block_ro.position}"
     if kind == RowKind.RENDER_OVERLAY_TITLE_HEADER:
-        arrow = expand_arrow_glyph(block_ro.title_expanded)
+        arrow = expand_arrow_for_header(state, kind)
         return f"└─ title {arrow}"
     if kind == RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE:
         return f"└─ font size: {block_ro.title_font_size}px"
@@ -164,7 +165,7 @@ def _row_text(state: TuningViewState, index: int) -> str:
     if kind == RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM:
         return f"└─ margin bottom: {block_ro.title_margin_bottom}px"
     if kind == RowKind.RENDER_OVERLAY_BODY_HEADER:
-        arrow = expand_arrow_glyph(block_ro.body_expanded)
+        arrow = expand_arrow_for_header(state, kind)
         return f"└─ body {arrow}"
     if kind == RowKind.RENDER_OVERLAY_BODY_FONT_SIZE:
         return f"└─ font size: {block_ro.body_font_size}px"
@@ -190,14 +191,14 @@ def _row_text(state: TuningViewState, index: int) -> str:
     block = state.tracks[stem]
     if kind == RowKind.TRACK_HEADER:
         layer_num = state.layer_z_order.index(stem) + 1
-        arrow = expand_arrow_glyph(block.expanded)
+        arrow = expand_arrow_for_header(state, kind, stem)
         return f"Layer {layer_num}: {stem_overlay_header(block.stem)} {arrow}"
     if kind == RowKind.TRACK_PRESET_DIR:
         return block.preset_dir_label
     if kind == RowKind.TRACK_PRESET:
         return block.preset_label
     if kind == RowKind.TRACK_PRESET_SWITCHING:
-        arrow = expand_arrow_glyph(block.preset_switching_expanded)
+        arrow = expand_arrow_for_header(state, kind, stem)
         return f"└─ preset switching {arrow}"
     if kind == RowKind.TRACK_PRESET_SWITCHING_MODE:
         return (
@@ -249,7 +250,7 @@ def _row_text(state: TuningViewState, index: int) -> str:
     if kind == RowKind.TRACK_BEAT:
         return f"└─ beat sensitivity: {block.beat_sensitivity:.2f}"
     if kind == RowKind.TRACK_EFFECTS_HEADER:
-        arrow = expand_arrow_glyph(block.effects_expanded)
+        arrow = expand_arrow_for_header(state, kind, stem)
         return f"└─ cleave effects {arrow}"
     assert kind == RowKind.TRACK_EFFECT
     effect = row_effect(state, index)
@@ -444,8 +445,8 @@ def _track_header_layer_prefix(state: TuningViewState, index: int) -> str:
     return f"Layer {layer_num}: "
 
 
-def _track_header_expand_suffix(expanded: bool) -> str:
-    return f" {expand_arrow_glyph(expanded)}"
+def _track_header_expand_suffix(state: TuningViewState, kind: RowKind, slot: str | None = None) -> str:
+    return f" {expand_arrow_for_header(state, kind, slot)}"
 
 
 def _render_overlay_header_prefix() -> str:
@@ -533,16 +534,12 @@ def _effects_header_prefix() -> str:
     return "└─ cleave effects "
 
 
-def _effects_header_expand_value(expanded: bool) -> str:
-    return expand_arrow_glyph(expanded)
+def _effects_header_expand_value(state: TuningViewState, kind: RowKind, slot: str | None) -> str:
+    return expand_arrow_for_header(state, kind, slot)
 
 
 def _render_overlay_text_header_prefix(label: str) -> str:
     return f"└─ {label} "
-
-
-def _render_overlay_text_header_expand_value(expanded: bool) -> str:
-    return expand_arrow_glyph(expanded)
 
 
 def _fit_track_header_stem(
@@ -559,7 +556,7 @@ def _fit_track_header_stem(
     budget = max_content_width - _row_indent(state, index)
     budget -= track_header_prefix_width(font)
     budget -= font.size(_track_header_layer_prefix(state, index))[0]
-    budget -= font.size(_track_header_expand_suffix(block.expanded))[0]
+    budget -= font.size(_track_header_expand_suffix(state, RowKind.TRACK_HEADER, stem))[0]
     if locked:
         budget -= track_header_lock_suffix_width(font.get_linesize())
     return fit_text_to_width(font, stem_overlay_header(block.stem), budget)
@@ -571,11 +568,11 @@ def _render_track_header_label(
     layer_prefix: str,
     stem_text: str,
     value_color: tuple[int, int, int],
-    expanded: bool,
+    expand_arrow: str,
     locked: bool,
     line_height: int,
 ) -> pygame.Surface:
-    arrow = _track_header_expand_suffix(expanded)
+    arrow = f" {expand_arrow}"
     prefix_surf = font.render(layer_prefix, True, LABEL)
     stem_surf = font.render(stem_text, True, value_color)
     arrow_surf = font.render(arrow, True, value_color)
@@ -626,13 +623,12 @@ def fit_row_text(
     if kind == RowKind.TRACK_HEADER:
         stem = state.layout.slot(index)
         assert stem is not None
-        expanded = state.tracks[stem].expanded
         return (
             _track_header_layer_prefix(state, index)
             + _fit_track_header_stem(
                 font, state, index, max_content_width=max_content_width
             )
-            + _track_header_expand_suffix(expanded)
+            + _track_header_expand_suffix(state, RowKind.TRACK_HEADER, stem)
         )
     if kind == RowKind.RENDER_SECTION_GAP:
         return ""
@@ -643,28 +639,24 @@ def fit_row_text(
     if kind in {RowKind.LAYER_MANAGEMENT_ADD, RowKind.LAYER_MANAGEMENT_DELETE}:
         return _row_text(state, index)
     if kind == RowKind.SETTINGS_HEADER:
-        expanded = state.settings.expanded
-        return "Editor Settings " + _track_header_expand_suffix(expanded)
+        return "Editor Settings" + _track_header_expand_suffix(state, kind)
     if kind == RowKind.RENDER_OVERLAY_HEADER:
-        expanded = state.render_overlay.expanded
         return (
             _render_overlay_header_prefix()
             + "OVERLAY"
-            + _track_header_expand_suffix(expanded)
+            + _track_header_expand_suffix(state, kind)
         )
     if kind == RowKind.RENDER_POST_FX_HEADER:
-        expanded = state.render_post_fx.expanded
         return (
             _render_post_fx_header_prefix()
             + "POST FX"
-            + _track_header_expand_suffix(expanded)
+            + _track_header_expand_suffix(state, kind)
         )
     if kind == RowKind.RENDER_TIMELINE_HEADER:
-        expanded = state.render_timeline.expanded
         return (
             _render_timeline_header_prefix()
             + "TIMELINE"
-            + _track_header_expand_suffix(expanded)
+            + f" {expand_arrow_glyph(state.render_timeline.expanded)}"
         )
     if kind in LABELED_SUB_ROW_KINDS:
         return _labeled_sub_row_prefix(state, index) + _fit_labeled_sub_row_value(
@@ -1211,13 +1203,17 @@ class TuningOverlay:
                 stem_text = _fit_track_header_stem(
                     font, state, index, max_content_width=max_content_width
                 )
-                expanded = block.expanded if block is not None else False
+                expand_arrow = (
+                    expand_arrow_for_header(state, RowKind.TRACK_HEADER, stem)
+                    if stem is not None
+                    else expand_arrow_glyph(False)
+                )
                 label_surf = _render_track_header_label(
                     font,
                     layer_prefix=layer_prefix,
                     stem_text=stem_text,
                     value_color=color,
-                    expanded=expanded,
+                    expand_arrow=expand_arrow,
                     locked=locked,
                     line_height=line_h,
                 )
@@ -1227,14 +1223,13 @@ class TuningOverlay:
                     indent + prefix_surf.get_width() + label_surf.get_width()
                 )
             elif kind == RowKind.SETTINGS_HEADER:
-                block = state.settings
                 icon_surf = render_glyph(
                     SETTINGS_GLYPH, color=VALUE, line_height=line_h
                 )
                 label_surf = _render_label_value_row(
                     font,
                     prefix="Editor Settings ",
-                    value=_effects_header_expand_value(block.expanded),
+                    value=expand_arrow_for_header(state, RowKind.SETTINGS_HEADER),
                     value_color=color,
                     prefix_color=LABEL,
                     line_height=line_h,
@@ -1256,7 +1251,7 @@ class TuningOverlay:
                     layer_prefix=_render_overlay_header_prefix(),
                     stem_text="OVERLAY",
                     value_color=color,
-                    expanded=block_ro.expanded,
+                    expand_arrow=expand_arrow_for_header(state, RowKind.RENDER_OVERLAY_HEADER),
                     locked=False,
                     line_height=line_h,
                 )
@@ -1277,7 +1272,7 @@ class TuningOverlay:
                     layer_prefix=_render_post_fx_header_prefix(),
                     stem_text="POST FX",
                     value_color=color,
-                    expanded=block_pp.expanded,
+                    expand_arrow=expand_arrow_for_header(state, RowKind.RENDER_POST_FX_HEADER),
                     locked=False,
                     line_height=line_h,
                 )
@@ -1298,7 +1293,7 @@ class TuningOverlay:
                     layer_prefix=_render_timeline_header_prefix(),
                     stem_text="TIMELINE",
                     value_color=color,
-                    expanded=block_tl.expanded,
+                    expand_arrow=expand_arrow_glyph(block_tl.expanded),
                     locked=False,
                     line_height=line_h,
                 )
@@ -1368,7 +1363,9 @@ class TuningOverlay:
                 surf = _render_label_value_row(
                     font,
                     prefix="└─ preset switching ",
-                    value=_effects_header_expand_value(block.preset_switching_expanded),
+                    value=_effects_header_expand_value(
+                        state, RowKind.TRACK_PRESET_SWITCHING, stem
+                    ),
                     value_color=color,
                     line_height=line_h,
                 )
@@ -1382,7 +1379,9 @@ class TuningOverlay:
                 surf = _render_label_value_row(
                     font,
                     prefix=_effects_header_prefix(),
-                    value=_effects_header_expand_value(block.effects_expanded),
+                    value=_effects_header_expand_value(
+                        state, RowKind.TRACK_EFFECTS_HEADER, stem
+                    ),
                     value_color=color,
                     line_height=line_h,
                 )
@@ -1393,17 +1392,16 @@ class TuningOverlay:
                 RowKind.RENDER_OVERLAY_TITLE_HEADER,
                 RowKind.RENDER_OVERLAY_BODY_HEADER,
             }:
-                block_ro = state.render_overlay
                 if kind == RowKind.RENDER_OVERLAY_TITLE_HEADER:
                     prefix = _render_overlay_text_header_prefix("title")
-                    expanded = block_ro.title_expanded
+                    header_kind = RowKind.RENDER_OVERLAY_TITLE_HEADER
                 else:
                     prefix = _render_overlay_text_header_prefix("body")
-                    expanded = block_ro.body_expanded
+                    header_kind = RowKind.RENDER_OVERLAY_BODY_HEADER
                 surf = _render_label_value_row(
                     font,
                     prefix=prefix,
-                    value=_render_overlay_text_header_expand_value(expanded),
+                    value=expand_arrow_for_header(state, header_kind),
                     value_color=color,
                     line_height=line_h,
                 )
