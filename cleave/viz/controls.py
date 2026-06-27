@@ -736,6 +736,10 @@ class TuningControls:
         elif kind == RowKind.SETTINGS_RENDER_MODE:
             self._settings.cycle_render_mode(forward=forward)
             self._apply_preview_resolutions()
+        elif kind == RowKind.SETTINGS_UI_WIDTH_MODE:
+            self._settings.cycle_ui_width_mode(forward=forward)
+        elif kind == RowKind.SETTINGS_UI_WIDTH:
+            self._settings.adjust_ui_width(forward=forward, ctrl=ctrl)
         elif kind == RowKind.SETTINGS_UI_FADE:
             self._settings.adjust_ui_fade(forward=forward, ctrl=ctrl)
 

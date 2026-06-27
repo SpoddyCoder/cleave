@@ -29,7 +29,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from cleave.config_schema import DEFAULT_UI_WIDTH
+
 BASE_UI_FONT_SIZE: int = 14
+UI_WIDTH_PX_FACTOR: int = 4
 UI_SCALE: float = 1.2
 TIMELINE_UI_SCALE: float = 1.2
 BASE_TIMELINE_ROW_HEIGHT: int = 25
@@ -37,6 +40,15 @@ BASE_TIMELINE_ROW_HEIGHT: int = 25
 
 def scale_px(value: float, *, scale: float) -> int:
     return max(1, round(value * scale))
+
+
+def panel_content_max_width_px(
+    ui_width: int = DEFAULT_UI_WIDTH,
+    *,
+    scale: float = UI_SCALE,
+) -> int:
+    """Map persisted ui_width (20-200) to scaled panel content max width in pixels."""
+    return scale_px(int(ui_width) * UI_WIDTH_PX_FACTOR, scale=scale)
 
 
 @dataclass(frozen=True)
@@ -74,13 +86,17 @@ class TimelineUiMetrics:
     rec_time_gap: int
 
 
-def tuning_ui_metrics(*, scale: float = UI_SCALE) -> TuningUiMetrics:
+def tuning_ui_metrics(
+    *,
+    scale: float = UI_SCALE,
+    ui_width: int = DEFAULT_UI_WIDTH,
+) -> TuningUiMetrics:
     return TuningUiMetrics(
         font_size=scale_px(BASE_UI_FONT_SIZE, scale=scale),
         padding=scale_px(8, scale=scale),
         line_gap=scale_px(3, scale=scale),
         margin=scale_px(10, scale=scale),
-        panel_content_max_width=scale_px(440, scale=scale),
+        panel_content_max_width=panel_content_max_width_px(ui_width, scale=scale),
         scrollbar_width=scale_px(15, scale=scale),
         scrollbar_content_gap=scale_px(4, scale=scale),
         tree_indent=scale_px(8, scale=scale),

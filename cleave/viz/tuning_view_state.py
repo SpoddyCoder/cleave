@@ -16,6 +16,8 @@ from cleave.config_schema import (
     DEFAULT_PRESET_DURATION,
     DEFAULT_SOFT_CUT_DURATION,
     DEFAULT_UI_FADE_SEC,
+    DEFAULT_UI_WIDTH,
+    DEFAULT_UI_WIDTH_MODE,
     default_render_overlay_runtime_values,
     default_render_post_fx_runtime_values,
 )
@@ -99,6 +101,8 @@ class RenderTimelineBlock:
 class SettingsBlock:
     expanded: bool = False
     render_mode: str = "balanced"
+    ui_width_mode: str = DEFAULT_UI_WIDTH_MODE
+    ui_width: int = DEFAULT_UI_WIDTH
     ui_fade: float = DEFAULT_UI_FADE_SEC
 
 
@@ -307,6 +311,8 @@ class TuningViewStateBuilder:
             settings=SettingsBlock(
                 expanded=self.session.settings.expanded,
                 render_mode=self._config_save.cfg.visualizer.render_mode,
+                ui_width_mode=self._config_save.cfg.visualizer.ui_width_mode,
+                ui_width=self._config_save.cfg.visualizer.ui_width,
                 ui_fade=self._config_save.cfg.visualizer.ui_fade,
             ),
             timeline_recording=tl.recording,

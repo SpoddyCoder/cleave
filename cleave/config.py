@@ -58,6 +58,8 @@ from cleave.config_schema import (
     DEFAULT_RENDER_WIDTH,
     DEFAULT_VISUALIZER_HEIGHT,
     DEFAULT_UI_FADE_SEC,
+    DEFAULT_UI_WIDTH,
+    DEFAULT_UI_WIDTH_MODE,
     DEFAULT_VISUALIZER_RENDER_MODE,
     DEFAULT_VISUALIZER_UPSCALE,
     DEFAULT_VISUALIZER_WIDTH,
@@ -66,6 +68,7 @@ from cleave.config_schema import (
     UPSCALE_MIN,
     VISUALIZER_RENDER_MODES,
     RenderOverlayPosition,
+    UiWidthMode,
     VisualizerRenderMode,
     as_mapping,
     clamp_beat_sensitivity,
@@ -120,6 +123,8 @@ class VisualizerConfig:
     upscale: float = DEFAULT_VISUALIZER_UPSCALE
     beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
     render_mode: VisualizerRenderMode = DEFAULT_VISUALIZER_RENDER_MODE
+    ui_width_mode: UiWidthMode = DEFAULT_UI_WIDTH_MODE
+    ui_width: int = DEFAULT_UI_WIDTH
     ui_fade: float = DEFAULT_UI_FADE_SEC
 
     @property

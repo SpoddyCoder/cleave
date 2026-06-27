@@ -49,6 +49,8 @@ class RowKind(Enum):
     RENDER_TIMELINE_HEADER = auto()
     SETTINGS_HEADER = auto()
     SETTINGS_RENDER_MODE = auto()
+    SETTINGS_UI_WIDTH_MODE = auto()
+    SETTINGS_UI_WIDTH = auto()
     SETTINGS_UI_FADE = auto()
     CONFIG_HEADER = auto()
     TRANSPORT = auto()
@@ -513,7 +515,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         is_pinned=True,
         repeatable=True,
         parent_group="settings",
-        help_title="UI fade",
+        help_title="UI auto-fade",
         help_entries=(
             ("Left/Right", "adjust delay before UI fades"),
             ("Ctrl + Left/Right", "large step"),
@@ -522,6 +524,32 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_description=(
             "Delay before the overlay panel fades out.",
             "0 keeps it always visible.",
+        ),
+    ),
+    RowKind.SETTINGS_UI_WIDTH_MODE: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        is_pinned=True,
+        repeatable=True,
+        parent_group="settings",
+        help_title="UI width mode",
+        help_entries=(("Left/Right", "cycle mode"),),
+        help_description=(
+            "Flexible shrinks the panel to fit content up to the max width.",
+            "Fixed keeps the panel at the max width always.",
+        ),
+    ),
+    RowKind.SETTINGS_UI_WIDTH: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        is_pinned=True,
+        repeatable=True,
+        parent_group="settings",
+        help_title="UI max width",
+        help_entries=(
+            ("Left/Right", "adjust max panel width"),
+            ("Ctrl + Left/Right", "large step"),
+        ),
+        help_description=(
+            "Maximum width of the main tuning panel.",
         ),
     ),
 }

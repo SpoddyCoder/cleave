@@ -5,7 +5,9 @@ visualizer:
   upscale: 1.5
   beat_sensitivity: 2.0   # overall beat sensitivity, can be overidden on a per layer basis
   render_mode: balanced
-  ui_fade: 10   # seconds before main UI fades; 0 = disabled (Esc hides)
+  ui_width_mode: flexible   # flexible | fixed
+  ui_width: 110   # max main panel width (20-200)
+  ui_fade: 10   # seconds before main UI auto-fades; 0 = disabled (Esc hides)
 
 render:
   width: 1280
