@@ -7,12 +7,16 @@ from typing import TYPE_CHECKING
 
 from cleave.config_schema import MAX_LAYER_COUNT
 from cleave.effects.registry import effect_roster
+from cleave.viz.row_sections import (
+    SETTINGS_SECTION,
+    append_expand_section_rows,
+    expand_section_sub_row_visible,
+)
 from cleave.viz.row_semantics import (
     RENDER_OVERLAY_BODY_NESTED_KINDS,
     RENDER_OVERLAY_SUB_ROW_KINDS,
     RENDER_OVERLAY_TITLE_NESTED_KINDS,
     RENDER_POST_FX_SUB_ROW_KINDS,
-    SETTINGS_SUB_ROW_KINDS,
     RowDescriptor,
     RowKind,
     TRACK_EFFECT_SUB_ROW_KINDS,
@@ -29,8 +33,9 @@ if TYPE_CHECKING:
 
 def _sub_row_expanded(state: TuningViewState, desc: RowDescriptor) -> bool:
     kind = desc.kind
-    if kind in SETTINGS_SUB_ROW_KINDS:
-        return state.settings.expanded
+    settings_visible = expand_section_sub_row_visible(state, desc, SETTINGS_SECTION)
+    if settings_visible is not None:
+        return settings_visible
     if kind in RENDER_OVERLAY_SUB_ROW_KINDS:
         return state.render_overlay.expanded
     if kind in RENDER_OVERLAY_TITLE_NESTED_KINDS:
@@ -74,12 +79,8 @@ class RowLayout:
 
     @classmethod
     def build(cls, state: TuningViewState) -> RowLayout:
-        row_list: list[RowDescriptor] = [
-            RowDescriptor(RowKind.SETTINGS_HEADER),
-        ]
-        if state.settings.expanded:
-            row_list.append(RowDescriptor(RowKind.SETTINGS_RENDER_MODE))
-            row_list.append(RowDescriptor(RowKind.SETTINGS_UI_FADE))
+        row_list: list[RowDescriptor] = []
+        append_expand_section_rows(row_list, SETTINGS_SECTION, state)
         row_list.extend(
             [
                 RowDescriptor(RowKind.CONFIG_HEADER),
