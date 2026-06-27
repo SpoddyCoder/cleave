@@ -14,6 +14,8 @@ class RowKind(Enum):
     TRACK_PRESET_SWITCHING_SCOPE = auto()
     TRACK_PRESET_DURATION = auto()
     TRACK_SOFT_CUT_DURATION = auto()
+    TRACK_EASTER_EGG = auto()
+    TRACK_PRESET_START_CLEAN = auto()
     TRACK_HARD_CUT_ENABLED = auto()
     TRACK_HARD_CUT_DURATION = auto()
     TRACK_HARD_CUT_SENSITIVITY = auto()
@@ -140,6 +142,23 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         repeatable=True,
         parent_group="track",
         help_entries=(("Left/Right", "step value"),),
+    ),
+    RowKind.TRACK_EASTER_EGG: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="track",
+        help_title="Easter egg",
+        help_entries=(
+            ("Left/Right", "step value"),
+            ("Ctrl+Left/Right", "large step"),
+        ),
+    ),
+    RowKind.TRACK_PRESET_START_CLEAN: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="track",
+        help_title="Start clean",
+        help_entries=(("Left/Right", "yes / no"),),
     ),
     RowKind.TRACK_HARD_CUT_ENABLED: RowBehavior(
         RowAffordance.VALUE_STEP,
@@ -350,6 +369,8 @@ PRESET_SWITCHING_SUBMENU_KINDS = frozenset(
         RowKind.TRACK_PRESET_SWITCHING_SCOPE,
         RowKind.TRACK_PRESET_DURATION,
         RowKind.TRACK_SOFT_CUT_DURATION,
+        RowKind.TRACK_EASTER_EGG,
+        RowKind.TRACK_PRESET_START_CLEAN,
         RowKind.TRACK_HARD_CUT_ENABLED,
     }
 )

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 import pygame
 
 from cleave.config import CleaveConfig, clamp_beat_sensitivity, clamp_effect_pct
+from cleave.config_schema import clamp_easter_egg
 from cleave.config_schema import PRESET_SWITCHING_MODES
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.extract import STEM_SOURCES
@@ -581,6 +582,14 @@ class TuningControls:
             if slot is None:
                 return
             self._step_soft_cut_duration(slot, forward=forward, ctrl=ctrl)
+        elif kind == RowKind.TRACK_EASTER_EGG:
+            if slot is None:
+                return
+            self._step_easter_egg(slot, forward=forward, ctrl=ctrl)
+        elif kind == RowKind.TRACK_PRESET_START_CLEAN:
+            if slot is None:
+                return
+            self._cycle_preset_start_clean(slot, forward=forward)
         elif kind == RowKind.TRACK_HARD_CUT_ENABLED:
             if slot is None:
                 return
@@ -801,6 +810,21 @@ class TuningControls:
         step = 10.0 if ctrl else 1.0
         delta = step if forward else -step
         layer.soft_cut_duration = max(0.0, min(60.0, layer.soft_cut_duration + delta))
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_preset_switching_change(slot)
+
+    def _step_easter_egg(self, slot: str, *, forward: bool, ctrl: bool = False) -> None:
+        layer = self.session.layers[slot]
+        step = 0.1 if ctrl else 0.01
+        delta = step if forward else -step
+        layer.easter_egg = clamp_easter_egg(layer.easter_egg + delta)
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_preset_switching_change(slot)
+
+    def _cycle_preset_start_clean(self, slot: str, *, forward: bool) -> None:
+        del forward
+        layer = self.session.layers[slot]
+        layer.preset_start_clean = not layer.preset_start_clean
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)
 

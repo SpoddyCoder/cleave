@@ -6,10 +6,12 @@ from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
 from cleave.config_schema import (
+    DEFAULT_EASTER_EGG,
     DEFAULT_HARD_CUT_DURATION,
     DEFAULT_HARD_CUT_ENABLED,
     DEFAULT_HARD_CUT_SENSITIVITY,
     DEFAULT_PRESET_DURATION,
+    DEFAULT_PRESET_START_CLEAN,
     DEFAULT_SOFT_CUT_DURATION,
 )
 from cleave.preset_playlist import PresetPlaylist
@@ -42,6 +44,8 @@ def _stem_layer(*, paths: tuple[Path, ...], index: int = 0) -> StemLayer:
     pm.set_preset_duration = MagicMock()
     pm.set_hard_cut_duration = MagicMock()
     pm.set_hard_cut_sensitivity = MagicMock()
+    pm.set_easter_egg = MagicMock()
+    pm.set_preset_start_clean = MagicMock()
     pm.load_preset = MagicMock()
     return StemLayer(slot="layer_1", pm=pm, fbo=MagicMock(), playlist=playlist)
 
@@ -86,6 +90,8 @@ def test_apply_projectm_connects_playlist(
     layer.pm.set_hard_cut_sensitivity.assert_called_once_with(
         DEFAULT_HARD_CUT_SENSITIVITY
     )
+    layer.pm.set_easter_egg.assert_called_once_with(DEFAULT_EASTER_EGG)
+    layer.pm.set_preset_start_clean.assert_called_once_with(False)
     playlist.connect.assert_called_once()
     assert playlist.connect.call_args.kwargs["on_preset_loaded"] is not None
     playlist.add_path.assert_called_once_with(
@@ -210,6 +216,8 @@ def test_reapply_projectm_preset_switching_only_projectm_layers() -> None:
         0.0,
         preset_duration=DEFAULT_PRESET_DURATION,
         soft_cut_duration=DEFAULT_SOFT_CUT_DURATION,
+        easter_egg=DEFAULT_EASTER_EGG,
+        preset_start_clean=DEFAULT_PRESET_START_CLEAN,
         hard_cut_duration=DEFAULT_HARD_CUT_DURATION,
         hard_cut_sensitivity=DEFAULT_HARD_CUT_SENSITIVITY,
         hard_cut_enabled=DEFAULT_HARD_CUT_ENABLED,

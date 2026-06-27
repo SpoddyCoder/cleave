@@ -103,6 +103,10 @@ class RowLayout:
                 row_list.append(
                     RowDescriptor(RowKind.TRACK_SOFT_CUT_DURATION, slot=slot)
                 )
+                row_list.append(RowDescriptor(RowKind.TRACK_EASTER_EGG, slot=slot))
+                row_list.append(
+                    RowDescriptor(RowKind.TRACK_PRESET_START_CLEAN, slot=slot)
+                )
                 row_list.append(
                     RowDescriptor(RowKind.TRACK_HARD_CUT_ENABLED, slot=slot)
                 )

@@ -11,7 +11,11 @@ from typing import Literal
 
 import pygame
 
-from cleave.config_schema import hard_cut_enabled_display, preset_switching_display
+from cleave.config_schema import (
+    hard_cut_enabled_display,
+    preset_start_clean_display,
+    preset_switching_display,
+)
 from cleave.extract import stem_control_label, stem_overlay_header
 from cleave.viz.row_semantics import (
     LABELED_SUB_ROW_KINDS,
@@ -203,6 +207,15 @@ def _row_text(state: TuningViewState, index: int) -> str:
         return (
             f"{_preset_switching_submenu_prefix()}soft cut: {block.soft_cut_duration:g}s"
         )
+    if kind == RowKind.TRACK_EASTER_EGG:
+        return (
+            f"{_preset_switching_submenu_prefix()}easter egg: {block.easter_egg:.2f}"
+        )
+    if kind == RowKind.TRACK_PRESET_START_CLEAN:
+        return (
+            f"{_preset_switching_submenu_prefix()}start clean: "
+            f"{preset_start_clean_display(block.preset_start_clean)}"
+        )
     if kind == RowKind.TRACK_HARD_CUT_ENABLED:
         return (
             f"{_preset_switching_submenu_prefix()}hard cut: "
@@ -255,6 +268,10 @@ def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
         return "  └─ preset duration: "
     if kind == RowKind.TRACK_SOFT_CUT_DURATION:
         return "  └─ soft cut: "
+    if kind == RowKind.TRACK_EASTER_EGG:
+        return "  └─ easter egg: "
+    if kind == RowKind.TRACK_PRESET_START_CLEAN:
+        return "  └─ start clean: "
     if kind == RowKind.TRACK_HARD_CUT_ENABLED:
         return "  └─ hard cut: "
     if kind == RowKind.TRACK_HARD_CUT_DURATION:
@@ -343,6 +360,10 @@ def _labeled_sub_row_value(state: TuningViewState, index: int) -> str:
         return f"{block.preset_duration:g}s"
     if kind == RowKind.TRACK_SOFT_CUT_DURATION:
         return f"{block.soft_cut_duration:g}s"
+    if kind == RowKind.TRACK_EASTER_EGG:
+        return f"{block.easter_egg:.2f}"
+    if kind == RowKind.TRACK_PRESET_START_CLEAN:
+        return preset_start_clean_display(block.preset_start_clean)
     if kind == RowKind.TRACK_HARD_CUT_ENABLED:
         return hard_cut_enabled_display(block.hard_cut_enabled)
     if kind == RowKind.TRACK_HARD_CUT_DURATION:

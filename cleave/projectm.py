@@ -116,6 +116,8 @@ _REQUIRED_SYMBOLS = (
     "projectm_set_preset_duration",
     "projectm_set_hard_cut_duration",
     "projectm_set_hard_cut_sensitivity",
+    "projectm_set_easter_egg",
+    "projectm_set_preset_start_clean",
 )
 
 
@@ -191,6 +193,12 @@ def _bind_functions(lib: ctypes.CDLL, path: str) -> None:
 
     lib.projectm_set_hard_cut_sensitivity.argtypes = [c_void_p, c_float]
     lib.projectm_set_hard_cut_sensitivity.restype = None
+
+    lib.projectm_set_easter_egg.argtypes = [c_void_p, c_float]
+    lib.projectm_set_easter_egg.restype = None
+
+    lib.projectm_set_preset_start_clean.argtypes = [c_void_p, c_bool]
+    lib.projectm_set_preset_start_clean.restype = None
 
 
 def _get_lib() -> ctypes.CDLL:
@@ -346,3 +354,9 @@ class ProjectM:
 
     def set_hard_cut_sensitivity(self, value: float) -> None:
         _get_lib().projectm_set_hard_cut_sensitivity(self._handle, c_float(value))
+
+    def set_easter_egg(self, value: float) -> None:
+        _get_lib().projectm_set_easter_egg(self._handle, c_float(value))
+
+    def set_preset_start_clean(self, enabled: bool) -> None:
+        _get_lib().projectm_set_preset_start_clean(self._handle, c_bool(enabled))

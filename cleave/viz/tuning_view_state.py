@@ -11,6 +11,8 @@ from cleave.config_schema import (
     DEFAULT_HARD_CUT_DURATION,
     DEFAULT_HARD_CUT_SENSITIVITY,
     DEFAULT_HARD_CUT_ENABLED,
+    DEFAULT_EASTER_EGG,
+    DEFAULT_PRESET_START_CLEAN,
     DEFAULT_PRESET_DURATION,
     DEFAULT_SOFT_CUT_DURATION,
     default_render_overlay_runtime_values,
@@ -53,6 +55,8 @@ class TrackBlock:
     hard_cut_duration: float = DEFAULT_HARD_CUT_DURATION
     hard_cut_sensitivity: float = DEFAULT_HARD_CUT_SENSITIVITY
     hard_cut_enabled: bool = DEFAULT_HARD_CUT_ENABLED
+    easter_egg: float = DEFAULT_EASTER_EGG
+    preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN
 
 
 @dataclass
@@ -245,6 +249,8 @@ class TuningViewStateBuilder:
                 hard_cut_duration=layer.hard_cut_duration,
                 hard_cut_sensitivity=layer.hard_cut_sensitivity,
                 hard_cut_enabled=layer.hard_cut_enabled,
+                easter_egg=layer.easter_egg,
+                preset_start_clean=layer.preset_start_clean,
             )
 
         notification_message, notification_remaining_sec = self._get_notification()

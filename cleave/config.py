@@ -28,6 +28,8 @@ from cleave.config_schema import (
     DEFAULT_HARD_CUT_DURATION,
     DEFAULT_HARD_CUT_SENSITIVITY,
     DEFAULT_HARD_CUT_ENABLED,
+    DEFAULT_EASTER_EGG,
+    DEFAULT_PRESET_START_CLEAN,
     DEFAULT_PRESET_ROOT,
     PresetSwitchingMode,
     PresetSwitchingScope,
@@ -105,6 +107,8 @@ class LayerConfig:
     hard_cut_duration: float = DEFAULT_HARD_CUT_DURATION
     hard_cut_sensitivity: float = DEFAULT_HARD_CUT_SENSITIVITY
     hard_cut_enabled: bool = DEFAULT_HARD_CUT_ENABLED
+    easter_egg: float = DEFAULT_EASTER_EGG
+    preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN
 
 
 @dataclass(frozen=True)
