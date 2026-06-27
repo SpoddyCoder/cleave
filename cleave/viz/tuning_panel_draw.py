@@ -70,6 +70,7 @@ from cleave.viz.theme import (
     LOCK_ICON,
     MOVE_MODE,
     PANEL_CONTENT_MAX_WIDTH,
+    panel_content_max_width_px,
     PRESET_FILE_ICON,
     PRESET_ICON,
     OVERRIDE_BG,
@@ -137,8 +138,14 @@ def _row_text(state: TuningViewState, index: int) -> str:
     if kind == RowKind.SETTINGS_RENDER_MODE:
         return f"└─ render mode: {state.settings.render_mode}"
 
+    if kind == RowKind.SETTINGS_UI_WIDTH_MODE:
+        return f"└─ UI width mode: {state.settings.ui_width_mode}"
+
+    if kind == RowKind.SETTINGS_UI_WIDTH:
+        return f"└─ UI max width: {state.settings.ui_width}"
+
     if kind == RowKind.SETTINGS_UI_FADE:
-        return f"└─ UI fade: {ui_fade_display(state.settings.ui_fade)}"
+        return f"└─ UI auto-fade: {ui_fade_display(state.settings.ui_fade)}"
 
     if kind == RowKind.RENDER_OVERLAY_HEADER:
         arrow = expand_arrow_for_header(state, kind)
@@ -310,8 +317,12 @@ def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
         return "└─ display time: "
     if kind == RowKind.SETTINGS_RENDER_MODE:
         return "└─ render mode: "
+    if kind == RowKind.SETTINGS_UI_WIDTH_MODE:
+        return "└─ UI width mode: "
+    if kind == RowKind.SETTINGS_UI_WIDTH:
+        return "└─ UI max width: "
     if kind == RowKind.SETTINGS_UI_FADE:
-        return "└─ UI fade: "
+        return "└─ UI auto-fade: "
     if kind == RowKind.RENDER_POST_FX_FADE_IN:
         return "└─ fade in: "
     if kind == RowKind.RENDER_POST_FX_FADE_OUT:
@@ -348,6 +359,10 @@ def _labeled_sub_row_value(state: TuningViewState, index: int) -> str:
         return f"{block_ro.display_time:.1f}s"
     if kind == RowKind.SETTINGS_RENDER_MODE:
         return state.settings.render_mode
+    if kind == RowKind.SETTINGS_UI_WIDTH_MODE:
+        return state.settings.ui_width_mode
+    if kind == RowKind.SETTINGS_UI_WIDTH:
+        return str(state.settings.ui_width)
     if kind == RowKind.SETTINGS_UI_FADE:
         return ui_fade_display(state.settings.ui_fade)
     block_pp = state.render_post_fx
@@ -908,11 +923,12 @@ def panel_content_max_width(
     index: int,
     scrollable_indices: frozenset[int],
     show_scrollbar: bool,
+    panel_max_width: int = PANEL_CONTENT_MAX_WIDTH,
 ) -> int:
     """Content width budget for a row; scrollable rows reserve the scrollbar column."""
     if show_scrollbar and index in scrollable_indices:
-        return PANEL_CONTENT_MAX_WIDTH - SCROLLBAR_WIDTH
-    return PANEL_CONTENT_MAX_WIDTH
+        return panel_max_width - SCROLLBAR_WIDTH
+    return panel_max_width
 
 
 def clip_rect_to_surface(
@@ -1163,6 +1179,7 @@ class TuningOverlay:
             max_panel_h=max_panel_h,
         )
         scrollable_indices = frozenset(metrics.scrollable_indices)
+        panel_max_width = panel_content_max_width_px(state.settings.ui_width)
 
         row_surfaces: list[pygame.Surface] = []
         row_time_surfaces: list[pygame.Surface | None] = []
@@ -1172,6 +1189,7 @@ class TuningOverlay:
                 index=index,
                 scrollable_indices=scrollable_indices,
                 show_scrollbar=metrics.show_scrollbar,
+                panel_max_width=panel_max_width,
             )
             kind = state.layout.kind(index)
             indent = self._padding + _row_indent(state, index)
@@ -1459,7 +1477,9 @@ class TuningOverlay:
                 row_widths.append(indent + surf.get_width())
 
         content_w = max(row_widths) if row_widths else 0
-        content_w = min(content_w, PANEL_CONTENT_MAX_WIDTH)
+        content_w = min(content_w, panel_max_width)
+        if state.settings.ui_width_mode == "fixed":
+            content_w = panel_max_width
         panel_w = content_w + self._padding * 2
         panel_h = metrics.panel_h
 

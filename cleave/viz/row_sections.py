@@ -217,6 +217,8 @@ SETTINGS_SECTION = ExpandSectionDef(
     toggle=_toggle_settings,
     children=(
         SectionNode(leaf_kind=RowKind.SETTINGS_RENDER_MODE),
+        SectionNode(leaf_kind=RowKind.SETTINGS_UI_WIDTH_MODE),
+        SectionNode(leaf_kind=RowKind.SETTINGS_UI_WIDTH),
         SectionNode(leaf_kind=RowKind.SETTINGS_UI_FADE),
     ),
 )

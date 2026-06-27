@@ -50,3 +50,11 @@ def test_baseline_tuning_ui_metrics() -> None:
     assert metrics.font_size == 14
     assert metrics.padding == 8
     assert metrics.tree_indent == 8
+    assert metrics.panel_content_max_width == 440
+
+
+def test_panel_content_max_width_px_default_matches_legacy() -> None:
+    from cleave.viz.theme import panel_content_max_width_px
+
+    assert panel_content_max_width_px(scale=1.2) == 528
+    assert panel_content_max_width_px(scale=1.0) == 440

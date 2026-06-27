@@ -212,6 +212,40 @@ def test_parse_visualizer_clamps_ui_fade_max() -> None:
     assert cfg.ui_fade == 60.0
 
 
+def test_parse_visualizer_ui_width_defaults_to_one_ten() -> None:
+    cfg = parse_visualizer_section({})
+    assert cfg.ui_width == 110
+
+
+def test_parse_visualizer_ui_width_mode_defaults_to_flexible() -> None:
+    cfg = parse_visualizer_section({})
+    assert cfg.ui_width_mode == "flexible"
+
+
+def test_parse_visualizer_reads_ui_width_mode() -> None:
+    cfg = parse_visualizer_section({"visualizer": {"ui_width_mode": "fixed"}})
+    assert cfg.ui_width_mode == "fixed"
+
+
+def test_parse_visualizer_rejects_invalid_ui_width_mode() -> None:
+    with pytest.raises(ValueError, match="visualizer.ui_width_mode must be one of"):
+        parse_visualizer_section({"visualizer": {"ui_width_mode": "stretch"}})
+
+
+def test_parse_visualizer_reads_ui_width() -> None:
+    cfg = parse_visualizer_section({"visualizer": {"ui_width": 80}})
+    assert cfg.ui_width == 80
+
+
+def test_parse_visualizer_clamps_ui_width() -> None:
+    cfg = parse_visualizer_section({"visualizer": {"ui_width": 200}})
+    assert cfg.ui_width == 200
+    cfg = parse_visualizer_section({"visualizer": {"ui_width": 250}})
+    assert cfg.ui_width == 200
+    cfg = parse_visualizer_section({"visualizer": {"ui_width": 5}})
+    assert cfg.ui_width == 20
+
+
 @pytest.mark.parametrize(
     "render_mode",
     ["full-quality", "balanced", "performance", "ultra-performance"],
