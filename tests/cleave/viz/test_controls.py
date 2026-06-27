@@ -120,6 +120,7 @@ def _make_controls(
                 browse_floor=preset_root / slot,
                 stem=TEST_LAYER_STEMS.get(slot, "drums"),
                 opacity_pct=50,
+                expanded=True,
             )
             for slot in slots
         },
@@ -154,6 +155,7 @@ def _make_controls_with_manager(
                 browse_floor=preset_root / slot,
                 stem=TEST_LAYER_STEMS.get(slot, "drums"),
                 opacity_pct=50,
+                expanded=True,
             )
             for slot in slots
         },
@@ -502,18 +504,19 @@ def test_re_enable_without_expanding() -> None:
 
 def test_header_collapses_and_expands_sub_rows() -> None:
     controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].expanded = False
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
-    preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
+    preset_dir_desc = RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1")
     controls.focus_descriptor = _desc(view, header_row)
     assert controls.session.layers["layer_1"].expanded is False
-    assert preset_dir_row not in view.layout.navigable_indices(view)
-    assert preset_dir_row not in view.layout.visible_indices(view)
+    assert not view.layout.contains_descriptor(preset_dir_desc)
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.layers["layer_1"].expanded is True
 
     view = controls.build_view_state(paused=False)
+    preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
     assert preset_dir_row in view.layout.navigable_indices(view)
     assert preset_dir_row in view.layout.visible_indices(view)
 
@@ -522,10 +525,9 @@ def test_disable_auto_collapses_sub_rows() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
-    preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
     controls.focus_descriptor = _desc(view, header_row)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
     controls.handle_keydown(_keydown(pygame.K_DOWN))
+    preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
     assert controls.focus_descriptor == _desc(view, preset_dir_row)
 
     controls.focus_descriptor = _desc(view, header_row)
@@ -535,15 +537,14 @@ def test_disable_auto_collapses_sub_rows() -> None:
     assert controls.focus_descriptor == _desc(view, header_row)
 
     view = controls.build_view_state(paused=False)
-    assert not view.layout.sub_row_visible(view, preset_dir_row)
-    assert preset_dir_row not in view.layout.visible_indices(view)
+    preset_dir_desc = RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1")
+    assert not view.layout.contains_descriptor(preset_dir_desc)
 
 
 def test_disabled_track_can_expand_sub_rows() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
-    preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
     controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
     assert controls.session.layers["layer_1"].enabled is False
@@ -554,6 +555,7 @@ def test_disabled_track_can_expand_sub_rows() -> None:
     assert controls.session.layers["layer_1"].expanded is True
 
     view = controls.build_view_state(paused=False)
+    preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
     assert preset_dir_row in view.layout.visible_indices(view)
     assert preset_dir_row in view.layout.navigable_indices(view)
 
@@ -763,6 +765,7 @@ def test_preset_row_truncates_long_filenames() -> None:
                 beat_sensitivity=1.0,
                 effects={},
                 enabled=True,
+                expanded=True,
                 preset_empty=False,
             )
         },
@@ -940,7 +943,7 @@ def test_navigable_rows_without_overwrite() -> None:
     )
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is False
-    assert len(view.layout) == 17
+    assert len(view.layout) == 18
 
     kinds = {view.layout.kind(i) for i in range(len(view.layout))}
     assert RowKind.CONFIG_HEADER in kinds
@@ -961,7 +964,7 @@ def test_navigable_rows_with_overwrite() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is True
-    assert len(view.layout) == 17
+    assert len(view.layout) == 18
 
     config_row = _config_header_row(view)
     assert config_row in view.layout.navigable_indices(view)
@@ -1143,6 +1146,7 @@ def test_track_header_text_omits_enabled_status() -> None:
 
 def test_track_header_expand_arrow() -> None:
     controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].expanded = False
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     assert _row_text(view, header_row).endswith(" ▶")
@@ -2091,6 +2095,7 @@ def _controls_with_playlist(
                 browse_floor=floor,
                 stem="layer_1",
                 opacity_pct=50,
+                expanded=True,
             )
         },
     )
@@ -2461,9 +2466,9 @@ def test_locked_blocks_move_mode() -> None:
 def test_locked_header_still_expands() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].locked = True
+    controls.session.layers["layer_1"].expanded = False
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
-    preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
     controls.focus_descriptor = _desc(view, header_row)
     assert controls.session.layers["layer_1"].expanded is False
 
@@ -2471,13 +2476,15 @@ def test_locked_header_still_expands() -> None:
     assert controls.session.layers["layer_1"].expanded is True
 
     view = controls.build_view_state(paused=False)
+    preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
     assert preset_dir_row in view.layout.visible_indices(view)
 
     controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert controls.session.layers["layer_1"].expanded is False
 
     view = controls.build_view_state(paused=False)
-    assert preset_dir_row not in view.layout.visible_indices(view)
+    preset_dir_desc = RowDescriptor(RowKind.TRACK_PRESET_DIR, slot="layer_1")
+    assert not view.layout.contains_descriptor(preset_dir_desc)
 
 
 def test_locked_sub_rows_use_locked_color() -> None:

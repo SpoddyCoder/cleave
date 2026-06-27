@@ -6,7 +6,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
-from cleave.viz.row_semantics import RowDescriptor, RowKind
+from cleave.effects.registry import effect_roster
+from cleave.viz.row_semantics import PRESET_SWITCHING_SUBMENU_KINDS, RowDescriptor, RowKind
 
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
@@ -142,8 +143,49 @@ def _settings_expanded(state: TuningViewState, _slot: str | None) -> bool:
     return state.settings.expanded
 
 
+def _render_overlay_expanded(state: TuningViewState, _slot: str | None) -> bool:
+    return state.render_overlay.expanded
+
+
+def _render_overlay_title_expanded(state: TuningViewState, _slot: str | None) -> bool:
+    return state.render_overlay.title_expanded
+
+
+def _render_overlay_body_expanded(state: TuningViewState, _slot: str | None) -> bool:
+    return state.render_overlay.body_expanded
+
+
+def _render_post_fx_expanded(state: TuningViewState, _slot: str | None) -> bool:
+    return state.render_post_fx.expanded
+
+
+def _track_header_expanded(state: TuningViewState, slot: str | None) -> bool:
+    if slot is None:
+        return True
+    return state.tracks[slot].expanded
+
+
+def _track_preset_switching_expanded(state: TuningViewState, slot: str | None) -> bool:
+    if slot is None:
+        return True
+    return state.tracks[slot].preset_switching_expanded
+
+
+def _track_effects_expanded(state: TuningViewState, slot: str | None) -> bool:
+    if slot is None:
+        return True
+    return state.tracks[slot].effects_expanded
+
+
 _EXPAND_SECTION_EXPANDED: dict[RowKind, Callable[[TuningViewState, str | None], bool]] = {
     RowKind.SETTINGS_HEADER: _settings_expanded,
+    RowKind.RENDER_OVERLAY_HEADER: _render_overlay_expanded,
+    RowKind.RENDER_OVERLAY_TITLE_HEADER: _render_overlay_title_expanded,
+    RowKind.RENDER_OVERLAY_BODY_HEADER: _render_overlay_body_expanded,
+    RowKind.RENDER_POST_FX_HEADER: _render_post_fx_expanded,
+    RowKind.TRACK_HEADER: _track_header_expanded,
+    RowKind.TRACK_PRESET_SWITCHING: _track_preset_switching_expanded,
+    RowKind.TRACK_EFFECTS_HEADER: _track_effects_expanded,
 }
 
 
@@ -156,7 +198,92 @@ SETTINGS_SECTION = ExpandSectionDef(
     ),
 )
 
+RENDER_OVERLAY_TITLE_SECTION = ExpandSectionDef(
+    header_kind=RowKind.RENDER_OVERLAY_TITLE_HEADER,
+    context="global",
+    children=(
+        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_TITLE_FONT),
+        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE),
+        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM),
+    ),
+)
+
+RENDER_OVERLAY_BODY_SECTION = ExpandSectionDef(
+    header_kind=RowKind.RENDER_OVERLAY_BODY_HEADER,
+    context="global",
+    children=(
+        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_BODY_FONT),
+        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_BODY_FONT_SIZE),
+    ),
+)
+
+RENDER_OVERLAY_SECTION = ExpandSectionDef(
+    header_kind=RowKind.RENDER_OVERLAY_HEADER,
+    context="global",
+    collapse_on_disable=True,
+    children=(
+        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_POSITION),
+        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_OPACITY),
+        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_BORDER_WIDTH),
+        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_START_DELAY),
+        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_DISPLAY_TIME),
+        SectionNode(expand=RENDER_OVERLAY_TITLE_SECTION),
+        SectionNode(expand=RENDER_OVERLAY_BODY_SECTION),
+    ),
+)
+
+RENDER_POST_FX_SECTION = ExpandSectionDef(
+    header_kind=RowKind.RENDER_POST_FX_HEADER,
+    context="global",
+    collapse_on_disable=True,
+    children=(
+        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_IN),
+        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_OUT),
+    ),
+)
+
+TRACK_PRESET_SWITCHING_SECTION = ExpandSectionDef(
+    header_kind=RowKind.TRACK_PRESET_SWITCHING,
+    context="per_slot",
+    children=tuple(
+        SectionNode(leaf_kind=kind) for kind in sorted(PRESET_SWITCHING_SUBMENU_KINDS, key=lambda k: k.name)
+    ),
+)
+
+TRACK_EFFECTS_SECTION = ExpandSectionDef(
+    header_kind=RowKind.TRACK_EFFECTS_HEADER,
+    context="per_slot",
+    children=(),
+)
+
+TRACK_SECTION = ExpandSectionDef(
+    header_kind=RowKind.TRACK_HEADER,
+    context="per_slot",
+    children=(
+        SectionNode(leaf_kind=RowKind.TRACK_PRESET_DIR),
+        SectionNode(leaf_kind=RowKind.TRACK_PRESET),
+        SectionNode(expand=TRACK_PRESET_SWITCHING_SECTION),
+        SectionNode(leaf_kind=RowKind.TRACK_STEM),
+        SectionNode(leaf_kind=RowKind.TRACK_BEAT),
+        SectionNode(leaf_kind=RowKind.TRACK_BLEND),
+        SectionNode(leaf_kind=RowKind.TRACK_OPACITY),
+        SectionNode(expand=TRACK_EFFECTS_SECTION),
+        SectionNode(leaf_kind=RowKind.LAYER_MANAGEMENT_DELETE),
+    ),
+)
+
 ROOT_SECTION_NODES: tuple[SectionNode, ...] = (SectionNode(expand=SETTINGS_SECTION),)
+
+RENDER_SECTION_NODES: tuple[SectionNode, ...] = (
+    SectionNode(expand=RENDER_OVERLAY_SECTION),
+    SectionNode(expand=RENDER_POST_FX_SECTION),
+)
+
+GLOBAL_EXPAND_SECTIONS: tuple[ExpandSectionDef, ...] = (
+    SETTINGS_SECTION,
+    RENDER_OVERLAY_SECTION,
+    RENDER_POST_FX_SECTION,
+)
 
 
 def expand_section_expanded(
@@ -216,6 +343,18 @@ def expand_section_sub_row_visible(
     return True
 
 
+def sub_row_expand_visible(state: TuningViewState, desc: RowDescriptor) -> bool:
+    for section in GLOBAL_EXPAND_SECTIONS:
+        visible = expand_section_sub_row_visible(state, desc, section)
+        if visible is not None:
+            return visible
+    if desc.slot is not None:
+        visible = expand_section_sub_row_visible(state, desc, TRACK_SECTION)
+        if visible is not None:
+            return visible
+    return True
+
+
 def append_expand_section_rows(
     row_list: list[RowDescriptor],
     section: ExpandSectionDef,
@@ -231,3 +370,66 @@ def append_expand_section_rows(
             row_list.append(RowDescriptor(child.leaf_kind, slot=section_slot))
         elif child.expand is not None:
             append_expand_section_rows(row_list, child.expand, state, slot)
+
+
+def append_preset_switching_section_rows(
+    row_list: list[RowDescriptor],
+    state: TuningViewState,
+    slot: str,
+) -> None:
+    block = state.tracks[slot]
+    row_list.append(RowDescriptor(RowKind.TRACK_PRESET_SWITCHING, slot=slot))
+    if not block.preset_switching_expanded:
+        return
+    row_list.append(RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_MODE, slot=slot))
+    if block.preset_switching != "projectm":
+        return
+    row_list.append(RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_SCOPE, slot=slot))
+    row_list.append(RowDescriptor(RowKind.TRACK_PRESET_DURATION, slot=slot))
+    row_list.append(RowDescriptor(RowKind.TRACK_SOFT_CUT_DURATION, slot=slot))
+    row_list.append(RowDescriptor(RowKind.TRACK_EASTER_EGG, slot=slot))
+    row_list.append(RowDescriptor(RowKind.TRACK_PRESET_START_CLEAN, slot=slot))
+    row_list.append(RowDescriptor(RowKind.TRACK_HARD_CUT_ENABLED, slot=slot))
+    if block.hard_cut_enabled:
+        row_list.append(RowDescriptor(RowKind.TRACK_HARD_CUT_DURATION, slot=slot))
+        row_list.append(RowDescriptor(RowKind.TRACK_HARD_CUT_SENSITIVITY, slot=slot))
+
+
+def append_effects_section_rows(
+    row_list: list[RowDescriptor],
+    state: TuningViewState,
+    slot: str,
+) -> None:
+    block = state.tracks[slot]
+    row_list.append(RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, slot=slot))
+    if not block.effects_expanded:
+        return
+    for effect_def in effect_roster(block.stem):
+        row_list.append(
+            RowDescriptor(
+                RowKind.TRACK_EFFECT,
+                slot=slot,
+                effect_id=effect_def.effect_id,
+                driver_slug=effect_def.driver_slug,
+            )
+        )
+
+
+def append_track_section_rows(
+    row_list: list[RowDescriptor],
+    state: TuningViewState,
+    slot: str,
+) -> None:
+    block = state.tracks[slot]
+    row_list.append(RowDescriptor(RowKind.TRACK_HEADER, slot=slot))
+    if not block.expanded:
+        return
+    row_list.append(RowDescriptor(RowKind.TRACK_PRESET_DIR, slot=slot))
+    row_list.append(RowDescriptor(RowKind.TRACK_PRESET, slot=slot))
+    append_preset_switching_section_rows(row_list, state, slot)
+    row_list.append(RowDescriptor(RowKind.TRACK_STEM, slot=slot))
+    row_list.append(RowDescriptor(RowKind.TRACK_BEAT, slot=slot))
+    row_list.append(RowDescriptor(RowKind.TRACK_BLEND, slot=slot))
+    row_list.append(RowDescriptor(RowKind.TRACK_OPACITY, slot=slot))
+    append_effects_section_rows(row_list, state, slot)
+    row_list.append(RowDescriptor(RowKind.LAYER_MANAGEMENT_DELETE, slot=slot))

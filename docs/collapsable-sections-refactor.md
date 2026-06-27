@@ -168,10 +168,10 @@ Execute in order; keep unit tests green after each step.
 - [x] **Step 2 — Introduce `row_sections.py` with expand registry**  
   Define `SectionNode`, `ExpandSectionDef`, root tree constant. First migration: **Settings** (smallest: one level, global context). Replace Settings branches in `RowLayout.build` and `_sub_row_expanded` with tree walk.
 
-- [ ] **Step 3 — Migrate render post-FX and render overlay**  
+- [x] **Step 3 — Migrate render post-FX and render overlay**  
   Post-FX: flat expandable section. Overlay: nested expandable sections (title, body). Keep `RenderOverlayControls` collapse-on-disable via `collapse_on_disable` hook.
 
-- [ ] **Step 4 — Migrate layer-scoped expandable sections**  
+- [x] **Step 4 — Migrate layer-scoped expandable sections**  
   Per-slot tree under `TRACK_HEADER`: layer header, preset switching subsection, cleave effects subsection. Remove redundant `if block.effects_expanded` / `if block.preset_switching_expanded` build branches. Confirm layer collapse still cascades (disable layer sets `expanded = False`).
 
 - [ ] **Step 5 — Conditional rows registry**  
