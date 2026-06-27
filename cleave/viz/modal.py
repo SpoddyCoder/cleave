@@ -71,8 +71,10 @@ class ModalHost:
         message: str,
         on_confirm: Callable[[], None],
         on_cancel: Callable[[], None] | None = None,
+        *,
+        cancel_label: str = "No",
     ) -> None:
-        def on_no() -> None:
+        def on_cancel_action() -> None:
             if on_cancel is not None:
                 on_cancel()
 
@@ -82,7 +84,7 @@ class ModalHost:
                 message=message,
                 options=[
                     ModalOption("Yes", on_confirm),
-                    ModalOption("No", on_no),
+                    ModalOption(cancel_label, on_cancel_action),
                 ],
                 on_dismiss=on_cancel,
             )
@@ -94,6 +96,10 @@ class ModalHost:
         on_save_as_new: Callable[[], None],
         on_dismiss: Callable[[], None] | None = None,
     ) -> None:
+        def on_cancel() -> None:
+            if on_dismiss is not None:
+                on_dismiss()
+
         self.prompt(
             ModalRequest(
                 kind=ModalKind.SAVE_CHOICE,
@@ -101,6 +107,7 @@ class ModalHost:
                 options=[
                     ModalOption("OVERWRITE", on_overwrite),
                     ModalOption("SAVE AS NEW", on_save_as_new),
+                    ModalOption("CANCEL", on_cancel),
                 ],
                 on_dismiss=on_dismiss,
             )

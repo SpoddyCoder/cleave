@@ -46,7 +46,7 @@ The pinned top block before a visual gap (`header_gap` in `draw()`): `header_row
 - Row kinds: `RowKind.SETTINGS_HEADER`, optional `RowKind.SETTINGS_RENDER_MODE` when `session.settings.expanded`, `RowKind.CONFIG_HEADER` (active config path; Enter saves), `RowKind.TRANSPORT`, optional `RowKind.PANEL_NOTIFICATION` (transient message under Transport).
 - Layout order in `RowLayout.build`: settings header, optional render-mode sub-row, config header, transport.
 - **Settings** header: label `Settings` in `ACTION`, expand arrow in value color; Left/Right toggles `session.settings.expanded` (UI-only). Sub-row when expanded: `└─ render mode: {mode}` cycles `visualizer.render_mode` in config (`full-quality`, `balanced`, `performance`, `ultra-performance`; default `balanced`).
-- Enter on `CONFIG_HEADER` opens an `OVERWRITE` / `SAVE AS NEW` centered modal when overwrite is allowed (`allow_overwrite`; false for repo-root `cleave-viz.yaml`). When overwrite is not allowed, a `SAVE AS NEW` / `CANCEL` modal appears (Enter confirms the focused option, Esc dismisses). Overwrite still uses the yes/no centered modal.
+- Enter on `CONFIG_HEADER` opens an `OVERWRITE` / `SAVE AS NEW` / `CANCEL` centered modal when overwrite is allowed (`allow_overwrite`; false for repo-root `cleave-viz.yaml`). When overwrite is not allowed, a `SAVE AS NEW` / `CANCEL` modal appears (Enter confirms the focused option, Esc dismisses). Overwrite still uses a yes/cancel centered modal (`Yes` / `CANCEL`).
 
 ## Whole panel
 
