@@ -919,7 +919,11 @@ class TuningOverlay:
 
         font = self._font_get()
         line_h = font.get_linesize()
-        visible_indices = state.layout.visible_indices(state)
+        frame = state.layout_frame
+        if frame is not None:
+            visible_indices = list(frame.visible_indices)
+        else:
+            visible_indices = state.layout.visible_indices(state)
         first_scrollable_visible = next(
             (
                 index

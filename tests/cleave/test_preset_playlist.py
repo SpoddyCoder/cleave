@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 from cleave.config import load_config
 from cleave.config_schema import DEFAULT_LAYER_SLOTS
@@ -197,6 +198,142 @@ def test_directory_display_clamps_sibling_parent_at_preset_root() -> None:
         playlist = scan_preset_playlist(root)
         label = directory_display(playlist, root)
         assert label == "./ (1/2)"
+
+
+def test_directory_display_label_caches_on_repeated_calls() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        pack_a = root / "pack-a"
+        pack_b = root / "pack-b"
+        pack_a.mkdir()
+        pack_b.mkdir()
+        _write_milk(pack_a / "a.milk")
+        _write_milk(pack_b / "b.milk")
+
+        playlist = scan_preset_playlist(root)
+        with patch(
+            "cleave.preset_playlist.list_navigable_dirs", wraps=list_navigable_dirs
+        ) as mock_list:
+            first = playlist.directory_display_label(root)
+            second = playlist.directory_display_label(root)
+            assert first == second == "./ (1/2)"
+            assert mock_list.call_count == 1
+
+
+def _playlist_with_siblings(root: Path) -> tuple:
+    siblings: list[Path] = []
+    for name in ("alpha", "beta", "gamma"):
+        sibling = root / name
+        sibling.mkdir()
+        _write_milk(sibling / "preset.milk")
+        siblings.append(sibling)
+    playlist = playlist_at_dir(siblings[0])
+    return playlist, siblings
+
+
+def test_directory_display_label_invalidated_after_next() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        preset_dir = root / "pack"
+        preset_dir.mkdir()
+        _write_milk(preset_dir / "a.milk")
+        _write_milk(preset_dir / "b.milk")
+        playlist = playlist_at_dir(preset_dir)
+        playlist.directory_display_label(root)
+        with patch(
+            "cleave.preset_playlist.list_navigable_dirs", wraps=list_navigable_dirs
+        ) as mock_list:
+            playlist.next()
+            playlist.directory_display_label(root)
+            assert mock_list.call_count == 1
+
+
+def test_directory_display_label_invalidated_after_prev() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        preset_dir = root / "pack"
+        preset_dir.mkdir()
+        _write_milk(preset_dir / "a.milk")
+        _write_milk(preset_dir / "b.milk")
+        playlist = playlist_at_dir(preset_dir)
+        playlist.directory_display_label(root)
+        with patch(
+            "cleave.preset_playlist.list_navigable_dirs", wraps=list_navigable_dirs
+        ) as mock_list:
+            playlist.prev()
+            playlist.directory_display_label(root)
+            assert mock_list.call_count == 1
+
+
+def test_directory_display_label_invalidated_after_step_by() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        preset_dir = root / "pack"
+        preset_dir.mkdir()
+        _write_milk(preset_dir / "a.milk")
+        _write_milk(preset_dir / "b.milk")
+        playlist = playlist_at_dir(preset_dir)
+        playlist.directory_display_label(root)
+        with patch(
+            "cleave.preset_playlist.list_navigable_dirs", wraps=list_navigable_dirs
+        ) as mock_list:
+            playlist.step_by(1)
+            playlist.directory_display_label(root)
+            assert mock_list.call_count == 1
+
+
+def test_directory_display_label_invalidated_after_step_sibling() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        playlist, siblings = _playlist_with_siblings(root)
+        playlist.directory_display_label(root)
+        with patch(
+            "cleave.preset_playlist.list_navigable_dirs", wraps=list_navigable_dirs
+        ) as mock_list:
+            playlist.step_sibling(1, preset_root=root)
+            label = playlist.directory_display_label(root)
+            assert mock_list.call_count >= 1
+            assert label == f"beta/ (2/3)"
+
+
+def test_directory_display_label_invalidated_after_enter_child() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        parent = root / "parent"
+        parent.mkdir()
+        _write_milk(parent / "root.milk")
+        child_a = parent / "child-a"
+        child_a.mkdir()
+        _write_milk(child_a / "a.milk")
+        playlist = playlist_at_dir(parent)
+        playlist.directory_display_label(root)
+        with patch(
+            "cleave.preset_playlist.list_navigable_dirs", wraps=list_navigable_dirs
+        ) as mock_list:
+            playlist.enter_child(root)
+            label = playlist.directory_display_label(root)
+            assert mock_list.call_count >= 1
+            assert label == "parent/child-a/ (1/1)"
+
+
+def test_directory_display_label_invalidated_after_go_parent() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        pack = root / "pack-a"
+        pack.mkdir()
+        _write_milk(pack / "pack.milk")
+        child = pack / "child"
+        child.mkdir()
+        _write_milk(child / "child.milk")
+        playlist = playlist_at_dir(child)
+        playlist.directory_display_label(root)
+        with patch(
+            "cleave.preset_playlist.list_navigable_dirs", wraps=list_navigable_dirs
+        ) as mock_list:
+            playlist.go_parent(root)
+            label = playlist.directory_display_label(root)
+            assert mock_list.call_count >= 1
+            assert label == "pack-a/ (1/1)"
 
 
 def test_empty_directory_display_and_config_path() -> None:

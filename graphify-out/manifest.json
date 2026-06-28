@@ -135,8 +135,8 @@
     "semantic_hash": ""
   },
   "cleave/preset_playlist.py": {
-    "mtime": 1782568279.003899,
-    "ast_hash": "6fb381eaf8635090c454640587eaff4f",
+    "mtime": 1782677275.472484,
+    "ast_hash": "2ec8e599c3c9e1a52c69bcd511a7a510",
     "semantic_hash": ""
   },
   "cleave/project.py": {
@@ -210,8 +210,8 @@
     "semantic_hash": ""
   },
   "cleave/viz/focus_nav.py": {
-    "mtime": 1782080806.8371565,
-    "ast_hash": "2d2a23fd9a93dddfb9ce6cd986e140f1",
+    "mtime": 1782677562.7044208,
+    "ast_hash": "607102e5ce99fe2adce2c49d5d6111fb",
     "semantic_hash": ""
   },
   "cleave/viz/fonts.py": {
@@ -350,8 +350,8 @@
     "semantic_hash": ""
   },
   "cleave/viz/row_layout.py": {
-    "mtime": 1782586949.5298789,
-    "ast_hash": "851e99edfb257bf188fda6f720a61e47",
+    "mtime": 1782677512.896432,
+    "ast_hash": "a48d4a0ddeee7829c2cf3f07ee33cb18",
     "semantic_hash": ""
   },
   "cleave/viz/row_sections.py": {
@@ -395,13 +395,13 @@
     "semantic_hash": ""
   },
   "cleave/viz/tuning_panel_draw.py": {
-    "mtime": 1782676610.2046328,
-    "ast_hash": "75dae1515f450a4bc180defef0e4e422",
+    "mtime": 1782677563.5764205,
+    "ast_hash": "8e1e2c6d85016aefd5f8e4c0ed202a90",
     "semantic_hash": ""
   },
   "cleave/viz/tuning_view_state.py": {
-    "mtime": 1782657028.3050268,
-    "ast_hash": "c3d75ce72ceb1ce72811f50f30eb559b",
+    "mtime": 1782677627.5604062,
+    "ast_hash": "f9565a0d5ec7f29c20bec6253a254bfc",
     "semantic_hash": ""
   },
   "cleave/viz/ui_tint.py": {
@@ -515,8 +515,8 @@
     "semantic_hash": ""
   },
   "tests/cleave/test_preset_playlist.py": {
-    "mtime": 1782052616.5135233,
-    "ast_hash": "2ab7660ef03292e3e10a685494f94411",
+    "mtime": 1782677288.1684813,
+    "ast_hash": "c3fa812573d520130ead80aef494d839",
     "semantic_hash": ""
   },
   "tests/cleave/test_preset_switching_config.py": {
@@ -690,8 +690,8 @@
     "semantic_hash": ""
   },
   "tests/cleave/viz/test_row_layout_resolution.py": {
-    "mtime": 1782568279.007899,
-    "ast_hash": "28bd0132da38ee4b8941449308140797",
+    "mtime": 1782677632.6644049,
+    "ast_hash": "0e88eb7998f962e9d43e71e3ac2c7356",
     "semantic_hash": ""
   },
   "tests/cleave/viz/test_row_sections.py": {
@@ -872,6 +872,16 @@
   "docs/ui-performance-improvements.md": {
     "mtime": 1782672944.5494554,
     "ast_hash": "435a8257371309c81ea939fe20116b04",
+    "semantic_hash": ""
+  },
+  "docs/ui-performance-results.md": {
+    "mtime": 1782676951.4645576,
+    "ast_hash": "eade512470d88cff30ca79b3a62d3766",
+    "semantic_hash": ""
+  },
+  "tests/cleave/viz/test_view_state_structure.py": {
+    "mtime": 1782677630.6764054,
+    "ast_hash": "61e56af9d40cd2745feac503c72c1f26",
     "semantic_hash": ""
   }
 }
