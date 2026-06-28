@@ -74,6 +74,16 @@ def test_track_layout_conditional_rows_when_predicates_pass() -> None:
     assert RowKind.TRACK_PRESET_DURATION in kinds
     assert RowKind.TRACK_HARD_CUT_DURATION in kinds
 
+    user_defined_kinds = _track_row_kinds(
+        preset_switching="user_defined",
+        hard_cut_enabled=True,
+        effects_expanded=False,
+    )
+    assert RowKind.TRACK_SOFT_CUT_DURATION in user_defined_kinds
+    assert RowKind.TRACK_HARD_CUT_ENABLED in user_defined_kinds
+    assert RowKind.TRACK_HARD_CUT_DURATION in user_defined_kinds
+    assert RowKind.TRACK_PRESET_SWITCHING_SCOPE not in user_defined_kinds
+
 
 def test_track_layout_omits_conditional_rows_when_predicates_fail() -> None:
     none_kinds = _track_row_kinds(preset_switching="none")
