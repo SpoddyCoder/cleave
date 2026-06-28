@@ -93,12 +93,42 @@ overlay: vs=3.0ms draw=4.9ms surf=0 font=2 rcache=0/1 up=0.6ms
 overlay: vs=3.0ms draw=10.8ms surf=1 font=6 rcache=41/2 up=0.6ms
 overlay: vs=3.1ms draw=5.2ms surf=0 font=2 rcache=0/1 up=0.7ms
 overlay: vs=3.0ms draw=5.3ms surf=0 font=2 rcache=0/1 up=0.6ms
+overlay: vs=3.3ms draw=5.4ms surf=0 font=2 rcache=0/1 up=1.0ms
+overlay: vs=3.3ms draw=5.2ms surf=0 font=2 rcache=0/1 up=1.0ms
+overlay: vs=3.2ms draw=5.3ms surf=0 font=2 rcache=0/1 up=1.0ms
+overlay: vs=3.3ms draw=5.3ms surf=0 font=2 rcache=0/1 up=1.0ms
 ```
 
 ## Phase 4
 
-```
+Stable-size GPU upload via `OverlayUploadCoordinator` and per-slot textures
+(`OverlayTextureSlot.TUNING`, `HELP`, `TIMELINE`). Each overlay frame picks
+`skip`, `partial`, or `full` from `UploadPlan.mode`; skip reuses the last
+uploaded texture when the content signature is unchanged.
 
+```
+overlay profiler: on (logging to terminal every 30 frames; latest on panel when open)
+overlay: vs=4.6ms draw=12.2ms surf=38 font=87 rcache=0/43 up=0.6ms ufull=1
+overlay: vs=3.0ms draw=3.7ms surf=0 font=2 rcache=0/1 up=0.0ms uskip=1
+overlay: vs=2.9ms draw=3.3ms surf=0 font=2 rcache=0/1 up=0.1ms upart=1/2
+overlay: vs=2.8ms draw=3.3ms surf=0 font=2 rcache=0/1 up=0.0ms uskip=1
+overlay: vs=2.8ms draw=3.3ms surf=0 font=2 rcache=0/1 up=0.1ms upart=1/2
+overlay: vs=3.1ms draw=4.2ms surf=0 font=2 rcache=0/1 up=0.3ms upart=1/2
+overlay: vs=3.2ms draw=4.0ms surf=0 font=2 rcache=0/1 up=0.1ms upart=1/2
+overlay: vs=3.4ms draw=4.4ms surf=0 font=2 rcache=0/1 up=0.1ms upart=1/2
+overlay: vs=3.3ms draw=11.6ms surf=1 font=6 rcache=40/3 up=0.7ms ufull=1
+overlay: vs=3.9ms draw=5.1ms surf=0 font=2 rcache=0/1 up=0.1ms upart=1/2
+overlay: vs=3.3ms draw=4.8ms surf=0 font=2 rcache=0/1 up=0.1ms upart=1/2
+overlay: vs=3.4ms draw=11.6ms surf=1 font=7 rcache=40/3 up=0.6ms ufull=1
+overlay: vs=3.8ms draw=4.8ms surf=0 font=2 rcache=0/1 up=0.0ms uskip=1
+overlay: vs=3.5ms draw=4.8ms surf=0 font=2 rcache=0/1 up=0.0ms uskip=1
+overlay: vs=3.5ms draw=4.8ms surf=0 font=2 rcache=0/1 up=0.0ms uskip=1
+overlay: vs=3.8ms draw=5.1ms surf=0 font=2 rcache=0/1 up=0.2ms uskip=1 upart=1/4
+overlay: vs=3.5ms draw=5.4ms surf=0 font=2 rcache=0/1 up=0.0ms uskip=3
+overlay: vs=3.5ms draw=3.9ms surf=0 font=2 rcache=0/1 up=0.2ms uskip=2 upart=1/4
+overlay: vs=3.4ms draw=4.0ms surf=0 font=2 rcache=0/1 up=0.0ms uskip=3
+overlay: vs=3.4ms draw=3.9ms surf=0 font=2 rcache=0/1 up=0.0ms uskip=3
+overlay: vs=3.5ms draw=4.1ms surf=0 font=2 rcache=0/1 up=0.1ms uskip=2 upart=1/2
 ```
 
 ## Phase 5

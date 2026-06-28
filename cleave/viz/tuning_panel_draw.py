@@ -66,6 +66,7 @@ from cleave.viz.material_icons import (
     track_header_lock_suffix_width,
     visibility_icon_slot_width,
 )
+from cleave.viz.ui_tint import draw_opaque_row_background
 from cleave.viz.theme import (
     ACTION,
     BACKGROUND,
@@ -98,12 +99,22 @@ from cleave.viz.theme import (
     tuning_ui_metrics,
 )
 from cleave.viz.overlay_profiler import OverlayDrawCounters
+from cleave.viz.overlay_upload import (
+    OverlayGpuState,
+    UploadPlan,
+    UploadSignature,
+    clip_dirty_rects,
+    upload_plan_for_signature,
+)
 from cleave.viz.tuning_panel_cache import (
+    PanelSignature,
     RowRenderEntry,
     TuningPanelCache,
     ensure_row_surface,
+    live_upload_signature,
     panel_signature,
     static_row_keys,
+    tuning_upload_signature,
 )
 from cleave.viz.tuning_view_state import TuningViewState
 
@@ -630,6 +641,43 @@ def panel_fps_layout(
     )
 
 
+def tuning_panel_max_dimensions(
+    viewport_w: int,
+    viewport_h: int,
+    ui_width: int,
+    *,
+    timeline_panel_open: bool = False,
+    margin_y: int,
+    padding: int,
+    panel_max_width: int | None = None,
+    timeline_row_count: int = 0,
+) -> tuple[int, int]:
+    """Maximum panel width and height for stable GPU texture capacity."""
+    del viewport_w  # horizontal placement uses margin_x elsewhere
+    max_w = (
+        panel_max_width
+        if panel_max_width is not None
+        else panel_content_max_width_px(ui_width)
+    )
+    max_panel_w = max_w + padding * 2
+    max_panel_h = viewport_h - margin_y * 2
+    if timeline_panel_open and timeline_row_count > 0:
+        from cleave.viz.timeline_overlay import timeline_viewport_reserve_px
+
+        max_panel_h -= timeline_viewport_reserve_px(timeline_row_count)
+    return max_panel_w, max_panel_h
+
+
+@dataclass(frozen=True)
+class ComposedTuningPanel:
+    upload_surface: pygame.Surface
+    panel_size: tuple[int, int]
+    screen_rect: tuple[int, int, int, int]
+    upload_plan: UploadPlan
+    upload_signature: UploadSignature
+    capacity: tuple[int, int]
+
+
 def scroll_metrics(
     *,
     visible_indices: list[int],
@@ -929,6 +977,10 @@ class TuningOverlay:
         self._scroll_y = 0
         self._panel_cache = TuningPanelCache()
 
+    @property
+    def gpu_state(self) -> OverlayGpuState:
+        return self._panel_cache.gpu
+
     def _clamp_scroll(self, scroll_content_h: int, viewport_h: int) -> None:
         max_scroll = max(0, scroll_content_h - viewport_h)
         if self._scroll_y < 0:
@@ -1041,14 +1093,20 @@ class TuningOverlay:
         panel_w: int,
         line_h: int,
     ) -> None:
+        row_rect = (self._padding, y, panel_w - self._padding * 2, line_h)
+        panel_bg_alpha = int(BACKGROUND_ALPHA * self._visibility)
         bg = _row_bg_color(state, index)
-        if bg is not None:
-            bg_alpha = int(FOCUS_ROW_BG_ALPHA * self._visibility)
-            pygame.draw.rect(
-                panel,
-                (*bg, bg_alpha),
-                (self._padding, y, panel_w - self._padding * 2, line_h),
-            )
+        tint_alpha = (
+            int(FOCUS_ROW_BG_ALPHA * self._visibility) if bg is not None else 0
+        )
+        draw_opaque_row_background(
+            panel,
+            row_rect,
+            BACKGROUND,
+            panel_bg_alpha,
+            bg,
+            tint_alpha=tint_alpha,
+        )
 
         indent = self._padding + _row_indent(state, index)
         if text_alpha >= 2:
@@ -1400,6 +1458,12 @@ class TuningOverlay:
             visible_indices=visible_indices,
             first_scrollable_visible=first_scrollable_visible,
         )
+        cache.last_transport_rect = (
+            BORDER_WIDTH,
+            transport_y,
+            panel_w - 2 * BORDER_WIDTH,
+            line_h,
+        )
         if bg_alpha >= 2:
             pygame.draw.rect(
                 panel,
@@ -1600,7 +1664,7 @@ class TuningOverlay:
         viewport_height: int,
         timeline_panel_open: bool = False,
         counters: OverlayDrawCounters | None = None,
-    ) -> tuple[pygame.Surface, tuple[int, int, int, int]] | None:
+    ) -> ComposedTuningPanel | None:
         self._panel_rect = None
         if self._visibility <= 0.01 or len(state.layout) == 0:
             return None
@@ -1622,11 +1686,18 @@ class TuningOverlay:
         )
         header_gap = line_h + self._line_gap
         _, margin_y = self._margin
-        max_panel_h = viewport_height - margin_y * 2
-        if timeline_panel_open:
-            from cleave.viz.timeline_overlay import timeline_viewport_reserve_px
-
-            max_panel_h -= timeline_viewport_reserve_px(len(state.layer_z_order))
+        panel_max_width = panel_content_max_width_px(state.settings.ui_width)
+        capacity = tuning_panel_max_dimensions(
+            viewport_width,
+            viewport_height,
+            state.settings.ui_width,
+            timeline_panel_open=timeline_panel_open,
+            margin_y=margin_y,
+            padding=self._padding,
+            panel_max_width=panel_max_width,
+            timeline_row_count=len(state.layer_z_order),
+        )
+        max_panel_h = capacity[1]
         metrics = scroll_metrics(
             visible_indices=visible_indices,
             first_scrollable_visible=first_scrollable_visible,
@@ -1750,12 +1821,23 @@ class TuningOverlay:
                 counters=counters,
             )
             self._panel_scratch = panel
-            return self._finish_compose_panel(
-                panel,
+            placement = self._finish_compose_panel(
                 panel_w=panel_w,
                 panel_h=panel_h,
                 viewport_width=viewport_width,
                 viewport_height=viewport_height,
+            )
+            if placement is None:
+                return None
+            assert prev_sig is not None
+            return self._build_composed_panel(
+                panel,
+                panel_sig=prev_sig,
+                panel_size=(panel_w, panel_h),
+                placement=placement,
+                state=state,
+                capacity=capacity,
+                incremental=True,
             )
 
         built_rows: dict[int, RowRenderEntry] = {}
@@ -1840,25 +1922,132 @@ class TuningOverlay:
 
         cache.panel_signature = new_sig
         cache.panel_size = (panel_w, panel_h)
+        self._set_transport_rect_cache(
+            transport_index,
+            metrics=metrics,
+            visible_indices=visible_indices,
+            first_scrollable_visible=first_scrollable_visible,
+            panel_w=panel_w,
+            line_h=line_h,
+        )
         self._panel_scratch = panel
 
-        return self._finish_compose_panel(
-            panel,
+        placement = self._finish_compose_panel(
             panel_w=panel_w,
             panel_h=panel_h,
             viewport_width=viewport_width,
             viewport_height=viewport_height,
         )
+        if placement is None:
+            return None
+        return self._build_composed_panel(
+            panel,
+            panel_sig=new_sig,
+            panel_size=(panel_w, panel_h),
+            placement=placement,
+            state=state,
+            capacity=capacity,
+            incremental=False,
+        )
+
+    def _set_transport_rect_cache(
+        self,
+        transport_index: int | None,
+        *,
+        metrics: PanelScrollMetrics,
+        visible_indices: list[int],
+        first_scrollable_visible: int | None,
+        panel_w: int,
+        line_h: int,
+    ) -> None:
+        if transport_index is None:
+            self._panel_cache.last_transport_rect = None
+            return
+        transport_y = self._transport_row_y(
+            transport_index,
+            metrics=metrics,
+            visible_indices=visible_indices,
+            first_scrollable_visible=first_scrollable_visible,
+        )
+        self._panel_cache.last_transport_rect = (
+            BORDER_WIDTH,
+            transport_y,
+            panel_w - 2 * BORDER_WIDTH,
+            line_h,
+        )
+
+    def _build_composed_panel(
+        self,
+        panel: pygame.Surface,
+        *,
+        panel_sig: PanelSignature,
+        panel_size: tuple[int, int],
+        placement: tuple[tuple[int, int, int, int], tuple[int, int]],
+        state: TuningViewState,
+        capacity: tuple[int, int],
+        incremental: bool,
+    ) -> ComposedTuningPanel:
+        cache = self._panel_cache
+        screen_rect, src_offset = placement
+        live_sig = live_upload_signature(state)
+        upload_signature = tuning_upload_signature(panel_sig, screen_rect, live_sig)
+        panel_w, panel_h = panel_size
+        src_x, src_y = src_offset
+        active_w, active_h = screen_rect[2], screen_rect[3]
+
+        if incremental and live_sig == cache.last_live_signature:
+            upload_plan = upload_plan_for_signature(
+                upload_signature,
+                cache.gpu.last_signature,
+            )
+        elif incremental:
+            dirty_rects: list[tuple[int, int, int, int]] = []
+            if cache.last_transport_rect is not None:
+                dirty_rects.append(cache.last_transport_rect)
+            if cache.last_fps_rect is not None and state.fps is not None:
+                dirty_rects.append(cache.last_fps_rect)
+            upload_plan = upload_plan_for_signature(
+                upload_signature,
+                cache.gpu.last_signature,
+                dirty_rects=clip_dirty_rects(tuple(dirty_rects), panel_w, panel_h),
+            )
+        else:
+            cache.last_live_signature = None
+            clip_rect = (
+                (src_x, src_y, active_w, active_h)
+                if src_x != 0 or src_y != 0 or (active_w, active_h) != (panel_w, panel_h)
+                else ()
+            )
+            if clip_rect:
+                upload_plan = upload_plan_for_signature(
+                    upload_signature,
+                    cache.gpu.last_signature,
+                    dirty_rects=clip_dirty_rects(clip_rect, panel_w, panel_h),
+                )
+            else:
+                upload_plan = upload_plan_for_signature(
+                    upload_signature,
+                    cache.gpu.last_signature,
+                )
+
+        cache.last_live_signature = live_sig
+        return ComposedTuningPanel(
+            upload_surface=panel,
+            panel_size=panel_size,
+            screen_rect=screen_rect,
+            upload_plan=upload_plan,
+            upload_signature=upload_signature,
+            capacity=capacity,
+        )
 
     def _finish_compose_panel(
         self,
-        panel: pygame.Surface,
         *,
         panel_w: int,
         panel_h: int,
         viewport_width: int,
         viewport_height: int,
-    ) -> tuple[pygame.Surface, tuple[int, int, int, int]] | None:
+    ) -> tuple[tuple[int, int, int, int], tuple[int, int]] | None:
         mx, my = self._margin
         if self._anchor == "topleft":
             pos = (mx, my)
@@ -1875,13 +2064,7 @@ class TuningOverlay:
         self._panel_rect = bounds
         src_x = bounds[0] - pos[0]
         src_y = bounds[1] - pos[1]
-        if src_x == 0 and src_y == 0 and (bounds[2], bounds[3]) == (panel_w, panel_h):
-            upload_surface: pygame.Surface = panel
-        else:
-            upload_surface = panel.subsurface(
-                (src_x, src_y, bounds[2], bounds[3])
-            )
-        return upload_surface, bounds
+        return bounds, (src_x, src_y)
 
     def draw(
         self,
@@ -1901,7 +2084,6 @@ class TuningOverlay:
         if composed is None:
             self._panel_rect = None
             return
-        _upload_surface, _screen_rect = composed
         panel = self._panel_scratch
         assert panel is not None
         mx, my = self._margin

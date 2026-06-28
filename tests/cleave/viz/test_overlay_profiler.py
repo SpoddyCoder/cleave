@@ -12,6 +12,7 @@ from cleave.viz.overlay_profiler import (
     OverlayProfiler,
     _format_sample_line,
 )
+from cleave.viz.overlay_upload import UploadPlan
 
 
 def test_from_env_disabled_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -37,8 +38,29 @@ def test_from_env_custom_interval(monkeypatch: pytest.MonkeyPatch) -> None:
     assert profiler.emit_interval_frames == 120
 
 
+def _sample(**overrides: object) -> OverlayFrameSample:
+    defaults = {
+        "view_state_build_ms": 0.0,
+        "panel_draw_ms": 0.0,
+        "upload_ms": 0.0,
+        "overlay_present_ms": 0.0,
+        "surface_builds": 0,
+        "font_renders": 0,
+        "row_cache_hits": 0,
+        "row_cache_misses": 0,
+        "upload_skipped": 0,
+        "upload_partial": 0,
+        "upload_full": 0,
+        "upload_partial_rects": 0,
+        "texture_reallocs": 0,
+        "skipped": False,
+    }
+    defaults.update(overrides)
+    return OverlayFrameSample(**defaults)  # type: ignore[arg-type]
+
+
 def test_format_sample_line_full() -> None:
-    sample = OverlayFrameSample(
+    sample = _sample(
         view_state_build_ms=0.4,
         panel_draw_ms=2.1,
         upload_ms=0.3,
@@ -47,7 +69,6 @@ def test_format_sample_line_full() -> None:
         font_renders=42,
         row_cache_hits=10,
         row_cache_misses=2,
-        skipped=False,
     )
     assert (
         _format_sample_line(sample)
@@ -56,18 +77,100 @@ def test_format_sample_line_full() -> None:
 
 
 def test_format_sample_line_skip() -> None:
-    sample = OverlayFrameSample(
-        view_state_build_ms=0.0,
-        panel_draw_ms=0.0,
-        upload_ms=0.0,
-        overlay_present_ms=0.0,
-        surface_builds=0,
-        font_renders=0,
-        row_cache_hits=0,
-        row_cache_misses=0,
-        skipped=True,
-    )
+    sample = _sample(skipped=True)
     assert _format_sample_line(sample) == "overlay: skip"
+
+
+def test_format_sample_line_upload_skip_suffix() -> None:
+    sample = _sample(
+        view_state_build_ms=1.3,
+        panel_draw_ms=1.0,
+        upload_ms=0.0,
+        surface_builds=0,
+        font_renders=2,
+        row_cache_hits=0,
+        row_cache_misses=1,
+        upload_skipped=1,
+    )
+    assert (
+        _format_sample_line(sample)
+        == "overlay: vs=1.3ms draw=1.0ms surf=0 font=2 rcache=0/1 up=0.0ms uskip=1"
+    )
+
+
+def test_format_sample_line_upload_partial_suffix() -> None:
+    sample = _sample(
+        view_state_build_ms=1.3,
+        panel_draw_ms=1.0,
+        upload_ms=0.1,
+        upload_partial=1,
+        upload_partial_rects=2,
+    )
+    assert (
+        _format_sample_line(sample)
+        == "overlay: vs=1.3ms draw=1.0ms surf=0 font=0 rcache=0/0 up=0.1ms upart=1/2"
+    )
+
+
+def test_note_upload_plan_increments_skip_partial_full() -> None:
+    profiler = OverlayProfiler(enabled=True, emit_interval_frames=999)
+    profiler.note_upload_plan(
+        UploadPlan(
+            mode="skip",
+            dirty_rects=(),
+            active_size=(100, 50),
+            screen_rect=(0, 0, 100, 50),
+        )
+    )
+    profiler.note_upload_plan(
+        UploadPlan(
+            mode="partial",
+            dirty_rects=((0, 0, 50, 10), (0, 10, 50, 10)),
+            active_size=(100, 50),
+            screen_rect=(0, 0, 100, 50),
+        )
+    )
+    profiler.note_upload_plan(
+        UploadPlan(
+            mode="full",
+            dirty_rects=((0, 0, 100, 50),),
+            active_size=(100, 50),
+            screen_rect=(0, 0, 100, 50),
+        )
+    )
+
+    sample = profiler.finish_frame()
+
+    assert sample is not None
+    assert sample.upload_skipped == 1
+    assert sample.upload_partial == 1
+    assert sample.upload_partial_rects == 2
+    assert sample.upload_full == 1
+
+
+def test_finish_frame_includes_upload_fields(capsys: pytest.CaptureFixture[str]) -> None:
+    profiler = OverlayProfiler(enabled=True, emit_interval_frames=1)
+    profiler._section_ms["view_state_build"] = 1.3
+    profiler._section_ms["panel_draw"] = 1.0
+    profiler._section_ms["upload"] = 0.0
+    profiler._counters.font_renders = 2
+    profiler._counters.row_cache_misses = 1
+    profiler.note_upload_plan(
+        UploadPlan(
+            mode="skip",
+            dirty_rects=(),
+            active_size=(100, 50),
+            screen_rect=(0, 0, 100, 50),
+        )
+    )
+
+    sample = profiler.finish_frame()
+
+    assert sample is not None
+    assert sample.upload_skipped == 1
+    assert capsys.readouterr().out.strip() == (
+        "overlay: vs=1.3ms draw=1.0ms surf=0 font=2 rcache=0/1 up=0.0ms uskip=1"
+    )
 
 
 def test_finish_frame_prints_compact_line(capsys: pytest.CaptureFixture[str]) -> None:

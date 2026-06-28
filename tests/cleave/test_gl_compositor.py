@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
+import pygame
 import pytest
 
 from cleave.blend_modes import BLEND_MODES
-from cleave.gl_compositor import GlCompositor, LayerFbo
+from cleave.gl_compositor import (
+    GlCompositor,
+    LayerFbo,
+    OverlayTextureSlot,
+    _overlay_subimage_y,
+)
 
 # Modes whose GL blend func uses GL_SRC_ALPHA (opacity stays in glColor alpha).
 _OPACITY_VIA_ALPHA = frozenset({"add"})
@@ -173,3 +179,231 @@ def test_resize_layer_fbo_reallocates_and_preserves_state() -> None:
     assert fbo.hue_mix == 0.25
     assert fbo.grit_strength == 0.33
     assert fbo.aberration_px == 2.5
+
+
+def _make_overlay_compositor() -> GlCompositor:
+    compositor = GlCompositor.__new__(GlCompositor)
+    compositor._initialized = True
+    compositor._overlay_slots = {}
+    compositor._texture_realloc_count = 0
+    compositor._layers = []
+    compositor._content_fbo_id = 0
+    compositor._content_texture_id = 0
+    compositor._content_depth_rbo_id = 0
+    compositor._bind_default_framebuffer = MagicMock()
+    compositor._bind_content_fbo = MagicMock()
+    return compositor
+
+
+def _make_surface(width: int, height: int) -> pygame.Surface:
+    surface = pygame.Surface((width, height), pygame.SRCALPHA)
+    surface.fill((10, 20, 30, 200))
+    return surface
+
+
+@pytest.fixture
+def gl_texture_mocks():
+    texture_ids = iter(range(100, 200))
+
+    def _gen_textures(_count: int = 1) -> list[int]:
+        return [next(texture_ids)]
+
+    with (
+        patch("cleave.gl_compositor.glGenTextures", side_effect=_gen_textures) as gen,
+        patch("cleave.gl_compositor.glTexImage2D") as tex_image,
+        patch("cleave.gl_compositor.glTexSubImage2D") as tex_subimage,
+        patch("cleave.gl_compositor.glDeleteTextures") as delete,
+        patch("cleave.gl_compositor.glBindTexture") as bind,
+        patch("cleave.gl_compositor.GlCompositor._configure_texture_params"),
+        patch(
+            "cleave.gl_compositor._overlay_surface_rgba",
+            return_value=b"\x00" * 16,
+        ) as rgba_bytes,
+    ):
+        yield {
+            "gen": gen,
+            "tex_image": tex_image,
+            "tex_subimage": tex_subimage,
+            "delete": delete,
+            "bind": bind,
+            "rgba_bytes": rgba_bytes,
+        }
+
+
+def test_ensure_overlay_texture_allocates_once_per_slot(gl_texture_mocks) -> None:
+    compositor = _make_overlay_compositor()
+
+    tex_id = compositor.ensure_overlay_texture(OverlayTextureSlot.TUNING, 200, 100)
+
+    assert tex_id == 100
+    assert compositor.overlay_texture_capacity(OverlayTextureSlot.TUNING) == (200, 100)
+    gl_texture_mocks["gen"].assert_called_once()
+    gl_texture_mocks["tex_image"].assert_called_once()
+    gl_texture_mocks["delete"].assert_not_called()
+
+    tex_id_again = compositor.ensure_overlay_texture(OverlayTextureSlot.TUNING, 200, 100)
+    assert tex_id_again == 100
+    gl_texture_mocks["gen"].assert_called_once()
+    gl_texture_mocks["tex_image"].assert_called_once()
+
+
+def test_upload_overlay_region_subimage_within_capacity(gl_texture_mocks) -> None:
+    compositor = _make_overlay_compositor()
+    compositor.ensure_overlay_texture(OverlayTextureSlot.TUNING, 400, 300)
+    gl_texture_mocks["tex_image"].reset_mock()
+    gl_texture_mocks["gen"].reset_mock()
+    gl_texture_mocks["delete"].reset_mock()
+
+    surface = _make_surface(200, 150)
+    tex_id = compositor.upload_overlay_region(
+        OverlayTextureSlot.TUNING, surface, dest_x=10, dest_y=20
+    )
+
+    assert tex_id == 100
+    gl_texture_mocks["delete"].assert_not_called()
+    gl_texture_mocks["tex_image"].assert_not_called()
+    gl_texture_mocks["gen"].assert_not_called()
+    gl_texture_mocks["tex_subimage"].assert_called_once()
+    args = gl_texture_mocks["tex_subimage"].call_args[0]
+    assert args[2] == 10
+    assert args[3] == _overlay_subimage_y(20, 150, 300)
+    assert args[4] == 200
+    assert args[5] == 150
+
+
+def test_upload_overlay_region_active_size_clips_surface(gl_texture_mocks) -> None:
+    compositor = _make_overlay_compositor()
+    compositor.ensure_overlay_texture(OverlayTextureSlot.TUNING, 400, 300)
+    gl_texture_mocks["rgba_bytes"].reset_mock()
+
+    surface = _make_surface(400, 300)
+    compositor.upload_overlay_region(
+        OverlayTextureSlot.TUNING,
+        surface,
+        dest_x=0,
+        dest_y=0,
+        active_w=200,
+        active_h=150,
+    )
+
+    rgba_call = gl_texture_mocks["rgba_bytes"].call_args[0][0]
+    assert rgba_call.get_size() == (200, 150)
+    subimage_args = gl_texture_mocks["tex_subimage"].call_args[0]
+    assert subimage_args[4] == 200
+    assert subimage_args[5] == 150
+
+
+def test_upload_overlay_region_realloc_when_capacity_grows(gl_texture_mocks) -> None:
+    compositor = _make_overlay_compositor()
+    compositor.ensure_overlay_texture(OverlayTextureSlot.TUNING, 200, 100)
+    gl_texture_mocks["tex_image"].reset_mock()
+    gl_texture_mocks["gen"].reset_mock()
+
+    surface = _make_surface(300, 200)
+    tex_id = compositor.upload_overlay_region(OverlayTextureSlot.TUNING, surface)
+
+    assert tex_id == 101
+    gl_texture_mocks["delete"].assert_called_once_with(1, [100])
+    gl_texture_mocks["gen"].assert_called_once()
+    gl_texture_mocks["tex_image"].assert_called_once()
+    image_args = gl_texture_mocks["tex_image"].call_args[0]
+    assert image_args[3] == 300
+    assert image_args[4] == 200
+    assert compositor.consume_texture_reallocs() == 1
+    assert compositor.consume_texture_reallocs() == 0
+
+
+def test_overlay_slots_are_independent(gl_texture_mocks) -> None:
+    compositor = _make_overlay_compositor()
+
+    tuning_id = compositor.upload_overlay_region(
+        OverlayTextureSlot.TUNING, _make_surface(100, 50)
+    )
+    help_id = compositor.upload_overlay_region(
+        OverlayTextureSlot.HELP, _make_surface(80, 40)
+    )
+
+    assert tuning_id == 100
+    assert help_id == 101
+    assert gl_texture_mocks["gen"].call_count == 2
+    tuning_state = compositor._overlay_slots[OverlayTextureSlot.TUNING]
+    help_state = compositor._overlay_slots[OverlayTextureSlot.HELP]
+    assert tuning_state.texture_id == 100
+    assert help_state.texture_id == 101
+
+
+def test_upload_overlay_texture_same_size_uses_subimage(gl_texture_mocks) -> None:
+    compositor = _make_overlay_compositor()
+    surface = _make_surface(128, 64)
+
+    tex_id = compositor.upload_overlay_texture(surface)
+    assert tex_id == 100
+    gl_texture_mocks["tex_image"].assert_called_once()
+    assert gl_texture_mocks["tex_subimage"].call_count == 1
+
+    gl_texture_mocks["tex_image"].reset_mock()
+    gl_texture_mocks["tex_subimage"].reset_mock()
+    tex_id_again = compositor.upload_overlay_texture(surface)
+    assert tex_id_again == 100
+    gl_texture_mocks["tex_image"].assert_not_called()
+    gl_texture_mocks["delete"].assert_not_called()
+    gl_texture_mocks["tex_subimage"].assert_called_once()
+
+
+def test_upload_overlay_texture_size_change_reallocates(gl_texture_mocks) -> None:
+    compositor = _make_overlay_compositor()
+
+    compositor.upload_overlay_texture(_make_surface(100, 50))
+    gl_texture_mocks["delete"].reset_mock()
+    gl_texture_mocks["gen"].reset_mock()
+    gl_texture_mocks["tex_image"].reset_mock()
+
+    tex_id = compositor.upload_overlay_texture(_make_surface(120, 60))
+
+    assert tex_id == 101
+    gl_texture_mocks["delete"].assert_called_once_with(1, [100])
+    gl_texture_mocks["gen"].assert_called_once()
+    gl_texture_mocks["tex_image"].assert_called_once()
+
+
+def test_draw_overlay_custom_tex_uv(gl_texture_mocks) -> None:
+    compositor = _make_overlay_compositor()
+    tex_uv = (0.1, 0.2, 0.9, 0.8)
+
+    with (
+        patch("cleave.gl_compositor.glTexCoord2f") as tex_coord,
+        patch("cleave.gl_compositor.glBegin"),
+        patch("cleave.gl_compositor.glEnd"),
+        patch("cleave.gl_compositor.glColor4f"),
+        patch("cleave.gl_compositor.glBindTexture"),
+        patch("cleave.gl_compositor.GlCompositor._push_blend_state", return_value=(True, 0, 0, 0)),
+        patch("cleave.gl_compositor.GlCompositor._pop_blend_state"),
+        patch("cleave.gl_compositor.GlCompositor._apply_src_alpha_blend"),
+        patch("cleave.gl_compositor.glEnable"),
+    ):
+        compositor.draw_overlay(42, 0, 0, 200, 100, tex_uv=tex_uv)
+
+    u0, v0, u1, v1 = tex_uv
+    tex_coord.assert_any_call(u0, 1.0 - v0)
+    tex_coord.assert_any_call(u1, 1.0 - v0)
+    tex_coord.assert_any_call(u1, 1.0 - v1)
+    tex_coord.assert_any_call(u0, 1.0 - v1)
+
+
+def test_destroy_deletes_all_slot_textures(gl_texture_mocks) -> None:
+    compositor = _make_overlay_compositor()
+    compositor.upload_overlay_region(
+        OverlayTextureSlot.TUNING, _make_surface(50, 50)
+    )
+    compositor.upload_overlay_region(
+        OverlayTextureSlot.HELP, _make_surface(40, 40)
+    )
+    compositor._destroy_content_fbo = MagicMock()
+
+    compositor.destroy()
+
+    delete_calls = [call[0][1][0] for call in gl_texture_mocks["delete"].call_args_list]
+    assert 100 in delete_calls
+    assert 101 in delete_calls
+    assert compositor._overlay_slots == {}
+    assert compositor._initialized is False

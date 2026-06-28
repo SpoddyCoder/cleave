@@ -431,6 +431,7 @@ def _tick_frame_live_overlay(
                 focus_cursor=runtime.controls.focus_cursor,
                 overlay_visibility=overlay_visibility,
             ),
+            profiler=profiler,
         )
 
     profiler.finish_frame()
