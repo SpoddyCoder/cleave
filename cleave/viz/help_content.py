@@ -6,17 +6,29 @@ from dataclasses import dataclass
 
 from cleave.viz.row_semantics import RowAffordance, RowKind, row_behavior
 
+HelpEntry = tuple[str, str]
+
 
 @dataclass(frozen=True)
 class HelpSection:
     title: str
-    entries: tuple[tuple[str, str], ...]
+    entries: tuple[HelpEntry, ...]
 
 
 @dataclass(frozen=True)
 class DescriptionSection:
     title: str
-    lines: tuple[str, ...]
+    lines: tuple[str, ...] = ()
+    entries: tuple[HelpEntry, ...] = ()
+
+
+def description_section(
+    title: str,
+    *,
+    lines: tuple[str, ...] = (),
+    mode_entries: tuple[HelpEntry, ...] = (),
+) -> DescriptionSection:
+    return DescriptionSection(title, lines=lines, entries=mode_entries)
 
 
 HelpContent = HelpSection | DescriptionSection
@@ -44,7 +56,7 @@ _TRANSPORT_SECTION = HelpSection(
 )
 
 _LAYER_SECTION_BASE: tuple[tuple[str, str], ...] = (
-    ("Enter", "move z-order"),
+    ("m", "move z-order"),
     ("Ctrl + Enter", "lock/unlock layer"),
     ("Shift + Left/Right", "solo layer"),
     ("Left/Right", "expand/collapse"),
@@ -184,11 +196,12 @@ def _description_section(
             return DescriptionSection(effect_help_title(effect_id), lines)
 
     behavior = row_behavior(row_kind)
-    if behavior.help_description is None:
+    if behavior.help_description is None and behavior.help_mode_entries is None:
         return None
-    return DescriptionSection(
+    return description_section(
         behavior.help_title or "About",
-        behavior.help_description,
+        lines=behavior.help_description or (),
+        mode_entries=behavior.help_mode_entries or (),
     )
 
 

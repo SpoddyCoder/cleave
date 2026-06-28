@@ -12,6 +12,8 @@ from unittest.mock import MagicMock, patch
 import pygame
 import pytest
 
+_MOVE_MODE_KEY = pygame.K_m
+
 from cleave.config_schema import DEFAULT_LAYER_SLOTS, MAX_LAYER_COUNT
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.preset_playlist import (
@@ -335,7 +337,7 @@ def test_delete_layer_exits_move_mode() -> None:
     manager.remove_layer.side_effect = remove_layer
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_HEADER))
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
     assert controls.move_mode_slot == "layer_1"
 
     controls._delete_layer("layer_2")
@@ -616,13 +618,13 @@ def test_move_mode_swaps_z_order() -> None:
         if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_2"
     )
     controls.focus_descriptor = _desc(view, header_row)
-    assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+    assert controls.handle_keydown(_keydown(_MOVE_MODE_KEY)) is True
     assert controls.move_mode_slot == "layer_2"
 
     assert controls.handle_keydown(_keydown(pygame.K_UP)) is True
     assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
 
-    assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+    assert controls.handle_keydown(_keydown(_MOVE_MODE_KEY)) is True
     assert controls.move_mode_slot is None
     assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
     assert controls.config_dirty
@@ -638,7 +640,7 @@ def test_move_mode_esc_cancels_without_applying() -> None:
         if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_2"
     )
     controls.focus_descriptor = _desc(view, header_row)
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
     controls.handle_keydown(_keydown(pygame.K_UP))
     assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
 
@@ -658,7 +660,7 @@ def test_move_mode_backspace_cancels_without_applying() -> None:
         if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_2"
     )
     controls.focus_descriptor = _desc(view, header_row)
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.session.layer_z_order == ["layer_1", "layer_3", "layer_2"]
 
@@ -1100,7 +1102,7 @@ def test_esc_in_move_mode_does_not_request_overlay_hide() -> None:
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
     assert controls.move_mode_slot == "layer_1"
     assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
     assert controls.move_mode_slot is None
@@ -1882,7 +1884,7 @@ def test_t_ignored_during_move_mode() -> None:
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.TRACK_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
     assert controls.move_mode_slot == "layer_1"
 
     controls.handle_keydown(_keydown(pygame.K_t))
@@ -2304,7 +2306,7 @@ def test_move_mode_colors_focused_track_header() -> None:
         if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_2"
     )
     controls.focus_descriptor = _desc(view, header_row)
-    assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+    assert controls.handle_keydown(_keydown(_MOVE_MODE_KEY)) is True
 
     view = controls.build_view_state(paused=False)
     child_row = header_row + 1
@@ -2470,7 +2472,7 @@ def test_locked_blocks_move_mode() -> None:
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
     assert controls.move_mode_slot is None
 
 
@@ -2543,7 +2545,7 @@ def test_locked_not_toggleable_during_move_mode() -> None:
     controls.focus_descriptor = _desc(view, bass_header)
     assert controls.session.layers["layer_2"].locked is False
 
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
     assert controls.move_mode_slot == "layer_2"
 
     controls.handle_keydown(_keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
@@ -2559,7 +2561,7 @@ def test_ctrl_quick_nav_blocked_during_move_mode() -> None:
         if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_2"
     )
     controls.focus_descriptor = _desc(view, bass_header)
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
     assert controls.move_mode_slot == "layer_2"
 
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
@@ -3165,7 +3167,7 @@ def test_move_mode_swap_calls_apply_preview_resolutions() -> None:
         if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot(i) == "layer_2"
     )
     controls.focus_descriptor = _desc(view, header_row)
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
     layer_manager.apply_preview_resolutions.reset_mock()
 
     controls.handle_keydown(_keydown(pygame.K_UP))

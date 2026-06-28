@@ -195,8 +195,10 @@ class TuningControls:
             if event.key == pygame.K_DOWN:
                 self._swap_stem_in_z_order(self.move_mode_slot, 1)
                 return True
-            if event.key == pygame.K_RETURN:
+            if event.key == pygame.K_m:
                 self._confirm_move_mode()
+                return True
+            if event.key == pygame.K_RETURN:
                 return True
 
         if event.key == pygame.K_ESCAPE:
@@ -261,6 +263,22 @@ class TuningControls:
                     self._delete_layer(slot)
                 return True
 
+        if event.key == pygame.K_m:
+            kind = self.focus_descriptor.kind
+            if kind == RowKind.TRACK_HEADER:
+                slot = self.focus_descriptor.slot
+                if slot is not None:
+                    if (
+                        self.session.layers[slot].locked
+                        and row_behavior(kind).can_enter_move_mode
+                    ):
+                        return True
+                    self._move_mode_original_z_order = list(
+                        self.session.layer_z_order
+                    )
+                    self.move_mode_slot = slot
+                return True
+
         if event.key == pygame.K_RETURN and mod_ctrl(event.mod):
             kind = self.focus_descriptor.kind
             if kind == RowKind.TRACK_HEADER:
@@ -292,19 +310,6 @@ class TuningControls:
                 return True
             if kind == RowKind.TRANSPORT:
                 toggle_pause(self.playback, self.duration_sec)
-                return True
-            if kind == RowKind.TRACK_HEADER:
-                slot = self.focus_descriptor.slot
-                if slot is not None:
-                    if (
-                        self.session.layers[slot].locked
-                        and row_behavior(kind).can_enter_move_mode
-                    ):
-                        return True
-                    self._move_mode_original_z_order = list(
-                        self.session.layer_z_order
-                    )
-                    self.move_mode_slot = slot
                 return True
             if kind == RowKind.CONFIG_HEADER:
                 self.prompt_save_config()

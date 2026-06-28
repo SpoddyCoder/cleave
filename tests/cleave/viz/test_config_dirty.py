@@ -40,9 +40,9 @@ def _mutate_layer_z_order(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_2", RowKind.TRACK_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    controls.handle_keydown(_keydown(pygame.K_m))
     controls.handle_keydown(_keydown(pygame.K_UP))
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    controls.handle_keydown(_keydown(pygame.K_m))
 
 
 def _mutate_stem_enabled(controls: TuningControls) -> None:
@@ -408,7 +408,7 @@ def _mutate_render_post_fx_solo(controls: TuningControls) -> None:
 def _mutate_move_mode_without_confirm(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_2", RowKind.TRACK_HEADER))
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    controls.handle_keydown(_keydown(pygame.K_m))
     controls.handle_keydown(_keydown(pygame.K_UP))
 
 

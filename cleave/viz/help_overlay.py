@@ -64,18 +64,17 @@ class HelpOverlay:
     def _entry_gap(self, font: pygame.font.Font) -> int:
         return font.size("  ")[0]
 
-    def _help_sections(self, sections: tuple[HelpContent, ...]) -> tuple[HelpSection, ...]:
-        return tuple(section for section in sections if isinstance(section, HelpSection))
+    def _section_entries(self, section: HelpContent) -> tuple[tuple[str, str], ...]:
+        return section.entries
 
     def _max_key_width(
         self, font: pygame.font.Font, sections: tuple[HelpContent, ...]
     ) -> int:
-        help_sections = self._help_sections(sections)
         return max(
             (
                 font.render(key, True, LABEL).get_width()
-                for section in help_sections
-                for key, _ in section.entries
+                for section in sections
+                for key, _ in self._section_entries(section)
             ),
             default=0,
         )
@@ -106,9 +105,20 @@ class HelpOverlay:
         title_w = font.render(section.title, True, HIGHLIGHT).get_width()
         if isinstance(section, DescriptionSection):
             line_widths = tuple(self._line_width(font, line) for line in section.lines)
-            if not line_widths:
+            entry_widths = tuple(
+                self._entry_width(
+                    font,
+                    key,
+                    description,
+                    key_column_width=key_column_width,
+                    entry_gap=entry_gap,
+                )
+                for key, description in section.entries
+            )
+            content_widths = line_widths + entry_widths
+            if not content_widths:
                 return title_w
-            return max(title_w, *line_widths)
+            return max(title_w, *content_widths)
         entry_widths = tuple(
             self._entry_width(
                 font,
@@ -124,11 +134,10 @@ class HelpOverlay:
         return max(title_w, *entry_widths)
 
     def _section_line_count(self, section: HelpContent) -> int:
-        body_lines = (
-            len(section.lines)
-            if isinstance(section, DescriptionSection)
-            else len(section.entries)
-        )
+        if isinstance(section, DescriptionSection):
+            body_lines = len(section.lines) + len(section.entries)
+        else:
+            body_lines = len(section.entries)
         return 2 + body_lines
 
     def _dash_separator(self, font: pygame.font.Font, width: int) -> pygame.Surface:
@@ -177,6 +186,18 @@ class HelpOverlay:
             for line in section.lines:
                 line_surf = font.render(line, True, VALUE)
                 panel.blit(line_surf, (self._padding, y))
+                y += row_stride
+            for key, description in section.entries:
+                self._blit_entry(
+                    panel,
+                    font,
+                    key,
+                    description,
+                    self._padding,
+                    y,
+                    key_column_width=key_column_width,
+                    entry_gap=entry_gap,
+                )
                 y += row_stride
             return y
 

@@ -5,6 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum, auto
 
+from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES
+from cleave.config_schema import (
+    PRESET_SWITCHING_MODE_HELP_ENTRIES,
+    VISUALIZER_RENDER_MODE_HELP_ENTRIES,
+)
+
 
 class RowKind(Enum):
     TRACK_HEADER = auto()
@@ -81,6 +87,7 @@ class RowBehavior:
     help_title: str = ""
     help_entries: tuple[tuple[str, str], ...] | None = None
     help_description: tuple[str, ...] | None = None
+    help_mode_entries: tuple[tuple[str, str], ...] | None = None
     navigable: bool = True
     quick_nav_target: bool = False
     is_header: bool = False
@@ -158,10 +165,8 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         parent_group="track",
         help_title="Switching mode",
         help_entries=(("Left/Right", "cycle mode"),),
-        help_description=(
-            "none - keeps the current preset indefinitely.",
-            "projectm - libprojectM switches automatically using beat detection.",
-        ),
+        help_description=(),
+        help_mode_entries=PRESET_SWITCHING_MODE_HELP_ENTRIES,
     ),
     RowKind.TRACK_PRESET_SWITCHING_SCOPE: RowBehavior(
         RowAffordance.VALUE_STEP,
@@ -267,16 +272,8 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Blend mode",
         help_description=(
             "How this layer is composited onto the layers below it.",
-            "black-key - Milkdrop black is transparent; brightness sets blend weight.",
-            "add - additive highlights, suited to drums.",
-            "multiply - multiply destination color by source.",
-            "screen - lighten destination with source.",
-            "subtract - subtract source from destination.",
-            "difference - absolute difference between layers.",
-            "exclusion - soft difference blend.",
-            "max - per-channel maximum of source and destination.",
-            "pure-add - add source without alpha weighting.",
         ),
+        help_mode_entries=BLEND_MODE_HELP_ENTRIES,
     ),
     RowKind.TRACK_OPACITY: RowBehavior(
         RowAffordance.VALUE_STEP,
@@ -510,6 +507,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "Trade-off between visual quality and CPU/GPU load.",
             "Affects layer resolution scaling in the live view only.",
         ),
+        help_mode_entries=VISUALIZER_RENDER_MODE_HELP_ENTRIES,
     ),
     RowKind.SETTINGS_UI_HEADER: RowBehavior(
         RowAffordance.EXPAND,
