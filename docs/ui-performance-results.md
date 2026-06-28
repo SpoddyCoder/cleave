@@ -1,11 +1,12 @@
 # UI Performance Results
+
 Consistent test case with 2 layers and user-presets. UI gradually opens all leaves of the tree...
 
 ## Phase 1
 Baseline, just the profiler built in this phase.
 
 ```
-overlay profiler: on (logging to terminal every 30 frames; latest on panel when open)
+overlay profiler: on (logging to terminal every 30 frames)
 overlay: vs=6.8ms draw=4.7ms surf=11 font=31 up=0.3ms
 overlay: vs=6.0ms draw=18.5ms surf=18 font=48 up=0.5ms
 overlay: vs=6.4ms draw=58.3ms surf=30 font=73 up=0.7ms
@@ -26,7 +27,7 @@ single `RowLayoutFrame` per frame (`visible_indices`, `navigable_indices`,
 memoization with invalidation on navigation mutators.
 
 ```
-overlay profiler: on (logging to terminal every 30 frames; latest on panel when open)
+overlay profiler: on (logging to terminal every 30 frames)
 overlay: vs=1.6ms draw=1.6ms surf=11 font=31 up=0.3ms
 overlay: vs=1.3ms draw=1.5ms surf=10 font=31 up=0.3ms
 overlay: vs=1.6ms draw=1.8ms surf=10 font=31 up=0.5ms
@@ -58,8 +59,40 @@ overlay: vs=3.0ms draw=8.0ms surf=57 font=128 up=0.6ms
 
 ## Phase 3
 
-```
+`TuningPanelCache` with computed `panel_signature` and per-row surfaces keyed by
+`(kind, slot, display_text, color_state, max_width, line_h)`. Transport and FPS
+sit outside the static signature; the incremental compose path patches those rows
+each frame.
+Full recompose runs when structure, focus, scroll, or any static row content
+changes.
 
+```
+overlay profiler: on (logging to terminal every 30 frames; latest on panel when open)
+overlay: vs=1.8ms draw=2.5ms surf=11 font=30 rcache=0/13 up=0.4ms
+overlay: vs=1.4ms draw=1.2ms surf=0 font=2 rcache=0/1 up=0.4ms
+overlay: vs=1.3ms draw=1.0ms surf=0 font=2 rcache=0/1 up=0.3ms
+overlay: vs=1.7ms draw=1.4ms surf=0 font=2 rcache=0/1 up=0.5ms
+overlay: vs=1.7ms draw=1.4ms surf=0 font=2 rcache=0/1 up=0.5ms
+overlay: vs=2.0ms draw=2.0ms surf=0 font=2 rcache=0/1 up=0.6ms
+overlay: vs=2.1ms draw=2.7ms surf=0 font=2 rcache=0/1 up=0.7ms
+overlay: vs=2.1ms draw=2.7ms surf=0 font=2 rcache=0/1 up=0.7ms
+overlay: vs=2.1ms draw=2.7ms surf=0 font=2 rcache=0/1 up=0.7ms
+overlay: vs=2.1ms draw=2.7ms surf=0 font=2 rcache=0/1 up=0.7ms
+overlay: vs=2.0ms draw=2.7ms surf=0 font=2 rcache=0/1 up=0.6ms
+overlay: vs=2.1ms draw=2.7ms surf=0 font=2 rcache=0/1 up=0.6ms
+overlay: vs=2.3ms draw=2.8ms surf=0 font=2 rcache=0/1 up=0.7ms
+overlay: vs=2.4ms draw=4.0ms surf=0 font=2 rcache=0/1 up=0.9ms
+overlay: vs=2.2ms draw=3.1ms surf=0 font=2 rcache=0/1 up=0.7ms
+overlay: vs=2.4ms draw=3.9ms surf=0 font=2 rcache=0/1 up=0.8ms
+overlay: vs=3.1ms draw=4.5ms surf=0 font=2 rcache=0/1 up=0.8ms
+overlay: vs=3.0ms draw=4.1ms surf=0 font=2 rcache=0/1 up=0.8ms
+overlay: vs=2.9ms draw=9.5ms surf=2 font=7 rcache=40/3 up=0.8ms
+overlay: vs=3.0ms draw=9.4ms surf=1 font=5 rcache=41/2 up=0.8ms
+overlay: vs=3.3ms draw=5.4ms surf=0 font=2 rcache=0/1 up=0.9ms
+overlay: vs=3.0ms draw=4.9ms surf=0 font=2 rcache=0/1 up=0.6ms
+overlay: vs=3.0ms draw=10.8ms surf=1 font=6 rcache=41/2 up=0.6ms
+overlay: vs=3.1ms draw=5.2ms surf=0 font=2 rcache=0/1 up=0.7ms
+overlay: vs=3.0ms draw=5.3ms surf=0 font=2 rcache=0/1 up=0.6ms
 ```
 
 ## Phase 4

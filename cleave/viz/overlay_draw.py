@@ -116,11 +116,6 @@ class OverlayDrawer:
             viewport_height=viewport_h,
             timeline_panel_open=timeline_panel_open,
             counters=counters,
-            profiler_status_line=(
-                profiler.last_line
-                if profiler is not None and profiler.enabled
-                else None
-            ),
         )
         if composed is not None:
             panel_surface, (px, py, pw, ph) = composed
