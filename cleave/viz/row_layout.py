@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from cleave.config_schema import MAX_LAYER_COUNT
@@ -50,9 +50,59 @@ def row_navigable(state: TuningViewState, desc: RowDescriptor) -> bool:
     return True
 
 
+def resolve_navigable_descriptor(
+    desc: RowDescriptor,
+    navigable_descriptors: tuple[RowDescriptor, ...] | list[RowDescriptor],
+) -> RowDescriptor:
+    if desc in navigable_descriptors:
+        return desc
+    header = section_header_descriptor(desc)
+    if header in navigable_descriptors:
+        return header
+    return RowDescriptor(RowKind.TRANSPORT)
+
+
+@dataclass(frozen=True)
+class RowLayoutFrame:
+    visible_indices: tuple[int, ...]
+    navigable_indices: tuple[int, ...]
+    navigable_descriptors: tuple[RowDescriptor, ...]
+    descriptor_index: dict[RowDescriptor, int]
+    resolved_focus_index: int
+
+
+def build_layout_frame(layout: RowLayout, state: TuningViewState) -> RowLayoutFrame:
+    from cleave.viz.focus_nav import cursor_main_descriptor
+
+    visible_indices = tuple(
+        index
+        for index in range(len(layout))
+        if row_draw_visible(state, layout.descriptor(index))
+    )
+    navigable_indices = tuple(
+        index
+        for index in range(len(layout))
+        if row_navigable(state, layout.descriptor(index))
+    )
+    navigable_descriptors = tuple(
+        layout.descriptor(index) for index in navigable_indices
+    )
+    focus_desc = cursor_main_descriptor(state.focus_cursor)
+    resolved = resolve_navigable_descriptor(focus_desc, navigable_descriptors)
+    resolved_focus_index = layout.find_descriptor(resolved)
+    return RowLayoutFrame(
+        visible_indices=visible_indices,
+        navigable_indices=navigable_indices,
+        navigable_descriptors=navigable_descriptors,
+        descriptor_index=layout.descriptor_index,
+        resolved_focus_index=resolved_focus_index,
+    )
+
+
 @dataclass(frozen=True)
 class RowLayout:
     rows: tuple[RowDescriptor, ...]
+    descriptor_index: dict[RowDescriptor, int] = field(default_factory=dict)
 
     @classmethod
     def build(cls, state: TuningViewState) -> RowLayout:
@@ -72,7 +122,11 @@ class RowLayout:
             row_list.append(RowDescriptor(RowKind.LAYER_MANAGEMENT_ADD))
         row_list.append(RowDescriptor(RowKind.RENDER_SECTION_GAP))
         append_render_section_rows(row_list, state)
-        return cls(tuple(row_list))
+        rows = tuple(row_list)
+        return cls(
+            rows=rows,
+            descriptor_index={desc: index for index, desc in enumerate(rows)},
+        )
 
     def __len__(self) -> int:
         return len(self.rows)
@@ -115,27 +169,34 @@ class RowLayout:
         raise ValueError(f"no row for kind={kind!r}")
 
     def find_descriptor(self, desc: RowDescriptor) -> int:
+        if self.descriptor_index:
+            try:
+                return self.descriptor_index[desc]
+            except KeyError:
+                pass
         for index, row in enumerate(self.rows):
             if row == desc:
                 return index
         raise ValueError(f"descriptor not in layout: {desc!r}")
 
     def contains_descriptor(self, desc: RowDescriptor) -> bool:
+        if self.descriptor_index:
+            return desc in self.descriptor_index
         return desc in self.rows
 
     def navigable_descriptors(self, state: TuningViewState) -> list[RowDescriptor]:
+        frame = state.layout_frame
+        if frame is not None:
+            return list(frame.navigable_descriptors)
         return [self.descriptor(index) for index in self.navigable_indices(state)]
 
     def resolve_navigable(
         self, desc: RowDescriptor, state: TuningViewState
     ) -> RowDescriptor:
-        navigable = self.navigable_descriptors(state)
-        if desc in navigable:
-            return desc
-        header = section_header_descriptor(desc)
-        if header in navigable:
-            return header
-        return RowDescriptor(RowKind.TRANSPORT)
+        frame = state.layout_frame
+        if frame is not None:
+            return resolve_navigable_descriptor(desc, frame.navigable_descriptors)
+        return resolve_navigable_descriptor(desc, self.navigable_descriptors(state))
 
     def header_row_count(self) -> int:
         count = 0
@@ -155,6 +216,9 @@ class RowLayout:
 
     def visible_indices(self, state: TuningViewState) -> list[int]:
         """Row indices drawn in the panel (sub-rows hidden when collapsed)."""
+        frame = state.layout_frame
+        if frame is not None:
+            return list(frame.visible_indices)
         return [
             index
             for index in range(len(self))
@@ -163,6 +227,9 @@ class RowLayout:
 
     def navigable_indices(self, state: TuningViewState) -> list[int]:
         """Row indices reachable via Up/Down (sub-rows skipped when collapsed)."""
+        frame = state.layout_frame
+        if frame is not None:
+            return list(frame.navigable_indices)
         return [
             index
             for index in range(len(self))

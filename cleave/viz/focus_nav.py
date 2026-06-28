@@ -27,10 +27,16 @@ def timeline_strip_in_ring(state: TuningViewState) -> bool:
 
 
 def build_focus_ring(state: TuningViewState) -> list[FocusCursor]:
-    ring: list[FocusCursor] = [
-        MainFocus(descriptor)
-        for descriptor in state.layout.navigable_descriptors(state)
-    ]
+    frame = state.layout_frame
+    if frame is not None:
+        ring: list[FocusCursor] = [
+            MainFocus(descriptor) for descriptor in frame.navigable_descriptors
+        ]
+    else:
+        ring = [
+            MainFocus(descriptor)
+            for descriptor in state.layout.navigable_descriptors(state)
+        ]
     if timeline_strip_in_ring(state):
         ring.extend(TimelineFocus(row) for row in range(len(state.layer_z_order)))
     return ring
