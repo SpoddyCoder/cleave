@@ -157,6 +157,9 @@ class LayerFramePipeline:
             layer,
             mode=layer_cfg.preset_switching,
             scope=layer_cfg.preset_switching_scope,
+            user_presets=[
+                str(path) for path in layer_cfg.preset_switching_presets
+            ],
             preset_duration=layer_cfg.preset_duration,
             soft_cut_duration=layer_cfg.soft_cut_duration,
             easter_egg=layer_cfg.easter_egg,

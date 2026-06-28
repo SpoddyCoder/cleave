@@ -225,6 +225,7 @@ class HelpOverlay:
         paused: bool = False,
         timeline_recording: bool = False,
         timeline_override_active: bool = False,
+        preset_switching: str | None = None,
     ) -> None:
         self._panel_rect = None
         font = self._font_get()
@@ -237,6 +238,7 @@ class HelpOverlay:
             paused=paused,
             timeline_recording=timeline_recording,
             timeline_override_active=timeline_override_active,
+            preset_switching=preset_switching,
         )
 
         entry_gap = self._entry_gap(font)

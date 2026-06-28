@@ -139,6 +139,16 @@ def test_preset_dir_help_titles() -> None:
     entries = dict(keyboard.entries)
     assert entries["Left/Right"] == "next/previous directory"
     assert entries["Ctrl + Left/Right"] == "up/down directory tree"
+    assert "Shift + +" not in entries
+
+
+def test_preset_dir_help_includes_add_shortcut_in_user_defined_mode() -> None:
+    sections = sections_for(
+        RowKind.TRACK_PRESET_DIR,
+        preset_switching="user_defined",
+    )
+    entries = dict(_keyboard_section(sections).entries)
+    assert entries["+"] == "add current preset to rotation set"
 
 
 def test_preset_file_help_titles() -> None:
@@ -150,6 +160,16 @@ def test_preset_file_help_titles() -> None:
     entries = dict(keyboard.entries)
     assert entries["Left/Right"] == "next/previous preset"
     assert entries["Ctrl + Left/Right"] == "next/previous large step"
+    assert "Shift + +" not in entries
+
+
+def test_preset_file_help_includes_add_shortcut_in_user_defined_mode() -> None:
+    sections = sections_for(
+        RowKind.TRACK_PRESET,
+        preset_switching="user_defined",
+    )
+    entries = dict(_keyboard_section(sections).entries)
+    assert entries["+"] == "add current preset to rotation set"
 
 
 def test_blend_mode_help_lists_modes() -> None:
@@ -249,6 +269,35 @@ def test_layer_management_delete_help() -> None:
     assert "" not in entries
     assert description is not None
     assert "At least one layer must remain." in description.lines
+
+
+def test_user_presets_help() -> None:
+    sections = sections_for(RowKind.TRACK_USER_PRESETS)
+    description = _description_section(sections)
+    keyboard = _keyboard_section(sections)
+    assert description is not None
+    assert description.title == "user presets"
+    assert "user-defined switching" in " ".join(description.lines)
+    assert dict(keyboard.entries)["Left/Right"] == "expand/collapse"
+
+
+def test_user_preset_item_help() -> None:
+    sections = sections_for(RowKind.TRACK_USER_PRESET_ITEM)
+    description = _description_section(sections)
+    keyboard = _keyboard_section(sections)
+    assert description is not None
+    assert description.title == "user preset entry"
+    assert dict(keyboard.entries)["Delete"] == "remove preset"
+
+
+def test_user_preset_add_help() -> None:
+    sections = sections_for(RowKind.TRACK_USER_PRESET_ADD)
+    description = _description_section(sections)
+    keyboard = _keyboard_section(sections)
+    assert description is not None
+    assert description.title == "Add Current Preset"
+    assert dict(keyboard.entries)["Enter"] == "add current preset"
+    assert any("+" in line and "preset dir" in line for line in description.lines)
 
 
 def test_navigable_row_kinds_have_help_sections() -> None:

@@ -134,6 +134,8 @@ class LayerRuntime:
     hard_cut_enabled: bool = DEFAULT_HARD_CUT_ENABLED
     easter_egg: float = DEFAULT_EASTER_EGG
     preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN
+    user_presets: list[str] = field(default_factory=list)  # absolute paths
+    user_presets_expanded: bool = False
 
 
 @dataclass
@@ -238,6 +240,10 @@ def session_from_cfg(
                 hard_cut_enabled=layer_cfg.hard_cut_enabled,
                 easter_egg=layer_cfg.easter_egg,
                 preset_start_clean=layer_cfg.preset_start_clean,
+                user_presets=[
+                    path.as_posix()
+                    for path in layer_cfg.preset_switching_presets
+                ],
             )
             for slot, layer_cfg in cfg.layers.items()
         },

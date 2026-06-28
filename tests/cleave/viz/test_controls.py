@@ -3224,6 +3224,34 @@ def test_projectm_mode_blocks_preset_browse() -> None:
     assert changed == []
 
 
+def test_user_defined_mode_allows_preset_browse() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_switching = "user_defined"
+    assert not controls._auto_preset_switching_blocks_browse("layer_1")
+    controls.session.layers["layer_1"].expanded = True
+    changed: list[str] = []
+    controls._layer_bindings = noop_layer_bindings(
+        on_preset_change=lambda slot, _pl: changed.append(slot)
+    )
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = view.layout.descriptor(
+        _row(view, "layer_1", RowKind.TRACK_PRESET)
+    )
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert changed == ["layer_1"]
+
+    root, siblings = _make_sibling_dir_tree(3)
+    dir_controls = _controls_with_playlist(root, siblings[0])
+    dir_controls.session.layers["layer_1"].preset_switching = "user_defined"
+    dir_controls.session.layers["layer_1"].expanded = True
+    dir_controls.focus_descriptor = _desc(
+        dir_controls.build_view_state(paused=False), _preset_dir_row(dir_controls)
+    )
+    playlist = dir_controls.session.layers["layer_1"].playlist
+    dir_controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert playlist.current_dir.resolve() == siblings[1].resolve()
+
+
 def test_scope_row_hidden_when_mode_none() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)

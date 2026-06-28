@@ -45,14 +45,21 @@ class OverlayDrawer:
             overlay_surface, view_state, timeline_panel_open=timeline_panel_open
         )
         if help_overlay is not None and view_state.help_visible:
+            focus = view_state.focus_descriptor
+            preset_switching = None
+            if focus.slot is not None:
+                track = view_state.tracks.get(focus.slot)
+                if track is not None:
+                    preset_switching = track.preset_switching
             help_overlay.draw(
                 overlay_surface,
-                view_state.focus_descriptor,
+                focus,
                 timeline_enabled=view_state.render_timeline.enabled,
                 timeline_submenu_focused=view_state.timeline_submenu_focused,
                 paused=view_state.paused,
                 timeline_recording=view_state.timeline_recording,
                 timeline_override_active=view_state.timeline_override_active,
+                preset_switching=preset_switching,
             )
 
         modal_active = modal_host is not None and modal_host.active

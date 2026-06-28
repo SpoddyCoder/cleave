@@ -2,7 +2,7 @@
 
 Proposal for per-layer automatic preset rotation. Supersedes the [Auto-switching presets (projectM mode)](roadmap.md#auto-switching-presets-projectm-mode) roadmap item; Cleave-native preset cycling is out of scope (see [Decisions](#decisions)).
 
-**Status:** Draft with decisions recorded. Not scheduled.
+**Status:** Implemented through v2 (none, projectM, user-defined list with add/remove UI). v3+ not scheduled.
 
 ## Overview
 
@@ -177,7 +177,7 @@ Defaults: `preset_switching: none`. Omit optional keys when they match defaults.
 | --- | --- |
 | **v1** | **none** + **projectM**; preset switching row and scope child row (`directory` only); hard cuts enabled; libprojectM default timing; shuffle off |
 | **v1.1** | Expose the most important timing parameters in the tuning panel (`preset_duration`, `soft_cut_duration`, hard-cut duration/sensitivity) |
-| **v2** | **user-defined** list + UI to add/remove presets |
+| **v2** (done) | **user-defined** list + UI to add/remove presets |
 | **v3** | `subtree` scope, shuffle toggle, gitignore-style filter patterns |
 | **v4** | Remaining optional timing parameters (e.g. `easter_egg`) |
 

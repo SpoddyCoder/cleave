@@ -97,6 +97,32 @@ _PRESET_SECTION = HelpSection(
     ),
 )
 
+_USER_PRESET_ADD_SHORTCUT = ("+", "add current preset to rotation set")
+
+_USER_PRESET_ITEM_SECTION = HelpSection(
+    "Edit",
+    (("Delete", "remove preset"),),
+)
+
+_USER_PRESET_ADD_SECTION = HelpSection(
+    "Add Current Preset",
+    (("Enter", "add current preset"),),
+)
+
+
+def _preset_dir_section(*, user_defined: bool = False) -> HelpSection:
+    entries = list(_PRESET_DIR_SECTION.entries)
+    if user_defined:
+        entries.append(_USER_PRESET_ADD_SHORTCUT)
+    return HelpSection(_PRESET_DIR_SECTION.title, tuple(entries))
+
+
+def _preset_section(*, user_defined: bool = False) -> HelpSection:
+    entries = list(_PRESET_SECTION.entries)
+    if user_defined:
+        entries.append(_USER_PRESET_ADD_SHORTCUT)
+    return HelpSection(_PRESET_SECTION.title, tuple(entries))
+
 _RENDER_SECTION = HelpSection(
     "Render",
     (
@@ -218,6 +244,7 @@ def sections_for(
     paused: bool = False,
     timeline_recording: bool = False,
     timeline_override_active: bool = False,
+    preset_switching: str | None = None,
 ) -> tuple[HelpContent, ...]:
     if timeline_submenu_focused:
         strip = timeline_strip_section(
@@ -256,10 +283,18 @@ def sections_for(
             )
     elif behavior.affordance == RowAffordance.VALUE_STEP:
         primary = _value_step_section(row_kind)
+    elif row_kind == RowKind.TRACK_USER_PRESET_ITEM:
+        primary = _USER_PRESET_ITEM_SECTION
+    elif row_kind == RowKind.TRACK_USER_PRESET_ADD:
+        primary = _USER_PRESET_ADD_SECTION
     elif behavior.affordance == RowAffordance.PATH_DIR:
-        primary = _PRESET_DIR_SECTION
+        primary = _preset_dir_section(
+            user_defined=preset_switching == "user_defined"
+        )
     elif behavior.affordance == RowAffordance.PATH_PRESET:
-        primary = _PRESET_SECTION
+        primary = _preset_section(
+            user_defined=preset_switching == "user_defined"
+        )
     elif behavior.affordance == RowAffordance.SEEK:
         primary = _TRANSPORT_SECTION
     elif row_kind == RowKind.LAYER_MANAGEMENT_ADD:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -14,7 +15,7 @@ from cleave.config_schema import PRESET_SWITCHING_MODES
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.extract import STEM_SOURCES
 from cleave.viz.config_save import ConfigSaveController
-from cleave.viz.key_repeat import KeyRepeatController, delete_key_pressed, mod_ctrl, mod_shift
+from cleave.viz.key_repeat import KeyRepeatController, add_current_preset_key_pressed, delete_key_pressed, mod_ctrl, mod_shift
 from cleave.viz.modal import ModalHost
 from cleave.viz.panel_notification import PanelNotificationHost
 from cleave.viz.playback import PlaybackState, seek, toggle_pause
@@ -22,6 +23,7 @@ from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.render_overlay_controls import RenderOverlayControls
 from cleave.viz.render_post_fx_controls import RenderPostFxControls
 from cleave.viz.settings_controls import SettingsControls
+from cleave.viz.user_presets import resolve_user_preset_dest, user_preset_item_display_name
 from cleave.viz.focus_nav import (
     FocusCursor,
     MainFocus,
@@ -66,6 +68,7 @@ class TuningControls:
         playback: PlaybackState,
         duration_sec: float,
         *,
+        project_dir: Path | None = None,
         layer_bindings: LiveLayerBindings | None = None,
         on_save_new_config: Callable[[], Path | None] | None = None,
         on_overwrite_config: Callable[[Path], str | None] | None = None,
@@ -77,6 +80,7 @@ class TuningControls:
         self.session = session
         self.cfg = cfg
         self.preset_root = preset_root
+        self.project_dir = project_dir
         self.playback = playback
         self.duration_sec = duration_sec
         self._layer_bindings = layer_bindings
@@ -257,6 +261,16 @@ class TuningControls:
 
         if delete_key_pressed(event):
             kind = self.focus_descriptor.kind
+            if kind == RowKind.TRACK_USER_PRESET_ITEM:
+                slot = self.focus_descriptor.slot
+                desc = self.focus_descriptor
+                if slot is not None and desc.preset_index is not None:
+                    if layer_lock_blocks_mutation(
+                        kind, locked=self.session.layers[slot].locked
+                    ):
+                        return True
+                    self._delete_user_preset(slot, desc.preset_index)
+                return True
             if row_triggers_layer_delete(kind):
                 slot = self.focus_descriptor.slot
                 if slot is not None:
@@ -279,6 +293,21 @@ class TuningControls:
                     self.move_mode_slot = slot
                 return True
 
+        if add_current_preset_key_pressed(event.key, event.mod):
+            kind = self.focus_descriptor.kind
+            slot = self.focus_descriptor.slot
+            if (
+                slot is not None
+                and kind in {RowKind.TRACK_PRESET_DIR, RowKind.TRACK_PRESET}
+                and self.session.layers[slot].preset_switching == "user_defined"
+            ):
+                if layer_lock_blocks_mutation(
+                    kind, locked=self.session.layers[slot].locked
+                ):
+                    return True
+                self._add_current_preset(slot)
+                return True
+
         if event.key == pygame.K_RETURN and mod_ctrl(event.mod):
             kind = self.focus_descriptor.kind
             if kind == RowKind.TRACK_HEADER:
@@ -289,6 +318,15 @@ class TuningControls:
 
         if event.key == pygame.K_RETURN:
             kind = self.focus_descriptor.kind
+            if kind == RowKind.TRACK_USER_PRESET_ADD:
+                slot = self.focus_descriptor.slot
+                if slot is not None:
+                    if layer_lock_blocks_mutation(
+                        kind, locked=self.session.layers[slot].locked
+                    ):
+                        return True
+                    self._add_current_preset(slot)
+                return True
             if kind == RowKind.LAYER_MANAGEMENT_ADD:
                 self._add_layer()
                 return True
@@ -507,6 +545,79 @@ class TuningControls:
             )
         self._normalize_focus_cursor()
 
+    def _user_presets_dir(self) -> Path | None:
+        if self.project_dir is None:
+            return None
+        return self.project_dir / "user-presets"
+
+    def _user_preset_path_referenced(self, path: str) -> bool:
+        target = Path(path).resolve()
+        for layer in self.session.layers.values():
+            for other in layer.user_presets:
+                if Path(other).resolve() == target:
+                    return True
+        return False
+
+    def _unlock_preset_after_modal(self, slot: str) -> None:
+        if self._layer_bindings is not None:
+            self._layer_bindings.unlock_preset_after_modal(slot)
+
+    def _add_current_preset(self, slot: str) -> None:
+        playlist = self.session.layers[slot].playlist
+        if playlist.current is None:
+            return
+        src_path = playlist.current
+        if self._layer_bindings is not None:
+            self._layer_bindings.lock_preset_for_modal(slot)
+        self._modal_host.prompt_yes_no(
+            f"Add preset: {src_path.name}?",
+            on_confirm=lambda: self._confirm_add_preset(slot, src_path),
+            on_cancel=lambda: self._unlock_preset_after_modal(slot),
+        )
+
+    def _confirm_add_preset(self, slot: str, src_path: Path) -> None:
+        try:
+            dest_dir = self._user_presets_dir()
+            if dest_dir is None:
+                return
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            dest_path, needs_copy = resolve_user_preset_dest(dest_dir, src_path)
+            if needs_copy:
+                shutil.copy2(src_path, dest_path)
+            self.session.layers[slot].user_presets.append(str(dest_path.resolve()))
+            if self._layer_bindings is not None:
+                self._layer_bindings.on_preset_switching_change(slot)
+        finally:
+            self._unlock_preset_after_modal(slot)
+
+    def _delete_user_preset(self, slot: str, index: int) -> None:
+        layer = self.session.layers[slot]
+        if index < 0 or index >= len(layer.user_presets):
+            return
+        label = user_preset_item_display_name(layer.user_presets, index)
+        self._modal_host.prompt_yes_no(
+            f"Remove preset: {label}?",
+            on_confirm=lambda: self._confirm_delete_preset(slot, index),
+        )
+
+    def _confirm_delete_preset(self, slot: str, index: int) -> None:
+        layer = self.session.layers[slot]
+        if index < 0 or index >= len(layer.user_presets):
+            return
+        removed = layer.user_presets.pop(index)
+        removed_path = Path(removed).resolve()
+        presets_dir = self._user_presets_dir()
+        if presets_dir is not None:
+            try:
+                removed_path.relative_to(presets_dir.resolve())
+            except ValueError:
+                pass
+            else:
+                if not self._user_preset_path_referenced(removed):
+                    removed_path.unlink(missing_ok=True)
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_preset_switching_change(slot)
+
     def _cancel_move_mode(self) -> None:
         if self._move_mode_original_z_order is not None:
             self.session.layer_z_order[:] = self._move_mode_original_z_order
@@ -587,7 +698,7 @@ class TuningControls:
             self._layer_bindings.on_preset_change(slot, playlist)
 
     def _auto_preset_switching_blocks_browse(self, slot: str) -> bool:
-        return self.session.layers[slot].preset_switching != "none"
+        return self.session.layers[slot].preset_switching == "projectm"
 
     def _cycle_preset_switching(self, slot: str, *, forward: bool) -> None:
         layer = self.session.layers[slot]
@@ -775,6 +886,12 @@ class TuningControls:
         if layer.effects_expanded == expanded:
             return
         layer.effects_expanded = expanded
+
+    def _set_user_presets_expanded(self, slot: str, expanded: bool) -> None:
+        layer = self.session.layers[slot]
+        if layer.user_presets_expanded == expanded:
+            return
+        layer.user_presets_expanded = expanded
 
     def _set_beat(self, slot: str, value: float) -> None:
         layer = self.session.layers[slot]
