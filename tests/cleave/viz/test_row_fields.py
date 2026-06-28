@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import inspect
+
 import pygame
 
 from cleave.config_schema import ui_fade_display
@@ -271,6 +273,20 @@ def test_row_kinds_requiring_fields_registry_complete() -> None:
     required = row_kinds_requiring_fields()
     assert required == frozenset(ROW_FIELDS.keys())
     assert RowKind.RENDER_SECTION_GAP not in ROW_FIELDS
+
+
+def test_row_field_apply_horizontal_signatures_match_field_mutator() -> None:
+    mismatches: list[str] = []
+    for kind, field in ROW_FIELDS.items():
+        handler = field.apply_horizontal
+        if handler is None:
+            continue
+        param_count = len(inspect.signature(handler).parameters)
+        if param_count != 5:
+            mismatches.append(
+                f"{kind.name} ({handler.__name__}): {param_count} params, expected 5"
+            )
+    assert not mismatches, "FieldMutator arity mismatches:\n" + "\n".join(mismatches)
 
 
 def test_format_row_value_path_icon() -> None:
