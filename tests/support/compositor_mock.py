@@ -10,4 +10,6 @@ def recording_compositor() -> MagicMock:
     compositor = MagicMock()
     compositor.draw_content_overlay = MagicMock(name="draw_content_overlay")
     compositor.draw_overlay = MagicMock(name="draw_overlay")
+    compositor.consume_texture_reallocs.return_value = 0
+    compositor.overlay_texture_capacity.return_value = (0, 0)
     return compositor

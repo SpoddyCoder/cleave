@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING
 
 from cleave.config import RenderOverlayPosition
@@ -22,7 +23,7 @@ from cleave.config_schema import (
     default_render_post_fx_runtime_values,
 )
 from cleave.extract import StemSource
-from cleave.preset_playlist import directory_display, preset_filename_display
+from cleave.preset_playlist import preset_filename_display
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.playback import PlaybackState, current_sec
 from cleave.viz.row_semantics import RowDescriptor, RowKind
@@ -30,7 +31,7 @@ from cleave.viz.session import TuningSession, config_path_display
 
 if TYPE_CHECKING:
     from cleave.viz.focus_nav import FocusCursor
-    from cleave.viz.row_layout import RowLayout
+    from cleave.viz.row_layout import RowLayout, RowLayoutFrame
 
 _RO_OVERLAY_DEFAULTS = default_render_overlay_runtime_values()
 _RO_POST_FX_DEFAULTS = default_render_post_fx_runtime_values()
@@ -136,12 +137,18 @@ class TuningViewState:
     timeline_override_active: bool = False
     help_visible: bool = False
     fps: float | None = None
-    layout: RowLayout = field(init=False, repr=False)
+    layout: RowLayout | None = field(default=None, repr=False)
+    layout_frame: RowLayoutFrame | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
-        from cleave.viz.row_layout import RowLayout
+        from cleave.viz.row_layout import RowLayout, build_layout_frame
 
-        object.__setattr__(self, "layout", RowLayout.build(self))
+        if self.layout is None:
+            object.__setattr__(self, "layout", RowLayout.build(self))
+        if self.layout_frame is None:
+            object.__setattr__(
+                self, "layout_frame", build_layout_frame(self.layout, self)
+            )
 
     @property
     def focus_descriptor(self) -> RowDescriptor:
@@ -187,8 +194,88 @@ class TuningViewState:
 
     @property
     def focus_index(self) -> int:
+        if self.layout_frame is not None:
+            from cleave.viz.focus_nav import cursor_main_descriptor
+            from cleave.viz.row_layout import resolve_navigable_descriptor
+
+            focus_desc = cursor_main_descriptor(self.focus_cursor)
+            resolved = resolve_navigable_descriptor(
+                focus_desc, self.layout_frame.navigable_descriptors
+            )
+            return self.layout.find_descriptor(resolved)
         resolved = self.layout.resolve_navigable(self.focus_descriptor, self)
         return self.layout.find_descriptor(resolved)
+
+
+def view_state_structure_signature(
+    session: TuningSession,
+    config_save: ConfigSaveController,
+    *,
+    notification_active: bool,
+) -> str:
+    layers: dict[str, object] = {}
+    for slot in session.layer_z_order:
+        layer = session.layers[slot]
+        playlist = layer.playlist
+        layers[slot] = {
+            "expanded": layer.expanded,
+            "effects_expanded": layer.effects_expanded,
+            "preset_switching_expanded": layer.preset_switching_expanded,
+            "user_presets_expanded": layer.user_presets_expanded,
+            "preset_switching": layer.preset_switching,
+            "preset_switching_scope": layer.preset_switching_scope,
+            "preset_duration": layer.preset_duration,
+            "soft_cut_duration": layer.soft_cut_duration,
+            "hard_cut_duration": layer.hard_cut_duration,
+            "hard_cut_sensitivity": layer.hard_cut_sensitivity,
+            "hard_cut_enabled": layer.hard_cut_enabled,
+            "easter_egg": layer.easter_egg,
+            "preset_start_clean": layer.preset_start_clean,
+            "effects": sorted(layer.effects.keys()),
+            "user_presets": list(layer.user_presets),
+            "playlist": {
+                "current_dir": str(playlist.current_dir),
+                "paths": [str(path) for path in playlist.paths],
+                "index": playlist.index,
+            },
+        }
+    ro = session.render_overlay
+    pp = session.render_post_fx
+    tl = session.timeline
+    payload = {
+        "layer_z_order": list(session.layer_z_order),
+        "settings": {
+            "expanded": session.settings.expanded,
+            "ui_expanded": session.settings.ui_expanded,
+        },
+        "notification_active": notification_active,
+        "layers": layers,
+        "render_overlay": {
+            "enabled": ro.enabled,
+            "expanded": ro.expanded,
+            "title_expanded": ro.title_expanded,
+            "body_expanded": ro.body_expanded,
+        },
+        "render_post_fx": {
+            "enabled": pp.enabled,
+            "expanded": pp.expanded,
+        },
+        "render_timeline": {"enabled": tl.enabled},
+        "timeline": {"enabled": tl.enabled},
+    }
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"))
+
+
+@dataclass(frozen=True)
+class _ViewStateStructure:
+    signature: str
+    layer_z_order: tuple[str, ...]
+    tracks: dict[str, TrackBlock]
+    settings: SettingsBlock
+    render_overlay: RenderOverlayBlock
+    render_post_fx: RenderPostFxBlock
+    render_timeline: RenderTimelineBlock
+    layout: RowLayout
 
 
 class TuningViewStateBuilder:
@@ -214,32 +301,24 @@ class TuningViewStateBuilder:
         self._get_move_mode_slot = get_move_mode_slot
         self._config_save = config_save
         self._get_notification = get_notification
+        self._structure: _ViewStateStructure | None = None
 
-    def build(
+    def _build_structure(
         self,
         *,
-        paused: bool,
-        position_sec: float | None = None,
-        fps: float | None = None,
-    ) -> TuningViewState:
-        if position_sec is None:
-            position_sec = current_sec(self.playback, self.duration_sec)
+        signature: str,
+        notification_active: bool,
+    ) -> _ViewStateStructure:
+        from cleave.viz.focus_nav import MainFocus
 
-        from cleave.viz.layer_visibility import effective_layer_enabled
-
+        layer_z_order = tuple(self.session.layer_z_order)
         tracks: dict[str, TrackBlock] = {}
-        for slot in self.session.layer_z_order:
+        for slot in layer_z_order:
             layer = self.session.layers[slot]
-            if self.session.timeline.enabled:
-                visible = effective_layer_enabled(
-                    self.session, slot, position_sec
-                )
-            else:
-                visible = layer.enabled
             tracks[slot] = TrackBlock(
                 stem=layer.stem,
-                preset_dir_label=directory_display(
-                    layer.playlist, self.preset_root
+                preset_dir_label=layer.playlist.directory_display_label(
+                    self.preset_root
                 ),
                 preset_label=preset_filename_display(layer.playlist),
                 blend_mode=layer.blend_mode,
@@ -249,7 +328,7 @@ class TuningViewStateBuilder:
                 preset_switching_expanded=layer.preset_switching_expanded,
                 beat_sensitivity=layer.beat_sensitivity,
                 enabled=layer.enabled,
-                visible=visible,
+                visible=layer.enabled,
                 expanded=layer.expanded,
                 locked=layer.locked,
                 preset_empty=not layer.playlist.paths,
@@ -266,13 +345,116 @@ class TuningViewStateBuilder:
                 user_presets_expanded=layer.user_presets_expanded,
             )
 
+        ro = self.session.render_overlay
+        pp = self.session.render_post_fx
+        tl = self.session.timeline
+        settings = SettingsBlock(
+            expanded=self.session.settings.expanded,
+            ui_expanded=self.session.settings.ui_expanded,
+        )
+        render_overlay = RenderOverlayBlock(
+            enabled=ro.enabled,
+            expanded=ro.expanded,
+            title_expanded=ro.title_expanded,
+            body_expanded=ro.body_expanded,
+        )
+        render_post_fx = RenderPostFxBlock(
+            enabled=pp.enabled,
+            expanded=pp.expanded,
+        )
+        render_timeline = RenderTimelineBlock(enabled=tl.enabled)
+        layout_state = TuningViewState(
+            layer_z_order=layer_z_order,
+            tracks=tracks,
+            paused=False,
+            position_sec=0.0,
+            focus_cursor=MainFocus(RowDescriptor(RowKind.TRANSPORT)),
+            move_mode_slot=None,
+            notification_message="…" if notification_active else None,
+            notification_remaining_sec=1.0 if notification_active else 0.0,
+            render_overlay=render_overlay,
+            render_post_fx=render_post_fx,
+            render_timeline=render_timeline,
+            settings=settings,
+        )
+        layout = layout_state.layout
+        assert layout is not None
+        return _ViewStateStructure(
+            signature=signature,
+            layer_z_order=layer_z_order,
+            tracks=tracks,
+            settings=settings,
+            render_overlay=render_overlay,
+            render_post_fx=render_post_fx,
+            render_timeline=render_timeline,
+            layout=layout,
+        )
+
+    def _patch_tracks(
+        self,
+        structure: _ViewStateStructure,
+        *,
+        position_sec: float,
+    ) -> dict[str, TrackBlock]:
+        from cleave.viz.layer_visibility import effective_layer_enabled
+
+        tracks: dict[str, TrackBlock] = {}
+        for slot in structure.layer_z_order:
+            base = structure.tracks[slot]
+            layer = self.session.layers[slot]
+            if self.session.timeline.enabled:
+                visible = effective_layer_enabled(
+                    self.session, slot, position_sec
+                )
+            else:
+                visible = layer.enabled
+            tracks[slot] = replace(
+                base,
+                stem=layer.stem,
+                enabled=layer.enabled,
+                visible=visible,
+                locked=layer.locked,
+                blend_mode=layer.blend_mode,
+                opacity_pct=layer.opacity_pct,
+                beat_sensitivity=layer.beat_sensitivity,
+                preset_label=preset_filename_display(layer.playlist),
+                effects=dict(layer.effects),
+            )
+        return tracks
+
+    def build(
+        self,
+        *,
+        paused: bool,
+        position_sec: float | None = None,
+        fps: float | None = None,
+    ) -> TuningViewState:
+        if position_sec is None:
+            position_sec = current_sec(self.playback, self.duration_sec)
+
         notification_message, notification_remaining_sec = self._get_notification()
+        notification_active = bool(
+            notification_message and notification_remaining_sec > 0
+        )
+        signature = view_state_structure_signature(
+            self.session,
+            self._config_save,
+            notification_active=notification_active,
+        )
+        if self._structure is None or self._structure.signature != signature:
+            self._structure = self._build_structure(
+                signature=signature,
+                notification_active=notification_active,
+            )
+        structure = self._structure
+
+        tracks = self._patch_tracks(structure, position_sec=position_sec)
 
         ro = self.session.render_overlay
         pp = self.session.render_post_fx
         tl = self.session.timeline
         state = TuningViewState(
-            layer_z_order=tuple(self.session.layer_z_order),
+            layer_z_order=structure.layer_z_order,
             tracks=tracks,
             paused=paused,
             position_sec=position_sec,
@@ -281,16 +463,15 @@ class TuningViewStateBuilder:
             notification_message=notification_message,
             notification_remaining_sec=notification_remaining_sec,
             allow_overwrite=self._config_save.allow_overwrite(),
-            active_config_label=config_path_display(self._config_save.active_config_path),
+            active_config_label=config_path_display(
+                self._config_save.active_config_path
+            ),
             config_dirty=self._config_save.config_dirty,
             solo_slot=self.session.solo_slot,
             solo_active=self.session.solo_slot is not None,
-            render_overlay=RenderOverlayBlock(
-                enabled=ro.enabled,
-                expanded=ro.expanded,
+            render_overlay=replace(
+                structure.render_overlay,
                 position=ro.position,
-                title_expanded=ro.title_expanded,
-                body_expanded=ro.body_expanded,
                 title_font_size=ro.title_font_size,
                 title_font=ro.title_font,
                 title_margin_bottom=ro.title_margin_bottom,
@@ -302,20 +483,18 @@ class TuningViewStateBuilder:
                 display_time=ro.display_time,
                 solo=self.session.render_overlay_solo,
             ),
-            render_post_fx=RenderPostFxBlock(
-                enabled=pp.enabled,
-                expanded=pp.expanded,
+            render_post_fx=replace(
+                structure.render_post_fx,
                 fade_in=pp.fade_in,
                 fade_out=pp.fade_out,
                 solo=self.session.render_post_fx_solo,
             ),
-            render_timeline=RenderTimelineBlock(
-                enabled=tl.enabled,
+            render_timeline=replace(
+                structure.render_timeline,
                 expanded=tl.panel_open,
             ),
-            settings=SettingsBlock(
-                expanded=self.session.settings.expanded,
-                ui_expanded=self.session.settings.ui_expanded,
+            settings=replace(
+                structure.settings,
                 render_mode=self._config_save.cfg.visualizer.render_mode,
                 ui_width_mode=self._config_save.cfg.visualizer.ui_width_mode,
                 ui_width=self._config_save.cfg.visualizer.ui_width,
@@ -325,5 +504,6 @@ class TuningViewStateBuilder:
             timeline_override_active=bool(tl.override_slots),
             help_visible=self.session.help_visible,
             fps=fps,
+            layout=structure.layout,
         )
         return state
