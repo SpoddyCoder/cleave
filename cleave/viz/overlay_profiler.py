@@ -55,6 +55,7 @@ class OverlayFrameSample:
     upload_partial_rects: int
     texture_reallocs: int
     skipped: bool
+    pm_fps: int | None = None
 
 
 def _upload_stats_suffix(sample: OverlayFrameSample) -> str:
@@ -85,7 +86,7 @@ def _upload_stats_suffix(sample: OverlayFrameSample) -> str:
 def _format_sample_line(sample: OverlayFrameSample) -> str:
     if sample.skipped:
         return "overlay: skip"
-    return (
+    line = (
         f"overlay: vs={sample.view_state_build_ms:.1f}ms"
         f" draw={sample.panel_draw_ms:.1f}ms"
         f" surf={sample.surface_builds}"
@@ -94,6 +95,9 @@ def _format_sample_line(sample: OverlayFrameSample) -> str:
         f" up={sample.upload_ms:.1f}ms"
         f"{_upload_stats_suffix(sample)}"
     )
+    if sample.pm_fps is not None:
+        line += f" pm={sample.pm_fps}"
+    return line
 
 
 @dataclass
@@ -105,6 +109,7 @@ class OverlayProfiler:
         default_factory=OverlayDrawCounters, init=False, repr=False
     )
     _skipped: bool = field(default=False, init=False, repr=False)
+    _pm_fps: int | None = field(default=None, init=False, repr=False)
     _frames_since_emit: int = field(default=0, init=False, repr=False)
     _emit_next_frame: bool = field(default=False, init=False, repr=False)
     last_line: str | None = field(default=None, init=False, repr=False)
@@ -131,6 +136,9 @@ class OverlayProfiler:
 
     def note_skipped_frame(self) -> None:
         self._skipped = True
+
+    def note_projectm_fps(self, target: int) -> None:
+        self._pm_fps = target
 
     def note_upload_plan(self, plan: UploadPlan) -> None:
         if not self.enabled:
@@ -177,6 +185,7 @@ class OverlayProfiler:
             upload_partial_rects=self._counters.upload_partial_rects,
             texture_reallocs=self._counters.texture_reallocs,
             skipped=self._skipped,
+            pm_fps=self._pm_fps,
         )
 
         line = _format_sample_line(sample)
@@ -214,3 +223,4 @@ class OverlayProfiler:
         self._section_ms.clear()
         self._counters = OverlayDrawCounters()
         self._skipped = False
+        self._pm_fps = None

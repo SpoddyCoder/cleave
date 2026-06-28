@@ -133,6 +133,40 @@ overlay: vs=3.5ms draw=4.1ms surf=0 font=2 rcache=0/1 up=0.1ms uskip=2 upart=1/2
 
 ## Phase 5
 
-```
+Decoupled projectM target FPS from UI-loaded display FPS via `ProjectMFpsGovernor`
+(asymmetric EMA with floor). Opening or scrolling the panel should no longer
+collapse libprojectM target fps on transient UI spikes.
 
+```
+overlay profiler: on (logging to terminal every 30 frames; latest on panel when open)
+overlay: vs=1.5ms draw=2.2ms surf=11 font=30 rcache=0/13 up=0.2ms ufull=1 pm=48
+overlay: vs=1.3ms draw=0.8ms surf=0 font=2 rcache=0/1 up=0.1ms upart=1/2 pm=48
+overlay: vs=1.6ms draw=1.1ms surf=0 font=2 rcache=0/1 up=0.1ms upart=1/2 pm=48
+overlay: vs=1.9ms draw=1.2ms surf=0 font=2 rcache=0/1 up=0.1ms upart=1/2 pm=48
+overlay: vs=1.9ms draw=1.4ms surf=0 font=2 rcache=0/1 up=0.0ms uskip=1 pm=48
+overlay: vs=2.0ms draw=5.0ms surf=1 font=5 rcache=32/2 up=0.4ms ufull=1 pm=48
+overlay: vs=2.0ms draw=2.2ms surf=0 font=2 rcache=0/1 up=0.1ms upart=1/2 pm=48
+overlay: vs=2.2ms draw=2.1ms surf=0 font=2 rcache=0/1 up=0.0ms uskip=1 pm=48
+overlay: vs=2.5ms draw=2.5ms surf=0 font=2 rcache=0/1 up=0.0ms uskip=1 pm=48
+overlay: vs=2.3ms draw=6.2ms surf=1 font=5 rcache=36/2 up=0.5ms ufull=1 pm=48
+overlay: vs=2.6ms draw=3.1ms surf=0 font=2 rcache=0/1 up=0.1ms upart=1/2 pm=48
+overlay: vs=2.8ms draw=3.4ms surf=0 font=2 rcache=0/1 up=0.1ms upart=1/2 pm=48
+overlay: vs=3.2ms draw=4.0ms surf=0 font=2 rcache=0/1 up=0.1ms upart=1/2 pm=48
+overlay: vs=2.8ms draw=3.7ms surf=0 font=2 rcache=0/1 up=0.1ms upart=1/2 pm=48
+overlay: vs=2.9ms draw=3.9ms surf=0 font=2 rcache=0/1 up=0.1ms upart=1/2 pm=48
+overlay: vs=2.8ms draw=3.9ms surf=0 font=2 rcache=0/1 up=0.1ms upart=1/2 pm=48
+overlay: vs=3.1ms draw=4.4ms surf=0 font=2 rcache=0/1 up=0.1ms upart=1/2 pm=48
+overlay: vs=3.0ms draw=4.3ms surf=0 font=2 rcache=0/1 up=0.0ms uskip=1 pm=48
+overlay: vs=3.0ms draw=4.3ms surf=0 font=2 rcache=0/1 up=0.0ms uskip=1 pm=48
+overlay: vs=3.0ms draw=4.5ms surf=0 font=2 rcache=0/1 up=0.1ms uskip=1 upart=1/2 pm=48
+overlay: vs=3.0ms draw=4.7ms surf=0 font=2 rcache=0/1 up=0.1ms uskip=1 upart=1/2 pm=48
+overlay: vs=2.9ms draw=3.6ms surf=0 font=2 rcache=0/1 up=0.2ms uskip=2 upart=1/2 pm=48
+overlay: vs=3.0ms draw=3.5ms surf=0 font=2 rcache=0/1 up=0.2ms uskip=2 upart=1/4 pm=48
+overlay: vs=3.0ms draw=3.6ms surf=0 font=2 rcache=0/1 up=0.0ms uskip=3 pm=48
+overlay: vs=3.5ms draw=4.0ms surf=0 font=2 rcache=0/1 up=0.3ms uskip=1 upart=2/6 pm=48
+overlay: vs=3.0ms draw=3.4ms surf=0 font=2 rcache=0/1 up=0.0ms uskip=3 pm=48
+overlay: vs=3.0ms draw=3.5ms surf=0 font=2 rcache=0/1 up=0.2ms uskip=1 upart=2/6 pm=48
+overlay: vs=3.1ms draw=3.7ms surf=0 font=2 rcache=0/1 up=0.2ms uskip=1 upart=2/6 pm=48
+overlay: vs=3.0ms draw=3.6ms surf=0 font=2 rcache=0/1 up=0.2ms uskip=1 upart=2/6 pm=48
+overlay: vs=3.1ms draw=3.5ms surf=0 font=2 rcache=0/1 up=0.0ms uskip=3 pm=48
 ```

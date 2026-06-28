@@ -35,7 +35,7 @@ from cleave.viz.timeline_overlay import TimelineOverlay
 from cleave.viz.playback import PlaybackState, current_sec, init_playback
 from cleave.viz.frame_finish import RenderOverlayPanelCache, finish_content_frame
 from cleave.viz.overlay_profiler import OverlayProfiler
-from cleave.viz.frame_rate import FrameRateMeter
+from cleave.viz.frame_rate import FrameRateMeter, ProjectMFpsGovernor
 from cleave.viz.focus_nav import FocusCursor, TimelineFocus
 from cleave.viz.input_dispatch import (
     dispatch_keydown,
@@ -526,6 +526,7 @@ class VisualizerApp:
 
             running = True
             frame_rate = FrameRateMeter()
+            pm_fps_governor = ProjectMFpsGovernor(nominal_fps=LIVE_PROJECTM_FPS)
             display_fps: float | None = None
             while running:
                 frame_rate.begin_frame()
@@ -555,10 +556,9 @@ class VisualizerApp:
                 if rt.controls.key_repeat_armed:
                     rt.overlay.notify_input()
 
-                if display_fps is not None:
-                    pm_fps = max(1, round(display_fps))
-                    for layer in rt.layers:
-                        layer.pm.set_fps(pm_fps)
+                pm_fps_governor.observe(display_fps)
+                pm_fps_governor.apply_if_changed(rt.layers)
+                rt.overlay_profiler.note_projectm_fps(pm_fps_governor.target_fps)
 
                 t_sec = current_sec(rt.playback, rt.seed.duration_sec)
                 self.tick_frame(
