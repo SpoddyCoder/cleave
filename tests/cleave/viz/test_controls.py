@@ -360,6 +360,17 @@ def _desc(view: TuningViewState, index: int) -> RowDescriptor:
     return view.layout.descriptor(index)
 
 
+def _expand_settings(controls: TuningControls) -> None:
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _expand_settings_ui(controls: TuningControls) -> None:
+    _expand_settings(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
 def _focus_index(controls: TuningControls, *, paused: bool = False) -> int:
     view = controls.build_view_state(paused=paused)
     return view.layout.find_descriptor(controls.focus_descriptor)
@@ -2946,7 +2957,7 @@ def test_settings_expand_collapse_and_sub_row_visibility() -> None:
     render_mode_row = view.layout.find_by_kind(RowKind.SETTINGS_RENDER_MODE)
     assert render_mode_row == 1
     assert render_mode_row in view.layout.navigable_indices(view)
-    assert view.layout.header_row_count() == 7
+    assert view.layout.header_row_count() == 5
 
     controls.focus_descriptor = _desc(view, render_mode_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
@@ -2958,6 +2969,35 @@ def test_settings_expand_collapse_and_sub_row_visibility() -> None:
         view.layout.kind(i) for i in range(len(view.layout))
     }
     assert view.layout.header_row_count() == 3
+
+
+def test_settings_ui_expand_collapse_and_sub_row_visibility() -> None:
+    controls = _make_controls(("layer_1",))
+    _expand_settings(controls)
+    view = controls.build_view_state(paused=False)
+    assert RowKind.SETTINGS_UI_FADE not in {
+        view.layout.kind(i) for i in range(len(view.layout))
+    }
+
+    ui_header = view.layout.find_by_kind(RowKind.SETTINGS_UI_HEADER)
+    controls.focus_descriptor = _desc(view, ui_header)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.settings.ui_expanded is True
+    view = controls.build_view_state(paused=False)
+    ui_fade_row = view.layout.find_by_kind(RowKind.SETTINGS_UI_FADE)
+    assert ui_fade_row in view.layout.navigable_indices(view)
+    assert view.layout.header_row_count() == 8
+
+    controls.focus_descriptor = _desc(view, ui_fade_row)
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    controls.focus_descriptor = _desc(view, ui_header)
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.settings.ui_expanded is False
+    view = controls.build_view_state(paused=False)
+    assert RowKind.SETTINGS_UI_FADE not in {
+        view.layout.kind(i) for i in range(len(view.layout))
+    }
+    assert view.layout.header_row_count() == 5
 
 
 def test_settings_collapse_from_sub_row_refocuses_header() -> None:
@@ -3031,8 +3071,7 @@ def test_cycle_render_mode_calls_apply_preview_resolutions() -> None:
 def test_settings_adjust_ui_fade() -> None:
     controls = _make_controls(("layer_1",))
     assert controls.cfg.visualizer.ui_fade == 10.0
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    _expand_settings_ui(controls)
     view = controls.build_view_state(paused=False)
     ui_fade_row = view.layout.find_by_kind(RowKind.SETTINGS_UI_FADE)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_FADE)
@@ -3040,7 +3079,7 @@ def test_settings_adjust_ui_fade() -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.cfg.visualizer.ui_fade == 11.0
     view = controls.build_view_state(paused=False)
-    assert _row_text(view, ui_fade_row) == "└─ UI auto-fade: 11s"
+    assert _row_text(view, ui_fade_row) == "  └─ auto-fade: 11s"
 
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
     assert controls.cfg.visualizer.ui_fade == 6.0
@@ -3049,14 +3088,13 @@ def test_settings_adjust_ui_fade() -> None:
         controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert controls.cfg.visualizer.ui_fade == 0.0
     view = controls.build_view_state(paused=False)
-    assert _row_text(view, ui_fade_row) == "└─ UI auto-fade: disabled"
+    assert _row_text(view, ui_fade_row) == "  └─ auto-fade: disabled"
 
 
 def test_settings_ui_fade_change_marks_config_dirty() -> None:
     controls = _make_controls(("layer_1",))
     assert not controls.config_dirty
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    _expand_settings_ui(controls)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_FADE)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.config_dirty
@@ -3065,8 +3103,7 @@ def test_settings_ui_fade_change_marks_config_dirty() -> None:
 def test_settings_adjust_ui_width() -> None:
     controls = _make_controls(("layer_1",))
     assert controls.cfg.visualizer.ui_width == 110
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    _expand_settings_ui(controls)
     view = controls.build_view_state(paused=False)
     ui_width_row = view.layout.find_by_kind(RowKind.SETTINGS_UI_WIDTH)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH)
@@ -3074,7 +3111,7 @@ def test_settings_adjust_ui_width() -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.cfg.visualizer.ui_width == 111
     view = controls.build_view_state(paused=False)
-    assert _row_text(view, ui_width_row) == "└─ UI max width: 111"
+    assert _row_text(view, ui_width_row) == "  └─ max width: 111"
 
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
     assert controls.cfg.visualizer.ui_width == 106
@@ -3087,8 +3124,7 @@ def test_settings_adjust_ui_width() -> None:
 def test_settings_ui_width_change_marks_config_dirty() -> None:
     controls = _make_controls(("layer_1",))
     assert not controls.config_dirty
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    _expand_settings_ui(controls)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.config_dirty
@@ -3097,8 +3133,7 @@ def test_settings_ui_width_change_marks_config_dirty() -> None:
 def test_settings_cycle_ui_width_mode() -> None:
     controls = _make_controls(("layer_1",))
     assert controls.cfg.visualizer.ui_width_mode == "flexible"
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    _expand_settings_ui(controls)
     view = controls.build_view_state(paused=False)
     mode_row = view.layout.find_by_kind(RowKind.SETTINGS_UI_WIDTH_MODE)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH_MODE)
@@ -3106,7 +3141,7 @@ def test_settings_cycle_ui_width_mode() -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.cfg.visualizer.ui_width_mode == "fixed"
     view = controls.build_view_state(paused=False)
-    assert _row_text(view, mode_row) == "└─ UI width mode: fixed"
+    assert _row_text(view, mode_row) == "  └─ width mode: fixed"
 
     controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert controls.cfg.visualizer.ui_width_mode == "flexible"
@@ -3115,8 +3150,7 @@ def test_settings_cycle_ui_width_mode() -> None:
 def test_settings_ui_width_mode_change_marks_config_dirty() -> None:
     controls = _make_controls(("layer_1",))
     assert not controls.config_dirty
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    _expand_settings_ui(controls)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH_MODE)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.config_dirty

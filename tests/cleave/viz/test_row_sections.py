@@ -137,6 +137,10 @@ def test_sub_row_expand_visible_nested_sections() -> None:
     render_mode = RowDescriptor(RowKind.SETTINGS_RENDER_MODE)
     assert sub_row_expand_visible(collapsed_settings, render_mode) is False
 
+    settings_only = _minimal_view_state(settings=SettingsBlock(expanded=True, ui_expanded=False))
+    ui_width = RowDescriptor(RowKind.SETTINGS_UI_WIDTH)
+    assert sub_row_expand_visible(settings_only, ui_width) is False
+
     collapsed_overlay = _minimal_view_state(
         render_overlay=RenderOverlayBlock(expanded=False),
     )
@@ -203,6 +207,9 @@ def test_section_header_descriptor_uses_tree_and_effect_fallback() -> None:
     assert section_header_descriptor(
         RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_FONT)
     ) == RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_HEADER)
+    assert section_header_descriptor(
+        RowDescriptor(RowKind.SETTINGS_UI_FADE)
+    ) == RowDescriptor(RowKind.SETTINGS_UI_HEADER)
 
 
 def test_render_overlay_section_kinds_from_tree() -> None:

@@ -31,6 +31,12 @@ class SettingsControls:
             return
         settings.expanded = expanded
 
+    def set_ui_expanded(self, expanded: bool) -> None:
+        settings = self.session.settings
+        if settings.ui_expanded == expanded:
+            return
+        settings.ui_expanded = expanded
+
     def cycle_render_mode(self, *, forward: bool) -> None:
         modes = VISUALIZER_RENDER_MODES
         current = self.cfg.visualizer.render_mode

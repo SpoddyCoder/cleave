@@ -215,8 +215,13 @@ def _mutate_timeline_enabled(controls: TuningControls) -> None:
 
 
 def _expand_settings(controls: TuningControls) -> None:
-    view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _expand_settings_ui(controls: TuningControls) -> None:
+    _expand_settings(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -228,22 +233,19 @@ def _mutate_visualizer_render_mode(controls: TuningControls) -> None:
 
 
 def _mutate_visualizer_ui_fade(controls: TuningControls) -> None:
-    _expand_settings(controls)
-    view = controls.build_view_state(paused=False)
+    _expand_settings_ui(controls)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_FADE)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_visualizer_ui_width(controls: TuningControls) -> None:
-    _expand_settings(controls)
-    view = controls.build_view_state(paused=False)
+    _expand_settings_ui(controls)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_visualizer_ui_width_mode(controls: TuningControls) -> None:
-    _expand_settings(controls)
-    view = controls.build_view_state(paused=False)
+    _expand_settings_ui(controls)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH_MODE)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
