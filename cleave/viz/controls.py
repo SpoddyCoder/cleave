@@ -11,7 +11,7 @@ import pygame
 
 from cleave.config import CleaveConfig, clamp_beat_sensitivity, clamp_effect_pct
 from cleave.config_schema import clamp_easter_egg
-from cleave.config_schema import PRESET_SWITCHING_MODES
+from cleave.config_schema import PRESET_SWITCHING_MODES, PRESET_SWITCHING_SCOPES
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.extract import STEM_SOURCES
 from cleave.viz.config_save import ConfigSaveController
@@ -711,6 +711,20 @@ class TuningControls:
             layer.preset_switching = modes[(index + 1) % len(modes)]
         else:
             layer.preset_switching = modes[(index - 1) % len(modes)]
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_preset_switching_change(slot)
+
+    def _cycle_preset_switching_scope(self, slot: str, *, forward: bool) -> None:
+        layer = self.session.layers[slot]
+        scopes = PRESET_SWITCHING_SCOPES
+        try:
+            index = scopes.index(layer.preset_switching_scope)
+        except ValueError:
+            index = 0
+        if forward:
+            layer.preset_switching_scope = scopes[(index + 1) % len(scopes)]
+        else:
+            layer.preset_switching_scope = scopes[(index - 1) % len(scopes)]
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)
 
