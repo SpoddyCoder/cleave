@@ -17,6 +17,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Iterator
 
+from cleave.viz.overlay_upload import UploadPlan
+
 _DEFAULT_EMIT_INTERVAL = 30
 
 _SECTION_NAMES = frozenset(
@@ -30,6 +32,11 @@ class OverlayDrawCounters:
     font_renders: int = 0
     row_cache_hits: int = 0
     row_cache_misses: int = 0
+    upload_skipped: int = 0
+    upload_partial: int = 0
+    upload_full: int = 0
+    upload_partial_rects: int = 0
+    texture_reallocs: int = 0
 
 
 @dataclass
@@ -42,7 +49,37 @@ class OverlayFrameSample:
     font_renders: int
     row_cache_hits: int
     row_cache_misses: int
+    upload_skipped: int
+    upload_partial: int
+    upload_full: int
+    upload_partial_rects: int
+    texture_reallocs: int
     skipped: bool
+
+
+def _upload_stats_suffix(sample: OverlayFrameSample) -> str:
+    if not (
+        sample.upload_skipped
+        or sample.upload_partial
+        or sample.upload_full
+        or sample.texture_reallocs
+    ):
+        return ""
+    parts: list[str] = []
+    if sample.upload_skipped:
+        parts.append(f"uskip={sample.upload_skipped}")
+    if sample.upload_partial:
+        rect_suffix = (
+            f"/{sample.upload_partial_rects}"
+            if sample.upload_partial_rects
+            else ""
+        )
+        parts.append(f"upart={sample.upload_partial}{rect_suffix}")
+    if sample.upload_full:
+        parts.append(f"ufull={sample.upload_full}")
+    if sample.texture_reallocs:
+        parts.append(f"urealloc={sample.texture_reallocs}")
+    return " " + " ".join(parts)
 
 
 def _format_sample_line(sample: OverlayFrameSample) -> str:
@@ -55,6 +92,7 @@ def _format_sample_line(sample: OverlayFrameSample) -> str:
         f" font={sample.font_renders}"
         f" rcache={sample.row_cache_hits}/{sample.row_cache_misses}"
         f" up={sample.upload_ms:.1f}ms"
+        f"{_upload_stats_suffix(sample)}"
     )
 
 
@@ -94,6 +132,17 @@ class OverlayProfiler:
     def note_skipped_frame(self) -> None:
         self._skipped = True
 
+    def note_upload_plan(self, plan: UploadPlan) -> None:
+        if not self.enabled:
+            return
+        if plan.mode == "skip":
+            self._counters.upload_skipped += 1
+        elif plan.mode == "partial":
+            self._counters.upload_partial += 1
+            self._counters.upload_partial_rects += len(plan.dirty_rects)
+        elif plan.mode == "full":
+            self._counters.upload_full += 1
+
     @contextmanager
     def time_section(self, name: str) -> Iterator[None]:
         if name not in _SECTION_NAMES:
@@ -122,6 +171,11 @@ class OverlayProfiler:
             font_renders=self._counters.font_renders,
             row_cache_hits=self._counters.row_cache_hits,
             row_cache_misses=self._counters.row_cache_misses,
+            upload_skipped=self._counters.upload_skipped,
+            upload_partial=self._counters.upload_partial,
+            upload_full=self._counters.upload_full,
+            upload_partial_rects=self._counters.upload_partial_rects,
+            texture_reallocs=self._counters.texture_reallocs,
             skipped=self._skipped,
         )
 

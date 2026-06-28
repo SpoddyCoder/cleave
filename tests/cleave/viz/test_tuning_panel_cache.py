@@ -6,15 +6,19 @@ import pygame
 
 from cleave.viz.overlay_profiler import OverlayDrawCounters
 from cleave.viz.row_semantics import RowDescriptor, RowKind, row_is_pinned
-from cleave.viz.theme import BORDER_COLOR
+from cleave.viz.theme import BORDER_COLOR, BORDER_WIDTH, SCROLLBAR_CONTENT_GAP, SCROLLBAR_WIDTH
 from cleave.viz.focus_nav import MainFocus
 from cleave.viz.tuning_panel_cache import (
     TuningPanelCache,
     ensure_row_surface,
+    live_upload_signature,
+    panel_signature,
     row_render_key,
     static_row_keys,
+    static_upload_content_hash,
+    tuning_upload_signature,
 )
-from cleave.viz.tuning_panel_draw import TuningOverlay
+from cleave.viz.tuning_panel_draw import TuningOverlay, tuning_panel_max_dimensions
 from cleave.viz.tuning_view_state import TrackBlock, TuningViewState
 from tests.cleave.viz.test_overlay import (
     _effects_expanded_view_state,
@@ -420,3 +424,244 @@ def test_incremental_compose_preserves_static_pixels() -> None:
     )
     after = pygame.image.tostring(panel, "RGBA")
     assert before != after
+
+
+def test_live_upload_signature_transport_and_fps() -> None:
+    state_with_fps = _minimal_view_state(fps=30.0, position_sec=65.0)
+    state_no_fps = _minimal_view_state(fps=None, position_sec=12.0)
+
+    assert live_upload_signature(state_with_fps) == ("01:05", "FPS: 30.0")
+    assert live_upload_signature(state_no_fps) == ("00:12", None)
+
+
+def test_tuning_upload_signature_combines_static_and_live() -> None:
+    state = _minimal_view_state(fps=30.0, position_sec=1.0)
+    pygame.init()
+    overlay = TuningOverlay()
+    font = overlay._font_get()
+    cache = TuningPanelCache()
+    static_keys = _static_keys(state, font, cache)
+    sig = panel_signature(
+        state,
+        visibility=1.0,
+        panel_w=400,
+        panel_h=300,
+        scroll_y=0,
+        static_row_keys=static_keys,
+    )
+    live_sig = live_upload_signature(state)
+    screen_rect = (10, 10, 400, 300)
+
+    upload_sig = tuning_upload_signature(sig, screen_rect, live_sig)
+
+    assert upload_sig.active_size == (400, 300)
+    assert upload_sig.screen_rect == screen_rect
+    assert upload_sig.content_hash == (static_upload_content_hash(sig), live_sig)
+
+
+def test_incremental_compose_sets_transport_rect_and_partial_plan() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    overlay.notify_input()
+    base = _minimal_view_state(fps=30.0, position_sec=0.0)
+
+    overlay.compose_panel(
+        base,
+        viewport_width=1280,
+        viewport_height=720,
+    )
+    cache = overlay._panel_cache
+    assert cache.last_transport_rect is not None
+    tx, ty, tw, th = cache.last_transport_rect
+    assert tx == BORDER_WIDTH
+    assert th == overlay._font_get().get_linesize()
+
+    moved = _minimal_view_state(fps=45.0, position_sec=15.0)
+    composed = overlay.compose_panel(
+        moved,
+        viewport_width=1280,
+        viewport_height=720,
+    )
+    assert composed is not None
+    assert composed.upload_plan.mode == "partial"
+    assert cache.last_transport_rect in composed.upload_plan.dirty_rects
+
+
+def test_incremental_compose_skip_plan_when_live_unchanged() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    overlay.notify_input()
+    state = _minimal_view_state(fps=30.0, position_sec=5.0)
+
+    first = overlay.compose_panel(
+        state,
+        viewport_width=1280,
+        viewport_height=720,
+    )
+    assert first is not None
+    assert first.upload_plan.mode == "full"
+
+    cache = overlay._panel_cache
+    cache.gpu.last_signature = first.upload_signature
+    cache.gpu.last_texture_id = 1
+    cache.gpu.capacity = first.capacity
+
+    second = overlay.compose_panel(
+        state,
+        viewport_width=1280,
+        viewport_height=720,
+    )
+    assert second is not None
+    assert second.upload_plan.mode == "skip"
+
+
+def test_tuning_panel_max_dimensions_reserves_timeline_strip() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    _, margin_y = overlay._margin
+    open_h = tuning_panel_max_dimensions(
+        1280,
+        720,
+        80,
+        timeline_panel_open=True,
+        margin_y=margin_y,
+        padding=overlay._padding,
+        timeline_row_count=4,
+    )[1]
+    closed_h = tuning_panel_max_dimensions(
+        1280,
+        720,
+        80,
+        timeline_panel_open=False,
+        margin_y=margin_y,
+        padding=overlay._padding,
+    )[1]
+    assert open_h < closed_h
+
+
+def _focus_row_bg_sample_pos(
+    overlay: TuningOverlay,
+    state: TuningViewState,
+    panel_w: int,
+) -> tuple[int, int]:
+    font = overlay._font_get()
+    line_h = font.get_linesize()
+    focus_index = state.focus_index
+    visible_indices = list(state.layout.visible_indices(state))
+    metrics = _panel_scroll_metrics(overlay, state)
+    if metrics.needs_scroll:
+        if focus_index in metrics.header_indices:
+            row_index = metrics.header_indices.index(focus_index)
+            y = overlay._padding + row_index * metrics.row_stride
+        else:
+            row_index = metrics.scrollable_indices.index(focus_index)
+            scroll_top = overlay._padding + metrics.header_block_h
+            y = scroll_top + row_index * metrics.row_stride - overlay._scroll_y
+    else:
+        y = overlay._padding
+        for index in visible_indices:
+            if index == focus_index:
+                break
+            y += metrics.row_stride
+    sample_x = overlay._padding + 12
+    if metrics.show_scrollbar:
+        content_right = (
+            panel_w - overlay._padding - SCROLLBAR_WIDTH - SCROLLBAR_CONTENT_GAP
+        )
+        if sample_x >= content_right:
+            sample_x = max(overlay._padding, content_right - 12)
+    sample_y = y + line_h // 2
+    return sample_x, sample_y
+
+
+def _focused_row_bg_pixel(
+    overlay: TuningOverlay,
+    state: TuningViewState,
+) -> tuple[int, int, int, int]:
+    """Sample a background-only pixel on the focused row (avoids glyph text)."""
+    overlay.compose_panel(
+        state,
+        viewport_width=1280,
+        viewport_height=720,
+    )
+    panel = overlay._panel_cache.panel
+    assert panel is not None
+    sample_x, sample_y = _focus_row_bg_sample_pos(
+        overlay, state, panel.get_width()
+    )
+    return panel.get_at((sample_x, sample_y))
+
+
+def _focused_row_pixel(
+    overlay: TuningOverlay,
+    state: TuningViewState,
+) -> tuple[int, int, int, int]:
+    return _focused_row_bg_pixel(overlay, state)
+
+
+def test_focused_row_has_opaque_panel_background() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    overlay.notify_input()
+    state = _two_layer_view_state(focus_slot="layer_1")
+    _r, _g, _b, a = _focused_row_bg_pixel(overlay, state)
+    assert a >= 250
+
+
+def test_focused_row_opaque_after_incremental_compose() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    overlay.notify_input()
+    state = _two_layer_view_state(focus_slot="layer_1")
+    overlay.compose_panel(
+        state,
+        viewport_width=1280,
+        viewport_height=720,
+    )
+    panel = overlay._panel_cache.panel
+    assert panel is not None
+
+    moved = _minimal_view_state(
+        layer_z_order=state.layer_z_order,
+        tracks=state.tracks,
+        focus_cursor=state.focus_cursor,
+        fps=45.0,
+        position_sec=12.0,
+    )
+    overlay.compose_panel(
+        moved,
+        viewport_width=1280,
+        viewport_height=720,
+    )
+
+    sample_x, sample_y = _focus_row_bg_sample_pos(
+        overlay, state, panel.get_width()
+    )
+    _r, _g, _b, a = panel.get_at((sample_x, sample_y))
+    assert a >= 250
+
+
+def test_timeline_open_full_upload_not_skip() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    overlay.notify_input()
+    from cleave.viz.tuning_view_state import RenderTimelineBlock
+
+    state = _minimal_view_state(
+        render_timeline=RenderTimelineBlock(enabled=True, expanded=True),
+    )
+    kwargs = dict(viewport_width=1280, viewport_height=720)
+
+    closed = overlay.compose_panel(state, timeline_panel_open=False, **kwargs)
+    assert closed is not None
+    assert closed.upload_plan.mode == "full"
+
+    cache = overlay._panel_cache
+    cache.gpu.last_signature = closed.upload_signature
+    cache.gpu.last_texture_id = 1
+    cache.gpu.capacity = closed.capacity
+
+    opened = overlay.compose_panel(state, timeline_panel_open=True, **kwargs)
+    assert opened is not None
+    assert opened.upload_plan.mode == "full"
+    assert opened.upload_signature.active_size[1] <= closed.upload_signature.active_size[1]

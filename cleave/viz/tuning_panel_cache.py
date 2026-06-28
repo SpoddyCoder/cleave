@@ -8,6 +8,7 @@ from typing import Callable, Protocol
 import pygame
 
 from cleave.viz.overlay_profiler import OverlayDrawCounters
+from cleave.viz.overlay_upload import OverlayGpuState, UploadSignature
 from cleave.viz.row_semantics import RowKind
 from cleave.viz.tuning_view_state import TuningViewState
 
@@ -75,6 +76,9 @@ class TuningPanelCache:
     panel_size: tuple[int, int] | None = None
     row_cache_structure: tuple[int, ...] | None = None
     last_fps_rect: tuple[int, int, int, int] | None = None
+    gpu: OverlayGpuState = field(default_factory=OverlayGpuState)
+    last_transport_rect: tuple[int, int, int, int] | None = None
+    last_live_signature: tuple[str, str | None] | None = None
 
     def clear_rows(self) -> None:
         self.row_surfaces.clear()
@@ -86,6 +90,9 @@ class TuningPanelCache:
         self.panel_signature = None
         self.panel_size = None
         self.last_fps_rect = None
+        self.gpu = OverlayGpuState()
+        self.last_transport_rect = None
+        self.last_live_signature = None
 
     def clear_all(self) -> None:
         self.clear_rows()
@@ -267,3 +274,37 @@ def ensure_row_surface(
     entry = RowRenderEntry(primary=surf, secondary=time_surf, content_width=width)
     cache.row_surfaces[key] = entry
     return entry
+
+
+def live_upload_signature(state: TuningViewState) -> tuple[str, str | None]:
+    from cleave.viz.frame_rate import format_fps_display
+    from cleave.viz.playback import format_mmss
+
+    fps = format_fps_display(state.fps) if state.fps is not None else None
+    return format_mmss(state.position_sec), fps
+
+
+def static_upload_content_hash(panel_sig: PanelSignature) -> tuple:
+    return (
+        panel_sig.visible_indices,
+        panel_sig.focus_index,
+        panel_sig.visibility_bucket,
+        panel_sig.panel_w,
+        panel_sig.panel_h,
+        panel_sig.scroll_y,
+        panel_sig.timeline_panel_open,
+        panel_sig.config_dirty,
+        panel_sig.static_row_keys,
+    )
+
+
+def tuning_upload_signature(
+    panel_sig: PanelSignature,
+    screen_rect: tuple[int, int, int, int],
+    live_sig: tuple[str, str | None],
+) -> UploadSignature:
+    return UploadSignature(
+        active_size=(screen_rect[2], screen_rect[3]),
+        screen_rect=screen_rect,
+        content_hash=(static_upload_content_hash(panel_sig), live_sig),
+    )
