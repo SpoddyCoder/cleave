@@ -1097,6 +1097,30 @@ def test_esc_requests_overlay_hide() -> None:
     assert controls.consume_hide_overlay() is False
 
 
+def test_esc_hide_preserves_focus_when_not_in_timeline_submenu() -> None:
+    controls = _make_controls()
+    view = controls.build_view_state(paused=False)
+    preset_row = _row(view, "layer_1", RowKind.TRACK_PRESET)
+    controls.focus_descriptor = _desc(view, preset_row)
+    assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
+    assert controls.consume_hide_overlay() is True
+    controls.exit_timeline_submenu()
+    assert controls.focus_descriptor.kind == RowKind.TRACK_PRESET
+
+
+def test_exit_timeline_submenu_only_when_submenu_focused() -> None:
+    controls = _make_controls()
+    view = controls.build_view_state(paused=False)
+    preset_row = _row(view, "layer_1", RowKind.TRACK_PRESET)
+    controls.focus_descriptor = _desc(view, preset_row)
+    controls.exit_timeline_submenu()
+    assert controls.focus_descriptor.kind == RowKind.TRACK_PRESET
+
+    controls.focus_cursor = TimelineFocus(0)
+    controls.exit_timeline_submenu()
+    assert controls.focus_descriptor.kind == RowKind.RENDER_TIMELINE_HEADER
+
+
 def test_esc_in_move_mode_does_not_request_overlay_hide() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     view = controls.build_view_state(paused=False)
