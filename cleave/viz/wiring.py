@@ -36,8 +36,10 @@ from cleave.viz.layer_visibility import apply_layer_visibility, effective_layer_
 from cleave.viz.mix_player import MixPlayer
 from cleave.viz.preset_switching import (
     EMPTY_ROTATION_NOTIFICATION,
+    EMPTY_USER_PRESETS_NOTIFICATION,
     apply_preset_switching,
     reapply_projectm_preset_switching,
+    sync_manual_browse_with_user_defined_rotation,
 )
 from cleave.stem_pcm import StemPcmBank
 from cleave.viz.playback import current_sec, seek
@@ -166,11 +168,17 @@ def make_tuning_controls(
     def on_preset_change(slot: str, playlist: PresetPlaylist) -> None:
         layer = layers_by_slot[slot]
         layer.playlist = playlist
-        if session.layers[slot].preset_switching != "none":
+        mode = session.layers[slot].preset_switching
+        if mode == "projectm":
             return
-        if playlist.current is not None:
-            playlist.load_into(layer.pm, smooth=False)
+        if playlist.current is None:
+            return
+        playlist.load_into(layer.pm, smooth=False)
+        if mode == "none":
             layer.pm.lock_preset(True)
+            return
+        layer.pm.lock_preset(False)
+        sync_manual_browse_with_user_defined_rotation(layer)
 
     def on_preset_switching_change(slot: str) -> None:
         layer = layers_by_slot[slot]
@@ -179,12 +187,16 @@ def make_tuning_controls(
         def on_empty() -> None:
             notify = notification_sink.get("fn")
             if notify is not None:
-                notify(EMPTY_ROTATION_NOTIFICATION)
+                if runtime.preset_switching == "user_defined":
+                    notify(EMPTY_USER_PRESETS_NOTIFICATION)
+                else:
+                    notify(EMPTY_ROTATION_NOTIFICATION)
 
         apply_preset_switching(
             layer,
             mode=runtime.preset_switching,
             scope=runtime.preset_switching_scope,
+            user_presets=runtime.user_presets,
             preset_duration=runtime.preset_duration,
             soft_cut_duration=runtime.soft_cut_duration,
             easter_egg=runtime.easter_egg,
@@ -194,6 +206,16 @@ def make_tuning_controls(
             hard_cut_sensitivity=runtime.hard_cut_sensitivity,
             on_empty=on_empty,
         )
+
+    def lock_preset_for_modal(slot: str) -> None:
+        layers_by_slot[slot].pm.lock_preset(True)
+
+    def unlock_preset_after_modal(slot: str) -> None:
+        runtime = session.layers[slot]
+        if runtime.preset_switching == "none":
+            layers_by_slot[slot].pm.lock_preset(True)
+        else:
+            layers_by_slot[slot].pm.lock_preset(False)
 
     notification_sink: dict[str, Callable[[str], None] | None] = {"fn": None}
 
@@ -271,22 +293,17 @@ def make_tuning_controls(
     def on_seek(delta_sec: float) -> None:
         seek(playback, delta_sec, duration_sec)
         LayerFramePipeline.flush_pcm(layers)
-        notify = notification_sink.get("fn")
-
-        def on_empty() -> None:
-            if notify is not None:
-                notify(EMPTY_ROTATION_NOTIFICATION)
-
         reapply_projectm_preset_switching(
             session,
             layers_by_slot,
             delta_sec=delta_sec,
-            on_empty=on_empty if notify is not None else None,
         )
 
     layer_bindings = LiveLayerBindings(
         on_preset_change=on_preset_change,
         on_preset_switching_change=on_preset_switching_change,
+        lock_preset_for_modal=lock_preset_for_modal,
+        unlock_preset_after_modal=unlock_preset_after_modal,
         on_blend_change=on_blend_change,
         on_stem_change=on_stem_change,
         on_opacity_change=on_opacity_change,
@@ -301,6 +318,7 @@ def make_tuning_controls(
         "session": session,
         "cfg": cfg,
         "preset_root": preset_root,
+        "project_dir": project_dir,
         "playback": playback,
         "duration_sec": duration_sec,
         "layer_bindings": layer_bindings,
@@ -386,11 +404,6 @@ def make_timeline_controls(
             session,
             layers_by_slot,
             delta_sec=delta_sec,
-            on_empty=(
-                (lambda: on_notification(EMPTY_ROTATION_NOTIFICATION))
-                if on_notification is not None
-                else None
-            ),
         )
 
     return TimelineControls(

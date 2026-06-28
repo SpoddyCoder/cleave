@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum, auto
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from cleave.config_schema import (
@@ -29,6 +30,7 @@ from cleave.viz.row_sections import (
 )
 from cleave.viz.row_semantics import RowDescriptor, RowKind, row_behavior
 from cleave.viz.tuning_view_state import TrackBlock, TuningViewState
+from cleave.viz.user_presets import user_preset_item_display_name
 
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
@@ -621,6 +623,14 @@ def _format_track_preset(state: TuningViewState, desc: RowDescriptor) -> str:
     return _track_block(state, desc).preset_label
 
 
+def _format_track_user_preset_item(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    assert desc.preset_index is not None
+    block = _track_block(state, desc)
+    return user_preset_item_display_name(block.user_presets, desc.preset_index)
+
+
 def _format_transport(_state: TuningViewState, _desc: RowDescriptor) -> str:
     return ""
 
@@ -667,6 +677,16 @@ def _apply_track_preset(
     if slot is None:
         return
     controls._step_preset(slot, forward=forward, ctrl=ctrl)
+
+
+def _noop_horizontal(
+    _controls: TuningControls,
+    _desc: RowDescriptor,
+    _forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    return
 
 
 def _apply_track_effect(
@@ -785,6 +805,22 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_track_preset_switching_mode,
         apply_horizontal=_apply_track_preset_switching_mode,
+    ),
+    RowKind.TRACK_USER_PRESETS: RowFieldDef(
+        panel_label="user presets",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        apply_horizontal=_apply_expand_subheader,
+    ),
+    RowKind.TRACK_USER_PRESET_ITEM: RowFieldDef(
+        panel_label="preset",
+        present_style=RowPresentStyle.PATH_ICON,
+        format_value=_format_track_user_preset_item,
+        apply_horizontal=_noop_horizontal,
+    ),
+    RowKind.TRACK_USER_PRESET_ADD: RowFieldDef(
+        panel_label="Add Current Preset",
+        present_style=RowPresentStyle.FULL_LINE,
+        apply_horizontal=_noop_horizontal,
     ),
     RowKind.TRACK_PRESET_SWITCHING_SCOPE: RowFieldDef(
         panel_label="scope",

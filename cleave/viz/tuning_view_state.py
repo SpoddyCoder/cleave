@@ -61,6 +61,8 @@ class TrackBlock:
     hard_cut_enabled: bool = DEFAULT_HARD_CUT_ENABLED
     easter_egg: float = DEFAULT_EASTER_EGG
     preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN
+    user_presets: list[str] = field(default_factory=list)
+    user_presets_expanded: bool = False
 
 
 @dataclass
@@ -260,6 +262,8 @@ class TuningViewStateBuilder:
                 hard_cut_enabled=layer.hard_cut_enabled,
                 easter_egg=layer.easter_egg,
                 preset_start_clean=layer.preset_start_clean,
+                user_presets=list(layer.user_presets),
+                user_presets_expanded=layer.user_presets_expanded,
             )
 
         notification_message, notification_remaining_sec = self._get_notification()

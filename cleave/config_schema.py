@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Literal, TypeVar
@@ -27,12 +28,20 @@ DEFAULT_BEAT_SENSITIVITY = 2.0
 BEAT_SENSITIVITY_MIN = 0.0
 BEAT_SENSITIVITY_MAX = 5.0
 
-PresetSwitchingMode = Literal["none", "projectm"]
+PresetSwitchingMode = Literal["none", "projectm", "user_defined"]
 PresetSwitchingScope = Literal["directory"]
-PRESET_SWITCHING_MODES: tuple[PresetSwitchingMode, ...] = ("none", "projectm")
+PRESET_SWITCHING_MODES: tuple[PresetSwitchingMode, ...] = (
+    "none",
+    "projectm",
+    "user_defined",
+)
 PRESET_SWITCHING_MODE_HELP_ENTRIES: tuple[tuple[PresetSwitchingMode, str], ...] = (
     ("none", "keeps the current preset indefinitely."),
     ("projectm", "libprojectM switches automatically using beat detection."),
+    (
+        "user_defined",
+        "cycles through a fixed list of presets defined in config.",
+    ),
 )
 PRESET_SWITCHING_SCOPES: tuple[PresetSwitchingScope, ...] = ("directory",)
 DEFAULT_PRESET_SWITCHING: PresetSwitchingMode = "none"
@@ -46,6 +55,7 @@ DEFAULT_EASTER_EGG = 1.0
 EASTER_EGG_MIN = 0.1
 EASTER_EGG_MAX = 5.0
 DEFAULT_PRESET_START_CLEAN = False
+DEFAULT_PRESET_SWITCHING_PRESETS: list[str] = []
 
 VisualizerRenderMode = Literal[
     "full-quality", "balanced", "performance", "ultra-performance"
@@ -121,6 +131,7 @@ def new_layer_config(slot: str, preset: Path, preset_root: Path) -> Any:
         locked=False,
         preset_switching=DEFAULT_PRESET_SWITCHING,
         preset_switching_scope=DEFAULT_PRESET_SWITCHING_SCOPE,
+        preset_switching_presets=[],
     )
 
 DEFAULT_BLEND_MODE: dict[StemSource, BlendMode] = {
@@ -227,7 +238,11 @@ def clamp_easter_egg(value: float) -> float:
 
 
 def preset_switching_display(mode: PresetSwitchingMode) -> str:
-    return "projectM" if mode == "projectm" else "none"
+    if mode == "projectm":
+        return "projectM"
+    if mode == "user_defined":
+        return "user-defined"
+    return "none"
 
 
 @dataclass(frozen=True)
@@ -275,12 +290,14 @@ SchemaField = FieldDescriptor | SectionDescriptor
 class ParseCtx:
     preset_root: Path | None = None
     layer_slots: tuple[str, ...] | None = None
+    cfg_dir: Path | None = None
 
 
 @dataclass
 class PersistCtx:
     cfg: Any
     session: Any
+    cfg_dir: Path | None = None
 
 
 def as_mapping(data: Any, label: str) -> dict[str, Any]:
@@ -333,6 +350,43 @@ def _resolve_preset(preset: str | Path, preset_root: Path) -> Path:
     if path.is_absolute():
         return path.resolve()
     return (preset_root / path).resolve()
+
+
+def _resolve_user_preset(preset: str | Path, cfg_dir: Path) -> Path:
+    path = Path(os.path.expanduser(str(preset)))
+    if path.is_absolute():
+        return path.resolve()
+    return (cfg_dir / path).resolve()
+
+
+def _to_cfg_relative(path: Path, cfg_dir: Path) -> str:
+    return path.resolve().relative_to(cfg_dir.resolve()).as_posix()
+
+
+def _parse_preset_switching_presets(
+    slot: str,
+    layer_raw: dict[str, Any],
+    ctx: ParseCtx,
+) -> list[Path]:
+    raw = layer_raw.get("preset_switching_presets")
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise ValueError(f"layers.{slot}.preset_switching_presets must be a list")
+    if ctx.cfg_dir is None:
+        warnings.warn(
+            f"layers.{slot}.preset_switching_presets skipped: cfg_dir not set",
+            stacklevel=2,
+        )
+        return []
+    presets: list[Path] = []
+    for index, entry in enumerate(raw):
+        if not isinstance(entry, str):
+            raise ValueError(
+                f"layers.{slot}.preset_switching_presets[{index}] must be a string"
+            )
+        presets.append(_resolve_user_preset(entry, ctx.cfg_dir))
+    return presets
 
 
 def _parse_scalar(raw: Any, ctx: ParseCtx, label: str) -> Any:
@@ -1090,6 +1144,9 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
         preset_start_clean = bool(
             layer_raw.get("preset_start_clean", DEFAULT_PRESET_START_CLEAN)
         )
+        preset_switching_presets = _parse_preset_switching_presets(
+            slot, layer_raw, ctx
+        )
         layers[slot] = LayerConfig(
             preset=_resolve_preset(preset_raw, preset_root),
             stem=stem,
@@ -1112,6 +1169,7 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
             hard_cut_enabled=hard_cut_enabled,
             easter_egg=easter_egg,
             preset_start_clean=preset_start_clean,
+            preset_switching_presets=preset_switching_presets,
         )
     return layers
 
@@ -1144,6 +1202,9 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             hard_cut_enabled = runtime.hard_cut_enabled
             easter_egg = runtime.easter_egg
             preset_start_clean = runtime.preset_start_clean
+            preset_switching_presets = [
+                Path(path) for path in runtime.user_presets
+            ]
             stem = getattr(runtime, "stem", stem)
         else:
             preset = to_config_relative(layer_cfg.preset, preset_root)
@@ -1160,6 +1221,7 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             hard_cut_enabled = layer_cfg.hard_cut_enabled
             easter_egg = layer_cfg.easter_egg
             preset_start_clean = layer_cfg.preset_start_clean
+            preset_switching_presets = list(layer_cfg.preset_switching_presets)
             effects = layer_cfg.effects
             beat = (
                 layer_cfg.beat_sensitivity
@@ -1201,6 +1263,16 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             layer_out["easter_egg"] = easter_egg
         if preset_start_clean != DEFAULT_PRESET_START_CLEAN:
             layer_out["preset_start_clean"] = preset_start_clean
+        if preset_switching_presets:
+            if ctx.cfg_dir is None:
+                layer_out["preset_switching_presets"] = [
+                    path.as_posix() for path in preset_switching_presets
+                ]
+            else:
+                layer_out["preset_switching_presets"] = [
+                    _to_cfg_relative(path, ctx.cfg_dir)
+                    for path in preset_switching_presets
+                ]
         layers_out[slot] = layer_out
 
     return layers_out
@@ -1389,7 +1461,9 @@ def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
 
 
 def persisted_session_payload(cfg: Any, session: Any) -> dict[str, Any]:
-    ctx = PersistCtx(cfg=cfg, session=session)
+    cfg_dir = getattr(cfg, "config_path", None)
+    cfg_dir = cfg_dir.parent if cfg_dir is not None else None
+    ctx = PersistCtx(cfg=cfg, session=session, cfg_dir=cfg_dir)
     return {
         "visualizer": persist_visualizer(ctx),
         "layer_z_order": persist_layer_z_order(ctx),

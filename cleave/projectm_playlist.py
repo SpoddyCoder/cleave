@@ -6,7 +6,7 @@ import ctypes
 import os
 import subprocess
 from collections.abc import Callable
-from ctypes import CFUNCTYPE, c_bool, c_char_p, c_uint32, c_void_p
+from ctypes import CFUNCTYPE, POINTER, c_bool, c_char_p, c_uint32, c_void_p
 from pathlib import Path
 
 from cleave.projectm import ProjectM
@@ -162,6 +162,23 @@ def _bind_functions(lib: ctypes.CDLL, path: str) -> None:
         lib.projectm_playlist_free_string.argtypes = [c_void_p]
         lib.projectm_playlist_free_string.restype = None
 
+    if hasattr(lib, "projectm_playlist_add_preset"):
+        lib.projectm_playlist_add_preset.argtypes = [
+            c_void_p,
+            c_char_p,
+            c_bool,
+        ]
+        lib.projectm_playlist_add_preset.restype = c_bool
+
+    if hasattr(lib, "projectm_playlist_add_presets"):
+        lib.projectm_playlist_add_presets.argtypes = [
+            c_void_p,
+            POINTER(c_char_p),
+            c_uint32,
+            c_bool,
+        ]
+        lib.projectm_playlist_add_presets.restype = c_uint32
+
 
 def _get_lib() -> ctypes.CDLL:
     global _lib
@@ -293,6 +310,37 @@ class ProjectMPlaylist:
             c_bool(recurse),
             c_bool(allow_duplicates),
         )
+
+    def add_presets(
+        self,
+        paths: list[Path | str],
+        *,
+        allow_duplicates: bool = False,
+    ) -> int:
+        lib = _get_lib()
+        if not paths:
+            return 0
+        if hasattr(lib, "projectm_playlist_add_presets"):
+            encoded = [os.fspath(path).encode("utf-8") for path in paths]
+            array = (c_char_p * len(encoded))(*encoded)
+            return int(
+                lib.projectm_playlist_add_presets(
+                    self._handle,
+                    array,
+                    c_uint32(len(encoded)),
+                    c_bool(allow_duplicates),
+                )
+            )
+        if not hasattr(lib, "projectm_playlist_add_preset"):
+            return 0
+        added = 0
+        for path in paths:
+            encoded = os.fspath(path).encode("utf-8")
+            if lib.projectm_playlist_add_preset(
+                self._handle, encoded, c_bool(allow_duplicates)
+            ):
+                added += 1
+        return added
 
     def set_shuffle(self, enabled: bool) -> None:
         _get_lib().projectm_playlist_set_shuffle(self._handle, c_bool(enabled))

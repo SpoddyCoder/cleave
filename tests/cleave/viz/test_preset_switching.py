@@ -242,6 +242,37 @@ def test_reapply_without_playlist_falls_back_to_apply() -> None:
         reapply_projectm_preset_switching(session, {"layer_1": layer})
 
     mock_apply.assert_called_once()
+    assert mock_apply.call_args.kwargs.get("on_empty") is None
+
+
+@patch("cleave.viz.preset_switching.ProjectMPlaylist")
+def test_reapply_without_playlist_does_not_notify_empty(
+    mock_playlist_cls: MagicMock,
+) -> None:
+    layer = _stem_layer(paths=())
+    on_empty = MagicMock()
+    session = TuningSession(
+        layer_z_order=["layer_1"],
+        layers={
+            "layer_1": LayerRuntime(
+                playlist=layer.playlist,
+                browse_floor=layer.playlist.current_dir,
+                stem="drums",
+                preset_switching="projectm",
+            ),
+        },
+    )
+
+    apply_preset_switching(
+        layer, mode="projectm", scope="directory", on_empty=on_empty
+    )
+    on_empty.assert_called_once()
+    on_empty.reset_mock()
+
+    reapply_projectm_preset_switching(session, {"layer_1": layer})
+
+    on_empty.assert_not_called()
+    mock_playlist_cls.create.assert_not_called()
 
 
 def test_reapply_on_forward_seek_reconnects_without_reload() -> None:

@@ -34,6 +34,13 @@ def delete_key_pressed(event: pygame.event.Event) -> bool:
     return scan_delete is not None and scancode == scan_delete
 
 
+def add_current_preset_key_pressed(key: int, mod: int) -> bool:
+    """True for + keys that add the current preset in user-defined mode."""
+    if key in (pygame.K_PLUS, pygame.K_KP_PLUS):
+        return True
+    return key == pygame.K_EQUALS and mod_shift(mod)
+
+
 @dataclass
 class _ActiveRepeat:
     key: int

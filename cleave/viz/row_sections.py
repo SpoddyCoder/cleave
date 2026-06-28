@@ -69,6 +69,12 @@ def _toggle_effects_header(controls: TuningControls, slot: str | None, forward: 
     controls._set_effects_expanded(slot, forward)
 
 
+def _toggle_user_presets(controls: TuningControls, slot: str | None, forward: bool) -> None:
+    if slot is None:
+        return
+    controls._set_user_presets_expanded(slot, forward)
+
+
 def _open_timeline_panel(controls: TuningControls, forward: bool) -> None:
     if forward:
         controls._open_timeline_panel()
@@ -199,6 +205,12 @@ def _track_effects_expanded(state: TuningViewState, slot: str | None) -> bool:
     return state.tracks[slot].effects_expanded
 
 
+def _user_presets_expanded(state: TuningViewState, slot: str | None) -> bool:
+    if slot is None:
+        return True
+    return state.tracks[slot].user_presets_expanded
+
+
 def _append_track_effect_rows(
     row_list: list[RowDescriptor],
     state: TuningViewState,
@@ -216,6 +228,25 @@ def _append_track_effect_rows(
                 driver_slug=effect_def.driver_slug,
             )
         )
+
+
+def _append_user_preset_rows(
+    row_list: list[RowDescriptor],
+    state: TuningViewState,
+    slot: str | None,
+) -> None:
+    if slot is None:
+        return
+    block = state.tracks[slot]
+    for index, _path in enumerate(block.user_presets):
+        row_list.append(
+            RowDescriptor(
+                RowKind.TRACK_USER_PRESET_ITEM,
+                slot=slot,
+                preset_index=index,
+            )
+        )
+    row_list.append(RowDescriptor(RowKind.TRACK_USER_PRESET_ADD, slot=slot))
 
 
 SETTINGS_UI_SECTION = ExpandSectionDef(
@@ -299,6 +330,12 @@ def _preset_switching_projectm(state: TuningViewState, desc: RowDescriptor) -> b
     return state.tracks[desc.slot].preset_switching == "projectm"
 
 
+def _preset_switching_user_defined(state: TuningViewState, desc: RowDescriptor) -> bool:
+    if desc.slot is None:
+        return False
+    return state.tracks[desc.slot].preset_switching == "user_defined"
+
+
 def _hard_cut_enabled(state: TuningViewState, desc: RowDescriptor) -> bool:
     if desc.slot is None:
         return False
@@ -328,6 +365,21 @@ PRESET_SWITCHING_PROJECTM = ConditionalRowsDef(
     ),
 )
 
+USER_PRESETS_SECTION = ExpandSectionDef(
+    header_kind=RowKind.TRACK_USER_PRESETS,
+    context="per_slot",
+    read_expanded=_user_presets_expanded,
+    toggle=_toggle_user_presets,
+    children=(),
+    append_dynamic_children=_append_user_preset_rows,
+)
+
+PRESET_SWITCHING_USER_DEFINED = ConditionalRowsDef(
+    name="preset_switching_user_defined",
+    predicate=_preset_switching_user_defined,
+    children=(SectionNode(expand=USER_PRESETS_SECTION),),
+)
+
 TRACK_PRESET_SWITCHING_SECTION = ExpandSectionDef(
     header_kind=RowKind.TRACK_PRESET_SWITCHING,
     context="per_slot",
@@ -336,6 +388,7 @@ TRACK_PRESET_SWITCHING_SECTION = ExpandSectionDef(
     children=(
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_MODE),
         SectionNode(conditional=PRESET_SWITCHING_PROJECTM),
+        SectionNode(conditional=PRESET_SWITCHING_USER_DEFINED),
     ),
 )
 
@@ -538,6 +591,8 @@ def _build_row_tree_indent_depth() -> dict[RowKind, int]:
         if node.expand is not None:
             _assign_expand_indent_depth(depths, node.expand, 0)
     depths[RowKind.TRACK_EFFECT] = 2
+    depths[RowKind.TRACK_USER_PRESET_ITEM] = 7
+    depths[RowKind.TRACK_USER_PRESET_ADD] = 3
     return depths
 
 

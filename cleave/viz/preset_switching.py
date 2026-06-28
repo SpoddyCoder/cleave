@@ -20,10 +20,11 @@ from cleave.projectm import ProjectM
 from cleave.projectm_playlist import ProjectMPlaylist
 from cleave.viz.layer import StemLayer
 
-PresetSwitchingMode = Literal["none", "projectm"]
+PresetSwitchingMode = Literal["none", "projectm", "user_defined"]
 PresetSwitchingScope = Literal["directory"]
 
 EMPTY_ROTATION_NOTIFICATION = "No presets in directory for auto switching"
+EMPTY_USER_PRESETS_NOTIFICATION = "No presets in user-defined rotation set"
 
 
 def _apply_projectm_timing(
@@ -51,18 +52,18 @@ def reapply_projectm_preset_switching(
     layers_by_slot: dict[str, StemLayer],
     *,
     delta_sec: float = 0.0,
-    on_empty: Callable[[], None] | None = None,
 ) -> None:
     """Re-attach projectM playlist switching after seek without reloading browse preset."""
     for slot, layer in layers_by_slot.items():
         runtime = session.layers[slot]
-        if runtime.preset_switching != "projectm":
+        if runtime.preset_switching not in ("projectm", "user_defined"):
             continue
         if layer.projectm_playlist is None:
             apply_preset_switching(
                 layer,
                 mode=runtime.preset_switching,
                 scope=runtime.preset_switching_scope,
+                user_presets=runtime.user_presets,
                 preset_duration=runtime.preset_duration,
                 soft_cut_duration=runtime.soft_cut_duration,
                 easter_egg=runtime.easter_egg,
@@ -70,7 +71,6 @@ def reapply_projectm_preset_switching(
                 hard_cut_enabled=runtime.hard_cut_enabled,
                 hard_cut_duration=runtime.hard_cut_duration,
                 hard_cut_sensitivity=runtime.hard_cut_sensitivity,
-                on_empty=on_empty,
             )
             continue
         _reapply_on_seek(
@@ -91,6 +91,7 @@ def apply_preset_switching(
     *,
     mode: PresetSwitchingMode,
     scope: PresetSwitchingScope,
+    user_presets: list[str] | None = None,
     preset_duration: float = DEFAULT_PRESET_DURATION,
     soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION,
     easter_egg: float = DEFAULT_EASTER_EGG,
@@ -124,6 +125,24 @@ def apply_preset_switching(
         hard_cut_sensitivity=hard_cut_sensitivity,
     )
 
+    if mode == "user_defined":
+        paths = [Path(path) for path in (user_presets or [])]
+        if not paths:
+            layer.auto_preset_path = None
+            pm.lock_preset(True)
+            if on_empty is not None:
+                on_empty()
+            return
+
+        playlist = ProjectMPlaylist.create()
+        playlist.connect(pm, on_preset_loaded=_auto_preset_loaded_callback(layer))
+        playlist.add_presets(paths, allow_duplicates=True)
+        playlist.set_shuffle(False)
+        layer.projectm_playlist = playlist
+        _sync_projectm_playlist_position(layer)
+        restart_projectm_preset_timer(layer)
+        return
+
     if scope == "directory":
         preset_dir = layer.playlist.current_dir
         if not milk_files_in_dir(preset_dir):
@@ -140,6 +159,15 @@ def apply_preset_switching(
         layer.projectm_playlist = playlist
         _sync_projectm_playlist_position(layer)
         restart_projectm_preset_timer(layer)
+
+
+def sync_manual_browse_with_user_defined_rotation(layer: StemLayer) -> None:
+    """Align user-defined rotation state after manual preset browse."""
+    current = layer.playlist.current
+    if current is None:
+        return
+    layer.auto_preset_path = current.resolve()
+    _sync_projectm_playlist_position(layer)
 
 
 def restart_projectm_preset_timer(layer: StemLayer) -> None:

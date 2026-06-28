@@ -10,6 +10,7 @@ from cleave.viz.key_repeat import (
     INITIAL_DELAY_SEC,
     SLOW_INTERVAL_SEC,
     KeyRepeatController,
+    add_current_preset_key_pressed,
     delete_key_pressed,
 )
 
@@ -138,3 +139,13 @@ def test_delete_key_pressed_matches_keysym_and_scancode() -> None:
 
     backspace = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_BACKSPACE, scancode=0)
     assert delete_key_pressed(backspace) is False
+
+
+def test_add_current_preset_key_pressed() -> None:
+    assert add_current_preset_key_pressed(pygame.K_PLUS, 0)
+    assert add_current_preset_key_pressed(pygame.K_KP_PLUS, 0)
+    assert add_current_preset_key_pressed(
+        pygame.K_EQUALS, pygame.KMOD_SHIFT
+    )
+    assert not add_current_preset_key_pressed(pygame.K_EQUALS, 0)
+    assert not add_current_preset_key_pressed(pygame.K_MINUS, 0)

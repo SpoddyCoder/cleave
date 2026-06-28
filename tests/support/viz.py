@@ -76,6 +76,8 @@ def noop_layer_bindings(**overrides: Callable) -> LiveLayerBindings:
     base = LiveLayerBindings(
         on_preset_change=lambda _slot, _playlist: None,
         on_preset_switching_change=lambda _slot: None,
+        lock_preset_for_modal=lambda _slot: None,
+        unlock_preset_after_modal=lambda _slot: None,
         on_blend_change=lambda _slot, _blend: None,
         on_stem_change=lambda _slot, _stem: None,
         on_opacity_change=lambda _slot, _pct: None,

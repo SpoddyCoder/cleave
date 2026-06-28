@@ -113,6 +113,7 @@ class LayerConfig:
     hard_cut_enabled: bool = DEFAULT_HARD_CUT_ENABLED
     easter_egg: float = DEFAULT_EASTER_EGG
     preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN
+    preset_switching_presets: list[Path] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -329,11 +330,11 @@ def _validate_presets(layers: dict[str, LayerConfig]) -> None:
 
 
 def _parse_layers(
-    data: dict[str, Any], preset_root: Path
+    data: dict[str, Any], preset_root: Path, cfg_dir: Path | None = None
 ) -> tuple[dict[str, LayerConfig], "ParseCtx"]:
     from cleave.config_schema import ParseCtx
 
-    ctx = ParseCtx(preset_root=preset_root)
+    ctx = ParseCtx(preset_root=preset_root, cfg_dir=cfg_dir)
     layers = parse_layers_section(data, ctx)
     return layers, ctx
 
@@ -361,7 +362,7 @@ def load_config(
     paths = _parse_paths(data)
     visualizer = parse_visualizer_section(data)
     render = parse_render_section(data)
-    layers, parse_ctx = _parse_layers(data, paths.preset_root)
+    layers, parse_ctx = _parse_layers(data, paths.preset_root, path.parent)
     layer_z_order = parse_layer_z_order_section(data, parse_ctx)
     timeline = parse_timeline_section(data, parse_ctx)
     _validate_presets(layers)

@@ -370,7 +370,11 @@ def fit_row_text(
         )
     field = ROW_FIELDS.get(kind)
     if field is not None and field.present_style == RowPresentStyle.FULL_LINE:
-        if kind in {RowKind.LAYER_MANAGEMENT_ADD, RowKind.LAYER_MANAGEMENT_DELETE}:
+        if kind in {
+            RowKind.LAYER_MANAGEMENT_ADD,
+            RowKind.LAYER_MANAGEMENT_DELETE,
+            RowKind.TRACK_USER_PRESET_ADD,
+        }:
             return _row_text(state, index)
     if field is not None and field.present_style == RowPresentStyle.COMPOSITE_HEADER:
         return row_composite_header_display_text(state, state.layout.descriptor(index))
@@ -428,6 +432,7 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
         RowKind.CONFIG_HEADER,
         RowKind.LAYER_MANAGEMENT_ADD,
         RowKind.LAYER_MANAGEMENT_DELETE,
+        RowKind.TRACK_USER_PRESET_ADD,
     }:
         if kind == RowKind.CONFIG_HEADER and state.solo_active:
             return DISABLED
@@ -459,7 +464,7 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
     if (
         stem is not None
         and kind in {RowKind.TRACK_PRESET_DIR, RowKind.TRACK_PRESET}
-        and state.tracks[stem].preset_switching != "none"
+        and state.tracks[stem].preset_switching == "projectm"
     ):
         return DISABLED
 
@@ -1021,7 +1026,7 @@ class TuningOverlay:
                         icon_color=icon_color,
                         line_height=line_h,
                     )
-                elif kind == RowKind.TRACK_PRESET:
+                elif kind in {RowKind.TRACK_PRESET, RowKind.TRACK_USER_PRESET_ITEM}:
                     glyph = FILE_GLYPH
                     icon_color = PRESET_FILE_ICON
                     icon_surf = _render_preset_row_prefix(
@@ -1090,7 +1095,11 @@ class TuningOverlay:
                 ROW_FIELDS.get(kind) is not None
                 and ROW_FIELDS[kind].present_style == RowPresentStyle.FULL_LINE
                 and kind
-                in {RowKind.LAYER_MANAGEMENT_ADD, RowKind.LAYER_MANAGEMENT_DELETE}
+                in {
+                    RowKind.LAYER_MANAGEMENT_ADD,
+                    RowKind.LAYER_MANAGEMENT_DELETE,
+                    RowKind.TRACK_USER_PRESET_ADD,
+                }
             ):
                 label = _row_text(state, index)
                 label_color = _row_value_color(state, index)

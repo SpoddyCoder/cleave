@@ -18,6 +18,9 @@ class RowKind(Enum):
     TRACK_PRESET = auto()
     TRACK_PRESET_SWITCHING = auto()
     TRACK_PRESET_SWITCHING_MODE = auto()
+    TRACK_USER_PRESETS = auto()
+    TRACK_USER_PRESET_ITEM = auto()
+    TRACK_USER_PRESET_ADD = auto()
     TRACK_PRESET_SWITCHING_SCOPE = auto()
     TRACK_PRESET_DURATION = auto()
     TRACK_SOFT_CUT_DURATION = auto()
@@ -69,6 +72,7 @@ class RowDescriptor:
     slot: str | None = None
     effect_id: str | None = None
     driver_slug: str | None = None
+    preset_index: int | None = None
 
 
 class RowAffordance(Enum):
@@ -167,6 +171,35 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_entries=(("Left/Right", "cycle mode"),),
         help_description=(),
         help_mode_entries=PRESET_SWITCHING_MODE_HELP_ENTRIES,
+    ),
+    RowKind.TRACK_USER_PRESETS: RowBehavior(
+        RowAffordance.EXPAND,
+        is_sub_header=True,
+        parent_group="track",
+        help_title="user presets",
+        help_description=(
+            "Presets in the rotation set for user-defined switching.",
+            "Expand to list entries and add from the current browse position.",
+        ),
+    ),
+    RowKind.TRACK_USER_PRESET_ITEM: RowBehavior(
+        RowAffordance.PATH_PRESET,
+        parent_group="track",
+        help_title="user preset entry",
+        help_description=(
+            "Preset in the user-defined rotation set for this layer.",
+        ),
+    ),
+    RowKind.TRACK_USER_PRESET_ADD: RowBehavior(
+        RowAffordance.ACTION,
+        parent_group="track",
+        blocked_by_layer_lock=True,
+        help_title="Add Current Preset",
+        help_description=(
+            "Add the layer's current preset to the user-defined rotation set.",
+            "Copies the preset file into the project presets folder.",
+            "+ on the preset dir or preset file row is the same action.",
+        ),
     ),
     RowKind.TRACK_PRESET_SWITCHING_SCOPE: RowBehavior(
         RowAffordance.VALUE_STEP,
@@ -579,6 +612,9 @@ TRACK_SUB_ROW_KINDS = frozenset(
     k for k, b in ROW_BEHAVIORS.items() if b.parent_group == "track"
 )
 TRACK_EFFECT_SUB_ROW_KINDS = frozenset({RowKind.TRACK_EFFECT})
+TRACK_USER_PRESET_SUB_ROW_KINDS = frozenset(
+    {RowKind.TRACK_USER_PRESET_ITEM, RowKind.TRACK_USER_PRESET_ADD}
+)
 
 _LAYER_LOCK_BLOCKING_AFFORDANCES = frozenset(
     {
@@ -655,4 +691,6 @@ def section_header_descriptor(desc: RowDescriptor) -> RowDescriptor:
     kind = desc.kind
     if kind in TRACK_EFFECT_SUB_ROW_KINDS:
         return RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, slot=desc.slot)
+    if kind in TRACK_USER_PRESET_SUB_ROW_KINDS:
+        return RowDescriptor(RowKind.TRACK_USER_PRESETS, slot=desc.slot)
     return desc
