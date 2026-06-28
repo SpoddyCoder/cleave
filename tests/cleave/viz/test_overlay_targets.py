@@ -57,6 +57,32 @@ def test_draw_tuning_overlay_uploads_help_panel() -> None:
     compositor.draw_overlay.assert_any_call(22, *help_panel)
 
 
+def test_draw_tuning_overlay_hides_help_when_overlay_hidden() -> None:
+    pygame.init()
+    compositor = recording_compositor()
+    compositor.upload_overlay_texture.return_value = 11
+
+    overlay = MagicMock()
+    overlay.panel_rect = (10, 20, 100, 50)
+    help_overlay = HelpOverlay()
+    overlay_surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    view_state = MagicMock()
+    view_state.help_visible = True
+    view_state.focus_descriptor = RowDescriptor(RowKind.TRANSPORT)
+
+    OverlayDrawer.draw_tuning(
+        compositor,
+        overlay,
+        overlay_surface,
+        view_state,
+        overlay_visible=False,
+        help_overlay=help_overlay,
+    )
+
+    compositor.draw_overlay.assert_called_once_with(11, 10, 20, 100, 50)
+    assert help_overlay.panel_rect is None
+
+
 def test_draw_timeline_overlay_uses_display_target() -> None:
     pygame.init()
     compositor = recording_compositor()

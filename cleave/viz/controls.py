@@ -927,6 +927,8 @@ class TuningControls:
         )
 
     def exit_timeline_submenu(self) -> None:
+        if not isinstance(self.focus_cursor, TimelineFocus):
+            return
         self._apply_focus_cursor(
             MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
         )

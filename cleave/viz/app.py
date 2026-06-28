@@ -361,6 +361,7 @@ def _tick_frame_live_overlay(
         runtime.overlay_surface,
         view_state,
         timeline_panel_open=timeline_panel_open,
+        overlay_visible=overlay_visibility > 0.01,
         help_overlay=runtime.help_overlay,
         modal_host=runtime.modal_host,
     )

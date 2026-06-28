@@ -37,6 +37,7 @@ class OverlayDrawer:
         view_state: TuningViewState,
         *,
         timeline_panel_open: bool = False,
+        overlay_visible: bool = True,
         help_overlay: HelpOverlay | None = None,
         modal_host: ModalHost | None = None,
     ) -> None:
@@ -44,7 +45,8 @@ class OverlayDrawer:
         overlay.draw(
             overlay_surface, view_state, timeline_panel_open=timeline_panel_open
         )
-        if help_overlay is not None and view_state.help_visible:
+        show_help = view_state.help_visible and overlay_visible
+        if help_overlay is not None and show_help:
             focus = view_state.focus_descriptor
             preset_switching = None
             if focus.slot is not None:
@@ -86,7 +88,7 @@ class OverlayDrawer:
             tex_id = compositor.upload_overlay_texture(panel_surface)
             compositor.draw_overlay(tex_id, px, py, pw, ph)
 
-        if help_overlay is not None and view_state.help_visible:
+        if help_overlay is not None and show_help:
             help_panel = help_overlay.panel_rect
             if help_panel is not None:
                 hx, hy, hw, hh = help_panel
