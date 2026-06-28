@@ -30,6 +30,10 @@ BEAT_SENSITIVITY_MAX = 5.0
 PresetSwitchingMode = Literal["none", "projectm"]
 PresetSwitchingScope = Literal["directory"]
 PRESET_SWITCHING_MODES: tuple[PresetSwitchingMode, ...] = ("none", "projectm")
+PRESET_SWITCHING_MODE_HELP_ENTRIES: tuple[tuple[PresetSwitchingMode, str], ...] = (
+    ("none", "keeps the current preset indefinitely."),
+    ("projectm", "libprojectM switches automatically using beat detection."),
+)
 PRESET_SWITCHING_SCOPES: tuple[PresetSwitchingScope, ...] = ("directory",)
 DEFAULT_PRESET_SWITCHING: PresetSwitchingMode = "none"
 DEFAULT_PRESET_SWITCHING_SCOPE: PresetSwitchingScope = "directory"
@@ -52,6 +56,13 @@ VISUALIZER_RENDER_MODES: tuple[VisualizerRenderMode, ...] = (
     "balanced",
     "performance",
     "ultra-performance",
+)
+
+VISUALIZER_RENDER_MODE_HELP_ENTRIES: tuple[tuple[VisualizerRenderMode, str], ...] = (
+    ("full-quality", "every layer at configured resolution."),
+    ("balanced", "top layer full size; lower layers step down."),
+    ("performance", "more aggressive downscale from top."),
+    ("ultra-performance", "lowest preview resolution for heaviest load reduction."),
 )
 
 DEFAULT_VISUALIZER_RENDER_MODE: VisualizerRenderMode = "balanced"

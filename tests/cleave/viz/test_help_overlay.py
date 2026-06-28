@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES, BLEND_MODES
+from cleave.config_schema import (
+    PRESET_SWITCHING_MODE_HELP_ENTRIES,
+    VISUALIZER_RENDER_MODE_HELP_ENTRIES,
+)
 from cleave.viz.help_content import (
     DescriptionSection,
     HelpSection,
@@ -44,17 +49,33 @@ def _timeline_keys(**kwargs: object) -> list[str]:
 def test_help_entry_columns_align_to_widest_key() -> None:
     overlay = HelpOverlay()
     font = overlay._font_get()
-    sections = (NAVIGATION_SECTION, layer_section(timeline_enabled=False))
+    mode_description = DescriptionSection(
+        "Blend mode",
+        lines=("How this layer is composited onto the layers below it.",),
+        entries=BLEND_MODE_HELP_ENTRIES,
+    )
+    sections = (NAVIGATION_SECTION, layer_section(timeline_enabled=False), mode_description)
     key_column_width = overlay._max_key_width(font, sections)
     entry_gap = overlay._entry_gap(font)
 
+    all_keys = [
+        key
+        for section in sections
+        for key, _ in (
+            section.entries
+            if isinstance(section, (HelpSection, DescriptionSection))
+            else ()
+        )
+    ]
     widest_key = max(
-        (key for section in sections for key, _ in section.entries),
+        all_keys,
         key=lambda key: font.render(key, True, LABEL).get_width(),
     )
     assert key_column_width == font.render(widest_key, True, LABEL).get_width()
 
     for section in sections:
+        if not isinstance(section, (HelpSection, DescriptionSection)):
+            continue
         for key, description in section.entries:
             assert overlay._entry_width(
                 font,
@@ -135,7 +156,29 @@ def test_blend_mode_help_lists_modes() -> None:
     description = _description_section(sections_for(RowKind.TRACK_BLEND))
     assert description is not None
     assert description.title == "Blend mode"
-    assert any("black-key -" in line for line in description.lines)
+    assert description.lines == (
+        "How this layer is composited onto the layers below it.",
+    )
+    assert description.entries == BLEND_MODE_HELP_ENTRIES
+    assert [mode for mode, _ in description.entries] == list(BLEND_MODES)
+
+
+def test_switching_mode_help_lists_modes() -> None:
+    description = _description_section(
+        sections_for(RowKind.TRACK_PRESET_SWITCHING_MODE)
+    )
+    assert description is not None
+    assert description.title == "Switching mode"
+    assert description.lines == ()
+    assert description.entries == PRESET_SWITCHING_MODE_HELP_ENTRIES
+
+
+def test_render_mode_help_lists_modes() -> None:
+    description = _description_section(sections_for(RowKind.SETTINGS_RENDER_MODE))
+    assert description is not None
+    assert description.title == "Render mode"
+    assert "live view only" in " ".join(description.lines)
+    assert description.entries == VISUALIZER_RENDER_MODE_HELP_ENTRIES
 
 
 def test_timeline_help_mentions_visibility_handoff() -> None:
@@ -216,7 +259,8 @@ def test_navigable_row_kinds_have_help_sections() -> None:
         assert sections, f"{row_kind} returned no help sections"
         assert any(
             (
-                isinstance(section, DescriptionSection) and section.lines
+                isinstance(section, DescriptionSection)
+                and (section.lines or section.entries)
             )
             or (
                 isinstance(section, HelpSection) and section.entries
@@ -227,7 +271,9 @@ def test_navigable_row_kinds_have_help_sections() -> None:
 
 def test_navigable_row_kinds_with_description_use_keyboard_controls_title() -> None:
     for row_kind, behavior in ROW_BEHAVIORS.items():
-        if not behavior.navigable or behavior.help_description is None:
+        if not behavior.navigable:
+            continue
+        if behavior.help_description is None and behavior.help_mode_entries is None:
             continue
         if row_kind == RowKind.TRACK_EFFECT:
             continue
@@ -237,7 +283,9 @@ def test_navigable_row_kinds_with_description_use_keyboard_controls_title() -> N
 
 def test_navigable_row_kinds_with_description_have_three_sections() -> None:
     for row_kind, behavior in ROW_BEHAVIORS.items():
-        if not behavior.navigable or behavior.help_description is None:
+        if not behavior.navigable:
+            continue
+        if behavior.help_description is None and behavior.help_mode_entries is None:
             continue
         sections = sections_for(row_kind)
         assert len(sections) == 3, f"{row_kind} expected 3 sections, got {len(sections)}"
@@ -248,7 +296,9 @@ def test_navigable_row_kinds_with_description_have_three_sections() -> None:
 
 def test_description_sections_use_control_name_not_about() -> None:
     for row_kind, behavior in ROW_BEHAVIORS.items():
-        if not behavior.navigable or behavior.help_description is None:
+        if not behavior.navigable:
+            continue
+        if behavior.help_description is None and behavior.help_mode_entries is None:
             continue
         if row_kind == RowKind.TRACK_EFFECT:
             continue
