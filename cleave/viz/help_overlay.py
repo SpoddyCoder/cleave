@@ -11,7 +11,7 @@ from cleave.viz.help_content import (
     sections_for,
 )
 from cleave.viz.row_semantics import RowDescriptor, RowKind
-from cleave.viz.tuning_panel_draw import clip_rect_to_surface
+from cleave.viz.tuning_panel_draw import clip_rect_to_bounds
 from cleave.viz.theme import (
     BACKGROUND,
     BACKGROUND_ALPHA,
@@ -51,6 +51,7 @@ class HelpOverlay:
         self._font_size = font_size
         self._font: pygame.font.Font | None = None
         self._panel_rect: tuple[int, int, int, int] | None = None
+        self._last_panel: pygame.Surface | None = None
 
     @property
     def panel_rect(self) -> tuple[int, int, int, int] | None:
@@ -215,19 +216,21 @@ class HelpOverlay:
             y += row_stride
         return y
 
-    def draw(
+    def compose_panel(
         self,
-        surface: pygame.Surface,
         focus: RowDescriptor,
         *,
+        viewport_width: int,
+        viewport_height: int,
         timeline_enabled: bool = False,
         timeline_submenu_focused: bool = False,
         paused: bool = False,
         timeline_recording: bool = False,
         timeline_override_active: bool = False,
         preset_switching: str | None = None,
-    ) -> None:
+    ) -> tuple[pygame.Surface, tuple[int, int, int, int]] | None:
         self._panel_rect = None
+        self._last_panel = None
         font = self._font_get()
         line_h = font.get_linesize()
         sections = sections_for(
@@ -291,9 +294,54 @@ class HelpOverlay:
             )
 
         mx, my = self._margin
-        pos = (surface.get_width() - panel_w - mx, my)
-        surface.blit(panel, pos)
-        self._panel_rect = clip_rect_to_surface(
+        pos = (viewport_width - panel_w - mx, my)
+        bounds = clip_rect_to_bounds(
             (pos[0], pos[1], panel_w, panel_h),
-            surface,
+            viewport_width,
+            viewport_height,
         )
+        if bounds is None:
+            return None
+        self._panel_rect = bounds
+        self._last_panel = panel
+        src_x = bounds[0] - pos[0]
+        src_y = bounds[1] - pos[1]
+        if src_x == 0 and src_y == 0 and (bounds[2], bounds[3]) == (panel_w, panel_h):
+            upload_surface: pygame.Surface = panel
+        else:
+            upload_surface = panel.subsurface(
+                (src_x, src_y, bounds[2], bounds[3])
+            )
+        return upload_surface, bounds
+
+    def draw(
+        self,
+        surface: pygame.Surface,
+        focus: RowDescriptor,
+        *,
+        timeline_enabled: bool = False,
+        timeline_submenu_focused: bool = False,
+        paused: bool = False,
+        timeline_recording: bool = False,
+        timeline_override_active: bool = False,
+        preset_switching: str | None = None,
+    ) -> None:
+        composed = self.compose_panel(
+            focus,
+            viewport_width=surface.get_width(),
+            viewport_height=surface.get_height(),
+            timeline_enabled=timeline_enabled,
+            timeline_submenu_focused=timeline_submenu_focused,
+            paused=paused,
+            timeline_recording=timeline_recording,
+            timeline_override_active=timeline_override_active,
+            preset_switching=preset_switching,
+        )
+        if composed is None:
+            self._panel_rect = None
+            return
+        panel = self._last_panel
+        assert panel is not None
+        mx, my = self._margin
+        pos = (surface.get_width() - panel.get_width() - mx, my)
+        surface.blit(panel, pos)

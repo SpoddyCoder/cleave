@@ -14,8 +14,10 @@ from cleave.viz.app import (
     LiveVisualizerRuntime,
     VisualizerApp,
     VisualizerSeed,
+    _live_overlay_ui_active,
     _timeline_strip_fade,
     _timeline_strip_visible,
+    _tuning_view_state_needed,
 )
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.input_dispatch import key_handler_for_runtime
@@ -35,8 +37,7 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
     )
     controls = MagicMock()
     controls.build_view_state.return_value = MagicMock()
-    overlay = MagicMock()
-    overlay.update = MagicMock()
+    overlay = TuningOverlay()
     modal_host = ModalHost()
     seed = VisualizerSeed(
         project_dir=MagicMock(),
@@ -135,6 +136,7 @@ def test_tick_frame_overlay_order_fade_content_present_then_ui(
     pygame.init()
     compositor = recording_compositor()
     runtime = _minimal_runtime(compositor)
+    runtime.overlay.notify_input()
     call_order: list[str] = []
 
     compositor.apply_frame_fade.side_effect = lambda *_a, **_k: call_order.append(
@@ -504,6 +506,7 @@ def test_tick_frame_overlay_order_at_upscale_one(
     pygame.init()
     compositor = recording_compositor()
     runtime = _minimal_runtime(compositor, upscale=1.0)
+    runtime.overlay.notify_input()
     call_order: list[str] = []
 
     compositor.apply_frame_fade.side_effect = lambda *_a, **_k: call_order.append(
@@ -650,6 +653,86 @@ def test_tick_frame_draws_timeline_when_overlay_hidden_but_submenu_focused(
     app = VisualizerApp(runtime)
     app.tick_frame(1.0, paused=True, draw_overlay=True, n_pcm=735)
     mock_draw_timeline.assert_called_once()
+    _mock_draw_tuning.assert_not_called()
+
+
+@patch("cleave.viz.app.OverlayDrawer.draw_timeline")
+@patch("cleave.viz.app.OverlayDrawer.draw_tuning")
+@patch("cleave.viz.frame_finish._composite_render_overlay")
+@patch("cleave.viz.frame_finish.live_frame_fade_alpha", return_value=1.0)
+@patch("cleave.viz.app.LayerFramePipeline.composite")
+@patch("cleave.viz.app.LayerFramePipeline.render_frame")
+@patch("cleave.viz.app.apply_layer_visibility")
+def test_tick_frame_skips_view_state_and_draw_tuning_when_overlay_hidden(
+    _mock_visibility: MagicMock,
+    _mock_effects: MagicMock,
+    _mock_composite: MagicMock,
+    _mock_fade_alpha: MagicMock,
+    _mock_live_overlay: MagicMock,
+    mock_draw_tuning: MagicMock,
+    _mock_draw_timeline: MagicMock,
+) -> None:
+    pygame.init()
+    compositor = recording_compositor()
+    runtime = _minimal_runtime(compositor)
+    runtime.controls.build_view_state = MagicMock()
+
+    app = VisualizerApp(runtime)
+    app.tick_frame(1.0, paused=True, draw_overlay=True, n_pcm=735)
+
+    runtime.controls.build_view_state.assert_not_called()
+    mock_draw_tuning.assert_not_called()
+
+
+@patch("cleave.viz.app.OverlayDrawer.draw_tuning")
+@patch("cleave.viz.frame_finish._composite_render_overlay")
+@patch("cleave.viz.frame_finish.live_frame_fade_alpha", return_value=1.0)
+@patch("cleave.viz.app.LayerFramePipeline.composite")
+@patch("cleave.viz.app.LayerFramePipeline.render_frame")
+@patch("cleave.viz.app.apply_layer_visibility")
+def test_tick_frame_draws_tuning_when_modal_active_and_panel_hidden(
+    _mock_visibility: MagicMock,
+    _mock_effects: MagicMock,
+    _mock_composite: MagicMock,
+    _mock_fade_alpha: MagicMock,
+    _mock_live_overlay: MagicMock,
+    mock_draw_tuning: MagicMock,
+) -> None:
+    pygame.init()
+    compositor = recording_compositor()
+    runtime = _minimal_runtime(compositor)
+    runtime.controls.build_view_state = MagicMock(return_value=MagicMock())
+    runtime.modal_host.prompt_yes_no("test?", on_confirm=lambda: None)
+
+    app = VisualizerApp(runtime)
+    app.tick_frame(1.0, paused=True, draw_overlay=True, n_pcm=735)
+
+    runtime.controls.build_view_state.assert_called_once()
+    mock_draw_tuning.assert_called_once()
+
+
+def test_live_overlay_ui_active_gating() -> None:
+    assert not _live_overlay_ui_active(
+        overlay_visibility=0.0, modal_active=False, timeline_strip_visible=False
+    )
+    assert _live_overlay_ui_active(
+        overlay_visibility=0.5, modal_active=False, timeline_strip_visible=False
+    )
+    assert _live_overlay_ui_active(
+        overlay_visibility=0.0, modal_active=True, timeline_strip_visible=False
+    )
+    assert _live_overlay_ui_active(
+        overlay_visibility=0.0, modal_active=False, timeline_strip_visible=True
+    )
+
+
+def test_tuning_view_state_needed_gating() -> None:
+    assert not _tuning_view_state_needed(overlay_visibility=0.0, modal_active=False)
+    assert _tuning_view_state_needed(overlay_visibility=0.5, modal_active=False)
+    assert _tuning_view_state_needed(overlay_visibility=0.0, modal_active=True)
+    assert not _tuning_view_state_needed(
+        overlay_visibility=0.0, modal_active=False
+    )
 
 
 def test_timeline_strip_visible_while_submenu_focused_despite_hidden_overlay() -> None:

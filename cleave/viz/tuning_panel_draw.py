@@ -96,10 +96,36 @@ from cleave.viz.theme import (
     VALUE,
     tuning_ui_metrics,
 )
+from cleave.viz.overlay_profiler import OverlayDrawCounters
 from cleave.viz.tuning_view_state import TuningViewState
 from cleave.viz.ui_tint import blit_tint
 
 Anchor = Literal["topleft", "bottomleft"]
+
+
+def _render_text(
+    font: pygame.font.Font,
+    text: str,
+    antialias: bool,
+    color: tuple[int, int, int],
+    *,
+    counters: OverlayDrawCounters | None = None,
+) -> pygame.Surface:
+    if counters is not None:
+        counters.font_renders += 1
+    return font.render(text, antialias, color)
+
+
+def _compose_surface(
+    size: tuple[int, int],
+    *,
+    counters: OverlayDrawCounters | None = None,
+    flags: int = pygame.SRCALPHA,
+) -> pygame.Surface:
+    if counters is not None:
+        counters.surface_builds += 1
+    return pygame.Surface(size, flags)
+
 
 _tuning_ui = tuning_ui_metrics()
 TREE_INDENT = _tuning_ui.tree_indent
@@ -185,14 +211,17 @@ def _render_label_value_row(
     prefix_color: tuple[int, int, int] | None = None,
     suffix_surf: pygame.Surface | None = None,
     suffix_gap: int = 0,
+    counters: OverlayDrawCounters | None = None,
 ) -> pygame.Surface:
-    prefix_surf = font.render(prefix, True, prefix_color if prefix_color is not None else LABEL)
-    value_surf = font.render(value, True, value_color)
+    prefix_surf = _render_text(
+        font, prefix, True, prefix_color if prefix_color is not None else LABEL, counters=counters
+    )
+    value_surf = _render_text(font, value, True, value_color, counters=counters)
     label_w = prefix_surf.get_width() + value_surf.get_width()
     if suffix_surf is not None:
         label_w += suffix_gap + suffix_surf.get_width()
 
-    label_surf = pygame.Surface((label_w, line_height), pygame.SRCALPHA)
+    label_surf = _compose_surface((label_w, line_height), counters=counters)
     x = 0
     label_surf.blit(prefix_surf, (x, 0))
     x += prefix_surf.get_width()
@@ -261,11 +290,12 @@ def _render_preset_row_prefix(
     glyph: str,
     icon_color: tuple[int, int, int],
     line_height: int,
+    counters: OverlayDrawCounters | None = None,
 ) -> pygame.Surface:
-    tree_surf = font.render(TREE_BRANCH, True, LABEL)
+    tree_surf = _render_text(font, TREE_BRANCH, True, LABEL, counters=counters)
     icon_surf = render_glyph(glyph, color=icon_color, line_height=line_height)
     total_w = tree_surf.get_width() + icon_surf.get_width()
-    surf = pygame.Surface((total_w, line_height), pygame.SRCALPHA)
+    surf = _compose_surface((total_w, line_height), counters=counters)
     surf.blit(tree_surf, (0, 0))
     surf.blit(icon_surf, (tree_surf.get_width(), 0))
     return surf
@@ -301,11 +331,12 @@ def _render_track_header_label(
     expand_arrow: str,
     locked: bool,
     line_height: int,
+    counters: OverlayDrawCounters | None = None,
 ) -> pygame.Surface:
     arrow = f" {expand_arrow}"
-    prefix_surf = font.render(layer_prefix, True, LABEL)
-    stem_surf = font.render(stem_text, True, value_color)
-    arrow_surf = font.render(arrow, True, value_color)
+    prefix_surf = _render_text(font, layer_prefix, True, LABEL, counters=counters)
+    stem_surf = _render_text(font, stem_text, True, value_color, counters=counters)
+    arrow_surf = _render_text(font, arrow, True, value_color, counters=counters)
     lock_surf = (
         render_glyph(LOCK_GLYPH, color=LOCK_ICON, line_height=line_height)
         if locked
@@ -316,7 +347,7 @@ def _render_track_header_label(
     if lock_surf is not None:
         label_w += ROW_ICON_SUFFIX_GAP + lock_surf.get_width()
 
-    label_surf = pygame.Surface((label_w, line_height), pygame.SRCALPHA)
+    label_surf = _compose_surface((label_w, line_height), counters=counters)
     x = 0
     label_surf.blit(prefix_surf, (x, 0))
     x += prefix_surf.get_width()
@@ -644,14 +675,22 @@ def clip_rect_to_surface(
     surface: pygame.Surface,
 ) -> tuple[int, int, int, int] | None:
     """Intersection of rect with surface bounds (for subsurface-safe panel_rect)."""
+    return clip_rect_to_bounds(rect, surface.get_width(), surface.get_height())
+
+
+def clip_rect_to_bounds(
+    rect: tuple[int, int, int, int],
+    bounds_w: int,
+    bounds_h: int,
+) -> tuple[int, int, int, int] | None:
+    """Intersection of rect with a width/height viewport."""
     x, y, w, h = rect
     if w <= 0 or h <= 0:
         return None
-    sw, sh = surface.get_width(), surface.get_height()
     left = max(x, 0)
     top = max(y, 0)
-    right = min(x + w, sw)
-    bottom = min(y + h, sh)
+    right = min(x + w, bounds_w)
+    bottom = min(y + h, bounds_h)
     clip_w = right - left
     clip_h = bottom - top
     if clip_w <= 0 or clip_h <= 0:
@@ -694,6 +733,7 @@ class TuningOverlay:
         self._visibility = 0.0
         self._font: pygame.font.Font | None = None
         self._panel_rect: tuple[int, int, int, int] | None = None
+        self._panel_scratch: pygame.Surface | None = None
         self._scroll_y = 0
 
     def _clamp_scroll(self, scroll_content_h: int, viewport_h: int) -> None:
@@ -778,6 +818,22 @@ class TuningOverlay:
         """Top-left x, y, width, height of the last drawn panel, if any."""
         return self._panel_rect
 
+    def _ensure_panel_scratch(
+        self,
+        panel_w: int,
+        panel_h: int,
+        *,
+        counters: OverlayDrawCounters | None = None,
+    ) -> pygame.Surface:
+        if (
+            self._panel_scratch is None
+            or self._panel_scratch.get_size() != (panel_w, panel_h)
+        ):
+            self._panel_scratch = _compose_surface(
+                (panel_w, panel_h), counters=counters
+            )
+        return self._panel_scratch
+
     def _blit_row(
         self,
         panel: pygame.Surface,
@@ -847,21 +903,23 @@ class TuningOverlay:
             (track_x, thumb_y, SCROLLBAR_WIDTH, thumb_h),
         )
 
-    def draw(
+    def compose_panel(
         self,
-        surface: pygame.Surface,
         state: TuningViewState,
         *,
+        viewport_width: int,
+        viewport_height: int,
         timeline_panel_open: bool = False,
-    ) -> None:
+        counters: OverlayDrawCounters | None = None,
+        profiler_status_line: str | None = None,
+    ) -> tuple[pygame.Surface, tuple[int, int, int, int]] | None:
         self._panel_rect = None
         if self._visibility <= 0.01 or len(state.layout) == 0:
-            return
+            return None
 
         font = self._font_get()
         line_h = font.get_linesize()
         visible_indices = state.layout.visible_indices(state)
-        visible_count = len(visible_indices)
         first_scrollable_visible = next(
             (
                 index
@@ -872,7 +930,7 @@ class TuningOverlay:
         )
         header_gap = line_h + self._line_gap
         _, margin_y = self._margin
-        max_panel_h = surface.get_height() - margin_y * 2
+        max_panel_h = viewport_height - margin_y * 2
         if timeline_panel_open:
             from cleave.viz.timeline_overlay import timeline_viewport_reserve_px
 
@@ -910,7 +968,7 @@ class TuningOverlay:
                     paused=state.paused,
                 )
                 time_text = f" [{format_mmss(state.position_sec)}]"
-                time_surf = font.render(time_text, True, color)
+                time_surf = _render_text(font, time_text, True, color, counters=counters)
                 row_surfaces.append(icons_surf)
                 row_time_surfaces.append(time_surf)
                 row_widths.append(
@@ -943,6 +1001,7 @@ class TuningOverlay:
                     expand_arrow=expand_arrow,
                     locked=locked,
                     line_height=line_h,
+                    counters=counters,
                 )
                 row_surfaces.append(prefix_surf)
                 row_time_surfaces.append(label_surf)
@@ -961,6 +1020,7 @@ class TuningOverlay:
                     value_color=color,
                     prefix_color=LABEL,
                     line_height=line_h,
+                    counters=counters,
                 )
                 row_surfaces.append(icon_surf)
                 row_time_surfaces.append(label_surf)
@@ -1002,6 +1062,7 @@ class TuningOverlay:
                     expand_arrow=format_composite_header_expand_value(state, desc),
                     locked=False,
                     line_height=line_h,
+                    counters=counters,
                 )
                 row_surfaces.append(prefix_surf)
                 row_time_surfaces.append(label_surf)
@@ -1009,7 +1070,7 @@ class TuningOverlay:
                     indent + prefix_surf.get_width() + label_surf.get_width()
                 )
             elif kind == RowKind.RENDER_SECTION_GAP:
-                gap_surf = pygame.Surface((1, line_h), pygame.SRCALPHA)
+                gap_surf = _compose_surface((1, line_h), counters=counters)
                 row_surfaces.append(gap_surf)
                 row_time_surfaces.append(None)
                 row_widths.append(indent + gap_surf.get_width())
@@ -1025,6 +1086,7 @@ class TuningOverlay:
                         glyph=glyph,
                         icon_color=icon_color,
                         line_height=line_h,
+                        counters=counters,
                     )
                 elif kind in {RowKind.TRACK_PRESET, RowKind.TRACK_USER_PRESET_ITEM}:
                     glyph = FILE_GLYPH
@@ -1034,6 +1096,7 @@ class TuningOverlay:
                         glyph=glyph,
                         icon_color=icon_color,
                         line_height=line_h,
+                        counters=counters,
                     )
                 else:
                     icon_surf = render_glyph(
@@ -1050,12 +1113,13 @@ class TuningOverlay:
                         value_color=CONFIG_DIRTY,
                         prefix_color=color,
                         line_height=line_h,
+                        counters=counters,
                     )
                 else:
                     label = fit_row_text(
                         font, state, index, max_content_width=max_content_width
                     )
-                    label_surf = font.render(label, True, color)
+                    label_surf = _render_text(font, label, True, color, counters=counters)
                 row_surfaces.append(icon_surf)
                 row_time_surfaces.append(label_surf)
                 row_widths.append(
@@ -1072,6 +1136,7 @@ class TuningOverlay:
                     value=format_expand_subheader_value(state, desc),
                     value_color=color,
                     line_height=line_h,
+                    counters=counters,
                 )
                 row_surfaces.append(surf)
                 row_time_surfaces.append(None)
@@ -1087,6 +1152,7 @@ class TuningOverlay:
                     value=value,
                     value_color=color,
                     line_height=line_h,
+                    counters=counters,
                 )
                 row_surfaces.append(surf)
                 row_time_surfaces.append(None)
@@ -1103,7 +1169,7 @@ class TuningOverlay:
             ):
                 label = _row_text(state, index)
                 label_color = _row_value_color(state, index)
-                surf = font.render(label, True, label_color)
+                surf = _render_text(font, label, True, label_color, counters=counters)
                 row_surfaces.append(surf)
                 row_time_surfaces.append(None)
                 row_widths.append(indent + surf.get_width())
@@ -1111,7 +1177,7 @@ class TuningOverlay:
                 text = fit_row_text(
                     font, state, index, max_content_width=max_content_width
                 )
-                surf = font.render(text, True, color)
+                surf = _render_text(font, text, True, color, counters=counters)
                 row_surfaces.append(surf)
                 row_time_surfaces.append(None)
                 row_widths.append(indent + surf.get_width())
@@ -1125,9 +1191,9 @@ class TuningOverlay:
 
         alpha = int(BACKGROUND_ALPHA * self._visibility)
         if alpha < 2:
-            return
+            return None
 
-        panel = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+        panel = self._ensure_panel_scratch(panel_w, panel_h, counters=counters)
         panel.fill((*BACKGROUND, alpha))
 
         text_alpha = int(255 * self._visibility)
@@ -1217,7 +1283,9 @@ class TuningOverlay:
                 row_y += line_h + self._line_gap
 
         if state.fps is not None and text_alpha >= 2:
-            fps_surf = font.render(format_fps_display(state.fps), True, VALUE)
+            fps_surf = _render_text(
+                font, format_fps_display(state.fps), True, VALUE, counters=counters
+            )
             fps_surf.set_alpha(text_alpha)
             fps_layout = panel_fps_layout(
                 panel_w=panel_w,
@@ -1228,7 +1296,7 @@ class TuningOverlay:
             panel.blit(fps_surf, (fps_layout.x, fps_layout.y))
 
         if text_alpha >= 2:
-            help_hint = font.render("h - help", True, LABEL)
+            help_hint = _render_text(font, "h - help", True, LABEL, counters=counters)
             help_hint.set_alpha(text_alpha)
             hint_layout = panel_help_hint_layout(
                 panel_w=panel_w,
@@ -1239,6 +1307,13 @@ class TuningOverlay:
                 show_scrollbar=metrics.show_scrollbar,
             )
             panel.blit(help_hint, (hint_layout.x, hint_layout.y))
+
+        if profiler_status_line and text_alpha >= 2:
+            prof_surf = _render_text(
+                font, profiler_status_line, True, DISABLED, counters=counters
+            )
+            prof_surf.set_alpha(text_alpha)
+            panel.blit(prof_surf, (self._padding, panel_h - self._padding - line_h))
 
         border_alpha = int(255 * self._visibility)
         if border_alpha >= 2 and BORDER_WIDTH > 0:
@@ -1253,10 +1328,50 @@ class TuningOverlay:
         if self._anchor == "topleft":
             pos = (mx, my)
         else:
-            pos = (mx, surface.get_height() - panel_h - my)
+            pos = (mx, viewport_height - panel_h - my)
 
-        surface.blit(panel, pos)
-        self._panel_rect = clip_rect_to_surface(
+        bounds = clip_rect_to_bounds(
             (pos[0], pos[1], panel_w, panel_h),
-            surface,
+            viewport_width,
+            viewport_height,
         )
+        if bounds is None:
+            return None
+        self._panel_rect = bounds
+        src_x = bounds[0] - pos[0]
+        src_y = bounds[1] - pos[1]
+        if src_x == 0 and src_y == 0 and (bounds[2], bounds[3]) == (panel_w, panel_h):
+            upload_surface: pygame.Surface = panel
+        else:
+            upload_surface = panel.subsurface(
+                (src_x, src_y, bounds[2], bounds[3])
+            )
+        return upload_surface, bounds
+
+    def draw(
+        self,
+        surface: pygame.Surface,
+        state: TuningViewState,
+        *,
+        timeline_panel_open: bool = False,
+        counters: OverlayDrawCounters | None = None,
+    ) -> None:
+        composed = self.compose_panel(
+            state,
+            viewport_width=surface.get_width(),
+            viewport_height=surface.get_height(),
+            timeline_panel_open=timeline_panel_open,
+            counters=counters,
+        )
+        if composed is None:
+            self._panel_rect = None
+            return
+        _upload_surface, _screen_rect = composed
+        panel = self._panel_scratch
+        assert panel is not None
+        mx, my = self._margin
+        if self._anchor == "topleft":
+            blit_pos = (mx, my)
+        else:
+            blit_pos = (mx, surface.get_height() - panel.get_height() - my)
+        surface.blit(panel, blit_pos)
