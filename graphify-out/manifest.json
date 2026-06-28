@@ -685,8 +685,8 @@
     "semantic_hash": ""
   },
   "tests/cleave/viz/test_row_fields.py": {
-    "mtime": 1782657050.0650263,
-    "ast_hash": "36261f4c7d2608790b73e7bdbcfe903d",
+    "mtime": 1782691043.277278,
+    "ast_hash": "c8aebda2c87c818d94dc3834312890d8",
     "semantic_hash": ""
   },
   "tests/cleave/viz/test_row_layout_resolution.py": {
