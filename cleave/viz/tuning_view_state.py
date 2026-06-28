@@ -100,6 +100,7 @@ class RenderTimelineBlock:
 @dataclass
 class SettingsBlock:
     expanded: bool = False
+    ui_expanded: bool = False
     render_mode: str = "balanced"
     ui_width_mode: str = DEFAULT_UI_WIDTH_MODE
     ui_width: int = DEFAULT_UI_WIDTH
@@ -310,6 +311,7 @@ class TuningViewStateBuilder:
             ),
             settings=SettingsBlock(
                 expanded=self.session.settings.expanded,
+                ui_expanded=self.session.settings.ui_expanded,
                 render_mode=self._config_save.cfg.visualizer.render_mode,
                 ui_width_mode=self._config_save.cfg.visualizer.ui_width_mode,
                 ui_width=self._config_save.cfg.visualizer.ui_width,

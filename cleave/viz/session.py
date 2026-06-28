@@ -108,6 +108,7 @@ def default_timeline_runtime() -> TimelineRuntime:
 @dataclass
 class SettingsRuntime:
     expanded: bool = False
+    ui_expanded: bool = False
 
 
 @dataclass

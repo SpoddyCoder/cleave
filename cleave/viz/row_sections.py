@@ -27,6 +27,10 @@ def _toggle_settings(controls: TuningControls, _slot: str | None, forward: bool)
     controls._settings.set_expanded(forward)
 
 
+def _toggle_settings_ui(controls: TuningControls, _slot: str | None, forward: bool) -> None:
+    controls._settings.set_ui_expanded(forward)
+
+
 def _toggle_render_overlay(controls: TuningControls, _slot: str | None, forward: bool) -> None:
     controls._render_overlay.set_expanded(forward)
 
@@ -157,6 +161,10 @@ def _settings_expanded(state: TuningViewState, _slot: str | None) -> bool:
     return state.settings.expanded
 
 
+def _settings_ui_expanded(state: TuningViewState, _slot: str | None) -> bool:
+    return state.settings.ui_expanded
+
+
 def _render_overlay_expanded(state: TuningViewState, _slot: str | None) -> bool:
     return state.render_overlay.expanded
 
@@ -210,6 +218,18 @@ def _append_track_effect_rows(
         )
 
 
+SETTINGS_UI_SECTION = ExpandSectionDef(
+    header_kind=RowKind.SETTINGS_UI_HEADER,
+    context="global",
+    read_expanded=_settings_ui_expanded,
+    toggle=_toggle_settings_ui,
+    children=(
+        SectionNode(leaf_kind=RowKind.SETTINGS_UI_WIDTH_MODE),
+        SectionNode(leaf_kind=RowKind.SETTINGS_UI_WIDTH),
+        SectionNode(leaf_kind=RowKind.SETTINGS_UI_FADE),
+    ),
+)
+
 SETTINGS_SECTION = ExpandSectionDef(
     header_kind=RowKind.SETTINGS_HEADER,
     context="global",
@@ -217,9 +237,7 @@ SETTINGS_SECTION = ExpandSectionDef(
     toggle=_toggle_settings,
     children=(
         SectionNode(leaf_kind=RowKind.SETTINGS_RENDER_MODE),
-        SectionNode(leaf_kind=RowKind.SETTINGS_UI_WIDTH_MODE),
-        SectionNode(leaf_kind=RowKind.SETTINGS_UI_WIDTH),
-        SectionNode(leaf_kind=RowKind.SETTINGS_UI_FADE),
+        SectionNode(expand=SETTINGS_UI_SECTION),
     ),
 )
 

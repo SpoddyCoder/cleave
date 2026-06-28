@@ -55,9 +55,9 @@ def test_row_panel_label_settings_header() -> None:
 
 def test_labeled_row_prefix_settings_children() -> None:
     assert labeled_row_prefix(RowKind.SETTINGS_RENDER_MODE) == "└─ render mode: "
-    assert labeled_row_prefix(RowKind.SETTINGS_UI_WIDTH_MODE) == "└─ UI width mode: "
-    assert labeled_row_prefix(RowKind.SETTINGS_UI_WIDTH) == "└─ UI max width: "
-    assert labeled_row_prefix(RowKind.SETTINGS_UI_FADE) == "└─ UI auto-fade: "
+    assert labeled_row_prefix(RowKind.SETTINGS_UI_WIDTH_MODE) == "  └─ width mode: "
+    assert labeled_row_prefix(RowKind.SETTINGS_UI_WIDTH) == "  └─ max width: "
+    assert labeled_row_prefix(RowKind.SETTINGS_UI_FADE) == "  └─ auto-fade: "
 
 
 def test_labeled_row_prefix_track_depths() -> None:
@@ -131,7 +131,7 @@ def test_row_labeled_display_text_settings() -> None:
     desc = RowDescriptor(RowKind.SETTINGS_RENDER_MODE)
     assert row_labeled_display_text(state, desc) == "└─ render mode: balanced"
     fade_desc = RowDescriptor(RowKind.SETTINGS_UI_FADE)
-    assert row_labeled_display_text(state, fade_desc) == "└─ UI auto-fade: 11s"
+    assert row_labeled_display_text(state, fade_desc) == "  └─ auto-fade: 11s"
 
 
 def test_apply_field_horizontal_unknown_kind_returns_false() -> None:
@@ -199,6 +199,10 @@ def test_apply_field_horizontal_via_controls_keydown() -> None:
     controls = _make_controls()
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    view = controls.build_view_state(paused=False)
+    ui_header = view.layout.find_by_kind(RowKind.SETTINGS_UI_HEADER)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH_MODE)
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
@@ -211,6 +215,7 @@ def test_expand_subheader_prefix_preset_switching() -> None:
         == "└─ preset switching "
     )
     assert expand_subheader_prefix(RowKind.RENDER_OVERLAY_TITLE_HEADER) == "└─ title "
+    assert expand_subheader_prefix(RowKind.SETTINGS_UI_HEADER) == "└─ UI "
 
 
 def test_row_expand_subheader_display_text() -> None:
@@ -259,7 +264,7 @@ def test_apply_field_horizontal_track_header_solo_and_expand() -> None:
 
 
 def test_row_fields_count() -> None:
-    assert len(ROW_FIELDS) == 46
+    assert len(ROW_FIELDS) == 47
 
 
 def test_row_kinds_requiring_fields_registry_complete() -> None:

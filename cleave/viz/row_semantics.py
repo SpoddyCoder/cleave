@@ -49,6 +49,7 @@ class RowKind(Enum):
     RENDER_TIMELINE_HEADER = auto()
     SETTINGS_HEADER = auto()
     SETTINGS_RENDER_MODE = auto()
+    SETTINGS_UI_HEADER = auto()
     SETTINGS_UI_WIDTH_MODE = auto()
     SETTINGS_UI_WIDTH = auto()
     SETTINGS_UI_FADE = auto()
@@ -510,12 +511,20 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "Affects layer resolution scaling in the live view only.",
         ),
     ),
+    RowKind.SETTINGS_UI_HEADER: RowBehavior(
+        RowAffordance.EXPAND,
+        is_sub_header=True,
+        is_pinned=True,
+        parent_group="settings",
+        help_title="UI",
+        help_description=("Panel width and auto-fade for the main tuning overlay.",),
+    ),
     RowKind.SETTINGS_UI_FADE: RowBehavior(
         RowAffordance.VALUE_STEP,
         is_pinned=True,
         repeatable=True,
-        parent_group="settings",
-        help_title="UI auto-fade",
+        parent_group="settings_ui",
+        help_title="Auto-fade",
         help_entries=(
             ("Left/Right", "adjust delay before UI fades"),
             ("Ctrl + Left/Right", "large step"),
@@ -530,8 +539,8 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.VALUE_STEP,
         is_pinned=True,
         repeatable=True,
-        parent_group="settings",
-        help_title="UI width mode",
+        parent_group="settings_ui",
+        help_title="Width mode",
         help_entries=(("Left/Right", "cycle mode"),),
         help_description=(
             "Flexible shrinks the panel to fit content up to the max width.",
@@ -542,8 +551,8 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.VALUE_STEP,
         is_pinned=True,
         repeatable=True,
-        parent_group="settings",
-        help_title="UI max width",
+        parent_group="settings_ui",
+        help_title="Max width",
         help_entries=(
             ("Left/Right", "adjust max panel width"),
             ("Ctrl + Left/Right", "large step"),

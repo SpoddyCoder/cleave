@@ -718,20 +718,25 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         format_value=_format_settings_render_mode,
         apply_horizontal=_apply_settings_render_mode,
     ),
+    RowKind.SETTINGS_UI_HEADER: RowFieldDef(
+        panel_label="UI",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        apply_horizontal=_apply_expand_subheader,
+    ),
     RowKind.SETTINGS_UI_WIDTH_MODE: RowFieldDef(
-        panel_label="UI width mode",
+        panel_label="width mode",
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_settings_ui_width_mode,
         apply_horizontal=_apply_settings_ui_width_mode,
     ),
     RowKind.SETTINGS_UI_WIDTH: RowFieldDef(
-        panel_label="UI max width",
+        panel_label="max width",
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_settings_ui_width,
         apply_horizontal=_apply_settings_ui_width,
     ),
     RowKind.SETTINGS_UI_FADE: RowFieldDef(
-        panel_label="UI auto-fade",
+        panel_label="auto-fade",
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_settings_ui_fade,
         apply_horizontal=_apply_settings_ui_fade,
