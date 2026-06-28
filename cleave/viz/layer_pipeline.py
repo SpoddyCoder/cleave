@@ -120,6 +120,11 @@ class LayerFramePipeline:
             LayerFramePipeline.resize_layer(layer, compositor, width, height)
 
     @staticmethod
+    def set_projectm_fps(layers: list[StemLayer], fps: int) -> None:
+        for layer in layers:
+            layer.pm.set_fps(fps)
+
+    @staticmethod
     def build_single(
         slot: str,
         layer_cfg: LayerConfig,
