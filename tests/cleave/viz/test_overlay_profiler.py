@@ -45,11 +45,13 @@ def test_format_sample_line_full() -> None:
         overlay_present_ms=0.05,
         surface_builds=18,
         font_renders=42,
+        row_cache_hits=10,
+        row_cache_misses=2,
         skipped=False,
     )
     assert (
         _format_sample_line(sample)
-        == "overlay: vs=0.4ms draw=2.1ms surf=18 font=42 up=0.3ms"
+        == "overlay: vs=0.4ms draw=2.1ms surf=18 font=42 rcache=10/2 up=0.3ms"
     )
 
 
@@ -61,6 +63,8 @@ def test_format_sample_line_skip() -> None:
         overlay_present_ms=0.0,
         surface_builds=0,
         font_renders=0,
+        row_cache_hits=0,
+        row_cache_misses=0,
         skipped=True,
     )
     assert _format_sample_line(sample) == "overlay: skip"
@@ -83,7 +87,7 @@ def test_finish_frame_prints_compact_line(capsys: pytest.CaptureFixture[str]) ->
     assert sample.surface_builds == 18
     assert sample.font_renders == 42
     assert capsys.readouterr().out.strip() == (
-        "overlay: vs=0.4ms draw=2.1ms surf=18 font=42 up=0.3ms"
+        "overlay: vs=0.4ms draw=2.1ms surf=18 font=42 rcache=0/0 up=0.3ms"
     )
 
 

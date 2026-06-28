@@ -7,7 +7,7 @@ See cleave/viz/theme.py and .cursor/rules/live-tuning-ui.mdc.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Callable, Literal
 
 import pygame
 
@@ -59,6 +59,7 @@ from cleave.viz.material_icons import (
     VISIBILITY_GLYPH,
     VISIBILITY_OFF_GLYPH,
     VISIBILITY_ICON_PAD_X,
+    material_font,
     render_glyph,
     render_transport_icons,
     row_icon_prefix_width,
@@ -97,8 +98,14 @@ from cleave.viz.theme import (
     tuning_ui_metrics,
 )
 from cleave.viz.overlay_profiler import OverlayDrawCounters
+from cleave.viz.tuning_panel_cache import (
+    RowRenderEntry,
+    TuningPanelCache,
+    ensure_row_surface,
+    panel_signature,
+    static_row_keys,
+)
 from cleave.viz.tuning_view_state import TuningViewState
-from cleave.viz.ui_tint import blit_tint
 
 Anchor = Literal["topleft", "bottomleft"]
 
@@ -188,6 +195,7 @@ def _fit_labeled_sub_row_value(
     index: int,
     *,
     max_content_width: int = PANEL_CONTENT_MAX_WIDTH,
+    cache: TuningPanelCache | None = None,
 ) -> str:
     kind = state.layout.kind(index)
     budget = max_content_width - _row_indent(state, index)
@@ -197,8 +205,14 @@ def _fit_labeled_sub_row_value(
         RowKind.RENDER_OVERLAY_TITLE_FONT,
         RowKind.RENDER_OVERLAY_BODY_FONT,
     }:
-        return fit_counter_label_to_width(font, value, budget)
-    return fit_text_to_width(font, value, budget)
+        if cache is None:
+            return fit_counter_label_to_width(font, value, budget)
+        return cache.fit_text_cached(
+            "counter", fit_counter_label_to_width, font, value, budget
+        )
+    if cache is None:
+        return fit_text_to_width(font, value, budget)
+    return cache.fit_text_cached("text", fit_text_to_width, font, value, budget)
 
 
 def _render_label_value_row(
@@ -307,6 +321,7 @@ def _fit_track_header_stem(
     index: int,
     *,
     max_content_width: int = PANEL_CONTENT_MAX_WIDTH,
+    cache: TuningPanelCache | None = None,
 ) -> str:
     stem = state.layout.slot(index)
     assert stem is not None
@@ -319,7 +334,10 @@ def _fit_track_header_stem(
     budget -= font.size(_track_header_expand_suffix(state, desc))[0]
     if locked:
         budget -= track_header_lock_suffix_width(font.get_linesize())
-    return fit_text_to_width(font, stem_overlay_header(block.stem), budget)
+    stem_text = stem_overlay_header(block.stem)
+    if cache is None:
+        return fit_text_to_width(font, stem_text, budget)
+    return cache.fit_text_cached("text", fit_text_to_width, font, stem_text, budget)
 
 
 def _render_track_header_label(
@@ -366,8 +384,20 @@ def fit_row_text(
     index: int,
     *,
     max_content_width: int = PANEL_CONTENT_MAX_WIDTH,
+    cache: TuningPanelCache | None = None,
 ) -> str:
     """Fit row label to the shared panel content width (pixels)."""
+
+    def _fit(
+        fitter: str,
+        fit_fn: Callable[[pygame.font.Font, str, int], str],
+        text: str,
+        budget: int,
+    ) -> str:
+        if cache is None:
+            return fit_fn(font, text, budget)
+        return cache.fit_text_cached(fitter, fit_fn, font, text, budget)
+
     kind = state.layout.kind(index)
     indent = _row_indent(state, index)
     budget = max_content_width - indent
@@ -379,9 +409,11 @@ def fit_row_text(
         if kind == RowKind.CONFIG_HEADER:
             icon_w = row_icon_prefix_width(line_h)
             suffix_w = font.size("*")[0] if state.config_dirty else 0
-            return fit_path_label_to_width(font, text, budget - icon_w - suffix_w)
+            return _fit(
+                "path", fit_path_label_to_width, text, budget - icon_w - suffix_w
+            )
         prefix_w = preset_row_prefix_width(font, line_h)
-        return fit_counter_label_to_width(font, text, budget - prefix_w)
+        return _fit("counter", fit_counter_label_to_width, text, budget - prefix_w)
     if kind == RowKind.TRACK_HEADER:
         stem = state.layout.slot(index)
         assert stem is not None
@@ -389,15 +421,19 @@ def fit_row_text(
         return (
             _track_header_layer_prefix(state, index)
             + _fit_track_header_stem(
-                font, state, index, max_content_width=max_content_width
+                font,
+                state,
+                index,
+                max_content_width=max_content_width,
+                cache=cache,
             )
             + _track_header_expand_suffix(state, desc)
         )
     if kind == RowKind.RENDER_SECTION_GAP:
         return ""
     if kind == RowKind.PANEL_NOTIFICATION:
-        return fit_text_to_width(
-            font, state.notification_message or "", budget
+        return _fit(
+            "text", fit_text_to_width, state.notification_message or "", budget
         )
     field = ROW_FIELDS.get(kind)
     if field is not None and field.present_style == RowPresentStyle.FULL_LINE:
@@ -413,9 +449,13 @@ def fit_row_text(
         return row_expand_subheader_display_text(state, state.layout.descriptor(index))
     if kind in LABELED_SUB_ROW_KINDS:
         return _labeled_sub_row_prefix(state, index) + _fit_labeled_sub_row_value(
-            font, state, index, max_content_width=max_content_width
+            font,
+            state,
+            index,
+            max_content_width=max_content_width,
+            cache=cache,
         )
-    return fit_text_to_width(font, text, budget)
+    return _fit("text", fit_text_to_width, text, budget)
 
 
 def _row_indent(state: TuningViewState, index: int) -> int:
@@ -670,6 +710,158 @@ def panel_content_max_width(
     return panel_max_width
 
 
+def _transport_icons_width(line_h: int) -> int:
+    icon_h = line_h + 1
+    bar_w = max(2, (icon_h + 4) // 7)
+    inner_gap = max(1, bar_w // 2)
+    tri_w = (icon_h * 3) // 4
+    slot_w = max(tri_w, 2 * bar_w + inner_gap, bar_w + inner_gap + tri_w)
+    gap = max(8, line_h // 2)
+    return 3 * slot_w + 2 * gap
+
+
+def _glyph_icon_width(glyph: str, line_h: int) -> int:
+    icon_h = line_h + 1
+    return material_font(icon_h).size(glyph)[0]
+
+
+def _estimate_row_content_width(
+    *,
+    padding: int,
+    font: pygame.font.Font,
+    state: TuningViewState,
+    index: int,
+    max_content_width: int,
+    line_h: int,
+) -> int:
+    indent = padding + _row_indent(state, index)
+    kind = state.layout.kind(index)
+
+    if kind == RowKind.TRANSPORT:
+        time_text = f" [{format_mmss(state.position_sec)}]"
+        return indent + _transport_icons_width(line_h) + font.size(time_text)[0]
+
+    if kind == RowKind.TRACK_HEADER:
+        stem = state.layout.slot(index)
+        block = state.tracks[stem] if stem is not None else None
+        locked = block.locked if block is not None else False
+        desc = RowDescriptor(RowKind.TRACK_HEADER, slot=stem)
+        prefix_w = visibility_icon_slot_width(line_h)
+        layer_prefix = composite_header_prefix_part(state, desc)
+        stem_text = _fit_track_header_stem(
+            font, state, index, max_content_width=max_content_width
+        )
+        expand_arrow = (
+            format_composite_header_expand_value(state, desc)
+            if stem is not None
+            else expand_arrow_glyph(False)
+        )
+        label_w = (
+            font.size(layer_prefix)[0]
+            + font.size(stem_text)[0]
+            + font.size(f" {expand_arrow}")[0]
+        )
+        if locked:
+            label_w += track_header_lock_suffix_width(line_h)
+        return indent + prefix_w + label_w
+
+    if kind == RowKind.SETTINGS_HEADER:
+        desc = state.layout.descriptor(index)
+        icon_w = _glyph_icon_width(SETTINGS_GLYPH, line_h)
+        prefix = composite_header_prefix_part(state, desc)
+        value = format_composite_header_expand_value(state, desc)
+        return indent + icon_w + font.size(prefix)[0] + font.size(value)[0]
+
+    if kind in {
+        RowKind.RENDER_OVERLAY_HEADER,
+        RowKind.RENDER_POST_FX_HEADER,
+        RowKind.RENDER_TIMELINE_HEADER,
+    }:
+        desc = state.layout.descriptor(index)
+        prefix_w = visibility_icon_slot_width(line_h)
+        layer_prefix = composite_header_prefix_part(state, desc)
+        stem_text = composite_header_suffix_part(state, desc)
+        expand_arrow = format_composite_header_expand_value(state, desc)
+        label_w = (
+            font.size(layer_prefix)[0]
+            + font.size(stem_text)[0]
+            + font.size(f" {expand_arrow}")[0]
+        )
+        return indent + prefix_w + label_w
+
+    if kind == RowKind.RENDER_SECTION_GAP:
+        return indent + 1
+
+    if (
+        ROW_FIELDS.get(kind) is not None
+        and ROW_FIELDS[kind].present_style == RowPresentStyle.PATH_ICON
+    ):
+        if kind == RowKind.TRACK_PRESET_DIR:
+            prefix_w = preset_row_prefix_width(font, line_h)
+        elif kind in {RowKind.TRACK_PRESET, RowKind.TRACK_USER_PRESET_ITEM}:
+            prefix_w = preset_row_prefix_width(font, line_h)
+        else:
+            prefix_w = tree_branch_prefix_width(font) + _glyph_icon_width(
+                FILE_GLYPH, line_h
+            )
+        if kind == RowKind.CONFIG_HEADER:
+            path = fit_row_text(
+                font, state, index, max_content_width=max_content_width
+            )
+            suffix_w = font.size("*")[0] if state.config_dirty else 0
+            return indent + prefix_w + font.size(path)[0] + suffix_w
+        label = fit_row_text(
+            font, state, index, max_content_width=max_content_width
+        )
+        return indent + prefix_w + font.size(label)[0]
+
+    if (
+        ROW_FIELDS.get(kind) is not None
+        and ROW_FIELDS[kind].present_style == RowPresentStyle.EXPAND_SUBHEADER
+    ):
+        desc = state.layout.descriptor(index)
+        prefix = expand_subheader_prefix(kind)
+        value = format_expand_subheader_value(state, desc)
+        return indent + font.size(prefix)[0] + font.size(value)[0]
+
+    if kind in LABELED_SUB_ROW_KINDS:
+        prefix = _labeled_sub_row_prefix(state, index)
+        value = _fit_labeled_sub_row_value(
+            font, state, index, max_content_width=max_content_width
+        )
+        return indent + font.size(prefix)[0] + font.size(value)[0]
+
+    if (
+        ROW_FIELDS.get(kind) is not None
+        and ROW_FIELDS[kind].present_style == RowPresentStyle.FULL_LINE
+        and kind
+        in {
+            RowKind.LAYER_MANAGEMENT_ADD,
+            RowKind.LAYER_MANAGEMENT_DELETE,
+            RowKind.TRACK_USER_PRESET_ADD,
+        }
+    ):
+        label = _row_text(state, index)
+        return indent + font.size(label)[0]
+
+    text = fit_row_text(font, state, index, max_content_width=max_content_width)
+    return indent + font.size(text)[0]
+
+
+def _scrollable_row_in_viewport(
+    *,
+    row_index: int,
+    scroll_y: int,
+    scroll_top: int,
+    scroll_bottom: int,
+    row_stride: int,
+    line_h: int,
+) -> bool:
+    local_y = row_index * row_stride
+    y = scroll_top + local_y - scroll_y
+    return y + line_h > scroll_top and y < scroll_bottom
+
+
 def clip_rect_to_surface(
     rect: tuple[int, int, int, int],
     surface: pygame.Surface,
@@ -735,6 +927,7 @@ class TuningOverlay:
         self._panel_rect: tuple[int, int, int, int] | None = None
         self._panel_scratch: pygame.Surface | None = None
         self._scroll_y = 0
+        self._panel_cache = TuningPanelCache()
 
     def _clamp_scroll(self, scroll_content_h: int, viewport_h: int) -> None:
         max_scroll = max(0, scroll_content_h - viewport_h)
@@ -785,6 +978,7 @@ class TuningOverlay:
         self._idle_sec = self._hold_idle_sec + self._fade_duration_sec + 1.0
         self._visibility = 0.0
         self._scroll_y = 0
+        self._panel_cache.clear_all()
 
     def is_visible(self) -> bool:
         return self._visibility > 0.01
@@ -840,30 +1034,26 @@ class TuningOverlay:
         *,
         state: TuningViewState,
         index: int,
-        draw_index: int,
-        row_surfaces: list[pygame.Surface],
-        row_time_surfaces: list[pygame.Surface | None],
+        surf: pygame.Surface,
+        time_surf: pygame.Surface | None,
         y: int,
         text_alpha: int,
         panel_w: int,
         line_h: int,
     ) -> None:
-        surf = row_surfaces[draw_index]
         bg = _row_bg_color(state, index)
         if bg is not None:
             bg_alpha = int(FOCUS_ROW_BG_ALPHA * self._visibility)
-            blit_tint(
+            pygame.draw.rect(
                 panel,
+                (*bg, bg_alpha),
                 (self._padding, y, panel_w - self._padding * 2, line_h),
-                bg,
-                alpha=bg_alpha,
             )
 
         indent = self._padding + _row_indent(state, index)
         if text_alpha >= 2:
             surf.set_alpha(text_alpha)
             panel.blit(surf, (indent, y))
-            time_surf = row_time_surfaces[draw_index]
             if time_surf is not None:
                 time_surf.set_alpha(text_alpha)
                 panel.blit(time_surf, (indent + surf.get_width(), y))
@@ -903,6 +1093,505 @@ class TuningOverlay:
             (track_x, thumb_y, SCROLLBAR_WIDTH, thumb_h),
         )
 
+    def _build_row_at_index(
+        self,
+        font: pygame.font.Font,
+        state: TuningViewState,
+        index: int,
+        *,
+        max_content_width: int,
+        line_h: int,
+        counters: OverlayDrawCounters | None = None,
+        cache: TuningPanelCache | None = None,
+    ) -> tuple[pygame.Surface, pygame.Surface | None, int]:
+        kind = state.layout.kind(index)
+        indent = self._padding + _row_indent(state, index)
+        color = _row_value_color(state, index)
+
+        if kind == RowKind.TRANSPORT:
+            icons_surf = render_transport_icons(
+                color=color,
+                line_height=line_h,
+                paused=state.paused,
+            )
+            time_text = f" [{format_mmss(state.position_sec)}]"
+            time_surf = _render_text(font, time_text, True, color, counters=counters)
+            width = indent + icons_surf.get_width() + time_surf.get_width()
+            return icons_surf, time_surf, width
+
+        if kind == RowKind.TRACK_HEADER:
+            stem = state.layout.slot(index)
+            block = state.tracks[stem] if stem is not None else None
+            enabled = block.visible if block is not None else True
+            solo = stem is not None and state.solo_slot == stem
+            locked = block.locked if block is not None else False
+            desc = RowDescriptor(RowKind.TRACK_HEADER, slot=stem)
+            prefix_surf = render_visibility_icon(
+                enabled=enabled, solo=solo, line_height=line_h
+            )
+            layer_prefix = composite_header_prefix_part(state, desc)
+            stem_text = _fit_track_header_stem(
+                font,
+                state,
+                index,
+                max_content_width=max_content_width,
+                cache=cache,
+            )
+            expand_arrow = (
+                format_composite_header_expand_value(state, desc)
+                if stem is not None
+                else expand_arrow_glyph(False)
+            )
+            label_surf = _render_track_header_label(
+                font,
+                layer_prefix=layer_prefix,
+                stem_text=stem_text,
+                value_color=color,
+                expand_arrow=expand_arrow,
+                locked=locked,
+                line_height=line_h,
+                counters=counters,
+            )
+            width = indent + prefix_surf.get_width() + label_surf.get_width()
+            return prefix_surf, label_surf, width
+
+        if kind == RowKind.SETTINGS_HEADER:
+            desc = state.layout.descriptor(index)
+            icon_surf = render_glyph(SETTINGS_GLYPH, color=VALUE, line_height=line_h)
+            label_surf = _render_label_value_row(
+                font,
+                prefix=composite_header_prefix_part(state, desc),
+                value=format_composite_header_expand_value(state, desc),
+                value_color=color,
+                prefix_color=LABEL,
+                line_height=line_h,
+                counters=counters,
+            )
+            width = indent + icon_surf.get_width() + label_surf.get_width()
+            return icon_surf, label_surf, width
+
+        if kind in {
+            RowKind.RENDER_OVERLAY_HEADER,
+            RowKind.RENDER_POST_FX_HEADER,
+            RowKind.RENDER_TIMELINE_HEADER,
+        }:
+            desc = state.layout.descriptor(index)
+            if kind == RowKind.RENDER_OVERLAY_HEADER:
+                block_ro = state.render_overlay
+                prefix_surf = render_visibility_icon(
+                    enabled=block_ro.enabled,
+                    solo=block_ro.solo,
+                    line_height=line_h,
+                )
+            elif kind == RowKind.RENDER_POST_FX_HEADER:
+                block_pp = state.render_post_fx
+                prefix_surf = render_visibility_icon(
+                    enabled=block_pp.enabled,
+                    solo=block_pp.solo,
+                    line_height=line_h,
+                )
+            else:
+                block_tl = state.render_timeline
+                prefix_surf = render_visibility_icon(
+                    enabled=block_tl.enabled,
+                    solo=False,
+                    line_height=line_h,
+                )
+            label_surf = _render_track_header_label(
+                font,
+                layer_prefix=composite_header_prefix_part(state, desc),
+                stem_text=composite_header_suffix_part(state, desc),
+                value_color=color,
+                expand_arrow=format_composite_header_expand_value(state, desc),
+                locked=False,
+                line_height=line_h,
+                counters=counters,
+            )
+            width = indent + prefix_surf.get_width() + label_surf.get_width()
+            return prefix_surf, label_surf, width
+
+        if kind == RowKind.RENDER_SECTION_GAP:
+            gap_surf = _compose_surface((1, line_h), counters=counters)
+            return gap_surf, None, indent + gap_surf.get_width()
+
+        if (
+            ROW_FIELDS.get(kind) is not None
+            and ROW_FIELDS[kind].present_style == RowPresentStyle.PATH_ICON
+        ):
+            if kind == RowKind.TRACK_PRESET_DIR:
+                glyph = FOLDER_GLYPH
+                icon_color = PRESET_ICON
+                icon_surf = _render_preset_row_prefix(
+                    font,
+                    glyph=glyph,
+                    icon_color=icon_color,
+                    line_height=line_h,
+                    counters=counters,
+                )
+            elif kind in {RowKind.TRACK_PRESET, RowKind.TRACK_USER_PRESET_ITEM}:
+                glyph = FILE_GLYPH
+                icon_color = PRESET_FILE_ICON
+                icon_surf = _render_preset_row_prefix(
+                    font,
+                    glyph=glyph,
+                    icon_color=icon_color,
+                    line_height=line_h,
+                    counters=counters,
+                )
+            else:
+                icon_surf = render_glyph(
+                    FILE_GLYPH, color=PRESET_FILE_ICON, line_height=line_h
+                )
+            if kind == RowKind.CONFIG_HEADER:
+                path = fit_row_text(
+                    font,
+                    state,
+                    index,
+                    max_content_width=max_content_width,
+                    cache=cache,
+                )
+                label_surf = _render_label_value_row(
+                    font,
+                    prefix=path,
+                    value="*" if state.config_dirty else "",
+                    value_color=CONFIG_DIRTY,
+                    prefix_color=color,
+                    line_height=line_h,
+                    counters=counters,
+                )
+            else:
+                label = fit_row_text(
+                    font,
+                    state,
+                    index,
+                    max_content_width=max_content_width,
+                    cache=cache,
+                )
+                label_surf = _render_text(font, label, True, color, counters=counters)
+            width = indent + icon_surf.get_width() + label_surf.get_width()
+            return icon_surf, label_surf, width
+
+        if (
+            ROW_FIELDS.get(kind) is not None
+            and ROW_FIELDS[kind].present_style == RowPresentStyle.EXPAND_SUBHEADER
+        ):
+            desc = state.layout.descriptor(index)
+            surf = _render_label_value_row(
+                font,
+                prefix=expand_subheader_prefix(kind),
+                value=format_expand_subheader_value(state, desc),
+                value_color=color,
+                line_height=line_h,
+                counters=counters,
+            )
+            return surf, None, indent + surf.get_width()
+
+        if kind in LABELED_SUB_ROW_KINDS:
+            prefix = _labeled_sub_row_prefix(state, index)
+            value = _fit_labeled_sub_row_value(
+                font,
+                state,
+                index,
+                max_content_width=max_content_width,
+                cache=cache,
+            )
+            surf = _render_label_value_row(
+                font,
+                prefix=prefix,
+                value=value,
+                value_color=color,
+                line_height=line_h,
+                counters=counters,
+            )
+            return surf, None, indent + surf.get_width()
+
+        if (
+            ROW_FIELDS.get(kind) is not None
+            and ROW_FIELDS[kind].present_style == RowPresentStyle.FULL_LINE
+            and kind
+            in {
+                RowKind.LAYER_MANAGEMENT_ADD,
+                RowKind.LAYER_MANAGEMENT_DELETE,
+                RowKind.TRACK_USER_PRESET_ADD,
+            }
+        ):
+            label = _row_text(state, index)
+            label_color = _row_value_color(state, index)
+            surf = _render_text(font, label, True, label_color, counters=counters)
+            return surf, None, indent + surf.get_width()
+
+        text = fit_row_text(
+            font, state, index, max_content_width=max_content_width, cache=cache
+        )
+        surf = _render_text(font, text, True, color, counters=counters)
+        return surf, None, indent + surf.get_width()
+
+    def _max_content_width(
+        self,
+        index: int,
+        *,
+        scrollable_indices: frozenset[int],
+        show_scrollbar: bool,
+        panel_max_width: int,
+    ) -> int:
+        return panel_content_max_width(
+            index=index,
+            scrollable_indices=scrollable_indices,
+            show_scrollbar=show_scrollbar,
+            panel_max_width=panel_max_width,
+        )
+
+    def _ensure_cache_panel(
+        self,
+        panel_w: int,
+        panel_h: int,
+        *,
+        counters: OverlayDrawCounters | None = None,
+    ) -> pygame.Surface:
+        cache = self._panel_cache
+        if cache.panel is None or cache.panel.get_size() != (panel_w, panel_h):
+            cache.panel = _compose_surface((panel_w, panel_h), counters=counters)
+        return cache.panel
+
+    def _transport_row_y(
+        self,
+        transport_index: int,
+        *,
+        metrics: PanelScrollMetrics,
+        visible_indices: list[int],
+        first_scrollable_visible: int | None,
+    ) -> int:
+        if metrics.needs_scroll:
+            try:
+                header_pos = metrics.header_indices.index(transport_index)
+            except ValueError:
+                return self._padding
+            return self._padding + header_pos * metrics.row_stride
+        row_y = self._padding
+        for index in visible_indices:
+            if index == first_scrollable_visible:
+                row_y += metrics.row_stride
+            if index == transport_index:
+                return row_y
+            row_y += metrics.row_stride
+        return self._padding
+
+    def _patch_live_panel_rows(
+        self,
+        panel: pygame.Surface,
+        state: TuningViewState,
+        *,
+        font: pygame.font.Font,
+        metrics: PanelScrollMetrics,
+        visible_indices: list[int],
+        first_scrollable_visible: int | None,
+        transport_index: int,
+        transport_entry: RowRenderEntry,
+        panel_w: int,
+        line_h: int,
+        text_alpha: int,
+        counters: OverlayDrawCounters | None = None,
+    ) -> None:
+        cache = self._panel_cache
+        bg_alpha = int(BACKGROUND_ALPHA * self._visibility)
+        transport_y = self._transport_row_y(
+            transport_index,
+            metrics=metrics,
+            visible_indices=visible_indices,
+            first_scrollable_visible=first_scrollable_visible,
+        )
+        if bg_alpha >= 2:
+            pygame.draw.rect(
+                panel,
+                (*BACKGROUND, bg_alpha),
+                (
+                    BORDER_WIDTH,
+                    transport_y,
+                    panel_w - 2 * BORDER_WIDTH,
+                    line_h,
+                ),
+            )
+        self._blit_row(
+            panel,
+            state=state,
+            index=transport_index,
+            surf=transport_entry.primary,
+            time_surf=transport_entry.secondary,
+            y=transport_y,
+            text_alpha=text_alpha,
+            panel_w=panel_w,
+            line_h=line_h,
+        )
+
+        if state.fps is not None and text_alpha >= 2:
+            if cache.last_fps_rect is not None and bg_alpha >= 2:
+                pygame.draw.rect(panel, (*BACKGROUND, bg_alpha), cache.last_fps_rect)
+            fps_surf = _render_text(
+                font, format_fps_display(state.fps), True, VALUE, counters=counters
+            )
+            fps_surf.set_alpha(text_alpha)
+            fps_layout = panel_fps_layout(
+                panel_w=panel_w,
+                padding=self._padding,
+                text_width=fps_surf.get_width(),
+                show_scrollbar=metrics.show_scrollbar,
+            )
+            panel.blit(fps_surf, (fps_layout.x, fps_layout.y))
+            cache.last_fps_rect = (
+                fps_layout.x,
+                fps_layout.y,
+                fps_surf.get_width(),
+                fps_surf.get_height(),
+            )
+
+    def _composite_panel_rows(
+        self,
+        panel: pygame.Surface,
+        state: TuningViewState,
+        built_rows: dict[int, RowRenderEntry],
+        *,
+        metrics: PanelScrollMetrics,
+        visible_indices: list[int],
+        first_scrollable_visible: int | None,
+        panel_w: int,
+        line_h: int,
+        text_alpha: int,
+        header_gap: int,
+    ) -> None:
+        if metrics.needs_scroll:
+            header_y = self._padding
+            for row_index, index in enumerate(metrics.header_indices):
+                y = header_y + row_index * metrics.row_stride
+                entry = built_rows[index]
+                self._blit_row(
+                    panel,
+                    state=state,
+                    index=index,
+                    surf=entry.primary,
+                    time_surf=entry.secondary,
+                    y=y,
+                    text_alpha=text_alpha,
+                    panel_w=panel_w,
+                    line_h=line_h,
+                )
+
+            scroll_top = self._padding + metrics.header_block_h
+            scroll_bottom = scroll_top + metrics.scroll_viewport_h
+            old_clip = panel.get_clip()
+            clip_right_reserve = (
+                SCROLLBAR_WIDTH + SCROLLBAR_CONTENT_GAP
+                if metrics.show_scrollbar
+                else self._padding
+            )
+            clip_w = panel_w - self._padding - clip_right_reserve
+            panel.set_clip(
+                pygame.Rect(self._padding, scroll_top, clip_w, metrics.scroll_viewport_h)
+            )
+            for row_index, index in enumerate(metrics.scrollable_indices):
+                local_y = row_index * metrics.row_stride
+                y = scroll_top + local_y - self._scroll_y
+                if y + line_h <= scroll_top or y >= scroll_bottom:
+                    continue
+                entry = built_rows[index]
+                self._blit_row(
+                    panel,
+                    state=state,
+                    index=index,
+                    surf=entry.primary,
+                    time_surf=entry.secondary,
+                    y=y,
+                    text_alpha=text_alpha,
+                    panel_w=panel_w,
+                    line_h=line_h,
+                )
+            panel.set_clip(old_clip)
+
+            if metrics.show_scrollbar:
+                self._draw_scrollbar(
+                    panel,
+                    panel_w=panel_w,
+                    scroll_top=scroll_top,
+                    scroll_viewport_h=metrics.scroll_viewport_h,
+                    scroll_content_h=metrics.scroll_content_h,
+                    border_alpha=int(255 * self._visibility),
+                )
+        else:
+            row_y = self._padding
+            for index in visible_indices:
+                if index == first_scrollable_visible:
+                    row_y += header_gap
+                entry = built_rows[index]
+                self._blit_row(
+                    panel,
+                    state=state,
+                    index=index,
+                    surf=entry.primary,
+                    time_surf=entry.secondary,
+                    y=row_y,
+                    text_alpha=text_alpha,
+                    panel_w=panel_w,
+                    line_h=line_h,
+                )
+                row_y += line_h + self._line_gap
+
+    def _draw_panel_chrome(
+        self,
+        panel: pygame.Surface,
+        state: TuningViewState,
+        *,
+        font: pygame.font.Font,
+        metrics: PanelScrollMetrics,
+        panel_w: int,
+        panel_h: int,
+        line_h: int,
+        text_alpha: int,
+        counters: OverlayDrawCounters | None,
+        draw_fps: bool,
+    ) -> None:
+        cache = self._panel_cache
+        if draw_fps and state.fps is not None and text_alpha >= 2:
+            fps_surf = _render_text(
+                font, format_fps_display(state.fps), True, VALUE, counters=counters
+            )
+            fps_surf.set_alpha(text_alpha)
+            fps_layout = panel_fps_layout(
+                panel_w=panel_w,
+                padding=self._padding,
+                text_width=fps_surf.get_width(),
+                show_scrollbar=metrics.show_scrollbar,
+            )
+            panel.blit(fps_surf, (fps_layout.x, fps_layout.y))
+            cache.last_fps_rect = (
+                fps_layout.x,
+                fps_layout.y,
+                fps_surf.get_width(),
+                fps_surf.get_height(),
+            )
+        elif not draw_fps:
+            cache.last_fps_rect = None
+
+        if text_alpha >= 2:
+            help_hint = _render_text(font, "h - help", True, LABEL, counters=counters)
+            help_hint.set_alpha(text_alpha)
+            hint_layout = panel_help_hint_layout(
+                panel_w=panel_w,
+                panel_h=panel_h,
+                padding=self._padding,
+                line_h=line_h,
+                hint_width=help_hint.get_width(),
+                show_scrollbar=metrics.show_scrollbar,
+            )
+            panel.blit(help_hint, (hint_layout.x, hint_layout.y))
+
+        border_alpha = int(255 * self._visibility)
+        if border_alpha >= 2 and BORDER_WIDTH > 0:
+            pygame.draw.rect(
+                panel,
+                (*BORDER_COLOR, border_alpha),
+                panel.get_rect(),
+                width=BORDER_WIDTH,
+            )
+
     def compose_panel(
         self,
         state: TuningViewState,
@@ -911,7 +1600,6 @@ class TuningOverlay:
         viewport_height: int,
         timeline_panel_open: bool = False,
         counters: OverlayDrawCounters | None = None,
-        profiler_status_line: str | None = None,
     ) -> tuple[pygame.Surface, tuple[int, int, int, int]] | None:
         self._panel_rect = None
         if self._visibility <= 0.01 or len(state.layout) == 0:
@@ -948,261 +1636,6 @@ class TuningOverlay:
             header_gap=header_gap,
             max_panel_h=max_panel_h,
         )
-        scrollable_indices = frozenset(metrics.scrollable_indices)
-        panel_max_width = panel_content_max_width_px(state.settings.ui_width)
-
-        row_surfaces: list[pygame.Surface] = []
-        row_time_surfaces: list[pygame.Surface | None] = []
-        row_widths: list[int] = []
-        for index in visible_indices:
-            max_content_width = panel_content_max_width(
-                index=index,
-                scrollable_indices=scrollable_indices,
-                show_scrollbar=metrics.show_scrollbar,
-                panel_max_width=panel_max_width,
-            )
-            kind = state.layout.kind(index)
-            indent = self._padding + _row_indent(state, index)
-            color = _row_value_color(state, index)
-
-            if kind == RowKind.TRANSPORT:
-                icons_surf = render_transport_icons(
-                    color=color,
-                    line_height=line_h,
-                    paused=state.paused,
-                )
-                time_text = f" [{format_mmss(state.position_sec)}]"
-                time_surf = _render_text(font, time_text, True, color, counters=counters)
-                row_surfaces.append(icons_surf)
-                row_time_surfaces.append(time_surf)
-                row_widths.append(
-                    indent + icons_surf.get_width() + time_surf.get_width()
-                )
-            elif kind == RowKind.TRACK_HEADER:
-                stem = state.layout.slot(index)
-                block = state.tracks[stem] if stem is not None else None
-                enabled = block.visible if block is not None else True
-                solo = stem is not None and state.solo_slot == stem
-                locked = block.locked if block is not None else False
-                desc = RowDescriptor(RowKind.TRACK_HEADER, slot=stem)
-                prefix_surf = render_visibility_icon(
-                    enabled=enabled, solo=solo, line_height=line_h
-                )
-                layer_prefix = composite_header_prefix_part(state, desc)
-                stem_text = _fit_track_header_stem(
-                    font, state, index, max_content_width=max_content_width
-                )
-                expand_arrow = (
-                    format_composite_header_expand_value(state, desc)
-                    if stem is not None
-                    else expand_arrow_glyph(False)
-                )
-                label_surf = _render_track_header_label(
-                    font,
-                    layer_prefix=layer_prefix,
-                    stem_text=stem_text,
-                    value_color=color,
-                    expand_arrow=expand_arrow,
-                    locked=locked,
-                    line_height=line_h,
-                    counters=counters,
-                )
-                row_surfaces.append(prefix_surf)
-                row_time_surfaces.append(label_surf)
-                row_widths.append(
-                    indent + prefix_surf.get_width() + label_surf.get_width()
-                )
-            elif kind == RowKind.SETTINGS_HEADER:
-                desc = state.layout.descriptor(index)
-                icon_surf = render_glyph(
-                    SETTINGS_GLYPH, color=VALUE, line_height=line_h
-                )
-                label_surf = _render_label_value_row(
-                    font,
-                    prefix=composite_header_prefix_part(state, desc),
-                    value=format_composite_header_expand_value(state, desc),
-                    value_color=color,
-                    prefix_color=LABEL,
-                    line_height=line_h,
-                    counters=counters,
-                )
-                row_surfaces.append(icon_surf)
-                row_time_surfaces.append(label_surf)
-                row_widths.append(
-                    indent + icon_surf.get_width() + label_surf.get_width()
-                )
-            elif kind in {
-                RowKind.RENDER_OVERLAY_HEADER,
-                RowKind.RENDER_POST_FX_HEADER,
-                RowKind.RENDER_TIMELINE_HEADER,
-            }:
-                desc = state.layout.descriptor(index)
-                if kind == RowKind.RENDER_OVERLAY_HEADER:
-                    block_ro = state.render_overlay
-                    prefix_surf = render_visibility_icon(
-                        enabled=block_ro.enabled,
-                        solo=block_ro.solo,
-                        line_height=line_h,
-                    )
-                elif kind == RowKind.RENDER_POST_FX_HEADER:
-                    block_pp = state.render_post_fx
-                    prefix_surf = render_visibility_icon(
-                        enabled=block_pp.enabled,
-                        solo=block_pp.solo,
-                        line_height=line_h,
-                    )
-                else:
-                    block_tl = state.render_timeline
-                    prefix_surf = render_visibility_icon(
-                        enabled=block_tl.enabled,
-                        solo=False,
-                        line_height=line_h,
-                    )
-                label_surf = _render_track_header_label(
-                    font,
-                    layer_prefix=composite_header_prefix_part(state, desc),
-                    stem_text=composite_header_suffix_part(state, desc),
-                    value_color=color,
-                    expand_arrow=format_composite_header_expand_value(state, desc),
-                    locked=False,
-                    line_height=line_h,
-                    counters=counters,
-                )
-                row_surfaces.append(prefix_surf)
-                row_time_surfaces.append(label_surf)
-                row_widths.append(
-                    indent + prefix_surf.get_width() + label_surf.get_width()
-                )
-            elif kind == RowKind.RENDER_SECTION_GAP:
-                gap_surf = _compose_surface((1, line_h), counters=counters)
-                row_surfaces.append(gap_surf)
-                row_time_surfaces.append(None)
-                row_widths.append(indent + gap_surf.get_width())
-            elif (
-                ROW_FIELDS.get(kind) is not None
-                and ROW_FIELDS[kind].present_style == RowPresentStyle.PATH_ICON
-            ):
-                if kind == RowKind.TRACK_PRESET_DIR:
-                    glyph = FOLDER_GLYPH
-                    icon_color = PRESET_ICON
-                    icon_surf = _render_preset_row_prefix(
-                        font,
-                        glyph=glyph,
-                        icon_color=icon_color,
-                        line_height=line_h,
-                        counters=counters,
-                    )
-                elif kind in {RowKind.TRACK_PRESET, RowKind.TRACK_USER_PRESET_ITEM}:
-                    glyph = FILE_GLYPH
-                    icon_color = PRESET_FILE_ICON
-                    icon_surf = _render_preset_row_prefix(
-                        font,
-                        glyph=glyph,
-                        icon_color=icon_color,
-                        line_height=line_h,
-                        counters=counters,
-                    )
-                else:
-                    icon_surf = render_glyph(
-                        FILE_GLYPH, color=PRESET_FILE_ICON, line_height=line_h
-                    )
-                if kind == RowKind.CONFIG_HEADER:
-                    path = fit_row_text(
-                        font, state, index, max_content_width=max_content_width
-                    )
-                    label_surf = _render_label_value_row(
-                        font,
-                        prefix=path,
-                        value="*" if state.config_dirty else "",
-                        value_color=CONFIG_DIRTY,
-                        prefix_color=color,
-                        line_height=line_h,
-                        counters=counters,
-                    )
-                else:
-                    label = fit_row_text(
-                        font, state, index, max_content_width=max_content_width
-                    )
-                    label_surf = _render_text(font, label, True, color, counters=counters)
-                row_surfaces.append(icon_surf)
-                row_time_surfaces.append(label_surf)
-                row_widths.append(
-                    indent + icon_surf.get_width() + label_surf.get_width()
-                )
-            elif (
-                ROW_FIELDS.get(kind) is not None
-                and ROW_FIELDS[kind].present_style == RowPresentStyle.EXPAND_SUBHEADER
-            ):
-                desc = state.layout.descriptor(index)
-                surf = _render_label_value_row(
-                    font,
-                    prefix=expand_subheader_prefix(kind),
-                    value=format_expand_subheader_value(state, desc),
-                    value_color=color,
-                    line_height=line_h,
-                    counters=counters,
-                )
-                row_surfaces.append(surf)
-                row_time_surfaces.append(None)
-                row_widths.append(indent + surf.get_width())
-            elif kind in LABELED_SUB_ROW_KINDS:
-                prefix = _labeled_sub_row_prefix(state, index)
-                value = _fit_labeled_sub_row_value(
-                    font, state, index, max_content_width=max_content_width
-                )
-                surf = _render_label_value_row(
-                    font,
-                    prefix=prefix,
-                    value=value,
-                    value_color=color,
-                    line_height=line_h,
-                    counters=counters,
-                )
-                row_surfaces.append(surf)
-                row_time_surfaces.append(None)
-                row_widths.append(indent + surf.get_width())
-            elif (
-                ROW_FIELDS.get(kind) is not None
-                and ROW_FIELDS[kind].present_style == RowPresentStyle.FULL_LINE
-                and kind
-                in {
-                    RowKind.LAYER_MANAGEMENT_ADD,
-                    RowKind.LAYER_MANAGEMENT_DELETE,
-                    RowKind.TRACK_USER_PRESET_ADD,
-                }
-            ):
-                label = _row_text(state, index)
-                label_color = _row_value_color(state, index)
-                surf = _render_text(font, label, True, label_color, counters=counters)
-                row_surfaces.append(surf)
-                row_time_surfaces.append(None)
-                row_widths.append(indent + surf.get_width())
-            else:
-                text = fit_row_text(
-                    font, state, index, max_content_width=max_content_width
-                )
-                surf = _render_text(font, text, True, color, counters=counters)
-                row_surfaces.append(surf)
-                row_time_surfaces.append(None)
-                row_widths.append(indent + surf.get_width())
-
-        content_w = max(row_widths) if row_widths else 0
-        content_w = min(content_w, panel_max_width)
-        if state.settings.ui_width_mode == "fixed":
-            content_w = panel_max_width
-        panel_w = content_w + self._padding * 2
-        panel_h = metrics.panel_h
-
-        alpha = int(BACKGROUND_ALPHA * self._visibility)
-        if alpha < 2:
-            return None
-
-        panel = self._ensure_panel_scratch(panel_w, panel_h, counters=counters)
-        panel.fill((*BACKGROUND, alpha))
-
-        text_alpha = int(255 * self._visibility)
-        index_to_draw = {index: draw_index for draw_index, index in enumerate(visible_indices)}
-
         if metrics.needs_scroll:
             self._ensure_focus_visible(
                 state,
@@ -1211,123 +1644,221 @@ class TuningOverlay:
                 metrics.scroll_viewport_h,
                 line_h,
             )
-            header_y = self._padding
-            for row_index, index in enumerate(metrics.header_indices):
-                y = header_y + row_index * metrics.row_stride
-                self._blit_row(
-                    panel,
-                    state=state,
-                    index=index,
-                    draw_index=index_to_draw[index],
-                    row_surfaces=row_surfaces,
-                    row_time_surfaces=row_time_surfaces,
-                    y=y,
-                    text_alpha=text_alpha,
-                    panel_w=panel_w,
-                    line_h=line_h,
-                )
-
             scroll_top = self._padding + metrics.header_block_h
             scroll_bottom = scroll_top + metrics.scroll_viewport_h
-            old_clip = panel.get_clip()
-            clip_right_reserve = (
-                SCROLLBAR_WIDTH + SCROLLBAR_CONTENT_GAP
-                if metrics.show_scrollbar
-                else self._padding
-            )
-            clip_w = panel_w - self._padding - clip_right_reserve
-            panel.set_clip(
-                pygame.Rect(self._padding, scroll_top, clip_w, metrics.scroll_viewport_h)
-            )
+            raster_indices: set[int] = set(metrics.header_indices)
             for row_index, index in enumerate(metrics.scrollable_indices):
-                local_y = row_index * metrics.row_stride
-                y = scroll_top + local_y - self._scroll_y
-                if y + line_h <= scroll_top or y >= scroll_bottom:
-                    continue
-                self._blit_row(
-                    panel,
-                    state=state,
-                    index=index,
-                    draw_index=index_to_draw[index],
-                    row_surfaces=row_surfaces,
-                    row_time_surfaces=row_time_surfaces,
-                    y=y,
-                    text_alpha=text_alpha,
-                    panel_w=panel_w,
-                    line_h=line_h,
-                )
-            panel.set_clip(old_clip)
-
-            if metrics.show_scrollbar:
-                self._draw_scrollbar(
-                    panel,
-                    panel_w=panel_w,
+                if _scrollable_row_in_viewport(
+                    row_index=row_index,
+                    scroll_y=self._scroll_y,
                     scroll_top=scroll_top,
-                    scroll_viewport_h=metrics.scroll_viewport_h,
-                    scroll_content_h=metrics.scroll_content_h,
-                    border_alpha=int(255 * self._visibility),
-                )
-        else:
-            row_y = self._padding
-            for draw_index, index in enumerate(visible_indices):
-                if index == first_scrollable_visible:
-                    row_y += header_gap
-                self._blit_row(
-                    panel,
-                    state=state,
-                    index=index,
-                    draw_index=draw_index,
-                    row_surfaces=row_surfaces,
-                    row_time_surfaces=row_time_surfaces,
-                    y=row_y,
-                    text_alpha=text_alpha,
-                    panel_w=panel_w,
+                    scroll_bottom=scroll_bottom,
+                    row_stride=metrics.row_stride,
                     line_h=line_h,
-                )
-                row_y += line_h + self._line_gap
+                ):
+                    raster_indices.add(index)
+        else:
+            raster_indices = set(visible_indices)
 
-        if state.fps is not None and text_alpha >= 2:
-            fps_surf = _render_text(
-                font, format_fps_display(state.fps), True, VALUE, counters=counters
-            )
-            fps_surf.set_alpha(text_alpha)
-            fps_layout = panel_fps_layout(
-                panel_w=panel_w,
-                padding=self._padding,
-                text_width=fps_surf.get_width(),
+        scrollable_indices = frozenset(metrics.scrollable_indices)
+        panel_max_width = panel_content_max_width_px(state.settings.ui_width)
+        vis_tuple = tuple(visible_indices)
+        cache = self._panel_cache
+        if cache.row_cache_structure != vis_tuple:
+            cache.clear_rows()
+            cache.row_cache_structure = vis_tuple
+
+        def max_content_width_for(index: int) -> int:
+            return self._max_content_width(
+                index,
+                scrollable_indices=scrollable_indices,
                 show_scrollbar=metrics.show_scrollbar,
+                panel_max_width=panel_max_width,
             )
-            panel.blit(fps_surf, (fps_layout.x, fps_layout.y))
 
-        if text_alpha >= 2:
-            help_hint = _render_text(font, "h - help", True, LABEL, counters=counters)
-            help_hint.set_alpha(text_alpha)
-            hint_layout = panel_help_hint_layout(
+        static_keys = static_row_keys(
+            state,
+            font=font,
+            cache=cache,
+            visible_indices=vis_tuple,
+            max_content_width_for_index=max_content_width_for,
+            line_h=line_h,
+        )
+
+        panel_h = metrics.panel_h
+        prev_sig = cache.panel_signature
+        prev_size = cache.panel_size
+        candidate_w = (
+            prev_size[0]
+            if prev_size is not None
+            else panel_max_width + self._padding * 2
+        )
+        new_sig = panel_signature(
+            state,
+            visibility=self._visibility,
+            panel_w=candidate_w,
+            panel_h=panel_h,
+            scroll_y=self._scroll_y,
+            timeline_panel_open=timeline_panel_open,
+            static_row_keys=static_keys,
+        )
+        can_incremental = (
+            cache.panel is not None
+            and prev_sig is not None
+            and prev_size is not None
+            and new_sig == prev_sig
+            and prev_size[1] == panel_h
+        )
+
+        transport_index = next(
+            (
+                index
+                for index in visible_indices
+                if state.layout.kind(index) == RowKind.TRANSPORT
+            ),
+            None,
+        )
+
+        if can_incremental:
+            assert cache.panel is not None
+            assert transport_index is not None
+            panel = cache.panel
+            panel_w = prev_size[0]
+            text_alpha = int(255 * self._visibility)
+            transport_entry = ensure_row_surface(
+                cache,
+                state,
+                transport_index,
+                font,
+                self._build_row_at_index,
+                max_content_width=max_content_width_for(transport_index),
+                line_h=line_h,
+                counters=counters,
+            )
+            self._patch_live_panel_rows(
+                panel,
+                state,
+                font=font,
+                metrics=metrics,
+                visible_indices=visible_indices,
+                first_scrollable_visible=first_scrollable_visible,
+                transport_index=transport_index,
+                transport_entry=transport_entry,
+                panel_w=panel_w,
+                line_h=line_h,
+                text_alpha=text_alpha,
+                counters=counters,
+            )
+            self._panel_scratch = panel
+            return self._finish_compose_panel(
+                panel,
                 panel_w=panel_w,
                 panel_h=panel_h,
-                padding=self._padding,
-                line_h=line_h,
-                hint_width=help_hint.get_width(),
-                show_scrollbar=metrics.show_scrollbar,
-            )
-            panel.blit(help_hint, (hint_layout.x, hint_layout.y))
-
-        if profiler_status_line and text_alpha >= 2:
-            prof_surf = _render_text(
-                font, profiler_status_line, True, DISABLED, counters=counters
-            )
-            prof_surf.set_alpha(text_alpha)
-            panel.blit(prof_surf, (self._padding, panel_h - self._padding - line_h))
-
-        border_alpha = int(255 * self._visibility)
-        if border_alpha >= 2 and BORDER_WIDTH > 0:
-            pygame.draw.rect(
-                panel,
-                (*BORDER_COLOR, border_alpha),
-                panel.get_rect(),
-                width=BORDER_WIDTH,
+                viewport_width=viewport_width,
+                viewport_height=viewport_height,
             )
 
+        built_rows: dict[int, RowRenderEntry] = {}
+        row_widths: list[int] = []
+        for index in visible_indices:
+            max_content_width = max_content_width_for(index)
+            if index in raster_indices:
+                entry = ensure_row_surface(
+                    cache,
+                    state,
+                    index,
+                    font,
+                    self._build_row_at_index,
+                    max_content_width=max_content_width,
+                    line_h=line_h,
+                    counters=counters,
+                )
+                built_rows[index] = entry
+                row_widths.append(entry.content_width)
+            else:
+                row_widths.append(
+                    _estimate_row_content_width(
+                        padding=self._padding,
+                        font=font,
+                        state=state,
+                        index=index,
+                        max_content_width=max_content_width,
+                        line_h=line_h,
+                    )
+                )
+
+        content_w = max(row_widths) if row_widths else 0
+        content_w = min(content_w, panel_max_width)
+        if state.settings.ui_width_mode == "fixed":
+            content_w = panel_max_width
+        panel_w = content_w + self._padding * 2
+
+        alpha = int(BACKGROUND_ALPHA * self._visibility)
+        if alpha < 2:
+            return None
+
+        new_sig = panel_signature(
+            state,
+            visibility=self._visibility,
+            panel_w=panel_w,
+            panel_h=panel_h,
+            scroll_y=self._scroll_y,
+            timeline_panel_open=timeline_panel_open,
+            static_row_keys=static_keys,
+        )
+
+        panel = self._ensure_cache_panel(panel_w, panel_h, counters=counters)
+        panel.fill((*BACKGROUND, alpha))
+
+        text_alpha = int(255 * self._visibility)
+
+        self._composite_panel_rows(
+            panel,
+            state,
+            built_rows,
+            metrics=metrics,
+            visible_indices=visible_indices,
+            first_scrollable_visible=first_scrollable_visible,
+            panel_w=panel_w,
+            line_h=line_h,
+            text_alpha=text_alpha,
+            header_gap=header_gap,
+        )
+
+        self._draw_panel_chrome(
+            panel,
+            state,
+            font=font,
+            metrics=metrics,
+            panel_w=panel_w,
+            panel_h=panel_h,
+            line_h=line_h,
+            text_alpha=text_alpha,
+            counters=counters,
+            draw_fps=True,
+        )
+
+        cache.panel_signature = new_sig
+        cache.panel_size = (panel_w, panel_h)
+        self._panel_scratch = panel
+
+        return self._finish_compose_panel(
+            panel,
+            panel_w=panel_w,
+            panel_h=panel_h,
+            viewport_width=viewport_width,
+            viewport_height=viewport_height,
+        )
+
+    def _finish_compose_panel(
+        self,
+        panel: pygame.Surface,
+        *,
+        panel_w: int,
+        panel_h: int,
+        viewport_width: int,
+        viewport_height: int,
+    ) -> tuple[pygame.Surface, tuple[int, int, int, int]] | None:
         mx, my = self._margin
         if self._anchor == "topleft":
             pos = (mx, my)

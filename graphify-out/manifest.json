@@ -300,8 +300,8 @@
     "semantic_hash": ""
   },
   "cleave/viz/overlay_draw.py": {
-    "mtime": 1782676607.1966333,
-    "ast_hash": "bf38b004617395d98e8fcdebe2fbc140",
+    "mtime": 1782680840.775686,
+    "ast_hash": "c05ff669401a81913b503e184832ae73",
     "semantic_hash": ""
   },
   "cleave/viz/panel_notification.py": {
@@ -395,8 +395,8 @@
     "semantic_hash": ""
   },
   "cleave/viz/tuning_panel_draw.py": {
-    "mtime": 1782677563.5764205,
-    "ast_hash": "8e1e2c6d85016aefd5f8e4c0ed202a90",
+    "mtime": 1782681187.471607,
+    "ast_hash": "4e239dafed7f446c23f3c1f4f2702ced",
     "semantic_hash": ""
   },
   "cleave/viz/tuning_view_state.py": {
@@ -650,8 +650,8 @@
     "semantic_hash": ""
   },
   "tests/cleave/viz/test_overlay.py": {
-    "mtime": 1782568745.9318488,
-    "ast_hash": "6fd30cfee820e13517af2e15ad82f72d",
+    "mtime": 1782680852.5436838,
+    "ast_hash": "a86b99f2eb9dc024fd1ca7047478c9f6",
     "semantic_hash": ""
   },
   "tests/cleave/viz/test_overlay_targets.py": {
@@ -855,13 +855,13 @@
     "semantic_hash": ""
   },
   "cleave/viz/overlay_profiler.py": {
-    "mtime": 1782676615.812631,
-    "ast_hash": "9226a1231be330854d471e4850be126f",
+    "mtime": 1782680037.711864,
+    "ast_hash": "8d54051d0a2f9dd98e04671dc767171f",
     "semantic_hash": ""
   },
   "tests/cleave/viz/test_overlay_profiler.py": {
-    "mtime": 1782676619.2886298,
-    "ast_hash": "dad8d6d872ac28f861a1c946bec06673",
+    "mtime": 1782680124.9958482,
+    "ast_hash": "73cf6e8dd2e300e209d06b26aab9be17",
     "semantic_hash": ""
   },
   "docs/ui-performance-improvements-plan.md": {
@@ -875,13 +875,23 @@
     "semantic_hash": ""
   },
   "docs/ui-performance-results.md": {
-    "mtime": 1782676951.4645576,
-    "ast_hash": "eade512470d88cff30ca79b3a62d3766",
+    "mtime": 1782680856.283683,
+    "ast_hash": "e00d44494d5e60999e6468d6fd5e358e",
     "semantic_hash": ""
   },
   "tests/cleave/viz/test_view_state_structure.py": {
     "mtime": 1782677630.6764054,
     "ast_hash": "61e56af9d40cd2745feac503c72c1f26",
+    "semantic_hash": ""
+  },
+  "cleave/viz/tuning_panel_cache.py": {
+    "mtime": 1782680841.819686,
+    "ast_hash": "f72d4c94a25f73dee579a62917e467c1",
+    "semantic_hash": ""
+  },
+  "tests/cleave/viz/test_tuning_panel_cache.py": {
+    "mtime": 1782681192.9676058,
+    "ast_hash": "280ec04476f5bfed717b90e8f6fc4f38",
     "semantic_hash": ""
   }
 }

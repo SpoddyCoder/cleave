@@ -28,6 +28,8 @@ _SECTION_NAMES = frozenset(
 class OverlayDrawCounters:
     surface_builds: int = 0
     font_renders: int = 0
+    row_cache_hits: int = 0
+    row_cache_misses: int = 0
 
 
 @dataclass
@@ -38,6 +40,8 @@ class OverlayFrameSample:
     overlay_present_ms: float
     surface_builds: int
     font_renders: int
+    row_cache_hits: int
+    row_cache_misses: int
     skipped: bool
 
 
@@ -49,6 +53,7 @@ def _format_sample_line(sample: OverlayFrameSample) -> str:
         f" draw={sample.panel_draw_ms:.1f}ms"
         f" surf={sample.surface_builds}"
         f" font={sample.font_renders}"
+        f" rcache={sample.row_cache_hits}/{sample.row_cache_misses}"
         f" up={sample.upload_ms:.1f}ms"
     )
 
@@ -115,6 +120,8 @@ class OverlayProfiler:
             overlay_present_ms=self._section_ms.get("overlay_present", 0.0),
             surface_builds=self._counters.surface_builds,
             font_renders=self._counters.font_renders,
+            row_cache_hits=self._counters.row_cache_hits,
+            row_cache_misses=self._counters.row_cache_misses,
             skipped=self._skipped,
         )
 
