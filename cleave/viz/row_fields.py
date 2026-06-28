@@ -318,12 +318,15 @@ def _apply_track_preset_switching_mode(
 
 
 def _apply_track_preset_switching_scope(
-    _controls: TuningControls,
-    _desc: RowDescriptor,
-    _forward: bool,
+    controls: TuningControls,
+    desc: RowDescriptor,
+    forward: bool,
     _ctrl: bool,
+    _shift: bool,
 ) -> None:
-    return
+    if desc.slot is None:
+        return
+    controls._cycle_preset_switching_scope(desc.slot, forward=forward)
 
 
 def _apply_track_preset_duration(
