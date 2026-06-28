@@ -11,8 +11,92 @@ from cleave.viz.tuning_view_state import (
     TrackBlock,
     TuningViewState,
 )
+from cleave.viz.row_layout import (
+    build_layout_frame,
+    row_draw_visible,
+    row_navigable,
+)
 from cleave.viz.row_semantics import RowDescriptor, RowKind, section_header_descriptor
 from tests.cleave.viz.test_overlay import _minimal_view_state
+
+
+def _legacy_visible_indices(state: TuningViewState) -> tuple[int, ...]:
+    layout = state.layout
+    assert layout is not None
+    return tuple(
+        index
+        for index in range(len(layout))
+        if row_draw_visible(state, layout.descriptor(index))
+    )
+
+
+def _legacy_navigable_indices(state: TuningViewState) -> tuple[int, ...]:
+    layout = state.layout
+    assert layout is not None
+    return tuple(
+        index
+        for index in range(len(layout))
+        if row_navigable(state, layout.descriptor(index))
+    )
+
+
+def _legacy_focus_index(state: TuningViewState) -> int:
+    layout = state.layout
+    assert layout is not None
+    object.__setattr__(state, "layout_frame", None)
+    try:
+        resolved = layout.resolve_navigable(state.focus_descriptor, state)
+        return layout.find_descriptor(resolved)
+    finally:
+        object.__setattr__(
+            state, "layout_frame", build_layout_frame(layout, state)
+        )
+
+
+def test_layout_frame_matches_legacy_indices() -> None:
+    state = _minimal_view_state(
+        tracks={
+            "layer_1": TrackBlock(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                expanded=True,
+            )
+        },
+    )
+    layout = state.layout
+    assert layout is not None
+    frame = build_layout_frame(layout, state)
+    assert frame.visible_indices == _legacy_visible_indices(state)
+    assert frame.navigable_indices == _legacy_navigable_indices(state)
+    assert frame.resolved_focus_index == _legacy_focus_index(state)
+    assert frame.descriptor_index == layout.descriptor_index
+
+
+def test_layout_frame_collapsed_track_block() -> None:
+    state = _minimal_view_state()
+    layout = state.layout
+    assert layout is not None
+    frame = build_layout_frame(layout, state)
+    assert frame.visible_indices == _legacy_visible_indices(state)
+    assert frame.navigable_indices == _legacy_navigable_indices(state)
+
+
+def test_focus_index_uses_layout_frame_navigable() -> None:
+    state = _minimal_view_state()
+    layout = state.layout
+    assert layout is not None
+    frame = build_layout_frame(layout, state)
+    object.__setattr__(state, "layout_frame", frame)
+    assert state.focus_index == frame.resolved_focus_index
+    state.focus_descriptor = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
+    assert state.focus_index == layout.find_descriptor(
+        RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
+    )
 
 
 def test_find_descriptor_and_contains_descriptor() -> None:

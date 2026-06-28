@@ -9,7 +9,20 @@ import pygame
 from cleave.extract import StemSource
 from cleave.timeline import TimelineCue, layer_visible_at, stem_abbreviation
 from cleave.viz.material_icons import visibility_icon_slot_width
-from cleave.viz.tuning_panel_draw import clip_rect_to_surface, render_visibility_icon
+from cleave.viz.overlay_upload import (
+    UploadPlan,
+    UploadSignature,
+    clip_dirty_rects,
+    upload_plan_for_signature,
+)
+from cleave.viz.timeline_panel_cache import (
+    TimelinePanelCache,
+    timeline_badge_reserve_px,
+    timeline_panel_max_dimensions,
+    timeline_static_signature,
+    timeline_upload_signature,
+)
+from cleave.viz.tuning_panel_draw import clip_rect_to_bounds, clip_rect_to_surface, render_visibility_icon
 from cleave.viz.playback import format_mmss
 from cleave.viz.theme import (
     ARMED_BG,
@@ -304,6 +317,61 @@ def row_prefix_width(
     return layer_num_width + stem_abbrev_width + eye_slot_w
 
 
+def timeline_live_signature(
+    state: TimelineViewState,
+    *,
+    playhead_px: int,
+    bar_left: int,
+    bar_width: int,
+    row_count: int,
+    row_h: int,
+    flash_sig: tuple = (),
+    ticks_ms: int | None = None,
+) -> tuple:
+    if ticks_ms is None:
+        ticks_ms = pygame.time.get_ticks()
+    rec_flash = rec_flash_visible(ticks_ms) if state.recording else None
+    return (
+        playhead_px,
+        bar_left,
+        bar_width,
+        row_count,
+        row_h,
+        transport_time_text(state.position_sec),
+        rec_flash,
+        flash_sig,
+    )
+
+
+@dataclass(frozen=True)
+class _TimelineLayout:
+    panel_w: int
+    panel_h: int
+    panel_x: int
+    panel_y: int
+    row_count: int
+    row_h: int
+    bar_left: int
+    bar_width: int
+    eye_slot_w: int
+    timeline_eye_x: int
+    layer_num_width: int
+    stem_abbrev_width: int
+    badge_reserve: int
+    bar_top: int
+    bar_bottom: int
+
+
+@dataclass(frozen=True)
+class ComposedTimelinePanel:
+    upload_surface: pygame.Surface
+    panel_size: tuple[int, int]
+    screen_rect: tuple[int, int, int, int]
+    upload_plan: UploadPlan
+    upload_signature: UploadSignature
+    capacity: tuple[int, int]
+
+
 class TimelineOverlay:
     """Bottom-anchored timeline panel drawn over the composited frame."""
 
@@ -335,11 +403,19 @@ class TimelineOverlay:
         self._stem_abbrev_width: int = 0
         self._bar_layout: tuple[int, int, int] | None = None
         self._row_layout: list[tuple[int, int, int, int, str, int]] = []
+        self._cache = TimelinePanelCache()
+        self._visibility = 1.0
+        self._upload_scratch: pygame.Surface | None = None
+        self._blit_src: tuple[int, int] = (0, 0)
 
     def _font_get(self) -> pygame.font.Font:
         if self._font is None:
             self._font = pygame.font.SysFont("monospace", self._font_size)
         return self._font
+
+    @property
+    def gpu_state(self):
+        return self._cache.gpu
 
     @property
     def panel_rect(self) -> tuple[int, int, int, int] | None:
@@ -359,52 +435,77 @@ class TimelineOverlay:
         """Last draw layout: ``(row_index, x, y, w, h, stem)`` in panel coordinates."""
         return list(self._row_layout)
 
-    def draw(
+    def _compute_layout(
         self,
-        surface: pygame.Surface,
         state: TimelineViewState,
-    ) -> None:
-        self._panel_rect = None
-        self._header_badge_rect = None
-        self._bar_layout = None
-        self._row_layout = []
-        if not state.enabled:
-            return
-
-        display_width, display_height = surface.get_size()
-        panel_w = display_width - self._margin * 2
+        *,
+        viewport_width: int,
+        viewport_height: int,
+    ) -> _TimelineLayout | None:
         row_count = len(state.layer_z_order)
         if row_count == 0:
-            return
+            return None
 
         metrics = timeline_ui_metrics()
         row_h = metrics.row_height
+        panel_w = viewport_width - self._margin * 2
         panel_h = timeline_panel_height_px(row_count)
         panel_x = self._margin
-        panel_y = display_height - panel_h - self._margin
+        panel_y = viewport_height - panel_h - self._margin
+        badge_reserve = timeline_badge_reserve_px(font_size=self._font_size)
 
         font = self._font_get()
-        num_sample = font.render(
-            layer_num_prefix(max(row_count, 1)), True, LABEL
-        )
+        num_sample = font.render(layer_num_prefix(max(row_count, 1)), True, LABEL)
         abbrev_sample = font.render(stem_abbrev_label("drums"), True, LABEL)
-        self._layer_num_width = num_sample.get_width()
-        self._stem_abbrev_width = abbrev_sample.get_width()
+        layer_num_width = num_sample.get_width()
+        stem_abbrev_width = abbrev_sample.get_width()
         eye_slot_w = visibility_icon_slot_width(row_h)
-        prefix_width = row_prefix_width(
-            self._layer_num_width, self._stem_abbrev_width, row_h
-        )
+        prefix_width = row_prefix_width(layer_num_width, stem_abbrev_width, row_h)
         bar_left = self._padding + prefix_width
         bar_width = max(1, panel_w - self._padding * 2 - prefix_width - eye_slot_w)
-        self._bar_layout = (bar_left, bar_width, eye_slot_w)
         timeline_eye_x = panel_w - self._padding - eye_slot_w
+        bar_top = self._padding
+        bar_bottom = self._padding + row_count * row_h + (row_count - 1) * self._row_gap
+
+        self._layer_num_width = layer_num_width
+        self._stem_abbrev_width = stem_abbrev_width
+        self._bar_layout = (bar_left, bar_width, eye_slot_w)
+
+        return _TimelineLayout(
+            panel_w=panel_w,
+            panel_h=panel_h,
+            panel_x=panel_x,
+            panel_y=panel_y,
+            row_count=row_count,
+            row_h=row_h,
+            bar_left=bar_left,
+            bar_width=bar_width,
+            eye_slot_w=eye_slot_w,
+            timeline_eye_x=timeline_eye_x,
+            layer_num_width=layer_num_width,
+            stem_abbrev_width=stem_abbrev_width,
+            badge_reserve=badge_reserve,
+            bar_top=bar_top,
+            bar_bottom=bar_bottom,
+        )
+
+    def _build_static_panel(
+        self,
+        state: TimelineViewState,
+        layout: _TimelineLayout,
+    ) -> pygame.Surface:
+        panel_w = layout.panel_w
+        panel_h = layout.panel_h
+        row_count = layout.row_count
+        row_h = layout.row_h
+        bar_left = layout.bar_left
+        bar_width = layout.bar_width
+        timeline_eye_x = layout.timeline_eye_x
 
         panel = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
         panel.fill((*BACKGROUND, BACKGROUND_ALPHA))
-
-        playhead_px = playhead_x(
-            state.position_sec, bar_left, bar_width, state.duration_sec
-        )
+        font = self._font_get()
+        self._row_layout = []
 
         for display_i in range(row_count):
             row_index = display_i
@@ -427,24 +528,16 @@ class TimelineOverlay:
 
             layer_num = row_index + 1
             layer_num_x = self._padding
-            stem_abbrev_x = layer_num_x + self._layer_num_width
-            monitor_eye_x = stem_abbrev_x + self._stem_abbrev_width
+            stem_abbrev_x = layer_num_x + layout.layer_num_width
+            monitor_eye_x = stem_abbrev_x + layout.stem_abbrev_width
 
             if focused:
                 blit_tint(panel, row_rect, HIGHLIGHT)
 
             abbrev_rect = pygame.Rect(
-                stem_abbrev_x, row_y, self._stem_abbrev_width, row_h
+                stem_abbrev_x, row_y, layout.stem_abbrev_width, row_h
             )
-            if armed_abbrev_bg_visible(
-                armed=armed,
-                recording=state.recording,
-                flash_starts=state.arm_flash_start_ms,
-                slot=slot,
-            ):
-                armed_surf = pygame.Surface((abbrev_rect.w, abbrev_rect.h), pygame.SRCALPHA)
-                armed_surf.fill((*ARMED_BG, ARMED_BG_ALPHA))
-                panel.blit(armed_surf, abbrev_rect.topleft)
+            # Armed abbrev background and recording monitor flash are live-patched.
 
             if focused:
                 label_color = HIGHLIGHT
@@ -464,18 +557,19 @@ class TimelineOverlay:
             monitor_override = (
                 slot in state.override_slots
                 and not (state.recording and armed)
-            ) or (state.recording and armed and rec_flash_visible())
-            monitor_icon = render_visibility_icon(
-                enabled=monitor_enabled,
-                override=monitor_override,
-                line_height=row_h,
             )
+            if not (state.recording and armed):
+                monitor_icon = render_visibility_icon(
+                    enabled=monitor_enabled,
+                    override=monitor_override,
+                    line_height=row_h,
+                )
+                panel.blit(monitor_icon, (monitor_eye_x, row_y))
             timeline_icon = render_visibility_icon(
                 enabled=timeline_enabled,
                 solo=False,
                 line_height=row_h,
             )
-            panel.blit(monitor_icon, (monitor_eye_x, row_y))
             panel.blit(timeline_icon, (timeline_eye_x, row_y))
 
             bar_column_rect = pygame.Rect(bar_left, row_y, bar_width, row_h)
@@ -518,17 +612,6 @@ class TimelineOverlay:
                     HIGHLIGHT,
                 )
 
-        bar_top = self._padding
-        bar_bottom = self._padding + row_count * row_h + (row_count - 1) * self._row_gap
-        playhead_left = max(bar_left, min(bar_left + bar_width - 1, playhead_px))
-        pygame.draw.line(
-            panel,
-            PLAYHEAD,
-            (playhead_left, bar_top),
-            (playhead_left, bar_bottom - 1),
-            PLAYHEAD_WIDTH,
-        )
-
         if BORDER_WIDTH > 0:
             pygame.draw.rect(
                 panel,
@@ -536,32 +619,173 @@ class TimelineOverlay:
                 panel.get_rect(),
                 width=BORDER_WIDTH,
             )
+        return panel
 
-        surface.blit(panel, (panel_x, panel_y))
-        self._panel_rect = clip_rect_to_surface(
-            (panel_x, panel_y, panel_w, panel_h),
-            surface,
+    def _row_y(self, display_i: int, row_h: int) -> int:
+        return self._padding + display_i * (row_h + self._row_gap)
+
+    def _restore_upload_rect_from_static(
+        self,
+        upload: pygame.Surface,
+        static_panel: pygame.Surface,
+        rect: tuple[int, int, int, int],
+        *,
+        panel_y_offset: int,
+    ) -> None:
+        x, y, w, h = rect
+        panel_y = y - panel_y_offset
+        if panel_y < 0 or panel_y >= static_panel.get_height():
+            return
+        clip_h = min(h, static_panel.get_height() - panel_y)
+        if clip_h <= 0:
+            return
+        source = static_panel.subsurface((x, panel_y, w, clip_h))
+        upload.blit(source, (x, y))
+
+    def _draw_row_live_flash(
+        self,
+        upload: pygame.Surface,
+        static_panel: pygame.Surface,
+        state: TimelineViewState,
+        layout: _TimelineLayout,
+        *,
+        row_index: int,
+        panel_y_offset: int,
+    ) -> list[tuple[int, int, int, int]]:
+        slot = state.layer_z_order[row_index]
+        row_h = layout.row_h
+        row_y = self._row_y(row_index, row_h)
+        upload_y = panel_y_offset + row_y
+        armed = slot in state.armed_slots
+        stem_abbrev_x = self._padding + layout.layer_num_width
+        monitor_eye_x = stem_abbrev_x + layout.stem_abbrev_width
+        eye_slot_w = visibility_icon_slot_width(row_h)
+        dirty: list[tuple[int, int, int, int]] = []
+
+        abbrev_rect = (stem_abbrev_x, upload_y, layout.stem_abbrev_width, row_h)
+        self._restore_upload_rect_from_static(
+            upload,
+            static_panel,
+            abbrev_rect,
+            panel_y_offset=panel_y_offset,
         )
+        if armed_abbrev_bg_visible(
+            armed=armed,
+            recording=state.recording,
+            flash_starts=state.arm_flash_start_ms,
+            slot=slot,
+        ):
+            armed_surf = pygame.Surface(
+                (layout.stem_abbrev_width, row_h), pygame.SRCALPHA
+            )
+            armed_surf.fill((*ARMED_BG, ARMED_BG_ALPHA))
+            upload.blit(armed_surf, (stem_abbrev_x, upload_y))
+        dirty.append(abbrev_rect)
 
-        self._header_badge_rect = self._draw_header_badges(
-            surface,
-            font,
-            panel_x,
-            panel_y,
-            panel_w,
-            state.position_sec,
-            state.recording,
+        monitor_rect = (monitor_eye_x, upload_y, eye_slot_w, row_h)
+        self._restore_upload_rect_from_static(
+            upload,
+            static_panel,
+            monitor_rect,
+            panel_y_offset=panel_y_offset,
         )
+        monitor_enabled = state.monitor_visible.get(slot, True)
+        monitor_override = (
+            slot in state.override_slots
+            and not (state.recording and armed)
+        ) or (state.recording and armed and rec_flash_visible())
+        monitor_icon = render_visibility_icon(
+            enabled=monitor_enabled,
+            override=monitor_override,
+            line_height=row_h,
+        )
+        upload.blit(monitor_icon, (monitor_eye_x, upload_y))
+        dirty.append(monitor_rect)
+        return dirty
 
-    def _draw_header_badges(
+    def _live_flash_row_indices(self, state: TimelineViewState) -> tuple[int, ...]:
+        indices: list[int] = []
+        for row_index, slot in enumerate(state.layer_z_order):
+            armed = slot in state.armed_slots
+            if arm_abbrev_flash_active(state.arm_flash_start_ms, slot):
+                indices.append(row_index)
+            elif state.recording and armed:
+                indices.append(row_index)
+            elif armed and not state.recording:
+                indices.append(row_index)
+        return tuple(indices)
+
+    def _live_flash_signature(self, state: TimelineViewState) -> tuple:
+        parts: list[tuple] = []
+        for row_index in self._live_flash_row_indices(state):
+            slot = state.layer_z_order[row_index]
+            armed = slot in state.armed_slots
+            parts.append(
+                (
+                    slot,
+                    armed_abbrev_bg_visible(
+                        armed=armed,
+                        recording=state.recording,
+                        flash_starts=state.arm_flash_start_ms,
+                        slot=slot,
+                    ),
+                    (
+                        (slot in state.override_slots and not (state.recording and armed))
+                        or (state.recording and armed and rec_flash_visible())
+                    ),
+                )
+            )
+        return tuple(parts)
+
+    def _playhead_strip_rect(
+        self,
+        layout: _TimelineLayout,
+        playhead_px: int,
+        *,
+        y_offset: int,
+    ) -> tuple[int, int, int, int]:
+        playhead_left = max(
+            layout.bar_left,
+            min(layout.bar_left + layout.bar_width - 1, playhead_px),
+        )
+        x = playhead_left - max(1, PLAYHEAD_WIDTH)
+        y = y_offset + layout.bar_top
+        w = max(1, PLAYHEAD_WIDTH) * 2 + 1
+        h = layout.bar_bottom - layout.bar_top
+        return (x, y, w, h)
+
+    def _draw_playhead(
+        self,
+        surface: pygame.Surface,
+        layout: _TimelineLayout,
+        playhead_px: int,
+        *,
+        y_offset: int,
+    ) -> tuple[int, int, int, int]:
+        playhead_left = max(
+            layout.bar_left,
+            min(layout.bar_left + layout.bar_width - 1, playhead_px),
+        )
+        y0 = y_offset + layout.bar_top
+        y1 = y_offset + layout.bar_bottom - 1
+        pygame.draw.line(
+            surface,
+            PLAYHEAD,
+            (playhead_left, y0),
+            (playhead_left, y1),
+            PLAYHEAD_WIDTH,
+        )
+        return self._playhead_strip_rect(layout, playhead_px, y_offset=y_offset)
+
+    def _draw_header_badges_on_surface(
         self,
         surface: pygame.Surface,
         font: pygame.font.Font,
-        panel_x: int,
-        panel_y: int,
         panel_w: int,
         position_sec: float,
         recording: bool,
+        *,
+        y_offset: int = 0,
     ) -> tuple[int, int, int, int]:
         time_surf = font.render(transport_time_text(position_sec), True, VALUE)
         time_w = time_surf.get_width() + REC_BADGE_PAD_X * 2
@@ -576,8 +800,8 @@ class TimelineOverlay:
         badge_h = time_h
         gap = REC_TIME_GAP if recording else 0
         total_w = time_w + gap + rec_w
-        time_x = panel_x + panel_w - time_w
-        badge_y = panel_y - REC_BADGE_GAP - badge_h
+        time_x = panel_w - time_w
+        badge_y = y_offset
 
         pygame.draw.rect(surface, BACKGROUND, (time_x, badge_y, time_w, badge_h))
         surface.blit(
@@ -596,4 +820,272 @@ class TimelineOverlay:
                 (rec_x + REC_BADGE_PAD_X, badge_y + REC_BADGE_PAD_Y),
             )
 
-        return clip_rect_to_surface((header_x, badge_y, total_w, badge_h), surface)
+        return (header_x, badge_y, total_w, badge_h)
+
+    def _ensure_upload_scratch(
+        self,
+        upload_w: int,
+        upload_h: int,
+    ) -> pygame.Surface:
+        scratch = self._upload_scratch
+        if (
+            scratch is not None
+            and scratch.get_width() == upload_w
+            and scratch.get_height() == upload_h
+        ):
+            return scratch
+        scratch = pygame.Surface((upload_w, upload_h), pygame.SRCALPHA)
+        self._upload_scratch = scratch
+        return scratch
+
+    def _patch_live_overlay(
+        self,
+        upload: pygame.Surface,
+        static_panel: pygame.Surface,
+        state: TimelineViewState,
+        layout: _TimelineLayout,
+        *,
+        playhead_px: int,
+        incremental: bool,
+    ) -> list[tuple[int, int, int, int]]:
+        cache = self._cache
+        panel_y_offset = layout.badge_reserve
+        font = self._font_get()
+
+        if incremental and cache.last_playhead_rect is not None:
+            self._restore_upload_rect_from_static(
+                upload,
+                static_panel,
+                cache.last_playhead_rect,
+                panel_y_offset=panel_y_offset,
+            )
+
+        playhead_rect = self._draw_playhead(
+            upload,
+            layout,
+            playhead_px,
+            y_offset=panel_y_offset,
+        )
+        cache.last_playhead_rect = playhead_rect
+
+        badge_top = panel_y_offset - layout.badge_reserve
+        if incremental and cache.last_badge_rect is not None:
+            bx, by, bw, bh = cache.last_badge_rect
+            upload.fill((0, 0, 0, 0), (bx, by, bw, bh))
+
+        badge_rect = self._draw_header_badges_on_surface(
+            upload,
+            font,
+            layout.panel_w,
+            state.position_sec,
+            state.recording,
+            y_offset=badge_top,
+        )
+        cache.last_badge_rect = badge_rect
+
+        flash_dirty: list[tuple[int, int, int, int]] = []
+        for row_index in self._live_flash_row_indices(state):
+            flash_dirty.extend(
+                self._draw_row_live_flash(
+                    upload,
+                    static_panel,
+                    state,
+                    layout,
+                    row_index=row_index,
+                    panel_y_offset=panel_y_offset,
+                )
+            )
+        cache.last_flash_rects = tuple(flash_dirty)
+        return flash_dirty
+
+    def compose_panel(
+        self,
+        state: TimelineViewState,
+        *,
+        viewport_width: int,
+        viewport_height: int,
+        visibility: float = 1.0,
+    ) -> ComposedTimelinePanel | None:
+        self._visibility = visibility
+        self._panel_rect = None
+        self._header_badge_rect = None
+        if not state.enabled or visibility <= 0.01:
+            return None
+
+        layout = self._compute_layout(
+            state,
+            viewport_width=viewport_width,
+            viewport_height=viewport_height,
+        )
+        if layout is None:
+            return None
+
+        panel_w = layout.panel_w
+        panel_h = layout.panel_h
+        static_sig = timeline_static_signature(
+            state,
+            panel_w=panel_w,
+            panel_h=panel_h,
+            visibility=visibility,
+        )
+        cache = self._cache
+        can_reuse_static = (
+            cache.panel is not None
+            and cache.static_signature == static_sig
+            and cache.panel_size == (panel_w, panel_h)
+        )
+
+        if can_reuse_static:
+            assert cache.panel is not None
+            static_panel = cache.panel
+            incremental = True
+        else:
+            static_panel = self._build_static_panel(state, layout)
+            cache.panel = static_panel
+            cache.static_signature = static_sig
+            cache.panel_size = (panel_w, panel_h)
+            cache.last_playhead_rect = None
+            cache.last_badge_rect = None
+            cache.last_flash_rects = ()
+            cache.last_live_signature = None
+            incremental = False
+
+        upload_w = panel_w
+        upload_h = panel_h + layout.badge_reserve
+        upload = self._ensure_upload_scratch(upload_w, upload_h)
+        upload.fill((0, 0, 0, 0))
+        upload.blit(static_panel, (0, layout.badge_reserve))
+
+        playhead_px = playhead_x(
+            state.position_sec,
+            layout.bar_left,
+            layout.bar_width,
+            state.duration_sec,
+        )
+        prev_playhead = cache.last_playhead_rect
+        prev_badge = cache.last_badge_rect
+        prev_flash = cache.last_flash_rects
+        flash_dirty = self._patch_live_overlay(
+            upload,
+            static_panel,
+            state,
+            layout,
+            playhead_px=playhead_px,
+            incremental=incremental,
+        )
+
+        upload_top_y = layout.panel_y - layout.badge_reserve
+        screen_bounds = clip_rect_to_bounds(
+            (layout.panel_x, upload_top_y, upload_w, upload_h),
+            viewport_width,
+            viewport_height,
+        )
+        if screen_bounds is None:
+            return None
+
+        sx, sy, sw, sh = screen_bounds
+        panel_screen_y = layout.panel_y
+        self._panel_rect = clip_rect_to_bounds(
+            (layout.panel_x, panel_screen_y, panel_w, panel_h),
+            viewport_width,
+            viewport_height,
+        )
+        badge_screen_y = panel_screen_y - layout.badge_reserve
+        badge_local = cache.last_badge_rect
+        if badge_local is not None:
+            bx, by, bw, bh = badge_local
+            self._header_badge_rect = clip_rect_to_bounds(
+                (layout.panel_x + bx, badge_screen_y + by, bw, bh),
+                viewport_width,
+                viewport_height,
+            )
+
+        capacity = timeline_panel_max_dimensions(
+            viewport_width,
+            viewport_height,
+            margin=self._margin,
+        )
+        live_sig = timeline_live_signature(
+            state,
+            playhead_px=playhead_px,
+            bar_left=layout.bar_left,
+            bar_width=layout.bar_width,
+            row_count=layout.row_count,
+            row_h=layout.row_h,
+            flash_sig=self._live_flash_signature(state),
+        )
+        upload_signature = timeline_upload_signature(static_sig, screen_bounds, live_sig)
+
+        src_x = sx - layout.panel_x
+        src_y = sy - upload_top_y
+        if incremental and live_sig == cache.last_live_signature:
+            upload_plan = upload_plan_for_signature(
+                upload_signature,
+                cache.gpu.last_signature,
+            )
+        elif incremental:
+            dirty_rects: list[tuple[int, int, int, int]] = []
+            for rect in (
+                *prev_flash,
+                *flash_dirty,
+                prev_playhead,
+                cache.last_playhead_rect,
+                prev_badge,
+                cache.last_badge_rect,
+            ):
+                if rect is not None:
+                    dirty_rects.append(rect)
+            upload_plan = upload_plan_for_signature(
+                upload_signature,
+                cache.gpu.last_signature,
+                dirty_rects=clip_dirty_rects(tuple(dirty_rects), upload_w, upload_h),
+            )
+        else:
+            clip_rect = (
+                (src_x, src_y, sw, sh)
+                if src_x != 0 or src_y != 0 or (sw, sh) != (upload_w, upload_h)
+                else ()
+            )
+            if clip_rect:
+                upload_plan = upload_plan_for_signature(
+                    upload_signature,
+                    cache.gpu.last_signature,
+                    dirty_rects=clip_dirty_rects(clip_rect, upload_w, upload_h),
+                )
+            else:
+                upload_plan = upload_plan_for_signature(
+                    upload_signature,
+                    cache.gpu.last_signature,
+                )
+
+        cache.last_live_signature = live_sig
+        self._blit_src = (src_x, src_y)
+
+        return ComposedTimelinePanel(
+            upload_surface=upload,
+            panel_size=(panel_w, panel_h),
+            screen_rect=screen_bounds,
+            upload_plan=upload_plan,
+            upload_signature=upload_signature,
+            capacity=capacity,
+        )
+
+    def draw(
+        self,
+        surface: pygame.Surface,
+        state: TimelineViewState,
+    ) -> None:
+        composed = self.compose_panel(
+            state,
+            viewport_width=surface.get_width(),
+            viewport_height=surface.get_height(),
+        )
+        if composed is None:
+            self._panel_rect = None
+            self._header_badge_rect = None
+            self._bar_layout = None
+            self._row_layout = []
+            return
+        sx, sy, sw, sh = composed.screen_rect
+        src_x, src_y = self._blit_src
+        surface.blit(composed.upload_surface, (sx, sy), (src_x, src_y, sw, sh))

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 
 import pygame
 
@@ -94,6 +95,32 @@ def _gl_name(gen_fn, count: int = 1) -> int:
         return int(names)
 
 
+class OverlayTextureSlot(Enum):
+    """Stable GL overlay texture bucket (one texture per slot)."""
+
+    TUNING = "tuning"
+    HELP = "help"
+    TIMELINE = "timeline"
+    FULL_VIEWPORT = "full_viewport"
+
+
+@dataclass
+class _OverlaySlotState:
+    texture_id: int = 0
+    capacity_w: int = 0
+    capacity_h: int = 0
+
+
+def _overlay_surface_rgba(surface: pygame.Surface) -> bytes:
+    """RGBA pixel bytes with Y flipped for OpenGL upload."""
+    return pygame.image.tostring(surface, "RGBA", True)
+
+
+def _overlay_subimage_y(dest_y: int, active_h: int, capacity_h: int) -> int:
+    """Map top-left *dest_y* to glTexSubImage2D's bottom-origin row."""
+    return capacity_h - dest_y - active_h
+
+
 @dataclass
 class LayerFbo:
     """Off-screen RGBA framebuffer for one compositor layer."""
@@ -169,8 +196,8 @@ class GlCompositor:
         self.bg = bg
         self._initialized = False
         self._layers: list[LayerFbo] = []
-        self._overlay_texture_id: int = 0
-        self._overlay_texture_size: tuple[int, int] | None = None
+        self._overlay_slots: dict[OverlayTextureSlot, _OverlaySlotState] = {}
+        self._texture_realloc_count = 0
         self._content_fbo_id: int = 0
         self._content_texture_id: int = 0
         self._content_depth_rbo_id: int = 0
@@ -477,18 +504,23 @@ class GlCompositor:
         width: int,
         height: int,
         rgba: tuple[float, float, float, float],
+        tex_uv: tuple[float, float, float, float] | None = None,
     ) -> None:
+        if tex_uv is None:
+            u0, v0, u1, v1 = 0.0, 0.0, 1.0, 1.0
+        else:
+            u0, v0, u1, v1 = tex_uv
         glBindTexture(GL_TEXTURE_2D, texture_id)
         glColor4f(*rgba)
         glBegin(GL_QUADS)
         # Flip V: OpenGL textures are bottom-origin; ortho uses top-left origin.
-        glTexCoord2f(0.0, 1.0)
+        glTexCoord2f(u0, 1.0 - v0)
         glVertex2f(x, y)
-        glTexCoord2f(1.0, 1.0)
+        glTexCoord2f(u1, 1.0 - v0)
         glVertex2f(x + float(width), y)
-        glTexCoord2f(1.0, 0.0)
+        glTexCoord2f(u1, 1.0 - v1)
         glVertex2f(x + float(width), y + float(height))
-        glTexCoord2f(0.0, 0.0)
+        glTexCoord2f(u0, 1.0 - v1)
         glVertex2f(x, y + float(height))
         glEnd()
         glBindTexture(GL_TEXTURE_2D, 0)
@@ -640,46 +672,157 @@ class GlCompositor:
         ]
         return b"".join(reversed(rows))
 
+    def _overlay_slot_state(self, slot: OverlayTextureSlot) -> _OverlaySlotState:
+        state = self._overlay_slots.get(slot)
+        if state is None:
+            state = _OverlaySlotState()
+            self._overlay_slots[slot] = state
+        return state
+
+    def _destroy_overlay_slot(self, slot: OverlayTextureSlot) -> None:
+        state = self._overlay_slots.pop(slot, None)
+        if state is None or not state.texture_id:
+            return
+        glDeleteTextures(1, [state.texture_id])
+
+    def overlay_texture_capacity(self, slot: OverlayTextureSlot) -> tuple[int, int]:
+        """Current GL texture size for *slot* (0, 0) when not allocated yet."""
+        self._ensure_init()
+        state = self._overlay_slot_state(slot)
+        return (state.capacity_w, state.capacity_h)
+
+    def ensure_overlay_texture(
+        self,
+        slot: OverlayTextureSlot,
+        capacity_w: int,
+        capacity_h: int,
+    ) -> int:
+        """Allocate or grow a slot texture; capacity never shrinks until destroy()."""
+        self._ensure_init()
+        state = self._overlay_slot_state(slot)
+        if (
+            state.texture_id
+            and state.capacity_w >= capacity_w
+            and state.capacity_h >= capacity_h
+        ):
+            return state.texture_id
+
+        if state.texture_id:
+            glDeleteTextures(1, [state.texture_id])
+            state.texture_id = 0
+            self._texture_realloc_count += 1
+
+        texture_id = _gl_name(glGenTextures)
+        glBindTexture(GL_TEXTURE_2D, texture_id)
+        glTexImage2D(
+            GL_TEXTURE_2D,
+            0,
+            GL_RGBA8,
+            capacity_w,
+            capacity_h,
+            0,
+            GL_RGBA,
+            GL_UNSIGNED_BYTE,
+            None,
+        )
+        self._configure_texture_params()
+        glBindTexture(GL_TEXTURE_2D, 0)
+        state.texture_id = texture_id
+        state.capacity_w = capacity_w
+        state.capacity_h = capacity_h
+        return texture_id
+
+    def consume_texture_reallocs(self) -> int:
+        """Return overlay texture realloc count since last consume and reset."""
+        count = self._texture_realloc_count
+        self._texture_realloc_count = 0
+        return count
+
+    def _upload_overlay_subimage(
+        self,
+        texture_id: int,
+        dest_x: int,
+        dest_y: int,
+        active_w: int,
+        active_h: int,
+        data: bytes,
+        capacity_h: int,
+    ) -> None:
+        gl_y = _overlay_subimage_y(dest_y, active_h, capacity_h)
+        glBindTexture(GL_TEXTURE_2D, texture_id)
+        glTexSubImage2D(
+            GL_TEXTURE_2D,
+            0,
+            dest_x,
+            gl_y,
+            active_w,
+            active_h,
+            GL_RGBA,
+            GL_UNSIGNED_BYTE,
+            data,
+        )
+        glBindTexture(GL_TEXTURE_2D, 0)
+
+    def upload_overlay_region(
+        self,
+        slot: OverlayTextureSlot,
+        surface: pygame.Surface,
+        dest_x: int = 0,
+        dest_y: int = 0,
+        active_w: int | None = None,
+        active_h: int | None = None,
+    ) -> int:
+        """Upload a pygame surface region into a stable slot texture."""
+        self._ensure_init()
+        if not surface.get_flags() & pygame.SRCALPHA:
+            surface = surface.convert_alpha()
+        surf_w, surf_h = surface.get_size()
+        upload_w = surf_w if active_w is None else active_w
+        upload_h = surf_h if active_h is None else active_h
+        if upload_w < surf_w or upload_h < surf_h:
+            surface = surface.subsurface((0, 0, upload_w, upload_h))
+            surf_w, surf_h = upload_w, upload_h
+        needed_w = dest_x + upload_w
+        needed_h = dest_y + upload_h
+        texture_id = self.ensure_overlay_texture(slot, needed_w, needed_h)
+        state = self._overlay_slot_state(slot)
+        data = _overlay_surface_rgba(surface)
+        self._upload_overlay_subimage(
+            texture_id,
+            dest_x,
+            dest_y,
+            upload_w,
+            upload_h,
+            data,
+            state.capacity_h,
+        )
+        return texture_id
+
     def upload_overlay_texture(self, surface: pygame.Surface) -> int:
         """Upload a pygame SRCALPHA surface as a GL texture (Y-flipped for GL)."""
         self._ensure_init()
         if not surface.get_flags() & pygame.SRCALPHA:
             surface = surface.convert_alpha()
         width, height = surface.get_size()
-        data = pygame.image.tostring(surface, "RGBA", True)
+        data = _overlay_surface_rgba(surface)
+        slot = OverlayTextureSlot.FULL_VIEWPORT
+        state = self._overlay_slot_state(slot)
 
         if (
-            self._overlay_texture_id
-            and self._overlay_texture_size == (width, height)
+            state.texture_id
+            and state.capacity_w == width
+            and state.capacity_h == height
         ):
-            glBindTexture(GL_TEXTURE_2D, self._overlay_texture_id)
-            glTexSubImage2D(
-                GL_TEXTURE_2D,
-                0,
-                0,
-                0,
-                width,
-                height,
-                GL_RGBA,
-                GL_UNSIGNED_BYTE,
-                data,
+            self._upload_overlay_subimage(
+                state.texture_id, 0, 0, width, height, data, height
             )
-            glBindTexture(GL_TEXTURE_2D, 0)
-            return self._overlay_texture_id
+            return state.texture_id
 
-        if self._overlay_texture_id:
-            glDeleteTextures(1, [self._overlay_texture_id])
-            self._overlay_texture_id = 0
-
-        texture_id = _gl_name(glGenTextures)
-        glBindTexture(GL_TEXTURE_2D, texture_id)
-        glTexImage2D(
-            GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data
+        self._destroy_overlay_slot(slot)
+        texture_id = self.ensure_overlay_texture(slot, width, height)
+        self._upload_overlay_subimage(
+            texture_id, 0, 0, width, height, data, height
         )
-        self._configure_texture_params()
-        glBindTexture(GL_TEXTURE_2D, 0)
-        self._overlay_texture_id = texture_id
-        self._overlay_texture_size = (width, height)
         return texture_id
 
     def _draw_overlay_quad(
@@ -690,13 +833,20 @@ class GlCompositor:
         width: int,
         height: int,
         alpha: float,
+        tex_uv: tuple[float, float, float, float] | None = None,
     ) -> None:
         blend_enabled, blend_src, blend_dst, blend_equation = self._push_blend_state()
         try:
             glEnable(GL_BLEND)
             self._apply_src_alpha_blend()
             self._draw_textured_quad(
-                texture_id, float(x), float(y), width, height, (1.0, 1.0, 1.0, alpha)
+                texture_id,
+                float(x),
+                float(y),
+                width,
+                height,
+                (1.0, 1.0, 1.0, alpha),
+                tex_uv,
             )
         finally:
             self._pop_blend_state(blend_enabled, blend_src, blend_dst, blend_equation)
@@ -724,21 +874,20 @@ class GlCompositor:
         width: int,
         height: int,
         alpha: float = 1.0,
+        tex_uv: tuple[float, float, float, float] | None = None,
     ) -> None:
         """Draw *texture_id* onto the display framebuffer with SRCALPHA blending."""
         self._ensure_init()
         self._bind_default_framebuffer()
-        self._draw_overlay_quad(texture_id, x, y, width, height, alpha)
+        self._draw_overlay_quad(texture_id, x, y, width, height, alpha, tex_uv)
 
     def destroy(self) -> None:
         for layer in self._layers:
             layer.destroy()
         self._layers.clear()
         self._destroy_content_fbo()
-        if self._overlay_texture_id:
-            glDeleteTextures(1, [self._overlay_texture_id])
-            self._overlay_texture_id = 0
-        self._overlay_texture_size = None
+        for slot in list(self._overlay_slots):
+            self._destroy_overlay_slot(slot)
         self._initialized = False
 
     def __enter__(self) -> GlCompositor:

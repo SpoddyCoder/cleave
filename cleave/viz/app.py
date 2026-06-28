@@ -34,7 +34,8 @@ from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.timeline_overlay import TimelineOverlay
 from cleave.viz.playback import PlaybackState, current_sec, init_playback
 from cleave.viz.frame_finish import RenderOverlayPanelCache, finish_content_frame
-from cleave.viz.frame_rate import FrameRateMeter
+from cleave.viz.overlay_profiler import OverlayProfiler
+from cleave.viz.frame_rate import FrameRateMeter, ProjectMFpsGovernor
 from cleave.viz.focus_nav import FocusCursor, TimelineFocus
 from cleave.viz.input_dispatch import (
     dispatch_keydown,
@@ -93,6 +94,7 @@ class LiveVisualizerRuntime(VisualizerCore):
     render_overlay_panel_cache: RenderOverlayPanelCache = field(
         default_factory=RenderOverlayPanelCache
     )
+    overlay_profiler: OverlayProfiler = field(default_factory=OverlayProfiler.from_env)
 
 
 @dataclass
@@ -269,6 +271,23 @@ def init_gl_resources_render(
     )
 
 
+def _live_overlay_ui_active(
+    *,
+    overlay_visibility: float,
+    modal_active: bool,
+    timeline_strip_visible: bool,
+) -> bool:
+    return overlay_visibility > 0.01 or modal_active or timeline_strip_visible
+
+
+def _tuning_view_state_needed(
+    *,
+    overlay_visibility: float,
+    modal_active: bool,
+) -> bool:
+    return overlay_visibility > 0.01 or modal_active
+
+
 def _timeline_strip_visible(
     tl: TimelineRuntime,
     *,
@@ -333,6 +352,8 @@ def _tick_frame_live_overlay(
     overlay_dt: float,
     display_fps: float | None = None,
 ) -> None:
+    profiler = runtime.overlay_profiler
+
     finish_content_frame(
         runtime,
         t_sec,
@@ -340,31 +361,59 @@ def _tick_frame_live_overlay(
         overlay_solo=runtime.seed.session.render_overlay_solo,
         panel_cache=runtime.render_overlay_panel_cache,
     )
-    view_state = runtime.controls.build_view_state(
-        paused=paused,
-        position_sec=t_sec,
-        fps=display_fps,
-    )
-    tl = runtime.seed.session.timeline
+
     runtime.overlay.set_hold_idle_sec(runtime.seed.cfg.visualizer.ui_fade)
     runtime.overlay.update(overlay_dt)
+
     overlay_visibility = runtime.overlay.visibility
+    modal_active = runtime.modal_host.active
+    tl = runtime.seed.session.timeline
     timeline_strip_visible = _timeline_strip_visible(
         tl,
         overlay_visibility=overlay_visibility,
         focus_cursor=runtime.controls.focus_cursor,
     )
-    timeline_panel_open = tl.enabled and tl.panel_open and overlay_visibility > 0.01
-    OverlayDrawer.draw_tuning(
-        runtime.compositor,
-        runtime.overlay,
-        runtime.overlay_surface,
-        view_state,
-        timeline_panel_open=timeline_panel_open,
-        overlay_visible=overlay_visibility > 0.01,
-        help_overlay=runtime.help_overlay,
-        modal_host=runtime.modal_host,
-    )
+
+    if not _live_overlay_ui_active(
+        overlay_visibility=overlay_visibility,
+        modal_active=modal_active,
+        timeline_strip_visible=timeline_strip_visible,
+    ):
+        profiler.note_skipped_frame()
+        profiler.finish_frame()
+        return
+
+    view_state = None
+    if _tuning_view_state_needed(
+        overlay_visibility=overlay_visibility,
+        modal_active=modal_active,
+    ):
+        with profiler.time_section("view_state_build"):
+            view_state = runtime.controls.build_view_state(
+                paused=paused,
+                position_sec=t_sec,
+                fps=display_fps,
+            )
+
+    if _tuning_view_state_needed(
+        overlay_visibility=overlay_visibility,
+        modal_active=modal_active,
+    ):
+        timeline_panel_open = (
+            tl.enabled and tl.panel_open and overlay_visibility > 0.01
+        )
+        with profiler.time_section("panel_draw"):
+            OverlayDrawer.draw_tuning(
+                runtime.compositor,
+                runtime.overlay,
+                runtime.overlay_surface,
+                view_state,
+                timeline_panel_open=timeline_panel_open,
+                overlay_visible=overlay_visibility > 0.01,
+                help_overlay=runtime.help_overlay,
+                modal_host=runtime.modal_host,
+                profiler=profiler,
+            )
 
     if timeline_strip_visible:
         timeline_state = build_timeline_view_state(
@@ -382,7 +431,10 @@ def _tick_frame_live_overlay(
                 focus_cursor=runtime.controls.focus_cursor,
                 overlay_visibility=overlay_visibility,
             ),
+            profiler=profiler,
         )
+
+    profiler.finish_frame()
 
 
 class VisualizerApp:
@@ -474,6 +526,7 @@ class VisualizerApp:
 
             running = True
             frame_rate = FrameRateMeter()
+            pm_fps_governor = ProjectMFpsGovernor(nominal_fps=LIVE_PROJECTM_FPS)
             display_fps: float | None = None
             while running:
                 frame_rate.begin_frame()
@@ -503,10 +556,9 @@ class VisualizerApp:
                 if rt.controls.key_repeat_armed:
                     rt.overlay.notify_input()
 
-                if display_fps is not None:
-                    pm_fps = max(1, round(display_fps))
-                    for layer in rt.layers:
-                        layer.pm.set_fps(pm_fps)
+                pm_fps_governor.observe(display_fps)
+                pm_fps_governor.apply_if_changed(rt.layers)
+                rt.overlay_profiler.note_projectm_fps(pm_fps_governor.target_fps)
 
                 t_sec = current_sec(rt.playback, rt.seed.duration_sec)
                 self.tick_frame(

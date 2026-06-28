@@ -2,16 +2,25 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import pygame
 
 from cleave.viz.help_content import (
     DescriptionSection,
     HelpContent,
-    HelpSection,
     sections_for,
 )
-from cleave.viz.row_semantics import RowDescriptor, RowKind
-from cleave.viz.tuning_panel_draw import clip_rect_to_surface
+from cleave.viz.help_panel_cache import (
+    HelpPanelCache,
+    compute_help_panel_size,
+    help_content_signature,
+    help_panel_max_dimensions,
+    help_upload_signature,
+)
+from cleave.viz.overlay_upload import OverlayGpuState, UploadPlan, UploadSignature, upload_plan_for_signature
+from cleave.viz.row_semantics import RowDescriptor
+from cleave.viz.tuning_panel_draw import clip_rect_to_bounds
 from cleave.viz.theme import (
     BACKGROUND,
     BACKGROUND_ALPHA,
@@ -23,6 +32,16 @@ from cleave.viz.theme import (
     VALUE,
     tuning_ui_metrics,
 )
+
+
+@dataclass(frozen=True)
+class ComposedHelpPanel:
+    upload_surface: pygame.Surface
+    panel_size: tuple[int, int]
+    screen_rect: tuple[int, int, int, int]
+    upload_plan: UploadPlan
+    upload_signature: UploadSignature
+    capacity: tuple[int, int]
 
 
 class HelpOverlay:
@@ -51,10 +70,15 @@ class HelpOverlay:
         self._font_size = font_size
         self._font: pygame.font.Font | None = None
         self._panel_rect: tuple[int, int, int, int] | None = None
+        self._cache = HelpPanelCache()
 
     @property
     def panel_rect(self) -> tuple[int, int, int, int] | None:
         return self._panel_rect
+
+    @property
+    def gpu_state(self) -> OverlayGpuState:
+        return self._cache.gpu
 
     def _font_get(self) -> pygame.font.Font:
         if self._font is None:
@@ -215,35 +239,16 @@ class HelpOverlay:
             y += row_stride
         return y
 
-    def draw(
+    def _build_panel_surface(
         self,
-        surface: pygame.Surface,
-        focus: RowDescriptor,
+        font: pygame.font.Font,
+        sections: tuple[HelpContent, ...],
         *,
-        timeline_enabled: bool = False,
-        timeline_submenu_focused: bool = False,
-        paused: bool = False,
-        timeline_recording: bool = False,
-        timeline_override_active: bool = False,
-        preset_switching: str | None = None,
-    ) -> None:
-        self._panel_rect = None
-        font = self._font_get()
-        line_h = font.get_linesize()
-        sections = sections_for(
-            focus.kind,
-            effect_id=focus.effect_id,
-            timeline_enabled=timeline_enabled,
-            timeline_submenu_focused=timeline_submenu_focused,
-            paused=paused,
-            timeline_recording=timeline_recording,
-            timeline_override_active=timeline_override_active,
-            preset_switching=preset_switching,
-        )
-
+        panel_w: int,
+        panel_h: int,
+    ) -> pygame.Surface:
         entry_gap = self._entry_gap(font)
         key_column_width = self._max_key_width(font, sections)
-
         content_w = max(
             (
                 self._section_content_width(
@@ -256,13 +261,8 @@ class HelpOverlay:
             ),
             default=0,
         )
-
+        line_h = font.get_linesize()
         row_stride = line_h + self._line_gap
-        line_count = sum(self._section_line_count(section) for section in sections)
-        line_count += max(0, len(sections) - 1)
-        content_h = line_count * row_stride - self._line_gap
-        panel_w = content_w + self._padding * 2
-        panel_h = content_h + self._padding * 2
 
         panel = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
         panel.fill((*BACKGROUND, BACKGROUND_ALPHA))
@@ -289,11 +289,147 @@ class HelpOverlay:
                 panel.get_rect(),
                 width=BORDER_WIDTH,
             )
+        return panel
+
+    def compose_panel(
+        self,
+        focus: RowDescriptor,
+        *,
+        viewport_width: int,
+        viewport_height: int,
+        timeline_enabled: bool = False,
+        timeline_submenu_focused: bool = False,
+        paused: bool = False,
+        timeline_recording: bool = False,
+        timeline_override_active: bool = False,
+        preset_switching: str | None = None,
+    ) -> ComposedHelpPanel | None:
+        self._panel_rect = None
+        font = self._font_get()
+        content_sig = help_content_signature(
+            focus,
+            timeline_enabled=timeline_enabled,
+            timeline_submenu_focused=timeline_submenu_focused,
+            paused=paused,
+            timeline_recording=timeline_recording,
+            timeline_override_active=timeline_override_active,
+            preset_switching=preset_switching,
+        )
+        sections = sections_for(
+            focus.kind,
+            effect_id=focus.effect_id,
+            timeline_enabled=timeline_enabled,
+            timeline_submenu_focused=timeline_submenu_focused,
+            paused=paused,
+            timeline_recording=timeline_recording,
+            timeline_override_active=timeline_override_active,
+            preset_switching=preset_switching,
+        )
+        panel_w, panel_h = compute_help_panel_size(
+            font,
+            sections,
+            padding=self._padding,
+            line_gap=self._line_gap,
+        )
+        panel_size = (panel_w, panel_h)
+        cache = self._cache
+
+        if (
+            cache.panel is not None
+            and content_sig == cache.panel_signature
+            and cache.panel_size == panel_size
+        ):
+            panel = cache.panel
+        else:
+            panel = self._build_panel_surface(
+                font,
+                sections,
+                panel_w=panel_w,
+                panel_h=panel_h,
+            )
+            cache.panel = panel
+            cache.panel_signature = content_sig
+            cache.panel_size = panel_size
 
         mx, my = self._margin
-        pos = (surface.get_width() - panel_w - mx, my)
-        surface.blit(panel, pos)
-        self._panel_rect = clip_rect_to_surface(
+        pos = (viewport_width - panel_w - mx, my)
+        bounds = clip_rect_to_bounds(
             (pos[0], pos[1], panel_w, panel_h),
-            surface,
+            viewport_width,
+            viewport_height,
         )
+        if bounds is None:
+            return None
+        self._panel_rect = bounds
+
+        capacity = help_panel_max_dimensions(
+            viewport_width,
+            viewport_height,
+            margin=self._margin,
+            padding=self._padding,
+            line_gap=self._line_gap,
+            font_size=self._font_size,
+        )
+        upload_signature = help_upload_signature(content_sig, bounds, panel_size)
+        src_x = bounds[0] - pos[0]
+        src_y = bounds[1] - pos[1]
+        active_w, active_h = bounds[2], bounds[3]
+        clip_rect = (
+            (src_x, src_y, active_w, active_h)
+            if src_x != 0 or src_y != 0 or (active_w, active_h) != panel_size
+            else ()
+        )
+        if clip_rect:
+            from cleave.viz.overlay_upload import clip_dirty_rects
+
+            upload_plan = upload_plan_for_signature(
+                upload_signature,
+                cache.gpu.last_signature,
+                dirty_rects=clip_dirty_rects(clip_rect, panel_w, panel_h),
+            )
+        else:
+            upload_plan = upload_plan_for_signature(
+                upload_signature,
+                cache.gpu.last_signature,
+            )
+
+        return ComposedHelpPanel(
+            upload_surface=panel,
+            panel_size=panel_size,
+            screen_rect=bounds,
+            upload_plan=upload_plan,
+            upload_signature=upload_signature,
+            capacity=capacity,
+        )
+
+    def draw(
+        self,
+        surface: pygame.Surface,
+        focus: RowDescriptor,
+        *,
+        timeline_enabled: bool = False,
+        timeline_submenu_focused: bool = False,
+        paused: bool = False,
+        timeline_recording: bool = False,
+        timeline_override_active: bool = False,
+        preset_switching: str | None = None,
+    ) -> None:
+        composed = self.compose_panel(
+            focus,
+            viewport_width=surface.get_width(),
+            viewport_height=surface.get_height(),
+            timeline_enabled=timeline_enabled,
+            timeline_submenu_focused=timeline_submenu_focused,
+            paused=paused,
+            timeline_recording=timeline_recording,
+            timeline_override_active=timeline_override_active,
+            preset_switching=preset_switching,
+        )
+        if composed is None:
+            self._panel_rect = None
+            return
+        panel = self._cache.panel
+        assert panel is not None
+        mx, my = self._margin
+        pos = (surface.get_width() - panel.get_width() - mx, my)
+        surface.blit(panel, pos)

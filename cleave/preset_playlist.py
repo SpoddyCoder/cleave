@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -86,6 +86,8 @@ class PresetPlaylist:
     current_dir: Path
     paths: tuple[Path, ...]
     index: int = 0
+    _dir_display_root: Path | None = field(default=None, repr=False)
+    _dir_display_label: str | None = field(default=None, repr=False)
 
     @property
     def current(self) -> Path | None:
@@ -93,27 +95,68 @@ class PresetPlaylist:
             return None
         return self.paths[self.index]
 
+    def _invalidate_dir_display(self) -> None:
+        self._dir_display_root = None
+        self._dir_display_label = None
+
+    def _compute_dir_display_label(self, preset_root: Path) -> str:
+        rel = to_config_relative(self.current_dir, preset_root).rstrip("/") + "/"
+        siblings = list_navigable_dirs(
+            navigable_parent(self.current_dir, preset_root)
+        )
+        if not siblings:
+            return f"{rel} (1/1)"
+        resolved_current = self.current_dir.resolve()
+        try:
+            position = (
+                next(
+                    i
+                    for i, sibling in enumerate(siblings)
+                    if sibling.resolve() == resolved_current
+                )
+                + 1
+            )
+        except StopIteration:
+            position = 1
+        return f"{rel} ({position}/{len(siblings)})"
+
+    def directory_display_label(self, preset_root: Path) -> str:
+        resolved_root = preset_root.resolve()
+        if (
+            self._dir_display_root == resolved_root
+            and self._dir_display_label is not None
+        ):
+            return self._dir_display_label
+        label = self._compute_dir_display_label(preset_root)
+        self._dir_display_root = resolved_root
+        self._dir_display_label = label
+        return label
+
     def _apply(self, other: PresetPlaylist) -> None:
         self.current_dir = other.current_dir
         self.paths = other.paths
         self.index = other.index
+        self._invalidate_dir_display()
 
     def next(self) -> Path | None:
         if not self.paths:
             return None
         self.index = (self.index + 1) % len(self.paths)
+        self._invalidate_dir_display()
         return self.current
 
     def prev(self) -> Path | None:
         if not self.paths:
             return None
         self.index = (self.index - 1) % len(self.paths)
+        self._invalidate_dir_display()
         return self.current
 
     def step_by(self, delta: int) -> Path | None:
         if not self.paths:
             return None
         self.index = (self.index + delta) % len(self.paths)
+        self._invalidate_dir_display()
         return self.current
 
     def step_sibling(self, delta: int = 1, *, preset_root: Path) -> bool:
@@ -129,6 +172,7 @@ class PresetPlaylist:
             idx = 0
         new_idx = (idx + delta) % len(siblings)
         self._apply(playlist_at_dir(siblings[new_idx], index=0))
+        self._invalidate_dir_display()
         return True
 
     def enter_child(self, preset_root: Path) -> bool:
@@ -136,6 +180,7 @@ class PresetPlaylist:
         if not children:
             return False
         self._apply(playlist_at_dir(children[0], index=0))
+        self._invalidate_dir_display()
         return True
 
     def go_parent(self, preset_root: Path) -> bool:
@@ -145,6 +190,7 @@ class PresetPlaylist:
         if not _path_at_or_below(parent, preset_root):
             return False
         self._apply(playlist_at_dir(parent, index=0))
+        self._invalidate_dir_display()
         return True
 
     def load_into(self, pm: ProjectM, smooth: bool = False) -> None:
@@ -200,25 +246,7 @@ def scan_preset_playlist(anchor: Path) -> PresetPlaylist:
 
 def directory_display(playlist: PresetPlaylist, preset_root: Path) -> str:
     """Directory path for overlay with sibling position among navigable dirs."""
-    rel = to_config_relative(playlist.current_dir, preset_root).rstrip("/") + "/"
-    siblings = list_navigable_dirs(
-        navigable_parent(playlist.current_dir, preset_root)
-    )
-    if not siblings:
-        return f"{rel} (1/1)"
-    resolved_current = playlist.current_dir.resolve()
-    try:
-        position = (
-            next(
-                i
-                for i, sibling in enumerate(siblings)
-                if sibling.resolve() == resolved_current
-            )
-            + 1
-        )
-    except StopIteration:
-        position = 1
-    return f"{rel} ({position}/{len(siblings)})"
+    return playlist.directory_display_label(preset_root)
 
 
 def preset_filename_display(playlist: PresetPlaylist) -> str:

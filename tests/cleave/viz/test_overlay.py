@@ -243,6 +243,104 @@ def test_fps_layout_top_right_on_transport_row() -> None:
     assert with_bar.x == without_bar.x - SCROLLBAR_WIDTH - SCROLLBAR_CONTENT_GAP
 
 
+def _cached_compose_panel(
+    overlay: TuningOverlay,
+    state: TuningViewState,
+) -> pygame.Surface:
+    overlay.notify_input()
+    overlay.compose_panel(
+        state,
+        viewport_width=1280,
+        viewport_height=720,
+    )
+    overlay._panel_cache.panel_signature = None
+    overlay._panel_cache.panel = None
+    overlay.compose_panel(
+        state,
+        viewport_width=1280,
+        viewport_height=720,
+    )
+    cached = overlay._panel_cache.panel
+    assert cached is not None
+    return cached
+
+
+def test_cached_compose_matches_full_compose_pixels() -> None:
+    pygame.init()
+    state = _minimal_view_state(fps=30.0, position_sec=12.0)
+    cold_panel = _copy_panel_surface(TuningOverlay(), state)
+    cached = _cached_compose_panel(TuningOverlay(), state)
+
+    assert pygame.image.tostring(cold_panel, "RGBA") == pygame.image.tostring(
+        cached, "RGBA"
+    )
+
+
+def test_cached_compose_matches_collapsed_panel_pixels() -> None:
+    pygame.init()
+    state = _minimal_view_state(
+        tracks={
+            "layer_1": TrackBlock(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                expanded=False,
+            )
+        },
+    )
+    cold_panel = _copy_panel_surface(TuningOverlay(), state)
+    cached = _cached_compose_panel(TuningOverlay(), state)
+
+    assert pygame.image.tostring(cold_panel, "RGBA") == pygame.image.tostring(
+        cached, "RGBA"
+    )
+
+
+def test_cached_compose_matches_one_layer_expanded_panel_pixels() -> None:
+    pygame.init()
+    state = _minimal_view_state(
+        tracks={
+            "layer_1": TrackBlock(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                expanded=True,
+            )
+        },
+    )
+    cold_panel = _copy_panel_surface(TuningOverlay(), state)
+    cached = _cached_compose_panel(TuningOverlay(), state)
+
+    assert pygame.image.tostring(cold_panel, "RGBA") == pygame.image.tostring(
+        cached, "RGBA"
+    )
+
+
+def test_cached_compose_matches_scrolled_focus_panel_pixels() -> None:
+    pygame.init()
+    state = _effects_expanded_view_state()
+    scroll_focus = state.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER) - 1
+    state.focus_descriptor = state.layout.descriptor(scroll_focus)
+
+    cold_overlay = TuningOverlay()
+    cold_panel = _copy_panel_surface(cold_overlay, state)
+    warm_overlay = TuningOverlay()
+    warm_overlay._scroll_y = cold_overlay._scroll_y
+    cached = _cached_compose_panel(warm_overlay, state)
+
+    assert pygame.image.tostring(cold_panel, "RGBA") == pygame.image.tostring(
+        cached, "RGBA"
+    )
+
+
 def test_draw_fps_counter_when_present() -> None:
     pygame.init()
     overlay = TuningOverlay()
