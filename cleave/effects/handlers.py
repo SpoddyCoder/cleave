@@ -24,14 +24,12 @@ class EffectHandler(Generic[StateT]):
 
 def _build_handlers() -> dict[str, EffectHandler[Any]]:
     from cleave.effects.flash import FLASH_HANDLER
-    from cleave.effects.flare import FLARE_HANDLER
     from cleave.effects.grit import GRIT_HANDLER
     from cleave.effects.hue import HUE_HANDLER
     from cleave.effects.pulse import PULSE_HANDLER
 
     handlers = (
         PULSE_HANDLER,
-        FLARE_HANDLER,
         FLASH_HANDLER,
         HUE_HANDLER,
         GRIT_HANDLER,

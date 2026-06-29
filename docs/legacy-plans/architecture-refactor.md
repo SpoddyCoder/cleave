@@ -344,7 +344,7 @@ exist in exactly one place.
 ### Task 3.2: Registry driven effect dispatch
 
 [cleave/effects/runtime.py](cleave/effects/runtime.py) `EffectRuntime.update()` and
-`.modifiers()` repeat near identical loops per effect (`pulse`, `flash`, `flare`,
+`.modifiers()` repeat near identical loops per effect (`pulse`, `flash`,
 `hue`, `grit`). Drive them from [cleave/effects/registry.py](cleave/effects/registry.py)
 so adding an effect means adding a registry entry plus one effect module, not editing
 dispatch blocks.
