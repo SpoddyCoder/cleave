@@ -1,10 +1,14 @@
-"""GPU post-processing (bloom) via moderngl sharing the active pygame GL context."""
+"""GPU post-processing (bloom, grit, highlight rolloff) via moderngl sharing the active pygame GL context.
+
+See docs/gl-post-process.md for moderngl buffer and verification conventions.
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 import moderngl
+import numpy as np
 from OpenGL.GL import (
     GL_ACTIVE_TEXTURE,
     GL_BLEND,
@@ -41,7 +45,8 @@ except ImportError:  # pragma: no cover - PyOpenGL without VAO entry points
     GL_VERTEX_ARRAY_BINDING = None  # type: ignore[misc, assignment]
     glBindVertexArray = None  # type: ignore[misc, assignment]
 
-from cleave.effects.flare import FLARE_BLUR_RADIUS, FLARE_INTENSITY_SCALE
+BLOOM_BLUR_RADIUS = 8.0
+BLOOM_INTENSITY_SCALE = 1.5
 
 _QUAD_VERT = """
 #version 330
@@ -128,6 +133,82 @@ void main() {
     fragColor = clamp(base + vec4(grain, grain, grain, 0.0), 0.0, 1.0);
 }
 """
+
+_HIGHLIGHT_ROLLOFF_FRAG = """
+#version 330
+uniform sampler2D image;
+uniform float threshold;
+uniform float ceiling;
+uniform float strength;
+uniform float softness;
+uniform float desaturation;
+in vec2 uv;
+out vec4 fragColor;
+
+float ss(float t) {
+    t = clamp(t, 0.0, 1.0);
+    return t * t * (3.0 - 2.0 * t);
+}
+
+void main() {
+    vec4 rgba = texture(image, uv);
+    vec3 rgb = rgba.rgb;
+    float lum = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
+
+    if (lum <= threshold || strength <= 0.0) {
+        fragColor = rgba;
+        return;
+    }
+
+    float eff_ceiling = min(ceiling, threshold);
+    float excess = lum - threshold;
+    float headroom = max(1.0 - threshold, 1e-6);
+    float norm = min(excess / headroom, 1.0);
+
+    float knee_width = max(softness * headroom, 1e-6);
+    float knee_t = ss(min(excess / knee_width, 1.0));
+    float linear_lum = threshold + excess * (1.0 - knee_t);
+
+    float reinhard = norm / (1.0 + norm);
+    float filmic_lum = threshold + (eff_ceiling - threshold) * (reinhard / 0.5);
+
+    float past_knee = max(excess - knee_width, 0.0);
+    float shoulder_span = max(headroom - knee_width, 1e-6);
+    float shoulder_t = ss(min(past_knee / shoulder_span, 1.0));
+    float compressed = linear_lum * (1.0 - shoulder_t) + filmic_lum * shoulder_t;
+
+    float eff_strength = clamp(strength, 0.0, 2.0);
+    float new_lum;
+    if (eff_strength <= 1.0) {
+        new_lum = lum + (compressed - lum) * eff_strength;
+    } else {
+        float extra = eff_strength - 1.0;
+        float aggressive = threshold + (eff_ceiling - threshold) * norm;
+        float full_lum = lum + (compressed - lum);
+        new_lum = full_lum + (aggressive - full_lum) * extra;
+    }
+
+    float scale = (lum > 1e-4) ? (new_lum / lum) : 1.0;
+    vec3 out_rgb = rgb * scale;
+
+    if (desaturation > 0.0 && new_lum > threshold) {
+        float span = max(1.0 - threshold, 1e-6);
+        float t = ss((new_lum - threshold) / span);
+        float desat_t = desaturation * t;
+        out_rgb = mix(out_rgb, vec3(new_lum), desat_t);
+    }
+
+    fragColor = vec4(clamp(out_rgb, 0.0, 1.0), rgba.a);
+}
+"""
+
+
+def _ensure_moderngl_draw_state() -> None:
+    """Leave fixed-function GL state compatible with moderngl fullscreen draws."""
+    glColorMask(True, True, True, True)
+    glDisable(GL_SCISSOR_TEST)
+    glDisable(GL_BLEND)
+    glDisable(GL_DEPTH_TEST)
 
 
 def _gl_int(param: int) -> int:
@@ -254,7 +335,7 @@ class _PingPongBuffers:
 
 
 class GlPostProcess:
-    """Separable bloom pass on an existing layer FBO texture."""
+    """GPU post-processing (bloom, grit, highlight rolloff) on an existing layer FBO texture."""
 
     def __init__(self) -> None:
         self._ctx: moderngl.Context | None = None
@@ -264,6 +345,7 @@ class GlPostProcess:
         self._copy_prog: moderngl.Program | None = None
         self._composite_prog: moderngl.Program | None = None
         self._grit_prog: moderngl.Program | None = None
+        self._highlight_rolloff_prog: moderngl.Program | None = None
         self._buffers: dict[tuple[int, int], _PingPongBuffers] = {}
         self._external_textures: dict[tuple[int, int, int], moderngl.Texture] = {}
         self._dest_fbos: dict[tuple[int, int, int], moderngl.Framebuffer] = {}
@@ -287,11 +369,21 @@ class GlPostProcess:
             vertex_shader=_QUAD_VERT,
             fragment_shader=_GRIT_FRAG,
         )
+        self._highlight_rolloff_prog = self._ctx.program(
+            vertex_shader=_QUAD_VERT,
+            fragment_shader=_HIGHLIGHT_ROLLOFF_FRAG,
+        )
+        # Binary float32 quad: (x, y, u, v) per vertex covering NDC [-1,1] x [-1,1].
         self._quad_buffer = self._ctx.buffer(
-            b"-1.0 -1.0  0.0 0.0 "
-            b" 1.0 -1.0  1.0 0.0 "
-            b"-1.0  1.0  0.0 1.0 "
-            b" 1.0  1.0  1.0 1.0"
+            np.array(
+                [
+                    -1.0, -1.0, 0.0, 0.0,
+                     1.0, -1.0, 1.0, 0.0,
+                    -1.0,  1.0, 0.0, 1.0,
+                     1.0,  1.0, 1.0, 1.0,
+                ],
+                dtype=np.float32,
+            ).tobytes()
         )
 
     def _ensure_init(self) -> None:
@@ -336,7 +428,7 @@ class GlPostProcess:
         cached = self._external_textures.get(key)
         if cached is not None:
             return cached
-        tex = self._ctx.external_texture(texture_id, (width, height), 4, 0, "f1")
+        tex = self._ctx.external_texture(texture_id, (width, height), 4, 0, "u1")
         tex.filter = (moderngl.LINEAR, moderngl.LINEAR)
         tex.repeat_x = False
         tex.repeat_y = False
@@ -374,6 +466,7 @@ class GlPostProcess:
         texture: moderngl.Texture,
         extra_uniforms: dict[str, object] | None = None,
     ) -> None:
+        _ensure_moderngl_draw_state()
         fbo.use()
         texture.use(0)
         program["image"].value = 0
@@ -389,8 +482,8 @@ class GlPostProcess:
         height: int,
         strength: float,
         *,
-        blur_radius: float = FLARE_BLUR_RADIUS,
-        intensity_scale: float = FLARE_INTENSITY_SCALE,
+        blur_radius: float = BLOOM_BLUR_RADIUS,
+        intensity_scale: float = BLOOM_INTENSITY_SCALE,
     ) -> int:
         """Bloom *texture_id* in-place; returns the (unchanged) texture id."""
         if strength <= 0.0 or texture_id == 0:
@@ -469,15 +562,69 @@ class GlPostProcess:
         saved = _save_gl_state()
         try:
             src = self._external_layer_texture(texture_id, width, height)
+            buffers = self._ensure_buffers(width, height)
+            self._draw_quad(
+                self._copy_prog,
+                buffers.copy_fbo,
+                texture=src,
+            )
             dest_fbo = self._dest_fbo_for(src, texture_id, width, height)
             self._draw_quad(
                 self._grit_prog,
                 dest_fbo,
-                texture=src,
+                texture=buffers.copy_tex,
                 extra_uniforms={
                     "grit_strength": grit_strength,
                     "aberration_px": aberration_px,
                     "resolution": (float(width), float(height)),
+                },
+            )
+        finally:
+            _restore_gl_state(saved)
+            _prepare_fixed_function_gl()
+
+        return texture_id
+
+    def apply_highlight_rolloff(
+        self,
+        texture_id: int,
+        width: int,
+        height: int,
+        threshold: float,
+        ceiling: float,
+        strength: float,
+        softness: float,
+        desaturation: float,
+    ) -> int:
+        """Compress highlights in-place via GPU shader; returns texture id."""
+        if strength <= 0.0 or texture_id == 0:
+            return texture_id
+
+        self._ensure_init()
+        assert self._ctx is not None
+        assert self._copy_prog is not None
+        assert self._highlight_rolloff_prog is not None
+
+        saved = _save_gl_state()
+        try:
+            src = self._external_layer_texture(texture_id, width, height)
+            buffers = self._ensure_buffers(width, height)
+
+            # Copy source to internal buffer (avoids sampling+writing same texture).
+            self._draw_quad(self._copy_prog, buffers.copy_fbo, texture=src)
+
+            # Apply highlight rolloff from buffer back to the source texture.
+            dest_fbo = self._dest_fbo_for(src, texture_id, width, height)
+            self._draw_quad(
+                self._highlight_rolloff_prog,
+                dest_fbo,
+                texture=buffers.copy_tex,
+                extra_uniforms={
+                    "threshold": threshold,
+                    "ceiling": ceiling,
+                    "strength": strength,
+                    "softness": softness,
+                    "desaturation": desaturation,
                 },
             )
         finally:
@@ -507,3 +654,4 @@ class GlPostProcess:
         self._copy_prog = None
         self._composite_prog = None
         self._grit_prog = None
+        self._highlight_rolloff_prog = None

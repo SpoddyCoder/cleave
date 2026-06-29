@@ -3,49 +3,53 @@ visualizer:
   width: 1280
   height: 720
   upscale: 1.5
-  beat_sensitivity: 2.0   # overall beat sensitivity, can be overidden on a per layer basis
+  beat_sensitivity: 2.0
   render_mode: balanced
-  ui_width_mode: flexible   # flexible | fixed
-  ui_width: 110   # max main panel width (20-200)
-  ui_fade: 10   # seconds before main UI auto-fades; 0 = disabled (Esc hides)
+  ui_width_mode: flexible
+  ui_width: 110
+  ui_fade: 10
 
 render:
   width: 1280
   height: 720
   fps: 60
   post_fx:
-    enabled: false
-    fade_in: 30     # counted from start, 0 = disabled
-    fade_out: 4     # counted from end, 0 = disable
+    enabled: true
+    fade_in: 15
+    fade_out: 4
+    highlight_rolloff:
+      enabled: true
+      threshold_pct: 78
+      ceiling_pct: 65
+      strength_pct: 70
+      softness_pct: 40
+      desaturation_pct: 30
 
   overlay:
     enabled: true
     start_delay: 5
     display_time: 30
     position: bottom-left
-    title: 
+    title:
       content: |
-        Cleave Final Render
-      font-size: 24
-      font-colour: "#ffffff"
-      background-colour: "#3333ff"
-      margin-bottom: 10
-    body: 
+        Your Track Title
+      font-size: 28
+      font-colour: "#f0f4ff"
+      background-colour: "#5b6fd6"
+      margin-bottom: 12
+    body:
       content: |
-        Place anything you like here
-        Like musician names, year of release etc.
-        Edit the cleave-viz.yaml to modify this message, colours etc.
-      font-size: 18
-      colour: "#ffffff"
-      background-colour: 
+        Artist Name  ·  Album  ·  2026
+      font-size: 16
+      colour: "#b8c4e0"
     background:
-      margin: 40
-      padding: 20
-      colour: "#000000"
-      opacity: 0.6
+      margin: 36
+      padding: 24
+      colour: "#0c1020"
+      opacity: 0.85
       border:
-        colour: "#ffffff"
-        width: 4
+        colour: "#5b6fd6"
+        width: 2
 
 paths:
   preset_root: ~/milkdrop-presets
@@ -57,7 +61,7 @@ layer_z_order:
   - layer_2
   - layer_3
   - layer_4
-  
+
 layers:
   layer_1:
     stem: drums
@@ -67,33 +71,75 @@ layers:
     width: 1280
     height: 720
     blend_mode: add
+    beat_sensitivity: 2.0
+    preset_switching: projectm
+    preset_duration: 23
+    soft_cut_duration: 0.8
+    hard_cut_sensitivity: 0.7
+    effects:
+      pulse:
+        onset: 30
+      flash:
+        onset: 15
 
   layer_2:
     stem: bass
     preset: presets-milkdrop-original/Milkdrop-Original/
     enabled: true
     opacity: 1.0
-    width: 1280
-    height: 720
+    width: 960
+    height: 540
     blend_mode: black-key
+    beat_sensitivity: 2.0
+    preset_switching: projectm
+    preset_duration: 31
+    soft_cut_duration: 1.2
+    hard_cut_enabled: false
+    effects:
+      pulse:
+        sub_bass: 35
+      grit:
+        sub_bass: 10
 
   layer_3:
     stem: vocals
     preset: presets-cream-of-the-crop/Sparkle/Explosions/
     enabled: true
     opacity: 1.0
-    width: 1280
-    height: 720
+    width: 960
+    height: 540
     blend_mode: black-key
+    beat_sensitivity: 2.0
+    preset_switching: projectm
+    preset_duration: 37
+    soft_cut_duration: 1.6
+    hard_cut_sensitivity: 0.7
+    effects:
+      hue:
+        pitch: 30
+      pulse:
+        rms: 25
+      flash:
+        rms: 12
 
   layer_4:
     stem: other
     preset: presets-milkdrop-original/Milkdrop-Original/
     enabled: true
     opacity: 1.0
-    width: 1280
-    height: 720
+    width: 640
+    height: 360
     blend_mode: black-key
+    beat_sensitivity: 2.0
+    preset_switching: projectm
+    preset_duration: 43
+    soft_cut_duration: 2.0
+    hard_cut_enabled: false
+    effects:
+      pulse:
+        centroid: 25
+      grit:
+        centroid: 8
 
 timeline:
   enabled: false

@@ -51,6 +51,12 @@ def _toggle_render_post_fx(controls: TuningControls, _slot: str | None, forward:
     controls._render_post_fx.set_expanded(forward)
 
 
+def _toggle_render_post_fx_highlight_rolloff(
+    controls: TuningControls, _slot: str | None, forward: bool
+) -> None:
+    controls._render_post_fx.set_highlight_rolloff_expanded(forward)
+
+
 def _toggle_track_header(controls: TuningControls, slot: str | None, forward: bool) -> None:
     if slot is None:
         return
@@ -187,6 +193,12 @@ def _render_post_fx_expanded(state: TuningViewState, _slot: str | None) -> bool:
     return state.render_post_fx.expanded
 
 
+def _render_post_fx_highlight_rolloff_expanded(
+    state: TuningViewState, _slot: str | None
+) -> bool:
+    return state.render_post_fx.highlight_rolloff.expanded
+
+
 def _track_header_expanded(state: TuningViewState, slot: str | None) -> bool:
     if slot is None:
         return True
@@ -312,6 +324,21 @@ RENDER_OVERLAY_SECTION = ExpandSectionDef(
     ),
 )
 
+RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SECTION = ExpandSectionDef(
+    header_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER,
+    context="global",
+    read_expanded=_render_post_fx_highlight_rolloff_expanded,
+    toggle=_toggle_render_post_fx_highlight_rolloff,
+    children=(
+        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_ENABLED),
+        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD),
+        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CEILING),
+        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_STRENGTH),
+        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SOFTNESS),
+        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_DESATURATION),
+    ),
+)
+
 RENDER_POST_FX_SECTION = ExpandSectionDef(
     header_kind=RowKind.RENDER_POST_FX_HEADER,
     context="global",
@@ -321,6 +348,7 @@ RENDER_POST_FX_SECTION = ExpandSectionDef(
     children=(
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_IN),
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_OUT),
+        SectionNode(expand=RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SECTION),
     ),
 )
 

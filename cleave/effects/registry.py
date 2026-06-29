@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from cleave.extract import STEM_SOURCES, StemSource
 
-EFFECT_IDS = frozenset({"pulse", "flare", "flash", "hue", "grit"})
+EFFECT_IDS = frozenset({"pulse", "flash", "hue", "grit"})
 
 DRIVER_SLUGS = frozenset(
     {"onset", "sub_bass", "mid_bass", "rms", "pitch", "centroid"}
@@ -47,7 +47,6 @@ def _def(effect_id: str, driver_slug: str) -> EffectDef:
 _EFFECT_ROSTER: dict[StemSource, tuple[EffectDef, ...]] = {
     "drums": (
         _def("pulse", "onset"),
-        _def("flare", "onset"),
         _def("flash", "onset"),
         _def("grit", "onset"),
     ),
@@ -70,7 +69,6 @@ _EFFECT_ROSTER: dict[StemSource, tuple[EffectDef, ...]] = {
     ),
     "full_mix": (
         EffectDef("pulse", "onset", "full_mix", "onset_strength"),
-        EffectDef("flare", "onset", "full_mix", "onset_strength"),
         EffectDef("flash", "onset", "full_mix", "onset_strength"),
         EffectDef("grit", "onset", "full_mix", "onset_strength"),
     ),
@@ -83,7 +81,6 @@ def effect_roster(stem: StemSource) -> tuple[EffectDef, ...]:
 
 _EFFECT_HELP_TITLES: dict[str, str] = {
     "pulse": "Pulse",
-    "flare": "Flare",
     "flash": "Flash",
     "hue": "Hue",
     "grit": "Grit",
@@ -93,10 +90,6 @@ _EFFECT_HELP_DESCRIPTIONS: dict[str, tuple[str, ...]] = {
     "pulse": (
         "Opacity follows the audio driver signal.",
         "Peaks on transients or sustained energy depending on driver.",
-    ),
-    "flare": (
-        "Bloom burst on drum onsets.",
-        "Drums stem only.",
     ),
     "flash": (
         "Brief white flash when the driver crosses its threshold.",

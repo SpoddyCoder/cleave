@@ -113,7 +113,6 @@ Update `_DRIVER_SIGNAL_KEYS` and signals fixtures accordingly.
   ```python
   "full_mix": (
       EffectDef("pulse", "onset", "full_mix", "onset_strength"),
-      EffectDef("flare", "onset", "full_mix", "onset_strength"),
       EffectDef("flash", "onset", "full_mix", "onset_strength"),
       EffectDef("grit",  "onset", "full_mix", "onset_strength"),
   )

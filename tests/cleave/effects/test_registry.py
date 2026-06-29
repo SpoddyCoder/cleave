@@ -17,7 +17,7 @@ from cleave.extract import STEM_SOURCES
 
 
 def test_effect_ids_and_driver_slugs() -> None:
-    assert EFFECT_IDS == frozenset({"pulse", "flare", "flash", "hue", "grit"})
+    assert EFFECT_IDS == frozenset({"pulse", "flash", "hue", "grit"})
     assert DRIVER_SLUGS == frozenset(
         {"onset", "sub_bass", "mid_bass", "rms", "pitch", "centroid"}
     )
@@ -28,10 +28,9 @@ def test_effect_ids_and_driver_slugs() -> None:
     [
         (
             "drums",
-            4,
+            3,
             [
                 ("pulse", "onset"),
-                ("flare", "onset"),
                 ("flash", "onset"),
                 ("grit", "onset"),
             ],
@@ -67,10 +66,9 @@ def test_effect_ids_and_driver_slugs() -> None:
         ),
         (
             "full_mix",
-            4,
+            3,
             [
                 ("pulse", "onset"),
-                ("flare", "onset"),
                 ("flash", "onset"),
                 ("grit", "onset"),
             ],

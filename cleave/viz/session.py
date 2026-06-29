@@ -24,6 +24,7 @@ from cleave.config_schema import (
     PresetSwitchingMode,
     PresetSwitchingScope,
     default_render_overlay_runtime_values,
+    default_highlight_rolloff_runtime_values,
     default_render_post_fx_runtime_values,
 )
 from cleave.extract import StemSource
@@ -71,15 +72,33 @@ def default_render_overlay_runtime() -> RenderOverlayRuntime:
 
 
 @dataclass
+class HighlightRolloffRuntime:
+    enabled: bool
+    threshold_pct: int
+    ceiling_pct: int
+    strength_pct: int
+    softness_pct: int
+    desaturation_pct: int
+
+
+def default_highlight_rolloff_runtime() -> HighlightRolloffRuntime:
+    return HighlightRolloffRuntime(**default_highlight_rolloff_runtime_values())
+
+
+@dataclass
 class RenderPostFxRuntime:
     enabled: bool
     expanded: bool
     fade_in: float
     fade_out: float
+    highlight_rolloff: HighlightRolloffRuntime
+    highlight_rolloff_expanded: bool = False
 
 
 def default_render_post_fx_runtime() -> RenderPostFxRuntime:
-    return RenderPostFxRuntime(**default_render_post_fx_runtime_values())
+    values = default_render_post_fx_runtime_values()
+    highlight_rolloff = HighlightRolloffRuntime(**values.pop("highlight_rolloff"))
+    return RenderPostFxRuntime(highlight_rolloff=highlight_rolloff, **values)
 
 
 @dataclass
@@ -179,11 +198,21 @@ def render_post_fx_runtime_from_cfg(
 ) -> RenderPostFxRuntime:
     post_fx = cfg.render.post_fx if cfg.render is not None else None
     if post_fx is not None:
+        hr = post_fx.highlight_rolloff
         return replace(
             default_render_post_fx_runtime(),
             enabled=post_fx.enabled,
             fade_in=post_fx.fade_in,
             fade_out=post_fx.fade_out,
+            highlight_rolloff=replace(
+                default_highlight_rolloff_runtime(),
+                enabled=hr.enabled,
+                threshold_pct=hr.threshold_pct,
+                ceiling_pct=hr.ceiling_pct,
+                strength_pct=hr.strength_pct,
+                softness_pct=hr.softness_pct,
+                desaturation_pct=hr.desaturation_pct,
+            ),
         )
     return default_render_post_fx_runtime()
 

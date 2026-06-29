@@ -143,7 +143,7 @@ Signal-driven compositor modifiers on top of each layer. Tune depths (0-100%).
 
 | Stem | Effects |
 | --- | --- |
-| Drums | pulse, flare, flash, grit |
+| Drums | pulse, flash, grit |
 | Bass | pulse (sub_bass, mid_bass), flash, grit |
 | Vocals | pulse, hue (pitch), flash, grit |
 | Other | pulse, flash, grit |

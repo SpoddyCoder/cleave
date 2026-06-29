@@ -31,7 +31,15 @@ from cleave.config_schema import (
     parse_timeline_section,
     template_layer_entry,
 )
-from tests.support.config import TEST_LAYER_STEMS
+from tests.support.config import (
+    TEST_LAYER_STEMS,
+    default_render_post_fx_config,
+    default_render_post_fx_runtime,
+    layer_configs,
+    layer_runtimes,
+    make_preset_dirs,
+    slot_for_stem,
+)
 from cleave.config_snapshot import (
     next_unnamed_path,
     persisted_session_payload,
@@ -40,12 +48,10 @@ from cleave.config_snapshot import (
 )
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import playlist_at_dir
-from tests.support.config import layer_configs, layer_runtimes, make_preset_dirs, slot_for_stem
 from cleave.timeline import TimelineCue
 from cleave.viz.session import (
     LayerRuntime,
     RenderOverlayRuntime,
-    RenderPostFxRuntime,
     TuningSession,
     session_from_cfg,
 )
@@ -161,7 +167,6 @@ def test_write_session_snapshot_sparse_all_effect_types() -> None:
     session_effects: dict[str, dict[str, dict[str, int]]] = {
         "layer_1": {
             "pulse": {"onset": 35},
-            "flare": {"onset": 20},
             "flash": {"onset": 15},
             "grit": {"onset": 10},
         },
@@ -517,7 +522,7 @@ def test_write_session_snapshot_omits_all_zero_effects() -> None:
                     ),
                     browse_floor=preset_root / TEST_LAYER_STEMS[slot],
                     effects=(
-                        {"pulse": {"onset": 0}, "flare": {"onset": 0}}
+                        {"pulse": {"onset": 0}}
                         if slot == "layer_3"
                         else {}
                     ),
@@ -626,14 +631,12 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
         config_path=config_path,
         render=RenderConfig(
             overlay=_render_overlay_cfg(),
-            post_fx=RenderPostFxConfig(
-                enabled=True, fade_in=30.0, fade_out=4.0
-            ),
+            post_fx=default_render_post_fx_config(enabled=True, fade_in=30.0, fade_out=4.0),
         ),
     )
     session = TuningSession(
         layer_z_order=list(DEFAULT_LAYER_SLOTS),
-        render_post_fx=RenderPostFxRuntime(
+        render_post_fx=default_render_post_fx_runtime(
             enabled=True,
             expanded=False,
             fade_in=12.0,
@@ -737,6 +740,10 @@ def test_write_session_snapshot_persists_render_post_fx(tmp_path: Path) -> None:
     assert round_trip.post_fx.enabled is True
     assert round_trip.post_fx.fade_in == 12.0
     assert round_trip.post_fx.fade_out == 3.0
+    hr = post_fx["highlight_rolloff"]
+    assert hr["enabled"] is True
+    assert hr["threshold_pct"] == 78
+    assert round_trip.post_fx.highlight_rolloff.threshold_pct == 78
 
 
 def test_write_session_snapshot_render_post_fx_solo_does_not_affect_enabled(
