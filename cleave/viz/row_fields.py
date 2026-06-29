@@ -264,6 +264,42 @@ def _format_render_post_fx_fade_out(
     return f"{state.render_post_fx.fade_out:.1f}s"
 
 
+def _format_render_post_fx_highlight_rolloff_enabled(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return "on" if state.render_post_fx.highlight_rolloff.enabled else "off"
+
+
+def _format_render_post_fx_highlight_rolloff_threshold(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return f"{state.render_post_fx.highlight_rolloff.threshold_pct}%"
+
+
+def _format_render_post_fx_highlight_rolloff_ceiling(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return f"{state.render_post_fx.highlight_rolloff.ceiling_pct}%"
+
+
+def _format_render_post_fx_highlight_rolloff_strength(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return f"{state.render_post_fx.highlight_rolloff.strength_pct}%"
+
+
+def _format_render_post_fx_highlight_rolloff_softness(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return f"{state.render_post_fx.highlight_rolloff.softness_pct}%"
+
+
+def _format_render_post_fx_highlight_rolloff_desaturation(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return f"{state.render_post_fx.highlight_rolloff.desaturation_pct}%"
+
+
 def _apply_track_stem(
     controls: TuningControls, desc: RowDescriptor, forward: bool, _ctrl: bool,
     _shift: bool,
@@ -513,6 +549,73 @@ def _apply_render_post_fx_fade_out(
     delta = step if forward else -step
     controls._render_post_fx.set_fade_out(
         controls.session.render_post_fx.fade_out + delta
+    )
+
+
+def _apply_render_post_fx_highlight_rolloff_enabled(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls._render_post_fx.set_highlight_rolloff_enabled(forward)
+
+
+def _apply_render_post_fx_highlight_rolloff_threshold(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
+    _shift: bool,
+) -> None:
+    step = 10 if ctrl else 1
+    delta = step if forward else -step
+    hr = controls.session.render_post_fx.highlight_rolloff
+    controls._render_post_fx.set_highlight_rolloff_threshold_pct(
+        hr.threshold_pct + delta
+    )
+
+
+def _apply_render_post_fx_highlight_rolloff_ceiling(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
+    _shift: bool,
+) -> None:
+    step = 10 if ctrl else 1
+    delta = step if forward else -step
+    hr = controls.session.render_post_fx.highlight_rolloff
+    controls._render_post_fx.set_highlight_rolloff_ceiling_pct(
+        hr.ceiling_pct + delta
+    )
+
+
+def _apply_render_post_fx_highlight_rolloff_strength(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
+    _shift: bool,
+) -> None:
+    step = 10 if ctrl else 1
+    delta = step if forward else -step
+    hr = controls.session.render_post_fx.highlight_rolloff
+    controls._render_post_fx.set_highlight_rolloff_strength_pct(
+        hr.strength_pct + delta
+    )
+
+
+def _apply_render_post_fx_highlight_rolloff_softness(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
+    _shift: bool,
+) -> None:
+    step = 10 if ctrl else 1
+    delta = step if forward else -step
+    hr = controls.session.render_post_fx.highlight_rolloff
+    controls._render_post_fx.set_highlight_rolloff_softness_pct(
+        hr.softness_pct + delta
+    )
+
+
+def _apply_render_post_fx_highlight_rolloff_desaturation(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
+    _shift: bool,
+) -> None:
+    step = 10 if ctrl else 1
+    delta = step if forward else -step
+    hr = controls.session.render_post_fx.highlight_rolloff
+    controls._render_post_fx.set_highlight_rolloff_desaturation_pct(
+        hr.desaturation_pct + delta
     )
 
 
@@ -968,6 +1071,47 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_render_post_fx_fade_out,
         apply_horizontal=_apply_render_post_fx_fade_out,
+    ),
+    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER: RowFieldDef(
+        panel_label="highlight rolloff",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        apply_horizontal=_apply_expand_subheader,
+    ),
+    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_ENABLED: RowFieldDef(
+        panel_label="enabled",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_post_fx_highlight_rolloff_enabled,
+        apply_horizontal=_apply_render_post_fx_highlight_rolloff_enabled,
+    ),
+    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD: RowFieldDef(
+        panel_label="threshold",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_post_fx_highlight_rolloff_threshold,
+        apply_horizontal=_apply_render_post_fx_highlight_rolloff_threshold,
+    ),
+    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CEILING: RowFieldDef(
+        panel_label="ceiling",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_post_fx_highlight_rolloff_ceiling,
+        apply_horizontal=_apply_render_post_fx_highlight_rolloff_ceiling,
+    ),
+    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_STRENGTH: RowFieldDef(
+        panel_label="strength",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_post_fx_highlight_rolloff_strength,
+        apply_horizontal=_apply_render_post_fx_highlight_rolloff_strength,
+    ),
+    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SOFTNESS: RowFieldDef(
+        panel_label="softness",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_post_fx_highlight_rolloff_softness,
+        apply_horizontal=_apply_render_post_fx_highlight_rolloff_softness,
+    ),
+    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_DESATURATION: RowFieldDef(
+        panel_label="desaturation",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_post_fx_highlight_rolloff_desaturation,
+        apply_horizontal=_apply_render_post_fx_highlight_rolloff_desaturation,
     ),
     RowKind.RENDER_TIMELINE_HEADER: RowFieldDef(
         panel_label="TIMELINE",

@@ -1422,6 +1422,18 @@ def test_transport_icons_play_vs_pause() -> None:
     assert overlap_px < play_mask.count() or overlap_px < pause_mask.count()
 
 
+def test_render_post_fx_highlight_rolloff_disable_keeps_section_expanded() -> None:
+    controls = _make_controls()
+    controls.session.render_post_fx.expanded = True
+    controls._render_post_fx.set_highlight_rolloff_expanded(True)
+    controls._render_post_fx.set_highlight_rolloff_enabled(True)
+
+    controls._render_post_fx.set_highlight_rolloff_enabled(False)
+
+    assert controls.session.render_post_fx.highlight_rolloff.enabled is False
+    assert controls.session.render_post_fx.highlight_rolloff_expanded is True
+
+
 def test_render_timeline_header_after_post_fx() -> None:
     controls = _make_controls()
     view = controls.build_view_state(paused=False)

@@ -98,6 +98,16 @@ def _snapshot_render_overlay(
     post_fx["enabled"] = post_fx_payload["enabled"]
     post_fx["fade_in"] = post_fx_payload["fade_in"]
     post_fx["fade_out"] = post_fx_payload["fade_out"]
+    hr_payload = post_fx_payload["highlight_rolloff"]
+    hr_orig = post_fx.get("highlight_rolloff")
+    highlight_rolloff: dict[str, Any] = (
+        dict(hr_orig) if isinstance(hr_orig, dict) else {}
+    )
+    highlight_rolloff["enabled"] = hr_payload["enabled"]
+    highlight_rolloff["threshold_pct"] = hr_payload["threshold_pct"]
+    highlight_rolloff["strength_pct"] = hr_payload["strength_pct"]
+    highlight_rolloff["softness_pct"] = hr_payload["softness_pct"]
+    post_fx["highlight_rolloff"] = highlight_rolloff
 
     render_out: dict[str, Any] = {}
     if isinstance(orig_render, dict):

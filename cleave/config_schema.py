@@ -193,6 +193,17 @@ DEFAULT_RENDER_OVERLAY_BORDER_WIDTH = 4
 DEFAULT_RENDER_POST_FX_FADE_IN = 30.0
 DEFAULT_RENDER_POST_FX_FADE_OUT = 4.0
 
+DEFAULT_HIGHLIGHT_ROLLOFF_ENABLED = True
+DEFAULT_HIGHLIGHT_ROLLOFF_THRESHOLD_PCT = 78
+DEFAULT_HIGHLIGHT_ROLLOFF_CEILING_PCT = 65
+DEFAULT_HIGHLIGHT_ROLLOFF_STRENGTH_PCT = 70
+DEFAULT_HIGHLIGHT_ROLLOFF_SOFTNESS_PCT = 40
+DEFAULT_HIGHLIGHT_ROLLOFF_DESATURATION_PCT = 30
+
+HIGHLIGHT_ROLLOFF_THRESHOLD_PCT_MIN = 0
+HIGHLIGHT_ROLLOFF_THRESHOLD_PCT_MAX = 95
+HIGHLIGHT_ROLLOFF_STRENGTH_PCT_MAX = 200
+
 # --- Timeline defaults ---
 
 DEFAULT_TIMELINE_ENABLED = True
@@ -227,6 +238,34 @@ def _parse_preset_switching_scope(raw: Any, label: str) -> PresetSwitchingScope:
 
 def hard_cut_enabled_display(enabled: bool) -> str:
     return "enabled" if enabled else "disabled"
+
+
+def clamp_highlight_rolloff_threshold_pct(value: int) -> int:
+    return max(
+        HIGHLIGHT_ROLLOFF_THRESHOLD_PCT_MIN,
+        min(HIGHLIGHT_ROLLOFF_THRESHOLD_PCT_MAX, int(value)),
+    )
+
+
+def clamp_highlight_rolloff_ceiling_pct(
+    value: int, *, threshold_pct: int | None = None
+) -> int:
+    clamped = max(0, min(100, int(value)))
+    if threshold_pct is not None:
+        clamped = min(clamped, int(threshold_pct))
+    return clamped
+
+
+def clamp_highlight_rolloff_strength_pct(value: int) -> int:
+    return max(0, min(HIGHLIGHT_ROLLOFF_STRENGTH_PCT_MAX, int(value)))
+
+
+def clamp_highlight_rolloff_softness_pct(value: int) -> int:
+    return max(0, min(100, int(value)))
+
+
+def clamp_highlight_rolloff_desaturation_pct(value: int) -> int:
+    return max(0, min(100, int(value)))
 
 
 def preset_start_clean_display(enabled: bool) -> str:
@@ -835,7 +874,94 @@ VISUALIZER_FIELDS: tuple[FieldDescriptor, ...] = (
     ),
 )
 
-RENDER_POST_FX_FIELDS: tuple[FieldDescriptor, ...] = (
+def _build_highlight_rolloff_config(parsed: dict[str, Any]) -> Any:
+    from cleave.config import HighlightRolloffConfig
+
+    threshold_pct = parsed["threshold_pct"]
+    return HighlightRolloffConfig(
+        enabled=parsed["enabled"],
+        threshold_pct=threshold_pct,
+        ceiling_pct=clamp_highlight_rolloff_ceiling_pct(
+            parsed["ceiling_pct"], threshold_pct=threshold_pct
+        ),
+        strength_pct=parsed["strength_pct"],
+        softness_pct=parsed["softness_pct"],
+        desaturation_pct=parsed["desaturation_pct"],
+    )
+
+
+HIGHLIGHT_ROLLOFF_SECTION = SectionDescriptor(
+    yaml_key="highlight_rolloff",
+    fields=(
+        FieldDescriptor(
+            "enabled",
+            DEFAULT_HIGHLIGHT_ROLLOFF_ENABLED,
+            "session",
+            lambda raw, _ctx, _label: bool(raw),
+            _dump_scalar,
+        ),
+        FieldDescriptor(
+            "threshold_pct",
+            DEFAULT_HIGHLIGHT_ROLLOFF_THRESHOLD_PCT,
+            "session",
+            lambda raw, _ctx, _label: clamp_highlight_rolloff_threshold_pct(
+                int(float(raw))
+            ),
+            _dump_scalar,
+        ),
+        FieldDescriptor(
+            "ceiling_pct",
+            DEFAULT_HIGHLIGHT_ROLLOFF_CEILING_PCT,
+            "session",
+            lambda raw, _ctx, _label: clamp_highlight_rolloff_ceiling_pct(
+                int(float(raw))
+            ),
+            _dump_scalar,
+        ),
+        FieldDescriptor(
+            "strength_pct",
+            DEFAULT_HIGHLIGHT_ROLLOFF_STRENGTH_PCT,
+            "session",
+            lambda raw, _ctx, _label: clamp_highlight_rolloff_strength_pct(
+                int(float(raw))
+            ),
+            _dump_scalar,
+        ),
+        FieldDescriptor(
+            "softness_pct",
+            DEFAULT_HIGHLIGHT_ROLLOFF_SOFTNESS_PCT,
+            "session",
+            lambda raw, _ctx, _label: clamp_highlight_rolloff_softness_pct(
+                int(float(raw))
+            ),
+            _dump_scalar,
+        ),
+        FieldDescriptor(
+            "desaturation_pct",
+            DEFAULT_HIGHLIGHT_ROLLOFF_DESATURATION_PCT,
+            "session",
+            lambda raw, _ctx, _label: clamp_highlight_rolloff_desaturation_pct(
+                int(float(raw))
+            ),
+            _dump_scalar,
+        ),
+    ),
+    build=_build_highlight_rolloff_config,
+    optional=True,
+    default_factory=lambda: _build_highlight_rolloff_config(
+        {
+            "enabled": DEFAULT_HIGHLIGHT_ROLLOFF_ENABLED,
+            "threshold_pct": DEFAULT_HIGHLIGHT_ROLLOFF_THRESHOLD_PCT,
+            "ceiling_pct": DEFAULT_HIGHLIGHT_ROLLOFF_CEILING_PCT,
+            "strength_pct": DEFAULT_HIGHLIGHT_ROLLOFF_STRENGTH_PCT,
+            "softness_pct": DEFAULT_HIGHLIGHT_ROLLOFF_SOFTNESS_PCT,
+            "desaturation_pct": DEFAULT_HIGHLIGHT_ROLLOFF_DESATURATION_PCT,
+        }
+    ),
+)
+
+
+RENDER_POST_FX_FIELDS: tuple[SchemaField, ...] = (
     FieldDescriptor(
         "enabled",
         True,
@@ -857,6 +983,7 @@ RENDER_POST_FX_FIELDS: tuple[FieldDescriptor, ...] = (
         lambda raw, ctx, label: float(require_non_negative_number(raw, label)),
         _dump_scalar,
     ),
+    HIGHLIGHT_ROLLOFF_SECTION,
 )
 
 
@@ -1288,20 +1415,20 @@ def _parse_render_overlay_section(overlay_map: dict[str, Any]) -> Any:
     return _build_render_overlay_config(parsed)
 
 
-def _parse_render_post_fx_section(post_fx_map: dict[str, Any]) -> Any:
+def _build_render_post_fx_config(parsed: dict[str, Any]) -> Any:
     from cleave.config import RenderPostFxConfig
 
-    ctx = ParseCtx()
-    parsed: dict[str, Any] = {}
-    for field in RENDER_POST_FX_FIELDS:
-        parsed[field.yaml_key] = _parse_field(
-            post_fx_map, field, ctx, "render.post_fx"
-        )
-    return RenderPostFxConfig(
-        enabled=parsed["enabled"],
-        fade_in=parsed["fade_in"],
-        fade_out=parsed["fade_out"],
+    return RenderPostFxConfig(**parsed)
+
+
+def _parse_render_post_fx_section(post_fx_map: dict[str, Any]) -> Any:
+    parsed = _parse_overlay_fields(
+        post_fx_map,
+        RENDER_POST_FX_FIELDS,
+        ParseCtx(),
+        "render.post_fx",
     )
+    return _build_render_post_fx_config(parsed)
 
 
 def parse_render_section(data: dict[str, Any]) -> Any | None:
@@ -1393,8 +1520,16 @@ def persist_render(ctx: PersistCtx) -> dict[str, Any]:
         "enabled": runtime_pp.enabled,
         "fade_in": runtime_pp.fade_in,
         "fade_out": runtime_pp.fade_out,
+        "highlight_rolloff": {
+            "enabled": runtime_pp.highlight_rolloff.enabled,
+            "threshold_pct": runtime_pp.highlight_rolloff.threshold_pct,
+            "ceiling_pct": runtime_pp.highlight_rolloff.ceiling_pct,
+            "strength_pct": runtime_pp.highlight_rolloff.strength_pct,
+            "softness_pct": runtime_pp.highlight_rolloff.softness_pct,
+            "desaturation_pct": runtime_pp.highlight_rolloff.desaturation_pct,
+        },
     }
-    post_fx = _dump_fields(RENDER_POST_FX_FIELDS, post_fx_values, ctx)
+    post_fx = _dump_overlay_fields(RENDER_POST_FX_FIELDS, post_fx_values, ctx)
     from cleave.config import render_fps, render_output_size
 
     width, height = render_output_size(ctx.cfg)
@@ -1492,12 +1627,25 @@ def default_render_overlay_runtime_values() -> dict[str, Any]:
     }
 
 
+def default_highlight_rolloff_runtime_values() -> dict[str, Any]:
+    return {
+        "enabled": DEFAULT_HIGHLIGHT_ROLLOFF_ENABLED,
+        "threshold_pct": DEFAULT_HIGHLIGHT_ROLLOFF_THRESHOLD_PCT,
+        "ceiling_pct": DEFAULT_HIGHLIGHT_ROLLOFF_CEILING_PCT,
+        "strength_pct": DEFAULT_HIGHLIGHT_ROLLOFF_STRENGTH_PCT,
+        "softness_pct": DEFAULT_HIGHLIGHT_ROLLOFF_SOFTNESS_PCT,
+        "desaturation_pct": DEFAULT_HIGHLIGHT_ROLLOFF_DESATURATION_PCT,
+    }
+
+
 def default_render_post_fx_runtime_values() -> dict[str, Any]:
     return {
         "enabled": True,
         "expanded": False,
         "fade_in": DEFAULT_RENDER_POST_FX_FADE_IN,
         "fade_out": DEFAULT_RENDER_POST_FX_FADE_OUT,
+        "highlight_rolloff": default_highlight_rolloff_runtime_values(),
+        "highlight_rolloff_expanded": False,
     }
 
 
