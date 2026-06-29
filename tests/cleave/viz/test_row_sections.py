@@ -15,6 +15,7 @@ from cleave.viz.row_sections import (
 )
 from cleave.viz.row_semantics import RowDescriptor, RowKind, section_header_descriptor
 from cleave.viz.tuning_view_state import (
+    HighlightRolloffBlock,
     RenderOverlayBlock,
     RenderPostFxBlock,
     SettingsBlock,
@@ -162,6 +163,15 @@ def test_sub_row_expand_visible_nested_sections() -> None:
     )
     title_font = RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_FONT)
     assert sub_row_expand_visible(title_collapsed, title_font) is False
+
+    highlight_collapsed = _minimal_view_state(
+        render_post_fx=RenderPostFxBlock(
+            expanded=True,
+            highlight_rolloff=HighlightRolloffBlock(expanded=False),
+        ),
+    )
+    threshold = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD)
+    assert sub_row_expand_visible(highlight_collapsed, threshold) is False
 
     layer_collapsed = _minimal_view_state(
         tracks={"layer_1": _track_block(expanded=False)},

@@ -32,6 +32,7 @@ from cleave.config import (
     render_output_size,
     _parse_layers,
 )
+from tests.support.config import default_highlight_rolloff_config, default_render_post_fx_config
 from cleave.config_schema import (
     DEFAULT_LAYER_SLOTS,
     DEFAULT_RENDER_HEIGHT,
@@ -631,12 +632,52 @@ render:
     render = parse_render_section(data)
     assert render == RenderConfig(
         overlay=None,
-        post_fx=RenderPostFxConfig(
-            enabled=True,
-            fade_in=12.0,
-            fade_out=3.0,
-        ),
+        post_fx=default_render_post_fx_config(enabled=True, fade_in=12.0, fade_out=3.0),
     )
+
+
+def test_parse_render_post_fx_highlight_rolloff_defaults() -> None:
+    data = yaml.safe_load(
+        """\
+render:
+  post_fx:
+    highlight_rolloff:
+      threshold_pct: 82
+"""
+    )
+    render = parse_render_section(data)
+    assert render is not None
+    assert render.post_fx is not None
+    hr = render.post_fx.highlight_rolloff
+    assert hr.enabled is True
+    assert hr.threshold_pct == 82
+    assert hr.ceiling_pct == 65
+    assert hr.strength_pct == 70
+    assert hr.softness_pct == 40
+    assert hr.desaturation_pct == 30
+
+
+def test_parse_render_post_fx_highlight_rolloff_clamps() -> None:
+    data = yaml.safe_load(
+        """\
+render:
+  post_fx:
+    highlight_rolloff:
+      threshold_pct: 10
+      ceiling_pct: 80
+      strength_pct: 250
+      softness_pct: -5
+      desaturation_pct: 150
+"""
+    )
+    render = parse_render_section(data)
+    assert render is not None
+    hr = render.post_fx.highlight_rolloff
+    assert hr.threshold_pct == 10
+    assert hr.ceiling_pct == 10
+    assert hr.strength_pct == 200
+    assert hr.softness_pct == 0
+    assert hr.desaturation_pct == 100
 
 
 def test_load_config_render_none_without_overlay_section(

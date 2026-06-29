@@ -277,6 +277,16 @@ class GlCompositor:
         if not self._initialized:
             self.init()
 
+    @property
+    def content_texture_id(self) -> int:
+        """Read-only GL texture id for the composited content FBO."""
+        return self._content_texture_id
+
+    @property
+    def content_fbo_id(self) -> int:
+        """Read-only GL framebuffer id for the composited content target."""
+        return self._content_fbo_id
+
     @staticmethod
     def _apply_layer_blend_mode(mode: BlendMode) -> None:
         """Configure GL blend for stacking layer FBOs onto the output framebuffer."""
