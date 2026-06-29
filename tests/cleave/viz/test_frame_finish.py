@@ -35,7 +35,6 @@ def test_finish_content_frame_applies_highlight_rolloff_when_active() -> None:
         42,
         1280,
         720,
-        99,
         0.8,
         0.6,
         0.65,

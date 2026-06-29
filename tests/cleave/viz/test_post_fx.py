@@ -75,3 +75,30 @@ def test_highlight_desaturation_mix_increases_with_luminance() -> None:
     low = highlight_desaturation_mix(0.80, 0.78, 0.5)
     high = highlight_desaturation_mix(0.95, 0.78, 0.5)
     assert high > low > 0.0
+
+
+def test_apply_highlight_rolloff_rgb_matches_scalar_reference() -> None:
+    import numpy as np
+
+    from cleave.viz.post_fx import apply_highlight_rolloff_rgb
+
+    rgb = np.array(
+        [
+            [[1.0, 1.0, 1.0], [0.5, 0.4, 0.3]],
+            [[0.9, 0.85, 0.8], [0.2, 0.6, 0.1]],
+        ],
+        dtype=np.float32,
+    )
+    out = apply_highlight_rolloff_rgb(rgb, 0.78, 0.65, 0.7, 0.4, 0.3)
+
+    for y in range(2):
+        for x in range(2):
+            lum = 0.2126 * rgb[y, x, 0] + 0.7152 * rgb[y, x, 1] + 0.0722 * rgb[y, x, 2]
+            new_lum = compress_highlight_luminance(lum, 0.78, 0.65, 0.7, 0.4)
+            if lum > 1e-4:
+                expected = rgb[y, x] * (new_lum / lum)
+            else:
+                expected = rgb[y, x]
+            desat_t = highlight_desaturation_mix(new_lum, 0.78, 0.3)
+            expected = expected * (1.0 - desat_t) + new_lum * desat_t
+            assert np.allclose(out[y, x], expected, atol=1e-5), (y, x, out[y, x], expected)
