@@ -120,8 +120,8 @@
     "semantic_hash": ""
   },
   "cleave/gl_post_process.py": {
-    "mtime": 1782769703.4919703,
-    "ast_hash": "7810f1c45bb5182fb03e6b648855feca",
+    "mtime": 1782771908.6636896,
+    "ast_hash": "2e28a1502827ecabb82a53d142b90968",
     "semantic_hash": ""
   },
   "cleave/paths.py": {
@@ -220,8 +220,8 @@
     "semantic_hash": ""
   },
   "cleave/viz/frame_finish.py": {
-    "mtime": 1782769389.648021,
-    "ast_hash": "7e6f617d91025150ecb83259acaacdfd",
+    "mtime": 1782771914.8916888,
+    "ast_hash": "d27cb371c7152ec2175b442cf4806e91",
     "semantic_hash": ""
   },
   "cleave/viz/frame_rate.py": {
@@ -315,8 +315,8 @@
     "semantic_hash": ""
   },
   "cleave/viz/post_fx.py": {
-    "mtime": 1782769388.2640212,
-    "ast_hash": "67f86d270e764af61335fe81aaf4e8b8",
+    "mtime": 1782770651.5358534,
+    "ast_hash": "480df605814774cbc1b5dce4db73fe40",
     "semantic_hash": ""
   },
   "cleave/viz/preset_switching.py": {
@@ -500,8 +500,8 @@
     "semantic_hash": ""
   },
   "tests/cleave/test_gl_post_process.py": {
-    "mtime": 1782769713.7919683,
-    "ast_hash": "7e2603d51965cd86cfa0e90a46e01248",
+    "mtime": 1782772045.6036708,
+    "ast_hash": "9d6aa134956581f6fb39461097334dbc",
     "semantic_hash": ""
   },
   "tests/cleave/test_paths.py": {
@@ -665,8 +665,8 @@
     "semantic_hash": ""
   },
   "tests/cleave/viz/test_post_fx.py": {
-    "mtime": 1782769401.2400198,
-    "ast_hash": "b954dd52b603eff7106cff813acc5add",
+    "mtime": 1782770638.819855,
+    "ast_hash": "4768b33ca7ee775f8236f566bb0ff263",
     "semantic_hash": ""
   },
   "tests/cleave/viz/test_preset_switching.py": {
@@ -925,8 +925,18 @@
     "semantic_hash": ""
   },
   "tests/cleave/viz/test_frame_finish.py": {
-    "mtime": 1782769400.1480198,
-    "ast_hash": "afa91304d4a43fad24aea01b7d350dd4",
+    "mtime": 1782772053.3036695,
+    "ast_hash": "e71ac145f04ce0507fae313d7d48ef72",
+    "semantic_hash": ""
+  },
+  "tests/cleave/test_highlight_rolloff_gl_integration.py": {
+    "mtime": 1782771927.7076871,
+    "ast_hash": "a69cbb7d0f91294f95eacc54168b5752",
+    "semantic_hash": ""
+  },
+  "tests/cleave/test_highlight_rolloff_gpu_probe.py": {
+    "mtime": 1782772072.067667,
+    "ast_hash": "c470ea083f1615b9d1dcc5bcaa47803f",
     "semantic_hash": ""
   }
 }

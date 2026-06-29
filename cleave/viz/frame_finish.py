@@ -109,7 +109,6 @@ def finish_content_frame(
             compositor.content_texture_id,
             compositor.content_width,
             compositor.content_height,
-            compositor.content_fbo_id,
             hr.threshold_pct / 100.0,
             hr.ceiling_pct / 100.0,
             hr.strength_pct / 100.0,

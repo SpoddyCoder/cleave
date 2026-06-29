@@ -1,0 +1,22 @@
+---
+description: moderngl GPU post-process pitfalls and verification
+globs:
+  - cleave/gl_post_process.py
+  - tests/cleave/test_highlight_rolloff*.py
+  - tests/cleave/test_gl_post_process.py
+---
+
+# GPU post-processing (moderngl)
+
+Full write-up: [docs/gl-post-process.md](docs/gl-post-process.md).
+
+## Critical pitfall
+
+`GlPostProcess` fullscreen passes use a shared quad VBO. **Buffer data must be binary float32**, not ASCII strings like `b"-1.0 -1.0 ..."`. Wrong encoding produces degenerate geometry, all-black output, and no GL error. This broke bloom, grit, and highlight rolloff until fixed.
+
+## Adding a new pass
+
+- Reuse `_draw_quad` (calls `_ensure_moderngl_draw_state` before draw).
+- In-place writes: copy source to ping buffer, then draw to `_dest_fbo_for(external_texture)`.
+- Wrap in `_save_gl_state` / `_restore_gl_state` and `_prepare_fixed_function_gl`.
+- Confirm pixels change with integration or probe tests; mocks alone are insufficient.

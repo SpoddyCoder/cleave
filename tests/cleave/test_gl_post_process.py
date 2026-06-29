@@ -1,4 +1,4 @@
-"""Tests for GPU bloom post-process GL state save/restore."""
+"""Tests for GPU post-process GL state save/restore and draw dispatch."""
 
 from __future__ import annotations
 
@@ -96,7 +96,6 @@ def test_apply_highlight_rolloff_prepares_fixed_function_gl() -> None:
                         texture_id=7,
                         width=64,
                         height=64,
-                        dest_fbo_id=11,
                         threshold=0.78,
                         ceiling=0.65,
                         strength=0.7,
@@ -108,164 +107,36 @@ def test_apply_highlight_rolloff_prepares_fixed_function_gl() -> None:
     prepare.assert_called_once()
 
 
-def test_apply_highlight_rolloff_reads_from_copy_texture() -> None:
-    """Regression: sampling the destination attachment in-place is undefined (no visible effect)."""
+def test_apply_highlight_rolloff_draws_via_gpu_shader() -> None:
+    """Highlight rolloff must use the GPU shader path (copy + highlight draw)."""
     ctx, _vaos = _mock_gl_post_process_ctx()
-    ctx.detect_framebuffer.return_value = MagicMock(name="detected_fbo", use=MagicMock())
     post = GlPostProcess()
-    ping_buffers = MagicMock(
-        copy_tex=MagicMock(use=MagicMock()),
-        copy_fbo=MagicMock(use=MagicMock()),
-        ping_tex=MagicMock(use=MagicMock()),
-        ping_fbo=MagicMock(use=MagicMock()),
-        pong_tex=MagicMock(use=MagicMock()),
-        pong_fbo=MagicMock(use=MagicMock()),
-    )
-    draw_calls: list[MagicMock] = []
-
-    def _record_draw(
-        program: MagicMock,
-        fbo: MagicMock,
-        *,
-        texture: MagicMock,
-        extra_uniforms: dict[str, object] | None = None,
-    ) -> None:
-        draw_calls.append(texture)
 
     with patch("cleave.gl_post_process.moderngl.create_context", return_value=ctx):
         with patch("cleave.gl_post_process._save_gl_state", return_value=MagicMock()):
             with patch("cleave.gl_post_process._restore_gl_state"):
                 with patch("cleave.gl_post_process._prepare_fixed_function_gl"):
-                    with patch("cleave.gl_post_process.glBindFramebuffer"):
-                        with patch("cleave.gl_post_process.glViewport"):
-                            with patch.object(
-                                post, "_ensure_buffers", return_value=ping_buffers
-                            ):
-                                with patch.object(
-                                    post, "_draw_quad", side_effect=_record_draw
-                                ):
-                                    post.init()
-                                    post.apply_highlight_rolloff(
-                                        texture_id=7,
-                                        width=64,
-                                        height=64,
-                                        dest_fbo_id=11,
-                                        threshold=0.78,
-                                        ceiling=0.65,
-                                        strength=0.7,
-                                        softness=0.4,
-                                        desaturation=0.3,
-                                    )
+                    with patch.object(post, "_draw_quad") as mock_draw:
+                        result = post.apply_highlight_rolloff(
+                            texture_id=7,
+                            width=64,
+                            height=64,
+                            threshold=0.78,
+                            ceiling=0.65,
+                            strength=0.7,
+                            softness=0.4,
+                            desaturation=0.3,
+                        )
 
-    assert len(draw_calls) == 2
-    assert draw_calls[0] is not ping_buffers.copy_tex
-    assert draw_calls[1] is ping_buffers.copy_tex
+    assert result == 7
+    assert mock_draw.call_count == 2, (
+        f"Expected 2 _draw_quad calls (copy + highlight), got {mock_draw.call_count}"
+    )
 
 
 def test_apply_highlight_rolloff_skips_when_strength_zero() -> None:
     post = GlPostProcess()
-    assert (
-        post.apply_highlight_rolloff(7, 64, 64, 11, 0.78, 0.65, 0.0, 0.4, 0.0) == 7
-    )
-
-
-def test_apply_highlight_rolloff_unbinds_before_sampling_content_texture() -> None:
-    """Regression: composite() leaves content FBO bound; sampling its attachment is undefined."""
-    ctx, _vaos = _mock_gl_post_process_ctx()
-    post = GlPostProcess()
-    ping_buffers = MagicMock(
-        copy_tex=MagicMock(use=MagicMock()),
-        copy_fbo=MagicMock(use=MagicMock()),
-        ping_tex=MagicMock(use=MagicMock()),
-        ping_fbo=MagicMock(use=MagicMock()),
-        pong_tex=MagicMock(use=MagicMock()),
-        pong_fbo=MagicMock(use=MagicMock()),
-    )
-    dest_fbo = MagicMock(name="dest_fbo", use=MagicMock())
-
-    with patch("cleave.gl_post_process.moderngl.create_context", return_value=ctx):
-        with patch("cleave.gl_post_process._save_gl_state", return_value=MagicMock()):
-            with patch("cleave.gl_post_process._restore_gl_state"):
-                with patch("cleave.gl_post_process._prepare_fixed_function_gl"):
-                    with patch("cleave.gl_post_process.glBindFramebuffer") as bind_fbo:
-                        with patch.object(
-                            post, "_ensure_buffers", return_value=ping_buffers
-                        ):
-                            with patch.object(
-                                post, "_dest_fbo_for", return_value=dest_fbo
-                            ):
-                                with patch.object(post, "_draw_quad"):
-                                    post.init()
-                                    post.apply_highlight_rolloff(
-                                        texture_id=7,
-                                        width=64,
-                                        height=64,
-                                        dest_fbo_id=42,
-                                        threshold=0.78,
-                                        ceiling=0.65,
-                                        strength=0.7,
-                                        softness=0.4,
-                                        desaturation=0.3,
-                                    )
-
-    bind_fbo.assert_any_call(GL_FRAMEBUFFER, 0)
-
-
-def test_apply_highlight_rolloff_writes_via_dest_fbo_for() -> None:
-    """Regression: write processed output back through the content texture wrapper."""
-    ctx, _vaos = _mock_gl_post_process_ctx()
-    post = GlPostProcess()
-    ping_buffers = MagicMock(
-        copy_tex=MagicMock(use=MagicMock()),
-        copy_fbo=MagicMock(use=MagicMock()),
-        ping_tex=MagicMock(use=MagicMock()),
-        ping_fbo=MagicMock(use=MagicMock()),
-        pong_tex=MagicMock(use=MagicMock()),
-        pong_fbo=MagicMock(use=MagicMock()),
-    )
-    dest_fbo = MagicMock(name="dest_fbo", use=MagicMock())
-    draw_fbos: list[MagicMock] = []
-
-    def _record_draw(
-        program: MagicMock,
-        fbo: MagicMock,
-        *,
-        texture: MagicMock,
-        extra_uniforms: dict[str, object] | None = None,
-    ) -> None:
-        draw_fbos.append(fbo)
-
-    with patch("cleave.gl_post_process.moderngl.create_context", return_value=ctx):
-        with patch("cleave.gl_post_process._save_gl_state", return_value=MagicMock()):
-            with patch("cleave.gl_post_process._restore_gl_state"):
-                with patch("cleave.gl_post_process._prepare_fixed_function_gl"):
-                    with patch("cleave.gl_post_process.glBindFramebuffer"):
-                        with patch.object(
-                            post, "_ensure_buffers", return_value=ping_buffers
-                        ):
-                            with patch.object(
-                                post, "_dest_fbo_for", return_value=dest_fbo
-                            ) as dest_for:
-                                with patch.object(
-                                    post, "_draw_quad", side_effect=_record_draw
-                                ):
-                                    post.init()
-                                    post.apply_highlight_rolloff(
-                                        texture_id=7,
-                                        width=64,
-                                        height=64,
-                                        dest_fbo_id=42,
-                                        threshold=0.78,
-                                        ceiling=0.65,
-                                        strength=0.7,
-                                        softness=0.4,
-                                        desaturation=0.3,
-                                    )
-
-    dest_for.assert_called_once()
-    assert len(draw_fbos) == 2
-    assert draw_fbos[1] is dest_fbo
-    ctx.detect_framebuffer.assert_not_called()
+    assert post.apply_highlight_rolloff(7, 64, 64, 0.78, 0.65, 0.0, 0.4, 0.0) == 7
 
 
 def test_apply_bloom_caches_dest_fbo_per_texture() -> None:
