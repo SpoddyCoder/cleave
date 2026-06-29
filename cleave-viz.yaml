@@ -77,8 +77,6 @@ layers:
     soft_cut_duration: 0.8
     hard_cut_sensitivity: 0.7
     effects:
-      flare:
-        onset: 25
       pulse:
         onset: 30
       flash:

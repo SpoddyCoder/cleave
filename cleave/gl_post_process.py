@@ -45,7 +45,8 @@ except ImportError:  # pragma: no cover - PyOpenGL without VAO entry points
     GL_VERTEX_ARRAY_BINDING = None  # type: ignore[misc, assignment]
     glBindVertexArray = None  # type: ignore[misc, assignment]
 
-from cleave.effects.flare import FLARE_BLUR_RADIUS, FLARE_INTENSITY_SCALE
+BLOOM_BLUR_RADIUS = 8.0
+BLOOM_INTENSITY_SCALE = 1.5
 
 _QUAD_VERT = """
 #version 330
@@ -481,8 +482,8 @@ class GlPostProcess:
         height: int,
         strength: float,
         *,
-        blur_radius: float = FLARE_BLUR_RADIUS,
-        intensity_scale: float = FLARE_INTENSITY_SCALE,
+        blur_radius: float = BLOOM_BLUR_RADIUS,
+        intensity_scale: float = BLOOM_INTENSITY_SCALE,
     ) -> int:
         """Bloom *texture_id* in-place; returns the (unchanged) texture id."""
         if strength <= 0.0 or texture_id == 0:

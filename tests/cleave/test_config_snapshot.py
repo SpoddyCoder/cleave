@@ -167,7 +167,6 @@ def test_write_session_snapshot_sparse_all_effect_types() -> None:
     session_effects: dict[str, dict[str, dict[str, int]]] = {
         "layer_1": {
             "pulse": {"onset": 35},
-            "flare": {"onset": 20},
             "flash": {"onset": 15},
             "grit": {"onset": 10},
         },
@@ -523,7 +522,7 @@ def test_write_session_snapshot_omits_all_zero_effects() -> None:
                     ),
                     browse_floor=preset_root / TEST_LAYER_STEMS[slot],
                     effects=(
-                        {"pulse": {"onset": 0}, "flare": {"onset": 0}}
+                        {"pulse": {"onset": 0}}
                         if slot == "layer_3"
                         else {}
                     ),
