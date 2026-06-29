@@ -22,7 +22,9 @@ from cleave.viz.app import (
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.input_dispatch import key_handler_for_runtime
 from cleave.viz.row_semantics import RowDescriptor, RowKind
-from cleave.viz.session import LayerRuntime, RenderPostFxRuntime, TuningSession
+from tests.support.config import default_render_post_fx_runtime
+from cleave.viz.session import LayerRuntime, TuningSession
+from tests.support.config import default_render_post_fx_runtime
 from cleave.viz.modal import ModalHost
 from cleave.viz.tuning_panel_draw import TuningOverlay
 from tests.support.compositor_mock import recording_compositor
@@ -32,7 +34,7 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
     display_w = int(1280 * upscale)
     display_h = int(720 * upscale)
     session = TuningSession(layer_z_order=[], layers={})
-    session.render_post_fx = RenderPostFxRuntime(
+    session.render_post_fx = default_render_post_fx_runtime(
         enabled=False, expanded=False, fade_in=0.0, fade_out=0.0
     )
     controls = MagicMock()

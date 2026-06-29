@@ -208,6 +208,54 @@ def _mutate_render_post_fx_fade_out(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
+def _expand_render_post_fx_highlight_rolloff(controls: TuningControls) -> None:
+    _expand_render_post_fx(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_post_fx_highlight_rolloff_enabled(controls: TuningControls) -> None:
+    _expand_render_post_fx_highlight_rolloff(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_ENABLED)
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+
+
+def _mutate_render_post_fx_highlight_rolloff_threshold(controls: TuningControls) -> None:
+    _expand_render_post_fx_highlight_rolloff(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_post_fx_highlight_rolloff_ceiling(controls: TuningControls) -> None:
+    _expand_render_post_fx_highlight_rolloff(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CEILING)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_post_fx_highlight_rolloff_strength(controls: TuningControls) -> None:
+    _expand_render_post_fx_highlight_rolloff(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_STRENGTH)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_post_fx_highlight_rolloff_softness(controls: TuningControls) -> None:
+    _expand_render_post_fx_highlight_rolloff(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SOFTNESS)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_post_fx_highlight_rolloff_desaturation(controls: TuningControls) -> None:
+    _expand_render_post_fx_highlight_rolloff(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_DESATURATION)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
 def _mutate_timeline_enabled(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
@@ -294,6 +342,12 @@ _PERSISTED_MUTATIONS: list[
     ("render_post_fx.enabled", _mutate_render_post_fx_enabled, ("layer_1",), {}),
     ("render_post_fx.fade_in", _mutate_render_post_fx_fade_in, ("layer_1",), {}),
     ("render_post_fx.fade_out", _mutate_render_post_fx_fade_out, ("layer_1",), {}),
+    ("render_post_fx.highlight_rolloff.enabled", _mutate_render_post_fx_highlight_rolloff_enabled, ("layer_1",), {}),
+    ("render_post_fx.highlight_rolloff.threshold_pct", _mutate_render_post_fx_highlight_rolloff_threshold, ("layer_1",), {}),
+    ("render_post_fx.highlight_rolloff.ceiling_pct", _mutate_render_post_fx_highlight_rolloff_ceiling, ("layer_1",), {}),
+    ("render_post_fx.highlight_rolloff.strength_pct", _mutate_render_post_fx_highlight_rolloff_strength, ("layer_1",), {}),
+    ("render_post_fx.highlight_rolloff.softness_pct", _mutate_render_post_fx_highlight_rolloff_softness, ("layer_1",), {}),
+    ("render_post_fx.highlight_rolloff.desaturation_pct", _mutate_render_post_fx_highlight_rolloff_desaturation, ("layer_1",), {}),
     ("timeline.enabled", _mutate_timeline_enabled, ("layer_1",), {"timeline_enabled": True}),
     ("visualizer.render_mode", _mutate_visualizer_render_mode, ("layer_1",), {}),
     ("visualizer.ui_fade", _mutate_visualizer_ui_fade, ("layer_1",), {}),

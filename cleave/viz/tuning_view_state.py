@@ -86,11 +86,25 @@ class RenderOverlayBlock:
 
 
 @dataclass
+class HighlightRolloffBlock:
+    enabled: bool = True
+    expanded: bool = False
+    threshold_pct: int = 78
+    ceiling_pct: int = 65
+    strength_pct: int = 70
+    softness_pct: int = 40
+    desaturation_pct: int = 30
+
+
+@dataclass
 class RenderPostFxBlock:
     enabled: bool = _RO_POST_FX_DEFAULTS["enabled"]
     expanded: bool = _RO_POST_FX_DEFAULTS["expanded"]
     fade_in: float = _RO_POST_FX_DEFAULTS["fade_in"]
     fade_out: float = _RO_POST_FX_DEFAULTS["fade_out"]
+    highlight_rolloff: HighlightRolloffBlock = field(
+        default_factory=HighlightRolloffBlock
+    )
     solo: bool = False
 
 
@@ -259,6 +273,7 @@ def view_state_structure_signature(
         "render_post_fx": {
             "enabled": pp.enabled,
             "expanded": pp.expanded,
+            "highlight_rolloff_expanded": pp.highlight_rolloff_expanded,
         },
         "render_timeline": {"enabled": tl.enabled},
         "timeline": {"enabled": tl.enabled},
@@ -361,6 +376,15 @@ class TuningViewStateBuilder:
         render_post_fx = RenderPostFxBlock(
             enabled=pp.enabled,
             expanded=pp.expanded,
+            highlight_rolloff=HighlightRolloffBlock(
+                enabled=pp.highlight_rolloff.enabled,
+                expanded=pp.highlight_rolloff_expanded,
+                threshold_pct=pp.highlight_rolloff.threshold_pct,
+                ceiling_pct=pp.highlight_rolloff.ceiling_pct,
+                strength_pct=pp.highlight_rolloff.strength_pct,
+                softness_pct=pp.highlight_rolloff.softness_pct,
+                desaturation_pct=pp.highlight_rolloff.desaturation_pct,
+            ),
         )
         render_timeline = RenderTimelineBlock(enabled=tl.enabled)
         layout_state = TuningViewState(
@@ -487,6 +511,16 @@ class TuningViewStateBuilder:
                 structure.render_post_fx,
                 fade_in=pp.fade_in,
                 fade_out=pp.fade_out,
+                highlight_rolloff=replace(
+                    structure.render_post_fx.highlight_rolloff,
+                    enabled=pp.highlight_rolloff.enabled,
+                    expanded=pp.highlight_rolloff_expanded,
+                    threshold_pct=pp.highlight_rolloff.threshold_pct,
+                    ceiling_pct=pp.highlight_rolloff.ceiling_pct,
+                    strength_pct=pp.highlight_rolloff.strength_pct,
+                    softness_pct=pp.highlight_rolloff.softness_pct,
+                    desaturation_pct=pp.highlight_rolloff.desaturation_pct,
+                ),
                 solo=self.session.render_post_fx_solo,
             ),
             render_timeline=replace(

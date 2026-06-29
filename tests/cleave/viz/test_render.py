@@ -12,11 +12,11 @@ import pytest
 
 from cleave.config import VIZ_CONFIG_FILENAME, RenderConfig, load_config
 from cleave.viz.session import (
-    RenderPostFxRuntime,
     TuningSession,
     default_render_overlay_runtime,
     session_from_cfg,
 )
+from tests.support.config import default_render_post_fx_runtime
 from cleave.paths import repo_root
 from cleave.config_schema import (
     DEFAULT_LAYER_SLOTS,
@@ -55,7 +55,7 @@ def _attach_render_post_fx_session(
     fade_in: float = 0.0,
     fade_out: float = 0.0,
 ) -> None:
-    runtime.seed.session.render_post_fx = RenderPostFxRuntime(
+    runtime.seed.session.render_post_fx = default_render_post_fx_runtime(
         enabled=enabled,
         expanded=False,
         fade_in=fade_in,
@@ -99,7 +99,7 @@ def _mock_render_runtime(
     seed.session = TuningSession(
         layer_z_order=list(DEFAULT_LAYER_SLOTS),
         render_overlay=replace(default_render_overlay_runtime(), enabled=False),
-        render_post_fx=RenderPostFxRuntime(
+        render_post_fx=default_render_post_fx_runtime(
             enabled=False,
             expanded=False,
             fade_in=0.0,

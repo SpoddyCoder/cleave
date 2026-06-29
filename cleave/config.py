@@ -174,10 +174,21 @@ class RenderOverlayConfig:
 
 
 @dataclass(frozen=True)
+class HighlightRolloffConfig:
+    enabled: bool
+    threshold_pct: int
+    ceiling_pct: int
+    strength_pct: int
+    softness_pct: int
+    desaturation_pct: int
+
+
+@dataclass(frozen=True)
 class RenderPostFxConfig:
     enabled: bool
     fade_in: float
     fade_out: float
+    highlight_rolloff: HighlightRolloffConfig
 
 
 @dataclass(frozen=True)

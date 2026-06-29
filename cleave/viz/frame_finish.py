@@ -22,7 +22,7 @@ from cleave.config_schema import render_overlay_base
 
 if TYPE_CHECKING:
     from cleave.viz.app import VisualizerCore
-from cleave.viz.post_fx import live_frame_fade_alpha
+from cleave.viz.post_fx import highlight_rolloff_active, live_frame_fade_alpha
 from cleave.viz.render_overlay import (
     build_live_overlay_config,
     build_panel_surface,
@@ -102,6 +102,19 @@ def finish_content_frame(
     duration_sec = core.seed.duration_sec if duration_sec is None else duration_sec
 
     pp = session.render_post_fx
+    if highlight_rolloff_active(pp, solo=post_fx_solo):
+        hr = pp.highlight_rolloff
+        compositor = core.compositor
+        core.post_process.apply_highlight_rolloff(
+            compositor.content_texture_id,
+            compositor.content_width,
+            compositor.content_height,
+            hr.threshold_pct / 100.0,
+            hr.ceiling_pct / 100.0,
+            hr.strength_pct / 100.0,
+            hr.softness_pct / 100.0,
+            hr.desaturation_pct / 100.0,
+        )
     frame_fade_alpha = live_frame_fade_alpha(
         t_sec,
         duration_sec,

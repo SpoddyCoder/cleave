@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from cleave.viz.tuning_view_state import (
+    HighlightRolloffBlock,
     RenderOverlayBlock,
     RenderPostFxBlock,
     SettingsBlock,
@@ -211,6 +212,19 @@ def test_resolve_navigable_render_post_fx_sub_row_collapsed() -> None:
     )
 
 
+def test_resolve_navigable_render_post_fx_highlight_rolloff_nested_collapsed() -> None:
+    state = _minimal_view_state(
+        render_post_fx=RenderPostFxBlock(
+            expanded=True,
+            highlight_rolloff=HighlightRolloffBlock(expanded=False),
+        ),
+    )
+    threshold = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD)
+    assert threshold not in state.layout.rows
+    header = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER)
+    assert state.layout.resolve_navigable(threshold, state) == header
+
+
 def test_section_header_descriptor_mappings() -> None:
     assert section_header_descriptor(RowDescriptor(RowKind.SETTINGS_RENDER_MODE)) == RowDescriptor(
         RowKind.SETTINGS_HEADER
@@ -227,6 +241,9 @@ def test_section_header_descriptor_mappings() -> None:
     assert section_header_descriptor(RowDescriptor(RowKind.RENDER_POST_FX_FADE_OUT)) == RowDescriptor(
         RowKind.RENDER_POST_FX_HEADER
     )
+    assert section_header_descriptor(
+        RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD)
+    ) == RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER)
     assert section_header_descriptor(
         RowDescriptor(RowKind.TRACK_STEM, slot="layer_1")
     ) == RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")

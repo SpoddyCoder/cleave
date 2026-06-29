@@ -55,6 +55,13 @@ class RowKind(Enum):
     RENDER_POST_FX_HEADER = auto()
     RENDER_POST_FX_FADE_IN = auto()
     RENDER_POST_FX_FADE_OUT = auto()
+    RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER = auto()
+    RENDER_POST_FX_HIGHLIGHT_ROLLOFF_ENABLED = auto()
+    RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD = auto()
+    RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CEILING = auto()
+    RENDER_POST_FX_HIGHLIGHT_ROLLOFF_STRENGTH = auto()
+    RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SOFTNESS = auto()
+    RENDER_POST_FX_HIGHLIGHT_ROLLOFF_DESATURATION = auto()
     RENDER_TIMELINE_HEADER = auto()
     SETTINGS_HEADER = auto()
     SETTINGS_RENDER_MODE = auto()
@@ -487,7 +494,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Post FX",
         help_description=(
             "Post-processing effects applied to the composited output:",
-            "fade in and fade out.",
+            "fade in, fade out, and highlight rolloff.",
         ),
         quick_nav_target=True,
     ),
@@ -507,6 +514,83 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Fade out",
         help_description=(
             "Duration of the fade-out at the end of the render.",
+        ),
+    ),
+    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER: RowBehavior(
+        RowAffordance.EXPAND,
+        is_sub_header=True,
+        parent_group="render_post_fx",
+        help_title="Highlight rolloff",
+        help_description=(
+            "Compresses bright centre hotspots after layers are composited.",
+            "Prevents stacked black-key layers from washing out to white.",
+            "Preserves hue by scaling RGB to the compressed luminance.",
+        ),
+    ),
+    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_ENABLED: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="render_post_fx_highlight_rolloff",
+        help_title="Enabled",
+        help_description=(
+            "Toggle highlight rolloff on the composited output.",
+            "Use when bright centre peaks look blown out or flat white.",
+        ),
+    ),
+    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="render_post_fx_highlight_rolloff",
+        help_title="Threshold",
+        help_description=(
+            "Rec.709 luminance level where compression begins.",
+            "Lower = compression starts earlier, more of the image affected.",
+            "Higher = only the brightest peaks are compressed.",
+        ),
+    ),
+    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CEILING: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="render_post_fx_highlight_rolloff",
+        help_title="Ceiling",
+        help_description=(
+            "Luminance target for fully compressed highlights.",
+            "At full strength, saturated whites are pulled down to this level.",
+            "Must be at or below threshold (e.g. threshold 78%, ceiling 65%).",
+        ),
+    ),
+    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_STRENGTH: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="render_post_fx_highlight_rolloff",
+        help_title="Strength",
+        help_description=(
+            "How strongly highlights above the threshold are compressed.",
+            "100% = full compression toward the ceiling.",
+            "Above 100% (up to 200%) = extra aggressive pull toward the ceiling.",
+            "Lower = gentler rolloff with more retained brightness.",
+        ),
+    ),
+    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SOFTNESS: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="render_post_fx_highlight_rolloff",
+        help_title="Softness",
+        help_description=(
+            "Width of the soft knee above the threshold.",
+            "Higher = wider, more gradual transition into compression.",
+            "Lower = tighter transition right at the threshold.",
+        ),
+    ),
+    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_DESATURATION: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="render_post_fx_highlight_rolloff",
+        help_title="Desaturation",
+        help_description=(
+            "How much compressed highlights lose color purity.",
+            "Higher = less pure white, more tinted or muted highlights.",
+            "Hue is preserved during luminance scaling, then pulled toward gray.",
         ),
     ),
     RowKind.RENDER_TIMELINE_HEADER: RowBehavior(
