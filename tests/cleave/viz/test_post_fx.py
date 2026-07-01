@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from cleave.easing import fade_alpha
 from cleave.viz.post_fx import (
     compress_highlight_luminance,
@@ -10,6 +12,8 @@ from cleave.viz.post_fx import (
     live_frame_fade_alpha,
 )
 from tests.support.config import default_render_post_fx_runtime
+
+HIGHLIGHT_ROLLOFF_MODES = ("rolloff", "smoothstep", "aces_fit")
 
 
 def test_live_frame_fade_alpha_enabled() -> None:
@@ -65,6 +69,31 @@ def test_compress_highlight_luminance_strength_above_100_more_aggressive() -> No
 def test_compress_highlight_luminance_ceiling_clamped_to_threshold() -> None:
     result = compress_highlight_luminance(1.0, 0.78, 0.90, 1.0, 0.4)
     assert result <= 0.78
+
+
+@pytest.mark.parametrize("mode", HIGHLIGHT_ROLLOFF_MODES)
+def test_compress_highlight_luminance_reduces_bright_highlights_per_mode(
+    mode: str,
+) -> None:
+    compressed = compress_highlight_luminance(0.95, 0.78, 0.65, 1.0, 0.4, mode=mode)
+    assert compressed < 0.95
+    assert compressed >= 0.65
+
+
+@pytest.mark.parametrize("mode", HIGHLIGHT_ROLLOFF_MODES)
+def test_compress_highlight_luminance_full_strength_maps_white_to_ceiling_per_mode(
+    mode: str,
+) -> None:
+    result = compress_highlight_luminance(1.0, 0.78, 0.65, 1.0, 0.4, mode=mode)
+    assert abs(result - 0.65) < 0.01
+
+
+def test_compress_highlight_luminance_modes_differ_at_same_inputs() -> None:
+    results = {
+        mode: compress_highlight_luminance(0.9, 0.78, 0.65, 1.0, 0.0, mode=mode)
+        for mode in HIGHLIGHT_ROLLOFF_MODES
+    }
+    assert len(set(results.values())) == len(HIGHLIGHT_ROLLOFF_MODES)
 
 
 def test_highlight_desaturation_mix_zero_below_threshold() -> None:

@@ -60,13 +60,16 @@ from cleave.config_schema import (
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
+    DEFAULT_HIGHLIGHT_ROLLOFF_MODE,
     DEFAULT_VISUALIZER_RENDER_MODE,
     DEFAULT_VISUALIZER_UPSCALE,
     DEFAULT_VISUALIZER_WIDTH,
+    HIGHLIGHT_ROLLOFF_MODES,
     LAYER_DEFAULT_SIZE,
     RENDER_OVERLAY_POSITIONS,
     UPSCALE_MIN,
     VISUALIZER_RENDER_MODES,
+    HighlightRolloffMode,
     RenderOverlayPosition,
     UiWidthMode,
     VisualizerRenderMode,
@@ -176,6 +179,7 @@ class RenderOverlayConfig:
 @dataclass(frozen=True)
 class HighlightRolloffConfig:
     enabled: bool
+    mode: HighlightRolloffMode
     threshold_pct: int
     ceiling_pct: int
     strength_pct: int

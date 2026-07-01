@@ -22,7 +22,11 @@ from cleave.config_schema import render_overlay_base
 
 if TYPE_CHECKING:
     from cleave.viz.app import VisualizerCore
-from cleave.viz.post_fx import highlight_rolloff_active, live_frame_fade_alpha
+from cleave.viz.post_fx import (
+    highlight_rolloff_active,
+    highlight_rolloff_mode_index,
+    live_frame_fade_alpha,
+)
 from cleave.viz.render_overlay import (
     build_live_overlay_config,
     build_panel_surface,
@@ -114,6 +118,7 @@ def finish_content_frame(
             hr.strength_pct / 100.0,
             hr.softness_pct / 100.0,
             hr.desaturation_pct / 100.0,
+            highlight_rolloff_mode_index(hr.mode),
         )
     frame_fade_alpha = live_frame_fade_alpha(
         t_sec,

@@ -21,6 +21,7 @@ from cleave.config_schema import (
     DEFAULT_HARD_CUT_ENABLED,
     DEFAULT_EASTER_EGG,
     DEFAULT_PRESET_START_CLEAN,
+    HighlightRolloffMode,
     PresetSwitchingMode,
     PresetSwitchingScope,
     default_render_overlay_runtime_values,
@@ -74,6 +75,7 @@ def default_render_overlay_runtime() -> RenderOverlayRuntime:
 @dataclass
 class HighlightRolloffRuntime:
     enabled: bool
+    mode: HighlightRolloffMode
     threshold_pct: int
     ceiling_pct: int
     strength_pct: int
@@ -207,6 +209,7 @@ def render_post_fx_runtime_from_cfg(
             highlight_rolloff=replace(
                 default_highlight_rolloff_runtime(),
                 enabled=hr.enabled,
+                mode=hr.mode,
                 threshold_pct=hr.threshold_pct,
                 ceiling_pct=hr.ceiling_pct,
                 strength_pct=hr.strength_pct,

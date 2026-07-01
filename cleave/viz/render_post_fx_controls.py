@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from cleave.config_schema import (
+    HIGHLIGHT_ROLLOFF_MODES,
     clamp_highlight_rolloff_ceiling_pct,
     clamp_highlight_rolloff_desaturation_pct,
     clamp_highlight_rolloff_softness_pct,
@@ -92,3 +93,15 @@ class RenderPostFxControls:
         self.session.render_post_fx.highlight_rolloff.desaturation_pct = (
             clamp_highlight_rolloff_desaturation_pct(desaturation_pct)
         )
+
+    def cycle_highlight_rolloff_mode(self, *, forward: bool) -> None:
+        modes = HIGHLIGHT_ROLLOFF_MODES
+        hr = self.session.render_post_fx.highlight_rolloff
+        try:
+            index = modes.index(hr.mode)
+        except ValueError:
+            index = 0
+        if forward:
+            hr.mode = modes[(index + 1) % len(modes)]
+        else:
+            hr.mode = modes[(index - 1) % len(modes)]

@@ -270,6 +270,12 @@ def _format_render_post_fx_highlight_rolloff_enabled(
     return "on" if state.render_post_fx.highlight_rolloff.enabled else "off"
 
 
+def _format_render_post_fx_highlight_rolloff_mode(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return state.render_post_fx.highlight_rolloff.mode
+
+
 def _format_render_post_fx_highlight_rolloff_threshold(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
@@ -557,6 +563,13 @@ def _apply_render_post_fx_highlight_rolloff_enabled(
     _shift: bool,
 ) -> None:
     controls._render_post_fx.set_highlight_rolloff_enabled(forward)
+
+
+def _apply_render_post_fx_highlight_rolloff_mode(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls._render_post_fx.cycle_highlight_rolloff_mode(forward=forward)
 
 
 def _apply_render_post_fx_highlight_rolloff_threshold(
@@ -1082,6 +1095,12 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_render_post_fx_highlight_rolloff_enabled,
         apply_horizontal=_apply_render_post_fx_highlight_rolloff_enabled,
+    ),
+    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE: RowFieldDef(
+        panel_label="mode",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_post_fx_highlight_rolloff_mode,
+        apply_horizontal=_apply_render_post_fx_highlight_rolloff_mode,
     ),
     RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD: RowFieldDef(
         panel_label="threshold",

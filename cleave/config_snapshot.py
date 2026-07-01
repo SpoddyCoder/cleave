@@ -104,6 +104,7 @@ def _snapshot_render_overlay(
         dict(hr_orig) if isinstance(hr_orig, dict) else {}
     )
     highlight_rolloff["enabled"] = hr_payload["enabled"]
+    highlight_rolloff["mode"] = hr_payload["mode"]
     highlight_rolloff["threshold_pct"] = hr_payload["threshold_pct"]
     highlight_rolloff["strength_pct"] = hr_payload["strength_pct"]
     highlight_rolloff["softness_pct"] = hr_payload["softness_pct"]

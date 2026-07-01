@@ -533,6 +533,7 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
             return DISABLED
 
     if kind in {
+        RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE,
         RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD,
         RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CEILING,
         RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_STRENGTH,

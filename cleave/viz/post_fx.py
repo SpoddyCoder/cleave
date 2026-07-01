@@ -4,13 +4,56 @@ from __future__ import annotations
 
 import numpy as np
 
+from cleave.config_schema import DEFAULT_HIGHLIGHT_ROLLOFF_MODE, HighlightRolloffMode
 from cleave.easing import fade_alpha
 from cleave.viz.session import RenderPostFxRuntime
+
+ACES_AT_ONE = 2.54 / 3.16
 
 
 def _smoothstep(t: float) -> float:
     t = max(0.0, min(1.0, t))
     return t * t * (3.0 - 2.0 * t)
+
+
+def _shoulder_filmic_lum(
+    mode: HighlightRolloffMode,
+    norm: float,
+    threshold: float,
+    ceiling: float,
+) -> float:
+    span = ceiling - threshold
+    if mode == "rolloff":
+        reinhard = norm / (1.0 + norm)
+        return threshold + span * (reinhard / 0.5)
+    if mode == "smoothstep":
+        return threshold + span * _smoothstep(norm)
+    aces = (norm * (2.51 * norm + 0.03)) / (norm * (2.43 * norm + 0.59) + 0.14)
+    return threshold + span * (aces / ACES_AT_ONE)
+
+
+def _shoulder_filmic_lum_np(
+    mode: HighlightRolloffMode,
+    norm: np.ndarray,
+    threshold: float,
+    ceiling: float,
+) -> np.ndarray:
+    span = ceiling - threshold
+    if mode == "rolloff":
+        reinhard = norm / (1.0 + norm)
+        return threshold + span * (reinhard / 0.5)
+    if mode == "smoothstep":
+        return threshold + span * _smoothstep_np(norm)
+    aces = (norm * (2.51 * norm + 0.03)) / (norm * (2.43 * norm + 0.59) + 0.14)
+    return threshold + span * (aces / ACES_AT_ONE)
+
+
+def highlight_rolloff_mode_index(mode: HighlightRolloffMode) -> int:
+    if mode == "rolloff":
+        return 0
+    if mode == "smoothstep":
+        return 1
+    return 2
 
 
 def compress_highlight_luminance(
@@ -19,6 +62,7 @@ def compress_highlight_luminance(
     ceiling: float,
     strength: float,
     softness: float,
+    mode: HighlightRolloffMode = DEFAULT_HIGHLIGHT_ROLLOFF_MODE,
 ) -> float:
     """Rec.709 luminance filmic highlight compression toward ceiling."""
     if lum <= threshold or strength <= 0.0:
@@ -34,8 +78,7 @@ def compress_highlight_luminance(
 
     linear_lum = threshold + excess * (1.0 - knee_t)
 
-    reinhard = norm / (1.0 + norm)
-    filmic_lum = threshold + (ceiling - threshold) * (reinhard / 0.5)
+    filmic_lum = _shoulder_filmic_lum(mode, norm, threshold, ceiling)
 
     past_knee = max(0.0, excess - knee_width)
     shoulder_span = max(headroom - knee_width, 1e-6)
@@ -76,6 +119,7 @@ def _compress_highlight_luminance_np(
     ceiling: float,
     strength: float,
     softness: float,
+    mode: HighlightRolloffMode = DEFAULT_HIGHLIGHT_ROLLOFF_MODE,
 ) -> np.ndarray:
     ceiling = min(ceiling, threshold)
     excess = np.maximum(lum - threshold, 0.0)
@@ -86,8 +130,7 @@ def _compress_highlight_luminance_np(
     knee_t = _smoothstep_np(np.minimum(excess / knee_width, 1.0))
     linear_lum = threshold + excess * (1.0 - knee_t)
 
-    reinhard = norm / (1.0 + norm)
-    filmic_lum = threshold + (ceiling - threshold) * (reinhard / 0.5)
+    filmic_lum = _shoulder_filmic_lum_np(mode, norm, threshold, ceiling)
 
     past_knee = np.maximum(excess - knee_width, 0.0)
     shoulder_span = max(headroom - knee_width, 1e-6)
@@ -114,6 +157,7 @@ def apply_highlight_rolloff_rgb(
     strength: float,
     softness: float,
     desaturation: float,
+    mode: HighlightRolloffMode = DEFAULT_HIGHLIGHT_ROLLOFF_MODE,
 ) -> np.ndarray:
     """Vectorized highlight rolloff on float RGB (H, W, 3) in 0..1."""
     if strength <= 0.0:
@@ -125,7 +169,7 @@ def apply_highlight_rolloff_rgb(
         + 0.0722 * rgb[..., 2]
     )
     new_lum = _compress_highlight_luminance_np(
-        lum, threshold, ceiling, strength, softness
+        lum, threshold, ceiling, strength, softness, mode
     )
 
     scale = np.ones_like(lum)
@@ -151,11 +195,12 @@ def apply_highlight_rolloff_rgba(
     strength: float,
     softness: float,
     desaturation: float,
+    mode: HighlightRolloffMode = DEFAULT_HIGHLIGHT_ROLLOFF_MODE,
 ) -> bytes:
     """Apply highlight rolloff to uint8 RGBA (H, W, 4); returns GL upload bytes."""
     rgb = rgba[..., :3].astype(np.float32) / 255.0
     rgb_out = apply_highlight_rolloff_rgb(
-        rgb, threshold, ceiling, strength, softness, desaturation
+        rgb, threshold, ceiling, strength, softness, desaturation, mode
     )
     out = rgba.copy()
     out[..., :3] = np.clip(rgb_out * 255.0, 0.0, 255.0).astype(np.uint8)

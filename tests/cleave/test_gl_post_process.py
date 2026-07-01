@@ -101,6 +101,7 @@ def test_apply_highlight_rolloff_prepares_fixed_function_gl() -> None:
                         strength=0.7,
                         softness=0.4,
                         desaturation=0.3,
+                        mode=0,
                     )
 
     restore.assert_called_once()
@@ -126,6 +127,7 @@ def test_apply_highlight_rolloff_draws_via_gpu_shader() -> None:
                             strength=0.7,
                             softness=0.4,
                             desaturation=0.3,
+                            mode=0,
                         )
 
     assert result == 7
@@ -136,7 +138,32 @@ def test_apply_highlight_rolloff_draws_via_gpu_shader() -> None:
 
 def test_apply_highlight_rolloff_skips_when_strength_zero() -> None:
     post = GlPostProcess()
-    assert post.apply_highlight_rolloff(7, 64, 64, 0.78, 0.65, 0.0, 0.4, 0.0) == 7
+    assert post.apply_highlight_rolloff(7, 64, 64, 0.78, 0.65, 0.0, 0.4, 0.0, 0) == 7
+
+
+def test_apply_highlight_rolloff_sets_mode_uniform() -> None:
+    ctx, _vaos = _mock_gl_post_process_ctx()
+    post = GlPostProcess()
+
+    with patch("cleave.gl_post_process.moderngl.create_context", return_value=ctx):
+        with patch("cleave.gl_post_process._save_gl_state", return_value=MagicMock()):
+            with patch("cleave.gl_post_process._restore_gl_state"):
+                with patch("cleave.gl_post_process._prepare_fixed_function_gl"):
+                    with patch.object(post, "_draw_quad") as mock_draw:
+                        post.apply_highlight_rolloff(
+                            texture_id=7,
+                            width=64,
+                            height=64,
+                            threshold=0.78,
+                            ceiling=0.65,
+                            strength=0.7,
+                            softness=0.4,
+                            desaturation=0.3,
+                            mode=2,
+                        )
+
+    highlight_call = mock_draw.call_args_list[1]
+    assert highlight_call.kwargs["extra_uniforms"]["mode"] == 2
 
 
 def test_apply_bloom_caches_dest_fbo_per_texture() -> None:
