@@ -40,8 +40,8 @@
     "semantic_hash": ""
   },
   "cleave/config_schema.py": {
-    "mtime": 1782945232.6108458,
-    "ast_hash": "37a9ed157fb51cb1b88cb5e1fcd68054",
+    "mtime": 1782946932.9142752,
+    "ast_hash": "922ba1fbfc32121b58b146affcaa39f2",
     "semantic_hash": ""
   },
   "cleave/config_snapshot.py": {
@@ -355,8 +355,8 @@
     "semantic_hash": ""
   },
   "cleave/viz/row_semantics.py": {
-    "mtime": 1782945170.1788664,
-    "ast_hash": "c960a420328fa2b28532f90f5608aafe",
+    "mtime": 1782946935.8742743,
+    "ast_hash": "215b68c695984fa76334290d08ed4aab",
     "semantic_hash": ""
   },
   "cleave/viz/session.py": {
@@ -590,8 +590,8 @@
     "semantic_hash": ""
   },
   "tests/cleave/viz/test_help_overlay.py": {
-    "mtime": 1782944188.8551943,
-    "ast_hash": "0bb217ab4220a79455ae9d53ad6b859f",
+    "mtime": 1782946938.798273,
+    "ast_hash": "fa163ee404787fcf038797eb5ad9c6b7",
     "semantic_hash": ""
   },
   "tests/cleave/viz/test_input_dispatch.py": {
@@ -795,8 +795,8 @@
     "semantic_hash": ""
   },
   "docs/legacy-plans/collapsable-sections-refactor.md": {
-    "mtime": 1782593810.8091364,
-    "ast_hash": "7f31c422899b304e55e0caa1e3902751",
+    "mtime": 1782945560.634737,
+    "ast_hash": "da255294a1db239b11ba434dcd539f0f",
     "semantic_hash": ""
   },
   "docs/legacy-plans/dynamic-layers-plan.md": {

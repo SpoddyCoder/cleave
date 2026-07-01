@@ -7,6 +7,8 @@ from enum import Enum, auto
 
 from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES
 from cleave.config_schema import (
+    HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES,
+    HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES,
     PRESET_SWITCHING_MODE_HELP_ENTRIES,
     VISUALIZER_RENDER_MODE_HELP_ENTRIES,
 )
@@ -494,7 +496,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         can_solo=True,
         help_title="Post FX",
         help_description=(
-            "Post-processing effects applied to the composited output:",
+            "Post-processing effects applied during final compositing:",
             "fade in, fade out, and highlight rolloff.",
         ),
         quick_nav_target=True,
@@ -523,7 +525,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         parent_group="render_post_fx",
         help_title="Highlight rolloff",
         help_description=(
-            "Compresses bright centre hotspots after layers are composited.",
+            "Compresses bright hotspots during layer compositing.",
             "Prevents stacked black-key layers from washing out to white.",
             "Preserves hue by scaling RGB to the compressed luminance.",
         ),
@@ -534,12 +536,8 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         parent_group="render_post_fx_highlight_rolloff",
         help_title="Mode",
         help_entries=(("Left/Right", "cycle mode"),),
-        help_description=(
-            "Where highlight rolloff is applied.",
-            "off: disabled.",
-            "per_layer: on each active layer before compositing.",
-            "composite: after all layers are stacked (default).",
-        ),
+        help_description=("Where highlight rolloff is applied.",),
+        help_mode_entries=HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES,
     ),
     RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CURVE: RowBehavior(
         RowAffordance.VALUE_STEP,
@@ -547,12 +545,8 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         parent_group="render_post_fx_highlight_rolloff",
         help_title="Curve",
         help_entries=(("Left/Right", "cycle curve"),),
-        help_description=(
-            "Shoulder curve used above the soft knee.",
-            "rolloff: Reinhard-style filmic compression.",
-            "smoothstep: gradual S-curve toward the ceiling.",
-            "aces_fit: ACES tone-map fit scaled to the ceiling.",
-        ),
+        help_description=("Shoulder curve used above the soft knee.",),
+        help_mode_entries=HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES,
     ),
     RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD: RowBehavior(
         RowAffordance.VALUE_STEP,

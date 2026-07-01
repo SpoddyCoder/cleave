@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES, BLEND_MODES
 from cleave.config_schema import (
+    HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES,
+    HIGHLIGHT_ROLLOFF_APPLY_MODES,
+    HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES,
+    HIGHLIGHT_ROLLOFF_CURVES,
     PRESET_SWITCHING_MODE_HELP_ENTRIES,
     VISUALIZER_RENDER_MODE_HELP_ENTRIES,
 )
@@ -199,6 +203,46 @@ def test_render_mode_help_lists_modes() -> None:
     assert description.title == "Render mode"
     assert "live view only" in " ".join(description.lines)
     assert description.entries == VISUALIZER_RENDER_MODE_HELP_ENTRIES
+
+
+def test_highlight_rolloff_mode_help_lists_modes() -> None:
+    description = _description_section(
+        sections_for(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE)
+    )
+    assert description is not None
+    assert description.title == "Mode"
+    assert description.lines == ("Where highlight rolloff is applied.",)
+    assert description.entries == HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES
+    assert [mode for mode, _ in description.entries] == list(
+        HIGHLIGHT_ROLLOFF_APPLY_MODES
+    )
+
+
+def test_highlight_rolloff_curve_help_lists_curves() -> None:
+    description = _description_section(
+        sections_for(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CURVE)
+    )
+    assert description is not None
+    assert description.title == "Curve"
+    assert description.lines == ("Shoulder curve used above the soft knee.",)
+    assert description.entries == HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES
+    assert [curve for curve, _ in description.entries] == list(HIGHLIGHT_ROLLOFF_CURVES)
+
+
+def test_highlight_rolloff_header_help() -> None:
+    description = _description_section(
+        sections_for(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER)
+    )
+    assert description is not None
+    assert description.lines[0] == (
+        "Compresses bright hotspots during layer compositing."
+    )
+
+
+def test_render_post_fx_header_help() -> None:
+    description = _description_section(sections_for(RowKind.RENDER_POST_FX_HEADER))
+    assert description is not None
+    assert "applied during final compositing" in description.lines[0]
 
 
 def test_timeline_help_mentions_visibility_handoff() -> None:
