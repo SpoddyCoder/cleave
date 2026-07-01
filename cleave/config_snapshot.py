@@ -105,6 +105,7 @@ def _snapshot_render_overlay(
     )
     highlight_rolloff["enabled"] = hr_payload["enabled"]
     highlight_rolloff["mode"] = hr_payload["mode"]
+    highlight_rolloff["curve"] = hr_payload["curve"]
     highlight_rolloff["threshold_pct"] = hr_payload["threshold_pct"]
     highlight_rolloff["strength_pct"] = hr_payload["strength_pct"]
     highlight_rolloff["softness_pct"] = hr_payload["softness_pct"]

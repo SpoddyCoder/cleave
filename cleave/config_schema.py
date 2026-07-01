@@ -193,15 +193,24 @@ DEFAULT_RENDER_OVERLAY_BORDER_WIDTH = 4
 DEFAULT_RENDER_POST_FX_FADE_IN = 30.0
 DEFAULT_RENDER_POST_FX_FADE_OUT = 4.0
 
-HighlightRolloffMode = Literal["rolloff", "smoothstep", "aces_fit"]
+HighlightRolloffApplyMode = Literal["composite", "per_layer"]
 
-HIGHLIGHT_ROLLOFF_MODES: tuple[HighlightRolloffMode, ...] = (
+HIGHLIGHT_ROLLOFF_APPLY_MODES: tuple[HighlightRolloffApplyMode, ...] = (
+    "composite",
+    "per_layer",
+)
+
+DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE: HighlightRolloffApplyMode = "composite"
+
+HighlightRolloffCurve = Literal["rolloff", "smoothstep", "aces_fit"]
+
+HIGHLIGHT_ROLLOFF_CURVES: tuple[HighlightRolloffCurve, ...] = (
     "rolloff",
     "smoothstep",
     "aces_fit",
 )
 
-DEFAULT_HIGHLIGHT_ROLLOFF_MODE: HighlightRolloffMode = "rolloff"
+DEFAULT_HIGHLIGHT_ROLLOFF_CURVE: HighlightRolloffCurve = "rolloff"
 
 DEFAULT_HIGHLIGHT_ROLLOFF_ENABLED = True
 DEFAULT_HIGHLIGHT_ROLLOFF_THRESHOLD_PCT = 78
@@ -278,13 +287,28 @@ def clamp_highlight_rolloff_desaturation_pct(value: int) -> int:
     return max(0, min(100, int(value)))
 
 
-def _parse_highlight_rolloff_mode(
-    value: Any, ctx: ParseCtx, label: str = "render.post_fx.highlight_rolloff.mode"
-) -> HighlightRolloffMode:
+def _parse_highlight_rolloff_apply_mode(
+    value: Any,
+    ctx: ParseCtx,
+    label: str = "render.post_fx.highlight_rolloff.mode",
+) -> HighlightRolloffApplyMode:
     if not isinstance(value, str):
         raise ValueError(f"{label} must be a string")
-    if value not in HIGHLIGHT_ROLLOFF_MODES:
-        allowed = ", ".join(f"'{mode}'" for mode in HIGHLIGHT_ROLLOFF_MODES)
+    if value not in HIGHLIGHT_ROLLOFF_APPLY_MODES:
+        allowed = ", ".join(f"'{mode}'" for mode in HIGHLIGHT_ROLLOFF_APPLY_MODES)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return value
+
+
+def _parse_highlight_rolloff_curve(
+    value: Any,
+    ctx: ParseCtx,
+    label: str = "render.post_fx.highlight_rolloff.curve",
+) -> HighlightRolloffCurve:
+    if not isinstance(value, str):
+        raise ValueError(f"{label} must be a string")
+    if value not in HIGHLIGHT_ROLLOFF_CURVES:
+        allowed = ", ".join(f"'{curve}'" for curve in HIGHLIGHT_ROLLOFF_CURVES)
         raise ValueError(f"{label} must be one of: {allowed}")
     return value
 
@@ -902,6 +926,7 @@ def _build_highlight_rolloff_config(parsed: dict[str, Any]) -> Any:
     return HighlightRolloffConfig(
         enabled=parsed["enabled"],
         mode=parsed["mode"],
+        curve=parsed["curve"],
         threshold_pct=threshold_pct,
         ceiling_pct=clamp_highlight_rolloff_ceiling_pct(
             parsed["ceiling_pct"], threshold_pct=threshold_pct
@@ -924,9 +949,16 @@ HIGHLIGHT_ROLLOFF_SECTION = SectionDescriptor(
         ),
         FieldDescriptor(
             "mode",
-            DEFAULT_HIGHLIGHT_ROLLOFF_MODE,
+            DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
             "session",
-            _parse_highlight_rolloff_mode,
+            _parse_highlight_rolloff_apply_mode,
+            _dump_scalar,
+        ),
+        FieldDescriptor(
+            "curve",
+            DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
+            "session",
+            _parse_highlight_rolloff_curve,
             _dump_scalar,
         ),
         FieldDescriptor(
@@ -980,7 +1012,8 @@ HIGHLIGHT_ROLLOFF_SECTION = SectionDescriptor(
     default_factory=lambda: _build_highlight_rolloff_config(
         {
             "enabled": DEFAULT_HIGHLIGHT_ROLLOFF_ENABLED,
-            "mode": DEFAULT_HIGHLIGHT_ROLLOFF_MODE,
+            "mode": DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
+            "curve": DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
             "threshold_pct": DEFAULT_HIGHLIGHT_ROLLOFF_THRESHOLD_PCT,
             "ceiling_pct": DEFAULT_HIGHLIGHT_ROLLOFF_CEILING_PCT,
             "strength_pct": DEFAULT_HIGHLIGHT_ROLLOFF_STRENGTH_PCT,
@@ -1553,6 +1586,7 @@ def persist_render(ctx: PersistCtx) -> dict[str, Any]:
         "highlight_rolloff": {
             "enabled": runtime_pp.highlight_rolloff.enabled,
             "mode": runtime_pp.highlight_rolloff.mode,
+            "curve": runtime_pp.highlight_rolloff.curve,
             "threshold_pct": runtime_pp.highlight_rolloff.threshold_pct,
             "ceiling_pct": runtime_pp.highlight_rolloff.ceiling_pct,
             "strength_pct": runtime_pp.highlight_rolloff.strength_pct,
@@ -1661,7 +1695,8 @@ def default_render_overlay_runtime_values() -> dict[str, Any]:
 def default_highlight_rolloff_runtime_values() -> dict[str, Any]:
     return {
         "enabled": DEFAULT_HIGHLIGHT_ROLLOFF_ENABLED,
-        "mode": DEFAULT_HIGHLIGHT_ROLLOFF_MODE,
+        "mode": DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
+        "curve": DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
         "threshold_pct": DEFAULT_HIGHLIGHT_ROLLOFF_THRESHOLD_PCT,
         "ceiling_pct": DEFAULT_HIGHLIGHT_ROLLOFF_CEILING_PCT,
         "strength_pct": DEFAULT_HIGHLIGHT_ROLLOFF_STRENGTH_PCT,

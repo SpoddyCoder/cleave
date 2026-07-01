@@ -20,7 +20,8 @@ def test_finish_content_frame_applies_highlight_rolloff_when_active() -> None:
     core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
     hr = core.seed.session.render_post_fx.highlight_rolloff
     hr.enabled = True
-    hr.mode = "rolloff"
+    hr.mode = "composite"
+    hr.curve = "rolloff"
     hr.threshold_pct = 80
     hr.ceiling_pct = 60
     hr.strength_pct = 65
@@ -45,7 +46,7 @@ def test_finish_content_frame_applies_highlight_rolloff_when_active() -> None:
     )
 
 
-def test_finish_content_frame_passes_highlight_rolloff_mode_index() -> None:
+def test_finish_content_frame_passes_highlight_rolloff_curve_index() -> None:
     core = MagicMock()
     core.seed.width = 1280
     core.seed.height = 720
@@ -57,7 +58,8 @@ def test_finish_content_frame_passes_highlight_rolloff_mode_index() -> None:
     core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
     hr = core.seed.session.render_post_fx.highlight_rolloff
     hr.enabled = True
-    hr.mode = "aces_fit"
+    hr.mode = "composite"
+    hr.curve = "aces_fit"
 
     with patch(
         "cleave.viz.frame_finish._composite_render_overlay",
@@ -104,3 +106,23 @@ def test_finish_content_frame_applies_highlight_rolloff_when_post_fx_disabled() 
         finish_content_frame(core, 1.0)
 
     core.post_process.apply_highlight_rolloff.assert_called_once()
+
+
+def test_finish_content_frame_skips_composite_rolloff_when_per_layer() -> None:
+    core = MagicMock()
+    core.seed.duration_sec = 60.0
+    core.compositor.content_texture_id = 42
+    core.compositor.content_width = 1280
+    core.compositor.content_height = 720
+    core.compositor.content_fbo_id = 99
+    core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
+    hr = core.seed.session.render_post_fx.highlight_rolloff
+    hr.enabled = True
+    hr.mode = "per_layer"
+
+    with patch(
+        "cleave.viz.frame_finish._composite_render_overlay",
+    ):
+        finish_content_frame(core, 1.0)
+
+    core.post_process.apply_highlight_rolloff.assert_not_called()

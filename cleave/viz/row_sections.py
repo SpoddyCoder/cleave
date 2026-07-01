@@ -332,6 +332,7 @@ RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SECTION = ExpandSectionDef(
     children=(
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_ENABLED),
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE),
+        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CURVE),
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD),
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CEILING),
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_STRENGTH),

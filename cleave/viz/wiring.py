@@ -17,11 +17,13 @@ from cleave.config_snapshot import next_unnamed_path, write_session_snapshot
 from cleave.effects.runtime import EffectRuntime
 from cleave.extract import STEM_NAMES, STEM_SOURCES
 from cleave.gl_compositor import GlCompositor
+from cleave.gl_post_process import GlPostProcess
 from cleave.paths import repo_root
 from cleave.preset_playlist import PresetPlaylist, preset_browse_floor, scan_single_layer
 from cleave.signals import Signals
 from cleave.viz.controls import TuningControls
 from cleave.viz.live_layer_bindings import LiveLayerBindings
+from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
 from cleave.viz.modal import ModalHost
 from cleave.viz.session import (
     LayerRuntime,
@@ -164,6 +166,8 @@ def make_tuning_controls(
     mix_player: MixPlayer | None = None,
     modal_host: ModalHost | None = None,
     layer_manager: LayerManager | None = None,
+    compositor: GlCompositor | None = None,
+    post_process: GlPostProcess | None = None,
 ) -> TuningControls:
     def on_preset_change(slot: str, playlist: PresetPlaylist) -> None:
         layer = layers_by_slot[slot]
@@ -299,6 +303,41 @@ def make_tuning_controls(
             delta_sec=delta_sec,
         )
 
+    def on_highlight_rolloff_apply_mode_change(old_mode: str, new_mode: str) -> None:
+        if compositor is None or post_process is None:
+            return
+        hr = session.render_post_fx.highlight_rolloff
+        if not hr.enabled or session.render_post_fx_solo:
+            return
+        for layer in layers:
+            if not layer.fbo.enabled:
+                continue
+            fbo = layer.fbo
+            if new_mode == "per_layer" and old_mode == "composite":
+                compositor.copy_layer_to_rolloff_source(
+                    post_process,
+                    layer.slot,
+                    fbo.texture_id,
+                    fbo.width,
+                    fbo.height,
+                )
+                LayerFramePipeline.apply_layer_highlight_rolloff(
+                    layer, post_process, compositor, hr
+                )
+            elif new_mode == "composite" and old_mode == "per_layer":
+                compositor.restore_layer_from_rolloff_source(
+                    post_process,
+                    layer.slot,
+                    fbo.texture_id,
+                    fbo.width,
+                    fbo.height,
+                )
+
+    render_post_fx_bindings = RenderPostFxBindings(
+        on_highlight_rolloff_apply_mode_change=on_highlight_rolloff_apply_mode_change,
+        is_paused=lambda: playback.paused,
+    )
+
     layer_bindings = LiveLayerBindings(
         on_preset_change=on_preset_change,
         on_preset_switching_change=on_preset_switching_change,
@@ -322,6 +361,7 @@ def make_tuning_controls(
         "playback": playback,
         "duration_sec": duration_sec,
         "layer_bindings": layer_bindings,
+        "render_post_fx_bindings": render_post_fx_bindings,
         "layer_manager": layer_manager,
     }
     if modal_host is not None:

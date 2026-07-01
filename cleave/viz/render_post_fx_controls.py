@@ -3,21 +3,29 @@
 from __future__ import annotations
 
 from cleave.config_schema import (
-    HIGHLIGHT_ROLLOFF_MODES,
+    HIGHLIGHT_ROLLOFF_APPLY_MODES,
+    HIGHLIGHT_ROLLOFF_CURVES,
     clamp_highlight_rolloff_ceiling_pct,
     clamp_highlight_rolloff_desaturation_pct,
     clamp_highlight_rolloff_softness_pct,
     clamp_highlight_rolloff_strength_pct,
     clamp_highlight_rolloff_threshold_pct,
 )
+from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
 from cleave.viz.session import TuningSession
 
 
 class RenderPostFxControls:
     """Mutations for render post-FX rows."""
 
-    def __init__(self, session: TuningSession) -> None:
+    def __init__(
+        self,
+        session: TuningSession,
+        *,
+        bindings: RenderPostFxBindings | None = None,
+    ) -> None:
         self.session = session
+        self._bindings = bindings
 
     def set_expanded(self, expanded: bool) -> None:
         pp = self.session.render_post_fx
@@ -95,8 +103,9 @@ class RenderPostFxControls:
         )
 
     def cycle_highlight_rolloff_mode(self, *, forward: bool) -> None:
-        modes = HIGHLIGHT_ROLLOFF_MODES
+        modes = HIGHLIGHT_ROLLOFF_APPLY_MODES
         hr = self.session.render_post_fx.highlight_rolloff
+        old_mode = hr.mode
         try:
             index = modes.index(hr.mode)
         except ValueError:
@@ -105,3 +114,25 @@ class RenderPostFxControls:
             hr.mode = modes[(index + 1) % len(modes)]
         else:
             hr.mode = modes[(index - 1) % len(modes)]
+        if hr.mode != old_mode and self._bindings is not None:
+            paused = (
+                self._bindings.is_paused()
+                if self._bindings.is_paused is not None
+                else False
+            )
+            if paused and self._bindings.on_highlight_rolloff_apply_mode_change:
+                self._bindings.on_highlight_rolloff_apply_mode_change(
+                    old_mode, hr.mode
+                )
+
+    def cycle_highlight_rolloff_curve(self, *, forward: bool) -> None:
+        curves = HIGHLIGHT_ROLLOFF_CURVES
+        hr = self.session.render_post_fx.highlight_rolloff
+        try:
+            index = curves.index(hr.curve)
+        except ValueError:
+            index = 0
+        if forward:
+            hr.curve = curves[(index + 1) % len(curves)]
+        else:
+            hr.curve = curves[(index - 1) % len(curves)]

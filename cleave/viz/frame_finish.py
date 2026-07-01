@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from cleave.viz.app import VisualizerCore
 from cleave.viz.post_fx import (
     highlight_rolloff_active,
-    highlight_rolloff_mode_index,
+    highlight_rolloff_curve_index,
     live_frame_fade_alpha,
 )
 from cleave.viz.render_overlay import (
@@ -106,8 +106,8 @@ def finish_content_frame(
     duration_sec = core.seed.duration_sec if duration_sec is None else duration_sec
 
     pp = session.render_post_fx
-    if highlight_rolloff_active(pp, solo=post_fx_solo):
-        hr = pp.highlight_rolloff
+    hr = pp.highlight_rolloff
+    if highlight_rolloff_active(pp, solo=post_fx_solo) and hr.mode == "composite":
         compositor = core.compositor
         core.post_process.apply_highlight_rolloff(
             compositor.content_texture_id,
@@ -118,7 +118,7 @@ def finish_content_frame(
             hr.strength_pct / 100.0,
             hr.softness_pct / 100.0,
             hr.desaturation_pct / 100.0,
-            highlight_rolloff_mode_index(hr.mode),
+            highlight_rolloff_curve_index(hr.curve),
         )
     frame_fade_alpha = live_frame_fade_alpha(
         t_sec,

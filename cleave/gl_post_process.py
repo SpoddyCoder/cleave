@@ -450,13 +450,14 @@ class GlPostProcess:
         self._external_textures[key] = tex
         return tex
 
-    def _dest_fbo_for(self, src: moderngl.Texture, texture_id: int, width: int, height: int) -> moderngl.Framebuffer:
+    def _dest_fbo_for(self, texture_id: int, width: int, height: int) -> moderngl.Framebuffer:
         self._ensure_init()
         key = (texture_id, width, height)
         cached = self._dest_fbos.get(key)
         if cached is not None:
             return cached
-        dest_fbo = self._ctx.framebuffer(color_attachments=[src])
+        dest_tex = self._external_layer_texture(texture_id, width, height)
+        dest_fbo = self._ctx.framebuffer(color_attachments=[dest_tex])
         self._dest_fbos[key] = dest_fbo
         return dest_fbo
 
@@ -544,7 +545,7 @@ class GlPostProcess:
                 },
             )
 
-            dest_fbo = self._dest_fbo_for(src, texture_id, width, height)
+            dest_fbo = self._dest_fbo_for(texture_id, width, height)
             dest_fbo.use()
             buffers.copy_tex.use(0)
             buffers.pong_tex.use(1)
@@ -583,7 +584,7 @@ class GlPostProcess:
                 buffers.copy_fbo,
                 texture=src,
             )
-            dest_fbo = self._dest_fbo_for(src, texture_id, width, height)
+            dest_fbo = self._dest_fbo_for(texture_id, width, height)
             self._draw_quad(
                 self._grit_prog,
                 dest_fbo,
@@ -600,6 +601,30 @@ class GlPostProcess:
 
         return texture_id
 
+    def copy_texture(
+        self,
+        source_texture_id: int,
+        dest_texture_id: int,
+        width: int,
+        height: int,
+    ) -> None:
+        """Copy *source_texture_id* into *dest_texture_id* (same dimensions)."""
+        if source_texture_id == 0 or dest_texture_id == 0:
+            return
+
+        self._ensure_init()
+        assert self._ctx is not None
+        assert self._copy_prog is not None
+
+        saved = _save_gl_state()
+        try:
+            src = self._external_layer_texture(source_texture_id, width, height)
+            dest_fbo = self._dest_fbo_for(dest_texture_id, width, height)
+            self._draw_quad(self._copy_prog, dest_fbo, texture=src)
+        finally:
+            _restore_gl_state(saved)
+            _prepare_fixed_function_gl()
+
     def apply_highlight_rolloff(
         self,
         texture_id: int,
@@ -611,6 +636,8 @@ class GlPostProcess:
         softness: float,
         desaturation: float,
         mode: int,
+        *,
+        source_texture_id: int | None = None,
     ) -> int:
         """Compress highlights in-place via GPU shader; returns texture id."""
         if strength <= 0.0 or texture_id == 0:
@@ -623,14 +650,15 @@ class GlPostProcess:
 
         saved = _save_gl_state()
         try:
-            src = self._external_layer_texture(texture_id, width, height)
+            sample_id = texture_id if source_texture_id is None else source_texture_id
+            src = self._external_layer_texture(sample_id, width, height)
             buffers = self._ensure_buffers(width, height)
 
             # Copy source to internal buffer (avoids sampling+writing same texture).
             self._draw_quad(self._copy_prog, buffers.copy_fbo, texture=src)
 
-            # Apply highlight rolloff from buffer back to the source texture.
-            dest_fbo = self._dest_fbo_for(src, texture_id, width, height)
+            # Apply highlight rolloff from buffer back to the dest texture.
+            dest_fbo = self._dest_fbo_for(texture_id, width, height)
             self._draw_quad(
                 self._highlight_rolloff_prog,
                 dest_fbo,

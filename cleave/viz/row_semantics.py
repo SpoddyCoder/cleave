@@ -58,6 +58,7 @@ class RowKind(Enum):
     RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER = auto()
     RENDER_POST_FX_HIGHLIGHT_ROLLOFF_ENABLED = auto()
     RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE = auto()
+    RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CURVE = auto()
     RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD = auto()
     RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CEILING = auto()
     RENDER_POST_FX_HIGHLIGHT_ROLLOFF_STRENGTH = auto()
@@ -544,6 +545,18 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         parent_group="render_post_fx_highlight_rolloff",
         help_title="Mode",
         help_entries=(("Left/Right", "cycle mode"),),
+        help_description=(
+            "Where highlight rolloff is applied.",
+            "composite: after all layers are stacked (default).",
+            "per_layer: on each active layer before compositing.",
+        ),
+    ),
+    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CURVE: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="render_post_fx_highlight_rolloff",
+        help_title="Curve",
+        help_entries=(("Left/Right", "cycle curve"),),
         help_description=(
             "Shoulder curve used above the soft knee.",
             "rolloff: Reinhard-style filmic compression.",

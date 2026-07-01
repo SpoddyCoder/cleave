@@ -15,8 +15,12 @@ from cleave.stem_pcm import StemPcmBank
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_preview_resolution import preview_sizes_for_session
 from cleave.viz.layer_visibility import effective_layer_enabled
+from cleave.viz.post_fx import (
+    highlight_rolloff_active,
+    highlight_rolloff_curve_index,
+)
 from cleave.viz.preset_switching import apply_preset_switching
-from cleave.viz.session import TuningSession
+from cleave.viz.session import HighlightRolloffRuntime, TuningSession
 from OpenGL.GL import GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, glClear, glClearColor, glViewport
 
 
@@ -88,6 +92,17 @@ def _apply_layer_grit(layer: StemLayer, post_process: GlPostProcess | None) -> N
         fbo.height,
         fbo.grit_strength,
         fbo.aberration_px,
+    )
+
+
+def _apply_layer_highlight_rolloff(
+    layer: StemLayer,
+    post_process: GlPostProcess,
+    compositor: GlCompositor,
+    hr: HighlightRolloffRuntime,
+) -> None:
+    LayerFramePipeline.apply_layer_highlight_rolloff(
+        layer, post_process, compositor, hr
     )
 
 
@@ -230,6 +245,30 @@ class LayerFramePipeline:
             layer.pm.flush_pcm()
 
     @staticmethod
+    def apply_layer_highlight_rolloff(
+        layer: StemLayer,
+        post_process: GlPostProcess,
+        compositor: GlCompositor,
+        hr: HighlightRolloffRuntime,
+    ) -> None:
+        fbo = layer.fbo
+        source_id = compositor.rolloff_source_texture_id(layer.slot)
+        if source_id == 0:
+            return
+        post_process.apply_highlight_rolloff(
+            fbo.texture_id,
+            fbo.width,
+            fbo.height,
+            hr.threshold_pct / 100.0,
+            hr.ceiling_pct / 100.0,
+            hr.strength_pct / 100.0,
+            hr.softness_pct / 100.0,
+            hr.desaturation_pct / 100.0,
+            highlight_rolloff_curve_index(hr.curve),
+            source_texture_id=source_id,
+        )
+
+    @staticmethod
     def render_frame(
         session: TuningSession,
         layers: list[StemLayer],
@@ -242,6 +281,7 @@ class LayerFramePipeline:
         t_sec: float,
         *,
         paused: bool,
+        compositor: GlCompositor | None = None,
     ) -> None:
         if not paused:
             for layer in layers:
@@ -260,12 +300,37 @@ class LayerFramePipeline:
             t_sec,
         )
 
+        pp = session.render_post_fx
+        hr = pp.highlight_rolloff
+        per_layer = (
+            highlight_rolloff_active(pp, solo=False)
+            and hr.mode == "per_layer"
+            and compositor is not None
+        )
+
         if not paused:
             for layer in layers:
                 if layer.fbo.enabled:
                     _render_layer_fbo(layer, layer.pm)
                     _apply_layer_bloom(layer, post_process)
                     _apply_layer_grit(layer, post_process)
+                    if per_layer:
+                        compositor.copy_layer_to_rolloff_source(
+                            post_process,
+                            layer.slot,
+                            layer.fbo.texture_id,
+                            layer.fbo.width,
+                            layer.fbo.height,
+                        )
+                        _apply_layer_highlight_rolloff(
+                            layer, post_process, compositor, hr
+                        )
+        elif per_layer:
+            for layer in layers:
+                if layer.fbo.enabled:
+                    _apply_layer_highlight_rolloff(
+                        layer, post_process, compositor, hr
+                    )
 
     @staticmethod
     def composite(
