@@ -228,6 +228,13 @@ def _mutate_render_post_fx_highlight_rolloff_mode(controls: TuningControls) -> N
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
+def _mutate_render_post_fx_highlight_rolloff_curve(controls: TuningControls) -> None:
+    _expand_render_post_fx_highlight_rolloff(controls)
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CURVE)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
 def _mutate_render_post_fx_highlight_rolloff_threshold(controls: TuningControls) -> None:
     _expand_render_post_fx_highlight_rolloff(controls)
     view = controls.build_view_state(paused=False)
@@ -351,6 +358,7 @@ _PERSISTED_MUTATIONS: list[
     ("render_post_fx.fade_out", _mutate_render_post_fx_fade_out, ("layer_1",), {}),
     ("render_post_fx.highlight_rolloff.enabled", _mutate_render_post_fx_highlight_rolloff_enabled, ("layer_1",), {}),
     ("render_post_fx.highlight_rolloff.mode", _mutate_render_post_fx_highlight_rolloff_mode, ("layer_1",), {}),
+    ("render_post_fx.highlight_rolloff.curve", _mutate_render_post_fx_highlight_rolloff_curve, ("layer_1",), {}),
     ("render_post_fx.highlight_rolloff.threshold_pct", _mutate_render_post_fx_highlight_rolloff_threshold, ("layer_1",), {}),
     ("render_post_fx.highlight_rolloff.ceiling_pct", _mutate_render_post_fx_highlight_rolloff_ceiling, ("layer_1",), {}),
     ("render_post_fx.highlight_rolloff.strength_pct", _mutate_render_post_fx_highlight_rolloff_strength, ("layer_1",), {}),
