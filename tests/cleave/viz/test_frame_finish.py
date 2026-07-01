@@ -88,7 +88,7 @@ def test_finish_content_frame_skips_highlight_rolloff_when_solo() -> None:
     core.post_process.apply_highlight_rolloff.assert_not_called()
 
 
-def test_finish_content_frame_applies_highlight_rolloff_when_post_fx_disabled() -> None:
+def test_finish_content_frame_skips_highlight_rolloff_when_post_fx_disabled() -> None:
     core = MagicMock()
     core.seed.duration_sec = 60.0
     core.compositor.content_texture_id = 42
@@ -103,7 +103,7 @@ def test_finish_content_frame_applies_highlight_rolloff_when_post_fx_disabled() 
     ):
         finish_content_frame(core, 1.0)
 
-    core.post_process.apply_highlight_rolloff.assert_called_once()
+    core.post_process.apply_highlight_rolloff.assert_not_called()
 
 
 def test_finish_content_frame_skips_composite_rolloff_when_per_layer() -> None:
