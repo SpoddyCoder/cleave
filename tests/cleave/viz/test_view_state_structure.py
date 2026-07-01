@@ -105,6 +105,22 @@ def test_builder_skips_layout_rebuild_when_structure_unchanged() -> None:
     assert view_b.layout is layout_a
 
 
+def test_builder_patches_highlight_rolloff_curve_without_structure_rebuild() -> None:
+    controls = _make_controls(("layer_1",))
+    builder = controls._view_state
+    session = controls.session
+    session.render_post_fx.highlight_rolloff.curve = "rolloff"
+
+    view_a = builder.build(paused=False)
+    layout_a = view_a.layout
+    assert view_a.render_post_fx.highlight_rolloff.curve == "rolloff"
+
+    session.render_post_fx.highlight_rolloff.curve = "smoothstep"
+    view_b = builder.build(paused=False)
+    assert view_b.layout is layout_a
+    assert view_b.render_post_fx.highlight_rolloff.curve == "smoothstep"
+
+
 def test_minimal_view_state_still_builds_layout() -> None:
     state = _minimal_view_state()
     assert state.layout is not None

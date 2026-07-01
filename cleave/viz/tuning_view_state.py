@@ -522,6 +522,7 @@ class TuningViewStateBuilder:
                     enabled=pp.highlight_rolloff.enabled,
                     expanded=pp.highlight_rolloff_expanded,
                     mode=pp.highlight_rolloff.mode,
+                    curve=pp.highlight_rolloff.curve,
                     threshold_pct=pp.highlight_rolloff.threshold_pct,
                     ceiling_pct=pp.highlight_rolloff.ceiling_pct,
                     strength_pct=pp.highlight_rolloff.strength_pct,
