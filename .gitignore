@@ -22,7 +22,3 @@ __pycache__/
 venv/
 .venv/
 cleave-env/
-
-# graphify
-graphify-out/cost.json
-graphify-out/cache/*
