@@ -35,18 +35,18 @@
     "semantic_hash": ""
   },
   "cleave/config.py": {
-    "mtime": 1782933583.402744,
-    "ast_hash": "26c22170b59e29f3737223ca9124baaf",
+    "mtime": 1782940017.0325935,
+    "ast_hash": "a6d21c23505cf610ab9a510c1923f08a",
     "semantic_hash": ""
   },
   "cleave/config_schema.py": {
-    "mtime": 1782933581.7627444,
-    "ast_hash": "875e6e5005b513e03f1af93460d263e2",
+    "mtime": 1782940014.3885944,
+    "ast_hash": "16723d198a7a1d06f4548d847045c853",
     "semantic_hash": ""
   },
   "cleave/config_snapshot.py": {
-    "mtime": 1782934205.0785387,
-    "ast_hash": "93ea33820c3ab934552e73b0c600be63",
+    "mtime": 1782940071.6765752,
+    "ast_hash": "3d0474363c7f428bad867f98c223221f",
     "semantic_hash": ""
   },
   "cleave/easing.py": {
@@ -110,13 +110,13 @@
     "semantic_hash": ""
   },
   "cleave/gl_compositor.py": {
-    "mtime": 1782776240.635117,
-    "ast_hash": "ae33fc0502582e980dea17569418d55a",
+    "mtime": 1782940179.2005382,
+    "ast_hash": "998df8a186f747b3986ff08e2d8e1842",
     "semantic_hash": ""
   },
   "cleave/gl_post_process.py": {
-    "mtime": 1782934083.198574,
-    "ast_hash": "1b4c235dcfde5fa0c47cf6a8a348e764",
+    "mtime": 1782940997.3402627,
+    "ast_hash": "413cf638b89c0d63de68b8566e8a8de7",
     "semantic_hash": ""
   },
   "cleave/paths.py": {
@@ -180,8 +180,8 @@
     "semantic_hash": ""
   },
   "cleave/viz/app.py": {
-    "mtime": 1782858256.349167,
-    "ast_hash": "05dc53bb89eb7da435c6b562d1c30efe",
+    "mtime": 1782940086.9045696,
+    "ast_hash": "3ed033f08e802114b5772db6ad784e29",
     "semantic_hash": ""
   },
   "cleave/viz/bootstrap.py": {
@@ -195,8 +195,8 @@
     "semantic_hash": ""
   },
   "cleave/viz/controls.py": {
-    "mtime": 1782858256.349167,
-    "ast_hash": "20aea5034dd63ef0980579bba37354cd",
+    "mtime": 1782940075.264574,
+    "ast_hash": "86aabc57117381140fddd40a8a6460a0",
     "semantic_hash": ""
   },
   "cleave/viz/focus_context.py": {
@@ -215,8 +215,8 @@
     "semantic_hash": ""
   },
   "cleave/viz/frame_finish.py": {
-    "mtime": 1782934083.9225738,
-    "ast_hash": "ed9f9d058fd1a985e0a9ad8eb53abffe",
+    "mtime": 1782940054.912581,
+    "ast_hash": "8f22897a2575a3d33ed40c4c68294c04",
     "semantic_hash": ""
   },
   "cleave/viz/frame_rate.py": {
@@ -250,8 +250,8 @@
     "semantic_hash": ""
   },
   "cleave/viz/layer_pipeline.py": {
-    "mtime": 1782858256.349167,
-    "ast_hash": "90dba9ecfe75abb233f7ffd433ce830f",
+    "mtime": 1782940096.896566,
+    "ast_hash": "ca8c2ace8a3fdd3530f2fb1eefae856a",
     "semantic_hash": ""
   },
   "cleave/viz/layer_preview_resolution.py": {
@@ -310,8 +310,8 @@
     "semantic_hash": ""
   },
   "cleave/viz/post_fx.py": {
-    "mtime": 1782933599.0667386,
-    "ast_hash": "6a2495fd5b8789f60a200afa6989c0d1",
+    "mtime": 1782940025.7085905,
+    "ast_hash": "7fb2709f1839f33fa5e8691e7fc59d82",
     "semantic_hash": ""
   },
   "cleave/viz/preset_switching.py": {
@@ -335,13 +335,13 @@
     "semantic_hash": ""
   },
   "cleave/viz/render_post_fx_controls.py": {
-    "mtime": 1782934086.3745732,
-    "ast_hash": "32da342ecd660d077539d386b5a4ea2a",
+    "mtime": 1782940065.6005774,
+    "ast_hash": "0c653b49a0644f7d4fdb8ab66a9d5efa",
     "semantic_hash": ""
   },
   "cleave/viz/row_fields.py": {
-    "mtime": 1782934097.05857,
-    "ast_hash": "f6d0a1404ddf6ea4872b811f54050222",
+    "mtime": 1782940076.8565733,
+    "ast_hash": "6d4103b8544439e9e1f93b22c4e3d00f",
     "semantic_hash": ""
   },
   "cleave/viz/row_layout.py": {
@@ -350,18 +350,18 @@
     "semantic_hash": ""
   },
   "cleave/viz/row_sections.py": {
-    "mtime": 1782934087.6425726,
-    "ast_hash": "d3e0f26ce3742a36cb14aefa61cbff7f",
+    "mtime": 1782940057.82058,
+    "ast_hash": "a9d205522065f2b19433aa7da8407925",
     "semantic_hash": ""
   },
   "cleave/viz/row_semantics.py": {
-    "mtime": 1782934093.1865711,
-    "ast_hash": "0f5cec9898536f163e9a41b57c41b662",
+    "mtime": 1782940057.1245801,
+    "ast_hash": "155858e0b53f924147d8de1ebf33eac3",
     "semantic_hash": ""
   },
   "cleave/viz/session.py": {
-    "mtime": 1782933602.4627376,
-    "ast_hash": "71b17206fda6168c13aa82035a01077b",
+    "mtime": 1782940017.940593,
+    "ast_hash": "f3f3568e972fc4a828e17262d5908563",
     "semantic_hash": ""
   },
   "cleave/viz/settings_controls.py": {
@@ -390,13 +390,13 @@
     "semantic_hash": ""
   },
   "cleave/viz/tuning_panel_draw.py": {
-    "mtime": 1782934097.5465698,
-    "ast_hash": "ef88a3746f82c6b837d398694e7b5733",
+    "mtime": 1782940070.8045757,
+    "ast_hash": "97d2d8a34d2604ca7e901506bc09f9c0",
     "semantic_hash": ""
   },
   "cleave/viz/tuning_view_state.py": {
-    "mtime": 1782934089.882572,
-    "ast_hash": "a638df45e6bf126c66e668d986109735",
+    "mtime": 1782940060.1965792,
+    "ast_hash": "647252134d745c915846d9ee5c038fb7",
     "semantic_hash": ""
   },
   "cleave/viz/ui_tint.py": {
@@ -410,8 +410,8 @@
     "semantic_hash": ""
   },
   "cleave/viz/wiring.py": {
-    "mtime": 1782858256.349167,
-    "ast_hash": "42ca41a8126cc38145722567e865f6cc",
+    "mtime": 1782940101.8045642,
+    "ast_hash": "aa85d0d5a62783d24906cc8617582f3c",
     "semantic_hash": ""
   },
   "pyproject.toml": {
@@ -465,13 +465,13 @@
     "semantic_hash": ""
   },
   "tests/cleave/test_config.py": {
-    "mtime": 1782934216.5425348,
-    "ast_hash": "dd06162d833d205ffb60876fd6af63b0",
+    "mtime": 1782940123.1365569,
+    "ast_hash": "27a56531a8fafe1995f3c0bb9d19db57",
     "semantic_hash": ""
   },
   "tests/cleave/test_config_snapshot.py": {
-    "mtime": 1782934214.7225354,
-    "ast_hash": "81bef0437461387bafae273a0c092ccd",
+    "mtime": 1782940108.5125618,
+    "ast_hash": "259fe9ace6656bfd2ec7bcc42f330691",
     "semantic_hash": ""
   },
   "tests/cleave/test_easing.py": {
@@ -485,8 +485,8 @@
     "semantic_hash": ""
   },
   "tests/cleave/test_gl_compositor.py": {
-    "mtime": 1782690327.2254417,
-    "ast_hash": "1bb7b88e6ad6b1afdc618edf6ea4ec58",
+    "mtime": 1782940193.8405337,
+    "ast_hash": "ee3b1029d4b90b0bacffac873691f913",
     "semantic_hash": ""
   },
   "tests/cleave/test_gl_post_process.py": {
@@ -560,7 +560,7 @@
     "semantic_hash": ""
   },
   "tests/cleave/viz/test_config_dirty.py": {
-    "mtime": 1782934207.7425377,
+    "mtime": 1782939020.236926,
     "ast_hash": "fa0ff8c011a5ed01ccb95e131bbce180",
     "semantic_hash": ""
   },
@@ -615,8 +615,8 @@
     "semantic_hash": ""
   },
   "tests/cleave/viz/test_layer_pipeline.py": {
-    "mtime": 1782858256.349167,
-    "ast_hash": "742ef32238971ce893450391a9162298",
+    "mtime": 1782940158.164545,
+    "ast_hash": "ae028fdb1c985b55dea4a75923b035e5",
     "semantic_hash": ""
   },
   "tests/cleave/viz/test_layer_preview_resolution.py": {
@@ -655,8 +655,8 @@
     "semantic_hash": ""
   },
   "tests/cleave/viz/test_post_fx.py": {
-    "mtime": 1782934244.0425253,
-    "ast_hash": "b2b0f1f2df82625ea9d70e98749a666c",
+    "mtime": 1782940119.1205583,
+    "ast_hash": "1e79c5be1d4c715dd59e36eeac1181c6",
     "semantic_hash": ""
   },
   "tests/cleave/viz/test_preset_switching.py": {
@@ -675,8 +675,8 @@
     "semantic_hash": ""
   },
   "tests/cleave/viz/test_row_fields.py": {
-    "mtime": 1782934117.1145647,
-    "ast_hash": "a2b55ec36b77aa948fee4e2474312ce7",
+    "mtime": 1782940158.5005448,
+    "ast_hash": "0ff64b9c71d2e2d123047868841488bf",
     "semantic_hash": ""
   },
   "tests/cleave/viz/test_row_layout_resolution.py": {
@@ -690,8 +690,8 @@
     "semantic_hash": ""
   },
   "tests/cleave/viz/test_row_semantics.py": {
-    "mtime": 1782934110.4785662,
-    "ast_hash": "ceabfc10349d37219fc8b988e1c1c529",
+    "mtime": 1782940122.0645573,
+    "ast_hash": "feb96ae9b977874b51bae2e82ff256d0",
     "semantic_hash": ""
   },
   "tests/cleave/viz/test_session.py": {
@@ -780,8 +780,8 @@
     "semantic_hash": ""
   },
   "cleave-viz.yaml": {
-    "mtime": 1782933585.6227431,
-    "ast_hash": "37327aa62e3fe3ff8d1ed9f713991b9a",
+    "mtime": 1782940071.0365756,
+    "ast_hash": "13bb69b6769f5f1d4eed04ac33f598bb",
     "semantic_hash": ""
   },
   "docs/legacy-plans/architecture-improvements.md": {
@@ -915,8 +915,8 @@
     "semantic_hash": ""
   },
   "tests/cleave/viz/test_frame_finish.py": {
-    "mtime": 1782934224.034532,
-    "ast_hash": "a0d5c64bba68197f80753d4c7e07701c",
+    "mtime": 1782940121.3725574,
+    "ast_hash": "f75703d5fc70fa338662fbce5529da4a",
     "semantic_hash": ""
   },
   "tests/cleave/test_highlight_rolloff_gl_integration.py": {
@@ -930,8 +930,18 @@
     "semantic_hash": ""
   },
   "docs/gl-post-process.md": {
-    "mtime": 1782932544.7030854,
-    "ast_hash": "e2debb984920ab973c5e5a602d5790f4",
+    "mtime": 1782941031.192253,
+    "ast_hash": "fc9d29ec5f58a0093fd4f567ec3849d9",
+    "semantic_hash": ""
+  },
+  "cleave/viz/render_post_fx_bindings.py": {
+    "mtime": 1782940060.724579,
+    "ast_hash": "48a18ace8e49a7d8bef51116b5b45ec7",
+    "semantic_hash": ""
+  },
+  "tests/cleave/test_highlight_rolloff_per_layer_repro.py": {
+    "mtime": 1782940968.2682717,
+    "ast_hash": "e51fa277c0ebfcb53d581d1ea6f72fc8",
     "semantic_hash": ""
   }
 }

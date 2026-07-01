@@ -1,6 +1,13 @@
 # GPU post-processing (moderngl)
 
-Layer bloom, grit, and post-composite highlight rolloff run in [cleave/gl_post_process.py](../cleave/gl_post_process.py) via **moderngl** on the same OpenGL context as pygame and the fixed-function compositor in [cleave/gl_compositor.py](../cleave/gl_compositor.py).
+Layer bloom, grit, and highlight rolloff run in [cleave/gl_post_process.py](../cleave/gl_post_process.py) via **moderngl** on the same OpenGL context as pygame and the fixed-function compositor in [cleave/gl_compositor.py](../cleave/gl_compositor.py).
+
+Highlight rolloff supports two apply modes under `render.post_fx.highlight_rolloff.mode`:
+
+- `composite` (default): after all layers are stacked in [cleave/viz/frame_finish.py](../cleave/viz/frame_finish.py)
+- `per_layer`: on each active layer before compositing in [cleave/viz/layer_pipeline.py](../cleave/viz/layer_pipeline.py)
+
+Per-layer mode keeps a frozen rolloff source texture per layer slot in the compositor so paused live tuning can re-apply rolloff without stacking. The shoulder curve is `render.post_fx.highlight_rolloff.curve` (`rolloff`, `smoothstep`, `aces_fit`).
 
 ## Incident: silent all-black shader output (2026)
 
@@ -34,6 +41,12 @@ self._ctx.buffer(
 
 After this fix, the GPU highlight rolloff path matched the CPU math and was ~15x faster than readback at 1280x720 in probe timing.
 
+## Incident: per-layer rolloff wrote to the wrong texture (2026)
+
+Per-layer highlight rolloff had no visible effect while composite mode worked. The cause was `_dest_fbo_for(src, texture_id, ...)`: it attached the sampled `src` texture as the render target and used `texture_id` only as a cache key. For in-place passes (bloom, grit, composite rolloff) `src` and `texture_id` are the same texture, so it worked by accident. The per-layer path is the first pass whose sample source differs from its write destination (`copy_texture` and `apply_highlight_rolloff(..., source_texture_id=...)`), so every draw wrote back onto the source and left the layer texture untouched.
+
+Fix: `_dest_fbo_for(texture_id, ...)` now attaches the external texture for `texture_id` (the destination), so source and destination are decoupled. When they coincide the behavior is identical to before.
+
 ## Checklist for new GPU passes
 
 When adding or changing code in `GlPostProcess`:
@@ -58,6 +71,8 @@ Use `-s` on the probe file to print CPU vs GPU timing.
 
 | Piece | Location |
 | --- | --- |
-| Post-composite highlight rolloff | [cleave/viz/frame_finish.py](../cleave/viz/frame_finish.py) |
+| Composite highlight rolloff | [cleave/viz/frame_finish.py](../cleave/viz/frame_finish.py) |
+| Per-layer highlight rolloff | [cleave/viz/layer_pipeline.py](../cleave/viz/layer_pipeline.py) |
+| Rolloff source textures (paused tuning) | [cleave/gl_compositor.py](../cleave/gl_compositor.py) |
 | Per-layer bloom / grit | [cleave/viz/layer_pipeline.py](../cleave/viz/layer_pipeline.py) |
 | CPU reference math (tests) | [cleave/viz/post_fx.py](../cleave/viz/post_fx.py) |

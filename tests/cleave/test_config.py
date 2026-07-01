@@ -650,7 +650,8 @@ render:
     assert render.post_fx is not None
     hr = render.post_fx.highlight_rolloff
     assert hr.enabled is True
-    assert hr.mode == "rolloff"
+    assert hr.mode == "composite"
+    assert hr.curve == "rolloff"
     assert hr.threshold_pct == 82
     assert hr.ceiling_pct == 65
     assert hr.strength_pct == 70
@@ -658,7 +659,23 @@ render:
     assert hr.desaturation_pct == 30
 
 
-@pytest.mark.parametrize("mode", ("rolloff", "smoothstep", "aces_fit"))
+@pytest.mark.parametrize("curve", ("rolloff", "smoothstep", "aces_fit"))
+def test_parse_render_post_fx_highlight_rolloff_valid_curves(curve: str) -> None:
+    data = yaml.safe_load(
+        f"""\
+render:
+  post_fx:
+    highlight_rolloff:
+      curve: {curve}
+"""
+    )
+    render = parse_render_section(data)
+    assert render is not None
+    assert render.post_fx is not None
+    assert render.post_fx.highlight_rolloff.curve == curve
+
+
+@pytest.mark.parametrize("mode", ("composite", "per_layer"))
 def test_parse_render_post_fx_highlight_rolloff_valid_modes(mode: str) -> None:
     data = yaml.safe_load(
         f"""\
@@ -672,6 +689,19 @@ render:
     assert render is not None
     assert render.post_fx is not None
     assert render.post_fx.highlight_rolloff.mode == mode
+
+
+def test_parse_render_post_fx_highlight_rolloff_rejects_invalid_curve() -> None:
+    data = yaml.safe_load(
+        """\
+render:
+  post_fx:
+    highlight_rolloff:
+      curve: reinhard
+"""
+    )
+    with pytest.raises(ValueError, match="curve must be one of"):
+        parse_render_section(data)
 
 
 def test_parse_render_post_fx_highlight_rolloff_rejects_invalid_mode() -> None:

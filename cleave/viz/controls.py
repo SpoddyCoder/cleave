@@ -21,6 +21,7 @@ from cleave.viz.panel_notification import PanelNotificationHost
 from cleave.viz.playback import PlaybackState, seek, toggle_pause
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.render_overlay_controls import RenderOverlayControls
+from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
 from cleave.viz.render_post_fx_controls import RenderPostFxControls
 from cleave.viz.settings_controls import SettingsControls
 from cleave.viz.user_presets import resolve_user_preset_dest, user_preset_item_display_name
@@ -70,6 +71,7 @@ class TuningControls:
         *,
         project_dir: Path | None = None,
         layer_bindings: LiveLayerBindings | None = None,
+        render_post_fx_bindings: RenderPostFxBindings | None = None,
         on_save_new_config: Callable[[], Path | None] | None = None,
         on_overwrite_config: Callable[[Path], str | None] | None = None,
         launch_config_path: Path | None = None,
@@ -84,6 +86,7 @@ class TuningControls:
         self.playback = playback
         self.duration_sec = duration_sec
         self._layer_bindings = layer_bindings
+        self._render_post_fx_bindings = render_post_fx_bindings
         self._layer_manager = layer_manager
         self._modal_host = modal_host if modal_host is not None else ModalHost()
 
@@ -118,7 +121,9 @@ class TuningControls:
             get_notification=self._notification_host.active,
         )
         self._render_overlay = RenderOverlayControls(session)
-        self._render_post_fx = RenderPostFxControls(session)
+        self._render_post_fx = RenderPostFxControls(
+            session, bindings=render_post_fx_bindings
+        )
         self._settings = SettingsControls(session, cfg)
         if session.timeline.enabled:
             self.show_notification(NOTIFICATION_TIMELINE_ENABLED_TEXT)

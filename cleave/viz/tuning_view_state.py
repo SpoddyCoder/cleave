@@ -9,7 +9,8 @@ from typing import TYPE_CHECKING
 
 from cleave.config import RenderOverlayPosition
 from cleave.config_schema import (
-    DEFAULT_HIGHLIGHT_ROLLOFF_MODE,
+    DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
+    DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
     DEFAULT_HARD_CUT_DURATION,
     DEFAULT_HARD_CUT_SENSITIVITY,
     DEFAULT_HARD_CUT_ENABLED,
@@ -90,7 +91,8 @@ class RenderOverlayBlock:
 class HighlightRolloffBlock:
     enabled: bool = True
     expanded: bool = False
-    mode: str = DEFAULT_HIGHLIGHT_ROLLOFF_MODE
+    mode: str = DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE
+    curve: str = DEFAULT_HIGHLIGHT_ROLLOFF_CURVE
     threshold_pct: int = 78
     ceiling_pct: int = 65
     strength_pct: int = 70
@@ -382,6 +384,7 @@ class TuningViewStateBuilder:
                 enabled=pp.highlight_rolloff.enabled,
                 expanded=pp.highlight_rolloff_expanded,
                 mode=pp.highlight_rolloff.mode,
+                curve=pp.highlight_rolloff.curve,
                 threshold_pct=pp.highlight_rolloff.threshold_pct,
                 ceiling_pct=pp.highlight_rolloff.ceiling_pct,
                 strength_pct=pp.highlight_rolloff.strength_pct,

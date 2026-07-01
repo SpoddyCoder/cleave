@@ -8,6 +8,7 @@ from enum import Enum
 import pygame
 
 from cleave.blend_modes import BlendMode
+from cleave.gl_post_process import GlPostProcess
 from OpenGL.GL import (
     GL_BLEND,
     GL_BLEND_EQUATION_RGB,
@@ -122,6 +123,26 @@ def _overlay_subimage_y(dest_y: int, active_h: int, capacity_h: int) -> int:
 
 
 @dataclass
+class _RolloffSourceSlot:
+    texture_id: int = 0
+    fbo_id: int = 0
+    depth_rbo_id: int = 0
+    width: int = 0
+    height: int = 0
+
+    def destroy(self) -> None:
+        if self.texture_id:
+            glDeleteTextures(1, [self.texture_id])
+            self.texture_id = 0
+        if self.depth_rbo_id:
+            glDeleteRenderbuffers(1, [self.depth_rbo_id])
+            self.depth_rbo_id = 0
+        if self.fbo_id:
+            glDeleteFramebuffers(1, [self.fbo_id])
+            self.fbo_id = 0
+
+
+@dataclass
 class LayerFbo:
     """Off-screen RGBA framebuffer for one compositor layer."""
 
@@ -196,6 +217,7 @@ class GlCompositor:
         self.bg = bg
         self._initialized = False
         self._layers: list[LayerFbo] = []
+        self._rolloff_sources: dict[str, _RolloffSourceSlot] = {}
         self._overlay_slots: dict[OverlayTextureSlot, _OverlaySlotState] = {}
         self._texture_realloc_count = 0
         self._content_fbo_id: int = 0
@@ -448,18 +470,80 @@ class GlCompositor:
             layer.hue_mix = hue_mix
             layer.grit_strength = grit_strength
             layer.aberration_px = aberration_px
+            self._destroy_rolloff_source(name)
+            self._ensure_rolloff_source(name, width, height)
             return
 
         raise ValueError(f"no layer FBO named {name!r}")
 
     def remove_layer_fbo(self, name: str) -> None:
         """Destroy the named FBO and remove it from the compositor stack."""
+        self._destroy_rolloff_source(name)
         for i, fbo in enumerate(self._layers):
             if fbo.name == name:
                 fbo.destroy()
                 del self._layers[i]
                 return
         raise ValueError(f"no layer FBO named {name!r}")
+
+    def _ensure_rolloff_source(self, name: str, width: int, height: int) -> _RolloffSourceSlot:
+        if not hasattr(self, "_rolloff_sources"):
+            self._rolloff_sources = {}
+        slot = self._rolloff_sources.get(name)
+        if slot is not None and slot.width == width and slot.height == height:
+            return slot
+
+        if slot is not None:
+            slot.destroy()
+
+        fbo_id, texture_id, depth_rbo_id = self._allocate_layer_framebuffer(
+            f"{name}_rolloff_source", width, height
+        )
+        slot = _RolloffSourceSlot(
+            texture_id=texture_id,
+            fbo_id=fbo_id,
+            depth_rbo_id=depth_rbo_id,
+            width=width,
+            height=height,
+        )
+        self._rolloff_sources[name] = slot
+        return slot
+
+    def rolloff_source_texture_id(self, name: str) -> int:
+        slot = self._rolloff_sources.get(name)
+        return 0 if slot is None else slot.texture_id
+
+    def copy_layer_to_rolloff_source(
+        self,
+        post_process: GlPostProcess,
+        name: str,
+        layer_texture_id: int,
+        width: int,
+        height: int,
+    ) -> None:
+        dest = self._ensure_rolloff_source(name, width, height)
+        post_process.copy_texture(layer_texture_id, dest.texture_id, width, height)
+
+    def restore_layer_from_rolloff_source(
+        self,
+        post_process: GlPostProcess,
+        name: str,
+        layer_texture_id: int,
+        width: int,
+        height: int,
+    ) -> None:
+        source_id = self.rolloff_source_texture_id(name)
+        if source_id == 0:
+            return
+        post_process.copy_texture(source_id, layer_texture_id, width, height)
+
+    def _destroy_rolloff_source(self, name: str) -> None:
+        sources = getattr(self, "_rolloff_sources", None)
+        if sources is None:
+            return
+        slot = sources.pop(name, None)
+        if slot is not None:
+            slot.destroy()
 
     def _bind_content_fbo(self) -> None:
         glBindFramebuffer(GL_FRAMEBUFFER, self._content_fbo_id)
@@ -895,6 +979,8 @@ class GlCompositor:
         for layer in self._layers:
             layer.destroy()
         self._layers.clear()
+        for name in list(getattr(self, "_rolloff_sources", {})):
+            self._destroy_rolloff_source(name)
         self._destroy_content_fbo()
         for slot in list(self._overlay_slots):
             self._destroy_overlay_slot(slot)

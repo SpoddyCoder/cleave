@@ -210,6 +210,8 @@ def init_gl_resources_heavy(
         mix_player=mix_player,
         modal_host=modal_host,
         layer_manager=layer_manager,
+        compositor=compositor,
+        post_process=post_process,
     )
     timeline_controls = make_timeline_controls(
         session=seed.session,
@@ -336,6 +338,7 @@ def tick_frame_core(
         runtime.seed.signals,
         t_sec,
         paused=paused,
+        compositor=runtime.compositor,
     )
 
     LayerFramePipeline.composite(

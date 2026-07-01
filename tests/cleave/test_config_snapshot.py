@@ -742,25 +742,27 @@ def test_write_session_snapshot_persists_render_post_fx(tmp_path: Path) -> None:
     assert round_trip.post_fx.fade_out == 3.0
     hr = post_fx["highlight_rolloff"]
     assert hr["enabled"] is True
-    assert hr["mode"] == "rolloff"
+    assert hr["mode"] == "composite"
+    assert hr["curve"] == "rolloff"
     assert hr["threshold_pct"] == 78
     assert round_trip.post_fx.highlight_rolloff.threshold_pct == 78
-    assert round_trip.post_fx.highlight_rolloff.mode == "rolloff"
+    assert round_trip.post_fx.highlight_rolloff.mode == "composite"
+    assert round_trip.post_fx.highlight_rolloff.curve == "rolloff"
 
 
-def test_write_session_snapshot_persists_highlight_rolloff_mode(tmp_path: Path) -> None:
+def test_write_session_snapshot_persists_highlight_rolloff_curve(tmp_path: Path) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
-    session.render_post_fx.highlight_rolloff.mode = "aces_fit"
+    session.render_post_fx.highlight_rolloff.curve = "aces_fit"
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
     hr = data["render"]["post_fx"]["highlight_rolloff"]
-    assert hr["mode"] == "aces_fit"
+    assert hr["curve"] == "aces_fit"
 
     round_trip = parse_render_section(data)
     assert round_trip is not None
     assert round_trip.post_fx is not None
-    assert round_trip.post_fx.highlight_rolloff.mode == "aces_fit"
+    assert round_trip.post_fx.highlight_rolloff.curve == "aces_fit"
 
 
 def test_write_session_snapshot_render_post_fx_solo_does_not_affect_enabled(
