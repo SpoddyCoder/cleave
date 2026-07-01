@@ -57,6 +57,7 @@ class RowKind(Enum):
     RENDER_POST_FX_FADE_OUT = auto()
     RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER = auto()
     RENDER_POST_FX_HIGHLIGHT_ROLLOFF_ENABLED = auto()
+    RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE = auto()
     RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD = auto()
     RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CEILING = auto()
     RENDER_POST_FX_HIGHLIGHT_ROLLOFF_STRENGTH = auto()
@@ -535,6 +536,19 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_description=(
             "Toggle highlight rolloff on the composited output.",
             "Use when bright centre peaks look blown out or flat white.",
+        ),
+    ),
+    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="render_post_fx_highlight_rolloff",
+        help_title="Mode",
+        help_entries=(("Left/Right", "cycle mode"),),
+        help_description=(
+            "Shoulder curve used above the soft knee.",
+            "rolloff: Reinhard-style filmic compression.",
+            "smoothstep: gradual S-curve toward the ceiling.",
+            "aces_fit: ACES tone-map fit scaled to the ceiling.",
         ),
     ),
     RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD: RowBehavior(

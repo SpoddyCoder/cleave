@@ -142,12 +142,28 @@ uniform float ceiling;
 uniform float strength;
 uniform float softness;
 uniform float desaturation;
+uniform int mode;
 in vec2 uv;
 out vec4 fragColor;
+
+const float ACES_AT_ONE = 2.54 / 3.16;
 
 float ss(float t) {
     t = clamp(t, 0.0, 1.0);
     return t * t * (3.0 - 2.0 * t);
+}
+
+float shoulder_filmic_lum(float norm, float eff_threshold, float eff_ceiling) {
+    float span = eff_ceiling - eff_threshold;
+    if (mode == 0) {
+        float reinhard = norm / (1.0 + norm);
+        return eff_threshold + span * (reinhard / 0.5);
+    }
+    if (mode == 1) {
+        return eff_threshold + span * ss(norm);
+    }
+    float aces = (norm * (2.51 * norm + 0.03)) / (norm * (2.43 * norm + 0.59) + 0.14);
+    return eff_threshold + span * (aces / ACES_AT_ONE);
 }
 
 void main() {
@@ -169,8 +185,7 @@ void main() {
     float knee_t = ss(min(excess / knee_width, 1.0));
     float linear_lum = threshold + excess * (1.0 - knee_t);
 
-    float reinhard = norm / (1.0 + norm);
-    float filmic_lum = threshold + (eff_ceiling - threshold) * (reinhard / 0.5);
+    float filmic_lum = shoulder_filmic_lum(norm, threshold, eff_ceiling);
 
     float past_knee = max(excess - knee_width, 0.0);
     float shoulder_span = max(headroom - knee_width, 1e-6);
@@ -595,6 +610,7 @@ class GlPostProcess:
         strength: float,
         softness: float,
         desaturation: float,
+        mode: int,
     ) -> int:
         """Compress highlights in-place via GPU shader; returns texture id."""
         if strength <= 0.0 or texture_id == 0:
@@ -625,6 +641,7 @@ class GlPostProcess:
                     "strength": strength,
                     "softness": softness,
                     "desaturation": desaturation,
+                    "mode": mode,
                 },
             )
         finally:

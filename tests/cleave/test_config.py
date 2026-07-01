@@ -650,11 +650,41 @@ render:
     assert render.post_fx is not None
     hr = render.post_fx.highlight_rolloff
     assert hr.enabled is True
+    assert hr.mode == "rolloff"
     assert hr.threshold_pct == 82
     assert hr.ceiling_pct == 65
     assert hr.strength_pct == 70
     assert hr.softness_pct == 40
     assert hr.desaturation_pct == 30
+
+
+@pytest.mark.parametrize("mode", ("rolloff", "smoothstep", "aces_fit"))
+def test_parse_render_post_fx_highlight_rolloff_valid_modes(mode: str) -> None:
+    data = yaml.safe_load(
+        f"""\
+render:
+  post_fx:
+    highlight_rolloff:
+      mode: {mode}
+"""
+    )
+    render = parse_render_section(data)
+    assert render is not None
+    assert render.post_fx is not None
+    assert render.post_fx.highlight_rolloff.mode == mode
+
+
+def test_parse_render_post_fx_highlight_rolloff_rejects_invalid_mode() -> None:
+    data = yaml.safe_load(
+        """\
+render:
+  post_fx:
+    highlight_rolloff:
+      mode: reinhard
+"""
+    )
+    with pytest.raises(ValueError, match="mode must be one of"):
+        parse_render_section(data)
 
 
 def test_parse_render_post_fx_highlight_rolloff_clamps() -> None:

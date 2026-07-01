@@ -70,6 +70,28 @@ def test_highlight_rolloff_darkens_blown_out_white(gl_context) -> None:
         strength=0.7,
         softness=0.4,
         desaturation=0.3,
+        mode=0,
+    )
+    after = _read_content_pixel(comp)
+    assert after[0] < before[0], f"expected darker RGB, got before={before} after={after}"
+
+
+def test_highlight_rolloff_smoothstep_darkens_white(gl_context) -> None:
+    comp, pp = gl_context
+    _fill_content_white(comp)
+    before = _read_content_pixel(comp)
+    assert before[0] == 255
+
+    pp.apply_highlight_rolloff(
+        comp.content_texture_id,
+        comp.content_width,
+        comp.content_height,
+        threshold=0.78,
+        ceiling=0.65,
+        strength=0.7,
+        softness=0.4,
+        desaturation=0.3,
+        mode=1,
     )
     after = _read_content_pixel(comp)
     assert after[0] < before[0], f"expected darker RGB, got before={before} after={after}"
@@ -89,6 +111,7 @@ def test_highlight_rolloff_strength_zero_is_noop(gl_context) -> None:
         strength=0.0,
         softness=0.4,
         desaturation=0.0,
+        mode=0,
     )
     after = _read_content_pixel(comp)
     assert after == before
@@ -107,6 +130,7 @@ def test_highlight_rolloff_toggle_off_vs_on(gl_context) -> None:
         strength=1.0,
         softness=0.4,
         desaturation=0.0,
+        mode=0,
     )
     compressed = _read_content_pixel(comp)
 

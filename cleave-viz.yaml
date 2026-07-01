@@ -19,6 +19,7 @@ render:
     fade_out: 4
     highlight_rolloff:
       enabled: true
+      mode: rolloff
       threshold_pct: 78
       ceiling_pct: 65
       strength_pct: 70
