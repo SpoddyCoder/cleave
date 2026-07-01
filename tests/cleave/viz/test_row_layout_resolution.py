@@ -212,6 +212,19 @@ def test_resolve_navigable_render_post_fx_sub_row_collapsed() -> None:
     )
 
 
+def test_resolve_navigable_render_post_fx_highlight_rolloff_mode_off_hides_params() -> None:
+    state = _minimal_view_state(
+        render_post_fx=RenderPostFxBlock(
+            expanded=True,
+            highlight_rolloff=HighlightRolloffBlock(expanded=True, mode="off"),
+        ),
+    )
+    threshold = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD)
+    assert threshold not in state.layout.rows
+    mode = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE)
+    assert mode in state.layout.rows
+
+
 def test_resolve_navigable_render_post_fx_highlight_rolloff_nested_collapsed() -> None:
     state = _minimal_view_state(
         render_post_fx=RenderPostFxBlock(

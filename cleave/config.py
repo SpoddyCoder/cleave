@@ -181,7 +181,6 @@ class RenderOverlayConfig:
 
 @dataclass(frozen=True)
 class HighlightRolloffConfig:
-    enabled: bool
     mode: HighlightRolloffApplyMode
     curve: HighlightRolloffCurve
     threshold_pct: int

@@ -128,8 +128,8 @@ def test_format_row_value_track_and_render() -> None:
         state, RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD)
     ) == "78%"
     assert format_row_value(
-        state, RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_ENABLED)
-    ) == "on"
+        state, RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE)
+    ) == "composite"
 
 
 def test_row_labeled_display_text_settings() -> None:
@@ -276,7 +276,7 @@ def test_apply_field_horizontal_track_header_solo_and_expand() -> None:
 
 
 def test_row_fields_count() -> None:
-        assert len(ROW_FIELDS) == 59
+        assert len(ROW_FIELDS) == 58
 
 
 def test_row_kinds_requiring_fields_registry_complete() -> None:

@@ -741,7 +741,6 @@ def test_write_session_snapshot_persists_render_post_fx(tmp_path: Path) -> None:
     assert round_trip.post_fx.fade_in == 12.0
     assert round_trip.post_fx.fade_out == 3.0
     hr = post_fx["highlight_rolloff"]
-    assert hr["enabled"] is True
     assert hr["mode"] == "composite"
     assert hr["curve"] == "rolloff"
     assert hr["threshold_pct"] == 78

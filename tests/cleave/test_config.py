@@ -649,7 +649,6 @@ render:
     assert render is not None
     assert render.post_fx is not None
     hr = render.post_fx.highlight_rolloff
-    assert hr.enabled is True
     assert hr.mode == "composite"
     assert hr.curve == "rolloff"
     assert hr.threshold_pct == 82
@@ -675,7 +674,7 @@ render:
     assert render.post_fx.highlight_rolloff.curve == curve
 
 
-@pytest.mark.parametrize("mode", ("composite", "per_layer"))
+@pytest.mark.parametrize("mode", ("off", "per_layer", "composite"))
 def test_parse_render_post_fx_highlight_rolloff_valid_modes(mode: str) -> None:
     data = yaml.safe_load(
         f"""\

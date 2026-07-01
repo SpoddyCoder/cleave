@@ -75,7 +75,6 @@ def default_render_overlay_runtime() -> RenderOverlayRuntime:
 
 @dataclass
 class HighlightRolloffRuntime:
-    enabled: bool
     mode: HighlightRolloffApplyMode
     curve: HighlightRolloffCurve
     threshold_pct: int
@@ -210,7 +209,6 @@ def render_post_fx_runtime_from_cfg(
             fade_out=post_fx.fade_out,
             highlight_rolloff=replace(
                 default_highlight_rolloff_runtime(),
-                enabled=hr.enabled,
                 mode=hr.mode,
                 curve=hr.curve,
                 threshold_pct=hr.threshold_pct,

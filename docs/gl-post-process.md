@@ -2,10 +2,11 @@
 
 Layer bloom, grit, and highlight rolloff run in [cleave/gl_post_process.py](../cleave/gl_post_process.py) via **moderngl** on the same OpenGL context as pygame and the fixed-function compositor in [cleave/gl_compositor.py](../cleave/gl_compositor.py).
 
-Highlight rolloff supports two apply modes under `render.post_fx.highlight_rolloff.mode`:
+Highlight rolloff supports three apply modes under `render.post_fx.highlight_rolloff.mode`:
 
-- `composite` (default): after all layers are stacked in [cleave/viz/frame_finish.py](../cleave/viz/frame_finish.py)
+- `off`: disabled
 - `per_layer`: on each active layer before compositing in [cleave/viz/layer_pipeline.py](../cleave/viz/layer_pipeline.py)
+- `composite` (default): after all layers are stacked in [cleave/viz/frame_finish.py](../cleave/viz/frame_finish.py)
 
 Per-layer mode keeps a frozen rolloff source texture per layer slot in the compositor so paused live tuning can re-apply rolloff without stacking. The shoulder curve is `render.post_fx.highlight_rolloff.curve` (`rolloff`, `smoothstep`, `aces_fit`).
 

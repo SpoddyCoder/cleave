@@ -103,7 +103,6 @@ def _snapshot_render_overlay(
     highlight_rolloff: dict[str, Any] = (
         dict(hr_orig) if isinstance(hr_orig, dict) else {}
     )
-    highlight_rolloff["enabled"] = hr_payload["enabled"]
     highlight_rolloff["mode"] = hr_payload["mode"]
     highlight_rolloff["curve"] = hr_payload["curve"]
     highlight_rolloff["threshold_pct"] = hr_payload["threshold_pct"]

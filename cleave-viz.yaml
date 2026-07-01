@@ -18,7 +18,6 @@ render:
     fade_in: 15
     fade_out: 4
     highlight_rolloff:
-      enabled: true
       mode: composite
       curve: rolloff
       threshold_pct: 78

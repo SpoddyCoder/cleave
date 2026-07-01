@@ -121,6 +121,39 @@ def test_builder_patches_highlight_rolloff_curve_without_structure_rebuild() -> 
     assert view_b.render_post_fx.highlight_rolloff.curve == "smoothstep"
 
 
+def test_structure_signature_invalidates_on_highlight_rolloff_mode() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.render_post_fx.highlight_rolloff.mode = "composite"
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.render_post_fx.highlight_rolloff.mode = "off"
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_builder_rebuilds_layout_when_highlight_rolloff_mode_changes() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    session.render_post_fx.expanded = True
+    session.render_post_fx.highlight_rolloff_expanded = True
+    session.render_post_fx.highlight_rolloff.mode = "composite"
+    builder = controls._view_state
+
+    view_on = builder.build(paused=False)
+    threshold = RowDescriptor(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD)
+    assert threshold in view_on.layout.rows
+
+    session.render_post_fx.highlight_rolloff.mode = "off"
+    view_off = builder.build(paused=False)
+    assert view_off.layout is not view_on.layout
+    assert threshold not in view_off.layout.rows
+
+
 def test_minimal_view_state_still_builds_layout() -> None:
     state = _minimal_view_state()
     assert state.layout is not None

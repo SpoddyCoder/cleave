@@ -89,7 +89,6 @@ class RenderOverlayBlock:
 
 @dataclass
 class HighlightRolloffBlock:
-    enabled: bool = True
     expanded: bool = False
     mode: str = DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE
     curve: str = DEFAULT_HIGHLIGHT_ROLLOFF_CURVE
@@ -278,6 +277,7 @@ def view_state_structure_signature(
             "enabled": pp.enabled,
             "expanded": pp.expanded,
             "highlight_rolloff_expanded": pp.highlight_rolloff_expanded,
+            "highlight_rolloff_mode": pp.highlight_rolloff.mode,
         },
         "render_timeline": {"enabled": tl.enabled},
         "timeline": {"enabled": tl.enabled},
@@ -381,7 +381,6 @@ class TuningViewStateBuilder:
             enabled=pp.enabled,
             expanded=pp.expanded,
             highlight_rolloff=HighlightRolloffBlock(
-                enabled=pp.highlight_rolloff.enabled,
                 expanded=pp.highlight_rolloff_expanded,
                 mode=pp.highlight_rolloff.mode,
                 curve=pp.highlight_rolloff.curve,
@@ -519,7 +518,6 @@ class TuningViewStateBuilder:
                 fade_out=pp.fade_out,
                 highlight_rolloff=replace(
                     structure.render_post_fx.highlight_rolloff,
-                    enabled=pp.highlight_rolloff.enabled,
                     expanded=pp.highlight_rolloff_expanded,
                     mode=pp.highlight_rolloff.mode,
                     curve=pp.highlight_rolloff.curve,

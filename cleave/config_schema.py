@@ -193,11 +193,12 @@ DEFAULT_RENDER_OVERLAY_BORDER_WIDTH = 4
 DEFAULT_RENDER_POST_FX_FADE_IN = 30.0
 DEFAULT_RENDER_POST_FX_FADE_OUT = 4.0
 
-HighlightRolloffApplyMode = Literal["composite", "per_layer"]
+HighlightRolloffApplyMode = Literal["off", "per_layer", "composite"]
 
 HIGHLIGHT_ROLLOFF_APPLY_MODES: tuple[HighlightRolloffApplyMode, ...] = (
-    "composite",
+    "off",
     "per_layer",
+    "composite",
 )
 
 DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE: HighlightRolloffApplyMode = "composite"
@@ -212,7 +213,6 @@ HIGHLIGHT_ROLLOFF_CURVES: tuple[HighlightRolloffCurve, ...] = (
 
 DEFAULT_HIGHLIGHT_ROLLOFF_CURVE: HighlightRolloffCurve = "rolloff"
 
-DEFAULT_HIGHLIGHT_ROLLOFF_ENABLED = True
 DEFAULT_HIGHLIGHT_ROLLOFF_THRESHOLD_PCT = 78
 DEFAULT_HIGHLIGHT_ROLLOFF_CEILING_PCT = 65
 DEFAULT_HIGHLIGHT_ROLLOFF_STRENGTH_PCT = 70
@@ -292,6 +292,8 @@ def _parse_highlight_rolloff_apply_mode(
     ctx: ParseCtx,
     label: str = "render.post_fx.highlight_rolloff.mode",
 ) -> HighlightRolloffApplyMode:
+    if value is False:
+        value = "off"
     if not isinstance(value, str):
         raise ValueError(f"{label} must be a string")
     if value not in HIGHLIGHT_ROLLOFF_APPLY_MODES:
@@ -924,7 +926,6 @@ def _build_highlight_rolloff_config(parsed: dict[str, Any]) -> Any:
 
     threshold_pct = parsed["threshold_pct"]
     return HighlightRolloffConfig(
-        enabled=parsed["enabled"],
         mode=parsed["mode"],
         curve=parsed["curve"],
         threshold_pct=threshold_pct,
@@ -940,13 +941,6 @@ def _build_highlight_rolloff_config(parsed: dict[str, Any]) -> Any:
 HIGHLIGHT_ROLLOFF_SECTION = SectionDescriptor(
     yaml_key="highlight_rolloff",
     fields=(
-        FieldDescriptor(
-            "enabled",
-            DEFAULT_HIGHLIGHT_ROLLOFF_ENABLED,
-            "session",
-            lambda raw, _ctx, _label: bool(raw),
-            _dump_scalar,
-        ),
         FieldDescriptor(
             "mode",
             DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
@@ -1011,7 +1005,6 @@ HIGHLIGHT_ROLLOFF_SECTION = SectionDescriptor(
     optional=True,
     default_factory=lambda: _build_highlight_rolloff_config(
         {
-            "enabled": DEFAULT_HIGHLIGHT_ROLLOFF_ENABLED,
             "mode": DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
             "curve": DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
             "threshold_pct": DEFAULT_HIGHLIGHT_ROLLOFF_THRESHOLD_PCT,
@@ -1584,7 +1577,6 @@ def persist_render(ctx: PersistCtx) -> dict[str, Any]:
         "fade_in": runtime_pp.fade_in,
         "fade_out": runtime_pp.fade_out,
         "highlight_rolloff": {
-            "enabled": runtime_pp.highlight_rolloff.enabled,
             "mode": runtime_pp.highlight_rolloff.mode,
             "curve": runtime_pp.highlight_rolloff.curve,
             "threshold_pct": runtime_pp.highlight_rolloff.threshold_pct,
@@ -1694,7 +1686,6 @@ def default_render_overlay_runtime_values() -> dict[str, Any]:
 
 def default_highlight_rolloff_runtime_values() -> dict[str, Any]:
     return {
-        "enabled": DEFAULT_HIGHLIGHT_ROLLOFF_ENABLED,
         "mode": DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
         "curve": DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
         "threshold_pct": DEFAULT_HIGHLIGHT_ROLLOFF_THRESHOLD_PCT,
