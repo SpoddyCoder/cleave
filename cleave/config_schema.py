@@ -201,6 +201,14 @@ HIGHLIGHT_ROLLOFF_APPLY_MODES: tuple[HighlightRolloffApplyMode, ...] = (
     "composite",
 )
 
+HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES: tuple[
+    tuple[HighlightRolloffApplyMode, str], ...
+] = (
+    ("off", "disabled."),
+    ("per_layer", "on each active layer before compositing."),
+    ("composite", "after all layers are stacked (default)."),
+)
+
 DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE: HighlightRolloffApplyMode = "composite"
 
 HighlightRolloffCurve = Literal["rolloff", "smoothstep", "aces_fit"]
@@ -209,6 +217,12 @@ HIGHLIGHT_ROLLOFF_CURVES: tuple[HighlightRolloffCurve, ...] = (
     "rolloff",
     "smoothstep",
     "aces_fit",
+)
+
+HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES: tuple[tuple[HighlightRolloffCurve, str], ...] = (
+    ("rolloff", "Reinhard-style filmic compression."),
+    ("smoothstep", "gradual S-curve toward the ceiling."),
+    ("aces_fit", "ACES tone-map fit scaled to the ceiling."),
 )
 
 DEFAULT_HIGHLIGHT_ROLLOFF_CURVE: HighlightRolloffCurve = "rolloff"
