@@ -306,14 +306,14 @@ def make_tuning_controls(
     def on_highlight_rolloff_apply_mode_change(old_mode: str, new_mode: str) -> None:
         if compositor is None or post_process is None:
             return
-        hr = session.render_post_fx.highlight_rolloff
-        if not hr.enabled or session.render_post_fx_solo:
+        if session.render_post_fx_solo:
             return
+        hr = session.render_post_fx.highlight_rolloff
         for layer in layers:
             if not layer.fbo.enabled:
                 continue
             fbo = layer.fbo
-            if new_mode == "per_layer" and old_mode == "composite":
+            if new_mode == "per_layer" and old_mode in ("composite", "off"):
                 compositor.copy_layer_to_rolloff_source(
                     post_process,
                     layer.slot,
@@ -324,7 +324,7 @@ def make_tuning_controls(
                 LayerFramePipeline.apply_layer_highlight_rolloff(
                     layer, post_process, compositor, hr
                 )
-            elif new_mode == "composite" and old_mode == "per_layer":
+            elif old_mode == "per_layer" and new_mode in ("composite", "off"):
                 compositor.restore_layer_from_rolloff_source(
                     post_process,
                     layer.slot,

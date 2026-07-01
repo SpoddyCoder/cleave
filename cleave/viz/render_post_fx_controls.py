@@ -64,12 +64,6 @@ class RenderPostFxControls:
             return
         pp.highlight_rolloff_expanded = expanded
 
-    def set_highlight_rolloff_enabled(self, enabled: bool) -> None:
-        hr = self.session.render_post_fx.highlight_rolloff
-        if hr.enabled == enabled:
-            return
-        hr.enabled = enabled
-
     def _enforce_ceiling_vs_threshold(self) -> None:
         hr = self.session.render_post_fx.highlight_rolloff
         hr.ceiling_pct = clamp_highlight_rolloff_ceiling_pct(

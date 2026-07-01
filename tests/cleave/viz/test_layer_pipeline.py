@@ -163,7 +163,6 @@ def test_render_frame_applies_per_layer_highlight_rolloff_when_playing() -> None
     session = _session(("layer_1",))
     session.render_post_fx = default_render_post_fx_runtime(enabled=True)
     hr = session.render_post_fx.highlight_rolloff
-    hr.enabled = True
     hr.mode = "per_layer"
     compositor = MagicMock()
     compositor.rolloff_source_texture_id.return_value = 22
@@ -204,7 +203,6 @@ def test_render_frame_paused_per_layer_uses_frozen_rolloff_source() -> None:
     session = _session(("layer_1",))
     session.render_post_fx = default_render_post_fx_runtime(enabled=True)
     hr = session.render_post_fx.highlight_rolloff
-    hr.enabled = True
     hr.mode = "per_layer"
     compositor = MagicMock()
     compositor.rolloff_source_texture_id.return_value = 22

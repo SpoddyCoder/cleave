@@ -56,7 +56,6 @@ class RowKind(Enum):
     RENDER_POST_FX_FADE_IN = auto()
     RENDER_POST_FX_FADE_OUT = auto()
     RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER = auto()
-    RENDER_POST_FX_HIGHLIGHT_ROLLOFF_ENABLED = auto()
     RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE = auto()
     RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CURVE = auto()
     RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD = auto()
@@ -529,16 +528,6 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "Preserves hue by scaling RGB to the compressed luminance.",
         ),
     ),
-    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_ENABLED: RowBehavior(
-        RowAffordance.VALUE_STEP,
-        repeatable=True,
-        parent_group="render_post_fx_highlight_rolloff",
-        help_title="Enabled",
-        help_description=(
-            "Toggle highlight rolloff on the composited output.",
-            "Use when bright centre peaks look blown out or flat white.",
-        ),
-    ),
     RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
@@ -547,8 +536,9 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_entries=(("Left/Right", "cycle mode"),),
         help_description=(
             "Where highlight rolloff is applied.",
-            "composite: after all layers are stacked (default).",
+            "off: disabled.",
             "per_layer: on each active layer before compositing.",
+            "composite: after all layers are stacked (default).",
         ),
     ),
     RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CURVE: RowBehavior(

@@ -324,20 +324,27 @@ RENDER_OVERLAY_SECTION = ExpandSectionDef(
     ),
 )
 
-RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SECTION = ExpandSectionDef(
-    header_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER,
-    context="global",
-    read_expanded=_render_post_fx_highlight_rolloff_expanded,
-    toggle=_toggle_render_post_fx_highlight_rolloff,
+RENDER_POST_FX_HIGHLIGHT_ROLLOFF_ACTIVE = ConditionalRowsDef(
+    name="highlight_rolloff_active",
+    predicate=lambda state, _desc: state.render_post_fx.highlight_rolloff.mode != "off",
     children=(
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_ENABLED),
-        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE),
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CURVE),
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD),
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CEILING),
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_STRENGTH),
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SOFTNESS),
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_DESATURATION),
+    ),
+)
+
+RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SECTION = ExpandSectionDef(
+    header_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER,
+    context="global",
+    read_expanded=_render_post_fx_highlight_rolloff_expanded,
+    toggle=_toggle_render_post_fx_highlight_rolloff,
+    children=(
+        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE),
+        SectionNode(conditional=RENDER_POST_FX_HIGHLIGHT_ROLLOFF_ACTIVE),
     ),
 )
 

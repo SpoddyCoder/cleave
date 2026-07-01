@@ -264,12 +264,6 @@ def _format_render_post_fx_fade_out(
     return f"{state.render_post_fx.fade_out:.1f}s"
 
 
-def _format_render_post_fx_highlight_rolloff_enabled(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return "on" if state.render_post_fx.highlight_rolloff.enabled else "off"
-
-
 def _format_render_post_fx_highlight_rolloff_mode(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
@@ -562,13 +556,6 @@ def _apply_render_post_fx_fade_out(
     controls._render_post_fx.set_fade_out(
         controls.session.render_post_fx.fade_out + delta
     )
-
-
-def _apply_render_post_fx_highlight_rolloff_enabled(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
-    _shift: bool,
-) -> None:
-    controls._render_post_fx.set_highlight_rolloff_enabled(forward)
 
 
 def _apply_render_post_fx_highlight_rolloff_mode(
@@ -1102,12 +1089,6 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         panel_label="highlight rolloff",
         present_style=RowPresentStyle.EXPAND_SUBHEADER,
         apply_horizontal=_apply_expand_subheader,
-    ),
-    RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_ENABLED: RowFieldDef(
-        panel_label="enabled",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_post_fx_highlight_rolloff_enabled,
-        apply_horizontal=_apply_render_post_fx_highlight_rolloff_enabled,
     ),
     RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE: RowFieldDef(
         panel_label="mode",

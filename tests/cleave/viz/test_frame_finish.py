@@ -19,7 +19,6 @@ def test_finish_content_frame_applies_highlight_rolloff_when_active() -> None:
     core.compositor.content_fbo_id = 99
     core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
     hr = core.seed.session.render_post_fx.highlight_rolloff
-    hr.enabled = True
     hr.mode = "composite"
     hr.curve = "rolloff"
     hr.threshold_pct = 80
@@ -57,7 +56,6 @@ def test_finish_content_frame_passes_highlight_rolloff_curve_index() -> None:
     core.compositor.content_fbo_id = 99
     core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
     hr = core.seed.session.render_post_fx.highlight_rolloff
-    hr.enabled = True
     hr.mode = "composite"
     hr.curve = "aces_fit"
 
@@ -80,7 +78,7 @@ def test_finish_content_frame_skips_highlight_rolloff_when_solo() -> None:
     core.compositor.content_height = 720
     core.compositor.content_fbo_id = 99
     core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
-    core.seed.session.render_post_fx.highlight_rolloff.enabled = True
+    core.seed.session.render_post_fx.highlight_rolloff.mode = "composite"
 
     with patch(
         "cleave.viz.frame_finish._composite_render_overlay",
@@ -98,7 +96,7 @@ def test_finish_content_frame_applies_highlight_rolloff_when_post_fx_disabled() 
     core.compositor.content_height = 720
     core.compositor.content_fbo_id = 99
     core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=False)
-    core.seed.session.render_post_fx.highlight_rolloff.enabled = True
+    core.seed.session.render_post_fx.highlight_rolloff.mode = "composite"
 
     with patch(
         "cleave.viz.frame_finish._composite_render_overlay",
@@ -117,7 +115,6 @@ def test_finish_content_frame_skips_composite_rolloff_when_per_layer() -> None:
     core.compositor.content_fbo_id = 99
     core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
     hr = core.seed.session.render_post_fx.highlight_rolloff
-    hr.enabled = True
     hr.mode = "per_layer"
 
     with patch(

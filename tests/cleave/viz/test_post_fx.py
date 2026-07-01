@@ -36,12 +36,12 @@ def test_live_frame_fade_alpha_solo() -> None:
 
 def test_highlight_rolloff_active() -> None:
     pp = default_render_post_fx_runtime(enabled=True)
-    pp.highlight_rolloff.enabled = True
+    pp.highlight_rolloff.mode = "composite"
     assert highlight_rolloff_active(pp, solo=False) is True
     assert highlight_rolloff_active(pp, solo=True) is False
     pp.enabled = False
     assert highlight_rolloff_active(pp, solo=False) is True
-    pp.highlight_rolloff.enabled = False
+    pp.highlight_rolloff.mode = "off"
     assert highlight_rolloff_active(pp, solo=False) is False
 
 

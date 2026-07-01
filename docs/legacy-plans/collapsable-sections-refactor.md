@@ -22,7 +22,9 @@ Not: value toggles without an arrow (hard cut enabled), mode cycling rows.
 
 **Sibling rows** at the current tree level that appear or disappear based on a **value predicate** on session or view state. No expand arrow; no separate expanded flag. The driving row stays visible (e.g. switching mode, hard cut enabled).
 
-Examples: projectm-only preset switching params; hard-cut duration/sensitivity when hard cut is on.
+Examples: projectm-only preset switching params; hard-cut duration/sensitivity when hard cut is on; highlight rolloff params when mode is not `off`.
+
+**Structure signature:** predicates run when `RowLayout.build()` runs, which happens only when `view_state_structure_signature()` changes ([cleave/viz/tuning_view_state.py](cleave/viz/tuning_view_state.py)). If the gating field is missing from the signature, sibling rows stay stale until some unrelated change forces a rebuild. Add every field that controls conditional row presence to the signature; add a matching test in [tests/cleave/viz/test_view_state_structure.py](tests/cleave/viz/test_view_state_structure.py).
 
 ### Panel anchor (exception)
 
@@ -266,14 +268,17 @@ Left/Right mutations register `apply_horizontal` on the field def; expand toggle
    - optional `append_dynamic_children` for roster-driven leaf rows
 4. Attach the section under the correct parent in the section tree (`ROOT_SECTION_NODES`, `TRACK_SECTION`, `RENDER_SECTION_NODES`, or a nested `SectionNode(expand=...)`).
 5. Register `RowFieldDef` in [cleave/viz/row_fields.py](cleave/viz/row_fields.py) with `EXPAND_SUBHEADER` (nested subsection) or `COMPOSITE_HEADER` (top-level render/layer header) as appropriate; set `panel_label` (and `header_prefix` / `header_suffix` for composite headers). Expand arrows are automatic via `format_value` or `expand_arrow_for_header`.
-6. No new branches in [cleave/viz/tuning_panel_draw.py](cleave/viz/tuning_panel_draw.py) or [cleave/viz/controls.py](cleave/viz/controls.py) (`apply_expand_toggle` handles expand input).
+6. Ensure the section `*_expanded` flag (or disable state when using `collapse_on_disable`) is in `view_state_structure_signature()` so child rows appear and disappear immediately.
+7. No new branches in [cleave/viz/tuning_panel_draw.py](cleave/viz/tuning_panel_draw.py) or [cleave/viz/controls.py](cleave/viz/controls.py) (`apply_expand_toggle` handles expand input).
 
 ### New conditional rows
 
 1. Add `RowKind` leaf rows with `RowBehavior` in [cleave/viz/row_semantics.py](cleave/viz/row_semantics.py).
 2. Define a `ConditionalRowsDef` with a named predicate; attach as `SectionNode(conditional=...)` under the correct parent in the section tree.
 3. Register `RowFieldDef` in [cleave/viz/row_fields.py](cleave/viz/row_fields.py) with `LABELED_VALUE`, `format_value`, and `apply_horizontal`.
-4. No arrow, no expanded bool, no parallel predicate map, no new draw or control branches.
+4. Add each predicate input field to `view_state_structure_signature()` in [cleave/viz/tuning_view_state.py](cleave/viz/tuning_view_state.py) (layer fields under `layers`, render fields under `render_post_fx` / `render_overlay`, etc.). Without this, show/hide lags until another structural change rebuilds the layout.
+5. Add `test_structure_signature_invalidates_on_*` (and optionally a layout row-presence test) in [tests/cleave/viz/test_view_state_structure.py](tests/cleave/viz/test_view_state_structure.py).
+6. No arrow, no expanded bool, no parallel predicate map, no new draw or control branches.
 
 ### New value row
 

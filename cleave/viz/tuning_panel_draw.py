@@ -532,18 +532,6 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
         if not state.render_post_fx.enabled:
             return DISABLED
 
-    if kind in {
-        RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE,
-        RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CURVE,
-        RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD,
-        RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CEILING,
-        RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_STRENGTH,
-        RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SOFTNESS,
-        RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_DESATURATION,
-    }:
-        if not state.render_post_fx.highlight_rolloff.enabled:
-            return DISABLED
-
     if kind == RowKind.RENDER_TIMELINE_HEADER:
         if not state.render_timeline.enabled:
             return DISABLED
