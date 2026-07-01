@@ -8,6 +8,8 @@ Highlight rolloff supports three apply modes under `render.post_fx.highlight_rol
 - `per_layer`: on each active layer before compositing in [cleave/viz/layer_pipeline.py](../cleave/viz/layer_pipeline.py)
 - `composite` (default): after all layers are stacked in [cleave/viz/frame_finish.py](../cleave/viz/frame_finish.py)
 
+Both apply paths gate on `highlight_rolloff_active()` in [cleave/viz/post_fx.py](../cleave/viz/post_fx.py), which requires `render.post_fx.enabled`, `mode != "off"`, and (for composite) not `render_post_fx_solo`. The parent **Render: POST FX** eye toggle must disable highlight rolloff the same way it disables fade (`live_frame_fade_alpha`). UI dimming of sub-rows is not enough; runtime helpers must check `pp.enabled`.
+
 Per-layer mode keeps a frozen rolloff source texture per layer slot in the compositor so paused live tuning can re-apply rolloff without stacking. The shoulder curve is `render.post_fx.highlight_rolloff.curve` (`rolloff`, `smoothstep`, `aces_fit`).
 
 ## Incident: silent all-black shader output (2026)
@@ -47,6 +49,13 @@ After this fix, the GPU highlight rolloff path matched the CPU math and was ~15x
 Per-layer highlight rolloff had no visible effect while composite mode worked. The cause was `_dest_fbo_for(src, texture_id, ...)`: it attached the sampled `src` texture as the render target and used `texture_id` only as a cache key. For in-place passes (bloom, grit, composite rolloff) `src` and `texture_id` are the same texture, so it worked by accident. The per-layer path is the first pass whose sample source differs from its write destination (`copy_texture` and `apply_highlight_rolloff(..., source_texture_id=...)`), so every draw wrote back onto the source and left the layer texture untouched.
 
 Fix: `_dest_fbo_for(texture_id, ...)` now attaches the external texture for `texture_id` (the destination), so source and destination are decoupled. When they coincide the behavior is identical to before.
+
+## Checklist for new render post-FX children
+
+When adding a subsection under **Render: POST FX** (new YAML fields, panel rows, or GPU passes):
+
+1. **Respect `render.post_fx.enabled`.** Reuse `highlight_rolloff_active()` or an equivalent helper that checks `pp.enabled` and `render_post_fx_solo` where applicable. Do not gate only on a child `mode` or strength field.
+2. **Test with `enabled=False`.** Add or extend tests in [tests/cleave/viz/test_post_fx.py](../tests/cleave/viz/test_post_fx.py), [tests/cleave/viz/test_frame_finish.py](../tests/cleave/viz/test_frame_finish.py), and/or [tests/cleave/viz/test_layer_pipeline.py](../tests/cleave/viz/test_layer_pipeline.py) asserting the effect is skipped when the parent section is disabled.
 
 ## Checklist for new GPU passes
 

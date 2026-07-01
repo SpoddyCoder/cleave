@@ -208,7 +208,7 @@ def apply_highlight_rolloff_rgba(
 
 
 def highlight_rolloff_active(pp: RenderPostFxRuntime, *, solo: bool) -> bool:
-    return pp.highlight_rolloff.mode != "off" and not solo
+    return pp.enabled and pp.highlight_rolloff.mode != "off" and not solo
 
 
 def live_frame_fade_alpha(

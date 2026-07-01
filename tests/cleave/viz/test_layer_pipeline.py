@@ -196,6 +196,40 @@ def test_render_frame_applies_per_layer_highlight_rolloff_when_playing() -> None
     assert post_process.apply_highlight_rolloff.call_args.kwargs["source_texture_id"] == 22
 
 
+def test_render_frame_skips_per_layer_highlight_rolloff_when_post_fx_disabled() -> None:
+    layer = _stem_layer("layer_1")
+    layer.fbo.enabled = True
+    layer.fbo.texture_id = 11
+    session = _session(("layer_1",))
+    session.render_post_fx = default_render_post_fx_runtime(enabled=False)
+    session.render_post_fx.highlight_rolloff.mode = "per_layer"
+    compositor = MagicMock()
+    post_process = MagicMock()
+    effect_runtime = MagicMock()
+    effect_runtime.modifiers.return_value = {"layer_1": MagicMock(
+        opacity=1.0, flash_alpha=0.0, bloom_strength=0.0, hue_rgb=(1, 1, 1),
+        hue_mix=0.0, grit_strength=0.0, aberration_px=0.0,
+    )}
+
+    with patch("cleave.viz.layer_pipeline._render_layer_fbo"):
+        LayerFramePipeline.render_frame(
+            session,
+            [layer],
+            {"layer_1": layer},
+            MagicMock(),
+            512,
+            post_process,
+            effect_runtime,
+            None,
+            1.0,
+            paused=False,
+            compositor=compositor,
+        )
+
+    compositor.copy_layer_to_rolloff_source.assert_not_called()
+    post_process.apply_highlight_rolloff.assert_not_called()
+
+
 def test_render_frame_paused_per_layer_uses_frozen_rolloff_source() -> None:
     layer = _stem_layer("layer_1")
     layer.fbo.enabled = True
