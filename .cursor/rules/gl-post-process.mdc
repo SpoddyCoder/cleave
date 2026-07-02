@@ -1,22 +1,42 @@
 ---
 description: moderngl GPU post-process pitfalls and verification
 globs:
-  - cleave/gl_post_process.py
-  - tests/cleave/test_highlight_rolloff*.py
-  - tests/cleave/test_gl_post_process.py
+  - cleave/gl_*.py
+  - cleave/viz/post_fx.py
+  - cleave/viz/frame_finish.py
+  - cleave/viz/layer_pipeline.py
+  - cleave/viz/render_post_fx_controls.py
+  - tests/cleave/test_gl_*.py
+  - tests/cleave/test_*rolloff*.py
+  - tests/cleave/test_hdr_*.py
+  - tests/cleave/test_chroma_*.py
+  - tests/cleave/viz/test_post_fx.py
+  - tests/cleave/viz/test_frame_finish.py
+  - tests/cleave/viz/test_layer_pipeline.py
 ---
 
 # GPU post-processing (moderngl)
 
-Full write-up: [docs/gl-post-process.md](docs/gl-post-process.md).
+Shader passes in [cleave/gl_post_process.py](cleave/gl_post_process.py) share the pygame GL context with [cleave/gl_compositor.py](cleave/gl_compositor.py). Per-layer wiring: [cleave/viz/layer_pipeline.py](cleave/viz/layer_pipeline.py). Composite wiring and present: [cleave/viz/frame_finish.py](cleave/viz/frame_finish.py) (`finish_content_frame`). Active helpers and CPU reference math: [cleave/viz/post_fx.py](cleave/viz/post_fx.py).
 
-## Critical pitfall
+## Runtime gating
 
-`GlPostProcess` fullscreen passes use a shared quad VBO. **Buffer data must be binary float32**, not ASCII strings like `b"-1.0 -1.0 ..."`. Wrong encoding produces degenerate geometry, all-black output, and no GL error. This broke bloom, grit, and highlight rolloff until fixed.
+Reuse or add `*_active()` helpers in `post_fx.py` that check `render.post_fx.enabled`, child mode/strength, and `render_post_fx_solo`. Panel dimming is not enough. Test `enabled=False` in `test_post_fx.py`, `test_frame_finish.py`, and/or `test_layer_pipeline.py`.
 
-## Adding a new pass
+## HDR (`render.hdr_compositing`)
 
-- Reuse `_draw_quad` (calls `_ensure_moderngl_draw_state` before draw).
-- In-place writes: copy source to ping buffer, then draw to `_dest_fbo_for(external_texture)`.
-- Wrap in `_save_gl_state` / `_restore_gl_state` and `_prepare_fixed_function_gl`.
-- Confirm pixels change with integration or probe tests; mocks alone are insufficient.
+When enabled, compositor FBOs use `GL_RGBA16F` ([cleave/gl_color_format.py](cleave/gl_color_format.py)). `GlPostProcess` must match via `moderngl_external_dtype` / `moderngl_internal_dtype` (`f2` half-float, `f1` for 8-bit internal). **Never `u1` for 8-bit internal buffers** (breaks copy/bloom/grit). Skip output clamp when wired for `RGBA16F` (`hdr` uniform). 8-bit black-key stacking washes bright layers before tone curves.
+
+`finish_content_frame` order: HDR display shoulder (fixed constants in `post_fx.py`; not gated on post-FX `enabled`) -> user composite highlight rolloff -> user composite chroma boost -> frame fade -> overlay -> present (8-bit clamp). Per-layer rolloff/chroma_boost keep frozen compositor source textures for paused live tuning.
+
+## Known pitfalls (GlPostProcess)
+
+1. **Quad VBO: binary float32** (`numpy.float32.tobytes()`), never ASCII strings like `b"-1.0 -1.0 ..."`. Wrong bytes collapse geometry, all-black output, no GL error.
+2. **`_dest_fbo_for(texture_id)` attaches the write target**, not the sample source. Per-layer passes use different textures; attaching `src` silently no-ops.
+3. **In-place writes: copy-then-draw** (`_copy_prog` to ping, draw to `_dest_fbo_for`). Never sample a texture bound as the active draw attachment.
+
+## New GPU pass
+
+- Draw via `_draw_quad` (`_ensure_moderngl_draw_state()`; compositor fixed-function state can block shader output).
+- Wrap in `_save_gl_state` / `_restore_gl_state`, then `_prepare_fixed_function_gl()`.
+- Confirm pixels change in `test_highlight_rolloff_gpu_probe.py` or `*_gl_integration.py`; mocks miss silent no-ops.
