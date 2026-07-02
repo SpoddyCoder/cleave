@@ -125,6 +125,7 @@ def cmd_render(args: argparse.Namespace) -> None:
             config=args.config,
             output=args.output,
             high_quality=args.high_quality,
+            full_res=args.full_res,
             start_sec=args.start,
             end_sec=args.end,
         )
@@ -260,6 +261,13 @@ def build_parser() -> argparse.ArgumentParser:
         dest="high_quality",
         action="store_true",
         help="veryslow libx264 preset for best encode quality (slower)",
+    )
+    render.add_argument(
+        "-fr",
+        "--full-res",
+        dest="full_res",
+        action="store_true",
+        help="render every layer at render.width x render.height",
     )
     render.add_argument(
         "--start",
