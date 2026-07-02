@@ -15,7 +15,7 @@ render:
   fps: 60
   hdr_compositing: true
   post_fx:
-    enabled: true
+    enabled: false
     fade_in: 15
     fade_out: 4
     highlight_rolloff:
