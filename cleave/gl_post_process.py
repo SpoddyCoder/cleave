@@ -1,7 +1,4 @@
-"""GPU post-processing (bloom, grit, highlight rolloff) via moderngl sharing the active pygame GL context.
-
-See docs/gl-post-process.md for moderngl buffer and verification conventions.
-"""
+"""GPU post-processing (bloom, grit, highlight rolloff, chroma boost) via moderngl sharing the active pygame GL context."""
 
 from __future__ import annotations
 
