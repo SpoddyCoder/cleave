@@ -2,13 +2,26 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 
+from cleave.config import CleaveConfig, render_hdr_compositing
 from cleave.config_schema import DEFAULT_HIGHLIGHT_ROLLOFF_CURVE, HighlightRolloffCurve
 from cleave.easing import fade_alpha
 from cleave.viz.session import RenderPostFxRuntime
 
+if TYPE_CHECKING:
+    from cleave.gl_post_process import GlPostProcess
+
 ACES_AT_ONE = 2.54 / 3.16
+
+DISPLAY_SHOULDER_THRESHOLD = 0.90
+DISPLAY_SHOULDER_CEILING = 0.84
+DISPLAY_SHOULDER_STRENGTH = 0.35
+DISPLAY_SHOULDER_SOFTNESS = 0.70
+DISPLAY_SHOULDER_DESATURATION = 0.06
+DISPLAY_SHOULDER_CURVE: HighlightRolloffCurve = "rolloff"
 
 
 def _smoothstep(t: float) -> float:
@@ -205,6 +218,29 @@ def apply_highlight_rolloff_rgba(
     out = rgba.copy()
     out[..., :3] = np.clip(rgb_out * 255.0, 0.0, 255.0).astype(np.uint8)
     return out.tobytes()
+
+
+def hdr_display_shoulder_active(cfg: CleaveConfig) -> bool:
+    return render_hdr_compositing(cfg)
+
+
+def apply_hdr_display_shoulder(
+    post_process: GlPostProcess,
+    texture_id: int,
+    width: int,
+    height: int,
+) -> None:
+    post_process.apply_highlight_rolloff(
+        texture_id,
+        width,
+        height,
+        DISPLAY_SHOULDER_THRESHOLD,
+        DISPLAY_SHOULDER_CEILING,
+        DISPLAY_SHOULDER_STRENGTH,
+        DISPLAY_SHOULDER_SOFTNESS,
+        DISPLAY_SHOULDER_DESATURATION,
+        highlight_rolloff_curve_index(DISPLAY_SHOULDER_CURVE),
+    )
 
 
 def highlight_rolloff_active(pp: RenderPostFxRuntime, *, solo: bool) -> bool:

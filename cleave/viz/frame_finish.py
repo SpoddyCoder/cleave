@@ -1,7 +1,9 @@
 """Shared content-frame finish for live play and offline render.
 
-After layer compositing, both paths run the same sequence: post-FX fade,
-render overlay composite, then present to the display framebuffer.
+After layer compositing, both paths run the same sequence: HDR display
+shoulder (when ``render.hdr_compositing`` is enabled), optional user highlight
+rolloff, post-FX fade, render overlay composite, then present to the display
+framebuffer.
 
 When ``cfg.render`` is absent, overlay resolution matches live WYSIWYG:
 ``render_overlay_base(cfg)`` falls back to ``default_render_overlay_config()``,
@@ -23,6 +25,8 @@ from cleave.config_schema import render_overlay_base
 if TYPE_CHECKING:
     from cleave.viz.app import VisualizerCore
 from cleave.viz.post_fx import (
+    apply_hdr_display_shoulder,
+    hdr_display_shoulder_active,
     highlight_rolloff_active,
     highlight_rolloff_curve_index,
     live_frame_fade_alpha,
@@ -105,10 +109,18 @@ def finish_content_frame(
     session = core.seed.session if session is None else session
     duration_sec = core.seed.duration_sec if duration_sec is None else duration_sec
 
+    compositor = core.compositor
+    if hdr_display_shoulder_active(core.seed.cfg):
+        apply_hdr_display_shoulder(
+            core.post_process,
+            compositor.content_texture_id,
+            compositor.content_width,
+            compositor.content_height,
+        )
+
     pp = session.render_post_fx
     hr = pp.highlight_rolloff
     if highlight_rolloff_active(pp, solo=post_fx_solo) and hr.mode == "composite":
-        compositor = core.compositor
         core.post_process.apply_highlight_rolloff(
             compositor.content_texture_id,
             compositor.content_width,

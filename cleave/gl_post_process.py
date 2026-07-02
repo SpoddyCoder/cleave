@@ -148,6 +148,7 @@ uniform float strength;
 uniform float softness;
 uniform float desaturation;
 uniform int mode;
+uniform bool hdr;
 in vec2 uv;
 out vec4 fragColor;
 
@@ -218,7 +219,7 @@ void main() {
         out_rgb = mix(out_rgb, vec3(new_lum), desat_t);
     }
 
-    fragColor = vec4(clamp(out_rgb, 0.0, 1.0), rgba.a);
+    fragColor = hdr ? vec4(out_rgb, rgba.a) : vec4(clamp(out_rgb, 0.0, 1.0), rgba.a);
 }
 """
 
@@ -686,6 +687,7 @@ class GlPostProcess:
                     "softness": softness,
                     "desaturation": desaturation,
                     "mode": mode,
+                    "hdr": self._color_format is RGBA16F,
                 },
             )
         finally:

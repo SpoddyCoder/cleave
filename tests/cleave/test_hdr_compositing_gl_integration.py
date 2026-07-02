@@ -147,6 +147,44 @@ def test_stack_bright_layers_float_retains_chroma(gl_context_float) -> None:
     assert _channel_spread(rgb) > 0.1
 
 
+def test_display_shoulder_maps_hdr_with_hue(gl_context_float) -> None:
+    comp, pp = gl_context_float
+    comp.composite(_make_bright_layers(comp))
+    before = _read_content_pixel_float(comp, *CENTER)
+    assert _channel_spread(before) > 0.1
+    assert max(before) > 1.0
+
+    from cleave.viz.post_fx import apply_hdr_display_shoulder
+
+    apply_hdr_display_shoulder(
+        pp, comp.content_texture_id, comp.content_width, comp.content_height
+    )
+    after = _read_content_pixel_float(comp, *CENTER)
+    assert _channel_spread(after) > 0.1
+    assert max(after) < max(before)
+
+
+def test_display_shoulder_present_not_flat_white(gl_context_float) -> None:
+    comp, pp = gl_context_float
+    layer = comp.create_layer_fbo("moderate_hdr", W, H, opacity=1.0, blend_mode="black-key")
+    _fill_layer_fbo(layer, (1.05, 1.0, 0.95, 1.0))
+    comp.composite([layer])
+
+    from cleave.viz.post_fx import apply_hdr_display_shoulder
+
+    apply_hdr_display_shoulder(
+        pp, comp.content_texture_id, comp.content_width, comp.content_height
+    )
+    comp.present_content()
+    frame = comp.read_rgba_frame()
+    cx = (comp.display_width // 2) * 4
+    row = comp.display_height // 2
+    row_stride = comp.display_width * 4
+    offset = (comp.display_height - 1 - row) * row_stride + cx
+    r, g, b = frame[offset], frame[offset + 1], frame[offset + 2]
+    assert max(r, g, b) - min(r, g, b) > 5
+
+
 def test_composite_rolloff_maps_hdr_with_hue(gl_context_float) -> None:
     comp, pp = gl_context_float
     comp.composite(_make_bright_layers(comp))

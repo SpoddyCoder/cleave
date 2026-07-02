@@ -22,12 +22,13 @@ Black-key stacking (`GL_ONE`, `GL_ONE_MINUS_SRC_COLOR`) clamps each intermediate
 
 Frame finish order in [cleave/viz/frame_finish.py](../cleave/viz/frame_finish.py) (`finish_content_frame`):
 
-1. Composite highlight rolloff on the content FBO (when `mode` is `composite` and post-FX is active)
+0. HDR display shoulder on the content FBO when `render.hdr_compositing` is true (fixed constants in [cleave/viz/post_fx.py](../cleave/viz/post_fx.py); reuses `apply_highlight_rolloff`, not gated on `render.post_fx.enabled`)
+1. User composite highlight rolloff on the content FBO (when `mode` is `composite` and post-FX is active)
 2. Frame fade (`apply_frame_fade`)
 3. Render overlay composite
 4. Present to the default 8-bit framebuffer (`present_content`)
 
-`present_content` blits the content texture to the display framebuffer, which clamps for screen output. Composite rolloff runs before present so tone mapping is graceful rather than a hard clip.
+`present_content` blits the content texture to the display framebuffer, which clamps for screen output. Display shoulder and composite rolloff run before present so tone mapping is graceful; present clamp is a safety net, not the primary tone curve.
 
 Offline render in [cleave/viz/render.py](../cleave/viz/render.py) calls `finish_content_frame` then `read_rgba_frame`, which reads `GL_UNSIGNED_BYTE` from the default framebuffer after present. No float readback is required on the render path.
 

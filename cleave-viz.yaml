@@ -19,7 +19,7 @@ render:
     fade_in: 15
     fade_out: 4
     highlight_rolloff:
-      mode: composite
+      mode: off
       curve: rolloff
       threshold_pct: 78
       ceiling_pct: 65
