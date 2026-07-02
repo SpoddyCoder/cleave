@@ -109,6 +109,15 @@ def _snapshot_render_overlay(
     highlight_rolloff["strength_pct"] = hr_payload["strength_pct"]
     highlight_rolloff["softness_pct"] = hr_payload["softness_pct"]
     post_fx["highlight_rolloff"] = highlight_rolloff
+    cb_payload = post_fx_payload["chroma_boost"]
+    cb_orig = post_fx.get("chroma_boost")
+    chroma_boost: dict[str, Any] = (
+        dict(cb_orig) if isinstance(cb_orig, dict) else {}
+    )
+    chroma_boost["mode"] = cb_payload["mode"]
+    chroma_boost["variant"] = cb_payload["variant"]
+    chroma_boost["amount_pct"] = cb_payload["amount_pct"]
+    post_fx["chroma_boost"] = chroma_boost
 
     render_out: dict[str, Any] = {}
     if isinstance(orig_render, dict):

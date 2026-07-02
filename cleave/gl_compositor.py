@@ -226,6 +226,7 @@ class GlCompositor:
         self._initialized = False
         self._layers: list[LayerFbo] = []
         self._rolloff_sources: dict[str, _RolloffSourceSlot] = {}
+        self._chroma_sources: dict[str, _RolloffSourceSlot] = {}
         self._overlay_slots: dict[OverlayTextureSlot, _OverlaySlotState] = {}
         self._texture_realloc_count = 0
         self._content_fbo_id: int = 0
@@ -495,7 +496,9 @@ class GlCompositor:
             layer.grit_strength = grit_strength
             layer.aberration_px = aberration_px
             self._destroy_rolloff_source(name)
+            self._destroy_chroma_source(name)
             self._ensure_rolloff_source(name, width, height)
+            self._ensure_chroma_source(name, width, height)
             return
 
         raise ValueError(f"no layer FBO named {name!r}")
@@ -503,6 +506,7 @@ class GlCompositor:
     def remove_layer_fbo(self, name: str) -> None:
         """Destroy the named FBO and remove it from the compositor stack."""
         self._destroy_rolloff_source(name)
+        self._destroy_chroma_source(name)
         for i, fbo in enumerate(self._layers):
             if fbo.name == name:
                 fbo.destroy()
@@ -560,6 +564,65 @@ class GlCompositor:
         if source_id == 0:
             return
         post_process.copy_texture(source_id, layer_texture_id, width, height)
+
+    def _ensure_chroma_source(self, name: str, width: int, height: int) -> _RolloffSourceSlot:
+        if not hasattr(self, "_chroma_sources"):
+            self._chroma_sources = {}
+        slot = self._chroma_sources.get(name)
+        if slot is not None and slot.width == width and slot.height == height:
+            return slot
+
+        if slot is not None:
+            slot.destroy()
+
+        fbo_id, texture_id, depth_rbo_id = self._allocate_layer_framebuffer(
+            f"{name}_chroma_source", width, height
+        )
+        slot = _RolloffSourceSlot(
+            texture_id=texture_id,
+            fbo_id=fbo_id,
+            depth_rbo_id=depth_rbo_id,
+            width=width,
+            height=height,
+        )
+        self._chroma_sources[name] = slot
+        return slot
+
+    def chroma_source_texture_id(self, name: str) -> int:
+        slot = self._chroma_sources.get(name)
+        return 0 if slot is None else slot.texture_id
+
+    def copy_layer_to_chroma_source(
+        self,
+        post_process: GlPostProcess,
+        name: str,
+        layer_texture_id: int,
+        width: int,
+        height: int,
+    ) -> None:
+        dest = self._ensure_chroma_source(name, width, height)
+        post_process.copy_texture(layer_texture_id, dest.texture_id, width, height)
+
+    def restore_layer_from_chroma_source(
+        self,
+        post_process: GlPostProcess,
+        name: str,
+        layer_texture_id: int,
+        width: int,
+        height: int,
+    ) -> None:
+        source_id = self.chroma_source_texture_id(name)
+        if source_id == 0:
+            return
+        post_process.copy_texture(source_id, layer_texture_id, width, height)
+
+    def _destroy_chroma_source(self, name: str) -> None:
+        sources = getattr(self, "_chroma_sources", None)
+        if sources is None:
+            return
+        slot = sources.pop(name, None)
+        if slot is not None:
+            slot.destroy()
 
     def _destroy_rolloff_source(self, name: str) -> None:
         sources = getattr(self, "_rolloff_sources", None)
@@ -1005,6 +1068,8 @@ class GlCompositor:
         self._layers.clear()
         for name in list(getattr(self, "_rolloff_sources", {})):
             self._destroy_rolloff_source(name)
+        for name in list(getattr(self, "_chroma_sources", {})):
+            self._destroy_chroma_source(name)
         self._destroy_content_fbo()
         for slot in list(self._overlay_slots):
             self._destroy_overlay_slot(slot)

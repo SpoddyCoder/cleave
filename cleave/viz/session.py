@@ -27,6 +27,7 @@ from cleave.config_schema import (
     PresetSwitchingScope,
     default_render_overlay_runtime_values,
     default_highlight_rolloff_runtime_values,
+    default_chroma_boost_runtime_values,
     default_render_post_fx_runtime_values,
 )
 from cleave.extract import StemSource
@@ -89,6 +90,17 @@ def default_highlight_rolloff_runtime() -> HighlightRolloffRuntime:
 
 
 @dataclass
+class ChromaBoostRuntime:
+    mode: str
+    variant: str
+    amount_pct: int
+
+
+def default_chroma_boost_runtime() -> ChromaBoostRuntime:
+    return ChromaBoostRuntime(**default_chroma_boost_runtime_values())
+
+
+@dataclass
 class RenderPostFxRuntime:
     enabled: bool
     expanded: bool
@@ -96,12 +108,19 @@ class RenderPostFxRuntime:
     fade_out: float
     highlight_rolloff: HighlightRolloffRuntime
     highlight_rolloff_expanded: bool = False
+    chroma_boost: ChromaBoostRuntime = field(default_factory=default_chroma_boost_runtime)
+    chroma_boost_expanded: bool = False
 
 
 def default_render_post_fx_runtime() -> RenderPostFxRuntime:
     values = default_render_post_fx_runtime_values()
     highlight_rolloff = HighlightRolloffRuntime(**values.pop("highlight_rolloff"))
-    return RenderPostFxRuntime(highlight_rolloff=highlight_rolloff, **values)
+    chroma_boost = ChromaBoostRuntime(**values.pop("chroma_boost"))
+    return RenderPostFxRuntime(
+        highlight_rolloff=highlight_rolloff,
+        chroma_boost=chroma_boost,
+        **values,
+    )
 
 
 @dataclass
@@ -202,6 +221,7 @@ def render_post_fx_runtime_from_cfg(
     post_fx = cfg.render.post_fx if cfg.render is not None else None
     if post_fx is not None:
         hr = post_fx.highlight_rolloff
+        cb = post_fx.chroma_boost
         return replace(
             default_render_post_fx_runtime(),
             enabled=post_fx.enabled,
@@ -216,6 +236,12 @@ def render_post_fx_runtime_from_cfg(
                 strength_pct=hr.strength_pct,
                 softness_pct=hr.softness_pct,
                 desaturation_pct=hr.desaturation_pct,
+            ),
+            chroma_boost=replace(
+                default_chroma_boost_runtime(),
+                mode=cb.mode,
+                variant=cb.variant,
+                amount_pct=cb.amount_pct,
             ),
         )
     return default_render_post_fx_runtime()

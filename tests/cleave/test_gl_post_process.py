@@ -166,6 +166,32 @@ def test_apply_highlight_rolloff_sets_mode_uniform() -> None:
     assert highlight_call.kwargs["extra_uniforms"]["mode"] == 2
 
 
+def test_apply_chroma_boost_skips_when_amount_zero() -> None:
+    post = GlPostProcess()
+    assert post.apply_chroma_boost(7, 64, 64, 0, 0) == 7
+
+
+def test_apply_chroma_boost_draws_via_gpu_shader() -> None:
+    ctx, _vaos = _mock_gl_post_process_ctx()
+    post = GlPostProcess()
+
+    with patch("cleave.gl_post_process.moderngl.create_context", return_value=ctx):
+        with patch("cleave.gl_post_process._save_gl_state", return_value=MagicMock()):
+            with patch("cleave.gl_post_process._restore_gl_state"):
+                with patch("cleave.gl_post_process._prepare_fixed_function_gl"):
+                    with patch.object(post, "_draw_quad") as mock_draw:
+                        result = post.apply_chroma_boost(
+                            texture_id=7,
+                            width=64,
+                            height=64,
+                            amount_pct=25,
+                            variant=1,
+                        )
+
+    assert result == 7
+    assert mock_draw.call_count == 2
+
+
 def test_apply_bloom_caches_dest_fbo_per_texture() -> None:
     ctx, _vaos = _mock_gl_post_process_ctx()
     post = GlPostProcess()

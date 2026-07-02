@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from cleave.config_schema import (
+    CHROMA_BOOST_APPLY_MODES,
+    CHROMA_BOOST_VARIANTS,
     HIGHLIGHT_ROLLOFF_APPLY_MODES,
     HIGHLIGHT_ROLLOFF_CURVES,
+    clamp_chroma_boost_amount_pct,
     clamp_highlight_rolloff_ceiling_pct,
     clamp_highlight_rolloff_desaturation_pct,
     clamp_highlight_rolloff_softness_pct,
@@ -130,3 +133,47 @@ class RenderPostFxControls:
             hr.curve = curves[(index + 1) % len(curves)]
         else:
             hr.curve = curves[(index - 1) % len(curves)]
+
+    def set_chroma_boost_expanded(self, expanded: bool) -> None:
+        pp = self.session.render_post_fx
+        if pp.chroma_boost_expanded == expanded:
+            return
+        pp.chroma_boost_expanded = expanded
+
+    def set_chroma_boost_amount_pct(self, amount_pct: int) -> None:
+        self.session.render_post_fx.chroma_boost.amount_pct = (
+            clamp_chroma_boost_amount_pct(amount_pct)
+        )
+
+    def cycle_chroma_boost_mode(self, *, forward: bool) -> None:
+        modes = CHROMA_BOOST_APPLY_MODES
+        cb = self.session.render_post_fx.chroma_boost
+        old_mode = cb.mode
+        try:
+            index = modes.index(cb.mode)
+        except ValueError:
+            index = 0
+        if forward:
+            cb.mode = modes[(index + 1) % len(modes)]
+        else:
+            cb.mode = modes[(index - 1) % len(modes)]
+        if cb.mode != old_mode and self._bindings is not None:
+            paused = (
+                self._bindings.is_paused()
+                if self._bindings.is_paused is not None
+                else False
+            )
+            if paused and self._bindings.on_chroma_boost_apply_mode_change:
+                self._bindings.on_chroma_boost_apply_mode_change(old_mode, cb.mode)
+
+    def cycle_chroma_boost_variant(self, *, forward: bool) -> None:
+        variants = CHROMA_BOOST_VARIANTS
+        cb = self.session.render_post_fx.chroma_boost
+        try:
+            index = variants.index(cb.variant)
+        except ValueError:
+            index = 0
+        if forward:
+            cb.variant = variants[(index + 1) % len(variants)]
+        else:
+            cb.variant = variants[(index - 1) % len(variants)]

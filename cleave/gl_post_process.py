@@ -223,6 +223,36 @@ void main() {
 }
 """
 
+_CHROMA_BOOST_FRAG = """
+#version 330
+uniform sampler2D image;
+uniform float amount;
+uniform int variant;
+uniform bool hdr;
+in vec2 uv;
+out vec4 fragColor;
+
+void main() {
+    vec4 rgba = texture(image, uv);
+    vec3 rgb = rgba.rgb;
+    float lum = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
+
+    float factor;
+    if (variant == 0) {
+        factor = 1.0 + amount;
+    } else {
+        float maxc = max(max(rgb.r, rgb.g), rgb.b);
+        float minc = min(min(rgb.r, rgb.g), rgb.b);
+        float sat = (maxc - minc) / (maxc + 1e-6);
+        float weight = 1.0 - sat;
+        factor = 1.0 + amount * weight;
+    }
+
+    vec3 out_rgb = mix(vec3(lum), rgb, factor);
+    fragColor = hdr ? vec4(out_rgb, rgba.a) : vec4(clamp(out_rgb, 0.0, 1.0), rgba.a);
+}
+"""
+
 
 def _ensure_moderngl_draw_state() -> None:
     """Leave fixed-function GL state compatible with moderngl fullscreen draws."""
@@ -368,6 +398,7 @@ class GlPostProcess:
         self._composite_prog: moderngl.Program | None = None
         self._grit_prog: moderngl.Program | None = None
         self._highlight_rolloff_prog: moderngl.Program | None = None
+        self._chroma_boost_prog: moderngl.Program | None = None
         self._buffers: dict[tuple[int, int], _PingPongBuffers] = {}
         self._external_textures: dict[tuple[int, int, int], moderngl.Texture] = {}
         self._dest_fbos: dict[tuple[int, int, int], moderngl.Framebuffer] = {}
@@ -394,6 +425,10 @@ class GlPostProcess:
         self._highlight_rolloff_prog = self._ctx.program(
             vertex_shader=_QUAD_VERT,
             fragment_shader=_HIGHLIGHT_ROLLOFF_FRAG,
+        )
+        self._chroma_boost_prog = self._ctx.program(
+            vertex_shader=_QUAD_VERT,
+            fragment_shader=_CHROMA_BOOST_FRAG,
         )
         # Binary float32 quad: (x, y, u, v) per vertex covering NDC [-1,1] x [-1,1].
         self._quad_buffer = self._ctx.buffer(
@@ -696,6 +731,50 @@ class GlPostProcess:
 
         return texture_id
 
+    def apply_chroma_boost(
+        self,
+        texture_id: int,
+        width: int,
+        height: int,
+        amount_pct: int,
+        variant: int,
+        *,
+        source_texture_id: int | None = None,
+    ) -> int:
+        """Boost chroma in-place via GPU shader; returns texture id."""
+        if amount_pct <= 0 or texture_id == 0:
+            return texture_id
+
+        self._ensure_init()
+        assert self._ctx is not None
+        assert self._copy_prog is not None
+        assert self._chroma_boost_prog is not None
+
+        saved = _save_gl_state()
+        try:
+            sample_id = texture_id if source_texture_id is None else source_texture_id
+            src = self._external_layer_texture(sample_id, width, height)
+            buffers = self._ensure_buffers(width, height)
+
+            self._draw_quad(self._copy_prog, buffers.copy_fbo, texture=src)
+
+            dest_fbo = self._dest_fbo_for(texture_id, width, height)
+            self._draw_quad(
+                self._chroma_boost_prog,
+                dest_fbo,
+                texture=buffers.copy_tex,
+                extra_uniforms={
+                    "amount": amount_pct / 100.0,
+                    "variant": variant,
+                    "hdr": self._color_format is RGBA16F,
+                },
+            )
+        finally:
+            _restore_gl_state(saved)
+            _prepare_fixed_function_gl()
+
+        return texture_id
+
     def destroy(self) -> None:
         for fbo in self._dest_fbos.values():
             fbo.release()
@@ -720,3 +799,4 @@ class GlPostProcess:
         self._composite_prog = None
         self._grit_prog = None
         self._highlight_rolloff_prog = None
+        self._chroma_boost_prog = None

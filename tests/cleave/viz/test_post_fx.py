@@ -6,6 +6,8 @@ import pytest
 
 from cleave.easing import fade_alpha
 from cleave.viz.post_fx import (
+    apply_chroma_boost_rgb,
+    chroma_boost_active,
     compress_highlight_luminance,
     highlight_desaturation_mix,
     highlight_rolloff_active,
@@ -199,3 +201,42 @@ def test_apply_highlight_rolloff_rgb_matches_scalar_reference() -> None:
             desat_t = highlight_desaturation_mix(new_lum, 0.78, 0.3)
             expected = expected * (1.0 - desat_t) + new_lum * desat_t
             assert np.allclose(out[y, x], expected, atol=1e-5), (y, x, out[y, x], expected)
+
+
+def test_chroma_boost_active() -> None:
+    pp = default_render_post_fx_runtime(enabled=True)
+    pp.chroma_boost.mode = "composite"
+    pp.chroma_boost.amount_pct = 25
+    assert chroma_boost_active(pp, solo=False) is True
+    assert chroma_boost_active(pp, solo=True) is False
+    pp.enabled = False
+    assert chroma_boost_active(pp, solo=False) is False
+    pp.enabled = True
+    pp.chroma_boost.mode = "off"
+    assert chroma_boost_active(pp, solo=False) is False
+    pp.chroma_boost.mode = "composite"
+    pp.chroma_boost.amount_pct = 0
+    assert chroma_boost_active(pp, solo=False) is False
+
+
+def test_apply_chroma_boost_rgb_saturation_increases_spread() -> None:
+    import numpy as np
+
+    rgb = np.array([[[0.4, 0.5, 0.6]]], dtype=np.float32)
+    out = apply_chroma_boost_rgb(rgb, 50, "saturation")
+    spread_in = float(np.max(rgb) - np.min(rgb))
+    spread_out = float(np.max(out) - np.min(out))
+    assert spread_out > spread_in
+
+
+def test_apply_chroma_boost_rgb_vibrance_spares_saturated_pixels() -> None:
+    import numpy as np
+
+    saturated = np.array([[[1.0, 0.1, 0.1]]], dtype=np.float32)
+    saturated_sat = apply_chroma_boost_rgb(saturated, 50, "saturation")
+    saturated_vib = apply_chroma_boost_rgb(saturated, 50, "vibrance")
+
+    saturated_sat_delta = float(np.abs(saturated_sat - saturated).sum())
+    saturated_vib_delta = float(np.abs(saturated_vib - saturated).sum())
+    assert saturated_vib_delta < saturated_sat_delta
+

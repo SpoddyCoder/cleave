@@ -247,6 +247,61 @@ def highlight_rolloff_active(pp: RenderPostFxRuntime, *, solo: bool) -> bool:
     return pp.enabled and pp.highlight_rolloff.mode != "off" and not solo
 
 
+def chroma_boost_variant_index(variant: str) -> int:
+    if variant == "saturation":
+        return 0
+    return 1
+
+
+def apply_chroma_boost_rgb(
+    rgb: np.ndarray,
+    amount_pct: int,
+    variant: str,
+) -> np.ndarray:
+    """Vectorized chroma boost on float RGB (H, W, 3) in 0..1."""
+    if amount_pct <= 0:
+        return rgb
+
+    amount = amount_pct / 100.0
+    lum = (
+        0.2126 * rgb[..., 0]
+        + 0.7152 * rgb[..., 1]
+        + 0.0722 * rgb[..., 2]
+    )
+    if variant == "saturation":
+        factor = 1.0 + amount
+        return lum[..., np.newaxis] + (rgb - lum[..., np.newaxis]) * factor
+
+    maxc = np.max(rgb, axis=-1)
+    minc = np.min(rgb, axis=-1)
+    sat = (maxc - minc) / (maxc + 1e-6)
+    weight = 1.0 - sat
+    factor = 1.0 + amount * weight
+    return lum[..., np.newaxis] + (rgb - lum[..., np.newaxis]) * factor[..., np.newaxis]
+
+
+def apply_chroma_boost_rgba(
+    rgba: np.ndarray,
+    amount_pct: int,
+    variant: str,
+) -> bytes:
+    """Apply chroma boost to uint8 RGBA (H, W, 4); returns GL upload bytes."""
+    rgb = rgba[..., :3].astype(np.float32) / 255.0
+    rgb_out = apply_chroma_boost_rgb(rgb, amount_pct, variant)
+    out = rgba.copy()
+    out[..., :3] = np.clip(rgb_out * 255.0, 0.0, 255.0).astype(np.uint8)
+    return out.tobytes()
+
+
+def chroma_boost_active(pp: RenderPostFxRuntime, *, solo: bool) -> bool:
+    return (
+        pp.enabled
+        and pp.chroma_boost.mode != "off"
+        and not solo
+        and pp.chroma_boost.amount_pct > 0
+    )
+
+
 def live_frame_fade_alpha(
     t_sec: float,
     duration_sec: float,

@@ -234,6 +234,43 @@ DEFAULT_HIGHLIGHT_ROLLOFF_STRENGTH_PCT = 70
 DEFAULT_HIGHLIGHT_ROLLOFF_SOFTNESS_PCT = 40
 DEFAULT_HIGHLIGHT_ROLLOFF_DESATURATION_PCT = 30
 
+ChromaBoostApplyMode = Literal["off", "per_layer", "composite"]
+
+CHROMA_BOOST_APPLY_MODES: tuple[ChromaBoostApplyMode, ...] = (
+    "off",
+    "per_layer",
+    "composite",
+)
+
+CHROMA_BOOST_APPLY_MODE_HELP_ENTRIES: tuple[
+    tuple[ChromaBoostApplyMode, str], ...
+] = (
+    ("off", "disabled."),
+    ("per_layer", "on each active layer before compositing."),
+    ("composite", "after all layers are stacked."),
+)
+
+DEFAULT_CHROMA_BOOST_APPLY_MODE: ChromaBoostApplyMode = "off"
+
+ChromaBoostVariant = Literal["saturation", "vibrance"]
+
+CHROMA_BOOST_VARIANTS: tuple[ChromaBoostVariant, ...] = (
+    "saturation",
+    "vibrance",
+)
+
+CHROMA_BOOST_VARIANT_HELP_ENTRIES: tuple[tuple[ChromaBoostVariant, str], ...] = (
+    ("saturation", "uniform chroma boost around Rec.709 luma."),
+    ("vibrance", "boosts muted colors more; spares already-saturated pixels."),
+)
+
+DEFAULT_CHROMA_BOOST_VARIANT: ChromaBoostVariant = "vibrance"
+
+DEFAULT_CHROMA_BOOST_AMOUNT_PCT = 25
+
+CHROMA_BOOST_AMOUNT_PCT_MIN = 0
+CHROMA_BOOST_AMOUNT_PCT_MAX = 100
+
 HIGHLIGHT_ROLLOFF_THRESHOLD_PCT_MIN = 0
 HIGHLIGHT_ROLLOFF_THRESHOLD_PCT_MAX = 95
 HIGHLIGHT_ROLLOFF_STRENGTH_PCT_MAX = 200
@@ -300,6 +337,41 @@ def clamp_highlight_rolloff_softness_pct(value: int) -> int:
 
 def clamp_highlight_rolloff_desaturation_pct(value: int) -> int:
     return max(0, min(100, int(value)))
+
+
+def clamp_chroma_boost_amount_pct(value: int) -> int:
+    return max(
+        CHROMA_BOOST_AMOUNT_PCT_MIN,
+        min(CHROMA_BOOST_AMOUNT_PCT_MAX, int(value)),
+    )
+
+
+def _parse_chroma_boost_apply_mode(
+    value: object,
+    _ctx: ParseCtx,
+    label: str = "render.post_fx.chroma_boost.mode",
+) -> ChromaBoostApplyMode:
+    if value is False:
+        value = "off"
+    if not isinstance(value, str):
+        raise ValueError(f"{label} must be a string")
+    if value not in CHROMA_BOOST_APPLY_MODES:
+        allowed = ", ".join(f"'{mode}'" for mode in CHROMA_BOOST_APPLY_MODES)
+        raise ValueError(f"{label} must be one of {allowed}, got {value!r}")
+    return value  # type: ignore[return-value]
+
+
+def _parse_chroma_boost_variant(
+    value: object,
+    _ctx: ParseCtx,
+    label: str = "render.post_fx.chroma_boost.variant",
+) -> ChromaBoostVariant:
+    if not isinstance(value, str):
+        raise ValueError(f"{label} must be a string")
+    if value not in CHROMA_BOOST_VARIANTS:
+        allowed = ", ".join(f"'{variant}'" for variant in CHROMA_BOOST_VARIANTS)
+        raise ValueError(f"{label} must be one of {allowed}, got {value!r}")
+    return value  # type: ignore[return-value]
 
 
 def _parse_highlight_rolloff_apply_mode(
@@ -953,6 +1025,53 @@ def _build_highlight_rolloff_config(parsed: dict[str, Any]) -> Any:
     )
 
 
+def _build_chroma_boost_config(parsed: dict[str, Any]) -> Any:
+    from cleave.config import ChromaBoostConfig
+
+    return ChromaBoostConfig(
+        mode=parsed["mode"],
+        variant=parsed["variant"],
+        amount_pct=parsed["amount_pct"],
+    )
+
+
+CHROMA_BOOST_SECTION = SectionDescriptor(
+    yaml_key="chroma_boost",
+    fields=(
+        FieldDescriptor(
+            "mode",
+            DEFAULT_CHROMA_BOOST_APPLY_MODE,
+            "session",
+            _parse_chroma_boost_apply_mode,
+            _dump_scalar,
+        ),
+        FieldDescriptor(
+            "variant",
+            DEFAULT_CHROMA_BOOST_VARIANT,
+            "session",
+            _parse_chroma_boost_variant,
+            _dump_scalar,
+        ),
+        FieldDescriptor(
+            "amount_pct",
+            DEFAULT_CHROMA_BOOST_AMOUNT_PCT,
+            "session",
+            lambda raw, _ctx, _label: clamp_chroma_boost_amount_pct(int(float(raw))),
+            _dump_scalar,
+        ),
+    ),
+    build=_build_chroma_boost_config,
+    optional=True,
+    default_factory=lambda: _build_chroma_boost_config(
+        {
+            "mode": DEFAULT_CHROMA_BOOST_APPLY_MODE,
+            "variant": DEFAULT_CHROMA_BOOST_VARIANT,
+            "amount_pct": DEFAULT_CHROMA_BOOST_AMOUNT_PCT,
+        }
+    ),
+)
+
+
 HIGHLIGHT_ROLLOFF_SECTION = SectionDescriptor(
     yaml_key="highlight_rolloff",
     fields=(
@@ -1055,6 +1174,7 @@ RENDER_POST_FX_FIELDS: tuple[SchemaField, ...] = (
         _dump_scalar,
     ),
     HIGHLIGHT_ROLLOFF_SECTION,
+    CHROMA_BOOST_SECTION,
 )
 
 
@@ -1609,6 +1729,11 @@ def persist_render(ctx: PersistCtx) -> dict[str, Any]:
             "softness_pct": runtime_pp.highlight_rolloff.softness_pct,
             "desaturation_pct": runtime_pp.highlight_rolloff.desaturation_pct,
         },
+        "chroma_boost": {
+            "mode": runtime_pp.chroma_boost.mode,
+            "variant": runtime_pp.chroma_boost.variant,
+            "amount_pct": runtime_pp.chroma_boost.amount_pct,
+        },
     }
     post_fx = _dump_overlay_fields(RENDER_POST_FX_FIELDS, post_fx_values, ctx)
     from cleave.config import render_fps, render_hdr_compositing, render_output_size
@@ -1721,6 +1846,14 @@ def default_highlight_rolloff_runtime_values() -> dict[str, Any]:
     }
 
 
+def default_chroma_boost_runtime_values() -> dict[str, Any]:
+    return {
+        "mode": DEFAULT_CHROMA_BOOST_APPLY_MODE,
+        "variant": DEFAULT_CHROMA_BOOST_VARIANT,
+        "amount_pct": DEFAULT_CHROMA_BOOST_AMOUNT_PCT,
+    }
+
+
 def default_render_post_fx_runtime_values() -> dict[str, Any]:
     return {
         "enabled": True,
@@ -1729,6 +1862,8 @@ def default_render_post_fx_runtime_values() -> dict[str, Any]:
         "fade_out": DEFAULT_RENDER_POST_FX_FADE_OUT,
         "highlight_rolloff": default_highlight_rolloff_runtime_values(),
         "highlight_rolloff_expanded": False,
+        "chroma_boost": default_chroma_boost_runtime_values(),
+        "chroma_boost_expanded": False,
     }
 
 

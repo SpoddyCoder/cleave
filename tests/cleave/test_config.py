@@ -705,6 +705,56 @@ render:
     assert hr.desaturation_pct == 30
 
 
+def test_parse_render_post_fx_chroma_boost_defaults() -> None:
+    data = yaml.safe_load(
+        """\
+render:
+  post_fx:
+    chroma_boost:
+      amount_pct: 40
+"""
+    )
+    render = parse_render_section(data)
+    assert render is not None
+    assert render.post_fx is not None
+    cb = render.post_fx.chroma_boost
+    assert cb.mode == "off"
+    assert cb.variant == "vibrance"
+    assert cb.amount_pct == 40
+
+
+@pytest.mark.parametrize("variant", ("saturation", "vibrance"))
+def test_parse_render_post_fx_chroma_boost_valid_variants(variant: str) -> None:
+    data = yaml.safe_load(
+        f"""\
+render:
+  post_fx:
+    chroma_boost:
+      variant: {variant}
+"""
+    )
+    render = parse_render_section(data)
+    assert render is not None
+    assert render.post_fx is not None
+    assert render.post_fx.chroma_boost.variant == variant
+
+
+@pytest.mark.parametrize("mode", ("off", "per_layer", "composite"))
+def test_parse_render_post_fx_chroma_boost_valid_modes(mode: str) -> None:
+    data = yaml.safe_load(
+        f"""\
+render:
+  post_fx:
+    chroma_boost:
+      mode: {mode}
+"""
+    )
+    render = parse_render_section(data)
+    assert render is not None
+    assert render.post_fx is not None
+    assert render.post_fx.chroma_boost.mode == mode
+
+
 @pytest.mark.parametrize("curve", ("rolloff", "smoothstep", "aces_fit"))
 def test_parse_render_post_fx_highlight_rolloff_valid_curves(curve: str) -> None:
     data = yaml.safe_load(

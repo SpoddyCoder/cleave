@@ -263,6 +263,35 @@ def _mutate_render_post_fx_highlight_rolloff_desaturation(controls: TuningContro
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
+def _expand_render_post_fx_chroma_boost(controls: TuningControls) -> None:
+    _expand_render_post_fx(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_post_fx_chroma_boost_mode(controls: TuningControls) -> None:
+    _expand_render_post_fx_chroma_boost(controls)
+    controls.build_view_state(paused=False)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_CHROMA_BOOST_MODE)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_post_fx_chroma_boost_variant(controls: TuningControls) -> None:
+    _expand_render_post_fx_chroma_boost(controls)
+    controls.session.render_post_fx.chroma_boost.mode = "composite"
+    controls.build_view_state(paused=False)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_CHROMA_BOOST_VARIANT)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_render_post_fx_chroma_boost_amount(controls: TuningControls) -> None:
+    _expand_render_post_fx_chroma_boost(controls)
+    controls.session.render_post_fx.chroma_boost.mode = "composite"
+    controls.build_view_state(paused=False)
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_CHROMA_BOOST_AMOUNT)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
 def _mutate_timeline_enabled(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
@@ -356,6 +385,9 @@ _PERSISTED_MUTATIONS: list[
     ("render_post_fx.highlight_rolloff.strength_pct", _mutate_render_post_fx_highlight_rolloff_strength, ("layer_1",), {}),
     ("render_post_fx.highlight_rolloff.softness_pct", _mutate_render_post_fx_highlight_rolloff_softness, ("layer_1",), {}),
     ("render_post_fx.highlight_rolloff.desaturation_pct", _mutate_render_post_fx_highlight_rolloff_desaturation, ("layer_1",), {}),
+    ("render_post_fx.chroma_boost.mode", _mutate_render_post_fx_chroma_boost_mode, ("layer_1",), {}),
+    ("render_post_fx.chroma_boost.variant", _mutate_render_post_fx_chroma_boost_variant, ("layer_1",), {}),
+    ("render_post_fx.chroma_boost.amount_pct", _mutate_render_post_fx_chroma_boost_amount, ("layer_1",), {}),
     ("timeline.enabled", _mutate_timeline_enabled, ("layer_1",), {"timeline_enabled": True}),
     ("visualizer.render_mode", _mutate_visualizer_render_mode, ("layer_1",), {}),
     ("visualizer.ui_fade", _mutate_visualizer_ui_fade, ("layer_1",), {}),
