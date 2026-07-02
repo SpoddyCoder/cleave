@@ -53,6 +53,7 @@ from cleave.config_schema import (
     DEFAULT_RENDER_POST_FX_FADE_OUT,
     DEFAULT_TEXTURE_PATHS,
     DEFAULT_TIMELINE_ENABLED,
+    DEFAULT_HDR_COMPOSITING,
     DEFAULT_RENDER_FPS,
     DEFAULT_RENDER_HEIGHT,
     DEFAULT_RENDER_WIDTH,
@@ -203,6 +204,7 @@ class RenderConfig:
     fps: int = DEFAULT_RENDER_FPS
     width: int = DEFAULT_RENDER_WIDTH
     height: int = DEFAULT_RENDER_HEIGHT
+    hdr_compositing: bool = DEFAULT_HDR_COMPOSITING
     overlay: RenderOverlayConfig | None = None
     post_fx: RenderPostFxConfig | None = None
 
@@ -240,6 +242,13 @@ def render_output_size(cfg: CleaveConfig) -> tuple[int, int]:
     if cfg.render is not None:
         return cfg.render.width, cfg.render.height
     return DEFAULT_RENDER_WIDTH, DEFAULT_RENDER_HEIGHT
+
+
+def render_hdr_compositing(cfg: CleaveConfig) -> bool:
+    """Whether layer and content FBOs use float HDR compositing."""
+    if cfg.render is None:
+        return False
+    return cfg.render.hdr_compositing
 
 
 def _expand_path(path: Path | str) -> Path:

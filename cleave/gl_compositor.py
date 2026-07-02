@@ -8,6 +8,12 @@ from enum import Enum
 import pygame
 
 from cleave.blend_modes import BlendMode
+from cleave.gl_color_format import (
+    RGBA8,
+    RGBA16F,
+    GlColorFormat,
+    probe_rgba16f_framebuffer,
+)
 from cleave.gl_post_process import GlPostProcess
 from OpenGL.GL import (
     GL_BLEND,
@@ -205,6 +211,7 @@ class GlCompositor:
         display_width: int | None = None,
         display_height: int | None = None,
         bg: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0),
+        color_format: GlColorFormat = RGBA8,
     ) -> None:
         self.content_width = content_width
         self.content_height = content_height
@@ -215,6 +222,7 @@ class GlCompositor:
             display_height if display_height is not None else content_height
         )
         self.bg = bg
+        self._color_format = color_format
         self._initialized = False
         self._layers: list[LayerFbo] = []
         self._rolloff_sources: dict[str, _RolloffSourceSlot] = {}
@@ -226,6 +234,13 @@ class GlCompositor:
 
     def init(self) -> None:
         """Initialize GL state after a pygame OPENGL context exists."""
+        if self._color_format is RGBA16F and not probe_rgba16f_framebuffer(
+            self.content_width, self.content_height
+        ):
+            raise RuntimeError(
+                "HDR compositing requires RGBA16F framebuffer support; "
+                "set render.hdr_compositing: false to use 8-bit compositing"
+            )
         self.setup_gl_state()
         self._allocate_content_fbo()
         self._initialized = True
@@ -363,10 +378,19 @@ class GlCompositor:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
 
     def _create_rgba_texture(self, width: int, height: int) -> int:
+        fmt = self._color_format
         texture_id = _gl_name(glGenTextures)
         glBindTexture(GL_TEXTURE_2D, texture_id)
         glTexImage2D(
-            GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, None
+            GL_TEXTURE_2D,
+            0,
+            fmt.internal_format,
+            width,
+            height,
+            0,
+            GL_RGBA,
+            fmt.pixel_type,
+            None,
         )
         self._configure_texture_params()
         return texture_id

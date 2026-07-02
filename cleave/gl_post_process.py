@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 import moderngl
 import numpy as np
+from cleave.gl_color_format import RGBA8, RGBA16F, GlColorFormat
 from OpenGL.GL import (
     GL_ACTIVE_TEXTURE,
     GL_BLEND,
@@ -98,13 +99,15 @@ _COMPOSITE_FRAG = """
 uniform sampler2D original;
 uniform sampler2D blurred;
 uniform float strength;
+uniform bool hdr;
 in vec2 uv;
 out vec4 fragColor;
 
 void main() {
     vec4 base = texture(original, uv);
     vec4 bloom = texture(blurred, uv);
-    fragColor = min(base + bloom * strength, vec4(1.0));
+    vec4 result = base + bloom * strength;
+    fragColor = hdr ? result : min(result, vec4(1.0));
 }
 """
 
@@ -114,6 +117,7 @@ uniform sampler2D image;
 uniform float grit_strength;
 uniform float aberration_px;
 uniform vec2 resolution;
+uniform bool hdr;
 in vec2 uv;
 out vec4 fragColor;
 
@@ -130,7 +134,8 @@ void main() {
     vec4 base = vec4(r, g, b, a);
 
     float grain = (film_grain(uv * resolution) - 0.5) * grit_strength;
-    fragColor = clamp(base + vec4(grain, grain, grain, 0.0), 0.0, 1.0);
+    vec4 result = base + vec4(grain, grain, grain, 0.0);
+    fragColor = hdr ? result : clamp(result, 0.0, 1.0);
 }
 """
 
@@ -352,7 +357,8 @@ class _PingPongBuffers:
 class GlPostProcess:
     """GPU post-processing (bloom, grit, highlight rolloff) on an existing layer FBO texture."""
 
-    def __init__(self) -> None:
+    def __init__(self, color_format: GlColorFormat = RGBA8) -> None:
+        self._color_format = color_format
         self._ctx: moderngl.Context | None = None
         self._quad_buffer: moderngl.Buffer | None = None
         self._quad_vaos: dict[int, moderngl.VertexArray] = {}
@@ -413,7 +419,9 @@ class GlPostProcess:
             return self._buffers[key]
 
         def _make_pair() -> tuple[moderngl.Texture, moderngl.Framebuffer]:
-            tex = self._ctx.texture(key, 4)
+            tex = self._ctx.texture(
+                key, 4, dtype=self._color_format.moderngl_internal_dtype
+            )
             tex.filter = (moderngl.LINEAR, moderngl.LINEAR)
             tex.repeat_x = False
             tex.repeat_y = False
@@ -443,7 +451,13 @@ class GlPostProcess:
         cached = self._external_textures.get(key)
         if cached is not None:
             return cached
-        tex = self._ctx.external_texture(texture_id, (width, height), 4, 0, "u1")
+        tex = self._ctx.external_texture(
+            texture_id,
+            (width, height),
+            4,
+            0,
+            self._color_format.moderngl_external_dtype,
+        )
         tex.filter = (moderngl.LINEAR, moderngl.LINEAR)
         tex.repeat_x = False
         tex.repeat_y = False
@@ -552,6 +566,7 @@ class GlPostProcess:
             self._composite_prog["original"].value = 0
             self._composite_prog["blurred"].value = 1
             self._composite_prog["strength"].value = strength * intensity_scale
+            self._composite_prog["hdr"].value = self._color_format is RGBA16F
             self._quad_vao_for(self._composite_prog).render(moderngl.TRIANGLE_STRIP)
         finally:
             _restore_gl_state(saved)
@@ -593,6 +608,7 @@ class GlPostProcess:
                     "grit_strength": grit_strength,
                     "aberration_px": aberration_px,
                     "resolution": (float(width), float(height)),
+                    "hdr": self._color_format is RGBA16F,
                 },
             )
         finally:
@@ -682,10 +698,12 @@ class GlPostProcess:
         for fbo in self._dest_fbos.values():
             fbo.release()
         self._dest_fbos.clear()
+        for tex in self._external_textures.values():
+            tex.release()
+        self._external_textures.clear()
         for buffers in self._buffers.values():
             buffers.release()
         self._buffers.clear()
-        self._external_textures.clear()
         for vao in self._quad_vaos.values():
             vao.release()
         self._quad_vaos.clear()

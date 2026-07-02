@@ -106,6 +106,42 @@ def test_finish_content_frame_skips_highlight_rolloff_when_post_fx_disabled() ->
     core.post_process.apply_highlight_rolloff.assert_not_called()
 
 
+def test_finish_content_frame_call_order_rolloff_fade_overlay_present() -> None:
+    core = MagicMock()
+    core.seed.width = 1280
+    core.seed.height = 720
+    core.seed.duration_sec = 60.0
+    core.compositor.content_texture_id = 42
+    core.compositor.content_width = 1280
+    core.compositor.content_height = 720
+    core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
+    core.seed.session.render_post_fx.highlight_rolloff.mode = "composite"
+    call_order: list[str] = []
+
+    core.post_process.apply_highlight_rolloff.side_effect = (
+        lambda *_a, **_k: call_order.append("highlight_rolloff")
+    )
+    core.compositor.apply_frame_fade.side_effect = (
+        lambda *_a, **_k: call_order.append("frame_fade")
+    )
+    core.compositor.present_content.side_effect = (
+        lambda: call_order.append("present_content")
+    )
+
+    with patch(
+        "cleave.viz.frame_finish._composite_render_overlay",
+        side_effect=lambda *_a, **_k: call_order.append("overlay"),
+    ):
+        finish_content_frame(core, 1.0)
+
+    assert call_order == [
+        "highlight_rolloff",
+        "frame_fade",
+        "overlay",
+        "present_content",
+    ]
+
+
 def test_finish_content_frame_skips_composite_rolloff_when_per_layer() -> None:
     core = MagicMock()
     core.seed.duration_sec = 60.0
