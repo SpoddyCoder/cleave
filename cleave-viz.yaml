@@ -13,6 +13,7 @@ render:
   width: 1280
   height: 720
   fps: 60
+  hdr_compositing: true
   post_fx:
     enabled: true
     fade_in: 15

@@ -22,6 +22,7 @@ DEFAULT_VISUALIZER_HEIGHT = 720
 DEFAULT_RENDER_FPS = 30
 DEFAULT_RENDER_WIDTH = 1280
 DEFAULT_RENDER_HEIGHT = 720
+DEFAULT_HDR_COMPOSITING = True
 DEFAULT_VISUALIZER_UPSCALE = 1.0
 UPSCALE_MIN = 1.0
 DEFAULT_BEAT_SENSITIVITY = 2.0
@@ -1526,8 +1527,17 @@ def parse_render_section(data: dict[str, Any]) -> Any | None:
         if post_fx_raw is not None
         else None
     )
+    hdr_raw = render_map.get("hdr_compositing")
+    hdr_compositing = (
+        DEFAULT_HDR_COMPOSITING if hdr_raw is None else bool(hdr_raw)
+    )
     return RenderConfig(
-        fps=fps, width=width, height=height, overlay=overlay, post_fx=post_fx
+        fps=fps,
+        width=width,
+        height=height,
+        hdr_compositing=hdr_compositing,
+        overlay=overlay,
+        post_fx=post_fx,
     )
 
 
@@ -1601,13 +1611,14 @@ def persist_render(ctx: PersistCtx) -> dict[str, Any]:
         },
     }
     post_fx = _dump_overlay_fields(RENDER_POST_FX_FIELDS, post_fx_values, ctx)
-    from cleave.config import render_fps, render_output_size
+    from cleave.config import render_fps, render_hdr_compositing, render_output_size
 
     width, height = render_output_size(ctx.cfg)
     return {
         "fps": render_fps(ctx.cfg),
         "width": width,
         "height": height,
+        "hdr_compositing": render_hdr_compositing(ctx.cfg),
         "overlay": overlay,
         "post_fx": post_fx,
     }

@@ -12,6 +12,27 @@ Both apply paths gate on `highlight_rolloff_active()` in [cleave/viz/post_fx.py]
 
 Per-layer mode keeps a frozen rolloff source texture per layer slot in the compositor so paused live tuning can re-apply rolloff without stacking. The shoulder curve is `render.post_fx.highlight_rolloff.curve` (`rolloff`, `smoothstep`, `aces_fit`).
 
+## HDR compositing
+
+When `render.hdr_compositing` is true (default in [cleave-viz.yaml](../cleave-viz.yaml)), the compositor allocates layer FBOs, the content FBO, and per-layer rolloff source slots as `GL_RGBA16F` instead of `GL_RGBA8`. Format selection lives in [cleave/gl_color_format.py](../cleave/gl_color_format.py) (`resolve_compositor_format`, `probe_rgba16f_framebuffer`). Overlay textures stay `GL_RGBA8`.
+
+`GlPostProcess` must match compositor FBO formats: `external_texture` uses `moderngl_external_dtype` (`u1` for `GL_RGBA8`, `f2` for `GL_RGBA16F`); internal ping-pong buffers use `moderngl_internal_dtype` (`f1` for 8-bit, `f2` for half-float). Do not use `u1` for 8-bit internal buffers; moderngl `ctx.texture()` defaults to normalized `f1` and `u1` internal buffers break copy/grit/bloom on layer textures. Mismatched external dtype silently samples wrong values or clamps early. Bloom, grit, and composite highlight rolloff skip output clamp when the post-process instance is wired for `RGBA16F` (`hdr` uniform in [cleave/gl_post_process.py](../cleave/gl_post_process.py)).
+
+Black-key stacking (`GL_ONE`, `GL_ONE_MINUS_SRC_COLOR`) clamps each intermediate result in 8-bit targets, which washes stacked bright layers to flat white before any tone curve. Float accumulation keeps true energy and chroma through the stack.
+
+Frame finish order in [cleave/viz/frame_finish.py](../cleave/viz/frame_finish.py) (`finish_content_frame`):
+
+1. Composite highlight rolloff on the content FBO (when `mode` is `composite` and post-FX is active)
+2. Frame fade (`apply_frame_fade`)
+3. Render overlay composite
+4. Present to the default 8-bit framebuffer (`present_content`)
+
+`present_content` blits the content texture to the display framebuffer, which clamps for screen output. Composite rolloff runs before present so tone mapping is graceful rather than a hard clip.
+
+Offline render in [cleave/viz/render.py](../cleave/viz/render.py) calls `finish_content_frame` then `read_rgba_frame`, which reads `GL_UNSIGNED_BYTE` from the default framebuffer after present. No float readback is required on the render path.
+
+Toggle `render.hdr_compositing: false` to compare against the legacy 8-bit compositor path. Descriptor and defaults are in [cleave/config_schema.py](../cleave/config_schema.py).
+
 ## Incident: silent all-black shader output (2026)
 
 Highlight rolloff was first wired with a moderngl fragment shader, but toggling controls had **no visible effect**. A CPU readback path (glReadPixels, numpy, glTexSubImage2D) worked but cost roughly half the frame rate at 720p.
@@ -71,6 +92,8 @@ When adding or changing code in `GlPostProcess`:
 
 ```bash
 /home/fernpa/anaconda3/envs/cleave/bin/python -m pytest \
+  tests/cleave/test_gl_color_format.py \
+  tests/cleave/test_hdr_compositing_gl_integration.py \
   tests/cleave/test_highlight_rolloff_gpu_probe.py \
   tests/cleave/test_highlight_rolloff_gl_integration.py -v
 ```
@@ -81,6 +104,9 @@ Use `-s` on the probe file to print CPU vs GPU timing.
 
 | Piece | Location |
 | --- | --- |
+| HDR compositing format | [cleave/gl_color_format.py](../cleave/gl_color_format.py) |
+| Compositor float FBOs | [cleave/gl_compositor.py](../cleave/gl_compositor.py) |
+| `render.hdr_compositing` config | [cleave/config_schema.py](../cleave/config_schema.py) |
 | Composite highlight rolloff | [cleave/viz/frame_finish.py](../cleave/viz/frame_finish.py) |
 | Per-layer highlight rolloff | [cleave/viz/layer_pipeline.py](../cleave/viz/layer_pipeline.py) |
 | Rolloff source textures (paused tuning) | [cleave/gl_compositor.py](../cleave/gl_compositor.py) |

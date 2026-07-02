@@ -10,8 +10,9 @@ from pathlib import Path
 
 import pygame
 
-from cleave.config import CleaveConfig, render_fps
+from cleave.config import CleaveConfig, render_fps, render_hdr_compositing
 from cleave.effects.runtime import EffectRuntime
+from cleave.gl_color_format import GlColorFormat, resolve_compositor_format
 from cleave.gl_compositor import GlCompositor
 from cleave.gl_post_process import GlPostProcess
 from cleave.preset_playlist import PresetPlaylist
@@ -129,12 +130,18 @@ def build_runtime_base(
     )
 
 
+def _compositor_color_format(cfg: CleaveConfig) -> GlColorFormat:
+    return resolve_compositor_format(render_hdr_compositing(cfg))
+
+
 def _make_compositor(seed: VisualizerSeed) -> GlCompositor:
+    color_format = _compositor_color_format(seed.cfg)
     c = GlCompositor(
         seed.width,
         seed.height,
         display_width=seed.display_width,
         display_height=seed.display_height,
+        color_format=color_format,
     )
     c.init()
     return c
@@ -143,8 +150,9 @@ def _make_compositor(seed: VisualizerSeed) -> GlCompositor:
 def _init_compositor_and_post(
     seed: VisualizerSeed,
 ) -> tuple[GlCompositor, GlPostProcess]:
+    color_format = _compositor_color_format(seed.cfg)
     compositor = _make_compositor(seed)
-    post_process = GlPostProcess()
+    post_process = GlPostProcess(color_format=color_format)
     post_process.init()
     return compositor, post_process
 
@@ -247,14 +255,16 @@ def init_gl_resources_heavy(
 def init_gl_resources_render(
     seed: VisualizerSeed, *, output_width: int, output_height: int
 ) -> RenderVisualizerRuntime:
+    color_format = _compositor_color_format(seed.cfg)
     compositor = GlCompositor(
         seed.width,
         seed.height,
         display_width=output_width,
         display_height=output_height,
+        color_format=color_format,
     )
     compositor.init()
-    post_process = GlPostProcess()
+    post_process = GlPostProcess(color_format=color_format)
     post_process.init()
     layers, layers_by_slot = LayerFramePipeline.build(
         seed.cfg,

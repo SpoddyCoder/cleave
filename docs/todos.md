@@ -21,69 +21,7 @@ runs. See [gl-post-process.md](gl-post-process.md) and the black-key blend in
 
 ### HDR compositing with a single tone curve toward white
 
-Goal: stop multi-layer whiteout at the source and reduce the need for aggressive
-per-layer highlight rolloff (which is what currently drains vibrancy). Composite
-the whole stack in floating point without per-step clamping, then apply one
-global highlight curve at the end. This preserves each layer's true energy and
-chroma through the stack, so a gentle global curve replaces heavy per-layer
-compression.
-
-Why per-layer rolloff is needed today: black-key blend is
-`out = src + dst * (1 - src)`. In `GL_RGBA8` targets each intermediate result is
-clamped to `[0,1]`, so after three or four bright layers the top of the range is
-already `(1,1,1)` with no chroma left. Composite-mode rolloff then tone-maps
-pixels that are already white and cannot recover color. Float accumulation keeps
-the true sum so a single curve at present time can roll off gracefully.
-
-Implementation notes:
-
-- Change layer FBO and content FBO allocation from `GL_RGBA8` to a float
-internal format (`GL_RGBA16F`) in
-[cleave/gl_compositor.py](../cleave/gl_compositor.py) (`_create_rgba_texture`,
-`_allocate_content_fbo`, `_allocate_layer_framebuffer`, and the rolloff source
-slot in `_ensure_rolloff_source`). Use `GL_RGBA16F` internal format with
-`GL_RGBA`, `GL_FLOAT` (or `GL_HALF_FLOAT`) pixel type. Confirm
-`glCheckFramebufferStatus` still returns `GL_FRAMEBUFFER_COMPLETE`; float
-color-renderable formats are required by the target GL version.
-- libprojectM renders into the layer FBOs. Verify it writes correctly into a
-float target and that values are not pre-clamped on the projectM side
-([cleave/projectm.py](../cleave/projectm.py)).
-- moderngl post-FX in [cleave/gl_post_process.py](../cleave/gl_post_process.py)
-wraps these textures with `external_texture(..., "u1")` and internal
-ping-pong textures via `ctx.texture(key, 4)`. Switch the external dtype to
-`"f2"` (half) or `"f4"` (float) to match the new FBO format, and allocate the
-internal buffers as float (`ctx.texture(key, 4, dtype="f2")`). Mismatched
-dtype silently samples wrong or clamps.
-- Apply exactly one global tone/soft-knee curve toward 1 on the composited
-content before present. Reuse the existing composite highlight rolloff pass in
-[cleave/viz/frame_finish.py](../cleave/viz/frame_finish.py)
-(`apply_highlight_rolloff` on `content_texture_id`); with HDR input it now has
-real headroom to work with. Per-layer rolloff should become optional and
-light, not the primary defense.
-- `present_content` blits the content FBO to the default 8-bit framebuffer, which
-clamps for display. That is fine for the screen, but make sure the tone curve
-runs before present so the mapping to `[0,1]` is graceful rather than a hard
-clip.
-- Offline render: `read_rgba_frame` in
-[cleave/gl_compositor.py](../cleave/gl_compositor.py) reads
-`GL_UNSIGNED_BYTE`. Since present already tone-maps into the 8-bit default
-framebuffer, reading the default framebuffer as bytes still works; verify the
-render path presents (tone-maps) before readback. If any readback happens from
-a float FBO directly, add explicit tonemap plus 8-bit conversion.
-- Consider a config toggle under `render` (for example
-`render.hdr_compositing`) so the float path can be compared against the
-current 8-bit path. Follow descriptor-driven config in
-[cleave/config_schema.py](../cleave/config_schema.py).
-- Tests: extend the GPU probe and integration tests in
-[tests/cleave/test_highlight_rolloff_gpu_probe.py](../tests/cleave/test_highlight_rolloff_gpu_probe.py)
-and
-[tests/cleave/test_highlight_rolloff_gl_integration.py](../tests/cleave/test_highlight_rolloff_gl_integration.py)
-to assert that stacking several bright layers in float retains chroma
-(channels differ) where the 8-bit path would read `(1,1,1)`. Verify with pixel
-readback, not mocks.
-- Watch performance and VRAM: half-float doubles texture memory versus 8-bit.
-`GL_RGBA16F` is the sensible middle ground over full `GL_RGBA32F`.
-
+Done — see [gl-post-process.md](gl-post-process.md#hdr-compositing).
 
 
 ### Post-FX vibrance / saturation boost pass

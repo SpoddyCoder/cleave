@@ -106,6 +106,44 @@ def test_highlight_desaturation_mix_increases_with_luminance() -> None:
     assert high > low > 0.0
 
 
+def _black_key_stack(
+    layer_rgbs: tuple[tuple[float, float, float], ...],
+    *,
+    clamp: bool,
+) -> tuple[float, float, float]:
+    """Simulate black-key compositing: out = src + dst * (1 - src) per channel."""
+    dst = [0.0, 0.0, 0.0]
+    for src in layer_rgbs:
+        out = [src[i] + dst[i] * (1.0 - src[i]) for i in range(3)]
+        if clamp:
+            out = [max(0.0, min(1.0, c)) for c in out]
+        dst = out
+    return (dst[0], dst[1], dst[2])
+
+
+def _channel_spread(rgb: tuple[float, float, float]) -> float:
+    return max(rgb) - min(rgb)
+
+
+_BRIGHT_STACK_LAYERS = (
+    (1.5, 0.4, 0.2),
+    (0.3, 1.3, 0.2),
+    (0.2, 0.3, 1.5),
+)
+
+
+def test_black_key_stack_8bit_clamps_chroma_reference() -> None:
+    rgb = _black_key_stack(_BRIGHT_STACK_LAYERS, clamp=True)
+    assert rgb == pytest.approx((1.0, 1.0, 1.0), abs=1e-6)
+    assert _channel_spread(rgb) == pytest.approx(0.0, abs=1e-6)
+
+
+def test_black_key_stack_float_retains_chroma_reference() -> None:
+    rgb = _black_key_stack(_BRIGHT_STACK_LAYERS, clamp=False)
+    assert _channel_spread(rgb) > 0.1
+    assert max(rgb) > 1.0
+
+
 def test_apply_highlight_rolloff_rgb_matches_scalar_reference() -> None:
     import numpy as np
 

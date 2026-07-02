@@ -235,7 +235,9 @@ def _mock_gl_post_process_ctx() -> tuple[MagicMock, list[_ReadOnlyProgramVao]]:
         vaos.append(vao)
         return vao
 
-    def _texture(size: tuple[int, int], _components: int) -> MagicMock:
+    def _texture(
+        size: tuple[int, int], _components: int, **kwargs: object
+    ) -> MagicMock:
         tex = MagicMock(name="texture")
         tex.filter = None
         tex.repeat_x = None

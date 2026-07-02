@@ -30,22 +30,27 @@ from cleave.config import (
     load_config,
     project_viz_config_path,
     render_output_size,
+    render_hdr_compositing,
     _parse_layers,
 )
 from tests.support.config import default_highlight_rolloff_config, default_render_post_fx_config
 from cleave.config_schema import (
+    DEFAULT_HDR_COMPOSITING,
     DEFAULT_LAYER_SLOTS,
     DEFAULT_RENDER_HEIGHT,
     DEFAULT_RENDER_WIDTH,
     MAX_LAYER_COUNT,
     ParseCtx,
+    PersistCtx,
     next_layer_slot,
     parse_hex_colour,
     parse_render_section,
     parse_timeline_section,
     parse_visualizer_section,
+    persist_render,
     template_layer_entry,
 )
+from cleave.viz.session import TuningSession
 from cleave.paths import repo_root
 from cleave.extract import STEM_NAMES
 from cleave.timeline import TimelineCue
@@ -598,6 +603,48 @@ def test_parse_render_width_height_explicit() -> None:
     assert render is not None
     assert render.width == 1920
     assert render.height == 1080
+
+
+def test_parse_render_hdr_compositing_defaults_true() -> None:
+    render = parse_render_section({"render": {"fps": 24}})
+    assert render is not None
+    assert render.hdr_compositing is DEFAULT_HDR_COMPOSITING
+
+
+def test_parse_render_hdr_compositing_explicit_false() -> None:
+    render = parse_render_section({"render": {"hdr_compositing": False}})
+    assert render is not None
+    assert render.hdr_compositing is False
+
+
+def test_render_hdr_compositing_false_without_render_section(
+    minimal_project: Path,
+) -> None:
+    cfg = load_config(project_root=minimal_project)
+    assert cfg.render is None
+    assert render_hdr_compositing(cfg) is False
+
+
+def test_persist_render_hdr_compositing_round_trip() -> None:
+    render = parse_render_section(
+        {"render": {"hdr_compositing": False, "fps": 24}}
+    )
+    assert render is not None
+    cfg = CleaveConfig(
+        paths=PathsConfig(preset_root=Path("/tmp"), texture_paths=()),
+        layers={},
+        visualizer=VisualizerConfig(),
+        config_path=Path("/tmp/cleave-viz.yaml"),
+        render=render,
+    )
+    session = TuningSession(layer_z_order=[])
+    payload = persist_render(PersistCtx(cfg=cfg, session=session, cfg_dir=None))
+    assert payload["hdr_compositing"] is False
+
+    round_trip = parse_render_section({"render": payload})
+    assert round_trip is not None
+    assert round_trip.hdr_compositing is False
+    assert round_trip.fps == 24
 
 
 def test_render_output_size_defaults_without_render_section(
