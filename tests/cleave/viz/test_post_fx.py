@@ -144,6 +144,36 @@ def test_black_key_stack_float_retains_chroma_reference() -> None:
     assert max(rgb) > 1.0
 
 
+def test_apply_highlight_rolloff_rgb_display_shoulder_on_hot_hdr() -> None:
+    import numpy as np
+
+    from cleave.viz.post_fx import (
+        DISPLAY_SHOULDER_CEILING,
+        DISPLAY_SHOULDER_CURVE,
+        DISPLAY_SHOULDER_DESATURATION,
+        DISPLAY_SHOULDER_SOFTNESS,
+        DISPLAY_SHOULDER_STRENGTH,
+        DISPLAY_SHOULDER_THRESHOLD,
+        apply_highlight_rolloff_rgb,
+    )
+
+    hot_hdr = (1.05, 1.0, 0.95)
+    rgb = np.array([[hot_hdr]], dtype=np.float32)
+    out = apply_highlight_rolloff_rgb(
+        rgb,
+        DISPLAY_SHOULDER_THRESHOLD,
+        DISPLAY_SHOULDER_CEILING,
+        DISPLAY_SHOULDER_STRENGTH,
+        DISPLAY_SHOULDER_SOFTNESS,
+        DISPLAY_SHOULDER_DESATURATION,
+        DISPLAY_SHOULDER_CURVE,
+    )
+    pixel = tuple(out[0, 0])
+    assert max(hot_hdr) > 1.0
+    assert max(pixel) < 1.0
+    assert _channel_spread(pixel) > 0.0
+
+
 def test_apply_highlight_rolloff_rgb_matches_scalar_reference() -> None:
     import numpy as np
 
