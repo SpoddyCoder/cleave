@@ -66,12 +66,16 @@ from cleave.config_schema import (
     DEFAULT_VISUALIZER_RENDER_MODE,
     DEFAULT_VISUALIZER_UPSCALE,
     DEFAULT_VISUALIZER_WIDTH,
+    CHROMA_BOOST_APPLY_MODES,
+    CHROMA_BOOST_VARIANTS,
     HIGHLIGHT_ROLLOFF_APPLY_MODES,
     HIGHLIGHT_ROLLOFF_CURVES,
     LAYER_DEFAULT_SIZE,
     RENDER_OVERLAY_POSITIONS,
     UPSCALE_MIN,
     VISUALIZER_RENDER_MODES,
+    ChromaBoostApplyMode,
+    ChromaBoostVariant,
     HighlightRolloffApplyMode,
     HighlightRolloffCurve,
     RenderOverlayPosition,
@@ -192,11 +196,19 @@ class HighlightRolloffConfig:
 
 
 @dataclass(frozen=True)
+class ChromaBoostConfig:
+    mode: ChromaBoostApplyMode
+    variant: ChromaBoostVariant
+    amount_pct: int
+
+
+@dataclass(frozen=True)
 class RenderPostFxConfig:
     enabled: bool
     fade_in: float
     fade_out: float
     highlight_rolloff: HighlightRolloffConfig
+    chroma_boost: ChromaBoostConfig
 
 
 @dataclass(frozen=True)

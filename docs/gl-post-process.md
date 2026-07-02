@@ -1,6 +1,6 @@
 # GPU post-processing (moderngl)
 
-Layer bloom, grit, and highlight rolloff run in [cleave/gl_post_process.py](../cleave/gl_post_process.py) via **moderngl** on the same OpenGL context as pygame and the fixed-function compositor in [cleave/gl_compositor.py](../cleave/gl_compositor.py).
+Layer bloom, grit, highlight rolloff, and chroma boost run in [cleave/gl_post_process.py](../cleave/gl_post_process.py) via **moderngl** on the same OpenGL context as pygame and the fixed-function compositor in [cleave/gl_compositor.py](../cleave/gl_compositor.py).
 
 Highlight rolloff supports three apply modes under `render.post_fx.highlight_rolloff.mode`:
 
@@ -8,9 +8,27 @@ Highlight rolloff supports three apply modes under `render.post_fx.highlight_rol
 - `per_layer`: on each active layer before compositing in [cleave/viz/layer_pipeline.py](../cleave/viz/layer_pipeline.py)
 - `composite` (default): after all layers are stacked in [cleave/viz/frame_finish.py](../cleave/viz/frame_finish.py)
 
-Both apply paths gate on `highlight_rolloff_active()` in [cleave/viz/post_fx.py](../cleave/viz/post_fx.py), which requires `render.post_fx.enabled`, `mode != "off"`, and (for composite) not `render_post_fx_solo`. The parent **Render: POST FX** eye toggle must disable highlight rolloff the same way it disables fade (`live_frame_fade_alpha`). UI dimming of sub-rows is not enough; runtime helpers must check `pp.enabled`.
+Both highlight rolloff and chroma boost gate on helpers in [cleave/viz/post_fx.py](../cleave/viz/post_fx.py): `highlight_rolloff_active()` and `chroma_boost_active()`. Each requires `render.post_fx.enabled`, `mode != "off"`, and not `render_post_fx_solo`. Chroma boost also requires `amount_pct > 0`. The parent **Render: POST FX** eye toggle must disable both passes the same way it disables fade (`live_frame_fade_alpha`). UI dimming of sub-rows is not enough; runtime helpers must check `pp.enabled`.
 
-Per-layer mode keeps a frozen rolloff source texture per layer slot in the compositor so paused live tuning can re-apply rolloff without stacking. The shoulder curve is `render.post_fx.highlight_rolloff.curve` (`rolloff`, `smoothstep`, `aces_fit`).
+Per-layer mode keeps a frozen rolloff source texture per layer slot in the compositor so paused live tuning can re-apply rolloff without stacking. Per-layer chroma boost uses parallel chroma source slots (`copy_layer_to_chroma_source`, `restore_layer_from_chroma_source`, `chroma_source_texture_id` in [cleave/gl_compositor.py](../cleave/gl_compositor.py)). The shoulder curve is `render.post_fx.highlight_rolloff.curve` (`rolloff`, `smoothstep`, `aces_fit`).
+
+## Chroma boost
+
+`render.post_fx.chroma_boost` boosts chroma around Rec.709 luma:
+
+- `mode`: `off` | `per_layer` | `composite` (default `off`)
+- `variant`: `saturation` (uniform) | `vibrance` (weights boost by `(1 - sat)`; default)
+- `amount_pct`: 0-100 (default 25)
+
+Math (CPU and GPU must match):
+
+- `lum = dot(rgb, vec3(0.2126, 0.7152, 0.0722))`
+- Saturation: `factor = 1.0 + amount` where `amount = amount_pct / 100.0`
+- Vibrance: `sat = (maxc - minc) / (maxc + 1e-6)`, `weight = 1.0 - sat`, `factor = 1.0 + amount * weight`
+- Output: `out_rgb = mix(vec3(lum), rgb, factor)`
+- HDR: skip `[0,1]` clamp when compositor/post-process use `RGBA16F` (`hdr` uniform)
+
+Composite path runs in [cleave/viz/frame_finish.py](../cleave/viz/frame_finish.py) after user composite highlight rolloff and before frame fade. Per-layer path runs in [cleave/viz/layer_pipeline.py](../cleave/viz/layer_pipeline.py) after bloom, grit, and optional per-layer rolloff.
 
 ## HDR compositing
 
@@ -24,9 +42,10 @@ Frame finish order in [cleave/viz/frame_finish.py](../cleave/viz/frame_finish.py
 
 0. HDR display shoulder on the content FBO when `render.hdr_compositing` is true (fixed constants in [cleave/viz/post_fx.py](../cleave/viz/post_fx.py); reuses `apply_highlight_rolloff`, not gated on `render.post_fx.enabled`)
 1. User composite highlight rolloff on the content FBO (when `mode` is `composite` and post-FX is active)
-2. Frame fade (`apply_frame_fade`)
-3. Render overlay composite
-4. Present to the default 8-bit framebuffer (`present_content`)
+2. User composite chroma boost on the content FBO (when `chroma_boost.mode` is `composite` and `chroma_boost_active()`)
+3. Frame fade (`apply_frame_fade`)
+4. Render overlay composite
+5. Present to the default 8-bit framebuffer (`present_content`)
 
 `present_content` blits the content texture to the display framebuffer, which clamps for screen output. Display shoulder and composite rolloff run before present so tone mapping is graceful; present clamp is a safety net, not the primary tone curve.
 
@@ -76,7 +95,7 @@ Fix: `_dest_fbo_for(texture_id, ...)` now attaches the external texture for `tex
 
 When adding a subsection under **Render: POST FX** (new YAML fields, panel rows, or GPU passes):
 
-1. **Respect `render.post_fx.enabled`.** Reuse `highlight_rolloff_active()` or an equivalent helper that checks `pp.enabled` and `render_post_fx_solo` where applicable. Do not gate only on a child `mode` or strength field.
+1. **Respect `render.post_fx.enabled`.** Reuse `highlight_rolloff_active()`, `chroma_boost_active()`, or an equivalent helper that checks `pp.enabled` and `render_post_fx_solo` where applicable. Do not gate only on a child `mode` or strength field.
 2. **Test with `enabled=False`.** Add or extend tests in [tests/cleave/viz/test_post_fx.py](../tests/cleave/viz/test_post_fx.py), [tests/cleave/viz/test_frame_finish.py](../tests/cleave/viz/test_frame_finish.py), and/or [tests/cleave/viz/test_layer_pipeline.py](../tests/cleave/viz/test_layer_pipeline.py) asserting the effect is skipped when the parent section is disabled.
 
 ## Checklist for new GPU passes
@@ -109,7 +128,10 @@ Use `-s` on the probe file to print CPU vs GPU timing.
 | Compositor float FBOs | [cleave/gl_compositor.py](../cleave/gl_compositor.py) |
 | `render.hdr_compositing` config | [cleave/config_schema.py](../cleave/config_schema.py) |
 | Composite highlight rolloff | [cleave/viz/frame_finish.py](../cleave/viz/frame_finish.py) |
+| Composite chroma boost | [cleave/viz/frame_finish.py](../cleave/viz/frame_finish.py) |
 | Per-layer highlight rolloff | [cleave/viz/layer_pipeline.py](../cleave/viz/layer_pipeline.py) |
+| Per-layer chroma boost | [cleave/viz/layer_pipeline.py](../cleave/viz/layer_pipeline.py) |
 | Rolloff source textures (paused tuning) | [cleave/gl_compositor.py](../cleave/gl_compositor.py) |
+| Chroma source textures (paused tuning) | [cleave/gl_compositor.py](../cleave/gl_compositor.py) |
 | Per-layer bloom / grit | [cleave/viz/layer_pipeline.py](../cleave/viz/layer_pipeline.py) |
 | CPU reference math (tests) | [cleave/viz/post_fx.py](../cleave/viz/post_fx.py) |

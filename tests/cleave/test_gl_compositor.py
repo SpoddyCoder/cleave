@@ -167,6 +167,7 @@ def test_resize_layer_fbo_reallocates_and_preserves_state() -> None:
     assert compositor._allocate_layer_framebuffer.call_args_list == [
         (("layer_1", 640, 360),),
         (("layer_1_rolloff_source", 640, 360),),
+        (("layer_1_chroma_source", 640, 360),),
     ]
     assert fbo.width == 640
     assert fbo.height == 360

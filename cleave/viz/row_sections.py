@@ -57,6 +57,12 @@ def _toggle_render_post_fx_highlight_rolloff(
     controls._render_post_fx.set_highlight_rolloff_expanded(forward)
 
 
+def _toggle_render_post_fx_chroma_boost(
+    controls: TuningControls, _slot: str | None, forward: bool
+) -> None:
+    controls._render_post_fx.set_chroma_boost_expanded(forward)
+
+
 def _toggle_track_header(controls: TuningControls, slot: str | None, forward: bool) -> None:
     if slot is None:
         return
@@ -197,6 +203,12 @@ def _render_post_fx_highlight_rolloff_expanded(
     state: TuningViewState, _slot: str | None
 ) -> bool:
     return state.render_post_fx.highlight_rolloff.expanded
+
+
+def _render_post_fx_chroma_boost_expanded(
+    state: TuningViewState, _slot: str | None
+) -> bool:
+    return state.render_post_fx.chroma_boost.expanded
 
 
 def _track_header_expanded(state: TuningViewState, slot: str | None) -> bool:
@@ -348,6 +360,26 @@ RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SECTION = ExpandSectionDef(
     ),
 )
 
+RENDER_POST_FX_CHROMA_BOOST_ACTIVE = ConditionalRowsDef(
+    name="chroma_boost_active",
+    predicate=lambda state, _desc: state.render_post_fx.chroma_boost.mode != "off",
+    children=(
+        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_CHROMA_BOOST_VARIANT),
+        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_CHROMA_BOOST_AMOUNT),
+    ),
+)
+
+RENDER_POST_FX_CHROMA_BOOST_SECTION = ExpandSectionDef(
+    header_kind=RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER,
+    context="global",
+    read_expanded=_render_post_fx_chroma_boost_expanded,
+    toggle=_toggle_render_post_fx_chroma_boost,
+    children=(
+        SectionNode(leaf_kind=RowKind.RENDER_POST_FX_CHROMA_BOOST_MODE),
+        SectionNode(conditional=RENDER_POST_FX_CHROMA_BOOST_ACTIVE),
+    ),
+)
+
 RENDER_POST_FX_SECTION = ExpandSectionDef(
     header_kind=RowKind.RENDER_POST_FX_HEADER,
     context="global",
@@ -358,6 +390,7 @@ RENDER_POST_FX_SECTION = ExpandSectionDef(
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_IN),
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_OUT),
         SectionNode(expand=RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SECTION),
+        SectionNode(expand=RENDER_POST_FX_CHROMA_BOOST_SECTION),
     ),
 )
 

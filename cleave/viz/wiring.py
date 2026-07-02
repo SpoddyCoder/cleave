@@ -333,8 +333,39 @@ def make_tuning_controls(
                     fbo.height,
                 )
 
+    def on_chroma_boost_apply_mode_change(old_mode: str, new_mode: str) -> None:
+        if compositor is None or post_process is None:
+            return
+        if session.render_post_fx_solo:
+            return
+        cb = session.render_post_fx.chroma_boost
+        for layer in layers:
+            if not layer.fbo.enabled:
+                continue
+            fbo = layer.fbo
+            if new_mode == "per_layer" and old_mode in ("composite", "off"):
+                compositor.copy_layer_to_chroma_source(
+                    post_process,
+                    layer.slot,
+                    fbo.texture_id,
+                    fbo.width,
+                    fbo.height,
+                )
+                LayerFramePipeline.apply_layer_chroma_boost(
+                    layer, post_process, compositor, cb
+                )
+            elif old_mode == "per_layer" and new_mode in ("composite", "off"):
+                compositor.restore_layer_from_chroma_source(
+                    post_process,
+                    layer.slot,
+                    fbo.texture_id,
+                    fbo.width,
+                    fbo.height,
+                )
+
     render_post_fx_bindings = RenderPostFxBindings(
         on_highlight_rolloff_apply_mode_change=on_highlight_rolloff_apply_mode_change,
+        on_chroma_boost_apply_mode_change=on_chroma_boost_apply_mode_change,
         is_paused=lambda: playback.paused,
     )
 

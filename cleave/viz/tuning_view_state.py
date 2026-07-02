@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING
 
 from cleave.config import RenderOverlayPosition
 from cleave.config_schema import (
+    DEFAULT_CHROMA_BOOST_APPLY_MODE,
+    DEFAULT_CHROMA_BOOST_VARIANT,
     DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
     DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
     DEFAULT_HARD_CUT_DURATION,
@@ -100,6 +102,14 @@ class HighlightRolloffBlock:
 
 
 @dataclass
+class ChromaBoostBlock:
+    expanded: bool = False
+    mode: str = DEFAULT_CHROMA_BOOST_APPLY_MODE
+    variant: str = DEFAULT_CHROMA_BOOST_VARIANT
+    amount_pct: int = 25
+
+
+@dataclass
 class RenderPostFxBlock:
     enabled: bool = _RO_POST_FX_DEFAULTS["enabled"]
     expanded: bool = _RO_POST_FX_DEFAULTS["expanded"]
@@ -108,6 +118,7 @@ class RenderPostFxBlock:
     highlight_rolloff: HighlightRolloffBlock = field(
         default_factory=HighlightRolloffBlock
     )
+    chroma_boost: ChromaBoostBlock = field(default_factory=ChromaBoostBlock)
     solo: bool = False
 
 
@@ -278,6 +289,8 @@ def view_state_structure_signature(
             "expanded": pp.expanded,
             "highlight_rolloff_expanded": pp.highlight_rolloff_expanded,
             "highlight_rolloff_mode": pp.highlight_rolloff.mode,
+            "chroma_boost_expanded": pp.chroma_boost_expanded,
+            "chroma_boost_mode": pp.chroma_boost.mode,
         },
         "render_timeline": {"enabled": tl.enabled},
         "timeline": {"enabled": tl.enabled},
@@ -389,6 +402,12 @@ class TuningViewStateBuilder:
                 strength_pct=pp.highlight_rolloff.strength_pct,
                 softness_pct=pp.highlight_rolloff.softness_pct,
                 desaturation_pct=pp.highlight_rolloff.desaturation_pct,
+            ),
+            chroma_boost=ChromaBoostBlock(
+                expanded=pp.chroma_boost_expanded,
+                mode=pp.chroma_boost.mode,
+                variant=pp.chroma_boost.variant,
+                amount_pct=pp.chroma_boost.amount_pct,
             ),
         )
         render_timeline = RenderTimelineBlock(enabled=tl.enabled)
@@ -526,6 +545,13 @@ class TuningViewStateBuilder:
                     strength_pct=pp.highlight_rolloff.strength_pct,
                     softness_pct=pp.highlight_rolloff.softness_pct,
                     desaturation_pct=pp.highlight_rolloff.desaturation_pct,
+                ),
+                chroma_boost=replace(
+                    structure.render_post_fx.chroma_boost,
+                    expanded=pp.chroma_boost_expanded,
+                    mode=pp.chroma_boost.mode,
+                    variant=pp.chroma_boost.variant,
+                    amount_pct=pp.chroma_boost.amount_pct,
                 ),
                 solo=self.session.render_post_fx_solo,
             ),

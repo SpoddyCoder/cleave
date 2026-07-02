@@ -16,11 +16,13 @@ from cleave.viz.layer import StemLayer
 from cleave.viz.layer_preview_resolution import preview_sizes_for_session
 from cleave.viz.layer_visibility import effective_layer_enabled
 from cleave.viz.post_fx import (
+    chroma_boost_active,
+    chroma_boost_variant_index,
     highlight_rolloff_active,
     highlight_rolloff_curve_index,
 )
 from cleave.viz.preset_switching import apply_preset_switching
-from cleave.viz.session import HighlightRolloffRuntime, TuningSession
+from cleave.viz.session import ChromaBoostRuntime, HighlightRolloffRuntime, TuningSession
 from OpenGL.GL import GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, glClear, glClearColor, glViewport
 
 
@@ -103,6 +105,17 @@ def _apply_layer_highlight_rolloff(
 ) -> None:
     LayerFramePipeline.apply_layer_highlight_rolloff(
         layer, post_process, compositor, hr
+    )
+
+
+def _apply_layer_chroma_boost(
+    layer: StemLayer,
+    post_process: GlPostProcess,
+    compositor: GlCompositor,
+    cb: ChromaBoostRuntime,
+) -> None:
+    LayerFramePipeline.apply_layer_chroma_boost(
+        layer, post_process, compositor, cb
     )
 
 
@@ -269,6 +282,26 @@ class LayerFramePipeline:
         )
 
     @staticmethod
+    def apply_layer_chroma_boost(
+        layer: StemLayer,
+        post_process: GlPostProcess,
+        compositor: GlCompositor,
+        cb: ChromaBoostRuntime,
+    ) -> None:
+        fbo = layer.fbo
+        source_id = compositor.chroma_source_texture_id(layer.slot)
+        if source_id == 0:
+            return
+        post_process.apply_chroma_boost(
+            fbo.texture_id,
+            fbo.width,
+            fbo.height,
+            cb.amount_pct,
+            chroma_boost_variant_index(cb.variant),
+            source_texture_id=source_id,
+        )
+
+    @staticmethod
     def render_frame(
         session: TuningSession,
         layers: list[StemLayer],
@@ -302,9 +335,15 @@ class LayerFramePipeline:
 
         pp = session.render_post_fx
         hr = pp.highlight_rolloff
-        per_layer = (
+        cb = pp.chroma_boost
+        per_layer_rolloff = (
             highlight_rolloff_active(pp, solo=False)
             and hr.mode == "per_layer"
+            and compositor is not None
+        )
+        per_layer_chroma = (
+            chroma_boost_active(pp, solo=False)
+            and cb.mode == "per_layer"
             and compositor is not None
         )
 
@@ -314,7 +353,7 @@ class LayerFramePipeline:
                     _render_layer_fbo(layer, layer.pm)
                     _apply_layer_bloom(layer, post_process)
                     _apply_layer_grit(layer, post_process)
-                    if per_layer:
+                    if per_layer_rolloff:
                         compositor.copy_layer_to_rolloff_source(
                             post_process,
                             layer.slot,
@@ -325,12 +364,30 @@ class LayerFramePipeline:
                         _apply_layer_highlight_rolloff(
                             layer, post_process, compositor, hr
                         )
-        elif per_layer:
-            for layer in layers:
-                if layer.fbo.enabled:
-                    _apply_layer_highlight_rolloff(
-                        layer, post_process, compositor, hr
-                    )
+                    if per_layer_chroma:
+                        compositor.copy_layer_to_chroma_source(
+                            post_process,
+                            layer.slot,
+                            layer.fbo.texture_id,
+                            layer.fbo.width,
+                            layer.fbo.height,
+                        )
+                        _apply_layer_chroma_boost(
+                            layer, post_process, compositor, cb
+                        )
+        else:
+            if per_layer_rolloff:
+                for layer in layers:
+                    if layer.fbo.enabled:
+                        _apply_layer_highlight_rolloff(
+                            layer, post_process, compositor, hr
+                        )
+            if per_layer_chroma:
+                for layer in layers:
+                    if layer.fbo.enabled:
+                        _apply_layer_chroma_boost(
+                            layer, post_process, compositor, cb
+                        )
 
     @staticmethod
     def composite(

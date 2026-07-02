@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cleave.config import HighlightRolloffConfig, LayerConfig, RenderPostFxConfig, VIZ_CONFIG_FILENAME, dump_yaml
+from cleave.config import ChromaBoostConfig, HighlightRolloffConfig, LayerConfig, RenderPostFxConfig, VIZ_CONFIG_FILENAME, dump_yaml
 from cleave.config_schema import (
     DEFAULT_LAYER_SLOTS,
     DEFAULT_LAYER_Z_ORDER,
+    default_chroma_boost_runtime_values,
     default_highlight_rolloff_runtime_values,
     template_layer_entry,
     template_visualizer_section,
@@ -15,7 +16,7 @@ from cleave.config_schema import (
 from cleave.extract import STEM_NAMES, StemSource
 from cleave.paths import repo_root
 from cleave.preset_playlist import playlist_at_dir
-from cleave.viz.session import HighlightRolloffRuntime, LayerRuntime, RenderPostFxRuntime
+from cleave.viz.session import ChromaBoostRuntime, HighlightRolloffRuntime, LayerRuntime, RenderPostFxRuntime
 
 TEST_LAYER_STEMS: dict[str, StemSource] = {
     "layer_1": "drums",
@@ -29,12 +30,17 @@ def default_highlight_rolloff_config() -> HighlightRolloffConfig:
     return HighlightRolloffConfig(**default_highlight_rolloff_runtime_values())
 
 
+def default_chroma_boost_config() -> ChromaBoostConfig:
+    return ChromaBoostConfig(**default_chroma_boost_runtime_values())
+
+
 def default_render_post_fx_config(**overrides: object) -> RenderPostFxConfig:
     values: dict[str, object] = {
         "enabled": True,
         "fade_in": 30.0,
         "fade_out": 4.0,
         "highlight_rolloff": default_highlight_rolloff_config(),
+        "chroma_boost": default_chroma_boost_config(),
     }
     values.update(overrides)
     return RenderPostFxConfig(**values)  # type: ignore[arg-type]
@@ -50,10 +56,17 @@ def default_render_post_fx_runtime(**overrides: object) -> RenderPostFxRuntime:
             **default_highlight_rolloff_runtime_values()
         ),
         "highlight_rolloff_expanded": False,
+        "chroma_boost": ChromaBoostRuntime(**default_chroma_boost_runtime_values()),
+        "chroma_boost_expanded": False,
     }
     values.update(overrides)
     highlight_rolloff = values.pop("highlight_rolloff")
-    return RenderPostFxRuntime(highlight_rolloff=highlight_rolloff, **values)  # type: ignore[arg-type]
+    chroma_boost = values.pop("chroma_boost")
+    return RenderPostFxRuntime(
+        highlight_rolloff=highlight_rolloff,
+        chroma_boost=chroma_boost,
+        **values,
+    )  # type: ignore[arg-type]
 
 
 def repo_root_template_path() -> Path:

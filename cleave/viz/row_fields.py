@@ -306,6 +306,24 @@ def _format_render_post_fx_highlight_rolloff_desaturation(
     return f"{state.render_post_fx.highlight_rolloff.desaturation_pct}%"
 
 
+def _format_render_post_fx_chroma_boost_mode(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return state.render_post_fx.chroma_boost.mode
+
+
+def _format_render_post_fx_chroma_boost_variant(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return state.render_post_fx.chroma_boost.variant
+
+
+def _format_render_post_fx_chroma_boost_amount(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return f"{state.render_post_fx.chroma_boost.amount_pct}%"
+
+
 def _apply_track_stem(
     controls: TuningControls, desc: RowDescriptor, forward: bool, _ctrl: bool,
     _shift: bool,
@@ -630,6 +648,30 @@ def _apply_render_post_fx_highlight_rolloff_desaturation(
     controls._render_post_fx.set_highlight_rolloff_desaturation_pct(
         hr.desaturation_pct + delta
     )
+
+
+def _apply_render_post_fx_chroma_boost_mode(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls._render_post_fx.cycle_chroma_boost_mode(forward=forward)
+
+
+def _apply_render_post_fx_chroma_boost_variant(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls._render_post_fx.cycle_chroma_boost_variant(forward=forward)
+
+
+def _apply_render_post_fx_chroma_boost_amount(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
+    _shift: bool,
+) -> None:
+    step = 10 if ctrl else 1
+    delta = step if forward else -step
+    cb = controls.session.render_post_fx.chroma_boost
+    controls._render_post_fx.set_chroma_boost_amount_pct(cb.amount_pct + delta)
 
 
 def _apply_expand_subheader(
@@ -1131,6 +1173,29 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_render_post_fx_highlight_rolloff_desaturation,
         apply_horizontal=_apply_render_post_fx_highlight_rolloff_desaturation,
+    ),
+    RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER: RowFieldDef(
+        panel_label="chroma boost",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        apply_horizontal=_apply_expand_subheader,
+    ),
+    RowKind.RENDER_POST_FX_CHROMA_BOOST_MODE: RowFieldDef(
+        panel_label="mode",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_post_fx_chroma_boost_mode,
+        apply_horizontal=_apply_render_post_fx_chroma_boost_mode,
+    ),
+    RowKind.RENDER_POST_FX_CHROMA_BOOST_VARIANT: RowFieldDef(
+        panel_label="variant",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_post_fx_chroma_boost_variant,
+        apply_horizontal=_apply_render_post_fx_chroma_boost_variant,
+    ),
+    RowKind.RENDER_POST_FX_CHROMA_BOOST_AMOUNT: RowFieldDef(
+        panel_label="amount",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_post_fx_chroma_boost_amount,
+        apply_horizontal=_apply_render_post_fx_chroma_boost_amount,
     ),
     RowKind.RENDER_TIMELINE_HEADER: RowFieldDef(
         panel_label="TIMELINE",

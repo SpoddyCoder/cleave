@@ -26,6 +26,8 @@ if TYPE_CHECKING:
     from cleave.viz.app import VisualizerCore
 from cleave.viz.post_fx import (
     apply_hdr_display_shoulder,
+    chroma_boost_active,
+    chroma_boost_variant_index,
     hdr_display_shoulder_active,
     highlight_rolloff_active,
     highlight_rolloff_curve_index,
@@ -131,6 +133,15 @@ def finish_content_frame(
             hr.softness_pct / 100.0,
             hr.desaturation_pct / 100.0,
             highlight_rolloff_curve_index(hr.curve),
+        )
+    cb = pp.chroma_boost
+    if chroma_boost_active(pp, solo=post_fx_solo) and cb.mode == "composite":
+        core.post_process.apply_chroma_boost(
+            compositor.content_texture_id,
+            compositor.content_width,
+            compositor.content_height,
+            cb.amount_pct,
+            chroma_boost_variant_index(cb.variant),
         )
     frame_fade_alpha = live_frame_fade_alpha(
         t_sec,

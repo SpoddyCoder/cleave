@@ -7,6 +7,8 @@ from enum import Enum, auto
 
 from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES
 from cleave.config_schema import (
+    CHROMA_BOOST_APPLY_MODE_HELP_ENTRIES,
+    CHROMA_BOOST_VARIANT_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES,
     PRESET_SWITCHING_MODE_HELP_ENTRIES,
@@ -65,6 +67,10 @@ class RowKind(Enum):
     RENDER_POST_FX_HIGHLIGHT_ROLLOFF_STRENGTH = auto()
     RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SOFTNESS = auto()
     RENDER_POST_FX_HIGHLIGHT_ROLLOFF_DESATURATION = auto()
+    RENDER_POST_FX_CHROMA_BOOST_HEADER = auto()
+    RENDER_POST_FX_CHROMA_BOOST_MODE = auto()
+    RENDER_POST_FX_CHROMA_BOOST_VARIANT = auto()
+    RENDER_POST_FX_CHROMA_BOOST_AMOUNT = auto()
     RENDER_TIMELINE_HEADER = auto()
     SETTINGS_HEADER = auto()
     SETTINGS_RENDER_MODE = auto()
@@ -497,7 +503,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Post FX",
         help_description=(
             "Post-processing effects applied during final compositing:",
-            "fade in, fade out, and highlight rolloff.",
+            "fade in, fade out, highlight rolloff, and chroma boost.",
         ),
         quick_nav_target=True,
     ),
@@ -605,6 +611,45 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "How much compressed highlights lose color purity.",
             "Higher = less pure white, more tinted or muted highlights.",
             "Hue is preserved during luminance scaling, then pulled toward gray.",
+        ),
+    ),
+    RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER: RowBehavior(
+        RowAffordance.EXPAND,
+        is_sub_header=True,
+        parent_group="render_post_fx",
+        help_title="Chroma boost",
+        help_description=(
+            "Boosts saturation or vibrance around Rec.709 luma.",
+            "Useful after highlight compression to restore perceived color.",
+            "Vibrance spares already-saturated pixels to avoid clipping primaries.",
+        ),
+    ),
+    RowKind.RENDER_POST_FX_CHROMA_BOOST_MODE: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="render_post_fx_chroma_boost",
+        help_title="Mode",
+        help_entries=(("Left/Right", "cycle mode"),),
+        help_description=("Where chroma boost is applied.",),
+        help_mode_entries=CHROMA_BOOST_APPLY_MODE_HELP_ENTRIES,
+    ),
+    RowKind.RENDER_POST_FX_CHROMA_BOOST_VARIANT: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="render_post_fx_chroma_boost",
+        help_title="Variant",
+        help_entries=(("Left/Right", "cycle variant"),),
+        help_description=("Saturation vs vibrance weighting.",),
+        help_mode_entries=CHROMA_BOOST_VARIANT_HELP_ENTRIES,
+    ),
+    RowKind.RENDER_POST_FX_CHROMA_BOOST_AMOUNT: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="render_post_fx_chroma_boost",
+        help_title="Amount",
+        help_description=(
+            "Chroma boost strength as a percentage.",
+            "0% disables the pass even when mode is not off.",
         ),
     ),
     RowKind.RENDER_TIMELINE_HEADER: RowBehavior(

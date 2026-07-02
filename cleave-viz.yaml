@@ -26,6 +26,10 @@ render:
       strength_pct: 70
       softness_pct: 40
       desaturation_pct: 30
+    chroma_boost:
+      mode: off
+      variant: vibrance
+      amount_pct: 25
 
   overlay:
     enabled: true

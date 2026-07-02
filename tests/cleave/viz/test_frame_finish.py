@@ -131,6 +131,83 @@ def test_finish_content_frame_call_order_rolloff_fade_overlay_present() -> None:
     ]
 
 
+def test_finish_content_frame_applies_chroma_boost_when_active() -> None:
+    core = _make_core(hdr_compositing=False)
+    core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
+    cb = core.seed.session.render_post_fx.chroma_boost
+    cb.mode = "composite"
+    cb.variant = "vibrance"
+    cb.amount_pct = 40
+
+    with (
+        patch("cleave.viz.frame_finish.apply_hdr_display_shoulder"),
+        patch("cleave.viz.frame_finish._composite_render_overlay"),
+    ):
+        finish_content_frame(core, 1.0)
+
+    core.post_process.apply_chroma_boost.assert_called_once_with(
+        42,
+        1280,
+        720,
+        40,
+        1,
+    )
+
+
+def test_finish_content_frame_skips_chroma_boost_when_post_fx_disabled() -> None:
+    core = _make_core(hdr_compositing=False)
+    core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=False)
+    core.seed.session.render_post_fx.chroma_boost.mode = "composite"
+    core.seed.session.render_post_fx.chroma_boost.amount_pct = 25
+
+    with (
+        patch("cleave.viz.frame_finish.apply_hdr_display_shoulder"),
+        patch("cleave.viz.frame_finish._composite_render_overlay"),
+    ):
+        finish_content_frame(core, 1.0)
+
+    core.post_process.apply_chroma_boost.assert_not_called()
+
+
+def test_finish_content_frame_call_order_rolloff_chroma_fade_overlay_present() -> None:
+    core = _make_core(hdr_compositing=False)
+    core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
+    core.seed.session.render_post_fx.highlight_rolloff.mode = "composite"
+    core.seed.session.render_post_fx.chroma_boost.mode = "composite"
+    core.seed.session.render_post_fx.chroma_boost.amount_pct = 25
+    call_order: list[str] = []
+
+    core.post_process.apply_highlight_rolloff.side_effect = (
+        lambda *_a, **_k: call_order.append("highlight_rolloff")
+    )
+    core.post_process.apply_chroma_boost.side_effect = (
+        lambda *_a, **_k: call_order.append("chroma_boost")
+    )
+    core.compositor.apply_frame_fade.side_effect = (
+        lambda *_a, **_k: call_order.append("frame_fade")
+    )
+    core.compositor.present_content.side_effect = (
+        lambda: call_order.append("present_content")
+    )
+
+    with (
+        patch("cleave.viz.frame_finish.apply_hdr_display_shoulder"),
+        patch(
+            "cleave.viz.frame_finish._composite_render_overlay",
+            side_effect=lambda *_a, **_k: call_order.append("overlay"),
+        ),
+    ):
+        finish_content_frame(core, 1.0)
+
+    assert call_order == [
+        "highlight_rolloff",
+        "chroma_boost",
+        "frame_fade",
+        "overlay",
+        "present_content",
+    ]
+
+
 def test_finish_content_frame_skips_composite_rolloff_when_per_layer() -> None:
     core = _make_core(hdr_compositing=False)
     core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
