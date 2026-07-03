@@ -144,6 +144,7 @@ Project scan: typically tens to low hundreds of presets (per-layer rotation dirs
 ## Related work
 
 - [presets-check-proposal.md](presets-check-proposal.md) — problem statement and classification heuristics
+- [projectm-api-coverage.md](projectm-api-coverage.md) — libprojectM symbol audit and live failure handling
 - [preset-switching-proposal.md](legacy-plans/preset-switching-proposal.md) — live rotation design
 - [todos.md](todos.md) — projectM robustness callbacks (shared with scan)
 - [.cursor/rules/preset-scan-scope.mdc](../.cursor/rules/preset-scan-scope.mdc) — update scan derivation when `preset_switching_scope` changes

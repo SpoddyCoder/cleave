@@ -5,8 +5,13 @@ from __future__ import annotations
 import ctypes
 import os
 import subprocess
+import sys
+from collections import deque
+from collections.abc import Callable
 from ctypes import (
+    CFUNCTYPE,
     POINTER,
+    byref,
     c_bool,
     c_char_p,
     c_double,
@@ -14,9 +19,11 @@ from ctypes import (
     c_int32,
     c_size_t,
     c_uint,
+    c_uint8,
     c_uint32,
     c_void_p,
 )
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -27,6 +34,32 @@ PROJECTM_MONO = 1
 PROJECTM_STEREO = 2
 
 _lib: ctypes.CDLL | None = None
+_log_callback: CFUNCTYPE | None = None
+
+PROJECTM_LOG_LEVEL_DEBUG = 2
+
+PresetSwitchFailedEvent = CFUNCTYPE(None, c_char_p, c_char_p, c_void_p)
+LogCallback = CFUNCTYPE(None, c_char_p, c_int32, c_void_p)
+
+
+class ProjectmTextureLoadData(ctypes.Structure):
+    _fields_ = [
+        ("data", POINTER(c_uint8)),
+        ("width", c_uint32),
+        ("height", c_uint32),
+        ("channels", c_uint32),
+        ("texture_id", c_uint32),
+    ]
+
+
+TextureLoadEvent = CFUNCTYPE(None, c_char_p, POINTER(ProjectmTextureLoadData), c_void_p)
+
+
+@dataclass(frozen=True)
+class PresetLoadFailure:
+    filename: str
+    message: str
+    exhausted: bool = False
 
 
 class ProjectMLibraryError(OSError):
@@ -200,6 +233,86 @@ def _bind_functions(lib: ctypes.CDLL, path: str) -> None:
     lib.projectm_set_preset_start_clean.argtypes = [c_void_p, c_bool]
     lib.projectm_set_preset_start_clean.restype = None
 
+    _bind_optional_functions(lib)
+
+
+def _bind_optional_functions(lib: ctypes.CDLL) -> None:
+    if hasattr(lib, "projectm_set_preset_switch_failed_event_callback"):
+        lib.projectm_set_preset_switch_failed_event_callback.argtypes = [
+            c_void_p,
+            PresetSwitchFailedEvent,
+            c_void_p,
+        ]
+        lib.projectm_set_preset_switch_failed_event_callback.restype = None
+
+    if hasattr(lib, "projectm_set_texture_load_event_callback"):
+        lib.projectm_set_texture_load_event_callback.argtypes = [
+            c_void_p,
+            TextureLoadEvent,
+            c_void_p,
+        ]
+        lib.projectm_set_texture_load_event_callback.restype = None
+
+    if hasattr(lib, "projectm_set_log_callback"):
+        lib.projectm_set_log_callback.argtypes = [
+            LogCallback,
+            c_bool,
+            c_void_p,
+        ]
+        lib.projectm_set_log_callback.restype = None
+
+    if hasattr(lib, "projectm_set_log_level"):
+        lib.projectm_set_log_level.argtypes = [c_int32, c_bool]
+        lib.projectm_set_log_level.restype = None
+
+    if hasattr(lib, "projectm_get_version_components"):
+        lib.projectm_get_version_components.argtypes = [
+            POINTER(c_int32),
+            POINTER(c_int32),
+            POINTER(c_int32),
+        ]
+        lib.projectm_get_version_components.restype = None
+
+    if hasattr(lib, "projectm_get_version_string"):
+        lib.projectm_get_version_string.argtypes = []
+        lib.projectm_get_version_string.restype = c_char_p
+
+    if hasattr(lib, "projectm_get_vcs_version_string"):
+        lib.projectm_get_vcs_version_string.argtypes = []
+        lib.projectm_get_vcs_version_string.restype = c_char_p
+
+    if hasattr(lib, "projectm_free_string"):
+        lib.projectm_free_string.argtypes = [c_void_p]
+        lib.projectm_free_string.restype = None
+
+
+def _decode_lib_string(ptr: c_char_p) -> str | None:
+    if not ptr:
+        return None
+    return ctypes.string_at(ptr).decode("utf-8")
+
+
+def _free_lib_string(lib: ctypes.CDLL, ptr: c_char_p) -> None:
+    if ptr and hasattr(lib, "projectm_free_string"):
+        lib.projectm_free_string(ptr)
+
+
+def _enable_debug_logging(lib: ctypes.CDLL) -> None:
+    global _log_callback
+    if os.environ.get("CLEAVE_PROJECTM_LOG") != "1":
+        return
+    if not hasattr(lib, "projectm_set_log_callback"):
+        return
+
+    def _on_log(message: bytes, _level: int, _user_data: c_void_p) -> None:
+        if message:
+            print(message.decode("utf-8", errors="replace"), file=sys.stderr)
+
+    _log_callback = LogCallback(_on_log)
+    lib.projectm_set_log_callback(_log_callback, c_bool(False), c_void_p())
+    if hasattr(lib, "projectm_set_log_level"):
+        lib.projectm_set_log_level(c_int32(PROJECTM_LOG_LEVEL_DEBUG), c_bool(False))
+
 
 def _get_lib() -> ctypes.CDLL:
     global _lib
@@ -214,6 +327,7 @@ def _get_lib() -> ctypes.CDLL:
         except (OSError, ProjectMLibraryError) as exc:
             errors.append(f"{path}: {exc}")
             continue
+        _enable_debug_logging(loaded)
         _lib = loaded
         return loaded
 
@@ -238,6 +352,9 @@ class ProjectM:
         self._texture_path_storage: list[bytes] = []
         self._beat_sensitivity = DEFAULT_BEAT_SENSITIVITY
         self._pcm_channels = 1
+        self._failure_queue: deque[PresetLoadFailure] = deque()
+        self._switch_failed_callback: PresetSwitchFailedEvent | None = None
+        self.set_preset_switch_failed_handler(self._enqueue_preset_failure)
 
     @property
     def handle(self) -> c_void_p:
@@ -360,3 +477,82 @@ class ProjectM:
 
     def set_preset_start_clean(self, enabled: bool) -> None:
         _get_lib().projectm_set_preset_start_clean(self._handle, c_bool(enabled))
+
+    def _enqueue_preset_failure(
+        self,
+        filename: str,
+        message: str,
+        *,
+        exhausted: bool = False,
+    ) -> None:
+        self._failure_queue.append(
+            PresetLoadFailure(
+                filename=filename,
+                message=message,
+                exhausted=exhausted,
+            )
+        )
+
+    def set_preset_switch_failed_handler(
+        self, callback: Callable[[str, str], None]
+    ) -> None:
+        lib = _get_lib()
+        if not hasattr(lib, "projectm_set_preset_switch_failed_event_callback"):
+            return
+
+        def _on_failed(
+            filename: bytes, message: bytes, _user_data: c_void_p
+        ) -> None:
+            callback(
+                filename.decode("utf-8") if filename else "",
+                message.decode("utf-8") if message else "",
+            )
+
+        self._switch_failed_callback = PresetSwitchFailedEvent(_on_failed)
+        lib.projectm_set_preset_switch_failed_event_callback(
+            self._handle, self._switch_failed_callback, c_void_p()
+        )
+
+    def clear_preset_switch_failed_handler(self) -> None:
+        lib = _get_lib()
+        if hasattr(lib, "projectm_set_preset_switch_failed_event_callback"):
+            lib.projectm_set_preset_switch_failed_event_callback(
+                self._handle, PresetSwitchFailedEvent(), c_void_p()
+            )
+        self._switch_failed_callback = None
+
+    def drain_preset_failures(self) -> list[PresetLoadFailure]:
+        failures = list(self._failure_queue)
+        self._failure_queue.clear()
+        return failures
+
+    def version_info(self) -> dict[str, int | str]:
+        lib = _get_lib()
+        info: dict[str, int | str] = {}
+        if hasattr(lib, "projectm_get_version_components"):
+            major = c_int32()
+            minor = c_int32()
+            patch = c_int32()
+            lib.projectm_get_version_components(
+                byref(major), byref(minor), byref(patch)
+            )
+            info["major"] = major.value
+            info["minor"] = minor.value
+            info["patch"] = patch.value
+        if hasattr(lib, "projectm_get_version_string"):
+            ptr = lib.projectm_get_version_string()
+            try:
+                version = _decode_lib_string(ptr)
+                if version is not None:
+                    info["version"] = version
+            finally:
+                _free_lib_string(lib, ptr)
+        if hasattr(lib, "projectm_get_vcs_version_string"):
+            ptr = lib.projectm_get_vcs_version_string()
+            try:
+                vcs = _decode_lib_string(ptr)
+                if vcs is not None:
+                    info["vcs"] = vcs
+            finally:
+                _free_lib_string(lib, ptr)
+        return info

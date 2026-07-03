@@ -9,6 +9,7 @@ import pytest
 
 from cleave.projectm import ProjectM
 from cleave.projectm_playlist import (
+    DEFAULT_RETRY_COUNT,
     ProjectMPlaylist,
     ProjectMPlaylistLibraryError,
     _bind_functions,
@@ -23,8 +24,11 @@ def _mock_lib() -> MagicMock:
         "projectm_playlist_connect",
         "projectm_playlist_add_path",
         "projectm_playlist_set_shuffle",
-        "projectm_playlist_set_preset_load_event_callback",
         "projectm_playlist_set_preset_switched_event_callback",
+        "projectm_playlist_set_preset_switch_failed_event_callback",
+        "projectm_playlist_play_next",
+        "projectm_playlist_get_retry_count",
+        "projectm_playlist_set_retry_count",
         "projectm_playlist_size",
         "projectm_playlist_get_position",
         "projectm_playlist_set_position",
@@ -33,6 +37,8 @@ def _mock_lib() -> MagicMock:
     ):
         setattr(lib, name, MagicMock())
     lib.projectm_playlist_create.return_value = MagicMock()
+    lib.projectm_playlist_play_next.return_value = 2
+    lib.projectm_playlist_get_retry_count.return_value = DEFAULT_RETRY_COUNT
     return lib
 
 
@@ -72,48 +78,31 @@ def test_destroy_disconnects_before_free() -> None:
     lib.projectm_playlist_destroy.assert_called_once()
 
 
-def test_connect_installs_instant_load_callback() -> None:
+def test_connect_does_not_install_preset_load_callback() -> None:
     lib = _mock_lib()
+    lib.projectm_playlist_set_preset_load_event_callback = MagicMock()
     pm = ProjectM.__new__(ProjectM)
     pm._handle = MagicMock()
-    pm.load_preset = MagicMock()
-    loaded_paths: list[str] = []
-
-    with patch("cleave.projectm_playlist._get_lib", return_value=lib):
-        playlist = ProjectMPlaylist.create()
-        playlist.connect(
-            pm, on_preset_loaded=lambda path: loaded_paths.append(str(path))
-        )
-
-    lib.projectm_playlist_set_preset_load_event_callback.assert_called()
-    install_call = lib.projectm_playlist_set_preset_load_event_callback.call_args
-    callback = install_call.args[1]
-    assert callback is not None
-    assert callback(0, b"/tmp/a.milk", True, None) is True
-    pm.load_preset.assert_called_once_with("/tmp/a.milk", smooth=False)
-    assert loaded_paths == ["/tmp/a.milk"]
-
-
-def test_load_callback_honors_hard_cut_flag() -> None:
-    lib = _mock_lib()
-    pm = ProjectM.__new__(ProjectM)
-    pm._handle = MagicMock()
-    pm.load_preset = MagicMock()
+    pm._enqueue_preset_failure = MagicMock()
 
     with patch("cleave.projectm_playlist._get_lib", return_value=lib):
         playlist = ProjectMPlaylist.create()
         playlist.connect(pm, on_preset_loaded=lambda _path: None)
 
-    callback = lib.projectm_playlist_set_preset_load_event_callback.call_args.args[1]
-    callback(1, b"/tmp/b.milk", False, None)
-    pm.load_preset.assert_called_once_with("/tmp/b.milk", smooth=True)
+    lib.projectm_playlist_set_preset_load_event_callback.assert_not_called()
+    lib.projectm_playlist_set_preset_switched_event_callback.assert_called()
+    lib.projectm_playlist_set_preset_switch_failed_event_callback.assert_called()
+    lib.projectm_playlist_set_retry_count.assert_called_once()
+    retry_args = lib.projectm_playlist_set_retry_count.call_args.args
+    assert retry_args[0] == playlist.handle
+    assert retry_args[1].value == DEFAULT_RETRY_COUNT
 
 
 def test_preset_switched_callback_notifies_on_preset_loaded() -> None:
     lib = _mock_lib()
     pm = ProjectM.__new__(ProjectM)
     pm._handle = MagicMock()
-    pm.load_preset = MagicMock()
+    pm._enqueue_preset_failure = MagicMock()
     loaded_paths: list[str] = []
 
     with patch("cleave.projectm_playlist._get_lib", return_value=lib):
@@ -132,17 +121,59 @@ def test_preset_switched_callback_notifies_on_preset_loaded() -> None:
     assert loaded_paths == ["/tmp/c.milk"]
 
 
-def test_destroy_clears_preset_load_callback() -> None:
+def test_switch_failed_callback_enqueues_exhausted_failure() -> None:
     lib = _mock_lib()
     pm = ProjectM.__new__(ProjectM)
     pm._handle = MagicMock()
+    pm._enqueue_preset_failure = MagicMock()
+
+    with patch("cleave.projectm_playlist._get_lib", return_value=lib):
+        playlist = ProjectMPlaylist.create()
+        playlist.connect(pm)
+        failed = (
+            lib.projectm_playlist_set_preset_switch_failed_event_callback.call_args.args[
+                1
+            ]
+        )
+        failed(b"/tmp/bad.milk", b"too many retries", None)
+
+    pm._enqueue_preset_failure.assert_called_once_with(
+        "/tmp/bad.milk",
+        "too many retries",
+        exhausted=True,
+    )
+
+
+def test_play_next_and_retry_count() -> None:
+    lib = _mock_lib()
+    with patch("cleave.projectm_playlist._get_lib", return_value=lib):
+        playlist = ProjectMPlaylist.create()
+        assert playlist.play_next(hard_cut=True) == 2
+        lib.projectm_playlist_play_next.assert_called_once()
+        playlist.set_retry_count(250)
+        lib.projectm_playlist_set_retry_count.assert_called()
+        lib.projectm_playlist_get_retry_count.return_value = 250
+        assert playlist.get_retry_count() == 250
+
+
+def test_destroy_clears_callbacks() -> None:
+    lib = _mock_lib()
+    pm = ProjectM.__new__(ProjectM)
+    pm._handle = MagicMock()
+    pm._enqueue_preset_failure = MagicMock()
     with patch("cleave.projectm_playlist._get_lib", return_value=lib):
         playlist = ProjectMPlaylist.create()
         playlist.connect(pm)
         playlist.destroy()
 
-    clear_call = lib.projectm_playlist_set_preset_load_event_callback.call_args_list[-1]
-    assert not clear_call.args[1]
+    clear_switched = (
+        lib.projectm_playlist_set_preset_switched_event_callback.call_args_list[-1]
+    )
+    assert not clear_switched.args[1]
+    clear_failed = (
+        lib.projectm_playlist_set_preset_switch_failed_event_callback.call_args_list[-1]
+    )
+    assert not clear_failed.args[1]
 
 
 def test_item_roundtrip_with_real_library(tmp_path: Path) -> None:
