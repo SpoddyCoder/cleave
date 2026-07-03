@@ -9,7 +9,7 @@ Must-do items for Cleave. Everything else is iterative enhancements or listed in
 Outstanding bugs and issues.
 
 ### Solo mode red eye icon
-Solo mode on layers used to show a red background on the eye icon to indicate it was in solo mode, the other layers were put in disabled state - this is no longer happening.
+Solo mode on layers used to show a red background on the eye icon to indicate it was in solo mode, the other layers were put in disabled state - this is no longer happening - or it may be happening, but not immediately visible.
 Think this occurred when we added caching to the UI during pref improvements. Suspect the visual state would update next time the cache is invalidated. We've seen this issue elsewhere.
 
 ---

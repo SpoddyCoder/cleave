@@ -35,6 +35,7 @@ class RowRenderKey:
     slot: str | None
     display_text: str
     color_state: tuple[int, int, int]
+    visibility_icon: tuple[bool, bool] | None
     max_width: int
     line_h: int
 
@@ -135,7 +136,11 @@ def row_render_key(
     max_content_width: int,
     line_h: int,
 ) -> RowRenderKey:
-    from cleave.viz.tuning_panel_draw import _row_value_color, fit_row_text
+    from cleave.viz.tuning_panel_draw import (
+        _row_value_color,
+        fit_row_text,
+        row_visibility_icon_key,
+    )
 
     kind = state.layout.kind(index)
     slot = state.layout.slot(index)
@@ -152,6 +157,7 @@ def row_render_key(
         slot=slot,
         display_text=display_text,
         color_state=color_state,
+        visibility_icon=row_visibility_icon_key(state, index),
         max_width=max_content_width,
         line_h=line_h,
     )
@@ -185,6 +191,7 @@ def static_row_keys(
                 key.slot,
                 key.display_text,
                 key.color_state,
+                key.visibility_icon,
                 key.max_width,
                 key.line_h,
             )

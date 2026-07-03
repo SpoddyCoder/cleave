@@ -1834,6 +1834,14 @@ def test_track_header_visible_uses_layer_enabled_when_timeline_off() -> None:
     assert view.tracks["layer_1"].enabled is False
 
 
+def test_solo_marks_non_solo_tracks_not_visible_when_timeline_off() -> None:
+    controls = _make_controls(("layer_1", "layer_2"), timeline_enabled=False)
+    controls.session.solo_slot = "layer_1"
+    view = controls.build_view_state(paused=False)
+    assert view.tracks["layer_1"].visible is True
+    assert view.tracks["layer_2"].visible is False
+
+
 def test_render_timeline_enabled_change_callback() -> None:
     controls = _make_controls(timeline_enabled=True)
     events: list[bool] = []
