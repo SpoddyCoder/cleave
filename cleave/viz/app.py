@@ -342,6 +342,10 @@ def tick_frame_core(
 
     apply_layer_visibility(runtime.seed.session, runtime.layers_by_slot, t_sec)
 
+    on_panel_notification = None
+    if isinstance(runtime, LiveVisualizerRuntime):
+        on_panel_notification = runtime.controls.show_notification
+
     LayerFramePipeline.render_frame(
         runtime.seed.session,
         runtime.layers,
@@ -354,6 +358,7 @@ def tick_frame_core(
         t_sec,
         paused=paused,
         compositor=runtime.compositor,
+        on_panel_notification=on_panel_notification,
     )
 
     LayerFramePipeline.composite(

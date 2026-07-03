@@ -13,6 +13,8 @@ from cleave.projectm import ProjectM
 
 _lib: ctypes.CDLL | None = None
 
+DEFAULT_RETRY_COUNT = 500
+
 
 class ProjectMPlaylistLibraryError(OSError):
     """libprojectM playlist shared library not found or failed to load."""
@@ -89,8 +91,8 @@ _REQUIRED_SYMBOLS = (
     "projectm_playlist_set_shuffle",
 )
 
-PresetLoadEvent = CFUNCTYPE(c_bool, c_uint32, c_char_p, c_bool, c_void_p)
 PresetSwitchedEvent = CFUNCTYPE(None, c_bool, c_uint32, c_void_p)
+PresetSwitchFailedEvent = CFUNCTYPE(None, c_char_p, c_char_p, c_void_p)
 
 
 def _bind_functions(lib: ctypes.CDLL, path: str) -> None:
@@ -121,14 +123,6 @@ def _bind_functions(lib: ctypes.CDLL, path: str) -> None:
     lib.projectm_playlist_set_shuffle.argtypes = [c_void_p, c_bool]
     lib.projectm_playlist_set_shuffle.restype = None
 
-    if hasattr(lib, "projectm_playlist_set_preset_load_event_callback"):
-        lib.projectm_playlist_set_preset_load_event_callback.argtypes = [
-            c_void_p,
-            c_void_p,
-            c_void_p,
-        ]
-        lib.projectm_playlist_set_preset_load_event_callback.restype = None
-
     if hasattr(lib, "projectm_playlist_set_preset_switched_event_callback"):
         lib.projectm_playlist_set_preset_switched_event_callback.argtypes = [
             c_void_p,
@@ -136,6 +130,26 @@ def _bind_functions(lib: ctypes.CDLL, path: str) -> None:
             c_void_p,
         ]
         lib.projectm_playlist_set_preset_switched_event_callback.restype = None
+
+    if hasattr(lib, "projectm_playlist_set_preset_switch_failed_event_callback"):
+        lib.projectm_playlist_set_preset_switch_failed_event_callback.argtypes = [
+            c_void_p,
+            c_void_p,
+            c_void_p,
+        ]
+        lib.projectm_playlist_set_preset_switch_failed_event_callback.restype = None
+
+    if hasattr(lib, "projectm_playlist_play_next"):
+        lib.projectm_playlist_play_next.argtypes = [c_void_p, c_bool]
+        lib.projectm_playlist_play_next.restype = c_uint32
+
+    if hasattr(lib, "projectm_playlist_get_retry_count"):
+        lib.projectm_playlist_get_retry_count.argtypes = [c_void_p]
+        lib.projectm_playlist_get_retry_count.restype = c_uint32
+
+    if hasattr(lib, "projectm_playlist_set_retry_count"):
+        lib.projectm_playlist_set_retry_count.argtypes = [c_void_p, c_uint32]
+        lib.projectm_playlist_set_retry_count.restype = None
 
     if hasattr(lib, "projectm_playlist_size"):
         lib.projectm_playlist_size.argtypes = [c_void_p]
@@ -210,8 +224,8 @@ class ProjectMPlaylist:
     def __init__(self, handle: c_void_p, *, pm: ProjectM | None = None) -> None:
         self._handle = handle
         self._pm = pm
-        self._preset_load_callback: PresetLoadEvent | None = None
         self._preset_switched_callback: PresetSwitchedEvent | None = None
+        self._switch_failed_callback: PresetSwitchFailedEvent | None = None
         self._on_preset_loaded: Callable[[Path], None] | None = None
 
     @classmethod
@@ -240,21 +254,24 @@ class ProjectMPlaylist:
         _get_lib().projectm_playlist_connect(self._handle, pm_handle)
         self._pm = pm
         if pm is not None:
+            self.set_retry_count(DEFAULT_RETRY_COUNT)
             self._install_callbacks()
 
     def _clear_callbacks(self) -> None:
         lib = _get_lib()
         if self._handle:
-            if hasattr(lib, "projectm_playlist_set_preset_load_event_callback"):
-                lib.projectm_playlist_set_preset_load_event_callback(
-                    self._handle, c_void_p(), c_void_p()
-                )
             if hasattr(lib, "projectm_playlist_set_preset_switched_event_callback"):
                 lib.projectm_playlist_set_preset_switched_event_callback(
                     self._handle, c_void_p(), c_void_p()
                 )
-        self._preset_load_callback = None
+            if hasattr(
+                lib, "projectm_playlist_set_preset_switch_failed_event_callback"
+            ):
+                lib.projectm_playlist_set_preset_switch_failed_event_callback(
+                    self._handle, c_void_p(), c_void_p()
+                )
         self._preset_switched_callback = None
+        self._switch_failed_callback = None
 
     def _notify_preset_loaded(self, path: Path) -> None:
         if self._on_preset_loaded is not None:
@@ -265,21 +282,6 @@ class ProjectMPlaylist:
         pm = self._pm
         if pm is None:
             return
-
-        if hasattr(lib, "projectm_playlist_set_preset_load_event_callback"):
-            def _on_preset_load(
-                _index: int, filename: bytes, hard_cut: bool, _user_data: c_void_p
-            ) -> bool:
-                if filename:
-                    decoded = filename.decode("utf-8")
-                    pm.load_preset(decoded, smooth=not hard_cut)
-                    self._notify_preset_loaded(Path(decoded))
-                return True
-
-            self._preset_load_callback = PresetLoadEvent(_on_preset_load)
-            lib.projectm_playlist_set_preset_load_event_callback(
-                self._handle, self._preset_load_callback, c_void_p()
-            )
 
         if hasattr(lib, "projectm_playlist_set_preset_switched_event_callback"):
             playlist = self
@@ -295,6 +297,43 @@ class ProjectMPlaylist:
             lib.projectm_playlist_set_preset_switched_event_callback(
                 self._handle, self._preset_switched_callback, c_void_p()
             )
+
+        if hasattr(lib, "projectm_playlist_set_preset_switch_failed_event_callback"):
+            def _on_switch_failed(
+                filename: bytes, message: bytes, _user_data: c_void_p
+            ) -> None:
+                pm._enqueue_preset_failure(
+                    filename.decode("utf-8") if filename else "",
+                    message.decode("utf-8") if message else "",
+                    exhausted=True,
+                )
+
+            self._switch_failed_callback = PresetSwitchFailedEvent(_on_switch_failed)
+            lib.projectm_playlist_set_preset_switch_failed_event_callback(
+                self._handle, self._switch_failed_callback, c_void_p()
+            )
+
+    def play_next(self, *, hard_cut: bool = False) -> int:
+        lib = _get_lib()
+        if not hasattr(lib, "projectm_playlist_play_next"):
+            return 0
+        return int(
+            lib.projectm_playlist_play_next(self._handle, c_bool(hard_cut))
+        )
+
+    def get_retry_count(self) -> int:
+        lib = _get_lib()
+        if not hasattr(lib, "projectm_playlist_get_retry_count"):
+            return DEFAULT_RETRY_COUNT
+        return int(lib.projectm_playlist_get_retry_count(self._handle))
+
+    def set_retry_count(self, count: int) -> None:
+        lib = _get_lib()
+        if not hasattr(lib, "projectm_playlist_set_retry_count"):
+            return
+        lib.projectm_playlist_set_retry_count(
+            self._handle, c_uint32(count)
+        )
 
     def add_path(
         self,
