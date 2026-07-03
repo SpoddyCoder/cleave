@@ -28,6 +28,7 @@ Examples:
 ```bash
 ./cleave.py scan projects/sights-and-sounds-26/
 ./cleave.py scan projects/sights-and-sounds-26/ -c cleave-viz.yaml
+./cleave.py scan projects/sights-and-sounds-26/ --slow
 ```
 
 ### Bulk scan (escape hatch)
@@ -45,14 +46,15 @@ cleave scan --presets-dir <dir> --texture-path <dir> [--texture-path ...] [optio
 
 | Flag | Purpose |
 | --- | --- |
-| (default) | Report only: summary on stderr, optional JSON report |
+| (default) | Quick probe: short frames + short warmup; report only on stderr, optional JSON report. Faster; may flag slow-starting or legitimately dark presets (more false positives). |
+| `--slow` | Longer frames + longer warmup before luminance sample. Slower; fewer false positives. Use before acting on results (quarantine/delete) or for a final bulk audit. |
 | `--report <path>` | JSON report path |
 | `--recursive` | Bulk mode only: scan subdirectories |
 | `--quarantine <dir>` | Move failed presets (v2) |
 | `--delete` | Remove failed presets (v3) |
-| `--frames N` | Frames per preset after load (default TBD, e.g. 30-60) |
-| `--warmup-sec S` | Seconds before luminance sample (default TBD, e.g. 1-2) |
 | `--resume <report>` | Skip presets already in a prior report (v2) |
+
+Probe timing is a single profile (no separate `--frames` / `--warmup-sec` flags). Internal values TBD at implementation (e.g. quick ~15 frames / ~0.5 s warmup; slow ~60 frames / ~3 s warmup). Record `probe_mode`: `quick` | `slow` in the JSON report.
 
 ## Scan set derivation (project mode)
 
@@ -76,13 +78,22 @@ Bulk mode: require at least one texture path (`--texture-path` and/or from `-c`)
 
 Same harness as [presets-check-proposal.md](presets-check-proposal.md#per-preset-behavior): hidden pygame GL context, one [ProjectM](../cleave/projectm.py), small FBO, synthetic PCM, luminance sample after warmup. Switch-failed callbacks from the projectM robustness work ([todos.md](todos.md)).
 
+**Quick (default):** short render + short warmup. Intended for iteration and smoke tests.
+
+**`--slow`:** longer render + longer warmup. Better for presets that need time to develop and for fade-to-black cases; fewer false positives.
+
 Result categories: `load_failed`, `black`, `dim`, `ok` (see proposal).
+
+### Destructive actions
+
+When `--quarantine` or `--delete` is used **without** `--slow`, print a clear stderr warning that quick mode has more false positives and recommend re-running with `--slow` before moving or deleting files. Do not block the action.
 
 ## JSON report (v1)
 
 Include environment metadata:
 
 - `scan_mode`: `project` | `bulk`
+- `probe_mode`: `quick` | `slow`
 - `project_dir`, `config_path` (project mode)
 - `preset_root`, `texture_paths` (resolved absolute)
 - `layers`: slot -> list of contributing paths or dirs
@@ -107,21 +118,22 @@ Does not use [layer_pipeline.py](../cleave/viz/layer_pipeline.py) or the composi
 - Scan set derivation as above
 - Dedup + layer attribution in report
 - Report-only, synthetic PCM, load failure + luminance check
+- Quick probe (default) and `--slow` profile
 
 **v2**
 
 - `--quarantine`, `--resume`
-- Optional longer soak mode (fade-to-black cases)
+- Stderr warning when `--quarantine` runs without `--slow`
 
 **v3 (optional)**
 
-- `--delete` with confirmation
+- `--delete` with confirmation; same `--slow` warning as quarantine
 - Import report into rotation blocklist
 - Optional project PCM clip instead of synthetic tone
 
 ## Runtime expectations
 
-Project scan: typically tens to low hundreds of presets (per-layer rotation dirs). Bulk COTC: see proposal runtime table (~1-3 hours full pack). Progress on stderr; `--resume` for long bulk runs.
+Project scan: typically tens to low hundreds of presets (per-layer rotation dirs). Bulk COTC: see proposal runtime table; quick default is roughly 2-3x faster than `--slow` on the same set. Progress on stderr; `--resume` for long bulk runs.
 
 ## Open questions
 
