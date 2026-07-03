@@ -28,8 +28,8 @@ Minimal harness (no Cleave project, stems, or compositor stack):
 4. For each `.milk`:
   - Load preset; record libprojectM load/parse failures via switch-failed callbacks (see [todos.md](todos.md) projectM robustness item).
   - Feed synthetic PCM (test tone or brief noise burst, not silence, so reactive presets get energy).
-  - Advance frame time and render for `--frames` frames.
-  - After `--warmup-sec`, sample FBO luminance (small `glReadPixels` patch, not full resolution).
+  - Advance frame time and render for the active probe profile (quick by default; longer with `--slow`; see [presets-scan-plan.md](presets-scan-plan.md)).
+  - After warmup, sample FBO luminance (small `glReadPixels` patch, not full resolution).
 5. Classify and record result.
 
 
@@ -45,11 +45,11 @@ Minimal harness (no Cleave project, stems, or compositor stack):
 | `ok`          | Passes thresholds                                                      | —                                |
 
 
-**Not reliably detected in v1:** presets that flash then fade to black over several seconds (needs longer soak per preset), presets that only work on a specific stem, legitimately dark presets that are intentional.
+**Not reliably detected in quick mode:** presets that flash then fade to black over several seconds, presets that only work on a specific stem, legitimately dark presets that are intentional. Use `--slow` for better coverage on fade-to-black cases.
 
 ## Runtime
 
-Rough order of magnitude at 480×270, ~30 frames per preset:
+Rough order of magnitude at 480×270, quick probe (default):
 
 
 | Scope                 | Presets  | Time       |
@@ -78,7 +78,7 @@ Shared infrastructure with the projectM robustness work (switch-failed callbacks
 **v1**
 
 - Report-only scan of a single directory
-- Load-failure detection + short render luminance check
+- Load-failure detection + luminance check (quick default, `--slow` optional; see scan plan)
 - Synthetic PCM
 - JSON report
 
@@ -86,7 +86,6 @@ Shared infrastructure with the projectM robustness work (switch-failed callbacks
 
 - `--quarantine`, `--recursive`, `--resume`
 - Config-driven texture paths
-- Optional longer soak mode for fade-to-black cases
 
 **v3 (optional)**
 
