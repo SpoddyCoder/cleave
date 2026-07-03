@@ -1,0 +1,27 @@
+---
+description: Keep cleave scan preset derivation aligned with preset_switching_scope
+globs: cleave/config_schema.py,cleave/viz/preset_switching.py,cleave/preset_scan*.py,cleave/cli.py
+alwaysApply: false
+---
+
+# Preset scan and switching scope
+
+When changing `PresetSwitchingScope`, `PRESET_SWITCHING_SCOPES`, or how [cleave/viz/preset_switching.py](cleave/viz/preset_switching.py) builds the projectM playlist (`add_path` recurse flag, directory vs other roots), also update **scan set derivation** for `cleave scan`.
+
+Plan: [docs/presets-scan-plan.md](docs/presets-scan-plan.md).
+
+## Current contract (v1)
+
+- Only scope value today: `directory`.
+- Live rotation: immediate `*.milk` siblings in `playlist.current_dir`, **non-recursive** (`recurse=False`).
+- Project scan includes that same directory for **every** layer (even `preset_switching: none` or `enabled: false`), plus `preset_switching_presets` when mode is `user_defined`.
+- Bulk mode uses `--presets-dir` with optional `--recursive`; project mode does not recurse into subfolders.
+
+## When scope expands
+
+1. Mirror the new live rule in the scan-target builder (same module family as [cleave/preset_scan.py](cleave/preset_scan.py)).
+2. Extend JSON report `layers` / metadata if attribution changes.
+3. Add or adjust unit tests for target enumeration (no GL required).
+4. Update [docs/presets-scan-plan.md](docs/presets-scan-plan.md) scan set section.
+
+Do not let play and scan disagree on which presets are in rotation.
