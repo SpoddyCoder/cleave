@@ -143,7 +143,7 @@ def test_resolve_navigable_returns_descriptor_when_navigable() -> None:
 
 def test_resolve_navigable_settings_render_mode_collapsed() -> None:
     state = _minimal_view_state(settings=SettingsBlock(expanded=False))
-    render_mode = RowDescriptor(RowKind.SETTINGS_RENDER_MODE)
+    render_mode = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
     assert render_mode not in state.layout.navigable_descriptors(state)
     assert state.layout.resolve_navigable(render_mode, state) == RowDescriptor(
         RowKind.SETTINGS_HEADER
@@ -239,7 +239,7 @@ def test_resolve_navigable_render_post_fx_highlight_rolloff_nested_collapsed() -
 
 
 def test_section_header_descriptor_mappings() -> None:
-    assert section_header_descriptor(RowDescriptor(RowKind.SETTINGS_RENDER_MODE)) == RowDescriptor(
+    assert section_header_descriptor(RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)) == RowDescriptor(
         RowKind.SETTINGS_HEADER
     )
     assert section_header_descriptor(

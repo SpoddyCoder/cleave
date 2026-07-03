@@ -6,6 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from cleave.config import RenderConfig
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline
@@ -77,7 +78,7 @@ def test_resize_layer_updates_projectm_and_compositor() -> None:
 def test_apply_preview_resolutions_resizes_when_size_changes() -> None:
     layer = _stem_layer("layer_1")
     base_cfg = make_test_cfg(("layer_1",))
-    cfg = replace(base_cfg, visualizer=replace(base_cfg.visualizer, render_mode="performance"))
+    cfg = replace(base_cfg, visualizer=replace(base_cfg.visualizer, preview_quality="performance"))
     session = _session(("layer_1",))
     compositor = MagicMock()
 
@@ -92,7 +93,7 @@ def test_apply_preview_resolutions_resizes_when_size_changes() -> None:
 def test_apply_preview_resolutions_skips_when_unchanged() -> None:
     layer = _stem_layer("layer_1", width=960, height=540)
     base_cfg = make_test_cfg(("layer_1",))
-    cfg = replace(base_cfg, visualizer=replace(base_cfg.visualizer, render_mode="performance"))
+    cfg = replace(base_cfg, visualizer=replace(base_cfg.visualizer, preview_quality="performance"))
     session = _session(("layer_1",))
     compositor = MagicMock()
 
@@ -105,12 +106,18 @@ def test_apply_preview_resolutions_skips_when_unchanged() -> None:
 
 
 @patch.object(LayerFramePipeline, "build_single")
-def test_build_preview_resolutions_false_skips_scaling(build_single: MagicMock) -> None:
+def test_build_preview_resolutions_false_uses_render_output_size(
+    build_single: MagicMock,
+) -> None:
     slot = "layer_1"
     stem_layer = _stem_layer(slot)
     build_single.return_value = stem_layer
     base_cfg = make_test_cfg((slot,))
-    cfg = replace(base_cfg, visualizer=replace(base_cfg.visualizer, render_mode="performance"))
+    cfg = replace(
+        base_cfg,
+        render=RenderConfig(fps=30, width=1920, height=1080),
+        visualizer=replace(base_cfg.visualizer, preview_quality="performance"),
+    )
     compositor = MagicMock()
     playlist = stem_layer.playlist
 
@@ -124,20 +131,54 @@ def test_build_preview_resolutions_false_skips_scaling(build_single: MagicMock) 
 
     assert layers == [stem_layer]
     assert layers_by_slot == {slot: stem_layer}
+    build_single.assert_called_once()
+    assert build_single.call_args.kwargs["width"] == 1920
+    assert build_single.call_args.kwargs["height"] == 1080
     compositor.resize_layer_fbo.assert_not_called()
     stem_layer.pm.set_window_size.assert_not_called()
 
 
+@patch.object(LayerFramePipeline, "build_single")
+def test_build_preview_resolutions_false_viz_quality_uses_preview_sizes(
+    build_single: MagicMock,
+) -> None:
+    slot = "layer_1"
+    stem_layer = _stem_layer(slot)
+    build_single.return_value = stem_layer
+    base_cfg = make_test_cfg((slot,))
+    cfg = replace(
+        base_cfg,
+        render=RenderConfig(fps=30, width=1920, height=1080),
+        visualizer=replace(base_cfg.visualizer, preview_quality="performance"),
+    )
+    compositor = MagicMock()
+    playlist = stem_layer.playlist
+
+    LayerFramePipeline.build(
+        cfg,
+        compositor,
+        {slot: playlist},
+        projectm_fps=30,
+        preview_resolutions=False,
+        viz_quality=True,
+    )
+
+    build_single.assert_called_once()
+    assert build_single.call_args.kwargs["width"] == 960
+    assert build_single.call_args.kwargs["height"] == 540
+
+
 @patch.object(LayerFramePipeline, "apply_preview_resolutions")
 @patch.object(LayerFramePipeline, "build_single")
-def test_build_preview_resolutions_true_applies_scaling(
+def test_build_preview_resolutions_true_builds_at_preview_size(
     build_single: MagicMock,
     apply_preview_resolutions: MagicMock,
 ) -> None:
     slot = "layer_1"
     stem_layer = _stem_layer(slot)
     build_single.return_value = stem_layer
-    cfg = make_test_cfg((slot,))
+    base_cfg = make_test_cfg((slot,))
+    cfg = replace(base_cfg, visualizer=replace(base_cfg.visualizer, preview_quality="performance"))
     session = _session((slot,))
     compositor = MagicMock()
     playlist = stem_layer.playlist
@@ -151,6 +192,9 @@ def test_build_preview_resolutions_true_applies_scaling(
         session=session,
     )
 
+    build_single.assert_called_once()
+    assert build_single.call_args.kwargs["width"] == 960
+    assert build_single.call_args.kwargs["height"] == 540
     apply_preview_resolutions.assert_called_once_with(
         cfg, session, {slot: stem_layer}, compositor
     )

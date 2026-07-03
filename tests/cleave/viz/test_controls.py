@@ -2984,7 +2984,7 @@ def test_settings_expand_collapse_and_sub_row_visibility() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     settings_row = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
-    assert RowKind.SETTINGS_RENDER_MODE not in {
+    assert RowKind.SETTINGS_PREVIEW_QUALITY not in {
         view.layout.kind(i) for i in range(len(view.layout))
     }
 
@@ -2992,18 +2992,18 @@ def test_settings_expand_collapse_and_sub_row_visibility() -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.settings.expanded is True
     view = controls.build_view_state(paused=False)
-    render_mode_row = view.layout.find_by_kind(RowKind.SETTINGS_RENDER_MODE)
-    assert render_mode_row == 1
-    assert render_mode_row in view.layout.navigable_indices(view)
+    preview_quality_row = view.layout.find_by_kind(RowKind.SETTINGS_PREVIEW_QUALITY)
+    assert preview_quality_row == 1
+    assert preview_quality_row in view.layout.navigable_indices(view)
     assert view.layout.header_row_count() == 5
 
-    controls.focus_descriptor = _desc(view, render_mode_row)
+    controls.focus_descriptor = _desc(view, preview_quality_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
     controls.focus_descriptor = _desc(view, settings_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert controls.session.settings.expanded is False
     view = controls.build_view_state(paused=False)
-    assert RowKind.SETTINGS_RENDER_MODE not in {
+    assert RowKind.SETTINGS_PREVIEW_QUALITY not in {
         view.layout.kind(i) for i in range(len(view.layout))
     }
     assert view.layout.header_row_count() == 3
@@ -3044,7 +3044,7 @@ def test_settings_collapse_from_sub_row_refocuses_header() -> None:
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_RENDER_MODE)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
     controls._settings.set_expanded(False)
     view = controls.build_view_state(paused=False)
     assert view.layout.resolve_navigable(
@@ -3052,54 +3052,54 @@ def test_settings_collapse_from_sub_row_refocuses_header() -> None:
     ) == RowDescriptor(RowKind.SETTINGS_HEADER)
 
 
-def test_settings_cycle_render_mode() -> None:
+def test_settings_cycle_preview_quality() -> None:
     controls = _make_controls(("layer_1",))
-    assert controls.cfg.visualizer.render_mode == "balanced"
+    assert controls.cfg.visualizer.preview_quality == "balanced"
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_RENDER_MODE)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.cfg.visualizer.render_mode == "performance"
+    assert controls.cfg.visualizer.preview_quality == "performance"
     view = controls.build_view_state(paused=False)
-    assert _row_text(view, _focus_index(controls)) == "└─ render mode: performance"
+    assert _row_text(view, _focus_index(controls)) == "└─ preview quality: performance"
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.cfg.visualizer.render_mode == "ultra-performance"
+    assert controls.cfg.visualizer.preview_quality == "ultra-performance"
     view = controls.build_view_state(paused=False)
-    assert _row_text(view, _focus_index(controls)) == "└─ render mode: ultra-performance"
+    assert _row_text(view, _focus_index(controls)) == "└─ preview quality: ultra-performance"
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.cfg.visualizer.render_mode == "full-quality"
+    assert controls.cfg.visualizer.preview_quality == "full-quality"
     view = controls.build_view_state(paused=False)
-    assert _row_text(view, _focus_index(controls)) == "└─ render mode: full-quality"
+    assert _row_text(view, _focus_index(controls)) == "└─ preview quality: full-quality"
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.cfg.visualizer.render_mode == "balanced"
+    assert controls.cfg.visualizer.preview_quality == "balanced"
 
     controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert controls.cfg.visualizer.render_mode == "full-quality"
+    assert controls.cfg.visualizer.preview_quality == "full-quality"
 
 
-def test_settings_render_mode_change_marks_config_dirty() -> None:
+def test_settings_preview_quality_change_marks_config_dirty() -> None:
     controls = _make_controls(("layer_1",))
     assert not controls.config_dirty
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_RENDER_MODE)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.config_dirty
 
 
-def test_cycle_render_mode_calls_apply_preview_resolutions() -> None:
+def test_cycle_preview_quality_calls_apply_preview_resolutions() -> None:
     controls, layer_manager = _make_controls_with_manager(("layer_1",))
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_RENDER_MODE)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 

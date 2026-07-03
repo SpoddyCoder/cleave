@@ -148,13 +148,13 @@ def test_render_parser_uses_project_dir_and_options() -> None:
     assert args.project_dir == "my-project"
     assert args.config == Path("cfg.yaml")
     assert args.output == Path("out.mp4")
-    assert not args.full_res
+    assert not args.viz_quality
 
 
-def test_render_parser_accepts_full_res_short_flag() -> None:
+def test_render_parser_accepts_viz_quality_short_flag() -> None:
     parser = build_parser()
-    args = parser.parse_args(["render", "my-project", "-fr"])
-    assert args.full_res is True
+    args = parser.parse_args(["render", "my-project", "-vq"])
+    assert args.viz_quality is True
 
 
 def _complete_project(tmp_path: Path, slug: str = "my-track") -> Path:
@@ -275,7 +275,7 @@ def test_cmd_render_calls_render(
         config=Path("cfg.yaml"),
         output=Path("video.mp4"),
         high_quality=False,
-        full_res=False,
+        viz_quality=False,
         start_sec=None,
         end_sec=None,
     )
@@ -340,13 +340,13 @@ def test_cmd_render_passes_start_and_end(
         config=None,
         output=None,
         high_quality=False,
-        full_res=False,
+        viz_quality=False,
         start_sec=10,
         end_sec=20,
     )
 
 
-def test_cmd_render_passes_full_res_flag(
+def test_cmd_render_passes_viz_quality_flag(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
@@ -364,10 +364,36 @@ def test_cmd_render_passes_full_res_flag(
         return_value=render_result,
     ) as render:
         cmd_render(
-            build_parser().parse_args(["render", "my-track", "--full-res"]),
+            build_parser().parse_args(["render", "my-track", "--viz-quality"]),
         )
 
-    assert render.call_args.kwargs["full_res"] is True
+    assert render.call_args.kwargs["viz_quality"] is True
+
+
+def test_cmd_render_viz_quality_completion_message(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = _complete_project(tmp_path)
+    render_result = RenderResult(
+        output_path=(project / "renders" / "out.mp4").resolve(),
+        output_width=1280,
+        output_height=720,
+        mix_filename="my-track.flac",
+    )
+
+    with patch.object(
+        importlib.import_module("cleave.viz.render"),
+        "render",
+        return_value=render_result,
+    ):
+        cmd_render(build_parser().parse_args(["render", "my-track", "-vq"]))
+
+    out = capsys.readouterr().out
+    assert (
+        "my-track.flac final render at 1280x720 completed, "
+        "in viz-quality mode, in"
+    ) in out
 
 
 def test_cmd_render_segment_completion_message(

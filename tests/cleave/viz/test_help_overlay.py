@@ -9,7 +9,7 @@ from cleave.config_schema import (
     HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_CURVES,
     PRESET_SWITCHING_MODE_HELP_ENTRIES,
-    VISUALIZER_RENDER_MODE_HELP_ENTRIES,
+    VISUALIZER_PREVIEW_QUALITY_HELP_ENTRIES,
 )
 from cleave.viz.help_content import (
     DescriptionSection,
@@ -197,12 +197,12 @@ def test_switching_mode_help_lists_modes() -> None:
     assert description.entries == PRESET_SWITCHING_MODE_HELP_ENTRIES
 
 
-def test_render_mode_help_lists_modes() -> None:
-    description = _description_section(sections_for(RowKind.SETTINGS_RENDER_MODE))
+def test_preview_quality_help_lists_modes() -> None:
+    description = _description_section(sections_for(RowKind.SETTINGS_PREVIEW_QUALITY))
     assert description is not None
-    assert description.title == "Render mode"
+    assert description.title == "Preview quality"
     assert "live view only" in " ".join(description.lines)
-    assert description.entries == VISUALIZER_RENDER_MODE_HELP_ENTRIES
+    assert description.entries == VISUALIZER_PREVIEW_QUALITY_HELP_ENTRIES
 
 
 def test_highlight_rolloff_mode_help_lists_modes() -> None:
@@ -401,8 +401,8 @@ def test_description_sections_use_control_name_not_about() -> None:
         assert description.title == behavior.help_title, row_kind
 
 
-def test_settings_render_mode_description_separated_from_keyboard() -> None:
-    sections = sections_for(RowKind.SETTINGS_RENDER_MODE)
+def test_settings_preview_quality_description_separated_from_keyboard() -> None:
+    sections = sections_for(RowKind.SETTINGS_PREVIEW_QUALITY)
     keyboard = _keyboard_section(sections)
     description = _description_section(sections)
     assert dict(keyboard.entries) == {"Left/Right": "cycle mode"}

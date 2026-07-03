@@ -7,13 +7,12 @@ import os
 import shutil
 import subprocess
 import sys
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 
 import pygame
 
 from cleave.config import (
-    CleaveConfig,
     VIZ_CONFIG_FILENAME,
     load_config,
     render_fps,
@@ -146,15 +145,6 @@ def _resolve_render_config_path(
     return path
 
 
-def apply_full_res_layers(cfg: CleaveConfig) -> None:
-    """Set every layer to the offline render output resolution."""
-    width, height = render_output_size(cfg)
-    cfg.layers = {
-        slot: replace(layer, width=width, height=height)
-        for slot, layer in cfg.layers.items()
-    }
-
-
 def validate_render_project(
     project_dir: Path | str, *, config: Path | None = None
 ) -> Path:
@@ -187,7 +177,7 @@ def render(
     config: Path | None = None,
     output: Path | None = None,
     high_quality: bool = False,
-    full_res: bool = False,
+    viz_quality: bool = False,
     start_sec: int | None = None,
     end_sec: int | None = None,
 ) -> RenderResult:
@@ -195,8 +185,6 @@ def render(
     project = validate_render_project(project_dir, config=config)
     config_path = _resolve_render_config_path(config, project)
     cfg = load_config(config_path, repo_root())
-    if full_res:
-        apply_full_res_layers(cfg)
 
     if output is not None:
         output_path = Path(output).expanduser()
@@ -228,7 +216,10 @@ def render(
     runtime: RenderVisualizerRuntime | None = None
     try:
         runtime = init_gl_resources_render(
-            seed, output_width=output_width, output_height=output_height
+            seed,
+            output_width=output_width,
+            output_height=output_height,
+            viz_quality=viz_quality,
         )
         app = VisualizerApp(runtime)
 

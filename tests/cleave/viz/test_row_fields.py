@@ -56,7 +56,7 @@ def test_row_panel_label_settings_header() -> None:
 
 
 def test_labeled_row_prefix_settings_children() -> None:
-    assert labeled_row_prefix(RowKind.SETTINGS_RENDER_MODE) == "└─ render mode: "
+    assert labeled_row_prefix(RowKind.SETTINGS_PREVIEW_QUALITY) == "└─ preview quality: "
     assert labeled_row_prefix(RowKind.SETTINGS_UI_WIDTH_MODE) == "  └─ width mode: "
     assert labeled_row_prefix(RowKind.SETTINGS_UI_WIDTH) == "  └─ max width: "
     assert labeled_row_prefix(RowKind.SETTINGS_UI_FADE) == "  └─ auto-fade: "
@@ -70,14 +70,14 @@ def test_labeled_row_prefix_track_depths() -> None:
 def test_format_row_value_settings() -> None:
     state = _minimal_view_state(
         settings=SettingsBlock(
-            render_mode="performance",
+            preview_quality="performance",
             ui_width_mode="fixed",
             ui_width=320,
             ui_fade=0.0,
         ),
     )
     assert (
-        format_row_value(state, RowDescriptor(RowKind.SETTINGS_RENDER_MODE))
+        format_row_value(state, RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY))
         == "performance"
     )
     assert (
@@ -134,10 +134,10 @@ def test_format_row_value_track_and_render() -> None:
 
 def test_row_labeled_display_text_settings() -> None:
     state = _minimal_view_state(
-        settings=SettingsBlock(render_mode="balanced", ui_fade=11.0),
+        settings=SettingsBlock(preview_quality="balanced", ui_fade=11.0),
     )
-    desc = RowDescriptor(RowKind.SETTINGS_RENDER_MODE)
-    assert row_labeled_display_text(state, desc) == "└─ render mode: balanced"
+    desc = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
+    assert row_labeled_display_text(state, desc) == "└─ preview quality: balanced"
     fade_desc = RowDescriptor(RowKind.SETTINGS_UI_FADE)
     assert row_labeled_display_text(state, fade_desc) == "  └─ auto-fade: 11s"
 
@@ -152,21 +152,21 @@ def test_apply_field_horizontal_unknown_kind_returns_false() -> None:
     )
 
 
-def test_apply_field_horizontal_cycles_render_mode() -> None:
+def test_apply_field_horizontal_cycles_preview_quality() -> None:
     controls = _make_controls()
-    desc = RowDescriptor(RowKind.SETTINGS_RENDER_MODE)
-    assert controls.cfg.visualizer.render_mode == "balanced"
+    desc = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
+    assert controls.cfg.visualizer.preview_quality == "balanced"
 
     assert apply_field_horizontal(controls, desc, True, False) is True
-    assert controls.cfg.visualizer.render_mode == "performance"
+    assert controls.cfg.visualizer.preview_quality == "performance"
 
     apply_field_horizontal(controls, desc, False, False)
-    assert controls.cfg.visualizer.render_mode == "balanced"
+    assert controls.cfg.visualizer.preview_quality == "balanced"
 
 
-def test_apply_field_horizontal_render_mode_calls_preview_resolutions() -> None:
+def test_apply_field_horizontal_preview_quality_calls_preview_resolutions() -> None:
     controls, layer_manager = _make_controls_with_manager()
-    desc = RowDescriptor(RowKind.SETTINGS_RENDER_MODE)
+    desc = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
 
     apply_field_horizontal(controls, desc, True, False)
 

@@ -12,7 +12,7 @@ from cleave.config_schema import (
     HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES,
     PRESET_SWITCHING_MODE_HELP_ENTRIES,
-    VISUALIZER_RENDER_MODE_HELP_ENTRIES,
+    VISUALIZER_PREVIEW_QUALITY_HELP_ENTRIES,
 )
 
 
@@ -73,7 +73,7 @@ class RowKind(Enum):
     RENDER_POST_FX_CHROMA_BOOST_AMOUNT = auto()
     RENDER_TIMELINE_HEADER = auto()
     SETTINGS_HEADER = auto()
-    SETTINGS_RENDER_MODE = auto()
+    SETTINGS_PREVIEW_QUALITY = auto()
     SETTINGS_UI_HEADER = auto()
     SETTINGS_UI_WIDTH_MODE = auto()
     SETTINGS_UI_WIDTH = auto()
@@ -672,18 +672,18 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_description=("Global visualizer settings (not per-layer).",),
         quick_nav_target=True,
     ),
-    RowKind.SETTINGS_RENDER_MODE: RowBehavior(
+    RowKind.SETTINGS_PREVIEW_QUALITY: RowBehavior(
         RowAffordance.VALUE_STEP,
         is_pinned=True,
         repeatable=True,
         parent_group="settings",
-        help_title="Render mode",
+        help_title="Preview quality",
         help_entries=(("Left/Right", "cycle mode"),),
         help_description=(
             "Trade-off between visual quality and CPU/GPU load.",
             "Affects layer resolution scaling in the live view only.",
         ),
-        help_mode_entries=VISUALIZER_RENDER_MODE_HELP_ENTRIES,
+        help_mode_entries=VISUALIZER_PREVIEW_QUALITY_HELP_ENTRIES,
     ),
     RowKind.SETTINGS_UI_HEADER: RowBehavior(
         RowAffordance.EXPAND,

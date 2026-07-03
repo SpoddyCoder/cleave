@@ -60,7 +60,7 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.RENDER_POST_FX_CHROMA_BOOST_MODE,
         RowKind.RENDER_POST_FX_CHROMA_BOOST_VARIANT,
         RowKind.RENDER_POST_FX_CHROMA_BOOST_AMOUNT,
-        RowKind.SETTINGS_RENDER_MODE,
+        RowKind.SETTINGS_PREVIEW_QUALITY,
         RowKind.SETTINGS_UI_WIDTH_MODE,
         RowKind.SETTINGS_UI_WIDTH,
         RowKind.SETTINGS_UI_FADE,
@@ -88,7 +88,7 @@ def test_row_is_pinned() -> None:
     assert row_is_pinned(RowKind.TRANSPORT) is True
     assert row_is_pinned(RowKind.CONFIG_HEADER) is True
     assert row_is_pinned(RowKind.SETTINGS_HEADER) is True
-    assert row_is_pinned(RowKind.SETTINGS_RENDER_MODE) is True
+    assert row_is_pinned(RowKind.SETTINGS_PREVIEW_QUALITY) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_HEADER) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_FADE) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_WIDTH_MODE) is True
@@ -127,7 +127,7 @@ def test_parent_group_on_row_behaviors() -> None:
     assert row_behavior(RowKind.RENDER_OVERLAY_TITLE_FONT).parent_group == "render_overlay_title"
     assert row_behavior(RowKind.RENDER_OVERLAY_BODY_FONT).parent_group == "render_overlay_body"
     assert row_behavior(RowKind.RENDER_POST_FX_FADE_IN).parent_group == "render_post_fx"
-    assert row_behavior(RowKind.SETTINGS_RENDER_MODE).parent_group == "settings"
+    assert row_behavior(RowKind.SETTINGS_PREVIEW_QUALITY).parent_group == "settings"
     assert row_behavior(RowKind.SETTINGS_UI_WIDTH_MODE).parent_group == "settings_ui"
 
 
