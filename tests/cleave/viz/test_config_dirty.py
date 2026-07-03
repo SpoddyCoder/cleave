@@ -309,10 +309,10 @@ def _expand_settings_ui(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
-def _mutate_visualizer_render_mode(controls: TuningControls) -> None:
+def _mutate_visualizer_preview_quality(controls: TuningControls) -> None:
     _expand_settings(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_RENDER_MODE)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -389,7 +389,7 @@ _PERSISTED_MUTATIONS: list[
     ("render_post_fx.chroma_boost.variant", _mutate_render_post_fx_chroma_boost_variant, ("layer_1",), {}),
     ("render_post_fx.chroma_boost.amount_pct", _mutate_render_post_fx_chroma_boost_amount, ("layer_1",), {}),
     ("timeline.enabled", _mutate_timeline_enabled, ("layer_1",), {"timeline_enabled": True}),
-    ("visualizer.render_mode", _mutate_visualizer_render_mode, ("layer_1",), {}),
+    ("visualizer.preview_quality", _mutate_visualizer_preview_quality, ("layer_1",), {}),
     ("visualizer.ui_fade", _mutate_visualizer_ui_fade, ("layer_1",), {}),
     ("visualizer.ui_width", _mutate_visualizer_ui_width, ("layer_1",), {}),
     ("visualizer.ui_width_mode", _mutate_visualizer_ui_width_mode, ("layer_1",), {}),

@@ -16,13 +16,6 @@ Think this occurred when we added caching to the UI during pref improvements. Su
 
 ## Architecture
 
-### Render Width & Height Per Layer & Related Stuff...
-Render should always use the final render width & height for every layer for best visual fidelity.
-It's approx 20% slower on final render - so safe to assume user would want this when doing final renders
-It should be opt-in to the old behaviour of using the per-layer w/h (--low-quality flag)
-Food for thought: should we do away with per-layer w/h altogether? Downscaling each layer is only so the visual editor can run at reasonable frame rates -
-so perhaps its just better we leave the downscaling each layer to the render mode setting in the visualizer. (sidenote: I hate that name render mode - so easy to confuse with the render command and render settings)
-
 ### projectM
 
 - Tie projectM mesh size to `render_mode` (internal warp mesh resolution, separate from Cleave layer FBO downscaling in [cleave/viz/layer_preview_resolution.py](cleave/viz/layer_preview_resolution.py)).

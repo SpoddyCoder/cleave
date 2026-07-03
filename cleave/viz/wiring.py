@@ -22,6 +22,7 @@ from cleave.paths import repo_root
 from cleave.preset_playlist import PresetPlaylist, preset_browse_floor, scan_single_layer
 from cleave.signals import Signals
 from cleave.viz.controls import TuningControls
+from cleave.viz.layer_preview_resolution import preview_layer_size
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
 from cleave.viz.modal import ModalHost
@@ -98,6 +99,12 @@ class LayerManager:
         preset = playlist.current if playlist.current is not None else self.preset_root
         layer_cfg = new_layer_config(slot, preset, self.preset_root)
         self.cfg.layers[slot] = layer_cfg
+        z_index = len(self.session.layer_z_order)
+        width, height = preview_layer_size(
+            self.cfg.visualizer.preview_quality,
+            z_index,
+            self.cfg.visualizer,
+        )
         stem_layer = LayerFramePipeline.build_single(
             slot,
             layer_cfg,
@@ -106,6 +113,8 @@ class LayerManager:
             self.projectm_fps,
             self.texture_paths,
             beat_sensitivity=self.cfg.visualizer.beat_sensitivity,
+            width=width,
+            height=height,
         )
         self.layers.append(stem_layer)
         self.layers_by_slot[slot] = stem_layer

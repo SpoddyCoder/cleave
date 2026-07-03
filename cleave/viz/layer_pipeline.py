@@ -13,7 +13,11 @@ from cleave.projectm import ProjectM
 from cleave.signals import Signals
 from cleave.stem_pcm import StemPcmBank
 from cleave.viz.layer import StemLayer
-from cleave.viz.layer_preview_resolution import preview_sizes_for_session
+from cleave.viz.layer_preview_resolution import (
+    preview_layer_size,
+    preview_sizes_for_session,
+    render_layer_size,
+)
 from cleave.viz.layer_visibility import effective_layer_enabled
 from cleave.viz.post_fx import (
     chroma_boost_active,
@@ -161,8 +165,11 @@ class LayerFramePipeline:
         fps: int,
         texture_paths: list[Path],
         beat_sensitivity: float,
+        *,
+        width: int,
+        height: int,
     ) -> StemLayer:
-        w, h = layer_cfg.width, layer_cfg.height
+        w, h = width, height
 
         pm = ProjectM()
         pm.set_window_size(w, h)
@@ -226,11 +233,30 @@ class LayerFramePipeline:
         projectm_fps: int,
         preview_resolutions: bool = True,
         session: TuningSession | None = None,
+        viz_quality: bool = False,
     ) -> tuple[list[StemLayer], dict[str, StemLayer]]:
         texture_paths = list(cfg.paths.texture_paths)
         runtimes: list[StemLayer] = []
 
+        if preview_resolutions:
+            if session is None:
+                raise ValueError("session is required when preview_resolutions=True")
+            z_order = session.layer_z_order
+            preview_quality = cfg.visualizer.preview_quality
+            visualizer = cfg.visualizer
+
+            def layer_size(slot: str) -> tuple[int, int]:
+                z_index = z_order.index(slot)
+                return preview_layer_size(preview_quality, z_index, visualizer)
+        else:
+            z_order = cfg.layer_z_order
+
+            def layer_size(slot: str) -> tuple[int, int]:
+                z_index = z_order.index(slot)
+                return render_layer_size(cfg, z_index, viz_quality=viz_quality)
+
         for slot, layer_cfg in cfg.layers_in_z_order():
+            width, height = layer_size(slot)
             runtimes.append(
                 LayerFramePipeline.build_single(
                     slot,
@@ -240,13 +266,13 @@ class LayerFramePipeline:
                     projectm_fps,
                     texture_paths,
                     _beat_sensitivity(cfg, slot),
+                    width=width,
+                    height=height,
                 )
             )
 
         layers_by_slot = {layer.slot: layer for layer in runtimes}
         if preview_resolutions:
-            if session is None:
-                raise ValueError("session is required when preview_resolutions=True")
             LayerFramePipeline.apply_preview_resolutions(
                 cfg, session, layers_by_slot, compositor
             )

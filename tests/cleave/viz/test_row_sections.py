@@ -145,7 +145,7 @@ def test_expand_section_collapsed_when_block_disabled() -> None:
 
 def test_sub_row_expand_visible_nested_sections() -> None:
     collapsed_settings = _minimal_view_state(settings=SettingsBlock(expanded=False))
-    render_mode = RowDescriptor(RowKind.SETTINGS_RENDER_MODE)
+    render_mode = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
     assert sub_row_expand_visible(collapsed_settings, render_mode) is False
 
     settings_only = _minimal_view_state(settings=SettingsBlock(expanded=True, ui_expanded=False))

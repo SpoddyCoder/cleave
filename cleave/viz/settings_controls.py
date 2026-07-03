@@ -7,7 +7,7 @@ from dataclasses import replace
 from cleave.config import CleaveConfig
 from cleave.config_schema import (
     UI_WIDTH_MODES,
-    VISUALIZER_RENDER_MODES,
+    VISUALIZER_PREVIEW_QUALITIES,
     clamp_ui_fade,
     clamp_ui_width,
 )
@@ -37,9 +37,9 @@ class SettingsControls:
             return
         settings.ui_expanded = expanded
 
-    def cycle_render_mode(self, *, forward: bool) -> None:
-        modes = VISUALIZER_RENDER_MODES
-        current = self.cfg.visualizer.render_mode
+    def cycle_preview_quality(self, *, forward: bool) -> None:
+        modes = VISUALIZER_PREVIEW_QUALITIES
+        current = self.cfg.visualizer.preview_quality
         try:
             index = modes.index(current)
         except ValueError:
@@ -48,7 +48,7 @@ class SettingsControls:
             new_mode = modes[(index + 1) % len(modes)]
         else:
             new_mode = modes[(index - 1) % len(modes)]
-        self.cfg.visualizer = replace(self.cfg.visualizer, render_mode=new_mode)
+        self.cfg.visualizer = replace(self.cfg.visualizer, preview_quality=new_mode)
 
     def cycle_ui_width_mode(self, *, forward: bool) -> None:
         modes = UI_WIDTH_MODES

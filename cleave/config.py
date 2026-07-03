@@ -63,24 +63,23 @@ from cleave.config_schema import (
     DEFAULT_UI_WIDTH_MODE,
     DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
     DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
-    DEFAULT_VISUALIZER_RENDER_MODE,
+    DEFAULT_VISUALIZER_PREVIEW_QUALITY,
     DEFAULT_VISUALIZER_UPSCALE,
     DEFAULT_VISUALIZER_WIDTH,
     CHROMA_BOOST_APPLY_MODES,
     CHROMA_BOOST_VARIANTS,
     HIGHLIGHT_ROLLOFF_APPLY_MODES,
     HIGHLIGHT_ROLLOFF_CURVES,
-    LAYER_DEFAULT_SIZE,
     RENDER_OVERLAY_POSITIONS,
     UPSCALE_MIN,
-    VISUALIZER_RENDER_MODES,
+    VISUALIZER_PREVIEW_QUALITIES,
     ChromaBoostApplyMode,
     ChromaBoostVariant,
     HighlightRolloffApplyMode,
     HighlightRolloffCurve,
     RenderOverlayPosition,
     UiWidthMode,
-    VisualizerRenderMode,
+    VisualizerPreviewQuality,
     as_mapping,
     clamp_beat_sensitivity,
     clamp_upscale,
@@ -109,8 +108,6 @@ class LayerConfig:
     stem: StemSource
     enabled: bool = True
     opacity: float = 1.0
-    width: int = 1280
-    height: int = 720
     beat_sensitivity: float | None = None
     effects: dict[str, dict[str, int]] = field(default_factory=dict)
     blend_mode: BlendMode = "black-key"
@@ -134,7 +131,7 @@ class VisualizerConfig:
     height: int = DEFAULT_VISUALIZER_HEIGHT
     upscale: float = DEFAULT_VISUALIZER_UPSCALE
     beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
-    render_mode: VisualizerRenderMode = DEFAULT_VISUALIZER_RENDER_MODE
+    preview_quality: VisualizerPreviewQuality = DEFAULT_VISUALIZER_PREVIEW_QUALITY
     ui_width_mode: UiWidthMode = DEFAULT_UI_WIDTH_MODE
     ui_width: int = DEFAULT_UI_WIDTH
     ui_fade: float = DEFAULT_UI_FADE_SEC

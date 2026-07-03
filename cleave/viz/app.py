@@ -253,7 +253,11 @@ def init_gl_resources_heavy(
 
 
 def init_gl_resources_render(
-    seed: VisualizerSeed, *, output_width: int, output_height: int
+    seed: VisualizerSeed,
+    *,
+    output_width: int,
+    output_height: int,
+    viz_quality: bool = False,
 ) -> RenderVisualizerRuntime:
     color_format = _compositor_color_format(seed.cfg)
     compositor = GlCompositor(
@@ -272,6 +276,7 @@ def init_gl_resources_render(
         seed.playlists,
         projectm_fps=render_fps(seed.cfg),
         preview_resolutions=False,
+        viz_quality=viz_quality,
     )
 
     return RenderVisualizerRuntime(

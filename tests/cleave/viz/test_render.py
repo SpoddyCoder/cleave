@@ -36,7 +36,6 @@ from cleave.viz.render import (  # noqa: E402
     _default_output_path,
     _is_partial_segment,
     _resolve_segment,
-    apply_full_res_layers,
     validate_render_project,
 )
 from tests.cleave.viz.test_render_overlay import _overlay_cfg
@@ -315,22 +314,6 @@ def test_default_output_path_suffix_only_for_partial_segments(tmp_path: Path) ->
     ) == tmp_path / "renders" / "my-viz_10-60s.mp4"
 
 
-def test_apply_full_res_layers_sets_render_output_size(tmp_path: Path) -> None:
-    project = _setup_render_project(
-        tmp_path,
-        render_width=1920,
-        render_height=1080,
-    )
-    cfg = load_config(project / VIZ_CONFIG_FILENAME, repo_root())
-    assert {cfg.layers[slot].width for slot in cfg.layer_z_order} != {1920}
-
-    apply_full_res_layers(cfg)
-
-    for slot in cfg.layer_z_order:
-        assert cfg.layers[slot].width == 1920
-        assert cfg.layers[slot].height == 1080
-
-
 @patch.object(render_mod, "pygame")
 @patch.object(render_mod, "shutil")
 @patch.object(render_mod, "subprocess")
@@ -338,7 +321,7 @@ def test_apply_full_res_layers_sets_render_output_size(tmp_path: Path) -> None:
 @patch.object(render_mod, "build_runtime_base")
 @patch.object(render_mod, "scan_all_layers", return_value={})
 @patch.object(render_mod, "VisualizerApp")
-def test_render_full_res_passes_overridden_layer_sizes(
+def test_render_default_passes_viz_quality_false_to_init_gl(
     mock_app_cls: MagicMock,
     _mock_scan: MagicMock,
     mock_build: MagicMock,
@@ -378,12 +361,63 @@ def test_render_full_res_passes_overridden_layer_sizes(
 
     _attach_render_post_fx_session(runtime)
 
-    render_mod.render(project, full_res=True)
+    render_mod.render(project)
 
-    captured_cfg = mock_build.call_args[0][0]
-    for slot in captured_cfg.layer_z_order:
-        assert captured_cfg.layers[slot].width == 1920
-        assert captured_cfg.layers[slot].height == 1080
+    mock_init_gl.assert_called_once()
+    assert mock_init_gl.call_args.kwargs["viz_quality"] is False
+
+
+@patch.object(render_mod, "pygame")
+@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "subprocess")
+@patch.object(render_mod, "init_gl_resources_render")
+@patch.object(render_mod, "build_runtime_base")
+@patch.object(render_mod, "scan_all_layers", return_value={})
+@patch.object(render_mod, "VisualizerApp")
+def test_render_viz_quality_passes_flag_to_init_gl(
+    mock_app_cls: MagicMock,
+    _mock_scan: MagicMock,
+    mock_build: MagicMock,
+    mock_init_gl: MagicMock,
+    mock_subprocess: MagicMock,
+    mock_shutil: MagicMock,
+    _mock_pygame: MagicMock,
+    tmp_path: Path,
+) -> None:
+    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
+    project = _setup_render_project(
+        tmp_path,
+        render_width=1920,
+        render_height=1080,
+    )
+    fps = 10
+    duration_sec = 2.0
+
+    compositor = MagicMock()
+    compositor.read_rgba_frame.return_value = _render_frame_bytes(1920, 1080)
+
+    seed, runtime = _mock_render_runtime(
+        width=1920, height=1080, fps=fps, duration_sec=duration_sec
+    )
+    runtime.compositor = compositor
+    mock_build.return_value = seed
+    mock_init_gl.return_value = runtime
+
+    mock_app = MagicMock()
+    mock_app_cls.return_value = mock_app
+
+    stdin_mock = MagicMock()
+    proc = MagicMock()
+    proc.stdin = stdin_mock
+    proc.wait.return_value = 0
+    mock_subprocess.Popen.return_value = proc
+
+    _attach_render_post_fx_session(runtime)
+
+    render_mod.render(project, viz_quality=True)
+
+    mock_init_gl.assert_called_once()
+    assert mock_init_gl.call_args.kwargs["viz_quality"] is True
 
 
 @patch.object(render_mod, "pygame")
@@ -926,7 +960,7 @@ def test_render_ffmpeg_ignores_upscale_uses_render_resolution(
     cmd = mock_subprocess.Popen.call_args[0][0]
     assert "-s" in cmd and f"{render_w}x{render_h}" in cmd
     mock_init_gl.assert_called_once_with(
-        seed, output_width=render_w, output_height=render_h
+        seed, output_width=render_w, output_height=render_h, viz_quality=False
     )
     assert compositor.present_content.call_count == math.ceil(duration_sec * fps)
 
@@ -984,7 +1018,7 @@ def test_render_ffmpeg_uses_explicit_render_resolution(
     cmd = mock_subprocess.Popen.call_args[0][0]
     assert "-s" in cmd and f"{render_w}x{render_h}" in cmd
     mock_init_gl.assert_called_once_with(
-        seed, output_width=render_w, output_height=render_h
+        seed, output_width=render_w, output_height=render_h, viz_quality=False
     )
 
 

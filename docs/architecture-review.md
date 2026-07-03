@@ -31,19 +31,19 @@ Live edits mutate `session.layers`, `session.render_overlay`, and related runtim
 
 This works today because persistence is careful, but it is a convention, not enforced by types. Any new code that reads `cfg.layers[slot].opacity` instead of `session.layers[slot].opacity_pct` will silently use stale data. The `FieldSource` (`cfg` / `session` / `both`) model in field descriptors helps at save time but does not protect runtime readers.
 
-**Recommended direction:** make session the single live authority; treat `cfg` as bootstrap plus immutable structural fields (paths, per-layer width/height if kept), or sync both on every mutation.
+**Recommended direction:** make session the single live authority; treat `cfg` as bootstrap plus immutable structural fields (paths), or sync both on every mutation.
 
-### Layer resolution model is overloaded
+### Layer resolution model (simplified)
 
-Three concepts interact:
+Done: offline render uses full `render.width` x `render.height` per layer by default; live preview and `--viz-quality` offline renders scale layers via `visualizer.preview_quality` only. Per-layer width/height removed from config.
 
-1. Per-layer `width` / `height` in config ([LayerConfig](../cleave/config.py))
-2. `visualizer.render_mode` preview downscaling ([cleave/viz/layer_preview_resolution.py](../cleave/viz/layer_preview_resolution.py))
+Three concepts used to interact:
+
+1. Per-layer `width` / `height` in config (removed)
+2. `visualizer.preview_quality` preview downscaling ([cleave/viz/layer_preview_resolution.py](../cleave/viz/layer_preview_resolution.py))
 3. Offline render output size ([cleave/viz/render.py](../cleave/viz/render.py))
 
-[todos.md](todos.md) already flags this. The naming collision between `render_mode` and the `render` command makes misconfiguration likely. Until simplified, every change to fidelity or performance risks live/offline divergence.
-
-**Recommended direction:** one knob for preview downscale (`render_mode` only) and demote or remove per-layer width/height from the persisted model, as suggested in todos.
+**Remaining risk:** live/offline divergence if preview quality changes are not reflected in offline `--viz-quality` path; default offline path is full resolution per layer.
 
 ### Snapshot write has a parallel persist path
 
@@ -119,7 +119,6 @@ Not urgent unless adding many new GPU effects, but refactors there are high-risk
 | Priority | Item | Why |
 | --- | --- | --- |
 | **P0** | Session as single live authority (or strict sync) | Prevents silent stale-config bugs as features grow |
-| **P0** | Simplify layer resolution (`render_mode` vs per-layer w/h) | Already on todo list; affects WYSIWYG trust |
 | **P1** | Unify snapshot persist through descriptors | Stops render/overlay field drift on save |
 | **P1** | Finish draw-side descriptor migration (or extract `PresentStyle` renderers) | Cuts multi-file tax per new row |
 | **P2** | Decouple effects from `viz.session` | Unblocks reuse and cleaner module boundaries |
@@ -131,4 +130,4 @@ Not urgent unless adding many new GPU effects, but refactors there are high-risk
 
 ## 4. Bottom line
 
-The architecture principles in the cursor rules match what the code is aiming for. The highest-risk debt is not messy code but **multiple sources of truth** (cfg/session, dual persist paths, triple layer-resolution knobs) and **incomplete descriptor coverage on the draw path**. Fixing those two areas gives the best return before polishing module sizes or GL structure.
+The architecture principles in the cursor rules match what the code is aiming for. The highest-risk debt is not messy code but **multiple sources of truth** (cfg/session, dual persist paths) and **incomplete descriptor coverage on the draw path**. Fixing those two areas gives the best return before polishing module sizes or GL structure.

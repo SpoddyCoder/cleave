@@ -1,12 +1,12 @@
-"""Live preview layer resolution from visualizer render mode and z-order."""
+"""Live preview layer resolution from visualizer preview quality and z-order."""
 
 from __future__ import annotations
 
 from cleave.config import (
     CleaveConfig,
-    LayerConfig,
     VisualizerConfig,
-    VisualizerRenderMode,
+    VisualizerPreviewQuality,
+    render_output_size,
 )
 from cleave.viz.session import TuningSession
 
@@ -19,14 +19,14 @@ _ULTRA_PERFORMANCE_SCALES: tuple[float, ...] = (0.50, 0.35, 0.25)
 _FLOOR_ONLY = 0.0
 
 
-def _requested_scale(render_mode: VisualizerRenderMode, z_index: int) -> float:
-    if render_mode == "full-quality":
+def _requested_scale(preview_quality: VisualizerPreviewQuality, z_index: int) -> float:
+    if preview_quality == "full-quality":
         return 1.0
-    if render_mode == "balanced":
+    if preview_quality == "balanced":
         if z_index < len(_BALANCED_SCALES):
             return _BALANCED_SCALES[z_index]
         return _FLOOR_ONLY
-    if render_mode == "performance":
+    if preview_quality == "performance":
         if z_index < len(_PERFORMANCE_SCALES):
             return _PERFORMANCE_SCALES[z_index]
         return _FLOOR_ONLY
@@ -36,17 +36,16 @@ def _requested_scale(render_mode: VisualizerRenderMode, z_index: int) -> float:
 
 
 def preview_layer_size(
-    render_mode: VisualizerRenderMode,
+    preview_quality: VisualizerPreviewQuality,
     z_index: int,
-    layer_cfg: LayerConfig,
     visualizer: VisualizerConfig,
 ) -> tuple[int, int]:
-    layer_w = layer_cfg.width
-    layer_h = layer_cfg.height
-    if render_mode == "full-quality":
+    layer_w = visualizer.width
+    layer_h = visualizer.height
+    if preview_quality == "full-quality":
         return layer_w, layer_h
 
-    requested_scale = _requested_scale(render_mode, z_index)
+    requested_scale = _requested_scale(preview_quality, z_index)
     min_w = round(visualizer.width * PREVIEW_MIN_VIZ_SCALE)
     min_h = round(visualizer.height * PREVIEW_MIN_VIZ_SCALE)
     effective_scale = max(requested_scale, min_w / layer_w, min_h / layer_h)
@@ -55,18 +54,37 @@ def preview_layer_size(
     return w, h
 
 
+def offline_layer_sizes(cfg: CleaveConfig) -> dict[str, tuple[int, int]]:
+    preview_quality = cfg.visualizer.preview_quality
+    visualizer = cfg.visualizer
+    return {
+        slot: preview_layer_size(preview_quality, z_index, visualizer)
+        for z_index, slot in enumerate(cfg.layer_z_order)
+    }
+
+
+def render_layer_size(
+    cfg: CleaveConfig,
+    z_index: int,
+    *,
+    viz_quality: bool,
+) -> tuple[int, int]:
+    if not viz_quality:
+        return render_output_size(cfg)
+    return preview_layer_size(
+        cfg.visualizer.preview_quality,
+        z_index,
+        cfg.visualizer,
+    )
+
+
 def preview_sizes_for_session(
     cfg: CleaveConfig,
     session: TuningSession,
 ) -> dict[str, tuple[int, int]]:
-    render_mode = cfg.visualizer.render_mode
+    preview_quality = cfg.visualizer.preview_quality
     visualizer = cfg.visualizer
     return {
-        slot: preview_layer_size(
-            render_mode,
-            z_index,
-            cfg.layers[slot],
-            visualizer,
-        )
+        slot: preview_layer_size(preview_quality, z_index, visualizer)
         for z_index, slot in enumerate(session.layer_z_order)
     }

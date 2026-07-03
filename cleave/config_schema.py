@@ -58,25 +58,27 @@ EASTER_EGG_MAX = 5.0
 DEFAULT_PRESET_START_CLEAN = False
 DEFAULT_PRESET_SWITCHING_PRESETS: list[str] = []
 
-VisualizerRenderMode = Literal[
+VisualizerPreviewQuality = Literal[
     "full-quality", "balanced", "performance", "ultra-performance"
 ]
 
-VISUALIZER_RENDER_MODES: tuple[VisualizerRenderMode, ...] = (
+VISUALIZER_PREVIEW_QUALITIES: tuple[VisualizerPreviewQuality, ...] = (
     "full-quality",
     "balanced",
     "performance",
     "ultra-performance",
 )
 
-VISUALIZER_RENDER_MODE_HELP_ENTRIES: tuple[tuple[VisualizerRenderMode, str], ...] = (
+VISUALIZER_PREVIEW_QUALITY_HELP_ENTRIES: tuple[
+    tuple[VisualizerPreviewQuality, str], ...
+] = (
     ("full-quality", "every layer at configured resolution."),
     ("balanced", "top layer full size; lower layers step down."),
     ("performance", "more aggressive downscale from top."),
     ("ultra-performance", "lowest preview resolution for heaviest load reduction."),
 )
 
-DEFAULT_VISUALIZER_RENDER_MODE: VisualizerRenderMode = "balanced"
+DEFAULT_VISUALIZER_PREVIEW_QUALITY: VisualizerPreviewQuality = "balanced"
 DEFAULT_UI_FADE_SEC = 10.0
 UI_FADE_MAX_SEC = 60.0
 DEFAULT_UI_WIDTH = 110
@@ -120,14 +122,11 @@ def next_layer_slot(existing_slots: list[str]) -> str:
 def new_layer_config(slot: str, preset: Path, preset_root: Path) -> Any:
     from cleave.config import LayerConfig
 
-    w, h = LAYER_DEFAULT_SIZE[DEFAULT_NEW_LAYER_STEM]
     return LayerConfig(
         preset=preset,
         stem=DEFAULT_NEW_LAYER_STEM,
         enabled=True,
         opacity=1.0,
-        width=w,
-        height=h,
         blend_mode=DEFAULT_BLEND_MODE[DEFAULT_NEW_LAYER_STEM],
         locked=False,
         preset_switching=DEFAULT_PRESET_SWITCHING,
@@ -141,14 +140,6 @@ DEFAULT_BLEND_MODE: dict[StemSource, BlendMode] = {
     "bass": "black-key",
     "vocals": "black-key",
     "full_mix": "black-key",
-}
-
-LAYER_DEFAULT_SIZE: dict[StemSource, tuple[int, int]] = {
-    "other": (640, 360),
-    "bass": (960, 540),
-    "vocals": (960, 540),
-    "drums": (1280, 720),
-    "full_mix": (1280, 720),
 }
 
 DEFAULT_PRESET_ROOT = Path("~/.local/share/cleave/presets")
@@ -611,13 +602,13 @@ def clamp_ui_width(value: int | float) -> int:
     return max(UI_WIDTH_MIN, min(UI_WIDTH_MAX, int(round(value))))
 
 
-def _parse_visualizer_render_mode(
-    value: Any, ctx: ParseCtx, label: str = "visualizer.render_mode"
-) -> VisualizerRenderMode:
+def _parse_visualizer_preview_quality(
+    value: Any, ctx: ParseCtx, label: str = "visualizer.preview_quality"
+) -> VisualizerPreviewQuality:
     if not isinstance(value, str):
         raise ValueError(f"{label} must be a string")
-    if value not in VISUALIZER_RENDER_MODES:
-        allowed = ", ".join(f"'{mode}'" for mode in VISUALIZER_RENDER_MODES)
+    if value not in VISUALIZER_PREVIEW_QUALITIES:
+        allowed = ", ".join(f"'{mode}'" for mode in VISUALIZER_PREVIEW_QUALITIES)
         raise ValueError(f"{label} must be one of: {allowed}")
     return value
 
@@ -975,10 +966,10 @@ VISUALIZER_FIELDS: tuple[FieldDescriptor, ...] = (
         lambda value, _ctx: clamp_beat_sensitivity(value),
     ),
     FieldDescriptor(
-        "render_mode",
-        DEFAULT_VISUALIZER_RENDER_MODE,
+        "preview_quality",
+        DEFAULT_VISUALIZER_PREVIEW_QUALITY,
         "cfg",
-        _parse_visualizer_render_mode,
+        _parse_visualizer_preview_quality,
         _dump_scalar,
     ),
     FieldDescriptor(
@@ -1285,7 +1276,7 @@ def parse_visualizer_section(data: dict[str, Any]) -> Any:
         height=parsed["height"],
         upscale=parsed["upscale"],
         beat_sensitivity=parsed["beat_sensitivity"],
-        render_mode=parsed["render_mode"],
+        preview_quality=parsed["preview_quality"],
         ui_width_mode=parsed["ui_width_mode"],
         ui_width=parsed["ui_width"],
         ui_fade=parsed["ui_fade"],
@@ -1299,7 +1290,7 @@ def persist_visualizer(ctx: PersistCtx) -> dict[str, Any]:
         "height": vis.height,
         "upscale": vis.upscale,
         "beat_sensitivity": vis.beat_sensitivity,
-        "render_mode": vis.render_mode,
+        "preview_quality": vis.preview_quality,
         "ui_width_mode": vis.ui_width_mode,
         "ui_width": vis.ui_width,
         "ui_fade": vis.ui_fade,
@@ -1431,7 +1422,6 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
             raise ValueError(f"layers.{slot}.preset is required")
 
         stem = _parse_stem(slot, layer_raw)
-        default_width, default_height = LAYER_DEFAULT_SIZE[stem]
         beat_raw = layer_raw.get("beat_sensitivity")
         preset_switching = _parse_preset_switching(
             layer_raw.get("preset_switching", DEFAULT_PRESET_SWITCHING),
@@ -1470,8 +1460,6 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
             stem=stem,
             enabled=bool(layer_raw.get("enabled", True)),
             opacity=float(layer_raw.get("opacity", 1.0)),
-            width=int(layer_raw.get("width", default_width)),
-            height=int(layer_raw.get("height", default_height)),
             beat_sensitivity=clamp_beat_sensitivity(beat_raw)
             if beat_raw is not None
             else None,
@@ -1552,8 +1540,6 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             "preset": preset,
             "enabled": enabled,
             "opacity": opacity,
-            "width": layer_cfg.width,
-            "height": layer_cfg.height,
             "blend_mode": blend_mode,
             "locked": locked,
         }
@@ -1881,13 +1867,10 @@ def template_visualizer_section(*, name: str = "cleave-viz-example") -> dict[str
 def template_layer_entry(
     slot: str, stem: StemSource = DEFAULT_NEW_LAYER_STEM
 ) -> dict[str, Any]:
-    width, height = LAYER_DEFAULT_SIZE[stem]
     return {
         "stem": stem,
         "preset": f"presets/{stem}/",
         "enabled": True,
         "opacity": 1.0,
-        "width": width,
-        "height": height,
         "blend_mode": DEFAULT_BLEND_MODE[stem],
     }

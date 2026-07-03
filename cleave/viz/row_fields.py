@@ -65,10 +65,10 @@ def tree_branch_prefix(depth: int) -> str:
     return " " * (2 * (depth - 1)) + "└─ "
 
 
-def _format_settings_render_mode(
+def _format_settings_preview_quality(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return state.settings.render_mode
+    return state.settings.preview_quality
 
 
 def _format_settings_ui_width_mode(
@@ -89,14 +89,14 @@ def _format_settings_ui_fade(
     return ui_fade_display(state.settings.ui_fade)
 
 
-def _apply_settings_render_mode(
+def _apply_settings_preview_quality(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
     _ctrl: bool,
     _shift: bool,
 ) -> None:
-    controls._settings.cycle_render_mode(forward=forward)
+    controls._settings.cycle_preview_quality(forward=forward)
     controls._apply_preview_resolutions()
 
 
@@ -893,11 +893,11 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.COMPOSITE_HEADER,
         apply_horizontal=_apply_settings_header,
     ),
-    RowKind.SETTINGS_RENDER_MODE: RowFieldDef(
-        panel_label="render mode",
+    RowKind.SETTINGS_PREVIEW_QUALITY: RowFieldDef(
+        panel_label="preview quality",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_settings_render_mode,
-        apply_horizontal=_apply_settings_render_mode,
+        format_value=_format_settings_preview_quality,
+        apply_horizontal=_apply_settings_preview_quality,
     ),
     RowKind.SETTINGS_UI_HEADER: RowFieldDef(
         panel_label="UI",

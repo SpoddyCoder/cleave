@@ -41,6 +41,10 @@ def _high_quality_clause(high_quality: bool) -> str:
     return ", in high-quality mode" if high_quality else ""
 
 
+def _viz_quality_clause(viz_quality: bool) -> str:
+    return ", in viz-quality mode" if viz_quality else ""
+
+
 def _render_scope_clause(segment: RenderSegment | None) -> str:
     if segment is None:
         return "final render"
@@ -125,7 +129,7 @@ def cmd_render(args: argparse.Namespace) -> None:
             config=args.config,
             output=args.output,
             high_quality=args.high_quality,
-            full_res=args.full_res,
+            viz_quality=args.viz_quality,
             start_sec=args.start,
             end_sec=args.end,
         )
@@ -137,7 +141,8 @@ def cmd_render(args: argparse.Namespace) -> None:
     size = f"{result.output_width}x{result.output_height}"
     print(
         f"{result.mix_filename} {_render_scope_clause(result.segment)} at {size} "
-        f"completed{_high_quality_clause(args.high_quality)}, in {elapsed}"
+        f"completed{_high_quality_clause(args.high_quality)}"
+        f"{_viz_quality_clause(args.viz_quality)}, in {elapsed}"
     )
 
 
@@ -263,11 +268,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="veryslow libx264 preset for best encode quality (slower)",
     )
     render.add_argument(
-        "-fr",
-        "--full-res",
-        dest="full_res",
+        "-vq",
+        "--viz-quality",
+        dest="viz_quality",
         action="store_true",
-        help="render every layer at render.width x render.height",
+        help=(
+            "scale each layer with preview_quality instead of full render "
+            "resolution (~20%% faster)"
+        ),
     )
     render.add_argument(
         "--start",

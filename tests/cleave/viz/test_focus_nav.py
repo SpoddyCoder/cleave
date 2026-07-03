@@ -110,7 +110,7 @@ def test_move_focus_up_from_settings_wraps_to_last_timeline_row() -> None:
 def test_resolve_cursor_maps_stale_main_descriptor() -> None:
     state = _minimal_view_state()
     ring = build_focus_ring(state)
-    stale = MainFocus(RowDescriptor(RowKind.SETTINGS_RENDER_MODE))
+    stale = MainFocus(RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY))
 
     resolved = resolve_cursor(stale, ring, state)
 

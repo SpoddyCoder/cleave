@@ -198,9 +198,9 @@ def test_parse_visualizer_reads_name() -> None:
     assert cfg.name == "buttercup-24"
 
 
-def test_parse_visualizer_render_mode_defaults_to_balanced() -> None:
+def test_parse_visualizer_preview_quality_defaults_to_balanced() -> None:
     cfg = parse_visualizer_section({})
-    assert cfg.render_mode == "balanced"
+    assert cfg.preview_quality == "balanced"
 
 
 def test_parse_visualizer_ui_fade_defaults_to_ten() -> None:
@@ -253,17 +253,17 @@ def test_parse_visualizer_clamps_ui_width() -> None:
 
 
 @pytest.mark.parametrize(
-    "render_mode",
+    "preview_quality",
     ["full-quality", "balanced", "performance", "ultra-performance"],
 )
-def test_parse_visualizer_reads_render_mode(render_mode: str) -> None:
-    cfg = parse_visualizer_section({"visualizer": {"render_mode": render_mode}})
-    assert cfg.render_mode == render_mode
+def test_parse_visualizer_reads_preview_quality(preview_quality: str) -> None:
+    cfg = parse_visualizer_section({"visualizer": {"preview_quality": preview_quality}})
+    assert cfg.preview_quality == preview_quality
 
 
-def test_parse_visualizer_rejects_invalid_render_mode() -> None:
-    with pytest.raises(ValueError, match="visualizer.render_mode must be one of"):
-        parse_visualizer_section({"visualizer": {"render_mode": "ultra"}})
+def test_parse_visualizer_rejects_invalid_preview_quality() -> None:
+    with pytest.raises(ValueError, match="visualizer.preview_quality must be one of"):
+        parse_visualizer_section({"visualizer": {"preview_quality": "ultra"}})
 
 
 def test_load_config_reads_visualizer_name(minimal_project: Path) -> None:
