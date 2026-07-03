@@ -450,12 +450,7 @@ class TuningViewStateBuilder:
         for slot in structure.layer_z_order:
             base = structure.tracks[slot]
             layer = self.session.layers[slot]
-            if self.session.timeline.enabled:
-                visible = effective_layer_enabled(
-                    self.session, slot, position_sec
-                )
-            else:
-                visible = layer.enabled
+            visible = effective_layer_enabled(self.session, slot, position_sec)
             tracks[slot] = replace(
                 base,
                 stem=layer.stem,

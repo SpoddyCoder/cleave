@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pygame
 
 from cleave.viz.overlay_profiler import OverlayDrawCounters
 from cleave.viz.row_semantics import RowDescriptor, RowKind, row_is_pinned
-from cleave.viz.theme import BORDER_COLOR, BORDER_WIDTH, SCROLLBAR_CONTENT_GAP, SCROLLBAR_WIDTH
+from cleave.viz.theme import (
+    BORDER_COLOR,
+    BORDER_WIDTH,
+    SCROLLBAR_CONTENT_GAP,
+    SCROLLBAR_WIDTH,
+    SOLO_BG,
+)
 from cleave.viz.focus_nav import MainFocus
 from cleave.viz.tuning_panel_cache import (
     TuningPanelCache,
@@ -103,6 +111,100 @@ def test_focus_change_changes_static_row_keys_for_affected_rows() -> None:
     )
 
     assert track_key_when_track_focused != track_key_when_transport_focused
+
+
+def test_solo_change_invalidates_track_header_row_key() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    font = overlay._font_get()
+    cache = TuningPanelCache()
+    state = _two_layer_view_state(focus_slot="layer_1")
+    index = next(
+        i
+        for i in state.layout.visible_indices(state)
+        if state.layout.kind(i) == RowKind.TRACK_HEADER
+        and state.layout.slot(i) == "layer_1"
+    )
+    line_h = font.get_linesize()
+    max_w = 400
+
+    key_before = row_render_key(
+        state,
+        index,
+        font,
+        cache=cache,
+        max_content_width=max_w,
+        line_h=line_h,
+    )
+    state_solo = replace(
+        state,
+        solo_slot="layer_1",
+        solo_active=True,
+        tracks={
+            "layer_1": replace(state.tracks["layer_1"], visible=True),
+            "layer_2": replace(state.tracks["layer_2"], visible=False),
+        },
+    )
+    key_after = row_render_key(
+        state_solo,
+        index,
+        font,
+        cache=cache,
+        max_content_width=max_w,
+        line_h=line_h,
+    )
+    assert key_before != key_after
+    assert key_before.visibility_icon == (True, False)
+    assert key_after.visibility_icon == (True, True)
+
+
+def test_solo_change_misses_warm_row_cache_for_track_header() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    font = overlay._font_get()
+    cache = TuningPanelCache()
+    state = _two_layer_view_state(focus_slot="layer_1")
+    index = next(
+        i
+        for i in state.layout.visible_indices(state)
+        if state.layout.kind(i) == RowKind.TRACK_HEADER
+        and state.layout.slot(i) == "layer_1"
+    )
+    line_h = font.get_linesize()
+    max_w = 400
+
+    ensure_row_surface(
+        cache,
+        state,
+        index,
+        font,
+        overlay._build_row_at_index,
+        max_content_width=max_w,
+        line_h=line_h,
+    )
+    state_solo = replace(
+        state,
+        solo_slot="layer_1",
+        solo_active=True,
+        tracks={
+            "layer_1": replace(state.tracks["layer_1"], visible=True),
+            "layer_2": replace(state.tracks["layer_2"], visible=False),
+        },
+    )
+    counters = OverlayDrawCounters()
+    entry = ensure_row_surface(
+        cache,
+        state_solo,
+        index,
+        font,
+        overlay._build_row_at_index,
+        max_content_width=max_w,
+        line_h=line_h,
+        counters=counters,
+    )
+    assert counters.row_cache_misses == 1
+    assert counters.row_cache_hits == 0
+    assert entry.primary.get_at((1, line_h // 2))[:3] == SOLO_BG
 
 
 def test_repeated_compose_panel_near_zero_font_renders_when_idle() -> None:

@@ -268,6 +268,28 @@ def _track_header_expand_suffix(state: TuningViewState, desc: RowDescriptor) -> 
     return f" {format_composite_header_expand_value(state, desc)}"
 
 
+def row_visibility_icon_key(
+    state: TuningViewState, index: int
+) -> tuple[bool, bool] | None:
+    """Return ``(enabled, solo)`` for rows with a visibility eye, else ``None``."""
+    kind = state.layout.kind(index)
+    stem = state.layout.slot(index)
+    if kind == RowKind.TRACK_HEADER:
+        if stem is None:
+            return None
+        block = state.tracks[stem]
+        return (block.visible, state.solo_slot == stem)
+    if kind == RowKind.RENDER_OVERLAY_HEADER:
+        block = state.render_overlay
+        return (block.enabled, block.solo)
+    if kind == RowKind.RENDER_POST_FX_HEADER:
+        block = state.render_post_fx
+        return (block.enabled, block.solo)
+    if kind == RowKind.RENDER_TIMELINE_HEADER:
+        return (state.render_timeline.enabled, False)
+    return None
+
+
 def render_visibility_icon(
     *,
     enabled: bool,
