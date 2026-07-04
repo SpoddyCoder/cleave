@@ -1,8 +1,18 @@
 # Preset scan plan
 
-Implementation plan for `cleave scan`: offline batch classification of Milkdrop presets (load failures, black output). Background and heuristics live in [presets-check-proposal.md](presets-check-proposal.md).
+Implementation plan for `cleave scan`: offline batch classification of Milkdrop presets (load failures, black output). Background and heuristics live in [presets-check-proposal.md](presets-check-proposal.md). Investigation notes: [presets-scan-learnings.md](presets-scan-learnings.md).
 
-**Status:** v1 implemented (`cleave scan` project and bulk modes, quick/`--slow` probes, JSON report).
+## Status
+
+| Phase | State | Notes |
+| --- | --- | --- |
+| v1 | Done | Project/bulk scan, quick/`--slow` profiles, JSON report, v1 classifier |
+| v2 | Done | `--quarantine`, `--resume`, incremental/interrupt-safe reports |
+| Live clean boot | Done | Manual preset browse forces black boot ([cleave/viz/preset_switching.py](../cleave/viz/preset_switching.py) `load_manual_preset_clean`) |
+| Classifier rework | Outstanding | Clean-boot probe, full-frame metrics, manual test set, threshold retune |
+| v3 | Outstanding | `--delete`, reference clip for `--slow`, report PCM metadata |
+
+**Classifier:** v1/v2 ship a center-patch, mean-only probe with a shared `ProjectM`. Results are useful for smoke tests but not trusted for bulk quarantine. See [Classifier rework](#classifier-rework) and [presets-scan-learnings.md](presets-scan-learnings.md).
 
 ## Goals
 
@@ -46,16 +56,16 @@ cleave scan --presets-dir <dir> --texture-path <dir> [--texture-path ...] [optio
 
 | Flag | Purpose |
 | --- | --- |
-| (default) | Quick probe: short frames + short warmup; report only on stderr, optional JSON report. Faster; may flag slow-starting or legitimately dark presets (more false positives). |
-| `--slow` | Longer frames + longer warmup before luminance sample. Slower; fewer false positives. Use before acting on results (quarantine/delete) or for a final bulk audit. |
+| (default) | Quick probe: 15 frames, 0.5 s warmup; synthetic mono PCM; report on stderr, optional JSON |
+| `--slow` | 60 frames, 3 s warmup; same synthetic mono PCM today (reference clip planned for v3) |
 | `--report <path>` | JSON report path; written incrementally so a run can be resumed |
 | `--recursive` | Bulk mode only: scan subdirectories |
-| `--quarantine <dir>` | Move failed presets to DIR (v2); DIR must be a directory outside the scan set |
+| `--quarantine <dir>` | Move failed presets to DIR; DIR must be outside the scan set |
 | `--delete` | Remove failed presets after the scan (v3); prompts unless `--yes` |
 | `--yes` | Skip confirmation for `--delete` (required when stdin is not a TTY) |
-| `--resume` | Skip presets already in the `--report` file (v2); requires `--report PATH` |
+| `--resume` | Skip presets already in the `--report` file; requires `--report PATH` |
 
-Probe timing is a single profile (no separate `--frames` / `--warmup-sec` flags). Internal values TBD at implementation (e.g. quick ~15 frames / ~0.5 s warmup; slow ~60 frames / ~3 s warmup). Record `probe_mode`: `quick` | `slow` in the JSON report.
+Record `probe_mode`: `quick` | `slow` in the JSON report.
 
 ## Scan set derivation (project mode)
 
@@ -75,128 +85,126 @@ Project mode: always apply `paths.texture_paths` from the loaded config.
 
 Bulk mode: require at least one texture path (`--texture-path` and/or from `-c`). Record paths used in the report.
 
-## Per-preset probe
+## Per-preset probe (shipped v1/v2)
 
-Same harness as [presets-check-proposal.md](presets-check-proposal.md#per-preset-behavior): hidden pygame GL context, a fresh [ProjectM](../cleave/projectm.py) per preset (so feedback state from the previous preset cannot contaminate classification), shared small FBO, luminance sample after warmup. Switch-failed callbacks from the projectM robustness work ([todos.md](todos.md)). Fresh instances keep quick and slow results order-independent and avoid `--slow` false `black` hits from inherited feedback frames.
+Hidden pygame GL context, one shared [ProjectM](../cleave/projectm.py) for the run, small RGBA FBO (480x270). Switch-failed callbacks from the projectM robustness work ([todos.md](todos.md)).
 
-Each post-warmup frame reads the full FBO (`glReadPixels` over the probe resolution). Per frame the probe records max luma, mean luma, and **coverage** (fraction of pixels with luma >= `coverage_luma_min`, default 16). Classification uses the peak max, peak mean, and peak coverage across all sampled frames.
+Per preset:
 
-**Quick (default):** short render + short warmup; feeds synthetic mono PCM. Intended for iteration and smoke tests.
+1. `load_preset(path, smooth=False)` then `lock_preset(True)` (no clean-boot flag today; feedback can carry from the previous preset).
+2. Render `warmup_frames + profile.frames` at 30 fps with synthetic mono PCM.
+3. After warmup, sample a 32x32 luma patch at the frame center each frame; keep max and mean from the **last** post-warmup frame only.
+4. Classify from load failures plus those two values.
 
-**`--slow`:** longer render + longer warmup; feeds stereo PCM from the bundled reference clip [assets/audio/scan-reference-10s.wav](../assets/audio/scan-reference-10s.wav) (10 s excerpt from `projects/sights-and-sounds-26/sights-and-sounds-26.wav` starting at 82 s). Better for presets that need time to develop and for fade-to-black cases; fewer false positives. Each preset probe resets the clip cursor so classification is deterministic.
+**Quick (default):** 15 frames, 0.5 s warmup.
+
+**`--slow`:** 60 frames, 3 s warmup. Same PCM as quick until v3 wires [assets/audio/scan-reference-10s.wav](../assets/audio/scan-reference-10s.wav) (10 s excerpt from `projects/sights-and-sounds-26/sights-and-sounds-26.wav` starting at 82 s).
 
 Result categories: `load_failed`, `black`, `dim`, `ok` (see proposal).
 
-### Classification thresholds
+### Classification thresholds (shipped)
 
 Recorded in each report under `thresholds`:
 
 | Key | Default | Use |
 | --- | --- | --- |
 | `black_max_luma` | 1.0 | Peak max luma below this => `black` |
-| `black_coverage` | 0.0005 | Peak coverage below this => `black` |
-| `dim_coverage` | 0.01 | Peak coverage below this (but not black) => `dim` |
-| `coverage_luma_min` | 16.0 | Luma floor when counting covered pixels |
+| `dim_mean_luma` | 8.0 | Peak mean luma below this (but not black) => `dim` |
 
-Coverage replaces mean-luma dim detection so sparse bright content on a dark field (high peak max and coverage, low peak mean) classifies as `ok`. Each preset entry may include optional `luma: { max, mean, coverage }` with the peak values used for classification.
+No `luma` block per preset in v1/v2 reports. No coverage metrics.
 
 ### Destructive actions
 
-When `--quarantine` or `--delete` is used **without** `--slow`, print a clear stderr warning that quick mode has more false positives and recommend re-running with `--slow` before moving or deleting files. Do not block the action.
+When `--quarantine` or `--delete` is used **without** `--slow`, print a clear stderr warning that quick mode has more false positives and recommend re-running with `--slow` before moving or deleting files. Do not block the action. Treat quarantine as safe only after classifier rework and manual spot checks.
 
-## JSON report (v1)
+## JSON report
 
 Include environment metadata:
 
 - `scan_mode`: `project` | `bulk`
 - `probe_mode`: `quick` | `slow`
+- `complete`: `true` on normal finish, `false` if interrupted (v2)
 - `project_dir`, `config_path` (project mode)
 - `preset_root`, `texture_paths` (resolved absolute)
 - `layers`: slot -> list of contributing paths or dirs
+- `thresholds`, `probe_frames`, `probe_fps`, `fbo_size`
 - `presets`: deduplicated entries with `path`, `result`, `layers[]`, optional timings/errors
 
-## v2 report and resume
+### Incremental writes and resume (v2, done)
 
-Long bulk audits are the motivating case: thousands of presets, minutes to tens of minutes per run. v2 makes `--report` durable so `--resume` can pick up where a killed or interrupted run stopped.
+- Flush every 10 probed presets and once at end (`REPORT_FLUSH_EVERY = 10`); only when `--report` is set.
+- Atomic write via temp file + `os.replace`.
+- `KeyboardInterrupt`: flush partial report, `complete: false`, print resume hint, exit non-zero.
+- `--resume` requires `--report PATH`; skip paths already in the report; warn on `scan_mode` / `probe_mode` mismatch.
+- Incomplete report without `--resume`: error with resume command before probing.
+- Complete report with `--resume`: error before probing.
 
-### Incremental report writes
+### Quarantine checks (v2, done)
 
-`run_scan` currently accumulates all `PresetScanResult`s in memory and the caller writes the report once at the end (`write_scan_report` after the loop). Change so a partial report is flushed to disk during the scan:
+- Target must be a directory (create with parents if missing).
+- Reject quarantine dir inside the scanned preset tree.
+- Only `load_failed`, `black`, `dim` are moved.
 
-- Flush every 10 probed presets and once more at the end. Batch size is a small internal constant (e.g. `REPORT_FLUSH_EVERY = 10`); no CLI flag.
-- Only flush when a report path is set. With no `--report`, behavior is unchanged (in-memory only, single stderr summary).
-- Reuse `build_scan_report` + `write_scan_report` on the results collected so far so the partial file has the same shape as a final report. Add a top-level `complete: bool` field (`false` while scanning, `true` on normal completion) so `--resume` and humans can tell a partial file from a finished one.
-- Write atomically: serialize to a temp file in the same directory and `os.replace` onto the target so an interrupt mid-write cannot corrupt the JSON.
+## Classifier rework
 
-Threading the report path into `run_scan` keeps the flush next to the loop that produces results. `run_scan` takes an optional `report_path` plus the metadata `build_scan_report` needs (or a small callback/closure the CLI supplies that turns "results so far" into a written report). Pick the closure approach to avoid duplicating the project-vs-bulk metadata assembly inside `run_scan`.
+Target behavior for the next scan harness change (not yet implemented):
 
-### Interrupt safety (Ctrl+C)
+1. **Clean boot** — `set_preset_start_clean(True)` before each `load_preset`, or fresh `ProjectM` per preset. Matches live manual browse and removes order-dependent feedback contamination.
+2. **Full-frame sampling** — `glReadPixels` over the probe FBO; per frame record max luma, mean luma, coverage (fraction of pixels >= `coverage_luma_min`).
+3. **Peak across frames** — Classification uses peak max, peak mean, and peak coverage across all post-warmup frames (consider frame 0 as well so flash-then-fade is caught).
+4. **Combined rules** — Coverage for bright-on-black; mean for uniformly dim output; bright-on-black guard for tunnel/kaleidoscope presets. Starting constants from exploration: `coverage_luma_min` 16, `black_coverage` 0.0005, `dim_coverage` 0.01, `dim_mean_luma` 10, guard `max >= 100` and `coverage >= 0.02`. Tune against a manual set.
+5. **Report fields** — Optional per-preset `luma: { max, mean, coverage }` with the peak values used.
 
-Trap `KeyboardInterrupt` around the probe loop so a manual stop still leaves a usable report:
+### Manual test set workflow
 
-- On `KeyboardInterrupt`, flush the results collected so far (with `complete: false`), tear down GL/ProjectM in the existing `finally`, print `Scan interrupted; <scanned>/<total> saved (complete: false).` plus a copy-pasteable `Resume: <command>` line, and exit non-zero.
-- With incremental flushing already in place the trap mainly guarantees the very latest completed preset is on disk and the `complete` flag is honest; do not attempt to record the preset that was mid-probe when interrupted.
-- If no `--report` was given, print a short stderr hint that the run was interrupted and results were not saved (see help wording below).
-
-### `--resume`
-
-- Boolean flag: continue a prior scan using the same `--report PATH` for input and merged output.
-- `--resume` requires `--report PATH`. Error if omitted: `error: --resume requires --report PATH`.
-- If `--report PATH` exists with `complete: false` and `--resume` is not set, exit before probing: `error: <path> is incomplete (<scanned>/<total>). Resume with: <command> or delete the file to start over.`
-- If `--resume` and the report has `complete: true`, exit before probing: `error: <path> is already complete (<N> presets). Or delete the file to scan again.`
-- The report at `--report PATH` must exist. Give a clear error and prompt the user to supply the file:
-  - Path does not exist / not a file: `error: resume report not found: <path>`.
-  - Unreadable or malformed JSON, or missing the expected fields: `error: cannot read resume report <path>: <reason>`.
-- Load the prior report JSON, collect the set of resolved absolute preset paths that already have a result, and skip those targets in the new run. Probe only the remainder; merge new results with the carried-over ones in the output report.
-- Guard against mismatched scans: if the resume report's `scan_mode`, `probe_mode`, or target set clearly differs from the current invocation, warn on stderr (do not hard-block) so a quick-mode report is not blindly resumed under `--slow`.
-- On resume, print `Resuming: <N> done` once, then continue progress as `Scanning <index>/<total>` using the full target list index (not a separate remaining counter).
-
-### Quarantine input checks
-
-`--quarantine <dir>` must validate its argument before any probing so failures surface immediately, not after a long scan:
-
-- The value must be a directory path. If it exists, it must be a directory (error if it is a regular file): `error: --quarantine target is not a directory: <path>`.
-- If it does not exist, create it (with parents) rather than failing; error only if creation fails (e.g. permission denied): `error: cannot create quarantine directory <path>: <reason>`.
-- Reject a quarantine dir that is inside the scan set: refuse when the resolved quarantine path is the presets/anchor directory or a subdirectory of it, to avoid moving files into a location that is itself being scanned/walked. `error: --quarantine directory must be outside the scanned presets directory`.
-- `--quarantine` only moves presets classified as failures (`load_failed`, `black`, `dim` per policy); combine with the existing without-`--slow` warning.
-
-### Help text
-
-- The `--report` help must state that it also enables resuming an interrupted scan, e.g. `Write JSON scan report to PATH incrementally so an interrupted run can be resumed with the same PATH and --resume.`
-- Add a note near `--resume`/in the command epilog recommending `--report` for large preset directories so users opt into a resumable run up front; resume is `--report PATH --resume`.
+1. Set layer `preset_switching` to `none` (or `user_defined`) and browse presets with Left/Right (clean boot is automatic).
+2. Label examples: `ok`, `dim`, broken (black / never develops). Save paths and notes.
+3. Implement harness changes above; add a small test or script that classifies the labeled set and reports mismatches.
+4. Tune thresholds; run `--slow` on a larger pack; spot-check before `--quarantine`.
 
 ## Architecture
 
 | Piece | Location |
 | --- | --- |
-| Scan harness + classification | [cleave/preset_scan.py](../cleave/preset_scan.py) (new) |
-| Scan set builder | `preset_scan.py` or `cleave/preset_scan_targets.py` (new); reuse [preset_playlist.py](../cleave/preset_playlist.py) `scan_preset_playlist`, `milk_files_in_dir` |
+| Scan harness + classification | [cleave/preset_scan.py](../cleave/preset_scan.py) |
+| Scan set builder | [cleave/preset_scan_targets.py](../cleave/preset_scan_targets.py) |
 | CLI | [cleave/cli.py](../cleave/cli.py) `cmd_scan` |
+| Live clean manual load | [cleave/viz/preset_switching.py](../cleave/viz/preset_switching.py) `load_manual_preset_clean` |
 | Config | [cleave/config.py](../cleave/config.py) load + `paths.texture_paths` |
 
 Does not use [layer_pipeline.py](../cleave/viz/layer_pipeline.py) or the compositor; probe reads raw projectM FBO output.
 
 ## Phasing
 
-**v1**
+**v1 (done)**
 
 - Project scan + bulk scan (`--presets-dir` + required `--texture-path`)
 - Scan set derivation as above
 - Dedup + layer attribution in report
 - Report-only, synthetic PCM, load failure + luminance check
-- Quick probe (default) and `--slow` profile
+- Quick probe (default) and `--slow` profile (timing only; same PCM)
 
-**v2**
+**v2 (done)**
 
 - `--quarantine`, `--resume`
 - Stderr warning when `--quarantine` runs without `--slow`
-- Incremental + interrupt-safe report writes (see [v2 report and resume](#v2-report-and-resume))
+- Incremental + interrupt-safe report writes
+
+**Live (done, parallel to scan)**
+
+- Manual preset browse clean boot for honest preset review
+
+**Classifier rework (next)**
+
+- Clean-boot probe, full-frame coverage metrics, peak-across-frames, retuned thresholds
+- Manual labeled test set + harness validation before bulk quarantine
+- Per-preset `luma` in JSON report
 
 **v3**
 
 - `--delete` with confirmation (`--yes` to skip prompt; required when stdin is not a TTY); same `--slow` warning as quarantine; mutually exclusive with `--quarantine`
-- Bundled stereo reference clip for `--slow` probes (`assets/audio/scan-reference-10s.wav`); quick mode stays synthetic mono
-- Report fields: `pcm_source`, `pcm_channels`, and `reference_clip_path` when slow
+- Bundled stereo reference clip for `--slow` probes ([assets/audio/scan-reference-10s.wav](../assets/audio/scan-reference-10s.wav)); quick mode stays synthetic mono
+- Report fields: `pcm_source`, `pcm_channels`, `reference_clip_path` when slow
 
 ## Runtime expectations
 
@@ -204,13 +212,14 @@ Project scan: typically tens to low hundreds of presets (per-layer rotation dirs
 
 ## Open questions
 
-- Tune coverage thresholds per pack (`black_coverage`, `dim_coverage`, `coverage_luma_min`).
+- Final coverage and mean thresholds per pack (blocked on manual test set).
 - Quarantine: preserve directory structure vs flat hashed names.
 - CI: headless GL unreliable; keep local/dev tool unless GPU runner exists.
+- Whether auto `projectm` rotation should optionally force clean boot (today only manual browse does).
 
 ## Related work
 
-- [presets-scan-learnings.md](presets-scan-learnings.md) — investigation arc and threshold tuning notes from live scan runs
+- [presets-scan-learnings.md](presets-scan-learnings.md) — investigation arc and threshold tuning notes
 - [presets-check-proposal.md](presets-check-proposal.md) — problem statement and classification heuristics
 - [projectm-api-coverage.md](projectm-api-coverage.md) — libprojectM symbol audit and live failure handling
 - [preset-switching-proposal.md](legacy-plans/preset-switching-proposal.md) — live rotation design
