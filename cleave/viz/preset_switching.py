@@ -161,6 +161,27 @@ def apply_preset_switching(
         restart_projectm_preset_timer(layer)
 
 
+def load_manual_preset_clean(
+    layer: StemLayer,
+    *,
+    preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN,
+) -> None:
+    """Load the current browse preset with a guaranteed clean (black) boot.
+
+    ``load_preset(smooth=False)`` inherits the previous preset's final frame as
+    projectM feedback state, so a preset that only develops when seeded looks
+    fine after a switch even when it cannot start from black. Manual browsing
+    forces ``preset_start_clean`` for this load so each preset boots from black,
+    then restores the layer's configured value for later auto-switch transitions.
+    """
+    pm = layer.pm
+    if layer.playlist.current is None:
+        return
+    pm.set_preset_start_clean(True)
+    layer.playlist.load_into(pm, smooth=False)
+    pm.set_preset_start_clean(preset_start_clean)
+
+
 def sync_manual_browse_with_user_defined_rotation(layer: StemLayer) -> None:
     """Align user-defined rotation state after manual preset browse."""
     current = layer.playlist.current
