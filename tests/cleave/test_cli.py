@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -633,6 +634,118 @@ def test_scan_parser_bulk_mode() -> None:
     assert args.report == Path("out.json")
 
 
+def test_scan_parser_resume_flag() -> None:
+    parser = build_parser()
+    args = parser.parse_args(
+        ["scan", "my-project", "--report", "out.json", "--resume"]
+    )
+    assert args.report == Path("out.json")
+    assert args.resume is True
+
+
+def test_cmd_scan_resume_requires_report(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+
+    with pytest.raises(SystemExit) as exc_info:
+        cmd_scan(build_parser().parse_args(["scan", "my-project", "--resume"]))
+
+    assert exc_info.value.code == 1
+
+
+def test_cmd_scan_blocks_incomplete_report_without_resume(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = _complete_project(tmp_path)
+    (project / "cleave-viz.yaml").write_text(
+        (Path(__file__).resolve().parents[2] / "cleave-viz.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    presets = tuple(
+        PresetTarget(path=Path(f"/tmp/p{i}.milk"), layers=("layer_1",))
+        for i in range(10)
+    )
+    targets = ScanTargets(presets=presets)
+
+    report_path = tmp_path / "scan-report.json"
+    report_path.write_text(
+        json.dumps({"presets": [{}, {}, {}], "complete": False}),
+        encoding="utf-8",
+    )
+
+    with (
+        patch("cleave.cli.build_project_targets", return_value=targets),
+        patch("cleave.cli.run_scan") as run_scan_mock,
+    ):
+        with pytest.raises(SystemExit) as exc_info:
+            cmd_scan(
+                build_parser().parse_args(
+                    ["scan", "my-track", "--report", str(report_path)]
+                )
+            )
+
+    assert exc_info.value.code == 1
+    run_scan_mock.assert_not_called()
+    err = capsys.readouterr().err
+    assert "incomplete (3/10)" in err
+    assert "--resume" in err
+
+
+def test_cmd_scan_resume_rejects_complete_report(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = _complete_project(tmp_path)
+    (project / "cleave-viz.yaml").write_text(
+        (Path(__file__).resolve().parents[2] / "cleave-viz.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    report_path = tmp_path / "scan-report.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "scan_mode": "project",
+                "probe_mode": "quick",
+                "complete": True,
+                "presets": [
+                    {
+                        "path": "/tmp/a.milk",
+                        "result": "ok",
+                        "layers": ["layer_1"],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with patch("cleave.cli.build_project_targets") as build_targets_mock:
+        with pytest.raises(SystemExit) as exc_info:
+            cmd_scan(
+                build_parser().parse_args(
+                    [
+                        "scan",
+                        "my-track",
+                        "--report",
+                        str(report_path),
+                        "--resume",
+                    ]
+                )
+            )
+
+    assert exc_info.value.code == 1
+    build_targets_mock.assert_not_called()
+    err = capsys.readouterr().err
+    assert "already complete" in err
+    assert "delete the file" in err
+
+
 def test_cmd_scan_rejects_bulk_flags_in_project_mode(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -816,3 +929,4 @@ def test_module_help_lists_subcommands() -> None:
     assert "--presets-dir" in scan.stdout
     assert "--slow" in scan.stdout
     assert "--report" in scan.stdout
+    assert "--resume" in scan.stdout
