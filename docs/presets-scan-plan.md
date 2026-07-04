@@ -48,11 +48,11 @@ cleave scan --presets-dir <dir> --texture-path <dir> [--texture-path ...] [optio
 | --- | --- |
 | (default) | Quick probe: short frames + short warmup; report only on stderr, optional JSON report. Faster; may flag slow-starting or legitimately dark presets (more false positives). |
 | `--slow` | Longer frames + longer warmup before luminance sample. Slower; fewer false positives. Use before acting on results (quarantine/delete) or for a final bulk audit. |
-| `--report <path>` | JSON report path |
+| `--report <path>` | JSON report path; written incrementally so a run can be resumed |
 | `--recursive` | Bulk mode only: scan subdirectories |
-| `--quarantine <dir>` | Move failed presets (v2) |
+| `--quarantine <dir>` | Move failed presets to DIR (v2); DIR must be a directory outside the scan set |
 | `--delete` | Remove failed presets (v3) |
-| `--resume <report>` | Skip presets already in a prior report (v2) |
+| `--resume` | Skip presets already in the `--report` file (v2); requires `--report PATH` |
 
 Probe timing is a single profile (no separate `--frames` / `--warmup-sec` flags). Internal values TBD at implementation (e.g. quick ~15 frames / ~0.5 s warmup; slow ~60 frames / ~3 s warmup). Record `probe_mode`: `quick` | `slow` in the JSON report.
 
@@ -99,6 +99,56 @@ Include environment metadata:
 - `layers`: slot -> list of contributing paths or dirs
 - `presets`: deduplicated entries with `path`, `result`, `layers[]`, optional timings/errors
 
+## v2 report and resume
+
+Long bulk audits are the motivating case: thousands of presets, minutes to tens of minutes per run. v2 makes `--report` durable so `--resume` can pick up where a killed or interrupted run stopped.
+
+### Incremental report writes
+
+`run_scan` currently accumulates all `PresetScanResult`s in memory and the caller writes the report once at the end (`write_scan_report` after the loop). Change so a partial report is flushed to disk during the scan:
+
+- Flush every 10 probed presets and once more at the end. Batch size is a small internal constant (e.g. `REPORT_FLUSH_EVERY = 10`); no CLI flag.
+- Only flush when a report path is set. With no `--report`, behavior is unchanged (in-memory only, single stderr summary).
+- Reuse `build_scan_report` + `write_scan_report` on the results collected so far so the partial file has the same shape as a final report. Add a top-level `complete: bool` field (`false` while scanning, `true` on normal completion) so `--resume` and humans can tell a partial file from a finished one.
+- Write atomically: serialize to a temp file in the same directory and `os.replace` onto the target so an interrupt mid-write cannot corrupt the JSON.
+
+Threading the report path into `run_scan` keeps the flush next to the loop that produces results. `run_scan` takes an optional `report_path` plus the metadata `build_scan_report` needs (or a small callback/closure the CLI supplies that turns "results so far" into a written report). Pick the closure approach to avoid duplicating the project-vs-bulk metadata assembly inside `run_scan`.
+
+### Interrupt safety (Ctrl+C)
+
+Trap `KeyboardInterrupt` around the probe loop so a manual stop still leaves a usable report:
+
+- On `KeyboardInterrupt`, flush the results collected so far (with `complete: false`), tear down GL/ProjectM in the existing `finally`, print `Scan interrupted; <scanned>/<total> saved (complete: false).` plus a copy-pasteable `Resume: <command>` line, and exit non-zero.
+- With incremental flushing already in place the trap mainly guarantees the very latest completed preset is on disk and the `complete` flag is honest; do not attempt to record the preset that was mid-probe when interrupted.
+- If no `--report` was given, print a short stderr hint that the run was interrupted and results were not saved (see help wording below).
+
+### `--resume`
+
+- Boolean flag: continue a prior scan using the same `--report PATH` for input and merged output.
+- `--resume` requires `--report PATH`. Error if omitted: `error: --resume requires --report PATH`.
+- If `--report PATH` exists with `complete: false` and `--resume` is not set, exit before probing: `error: <path> is incomplete (<scanned>/<total>). Resume with: <command> or delete the file to start over.`
+- If `--resume` and the report has `complete: true`, exit before probing: `error: <path> is already complete (<N> presets). Or delete the file to scan again.`
+- The report at `--report PATH` must exist. Give a clear error and prompt the user to supply the file:
+  - Path does not exist / not a file: `error: resume report not found: <path>`.
+  - Unreadable or malformed JSON, or missing the expected fields: `error: cannot read resume report <path>: <reason>`.
+- Load the prior report JSON, collect the set of resolved absolute preset paths that already have a result, and skip those targets in the new run. Probe only the remainder; merge new results with the carried-over ones in the output report.
+- Guard against mismatched scans: if the resume report's `scan_mode`, `probe_mode`, or target set clearly differs from the current invocation, warn on stderr (do not hard-block) so a quick-mode report is not blindly resumed under `--slow`.
+- On resume, print `Resuming: <N> done` once, then continue progress as `Scanning <index>/<total>` using the full target list index (not a separate remaining counter).
+
+### Quarantine input checks
+
+`--quarantine <dir>` must validate its argument before any probing so failures surface immediately, not after a long scan:
+
+- The value must be a directory path. If it exists, it must be a directory (error if it is a regular file): `error: --quarantine target is not a directory: <path>`.
+- If it does not exist, create it (with parents) rather than failing; error only if creation fails (e.g. permission denied): `error: cannot create quarantine directory <path>: <reason>`.
+- Reject a quarantine dir that is inside the scan set: refuse when the resolved quarantine path is the presets/anchor directory or a subdirectory of it, to avoid moving files into a location that is itself being scanned/walked. `error: --quarantine directory must be outside the scanned presets directory`.
+- `--quarantine` only moves presets classified as failures (`load_failed`, `black`, `dim` per policy); combine with the existing without-`--slow` warning.
+
+### Help text
+
+- The `--report` help must state that it also enables resuming an interrupted scan, e.g. `Write JSON scan report to PATH incrementally so an interrupted run can be resumed with the same PATH and --resume.`
+- Add a note near `--resume`/in the command epilog recommending `--report` for large preset directories so users opt into a resumable run up front; resume is `--report PATH --resume`.
+
 ## Architecture
 
 | Piece | Location |
@@ -124,6 +174,7 @@ Does not use [layer_pipeline.py](../cleave/viz/layer_pipeline.py) or the composi
 
 - `--quarantine`, `--resume`
 - Stderr warning when `--quarantine` runs without `--slow`
+- Incremental + interrupt-safe report writes (see [v2 report and resume](#v2-report-and-resume))
 
 **v3 (optional)**
 

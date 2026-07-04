@@ -5,8 +5,11 @@ from __future__ import annotations
 import json
 import math
 import os
+import shutil
 import sys
+import tempfile
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -67,6 +70,12 @@ SCAN_THRESHOLDS: dict[str, float] = {
     "dim_mean_luma": DIM_MEAN_LUMA_THRESHOLD,
 }
 
+REPORT_FLUSH_EVERY = 10
+
+QUARANTINE_CATEGORIES: frozenset[PresetResultCategory] = frozenset(
+    ("load_failed", "black", "dim")
+)
+
 
 @dataclass(frozen=True)
 class ProbeProfile:
@@ -105,6 +114,16 @@ class ScanReport:
     probe_fps: int
     fbo_size: tuple[int, int]
     presets: tuple[PresetScanResult, ...]
+    complete: bool = True
+
+
+@dataclass(frozen=True)
+class ResumeData:
+    scan_mode: ScanMode
+    probe_mode: ProbeMode
+    results: tuple[PresetScanResult, ...]
+    skip_paths: frozenset[Path]
+    complete: bool
 
 
 def probe_profile(*, slow: bool = False) -> ProbeProfile:
@@ -143,6 +162,7 @@ def build_scan_report(
     results: list[PresetScanResult] | tuple[PresetScanResult, ...],
     project_dir: Path | None = None,
     config_path: Path | None = None,
+    complete: bool = True,
 ) -> ScanReport:
     layers = {
         slot: [str(path) for path in paths]
@@ -166,6 +186,7 @@ def build_scan_report(
         probe_fps=PROBE_FPS,
         fbo_size=(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT),
         presets=tuple(results),
+        complete=complete,
     )
 
 
@@ -198,14 +219,151 @@ def scan_report_to_dict(report: ScanReport) -> dict[str, Any]:
         "fbo_size": list(report.fbo_size),
         "presets": [_preset_result_to_dict(preset) for preset in report.presets],
         "summary": scan_report_summary(report),
+        "complete": report.complete,
     }
 
 
 def write_scan_report(path: Path, report: ScanReport) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as fh:
-        json.dump(scan_report_to_dict(report), fh, indent=2)
-        fh.write("\n")
+    fd, tmp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    tmp_path = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(scan_report_to_dict(report), fh, indent=2)
+            fh.write("\n")
+        os.replace(tmp_path, path)
+    except BaseException:
+        tmp_path.unlink(missing_ok=True)
+        raise
+
+
+def existing_report_status(path: Path) -> tuple[int, bool]:
+    """Return preset count and completion flag from an on-disk report."""
+    resolved = path.expanduser().resolve()
+    if not resolved.is_file():
+        raise ValueError(f"resume report not found: {resolved}")
+
+    try:
+        raw = json.loads(resolved.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"malformed JSON: {exc}") from exc
+    except OSError as exc:
+        raise ValueError(str(exc)) from exc
+
+    if not isinstance(raw, dict):
+        raise ValueError("report root must be a JSON object")
+
+    presets_raw = raw.get("presets")
+    if not isinstance(presets_raw, list):
+        raise ValueError("missing presets array")
+
+    complete = raw.get("complete", True)
+    return len(presets_raw), bool(complete)
+
+
+def load_resume_results(path: Path) -> ResumeData:
+    """Load prior scan results and skip paths from a report JSON file."""
+    resolved = path.expanduser().resolve()
+    if not resolved.is_file():
+        raise ValueError(f"resume report not found: {resolved}")
+
+    try:
+        raw = json.loads(resolved.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"malformed JSON: {exc}") from exc
+    except OSError as exc:
+        raise ValueError(str(exc)) from exc
+
+    if not isinstance(raw, dict):
+        raise ValueError("report root must be a JSON object")
+
+    scan_mode = raw.get("scan_mode")
+    if scan_mode not in ("project", "bulk"):
+        raise ValueError("missing or invalid scan_mode")
+
+    probe_mode = raw.get("probe_mode")
+    if probe_mode not in ("quick", "slow"):
+        raise ValueError("missing or invalid probe_mode")
+
+    presets_raw = raw.get("presets")
+    if not isinstance(presets_raw, list):
+        raise ValueError("missing presets array")
+
+    results: list[PresetScanResult] = []
+    skip_paths: set[Path] = set()
+    for index, entry in enumerate(presets_raw):
+        try:
+            result = _preset_result_from_dict(entry)
+        except ValueError as exc:
+            raise ValueError(f"invalid preset entry at index {index}: {exc}") from exc
+        results.append(result)
+        skip_paths.add(result.path.resolve())
+
+    complete = bool(raw.get("complete", True))
+
+    return ResumeData(
+        scan_mode=scan_mode,
+        probe_mode=probe_mode,
+        results=tuple(results),
+        skip_paths=frozenset(skip_paths),
+        complete=complete,
+    )
+
+
+def validate_quarantine_dir(
+    quarantine_dir: Path,
+    scanned_dirs: tuple[Path, ...],
+) -> Path:
+    """Resolve and create *quarantine_dir*; reject paths inside scanned preset dirs."""
+    resolved = quarantine_dir.expanduser().resolve()
+    if resolved.exists() and not resolved.is_dir():
+        raise ValueError(f"--quarantine target is not a directory: {resolved}")
+
+    try:
+        resolved.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise ValueError(f"cannot create quarantine directory {resolved}: {exc}") from exc
+
+    for scanned in scanned_dirs:
+        scanned_resolved = scanned.expanduser().resolve()
+        if _path_is_inside_or_equal(resolved, scanned_resolved):
+            raise ValueError(
+                "--quarantine directory must be outside the scanned presets directory"
+            )
+
+    return resolved
+
+
+def quarantine_presets(
+    results: list[PresetScanResult] | tuple[PresetScanResult, ...],
+    quarantine_dir: Path,
+) -> list[tuple[Path, Path]]:
+    """Move failed presets into *quarantine_dir* (flat layout, suffix on collision)."""
+    moves: list[tuple[Path, Path]] = []
+    for result in results:
+        if result.result not in QUARANTINE_CATEGORIES:
+            continue
+        src = result.path
+        if not src.is_file():
+            continue
+        dst = _unique_quarantine_path(quarantine_dir, src.name)
+        shutil.move(str(src), str(dst))
+        moves.append((src, dst))
+    return moves
+
+
+def scanned_preset_dirs(targets: ScanTargets) -> tuple[Path, ...]:
+    """Directories whose preset files are included in *targets*."""
+    dirs: set[Path] = set()
+    if targets.presets_dir is not None:
+        dirs.add(targets.presets_dir.resolve())
+    for paths in targets.layer_sources.values():
+        for path in paths:
+            if path.is_dir():
+                dirs.add(path.resolve())
+            else:
+                dirs.add(path.parent.resolve())
+    return tuple(sorted(dirs))
 
 
 def run_scan(
@@ -213,6 +371,8 @@ def run_scan(
     *,
     slow: bool = False,
     texture_paths: tuple[Path, ...] | None = None,
+    report_sink: Callable[[list[PresetScanResult], bool], None] | None = None,
+    skip_paths: frozenset[Path] | None = None,
 ) -> list[PresetScanResult]:
     """Probe each preset in *targets* with a hidden GL context and one ProjectM."""
     profile = probe_profile(slow=slow)
@@ -233,7 +393,11 @@ def run_scan(
     pm: ProjectM | None = None
     fbo: _ProbeFbo | None = None
     results: list[PresetScanResult] = []
+    skip = skip_paths or frozenset()
     total = len(targets.presets)
+    skip_count = len(skip)
+    probed = 0
+    resumed_announced = False
     try:
         pm = ProjectM()
         pm.set_window_size(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT)
@@ -247,6 +411,11 @@ def run_scan(
         frame_dt = 1.0 / PROBE_FPS
 
         for index, target in enumerate(targets.presets, start=1):
+            if target.path.resolve() in skip:
+                continue
+            if skip_count and not resumed_announced:
+                _progress(f"Resuming: {skip_count} done")
+                resumed_announced = True
             _progress(f"Scanning {index}/{total} {target.path}...")
             result = _probe_preset(
                 pm,
@@ -258,6 +427,16 @@ def run_scan(
                 frame_dt=frame_dt,
             )
             results.append(result)
+            probed += 1
+            if report_sink is not None and probed % REPORT_FLUSH_EVERY == 0:
+                report_sink(results, False)
+
+        if report_sink is not None:
+            report_sink(results, True)
+    except KeyboardInterrupt:
+        if report_sink is not None:
+            report_sink(results, False)
+        raise
     finally:
         if fbo is not None:
             fbo.destroy()
@@ -424,6 +603,74 @@ def _path_to_str(path: Path | None) -> str | None:
     if path is None:
         return None
     return str(path)
+
+
+def _path_is_inside_or_equal(child: Path, parent: Path) -> bool:
+    child_resolved = child.resolve()
+    parent_resolved = parent.resolve()
+    if child_resolved == parent_resolved:
+        return True
+    try:
+        child_resolved.relative_to(parent_resolved)
+    except ValueError:
+        return False
+    return True
+
+
+def _unique_quarantine_path(quarantine_dir: Path, filename: str) -> Path:
+    candidate = quarantine_dir / filename
+    if not candidate.exists():
+        return candidate
+    stem = Path(filename).stem
+    suffix = Path(filename).suffix
+    index = 1
+    while True:
+        candidate = quarantine_dir / f"{stem}_{index}{suffix}"
+        if not candidate.exists():
+            return candidate
+        index += 1
+
+
+def _preset_result_from_dict(entry: Any) -> PresetScanResult:
+    if not isinstance(entry, dict):
+        raise ValueError("expected a JSON object")
+
+    path_raw = entry.get("path")
+    if not isinstance(path_raw, str) or not path_raw:
+        raise ValueError("missing path")
+
+    result_raw = entry.get("result")
+    if result_raw not in ("load_failed", "black", "dim", "ok"):
+        raise ValueError("missing or invalid result")
+
+    layers_raw = entry.get("layers", [])
+    if not isinstance(layers_raw, list) or not all(
+        isinstance(layer, str) for layer in layers_raw
+    ):
+        raise ValueError("layers must be a string array")
+
+    error_raw = entry.get("error")
+    error = error_raw if isinstance(error_raw, str) else None
+
+    timings: PresetScanTimings | None = None
+    timings_raw = entry.get("timings")
+    if timings_raw is not None:
+        if not isinstance(timings_raw, dict):
+            raise ValueError("timings must be an object")
+        load_sec = timings_raw.get("load_sec")
+        render_sec = timings_raw.get("render_sec")
+        timings = PresetScanTimings(
+            load_sec=float(load_sec) if load_sec is not None else None,
+            render_sec=float(render_sec) if render_sec is not None else None,
+        )
+
+    return PresetScanResult(
+        path=Path(path_raw).resolve(),
+        result=result_raw,
+        layers=tuple(layers_raw),
+        error=error,
+        timings=timings,
+    )
 
 
 def _preset_result_to_dict(preset: PresetScanResult) -> dict[str, Any]:
