@@ -17,8 +17,11 @@ from cleave.cli import (
     cmd_play,
     cmd_render,
     cmd_restore,
+    cmd_scan,
     cmd_separate,
 )
+from cleave.preset_scan import PresetScanResult
+from cleave.preset_scan_targets import PresetTarget, ScanTargets
 from cleave.viz.render import RenderResult
 from cleave.extract import STEM_NAMES, stems_dir
 from cleave.project import write_manifest
@@ -598,6 +601,167 @@ def test_shortcut_flags() -> None:
     assert render_args.end is None
 
 
+def test_scan_parser_project_mode() -> None:
+    parser = build_parser()
+    args = parser.parse_args(["scan", "my-project", "-c", "cfg.yaml", "--slow"])
+    assert args.project_dir == "my-project"
+    assert args.config == Path("cfg.yaml")
+    assert args.slow
+    assert args.presets_dir is None
+    assert args.texture_path == []
+    assert args.report is None
+
+
+def test_scan_parser_bulk_mode() -> None:
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "scan",
+            "--presets-dir",
+            "/tmp/presets",
+            "--texture-path",
+            "/tmp/tex",
+            "--recursive",
+            "--report",
+            "out.json",
+        ]
+    )
+    assert args.project_dir is None
+    assert args.presets_dir == Path("/tmp/presets")
+    assert args.texture_path == [Path("/tmp/tex")]
+    assert args.recursive
+    assert args.report == Path("out.json")
+
+
+def test_cmd_scan_rejects_bulk_flags_in_project_mode(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+
+    with pytest.raises(SystemExit) as exc_info:
+        cmd_scan(
+            build_parser().parse_args(
+                ["scan", "my-project", "--texture-path", "/tmp/tex"]
+            )
+        )
+
+    assert exc_info.value.code == 1
+
+
+def test_cmd_scan_rejects_project_dir_with_bulk_mode(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+
+    with pytest.raises(SystemExit) as exc_info:
+        cmd_scan(
+            build_parser().parse_args(
+                [
+                    "scan",
+                    "my-project",
+                    "--presets-dir",
+                    "/tmp/presets",
+                    "--texture-path",
+                    "/tmp/tex",
+                ]
+            )
+        )
+
+    assert exc_info.value.code == 1
+
+
+def test_cmd_scan_bulk_without_texture_paths_errors(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    presets_dir = tmp_path / "presets"
+    presets_dir.mkdir()
+
+    with pytest.raises(SystemExit) as exc_info:
+        cmd_scan(
+            build_parser().parse_args(
+                ["scan", "--presets-dir", str(presets_dir)]
+            )
+        )
+
+    assert exc_info.value.code == 1
+    assert "texture" in capsys.readouterr().err.lower()
+
+
+def test_cmd_scan_project_mode_smoke(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = _complete_project(tmp_path)
+    (project / "cleave-viz.yaml").write_text(
+        (Path(__file__).resolve().parents[2] / "cleave-viz.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    preset_results = [
+        PresetScanResult(path=Path("/tmp/a.milk"), result="ok", layers=("layer_1",)),
+    ]
+    targets = ScanTargets(presets=())
+
+    report_path = tmp_path / "scan-report.json"
+    with (
+        patch("cleave.cli.build_project_targets", return_value=targets),
+        patch("cleave.cli.run_scan", return_value=preset_results),
+    ):
+        cmd_scan(
+            build_parser().parse_args(
+                ["scan", "my-track", "--report", str(report_path)]
+            )
+        )
+
+    err = capsys.readouterr().err
+    assert "Scan complete:" in err
+    assert "ok=1" in err
+    assert report_path.is_file()
+
+
+def test_cmd_scan_bulk_mode_smoke(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    presets_dir = tmp_path / "pack"
+    presets_dir.mkdir()
+    texture_dir = tmp_path / "textures"
+    texture_dir.mkdir()
+
+    preset_results = [
+        PresetScanResult(path=presets_dir / "a.milk", result="black", layers=()),
+    ]
+    targets = ScanTargets(
+        presets=(PresetTarget(path=presets_dir / "a.milk", layers=()),),
+        presets_dir=presets_dir,
+    )
+
+    with (
+        patch("cleave.cli.build_bulk_targets", return_value=targets),
+        patch("cleave.cli.run_scan", return_value=preset_results) as run_scan,
+    ):
+        cmd_scan(
+            build_parser().parse_args(
+                [
+                    "scan",
+                    "--presets-dir",
+                    str(presets_dir),
+                    "--texture-path",
+                    str(texture_dir),
+                    "--slow",
+                ]
+            )
+        )
+
+    run_scan.assert_called_once()
+    assert run_scan.call_args.kwargs["slow"] is True
+    assert run_scan.call_args.kwargs["texture_paths"] == (texture_dir.resolve(),)
+    err = capsys.readouterr().err
+    assert "black=1" in err
+
+
 def test_module_help_lists_subcommands() -> None:
     root = subprocess.run(
         [sys.executable, "-m", "cleave", "--help"],
@@ -610,6 +774,7 @@ def test_module_help_lists_subcommands() -> None:
     assert "analyse" not in out
     assert "play" in out
     assert "render" in out
+    assert "scan" in out
     assert "backup" in out
     assert "restore" in out
     assert out.startswith("usage: cleave [-h] <command> target")
@@ -641,3 +806,13 @@ def test_module_help_lists_subcommands() -> None:
     assert "--start SEC" in render.stdout
     assert "--end SEC" in render.stdout
     assert "-hq" in render.stdout
+
+    scan = subprocess.run(
+        [sys.executable, "-m", "cleave", "scan", "--help"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "--presets-dir" in scan.stdout
+    assert "--slow" in scan.stdout
+    assert "--report" in scan.stdout
