@@ -21,6 +21,7 @@ from cleave.viz.preset_switching import (
     EMPTY_ROTATION_NOTIFICATION,
     active_auto_preset_path,
     apply_preset_switching,
+    load_manual_preset_clean,
     reapply_projectm_preset_switching,
     reset_projectm_preset_timer,
     restart_projectm_preset_timer,
@@ -48,6 +49,41 @@ def _stem_layer(*, paths: tuple[Path, ...], index: int = 0) -> StemLayer:
     pm.set_preset_start_clean = MagicMock()
     pm.load_preset = MagicMock()
     return StemLayer(slot="layer_1", pm=pm, fbo=MagicMock(), playlist=playlist)
+
+
+def test_load_manual_preset_clean_forces_black_boot_then_restores() -> None:
+    layer = _stem_layer(paths=_MILK)
+    layer.playlist.load_into = MagicMock()
+
+    load_manual_preset_clean(layer, preset_start_clean=False)
+
+    assert layer.pm.set_preset_start_clean.call_args_list == [
+        call(True),
+        call(False),
+    ]
+    layer.playlist.load_into.assert_called_once_with(layer.pm, smooth=False)
+
+
+def test_load_manual_preset_clean_restores_configured_start_clean() -> None:
+    layer = _stem_layer(paths=_MILK)
+    layer.playlist.load_into = MagicMock()
+
+    load_manual_preset_clean(layer, preset_start_clean=True)
+
+    assert layer.pm.set_preset_start_clean.call_args_list == [
+        call(True),
+        call(True),
+    ]
+
+
+def test_load_manual_preset_clean_noop_without_preset() -> None:
+    layer = _stem_layer(paths=())
+    layer.playlist.load_into = MagicMock()
+
+    load_manual_preset_clean(layer)
+
+    layer.pm.set_preset_start_clean.assert_not_called()
+    layer.playlist.load_into.assert_not_called()
 
 
 def test_apply_none_locks_and_disables_hard_cuts() -> None:
