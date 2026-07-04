@@ -1,1 +1,0 @@
-Scan complete: 1007 preset(s); ok=780, dim=125, black=89, load_failed=13
