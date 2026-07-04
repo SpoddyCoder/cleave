@@ -90,7 +90,6 @@ Shared infrastructure with the projectM robustness work (switch-failed callbacks
 **v3 (optional)**
 
 - `--delete` with confirmation
-- Import report into a user-defined rotation blocklist
 - Optional project PCM clip instead of synthetic tone
 
 
