@@ -51,7 +51,8 @@ cleave scan --presets-dir <dir> --texture-path <dir> [--texture-path ...] [optio
 | `--report <path>` | JSON report path; written incrementally so a run can be resumed |
 | `--recursive` | Bulk mode only: scan subdirectories |
 | `--quarantine <dir>` | Move failed presets to DIR (v2); DIR must be a directory outside the scan set |
-| `--delete` | Remove failed presets (v3) |
+| `--delete` | Remove failed presets after the scan (v3); prompts unless `--yes` |
+| `--yes` | Skip confirmation for `--delete` (required when stdin is not a TTY) |
 | `--resume` | Skip presets already in the `--report` file (v2); requires `--report PATH` |
 
 Probe timing is a single profile (no separate `--frames` / `--warmup-sec` flags). Internal values TBD at implementation (e.g. quick ~15 frames / ~0.5 s warmup; slow ~60 frames / ~3 s warmup). Record `probe_mode`: `quick` | `slow` in the JSON report.
@@ -76,13 +77,28 @@ Bulk mode: require at least one texture path (`--texture-path` and/or from `-c`)
 
 ## Per-preset probe
 
-Same harness as [presets-check-proposal.md](presets-check-proposal.md#per-preset-behavior): hidden pygame GL context, one [ProjectM](../cleave/projectm.py), small FBO, synthetic PCM, luminance sample after warmup. Switch-failed callbacks from the projectM robustness work ([todos.md](todos.md)).
+Same harness as [presets-check-proposal.md](presets-check-proposal.md#per-preset-behavior): hidden pygame GL context, a fresh [ProjectM](../cleave/projectm.py) per preset (so feedback state from the previous preset cannot contaminate classification), shared small FBO, luminance sample after warmup. Switch-failed callbacks from the projectM robustness work ([todos.md](todos.md)). Fresh instances keep quick and slow results order-independent and avoid `--slow` false `black` hits from inherited feedback frames.
 
-**Quick (default):** short render + short warmup. Intended for iteration and smoke tests.
+Each post-warmup frame reads the full FBO (`glReadPixels` over the probe resolution). Per frame the probe records max luma, mean luma, and **coverage** (fraction of pixels with luma >= `coverage_luma_min`, default 16). Classification uses the peak max, peak mean, and peak coverage across all sampled frames.
 
-**`--slow`:** longer render + longer warmup. Better for presets that need time to develop and for fade-to-black cases; fewer false positives.
+**Quick (default):** short render + short warmup; feeds synthetic mono PCM. Intended for iteration and smoke tests.
+
+**`--slow`:** longer render + longer warmup; feeds stereo PCM from the bundled reference clip [assets/audio/scan-reference-10s.wav](../assets/audio/scan-reference-10s.wav) (10 s excerpt from `projects/sights-and-sounds-26/sights-and-sounds-26.wav` starting at 82 s). Better for presets that need time to develop and for fade-to-black cases; fewer false positives. Each preset probe resets the clip cursor so classification is deterministic.
 
 Result categories: `load_failed`, `black`, `dim`, `ok` (see proposal).
+
+### Classification thresholds
+
+Recorded in each report under `thresholds`:
+
+| Key | Default | Use |
+| --- | --- | --- |
+| `black_max_luma` | 1.0 | Peak max luma below this => `black` |
+| `black_coverage` | 0.0005 | Peak coverage below this => `black` |
+| `dim_coverage` | 0.01 | Peak coverage below this (but not black) => `dim` |
+| `coverage_luma_min` | 16.0 | Luma floor when counting covered pixels |
+
+Coverage replaces mean-luma dim detection so sparse bright content on a dark field (high peak max and coverage, low peak mean) classifies as `ok`. Each preset entry may include optional `luma: { max, mean, coverage }` with the peak values used for classification.
 
 ### Destructive actions
 
@@ -176,11 +192,11 @@ Does not use [layer_pipeline.py](../cleave/viz/layer_pipeline.py) or the composi
 - Stderr warning when `--quarantine` runs without `--slow`
 - Incremental + interrupt-safe report writes (see [v2 report and resume](#v2-report-and-resume))
 
-**v3 (optional)**
+**v3**
 
-- `--delete` with confirmation; same `--slow` warning as quarantine
-- Import report into rotation blocklist
-- Optional project PCM clip instead of synthetic tone
+- `--delete` with confirmation (`--yes` to skip prompt; required when stdin is not a TTY); same `--slow` warning as quarantine; mutually exclusive with `--quarantine`
+- Bundled stereo reference clip for `--slow` probes (`assets/audio/scan-reference-10s.wav`); quick mode stays synthetic mono
+- Report fields: `pcm_source`, `pcm_channels`, and `reference_clip_path` when slow
 
 ## Runtime expectations
 
@@ -188,12 +204,13 @@ Project scan: typically tens to low hundreds of presets (per-layer rotation dirs
 
 ## Open questions
 
-- Default black vs dim thresholds (tune per pack).
+- Tune coverage thresholds per pack (`black_coverage`, `dim_coverage`, `coverage_luma_min`).
 - Quarantine: preserve directory structure vs flat hashed names.
 - CI: headless GL unreliable; keep local/dev tool unless GPU runner exists.
 
 ## Related work
 
+- [presets-scan-learnings.md](presets-scan-learnings.md) — investigation arc and threshold tuning notes from live scan runs
 - [presets-check-proposal.md](presets-check-proposal.md) — problem statement and classification heuristics
 - [projectm-api-coverage.md](projectm-api-coverage.md) — libprojectM symbol audit and live failure handling
 - [preset-switching-proposal.md](legacy-plans/preset-switching-proposal.md) — live rotation design
