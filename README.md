@@ -93,6 +93,7 @@ This will separate the track into its component stem tracks (bass, drums, vocals
 * `play` accepts a source audio file or project slug/path
 * `separate` can be run on its own without launching the visualizer
 * `render` accepts a project slug or path (not a source audio file).
+* `scan` classifies Milkdrop presets for load failures and black/dim output (project config or bulk `--presets-dir`).
 * `backup` archives a full project directory (mix, stems, configs, renders) to a `.cleave-tar.gz` file.
 * `restore` unpacks a `.cleave-tar.gz` archive into `projects/<slug>/` (slug from `project.yaml`).
 

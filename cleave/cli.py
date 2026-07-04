@@ -4,8 +4,21 @@ import sys
 import time
 from pathlib import Path
 
-from cleave.config import VIZ_CONFIG_FILENAME, ensure_project_viz_config
+from cleave.config import (
+    VIZ_CONFIG_FILENAME,
+    ensure_project_viz_config,
+    find_config_path,
+    load_config,
+)
 from cleave.paths import resolve_project
+from cleave.preset_scan import (
+    build_scan_report,
+    probe_profile,
+    run_scan,
+    scan_report_summary,
+    write_scan_report,
+)
+from cleave.preset_scan_targets import ScanTargets, build_bulk_targets, build_project_targets
 from cleave.separate import (
     project_stems_complete,
     resolve_separate_target,
@@ -162,6 +175,124 @@ def cmd_backup(args: argparse.Namespace) -> None:
         _exit_error(f"error: {e}")
 
     print(f"Backed up to {archive_path}")
+
+
+def _dedupe_texture_paths(paths: list[Path]) -> tuple[Path, ...]:
+    seen: set[Path] = set()
+    ordered: list[Path] = []
+    for path in paths:
+        resolved = path.expanduser().resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        ordered.append(resolved)
+    return tuple(ordered)
+
+
+def _print_scan_summary(summary: dict[str, int]) -> None:
+    print(
+        "Scan complete: "
+        f"{summary['total']} preset(s); "
+        f"ok={summary['ok']}, dim={summary['dim']}, "
+        f"black={summary['black']}, load_failed={summary['load_failed']}",
+        file=sys.stderr,
+    )
+
+
+def cmd_scan(args: argparse.Namespace) -> None:
+    bulk_mode = args.presets_dir is not None
+
+    if bulk_mode:
+        if args.project_dir is not None:
+            _exit_error(
+                "error: --presets-dir cannot be used with a project directory"
+            )
+    else:
+        if args.project_dir is None:
+            _exit_error("error: project directory required (or use --presets-dir)")
+        if args.texture_path:
+            _exit_error("error: --texture-path is only valid in bulk scan mode")
+        if args.recursive:
+            _exit_error("error: --recursive is only valid in bulk scan mode")
+
+    profile = probe_profile(slow=args.slow)
+
+    if bulk_mode:
+        texture_paths = list(args.texture_path)
+        config_path: Path | None = None
+        if args.config is not None:
+            config_path = args.config.expanduser().resolve()
+            cfg = load_config(config_path, None)
+            texture_paths.extend(cfg.paths.texture_paths)
+        resolved_textures = _dedupe_texture_paths(texture_paths)
+        if not resolved_textures:
+            _exit_error(
+                "error: bulk scan requires at least one --texture-path "
+                "or paths.texture_paths in -c config"
+            )
+
+        presets_dir = args.presets_dir.expanduser().resolve()
+        if not presets_dir.is_dir():
+            _exit_error(f"error: presets directory not found: {presets_dir}")
+
+        targets = build_bulk_targets(presets_dir, recursive=args.recursive)
+        try:
+            results = run_scan(
+                targets,
+                slow=args.slow,
+                texture_paths=resolved_textures,
+            )
+        except (FileNotFoundError, ValueError, RuntimeError) as e:
+            _exit_error(f"error: {e}")
+
+        report = build_scan_report(
+            scan_mode="bulk",
+            profile=profile,
+            targets=ScanTargets(
+                presets=targets.presets,
+                presets_dir=targets.presets_dir,
+                texture_paths=resolved_textures,
+            ),
+            results=results,
+            config_path=config_path,
+        )
+    else:
+        try:
+            project_dir = resolve_project(Path(args.project_dir))
+        except (FileNotFoundError, ValueError) as e:
+            _exit_error(f"error: {e}")
+
+        config_path = find_config_path(args.config, project_dir)
+        if config_path is None:
+            _exit_error(f"error: no {VIZ_CONFIG_FILENAME} found for project")
+
+        try:
+            cfg = load_config(args.config, project_dir)
+        except (FileNotFoundError, ValueError) as e:
+            _exit_error(f"error: {e}")
+
+        targets = build_project_targets(cfg)
+        try:
+            results = run_scan(targets, slow=args.slow)
+        except (FileNotFoundError, ValueError, RuntimeError) as e:
+            _exit_error(f"error: {e}")
+
+        report = build_scan_report(
+            scan_mode="project",
+            profile=profile,
+            targets=targets,
+            results=results,
+            project_dir=project_dir,
+            config_path=config_path,
+        )
+
+    summary = scan_report_summary(report)
+    _print_scan_summary(summary)
+
+    if args.report is not None:
+        report_path = args.report.expanduser()
+        write_scan_report(report_path, report)
+        print(f"Wrote scan report to {report_path.resolve()}")
 
 
 def cmd_restore(args: argparse.Namespace) -> None:
@@ -334,6 +465,53 @@ def build_parser() -> argparse.ArgumentParser:
         help="Replace existing project without prompting",
     )
     restore.set_defaults(func=cmd_restore)
+
+    scan = subparsers.add_parser(
+        "scan",
+        prog="cleave scan",
+        help="Scan Milkdrop presets for load failures and black output",
+    )
+    scan.add_argument(
+        "project_dir",
+        nargs="?",
+        help=_PROJECT_DIR_HELP,
+    )
+    scan.add_argument(
+        "-c",
+        "--config",
+        type=Path,
+        help=f"Config path (default: <project>/{VIZ_CONFIG_FILENAME})",
+    )
+    scan.add_argument(
+        "--presets-dir",
+        type=Path,
+        help="Bulk mode: directory of .milk presets (mutually exclusive with project)",
+    )
+    scan.add_argument(
+        "--texture-path",
+        action="append",
+        type=Path,
+        default=[],
+        metavar="DIR",
+        help="Bulk mode: texture search path (repeatable; required unless -c supplies paths)",
+    )
+    scan.add_argument(
+        "--recursive",
+        action="store_true",
+        help="Bulk mode: scan subdirectories for .milk files",
+    )
+    scan.add_argument(
+        "--slow",
+        action="store_true",
+        help="Longer probe warmup and render before luminance sample",
+    )
+    scan.add_argument(
+        "--report",
+        type=Path,
+        metavar="PATH",
+        help="Write JSON scan report to PATH",
+    )
+    scan.set_defaults(func=cmd_scan)
 
     return parser
 

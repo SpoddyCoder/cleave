@@ -2,7 +2,7 @@
 
 Implementation plan for `cleave scan`: offline batch classification of Milkdrop presets (load failures, black output). Background and heuristics live in [presets-check-proposal.md](presets-check-proposal.md).
 
-**Status:** Planned. Not implemented.
+**Status:** v1 implemented (`cleave scan` project and bulk modes, quick/`--slow` probes, JSON report).
 
 ## Goals
 
