@@ -170,7 +170,7 @@ def test_load_golden_set_validates_case_count(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match="must contain 30 cases"):
+    with pytest.raises(ValueError, match="must contain 50 cases"):
         load_golden_set(yaml_path)
 
 
@@ -410,10 +410,15 @@ def test_golden_case_2_visualizer_scan_disparity() -> None:
 
     golden = load_golden_set(FIXTURE_PATH)
     cache = load_metrics_cache(DEFAULT_METRICS_CACHE_PATH)
-    report = evaluate(cache, golden)
-
     case_2 = next(case for case in golden.cases if case.id == GOLDEN_CASE_2_ID)
     assert case_2.expected_result == "black"
+    mini = GoldenSet(
+        version=golden.version,
+        preset_root=golden.preset_root,
+        texture_paths=golden.texture_paths,
+        cases=(case_2,),
+    )
+    report = evaluate(cache, mini)
 
     mismatch = next(
         (entry for entry in report.mismatches if entry.id == GOLDEN_CASE_2_ID),

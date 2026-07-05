@@ -41,7 +41,7 @@ from cleave.preset_scan_metrics import (
 from cleave.projectm import PresetLoadFailure, ProjectM
 from cleave.stem_pcm import samples_per_frame
 
-GOLDEN_CASE_COUNT = 30
+GOLDEN_CASE_COUNT = 50
 GoldenExpectedResult = Literal["ok", "dim", "black", "washed_out"]
 
 DEFAULT_GOLDEN_SET_PATH = (
