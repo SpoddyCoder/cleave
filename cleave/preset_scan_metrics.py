@@ -15,8 +15,9 @@ import numpy as np
 from OpenGL.GL import GL_RGBA, GL_UNSIGNED_BYTE, glReadPixels
 
 LUMA_COVERAGE_CUTOFFS: tuple[int, ...] = (8, 16, 32, 64, 128, 192)
-METRICS_CACHE_VERSION = 2
-SUPPORTED_METRICS_CACHE_VERSIONS: frozenset[int] = frozenset((1, 2))
+WHITE_COVERAGE_CUTOFFS: tuple[int, ...] = (224, 235, 245)
+METRICS_CACHE_VERSION = 3
+SUPPORTED_METRICS_CACHE_VERSIONS: frozenset[int] = frozenset((3,))
 
 _LUMA_R = 0.2126
 _LUMA_G = 0.7152
@@ -28,6 +29,7 @@ class FrameMetrics:
     max_luma: float
     mean_luma: float
     coverage: dict[int, float]
+    white_coverage: dict[int, float]
 
 
 @dataclass(frozen=True)
@@ -56,6 +58,7 @@ def empty_frame_metrics() -> FrameMetrics:
         max_luma=0.0,
         mean_luma=0.0,
         coverage={cutoff: 0.0 for cutoff in LUMA_COVERAGE_CUTOFFS},
+        white_coverage={cutoff: 0.0 for cutoff in WHITE_COVERAGE_CUTOFFS},
     )
 
 
@@ -66,13 +69,18 @@ def sample_frame_metrics(width: int, height: int) -> FrameMetrics:
     g = rgba[..., 1].astype(np.float32)
     b = rgba[..., 2].astype(np.float32)
     luma = _LUMA_R * r + _LUMA_G * g + _LUMA_B * b
+    white = np.minimum(np.minimum(r, g), b)
     coverage = {
         cutoff: float((luma >= cutoff).mean()) for cutoff in LUMA_COVERAGE_CUTOFFS
+    }
+    white_coverage = {
+        cutoff: float((white >= cutoff).mean()) for cutoff in WHITE_COVERAGE_CUTOFFS
     }
     return FrameMetrics(
         max_luma=float(luma.max()),
         mean_luma=float(luma.mean()),
         coverage=coverage,
+        white_coverage=white_coverage,
     )
 
 
@@ -100,7 +108,38 @@ def peak_metrics(
             cutoff: max(frame.coverage[cutoff] for frame in window)
             for cutoff in LUMA_COVERAGE_CUTOFFS
         },
+        white_coverage={
+            cutoff: max(frame.white_coverage[cutoff] for frame in window)
+            for cutoff in WHITE_COVERAGE_CUTOFFS
+        },
     )
+
+
+def white_frame_fraction(
+    frames: list[FrameMetrics] | tuple[FrameMetrics, ...],
+    *,
+    warmup_frames: int,
+    window_frames: int,
+    channel_min_cutoff: int,
+    area_frac: float,
+) -> float:
+    if not frames:
+        return 0.0
+
+    start = max(0, warmup_frames)
+    if window_frames <= 0:
+        window = frames[start:]
+    else:
+        window = frames[start : start + window_frames]
+    if not window:
+        return 0.0
+
+    white_count = sum(
+        1
+        for frame in window
+        if frame.white_coverage[channel_min_cutoff] >= area_frac
+    )
+    return white_count / len(window)
 
 
 def frame_metrics_to_dict(metrics: FrameMetrics) -> dict[str, Any]:
@@ -108,6 +147,10 @@ def frame_metrics_to_dict(metrics: FrameMetrics) -> dict[str, Any]:
         "max_luma": metrics.max_luma,
         "mean_luma": metrics.mean_luma,
         "coverage": {str(cutoff): metrics.coverage[cutoff] for cutoff in LUMA_COVERAGE_CUTOFFS},
+        "white_coverage": {
+            str(cutoff): metrics.white_coverage[cutoff]
+            for cutoff in WHITE_COVERAGE_CUTOFFS
+        },
     }
 
 
@@ -131,10 +174,22 @@ def frame_metrics_from_dict(data: Any) -> FrameMetrics:
             raise ValueError(f"frame metrics missing coverage for cutoff {cutoff}")
         coverage[cutoff] = float(value)
 
+    white_coverage_raw = data.get("white_coverage")
+    if not isinstance(white_coverage_raw, dict):
+        raise ValueError("frame metrics missing white_coverage object")
+
+    white_coverage: dict[int, float] = {}
+    for cutoff in WHITE_COVERAGE_CUTOFFS:
+        value = white_coverage_raw.get(str(cutoff), white_coverage_raw.get(cutoff))
+        if not isinstance(value, (int, float)):
+            raise ValueError(f"frame metrics missing white_coverage for cutoff {cutoff}")
+        white_coverage[cutoff] = float(value)
+
     return FrameMetrics(
         max_luma=float(max_luma),
         mean_luma=float(mean_luma),
         coverage=coverage,
+        white_coverage=white_coverage,
     )
 
 
@@ -225,6 +280,12 @@ def metrics_cache_from_dict(data: Any) -> MetricsCache:
 
     version = data.get("version")
     if version not in SUPPORTED_METRICS_CACHE_VERSIONS:
+        if version == 2:
+            raise ValueError(
+                f"metrics cache version {version} is stale (current is "
+                f"{METRICS_CACHE_VERSION}); regenerate with "
+                "cleave scan-golden --probe or cleave scan-golden --probe --slow"
+            )
         raise ValueError(f"unsupported metrics cache version: {version!r}")
 
     probe_fps = data.get("probe_fps")
