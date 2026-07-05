@@ -359,7 +359,7 @@ GOLDEN_KNOWN_MISMATCH_IDS = frozenset({2})
 def test_golden_metrics_cache_accuracy() -> None:
     """Regression against committed slow-probe metrics cache."""
     if not DEFAULT_METRICS_CACHE_PATH.is_file():
-        pytest.skip("metrics cache not generated; run: cleave scan-golden --probe")
+        pytest.skip("metrics cache not generated; run: cleave scan-golden --probe --slow")
 
     golden = load_golden_set(FIXTURE_PATH)
     cache = load_metrics_cache(DEFAULT_METRICS_CACHE_PATH)

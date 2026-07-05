@@ -87,7 +87,7 @@ Explored but not re-adopted without a labeled test set:
 
 - Use live manual browse (clean boot) to build a labeled test set before trusting scan quarantine.
 - Run `--slow` before quarantine or delete once the classifier is reworked; quick mode is for triage only.
-- Golden-set metrics cache uses the slow profile (90 warmup + 60 window frames); probe with `cleave scan-golden --probe --slow` and one fresh `ProjectM` per preset.
+- Golden-set metrics cache uses the slow profile (90 warmup + 60 window frames); regenerate with `cleave scan-golden --probe --slow` (one fresh `ProjectM` per preset).
 - When reviewing borderline presets, read per-entry `luma` in the JSON report once the harness emits it (not in v1/v2 reports today).
 - Do not treat current scan JSON as ground truth for bulk moves.
 
