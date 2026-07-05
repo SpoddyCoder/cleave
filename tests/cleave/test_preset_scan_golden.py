@@ -147,11 +147,11 @@ def test_load_golden_set_parses_fixture() -> None:
     golden = load_golden_set(FIXTURE_PATH)
 
     assert golden.version == 1
-    assert golden.preset_root == Path("~/milkdrop-presets").expanduser().resolve()
+    assert golden.preset_root == (repo_root() / "assets" / "milkdrop-presets").resolve()
     assert len(golden.texture_paths) == 1
     assert golden.texture_paths[0] == (
-        Path("~/milkdrop-presets/presets-milkdrop-texture-pack").expanduser().resolve()
-    )
+        repo_root() / "assets" / "milkdrop-presets" / "presets-milkdrop-texture-pack"
+    ).resolve()
     assert len(golden.cases) == GOLDEN_CASE_COUNT
     assert golden.cases[0].id == 1
     assert golden.cases[-1].id == GOLDEN_CASE_COUNT

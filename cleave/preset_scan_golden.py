@@ -110,6 +110,24 @@ class SweepResult:
     accuracy: float
 
 
+def _resolve_golden_path(raw: str) -> Path:
+    """Resolve a golden-set path (repo-relative, absolute, or ``~``)."""
+    path = Path(raw).expanduser()
+    if path.is_absolute():
+        return path.resolve()
+    return (repo_root() / path).resolve()
+
+
+def _golden_preset_key(path: Path) -> str:
+    """Stable lookup key for a preset across different preset_root locations."""
+    normalized = path.expanduser().resolve().as_posix()
+    marker = "presets-milkdrop-original/"
+    idx = normalized.find(marker)
+    if idx != -1:
+        return normalized[idx:]
+    return path.name
+
+
 def load_golden_set(path: Path | None = None) -> GoldenSet:
     """Load and validate the golden-set YAML fixture."""
     resolved = (path or DEFAULT_GOLDEN_SET_PATH).expanduser().resolve()
@@ -133,13 +151,13 @@ def load_golden_set(path: Path | None = None) -> GoldenSet:
     preset_root_raw = raw.get("preset_root")
     if not isinstance(preset_root_raw, str) or not preset_root_raw:
         raise ValueError("golden set missing preset_root")
-    preset_root = Path(preset_root_raw).expanduser().resolve()
+    preset_root = _resolve_golden_path(preset_root_raw)
 
     texture_paths_raw = raw.get("texture_paths")
     if not isinstance(texture_paths_raw, list) or not texture_paths_raw:
         raise ValueError("golden set missing texture_paths")
     texture_paths = tuple(
-        Path(entry).expanduser().resolve()
+        _resolve_golden_path(entry)
         for entry in texture_paths_raw
         if isinstance(entry, str) and entry
     )
@@ -377,7 +395,7 @@ def evaluate(
         strict=strict_profile,
         file=file,
     )
-    metrics_by_path = {entry.path.resolve(): entry for entry in cache.presets}
+    metrics_by_key = {_golden_preset_key(entry.path): entry for entry in cache.presets}
     mismatches: list[EvalMismatch] = []
     per_category_totals: dict[GoldenExpectedResult, int] = {
         label: 0 for label in _VALID_EXPECTED
@@ -392,7 +410,7 @@ def evaluate(
 
     correct = 0
     for case in golden.cases:
-        preset_metrics = metrics_by_path.get(case.preset.resolve())
+        preset_metrics = metrics_by_key.get(_golden_preset_key(case.preset))
         if preset_metrics is None:
             raise ValueError(
                 f"metrics cache missing preset for case {case.id}: {case.preset}"
