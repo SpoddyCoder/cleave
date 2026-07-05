@@ -1,10 +1,10 @@
 # Preset scan golden set
 
-Manual classifier labels for tuning `cleave scan`. Source: layer 1 preset comments in [projects/sights-and-sounds-26/](../projects/sights-and-sounds-26/) `unnamed-1.yaml` through `unnamed-30.yaml`, reviewed with clean manual preset boot.
+Manual labels for tuning `cleave scan`. Source: layer 1 preset in [projects/sights-and-sounds-26/](../projects/sights-and-sounds-26/) `unnamed-1.yaml` through `unnamed-30.yaml`, reviewed in the live visualizer with clean manual preset boot.
 
 Machine-readable fixture: [tests/fixtures/preset_scan_golden_set.yaml](../tests/fixtures/preset_scan_golden_set.yaml).
 
-Metrics cache (slow probe, reference audio): [tests/fixtures/preset_scan_golden_metrics.json](../tests/fixtures/preset_scan_golden_metrics.json).
+Committed metrics cache (quick probe): [tests/fixtures/preset_scan_golden_metrics.json](../tests/fixtures/preset_scan_golden_metrics.json).
 
 ## Review context
 
@@ -36,22 +36,27 @@ Shipped scan categories map as: `ok` -> `ok`; `dim` -> `dim`; `black` and `load_
 
 **Quarantine targets:** 9 (`dim` 3, `black` 3, `washed_out` 3).
 
-## Known eval mismatch (slow probe)
+## Visualizer vs scan (case 2)
 
-Golden eval targets **29/30** accuracy. One case is an accepted mismatch under the reference-audio slow probe:
+Golden case 2 (Aderrasi - Airhandler) is an accepted **eval disparity**, not a mis-label:
 
-| ID | Preset | Expected | Slow-probe actual | Notes |
-| --- | --- | --- | --- | --- |
-| 2 | Aderrasi - Airhandler (Principle of Sharing).milk | `black` | `washed_out` | Live clean boot shows a broken preset (stays black). Reference-audio slow probe produces extreme white metrics (max 255, mean 227). Classifier labels `washed_out`, not `black`. |
+| Source | Label | Notes |
+| --- | --- | --- |
+| Live visualizer | `black` | Clean boot; stays black (verified at reference-clip offset ~82 s) |
+| Scan probe | `washed_out` | Quick and slow profiles both drive extreme white metrics |
 
-Unit test: [tests/cleave/test_preset_scan_golden.py](../tests/cleave/test_preset_scan_golden.py) (`GOLDEN_MIN_ACCURACY = 29`, `GOLDEN_KNOWN_MISMATCH_IDS = {2}`).
+Both labels describe the same non-working preset. The visualizer label is ground truth for appearance; scan still **quarantines** it (`washed_out` is a quarantine category), but **scan classification cannot be trusted** for this preset.
+
+Root cause is not understood. See [todos.md](todos.md).
+
+Unit test: [tests/cleave/test_preset_scan_golden.py](../tests/cleave/test_preset_scan_golden.py) (`test_golden_case_2_visualizer_scan_disparity`).
 
 ## Cases
 
 | ID | Preset | Expected | Notes |
 | --- | --- | --- | --- |
 | 1 | BrainStain-Blackwidow.milk | `dim` | Working, but too dim |
-| 2 | Aderrasi - Airhandler (Principle of Sharing).milk | `black` | Not working (see known mismatch above) |
+| 2 | Aderrasi - Airhandler (Principle of Sharing).milk | `black` | Not working (see visualizer vs scan above) |
 | 3 | BrainStain-re entry.milk | `ok` | May appear dim but clearly working |
 | 4 | Eo.S. + Phat - chasers 11 sentinel C_poltergeist_mix response daemon.milk | `ok` | May appear dim but clearly working |
 | 5 | Eo.S. - angels of decay.milk | `washed_out` | Highly washed out to white |
@@ -85,26 +90,24 @@ Unit test: [tests/cleave/test_preset_scan_golden.py](../tests/cleave/test_preset
 
 1. Load [tests/fixtures/preset_scan_golden_set.yaml](../tests/fixtures/preset_scan_golden_set.yaml).
 2. Probe all 30 cases with clean boot and full-frame metrics.
-3. Compare classifier output to `expected_result`; report mismatches and accuracy per category.
-4. Tune thresholds in [cleave/preset_scan.py](../cleave/preset_scan.py) until eval passes (29/30 with case 2 accepted); spot-check on a larger pack.
+3. Compare classifier output to `expected_result` (`cleave scan-golden --eval`).
 
-**Probe profile:** slow cache uses 90 warmup + 60 window frames at 30 fps (150 frames total), stereo reference clip ([assets/audio/scan-reference-10s.wav](../assets/audio/scan-reference-10s.wav)). Golden harness uses a fresh `ProjectM` per preset.
+**Committed cache profile:** quick (15 warmup + 75 window frames at 30 fps, synthetic mono PCM). Regenerate with `cleave scan-golden --probe`. Use `--slow` for the reference-audio profile before bulk quarantine.
 
 **Commands:**
 
 ```bash
-# Regenerate committed slow cache (needs GL)
-cleave scan-golden --probe --slow
+# Regenerate committed cache (needs GL; quick profile unless --slow)
+cleave scan-golden --probe
 
-# Evaluate classifier against labels (GL-free)
+# Evaluate classifier against visualizer labels (GL-free)
 cleave scan-golden --eval
 
 # Grid search warmup/window (GL-free)
 cleave scan-golden --sweep
 ```
 
-- **Probe:** `cleave scan-golden --probe` without `--slow` uses the quick profile; warns when overwriting the committed slow cache.
-- **Eval:** `cleave scan-golden --eval` reads warmup/window from the cache automatically; mismatched `--warmup` / `--window` flags error.
-- **Legacy v1 caches:** eval infers profile from frame count (90=quick, 150=slow) with a stderr warning.
+- **Probe:** `--probe` without `--slow` overwrites the quick cache; `--probe --slow` writes the slow profile instead.
+- **Eval:** reads warmup/window from cache metadata; mismatched `--warmup` / `--window` flags error.
 
 See [presets-scan-plan.md](presets-scan-plan.md) and [presets-scan-learnings.md](presets-scan-learnings.md).

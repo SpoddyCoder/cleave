@@ -5,7 +5,7 @@
 #   ok        - pass; do not quarantine
 #   dim       - quarantine; preset runs but output is too dim
 #   black     - quarantine; preset does not develop (black / broken)
-#   washed_out - quarantine; extreme white blowout (future classifier case)
+#   washed_out - quarantine; extreme white blowout
 #
 # Harness should resolve preset paths against preset_root and apply texture_paths.
 
@@ -25,7 +25,7 @@ cases:
     source_config: unnamed-2.yaml
     preset: presets-milkdrop-original/Milkdrop-Original/Aderrasi - Airhandler (Principle of Sharing).milk
     expected_result: black
-    notes: Not working.
+    notes: Not working in visualizer. Scan classifies washed_out (accepted eval disparity).
 
   - id: 3
     source_config: unnamed-3.yaml

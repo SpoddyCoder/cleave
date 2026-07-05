@@ -196,6 +196,7 @@ Project scan: typically tens to low hundreds of presets (per-layer rotation dirs
 
 ## Open questions
 
+- Golden case 2 visualizer vs scan disparity (see [todos.md](todos.md)).
 - Final coverage and mean thresholds per pack beyond the golden set.
 - Quarantine: preserve directory structure vs flat hashed names.
 - CI: headless GL unreliable; keep local/dev tool unless GPU runner exists.
