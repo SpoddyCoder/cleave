@@ -16,6 +16,10 @@ from cleave.preset_scan import (
     BRIGHT_ON_BLACK_COVERAGE,
     BRIGHT_ON_BLACK_MAX,
     COVERAGE_LUMA_MIN,
+    CAPPED_DIM_COV16,
+    CAPPED_DIM_MAX_HI,
+    CAPPED_DIM_MAX_LO,
+    CAPPED_DIM_MEAN,
     DIM_COVERAGE,
     DIM_MEAN_LUMA,
     PROBE_FBO_HEIGHT,
@@ -34,7 +38,11 @@ from cleave.preset_scan import (
     WASHED_COVERAGE_CUTOFF,
     WASHED_COVERAGE_HIGH,
     WASHED_COVERAGE_MODERATE,
+    WASHED_COV192_BROAD_MIN,
     WASHED_COV192_CAP,
+    WASHED_COV128_MIN,
+    WASHED_COV16_MIN,
+    WASHED_MEAN_BROAD,
     WASHED_MEAN_HIGH,
     WASHED_MEAN_MID,
     WASHED_MEAN_MODERATE,
@@ -61,10 +69,12 @@ from cleave.projectm import PresetLoadFailure
 def _coverage_at(
     *,
     cutoff_16: float = 0.0,
+    cutoff_128: float = 0.0,
     cutoff_192: float = 0.0,
 ) -> dict[int, float]:
     coverage = {cutoff: 0.0 for cutoff in LUMA_COVERAGE_CUTOFFS}
     coverage[COVERAGE_LUMA_MIN] = cutoff_16
+    coverage[128] = cutoff_128
     coverage[WASHED_COVERAGE_CUTOFF] = cutoff_192
     return coverage
 
@@ -74,12 +84,17 @@ def _peaks(
     max_luma: float,
     mean_luma: float,
     cutoff_16: float = 0.0,
+    cutoff_128: float = 0.0,
     cutoff_192: float = 0.0,
 ) -> FrameMetrics:
     return FrameMetrics(
         max_luma=max_luma,
         mean_luma=mean_luma,
-        coverage=_coverage_at(cutoff_16=cutoff_16, cutoff_192=cutoff_192),
+        coverage=_coverage_at(
+            cutoff_16=cutoff_16,
+            cutoff_128=cutoff_128,
+            cutoff_192=cutoff_192,
+        ),
     )
 
 
@@ -255,6 +270,65 @@ def test_classify_preset_result_moderate_wash_boundary_ok() -> None:
         ),
     )
     assert result == "ok"
+    assert error is None
+
+
+def test_classify_preset_result_washed_out_broad() -> None:
+    """High cov128 with moderate cov192 blowout (golden case 5)."""
+    result, error = classify_preset_result(
+        [],
+        _peaks(
+            max_luma=255.0,
+            mean_luma=WASHED_MEAN_BROAD + 7.4,
+            cutoff_16=WASHED_COV16_MIN,
+            cutoff_128=WASHED_COV128_MIN,
+            cutoff_192=WASHED_COV192_BROAD_MIN + 0.07,
+        ),
+    )
+    assert result == "washed_out"
+    assert error is None
+
+
+def test_classify_preset_result_broad_wash_boundary_ok() -> None:
+    """Partial cov128 saturation stays ok below broad wash thresholds."""
+    result, error = classify_preset_result(
+        [],
+        _peaks(
+            max_luma=255.0,
+            mean_luma=WASHED_MEAN_BROAD + 4.9,
+            cutoff_16=WASHED_COV16_MIN,
+            cutoff_128=WASHED_COV128_MIN - 0.13,
+            cutoff_192=WASHED_COV192_BROAD_MIN + 0.17,
+        ),
+    )
+    assert result == "ok"
+    assert error is None
+
+
+def test_classify_preset_result_capped_dim_max_hi_boundary_ok() -> None:
+    """Healthy mid-max presets stay ok above capped dim max (golden case 7)."""
+    result, error = classify_preset_result(
+        [],
+        _peaks(
+            max_luma=CAPPED_DIM_MAX_HI + 3.3,
+            mean_luma=DIM_MEAN_LUMA - 0.6,
+            cutoff_16=CAPPED_DIM_COV16 + 0.0172,
+        ),
+    )
+    assert result == "ok"
+    assert error is None
+
+
+def test_classify_preset_result_capped_dim_below_max_hi() -> None:
+    result, error = classify_preset_result(
+        [],
+        _peaks(
+            max_luma=CAPPED_DIM_MAX_HI - 3.4,
+            mean_luma=CAPPED_DIM_MEAN - 1.1,
+            cutoff_16=CAPPED_DIM_COV16 + 0.6342,
+        ),
+    )
+    assert result == "dim"
     assert error is None
 
 
