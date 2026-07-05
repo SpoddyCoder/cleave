@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import os
 import sys
 from dataclasses import dataclass
@@ -46,6 +47,12 @@ from cleave.stem_pcm import samples_per_frame
 
 GOLDEN_CASE_COUNT = 50
 GoldenExpectedResult = Literal["ok", "dim", "black", "washed_out"]
+
+# Threshold values at or above this sentinel disable optional quick washed-out tiers.
+SWEEP_RULE_DISABLED = 999.0
+
+DEFAULT_SWEEP_WARMUP_FRAMES = (10, 12, 15, 18, 20)
+DEFAULT_SWEEP_WINDOW_FRAMES = (60, 70, 75)
 
 DEFAULT_GOLDEN_SET_PATH = (
     repo_root() / "tests" / "fixtures" / "preset_scan_golden_set.yaml"
@@ -465,21 +472,178 @@ def evaluate(
     )
 
 
+def _threshold_variant_key(thresholds: dict[str, float] | None) -> tuple[tuple[str, float], ...] | None:
+    if thresholds is None:
+        return None
+    return tuple(sorted(thresholds.items()))
+
+
+def _merge_threshold_variants(
+    *grids: tuple[dict[str, float] | None, ...],
+) -> tuple[dict[str, float] | None, ...]:
+    merged: list[dict[str, float] | None] = []
+    seen: set[tuple[tuple[str, float], ...] | None] = set()
+    for grid in grids:
+        for entry in grid:
+            key = _threshold_variant_key(entry)
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(entry)
+    return tuple(merged)
+
+
+def _threshold_grid(
+    base: dict[str, float],
+    axes: dict[str, tuple[float, ...]],
+) -> tuple[dict[str, float], ...]:
+    if not axes:
+        return ()
+    keys = tuple(axes.keys())
+    combos = itertools.product(*(axes[key] for key in keys))
+    return tuple(
+        {
+            **base,
+            **dict(zip(keys, combo)),
+        }
+        for combo in combos
+    )
+
+
+def _quick_luma_washed_disabled_overrides() -> dict[str, float]:
+    """Disable quick-only luma washed-out tiers; hard/soft white rules stay active."""
+    return {
+        "washed_mean_soft": SWEEP_RULE_DISABLED,
+        "min_white_frame_frac_soft": SWEEP_RULE_DISABLED,
+        "washed_mean_peak": SWEEP_RULE_DISABLED,
+        "washed_max_lo": SWEEP_RULE_DISABLED,
+        "washed_max_mid": SWEEP_RULE_DISABLED,
+    }
+
+
+def _hard_white_threshold_grid(base: dict[str, float]) -> tuple[dict[str, float], ...]:
+    return _threshold_grid(
+        base,
+        {
+            "white_channel_min": (224.0, 235.0, 245.0),
+            "white_area_frac": (0.5, 0.55, 0.6, 0.65, 0.7),
+            "min_white_frame_frac": (0.2, 0.25, 0.3, 0.35, 0.4),
+        },
+    )
+
+
 def default_threshold_sweep_variants(
     probe_mode: ProbeMode,
 ) -> tuple[dict[str, float] | None, ...]:
-    """Default grid of white-detector knob overrides for sweep."""
+    """Default threshold grids for golden sweep (GL-free; uses cached frame metrics)."""
     base = scan_thresholds(probe_mode)
-    variants: list[dict[str, float] | None] = [None]
-    for channel_min in (224.0, 235.0, 245.0):
-        for area_frac in (0.5, 0.6, 0.7):
-            for min_frac in (0.2, 0.3, 0.4):
-                override = dict(base)
-                override["white_channel_min"] = channel_min
-                override["white_area_frac"] = area_frac
-                override["min_white_frame_frac"] = min_frac
-                variants.append(override)
-    return tuple(variants)
+    grids: list[tuple[dict[str, float] | None, ...]] = [(None,)]
+
+    grids.append(_hard_white_threshold_grid(base))
+
+    if probe_mode == "quick":
+        luma_off = _quick_luma_washed_disabled_overrides()
+        grids.append(
+            _threshold_grid(
+                {**base, **luma_off},
+                {
+                    "white_channel_min": (224.0, 235.0, 245.0),
+                    "white_area_frac": (0.5, 0.6, 0.7),
+                    "min_white_frame_frac": (0.2, 0.3, 0.4),
+                },
+            )
+        )
+        grids.append(
+            _threshold_grid(
+                base,
+                {
+                    "white_area_frac_soft": (0.10, 0.15, 0.20),
+                    "min_white_frame_frac_soft": (0.40, 0.55, 0.70),
+                    "washed_mean_soft": (180.0, 200.0, 220.0, SWEEP_RULE_DISABLED),
+                },
+            )
+        )
+        grids.append(
+            _threshold_grid(
+                base,
+                {
+                    "washed_mean_peak": (235.0, 245.0, SWEEP_RULE_DISABLED),
+                    "washed_cov192_peak": (0.90, 0.95, 0.99),
+                },
+            )
+        )
+        grids.append(
+            _threshold_grid(
+                base,
+                {
+                    "washed_max_lo": (235.0, 240.0, SWEEP_RULE_DISABLED),
+                    "washed_mean_lo": (150.0, 155.0, 160.0),
+                    "washed_mean_hi": (170.0, 175.0, 180.0),
+                    "washed_cov192_lo": (0.05, 0.10, 0.15, 0.20),
+                },
+            )
+        )
+        grids.append(
+            _threshold_grid(
+                base,
+                {
+                    "washed_max_mid": (235.0, 240.0, SWEEP_RULE_DISABLED),
+                    "washed_mean_mid_lo": (170.0, 176.0, 182.0),
+                    "washed_mean_mid_hi": (188.0, 192.0, 196.0),
+                    "washed_cov192_mid": (0.25, 0.30, 0.40),
+                    "washed_white235_mid_max": (0.10, 0.20, 0.35),
+                },
+            )
+        )
+        grids.append(
+            _threshold_grid(
+                base,
+                {
+                    "dim_bob_cov_lo": (0.05, 0.07, 0.10),
+                    "dim_bob_cov_hi": (0.12, 0.13, 0.15),
+                    "dim_bob_mean_mid": (5.5, 6.0, 7.0),
+                    "dim_bob_mean_hi": (9.5, 10.0, 11.0),
+                },
+            )
+        )
+        grids.append(
+            _threshold_grid(
+                base,
+                {
+                    "very_sparse_dim_mean": (5.10, 5.15, 5.20),
+                    "sparse_dim_mean": (9.90, 9.95, 10.0),
+                    "sparse_dim_cov16_max": (0.128, 0.140, 0.165),
+                },
+            )
+        )
+        grids.append(
+            _threshold_grid(
+                base,
+                {
+                    "white_channel_min": (224.0, 235.0, 245.0),
+                    "min_white_frame_frac": (0.25, 0.30, 0.35),
+                    "washed_mean_peak": (245.0, SWEEP_RULE_DISABLED),
+                    "washed_max_lo": (240.0, SWEEP_RULE_DISABLED),
+                    "washed_max_mid": (240.0, SWEEP_RULE_DISABLED),
+                },
+            )
+        )
+    else:
+        grids.append(
+            _threshold_grid(
+                base,
+                {
+                    "very_sparse_dim_mean": (5.0, 5.1, 5.2),
+                    "sparse_dim_cov16_min": (0.100, 0.105, 0.110),
+                    "sparse_dim_cov16_max": (0.140, 0.155, 0.170),
+                    "capped_dim_mean": (35.0, 40.0, 45.0),
+                    "capped_dim_max_hi": (170.0, 177.0, 185.0),
+                    "capped_dim_cov16": (0.03, 0.04, 0.05),
+                },
+            )
+        )
+
+    return _merge_threshold_variants(*grids)
 
 
 def sweep(
@@ -491,8 +655,8 @@ def sweep(
     threshold_variants: tuple[dict[str, float] | None, ...] | None = None,
 ) -> list[SweepResult]:
     """Grid search over probe windows and thresholds; rank by golden agreement."""
-    warmups = warmup_frames_values or (10, 15, 20)
-    windows = window_frames_values or (60, 75)
+    warmups = warmup_frames_values or DEFAULT_SWEEP_WARMUP_FRAMES
+    windows = window_frames_values or DEFAULT_SWEEP_WINDOW_FRAMES
     profile = resolve_cache_probe_profile(cache)
     threshold_sets = threshold_variants or default_threshold_sweep_variants(
         profile.mode

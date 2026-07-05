@@ -564,6 +564,9 @@ def cmd_scan_golden(args: argparse.Namespace) -> None:
         DEFAULT_GOLDEN_SET_PATH,
         DEFAULT_METRICS_CACHE_PATH,
         DEFAULT_SLOW_METRICS_CACHE_PATH,
+        DEFAULT_SWEEP_WARMUP_FRAMES,
+        DEFAULT_SWEEP_WINDOW_FRAMES,
+        default_threshold_sweep_variants,
         evaluate,
         format_probe_profile_summary,
         load_golden_set,
@@ -571,6 +574,7 @@ def cmd_scan_golden(args: argparse.Namespace) -> None:
         print_eval_report,
         probe_golden_set,
         probe_profile,
+        resolve_cache_probe_profile,
         sweep,
     )
 
@@ -621,8 +625,19 @@ def cmd_scan_golden(args: argparse.Namespace) -> None:
         return
 
     results = sweep(cache, golden)
+    profile = resolve_cache_probe_profile(cache)
+    variant_count = len(default_threshold_sweep_variants(profile.mode))
+    config_count = len(results)
+    print(
+        f"Sweep: {config_count} configs "
+        f"({variant_count} threshold variants x "
+        f"{len(DEFAULT_SWEEP_WARMUP_FRAMES)} warmups x "
+        f"{len(DEFAULT_SWEEP_WINDOW_FRAMES)} windows, "
+        f"{profile.mode} cache)",
+        file=sys.stderr,
+    )
     print("Sweep results (best first):", file=sys.stderr)
-    for index, entry in enumerate(results[:10], start=1):
+    for index, entry in enumerate(results[:15], start=1):
         threshold_note = ""
         if entry.thresholds is not None:
             threshold_note = f" thresholds={entry.thresholds}"
