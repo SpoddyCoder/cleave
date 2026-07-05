@@ -79,11 +79,10 @@ Shipped scan categories map as: `ok` -> `ok`; `dim` -> `dim`; `black` and `load_
 
 Golden metrics cache: slow probe profile (90 warmup + 60 window frames at 30 fps, 150 frames total). Use a fresh `ProjectM` per preset so feedback state does not leak between cases.
 
-- **Probe (default slow):** `cleave scan-golden --probe` writes v2 cache JSON with embedded probe profile metadata.
+- **Probe:** `cleave scan-golden --probe` uses the quick profile (same as `cleave scan`); warns when overwriting the committed slow cache.
 - **Eval:** `cleave scan-golden --eval` reads warmup/window from the cache automatically; mismatched `--warmup` / `--window` flags error.
-- **Quick probe:** `cleave scan-golden --probe --quick` (90 frames) warns when overwriting the committed fixture cache.
 - **Legacy v1 caches:** eval infers profile from frame count (90=quick, 150=slow) with a stderr warning.
 
-Regenerate the committed fixture with `cleave scan-golden --probe` (slow is default) or `cleave scan-golden --probe --slow`.
+Regenerate the committed fixture with `cleave scan-golden --probe --slow`.
 
 See [presets-scan-plan.md](presets-scan-plan.md#classifier-rework).

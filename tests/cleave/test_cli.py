@@ -930,3 +930,12 @@ def test_module_help_lists_subcommands() -> None:
     assert "--slow" in scan.stdout
     assert "--report" in scan.stdout
     assert "--resume" in scan.stdout
+
+    scan_golden = subprocess.run(
+        [sys.executable, "-m", "cleave", "scan-golden", "--help"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "--slow" in scan_golden.stdout
+    assert "--quick" not in scan_golden.stdout

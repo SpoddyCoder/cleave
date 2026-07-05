@@ -214,6 +214,14 @@ def _warn_quarantine_without_slow() -> None:
     )
 
 
+def _warn_golden_probe_without_slow() -> None:
+    print(
+        "warning: quick probe overwrites the committed golden metrics cache; "
+        "re-run with --slow for eval-compatible fixtures",
+        file=sys.stderr,
+    )
+
+
 def _warn_resume_mismatch(
     *,
     field: str,
@@ -532,21 +540,14 @@ def cmd_scan_golden(args: argparse.Namespace) -> None:
     )
 
     if args.probe:
-        if args.quick and args.slow:
-            _exit_error("error: --quick and --slow are mutually exclusive")
-        slow = not args.quick
         if (
-            args.quick
+            not args.slow
             and cache_path == DEFAULT_METRICS_CACHE_PATH.resolve()
         ):
-            print(
-                "Warning: quick probe overwrites the committed golden metrics cache; "
-                "use --slow (default) for eval-compatible fixtures",
-                file=sys.stderr,
-            )
+            _warn_golden_probe_without_slow()
         golden = load_golden_set(golden_path)
-        probe_golden_set(golden, cache_path, slow=slow)
-        profile = probe_profile(slow=slow)
+        probe_golden_set(golden, cache_path, slow=args.slow)
+        profile = probe_profile(slow=args.slow)
         print(
             f"Wrote cache ({format_probe_profile_summary(profile)}) to {cache_path}",
             file=sys.stderr,
@@ -851,12 +852,7 @@ def build_parser() -> argparse.ArgumentParser:
     scan_golden.add_argument(
         "--slow",
         action="store_true",
-        help="Use slow probe profile (default for golden cache)",
-    )
-    scan_golden.add_argument(
-        "--quick",
-        action="store_true",
-        help="Use quick probe profile (90 frames; not eval-compatible with slow cache)",
+        help="Longer probe warmup and render before luminance sample",
     )
     scan_golden.add_argument(
         "--warmup",
