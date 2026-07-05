@@ -13,6 +13,7 @@ import pytest
 from cleave.preset_scan_metrics import (
     LUMA_COVERAGE_CUTOFFS,
     METRICS_CACHE_VERSION,
+    WHITE_COVERAGE_CUTOFFS,
     FrameMetrics,
     MetricsCache,
     PresetMetrics,
@@ -25,6 +26,7 @@ from cleave.preset_scan_metrics import (
     preset_metrics_from_dict,
     preset_metrics_to_dict,
     sample_frame_metrics,
+    white_frame_fraction,
     write_metrics_cache,
 )
 
@@ -34,10 +36,18 @@ def _frame(
     max_luma: float,
     mean_luma: float,
     coverage_16: float = 0.0,
+    white_235: float = 0.0,
 ) -> FrameMetrics:
     coverage = {cutoff: 0.0 for cutoff in LUMA_COVERAGE_CUTOFFS}
     coverage[16] = coverage_16
-    return FrameMetrics(max_luma=max_luma, mean_luma=mean_luma, coverage=coverage)
+    white_coverage = {cutoff: 0.0 for cutoff in WHITE_COVERAGE_CUTOFFS}
+    white_coverage[235] = white_235
+    return FrameMetrics(
+        max_luma=max_luma,
+        mean_luma=mean_luma,
+        coverage=coverage,
+        white_coverage=white_coverage,
+    )
 
 
 def test_peak_metrics_empty() -> None:
@@ -45,20 +55,22 @@ def test_peak_metrics_empty() -> None:
     assert result.max_luma == 0.0
     assert result.mean_luma == 0.0
     assert result.coverage == {cutoff: 0.0 for cutoff in LUMA_COVERAGE_CUTOFFS}
+    assert result.white_coverage == {cutoff: 0.0 for cutoff in WHITE_COVERAGE_CUTOFFS}
 
 
 def test_peak_metrics_skips_warmup_and_limits_window() -> None:
     frames = [
-        _frame(max_luma=1.0, mean_luma=1.0, coverage_16=0.01),
-        _frame(max_luma=2.0, mean_luma=2.0, coverage_16=0.02),
-        _frame(max_luma=100.0, mean_luma=10.0, coverage_16=0.5),
-        _frame(max_luma=50.0, mean_luma=30.0, coverage_16=0.3),
-        _frame(max_luma=80.0, mean_luma=20.0, coverage_16=0.4),
+        _frame(max_luma=1.0, mean_luma=1.0, coverage_16=0.01, white_235=0.1),
+        _frame(max_luma=2.0, mean_luma=2.0, coverage_16=0.02, white_235=0.2),
+        _frame(max_luma=100.0, mean_luma=10.0, coverage_16=0.5, white_235=0.9),
+        _frame(max_luma=50.0, mean_luma=30.0, coverage_16=0.3, white_235=0.7),
+        _frame(max_luma=80.0, mean_luma=20.0, coverage_16=0.4, white_235=0.8),
     ]
     result = peak_metrics(frames, warmup_frames=2, window_frames=2)
     assert result.max_luma == 100.0
     assert result.mean_luma == 30.0
     assert result.coverage[16] == 0.5
+    assert result.white_coverage[235] == 0.9
 
 
 def test_peak_metrics_unbounded_window_uses_all_post_warmup() -> None:
@@ -95,11 +107,44 @@ def test_peak_metrics_takes_peak_not_last() -> None:
     assert result.coverage[16] == 0.9
 
 
+def test_white_frame_fraction_counts_persistently_white_frames() -> None:
+    frames = [
+        _frame(max_luma=255.0, mean_luma=255.0, white_235=0.9),
+        _frame(max_luma=255.0, mean_luma=255.0, white_235=0.7),
+        _frame(max_luma=50.0, mean_luma=50.0, white_235=0.1),
+        _frame(max_luma=255.0, mean_luma=255.0, white_235=0.5),
+    ]
+    frac = white_frame_fraction(
+        frames,
+        warmup_frames=0,
+        window_frames=4,
+        channel_min_cutoff=235,
+        area_frac=0.6,
+    )
+    assert frac == pytest.approx(0.5)
+
+
+def test_white_frame_fraction_empty() -> None:
+    assert (
+        white_frame_fraction(
+            [],
+            warmup_frames=0,
+            window_frames=10,
+            channel_min_cutoff=235,
+            area_frac=0.6,
+        )
+        == 0.0
+    )
+
+
 def test_frame_metrics_json_round_trip() -> None:
     original = FrameMetrics(
         max_luma=123.5,
         mean_luma=12.3,
         coverage={cutoff: float(cutoff) / 256.0 for cutoff in LUMA_COVERAGE_CUTOFFS},
+        white_coverage={
+            cutoff: float(cutoff) / 256.0 for cutoff in WHITE_COVERAGE_CUTOFFS
+        },
     )
     restored = frame_metrics_from_dict(frame_metrics_to_dict(original))
     assert restored == original
@@ -183,20 +228,7 @@ def test_write_and_load_metrics_cache() -> None:
         assert payload["total_frames"] == 90
 
 
-def test_metrics_cache_v1_loads_without_probe_profile() -> None:
-    payload = {
-        "version": 1,
-        "probe_fps": 30,
-        "fbo_size": [480, 270],
-        "presets": [],
-    }
-    cache = metrics_cache_from_dict(payload)
-    assert cache.version == 1
-    assert cache.probe_mode is None
-    assert cache.warmup_frames is None
-
-
-def test_metrics_cache_v2_requires_probe_profile() -> None:
+def test_metrics_cache_v3_requires_probe_profile() -> None:
     payload = {
         "version": METRICS_CACHE_VERSION,
         "probe_fps": 30,
@@ -210,6 +242,21 @@ def test_metrics_cache_v2_requires_probe_profile() -> None:
 def test_metrics_cache_from_dict_rejects_bad_version() -> None:
     with pytest.raises(ValueError, match="unsupported metrics cache version"):
         metrics_cache_from_dict({"version": 99, "probe_fps": 30, "fbo_size": [1, 1], "presets": []})
+
+
+def test_metrics_cache_from_dict_rejects_v2() -> None:
+    payload = {
+        "version": 2,
+        "probe_fps": 30,
+        "fbo_size": [480, 270],
+        "probe_mode": "quick",
+        "warmup_frames": 15,
+        "window_frames": 75,
+        "total_frames": 90,
+        "presets": [],
+    }
+    with pytest.raises(ValueError, match="stale"):
+        metrics_cache_from_dict(payload)
 
 
 @patch("cleave.preset_scan_metrics.glReadPixels")
@@ -234,3 +281,5 @@ def test_sample_frame_metrics_full_frame(mock_read_pixels) -> None:
     assert result.mean_luma == pytest.approx(expected_mean)
     assert result.coverage[8] == pytest.approx(0.25)
     assert result.coverage[192] == pytest.approx(0.125)
+    assert result.white_coverage[235] == pytest.approx(0.125)
+    assert result.white_coverage[224] == pytest.approx(0.125)

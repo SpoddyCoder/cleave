@@ -47,10 +47,12 @@ from cleave.paths import repo_root
 from cleave.pcm_io import SAMPLE_RATE_HZ, load_wav_pcm_44k
 from cleave.preset_scan_metrics import (
     LUMA_COVERAGE_CUTOFFS,
+    WHITE_COVERAGE_CUTOFFS,
     FrameMetrics,
     PresetMetrics,
     peak_metrics,
     sample_frame_metrics,
+    white_frame_fraction,
 )
 from cleave.preset_scan_targets import PresetTarget, ScanTargets
 from cleave.projectm import PresetLoadFailure, ProjectM
@@ -72,7 +74,10 @@ PROBE_FBO_WIDTH = 480
 PROBE_FBO_HEIGHT = 270
 
 COVERAGE_LUMA_MIN = 16
-WASHED_COVERAGE_CUTOFF = 192
+
+WHITE_CHANNEL_MIN = 235
+WHITE_AREA_FRAC = 0.6
+MIN_WHITE_FRAME_FRAC = 0.3
 
 BLACK_MAX_LUMA = 1.0
 BLACK_COVERAGE = 0.0003
@@ -80,11 +85,11 @@ BLACK_COVERAGE = 0.0003
 DIM_MEAN_LUMA = 15.0
 DIM_COVERAGE = 0.25
 
-VERY_SPARSE_DIM_MEAN = 5.1
+VERY_SPARSE_DIM_MEAN = 5.15
 VERY_SPARSE_DIM_MAX = 100.0
 VERY_SPARSE_DIM_COV16 = 0.015
 
-SPARSE_DIM_MEAN = 10.0
+SPARSE_DIM_MEAN = 9.95
 SPARSE_DIM_MAX = 80.0
 SPARSE_DIM_COV16_MIN = 0.102
 SPARSE_DIM_COV16_MAX = 0.128
@@ -94,20 +99,29 @@ CAPPED_DIM_MAX_LO = 50.0
 CAPPED_DIM_MAX_HI = 111.0
 CAPPED_DIM_COV16 = 0.9
 
-WASHED_MEAN_HIGH = 244.6
-WASHED_COVERAGE_HIGH = 0.85
-WASHED_COVERAGE_HIGH_MAX = 1.005
-WASHED_MEAN_MODERATE = 193.5
-WASHED_COVERAGE_MODERATE = 1.001
-WASHED_MEAN_MID = 141.0
-WASHED_MEAN_BROAD = 236.0
-WASHED_COV16_MIN = 0.99
-WASHED_COV128_MIN = 0.99
-WASHED_COV192_CAP = 0.89
-WASHED_COV192_BROAD_MIN = 0.29
-
 BRIGHT_ON_BLACK_MAX = 25.0
 BRIGHT_ON_BLACK_COVERAGE = 0.00025
+
+DIM_BOB_COV_LO = 0.07
+DIM_BOB_COV_HI = 0.13
+DIM_BOB_MEAN_MID = 6.0
+DIM_BOB_MEAN_HI = 10.0
+
+WASHED_WHITE_AREA_FRAC_SOFT = 0.15
+WASHED_MIN_WHITE_FRAME_FRAC_SOFT = 0.55
+WASHED_MEAN_SOFT = 200.0
+WASHED_MEAN_PEAK = 245.0
+WASHED_COV16_MIN = 0.999
+WASHED_COV192_PEAK = 0.95
+WASHED_MAX_LO = 240.0
+WASHED_MEAN_LO = 155.0
+WASHED_MEAN_HI = 175.0
+WASHED_COV192_LO = 0.05
+WASHED_MAX_MID = 240.0
+WASHED_MEAN_MID_LO = 176.0
+WASHED_MEAN_MID_HI = 192.0
+WASHED_COV192_MID = 0.30
+WASHED_WHITE235_MID_MAX = 0.20
 
 SLOW_BLACK_MAX_LUMA = 1.0
 SLOW_BLACK_COVERAGE = 0.0003
@@ -124,17 +138,6 @@ SLOW_CAPPED_DIM_MEAN = 40.0
 SLOW_CAPPED_DIM_MAX_LO = 50.0
 SLOW_CAPPED_DIM_MAX_HI = 177.0
 SLOW_CAPPED_DIM_COV16 = 0.04
-SLOW_WASHED_MEAN_HIGH = 195.0
-SLOW_WASHED_COVERAGE_HIGH = 0.85
-SLOW_WASHED_COVERAGE_HIGH_MAX = 0.99
-SLOW_WASHED_MEAN_MODERATE = 193.5
-SLOW_WASHED_COVERAGE_MODERATE = 0.45
-SLOW_WASHED_MEAN_MID = 125.0
-SLOW_WASHED_MEAN_BROAD = 170.0
-SLOW_WASHED_COV16_MIN = 0.99
-SLOW_WASHED_COV128_MIN = 0.99
-SLOW_WASHED_COV192_CAP = 0.245
-SLOW_WASHED_COV192_BROAD_MIN = 0.29
 SLOW_BRIGHT_ON_BLACK_MAX = 25.0
 SLOW_BRIGHT_ON_BLACK_COVERAGE = 0.00025
 SLOW_COVERAGE_LUMA_MIN = 16
@@ -155,20 +158,31 @@ QUICK_SCAN_THRESHOLDS: dict[str, float] = {
     "capped_dim_max_lo": CAPPED_DIM_MAX_LO,
     "capped_dim_max_hi": CAPPED_DIM_MAX_HI,
     "capped_dim_cov16": CAPPED_DIM_COV16,
-    "washed_mean_high": WASHED_MEAN_HIGH,
-    "washed_coverage_high": WASHED_COVERAGE_HIGH,
-    "washed_coverage_high_max": WASHED_COVERAGE_HIGH_MAX,
-    "washed_mean_moderate": WASHED_MEAN_MODERATE,
-    "washed_coverage_moderate": WASHED_COVERAGE_MODERATE,
-    "washed_mean_mid": WASHED_MEAN_MID,
-    "washed_mean_broad": WASHED_MEAN_BROAD,
-    "washed_cov16_min": WASHED_COV16_MIN,
-    "washed_cov128_min": WASHED_COV128_MIN,
-    "washed_cov192_cap": WASHED_COV192_CAP,
-    "washed_cov192_broad_min": WASHED_COV192_BROAD_MIN,
+    "white_channel_min": float(WHITE_CHANNEL_MIN),
+    "white_area_frac": WHITE_AREA_FRAC,
+    "min_white_frame_frac": MIN_WHITE_FRAME_FRAC,
     "bright_on_black_max": BRIGHT_ON_BLACK_MAX,
     "bright_on_black_coverage": BRIGHT_ON_BLACK_COVERAGE,
     "coverage_luma_min": float(COVERAGE_LUMA_MIN),
+    "dim_bob_cov_lo": DIM_BOB_COV_LO,
+    "dim_bob_cov_hi": DIM_BOB_COV_HI,
+    "dim_bob_mean_mid": DIM_BOB_MEAN_MID,
+    "dim_bob_mean_hi": DIM_BOB_MEAN_HI,
+    "white_area_frac_soft": WASHED_WHITE_AREA_FRAC_SOFT,
+    "min_white_frame_frac_soft": WASHED_MIN_WHITE_FRAME_FRAC_SOFT,
+    "washed_mean_soft": WASHED_MEAN_SOFT,
+    "washed_mean_peak": WASHED_MEAN_PEAK,
+    "washed_cov16_min": WASHED_COV16_MIN,
+    "washed_cov192_peak": WASHED_COV192_PEAK,
+    "washed_max_lo": WASHED_MAX_LO,
+    "washed_mean_lo": WASHED_MEAN_LO,
+    "washed_mean_hi": WASHED_MEAN_HI,
+    "washed_cov192_lo": WASHED_COV192_LO,
+    "washed_max_mid": WASHED_MAX_MID,
+    "washed_mean_mid_lo": WASHED_MEAN_MID_LO,
+    "washed_mean_mid_hi": WASHED_MEAN_MID_HI,
+    "washed_cov192_mid": WASHED_COV192_MID,
+    "washed_white235_mid_max": WASHED_WHITE235_MID_MAX,
 }
 
 SLOW_SCAN_THRESHOLDS: dict[str, float] = {
@@ -187,17 +201,9 @@ SLOW_SCAN_THRESHOLDS: dict[str, float] = {
     "capped_dim_max_lo": SLOW_CAPPED_DIM_MAX_LO,
     "capped_dim_max_hi": SLOW_CAPPED_DIM_MAX_HI,
     "capped_dim_cov16": SLOW_CAPPED_DIM_COV16,
-    "washed_mean_high": SLOW_WASHED_MEAN_HIGH,
-    "washed_coverage_high": SLOW_WASHED_COVERAGE_HIGH,
-    "washed_coverage_high_max": SLOW_WASHED_COVERAGE_HIGH_MAX,
-    "washed_mean_moderate": SLOW_WASHED_MEAN_MODERATE,
-    "washed_coverage_moderate": SLOW_WASHED_COVERAGE_MODERATE,
-    "washed_mean_mid": SLOW_WASHED_MEAN_MID,
-    "washed_mean_broad": SLOW_WASHED_MEAN_BROAD,
-    "washed_cov16_min": SLOW_WASHED_COV16_MIN,
-    "washed_cov128_min": SLOW_WASHED_COV128_MIN,
-    "washed_cov192_cap": SLOW_WASHED_COV192_CAP,
-    "washed_cov192_broad_min": SLOW_WASHED_COV192_BROAD_MIN,
+    "white_channel_min": float(WHITE_CHANNEL_MIN),
+    "white_area_frac": WHITE_AREA_FRAC,
+    "min_white_frame_frac": MIN_WHITE_FRAME_FRAC,
     "bright_on_black_max": SLOW_BRIGHT_ON_BLACK_MAX,
     "bright_on_black_coverage": SLOW_BRIGHT_ON_BLACK_COVERAGE,
     "coverage_luma_min": float(SLOW_COVERAGE_LUMA_MIN),
@@ -376,58 +382,145 @@ def _normalize_peak_metrics(
     return float(max_raw), float(mean_raw), coverage
 
 
+def _peak_white_coverage(
+    peaks: FrameMetrics | dict[str, Any],
+    cutoff: int,
+) -> float:
+    if isinstance(peaks, FrameMetrics):
+        return peaks.white_coverage.get(cutoff, 0.0)
+
+    if not isinstance(peaks, dict):
+        raise TypeError("peaks must be FrameMetrics or a metrics dict")
+
+    white_raw = peaks.get("white_coverage")
+    if not isinstance(white_raw, dict):
+        return 0.0
+
+    value = white_raw.get(cutoff, white_raw.get(str(cutoff)))
+    if not isinstance(value, (int, float)):
+        return 0.0
+    return float(value)
+
+
+def _dim_bright_on_black_ok(
+    *,
+    max_luma: float,
+    mean_luma: float,
+    cov_min: float,
+    th: dict[str, float],
+) -> bool:
+    if max_luma < th["bright_on_black_max"] or cov_min < th["bright_on_black_coverage"]:
+        return False
+    if "dim_bob_cov_lo" not in th:
+        return True
+    if cov_min < th["dim_bob_cov_lo"]:
+        return True
+    if mean_luma >= th["dim_bob_mean_hi"]:
+        return True
+    return th["dim_bob_cov_lo"] <= cov_min < th["dim_bob_cov_hi"] and mean_luma >= th[
+        "dim_bob_mean_mid"
+    ]
+
+
+def _quick_washed_out(
+    peaks: FrameMetrics | dict[str, Any],
+    frames: tuple[FrameMetrics, ...],
+    th: dict[str, float],
+) -> bool:
+    max_luma, mean_luma, coverage = _normalize_peak_metrics(peaks)
+    cov16 = coverage[int(th["coverage_luma_min"])]
+    cov192 = coverage.get(192, 0.0)
+    white235 = _peak_white_coverage(peaks, int(th["white_channel_min"]))
+
+    white_frac = white_frame_fraction(
+        frames,
+        warmup_frames=0,
+        window_frames=0,
+        channel_min_cutoff=int(th["white_channel_min"]),
+        area_frac=th["white_area_frac"],
+    )
+    if white_frac >= th["min_white_frame_frac"]:
+        return True
+
+    white_frac_soft = white_frame_fraction(
+        frames,
+        warmup_frames=0,
+        window_frames=0,
+        channel_min_cutoff=int(th["white_channel_min"]),
+        area_frac=th["white_area_frac_soft"],
+    )
+    if (
+        white_frac_soft >= th["min_white_frame_frac_soft"]
+        and mean_luma >= th["washed_mean_soft"]
+    ):
+        return True
+
+    if (
+        mean_luma >= th["washed_mean_peak"]
+        and cov16 >= th["washed_cov16_min"]
+        and cov192 >= th["washed_cov192_peak"]
+    ):
+        return True
+
+    if (
+        cov16 >= th["washed_cov16_min"]
+        and max_luma >= th["washed_max_lo"]
+        and th["washed_mean_lo"] <= mean_luma <= th["washed_mean_hi"]
+        and cov192 >= th["washed_cov192_lo"]
+    ):
+        return True
+
+    if (
+        cov16 >= th["washed_cov16_min"]
+        and max_luma >= th["washed_max_mid"]
+        and th["washed_mean_mid_lo"] <= mean_luma <= th["washed_mean_mid_hi"]
+        and cov192 >= th["washed_cov192_mid"]
+        and white235 < th["washed_white235_mid_max"]
+    ):
+        return True
+
+    return False
+
+
 def classify_preset_result(
     failures: list[PresetLoadFailure],
     peaks: FrameMetrics | dict[str, Any],
     *,
+    frames: tuple[FrameMetrics, ...] | None = None,
     probe_mode: ProbeMode = "quick",
     thresholds: dict[str, float] | None = None,
 ) -> tuple[PresetResultCategory, str | None]:
     if failures:
         return "load_failed", failures[0].message
 
-    th = dict(thresholds) if thresholds is not None else scan_thresholds(probe_mode)
+    th = scan_thresholds(probe_mode)
+    if thresholds is not None:
+        th.update(thresholds)
+
+    if frames is not None:
+        if probe_mode == "quick" and "washed_mean_peak" in th:
+            if _quick_washed_out(peaks, frames, th):
+                return "washed_out", None
+        else:
+            white_frac = white_frame_fraction(
+                frames,
+                warmup_frames=0,
+                window_frames=0,
+                channel_min_cutoff=int(th["white_channel_min"]),
+                area_frac=th["white_area_frac"],
+            )
+            if white_frac >= th["min_white_frame_frac"]:
+                return "washed_out", None
 
     max_luma, mean_luma, coverage = _normalize_peak_metrics(peaks)
     cov_min = coverage[int(th["coverage_luma_min"])]
-    cov128 = coverage[128]
-    cov_washed = coverage[WASHED_COVERAGE_CUTOFF]
-
-    if (
-        mean_luma >= th["washed_mean_high"]
-        and cov_washed >= th["washed_coverage_high"]
-        and cov_washed < th["washed_coverage_high_max"]
-    ):
-        return "washed_out", None
-
-    if (
-        mean_luma >= th["washed_mean_moderate"]
-        and cov_min >= th["washed_cov16_min"]
-        and cov_washed >= th["washed_coverage_moderate"]
-        and cov_washed < th["washed_coverage_high_max"]
-    ):
-        return "washed_out", None
-
-    if (
-        mean_luma >= th["washed_mean_broad"]
-        and cov_min >= th["washed_cov16_min"]
-        and cov128 >= th["washed_cov128_min"]
-        and cov_washed >= th["washed_cov192_broad_min"]
-        and cov_washed < th["washed_coverage_high_max"]
-    ):
-        return "washed_out", None
-
-    if (
-        mean_luma >= th["washed_mean_mid"]
-        and cov_min >= th["washed_cov16_min"]
-        and cov_washed <= th["washed_cov192_cap"]
-    ):
-        return "washed_out", None
 
     if max_luma < th["black_max_luma"] or cov_min < th["black_coverage"]:
-        if (
-            max_luma >= th["bright_on_black_max"]
-            and cov_min >= th["bright_on_black_coverage"]
+        if _dim_bright_on_black_ok(
+            max_luma=max_luma,
+            mean_luma=mean_luma,
+            cov_min=cov_min,
+            th=th,
         ):
             return "ok", None
         return "black", None
@@ -454,9 +547,11 @@ def classify_preset_result(
         return "dim", None
 
     if mean_luma < th["dim_mean_luma"] and cov_min < th["dim_coverage"]:
-        if (
-            max_luma >= th["bright_on_black_max"]
-            and cov_min >= th["bright_on_black_coverage"]
+        if _dim_bright_on_black_ok(
+            max_luma=max_luma,
+            mean_luma=mean_luma,
+            cov_min=cov_min,
+            th=th,
         ):
             return "ok", None
         return "dim", None
@@ -860,14 +955,20 @@ def _probe_preset(
         )
 
     render_sec = time.perf_counter() - render_started
+    warmup = profile.warmup_frames
+    window = profile.window_frames
+    window_frames = tuple(frame_metrics[warmup : warmup + window])
     peaks = peak_metrics(
         frame_metrics,
-        warmup_frames=profile.warmup_frames,
-        window_frames=profile.window_frames,
+        warmup_frames=warmup,
+        window_frames=window,
     )
     failures = pm.drain_preset_failures()
     category, error = classify_preset_result(
-        failures, peaks, probe_mode=profile.mode
+        failures,
+        peaks,
+        frames=window_frames,
+        probe_mode=profile.mode,
     )
 
     return PresetScanResult(
@@ -1072,10 +1173,23 @@ def _scan_luma_from_dict(data: Any) -> FrameMetrics | None:
             raise ValueError(f"luma missing coverage for cutoff {cutoff}")
         coverage[cutoff] = float(value)
 
+    white_coverage_raw = data.get("white_coverage")
+    white_coverage: dict[int, float] = {
+        cutoff: 0.0 for cutoff in WHITE_COVERAGE_CUTOFFS
+    }
+    if white_coverage_raw is not None:
+        if not isinstance(white_coverage_raw, dict):
+            raise ValueError("luma white_coverage must be an object")
+        for cutoff in WHITE_COVERAGE_CUTOFFS:
+            value = white_coverage_raw.get(str(cutoff), white_coverage_raw.get(cutoff))
+            if isinstance(value, (int, float)):
+                white_coverage[cutoff] = float(value)
+
     return FrameMetrics(
         max_luma=float(max_raw),
         mean_luma=float(mean_raw),
         coverage=coverage,
+        white_coverage=white_coverage,
     )
 
 
@@ -1085,6 +1199,10 @@ def _scan_luma_to_dict(luma: FrameMetrics) -> dict[str, Any]:
         "mean": luma.mean_luma,
         "coverage": {
             str(cutoff): luma.coverage[cutoff] for cutoff in LUMA_COVERAGE_CUTOFFS
+        },
+        "white_coverage": {
+            str(cutoff): luma.white_coverage[cutoff]
+            for cutoff in WHITE_COVERAGE_CUTOFFS
         },
     }
 

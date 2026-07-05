@@ -12,7 +12,6 @@ from cleave.preset_scan import (
     BLACK_MAX_LUMA,
     DIM_COVERAGE,
     DIM_MEAN_LUMA,
-    QUARANTINE_CATEGORIES,
     QUICK_PROBE_WARMUP_FRAMES,
     QUICK_PROBE_WINDOW_FRAMES,
     SLOW_PROBE_WARMUP_FRAMES,
@@ -38,6 +37,7 @@ from cleave.preset_scan_metrics import (
     MetricsCache,
     PresetMetrics,
     LUMA_COVERAGE_CUTOFFS,
+    WHITE_COVERAGE_CUTOFFS,
 )
 from cleave.paths import repo_root
 
@@ -57,17 +57,25 @@ def _coverage(
     return coverage
 
 
+def _white_coverage(*, white_235: float = 0.0) -> dict[int, float]:
+    white_coverage = {cutoff: 0.0 for cutoff in WHITE_COVERAGE_CUTOFFS}
+    white_coverage[235] = white_235
+    return white_coverage
+
+
 def _frame(
     *,
     max_luma: float,
     mean_luma: float,
     cutoff_16: float = 0.0,
     cutoff_192: float = 0.0,
+    white_235: float = 0.0,
 ) -> FrameMetrics:
     return FrameMetrics(
         max_luma=max_luma,
         mean_luma=mean_luma,
         coverage=_coverage(cutoff_16=cutoff_16, cutoff_192=cutoff_192),
+        white_coverage=_white_coverage(white_235=white_235),
     )
 
 
@@ -373,10 +381,10 @@ def test_evaluate_rejects_profile_mismatch(tmp_path: Path) -> None:
         evaluate(cache, golden, warmup_frames=10, window_frames=90)
 
 
-def test_resolve_cache_probe_profile_infers_v1_quick(tmp_path: Path) -> None:
+def test_resolve_cache_probe_profile_infers_quick_from_frame_count(tmp_path: Path) -> None:
     golden = _mini_golden(tmp_path)
     cache = MetricsCache(
-        version=1,
+        version=METRICS_CACHE_VERSION,
         probe_fps=30,
         fbo_size=(480, 270),
         presets=_mini_cache(golden).presets,
@@ -403,13 +411,19 @@ def test_resolve_eval_probe_window_uses_cache_by_default(tmp_path: Path) -> None
 GOLDEN_CASE_2_ID = 2
 
 
-def test_golden_case_2_visualizer_scan_disparity() -> None:
-    """Case 2: visualizer black label vs scan washed_out. Accepted; still quarantines."""
+def test_golden_case_2_not_washed_out_with_v3_cache() -> None:
+    """Case 2: visualizer black; scan ok/black is accepted, not washed_out."""
     if not DEFAULT_METRICS_CACHE_PATH.is_file():
         pytest.skip("metrics cache not generated; run: cleave scan-golden --probe")
 
     golden = load_golden_set(FIXTURE_PATH)
-    cache = load_metrics_cache(DEFAULT_METRICS_CACHE_PATH)
+    try:
+        cache = load_metrics_cache(DEFAULT_METRICS_CACHE_PATH)
+    except ValueError:
+        pytest.skip("metrics cache outdated; run: cleave scan-golden --probe")
+    if cache.version != METRICS_CACHE_VERSION:
+        pytest.skip("metrics cache outdated; run: cleave scan-golden --probe")
+
     case_2 = next(case for case in golden.cases if case.id == GOLDEN_CASE_2_ID)
     assert case_2.expected_result == "black"
     mini = GoldenSet(
@@ -424,7 +438,5 @@ def test_golden_case_2_visualizer_scan_disparity() -> None:
         (entry for entry in report.mismatches if entry.id == GOLDEN_CASE_2_ID),
         None,
     )
-    assert mismatch is not None
-    assert mismatch.expected == "black"
-    assert mismatch.actual == "washed_out"
-    assert mismatch.actual in QUARANTINE_CATEGORIES
+    if mismatch is not None:
+        assert mismatch.actual != "washed_out"

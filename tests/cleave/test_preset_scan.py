@@ -22,6 +22,7 @@ from cleave.preset_scan import (
     CAPPED_DIM_MEAN,
     DIM_COVERAGE,
     DIM_MEAN_LUMA,
+    MIN_WHITE_FRAME_FRAC,
     PROBE_FBO_HEIGHT,
     PROBE_FBO_WIDTH,
     PROBE_FPS,
@@ -47,17 +48,9 @@ from cleave.preset_scan import (
     SPARSE_DIM_COV16_MIN,
     SPARSE_DIM_MAX,
     SPARSE_DIM_MEAN,
-    WASHED_COVERAGE_CUTOFF,
-    WASHED_COVERAGE_HIGH,
-    WASHED_COVERAGE_MODERATE,
-    WASHED_COV192_BROAD_MIN,
-    WASHED_COV192_CAP,
-    WASHED_COV128_MIN,
-    WASHED_COV16_MIN,
-    WASHED_MEAN_BROAD,
-    WASHED_MEAN_HIGH,
-    WASHED_MEAN_MID,
-    WASHED_MEAN_MODERATE,
+    VERY_SPARSE_DIM_MAX,
+    WHITE_AREA_FRAC,
+    WHITE_CHANNEL_MIN,
     PresetScanResult,
     PresetScanTimings,
     ProbePcm,
@@ -78,7 +71,11 @@ from cleave.preset_scan import (
     validate_quarantine_dir,
     write_scan_report,
 )
-from cleave.preset_scan_metrics import LUMA_COVERAGE_CUTOFFS, FrameMetrics
+from cleave.preset_scan_metrics import (
+    LUMA_COVERAGE_CUTOFFS,
+    WHITE_COVERAGE_CUTOFFS,
+    FrameMetrics,
+)
 from cleave.preset_scan_targets import PresetTarget, ScanTargets
 from cleave.projectm import PresetLoadFailure
 
@@ -92,8 +89,14 @@ def _coverage_at(
     coverage = {cutoff: 0.0 for cutoff in LUMA_COVERAGE_CUTOFFS}
     coverage[COVERAGE_LUMA_MIN] = cutoff_16
     coverage[128] = cutoff_128
-    coverage[WASHED_COVERAGE_CUTOFF] = cutoff_192
+    coverage[192] = cutoff_192
     return coverage
+
+
+def _white_coverage_at(*, white_235: float = 0.0) -> dict[int, float]:
+    white_coverage = {cutoff: 0.0 for cutoff in WHITE_COVERAGE_CUTOFFS}
+    white_coverage[235] = white_235
+    return white_coverage
 
 
 def _peaks(
@@ -103,6 +106,7 @@ def _peaks(
     cutoff_16: float = 0.0,
     cutoff_128: float = 0.0,
     cutoff_192: float = 0.0,
+    white_235: float = 0.0,
 ) -> FrameMetrics:
     return FrameMetrics(
         max_luma=max_luma,
@@ -112,6 +116,22 @@ def _peaks(
             cutoff_128=cutoff_128,
             cutoff_192=cutoff_192,
         ),
+        white_coverage=_white_coverage_at(white_235=white_235),
+    )
+
+
+def _frame(
+    *,
+    max_luma: float,
+    mean_luma: float,
+    cutoff_16: float = 0.0,
+    white_235: float = 0.0,
+) -> FrameMetrics:
+    return _peaks(
+        max_luma=max_luma,
+        mean_luma=mean_luma,
+        cutoff_16=cutoff_16,
+        white_235=white_235,
     )
 
 
@@ -133,18 +153,38 @@ def test_probe_profile_slow() -> None:
 
 _TUNED_SLOW_ONLY_KEYS = frozenset(
     {
+        "very_sparse_dim_mean",
         "very_sparse_dim_cov16",
+        "sparse_dim_mean",
         "sparse_dim_cov16_min",
         "sparse_dim_cov16_max",
         "capped_dim_mean",
         "capped_dim_max_hi",
         "capped_dim_cov16",
-        "washed_mean_high",
-        "washed_coverage_high_max",
-        "washed_coverage_moderate",
-        "washed_mean_mid",
-        "washed_mean_broad",
-        "washed_cov192_cap",
+    }
+)
+
+_QUICK_ONLY_THRESHOLD_KEYS = frozenset(
+    {
+        "dim_bob_cov_lo",
+        "dim_bob_cov_hi",
+        "dim_bob_mean_mid",
+        "dim_bob_mean_hi",
+        "white_area_frac_soft",
+        "min_white_frame_frac_soft",
+        "washed_mean_soft",
+        "washed_mean_peak",
+        "washed_cov16_min",
+        "washed_cov192_peak",
+        "washed_max_lo",
+        "washed_mean_lo",
+        "washed_mean_hi",
+        "washed_cov192_lo",
+        "washed_max_mid",
+        "washed_mean_mid_lo",
+        "washed_mean_mid_hi",
+        "washed_cov192_mid",
+        "washed_white235_mid_max",
     }
 )
 
@@ -154,14 +194,12 @@ def test_scan_thresholds_quick_vs_slow() -> None:
     slow = scan_thresholds("slow")
     assert quick == QUICK_SCAN_THRESHOLDS
     assert slow == SLOW_SCAN_THRESHOLDS
-    differing = {
-        key
-        for key in QUICK_SCAN_THRESHOLDS
-        if quick[key] != slow[key]
-    }
+    shared_keys = QUICK_SCAN_THRESHOLDS.keys() & SLOW_SCAN_THRESHOLDS.keys()
+    differing = {key for key in shared_keys if quick[key] != slow[key]}
     assert _TUNED_SLOW_ONLY_KEYS <= differing
     for key in _TUNED_SLOW_ONLY_KEYS:
         assert quick[key] != slow[key]
+    assert _QUICK_ONLY_THRESHOLD_KEYS <= QUICK_SCAN_THRESHOLDS.keys() - SLOW_SCAN_THRESHOLDS.keys()
 
 
 def test_build_scan_report_uses_mode_thresholds() -> None:
@@ -268,108 +306,111 @@ def test_classify_preset_result_bright_on_black_guard() -> None:
     assert error is None
 
 
-def test_classify_preset_result_washed_out_high() -> None:
-    result, error = classify_preset_result(
-        [],
-        _peaks(
-            max_luma=255.0,
-            mean_luma=WASHED_MEAN_HIGH,
-            cutoff_16=1.0,
-            cutoff_192=WASHED_COVERAGE_HIGH + 0.03,
-        ),
+def test_classify_preset_result_washed_out_persistent_white() -> None:
+    white_frames = tuple(
+        _frame(max_luma=255.0, mean_luma=255.0, white_235=0.9) for _ in range(10)
     )
+    dark_frames = tuple(
+        _frame(max_luma=50.0, mean_luma=50.0, white_235=0.1) for _ in range(20)
+    )
+    frames = white_frames + dark_frames
+    peaks = _peaks(max_luma=255.0, mean_luma=255.0, cutoff_16=1.0, white_235=0.9)
+    result, error = classify_preset_result([], peaks, frames=frames)
     assert result == "washed_out"
     assert error is None
 
 
 def test_classify_preset_result_bright_ok_not_washed_out() -> None:
-    """Bright usable presets can saturate cov192 without being washed_out."""
+    """Bright usable presets with only brief white flashes stay ok."""
+    frames = tuple(
+        _frame(max_luma=255.0, mean_luma=200.0, white_235=0.9) for _ in range(2)
+    ) + tuple(
+        _frame(max_luma=255.0, mean_luma=200.0, white_235=0.1) for _ in range(18)
+    )
+    peaks = _peaks(max_luma=255.0, mean_luma=200.0, cutoff_16=1.0, cutoff_192=1.0)
+    result, error = classify_preset_result([], peaks, frames=frames)
+    assert result == "ok"
+    assert error is None
+
+
+def test_classify_preset_result_washed_out_boundary() -> None:
+    """Exactly min_white_frame_frac of white frames triggers washed_out."""
+    white_count = int(10 * MIN_WHITE_FRAME_FRAC)
+    frames = tuple(
+        _frame(max_luma=255.0, mean_luma=255.0, white_235=WHITE_AREA_FRAC)
+        for _ in range(white_count)
+    ) + tuple(
+        _frame(max_luma=50.0, mean_luma=50.0, white_235=0.0)
+        for _ in range(10 - white_count)
+    )
+    peaks = _peaks(
+        max_luma=255.0,
+        mean_luma=255.0,
+        cutoff_16=1.0,
+        white_235=WHITE_AREA_FRAC,
+    )
+    result, error = classify_preset_result([], peaks, frames=frames)
+    assert result == "washed_out"
+    assert error is None
+
+
+def test_classify_preset_result_high_luma_without_frames_not_washed() -> None:
+    """Peak luma alone does not classify washed_out without frame window."""
     result, error = classify_preset_result(
         [],
         _peaks(
             max_luma=255.0,
-            mean_luma=WASHED_MEAN_HIGH - 9.0,
+            mean_luma=255.0,
             cutoff_16=1.0,
             cutoff_192=1.0,
+            white_235=0.9,
         ),
     )
     assert result == "ok"
     assert error is None
 
 
-def test_classify_preset_result_washed_out_mid() -> None:
-    result, error = classify_preset_result(
-        [],
-        _peaks(
-            max_luma=240.0,
-            mean_luma=WASHED_MEAN_MID,
-            cutoff_16=0.99,
-            cutoff_192=WASHED_COV192_CAP,
-        ),
+def test_classify_preset_result_quick_peak_washed_out() -> None:
+    frames = tuple(
+        _peaks(max_luma=255.0, mean_luma=247.0, cutoff_16=1.0, cutoff_192=1.0)
+        for _ in range(10)
     )
+    peaks = _peaks(
+        max_luma=255.0,
+        mean_luma=247.0,
+        cutoff_16=1.0,
+        cutoff_192=1.0,
+    )
+    result, error = classify_preset_result([], peaks, frames=frames, probe_mode="quick")
     assert result == "washed_out"
     assert error is None
 
 
-def test_classify_preset_result_washed_out_moderate() -> None:
-    """High mean with partial cov192 blowout (golden case 2 mid-wash path)."""
+def test_classify_preset_result_quick_dim_bob_guard_mean_band() -> None:
+    """Quick dim guard: sparse mid-coverage with mean below bob mean_hi stays dim."""
     result, error = classify_preset_result(
         [],
         _peaks(
-            max_luma=255.0,
-            mean_luma=229.3,
-            cutoff_16=0.9941,
-            cutoff_192=WASHED_COV192_CAP - 0.01,
+            max_luma=SPARSE_DIM_MAX + 128.5,
+            mean_luma=9.6,
+            cutoff_16=0.164,
         ),
     )
-    assert result == "washed_out"
+    assert result == "dim"
     assert error is None
 
 
-def test_classify_preset_result_moderate_wash_boundary_ok() -> None:
-    """Below moderate mean stays ok even with high cov192."""
+def test_classify_preset_result_quick_dim_bob_guard_mid_cov() -> None:
+    """Quick dim guard: mid coverage with low mean stays dim."""
     result, error = classify_preset_result(
         [],
         _peaks(
-            max_luma=255.0,
-            mean_luma=WASHED_MEAN_MODERATE - 1.0,
-            cutoff_16=1.0,
-            cutoff_192=WASHED_COVERAGE_MODERATE + 0.03,
+            max_luma=VERY_SPARSE_DIM_MAX + 136.8,
+            mean_luma=5.11,
+            cutoff_16=0.098,
         ),
     )
-    assert result == "ok"
-    assert error is None
-
-
-def test_classify_preset_result_washed_out_broad() -> None:
-    """High cov128 with moderate cov192 blowout (golden case 5)."""
-    result, error = classify_preset_result(
-        [],
-        _peaks(
-            max_luma=255.0,
-            mean_luma=WASHED_MEAN_BROAD + 7.4,
-            cutoff_16=WASHED_COV16_MIN,
-            cutoff_128=WASHED_COV128_MIN,
-            cutoff_192=WASHED_COV192_BROAD_MIN + 0.07,
-        ),
-    )
-    assert result == "washed_out"
-    assert error is None
-
-
-def test_classify_preset_result_broad_wash_boundary_ok() -> None:
-    """Partial cov128 saturation stays ok below broad wash thresholds."""
-    result, error = classify_preset_result(
-        [],
-        _peaks(
-            max_luma=255.0,
-            mean_luma=WASHED_MEAN_MID - 5.0,
-            cutoff_16=WASHED_COV16_MIN,
-            cutoff_128=WASHED_COV128_MIN - 0.13,
-            cutoff_192=WASHED_COV192_BROAD_MIN + 0.17,
-        ),
-    )
-    assert result == "ok"
+    assert result == "dim"
     assert error is None
 
 
@@ -1103,6 +1144,7 @@ def test_probe_preset_clean_boot(monkeypatch: pytest.MonkeyPatch) -> None:
         max_luma=50.0,
         mean_luma=25.0,
         coverage=_healthy_coverage(),
+        white_coverage=_white_coverage_at(),
     )
 
     monkeypatch.setattr(
@@ -1139,9 +1181,24 @@ def test_probe_preset_uses_peak_metrics_over_last_frame(
     target = PresetTarget(path=Path("/tmp/a.milk"), layers=())
 
     frames = [
-        FrameMetrics(max_luma=1.0, mean_luma=1.0, coverage=_healthy_coverage()),
-        FrameMetrics(max_luma=200.0, mean_luma=50.0, coverage=_healthy_coverage()),
-        FrameMetrics(max_luma=1.0, mean_luma=1.0, coverage=_healthy_coverage()),
+        FrameMetrics(
+            max_luma=1.0,
+            mean_luma=1.0,
+            coverage=_healthy_coverage(),
+            white_coverage=_white_coverage_at(),
+        ),
+        FrameMetrics(
+            max_luma=200.0,
+            mean_luma=50.0,
+            coverage=_healthy_coverage(),
+            white_coverage=_white_coverage_at(),
+        ),
+        FrameMetrics(
+            max_luma=1.0,
+            mean_luma=1.0,
+            coverage=_healthy_coverage(),
+            white_coverage=_white_coverage_at(),
+        ),
     ]
     call_count = {"index": 0}
 
@@ -1183,11 +1240,19 @@ def test_preset_result_luma_serialization_round_trip() -> None:
     from cleave.preset_scan import _preset_result_from_dict, _preset_result_to_dict
 
     coverage = {cutoff: float(cutoff) / 256.0 for cutoff in LUMA_COVERAGE_CUTOFFS}
+    white_coverage = {
+        cutoff: float(cutoff) / 256.0 for cutoff in WHITE_COVERAGE_CUTOFFS
+    }
     preset = PresetScanResult(
         path=Path("/tmp/a.milk"),
         result="ok",
         layers=("layer_1",),
-        luma=FrameMetrics(max_luma=42.0, mean_luma=12.0, coverage=coverage),
+        luma=FrameMetrics(
+            max_luma=42.0,
+            mean_luma=12.0,
+            coverage=coverage,
+            white_coverage=white_coverage,
+        ),
     )
 
     payload = _preset_result_to_dict(preset)

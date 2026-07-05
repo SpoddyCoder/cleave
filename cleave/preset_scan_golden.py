@@ -20,6 +20,7 @@ from cleave.preset_scan import (
     QUICK_PROBE_WINDOW_FRAMES,
     SLOW_PROBE_WARMUP_FRAMES,
     SLOW_PROBE_WINDOW_FRAMES,
+    WHITE_CHANNEL_MIN,
     PresetResultCategory,
     ProbeMode,
     ProbeProfile,
@@ -28,6 +29,7 @@ from cleave.preset_scan import (
     classify_preset_result,
     probe_preset_metrics,
     probe_profile,
+    scan_thresholds,
 )
 from cleave.preset_scan_metrics import (
     METRICS_CACHE_VERSION,
@@ -36,6 +38,7 @@ from cleave.preset_scan_metrics import (
     PresetMetrics,
     load_metrics_cache,
     peak_metrics,
+    white_frame_fraction,
     write_metrics_cache,
 )
 from cleave.projectm import PresetLoadFailure, ProjectM
@@ -80,6 +83,8 @@ class EvalMismatch:
     expected: GoldenExpectedResult
     actual: PresetResultCategory
     luma: FrameMetrics | None
+    white_frame_frac: float | None = None
+    white_coverage_peak: float | None = None
 
 
 @dataclass(frozen=True)
@@ -393,7 +398,7 @@ def evaluate(
                 f"metrics cache missing preset for case {case.id}: {case.preset}"
             )
 
-        actual, luma = _classify_cached_preset(
+        actual, luma, white_frac, white_cov_peak = _classify_cached_preset(
             preset_metrics,
             warmup_frames=resolved_warmup,
             window_frames=resolved_window,
@@ -416,6 +421,8 @@ def evaluate(
                     expected=case.expected_result,
                     actual=actual,
                     luma=luma,
+                    white_frame_frac=white_frac,
+                    white_coverage_peak=white_cov_peak,
                 )
             )
 
@@ -440,6 +447,23 @@ def evaluate(
     )
 
 
+def default_threshold_sweep_variants(
+    probe_mode: ProbeMode,
+) -> tuple[dict[str, float] | None, ...]:
+    """Default grid of white-detector knob overrides for sweep."""
+    base = scan_thresholds(probe_mode)
+    variants: list[dict[str, float] | None] = [None]
+    for channel_min in (224.0, 235.0, 245.0):
+        for area_frac in (0.5, 0.6, 0.7):
+            for min_frac in (0.2, 0.3, 0.4):
+                override = dict(base)
+                override["white_channel_min"] = channel_min
+                override["white_area_frac"] = area_frac
+                override["min_white_frame_frac"] = min_frac
+                variants.append(override)
+    return tuple(variants)
+
+
 def sweep(
     cache: MetricsCache,
     golden: GoldenSet,
@@ -451,7 +475,10 @@ def sweep(
     """Grid search over probe windows and thresholds; rank by golden agreement."""
     warmups = warmup_frames_values or (10, 15, 20)
     windows = window_frames_values or (60, 75)
-    threshold_sets = threshold_variants or (None,)
+    profile = resolve_cache_probe_profile(cache)
+    threshold_sets = threshold_variants or default_threshold_sweep_variants(
+        profile.mode
+    )
 
     results: list[SweepResult] = []
     for warmup in warmups:
@@ -514,9 +541,18 @@ def print_eval_report(report: EvalReport, *, file: Any = None) -> None:
                     f" mean={mismatch.luma.mean_luma:.1f}"
                     f" cov16={mismatch.luma.coverage.get(16, 0.0):.4f}"
                 )
+            white_bits = ""
+            if mismatch.white_frame_frac is not None:
+                white_bits = f" white_frac={mismatch.white_frame_frac:.3f}"
+            if mismatch.white_coverage_peak is not None:
+                white_bits += (
+                    f" white_cov{int(WHITE_CHANNEL_MIN)}="
+                    f"{mismatch.white_coverage_peak:.4f}"
+                )
             print(
                 f"  [{mismatch.id}] {mismatch.preset_name}: "
-                f"expected={mismatch.expected} actual={mismatch.actual}{luma_bits}",
+                f"expected={mismatch.expected} actual={mismatch.actual}"
+                f"{luma_bits}{white_bits}",
                 file=out,
             )
 
@@ -535,7 +571,7 @@ def _classify_cached_preset(
     window_frames: int,
     probe_mode: ProbeMode,
     thresholds: dict[str, float] | None,
-) -> tuple[PresetResultCategory, FrameMetrics | None]:
+) -> tuple[PresetResultCategory, FrameMetrics | None, float | None, float | None]:
     failures: list[PresetLoadFailure] = []
     if preset_metrics.load_failed:
         failures = [
@@ -549,17 +585,39 @@ def _classify_cached_preset(
         category, _ = classify_preset_result(
             failures, {}, probe_mode=probe_mode, thresholds=thresholds
         )
-        return category, None
+        return category, None, None, None
 
+    window_slice = preset_metrics.frames[
+        warmup_frames : warmup_frames + window_frames
+    ]
     peaks = peak_metrics(
         preset_metrics.frames,
         warmup_frames=warmup_frames,
         window_frames=window_frames,
     )
     category, _ = classify_preset_result(
-        failures, peaks, probe_mode=probe_mode, thresholds=thresholds
+        failures,
+        peaks,
+        frames=window_slice,
+        probe_mode=probe_mode,
+        thresholds=thresholds,
     )
-    return category, peaks
+    th = scan_thresholds(probe_mode)
+    if thresholds is not None:
+        th.update(thresholds)
+    white_frac = white_frame_fraction(
+        window_slice,
+        warmup_frames=0,
+        window_frames=0,
+        channel_min_cutoff=int(th["white_channel_min"]),
+        area_frac=th["white_area_frac"],
+    )
+    white_cov_peak = (
+        peaks.white_coverage.get(int(th["white_channel_min"]))
+        if peaks.white_coverage
+        else None
+    )
+    return category, peaks, white_frac, white_cov_peak
 
 
 def _progress(message: str) -> None:
