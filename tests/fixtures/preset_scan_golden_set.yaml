@@ -197,120 +197,120 @@ cases:
 
   - id: 31
     source_config: unnamed-31.yaml
-    preset: quarantine/$$$ Royal - Mashup (244).milk
+    preset: presets-cream-of-the-crop/Sparkle/Explosions/$$$ Royal - Mashup (244).milk
     expected_result: ok
     notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
 
   - id: 32
     source_config: unnamed-32.yaml
-    preset: quarantine/$$$ Royal - Mashup (248).milk
+    preset: presets-cream-of-the-crop/Sparkle/Explosions/$$$ Royal - Mashup (248).milk
     expected_result: ok
     notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
 
   - id: 33
     source_config: unnamed-33.yaml
-    preset: quarantine/$$$ Royal - Mashup (409).milk
+    preset: presets-cream-of-the-crop/Sparkle/Explosions/$$$ Royal - Mashup (409).milk
     expected_result: ok
     notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
 
   - id: 34
     source_config: unnamed-34.yaml
-    preset: quarantine/2009 4th of July with AdamFX n Martin - into the fireworks E.milk
+    preset: presets-cream-of-the-crop/Sparkle/Explosions/2009 4th of July with AdamFX n Martin - into the fireworks E.milk
     expected_result: ok
     notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
 
   - id: 35
     source_config: unnamed-35.yaml
-    preset: quarantine/3dRaGoNs & Unchained - Dragon Science.milk
+    preset: presets-milkdrop-original/Milkdrop-Original/3dRaGoNs & Unchained - Dragon Science.milk
     expected_result: ok
     notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
 
   - id: 36
     source_config: unnamed-36.yaml
-    preset: quarantine/Aderrasi + Flexi - Airhandler (Last Breath - Calm) [moebius morbid vision edit].milk
+    preset: presets-milkdrop-original/Milkdrop-Original/Aderrasi + Flexi - Airhandler (Last Breath - Calm) [moebius morbid vision edit].milk
     expected_result: ok
     notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
 
   - id: 37
     source_config: unnamed-37.yaml
-    preset: quarantine/Aderrasi - Halls Of Centrifuge.milk
+    preset: presets-milkdrop-original/Milkdrop-Original/Aderrasi - Halls Of Centrifuge.milk
     expected_result: ok
     notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
 
   - id: 38
     source_config: unnamed-38.yaml
-    preset: quarantine/Aderrasi - Songflower (Moss Posy).milk
+    preset: presets-milkdrop-original/Milkdrop-Original/Aderrasi - Songflower (Moss Posy).milk
     expected_result: ok
     notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
 
   - id: 39
     source_config: unnamed-39.yaml
-    preset: quarantine/Aderrasi - The Lurker (Twin Mix) - Bitcore Tweak.milk
+    preset: presets-milkdrop-original/Milkdrop-Original/Aderrasi - The Lurker (Twin Mix) - Bitcore Tweak.milk
     expected_result: ok
     notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
 
   - id: 40
     source_config: unnamed-40.yaml
-    preset: quarantine/Aderrasi - What Cannot Be Undone.milk
+    preset: presets-milkdrop-original/Milkdrop-Original/Aderrasi - What Cannot Be Undone.milk
     expected_result: ok
     notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
 
   - id: 41
     source_config: unnamed-41.yaml
-    preset: quarantine/An Digital FX Edit 2 martin - girlie affairs Internal LightFX AdamFX k.milk
+    preset: presets-cream-of-the-crop/Sparkle/Explosions/An Digital FX Edit 2 martin - girlie affairs Internal LightFX AdamFX k.milk
     expected_result: ok
     notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
 
   - id: 42
     source_config: unnamed-42.yaml
-    preset: quarantine/Eo.S. + Geiss - glowsticks v2 03 music shifter edit b (water mix).milk
+    preset: presets-milkdrop-original/Milkdrop-Original/Eo.S. + Geiss - glowsticks v2 03 music shifter edit b (water mix).milk
     expected_result: ok
     notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
 
   - id: 43
     source_config: unnamed-43.yaml
-    preset: quarantine/Eo.S. - pointfield 04 arcs demon_phat edit_v3.milk
+    preset: presets-milkdrop-original/Milkdrop-Original/Eo.S. - pointfield 04 arcs demon_phat edit_v3.milk
     expected_result: ok
     notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
 
   - id: 44
     source_config: unnamed-44.yaml
-    preset: quarantine/Flexi + bdrv - what to do [Phat edit].milk
+    preset: presets-milkdrop-original/Milkdrop-Original/Flexi + bdrv - what to do [Phat edit].milk
     expected_result: ok
     notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
 
   - id: 45
     source_config: unnamed-45.yaml
-    preset: quarantine/Flexi - fractal remix weed.milk
+    preset: presets-milkdrop-original/Milkdrop-Original/Flexi - fractal remix weed.milk
     expected_result: ok
     notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
 
   - id: 46
     source_config: unnamed-46.yaml
-    preset: quarantine/Esotic & Rozzor - Pixie Party Light ((No Wave Invasion) Mandala Chill Red Yellow Mix).milk
+    preset: presets-milkdrop-original/Milkdrop-Original/Esotic & Rozzor - Pixie Party Light ((No Wave Invasion) Mandala Chill Red Yellow Mix).milk
     expected_result: washed_out
     notes: High-intensity but washed out to white; too blown out to use.
 
   - id: 47
     source_config: unnamed-47.yaml
-    preset: quarantine/Esotic & Rozzer - The Dark Side Of My Moon.milk
+    preset: presets-cream-of-the-crop/Fractal/Nested Circle/Esotic & Rozzer - The Dark Side Of My Moon.milk
     expected_result: washed_out
     notes: High-intensity but washed out to white; too blown out to use.
 
   - id: 48
     source_config: unnamed-48.yaml
-    preset: quarantine/Esotic & Rozzer - Now And Later.milk
+    preset: presets-cream-of-the-crop/Fractal/Nested Circle/Esotic & Rozzer - Now And Later.milk
     expected_result: washed_out
     notes: High-intensity but washed out to white; too blown out to use.
 
   - id: 49
     source_config: unnamed-49.yaml
-    preset: quarantine/Esotic & Rozzer - Hippie Hypnotizer.milk
+    preset: presets-cream-of-the-crop/Fractal/Nested Circle/Esotic & Rozzer - Hippie Hypnotizer.milk
     expected_result: washed_out
     notes: High-intensity but washed out to white; too blown out to use.
 
   - id: 50
     source_config: unnamed-50.yaml
-    preset: quarantine/Rovastar & Unchained - Demonology (Vampire Soul Mix).milk
+    preset: presets-milkdrop-original/Milkdrop-Original/Rovastar & Unchained - Demonology (Vampire Soul Mix).milk
     expected_result: washed_out
     notes: High-intensity but washed out to white; too blown out to use.
