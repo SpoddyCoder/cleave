@@ -23,6 +23,7 @@ from cleave.preset_scan_golden import (
     GOLDEN_CASE_COUNT,
     GoldenCase,
     GoldenSet,
+    default_threshold_sweep_variants,
     evaluate,
     load_golden_set,
     load_metrics_cache,
@@ -30,6 +31,7 @@ from cleave.preset_scan_golden import (
     resolve_eval_probe_window,
     scan_result_to_golden,
     sweep,
+    _merge_threshold_variants,
 )
 from cleave.preset_scan_metrics import (
     METRICS_CACHE_VERSION,
@@ -286,6 +288,35 @@ def test_sweep_ranks_better_configs_first(tmp_path: Path) -> None:
 
     assert len(results) == 2
     assert results[0].accuracy >= results[1].accuracy
+
+
+def test_default_threshold_sweep_variants_quick_is_expanded() -> None:
+    variants = default_threshold_sweep_variants("quick")
+    assert variants[0] is None
+    assert len(variants) > 100
+    assert any(
+        entry is not None and "washed_mean_peak" in entry for entry in variants
+    )
+    assert any(
+        entry is not None and "dim_bob_cov_lo" in entry for entry in variants
+    )
+
+
+def test_default_threshold_sweep_variants_slow_covers_white_and_dim() -> None:
+    variants = default_threshold_sweep_variants("slow")
+    assert variants[0] is None
+    assert len(variants) > 100
+    assert all(
+        entry is None or "washed_mean_peak" not in entry for entry in variants
+    )
+
+
+def test_merge_threshold_variants_deduplicates() -> None:
+    merged = _merge_threshold_variants(
+        (None, {"white_area_frac": 0.6}),
+        (None, {"white_area_frac": 0.6}, {"min_white_frame_frac": 0.3}),
+    )
+    assert merged == (None, {"white_area_frac": 0.6}, {"min_white_frame_frac": 0.3})
 
 
 def test_evaluate_uses_cache_probe_profile() -> None:
