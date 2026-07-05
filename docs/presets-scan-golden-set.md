@@ -61,7 +61,7 @@ Shipped scan categories map as: `ok` -> `ok`; `dim` -> `dim`; `black` and `load_
 | 21 | Geiss - Explosion 2.milk | `ok` | Slow start |
 | 22 | Goody - Acid Angel - Fallen Angel.milk | `ok` | Slow start |
 | 23 | Goody - Lights in the Sky.milk | `ok` | Slow start |
-| 24 | Goody - Need - Transcendance remix.milk | `ok` | Clear pass |
+| 24 | Goody - Need - Transcendance remix.milk | `ok` | Clear pass; high luma but usable (not washed_out) |
 | 25 | Mstress & Juppy - Dancer.milk | `ok` | May appear dim but clearly working |
 | 26 | Rovastar & Zylot - Crystal Ball (Many Visions Mix).milk | `black` | Does not work |
 | 27 | Fast transition to black - levels effect ... Isosceles edit.milk | `black` | Does not work |
@@ -76,5 +76,14 @@ Shipped scan categories map as: `ok` -> `ok`; `dim` -> `dim`; `black` and `load_
 3. Probe each preset with clean boot and full-frame metrics (classifier rework).
 4. Compare classifier output to `expected_result`; report mismatches and accuracy per category.
 5. Tune thresholds until the labeled set passes; then spot-check on a larger pack.
+
+Golden metrics cache: slow probe profile (90 warmup + 60 window frames at 30 fps, 150 frames total). Use a fresh `ProjectM` per preset so feedback state does not leak between cases.
+
+- **Probe (default slow):** `cleave scan-golden --probe` writes v2 cache JSON with embedded probe profile metadata.
+- **Eval:** `cleave scan-golden --eval` reads warmup/window from the cache automatically; mismatched `--warmup` / `--window` flags error.
+- **Quick probe:** `cleave scan-golden --probe --quick` (90 frames) warns when overwriting the committed fixture cache.
+- **Legacy v1 caches:** eval infers profile from frame count (90=quick, 150=slow) with a stderr warning.
+
+Regenerate the committed fixture with `cleave scan-golden --probe` (slow is default) or `cleave scan-golden --probe --slow`.
 
 See [presets-scan-plan.md](presets-scan-plan.md#classifier-rework).

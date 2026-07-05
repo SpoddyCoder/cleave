@@ -164,7 +164,7 @@ cases:
     source_config: unnamed-24.yaml
     preset: presets-milkdrop-original/Milkdrop-Original/Goody - Need - Transcendance remix.milk
     expected_result: ok
-    notes: Clear pass.
+    notes: Clear pass. High luma but usable; not washed_out.
 
   - id: 25
     source_config: unnamed-25.yaml

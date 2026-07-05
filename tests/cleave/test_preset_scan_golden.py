@@ -14,13 +14,19 @@ from cleave.preset_scan import (
     DIM_MEAN_LUMA,
     QUICK_PROBE_WARMUP_FRAMES,
     QUICK_PROBE_WINDOW_FRAMES,
+    SLOW_PROBE_WARMUP_FRAMES,
+    SLOW_PROBE_WINDOW_FRAMES,
 )
 from cleave.preset_scan_golden import (
+    DEFAULT_METRICS_CACHE_PATH,
     GOLDEN_CASE_COUNT,
     GoldenCase,
     GoldenSet,
     evaluate,
     load_golden_set,
+    load_metrics_cache,
+    resolve_cache_probe_profile,
+    resolve_eval_probe_window,
     scan_result_to_golden,
     sweep,
 )
@@ -97,6 +103,10 @@ def _mini_cache(golden: GoldenSet) -> MetricsCache:
         version=METRICS_CACHE_VERSION,
         probe_fps=30,
         fbo_size=(480, 270),
+        probe_mode="quick",
+        warmup_frames=0,
+        window_frames=90,
+        total_frames=90,
         presets=(
             PresetMetrics(
                 path=ok_path,
@@ -208,6 +218,10 @@ def test_evaluate_reports_mismatch(tmp_path: Path) -> None:
         version=cache.version,
         probe_fps=cache.probe_fps,
         fbo_size=cache.fbo_size,
+        probe_mode=cache.probe_mode,
+        warmup_frames=cache.warmup_frames,
+        window_frames=cache.window_frames,
+        total_frames=cache.total_frames,
         presets=(
             PresetMetrics(
                 path=ok_path,
@@ -264,13 +278,17 @@ def test_sweep_ranks_better_configs_first(tmp_path: Path) -> None:
     assert results[0].accuracy >= results[1].accuracy
 
 
-def test_evaluate_uses_default_probe_window() -> None:
+def test_evaluate_uses_cache_probe_profile() -> None:
     golden = load_golden_set(FIXTURE_PATH)
     ok_path = golden.cases[2].preset
     cache = MetricsCache(
         version=METRICS_CACHE_VERSION,
         probe_fps=30,
         fbo_size=(480, 270),
+        probe_mode="slow",
+        warmup_frames=SLOW_PROBE_WARMUP_FRAMES,
+        window_frames=SLOW_PROBE_WINDOW_FRAMES,
+        total_frames=SLOW_PROBE_WARMUP_FRAMES + SLOW_PROBE_WINDOW_FRAMES,
         presets=(
             PresetMetrics(
                 path=ok_path,
@@ -280,7 +298,7 @@ def test_evaluate_uses_default_probe_window() -> None:
                 frames=(
                     _frame(max_luma=50.0, mean_luma=50.0, cutoff_16=0.5),
                 )
-                * (QUICK_PROBE_WARMUP_FRAMES + QUICK_PROBE_WINDOW_FRAMES),
+                * (SLOW_PROBE_WARMUP_FRAMES + SLOW_PROBE_WINDOW_FRAMES),
             ),
         ),
     )
@@ -293,5 +311,61 @@ def test_evaluate_uses_default_probe_window() -> None:
 
     report = evaluate(cache, mini)
 
-    assert report.warmup_frames == QUICK_PROBE_WARMUP_FRAMES
-    assert report.window_frames == QUICK_PROBE_WINDOW_FRAMES
+    assert report.warmup_frames == SLOW_PROBE_WARMUP_FRAMES
+    assert report.window_frames == SLOW_PROBE_WINDOW_FRAMES
+    assert report.probe_mode == "slow"
+
+
+def test_evaluate_rejects_profile_mismatch(tmp_path: Path) -> None:
+    golden = _mini_golden(tmp_path)
+    cache = _mini_cache(golden)
+
+    with pytest.raises(ValueError, match="eval probe profile mismatch"):
+        evaluate(cache, golden, warmup_frames=10, window_frames=90)
+
+
+def test_resolve_cache_probe_profile_infers_v1_quick(tmp_path: Path) -> None:
+    golden = _mini_golden(tmp_path)
+    cache = MetricsCache(
+        version=1,
+        probe_fps=30,
+        fbo_size=(480, 270),
+        presets=_mini_cache(golden).presets,
+    )
+
+    profile = resolve_cache_probe_profile(cache)
+
+    assert profile.mode == "quick"
+    assert profile.warmup_frames == QUICK_PROBE_WARMUP_FRAMES
+    assert profile.window_frames == QUICK_PROBE_WINDOW_FRAMES
+
+
+def test_resolve_eval_probe_window_uses_cache_by_default(tmp_path: Path) -> None:
+    golden = _mini_golden(tmp_path)
+    cache = _mini_cache(golden)
+
+    warmup, window, profile = resolve_eval_probe_window(cache)
+
+    assert warmup == 0
+    assert window == 90
+    assert profile.mode == "quick"
+
+
+GOLDEN_MIN_ACCURACY = 29
+# Case 2 (Airhandler): synthetic PCM produces bright peaks; live label is black.
+GOLDEN_KNOWN_MISMATCH_IDS = frozenset({2})
+
+
+def test_golden_metrics_cache_accuracy() -> None:
+    """Regression against committed slow-probe metrics cache."""
+    if not DEFAULT_METRICS_CACHE_PATH.is_file():
+        pytest.skip("metrics cache not generated; run: cleave scan-golden --probe")
+
+    golden = load_golden_set(FIXTURE_PATH)
+    cache = load_metrics_cache(DEFAULT_METRICS_CACHE_PATH)
+    report = evaluate(cache, golden)
+
+    assert report.total == GOLDEN_CASE_COUNT
+    assert report.correct >= GOLDEN_MIN_ACCURACY
+    mismatch_ids = {entry.id for entry in report.mismatches}
+    assert mismatch_ids <= GOLDEN_KNOWN_MISMATCH_IDS

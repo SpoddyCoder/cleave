@@ -511,10 +511,12 @@ def cmd_scan_golden(args: argparse.Namespace) -> None:
         DEFAULT_GOLDEN_SET_PATH,
         DEFAULT_METRICS_CACHE_PATH,
         evaluate,
+        format_probe_profile_summary,
         load_golden_set,
         load_metrics_cache,
         print_eval_report,
         probe_golden_set,
+        probe_profile,
         sweep,
     )
 
@@ -530,16 +532,40 @@ def cmd_scan_golden(args: argparse.Namespace) -> None:
     )
 
     if args.probe:
+        if args.quick and args.slow:
+            _exit_error("error: --quick and --slow are mutually exclusive")
+        slow = not args.quick
+        if (
+            args.quick
+            and cache_path == DEFAULT_METRICS_CACHE_PATH.resolve()
+        ):
+            print(
+                "Warning: quick probe overwrites the committed golden metrics cache; "
+                "use --slow (default) for eval-compatible fixtures",
+                file=sys.stderr,
+            )
         golden = load_golden_set(golden_path)
-        probe_golden_set(golden, cache_path, slow=args.slow)
-        print(f"Wrote metrics cache to {cache_path}", file=sys.stderr)
+        probe_golden_set(golden, cache_path, slow=slow)
+        profile = probe_profile(slow=slow)
+        print(
+            f"Wrote cache ({format_probe_profile_summary(profile)}) to {cache_path}",
+            file=sys.stderr,
+        )
         return
 
     golden = load_golden_set(golden_path)
     cache = load_metrics_cache(cache_path)
 
     if args.eval:
-        report = evaluate(cache, golden)
+        try:
+            report = evaluate(
+                cache,
+                golden,
+                warmup_frames=args.warmup,
+                window_frames=args.window,
+            )
+        except ValueError as exc:
+            _exit_error(f"error: {exc}")
         print_eval_report(report)
         return
 
@@ -825,7 +851,24 @@ def build_parser() -> argparse.ArgumentParser:
     scan_golden.add_argument(
         "--slow",
         action="store_true",
-        help="Use slow probe profile (--probe only)",
+        help="Use slow probe profile (default for golden cache)",
+    )
+    scan_golden.add_argument(
+        "--quick",
+        action="store_true",
+        help="Use quick probe profile (90 frames; not eval-compatible with slow cache)",
+    )
+    scan_golden.add_argument(
+        "--warmup",
+        type=int,
+        metavar="N",
+        help="Override eval warmup frames (must match cache profile)",
+    )
+    scan_golden.add_argument(
+        "--window",
+        type=int,
+        metavar="N",
+        help="Override eval window frames (must match cache profile)",
     )
     scan_golden.add_argument(
         "--cache",
