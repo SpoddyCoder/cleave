@@ -23,6 +23,7 @@ from cleave.preset_scan import (
     PresetResultCategory,
     ProbeMode,
     ProbeProfile,
+    _configure_probe_projectm,
     build_probe_pcm,
     classify_preset_result,
     probe_preset_metrics,
@@ -236,10 +237,7 @@ def probe_golden_set(
             _progress(f"Probing {index}/{total} {case.preset}...")
             pm = ProjectM()
             try:
-                pm.set_window_size(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT)
-                pm.set_fps(PROBE_FPS)
-                pm.set_hard_cut_enabled(False)
-                pm.set_texture_paths(texture_strs)
+                _configure_probe_projectm(pm, texture_strs)
                 presets.append(
                     probe_preset_metrics(
                         pm,
