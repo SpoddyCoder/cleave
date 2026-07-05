@@ -27,6 +27,7 @@ from cleave.preset_scan import (
     PROBE_FPS,
     QUICK_PROBE_WARMUP_FRAMES,
     QUICK_PROBE_WINDOW_FRAMES,
+    REFERENCE_CLIP_PATH,
     REPORT_FLUSH_EVERY,
     SCAN_THRESHOLDS,
     SLOW_PROBE_WARMUP_FRAMES,
@@ -48,11 +49,15 @@ from cleave.preset_scan import (
     WASHED_MEAN_MODERATE,
     PresetScanResult,
     PresetScanTimings,
+    ProbePcm,
     ScanReport,
+    build_probe_pcm,
     build_scan_report,
     classify_preset_result,
+    delete_presets,
     existing_report_status,
     load_resume_results,
+    probe_pcm_metadata,
     probe_profile,
     quarantine_presets,
     run_scan,
@@ -437,6 +442,9 @@ def test_build_scan_report_project_mode() -> None:
     assert report.probe_frames == QUICK_PROBE_WARMUP_FRAMES + QUICK_PROBE_WINDOW_FRAMES
     assert report.probe_fps == PROBE_FPS
     assert report.fbo_size == (PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT)
+    assert report.pcm_source == "synthetic"
+    assert report.pcm_channels == 1
+    assert report.reference_clip_path is None
     assert len(report.presets) == 2
 
     summary = scan_report_summary(report)
@@ -472,6 +480,9 @@ def test_build_scan_report_bulk_mode() -> None:
 
     assert report.scan_mode == "bulk"
     assert report.probe_mode == "slow"
+    assert report.pcm_source == "reference-clip"
+    assert report.pcm_channels == 2
+    assert report.reference_clip_path == REFERENCE_CLIP_PATH.resolve()
     assert report.project_dir is None
     assert report.config_path is None
     assert report.presets_dir == presets_dir.resolve()
@@ -495,6 +506,9 @@ def test_scan_report_serialization_round_trip() -> None:
         probe_frames=QUICK_PROBE_WARMUP_FRAMES + QUICK_PROBE_WINDOW_FRAMES,
         probe_fps=PROBE_FPS,
         fbo_size=(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT),
+        pcm_source="synthetic",
+        pcm_channels=1,
+        reference_clip_path=None,
         presets=(
             PresetScanResult(
                 path=preset_path,
@@ -517,6 +531,9 @@ def test_scan_report_serialization_round_trip() -> None:
     assert payload["probe_frames"] == QUICK_PROBE_WARMUP_FRAMES + QUICK_PROBE_WINDOW_FRAMES
     assert payload["probe_fps"] == PROBE_FPS
     assert payload["fbo_size"] == [PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT]
+    assert payload["pcm_source"] == "synthetic"
+    assert payload["pcm_channels"] == 1
+    assert "reference_clip_path" not in payload
     assert payload["presets"] == [
         {
             "path": str(preset_path),
@@ -568,6 +585,9 @@ def test_write_scan_report_atomic_round_trip() -> None:
         probe_frames=QUICK_PROBE_WARMUP_FRAMES + QUICK_PROBE_WINDOW_FRAMES,
         probe_fps=PROBE_FPS,
         fbo_size=(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT),
+        pcm_source="synthetic",
+        pcm_channels=1,
+        reference_clip_path=None,
         presets=(),
         complete=False,
     )
@@ -906,6 +926,7 @@ def test_probe_preset_clean_boot(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_fbo.fbo_id = 1
     target = PresetTarget(path=Path("/tmp/a.milk"), layers=("layer_1",))
     profile = probe_profile(slow=False)
+    pcm = build_probe_pcm(profile)
     frame = FrameMetrics(
         max_luma=50.0,
         mean_luma=25.0,
@@ -922,6 +943,7 @@ def test_probe_preset_clean_boot(monkeypatch: pytest.MonkeyPatch) -> None:
         fake_fbo,
         target,
         profile=profile,
+        pcm=pcm,
         n_pcm=100,
         frame_dt=1.0 / PROBE_FPS,
     )
@@ -968,11 +990,13 @@ def test_probe_preset_uses_peak_metrics_over_last_frame(
         window_frames=3,
         mode=short_profile.mode,
     )
+    pcm = build_probe_pcm(short_profile)
     result = _probe_preset(
         fake_pm,
         fake_fbo,
         target,
         profile=short_profile,
+        pcm=pcm,
         n_pcm=4,
         frame_dt=1.0 / PROBE_FPS,
     )
@@ -1048,3 +1072,84 @@ def test_load_resume_results_with_luma(tmp_path: Path) -> None:
     assert resume.results[0].luma is not None
     assert resume.results[0].luma.max_luma == 30.0
     assert resume.results[0].luma.mean_luma == 10.0
+
+
+def test_probe_pcm_metadata_quick() -> None:
+    meta = probe_pcm_metadata(probe_profile(slow=False))
+    assert meta == {
+        "pcm_source": "synthetic",
+        "pcm_channels": 1,
+        "reference_clip_path": None,
+    }
+
+
+def test_probe_pcm_metadata_slow() -> None:
+    meta = probe_pcm_metadata(probe_profile(slow=True))
+    assert meta["pcm_source"] == "reference-clip"
+    assert meta["pcm_channels"] == 2
+    assert meta["reference_clip_path"] == REFERENCE_CLIP_PATH.resolve()
+
+
+def test_build_probe_pcm_quick() -> None:
+    pcm = build_probe_pcm(probe_profile(slow=False))
+    assert pcm.source == "synthetic"
+    assert pcm.channels == 1
+    assert pcm._pcm is None
+    chunk = pcm.chunk(3, 100)
+    assert chunk.shape == (100,)
+    assert float(np.max(np.abs(chunk))) > 0.01
+
+
+def test_build_probe_pcm_slow() -> None:
+    pcm = build_probe_pcm(probe_profile(slow=True))
+    assert pcm.source == "reference-clip"
+    assert pcm.channels == 2
+    assert pcm._pcm is not None
+    assert pcm.reference_clip_path == REFERENCE_CLIP_PATH.resolve()
+    chunk = pcm.chunk(0, 100)
+    assert chunk.shape == (200,)
+
+
+def test_probe_pcm_chunk_zero_pads_past_end() -> None:
+    pcm = ProbePcm(
+        channels=2,
+        source="reference-clip",
+        reference_clip_path=REFERENCE_CLIP_PATH,
+        _pcm=np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32),
+    )
+    chunk = pcm.chunk(9999, 10)
+    assert chunk.shape == (20,)
+    assert np.all(chunk == 0.0)
+
+
+def test_scan_report_slow_includes_reference_clip_path() -> None:
+    report = build_scan_report(
+        scan_mode="bulk",
+        profile=probe_profile(slow=True),
+        targets=ScanTargets(presets=()),
+        results=(),
+    )
+    payload = scan_report_to_dict(report)
+    assert payload["pcm_source"] == "reference-clip"
+    assert payload["pcm_channels"] == 2
+    assert payload["reference_clip_path"] == str(REFERENCE_CLIP_PATH.resolve())
+
+
+def test_delete_presets_removes_failures(tmp_path: Path) -> None:
+    presets_dir = tmp_path / "presets"
+    presets_dir.mkdir()
+    ok_path = presets_dir / "good.milk"
+    bad_path = presets_dir / "bad.milk"
+    ok_path.write_text("ok", encoding="utf-8")
+    bad_path.write_text("bad", encoding="utf-8")
+
+    deleted = delete_presets(
+        [
+            PresetScanResult(path=ok_path, result="ok", layers=()),
+            PresetScanResult(path=bad_path, result="black", layers=()),
+        ]
+    )
+
+    assert ok_path.is_file()
+    assert not bad_path.exists()
+    assert deleted == [bad_path]

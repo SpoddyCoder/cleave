@@ -9,10 +9,10 @@ Implementation plan for `cleave scan`: offline batch classification of Milkdrop 
 | v1 | Done | Project/bulk scan, quick/`--slow` profiles, JSON report, v1 classifier |
 | v2 | Done | `--quarantine`, `--resume`, incremental/interrupt-safe reports |
 | Live clean boot | Done | Manual preset browse forces black boot ([cleave/viz/preset_switching.py](../cleave/viz/preset_switching.py) `load_manual_preset_clean`) |
-| Classifier rework | Outstanding | Clean-boot probe, full-frame metrics, manual test set, threshold retune |
-| v3 | Outstanding | `--delete`, reference clip for `--slow`, report PCM metadata |
+| Classifier rework | Done | Clean-boot probe, full-frame metrics, peak-across-frames rules, golden-set tuning |
+| v3 | Done | `--delete`, reference clip for `--slow`, report PCM metadata |
 
-**Classifier:** v1/v2 ship a center-patch, mean-only probe with a shared `ProjectM`. Results are useful for smoke tests but not trusted for bulk quarantine. See [Classifier rework](#classifier-rework) and [presets-scan-learnings.md](presets-scan-learnings.md).
+**Classifier:** Shipped probe uses clean boot per preset, full-frame luma sampling, peak max/mean/coverage across post-warmup frames, and retuned thresholds validated against the 30-case golden set ([presets-scan-golden-set.md](presets-scan-golden-set.md)). See [presets-scan-learnings.md](presets-scan-learnings.md) for tuning notes.
 
 ## Goals
 
@@ -56,12 +56,12 @@ cleave scan --presets-dir <dir> --texture-path <dir> [--texture-path ...] [optio
 
 | Flag | Purpose |
 | --- | --- |
-| (default) | Quick probe: 15 frames, 0.5 s warmup; synthetic mono PCM; report on stderr, optional JSON |
-| `--slow` | 60 frames, 3 s warmup; same synthetic mono PCM today (reference clip planned for v3) |
+| (default) | Quick probe: 15 frames warmup + 75 window; synthetic mono PCM; report on stderr, optional JSON |
+| `--slow` | 90 frames warmup + 60 window; stereo reference clip ([assets/audio/scan-reference-10s.wav](../assets/audio/scan-reference-10s.wav)) |
 | `--report <path>` | JSON report path; written incrementally so a run can be resumed |
 | `--recursive` | Bulk mode only: scan subdirectories |
 | `--quarantine <dir>` | Move failed presets to DIR; DIR must be outside the scan set |
-| `--delete` | Remove failed presets after the scan (v3); prompts unless `--yes` |
+| `--delete` | Remove failed presets after the scan; prompts unless `--yes` |
 | `--yes` | Skip confirmation for `--delete` (required when stdin is not a TTY) |
 | `--resume` | Skip presets already in the `--report` file; requires `--report PATH` |
 
@@ -85,37 +85,32 @@ Project mode: always apply `paths.texture_paths` from the loaded config.
 
 Bulk mode: require at least one texture path (`--texture-path` and/or from `-c`). Record paths used in the report.
 
-## Per-preset probe (shipped v1/v2)
+## Per-preset probe (shipped)
 
-Hidden pygame GL context, one shared [ProjectM](../cleave/projectm.py) for the run, small RGBA FBO (480x270). Switch-failed callbacks from the projectM robustness work ([todos.md](todos.md)).
+Hidden pygame GL context, one shared [ProjectM](../cleave/projectm.py) per preset (fresh instance in golden harness; shared in bulk scan with clean boot per preset), 480x270 RGBA FBO. Switch-failed callbacks from the projectM robustness work ([todos.md](todos.md)).
 
 Per preset:
 
-1. `load_preset(path, smooth=False)` then `lock_preset(True)` (no clean-boot flag today; feedback can carry from the previous preset).
-2. Render `warmup_frames + profile.frames` at 30 fps with synthetic mono PCM.
-3. After warmup, sample a 32x32 luma patch at the frame center each frame; keep max and mean from the **last** post-warmup frame only.
-4. Classify from load failures plus those two values.
+1. `set_preset_start_clean(True)` then `load_preset(path, smooth=False)` then restore clean-boot flag.
+2. Render `warmup_frames + window_frames` at 30 fps with probe PCM (synthetic mono for quick; stereo reference clip for slow).
+3. After warmup, full-frame `glReadPixels` each frame; per frame record max luma, mean luma, and coverage at luma cutoffs (8, 16, 32, 64, 128, 192).
+4. Classify from load failures plus peak max, peak mean, and peak coverage across all post-warmup frames.
 
-**Quick (default):** 15 frames, 0.5 s warmup.
+**Quick (default):** 15 warmup + 75 window frames; synthetic mono PCM.
 
-**`--slow`:** 60 frames, 3 s warmup. Same PCM as quick until v3 wires [assets/audio/scan-reference-10s.wav](../assets/audio/scan-reference-10s.wav) (10 s excerpt from `projects/sights-and-sounds-26/sights-and-sounds-26.wav` starting at 82 s).
+**`--slow`:** 90 warmup + 60 window frames; stereo reference clip at [assets/audio/scan-reference-10s.wav](../assets/audio/scan-reference-10s.wav) (10 s excerpt from `projects/sights-and-sounds-26/sights-and-sounds-26.wav` starting at 82 s).
 
-Result categories: `load_failed`, `black`, `dim`, `ok` (see proposal).
+Result categories: `load_failed`, `black`, `dim`, `washed_out`, `ok` (see proposal).
 
 ### Classification thresholds (shipped)
 
-Recorded in each report under `thresholds`:
+Recorded in each report under `thresholds`. Constants live in [cleave/preset_scan.py](../cleave/preset_scan.py) (`SCAN_THRESHOLDS`). Tuned against the golden set; see [presets-scan-golden-set.md](presets-scan-golden-set.md).
 
-| Key | Default | Use |
-| --- | --- | --- |
-| `black_max_luma` | 1.0 | Peak max luma below this => `black` |
-| `dim_mean_luma` | 8.0 | Peak mean luma below this (but not black) => `dim` |
-
-No `luma` block per preset in v1/v2 reports. No coverage metrics.
+Per-preset `luma: { max, mean, coverage }` in JSON reports holds the peak values used for classification.
 
 ### Destructive actions
 
-When `--quarantine` or `--delete` is used **without** `--slow`, print a clear stderr warning that quick mode has more false positives and recommend re-running with `--slow` before moving or deleting files. Do not block the action. Treat quarantine as safe only after classifier rework and manual spot checks.
+When `--quarantine` or `--delete` is used **without** `--slow`, print a clear stderr warning that quick mode has more false positives and recommend re-running with `--slow` before moving or deleting files. Do not block the action. Prefer `--slow` before bulk quarantine or delete.
 
 ## JSON report
 
@@ -123,12 +118,15 @@ Include environment metadata:
 
 - `scan_mode`: `project` | `bulk`
 - `probe_mode`: `quick` | `slow`
+- `pcm_source`: `synthetic` | `reference-clip`
+- `pcm_channels`: 1 (quick) or 2 (slow)
+- `reference_clip_path`: absolute path to the reference wav when `probe_mode` is `slow`
 - `complete`: `true` on normal finish, `false` if interrupted (v2)
 - `project_dir`, `config_path` (project mode)
 - `preset_root`, `texture_paths` (resolved absolute)
 - `layers`: slot -> list of contributing paths or dirs
 - `thresholds`, `probe_frames`, `probe_fps`, `fbo_size`
-- `presets`: deduplicated entries with `path`, `result`, `layers[]`, optional timings/errors
+- `presets`: deduplicated entries with `path`, `result`, `layers[]`, optional `luma`, timings/errors
 
 ### Incremental writes and resume (v2, done)
 
@@ -139,28 +137,13 @@ Include environment metadata:
 - Incomplete report without `--resume`: error with resume command before probing.
 - Complete report with `--resume`: error before probing.
 
-### Quarantine checks (v2, done)
+### Quarantine and delete checks (v2/v3, done)
 
-- Target must be a directory (create with parents if missing).
+- Target must be a directory (create with parents if missing) for quarantine.
 - Reject quarantine dir inside the scanned preset tree.
-- Only `load_failed`, `black`, `dim` are moved.
-
-## Classifier rework
-
-Target behavior for the next scan harness change (not yet implemented):
-
-1. **Clean boot** — `set_preset_start_clean(True)` before each `load_preset`, or fresh `ProjectM` per preset. Matches live manual browse and removes order-dependent feedback contamination.
-2. **Full-frame sampling** — `glReadPixels` over the probe FBO; per frame record max luma, mean luma, coverage (fraction of pixels >= `coverage_luma_min`).
-3. **Peak across frames** — Classification uses peak max, peak mean, and peak coverage across all post-warmup frames (consider frame 0 as well so flash-then-fade is caught).
-4. **Combined rules** — Coverage for bright-on-black; mean for uniformly dim output; bright-on-black guard for tunnel/kaleidoscope presets. Starting constants from exploration: `coverage_luma_min` 16, `black_coverage` 0.0005, `dim_coverage` 0.01, `dim_mean_luma` 10, guard `max >= 100` and `coverage >= 0.02`. Tune against a manual set.
-5. **Report fields** — Optional per-preset `luma: { max, mean, coverage }` with the peak values used.
-
-### Manual test set workflow
-
-1. Set layer `preset_switching` to `none` (or `user_defined`) and browse presets with Left/Right (clean boot is automatic).
-2. Label examples: `ok`, `dim`, broken (black / never develops). Save paths and notes. Golden set: [presets-scan-golden-set.md](presets-scan-golden-set.md) ([tests/fixtures/preset_scan_golden_set.yaml](../tests/fixtures/preset_scan_golden_set.yaml), 30 cases from `projects/sights-and-sounds-26/unnamed-*.yaml`).
-3. Implement harness changes above; add a small test or script that classifies the labeled set and reports mismatches.
-4. Tune thresholds; run `--slow` on a larger pack; spot-check before `--quarantine`.
+- Only `load_failed`, `black`, `dim`, `washed_out` are moved or deleted.
+- `--delete` prompts for confirmation unless `--yes`; requires `--yes` when stdin is not a TTY.
+- `--delete` and `--quarantine` are mutually exclusive.
 
 ## Architecture
 
@@ -168,7 +151,8 @@ Target behavior for the next scan harness change (not yet implemented):
 | --- | --- |
 | Scan harness + classification | [cleave/preset_scan.py](../cleave/preset_scan.py) |
 | Scan set builder | [cleave/preset_scan_targets.py](../cleave/preset_scan_targets.py) |
-| CLI | [cleave/cli.py](../cleave/cli.py) `cmd_scan` |
+| Golden harness | [cleave/preset_scan_golden.py](../cleave/preset_scan_golden.py) |
+| CLI | [cleave/cli.py](../cleave/cli.py) `cmd_scan`, `cmd_scan_golden` |
 | Live clean manual load | [cleave/viz/preset_switching.py](../cleave/viz/preset_switching.py) `load_manual_preset_clean` |
 | Config | [cleave/config.py](../cleave/config.py) load + `paths.texture_paths` |
 
@@ -182,7 +166,7 @@ Does not use [layer_pipeline.py](../cleave/viz/layer_pipeline.py) or the composi
 - Scan set derivation as above
 - Dedup + layer attribution in report
 - Report-only, synthetic PCM, load failure + luminance check
-- Quick probe (default) and `--slow` profile (timing only; same PCM)
+- Quick probe (default) and `--slow` profile
 
 **v2 (done)**
 
@@ -194,13 +178,13 @@ Does not use [layer_pipeline.py](../cleave/viz/layer_pipeline.py) or the composi
 
 - Manual preset browse clean boot for honest preset review
 
-**Classifier rework (next)**
+**Classifier rework (done)**
 
 - Clean-boot probe, full-frame coverage metrics, peak-across-frames, retuned thresholds
-- Manual labeled test set + harness validation before bulk quarantine
+- Manual labeled test set + golden harness validation
 - Per-preset `luma` in JSON report
 
-**v3**
+**v3 (done)**
 
 - `--delete` with confirmation (`--yes` to skip prompt; required when stdin is not a TTY); same `--slow` warning as quarantine; mutually exclusive with `--quarantine`
 - Bundled stereo reference clip for `--slow` probes ([assets/audio/scan-reference-10s.wav](../assets/audio/scan-reference-10s.wav)); quick mode stays synthetic mono
@@ -212,7 +196,7 @@ Project scan: typically tens to low hundreds of presets (per-layer rotation dirs
 
 ## Open questions
 
-- Final coverage and mean thresholds per pack (blocked on manual test set).
+- Final coverage and mean thresholds per pack beyond the golden set.
 - Quarantine: preserve directory structure vs flat hashed names.
 - CI: headless GL unreliable; keep local/dev tool unless GPU runner exists.
 - Whether auto `projectm` rotation should optionally force clean boot (today only manual browse does).
@@ -221,6 +205,7 @@ Project scan: typically tens to low hundreds of presets (per-layer rotation dirs
 
 - [presets-scan-learnings.md](presets-scan-learnings.md) — investigation arc and threshold tuning notes
 - [presets-check-proposal.md](presets-check-proposal.md) — problem statement and classification heuristics
+- [presets-scan-golden-set.md](presets-scan-golden-set.md) — manual labels and golden harness
 - [projectm-api-coverage.md](projectm-api-coverage.md) — libprojectM symbol audit and live failure handling
 - [preset-switching-proposal.md](legacy-plans/preset-switching-proposal.md) — live rotation design
 - [todos.md](todos.md) — projectM robustness callbacks (shared with scan)

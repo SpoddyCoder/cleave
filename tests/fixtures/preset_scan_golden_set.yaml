@@ -1,6 +1,5 @@
 # Golden set for preset scan classifier tuning.
 # Manual labels from live review (clean manual preset boot) in
-# projects/sights-and-sounds-26/unnamed-1.yaml .. unnamed-25.yaml.
 #
 # expected_result:
 #   ok        - pass; do not quarantine
@@ -14,12 +13,6 @@ version: 1
 preset_root: ~/milkdrop-presets
 texture_paths:
   - ~/milkdrop-presets/presets-milkdrop-texture-pack
-source_project: projects/sights-and-sounds-26
-source_configs: unnamed-1.yaml through unnamed-30.yaml
-review_notes: >
-  Labels from layer_1 preset comments while browsing with clean manual preset
-  boot (load_manual_preset_clean). Most configs use beat_sensitivity 2.0 on
-  layer_1; unnamed-8 through unnamed-10 use ~0.9.
 
 cases:
   - id: 1

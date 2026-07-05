@@ -13,7 +13,9 @@ from cleave.config import (
 from cleave.paths import resolve_project
 from cleave.preset_scan import (
     PresetScanResult,
+    QUARANTINE_CATEGORIES,
     build_scan_report,
+    delete_presets,
     existing_report_status,
     load_resume_results,
     probe_profile,
@@ -214,6 +216,39 @@ def _warn_quarantine_without_slow() -> None:
     )
 
 
+def _warn_delete_without_slow() -> None:
+    print(
+        "warning: --delete without --slow may remove presets flagged by quick "
+        "probe false positives; re-run with --slow before deleting",
+        file=sys.stderr,
+    )
+
+
+def _delete_candidate_count(
+    results: list[PresetScanResult] | tuple[PresetScanResult, ...],
+) -> int:
+    return sum(
+        1
+        for result in results
+        if result.result in QUARANTINE_CATEGORIES and result.path.is_file()
+    )
+
+
+def _confirm_delete(count: int, *, yes: bool) -> None:
+    if count == 0:
+        return
+    if yes:
+        return
+    if not sys.stdin.isatty():
+        _exit_error("error: --delete requires --yes when stdin is not a TTY")
+    try:
+        answer = input(f"Delete {count} preset file(s) flagged by scan? [y/N] ").strip()
+    except EOFError:
+        answer = ""
+    if answer.lower() not in ("y", "yes"):
+        _exit_error("error: delete cancelled")
+
+
 def _warn_golden_probe_without_slow() -> None:
     print(
         "warning: quick probe overwrites the committed golden metrics cache; "
@@ -346,6 +381,9 @@ def cmd_scan(args: argparse.Namespace) -> None:
 
     if args.quarantine is not None and not args.slow:
         _warn_quarantine_without_slow()
+
+    if args.delete and not args.slow:
+        _warn_delete_without_slow()
 
     profile = probe_profile(slow=args.slow)
     current_scan_mode = "bulk" if bulk_mode else "project"
@@ -512,6 +550,13 @@ def cmd_scan(args: argparse.Namespace) -> None:
         moves = quarantine_presets(results, quarantine_dir)
         for src, dst in moves:
             print(f"Quarantined {src} -> {dst}")
+
+    if args.delete:
+        delete_count = _delete_candidate_count(results)
+        _confirm_delete(delete_count, yes=args.yes)
+        deleted = delete_presets(results)
+        for path in deleted:
+            print(f"Deleted {path}")
 
 
 def cmd_scan_golden(args: argparse.Namespace) -> None:
@@ -813,11 +858,22 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Continue a prior scan; requires --report PATH to an existing report",
     )
-    scan.add_argument(
+    scan_action = scan.add_mutually_exclusive_group()
+    scan_action.add_argument(
         "--quarantine",
         type=Path,
         metavar="DIR",
         help="Move failed presets (load_failed, black, dim, washed_out) to DIR",
+    )
+    scan_action.add_argument(
+        "--delete",
+        action="store_true",
+        help="Delete failed presets after the scan (prompts unless --yes)",
+    )
+    scan.add_argument(
+        "--yes",
+        action="store_true",
+        help="Skip confirmation for --delete (required when stdin is not a TTY)",
     )
     scan.set_defaults(func=cmd_scan)
 
