@@ -8,8 +8,8 @@ Committed metrics cache (quick probe): [tests/fixtures/preset_scan_golden_metric
 
 ## Review context
 
-- **Preset root:** `~/milkdrop-presets`
-- **Texture paths:** `~/milkdrop-presets/presets-milkdrop-texture-pack`
+- **Preset root:** [assets/milkdrop-presets/](../assets/milkdrop-presets/) (git submodules; see [README](../README.md))
+- **Texture paths:** `assets/milkdrop-presets/presets-milkdrop-texture-pack`
 - **Pack:** `presets-milkdrop-original/Milkdrop-Original/`
 - **Method:** Live browse with `load_manual_preset_clean` (black boot per switch)
 - **Beat sensitivity:** 2.0 on layer 1 in most configs; ~0.9 in unnamed-8 through unnamed-10

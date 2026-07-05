@@ -10,9 +10,9 @@
 # Harness should resolve preset paths against preset_root and apply texture_paths.
 
 version: 1
-preset_root: ~/milkdrop-presets
+preset_root: assets/milkdrop-presets
 texture_paths:
-  - ~/milkdrop-presets/presets-milkdrop-texture-pack
+  - assets/milkdrop-presets/presets-milkdrop-texture-pack
 
 cases:
   - id: 1
