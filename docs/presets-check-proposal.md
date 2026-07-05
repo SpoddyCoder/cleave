@@ -2,7 +2,7 @@
 
 Offline CLI to scan Milkdrop preset directories, classify each `.milk` file, and optionally quarantine or remove failures. Replaces the idea of skipping black presets at runtime during projectM auto-switching, which is hard to tune and risks false positives in live sessions.
 
-**Status:** CLI and scan-set design live in [presets-scan-plan.md](presets-scan-plan.md) (v1/v2 implemented; classifier rework outstanding). This doc keeps problem statement, probe heuristics, and runtime estimates.
+**Status:** Implemented. CLI and scan-set design: [presets-scan-plan.md](presets-scan-plan.md). Golden labels: [presets-scan-golden-set.md](presets-scan-golden-set.md).
 
 ## Problem
 
@@ -20,40 +20,31 @@ See [presets-scan-plan.md](presets-scan-plan.md) for CLI (`cleave scan <project_
 
 ## Per-preset behavior
 
-### Shipped (v1/v2)
+### Shipped probe
 
-Minimal harness (no Cleave project, stems, or compositor stack):
+Minimal harness (no Cleave compositor stack):
 
 1. Open a hidden pygame OpenGL context once.
-2. Create one [ProjectM](../cleave/projectm.py) instance and a small RGBA FBO (480x270).
+2. Create a [ProjectM](../cleave/projectm.py) instance (fresh per preset in golden harness) and a 480x270 RGBA FBO.
 3. Set texture search paths from config or flags.
-4. For each `.milk`:
-   - `load_preset(smooth=False)`; record libprojectM load/parse failures via switch-failed callbacks (see [todos.md](todos.md) projectM robustness item).
-   - Feed synthetic mono PCM (sine plus noise burst, not silence).
-   - Advance frame time and render for the active probe profile (quick or `--slow`; timing differs, PCM is the same today).
-   - After warmup, sample a small center `glReadPixels` patch; use max and mean luma from the last post-warmup frame.
-5. Classify and record result.
+4. For each `.milk`: clean boot, load, feed probe PCM, render for the active profile (quick or `--slow`), sample full-frame luma each frame.
+5. Classify from load failures plus peak max, mean, and coverage across post-warmup frames.
 
-**Known limitation:** shared `ProjectM` without clean boot inherits feedback from the previous preset. Scan order can change outcomes. See [presets-scan-learnings.md](presets-scan-learnings.md).
-
-### Planned (classifier rework)
-
-Clean boot per preset, full-frame luma, peak metrics across frames, coverage plus mean rules. Manual labeled test set before trusting bulk quarantine. Details in [presets-scan-plan.md](presets-scan-plan.md#classifier-rework).
+See [presets-scan-plan.md](presets-scan-plan.md) and [presets-scan-learnings.md](presets-scan-learnings.md).
 
 ### Live visualizer (shipped)
 
 Manual preset browse (`preset_switching` `none` or `user_defined`) forces a clean black boot so presets can be judged without feedback carry-over from the previous preset. Auto `projectm` rotation unchanged.
 
-### Result categories
+| Result | Meaning |
+| --- | --- |
+| `load_failed` | Parse or load error from libprojectM |
+| `black` | Does not develop after warmup |
+| `dim` | Too dim to use |
+| `washed_out` | Extreme white blowout |
+| `ok` | Passes thresholds |
 
-| Result | Meaning | Confidence (shipped probe) |
-| --- | --- | --- |
-| `load_failed` | Parse or load error from libprojectM | High |
-| `black` | Max luma below threshold after warmup | Medium (center patch; contamination) |
-| `dim` | Low mean luma but non-zero max | Medium |
-| `ok` | Passes thresholds | — |
-
-**Not reliably detected in quick mode:** presets that flash then fade to black, presets that only work on a specific stem, legitimately dark presets that are intentional. Longer `--slow` warmup helps timing only until reference audio and reworked metrics land.
+Run `--slow` before bulk quarantine. Golden case 2 has a known visualizer vs scan label disparity; quarantine outcome is still correct. See [presets-scan-golden-set.md](presets-scan-golden-set.md).
 
 ## Runtime
 

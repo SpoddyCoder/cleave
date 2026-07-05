@@ -8,6 +8,10 @@ Must-do items for Cleave. Everything else is iterative enhancements or listed in
 
 Outstanding bugs and issues.
 
+### Preset scan: golden case 2 visualizer vs probe disparity
+
+Golden case 2 (Aderrasi - Airhandler): stays **black** in the live visualizer (clean boot, including at the reference-clip offset ~82 s). Scan classifies **`washed_out`** in both quick and slow probe profiles. Quarantine outcome is acceptable; root cause of the visualizer vs scan split is unknown. Investigate probe environment (raw projectM vs compositor, PCM feeding, resolution, timing) and whether classification rules need a distinct path for this failure mode.
+
 ---
 
 ## Architecture
