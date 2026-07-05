@@ -87,7 +87,7 @@ SPARSE_DIM_COV16_MAX = 0.20
 
 CAPPED_DIM_MEAN = 21.0
 CAPPED_DIM_MAX_LO = 50.0
-CAPPED_DIM_MAX_HI = 120.0
+CAPPED_DIM_MAX_HI = 90.0
 CAPPED_DIM_COV16 = 0.25
 
 WASHED_MEAN_HIGH = 195.0
@@ -96,8 +96,11 @@ WASHED_COVERAGE_HIGH_MAX = 0.99
 WASHED_MEAN_MODERATE = 193.5
 WASHED_COVERAGE_MODERATE = 0.45
 WASHED_MEAN_MID = 125.0
+WASHED_MEAN_BROAD = 180.0
 WASHED_COV16_MIN = 0.99
+WASHED_COV128_MIN = 0.99
 WASHED_COV192_CAP = 0.20
+WASHED_COV192_BROAD_MIN = 0.35
 
 BRIGHT_ON_BLACK_MAX = 25.0
 BRIGHT_ON_BLACK_COVERAGE = 0.00025
@@ -124,8 +127,11 @@ SCAN_THRESHOLDS: dict[str, float] = {
     "washed_mean_moderate": WASHED_MEAN_MODERATE,
     "washed_coverage_moderate": WASHED_COVERAGE_MODERATE,
     "washed_mean_mid": WASHED_MEAN_MID,
+    "washed_mean_broad": WASHED_MEAN_BROAD,
     "washed_cov16_min": WASHED_COV16_MIN,
+    "washed_cov128_min": WASHED_COV128_MIN,
     "washed_cov192_cap": WASHED_COV192_CAP,
+    "washed_cov192_broad_min": WASHED_COV192_BROAD_MIN,
     "bright_on_black_max": BRIGHT_ON_BLACK_MAX,
     "bright_on_black_coverage": BRIGHT_ON_BLACK_COVERAGE,
     "coverage_luma_min": float(COVERAGE_LUMA_MIN),
@@ -249,6 +255,7 @@ def classify_preset_result(
 
     max_luma, mean_luma, coverage = _normalize_peak_metrics(peaks)
     cov_min = coverage[int(th["coverage_luma_min"])]
+    cov128 = coverage[128]
     cov_washed = coverage[WASHED_COVERAGE_CUTOFF]
 
     if (
@@ -262,6 +269,15 @@ def classify_preset_result(
         mean_luma >= th["washed_mean_moderate"]
         and cov_min >= th["washed_cov16_min"]
         and cov_washed >= th["washed_coverage_moderate"]
+        and cov_washed < th["washed_coverage_high_max"]
+    ):
+        return "washed_out", None
+
+    if (
+        mean_luma >= th["washed_mean_broad"]
+        and cov_min >= th["washed_cov16_min"]
+        and cov128 >= th["washed_cov128_min"]
+        and cov_washed >= th["washed_cov192_broad_min"]
         and cov_washed < th["washed_coverage_high_max"]
     ):
         return "washed_out", None
