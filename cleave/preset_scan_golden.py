@@ -18,7 +18,10 @@ from cleave.preset_scan import (
     PROBE_FPS,
     QUICK_PROBE_WARMUP_FRAMES,
     QUICK_PROBE_WINDOW_FRAMES,
+    SLOW_PROBE_WARMUP_FRAMES,
+    SLOW_PROBE_WINDOW_FRAMES,
     PresetResultCategory,
+    ProbeProfile,
     classify_preset_result,
     probe_preset_metrics,
     probe_profile,
@@ -83,6 +86,7 @@ class EvalReport:
     mismatches: tuple[EvalMismatch, ...]
     warmup_frames: int
     window_frames: int
+    probe_mode: str
 
 
 @dataclass(frozen=True)
@@ -214,38 +218,37 @@ def probe_golden_set(
         pygame.quit()
         raise RuntimeError(f"failed to open OpenGL context: {exc}") from exc
 
-    pm: ProjectM | None = None
     fbo = None
     presets: list[PresetMetrics] = []
     total = len(golden.cases)
     try:
-        pm = ProjectM()
-        pm.set_window_size(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT)
-        pm.set_fps(PROBE_FPS)
-        pm.set_hard_cut_enabled(False)
-        pm.set_texture_paths(texture_strs)
-
         fbo = create_probe_fbo(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT)
         n_pcm = samples_per_frame(PROBE_FPS)
         frame_dt = 1.0 / PROBE_FPS
 
         for index, case in enumerate(golden.cases, start=1):
             _progress(f"Probing {index}/{total} {case.preset}...")
-            presets.append(
-                probe_preset_metrics(
-                    pm,
-                    fbo,
-                    case.preset,
-                    profile=profile,
-                    n_pcm=n_pcm,
-                    frame_dt=frame_dt,
+            pm = ProjectM()
+            try:
+                pm.set_window_size(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT)
+                pm.set_fps(PROBE_FPS)
+                pm.set_hard_cut_enabled(False)
+                pm.set_texture_paths(texture_strs)
+                presets.append(
+                    probe_preset_metrics(
+                        pm,
+                        fbo,
+                        case.preset,
+                        profile=profile,
+                        n_pcm=n_pcm,
+                        frame_dt=frame_dt,
+                    )
                 )
-            )
+            finally:
+                pm.destroy()
     finally:
         if fbo is not None:
             fbo.destroy()
-        if pm is not None:
-            pm.destroy()
         pygame.quit()
 
     cache = MetricsCache(
@@ -253,20 +256,117 @@ def probe_golden_set(
         presets=tuple(presets),
         probe_fps=PROBE_FPS,
         fbo_size=(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT),
+        probe_mode=profile.mode,
+        warmup_frames=profile.warmup_frames,
+        window_frames=profile.window_frames,
+        total_frames=profile.total_frames,
     )
     write_metrics_cache(cache_path, cache)
     return cache
+
+
+def format_probe_profile_summary(profile: ProbeProfile) -> str:
+    return (
+        f"{profile.mode}: {profile.warmup_frames} warmup + "
+        f"{profile.window_frames} window, {profile.total_frames} frames"
+    )
+
+
+def resolve_cache_probe_profile(
+    cache: MetricsCache,
+    *,
+    file: Any = None,
+) -> ProbeProfile:
+    """Return the probe profile stored in or inferred from a metrics cache."""
+    if (
+        cache.probe_mode is not None
+        and cache.warmup_frames is not None
+        and cache.window_frames is not None
+    ):
+        return ProbeProfile(
+            warmup_frames=cache.warmup_frames,
+            window_frames=cache.window_frames,
+            mode=cache.probe_mode,
+        )
+
+    frame_counts = [len(entry.frames) for entry in cache.presets if entry.frames]
+    if not frame_counts:
+        raise ValueError("cannot infer probe profile from cache with no frame data")
+
+    unique_counts = sorted(set(frame_counts))
+    if len(unique_counts) != 1:
+        raise ValueError(
+            "cannot infer probe profile from cache with inconsistent frame counts: "
+            + ", ".join(str(count) for count in unique_counts)
+        )
+
+    count = unique_counts[0]
+    if count == QUICK_PROBE_WARMUP_FRAMES + QUICK_PROBE_WINDOW_FRAMES:
+        profile = probe_profile(slow=False)
+    elif count == SLOW_PROBE_WARMUP_FRAMES + SLOW_PROBE_WINDOW_FRAMES:
+        profile = probe_profile(slow=True)
+    else:
+        raise ValueError(
+            f"cannot infer probe profile from {count} cached frames per preset "
+            f"(expected {QUICK_PROBE_WARMUP_FRAMES + QUICK_PROBE_WINDOW_FRAMES} "
+            f"for quick or {SLOW_PROBE_WARMUP_FRAMES + SLOW_PROBE_WINDOW_FRAMES} for slow)"
+        )
+
+    out = file if file is not None else sys.stderr
+    print(
+        f"Warning: metrics cache v{cache.version} missing probe profile metadata; "
+        f"inferred {format_probe_profile_summary(profile)} from frame count",
+        file=out,
+    )
+    return profile
+
+
+def resolve_eval_probe_window(
+    cache: MetricsCache,
+    *,
+    warmup_frames: int | None = None,
+    window_frames: int | None = None,
+    strict: bool = True,
+    file: Any = None,
+) -> tuple[int, int, ProbeProfile]:
+    """Resolve eval warmup/window from cache metadata, checking explicit overrides."""
+    profile = resolve_cache_probe_profile(cache, file=file)
+    cache_warmup = profile.warmup_frames
+    cache_window = profile.window_frames
+
+    resolved_warmup = cache_warmup if warmup_frames is None else warmup_frames
+    resolved_window = cache_window if window_frames is None else window_frames
+
+    if strict and (
+        resolved_warmup != cache_warmup or resolved_window != cache_window
+    ):
+        raise ValueError(
+            "eval probe profile mismatch: cache has "
+            f"{format_probe_profile_summary(profile)}; "
+            f"requested warmup={resolved_warmup} window={resolved_window}"
+        )
+
+    return resolved_warmup, resolved_window, profile
 
 
 def evaluate(
     cache: MetricsCache,
     golden: GoldenSet,
     *,
-    warmup_frames: int = QUICK_PROBE_WARMUP_FRAMES,
-    window_frames: int = QUICK_PROBE_WINDOW_FRAMES,
+    warmup_frames: int | None = None,
+    window_frames: int | None = None,
     thresholds: dict[str, float] | None = None,
+    strict_profile: bool = True,
+    file: Any = None,
 ) -> EvalReport:
     """Classify cached metrics and compare to golden labels (GL-free)."""
+    resolved_warmup, resolved_window, profile = resolve_eval_probe_window(
+        cache,
+        warmup_frames=warmup_frames,
+        window_frames=window_frames,
+        strict=strict_profile,
+        file=file,
+    )
     metrics_by_path = {entry.path.resolve(): entry for entry in cache.presets}
     mismatches: list[EvalMismatch] = []
     per_category_totals: dict[GoldenExpectedResult, int] = {
@@ -290,8 +390,8 @@ def evaluate(
 
         actual, luma = _classify_cached_preset(
             preset_metrics,
-            warmup_frames=warmup_frames,
-            window_frames=window_frames,
+            warmup_frames=resolved_warmup,
+            window_frames=resolved_window,
             thresholds=thresholds,
         )
         actual_golden = scan_result_to_golden(actual)
@@ -328,8 +428,9 @@ def evaluate(
         per_category_accuracy=per_category_accuracy,
         confusion_matrix=confusion,
         mismatches=tuple(mismatches),
-        warmup_frames=warmup_frames,
-        window_frames=window_frames,
+        warmup_frames=resolved_warmup,
+        window_frames=resolved_window,
+        probe_mode=profile.mode,
     )
 
 
@@ -356,6 +457,7 @@ def sweep(
                     warmup_frames=warmup,
                     window_frames=window,
                     thresholds=thresholds,
+                    strict_profile=False,
                 )
                 results.append(
                     SweepResult(
@@ -380,7 +482,9 @@ def print_eval_report(report: EvalReport, *, file: Any = None) -> None:
     print(
         f"Golden eval: {report.correct}/{report.total} correct "
         f"({report.accuracy * 100:.1f}%) "
-        f"[warmup={report.warmup_frames}, window={report.window_frames}]",
+        f"[{report.probe_mode}: warmup={report.warmup_frames}, "
+        f"window={report.window_frames}, "
+        f"{report.warmup_frames + report.window_frames} frames]",
         file=out,
     )
     print("Per-category accuracy:", file=out)

@@ -125,6 +125,10 @@ def test_metrics_cache_json_round_trip() -> None:
         version=METRICS_CACHE_VERSION,
         probe_fps=30,
         fbo_size=(480, 270),
+        probe_mode="slow",
+        warmup_frames=90,
+        window_frames=60,
+        total_frames=150,
         presets=(
             PresetMetrics(
                 path=Path("/tmp/a.milk"),
@@ -151,6 +155,10 @@ def test_write_and_load_metrics_cache() -> None:
         version=METRICS_CACHE_VERSION,
         probe_fps=30,
         fbo_size=(480, 270),
+        probe_mode="quick",
+        warmup_frames=15,
+        window_frames=75,
+        total_frames=90,
         presets=(
             PresetMetrics(
                 path=Path("/tmp/c.milk"),
@@ -169,6 +177,34 @@ def test_write_and_load_metrics_cache() -> None:
         payload = json.loads(path.read_text(encoding="utf-8"))
         assert payload["version"] == METRICS_CACHE_VERSION
         assert payload["probe_fps"] == 30
+        assert payload["probe_mode"] == "quick"
+        assert payload["warmup_frames"] == 15
+        assert payload["window_frames"] == 75
+        assert payload["total_frames"] == 90
+
+
+def test_metrics_cache_v1_loads_without_probe_profile() -> None:
+    payload = {
+        "version": 1,
+        "probe_fps": 30,
+        "fbo_size": [480, 270],
+        "presets": [],
+    }
+    cache = metrics_cache_from_dict(payload)
+    assert cache.version == 1
+    assert cache.probe_mode is None
+    assert cache.warmup_frames is None
+
+
+def test_metrics_cache_v2_requires_probe_profile() -> None:
+    payload = {
+        "version": METRICS_CACHE_VERSION,
+        "probe_fps": 30,
+        "fbo_size": [480, 270],
+        "presets": [],
+    }
+    with pytest.raises(ValueError, match="missing required fields"):
+        metrics_cache_from_dict(payload)
 
 
 def test_metrics_cache_from_dict_rejects_bad_version() -> None:

@@ -27,9 +27,17 @@ from cleave.preset_scan import (
     SCAN_THRESHOLDS,
     SLOW_PROBE_WARMUP_FRAMES,
     SLOW_PROBE_WINDOW_FRAMES,
-    WASHED_COVERAGE,
+    SPARSE_DIM_COV16_MAX,
+    SPARSE_DIM_COV16_MIN,
+    SPARSE_DIM_MAX,
+    SPARSE_DIM_MEAN,
     WASHED_COVERAGE_CUTOFF,
-    WASHED_MEAN_LUMA,
+    WASHED_COVERAGE_HIGH,
+    WASHED_COVERAGE_MODERATE,
+    WASHED_COV192_CAP,
+    WASHED_MEAN_HIGH,
+    WASHED_MEAN_MID,
+    WASHED_MEAN_MODERATE,
     PresetScanResult,
     PresetScanTimings,
     ScanReport,
@@ -177,17 +185,102 @@ def test_classify_preset_result_bright_on_black_guard() -> None:
     assert error is None
 
 
-def test_classify_preset_result_washed_out() -> None:
+def test_classify_preset_result_washed_out_high() -> None:
     result, error = classify_preset_result(
         [],
         _peaks(
             max_luma=255.0,
-            mean_luma=WASHED_MEAN_LUMA,
+            mean_luma=WASHED_MEAN_HIGH,
             cutoff_16=1.0,
-            cutoff_192=WASHED_COVERAGE,
+            cutoff_192=WASHED_COVERAGE_HIGH + 0.03,
         ),
     )
     assert result == "washed_out"
+    assert error is None
+
+
+def test_classify_preset_result_bright_ok_not_washed_out() -> None:
+    """Bright usable presets can saturate cov192 without being washed_out."""
+    result, error = classify_preset_result(
+        [],
+        _peaks(
+            max_luma=255.0,
+            mean_luma=WASHED_MEAN_HIGH + 50.0,
+            cutoff_16=1.0,
+            cutoff_192=1.0,
+        ),
+    )
+    assert result == "ok"
+    assert error is None
+
+
+def test_classify_preset_result_washed_out_mid() -> None:
+    result, error = classify_preset_result(
+        [],
+        _peaks(
+            max_luma=240.0,
+            mean_luma=WASHED_MEAN_MID,
+            cutoff_16=0.99,
+            cutoff_192=WASHED_COV192_CAP,
+        ),
+    )
+    assert result == "washed_out"
+    assert error is None
+
+
+def test_classify_preset_result_washed_out_moderate() -> None:
+    """High mean with moderate cov192 saturation (not full-frame highlights)."""
+    result, error = classify_preset_result(
+        [],
+        _peaks(
+            max_luma=255.0,
+            mean_luma=WASHED_MEAN_MODERATE,
+            cutoff_16=1.0,
+            cutoff_192=WASHED_COVERAGE_MODERATE + 0.03,
+        ),
+    )
+    assert result == "washed_out"
+    assert error is None
+
+
+def test_classify_preset_result_moderate_wash_boundary_ok() -> None:
+    """Below moderate mean stays ok even with high cov192."""
+    result, error = classify_preset_result(
+        [],
+        _peaks(
+            max_luma=255.0,
+            mean_luma=WASHED_MEAN_MODERATE - 1.0,
+            cutoff_16=1.0,
+            cutoff_192=WASHED_COVERAGE_MODERATE + 0.03,
+        ),
+    )
+    assert result == "ok"
+    assert error is None
+
+
+def test_classify_preset_result_sparse_dim() -> None:
+    result, error = classify_preset_result(
+        [],
+        _peaks(
+            max_luma=SPARSE_DIM_MAX + 20.0,
+            mean_luma=SPARSE_DIM_MEAN - 2.0,
+            cutoff_16=(SPARSE_DIM_COV16_MIN + SPARSE_DIM_COV16_MAX) / 2.0,
+        ),
+    )
+    assert result == "dim"
+    assert error is None
+
+
+def test_classify_preset_result_black_flash_guard() -> None:
+    result, error = classify_preset_result(
+        [],
+        _peaks(
+            max_luma=BRIGHT_ON_BLACK_MAX + 50.0,
+            mean_luma=0.0,
+            cutoff_16=BRIGHT_ON_BLACK_COVERAGE,
+        ),
+    )
+    assert result == "ok"
     assert error is None
 
 
