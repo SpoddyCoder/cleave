@@ -200,7 +200,8 @@ def _print_scan_summary(summary: dict[str, int]) -> None:
         "Scan complete: "
         f"{summary['total']} preset(s); "
         f"ok={summary['ok']}, dim={summary['dim']}, "
-        f"black={summary['black']}, load_failed={summary['load_failed']}",
+        f"black={summary['black']}, washed_out={summary['washed_out']}, "
+        f"load_failed={summary['load_failed']}",
         file=sys.stderr,
     )
 
@@ -505,6 +506,57 @@ def cmd_scan(args: argparse.Namespace) -> None:
             print(f"Quarantined {src} -> {dst}")
 
 
+def cmd_scan_golden(args: argparse.Namespace) -> None:
+    from cleave.preset_scan_golden import (
+        DEFAULT_GOLDEN_SET_PATH,
+        DEFAULT_METRICS_CACHE_PATH,
+        evaluate,
+        load_golden_set,
+        load_metrics_cache,
+        print_eval_report,
+        probe_golden_set,
+        sweep,
+    )
+
+    golden_path = (
+        args.golden.expanduser().resolve()
+        if args.golden is not None
+        else DEFAULT_GOLDEN_SET_PATH
+    )
+    cache_path = (
+        args.cache.expanduser().resolve()
+        if args.cache is not None
+        else DEFAULT_METRICS_CACHE_PATH
+    )
+
+    if args.probe:
+        golden = load_golden_set(golden_path)
+        probe_golden_set(golden, cache_path, slow=args.slow)
+        print(f"Wrote metrics cache to {cache_path}", file=sys.stderr)
+        return
+
+    golden = load_golden_set(golden_path)
+    cache = load_metrics_cache(cache_path)
+
+    if args.eval:
+        report = evaluate(cache, golden)
+        print_eval_report(report)
+        return
+
+    results = sweep(cache, golden)
+    print("Sweep results (best first):", file=sys.stderr)
+    for index, entry in enumerate(results[:10], start=1):
+        threshold_note = ""
+        if entry.thresholds is not None:
+            threshold_note = f" thresholds={entry.thresholds}"
+        print(
+            f"  {index}. warmup={entry.warmup_frames} window={entry.window_frames}"
+            f"{threshold_note}: {entry.correct}/{entry.total} "
+            f"({entry.accuracy * 100:.1f}%)",
+            file=sys.stderr,
+        )
+
+
 def cmd_restore(args: argparse.Namespace) -> None:
     from cleave.archive import restore_project
 
@@ -738,9 +790,62 @@ def build_parser() -> argparse.ArgumentParser:
         "--quarantine",
         type=Path,
         metavar="DIR",
-        help="Move failed presets (load_failed, black, dim) to DIR",
+        help="Move failed presets (load_failed, black, dim, washed_out) to DIR",
     )
     scan.set_defaults(func=cmd_scan)
+
+    from cleave.paths import repo_root
+    from cleave.preset_scan_golden import (
+        DEFAULT_GOLDEN_SET_PATH,
+        DEFAULT_METRICS_CACHE_PATH,
+    )
+
+    scan_golden = subparsers.add_parser(
+        "scan-golden",
+        prog="cleave scan-golden",
+        help="Probe and evaluate the preset scan golden set",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    mode = scan_golden.add_mutually_exclusive_group(required=True)
+    mode.add_argument(
+        "--probe",
+        action="store_true",
+        help="GL probe all golden presets and write metrics cache",
+    )
+    mode.add_argument(
+        "--eval",
+        action="store_true",
+        help="Classify cached metrics and compare to golden labels",
+    )
+    mode.add_argument(
+        "--sweep",
+        action="store_true",
+        help="Grid search warmup/window settings against golden labels",
+    )
+    scan_golden.add_argument(
+        "--slow",
+        action="store_true",
+        help="Use slow probe profile (--probe only)",
+    )
+    scan_golden.add_argument(
+        "--cache",
+        type=Path,
+        metavar="PATH",
+        help=(
+            "Metrics cache JSON path "
+            f"(default: {DEFAULT_METRICS_CACHE_PATH.relative_to(repo_root())})"
+        ),
+    )
+    scan_golden.add_argument(
+        "--golden",
+        type=Path,
+        metavar="PATH",
+        help=(
+            "Golden set YAML path "
+            f"(default: {DEFAULT_GOLDEN_SET_PATH.relative_to(repo_root())})"
+        ),
+    )
+    scan_golden.set_defaults(func=cmd_scan_golden)
 
     return parser
 

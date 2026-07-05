@@ -5,22 +5,31 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import numpy as np
 import pytest
 
 from cleave.preset_scan import (
-    BLACK_MAX_LUMA_THRESHOLD,
-    DIM_MEAN_LUMA_THRESHOLD,
+    BLACK_COVERAGE,
+    BLACK_MAX_LUMA,
+    BRIGHT_ON_BLACK_COVERAGE,
+    BRIGHT_ON_BLACK_MAX,
+    COVERAGE_LUMA_MIN,
+    DIM_COVERAGE,
+    DIM_MEAN_LUMA,
     PROBE_FBO_HEIGHT,
     PROBE_FBO_WIDTH,
     PROBE_FPS,
-    QUICK_PROBE_FRAMES,
-    QUICK_PROBE_WARMUP_SEC,
+    QUICK_PROBE_WARMUP_FRAMES,
+    QUICK_PROBE_WINDOW_FRAMES,
     REPORT_FLUSH_EVERY,
-    SLOW_PROBE_FRAMES,
-    SLOW_PROBE_WARMUP_SEC,
+    SCAN_THRESHOLDS,
+    SLOW_PROBE_WARMUP_FRAMES,
+    SLOW_PROBE_WINDOW_FRAMES,
+    WASHED_COVERAGE,
+    WASHED_COVERAGE_CUTOFF,
+    WASHED_MEAN_LUMA,
     PresetScanResult,
     PresetScanTimings,
     ScanReport,
@@ -36,21 +45,49 @@ from cleave.preset_scan import (
     validate_quarantine_dir,
     write_scan_report,
 )
+from cleave.preset_scan_metrics import LUMA_COVERAGE_CUTOFFS, FrameMetrics
 from cleave.preset_scan_targets import PresetTarget, ScanTargets
 from cleave.projectm import PresetLoadFailure
 
 
+def _coverage_at(
+    *,
+    cutoff_16: float = 0.0,
+    cutoff_192: float = 0.0,
+) -> dict[int, float]:
+    coverage = {cutoff: 0.0 for cutoff in LUMA_COVERAGE_CUTOFFS}
+    coverage[COVERAGE_LUMA_MIN] = cutoff_16
+    coverage[WASHED_COVERAGE_CUTOFF] = cutoff_192
+    return coverage
+
+
+def _peaks(
+    *,
+    max_luma: float,
+    mean_luma: float,
+    cutoff_16: float = 0.0,
+    cutoff_192: float = 0.0,
+) -> FrameMetrics:
+    return FrameMetrics(
+        max_luma=max_luma,
+        mean_luma=mean_luma,
+        coverage=_coverage_at(cutoff_16=cutoff_16, cutoff_192=cutoff_192),
+    )
+
+
 def test_probe_profile_quick() -> None:
     profile = probe_profile(slow=False)
-    assert profile.frames == QUICK_PROBE_FRAMES
-    assert profile.warmup_sec == QUICK_PROBE_WARMUP_SEC
+    assert profile.warmup_frames == QUICK_PROBE_WARMUP_FRAMES
+    assert profile.window_frames == QUICK_PROBE_WINDOW_FRAMES
+    assert profile.total_frames == 90
     assert profile.mode == "quick"
 
 
 def test_probe_profile_slow() -> None:
     profile = probe_profile(slow=True)
-    assert profile.frames == SLOW_PROBE_FRAMES
-    assert profile.warmup_sec == SLOW_PROBE_WARMUP_SEC
+    assert profile.warmup_frames == SLOW_PROBE_WARMUP_FRAMES
+    assert profile.window_frames == SLOW_PROBE_WINDOW_FRAMES
+    assert profile.total_frames == 150
     assert profile.mode == "slow"
 
 
@@ -59,16 +96,30 @@ def test_classify_preset_result_load_failed() -> None:
         PresetLoadFailure(filename="/tmp/a.milk", message="shader error"),
         PresetLoadFailure(filename="/tmp/b.milk", message="later"),
     ]
-    result, error = classify_preset_result(failures, max_luma=100.0, mean_luma=100.0)
+    result, error = classify_preset_result(
+        failures, _peaks(max_luma=100.0, mean_luma=100.0, cutoff_16=0.5)
+    )
     assert result == "load_failed"
     assert error == "shader error"
 
 
-def test_classify_preset_result_black() -> None:
+def test_classify_preset_result_black_low_max() -> None:
     result, error = classify_preset_result(
         [],
-        max_luma=BLACK_MAX_LUMA_THRESHOLD - 0.01,
-        mean_luma=0.0,
+        _peaks(
+            max_luma=BLACK_MAX_LUMA - 0.01,
+            mean_luma=0.0,
+            cutoff_16=0.5,
+        ),
+    )
+    assert result == "black"
+    assert error is None
+
+
+def test_classify_preset_result_black_low_coverage() -> None:
+    result, error = classify_preset_result(
+        [],
+        _peaks(max_luma=50.0, mean_luma=25.0, cutoff_16=BLACK_COVERAGE - 0.0001),
     )
     assert result == "black"
     assert error is None
@@ -77,8 +128,11 @@ def test_classify_preset_result_black() -> None:
 def test_classify_preset_result_black_boundary_not_black() -> None:
     result, error = classify_preset_result(
         [],
-        max_luma=BLACK_MAX_LUMA_THRESHOLD,
-        mean_luma=0.0,
+        _peaks(
+            max_luma=BLACK_MAX_LUMA,
+            mean_luma=0.0,
+            cutoff_16=BLACK_COVERAGE,
+        ),
     )
     assert result == "dim"
     assert error is None
@@ -87,8 +141,11 @@ def test_classify_preset_result_black_boundary_not_black() -> None:
 def test_classify_preset_result_dim() -> None:
     result, error = classify_preset_result(
         [],
-        max_luma=BLACK_MAX_LUMA_THRESHOLD,
-        mean_luma=DIM_MEAN_LUMA_THRESHOLD - 0.01,
+        _peaks(
+            max_luma=BLACK_MAX_LUMA,
+            mean_luma=DIM_MEAN_LUMA - 0.01,
+            cutoff_16=DIM_COVERAGE - 0.001,
+        ),
     )
     assert result == "dim"
     assert error is None
@@ -97,15 +154,61 @@ def test_classify_preset_result_dim() -> None:
 def test_classify_preset_result_dim_boundary_ok() -> None:
     result, error = classify_preset_result(
         [],
-        max_luma=BLACK_MAX_LUMA_THRESHOLD,
-        mean_luma=DIM_MEAN_LUMA_THRESHOLD,
+        _peaks(
+            max_luma=BLACK_MAX_LUMA,
+            mean_luma=DIM_MEAN_LUMA,
+            cutoff_16=DIM_COVERAGE,
+        ),
     )
     assert result == "ok"
     assert error is None
 
 
+def test_classify_preset_result_bright_on_black_guard() -> None:
+    result, error = classify_preset_result(
+        [],
+        _peaks(
+            max_luma=BRIGHT_ON_BLACK_MAX,
+            mean_luma=DIM_MEAN_LUMA - 1.0,
+            cutoff_16=BRIGHT_ON_BLACK_COVERAGE,
+        ),
+    )
+    assert result == "ok"
+    assert error is None
+
+
+def test_classify_preset_result_washed_out() -> None:
+    result, error = classify_preset_result(
+        [],
+        _peaks(
+            max_luma=255.0,
+            mean_luma=WASHED_MEAN_LUMA,
+            cutoff_16=1.0,
+            cutoff_192=WASHED_COVERAGE,
+        ),
+    )
+    assert result == "washed_out"
+    assert error is None
+
+
 def test_classify_preset_result_ok() -> None:
-    result, error = classify_preset_result([], max_luma=50.0, mean_luma=50.0)
+    result, error = classify_preset_result(
+        [],
+        _peaks(max_luma=50.0, mean_luma=50.0, cutoff_16=0.5),
+    )
+    assert result == "ok"
+    assert error is None
+
+
+def test_classify_preset_result_accepts_metrics_dict() -> None:
+    result, error = classify_preset_result(
+        [],
+        {
+            "max_luma": 50.0,
+            "mean_luma": 50.0,
+            "coverage": _coverage_at(cutoff_16=0.5),
+        },
+    )
     assert result == "ok"
     assert error is None
 
@@ -164,7 +267,7 @@ def test_build_scan_report_project_mode() -> None:
     assert report.preset_root == preset_root.resolve()
     assert report.texture_paths == (texture_path.resolve(),)
     assert report.layers == {"layer_1": [str(anchor_dir)]}
-    assert report.probe_frames == QUICK_PROBE_FRAMES
+    assert report.probe_frames == QUICK_PROBE_WARMUP_FRAMES + QUICK_PROBE_WINDOW_FRAMES
     assert report.probe_fps == PROBE_FPS
     assert report.fbo_size == (PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT)
     assert len(report.presets) == 2
@@ -175,6 +278,7 @@ def test_build_scan_report_project_mode() -> None:
         "load_failed": 0,
         "black": 1,
         "dim": 0,
+        "washed_out": 0,
         "ok": 1,
     }
 
@@ -220,11 +324,8 @@ def test_scan_report_serialization_round_trip() -> None:
         preset_root=Path("/tmp/presets"),
         texture_paths=(Path("/tmp/textures"),),
         layers={"layer_1": ["/tmp/presets/pack"]},
-        thresholds={
-            "black_max_luma": BLACK_MAX_LUMA_THRESHOLD,
-            "dim_mean_luma": DIM_MEAN_LUMA_THRESHOLD,
-        },
-        probe_frames=QUICK_PROBE_FRAMES,
+        thresholds=dict(SCAN_THRESHOLDS),
+        probe_frames=QUICK_PROBE_WARMUP_FRAMES + QUICK_PROBE_WINDOW_FRAMES,
         probe_fps=PROBE_FPS,
         fbo_size=(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT),
         presets=(
@@ -245,8 +346,8 @@ def test_scan_report_serialization_round_trip() -> None:
     assert payload["preset_root"] == "/tmp/presets"
     assert payload["texture_paths"] == ["/tmp/textures"]
     assert payload["layers"] == {"layer_1": ["/tmp/presets/pack"]}
-    assert payload["thresholds"]["black_max_luma"] == BLACK_MAX_LUMA_THRESHOLD
-    assert payload["probe_frames"] == QUICK_PROBE_FRAMES
+    assert payload["thresholds"] == SCAN_THRESHOLDS
+    assert payload["probe_frames"] == QUICK_PROBE_WARMUP_FRAMES + QUICK_PROBE_WINDOW_FRAMES
     assert payload["probe_fps"] == PROBE_FPS
     assert payload["fbo_size"] == [PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT]
     assert payload["presets"] == [
@@ -261,6 +362,7 @@ def test_scan_report_serialization_round_trip() -> None:
         "load_failed": 0,
         "black": 0,
         "dim": 0,
+        "washed_out": 0,
         "ok": 1,
     }
     assert payload["complete"] is True
@@ -295,11 +397,8 @@ def test_write_scan_report_atomic_round_trip() -> None:
         preset_root=None,
         texture_paths=(),
         layers={},
-        thresholds={
-            "black_max_luma": BLACK_MAX_LUMA_THRESHOLD,
-            "dim_mean_luma": DIM_MEAN_LUMA_THRESHOLD,
-        },
-        probe_frames=QUICK_PROBE_FRAMES,
+        thresholds=dict(SCAN_THRESHOLDS),
+        probe_frames=QUICK_PROBE_WARMUP_FRAMES + QUICK_PROBE_WINDOW_FRAMES,
         probe_fps=PROBE_FPS,
         fbo_size=(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT),
         presets=(),
@@ -429,6 +528,25 @@ def test_validate_quarantine_dir_rejects_inside_scanned(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="outside the scanned presets directory"):
         validate_quarantine_dir(inside, (scanned,))
+
+
+def test_quarantine_presets_moves_washed_out(tmp_path: Path) -> None:
+    presets_dir = tmp_path / "presets"
+    presets_dir.mkdir()
+    quarantine_dir = tmp_path / "quarantine"
+    quarantine_dir.mkdir()
+
+    washed_path = presets_dir / "washed.milk"
+    washed_path.write_text("washed", encoding="utf-8")
+
+    moves = quarantine_presets(
+        [PresetScanResult(path=washed_path, result="washed_out", layers=())],
+        quarantine_dir,
+    )
+
+    assert not washed_path.exists()
+    assert (quarantine_dir / "washed.milk").is_file()
+    assert len(moves) == 1
 
 
 def test_quarantine_presets_moves_failures_flat(tmp_path: Path) -> None:
@@ -606,3 +724,160 @@ def test_run_scan_keyboard_interrupt_flushes_sink(
         run_scan(scan_targets, report_sink=sink)
 
     assert sink_calls == [(1, False)]
+
+
+def _healthy_coverage() -> dict[int, float]:
+    return _coverage_at(cutoff_16=0.5, cutoff_192=0.0)
+
+
+def test_probe_preset_clean_boot(monkeypatch: pytest.MonkeyPatch) -> None:
+    from cleave.preset_scan import _probe_preset
+
+    fake_pm = MagicMock()
+    fake_pm.drain_preset_failures.return_value = []
+    fake_fbo = MagicMock()
+    fake_fbo.fbo_id = 1
+    target = PresetTarget(path=Path("/tmp/a.milk"), layers=("layer_1",))
+    profile = probe_profile(slow=False)
+    frame = FrameMetrics(
+        max_luma=50.0,
+        mean_luma=25.0,
+        coverage=_healthy_coverage(),
+    )
+
+    monkeypatch.setattr(
+        "cleave.preset_scan.sample_frame_metrics",
+        lambda width, height: frame,
+    )
+
+    result = _probe_preset(
+        fake_pm,
+        fake_fbo,
+        target,
+        profile=profile,
+        n_pcm=100,
+        frame_dt=1.0 / PROBE_FPS,
+    )
+
+    assert fake_pm.set_preset_start_clean.call_args_list == [call(True), call(False)]
+    fake_pm.load_preset.assert_called_once_with(target.path, smooth=False)
+    fake_pm.lock_preset.assert_called_once_with(True)
+    assert result.result == "ok"
+    assert result.luma == frame
+
+
+def test_probe_preset_uses_peak_metrics_over_last_frame(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from cleave.preset_scan import _probe_preset
+
+    fake_pm = MagicMock()
+    fake_pm.drain_preset_failures.return_value = []
+    fake_fbo = MagicMock()
+    fake_fbo.fbo_id = 1
+    target = PresetTarget(path=Path("/tmp/a.milk"), layers=())
+
+    frames = [
+        FrameMetrics(max_luma=1.0, mean_luma=1.0, coverage=_healthy_coverage()),
+        FrameMetrics(max_luma=200.0, mean_luma=50.0, coverage=_healthy_coverage()),
+        FrameMetrics(max_luma=1.0, mean_luma=1.0, coverage=_healthy_coverage()),
+    ]
+    call_count = {"index": 0}
+
+    def fake_sample(width: int, height: int) -> FrameMetrics:
+        index = call_count["index"]
+        call_count["index"] += 1
+        return frames[min(index, len(frames) - 1)]
+
+    monkeypatch.setattr("cleave.preset_scan.sample_frame_metrics", fake_sample)
+    monkeypatch.setattr(
+        "cleave.preset_scan._synthetic_pcm_burst",
+        lambda frame_idx, n_pcm: np.zeros(n_pcm, dtype=np.float32),
+    )
+
+    short_profile = probe_profile(slow=False)
+    short_profile = type(short_profile)(
+        warmup_frames=0,
+        window_frames=3,
+        mode=short_profile.mode,
+    )
+    result = _probe_preset(
+        fake_pm,
+        fake_fbo,
+        target,
+        profile=short_profile,
+        n_pcm=4,
+        frame_dt=1.0 / PROBE_FPS,
+    )
+
+    assert result.luma is not None
+    assert result.luma.max_luma == 200.0
+    assert result.luma.mean_luma == 50.0
+    assert result.result == "ok"
+
+
+def test_preset_result_luma_serialization_round_trip() -> None:
+    from cleave.preset_scan import _preset_result_from_dict, _preset_result_to_dict
+
+    coverage = {cutoff: float(cutoff) / 256.0 for cutoff in LUMA_COVERAGE_CUTOFFS}
+    preset = PresetScanResult(
+        path=Path("/tmp/a.milk"),
+        result="ok",
+        layers=("layer_1",),
+        luma=FrameMetrics(max_luma=42.0, mean_luma=12.0, coverage=coverage),
+    )
+
+    payload = _preset_result_to_dict(preset)
+    assert payload["luma"]["max"] == 42.0
+    assert payload["luma"]["mean"] == 12.0
+    assert payload["luma"]["coverage"]["16"] == pytest.approx(16.0 / 256.0)
+
+    restored = _preset_result_from_dict(payload)
+    assert restored.luma == preset.luma
+
+
+def test_load_resume_results_with_washed_out(tmp_path: Path) -> None:
+    preset_path = tmp_path / "washed.milk"
+    payload = {
+        "scan_mode": "bulk",
+        "probe_mode": "quick",
+        "presets": [
+            {
+                "path": str(preset_path),
+                "result": "washed_out",
+                "layers": [],
+            },
+        ],
+    }
+    report_path = tmp_path / "resume.json"
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    resume = load_resume_results(report_path)
+    assert resume.results[0].result == "washed_out"
+
+
+def test_load_resume_results_with_luma(tmp_path: Path) -> None:
+    preset_path = tmp_path / "a.milk"
+    payload = {
+        "scan_mode": "bulk",
+        "probe_mode": "quick",
+        "presets": [
+            {
+                "path": str(preset_path),
+                "result": "ok",
+                "layers": [],
+                "luma": {
+                    "max": 30.0,
+                    "mean": 10.0,
+                    "coverage": {str(cutoff): 0.1 for cutoff in LUMA_COVERAGE_CUTOFFS},
+                },
+            },
+        ],
+    }
+    report_path = tmp_path / "resume.json"
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    resume = load_resume_results(report_path)
+    assert resume.results[0].luma is not None
+    assert resume.results[0].luma.max_luma == 30.0
+    assert resume.results[0].luma.mean_luma == 10.0
