@@ -65,8 +65,8 @@ REFERENCE_CLIP_PATH = repo_root() / "assets" / "audio" / "scan-reference-10s.wav
 
 QUICK_PROBE_WARMUP_FRAMES = 15
 QUICK_PROBE_WINDOW_FRAMES = 75
-SLOW_PROBE_WARMUP_FRAMES = 90
-SLOW_PROBE_WINDOW_FRAMES = 60
+SLOW_PROBE_WARMUP_FRAMES = 120
+SLOW_PROBE_WINDOW_FRAMES = 180
 PROBE_FPS = 30
 PROBE_FBO_WIDTH = 480
 PROBE_FBO_HEIGHT = 270
@@ -86,30 +86,60 @@ VERY_SPARSE_DIM_COV16 = 0.015
 
 SPARSE_DIM_MEAN = 10.0
 SPARSE_DIM_MAX = 80.0
-SPARSE_DIM_COV16_MIN = 0.105
+SPARSE_DIM_COV16_MIN = 0.102
 SPARSE_DIM_COV16_MAX = 0.128
 
-CAPPED_DIM_MEAN = 21.0
+CAPPED_DIM_MEAN = 22.0
 CAPPED_DIM_MAX_LO = 50.0
-CAPPED_DIM_MAX_HI = 92.0
-CAPPED_DIM_COV16 = 0.04
+CAPPED_DIM_MAX_HI = 111.0
+CAPPED_DIM_COV16 = 0.9
 
-WASHED_MEAN_HIGH = 195.0
+WASHED_MEAN_HIGH = 244.6
 WASHED_COVERAGE_HIGH = 0.85
-WASHED_COVERAGE_HIGH_MAX = 0.99
+WASHED_COVERAGE_HIGH_MAX = 1.005
 WASHED_MEAN_MODERATE = 193.5
-WASHED_COVERAGE_MODERATE = 0.45
-WASHED_MEAN_MID = 125.0
-WASHED_MEAN_BROAD = 170.0
+WASHED_COVERAGE_MODERATE = 1.001
+WASHED_MEAN_MID = 141.0
+WASHED_MEAN_BROAD = 236.0
 WASHED_COV16_MIN = 0.99
 WASHED_COV128_MIN = 0.99
-WASHED_COV192_CAP = 0.245
+WASHED_COV192_CAP = 0.89
 WASHED_COV192_BROAD_MIN = 0.29
 
 BRIGHT_ON_BLACK_MAX = 25.0
 BRIGHT_ON_BLACK_COVERAGE = 0.00025
 
-SCAN_THRESHOLDS: dict[str, float] = {
+SLOW_BLACK_MAX_LUMA = 1.0
+SLOW_BLACK_COVERAGE = 0.0003
+SLOW_DIM_MEAN_LUMA = 15.0
+SLOW_DIM_COVERAGE = 0.25
+SLOW_VERY_SPARSE_DIM_MEAN = 5.1
+SLOW_VERY_SPARSE_DIM_MAX = 100.0
+SLOW_VERY_SPARSE_DIM_COV16 = 0.019
+SLOW_SPARSE_DIM_MEAN = 10.0
+SLOW_SPARSE_DIM_MAX = 80.0
+SLOW_SPARSE_DIM_COV16_MIN = 0.105
+SLOW_SPARSE_DIM_COV16_MAX = 0.155
+SLOW_CAPPED_DIM_MEAN = 40.0
+SLOW_CAPPED_DIM_MAX_LO = 50.0
+SLOW_CAPPED_DIM_MAX_HI = 177.0
+SLOW_CAPPED_DIM_COV16 = 0.04
+SLOW_WASHED_MEAN_HIGH = 195.0
+SLOW_WASHED_COVERAGE_HIGH = 0.85
+SLOW_WASHED_COVERAGE_HIGH_MAX = 0.99
+SLOW_WASHED_MEAN_MODERATE = 193.5
+SLOW_WASHED_COVERAGE_MODERATE = 0.45
+SLOW_WASHED_MEAN_MID = 125.0
+SLOW_WASHED_MEAN_BROAD = 170.0
+SLOW_WASHED_COV16_MIN = 0.99
+SLOW_WASHED_COV128_MIN = 0.99
+SLOW_WASHED_COV192_CAP = 0.245
+SLOW_WASHED_COV192_BROAD_MIN = 0.29
+SLOW_BRIGHT_ON_BLACK_MAX = 25.0
+SLOW_BRIGHT_ON_BLACK_COVERAGE = 0.00025
+SLOW_COVERAGE_LUMA_MIN = 16
+
+QUICK_SCAN_THRESHOLDS: dict[str, float] = {
     "black_max_luma": BLACK_MAX_LUMA,
     "black_coverage": BLACK_COVERAGE,
     "dim_mean_luma": DIM_MEAN_LUMA,
@@ -140,6 +170,44 @@ SCAN_THRESHOLDS: dict[str, float] = {
     "bright_on_black_coverage": BRIGHT_ON_BLACK_COVERAGE,
     "coverage_luma_min": float(COVERAGE_LUMA_MIN),
 }
+
+SLOW_SCAN_THRESHOLDS: dict[str, float] = {
+    "black_max_luma": SLOW_BLACK_MAX_LUMA,
+    "black_coverage": SLOW_BLACK_COVERAGE,
+    "dim_mean_luma": SLOW_DIM_MEAN_LUMA,
+    "dim_coverage": SLOW_DIM_COVERAGE,
+    "very_sparse_dim_mean": SLOW_VERY_SPARSE_DIM_MEAN,
+    "very_sparse_dim_max": SLOW_VERY_SPARSE_DIM_MAX,
+    "very_sparse_dim_cov16": SLOW_VERY_SPARSE_DIM_COV16,
+    "sparse_dim_mean": SLOW_SPARSE_DIM_MEAN,
+    "sparse_dim_max": SLOW_SPARSE_DIM_MAX,
+    "sparse_dim_cov16_min": SLOW_SPARSE_DIM_COV16_MIN,
+    "sparse_dim_cov16_max": SLOW_SPARSE_DIM_COV16_MAX,
+    "capped_dim_mean": SLOW_CAPPED_DIM_MEAN,
+    "capped_dim_max_lo": SLOW_CAPPED_DIM_MAX_LO,
+    "capped_dim_max_hi": SLOW_CAPPED_DIM_MAX_HI,
+    "capped_dim_cov16": SLOW_CAPPED_DIM_COV16,
+    "washed_mean_high": SLOW_WASHED_MEAN_HIGH,
+    "washed_coverage_high": SLOW_WASHED_COVERAGE_HIGH,
+    "washed_coverage_high_max": SLOW_WASHED_COVERAGE_HIGH_MAX,
+    "washed_mean_moderate": SLOW_WASHED_MEAN_MODERATE,
+    "washed_coverage_moderate": SLOW_WASHED_COVERAGE_MODERATE,
+    "washed_mean_mid": SLOW_WASHED_MEAN_MID,
+    "washed_mean_broad": SLOW_WASHED_MEAN_BROAD,
+    "washed_cov16_min": SLOW_WASHED_COV16_MIN,
+    "washed_cov128_min": SLOW_WASHED_COV128_MIN,
+    "washed_cov192_cap": SLOW_WASHED_COV192_CAP,
+    "washed_cov192_broad_min": SLOW_WASHED_COV192_BROAD_MIN,
+    "bright_on_black_max": SLOW_BRIGHT_ON_BLACK_MAX,
+    "bright_on_black_coverage": SLOW_BRIGHT_ON_BLACK_COVERAGE,
+    "coverage_luma_min": float(SLOW_COVERAGE_LUMA_MIN),
+}
+
+
+def scan_thresholds(probe_mode: ProbeMode) -> dict[str, float]:
+    if probe_mode == "slow":
+        return dict(SLOW_SCAN_THRESHOLDS)
+    return dict(QUICK_SCAN_THRESHOLDS)
 
 REPORT_FLUSH_EVERY = 10
 
@@ -312,14 +380,13 @@ def classify_preset_result(
     failures: list[PresetLoadFailure],
     peaks: FrameMetrics | dict[str, Any],
     *,
+    probe_mode: ProbeMode = "quick",
     thresholds: dict[str, float] | None = None,
 ) -> tuple[PresetResultCategory, str | None]:
     if failures:
         return "load_failed", failures[0].message
 
-    th = dict(SCAN_THRESHOLDS)
-    if thresholds is not None:
-        th.update(thresholds)
+    th = dict(thresholds) if thresholds is not None else scan_thresholds(probe_mode)
 
     max_luma, mean_luma, coverage = _normalize_peak_metrics(peaks)
     cov_min = coverage[int(th["coverage_luma_min"])]
@@ -425,7 +492,7 @@ def build_scan_report(
         ),
         texture_paths=tuple(p.resolve() for p in targets.texture_paths),
         layers=layers,
-        thresholds=dict(SCAN_THRESHOLDS),
+        thresholds=scan_thresholds(profile.mode),
         probe_frames=profile.total_frames,
         probe_fps=PROBE_FPS,
         fbo_size=(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT),
@@ -796,7 +863,9 @@ def _probe_preset(
         window_frames=profile.window_frames,
     )
     failures = pm.drain_preset_failures()
-    category, error = classify_preset_result(failures, peaks)
+    category, error = classify_preset_result(
+        failures, peaks, probe_mode=profile.mode
+    )
 
     return PresetScanResult(
         path=target.path,

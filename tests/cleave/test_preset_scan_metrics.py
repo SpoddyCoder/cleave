@@ -126,9 +126,9 @@ def test_metrics_cache_json_round_trip() -> None:
         probe_fps=30,
         fbo_size=(480, 270),
         probe_mode="slow",
-        warmup_frames=90,
-        window_frames=60,
-        total_frames=150,
+        warmup_frames=120,
+        window_frames=180,
+        total_frames=300,
         presets=(
             PresetMetrics(
                 path=Path("/tmp/a.milk"),

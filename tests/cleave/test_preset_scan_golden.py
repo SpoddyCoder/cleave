@@ -17,6 +17,7 @@ from cleave.preset_scan import (
     QUICK_PROBE_WINDOW_FRAMES,
     SLOW_PROBE_WARMUP_FRAMES,
     SLOW_PROBE_WINDOW_FRAMES,
+    scan_thresholds,
 )
 from cleave.preset_scan_golden import (
     DEFAULT_METRICS_CACHE_PATH,
@@ -315,6 +316,53 @@ def test_evaluate_uses_cache_probe_profile() -> None:
     assert report.warmup_frames == SLOW_PROBE_WARMUP_FRAMES
     assert report.window_frames == SLOW_PROBE_WINDOW_FRAMES
     assert report.probe_mode == "slow"
+
+
+def test_evaluate_uses_slow_thresholds_for_slow_cache(monkeypatch) -> None:
+    golden = load_golden_set(FIXTURE_PATH)
+    ok_path = golden.cases[2].preset
+    cache = MetricsCache(
+        version=METRICS_CACHE_VERSION,
+        probe_fps=30,
+        fbo_size=(480, 270),
+        probe_mode="slow",
+        warmup_frames=SLOW_PROBE_WARMUP_FRAMES,
+        window_frames=SLOW_PROBE_WINDOW_FRAMES,
+        total_frames=SLOW_PROBE_WARMUP_FRAMES + SLOW_PROBE_WINDOW_FRAMES,
+        presets=(
+            PresetMetrics(
+                path=ok_path,
+                load_failed=False,
+                error=None,
+                fps=30,
+                frames=(
+                    _frame(max_luma=50.0, mean_luma=50.0, cutoff_16=0.5),
+                )
+                * (SLOW_PROBE_WARMUP_FRAMES + SLOW_PROBE_WINDOW_FRAMES),
+            ),
+        ),
+    )
+    mini = GoldenSet(
+        version=1,
+        preset_root=golden.preset_root,
+        texture_paths=golden.texture_paths,
+        cases=(golden.cases[2],),
+    )
+    seen_modes: list[str] = []
+    real_scan_thresholds = scan_thresholds
+
+    def track_scan_thresholds(mode: str) -> dict[str, float]:
+        seen_modes.append(mode)
+        return real_scan_thresholds(mode)
+
+    monkeypatch.setattr(
+        "cleave.preset_scan.scan_thresholds",
+        track_scan_thresholds,
+    )
+
+    evaluate(cache, mini)
+
+    assert seen_modes == ["slow"]
 
 
 def test_evaluate_rejects_profile_mismatch(tmp_path: Path) -> None:
