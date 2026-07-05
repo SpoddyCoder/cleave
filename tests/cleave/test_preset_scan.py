@@ -27,11 +27,22 @@ from cleave.preset_scan import (
     PROBE_FPS,
     QUICK_PROBE_WARMUP_FRAMES,
     QUICK_PROBE_WINDOW_FRAMES,
+    QUICK_SCAN_THRESHOLDS,
     REFERENCE_CLIP_PATH,
     REPORT_FLUSH_EVERY,
-    SCAN_THRESHOLDS,
     SLOW_PROBE_WARMUP_FRAMES,
     SLOW_PROBE_WINDOW_FRAMES,
+    SLOW_CAPPED_DIM_COV16,
+    SLOW_CAPPED_DIM_MAX_HI,
+    SLOW_CAPPED_DIM_MEAN,
+    SLOW_SCAN_THRESHOLDS,
+    SLOW_SPARSE_DIM_COV16_MAX,
+    SLOW_SPARSE_DIM_COV16_MIN,
+    SLOW_SPARSE_DIM_MAX,
+    SLOW_SPARSE_DIM_MEAN,
+    SLOW_VERY_SPARSE_DIM_COV16,
+    SLOW_VERY_SPARSE_DIM_MAX,
+    SLOW_VERY_SPARSE_DIM_MEAN,
     SPARSE_DIM_COV16_MAX,
     SPARSE_DIM_COV16_MIN,
     SPARSE_DIM_MAX,
@@ -63,6 +74,7 @@ from cleave.preset_scan import (
     run_scan,
     scan_report_summary,
     scan_report_to_dict,
+    scan_thresholds,
     validate_quarantine_dir,
     write_scan_report,
 )
@@ -115,8 +127,59 @@ def test_probe_profile_slow() -> None:
     profile = probe_profile(slow=True)
     assert profile.warmup_frames == SLOW_PROBE_WARMUP_FRAMES
     assert profile.window_frames == SLOW_PROBE_WINDOW_FRAMES
-    assert profile.total_frames == 150
+    assert profile.total_frames == 300
     assert profile.mode == "slow"
+
+
+_TUNED_SLOW_ONLY_KEYS = frozenset(
+    {
+        "very_sparse_dim_cov16",
+        "sparse_dim_cov16_min",
+        "sparse_dim_cov16_max",
+        "capped_dim_mean",
+        "capped_dim_max_hi",
+        "capped_dim_cov16",
+        "washed_mean_high",
+        "washed_coverage_high_max",
+        "washed_coverage_moderate",
+        "washed_mean_mid",
+        "washed_mean_broad",
+        "washed_cov192_cap",
+    }
+)
+
+
+def test_scan_thresholds_quick_vs_slow() -> None:
+    quick = scan_thresholds("quick")
+    slow = scan_thresholds("slow")
+    assert quick == QUICK_SCAN_THRESHOLDS
+    assert slow == SLOW_SCAN_THRESHOLDS
+    differing = {
+        key
+        for key in QUICK_SCAN_THRESHOLDS
+        if quick[key] != slow[key]
+    }
+    assert _TUNED_SLOW_ONLY_KEYS <= differing
+    for key in _TUNED_SLOW_ONLY_KEYS:
+        assert quick[key] != slow[key]
+
+
+def test_build_scan_report_uses_mode_thresholds() -> None:
+    targets = ScanTargets(presets=())
+    quick_report = build_scan_report(
+        scan_mode="bulk",
+        profile=probe_profile(slow=False),
+        targets=targets,
+        results=(),
+    )
+    slow_report = build_scan_report(
+        scan_mode="bulk",
+        profile=probe_profile(slow=True),
+        targets=targets,
+        results=(),
+    )
+    assert quick_report.thresholds == QUICK_SCAN_THRESHOLDS
+    assert slow_report.thresholds == SLOW_SCAN_THRESHOLDS
 
 
 def test_classify_preset_result_load_failed() -> None:
@@ -225,7 +288,7 @@ def test_classify_preset_result_bright_ok_not_washed_out() -> None:
         [],
         _peaks(
             max_luma=255.0,
-            mean_luma=WASHED_MEAN_HIGH + 50.0,
+            mean_luma=WASHED_MEAN_HIGH - 9.0,
             cutoff_16=1.0,
             cutoff_192=1.0,
         ),
@@ -249,14 +312,14 @@ def test_classify_preset_result_washed_out_mid() -> None:
 
 
 def test_classify_preset_result_washed_out_moderate() -> None:
-    """High mean with moderate cov192 saturation (not full-frame highlights)."""
+    """High mean with partial cov192 blowout (golden case 2 mid-wash path)."""
     result, error = classify_preset_result(
         [],
         _peaks(
             max_luma=255.0,
-            mean_luma=WASHED_MEAN_MODERATE,
-            cutoff_16=1.0,
-            cutoff_192=WASHED_COVERAGE_MODERATE + 0.03,
+            mean_luma=229.3,
+            cutoff_16=0.9941,
+            cutoff_192=WASHED_COV192_CAP - 0.01,
         ),
     )
     assert result == "washed_out"
@@ -300,7 +363,7 @@ def test_classify_preset_result_broad_wash_boundary_ok() -> None:
         [],
         _peaks(
             max_luma=255.0,
-            mean_luma=WASHED_MEAN_BROAD + 4.9,
+            mean_luma=WASHED_MEAN_MID - 5.0,
             cutoff_16=WASHED_COV16_MIN,
             cutoff_128=WASHED_COV128_MIN - 0.13,
             cutoff_192=WASHED_COV192_BROAD_MIN + 0.17,
@@ -358,6 +421,66 @@ def test_classify_preset_result_black_flash_guard() -> None:
             mean_luma=0.0,
             cutoff_16=BRIGHT_ON_BLACK_COVERAGE,
         ),
+    )
+    assert result == "ok"
+    assert error is None
+
+
+def test_classify_preset_result_slow_very_sparse_dim_boundary_ok() -> None:
+    """Slow golden case 15: sparse peaks stay ok below very_sparse cov16."""
+    result, error = classify_preset_result(
+        [],
+        _peaks(
+            max_luma=SLOW_VERY_SPARSE_DIM_MAX + 134.7,
+            mean_luma=SLOW_VERY_SPARSE_DIM_MEAN - 4.2,
+            cutoff_16=SLOW_VERY_SPARSE_DIM_COV16 - 0.0009,
+        ),
+        probe_mode="slow",
+    )
+    assert result == "ok"
+    assert error is None
+
+
+def test_classify_preset_result_slow_sparse_dim() -> None:
+    """Slow golden case 1: mid-coverage sparse dim band."""
+    result, error = classify_preset_result(
+        [],
+        _peaks(
+            max_luma=SLOW_SPARSE_DIM_MAX + 38.9,
+            mean_luma=SLOW_SPARSE_DIM_MEAN - 0.3,
+            cutoff_16=(SLOW_SPARSE_DIM_COV16_MIN + SLOW_SPARSE_DIM_COV16_MAX) / 2.0,
+        ),
+        probe_mode="slow",
+    )
+    assert result == "dim"
+    assert error is None
+
+
+def test_classify_preset_result_slow_capped_dim() -> None:
+    """Slow golden case 30: high coverage with capped mean luma."""
+    result, error = classify_preset_result(
+        [],
+        _peaks(
+            max_luma=SLOW_CAPPED_DIM_MAX_HI - 1.0,
+            mean_luma=SLOW_CAPPED_DIM_MEAN - 0.5,
+            cutoff_16=SLOW_CAPPED_DIM_COV16 + 0.96,
+        ),
+        probe_mode="slow",
+    )
+    assert result == "dim"
+    assert error is None
+
+
+def test_classify_preset_result_slow_capped_dim_max_hi_boundary_ok() -> None:
+    """Slow presets above capped max_hi stay ok."""
+    result, error = classify_preset_result(
+        [],
+        _peaks(
+            max_luma=SLOW_CAPPED_DIM_MAX_HI + 0.1,
+            mean_luma=SLOW_CAPPED_DIM_MEAN - 0.5,
+            cutoff_16=SLOW_CAPPED_DIM_COV16 + 0.96,
+        ),
+        probe_mode="slow",
     )
     assert result == "ok"
     assert error is None
@@ -502,7 +625,7 @@ def test_scan_report_serialization_round_trip() -> None:
         preset_root=Path("/tmp/presets"),
         texture_paths=(Path("/tmp/textures"),),
         layers={"layer_1": ["/tmp/presets/pack"]},
-        thresholds=dict(SCAN_THRESHOLDS),
+        thresholds=dict(QUICK_SCAN_THRESHOLDS),
         probe_frames=QUICK_PROBE_WARMUP_FRAMES + QUICK_PROBE_WINDOW_FRAMES,
         probe_fps=PROBE_FPS,
         fbo_size=(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT),
@@ -527,7 +650,7 @@ def test_scan_report_serialization_round_trip() -> None:
     assert payload["preset_root"] == "/tmp/presets"
     assert payload["texture_paths"] == ["/tmp/textures"]
     assert payload["layers"] == {"layer_1": ["/tmp/presets/pack"]}
-    assert payload["thresholds"] == SCAN_THRESHOLDS
+    assert payload["thresholds"] == QUICK_SCAN_THRESHOLDS
     assert payload["probe_frames"] == QUICK_PROBE_WARMUP_FRAMES + QUICK_PROBE_WINDOW_FRAMES
     assert payload["probe_fps"] == PROBE_FPS
     assert payload["fbo_size"] == [PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT]
@@ -581,7 +704,7 @@ def test_write_scan_report_atomic_round_trip() -> None:
         preset_root=None,
         texture_paths=(),
         layers={},
-        thresholds=dict(SCAN_THRESHOLDS),
+        thresholds=dict(QUICK_SCAN_THRESHOLDS),
         probe_frames=QUICK_PROBE_WARMUP_FRAMES + QUICK_PROBE_WINDOW_FRAMES,
         probe_fps=PROBE_FPS,
         fbo_size=(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT),

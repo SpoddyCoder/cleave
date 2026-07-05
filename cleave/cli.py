@@ -563,6 +563,7 @@ def cmd_scan_golden(args: argparse.Namespace) -> None:
     from cleave.preset_scan_golden import (
         DEFAULT_GOLDEN_SET_PATH,
         DEFAULT_METRICS_CACHE_PATH,
+        DEFAULT_SLOW_METRICS_CACHE_PATH,
         evaluate,
         format_probe_profile_summary,
         load_golden_set,
@@ -581,7 +582,11 @@ def cmd_scan_golden(args: argparse.Namespace) -> None:
     cache_path = (
         args.cache.expanduser().resolve()
         if args.cache is not None
-        else DEFAULT_METRICS_CACHE_PATH
+        else (
+            DEFAULT_SLOW_METRICS_CACHE_PATH
+            if args.slow
+            else DEFAULT_METRICS_CACHE_PATH
+        ).resolve()
     )
 
     if args.probe:
@@ -881,6 +886,7 @@ def build_parser() -> argparse.ArgumentParser:
     from cleave.preset_scan_golden import (
         DEFAULT_GOLDEN_SET_PATH,
         DEFAULT_METRICS_CACHE_PATH,
+        DEFAULT_SLOW_METRICS_CACHE_PATH,
     )
 
     scan_golden = subparsers.add_parser(

@@ -21,6 +21,7 @@ from cleave.preset_scan import (
     SLOW_PROBE_WARMUP_FRAMES,
     SLOW_PROBE_WINDOW_FRAMES,
     PresetResultCategory,
+    ProbeMode,
     ProbeProfile,
     build_probe_pcm,
     classify_preset_result,
@@ -47,6 +48,9 @@ DEFAULT_GOLDEN_SET_PATH = (
 )
 DEFAULT_METRICS_CACHE_PATH = (
     repo_root() / "tests" / "fixtures" / "preset_scan_golden_metrics.json"
+)
+DEFAULT_SLOW_METRICS_CACHE_PATH = (
+    repo_root() / "tests" / "fixtures" / "preset_scan_golden_metrics_slow.json"
 )
 
 _VALID_EXPECTED: frozenset[str] = frozenset(("ok", "dim", "black", "washed_out"))
@@ -395,6 +399,7 @@ def evaluate(
             preset_metrics,
             warmup_frames=resolved_warmup,
             window_frames=resolved_window,
+            probe_mode=profile.mode,
             thresholds=thresholds,
         )
         actual_golden = scan_result_to_golden(actual)
@@ -530,6 +535,7 @@ def _classify_cached_preset(
     *,
     warmup_frames: int,
     window_frames: int,
+    probe_mode: ProbeMode,
     thresholds: dict[str, float] | None,
 ) -> tuple[PresetResultCategory, FrameMetrics | None]:
     failures: list[PresetLoadFailure] = []
@@ -542,7 +548,9 @@ def _classify_cached_preset(
         ]
 
     if not preset_metrics.frames:
-        category, _ = classify_preset_result(failures, {}, thresholds=thresholds)
+        category, _ = classify_preset_result(
+            failures, {}, probe_mode=probe_mode, thresholds=thresholds
+        )
         return category, None
 
     peaks = peak_metrics(
@@ -550,7 +558,9 @@ def _classify_cached_preset(
         warmup_frames=warmup_frames,
         window_frames=window_frames,
     )
-    category, _ = classify_preset_result(failures, peaks, thresholds=thresholds)
+    category, _ = classify_preset_result(
+        failures, peaks, probe_mode=probe_mode, thresholds=thresholds
+    )
     return category, peaks
 
 
