@@ -306,8 +306,11 @@ def test_default_threshold_sweep_variants_slow_covers_white_and_dim() -> None:
     variants = default_threshold_sweep_variants("slow")
     assert variants[0] is None
     assert len(variants) > 100
+    assert any(
+        entry is not None and "washed_mean_peak" in entry for entry in variants
+    )
     assert all(
-        entry is None or "washed_mean_peak" not in entry for entry in variants
+        entry is None or "dim_bob_cov_lo" not in entry for entry in variants
     )
 
 
@@ -469,5 +472,4 @@ def test_golden_case_2_not_washed_out_with_v3_cache() -> None:
         (entry for entry in report.mismatches if entry.id == GOLDEN_CASE_2_ID),
         None,
     )
-    if mismatch is not None:
-        assert mismatch.actual != "washed_out"
+    assert mismatch is None

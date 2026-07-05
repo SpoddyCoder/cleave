@@ -565,7 +565,9 @@ def cmd_scan_golden(args: argparse.Namespace) -> None:
         DEFAULT_METRICS_CACHE_PATH,
         DEFAULT_SLOW_METRICS_CACHE_PATH,
         DEFAULT_SWEEP_WARMUP_FRAMES,
+        DEFAULT_SWEEP_WARMUP_FRAMES_SLOW,
         DEFAULT_SWEEP_WINDOW_FRAMES,
+        DEFAULT_SWEEP_WINDOW_FRAMES_SLOW,
         default_threshold_sweep_variants,
         evaluate,
         format_probe_profile_summary,
@@ -627,12 +629,22 @@ def cmd_scan_golden(args: argparse.Namespace) -> None:
     results = sweep(cache, golden)
     profile = resolve_cache_probe_profile(cache)
     variant_count = len(default_threshold_sweep_variants(profile.mode))
+    warmup_grid = (
+        DEFAULT_SWEEP_WARMUP_FRAMES_SLOW
+        if profile.mode == "slow"
+        else DEFAULT_SWEEP_WARMUP_FRAMES
+    )
+    window_grid = (
+        DEFAULT_SWEEP_WINDOW_FRAMES_SLOW
+        if profile.mode == "slow"
+        else DEFAULT_SWEEP_WINDOW_FRAMES
+    )
     config_count = len(results)
     print(
         f"Sweep: {config_count} configs "
         f"({variant_count} threshold variants x "
-        f"{len(DEFAULT_SWEEP_WARMUP_FRAMES)} warmups x "
-        f"{len(DEFAULT_SWEEP_WINDOW_FRAMES)} windows, "
+        f"{len(warmup_grid)} warmups x "
+        f"{len(window_grid)} windows, "
         f"{profile.mode} cache)",
         file=sys.stderr,
     )

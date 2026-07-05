@@ -57,7 +57,7 @@ cleave scan --presets-dir <dir> --texture-path <dir> [--texture-path ...] [optio
 | Flag | Purpose |
 | --- | --- |
 | (default) | Quick probe: 15 frames warmup + 75 window; synthetic mono PCM; report on stderr, optional JSON |
-| `--slow` | 90 frames warmup + 60 window; stereo reference clip ([assets/audio/scan-reference-10s.wav](../assets/audio/scan-reference-10s.wav)) |
+| `--slow` | 120 frames warmup + 180 window; stereo reference clip ([assets/audio/scan-reference-10s.wav](../assets/audio/scan-reference-10s.wav)) |
 | `--report <path>` | JSON report path; written incrementally so a run can be resumed |
 | `--recursive` | Bulk mode only: scan subdirectories |
 | `--quarantine <dir>` | Move failed presets to DIR; DIR must be outside the scan set |
@@ -98,7 +98,7 @@ Per preset:
 
 **Quick (default):** 15 warmup + 75 window frames; synthetic mono PCM.
 
-**`--slow`:** 90 warmup + 60 window frames; stereo reference clip at [assets/audio/scan-reference-10s.wav](../assets/audio/scan-reference-10s.wav) (10 s excerpt from `projects/sights-and-sounds-26/sights-and-sounds-26.wav` starting at 82 s).
+**`--slow`:** 120 warmup + 180 window frames; stereo reference clip at [assets/audio/scan-reference-10s.wav](../assets/audio/scan-reference-10s.wav) (10 s excerpt from `projects/sights-and-sounds-26/sights-and-sounds-26.wav` starting at 82 s).
 
 Result categories: `load_failed`, `black`, `dim`, `washed_out`, `ok` (see proposal).
 

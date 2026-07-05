@@ -15,13 +15,13 @@ Probe harness ([cleave/preset_scan.py](../cleave/preset_scan.py)):
 - Clean boot every probe (`set_preset_start_clean(True)` before `load_preset`).
 - Full-frame reads via [cleave/preset_scan_metrics.py](../cleave/preset_scan_metrics.py).
 - **Quick:** 15 warmup + 75 window frames; synthetic mono PCM.
-- **`--slow`:** 90 warmup + 60 window frames; stereo [assets/audio/scan-reference-10s.wav](../assets/audio/scan-reference-10s.wav).
+- **`--slow`:** 120 warmup + 180 window frames; stereo [assets/audio/scan-reference-10s.wav](../assets/audio/scan-reference-10s.wav). Tiered `washed_out` rules (same five tiers as quick; slow-specific threshold constants).
 
 Run `--slow` before bulk quarantine or delete. Quick mode is useful for triage and golden eval against the committed cache.
 
 ## Visualizer vs scan (case 2)
 
-Golden case 2 (Aderrasi - Airhandler): **black** in the live visualizer (clean boot, stays black); **washed_out** in scan (quick and slow). This is an accepted eval disparity, not a mis-label. Quarantine outcome is correct; scan category is not trustworthy for this preset. Cause unknown; backlog in [todos.md](todos.md).
+Golden case 2 (Aderrasi - Airhandler): **black** in the live visualizer (clean boot, stays black). Quick probe still classifies **`washed_out`**; **slow** probe with tiered washed-out rules classifies **`ok`** (not washed_out). This is an accepted eval disparity for quick, not a mis-label. Quarantine outcome is acceptable either way. Cause unknown; backlog in [todos.md](todos.md).
 
 ## Design notes (historical)
 
