@@ -158,7 +158,7 @@ Target behavior for the next scan harness change (not yet implemented):
 ### Manual test set workflow
 
 1. Set layer `preset_switching` to `none` (or `user_defined`) and browse presets with Left/Right (clean boot is automatic).
-2. Label examples: `ok`, `dim`, broken (black / never develops). Save paths and notes.
+2. Label examples: `ok`, `dim`, broken (black / never develops). Save paths and notes. Golden set: [presets-scan-golden-set.md](presets-scan-golden-set.md) ([tests/fixtures/preset_scan_golden_set.yaml](../tests/fixtures/preset_scan_golden_set.yaml), 30 cases from `projects/sights-and-sounds-26/unnamed-*.yaml`).
 3. Implement harness changes above; add a small test or script that classifies the labeled set and reports mismatches.
 4. Tune thresholds; run `--slow` on a larger pack; spot-check before `--quarantine`.
 
