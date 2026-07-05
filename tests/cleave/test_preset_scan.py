@@ -153,6 +153,8 @@ def test_probe_profile_slow() -> None:
 
 _TUNED_SLOW_ONLY_KEYS = frozenset(
     {
+        "dim_mean_luma",
+        "dim_coverage",
         "very_sparse_dim_mean",
         "very_sparse_dim_cov16",
         "sparse_dim_mean",
@@ -161,6 +163,20 @@ _TUNED_SLOW_ONLY_KEYS = frozenset(
         "capped_dim_mean",
         "capped_dim_max_hi",
         "capped_dim_cov16",
+        "mid_peak_dim_cov_lo",
+        "mid_peak_dim_max_lo",
+        "mid_peak_dim_max_hi",
+        "broken_soft_white_min_frac",
+        "broken_soft_white_mean_hi",
+        "washed_cov192_lo_max",
+        "washed_cov192_mid",
+        "washed_mean_mid_hi",
+        "washed_wf_soft_min",
+        "washed_wf_soft_mean_lo",
+        "washed_wf_soft_mean_hi",
+        "washed_mean_high_lo",
+        "washed_mean_high_hi",
+        "washed_cov192_high",
     }
 )
 
@@ -170,6 +186,11 @@ _QUICK_ONLY_THRESHOLD_KEYS = frozenset(
         "dim_bob_cov_hi",
         "dim_bob_mean_mid",
         "dim_bob_mean_hi",
+    }
+)
+
+_SHARED_WASHED_THRESHOLD_KEYS = frozenset(
+    {
         "white_area_frac_soft",
         "min_white_frame_frac_soft",
         "washed_mean_soft",
@@ -196,10 +217,12 @@ def test_scan_thresholds_quick_vs_slow() -> None:
     assert slow == SLOW_SCAN_THRESHOLDS
     shared_keys = QUICK_SCAN_THRESHOLDS.keys() & SLOW_SCAN_THRESHOLDS.keys()
     differing = {key for key in shared_keys if quick[key] != slow[key]}
-    assert _TUNED_SLOW_ONLY_KEYS <= differing
-    for key in _TUNED_SLOW_ONLY_KEYS:
+    slow_only_keys = SLOW_SCAN_THRESHOLDS.keys() - QUICK_SCAN_THRESHOLDS.keys()
+    assert _TUNED_SLOW_ONLY_KEYS <= differing | slow_only_keys
+    for key in _TUNED_SLOW_ONLY_KEYS - slow_only_keys:
         assert quick[key] != slow[key]
     assert _QUICK_ONLY_THRESHOLD_KEYS <= QUICK_SCAN_THRESHOLDS.keys() - SLOW_SCAN_THRESHOLDS.keys()
+    assert _SHARED_WASHED_THRESHOLD_KEYS <= shared_keys
 
 
 def test_build_scan_report_uses_mode_thresholds() -> None:
@@ -230,6 +253,62 @@ def test_classify_preset_result_load_failed() -> None:
     )
     assert result == "load_failed"
     assert error == "shader error"
+
+
+def test_classify_preset_result_defers_load_failed_when_rendered() -> None:
+    failures = [
+        PresetLoadFailure(
+            filename="/tmp/a.milk",
+            message="[PerFrameContext] Could not compile per-frame code",
+        ),
+    ]
+    peaks = _peaks(max_luma=255.0, mean_luma=120.0, cutoff_16=0.999)
+    frames = tuple(
+        _frame(max_luma=255.0, mean_luma=120.0, white_235=0.02) for _ in range(10)
+    )
+    for probe_mode in ("quick", "slow"):
+        result, error = classify_preset_result(
+            failures,
+            peaks,
+            frames=frames,
+            probe_mode=probe_mode,
+        )
+        assert result == "ok"
+        assert error is None
+
+
+def test_classify_preset_result_defer_load_failed_invalid_peaks_stays_load_failed() -> None:
+    failures = [
+        PresetLoadFailure(filename="/tmp/a.milk", message="shader error"),
+    ]
+    for probe_mode in ("quick", "slow"):
+        result, error = classify_preset_result(
+            failures,
+            {},
+            probe_mode=probe_mode,
+        )
+        assert result == "load_failed"
+        assert error == "shader error"
+
+
+def test_classify_preset_result_quick_broken_soft_white_is_black() -> None:
+    soft_white_frames = tuple(
+        _frame(max_luma=255.0, mean_luma=230.0, white_235=0.2) for _ in range(5)
+    )
+    peaks = _peaks(
+        max_luma=255.0,
+        mean_luma=230.0,
+        cutoff_16=0.99,
+        white_235=0.2,
+    )
+    result, error = classify_preset_result(
+        [],
+        peaks,
+        frames=soft_white_frames,
+        probe_mode="quick",
+    )
+    assert result == "black"
+    assert error is None
 
 
 def test_classify_preset_result_black_low_max() -> None:
@@ -382,6 +461,30 @@ def test_classify_preset_result_quick_peak_washed_out() -> None:
         cutoff_192=1.0,
     )
     result, error = classify_preset_result([], peaks, frames=frames, probe_mode="quick")
+    assert result == "washed_out"
+    assert error is None
+
+
+def test_classify_preset_result_slow_luma_band_washed_out() -> None:
+    """Luma-band washed_out tier with zero hard white frames (slow)."""
+    frames = tuple(
+        _peaks(
+            max_luma=242.0,
+            mean_luma=165.0,
+            cutoff_16=1.0,
+            cutoff_192=0.10,
+            white_235=0.05,
+        )
+        for _ in range(10)
+    )
+    peaks = _peaks(
+        max_luma=242.0,
+        mean_luma=165.0,
+        cutoff_16=1.0,
+        cutoff_192=0.10,
+        white_235=0.05,
+    )
+    result, error = classify_preset_result([], peaks, frames=frames, probe_mode="slow")
     assert result == "washed_out"
     assert error is None
 

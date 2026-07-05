@@ -53,6 +53,8 @@ SWEEP_RULE_DISABLED = 999.0
 
 DEFAULT_SWEEP_WARMUP_FRAMES = (10, 12, 15, 18, 20)
 DEFAULT_SWEEP_WINDOW_FRAMES = (60, 70, 75)
+DEFAULT_SWEEP_WARMUP_FRAMES_SLOW = (120,)
+DEFAULT_SWEEP_WINDOW_FRAMES_SLOW = (180,)
 
 DEFAULT_GOLDEN_SET_PATH = (
     repo_root() / "tests" / "fixtures" / "preset_scan_golden_set.yaml"
@@ -384,6 +386,33 @@ def resolve_eval_probe_window(
     return resolved_warmup, resolved_window, profile
 
 
+def _metrics_index_for_eval(
+    cache: MetricsCache,
+    *,
+    warmup_frames: int,
+    window_frames: int,
+) -> dict[str, PresetMetrics]:
+    """Map resolved preset paths to metrics, keeping the strongest probe per path."""
+    grouped: dict[str, list[PresetMetrics]] = {}
+    for entry in cache.presets:
+        grouped.setdefault(str(entry.path.resolve()), []).append(entry)
+
+    indexed: dict[str, PresetMetrics] = {}
+    for path_key, entries in grouped.items():
+        if len(entries) == 1:
+            indexed[path_key] = entries[0]
+            continue
+        indexed[path_key] = max(
+            entries,
+            key=lambda entry: peak_metrics(
+                entry.frames,
+                warmup_frames=warmup_frames,
+                window_frames=window_frames,
+            ).mean_luma,
+        )
+    return indexed
+
+
 def evaluate(
     cache: MetricsCache,
     golden: GoldenSet,
@@ -402,7 +431,11 @@ def evaluate(
         strict=strict_profile,
         file=file,
     )
-    metrics_by_key = {_golden_preset_key(entry.path): entry for entry in cache.presets}
+    metrics_by_path = _metrics_index_for_eval(
+        cache,
+        warmup_frames=resolved_warmup,
+        window_frames=resolved_window,
+    )
     mismatches: list[EvalMismatch] = []
     per_category_totals: dict[GoldenExpectedResult, int] = {
         label: 0 for label in _VALID_EXPECTED
@@ -417,7 +450,17 @@ def evaluate(
 
     correct = 0
     for case in golden.cases:
-        preset_metrics = metrics_by_key.get(_golden_preset_key(case.preset))
+        preset_metrics = metrics_by_path.get(str(case.preset.resolve()))
+        if preset_metrics is None:
+            legacy_key = _golden_preset_key(case.preset)
+            preset_metrics = next(
+                (
+                    entry
+                    for entry in cache.presets
+                    if _golden_preset_key(entry.path) == legacy_key
+                ),
+                None,
+            )
         if preset_metrics is None:
             raise ValueError(
                 f"metrics cache missing preset for case {case.id}: {case.preset}"
@@ -634,11 +677,68 @@ def default_threshold_sweep_variants(
                 base,
                 {
                     "very_sparse_dim_mean": (5.0, 5.1, 5.2),
-                    "sparse_dim_cov16_min": (0.100, 0.105, 0.110),
-                    "sparse_dim_cov16_max": (0.140, 0.155, 0.170),
+                    "sparse_dim_cov16_min": (0.075, 0.08, 0.085),
+                    "sparse_dim_cov16_max": (0.11, 0.12, 0.13),
+                    "sparse_dim_mean": (6.5, 7.0, 7.5),
                     "capped_dim_mean": (35.0, 40.0, 45.0),
-                    "capped_dim_max_hi": (170.0, 177.0, 185.0),
+                    "capped_dim_max_hi": (195.0, 200.0, 205.0),
                     "capped_dim_cov16": (0.03, 0.04, 0.05),
+                },
+            )
+        )
+        grids.append(
+            _threshold_grid(
+                base,
+                {
+                    "white_area_frac_soft": (0.10, 0.15, 0.20, 0.25),
+                    "min_white_frame_frac_soft": (0.35, 0.55, 0.70),
+                    "washed_mean_soft": (160.0, 180.0, 200.0, 220.0, SWEEP_RULE_DISABLED),
+                },
+            )
+        )
+        grids.append(
+            _threshold_grid(
+                base,
+                {
+                    "washed_mean_peak": (220.0, 235.0, 245.0, SWEEP_RULE_DISABLED),
+                    "washed_cov192_peak": (0.85, 0.90, 0.95, 0.99),
+                },
+            )
+        )
+        grids.append(
+            _threshold_grid(
+                base,
+                {
+                    "washed_max_lo": (230.0, 235.0, 240.0, SWEEP_RULE_DISABLED),
+                    "washed_mean_lo": (140.0, 150.0, 160.0),
+                    "washed_mean_hi": (175.0, 185.0, 195.0),
+                    "washed_cov192_lo": (0.03, 0.05, 0.10, 0.15),
+                },
+            )
+        )
+        grids.append(
+            _threshold_grid(
+                base,
+                {
+                    "washed_max_mid": (230.0, 235.0, 240.0, SWEEP_RULE_DISABLED),
+                    "washed_mean_mid_lo": (165.0, 170.0, 180.0),
+                    "washed_mean_mid_hi": (188.0, 192.0, 196.0),
+                    "washed_cov192_mid": (0.35, 0.39, 0.42),
+                    "washed_white235_mid_max": (0.08, 0.15, 0.25),
+                },
+            )
+        )
+        grids.append(
+            _threshold_grid(
+                base,
+                {
+                    "washed_cov192_lo_max": (0.11, 0.12, 0.13),
+                    "washed_wf_soft_min": (0.18, 0.20, 0.22),
+                    "washed_wf_soft_mean_lo": (180.0, 185.0, 190.0),
+                    "washed_wf_soft_mean_hi": (215.0, 220.0, 225.0),
+                    "washed_mean_high_lo": (195.0, 198.0, 200.0),
+                    "washed_mean_high_hi": (215.0, 220.0, 225.0),
+                    "washed_cov192_high": (0.75, 0.78, 0.80),
                 },
             )
         )
@@ -655,9 +755,23 @@ def sweep(
     threshold_variants: tuple[dict[str, float] | None, ...] | None = None,
 ) -> list[SweepResult]:
     """Grid search over probe windows and thresholds; rank by golden agreement."""
-    warmups = warmup_frames_values or DEFAULT_SWEEP_WARMUP_FRAMES
-    windows = window_frames_values or DEFAULT_SWEEP_WINDOW_FRAMES
     profile = resolve_cache_probe_profile(cache)
+    if warmup_frames_values is None:
+        warmups = (
+            DEFAULT_SWEEP_WARMUP_FRAMES_SLOW
+            if profile.mode == "slow"
+            else DEFAULT_SWEEP_WARMUP_FRAMES
+        )
+    else:
+        warmups = warmup_frames_values
+    if window_frames_values is None:
+        windows = (
+            DEFAULT_SWEEP_WINDOW_FRAMES_SLOW
+            if profile.mode == "slow"
+            else DEFAULT_SWEEP_WINDOW_FRAMES
+        )
+    else:
+        windows = window_frames_values
     threshold_sets = threshold_variants or default_threshold_sweep_variants(
         profile.mode
     )
