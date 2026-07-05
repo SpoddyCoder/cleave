@@ -22,6 +22,7 @@ from cleave.preset_scan import (
     SLOW_PROBE_WINDOW_FRAMES,
     PresetResultCategory,
     ProbeProfile,
+    build_probe_pcm,
     classify_preset_result,
     probe_preset_metrics,
     probe_profile,
@@ -205,6 +206,7 @@ def probe_golden_set(
     from cleave.preset_scan import create_probe_fbo
 
     profile = probe_profile(slow=slow)
+    probe_pcm = build_probe_pcm(profile)
     texture_strs = [str(path) for path in golden.texture_paths]
 
     os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
@@ -240,6 +242,7 @@ def probe_golden_set(
                         fbo,
                         case.preset,
                         profile=profile,
+                        pcm=probe_pcm,
                         n_pcm=n_pcm,
                         frame_dt=frame_dt,
                     )

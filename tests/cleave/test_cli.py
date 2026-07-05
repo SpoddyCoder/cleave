@@ -875,6 +875,110 @@ def test_cmd_scan_bulk_mode_smoke(
     assert "black=1" in err
 
 
+def test_cmd_scan_delete_requires_yes_without_tty(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    presets_dir = tmp_path / "pack"
+    presets_dir.mkdir()
+    texture_dir = tmp_path / "textures"
+    texture_dir.mkdir()
+    bad_path = presets_dir / "bad.milk"
+    bad_path.write_text("bad", encoding="utf-8")
+
+    preset_results = [
+        PresetScanResult(path=bad_path, result="black", layers=()),
+    ]
+    targets = ScanTargets(
+        presets=(PresetTarget(path=bad_path, layers=()),),
+        presets_dir=presets_dir,
+    )
+
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+
+    with (
+        patch("cleave.cli.build_bulk_targets", return_value=targets),
+        patch("cleave.cli.run_scan", return_value=preset_results),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        cmd_scan(
+            build_parser().parse_args(
+                [
+                    "scan",
+                    "--presets-dir",
+                    str(presets_dir),
+                    "--texture-path",
+                    str(texture_dir),
+                    "--delete",
+                ]
+            )
+        )
+
+    assert exc_info.value.code == 1
+    assert bad_path.is_file()
+    assert "--yes" in capsys.readouterr().err
+
+
+def test_cmd_scan_delete_with_yes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    presets_dir = tmp_path / "pack"
+    presets_dir.mkdir()
+    texture_dir = tmp_path / "textures"
+    texture_dir.mkdir()
+    bad_path = presets_dir / "bad.milk"
+    bad_path.write_text("bad", encoding="utf-8")
+
+    preset_results = [
+        PresetScanResult(path=bad_path, result="black", layers=()),
+    ]
+    targets = ScanTargets(
+        presets=(PresetTarget(path=bad_path, layers=()),),
+        presets_dir=presets_dir,
+    )
+
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+
+    with (
+        patch("cleave.cli.build_bulk_targets", return_value=targets),
+        patch("cleave.cli.run_scan", return_value=preset_results),
+    ):
+        cmd_scan(
+            build_parser().parse_args(
+                [
+                    "scan",
+                    "--presets-dir",
+                    str(presets_dir),
+                    "--texture-path",
+                    str(texture_dir),
+                    "--delete",
+                    "--yes",
+                ]
+            )
+        )
+
+    assert not bad_path.exists()
+    out = capsys.readouterr().out
+    assert f"Deleted {bad_path}" in out
+
+
+def test_scan_parser_rejects_delete_with_quarantine() -> None:
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(
+            [
+                "scan",
+                "--presets-dir",
+                "/tmp/presets",
+                "--texture-path",
+                "/tmp/tex",
+                "--delete",
+                "--quarantine",
+                "/tmp/q",
+            ]
+        )
+
+
 def test_module_help_lists_subcommands() -> None:
     root = subprocess.run(
         [sys.executable, "-m", "cleave", "--help"],

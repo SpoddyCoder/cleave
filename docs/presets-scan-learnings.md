@@ -1,24 +1,39 @@
 # Preset scan tuning learnings
 
-Notes from iterating on `cleave scan` classification heuristics. See [presets-scan-plan.md](presets-scan-plan.md) for command design, current status, and outstanding work.
+Notes from iterating on `cleave scan` classification heuristics. See [presets-scan-plan.md](presets-scan-plan.md) for command design and current status.
 
 ## What is in the branch today
 
-Committed on `presets-scan` (v1 + v2):
+Shipped on `presets-scan` (v1 through v3):
 
 - `cleave scan` project and bulk modes, quick/`--slow` probe profiles, JSON report.
 - v2: `--quarantine`, `--resume`, incremental and interrupt-safe report writes.
-- Live visualizer: manual preset browse (`preset_switching` `none` or `user_defined`) forces a clean black boot via `load_manual_preset_clean()` in [cleave/viz/preset_switching.py](../cleave/viz/preset_switching.py) (`set_preset_start_clean(True)` for the load, then restore the layer value).
+- v3: `--delete` with confirmation (`--yes` for non-TTY); stereo reference clip for `--slow`; report PCM metadata (`pcm_source`, `pcm_channels`, `reference_clip_path`).
+- Classifier rework: clean boot per preset, full-frame luma sampling, peak max/mean/coverage across post-warmup frames, `washed_out` category, retuned thresholds.
+- Golden harness: `cleave scan-golden` with committed slow-probe metrics cache; 29/30 eval accuracy (case 2 known mismatch; see below).
+- Live visualizer: manual preset browse (`preset_switching` `none` or `user_defined`) forces a clean black boot via `load_manual_preset_clean()` in [cleave/viz/preset_switching.py](../cleave/viz/preset_switching.py).
 
-The scan harness in [cleave/preset_scan.py](../cleave/preset_scan.py) is still the v1 probe:
+The scan harness in [cleave/preset_scan.py](../cleave/preset_scan.py):
 
-- One shared `ProjectM` for the whole run (`load_preset(smooth=False)` between presets).
-- 32x32 center-patch luma sample (`_sample_center_luma`), not full-frame coverage.
-- Classification on peak max and mean from the **last** post-warmup frame only (not peak across all sampled frames).
-- Thresholds: `black_max_luma` 1.0, `dim_mean_luma` 8.0.
-- Synthetic mono PCM for both quick and `--slow` (reference clip exists at [assets/audio/scan-reference-10s.wav](../assets/audio/scan-reference-10s.wav) but is not wired yet; v3).
+- Clean boot every probe (`set_preset_start_clean(True)` before `load_preset`).
+- Full-frame reads via [cleave/preset_scan_metrics.py](../cleave/preset_scan_metrics.py) `sample_frame_metrics`.
+- Classification on peak max, mean, and coverage across all post-warmup frames.
+- Quick mode: synthetic mono PCM (15 warmup + 75 window frames).
+- `--slow`: stereo reference clip at [assets/audio/scan-reference-10s.wav](../assets/audio/scan-reference-10s.wav) (90 warmup + 60 window frames).
 
-Classifier accuracy is not trusted yet. Do not quarantine large packs from current scan output without manual review.
+Run `--slow` before bulk quarantine or delete. Quick mode remains useful for triage only.
+
+## Golden eval (slow probe, reference audio)
+
+Committed cache: [tests/fixtures/preset_scan_golden_metrics.json](../tests/fixtures/preset_scan_golden_metrics.json). Regenerate with `cleave scan-golden --probe --slow`.
+
+Current eval: **29/30** (`cleave scan-golden --eval`). Known mismatch:
+
+| ID | Preset | Expected | Actual | Notes |
+| --- | --- | --- | --- | --- |
+| 2 | Aderrasi - Airhandler (Principle of Sharing).milk | `black` | `washed_out` | Live manual review labels this preset broken (clean boot stays black). Slow probe with reference audio drives extreme white peaks (max 255, mean 227, full cov16). Classifier sees washed-out metrics, not black. |
+
+Do not relabel case 2 without re-reviewing live behavior. Threshold tuning alone cannot reconcile reference-audio probe output with the manual black label for this preset.
 
 ## Timeline
 
@@ -28,73 +43,36 @@ First probe: 32x32 patch at frame center, peak mean luma only (`dim_mean_luma` 8
 
 On a COTC-scale run (~1007 presets), ~385 were quarantined. Manual review showed most were false positives. Bright-on-black presets (tunnels, kaleidoscopes, starfields) often have a dark center even when healthy.
 
-### Coverage metric (explored, not committed)
+### Coverage metric (explored, now shipped)
 
-Sampling moved to full-frame reads. Peaks tracked across all post-warmup frames. Classification used coverage (fraction of pixels at or above luma 16) alongside peak max:
+Sampling moved to full-frame reads. Peaks tracked across all post-warmup frames. Classification uses coverage (fraction of pixels at or above luma 16) alongside peak max and mean.
 
-| Constant | Value |
-| --- | --- |
-| `coverage_luma_min` | 16 |
-| `black_coverage` | 0.0005 |
-| `dim_coverage` | 0.01 |
-
-Quick mode (~150 quarantined) looked mostly accurate. `--slow` roughly doubled quarantines; the first 20 manually checked were all healthy (false positives). That pointed at probe contamination, not audio.
-
-### Shared ProjectM: feedback state leak (verified)
+### Shared ProjectM: feedback state leak (verified, fixed)
 
 `load_preset(smooth=False)` does not clear projectM's internal feedback framebuffer. The next preset inherits the previous preset's final frame as starting state.
 
-Effects observed in headless probes and live play:
-
-- Scan order changes outcomes (order-dependent classification).
-- Slow mode false positives: many presets collapsed to black over the long warmup while still inheriting a bright seed from the prior preset; quick mode sampled earlier before collapse.
-- Live manual browse: a preset can "work" when the prior preset left an active frame, but stay black when booted cold.
-
-Stereo reference PCM was ruled out; the artifact was framebuffer carry-over.
-
-### Clean boot for probing (explored, reverted from scan)
-
-Two ways to get a deterministic black boot, verified equivalent on sample presets:
-
-1. Fresh `ProjectM` per preset.
-2. `set_preset_start_clean(True)` before `load_preset`, then restore the configured value (consumed at load time).
-
-A follow-up change combined clean boot with full-frame coverage, `dim_mean_luma` 10, and a bright-on-black guard (`max >= 100` and `coverage >= 0.02`). It under-detected badly (slow scan ~15 failures vs ~150 that looked plausible under the contaminated shared instance, though that count mixed real failures with artifacts). The scan changes were reverted; live clean boot was kept.
+Scan now forces clean boot per preset. Golden harness uses a fresh `ProjectM` per case.
 
 ### Live visualizer fix (committed)
 
-Manual preset switching now always clean-boots via `load_manual_preset_clean()`. Auto `projectm` rotation is unchanged (still uses the layer's `preset_start_clean` config). This lets you judge presets honestly while browsing before building a classifier test set.
+Manual preset switching always clean-boots via `load_manual_preset_clean()`. Auto `projectm` rotation is unchanged (still uses the layer's `preset_start_clean` config).
 
-## Classifier rework (next)
+### Reference audio (v3, shipped)
 
-Current scan output is not reliable enough for bulk quarantine. Planned sequence:
-
-1. **Manual labels** — With clean manual browse, pick a small set of presets across `ok`, `dim`, and broken (black / never develops). Record paths and labels.
-2. **Harness requirements** — Clean boot every probe (`set_preset_start_clean(True)` or fresh `ProjectM`); full-frame sampling; peak max, mean, and coverage across all post-warmup frames (and likely from frame 0 so flash-then-fade is caught).
-3. **Threshold tuning** — Fit rules against the manual set; re-run on a larger pack; iterate.
-4. **Reference audio (v3)** — Wire [assets/audio/scan-reference-10s.wav](../assets/audio/scan-reference-10s.wav) for `--slow` after the luminance pipeline is stable.
-
-Explored but not re-adopted without a labeled test set:
-
-| Idea | Value | Risk |
-| --- | --- | --- |
-| Coverage + mean | Fixes center-patch false positives | Needs retune after clean boot |
-| `dim_mean_luma` ~10 | Separates sparse dim from healthy low-mean | Misses without coverage guard |
-| Bright-on-black guard | Keeps tunnels/kaleidoscopes out of `dim` | Threshold-sensitive |
-| Shared contaminated `ProjectM` | Harsh stress test | Order-dependent, not deterministic |
+[assets/audio/scan-reference-10s.wav](../assets/audio/scan-reference-10s.wav) feeds `--slow` probes in both `cleave scan` and `cleave scan-golden`. Metrics shift vs synthetic PCM; thresholds and the golden cache were retuned against the new slow probe.
 
 ## Practical guidance
 
-- Use live manual browse (clean boot) to build a labeled test set before trusting scan quarantine.
-- Run `--slow` before quarantine or delete once the classifier is reworked; quick mode is for triage only.
-- Golden-set metrics cache uses the slow profile (90 warmup + 60 window frames); regenerate with `cleave scan-golden --probe --slow` (one fresh `ProjectM` per preset).
-- When reviewing borderline presets, read per-entry `luma` in the JSON report once the harness emits it (not in v1/v2 reports today).
-- Do not treat current scan JSON as ground truth for bulk moves.
+- Use live manual browse (clean boot) to build or verify labeled test sets.
+- Run `--slow` before quarantine or delete.
+- Golden-set metrics cache uses the slow profile (90 warmup + 60 window frames, reference stereo clip). Regenerate with `cleave scan-golden --probe --slow`.
+- Read per-entry `luma` in the JSON report for borderline presets.
+- Treat golden eval mismatches outside the known set as signals to retune or re-label.
 
 ## What not to do
 
-- Do not go back to center-patch sampling for the final classifier.
-- Do not rely on mean luma alone (v1 false positives on bright-on-black).
-- Do not rely on coverage alone after clean-boot probing (misses uniformly dim frames with scattered bright pixels).
-- Do not reuse a single `ProjectM` across presets without forcing clean boot (`load_preset(smooth=False)` leaves feedback state).
-- Do not assume the reverted coverage retune is in the codebase; check [cleave/preset_scan.py](../cleave/preset_scan.py) before changing thresholds.
+- Do not go back to center-patch sampling.
+- Do not rely on mean luma alone (false positives on bright-on-black).
+- Do not rely on coverage alone (misses uniformly dim frames with scattered bright pixels).
+- Do not reuse a single `ProjectM` across presets without forcing clean boot.
+- Do not assume thresholds are frozen; check [cleave/preset_scan.py](../cleave/preset_scan.py) and re-run `cleave scan-golden --eval` after probe or classifier changes.

@@ -43,7 +43,8 @@ from OpenGL.GL import (
     glTexImage2D,
 )
 
-from cleave.pcm_io import SAMPLE_RATE_HZ
+from cleave.paths import repo_root
+from cleave.pcm_io import SAMPLE_RATE_HZ, load_wav_pcm_44k
 from cleave.preset_scan_metrics import (
     LUMA_COVERAGE_CUTOFFS,
     FrameMetrics,
@@ -56,8 +57,11 @@ from cleave.projectm import PresetLoadFailure, ProjectM
 from cleave.stem_pcm import samples_per_frame
 
 ProbeMode = Literal["quick", "slow"]
+ProbePcmSource = Literal["synthetic", "reference-clip"]
 ScanMode = Literal["project", "bulk"]
 PresetResultCategory = Literal["load_failed", "black", "dim", "washed_out", "ok"]
+
+REFERENCE_CLIP_PATH = repo_root() / "assets" / "audio" / "scan-reference-10s.wav"
 
 QUICK_PROBE_WARMUP_FRAMES = 15
 QUICK_PROBE_WINDOW_FRAMES = 75
@@ -76,19 +80,19 @@ BLACK_COVERAGE = 0.0003
 DIM_MEAN_LUMA = 15.0
 DIM_COVERAGE = 0.25
 
-VERY_SPARSE_DIM_MEAN = 3.0
+VERY_SPARSE_DIM_MEAN = 5.1
 VERY_SPARSE_DIM_MAX = 100.0
 VERY_SPARSE_DIM_COV16 = 0.015
 
 SPARSE_DIM_MEAN = 10.0
 SPARSE_DIM_MAX = 80.0
-SPARSE_DIM_COV16_MIN = 0.08
-SPARSE_DIM_COV16_MAX = 0.20
+SPARSE_DIM_COV16_MIN = 0.105
+SPARSE_DIM_COV16_MAX = 0.128
 
 CAPPED_DIM_MEAN = 21.0
 CAPPED_DIM_MAX_LO = 50.0
-CAPPED_DIM_MAX_HI = 90.0
-CAPPED_DIM_COV16 = 0.25
+CAPPED_DIM_MAX_HI = 92.0
+CAPPED_DIM_COV16 = 0.04
 
 WASHED_MEAN_HIGH = 195.0
 WASHED_COVERAGE_HIGH = 0.85
@@ -96,11 +100,11 @@ WASHED_COVERAGE_HIGH_MAX = 0.99
 WASHED_MEAN_MODERATE = 193.5
 WASHED_COVERAGE_MODERATE = 0.45
 WASHED_MEAN_MID = 125.0
-WASHED_MEAN_BROAD = 180.0
+WASHED_MEAN_BROAD = 170.0
 WASHED_COV16_MIN = 0.99
 WASHED_COV128_MIN = 0.99
-WASHED_COV192_CAP = 0.20
-WASHED_COV192_BROAD_MIN = 0.35
+WASHED_COV192_CAP = 0.245
+WASHED_COV192_BROAD_MIN = 0.29
 
 BRIGHT_ON_BLACK_MAX = 25.0
 BRIGHT_ON_BLACK_COVERAGE = 0.00025
@@ -156,6 +160,35 @@ class ProbeProfile:
 
 
 @dataclass(frozen=True)
+class ProbePcm:
+    channels: int
+    source: ProbePcmSource
+    reference_clip_path: Path | None
+    _pcm: np.ndarray | None
+
+    def chunk(self, frame_idx: int, n_samples: int) -> np.ndarray:
+        if self.source == "synthetic":
+            return _synthetic_pcm_burst(frame_idx, n_samples)
+
+        assert self._pcm is not None
+        ch = self.channels
+        if n_samples <= 0:
+            return np.array([], dtype=np.float32)
+
+        t_sec = frame_idx / PROBE_FPS
+        start_frame = int(t_sec * SAMPLE_RATE_HZ)
+        n_out = n_samples * ch
+        out = np.zeros(n_out, dtype=np.float32)
+        start = start_frame * ch
+        if start >= len(self._pcm):
+            return out
+
+        take = min(n_out, len(self._pcm) - start)
+        out[:take] = self._pcm[start : start + take]
+        return out
+
+
+@dataclass(frozen=True)
 class PresetScanTimings:
     load_sec: float | None = None
     render_sec: float | None = None
@@ -185,6 +218,9 @@ class ScanReport:
     probe_frames: int
     probe_fps: int
     fbo_size: tuple[int, int]
+    pcm_source: str
+    pcm_channels: int
+    reference_clip_path: Path | None
     presets: tuple[PresetScanResult, ...]
     complete: bool = True
 
@@ -196,6 +232,38 @@ class ResumeData:
     results: tuple[PresetScanResult, ...]
     skip_paths: frozenset[Path]
     complete: bool
+
+
+def probe_pcm_metadata(profile: ProbeProfile) -> dict[str, Any]:
+    """Return PCM source metadata for reports without loading audio files."""
+    if profile.mode == "slow":
+        return {
+            "pcm_source": "reference-clip",
+            "pcm_channels": 2,
+            "reference_clip_path": REFERENCE_CLIP_PATH.resolve(),
+        }
+    return {
+        "pcm_source": "synthetic",
+        "pcm_channels": 1,
+        "reference_clip_path": None,
+    }
+
+
+def build_probe_pcm(profile: ProbeProfile) -> ProbePcm:
+    if profile.mode == "slow":
+        pcm, channels = load_wav_pcm_44k(REFERENCE_CLIP_PATH)
+        return ProbePcm(
+            channels=channels,
+            source="reference-clip",
+            reference_clip_path=REFERENCE_CLIP_PATH.resolve(),
+            _pcm=pcm,
+        )
+    return ProbePcm(
+        channels=1,
+        source="synthetic",
+        reference_clip_path=None,
+        _pcm=None,
+    )
 
 
 def probe_profile(*, slow: bool = False) -> ProbeProfile:
@@ -343,6 +411,7 @@ def build_scan_report(
         slot: [str(path) for path in paths]
         for slot, paths in sorted(targets.layer_sources.items())
     }
+    pcm_meta = probe_pcm_metadata(profile)
     return ScanReport(
         scan_mode=scan_mode,
         probe_mode=profile.mode,
@@ -360,6 +429,9 @@ def build_scan_report(
         probe_frames=profile.total_frames,
         probe_fps=PROBE_FPS,
         fbo_size=(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT),
+        pcm_source=pcm_meta["pcm_source"],
+        pcm_channels=pcm_meta["pcm_channels"],
+        reference_clip_path=pcm_meta["reference_clip_path"],
         presets=tuple(results),
         complete=complete,
     )
@@ -380,7 +452,7 @@ def scan_report_summary(report: ScanReport) -> dict[str, int]:
 
 
 def scan_report_to_dict(report: ScanReport) -> dict[str, Any]:
-    return {
+    payload: dict[str, Any] = {
         "scan_mode": report.scan_mode,
         "probe_mode": report.probe_mode,
         "project_dir": _path_to_str(report.project_dir),
@@ -393,10 +465,15 @@ def scan_report_to_dict(report: ScanReport) -> dict[str, Any]:
         "probe_frames": report.probe_frames,
         "probe_fps": report.probe_fps,
         "fbo_size": list(report.fbo_size),
+        "pcm_source": report.pcm_source,
+        "pcm_channels": report.pcm_channels,
         "presets": [_preset_result_to_dict(preset) for preset in report.presets],
         "summary": scan_report_summary(report),
         "complete": report.complete,
     }
+    if report.probe_mode == "slow" and report.reference_clip_path is not None:
+        payload["reference_clip_path"] = str(report.reference_clip_path)
+    return payload
 
 
 def write_scan_report(path: Path, report: ScanReport) -> None:
@@ -510,6 +587,22 @@ def validate_quarantine_dir(
     return resolved
 
 
+def delete_presets(
+    results: list[PresetScanResult] | tuple[PresetScanResult, ...],
+) -> list[Path]:
+    """Delete preset files flagged in *results* (QUARANTINE_CATEGORIES only)."""
+    deleted: list[Path] = []
+    for result in results:
+        if result.result not in QUARANTINE_CATEGORIES:
+            continue
+        path = result.path
+        if not path.is_file():
+            continue
+        path.unlink()
+        deleted.append(path)
+    return deleted
+
+
 def quarantine_presets(
     results: list[PresetScanResult] | tuple[PresetScanResult, ...],
     quarantine_dir: Path,
@@ -552,6 +645,7 @@ def run_scan(
 ) -> list[PresetScanResult]:
     """Probe each preset in *targets* with a hidden GL context and one ProjectM."""
     profile = probe_profile(slow=slow)
+    probe_pcm = build_probe_pcm(profile)
     paths = texture_paths if texture_paths is not None else targets.texture_paths
     texture_strs = [str(path) for path in paths]
 
@@ -597,6 +691,7 @@ def run_scan(
                 fbo,
                 target,
                 profile=profile,
+                pcm=probe_pcm,
                 n_pcm=n_pcm,
                 frame_dt=frame_dt,
             )
@@ -631,6 +726,7 @@ def probe_preset_metrics(
     preset_path: Path,
     *,
     profile: ProbeProfile,
+    pcm: ProbePcm,
     n_pcm: int,
     frame_dt: float,
 ) -> PresetMetrics:
@@ -645,7 +741,7 @@ def probe_preset_metrics(
     for frame_idx in range(profile.total_frames):
         t_sec = frame_idx * frame_dt
         pm.set_frame_time(t_sec)
-        pm.feed_pcm(_synthetic_pcm_burst(frame_idx, n_pcm))
+        pm.feed_pcm(pcm.chunk(frame_idx, n_pcm), channels=pcm.channels)
         fbo.bind()
         pm.render_to_fbo(fbo.fbo_id)
         frame_metrics.append(
@@ -668,6 +764,7 @@ def _probe_preset(
     target: PresetTarget,
     *,
     profile: ProbeProfile,
+    pcm: ProbePcm,
     n_pcm: int,
     frame_dt: float,
 ) -> PresetScanResult:
@@ -685,7 +782,7 @@ def _probe_preset(
     for frame_idx in range(profile.total_frames):
         t_sec = frame_idx * frame_dt
         pm.set_frame_time(t_sec)
-        pm.feed_pcm(_synthetic_pcm_burst(frame_idx, n_pcm))
+        pm.feed_pcm(pcm.chunk(frame_idx, n_pcm), channels=pcm.channels)
         fbo.bind()
         pm.render_to_fbo(fbo.fbo_id)
         frame_metrics.append(
