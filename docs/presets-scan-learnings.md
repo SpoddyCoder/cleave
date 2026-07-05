@@ -26,7 +26,7 @@ Golden case 2 (Aderrasi - Airhandler): **black** in the live visualizer (clean b
 ## Design notes (historical)
 
 - Center-patch sampling caused false positives on bright-on-black presets; replaced with full-frame peaks plus coverage.
-- Shared `ProjectM` without clean boot leaked feedback between presets; scan and golden harness now clean-boot per preset (golden uses a fresh instance per case).
+- Shared `ProjectM` without clean boot leaked feedback between presets; both `cleave scan` and `cleave scan-golden --probe` now use a fresh instance per preset.
 - Reference audio for `--slow` shifts metrics vs synthetic PCM; thresholds tuned separately per profile.
 
 ## Practical guidance
@@ -40,5 +40,5 @@ Golden case 2 (Aderrasi - Airhandler): **black** in the live visualizer (clean b
 
 - Do not use center-patch sampling.
 - Do not rely on mean luma or coverage alone.
-- Do not reuse one `ProjectM` across presets without clean boot.
+- Do not reuse one `ProjectM` across presets; create a fresh instance per preset.
 - Re-run `cleave scan-golden --eval` after probe or classifier changes.

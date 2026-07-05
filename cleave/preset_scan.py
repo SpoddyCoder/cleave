@@ -702,6 +702,13 @@ def scanned_preset_dirs(targets: ScanTargets) -> tuple[Path, ...]:
     return tuple(sorted(dirs))
 
 
+def _configure_probe_projectm(pm: ProjectM, texture_strs: list[str]) -> None:
+    pm.set_window_size(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT)
+    pm.set_fps(PROBE_FPS)
+    pm.set_hard_cut_enabled(False)
+    pm.set_texture_paths(texture_strs)
+
+
 def run_scan(
     targets: ScanTargets,
     *,
@@ -710,7 +717,7 @@ def run_scan(
     report_sink: Callable[[list[PresetScanResult], bool], None] | None = None,
     skip_paths: frozenset[Path] | None = None,
 ) -> list[PresetScanResult]:
-    """Probe each preset in *targets* with a hidden GL context and one ProjectM."""
+    """Probe each preset in *targets* with a hidden GL context and a fresh ProjectM."""
     profile = probe_profile(slow=slow)
     probe_pcm = build_probe_pcm(profile)
     paths = texture_paths if texture_paths is not None else targets.texture_paths
@@ -727,7 +734,6 @@ def run_scan(
         pygame.quit()
         raise RuntimeError(f"failed to open OpenGL context: {exc}") from exc
 
-    pm: ProjectM | None = None
     fbo: _ProbeFbo | None = None
     results: list[PresetScanResult] = []
     skip = skip_paths or frozenset()
@@ -736,12 +742,6 @@ def run_scan(
     probed = 0
     resumed_announced = False
     try:
-        pm = ProjectM()
-        pm.set_window_size(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT)
-        pm.set_fps(PROBE_FPS)
-        pm.set_hard_cut_enabled(False)
-        pm.set_texture_paths(texture_strs)
-
         fbo = _ProbeFbo(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT)
         n_pcm = samples_per_frame(PROBE_FPS)
         frame_dt = 1.0 / PROBE_FPS
@@ -753,19 +753,24 @@ def run_scan(
                 _progress(f"Resuming: {skip_count} done")
                 resumed_announced = True
             _progress(f"Scanning {index}/{total} {target.path}...")
-            result = _probe_preset(
-                pm,
-                fbo,
-                target,
-                profile=profile,
-                pcm=probe_pcm,
-                n_pcm=n_pcm,
-                frame_dt=frame_dt,
-            )
-            results.append(result)
-            probed += 1
-            if report_sink is not None and probed % REPORT_FLUSH_EVERY == 0:
-                report_sink(results, False)
+            pm = ProjectM()
+            try:
+                _configure_probe_projectm(pm, texture_strs)
+                result = _probe_preset(
+                    pm,
+                    fbo,
+                    target,
+                    profile=profile,
+                    pcm=probe_pcm,
+                    n_pcm=n_pcm,
+                    frame_dt=frame_dt,
+                )
+                results.append(result)
+                probed += 1
+                if report_sink is not None and probed % REPORT_FLUSH_EVERY == 0:
+                    report_sink(results, False)
+            finally:
+                pm.destroy()
 
         if report_sink is not None:
             report_sink(results, True)
@@ -776,8 +781,6 @@ def run_scan(
     finally:
         if fbo is not None:
             fbo.destroy()
-        if pm is not None:
-            pm.destroy()
         pygame.quit()
 
     return results

@@ -889,8 +889,11 @@ def test_quarantine_presets_moves_failures_flat(tmp_path: Path) -> None:
 
 
 def _mock_run_scan_gl(monkeypatch: pytest.MonkeyPatch) -> None:
-    fake_pm = MagicMock()
-    fake_pm.destroy = MagicMock()
+    def make_pm() -> MagicMock:
+        fake_pm = MagicMock()
+        fake_pm.destroy = MagicMock()
+        return fake_pm
+
     fake_fbo = MagicMock()
     fake_fbo.destroy = MagicMock()
     fake_fbo.fbo_id = 1
@@ -901,7 +904,7 @@ def _mock_run_scan_gl(monkeypatch: pytest.MonkeyPatch) -> None:
         "cleave.preset_scan.pygame.display.set_mode",
         lambda *args, **kwargs: None,
     )
-    monkeypatch.setattr("cleave.preset_scan.ProjectM", lambda: fake_pm)
+    monkeypatch.setattr("cleave.preset_scan.ProjectM", make_pm)
     monkeypatch.setattr("cleave.preset_scan._ProbeFbo", lambda *args: fake_fbo)
 
 
@@ -914,6 +917,52 @@ def test_existing_report_status_incomplete(tmp_path: Path) -> None:
     scanned, complete = existing_report_status(report_path)
     assert scanned == 3
     assert complete is False
+
+
+def test_run_scan_creates_fresh_projectm_per_preset(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pm_instances: list[MagicMock] = []
+
+    def make_pm() -> MagicMock:
+        fake_pm = MagicMock()
+        fake_pm.destroy = MagicMock()
+        pm_instances.append(fake_pm)
+        return fake_pm
+
+    monkeypatch.setattr("cleave.preset_scan.pygame.init", lambda: None)
+    monkeypatch.setattr("cleave.preset_scan.pygame.quit", lambda: None)
+    monkeypatch.setattr(
+        "cleave.preset_scan.pygame.display.set_mode",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr("cleave.preset_scan.ProjectM", make_pm)
+
+    fake_fbo = MagicMock()
+    fake_fbo.destroy = MagicMock()
+    fake_fbo.fbo_id = 1
+    monkeypatch.setattr("cleave.preset_scan._ProbeFbo", lambda *args: fake_fbo)
+
+    probe_pms: list[MagicMock] = []
+
+    def fake_probe(pm, fbo, target, **kwargs):
+        probe_pms.append(pm)
+        return PresetScanResult(path=target.path, result="ok", layers=target.layers)
+
+    monkeypatch.setattr("cleave.preset_scan._probe_preset", fake_probe)
+
+    targets = tuple(
+        PresetTarget(path=tmp_path / f"p{i}.milk", layers=())
+        for i in range(3)
+    )
+    scan_targets = ScanTargets(presets=targets)
+
+    run_scan(scan_targets)
+
+    assert len(pm_instances) == 3
+    for pm in pm_instances:
+        pm.destroy.assert_called_once()
+    assert probe_pms == pm_instances
 
 
 def test_run_scan_resume_progress_message(

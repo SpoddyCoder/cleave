@@ -87,7 +87,7 @@ Bulk mode: require at least one texture path (`--texture-path` and/or from `-c`)
 
 ## Per-preset probe (shipped)
 
-Hidden pygame GL context, one shared [ProjectM](../cleave/projectm.py) per preset (fresh instance in golden harness; shared in bulk scan with clean boot per preset), 480x270 RGBA FBO. Switch-failed callbacks from the projectM robustness work ([todos.md](todos.md)).
+Hidden pygame GL context, one fresh [ProjectM](../cleave/projectm.py) per preset (both `cleave scan` and `cleave scan-golden --probe`), 480x270 RGBA FBO. Switch-failed callbacks from the projectM robustness work ([todos.md](todos.md)).
 
 Per preset:
 
