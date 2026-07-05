@@ -7,7 +7,7 @@ Notes from iterating on `cleave scan` classification. See [presets-scan-plan.md]
 - `cleave scan` project and bulk modes; quick (default) and `--slow` probe profiles; JSON report.
 - `--quarantine`, `--resume`, `--delete` (with confirmation).
 - Classifier: clean boot per preset, full-frame luma, peak max/mean/coverage across post-warmup frames, `washed_out` category.
-- Golden harness: `cleave scan-golden` with committed quick-probe metrics cache.
+- Golden harness: `cleave scan-golden` with committed quick and slow metrics caches ([tests/fixtures/preset_scan_golden_metrics.json](../tests/fixtures/preset_scan_golden_metrics.json), [tests/fixtures/preset_scan_golden_metrics_slow.json](../tests/fixtures/preset_scan_golden_metrics_slow.json)); both profiles at 50/50 on the golden set.
 - Live visualizer: manual preset browse forces clean black boot via `load_manual_preset_clean()` in [cleave/viz/preset_switching.py](../cleave/viz/preset_switching.py).
 
 Probe harness ([cleave/preset_scan.py](../cleave/preset_scan.py)):
@@ -21,7 +21,7 @@ Run `--slow` before bulk quarantine or delete. Quick mode is useful for triage a
 
 ## Visualizer vs scan (case 2)
 
-Golden case 2 (Aderrasi - Airhandler): **black** in the live visualizer (clean boot, stays black). Quick probe still classifies **`washed_out`**; **slow** probe with tiered washed-out rules classifies **`ok`** (not washed_out). This is an accepted eval disparity for quick, not a mis-label. Quarantine outcome is acceptable either way. Cause unknown; backlog in [todos.md](todos.md).
+Golden case 2 (Aderrasi - Airhandler): **black** in the live visualizer (clean boot, stays black). Committed golden caches classify **`black`** on both quick and slow profiles (50/50 eval). Quick uses the `broken_soft_white` guard; slow uses tuned tiered washed-out thresholds. Probe frame metrics can still look bright on synthetic PCM; quarantine outcome matches the visualizer label.
 
 ## Design notes (historical)
 
@@ -34,7 +34,7 @@ Golden case 2 (Aderrasi - Airhandler): **black** in the live visualizer (clean b
 - Use live manual browse (clean boot) to build or verify labeled test sets.
 - Run `--slow` before quarantine or delete.
 - Read per-entry `luma` in scan JSON reports for borderline presets.
-- Unexpected golden eval mismatches (outside case 2) signal threshold or label review.
+- Unexpected golden eval mismatches signal threshold or label review.
 
 ## What not to do
 
