@@ -43,8 +43,7 @@ from OpenGL.GL import (
     glTexImage2D,
 )
 
-from cleave.paths import repo_root
-from cleave.pcm_io import SAMPLE_RATE_HZ, load_wav_pcm_44k
+from cleave.pcm_io import SAMPLE_RATE_HZ
 from cleave.preset_scan_metrics import (
     LUMA_COVERAGE_CUTOFFS,
     WHITE_COVERAGE_CUTOFFS,
@@ -58,17 +57,11 @@ from cleave.preset_scan_targets import PresetTarget, ScanTargets
 from cleave.projectm import PresetLoadFailure, ProjectM
 from cleave.stem_pcm import samples_per_frame
 
-ProbeMode = Literal["quick", "slow"]
-ProbePcmSource = Literal["synthetic", "reference-clip"]
 ScanMode = Literal["project", "bulk"]
 PresetResultCategory = Literal["load_failed", "black", "dim", "washed_out", "ok"]
 
-REFERENCE_CLIP_PATH = repo_root() / "assets" / "audio" / "scan-reference-10s.wav"
-
-QUICK_PROBE_WARMUP_FRAMES = 15
-QUICK_PROBE_WINDOW_FRAMES = 75
-SLOW_PROBE_WARMUP_FRAMES = 120
-SLOW_PROBE_WINDOW_FRAMES = 180
+PROBE_WARMUP_FRAMES = 15
+PROBE_WINDOW_FRAMES = 75
 PROBE_FPS = 30
 PROBE_FBO_WIDTH = 480
 PROBE_FBO_HEIGHT = 270
@@ -124,57 +117,9 @@ WASHED_COV192_MID = 0.28
 WASHED_WHITE235_MID_MAX = 0.10
 
 DEFER_LOAD_FAILED_MIN_COV16 = 0.9
-QUICK_BROKEN_SOFT_WHITE_MEAN_HI = 235.0
+BROKEN_SOFT_WHITE_MEAN_HI = 235.0
 
-SLOW_BLACK_MAX_LUMA = 1.0
-SLOW_BLACK_COVERAGE = 0.0003
-SLOW_DIM_MEAN_LUMA = 16.0
-SLOW_DIM_COVERAGE = 0.20
-SLOW_MID_PEAK_DIM_COV_LO = 0.14
-SLOW_MID_PEAK_DIM_MAX_LO = 100.0
-SLOW_MID_PEAK_DIM_MAX_HI = 200.0
-SLOW_VERY_SPARSE_DIM_MEAN = 5.1
-SLOW_VERY_SPARSE_DIM_MAX = 100.0
-SLOW_VERY_SPARSE_DIM_COV16 = 0.026
-SLOW_SPARSE_DIM_MEAN = 7.0
-SLOW_SPARSE_DIM_MAX = 80.0
-SLOW_SPARSE_DIM_COV16_MIN = 0.08
-SLOW_SPARSE_DIM_COV16_MAX = 0.12
-SLOW_CAPPED_DIM_MEAN = 40.0
-SLOW_CAPPED_DIM_MAX_LO = 50.0
-SLOW_CAPPED_DIM_MAX_HI = 177.0
-SLOW_CAPPED_DIM_COV16 = 0.04
-SLOW_BRIGHT_ON_BLACK_MAX = 25.0
-SLOW_BRIGHT_ON_BLACK_COVERAGE = 0.00025
-SLOW_COVERAGE_LUMA_MIN = 16
-
-SLOW_BROKEN_SOFT_WHITE_MIN_FRAC = 0.22
-SLOW_BROKEN_SOFT_WHITE_MEAN_HI = 245.0
-
-SLOW_WASHED_WHITE_AREA_FRAC_SOFT = 0.15
-SLOW_WASHED_MIN_WHITE_FRAME_FRAC_SOFT = 0.55
-SLOW_WASHED_MEAN_SOFT = 200.0
-SLOW_WASHED_MEAN_PEAK = 245.0
-SLOW_WASHED_COV16_MIN = 0.999
-SLOW_WASHED_COV192_PEAK = 0.95
-SLOW_WASHED_MAX_LO = 240.0
-SLOW_WASHED_MEAN_LO = 155.0
-SLOW_WASHED_MEAN_HI = 175.0
-SLOW_WASHED_COV192_LO = 0.05
-SLOW_WASHED_COV192_LO_MAX = 0.12
-SLOW_WASHED_MAX_MID = 235.0
-SLOW_WASHED_MEAN_MID_LO = 170.0
-SLOW_WASHED_MEAN_MID_HI = 175.0
-SLOW_WASHED_COV192_MID = 0.24
-SLOW_WASHED_WHITE235_MID_MAX = 0.10
-SLOW_WASHED_WF_SOFT_MIN = 0.20
-SLOW_WASHED_WF_SOFT_MEAN_LO = 185.0
-SLOW_WASHED_WF_SOFT_MEAN_HI = 220.0
-SLOW_WASHED_MEAN_HIGH_LO = 198.0
-SLOW_WASHED_MEAN_HIGH_HI = 220.0
-SLOW_WASHED_COV192_HIGH = 0.78
-
-QUICK_SCAN_THRESHOLDS: dict[str, float] = {
+SCAN_THRESHOLDS: dict[str, float] = {
     "black_max_luma": BLACK_MAX_LUMA,
     "black_coverage": BLACK_COVERAGE,
     "dim_mean_luma": DIM_MEAN_LUMA,
@@ -217,62 +162,9 @@ QUICK_SCAN_THRESHOLDS: dict[str, float] = {
     "washed_white235_mid_max": WASHED_WHITE235_MID_MAX,
 }
 
-SLOW_SCAN_THRESHOLDS: dict[str, float] = {
-    "black_max_luma": SLOW_BLACK_MAX_LUMA,
-    "black_coverage": SLOW_BLACK_COVERAGE,
-    "dim_mean_luma": SLOW_DIM_MEAN_LUMA,
-    "dim_coverage": SLOW_DIM_COVERAGE,
-    "mid_peak_dim_cov_lo": SLOW_MID_PEAK_DIM_COV_LO,
-    "mid_peak_dim_max_lo": SLOW_MID_PEAK_DIM_MAX_LO,
-    "mid_peak_dim_max_hi": SLOW_MID_PEAK_DIM_MAX_HI,
-    "very_sparse_dim_mean": SLOW_VERY_SPARSE_DIM_MEAN,
-    "very_sparse_dim_max": SLOW_VERY_SPARSE_DIM_MAX,
-    "very_sparse_dim_cov16": SLOW_VERY_SPARSE_DIM_COV16,
-    "sparse_dim_mean": SLOW_SPARSE_DIM_MEAN,
-    "sparse_dim_max": SLOW_SPARSE_DIM_MAX,
-    "sparse_dim_cov16_min": SLOW_SPARSE_DIM_COV16_MIN,
-    "sparse_dim_cov16_max": SLOW_SPARSE_DIM_COV16_MAX,
-    "capped_dim_mean": SLOW_CAPPED_DIM_MEAN,
-    "capped_dim_max_lo": SLOW_CAPPED_DIM_MAX_LO,
-    "capped_dim_max_hi": SLOW_CAPPED_DIM_MAX_HI,
-    "capped_dim_cov16": SLOW_CAPPED_DIM_COV16,
-    "white_channel_min": float(WHITE_CHANNEL_MIN),
-    "white_area_frac": WHITE_AREA_FRAC,
-    "min_white_frame_frac": MIN_WHITE_FRAME_FRAC,
-    "bright_on_black_max": SLOW_BRIGHT_ON_BLACK_MAX,
-    "bright_on_black_coverage": SLOW_BRIGHT_ON_BLACK_COVERAGE,
-    "coverage_luma_min": float(SLOW_COVERAGE_LUMA_MIN),
-    "broken_soft_white_min_frac": SLOW_BROKEN_SOFT_WHITE_MIN_FRAC,
-    "broken_soft_white_mean_hi": SLOW_BROKEN_SOFT_WHITE_MEAN_HI,
-    "white_area_frac_soft": SLOW_WASHED_WHITE_AREA_FRAC_SOFT,
-    "min_white_frame_frac_soft": SLOW_WASHED_MIN_WHITE_FRAME_FRAC_SOFT,
-    "washed_mean_soft": SLOW_WASHED_MEAN_SOFT,
-    "washed_mean_peak": SLOW_WASHED_MEAN_PEAK,
-    "washed_cov16_min": SLOW_WASHED_COV16_MIN,
-    "washed_cov192_peak": SLOW_WASHED_COV192_PEAK,
-    "washed_max_lo": SLOW_WASHED_MAX_LO,
-    "washed_mean_lo": SLOW_WASHED_MEAN_LO,
-    "washed_mean_hi": SLOW_WASHED_MEAN_HI,
-    "washed_cov192_lo": SLOW_WASHED_COV192_LO,
-    "washed_cov192_lo_max": SLOW_WASHED_COV192_LO_MAX,
-    "washed_max_mid": SLOW_WASHED_MAX_MID,
-    "washed_mean_mid_lo": SLOW_WASHED_MEAN_MID_LO,
-    "washed_mean_mid_hi": SLOW_WASHED_MEAN_MID_HI,
-    "washed_cov192_mid": SLOW_WASHED_COV192_MID,
-    "washed_white235_mid_max": SLOW_WASHED_WHITE235_MID_MAX,
-    "washed_wf_soft_min": SLOW_WASHED_WF_SOFT_MIN,
-    "washed_wf_soft_mean_lo": SLOW_WASHED_WF_SOFT_MEAN_LO,
-    "washed_wf_soft_mean_hi": SLOW_WASHED_WF_SOFT_MEAN_HI,
-    "washed_mean_high_lo": SLOW_WASHED_MEAN_HIGH_LO,
-    "washed_mean_high_hi": SLOW_WASHED_MEAN_HIGH_HI,
-    "washed_cov192_high": SLOW_WASHED_COV192_HIGH,
-}
 
-
-def scan_thresholds(probe_mode: ProbeMode) -> dict[str, float]:
-    if probe_mode == "slow":
-        return dict(SLOW_SCAN_THRESHOLDS)
-    return dict(QUICK_SCAN_THRESHOLDS)
+def scan_thresholds() -> dict[str, float]:
+    return dict(SCAN_THRESHOLDS)
 
 REPORT_FLUSH_EVERY = 10
 
@@ -285,7 +177,6 @@ QUARANTINE_CATEGORIES: frozenset[PresetResultCategory] = frozenset(
 class ProbeProfile:
     warmup_frames: int
     window_frames: int
-    mode: ProbeMode
 
     @property
     def total_frames(self) -> int:
@@ -294,31 +185,10 @@ class ProbeProfile:
 
 @dataclass(frozen=True)
 class ProbePcm:
-    channels: int
-    source: ProbePcmSource
-    reference_clip_path: Path | None
-    _pcm: np.ndarray | None
+    channels: int = 1
 
     def chunk(self, frame_idx: int, n_samples: int) -> np.ndarray:
-        if self.source == "synthetic":
-            return _synthetic_pcm_burst(frame_idx, n_samples)
-
-        assert self._pcm is not None
-        ch = self.channels
-        if n_samples <= 0:
-            return np.array([], dtype=np.float32)
-
-        t_sec = frame_idx / PROBE_FPS
-        start_frame = int(t_sec * SAMPLE_RATE_HZ)
-        n_out = n_samples * ch
-        out = np.zeros(n_out, dtype=np.float32)
-        start = start_frame * ch
-        if start >= len(self._pcm):
-            return out
-
-        take = min(n_out, len(self._pcm) - start)
-        out[:take] = self._pcm[start : start + take]
-        return out
+        return _synthetic_pcm_burst(frame_idx, n_samples)
 
 
 @dataclass(frozen=True)
@@ -340,7 +210,6 @@ class PresetScanResult:
 @dataclass(frozen=True)
 class ScanReport:
     scan_mode: ScanMode
-    probe_mode: ProbeMode
     project_dir: Path | None
     config_path: Path | None
     presets_dir: Path | None
@@ -351,9 +220,6 @@ class ScanReport:
     probe_frames: int
     probe_fps: int
     fbo_size: tuple[int, int]
-    pcm_source: str
-    pcm_channels: int
-    reference_clip_path: Path | None
     presets: tuple[PresetScanResult, ...]
     complete: bool = True
 
@@ -361,55 +227,19 @@ class ScanReport:
 @dataclass(frozen=True)
 class ResumeData:
     scan_mode: ScanMode
-    probe_mode: ProbeMode
     results: tuple[PresetScanResult, ...]
     skip_paths: frozenset[Path]
     complete: bool
 
 
-def probe_pcm_metadata(profile: ProbeProfile) -> dict[str, Any]:
-    """Return PCM source metadata for reports without loading audio files."""
-    if profile.mode == "slow":
-        return {
-            "pcm_source": "reference-clip",
-            "pcm_channels": 2,
-            "reference_clip_path": REFERENCE_CLIP_PATH.resolve(),
-        }
-    return {
-        "pcm_source": "synthetic",
-        "pcm_channels": 1,
-        "reference_clip_path": None,
-    }
+def build_probe_pcm() -> ProbePcm:
+    return ProbePcm()
 
 
-def build_probe_pcm(profile: ProbeProfile) -> ProbePcm:
-    if profile.mode == "slow":
-        pcm, channels = load_wav_pcm_44k(REFERENCE_CLIP_PATH)
-        return ProbePcm(
-            channels=channels,
-            source="reference-clip",
-            reference_clip_path=REFERENCE_CLIP_PATH.resolve(),
-            _pcm=pcm,
-        )
-    return ProbePcm(
-        channels=1,
-        source="synthetic",
-        reference_clip_path=None,
-        _pcm=None,
-    )
-
-
-def probe_profile(*, slow: bool = False) -> ProbeProfile:
-    if slow:
-        return ProbeProfile(
-            warmup_frames=SLOW_PROBE_WARMUP_FRAMES,
-            window_frames=SLOW_PROBE_WINDOW_FRAMES,
-            mode="slow",
-        )
+def probe_profile() -> ProbeProfile:
     return ProbeProfile(
-        warmup_frames=QUICK_PROBE_WARMUP_FRAMES,
-        window_frames=QUICK_PROBE_WINDOW_FRAMES,
-        mode="quick",
+        warmup_frames=PROBE_WARMUP_FRAMES,
+        window_frames=PROBE_WINDOW_FRAMES,
     )
 
 
@@ -493,7 +323,7 @@ def _defer_load_failed(peaks: FrameMetrics | dict[str, Any], th: dict[str, float
     )
 
 
-def _slow_broken_soft_white_black(
+def _broken_soft_white_black(
     peaks: FrameMetrics | dict[str, Any],
     frames: tuple[FrameMetrics, ...],
     th: dict[str, float],
@@ -506,35 +336,7 @@ def _slow_broken_soft_white_black(
         channel_min_cutoff=int(th["white_channel_min"]),
         area_frac=th["white_area_frac"],
     )
-    if white_frac_hard > 0.0:
-        return False
-    white_frac_soft = white_frame_fraction(
-        frames,
-        warmup_frames=0,
-        window_frames=0,
-        channel_min_cutoff=int(th["white_channel_min"]),
-        area_frac=th["white_area_frac_soft"],
-    )
-    return (
-        white_frac_soft >= th["broken_soft_white_min_frac"]
-        and th["washed_mean_soft"] <= mean_luma <= th["broken_soft_white_mean_hi"]
-    )
-
-
-def _quick_broken_soft_white_black(
-    peaks: FrameMetrics | dict[str, Any],
-    frames: tuple[FrameMetrics, ...],
-    th: dict[str, float],
-) -> bool:
-    _, mean_luma, _ = _normalize_peak_metrics(peaks)
-    white_frac_hard = white_frame_fraction(
-        frames,
-        warmup_frames=0,
-        window_frames=0,
-        channel_min_cutoff=int(th["white_channel_min"]),
-        area_frac=th["white_area_frac"],
-    )
-    if white_frac_hard > 0.0:
+    if white_frac_hard >= th["min_white_frame_frac"]:
         return False
     white_frac_soft = white_frame_fraction(
         frames,
@@ -545,7 +347,7 @@ def _quick_broken_soft_white_black(
     )
     return (
         white_frac_soft >= th["min_white_frame_frac_soft"]
-        and th["washed_mean_soft"] <= mean_luma <= QUICK_BROKEN_SOFT_WHITE_MEAN_HI
+        and th["washed_mean_soft"] <= mean_luma <= BROKEN_SOFT_WHITE_MEAN_HI
     )
 
 
@@ -595,8 +397,7 @@ def _washed_out_tiers(
         and th["washed_mean_lo"] <= mean_luma <= th["washed_mean_hi"]
         and cov192 >= th["washed_cov192_lo"]
     ):
-        if "washed_cov192_lo_max" not in th or cov192 <= th["washed_cov192_lo_max"]:
-            return True
+        return True
 
     if (
         cov16 >= th["washed_cov16_min"]
@@ -604,33 +405,6 @@ def _washed_out_tiers(
         and th["washed_mean_mid_lo"] <= mean_luma <= th["washed_mean_mid_hi"]
         and cov192 >= th["washed_cov192_mid"]
         and white235 < th["washed_white235_mid_max"]
-    ):
-        return True
-
-    if "washed_wf_soft_min" in th:
-        white_frac_soft = white_frame_fraction(
-            frames,
-            warmup_frames=0,
-            window_frames=0,
-            channel_min_cutoff=int(th["white_channel_min"]),
-            area_frac=th["white_area_frac_soft"],
-        )
-        if (
-            white_frac_soft >= th["washed_wf_soft_min"]
-            and th["washed_wf_soft_mean_lo"] <= mean_luma <= th["washed_wf_soft_mean_hi"]
-            and cov16 >= th["washed_cov16_min"]
-        ):
-            return True
-
-    if (
-        "washed_mean_high_lo" in th
-        and cov16 >= th["washed_cov16_min"]
-        and th["washed_mean_high_lo"] <= mean_luma
-        and (
-            "washed_mean_high_hi" not in th
-            or mean_luma <= th["washed_mean_high_hi"]
-        )
-        and cov192 >= th["washed_cov192_high"]
     ):
         return True
 
@@ -642,10 +416,9 @@ def classify_preset_result(
     peaks: FrameMetrics | dict[str, Any],
     *,
     frames: tuple[FrameMetrics, ...] | None = None,
-    probe_mode: ProbeMode = "quick",
     thresholds: dict[str, float] | None = None,
 ) -> tuple[PresetResultCategory, str | None]:
-    th = scan_thresholds(probe_mode)
+    th = scan_thresholds()
     if thresholds is not None:
         th.update(thresholds)
 
@@ -657,11 +430,8 @@ def classify_preset_result(
         return "load_failed", active_failures[0].message
 
     if frames is not None:
-        if probe_mode == "quick" and "washed_mean_peak" in th:
-            if _quick_broken_soft_white_black(peaks, frames, th):
-                return "black", None
-        if probe_mode == "slow" and "broken_soft_white_min_frac" in th:
-            if _slow_broken_soft_white_black(peaks, frames, th):
+        if "washed_mean_peak" in th:
+            if _broken_soft_white_black(peaks, frames, th):
                 return "black", None
         if "washed_mean_peak" in th:
             if _washed_out_tiers(peaks, frames, th):
@@ -701,15 +471,6 @@ def classify_preset_result(
     ):
         return "dim", None
 
-    if (
-        "mid_peak_dim_cov_lo" in th
-        and mean_luma < th["dim_mean_luma"]
-        and cov_min >= th["mid_peak_dim_cov_lo"]
-        and cov_min < th["dim_coverage"]
-        and th["mid_peak_dim_max_lo"] <= max_luma < th["mid_peak_dim_max_hi"]
-    ):
-        return "dim", None
-
     if mean_luma < th["dim_mean_luma"] and cov_min < th["dim_coverage"]:
         if _dim_bright_on_black_ok(
             max_luma=max_luma,
@@ -737,10 +498,8 @@ def build_scan_report(
         slot: [str(path) for path in paths]
         for slot, paths in sorted(targets.layer_sources.items())
     }
-    pcm_meta = probe_pcm_metadata(profile)
     return ScanReport(
         scan_mode=scan_mode,
-        probe_mode=profile.mode,
         project_dir=project_dir.resolve() if project_dir is not None else None,
         config_path=config_path.resolve() if config_path is not None else None,
         presets_dir=(
@@ -751,13 +510,10 @@ def build_scan_report(
         ),
         texture_paths=tuple(p.resolve() for p in targets.texture_paths),
         layers=layers,
-        thresholds=scan_thresholds(profile.mode),
+        thresholds=scan_thresholds(),
         probe_frames=profile.total_frames,
         probe_fps=PROBE_FPS,
         fbo_size=(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT),
-        pcm_source=pcm_meta["pcm_source"],
-        pcm_channels=pcm_meta["pcm_channels"],
-        reference_clip_path=pcm_meta["reference_clip_path"],
         presets=tuple(results),
         complete=complete,
     )
@@ -780,7 +536,6 @@ def scan_report_summary(report: ScanReport) -> dict[str, int]:
 def scan_report_to_dict(report: ScanReport) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "scan_mode": report.scan_mode,
-        "probe_mode": report.probe_mode,
         "project_dir": _path_to_str(report.project_dir),
         "config_path": _path_to_str(report.config_path),
         "presets_dir": _path_to_str(report.presets_dir),
@@ -791,14 +546,10 @@ def scan_report_to_dict(report: ScanReport) -> dict[str, Any]:
         "probe_frames": report.probe_frames,
         "probe_fps": report.probe_fps,
         "fbo_size": list(report.fbo_size),
-        "pcm_source": report.pcm_source,
-        "pcm_channels": report.pcm_channels,
         "presets": [_preset_result_to_dict(preset) for preset in report.presets],
         "summary": scan_report_summary(report),
         "complete": report.complete,
     }
-    if report.probe_mode == "slow" and report.reference_clip_path is not None:
-        payload["reference_clip_path"] = str(report.reference_clip_path)
     return payload
 
 
@@ -860,10 +611,6 @@ def load_resume_results(path: Path) -> ResumeData:
     if scan_mode not in ("project", "bulk"):
         raise ValueError("missing or invalid scan_mode")
 
-    probe_mode = raw.get("probe_mode")
-    if probe_mode not in ("quick", "slow"):
-        raise ValueError("missing or invalid probe_mode")
-
     presets_raw = raw.get("presets")
     if not isinstance(presets_raw, list):
         raise ValueError("missing presets array")
@@ -882,7 +629,6 @@ def load_resume_results(path: Path) -> ResumeData:
 
     return ResumeData(
         scan_mode=scan_mode,
-        probe_mode=probe_mode,
         results=tuple(results),
         skip_paths=frozenset(skip_paths),
         complete=complete,
@@ -971,14 +717,13 @@ def _configure_probe_projectm(pm: ProjectM, texture_strs: list[str]) -> None:
 def run_scan(
     targets: ScanTargets,
     *,
-    slow: bool = False,
     texture_paths: tuple[Path, ...] | None = None,
     report_sink: Callable[[list[PresetScanResult], bool], None] | None = None,
     skip_paths: frozenset[Path] | None = None,
 ) -> list[PresetScanResult]:
     """Probe each preset in *targets* with a hidden GL context and a fresh ProjectM."""
-    profile = probe_profile(slow=slow)
-    probe_pcm = build_probe_pcm(profile)
+    profile = probe_profile()
+    probe_pcm = build_probe_pcm()
     paths = texture_paths if texture_paths is not None else targets.texture_paths
     texture_strs = [str(path) for path in paths]
 
@@ -1132,7 +877,6 @@ def _probe_preset(
         failures,
         peaks,
         frames=window_frames,
-        probe_mode=profile.mode,
     )
 
     return PresetScanResult(

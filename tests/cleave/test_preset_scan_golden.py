@@ -12,11 +12,8 @@ from cleave.preset_scan import (
     BLACK_MAX_LUMA,
     DIM_COVERAGE,
     DIM_MEAN_LUMA,
-    QUICK_PROBE_WARMUP_FRAMES,
-    QUICK_PROBE_WINDOW_FRAMES,
-    SLOW_PROBE_WARMUP_FRAMES,
-    SLOW_PROBE_WINDOW_FRAMES,
-    scan_thresholds,
+    PROBE_WARMUP_FRAMES,
+    PROBE_WINDOW_FRAMES,
 )
 from cleave.preset_scan_golden import (
     DEFAULT_METRICS_CACHE_PATH,
@@ -115,7 +112,6 @@ def _mini_cache(golden: GoldenSet) -> MetricsCache:
         version=METRICS_CACHE_VERSION,
         probe_fps=30,
         fbo_size=(480, 270),
-        probe_mode="quick",
         warmup_frames=0,
         window_frames=90,
         total_frames=90,
@@ -230,7 +226,6 @@ def test_evaluate_reports_mismatch(tmp_path: Path) -> None:
         version=cache.version,
         probe_fps=cache.probe_fps,
         fbo_size=cache.fbo_size,
-        probe_mode=cache.probe_mode,
         warmup_frames=cache.warmup_frames,
         window_frames=cache.window_frames,
         total_frames=cache.total_frames,
@@ -290,8 +285,8 @@ def test_sweep_ranks_better_configs_first(tmp_path: Path) -> None:
     assert results[0].accuracy >= results[1].accuracy
 
 
-def test_default_threshold_sweep_variants_quick_is_expanded() -> None:
-    variants = default_threshold_sweep_variants("quick")
+def test_default_threshold_sweep_variants_is_expanded() -> None:
+    variants = default_threshold_sweep_variants()
     assert variants[0] is None
     assert len(variants) > 100
     assert any(
@@ -299,18 +294,6 @@ def test_default_threshold_sweep_variants_quick_is_expanded() -> None:
     )
     assert any(
         entry is not None and "dim_bob_cov_lo" in entry for entry in variants
-    )
-
-
-def test_default_threshold_sweep_variants_slow_covers_white_and_dim() -> None:
-    variants = default_threshold_sweep_variants("slow")
-    assert variants[0] is None
-    assert len(variants) > 100
-    assert any(
-        entry is not None and "washed_mean_peak" in entry for entry in variants
-    )
-    assert all(
-        entry is None or "dim_bob_cov_lo" not in entry for entry in variants
     )
 
 
@@ -329,10 +312,9 @@ def test_evaluate_uses_cache_probe_profile() -> None:
         version=METRICS_CACHE_VERSION,
         probe_fps=30,
         fbo_size=(480, 270),
-        probe_mode="slow",
-        warmup_frames=SLOW_PROBE_WARMUP_FRAMES,
-        window_frames=SLOW_PROBE_WINDOW_FRAMES,
-        total_frames=SLOW_PROBE_WARMUP_FRAMES + SLOW_PROBE_WINDOW_FRAMES,
+        warmup_frames=PROBE_WARMUP_FRAMES,
+        window_frames=PROBE_WINDOW_FRAMES,
+        total_frames=PROBE_WARMUP_FRAMES + PROBE_WINDOW_FRAMES,
         presets=(
             PresetMetrics(
                 path=ok_path,
@@ -342,7 +324,7 @@ def test_evaluate_uses_cache_probe_profile() -> None:
                 frames=(
                     _frame(max_luma=50.0, mean_luma=50.0, cutoff_16=0.5),
                 )
-                * (SLOW_PROBE_WARMUP_FRAMES + SLOW_PROBE_WINDOW_FRAMES),
+                * (PROBE_WARMUP_FRAMES + PROBE_WINDOW_FRAMES),
             ),
         ),
     )
@@ -355,56 +337,8 @@ def test_evaluate_uses_cache_probe_profile() -> None:
 
     report = evaluate(cache, mini)
 
-    assert report.warmup_frames == SLOW_PROBE_WARMUP_FRAMES
-    assert report.window_frames == SLOW_PROBE_WINDOW_FRAMES
-    assert report.probe_mode == "slow"
-
-
-def test_evaluate_uses_slow_thresholds_for_slow_cache(monkeypatch) -> None:
-    golden = load_golden_set(FIXTURE_PATH)
-    ok_path = golden.cases[2].preset
-    cache = MetricsCache(
-        version=METRICS_CACHE_VERSION,
-        probe_fps=30,
-        fbo_size=(480, 270),
-        probe_mode="slow",
-        warmup_frames=SLOW_PROBE_WARMUP_FRAMES,
-        window_frames=SLOW_PROBE_WINDOW_FRAMES,
-        total_frames=SLOW_PROBE_WARMUP_FRAMES + SLOW_PROBE_WINDOW_FRAMES,
-        presets=(
-            PresetMetrics(
-                path=ok_path,
-                load_failed=False,
-                error=None,
-                fps=30,
-                frames=(
-                    _frame(max_luma=50.0, mean_luma=50.0, cutoff_16=0.5),
-                )
-                * (SLOW_PROBE_WARMUP_FRAMES + SLOW_PROBE_WINDOW_FRAMES),
-            ),
-        ),
-    )
-    mini = GoldenSet(
-        version=1,
-        preset_root=golden.preset_root,
-        texture_paths=golden.texture_paths,
-        cases=(golden.cases[2],),
-    )
-    seen_modes: list[str] = []
-    real_scan_thresholds = scan_thresholds
-
-    def track_scan_thresholds(mode: str) -> dict[str, float]:
-        seen_modes.append(mode)
-        return real_scan_thresholds(mode)
-
-    monkeypatch.setattr(
-        "cleave.preset_scan.scan_thresholds",
-        track_scan_thresholds,
-    )
-
-    evaluate(cache, mini)
-
-    assert seen_modes == ["slow"]
+    assert report.warmup_frames == PROBE_WARMUP_FRAMES
+    assert report.window_frames == PROBE_WINDOW_FRAMES
 
 
 def test_evaluate_rejects_profile_mismatch(tmp_path: Path) -> None:
@@ -415,7 +349,7 @@ def test_evaluate_rejects_profile_mismatch(tmp_path: Path) -> None:
         evaluate(cache, golden, warmup_frames=10, window_frames=90)
 
 
-def test_resolve_cache_probe_profile_infers_quick_from_frame_count(tmp_path: Path) -> None:
+def test_resolve_cache_probe_profile_infers_from_frame_count(tmp_path: Path) -> None:
     golden = _mini_golden(tmp_path)
     cache = MetricsCache(
         version=METRICS_CACHE_VERSION,
@@ -426,9 +360,8 @@ def test_resolve_cache_probe_profile_infers_quick_from_frame_count(tmp_path: Pat
 
     profile = resolve_cache_probe_profile(cache)
 
-    assert profile.mode == "quick"
-    assert profile.warmup_frames == QUICK_PROBE_WARMUP_FRAMES
-    assert profile.window_frames == QUICK_PROBE_WINDOW_FRAMES
+    assert profile.warmup_frames == PROBE_WARMUP_FRAMES
+    assert profile.window_frames == PROBE_WINDOW_FRAMES
 
 
 def test_resolve_eval_probe_window_uses_cache_by_default(tmp_path: Path) -> None:
@@ -439,7 +372,6 @@ def test_resolve_eval_probe_window_uses_cache_by_default(tmp_path: Path) -> None
 
     assert warmup == 0
     assert window == 90
-    assert profile.mode == "quick"
 
 
 GOLDEN_CASE_2_ID = 2

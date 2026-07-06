@@ -604,10 +604,9 @@ def test_shortcut_flags() -> None:
 
 def test_scan_parser_project_mode() -> None:
     parser = build_parser()
-    args = parser.parse_args(["scan", "my-project", "-c", "cfg.yaml", "--slow"])
+    args = parser.parse_args(["scan", "my-project", "-c", "cfg.yaml"])
     assert args.project_dir == "my-project"
     assert args.config == Path("cfg.yaml")
-    assert args.slow
     assert args.presets_dir is None
     assert args.texture_path == []
     assert args.report is None
@@ -711,7 +710,6 @@ def test_cmd_scan_resume_rejects_complete_report(
         json.dumps(
             {
                 "scan_mode": "project",
-                "probe_mode": "quick",
                 "complete": True,
                 "presets": [
                     {
@@ -863,13 +861,11 @@ def test_cmd_scan_bulk_mode_smoke(
                     str(presets_dir),
                     "--texture-path",
                     str(texture_dir),
-                    "--slow",
                 ]
             )
         )
 
     run_scan.assert_called_once()
-    assert run_scan.call_args.kwargs["slow"] is True
     assert run_scan.call_args.kwargs["texture_paths"] == (texture_dir.resolve(),)
     err = capsys.readouterr().err
     assert "black=1" in err
@@ -1031,7 +1027,6 @@ def test_module_help_lists_subcommands() -> None:
         check=True,
     )
     assert "--presets-dir" in scan.stdout
-    assert "--slow" in scan.stdout
     assert "--report" in scan.stdout
     assert "--resume" in scan.stdout
 
@@ -1041,5 +1036,3 @@ def test_module_help_lists_subcommands() -> None:
         text=True,
         check=True,
     )
-    assert "--slow" in scan_golden.stdout
-    assert "--quick" not in scan_golden.stdout

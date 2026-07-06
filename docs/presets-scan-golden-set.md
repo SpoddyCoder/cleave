@@ -4,7 +4,7 @@ Manual labels for tuning `cleave scan`. Source: layer 1 preset in [projects/sigh
 
 Machine-readable fixture: [tests/fixtures/preset_scan_golden_set.yaml](../tests/fixtures/preset_scan_golden_set.yaml).
 
-Committed metrics cache (quick probe): [tests/fixtures/preset_scan_golden_metrics.json](../tests/fixtures/preset_scan_golden_metrics.json).
+Committed metrics cache: [tests/fixtures/preset_scan_golden_metrics.json](../tests/fixtures/preset_scan_golden_metrics.json).
 
 ## Review context
 
@@ -42,14 +42,14 @@ Golden case 2 (Aderrasi - Airhandler) is an accepted **eval disparity**, not a m
 
 | Source | Label | Notes |
 | --- | --- | --- |
-| Live visualizer | `black` | Clean boot; stays black (verified at reference-clip offset ~82 s) |
-| Scan probe | `washed_out` | Quick and slow profiles both drive extreme white metrics |
+| Live visualizer | `black` | Clean boot; stays black |
+| Scan probe | `washed_out` | Synthetic PCM can drive extreme white metrics |
 
 Both labels describe the same non-working preset. The visualizer label is ground truth for appearance; scan still **quarantines** it (`washed_out` is a quarantine category), but **scan classification cannot be trusted** for this preset.
 
 Root cause is not understood. See [todos.md](todos.md).
 
-Unit test: [tests/cleave/test_preset_scan_golden.py](../tests/cleave/test_preset_scan_golden.py) (`test_golden_case_2_visualizer_scan_disparity`).
+Unit test: [tests/cleave/test_preset_scan_golden.py](../tests/cleave/test_preset_scan_golden.py) (`test_golden_case_2_not_washed_out_with_v3_cache`).
 
 ## Cases
 
@@ -89,15 +89,15 @@ Unit test: [tests/cleave/test_preset_scan_golden.py](../tests/cleave/test_preset
 ## Harness usage
 
 1. Load [tests/fixtures/preset_scan_golden_set.yaml](../tests/fixtures/preset_scan_golden_set.yaml).
-2. Probe all 30 cases with clean boot and full-frame metrics.
+2. Probe all 50 cases with clean boot and full-frame metrics.
 3. Compare classifier output to `expected_result` (`cleave scan-golden --eval`).
 
-**Committed cache profile:** quick (15 warmup + 75 window frames at 30 fps, synthetic mono PCM). Regenerate with `cleave scan-golden --probe`. Use `--slow` for the reference-audio profile before bulk quarantine.
+**Committed cache profile:** 15 warmup + 75 window frames at 30 fps, synthetic mono PCM. Regenerate with `cleave scan-golden --probe`.
 
 **Commands:**
 
 ```bash
-# Regenerate committed cache (needs GL; quick profile unless --slow)
+# Regenerate committed cache (needs GL)
 cleave scan-golden --probe
 
 # Evaluate classifier against visualizer labels (GL-free)
@@ -107,7 +107,6 @@ cleave scan-golden --eval
 cleave scan-golden --sweep
 ```
 
-- **Probe:** `--probe` without `--slow` overwrites the quick cache; `--probe --slow` writes the slow profile instead.
 - **Eval:** reads warmup/window from cache metadata; mismatched `--warmup` / `--window` flags error.
 
 See [presets-scan-plan.md](presets-scan-plan.md) and [presets-scan-learnings.md](presets-scan-learnings.md).

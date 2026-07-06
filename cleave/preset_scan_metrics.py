@@ -7,9 +7,7 @@ import os
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
-
-ProbeMode = Literal["quick", "slow"]
+from typing import Any
 
 import numpy as np
 from OpenGL.GL import GL_RGBA, GL_UNSIGNED_BYTE, glReadPixels
@@ -47,7 +45,6 @@ class MetricsCache:
     presets: tuple[PresetMetrics, ...]
     probe_fps: int
     fbo_size: tuple[int, int]
-    probe_mode: ProbeMode | None = None
     warmup_frames: int | None = None
     window_frames: int | None = None
     total_frames: int | None = None
@@ -245,8 +242,6 @@ def metrics_cache_to_dict(cache: MetricsCache) -> dict[str, Any]:
         "fbo_size": list(cache.fbo_size),
         "presets": [preset_metrics_to_dict(preset) for preset in cache.presets],
     }
-    if cache.probe_mode is not None:
-        payload["probe_mode"] = cache.probe_mode
     if cache.warmup_frames is not None:
         payload["warmup_frames"] = cache.warmup_frames
     if cache.window_frames is not None:
@@ -254,15 +249,6 @@ def metrics_cache_to_dict(cache: MetricsCache) -> dict[str, Any]:
     if cache.total_frames is not None:
         payload["total_frames"] = cache.total_frames
     return payload
-
-
-def _optional_probe_mode(data: dict[str, Any]) -> ProbeMode | None:
-    probe_mode = data.get("probe_mode")
-    if probe_mode is None:
-        return None
-    if probe_mode not in ("quick", "slow"):
-        raise ValueError(f"metrics cache has invalid probe_mode: {probe_mode!r}")
-    return probe_mode
 
 
 def _optional_int_field(data: dict[str, Any], key: str) -> int | None:
@@ -284,7 +270,7 @@ def metrics_cache_from_dict(data: Any) -> MetricsCache:
             raise ValueError(
                 f"metrics cache version {version} is stale (current is "
                 f"{METRICS_CACHE_VERSION}); regenerate with "
-                "cleave scan-golden --probe or cleave scan-golden --probe --slow"
+                "cleave scan-golden --probe"
             )
         raise ValueError(f"unsupported metrics cache version: {version!r}")
 
@@ -304,7 +290,6 @@ def metrics_cache_from_dict(data: Any) -> MetricsCache:
     if not isinstance(presets_raw, list):
         raise ValueError("metrics cache missing presets array")
 
-    probe_mode = _optional_probe_mode(data)
     warmup_frames = _optional_int_field(data, "warmup_frames")
     window_frames = _optional_int_field(data, "window_frames")
     total_frames = _optional_int_field(data, "total_frames")
@@ -313,7 +298,6 @@ def metrics_cache_from_dict(data: Any) -> MetricsCache:
         missing = [
             name
             for name, value in (
-                ("probe_mode", probe_mode),
                 ("warmup_frames", warmup_frames),
                 ("window_frames", window_frames),
                 ("total_frames", total_frames),
@@ -332,7 +316,6 @@ def metrics_cache_from_dict(data: Any) -> MetricsCache:
         presets=presets,
         probe_fps=probe_fps,
         fbo_size=(fbo_size_raw[0], fbo_size_raw[1]),
-        probe_mode=probe_mode,
         warmup_frames=warmup_frames,
         window_frames=window_frames,
         total_frames=total_frames,
