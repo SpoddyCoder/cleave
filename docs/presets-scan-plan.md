@@ -58,8 +58,10 @@ cleave scan --presets-dir <dir> --texture-path <dir> [--texture-path ...] [optio
 | (default) | 15 frames warmup + 75 window; synthetic mono PCM; report on stderr, optional JSON |
 | `--report <path>` | JSON report path; written incrementally so a run can be resumed |
 | `--recursive` | Bulk mode only: scan subdirectories |
-| `--quarantine <dir>` | Move failed presets to DIR; DIR must be outside the scan set |
-| `--delete` | Remove failed presets after the scan; prompts unless `--yes` |
+| `--quarantine <dir>` | Move failed presets (`load_failed`, `black`) to DIR; use `--include-dim` / `--include-washout` to extend |
+| `--delete` | Remove failed presets after the scan (`load_failed`, `black`; prompts unless `--yes`) |
+| `--include-dim` | Also quarantine or delete presets classified as `dim` |
+| `--include-washout` | Also quarantine or delete presets classified as `washed_out` |
 | `--yes` | Skip confirmation for `--delete` (required when stdin is not a TTY) |
 | `--resume` | Skip presets already in the `--report` file; requires `--report PATH` |
 
@@ -104,7 +106,7 @@ Per-preset `luma: { max, mean, coverage }` in JSON reports holds the peak values
 
 ### Destructive actions
 
-`--quarantine` and `--delete` move or remove presets flagged as `load_failed`, `black`, `dim`, or `washed_out`. Review scan results before destructive cleanup on large packs.
+`--quarantine` and `--delete` move or remove presets flagged as `load_failed` or `black` by default. Add `--include-dim` and/or `--include-washout` to extend cleanup to those categories. Review scan results before destructive cleanup on large packs.
 
 ## JSON report
 
@@ -131,7 +133,7 @@ Include environment metadata:
 
 - Target must be a directory (create with parents if missing) for quarantine.
 - Reject quarantine dir inside the scanned preset tree.
-- Only `load_failed`, `black`, `dim`, `washed_out` are moved or deleted.
+- Only `load_failed` and `black` are moved or deleted by default; `dim` and `washed_out` require `--include-dim` and `--include-washout`.
 - `--delete` prompts for confirmation unless `--yes`; requires `--yes` when stdin is not a TTY.
 - `--delete` and `--quarantine` are mutually exclusive.
 

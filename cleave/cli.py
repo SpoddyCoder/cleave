@@ -13,9 +13,10 @@ from cleave.config import (
 from cleave.paths import resolve_project
 from cleave.preset_scan import (
     PresetScanResult,
-    QUARANTINE_CATEGORIES,
+    PresetResultCategory,
     build_scan_report,
     delete_presets,
+    destructive_scan_categories,
     existing_report_status,
     load_resume_results,
     probe_profile,
@@ -210,11 +211,13 @@ def _print_scan_summary(summary: dict[str, int]) -> None:
 
 def _delete_candidate_count(
     results: list[PresetScanResult] | tuple[PresetScanResult, ...],
+    *,
+    categories: frozenset[PresetResultCategory],
 ) -> int:
     return sum(
         1
         for result in results
-        if result.result in QUARANTINE_CATEGORIES and result.path.is_file()
+        if result.result in categories and result.path.is_file()
     )
 
 
@@ -311,6 +314,21 @@ def _handle_scan_keyboard_interrupt(
 
 def cmd_scan(args: argparse.Namespace) -> None:
     bulk_mode = args.presets_dir is not None
+
+    destructive_categories = destructive_scan_categories(
+        include_dim=args.include_dim,
+        include_washout=args.include_washout,
+    )
+    if (
+        (args.include_dim or args.include_washout)
+        and args.quarantine is None
+        and not args.delete
+    ):
+        print(
+            "warning: --include-dim/--include-washout have no effect "
+            "without --quarantine or --delete",
+            file=sys.stderr,
+        )
 
     if args.resume and args.report is None:
         _exit_error("error: --resume requires --report PATH")
@@ -505,14 +523,21 @@ def cmd_scan(args: argparse.Namespace) -> None:
         print(f"Wrote scan report to {report_path}")
 
     if quarantine_dir is not None:
-        moves = quarantine_presets(results, quarantine_dir)
+        moves = quarantine_presets(
+            results,
+            quarantine_dir,
+            categories=destructive_categories,
+        )
         for src, dst in moves:
             print(f"Quarantined {src} -> {dst}")
 
     if args.delete:
-        delete_count = _delete_candidate_count(results)
+        delete_count = _delete_candidate_count(
+            results,
+            categories=destructive_categories,
+        )
         _confirm_delete(delete_count, yes=args.yes)
-        deleted = delete_presets(results)
+        deleted = delete_presets(results, categories=destructive_categories)
         for path in deleted:
             print(f"Deleted {path}")
 
@@ -825,12 +850,28 @@ def build_parser() -> argparse.ArgumentParser:
         "--quarantine",
         type=Path,
         metavar="DIR",
-        help="Move failed presets (load_failed, black, dim, washed_out) to DIR",
+        help=(
+            "Move failed presets (load_failed, black) to DIR; "
+            "use --include-dim / --include-washout to extend"
+        ),
     )
     scan_action.add_argument(
         "--delete",
         action="store_true",
-        help="Delete failed presets after the scan (prompts unless --yes)",
+        help=(
+            "Delete failed presets after the scan (load_failed, black; "
+            "prompts unless --yes)"
+        ),
+    )
+    scan.add_argument(
+        "--include-dim",
+        action="store_true",
+        help="Also quarantine or delete presets classified as dim",
+    )
+    scan.add_argument(
+        "--include-washout",
+        action="store_true",
+        help="Also quarantine or delete presets classified as washed_out",
     )
     scan.add_argument(
         "--yes",

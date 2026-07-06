@@ -975,6 +975,90 @@ def test_scan_parser_rejects_delete_with_quarantine() -> None:
         )
 
 
+def test_cmd_scan_include_flags_warn_without_destructive_action(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    presets_dir = tmp_path / "pack"
+    presets_dir.mkdir()
+    texture_dir = tmp_path / "textures"
+    texture_dir.mkdir()
+    preset_path = presets_dir / "ok.milk"
+    preset_path.write_text("ok", encoding="utf-8")
+
+    preset_results = [
+        PresetScanResult(path=preset_path, result="ok", layers=()),
+    ]
+    targets = ScanTargets(
+        presets=(PresetTarget(path=preset_path, layers=()),),
+        presets_dir=presets_dir,
+    )
+
+    with (
+        patch("cleave.cli.build_bulk_targets", return_value=targets),
+        patch("cleave.cli.run_scan", return_value=preset_results),
+    ):
+        cmd_scan(
+            build_parser().parse_args(
+                [
+                    "scan",
+                    "--presets-dir",
+                    str(presets_dir),
+                    "--texture-path",
+                    str(texture_dir),
+                    "--include-dim",
+                ]
+            )
+        )
+
+    err = capsys.readouterr().err
+    assert "warning:" in err
+    assert "--include-dim/--include-washout have no effect" in err
+
+
+def test_cmd_scan_delete_skips_dim_without_include_dim(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    presets_dir = tmp_path / "pack"
+    presets_dir.mkdir()
+    texture_dir = tmp_path / "textures"
+    texture_dir.mkdir()
+    dim_path = presets_dir / "dim.milk"
+    dim_path.write_text("dim", encoding="utf-8")
+
+    preset_results = [
+        PresetScanResult(path=dim_path, result="dim", layers=()),
+    ]
+    targets = ScanTargets(
+        presets=(PresetTarget(path=dim_path, layers=()),),
+        presets_dir=presets_dir,
+    )
+
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+
+    with (
+        patch("cleave.cli.build_bulk_targets", return_value=targets),
+        patch("cleave.cli.run_scan", return_value=preset_results),
+    ):
+        cmd_scan(
+            build_parser().parse_args(
+                [
+                    "scan",
+                    "--presets-dir",
+                    str(presets_dir),
+                    "--texture-path",
+                    str(texture_dir),
+                    "--delete",
+                    "--yes",
+                ]
+            )
+        )
+
+    assert dim_path.is_file()
+    assert "Deleted" not in capsys.readouterr().out
+
+
 def test_module_help_lists_subcommands() -> None:
     root = subprocess.run(
         [sys.executable, "-m", "cleave", "--help"],

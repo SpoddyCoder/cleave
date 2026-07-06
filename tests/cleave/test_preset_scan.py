@@ -44,6 +44,7 @@ from cleave.preset_scan import (
     build_scan_report,
     classify_preset_result,
     delete_presets,
+    destructive_scan_categories,
     existing_report_status,
     load_resume_results,
     probe_profile,
@@ -770,7 +771,21 @@ def test_validate_quarantine_dir_rejects_inside_scanned(tmp_path: Path) -> None:
         validate_quarantine_dir(inside, (scanned,))
 
 
-def test_quarantine_presets_moves_washed_out(tmp_path: Path) -> None:
+def test_destructive_scan_categories_default_and_opt_in() -> None:
+    default = destructive_scan_categories()
+    assert default == frozenset({"load_failed", "black"})
+
+    with_dim = destructive_scan_categories(include_dim=True)
+    assert with_dim == frozenset({"load_failed", "black", "dim"})
+
+    with_washout = destructive_scan_categories(include_washout=True)
+    assert with_washout == frozenset({"load_failed", "black", "washed_out"})
+
+    with_both = destructive_scan_categories(include_dim=True, include_washout=True)
+    assert with_both == frozenset({"load_failed", "black", "dim", "washed_out"})
+
+
+def test_quarantine_presets_skips_washed_out_by_default(tmp_path: Path) -> None:
     presets_dir = tmp_path / "presets"
     presets_dir.mkdir()
     quarantine_dir = tmp_path / "quarantine"
@@ -782,6 +797,25 @@ def test_quarantine_presets_moves_washed_out(tmp_path: Path) -> None:
     moves = quarantine_presets(
         [PresetScanResult(path=washed_path, result="washed_out", layers=())],
         quarantine_dir,
+    )
+
+    assert washed_path.is_file()
+    assert moves == []
+
+
+def test_quarantine_presets_moves_washed_out_when_opted_in(tmp_path: Path) -> None:
+    presets_dir = tmp_path / "presets"
+    presets_dir.mkdir()
+    quarantine_dir = tmp_path / "quarantine"
+    quarantine_dir.mkdir()
+
+    washed_path = presets_dir / "washed.milk"
+    washed_path.write_text("washed", encoding="utf-8")
+
+    moves = quarantine_presets(
+        [PresetScanResult(path=washed_path, result="washed_out", layers=())],
+        quarantine_dir,
+        categories=destructive_scan_categories(include_washout=True),
     )
 
     assert not washed_path.exists()
@@ -811,6 +845,34 @@ def test_quarantine_presets_moves_failures_flat(tmp_path: Path) -> None:
     moves = quarantine_presets(results, quarantine_dir)
 
     assert ok_path.is_file()
+    assert not bad_path.exists()
+    assert dup_path.is_file()
+    assert (quarantine_dir / "bad.milk").is_file()
+    assert len(moves) == 1
+
+
+def test_quarantine_presets_moves_dim_when_opted_in(tmp_path: Path) -> None:
+    presets_dir = tmp_path / "presets"
+    presets_dir.mkdir()
+    quarantine_dir = tmp_path / "quarantine"
+    quarantine_dir.mkdir()
+
+    bad_path = presets_dir / "bad.milk"
+    dup_path = presets_dir / "dup.milk"
+    bad_path.write_text("bad", encoding="utf-8")
+    dup_path.write_text("dup", encoding="utf-8")
+    (quarantine_dir / "dup.milk").write_text("existing", encoding="utf-8")
+
+    results = [
+        PresetScanResult(path=bad_path, result="black", layers=()),
+        PresetScanResult(path=dup_path, result="dim", layers=()),
+    ]
+    moves = quarantine_presets(
+        results,
+        quarantine_dir,
+        categories=destructive_scan_categories(include_dim=True),
+    )
+
     assert not bad_path.exists()
     assert not dup_path.exists()
     assert (quarantine_dir / "bad.milk").is_file()
@@ -1210,16 +1272,35 @@ def test_delete_presets_removes_failures(tmp_path: Path) -> None:
     presets_dir.mkdir()
     ok_path = presets_dir / "good.milk"
     bad_path = presets_dir / "bad.milk"
+    dim_path = presets_dir / "dim.milk"
     ok_path.write_text("ok", encoding="utf-8")
     bad_path.write_text("bad", encoding="utf-8")
+    dim_path.write_text("dim", encoding="utf-8")
 
     deleted = delete_presets(
         [
             PresetScanResult(path=ok_path, result="ok", layers=()),
             PresetScanResult(path=bad_path, result="black", layers=()),
+            PresetScanResult(path=dim_path, result="dim", layers=()),
         ]
     )
 
     assert ok_path.is_file()
     assert not bad_path.exists()
+    assert dim_path.is_file()
     assert deleted == [bad_path]
+
+
+def test_delete_presets_removes_dim_when_opted_in(tmp_path: Path) -> None:
+    presets_dir = tmp_path / "presets"
+    presets_dir.mkdir()
+    dim_path = presets_dir / "dim.milk"
+    dim_path.write_text("dim", encoding="utf-8")
+
+    deleted = delete_presets(
+        [PresetScanResult(path=dim_path, result="dim", layers=())],
+        categories=destructive_scan_categories(include_dim=True),
+    )
+
+    assert not dim_path.exists()
+    assert deleted == [dim_path]

@@ -36,13 +36,13 @@ See [presets-scan-plan.md](presets-scan-plan.md) and [presets-scan-learnings.md]
 
 Manual preset browse (`preset_switching` `none` or `user_defined`) forces a clean black boot so presets can be judged without feedback carry-over from the previous preset. Auto `projectm` rotation unchanged.
 
-| Result | Meaning |
-| --- | --- |
-| `load_failed` | Parse or load error from libprojectM |
-| `black` | Does not develop after warmup |
-| `dim` | Too dim to use |
-| `washed_out` | Extreme white blowout |
-| `ok` | Passes thresholds |
+| Result | Meaning | Default quarantine/delete |
+| --- | --- | --- |
+| `load_failed` | Parse or load error from libprojectM | yes |
+| `black` | Does not develop after warmup | yes |
+| `dim` | Too dim to use | no (`--include-dim`) |
+| `washed_out` | Extreme white blowout | no (`--include-washout`) |
+| `ok` | Passes thresholds | never |
 
 Golden case 2 has a known visualizer vs scan label disparity; quarantine outcome is still correct. See [presets-scan-golden-set.md](presets-scan-golden-set.md).
 

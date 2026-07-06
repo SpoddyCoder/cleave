@@ -34,7 +34,7 @@ Shipped scan categories map as: `ok` -> `ok`; `dim` -> `dim`; `black` and `load_
 | `black` | 3 |
 | `washed_out` | 3 |
 
-**Quarantine targets:** 9 (`dim` 3, `black` 3, `washed_out` 3).
+**Default quarantine/delete targets:** 3 (`black` 3). `dim` and `washed_out` require `--include-dim` and `--include-washout` respectively.
 
 ## Visualizer vs scan (case 2)
 
@@ -45,7 +45,7 @@ Golden case 2 (Aderrasi - Airhandler) is an accepted **eval disparity**, not a m
 | Live visualizer | `black` | Clean boot; stays black |
 | Scan probe | `washed_out` | Synthetic PCM can drive extreme white metrics |
 
-Both labels describe the same non-working preset. The visualizer label is ground truth for appearance; scan still **quarantines** it (`washed_out` is a quarantine category), but **scan classification cannot be trusted** for this preset.
+Both labels describe the same non-working preset. The visualizer label is ground truth for appearance; default `--quarantine` / `--delete` still move/remove it as `black`. If scan classifies it as `washed_out`, use `--include-washout` to quarantine or delete. **Scan classification cannot be trusted** for this preset.
 
 Root cause is not understood. See [todos.md](todos.md).
 
