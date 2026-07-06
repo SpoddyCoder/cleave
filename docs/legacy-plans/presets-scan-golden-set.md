@@ -1,14 +1,16 @@
 # Preset scan golden set
 
-Manual labels for tuning `cleave scan`. Source: layer 1 preset in [projects/sights-and-sounds-26/](../projects/sights-and-sounds-26/) `unnamed-1.yaml` through `unnamed-30.yaml`, reviewed in the live visualizer with clean manual preset boot.
+**Status: experimental / low confidence.** Manual labels and harness for tuning only; 46/50 eval agreement on committed cache. Do not treat scan output on other packs as validated.
 
-Machine-readable fixture: [tests/fixtures/preset_scan_golden_set.yaml](../tests/fixtures/preset_scan_golden_set.yaml).
+Source: layer 1 preset in [projects/sights-and-sounds-26/](../../projects/sights-and-sounds-26/) `unnamed-1.yaml` through `unnamed-30.yaml`, reviewed in the live visualizer with clean manual preset boot.
 
-Committed metrics cache: [tests/fixtures/preset_scan_golden_metrics.json](../tests/fixtures/preset_scan_golden_metrics.json).
+Machine-readable fixture: [tests/fixtures/preset_scan_golden_set.yaml](../../tests/fixtures/preset_scan_golden_set.yaml).
+
+Committed metrics cache: [tests/fixtures/preset_scan_golden_metrics.json](../../tests/fixtures/preset_scan_golden_metrics.json).
 
 ## Review context
 
-- **Preset root:** [assets/milkdrop-presets/](../assets/milkdrop-presets/) (git submodules; see [README](../README.md))
+- **Preset root:** [assets/milkdrop-presets/](../../assets/milkdrop-presets/) (git submodules; see [README](../../README.md))
 - **Texture paths:** `assets/milkdrop-presets/presets-milkdrop-texture-pack`
 - **Pack:** `presets-milkdrop-original/Milkdrop-Original/`
 - **Method:** Live browse with `load_manual_preset_clean` (black boot per switch)
@@ -47,9 +49,9 @@ Golden case 2 (Aderrasi - Airhandler) is an accepted **eval disparity**, not a m
 
 Both labels describe the same non-working preset. The visualizer label is ground truth for appearance; default `--quarantine` / `--delete` still move/remove it as `black`. If scan classifies it as `washed_out`, use `--include-washout` to quarantine or delete. **Scan classification cannot be trusted** for this preset.
 
-Root cause is not understood. See [todos.md](todos.md).
+Root cause is not understood. See [todos.md](../todos.md).
 
-Unit test: [tests/cleave/test_preset_scan_golden.py](../tests/cleave/test_preset_scan_golden.py) (`test_golden_case_2_not_washed_out_with_v3_cache`).
+Unit test: [tests/cleave/test_preset_scan_golden.py](../../tests/cleave/test_preset_scan_golden.py) (`test_golden_case_2_not_washed_out_with_v3_cache`).
 
 ## Cases
 
@@ -88,7 +90,7 @@ Unit test: [tests/cleave/test_preset_scan_golden.py](../tests/cleave/test_preset
 
 ## Harness usage
 
-1. Load [tests/fixtures/preset_scan_golden_set.yaml](../tests/fixtures/preset_scan_golden_set.yaml).
+1. Load [tests/fixtures/preset_scan_golden_set.yaml](../../tests/fixtures/preset_scan_golden_set.yaml).
 2. Probe all 50 cases with clean boot and full-frame metrics.
 3. Compare classifier output to `expected_result` (`cleave scan-golden --eval`).
 

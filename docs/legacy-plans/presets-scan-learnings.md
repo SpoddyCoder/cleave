@@ -1,19 +1,19 @@
 # Preset scan tuning learnings
 
-Notes from iterating on `cleave scan` classification. See [presets-scan-plan.md](presets-scan-plan.md) for command design.
+**Status: experimental / low confidence.** Historical notes from classifier iteration; thresholds are golden-set only. See [presets-scan-plan.md](presets-scan-plan.md) for command design.
 
 ## Shipped behavior
 
 - `cleave scan` project and bulk modes; JSON report.
 - `--quarantine`, `--resume`, `--delete` (with confirmation).
 - Classifier: clean boot per preset, full-frame luma, peak max/mean/coverage across post-warmup frames, `washed_out` category.
-- Golden harness: `cleave scan-golden` with committed metrics cache ([tests/fixtures/preset_scan_golden_metrics.json](../tests/fixtures/preset_scan_golden_metrics.json)).
-- Live visualizer: manual preset browse forces clean black boot via `load_manual_preset_clean()` in [cleave/viz/preset_switching.py](../cleave/viz/preset_switching.py).
+- Golden harness: `cleave scan-golden` with committed metrics cache ([tests/fixtures/preset_scan_golden_metrics.json](../../tests/fixtures/preset_scan_golden_metrics.json)).
+- Live visualizer: manual preset browse forces clean black boot via `load_manual_preset_clean()` in [cleave/viz/preset_switching.py](../../cleave/viz/preset_switching.py).
 
-Probe harness ([cleave/preset_scan.py](../cleave/preset_scan.py)):
+Probe harness ([cleave/preset_scan.py](../../cleave/preset_scan.py)):
 
 - Clean boot every probe (`set_preset_start_clean(True)` before `load_preset`).
-- Full-frame reads via [cleave/preset_scan_metrics.py](../cleave/preset_scan_metrics.py).
+- Full-frame reads via [cleave/preset_scan_metrics.py](../../cleave/preset_scan_metrics.py).
 - **Probe profile:** 15 warmup + 75 window frames; synthetic mono PCM.
 
 ## Visualizer vs scan (case 2)

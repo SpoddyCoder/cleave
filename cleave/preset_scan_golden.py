@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import itertools
-import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-import pygame
 import yaml
 
 from cleave.paths import repo_root
@@ -22,7 +20,7 @@ from cleave.preset_scan import (
     WHITE_CHANNEL_MIN,
     PresetResultCategory,
     ProbeProfile,
-    _configure_probe_projectm,
+    ProbeSession,
     build_probe_pcm,
     classify_preset_result,
     probe_preset_metrics,
@@ -34,13 +32,13 @@ from cleave.preset_scan_metrics import (
     FrameMetrics,
     MetricsCache,
     PresetMetrics,
+    empty_frame_metrics,
     load_metrics_cache,
     peak_metrics,
     white_frame_fraction,
     write_metrics_cache,
 )
 from cleave.projectm import PresetLoadFailure, ProjectM
-from cleave.stem_pcm import samples_per_frame
 
 GOLDEN_CASE_COUNT = 50
 GoldenExpectedResult = Literal["ok", "dim", "black", "washed_out"]
@@ -229,53 +227,31 @@ def probe_golden_set(
     cache_path: Path,
 ) -> MetricsCache:
     """GL probe every golden case; write full-frame metrics cache."""
-    from cleave.preset_scan import create_probe_fbo
-
     profile = probe_profile()
     probe_pcm = build_probe_pcm()
     texture_strs = [str(path) for path in golden.texture_paths]
 
-    os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
-    pygame.init()
-    try:
-        pygame.display.set_mode(
-            (PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT),
-            pygame.OPENGL | pygame.HIDDEN,
-        )
-    except pygame.error as exc:
-        pygame.quit()
-        raise RuntimeError(f"failed to open OpenGL context: {exc}") from exc
-
-    fbo = None
     presets: list[PresetMetrics] = []
     total = len(golden.cases)
-    try:
-        fbo = create_probe_fbo(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT)
-        n_pcm = samples_per_frame(PROBE_FPS)
-        frame_dt = 1.0 / PROBE_FPS
-
+    with ProbeSession(texture_strs) as session:
         for index, case in enumerate(golden.cases, start=1):
             _progress(f"Probing {index}/{total} {case.preset}...")
             pm = ProjectM()
             try:
-                _configure_probe_projectm(pm, texture_strs)
+                session.configure_projectm(pm)
                 presets.append(
                     probe_preset_metrics(
                         pm,
-                        fbo,
+                        session.fbo,
                         case.preset,
                         profile=profile,
                         pcm=probe_pcm,
-                        n_pcm=n_pcm,
-                        frame_dt=frame_dt,
+                        n_pcm=session.n_pcm,
+                        frame_dt=session.frame_dt,
                     )
                 )
             finally:
                 pm.destroy()
-    finally:
-        if fbo is not None:
-            fbo.destroy()
-        pygame.quit()
 
     cache = MetricsCache(
         version=METRICS_CACHE_VERSION,
@@ -772,7 +748,7 @@ def _classify_cached_preset(
 
     if not preset_metrics.frames:
         category, _ = classify_preset_result(
-            failures, {}, thresholds=thresholds
+            failures, empty_frame_metrics(), thresholds=thresholds
         )
         return category, None, None, None
 

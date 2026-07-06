@@ -45,10 +45,10 @@ from OpenGL.GL import (
 
 from cleave.pcm_io import SAMPLE_RATE_HZ
 from cleave.preset_scan_metrics import (
-    LUMA_COVERAGE_CUTOFFS,
-    WHITE_COVERAGE_CUTOFFS,
     FrameMetrics,
     PresetMetrics,
+    frame_metrics_from_dict,
+    frame_metrics_to_dict,
     peak_metrics,
     sample_frame_metrics,
     white_frame_fraction,
@@ -67,104 +67,100 @@ PROBE_FBO_WIDTH = 480
 PROBE_FBO_HEIGHT = 270
 
 COVERAGE_LUMA_MIN = 16
-
 WHITE_CHANNEL_MIN = 235
-WHITE_AREA_FRAC = 0.6
-MIN_WHITE_FRAME_FRAC = 0.3
-
-BLACK_MAX_LUMA = 1.0
-BLACK_COVERAGE = 0.0003
-
-DIM_MEAN_LUMA = 15.0
-DIM_COVERAGE = 0.25
-
-VERY_SPARSE_DIM_MEAN = 5.15
-VERY_SPARSE_DIM_MAX = 100.0
-VERY_SPARSE_DIM_COV16 = 0.015
-
-SPARSE_DIM_MEAN = 9.95
-SPARSE_DIM_MAX = 80.0
-SPARSE_DIM_COV16_MIN = 0.102
-SPARSE_DIM_COV16_MAX = 0.128
-
-CAPPED_DIM_MEAN = 22.0
-CAPPED_DIM_MAX_LO = 50.0
-CAPPED_DIM_MAX_HI = 111.0
-CAPPED_DIM_COV16 = 0.9
-
-BRIGHT_ON_BLACK_MAX = 25.0
-BRIGHT_ON_BLACK_COVERAGE = 0.00025
-
-DIM_BOB_COV_LO = 0.07
-DIM_BOB_COV_HI = 0.13
-DIM_BOB_MEAN_MID = 6.0
-DIM_BOB_MEAN_HI = 10.0
-
-WASHED_WHITE_AREA_FRAC_SOFT = 0.15
-WASHED_MIN_WHITE_FRAME_FRAC_SOFT = 0.55
-WASHED_MEAN_SOFT = 200.0
-WASHED_MEAN_PEAK = 245.0
-WASHED_COV16_MIN = 0.999
-WASHED_COV192_PEAK = 0.95
-WASHED_MAX_LO = 240.0
-WASHED_MEAN_LO = 155.0
-WASHED_MEAN_HI = 175.0
-WASHED_COV192_LO = 0.05
-WASHED_MAX_MID = 235.0
-WASHED_MEAN_MID_LO = 170.0
-WASHED_MEAN_MID_HI = 188.0
-WASHED_COV192_MID = 0.28
-WASHED_WHITE235_MID_MAX = 0.10
 
 DEFER_LOAD_FAILED_MIN_COV16 = 0.9
 BROKEN_SOFT_WHITE_MEAN_HI = 235.0
+WASHED_COV16_MIN = 0.999
 
-SCAN_THRESHOLDS: dict[str, float] = {
-    "black_max_luma": BLACK_MAX_LUMA,
-    "black_coverage": BLACK_COVERAGE,
-    "dim_mean_luma": DIM_MEAN_LUMA,
-    "dim_coverage": DIM_COVERAGE,
-    "very_sparse_dim_mean": VERY_SPARSE_DIM_MEAN,
-    "very_sparse_dim_max": VERY_SPARSE_DIM_MAX,
-    "very_sparse_dim_cov16": VERY_SPARSE_DIM_COV16,
-    "sparse_dim_mean": SPARSE_DIM_MEAN,
-    "sparse_dim_max": SPARSE_DIM_MAX,
-    "sparse_dim_cov16_min": SPARSE_DIM_COV16_MIN,
-    "sparse_dim_cov16_max": SPARSE_DIM_COV16_MAX,
-    "capped_dim_mean": CAPPED_DIM_MEAN,
-    "capped_dim_max_lo": CAPPED_DIM_MAX_LO,
-    "capped_dim_max_hi": CAPPED_DIM_MAX_HI,
-    "capped_dim_cov16": CAPPED_DIM_COV16,
+_SCAN_THRESHOLD_SPECS: dict[str, float] = {
+    "black_max_luma": 1.0,
+    "black_coverage": 0.0003,
+    "dim_mean_luma": 15.0,
+    "dim_coverage": 0.25,
+    "very_sparse_dim_mean": 5.15,
+    "very_sparse_dim_max": 100.0,
+    "very_sparse_dim_cov16": 0.015,
+    "sparse_dim_mean": 9.95,
+    "sparse_dim_max": 80.0,
+    "sparse_dim_cov16_min": 0.102,
+    "sparse_dim_cov16_max": 0.128,
+    "capped_dim_mean": 22.0,
+    "capped_dim_max_lo": 50.0,
+    "capped_dim_max_hi": 111.0,
+    "capped_dim_cov16": 0.9,
     "white_channel_min": float(WHITE_CHANNEL_MIN),
-    "white_area_frac": WHITE_AREA_FRAC,
-    "min_white_frame_frac": MIN_WHITE_FRAME_FRAC,
-    "bright_on_black_max": BRIGHT_ON_BLACK_MAX,
-    "bright_on_black_coverage": BRIGHT_ON_BLACK_COVERAGE,
+    "white_area_frac": 0.6,
+    "min_white_frame_frac": 0.3,
+    "bright_on_black_max": 25.0,
+    "bright_on_black_coverage": 0.00025,
     "coverage_luma_min": float(COVERAGE_LUMA_MIN),
-    "dim_bob_cov_lo": DIM_BOB_COV_LO,
-    "dim_bob_cov_hi": DIM_BOB_COV_HI,
-    "dim_bob_mean_mid": DIM_BOB_MEAN_MID,
-    "dim_bob_mean_hi": DIM_BOB_MEAN_HI,
-    "white_area_frac_soft": WASHED_WHITE_AREA_FRAC_SOFT,
-    "min_white_frame_frac_soft": WASHED_MIN_WHITE_FRAME_FRAC_SOFT,
-    "washed_mean_soft": WASHED_MEAN_SOFT,
-    "washed_mean_peak": WASHED_MEAN_PEAK,
+    "dim_bob_cov_lo": 0.07,
+    "dim_bob_cov_hi": 0.13,
+    "dim_bob_mean_mid": 6.0,
+    "dim_bob_mean_hi": 10.0,
+    "white_area_frac_soft": 0.15,
+    "min_white_frame_frac_soft": 0.55,
+    "washed_mean_soft": 200.0,
+    "washed_mean_peak": 245.0,
     "washed_cov16_min": WASHED_COV16_MIN,
-    "washed_cov192_peak": WASHED_COV192_PEAK,
-    "washed_max_lo": WASHED_MAX_LO,
-    "washed_mean_lo": WASHED_MEAN_LO,
-    "washed_mean_hi": WASHED_MEAN_HI,
-    "washed_cov192_lo": WASHED_COV192_LO,
-    "washed_max_mid": WASHED_MAX_MID,
-    "washed_mean_mid_lo": WASHED_MEAN_MID_LO,
-    "washed_mean_mid_hi": WASHED_MEAN_MID_HI,
-    "washed_cov192_mid": WASHED_COV192_MID,
-    "washed_white235_mid_max": WASHED_WHITE235_MID_MAX,
+    "washed_cov192_peak": 0.95,
+    "washed_max_lo": 240.0,
+    "washed_mean_lo": 155.0,
+    "washed_mean_hi": 175.0,
+    "washed_cov192_lo": 0.05,
+    "washed_max_mid": 235.0,
+    "washed_mean_mid_lo": 170.0,
+    "washed_mean_mid_hi": 188.0,
+    "washed_cov192_mid": 0.28,
+    "washed_white235_mid_max": 0.10,
 }
+
+SCAN_THRESHOLDS: dict[str, float] = dict(_SCAN_THRESHOLD_SPECS)
+
+BLACK_MAX_LUMA = _SCAN_THRESHOLD_SPECS["black_max_luma"]
+BLACK_COVERAGE = _SCAN_THRESHOLD_SPECS["black_coverage"]
+DIM_MEAN_LUMA = _SCAN_THRESHOLD_SPECS["dim_mean_luma"]
+DIM_COVERAGE = _SCAN_THRESHOLD_SPECS["dim_coverage"]
+VERY_SPARSE_DIM_MEAN = _SCAN_THRESHOLD_SPECS["very_sparse_dim_mean"]
+VERY_SPARSE_DIM_MAX = _SCAN_THRESHOLD_SPECS["very_sparse_dim_max"]
+VERY_SPARSE_DIM_COV16 = _SCAN_THRESHOLD_SPECS["very_sparse_dim_cov16"]
+SPARSE_DIM_MEAN = _SCAN_THRESHOLD_SPECS["sparse_dim_mean"]
+SPARSE_DIM_MAX = _SCAN_THRESHOLD_SPECS["sparse_dim_max"]
+SPARSE_DIM_COV16_MIN = _SCAN_THRESHOLD_SPECS["sparse_dim_cov16_min"]
+SPARSE_DIM_COV16_MAX = _SCAN_THRESHOLD_SPECS["sparse_dim_cov16_max"]
+CAPPED_DIM_MEAN = _SCAN_THRESHOLD_SPECS["capped_dim_mean"]
+CAPPED_DIM_MAX_LO = _SCAN_THRESHOLD_SPECS["capped_dim_max_lo"]
+CAPPED_DIM_MAX_HI = _SCAN_THRESHOLD_SPECS["capped_dim_max_hi"]
+CAPPED_DIM_COV16 = _SCAN_THRESHOLD_SPECS["capped_dim_cov16"]
+WHITE_AREA_FRAC = _SCAN_THRESHOLD_SPECS["white_area_frac"]
+MIN_WHITE_FRAME_FRAC = _SCAN_THRESHOLD_SPECS["min_white_frame_frac"]
+BRIGHT_ON_BLACK_MAX = _SCAN_THRESHOLD_SPECS["bright_on_black_max"]
+BRIGHT_ON_BLACK_COVERAGE = _SCAN_THRESHOLD_SPECS["bright_on_black_coverage"]
+DIM_BOB_COV_LO = _SCAN_THRESHOLD_SPECS["dim_bob_cov_lo"]
+DIM_BOB_COV_HI = _SCAN_THRESHOLD_SPECS["dim_bob_cov_hi"]
+DIM_BOB_MEAN_MID = _SCAN_THRESHOLD_SPECS["dim_bob_mean_mid"]
+DIM_BOB_MEAN_HI = _SCAN_THRESHOLD_SPECS["dim_bob_mean_hi"]
+WASHED_WHITE_AREA_FRAC_SOFT = _SCAN_THRESHOLD_SPECS["white_area_frac_soft"]
+WASHED_MIN_WHITE_FRAME_FRAC_SOFT = _SCAN_THRESHOLD_SPECS[
+    "min_white_frame_frac_soft"
+]
+WASHED_MEAN_SOFT = _SCAN_THRESHOLD_SPECS["washed_mean_soft"]
+WASHED_MEAN_PEAK = _SCAN_THRESHOLD_SPECS["washed_mean_peak"]
+WASHED_COV192_PEAK = _SCAN_THRESHOLD_SPECS["washed_cov192_peak"]
+WASHED_MAX_LO = _SCAN_THRESHOLD_SPECS["washed_max_lo"]
+WASHED_MEAN_LO = _SCAN_THRESHOLD_SPECS["washed_mean_lo"]
+WASHED_MEAN_HI = _SCAN_THRESHOLD_SPECS["washed_mean_hi"]
+WASHED_COV192_LO = _SCAN_THRESHOLD_SPECS["washed_cov192_lo"]
+WASHED_MAX_MID = _SCAN_THRESHOLD_SPECS["washed_max_mid"]
+WASHED_MEAN_MID_LO = _SCAN_THRESHOLD_SPECS["washed_mean_mid_lo"]
+WASHED_MEAN_MID_HI = _SCAN_THRESHOLD_SPECS["washed_mean_mid_hi"]
+WASHED_COV192_MID = _SCAN_THRESHOLD_SPECS["washed_cov192_mid"]
+WASHED_WHITE235_MID_MAX = _SCAN_THRESHOLD_SPECS["washed_white235_mid_max"]
 
 
 def scan_thresholds() -> dict[str, float]:
-    return dict(SCAN_THRESHOLDS)
+    return dict(_SCAN_THRESHOLD_SPECS)
 
 REPORT_FLUSH_EVERY = 10
 
@@ -257,51 +253,16 @@ def probe_profile() -> ProbeProfile:
 
 
 def _normalize_peak_metrics(
-    peaks: FrameMetrics | dict[str, Any],
+    peaks: FrameMetrics,
 ) -> tuple[float, float, dict[int, float]]:
-    if isinstance(peaks, FrameMetrics):
-        return peaks.max_luma, peaks.mean_luma, peaks.coverage
-
-    if not isinstance(peaks, dict):
-        raise TypeError("peaks must be FrameMetrics or a metrics dict")
-
-    max_raw = peaks.get("max_luma", peaks.get("max"))
-    mean_raw = peaks.get("mean_luma", peaks.get("mean"))
-    if not isinstance(max_raw, (int, float)) or not isinstance(mean_raw, (int, float)):
-        raise ValueError("peaks missing max_luma and mean_luma")
-
-    coverage_raw = peaks.get("coverage")
-    if not isinstance(coverage_raw, dict):
-        raise ValueError("peaks missing coverage")
-
-    coverage: dict[int, float] = {}
-    for cutoff in LUMA_COVERAGE_CUTOFFS:
-        value = coverage_raw.get(cutoff, coverage_raw.get(str(cutoff)))
-        if not isinstance(value, (int, float)):
-            raise ValueError(f"peaks missing coverage for cutoff {cutoff}")
-        coverage[cutoff] = float(value)
-
-    return float(max_raw), float(mean_raw), coverage
+    return peaks.max_luma, peaks.mean_luma, peaks.coverage
 
 
 def _peak_white_coverage(
-    peaks: FrameMetrics | dict[str, Any],
+    peaks: FrameMetrics,
     cutoff: int,
 ) -> float:
-    if isinstance(peaks, FrameMetrics):
-        return peaks.white_coverage.get(cutoff, 0.0)
-
-    if not isinstance(peaks, dict):
-        raise TypeError("peaks must be FrameMetrics or a metrics dict")
-
-    white_raw = peaks.get("white_coverage")
-    if not isinstance(white_raw, dict):
-        return 0.0
-
-    value = white_raw.get(cutoff, white_raw.get(str(cutoff)))
-    if not isinstance(value, (int, float)):
-        return 0.0
-    return float(value)
+    return peaks.white_coverage.get(cutoff, 0.0)
 
 
 def _dim_bright_on_black_ok(
@@ -324,11 +285,8 @@ def _dim_bright_on_black_ok(
     ]
 
 
-def _defer_load_failed(peaks: FrameMetrics | dict[str, Any], th: dict[str, float]) -> bool:
-    try:
-        max_luma, _, coverage = _normalize_peak_metrics(peaks)
-    except (TypeError, ValueError):
-        return False
+def _defer_load_failed(peaks: FrameMetrics, th: dict[str, float]) -> bool:
+    max_luma, _, coverage = _normalize_peak_metrics(peaks)
     cov_min = coverage[int(th["coverage_luma_min"])]
     return (
         max_luma >= th["black_max_luma"]
@@ -337,7 +295,7 @@ def _defer_load_failed(peaks: FrameMetrics | dict[str, Any], th: dict[str, float
 
 
 def _broken_soft_white_black(
-    peaks: FrameMetrics | dict[str, Any],
+    peaks: FrameMetrics,
     frames: tuple[FrameMetrics, ...],
     th: dict[str, float],
 ) -> bool:
@@ -365,7 +323,7 @@ def _broken_soft_white_black(
 
 
 def _washed_out_tiers(
-    peaks: FrameMetrics | dict[str, Any],
+    peaks: FrameMetrics,
     frames: tuple[FrameMetrics, ...],
     th: dict[str, float],
 ) -> bool:
@@ -426,7 +384,7 @@ def _washed_out_tiers(
 
 def classify_preset_result(
     failures: list[PresetLoadFailure],
-    peaks: FrameMetrics | dict[str, Any],
+    peaks: FrameMetrics,
     *,
     frames: tuple[FrameMetrics, ...] | None = None,
     thresholds: dict[str, float] | None = None,
@@ -442,13 +400,11 @@ def classify_preset_result(
     if active_failures:
         return "load_failed", active_failures[0].message
 
-    if frames is not None:
-        if "washed_mean_peak" in th:
-            if _broken_soft_white_black(peaks, frames, th):
-                return "black", None
-        if "washed_mean_peak" in th:
-            if _washed_out_tiers(peaks, frames, th):
-                return "washed_out", None
+    if frames is not None and "washed_mean_peak" in th:
+        if _broken_soft_white_black(peaks, frames, th):
+            return "black", None
+        if _washed_out_tiers(peaks, frames, th):
+            return "washed_out", None
 
     max_luma, mean_luma, coverage = _normalize_peak_metrics(peaks)
     cov_min = coverage[int(th["coverage_luma_min"])]
@@ -734,11 +690,55 @@ def scanned_preset_dirs(targets: ScanTargets) -> tuple[Path, ...]:
     return tuple(sorted(dirs))
 
 
-def _configure_probe_projectm(pm: ProjectM, texture_strs: list[str]) -> None:
+def configure_probe_projectm(pm: ProjectM, texture_strs: list[str]) -> None:
     pm.set_window_size(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT)
     pm.set_fps(PROBE_FPS)
     pm.set_hard_cut_enabled(False)
     pm.set_texture_paths(texture_strs)
+
+
+class ProbeSession:
+    """Hidden pygame/OpenGL context and probe FBO for preset scan GL work."""
+
+    def __init__(self, texture_strs: list[str] | None = None) -> None:
+        self._texture_strs = list(texture_strs or [])
+        self._fbo: ProbeFbo | None = None
+        self.n_pcm = samples_per_frame(PROBE_FPS)
+        self.frame_dt = 1.0 / PROBE_FPS
+
+    def __enter__(self) -> ProbeSession:
+        os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
+        pygame.init()
+        try:
+            pygame.display.set_mode(
+                (PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT),
+                pygame.OPENGL | pygame.HIDDEN,
+            )
+        except pygame.error as exc:
+            pygame.quit()
+            raise RuntimeError(f"failed to open OpenGL context: {exc}") from exc
+        self._fbo = ProbeFbo(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT)
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: object,
+    ) -> None:
+        if self._fbo is not None:
+            self._fbo.destroy()
+            self._fbo = None
+        pygame.quit()
+
+    @property
+    def fbo(self) -> ProbeFbo:
+        if self._fbo is None:
+            raise RuntimeError("ProbeSession is not active")
+        return self._fbo
+
+    def configure_projectm(self, pm: ProjectM) -> None:
+        configure_probe_projectm(pm, self._texture_strs)
 
 
 def run_scan(
@@ -754,65 +754,47 @@ def run_scan(
     paths = texture_paths if texture_paths is not None else targets.texture_paths
     texture_strs = [str(path) for path in paths]
 
-    os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
-    pygame.init()
-    try:
-        pygame.display.set_mode(
-            (PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT),
-            pygame.OPENGL | pygame.HIDDEN,
-        )
-    except pygame.error as exc:
-        pygame.quit()
-        raise RuntimeError(f"failed to open OpenGL context: {exc}") from exc
-
-    fbo: _ProbeFbo | None = None
     results: list[PresetScanResult] = []
     skip = skip_paths or frozenset()
     total = len(targets.presets)
     skip_count = len(skip)
     probed = 0
     resumed_announced = False
+
     try:
-        fbo = _ProbeFbo(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT)
-        n_pcm = samples_per_frame(PROBE_FPS)
-        frame_dt = 1.0 / PROBE_FPS
+        with ProbeSession(texture_strs) as session:
+            for index, target in enumerate(targets.presets, start=1):
+                if target.path.resolve() in skip:
+                    continue
+                if skip_count and not resumed_announced:
+                    _progress(f"Resuming: {skip_count} done")
+                    resumed_announced = True
+                _progress(f"Scanning {index}/{total} {target.path}...")
+                pm = ProjectM()
+                try:
+                    session.configure_projectm(pm)
+                    result = _probe_preset(
+                        pm,
+                        session.fbo,
+                        target,
+                        profile=profile,
+                        pcm=probe_pcm,
+                        n_pcm=session.n_pcm,
+                        frame_dt=session.frame_dt,
+                    )
+                    results.append(result)
+                    probed += 1
+                    if report_sink is not None and probed % REPORT_FLUSH_EVERY == 0:
+                        report_sink(results, False)
+                finally:
+                    pm.destroy()
 
-        for index, target in enumerate(targets.presets, start=1):
-            if target.path.resolve() in skip:
-                continue
-            if skip_count and not resumed_announced:
-                _progress(f"Resuming: {skip_count} done")
-                resumed_announced = True
-            _progress(f"Scanning {index}/{total} {target.path}...")
-            pm = ProjectM()
-            try:
-                _configure_probe_projectm(pm, texture_strs)
-                result = _probe_preset(
-                    pm,
-                    fbo,
-                    target,
-                    profile=profile,
-                    pcm=probe_pcm,
-                    n_pcm=n_pcm,
-                    frame_dt=frame_dt,
-                )
-                results.append(result)
-                probed += 1
-                if report_sink is not None and probed % REPORT_FLUSH_EVERY == 0:
-                    report_sink(results, False)
-            finally:
-                pm.destroy()
-
-        if report_sink is not None:
-            report_sink(results, True)
+            if report_sink is not None:
+                report_sink(results, True)
     except KeyboardInterrupt:
         if report_sink is not None:
             report_sink(results, False)
         raise
-    finally:
-        if fbo is not None:
-            fbo.destroy()
-        pygame.quit()
 
     return results
 
@@ -821,9 +803,31 @@ def _progress(message: str) -> None:
     print(message, file=sys.stderr, flush=True)
 
 
+def _render_frames(
+    pm: ProjectM,
+    fbo: ProbeFbo,
+    *,
+    profile: ProbeProfile,
+    pcm: ProbePcm,
+    n_pcm: int,
+    frame_dt: float,
+) -> tuple[FrameMetrics, ...]:
+    frame_metrics: list[FrameMetrics] = []
+    for frame_idx in range(profile.total_frames):
+        t_sec = frame_idx * frame_dt
+        pm.set_frame_time(t_sec)
+        pm.feed_pcm(pcm.chunk(frame_idx, n_pcm), channels=pcm.channels)
+        fbo.bind()
+        pm.render_to_fbo(fbo.fbo_id)
+        frame_metrics.append(
+            sample_frame_metrics(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT)
+        )
+    return tuple(frame_metrics)
+
+
 def probe_preset_metrics(
     pm: ProjectM,
-    fbo: _ProbeFbo,
+    fbo: ProbeFbo,
     preset_path: Path,
     *,
     profile: ProbeProfile,
@@ -838,16 +842,14 @@ def probe_preset_metrics(
     pm.set_preset_start_clean(False)
     pm.lock_preset(True)
 
-    frame_metrics: list[FrameMetrics] = []
-    for frame_idx in range(profile.total_frames):
-        t_sec = frame_idx * frame_dt
-        pm.set_frame_time(t_sec)
-        pm.feed_pcm(pcm.chunk(frame_idx, n_pcm), channels=pcm.channels)
-        fbo.bind()
-        pm.render_to_fbo(fbo.fbo_id)
-        frame_metrics.append(
-            sample_frame_metrics(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT)
-        )
+    frame_metrics = _render_frames(
+        pm,
+        fbo,
+        profile=profile,
+        pcm=pcm,
+        n_pcm=n_pcm,
+        frame_dt=frame_dt,
+    )
 
     failures = pm.drain_preset_failures()
     return PresetMetrics(
@@ -855,13 +857,13 @@ def probe_preset_metrics(
         load_failed=bool(failures),
         error=failures[0].message if failures else None,
         fps=PROBE_FPS,
-        frames=tuple(frame_metrics),
+        frames=frame_metrics,
     )
 
 
 def _probe_preset(
     pm: ProjectM,
-    fbo: _ProbeFbo,
+    fbo: ProbeFbo,
     target: PresetTarget,
     *,
     profile: ProbeProfile,
@@ -878,18 +880,14 @@ def _probe_preset(
     load_sec = time.perf_counter() - load_started
 
     render_started = time.perf_counter()
-    frame_metrics: list[FrameMetrics] = []
-
-    for frame_idx in range(profile.total_frames):
-        t_sec = frame_idx * frame_dt
-        pm.set_frame_time(t_sec)
-        pm.feed_pcm(pcm.chunk(frame_idx, n_pcm), channels=pcm.channels)
-        fbo.bind()
-        pm.render_to_fbo(fbo.fbo_id)
-        frame_metrics.append(
-            sample_frame_metrics(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT)
-        )
-
+    frame_metrics = _render_frames(
+        pm,
+        fbo,
+        profile=profile,
+        pcm=pcm,
+        n_pcm=n_pcm,
+        frame_dt=frame_dt,
+    )
     render_sec = time.perf_counter() - render_started
     warmup = profile.warmup_frames
     window = profile.window_frames
@@ -938,12 +936,12 @@ def _gl_name(gen_fn, count: int = 1) -> int:
         return int(names)
 
 
-def create_probe_fbo(width: int, height: int) -> _ProbeFbo:
+def create_probe_fbo(width: int, height: int) -> ProbeFbo:
     """Create a minimal RGBA FBO for preset scan probes."""
-    return _ProbeFbo(width, height)
+    return ProbeFbo(width, height)
 
 
-class _ProbeFbo:
+class ProbeFbo:
     """Minimal RGBA FBO for raw projectM probe output."""
 
     def __init__(self, width: int, height: int) -> None:
@@ -1074,7 +1072,8 @@ def _preset_result_from_dict(entry: Any) -> PresetScanResult:
             render_sec=float(render_sec) if render_sec is not None else None,
         )
 
-    luma = _scan_luma_from_dict(entry.get("luma"))
+    luma_raw = entry.get("luma")
+    luma = frame_metrics_from_dict(luma_raw) if luma_raw is not None else None
 
     return PresetScanResult(
         path=Path(path_raw).resolve(),
@@ -1084,62 +1083,6 @@ def _preset_result_from_dict(entry: Any) -> PresetScanResult:
         timings=timings,
         luma=luma,
     )
-
-
-def _scan_luma_from_dict(data: Any) -> FrameMetrics | None:
-    if data is None:
-        return None
-    if not isinstance(data, dict):
-        raise ValueError("luma must be an object")
-
-    max_raw = data.get("max")
-    mean_raw = data.get("mean")
-    if not isinstance(max_raw, (int, float)) or not isinstance(mean_raw, (int, float)):
-        raise ValueError("luma missing max or mean")
-
-    coverage_raw = data.get("coverage")
-    if not isinstance(coverage_raw, dict):
-        raise ValueError("luma missing coverage object")
-
-    coverage: dict[int, float] = {}
-    for cutoff in LUMA_COVERAGE_CUTOFFS:
-        value = coverage_raw.get(str(cutoff), coverage_raw.get(cutoff))
-        if not isinstance(value, (int, float)):
-            raise ValueError(f"luma missing coverage for cutoff {cutoff}")
-        coverage[cutoff] = float(value)
-
-    white_coverage_raw = data.get("white_coverage")
-    white_coverage: dict[int, float] = {
-        cutoff: 0.0 for cutoff in WHITE_COVERAGE_CUTOFFS
-    }
-    if white_coverage_raw is not None:
-        if not isinstance(white_coverage_raw, dict):
-            raise ValueError("luma white_coverage must be an object")
-        for cutoff in WHITE_COVERAGE_CUTOFFS:
-            value = white_coverage_raw.get(str(cutoff), white_coverage_raw.get(cutoff))
-            if isinstance(value, (int, float)):
-                white_coverage[cutoff] = float(value)
-
-    return FrameMetrics(
-        max_luma=float(max_raw),
-        mean_luma=float(mean_raw),
-        coverage=coverage,
-        white_coverage=white_coverage,
-    )
-
-
-def _scan_luma_to_dict(luma: FrameMetrics) -> dict[str, Any]:
-    return {
-        "max": luma.max_luma,
-        "mean": luma.mean_luma,
-        "coverage": {
-            str(cutoff): luma.coverage[cutoff] for cutoff in LUMA_COVERAGE_CUTOFFS
-        },
-        "white_coverage": {
-            str(cutoff): luma.white_coverage[cutoff]
-            for cutoff in WHITE_COVERAGE_CUTOFFS
-        },
-    }
 
 
 def _preset_result_to_dict(preset: PresetScanResult) -> dict[str, Any]:
@@ -1159,5 +1102,5 @@ def _preset_result_to_dict(preset: PresetScanResult) -> dict[str, Any]:
         if timings:
             payload["timings"] = timings
     if preset.luma is not None:
-        payload["luma"] = _scan_luma_to_dict(preset.luma)
+        payload["luma"] = frame_metrics_to_dict(preset.luma)
     return payload

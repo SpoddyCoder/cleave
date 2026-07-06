@@ -14,6 +14,9 @@ from cleave.paths import resolve_project
 from cleave.preset_scan import (
     PresetScanResult,
     PresetResultCategory,
+    ProbeProfile,
+    ScanMode,
+    ScanReport,
     build_scan_report,
     delete_presets,
     destructive_scan_categories,
@@ -28,6 +31,13 @@ from cleave.preset_scan import (
     write_scan_report,
 )
 from cleave.preset_scan_targets import ScanTargets, build_bulk_targets, build_project_targets
+
+
+def _experimental_notice() -> None:
+    print(
+        "warning: 'scan' is experimental; classification is only trusted on the golden set",
+        file=sys.stderr,
+    )
 from cleave.separate import (
     project_stems_complete,
     resolve_separate_target,
@@ -312,7 +322,62 @@ def _handle_scan_keyboard_interrupt(
     sys.exit(130)
 
 
+def _execute_preset_scan(
+    *,
+    args: argparse.Namespace,
+    profile: ProbeProfile,
+    prior_results: list[PresetScanResult],
+    skip_paths: frozenset[Path],
+    report_path: Path | None,
+    scan_mode: ScanMode,
+    scan_targets: ScanTargets,
+    report_targets: ScanTargets,
+    run_texture_paths: tuple[Path, ...] | None = None,
+    project_dir: Path | None = None,
+    config_path: Path | None = None,
+) -> tuple[list[PresetScanResult], ScanReport]:
+    target_total = len(scan_targets.presets)
+    _guard_incomplete_report(report_path, args, target_total)
+
+    def report_sink(new_results: list[PresetScanResult], complete: bool) -> None:
+        assert report_path is not None
+        report = build_scan_report(
+            scan_mode=scan_mode,
+            profile=profile,
+            targets=report_targets,
+            results=[*prior_results, *new_results],
+            project_dir=project_dir,
+            config_path=config_path,
+            complete=complete,
+        )
+        write_scan_report(report_path, report)
+
+    try:
+        new_results = run_scan(
+            scan_targets,
+            texture_paths=run_texture_paths,
+            report_sink=report_sink if report_path is not None else None,
+            skip_paths=skip_paths,
+        )
+    except KeyboardInterrupt:
+        _handle_scan_keyboard_interrupt(report_path, args, target_total)
+    except (FileNotFoundError, ValueError, RuntimeError) as e:
+        _exit_error(f"error: {e}")
+
+    results = [*prior_results, *new_results]
+    report = build_scan_report(
+        scan_mode=scan_mode,
+        profile=profile,
+        targets=report_targets,
+        results=results,
+        project_dir=project_dir,
+        config_path=config_path,
+    )
+    return results, report
+
+
 def cmd_scan(args: argparse.Namespace) -> None:
+    _experimental_notice()
     bulk_mode = args.presets_dir is not None
 
     destructive_categories = destructive_scan_categories(
@@ -417,39 +482,16 @@ def cmd_scan(args: argparse.Namespace) -> None:
             except ValueError as exc:
                 _exit_error(f"error: {exc}")
 
-        target_total = len(targets.presets)
-        _guard_incomplete_report(report_path, args, target_total)
-
-        def report_sink(new_results: list[PresetScanResult], complete: bool) -> None:
-            assert report_path is not None
-            report = build_scan_report(
-                scan_mode="bulk",
-                profile=profile,
-                targets=report_targets,
-                results=[*prior_results, *new_results],
-                config_path=config_path,
-                complete=complete,
-            )
-            write_scan_report(report_path, report)
-
-        try:
-            new_results = run_scan(
-                targets,
-                texture_paths=resolved_textures,
-                report_sink=report_sink if report_path is not None else None,
-                skip_paths=skip_paths,
-            )
-        except KeyboardInterrupt:
-            _handle_scan_keyboard_interrupt(report_path, args, target_total)
-        except (FileNotFoundError, ValueError, RuntimeError) as e:
-            _exit_error(f"error: {e}")
-
-        results = [*prior_results, *new_results]
-        report = build_scan_report(
-            scan_mode="bulk",
+        results, report = _execute_preset_scan(
+            args=args,
             profile=profile,
-            targets=report_targets,
-            results=results,
+            prior_results=prior_results,
+            skip_paths=skip_paths,
+            report_path=report_path,
+            scan_mode="bulk",
+            scan_targets=targets,
+            report_targets=report_targets,
+            run_texture_paths=resolved_textures,
             config_path=config_path,
         )
     else:
@@ -478,39 +520,15 @@ def cmd_scan(args: argparse.Namespace) -> None:
             except ValueError as exc:
                 _exit_error(f"error: {exc}")
 
-        target_total = len(targets.presets)
-        _guard_incomplete_report(report_path, args, target_total)
-
-        def report_sink(new_results: list[PresetScanResult], complete: bool) -> None:
-            assert report_path is not None
-            report = build_scan_report(
-                scan_mode="project",
-                profile=profile,
-                targets=targets,
-                results=[*prior_results, *new_results],
-                project_dir=project_dir,
-                config_path=config_path,
-                complete=complete,
-            )
-            write_scan_report(report_path, report)
-
-        try:
-            new_results = run_scan(
-                targets,
-                report_sink=report_sink if report_path is not None else None,
-                skip_paths=skip_paths,
-            )
-        except KeyboardInterrupt:
-            _handle_scan_keyboard_interrupt(report_path, args, target_total)
-        except (FileNotFoundError, ValueError, RuntimeError) as e:
-            _exit_error(f"error: {e}")
-
-        results = [*prior_results, *new_results]
-        report = build_scan_report(
-            scan_mode="project",
+        results, report = _execute_preset_scan(
+            args=args,
             profile=profile,
-            targets=targets,
-            results=results,
+            prior_results=prior_results,
+            skip_paths=skip_paths,
+            report_path=report_path,
+            scan_mode="project",
+            scan_targets=targets,
+            report_targets=targets,
             project_dir=project_dir,
             config_path=config_path,
         )
@@ -543,6 +561,7 @@ def cmd_scan(args: argparse.Namespace) -> None:
 
 
 def cmd_scan_golden(args: argparse.Namespace) -> None:
+    _experimental_notice()
     from cleave.preset_scan_golden import (
         DEFAULT_GOLDEN_SET_PATH,
         DEFAULT_METRICS_CACHE_PATH,
@@ -795,7 +814,7 @@ def build_parser() -> argparse.ArgumentParser:
     scan = subparsers.add_parser(
         "scan",
         prog="cleave scan",
-        help="Scan Milkdrop presets for load failures and black output",
+        help="[EXPERIMENTAL] Scan Milkdrop presets for load failures and black output",
         epilog=(
             "For large preset directories, use --report so an interrupted scan "
             "can be resumed with the same --report PATH and --resume."
@@ -889,7 +908,8 @@ def build_parser() -> argparse.ArgumentParser:
     scan_golden = subparsers.add_parser(
         "scan-golden",
         prog="cleave scan-golden",
-        help="Probe and evaluate the preset scan golden set",
+        description="[EXPERIMENTAL] Golden-set probe and classifier evaluation for preset scan.",
+        help="[EXPERIMENTAL] Probe and evaluate the preset scan golden set",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     mode = scan_golden.add_mutually_exclusive_group(required=True)

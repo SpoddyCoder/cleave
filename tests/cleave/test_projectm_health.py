@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 from cleave.projectm import PresetLoadFailure, ProjectM
 from cleave.projectm_health import (
     PRESET_SKIP_NOTIFICATION_INTERVAL_SEC,
+    PresetSkipNotifyTracker,
     drain_stem_layers_preset_failures,
 )
 from cleave.viz.layer import StemLayer
@@ -26,25 +27,29 @@ def _layer_with_failures(*failures: PresetLoadFailure) -> StemLayer:
 
 
 def test_drain_notifies_skipped_preset_rate_limited() -> None:
-    import cleave.projectm_health as health
-
-    health._last_skip_notify.clear()
+    tracker = PresetSkipNotifyTracker()
     layer = _layer_with_failures(
         PresetLoadFailure(filename="/tmp/a.milk", message="bad")
     )
     notify = MagicMock()
 
-    drain_stem_layers_preset_failures([layer], on_notification=notify)
+    drain_stem_layers_preset_failures(
+        [layer], on_notification=notify, skip_notify_tracker=tracker
+    )
     notify.assert_called_once_with("Skipped preset: a.milk")
 
     notify.reset_mock()
-    drain_stem_layers_preset_failures([layer], on_notification=notify)
+    drain_stem_layers_preset_failures(
+        [layer], on_notification=notify, skip_notify_tracker=tracker
+    )
     notify.assert_not_called()
 
-    health._last_skip_notify["layer_1"] = (
+    tracker.last_notify["layer_1"] = (
         time.monotonic() - PRESET_SKIP_NOTIFICATION_INTERVAL_SEC - 1
     )
-    drain_stem_layers_preset_failures([layer], on_notification=notify)
+    drain_stem_layers_preset_failures(
+        [layer], on_notification=notify, skip_notify_tracker=tracker
+    )
     notify.assert_called_once_with("Skipped preset: a.milk")
 
 

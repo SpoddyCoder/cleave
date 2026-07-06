@@ -347,7 +347,9 @@ class LayerFramePipeline:
         on_panel_notification: Callable[[str], None] | None = None,
     ) -> None:
         drain_stem_layers_preset_failures(
-            layers, on_notification=on_panel_notification
+            layers,
+            on_notification=on_panel_notification,
+            skip_notify_tracker=session.preset_skip_notify_tracker,
         )
 
         if not paused:

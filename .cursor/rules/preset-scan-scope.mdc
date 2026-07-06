@@ -8,7 +8,11 @@ alwaysApply: false
 
 When changing `PresetSwitchingScope`, `PRESET_SWITCHING_SCOPES`, or how [cleave/viz/preset_switching.py](cleave/viz/preset_switching.py) builds the projectM playlist (`add_path` recurse flag, directory vs other roots), also update **scan set derivation** for `cleave scan`.
 
-Plan: [docs/presets-scan-plan.md](docs/presets-scan-plan.md).
+Plan: [docs/legacy-plans/presets-scan-plan.md](docs/legacy-plans/presets-scan-plan.md).
+
+## Experimental / low trust
+
+`cleave scan` and `cleave scan-golden` are **experimental**. Classifier thresholds are tuned on the golden set only; treat project and bulk scan results as best-effort until validated on a pack. CLI prints a stderr warning on every `scan` / `scan-golden` invocation.
 
 ## Current contract (v1)
 
@@ -22,6 +26,6 @@ Plan: [docs/presets-scan-plan.md](docs/presets-scan-plan.md).
 1. Mirror the new live rule in the scan-target builder (same module family as [cleave/preset_scan.py](cleave/preset_scan.py)).
 2. Extend JSON report `layers` / metadata if attribution changes.
 3. Add or adjust unit tests for target enumeration (no GL required).
-4. Update [docs/presets-scan-plan.md](docs/presets-scan-plan.md) scan set section.
+4. Update [docs/legacy-plans/presets-scan-plan.md](docs/legacy-plans/presets-scan-plan.md) scan set section.
 
 Do not let play and scan disagree on which presets are in rotation.
