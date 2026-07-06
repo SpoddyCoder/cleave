@@ -8,7 +8,10 @@ Must-do items for Cleave. Everything else is iterative enhancements or listed in
 
 Outstanding bugs and issues.
 
-_(None.)_
+### Dirty flag on config file takes a while to appear
+* As user makes change the dirty asterisk does not immediately appear.
+* It appears when a UI action that clears the cache happens - expanding a secion etc.
+* Fixing this need to be careful not to introduce performance issues that the cache is used to mitigate.
 
 ---
 
