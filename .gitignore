@@ -5,10 +5,6 @@
 projects/*
 !projects/.gitkeep
 
-# user generated quarantined presets
-assets/milkdrop-presets/quarantine/*
-!assets/milkdrop-presets/quarantine/.gitkeep
-
 
 ####################################
 # Project Ignores
