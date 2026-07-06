@@ -3,9 +3,9 @@
 #
 # expected_result:
 #   ok        - pass; do not quarantine
-#   dim       - quarantine; preset runs but output is too dim
-#   black     - quarantine; preset does not develop (black / broken)
-#   washed_out - quarantine; extreme white blowout
+#   dim       - classify as dim; quarantine/delete only with --include-dim
+#   black     - quarantine/delete by default
+#   washed_out - classify as washed_out; quarantine/delete only with --include-washout
 #
 # Harness should resolve preset paths against preset_root and apply texture_paths.
 

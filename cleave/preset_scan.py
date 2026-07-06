@@ -168,9 +168,22 @@ def scan_thresholds() -> dict[str, float]:
 
 REPORT_FLUSH_EVERY = 10
 
-QUARANTINE_CATEGORIES: frozenset[PresetResultCategory] = frozenset(
-    ("load_failed", "black", "dim", "washed_out")
+DEFAULT_DESTRUCTIVE_CATEGORIES: frozenset[PresetResultCategory] = frozenset(
+    ("load_failed", "black")
 )
+
+
+def destructive_scan_categories(
+    *,
+    include_dim: bool = False,
+    include_washout: bool = False,
+) -> frozenset[PresetResultCategory]:
+    categories = set(DEFAULT_DESTRUCTIVE_CATEGORIES)
+    if include_dim:
+        categories.add("dim")
+    if include_washout:
+        categories.add("washed_out")
+    return frozenset(categories)
 
 
 @dataclass(frozen=True)
@@ -661,11 +674,18 @@ def validate_quarantine_dir(
 
 def delete_presets(
     results: list[PresetScanResult] | tuple[PresetScanResult, ...],
+    *,
+    categories: frozenset[PresetResultCategory] | None = None,
 ) -> list[Path]:
-    """Delete preset files flagged in *results* (QUARANTINE_CATEGORIES only)."""
+    """Delete preset files flagged in *results* within *categories*."""
+    active = (
+        DEFAULT_DESTRUCTIVE_CATEGORIES
+        if categories is None
+        else categories
+    )
     deleted: list[Path] = []
     for result in results:
-        if result.result not in QUARANTINE_CATEGORIES:
+        if result.result not in active:
             continue
         path = result.path
         if not path.is_file():
@@ -678,11 +698,18 @@ def delete_presets(
 def quarantine_presets(
     results: list[PresetScanResult] | tuple[PresetScanResult, ...],
     quarantine_dir: Path,
+    *,
+    categories: frozenset[PresetResultCategory] | None = None,
 ) -> list[tuple[Path, Path]]:
     """Move failed presets into *quarantine_dir* (flat layout, suffix on collision)."""
+    active = (
+        DEFAULT_DESTRUCTIVE_CATEGORIES
+        if categories is None
+        else categories
+    )
     moves: list[tuple[Path, Path]] = []
     for result in results:
-        if result.result not in QUARANTINE_CATEGORIES:
+        if result.result not in active:
             continue
         src = result.path
         if not src.is_file():
