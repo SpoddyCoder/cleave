@@ -1,0 +1,316 @@
+# Golden set for preset scan classifier tuning.
+# Manual labels from live review (clean manual preset boot) in
+#
+# expected_result:
+#   ok        - pass; do not quarantine
+#   dim       - classify as dim; quarantine/delete only with --include-dim
+#   black     - quarantine/delete by default
+#   washed_out - classify as washed_out; quarantine/delete only with --include-washout
+#
+# Harness should resolve preset paths against preset_root and apply texture_paths.
+
+version: 1
+preset_root: assets/milkdrop-presets
+texture_paths:
+  - assets/milkdrop-presets/presets-milkdrop-texture-pack
+
+cases:
+  - id: 1
+    source_config: unnamed-1.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/BrainStain-Blackwidow.milk
+    expected_result: dim
+    notes: Working, but too dim.
+
+  - id: 2
+    source_config: unnamed-2.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Aderrasi - Airhandler (Principle of Sharing).milk
+    expected_result: black
+    notes: Not working in visualizer (clean boot stays black). Both quick and slow golden caches classify black.
+
+  - id: 3
+    source_config: unnamed-3.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/BrainStain-re entry.milk
+    expected_result: ok
+    notes: May appear dim but is clearly working.
+
+  - id: 4
+    source_config: unnamed-4.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Eo.S. + Phat - chasers 11 sentinel C_poltergeist_mix response daemon.milk
+    expected_result: ok
+    notes: May appear dim but is clearly working.
+
+  - id: 5
+    source_config: unnamed-5.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Eo.S. - angels of decay.milk
+    expected_result: washed_out
+    notes: Working, but highly washed out to white. Opposite of dim; catch extreme cases.
+
+  - id: 6
+    source_config: unnamed-6.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Eo.S. - glowsticks v2 03 music.milk
+    expected_result: ok
+    notes: May appear dim but is clearly working.
+
+  - id: 7
+    source_config: unnamed-7.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Eo.S.+Phat - spectrum bubble new colors_v2.milk
+    expected_result: ok
+    notes: May appear dim but is clearly working.
+
+  - id: 8
+    source_config: unnamed-8.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Esotic & Rozzer - The Dark Side Of My Moon.milk
+    expected_result: washed_out
+    notes: Washed out to white. Opposite of dim; catch extreme cases.
+
+  - id: 9
+    source_config: unnamed-9.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Esotic & Rozzor - Pixie Party Light ((No Wave Invasion) Mandala Chill Red Yellow Mix).milk
+    expected_result: washed_out
+    notes: Washed out to white. Opposite of dim; catch extreme cases.
+
+  - id: 10
+    source_config: unnamed-10.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Flexi + Martin - dive.milk
+    expected_result: ok
+    notes: Clear pass.
+
+  - id: 11
+    source_config: unnamed-11.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Flexi + Geiss - pogo-cubes on tokamak matter [mind over matter remix].milk
+    expected_result: ok
+    notes: Clear pass.
+
+  - id: 12
+    source_config: unnamed-12.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Flexi + Geiss - pogo-cubes on tokamak matter.milk
+    expected_result: ok
+    notes: Clear pass.
+
+  - id: 13
+    source_config: unnamed-13.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Flexi + fiShbRaiN - witchcraft [complex terraforming - fiddling twists in the fabric of space].milk
+    expected_result: ok
+    notes: May start slow, but clearly works.
+
+  - id: 14
+    source_config: unnamed-14.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Flexi - mindblob [shiny mix].milk
+    expected_result: ok
+    notes: Clear pass; starts slow but clearly works.
+
+  - id: 15
+    source_config: unnamed-15.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Flexi - smashing fractals [Geiss' bas relief finish].milk
+    expected_result: ok
+    notes: May appear dim and start slow but is clearly working.
+
+  - id: 16
+    source_config: unnamed-16.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Flexi - working with infinity.milk
+    expected_result: ok
+    notes: Clear pass; starts slow but clearly works.
+
+  - id: 17
+    source_config: unnamed-17.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Flexi, Rovastar + Geiss - Fractopia vs bas relief.milk
+    expected_result: ok
+    notes: May appear dim and start slow but is clearly working.
+
+  - id: 18
+    source_config: unnamed-18.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Flexi, fishbrain + Martin - witchery.milk
+    expected_result: ok
+    notes: Starts dim but clearly works after it gets going.
+
+  - id: 19
+    source_config: unnamed-19.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Flexi, martin + geiss - dedicated to the sherwin maxawow.milk
+    expected_result: ok
+    notes: May appear dim at centre, but clearly works (grows from edge).
+
+  - id: 20
+    source_config: unnamed-20.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Fvese - Snowflake Like 2.milk
+    expected_result: ok
+    notes: Clear pass.
+
+  - id: 21
+    source_config: unnamed-21.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Geiss - Explosion 2.milk
+    expected_result: ok
+    notes: Starts slow but clearly works.
+
+  - id: 22
+    source_config: unnamed-22.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Goody - Acid Angel - Fallen Angel.milk
+    expected_result: ok
+    notes: Starts slow but clearly works.
+
+  - id: 23
+    source_config: unnamed-23.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Goody - Lights in the Sky.milk
+    expected_result: ok
+    notes: Starts slow, but clear pass.
+
+  - id: 24
+    source_config: unnamed-24.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Goody - Need - Transcendance remix.milk
+    expected_result: ok
+    notes: Clear pass. High luma but usable; not washed_out.
+
+  - id: 25
+    source_config: unnamed-25.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Mstress & Juppy - Dancer.milk
+    expected_result: ok
+    notes: May appear dim but is clearly working.
+
+  - id: 26
+    source_config: unnamed-26.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Rovastar & Zylot - Crystal Ball (Many Visions Mix).milk
+    expected_result: black
+    notes: Does not work.
+
+  - id: 27
+    source_config: unnamed-27.yaml
+    preset: presets-cream-of-the-crop/! Transition/Fast transition to black - levels effect === Goody's Lightning (ps 2-0) --- Isosceles edit.milk
+    expected_result: black
+    notes: Does not work.
+
+  - id: 28
+    source_config: unnamed-28.yaml
+    preset: presets-cream-of-the-crop/Dancer/Aurora/Jc - Lungs.milk
+    expected_result: dim
+    notes: Too dim.
+
+  - id: 29
+    source_config: unnamed-29.yaml
+    preset: presets-cream-of-the-crop/Dancer/Comet/EoS + Phat - chasers 11 sentinel C (Jelly V2).milk
+    expected_result: ok
+    notes: May appear dim but is clearly working.
+
+  - id: 30
+    source_config: unnamed-30.yaml
+    preset: presets-cream-of-the-crop/Particles/Blobby/only glimpses of the reality you once knew - what good is a drug if you can't turn it's effects on and off.milk
+    expected_result: dim
+    notes: Too dim.
+
+  - id: 31
+    source_config: unnamed-31.yaml
+    preset: presets-cream-of-the-crop/Sparkle/Explosions/$$$ Royal - Mashup (244).milk
+    expected_result: ok
+    notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
+
+  - id: 32
+    source_config: unnamed-32.yaml
+    preset: presets-cream-of-the-crop/Sparkle/Explosions/$$$ Royal - Mashup (248).milk
+    expected_result: ok
+    notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
+
+  - id: 33
+    source_config: unnamed-33.yaml
+    preset: presets-cream-of-the-crop/Sparkle/Explosions/$$$ Royal - Mashup (409).milk
+    expected_result: ok
+    notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
+
+  - id: 34
+    source_config: unnamed-34.yaml
+    preset: presets-cream-of-the-crop/Sparkle/Explosions/2009 4th of July with AdamFX n Martin - into the fireworks E.milk
+    expected_result: ok
+    notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
+
+  - id: 35
+    source_config: unnamed-35.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/3dRaGoNs & Unchained - Dragon Science.milk
+    expected_result: ok
+    notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
+
+  - id: 36
+    source_config: unnamed-36.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Aderrasi + Flexi - Airhandler (Last Breath - Calm) [moebius morbid vision edit].milk
+    expected_result: ok
+    notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
+
+  - id: 37
+    source_config: unnamed-37.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Aderrasi - Halls Of Centrifuge.milk
+    expected_result: ok
+    notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
+
+  - id: 38
+    source_config: unnamed-38.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Aderrasi - Songflower (Moss Posy).milk
+    expected_result: ok
+    notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
+
+  - id: 39
+    source_config: unnamed-39.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Aderrasi - The Lurker (Twin Mix) - Bitcore Tweak.milk
+    expected_result: ok
+    notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
+
+  - id: 40
+    source_config: unnamed-40.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Aderrasi - What Cannot Be Undone.milk
+    expected_result: ok
+    notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
+
+  - id: 41
+    source_config: unnamed-41.yaml
+    preset: presets-cream-of-the-crop/Sparkle/Explosions/An Digital FX Edit 2 martin - girlie affairs Internal LightFX AdamFX k.milk
+    expected_result: ok
+    notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
+
+  - id: 42
+    source_config: unnamed-42.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Eo.S. + Geiss - glowsticks v2 03 music shifter edit b (water mix).milk
+    expected_result: ok
+    notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
+
+  - id: 43
+    source_config: unnamed-43.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Eo.S. - pointfield 04 arcs demon_phat edit_v3.milk
+    expected_result: ok
+    notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
+
+  - id: 44
+    source_config: unnamed-44.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Flexi + bdrv - what to do [Phat edit].milk
+    expected_result: ok
+    notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
+
+  - id: 45
+    source_config: unnamed-45.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Flexi - fractal remix weed.milk
+    expected_result: ok
+    notes: High-intensity full-screen visual; clearly working; below whiteout threshold.
+
+  - id: 46
+    source_config: unnamed-46.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Esotic & Rozzor - Pixie Party Light ((No Wave Invasion) Mandala Chill Red Yellow Mix).milk
+    expected_result: washed_out
+    notes: High-intensity but washed out to white; too blown out to use.
+
+  - id: 47
+    source_config: unnamed-47.yaml
+    preset: presets-cream-of-the-crop/Fractal/Nested Circle/Esotic & Rozzer - The Dark Side Of My Moon.milk
+    expected_result: washed_out
+    notes: High-intensity but washed out to white; too blown out to use.
+
+  - id: 48
+    source_config: unnamed-48.yaml
+    preset: presets-cream-of-the-crop/Fractal/Nested Circle/Esotic & Rozzer - Now And Later.milk
+    expected_result: washed_out
+    notes: High-intensity but washed out to white; too blown out to use.
+
+  - id: 49
+    source_config: unnamed-49.yaml
+    preset: presets-cream-of-the-crop/Fractal/Nested Circle/Esotic & Rozzer - Hippie Hypnotizer.milk
+    expected_result: washed_out
+    notes: High-intensity but washed out to white; too blown out to use.
+
+  - id: 50
+    source_config: unnamed-50.yaml
+    preset: presets-milkdrop-original/Milkdrop-Original/Rovastar & Unchained - Demonology (Vampire Soul Mix).milk
+    expected_result: washed_out
+    notes: High-intensity but washed out to white; too blown out to use.

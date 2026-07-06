@@ -22,3 +22,7 @@ __pycache__/
 venv/
 .venv/
 cleave-env/
+
+# scratch / local temp
+tmp/
+tmp.txt

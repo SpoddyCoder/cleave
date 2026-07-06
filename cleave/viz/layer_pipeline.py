@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from collections.abc import Callable
+
 from cleave.config import CleaveConfig, LayerConfig
 from cleave.effects.runtime import EffectRuntime
 from cleave.gl_compositor import GlCompositor
 from cleave.gl_post_process import GlPostProcess
 from cleave.preset_playlist import PresetPlaylist
 from cleave.projectm import ProjectM
+from cleave.projectm_health import drain_stem_layers_preset_failures
 from cleave.signals import Signals
 from cleave.stem_pcm import StemPcmBank
 from cleave.viz.layer import StemLayer
@@ -341,7 +344,14 @@ class LayerFramePipeline:
         *,
         paused: bool,
         compositor: GlCompositor | None = None,
+        on_panel_notification: Callable[[str], None] | None = None,
     ) -> None:
+        drain_stem_layers_preset_failures(
+            layers,
+            on_notification=on_panel_notification,
+            skip_notify_tracker=session.preset_skip_notify_tracker,
+        )
+
         if not paused:
             for layer in layers:
                 if not layer.fbo.enabled:

@@ -12,6 +12,8 @@ jobs:
       SDL_VIDEODRIVER: dummy
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - uses: actions/setup-python@v5
         with:
