@@ -1,8 +1,6 @@
 # Preset scan proposal
 
-Offline CLI to scan Milkdrop preset directories, classify each `.milk` file, and optionally quarantine or remove failures. Replaces the idea of skipping black presets at runtime during projectM auto-switching, which is hard to tune and risks false positives in live sessions.
-
-**Status:** Implemented. CLI and scan-set design: [presets-scan-plan.md](presets-scan-plan.md). Golden labels: [presets-scan-golden-set.md](presets-scan-golden-set.md).
+**Status: experimental / low confidence.** Implementation exists (`cleave scan`, `cleave scan-golden`) but classification is only trusted on the golden set. See [presets-scan-plan.md](presets-scan-plan.md) for CLI design and [presets-scan-golden-set.md](presets-scan-golden-set.md) for labels.
 
 ## Problem
 
@@ -25,7 +23,7 @@ See [presets-scan-plan.md](presets-scan-plan.md) for CLI (`cleave scan <project_
 Minimal harness (no Cleave compositor stack):
 
 1. Open a hidden pygame OpenGL context once.
-2. Create a [ProjectM](../cleave/projectm.py) instance (fresh per preset in golden harness) and a 480x270 RGBA FBO.
+2. Create a [ProjectM](../../cleave/projectm.py) instance (fresh per preset in golden harness) and a 480x270 RGBA FBO.
 3. Set texture search paths from config or flags.
 4. For each `.milk`: clean boot, load, feed synthetic mono PCM, render 15 warmup + 75 window frames, sample full-frame luma each frame.
 5. Classify from load failures plus peak max, mean, and coverage across post-warmup frames.
@@ -60,13 +58,13 @@ Single GL context; no practical parallelism. Progress on stderr and `--resume` k
 
 ## Architecture sketch
 
-[cleave/preset_scan.py](../cleave/preset_scan.py) plus CLI in [cleave/cli.py](../cleave/cli.py). Reuses:
+[cleave/preset_scan.py](../../cleave/preset_scan.py) plus CLI in [cleave/cli.py](../../cleave/cli.py). Reuses:
 
-- [cleave/projectm.py](../cleave/projectm.py) for load, PCM, render
-- [cleave/preset_playlist.py](../cleave/preset_playlist.py) `milk_files_in_dir` / directory walk
-- [cleave/config.py](../cleave/config.py) for `paths.texture_paths` when a viz config is passed
+- [cleave/projectm.py](../../cleave/projectm.py) for load, PCM, render
+- [cleave/preset_playlist.py](../../cleave/preset_playlist.py) `milk_files_in_dir` / directory walk
+- [cleave/config.py](../../cleave/config.py) for `paths.texture_paths` when a viz config is passed
 
-Does not use [cleave/viz/layer_pipeline.py](../cleave/viz/layer_pipeline.py) or multi-layer compositing; black-key blend is irrelevant because the probe reads the raw projectM FBO.
+Does not use [cleave/viz/layer_pipeline.py](../../cleave/viz/layer_pipeline.py) or multi-layer compositing; black-key blend is irrelevant because the probe reads the raw projectM FBO.
 
 Shared infrastructure with the projectM robustness work (switch-failed callbacks, optional logging callback) benefits both live play and this tool.
 
@@ -84,9 +82,9 @@ Aligned with [presets-scan-plan.md](presets-scan-plan.md):
 
 ## Related work
 
-- [preset-switching-proposal.md](legacy-plans/preset-switching-proposal.md) documents live projectM rotation; playlist retry and switch-failed callbacks were planned there but not fully wired in Cleave.
+- [preset-switching-proposal.md](preset-switching-proposal.md) documents live projectM rotation; playlist retry and switch-failed callbacks were planned there but not fully wired in Cleave.
 - [presets-scan-learnings.md](presets-scan-learnings.md) — feedback leak, explored fixes, live clean boot.
-- [roadmap.md](roadmap.md) projectM PCM feeding note.
+- [roadmap.md](../roadmap.md) projectM PCM feeding note.
 
 ## Open questions
 

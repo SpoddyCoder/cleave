@@ -1,5 +1,7 @@
 # Preset scan plan
 
+**Status: experimental / low confidence.** `cleave scan` and `cleave scan-golden` are shipped but not production-ready. Classifier thresholds are tuned on the 50-case golden set only; treat project and bulk scan results as best-effort. Do not quarantine or delete presets from scan output without manual review.
+
 Implementation plan for `cleave scan`: offline batch classification of Milkdrop presets (load failures, black output). Background and heuristics live in [presets-check-proposal.md](presets-check-proposal.md). Investigation notes: [presets-scan-learnings.md](presets-scan-learnings.md).
 
 ## Status
@@ -8,7 +10,7 @@ Implementation plan for `cleave scan`: offline batch classification of Milkdrop 
 | --- | --- | --- |
 | v1 | Done | Project/bulk scan, JSON report, v1 classifier |
 | v2 | Done | `--quarantine`, `--resume`, incremental/interrupt-safe reports |
-| Live clean boot | Done | Manual preset browse forces black boot ([cleave/viz/preset_switching.py](../cleave/viz/preset_switching.py) `load_manual_preset_clean`) |
+| Live clean boot | Done | Manual preset browse forces black boot ([cleave/viz/preset_switching.py](../../cleave/viz/preset_switching.py) `load_manual_preset_clean`) |
 | Classifier rework | Done | Clean-boot probe, full-frame metrics, peak-across-frames rules, golden-set tuning |
 | v3 | Done | `--delete` |
 
@@ -29,8 +31,8 @@ Implementation plan for `cleave scan`: offline batch classification of Milkdrop 
 cleave scan <project_dir> [-c cleave-viz.yaml] [options]
 ```
 
-- Resolves the project via [cleave/paths.py](../cleave/paths.py) `resolve_project` (same as `render`).
-- Loads config via [cleave/config.py](../cleave/config.py) `find_config_path` (CLI `-c`, else `<project>/cleave-viz.yaml`, then global/template fallbacks).
+- Resolves the project via [cleave/paths.py](../../cleave/paths.py) `resolve_project` (same as `render`).
+- Loads config via [cleave/config.py](../../cleave/config.py) `find_config_path` (CLI `-c`, else `<project>/cleave-viz.yaml`, then global/template fallbacks).
 - Does **not** run `separate` or require stems/signals.
 
 Examples:
@@ -67,12 +69,12 @@ cleave scan --presets-dir <dir> --texture-path <dir> [--texture-path ...] [optio
 
 ## Scan set derivation (project mode)
 
-Build the preset list from parsed [CleaveConfig](../cleave/config.py) **on disk** (not live session). For each layer in `layer_z_order` (including **disabled** layers):
+Build the preset list from parsed [CleaveConfig](../../cleave/config.py) **on disk** (not live session). For each layer in `layer_z_order` (including **disabled** layers):
 
-1. **Anchor directory** — resolve `layers.<slot>.preset` under `paths.preset_root` via [scan_preset_playlist](../cleave/preset_playlist.py); take `playlist.current_dir`. Collect all `*.milk` files **directly in that directory** (non-recursive), same as projectM rotation in [apply_preset_switching](../cleave/viz/preset_switching.py) (`add_path(..., recurse=False)`).
+1. **Anchor directory** — resolve `layers.<slot>.preset` under `paths.preset_root` via [scan_preset_playlist](../../cleave/preset_playlist.py); take `playlist.current_dir`. Collect all `*.milk` files **directly in that directory** (non-recursive), same as projectM rotation in [apply_preset_switching](../../cleave/viz/preset_switching.py) (`add_path(..., recurse=False)`).
 2. **Include anchor directory even when `preset_switching` is `none`** — user may enable projectM later; scanning only the locked file would miss siblings they will rotate into.
 3. **projectM rotation** — when `preset_switching` is `projectm`, step 1 already matches live rotation (`scope == "directory"` today).
-4. **User-defined rotation** — when `preset_switching` is `user_defined`, add every path in `layers.<slot>.preset_switching_presets` (resolved relative to project dir per [config_schema](../cleave/config_schema.py)).
+4. **User-defined rotation** — when `preset_switching` is `user_defined`, add every path in `layers.<slot>.preset_switching_presets` (resolved relative to project dir per [config_schema](../../cleave/config_schema.py)).
 5. **Deduplicate** by resolved absolute `.milk` path. Keep metadata: which layer slot(s) referenced each file.
 
 Do **not** scan `browse_floor`, full `preset_root`, or subfolders under the anchor directory unless bulk mode with `--recursive`.
@@ -85,7 +87,7 @@ Bulk mode: require at least one texture path (`--texture-path` and/or from `-c`)
 
 ## Per-preset probe (shipped)
 
-Hidden pygame GL context, one fresh [ProjectM](../cleave/projectm.py) per preset (both `cleave scan` and `cleave scan-golden --probe`), 480x270 RGBA FBO. Switch-failed callbacks from the projectM robustness work ([todos.md](todos.md)).
+Hidden pygame GL context, one fresh [ProjectM](../../cleave/projectm.py) per preset (both `cleave scan` and `cleave scan-golden --probe`), 480x270 RGBA FBO. Switch-failed callbacks from the projectM robustness work ([todos.md](../todos.md)).
 
 Per preset:
 
@@ -100,9 +102,9 @@ Result categories: `load_failed`, `black`, `dim`, `washed_out`, `ok` (see propos
 
 ### Classification thresholds (shipped)
 
-Recorded in each report under `thresholds`. Constants live in [cleave/preset_scan.py](../cleave/preset_scan.py) (`SCAN_THRESHOLDS`). Tuned against the golden set; see [presets-scan-golden-set.md](presets-scan-golden-set.md).
+Recorded in each report under `thresholds`. Constants live in [cleave/preset_scan.py](../../cleave/preset_scan.py) (`SCAN_THRESHOLDS`). Tuned against the golden set; see [presets-scan-golden-set.md](presets-scan-golden-set.md).
 
-Per-preset `luma: { max, mean, coverage }` in JSON reports holds the peak values used for classification.
+Per-preset `luma: { max_luma, mean_luma, coverage, white_coverage }` in JSON reports holds the peak values used for classification.
 
 ### Destructive actions
 
@@ -141,14 +143,14 @@ Include environment metadata:
 
 | Piece | Location |
 | --- | --- |
-| Scan harness + classification | [cleave/preset_scan.py](../cleave/preset_scan.py) |
-| Scan set builder | [cleave/preset_scan_targets.py](../cleave/preset_scan_targets.py) |
-| Golden harness | [cleave/preset_scan_golden.py](../cleave/preset_scan_golden.py) |
-| CLI | [cleave/cli.py](../cleave/cli.py) `cmd_scan`, `cmd_scan_golden` |
-| Live clean manual load | [cleave/viz/preset_switching.py](../cleave/viz/preset_switching.py) `load_manual_preset_clean` |
-| Config | [cleave/config.py](../cleave/config.py) load + `paths.texture_paths` |
+| Scan harness + classification | [cleave/preset_scan.py](../../cleave/preset_scan.py) |
+| Scan set builder | [cleave/preset_scan_targets.py](../../cleave/preset_scan_targets.py) |
+| Golden harness | [cleave/preset_scan_golden.py](../../cleave/preset_scan_golden.py) |
+| CLI | [cleave/cli.py](../../cleave/cli.py) `cmd_scan`, `cmd_scan_golden` |
+| Live clean manual load | [cleave/viz/preset_switching.py](../../cleave/viz/preset_switching.py) `load_manual_preset_clean` |
+| Config | [cleave/config.py](../../cleave/config.py) load + `paths.texture_paths` |
 
-Does not use [layer_pipeline.py](../cleave/viz/layer_pipeline.py) or the compositor; probe reads raw projectM FBO output.
+Does not use [layer_pipeline.py](../../cleave/viz/layer_pipeline.py) or the compositor; probe reads raw projectM FBO output.
 
 ## Phasing
 
@@ -184,7 +186,7 @@ Project scan: typically tens to low hundreds of presets (per-layer rotation dirs
 
 ## Open questions
 
-- Golden case 2 visualizer vs scan disparity (see [todos.md](todos.md)).
+- Golden case 2 visualizer vs scan disparity (see [todos.md](../todos.md)).
 - Final coverage and mean thresholds per pack beyond the golden set.
 - Quarantine: preserve directory structure vs flat hashed names.
 - CI: headless GL unreliable; keep local/dev tool unless GPU runner exists.
@@ -195,7 +197,7 @@ Project scan: typically tens to low hundreds of presets (per-layer rotation dirs
 - [presets-scan-learnings.md](presets-scan-learnings.md) — investigation arc and threshold tuning notes
 - [presets-check-proposal.md](presets-check-proposal.md) — problem statement and classification heuristics
 - [presets-scan-golden-set.md](presets-scan-golden-set.md) — manual labels and golden harness
-- [projectm-api-coverage.md](projectm-api-coverage.md) — libprojectM symbol audit and live failure handling
-- [preset-switching-proposal.md](legacy-plans/preset-switching-proposal.md) — live rotation design
-- [todos.md](todos.md) — projectM robustness callbacks (shared with scan)
-- [.cursor/rules/preset-scan-scope.mdc](../.cursor/rules/preset-scan-scope.mdc) — update scan derivation when `preset_switching_scope` changes
+- [projectm-api-coverage.md](../projectm-api-coverage.md) — libprojectM symbol audit and live failure handling
+- [preset-switching-proposal.md](preset-switching-proposal.md) — live rotation design
+- [todos.md](../todos.md) — projectM robustness callbacks (shared with scan)
+- [.cursor/rules/preset-scan-scope.mdc](../../.cursor/rules/preset-scan-scope.mdc) — update scan derivation when `preset_switching_scope` changes

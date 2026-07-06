@@ -60,6 +60,7 @@ from cleave.preset_scan_metrics import (
     LUMA_COVERAGE_CUTOFFS,
     WHITE_COVERAGE_CUTOFFS,
     FrameMetrics,
+    empty_frame_metrics,
 )
 from cleave.preset_scan_targets import PresetTarget, ScanTargets
 from cleave.projectm import PresetLoadFailure
@@ -180,7 +181,7 @@ def test_classify_preset_result_defer_load_failed_invalid_peaks_stays_load_faile
     ]
     result, error = classify_preset_result(
         failures,
-        {},
+        empty_frame_metrics(),
     )
     assert result == "load_failed"
     assert error == "shader error"
@@ -444,19 +445,6 @@ def test_classify_preset_result_ok() -> None:
     result, error = classify_preset_result(
         [],
         _peaks(max_luma=50.0, mean_luma=50.0, cutoff_16=0.5),
-    )
-    assert result == "ok"
-    assert error is None
-
-
-def test_classify_preset_result_accepts_metrics_dict() -> None:
-    result, error = classify_preset_result(
-        [],
-        {
-            "max_luma": 50.0,
-            "mean_luma": 50.0,
-            "coverage": _coverage_at(cutoff_16=0.5),
-        },
     )
     assert result == "ok"
     assert error is None
@@ -890,14 +878,23 @@ def _mock_run_scan_gl(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_fbo.destroy = MagicMock()
     fake_fbo.fbo_id = 1
 
-    monkeypatch.setattr("cleave.preset_scan.pygame.init", lambda: None)
-    monkeypatch.setattr("cleave.preset_scan.pygame.quit", lambda: None)
-    monkeypatch.setattr(
-        "cleave.preset_scan.pygame.display.set_mode",
-        lambda *args, **kwargs: None,
-    )
+    class FakeProbeSession:
+        def __init__(self, texture_strs: list[str] | None = None) -> None:
+            self.fbo = fake_fbo
+            self.n_pcm = 1
+            self.frame_dt = 1.0 / 30.0
+
+        def __enter__(self) -> FakeProbeSession:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def configure_projectm(self, pm: MagicMock) -> None:
+            return None
+
     monkeypatch.setattr("cleave.preset_scan.ProjectM", make_pm)
-    monkeypatch.setattr("cleave.preset_scan._ProbeFbo", lambda *args: fake_fbo)
+    monkeypatch.setattr("cleave.preset_scan.ProbeSession", FakeProbeSession)
 
 
 def test_existing_report_status_incomplete(tmp_path: Path) -> None:
@@ -922,18 +919,28 @@ def test_run_scan_creates_fresh_projectm_per_preset(
         pm_instances.append(fake_pm)
         return fake_pm
 
-    monkeypatch.setattr("cleave.preset_scan.pygame.init", lambda: None)
-    monkeypatch.setattr("cleave.preset_scan.pygame.quit", lambda: None)
-    monkeypatch.setattr(
-        "cleave.preset_scan.pygame.display.set_mode",
-        lambda *args, **kwargs: None,
-    )
     monkeypatch.setattr("cleave.preset_scan.ProjectM", make_pm)
 
     fake_fbo = MagicMock()
     fake_fbo.destroy = MagicMock()
     fake_fbo.fbo_id = 1
-    monkeypatch.setattr("cleave.preset_scan._ProbeFbo", lambda *args: fake_fbo)
+
+    class FakeProbeSession:
+        def __init__(self, texture_strs: list[str] | None = None) -> None:
+            self.fbo = fake_fbo
+            self.n_pcm = 1
+            self.frame_dt = 1.0 / 30.0
+
+        def __enter__(self) -> FakeProbeSession:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def configure_projectm(self, pm: MagicMock) -> None:
+            return None
+
+    monkeypatch.setattr("cleave.preset_scan.ProbeSession", FakeProbeSession)
 
     probe_pms: list[MagicMock] = []
 
@@ -1206,8 +1213,8 @@ def test_preset_result_luma_serialization_round_trip() -> None:
     )
 
     payload = _preset_result_to_dict(preset)
-    assert payload["luma"]["max"] == 42.0
-    assert payload["luma"]["mean"] == 12.0
+    assert payload["luma"]["max_luma"] == 42.0
+    assert payload["luma"]["mean_luma"] == 12.0
     assert payload["luma"]["coverage"]["16"] == pytest.approx(16.0 / 256.0)
 
     restored = _preset_result_from_dict(payload)
@@ -1243,9 +1250,12 @@ def test_load_resume_results_with_luma(tmp_path: Path) -> None:
                 "result": "ok",
                 "layers": [],
                 "luma": {
-                    "max": 30.0,
-                    "mean": 10.0,
+                    "max_luma": 30.0,
+                    "mean_luma": 10.0,
                     "coverage": {str(cutoff): 0.1 for cutoff in LUMA_COVERAGE_CUTOFFS},
+                    "white_coverage": {
+                        str(cutoff): 0.0 for cutoff in WHITE_COVERAGE_CUTOFFS
+                    },
                 },
             },
         ],

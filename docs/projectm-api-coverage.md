@@ -2,7 +2,7 @@
 
 Audit of exported libprojectM 4.x symbols vs [cleave/projectm.py](../cleave/projectm.py) and [cleave/projectm_playlist.py](../cleave/projectm_playlist.py). Status values: **bound** (ctypes argtypes/restype), **used** (called from Cleave), **ignored** (deliberately unused), **future** (candidate for later work).
 
-Related: [presets-scan-plan.md](presets-scan-plan.md), [todos.md](todos.md) (projectM robustness item).
+Related: [legacy-plans/presets-scan-plan.md](legacy-plans/presets-scan-plan.md) (experimental / low confidence), [todos.md](todos.md) (projectM robustness item).
 
 ## Core library (`libprojectM-4`)
 

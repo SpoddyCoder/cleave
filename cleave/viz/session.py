@@ -32,6 +32,7 @@ from cleave.config_schema import (
 )
 from cleave.extract import StemSource
 from cleave.preset_playlist import PresetPlaylist, preset_browse_floor
+from cleave.projectm_health import PresetSkipNotifyTracker
 from cleave.timeline import TimelineCue
 from cleave.blend_modes import BlendMode
 
@@ -193,6 +194,9 @@ class TuningSession:
     timeline: TimelineRuntime = field(default_factory=default_timeline_runtime)
     settings: SettingsRuntime = field(default_factory=SettingsRuntime)
     help_visible: bool = False
+    preset_skip_notify_tracker: PresetSkipNotifyTracker = field(
+        default_factory=PresetSkipNotifyTracker
+    )
 
 
 def render_overlay_runtime_from_cfg(cfg: CleaveConfig) -> RenderOverlayRuntime:
