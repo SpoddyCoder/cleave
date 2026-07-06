@@ -21,6 +21,22 @@ Built on [projectM](https://github.com/projectM-visualizer/projectM) and [Demucs
 
 WSL2 audio glitches: see [microsoft/wslg#1257](https://github.com/microsoft/wslg/issues/1257). Disabling `systemd-timesyncd` should help.
 
+## Checkout
+
+Clone with submodules so preset packs are available for `cleave scan-golden --probe` and other preset work:
+
+```bash
+git clone --recurse-submodules <repo-url>
+```
+
+If you already cloned without submodules:
+
+```bash
+git submodule update --init --recursive
+```
+
+Preset packs live under [assets/milkdrop-presets/](assets/milkdrop-presets/) (projectM community repos). Play and project configs still default to `~/milkdrop-presets` in [cleave-viz.yaml](./cleave-viz.yaml); point `paths.preset_root` there or at `assets/milkdrop-presets` if you prefer the checkout copy.
+
 ## Setup
 
 Create a virtual environment...
@@ -50,20 +66,19 @@ pip install -r requirements-dev.txt
 
 ## Quick Start
 
-### Download Some Milkdrop Presets
+### Milkdrop presets
+
+The repo vendors three projectM preset packs as submodules under [assets/milkdrop-presets/](assets/milkdrop-presets/) (see **Checkout** above). For everyday browsing you can instead use a separate tree:
 
 ```bash
-# make a preset_root
 mkdir ~/milkdrop-presets
 cd ~/milkdrop-presets
-
-# there are thousands of community written presets to choose from...
 git clone https://github.com/projectM-visualizer/presets-cream-of-the-crop
 git clone https://github.com/projectM-visualizer/presets-milkdrop-original
 git clone https://github.com/projectM-visualizer/presets-milkdrop-texture-pack
 ```
 
-`preset_root` is defined in [cleave-viz.yaml](./cleave-viz.yaml)
+`preset_root` is defined in [cleave-viz.yaml](./cleave-viz.yaml).
 
 ### `cleave` a track
 
@@ -93,37 +108,13 @@ This will separate the track into its component stem tracks (bass, drums, vocals
 * `play` accepts a source audio file or project slug/path
 * `separate` can be run on its own without launching the visualizer
 * `render` accepts a project slug or path (not a source audio file).
+* `scan` (**experimental / low confidence**) classifies Milkdrop presets for load failures and output quality (project config or bulk `--presets-dir`); classification is only trusted on the golden set (`scan-golden`). `--quarantine` / `--delete` act on `load_failed` and `black` by default. Design docs: [docs/legacy-plans/presets-scan-plan.md](docs/legacy-plans/presets-scan-plan.md).
 * `backup` archives a full project directory (mix, stems, configs, renders) to a `.cleave-tar.gz` file.
 * `restore` unpacks a `.cleave-tar.gz` archive into `projects/<slug>/` (slug from `project.yaml`).
 
 ### Visualizer
-Controls...
 
-* `Up` / `Down`
-  * move up / down menu items
-* `CTRL` + `Up` / `Down`
-  * move up / down layers
-* `Right` / `Left`
-  * expand / collapse
-  * increment / decrement value by 1
-  * forward / back 10 secs
-  * next / previous milkdrop preset
-* `CTRL` + `Right` / `Left`
-  * enable / disable layer
-  * increment / decrement value by 10
-  * forward / back 30 secs
-  * up / down the preset directory tree 
-* `SHIFT` + `Right` / `Left`
-  * layers: solo / unsolo layer
-  * timeline: override mode
-* `Enter`
-  * move a stem layer up or down the z-order (not available on **Render: OVERLAY**)
-* `CTRL` + `Enter`
-  * lock / unlock stem layer
-* `CTRL` + `q`
-  * quit
-* `t`
-  * open timeline panel
+Controls: press `h` for help in the visualizer to show context sensitive controls + help.
 
 #### Compositing
 

@@ -1,0 +1,788 @@
+"""Golden-set harness for preset scan classifier tuning."""
+
+from __future__ import annotations
+
+import itertools
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Literal
+
+import yaml
+
+from cleave.paths import repo_root
+from cleave.preset_scan import (
+    PROBE_FBO_HEIGHT,
+    PROBE_FBO_WIDTH,
+    PROBE_FPS,
+    PROBE_WARMUP_FRAMES,
+    PROBE_WINDOW_FRAMES,
+    WHITE_CHANNEL_MIN,
+    PresetResultCategory,
+    ProbeProfile,
+    ProbeSession,
+    build_probe_pcm,
+    classify_preset_result,
+    probe_preset_metrics,
+    probe_profile,
+    scan_thresholds,
+)
+from cleave.preset_scan_metrics import (
+    METRICS_CACHE_VERSION,
+    FrameMetrics,
+    MetricsCache,
+    PresetMetrics,
+    empty_frame_metrics,
+    load_metrics_cache,
+    peak_metrics,
+    white_frame_fraction,
+    write_metrics_cache,
+)
+from cleave.projectm import PresetLoadFailure, ProjectM
+
+GOLDEN_CASE_COUNT = 50
+GoldenExpectedResult = Literal["ok", "dim", "black", "washed_out"]
+
+# Threshold values at or above this sentinel disable optional quick washed-out tiers.
+SWEEP_RULE_DISABLED = 999.0
+
+DEFAULT_SWEEP_WARMUP_FRAMES = (10, 12, 15, 18, 20)
+DEFAULT_SWEEP_WINDOW_FRAMES = (60, 70, 75)
+
+DEFAULT_GOLDEN_SET_PATH = (
+    repo_root() / "tests" / "fixtures" / "preset_scan_golden_set.yaml"
+)
+DEFAULT_METRICS_CACHE_PATH = (
+    repo_root() / "tests" / "fixtures" / "preset_scan_golden_metrics.json"
+)
+
+_VALID_EXPECTED: frozenset[str] = frozenset(("ok", "dim", "black", "washed_out"))
+
+
+@dataclass(frozen=True)
+class GoldenCase:
+    id: int
+    preset: Path
+    expected_result: GoldenExpectedResult
+    notes: str
+
+
+@dataclass(frozen=True)
+class GoldenSet:
+    version: int
+    preset_root: Path
+    texture_paths: tuple[Path, ...]
+    cases: tuple[GoldenCase, ...]
+
+
+@dataclass(frozen=True)
+class EvalMismatch:
+    id: int
+    preset_name: str
+    expected: GoldenExpectedResult
+    actual: PresetResultCategory
+    luma: FrameMetrics | None
+    white_frame_frac: float | None = None
+    white_coverage_peak: float | None = None
+
+
+@dataclass(frozen=True)
+class EvalReport:
+    total: int
+    correct: int
+    accuracy: float
+    per_category_accuracy: dict[GoldenExpectedResult, float]
+    confusion_matrix: dict[GoldenExpectedResult, dict[GoldenExpectedResult, int]]
+    mismatches: tuple[EvalMismatch, ...]
+    warmup_frames: int
+    window_frames: int
+
+
+@dataclass(frozen=True)
+class SweepResult:
+    warmup_frames: int
+    window_frames: int
+    thresholds: dict[str, float] | None
+    correct: int
+    total: int
+    accuracy: float
+
+
+def _resolve_golden_path(raw: str) -> Path:
+    """Resolve a golden-set path (repo-relative, absolute, or ``~``)."""
+    path = Path(raw).expanduser()
+    if path.is_absolute():
+        return path.resolve()
+    return (repo_root() / path).resolve()
+
+
+def _golden_preset_key(path: Path) -> str:
+    """Stable lookup key for a preset across different preset_root locations."""
+    normalized = path.expanduser().resolve().as_posix()
+    marker = "presets-milkdrop-original/"
+    idx = normalized.find(marker)
+    if idx != -1:
+        return normalized[idx:]
+    return path.name
+
+
+def load_golden_set(path: Path | None = None) -> GoldenSet:
+    """Load and validate the golden-set YAML fixture."""
+    resolved = (path or DEFAULT_GOLDEN_SET_PATH).expanduser().resolve()
+    if not resolved.is_file():
+        raise ValueError(f"golden set not found: {resolved}")
+
+    try:
+        raw = yaml.safe_load(resolved.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise ValueError(f"malformed YAML: {exc}") from exc
+    except OSError as exc:
+        raise ValueError(str(exc)) from exc
+
+    if not isinstance(raw, dict):
+        raise ValueError("golden set root must be a mapping")
+
+    version = raw.get("version")
+    if not isinstance(version, int):
+        raise ValueError("golden set missing version")
+
+    preset_root_raw = raw.get("preset_root")
+    if not isinstance(preset_root_raw, str) or not preset_root_raw:
+        raise ValueError("golden set missing preset_root")
+    preset_root = _resolve_golden_path(preset_root_raw)
+
+    texture_paths_raw = raw.get("texture_paths")
+    if not isinstance(texture_paths_raw, list) or not texture_paths_raw:
+        raise ValueError("golden set missing texture_paths")
+    texture_paths = tuple(
+        _resolve_golden_path(entry)
+        for entry in texture_paths_raw
+        if isinstance(entry, str) and entry
+    )
+    if not texture_paths:
+        raise ValueError("golden set missing texture_paths")
+
+    cases_raw = raw.get("cases")
+    if not isinstance(cases_raw, list):
+        raise ValueError("golden set missing cases array")
+
+    cases: list[GoldenCase] = []
+    for index, entry in enumerate(cases_raw):
+        if not isinstance(entry, dict):
+            raise ValueError(f"case at index {index} must be a mapping")
+
+        case_id = entry.get("id")
+        if not isinstance(case_id, int):
+            raise ValueError(f"case at index {index} missing id")
+
+        preset_raw = entry.get("preset")
+        if not isinstance(preset_raw, str) or not preset_raw:
+            raise ValueError(f"case {case_id} missing preset")
+
+        expected_raw = entry.get("expected_result")
+        if expected_raw not in _VALID_EXPECTED:
+            raise ValueError(f"case {case_id} missing or invalid expected_result")
+
+        notes_raw = entry.get("notes", "")
+        notes = notes_raw if isinstance(notes_raw, str) else ""
+
+        preset_path = (preset_root / preset_raw).resolve()
+        cases.append(
+            GoldenCase(
+                id=case_id,
+                preset=preset_path,
+                expected_result=expected_raw,
+                notes=notes,
+            )
+        )
+
+    if len(cases) != GOLDEN_CASE_COUNT:
+        raise ValueError(
+            f"golden set must contain {GOLDEN_CASE_COUNT} cases, got {len(cases)}"
+        )
+
+    seen_ids = {case.id for case in cases}
+    expected_ids = set(range(1, GOLDEN_CASE_COUNT + 1))
+    if seen_ids != expected_ids:
+        missing = sorted(expected_ids - seen_ids)
+        extra = sorted(seen_ids - expected_ids)
+        parts: list[str] = []
+        if missing:
+            parts.append(f"missing ids: {missing}")
+        if extra:
+            parts.append(f"unexpected ids: {extra}")
+        raise ValueError(f"golden set case ids invalid ({'; '.join(parts)})")
+
+    cases_sorted = tuple(sorted(cases, key=lambda case: case.id))
+    return GoldenSet(
+        version=version,
+        preset_root=preset_root,
+        texture_paths=texture_paths,
+        cases=cases_sorted,
+    )
+
+
+def probe_golden_set(
+    golden: GoldenSet,
+    cache_path: Path,
+) -> MetricsCache:
+    """GL probe every golden case; write full-frame metrics cache."""
+    profile = probe_profile()
+    probe_pcm = build_probe_pcm()
+    texture_strs = [str(path) for path in golden.texture_paths]
+
+    presets: list[PresetMetrics] = []
+    total = len(golden.cases)
+    with ProbeSession(texture_strs) as session:
+        for index, case in enumerate(golden.cases, start=1):
+            _progress(f"Probing {index}/{total} {case.preset}...")
+            pm = ProjectM()
+            try:
+                session.configure_projectm(pm)
+                presets.append(
+                    probe_preset_metrics(
+                        pm,
+                        session.fbo,
+                        case.preset,
+                        profile=profile,
+                        pcm=probe_pcm,
+                        n_pcm=session.n_pcm,
+                        frame_dt=session.frame_dt,
+                    )
+                )
+            finally:
+                pm.destroy()
+
+    cache = MetricsCache(
+        version=METRICS_CACHE_VERSION,
+        presets=tuple(presets),
+        probe_fps=PROBE_FPS,
+        fbo_size=(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT),
+        warmup_frames=profile.warmup_frames,
+        window_frames=profile.window_frames,
+        total_frames=profile.total_frames,
+    )
+    write_metrics_cache(cache_path, cache)
+    return cache
+
+
+def format_probe_profile_summary(profile: ProbeProfile) -> str:
+    return (
+        f"{profile.warmup_frames} warmup + "
+        f"{profile.window_frames} window, {profile.total_frames} frames"
+    )
+
+
+def resolve_cache_probe_profile(
+    cache: MetricsCache,
+    *,
+    file: Any = None,
+) -> ProbeProfile:
+    """Return the probe profile stored in or inferred from a metrics cache."""
+    if cache.warmup_frames is not None and cache.window_frames is not None:
+        return ProbeProfile(
+            warmup_frames=cache.warmup_frames,
+            window_frames=cache.window_frames,
+        )
+
+    frame_counts = [len(entry.frames) for entry in cache.presets if entry.frames]
+    if not frame_counts:
+        raise ValueError("cannot infer probe profile from cache with no frame data")
+
+    unique_counts = sorted(set(frame_counts))
+    if len(unique_counts) != 1:
+        raise ValueError(
+            "cannot infer probe profile from cache with inconsistent frame counts: "
+            + ", ".join(str(count) for count in unique_counts)
+        )
+
+    count = unique_counts[0]
+    expected_frames = PROBE_WARMUP_FRAMES + PROBE_WINDOW_FRAMES
+    if count != expected_frames:
+        raise ValueError(
+            f"cannot infer probe profile from {count} cached frames per preset "
+            f"(expected {expected_frames})"
+        )
+
+    profile = probe_profile()
+
+    out = file if file is not None else sys.stderr
+    print(
+        f"Warning: metrics cache v{cache.version} missing probe profile metadata; "
+        f"inferred {format_probe_profile_summary(profile)} from frame count",
+        file=out,
+    )
+    return profile
+
+
+def resolve_eval_probe_window(
+    cache: MetricsCache,
+    *,
+    warmup_frames: int | None = None,
+    window_frames: int | None = None,
+    strict: bool = True,
+    file: Any = None,
+) -> tuple[int, int, ProbeProfile]:
+    """Resolve eval warmup/window from cache metadata, checking explicit overrides."""
+    profile = resolve_cache_probe_profile(cache, file=file)
+    cache_warmup = profile.warmup_frames
+    cache_window = profile.window_frames
+
+    resolved_warmup = cache_warmup if warmup_frames is None else warmup_frames
+    resolved_window = cache_window if window_frames is None else window_frames
+
+    if strict and (
+        resolved_warmup != cache_warmup or resolved_window != cache_window
+    ):
+        raise ValueError(
+            "eval probe profile mismatch: cache has "
+            f"{format_probe_profile_summary(profile)}; "
+            f"requested warmup={resolved_warmup} window={resolved_window}"
+        )
+
+    return resolved_warmup, resolved_window, profile
+
+
+def _metrics_index_for_eval(
+    cache: MetricsCache,
+    *,
+    warmup_frames: int,
+    window_frames: int,
+) -> dict[str, PresetMetrics]:
+    """Map resolved preset paths to metrics, keeping the strongest probe per path."""
+    grouped: dict[str, list[PresetMetrics]] = {}
+    for entry in cache.presets:
+        grouped.setdefault(str(entry.path.resolve()), []).append(entry)
+
+    indexed: dict[str, PresetMetrics] = {}
+    for path_key, entries in grouped.items():
+        if len(entries) == 1:
+            indexed[path_key] = entries[0]
+            continue
+        indexed[path_key] = max(
+            entries,
+            key=lambda entry: peak_metrics(
+                entry.frames,
+                warmup_frames=warmup_frames,
+                window_frames=window_frames,
+            ).mean_luma,
+        )
+    return indexed
+
+
+def evaluate(
+    cache: MetricsCache,
+    golden: GoldenSet,
+    *,
+    warmup_frames: int | None = None,
+    window_frames: int | None = None,
+    thresholds: dict[str, float] | None = None,
+    strict_profile: bool = True,
+    file: Any = None,
+) -> EvalReport:
+    """Classify cached metrics and compare to golden labels (GL-free)."""
+    resolved_warmup, resolved_window, profile = resolve_eval_probe_window(
+        cache,
+        warmup_frames=warmup_frames,
+        window_frames=window_frames,
+        strict=strict_profile,
+        file=file,
+    )
+    metrics_by_path = _metrics_index_for_eval(
+        cache,
+        warmup_frames=resolved_warmup,
+        window_frames=resolved_window,
+    )
+    mismatches: list[EvalMismatch] = []
+    per_category_totals: dict[GoldenExpectedResult, int] = {
+        label: 0 for label in _VALID_EXPECTED
+    }
+    per_category_correct: dict[GoldenExpectedResult, int] = {
+        label: 0 for label in _VALID_EXPECTED
+    }
+    confusion: dict[GoldenExpectedResult, dict[GoldenExpectedResult, int]] = {
+        expected: {actual: 0 for actual in _VALID_EXPECTED}
+        for expected in _VALID_EXPECTED
+    }
+
+    correct = 0
+    for case in golden.cases:
+        preset_metrics = metrics_by_path.get(str(case.preset.resolve()))
+        if preset_metrics is None:
+            legacy_key = _golden_preset_key(case.preset)
+            preset_metrics = next(
+                (
+                    entry
+                    for entry in cache.presets
+                    if _golden_preset_key(entry.path) == legacy_key
+                ),
+                None,
+            )
+        if preset_metrics is None:
+            raise ValueError(
+                f"metrics cache missing preset for case {case.id}: {case.preset}"
+            )
+
+        actual, luma, white_frac, white_cov_peak = _classify_cached_preset(
+            preset_metrics,
+            warmup_frames=resolved_warmup,
+            window_frames=resolved_window,
+            thresholds=thresholds,
+        )
+        actual_golden = scan_result_to_golden(actual)
+
+        per_category_totals[case.expected_result] += 1
+        confusion[case.expected_result][actual_golden] += 1
+
+        if actual_golden == case.expected_result:
+            correct += 1
+            per_category_correct[case.expected_result] += 1
+        else:
+            mismatches.append(
+                EvalMismatch(
+                    id=case.id,
+                    preset_name=case.preset.name,
+                    expected=case.expected_result,
+                    actual=actual,
+                    luma=luma,
+                    white_frame_frac=white_frac,
+                    white_coverage_peak=white_cov_peak,
+                )
+            )
+
+    total = len(golden.cases)
+    per_category_accuracy: dict[GoldenExpectedResult, float] = {}
+    for label in _VALID_EXPECTED:
+        count = per_category_totals[label]
+        per_category_accuracy[label] = (
+            per_category_correct[label] / count if count else 0.0
+        )
+
+    return EvalReport(
+        total=total,
+        correct=correct,
+        accuracy=correct / total if total else 0.0,
+        per_category_accuracy=per_category_accuracy,
+        confusion_matrix=confusion,
+        mismatches=tuple(mismatches),
+        warmup_frames=resolved_warmup,
+        window_frames=resolved_window,
+    )
+
+
+def _threshold_variant_key(thresholds: dict[str, float] | None) -> tuple[tuple[str, float], ...] | None:
+    if thresholds is None:
+        return None
+    return tuple(sorted(thresholds.items()))
+
+
+def _merge_threshold_variants(
+    *grids: tuple[dict[str, float] | None, ...],
+) -> tuple[dict[str, float] | None, ...]:
+    merged: list[dict[str, float] | None] = []
+    seen: set[tuple[tuple[str, float], ...] | None] = set()
+    for grid in grids:
+        for entry in grid:
+            key = _threshold_variant_key(entry)
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(entry)
+    return tuple(merged)
+
+
+def _threshold_grid(
+    base: dict[str, float],
+    axes: dict[str, tuple[float, ...]],
+) -> tuple[dict[str, float], ...]:
+    if not axes:
+        return ()
+    keys = tuple(axes.keys())
+    combos = itertools.product(*(axes[key] for key in keys))
+    return tuple(
+        {
+            **base,
+            **dict(zip(keys, combo)),
+        }
+        for combo in combos
+    )
+
+
+def _quick_luma_washed_disabled_overrides() -> dict[str, float]:
+    """Disable quick-only luma washed-out tiers; hard/soft white rules stay active."""
+    return {
+        "washed_mean_soft": SWEEP_RULE_DISABLED,
+        "min_white_frame_frac_soft": SWEEP_RULE_DISABLED,
+        "washed_mean_peak": SWEEP_RULE_DISABLED,
+        "washed_max_lo": SWEEP_RULE_DISABLED,
+        "washed_max_mid": SWEEP_RULE_DISABLED,
+    }
+
+
+def _hard_white_threshold_grid(base: dict[str, float]) -> tuple[dict[str, float], ...]:
+    return _threshold_grid(
+        base,
+        {
+            "white_channel_min": (224.0, 235.0, 245.0),
+            "white_area_frac": (0.5, 0.55, 0.6, 0.65, 0.7),
+            "min_white_frame_frac": (0.2, 0.25, 0.3, 0.35, 0.4),
+        },
+    )
+
+
+def default_threshold_sweep_variants() -> tuple[dict[str, float] | None, ...]:
+    """Default threshold grids for golden sweep (GL-free; uses cached frame metrics)."""
+    base = scan_thresholds()
+    grids: list[tuple[dict[str, float] | None, ...]] = [(None,)]
+
+    grids.append(_hard_white_threshold_grid(base))
+
+    luma_off = _quick_luma_washed_disabled_overrides()
+    grids.append(
+        _threshold_grid(
+            {**base, **luma_off},
+            {
+                "white_channel_min": (224.0, 235.0, 245.0),
+                "white_area_frac": (0.5, 0.6, 0.7),
+                "min_white_frame_frac": (0.2, 0.3, 0.4),
+            },
+        )
+    )
+    grids.append(
+        _threshold_grid(
+            base,
+            {
+                "white_area_frac_soft": (0.10, 0.15, 0.20),
+                "min_white_frame_frac_soft": (0.40, 0.55, 0.70),
+                "washed_mean_soft": (180.0, 200.0, 220.0, SWEEP_RULE_DISABLED),
+            },
+        )
+    )
+    grids.append(
+        _threshold_grid(
+            base,
+            {
+                "washed_mean_peak": (235.0, 245.0, SWEEP_RULE_DISABLED),
+                "washed_cov192_peak": (0.90, 0.95, 0.99),
+            },
+        )
+    )
+    grids.append(
+        _threshold_grid(
+            base,
+            {
+                "washed_max_lo": (235.0, 240.0, SWEEP_RULE_DISABLED),
+                "washed_mean_lo": (150.0, 155.0, 160.0),
+                "washed_mean_hi": (170.0, 175.0, 180.0),
+                "washed_cov192_lo": (0.05, 0.10, 0.15, 0.20),
+            },
+        )
+    )
+    grids.append(
+        _threshold_grid(
+            base,
+            {
+                "washed_max_mid": (235.0, 240.0, SWEEP_RULE_DISABLED),
+                "washed_mean_mid_lo": (170.0, 176.0, 182.0),
+                "washed_mean_mid_hi": (188.0, 192.0, 196.0),
+                "washed_cov192_mid": (0.25, 0.30, 0.40),
+                "washed_white235_mid_max": (0.10, 0.20, 0.35),
+            },
+        )
+    )
+    grids.append(
+        _threshold_grid(
+            base,
+            {
+                "dim_bob_cov_lo": (0.05, 0.07, 0.10),
+                "dim_bob_cov_hi": (0.12, 0.13, 0.15),
+                "dim_bob_mean_mid": (5.5, 6.0, 7.0),
+                "dim_bob_mean_hi": (9.5, 10.0, 11.0),
+            },
+        )
+    )
+    grids.append(
+        _threshold_grid(
+            base,
+            {
+                "very_sparse_dim_mean": (5.10, 5.15, 5.20),
+                "sparse_dim_mean": (9.90, 9.95, 10.0),
+                "sparse_dim_cov16_max": (0.128, 0.140, 0.165),
+            },
+        )
+    )
+    grids.append(
+        _threshold_grid(
+            base,
+            {
+                "white_channel_min": (224.0, 235.0, 245.0),
+                "min_white_frame_frac": (0.25, 0.30, 0.35),
+                "washed_mean_peak": (245.0, SWEEP_RULE_DISABLED),
+                "washed_max_lo": (240.0, SWEEP_RULE_DISABLED),
+                "washed_max_mid": (240.0, SWEEP_RULE_DISABLED),
+            },
+        )
+    )
+
+    return _merge_threshold_variants(*grids)
+
+
+def sweep(
+    cache: MetricsCache,
+    golden: GoldenSet,
+    *,
+    warmup_frames_values: tuple[int, ...] | None = None,
+    window_frames_values: tuple[int, ...] | None = None,
+    threshold_variants: tuple[dict[str, float] | None, ...] | None = None,
+) -> list[SweepResult]:
+    """Grid search over probe windows and thresholds; rank by golden agreement."""
+    if warmup_frames_values is None:
+        warmups = DEFAULT_SWEEP_WARMUP_FRAMES
+    else:
+        warmups = warmup_frames_values
+    if window_frames_values is None:
+        windows = DEFAULT_SWEEP_WINDOW_FRAMES
+    else:
+        windows = window_frames_values
+    threshold_sets = threshold_variants or default_threshold_sweep_variants()
+
+    results: list[SweepResult] = []
+    for warmup in warmups:
+        for window in windows:
+            for thresholds in threshold_sets:
+                report = evaluate(
+                    cache,
+                    golden,
+                    warmup_frames=warmup,
+                    window_frames=window,
+                    thresholds=thresholds,
+                    strict_profile=False,
+                )
+                results.append(
+                    SweepResult(
+                        warmup_frames=warmup,
+                        window_frames=window,
+                        thresholds=thresholds,
+                        correct=report.correct,
+                        total=report.total,
+                        accuracy=report.accuracy,
+                    )
+                )
+
+    results.sort(
+        key=lambda entry: (-entry.accuracy, -entry.correct, entry.warmup_frames, entry.window_frames)
+    )
+    return results
+
+
+def print_eval_report(report: EvalReport, *, file: Any = None) -> None:
+    """Print a human-readable evaluation summary to stderr."""
+    out = file if file is not None else sys.stderr
+    print(
+        f"Golden eval: {report.correct}/{report.total} correct "
+        f"({report.accuracy * 100:.1f}%) "
+        f"[warmup={report.warmup_frames}, "
+        f"window={report.window_frames}, "
+        f"{report.warmup_frames + report.window_frames} frames]",
+        file=out,
+    )
+    print("Per-category accuracy:", file=out)
+    for label in ("ok", "dim", "black", "washed_out"):
+        accuracy = report.per_category_accuracy[label]
+        print(f"  {label}: {accuracy * 100:.1f}%", file=out)
+
+    print("Confusion matrix (expected -> actual):", file=out)
+    for expected in ("ok", "dim", "black", "washed_out"):
+        row = report.confusion_matrix[expected]
+        counts = ", ".join(f"{actual}={row[actual]}" for actual in row)
+        print(f"  {expected}: {counts}", file=out)
+
+    if report.mismatches:
+        print(f"Mismatches ({len(report.mismatches)}):", file=out)
+        for mismatch in report.mismatches:
+            luma_bits = ""
+            if mismatch.luma is not None:
+                luma_bits = (
+                    f" max={mismatch.luma.max_luma:.1f}"
+                    f" mean={mismatch.luma.mean_luma:.1f}"
+                    f" cov16={mismatch.luma.coverage.get(16, 0.0):.4f}"
+                )
+            white_bits = ""
+            if mismatch.white_frame_frac is not None:
+                white_bits = f" white_frac={mismatch.white_frame_frac:.3f}"
+            if mismatch.white_coverage_peak is not None:
+                white_bits += (
+                    f" white_cov{int(WHITE_CHANNEL_MIN)}="
+                    f"{mismatch.white_coverage_peak:.4f}"
+                )
+            print(
+                f"  [{mismatch.id}] {mismatch.preset_name}: "
+                f"expected={mismatch.expected} actual={mismatch.actual}"
+                f"{luma_bits}{white_bits}",
+                file=out,
+            )
+
+
+def scan_result_to_golden(result: PresetResultCategory) -> GoldenExpectedResult:
+    """Map scan classifier output to golden label space."""
+    if result == "load_failed":
+        return "black"
+    return result
+
+
+def _classify_cached_preset(
+    preset_metrics: PresetMetrics,
+    *,
+    warmup_frames: int,
+    window_frames: int,
+    thresholds: dict[str, float] | None,
+) -> tuple[PresetResultCategory, FrameMetrics | None, float | None, float | None]:
+    failures: list[PresetLoadFailure] = []
+    if preset_metrics.load_failed:
+        failures = [
+            PresetLoadFailure(
+                filename=str(preset_metrics.path),
+                message=preset_metrics.error or "load failed",
+            )
+        ]
+
+    if not preset_metrics.frames:
+        category, _ = classify_preset_result(
+            failures, empty_frame_metrics(), thresholds=thresholds
+        )
+        return category, None, None, None
+
+    window_slice = preset_metrics.frames[
+        warmup_frames : warmup_frames + window_frames
+    ]
+    peaks = peak_metrics(
+        preset_metrics.frames,
+        warmup_frames=warmup_frames,
+        window_frames=window_frames,
+    )
+    category, _ = classify_preset_result(
+        failures,
+        peaks,
+        frames=window_slice,
+        thresholds=thresholds,
+    )
+    th = scan_thresholds()
+    if thresholds is not None:
+        th.update(thresholds)
+    white_frac = white_frame_fraction(
+        window_slice,
+        warmup_frames=0,
+        window_frames=0,
+        channel_min_cutoff=int(th["white_channel_min"]),
+        area_frac=th["white_area_frac"],
+    )
+    white_cov_peak = (
+        peaks.white_coverage.get(int(th["white_channel_min"]))
+        if peaks.white_coverage
+        else None
+    )
+    return category, peaks, white_frac, white_cov_peak
+
+
+def _progress(message: str) -> None:
+    print(message, file=sys.stderr, flush=True)

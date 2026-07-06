@@ -41,6 +41,7 @@ from cleave.viz.preset_switching import (
     EMPTY_ROTATION_NOTIFICATION,
     EMPTY_USER_PRESETS_NOTIFICATION,
     apply_preset_switching,
+    load_manual_preset_clean,
     reapply_projectm_preset_switching,
     sync_manual_browse_with_user_defined_rotation,
 )
@@ -181,12 +182,15 @@ def make_tuning_controls(
     def on_preset_change(slot: str, playlist: PresetPlaylist) -> None:
         layer = layers_by_slot[slot]
         layer.playlist = playlist
-        mode = session.layers[slot].preset_switching
+        runtime = session.layers[slot]
+        mode = runtime.preset_switching
         if mode == "projectm":
             return
         if playlist.current is None:
             return
-        playlist.load_into(layer.pm, smooth=False)
+        load_manual_preset_clean(
+            layer, preset_start_clean=runtime.preset_start_clean
+        )
         if mode == "none":
             layer.pm.lock_preset(True)
             return

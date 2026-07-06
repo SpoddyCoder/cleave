@@ -4,8 +4,40 @@ import sys
 import time
 from pathlib import Path
 
-from cleave.config import VIZ_CONFIG_FILENAME, ensure_project_viz_config
+from cleave.config import (
+    VIZ_CONFIG_FILENAME,
+    ensure_project_viz_config,
+    find_config_path,
+    load_config,
+)
 from cleave.paths import resolve_project
+from cleave.preset_scan import (
+    PresetScanResult,
+    PresetResultCategory,
+    ProbeProfile,
+    ScanMode,
+    ScanReport,
+    build_scan_report,
+    delete_presets,
+    destructive_scan_categories,
+    existing_report_status,
+    load_resume_results,
+    probe_profile,
+    quarantine_presets,
+    run_scan,
+    scan_report_summary,
+    scanned_preset_dirs,
+    validate_quarantine_dir,
+    write_scan_report,
+)
+from cleave.preset_scan_targets import ScanTargets, build_bulk_targets, build_project_targets
+
+
+def _experimental_notice() -> None:
+    print(
+        "warning: 'scan' is experimental; classification is only trusted on the golden set",
+        file=sys.stderr,
+    )
 from cleave.separate import (
     project_stems_complete,
     resolve_separate_target,
@@ -162,6 +194,450 @@ def cmd_backup(args: argparse.Namespace) -> None:
         _exit_error(f"error: {e}")
 
     print(f"Backed up to {archive_path}")
+
+
+def _dedupe_texture_paths(paths: list[Path]) -> tuple[Path, ...]:
+    seen: set[Path] = set()
+    ordered: list[Path] = []
+    for path in paths:
+        resolved = path.expanduser().resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        ordered.append(resolved)
+    return tuple(ordered)
+
+
+def _print_scan_summary(summary: dict[str, int]) -> None:
+    print(
+        "Scan complete: "
+        f"{summary['total']} preset(s); "
+        f"ok={summary['ok']}, dim={summary['dim']}, "
+        f"black={summary['black']}, washed_out={summary['washed_out']}, "
+        f"load_failed={summary['load_failed']}",
+        file=sys.stderr,
+    )
+
+
+def _delete_candidate_count(
+    results: list[PresetScanResult] | tuple[PresetScanResult, ...],
+    *,
+    categories: frozenset[PresetResultCategory],
+) -> int:
+    return sum(
+        1
+        for result in results
+        if result.result in categories and result.path.is_file()
+    )
+
+
+def _confirm_delete(count: int, *, yes: bool) -> None:
+    if count == 0:
+        return
+    if yes:
+        return
+    if not sys.stdin.isatty():
+        _exit_error("error: --delete requires --yes when stdin is not a TTY")
+    try:
+        answer = input(f"Delete {count} preset file(s) flagged by scan? [y/N] ").strip()
+    except EOFError:
+        answer = ""
+    if answer.lower() not in ("y", "yes"):
+        _exit_error("error: delete cancelled")
+
+
+def _warn_resume_mismatch(
+    *,
+    field: str,
+    resume_value: str,
+    current_value: str,
+) -> None:
+    print(
+        f"warning: resume report {field} is {resume_value}, "
+        f"current run is {current_value}",
+        file=sys.stderr,
+    )
+
+
+def _format_scan_resume_command(args: argparse.Namespace) -> str:
+    parts = [sys.argv[0], "scan"]
+    if args.presets_dir is not None:
+        parts.extend(["--presets-dir", str(args.presets_dir)])
+        for texture_path in args.texture_path:
+            parts.extend(["--texture-path", str(texture_path)])
+        if args.recursive:
+            parts.append("--recursive")
+    elif args.project_dir is not None:
+        parts.append(str(args.project_dir))
+    if args.config is not None:
+        parts.extend(["-c", str(args.config)])
+    assert args.report is not None
+    parts.extend(["--report", str(args.report)])
+    parts.append("--resume")
+    return " ".join(parts)
+
+
+def _guard_incomplete_report(
+    report_path: Path | None,
+    args: argparse.Namespace,
+    target_total: int,
+) -> None:
+    if report_path is None or args.resume or not report_path.is_file():
+        return
+    try:
+        scanned, complete = existing_report_status(report_path)
+    except ValueError:
+        return
+    if complete:
+        return
+    resume_cmd = _format_scan_resume_command(args)
+    _exit_error(
+        f"error: {report_path} is incomplete ({scanned}/{target_total}).\n"
+        f"Resume with: {resume_cmd}\n"
+        f"Or delete the file to start over."
+    )
+
+
+def _handle_scan_keyboard_interrupt(
+    report_path: Path | None,
+    args: argparse.Namespace,
+    target_total: int,
+) -> None:
+    if report_path is None:
+        print(
+            "Scan interrupted; results were not saved "
+            "(use --report to enable resume)",
+            file=sys.stderr,
+        )
+    else:
+        try:
+            scanned, _ = existing_report_status(report_path)
+        except ValueError:
+            scanned = 0
+        print(
+            f"Scan interrupted; {scanned}/{target_total} saved (complete: false).\n"
+            f"Resume: {_format_scan_resume_command(args)}",
+            file=sys.stderr,
+        )
+    sys.exit(130)
+
+
+def _execute_preset_scan(
+    *,
+    args: argparse.Namespace,
+    profile: ProbeProfile,
+    prior_results: list[PresetScanResult],
+    skip_paths: frozenset[Path],
+    report_path: Path | None,
+    scan_mode: ScanMode,
+    scan_targets: ScanTargets,
+    report_targets: ScanTargets,
+    run_texture_paths: tuple[Path, ...] | None = None,
+    project_dir: Path | None = None,
+    config_path: Path | None = None,
+) -> tuple[list[PresetScanResult], ScanReport]:
+    target_total = len(scan_targets.presets)
+    _guard_incomplete_report(report_path, args, target_total)
+
+    def report_sink(new_results: list[PresetScanResult], complete: bool) -> None:
+        assert report_path is not None
+        report = build_scan_report(
+            scan_mode=scan_mode,
+            profile=profile,
+            targets=report_targets,
+            results=[*prior_results, *new_results],
+            project_dir=project_dir,
+            config_path=config_path,
+            complete=complete,
+        )
+        write_scan_report(report_path, report)
+
+    try:
+        new_results = run_scan(
+            scan_targets,
+            texture_paths=run_texture_paths,
+            report_sink=report_sink if report_path is not None else None,
+            skip_paths=skip_paths,
+        )
+    except KeyboardInterrupt:
+        _handle_scan_keyboard_interrupt(report_path, args, target_total)
+    except (FileNotFoundError, ValueError, RuntimeError) as e:
+        _exit_error(f"error: {e}")
+
+    results = [*prior_results, *new_results]
+    report = build_scan_report(
+        scan_mode=scan_mode,
+        profile=profile,
+        targets=report_targets,
+        results=results,
+        project_dir=project_dir,
+        config_path=config_path,
+    )
+    return results, report
+
+
+def cmd_scan(args: argparse.Namespace) -> None:
+    _experimental_notice()
+    bulk_mode = args.presets_dir is not None
+
+    destructive_categories = destructive_scan_categories(
+        include_dim=args.include_dim,
+        include_washout=args.include_washout,
+    )
+    if (
+        (args.include_dim or args.include_washout)
+        and args.quarantine is None
+        and not args.delete
+    ):
+        print(
+            "warning: --include-dim/--include-washout have no effect "
+            "without --quarantine or --delete",
+            file=sys.stderr,
+        )
+
+    if args.resume and args.report is None:
+        _exit_error("error: --resume requires --report PATH")
+
+    if bulk_mode:
+        if args.project_dir is not None:
+            _exit_error(
+                "error: --presets-dir cannot be used with a project directory"
+            )
+    else:
+        if args.project_dir is None:
+            _exit_error("error: project directory required (or use --presets-dir)")
+        if args.texture_path:
+            _exit_error("error: --texture-path is only valid in bulk scan mode")
+        if args.recursive:
+            _exit_error("error: --recursive is only valid in bulk scan mode")
+
+    prior_results: list[PresetScanResult] = []
+    skip_paths: frozenset[Path] = frozenset()
+    resume_scan_mode: str | None = None
+
+    if args.resume:
+        assert args.report is not None
+        resume_path = args.report.expanduser()
+        if not resume_path.is_file():
+            _exit_error(f"error: resume report not found: {resume_path}")
+        try:
+            resume_data = load_resume_results(resume_path)
+        except ValueError as exc:
+            _exit_error(f"error: cannot read resume report {resume_path}: {exc}")
+        prior_results = list(resume_data.results)
+        skip_paths = resume_data.skip_paths
+        resume_scan_mode = resume_data.scan_mode
+        if resume_data.complete:
+            _exit_error(
+                f"error: {resume_path} is already complete "
+                f"({len(prior_results)} presets).\n"
+                f"Or delete the file to scan again."
+            )
+
+    profile = probe_profile()
+    current_scan_mode = "bulk" if bulk_mode else "project"
+    if resume_scan_mode is not None and resume_scan_mode != current_scan_mode:
+        _warn_resume_mismatch(
+            field="scan_mode",
+            resume_value=resume_scan_mode,
+            current_value=current_scan_mode,
+        )
+
+    report_path = (
+        args.report.expanduser().resolve() if args.report is not None else None
+    )
+    quarantine_dir: Path | None = None
+
+    if bulk_mode:
+        texture_paths = list(args.texture_path)
+        config_path: Path | None = None
+        if args.config is not None:
+            config_path = args.config.expanduser().resolve()
+            cfg = load_config(config_path, None)
+            texture_paths.extend(cfg.paths.texture_paths)
+        resolved_textures = _dedupe_texture_paths(texture_paths)
+        if not resolved_textures:
+            _exit_error(
+                "error: bulk scan requires at least one --texture-path "
+                "or paths.texture_paths in -c config"
+            )
+
+        presets_dir = args.presets_dir.expanduser().resolve()
+        if not presets_dir.is_dir():
+            _exit_error(f"error: presets directory not found: {presets_dir}")
+
+        targets = build_bulk_targets(presets_dir, recursive=args.recursive)
+        report_targets = ScanTargets(
+            presets=targets.presets,
+            presets_dir=targets.presets_dir,
+            texture_paths=resolved_textures,
+        )
+
+        if args.quarantine is not None:
+            try:
+                quarantine_dir = validate_quarantine_dir(
+                    args.quarantine,
+                    scanned_preset_dirs(targets),
+                )
+            except ValueError as exc:
+                _exit_error(f"error: {exc}")
+
+        results, report = _execute_preset_scan(
+            args=args,
+            profile=profile,
+            prior_results=prior_results,
+            skip_paths=skip_paths,
+            report_path=report_path,
+            scan_mode="bulk",
+            scan_targets=targets,
+            report_targets=report_targets,
+            run_texture_paths=resolved_textures,
+            config_path=config_path,
+        )
+    else:
+        try:
+            project_dir = resolve_project(Path(args.project_dir))
+        except (FileNotFoundError, ValueError) as e:
+            _exit_error(f"error: {e}")
+
+        config_path = find_config_path(args.config, project_dir)
+        if config_path is None:
+            _exit_error(f"error: no {VIZ_CONFIG_FILENAME} found for project")
+
+        try:
+            cfg = load_config(args.config, project_dir)
+        except (FileNotFoundError, ValueError) as e:
+            _exit_error(f"error: {e}")
+
+        targets = build_project_targets(cfg)
+
+        if args.quarantine is not None:
+            try:
+                quarantine_dir = validate_quarantine_dir(
+                    args.quarantine,
+                    scanned_preset_dirs(targets),
+                )
+            except ValueError as exc:
+                _exit_error(f"error: {exc}")
+
+        results, report = _execute_preset_scan(
+            args=args,
+            profile=profile,
+            prior_results=prior_results,
+            skip_paths=skip_paths,
+            report_path=report_path,
+            scan_mode="project",
+            scan_targets=targets,
+            report_targets=targets,
+            project_dir=project_dir,
+            config_path=config_path,
+        )
+
+    summary = scan_report_summary(report)
+    _print_scan_summary(summary)
+
+    if report_path is not None:
+        write_scan_report(report_path, report)
+        print(f"Wrote scan report to {report_path}")
+
+    if quarantine_dir is not None:
+        moves = quarantine_presets(
+            results,
+            quarantine_dir,
+            categories=destructive_categories,
+        )
+        for src, dst in moves:
+            print(f"Quarantined {src} -> {dst}")
+
+    if args.delete:
+        delete_count = _delete_candidate_count(
+            results,
+            categories=destructive_categories,
+        )
+        _confirm_delete(delete_count, yes=args.yes)
+        deleted = delete_presets(results, categories=destructive_categories)
+        for path in deleted:
+            print(f"Deleted {path}")
+
+
+def cmd_scan_golden(args: argparse.Namespace) -> None:
+    _experimental_notice()
+    from cleave.preset_scan_golden import (
+        DEFAULT_GOLDEN_SET_PATH,
+        DEFAULT_METRICS_CACHE_PATH,
+        DEFAULT_SWEEP_WARMUP_FRAMES,
+        DEFAULT_SWEEP_WINDOW_FRAMES,
+        default_threshold_sweep_variants,
+        evaluate,
+        format_probe_profile_summary,
+        load_golden_set,
+        load_metrics_cache,
+        print_eval_report,
+        probe_golden_set,
+        probe_profile,
+        sweep,
+    )
+
+    golden_path = (
+        args.golden.expanduser().resolve()
+        if args.golden is not None
+        else DEFAULT_GOLDEN_SET_PATH
+    )
+    cache_path = (
+        args.cache.expanduser().resolve()
+        if args.cache is not None
+        else DEFAULT_METRICS_CACHE_PATH.resolve()
+    )
+
+    if args.probe:
+        golden = load_golden_set(golden_path)
+        probe_golden_set(golden, cache_path)
+        profile = probe_profile()
+        print(
+            f"Wrote cache ({format_probe_profile_summary(profile)}) to {cache_path}",
+            file=sys.stderr,
+        )
+        return
+
+    golden = load_golden_set(golden_path)
+    cache = load_metrics_cache(cache_path)
+
+    if args.eval:
+        try:
+            report = evaluate(
+                cache,
+                golden,
+                warmup_frames=args.warmup,
+                window_frames=args.window,
+            )
+        except ValueError as exc:
+            _exit_error(f"error: {exc}")
+        print_eval_report(report)
+        return
+
+    results = sweep(cache, golden)
+    variant_count = len(default_threshold_sweep_variants())
+    warmup_grid = DEFAULT_SWEEP_WARMUP_FRAMES
+    window_grid = DEFAULT_SWEEP_WINDOW_FRAMES
+    config_count = len(results)
+    print(
+        f"Sweep: {config_count} configs "
+        f"({variant_count} threshold variants x "
+        f"{len(warmup_grid)} warmups x "
+        f"{len(window_grid)} windows)",
+        file=sys.stderr,
+    )
+    print("Sweep results (best first):", file=sys.stderr)
+    for index, entry in enumerate(results[:15], start=1):
+        threshold_note = ""
+        if entry.thresholds is not None:
+            threshold_note = f" thresholds={entry.thresholds}"
+        print(
+            f"  {index}. warmup={entry.warmup_frames} window={entry.window_frames}"
+            f"{threshold_note}: {entry.correct}/{entry.total} "
+            f"({entry.accuracy * 100:.1f}%)",
+            file=sys.stderr,
+        )
 
 
 def cmd_restore(args: argparse.Namespace) -> None:
@@ -334,6 +810,155 @@ def build_parser() -> argparse.ArgumentParser:
         help="Replace existing project without prompting",
     )
     restore.set_defaults(func=cmd_restore)
+
+    scan = subparsers.add_parser(
+        "scan",
+        prog="cleave scan",
+        help="[EXPERIMENTAL] Scan Milkdrop presets for load failures and black output",
+        epilog=(
+            "For large preset directories, use --report so an interrupted scan "
+            "can be resumed with the same --report PATH and --resume."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    scan.add_argument(
+        "project_dir",
+        nargs="?",
+        help=_PROJECT_DIR_HELP,
+    )
+    scan.add_argument(
+        "-c",
+        "--config",
+        type=Path,
+        help=f"Config path (default: <project>/{VIZ_CONFIG_FILENAME})",
+    )
+    scan.add_argument(
+        "--presets-dir",
+        type=Path,
+        help="Bulk mode: directory of .milk presets (mutually exclusive with project)",
+    )
+    scan.add_argument(
+        "--texture-path",
+        action="append",
+        type=Path,
+        default=[],
+        metavar="DIR",
+        help="Bulk mode: texture search path (repeatable; required unless -c supplies paths)",
+    )
+    scan.add_argument(
+        "--recursive",
+        action="store_true",
+        help="Bulk mode: scan subdirectories for .milk files",
+    )
+    scan.add_argument(
+        "--report",
+        type=Path,
+        metavar="PATH",
+        help=(
+            "Write JSON scan report to PATH incrementally so an interrupted run "
+            "can be resumed with the same PATH and --resume."
+        ),
+    )
+    scan.add_argument(
+        "--resume",
+        action="store_true",
+        help="Continue a prior scan; requires --report PATH to an existing report",
+    )
+    scan_action = scan.add_mutually_exclusive_group()
+    scan_action.add_argument(
+        "--quarantine",
+        type=Path,
+        metavar="DIR",
+        help=(
+            "Move failed presets (load_failed, black) to DIR; "
+            "use --include-dim / --include-washout to extend"
+        ),
+    )
+    scan_action.add_argument(
+        "--delete",
+        action="store_true",
+        help=(
+            "Delete failed presets after the scan (load_failed, black; "
+            "prompts unless --yes)"
+        ),
+    )
+    scan.add_argument(
+        "--include-dim",
+        action="store_true",
+        help="Also quarantine or delete presets classified as dim",
+    )
+    scan.add_argument(
+        "--include-washout",
+        action="store_true",
+        help="Also quarantine or delete presets classified as washed_out",
+    )
+    scan.add_argument(
+        "--yes",
+        action="store_true",
+        help="Skip confirmation for --delete (required when stdin is not a TTY)",
+    )
+    scan.set_defaults(func=cmd_scan)
+
+    from cleave.paths import repo_root
+    from cleave.preset_scan_golden import (
+        DEFAULT_GOLDEN_SET_PATH,
+        DEFAULT_METRICS_CACHE_PATH,
+    )
+
+    scan_golden = subparsers.add_parser(
+        "scan-golden",
+        prog="cleave scan-golden",
+        description="[EXPERIMENTAL] Golden-set probe and classifier evaluation for preset scan.",
+        help="[EXPERIMENTAL] Probe and evaluate the preset scan golden set",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    mode = scan_golden.add_mutually_exclusive_group(required=True)
+    mode.add_argument(
+        "--probe",
+        action="store_true",
+        help="GL probe all golden presets and write metrics cache",
+    )
+    mode.add_argument(
+        "--eval",
+        action="store_true",
+        help="Classify cached metrics and compare to golden labels",
+    )
+    mode.add_argument(
+        "--sweep",
+        action="store_true",
+        help="Grid search warmup/window settings against golden labels",
+    )
+    scan_golden.add_argument(
+        "--warmup",
+        type=int,
+        metavar="N",
+        help="Override eval warmup frames (must match cache profile)",
+    )
+    scan_golden.add_argument(
+        "--window",
+        type=int,
+        metavar="N",
+        help="Override eval window frames (must match cache profile)",
+    )
+    scan_golden.add_argument(
+        "--cache",
+        type=Path,
+        metavar="PATH",
+        help=(
+            "Metrics cache JSON path "
+            f"(default: {DEFAULT_METRICS_CACHE_PATH.relative_to(repo_root())})"
+        ),
+    )
+    scan_golden.add_argument(
+        "--golden",
+        type=Path,
+        metavar="PATH",
+        help=(
+            "Golden set YAML path "
+            f"(default: {DEFAULT_GOLDEN_SET_PATH.relative_to(repo_root())})"
+        ),
+    )
+    scan_golden.set_defaults(func=cmd_scan_golden)
 
     return parser
 
