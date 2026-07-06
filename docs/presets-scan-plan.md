@@ -6,13 +6,13 @@ Implementation plan for `cleave scan`: offline batch classification of Milkdrop 
 
 | Phase | State | Notes |
 | --- | --- | --- |
-| v1 | Done | Project/bulk scan, quick/`--slow` profiles, JSON report, v1 classifier |
+| v1 | Done | Project/bulk scan, JSON report, v1 classifier |
 | v2 | Done | `--quarantine`, `--resume`, incremental/interrupt-safe reports |
 | Live clean boot | Done | Manual preset browse forces black boot ([cleave/viz/preset_switching.py](../cleave/viz/preset_switching.py) `load_manual_preset_clean`) |
 | Classifier rework | Done | Clean-boot probe, full-frame metrics, peak-across-frames rules, golden-set tuning |
-| v3 | Done | `--delete`, reference clip for `--slow`, report PCM metadata |
+| v3 | Done | `--delete` |
 
-**Classifier:** Shipped probe uses clean boot per preset, full-frame luma sampling, peak max/mean/coverage across post-warmup frames, and retuned thresholds validated against the 30-case golden set ([presets-scan-golden-set.md](presets-scan-golden-set.md)). See [presets-scan-learnings.md](presets-scan-learnings.md) for tuning notes.
+**Classifier:** Shipped probe uses clean boot per preset, full-frame luma sampling, peak max/mean/coverage across post-warmup frames, and retuned thresholds validated against the 50-case golden set ([presets-scan-golden-set.md](presets-scan-golden-set.md)). See [presets-scan-learnings.md](presets-scan-learnings.md) for tuning notes.
 
 ## Goals
 
@@ -38,7 +38,6 @@ Examples:
 ```bash
 ./cleave.py scan projects/sights-and-sounds-26/
 ./cleave.py scan projects/sights-and-sounds-26/ -c cleave-viz.yaml
-./cleave.py scan projects/sights-and-sounds-26/ --slow
 ```
 
 ### Bulk scan (escape hatch)
@@ -56,16 +55,13 @@ cleave scan --presets-dir <dir> --texture-path <dir> [--texture-path ...] [optio
 
 | Flag | Purpose |
 | --- | --- |
-| (default) | Quick probe: 15 frames warmup + 75 window; synthetic mono PCM; report on stderr, optional JSON |
-| `--slow` | 120 frames warmup + 180 window; stereo reference clip ([assets/audio/scan-reference-10s.wav](../assets/audio/scan-reference-10s.wav)) |
+| (default) | 15 frames warmup + 75 window; synthetic mono PCM; report on stderr, optional JSON |
 | `--report <path>` | JSON report path; written incrementally so a run can be resumed |
 | `--recursive` | Bulk mode only: scan subdirectories |
 | `--quarantine <dir>` | Move failed presets to DIR; DIR must be outside the scan set |
 | `--delete` | Remove failed presets after the scan; prompts unless `--yes` |
 | `--yes` | Skip confirmation for `--delete` (required when stdin is not a TTY) |
 | `--resume` | Skip presets already in the `--report` file; requires `--report PATH` |
-
-Record `probe_mode`: `quick` | `slow` in the JSON report.
 
 ## Scan set derivation (project mode)
 
@@ -92,13 +88,11 @@ Hidden pygame GL context, one fresh [ProjectM](../cleave/projectm.py) per preset
 Per preset:
 
 1. `set_preset_start_clean(True)` then `load_preset(path, smooth=False)` then restore clean-boot flag.
-2. Render `warmup_frames + window_frames` at 30 fps with probe PCM (synthetic mono for quick; stereo reference clip for slow).
+2. Render `warmup_frames + window_frames` at 30 fps with synthetic mono PCM.
 3. After warmup, full-frame `glReadPixels` each frame; per frame record max luma, mean luma, and coverage at luma cutoffs (8, 16, 32, 64, 128, 192).
 4. Classify from load failures plus peak max, peak mean, and peak coverage across all post-warmup frames.
 
-**Quick (default):** 15 warmup + 75 window frames; synthetic mono PCM.
-
-**`--slow`:** 120 warmup + 180 window frames; stereo reference clip at [assets/audio/scan-reference-10s.wav](../assets/audio/scan-reference-10s.wav) (10 s excerpt from `projects/sights-and-sounds-26/sights-and-sounds-26.wav` starting at 82 s).
+**Probe profile:** 15 warmup + 75 window frames; synthetic mono PCM.
 
 Result categories: `load_failed`, `black`, `dim`, `washed_out`, `ok` (see proposal).
 
@@ -110,17 +104,13 @@ Per-preset `luma: { max, mean, coverage }` in JSON reports holds the peak values
 
 ### Destructive actions
 
-When `--quarantine` or `--delete` is used **without** `--slow`, print a clear stderr warning that quick mode has more false positives and recommend re-running with `--slow` before moving or deleting files. Do not block the action. Prefer `--slow` before bulk quarantine or delete.
+`--quarantine` and `--delete` move or remove presets flagged as `load_failed`, `black`, `dim`, or `washed_out`. Review scan results before destructive cleanup on large packs.
 
 ## JSON report
 
 Include environment metadata:
 
 - `scan_mode`: `project` | `bulk`
-- `probe_mode`: `quick` | `slow`
-- `pcm_source`: `synthetic` | `reference-clip`
-- `pcm_channels`: 1 (quick) or 2 (slow)
-- `reference_clip_path`: absolute path to the reference wav when `probe_mode` is `slow`
 - `complete`: `true` on normal finish, `false` if interrupted (v2)
 - `project_dir`, `config_path` (project mode)
 - `preset_root`, `texture_paths` (resolved absolute)
@@ -133,7 +123,7 @@ Include environment metadata:
 - Flush every 10 probed presets and once at end (`REPORT_FLUSH_EVERY = 10`); only when `--report` is set.
 - Atomic write via temp file + `os.replace`.
 - `KeyboardInterrupt`: flush partial report, `complete: false`, print resume hint, exit non-zero.
-- `--resume` requires `--report PATH`; skip paths already in the report; warn on `scan_mode` / `probe_mode` mismatch.
+- `--resume` requires `--report PATH`; skip paths already in the report; warn on `scan_mode` mismatch.
 - Incomplete report without `--resume`: error with resume command before probing.
 - Complete report with `--resume`: error before probing.
 
@@ -166,12 +156,10 @@ Does not use [layer_pipeline.py](../cleave/viz/layer_pipeline.py) or the composi
 - Scan set derivation as above
 - Dedup + layer attribution in report
 - Report-only, synthetic PCM, load failure + luminance check
-- Quick probe (default) and `--slow` profile
 
 **v2 (done)**
 
 - `--quarantine`, `--resume`
-- Stderr warning when `--quarantine` runs without `--slow`
 - Incremental + interrupt-safe report writes
 
 **Live (done, parallel to scan)**
@@ -186,13 +174,11 @@ Does not use [layer_pipeline.py](../cleave/viz/layer_pipeline.py) or the composi
 
 **v3 (done)**
 
-- `--delete` with confirmation (`--yes` to skip prompt; required when stdin is not a TTY); same `--slow` warning as quarantine; mutually exclusive with `--quarantine`
-- Bundled stereo reference clip for `--slow` probes ([assets/audio/scan-reference-10s.wav](../assets/audio/scan-reference-10s.wav)); quick mode stays synthetic mono
-- Report fields: `pcm_source`, `pcm_channels`, `reference_clip_path` when slow
+- `--delete` with confirmation (`--yes` to skip prompt; required when stdin is not a TTY); mutually exclusive with `--quarantine`
 
 ## Runtime expectations
 
-Project scan: typically tens to low hundreds of presets (per-layer rotation dirs). Bulk COTC: see proposal runtime table; quick default is roughly 2-3x faster than `--slow` on the same set. Progress on stderr; `--resume` for long bulk runs.
+Project scan: typically tens to low hundreds of presets (per-layer rotation dirs). Bulk COTC: see proposal runtime table. Progress on stderr; `--resume` for long bulk runs.
 
 ## Open questions
 

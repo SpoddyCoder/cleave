@@ -208,22 +208,6 @@ def _print_scan_summary(summary: dict[str, int]) -> None:
     )
 
 
-def _warn_quarantine_without_slow() -> None:
-    print(
-        "warning: --quarantine without --slow may move presets flagged by quick "
-        "probe false positives; re-run with --slow before quarantining",
-        file=sys.stderr,
-    )
-
-
-def _warn_delete_without_slow() -> None:
-    print(
-        "warning: --delete without --slow may remove presets flagged by quick "
-        "probe false positives; re-run with --slow before deleting",
-        file=sys.stderr,
-    )
-
-
 def _delete_candidate_count(
     results: list[PresetScanResult] | tuple[PresetScanResult, ...],
 ) -> int:
@@ -247,14 +231,6 @@ def _confirm_delete(count: int, *, yes: bool) -> None:
         answer = ""
     if answer.lower() not in ("y", "yes"):
         _exit_error("error: delete cancelled")
-
-
-def _warn_golden_probe_without_slow() -> None:
-    print(
-        "warning: quick probe overwrites the committed golden metrics cache; "
-        "re-run with --slow for eval-compatible fixtures",
-        file=sys.stderr,
-    )
 
 
 def _warn_resume_mismatch(
@@ -282,8 +258,6 @@ def _format_scan_resume_command(args: argparse.Namespace) -> str:
         parts.append(str(args.project_dir))
     if args.config is not None:
         parts.extend(["-c", str(args.config)])
-    if args.slow:
-        parts.append("--slow")
     assert args.report is not None
     parts.extend(["--report", str(args.report)])
     parts.append("--resume")
@@ -357,7 +331,6 @@ def cmd_scan(args: argparse.Namespace) -> None:
     prior_results: list[PresetScanResult] = []
     skip_paths: frozenset[Path] = frozenset()
     resume_scan_mode: str | None = None
-    resume_probe_mode: str | None = None
 
     if args.resume:
         assert args.report is not None
@@ -371,7 +344,6 @@ def cmd_scan(args: argparse.Namespace) -> None:
         prior_results = list(resume_data.results)
         skip_paths = resume_data.skip_paths
         resume_scan_mode = resume_data.scan_mode
-        resume_probe_mode = resume_data.probe_mode
         if resume_data.complete:
             _exit_error(
                 f"error: {resume_path} is already complete "
@@ -379,25 +351,13 @@ def cmd_scan(args: argparse.Namespace) -> None:
                 f"Or delete the file to scan again."
             )
 
-    if args.quarantine is not None and not args.slow:
-        _warn_quarantine_without_slow()
-
-    if args.delete and not args.slow:
-        _warn_delete_without_slow()
-
-    profile = probe_profile(slow=args.slow)
+    profile = probe_profile()
     current_scan_mode = "bulk" if bulk_mode else "project"
     if resume_scan_mode is not None and resume_scan_mode != current_scan_mode:
         _warn_resume_mismatch(
             field="scan_mode",
             resume_value=resume_scan_mode,
             current_value=current_scan_mode,
-        )
-    if resume_probe_mode is not None and resume_probe_mode != profile.mode:
-        _warn_resume_mismatch(
-            field="probe_mode",
-            resume_value=resume_probe_mode,
-            current_value=profile.mode,
         )
 
     report_path = (
@@ -457,7 +417,6 @@ def cmd_scan(args: argparse.Namespace) -> None:
         try:
             new_results = run_scan(
                 targets,
-                slow=args.slow,
                 texture_paths=resolved_textures,
                 report_sink=report_sink if report_path is not None else None,
                 skip_paths=skip_paths,
@@ -520,7 +479,6 @@ def cmd_scan(args: argparse.Namespace) -> None:
         try:
             new_results = run_scan(
                 targets,
-                slow=args.slow,
                 report_sink=report_sink if report_path is not None else None,
                 skip_paths=skip_paths,
             )
@@ -563,11 +521,8 @@ def cmd_scan_golden(args: argparse.Namespace) -> None:
     from cleave.preset_scan_golden import (
         DEFAULT_GOLDEN_SET_PATH,
         DEFAULT_METRICS_CACHE_PATH,
-        DEFAULT_SLOW_METRICS_CACHE_PATH,
         DEFAULT_SWEEP_WARMUP_FRAMES,
-        DEFAULT_SWEEP_WARMUP_FRAMES_SLOW,
         DEFAULT_SWEEP_WINDOW_FRAMES,
-        DEFAULT_SWEEP_WINDOW_FRAMES_SLOW,
         default_threshold_sweep_variants,
         evaluate,
         format_probe_profile_summary,
@@ -576,7 +531,6 @@ def cmd_scan_golden(args: argparse.Namespace) -> None:
         print_eval_report,
         probe_golden_set,
         probe_profile,
-        resolve_cache_probe_profile,
         sweep,
     )
 
@@ -588,22 +542,13 @@ def cmd_scan_golden(args: argparse.Namespace) -> None:
     cache_path = (
         args.cache.expanduser().resolve()
         if args.cache is not None
-        else (
-            DEFAULT_SLOW_METRICS_CACHE_PATH
-            if args.slow
-            else DEFAULT_METRICS_CACHE_PATH
-        ).resolve()
+        else DEFAULT_METRICS_CACHE_PATH.resolve()
     )
 
     if args.probe:
-        if (
-            not args.slow
-            and cache_path == DEFAULT_METRICS_CACHE_PATH.resolve()
-        ):
-            _warn_golden_probe_without_slow()
         golden = load_golden_set(golden_path)
-        probe_golden_set(golden, cache_path, slow=args.slow)
-        profile = probe_profile(slow=args.slow)
+        probe_golden_set(golden, cache_path)
+        profile = probe_profile()
         print(
             f"Wrote cache ({format_probe_profile_summary(profile)}) to {cache_path}",
             file=sys.stderr,
@@ -627,25 +572,15 @@ def cmd_scan_golden(args: argparse.Namespace) -> None:
         return
 
     results = sweep(cache, golden)
-    profile = resolve_cache_probe_profile(cache)
-    variant_count = len(default_threshold_sweep_variants(profile.mode))
-    warmup_grid = (
-        DEFAULT_SWEEP_WARMUP_FRAMES_SLOW
-        if profile.mode == "slow"
-        else DEFAULT_SWEEP_WARMUP_FRAMES
-    )
-    window_grid = (
-        DEFAULT_SWEEP_WINDOW_FRAMES_SLOW
-        if profile.mode == "slow"
-        else DEFAULT_SWEEP_WINDOW_FRAMES
-    )
+    variant_count = len(default_threshold_sweep_variants())
+    warmup_grid = DEFAULT_SWEEP_WARMUP_FRAMES
+    window_grid = DEFAULT_SWEEP_WINDOW_FRAMES
     config_count = len(results)
     print(
         f"Sweep: {config_count} configs "
         f"({variant_count} threshold variants x "
         f"{len(warmup_grid)} warmups x "
-        f"{len(window_grid)} windows, "
-        f"{profile.mode} cache)",
+        f"{len(window_grid)} windows)",
         file=sys.stderr,
     )
     print("Sweep results (best first):", file=sys.stderr)
@@ -872,11 +807,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Bulk mode: scan subdirectories for .milk files",
     )
     scan.add_argument(
-        "--slow",
-        action="store_true",
-        help="Longer probe warmup and render before luminance sample",
-    )
-    scan.add_argument(
         "--report",
         type=Path,
         metavar="PATH",
@@ -913,7 +843,6 @@ def build_parser() -> argparse.ArgumentParser:
     from cleave.preset_scan_golden import (
         DEFAULT_GOLDEN_SET_PATH,
         DEFAULT_METRICS_CACHE_PATH,
-        DEFAULT_SLOW_METRICS_CACHE_PATH,
     )
 
     scan_golden = subparsers.add_parser(
@@ -937,11 +866,6 @@ def build_parser() -> argparse.ArgumentParser:
         "--sweep",
         action="store_true",
         help="Grid search warmup/window settings against golden labels",
-    )
-    scan_golden.add_argument(
-        "--slow",
-        action="store_true",
-        help="Longer probe warmup and render before luminance sample",
     )
     scan_golden.add_argument(
         "--warmup",

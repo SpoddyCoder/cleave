@@ -27,7 +27,7 @@ Minimal harness (no Cleave compositor stack):
 1. Open a hidden pygame OpenGL context once.
 2. Create a [ProjectM](../cleave/projectm.py) instance (fresh per preset in golden harness) and a 480x270 RGBA FBO.
 3. Set texture search paths from config or flags.
-4. For each `.milk`: clean boot, load, feed probe PCM, render for the active profile (quick or `--slow`), sample full-frame luma each frame.
+4. For each `.milk`: clean boot, load, feed synthetic mono PCM, render 15 warmup + 75 window frames, sample full-frame luma each frame.
 5. Classify from load failures plus peak max, mean, and coverage across post-warmup frames.
 
 See [presets-scan-plan.md](presets-scan-plan.md) and [presets-scan-learnings.md](presets-scan-learnings.md).
@@ -44,11 +44,11 @@ Manual preset browse (`preset_switching` `none` or `user_defined`) forces a clea
 | `washed_out` | Extreme white blowout |
 | `ok` | Passes thresholds |
 
-Run `--slow` before bulk quarantine. Golden case 2 has a known visualizer vs scan label disparity; quarantine outcome is still correct. See [presets-scan-golden-set.md](presets-scan-golden-set.md).
+Golden case 2 has a known visualizer vs scan label disparity; quarantine outcome is still correct. See [presets-scan-golden-set.md](presets-scan-golden-set.md).
 
 ## Runtime
 
-Rough order of magnitude at 480x270, quick probe (default):
+Rough order of magnitude at 480x270, default probe:
 
 | Scope | Presets | Time |
 | --- | --- | --- |
@@ -78,15 +78,15 @@ Aligned with [presets-scan-plan.md](presets-scan-plan.md):
 
 **v2 (done)** — `--quarantine`, `--resume`, incremental reports, config-driven texture paths in project mode.
 
-**Classifier rework (next)** — clean-boot probe, full-frame metrics, manual test set, threshold retune.
+**Classifier rework (done)** — clean-boot probe, full-frame metrics, golden harness, retuned thresholds.
 
-**v3** — `--delete` with confirmation; stereo reference clip for `--slow`; report PCM metadata fields.
+**v3 (done)** — `--delete` with confirmation.
 
 ## Related work
 
 - [preset-switching-proposal.md](legacy-plans/preset-switching-proposal.md) documents live projectM rotation; playlist retry and switch-failed callbacks were planned there but not fully wired in Cleave.
 - [presets-scan-learnings.md](presets-scan-learnings.md) — feedback leak, explored fixes, live clean boot.
-- [roadmap.md](roadmap.md) projectM PCM feeding note: batch scan may use a real audio slice for more realistic classification (v3).
+- [roadmap.md](roadmap.md) projectM PCM feeding note.
 
 ## Open questions
 

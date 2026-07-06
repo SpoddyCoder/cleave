@@ -26,24 +26,10 @@ from cleave.preset_scan import (
     PROBE_FBO_HEIGHT,
     PROBE_FBO_WIDTH,
     PROBE_FPS,
-    QUICK_PROBE_WARMUP_FRAMES,
-    QUICK_PROBE_WINDOW_FRAMES,
-    QUICK_SCAN_THRESHOLDS,
-    REFERENCE_CLIP_PATH,
+    PROBE_WARMUP_FRAMES,
+    PROBE_WINDOW_FRAMES,
+    SCAN_THRESHOLDS,
     REPORT_FLUSH_EVERY,
-    SLOW_PROBE_WARMUP_FRAMES,
-    SLOW_PROBE_WINDOW_FRAMES,
-    SLOW_CAPPED_DIM_COV16,
-    SLOW_CAPPED_DIM_MAX_HI,
-    SLOW_CAPPED_DIM_MEAN,
-    SLOW_SCAN_THRESHOLDS,
-    SLOW_SPARSE_DIM_COV16_MAX,
-    SLOW_SPARSE_DIM_COV16_MIN,
-    SLOW_SPARSE_DIM_MAX,
-    SLOW_SPARSE_DIM_MEAN,
-    SLOW_VERY_SPARSE_DIM_COV16,
-    SLOW_VERY_SPARSE_DIM_MAX,
-    SLOW_VERY_SPARSE_DIM_MEAN,
     SPARSE_DIM_COV16_MAX,
     SPARSE_DIM_COV16_MIN,
     SPARSE_DIM_MAX,
@@ -53,7 +39,6 @@ from cleave.preset_scan import (
     WHITE_CHANNEL_MIN,
     PresetScanResult,
     PresetScanTimings,
-    ProbePcm,
     ScanReport,
     build_probe_pcm,
     build_scan_report,
@@ -61,7 +46,6 @@ from cleave.preset_scan import (
     delete_presets,
     existing_report_status,
     load_resume_results,
-    probe_pcm_metadata,
     probe_profile,
     quarantine_presets,
     run_scan,
@@ -135,112 +119,26 @@ def _frame(
     )
 
 
-def test_probe_profile_quick() -> None:
-    profile = probe_profile(slow=False)
-    assert profile.warmup_frames == QUICK_PROBE_WARMUP_FRAMES
-    assert profile.window_frames == QUICK_PROBE_WINDOW_FRAMES
+def test_probe_profile() -> None:
+    profile = probe_profile()
+    assert profile.warmup_frames == PROBE_WARMUP_FRAMES
+    assert profile.window_frames == PROBE_WINDOW_FRAMES
     assert profile.total_frames == 90
-    assert profile.mode == "quick"
 
 
-def test_probe_profile_slow() -> None:
-    profile = probe_profile(slow=True)
-    assert profile.warmup_frames == SLOW_PROBE_WARMUP_FRAMES
-    assert profile.window_frames == SLOW_PROBE_WINDOW_FRAMES
-    assert profile.total_frames == 300
-    assert profile.mode == "slow"
+def test_scan_thresholds() -> None:
+    assert scan_thresholds() == SCAN_THRESHOLDS
 
 
-_TUNED_SLOW_ONLY_KEYS = frozenset(
-    {
-        "dim_mean_luma",
-        "dim_coverage",
-        "very_sparse_dim_mean",
-        "very_sparse_dim_cov16",
-        "sparse_dim_mean",
-        "sparse_dim_cov16_min",
-        "sparse_dim_cov16_max",
-        "capped_dim_mean",
-        "capped_dim_max_hi",
-        "capped_dim_cov16",
-        "mid_peak_dim_cov_lo",
-        "mid_peak_dim_max_lo",
-        "mid_peak_dim_max_hi",
-        "broken_soft_white_min_frac",
-        "broken_soft_white_mean_hi",
-        "washed_cov192_lo_max",
-        "washed_cov192_mid",
-        "washed_mean_mid_hi",
-        "washed_wf_soft_min",
-        "washed_wf_soft_mean_lo",
-        "washed_wf_soft_mean_hi",
-        "washed_mean_high_lo",
-        "washed_mean_high_hi",
-        "washed_cov192_high",
-    }
-)
-
-_QUICK_ONLY_THRESHOLD_KEYS = frozenset(
-    {
-        "dim_bob_cov_lo",
-        "dim_bob_cov_hi",
-        "dim_bob_mean_mid",
-        "dim_bob_mean_hi",
-    }
-)
-
-_SHARED_WASHED_THRESHOLD_KEYS = frozenset(
-    {
-        "white_area_frac_soft",
-        "min_white_frame_frac_soft",
-        "washed_mean_soft",
-        "washed_mean_peak",
-        "washed_cov16_min",
-        "washed_cov192_peak",
-        "washed_max_lo",
-        "washed_mean_lo",
-        "washed_mean_hi",
-        "washed_cov192_lo",
-        "washed_max_mid",
-        "washed_mean_mid_lo",
-        "washed_mean_mid_hi",
-        "washed_cov192_mid",
-        "washed_white235_mid_max",
-    }
-)
-
-
-def test_scan_thresholds_quick_vs_slow() -> None:
-    quick = scan_thresholds("quick")
-    slow = scan_thresholds("slow")
-    assert quick == QUICK_SCAN_THRESHOLDS
-    assert slow == SLOW_SCAN_THRESHOLDS
-    shared_keys = QUICK_SCAN_THRESHOLDS.keys() & SLOW_SCAN_THRESHOLDS.keys()
-    differing = {key for key in shared_keys if quick[key] != slow[key]}
-    slow_only_keys = SLOW_SCAN_THRESHOLDS.keys() - QUICK_SCAN_THRESHOLDS.keys()
-    assert _TUNED_SLOW_ONLY_KEYS <= differing | slow_only_keys
-    for key in _TUNED_SLOW_ONLY_KEYS - slow_only_keys:
-        assert quick[key] != slow[key]
-    assert _QUICK_ONLY_THRESHOLD_KEYS <= QUICK_SCAN_THRESHOLDS.keys() - SLOW_SCAN_THRESHOLDS.keys()
-    assert _SHARED_WASHED_THRESHOLD_KEYS <= shared_keys
-
-
-def test_build_scan_report_uses_mode_thresholds() -> None:
+def test_build_scan_report_uses_thresholds() -> None:
     targets = ScanTargets(presets=())
-    quick_report = build_scan_report(
+    report = build_scan_report(
         scan_mode="bulk",
-        profile=probe_profile(slow=False),
+        profile=probe_profile(),
         targets=targets,
         results=(),
     )
-    slow_report = build_scan_report(
-        scan_mode="bulk",
-        profile=probe_profile(slow=True),
-        targets=targets,
-        results=(),
-    )
-    assert quick_report.thresholds == QUICK_SCAN_THRESHOLDS
-    assert slow_report.thresholds == SLOW_SCAN_THRESHOLDS
+    assert report.thresholds == SCAN_THRESHOLDS
 
 
 def test_classify_preset_result_load_failed() -> None:
@@ -266,32 +164,28 @@ def test_classify_preset_result_defers_load_failed_when_rendered() -> None:
     frames = tuple(
         _frame(max_luma=255.0, mean_luma=120.0, white_235=0.02) for _ in range(10)
     )
-    for probe_mode in ("quick", "slow"):
-        result, error = classify_preset_result(
-            failures,
-            peaks,
-            frames=frames,
-            probe_mode=probe_mode,
-        )
-        assert result == "ok"
-        assert error is None
+    result, error = classify_preset_result(
+        failures,
+        peaks,
+        frames=frames,
+    )
+    assert result == "ok"
+    assert error is None
 
 
 def test_classify_preset_result_defer_load_failed_invalid_peaks_stays_load_failed() -> None:
     failures = [
         PresetLoadFailure(filename="/tmp/a.milk", message="shader error"),
     ]
-    for probe_mode in ("quick", "slow"):
-        result, error = classify_preset_result(
-            failures,
-            {},
-            probe_mode=probe_mode,
-        )
-        assert result == "load_failed"
-        assert error == "shader error"
+    result, error = classify_preset_result(
+        failures,
+        {},
+    )
+    assert result == "load_failed"
+    assert error == "shader error"
 
 
-def test_classify_preset_result_quick_broken_soft_white_is_black() -> None:
+def test_classify_preset_result_broken_soft_white_is_black() -> None:
     soft_white_frames = tuple(
         _frame(max_luma=255.0, mean_luma=230.0, white_235=0.2) for _ in range(5)
     )
@@ -305,7 +199,6 @@ def test_classify_preset_result_quick_broken_soft_white_is_black() -> None:
         [],
         peaks,
         frames=soft_white_frames,
-        probe_mode="quick",
     )
     assert result == "black"
     assert error is None
@@ -449,7 +342,7 @@ def test_classify_preset_result_high_luma_without_frames_not_washed() -> None:
     assert error is None
 
 
-def test_classify_preset_result_quick_peak_washed_out() -> None:
+def test_classify_preset_result_peak_washed_out() -> None:
     frames = tuple(
         _peaks(max_luma=255.0, mean_luma=247.0, cutoff_16=1.0, cutoff_192=1.0)
         for _ in range(10)
@@ -460,36 +353,12 @@ def test_classify_preset_result_quick_peak_washed_out() -> None:
         cutoff_16=1.0,
         cutoff_192=1.0,
     )
-    result, error = classify_preset_result([], peaks, frames=frames, probe_mode="quick")
+    result, error = classify_preset_result([], peaks, frames=frames)
     assert result == "washed_out"
     assert error is None
 
 
-def test_classify_preset_result_slow_luma_band_washed_out() -> None:
-    """Luma-band washed_out tier with zero hard white frames (slow)."""
-    frames = tuple(
-        _peaks(
-            max_luma=242.0,
-            mean_luma=165.0,
-            cutoff_16=1.0,
-            cutoff_192=0.10,
-            white_235=0.05,
-        )
-        for _ in range(10)
-    )
-    peaks = _peaks(
-        max_luma=242.0,
-        mean_luma=165.0,
-        cutoff_16=1.0,
-        cutoff_192=0.10,
-        white_235=0.05,
-    )
-    result, error = classify_preset_result([], peaks, frames=frames, probe_mode="slow")
-    assert result == "washed_out"
-    assert error is None
-
-
-def test_classify_preset_result_quick_dim_bob_guard_mean_band() -> None:
+def test_classify_preset_result_dim_bob_guard_mean_band() -> None:
     """Quick dim guard: sparse mid-coverage with mean below bob mean_hi stays dim."""
     result, error = classify_preset_result(
         [],
@@ -503,7 +372,7 @@ def test_classify_preset_result_quick_dim_bob_guard_mean_band() -> None:
     assert error is None
 
 
-def test_classify_preset_result_quick_dim_bob_guard_mid_cov() -> None:
+def test_classify_preset_result_dim_bob_guard_mid_cov() -> None:
     """Quick dim guard: mid coverage with low mean stays dim."""
     result, error = classify_preset_result(
         [],
@@ -570,66 +439,6 @@ def test_classify_preset_result_black_flash_guard() -> None:
     assert error is None
 
 
-def test_classify_preset_result_slow_very_sparse_dim_boundary_ok() -> None:
-    """Slow golden case 15: sparse peaks stay ok below very_sparse cov16."""
-    result, error = classify_preset_result(
-        [],
-        _peaks(
-            max_luma=SLOW_VERY_SPARSE_DIM_MAX + 134.7,
-            mean_luma=SLOW_VERY_SPARSE_DIM_MEAN - 4.2,
-            cutoff_16=SLOW_VERY_SPARSE_DIM_COV16 - 0.0009,
-        ),
-        probe_mode="slow",
-    )
-    assert result == "ok"
-    assert error is None
-
-
-def test_classify_preset_result_slow_sparse_dim() -> None:
-    """Slow golden case 1: mid-coverage sparse dim band."""
-    result, error = classify_preset_result(
-        [],
-        _peaks(
-            max_luma=SLOW_SPARSE_DIM_MAX + 38.9,
-            mean_luma=SLOW_SPARSE_DIM_MEAN - 0.3,
-            cutoff_16=(SLOW_SPARSE_DIM_COV16_MIN + SLOW_SPARSE_DIM_COV16_MAX) / 2.0,
-        ),
-        probe_mode="slow",
-    )
-    assert result == "dim"
-    assert error is None
-
-
-def test_classify_preset_result_slow_capped_dim() -> None:
-    """Slow golden case 30: high coverage with capped mean luma."""
-    result, error = classify_preset_result(
-        [],
-        _peaks(
-            max_luma=SLOW_CAPPED_DIM_MAX_HI - 1.0,
-            mean_luma=SLOW_CAPPED_DIM_MEAN - 0.5,
-            cutoff_16=SLOW_CAPPED_DIM_COV16 + 0.96,
-        ),
-        probe_mode="slow",
-    )
-    assert result == "dim"
-    assert error is None
-
-
-def test_classify_preset_result_slow_capped_dim_max_hi_boundary_ok() -> None:
-    """Slow presets above capped max_hi stay ok."""
-    result, error = classify_preset_result(
-        [],
-        _peaks(
-            max_luma=SLOW_CAPPED_DIM_MAX_HI + 0.1,
-            mean_luma=SLOW_CAPPED_DIM_MEAN - 0.5,
-            cutoff_16=SLOW_CAPPED_DIM_COV16 + 0.96,
-        ),
-        probe_mode="slow",
-    )
-    assert result == "ok"
-    assert error is None
-
-
 def test_classify_preset_result_ok() -> None:
     result, error = classify_preset_result(
         [],
@@ -691,7 +500,7 @@ def test_build_scan_report_project_mode() -> None:
     ]
     report = build_scan_report(
         scan_mode="project",
-        profile=probe_profile(slow=False),
+        profile=probe_profile(),
         targets=targets,
         results=results,
         project_dir=project_dir,
@@ -699,19 +508,15 @@ def test_build_scan_report_project_mode() -> None:
     )
 
     assert report.scan_mode == "project"
-    assert report.probe_mode == "quick"
     assert report.project_dir == project_dir.resolve()
     assert report.config_path == config_path.resolve()
     assert report.presets_dir is None
     assert report.preset_root == preset_root.resolve()
     assert report.texture_paths == (texture_path.resolve(),)
     assert report.layers == {"layer_1": [str(anchor_dir)]}
-    assert report.probe_frames == QUICK_PROBE_WARMUP_FRAMES + QUICK_PROBE_WINDOW_FRAMES
+    assert report.probe_frames == PROBE_WARMUP_FRAMES + PROBE_WINDOW_FRAMES
     assert report.probe_fps == PROBE_FPS
     assert report.fbo_size == (PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT)
-    assert report.pcm_source == "synthetic"
-    assert report.pcm_channels == 1
-    assert report.reference_clip_path is None
     assert len(report.presets) == 2
 
     summary = scan_report_summary(report)
@@ -733,7 +538,7 @@ def test_build_scan_report_bulk_mode() -> None:
     )
     report = build_scan_report(
         scan_mode="bulk",
-        profile=probe_profile(slow=True),
+        profile=probe_profile(),
         targets=targets,
         results=[
             PresetScanResult(
@@ -746,10 +551,6 @@ def test_build_scan_report_bulk_mode() -> None:
     )
 
     assert report.scan_mode == "bulk"
-    assert report.probe_mode == "slow"
-    assert report.pcm_source == "reference-clip"
-    assert report.pcm_channels == 2
-    assert report.reference_clip_path == REFERENCE_CLIP_PATH.resolve()
     assert report.project_dir is None
     assert report.config_path is None
     assert report.presets_dir == presets_dir.resolve()
@@ -762,20 +563,16 @@ def test_scan_report_serialization_round_trip() -> None:
     preset_path = Path("/tmp/presets/a.milk")
     report = ScanReport(
         scan_mode="project",
-        probe_mode="quick",
         project_dir=Path("/tmp/project"),
         config_path=Path("/tmp/project/cleave-viz.yaml"),
         presets_dir=None,
         preset_root=Path("/tmp/presets"),
         texture_paths=(Path("/tmp/textures"),),
         layers={"layer_1": ["/tmp/presets/pack"]},
-        thresholds=dict(QUICK_SCAN_THRESHOLDS),
-        probe_frames=QUICK_PROBE_WARMUP_FRAMES + QUICK_PROBE_WINDOW_FRAMES,
+        thresholds=dict(SCAN_THRESHOLDS),
+        probe_frames=PROBE_WARMUP_FRAMES + PROBE_WINDOW_FRAMES,
         probe_fps=PROBE_FPS,
         fbo_size=(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT),
-        pcm_source="synthetic",
-        pcm_channels=1,
-        reference_clip_path=None,
         presets=(
             PresetScanResult(
                 path=preset_path,
@@ -787,19 +584,17 @@ def test_scan_report_serialization_round_trip() -> None:
 
     payload = scan_report_to_dict(report)
     assert payload["scan_mode"] == "project"
-    assert payload["probe_mode"] == "quick"
     assert payload["project_dir"] == "/tmp/project"
     assert payload["config_path"] == "/tmp/project/cleave-viz.yaml"
     assert payload["presets_dir"] is None
     assert payload["preset_root"] == "/tmp/presets"
     assert payload["texture_paths"] == ["/tmp/textures"]
     assert payload["layers"] == {"layer_1": ["/tmp/presets/pack"]}
-    assert payload["thresholds"] == QUICK_SCAN_THRESHOLDS
-    assert payload["probe_frames"] == QUICK_PROBE_WARMUP_FRAMES + QUICK_PROBE_WINDOW_FRAMES
+    assert payload["thresholds"] == SCAN_THRESHOLDS
+    assert payload["probe_frames"] == PROBE_WARMUP_FRAMES + PROBE_WINDOW_FRAMES
     assert payload["probe_fps"] == PROBE_FPS
     assert payload["fbo_size"] == [PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT]
-    assert payload["pcm_source"] == "synthetic"
-    assert payload["pcm_channels"] == 1
+    assert "pcm_source" not in payload
     assert "reference_clip_path" not in payload
     assert payload["presets"] == [
         {
@@ -829,7 +624,7 @@ def test_build_scan_report_complete_flag() -> None:
     targets = ScanTargets(presets=())
     partial = build_scan_report(
         scan_mode="bulk",
-        profile=probe_profile(slow=False),
+        profile=probe_profile(),
         targets=targets,
         results=(),
         complete=False,
@@ -841,20 +636,16 @@ def test_build_scan_report_complete_flag() -> None:
 def test_write_scan_report_atomic_round_trip() -> None:
     report = ScanReport(
         scan_mode="bulk",
-        probe_mode="quick",
         project_dir=None,
         config_path=None,
         presets_dir=Path("/tmp/presets"),
         preset_root=None,
         texture_paths=(),
         layers={},
-        thresholds=dict(QUICK_SCAN_THRESHOLDS),
-        probe_frames=QUICK_PROBE_WARMUP_FRAMES + QUICK_PROBE_WINDOW_FRAMES,
+        thresholds=dict(SCAN_THRESHOLDS),
+        probe_frames=PROBE_WARMUP_FRAMES + PROBE_WINDOW_FRAMES,
         probe_fps=PROBE_FPS,
         fbo_size=(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT),
-        pcm_source="synthetic",
-        pcm_channels=1,
-        reference_clip_path=None,
         presets=(),
         complete=False,
     )
@@ -872,7 +663,6 @@ def test_load_resume_results_valid() -> None:
     preset_path = Path("/tmp/presets/a.milk").resolve()
     payload = {
         "scan_mode": "project",
-        "probe_mode": "slow",
         "presets": [
             {
                 "path": str(preset_path),
@@ -889,7 +679,6 @@ def test_load_resume_results_valid() -> None:
         resume = load_resume_results(report_path)
 
     assert resume.scan_mode == "project"
-    assert resume.probe_mode == "slow"
     assert len(resume.results) == 1
     assert resume.results[0].path == preset_path
     assert resume.results[0].result == "ok"
@@ -902,7 +691,6 @@ def test_load_resume_results_incomplete_flag() -> None:
     preset_path = Path("/tmp/presets/a.milk").resolve()
     payload = {
         "scan_mode": "bulk",
-        "probe_mode": "quick",
         "complete": False,
         "presets": [{"path": str(preset_path), "result": "ok", "layers": []}],
     }
@@ -918,13 +706,11 @@ def test_load_resume_results_incomplete_flag() -> None:
 @pytest.mark.parametrize(
     ("payload", "message"),
     [
-        ({"probe_mode": "quick", "presets": []}, "scan_mode"),
-        ({"scan_mode": "bulk", "presets": []}, "probe_mode"),
-        ({"scan_mode": "bulk", "probe_mode": "quick"}, "presets"),
+        ({"presets": []}, "scan_mode"),
+        ({"scan_mode": "bulk"}, "presets"),
         (
             {
                 "scan_mode": "bulk",
-                "probe_mode": "quick",
                 "presets": [{"result": "ok", "layers": []}],
             },
             "path",
@@ -1241,8 +1027,8 @@ def test_probe_preset_clean_boot(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_fbo = MagicMock()
     fake_fbo.fbo_id = 1
     target = PresetTarget(path=Path("/tmp/a.milk"), layers=("layer_1",))
-    profile = probe_profile(slow=False)
-    pcm = build_probe_pcm(profile)
+    profile = probe_profile()
+    pcm = build_probe_pcm()
     frame = FrameMetrics(
         max_luma=50.0,
         mean_luma=25.0,
@@ -1316,13 +1102,12 @@ def test_probe_preset_uses_peak_metrics_over_last_frame(
         lambda frame_idx, n_pcm: np.zeros(n_pcm, dtype=np.float32),
     )
 
-    short_profile = probe_profile(slow=False)
+    short_profile = probe_profile()
     short_profile = type(short_profile)(
         warmup_frames=0,
         window_frames=3,
-        mode=short_profile.mode,
     )
-    pcm = build_probe_pcm(short_profile)
+    pcm = build_probe_pcm()
     result = _probe_preset(
         fake_pm,
         fake_fbo,
@@ -1371,7 +1156,6 @@ def test_load_resume_results_with_washed_out(tmp_path: Path) -> None:
     preset_path = tmp_path / "washed.milk"
     payload = {
         "scan_mode": "bulk",
-        "probe_mode": "quick",
         "presets": [
             {
                 "path": str(preset_path),
@@ -1391,7 +1175,6 @@ def test_load_resume_results_with_luma(tmp_path: Path) -> None:
     preset_path = tmp_path / "a.milk"
     payload = {
         "scan_mode": "bulk",
-        "probe_mode": "quick",
         "presets": [
             {
                 "path": str(preset_path),
@@ -1414,65 +1197,12 @@ def test_load_resume_results_with_luma(tmp_path: Path) -> None:
     assert resume.results[0].luma.mean_luma == 10.0
 
 
-def test_probe_pcm_metadata_quick() -> None:
-    meta = probe_pcm_metadata(probe_profile(slow=False))
-    assert meta == {
-        "pcm_source": "synthetic",
-        "pcm_channels": 1,
-        "reference_clip_path": None,
-    }
-
-
-def test_probe_pcm_metadata_slow() -> None:
-    meta = probe_pcm_metadata(probe_profile(slow=True))
-    assert meta["pcm_source"] == "reference-clip"
-    assert meta["pcm_channels"] == 2
-    assert meta["reference_clip_path"] == REFERENCE_CLIP_PATH.resolve()
-
-
-def test_build_probe_pcm_quick() -> None:
-    pcm = build_probe_pcm(probe_profile(slow=False))
-    assert pcm.source == "synthetic"
+def test_build_probe_pcm_synthetic() -> None:
+    pcm = build_probe_pcm()
     assert pcm.channels == 1
-    assert pcm._pcm is None
     chunk = pcm.chunk(3, 100)
     assert chunk.shape == (100,)
     assert float(np.max(np.abs(chunk))) > 0.01
-
-
-def test_build_probe_pcm_slow() -> None:
-    pcm = build_probe_pcm(probe_profile(slow=True))
-    assert pcm.source == "reference-clip"
-    assert pcm.channels == 2
-    assert pcm._pcm is not None
-    assert pcm.reference_clip_path == REFERENCE_CLIP_PATH.resolve()
-    chunk = pcm.chunk(0, 100)
-    assert chunk.shape == (200,)
-
-
-def test_probe_pcm_chunk_zero_pads_past_end() -> None:
-    pcm = ProbePcm(
-        channels=2,
-        source="reference-clip",
-        reference_clip_path=REFERENCE_CLIP_PATH,
-        _pcm=np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32),
-    )
-    chunk = pcm.chunk(9999, 10)
-    assert chunk.shape == (20,)
-    assert np.all(chunk == 0.0)
-
-
-def test_scan_report_slow_includes_reference_clip_path() -> None:
-    report = build_scan_report(
-        scan_mode="bulk",
-        profile=probe_profile(slow=True),
-        targets=ScanTargets(presets=()),
-        results=(),
-    )
-    payload = scan_report_to_dict(report)
-    assert payload["pcm_source"] == "reference-clip"
-    assert payload["pcm_channels"] == 2
-    assert payload["reference_clip_path"] == str(REFERENCE_CLIP_PATH.resolve())
 
 
 def test_delete_presets_removes_failures(tmp_path: Path) -> None:

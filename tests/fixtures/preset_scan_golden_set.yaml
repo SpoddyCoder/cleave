@@ -25,7 +25,7 @@ cases:
     source_config: unnamed-2.yaml
     preset: presets-milkdrop-original/Milkdrop-Original/Aderrasi - Airhandler (Principle of Sharing).milk
     expected_result: black
-    notes: Not working in visualizer. Scan classifies washed_out (accepted eval disparity).
+    notes: Not working in visualizer (clean boot stays black). Both quick and slow golden caches classify black.
 
   - id: 3
     source_config: unnamed-3.yaml

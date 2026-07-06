@@ -17,13 +17,10 @@ from cleave.preset_scan import (
     PROBE_FBO_HEIGHT,
     PROBE_FBO_WIDTH,
     PROBE_FPS,
-    QUICK_PROBE_WARMUP_FRAMES,
-    QUICK_PROBE_WINDOW_FRAMES,
-    SLOW_PROBE_WARMUP_FRAMES,
-    SLOW_PROBE_WINDOW_FRAMES,
+    PROBE_WARMUP_FRAMES,
+    PROBE_WINDOW_FRAMES,
     WHITE_CHANNEL_MIN,
     PresetResultCategory,
-    ProbeMode,
     ProbeProfile,
     _configure_probe_projectm,
     build_probe_pcm,
@@ -53,17 +50,12 @@ SWEEP_RULE_DISABLED = 999.0
 
 DEFAULT_SWEEP_WARMUP_FRAMES = (10, 12, 15, 18, 20)
 DEFAULT_SWEEP_WINDOW_FRAMES = (60, 70, 75)
-DEFAULT_SWEEP_WARMUP_FRAMES_SLOW = (120,)
-DEFAULT_SWEEP_WINDOW_FRAMES_SLOW = (180,)
 
 DEFAULT_GOLDEN_SET_PATH = (
     repo_root() / "tests" / "fixtures" / "preset_scan_golden_set.yaml"
 )
 DEFAULT_METRICS_CACHE_PATH = (
     repo_root() / "tests" / "fixtures" / "preset_scan_golden_metrics.json"
-)
-DEFAULT_SLOW_METRICS_CACHE_PATH = (
-    repo_root() / "tests" / "fixtures" / "preset_scan_golden_metrics_slow.json"
 )
 
 _VALID_EXPECTED: frozenset[str] = frozenset(("ok", "dim", "black", "washed_out"))
@@ -106,7 +98,6 @@ class EvalReport:
     mismatches: tuple[EvalMismatch, ...]
     warmup_frames: int
     window_frames: int
-    probe_mode: str
 
 
 @dataclass(frozen=True)
@@ -236,14 +227,12 @@ def load_golden_set(path: Path | None = None) -> GoldenSet:
 def probe_golden_set(
     golden: GoldenSet,
     cache_path: Path,
-    *,
-    slow: bool = False,
 ) -> MetricsCache:
     """GL probe every golden case; write full-frame metrics cache."""
     from cleave.preset_scan import create_probe_fbo
 
-    profile = probe_profile(slow=slow)
-    probe_pcm = build_probe_pcm(profile)
+    profile = probe_profile()
+    probe_pcm = build_probe_pcm()
     texture_strs = [str(path) for path in golden.texture_paths]
 
     os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
@@ -293,7 +282,6 @@ def probe_golden_set(
         presets=tuple(presets),
         probe_fps=PROBE_FPS,
         fbo_size=(PROBE_FBO_WIDTH, PROBE_FBO_HEIGHT),
-        probe_mode=profile.mode,
         warmup_frames=profile.warmup_frames,
         window_frames=profile.window_frames,
         total_frames=profile.total_frames,
@@ -304,7 +292,7 @@ def probe_golden_set(
 
 def format_probe_profile_summary(profile: ProbeProfile) -> str:
     return (
-        f"{profile.mode}: {profile.warmup_frames} warmup + "
+        f"{profile.warmup_frames} warmup + "
         f"{profile.window_frames} window, {profile.total_frames} frames"
     )
 
@@ -315,15 +303,10 @@ def resolve_cache_probe_profile(
     file: Any = None,
 ) -> ProbeProfile:
     """Return the probe profile stored in or inferred from a metrics cache."""
-    if (
-        cache.probe_mode is not None
-        and cache.warmup_frames is not None
-        and cache.window_frames is not None
-    ):
+    if cache.warmup_frames is not None and cache.window_frames is not None:
         return ProbeProfile(
             warmup_frames=cache.warmup_frames,
             window_frames=cache.window_frames,
-            mode=cache.probe_mode,
         )
 
     frame_counts = [len(entry.frames) for entry in cache.presets if entry.frames]
@@ -338,16 +321,14 @@ def resolve_cache_probe_profile(
         )
 
     count = unique_counts[0]
-    if count == QUICK_PROBE_WARMUP_FRAMES + QUICK_PROBE_WINDOW_FRAMES:
-        profile = probe_profile(slow=False)
-    elif count == SLOW_PROBE_WARMUP_FRAMES + SLOW_PROBE_WINDOW_FRAMES:
-        profile = probe_profile(slow=True)
-    else:
+    expected_frames = PROBE_WARMUP_FRAMES + PROBE_WINDOW_FRAMES
+    if count != expected_frames:
         raise ValueError(
             f"cannot infer probe profile from {count} cached frames per preset "
-            f"(expected {QUICK_PROBE_WARMUP_FRAMES + QUICK_PROBE_WINDOW_FRAMES} "
-            f"for quick or {SLOW_PROBE_WARMUP_FRAMES + SLOW_PROBE_WINDOW_FRAMES} for slow)"
+            f"(expected {expected_frames})"
         )
+
+    profile = probe_profile()
 
     out = file if file is not None else sys.stderr
     print(
@@ -470,7 +451,6 @@ def evaluate(
             preset_metrics,
             warmup_frames=resolved_warmup,
             window_frames=resolved_window,
-            probe_mode=profile.mode,
             thresholds=thresholds,
         )
         actual_golden = scan_result_to_golden(actual)
@@ -511,7 +491,6 @@ def evaluate(
         mismatches=tuple(mismatches),
         warmup_frames=resolved_warmup,
         window_frames=resolved_window,
-        probe_mode=profile.mode,
     )
 
 
@@ -575,173 +554,99 @@ def _hard_white_threshold_grid(base: dict[str, float]) -> tuple[dict[str, float]
     )
 
 
-def default_threshold_sweep_variants(
-    probe_mode: ProbeMode,
-) -> tuple[dict[str, float] | None, ...]:
+def default_threshold_sweep_variants() -> tuple[dict[str, float] | None, ...]:
     """Default threshold grids for golden sweep (GL-free; uses cached frame metrics)."""
-    base = scan_thresholds(probe_mode)
+    base = scan_thresholds()
     grids: list[tuple[dict[str, float] | None, ...]] = [(None,)]
 
     grids.append(_hard_white_threshold_grid(base))
 
-    if probe_mode == "quick":
-        luma_off = _quick_luma_washed_disabled_overrides()
-        grids.append(
-            _threshold_grid(
-                {**base, **luma_off},
-                {
-                    "white_channel_min": (224.0, 235.0, 245.0),
-                    "white_area_frac": (0.5, 0.6, 0.7),
-                    "min_white_frame_frac": (0.2, 0.3, 0.4),
-                },
-            )
+    luma_off = _quick_luma_washed_disabled_overrides()
+    grids.append(
+        _threshold_grid(
+            {**base, **luma_off},
+            {
+                "white_channel_min": (224.0, 235.0, 245.0),
+                "white_area_frac": (0.5, 0.6, 0.7),
+                "min_white_frame_frac": (0.2, 0.3, 0.4),
+            },
         )
-        grids.append(
-            _threshold_grid(
-                base,
-                {
-                    "white_area_frac_soft": (0.10, 0.15, 0.20),
-                    "min_white_frame_frac_soft": (0.40, 0.55, 0.70),
-                    "washed_mean_soft": (180.0, 200.0, 220.0, SWEEP_RULE_DISABLED),
-                },
-            )
+    )
+    grids.append(
+        _threshold_grid(
+            base,
+            {
+                "white_area_frac_soft": (0.10, 0.15, 0.20),
+                "min_white_frame_frac_soft": (0.40, 0.55, 0.70),
+                "washed_mean_soft": (180.0, 200.0, 220.0, SWEEP_RULE_DISABLED),
+            },
         )
-        grids.append(
-            _threshold_grid(
-                base,
-                {
-                    "washed_mean_peak": (235.0, 245.0, SWEEP_RULE_DISABLED),
-                    "washed_cov192_peak": (0.90, 0.95, 0.99),
-                },
-            )
+    )
+    grids.append(
+        _threshold_grid(
+            base,
+            {
+                "washed_mean_peak": (235.0, 245.0, SWEEP_RULE_DISABLED),
+                "washed_cov192_peak": (0.90, 0.95, 0.99),
+            },
         )
-        grids.append(
-            _threshold_grid(
-                base,
-                {
-                    "washed_max_lo": (235.0, 240.0, SWEEP_RULE_DISABLED),
-                    "washed_mean_lo": (150.0, 155.0, 160.0),
-                    "washed_mean_hi": (170.0, 175.0, 180.0),
-                    "washed_cov192_lo": (0.05, 0.10, 0.15, 0.20),
-                },
-            )
+    )
+    grids.append(
+        _threshold_grid(
+            base,
+            {
+                "washed_max_lo": (235.0, 240.0, SWEEP_RULE_DISABLED),
+                "washed_mean_lo": (150.0, 155.0, 160.0),
+                "washed_mean_hi": (170.0, 175.0, 180.0),
+                "washed_cov192_lo": (0.05, 0.10, 0.15, 0.20),
+            },
         )
-        grids.append(
-            _threshold_grid(
-                base,
-                {
-                    "washed_max_mid": (235.0, 240.0, SWEEP_RULE_DISABLED),
-                    "washed_mean_mid_lo": (170.0, 176.0, 182.0),
-                    "washed_mean_mid_hi": (188.0, 192.0, 196.0),
-                    "washed_cov192_mid": (0.25, 0.30, 0.40),
-                    "washed_white235_mid_max": (0.10, 0.20, 0.35),
-                },
-            )
+    )
+    grids.append(
+        _threshold_grid(
+            base,
+            {
+                "washed_max_mid": (235.0, 240.0, SWEEP_RULE_DISABLED),
+                "washed_mean_mid_lo": (170.0, 176.0, 182.0),
+                "washed_mean_mid_hi": (188.0, 192.0, 196.0),
+                "washed_cov192_mid": (0.25, 0.30, 0.40),
+                "washed_white235_mid_max": (0.10, 0.20, 0.35),
+            },
         )
-        grids.append(
-            _threshold_grid(
-                base,
-                {
-                    "dim_bob_cov_lo": (0.05, 0.07, 0.10),
-                    "dim_bob_cov_hi": (0.12, 0.13, 0.15),
-                    "dim_bob_mean_mid": (5.5, 6.0, 7.0),
-                    "dim_bob_mean_hi": (9.5, 10.0, 11.0),
-                },
-            )
+    )
+    grids.append(
+        _threshold_grid(
+            base,
+            {
+                "dim_bob_cov_lo": (0.05, 0.07, 0.10),
+                "dim_bob_cov_hi": (0.12, 0.13, 0.15),
+                "dim_bob_mean_mid": (5.5, 6.0, 7.0),
+                "dim_bob_mean_hi": (9.5, 10.0, 11.0),
+            },
         )
-        grids.append(
-            _threshold_grid(
-                base,
-                {
-                    "very_sparse_dim_mean": (5.10, 5.15, 5.20),
-                    "sparse_dim_mean": (9.90, 9.95, 10.0),
-                    "sparse_dim_cov16_max": (0.128, 0.140, 0.165),
-                },
-            )
+    )
+    grids.append(
+        _threshold_grid(
+            base,
+            {
+                "very_sparse_dim_mean": (5.10, 5.15, 5.20),
+                "sparse_dim_mean": (9.90, 9.95, 10.0),
+                "sparse_dim_cov16_max": (0.128, 0.140, 0.165),
+            },
         )
-        grids.append(
-            _threshold_grid(
-                base,
-                {
-                    "white_channel_min": (224.0, 235.0, 245.0),
-                    "min_white_frame_frac": (0.25, 0.30, 0.35),
-                    "washed_mean_peak": (245.0, SWEEP_RULE_DISABLED),
-                    "washed_max_lo": (240.0, SWEEP_RULE_DISABLED),
-                    "washed_max_mid": (240.0, SWEEP_RULE_DISABLED),
-                },
-            )
+    )
+    grids.append(
+        _threshold_grid(
+            base,
+            {
+                "white_channel_min": (224.0, 235.0, 245.0),
+                "min_white_frame_frac": (0.25, 0.30, 0.35),
+                "washed_mean_peak": (245.0, SWEEP_RULE_DISABLED),
+                "washed_max_lo": (240.0, SWEEP_RULE_DISABLED),
+                "washed_max_mid": (240.0, SWEEP_RULE_DISABLED),
+            },
         )
-    else:
-        grids.append(
-            _threshold_grid(
-                base,
-                {
-                    "very_sparse_dim_mean": (5.0, 5.1, 5.2),
-                    "sparse_dim_cov16_min": (0.075, 0.08, 0.085),
-                    "sparse_dim_cov16_max": (0.11, 0.12, 0.13),
-                    "sparse_dim_mean": (6.5, 7.0, 7.5),
-                    "capped_dim_mean": (35.0, 40.0, 45.0),
-                    "capped_dim_max_hi": (195.0, 200.0, 205.0),
-                    "capped_dim_cov16": (0.03, 0.04, 0.05),
-                },
-            )
-        )
-        grids.append(
-            _threshold_grid(
-                base,
-                {
-                    "white_area_frac_soft": (0.10, 0.15, 0.20, 0.25),
-                    "min_white_frame_frac_soft": (0.35, 0.55, 0.70),
-                    "washed_mean_soft": (160.0, 180.0, 200.0, 220.0, SWEEP_RULE_DISABLED),
-                },
-            )
-        )
-        grids.append(
-            _threshold_grid(
-                base,
-                {
-                    "washed_mean_peak": (220.0, 235.0, 245.0, SWEEP_RULE_DISABLED),
-                    "washed_cov192_peak": (0.85, 0.90, 0.95, 0.99),
-                },
-            )
-        )
-        grids.append(
-            _threshold_grid(
-                base,
-                {
-                    "washed_max_lo": (230.0, 235.0, 240.0, SWEEP_RULE_DISABLED),
-                    "washed_mean_lo": (140.0, 150.0, 160.0),
-                    "washed_mean_hi": (175.0, 185.0, 195.0),
-                    "washed_cov192_lo": (0.03, 0.05, 0.10, 0.15),
-                },
-            )
-        )
-        grids.append(
-            _threshold_grid(
-                base,
-                {
-                    "washed_max_mid": (230.0, 235.0, 240.0, SWEEP_RULE_DISABLED),
-                    "washed_mean_mid_lo": (165.0, 170.0, 180.0),
-                    "washed_mean_mid_hi": (188.0, 192.0, 196.0),
-                    "washed_cov192_mid": (0.35, 0.39, 0.42),
-                    "washed_white235_mid_max": (0.08, 0.15, 0.25),
-                },
-            )
-        )
-        grids.append(
-            _threshold_grid(
-                base,
-                {
-                    "washed_cov192_lo_max": (0.11, 0.12, 0.13),
-                    "washed_wf_soft_min": (0.18, 0.20, 0.22),
-                    "washed_wf_soft_mean_lo": (180.0, 185.0, 190.0),
-                    "washed_wf_soft_mean_hi": (215.0, 220.0, 225.0),
-                    "washed_mean_high_lo": (195.0, 198.0, 200.0),
-                    "washed_mean_high_hi": (215.0, 220.0, 225.0),
-                    "washed_cov192_high": (0.75, 0.78, 0.80),
-                },
-            )
-        )
+    )
 
     return _merge_threshold_variants(*grids)
 
@@ -755,26 +660,15 @@ def sweep(
     threshold_variants: tuple[dict[str, float] | None, ...] | None = None,
 ) -> list[SweepResult]:
     """Grid search over probe windows and thresholds; rank by golden agreement."""
-    profile = resolve_cache_probe_profile(cache)
     if warmup_frames_values is None:
-        warmups = (
-            DEFAULT_SWEEP_WARMUP_FRAMES_SLOW
-            if profile.mode == "slow"
-            else DEFAULT_SWEEP_WARMUP_FRAMES
-        )
+        warmups = DEFAULT_SWEEP_WARMUP_FRAMES
     else:
         warmups = warmup_frames_values
     if window_frames_values is None:
-        windows = (
-            DEFAULT_SWEEP_WINDOW_FRAMES_SLOW
-            if profile.mode == "slow"
-            else DEFAULT_SWEEP_WINDOW_FRAMES
-        )
+        windows = DEFAULT_SWEEP_WINDOW_FRAMES
     else:
         windows = window_frames_values
-    threshold_sets = threshold_variants or default_threshold_sweep_variants(
-        profile.mode
-    )
+    threshold_sets = threshold_variants or default_threshold_sweep_variants()
 
     results: list[SweepResult] = []
     for warmup in warmups:
@@ -811,7 +705,7 @@ def print_eval_report(report: EvalReport, *, file: Any = None) -> None:
     print(
         f"Golden eval: {report.correct}/{report.total} correct "
         f"({report.accuracy * 100:.1f}%) "
-        f"[{report.probe_mode}: warmup={report.warmup_frames}, "
+        f"[warmup={report.warmup_frames}, "
         f"window={report.window_frames}, "
         f"{report.warmup_frames + report.window_frames} frames]",
         file=out,
@@ -865,7 +759,6 @@ def _classify_cached_preset(
     *,
     warmup_frames: int,
     window_frames: int,
-    probe_mode: ProbeMode,
     thresholds: dict[str, float] | None,
 ) -> tuple[PresetResultCategory, FrameMetrics | None, float | None, float | None]:
     failures: list[PresetLoadFailure] = []
@@ -879,7 +772,7 @@ def _classify_cached_preset(
 
     if not preset_metrics.frames:
         category, _ = classify_preset_result(
-            failures, {}, probe_mode=probe_mode, thresholds=thresholds
+            failures, {}, thresholds=thresholds
         )
         return category, None, None, None
 
@@ -895,10 +788,9 @@ def _classify_cached_preset(
         failures,
         peaks,
         frames=window_slice,
-        probe_mode=probe_mode,
         thresholds=thresholds,
     )
-    th = scan_thresholds(probe_mode)
+    th = scan_thresholds()
     if thresholds is not None:
         th.update(thresholds)
     white_frac = white_frame_fraction(
