@@ -28,7 +28,7 @@ jobs:
         run: |
           sudo find /etc/apt/sources.list.d/ -type f \( -name '*microsoft*' -o -name '*azure-cli*' \) -delete
           sudo apt-get update
-          sudo apt-get install -y libgl1 libglx-mesa0 libegl1 libgl1-mesa-dri xvfb
+          sudo apt-get install -y libgl1 libglx-mesa0 libegl1 libgl1-mesa-dri libgl-dev libegl-dev xvfb
 
       - name: Install Python dependencies
         run: |
