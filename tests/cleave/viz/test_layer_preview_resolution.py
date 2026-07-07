@@ -70,6 +70,7 @@ def _cfg(
         layer_z_order=list(slots),
         visualizer=_visualizer(preview_quality=preview_quality),
         config_path=Path("/tmp/test/cleave.config.yaml"),
+        user_config_path=Path("/tmp/user-config.yaml"),
     )
 
 

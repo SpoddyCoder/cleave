@@ -35,15 +35,6 @@ def _load_original_dict(cfg: CleaveConfig) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
-def _path_to_yaml_str(path: Path) -> str:
-    resolved = path.resolve()
-    home = Path.home()
-    try:
-        rel = resolved.relative_to(home)
-        return f"~/{rel.as_posix()}"
-    except ValueError:
-        return resolved.as_posix()
-
 
 def _snapshot_render_overlay(
     cfg: CleaveConfig,
@@ -160,23 +151,17 @@ def write_session_snapshot(
         visualizer["name"] = orig_vis["name"]
     visualizer.update(payload["visualizer"])
 
-    orig_paths = original.get("paths")
-    if isinstance(orig_paths, dict) and orig_paths:
-        paths = dict(orig_paths)
-    else:
-        paths = {
-            "preset_root": _path_to_yaml_str(cfg.paths.preset_root),
-            "texture_paths": [_path_to_yaml_str(p) for p in cfg.paths.texture_paths],
-        }
-
-    data = {
+    data: dict[str, Any] = {
         "visualizer": visualizer,
-        "paths": paths,
         "layer_z_order": payload["layer_z_order"],
         "layers": payload["layers"],
         "render": _snapshot_render_overlay(cfg, session, original),
         "timeline": payload["timeline"],
     }
+
+    orig_paths = original.get("paths")
+    if isinstance(orig_paths, dict) and orig_paths:
+        data["paths"] = dict(orig_paths)
 
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as fh:

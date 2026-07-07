@@ -70,6 +70,115 @@ def test_next_unnamed_path_fills_gaps(tmp_path: Path) -> None:
     assert next_unnamed_path(project_dir) == project_dir / "unnamed-4.yaml"
 
 
+def _minimal_snapshot_session(
+    root: Path, config_path: Path
+) -> tuple[CleaveConfig, TuningSession]:
+    preset_root = root / "presets"
+    make_preset_dirs(preset_root)
+    cfg = CleaveConfig(
+        paths=PathsConfig(preset_root=preset_root, texture_paths=(root / "tex",)),
+        layers={
+            slot: LayerConfig(
+                preset=preset_root / TEST_LAYER_STEMS[slot] / "anchor.milk",
+                stem=TEST_LAYER_STEMS[slot],
+            )
+            for slot in DEFAULT_LAYER_SLOTS
+        },
+        visualizer=VisualizerConfig(),
+        config_path=config_path,
+        user_config_path=root / "user-config.yaml",
+    )
+    session = TuningSession(
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
+        layers={
+            slot: LayerRuntime(
+                stem=TEST_LAYER_STEMS[slot],
+                playlist=playlist_at_dir(
+                    preset_root / TEST_LAYER_STEMS[slot], index=0
+                ),
+                browse_floor=preset_root / TEST_LAYER_STEMS[slot],
+            )
+            for slot in DEFAULT_LAYER_SLOTS
+        },
+    )
+    return cfg, session
+
+
+def test_write_session_snapshot_omits_paths_when_source_has_none(
+    tmp_path: Path,
+) -> None:
+    config_path = tmp_path / "cleave.config.yaml"
+    config_path.write_text("layers: {}\n", encoding="utf-8")
+    cfg, session = _minimal_snapshot_session(tmp_path, config_path)
+
+    out_path = tmp_path / "snapshot.yaml"
+    write_session_snapshot(out_path, cfg=cfg, session=session)
+
+    data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    assert "paths" not in data
+
+
+def test_write_session_snapshot_includes_paths_when_source_has_paths(
+    tmp_path: Path,
+) -> None:
+    preset_root = tmp_path / "presets"
+    texture_path = tmp_path / "textures"
+    texture_path.mkdir()
+    make_preset_dirs(preset_root)
+
+    source_paths = {
+        "preset_root": str(preset_root),
+        "texture_paths": [str(texture_path)],
+    }
+    config_path = tmp_path / "cleave.config.yaml"
+    config_path.write_text(
+        yaml.safe_dump({"layers": {}, "paths": source_paths}),
+        encoding="utf-8",
+    )
+    cfg, session = _minimal_snapshot_session(tmp_path, config_path)
+
+    out_path = tmp_path / "snapshot.yaml"
+    write_session_snapshot(out_path, cfg=cfg, session=session)
+
+    data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    assert data["paths"] == source_paths
+
+
+_EDITOR_VISUALIZER_KEYS = (
+    "preview_quality",
+    "ui_width_mode",
+    "ui_width",
+    "ui_fade",
+)
+
+
+def test_write_session_snapshot_visualizer_omits_editor_fields(
+    tmp_path: Path,
+) -> None:
+    config_path = tmp_path / "cleave.config.yaml"
+    config_path.write_text("layers: {}\n", encoding="utf-8")
+    cfg, session = _minimal_snapshot_session(tmp_path, config_path)
+    cfg = CleaveConfig(
+        paths=cfg.paths,
+        layers=cfg.layers,
+        visualizer=VisualizerConfig(
+            preview_quality="performance",
+            ui_width_mode="fixed",
+            ui_width=80,
+            ui_fade=5.0,
+        ),
+        config_path=cfg.config_path,
+        user_config_path=cfg.user_config_path,
+    )
+
+    out_path = tmp_path / "snapshot.yaml"
+    write_session_snapshot(out_path, cfg=cfg, session=session)
+
+    visualizer = yaml.safe_load(out_path.read_text(encoding="utf-8"))["visualizer"]
+    for key in _EDITOR_VISUALIZER_KEYS:
+        assert key not in visualizer
+
+
 def test_write_session_snapshot_includes_locked() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -90,6 +199,7 @@ def test_write_session_snapshot_includes_locked() -> None:
             },
             visualizer=VisualizerConfig(),
             config_path=config_path,
+            user_config_path=root / "user-config.yaml",
         )
 
         session = TuningSession(
@@ -137,6 +247,7 @@ def test_write_session_snapshot_sparse_effects() -> None:
             },
             visualizer=VisualizerConfig(),
             config_path=config_path,
+            user_config_path=root / "user-config.yaml",
         )
 
         session = TuningSession(
@@ -206,6 +317,7 @@ def test_write_session_snapshot_sparse_all_effect_types() -> None:
             },
             visualizer=VisualizerConfig(),
             config_path=config_path,
+            user_config_path=root / "user-config.yaml",
         )
 
         session = TuningSession(
@@ -277,6 +389,7 @@ def _snapshot_round_trip_layer_count(layer_count: int) -> None:
             },
             visualizer=VisualizerConfig(),
             config_path=config_path,
+            user_config_path=root / "user-config.yaml",
             layer_z_order=list(slots),
         )
 
@@ -332,6 +445,7 @@ def test_write_session_snapshot_uses_session_z_order_when_valid() -> None:
             },
             visualizer=VisualizerConfig(),
             config_path=config_path,
+            user_config_path=root / "user-config.yaml",
             layer_z_order=list(DEFAULT_LAYER_SLOTS),
         )
 
@@ -377,6 +491,7 @@ def test_write_session_snapshot_falls_back_to_cfg_z_order_when_invalid() -> None
             },
             visualizer=VisualizerConfig(),
             config_path=config_path,
+            user_config_path=root / "user-config.yaml",
             layer_z_order=cfg_order,
         )
 
@@ -421,6 +536,7 @@ def test_write_session_snapshot_includes_upscale() -> None:
             },
             visualizer=VisualizerConfig(width=1280, height=720, upscale=2.0),
             config_path=config_path,
+            user_config_path=root / "user-config.yaml",
         )
 
         session = TuningSession(
@@ -464,6 +580,7 @@ def test_write_session_snapshot_sparse_beat_sensitivity() -> None:
             },
             visualizer=VisualizerConfig(beat_sensitivity=2.0),
             config_path=config_path,
+            user_config_path=root / "user-config.yaml",
         )
 
         session = TuningSession(
@@ -510,6 +627,7 @@ def test_write_session_snapshot_omits_all_zero_effects() -> None:
             },
             visualizer=VisualizerConfig(),
             config_path=config_path,
+            user_config_path=root / "user-config.yaml",
         )
 
         session = TuningSession(
@@ -629,6 +747,7 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
         },
         visualizer=VisualizerConfig(),
         config_path=config_path,
+        user_config_path=root / "user-config.yaml",
         render=RenderConfig(
             overlay=_render_overlay_cfg(),
             post_fx=default_render_post_fx_config(enabled=True, fade_in=30.0, fade_out=4.0),
@@ -797,6 +916,7 @@ def test_write_session_snapshot_render_overlay_without_cfg_render(tmp_path: Path
         layers=cfg.layers,
         visualizer=cfg.visualizer,
         config_path=cfg.config_path,
+        user_config_path=cfg.user_config_path,
         render=None,
     )
     write_session_snapshot(out_path, cfg=cfg, session=session)
@@ -837,6 +957,7 @@ def test_write_session_snapshot_persists_timeline_at_bottom(tmp_path: Path) -> N
         layers=cfg.layers,
         visualizer=cfg.visualizer,
         config_path=out_path,
+        user_config_path=cfg.user_config_path,
         render=cfg.render,
         timeline=timeline,
     )
@@ -1005,6 +1126,7 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
             beat_sensitivity=cfg.visualizer.beat_sensitivity,
         ),
         config_path=cfg.config_path,
+        user_config_path=cfg.user_config_path,
         layer_z_order=cfg.layer_z_order,
         render=cfg.render,
         timeline=cfg.timeline,

@@ -95,6 +95,7 @@ def _cfg_and_session(*, preset_switching: str = "none") -> tuple[CleaveConfig, T
         layer_z_order=["layer_1"],
         visualizer=VisualizerConfig(),
         config_path=Path("/tmp/test/cleave.config.yaml"),
+        user_config_path=Path("/tmp/user-config.yaml"),
     )
     session = TuningSession(
         layer_z_order=["layer_1"],
@@ -187,6 +188,7 @@ def test_persist_layers_writes_projectm_mode(tmp_path: Path) -> None:
         layer_z_order=["layer_1"],
         visualizer=VisualizerConfig(),
         config_path=config_path,
+        user_config_path=Path("/tmp/user-config.yaml"),
     )
     session = TuningSession(
         layer_z_order=["layer_1"],

@@ -13,7 +13,16 @@ import pytest
 from cleave.viz.controls import TuningControls
 from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.row_semantics import RowDescriptor, RowKind
-from tests.cleave.viz.test_controls import _choose_save_as_new, _config_header_row, _desc, _keydown, _make_controls, _row
+from tests.cleave.viz.test_controls import (
+    _choose_save_as_new,
+    _config_header_row,
+    _desc,
+    _expand_settings,
+    _expand_settings_ui,
+    _keydown,
+    _make_controls,
+    _row,
+)
 from tests.cleave.viz.test_timeline_controls import _make_timeline_controls
 from tests.support.viz import keydown, stub_playback_state
 
@@ -298,42 +307,6 @@ def _mutate_timeline_enabled(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
 
 
-def _expand_settings(controls: TuningControls) -> None:
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-
-
-def _expand_settings_ui(controls: TuningControls) -> None:
-    _expand_settings(controls)
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_HEADER)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-
-
-def _mutate_visualizer_preview_quality(controls: TuningControls) -> None:
-    _expand_settings(controls)
-    view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-
-
-def _mutate_visualizer_ui_fade(controls: TuningControls) -> None:
-    _expand_settings_ui(controls)
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_FADE)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-
-
-def _mutate_visualizer_ui_width(controls: TuningControls) -> None:
-    _expand_settings_ui(controls)
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-
-
-def _mutate_visualizer_ui_width_mode(controls: TuningControls) -> None:
-    _expand_settings_ui(controls)
-    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH_MODE)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-
-
 def _mutate_timeline_cues_via_record() -> None:
     tuning = _make_controls(("layer_1",))
     tuning.session.timeline.enabled = True
@@ -389,10 +362,6 @@ _PERSISTED_MUTATIONS: list[
     ("render_post_fx.chroma_boost.variant", _mutate_render_post_fx_chroma_boost_variant, ("layer_1",), {}),
     ("render_post_fx.chroma_boost.amount_pct", _mutate_render_post_fx_chroma_boost_amount, ("layer_1",), {}),
     ("timeline.enabled", _mutate_timeline_enabled, ("layer_1",), {"timeline_enabled": True}),
-    ("visualizer.preview_quality", _mutate_visualizer_preview_quality, ("layer_1",), {}),
-    ("visualizer.ui_fade", _mutate_visualizer_ui_fade, ("layer_1",), {}),
-    ("visualizer.ui_width", _mutate_visualizer_ui_width, ("layer_1",), {}),
-    ("visualizer.ui_width_mode", _mutate_visualizer_ui_width_mode, ("layer_1",), {}),
 ]
 
 
@@ -510,6 +479,30 @@ def _mutate_help_visible(controls: TuningControls) -> None:
     controls.session.help_visible = True
 
 
+def _mutate_settings_preview_quality(controls: TuningControls) -> None:
+    _expand_settings(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_settings_ui_fade(controls: TuningControls) -> None:
+    _expand_settings_ui(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_FADE)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_settings_ui_width(controls: TuningControls) -> None:
+    _expand_settings_ui(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
+def _mutate_settings_ui_width_mode(controls: TuningControls) -> None:
+    _expand_settings_ui(controls)
+    controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH_MODE)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+
 def _mutate_focus_navigation(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_DOWN))
 
@@ -552,6 +545,10 @@ _SESSION_ONLY_MUTATIONS: list[tuple[str, Callable[[TuningControls], None], tuple
     ("render_post_fx.solo", _mutate_render_post_fx_solo, ("layer_1",)),
     ("move_mode.swap", _mutate_move_mode_without_confirm, ("layer_1", "layer_2")),
     ("help_visible", _mutate_help_visible, ("layer_1",)),
+    ("settings.preview_quality", _mutate_settings_preview_quality, ("layer_1",)),
+    ("settings.ui_fade", _mutate_settings_ui_fade, ("layer_1",)),
+    ("settings.ui_width", _mutate_settings_ui_width, ("layer_1",)),
+    ("settings.ui_width_mode", _mutate_settings_ui_width_mode, ("layer_1",)),
     ("focus_navigation", _mutate_focus_navigation, ("layer_1",)),
     ("timeline.armed", _mutate_timeline_arm, ("layer_1",)),
     ("timeline.recording", _mutate_timeline_recording_start, ("layer_1",)),

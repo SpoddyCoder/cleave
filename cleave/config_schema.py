@@ -936,7 +936,7 @@ def _dump_overlay_fields(
     return out
 
 
-VISUALIZER_FIELDS: tuple[FieldDescriptor, ...] = (
+VISUALIZER_PROJECT_FIELDS: tuple[FieldDescriptor, ...] = (
     FieldDescriptor(
         "width",
         DEFAULT_VISUALIZER_WIDTH,
@@ -965,6 +965,9 @@ VISUALIZER_FIELDS: tuple[FieldDescriptor, ...] = (
         _parse_beat_sensitivity,
         lambda value, _ctx: clamp_beat_sensitivity(value),
     ),
+)
+
+EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
     FieldDescriptor(
         "preview_quality",
         DEFAULT_VISUALIZER_PREVIEW_QUALITY,
@@ -997,6 +1000,10 @@ VISUALIZER_FIELDS: tuple[FieldDescriptor, ...] = (
         ),
         lambda value, _ctx: clamp_ui_fade(value),
     ),
+)
+
+VISUALIZER_FIELDS: tuple[FieldDescriptor, ...] = (
+    VISUALIZER_PROJECT_FIELDS + EDITOR_FIELDS
 )
 
 def _build_highlight_rolloff_config(parsed: dict[str, Any]) -> Any:
@@ -1260,13 +1267,48 @@ def _section_field_defaults(section: SectionDescriptor) -> dict[str, Any]:
     return out
 
 
-def parse_visualizer_section(data: dict[str, Any]) -> Any:
+def parse_editor_section(data: dict[str, Any]) -> Any:
+    from cleave.user_config import EditorSettings
+
+    editor = as_mapping(data.get("editor"), "editor")
+    ctx = ParseCtx()
+    parsed: dict[str, Any] = {}
+    for field in EDITOR_FIELDS:
+        parsed[field.yaml_key] = _parse_field(editor, field, ctx, "editor")
+    return EditorSettings(
+        preview_quality=parsed["preview_quality"],
+        ui_width_mode=parsed["ui_width_mode"],
+        ui_width=parsed["ui_width"],
+        ui_fade=parsed["ui_fade"],
+    )
+
+
+def dump_editor_section(editor: Any) -> dict[str, Any]:
+    values = {
+        "preview_quality": editor.preview_quality,
+        "ui_width_mode": editor.ui_width_mode,
+        "ui_width": editor.ui_width,
+        "ui_fade": editor.ui_fade,
+    }
+    ctx = PersistCtx(cfg=None, session=None)
+    return _dump_fields(EDITOR_FIELDS, values, ctx)
+
+
+def parse_visualizer_section(
+    data: dict[str, Any],
+    *,
+    editor: Any | None = None,
+) -> Any:
     from cleave.config import VisualizerConfig
+    from cleave.user_config import default_editor_settings
+
+    if editor is None:
+        editor = default_editor_settings()
 
     visualizer = as_mapping(data.get("visualizer"), "visualizer")
     ctx = ParseCtx()
     parsed: dict[str, Any] = {}
-    for field in VISUALIZER_FIELDS:
+    for field in VISUALIZER_PROJECT_FIELDS:
         parsed[field.yaml_key] = _parse_field(
             visualizer, field, ctx, "visualizer"
         )
@@ -1276,10 +1318,10 @@ def parse_visualizer_section(data: dict[str, Any]) -> Any:
         height=parsed["height"],
         upscale=parsed["upscale"],
         beat_sensitivity=parsed["beat_sensitivity"],
-        preview_quality=parsed["preview_quality"],
-        ui_width_mode=parsed["ui_width_mode"],
-        ui_width=parsed["ui_width"],
-        ui_fade=parsed["ui_fade"],
+        preview_quality=editor.preview_quality,
+        ui_width_mode=editor.ui_width_mode,
+        ui_width=editor.ui_width,
+        ui_fade=editor.ui_fade,
     )
 
 
@@ -1290,12 +1332,8 @@ def persist_visualizer(ctx: PersistCtx) -> dict[str, Any]:
         "height": vis.height,
         "upscale": vis.upscale,
         "beat_sensitivity": vis.beat_sensitivity,
-        "preview_quality": vis.preview_quality,
-        "ui_width_mode": vis.ui_width_mode,
-        "ui_width": vis.ui_width,
-        "ui_fade": vis.ui_fade,
     }
-    return _dump_fields(VISUALIZER_FIELDS, values, ctx)
+    return _dump_fields(VISUALIZER_PROJECT_FIELDS, values, ctx)
 
 
 def parse_layer_z_order_section(data: dict[str, Any], ctx: ParseCtx) -> list[str]:
@@ -1856,8 +1894,8 @@ def default_render_post_fx_runtime_values() -> dict[str, Any]:
 def template_visualizer_section(*, name: str = "cleave-viz-example") -> dict[str, Any]:
     ctx = PersistCtx(cfg=None, session=None)  # type: ignore[arg-type]
     out = _dump_fields(
-        VISUALIZER_FIELDS,
-        {field.yaml_key: field.default for field in VISUALIZER_FIELDS},
+        VISUALIZER_PROJECT_FIELDS,
+        {field.yaml_key: field.default for field in VISUALIZER_PROJECT_FIELDS},
         ctx,
     )
     out["name"] = name

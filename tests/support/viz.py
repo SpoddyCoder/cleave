@@ -111,6 +111,7 @@ def make_test_cfg(
         layer_z_order=list(slots),
         visualizer=VisualizerConfig(),
         config_path=config_path or Path("/tmp/test/cleave.config.yaml"),
+        user_config_path=Path("/tmp/user-config.yaml"),
     )
 
 

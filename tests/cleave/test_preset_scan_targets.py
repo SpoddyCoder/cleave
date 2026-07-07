@@ -10,10 +10,14 @@ from cleave.config import (
     LayerConfig,
     PathsConfig,
     VisualizerConfig,
+    VIZ_CONFIG_FILENAME,
+    dump_yaml,
+    load_config,
 )
 from cleave.config_schema import DEFAULT_LAYER_SLOTS
 from cleave.preset_scan_targets import build_bulk_targets, build_project_targets
 from cleave.extract import STEM_NAMES
+from tests.support.config import write_minimal_config, write_user_config_file
 
 
 def _write_milk(path: Path) -> None:
@@ -53,6 +57,7 @@ def _project_cfg(
         layers=layers,
         visualizer=VisualizerConfig(),
         config_path=tmp / "cleave-viz.yaml",
+        user_config_path=tmp / "user-config.yaml",
         layer_z_order=layer_z_order or ["layer_1"],
     )
 
@@ -258,3 +263,32 @@ def test_bulk_targets_recursive() -> None:
             direct.resolve(),
             nested.resolve(),
         ]
+
+
+def test_build_project_targets_uses_user_config_preset_root(tmp_path: Path) -> None:
+    import yaml
+
+    user_preset = tmp_path / "user-presets"
+    user_texture = tmp_path / "user-textures"
+    user_texture.mkdir(parents=True)
+
+    user_cfg_path = tmp_path / "user-config.yaml"
+    write_user_config_file(
+        user_cfg_path,
+        preset_root=user_preset,
+        texture_paths=(user_texture,),
+    )
+
+    project_dir = tmp_path / "project"
+    write_minimal_config(project_dir, user_preset)
+    cfg_path = project_dir / VIZ_CONFIG_FILENAME
+    data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    del data["paths"]
+    with cfg_path.open("w", encoding="utf-8") as handle:
+        dump_yaml(data, handle)
+
+    cfg = load_config(project_root=project_dir, user_config_path=user_cfg_path)
+    targets = build_project_targets(cfg)
+
+    assert targets.preset_root == user_preset.resolve()
+    assert targets.texture_paths == (user_texture.resolve(),)
