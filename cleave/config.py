@@ -5,7 +5,10 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal, TextIO
+from typing import TYPE_CHECKING, Any, Literal, TextIO
+
+if TYPE_CHECKING:
+    from cleave.user_config import UserConfig
 
 import yaml
 
@@ -93,7 +96,6 @@ from cleave.config_schema import (
 from cleave.timeline import TimelineCue
 
 VIZ_CONFIG_FILENAME = "cleave-viz.yaml"
-GLOBAL_CONFIG_PATH = Path.home() / ".config" / "cleave" / VIZ_CONFIG_FILENAME
 
 
 @dataclass(frozen=True)
@@ -230,6 +232,7 @@ class CleaveConfig:
     layers: dict[str, LayerConfig]
     visualizer: VisualizerConfig
     config_path: Path
+    user_config_path: Path
     layer_z_order: list[str] = field(default_factory=lambda: list(DEFAULT_LAYER_Z_ORDER))
     render: RenderConfig | None = None
     timeline: TimelineConfig | None = None
@@ -302,7 +305,7 @@ def find_config_path(
     config_path: Path | None = None,
     project_root: Path | None = None,
 ) -> Path | None:
-    """Locate config: CLI override, project cleave-viz.yaml, global, then repo template."""
+    """Locate config: CLI override, project cleave-viz.yaml, then repo template."""
     if config_path is not None:
         return _expand_path(config_path)
 
@@ -310,9 +313,6 @@ def find_config_path(
     local_path = root / VIZ_CONFIG_FILENAME
     if local_path.is_file():
         return local_path.resolve()
-
-    if GLOBAL_CONFIG_PATH.is_file():
-        return GLOBAL_CONFIG_PATH.resolve()
 
     from cleave.paths import repo_root
 
@@ -323,17 +323,32 @@ def find_config_path(
     return None
 
 
-def _parse_paths(data: dict[str, Any]) -> PathsConfig:
-    paths = as_mapping(data.get("paths"), "paths")
-    preset_root = _expand_path(paths.get("preset_root", DEFAULT_PRESET_ROOT))
+def _parse_paths(data: dict[str, Any], user_cfg: UserConfig) -> PathsConfig:
+    raw_paths = data.get("paths")
+    if raw_paths is None:
+        paths: dict[str, Any] = {}
+    else:
+        paths = as_mapping(raw_paths, "paths")
 
-    raw_texture_paths = paths.get("texture_paths", DEFAULT_TEXTURE_PATHS)
-    if not isinstance(raw_texture_paths, list):
-        raise ValueError("paths.texture_paths must be a list")
-    if not raw_texture_paths:
-        raise ValueError("paths.texture_paths must not be empty")
+    if "preset_root" in paths:
+        preset_root = _expand_path(paths["preset_root"])
+    elif user_cfg.preset_root is not None:
+        preset_root = user_cfg.preset_root
+    else:
+        preset_root = _expand_path(DEFAULT_PRESET_ROOT)
 
-    texture_paths = tuple(_expand_path(path) for path in raw_texture_paths)
+    if "texture_paths" in paths:
+        raw_texture_paths = paths["texture_paths"]
+        if not isinstance(raw_texture_paths, list):
+            raise ValueError("paths.texture_paths must be a list")
+        if not raw_texture_paths:
+            raise ValueError("paths.texture_paths must not be empty")
+        texture_paths = tuple(_expand_path(path) for path in raw_texture_paths)
+    elif user_cfg.texture_paths is not None:
+        texture_paths = user_cfg.texture_paths
+    else:
+        texture_paths = tuple(_expand_path(path) for path in DEFAULT_TEXTURE_PATHS)
+
     return PathsConfig(preset_root=preset_root, texture_paths=texture_paths)
 
 
@@ -378,13 +393,16 @@ def _parse_layers(
 def load_config(
     config_path: Path | None = None,
     project_root: Path | None = None,
+    user_config_path: Path | None = None,
 ) -> CleaveConfig:
     """Load, parse, and validate Cleave YAML configuration."""
+    from cleave.user_config import load_user_config
+
+    user_cfg = load_user_config(user_config_path)
     path = find_config_path(config_path, project_root)
     if path is None:
         raise FileNotFoundError(
-            f"no {VIZ_CONFIG_FILENAME} found; create one in the project "
-            f"directory or at {GLOBAL_CONFIG_PATH}"
+            f"no {VIZ_CONFIG_FILENAME} found; create one in the project directory"
         )
     if not path.is_file():
         raise FileNotFoundError(f"config file not found: {path}")
@@ -395,8 +413,8 @@ def load_config(
     if not isinstance(data, dict):
         raise ValueError(f"config root must be a mapping: {path}")
 
-    paths = _parse_paths(data)
-    visualizer = parse_visualizer_section(data)
+    paths = _parse_paths(data, user_cfg)
+    visualizer = parse_visualizer_section(data, editor=user_cfg.editor)
     render = parse_render_section(data)
     layers, parse_ctx = _parse_layers(data, paths.preset_root, path.parent)
     layer_z_order = parse_layer_z_order_section(data, parse_ctx)
@@ -408,6 +426,7 @@ def load_config(
         layers=layers,
         visualizer=visualizer,
         config_path=path,
+        user_config_path=user_cfg.path,
         layer_z_order=layer_z_order,
         render=render,
         timeline=timeline,

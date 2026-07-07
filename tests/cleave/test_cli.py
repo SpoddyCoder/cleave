@@ -26,6 +26,7 @@ from cleave.preset_scan_targets import PresetTarget, ScanTargets
 from cleave.viz.render import RenderResult
 from cleave.extract import STEM_NAMES, stems_dir
 from cleave.project import write_manifest
+from tests.support.config import write_minimal_config
 
 
 def _write_stub_stems(project: Path) -> None:
@@ -176,6 +177,10 @@ def _complete_project(tmp_path: Path, slug: str = "my-track") -> Path:
     )
     (project / "signals.json").write_text("{}")
     return project
+
+
+def _write_scan_project_config(project: Path, tmp_path: Path) -> None:
+    write_minimal_config(project, tmp_path / "presets")
 
 
 def test_cmd_play_calls_launch(
@@ -658,11 +663,7 @@ def test_cmd_scan_blocks_incomplete_report_without_resume(
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     project = _complete_project(tmp_path)
-    (project / "cleave-viz.yaml").write_text(
-        (Path(__file__).resolve().parents[2] / "cleave-viz.yaml").read_text(
-            encoding="utf-8"
-        )
-    )
+    _write_scan_project_config(project, tmp_path)
 
     presets = tuple(
         PresetTarget(path=Path(f"/tmp/p{i}.milk"), layers=("layer_1",))
@@ -699,11 +700,7 @@ def test_cmd_scan_resume_rejects_complete_report(
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     project = _complete_project(tmp_path)
-    (project / "cleave-viz.yaml").write_text(
-        (Path(__file__).resolve().parents[2] / "cleave-viz.yaml").read_text(
-            encoding="utf-8"
-        )
-    )
+    _write_scan_project_config(project, tmp_path)
 
     report_path = tmp_path / "scan-report.json"
     report_path.write_text(
@@ -804,11 +801,7 @@ def test_cmd_scan_project_mode_smoke(
 ) -> None:
     monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
     project = _complete_project(tmp_path)
-    (project / "cleave-viz.yaml").write_text(
-        (Path(__file__).resolve().parents[2] / "cleave-viz.yaml").read_text(
-            encoding="utf-8"
-        )
-    )
+    _write_scan_project_config(project, tmp_path)
 
     preset_results = [
         PresetScanResult(path=Path("/tmp/a.milk"), result="ok", layers=("layer_1",)),

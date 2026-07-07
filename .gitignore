@@ -1,7 +1,7 @@
 ####################################
-# User-generated project data (default: projects/ under repo root)
+# User-generated project data (dev checkout only; default data root is XDG ~/.local/share/cleave)
 #
-# Override with CLEAVE_DATA=~/.local/share/cleave for XDG layout (see cleave/paths.py).
+# Set CLEAVE_DATA=. (or another path) to keep projects/ in the repo (see cleave/paths.py).
 projects/*
 !projects/.gitkeep
 

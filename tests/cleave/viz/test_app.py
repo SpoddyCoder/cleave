@@ -28,6 +28,7 @@ from tests.support.config import default_render_post_fx_runtime
 from cleave.viz.modal import ModalHost
 from cleave.viz.tuning_panel_draw import TuningOverlay
 from tests.support.compositor_mock import recording_compositor
+from tests.support.viz import make_test_cfg
 
 
 def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisualizerRuntime:
@@ -83,7 +84,7 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
 def _run_seed(*, upscale: float = 2.0) -> VisualizerSeed:
     display_w = int(1280 * upscale)
     display_h = int(720 * upscale)
-    cfg = MagicMock()
+    cfg = make_test_cfg(("layer_1",))
     return VisualizerSeed(
         project_dir=MagicMock(),
         audio_path=MagicMock(),

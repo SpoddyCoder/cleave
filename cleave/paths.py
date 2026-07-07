@@ -17,11 +17,14 @@ def repo_root() -> Path:
 
 
 def data_dir() -> Path:
-    """Return Cleave data root (``CLEAVE_DATA`` or the repo / package root)."""
+    """Return Cleave data root (``CLEAVE_DATA``, ``XDG_DATA_HOME/cleave``, or ``~/.local/share/cleave``)."""
     override = os.environ.get("CLEAVE_DATA")
     if override:
         return Path(override).expanduser().resolve()
-    return _REPO_ROOT.resolve()
+    xdg_data_home = os.environ.get("XDG_DATA_HOME")
+    if xdg_data_home:
+        return (Path(xdg_data_home) / "cleave").resolve()
+    return (Path.home() / ".local" / "share" / "cleave").resolve()
 
 
 def projects_dir() -> Path:

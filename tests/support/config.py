@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from cleave.config import ChromaBoostConfig, HighlightRolloffConfig, LayerConfig, RenderPostFxConfig, VIZ_CONFIG_FILENAME, dump_yaml
+from cleave.user_config import EditorSettings
 from cleave.config_schema import (
     DEFAULT_LAYER_SLOTS,
     DEFAULT_LAYER_Z_ORDER,
@@ -150,3 +151,32 @@ def write_minimal_config(project_dir: Path, preset_root: Path, **overrides) -> P
         dump_yaml(data, handle)
 
     return config_path
+
+
+def write_user_config_file(
+    path: Path,
+    *,
+    preset_root: Path | None = None,
+    texture_paths: tuple[Path, ...] | None = None,
+    editor: EditorSettings | None = None,
+) -> Path:
+    """Write a minimal user config file for merge and path tests."""
+    data: dict = {}
+    if editor is not None:
+        data["editor"] = {
+            "preview_quality": editor.preview_quality,
+            "ui_width_mode": editor.ui_width_mode,
+            "ui_width": editor.ui_width,
+            "ui_fade": editor.ui_fade,
+        }
+    if preset_root is not None or texture_paths is not None:
+        paths: dict = {}
+        if preset_root is not None:
+            paths["preset_root"] = str(preset_root)
+        if texture_paths is not None:
+            paths["texture_paths"] = [str(entry) for entry in texture_paths]
+        data["paths"] = paths
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        dump_yaml(data, handle)
+    return path

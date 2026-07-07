@@ -11,6 +11,7 @@ from pathlib import Path
 import pygame
 
 from cleave.config import CleaveConfig, render_fps, render_hdr_compositing
+from cleave.user_config import persist_editor_settings
 from cleave.effects.runtime import EffectRuntime
 from cleave.gl_color_format import GlColorFormat, resolve_compositor_format
 from cleave.gl_compositor import GlCompositor
@@ -596,6 +597,7 @@ class VisualizerApp:
 
         finally:
             if rt is not None:
+                persist_editor_settings(rt.seed.cfg)
                 LayerFramePipeline.destroy(rt.layers)
                 rt.compositor.destroy()
                 rt.post_process.destroy()

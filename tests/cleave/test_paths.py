@@ -11,7 +11,6 @@ from cleave.paths import (
     data_dir,
     default_project_config,
     project_slug,
-    repo_root,
     resolve_project,
     validate_project_slug,
 )
@@ -25,7 +24,15 @@ def test_data_dir_uses_cleave_data_env(monkeypatch: pytest.MonkeyPatch, tmp_path
 
 def test_data_dir_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("CLEAVE_DATA", raising=False)
-    assert data_dir() == repo_root().resolve()
+    monkeypatch.delenv("XDG_DATA_HOME", raising=False)
+    expected = (Path.home() / ".local" / "share" / "cleave").resolve()
+    assert data_dir() == expected
+
+
+def test_data_dir_uses_xdg_data_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.delenv("CLEAVE_DATA", raising=False)
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    assert data_dir() == (tmp_path / "cleave").resolve()
 
 
 def test_resolve_project_by_slug(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
