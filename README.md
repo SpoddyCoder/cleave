@@ -10,7 +10,7 @@ Comprehensive visual editor allows you to browse and tune presets in real time -
 
 Render the final output in high defintion and high frame rates using `ffmpeg`.
 
-Built on [projectM](https://github.com/projectM-visualizer/projectM) and [Demucs](https://github.com/facebookresearch/demucs). Developed on WSL2; should run on any Linux with a display.
+Built on [projectM](https://github.com/projectM-visualizer/projectM) and [Demucs](https://github.com/facebookresearch/demucs) amongst [others](#attribution). Developed on WSL2; should run on any Linux with a display.
 
 ## Requirements
 
@@ -174,3 +174,18 @@ Clone with submodules so preset packs are available for `cleave scan-golden --pr
 ```bash
 git submodule update --init --recursive
 ```
+
+---
+
+## Attribution
+
+* [Milkdrop / projectM](https://github.com/projectM-visualizer/projectM) - visualizer engine
+* [Demucs](https://github.com/facebookresearch/demucs) - audio separation
+* [FFmpeg](https://ffmpeg.org) - video encoding
+* [pygame](https://www.pygame.org/) - window, input, overlay UI, and SDL2 audio
+* [OpenGL](https://www.opengl.org/) / [PyOpenGL](https://pyopengl.sourceforge.io/) - layer compositing and rendering
+* [ModernGL](https://moderngl.readthedocs.io/) - GPU post-processing
+* [librosa](https://librosa.org/) - audio analysis and feature extraction
+* [NumPy](https://numpy.org/) - numerical arrays for audio and effects
+* [PyYAML](https://pyyaml.org/) - configuration format
+* [soundfile](https://python-soundfile.readthedocs.io/) - WAV I/O
