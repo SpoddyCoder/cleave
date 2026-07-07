@@ -3,14 +3,14 @@
 # Run the same headless test command as .github/workflows/tests.yml locally.
 #
 # requires:
-#   sudo apt-get install -y libgl1 libglx-mesa0 libegl1 libgl1-mesa-dri xvfb
+#   sudo apt-get install -y libgl1 libglx-mesa0 libegl1 libgl1-mesa-dri libgl-dev libegl-dev xvfb
 #
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-APT_PKGS="libgl1 libglx-mesa0 libegl1 libgl1-mesa-dri xvfb"
+APT_PKGS="libgl1 libglx-mesa0 libegl1 libgl1-mesa-dri libgl-dev libegl-dev xvfb"
 
 if ! command -v xvfb-run >/dev/null; then
   echo "xvfb-run not found. Install with:" >&2
