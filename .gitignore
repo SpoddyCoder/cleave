@@ -10,6 +10,9 @@ projects/*
 # Project Ignores
 #
 
+# created by tests/run_ci_tests.sh
+sdlaudio.raw
+
 # python
 __pycache__/
 *.pyc

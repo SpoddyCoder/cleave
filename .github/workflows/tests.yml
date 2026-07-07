@@ -9,7 +9,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     env:
-      SDL_VIDEODRIVER: dummy
+      SDL_AUDIODRIVER: disk
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,7 +28,7 @@ jobs:
         run: |
           sudo find /etc/apt/sources.list.d/ -type f \( -name '*microsoft*' -o -name '*azure-cli*' \) -delete
           sudo apt-get update
-          sudo apt-get install -y libgl1
+          sudo apt-get install -y libgl1 libgl1-mesa-dri xvfb
 
       - name: Install Python dependencies
         run: |
@@ -36,4 +36,4 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Run unit tests
-        run: ./tests/run_unit_tests.py
+        run: xvfb-run -a ./tests/run_unit_tests.py
