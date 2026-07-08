@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
 
-Stem-separated music visualizer. Layer together drums, bass, vocal and other stems driving Milkdrop presets to create your own unique visual masterpieces. 
+Stem-separated music visualizer. Layer together drums, bass, vocal and other stems - each driving Milkdrop presets to create your own unique visual masterpieces. 
 
 Comprehensive visual editor allows you to browse and tune presets in real time - automate preset switching, layer in effects, post processing and a whole bunch more. Render the final output in high definition and high frame rates using `ffmpeg`.
 
@@ -133,8 +133,8 @@ The project directory stores all files required in a self-contained bundle...
 
 While focused on a preset **file** row:
 
-* `Ctrl + f` — copy the preset into `favourites/` (original stays in the pack).
-* `Ctrl + b` — move the `.milk` into `blacklist/` (removed from pack).
+* `Ctrl + f` — **copy** the preset into `favourites/` (original stays in the pack).
+* `Ctrl + b` — **move** the preset into `blacklist/` (permanently removed from pack).
 * Both folders live under `paths.preset_root` (default `~/.local/share/cleave/presets/`).
   * Browse them in the Editor like any other pack folder. 
 * Subdirectories inside `favourites/` or `blacklist/` appear as destination choices in the confirm modal.

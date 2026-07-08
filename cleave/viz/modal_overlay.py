@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pygame
 
-from cleave.viz.modal import ModalViewState
+from cleave.viz.modal import ModalViewState, modal_options_vertical
 from cleave.viz.theme import (
     BACKGROUND,
     BACKGROUND_ALPHA,
@@ -96,6 +96,7 @@ def draw(
             labels=state.options,
             focus_index=state.focus_index,
             text_alpha=text_alpha,
+            line_gap=line_gap,
         )
 
     if BORDER_WIDTH > 0:
@@ -129,7 +130,7 @@ def _measure_panel(
     if state.options:
         if state.message is not None:
             content_h += line_h + line_gap
-        options_w, options_h = _measure_options(font, state.options)
+        options_w, options_h = _measure_options(font, state.options, line_gap=line_gap)
         content_w = max(content_w, options_w)
         content_h += options_h
 
@@ -146,9 +147,16 @@ def _option_text(label: str) -> str:
 def _measure_options(
     font: pygame.font.Font,
     labels: tuple[str, ...],
+    *,
+    line_gap: int,
 ) -> tuple[int, int]:
     line_h = font.get_linesize()
     widths = [font.size(_option_text(label))[0] for label in labels]
+    if modal_options_vertical(len(labels)):
+        total_w = max(widths) if widths else 0
+        count = len(labels)
+        total_h = count * line_h + max(0, count - 1) * line_gap
+        return total_w, total_h
     total_w = sum(widths) + _OPTION_GAP * max(0, len(labels) - 1)
     return total_w, line_h
 
@@ -179,24 +187,34 @@ def _draw_options(
     labels: tuple[str, ...],
     focus_index: int,
     text_alpha: int,
+    line_gap: int,
 ) -> None:
-    options_w, _ = _measure_options(font, labels)
+    options_w, _ = _measure_options(font, labels, line_gap=line_gap)
     option_x = x + max(0, (content_width - options_w) // 2)
     line_h = font.get_linesize()
+    vertical = modal_options_vertical(len(labels))
+    cur_y = y
     for index, label in enumerate(labels):
         focused = index == focus_index
         color = HIGHLIGHT if focused else DISABLED
         text = _option_text(label)
+        text_w = font.size(text)[0]
+        row_x = option_x
+        if vertical:
+            row_x = option_x + max(0, (options_w - text_w) // 2)
         if focused and text_alpha >= 2:
             tint_alpha = int(FOCUS_ROW_BG_ALPHA * text_alpha / 255)
             blit_tint(
                 surface,
-                (option_x, y, font.size(text)[0], line_h),
+                (row_x, cur_y, text_w, line_h),
                 HIGHLIGHT,
                 alpha=tint_alpha,
             )
         option_surf = font.render(text, True, color)
         if text_alpha >= 2:
             option_surf.set_alpha(text_alpha)
-            surface.blit(option_surf, (option_x, y))
-        option_x += option_surf.get_width() + _OPTION_GAP
+            surface.blit(option_surf, (row_x, cur_y))
+        if vertical:
+            cur_y += line_h + line_gap
+        else:
+            option_x += option_surf.get_width() + _OPTION_GAP
