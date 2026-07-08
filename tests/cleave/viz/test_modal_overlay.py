@@ -5,13 +5,17 @@ from __future__ import annotations
 import pygame
 
 from cleave.viz import modal_overlay
-from cleave.viz.modal import ModalHost, ModalKind, ModalViewState
+from cleave.viz.modal import ModalHost, ModalKind, ModalOption, ModalViewState
 from cleave.viz.theme import HIGHLIGHT, MODAL_SCRIM_ALPHA
 from cleave.viz.ui_tint import blit_tint
 
 
 def _font() -> pygame.font.Font:
     return pygame.font.SysFont("monospace", 17)
+
+
+def _keydown(key: int) -> pygame.event.Event:
+    return pygame.event.Event(pygame.KEYDOWN, key=key, mod=0)
 
 
 def test_modal_panel_is_centered() -> None:
@@ -154,3 +158,57 @@ def test_modal_options_centered_when_message_is_wider() -> None:
     assert msg_w > options_w
     assert content_w == msg_w
     assert modal_overlay._PANEL_PAD_X + (content_w - options_w) // 2 > modal_overlay._PANEL_PAD_X
+
+
+def test_prompt_choice_renders_n_options() -> None:
+    pygame.init()
+    font = _font()
+    modal = ModalHost()
+    modal.prompt_choice(
+        "Favourite preset: demo.milk?",
+        [
+            ModalOption("(root)", lambda: None),
+            ModalOption("keepers", lambda: None),
+            ModalOption("wip", lambda: None),
+            ModalOption("Cancel", lambda: None),
+        ],
+    )
+    view = modal.view_state()
+    assert view is not None
+    assert view.kind == ModalKind.CHOICE
+    assert view.options == ("(root)", "keepers", "wip", "Cancel")
+
+    options_w, options_h = modal_overlay._measure_options(font, view.options)
+    assert options_h == font.get_linesize()
+    assert options_w > font.size(modal_overlay._option_text("(root)"))[0]
+
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    modal_overlay.draw(surface, view, font=font)
+
+
+def test_prompt_choice_left_right_cycles_options() -> None:
+    modal = ModalHost()
+    modal.prompt_choice(
+        "Blacklist preset: demo.milk?",
+        [
+            ModalOption("(root)", lambda: None),
+            ModalOption("review", lambda: None),
+            ModalOption("Cancel", lambda: None),
+        ],
+    )
+    view = modal.view_state()
+    assert view is not None
+    assert view.focus_index == 0
+
+    modal.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert modal.view_state() is not None
+    assert modal.view_state().focus_index == 1
+
+    modal.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert modal.view_state().focus_index == 2
+
+    modal.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert modal.view_state().focus_index == 0
+
+    modal.handle_keydown(_keydown(pygame.K_LEFT))
+    assert modal.view_state().focus_index == 2

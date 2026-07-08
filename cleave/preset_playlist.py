@@ -152,6 +152,28 @@ class PresetPlaylist:
         self._invalidate_dir_display()
         return self.current
 
+    def remove_preset(self, path: Path) -> bool:
+        """Remove path from sibling rotation; adjust index; invalidate dir label."""
+        resolved = path.resolve()
+        try:
+            removed_idx = next(
+                i for i, candidate in enumerate(self.paths) if candidate.resolve() == resolved
+            )
+        except StopIteration:
+            return False
+
+        self.paths = tuple(
+            candidate for candidate in self.paths if candidate.resolve() != resolved
+        )
+        if not self.paths:
+            self.index = 0
+        elif removed_idx < self.index:
+            self.index -= 1
+        elif removed_idx == self.index:
+            self.index = min(self.index, len(self.paths) - 1)
+        self._invalidate_dir_display()
+        return True
+
     def step_by(self, delta: int) -> Path | None:
         if not self.paths:
             return None

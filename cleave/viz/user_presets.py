@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import filecmp
 import os
+import shutil
 from pathlib import Path
 
 
@@ -21,6 +22,15 @@ def user_preset_item_display_name(paths: list[str], index: int) -> str:
         return name
     instance = matching.index(index) + 1
     return f"{name} ({instance})"
+
+
+def copy_with_dedup(dest_dir: Path, src_path: Path) -> Path:
+    """Copy ``src_path`` into ``dest_dir`` with dedup; return the destination path."""
+    dest_path, needs_copy = resolve_user_preset_dest(dest_dir, src_path)
+    if needs_copy:
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src_path, dest_path)
+    return dest_path
 
 
 def resolve_user_preset_dest(dest_dir: Path, src_path: Path) -> tuple[Path, bool]:

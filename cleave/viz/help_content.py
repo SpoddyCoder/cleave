@@ -89,11 +89,17 @@ _PRESET_DIR_SECTION = HelpSection(
     ),
 )
 
+_PRESET_CURATION_SHORTCUTS = (
+    ("Ctrl + f", "favourite preset"),
+    ("Ctrl + b", "blacklist preset"),
+)
+
 _PRESET_SECTION = HelpSection(
     "Edit",
     (
         ("Left/Right", "next/previous preset"),
         ("Ctrl + Left/Right", "next/previous large step"),
+        *_PRESET_CURATION_SHORTCUTS,
     ),
 )
 
@@ -101,7 +107,10 @@ _USER_PRESET_ADD_SHORTCUT = ("+", "add current preset to rotation set")
 
 _USER_PRESET_ITEM_SECTION = HelpSection(
     "Edit",
-    (("Delete", "remove preset"),),
+    (
+        ("Delete", "remove preset"),
+        *_PRESET_CURATION_SHORTCUTS,
+    ),
 )
 
 _USER_PRESET_ADD_SECTION = HelpSection(

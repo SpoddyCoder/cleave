@@ -13,6 +13,7 @@ class ModalKind(Enum):
     YES_NO = "yes_no"
     SAVE_CHOICE = "save_choice"
     UNSAVED_QUIT = "unsaved_quit"
+    CHOICE = "choice"
 
 
 @dataclass
@@ -87,6 +88,21 @@ class ModalHost:
                     ModalOption(cancel_label, on_cancel_action),
                 ],
                 on_dismiss=on_cancel,
+            )
+        )
+
+    def prompt_choice(
+        self,
+        message: str,
+        options: list[ModalOption],
+        on_dismiss: Callable[[], None] | None = None,
+    ) -> None:
+        self.prompt(
+            ModalRequest(
+                kind=ModalKind.CHOICE,
+                message=message,
+                options=options,
+                on_dismiss=on_dismiss,
             )
         )
 

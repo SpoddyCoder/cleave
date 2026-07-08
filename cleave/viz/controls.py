@@ -15,6 +15,7 @@ from cleave.config_schema import PRESET_SWITCHING_MODES, PRESET_SWITCHING_SCOPES
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.extract import STEM_SOURCES
 from cleave.viz.config_save import ConfigSaveController
+from cleave.viz.preset_curation_controls import PresetCurationController
 from cleave.viz.key_repeat import KeyRepeatController, add_current_preset_key_pressed, delete_key_pressed, mod_ctrl, mod_shift
 from cleave.viz.modal import ModalHost
 from cleave.viz.panel_notification import PanelNotificationHost
@@ -39,6 +40,7 @@ from cleave.viz.row_fields import (
     apply_field_horizontal,
 )
 from cleave.viz.row_semantics import (
+    PRESET_FILE_ROW_KINDS,
     REPEAT_ROW_KINDS,
     RowDescriptor,
     RowKind,
@@ -109,6 +111,12 @@ class TuningControls:
             on_overwrite_config=on_overwrite_config,
             on_notification=self.show_notification,
             move_mode_signature=self._move_mode_signature_payload,
+        )
+        self._preset_curation = PresetCurationController(
+            session,
+            preset_root,
+            self._modal_host,
+            layer_bindings,
         )
         self._view_state = TuningViewStateBuilder(
             session,
@@ -311,6 +319,28 @@ class TuningControls:
                 ):
                     return True
                 self._add_current_preset(slot)
+                return True
+
+        if mod_ctrl(event.mod) and event.key in (pygame.K_f, pygame.K_b):
+            kind = self.focus_descriptor.kind
+            slot = self.focus_descriptor.slot
+            if slot is not None and kind in PRESET_FILE_ROW_KINDS:
+                if layer_lock_blocks_mutation(
+                    kind, locked=self.session.layers[slot].locked
+                ):
+                    return True
+                src = self._resolve_preset_file_path(slot, kind, self.focus_descriptor)
+                if src is None or not src.is_file():
+                    return True
+                if event.key == pygame.K_f:
+                    self._preset_curation.prompt_favourite(slot, src)
+                else:
+                    self._preset_curation.prompt_blacklist(
+                        slot,
+                        src,
+                        from_user_preset=(kind == RowKind.TRACK_USER_PRESET_ITEM),
+                        user_preset_index=self.focus_descriptor.preset_index,
+                    )
                 return True
 
         if event.key == pygame.K_RETURN and mod_ctrl(event.mod):
@@ -566,6 +596,19 @@ class TuningControls:
     def _unlock_preset_after_modal(self, slot: str) -> None:
         if self._layer_bindings is not None:
             self._layer_bindings.unlock_preset_after_modal(slot)
+
+    def _resolve_preset_file_path(
+        self, slot: str, kind: RowKind, desc: RowDescriptor
+    ) -> Path | None:
+        layer = self.session.layers[slot]
+        if kind == RowKind.TRACK_PRESET:
+            return layer.playlist.current
+        if kind == RowKind.TRACK_USER_PRESET_ITEM:
+            index = desc.preset_index
+            if index is None or index < 0 or index >= len(layer.user_presets):
+                return None
+            return Path(layer.user_presets[index])
+        return None
 
     def _add_current_preset(self, slot: str) -> None:
         playlist = self.session.layers[slot].playlist
