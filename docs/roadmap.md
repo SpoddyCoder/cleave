@@ -2,6 +2,7 @@
 
 Aspirational ideas. Not scheduled; revisit when the core workflow feels solid.
 
+
 ## Timeline v2
 - Fade in/out on layer transitions
 - Beat snap for cue placement

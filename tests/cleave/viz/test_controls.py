@@ -3419,3 +3419,146 @@ def test_hard_cut_sensitivity_steps_like_beat_sensitivity() -> None:
     assert controls.session.layers["layer_1"].hard_cut_sensitivity == pytest.approx(
         1.61
     )
+
+
+def _focus_preset_file_row(controls: TuningControls) -> Path:
+    controls.session.layers["layer_1"].expanded = True
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = view.layout.descriptor(
+        _row(view, "layer_1", RowKind.TRACK_PRESET)
+    )
+    current = controls.session.layers["layer_1"].playlist.current
+    assert current is not None
+    current.parent.mkdir(parents=True, exist_ok=True)
+    current.write_text("milk", encoding="utf-8")
+    return current
+
+
+def _focus_user_preset_item_row(
+    controls: TuningControls,
+    *,
+    preset_path: Path | None = None,
+) -> tuple[RowDescriptor, Path]:
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "user_defined"
+    layer.preset_switching_expanded = True
+    layer.user_presets_expanded = True
+    layer.expanded = True
+    path = preset_path or Path("/tmp/projects/my-track/user-preset-0.milk")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("milk", encoding="utf-8")
+    layer.user_presets = [str(path)]
+    desc = RowDescriptor(
+        RowKind.TRACK_USER_PRESET_ITEM,
+        slot="layer_1",
+        preset_index=0,
+    )
+    controls.focus_descriptor = desc
+    return desc, path
+
+
+def test_ctrl_f_on_preset_file_prompts_favourite() -> None:
+    controls = _make_controls(("layer_1",))
+    current = _focus_preset_file_row(controls)
+    mock_curation = MagicMock()
+    controls._preset_curation = mock_curation
+
+    assert controls.handle_keydown(_keydown(pygame.K_f, mod=pygame.KMOD_CTRL)) is True
+
+    mock_curation.prompt_favourite.assert_called_once_with("layer_1", current)
+
+
+def test_ctrl_b_on_preset_file_prompts_blacklist() -> None:
+    controls = _make_controls(("layer_1",))
+    current = _focus_preset_file_row(controls)
+    mock_curation = MagicMock()
+    controls._preset_curation = mock_curation
+
+    assert controls.handle_keydown(_keydown(pygame.K_b, mod=pygame.KMOD_CTRL)) is True
+
+    mock_curation.prompt_blacklist.assert_called_once_with(
+        "layer_1",
+        current,
+        from_user_preset=False,
+        user_preset_index=None,
+    )
+
+
+def test_ctrl_f_on_user_preset_item_prompts_favourite() -> None:
+    controls = _make_controls(("layer_1",))
+    _desc_row, path = _focus_user_preset_item_row(controls)
+    mock_curation = MagicMock()
+    controls._preset_curation = mock_curation
+
+    assert controls.handle_keydown(_keydown(pygame.K_f, mod=pygame.KMOD_CTRL)) is True
+
+    mock_curation.prompt_favourite.assert_called_once_with("layer_1", path)
+
+
+def test_ctrl_b_on_user_preset_item_prompts_blacklist() -> None:
+    controls = _make_controls(("layer_1",))
+    desc, path = _focus_user_preset_item_row(controls)
+    mock_curation = MagicMock()
+    controls._preset_curation = mock_curation
+
+    assert controls.handle_keydown(_keydown(pygame.K_b, mod=pygame.KMOD_CTRL)) is True
+
+    mock_curation.prompt_blacklist.assert_called_once_with(
+        "layer_1",
+        path,
+        from_user_preset=True,
+        user_preset_index=desc.preset_index,
+    )
+
+
+def test_ctrl_f_b_not_on_preset_dir() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].expanded = True
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = view.layout.descriptor(
+        _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
+    )
+    mock_curation = MagicMock()
+    controls._preset_curation = mock_curation
+
+    controls.handle_keydown(_keydown(pygame.K_f, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_b, mod=pygame.KMOD_CTRL))
+    mock_curation.prompt_favourite.assert_not_called()
+    mock_curation.prompt_blacklist.assert_not_called()
+
+
+def test_ctrl_f_b_blocked_when_layer_locked() -> None:
+    controls = _make_controls(("layer_1",))
+    _focus_preset_file_row(controls)
+    controls.session.layers["layer_1"].locked = True
+    mock_curation = MagicMock()
+    controls._preset_curation = mock_curation
+
+    assert controls.handle_keydown(_keydown(pygame.K_f, mod=pygame.KMOD_CTRL)) is True
+    assert controls.handle_keydown(_keydown(pygame.K_b, mod=pygame.KMOD_CTRL)) is True
+    mock_curation.prompt_favourite.assert_not_called()
+    mock_curation.prompt_blacklist.assert_not_called()
+
+
+def test_ctrl_f_b_allowed_in_projectm_mode() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_switching = "projectm"
+    current = _focus_preset_file_row(controls)
+    mock_curation = MagicMock()
+    controls._preset_curation = mock_curation
+
+    assert controls.handle_keydown(_keydown(pygame.K_f, mod=pygame.KMOD_CTRL)) is True
+
+    mock_curation.prompt_favourite.assert_called_once_with("layer_1", current)
+
+
+def test_ctrl_f_b_ignored_on_non_preset_rows() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.focus_descriptor = RowDescriptor(RowKind.TRANSPORT)
+    mock_curation = MagicMock()
+    controls._preset_curation = mock_curation
+
+    controls.handle_keydown(_keydown(pygame.K_f, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_b, mod=pygame.KMOD_CTRL))
+    mock_curation.prompt_favourite.assert_not_called()
+    mock_curation.prompt_blacklist.assert_not_called()

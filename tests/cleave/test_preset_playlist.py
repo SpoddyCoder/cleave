@@ -400,3 +400,92 @@ def test_scan_single_layer_empty_root_returns_empty_playlist() -> None:
         playlist = scan_single_layer("layer_5", empty, root)
         assert playlist.current is None
         assert playlist.paths == ()
+
+
+def test_remove_preset_adjusts_index_when_removed_before_current() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        preset_dir = root / "pack"
+        preset_dir.mkdir()
+        alpha = preset_dir / "a.milk"
+        beta = preset_dir / "b.milk"
+        gamma = preset_dir / "c.milk"
+        _write_milk(alpha)
+        _write_milk(beta)
+        _write_milk(gamma)
+
+        playlist = playlist_at_dir(preset_dir, index=2)
+        assert playlist.remove_preset(alpha) is True
+        assert playlist.paths == (beta.resolve(), gamma.resolve())
+        assert playlist.index == 1
+        assert playlist.current == gamma.resolve()
+
+
+def test_remove_preset_at_current_index() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        preset_dir = root / "pack"
+        preset_dir.mkdir()
+        alpha = preset_dir / "a.milk"
+        beta = preset_dir / "b.milk"
+        _write_milk(alpha)
+        _write_milk(beta)
+
+        playlist = playlist_at_dir(preset_dir, index=1)
+        assert playlist.remove_preset(beta) is True
+        assert playlist.paths == (alpha.resolve(),)
+        assert playlist.index == 0
+        assert playlist.current == alpha.resolve()
+
+
+def test_remove_preset_empty_list_sets_index_zero() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        preset_dir = root / "pack"
+        preset_dir.mkdir()
+        only = preset_dir / "only.milk"
+        _write_milk(only)
+
+        playlist = playlist_at_dir(preset_dir, index=0)
+        assert playlist.remove_preset(only) is True
+        assert playlist.paths == ()
+        assert playlist.index == 0
+        assert playlist.current is None
+
+
+def test_remove_preset_missing_returns_false() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        preset_dir = root / "pack"
+        preset_dir.mkdir()
+        alpha = preset_dir / "a.milk"
+        _write_milk(alpha)
+
+        playlist = playlist_at_dir(preset_dir, index=0)
+        missing = preset_dir / "missing.milk"
+        assert playlist.remove_preset(missing) is False
+        assert playlist.paths == (alpha.resolve(),)
+        assert playlist.index == 0
+
+
+def test_remove_preset_invalidates_dir_display_cache() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        pack_a = root / "pack-a"
+        pack_b = root / "pack-b"
+        pack_a.mkdir()
+        pack_b.mkdir()
+        alpha = pack_a / "a.milk"
+        beta = pack_a / "b.milk"
+        _write_milk(alpha)
+        _write_milk(beta)
+        _write_milk(pack_b / "b.milk")
+
+        playlist = playlist_at_dir(pack_a, index=0)
+        playlist.directory_display_label(root)
+        with patch(
+            "cleave.preset_playlist.list_navigable_dirs", wraps=list_navigable_dirs
+        ) as mock_list:
+            playlist.remove_preset(alpha)
+            playlist.directory_display_label(root)
+            assert mock_list.call_count == 1
