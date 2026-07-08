@@ -16,6 +16,13 @@ class ModalKind(Enum):
     CHOICE = "choice"
 
 
+MODAL_VERTICAL_OPTION_THRESHOLD = 5
+
+
+def modal_options_vertical(option_count: int) -> bool:
+    return option_count > MODAL_VERTICAL_OPTION_THRESHOLD
+
+
 @dataclass
 class ModalOption:
     label: str
@@ -36,6 +43,10 @@ class ModalViewState:
     message: str | None
     options: tuple[str, ...]
     focus_index: int
+
+    @property
+    def options_vertical(self) -> bool:
+        return modal_options_vertical(len(self.options))
 
 
 _UNSAVED_QUIT_MESSAGE = "Unsaved changes - save changes before exit?"
@@ -182,8 +193,16 @@ class ModalHost:
             self._dismiss()
             return True
 
-        if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
-            option_count = len(self._request.options)  # type: ignore[union-attr]
+        option_count = len(self._request.options)  # type: ignore[union-attr]
+        vertical = modal_options_vertical(option_count)
+        if vertical:
+            if event.key in (pygame.K_UP, pygame.K_LEFT):
+                self._focus_index = (self._focus_index - 1) % option_count
+                return True
+            if event.key in (pygame.K_DOWN, pygame.K_RIGHT):
+                self._focus_index = (self._focus_index + 1) % option_count
+                return True
+        elif event.key in (pygame.K_LEFT, pygame.K_RIGHT):
             delta = -1 if event.key == pygame.K_LEFT else 1
             self._focus_index = (self._focus_index + delta) % option_count
             return True
