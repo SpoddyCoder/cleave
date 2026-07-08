@@ -9,7 +9,7 @@ from cleave.config_schema import (
     HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_CURVES,
     PRESET_SWITCHING_MODE_HELP_ENTRIES,
-    VISUALIZER_PREVIEW_QUALITY_HELP_ENTRIES,
+    EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
 )
 from cleave.viz.help_content import (
     DescriptionSection,
@@ -202,7 +202,7 @@ def test_preview_quality_help_lists_modes() -> None:
     assert description is not None
     assert description.title == "Preview quality"
     assert "live view only" in " ".join(description.lines)
-    assert description.entries == VISUALIZER_PREVIEW_QUALITY_HELP_ENTRIES
+    assert description.entries == EDITOR_PREVIEW_QUALITY_HELP_ENTRIES
 
 
 def test_highlight_rolloff_mode_help_lists_modes() -> None:

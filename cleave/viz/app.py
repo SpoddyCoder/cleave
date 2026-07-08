@@ -114,11 +114,11 @@ def build_runtime_base(
     return VisualizerSeed(
         project_dir=project_dir,
         audio_path=audio_path,
-        width=cfg.visualizer.width,
-        height=cfg.visualizer.height,
-        upscale=cfg.visualizer.upscale,
-        display_width=cfg.visualizer.display_width,
-        display_height=cfg.visualizer.display_height,
+        width=cfg.editor.width,
+        height=cfg.editor.height,
+        upscale=cfg.editor.upscale,
+        display_width=cfg.editor.display_width,
+        display_height=cfg.editor.display_height,
         window_title=f"Cleave — {project_dir.name}",
         session=session_from_cfg(cfg, playlists),
         cfg=cfg,
@@ -246,7 +246,7 @@ def init_gl_resources_heavy(
         modal_host=modal_host,
         mix_player=mix_player,
         playback=playback,
-        overlay=TuningOverlay(hold_idle_sec=seed.cfg.visualizer.ui_fade),
+        overlay=TuningOverlay(hold_idle_sec=seed.cfg.editor.ui_fade),
         help_overlay=HelpOverlay(),
         timeline_overlay=TimelineOverlay(),
         overlay_surface=overlay_surface,
@@ -386,7 +386,7 @@ def _tick_frame_live_overlay(
         panel_cache=runtime.render_overlay_panel_cache,
     )
 
-    runtime.overlay.set_hold_idle_sec(runtime.seed.cfg.visualizer.ui_fade)
+    runtime.overlay.set_hold_idle_sec(runtime.seed.cfg.editor.ui_fade)
     runtime.overlay.update(overlay_dt)
 
     overlay_visibility = runtime.overlay.visibility

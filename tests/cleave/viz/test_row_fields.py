@@ -155,13 +155,13 @@ def test_apply_field_horizontal_unknown_kind_returns_false() -> None:
 def test_apply_field_horizontal_cycles_preview_quality() -> None:
     controls = _make_controls()
     desc = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
-    assert controls.cfg.visualizer.preview_quality == "balanced"
+    assert controls.cfg.editor.preview_quality == "balanced"
 
     assert apply_field_horizontal(controls, desc, True, False) is True
-    assert controls.cfg.visualizer.preview_quality == "performance"
+    assert controls.cfg.editor.preview_quality == "performance"
 
     apply_field_horizontal(controls, desc, False, False)
-    assert controls.cfg.visualizer.preview_quality == "balanced"
+    assert controls.cfg.editor.preview_quality == "balanced"
 
 
 def test_apply_field_horizontal_preview_quality_calls_preview_resolutions() -> None:
@@ -194,13 +194,13 @@ def test_apply_field_horizontal_render_overlay_opacity() -> None:
 def test_apply_field_horizontal_adjusts_ui_fade() -> None:
     controls = _make_controls()
     desc = RowDescriptor(RowKind.SETTINGS_UI_FADE)
-    assert controls.cfg.visualizer.ui_fade == 10.0
+    assert controls.cfg.editor.ui_fade == 10.0
 
     apply_field_horizontal(controls, desc, True, False)
-    assert controls.cfg.visualizer.ui_fade == 11.0
+    assert controls.cfg.editor.ui_fade == 11.0
 
     apply_field_horizontal(controls, desc, False, True)
-    assert controls.cfg.visualizer.ui_fade == 6.0
+    assert controls.cfg.editor.ui_fade == 6.0
 
 
 def test_apply_field_horizontal_via_controls_keydown() -> None:
@@ -214,7 +214,7 @@ def test_apply_field_horizontal_via_controls_keydown() -> None:
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH_MODE)
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.cfg.visualizer.ui_width_mode == "fixed"
+    assert controls.cfg.editor.ui_width_mode == "fixed"
 
 
 def test_expand_subheader_prefix_preset_switching() -> None:

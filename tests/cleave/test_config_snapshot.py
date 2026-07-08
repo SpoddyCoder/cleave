@@ -18,7 +18,7 @@ from cleave.config import (
     RenderOverlayConfig,
     RenderOverlayTextBlockConfig,
     RenderPostFxConfig,
-    VisualizerConfig,
+    EditorConfig,
     _parse_layers,
     load_config,
 )
@@ -84,7 +84,7 @@ def _minimal_snapshot_session(
             )
             for slot in DEFAULT_LAYER_SLOTS
         },
-        visualizer=VisualizerConfig(),
+        editor=EditorConfig(),
         config_path=config_path,
         user_config_path=root / "user-config.yaml",
     )
@@ -144,7 +144,7 @@ def test_write_session_snapshot_includes_paths_when_source_has_paths(
     assert data["paths"] == source_paths
 
 
-_EDITOR_VISUALIZER_KEYS = (
+_EDITOR_USER_CONFIG_KEYS = (
     "preview_quality",
     "ui_width_mode",
     "ui_width",
@@ -152,7 +152,7 @@ _EDITOR_VISUALIZER_KEYS = (
 )
 
 
-def test_write_session_snapshot_visualizer_omits_editor_fields(
+def test_write_session_snapshot_editor_omits_editor_fields(
     tmp_path: Path,
 ) -> None:
     config_path = tmp_path / "cleave.config.yaml"
@@ -161,7 +161,7 @@ def test_write_session_snapshot_visualizer_omits_editor_fields(
     cfg = CleaveConfig(
         paths=cfg.paths,
         layers=cfg.layers,
-        visualizer=VisualizerConfig(
+        editor=EditorConfig(
             preview_quality="performance",
             ui_width_mode="fixed",
             ui_width=80,
@@ -174,8 +174,8 @@ def test_write_session_snapshot_visualizer_omits_editor_fields(
     out_path = tmp_path / "snapshot.yaml"
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
-    visualizer = yaml.safe_load(out_path.read_text(encoding="utf-8"))["visualizer"]
-    for key in _EDITOR_VISUALIZER_KEYS:
+    visualizer = yaml.safe_load(out_path.read_text(encoding="utf-8"))["editor"]
+    for key in _EDITOR_USER_CONFIG_KEYS:
         assert key not in visualizer
 
 
@@ -197,7 +197,7 @@ def test_write_session_snapshot_includes_locked() -> None:
             )
             for slot in DEFAULT_LAYER_SLOTS
             },
-            visualizer=VisualizerConfig(),
+            editor=EditorConfig(),
             config_path=config_path,
             user_config_path=root / "user-config.yaml",
         )
@@ -245,7 +245,7 @@ def test_write_session_snapshot_sparse_effects() -> None:
             )
             for slot in DEFAULT_LAYER_SLOTS
             },
-            visualizer=VisualizerConfig(),
+            editor=EditorConfig(),
             config_path=config_path,
             user_config_path=root / "user-config.yaml",
         )
@@ -315,7 +315,7 @@ def test_write_session_snapshot_sparse_all_effect_types() -> None:
             )
             for slot in DEFAULT_LAYER_SLOTS
             },
-            visualizer=VisualizerConfig(),
+            editor=EditorConfig(),
             config_path=config_path,
             user_config_path=root / "user-config.yaml",
         )
@@ -387,7 +387,7 @@ def _snapshot_round_trip_layer_count(layer_count: int) -> None:
                 )
                 for slot in slots
             },
-            visualizer=VisualizerConfig(),
+            editor=EditorConfig(),
             config_path=config_path,
             user_config_path=root / "user-config.yaml",
             layer_z_order=list(slots),
@@ -443,7 +443,7 @@ def test_write_session_snapshot_uses_session_z_order_when_valid() -> None:
             )
             for slot in DEFAULT_LAYER_SLOTS
             },
-            visualizer=VisualizerConfig(),
+            editor=EditorConfig(),
             config_path=config_path,
             user_config_path=root / "user-config.yaml",
             layer_z_order=list(DEFAULT_LAYER_SLOTS),
@@ -489,7 +489,7 @@ def test_write_session_snapshot_falls_back_to_cfg_z_order_when_invalid() -> None
             )
             for slot in DEFAULT_LAYER_SLOTS
             },
-            visualizer=VisualizerConfig(),
+            editor=EditorConfig(),
             config_path=config_path,
             user_config_path=root / "user-config.yaml",
             layer_z_order=cfg_order,
@@ -534,7 +534,7 @@ def test_write_session_snapshot_includes_upscale() -> None:
             )
             for slot in DEFAULT_LAYER_SLOTS
             },
-            visualizer=VisualizerConfig(width=1280, height=720, upscale=2.0),
+            editor=EditorConfig(width=1280, height=720, upscale=2.0),
             config_path=config_path,
             user_config_path=root / "user-config.yaml",
         )
@@ -557,7 +557,7 @@ def test_write_session_snapshot_includes_upscale() -> None:
         write_session_snapshot(out_path, cfg=cfg, session=session)
 
         data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
-        assert data["visualizer"]["upscale"] == 2.0
+        assert data["editor"]["upscale"] == 2.0
 
 
 def test_write_session_snapshot_sparse_beat_sensitivity() -> None:
@@ -578,7 +578,7 @@ def test_write_session_snapshot_sparse_beat_sensitivity() -> None:
             )
             for slot in DEFAULT_LAYER_SLOTS
             },
-            visualizer=VisualizerConfig(beat_sensitivity=2.0),
+            editor=EditorConfig(beat_sensitivity=2.0),
             config_path=config_path,
             user_config_path=root / "user-config.yaml",
         )
@@ -602,7 +602,7 @@ def test_write_session_snapshot_sparse_beat_sensitivity() -> None:
         write_session_snapshot(out_path, cfg=cfg, session=session)
 
         data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
-        assert data["visualizer"]["beat_sensitivity"] == 2.0
+        assert data["editor"]["beat_sensitivity"] == 2.0
         assert "beat_sensitivity" not in data["layers"]["layer_1"]
         assert data["layers"]["layer_2"]["beat_sensitivity"] == 1.5
 
@@ -625,7 +625,7 @@ def test_write_session_snapshot_omits_all_zero_effects() -> None:
             )
             for slot in DEFAULT_LAYER_SLOTS
             },
-            visualizer=VisualizerConfig(),
+            editor=EditorConfig(),
             config_path=config_path,
             user_config_path=root / "user-config.yaml",
         )
@@ -745,7 +745,7 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
             )
             for slot in DEFAULT_LAYER_SLOTS
         },
-        visualizer=VisualizerConfig(),
+        editor=EditorConfig(),
         config_path=config_path,
         user_config_path=root / "user-config.yaml",
         render=RenderConfig(
@@ -914,7 +914,7 @@ def test_write_session_snapshot_render_overlay_without_cfg_render(tmp_path: Path
     cfg = CleaveConfig(
         paths=cfg.paths,
         layers=cfg.layers,
-        visualizer=cfg.visualizer,
+        editor=cfg.editor,
         config_path=cfg.config_path,
         user_config_path=cfg.user_config_path,
         render=None,
@@ -955,7 +955,7 @@ def test_write_session_snapshot_persists_timeline_at_bottom(tmp_path: Path) -> N
     cfg_with_timeline = CleaveConfig(
         paths=cfg.paths,
         layers=cfg.layers,
-        visualizer=cfg.visualizer,
+        editor=cfg.editor,
         config_path=out_path,
         user_config_path=cfg.user_config_path,
         render=cfg.render,
@@ -1001,7 +1001,7 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
     config_path.write_text(
         yaml.safe_dump(
             {
-                "visualizer": {
+                "editor": {
                     "name": "round-trip-test",
                     "width": 1280,
                     "height": 720,
@@ -1113,17 +1113,17 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
     ]
 
     expected = persisted_session_payload(cfg, session)
-    assert expected["visualizer"]["upscale"] == 1.5
+    assert expected["editor"]["upscale"] == 1.5
 
     sig_before = persisted_session_signature(cfg, session)
     cfg_upscale_changed = CleaveConfig(
         paths=cfg.paths,
         layers=cfg.layers,
-        visualizer=VisualizerConfig(
-            width=cfg.visualizer.width,
-            height=cfg.visualizer.height,
+        editor=EditorConfig(
+            width=cfg.editor.width,
+            height=cfg.editor.height,
             upscale=2.0,
-            beat_sensitivity=cfg.visualizer.beat_sensitivity,
+            beat_sensitivity=cfg.editor.beat_sensitivity,
         ),
         config_path=cfg.config_path,
         user_config_path=cfg.user_config_path,
@@ -1137,8 +1137,8 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
     write_session_snapshot(snapshot_path, cfg=cfg, session=session)
 
     snapshot_data = yaml.safe_load(snapshot_path.read_text(encoding="utf-8"))
-    assert snapshot_data["visualizer"]["upscale"] == 1.5
-    assert snapshot_data["visualizer"]["beat_sensitivity"] == 2.2
+    assert snapshot_data["editor"]["upscale"] == 1.5
+    assert snapshot_data["editor"]["beat_sensitivity"] == 2.2
 
     cfg2 = load_config(config_path=snapshot_path)
     session2 = session_from_cfg(cfg2, _round_trip_playlists(preset_root))

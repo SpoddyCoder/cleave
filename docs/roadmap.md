@@ -41,4 +41,4 @@ Cleave today uses the standard four-stem split: drums, bass, vocals, other. Demu
 - **Shorter clips**: Demucs on full albums is slow; chunking or stem caching (already partially there via skip-if-exists) scales better for catalogue work.
 - **Live-ish separation**: sliding-window Demucs on a ring buffer (high latency, heavy CPU/GPU) could feed stems to Cleave in near real time; see also MIDI out for lower-latency drum triggers without full re-separation.
 
-None of the above is required for the current visualizer (default four layers, up to eight). Pick one when a concrete creative need shows up (e.g. guitar gets its own preset stack, or drum layers need independent bloom).
+None of the above is required for the current editor (default four layers, up to eight). Pick one when a concrete creative need shows up (e.g. guitar gets its own preset stack, or drum layers need independent bloom).

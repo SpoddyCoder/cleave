@@ -34,7 +34,7 @@ Gaps:
 
 - Default `data_dir()` is still the repo root, so new users get `projects/` in the checkout unless they set `CLEAVE_DATA`.
 - `GLOBAL_CONFIG_PATH` uses the same filename and shape as project config; there is no layered merge (user defaults + project overrides).
-- Editor settings (`preview_quality`, `ui_width`, `ui_width_mode`, `ui_fade`) live under `visualizer:` in project yaml and are persisted with the track via [persisted_session_payload](../cleave/config_schema.py).
+- Editor settings (`preview_quality`, `ui_width`, `ui_width_mode`, `ui_fade`) live under `editor:` in project yaml and are persisted with the track via [persisted_session_payload](../cleave/config_schema.py).
 - Preset quarantine was sketched under shipped assets; quarantine is user curation of a preset library, not app content.
 
 ---
@@ -102,7 +102,7 @@ Portable creative artifact tied to one song.
 | --- | --- |
 | `layers`, `layer_z_order`, `timeline` | Stem mapping, presets, effects, cues |
 | `render` | Output size, fps, post-fx, overlay copy and styling |
-| `visualizer` (subset) | Track-relevant live window size, beat sensitivity defaults, etc. |
+| `editor` (subset) | Track-relevant live window size, beat sensitivity defaults, etc. |
 | `paths` (optional) | Per-track override when a project needs a different preset pack |
 
 Not stored in the repo checkout by default.
@@ -127,14 +127,14 @@ Implementation sketch:
 
 | User config | Project config |
 | --- | --- |
-| `visualizer.preview_quality` | `layers`, `layer_z_order` |
-| `visualizer.ui_width_mode` | `timeline` |
-| `visualizer.ui_width` | `render` (including overlay and post-fx) |
-| `visualizer.ui_fade` | `visualizer.name`, `width`, `height`, `upscale`, `beat_sensitivity` |
+| `editor.preview_quality` | `layers`, `layer_z_order` |
+| `editor.ui_width_mode` | `timeline` |
+| `editor.ui_width` | `render` (including overlay and post-fx) |
+| `editor.ui_fade` | `editor.name`, `width`, `height`, `upscale`, `beat_sensitivity` |
 | `paths.preset_root` (default) | `paths` (optional per-track override) |
 | `paths.texture_paths` (default) | Per-layer `preset`, effects, switching |
 
-Revisit `visualizer.width` / `height`: treat as project if tied to export intent, user if treated as "my monitor preference." Default: project for anything that affects offline render parity.
+Revisit `editor.width` / `height`: treat as project if tied to export intent, user if treated as "my monitor preference." Default: project for anything that affects offline render parity.
 
 ---
 
@@ -224,7 +224,7 @@ Ordered for incremental delivery; each phase can land independently.
 ## Open questions
 
 - **Quarantine scope:** one global quarantine vs one per `preset_root`?
-- **`visualizer.width` / `height`:** user preference vs per-track export setting?
+- **`editor.width` / `height`:** user preference vs per-track export setting?
 - **Config filename:** keep `cleave-viz.yaml` for projects only and use `config.yaml` for user file (recommended), or unify names?
 - **Portable mode:** first-class CLI flag vs env-only `CLEAVE_DATA`?
 

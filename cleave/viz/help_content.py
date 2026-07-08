@@ -1,4 +1,4 @@
-"""Help panel section data and dispatch for the Cleave visualizer."""
+"""Help panel section data and dispatch for the Cleave editor."""
 
 from __future__ import annotations
 

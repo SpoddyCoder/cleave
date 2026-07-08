@@ -60,29 +60,29 @@ from cleave.config_schema import (
     DEFAULT_RENDER_FPS,
     DEFAULT_RENDER_HEIGHT,
     DEFAULT_RENDER_WIDTH,
-    DEFAULT_VISUALIZER_HEIGHT,
+    DEFAULT_EDITOR_HEIGHT,
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
     DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
     DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
-    DEFAULT_VISUALIZER_PREVIEW_QUALITY,
-    DEFAULT_VISUALIZER_UPSCALE,
-    DEFAULT_VISUALIZER_WIDTH,
+    DEFAULT_EDITOR_PREVIEW_QUALITY,
+    DEFAULT_EDITOR_UPSCALE,
+    DEFAULT_EDITOR_WIDTH,
     CHROMA_BOOST_APPLY_MODES,
     CHROMA_BOOST_VARIANTS,
     HIGHLIGHT_ROLLOFF_APPLY_MODES,
     HIGHLIGHT_ROLLOFF_CURVES,
     RENDER_OVERLAY_POSITIONS,
     UPSCALE_MIN,
-    VISUALIZER_PREVIEW_QUALITIES,
+    EDITOR_PREVIEW_QUALITIES,
     ChromaBoostApplyMode,
     ChromaBoostVariant,
     HighlightRolloffApplyMode,
     HighlightRolloffCurve,
     RenderOverlayPosition,
     UiWidthMode,
-    VisualizerPreviewQuality,
+    EditorPreviewQuality,
     as_mapping,
     clamp_beat_sensitivity,
     clamp_upscale,
@@ -90,7 +90,7 @@ from cleave.config_schema import (
     parse_layers_section,
     parse_render_section,
     parse_timeline_section,
-    parse_visualizer_section,
+    parse_project_editor_section,
     require_non_negative_number,
 )
 from cleave.timeline import TimelineCue
@@ -127,13 +127,13 @@ class LayerConfig:
 
 
 @dataclass(frozen=True)
-class VisualizerConfig:
+class EditorConfig:
     name: str = "render"
-    width: int = DEFAULT_VISUALIZER_WIDTH
-    height: int = DEFAULT_VISUALIZER_HEIGHT
-    upscale: float = DEFAULT_VISUALIZER_UPSCALE
+    width: int = DEFAULT_EDITOR_WIDTH
+    height: int = DEFAULT_EDITOR_HEIGHT
+    upscale: float = DEFAULT_EDITOR_UPSCALE
     beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
-    preview_quality: VisualizerPreviewQuality = DEFAULT_VISUALIZER_PREVIEW_QUALITY
+    preview_quality: EditorPreviewQuality = DEFAULT_EDITOR_PREVIEW_QUALITY
     ui_width_mode: UiWidthMode = DEFAULT_UI_WIDTH_MODE
     ui_width: int = DEFAULT_UI_WIDTH
     ui_fade: float = DEFAULT_UI_FADE_SEC
@@ -230,7 +230,7 @@ class TimelineConfig:
 class CleaveConfig:
     paths: PathsConfig
     layers: dict[str, LayerConfig]
-    visualizer: VisualizerConfig
+    editor: EditorConfig
     config_path: Path
     user_config_path: Path
     layer_z_order: list[str] = field(default_factory=lambda: list(DEFAULT_LAYER_Z_ORDER))
@@ -289,11 +289,11 @@ def ensure_project_viz_config(project_dir: Path) -> Path:
     if not isinstance(data, dict):
         raise ValueError(f"config template root must be a mapping: {src}")
 
-    visualizer = data.get("visualizer")
-    if not isinstance(visualizer, dict):
-        visualizer = {}
-        data["visualizer"] = visualizer
-    visualizer["name"] = project_dir.name
+    editor_section = data.get("editor")
+    if not isinstance(editor_section, dict):
+        editor_section = {}
+        data["editor"] = editor_section
+    editor_section["name"] = project_dir.name
 
     project_dir.mkdir(parents=True, exist_ok=True)
     with dst.open("w", encoding="utf-8") as fh:
@@ -414,7 +414,7 @@ def load_config(
         raise ValueError(f"config root must be a mapping: {path}")
 
     paths = _parse_paths(data, user_cfg)
-    visualizer = parse_visualizer_section(data, editor=user_cfg.editor)
+    editor = parse_project_editor_section(data, editor=user_cfg.editor)
     render = parse_render_section(data)
     layers, parse_ctx = _parse_layers(data, paths.preset_root, path.parent)
     layer_z_order = parse_layer_z_order_section(data, parse_ctx)
@@ -424,7 +424,7 @@ def load_config(
     return CleaveConfig(
         paths=paths,
         layers=layers,
-        visualizer=visualizer,
+        editor=editor,
         config_path=path,
         user_config_path=user_cfg.path,
         layer_z_order=layer_z_order,

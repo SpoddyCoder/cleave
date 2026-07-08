@@ -232,7 +232,7 @@ def render(
         if output is None:
             output_path = _default_output_path(
                 project,
-                cfg.visualizer.name,
+                cfg.editor.name,
                 segment,
                 duration_sec=duration_sec,
             )

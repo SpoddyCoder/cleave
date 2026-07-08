@@ -657,7 +657,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="cleave",
         description=(
-            "Stem-driven music visualizer\n\n"
+            "Stem-driven music visualizer with editor and render\n\n"
             "positional arguments:\n"
             f"  target                {_TARGET_HELP}"
         ),
@@ -694,7 +694,7 @@ def build_parser() -> argparse.ArgumentParser:
     play = subparsers.add_parser(
         "play",
         prog="cleave play",
-        help="Run the live visualizer (separates first if needed)",
+        help="Open the editor (separates first if needed)",
     )
     play.add_argument(
         "target",
@@ -733,7 +733,7 @@ def build_parser() -> argparse.ArgumentParser:
         "-o",
         "--output",
         type=Path,
-        help="Output MP4 path (default: <project>/renders/<visualizer.name>.mp4)",
+        help="Output MP4 path (default: <project>/renders/<editor.name>.mp4)",
     )
     render.add_argument(
         "-hq",

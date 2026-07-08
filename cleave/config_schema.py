@@ -15,15 +15,15 @@ from cleave.effects.registry import validate_effect_entry
 from cleave.extract import STEM_SOURCES, StemSource
 from cleave.timeline import TimelineCue
 
-# --- Visualizer defaults ---
+# --- Editor defaults ---
 
-DEFAULT_VISUALIZER_WIDTH = 1280
-DEFAULT_VISUALIZER_HEIGHT = 720
+DEFAULT_EDITOR_WIDTH = 1280
+DEFAULT_EDITOR_HEIGHT = 720
 DEFAULT_RENDER_FPS = 30
 DEFAULT_RENDER_WIDTH = 1280
 DEFAULT_RENDER_HEIGHT = 720
 DEFAULT_HDR_COMPOSITING = True
-DEFAULT_VISUALIZER_UPSCALE = 1.0
+DEFAULT_EDITOR_UPSCALE = 1.0
 UPSCALE_MIN = 1.0
 DEFAULT_BEAT_SENSITIVITY = 2.0
 BEAT_SENSITIVITY_MIN = 0.0
@@ -58,19 +58,19 @@ EASTER_EGG_MAX = 5.0
 DEFAULT_PRESET_START_CLEAN = False
 DEFAULT_PRESET_SWITCHING_PRESETS: list[str] = []
 
-VisualizerPreviewQuality = Literal[
+EditorPreviewQuality = Literal[
     "full-quality", "balanced", "performance", "ultra-performance"
 ]
 
-VISUALIZER_PREVIEW_QUALITIES: tuple[VisualizerPreviewQuality, ...] = (
+EDITOR_PREVIEW_QUALITIES: tuple[EditorPreviewQuality, ...] = (
     "full-quality",
     "balanced",
     "performance",
     "ultra-performance",
 )
 
-VISUALIZER_PREVIEW_QUALITY_HELP_ENTRIES: tuple[
-    tuple[VisualizerPreviewQuality, str], ...
+EDITOR_PREVIEW_QUALITY_HELP_ENTRIES: tuple[
+    tuple[EditorPreviewQuality, str], ...
 ] = (
     ("full-quality", "every layer at configured resolution."),
     ("balanced", "top layer full size; lower layers step down."),
@@ -78,7 +78,7 @@ VISUALIZER_PREVIEW_QUALITY_HELP_ENTRIES: tuple[
     ("ultra-performance", "lowest preview resolution for heaviest load reduction."),
 )
 
-DEFAULT_VISUALIZER_PREVIEW_QUALITY: VisualizerPreviewQuality = "balanced"
+DEFAULT_EDITOR_PREVIEW_QUALITY: EditorPreviewQuality = "balanced"
 DEFAULT_UI_FADE_SEC = 10.0
 UI_FADE_MAX_SEC = 60.0
 DEFAULT_UI_WIDTH = 110
@@ -602,19 +602,19 @@ def clamp_ui_width(value: int | float) -> int:
     return max(UI_WIDTH_MIN, min(UI_WIDTH_MAX, int(round(value))))
 
 
-def _parse_visualizer_preview_quality(
-    value: Any, ctx: ParseCtx, label: str = "visualizer.preview_quality"
-) -> VisualizerPreviewQuality:
+def _parse_editor_preview_quality(
+    value: Any, ctx: ParseCtx, label: str = "editor.preview_quality"
+) -> EditorPreviewQuality:
     if not isinstance(value, str):
         raise ValueError(f"{label} must be a string")
-    if value not in VISUALIZER_PREVIEW_QUALITIES:
-        allowed = ", ".join(f"'{mode}'" for mode in VISUALIZER_PREVIEW_QUALITIES)
+    if value not in EDITOR_PREVIEW_QUALITIES:
+        allowed = ", ".join(f"'{mode}'" for mode in EDITOR_PREVIEW_QUALITIES)
         raise ValueError(f"{label} must be one of: {allowed}")
     return value
 
 
 def _parse_ui_width_mode(
-    value: Any, ctx: ParseCtx, label: str = "visualizer.ui_width_mode"
+    value: Any, ctx: ParseCtx, label: str = "editor.ui_width_mode"
 ) -> UiWidthMode:
     if not isinstance(value, str):
         raise ValueError(f"{label} must be a string")
@@ -936,24 +936,24 @@ def _dump_overlay_fields(
     return out
 
 
-VISUALIZER_PROJECT_FIELDS: tuple[FieldDescriptor, ...] = (
+EDITOR_PROJECT_FIELDS: tuple[FieldDescriptor, ...] = (
     FieldDescriptor(
         "width",
-        DEFAULT_VISUALIZER_WIDTH,
+        DEFAULT_EDITOR_WIDTH,
         "cfg",
         lambda raw, _ctx, _label: int(raw),
         _dump_scalar,
     ),
     FieldDescriptor(
         "height",
-        DEFAULT_VISUALIZER_HEIGHT,
+        DEFAULT_EDITOR_HEIGHT,
         "cfg",
         lambda raw, _ctx, _label: int(raw),
         _dump_scalar,
     ),
     FieldDescriptor(
         "upscale",
-        DEFAULT_VISUALIZER_UPSCALE,
+        DEFAULT_EDITOR_UPSCALE,
         "cfg",
         _parse_upscale,
         lambda value, _ctx: clamp_upscale(value),
@@ -970,9 +970,9 @@ VISUALIZER_PROJECT_FIELDS: tuple[FieldDescriptor, ...] = (
 EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
     FieldDescriptor(
         "preview_quality",
-        DEFAULT_VISUALIZER_PREVIEW_QUALITY,
+        DEFAULT_EDITOR_PREVIEW_QUALITY,
         "cfg",
-        _parse_visualizer_preview_quality,
+        _parse_editor_preview_quality,
         _dump_scalar,
     ),
     FieldDescriptor(
@@ -1002,8 +1002,8 @@ EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
     ),
 )
 
-VISUALIZER_FIELDS: tuple[FieldDescriptor, ...] = (
-    VISUALIZER_PROJECT_FIELDS + EDITOR_FIELDS
+EDITOR_CONFIG_FIELDS: tuple[FieldDescriptor, ...] = (
+    EDITOR_PROJECT_FIELDS + EDITOR_FIELDS
 )
 
 def _build_highlight_rolloff_config(parsed: dict[str, Any]) -> Any:
@@ -1294,26 +1294,26 @@ def dump_editor_section(editor: Any) -> dict[str, Any]:
     return _dump_fields(EDITOR_FIELDS, values, ctx)
 
 
-def parse_visualizer_section(
+def parse_project_editor_section(
     data: dict[str, Any],
     *,
     editor: Any | None = None,
 ) -> Any:
-    from cleave.config import VisualizerConfig
+    from cleave.config import EditorConfig
     from cleave.user_config import default_editor_settings
 
     if editor is None:
         editor = default_editor_settings()
 
-    visualizer = as_mapping(data.get("visualizer"), "visualizer")
+    project_editor = as_mapping(data.get("editor"), "editor")
     ctx = ParseCtx()
     parsed: dict[str, Any] = {}
-    for field in VISUALIZER_PROJECT_FIELDS:
+    for field in EDITOR_PROJECT_FIELDS:
         parsed[field.yaml_key] = _parse_field(
-            visualizer, field, ctx, "visualizer"
+            project_editor, field, ctx, "editor"
         )
-    return VisualizerConfig(
-        name=str(visualizer.get("name", "render")),
+    return EditorConfig(
+        name=str(project_editor.get("name", "render")),
         width=parsed["width"],
         height=parsed["height"],
         upscale=parsed["upscale"],
@@ -1325,15 +1325,15 @@ def parse_visualizer_section(
     )
 
 
-def persist_visualizer(ctx: PersistCtx) -> dict[str, Any]:
-    vis = ctx.cfg.visualizer
+def persist_project_editor_section(ctx: PersistCtx) -> dict[str, Any]:
+    vis = ctx.cfg.editor
     values = {
         "width": vis.width,
         "height": vis.height,
         "upscale": vis.upscale,
         "beat_sensitivity": vis.beat_sensitivity,
     }
-    return _dump_fields(VISUALIZER_PROJECT_FIELDS, values, ctx)
+    return _dump_fields(EDITOR_PROJECT_FIELDS, values, ctx)
 
 
 def parse_layer_z_order_section(data: dict[str, Any], ctx: ParseCtx) -> list[str]:
@@ -1523,7 +1523,7 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
 
     preset_root = ctx.cfg.paths.preset_root
     layers_out: dict[str, dict[str, Any]] = {}
-    global_beat = ctx.cfg.visualizer.beat_sensitivity
+    global_beat = ctx.cfg.editor.beat_sensitivity
 
     for slot in ctx.session.layer_z_order:
         layer_cfg = ctx.cfg.layers[slot]
@@ -1831,7 +1831,7 @@ def persisted_session_payload(cfg: Any, session: Any) -> dict[str, Any]:
     cfg_dir = cfg_dir.parent if cfg_dir is not None else None
     ctx = PersistCtx(cfg=cfg, session=session, cfg_dir=cfg_dir)
     return {
-        "visualizer": persist_visualizer(ctx),
+        "editor": persist_project_editor_section(ctx),
         "layer_z_order": persist_layer_z_order(ctx),
         "layers": persist_layers(ctx),
         "render": persist_render(ctx),
@@ -1891,11 +1891,11 @@ def default_render_post_fx_runtime_values() -> dict[str, Any]:
     }
 
 
-def template_visualizer_section(*, name: str = "cleave-viz-example") -> dict[str, Any]:
+def template_project_editor_section(*, name: str = "cleave-viz-example") -> dict[str, Any]:
     ctx = PersistCtx(cfg=None, session=None)  # type: ignore[arg-type]
     out = _dump_fields(
-        VISUALIZER_PROJECT_FIELDS,
-        {field.yaml_key: field.default for field in VISUALIZER_PROJECT_FIELDS},
+        EDITOR_PROJECT_FIELDS,
+        {field.yaml_key: field.default for field in EDITOR_PROJECT_FIELDS},
         ctx,
     )
     out["name"] = name

@@ -3062,7 +3062,7 @@ def test_settings_collapse_from_sub_row_refocuses_header() -> None:
 
 def test_settings_cycle_preview_quality() -> None:
     controls = _make_controls(("layer_1",))
-    assert controls.cfg.visualizer.preview_quality == "balanced"
+    assert controls.cfg.editor.preview_quality == "balanced"
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_HEADER)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
@@ -3070,25 +3070,25 @@ def test_settings_cycle_preview_quality() -> None:
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.cfg.visualizer.preview_quality == "performance"
+    assert controls.cfg.editor.preview_quality == "performance"
     view = controls.build_view_state(paused=False)
     assert _row_text(view, _focus_index(controls)) == "└─ preview quality: performance"
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.cfg.visualizer.preview_quality == "ultra-performance"
+    assert controls.cfg.editor.preview_quality == "ultra-performance"
     view = controls.build_view_state(paused=False)
     assert _row_text(view, _focus_index(controls)) == "└─ preview quality: ultra-performance"
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.cfg.visualizer.preview_quality == "full-quality"
+    assert controls.cfg.editor.preview_quality == "full-quality"
     view = controls.build_view_state(paused=False)
     assert _row_text(view, _focus_index(controls)) == "└─ preview quality: full-quality"
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.cfg.visualizer.preview_quality == "balanced"
+    assert controls.cfg.editor.preview_quality == "balanced"
 
     controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert controls.cfg.visualizer.preview_quality == "full-quality"
+    assert controls.cfg.editor.preview_quality == "full-quality"
 
 
 def test_settings_preview_quality_change_does_not_mark_project_config_dirty() -> None:
@@ -3116,23 +3116,23 @@ def test_cycle_preview_quality_calls_apply_preview_resolutions() -> None:
 
 def test_settings_adjust_ui_fade() -> None:
     controls = _make_controls(("layer_1",))
-    assert controls.cfg.visualizer.ui_fade == 10.0
+    assert controls.cfg.editor.ui_fade == 10.0
     _expand_settings_ui(controls)
     view = controls.build_view_state(paused=False)
     ui_fade_row = view.layout.find_by_kind(RowKind.SETTINGS_UI_FADE)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_FADE)
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.cfg.visualizer.ui_fade == 11.0
+    assert controls.cfg.editor.ui_fade == 11.0
     view = controls.build_view_state(paused=False)
     assert _row_text(view, ui_fade_row) == "  └─ auto-fade: 11s"
 
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
-    assert controls.cfg.visualizer.ui_fade == 6.0
+    assert controls.cfg.editor.ui_fade == 6.0
 
     for _ in range(6):
         controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert controls.cfg.visualizer.ui_fade == 0.0
+    assert controls.cfg.editor.ui_fade == 0.0
     view = controls.build_view_state(paused=False)
     assert _row_text(view, ui_fade_row) == "  └─ auto-fade: disabled"
 
@@ -3148,23 +3148,23 @@ def test_settings_ui_fade_change_does_not_mark_project_config_dirty() -> None:
 
 def test_settings_adjust_ui_width() -> None:
     controls = _make_controls(("layer_1",))
-    assert controls.cfg.visualizer.ui_width == 110
+    assert controls.cfg.editor.ui_width == 110
     _expand_settings_ui(controls)
     view = controls.build_view_state(paused=False)
     ui_width_row = view.layout.find_by_kind(RowKind.SETTINGS_UI_WIDTH)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH)
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.cfg.visualizer.ui_width == 111
+    assert controls.cfg.editor.ui_width == 111
     view = controls.build_view_state(paused=False)
     assert _row_text(view, ui_width_row) == "  └─ max width: 111"
 
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
-    assert controls.cfg.visualizer.ui_width == 106
+    assert controls.cfg.editor.ui_width == 106
 
     for _ in range(86):
         controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert controls.cfg.visualizer.ui_width == 20
+    assert controls.cfg.editor.ui_width == 20
 
 
 def test_settings_ui_width_change_does_not_mark_project_config_dirty() -> None:
@@ -3178,19 +3178,19 @@ def test_settings_ui_width_change_does_not_mark_project_config_dirty() -> None:
 
 def test_settings_cycle_ui_width_mode() -> None:
     controls = _make_controls(("layer_1",))
-    assert controls.cfg.visualizer.ui_width_mode == "flexible"
+    assert controls.cfg.editor.ui_width_mode == "flexible"
     _expand_settings_ui(controls)
     view = controls.build_view_state(paused=False)
     mode_row = view.layout.find_by_kind(RowKind.SETTINGS_UI_WIDTH_MODE)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_UI_WIDTH_MODE)
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.cfg.visualizer.ui_width_mode == "fixed"
+    assert controls.cfg.editor.ui_width_mode == "fixed"
     view = controls.build_view_state(paused=False)
     assert _row_text(view, mode_row) == "  └─ width mode: fixed"
 
     controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert controls.cfg.visualizer.ui_width_mode == "flexible"
+    assert controls.cfg.editor.ui_width_mode == "flexible"
 
 
 def test_settings_ui_width_mode_change_does_not_mark_project_config_dirty() -> None:

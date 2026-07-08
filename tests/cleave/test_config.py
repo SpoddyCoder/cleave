@@ -20,7 +20,7 @@ from cleave.config import (
     RenderOverlayTextBlockConfig,
     RenderPostFxConfig,
     TimelineConfig,
-    VisualizerConfig,
+    EditorConfig,
     clamp_beat_sensitivity,
     clamp_effect_pct,
     clamp_upscale,
@@ -42,7 +42,7 @@ from cleave.config_schema import (
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
-    DEFAULT_VISUALIZER_PREVIEW_QUALITY,
+    DEFAULT_EDITOR_PREVIEW_QUALITY,
     MAX_LAYER_COUNT,
     ParseCtx,
     PersistCtx,
@@ -50,11 +50,11 @@ from cleave.config_schema import (
     parse_hex_colour,
     parse_render_section,
     parse_timeline_section,
-    parse_visualizer_section,
+    parse_project_editor_section,
     persist_render,
-    persist_visualizer,
+    persist_project_editor_section,
     template_layer_entry,
-    template_visualizer_section,
+    template_project_editor_section,
 )
 from cleave.user_config import EditorSettings
 from cleave.viz.session import TuningSession
@@ -175,65 +175,65 @@ def test_clamp_upscale() -> None:
     assert clamp_upscale(0.5) == 1.0
 
 
-def test_parse_visualizer_upscale_defaults_to_one() -> None:
-    cfg = parse_visualizer_section({})
+def test_parse_project_editor_upscale_defaults_to_one() -> None:
+    cfg = parse_project_editor_section({})
     assert cfg.upscale == 1.0
 
 
-def test_parse_visualizer_reads_upscale() -> None:
-    cfg = parse_visualizer_section({"visualizer": {"upscale": 2.0}})
+def test_parse_project_editor_reads_upscale() -> None:
+    cfg = parse_project_editor_section({"editor": {"upscale": 2.0}})
     assert cfg.upscale == 2.0
 
 
-def test_parse_visualizer_rejects_upscale_below_one() -> None:
-    with pytest.raises(ValueError, match="visualizer.upscale must be >= 1.0"):
-        parse_visualizer_section({"visualizer": {"upscale": 0.5}})
+def test_parse_project_editor_rejects_upscale_below_one() -> None:
+    with pytest.raises(ValueError, match="editor.upscale must be >= 1.0"):
+        parse_project_editor_section({"editor": {"upscale": 0.5}})
 
 
 def test_visualizer_display_dimensions() -> None:
-    cfg = VisualizerConfig(width=1280, height=720, upscale=1.5)
+    cfg = EditorConfig(width=1280, height=720, upscale=1.5)
     assert cfg.display_width == 1920
     assert cfg.display_height == 1080
 
-    cfg_round = VisualizerConfig(width=100, height=100, upscale=1.33)
+    cfg_round = EditorConfig(width=100, height=100, upscale=1.33)
     assert cfg_round.display_width == 133
     assert cfg_round.display_height == 133
 
 
-def test_parse_visualizer_name_defaults_to_render() -> None:
-    cfg = parse_visualizer_section({})
+def test_parse_project_editor_name_defaults_to_render() -> None:
+    cfg = parse_project_editor_section({})
     assert cfg.name == "render"
 
 
-def test_parse_visualizer_reads_name() -> None:
-    cfg = parse_visualizer_section({"visualizer": {"name": "buttercup-24"}})
+def test_parse_project_editor_reads_name() -> None:
+    cfg = parse_project_editor_section({"editor": {"name": "buttercup-24"}})
     assert cfg.name == "buttercup-24"
 
 
-def test_parse_visualizer_preview_quality_defaults_to_balanced() -> None:
-    cfg = parse_visualizer_section({})
-    assert cfg.preview_quality == DEFAULT_VISUALIZER_PREVIEW_QUALITY
+def test_parse_project_editor_preview_quality_defaults_to_balanced() -> None:
+    cfg = parse_project_editor_section({})
+    assert cfg.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY
 
 
-def test_parse_visualizer_ui_fade_defaults_to_ten() -> None:
-    cfg = parse_visualizer_section({})
+def test_parse_project_editor_ui_fade_defaults_to_ten() -> None:
+    cfg = parse_project_editor_section({})
     assert cfg.ui_fade == DEFAULT_UI_FADE_SEC
 
 
-def test_parse_visualizer_ui_width_defaults_to_one_ten() -> None:
-    cfg = parse_visualizer_section({})
+def test_parse_project_editor_ui_width_defaults_to_one_ten() -> None:
+    cfg = parse_project_editor_section({})
     assert cfg.ui_width == DEFAULT_UI_WIDTH
 
 
-def test_parse_visualizer_ui_width_mode_defaults_to_flexible() -> None:
-    cfg = parse_visualizer_section({})
+def test_parse_project_editor_ui_width_mode_defaults_to_flexible() -> None:
+    cfg = parse_project_editor_section({})
     assert cfg.ui_width_mode == DEFAULT_UI_WIDTH_MODE
 
 
-def test_parse_visualizer_ignores_editor_fields_in_project_yaml() -> None:
-    cfg = parse_visualizer_section(
+def test_parse_project_editor_ignores_editor_fields_in_project_yaml() -> None:
+    cfg = parse_project_editor_section(
         {
-            "visualizer": {
+            "editor": {
                 "preview_quality": "performance",
                 "ui_width_mode": "fixed",
                 "ui_width": 80,
@@ -241,21 +241,21 @@ def test_parse_visualizer_ignores_editor_fields_in_project_yaml() -> None:
             }
         }
     )
-    assert cfg.preview_quality == DEFAULT_VISUALIZER_PREVIEW_QUALITY
+    assert cfg.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY
     assert cfg.ui_width_mode == DEFAULT_UI_WIDTH_MODE
     assert cfg.ui_width == DEFAULT_UI_WIDTH
     assert cfg.ui_fade == DEFAULT_UI_FADE_SEC
 
 
-def test_parse_visualizer_section_accepts_editor_override() -> None:
+def test_parse_project_editor_section_accepts_editor_override() -> None:
     editor = EditorSettings(
         preview_quality="performance",
         ui_width_mode="fixed",
         ui_width=80,
         ui_fade=25.0,
     )
-    cfg = parse_visualizer_section(
-        {"visualizer": {"preview_quality": "ultra-performance", "ui_fade": 99}},
+    cfg = parse_project_editor_section(
+        {"editor": {"preview_quality": "ultra-performance", "ui_fade": 99}},
         editor=editor,
     )
     assert cfg.preview_quality == "performance"
@@ -264,8 +264,8 @@ def test_parse_visualizer_section_accepts_editor_override() -> None:
     assert cfg.ui_fade == 25.0
 
 
-def test_template_visualizer_section_omits_editor_fields() -> None:
-    section = template_visualizer_section(name="test")
+def test_template_project_editor_section_omits_editor_fields() -> None:
+    section = template_project_editor_section(name="test")
     assert section["name"] == "test"
     assert "width" in section
     assert "preview_quality" not in section
@@ -274,14 +274,14 @@ def test_template_visualizer_section_omits_editor_fields() -> None:
     assert "ui_fade" not in section
 
 
-def test_persist_visualizer_omits_editor_fields() -> None:
+def test_persist_project_editor_section_omits_editor_fields() -> None:
     cfg = CleaveConfig(
         paths=PathsConfig(
             preset_root=Path("/tmp/presets"),
             texture_paths=(Path("/tmp/textures"),),
         ),
         layers={},
-        visualizer=VisualizerConfig(
+        editor=EditorConfig(
             preview_quality="performance",
             ui_width_mode="fixed",
             ui_width=80,
@@ -294,7 +294,7 @@ def test_persist_visualizer_omits_editor_fields() -> None:
         timeline=None,
     )
     ctx = PersistCtx(cfg=cfg, session=TuningSession(layer_z_order=[]), cfg_dir=Path("/tmp"))
-    out = persist_visualizer(ctx)
+    out = persist_project_editor_section(ctx)
     assert "width" in out
     assert "preview_quality" not in out
     assert "ui_width_mode" not in out
@@ -304,7 +304,7 @@ def test_persist_visualizer_omits_editor_fields() -> None:
 
 def test_load_config_reads_visualizer_name(minimal_project: Path) -> None:
     cfg = load_config(project_root=minimal_project)
-    assert cfg.visualizer.name == "cleave-test"
+    assert cfg.editor.name == "cleave-test"
 
 
 def test_layers_in_z_order_matches_reversed_layer_z_order() -> None:
@@ -323,7 +323,7 @@ def test_layers_in_z_order_matches_reversed_layer_z_order() -> None:
             )
             for slot in DEFAULT_LAYER_SLOTS
         },
-        visualizer=VisualizerConfig(),
+        editor=EditorConfig(),
         config_path=Path("/tmp/cleave.config.yaml"),
         user_config_path=Path("/tmp/user-config.yaml"),
         layer_z_order=layer_z_order,
@@ -338,13 +338,13 @@ def test_load_config_clamps_beat_sensitivity(tmp_path: Path) -> None:
     write_minimal_config(project_dir, preset_root)
     cfg_path = project_dir / VIZ_CONFIG_FILENAME
     data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
-    data["visualizer"]["beat_sensitivity"] = 6.0
+    data["editor"]["beat_sensitivity"] = 6.0
     data["layers"]["layer_1"]["beat_sensitivity"] = -1
     with cfg_path.open("w", encoding="utf-8") as handle:
         dump_yaml(data, handle)
 
     cfg = load_config(project_root=project_dir)
-    assert cfg.visualizer.beat_sensitivity == 5.0
+    assert cfg.editor.beat_sensitivity == 5.0
     assert cfg.layers["layer_1"].beat_sensitivity == 0.0
 
 
@@ -369,10 +369,10 @@ def test_find_config_path_cli_override_wins(tmp_path: Path) -> None:
     project = tmp_path / "project"
     project.mkdir()
     project_config = project / VIZ_CONFIG_FILENAME
-    project_config.write_text("visualizer: {}\n", encoding="utf-8")
+    project_config.write_text("editor: {}\n", encoding="utf-8")
 
     override = tmp_path / "override.yaml"
-    override.write_text("visualizer: {}\n", encoding="utf-8")
+    override.write_text("editor: {}\n", encoding="utf-8")
 
     found = find_config_path(config_path=override, project_root=project)
     assert found == override.resolve()
@@ -382,7 +382,7 @@ def test_find_config_path_project_config(tmp_path: Path) -> None:
     project = tmp_path / "project"
     project.mkdir()
     project_config = project / VIZ_CONFIG_FILENAME
-    project_config.write_text("visualizer: {}\n", encoding="utf-8")
+    project_config.write_text("editor: {}\n", encoding="utf-8")
 
     found = find_config_path(project_root=project)
     assert found == project_config.resolve()
@@ -464,10 +464,10 @@ def test_load_config_editor_settings_from_user_config(tmp_path: Path) -> None:
     write_minimal_config(project_dir, preset_root)
 
     cfg = load_config(project_root=project_dir, user_config_path=user_cfg_path)
-    assert cfg.visualizer.preview_quality == "performance"
-    assert cfg.visualizer.ui_width_mode == "fixed"
-    assert cfg.visualizer.ui_width == 80
-    assert cfg.visualizer.ui_fade == 25.0
+    assert cfg.editor.preview_quality == "performance"
+    assert cfg.editor.ui_width_mode == "fixed"
+    assert cfg.editor.ui_width == 80
+    assert cfg.editor.ui_fade == 25.0
     assert cfg.user_config_path == user_cfg_path.resolve()
 
 
@@ -486,8 +486,8 @@ def test_load_config_ignores_editor_fields_in_project_yaml(tmp_path: Path) -> No
     write_minimal_config(
         project_dir,
         preset_root,
-        visualizer={
-            **template_visualizer_section(name="cleave-test"),
+        editor={
+            **template_project_editor_section(name="cleave-test"),
             "preview_quality": "ultra-performance",
             "ui_width_mode": "flexible",
             "ui_width": 200,
@@ -496,17 +496,17 @@ def test_load_config_ignores_editor_fields_in_project_yaml(tmp_path: Path) -> No
     )
 
     cfg = load_config(project_root=project_dir, user_config_path=user_cfg_path)
-    assert cfg.visualizer.preview_quality == "performance"
-    assert cfg.visualizer.ui_width_mode == "fixed"
-    assert cfg.visualizer.ui_width == 80
-    assert cfg.visualizer.ui_fade == 25.0
+    assert cfg.editor.preview_quality == "performance"
+    assert cfg.editor.ui_width_mode == "fixed"
+    assert cfg.editor.ui_width == 80
+    assert cfg.editor.ui_fade == 25.0
 
 
 def test_load_config_round_trip(minimal_project: Path) -> None:
     cfg = load_config(project_root=minimal_project)
     assert cfg.config_path == (minimal_project / VIZ_CONFIG_FILENAME).resolve()
     assert set(cfg.layers) == set(DEFAULT_LAYER_SLOTS)
-    assert cfg.visualizer.width > 0
+    assert cfg.editor.width > 0
     assert cfg.paths.preset_root.is_dir()
     for slot in DEFAULT_LAYER_SLOTS:
         assert cfg.layers[slot].preset.is_file()
@@ -514,7 +514,7 @@ def test_load_config_round_trip(minimal_project: Path) -> None:
 
 def test_repo_template_omits_editor_fields_and_paths() -> None:
     data = yaml.safe_load((repo_root() / VIZ_CONFIG_FILENAME).read_text(encoding="utf-8"))
-    visualizer = data["visualizer"]
+    visualizer = data["editor"]
     assert "preview_quality" not in visualizer
     assert "ui_width_mode" not in visualizer
     assert "ui_width" not in visualizer
@@ -530,8 +530,8 @@ def test_ensure_project_viz_config_sets_project_name(tmp_path: Path) -> None:
     assert dst == project_viz_config_path(project)
     assert dst.is_file()
     data = yaml.safe_load(dst.read_text(encoding="utf-8"))
-    assert data["visualizer"]["name"] == "song"
-    assert "preview_quality" not in data["visualizer"]
+    assert data["editor"]["name"] == "song"
+    assert "preview_quality" not in data["editor"]
     assert "paths" not in data
 
 
@@ -781,7 +781,7 @@ def test_persist_render_hdr_compositing_round_trip() -> None:
     cfg = CleaveConfig(
         paths=PathsConfig(preset_root=Path("/tmp"), texture_paths=()),
         layers={},
-        visualizer=VisualizerConfig(),
+        editor=EditorConfig(),
         config_path=Path("/tmp/cleave-viz.yaml"),
         user_config_path=Path("/tmp/user-config.yaml"),
         render=render,
@@ -809,7 +809,7 @@ def test_render_output_size_reads_render_section() -> None:
     cfg = CleaveConfig(
         paths=PathsConfig(preset_root=Path("/tmp"), texture_paths=()),
         layers={},
-        visualizer=VisualizerConfig(),
+        editor=EditorConfig(),
         config_path=Path("/tmp/cleave-viz.yaml"),
         user_config_path=Path("/tmp/user-config.yaml"),
         render=render,
@@ -1133,7 +1133,7 @@ def test_cleave_config_layer_z_order_defaults_to_list() -> None:
             texture_paths=(Path("/tmp/textures"),),
         ),
         layers={},
-        visualizer=VisualizerConfig(),
+        editor=EditorConfig(),
         config_path=Path("/tmp/cleave.config.yaml"),
         user_config_path=Path("/tmp/user-config.yaml"),
     )

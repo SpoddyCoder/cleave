@@ -78,7 +78,7 @@ def test_resize_layer_updates_projectm_and_compositor() -> None:
 def test_apply_preview_resolutions_resizes_when_size_changes() -> None:
     layer = _stem_layer("layer_1")
     base_cfg = make_test_cfg(("layer_1",))
-    cfg = replace(base_cfg, visualizer=replace(base_cfg.visualizer, preview_quality="performance"))
+    cfg = replace(base_cfg, editor=replace(base_cfg.editor, preview_quality="performance"))
     session = _session(("layer_1",))
     compositor = MagicMock()
 
@@ -93,7 +93,7 @@ def test_apply_preview_resolutions_resizes_when_size_changes() -> None:
 def test_apply_preview_resolutions_skips_when_unchanged() -> None:
     layer = _stem_layer("layer_1", width=960, height=540)
     base_cfg = make_test_cfg(("layer_1",))
-    cfg = replace(base_cfg, visualizer=replace(base_cfg.visualizer, preview_quality="performance"))
+    cfg = replace(base_cfg, editor=replace(base_cfg.editor, preview_quality="performance"))
     session = _session(("layer_1",))
     compositor = MagicMock()
 
@@ -116,7 +116,7 @@ def test_build_preview_resolutions_false_uses_render_output_size(
     cfg = replace(
         base_cfg,
         render=RenderConfig(fps=30, width=1920, height=1080),
-        visualizer=replace(base_cfg.visualizer, preview_quality="performance"),
+        editor=replace(base_cfg.editor, preview_quality="performance"),
     )
     compositor = MagicMock()
     playlist = stem_layer.playlist
@@ -149,7 +149,7 @@ def test_build_preview_resolutions_false_viz_quality_uses_preview_sizes(
     cfg = replace(
         base_cfg,
         render=RenderConfig(fps=30, width=1920, height=1080),
-        visualizer=replace(base_cfg.visualizer, preview_quality="performance"),
+        editor=replace(base_cfg.editor, preview_quality="performance"),
     )
     compositor = MagicMock()
     playlist = stem_layer.playlist
@@ -178,7 +178,7 @@ def test_build_preview_resolutions_true_builds_at_preview_size(
     stem_layer = _stem_layer(slot)
     build_single.return_value = stem_layer
     base_cfg = make_test_cfg((slot,))
-    cfg = replace(base_cfg, visualizer=replace(base_cfg.visualizer, preview_quality="performance"))
+    cfg = replace(base_cfg, editor=replace(base_cfg.editor, preview_quality="performance"))
     session = _session((slot,))
     compositor = MagicMock()
     playlist = stem_layer.playlist

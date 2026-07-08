@@ -8,7 +8,7 @@ Layer together drums, bass, vocal and other stems driving Milkdrop presets to cr
 
 Comprehensive visual editor allows you to browse and tune presets in real time - automate preset switching, layer in effects, post processing and a whole bunch more. 
 
-Render the final output in high defintion and high frame rates using `ffmpeg`.
+Render the final output in high definition and high frame rates using `ffmpeg`.
 
 Built on [projectM](https://github.com/projectM-visualizer/projectM) and [Demucs](https://github.com/facebookresearch/demucs) amongst [others](#attribution). Developed on WSL2; should run on any Linux with a display.
 
@@ -79,7 +79,7 @@ Note: There are many thousands of Milkdrop presets available, these are just a f
 ./cleave.py play ~/music/mysong.wav
 ```
 
-This will separate the track into its component stem tracks (bass, drums, vocals, other), perform some audio analysis, then launch the visualizer editor.
+This will separate the track into its component stem tracks (bass, drums, vocals, other), perform some audio analysis, then open the editor.
 
 ---
 
@@ -97,8 +97,8 @@ Cleave uses the XDG standard for user data and configuration directories...
 
 Available commands...
 
-* `play` play song in visualizer editor, accepts a source audio file or project slug/path.
-* `separate` can be run on its own without launching the visualizer.
+* `play` play song in the editor, accepts a source audio file or project slug/path.
+* `separate` can be run on its own without opening the editor.
 * `render` accepts a project slug or path (not a source audio file).
 * `backup` archives a full project directory (mix, stems, configs, renders etc.) to a `.cleave-tar.gz` file.
 * `restore` unpacks a `.cleave-tar.gz` archive into `projects/<slug>/` (slug from `project.yaml`).
@@ -112,7 +112,7 @@ Note: use `--help` on any command for options.
 The project directory stores all files required in a self-contained bundle...
 
 * `project.yaml` - project metadata
-* `cleave-viz.yaml` - visualizer & final render configuration. Not everything in here is surfaced in the visualizer UI just yet
+* `cleave-viz.yaml` - editor & final render configuration. Not everything in here is surfaced in the editor UI just yet
 * `signals.json` - audio analysis data used by `cleave effects`
 * `mysong.wav` - original source audio is copied into the project directory
 * `stems/` - separated audio stems
@@ -121,18 +121,19 @@ The project directory stores all files required in a self-contained bundle...
 
 ### Configuration
 
-* Visualizer Editor Settings (preview quality, panel width, fade) live in `~/.config/cleave/config.yaml`.
+* Editor settings (preview quality, panel width, fade) live in `~/.config/cleave/config.yaml`.
 * Override the data root with `CLEAVE_DATA` (e.g. `CLEAVE_DATA=.` for a dev checkout).
 * When a project omits `paths`, preset browsing defaults to `~/.local/share/cleave/presets`.
   * `paths.preset_root` in `cleave-viz.yaml` overrides this default when set.
 
-### Visualizer Editor
+### Editor
 
-* This is where you can create your visual masterpieces.
-* Press `h` to show context sensitive controls + help.
-* The visualizer may run at low frame rates with lots of layers (Milkdrop presets use a lot of CPU), use the UI settings to render at lower quality in the editor - the final render will still be at full quality.
+* Press `h` to show context sensitive help and controls.
+* The editor may run at low frame rates with multiple layers - some Milkdrop presets use a lot of CPU.
+  * Change the `preview quality` in the Editor settings menu.
+  * The final render will still be at full quality.
 
-#### Visualizer Timeline
+#### Timeline
 * TODO: Document
 
 ---
@@ -141,9 +142,9 @@ The project directory stores all files required in a self-contained bundle...
 
 ### Compositing
 
-* The visualizer supports up to eight libprojectM layers at tiered resolutions
+* The editor supports up to eight libprojectM layers at tiered resolutions
 * Composited to **1280x720** content by default (editable `cleave-viz.yaml`)
-* Live preview upscales via `visualizer.upscale` and runs at display frame rate
+* Live preview upscales via `editor.upscale` and runs at display frame rate
 * Offline render output resolution is set under `render.width` / `render.height` (default **1280x720**) and frame rate under `render.fps`
 * Each layer's libprojectM instance receives PCM from its assigned stem; stereo stems are fed as stereo, mono as mono.
 * Milkdrop draws on black, so cleave treats black as transparent and uses pixel brightness as blend weight (`black-key` default).
