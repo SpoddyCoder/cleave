@@ -137,16 +137,17 @@ While focused on a preset **file** row:
 * `Ctrl + b` — **move** the preset into `blacklist/` (permanently removed from pack).
 * Both folders live under `paths.preset_root` (default `~/.local/share/cleave/presets/`).
   * Browse them in the Editor like any other pack folder. 
-* Subdirectories inside `favourites/` or `blacklist/` appear as destination choices in the confirm modal.
-  * Makes it easy to categorise them in any way you choose, eg:
-  * `favourites/a-tier/`
-  * `favourites/b-tier/`
-  * `favourites/good-for-top-layer/`
-  * `favourites/good-for-bottom-layer/`
-  * `favourites/good-for-drums/`
-  * `favourites/good-for-full-mix/`
-  * `favourites/lots-of-black/`
-  * `favourites/full-colour-wash/`
+* Subdirectories inside `favourites/` or `blacklist/` appear as destination choices in the confirm modal, which makes it easy to categorise them in any way you choose, eg:
+```
+favourites/a-tier/
+favourites/b-tier/
+favourites/good-for-top-layer/
+favourites/good-for-bottom-layer/
+favourites/good-for-drums/
+favourites/good-for-full-mix/
+favourites/lots-of-black/
+favourites/full-colour-wash/
+```
 
 #### Timeline
 * TODO: Document
