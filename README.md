@@ -2,13 +2,9 @@
 
 [![Tests](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml/badge.svg)](https://github.com/SpoddyCoder/cleave/actions/workflows/tests.yml)
 
-Stem-separated music visualizer. 
+Stem-separated music visualizer. Layer together drums, bass, vocal and other stems driving Milkdrop presets to create your own unique visual masterpieces. 
 
-Layer together drums, bass, vocal and other stems driving Milkdrop presets to create your own unique visual masterpieces. 
-
-Comprehensive visual editor allows you to browse and tune presets in real time - automate preset switching, layer in effects, post processing and a whole bunch more. 
-
-Render the final output in high definition and high frame rates using `ffmpeg`.
+Comprehensive visual editor allows you to browse and tune presets in real time - automate preset switching, layer in effects, post processing and a whole bunch more. Render the final output in high definition and high frame rates using `ffmpeg`.
 
 Built on [projectM](https://github.com/projectM-visualizer/projectM) and [Demucs](https://github.com/facebookresearch/demucs) amongst [others](#attribution). Developed on WSL2; should run on any Linux with a display.
 
