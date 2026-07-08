@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pygame
 
-from cleave.config import CleaveConfig, LayerConfig, PathsConfig, VisualizerConfig
+from cleave.config import CleaveConfig, LayerConfig, PathsConfig, EditorConfig
 from cleave.config_schema import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.preset_playlist import PresetPlaylist
@@ -109,7 +109,7 @@ def make_test_cfg(
             for slot in DEFAULT_LAYER_SLOTS
         },
         layer_z_order=list(slots),
-        visualizer=VisualizerConfig(),
+        editor=EditorConfig(),
         config_path=config_path or Path("/tmp/test/cleave.config.yaml"),
         user_config_path=Path("/tmp/user-config.yaml"),
     )

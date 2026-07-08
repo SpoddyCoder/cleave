@@ -12,7 +12,7 @@ from cleave.config_schema import (
     HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES,
     PRESET_SWITCHING_MODE_HELP_ENTRIES,
-    VISUALIZER_PREVIEW_QUALITY_HELP_ENTRIES,
+    EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
 )
 
 
@@ -669,7 +669,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.EXPAND,
         is_header=True,
         help_title="Editor Settings",
-        help_description=("Global visualizer settings (not per-layer).",),
+        help_description=("Global editor settings (not per-layer).",),
         quick_nav_target=True,
     ),
     RowKind.SETTINGS_PREVIEW_QUALITY: RowBehavior(
@@ -683,7 +683,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "Trade-off between visual quality and CPU/GPU load.",
             "Affects layer resolution scaling in the live view only.",
         ),
-        help_mode_entries=VISUALIZER_PREVIEW_QUALITY_HELP_ENTRIES,
+        help_mode_entries=EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
     ),
     RowKind.SETTINGS_UI_HEADER: RowBehavior(
         RowAffordance.EXPAND,

@@ -12,7 +12,7 @@ from cleave.config_schema import (
     default_chroma_boost_runtime_values,
     default_highlight_rolloff_runtime_values,
     template_layer_entry,
-    template_visualizer_section,
+    template_project_editor_section,
 )
 from cleave.extract import STEM_NAMES, StemSource
 from cleave.paths import repo_root
@@ -128,7 +128,7 @@ def write_minimal_config(project_dir: Path, preset_root: Path, **overrides) -> P
     texture_root.mkdir(parents=True, exist_ok=True)
 
     data: dict = {
-        "visualizer": template_visualizer_section(name="cleave-test"),
+        "editor": template_project_editor_section(name="cleave-test"),
         "paths": {
             "preset_root": str(preset_root),
             "texture_paths": [str(texture_root)],

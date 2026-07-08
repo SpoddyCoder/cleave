@@ -11,15 +11,15 @@ from cleave.config_schema import (
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
-    DEFAULT_VISUALIZER_PREVIEW_QUALITY,
+    DEFAULT_EDITOR_PREVIEW_QUALITY,
 )
 from dataclasses import replace
 
-from cleave.config import VisualizerConfig
+from cleave.config import EditorConfig
 from cleave.user_config import (
     EditorSettings,
     default_editor_settings,
-    editor_settings_from_visualizer,
+    editor_settings_from_config,
     load_user_config,
     persist_editor_settings,
     user_config_path,
@@ -35,7 +35,7 @@ def test_load_user_config_missing_file_returns_defaults(tmp_path: Path) -> None:
     assert cfg.path == missing.resolve()
     assert cfg.preset_root is None
     assert cfg.texture_paths is None
-    assert cfg.editor.preview_quality == DEFAULT_VISUALIZER_PREVIEW_QUALITY
+    assert cfg.editor.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY
     assert cfg.editor.ui_width_mode == DEFAULT_UI_WIDTH_MODE
     assert cfg.editor.ui_width == DEFAULT_UI_WIDTH
     assert cfg.editor.ui_fade == DEFAULT_UI_FADE_SEC
@@ -43,7 +43,7 @@ def test_load_user_config_missing_file_returns_defaults(tmp_path: Path) -> None:
 
 def test_default_editor_settings_matches_schema_defaults() -> None:
     editor = default_editor_settings()
-    assert editor.preview_quality == DEFAULT_VISUALIZER_PREVIEW_QUALITY
+    assert editor.preview_quality == DEFAULT_EDITOR_PREVIEW_QUALITY
     assert editor.ui_width_mode == DEFAULT_UI_WIDTH_MODE
     assert editor.ui_width == DEFAULT_UI_WIDTH
     assert editor.ui_fade == DEFAULT_UI_FADE_SEC
@@ -146,14 +146,14 @@ def test_write_user_config_preserves_paths_and_rewrites_editor(tmp_path: Path) -
     assert data["future_key"] == {"keep": True}
 
 
-def test_editor_settings_from_visualizer() -> None:
-    vis = VisualizerConfig(
+def test_editor_settings_from_config() -> None:
+    vis = EditorConfig(
         preview_quality="performance",
         ui_width_mode="fixed",
         ui_width=75,
         ui_fade=22.5,
     )
-    editor = editor_settings_from_visualizer(vis)
+    editor = editor_settings_from_config(vis)
     assert editor == EditorSettings(
         preview_quality="performance",
         ui_width_mode="fixed",
@@ -169,7 +169,7 @@ def test_persist_editor_settings_writes_visualizer_editor_fields(
     cfg = replace(
         make_test_cfg(("layer_1",)),
         user_config_path=user_path,
-        visualizer=VisualizerConfig(
+        editor=EditorConfig(
             preview_quality="ultra-performance",
             ui_width_mode="fixed",
             ui_width=88,

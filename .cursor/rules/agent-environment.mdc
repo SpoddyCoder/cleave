@@ -23,7 +23,7 @@ alwaysApply: true
 
   `/home/fernpa/anaconda3/envs/cleave/bin/python tests/run_unit_tests.py`
 
-- The visualizer ([cleave.py](cleave.py) / `cleave.viz.launch`) needs display and OpenGL; do not launch it for routine agent verification. Use unit tests unless the user asks to run the visualizer.
+- The editor ([cleave.py](cleave.py) / `cleave.viz.launch`) needs display and OpenGL; do not launch it for routine agent verification. Use unit tests unless the user asks to run the editor.
 
 ## Optional activation
 

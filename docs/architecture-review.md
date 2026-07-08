@@ -27,7 +27,7 @@ These will lead to silent bugs, divergent behavior, or escalating change cost if
 
 ### Dual authority: `CleaveConfig` vs `TuningSession`
 
-Live edits mutate `session.layers`, `session.render_overlay`, and related runtime objects. `cfg` is only partially updated during play (for example `visualizer.render_mode` via `replace`, layer add/remove in [cleave/viz/wiring.py](../cleave/viz/wiring.py)). Most layer fields (opacity, stem, preset switching, effects) live only in session until save, when [persist_layers](../cleave/config_schema.py) merges session back into YAML.
+Live edits mutate `session.layers`, `session.render_overlay`, and related runtime objects. `cfg` is only partially updated during play (for example `editor.render_mode` via `replace`, layer add/remove in [cleave/viz/wiring.py](../cleave/viz/wiring.py)). Most layer fields (opacity, stem, preset switching, effects) live only in session until save, when [persist_layers](../cleave/config_schema.py) merges session back into YAML.
 
 This works today because persistence is careful, but it is a convention, not enforced by types. Any new code that reads `cfg.layers[slot].opacity` instead of `session.layers[slot].opacity_pct` will silently use stale data. The `FieldSource` (`cfg` / `session` / `both`) model in field descriptors helps at save time but does not protect runtime readers.
 
@@ -35,12 +35,12 @@ This works today because persistence is careful, but it is a convention, not enf
 
 ### Layer resolution model (simplified)
 
-Done: offline render uses full `render.width` x `render.height` per layer by default; live preview and `--viz-quality` offline renders scale layers via `visualizer.preview_quality` only. Per-layer width/height removed from config.
+Done: offline render uses full `render.width` x `render.height` per layer by default; live preview and `--viz-quality` offline renders scale layers via `editor.preview_quality` only. Per-layer width/height removed from config.
 
 Three concepts used to interact:
 
 1. Per-layer `width` / `height` in config (removed)
-2. `visualizer.preview_quality` preview downscaling ([cleave/viz/layer_preview_resolution.py](../cleave/viz/layer_preview_resolution.py))
+2. `editor.preview_quality` preview downscaling ([cleave/viz/layer_preview_resolution.py](../cleave/viz/layer_preview_resolution.py))
 3. Offline render output size ([cleave/viz/render.py](../cleave/viz/render.py))
 
 **Remaining risk:** live/offline divergence if preview quality changes are not reflected in offline `--viz-quality` path; default offline path is full resolution per layer.
@@ -53,7 +53,7 @@ Three concepts used to interact:
 
 ### Domain layering inversion: effects depend on viz
 
-[cleave/effects/runtime.py](../cleave/effects/runtime.py) imports `TuningSession` from [cleave/viz/session.py](../cleave/viz/session.py). Core effect logic is coupled to the visualizer session model. Adding effects from CLI, batch tools, or tests without the full viz stack gets harder; the dependency arrow points the wrong way.
+[cleave/effects/runtime.py](../cleave/effects/runtime.py) imports `TuningSession` from [cleave/viz/session.py](../cleave/viz/session.py). Core effect logic is coupled to the editor session model. Adding effects from CLI, batch tools, or tests without the full viz stack gets harder; the dependency arrow points the wrong way.
 
 **Recommended direction:** extract a small neutral type (for example `LayerEffectState`) in a non-viz module that both session and effects use.
 
@@ -71,9 +71,9 @@ These will make the codebase easier to work in but are lower risk than the flaws
 
 ### `config_schema.py` monolith (~1,900 lines)
 
-The module holds defaults, parse, dump, persist, display helpers, and section descriptors for visualizer, layers, render, and timeline. It is the right abstraction, but at this size it is hard to review, easy to break cross-section, and uses lazy imports back to [cleave/config.py](../cleave/config.py) to avoid cycles.
+The module holds defaults, parse, dump, persist, display helpers, and section descriptors for editor, layers, render, and timeline. It is the right abstraction, but at this size it is hard to review, easy to break cross-section, and uses lazy imports back to [cleave/config.py](../cleave/config.py) to avoid cycles.
 
-**Pragmatic split:** `config_schema/visualizer.py`, `layers.py`, `render.py`, `timeline.py` with a thin re-export, or keep one module but extract section descriptor tables.
+**Pragmatic split:** `config_schema/editor.py`, `layers.py`, `render.py`, `timeline.py` with a thin re-export, or keep one module but extract section descriptor tables.
 
 ### Four parallel UI registries
 

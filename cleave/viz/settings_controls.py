@@ -7,7 +7,7 @@ from dataclasses import replace
 from cleave.config import CleaveConfig
 from cleave.config_schema import (
     UI_WIDTH_MODES,
-    VISUALIZER_PREVIEW_QUALITIES,
+    EDITOR_PREVIEW_QUALITIES,
     clamp_ui_fade,
     clamp_ui_width,
 )
@@ -38,8 +38,8 @@ class SettingsControls:
         settings.ui_expanded = expanded
 
     def cycle_preview_quality(self, *, forward: bool) -> None:
-        modes = VISUALIZER_PREVIEW_QUALITIES
-        current = self.cfg.visualizer.preview_quality
+        modes = EDITOR_PREVIEW_QUALITIES
+        current = self.cfg.editor.preview_quality
         try:
             index = modes.index(current)
         except ValueError:
@@ -48,11 +48,11 @@ class SettingsControls:
             new_mode = modes[(index + 1) % len(modes)]
         else:
             new_mode = modes[(index - 1) % len(modes)]
-        self.cfg.visualizer = replace(self.cfg.visualizer, preview_quality=new_mode)
+        self.cfg.editor = replace(self.cfg.editor, preview_quality=new_mode)
 
     def cycle_ui_width_mode(self, *, forward: bool) -> None:
         modes = UI_WIDTH_MODES
-        current = self.cfg.visualizer.ui_width_mode
+        current = self.cfg.editor.ui_width_mode
         try:
             index = modes.index(current)
         except ValueError:
@@ -61,18 +61,18 @@ class SettingsControls:
             new_mode = modes[(index + 1) % len(modes)]
         else:
             new_mode = modes[(index - 1) % len(modes)]
-        self.cfg.visualizer = replace(self.cfg.visualizer, ui_width_mode=new_mode)
+        self.cfg.editor = replace(self.cfg.editor, ui_width_mode=new_mode)
 
     def adjust_ui_fade(self, *, forward: bool, ctrl: bool) -> None:
         step = 5.0 if ctrl else 1.0
         delta = step if forward else -step
-        current = self.cfg.visualizer.ui_fade
+        current = self.cfg.editor.ui_fade
         new_value = clamp_ui_fade(current + delta)
-        self.cfg.visualizer = replace(self.cfg.visualizer, ui_fade=new_value)
+        self.cfg.editor = replace(self.cfg.editor, ui_fade=new_value)
 
     def adjust_ui_width(self, *, forward: bool, ctrl: bool) -> None:
         step = 5 if ctrl else 1
         delta = step if forward else -step
-        current = self.cfg.visualizer.ui_width
+        current = self.cfg.editor.ui_width
         new_value = clamp_ui_width(current + delta)
-        self.cfg.visualizer = replace(self.cfg.visualizer, ui_width=new_value)
+        self.cfg.editor = replace(self.cfg.editor, ui_width=new_value)

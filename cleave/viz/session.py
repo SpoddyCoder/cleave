@@ -265,7 +265,7 @@ def _beat_sensitivity(cfg: CleaveConfig, slot: str) -> float:
     layer = cfg.layers[slot]
     if layer.beat_sensitivity is not None:
         return layer.beat_sensitivity
-    return cfg.visualizer.beat_sensitivity
+    return cfg.editor.beat_sensitivity
 
 
 def session_from_cfg(

@@ -145,14 +145,14 @@ def write_session_snapshot(
     original = _load_original_dict(cfg)
     payload = persisted_session_payload(cfg, session)
 
-    orig_vis = original.get("visualizer")
-    visualizer: dict[str, Any] = {}
-    if isinstance(orig_vis, dict) and "name" in orig_vis:
-        visualizer["name"] = orig_vis["name"]
-    visualizer.update(payload["visualizer"])
+    orig_editor = original.get("editor")
+    editor_out: dict[str, Any] = {}
+    if isinstance(orig_editor, dict) and "name" in orig_editor:
+        editor_out["name"] = orig_editor["name"]
+    editor_out.update(payload["editor"])
 
     data: dict[str, Any] = {
-        "visualizer": visualizer,
+        "editor": editor_out,
         "layer_z_order": payload["layer_z_order"],
         "layers": payload["layers"],
         "render": _snapshot_render_overlay(cfg, session, original),

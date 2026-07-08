@@ -62,7 +62,7 @@ def _beat_sensitivity(cfg: CleaveConfig, slot: str) -> float:
     layer = cfg.layers[slot]
     if layer.beat_sensitivity is not None:
         return layer.beat_sensitivity
-    return cfg.visualizer.beat_sensitivity
+    return cfg.editor.beat_sensitivity
 
 
 def _render_layer_fbo(layer: StemLayer, pm: ProjectM) -> None:
@@ -245,8 +245,8 @@ class LayerFramePipeline:
             if session is None:
                 raise ValueError("session is required when preview_resolutions=True")
             z_order = session.layer_z_order
-            preview_quality = cfg.visualizer.preview_quality
-            visualizer = cfg.visualizer
+            preview_quality = cfg.editor.preview_quality
+            visualizer = cfg.editor
 
             def layer_size(slot: str) -> tuple[int, int]:
                 z_index = z_order.index(slot)

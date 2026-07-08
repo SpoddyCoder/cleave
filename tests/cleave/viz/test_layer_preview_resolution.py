@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from cleave.config import CleaveConfig, LayerConfig, PathsConfig, RenderConfig, VisualizerConfig
+from cleave.config import CleaveConfig, LayerConfig, PathsConfig, RenderConfig, EditorConfig
 from cleave.config_schema import DEFAULT_LAYER_SLOTS
 from cleave.viz.layer_preview_resolution import (
     PREVIEW_MIN_VIZ_SCALE,
@@ -33,8 +33,8 @@ def _visualizer(
     height: int = 720,
     *,
     preview_quality: str = "balanced",
-) -> VisualizerConfig:
-    return VisualizerConfig(
+) -> EditorConfig:
+    return EditorConfig(
         width=width, height=height, preview_quality=preview_quality
     )  # type: ignore[arg-type]
 
@@ -68,7 +68,7 @@ def _cfg(
         paths=PathsConfig(preset_root=preset_root, texture_paths=()),
         layers=layers,
         layer_z_order=list(slots),
-        visualizer=_visualizer(preview_quality=preview_quality),
+        editor=_visualizer(preview_quality=preview_quality),
         config_path=Path("/tmp/test/cleave.config.yaml"),
         user_config_path=Path("/tmp/user-config.yaml"),
     )
@@ -155,12 +155,12 @@ def test_preview_sizes_for_session_keys_slots_with_z_order_indices() -> None:
     sizes = preview_sizes_for_session(cfg, session)
 
     assert set(sizes) == {"layer_2", "layer_1"}
-    assert sizes["layer_2"] == preview_layer_size("balanced", 0, cfg.visualizer)
-    assert sizes["layer_1"] == preview_layer_size("balanced", 1, cfg.visualizer)
+    assert sizes["layer_2"] == preview_layer_size("balanced", 0, cfg.editor)
+    assert sizes["layer_1"] == preview_layer_size("balanced", 1, cfg.editor)
 
 
 def test_preview_sizes_for_session_follows_cfg_preview_quality() -> None:
-    cfg = replace(_cfg(), visualizer=_visualizer(preview_quality="performance"))
+    cfg = replace(_cfg(), editor=_visualizer(preview_quality="performance"))
     session = _session(("layer_1",))
     sizes = preview_sizes_for_session(cfg, session)
     assert sizes["layer_1"] == (960, 540)
@@ -171,8 +171,8 @@ def test_offline_layer_sizes_uses_cfg_layer_z_order() -> None:
     sizes = offline_layer_sizes(cfg)
 
     assert set(sizes) == {"layer_2", "layer_1"}
-    assert sizes["layer_2"] == preview_layer_size("balanced", 0, cfg.visualizer)
-    assert sizes["layer_1"] == preview_layer_size("balanced", 1, cfg.visualizer)
+    assert sizes["layer_2"] == preview_layer_size("balanced", 0, cfg.editor)
+    assert sizes["layer_1"] == preview_layer_size("balanced", 1, cfg.editor)
 
 
 def test_render_layer_size_full_quality_uses_render_output() -> None:

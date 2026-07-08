@@ -102,9 +102,9 @@ class LayerManager:
         self.cfg.layers[slot] = layer_cfg
         z_index = len(self.session.layer_z_order)
         width, height = preview_layer_size(
-            self.cfg.visualizer.preview_quality,
+            self.cfg.editor.preview_quality,
             z_index,
-            self.cfg.visualizer,
+            self.cfg.editor,
         )
         stem_layer = LayerFramePipeline.build_single(
             slot,
@@ -113,7 +113,7 @@ class LayerManager:
             playlist,
             self.projectm_fps,
             self.texture_paths,
-            beat_sensitivity=self.cfg.visualizer.beat_sensitivity,
+            beat_sensitivity=self.cfg.editor.beat_sensitivity,
             width=width,
             height=height,
         )
@@ -124,7 +124,7 @@ class LayerManager:
             playlist=playlist,
             browse_floor=preset_browse_floor(layer_cfg.preset, self.preset_root),
             stem=DEFAULT_NEW_LAYER_STEM,
-            beat_sensitivity=self.cfg.visualizer.beat_sensitivity,
+            beat_sensitivity=self.cfg.editor.beat_sensitivity,
         )
         add_layer_to_session(self.session, slot, runtime)
         self.cfg.layer_z_order.append(slot)

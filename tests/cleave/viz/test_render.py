@@ -23,7 +23,7 @@ from cleave.config_schema import (
     DEFAULT_RENDER_FPS,
     DEFAULT_RENDER_HEIGHT,
     DEFAULT_RENDER_WIDTH,
-    template_visualizer_section,
+    template_project_editor_section,
 )
 from cleave.extract import STEM_NAMES, stems_dir
 from cleave.project import write_manifest
@@ -128,7 +128,7 @@ def _setup_render_project(
     render_fps: int = 10,
     render_width: int | None = None,
     render_height: int | None = None,
-    visualizer: dict | None = None,
+    editor: dict | None = None,
 ) -> Path:
     preset_root = tmp_path / "presets"
     project = tmp_path / "my-track"
@@ -138,8 +138,8 @@ def _setup_render_project(
     if render_height is not None:
         render["height"] = render_height
     overrides: dict = {"render": render}
-    if visualizer is not None:
-        overrides["visualizer"] = visualizer
+    if editor is not None:
+        overrides["editor"] = editor
     write_minimal_config(project, preset_root, **overrides)
     _write_stub_stems(project)
     (project / "signals.json").write_text("{}")
@@ -915,8 +915,8 @@ def test_render_ffmpeg_ignores_upscale_uses_render_resolution(
         render_fps=10,
         render_width=1280,
         render_height=720,
-        visualizer={
-            **template_visualizer_section(name="cleave-test"),
+        editor={
+            **template_project_editor_section(name="cleave-test"),
             "width": 640,
             "height": 360,
             "upscale": 2.0,

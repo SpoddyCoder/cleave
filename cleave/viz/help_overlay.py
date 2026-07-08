@@ -1,4 +1,4 @@
-"""Context-sensitive help panel for the Cleave visualizer."""
+"""Context-sensitive help panel for the Cleave editor."""
 
 from __future__ import annotations
 

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-from cleave.config import CleaveConfig, LayerConfig, PathsConfig, VisualizerConfig, load_config
+from cleave.config import CleaveConfig, LayerConfig, PathsConfig, EditorConfig, load_config
 from cleave.config_schema import (
     DEFAULT_EASTER_EGG,
     DEFAULT_HARD_CUT_DURATION,
@@ -93,7 +93,7 @@ def _cfg_and_session(*, preset_switching: str = "none") -> tuple[CleaveConfig, T
             )
         },
         layer_z_order=["layer_1"],
-        visualizer=VisualizerConfig(),
+        editor=EditorConfig(),
         config_path=Path("/tmp/test/cleave.config.yaml"),
         user_config_path=Path("/tmp/user-config.yaml"),
     )
@@ -186,7 +186,7 @@ def test_persist_layers_writes_projectm_mode(tmp_path: Path) -> None:
             )
         },
         layer_z_order=["layer_1"],
-        visualizer=VisualizerConfig(),
+        editor=EditorConfig(),
         config_path=config_path,
         user_config_path=Path("/tmp/user-config.yaml"),
     )

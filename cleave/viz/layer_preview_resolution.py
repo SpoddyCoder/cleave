@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from cleave.config import (
     CleaveConfig,
-    VisualizerConfig,
-    VisualizerPreviewQuality,
+    EditorConfig,
+    EditorPreviewQuality,
     render_output_size,
 )
 from cleave.viz.session import TuningSession
@@ -19,7 +19,7 @@ _ULTRA_PERFORMANCE_SCALES: tuple[float, ...] = (0.50, 0.35, 0.25)
 _FLOOR_ONLY = 0.0
 
 
-def _requested_scale(preview_quality: VisualizerPreviewQuality, z_index: int) -> float:
+def _requested_scale(preview_quality: EditorPreviewQuality, z_index: int) -> float:
     if preview_quality == "full-quality":
         return 1.0
     if preview_quality == "balanced":
@@ -36,9 +36,9 @@ def _requested_scale(preview_quality: VisualizerPreviewQuality, z_index: int) ->
 
 
 def preview_layer_size(
-    preview_quality: VisualizerPreviewQuality,
+    preview_quality: EditorPreviewQuality,
     z_index: int,
-    visualizer: VisualizerConfig,
+    visualizer: EditorConfig,
 ) -> tuple[int, int]:
     layer_w = visualizer.width
     layer_h = visualizer.height
@@ -55,8 +55,8 @@ def preview_layer_size(
 
 
 def offline_layer_sizes(cfg: CleaveConfig) -> dict[str, tuple[int, int]]:
-    preview_quality = cfg.visualizer.preview_quality
-    visualizer = cfg.visualizer
+    preview_quality = cfg.editor.preview_quality
+    visualizer = cfg.editor
     return {
         slot: preview_layer_size(preview_quality, z_index, visualizer)
         for z_index, slot in enumerate(cfg.layer_z_order)
@@ -72,9 +72,9 @@ def render_layer_size(
     if not viz_quality:
         return render_output_size(cfg)
     return preview_layer_size(
-        cfg.visualizer.preview_quality,
+        cfg.editor.preview_quality,
         z_index,
-        cfg.visualizer,
+        cfg.editor,
     )
 
 
@@ -82,8 +82,8 @@ def preview_sizes_for_session(
     cfg: CleaveConfig,
     session: TuningSession,
 ) -> dict[str, tuple[int, int]]:
-    preview_quality = cfg.visualizer.preview_quality
-    visualizer = cfg.visualizer
+    preview_quality = cfg.editor.preview_quality
+    visualizer = cfg.editor
     return {
         slot: preview_layer_size(preview_quality, z_index, visualizer)
         for z_index, slot in enumerate(session.layer_z_order)

@@ -9,14 +9,14 @@ from typing import Any
 
 import yaml
 
-from cleave.config import CleaveConfig, VisualizerConfig, dump_yaml
+from cleave.config import CleaveConfig, EditorConfig, dump_yaml
 from cleave.config_schema import (
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
-    DEFAULT_VISUALIZER_PREVIEW_QUALITY,
+    DEFAULT_EDITOR_PREVIEW_QUALITY,
     UiWidthMode,
-    VisualizerPreviewQuality,
+    EditorPreviewQuality,
     dump_editor_section,
     parse_editor_section,
 )
@@ -37,7 +37,7 @@ USER_CONFIG_PATH = user_config_path()
 
 @dataclass(frozen=True)
 class EditorSettings:
-    preview_quality: VisualizerPreviewQuality
+    preview_quality: EditorPreviewQuality
     ui_width_mode: UiWidthMode
     ui_width: int
     ui_fade: float
@@ -53,7 +53,7 @@ class UserConfig:
 
 def default_editor_settings() -> EditorSettings:
     return EditorSettings(
-        preview_quality=DEFAULT_VISUALIZER_PREVIEW_QUALITY,
+        preview_quality=DEFAULT_EDITOR_PREVIEW_QUALITY,
         ui_width_mode=DEFAULT_UI_WIDTH_MODE,
         ui_width=DEFAULT_UI_WIDTH,
         ui_fade=DEFAULT_UI_FADE_SEC,
@@ -113,18 +113,18 @@ def load_user_config(path: Path | None = None) -> UserConfig:
     )
 
 
-def editor_settings_from_visualizer(vis: VisualizerConfig) -> EditorSettings:
+def editor_settings_from_config(cfg: EditorConfig) -> EditorSettings:
     return EditorSettings(
-        preview_quality=vis.preview_quality,
-        ui_width_mode=vis.ui_width_mode,
-        ui_width=vis.ui_width,
-        ui_fade=vis.ui_fade,
+        preview_quality=cfg.preview_quality,
+        ui_width_mode=cfg.ui_width_mode,
+        ui_width=cfg.ui_width,
+        ui_fade=cfg.ui_fade,
     )
 
 
 def persist_editor_settings(cfg: CleaveConfig) -> None:
     write_user_config(
-        editor_settings_from_visualizer(cfg.visualizer),
+        editor_settings_from_config(cfg.editor),
         cfg.user_config_path,
     )
 
