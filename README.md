@@ -80,10 +80,6 @@ This will separate the track into its component stem tracks (bass, drums, vocals
 ---
 
 ## Using `cleave`
-Cleave uses the XDG standard for user data and configuration directories...
-
-* User data: `~/.local/share/cleave/`
-* Configuration: `~/.config/cleave/config.yaml`
 
 ### CLI
 
@@ -146,9 +142,16 @@ The project directory stores all files required in a self-contained bundle...
 * `user-presets/` - presets used by the project are copied into the project directory
 
 ### Configuration
+Cleave uses the XDG standard for user data and configuration, default locations...
 
-* Editor settings (preview quality, panel width, fade) live in `~/.config/cleave/config.yaml`.
+* User data: `~/.local/share/cleave/`
+  * `projects/`
+  * `presets/`
+  * `presets/favourites/`
+  * `presets/blacklist/`
 * Override the data root with `CLEAVE_DATA` (e.g. `CLEAVE_DATA=.` for a dev checkout).
+* Configuration: `~/.config/cleave/config.yaml`
+  * Editor settings (preview quality, panel width, fade)
 * When a project omits `paths`, preset browsing defaults to `~/.local/share/cleave/presets`.
   * `paths.preset_root` in `cleave-viz.yaml` overrides this default when set.
 
