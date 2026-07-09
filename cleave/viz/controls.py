@@ -263,8 +263,6 @@ class TuningControls:
             if kind == RowKind.TRACK_PRESET_DIR:
                 slot = self.focus_descriptor.slot
                 if slot is not None:
-                    if self._auto_preset_switching_blocks_browse(slot):
-                        return True
                     if layer_lock_blocks_mutation(
                         kind, locked=self.session.layers[slot].locked
                     ):
@@ -373,8 +371,6 @@ class TuningControls:
             if kind == RowKind.TRACK_PRESET_DIR:
                 slot = self.focus_descriptor.slot
                 if slot is not None:
-                    if self._auto_preset_switching_blocks_browse(slot):
-                        return True
                     if layer_lock_blocks_mutation(
                         kind, locked=self.session.layers[slot].locked
                     ):
@@ -692,13 +688,6 @@ class TuningControls:
 
         if (
             slot is not None
-            and kind in {RowKind.TRACK_PRESET_DIR, RowKind.TRACK_PRESET}
-            and self._auto_preset_switching_blocks_browse(slot)
-        ):
-            return
-
-        if (
-            slot is not None
             and layer_lock_blocks_mutation(
                 kind, locked=self.session.layers[slot].locked
             )
@@ -744,9 +733,6 @@ class TuningControls:
             playlist.prev()
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_change(slot, playlist)
-
-    def _auto_preset_switching_blocks_browse(self, slot: str) -> bool:
-        return self.session.layers[slot].preset_switching == "projectm"
 
     def _cycle_preset_switching(self, slot: str, *, forward: bool) -> None:
         layer = self.session.layers[slot]

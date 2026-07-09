@@ -179,12 +179,42 @@ def make_tuning_controls(
     compositor: GlCompositor | None = None,
     post_process: GlPostProcess | None = None,
 ) -> TuningControls:
+    def _empty_rotation_notify(slot: str) -> Callable[[], None]:
+        runtime = session.layers[slot]
+
+        def on_empty() -> None:
+            notify = notification_sink.get("fn")
+            if notify is not None:
+                if runtime.preset_switching == "user_defined":
+                    notify(EMPTY_USER_PRESETS_NOTIFICATION)
+                else:
+                    notify(EMPTY_ROTATION_NOTIFICATION)
+
+        return on_empty
+
     def on_preset_change(slot: str, playlist: PresetPlaylist) -> None:
         layer = layers_by_slot[slot]
         layer.playlist = playlist
         runtime = session.layers[slot]
         mode = runtime.preset_switching
         if mode == "projectm":
+            current = playlist.current
+            if current is not None:
+                layer.auto_preset_path = current.resolve()
+            apply_preset_switching(
+                layer,
+                mode=runtime.preset_switching,
+                scope=runtime.preset_switching_scope,
+                user_presets=runtime.user_presets,
+                preset_duration=runtime.preset_duration,
+                soft_cut_duration=runtime.soft_cut_duration,
+                easter_egg=runtime.easter_egg,
+                preset_start_clean=runtime.preset_start_clean,
+                hard_cut_enabled=runtime.hard_cut_enabled,
+                hard_cut_duration=runtime.hard_cut_duration,
+                hard_cut_sensitivity=runtime.hard_cut_sensitivity,
+                on_empty=_empty_rotation_notify(slot),
+            )
             return
         if playlist.current is None:
             return
@@ -200,15 +230,6 @@ def make_tuning_controls(
     def on_preset_switching_change(slot: str) -> None:
         layer = layers_by_slot[slot]
         runtime = session.layers[slot]
-
-        def on_empty() -> None:
-            notify = notification_sink.get("fn")
-            if notify is not None:
-                if runtime.preset_switching == "user_defined":
-                    notify(EMPTY_USER_PRESETS_NOTIFICATION)
-                else:
-                    notify(EMPTY_ROTATION_NOTIFICATION)
-
         apply_preset_switching(
             layer,
             mode=runtime.preset_switching,
@@ -221,7 +242,7 @@ def make_tuning_controls(
             hard_cut_enabled=runtime.hard_cut_enabled,
             hard_cut_duration=runtime.hard_cut_duration,
             hard_cut_sensitivity=runtime.hard_cut_sensitivity,
-            on_empty=on_empty,
+            on_empty=_empty_rotation_notify(slot),
         )
 
     def lock_preset_for_modal(slot: str) -> None:

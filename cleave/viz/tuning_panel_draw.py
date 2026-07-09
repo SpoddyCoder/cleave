@@ -565,13 +565,6 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
     ):
         return DISABLED
 
-    if (
-        stem is not None
-        and kind in {RowKind.TRACK_PRESET_DIR, RowKind.TRACK_PRESET}
-        and state.tracks[stem].preset_switching == "projectm"
-    ):
-        return DISABLED
-
     if stem is not None and state.move_mode_slot == stem:
         return MOVE_MODE
 
