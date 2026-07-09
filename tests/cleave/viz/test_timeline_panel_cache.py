@@ -51,6 +51,59 @@ def test_static_signature_changes_on_focus_change() -> None:
     assert _static_sig(unfocused) != _static_sig(focused)
 
 
+def test_static_signature_stable_for_playhead_when_not_recording() -> None:
+    paused = _view_state(position_sec=0.0, recording=False)
+    moved = _view_state(position_sec=12.5, recording=False)
+    assert _static_sig(paused) == _static_sig(moved)
+
+
+def test_static_signature_changes_on_playhead_while_recording() -> None:
+    """Armed bars grow with playhead; static cache must invalidate."""
+    at_start = _view_state(
+        position_sec=10.0,
+        recording=True,
+        armed_slots={"layer_1"},
+        record_start_sec=10.0,
+        record_baseline={"layer_1": True},
+    )
+    advanced = _view_state(
+        position_sec=15.0,
+        recording=True,
+        armed_slots={"layer_1"},
+        record_start_sec=10.0,
+        record_baseline={"layer_1": True},
+    )
+    assert _static_sig(at_start) != _static_sig(advanced)
+
+
+def test_compose_rebuilds_static_panel_when_recording_playhead_moves() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    kwargs = dict(viewport_width=1280, viewport_height=720)
+    first_state = _view_state(
+        position_sec=10.0,
+        recording=True,
+        armed_slots={"layer_1"},
+        record_start_sec=10.0,
+        record_baseline={"layer_1": True},
+    )
+    first = overlay.compose_panel(first_state, **kwargs)
+    assert first is not None
+    cached_panel = overlay._cache.panel
+    assert cached_panel is not None
+
+    second_state = _view_state(
+        position_sec=15.0,
+        recording=True,
+        armed_slots={"layer_1"},
+        record_start_sec=10.0,
+        record_baseline={"layer_1": True},
+    )
+    second = overlay.compose_panel(second_state, **kwargs)
+    assert second is not None
+    assert overlay._cache.panel is not cached_panel
+
+
 def test_live_signature_changes_on_position_sec() -> None:
     pygame.init()
     paused = _view_state(position_sec=0.0)

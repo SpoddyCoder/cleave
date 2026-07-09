@@ -18,7 +18,12 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class TimelineStaticSignature:
-    """Everything affecting strip chrome except live transport/playhead."""
+    """Everything affecting strip chrome except live transport/playhead.
+
+    While recording, ``record_playhead_sec`` is included because armed-row bars
+    grow with the playhead (see ``bar_segments_for_row``). Outside recording the
+    playhead is live-patched only.
+    """
 
     layer_z_order: tuple[str, ...]
     cues_fingerprint: tuple[tuple[float, tuple[tuple[str, bool], ...], bool], ...]
@@ -36,6 +41,7 @@ class TimelineStaticSignature:
     record_baseline: tuple[tuple[str, bool], ...]
     record_buffer_fingerprint: tuple[tuple[float, tuple[tuple[str, bool], ...], bool], ...]
     record_high_water_mark: float | None
+    record_playhead_sec: float | None
     panel_w: int
     panel_h: int
     visibility_bucket: int
@@ -89,6 +95,7 @@ def timeline_static_signature(
         record_baseline=tuple(sorted(state.record_baseline.items())),
         record_buffer_fingerprint=_cue_fingerprint(state.record_buffer),
         record_high_water_mark=state.record_high_water_mark,
+        record_playhead_sec=state.position_sec if state.recording else None,
         panel_w=panel_w,
         panel_h=panel_h,
         visibility_bucket=visibility_bucket(visibility),
