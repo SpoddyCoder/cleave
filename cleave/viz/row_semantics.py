@@ -256,7 +256,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             ("Ctrl + Left/Right", "large step"),
         ),
         help_description=(
-            "Probability that projectM picks a random preset instead of the next in sequence.",
+            "How much projectM randomizes preset duration (Milkdrop legacy gaussian).",
         ),
     ),
     RowKind.TRACK_PRESET_START_CLEAN: RowBehavior(

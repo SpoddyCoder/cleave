@@ -155,6 +155,8 @@ def apply_preset_switching(
         playlist = ProjectMPlaylist.create()
         playlist.connect(pm, on_preset_loaded=_auto_preset_loaded_callback(layer))
         playlist.add_path(preset_dir, recurse=False, allow_duplicates=False)
+        # Match Cleave browse order (sorted filenames); add_path uses readdir order.
+        playlist.sort()
         playlist.set_shuffle(False)
         layer.projectm_playlist = playlist
         _sync_projectm_playlist_position(layer)
