@@ -213,6 +213,7 @@ def make_tuning_controls(
                 hard_cut_enabled=runtime.hard_cut_enabled,
                 hard_cut_duration=runtime.hard_cut_duration,
                 hard_cut_sensitivity=runtime.hard_cut_sensitivity,
+                shuffle=runtime.preset_switching_shuffle,
                 on_empty=_empty_rotation_notify(slot),
             )
             return
@@ -242,6 +243,7 @@ def make_tuning_controls(
             hard_cut_enabled=runtime.hard_cut_enabled,
             hard_cut_duration=runtime.hard_cut_duration,
             hard_cut_sensitivity=runtime.hard_cut_sensitivity,
+            shuffle=runtime.preset_switching_shuffle,
             on_empty=_empty_rotation_notify(slot),
         )
 

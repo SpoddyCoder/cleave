@@ -3403,6 +3403,28 @@ def test_preset_start_clean_cycles_yes_no() -> None:
     assert controls.session.layers["layer_1"].preset_start_clean is False
 
 
+def test_preset_switching_shuffle_cycles_off_on() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_switching = "user_defined"
+    controls.session.layers["layer_1"].preset_switching_expanded = True
+    controls.session.layers["layer_1"].expanded = True
+    switched: list[str] = []
+    controls._layer_bindings = noop_layer_bindings(
+        on_preset_switching_change=lambda slot: switched.append(slot)
+    )
+    view = controls.build_view_state(paused=False)
+    row = _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_SHUFFLE)
+    controls.focus_descriptor = view.layout.descriptor(row)
+    assert controls.session.layers["layer_1"].preset_switching_shuffle is False
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].preset_switching_shuffle is True
+    assert switched == ["layer_1"]
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.layers["layer_1"].preset_switching_shuffle is False
+
+
 def test_hard_cut_sensitivity_steps_like_beat_sensitivity() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_switching = "projectm"

@@ -144,6 +144,28 @@ def test_apply_projectm_connects_playlist(
 
 @patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
 @patch("cleave.viz.preset_switching.ProjectMPlaylist")
+def test_apply_projectm_shuffle_enabled(
+    mock_playlist_cls: MagicMock,
+    _mock_milk: MagicMock,
+) -> None:
+    layer = _stem_layer(paths=_MILK)
+    playlist = MagicMock()
+    playlist.size.return_value = 3
+    playlist.item.side_effect = lambda i: _MILK[i]
+    mock_playlist_cls.create.return_value = playlist
+
+    apply_preset_switching(
+        layer,
+        mode="projectm",
+        scope="directory",
+        shuffle=True,
+    )
+
+    playlist.set_shuffle.assert_called_once_with(True)
+
+
+@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
+@patch("cleave.viz.preset_switching.ProjectMPlaylist")
 def test_apply_projectm_respects_hard_cut_disabled(
     mock_playlist_cls: MagicMock,
     _mock_milk: MagicMock,

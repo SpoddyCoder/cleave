@@ -47,6 +47,7 @@ PRESET_SWITCHING_MODE_HELP_ENTRIES: tuple[tuple[PresetSwitchingMode, str], ...] 
 PRESET_SWITCHING_SCOPES: tuple[PresetSwitchingScope, ...] = ("directory",)
 DEFAULT_PRESET_SWITCHING: PresetSwitchingMode = "none"
 DEFAULT_PRESET_SWITCHING_SCOPE: PresetSwitchingScope = "directory"
+DEFAULT_PRESET_SWITCHING_SHUFFLE = False
 DEFAULT_PRESET_DURATION = 30.0
 DEFAULT_SOFT_CUT_DURATION = 0.0
 DEFAULT_HARD_CUT_DURATION = 20.0
@@ -300,6 +301,10 @@ def _parse_preset_switching_scope(raw: Any, label: str) -> PresetSwitchingScope:
 
 def hard_cut_enabled_display(enabled: bool) -> str:
     return "enabled" if enabled else "disabled"
+
+
+def preset_switching_shuffle_display(enabled: bool) -> str:
+    return "on" if enabled else "off"
 
 
 def clamp_highlight_rolloff_threshold_pct(value: int) -> int:
@@ -1469,6 +1474,11 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
             layer_raw.get("preset_switching_scope", DEFAULT_PRESET_SWITCHING_SCOPE),
             f"layers.{slot}.preset_switching_scope",
         )
+        preset_switching_shuffle = bool(
+            layer_raw.get(
+                "preset_switching_shuffle", DEFAULT_PRESET_SWITCHING_SHUFFLE
+            )
+        )
         preset_duration = float(
             layer_raw.get("preset_duration", DEFAULT_PRESET_DURATION)
         )
@@ -1506,6 +1516,7 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
             locked=bool(layer_raw.get("locked", False)),
             preset_switching=preset_switching,
             preset_switching_scope=preset_switching_scope,
+            preset_switching_shuffle=preset_switching_shuffle,
             preset_duration=preset_duration,
             soft_cut_duration=soft_cut_duration,
             hard_cut_duration=hard_cut_duration,
@@ -1539,6 +1550,7 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             locked = runtime.locked
             preset_switching = runtime.preset_switching
             preset_switching_scope = runtime.preset_switching_scope
+            preset_switching_shuffle = runtime.preset_switching_shuffle
             preset_duration = runtime.preset_duration
             soft_cut_duration = runtime.soft_cut_duration
             hard_cut_duration = runtime.hard_cut_duration
@@ -1558,6 +1570,7 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             locked = layer_cfg.locked
             preset_switching = layer_cfg.preset_switching
             preset_switching_scope = layer_cfg.preset_switching_scope
+            preset_switching_shuffle = layer_cfg.preset_switching_shuffle
             preset_duration = layer_cfg.preset_duration
             soft_cut_duration = layer_cfg.soft_cut_duration
             hard_cut_duration = layer_cfg.hard_cut_duration
@@ -1591,6 +1604,8 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             layer_out["preset_switching"] = preset_switching
         if preset_switching_scope != DEFAULT_PRESET_SWITCHING_SCOPE:
             layer_out["preset_switching_scope"] = preset_switching_scope
+        if preset_switching_shuffle != DEFAULT_PRESET_SWITCHING_SHUFFLE:
+            layer_out["preset_switching_shuffle"] = preset_switching_shuffle
         if preset_duration != DEFAULT_PRESET_DURATION:
             layer_out["preset_duration"] = preset_duration
         if soft_cut_duration != DEFAULT_SOFT_CUT_DURATION:

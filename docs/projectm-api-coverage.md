@@ -76,7 +76,7 @@ Related: [legacy-plans/presets-scan-plan.md](legacy-plans/presets-scan-plan.md) 
 | `projectm_playlist_add_path` | bound, used | Directory rotation (`recurse=False`) |
 | `projectm_playlist_add_preset` | bound, used | Fallback when `add_presets` missing |
 | `projectm_playlist_add_presets` | bound, used | User-defined rotation |
-| `projectm_playlist_set_shuffle` | bound, used | Always false in Cleave |
+| `projectm_playlist_set_shuffle` | bound, used | Per-layer `preset_switching_shuffle` session field |
 | `projectm_playlist_size` | bound, used | Position sync |
 | `projectm_playlist_get_position` | bound, ignored | Position set only |
 | `projectm_playlist_set_position` | bound, used | Browse sync |

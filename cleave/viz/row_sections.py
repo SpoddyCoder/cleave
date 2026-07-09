@@ -427,6 +427,12 @@ HARD_CUT_ENABLED = ConditionalRowsDef(
     ),
 )
 
+PRESET_SWITCHING_SHUFFLE = ConditionalRowsDef(
+    name="preset_switching_shuffle",
+    predicate=_preset_switching_auto,
+    children=(SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_SHUFFLE),),
+)
+
 PRESET_SWITCHING_TIMING = ConditionalRowsDef(
     name="preset_switching_timing",
     predicate=_preset_switching_auto,
@@ -470,6 +476,7 @@ TRACK_PRESET_SWITCHING_SECTION = ExpandSectionDef(
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_MODE),
         SectionNode(conditional=PRESET_SWITCHING_PROJECTM),
         SectionNode(conditional=PRESET_SWITCHING_USER_DEFINED),
+        SectionNode(conditional=PRESET_SWITCHING_SHUFFLE),
         SectionNode(conditional=PRESET_SWITCHING_TIMING),
     ),
 )

@@ -26,6 +26,7 @@ class RowKind(Enum):
     TRACK_USER_PRESET_ITEM = auto()
     TRACK_USER_PRESET_ADD = auto()
     TRACK_PRESET_SWITCHING_SCOPE = auto()
+    TRACK_PRESET_SWITCHING_SHUFFLE = auto()
     TRACK_PRESET_DURATION = auto()
     TRACK_SOFT_CUT_DURATION = auto()
     TRACK_EASTER_EGG = auto()
@@ -224,6 +225,18 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_entries=(("Left/Right", "directory only in v1"),),
         help_description=(
             "Which preset files are eligible when projectM switches.",
+        ),
+    ),
+    RowKind.TRACK_PRESET_SWITCHING_SHUFFLE: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="track",
+        help_title="Shuffle",
+        help_entries=(("Left/Right", "off / on"),),
+        help_description=(
+            "When on, each auto switch picks a random preset from the rotation set",
+            "instead of the next in order. Preset position (N/X) may jump.",
+            "Manual Left/Right on the preset file row is unchanged.",
         ),
     ),
     RowKind.TRACK_PRESET_DURATION: RowBehavior(
