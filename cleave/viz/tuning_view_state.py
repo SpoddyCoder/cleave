@@ -19,6 +19,7 @@ from cleave.config_schema import (
     DEFAULT_EASTER_EGG,
     DEFAULT_PRESET_START_CLEAN,
     DEFAULT_PRESET_DURATION,
+    DEFAULT_PRESET_SWITCHING_SHUFFLE,
     DEFAULT_SOFT_CUT_DURATION,
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_WIDTH,
@@ -59,6 +60,7 @@ class TrackBlock:
     preset_empty: bool = False
     preset_switching: str = "none"
     preset_switching_scope: str = "directory"
+    preset_switching_shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE
     preset_duration: float = DEFAULT_PRESET_DURATION
     soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION
     hard_cut_duration: float = DEFAULT_HARD_CUT_DURATION
@@ -252,6 +254,7 @@ def view_state_structure_signature(
             "user_presets_expanded": layer.user_presets_expanded,
             "preset_switching": layer.preset_switching,
             "preset_switching_scope": layer.preset_switching_scope,
+            "preset_switching_shuffle": layer.preset_switching_shuffle,
             "preset_duration": layer.preset_duration,
             "soft_cut_duration": layer.soft_cut_duration,
             "hard_cut_duration": layer.hard_cut_duration,
@@ -366,6 +369,7 @@ class TuningViewStateBuilder:
                 preset_empty=not layer.playlist.paths,
                 preset_switching=layer.preset_switching,
                 preset_switching_scope=layer.preset_switching_scope,
+                preset_switching_shuffle=layer.preset_switching_shuffle,
                 preset_duration=layer.preset_duration,
                 soft_cut_duration=layer.soft_cut_duration,
                 hard_cut_duration=layer.hard_cut_duration,

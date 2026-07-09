@@ -17,6 +17,7 @@ from cleave.config_schema import (
     hard_cut_enabled_display,
     preset_start_clean_display,
     preset_switching_display,
+    preset_switching_shuffle_display,
     ui_fade_display,
 )
 from cleave.extract import stem_control_label, stem_overlay_header
@@ -172,6 +173,14 @@ def _format_track_preset_start_clean(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
     return preset_start_clean_display(_track_block(state, desc).preset_start_clean)
+
+
+def _format_track_preset_switching_shuffle(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    return preset_switching_shuffle_display(
+        _track_block(state, desc).preset_switching_shuffle
+    )
 
 
 def _format_track_hard_cut_enabled(
@@ -423,6 +432,15 @@ def _apply_track_preset_start_clean(
     if desc.slot is None:
         return
     controls._cycle_preset_start_clean(desc.slot, forward=forward)
+
+
+def _apply_track_preset_switching_shuffle(
+    controls: TuningControls, desc: RowDescriptor, forward: bool, _ctrl: bool,
+    _shift: bool,
+) -> None:
+    if desc.slot is None:
+        return
+    controls._cycle_preset_switching_shuffle(desc.slot, forward=forward)
 
 
 def _apply_track_hard_cut_enabled(
@@ -988,6 +1006,12 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_track_preset_switching_scope,
         apply_horizontal=_apply_track_preset_switching_scope,
+    ),
+    RowKind.TRACK_PRESET_SWITCHING_SHUFFLE: RowFieldDef(
+        panel_label="shuffle",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_track_preset_switching_shuffle,
+        apply_horizontal=_apply_track_preset_switching_shuffle,
     ),
     RowKind.TRACK_PRESET_DURATION: RowFieldDef(
         panel_label="preset duration",

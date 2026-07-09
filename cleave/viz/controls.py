@@ -804,6 +804,13 @@ class TuningControls:
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)
 
+    def _cycle_preset_switching_shuffle(self, slot: str, *, forward: bool) -> None:
+        del forward
+        layer = self.session.layers[slot]
+        layer.preset_switching_shuffle = not layer.preset_switching_shuffle
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_preset_switching_change(slot)
+
     def _step_hard_cut_duration(
         self, slot: str, *, forward: bool, ctrl: bool = False
     ) -> None:

@@ -14,6 +14,7 @@ from cleave.config_schema import (
     DEFAULT_BEAT_SENSITIVITY,
     DEFAULT_PRESET_SWITCHING,
     DEFAULT_PRESET_SWITCHING_SCOPE,
+    DEFAULT_PRESET_SWITCHING_SHUFFLE,
     DEFAULT_PRESET_DURATION,
     DEFAULT_SOFT_CUT_DURATION,
     DEFAULT_HARD_CUT_DURATION,
@@ -169,6 +170,7 @@ class LayerRuntime:
     locked: bool = False
     preset_switching: PresetSwitchingMode = DEFAULT_PRESET_SWITCHING
     preset_switching_scope: PresetSwitchingScope = DEFAULT_PRESET_SWITCHING_SCOPE
+    preset_switching_shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE
     preset_duration: float = DEFAULT_PRESET_DURATION
     soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION
     hard_cut_duration: float = DEFAULT_HARD_CUT_DURATION
@@ -296,6 +298,7 @@ def session_from_cfg(
                 locked=layer_cfg.locked,
                 preset_switching=layer_cfg.preset_switching,
                 preset_switching_scope=layer_cfg.preset_switching_scope,
+                preset_switching_shuffle=layer_cfg.preset_switching_shuffle,
                 preset_duration=layer_cfg.preset_duration,
                 soft_cut_duration=layer_cfg.soft_cut_duration,
                 hard_cut_duration=layer_cfg.hard_cut_duration,

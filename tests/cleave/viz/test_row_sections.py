@@ -73,6 +73,7 @@ def test_track_layout_conditional_rows_when_predicates_pass() -> None:
         effects_expanded=False,
     )
     assert RowKind.TRACK_PRESET_DURATION in kinds
+    assert RowKind.TRACK_PRESET_SWITCHING_SHUFFLE in kinds
     assert RowKind.TRACK_HARD_CUT_DURATION in kinds
 
     user_defined_kinds = _track_row_kinds(
@@ -81,6 +82,7 @@ def test_track_layout_conditional_rows_when_predicates_pass() -> None:
         effects_expanded=False,
     )
     assert RowKind.TRACK_SOFT_CUT_DURATION in user_defined_kinds
+    assert RowKind.TRACK_PRESET_SWITCHING_SHUFFLE in user_defined_kinds
     assert RowKind.TRACK_HARD_CUT_ENABLED in user_defined_kinds
     assert RowKind.TRACK_HARD_CUT_DURATION in user_defined_kinds
     assert RowKind.TRACK_PRESET_SWITCHING_SCOPE not in user_defined_kinds
@@ -89,6 +91,7 @@ def test_track_layout_conditional_rows_when_predicates_pass() -> None:
 def test_track_layout_omits_conditional_rows_when_predicates_fail() -> None:
     none_kinds = _track_row_kinds(preset_switching="none")
     assert RowKind.TRACK_PRESET_DURATION not in none_kinds
+    assert RowKind.TRACK_PRESET_SWITCHING_SHUFFLE not in none_kinds
 
     hard_cut_off = _track_row_kinds(hard_cut_enabled=False)
     assert RowKind.TRACK_HARD_CUT_DURATION not in hard_cut_off
@@ -112,6 +115,7 @@ def test_track_layout_row_order_when_fully_expanded() -> None:
         RowKind.TRACK_PRESET_SWITCHING,
         RowKind.TRACK_PRESET_SWITCHING_MODE,
         RowKind.TRACK_PRESET_SWITCHING_SCOPE,
+        RowKind.TRACK_PRESET_SWITCHING_SHUFFLE,
         RowKind.TRACK_PRESET_DURATION,
         RowKind.TRACK_SOFT_CUT_DURATION,
         RowKind.TRACK_EASTER_EGG,

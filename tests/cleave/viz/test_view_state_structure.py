@@ -169,6 +169,40 @@ def test_builder_rebuilds_layout_when_highlight_rolloff_mode_changes() -> None:
     assert threshold not in view_off.layout.rows
 
 
+def test_structure_signature_invalidates_on_preset_switching_shuffle() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.layers["layer_1"].preset_switching = "projectm"
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.layers["layer_1"].preset_switching_shuffle = True
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_builder_updates_shuffle_display_when_shuffle_changes() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    session.layers["layer_1"].preset_switching = "projectm"
+    session.layers["layer_1"].preset_switching_expanded = True
+    session.layers["layer_1"].expanded = True
+    builder = controls._view_state
+
+    view_off = builder.build(paused=False)
+    shuffle_row = RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_SHUFFLE, slot="layer_1")
+    assert shuffle_row in view_off.layout.rows
+    assert view_off.tracks["layer_1"].preset_switching_shuffle is False
+
+    session.layers["layer_1"].preset_switching_shuffle = True
+    view_on = builder.build(paused=False)
+    assert shuffle_row in view_on.layout.rows
+    assert view_on.tracks["layer_1"].preset_switching_shuffle is True
+
+
 def test_minimal_view_state_still_builds_layout() -> None:
     state = _minimal_view_state()
     assert state.layout is not None

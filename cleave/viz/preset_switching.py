@@ -13,6 +13,7 @@ from cleave.config_schema import (
     DEFAULT_HARD_CUT_SENSITIVITY,
     DEFAULT_PRESET_DURATION,
     DEFAULT_PRESET_START_CLEAN,
+    DEFAULT_PRESET_SWITCHING_SHUFFLE,
     DEFAULT_SOFT_CUT_DURATION,
 )
 from cleave.preset_playlist import milk_files_in_dir
@@ -64,6 +65,7 @@ def reapply_projectm_preset_switching(
                 mode=runtime.preset_switching,
                 scope=runtime.preset_switching_scope,
                 user_presets=runtime.user_presets,
+                shuffle=runtime.preset_switching_shuffle,
                 preset_duration=runtime.preset_duration,
                 soft_cut_duration=runtime.soft_cut_duration,
                 easter_egg=runtime.easter_egg,
@@ -92,6 +94,7 @@ def apply_preset_switching(
     mode: PresetSwitchingMode,
     scope: PresetSwitchingScope,
     user_presets: list[str] | None = None,
+    shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE,
     preset_duration: float = DEFAULT_PRESET_DURATION,
     soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION,
     easter_egg: float = DEFAULT_EASTER_EGG,
@@ -137,7 +140,7 @@ def apply_preset_switching(
         playlist = ProjectMPlaylist.create()
         playlist.connect(pm, on_preset_loaded=_auto_preset_loaded_callback(layer))
         playlist.add_presets(paths, allow_duplicates=True)
-        playlist.set_shuffle(False)
+        playlist.set_shuffle(shuffle)
         layer.projectm_playlist = playlist
         _sync_projectm_playlist_position(layer)
         restart_projectm_preset_timer(layer)
@@ -157,7 +160,7 @@ def apply_preset_switching(
         playlist.add_path(preset_dir, recurse=False, allow_duplicates=False)
         # Match Cleave browse order (sorted filenames); add_path uses readdir order.
         playlist.sort()
-        playlist.set_shuffle(False)
+        playlist.set_shuffle(shuffle)
         layer.projectm_playlist = playlist
         _sync_projectm_playlist_position(layer)
         restart_projectm_preset_timer(layer)

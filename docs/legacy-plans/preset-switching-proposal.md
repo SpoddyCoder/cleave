@@ -2,7 +2,7 @@
 
 Proposal for per-layer automatic preset rotation. Supersedes the [Auto-switching presets (projectM mode)](roadmap.md#auto-switching-presets-projectm-mode) roadmap item; Cleave-native preset cycling is out of scope (see [Decisions](#decisions)).
 
-**Status:** Implemented through v2 (none, projectM, user-defined list with add/remove UI). v3+ not scheduled.
+**Status:** Implemented through v2 (none, projectM, user-defined list with add/remove UI). Shuffle toggle shipped; v3 subtree scope and filters not scheduled.
 
 ## Overview
 
