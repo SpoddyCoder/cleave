@@ -102,26 +102,6 @@ Available commands...
 
 Note: use `--help` on any command for options.
 
-### Project Directory
-
-`cleave` creates a new directory under `~/.local/share/cleave/projects/` for each song.
-The project directory stores all files required in a self-contained bundle...
-
-* `project.yaml` - project metadata
-* `cleave-viz.yaml` - editor & final render configuration. Not everything in here is surfaced in the editor UI just yet
-* `signals.json` - audio analysis data used by `cleave effects`
-* `mysong.wav` - original source audio is copied into the project directory
-* `stems/` - separated audio stems
-* `renders/` - final output renders
-* `user-presets/` - presets used by the project are copied into the project directory
-
-### Configuration
-
-* Editor settings (preview quality, panel width, fade) live in `~/.config/cleave/config.yaml`.
-* Override the data root with `CLEAVE_DATA` (e.g. `CLEAVE_DATA=.` for a dev checkout).
-* When a project omits `paths`, preset browsing defaults to `~/.local/share/cleave/presets`.
-  * `paths.preset_root` in `cleave-viz.yaml` overrides this default when set.
-
 ### Editor
 
 * Press `h` to show context sensitive help and controls.
@@ -151,6 +131,26 @@ favourites/full-colour-wash/
 
 #### Timeline
 * TODO: Document
+
+### Project Directory
+
+`cleave` creates a new directory under `~/.local/share/cleave/projects/` for each song.
+The project directory stores all files required in a self-contained bundle...
+
+* `project.yaml` - project metadata
+* `cleave-viz.yaml` - editor & final render configuration. Not everything in here is surfaced in the editor UI just yet
+* `signals.json` - audio analysis data used by `cleave effects`
+* `mysong.wav` - original source audio is copied into the project directory
+* `stems/` - separated audio stems
+* `renders/` - final output renders
+* `user-presets/` - presets used by the project are copied into the project directory
+
+### Configuration
+
+* Editor settings (preview quality, panel width, fade) live in `~/.config/cleave/config.yaml`.
+* Override the data root with `CLEAVE_DATA` (e.g. `CLEAVE_DATA=.` for a dev checkout).
+* When a project omits `paths`, preset browsing defaults to `~/.local/share/cleave/presets`.
+  * `paths.preset_root` in `cleave-viz.yaml` overrides this default when set.
 
 ---
 
