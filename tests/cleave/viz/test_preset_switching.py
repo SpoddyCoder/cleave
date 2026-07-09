@@ -133,6 +133,7 @@ def test_apply_projectm_connects_playlist(
     playlist.add_path.assert_called_once_with(
         layer.playlist.current_dir, recurse=False, allow_duplicates=False
     )
+    playlist.sort.assert_called_once_with()
     playlist.set_shuffle.assert_called_once_with(False)
     assert layer.projectm_playlist is playlist
     layer.pm.load_preset.assert_called_once_with(_MILK[0], smooth=False)

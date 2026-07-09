@@ -10,6 +10,8 @@ import pytest
 from cleave.projectm import ProjectM
 from cleave.projectm_playlist import (
     DEFAULT_RETRY_COUNT,
+    SORT_ORDER_ASCENDING,
+    SORT_PREDICATE_FILENAME_ONLY,
     ProjectMPlaylist,
     ProjectMPlaylistLibraryError,
     _bind_functions,
@@ -24,6 +26,7 @@ def _mock_lib() -> MagicMock:
         "projectm_playlist_connect",
         "projectm_playlist_add_path",
         "projectm_playlist_set_shuffle",
+        "projectm_playlist_sort",
         "projectm_playlist_set_preset_switched_event_callback",
         "projectm_playlist_set_preset_switch_failed_event_callback",
         "projectm_playlist_play_next",
@@ -66,6 +69,23 @@ def test_create_connect_add_path_set_shuffle_destroy() -> None:
     lib.projectm_playlist_add_path.assert_called_once()
     lib.projectm_playlist_set_shuffle.assert_called_once()
     lib.projectm_playlist_destroy.assert_called_once()
+
+
+def test_sort_defaults_to_filename_ascending() -> None:
+    lib = _mock_lib()
+    lib.projectm_playlist_size.return_value = 5
+
+    with patch("cleave.projectm_playlist._get_lib", return_value=lib):
+        playlist = ProjectMPlaylist.create()
+        playlist.sort()
+
+    lib.projectm_playlist_sort.assert_called_once()
+    args = lib.projectm_playlist_sort.call_args.args
+    assert args[0] == playlist.handle
+    assert args[1].value == 0
+    assert args[2].value == 5
+    assert args[3].value == SORT_PREDICATE_FILENAME_ONLY
+    assert args[4].value == SORT_ORDER_ASCENDING
 
 
 def test_destroy_disconnects_before_free() -> None:

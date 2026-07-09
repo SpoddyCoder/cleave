@@ -6,7 +6,7 @@ import ctypes
 import os
 import subprocess
 from collections.abc import Callable
-from ctypes import CFUNCTYPE, POINTER, c_bool, c_char_p, c_uint32, c_void_p
+from ctypes import CFUNCTYPE, POINTER, c_bool, c_char_p, c_int, c_uint32, c_void_p
 from pathlib import Path
 
 from cleave.projectm import ProjectM
@@ -14,6 +14,12 @@ from cleave.projectm import ProjectM
 _lib: ctypes.CDLL | None = None
 
 DEFAULT_RETRY_COUNT = 500
+
+# projectm_playlist_sort_predicate / projectm_playlist_sort_order (playlist_types.h)
+SORT_PREDICATE_FULL_PATH = 0
+SORT_PREDICATE_FILENAME_ONLY = 1
+SORT_ORDER_ASCENDING = 0
+SORT_ORDER_DESCENDING = 1
 
 
 class ProjectMPlaylistLibraryError(OSError):
@@ -192,6 +198,16 @@ def _bind_functions(lib: ctypes.CDLL, path: str) -> None:
             c_bool,
         ]
         lib.projectm_playlist_add_presets.restype = c_uint32
+
+    if hasattr(lib, "projectm_playlist_sort"):
+        lib.projectm_playlist_sort.argtypes = [
+            c_void_p,
+            c_uint32,
+            c_uint32,
+            c_int,
+            c_int,
+        ]
+        lib.projectm_playlist_sort.restype = None
 
 
 def _get_lib() -> ctypes.CDLL:
@@ -383,6 +399,28 @@ class ProjectMPlaylist:
 
     def set_shuffle(self, enabled: bool) -> None:
         _get_lib().projectm_playlist_set_shuffle(self._handle, c_bool(enabled))
+
+    def sort(
+        self,
+        *,
+        start_index: int = 0,
+        count: int | None = None,
+        predicate: int = SORT_PREDICATE_FILENAME_ONLY,
+        order: int = SORT_ORDER_ASCENDING,
+    ) -> None:
+        """Sort playlist items to match Cleave browse order (alphabetical filename)."""
+        lib = _get_lib()
+        if not hasattr(lib, "projectm_playlist_sort"):
+            return
+        if count is None:
+            count = self.size()
+        lib.projectm_playlist_sort(
+            self._handle,
+            c_uint32(start_index),
+            c_uint32(count),
+            c_int(predicate),
+            c_int(order),
+        )
 
     def size(self) -> int:
         lib = _get_lib()

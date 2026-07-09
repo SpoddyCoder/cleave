@@ -92,7 +92,8 @@ Related: [legacy-plans/presets-scan-plan.md](legacy-plans/presets-scan-plan.md) 
 | `projectm_playlist_clear` / `remove_*` / `insert_*` | future | Dynamic playlist editing |
 | `projectm_playlist_items` / `free_string_array` | future | Bulk listing |
 | `projectm_playlist_get_shuffle` / `set_shuffle` | bound, used | set only |
-| `projectm_playlist_sort` / `set_filter` / `apply_filter` / `get_filter` | ignored | No playlist filters in Cleave |
+| `projectm_playlist_sort` | bound, used | After directory `add_path`; filename ascending to match Cleave browse |
+| `projectm_playlist_set_filter` / `apply_filter` / `get_filter` | ignored | No playlist filters in Cleave |
 
 ## Live failure handling
 
