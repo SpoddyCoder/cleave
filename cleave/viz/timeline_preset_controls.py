@@ -5,7 +5,12 @@ from __future__ import annotations
 import random
 from collections.abc import Callable
 
-from cleave.timeline_presets import build_random_cues, build_slow_build_cues
+from cleave.timeline_presets import (
+    build_arc_cues,
+    build_breathing_cues,
+    build_dialogue_cues,
+    build_pulse_cues,
+)
 from cleave.viz.modal import ModalHost, ModalOption
 from cleave.viz.session import TuningSession
 
@@ -13,8 +18,10 @@ _CANCEL_LABEL = "Cancel"
 _PROMPT_MESSAGE = "Which timeline preset do you wish to apply?"
 
 _KIND_BUILDERS = {
-    "slow_build": (build_slow_build_cues, "Applied Slow Build timeline preset"),
-    "random": (build_random_cues, "Applied Random timeline preset"),
+    "breathing": (build_breathing_cues, "Applied Breathing timeline preset"),
+    "dialogue": (build_dialogue_cues, "Applied Dialogue timeline preset"),
+    "arc": (build_arc_cues, "Applied Arc timeline preset"),
+    "pulse": (build_pulse_cues, "Applied Pulse timeline preset"),
 }
 
 
@@ -36,12 +43,20 @@ class TimelinePresetController:
         dismiss = lambda: None
         options = [
             ModalOption(
-                "Slow Build",
-                lambda: self._apply("slow_build", duration_sec),
+                "Breathing",
+                lambda: self._apply("breathing", duration_sec),
             ),
             ModalOption(
-                "Random",
-                lambda: self._apply("random", duration_sec),
+                "Dialogue",
+                lambda: self._apply("dialogue", duration_sec),
+            ),
+            ModalOption(
+                "Arc",
+                lambda: self._apply("arc", duration_sec),
+            ),
+            ModalOption(
+                "Pulse",
+                lambda: self._apply("pulse", duration_sec),
             ),
             ModalOption(_CANCEL_LABEL, dismiss),
         ]

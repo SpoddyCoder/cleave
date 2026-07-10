@@ -14,6 +14,7 @@ from cleave.config_schema import (
     PRESET_SWITCHING_MODE_HELP_ENTRIES,
     EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
 )
+from cleave.timeline_presets import TIMELINE_PRESET_HELP_ENTRIES
 
 
 class RowKind(Enum):
@@ -684,8 +685,9 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         navigable=True,
         help_title="Timeline presets",
         help_description=(
-            "Apply a generated timeline preset that clears existing cues.",
+            "Apply a randomly generated timeline preset (this will overwrite the current timeline).",
         ),
+        help_mode_entries=TIMELINE_PRESET_HELP_ENTRIES,
     ),
     RowKind.SETTINGS_HEADER: RowBehavior(
         RowAffordance.EXPAND,

@@ -1468,11 +1468,11 @@ def test_timeline_presets_enter_opens_choice_modal() -> None:
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
     assert modal_view.kind == ModalKind.CHOICE
-    assert modal_view.options == ("Slow Build", "Random", "Cancel")
+    assert modal_view.options == ("Breathing", "Dialogue", "Arc", "Pulse", "Cancel")
     assert "timeline preset" in modal_view.message.lower()
 
 
-def test_timeline_presets_slow_build_clears_and_applies() -> None:
+def test_timeline_presets_breathing_clears_and_applies() -> None:
     controls = _make_controls(("layer_1", "layer_2", "layer_3", "layer_4"))
     prior = [
         TimelineCue(t=1.0, layers={"layer_1": False}),
@@ -1484,7 +1484,7 @@ def test_timeline_presets_slow_build_clears_and_applies() -> None:
     controls.session.timeline.armed_slots.add("layer_1")
     _focus_timeline_presets(controls)
     controls.handle_keydown(_keydown(pygame.K_RETURN))
-    _choose_modal_option(controls, "Slow Build")
+    _choose_modal_option(controls, "Breathing")
     assert not controls.modal_host.active
     assert controls.session.timeline.enabled is True
     assert controls.session.timeline.recording is False
@@ -1496,13 +1496,13 @@ def test_timeline_presets_slow_build_clears_and_applies() -> None:
     assert set(cues[0].layers) == set(controls.session.layer_z_order)
 
 
-def test_timeline_presets_random_clears_and_applies() -> None:
+def test_timeline_presets_arc_clears_and_applies() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     controls.session.timeline.cues = [TimelineCue(t=5.0, layers={"layer_1": False})]
     controls.session.timeline.enabled = False
     _focus_timeline_presets(controls)
     controls.handle_keydown(_keydown(pygame.K_RETURN))
-    _choose_modal_option(controls, "Random")
+    _choose_modal_option(controls, "Arc")
     assert not controls.modal_host.active
     assert controls.session.timeline.enabled is True
     cues = controls.session.timeline.cues
