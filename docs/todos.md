@@ -15,6 +15,18 @@ Outstanding bugs and issues.
 
 ---
 
+## Features
+
+### Timeline beat snap (v1)
+
+Done. Batch-quantize committed timeline cues to a librosa beat grid from the drums stem (`beat_times` in `signals.json`). Green **snap to beats** ACTION row under Render: TIMELINE.
+
+**v1.1**
+
+- Optional bar snap: every Nth beat (default N=4, assume 4/4 phase).
+
+---
+
 ## Architecture
 
 ### projectM

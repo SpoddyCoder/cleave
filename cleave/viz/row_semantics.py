@@ -75,6 +75,7 @@ class RowKind(Enum):
     RENDER_POST_FX_CHROMA_BOOST_AMOUNT = auto()
     RENDER_TIMELINE_HEADER = auto()
     TIMELINE_PRESETS = auto()
+    TIMELINE_SNAP_TO_BEATS = auto()
     SETTINGS_HEADER = auto()
     SETTINGS_PREVIEW_QUALITY = auto()
     SETTINGS_UI_HEADER = auto()
@@ -690,6 +691,16 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "(this will overwrite the current timeline).",
         ),
         help_mode_entries=TIMELINE_PRESET_HELP_ENTRIES,
+    ),
+    RowKind.TIMELINE_SNAP_TO_BEATS: RowBehavior(
+        RowAffordance.ACTION,
+        navigable=True,
+        help_title="Snap to beats",
+        help_entries=(("Enter", "snap cues to beats"),),
+        help_description=(
+            "Snap all committed timeline cues to the nearest beat",
+            "(irreversible).",
+        ),
     ),
     RowKind.SETTINGS_HEADER: RowBehavior(
         RowAffordance.EXPAND,
