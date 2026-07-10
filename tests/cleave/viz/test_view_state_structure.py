@@ -121,6 +121,42 @@ def test_builder_patches_highlight_rolloff_curve_without_structure_rebuild() -> 
     assert view_b.render_post_fx.highlight_rolloff.curve == "smoothstep"
 
 
+def test_structure_signature_invalidates_on_timeline_panel_open() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.timeline.panel_open = False
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.timeline.panel_open = True
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    session.timeline.panel_open = False
+    builder = controls._view_state
+
+    view_closed = builder.build(paused=False)
+    presets = RowDescriptor(RowKind.TIMELINE_PRESETS)
+    assert presets not in view_closed.layout.rows
+
+    session.timeline.panel_open = True
+    view_open = builder.build(paused=False)
+    assert view_open.layout is not view_closed.layout
+    assert presets in view_open.layout.rows
+
+    session.timeline.panel_open = False
+    view_closed_again = builder.build(paused=False)
+    assert view_closed_again.layout is not view_open.layout
+    assert presets not in view_closed_again.layout.rows
+
+
 def test_structure_signature_invalidates_on_highlight_rolloff_mode() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session

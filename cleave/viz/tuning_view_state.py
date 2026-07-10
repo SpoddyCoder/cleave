@@ -295,7 +295,10 @@ def view_state_structure_signature(
             "chroma_boost_expanded": pp.chroma_boost_expanded,
             "chroma_boost_mode": pp.chroma_boost.mode,
         },
-        "render_timeline": {"enabled": tl.enabled},
+        "render_timeline": {
+            "enabled": tl.enabled,
+            "panel_open": tl.panel_open,
+        },
         "timeline": {"enabled": tl.enabled},
     }
     return json.dumps(payload, sort_keys=True, separators=(",", ":"))
@@ -414,7 +417,10 @@ class TuningViewStateBuilder:
                 amount_pct=pp.chroma_boost.amount_pct,
             ),
         )
-        render_timeline = RenderTimelineBlock(enabled=tl.enabled)
+        render_timeline = RenderTimelineBlock(
+            enabled=tl.enabled,
+            expanded=tl.panel_open,
+        )
         layout_state = TuningViewState(
             layer_z_order=layer_z_order,
             tracks=tracks,
