@@ -1260,7 +1260,7 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.FULL_LINE,
     ),
     RowKind.TIMELINE_PRESETS: RowFieldDef(
-        panel_label="presets",
+        panel_label="apply a preset",
         present_style=RowPresentStyle.FULL_LINE,
     ),
     RowKind.PANEL_NOTIFICATION: RowFieldDef(
