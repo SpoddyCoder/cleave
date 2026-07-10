@@ -206,7 +206,8 @@ def test_timeline_presets_help_lists_characters() -> None:
     assert description is not None
     assert description.title == "Timeline presets"
     assert description.lines == (
-        "Apply a randomly generated timeline preset (this will overwrite the current timeline).",
+        "Apply a randomly generated timeline preset",
+        "(this will overwrite the current timeline).",
     )
     assert description.entries == TIMELINE_PRESET_HELP_ENTRIES
     assert [name for name, _ in description.entries] == [
