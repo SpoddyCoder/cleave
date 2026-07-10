@@ -684,6 +684,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.ACTION,
         navigable=True,
         help_title="Timeline presets",
+        help_entries=(("Enter", "apply a preset"),),
         help_description=(
             "Apply a randomly generated timeline preset (this will overwrite the current timeline).",
         ),

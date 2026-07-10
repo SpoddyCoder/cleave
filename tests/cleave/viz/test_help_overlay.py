@@ -201,7 +201,8 @@ def test_switching_mode_help_lists_modes() -> None:
 
 
 def test_timeline_presets_help_lists_characters() -> None:
-    description = _description_section(sections_for(RowKind.TIMELINE_PRESETS))
+    sections = sections_for(RowKind.TIMELINE_PRESETS)
+    description = _description_section(sections)
     assert description is not None
     assert description.title == "Timeline presets"
     assert description.lines == (
@@ -214,6 +215,9 @@ def test_timeline_presets_help_lists_characters() -> None:
         "Arc",
         "Pulse",
     ]
+    keyboard = _keyboard_section(sections)
+    assert keyboard.title == KEYBOARD_CONTROLS_SECTION_TITLE
+    assert keyboard.entries == (("Enter", "apply a preset"),)
 
 
 def test_preview_quality_help_lists_modes() -> None:

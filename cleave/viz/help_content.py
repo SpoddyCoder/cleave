@@ -317,7 +317,13 @@ def sections_for(
             (("Enter/Delete", "confirm delete"),),
         )
     elif behavior.affordance == RowAffordance.ACTION:
-        primary = _SAVE_SECTION
+        if behavior.help_entries is not None:
+            primary = HelpSection(
+                behavior.help_title or "Edit",
+                behavior.help_entries,
+            )
+        else:
+            primary = _SAVE_SECTION
 
     if primary is None:
         return (NAVIGATION_SECTION,)
