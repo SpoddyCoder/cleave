@@ -107,7 +107,7 @@ These rows do not split label and value; the implementation is deliberate:
 - **Preset dir / preset filename**: single-color row text plus Material Icons (icon colors above).
 - **Transport**: single-color header row in row value color.
 - **Panel notifications** (`RowKind.PANEL_NOTIFICATION`): pinned under Transport; full-line text in `HIGHLIGHT`; 5 second duration; non-blocking.
-- **Centered modals** ([cleave/viz/modal_overlay.py](cleave/viz/modal_overlay.py)): yes/no message in `VALUE`; options use `HIGHLIGHT` or `DISABLED` by focus. Unsaved-quit message uses `HIGHLIGHT` with a tinted background. Save-choice options follow the same highlight pattern.
+- **Centered modals** ([cleave/viz/modal_overlay.py](cleave/viz/modal_overlay.py)): title/question in `LABEL`; options use `HIGHLIGHT` when focused else `VALUE`. Focus background tint stays `HIGHLIGHT`.
 
 When focus, move mode, disabled layer, locked sub-row, or empty preset applies, `_row_value_color` may return an accent or state color instead of `VALUE`. That override is expected.
 

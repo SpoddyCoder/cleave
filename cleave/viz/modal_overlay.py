@@ -10,9 +10,9 @@ from cleave.viz.theme import (
     BACKGROUND_ALPHA,
     BORDER_COLOR,
     BORDER_WIDTH,
-    DISABLED,
     FOCUS_ROW_BG_ALPHA,
     HIGHLIGHT,
+    LABEL,
     MODAL_SCRIM_ALPHA,
     VALUE,
     tuning_ui_metrics,
@@ -171,7 +171,7 @@ def _draw_message(
     text_alpha: int,
 ) -> int:
     line_h = font.get_linesize()
-    msg_surf = font.render(message, True, VALUE)
+    msg_surf = font.render(message, True, LABEL)
     msg_surf.set_alpha(text_alpha)
     surface.blit(msg_surf, (x, y))
     return y + line_h
@@ -196,7 +196,7 @@ def _draw_options(
     cur_y = y
     for index, label in enumerate(labels):
         focused = index == focus_index
-        color = HIGHLIGHT if focused else DISABLED
+        color = HIGHLIGHT if focused else VALUE
         text = _option_text(label)
         text_w = font.size(text)[0]
         row_x = option_x
