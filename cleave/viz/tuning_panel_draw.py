@@ -538,6 +538,7 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
         RowKind.LAYER_MANAGEMENT_DELETE,
         RowKind.TRACK_USER_PRESET_ADD,
         RowKind.TIMELINE_PRESETS,
+        RowKind.TIMELINE_SNAP_TO_BEATS,
     }:
         if kind == RowKind.CONFIG_HEADER and state.solo_active:
             return DISABLED
@@ -904,6 +905,7 @@ def _estimate_row_content_width(
             RowKind.LAYER_MANAGEMENT_DELETE,
             RowKind.TRACK_USER_PRESET_ADD,
             RowKind.TIMELINE_PRESETS,
+            RowKind.TIMELINE_SNAP_TO_BEATS,
         }
     ):
         label = _row_text(state, index)
@@ -1389,6 +1391,7 @@ class TuningOverlay:
                 RowKind.LAYER_MANAGEMENT_DELETE,
                 RowKind.TRACK_USER_PRESET_ADD,
                 RowKind.TIMELINE_PRESETS,
+                RowKind.TIMELINE_SNAP_TO_BEATS,
             }
         ):
             label = _row_text(state, index)

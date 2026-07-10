@@ -10,6 +10,7 @@ import numpy as np
 
 from cleave.extract import (
     extract_bass,
+    extract_drums_beats,
     extract_drums_onset,
     extract_mix_onset,
     extract_mix_rms,
@@ -37,16 +38,24 @@ def run_analyse(project_dir: Path, *, high_quality: bool) -> Path:
     )
 
     drums_onset = extract_drums_onset(paths["drums"])
+    drums_beats = extract_drums_beats(paths["drums"])
     bass = extract_bass(paths["bass"])
     vocals = extract_vocals(paths["vocals"], high_quality=high_quality)
     other = extract_other(paths["other"])
     mix_onset = extract_mix_onset(mix)
     mix_rms = extract_mix_rms(mix)
 
+    if len(drums_beats) == 0:
+        print("drum stem beat detection produced no useful data")
+        beat_times = []
+    else:
+        beat_times = [float(t) for t in drums_beats]
+
     output: dict = {
         "version": 2,
         "sample_rate_hz": int(TARGET_HZ),
         "duration_sec": duration_sec,
+        "beat_times": beat_times,
         "drums": {
             "onset_strength": resample_to_100hz(
                 *drums_onset, duration_sec

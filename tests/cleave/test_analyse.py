@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
+import pytest
 
 from cleave.analyse import run_analyse
 from cleave.extract import STEM_NAMES, stems_dir
@@ -51,11 +52,13 @@ def _write_project(project: Path) -> None:
 @patch("cleave.analyse.extract_other", return_value=_stub_signal())
 @patch("cleave.analyse.extract_vocals", return_value=_stub_vocals())
 @patch("cleave.analyse.extract_bass", return_value=_stub_bass())
+@patch("cleave.analyse.extract_drums_beats", return_value=np.array([0.5, 1.0, 1.5]))
 @patch("cleave.analyse.extract_drums_onset", return_value=_stub_signal())
 @patch("cleave.analyse._stem_duration_sec", return_value=1.0)
 def test_run_analyse_writes_version_2_full_mix(
     _duration: object,
     _drums: object,
+    _drums_beats: object,
     _bass: object,
     _vocals: object,
     _other: object,
@@ -74,6 +77,37 @@ def test_run_analyse_writes_version_2_full_mix(
     assert set(data["full_mix"]) == {"onset_strength", "rms"}
     assert len(data["full_mix"]["onset_strength"]) > 0
     assert len(data["full_mix"]["rms"]) > 0
+    assert data["beat_times"] == [0.5, 1.0, 1.5]
+
+
+@patch("cleave.analyse.extract_mix_rms", return_value=_stub_signal())
+@patch("cleave.analyse.extract_mix_onset", return_value=_stub_signal())
+@patch("cleave.analyse.extract_other", return_value=_stub_signal())
+@patch("cleave.analyse.extract_vocals", return_value=_stub_vocals())
+@patch("cleave.analyse.extract_bass", return_value=_stub_bass())
+@patch("cleave.analyse.extract_drums_beats", return_value=np.array([]))
+@patch("cleave.analyse.extract_drums_onset", return_value=_stub_signal())
+@patch("cleave.analyse._stem_duration_sec", return_value=1.0)
+def test_run_analyse_empty_beats_warns_and_persists_empty(
+    _duration: object,
+    _drums: object,
+    _drums_beats: object,
+    _bass: object,
+    _vocals: object,
+    _other: object,
+    _mix_onset: object,
+    _mix_rms: object,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    project = tmp_path / "project"
+    _write_project(project)
+
+    signals_path = run_analyse(project, high_quality=False)
+    data = json.loads(signals_path.read_text(encoding="utf-8"))
+
+    assert data["beat_times"] == []
+    assert "drum stem beat detection produced no useful data" in capsys.readouterr().out
 
 
 @patch(
