@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
+
+import numpy as np
 
 from cleave.extract import STEM_SOURCES, StemSource
 
@@ -121,3 +124,55 @@ def should_accept_toggle(last_toggle_t: float | None, t_sec: float) -> bool:
     if last_toggle_t is None:
         return True
     return t_sec - last_toggle_t >= RECORD_DEBOUNCE_SEC
+
+
+def _nearest_with_earlier_tie(t: float, candidates: Sequence[float]) -> float:
+    return min(candidates, key=lambda c: (abs(c - t), c))
+
+
+def snap_cues_to_beats(
+    cues: Sequence[TimelineCue],
+    beat_times: Sequence[float],
+) -> list[TimelineCue]:
+    """Rewrite cue times to the nearest beat; merge collisions at the same ``t``."""
+    if not cues or not beat_times:
+        return list(cues)
+
+    beats = np.asarray(beat_times, dtype=np.float64)
+    if beats.size == 1:
+        sole = float(beats[0])
+        snapped = [
+            TimelineCue(t=sole, layers=dict(cue.layers), show_tick=cue.show_tick)
+            for cue in cues
+        ]
+        return _merge_cues_at_same_t(snapped)
+
+    first = float(beats[0])
+    last = float(beats[-1])
+    interval = float(np.median(np.diff(beats)))
+
+    def snap_t(t: float) -> float:
+        if first <= t <= last:
+            idx = int(np.searchsorted(beats, t))
+            candidates: list[float] = []
+            if idx > 0:
+                candidates.append(float(beats[idx - 1]))
+            if idx < len(beats):
+                candidates.append(float(beats[idx]))
+            return _nearest_with_earlier_tie(t, candidates)
+        raw = (t - first) / interval
+        lo = int(np.floor(raw))
+        return _nearest_with_earlier_tie(
+            t,
+            (first + lo * interval, first + (lo + 1) * interval),
+        )
+
+    snapped = [
+        TimelineCue(
+            t=snap_t(cue.t),
+            layers=dict(cue.layers),
+            show_tick=cue.show_tick,
+        )
+        for cue in cues
+    ]
+    return _merge_cues_at_same_t(snapped)

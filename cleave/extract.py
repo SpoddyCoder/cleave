@@ -100,6 +100,13 @@ def extract_drums_onset(path: Path | str) -> tuple[np.ndarray, np.ndarray]:
     return values, times
 
 
+def extract_drums_beats(path: Path | str) -> np.ndarray:
+    """Beat times in seconds from the drum stem."""
+    y, sr = _load(path)
+    _tempo, frames = librosa.beat.beat_track(y=y, sr=sr, hop_length=HOP_LENGTH)
+    return librosa.frames_to_time(frames, sr=sr, hop_length=HOP_LENGTH)
+
+
 def extract_mix_onset(path: Path | str) -> tuple[np.ndarray, np.ndarray]:
     """Onset strength envelope from the mixed source track."""
     return extract_drums_onset(path)

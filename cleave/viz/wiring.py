@@ -430,6 +430,7 @@ def make_tuning_controls(
         "layer_bindings": layer_bindings,
         "render_post_fx_bindings": render_post_fx_bindings,
         "layer_manager": layer_manager,
+        "beat_times": list(signals.beat_times) if signals is not None else [],
     }
     if modal_host is not None:
         kwargs["modal_host"] = modal_host

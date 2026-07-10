@@ -5,8 +5,11 @@ Aspirational ideas. Not scheduled; revisit when the core workflow feels solid.
 
 ## Timeline v2
 - Fade in/out on layer transitions
-- Beat snap for cue placement
 - External timeline file for very long cue lists
+
+### Beat detection (cue snap) v2
+
+Investigate [madmom](https://github.com/CPJKU/madmom): trained beat and downbeat models for stronger bar alignment and tempo-map quality than librosa alone. Same persisted grid feeds timeline snap and MIDI out; heavier analyse step and new dependency. (v1 librosa snap is in [todos.md](todos.md).)
 
 ## MIDI out
 

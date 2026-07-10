@@ -683,6 +683,7 @@ def _build_row_tree_indent_depth() -> dict[RowKind, int]:
     depths[RowKind.TRACK_USER_PRESET_ITEM] = 7
     depths[RowKind.TRACK_USER_PRESET_ADD] = 3
     depths[RowKind.TIMELINE_PRESETS] = 1
+    depths[RowKind.TIMELINE_SNAP_TO_BEATS] = 1
     return depths
 
 
@@ -797,6 +798,7 @@ def append_render_section_rows(
                 and state.render_timeline.expanded
             ):
                 row_list.append(RowDescriptor(RowKind.TIMELINE_PRESETS))
+                row_list.append(RowDescriptor(RowKind.TIMELINE_SNAP_TO_BEATS))
 
 
 def append_track_section_rows(
