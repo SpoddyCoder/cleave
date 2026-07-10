@@ -25,6 +25,7 @@ from cleave.viz.render_overlay_controls import RenderOverlayControls
 from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
 from cleave.viz.render_post_fx_controls import RenderPostFxControls
 from cleave.viz.settings_controls import SettingsControls
+from cleave.viz.timeline_preset_controls import TimelinePresetController
 from cleave.viz.user_presets import resolve_user_preset_dest, user_preset_item_display_name
 from cleave.viz.focus_nav import (
     FocusCursor,
@@ -117,6 +118,11 @@ class TuningControls:
             preset_root,
             self._modal_host,
             layer_bindings,
+        )
+        self._timeline_presets = TimelinePresetController(
+            session,
+            self._modal_host,
+            on_notification=self.show_notification,
         )
         self._view_state = TuningViewStateBuilder(
             session,
@@ -367,6 +373,9 @@ class TuningControls:
                 slot = self.focus_descriptor.slot
                 if slot is not None:
                     self._delete_layer(slot)
+                return True
+            if kind == RowKind.TIMELINE_PRESETS:
+                self._timeline_presets.prompt(self.duration_sec)
                 return True
             if kind == RowKind.TRACK_PRESET_DIR:
                 slot = self.focus_descriptor.slot

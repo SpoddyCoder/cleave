@@ -73,6 +73,7 @@ class RowKind(Enum):
     RENDER_POST_FX_CHROMA_BOOST_VARIANT = auto()
     RENDER_POST_FX_CHROMA_BOOST_AMOUNT = auto()
     RENDER_TIMELINE_HEADER = auto()
+    TIMELINE_PRESETS = auto()
     SETTINGS_HEADER = auto()
     SETTINGS_PREVIEW_QUALITY = auto()
     SETTINGS_UI_HEADER = auto()
@@ -677,6 +678,14 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "visibility is controlled by the timeline instead.",
         ),
         quick_nav_target=True,
+    ),
+    RowKind.TIMELINE_PRESETS: RowBehavior(
+        RowAffordance.ACTION,
+        navigable=True,
+        help_title="Timeline presets",
+        help_description=(
+            "Apply a generated timeline preset that clears existing cues.",
+        ),
     ),
     RowKind.SETTINGS_HEADER: RowBehavior(
         RowAffordance.EXPAND,

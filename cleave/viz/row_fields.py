@@ -1259,6 +1259,10 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         panel_label="Delete Layer",
         present_style=RowPresentStyle.FULL_LINE,
     ),
+    RowKind.TIMELINE_PRESETS: RowFieldDef(
+        panel_label="presets",
+        present_style=RowPresentStyle.FULL_LINE,
+    ),
     RowKind.PANEL_NOTIFICATION: RowFieldDef(
         panel_label="",
         present_style=RowPresentStyle.FULL_LINE,
