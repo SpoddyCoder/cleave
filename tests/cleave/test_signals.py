@@ -38,6 +38,7 @@ def test_load_signals_minimal_fixture(
     assert signals.path == minimal_signals_json_path.resolve()
     assert signals.sample_rate_hz == 100.0
     assert signals.duration_sec == pytest.approx(0.14)
+    assert signals.beat_times == (0.0, 0.5, 1.0)
 
     pitch = signals.array("vocals", "pitch_hz")
     assert math.isnan(pitch[2])
@@ -47,6 +48,27 @@ def test_load_signals_minimal_fixture(
     assert full_mix_onset[3] == pytest.approx(0.7)
     full_mix_rms = signals.array("full_mix", "rms")
     assert full_mix_rms[0] == pytest.approx(0.10)
+
+
+def test_load_signals_missing_beat_times_defaults_empty(tmp_path: Path) -> None:
+    path = tmp_path / "signals.json"
+    path.write_text(
+        json.dumps(
+            {
+                "version": 2,
+                "sample_rate_hz": 100,
+                "duration_sec": 0.1,
+                "drums": {"onset_strength": [0.0]},
+                "bass": {"rms": [0.0], "sub_bass": [0.0], "mid_bass": [0.0]},
+                "vocals": {"rms": [0.0], "pitch_hz": [220.0]},
+                "other": {"spectral_centroid": [1000.0]},
+                "full_mix": {"onset_strength": [0.0], "rms": [0.0]},
+            }
+        ),
+        encoding="utf-8",
+    )
+    signals = load_signals(path)
+    assert signals.beat_times == ()
 
 
 def test_load_signals_rejects_version_1(tmp_path: Path) -> None:

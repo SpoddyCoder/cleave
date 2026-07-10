@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import shutil
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -26,6 +26,7 @@ from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
 from cleave.viz.render_post_fx_controls import RenderPostFxControls
 from cleave.viz.settings_controls import SettingsControls
 from cleave.viz.timeline_preset_controls import TimelinePresetController
+from cleave.viz.timeline_snap_controls import TimelineSnapController
 from cleave.viz.user_presets import resolve_user_preset_dest, user_preset_item_display_name
 from cleave.viz.focus_nav import (
     FocusCursor,
@@ -81,6 +82,7 @@ class TuningControls:
         repo_root_example: Path | None = None,
         modal_host: ModalHost | None = None,
         layer_manager: LayerManager | None = None,
+        beat_times: Sequence[float] = (),
     ) -> None:
         self.session = session
         self.cfg = cfg
@@ -122,6 +124,12 @@ class TuningControls:
         self._timeline_presets = TimelinePresetController(
             session,
             self._modal_host,
+            on_notification=self.show_notification,
+        )
+        self._timeline_snap = TimelineSnapController(
+            session,
+            self._modal_host,
+            beat_times,
             on_notification=self.show_notification,
         )
         self._view_state = TuningViewStateBuilder(
@@ -376,6 +384,9 @@ class TuningControls:
                 return True
             if kind == RowKind.TIMELINE_PRESETS:
                 self._timeline_presets.prompt(self.duration_sec)
+                return True
+            if kind == RowKind.TIMELINE_SNAP_TO_BEATS:
+                self._timeline_snap.prompt()
                 return True
             if kind == RowKind.TRACK_PRESET_DIR:
                 slot = self.focus_descriptor.slot
