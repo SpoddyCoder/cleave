@@ -11,6 +11,7 @@ from cleave.config_schema import (
     PRESET_SWITCHING_MODE_HELP_ENTRIES,
     EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
 )
+from cleave.timeline_presets import TIMELINE_PRESET_HELP_ENTRIES
 from cleave.viz.help_content import (
     DescriptionSection,
     HelpSection,
@@ -197,6 +198,22 @@ def test_switching_mode_help_lists_modes() -> None:
     assert description.title == "Switching mode"
     assert description.lines == ()
     assert description.entries == PRESET_SWITCHING_MODE_HELP_ENTRIES
+
+
+def test_timeline_presets_help_lists_characters() -> None:
+    description = _description_section(sections_for(RowKind.TIMELINE_PRESETS))
+    assert description is not None
+    assert description.title == "Timeline presets"
+    assert description.lines == (
+        "Apply a randomly generated timeline preset (this will overwrite the current timeline).",
+    )
+    assert description.entries == TIMELINE_PRESET_HELP_ENTRIES
+    assert [name for name, _ in description.entries] == [
+        "Breathing",
+        "Dialogue",
+        "Arc",
+        "Pulse",
+    ]
 
 
 def test_preview_quality_help_lists_modes() -> None:
