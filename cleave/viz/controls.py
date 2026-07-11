@@ -83,6 +83,7 @@ class TuningControls:
         modal_host: ModalHost | None = None,
         layer_manager: LayerManager | None = None,
         beat_times: Sequence[float] = (),
+        bar_times: Sequence[float] = (),
     ) -> None:
         self.session = session
         self.cfg = cfg
@@ -130,6 +131,7 @@ class TuningControls:
             session,
             self._modal_host,
             beat_times,
+            bar_times,
             on_notification=self.show_notification,
         )
         self._view_state = TuningViewStateBuilder(
@@ -387,6 +389,9 @@ class TuningControls:
                 return True
             if kind == RowKind.TIMELINE_SNAP_TO_BEATS:
                 self._timeline_snap.prompt()
+                return True
+            if kind == RowKind.TIMELINE_SNAP_TO_BARS:
+                self._timeline_snap.prompt_bars()
                 return True
             if kind == RowKind.TRACK_PRESET_DIR:
                 slot = self.focus_descriptor.slot

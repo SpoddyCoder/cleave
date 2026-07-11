@@ -46,6 +46,7 @@ from cleave.viz.preset_switching import (
     sync_manual_browse_with_user_defined_rotation,
 )
 from cleave.stem_pcm import StemPcmBank
+from cleave.timeline import bar_times_from_beats
 from cleave.viz.playback import current_sec, seek
 from cleave.config import VIZ_CONFIG_FILENAME
 
@@ -418,6 +419,16 @@ def make_tuning_controls(
         on_seek=on_seek,
     )
 
+    beat_times: list[float] = []
+    bar_times: list[float] = []
+    if signals is not None:
+        beat_times = list(signals.beat_times)
+        if beat_times:
+            onset_at_beats = [
+                signals.sample("drums", "onset_strength", t) for t in beat_times
+            ]
+            bar_times = list(bar_times_from_beats(beat_times, onset_at_beats))
+
     kwargs: dict = {
         "session": session,
         "cfg": cfg,
@@ -428,7 +439,8 @@ def make_tuning_controls(
         "layer_bindings": layer_bindings,
         "render_post_fx_bindings": render_post_fx_bindings,
         "layer_manager": layer_manager,
-        "beat_times": list(signals.beat_times) if signals is not None else [],
+        "beat_times": beat_times,
+        "bar_times": bar_times,
     }
     if modal_host is not None:
         kwargs["modal_host"] = modal_host

@@ -76,6 +76,7 @@ class RowKind(Enum):
     RENDER_TIMELINE_HEADER = auto()
     TIMELINE_PRESETS = auto()
     TIMELINE_SNAP_TO_BEATS = auto()
+    TIMELINE_SNAP_TO_BARS = auto()
     SETTINGS_HEADER = auto()
     SETTINGS_PREVIEW_QUALITY = auto()
     SETTINGS_UI_HEADER = auto()
@@ -700,6 +701,16 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_description=(
             "Snap all committed timeline cues to the nearest beat",
             "(irreversible).",
+        ),
+    ),
+    RowKind.TIMELINE_SNAP_TO_BARS: RowBehavior(
+        RowAffordance.ACTION,
+        navigable=True,
+        help_title="Snap to bars",
+        help_entries=(("Enter", "choose bar phase offset"),),
+        help_description=(
+            "Snap all committed timeline cues to the nearest bar;",
+            "Enter opens a phase-offset choice (irreversible).",
         ),
     ),
     RowKind.SETTINGS_HEADER: RowBehavior(

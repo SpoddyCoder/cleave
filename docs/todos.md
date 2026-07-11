@@ -15,23 +15,7 @@ Outstanding bugs and issues.
 
 ---
 
-## Features
-
-### Timeline beat snap (v1)
-
-Done. Batch-quantize committed timeline cues to a librosa beat grid from the drums stem (`beat_times` in `signals.json`). Green **snap to beats** ACTION row under Render: TIMELINE.
-
-**v1.1**
-
-- Optional bar snap: every Nth beat (default N=4, assume 4/4 phase).
-
----
-
 ## Architecture
-
-### Timeline cues: per-track (or single-slot) model
-
-Done. Each track owns a `TimelineLane` (explicit `baseline` plus ordered `SlotCue` transitions) in [cleave/timeline.py](../cleave/timeline.py). Persisted as `timeline.lanes` in YAML. Edits (`punch_lane`, snap, presets, record buffer) are lane-local, so armed recording cannot rewrite unarmed tracks. See [roadmap.md](roadmap.md) Timeline v2 for fades and richer cue types on this model.
 
 ### projectM
 
