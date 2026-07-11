@@ -287,7 +287,10 @@ def test_build_record_punch_cues_writes_baseline_only_when_it_differs() -> None:
     session.timeline.record_buffer = [TimelineCue(t=12.0, layers={"layer_1": False})]
 
     punch = build_record_punch_cues(session, record_start=10.0, record_stop=20.0)
-    assert TimelineCue(t=10.0, layers={"layer_1": True}, show_tick=False) in punch
+    assert (
+        TimelineCue(t=10.0, layers={"layer_1": True}, no_tick_slots=frozenset({"layer_1"}))
+        in punch
+    )
     assert TimelineCue(t=12.0, layers={"layer_1": False}) in punch
 
     session.timeline.record_baseline = {"layer_1": False}
@@ -515,7 +518,10 @@ def test_build_record_punch_cues_restores_committed_at_stop() -> None:
 
     punch = build_record_punch_cues(session, record_start=10.0, record_stop=20.0)
     assert TimelineCue(t=15.0, layers={"layer_1": True}) in punch
-    assert TimelineCue(t=20.0, layers={"layer_1": False}, show_tick=False) in punch
+    assert (
+        TimelineCue(t=20.0, layers={"layer_1": False}, no_tick_slots=frozenset({"layer_1"}))
+        in punch
+    )
     assert timeline_committed_visible(session, "layer_1", 20.0) is False
 
 
@@ -533,7 +539,10 @@ def test_build_record_punch_cues_restores_when_disable_only_inside_punch() -> No
     session.timeline.record_buffer = [TimelineCue(t=18.0, layers={"layer_1": True})]
 
     punch = build_record_punch_cues(session, record_start=10.0, record_stop=22.0)
-    assert TimelineCue(t=22.0, layers={"layer_1": False}, show_tick=False) in punch
+    assert (
+        TimelineCue(t=22.0, layers={"layer_1": False}, no_tick_slots=frozenset({"layer_1"}))
+        in punch
+    )
     assert committed_visible_outside_punch(session, "layer_1", 10.0, 22.0) is True
     assert timeline_committed_visible(session, "layer_1", 22.0) is False
 
@@ -579,7 +588,10 @@ def test_build_record_punch_cues_adds_t0_anchor_on_first_record() -> None:
     ]
 
     punch = build_record_punch_cues(session, record_start=2.0, record_stop=20.0)
-    assert TimelineCue(t=0.0, layers={"layer_1": False}, show_tick=False) in punch
+    assert (
+        TimelineCue(t=0.0, layers={"layer_1": False}, no_tick_slots=frozenset({"layer_1"}))
+        in punch
+    )
 
 
 def test_timeline_bar_preserves_pre_first_cue_after_layer_toggle() -> None:

@@ -522,12 +522,24 @@ def test_unique_cue_times_clamps_to_duration() -> None:
     assert unique_cue_times(cues, 10.0) == [5.0]
 
 
-def test_cue_times_for_stem_skips_show_tick_false() -> None:
+def test_cue_times_for_stem_skips_no_tick_slots() -> None:
     cues = [
         TimelineCue(t=5.0, layers={"layer_1": False}),
-        TimelineCue(t=10.0, layers={"layer_1": True}, show_tick=False),
+        TimelineCue(t=10.0, layers={"layer_1": True}, no_tick_slots=frozenset({"layer_1"})),
     ]
     assert cue_times_for_stem(cues, "layer_1", 30.0) == [5.0]
+
+
+def test_cue_times_for_stem_tick_is_per_slot_in_merged_cue() -> None:
+    cues = [
+        TimelineCue(
+            t=10.0,
+            layers={"layer_1": True, "layer_2": False},
+            no_tick_slots=frozenset({"layer_1"}),
+        ),
+    ]
+    assert cue_times_for_stem(cues, "layer_1", 30.0) == []
+    assert cue_times_for_stem(cues, "layer_2", 30.0) == [10.0]
 
 
 def test_cue_times_for_stem_only_includes_relevant_layers() -> None:
@@ -716,7 +728,11 @@ def test_bar_shows_fill_for_backward_skipped_range() -> None:
         recording=True,
         record_start_sec=20.0,
         record_baseline={"layer_1": True},
-        record_buffer=[TimelineCue(t=20.0, layers={"layer_1": False}, show_tick=False)],
+        record_buffer=[
+            TimelineCue(
+                t=20.0, layers={"layer_1": False}, no_tick_slots=frozenset({"layer_1"})
+            )
+        ],
         record_high_water_mark=30.0,
     )
     assert _bar_visible_at(state, slot, 25.0) is False
@@ -735,7 +751,11 @@ def test_bar_shows_fill_for_backward_seek_with_expanded_punch_start() -> None:
         recording=True,
         record_start_sec=10.0,
         record_baseline={"layer_1": False},
-        record_buffer=[TimelineCue(t=10.0, layers={"layer_1": True}, show_tick=False)],
+        record_buffer=[
+            TimelineCue(
+                t=10.0, layers={"layer_1": True}, no_tick_slots=frozenset({"layer_1"})
+            )
+        ],
         record_high_water_mark=20.0,
     )
     assert _bar_visible_at(state, slot, 15.0) is True
@@ -754,7 +774,11 @@ def test_bar_without_high_water_mark_behaves_as_before() -> None:
         recording=True,
         record_start_sec=20.0,
         record_baseline={"layer_1": True},
-        record_buffer=[TimelineCue(t=20.0, layers={"layer_1": False}, show_tick=False)],
+        record_buffer=[
+            TimelineCue(
+                t=20.0, layers={"layer_1": False}, no_tick_slots=frozenset({"layer_1"})
+            )
+        ],
         record_high_water_mark=None,
     )
     assert _bar_visible_at(state, slot, 22.0) is False

@@ -966,6 +966,40 @@ def test_write_session_snapshot_persists_timeline_at_bottom(tmp_path: Path) -> N
     assert session2.timeline.cues == list(timeline.cues)
 
 
+def test_write_session_snapshot_round_trips_no_tick_slots(tmp_path: Path) -> None:
+    cfg, session, out_path = _snapshot_fixture(tmp_path)
+    session.timeline.enabled = True
+    session.timeline.cues = [
+        TimelineCue(t=0.0, layers={"layer_1": True}, no_tick_slots=frozenset({"layer_1"})),
+        TimelineCue(t=12.0, layers={"layer_1": False}),
+    ]
+    write_session_snapshot(out_path, cfg=cfg, session=session)
+
+    data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    assert data["timeline"]["cues"] == [
+        {"t": 0.0, "layers": {"layer_1": True}, "no_tick": ["layer_1"]},
+        {"t": 12.0, "layers": {"layer_1": False}},
+    ]
+
+    timeline = parse_timeline_section(
+        data,
+        ParseCtx(layer_slots=tuple(cfg.layer_z_order)),
+    )
+    assert timeline is not None
+    playlists = _round_trip_playlists(cfg.paths.preset_root)
+    cfg_with_timeline = CleaveConfig(
+        paths=cfg.paths,
+        layers=cfg.layers,
+        editor=cfg.editor,
+        config_path=out_path,
+        user_config_path=cfg.user_config_path,
+        render=cfg.render,
+        timeline=timeline,
+    )
+    session2 = session_from_cfg(cfg_with_timeline, playlists)
+    assert session2.timeline.cues == session.timeline.cues
+
+
 def test_write_session_snapshot_persists_timeline_disabled_without_cues(
     tmp_path: Path,
 ) -> None:
