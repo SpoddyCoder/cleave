@@ -76,9 +76,13 @@ def test_snap_single_beat_snaps_everything() -> None:
     ]
 
 
-def test_snap_preserves_show_tick() -> None:
-    cues = [TimelineCue(t=0.1, layers={"layer_1": True}, show_tick=False)]
+def test_snap_preserves_no_tick_slots() -> None:
+    cues = [
+        TimelineCue(t=0.1, layers={"layer_1": True}, no_tick_slots=frozenset({"layer_1"}))
+    ]
     result = snap_cues_to_beats(cues, (0.0, 1.0))
     assert result == [
-        TimelineCue(t=0.0, layers={"layer_1": True}, show_tick=False),
+        TimelineCue(
+            t=0.0, layers={"layer_1": True}, no_tick_slots=frozenset({"layer_1"})
+        ),
     ]

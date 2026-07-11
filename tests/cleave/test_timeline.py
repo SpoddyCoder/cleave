@@ -144,6 +144,55 @@ def test_punch_replace_merges_cues_at_same_t() -> None:
     ]
 
 
+def test_punch_replace_preserves_unarmed_transition_tick_on_collision() -> None:
+    """A synthetic armed punch cue colliding with an unarmed slot's real
+    transition must not mark that transition silent (regression: the AND-merge of
+    a per-cue tick flag flipped the unarmed slot's pre-first-cue anchor)."""
+    cues = [TimelineCue(t=12.0, layers={"layer_2": True})]
+    result = punch_replace(
+        cues,
+        armed_stems={"layer_1"},
+        start_sec=5.0,
+        stop_sec=12.0,
+        new_cues=[
+            TimelineCue(
+                t=12.0,
+                layers={"layer_1": True},
+                no_tick_slots=frozenset({"layer_1"}),
+            ),
+        ],
+    )
+    merged = next(cue for cue in result if cue.t == 12.0)
+    assert merged.layers == {"layer_2": True, "layer_1": True}
+    assert merged.shows_tick("layer_2") is True
+    assert merged.shows_tick("layer_1") is False
+
+
+def test_punch_replace_unarmed_anchor_unchanged_by_armed_record() -> None:
+    """The unarmed slot's inferred leading section stays put after an armed take
+    lands a colliding cue at its first transition."""
+    from cleave.viz.layer_visibility import _anchor_visibility_for_slot
+
+    cues = [TimelineCue(t=12.0, layers={"layer_2": True})]
+    # Real transition ON at 12 with no t=0 anchor -> inferred OFF before it.
+    assert _anchor_visibility_for_slot(cues, "layer_2", True) is False
+
+    result = punch_replace(
+        cues,
+        armed_stems={"layer_1"},
+        start_sec=5.0,
+        stop_sec=12.0,
+        new_cues=[
+            TimelineCue(
+                t=12.0, layers={"layer_1": True}, no_tick_slots=frozenset({"layer_1"})
+            ),
+        ],
+    )
+    inferred = _anchor_visibility_for_slot(result, "layer_2", True)
+    assert inferred is False  # still OFF; layer_1's silent cue did not corrupt it
+    assert layer_visible_at(result, {"layer_2": inferred}, "layer_2", 6.0) is False
+
+
 def test_should_accept_toggle_debounces() -> None:
     assert should_accept_toggle(None, 1.0) is True
     assert should_accept_toggle(1.0, 1.0 + RECORD_DEBOUNCE_SEC - 0.01) is False

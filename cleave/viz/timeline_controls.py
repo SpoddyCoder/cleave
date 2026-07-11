@@ -346,13 +346,21 @@ class TimelineControls:
                     remaining = {k: val for k, val in cue.layers.items() if k != slot}
                     if remaining:
                         cleaned.append(
-                            TimelineCue(t=cue.t, layers=remaining, show_tick=cue.show_tick)
+                            TimelineCue(
+                                t=cue.t,
+                                layers=remaining,
+                                no_tick_slots=cue.no_tick_slots.intersection(remaining),
+                            )
                         )
                 else:
                     cleaned.append(cue)
             tl.record_buffer = cleaned
             tl.record_buffer.append(
-                TimelineCue(t=skip_start, layers={slot: v}, show_tick=False)
+                TimelineCue(
+                    t=skip_start,
+                    layers={slot: v},
+                    no_tick_slots=frozenset({slot}),
+                )
             )
             self._last_toggle_t.pop(slot, None)
         tl.record_buffer.sort(key=lambda c: c.t)
