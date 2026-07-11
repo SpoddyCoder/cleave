@@ -39,7 +39,7 @@ def _anchor_visibility_for_slot(
     if not slot_cues:
         return layer_enabled_fallback
     earliest = min(slot_cues, key=lambda cue: cue.t)
-    if earliest.t > 0.0 and earliest.show_tick:
+    if earliest.t > 0.0 and earliest.shows_tick(slot):
         return not earliest.layers[slot]
     return layer_enabled_fallback
 
@@ -149,7 +149,7 @@ def build_record_punch_cues(
                     layers={
                         slot: timeline_committed_visible(session, slot, 0.0),
                     },
-                    show_tick=False,
+                    no_tick_slots=frozenset({slot}),
                 )
             )
     for slot, baseline in tl.record_baseline.items():
@@ -160,7 +160,7 @@ def build_record_punch_cues(
                 TimelineCue(
                     t=record_start,
                     layers={slot: baseline},
-                    show_tick=False,
+                    no_tick_slots=frozenset({slot}),
                 )
             )
     punch.extend(
@@ -178,7 +178,7 @@ def build_record_punch_cues(
                 TimelineCue(
                     t=record_stop,
                     layers={slot: committed_at_stop},
-                    show_tick=False,
+                    no_tick_slots=frozenset({slot}),
                 )
             )
     return punch

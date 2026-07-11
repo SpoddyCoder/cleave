@@ -110,8 +110,47 @@ def test_punch_replace_removes_armed_cues_in_range() -> None:
         TimelineCue(t=1.0, layers={"layer_1": False}),
         TimelineCue(t=5.0, layers={"layer_2": False}),
         TimelineCue(t=6.0, layers={"layer_1": False}),
+        # Unarmed layer_3 entry from the shared cue at t=8 must survive.
+        TimelineCue(t=8.0, layers={"layer_3": False}),
         TimelineCue(t=12.0, layers={"layer_4": False}),
     ]
+
+
+def test_punch_replace_preserves_unarmed_slots_in_shared_cue() -> None:
+    """Preset-style multi-slot cues must not lose unarmed keys when punching."""
+    cues = [
+        TimelineCue(
+            t=0.0,
+            layers={
+                "layer_1": True,
+                "layer_2": False,
+                "layer_3": True,
+                "layer_4": False,
+            },
+        ),
+        TimelineCue(t=10.0, layers={"layer_1": False, "layer_2": True}),
+        TimelineCue(t=20.0, layers={"layer_3": False}),
+    ]
+    result = punch_replace(
+        cues,
+        armed_stems={"layer_1"},
+        start_sec=0.0,
+        stop_sec=15.0,
+        new_cues=[
+            TimelineCue(t=0.0, layers={"layer_1": False}),
+            TimelineCue(t=5.0, layers={"layer_1": True}),
+        ],
+    )
+    by_t = {cue.t: cue.layers for cue in result}
+    assert by_t[0.0] == {
+        "layer_1": False,
+        "layer_2": False,
+        "layer_3": True,
+        "layer_4": False,
+    }
+    assert by_t[5.0] == {"layer_1": True}
+    assert by_t[10.0] == {"layer_2": True}
+    assert by_t[20.0] == {"layer_3": False}
 
 
 def test_punch_replace_keeps_unarmed_cues_in_range() -> None:
@@ -142,6 +181,55 @@ def test_punch_replace_merges_cues_at_same_t() -> None:
         TimelineCue(t=2.0, layers={"layer_1": True, "layer_2": False}),
         TimelineCue(t=20.0, layers={"layer_4": False}),
     ]
+
+
+def test_punch_replace_preserves_unarmed_transition_tick_on_collision() -> None:
+    """A synthetic armed punch cue colliding with an unarmed slot's real
+    transition must not mark that transition silent (regression: the AND-merge of
+    a per-cue tick flag flipped the unarmed slot's pre-first-cue anchor)."""
+    cues = [TimelineCue(t=12.0, layers={"layer_2": True})]
+    result = punch_replace(
+        cues,
+        armed_stems={"layer_1"},
+        start_sec=5.0,
+        stop_sec=12.0,
+        new_cues=[
+            TimelineCue(
+                t=12.0,
+                layers={"layer_1": True},
+                no_tick_slots=frozenset({"layer_1"}),
+            ),
+        ],
+    )
+    merged = next(cue for cue in result if cue.t == 12.0)
+    assert merged.layers == {"layer_2": True, "layer_1": True}
+    assert merged.shows_tick("layer_2") is True
+    assert merged.shows_tick("layer_1") is False
+
+
+def test_punch_replace_unarmed_anchor_unchanged_by_armed_record() -> None:
+    """The unarmed slot's inferred leading section stays put after an armed take
+    lands a colliding cue at its first transition."""
+    from cleave.viz.layer_visibility import _anchor_visibility_for_slot
+
+    cues = [TimelineCue(t=12.0, layers={"layer_2": True})]
+    # Real transition ON at 12 with no t=0 anchor -> inferred OFF before it.
+    assert _anchor_visibility_for_slot(cues, "layer_2", True) is False
+
+    result = punch_replace(
+        cues,
+        armed_stems={"layer_1"},
+        start_sec=5.0,
+        stop_sec=12.0,
+        new_cues=[
+            TimelineCue(
+                t=12.0, layers={"layer_1": True}, no_tick_slots=frozenset({"layer_1"})
+            ),
+        ],
+    )
+    inferred = _anchor_visibility_for_slot(result, "layer_2", True)
+    assert inferred is False  # still OFF; layer_1's silent cue did not corrupt it
+    assert layer_visible_at(result, {"layer_2": inferred}, "layer_2", 6.0) is False
 
 
 def test_should_accept_toggle_debounces() -> None:

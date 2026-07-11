@@ -1825,7 +1825,19 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
                 + ", ".join(unknown)
             )
         layers = {stem: bool(layers_raw[stem]) for stem in layers_raw}
-        cues.append(TimelineCue(t=t, layers=layers))
+        no_tick_raw = cue_map.get("no_tick", [])
+        if no_tick_raw is None:
+            no_tick_raw = []
+        if not isinstance(no_tick_raw, list):
+            raise ValueError(f"timeline.cues[{index}].no_tick must be a list")
+        no_tick = frozenset(str(stem) for stem in no_tick_raw)
+        unknown_no_tick = sorted(no_tick - set(layers))
+        if unknown_no_tick:
+            raise ValueError(
+                f"timeline.cues[{index}].no_tick must reference layers in the cue: "
+                + ", ".join(unknown_no_tick)
+            )
+        cues.append(TimelineCue(t=t, layers=layers, no_tick_slots=no_tick))
     cues.sort(key=lambda cue: cue.t)
     return TimelineConfig(enabled=enabled, cues=tuple(cues))
 
@@ -1835,10 +1847,17 @@ def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
     out: dict[str, Any] = {"enabled": runtime.enabled}
     if runtime.cues:
         out["cues"] = [
-            {"t": cue.t, "layers": dict(cue.layers)}
+            _persist_timeline_cue(cue)
             for cue in sorted(runtime.cues, key=lambda cue: cue.t)
         ]
     return out
+
+
+def _persist_timeline_cue(cue: TimelineCue) -> dict[str, Any]:
+    entry: dict[str, Any] = {"t": cue.t, "layers": dict(cue.layers)}
+    if cue.no_tick_slots:
+        entry["no_tick"] = sorted(cue.no_tick_slots)
+    return entry
 
 
 def persisted_session_payload(cfg: Any, session: Any) -> dict[str, Any]:

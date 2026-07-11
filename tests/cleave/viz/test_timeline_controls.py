@@ -576,7 +576,7 @@ def test_forward_seek_during_record_fills_with_active_state() -> None:
     assert any(
         cue.t == 10.0
         and cue.layers.get("layer_1") is True
-        and cue.show_tick is False
+        and not cue.shows_tick("layer_1")
         for cue in session.timeline.record_buffer
     )
     assert armed_recording_visible(session, "layer_1", 15.0) == active_at_start
@@ -672,7 +672,7 @@ def test_stop_record_restores_committed_after_punch_range() -> None:
         cue for cue in session.timeline.cues if cue.t == 20.0 and "layer_1" in cue.layers
     ]
     assert len(restore_cues) == 1
-    assert restore_cues[0].show_tick is False
+    assert not restore_cues[0].shows_tick("layer_1")
 
 
 def test_stop_record_restores_disabled_tail_when_disable_inside_punch() -> None:
@@ -745,6 +745,142 @@ def test_stop_record_preserves_unarmed_cues_in_punch_range() -> None:
     assert not any(
         cue.t == 11.0 and "layer_1" in cue.layers for cue in session.timeline.cues
     )
+
+
+def test_stop_record_preserves_unarmed_slots_in_preset_style_cues() -> None:
+    """Recording one armed layer must not rewrite shared multi-slot preset cues.
+
+    Timeline presets emit a full t=0 cue for every slot and pack simultaneous
+    transitions into one TimelineCue. Whole-cue punch deletion used to erase
+    unarmed keys from those objects, flipping whole sections on other tracks.
+    """
+    from cleave.viz.layer_visibility import timeline_committed_visible
+
+    slots = tuple(DEFAULT_LAYER_SLOTS)
+    cues = [
+        TimelineCue(
+            t=0.0,
+            layers={
+                "layer_1": True,
+                "layer_2": False,
+                "layer_3": True,
+                "layer_4": False,
+            },
+        ),
+        TimelineCue(t=8.0, layers={"layer_1": False, "layer_2": True}),
+        TimelineCue(t=16.0, layers={"layer_3": False, "layer_4": True}),
+        TimelineCue(t=24.0, layers={"layer_2": False}),
+    ]
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=5.0,
+        cues=cues,
+    )
+    for slot in slots:
+        session.layers[slot].enabled = cues[0].layers[slot]
+
+    unarmed = ("layer_2", "layer_3", "layer_4")
+    sample = (0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0, 30.0)
+    before = {
+        slot: [timeline_committed_visible(session, slot, t) for t in sample]
+        for slot in unarmed
+    }
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.playback.player.seek(12.0)
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.playback.player.seek(18.0)
+    controls.handle_keydown(keydown(pygame.K_r))
+
+    after = {
+        slot: [timeline_committed_visible(session, slot, t) for t in sample]
+        for slot in unarmed
+    }
+    assert after == before
+    # Shared cue at t=8 kept layer_2; armed layer_1 was rewritten separately.
+    cue_at_8 = next(cue for cue in session.timeline.cues if cue.t == 8.0)
+    assert cue_at_8.layers.get("layer_2") is True
+    cue_at_16 = next(cue for cue in session.timeline.cues if cue.t == 16.0)
+    assert cue_at_16.layers == {"layer_3": False, "layer_4": True}
+
+
+def test_stop_record_preserves_unarmed_after_breathing_preset() -> None:
+    """End-to-end: punch through a real preset must leave unarmed tracks alone."""
+    import random
+
+    from cleave.timeline_presets import build_breathing_cues
+    from cleave.viz.layer_visibility import timeline_committed_visible
+
+    slots = list(DEFAULT_LAYER_SLOTS)
+    cues = build_breathing_cues(slots, 60.0, random.Random(42))
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=5.0,
+        cues=cues,
+    )
+    for slot in slots:
+        session.layers[slot].enabled = cues[0].layers[slot]
+
+    unarmed = ("layer_2", "layer_3", "layer_4")
+    sample = tuple(i * 2.5 for i in range(25))
+    before = {
+        slot: [timeline_committed_visible(session, slot, t) for t in sample]
+        for slot in unarmed
+    }
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.playback.player.seek(25.0)
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.playback.player.seek(35.0)
+    controls.handle_keydown(keydown(pygame.K_r))
+
+    after = {
+        slot: [timeline_committed_visible(session, slot, t) for t in sample]
+        for slot in unarmed
+    }
+    assert after == before
+
+
+def test_stop_record_does_not_flip_unarmed_leading_section() -> None:
+    """Regression: recording an armed layer must not change an unarmed layer.
+
+    layer_2 (unarmed) has a real transition at t=12 turning it ON and no t=0
+    anchor - a state reachable after reload or in evolved projects. Recording
+    armed layer_1 lands a synthetic committed-restore cue exactly at t=12; the
+    per-slot tick must keep layer_2's transition real so its inferred leading
+    section (0..12 = OFF) is unchanged.
+    """
+    from cleave.viz.layer_visibility import timeline_committed_visible
+
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=5.0,
+        cues=[
+            TimelineCue(t=12.0, layers={"layer_2": True}),
+            TimelineCue(t=0.0, layers={"layer_1": False}),
+            TimelineCue(t=30.0, layers={"layer_1": True}),
+        ],
+    )
+    session.layers["layer_2"].enabled = True
+
+    sample = (0.0, 6.0, 11.9, 12.0, 20.0)
+    before = [timeline_committed_visible(session, "layer_2", t) for t in sample]
+    assert before == [False, False, False, True, True]
+
+    controls.handle_keydown(keydown(pygame.K_r))  # start record on layer_1
+    controls.playback.player.seek(8.0)
+    controls.handle_keydown(keydown(pygame.K_1))  # toggle layer_1 on
+    controls.playback.player.seek(12.0)
+    controls.handle_keydown(keydown(pygame.K_r))  # stop -> restore cue at t=12
+
+    merged = [cue for cue in session.timeline.cues if cue.t == 12.0]
+    assert len(merged) == 1
+    assert merged[0].shows_tick("layer_2") is True
+
+    after = [timeline_committed_visible(session, "layer_2", t) for t in sample]
+    assert after == before
 
 
 def test_ctrl_space_starts_record_when_paused() -> None:

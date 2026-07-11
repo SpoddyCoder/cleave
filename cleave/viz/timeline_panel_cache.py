@@ -65,9 +65,12 @@ def visibility_bucket(visibility: float) -> int:
     return min(255, int(visibility * 255))
 
 
-def _cue_fingerprint(cues: list) -> tuple[tuple[float, tuple[tuple[str, bool], ...], bool], ...]:
+def _cue_fingerprint(
+    cues: list,
+) -> tuple[tuple[float, tuple[tuple[str, bool], ...], tuple[str, ...]], ...]:
     return tuple(
-        (cue.t, tuple(sorted(cue.layers.items())), cue.show_tick) for cue in cues
+        (cue.t, tuple(sorted(cue.layers.items())), tuple(sorted(cue.no_tick_slots)))
+        for cue in cues
     )
 
 

@@ -24,7 +24,18 @@ _STEM_SOURCE_ABBREVIATIONS = {
 class TimelineCue:
     t: float
     layers: dict[str, bool]
-    show_tick: bool = True
+    no_tick_slots: frozenset[str] = frozenset()
+
+    def shows_tick(self, slot: str) -> bool:
+        """True when *slot* changes here and marks a real (ticked) transition.
+
+        Tick-ness is per slot so cues that merge several slots at the same time
+        keep each slot's own transition semantics. A slot in ``no_tick_slots`` is
+        a synthetic anchor/restore (baseline capture, committed restore, seek
+        fill) that neither draws a tick nor counts as a transition for
+        pre-first-cue anchor inference.
+        """
+        return slot in self.layers and slot not in self.no_tick_slots
 
 
 def stem_abbreviation(stem: StemSource) -> str:
@@ -73,7 +84,7 @@ def _merge_cues_at_same_t(cues: list[TimelineCue]) -> list[TimelineCue]:
     merged: list[TimelineCue] = []
     current_t: float | None = None
     current_layers: dict[str, bool] = {}
-    current_show_tick = True
+    current_no_tick: set[str] = set()
     for cue in sorted(cues, key=lambda c: c.t):
         if current_t is None:
             current_t = cue.t
@@ -82,20 +93,24 @@ def _merge_cues_at_same_t(cues: list[TimelineCue]) -> list[TimelineCue]:
                 TimelineCue(
                     t=current_t,
                     layers=dict(current_layers),
-                    show_tick=current_show_tick,
+                    no_tick_slots=frozenset(current_no_tick),
                 )
             )
             current_t = cue.t
             current_layers = {}
-            current_show_tick = True
-        current_layers.update(cue.layers)
-        current_show_tick = current_show_tick and cue.show_tick
+            current_no_tick = set()
+        for slot, value in cue.layers.items():
+            current_layers[slot] = value
+            if slot in cue.no_tick_slots:
+                current_no_tick.add(slot)
+            else:
+                current_no_tick.discard(slot)
     if current_t is not None:
         merged.append(
             TimelineCue(
                 t=current_t,
                 layers=dict(current_layers),
-                show_tick=current_show_tick,
+                no_tick_slots=frozenset(current_no_tick),
             )
         )
     return merged
@@ -108,14 +123,34 @@ def punch_replace(
     stop_sec: float,
     new_cues: list[TimelineCue],
 ) -> list[TimelineCue]:
-    kept = [
-        cue
-        for cue in cues
+    """Overwrite armed slots in ``[start_sec, stop_sec]``; leave unarmed slots intact.
+
+    Cues are often multi-slot (timeline presets put every slot on the t=0 cue,
+    and simultaneous transitions share one object). Deleting a whole cue when it
+    mentions an armed stem would erase unarmed slots that share that object —
+    strip armed keys only, then merge in ``new_cues``.
+    """
+    kept: list[TimelineCue] = []
+    for cue in cues:
         if not (
             start_sec <= cue.t <= stop_sec
             and _cue_modifies_armed_stem(cue, armed_stems)
-        )
-    ]
+        ):
+            kept.append(cue)
+            continue
+        remaining = {
+            slot: visible
+            for slot, visible in cue.layers.items()
+            if slot not in armed_stems
+        }
+        if remaining:
+            kept.append(
+                TimelineCue(
+                    t=cue.t,
+                    layers=remaining,
+                    no_tick_slots=cue.no_tick_slots.intersection(remaining),
+                )
+            )
     combined = kept + list(new_cues)
     return _merge_cues_at_same_t(combined)
 
@@ -142,7 +177,11 @@ def snap_cues_to_beats(
     if beats.size == 1:
         sole = float(beats[0])
         snapped = [
-            TimelineCue(t=sole, layers=dict(cue.layers), show_tick=cue.show_tick)
+            TimelineCue(
+                t=sole,
+                layers=dict(cue.layers),
+                no_tick_slots=cue.no_tick_slots,
+            )
             for cue in cues
         ]
         return _merge_cues_at_same_t(snapped)
@@ -171,7 +210,7 @@ def snap_cues_to_beats(
         TimelineCue(
             t=snap_t(cue.t),
             layers=dict(cue.layers),
-            show_tick=cue.show_tick,
+            no_tick_slots=cue.no_tick_slots,
         )
         for cue in cues
     ]

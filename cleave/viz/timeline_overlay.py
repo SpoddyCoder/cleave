@@ -125,11 +125,7 @@ def cue_times_for_stem(
         {
             cue.t
             for cue in cues
-            if (
-                slot in cue.layers
-                and cue.show_tick
-                and 0.0 <= cue.t <= duration_sec
-            )
+            if cue.shows_tick(slot) and 0.0 <= cue.t <= duration_sec
         }
     )
 
