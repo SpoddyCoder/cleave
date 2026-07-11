@@ -13,7 +13,7 @@ from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.effects.constants import clamp_effect_pct
 from cleave.effects.registry import validate_effect_entry
 from cleave.extract import STEM_SOURCES, StemSource
-from cleave.timeline import TimelineCue
+from cleave.timeline import SlotCue, TimelineLane, canonicalize
 
 # --- Editor defaults ---
 
@@ -1796,68 +1796,75 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
         return None
     timeline_map = as_mapping(timeline, "timeline")
     enabled = bool(timeline_map.get("enabled", DEFAULT_TIMELINE_ENABLED))
-    cues_raw = timeline_map.get("cues", [])
-    if cues_raw is None:
-        cues_raw = []
-    if not isinstance(cues_raw, list):
-        raise ValueError("timeline.cues must be a list")
-    cues: list[TimelineCue] = []
-    for index, item in enumerate(cues_raw):
-        cue_map = as_mapping(item, f"timeline.cues[{index}]")
-        t = float(
-            require_non_negative_number(
-                cue_map.get("t"),
-                f"timeline.cues[{index}].t",
-            )
+    # Legacy timeline.cues is ignored (clean break; no migration).
+    lanes_raw = timeline_map.get("lanes")
+    if lanes_raw is None:
+        return TimelineConfig(enabled=enabled, lanes={})
+    lanes_map = as_mapping(lanes_raw, "timeline.lanes")
+    if ctx.layer_slots is None:
+        raise ValueError("layer_slots required to parse timeline")
+    allowed_slots = set(ctx.layer_slots)
+    unknown_slots = sorted(set(lanes_map) - allowed_slots)
+    if unknown_slots:
+        raise ValueError(
+            "unknown layer keys in timeline.lanes "
+            f"(expected {', '.join(ctx.layer_slots)}): "
+            + ", ".join(unknown_slots)
         )
-        layers_raw = as_mapping(
-            cue_map.get("layers"),
-            f"timeline.cues[{index}].layers",
+    lanes: dict[str, TimelineLane] = {}
+    for slot, lane_raw in lanes_map.items():
+        lane_map = as_mapping(lane_raw, f"timeline.lanes.{slot}")
+        baseline: bool | None
+        if "baseline" in lane_map:
+            baseline = bool(lane_map["baseline"])
+        else:
+            baseline = None
+        cues_raw = lane_map.get("cues", [])
+        if cues_raw is None:
+            cues_raw = []
+        if not isinstance(cues_raw, list):
+            raise ValueError(f"timeline.lanes.{slot}.cues must be a list")
+        cues: list[SlotCue] = []
+        for index, item in enumerate(cues_raw):
+            cue_map = as_mapping(item, f"timeline.lanes.{slot}.cues[{index}]")
+            if "visible" not in cue_map:
+                raise ValueError(
+                    f"timeline.lanes.{slot}.cues[{index}] missing visible"
+                )
+            t = float(
+                require_non_negative_number(
+                    cue_map.get("t"),
+                    f"timeline.lanes.{slot}.cues[{index}].t",
+                )
+            )
+            cues.append(SlotCue(t=t, visible=bool(cue_map["visible"])))
+        lanes[str(slot)] = TimelineLane(
+            baseline=baseline,
+            cues=canonicalize(baseline, cues),
         )
-        if ctx.layer_slots is None:
-            raise ValueError("layer_slots required to parse timeline")
-        allowed_slots = ctx.layer_slots
-        unknown = sorted(set(layers_raw) - set(allowed_slots))
-        if unknown:
-            raise ValueError(
-                f"unknown layer keys in timeline.cues[{index}].layers "
-                f"(expected {', '.join(allowed_slots)}): "
-                + ", ".join(unknown)
-            )
-        layers = {stem: bool(layers_raw[stem]) for stem in layers_raw}
-        no_tick_raw = cue_map.get("no_tick", [])
-        if no_tick_raw is None:
-            no_tick_raw = []
-        if not isinstance(no_tick_raw, list):
-            raise ValueError(f"timeline.cues[{index}].no_tick must be a list")
-        no_tick = frozenset(str(stem) for stem in no_tick_raw)
-        unknown_no_tick = sorted(no_tick - set(layers))
-        if unknown_no_tick:
-            raise ValueError(
-                f"timeline.cues[{index}].no_tick must reference layers in the cue: "
-                + ", ".join(unknown_no_tick)
-            )
-        cues.append(TimelineCue(t=t, layers=layers, no_tick_slots=no_tick))
-    cues.sort(key=lambda cue: cue.t)
-    return TimelineConfig(enabled=enabled, cues=tuple(cues))
+    return TimelineConfig(enabled=enabled, lanes=lanes)
 
 
 def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
     runtime = ctx.session.timeline
     out: dict[str, Any] = {"enabled": runtime.enabled}
-    if runtime.cues:
-        out["cues"] = [
-            _persist_timeline_cue(cue)
-            for cue in sorted(runtime.cues, key=lambda cue: cue.t)
-        ]
+    lanes_out: dict[str, Any] = {}
+    for slot in sorted(runtime.lanes):
+        lane = runtime.lanes[slot]
+        if lane.baseline is None and not lane.cues:
+            continue
+        entry: dict[str, Any] = {}
+        if lane.baseline is not None:
+            entry["baseline"] = lane.baseline
+        if lane.cues:
+            entry["cues"] = [
+                {"t": cue.t, "visible": cue.visible}
+                for cue in lane.cues
+            ]
+        lanes_out[slot] = entry
+    if lanes_out:
+        out["lanes"] = lanes_out
     return out
-
-
-def _persist_timeline_cue(cue: TimelineCue) -> dict[str, Any]:
-    entry: dict[str, Any] = {"t": cue.t, "layers": dict(cue.layers)}
-    if cue.no_tick_slots:
-        entry["no_tick"] = sorted(cue.no_tick_slots)
-    return entry
 
 
 def persisted_session_payload(cfg: Any, session: Any) -> dict[str, Any]:

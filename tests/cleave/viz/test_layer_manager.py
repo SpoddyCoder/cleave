@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 from cleave.config_schema import MAX_LAYER_COUNT, MIN_LAYER_COUNT
 from cleave.preset_playlist import PresetPlaylist
-from cleave.timeline import TimelineCue
+from cleave.timeline import SlotCue
 from cleave.viz.layer import StemLayer
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.wiring import LayerManager, _discard_timeline_slot
@@ -147,10 +147,13 @@ def test_discard_timeline_slot_strips_slot_from_timeline_state() -> None:
     session.timeline.monitor["layer_2"] = False
     session.timeline.override_visible["layer_2"] = True
     session.timeline.arm_flash_start_ms["layer_2"] = 100
-    session.timeline.record_buffer = [
-        TimelineCue(t=1.0, layers={"layer_1": True, "layer_2": False}),
-        TimelineCue(t=2.0, layers={"layer_2": True}),
-    ]
+    session.timeline.record_buffer = {
+        "layer_1": [SlotCue(t=1.0, visible=True)],
+        "layer_2": [
+            SlotCue(t=1.0, visible=False),
+            SlotCue(t=2.0, visible=True),
+        ],
+    }
 
     _discard_timeline_slot(session, "layer_2")
 
@@ -160,6 +163,7 @@ def test_discard_timeline_slot_strips_slot_from_timeline_state() -> None:
     assert "layer_2" not in session.timeline.monitor
     assert "layer_2" not in session.timeline.override_visible
     assert "layer_2" not in session.timeline.arm_flash_start_ms
-    assert session.timeline.record_buffer == [
-        TimelineCue(t=1.0, layers={"layer_1": True}),
-    ]
+    assert "layer_2" not in session.timeline.record_buffer
+    assert session.timeline.record_buffer == {
+        "layer_1": [SlotCue(t=1.0, visible=True)],
+    }

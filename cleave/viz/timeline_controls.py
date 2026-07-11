@@ -6,11 +6,7 @@ from collections.abc import Callable
 
 import pygame
 
-from cleave.timeline import (
-    TimelineCue,
-    punch_replace,
-    should_accept_toggle,
-)
+from cleave.timeline import SlotCue, canonicalize, should_accept_toggle
 from cleave.viz.controls import SEEK_LONG, SEEK_SHORT
 from cleave.viz.session import TuningSession
 from cleave.viz.key_repeat import mod_ctrl, mod_shift
@@ -192,28 +188,20 @@ class TimelineControls:
 
         record_stop = current_sec(self.playback, self.duration_sec)
         punch_end = max(record_stop, tl.record_high_water_mark or record_stop)
-        tl.cues = punch_replace(
-            tl.cues,
-            {slot},
+        build_record_punch_cues(
+            self.session,
             record_start,
             punch_end,
-            build_record_punch_cues(
-                self.session,
-                record_start,
-                punch_end,
-                slots={slot},
-            ),
+            slots={slot},
         )
         tl.record_baseline.pop(slot, None)
-        tl.record_buffer = [
-            cue for cue in tl.record_buffer if slot not in cue.layers
-        ]
+        tl.record_buffer.pop(slot, None)
         self._last_toggle_t.pop(slot, None)
 
         if not tl.armed_slots:
             tl.recording = False
             tl.record_start_sec = None
-            tl.record_buffer = []
+            tl.record_buffer = {}
             tl.record_baseline = {}
             tl.record_high_water_mark = None
             self._last_toggle_t = {}
@@ -241,7 +229,7 @@ class TimelineControls:
 
         tl.recording = True
         tl.record_start_sec = t_sec
-        tl.record_buffer = []
+        tl.record_buffer = {}
         tl.record_high_water_mark = None
         self._last_toggle_t = {}
 
@@ -252,23 +240,17 @@ class TimelineControls:
         record_start = tl.record_start_sec
         if record_start is None:
             tl.recording = False
-            tl.record_buffer = []
+            tl.record_buffer = {}
             tl.record_baseline = {}
             tl.record_high_water_mark = None
             return
 
         record_stop = current_sec(self.playback, self.duration_sec)
         punch_end = max(record_stop, tl.record_high_water_mark or record_stop)
-        tl.cues = punch_replace(
-            tl.cues,
-            set(tl.record_baseline),
-            record_start,
-            punch_end,
-            build_record_punch_cues(self.session, record_start, punch_end),
-        )
+        build_record_punch_cues(self.session, record_start, punch_end)
         tl.recording = False
         tl.record_start_sec = None
-        tl.record_buffer = []
+        tl.record_buffer = {}
         tl.record_baseline = {}
         tl.record_high_water_mark = None
         self._last_toggle_t = {}
@@ -326,7 +308,9 @@ class TimelineControls:
             return
 
         current = armed_recording_visible(self.session, slot, t_sec)
-        tl.record_buffer.append(TimelineCue(t=t_sec, layers={slot: not current}))
+        tl.record_buffer.setdefault(slot, []).append(
+            SlotCue(t=t_sec, visible=not current)
+        )
         self._last_toggle_t[slot] = t_sec
 
         if self._on_visibility_change is not None:
@@ -340,30 +324,15 @@ class TimelineControls:
             if slot not in tl.record_baseline:
                 continue
             v = armed_recording_visible(self.session, slot, old_t)
-            cleaned: list[TimelineCue] = []
-            for cue in tl.record_buffer:
-                if skip_start <= cue.t <= skip_end and slot in cue.layers:
-                    remaining = {k: val for k, val in cue.layers.items() if k != slot}
-                    if remaining:
-                        cleaned.append(
-                            TimelineCue(
-                                t=cue.t,
-                                layers=remaining,
-                                no_tick_slots=cue.no_tick_slots.intersection(remaining),
-                            )
-                        )
-                else:
-                    cleaned.append(cue)
-            tl.record_buffer = cleaned
-            tl.record_buffer.append(
-                TimelineCue(
-                    t=skip_start,
-                    layers={slot: v},
-                    no_tick_slots=frozenset({slot}),
-                )
+            buf = tl.record_buffer.get(slot, [])
+            kept = [
+                cue for cue in buf if not (skip_start <= cue.t <= skip_end)
+            ]
+            tl.record_buffer[slot] = canonicalize(
+                tl.record_baseline[slot],
+                kept + [SlotCue(t=skip_start, visible=v)],
             )
             self._last_toggle_t.pop(slot, None)
-        tl.record_buffer.sort(key=lambda c: c.t)
         tl.record_high_water_mark = max(tl.record_high_water_mark or 0.0, old_t)
         if tl.record_start_sec is not None and new_t < tl.record_start_sec:
             tl.record_start_sec = new_t

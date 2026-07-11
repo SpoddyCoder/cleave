@@ -4,8 +4,12 @@ Aspirational ideas. Not scheduled; revisit when the core workflow feels solid.
 
 
 ## Timeline v2
-- Fade in/out on layer transitions
-- External timeline file for very long cue lists
+
+Base: per-track lane model (`TimelineLane` / `SlotCue` in [cleave/timeline.py](../cleave/timeline.py); `timeline.lanes` in YAML). Tracks are isolated by construction.
+
+- Fade in/out on layer transitions (attach to `SlotCue`)
+- External timeline file for very long cue lists (per-lane snapshots)
+- Richer cue types as `SlotCue` subtypes; undo as per-lane snapshots
 
 ### Beat detection (cue snap) v2
 

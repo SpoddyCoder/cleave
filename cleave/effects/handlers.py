@@ -37,11 +37,25 @@ def _build_handlers() -> dict[str, EffectHandler[Any]]:
     return {handler.effect_id: handler for handler in handlers}
 
 
-EFFECT_HANDLERS: dict[str, EffectHandler[Any]] = _build_handlers()
+_EFFECT_HANDLERS: dict[str, EffectHandler[Any]] | None = None
+
+
+def _handlers() -> dict[str, EffectHandler[Any]]:
+    """Lazy registry so effect modules can import ``EffectHandler`` at load time."""
+    global _EFFECT_HANDLERS
+    if _EFFECT_HANDLERS is None:
+        _EFFECT_HANDLERS = _build_handlers()
+    return _EFFECT_HANDLERS
 
 
 def handler_for(effect_id: str) -> EffectHandler[Any]:
     try:
-        return EFFECT_HANDLERS[effect_id]
+        return _handlers()[effect_id]
     except KeyError as exc:
         raise KeyError(f"no handler registered for effect {effect_id!r}") from exc
+
+
+def __getattr__(name: str) -> Any:
+    if name == "EFFECT_HANDLERS":
+        return _handlers()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 from collections.abc import Sequence
 
-from cleave.timeline import TimelineCue
+from cleave.timeline import TimelineLane
 from cleave.timeline_presets.busyness import (
     MIN_SWITCH_GAP_SEC,
     CharacterProfile,
@@ -27,10 +27,10 @@ def compose_timeline(
     duration_sec: float,
     profile: CharacterProfile,
     rng: random.Random,
-) -> list[TimelineCue]:
+) -> dict[str, TimelineLane]:
     slot_list = list(slots)
     if not slot_list or duration_sec <= 0.0:
-        return []
+        return {}
     if len(slot_list) == 1:
         return cues_from_states(slot_list, [(0.0, frozenset({slot_list[0]}))])
 

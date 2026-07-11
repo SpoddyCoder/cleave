@@ -7,7 +7,14 @@ from dataclasses import dataclass, field
 import pygame
 
 from cleave.extract import StemSource
-from cleave.timeline import TimelineCue, layer_visible_at, stem_abbreviation
+from cleave.timeline import (
+    SlotCue,
+    TimelineLane,
+    empty_lane,
+    lane_segments,
+    lane_tick_times,
+    stem_abbreviation,
+)
 from cleave.viz.material_icons import visibility_icon_slot_width
 from cleave.viz.overlay_upload import (
     UploadPlan,
@@ -70,7 +77,7 @@ ARM_FLASH_DURATION_MS: int = ARM_FLASH_HALF_MS * 4
 @dataclass
 class TimelineViewState:
     layer_z_order: list[str]
-    cues: list[TimelineCue]
+    lanes: dict[str, TimelineLane]
     defaults: dict[str, bool]
     position_sec: float
     duration_sec: float
@@ -83,7 +90,7 @@ class TimelineViewState:
     recording: bool = False
     record_start_sec: float | None = None
     record_baseline: dict[str, bool] = field(default_factory=dict)
-    record_buffer: list[TimelineCue] = field(default_factory=list)
+    record_buffer: dict[str, list[SlotCue]] = field(default_factory=dict)
     record_high_water_mark: float | None = None
     enabled: bool = False
     submenu_focused: bool = False
@@ -91,42 +98,35 @@ class TimelineViewState:
 
 
 def visibility_segments(
-    cues: list[TimelineCue],
-    defaults: dict[str, bool],
-    slot: str,
+    lane: TimelineLane,
     duration_sec: float,
+    *,
+    inherit: bool,
 ) -> list[tuple[float, float, bool]]:
-    """Return ``(start_t, end_t, visible)`` segments for *slot* over ``[0, duration_sec]``."""
-    if duration_sec <= 0:
-        return []
-    boundaries = sorted({0.0, duration_sec} | {cue.t for cue in cues})
-    segments: list[tuple[float, float, bool]] = []
-    for index in range(len(boundaries) - 1):
-        start_t = boundaries[index]
-        end_t = boundaries[index + 1]
-        if end_t <= start_t:
-            continue
-        visible = layer_visible_at(cues, defaults, slot, start_t)
-        segments.append((start_t, end_t, visible))
-    return segments
-
-
-def unique_cue_times(cues: list[TimelineCue], duration_sec: float) -> list[float]:
-    return sorted({cue.t for cue in cues if 0.0 <= cue.t <= duration_sec})
+    """Return ``(start_t, end_t, visible)`` segments over ``[0, duration_sec]``."""
+    return lane_segments(lane, duration_sec, inherit=inherit)
 
 
 def cue_times_for_stem(
-    cues: list[TimelineCue],
-    slot: str,
+    lane: TimelineLane,
     duration_sec: float,
 ) -> list[float]:
-    """Cue times that change visibility for *slot* within ``[0, duration_sec]``."""
-    return sorted(
-        {
-            cue.t
-            for cue in cues
-            if cue.shows_tick(slot) and 0.0 <= cue.t <= duration_sec
-        }
+    """Cue times within ``[0, duration_sec]`` (every stored cue is a real transition)."""
+    return lane_tick_times(lane, duration_sec)
+
+
+def _lane_for_view(state: TimelineViewState, slot: str) -> TimelineLane:
+    return state.lanes.get(slot) or empty_lane()
+
+
+def _inherit_for_view(state: TimelineViewState, slot: str) -> bool:
+    return state.defaults.get(slot, True)
+
+
+def _recording_view_lane(state: TimelineViewState, slot: str) -> TimelineLane:
+    return TimelineLane(
+        baseline=state.record_baseline[slot],
+        cues=list(state.record_buffer.get(slot, [])),
     )
 
 
@@ -152,8 +152,10 @@ def bar_segments_for_row(
     duration = state.duration_sec
     if duration <= 0:
         return []
+    inherit = _inherit_for_view(state, slot)
+    lane = _lane_for_view(state, slot)
     if not (state.recording and slot in state.record_baseline):
-        return visibility_segments(state.cues, state.defaults, slot, duration)
+        return visibility_segments(lane, duration, inherit=inherit)
 
     record_start = state.record_start_sec
     if record_start is None:
@@ -162,19 +164,19 @@ def bar_segments_for_row(
     playhead = max(0.0, min(state.position_sec, duration))
 
     segments: list[tuple[float, float, bool]] = []
-    committed = visibility_segments(state.cues, state.defaults, slot, duration)
+    committed = visibility_segments(lane, duration, inherit=inherit)
 
     if record_start > 0.0:
         segments.extend(_clip_segments(committed, 0.0, record_start))
 
     effective_end = max(playhead, state.record_high_water_mark or 0.0)
     if effective_end > record_start:
-        armed_defaults = dict(state.defaults)
-        armed_defaults.update(state.record_baseline)
         segments.extend(
             _clip_segments(
                 visibility_segments(
-                    state.record_buffer, armed_defaults, slot, effective_end
+                    _recording_view_lane(state, slot),
+                    effective_end,
+                    inherit=True,
                 ),
                 record_start,
                 effective_end,
@@ -189,8 +191,9 @@ def bar_segments_for_row(
 def bar_tick_times_for_row(state: TimelineViewState, slot: str) -> list[float]:
     """Cue tick times for one timeline row."""
     duration = state.duration_sec
+    lane = _lane_for_view(state, slot)
     if not (state.recording and slot in state.record_baseline):
-        return cue_times_for_stem(state.cues, slot, duration)
+        return cue_times_for_stem(lane, duration)
 
     record_start = state.record_start_sec
     if record_start is None:
@@ -199,12 +202,12 @@ def bar_tick_times_for_row(state: TimelineViewState, slot: str) -> list[float]:
     effective_end = max(playhead, state.record_high_water_mark or 0.0)
     committed_ticks = [
         t
-        for t in cue_times_for_stem(state.cues, slot, duration)
+        for t in cue_times_for_stem(lane, duration)
         if t < record_start or t > effective_end
     ]
     live_ticks = [
         t
-        for t in cue_times_for_stem(state.record_buffer, slot, duration)
+        for t in cue_times_for_stem(_recording_view_lane(state, slot), duration)
         if record_start <= t <= effective_end
     ]
     return sorted(set(committed_ticks) | set(live_ticks))

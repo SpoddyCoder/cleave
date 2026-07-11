@@ -58,9 +58,7 @@ def _discard_timeline_slot(session: TuningSession, slot: str) -> None:
     timeline.monitor.pop(slot, None)
     timeline.override_visible.pop(slot, None)
     timeline.arm_flash_start_ms.pop(slot, None)
-    for cue in timeline.record_buffer:
-        cue.layers.pop(slot, None)
-    timeline.record_buffer = [cue for cue in timeline.record_buffer if cue.layers]
+    timeline.record_buffer.pop(slot, None)
 
 
 class LayerManager:

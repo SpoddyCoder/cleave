@@ -9,7 +9,7 @@ import pygame
 from cleave.config_schema import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
-from cleave.timeline import TimelineCue
+from cleave.timeline import SlotCue, TimelineLane, canonicalize, copy_lane, empty_lane, lane_visible_at
 from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, TuningControls
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.layer_visibility import armed_recording_visible, effective_layer_enabled
@@ -17,10 +17,27 @@ from cleave.viz.timeline_controls import TimelineControls
 from tests.support.viz import keydown, make_playlist, stub_playback_state
 
 
+def _lane(
+    baseline: bool | None,
+    *transitions: tuple[float, bool],
+) -> TimelineLane:
+    cues = [SlotCue(t=t, visible=v) for t, v in transitions]
+    return TimelineLane(baseline=baseline, cues=canonicalize(baseline, cues))
+
+
+def _preset_lanes() -> dict[str, TimelineLane]:
+    return {
+        "layer_1": _lane(True, (8.0, False)),
+        "layer_2": _lane(False, (8.0, True)),
+        "layer_3": _lane(True, (16.0, False)),
+        "layer_4": _lane(False, (16.0, True), (24.0, False)),
+    }
+
+
 def _make_timeline_controls(
     *,
     slots: tuple[str, ...] = tuple(DEFAULT_LAYER_SLOTS),
-    cues: list[TimelineCue] | None = None,
+    lanes: dict[str, TimelineLane] | None = None,
     focus_row: int = 0,
     armed_slots: set[str] | None = None,
     panel_open: bool = True,
@@ -50,7 +67,10 @@ def _make_timeline_controls(
     tl = session.timeline
     tl.enabled = enabled
     tl.panel_open = panel_open
-    tl.cues = list(cues or [])
+    tl.lanes = {
+        slot: copy_lane(lanes[slot]) if lanes and slot in lanes else empty_lane()
+        for slot in slots
+    }
     tl.focus_row = focus_row
     tl.armed_slots = set(armed_slots or ())
     tl.recording = recording
@@ -142,7 +162,7 @@ def test_space_toggles_pause() -> None:
 def test_pause_snapshots_monitor_and_sets_preview_active() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         position_sec=5.0,
-        cues=[TimelineCue(t=0.0, layers={"layer_1": False})],
+        lanes={"layer_1": _lane(False)},
     )
     session.layers["layer_1"].enabled = True
 
@@ -180,8 +200,8 @@ def test_num_keys_toggle_monitor_when_paused() -> None:
 
     controls.handle_keydown(keydown(pygame.K_1))
     assert session.timeline.monitor["layer_1"] is False
-    assert session.timeline.cues == []
-    assert session.timeline.record_buffer == []
+    assert session.timeline.lanes == {slot: empty_lane() for slot in session.layer_z_order}
+    assert session.timeline.record_buffer == {}
     assert visibility_calls == [True, True]
 
 
@@ -224,14 +244,14 @@ def test_num_keys_ignored_when_playing_not_in_override() -> None:
     controls.handle_keydown(keydown(pygame.K_1))
     assert session.timeline.preview_active is False
     assert session.timeline.monitor == {}
-    assert session.timeline.cues == []
+    assert session.timeline.lanes == {slot: empty_lane() for slot in session.layer_z_order}
     assert session.timeline.override_slots == set()
     assert visibility_calls == []
 
 
 def test_num_keys_toggle_override_visible_when_playing() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
-        cues=[TimelineCue(t=0.0, layers={"layer_1": True})],
+        lanes={"layer_1": _lane(True)},
     )
     session.timeline.override_slots = {"layer_1"}
     session.timeline.override_visible = {"layer_1": True}
@@ -255,7 +275,7 @@ def test_record_from_pause_stores_wysiwyg_baseline_when_monitor_differs() -> Non
     assert session.timeline.recording is True
     assert session.timeline.preview_active is False
     assert session.timeline.monitor == {}
-    assert session.timeline.record_buffer == []
+    assert session.timeline.record_buffer == {}
     assert session.timeline.record_baseline == {"layer_1": False}
 
 
@@ -277,7 +297,7 @@ def test_record_preserves_override() -> None:
 def test_shift_enter_override_when_playing() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         focus_row=1,
-        cues=[TimelineCue(t=0.0, layers={"layer_2": False})],
+        lanes={"layer_2": _lane(False)},
     )
 
     controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
@@ -301,7 +321,7 @@ def test_shift_enter_clears_override_on_same_focused_row() -> None:
 def test_shift_enter_override_when_paused() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         focus_row=1,
-        cues=[TimelineCue(t=0.0, layers={"layer_2": False})],
+        lanes={"layer_2": _lane(False)},
     )
     controls.playback.paused = True
 
@@ -316,7 +336,7 @@ def test_shift_enter_override_when_paused() -> None:
 def test_shift_enter_override_clears_preview_when_paused() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         focus_row=1,
-        cues=[TimelineCue(t=0.0, layers={"layer_2": False})],
+        lanes={"layer_2": _lane(False)},
     )
     controls.playback.paused = True
     session.timeline.preview_active = True
@@ -332,7 +352,7 @@ def test_shift_enter_override_clears_preview_when_paused() -> None:
 
 def test_num_keys_toggle_override_when_paused() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
-        cues=[TimelineCue(t=0.0, layers={"layer_1": True})],
+        lanes={"layer_1": _lane(True)},
     )
     controls.playback.paused = True
     session.timeline.override_slots = {"layer_1"}
@@ -369,7 +389,7 @@ def test_shift_enter_does_not_set_session_solo_stem() -> None:
 def test_multiple_override_stems() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         focus_row=0,
-        cues=[TimelineCue(t=0.0, layers={"layer_1": False, "layer_2": False})],
+        lanes={"layer_1": _lane(False), "layer_2": _lane(False)},
     )
 
     controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_SHIFT))
@@ -409,12 +429,12 @@ def test_ctrl_enter_noop_while_recording() -> None:
 
     controls.handle_keydown(keydown(pygame.K_r))
     assert session.timeline.armed_slots == {"layer_1"}
-    assert session.timeline.record_buffer == []
+    assert session.timeline.record_buffer == {}
 
     controls.handle_keydown(keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
 
     assert session.timeline.armed_slots == {"layer_1"}
-    assert session.timeline.record_buffer == []
+    assert session.timeline.record_buffer == {}
 
 
 def test_r_without_armed_layers_shows_notification() -> None:
@@ -448,7 +468,7 @@ def test_record_start_stores_baseline_not_buffer() -> None:
     session.layers["layer_2"].enabled = False
 
     controls.handle_keydown(keydown(pygame.K_r))
-    assert session.timeline.record_buffer == []
+    assert session.timeline.record_buffer == {}
     assert session.timeline.record_baseline == {"layer_1": True, "layer_2": False}
 
 
@@ -461,16 +481,14 @@ def test_layer_keys_only_affect_armed_stems() -> None:
     session.layers["layer_2"].enabled = True
 
     controls.handle_keydown(keydown(pygame.K_r))
-    assert len(session.timeline.record_buffer) == 0
+    assert session.timeline.record_buffer == {}
 
     controls.handle_keydown(keydown(pygame.K_2))
-    assert len(session.timeline.record_buffer) == 0
+    assert session.timeline.record_buffer == {}
 
     controls.handle_keydown(keydown(pygame.K_1))
-    assert len(session.timeline.record_buffer) == 1
-    assert session.timeline.record_buffer[0] == TimelineCue(
-        t=2.0, layers={"layer_1": False}
-    )
+    assert len(session.timeline.record_buffer) == 1  # slot buffer
+    assert session.timeline.record_buffer == {"layer_1": [SlotCue(t=2.0, visible=False)]}
 
 
 def test_numpad_layer_keys_work_while_recording() -> None:
@@ -483,10 +501,8 @@ def test_numpad_layer_keys_work_while_recording() -> None:
     controls.handle_keydown(keydown(pygame.K_r))
     controls.handle_keydown(keydown(pygame.K_KP1))
 
-    assert len(session.timeline.record_buffer) == 1
-    assert session.timeline.record_buffer[0] == TimelineCue(
-        t=6.0, layers={"layer_1": False}
-    )
+    assert len(session.timeline.record_buffer) == 1  # slot buffer
+    assert session.timeline.record_buffer == {"layer_1": [SlotCue(t=6.0, visible=False)]}
 
 
 def test_layer_key_debounce_ignores_rapid_press() -> None:
@@ -498,14 +514,14 @@ def test_layer_key_debounce_ignores_rapid_press() -> None:
     controls.handle_keydown(keydown(pygame.K_r))
     controls.handle_keydown(keydown(pygame.K_1))
     controls.handle_keydown(keydown(pygame.K_1))
-    assert len(session.timeline.record_buffer) == 1
+    assert len(session.timeline.record_buffer) == 1  # slot buffer
 
 
 def test_disarm_during_recording_commits_slot_and_exits_recording() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=5.0,
-        cues=[TimelineCue(t=0.0, layers={"layer_1": False})],
+        lanes={"layer_1": _lane(False)},
     )
     session.layers["layer_1"].enabled = True
 
@@ -515,11 +531,11 @@ def test_disarm_during_recording_commits_slot_and_exits_recording() -> None:
     assert session.timeline.armed_slots == set()
     assert session.timeline.recording is False
     assert session.timeline.record_baseline == {}
-    assert session.timeline.record_buffer == []
-    assert any(
-        cue.t == 5.0 and cue.layers.get("layer_1") is False
-        for cue in session.timeline.cues
-    )
+    assert session.timeline.record_buffer == {}
+    from cleave.viz.layer_visibility import timeline_committed_visible
+
+    lane = session.timeline.lanes["layer_1"]
+    assert timeline_committed_visible(session, "layer_1", 5.0) is False
     assert visibility_calls
 
 
@@ -528,7 +544,7 @@ def test_disarm_one_slot_keeps_recording_on_remaining_armed() -> None:
         armed_slots={"layer_1", "layer_2"},
         focus_row=0,
         position_sec=8.0,
-        cues=[TimelineCue(t=0.0, layers={"layer_1": False, "layer_2": False})],
+        lanes={"layer_1": _lane(False), "layer_2": _lane(False)},
     )
     session.layers["layer_1"].enabled = True
     session.layers["layer_2"].enabled = True
@@ -540,7 +556,7 @@ def test_disarm_one_slot_keeps_recording_on_remaining_armed() -> None:
     assert session.timeline.recording is True
     assert session.timeline.record_baseline == {"layer_2": False}
     assert "layer_1" not in session.timeline.record_baseline
-    assert all("layer_1" not in cue.layers for cue in session.timeline.record_buffer)
+    assert "layer_1" not in session.timeline.record_buffer
     assert visibility_calls
 
 
@@ -573,12 +589,6 @@ def test_forward_seek_during_record_fills_with_active_state() -> None:
     controls.handle_keydown(keydown(pygame.K_RIGHT))
     assert seeks == [SEEK_SHORT]
 
-    assert any(
-        cue.t == 10.0
-        and cue.layers.get("layer_1") is True
-        and not cue.shows_tick("layer_1")
-        for cue in session.timeline.record_buffer
-    )
     assert armed_recording_visible(session, "layer_1", 15.0) == active_at_start
     assert visibility_calls
 
@@ -605,7 +615,7 @@ def test_seek_during_record_active_state_not_overwritten_by_committed_cues() -> 
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=10.0,
-        cues=[TimelineCue(t=0.0, layers={"layer_1": False})],
+        lanes={"layer_1": _lane(False)},
     )
     session.layers["layer_1"].enabled = True
 
@@ -623,7 +633,7 @@ def test_r_stop_punches_cues_and_clears_record_state() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=10.0,
-        cues=[TimelineCue(t=5.0, layers={"layer_2": False})],
+        lanes={"layer_2": _lane(True, (5.0, False))},
     )
     session.layers["layer_1"].enabled = True
 
@@ -633,24 +643,27 @@ def test_r_stop_punches_cues_and_clears_record_state() -> None:
     controls.handle_keydown(keydown(pygame.K_r))
 
     assert session.timeline.recording is False
-    assert session.timeline.record_buffer == []
+    assert session.timeline.record_buffer == {}
     assert session.timeline.record_start_sec is None
-    assert TimelineCue(t=5.0, layers={"layer_2": False}) in session.timeline.cues
-    assert any(
-        cue.t == 10.0 and cue.layers.get("layer_1") is False
-        for cue in session.timeline.cues
-    )
+    assert session.timeline.lanes["layer_2"] == _lane(True, (5.0, False))
+    lane = session.timeline.lanes["layer_1"]
+    assert SlotCue(t=10.0, visible=False) in lane.cues
     assert visibility_calls[-1] is True
+
+
+
+def _lane_visible(session, slot: str, t: float) -> bool:
+    from cleave.viz.layer_visibility import timeline_defaults
+
+    lane = session.timeline.lanes.get(slot) or empty_lane()
+    return lane_visible_at(lane, t, inherit=timeline_defaults(session)[slot])
 
 
 def test_stop_record_restores_committed_after_punch_range() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=10.0,
-        cues=[
-            TimelineCue(t=0.0, layers={"layer_1": False}),
-            TimelineCue(t=30.0, layers={"layer_1": True}),
-        ],
+        lanes={"layer_1": _lane(False, (30.0, True))},
     )
 
     controls.handle_keydown(keydown(pygame.K_r))
@@ -658,31 +671,20 @@ def test_stop_record_restores_committed_after_punch_range() -> None:
     controls.playback.player.seek(20.0)
     controls.handle_keydown(keydown(pygame.K_r))
 
-    from cleave.timeline import layer_visible_at
-    from cleave.viz.layer_visibility import timeline_defaults
-
-    defaults = timeline_defaults(session)
-    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 14.9) is True
-    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 15.0) is True
-    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 19.9) is True
-    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 20.0) is False
-    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 29.9) is False
-    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 30.0) is True
-    restore_cues = [
-        cue for cue in session.timeline.cues if cue.t == 20.0 and "layer_1" in cue.layers
-    ]
-    assert len(restore_cues) == 1
-    assert not restore_cues[0].shows_tick("layer_1")
+    assert _lane_visible(session, "layer_1", 14.9) is True
+    assert _lane_visible(session, "layer_1", 15.0) is True
+    assert _lane_visible(session, "layer_1", 19.9) is True
+    assert _lane_visible(session, "layer_1", 20.0) is False
+    assert _lane_visible(session, "layer_1", 29.9) is False
+    assert _lane_visible(session, "layer_1", 30.0) is True
+    assert SlotCue(t=20.0, visible=False) in session.timeline.lanes["layer_1"].cues
 
 
 def test_stop_record_restores_disabled_tail_when_disable_inside_punch() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=10.0,
-        cues=[
-            TimelineCue(t=15.0, layers={"layer_1": False}),
-            TimelineCue(t=25.0, layers={"layer_1": True}),
-        ],
+        lanes={"layer_1": _lane(True, (15.0, False), (25.0, True))},
     )
     session.layers["layer_1"].enabled = True
 
@@ -693,23 +695,19 @@ def test_stop_record_restores_disabled_tail_when_disable_inside_punch() -> None:
     controls.playback.player.seek(22.0)
     controls.handle_keydown(keydown(pygame.K_r))
 
-    from cleave.timeline import layer_visible_at
-    from cleave.viz.layer_visibility import timeline_defaults
-
-    defaults = timeline_defaults(session)
-    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 11.9) is False
-    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 12.0) is True
-    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 21.9) is True
-    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 22.0) is False
-    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 24.9) is False
-    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 25.0) is True
+    assert _lane_visible(session, "layer_1", 11.9) is False
+    assert _lane_visible(session, "layer_1", 12.0) is True
+    assert _lane_visible(session, "layer_1", 21.9) is True
+    assert _lane_visible(session, "layer_1", 22.0) is False
+    assert _lane_visible(session, "layer_1", 24.9) is False
+    assert _lane_visible(session, "layer_1", 25.0) is True
 
 
 def test_stop_record_restores_enabled_tail_when_injecting_disabled_section() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=10.0,
-        cues=[TimelineCue(t=5.0, layers={"layer_1": True})],
+        lanes={"layer_1": _lane(True, (5.0, True))},
     )
     session.layers["layer_1"].enabled = False
 
@@ -718,66 +716,45 @@ def test_stop_record_restores_enabled_tail_when_injecting_disabled_section() -> 
     controls.playback.player.seek(22.0)
     controls.handle_keydown(keydown(pygame.K_r))
 
-    from cleave.timeline import layer_visible_at
-    from cleave.viz.layer_visibility import timeline_defaults
-
-    defaults = timeline_defaults(session)
-    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 9.9) is True
-    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 10.0) is False
-    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 21.9) is False
-    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 22.0) is True
-    assert layer_visible_at(session.timeline.cues, defaults, "layer_1", 40.0) is True
+    assert _lane_visible(session, "layer_1", 9.9) is True
+    assert _lane_visible(session, "layer_1", 10.0) is False
+    assert _lane_visible(session, "layer_1", 21.9) is False
+    assert _lane_visible(session, "layer_1", 22.0) is True
+    assert _lane_visible(session, "layer_1", 40.0) is True
 
 
 def test_stop_record_preserves_unarmed_cues_in_punch_range() -> None:
-    bass_cue = TimelineCue(t=12.0, layers={"layer_2": False})
+    bass_lane = _lane(True, (12.0, False))
     controls, session, _, _, _, _ = _make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=10.0,
-        cues=[bass_cue, TimelineCue(t=11.0, layers={"layer_1": True})],
+        lanes={
+            "layer_2": bass_lane,
+            "layer_1": _lane(True, (11.0, True)),
+        },
     )
 
     controls.handle_keydown(keydown(pygame.K_r))
     controls.playback.player.seek(14.0)
     controls.handle_keydown(keydown(pygame.K_r))
 
-    assert bass_cue in session.timeline.cues
-    assert not any(
-        cue.t == 11.0 and "layer_1" in cue.layers for cue in session.timeline.cues
-    )
+    assert session.timeline.lanes["layer_2"] == bass_lane
+    assert SlotCue(t=11.0, visible=True) not in session.timeline.lanes["layer_1"].cues
 
 
 def test_stop_record_preserves_unarmed_slots_in_preset_style_cues() -> None:
-    """Recording one armed layer must not rewrite shared multi-slot preset cues.
-
-    Timeline presets emit a full t=0 cue for every slot and pack simultaneous
-    transitions into one TimelineCue. Whole-cue punch deletion used to erase
-    unarmed keys from those objects, flipping whole sections on other tracks.
-    """
+    """Recording one armed layer must not rewrite unarmed lanes."""
     from cleave.viz.layer_visibility import timeline_committed_visible
 
     slots = tuple(DEFAULT_LAYER_SLOTS)
-    cues = [
-        TimelineCue(
-            t=0.0,
-            layers={
-                "layer_1": True,
-                "layer_2": False,
-                "layer_3": True,
-                "layer_4": False,
-            },
-        ),
-        TimelineCue(t=8.0, layers={"layer_1": False, "layer_2": True}),
-        TimelineCue(t=16.0, layers={"layer_3": False, "layer_4": True}),
-        TimelineCue(t=24.0, layers={"layer_2": False}),
-    ]
+    lanes = _preset_lanes()
     controls, session, _, _, _, _ = _make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=5.0,
-        cues=cues,
+        lanes=lanes,
     )
     for slot in slots:
-        session.layers[slot].enabled = cues[0].layers[slot]
+        session.layers[slot].enabled = lanes[slot].baseline is True
 
     unarmed = ("layer_2", "layer_3", "layer_4")
     sample = (0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0, 30.0)
@@ -798,11 +775,9 @@ def test_stop_record_preserves_unarmed_slots_in_preset_style_cues() -> None:
         for slot in unarmed
     }
     assert after == before
-    # Shared cue at t=8 kept layer_2; armed layer_1 was rewritten separately.
-    cue_at_8 = next(cue for cue in session.timeline.cues if cue.t == 8.0)
-    assert cue_at_8.layers.get("layer_2") is True
-    cue_at_16 = next(cue for cue in session.timeline.cues if cue.t == 16.0)
-    assert cue_at_16.layers == {"layer_3": False, "layer_4": True}
+    assert session.timeline.lanes["layer_2"] == lanes["layer_2"]
+    assert session.timeline.lanes["layer_3"] == lanes["layer_3"]
+    assert session.timeline.lanes["layer_4"] == lanes["layer_4"]
 
 
 def test_stop_record_preserves_unarmed_after_breathing_preset() -> None:
@@ -813,14 +788,14 @@ def test_stop_record_preserves_unarmed_after_breathing_preset() -> None:
     from cleave.viz.layer_visibility import timeline_committed_visible
 
     slots = list(DEFAULT_LAYER_SLOTS)
-    cues = build_breathing_cues(slots, 60.0, random.Random(42))
+    lanes = build_breathing_cues(slots, 60.0, random.Random(42))
     controls, session, _, _, _, _ = _make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=5.0,
-        cues=cues,
+        lanes=lanes,
     )
     for slot in slots:
-        session.layers[slot].enabled = cues[0].layers[slot]
+        session.layers[slot].enabled = bool(lanes[slot].baseline)
 
     unarmed = ("layer_2", "layer_3", "layer_4")
     sample = tuple(i * 2.5 for i in range(25))
@@ -844,40 +819,30 @@ def test_stop_record_preserves_unarmed_after_breathing_preset() -> None:
 
 
 def test_stop_record_does_not_flip_unarmed_leading_section() -> None:
-    """Regression: recording an armed layer must not change an unarmed layer.
-
-    layer_2 (unarmed) has a real transition at t=12 turning it ON and no t=0
-    anchor - a state reachable after reload or in evolved projects. Recording
-    armed layer_1 lands a synthetic committed-restore cue exactly at t=12; the
-    per-slot tick must keep layer_2's transition real so its inferred leading
-    section (0..12 = OFF) is unchanged.
-    """
+    """Regression: recording an armed layer must not change an unarmed lane."""
     from cleave.viz.layer_visibility import timeline_committed_visible
 
     controls, session, _, _, _, _ = _make_timeline_controls(
         armed_slots={"layer_1"},
         position_sec=5.0,
-        cues=[
-            TimelineCue(t=12.0, layers={"layer_2": True}),
-            TimelineCue(t=0.0, layers={"layer_1": False}),
-            TimelineCue(t=30.0, layers={"layer_1": True}),
-        ],
+        lanes={
+            "layer_2": _lane(None, (12.0, True)),
+            "layer_1": _lane(False, (30.0, True)),
+        },
     )
-    session.layers["layer_2"].enabled = True
+    session.layers["layer_2"].enabled = False
 
     sample = (0.0, 6.0, 11.9, 12.0, 20.0)
     before = [timeline_committed_visible(session, "layer_2", t) for t in sample]
     assert before == [False, False, False, True, True]
 
-    controls.handle_keydown(keydown(pygame.K_r))  # start record on layer_1
+    controls.handle_keydown(keydown(pygame.K_r))
     controls.playback.player.seek(8.0)
-    controls.handle_keydown(keydown(pygame.K_1))  # toggle layer_1 on
+    controls.handle_keydown(keydown(pygame.K_1))
     controls.playback.player.seek(12.0)
-    controls.handle_keydown(keydown(pygame.K_r))  # stop -> restore cue at t=12
+    controls.handle_keydown(keydown(pygame.K_r))
 
-    merged = [cue for cue in session.timeline.cues if cue.t == 12.0]
-    assert len(merged) == 1
-    assert merged[0].shows_tick("layer_2") is True
+    assert session.timeline.lanes["layer_2"] == _lane(None, (12.0, True))
 
     after = [timeline_committed_visible(session, "layer_2", t) for t in sample]
     assert after == before

@@ -94,7 +94,7 @@ from cleave.config_schema import (
     parse_project_editor_section,
     require_non_negative_number,
 )
-from cleave.timeline import TimelineCue
+from cleave.timeline import TimelineLane
 
 VIZ_CONFIG_FILENAME = "cleave-viz.yaml"
 
@@ -225,7 +225,7 @@ class RenderConfig:
 @dataclass(frozen=True)
 class TimelineConfig:
     enabled: bool
-    cues: tuple[TimelineCue, ...]
+    lanes: dict[str, TimelineLane]
 
 
 @dataclass
