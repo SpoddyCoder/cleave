@@ -4,13 +4,19 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 
-from cleave.timeline import bar_times_at_phase, empty_lane, snap_lane_to_beats
+from cleave.timeline import (
+    bar_period_sec,
+    empty_lane,
+    shift_lane_times,
+    snap_lane_to_beats,
+)
 from cleave.viz.modal import ModalHost, ModalOption
 from cleave.viz.session import TuningSession
 
 _CANCEL_LABEL = "Cancel"
 _BEATS_PER_BAR = 4
-_BAR_SNAP_MESSAGE = "Snap timeline cues to nearest bar (choose phase offset)"
+_BAR_OFFSETS = (-3, -2, -1, 0, 1, 2, 3)
+_BAR_SNAP_MESSAGE = "Snap timeline cues to nearest bar (choose bar offset)"
 
 
 class TimelineSnapController:
@@ -23,18 +29,12 @@ class TimelineSnapController:
         beat_times: Sequence[float],
         bar_times: Sequence[float] = (),
         *,
-        bar_phase: int | None = None,
         on_notification: Callable[[str], None] | None = None,
     ) -> None:
         self.session = session
         self._modal = modal_host
         self._beat_times = tuple(beat_times)
         self._bar_times = tuple(bar_times)
-        self._bar_phase = (
-            bar_phase
-            if bar_phase is not None
-            else _infer_bar_phase(self._beat_times, self._bar_times)
-        )
         self._on_notification = on_notification
 
     def prompt(self) -> None:
@@ -45,7 +45,7 @@ class TimelineSnapController:
             done_msg="Snapped timeline cues to beats",
         )
 
-    def prompt_bars(self) -> None:
+    def prompt_bars(self, duration_sec: float) -> None:
         tl = self.session.timeline
         if tl.recording:
             return
@@ -59,27 +59,47 @@ class TimelineSnapController:
             self._notify("No bars available; re-run separate")
             return
         dismiss = lambda: None
-        options: list[ModalOption] = []
-        for offset in range(_BEATS_PER_BAR):
-            options.append(
-                ModalOption(
-                    f"+{offset}",
-                    lambda o=offset: self._snap_bars_at_offset(o),
-                )
+        options: list[ModalOption] = [
+            ModalOption(
+                f"{offset:+d}",
+                lambda o=offset: self._snap_bars_at_offset(o, duration_sec),
             )
+            for offset in _BAR_OFFSETS
+        ]
         options.append(ModalOption(_CANCEL_LABEL, dismiss))
         self._modal.prompt_choice(
             _BAR_SNAP_MESSAGE,
             options,
             on_dismiss=dismiss,
+            initial_focus_index=_BAR_OFFSETS.index(0),
         )
 
-    def _snap_bars_at_offset(self, offset: int) -> None:
-        phase = (self._bar_phase + offset) % _BEATS_PER_BAR
-        grid = bar_times_at_phase(
-            self._beat_times, phase, beats_per_bar=_BEATS_PER_BAR
+    def _snap_bars_at_offset(self, offset: int, duration_sec: float) -> None:
+        grid = self._bar_times
+        label = f"{offset:+d}"
+        notify_msg = f"Snapped timeline cues to bars ({label})"
+        period = (
+            bar_period_sec(
+                grid, self._beat_times, beats_per_bar=_BEATS_PER_BAR
+            )
+            if offset != 0
+            else None
         )
-        self._snap_to(grid, f"Snapped timeline cues to bars (+{offset})")
+        tl = self.session.timeline
+        for slot in list(tl.lanes):
+            lane = snap_lane_to_beats(
+                tl.lanes.get(slot) or empty_lane(),
+                grid,
+            )
+            if offset != 0 and period is not None:
+                lane = shift_lane_times(
+                    lane,
+                    offset * period,
+                    t_min=0.0,
+                    t_max=duration_sec,
+                )
+            tl.lanes[slot] = lane
+        self._notify(notify_msg)
 
     def _prompt(
         self,
@@ -116,16 +136,3 @@ class TimelineSnapController:
     def _notify(self, message: str) -> None:
         if self._on_notification is not None:
             self._on_notification(message)
-
-
-def _infer_bar_phase(
-    beat_times: Sequence[float],
-    bar_times: Sequence[float],
-) -> int:
-    if not bar_times or not beat_times:
-        return 0
-    first = bar_times[0]
-    for i, t in enumerate(beat_times):
-        if t == first:
-            return i % _BEATS_PER_BAR
-    return 0

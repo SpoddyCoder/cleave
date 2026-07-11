@@ -7,9 +7,12 @@ import pytest
 from cleave.timeline import (
     SlotCue,
     TimelineLane,
+    bar_period_sec,
     bar_phase_from_beats,
     bar_times_at_phase,
     bar_times_from_beats,
+    grid_period,
+    shift_lane_times,
     snap_lane_to_beats,
 )
 
@@ -131,3 +134,37 @@ def test_bar_times_at_phase_empty_beats() -> None:
 def test_bar_times_length_mismatch_raises() -> None:
     with pytest.raises(ValueError, match="same length"):
         bar_times_from_beats((0.0, 1.0, 2.0, 3.0), (1.0, 1.0, 1.0))
+
+
+def test_grid_period_median_spacing() -> None:
+    assert grid_period((0.0, 4.0, 8.0)) == 4.0
+    assert grid_period((0.0,)) is None
+    assert grid_period(()) is None
+
+
+def test_bar_period_falls_back_to_beat_median() -> None:
+    assert bar_period_sec((0.0,), (0.0, 1.0, 2.0, 3.0)) == 4.0
+    assert bar_period_sec((0.0, 4.0), (0.0, 1.0)) == 4.0
+    assert bar_period_sec((0.0,), (0.0,)) is None
+
+
+def test_shift_lane_times_clamps_and_canonicalizes() -> None:
+    lane = _lane(False, (1.0, True), (5.0, False))
+    result = shift_lane_times(lane, -2.0, t_min=0.0, t_max=4.0)
+    assert result.cues == [
+        SlotCue(t=0.0, visible=True),
+        SlotCue(t=3.0, visible=False),
+    ]
+    past_end = shift_lane_times(lane, 2.0, t_min=0.0, t_max=4.0)
+    assert past_end.cues == [
+        SlotCue(t=3.0, visible=True),
+        SlotCue(t=4.0, visible=False),
+    ]
+    merged = shift_lane_times(
+        _lane(False, (0.5, True), (0.6, False)),
+        -1.0,
+        t_min=0.0,
+        t_max=10.0,
+    )
+    # Both clamp to 0.0; last-wins -> False; matches baseline False -> drop
+    assert merged.cues == []

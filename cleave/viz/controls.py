@@ -391,7 +391,7 @@ class TuningControls:
                 self._timeline_snap.prompt()
                 return True
             if kind == RowKind.TIMELINE_SNAP_TO_BARS:
-                self._timeline_snap.prompt_bars()
+                self._timeline_snap.prompt_bars(self.duration_sec)
                 return True
             if kind == RowKind.TRACK_PRESET_DIR:
                 slot = self.focus_descriptor.slot
