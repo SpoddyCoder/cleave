@@ -1,4 +1,4 @@
-"""Tests for timeline cue evaluation and editing."""
+"""Tests for per-lane timeline evaluation and editing."""
 
 from __future__ import annotations
 
@@ -7,19 +7,26 @@ import pytest
 from cleave.config_schema import DEFAULT_LAYER_SLOTS
 from cleave.timeline import (
     RECORD_DEBOUNCE_SEC,
-    TimelineCue,
-    layer_visible_at,
-    punch_replace,
+    SlotCue,
+    Timeline,
+    TimelineLane,
+    canonicalize,
+    empty_lane,
+    lane_visible_at,
+    punch_lane,
+    set_lane_cue,
     should_accept_toggle,
     stem_abbreviation,
-    visible_state_at,
+    strip_lane_range,
 )
 
 
-def _defaults(**overrides: bool) -> dict[str, bool]:
-    base = {slot: True for slot in DEFAULT_LAYER_SLOTS}
-    base.update(overrides)
-    return base
+def _lane(
+    baseline: bool | None,
+    *transitions: tuple[float, bool],
+) -> TimelineLane:
+    cues = [SlotCue(t=t, visible=v) for t, v in transitions]
+    return TimelineLane(baseline=baseline, cues=canonicalize(baseline, cues))
 
 
 def test_stem_abbreviation_maps_known_stems() -> None:
@@ -38,40 +45,51 @@ def test_stem_abbreviation_rejects_unknown_stem() -> None:
         stem_abbreviation("synth")  # type: ignore[arg-type]
 
 
-def test_layer_visible_at_uses_defaults_when_no_cues() -> None:
-    defaults = _defaults(layer_1=False, layer_2=True)
-    assert layer_visible_at([], defaults, "layer_1", 10.0) is False
-    assert layer_visible_at([], defaults, "layer_2", 10.0) is True
+def test_lane_visible_at_uses_inherit_when_baseline_none() -> None:
+    lane = empty_lane()
+    assert lane_visible_at(lane, 10.0, inherit=False) is False
+    assert lane_visible_at(lane, 10.0, inherit=True) is True
 
 
-def test_layer_visible_at_applies_cues_up_to_t_sec() -> None:
-    defaults = _defaults()
-    cues = [
-        TimelineCue(t=5.0, layers={"layer_1": False}),
-        TimelineCue(t=10.0, layers={"layer_1": True}),
-        TimelineCue(t=15.0, layers={"layer_1": False}),
-    ]
-    assert layer_visible_at(cues, defaults, "layer_1", 4.9) is True
-    assert layer_visible_at(cues, defaults, "layer_1", 5.0) is False
-    assert layer_visible_at(cues, defaults, "layer_1", 12.0) is True
-    assert layer_visible_at(cues, defaults, "layer_1", 14.9) is True
-    assert layer_visible_at(cues, defaults, "layer_1", 20.0) is False
+def test_lane_visible_at_uses_concrete_baseline() -> None:
+    lane = _lane(False)
+    assert lane_visible_at(lane, 10.0, inherit=True) is False
 
 
-def test_layer_visible_at_last_write_wins_per_slot() -> None:
-    defaults = _defaults()
-    cues = [
-        TimelineCue(t=1.0, layers={"layer_1": False, "layer_2": False}),
-        TimelineCue(t=1.0, layers={"layer_1": True}),
-    ]
-    assert layer_visible_at(cues, defaults, "layer_1", 2.0) is True
-    assert layer_visible_at(cues, defaults, "layer_2", 2.0) is False
+def test_lane_visible_at_applies_cues_up_to_t_sec() -> None:
+    lane = _lane(True, (5.0, False), (10.0, True), (15.0, False))
+    assert lane_visible_at(lane, 4.9, inherit=True) is True
+    assert lane_visible_at(lane, 5.0, inherit=True) is False
+    assert lane_visible_at(lane, 12.0, inherit=True) is True
+    assert lane_visible_at(lane, 14.9, inherit=True) is True
+    assert lane_visible_at(lane, 20.0, inherit=True) is False
 
 
-def test_visible_state_at_returns_all_slots() -> None:
-    defaults = _defaults(layer_1=False)
-    cues = [TimelineCue(t=1.0, layers={"layer_2": False})]
-    state = visible_state_at(cues, defaults, list(DEFAULT_LAYER_SLOTS), 2.0)
+def test_canonicalize_last_write_wins_at_equal_t() -> None:
+    cues = canonicalize(
+        True,
+        [SlotCue(t=1.0, visible=False), SlotCue(t=1.0, visible=True)],
+    )
+    assert cues == []
+
+
+def test_canonicalize_drops_redundant_transitions() -> None:
+    cues = canonicalize(
+        False,
+        [SlotCue(t=1.0, visible=False), SlotCue(t=2.0, visible=True)],
+    )
+    assert cues == [SlotCue(t=2.0, visible=True)]
+
+
+def test_timeline_visible_state_at_returns_all_slots() -> None:
+    timeline = Timeline(
+        lanes={
+            "layer_1": _lane(False),
+            "layer_2": _lane(True, (1.0, False)),
+        }
+    )
+    inherits = {slot: True for slot in DEFAULT_LAYER_SLOTS}
+    state = timeline.visible_state_at(list(DEFAULT_LAYER_SLOTS), 2.0, inherits)
     assert set(state) == set(DEFAULT_LAYER_SLOTS)
     assert state["layer_1"] is False
     assert state["layer_2"] is False
@@ -79,12 +97,17 @@ def test_visible_state_at_returns_all_slots() -> None:
     assert state["layer_4"] is True
 
 
-def test_visible_state_at_with_six_slots() -> None:
+def test_timeline_visible_state_at_with_six_slots() -> None:
     slots = [f"layer_{i}" for i in range(1, 7)]
-    defaults = {slot: True for slot in slots}
-    defaults["layer_3"] = False
-    cues = [TimelineCue(t=1.0, layers={"layer_4": False})]
-    state = visible_state_at(cues, defaults, slots, 2.0)
+    inherits = {slot: True for slot in slots}
+    inherits["layer_3"] = False
+    timeline = Timeline(
+        lanes={
+            "layer_3": empty_lane(),
+            "layer_4": _lane(True, (1.0, False)),
+        }
+    )
+    state = timeline.visible_state_at(slots, 2.0, inherits)
     assert set(state) == set(slots)
     assert state["layer_3"] is False
     assert state["layer_4"] is False
@@ -92,144 +115,79 @@ def test_visible_state_at_with_six_slots() -> None:
     assert state["layer_6"] is True
 
 
-def test_punch_replace_removes_armed_cues_in_range() -> None:
-    cues = [
-        TimelineCue(t=1.0, layers={"layer_1": False}),
-        TimelineCue(t=5.0, layers={"layer_2": False}),
-        TimelineCue(t=8.0, layers={"layer_1": True, "layer_3": False}),
-        TimelineCue(t=12.0, layers={"layer_4": False}),
-    ]
-    result = punch_replace(
-        cues,
-        armed_stems={"layer_1"},
-        start_sec=4.0,
-        stop_sec=10.0,
-        new_cues=[TimelineCue(t=6.0, layers={"layer_1": False})],
+def test_punch_lane_replaces_cues_in_range() -> None:
+    lane = _lane(True, (1.0, False), (5.0, True), (8.0, False), (12.0, True))
+    result = punch_lane(
+        lane,
+        4.0,
+        10.0,
+        [SlotCue(t=6.0, visible=False)],
     )
-    assert result == [
-        TimelineCue(t=1.0, layers={"layer_1": False}),
-        TimelineCue(t=5.0, layers={"layer_2": False}),
-        TimelineCue(t=6.0, layers={"layer_1": False}),
-        # Unarmed layer_3 entry from the shared cue at t=8 must survive.
-        TimelineCue(t=8.0, layers={"layer_3": False}),
-        TimelineCue(t=12.0, layers={"layer_4": False}),
+    assert result.baseline is True
+    assert result.cues == [
+        SlotCue(t=1.0, visible=False),
+        SlotCue(t=12.0, visible=True),
     ]
 
 
-def test_punch_replace_preserves_unarmed_slots_in_shared_cue() -> None:
-    """Preset-style multi-slot cues must not lose unarmed keys when punching."""
-    cues = [
-        TimelineCue(
-            t=0.0,
-            layers={
-                "layer_1": True,
-                "layer_2": False,
-                "layer_3": True,
-                "layer_4": False,
-            },
+def test_punch_lane_isolation_leaves_other_lanes_untouched() -> None:
+    """Lane isolation: punching one track cannot rewrite another (by construction)."""
+    lanes = {
+        "layer_1": _lane(
+            True,
+            (0.0, True),  # redundant with baseline; dropped
+            (10.0, False),
         ),
-        TimelineCue(t=10.0, layers={"layer_1": False, "layer_2": True}),
-        TimelineCue(t=20.0, layers={"layer_3": False}),
-    ]
-    result = punch_replace(
-        cues,
-        armed_stems={"layer_1"},
-        start_sec=0.0,
-        stop_sec=15.0,
-        new_cues=[
-            TimelineCue(t=0.0, layers={"layer_1": False}),
-            TimelineCue(t=5.0, layers={"layer_1": True}),
-        ],
-    )
-    by_t = {cue.t: cue.layers for cue in result}
-    assert by_t[0.0] == {
-        "layer_1": False,
-        "layer_2": False,
-        "layer_3": True,
-        "layer_4": False,
+        "layer_2": _lane(False, (10.0, True)),
+        "layer_3": _lane(True, (20.0, False)),
+        "layer_4": _lane(False),
     }
-    assert by_t[5.0] == {"layer_1": True}
-    assert by_t[10.0] == {"layer_2": True}
-    assert by_t[20.0] == {"layer_3": False}
-
-
-def test_punch_replace_keeps_unarmed_cues_in_range() -> None:
-    cues = [TimelineCue(t=5.0, layers={"layer_2": False})]
-    result = punch_replace(
-        cues,
-        armed_stems={"layer_1"},
-        start_sec=0.0,
-        stop_sec=10.0,
-        new_cues=[],
+    # Fold baselines the way presets would: concrete baselines, transition cues.
+    lanes["layer_1"] = _lane(True, (10.0, False))
+    before_unarmed = {
+        slot: TimelineLane(baseline=lane.baseline, cues=list(lane.cues))
+        for slot, lane in lanes.items()
+        if slot != "layer_1"
+    }
+    lanes["layer_1"] = punch_lane(
+        lanes["layer_1"],
+        0.0,
+        15.0,
+        [SlotCue(t=0.0, visible=False), SlotCue(t=5.0, visible=True)],
     )
-    assert result == [TimelineCue(t=5.0, layers={"layer_2": False})]
-
-
-def test_punch_replace_merges_cues_at_same_t() -> None:
-    cues = [TimelineCue(t=20.0, layers={"layer_4": False})]
-    result = punch_replace(
-        cues,
-        armed_stems={"layer_1", "layer_2"},
-        start_sec=0.0,
-        stop_sec=10.0,
-        new_cues=[
-            TimelineCue(t=2.0, layers={"layer_1": True}),
-            TimelineCue(t=2.0, layers={"layer_2": False}),
-        ],
-    )
-    assert result == [
-        TimelineCue(t=2.0, layers={"layer_1": True, "layer_2": False}),
-        TimelineCue(t=20.0, layers={"layer_4": False}),
+    for slot, expected in before_unarmed.items():
+        assert lanes[slot].baseline == expected.baseline
+        assert lanes[slot].cues == expected.cues
+    assert lanes["layer_1"].cues == [
+        SlotCue(t=0.0, visible=False),
+        SlotCue(t=5.0, visible=True),
     ]
 
 
-def test_punch_replace_preserves_unarmed_transition_tick_on_collision() -> None:
-    """A synthetic armed punch cue colliding with an unarmed slot's real
-    transition must not mark that transition silent (regression: the AND-merge of
-    a per-cue tick flag flipped the unarmed slot's pre-first-cue anchor)."""
-    cues = [TimelineCue(t=12.0, layers={"layer_2": True})]
-    result = punch_replace(
-        cues,
-        armed_stems={"layer_1"},
-        start_sec=5.0,
-        stop_sec=12.0,
-        new_cues=[
-            TimelineCue(
-                t=12.0,
-                layers={"layer_1": True},
-                no_tick_slots=frozenset({"layer_1"}),
-            ),
-        ],
+def test_punch_lane_does_not_touch_sibling_lane_at_same_t() -> None:
+    """Collision at the same t stays per-lane; no shared cue / no_tick merge."""
+    layer_2 = _lane(False, (12.0, True))
+    layer_1 = punch_lane(
+        _lane(False),
+        5.0,
+        12.0,
+        [SlotCue(t=12.0, visible=True)],
     )
-    merged = next(cue for cue in result if cue.t == 12.0)
-    assert merged.layers == {"layer_2": True, "layer_1": True}
-    assert merged.shows_tick("layer_2") is True
-    assert merged.shows_tick("layer_1") is False
+    assert layer_2.cues == [SlotCue(t=12.0, visible=True)]
+    assert lane_visible_at(layer_2, 6.0, inherit=True) is False
+    assert layer_1.cues == [SlotCue(t=12.0, visible=True)]
 
 
-def test_punch_replace_unarmed_anchor_unchanged_by_armed_record() -> None:
-    """The unarmed slot's inferred leading section stays put after an armed take
-    lands a colliding cue at its first transition."""
-    from cleave.viz.layer_visibility import _anchor_visibility_for_slot
+def test_strip_lane_range_removes_cues_in_range() -> None:
+    lane = _lane(True, (1.0, False), (5.0, True), (8.0, False))
+    result = strip_lane_range(lane, 4.0, 6.0)
+    assert result.cues == [SlotCue(t=1.0, visible=False)]
 
-    cues = [TimelineCue(t=12.0, layers={"layer_2": True})]
-    # Real transition ON at 12 with no t=0 anchor -> inferred OFF before it.
-    assert _anchor_visibility_for_slot(cues, "layer_2", True) is False
 
-    result = punch_replace(
-        cues,
-        armed_stems={"layer_1"},
-        start_sec=5.0,
-        stop_sec=12.0,
-        new_cues=[
-            TimelineCue(
-                t=12.0, layers={"layer_1": True}, no_tick_slots=frozenset({"layer_1"})
-            ),
-        ],
-    )
-    inferred = _anchor_visibility_for_slot(result, "layer_2", True)
-    assert inferred is False  # still OFF; layer_1's silent cue did not corrupt it
-    assert layer_visible_at(result, {"layer_2": inferred}, "layer_2", 6.0) is False
+def test_set_lane_cue_replaces_at_t() -> None:
+    lane = _lane(True, (5.0, False))
+    result = set_lane_cue(lane, 5.0, True)
+    assert result.cues == []  # True matches baseline after canonicalize
 
 
 def test_should_accept_toggle_debounces() -> None:

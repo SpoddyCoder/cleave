@@ -48,7 +48,7 @@ from cleave.config_snapshot import (
 )
 from cleave.extract import STEM_NAMES
 from cleave.preset_playlist import playlist_at_dir
-from cleave.timeline import TimelineCue
+from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.session import (
     LayerRuntime,
     RenderOverlayRuntime,
@@ -931,20 +931,31 @@ def test_write_session_snapshot_render_overlay_without_cfg_render(tmp_path: Path
 def test_write_session_snapshot_persists_timeline_at_bottom(tmp_path: Path) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
     session.timeline.enabled = True
-    session.timeline.cues = [
-        TimelineCue(t=2.5, layers={"layer_1": False, "layer_2": True}),
-        TimelineCue(t=10.0, layers={"layer_3": False}),
-    ]
+    session.timeline.lanes = {
+        "layer_1": TimelineLane(
+            baseline=False,
+            cues=[SlotCue(t=2.5, visible=True)],
+        ),
+        "layer_2": TimelineLane(
+            baseline=False,
+            cues=[SlotCue(t=2.5, visible=True)],
+        ),
+        "layer_3": TimelineLane(
+            baseline=True,
+            cues=[SlotCue(t=10.0, visible=False)],
+        ),
+    }
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     raw = out_path.read_text(encoding="utf-8")
     data = yaml.safe_load(raw)
     assert list(data.keys())[-1] == "timeline"
     assert data["timeline"]["enabled"] is True
-    assert data["timeline"]["cues"] == [
-        {"t": 2.5, "layers": {"layer_1": False, "layer_2": True}},
-        {"t": 10.0, "layers": {"layer_3": False}},
-    ]
+    assert data["timeline"]["lanes"] == {
+        "layer_1": {"baseline": False, "cues": [{"t": 2.5, "visible": True}]},
+        "layer_2": {"baseline": False, "cues": [{"t": 2.5, "visible": True}]},
+        "layer_3": {"baseline": True, "cues": [{"t": 10.0, "visible": False}]},
+    }
 
     timeline = parse_timeline_section(
         data,
@@ -963,23 +974,29 @@ def test_write_session_snapshot_persists_timeline_at_bottom(tmp_path: Path) -> N
     )
     session2 = session_from_cfg(cfg_with_timeline, playlists)
     assert session2.timeline.enabled is True
-    assert session2.timeline.cues == list(timeline.cues)
+    assert session2.timeline.lanes["layer_1"] == session.timeline.lanes["layer_1"]
+    assert session2.timeline.lanes["layer_2"] == session.timeline.lanes["layer_2"]
+    assert session2.timeline.lanes["layer_3"] == session.timeline.lanes["layer_3"]
 
 
-def test_write_session_snapshot_round_trips_no_tick_slots(tmp_path: Path) -> None:
+def test_write_session_snapshot_round_trips_lane_baseline_and_cues(tmp_path: Path) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
     session.timeline.enabled = True
-    session.timeline.cues = [
-        TimelineCue(t=0.0, layers={"layer_1": True}, no_tick_slots=frozenset({"layer_1"})),
-        TimelineCue(t=12.0, layers={"layer_1": False}),
-    ]
+    session.timeline.lanes = {
+        "layer_1": TimelineLane(
+            baseline=True,
+            cues=[SlotCue(t=12.0, visible=False)],
+        ),
+    }
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
-    assert data["timeline"]["cues"] == [
-        {"t": 0.0, "layers": {"layer_1": True}, "no_tick": ["layer_1"]},
-        {"t": 12.0, "layers": {"layer_1": False}},
-    ]
+    assert data["timeline"]["lanes"] == {
+        "layer_1": {
+            "baseline": True,
+            "cues": [{"t": 12.0, "visible": False}],
+        },
+    }
 
     timeline = parse_timeline_section(
         data,
@@ -997,7 +1014,7 @@ def test_write_session_snapshot_round_trips_no_tick_slots(tmp_path: Path) -> Non
         timeline=timeline,
     )
     session2 = session_from_cfg(cfg_with_timeline, playlists)
-    assert session2.timeline.cues == session.timeline.cues
+    assert session2.timeline.lanes["layer_1"] == session.timeline.lanes["layer_1"]
 
 
 def test_write_session_snapshot_persists_timeline_disabled_without_cues(
@@ -1005,7 +1022,7 @@ def test_write_session_snapshot_persists_timeline_disabled_without_cues(
 ) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
     session.timeline.enabled = False
-    session.timeline.cues = []
+    session.timeline.lanes = {}
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
@@ -1115,9 +1132,16 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
                 },
                 "timeline": {
                     "enabled": True,
-                    "cues": [
-                        {"t": 1.0, "layers": {"layer_1": False, "layer_2": True}},
-                    ],
+                    "lanes": {
+                        "layer_1": {
+                            "baseline": False,
+                            "cues": [{"t": 1.0, "visible": False}],
+                        },
+                        "layer_2": {
+                            "baseline": False,
+                            "cues": [{"t": 1.0, "visible": True}],
+                        },
+                    },
                 },
             }
         ),
@@ -1141,10 +1165,24 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
     session.render_overlay.opacity_pct = 80
     session.render_post_fx.fade_in = 18.0
     session.render_post_fx.fade_out = 2.0
-    session.timeline.cues = [
-        TimelineCue(t=1.0, layers={"layer_1": False, "layer_2": True}),
-        TimelineCue(t=12.5, layers={"layer_3": False, "layer_4": True}),
-    ]
+    session.timeline.lanes = {
+        "layer_1": TimelineLane(
+            baseline=False,
+            cues=[SlotCue(t=1.0, visible=True)],
+        ),
+        "layer_2": TimelineLane(
+            baseline=False,
+            cues=[SlotCue(t=1.0, visible=True)],
+        ),
+        "layer_3": TimelineLane(
+            baseline=True,
+            cues=[SlotCue(t=12.5, visible=False)],
+        ),
+        "layer_4": TimelineLane(
+            baseline=True,
+            cues=[SlotCue(t=12.5, visible=False)],
+        ),
+    }
 
     expected = persisted_session_payload(cfg, session)
     assert expected["editor"]["upscale"] == 1.5

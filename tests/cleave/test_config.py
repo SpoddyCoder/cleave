@@ -60,7 +60,7 @@ from cleave.user_config import EditorSettings
 from cleave.viz.session import TuningSession
 from cleave.paths import repo_root
 from cleave.extract import STEM_NAMES
-from cleave.timeline import TimelineCue
+from cleave.timeline import SlotCue, TimelineLane
 from tests.support.config import (
     TEST_LAYER_STEMS,
     slot_for_stem,
@@ -1011,87 +1011,78 @@ def test_parse_timeline_defaults_enabled_true() -> None:
         {"timeline": {}},
         _timeline_parse_ctx(),
     )
-    assert timeline == TimelineConfig(enabled=True, cues=())
+    assert timeline == TimelineConfig(enabled=True, lanes={})
 
 
-def test_parse_timeline_reads_cues_sorted_by_t() -> None:
+def test_parse_timeline_reads_lanes() -> None:
     timeline = parse_timeline_section(
         {
             "timeline": {
                 "enabled": True,
-                "cues": [
-                    {"t": 10.0, "layers": {"layer_1": False}},
-                    {"t": 2.5, "layers": {"layer_2": True}},
-                ],
+                "lanes": {
+                    "layer_1": {
+                        "baseline": True,
+                        "cues": [{"t": 10.0, "visible": False}],
+                    },
+                    "layer_2": {
+                        "baseline": False,
+                        "cues": [{"t": 2.5, "visible": True}],
+                    },
+                },
             }
         },
         _timeline_parse_ctx(),
     )
     assert timeline is not None
     assert timeline.enabled is True
-    assert timeline.cues == (
-        TimelineCue(t=2.5, layers={"layer_2": True}),
-        TimelineCue(t=10.0, layers={"layer_1": False}),
+    assert timeline.lanes["layer_1"] == TimelineLane(
+        baseline=True,
+        cues=[SlotCue(t=10.0, visible=False)],
+    )
+    assert timeline.lanes["layer_2"] == TimelineLane(
+        baseline=False,
+        cues=[SlotCue(t=2.5, visible=True)],
     )
 
 
-def test_parse_timeline_reads_no_tick_slots() -> None:
+def test_parse_timeline_ignores_legacy_cues() -> None:
     timeline = parse_timeline_section(
         {
             "timeline": {
-                "cues": [
-                    {
-                        "t": 12.0,
-                        "layers": {"layer_1": True, "layer_2": False},
-                        "no_tick": ["layer_1"],
-                    },
-                ],
+                "enabled": True,
+                "cues": [{"t": 1.0, "layers": {"layer_1": False}}],
             }
         },
         _timeline_parse_ctx(),
     )
     assert timeline is not None
-    assert timeline.cues == (
-        TimelineCue(
-            t=12.0,
-            layers={"layer_1": True, "layer_2": False},
-            no_tick_slots=frozenset({"layer_1"}),
-        ),
-    )
+    assert timeline.lanes == {}
 
 
-def test_parse_timeline_rejects_no_tick_not_in_layers() -> None:
-    with pytest.raises(ValueError, match="no_tick must reference layers in the cue"):
+def test_parse_timeline_rejects_unknown_lane_slot() -> None:
+    with pytest.raises(ValueError, match="unknown layer keys in timeline.lanes"):
         parse_timeline_section(
             {
                 "timeline": {
-                    "cues": [
-                        {"t": 1.0, "layers": {"layer_1": True}, "no_tick": ["layer_2"]},
-                    ],
+                    "lanes": {
+                        "layer_9": {"baseline": True, "cues": []},
+                    }
                 }
             },
             _timeline_parse_ctx(),
         )
 
 
-def test_parse_timeline_rejects_unknown_stem() -> None:
-    with pytest.raises(ValueError, match="unknown layer keys in timeline.cues"):
+def test_parse_timeline_rejects_negative_t() -> None:
+    with pytest.raises(ValueError, match="timeline.lanes.layer_1.cues\\[0\\].t must be non-negative"):
         parse_timeline_section(
             {
                 "timeline": {
-                    "cues": [{"t": 1.0, "layers": {"synth": True}}],
-                }
-            },
-            _timeline_parse_ctx(),
-        )
-
-
-def test_parse_timeline_clamps_negative_t() -> None:
-    with pytest.raises(ValueError, match="timeline.cues\\[0\\].t must be non-negative"):
-        parse_timeline_section(
-            {
-                "timeline": {
-                    "cues": [{"t": -1.0, "layers": {"layer_1": False}}],
+                    "lanes": {
+                        "layer_1": {
+                            "cues": [{"t": -1.0, "visible": False}],
+                        }
+                    }
                 }
             },
             _timeline_parse_ctx(),
@@ -1103,7 +1094,12 @@ def test_load_config_reads_timeline(minimal_project: Path) -> None:
     data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     data["timeline"] = {
         "enabled": True,
-        "cues": [{"t": 3.0, "layers": {"layer_3": False}}],
+        "lanes": {
+            "layer_3": {
+                "baseline": True,
+                "cues": [{"t": 3.0, "visible": False}],
+            }
+        },
     }
     with cfg_path.open("w", encoding="utf-8") as handle:
         dump_yaml(data, handle)
@@ -1111,7 +1107,10 @@ def test_load_config_reads_timeline(minimal_project: Path) -> None:
     cfg = load_config(project_root=minimal_project)
     assert cfg.timeline is not None
     assert cfg.timeline.enabled is True
-    assert cfg.timeline.cues == (TimelineCue(t=3.0, layers={"layer_3": False}),)
+    assert cfg.timeline.lanes["layer_3"] == TimelineLane(
+        baseline=True,
+        cues=[SlotCue(t=3.0, visible=False)],
+    )
 
 
 def test_next_layer_slot_skips_used_slots() -> None:
@@ -1157,11 +1156,13 @@ def test_parse_timeline_rejects_layer_not_in_config(tmp_path: Path) -> None:
     cfg_path = project_dir / VIZ_CONFIG_FILENAME
     data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     data["timeline"] = {
-        "cues": [{"t": 1.0, "layers": {"layer_3": True}}],
+        "lanes": {
+            "layer_3": {"baseline": True, "cues": [{"t": 1.0, "visible": True}]},
+        }
     }
     with cfg_path.open("w", encoding="utf-8") as handle:
         dump_yaml(data, handle)
-    with pytest.raises(ValueError, match="unknown layer keys in timeline.cues"):
+    with pytest.raises(ValueError, match="unknown layer keys in timeline.lanes"):
         load_config(project_root=project_dir)
 
 

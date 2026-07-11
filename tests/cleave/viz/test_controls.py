@@ -24,7 +24,7 @@ from cleave.preset_playlist import (
     preset_filename_display,
     scan_preset_playlist,
 )
-from cleave.timeline import TimelineCue
+from cleave.timeline import SlotCue, TimelineLane, canonicalize
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.key_repeat import mod_shift
 from cleave.viz.playback import format_mmss
@@ -1481,13 +1481,21 @@ def test_timeline_presets_enter_opens_choice_modal() -> None:
     assert "timeline preset" in modal_view.message.lower()
 
 
+def _lane(
+    baseline: bool | None,
+    *transitions: tuple[float, bool],
+) -> TimelineLane:
+    cues = [SlotCue(t=t, visible=v) for t, v in transitions]
+    return TimelineLane(baseline=baseline, cues=canonicalize(baseline, cues))
+
+
 def test_timeline_presets_breathing_clears_and_applies() -> None:
     controls = _make_controls(("layer_1", "layer_2", "layer_3", "layer_4"))
-    prior = [
-        TimelineCue(t=1.0, layers={"layer_1": False}),
-        TimelineCue(t=2.0, layers={"layer_2": True}),
-    ]
-    controls.session.timeline.cues = list(prior)
+    prior = {
+        "layer_1": _lane(True, (1.0, False)),
+        "layer_2": _lane(True, (2.0, True)),
+    }
+    controls.session.timeline.lanes = dict(prior)
     controls.session.timeline.enabled = False
     controls.session.timeline.recording = True
     controls.session.timeline.armed_slots.add("layer_1")
@@ -1498,46 +1506,50 @@ def test_timeline_presets_breathing_clears_and_applies() -> None:
     assert controls.session.timeline.enabled is True
     assert controls.session.timeline.recording is False
     assert not controls.session.timeline.armed_slots
-    cues = controls.session.timeline.cues
-    assert cues
-    assert cues != prior
-    assert cues[0].t == 0.0
-    assert set(cues[0].layers) == set(controls.session.layer_z_order)
+    lanes = controls.session.timeline.lanes
+    assert lanes
+    assert lanes != prior
+    assert set(lanes) == set(controls.session.layer_z_order)
+    assert all(lane.baseline is not None for lane in lanes.values())
+    assert any(lane.baseline for lane in lanes.values())
 
 
 def test_timeline_presets_arc_clears_and_applies() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
-    controls.session.timeline.cues = [TimelineCue(t=5.0, layers={"layer_1": False})]
+    controls.session.timeline.lanes = {"layer_1": _lane(True, (5.0, False))}
     controls.session.timeline.enabled = False
     _focus_timeline_presets(controls)
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     _choose_modal_option(controls, "Arc")
     assert not controls.modal_host.active
     assert controls.session.timeline.enabled is True
-    cues = controls.session.timeline.cues
-    assert cues
-    assert cues[0].t == 0.0
-    assert set(cues[0].layers) == {"layer_1", "layer_2"}
+    lanes = controls.session.timeline.lanes
+    assert lanes
+    assert set(lanes) == {"layer_1", "layer_2"}
+    assert all(lane.baseline is not None for lane in lanes.values())
 
 
 def test_timeline_presets_cancel_and_escape_leave_unchanged() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
-    prior = [TimelineCue(t=3.0, layers={"layer_1": True, "layer_2": False})]
-    controls.session.timeline.cues = list(prior)
+    prior = {
+        "layer_1": _lane(True, (3.0, True)),
+        "layer_2": _lane(True, (3.0, False)),
+    }
+    controls.session.timeline.lanes = dict(prior)
     controls.session.timeline.enabled = False
 
     _focus_timeline_presets(controls)
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     _choose_modal_option(controls, "Cancel")
     assert not controls.modal_host.active
-    assert controls.session.timeline.cues == prior
+    assert controls.session.timeline.lanes == prior
     assert controls.session.timeline.enabled is False
 
     _focus_timeline_presets(controls)
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     controls.handle_modal_keydown(_keydown(pygame.K_ESCAPE))
     assert not controls.modal_host.active
-    assert controls.session.timeline.cues == prior
+    assert controls.session.timeline.lanes == prior
     assert controls.session.timeline.enabled is False
 
 
@@ -1546,9 +1558,9 @@ def test_timeline_snap_enter_opens_yes_cancel_modal() -> None:
         ("layer_1",),
         beat_times=(0.0, 1.0, 2.0),
     )
-    controls.session.timeline.cues = [
-        TimelineCue(t=0.4, layers={"layer_1": True}),
-    ]
+    controls.session.timeline.lanes = {
+        "layer_1": _lane(None, (0.4, True)),
+    }
     _focus_timeline_snap(controls)
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
     modal_view = controls.modal_host.view_state()
@@ -1563,17 +1575,19 @@ def test_timeline_snap_confirm_mutates_cues() -> None:
         ("layer_1", "layer_2"),
         beat_times=(0.0, 1.0, 2.0),
     )
-    controls.session.timeline.cues = [
-        TimelineCue(t=0.4, layers={"layer_1": True}),
-        TimelineCue(t=1.6, layers={"layer_2": False}),
-    ]
+    controls.session.timeline.lanes = {
+        "layer_1": _lane(None, (0.4, True)),
+        "layer_2": _lane(None, (1.6, False)),
+    }
     _focus_timeline_snap(controls)
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     _choose_modal_option(controls, "Yes")
     assert not controls.modal_host.active
-    assert controls.session.timeline.cues == [
-        TimelineCue(t=0.0, layers={"layer_1": True}),
-        TimelineCue(t=2.0, layers={"layer_2": False}),
+    assert controls.session.timeline.lanes["layer_1"].cues == [
+        SlotCue(t=0.0, visible=True),
+    ]
+    assert controls.session.timeline.lanes["layer_2"].cues == [
+        SlotCue(t=2.0, visible=False),
     ]
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "Snapped timeline cues to beats"
@@ -1584,13 +1598,13 @@ def test_timeline_snap_recording_blocks() -> None:
         ("layer_1",),
         beat_times=(0.0, 1.0),
     )
-    prior = [TimelineCue(t=0.4, layers={"layer_1": True})]
-    controls.session.timeline.cues = list(prior)
+    prior = {"layer_1": _lane(None, (0.4, True))}
+    controls.session.timeline.lanes = dict(prior)
     controls.session.timeline.recording = True
     _focus_timeline_snap(controls)
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
     assert not controls.modal_host.active
-    assert controls.session.timeline.cues == prior
+    assert controls.session.timeline.lanes == prior
     view = controls.build_view_state(paused=False)
     assert view.notification_message is None
 
@@ -1600,7 +1614,7 @@ def test_timeline_snap_no_cues_notifies() -> None:
         ("layer_1",),
         beat_times=(0.0, 1.0),
     )
-    controls.session.timeline.cues = []
+    controls.session.timeline.lanes = {}
     _focus_timeline_snap(controls)
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
     assert not controls.modal_host.active
@@ -1992,9 +2006,9 @@ def test_render_timeline_header_eye_color_when_disabled() -> None:
 
 def test_track_header_visible_follows_timeline_at_position() -> None:
     controls = _make_controls(("layer_1", "layer_2"), timeline_enabled=True)
-    controls.session.timeline.cues = [
-        TimelineCue(t=5.0, layers={"layer_1": False}),
-    ]
+    controls.session.timeline.lanes = {
+        "layer_1": _lane(True, (5.0, False)),
+    }
     before = controls.build_view_state(paused=False, position_sec=4.9)
     after = controls.build_view_state(paused=False, position_sec=5.0)
     assert before.tracks["layer_1"].visible is True

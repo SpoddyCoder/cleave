@@ -2,16 +2,8 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
-
-from cleave.config import load_config
-from cleave.paths import repo_root
-from cleave.preset_playlist import scan_all_layers
-from cleave.projectm import ProjectMLibraryError
-from cleave.viz.app import VisualizerApp, build_runtime_base
-from cleave.viz.bootstrap import resolve_config_path, resolve_mix_path
-from cleave.viz.render import render
+from typing import Any
 
 __all__ = [
     "VisualizerApp",
@@ -21,12 +13,37 @@ __all__ = [
 ]
 
 
+def __getattr__(name: str) -> Any:
+    if name == "VisualizerApp":
+        from cleave.viz.app import VisualizerApp as _VisualizerApp
+
+        return _VisualizerApp
+    if name == "build_runtime_base":
+        from cleave.viz.app import build_runtime_base as _build_runtime_base
+
+        return _build_runtime_base
+    if name == "render":
+        from cleave.viz.render import render as _render
+
+        return _render
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 def launch(
     project_dir: Path,
     *,
     config: Path | None = None,
 ) -> None:
     """Entry for `python -m cleave play` and programmatic launch."""
+    import sys
+
+    from cleave.config import load_config
+    from cleave.paths import repo_root
+    from cleave.preset_playlist import scan_all_layers
+    from cleave.projectm import ProjectMLibraryError
+    from cleave.viz.app import VisualizerApp, build_runtime_base
+    from cleave.viz.bootstrap import resolve_config_path, resolve_mix_path
+
     audio_path = resolve_mix_path(project_dir)
     config_path = resolve_config_path(config, project_dir)
 

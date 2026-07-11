@@ -1,9 +1,9 @@
-"""Timeline cue evaluation and editing for per-slot layer visibility."""
+"""Per-lane timeline evaluation and editing for layer visibility."""
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -21,21 +21,46 @@ _STEM_SOURCE_ABBREVIATIONS = {
 
 
 @dataclass(frozen=True)
-class TimelineCue:
+class SlotCue:
     t: float
-    layers: dict[str, bool]
-    no_tick_slots: frozenset[str] = frozenset()
+    visible: bool
 
-    def shows_tick(self, slot: str) -> bool:
-        """True when *slot* changes here and marks a real (ticked) transition.
 
-        Tick-ness is per slot so cues that merge several slots at the same time
-        keep each slot's own transition semantics. A slot in ``no_tick_slots`` is
-        a synthetic anchor/restore (baseline capture, committed restore, seek
-        fill) that neither draws a tick nor counts as a transition for
-        pre-first-cue anchor inference.
-        """
-        return slot in self.layers and slot not in self.no_tick_slots
+@dataclass
+class TimelineLane:
+    baseline: bool | None  # None = inherit session.layers[slot].enabled
+    cues: list[SlotCue]  # canonical: strictly increasing t, no redundant transitions
+
+
+@dataclass
+class Timeline:
+    enabled: bool = True
+    lanes: dict[str, TimelineLane] = field(default_factory=dict)
+
+    def visible_at(self, slot: str, t_sec: float, *, inherit: bool) -> bool:
+        lane = self.lanes.get(slot)
+        if lane is None:
+            return inherit
+        return lane_visible_at(lane, t_sec, inherit=inherit)
+
+    def visible_state_at(
+        self,
+        slots: Sequence[str],
+        t_sec: float,
+        inherits: Mapping[str, bool],
+    ) -> dict[str, bool]:
+        return {
+            slot: self.visible_at(slot, t_sec, inherit=inherits[slot])
+            for slot in slots
+        }
+
+
+def empty_lane() -> TimelineLane:
+    return TimelineLane(baseline=None, cues=[])
+
+
+def copy_lane(lane: TimelineLane) -> TimelineLane:
+    return TimelineLane(baseline=lane.baseline, cues=list(lane.cues))
 
 
 def stem_abbreviation(stem: StemSource) -> str:
@@ -45,114 +70,125 @@ def stem_abbreviation(stem: StemSource) -> str:
     return _STEM_SOURCE_ABBREVIATIONS[stem]
 
 
-def layer_visible_at(
-    cues: list[TimelineCue],
-    defaults: dict[str, bool],
-    slot: str,
+def canonicalize(
+    baseline: bool | None,
+    cues: Sequence[SlotCue],
+) -> list[SlotCue]:
+    """Drop redundant/no-op transitions; last-wins at equal ``t``.
+
+    Returns strictly increasing ``t`` cues where each changes visibility from
+    the previous state (``baseline``, or the prior cue when baseline is None).
+    """
+    if not cues:
+        return []
+    ordered = sorted(cues, key=lambda cue: cue.t)
+    collapsed: list[SlotCue] = []
+    for cue in ordered:
+        if collapsed and collapsed[-1].t == cue.t:
+            collapsed[-1] = cue
+        else:
+            collapsed.append(cue)
+    result: list[SlotCue] = []
+    current = baseline
+    for cue in collapsed:
+        if current is not None and cue.visible == current:
+            continue
+        result.append(cue)
+        current = cue.visible
+    return result
+
+
+def lane_visible_at(
+    lane: TimelineLane,
     t_sec: float,
+    *,
+    inherit: bool,
 ) -> bool:
-    if slot not in defaults:
-        allowed = ", ".join(sorted(defaults))
-        raise ValueError(f"unknown slot: {slot!r} (expected one of: {allowed})")
-    visible = defaults[slot]
-    for cue in sorted(cues, key=lambda c: c.t):
+    """Visibility at ``t_sec``. If ``baseline`` is None, use ``inherit`` until the first cue."""
+    visible = inherit if lane.baseline is None else lane.baseline
+    for cue in lane.cues:
         if cue.t > t_sec:
             break
-        if slot in cue.layers:
-            visible = cue.layers[slot]
+        visible = cue.visible
     return visible
 
 
-def visible_state_at(
-    cues: list[TimelineCue],
-    defaults: dict[str, bool],
-    slots: list[str],
-    t_sec: float,
-) -> dict[str, bool]:
-    return {
-        slot: layer_visible_at(cues, defaults, slot, t_sec) for slot in slots
-    }
-
-
-def _cue_modifies_armed_stem(cue: TimelineCue, armed_stems: set[str]) -> bool:
-    return bool(set(cue.layers) & armed_stems)
-
-
-def _merge_cues_at_same_t(cues: list[TimelineCue]) -> list[TimelineCue]:
-    if not cues:
+def lane_segments(
+    lane: TimelineLane,
+    duration_sec: float,
+    *,
+    inherit: bool,
+) -> list[tuple[float, float, bool]]:
+    """Return ``(start_t, end_t, visible)`` segments over ``[0, duration_sec]``."""
+    if duration_sec <= 0:
         return []
-    merged: list[TimelineCue] = []
-    current_t: float | None = None
-    current_layers: dict[str, bool] = {}
-    current_no_tick: set[str] = set()
-    for cue in sorted(cues, key=lambda c: c.t):
-        if current_t is None:
-            current_t = cue.t
-        elif cue.t != current_t:
-            merged.append(
-                TimelineCue(
-                    t=current_t,
-                    layers=dict(current_layers),
-                    no_tick_slots=frozenset(current_no_tick),
-                )
-            )
-            current_t = cue.t
-            current_layers = {}
-            current_no_tick = set()
-        for slot, value in cue.layers.items():
-            current_layers[slot] = value
-            if slot in cue.no_tick_slots:
-                current_no_tick.add(slot)
-            else:
-                current_no_tick.discard(slot)
-    if current_t is not None:
-        merged.append(
-            TimelineCue(
-                t=current_t,
-                layers=dict(current_layers),
-                no_tick_slots=frozenset(current_no_tick),
-            )
-        )
-    return merged
+    boundaries = sorted({0.0, duration_sec} | {cue.t for cue in lane.cues})
+    segments: list[tuple[float, float, bool]] = []
+    for index in range(len(boundaries) - 1):
+        start_t = boundaries[index]
+        end_t = boundaries[index + 1]
+        if end_t <= start_t:
+            continue
+        if end_t <= 0.0 or start_t >= duration_sec:
+            continue
+        clip_start = max(start_t, 0.0)
+        clip_end = min(end_t, duration_sec)
+        if clip_end <= clip_start:
+            continue
+        visible = lane_visible_at(lane, clip_start, inherit=inherit)
+        segments.append((clip_start, clip_end, visible))
+    return segments
 
 
-def punch_replace(
-    cues: list[TimelineCue],
-    armed_stems: set[str],
+def lane_tick_times(lane: TimelineLane, duration_sec: float) -> list[float]:
+    """Cue times within ``[0, duration_sec]`` (every stored cue is a real transition)."""
+    return sorted(
+        cue.t for cue in lane.cues if 0.0 <= cue.t <= duration_sec
+    )
+
+
+def punch_lane(
+    lane: TimelineLane,
     start_sec: float,
     stop_sec: float,
-    new_cues: list[TimelineCue],
-) -> list[TimelineCue]:
-    """Overwrite armed slots in ``[start_sec, stop_sec]``; leave unarmed slots intact.
+    new_cues: Sequence[SlotCue],
+) -> TimelineLane:
+    """Overwrite cues in ``[start_sec, stop_sec]`` with ``new_cues``; canonicalize."""
+    kept = [
+        cue for cue in lane.cues if not (start_sec <= cue.t <= stop_sec)
+    ]
+    return TimelineLane(
+        baseline=lane.baseline,
+        cues=canonicalize(lane.baseline, kept + list(new_cues)),
+    )
 
-    Cues are often multi-slot (timeline presets put every slot on the t=0 cue,
-    and simultaneous transitions share one object). Deleting a whole cue when it
-    mentions an armed stem would erase unarmed slots that share that object —
-    strip armed keys only, then merge in ``new_cues``.
-    """
-    kept: list[TimelineCue] = []
-    for cue in cues:
-        if not (
-            start_sec <= cue.t <= stop_sec
-            and _cue_modifies_armed_stem(cue, armed_stems)
-        ):
-            kept.append(cue)
-            continue
-        remaining = {
-            slot: visible
-            for slot, visible in cue.layers.items()
-            if slot not in armed_stems
-        }
-        if remaining:
-            kept.append(
-                TimelineCue(
-                    t=cue.t,
-                    layers=remaining,
-                    no_tick_slots=cue.no_tick_slots.intersection(remaining),
-                )
-            )
-    combined = kept + list(new_cues)
-    return _merge_cues_at_same_t(combined)
+
+def strip_lane_range(
+    lane: TimelineLane,
+    start_sec: float,
+    stop_sec: float,
+) -> TimelineLane:
+    """Remove cues with ``t`` in ``[start_sec, stop_sec]``; canonicalize."""
+    kept = [
+        cue for cue in lane.cues if not (start_sec <= cue.t <= stop_sec)
+    ]
+    return TimelineLane(
+        baseline=lane.baseline,
+        cues=canonicalize(lane.baseline, kept),
+    )
+
+
+def set_lane_cue(
+    lane: TimelineLane,
+    t: float,
+    visible: bool,
+) -> TimelineLane:
+    """Set or replace the transition at ``t``; canonicalize."""
+    others = [cue for cue in lane.cues if cue.t != t]
+    return TimelineLane(
+        baseline=lane.baseline,
+        cues=canonicalize(lane.baseline, others + [SlotCue(t=t, visible=visible)]),
+    )
 
 
 def should_accept_toggle(last_toggle_t: float | None, t_sec: float) -> bool:
@@ -165,26 +201,22 @@ def _nearest_with_earlier_tie(t: float, candidates: Sequence[float]) -> float:
     return min(candidates, key=lambda c: (abs(c - t), c))
 
 
-def snap_cues_to_beats(
-    cues: Sequence[TimelineCue],
+def snap_lane_to_beats(
+    lane: TimelineLane,
     beat_times: Sequence[float],
-) -> list[TimelineCue]:
-    """Rewrite cue times to the nearest beat; merge collisions at the same ``t``."""
-    if not cues or not beat_times:
-        return list(cues)
+) -> TimelineLane:
+    """Rewrite cue times to the nearest beat; canonicalize collisions."""
+    if not lane.cues or not beat_times:
+        return TimelineLane(baseline=lane.baseline, cues=list(lane.cues))
 
     beats = np.asarray(beat_times, dtype=np.float64)
     if beats.size == 1:
         sole = float(beats[0])
-        snapped = [
-            TimelineCue(
-                t=sole,
-                layers=dict(cue.layers),
-                no_tick_slots=cue.no_tick_slots,
-            )
-            for cue in cues
-        ]
-        return _merge_cues_at_same_t(snapped)
+        snapped = [SlotCue(t=sole, visible=cue.visible) for cue in lane.cues]
+        return TimelineLane(
+            baseline=lane.baseline,
+            cues=canonicalize(lane.baseline, snapped),
+        )
 
     first = float(beats[0])
     last = float(beats[-1])
@@ -206,12 +238,8 @@ def snap_cues_to_beats(
             (first + lo * interval, first + (lo + 1) * interval),
         )
 
-    snapped = [
-        TimelineCue(
-            t=snap_t(cue.t),
-            layers=dict(cue.layers),
-            no_tick_slots=cue.no_tick_slots,
-        )
-        for cue in cues
-    ]
-    return _merge_cues_at_same_t(snapped)
+    snapped = [SlotCue(t=snap_t(cue.t), visible=cue.visible) for cue in lane.cues]
+    return TimelineLane(
+        baseline=lane.baseline,
+        cues=canonicalize(lane.baseline, snapped),
+    )

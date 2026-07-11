@@ -5,6 +5,7 @@ from __future__ import annotations
 import random
 from collections.abc import Callable
 
+from cleave.timeline import copy_lane, empty_lane
 from cleave.timeline_presets import (
     build_arc_cues,
     build_breathing_cues,
@@ -67,18 +68,22 @@ class TimelinePresetController:
         self._clear_timeline_state()
         tl = self.session.timeline
         tl.enabled = True
-        tl.cues = builder(
+        built = builder(
             list(self.session.layer_z_order),
             duration_sec,
             random.Random(),
         )
+        for slot in self.session.layer_z_order:
+            tl.lanes[slot] = copy_lane(built.get(slot, empty_lane()))
         if self._on_notification is not None:
             self._on_notification(message)
 
     def _clear_timeline_state(self) -> None:
         tl = self.session.timeline
-        tl.cues = []
-        tl.record_buffer = []
+        tl.lanes = {
+            slot: empty_lane() for slot in self.session.layer_z_order
+        }
+        tl.record_buffer = {}
         tl.recording = False
         tl.record_start_sec = None
         tl.record_baseline = {}

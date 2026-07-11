@@ -225,7 +225,7 @@ def test_draw_timeline_overlay_uses_display_target() -> None:
     overlay_surface = _overlay_surface_mock()
     view_state = TimelineViewState(
         layer_z_order=["layer_1"],
-        cues=[],
+        lanes={},
         defaults={},
         position_sec=0.0,
         duration_sec=120.0,
@@ -237,7 +237,7 @@ def test_draw_timeline_overlay_uses_display_target() -> None:
         recording=False,
         record_start_sec=0.0,
         record_baseline={},
-        record_buffer=[],
+        record_buffer={},
         enabled=True,
     )
 
@@ -267,7 +267,7 @@ def test_draw_timeline_overlay_applies_visibility_alpha() -> None:
     overlay_surface = _overlay_surface_mock()
     view_state = TimelineViewState(
         layer_z_order=["layer_1"],
-        cues=[],
+        lanes={},
         defaults={},
         position_sec=0.0,
         duration_sec=120.0,
@@ -279,7 +279,7 @@ def test_draw_timeline_overlay_applies_visibility_alpha() -> None:
         recording=False,
         record_start_sec=0.0,
         record_baseline={},
-        record_buffer=[],
+        record_buffer={},
         enabled=True,
     )
 

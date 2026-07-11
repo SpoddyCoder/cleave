@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import pygame
 
 from cleave.config_schema import MAX_LAYER_COUNT
+from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.overlay_upload import OverlayGpuState, UploadSignature
 from cleave.viz.playback import format_mmss
 from cleave.viz.theme import timeline_panel_height_px, timeline_ui_metrics
@@ -26,7 +27,7 @@ class TimelineStaticSignature:
     """
 
     layer_z_order: tuple[str, ...]
-    cues_fingerprint: tuple[tuple[float, tuple[tuple[str, bool], ...], bool], ...]
+    lanes_fingerprint: tuple[tuple[str, bool | None, tuple[tuple[float, bool], ...]], ...]
     defaults: tuple[tuple[str, bool], ...]
     duration_sec: float
     focus_row: int
@@ -39,7 +40,9 @@ class TimelineStaticSignature:
     submenu_focused: bool
     record_start_sec: float | None
     record_baseline: tuple[tuple[str, bool], ...]
-    record_buffer_fingerprint: tuple[tuple[float, tuple[tuple[str, bool], ...], bool], ...]
+    record_buffer_fingerprint: tuple[
+        tuple[str, tuple[tuple[float, bool], ...]], ...
+    ]
     record_high_water_mark: float | None
     record_playhead_sec: float | None
     panel_w: int
@@ -65,12 +68,33 @@ def visibility_bucket(visibility: float) -> int:
     return min(255, int(visibility * 255))
 
 
-def _cue_fingerprint(
-    cues: list,
-) -> tuple[tuple[float, tuple[tuple[str, bool], ...], tuple[str, ...]], ...]:
+def _slot_cues_fingerprint(
+    cues: list[SlotCue],
+) -> tuple[tuple[float, bool], ...]:
+    return tuple((cue.t, cue.visible) for cue in cues)
+
+
+def _lane_fingerprint(
+    lane: TimelineLane,
+) -> tuple[bool | None, tuple[tuple[float, bool], ...]]:
+    return (lane.baseline, _slot_cues_fingerprint(lane.cues))
+
+
+def _lanes_fingerprint(
+    lanes: dict[str, TimelineLane],
+) -> tuple[tuple[str, bool | None, tuple[tuple[float, bool], ...]], ...]:
     return tuple(
-        (cue.t, tuple(sorted(cue.layers.items())), tuple(sorted(cue.no_tick_slots)))
-        for cue in cues
+        (slot, *_lane_fingerprint(lane))
+        for slot, lane in sorted(lanes.items())
+    )
+
+
+def _record_buffer_fingerprint(
+    record_buffer: dict[str, list[SlotCue]],
+) -> tuple[tuple[str, tuple[tuple[float, bool], ...]], ...]:
+    return tuple(
+        (slot, _slot_cues_fingerprint(cues))
+        for slot, cues in sorted(record_buffer.items())
     )
 
 
@@ -83,7 +107,7 @@ def timeline_static_signature(
 ) -> TimelineStaticSignature:
     return TimelineStaticSignature(
         layer_z_order=tuple(state.layer_z_order),
-        cues_fingerprint=_cue_fingerprint(state.cues),
+        lanes_fingerprint=_lanes_fingerprint(state.lanes),
         defaults=tuple(sorted(state.defaults.items())),
         duration_sec=state.duration_sec,
         focus_row=state.focus_row,
@@ -96,7 +120,7 @@ def timeline_static_signature(
         submenu_focused=state.submenu_focused,
         record_start_sec=state.record_start_sec,
         record_baseline=tuple(sorted(state.record_baseline.items())),
-        record_buffer_fingerprint=_cue_fingerprint(state.record_buffer),
+        record_buffer_fingerprint=_record_buffer_fingerprint(state.record_buffer),
         record_high_water_mark=state.record_high_water_mark,
         record_playhead_sec=state.position_sec if state.recording else None,
         panel_w=panel_w,

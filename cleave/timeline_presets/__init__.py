@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 from collections.abc import Sequence
 
-from cleave.timeline import TimelineCue
+from cleave.timeline import TimelineLane
 from cleave.timeline_presets.arrange import compose_timeline
 from cleave.timeline_presets.busyness import (
     ARC,
@@ -37,7 +37,7 @@ def build_breathing_cues(
     slots: Sequence[str],
     duration_sec: float,
     rng: random.Random | None = None,
-) -> list[TimelineCue]:
+) -> dict[str, TimelineLane]:
     return compose_timeline(slots, duration_sec, BREATHING, _rng(rng))
 
 
@@ -45,7 +45,7 @@ def build_dialogue_cues(
     slots: Sequence[str],
     duration_sec: float,
     rng: random.Random | None = None,
-) -> list[TimelineCue]:
+) -> dict[str, TimelineLane]:
     return compose_timeline(slots, duration_sec, DIALOGUE, _rng(rng))
 
 
@@ -53,7 +53,7 @@ def build_arc_cues(
     slots: Sequence[str],
     duration_sec: float,
     rng: random.Random | None = None,
-) -> list[TimelineCue]:
+) -> dict[str, TimelineLane]:
     return compose_timeline(slots, duration_sec, ARC, _rng(rng))
 
 
@@ -61,7 +61,7 @@ def build_pulse_cues(
     slots: Sequence[str],
     duration_sec: float,
     rng: random.Random | None = None,
-) -> list[TimelineCue]:
+) -> dict[str, TimelineLane]:
     return compose_timeline(slots, duration_sec, PULSE, _rng(rng))
 
 

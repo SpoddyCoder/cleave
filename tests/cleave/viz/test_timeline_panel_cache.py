@@ -5,7 +5,7 @@ from __future__ import annotations
 import pygame
 
 from cleave.config_schema import MAX_LAYER_COUNT
-from cleave.timeline import TimelineCue
+from cleave.timeline import SlotCue, TimelineLane, canonicalize
 from cleave.viz.overlay_upload import upload_plan_for_signature
 from cleave.viz.timeline_overlay import TimelineOverlay, TimelineViewState, timeline_live_signature
 from cleave.viz.timeline_panel_cache import (
@@ -30,9 +30,17 @@ def test_static_signature_stable_for_same_state() -> None:
     assert _static_sig(state) == _static_sig(state)
 
 
+def _lane(
+    baseline: bool | None,
+    *transitions: tuple[float, bool],
+) -> TimelineLane:
+    cues = [SlotCue(t=t, visible=v) for t, v in transitions]
+    return TimelineLane(baseline=baseline, cues=canonicalize(baseline, cues))
+
+
 def test_static_signature_changes_on_cue_edit() -> None:
     base = _view_state()
-    edited = _view_state(cues=[TimelineCue(t=10.0, layers={"layer_1": False})])
+    edited = _view_state(lanes={"layer_1": _lane(True, (10.0, False))})
     assert _static_sig(base) != _static_sig(edited)
 
 

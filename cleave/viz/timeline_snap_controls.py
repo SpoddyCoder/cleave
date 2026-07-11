@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 
-from cleave.timeline import snap_cues_to_beats
+from cleave.timeline import empty_lane, snap_lane_to_beats
 from cleave.viz.modal import ModalHost
 from cleave.viz.session import TuningSession
 
@@ -29,7 +29,7 @@ class TimelineSnapController:
         tl = self.session.timeline
         if tl.recording:
             return
-        if not tl.cues:
+        if not any(lane.cues for lane in tl.lanes.values()):
             self._notify("No timeline cues to snap")
             return
         if not self._beat_times:
@@ -43,7 +43,11 @@ class TimelineSnapController:
 
     def _snap(self) -> None:
         tl = self.session.timeline
-        tl.cues = snap_cues_to_beats(tl.cues, self._beat_times)
+        for slot in list(tl.lanes):
+            tl.lanes[slot] = snap_lane_to_beats(
+                tl.lanes.get(slot) or empty_lane(),
+                self._beat_times,
+            )
         self._notify("Snapped timeline cues to beats")
 
     def _notify(self, message: str) -> None:

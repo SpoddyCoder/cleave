@@ -4,10 +4,18 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from cleave.timeline import TimelineCue, layer_visible_at
+from cleave.timeline import (
+    SlotCue,
+    TimelineLane,
+    canonicalize,
+    copy_lane,
+    empty_lane,
+    lane_visible_at,
+    punch_lane,
+    strip_lane_range,
+)
 from cleave.viz.focus_nav import (
     FocusCursor,
-    TimelineFocus,
     cursor_timeline_row,
     cursor_timeline_submenu_focused,
 )
@@ -18,38 +26,21 @@ if TYPE_CHECKING:
     from cleave.viz.layer import StemLayer
 
 
-def _slot_has_committed_cues(cues: list[TimelineCue], slot: str) -> bool:
-    return any(slot in cue.layers for cue in cues)
+def _lane_for_slot(session: TuningSession, slot: str) -> TimelineLane:
+    return session.timeline.lanes.get(slot) or empty_lane()
 
 
-def _slot_has_t0_cue(cues: list[TimelineCue], slot: str) -> bool:
-    return any(slot in cue.layers and cue.t == 0.0 for cue in cues)
-
-
-def _anchor_visibility_for_slot(
-    cues: list[TimelineCue],
-    slot: str,
-    layer_enabled_fallback: bool,
-) -> bool:
-    """Pre-first-cue visibility for a slot that already has timeline cues."""
-    for cue in cues:
-        if cue.t == 0.0 and slot in cue.layers:
-            return cue.layers[slot]
-    slot_cues = [cue for cue in cues if slot in cue.layers]
-    if not slot_cues:
-        return layer_enabled_fallback
-    earliest = min(slot_cues, key=lambda cue: cue.t)
-    if earliest.t > 0.0 and earliest.shows_tick(slot):
-        return not earliest.layers[slot]
-    return layer_enabled_fallback
+def _inherit_for_slot(session: TuningSession, slot: str) -> bool:
+    return session.layers[slot].enabled
 
 
 def timeline_defaults(session: TuningSession) -> dict[str, bool]:
-    cues = session.timeline.cues
+    """Per-slot inherit values: concrete lane baseline, else ``layers[slot].enabled``."""
     return {
         slot: (
-            _anchor_visibility_for_slot(cues, slot, session.layers[slot].enabled)
-            if _slot_has_committed_cues(cues, slot)
+            lane.baseline
+            if (lane := session.timeline.lanes.get(slot)) is not None
+            and lane.baseline is not None
             else session.layers[slot].enabled
         )
         for slot in session.layer_z_order
@@ -61,11 +52,10 @@ def timeline_committed_visible(
     slot: str,
     t_sec: float,
 ) -> bool:
-    return layer_visible_at(
-        session.timeline.cues,
-        timeline_defaults(session),
-        slot,
+    return lane_visible_at(
+        _lane_for_slot(session, slot),
         t_sec,
+        inherit=_inherit_for_slot(session, slot),
     )
 
 
@@ -73,9 +63,8 @@ def snapshot_monitor_from_timeline(
     session: TuningSession,
     t_sec: float,
 ) -> dict[str, bool]:
-    defaults = timeline_defaults(session)
     return {
-        slot: layer_visible_at(session.timeline.cues, defaults, slot, t_sec)
+        slot: timeline_committed_visible(session, slot, t_sec)
         for slot in session.layer_z_order
     }
 
@@ -96,18 +85,19 @@ def armed_recording_defaults(session: TuningSession) -> dict[str, bool]:
     return defaults
 
 
+def _recording_lane(session: TuningSession, slot: str) -> TimelineLane:
+    baseline = session.timeline.record_baseline[slot]
+    cues = session.timeline.record_buffer.get(slot, [])
+    return TimelineLane(baseline=baseline, cues=list(cues))
+
+
 def armed_recording_visible(
     session: TuningSession,
     slot: str,
     t_sec: float,
 ) -> bool:
     """Visibility for a record-pass slot during an active take."""
-    return layer_visible_at(
-        session.timeline.record_buffer,
-        armed_recording_defaults(session),
-        slot,
-        t_sec,
-    )
+    return lane_visible_at(_recording_lane(session, slot), t_sec, inherit=True)
 
 
 def committed_visible_outside_punch(
@@ -116,16 +106,48 @@ def committed_visible_outside_punch(
     record_start: float,
     record_stop: float,
 ) -> bool:
-    """Committed visibility at *record_stop* ignoring armed-slot cues inside the punch."""
-    kept = [
-        cue
-        for cue in session.timeline.cues
-        if not (
-            record_start <= cue.t <= record_stop
-            and slot in cue.layers
-        )
-    ]
-    return layer_visible_at(kept, timeline_defaults(session), slot, record_stop)
+    """Committed visibility at *record_stop* ignoring cues inside the punch."""
+    stripped = strip_lane_range(
+        _lane_for_slot(session, slot),
+        record_start,
+        record_stop,
+    )
+    return lane_visible_at(
+        stripped,
+        record_stop,
+        inherit=_inherit_for_slot(session, slot),
+    )
+
+
+def _fold_lane_baseline(session: TuningSession, slot: str) -> TimelineLane:
+    """Freeze inherit into an explicit baseline when the lane was still untouched."""
+    lane = _lane_for_slot(session, slot)
+    if lane.baseline is not None:
+        return TimelineLane(baseline=lane.baseline, cues=list(lane.cues))
+    baseline = _inherit_for_slot(session, slot)
+    return TimelineLane(
+        baseline=baseline,
+        cues=canonicalize(baseline, lane.cues),
+    )
+
+
+def _punch_cues_for_slot(
+    session: TuningSession,
+    slot: str,
+    record_start: float,
+    record_stop: float,
+) -> list[SlotCue]:
+    tl = session.timeline
+    punch: list[SlotCue] = []
+    baseline = tl.record_baseline[slot]
+    if baseline != timeline_committed_visible(session, slot, record_start):
+        punch.append(SlotCue(t=record_start, visible=baseline))
+    punch.extend(tl.record_buffer.get(slot, []))
+    end_visible = armed_recording_visible(session, slot, record_stop)
+    committed_at_stop = timeline_committed_visible(session, slot, record_stop)
+    if end_visible != committed_at_stop:
+        punch.append(SlotCue(t=record_stop, visible=committed_at_stop))
+    return punch
 
 
 def build_record_punch_cues(
@@ -134,54 +156,16 @@ def build_record_punch_cues(
     record_stop: float,
     *,
     slots: set[str] | None = None,
-) -> list[TimelineCue]:
-    """Cues to punch on record stop: baseline, toggles, and committed restore at stop."""
+) -> None:
+    """Fold baselines and punch the take into each armed lane."""
     tl = session.timeline
     target_slots = set(tl.record_baseline) if slots is None else slots
-    punch: list[TimelineCue] = []
     for slot in target_slots:
         if slot not in tl.record_baseline:
             continue
-        if not _slot_has_t0_cue(tl.cues, slot):
-            punch.append(
-                TimelineCue(
-                    t=0.0,
-                    layers={
-                        slot: timeline_committed_visible(session, slot, 0.0),
-                    },
-                    no_tick_slots=frozenset({slot}),
-                )
-            )
-    for slot, baseline in tl.record_baseline.items():
-        if slot not in target_slots:
-            continue
-        if baseline != timeline_committed_visible(session, slot, record_start):
-            punch.append(
-                TimelineCue(
-                    t=record_start,
-                    layers={slot: baseline},
-                    no_tick_slots=frozenset({slot}),
-                )
-            )
-    punch.extend(
-        cue
-        for cue in tl.record_buffer
-        if target_slots.intersection(cue.layers)
-    )
-    for slot in target_slots:
-        if slot not in tl.record_baseline:
-            continue
-        end_visible = armed_recording_visible(session, slot, record_stop)
-        committed_at_stop = timeline_committed_visible(session, slot, record_stop)
-        if end_visible != committed_at_stop:
-            punch.append(
-                TimelineCue(
-                    t=record_stop,
-                    layers={slot: committed_at_stop},
-                    no_tick_slots=frozenset({slot}),
-                )
-            )
-    return punch
+        lane = _fold_lane_baseline(session, slot)
+        new_cues = _punch_cues_for_slot(session, slot, record_start, record_stop)
+        tl.lanes[slot] = punch_lane(lane, record_start, record_stop, new_cues)
 
 
 def effective_layer_enabled(
@@ -194,18 +178,17 @@ def effective_layer_enabled(
     if not session.timeline.enabled:
         return session.layers[slot].enabled
     tl = session.timeline
-    defaults = timeline_defaults(session)
     if tl.recording:
         if slot in tl.record_baseline:
             return armed_recording_visible(session, slot, t_sec)
         if slot in tl.override_slots:
             return tl.override_visible.get(slot, True)
-        return layer_visible_at(tl.cues, defaults, slot, t_sec)
+        return timeline_committed_visible(session, slot, t_sec)
     if tl.preview_active:
         return tl.monitor[slot]
     if slot in tl.override_slots:
         return tl.override_visible.get(slot, True)
-    return layer_visible_at(tl.cues, defaults, slot, t_sec)
+    return timeline_committed_visible(session, slot, t_sec)
 
 
 def apply_layer_visibility(
@@ -244,7 +227,10 @@ def build_timeline_view_state(
     }
     return TimelineViewState(
         layer_z_order=list(session.layer_z_order),
-        cues=list(tl.cues),
+        lanes={
+            slot: copy_lane(_lane_for_slot(session, slot))
+            for slot in session.layer_z_order
+        },
         defaults=timeline_defaults(session),
         position_sec=position_sec,
         duration_sec=duration_sec,
@@ -257,7 +243,9 @@ def build_timeline_view_state(
         recording=tl.recording,
         record_start_sec=tl.record_start_sec,
         record_baseline=dict(tl.record_baseline),
-        record_buffer=list(tl.record_buffer),
+        record_buffer={
+            slot: list(cues) for slot, cues in tl.record_buffer.items()
+        },
         record_high_water_mark=tl.record_high_water_mark,
         enabled=tl.enabled,
         submenu_focused=submenu_focused,

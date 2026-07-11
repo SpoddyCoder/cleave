@@ -34,7 +34,7 @@ from cleave.config_schema import (
 from cleave.extract import StemSource
 from cleave.preset_playlist import PresetPlaylist, preset_browse_floor
 from cleave.projectm_health import PresetSkipNotifyTracker
-from cleave.timeline import TimelineCue
+from cleave.timeline import SlotCue, TimelineLane, copy_lane, empty_lane
 from cleave.blend_modes import BlendMode
 
 
@@ -128,12 +128,12 @@ def default_render_post_fx_runtime() -> RenderPostFxRuntime:
 @dataclass
 class TimelineRuntime:
     enabled: bool = True
-    cues: list[TimelineCue] = field(default_factory=list)
+    lanes: dict[str, TimelineLane] = field(default_factory=dict)
     panel_open: bool = False
     focus_row: int = 0
     armed_slots: set[str] = field(default_factory=set)
     recording: bool = False
-    record_buffer: list[TimelineCue] = field(default_factory=list)
+    record_buffer: dict[str, list[SlotCue]] = field(default_factory=dict)
     record_baseline: dict[str, bool] = field(default_factory=dict)
     record_start_sec: float | None = None
     record_high_water_mark: float | None = None
@@ -255,12 +255,15 @@ def render_post_fx_runtime_from_cfg(
 
 def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
     timeline = cfg.timeline
-    if timeline is None:
-        return TimelineRuntime()
-    return TimelineRuntime(
-        enabled=timeline.enabled,
-        cues=list(timeline.cues),
-    )
+    enabled = True if timeline is None else timeline.enabled
+    source_lanes = {} if timeline is None else timeline.lanes
+    lanes: dict[str, TimelineLane] = {}
+    for slot in cfg.layer_z_order:
+        if slot in source_lanes:
+            lanes[slot] = copy_lane(source_lanes[slot])
+        else:
+            lanes[slot] = empty_lane()
+    return TimelineRuntime(enabled=enabled, lanes=lanes)
 
 
 def _beat_sensitivity(cfg: CleaveConfig, slot: str) -> float:
@@ -323,10 +326,13 @@ def add_layer_to_session(
 ) -> None:
     session.layers[slot] = runtime
     session.layer_z_order.append(slot)
+    session.timeline.lanes[slot] = empty_lane()
 
 
 def remove_layer_from_session(session: TuningSession, slot: str) -> None:
     session.layer_z_order.remove(slot)
     del session.layers[slot]
+    session.timeline.lanes.pop(slot, None)
+    session.timeline.record_buffer.pop(slot, None)
     if session.solo_slot == slot:
         session.solo_slot = None

@@ -1,4 +1,4 @@
-"""Tests for procedural timeline preset generation."""
+"""Tests for procedural timeline preset generation (per-lane)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import statistics
 
 import pytest
 
-from cleave.timeline import TimelineCue, layer_visible_at, visible_state_at
+from cleave.timeline import Timeline, TimelineLane, lane_visible_at
 from cleave.timeline_presets import (
     MIN_SWITCH_GAP_SEC,
     ALL_BUILDERS,
@@ -26,62 +26,74 @@ def _slots(n: int) -> list[str]:
     return [f"layer_{i}" for i in range(1, n + 1)]
 
 
-def _defaults_false(slots: list[str]) -> dict[str, bool]:
+def _inherits_false(slots: list[str]) -> dict[str, bool]:
     return {slot: False for slot in slots}
 
 
-def _assert_sorted(cues: list[TimelineCue]) -> None:
-    times = [c.t for c in cues]
-    assert times == sorted(times)
+def _timeline(lanes: dict[str, TimelineLane]) -> Timeline:
+    return Timeline(lanes=lanes)
+
+
+def _visible_at(
+    lanes: dict[str, TimelineLane],
+    slots: list[str],
+    t: float,
+) -> dict[str, bool]:
+    inherits = _inherits_false(slots)
+    return _timeline(lanes).visible_state_at(slots, t, inherits)
+
+
+def _all_transition_times(lanes: dict[str, TimelineLane]) -> list[float]:
+    times = sorted({cue.t for lane in lanes.values() for cue in lane.cues})
+    return times
+
+
+def _assert_lanes_cover_slots(lanes: dict[str, TimelineLane], slots: list[str]) -> None:
+    assert set(lanes) == set(slots)
+    for slot in slots:
+        assert lanes[slot].baseline is not None
 
 
 def _assert_never_zero(
-    cues: list[TimelineCue],
+    lanes: dict[str, TimelineLane],
     slots: list[str],
     duration_sec: float,
 ) -> None:
-    defaults = _defaults_false(slots)
     sample_times = [0.0]
-    for cue in cues:
-        sample_times.append(cue.t)
-        sample_times.append(max(0.0, cue.t - 1e-6))
-        sample_times.append(cue.t + 1e-6)
+    for t in _all_transition_times(lanes):
+        sample_times.append(t)
+        sample_times.append(max(0.0, t - 1e-6))
+        sample_times.append(t + 1e-6)
     sample_times.append(duration_sec)
     sample_times.append(max(0.0, duration_sec - 1e-6))
     for t in sample_times:
         if t < 0.0 or t > duration_sec:
             continue
-        state = visible_state_at(cues, defaults, slots, t)
+        state = _visible_at(lanes, slots, t)
         assert any(state.values()), f"zero layers active at t={t}"
 
 
-def _assert_min_gap(cues: list[TimelineCue], duration_sec: float) -> None:
-    if len(cues) < 2:
+def _assert_min_gap(lanes: dict[str, TimelineLane], duration_sec: float) -> None:
+    times = _all_transition_times(lanes)
+    if len(times) < 2:
         return
     if duration_sec <= MIN_SWITCH_GAP_SEC:
         return
-    for prev, cur in zip(cues, cues[1:]):
-        assert cur.t - prev.t >= MIN_SWITCH_GAP_SEC - 1e-9
-
-
-def _assert_first_cue_full(cues: list[TimelineCue], slots: list[str]) -> None:
-    assert cues
-    assert cues[0].t == 0.0
-    assert set(cues[0].layers) == set(slots)
+    for prev, cur in zip(times, times[1:]):
+        assert cur - prev >= MIN_SWITCH_GAP_SEC - 1e-9
 
 
 def _active_count_at(
-    cues: list[TimelineCue],
+    lanes: dict[str, TimelineLane],
     slots: list[str],
     t: float,
 ) -> int:
-    defaults = _defaults_false(slots)
-    state = visible_state_at(cues, defaults, slots, t)
+    state = _visible_at(lanes, slots, t)
     return sum(1 for v in state.values() if v)
 
 
 def _sample_active_counts(
-    cues: list[TimelineCue],
+    lanes: dict[str, TimelineLane],
     slots: list[str],
     duration_sec: float,
     step: float = 2.0,
@@ -89,13 +101,13 @@ def _sample_active_counts(
     counts: list[int] = []
     t = 0.0
     while t <= duration_sec:
-        counts.append(_active_count_at(cues, slots, t))
+        counts.append(_active_count_at(lanes, slots, t))
         t += step
     return counts
 
 
 def _high_cost_fraction(
-    cues: list[TimelineCue],
+    lanes: dict[str, TimelineLane],
     slots: list[str],
     duration_sec: float,
     step: float = 2.0,
@@ -106,7 +118,7 @@ def _high_cost_fraction(
     total_steps = 0
     t = 0.0
     while t <= duration_sec:
-        n = _active_count_at(cues, slots, t)
+        n = _active_count_at(lanes, slots, t)
         if chord_cost(n) >= 4.0:
             high_steps += 1
         total_steps += 1
@@ -115,21 +127,15 @@ def _high_cost_fraction(
 
 
 def _transition_hamming_distances(
-    cues: list[TimelineCue],
+    lanes: dict[str, TimelineLane],
     slots: list[str],
-    duration_sec: float,
 ) -> list[int]:
-    defaults = _defaults_false(slots)
+    times = [0.0] + _all_transition_times(lanes)
     distances: list[int] = []
     prev_active: frozenset[str] | None = None
-    for cue in cues:
-        if cue.t == 0.0:
-            prev_active = frozenset(
-                slot for slot in slots if layer_visible_at(cues, defaults, slot, 0.0)
-            )
-            continue
+    for t in times:
         active = frozenset(
-            slot for slot in slots if layer_visible_at(cues, defaults, slot, cue.t)
+            slot for slot in slots if _visible_at(lanes, slots, t)[slot]
         )
         if prev_active is not None:
             distances.append(hamming_distance(prev_active, active))
@@ -142,22 +148,21 @@ def _transition_hamming_distances(
 @pytest.mark.parametrize("duration_sec", _DURATIONS)
 def test_preset_invariants(builder, n: int, duration_sec: float) -> None:
     slots = _slots(n)
-    cues = builder(slots, duration_sec, random.Random(n * 1000 + int(duration_sec)))
-    assert cues
-    _assert_sorted(cues)
-    _assert_first_cue_full(cues, slots)
-    _assert_never_zero(cues, slots, duration_sec)
-    _assert_min_gap(cues, duration_sec)
+    lanes = builder(slots, duration_sec, random.Random(n * 1000 + int(duration_sec)))
+    assert lanes
+    _assert_lanes_cover_slots(lanes, slots)
+    _assert_never_zero(lanes, slots, duration_sec)
+    _assert_min_gap(lanes, duration_sec)
     if n == 1:
-        assert len(cues) == 1
-        assert cues[0].layers == {slots[0]: True}
+        assert lanes[slots[0]].baseline is True
+        assert lanes[slots[0]].cues == []
 
 
 @pytest.mark.parametrize("builder", ALL_BUILDERS)
 def test_empty_slots_or_nonpositive_duration(builder) -> None:
-    assert builder([], 60.0, random.Random(1)) == []
-    assert builder(["layer_1"], 0.0, random.Random(1)) == []
-    assert builder(["layer_1"], -5.0, random.Random(1)) == []
+    assert builder([], 60.0, random.Random(1)) == {}
+    assert builder(["layer_1"], 0.0, random.Random(1)) == {}
+    assert builder(["layer_1"], -5.0, random.Random(1)) == {}
 
 
 @pytest.mark.parametrize("builder", ALL_BUILDERS)
@@ -173,18 +178,18 @@ def test_seeded_rng_is_deterministic(builder) -> None:
 def test_short_duration_still_never_zero() -> None:
     slots = _slots(4)
     for builder in ALL_BUILDERS:
-        cues = builder(slots, 4.0, random.Random(7))
-        assert len(cues) == 1
-        _assert_never_zero(cues, slots, 4.0)
-        assert sum(1 for v in cues[0].layers.values() if v) >= 1
+        lanes = builder(slots, 4.0, random.Random(7))
+        assert all(not lane.cues for lane in lanes.values())
+        _assert_never_zero(lanes, slots, 4.0)
+        assert sum(1 for lane in lanes.values() if lane.baseline) >= 1
 
 
 @pytest.mark.parametrize("builder", (build_breathing_cues, build_dialogue_cues))
 @pytest.mark.parametrize("duration_sec", (60.0, 120.0, 180.0))
 def test_low_characters_favor_sparse_layers(builder, duration_sec: float) -> None:
     slots = _slots(4)
-    cues = builder(slots, duration_sec, random.Random(42))
-    counts = _sample_active_counts(cues, slots, duration_sec)
+    lanes = builder(slots, duration_sec, random.Random(42))
+    counts = _sample_active_counts(lanes, slots, duration_sec)
     assert statistics.median(counts) <= 2.0
 
 
@@ -192,27 +197,26 @@ def test_low_characters_favor_sparse_layers(builder, duration_sec: float) -> Non
 def test_high_cost_time_is_bounded(duration_sec: float) -> None:
     slots = _slots(4)
     for builder in ALL_BUILDERS:
-        cues = builder(slots, duration_sec, random.Random(99))
-        frac = _high_cost_fraction(cues, slots, duration_sec)
+        lanes = builder(slots, duration_sec, random.Random(99))
+        frac = _high_cost_fraction(lanes, slots, duration_sec)
         assert frac < 0.12, f"{builder.__name__} high-cost fraction {frac:.2f}"
 
 
 @pytest.mark.parametrize("duration_sec", (90.0, 180.0))
 def test_arc_resolves_without_full_tutti_at_end(duration_sec: float) -> None:
     slots = _slots(4)
-    cues = build_arc_cues(slots, duration_sec, random.Random(7))
-    defaults = _defaults_false(slots)
-    end_state = visible_state_at(cues, defaults, slots, duration_sec)
+    lanes = build_arc_cues(slots, duration_sec, random.Random(7))
+    end_state = _visible_at(lanes, slots, duration_sec)
     assert not all(end_state.values())
 
 
 @pytest.mark.parametrize("duration_sec", (120.0, 180.0))
 def test_arc_uses_climax_window(duration_sec: float) -> None:
     slots = _slots(4)
-    cues = build_arc_cues(slots, duration_sec, random.Random(13))
+    lanes = build_arc_cues(slots, duration_sec, random.Random(13))
     climax_hits = 0
     for t in [duration_sec * p for p in (0.71, 0.74, 0.76)]:
-        if _active_count_at(cues, slots, t) >= 3:
+        if _active_count_at(lanes, slots, t) >= 3:
             climax_hits += 1
     assert climax_hits >= 1
 
@@ -220,8 +224,8 @@ def test_arc_uses_climax_window(duration_sec: float) -> None:
 @pytest.mark.parametrize("builder", ALL_BUILDERS)
 def test_voice_leading_mostly_smooth(builder) -> None:
     slots = _slots(4)
-    cues = builder(slots, 120.0, random.Random(55))
-    distances = _transition_hamming_distances(cues, slots, 120.0)
+    lanes = builder(slots, 120.0, random.Random(55))
+    distances = _transition_hamming_distances(lanes, slots)
     if not distances:
         return
     smooth = sum(1 for d in distances if d <= 2)
@@ -230,30 +234,28 @@ def test_voice_leading_mostly_smooth(builder) -> None:
 
 def test_breathing_starts_with_one_layer() -> None:
     slots = _slots(5)
-    cues = build_breathing_cues(slots, 120.0, random.Random(11))
-    assert sum(1 for v in cues[0].layers.values() if v) == 1
+    lanes = build_breathing_cues(slots, 120.0, random.Random(11))
+    assert sum(1 for lane in lanes.values() if lane.baseline) == 1
 
 
 def test_pulse_rotates_singles() -> None:
     slots = _slots(4)
-    cues = build_pulse_cues(slots, 90.0, random.Random(21))
-    defaults = _defaults_false(slots)
+    lanes = build_pulse_cues(slots, 90.0, random.Random(21))
     solo_seen: set[str] = set()
-    for cue in cues:
-        if cue.t == 0.0:
+    for t in _all_transition_times(lanes):
+        if t == 0.0:
             continue
-        active = [s for s in slots if layer_visible_at(cues, defaults, s, cue.t)]
+        active = [s for s in slots if lane_visible_at(lanes[s], t, inherit=False)]
         if len(active) == 1:
             solo_seen.add(active[0])
     assert len(solo_seen) >= 2
 
 
-def test_layer_visible_at_with_all_false_defaults() -> None:
+def test_lane_visible_at_with_all_false_inherits() -> None:
     slots = _slots(3)
-    cues = build_dialogue_cues(slots, 60.0, random.Random(3))
-    defaults = _defaults_false(slots)
+    lanes = build_dialogue_cues(slots, 60.0, random.Random(3))
     for slot in slots:
-        layer_visible_at(cues, defaults, slot, 0.0)
+        lane_visible_at(lanes[slot], 0.0, inherit=False)
 
 
 def test_in_climax_window_bounds() -> None:

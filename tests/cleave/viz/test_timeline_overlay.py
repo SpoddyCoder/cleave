@@ -7,7 +7,7 @@ import pygame
 from cleave.config_schema import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
-from cleave.timeline import TimelineCue, layer_visible_at, stem_abbreviation
+from cleave.timeline import SlotCue, TimelineLane, canonicalize, lane_visible_at, stem_abbreviation
 from cleave.viz.material_icons import visibility_icon_slot_width
 from cleave.viz.tuning_panel_draw import render_visibility_icon
 from cleave.viz.theme import (
@@ -39,14 +39,21 @@ from cleave.viz.timeline_overlay import (
     stem_label_text,
     transport_time_text,
     time_to_x,
-    unique_cue_times,
     visibility_segments,
 )
 
 
+def _lane(
+    baseline: bool | None,
+    *transitions: tuple[float, bool],
+) -> TimelineLane:
+    cues = [SlotCue(t=t, visible=v) for t, v in transitions]
+    return TimelineLane(baseline=baseline, cues=canonicalize(baseline, cues))
+
+
 def _view_state(
     *,
-    cues: list[TimelineCue] | None = None,
+    lanes: dict[str, TimelineLane] | None = None,
     defaults: dict[str, bool] | None = None,
     position_sec: float = 0.0,
     duration_sec: float = 100.0,
@@ -56,7 +63,7 @@ def _view_state(
     recording: bool = False,
     record_start_sec: float | None = None,
     record_baseline: dict[str, bool] | None = None,
-    record_buffer: list[TimelineCue] | None = None,
+    record_buffer: dict[str, list[SlotCue]] | None = None,
     record_high_water_mark: float | None = None,
     enabled: bool = True,
     layer_z_order: list[str] | None = None,
@@ -66,13 +73,17 @@ def _view_state(
     arm_flash_start_ms: dict[str, int] | None = None,
 ) -> TimelineViewState:
     order = list(layer_z_order or list(DEFAULT_LAYER_SLOTS))
-    cue_list = list(cues or [])
+    lane_map = dict(lanes or {})
     default_map = dict(
         defaults or {slot: True for slot in (layer_z_order or list(DEFAULT_LAYER_SLOTS))}
     )
     if monitor_visible is None:
         monitor_visible = {
-            stem: layer_visible_at(cue_list, default_map, stem, position_sec)
+            stem: lane_visible_at(
+                lane_map.get(stem) or TimelineLane(baseline=None, cues=[]),
+                position_sec,
+                inherit=default_map[stem],
+            )
             for stem in order
         }
     if timeline_visible is None:
@@ -83,7 +94,7 @@ def _view_state(
             slot: TEST_LAYER_STEMS.get(slot, "drums")
             for slot in order
         },
-        cues=cue_list,
+        lanes=lane_map,
         defaults=default_map,
         position_sec=position_sec,
         duration_sec=duration_sec,
@@ -95,7 +106,7 @@ def _view_state(
         recording=recording,
         record_start_sec=record_start_sec,
         record_baseline=dict(record_baseline or ()),
-        record_buffer=list(record_buffer or ()),
+        record_buffer=dict(record_buffer or ()),
         record_high_water_mark=record_high_water_mark,
         enabled=enabled,
         submenu_focused=submenu_focused,
@@ -454,7 +465,7 @@ def test_recording_baseline_does_not_draw_cue_tick() -> None:
     pygame.init()
     overlay = TimelineOverlay()
     state = _view_state(
-        cues=[TimelineCue(t=0.0, layers={"layer_1": False})],
+        lanes={"layer_1": _lane(False)},
         position_sec=10.0,
         armed_slots={"layer_1"},
         recording=True,
@@ -465,14 +476,14 @@ def test_recording_baseline_does_not_draw_cue_tick() -> None:
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, state)
 
-    assert bar_tick_times_for_row(state, "layer_1") == [0.0]
+    assert bar_tick_times_for_row(state, "layer_1") == []
 
 
 def test_draw_dual_eye_state_does_not_crash() -> None:
     pygame.init()
     overlay = TimelineOverlay()
     state = _view_state(
-        cues=[TimelineCue(t=25.0, layers={"layer_1": False})],
+        lanes={"layer_1": _lane(True, (25.0, False))},
         position_sec=25.0,
         focus_row=1,
         armed_slots={"layer_2"},
@@ -487,18 +498,14 @@ def test_draw_dual_eye_state_does_not_crash() -> None:
 
 
 def test_visibility_segments_default_only() -> None:
-    defaults = {"layer_1": True, "layer_2": False, "layer_3": True, "layer_4": True}
-    segments = visibility_segments([], defaults, "layer_2", 60.0)
+    lane = TimelineLane(baseline=False, cues=[])
+    segments = visibility_segments(lane, 60.0, inherit=True)
     assert segments == [(0.0, 60.0, False)]
 
 
 def test_visibility_segments_from_cues() -> None:
-    defaults = {slot: True for slot in DEFAULT_LAYER_SLOTS}
-    cues = [
-        TimelineCue(t=10.0, layers={"layer_1": False}),
-        TimelineCue(t=30.0, layers={"layer_1": True}),
-    ]
-    segments = visibility_segments(cues, defaults, "layer_1", 60.0)
+    lane = _lane(True, (10.0, False), (30.0, True))
+    segments = visibility_segments(lane, 60.0, inherit=True)
     assert segments == [
         (0.0, 10.0, True),
         (10.0, 30.0, False),
@@ -507,51 +514,19 @@ def test_visibility_segments_from_cues() -> None:
 
 
 def test_visibility_segments_other_stem_unchanged_across_unrelated_cue() -> None:
-    defaults = {slot: True for slot in DEFAULT_LAYER_SLOTS}
-    cues = [TimelineCue(t=5.0, layers={"layer_1": False})]
-    segments = visibility_segments(cues, defaults, "layer_2", 20.0)
-    assert segments == [(0.0, 5.0, True), (5.0, 20.0, True)]
+    lane = _lane(True)
+    segments = visibility_segments(lane, 20.0, inherit=True)
+    assert segments == [(0.0, 20.0, True)]
 
 
-def test_unique_cue_times_clamps_to_duration() -> None:
-    cues = [
-        TimelineCue(t=-1.0, layers={"layer_1": False}),
-        TimelineCue(t=5.0, layers={"layer_2": False}),
-        TimelineCue(t=50.0, layers={"layer_3": False}),
-    ]
-    assert unique_cue_times(cues, 10.0) == [5.0]
+def test_cue_times_for_stem_lists_lane_transitions() -> None:
+    lane = _lane(True, (5.0, False), (15.0, True))
+    assert cue_times_for_stem(lane, 30.0) == [5.0, 15.0]
 
 
-def test_cue_times_for_stem_skips_no_tick_slots() -> None:
-    cues = [
-        TimelineCue(t=5.0, layers={"layer_1": False}),
-        TimelineCue(t=10.0, layers={"layer_1": True}, no_tick_slots=frozenset({"layer_1"})),
-    ]
-    assert cue_times_for_stem(cues, "layer_1", 30.0) == [5.0]
-
-
-def test_cue_times_for_stem_tick_is_per_slot_in_merged_cue() -> None:
-    cues = [
-        TimelineCue(
-            t=10.0,
-            layers={"layer_1": True, "layer_2": False},
-            no_tick_slots=frozenset({"layer_1"}),
-        ),
-    ]
-    assert cue_times_for_stem(cues, "layer_1", 30.0) == []
-    assert cue_times_for_stem(cues, "layer_2", 30.0) == [10.0]
-
-
-def test_cue_times_for_stem_only_includes_relevant_layers() -> None:
-    cues = [
-        TimelineCue(t=5.0, layers={"layer_1": False}),
-        TimelineCue(t=15.0, layers={"layer_2": False, "layer_3": True}),
-        TimelineCue(t=25.0, layers={"layer_4": False}),
-    ]
-    assert cue_times_for_stem(cues, "layer_1", 30.0) == [5.0]
-    assert cue_times_for_stem(cues, "layer_2", 30.0) == [15.0]
-    assert cue_times_for_stem(cues, "layer_3", 30.0) == [15.0]
-    assert cue_times_for_stem(cues, "layer_4", 30.0) == [25.0]
+def test_cue_times_for_stem_clamps_to_duration() -> None:
+    lane = _lane(True, (5.0, False), (50.0, True))
+    assert cue_times_for_stem(lane, 10.0) == [5.0]
 
 
 def test_stem_labels_use_abbreviations() -> None:
@@ -585,7 +560,7 @@ def test_draw_does_not_crash() -> None:
     pygame.init()
     overlay = TimelineOverlay()
     state = _view_state(
-        cues=[TimelineCue(t=25.0, layers={"layer_1": False})],
+        lanes={"layer_1": _lane(True, (25.0, False))},
         position_sec=25.0,
         focus_row=1,
         armed_slots={"layer_2"},
@@ -728,11 +703,7 @@ def test_bar_shows_fill_for_backward_skipped_range() -> None:
         recording=True,
         record_start_sec=20.0,
         record_baseline={"layer_1": True},
-        record_buffer=[
-            TimelineCue(
-                t=20.0, layers={"layer_1": False}, no_tick_slots=frozenset({"layer_1"})
-            )
-        ],
+        record_buffer={"layer_1": [SlotCue(t=20.0, visible=False)]},
         record_high_water_mark=30.0,
     )
     assert _bar_visible_at(state, slot, 25.0) is False
@@ -751,11 +722,7 @@ def test_bar_shows_fill_for_backward_seek_with_expanded_punch_start() -> None:
         recording=True,
         record_start_sec=10.0,
         record_baseline={"layer_1": False},
-        record_buffer=[
-            TimelineCue(
-                t=10.0, layers={"layer_1": True}, no_tick_slots=frozenset({"layer_1"})
-            )
-        ],
+        record_buffer={"layer_1": [SlotCue(t=10.0, visible=True)]},
         record_high_water_mark=20.0,
     )
     assert _bar_visible_at(state, slot, 15.0) is True
@@ -774,11 +741,7 @@ def test_bar_without_high_water_mark_behaves_as_before() -> None:
         recording=True,
         record_start_sec=20.0,
         record_baseline={"layer_1": True},
-        record_buffer=[
-            TimelineCue(
-                t=20.0, layers={"layer_1": False}, no_tick_slots=frozenset({"layer_1"})
-            )
-        ],
+        record_buffer={"layer_1": [SlotCue(t=20.0, visible=False)]},
         record_high_water_mark=None,
     )
     assert _bar_visible_at(state, slot, 22.0) is False
