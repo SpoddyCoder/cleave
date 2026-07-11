@@ -1035,6 +1035,45 @@ def test_parse_timeline_reads_cues_sorted_by_t() -> None:
     )
 
 
+def test_parse_timeline_reads_no_tick_slots() -> None:
+    timeline = parse_timeline_section(
+        {
+            "timeline": {
+                "cues": [
+                    {
+                        "t": 12.0,
+                        "layers": {"layer_1": True, "layer_2": False},
+                        "no_tick": ["layer_1"],
+                    },
+                ],
+            }
+        },
+        _timeline_parse_ctx(),
+    )
+    assert timeline is not None
+    assert timeline.cues == (
+        TimelineCue(
+            t=12.0,
+            layers={"layer_1": True, "layer_2": False},
+            no_tick_slots=frozenset({"layer_1"}),
+        ),
+    )
+
+
+def test_parse_timeline_rejects_no_tick_not_in_layers() -> None:
+    with pytest.raises(ValueError, match="no_tick must reference layers in the cue"):
+        parse_timeline_section(
+            {
+                "timeline": {
+                    "cues": [
+                        {"t": 1.0, "layers": {"layer_1": True}, "no_tick": ["layer_2"]},
+                    ],
+                }
+            },
+            _timeline_parse_ctx(),
+        )
+
+
 def test_parse_timeline_rejects_unknown_stem() -> None:
     with pytest.raises(ValueError, match="unknown layer keys in timeline.cues"):
         parse_timeline_section(
