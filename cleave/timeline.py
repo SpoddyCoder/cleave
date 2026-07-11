@@ -123,14 +123,34 @@ def punch_replace(
     stop_sec: float,
     new_cues: list[TimelineCue],
 ) -> list[TimelineCue]:
-    kept = [
-        cue
-        for cue in cues
+    """Overwrite armed slots in ``[start_sec, stop_sec]``; leave unarmed slots intact.
+
+    Cues are often multi-slot (timeline presets put every slot on the t=0 cue,
+    and simultaneous transitions share one object). Deleting a whole cue when it
+    mentions an armed stem would erase unarmed slots that share that object —
+    strip armed keys only, then merge in ``new_cues``.
+    """
+    kept: list[TimelineCue] = []
+    for cue in cues:
         if not (
             start_sec <= cue.t <= stop_sec
             and _cue_modifies_armed_stem(cue, armed_stems)
-        )
-    ]
+        ):
+            kept.append(cue)
+            continue
+        remaining = {
+            slot: visible
+            for slot, visible in cue.layers.items()
+            if slot not in armed_stems
+        }
+        if remaining:
+            kept.append(
+                TimelineCue(
+                    t=cue.t,
+                    layers=remaining,
+                    no_tick_slots=cue.no_tick_slots.intersection(remaining),
+                )
+            )
     combined = kept + list(new_cues)
     return _merge_cues_at_same_t(combined)
 

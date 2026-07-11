@@ -110,8 +110,47 @@ def test_punch_replace_removes_armed_cues_in_range() -> None:
         TimelineCue(t=1.0, layers={"layer_1": False}),
         TimelineCue(t=5.0, layers={"layer_2": False}),
         TimelineCue(t=6.0, layers={"layer_1": False}),
+        # Unarmed layer_3 entry from the shared cue at t=8 must survive.
+        TimelineCue(t=8.0, layers={"layer_3": False}),
         TimelineCue(t=12.0, layers={"layer_4": False}),
     ]
+
+
+def test_punch_replace_preserves_unarmed_slots_in_shared_cue() -> None:
+    """Preset-style multi-slot cues must not lose unarmed keys when punching."""
+    cues = [
+        TimelineCue(
+            t=0.0,
+            layers={
+                "layer_1": True,
+                "layer_2": False,
+                "layer_3": True,
+                "layer_4": False,
+            },
+        ),
+        TimelineCue(t=10.0, layers={"layer_1": False, "layer_2": True}),
+        TimelineCue(t=20.0, layers={"layer_3": False}),
+    ]
+    result = punch_replace(
+        cues,
+        armed_stems={"layer_1"},
+        start_sec=0.0,
+        stop_sec=15.0,
+        new_cues=[
+            TimelineCue(t=0.0, layers={"layer_1": False}),
+            TimelineCue(t=5.0, layers={"layer_1": True}),
+        ],
+    )
+    by_t = {cue.t: cue.layers for cue in result}
+    assert by_t[0.0] == {
+        "layer_1": False,
+        "layer_2": False,
+        "layer_3": True,
+        "layer_4": False,
+    }
+    assert by_t[5.0] == {"layer_1": True}
+    assert by_t[10.0] == {"layer_2": True}
+    assert by_t[20.0] == {"layer_3": False}
 
 
 def test_punch_replace_keeps_unarmed_cues_in_range() -> None:

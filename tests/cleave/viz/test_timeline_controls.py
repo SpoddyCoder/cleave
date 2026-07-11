@@ -747,6 +747,102 @@ def test_stop_record_preserves_unarmed_cues_in_punch_range() -> None:
     )
 
 
+def test_stop_record_preserves_unarmed_slots_in_preset_style_cues() -> None:
+    """Recording one armed layer must not rewrite shared multi-slot preset cues.
+
+    Timeline presets emit a full t=0 cue for every slot and pack simultaneous
+    transitions into one TimelineCue. Whole-cue punch deletion used to erase
+    unarmed keys from those objects, flipping whole sections on other tracks.
+    """
+    from cleave.viz.layer_visibility import timeline_committed_visible
+
+    slots = tuple(DEFAULT_LAYER_SLOTS)
+    cues = [
+        TimelineCue(
+            t=0.0,
+            layers={
+                "layer_1": True,
+                "layer_2": False,
+                "layer_3": True,
+                "layer_4": False,
+            },
+        ),
+        TimelineCue(t=8.0, layers={"layer_1": False, "layer_2": True}),
+        TimelineCue(t=16.0, layers={"layer_3": False, "layer_4": True}),
+        TimelineCue(t=24.0, layers={"layer_2": False}),
+    ]
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=5.0,
+        cues=cues,
+    )
+    for slot in slots:
+        session.layers[slot].enabled = cues[0].layers[slot]
+
+    unarmed = ("layer_2", "layer_3", "layer_4")
+    sample = (0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0, 30.0)
+    before = {
+        slot: [timeline_committed_visible(session, slot, t) for t in sample]
+        for slot in unarmed
+    }
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.playback.player.seek(12.0)
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.playback.player.seek(18.0)
+    controls.handle_keydown(keydown(pygame.K_r))
+
+    after = {
+        slot: [timeline_committed_visible(session, slot, t) for t in sample]
+        for slot in unarmed
+    }
+    assert after == before
+    # Shared cue at t=8 kept layer_2; armed layer_1 was rewritten separately.
+    cue_at_8 = next(cue for cue in session.timeline.cues if cue.t == 8.0)
+    assert cue_at_8.layers.get("layer_2") is True
+    cue_at_16 = next(cue for cue in session.timeline.cues if cue.t == 16.0)
+    assert cue_at_16.layers == {"layer_3": False, "layer_4": True}
+
+
+def test_stop_record_preserves_unarmed_after_breathing_preset() -> None:
+    """End-to-end: punch through a real preset must leave unarmed tracks alone."""
+    import random
+
+    from cleave.timeline_presets import build_breathing_cues
+    from cleave.viz.layer_visibility import timeline_committed_visible
+
+    slots = list(DEFAULT_LAYER_SLOTS)
+    cues = build_breathing_cues(slots, 60.0, random.Random(42))
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=5.0,
+        cues=cues,
+    )
+    for slot in slots:
+        session.layers[slot].enabled = cues[0].layers[slot]
+
+    unarmed = ("layer_2", "layer_3", "layer_4")
+    sample = tuple(i * 2.5 for i in range(25))
+    before = {
+        slot: [timeline_committed_visible(session, slot, t) for t in sample]
+        for slot in unarmed
+    }
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.playback.player.seek(25.0)
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.playback.player.seek(35.0)
+    controls.handle_keydown(keydown(pygame.K_r))
+
+    after = {
+        slot: [timeline_committed_visible(session, slot, t) for t in sample]
+        for slot in unarmed
+    }
+    assert after == before
+
+
 def test_stop_record_does_not_flip_unarmed_leading_section() -> None:
     """Regression: recording an armed layer must not change an unarmed layer.
 
