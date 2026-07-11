@@ -201,6 +201,59 @@ def _nearest_with_earlier_tie(t: float, candidates: Sequence[float]) -> float:
     return min(candidates, key=lambda c: (abs(c - t), c))
 
 
+def bar_phase_from_beats(
+    beat_times: Sequence[float],
+    onset_at_beats: Sequence[float],
+    *,
+    beats_per_bar: int = 4,
+) -> int | None:
+    """Pick 4/4 bar phase by maximizing summed onset at candidate downbeats."""
+    if len(beat_times) != len(onset_at_beats):
+        raise ValueError(
+            "beat_times and onset_at_beats must have the same length "
+            f"(got {len(beat_times)} and {len(onset_at_beats)})"
+        )
+    if beats_per_bar < 1:
+        raise ValueError(f"beats_per_bar must be >= 1 (got {beats_per_bar})")
+    n = (len(beat_times) // beats_per_bar) * beats_per_bar
+    if n < beats_per_bar:
+        return None
+    onset = np.asarray(onset_at_beats[:n], dtype=np.float64).reshape(
+        -1, beats_per_bar
+    )
+    return int(np.argmax(onset.sum(axis=0)))
+
+
+def bar_times_at_phase(
+    beat_times: Sequence[float],
+    phase: int,
+    *,
+    beats_per_bar: int = 4,
+) -> tuple[float, ...]:
+    """Return every ``beats_per_bar``-th beat starting at ``phase``."""
+    if beats_per_bar < 1:
+        raise ValueError(f"beats_per_bar must be >= 1 (got {beats_per_bar})")
+    if not beat_times:
+        return ()
+    phase = phase % beats_per_bar
+    return tuple(beat_times[phase::beats_per_bar])
+
+
+def bar_times_from_beats(
+    beat_times: Sequence[float],
+    onset_at_beats: Sequence[float],
+    *,
+    beats_per_bar: int = 4,
+) -> tuple[float, ...]:
+    """Bar grid at the onset-strongest phase (see ``bar_phase_from_beats``)."""
+    k = bar_phase_from_beats(
+        beat_times, onset_at_beats, beats_per_bar=beats_per_bar
+    )
+    if k is None:
+        return ()
+    return bar_times_at_phase(beat_times, k, beats_per_bar=beats_per_bar)
+
+
 def snap_lane_to_beats(
     lane: TimelineLane,
     beat_times: Sequence[float],
