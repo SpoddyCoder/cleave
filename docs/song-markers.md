@@ -41,15 +41,15 @@ Build UI and editing only. No snap, preset generation, or beat-phase logic yet.
 
 ### List interaction
 
-- **Sticky selection:** the highlighted list row stays put until the user moves focus (Up/Down) or deletes it. Drop/replace does **not** select the new marker; prior selection is preserved (remapped by time if the list shifts). Do **not** auto-follow the playhead.
-- **Enter** on a highlighted song marker seeks the playhead to that time (audition / verify placement). Timeline row arm uses **a**, so **Enter** is free for seek-to-marker.
-- **Delete** prompts a confirm modal, then removes the highlighted song marker.
+- Focus on a song-marker list row highlights that row and the matching strip tick. Drop/replace does **not** move focus onto the new marker; if a marker row was already focused, that selection is remapped by time when the list shifts. Do **not** auto-follow the playhead.
+- **Enter** on a focused song marker seeks the playhead to that time (audition / verify placement). Timeline row arm uses **a**, so **Enter** is free for seek-to-marker.
+- **Delete** prompts a confirm modal, then removes the focused song marker.
 - No nudge in v1 — delete and re-drop at the playhead is enough, with **Enter** to verify.
 
 ### Timeline display
 
 - Song markers render as **red 2px vertical lines** spanning all lanes (global structure, not per-layer visibility cues).
-- The highlighted song marker uses a **4px yellow/orange** line on the strip.
+- The **4px yellow/orange** strip highlight appears only while focus is on that marker's `SONG_MARKER_ITEM` list row. When focus is elsewhere (other panel rows, timeline strip lanes, etc.), all song markers draw as the normal red 2px lines.
 
 ### Placement rules
 

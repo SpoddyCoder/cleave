@@ -36,13 +36,16 @@ HelpContent = HelpSection | DescriptionSection
 KEYBOARD_CONTROLS_SECTION_TITLE = "Keyboard Controls"
 
 NAVIGATION_SECTION = HelpSection(
-    "Navigation",
+    "Navigation / Global",
     (
         ("Up/Down", "move row"),
         ("Ctrl + Up/Down", "jump section"),
         ("ESC", "hide UI"),
         ("Ctrl + Q", "quit"),
         ("Ctrl + S", "save config"),
+        ("Ctrl + Enter", "place song marker"),
+        ("Ctrl + f", "favourite preset"),
+        ("Ctrl + b", "blacklist preset"),
     ),
 )
 

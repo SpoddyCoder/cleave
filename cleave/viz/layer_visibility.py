@@ -18,14 +18,26 @@ from cleave.timeline import (
 )
 from cleave.viz.focus_nav import (
     FocusCursor,
+    MainFocus,
     cursor_timeline_row,
     cursor_timeline_submenu_focused,
 )
+from cleave.viz.row_semantics import RowKind
 from cleave.viz.session import TuningSession
 from cleave.viz.timeline_overlay import TimelineViewState, prune_expired_arm_flashes
 
 if TYPE_CHECKING:
     from cleave.viz.layer import StemLayer
+
+
+def focused_song_marker_index(focus_cursor: FocusCursor | None) -> int | None:
+    """Strip highlight index only while a song-marker list row has main focus."""
+    if not isinstance(focus_cursor, MainFocus):
+        return None
+    desc = focus_cursor.descriptor
+    if desc.kind != RowKind.SONG_MARKER_ITEM:
+        return None
+    return desc.marker_index
 
 
 def _lane_for_slot(session: TuningSession, slot: str) -> TimelineLane:
@@ -261,5 +273,5 @@ def build_timeline_view_state(
             bar_times, beat_times, tl.bar_phase_offset
         ),
         song_marker_times=tuple(session.song_markers.times),
-        selected_song_marker_index=session.song_markers.selected_index,
+        selected_song_marker_index=focused_song_marker_index(focus_cursor),
     )
