@@ -58,7 +58,7 @@ _TRANSPORT_SECTION = HelpSection(
 
 _LAYER_SECTION_BASE: tuple[tuple[str, str], ...] = (
     ("m", "move z-order"),
-    ("Ctrl + Enter", "lock/unlock layer"),
+    ("l", "lock/unlock layer"),
     ("Shift + Left/Right", "solo layer"),
     ("Left/Right", "expand/collapse"),
     ("Delete", "delete layer"),

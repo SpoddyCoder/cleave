@@ -3069,17 +3069,17 @@ def _sub_rows_for_stem(view: TuningViewState, stem: str) -> list[int]:
     ]
 
 
-def test_ctrl_enter_toggles_lock() -> None:
+def test_l_toggles_lock() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
     assert controls.session.layers["layer_1"].locked is False
 
-    controls.handle_keydown(_keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_l))
     assert controls.session.layers["layer_1"].locked is True
 
-    controls.handle_keydown(_keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_l))
     assert controls.session.layers["layer_1"].locked is False
 
 
@@ -3201,7 +3201,7 @@ def test_locked_not_toggleable_during_move_mode() -> None:
     controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
     assert controls.move_mode_slot == "layer_2"
 
-    controls.handle_keydown(_keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_l))
     assert controls.session.layers["layer_2"].locked is False
 
 

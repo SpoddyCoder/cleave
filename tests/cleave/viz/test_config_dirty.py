@@ -77,7 +77,7 @@ def _mutate_stem_blend_mode(controls: TuningControls) -> None:
 def _mutate_stem_locked(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_HEADER))
-    controls.handle_keydown(_keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(_keydown(pygame.K_l))
 
 
 def _mutate_stem_beat_sensitivity(controls: TuningControls) -> None:

@@ -96,7 +96,7 @@ def test_help_entry_columns_align_to_widest_key() -> None:
 def test_layer_section_includes_visibility_when_timeline_disabled() -> None:
     section = layer_section(timeline_enabled=False)
     entries = dict(section.entries)
-    assert entries.get("Ctrl + Enter") == "lock/unlock layer"
+    assert entries.get("l") == "lock/unlock layer"
     assert entries.get("Shift + Left/Right") == "solo layer"
     assert entries.get("Ctrl + Left/Right") == "enable/disable layer"
     assert entries.get("Delete") == "delete layer"
