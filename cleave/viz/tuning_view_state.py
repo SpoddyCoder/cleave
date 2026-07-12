@@ -133,6 +133,7 @@ class RenderTimelineBlock:
     bar_phase_offset: int = 0
     show_bar_grid: bool = False
     song_marker_snap_proximity: float = 5.0
+    song_marker_snap_scope: str = "each_layer"
     locked: bool = False
     song_markers_expanded: bool = False
     song_marker_times: tuple[float, ...] = ()
@@ -433,6 +434,7 @@ class TuningViewStateBuilder:
             bar_phase_offset=tl.bar_phase_offset,
             show_bar_grid=tl.show_bar_grid,
             song_marker_snap_proximity=tl.song_marker_snap_proximity,
+            song_marker_snap_scope=tl.song_marker_snap_scope,
             song_markers_expanded=self.session.song_markers.expanded,
             song_marker_times=tuple(self.session.song_markers.times),
         )
@@ -583,6 +585,7 @@ class TuningViewStateBuilder:
                 bar_phase_offset=tl.bar_phase_offset,
                 show_bar_grid=tl.show_bar_grid,
                 song_marker_snap_proximity=tl.song_marker_snap_proximity,
+                song_marker_snap_scope=tl.song_marker_snap_scope,
                 locked=tl.locked,
                 song_markers_expanded=self.session.song_markers.expanded,
                 song_marker_times=tuple(self.session.song_markers.times),

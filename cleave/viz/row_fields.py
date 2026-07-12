@@ -33,6 +33,10 @@ from cleave.viz.row_sections import (
 from cleave.viz.row_semantics import RowDescriptor, RowKind, row_behavior
 from cleave.viz.tuning_view_state import TrackBlock, TuningViewState
 from cleave.viz.user_presets import user_preset_item_display_name
+from cleave.viz.timeline_snap_controls import (
+    cycle_song_marker_snap_scope,
+    song_marker_snap_scope_label,
+)
 
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
@@ -40,6 +44,7 @@ if TYPE_CHECKING:
 
 class RowPresentStyle(Enum):
     LABELED_VALUE = auto()
+    ACTION_PARAMETER = auto()
     EXPAND_SUBHEADER = auto()
     COMPOSITE_HEADER = auto()
     PATH_ICON = auto()
@@ -149,6 +154,30 @@ def _apply_timeline_snap_marker_proximity(
             _SONG_MARKER_SNAP_PROXIMITY_MAX,
             round(tl.song_marker_snap_proximity + delta, 1),
         ),
+    )
+
+
+def _format_timeline_snap_marker_scope(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return song_marker_snap_scope_label(
+        state.render_timeline.song_marker_snap_scope,
+        state.layer_z_order,
+    )
+
+
+def _apply_timeline_snap_marker_scope(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    tl = controls.session.timeline
+    tl.song_marker_snap_scope = cycle_song_marker_snap_scope(
+        tl.song_marker_snap_scope,
+        controls.session.layer_z_order,
+        forward=forward,
     )
 
 
@@ -1376,10 +1405,16 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.FULL_LINE,
     ),
     RowKind.TIMELINE_SNAP_MARKER_PROXIMITY: RowFieldDef(
-        panel_label="snap marker proximity",
-        present_style=RowPresentStyle.LABELED_VALUE,
+        panel_label="proximity",
+        present_style=RowPresentStyle.ACTION_PARAMETER,
         format_value=_format_timeline_snap_marker_proximity,
         apply_horizontal=_apply_timeline_snap_marker_proximity,
+    ),
+    RowKind.TIMELINE_SNAP_MARKER_SCOPE: RowFieldDef(
+        panel_label="layer scope",
+        present_style=RowPresentStyle.ACTION_PARAMETER,
+        format_value=_format_timeline_snap_marker_scope,
+        apply_horizontal=_apply_timeline_snap_marker_scope,
     ),
     RowKind.TIMELINE_SNAP_TO_SONG_MARKERS: RowFieldDef(
         panel_label="snap to song markers",
@@ -1432,6 +1467,12 @@ def labeled_row_prefix(kind: RowKind) -> str:
 
 
 def row_labeled_display_text(state: TuningViewState, desc: RowDescriptor) -> str:
+    return labeled_row_prefix(desc.kind) + format_row_value(state, desc)
+
+
+def row_action_parameter_display_text(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
     return labeled_row_prefix(desc.kind) + format_row_value(state, desc)
 
 

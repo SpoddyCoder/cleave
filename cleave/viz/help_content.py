@@ -298,6 +298,8 @@ def sections_for(
             )
     elif behavior.affordance == RowAffordance.VALUE_STEP:
         primary = _value_step_section(row_kind)
+    elif behavior.affordance == RowAffordance.ACTION_PARAMETER:
+        primary = _value_step_section(row_kind)
     elif row_kind == RowKind.TRACK_USER_PRESET_ITEM:
         primary = _USER_PRESET_ITEM_SECTION
     elif row_kind == RowKind.TRACK_USER_PRESET_ADD:

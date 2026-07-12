@@ -16,6 +16,7 @@ from cleave.viz.tuning_panel_draw import (
     TuningOverlay,
     _row_bg_color,
     _row_text,
+    _action_parameter_label_color,
     _row_value_color,
     fit_row_text,
     panel_content_max_width,
@@ -864,6 +865,30 @@ def test_action_row_value_color() -> None:
     assert _row_value_color(state, config_row) == ACTION
     assert _row_value_color(state, add_row) == ACTION
     assert _row_value_color(state, delete_row) == ACTION
+
+
+def test_action_parameter_row_value_color() -> None:
+    state = _minimal_view_state(
+        render_timeline=RenderTimelineBlock(enabled=True, expanded=True),
+    )
+    snap_row = state.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
+    prox_row = state.layout.find_by_kind(RowKind.TIMELINE_SNAP_MARKER_PROXIMITY)
+    scope_row = state.layout.find_by_kind(RowKind.TIMELINE_SNAP_MARKER_SCOPE)
+    assert _row_value_color(state, snap_row) == ACTION
+    assert _row_value_color(state, prox_row) == VALUE
+    assert _row_value_color(state, scope_row) == VALUE
+    assert _action_parameter_label_color(state, prox_row) == ACTION
+    assert _action_parameter_label_color(state, scope_row) == ACTION
+
+    locked = _minimal_view_state(
+        render_timeline=RenderTimelineBlock(
+            enabled=True,
+            expanded=True,
+            locked=True,
+        ),
+    )
+    prox_locked = locked.layout.find_by_kind(RowKind.TIMELINE_SNAP_MARKER_PROXIMITY)
+    assert _row_value_color(locked, prox_locked) == LOCKED
 
 
 def test_draw_layer_management_rows_without_error() -> None:

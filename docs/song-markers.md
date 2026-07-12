@@ -75,20 +75,33 @@ Workflow:
 
 ### Behavior
 
-For each song marker (ascending time), pull the **closest** unclaimed timeline cue within proximity onto that marker. Each cue moves at most once (**exclusive assignment**). If no unclaimed cue lies within proximity, that marker is a no-op. Visibility flags are preserved; only cue times change. Lanes are canonicalized after moves.
+For each song marker (ascending time), pull the **closest** unclaimed timeline cue within proximity onto that marker. Each cue moves at most once (**exclusive assignment**). If no unclaimed cue lies within proximity, that marker is a no-op. Visibility flags are preserved; only cue times change. Tracks are canonicalized after moves.
 
 Default proximity: **5.0s** (session-only; Left/Right on the proximity row, clamp 0.5..30.0, step 0.5).
 
-### Layer scope modal
+### Panel layout
 
-Enter on **snap to song markers** opens a choice modal:
+Under **snap to bars**, **snap to song markers** is an action row with two child parameter rows:
 
-- **Layer 1** … **Layer N** — only that lane (one option per `layer_z_order` entry)
-- **All layers (closest wins)** — for each marker, among cues in all lanes within proximity, move the single closest cue (tie: earlier cue time, then earlier layer in z-order)
-- **Each layer** — for each lane independently, each marker pulls that lane's closest unclaimed cue within proximity (claims are per-lane)
-- **Cancel**
+```
+snap to song markers
+└─ proximity: 5.0s
+└─ layer scope: all layers
+```
 
-Destructive multi-lane moves stay explicit via the modal; no silent wide snaps.
+Parameter rows use `ACTION` green for the label prefix and white `VALUE` for the value. Left/Right adjusts proximity or cycles layer scope.
+
+### Layer scope
+
+Session-only **layer scope** (Left/Right on the layer scope row) cycles:
+
+- **layer 1** … **layer N** — only that track
+- **closest wins** — for each marker, among cues in all tracks within proximity, move the single closest cue (tie: earlier cue time, then earlier layer in z-order)
+- **all layers** (default) — for each track independently, each marker pulls that track's closest unclaimed cue within proximity (claims are per-track)
+
+### Confirm
+
+Enter on **snap to song markers** opens a Yes/CANCEL confirm modal describing proximity and the current layer scope. It does not open a multi-choice scope modal.
 
 ---
 

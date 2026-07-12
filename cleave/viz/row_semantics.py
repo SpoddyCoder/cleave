@@ -80,6 +80,7 @@ class RowKind(Enum):
     TIMELINE_SNAP_TO_BEATS = auto()
     TIMELINE_SNAP_TO_BARS = auto()
     TIMELINE_SNAP_MARKER_PROXIMITY = auto()
+    TIMELINE_SNAP_MARKER_SCOPE = auto()
     TIMELINE_SNAP_TO_SONG_MARKERS = auto()
     SONG_MARKERS_HEADER = auto()
     SONG_MARKER_ITEM = auto()
@@ -106,6 +107,7 @@ class RowDescriptor:
 class RowAffordance(Enum):
     EXPAND = auto()
     VALUE_STEP = auto()
+    ACTION_PARAMETER = auto()
     PATH_DIR = auto()
     PATH_PRESET = auto()
     SEEK = auto()
@@ -754,18 +756,29 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         ),
     ),
     RowKind.TIMELINE_SNAP_MARKER_PROXIMITY: RowBehavior(
-        RowAffordance.VALUE_STEP,
+        RowAffordance.ACTION_PARAMETER,
         navigable=True,
         repeatable=True,
         blocked_by_section_lock=True,
-        help_title="Song marker snap proximity",
+        help_title="Snap proximity",
         help_entries=(
             ("Left", "decrease proximity"),
             ("Right", "increase proximity"),
         ),
         help_description=(
             "Maximum distance for snap to song markers.",
-            "Tune before Enter on snap to song markers.",
+        ),
+    ),
+    RowKind.TIMELINE_SNAP_MARKER_SCOPE: RowBehavior(
+        RowAffordance.ACTION_PARAMETER,
+        navigable=True,
+        repeatable=True,
+        blocked_by_section_lock=True,
+        help_title="Snap layer scope",
+        help_entries=(("Left/Right", "cycle layer scope"),),
+        help_description=(
+            "Which tracks snap to song markers.",
+            "Per-layer, closest wins, or all layers independently.",
         ),
     ),
     RowKind.TIMELINE_SNAP_TO_SONG_MARKERS: RowBehavior(
@@ -776,7 +789,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_entries=(("Enter", "snap cues to song markers"),),
         help_description=(
             "Pull closest cues within proximity onto song markers",
-            "(irreversible; choose layer scope in the modal).",
+            "(irreversible; confirm uses proximity and layer scope).",
         ),
     ),
     RowKind.SONG_MARKERS_HEADER: RowBehavior(
@@ -876,6 +889,11 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
 
 HEADER_ROW_KINDS = frozenset(k for k, b in ROW_BEHAVIORS.items() if b.is_header)
 REPEAT_ROW_KINDS = frozenset(k for k, b in ROW_BEHAVIORS.items() if b.repeatable)
+ACTION_PARAMETER_SUB_ROW_KINDS = frozenset(
+    k
+    for k, b in ROW_BEHAVIORS.items()
+    if b.affordance == RowAffordance.ACTION_PARAMETER and not b.is_header
+)
 LABELED_SUB_ROW_KINDS = frozenset(
     k
     for k, b in ROW_BEHAVIORS.items()
@@ -902,6 +920,7 @@ PRESET_FILE_ROW_KINDS = frozenset({RowKind.TRACK_PRESET, RowKind.TRACK_USER_PRES
 _SECTION_LOCK_BLOCKING_AFFORDANCES = frozenset(
     {
         RowAffordance.VALUE_STEP,
+        RowAffordance.ACTION_PARAMETER,
         RowAffordance.PATH_DIR,
         RowAffordance.PATH_PRESET,
     }
