@@ -78,6 +78,7 @@ Colors live in [cleave/viz/theme.py](cleave/viz/theme.py). Label truncation uses
 | Label | `LABEL` | `(170, 210, 255)` | Light blue prefixes and section titles |
 | Value | `VALUE` | `(255, 255, 255)` | Default white for values and state indicators |
 | Action | `ACTION` | `(80, 190, 125)` | Modal confirm rows (save config, add/delete layer) |
+| Action parameter | `ACTION` / `VALUE` | `(80, 190, 125)` / `(255, 255, 255)` | Label prefix in ACTION green; value in white VALUE |
 | Disabled | `DISABLED` | `(140, 140, 140)` | Inactive rows and controls |
 | Locked | `LOCKED` | `(235, 150, 150)` | Locked sub-rows that cannot be edited |
 

@@ -149,6 +149,7 @@ class TimelineRuntime:
     bar_phase_offset: int = 0
     show_bar_grid: bool = False
     song_marker_snap_proximity: float = 5.0
+    song_marker_snap_scope: str = "each_layer"
 
 
 def default_timeline_runtime() -> TimelineRuntime:
