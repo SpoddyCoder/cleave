@@ -6,25 +6,24 @@ import random
 from collections.abc import Sequence
 
 from cleave.timeline import TimelineLane
-from cleave.timeline_presets.busyness import (
-    MIN_SWITCH_GAP_BARS,
-    MIN_SWITCH_GAP_SEC,
-    PHRASE_BARS_MAX,
-    PHRASE_BARS_MIN,
-    PHRASE_SEC_MIN,
-    CharacterProfile,
-    in_climax_window,
-)
+from cleave.timeline_presets.characters import CharacterProfile, in_climax_window
 from cleave.timeline_presets.chords import ChordVocab, build_vocab
 from cleave.timeline_presets.emit import cues_from_states
 from cleave.timeline_presets.grid import thin_bar_times_for_arrange
 from cleave.timeline_presets.motifs import (
+    MIN_SWITCH_GAP_BARS,
+    MIN_SWITCH_GAP_SEC,
     MotifDef,
     expand_motif,
     hamming_distance,
     motif_max_cost_resolved,
     motifs_for_profile,
 )
+
+# Phrase length bounds for the arranger (bar counts and wall-clock seconds).
+PHRASE_BARS_MIN = 4
+PHRASE_BARS_MAX = 8
+PHRASE_SEC_MIN = 8.0
 
 
 def compose_timeline(
@@ -172,7 +171,7 @@ def _partition_phrases(
         end = bars[end_i] if end_i < n else duration_sec
 
         # Extend on the thinned grid until wall-clock meets PHRASE_SEC_MIN.
-        # Holes may push a phrase past PHRASE_SEC_MAX; do not invent bars.
+        # Gaps in the bar grid may yield longer phrases; do not invent bars.
         while end - start < PHRASE_SEC_MIN - 1e-9 and end_i < n:
             end_i += 1
             end = bars[end_i] if end_i < n else duration_sec

@@ -215,6 +215,8 @@ def test_timeline_presets_help_lists_characters() -> None:
         "Dialogue",
         "Arc",
         "Pulse",
+        "Reset (All Off)",
+        "Reset (All On)",
     ]
     keyboard = _keyboard_section(sections)
     assert keyboard.title == KEYBOARD_CONTROLS_SECTION_TITLE

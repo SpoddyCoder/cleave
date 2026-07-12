@@ -1574,7 +1574,15 @@ def test_timeline_presets_enter_opens_choice_modal() -> None:
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
     assert modal_view.kind == ModalKind.CHOICE
-    assert modal_view.options == ("Breathing", "Dialogue", "Arc", "Pulse", "Cancel")
+    assert modal_view.options == (
+        "Breathing",
+        "Dialogue",
+        "Arc",
+        "Pulse",
+        "Reset (All Off)",
+        "Reset (All On)",
+        "Cancel",
+    )
     assert "timeline preset" in modal_view.message.lower()
 
 
@@ -1636,6 +1644,47 @@ def test_timeline_presets_arc_clears_and_applies() -> None:
     assert lanes
     assert set(lanes) == {"layer_1", "layer_2"}
     assert all(lane.baseline is not None for lane in lanes.values())
+
+
+def test_timeline_presets_reset_all_off() -> None:
+    controls = _make_controls(("layer_1", "layer_2", "layer_3"))
+    controls.session.timeline.lanes = {
+        "layer_1": _lane(True, (1.0, False)),
+        "layer_2": _lane(False, (2.0, True)),
+    }
+    controls.session.timeline.enabled = False
+    controls.session.timeline.recording = True
+    controls.session.timeline.armed_slots.add("layer_1")
+    _focus_timeline_presets(controls)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    _choose_modal_option(controls, "Reset (All Off)")
+    assert not controls.modal_host.active
+    assert controls.session.timeline.enabled is True
+    assert controls.session.timeline.recording is False
+    assert not controls.session.timeline.armed_slots
+    lanes = controls.session.timeline.lanes
+    assert set(lanes) == {"layer_1", "layer_2", "layer_3"}
+    assert all(lane.baseline is False and lane.cues == [] for lane in lanes.values())
+    view = controls.build_view_state(paused=False)
+    assert view.notification_message == "Reset timeline: all layers off"
+
+
+def test_timeline_presets_reset_all_on() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    controls.session.timeline.lanes = {
+        "layer_1": _lane(False, (3.0, True)),
+    }
+    controls.session.timeline.enabled = False
+    _focus_timeline_presets(controls)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    _choose_modal_option(controls, "Reset (All On)")
+    assert not controls.modal_host.active
+    assert controls.session.timeline.enabled is True
+    lanes = controls.session.timeline.lanes
+    assert set(lanes) == {"layer_1", "layer_2"}
+    assert all(lane.baseline is True and lane.cues == [] for lane in lanes.values())
+    view = controls.build_view_state(paused=False)
+    assert view.notification_message == "Reset timeline: all layers on"
 
 
 def test_timeline_presets_refuse_without_bars() -> None:

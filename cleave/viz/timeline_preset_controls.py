@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 from collections.abc import Callable, Sequence
 
-from cleave.timeline import copy_lane, empty_lane, shift_bars_by_beats
+from cleave.timeline import TimelineLane, copy_lane, empty_lane, shift_bars_by_beats
 from cleave.timeline_presets import (
     build_arc_cues,
     build_breathing_cues,
@@ -63,6 +63,14 @@ class TimelinePresetController:
                 "Pulse",
                 lambda: self._apply("pulse", duration_sec),
             ),
+            ModalOption(
+                "Reset (All Off)",
+                lambda: self._reset(all_on=False),
+            ),
+            ModalOption(
+                "Reset (All On)",
+                lambda: self._reset(all_on=True),
+            ),
             ModalOption(_CANCEL_LABEL, dismiss),
         ]
         self._modal.prompt_choice(_PROMPT_MESSAGE, options, on_dismiss=dismiss)
@@ -94,6 +102,21 @@ class TimelinePresetController:
         )
         for slot in self.session.layer_z_order:
             tl.lanes[slot] = copy_lane(built.get(slot, empty_lane()))
+        self._notify(message)
+
+    def _reset(self, *, all_on: bool) -> None:
+        self._clear_timeline_state()
+        tl = self.session.timeline
+        tl.enabled = True
+        tl.lanes = {
+            slot: TimelineLane(baseline=all_on, cues=[])
+            for slot in self.session.layer_z_order
+        }
+        message = (
+            "Reset timeline: all layers on"
+            if all_on
+            else "Reset timeline: all layers off"
+        )
         self._notify(message)
 
     def _clear_timeline_state(self) -> None:
