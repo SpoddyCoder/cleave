@@ -17,20 +17,6 @@ Outstanding bugs and issues.
 
 ## Beat grid and cue snap
 
-Low user effort is the goal: improve the automatic grid before adding manual
-workflow. Existing projects must re-run analyse (rewrite `signals.json`) after
-beat-detection changes; Demucs stems can stay.
-
-### Stronger beat and downbeat detection
-* Done: [Beat This!](https://github.com/CPJKU/beat_this) on the mix writes
-  `beat_times` and `downbeat_times` in `signals.json` (version 3). Timeline snap
-  uses those grids; onset envelopes for effects are unchanged. Plan:
-  [BeatThis-plan.md](BeatThis-plan.md).
-* Re-analyse existing projects with `cleave separate <slug>` or `cleave play`
-  (stems reused; only `signals.json` rewrites).
-* Known remaining weak spots: quiet intros / drum-sparse sections, half-time and
-  double-time flips, unusual meters.
-
 ### Sparse song anchors (after the grid is solid)
 * Manual "drop song cue" at major transitions for guaranteed pops solves a
   different problem from beat snap (structure vs pulse).
