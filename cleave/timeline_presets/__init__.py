@@ -12,7 +12,10 @@ from cleave.timeline_presets.busyness import (
     BREATHING,
     DIALOGUE,
     MIN_SWITCH_GAP_BARS,
+    MIN_SWITCH_GAP_SEC,
     PHI,
+    PHRASE_SEC_MAX,
+    PHRASE_SEC_MIN,
     PULSE,
     TIMELINE_PRESET_HELP_ENTRIES,
 )
@@ -20,7 +23,10 @@ from cleave.timeline_presets.busyness import (
 __all__ = (
     "ALL_BUILDERS",
     "MIN_SWITCH_GAP_BARS",
+    "MIN_SWITCH_GAP_SEC",
     "PHI",
+    "PHRASE_SEC_MAX",
+    "PHRASE_SEC_MIN",
     "TIMELINE_PRESET_HELP_ENTRIES",
     "build_arc_cues",
     "build_breathing_cues",

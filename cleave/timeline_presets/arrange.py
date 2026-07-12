@@ -8,13 +8,16 @@ from collections.abc import Sequence
 from cleave.timeline import TimelineLane
 from cleave.timeline_presets.busyness import (
     MIN_SWITCH_GAP_BARS,
+    MIN_SWITCH_GAP_SEC,
     PHRASE_BARS_MAX,
     PHRASE_BARS_MIN,
+    PHRASE_SEC_MIN,
     CharacterProfile,
     in_climax_window,
 )
 from cleave.timeline_presets.chords import ChordVocab, build_vocab
 from cleave.timeline_presets.emit import cues_from_states
+from cleave.timeline_presets.grid import thin_bar_times_for_arrange
 from cleave.timeline_presets.motifs import (
     MotifDef,
     expand_motif,
@@ -42,7 +45,7 @@ def compose_timeline(
     vocab = build_vocab(order)
     motifs = motifs_for_profile(profile.motif_ids)
 
-    bars = [t for t in bar_times if 0.0 <= t < duration_sec - 1e-9]
+    bars = thin_bar_times_for_arrange(bar_times, duration_sec)
     if len(bars) < PHRASE_BARS_MIN:
         opening = frozenset({order[0]})
         return cues_from_states(slot_list, [(0.0, opening)])
@@ -109,6 +112,7 @@ def compose_timeline(
             duration_sec=duration_sec,
             prev_time=states[-1][0] if states else None,
             min_gap_bars=MIN_SWITCH_GAP_BARS,
+            min_gap_sec=MIN_SWITCH_GAP_SEC,
         )
         solo_rotation += len(phrase_states)
 
@@ -116,7 +120,13 @@ def compose_timeline(
             if prev_active is not None and active == prev_active:
                 continue
             if states:
-                t = _enforce_min_bar_gap(bars, states[-1][0], t, MIN_SWITCH_GAP_BARS)
+                t = _enforce_min_bar_gap(
+                    bars,
+                    states[-1][0],
+                    t,
+                    MIN_SWITCH_GAP_BARS,
+                    MIN_SWITCH_GAP_SEC,
+                )
                 if t is None:
                     continue
             if t >= duration_sec:
@@ -160,6 +170,13 @@ def _partition_phrases(
         start = bars[i]
         end_i = i + target
         end = bars[end_i] if end_i < n else duration_sec
+
+        # Extend on the thinned grid until wall-clock meets PHRASE_SEC_MIN.
+        # Holes may push a phrase past PHRASE_SEC_MAX; do not invent bars.
+        while end - start < PHRASE_SEC_MIN - 1e-9 and end_i < n:
+            end_i += 1
+            end = bars[end_i] if end_i < n else duration_sec
+
         if end - start < 1e-6:
             break
         phrases.append((start, end))
@@ -178,31 +195,39 @@ def _enforce_min_bar_gap(
     prev_t: float,
     t: float,
     min_gap_bars: int,
+    min_gap_sec: float = MIN_SWITCH_GAP_SEC,
 ) -> float | None:
     if not bars:
         return None
     prev_idx = _nearest_bar_index(prev_t, bars)
     t_idx = _nearest_bar_index(t, bars)
     need_idx = prev_idx + min_gap_bars
-    if t_idx < need_idx:
-        if need_idx >= len(bars):
-            return None
-        return bars[need_idx]
-    return bars[t_idx]
+    idx = max(t_idx, need_idx)
+    while idx < len(bars):
+        if (
+            idx - prev_idx >= min_gap_bars
+            and bars[idx] - prev_t >= min_gap_sec - 1e-9
+        ):
+            return bars[idx]
+        idx += 1
+    return None
 
 
 def _bar_after_gap(
     bars: Sequence[float],
     from_t: float,
     gap_bars: int,
+    min_gap_sec: float = MIN_SWITCH_GAP_SEC,
 ) -> float | None:
     if not bars:
         return None
     idx = _nearest_bar_index(from_t, bars)
     target = idx + gap_bars
-    if target >= len(bars):
-        return None
-    return bars[target]
+    while target < len(bars):
+        if bars[target] - from_t >= min_gap_sec - 1e-9:
+            return bars[target]
+        target += 1
+    return None
 
 
 def _climax_phrase_index(

@@ -6,7 +6,7 @@ import random
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from cleave.timeline_presets.busyness import MIN_SWITCH_GAP_BARS
+from cleave.timeline_presets.busyness import MIN_SWITCH_GAP_BARS, MIN_SWITCH_GAP_SEC
 from cleave.timeline_presets.chords import ChordVocab
 
 
@@ -162,6 +162,44 @@ def _nearest_bar_index(t: float, bars: Sequence[float]) -> int:
     return min(range(len(bars)), key=lambda i: (abs(bars[i] - t), bars[i]))
 
 
+def _index_after_gap(
+    bars: Sequence[float],
+    from_idx: int,
+    min_gap_bars: int,
+    min_gap_sec: float,
+) -> int | None:
+    """First index >= from_idx + min_gap_bars that also meets the seconds floor."""
+    if not bars or from_idx < 0:
+        return None
+    target = from_idx + min_gap_bars
+    while target < len(bars):
+        if bars[target] - bars[from_idx] >= min_gap_sec - 1e-9:
+            return target
+        target += 1
+    return None
+
+
+def _effective_step_bars(
+    phrase_bars: Sequence[float],
+    min_gap_bars: int,
+    min_gap_sec: float,
+) -> int:
+    """Bar-index step that satisfies both gap floors across the phrase grid."""
+    step = min_gap_bars
+    if len(phrase_bars) < 2:
+        return step
+    for i in range(len(phrase_bars)):
+        j = step
+        while (
+            i + j < len(phrase_bars)
+            and phrase_bars[i + j] - phrase_bars[i] < min_gap_sec - 1e-9
+        ):
+            j += 1
+        if i + j < len(phrase_bars):
+            step = max(step, j)
+    return step
+
+
 def _expand_flash_tutti(
     vocab: ChordVocab,
     rotation: int,
@@ -170,6 +208,7 @@ def _expand_flash_tutti(
     bar_times: Sequence[float],
     duration_sec: float,
     min_gap_bars: int,
+    min_gap_sec: float,
     prev_time: float | None = None,
 ) -> list[tuple[float, frozenset[str]]]:
     if vocab.tutti_id is None:
@@ -204,7 +243,9 @@ def _expand_flash_tutti(
     earliest = phrase_start
     if prev_time is not None:
         prev_idx = _nearest_bar_index(prev_time, bars)
-        earliest_idx = min(len(bars) - 1, prev_idx + min_gap_bars)
+        earliest_idx = _index_after_gap(bars, prev_idx, min_gap_bars, min_gap_sec)
+        if earliest_idx is None:
+            return [(phrase_start, duo)]
         earliest = bars[earliest_idx]
 
     tutti_idx = _nearest_bar_index(tutti_t, bars)
@@ -214,10 +255,17 @@ def _expand_flash_tutti(
             tutti_idx = min(len(bars) - 1, tutti_idx + 1)
     tutti_t = bars[tutti_idx]
 
-    duo_idx = max(0, tutti_idx - min_gap_bars)
-    solo_idx = min(len(bars) - 1, tutti_idx + min_gap_bars)
+    duo_idx = 0
+    for candidate in range(tutti_idx, -1, -1):
+        if (
+            tutti_idx - candidate >= min_gap_bars
+            and tutti_t - bars[candidate] >= min_gap_sec - 1e-9
+        ):
+            duo_idx = candidate
+            break
+    solo_idx = _index_after_gap(bars, tutti_idx, min_gap_bars, min_gap_sec)
     duo_t = bars[duo_idx]
-    solo_t = bars[solo_idx]
+    solo_t = bars[solo_idx] if solo_idx is not None else bars[-1]
 
     states: list[tuple[float, frozenset[str]]] = []
     if (
@@ -227,7 +275,11 @@ def _expand_flash_tutti(
     ):
         states.append((duo_t, duo))
     states.append((tutti_t, tutti))
-    if solo_t <= phrase_end - 1e-9 and solo_t > tutti_t + 1e-9:
+    if (
+        solo_idx is not None
+        and solo_t <= phrase_end - 1e-9
+        and solo_t > tutti_t + 1e-9
+    ):
         states.append((solo_t, solo))
     return states
 
@@ -244,6 +296,7 @@ def expand_motif(
     duration_sec: float | None = None,
     prev_time: float | None = None,
     min_gap_bars: int = MIN_SWITCH_GAP_BARS,
+    min_gap_sec: float = MIN_SWITCH_GAP_SEC,
 ) -> list[tuple[float, frozenset[str]]]:
     """Expand a motif into timed active sets on bar boundaries within a phrase."""
     if motif.id == "flash_tutti":
@@ -255,6 +308,7 @@ def expand_motif(
             bar_times,
             duration_sec if duration_sec is not None else phrase_end,
             min_gap_bars,
+            min_gap_sec,
             prev_time,
         )
 
@@ -264,17 +318,18 @@ def expand_motif(
         phrase_bars = [phrase_start]
 
     n = len(chord_ids)
-    if n == 1 or len(phrase_bars) < 1 + (n - 1) * min_gap_bars:
+    step = _effective_step_bars(phrase_bars, min_gap_bars, min_gap_sec)
+    if n == 1 or len(phrase_bars) < 1 + (n - 1) * step:
         return [(phrase_bars[0], vocab.active_for(chord_ids[0]))]
 
     span = len(phrase_bars) - 1
-    min_needed = (n - 1) * min_gap_bars
+    min_needed = (n - 1) * step
     if span < min_needed:
         return [(phrase_bars[0], vocab.active_for(chord_ids[0]))]
 
-    step = max(min_gap_bars, span // n)
+    step = max(step, span // n)
     if step * (n - 1) > span:
-        step = min_gap_bars
+        step = _effective_step_bars(phrase_bars, min_gap_bars, min_gap_sec)
 
     states: list[tuple[float, frozenset[str]]] = []
     for i, chord_id in enumerate(chord_ids):
