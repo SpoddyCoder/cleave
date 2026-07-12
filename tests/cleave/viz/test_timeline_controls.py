@@ -10,7 +10,7 @@ from cleave.config_schema import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
 from cleave.timeline import SlotCue, TimelineLane, canonicalize, copy_lane, empty_lane, lane_visible_at
-from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, TuningControls
+from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, SEEK_TINY, TuningControls
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.layer_visibility import armed_recording_visible, effective_layer_enabled
 from cleave.viz.timeline_controls import TimelineControls
@@ -419,6 +419,16 @@ def test_ctrl_seek_when_not_recording() -> None:
     assert seeks == [SEEK_LONG, -SEEK_LONG]
 
 
+def test_shift_seek_when_not_recording() -> None:
+    controls, _, _, _, seeks, _ = _make_timeline_controls()
+
+    controls.handle_keydown(keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
+    assert seeks == [SEEK_TINY]
+
+    controls.handle_keydown(keydown(pygame.K_LEFT, mod=pygame.KMOD_SHIFT))
+    assert seeks == [SEEK_TINY, -SEEK_TINY]
+
+
 def test_ctrl_enter_noop_while_recording() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
         focus_row=0,
@@ -570,9 +580,18 @@ def test_seek_allowed_while_recording() -> None:
 
     controls.handle_keydown(keydown(pygame.K_RIGHT))
     controls.handle_keydown(keydown(pygame.K_LEFT))
+    controls.handle_keydown(keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
+    controls.handle_keydown(keydown(pygame.K_LEFT, mod=pygame.KMOD_SHIFT))
     controls.handle_keydown(keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
     controls.handle_keydown(keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
-    assert seeks == [SEEK_SHORT, -SEEK_SHORT, SEEK_LONG, -SEEK_LONG]
+    assert seeks == [
+        SEEK_SHORT,
+        -SEEK_SHORT,
+        SEEK_TINY,
+        -SEEK_TINY,
+        SEEK_LONG,
+        -SEEK_LONG,
+    ]
 
 
 def test_forward_seek_during_record_fills_with_active_state() -> None:

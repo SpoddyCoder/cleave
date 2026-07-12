@@ -927,11 +927,16 @@ def _apply_transport(
     _desc: RowDescriptor,
     forward: bool,
     ctrl: bool,
-    _shift: bool,
+    shift: bool,
 ) -> None:
-    from cleave.viz.controls import SEEK_LONG, SEEK_SHORT
+    from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, SEEK_TINY
 
-    delta_sec = SEEK_LONG if ctrl else SEEK_SHORT
+    if ctrl:
+        delta_sec = SEEK_LONG
+    elif shift:
+        delta_sec = SEEK_TINY
+    else:
+        delta_sec = SEEK_SHORT
     if not forward:
         delta_sec = -delta_sec
     controls._do_seek(delta_sec)

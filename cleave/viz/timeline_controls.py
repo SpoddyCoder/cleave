@@ -7,7 +7,7 @@ from collections.abc import Callable
 import pygame
 
 from cleave.timeline import SlotCue, canonicalize, should_accept_toggle
-from cleave.viz.controls import SEEK_LONG, SEEK_SHORT
+from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, SEEK_TINY
 from cleave.viz.session import TuningSession
 from cleave.viz.key_repeat import mod_ctrl, mod_shift
 from cleave.viz.layer_visibility import (
@@ -104,6 +104,7 @@ class TimelineControls:
             self._do_seek(
                 event.key == pygame.K_RIGHT,
                 long=mod_ctrl(event.mod),
+                tiny=mod_shift(event.mod),
             )
             return True
 
@@ -337,8 +338,13 @@ class TimelineControls:
         if tl.record_start_sec is not None and new_t < tl.record_start_sec:
             tl.record_start_sec = new_t
 
-    def _do_seek(self, forward: bool, *, long: bool) -> None:
-        delta_sec = SEEK_LONG if long else SEEK_SHORT
+    def _do_seek(self, forward: bool, *, long: bool = False, tiny: bool = False) -> None:
+        if long:
+            delta_sec = SEEK_LONG
+        elif tiny:
+            delta_sec = SEEK_TINY
+        else:
+            delta_sec = SEEK_SHORT
         if not forward:
             delta_sec = -delta_sec
         if self.session.timeline.recording:
