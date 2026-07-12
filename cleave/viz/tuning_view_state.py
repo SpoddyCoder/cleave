@@ -128,6 +128,7 @@ class RenderPostFxBlock:
 class RenderTimelineBlock:
     enabled: bool = False
     expanded: bool = False
+    bar_phase_offset: int = 0
 
 
 @dataclass
@@ -420,6 +421,7 @@ class TuningViewStateBuilder:
         render_timeline = RenderTimelineBlock(
             enabled=tl.enabled,
             expanded=tl.panel_open,
+            bar_phase_offset=tl.bar_phase_offset,
         )
         layout_state = TuningViewState(
             layer_z_order=layer_z_order,
@@ -563,6 +565,7 @@ class TuningViewStateBuilder:
             render_timeline=replace(
                 structure.render_timeline,
                 expanded=tl.panel_open,
+                bar_phase_offset=tl.bar_phase_offset,
             ),
             settings=replace(
                 structure.settings,

@@ -144,9 +144,11 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
 
     view_closed = builder.build(paused=False)
     presets = RowDescriptor(RowKind.TIMELINE_PRESETS)
+    bar_phase = RowDescriptor(RowKind.TIMELINE_BAR_PHASE)
     snap_beats = RowDescriptor(RowKind.TIMELINE_SNAP_TO_BEATS)
     snap_bars = RowDescriptor(RowKind.TIMELINE_SNAP_TO_BARS)
     assert presets not in view_closed.layout.rows
+    assert bar_phase not in view_closed.layout.rows
     assert snap_beats not in view_closed.layout.rows
     assert snap_bars not in view_closed.layout.rows
 
@@ -154,18 +156,22 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     view_open = builder.build(paused=False)
     assert view_open.layout is not view_closed.layout
     assert presets in view_open.layout.rows
+    assert bar_phase in view_open.layout.rows
     assert snap_beats in view_open.layout.rows
     assert snap_bars in view_open.layout.rows
     presets_idx = view_open.layout.rows.index(presets)
+    bar_phase_idx = view_open.layout.rows.index(bar_phase)
     snap_beats_idx = view_open.layout.rows.index(snap_beats)
     snap_bars_idx = view_open.layout.rows.index(snap_bars)
-    assert snap_beats_idx == presets_idx + 1
+    assert bar_phase_idx == presets_idx + 1
+    assert snap_beats_idx == bar_phase_idx + 1
     assert snap_bars_idx == snap_beats_idx + 1
 
     session.timeline.panel_open = False
     view_closed_again = builder.build(paused=False)
     assert view_closed_again.layout is not view_open.layout
     assert presets not in view_closed_again.layout.rows
+    assert bar_phase not in view_closed_again.layout.rows
     assert snap_beats not in view_closed_again.layout.rows
     assert snap_bars not in view_closed_again.layout.rows
 

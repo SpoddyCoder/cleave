@@ -201,6 +201,20 @@ def _nearest_with_earlier_tie(t: float, candidates: Sequence[float]) -> float:
     return min(candidates, key=lambda c: (abs(c - t), c))
 
 
+def _nearest_beat_index(t: float, beats: np.ndarray) -> int:
+    last = len(beats) - 1
+    idx = int(np.searchsorted(beats, float(t)))
+    candidates: list[int] = []
+    if idx > 0:
+        candidates.append(idx - 1)
+    if idx <= last:
+        candidates.append(idx)
+    return min(
+        candidates,
+        key=lambda i: (abs(float(beats[i]) - float(t)), float(beats[i])),
+    )
+
+
 def shift_bars_by_beats(
     downbeat_times: Sequence[float],
     beat_times: Sequence[float],
@@ -217,19 +231,36 @@ def shift_bars_by_beats(
     last = len(beats) - 1
     result: list[float] = []
     for t in downbeat_times:
-        idx = int(np.searchsorted(beats, float(t)))
-        candidates: list[int] = []
-        if idx > 0:
-            candidates.append(idx - 1)
-        if idx <= last:
-            candidates.append(idx)
-        nearest = min(
-            candidates,
-            key=lambda i: (abs(float(beats[i]) - float(t)), float(beats[i])),
-        )
+        nearest = _nearest_beat_index(float(t), beats)
         shifted = max(0, min(last, nearest + offset))
         result.append(float(beats[shifted]))
     return tuple(result)
+
+
+def shift_lane_cues_by_beats(
+    lane: TimelineLane,
+    beat_times: Sequence[float],
+    delta: int,
+) -> TimelineLane:
+    """Map each cue to the nearest beat, move by ``delta`` indices, canonicalize."""
+    if not lane.cues or not beat_times or delta == 0:
+        return TimelineLane(baseline=lane.baseline, cues=list(lane.cues))
+
+    beats = np.asarray(beat_times, dtype=np.float64)
+    last = len(beats) - 1
+    shifted = [
+        SlotCue(
+            t=float(
+                beats[max(0, min(last, _nearest_beat_index(cue.t, beats) + delta))]
+            ),
+            visible=cue.visible,
+        )
+        for cue in lane.cues
+    ]
+    return TimelineLane(
+        baseline=lane.baseline,
+        cues=canonicalize(lane.baseline, shifted),
+    )
 
 
 def snap_lane_to_beats(

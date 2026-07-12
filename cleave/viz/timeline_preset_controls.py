@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import random
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
-from cleave.timeline import copy_lane, empty_lane
+from cleave.timeline import copy_lane, empty_lane, shift_bars_by_beats
 from cleave.timeline_presets import (
     build_arc_cues,
     build_breathing_cues,
@@ -33,11 +33,15 @@ class TimelinePresetController:
         self,
         session: TuningSession,
         modal_host: ModalHost,
+        beat_times: Sequence[float] = (),
+        bar_times: Sequence[float] = (),
         *,
         on_notification: Callable[[str], None] | None = None,
     ) -> None:
         self.session = session
         self._modal = modal_host
+        self._beat_times = tuple(beat_times)
+        self._bar_times = tuple(bar_times)
         self._on_notification = on_notification
 
     def prompt(self, duration_sec: float) -> None:
@@ -64,7 +68,21 @@ class TimelinePresetController:
         self._modal.prompt_choice(_PROMPT_MESSAGE, options, on_dismiss=dismiss)
 
     def _apply(self, kind: str, duration_sec: float) -> None:
+        if not self._bar_times:
+            self._notify("No bars available; re-run separate")
+            return
+        if not self._beat_times:
+            self._notify("No beats available; re-run separate")
+            return
         builder, message = _KIND_BUILDERS[kind]
+        grid = shift_bars_by_beats(
+            self._bar_times,
+            self._beat_times,
+            self.session.timeline.bar_phase_offset,
+        )
+        if not grid:
+            self._notify("No bars available; re-run separate")
+            return
         self._clear_timeline_state()
         tl = self.session.timeline
         tl.enabled = True
@@ -72,11 +90,11 @@ class TimelinePresetController:
             list(self.session.layer_z_order),
             duration_sec,
             random.Random(),
+            bar_times=grid,
         )
         for slot in self.session.layer_z_order:
             tl.lanes[slot] = copy_lane(built.get(slot, empty_lane()))
-        if self._on_notification is not None:
-            self._on_notification(message)
+        self._notify(message)
 
     def _clear_timeline_state(self) -> None:
         tl = self.session.timeline
@@ -94,3 +112,7 @@ class TimelinePresetController:
         tl.preview_active = False
         tl.monitor.clear()
         tl.arm_flash_start_ms.clear()
+
+    def _notify(self, message: str) -> None:
+        if self._on_notification is not None:
+            self._on_notification(message)

@@ -11,7 +11,7 @@ from cleave.timeline_presets.busyness import (
     ARC,
     BREATHING,
     DIALOGUE,
-    MIN_SWITCH_GAP_SEC,
+    MIN_SWITCH_GAP_BARS,
     PHI,
     PULSE,
     TIMELINE_PRESET_HELP_ENTRIES,
@@ -19,7 +19,7 @@ from cleave.timeline_presets.busyness import (
 
 __all__ = (
     "ALL_BUILDERS",
-    "MIN_SWITCH_GAP_SEC",
+    "MIN_SWITCH_GAP_BARS",
     "PHI",
     "TIMELINE_PRESET_HELP_ENTRIES",
     "build_arc_cues",
@@ -37,32 +37,36 @@ def build_breathing_cues(
     slots: Sequence[str],
     duration_sec: float,
     rng: random.Random | None = None,
+    bar_times: Sequence[float] = (),
 ) -> dict[str, TimelineLane]:
-    return compose_timeline(slots, duration_sec, BREATHING, _rng(rng))
+    return compose_timeline(slots, duration_sec, BREATHING, _rng(rng), bar_times)
 
 
 def build_dialogue_cues(
     slots: Sequence[str],
     duration_sec: float,
     rng: random.Random | None = None,
+    bar_times: Sequence[float] = (),
 ) -> dict[str, TimelineLane]:
-    return compose_timeline(slots, duration_sec, DIALOGUE, _rng(rng))
+    return compose_timeline(slots, duration_sec, DIALOGUE, _rng(rng), bar_times)
 
 
 def build_arc_cues(
     slots: Sequence[str],
     duration_sec: float,
     rng: random.Random | None = None,
+    bar_times: Sequence[float] = (),
 ) -> dict[str, TimelineLane]:
-    return compose_timeline(slots, duration_sec, ARC, _rng(rng))
+    return compose_timeline(slots, duration_sec, ARC, _rng(rng), bar_times)
 
 
 def build_pulse_cues(
     slots: Sequence[str],
     duration_sec: float,
     rng: random.Random | None = None,
+    bar_times: Sequence[float] = (),
 ) -> dict[str, TimelineLane]:
-    return compose_timeline(slots, duration_sec, PULSE, _rng(rng))
+    return compose_timeline(slots, duration_sec, PULSE, _rng(rng), bar_times)
 
 
 ALL_BUILDERS = (

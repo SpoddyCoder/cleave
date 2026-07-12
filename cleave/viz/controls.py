@@ -25,6 +25,7 @@ from cleave.viz.render_overlay_controls import RenderOverlayControls
 from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
 from cleave.viz.render_post_fx_controls import RenderPostFxControls
 from cleave.viz.settings_controls import SettingsControls
+from cleave.viz.timeline_phase_controls import TimelinePhaseController
 from cleave.viz.timeline_preset_controls import TimelinePresetController
 from cleave.viz.timeline_snap_controls import TimelineSnapController
 from cleave.viz.user_presets import resolve_user_preset_dest, user_preset_item_display_name
@@ -125,6 +126,13 @@ class TuningControls:
         self._timeline_presets = TimelinePresetController(
             session,
             self._modal_host,
+            beat_times,
+            bar_times,
+            on_notification=self.show_notification,
+        )
+        self._timeline_phase = TimelinePhaseController(
+            session,
+            beat_times,
             on_notification=self.show_notification,
         )
         self._timeline_snap = TimelineSnapController(

@@ -6,7 +6,7 @@ import random
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from cleave.timeline_presets.busyness import chord_cost_for_active
+from cleave.timeline_presets.busyness import MIN_SWITCH_GAP_BARS
 from cleave.timeline_presets.chords import ChordVocab
 
 
@@ -158,51 +158,76 @@ def motif_max_cost_resolved(
     return max(vocab.cost_for(step) for step in steps)
 
 
+def _nearest_bar_index(t: float, bars: Sequence[float]) -> int:
+    return min(range(len(bars)), key=lambda i: (abs(bars[i] - t), bars[i]))
+
+
 def _expand_flash_tutti(
     vocab: ChordVocab,
     rotation: int,
     phrase_start: float,
     phrase_end: float,
-    min_gap: float,
+    bar_times: Sequence[float],
     duration_sec: float,
+    min_gap_bars: int,
     prev_time: float | None = None,
 ) -> list[tuple[float, frozenset[str]]]:
     if vocab.tutti_id is None:
+        phrase_bars = [t for t in bar_times if phrase_start <= t < phrase_end]
         solo = vocab.active_for(_pick_single(vocab, rotation))
-        return [(phrase_start, solo)]
+        t0 = phrase_bars[0] if phrase_bars else phrase_start
+        return [(t0, solo)]
 
     duo = vocab.active_for(_pick_duo(vocab, rotation))
     tutti = vocab.active_for(_pick_tutti(vocab))
     solo = vocab.active_for(_pick_single(vocab, rotation))
 
+    bars = list(bar_times)
+    if not bars:
+        return [(phrase_start, tutti)]
+
     window_start = 0.70 * duration_sec
     window_end = 0.78 * duration_sec
-    overlap_start = max(phrase_start, window_start)
-    overlap_end = min(phrase_end, window_end)
+    window_bars = [
+        t
+        for t in bars
+        if window_start <= t < window_end and phrase_start <= t < phrase_end
+    ]
+    if not window_bars:
+        window_bars = [t for t in bars if phrase_start <= t < phrase_end]
+    if not window_bars:
+        window_bars = [t for t in bars if phrase_start <= t <= phrase_end]
+
+    mid = (window_start + window_end) * 0.5
+    tutti_t = min(window_bars, key=lambda t: (abs(t - mid), t))
 
     earliest = phrase_start
     if prev_time is not None:
-        earliest = max(earliest, prev_time + min_gap)
+        prev_idx = _nearest_bar_index(prev_time, bars)
+        earliest_idx = min(len(bars) - 1, prev_idx + min_gap_bars)
+        earliest = bars[earliest_idx]
 
-    if overlap_end > overlap_start:
-        tutti_t = (overlap_start + overlap_end) * 0.5
-    else:
-        tutti_t = (phrase_start + phrase_end) * 0.5
+    tutti_idx = _nearest_bar_index(tutti_t, bars)
+    if bars[tutti_idx] < earliest - 1e-9:
+        tutti_idx = _nearest_bar_index(earliest, bars)
+        if bars[tutti_idx] < earliest - 1e-9:
+            tutti_idx = min(len(bars) - 1, tutti_idx + 1)
+    tutti_t = bars[tutti_idx]
 
-    tutti_t = max(earliest, tutti_t)
-    if tutti_t > overlap_end - 1e-6 and overlap_end > overlap_start:
-        tutti_t = max(earliest, overlap_start)
-    if tutti_t >= phrase_end - 1e-6:
-        tutti_t = max(earliest, phrase_end - min_gap * 0.5)
-
-    duo_t = tutti_t - min_gap
-    solo_t = tutti_t + min_gap
+    duo_idx = max(0, tutti_idx - min_gap_bars)
+    solo_idx = min(len(bars) - 1, tutti_idx + min_gap_bars)
+    duo_t = bars[duo_idx]
+    solo_t = bars[solo_idx]
 
     states: list[tuple[float, frozenset[str]]] = []
-    if duo_t >= earliest and duo_t >= phrase_start and duo_t < tutti_t - 1e-6:
+    if (
+        duo_t >= earliest - 1e-9
+        and duo_t >= phrase_start - 1e-9
+        and duo_t < tutti_t - 1e-9
+    ):
         states.append((duo_t, duo))
     states.append((tutti_t, tutti))
-    if solo_t <= phrase_end - 1e-6 and solo_t > tutti_t + 1e-6:
+    if solo_t <= phrase_end - 1e-9 and solo_t > tutti_t + 1e-9:
         states.append((solo_t, solo))
     return states
 
@@ -214,52 +239,47 @@ def expand_motif(
     rotation: int,
     phrase_start: float,
     phrase_end: float,
-    min_gap: float,
+    bar_times: Sequence[float],
     *,
     duration_sec: float | None = None,
     prev_time: float | None = None,
+    min_gap_bars: int = MIN_SWITCH_GAP_BARS,
 ) -> list[tuple[float, frozenset[str]]]:
-    """Expand a motif into timed active sets within a phrase."""
+    """Expand a motif into timed active sets on bar boundaries within a phrase."""
     if motif.id == "flash_tutti":
         return _expand_flash_tutti(
             vocab,
             rotation,
             phrase_start,
             phrase_end,
-            min_gap,
+            bar_times,
             duration_sec if duration_sec is not None else phrase_end,
+            min_gap_bars,
             prev_time,
         )
 
     chord_ids = motif.resolve_steps(vocab, rng, rotation)
-    weights = motif.weights[: len(chord_ids)]
-    if len(weights) < len(chord_ids):
-        weights = weights + (1.0,) * (len(chord_ids) - len(weights))
+    phrase_bars = [t for t in bar_times if phrase_start <= t < phrase_end]
+    if not phrase_bars:
+        phrase_bars = [phrase_start]
 
-    phrase_len = phrase_end - phrase_start
     n = len(chord_ids)
-    if n == 1 or phrase_len < min_gap:
-        active = vocab.active_for(chord_ids[0])
-        return [(phrase_start, active)]
+    if n == 1 or len(phrase_bars) < 1 + (n - 1) * min_gap_bars:
+        return [(phrase_bars[0], vocab.active_for(chord_ids[0]))]
 
-    min_span = (n - 1) * min_gap
-    if phrase_len < min_span:
-        active = vocab.active_for(chord_ids[0])
-        return [(phrase_start, active)]
+    span = len(phrase_bars) - 1
+    min_needed = (n - 1) * min_gap_bars
+    if span < min_needed:
+        return [(phrase_bars[0], vocab.active_for(chord_ids[0]))]
 
-    gap = phrase_len / n
-    if gap < min_gap - 1e-9:
-        gap = min_gap
-        if gap * (n - 1) > phrase_len + 1e-9:
-            active = vocab.active_for(chord_ids[0])
-            return [(phrase_start, active)]
+    step = max(min_gap_bars, span // n)
+    if step * (n - 1) > span:
+        step = min_gap_bars
 
     states: list[tuple[float, frozenset[str]]] = []
     for i, chord_id in enumerate(chord_ids):
-        t = phrase_start + i * gap
-        if t >= phrase_end:
-            break
-        states.append((t, vocab.active_for(chord_id)))
+        idx = min(i * step, len(phrase_bars) - 1)
+        states.append((phrase_bars[idx], vocab.active_for(chord_id)))
     return states
 
 

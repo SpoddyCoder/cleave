@@ -6,6 +6,7 @@ from cleave.timeline import (
     SlotCue,
     TimelineLane,
     shift_bars_by_beats,
+    shift_lane_cues_by_beats,
     snap_lane_to_beats,
 )
 
@@ -101,3 +102,30 @@ def test_shift_bars_by_beats_nearest_and_empty() -> None:
     assert shift_bars_by_beats((0.4, 3.6), beat_times, 1) == (1.0, 4.0)
     assert shift_bars_by_beats((), beat_times, 1) == ()
     assert shift_bars_by_beats((0.0,), (), 1) == ()
+
+
+def test_shift_lane_cues_by_beats_offsets() -> None:
+    lane = _lane(False, (0.1, True), (2.1, False))
+    result = shift_lane_cues_by_beats(lane, (0.0, 1.0, 2.0, 3.0), 1)
+    assert result.cues == [
+        SlotCue(t=1.0, visible=True),
+        SlotCue(t=3.0, visible=False),
+    ]
+
+
+def test_shift_lane_cues_by_beats_clamps_and_canonicalizes() -> None:
+    lane = _lane(False, (0.0, True), (0.1, False))
+    result = shift_lane_cues_by_beats(lane, (0.0, 1.0), -1)
+    assert result.cues == []
+    # Both cues collapse onto beat 1 as False; matches baseline -> dropped.
+    result_fwd = shift_lane_cues_by_beats(lane, (0.0, 1.0), 1)
+    assert result_fwd.cues == []
+    lane_on = _lane(False, (0.0, True), (0.9, True))
+    result_on = shift_lane_cues_by_beats(lane_on, (0.0, 1.0), 1)
+    assert result_on.cues == [SlotCue(t=1.0, visible=True)]
+
+
+def test_shift_lane_cues_by_beats_empty_noop() -> None:
+    lane = _lane(None, (0.4, True))
+    assert shift_lane_cues_by_beats(lane, (), 1).cues == [SlotCue(t=0.4, visible=True)]
+    assert shift_lane_cues_by_beats(_lane(True), (0.0, 1.0), 1).cues == []
