@@ -1267,6 +1267,10 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         panel_label="snap to beats",
         present_style=RowPresentStyle.FULL_LINE,
     ),
+    RowKind.TIMELINE_SNAP_TO_BARS: RowFieldDef(
+        panel_label="snap to bars",
+        present_style=RowPresentStyle.FULL_LINE,
+    ),
     RowKind.PANEL_NOTIFICATION: RowFieldDef(
         panel_label="",
         present_style=RowPresentStyle.FULL_LINE,
