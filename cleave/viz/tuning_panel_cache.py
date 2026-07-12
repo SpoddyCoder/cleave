@@ -38,6 +38,8 @@ class RowRenderKey:
     visibility_icon: tuple[bool, bool] | None
     max_width: int
     line_h: int
+    header_locked: bool = False
+    config_dirty_suffix: bool = False
 
 
 @dataclass
@@ -152,12 +154,20 @@ def row_render_key(
         cache=cache,
     )
     color_state = _row_value_color(state, index)
+    header_locked = (
+        kind == RowKind.TRACK_HEADER
+        and slot is not None
+        and state.tracks[slot].locked
+    )
+    config_dirty_suffix = kind == RowKind.CONFIG_HEADER and state.config_dirty
     return RowRenderKey(
         kind=kind,
         slot=slot,
         display_text=display_text,
         color_state=color_state,
         visibility_icon=row_visibility_icon_key(state, index),
+        header_locked=header_locked,
+        config_dirty_suffix=config_dirty_suffix,
         max_width=max_content_width,
         line_h=line_h,
     )
@@ -194,6 +204,8 @@ def static_row_keys(
                 key.visibility_icon,
                 key.max_width,
                 key.line_h,
+                key.header_locked,
+                key.config_dirty_suffix,
             )
         )
     return tuple(keys)

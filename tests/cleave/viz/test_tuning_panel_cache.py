@@ -11,6 +11,8 @@ from cleave.viz.row_semantics import RowDescriptor, RowKind, row_is_pinned
 from cleave.viz.theme import (
     BORDER_COLOR,
     BORDER_WIDTH,
+    CONFIG_DIRTY,
+    LOCK_ICON,
     SCROLLBAR_CONTENT_GAP,
     SCROLLBAR_WIDTH,
     SOLO_BG,
@@ -205,6 +207,175 @@ def test_solo_change_misses_warm_row_cache_for_track_header() -> None:
     assert counters.row_cache_misses == 1
     assert counters.row_cache_hits == 0
     assert entry.primary.get_at((1, line_h // 2))[:3] == SOLO_BG
+
+
+def _surface_has_color(surf: pygame.Surface, color: tuple[int, int, int]) -> bool:
+    w, h = surf.get_size()
+    for y in range(h):
+        for x in range(w):
+            if surf.get_at((x, y))[:3] == color:
+                return True
+    return False
+
+
+def test_config_dirty_change_invalidates_config_header_row_key() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    font = overlay._font_get()
+    cache = TuningPanelCache()
+    state = _minimal_view_state(config_dirty=False)
+    index = state.layout.find_by_kind(RowKind.CONFIG_HEADER)
+    line_h = font.get_linesize()
+    max_w = 400
+
+    key_before = row_render_key(
+        state,
+        index,
+        font,
+        cache=cache,
+        max_content_width=max_w,
+        line_h=line_h,
+    )
+    state_dirty = replace(state, config_dirty=True)
+    key_after = row_render_key(
+        state_dirty,
+        index,
+        font,
+        cache=cache,
+        max_content_width=max_w,
+        line_h=line_h,
+    )
+    assert key_before != key_after
+    assert not key_before.config_dirty_suffix
+    assert key_after.config_dirty_suffix
+
+
+def test_config_dirty_change_misses_warm_row_cache_for_config_header() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    font = overlay._font_get()
+    cache = TuningPanelCache()
+    state = _minimal_view_state(config_dirty=False)
+    index = state.layout.find_by_kind(RowKind.CONFIG_HEADER)
+    line_h = font.get_linesize()
+    max_w = 400
+
+    ensure_row_surface(
+        cache,
+        state,
+        index,
+        font,
+        overlay._build_row_at_index,
+        max_content_width=max_w,
+        line_h=line_h,
+    )
+    state_dirty = replace(state, config_dirty=True)
+    counters = OverlayDrawCounters()
+    entry = ensure_row_surface(
+        cache,
+        state_dirty,
+        index,
+        font,
+        overlay._build_row_at_index,
+        max_content_width=max_w,
+        line_h=line_h,
+        counters=counters,
+    )
+    assert counters.row_cache_misses == 1
+    assert counters.row_cache_hits == 0
+    assert entry.secondary is not None
+    assert _surface_has_color(entry.secondary, CONFIG_DIRTY)
+
+
+def test_lock_change_invalidates_track_header_row_key() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    font = overlay._font_get()
+    cache = TuningPanelCache()
+    state = _two_layer_view_state(focus_slot="layer_1")
+    index = next(
+        i
+        for i in state.layout.visible_indices(state)
+        if state.layout.kind(i) == RowKind.TRACK_HEADER
+        and state.layout.slot(i) == "layer_1"
+    )
+    line_h = font.get_linesize()
+    max_w = 400
+
+    key_before = row_render_key(
+        state,
+        index,
+        font,
+        cache=cache,
+        max_content_width=max_w,
+        line_h=line_h,
+    )
+    state_locked = replace(
+        state,
+        tracks={
+            "layer_1": replace(state.tracks["layer_1"], locked=True),
+            "layer_2": state.tracks["layer_2"],
+        },
+    )
+    key_after = row_render_key(
+        state_locked,
+        index,
+        font,
+        cache=cache,
+        max_content_width=max_w,
+        line_h=line_h,
+    )
+    assert key_before != key_after
+    assert not key_before.header_locked
+    assert key_after.header_locked
+
+
+def test_lock_change_misses_warm_row_cache_for_track_header() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    font = overlay._font_get()
+    cache = TuningPanelCache()
+    state = _two_layer_view_state(focus_slot="layer_1")
+    index = next(
+        i
+        for i in state.layout.visible_indices(state)
+        if state.layout.kind(i) == RowKind.TRACK_HEADER
+        and state.layout.slot(i) == "layer_1"
+    )
+    line_h = font.get_linesize()
+    max_w = 400
+
+    ensure_row_surface(
+        cache,
+        state,
+        index,
+        font,
+        overlay._build_row_at_index,
+        max_content_width=max_w,
+        line_h=line_h,
+    )
+    state_locked = replace(
+        state,
+        tracks={
+            "layer_1": replace(state.tracks["layer_1"], locked=True),
+            "layer_2": state.tracks["layer_2"],
+        },
+    )
+    counters = OverlayDrawCounters()
+    entry = ensure_row_surface(
+        cache,
+        state_locked,
+        index,
+        font,
+        overlay._build_row_at_index,
+        max_content_width=max_w,
+        line_h=line_h,
+        counters=counters,
+    )
+    assert counters.row_cache_misses == 1
+    assert counters.row_cache_hits == 0
+    assert entry.secondary is not None
+    assert _surface_has_color(entry.secondary, LOCK_ICON)
 
 
 def test_repeated_compose_panel_near_zero_font_renders_when_idle() -> None:
