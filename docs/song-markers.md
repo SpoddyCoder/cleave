@@ -18,9 +18,9 @@ v1 is **manual only** — user-driven placement with streamlined UX. No auto-sug
 
 ---
 
-## Phase 1 — UI / UX
+## Phase 1 — UI / UX (done)
 
-Build UI and editing only. No snap, preset generation, or beat-phase logic yet.
+Build UI and editing only. No preset generation or beat-phase logic yet.
 
 ### Add a song marker
 
@@ -63,7 +63,7 @@ Song markers, list editing, seek-to-marker, and timeline drawing only. Value on 
 
 ---
 
-## Phase 2 — Snap to song markers
+## Phase 2 — Snap to song markers (done)
 
 Add a **snap to song markers** action under the timeline section (after snap to bars), with an adjacent proximity control.
 
@@ -94,7 +94,7 @@ Destructive multi-lane moves stay explicit via the modal; no silent wide snaps.
 
 ## Phase 3 — Timeline preset generation
 
-Update preset generation so new timeline presets can **latch onto** song markers where appropriate. Details TBD when Phase 1 song markers exist in projects.
+Update preset generation so new timeline presets can **latch onto** song markers where appropriate. Details TBD.
 
 ---
 
