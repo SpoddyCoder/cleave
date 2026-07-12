@@ -15,6 +15,32 @@ Outstanding bugs and issues.
 
 ---
 
+## Beat grid and cue snap
+
+Low user effort is the goal: improve the automatic grid before adding manual
+workflow. Existing projects must re-run analyse (rewrite `signals.json`) after
+beat-detection changes; Demucs stems can stay.
+
+### Stronger beat and downbeat detection
+* Current analyse uses drum-stem librosa with a per-frame tempo curve
+  ([cleave/extract.py](../cleave/extract.py) `extract_drums_beats`). Better than
+  a single global tempo, but still not reliably "on the pop."
+* Next: investigate [madmom](https://github.com/CPJKU/madmom) (or similar trained
+  beat and downbeat models) for stronger bar alignment and tempo-map quality.
+* Same persisted `beat_times` (and optional downbeats) feed timeline snap and
+  future MIDI out; expect a heavier analyse step and a new dependency.
+* Known remaining weak spots even with better models: quiet intros / drum-sparse
+  sections, half-time and double-time flips, unusual meters.
+
+### Sparse song anchors (after the grid is solid)
+* Manual "drop song cue" at major transitions for guaranteed pops solves a
+  different problem from beat snap (structure vs pulse).
+* Prefer automation: auto-suggested anchors (energy / novelty / structure), with
+  optional manual drop only to correct or pin a few points.
+* Do not make dense hand-cueing the normal path.
+
+---
+
 ## Architecture
 
 ### projectM
