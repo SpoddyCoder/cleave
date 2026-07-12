@@ -150,7 +150,7 @@ class TimelineControls:
                 self._toggle_override_focused_row()
             return True
 
-        if event.key == pygame.K_RETURN:
+        if event.key == pygame.K_a:
             self._toggle_arm()
             return True
 
@@ -190,6 +190,14 @@ class TimelineControls:
                 self._commit_recording_slot(slot)
         else:
             armed.add(slot)
+            if tl.recording:
+                t_sec = current_sec(self.playback, self.duration_sec)
+                tl.record_baseline[slot] = effective_layer_enabled(
+                    self.session, slot, t_sec
+                )
+                tl.record_slot_start_sec[slot] = t_sec
+                self._last_toggle_t.pop(slot, None)
+                self._refresh_visibility()
         tl.arm_flash_start_ms[slot] = pygame.time.get_ticks()
 
     def _commit_recording_slot(self, slot: str) -> None:
@@ -208,6 +216,7 @@ class TimelineControls:
         )
         tl.record_baseline.pop(slot, None)
         tl.record_buffer.pop(slot, None)
+        tl.record_slot_start_sec.pop(slot, None)
         self._last_toggle_t.pop(slot, None)
 
         if not tl.armed_slots:
@@ -215,6 +224,7 @@ class TimelineControls:
             tl.record_start_sec = None
             tl.record_buffer = {}
             tl.record_baseline = {}
+            tl.record_slot_start_sec = {}
             tl.record_high_water_mark = None
             self._last_toggle_t = {}
 
@@ -232,6 +242,7 @@ class TimelineControls:
             stem: effective_layer_enabled(self.session, stem, t_sec)
             for stem in tl.armed_slots
         }
+        tl.record_slot_start_sec = {stem: t_sec for stem in tl.armed_slots}
 
         tl.preview_active = False
         tl.monitor = {}
@@ -254,6 +265,7 @@ class TimelineControls:
             tl.recording = False
             tl.record_buffer = {}
             tl.record_baseline = {}
+            tl.record_slot_start_sec = {}
             tl.record_high_water_mark = None
             return
 
@@ -264,6 +276,7 @@ class TimelineControls:
         tl.record_start_sec = None
         tl.record_buffer = {}
         tl.record_baseline = {}
+        tl.record_slot_start_sec = {}
         tl.record_high_water_mark = None
         self._last_toggle_t = {}
 
@@ -314,7 +327,7 @@ class TimelineControls:
 
     def _toggle_armed_layer_at(self, slot: str, t_sec: float) -> None:
         tl = self.session.timeline
-        if slot not in tl.armed_slots:
+        if slot not in tl.armed_slots or slot not in tl.record_baseline:
             return
         if not should_accept_toggle(self._last_toggle_t.get(slot), t_sec):
             return
@@ -347,7 +360,11 @@ class TimelineControls:
             self._last_toggle_t.pop(slot, None)
         tl.record_high_water_mark = max(tl.record_high_water_mark or 0.0, old_t)
         if tl.record_start_sec is not None and new_t < tl.record_start_sec:
+            prior_start = tl.record_start_sec
             tl.record_start_sec = new_t
+            for slot, slot_start in list(tl.record_slot_start_sec.items()):
+                if slot_start == prior_start:
+                    tl.record_slot_start_sec[slot] = new_t
 
     def _do_seek(self, forward: bool, *, long: bool = False, tiny: bool = False) -> None:
         if long:

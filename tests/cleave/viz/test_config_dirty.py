@@ -531,7 +531,7 @@ def _mutate_timeline_arm(controls: TuningControls) -> None:
         focus_row=0,
     )
     assert "layer_1" not in session.timeline.armed_slots
-    timeline_controls.handle_keydown(keydown(pygame.K_RETURN))
+    timeline_controls.handle_keydown(keydown(pygame.K_a))
     assert "layer_1" in session.timeline.armed_slots
 
 

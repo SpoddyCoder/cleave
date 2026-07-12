@@ -458,6 +458,7 @@ def test_timeline_strip_help_paused() -> None:
     keys = [key for key, _ in section.entries]
     assert keys.index("Shift + Enter") + 1 == keys.index("1-4")
     entries = dict(section.entries)
+    assert entries["a"] == "toggle arm track"
     assert entries["1-4"] == "toggle layer visibility"
     assert entries["Shift + Enter"] == "toggle override"
     assert "Ctrl + Enter" not in entries

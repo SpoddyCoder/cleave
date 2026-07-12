@@ -1,0 +1,97 @@
+# Song Markers
+
+Manual markers at major song transitions. They solve a different problem from beat snap: **structure vs pulse**. Sparse, user-placed song markers for guaranteed pops at section changes, not rhythmic grid alignment.
+
+Related: [timeline-idea.md](timeline-idea.md), [live-tuning-ui](../.cursor/rules/live-tuning-ui.mdc).
+
+Naming: use **song markers** everywhere in UI, docs, and code identifiers. Reserve **cue** for per-lane timeline visibility transitions (`SlotCue`).
+
+---
+
+## Scope and persistence
+
+**Project-scoped, not viz config.** Song markers are definitive information about the song. They live with the project (alongside `project.yaml` and `signals.json`) and persist across many viz YAML snapshots. They are not duplicated or lost when saving `unnamed-N.yaml` or switching configs.
+
+v1 is **manual only** — user-driven placement with streamlined UX. No auto-suggestion in the first release.
+
+---
+
+## Phase 1 — UI / UX
+
+Build UI and editing only. No snap, preset generation, or beat-phase logic yet.
+
+### Add a song marker
+
+- Global shortcut **Ctrl+Enter** from the timeline strip or the main tuning panel.
+- Drops a song marker at the current playhead time.
+- Shows a toast and appends the marker to the list.
+
+### Panel
+
+- New expandable child under **Render: Timeline**: `song markers`.
+- List of marker times in `[mm:ss.ms]` format.
+- Parent row should show a count when useful (e.g. `song markers (4)`).
+
+### List interaction
+
+- **Enter** on a highlighted song marker seeks the playhead to that time (audition / verify placement).
+- **Delete** removes the highlighted song marker.
+- No nudge in v1 — delete and re-drop at the playhead is enough, with **Enter** to verify.
+
+### Timeline display
+
+- Song markers render as **red 2px vertical lines** spanning all lanes (global structure, not per-layer visibility cues).
+- The highlighted song marker uses a **4px yellow/orange** line on the strip.
+
+### Placement rules
+
+- If a new song marker falls within **2 seconds** of an existing song marker, **replace** the nearer existing marker (not both).
+- When the new time is between two song markers, the **nearest** one is replaced.
+- Show a warning toast on replace (include old and new times when practical).
+
+### Phase 1 deliverable
+
+Song markers, list editing, seek-to-marker, and timeline drawing only. Value on its own as a visual reference while editing lanes by hand.
+
+---
+
+## Phase 2 — Snap to song markers
+
+Add a **snap to song markers** action (button or row under the timeline section).
+
+### Behavior
+
+For **each song marker**, pull the **closest** timeline lane cue on the selected layer(s) toward that song marker.
+
+- If no lane cue lies within the proximity window, **no-op** for that song marker.
+- Default proximity window: **5 seconds** (configurable).
+
+### UI
+
+Modal with layer scope:
+
+- Layer 1, Layer 2, … (per active layer)
+- All layers
+- Cancel
+
+Include proximity (and any other snap options) in the modal or an adjacent control so users can tune behavior before applying. Destructive multi-lane moves should be explicit; no silent wide snaps.
+
+---
+
+## Phase 3 — Timeline preset generation
+
+Update preset generation so new timeline presets can **latch onto** song markers where appropriate. Details TBD when Phase 1 song markers exist in projects.
+
+---
+
+## Phase 4 — Beat / bar phase (open question)
+
+Song markers might improve beat or bar offset if treated as downbeat hints.
+
+**Caveat:** section hits are not always bar 1 (pickups, beat-3 crashes, early snares). Treating every song marker as a downbeat could harm phase accuracy. Keep language as **structure / section** until there is an explicit downbeat notion or a separate user action.
+
+---
+
+## Later — automation (v2+)
+
+Auto-suggested song markers (energy, novelty, structure) with optional manual drop to correct or pin a few points. Out of scope for v1.

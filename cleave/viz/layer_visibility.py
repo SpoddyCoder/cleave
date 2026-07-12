@@ -165,9 +165,10 @@ def build_record_punch_cues(
     for slot in target_slots:
         if slot not in tl.record_baseline:
             continue
+        slot_start = tl.record_slot_start_sec.get(slot, record_start)
         lane = _fold_lane_baseline(session, slot)
-        new_cues = _punch_cues_for_slot(session, slot, record_start, record_stop)
-        tl.lanes[slot] = punch_lane(lane, record_start, record_stop, new_cues)
+        new_cues = _punch_cues_for_slot(session, slot, slot_start, record_stop)
+        tl.lanes[slot] = punch_lane(lane, slot_start, record_stop, new_cues)
 
 
 def effective_layer_enabled(
@@ -246,6 +247,7 @@ def build_timeline_view_state(
         armed_slots=set(tl.armed_slots),
         recording=tl.recording,
         record_start_sec=tl.record_start_sec,
+        record_slot_start_sec=dict(tl.record_slot_start_sec),
         record_baseline=dict(tl.record_baseline),
         record_buffer={
             slot: list(cues) for slot, cues in tl.record_buffer.items()
