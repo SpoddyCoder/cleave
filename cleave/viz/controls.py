@@ -14,7 +14,6 @@ from cleave.config_schema import clamp_easter_egg
 from cleave.config_schema import PRESET_SWITCHING_MODES, PRESET_SWITCHING_SCOPES
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.extract import STEM_SOURCES
-from cleave.project import save_song_markers
 from cleave.song_markers import format_marker_time, nearest_index, place_marker
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.preset_curation_controls import PresetCurationController
@@ -114,6 +113,7 @@ class TuningControls:
             session,
             cfg,
             self._modal_host,
+            project_dir=project_dir,
             launch_config_path=launch_config_path,
             repo_root_example=repo_root_example,
             on_save_new_config=on_save_new_config,
@@ -1022,7 +1022,7 @@ class TuningControls:
             seek_to(self.playback, target, self.duration_sec)
 
     def drop_song_marker(self) -> None:
-        """Drop or replace a song marker at the playhead; persist to project.yaml."""
+        """Drop or replace a song marker at the playhead (session until Save)."""
         if self.session.timeline.recording:
             return
         t = current_sec(self.playback, self.duration_sec)
@@ -1042,8 +1042,6 @@ class TuningControls:
         else:
             markers.selected_index = nearest_index(new_times, t)
             self.show_notification(f"Song marker {format_marker_time(t)}")
-        if self.project_dir is not None:
-            save_song_markers(self.project_dir, markers.times)
         selected = markers.selected_index
         if selected is not None:
             self._apply_focus_cursor(
@@ -1075,8 +1073,6 @@ class TuningControls:
             markers.selected_index = min(index, len(markers.times) - 1)
         elif markers.selected_index > index:
             markers.selected_index -= 1
-        if self.project_dir is not None:
-            save_song_markers(self.project_dir, markers.times)
         self.show_notification(
             f"Song marker removed {format_marker_time(removed)}"
         )

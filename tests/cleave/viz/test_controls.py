@@ -25,6 +25,7 @@ from cleave.preset_playlist import (
     scan_preset_playlist,
 )
 from cleave.timeline import SlotCue, TimelineLane, canonicalize
+from cleave.project import load_manifest, write_manifest
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.key_repeat import mod_shift
 from cleave.viz.playback import format_mmss
@@ -114,6 +115,7 @@ def _make_controls(
     repo_root_example: Path = _REPO_ROOT_EXAMPLE,
     beat_times: tuple[float, ...] = (),
     bar_times: tuple[float, ...] = (),
+    project_dir: Path | None = None,
 ) -> TuningControls:
     preset_root = Path("/tmp/presets")
     cfg = make_test_cfg(slots, preset_root=preset_root, config_path=launch_config_path or _DEFAULT_ACTIVE_CONFIG)
@@ -137,6 +139,7 @@ def _make_controls(
         preset_root=preset_root,
         playback=stub_playback_state(),
         duration_sec=120.0,
+        project_dir=project_dir,
         launch_config_path=launch_config_path,
         repo_root_example=repo_root_example,
         beat_times=beat_times,
@@ -4401,3 +4404,153 @@ def test_up_down_syncs_song_marker_selected_index() -> None:
     )
     assert controls.handle_keydown(_keydown(pygame.K_UP)) is True
     assert markers.selected_index == 0
+
+
+def _project_with_markers(tmp_path: Path, markers: tuple[float, ...] = ()) -> Path:
+    project = tmp_path / "song"
+    project.mkdir()
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=tmp_path / "source.flac",
+        demucs_model="htdemucs",
+        song_markers=markers,
+    )
+    assert load_manifest(project).song_markers == markers
+    return project
+
+
+def test_drop_song_marker_does_not_write_project_yaml(tmp_path: Path) -> None:
+    project = _project_with_markers(tmp_path, (10.0,))
+    controls = _make_controls(("layer_1",), project_dir=project)
+    controls.session.song_markers.times = [10.0]
+    controls.clear_config_dirty()
+    controls.playback.player.seek(25.0)
+    controls.drop_song_marker()
+    assert controls.session.song_markers.times == [10.0, 25.0]
+    assert load_manifest(project).song_markers == (10.0,)
+    assert controls.config_dirty
+
+
+def test_delete_song_marker_does_not_write_project_yaml(tmp_path: Path) -> None:
+    project = _project_with_markers(tmp_path, (5.0, 15.0, 25.0))
+    controls = _make_controls(("layer_1",), project_dir=project)
+    markers = controls.session.song_markers
+    markers.times = [5.0, 15.0, 25.0]
+    markers.expanded = True
+    markers.selected_index = 1
+    controls.clear_config_dirty()
+    controls.session.timeline.panel_open = True
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.SONG_MARKER_ITEM, marker_index=1
+    )
+    assert controls.handle_keydown(_keydown(pygame.K_DELETE)) is True
+    controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
+    assert markers.times == [5.0, 25.0]
+    assert load_manifest(project).song_markers == (5.0, 15.0, 25.0)
+    assert controls.config_dirty
+
+
+def test_marker_only_edit_marks_dirty_and_save_clears(tmp_path: Path) -> None:
+    project = _project_with_markers(tmp_path, ())
+    saved_path = project / "unnamed-1.yaml"
+    controls = _make_controls(("layer_1",), project_dir=project)
+    controls._config_save._on_save_new_config = lambda: saved_path
+    assert not controls.config_dirty
+
+    controls.playback.player.seek(12.5)
+    controls.drop_song_marker()
+    assert controls.config_dirty
+    assert load_manifest(project).song_markers == ()
+
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = _desc(view, _config_header_row(view))
+    _choose_save_as_new(controls)
+
+    assert not controls.config_dirty
+    assert load_manifest(project).song_markers == (12.5,)
+
+
+def test_overwrite_save_flushes_song_markers(tmp_path: Path) -> None:
+    project = _project_with_markers(tmp_path, (8.0,))
+    launch = project / "active.yaml"
+    launch.write_text("editor: {}\n", encoding="utf-8")
+    writes: list[Path] = []
+    controls = _make_controls(
+        ("layer_1",),
+        project_dir=project,
+        launch_config_path=launch,
+    )
+    controls.session.song_markers.times = [8.0]
+    controls.clear_config_dirty()
+    controls._config_save._on_overwrite_config = (
+        lambda path: writes.append(path) or path.name
+    )
+
+    controls.playback.player.seek(40.0)
+    controls.drop_song_marker()
+    assert controls.config_dirty
+    assert load_manifest(project).song_markers == (8.0,)
+
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = _desc(view, _config_header_row(view))
+    _choose_overwrite(controls)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+
+    assert writes == [launch]
+    assert load_manifest(project).song_markers == (8.0, 40.0)
+    assert not controls.config_dirty
+
+
+def test_quit_discard_leaves_project_markers_unchanged(tmp_path: Path) -> None:
+    project = _project_with_markers(tmp_path, (10.0, 20.0))
+    controls = _make_controls(("layer_1",), project_dir=project)
+    controls.session.song_markers.times = [10.0, 20.0]
+    controls.clear_config_dirty()
+
+    controls.playback.player.seek(55.0)
+    controls.drop_song_marker()
+    assert controls.config_dirty
+
+    assert controls.try_quit() is False
+    modal = controls.modal_host.view_state()
+    assert modal is not None
+    assert modal.kind == ModalKind.UNSAVED_QUIT
+    controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
+    controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
+    assert controls.consume_pending_exit() is True
+    assert load_manifest(project).song_markers == (10.0, 20.0)
+
+
+def test_save_as_new_flushes_markers_to_same_project_yaml(tmp_path: Path) -> None:
+    project = _project_with_markers(tmp_path, ())
+    new_yaml = project / "unnamed-3.yaml"
+    controls = _make_controls(("layer_1",), project_dir=project)
+    controls._config_save._on_save_new_config = lambda: new_yaml
+
+    controls.playback.player.seek(3.0)
+    controls.drop_song_marker()
+    view = controls.build_view_state(paused=False)
+    controls.focus_descriptor = _desc(view, _config_header_row(view))
+    _choose_save_as_new(controls)
+
+    assert load_manifest(project).song_markers == (3.0,)
+    assert controls._config_save.active_config_path == new_yaml
+    assert not controls.config_dirty
+
+
+def test_song_markers_expanded_does_not_mark_dirty() -> None:
+    controls = _make_controls(("layer_1",))
+    assert not controls.config_dirty
+    controls.session.song_markers.expanded = True
+    assert not controls.config_dirty
+
+
+def test_no_project_dir_marker_edit_still_marks_dirty() -> None:
+    controls = _make_controls(("layer_1",), project_dir=None)
+    controls.playback.player.seek(1.0)
+    controls.drop_song_marker()
+    assert controls.config_dirty
+    controls.clear_config_dirty()
+    assert not controls.config_dirty
