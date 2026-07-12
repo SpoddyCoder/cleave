@@ -254,50 +254,25 @@ def bar_times_from_beats(
     return bar_times_at_phase(beat_times, k, beats_per_bar=beats_per_bar)
 
 
-def grid_period(times: Sequence[float]) -> float | None:
-    """Median spacing between successive times, or None if fewer than two."""
-    if len(times) < 2:
-        return None
-    return float(np.median(np.diff(np.asarray(times, dtype=np.float64))))
-
-
-def bar_period_sec(
+def bar_phase_matching(
+    beat_times: Sequence[float],
     bar_times: Sequence[float],
-    beat_times: Sequence[float] = (),
     *,
     beats_per_bar: int = 4,
-) -> float | None:
-    """Bar period from bar-grid median spacing, else ``beats_per_bar`` beat medians."""
-    period = grid_period(bar_times)
-    if period is not None:
-        return period
-    beat_period = grid_period(beat_times)
-    if beat_period is not None:
-        return float(beats_per_bar) * beat_period
+) -> int | None:
+    """Return phase ``k`` where ``bar_times_at_phase`` equals ``bar_times``."""
+    if beats_per_bar < 1:
+        raise ValueError(f"beats_per_bar must be >= 1 (got {beats_per_bar})")
+    if not beat_times or not bar_times:
+        return None
+    target = tuple(float(t) for t in bar_times)
+    for k in range(beats_per_bar):
+        if (
+            bar_times_at_phase(beat_times, k, beats_per_bar=beats_per_bar)
+            == target
+        ):
+            return k
     return None
-
-
-def shift_lane_times(
-    lane: TimelineLane,
-    delta_sec: float,
-    *,
-    t_min: float = 0.0,
-    t_max: float,
-) -> TimelineLane:
-    """Shift cue times by ``delta_sec``, clamp to ``[t_min, t_max]``, canonicalize."""
-    if not lane.cues:
-        return TimelineLane(baseline=lane.baseline, cues=[])
-    shifted = [
-        SlotCue(
-            t=max(t_min, min(t_max, cue.t + delta_sec)),
-            visible=cue.visible,
-        )
-        for cue in lane.cues
-    ]
-    return TimelineLane(
-        baseline=lane.baseline,
-        cues=canonicalize(lane.baseline, shifted),
-    )
 
 
 def snap_lane_to_beats(

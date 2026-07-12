@@ -707,10 +707,11 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.ACTION,
         navigable=True,
         help_title="Snap to bars",
-        help_entries=(("Enter", "choose bar phase offset"),),
+        help_entries=(("Enter", "choose bar phase"),),
         help_description=(
             "Snap all committed timeline cues to the nearest bar;",
-            "Enter opens a phase-offset choice (irreversible).",
+            "Enter opens a bar-phase choice +0..+3 (irreversible).",
+            "Phases are subsets of the beat grid.",
         ),
     ),
     RowKind.SETTINGS_HEADER: RowBehavior(
