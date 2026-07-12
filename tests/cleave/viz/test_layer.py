@@ -641,3 +641,25 @@ def test_build_timeline_view_state_empty_signals_empty_bar_grid() -> None:
     state = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
     assert state.show_bar_grid is True
     assert state.bar_grid_times == ()
+
+
+def test_build_timeline_view_state_includes_song_markers() -> None:
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+    )
+    session.song_markers.times = [12.5, 64.0]
+    session.song_markers.selected_index = 1
+    state = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
+    assert state.song_marker_times == (12.5, 64.0)
+    assert state.selected_song_marker_index == 1
+
+
+def test_build_timeline_view_state_default_song_markers_empty() -> None:
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+    )
+    state = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
+    assert state.song_marker_times == ()
+    assert state.selected_song_marker_index is None

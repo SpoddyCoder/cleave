@@ -236,6 +236,20 @@ def test_row_expand_subheader_display_text() -> None:
     assert row_expand_subheader_display_text(state, desc) == "└─ preset switching ▶"
 
 
+def test_song_markers_expand_subheader_includes_count() -> None:
+    from cleave.viz.tuning_view_state import RenderTimelineBlock
+
+    state = _minimal_view_state(
+        render_timeline=RenderTimelineBlock(
+            expanded=True,
+            song_markers_expanded=False,
+            song_marker_times=(1.0, 2.0, 3.0, 4.0),
+        )
+    )
+    desc = RowDescriptor(RowKind.SONG_MARKERS_HEADER)
+    assert row_expand_subheader_display_text(state, desc) == "└─ song markers (4) ▶"
+
+
 def test_composite_header_render_overlay_metadata() -> None:
     field = row_field_def(RowKind.RENDER_OVERLAY_HEADER)
     assert field.present_style == RowPresentStyle.COMPOSITE_HEADER
@@ -276,7 +290,7 @@ def test_apply_field_horizontal_track_header_solo_and_expand() -> None:
 
 
 def test_row_fields_count() -> None:
-        assert len(ROW_FIELDS) == 68
+        assert len(ROW_FIELDS) == 70
 
 
 def test_row_kinds_requiring_fields_registry_complete() -> None:

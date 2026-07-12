@@ -87,6 +87,10 @@ def _toggle_user_presets(controls: TuningControls, slot: str | None, forward: bo
     controls._set_user_presets_expanded(slot, forward)
 
 
+def _toggle_song_markers(controls: TuningControls, _slot: str | None, forward: bool) -> None:
+    controls._set_song_markers_expanded(forward)
+
+
 def _open_timeline_panel(controls: TuningControls, forward: bool) -> None:
     if forward:
         controls._open_timeline_panel()
@@ -234,6 +238,10 @@ def _user_presets_expanded(state: TuningViewState, slot: str | None) -> bool:
     return state.tracks[slot].user_presets_expanded
 
 
+def _song_markers_expanded(state: TuningViewState, _slot: str | None) -> bool:
+    return state.render_timeline.song_markers_expanded
+
+
 def _append_track_effect_rows(
     row_list: list[RowDescriptor],
     state: TuningViewState,
@@ -270,6 +278,17 @@ def _append_user_preset_rows(
             )
         )
     row_list.append(RowDescriptor(RowKind.TRACK_USER_PRESET_ADD, slot=slot))
+
+
+def _append_song_marker_rows(
+    row_list: list[RowDescriptor],
+    state: TuningViewState,
+    _slot: str | None,
+) -> None:
+    for index in range(len(state.render_timeline.song_marker_times)):
+        row_list.append(
+            RowDescriptor(RowKind.SONG_MARKER_ITEM, marker_index=index)
+        )
 
 
 SETTINGS_UI_SECTION = ExpandSectionDef(
@@ -513,6 +532,15 @@ RENDER_SECTION_NODES: tuple[SectionNode, ...] = (
     SectionNode(panel_anchor=TIMELINE_PANEL_ANCHOR),
 )
 
+SONG_MARKERS_SECTION = ExpandSectionDef(
+    header_kind=RowKind.SONG_MARKERS_HEADER,
+    context="global",
+    read_expanded=_song_markers_expanded,
+    toggle=_toggle_song_markers,
+    children=(),
+    append_dynamic_children=_append_song_marker_rows,
+)
+
 
 def _collect_expand_sections(
     *roots: ExpandSectionDef,
@@ -544,6 +572,7 @@ def _collect_expand_sections(
 _ALL_EXPAND_SECTIONS = _collect_expand_sections(
     SETTINGS_SECTION,
     TRACK_SECTION,
+    SONG_MARKERS_SECTION,
     extra_nodes=RENDER_SECTION_NODES,
 )
 
@@ -642,6 +671,8 @@ RENDER_TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_BAR_GRID,
         RowKind.TIMELINE_SNAP_TO_BEATS,
         RowKind.TIMELINE_SNAP_TO_BARS,
+        RowKind.SONG_MARKERS_HEADER,
+        RowKind.SONG_MARKER_ITEM,
     }
 )
 
@@ -684,6 +715,8 @@ def _build_row_tree_indent_depth() -> dict[RowKind, int]:
     depths[RowKind.TIMELINE_BAR_GRID] = 1
     depths[RowKind.TIMELINE_SNAP_TO_BEATS] = 1
     depths[RowKind.TIMELINE_SNAP_TO_BARS] = 1
+    depths[RowKind.SONG_MARKERS_HEADER] = 1
+    depths[RowKind.SONG_MARKER_ITEM] = 2
     return depths
 
 
@@ -802,6 +835,7 @@ def append_render_section_rows(
                 row_list.append(RowDescriptor(RowKind.TIMELINE_BAR_GRID))
                 row_list.append(RowDescriptor(RowKind.TIMELINE_SNAP_TO_BEATS))
                 row_list.append(RowDescriptor(RowKind.TIMELINE_SNAP_TO_BARS))
+                append_expand_section_rows(row_list, SONG_MARKERS_SECTION, state)
 
 
 def append_track_section_rows(

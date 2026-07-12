@@ -51,6 +51,8 @@ class TimelineStaticSignature:
     visibility_bucket: int
     show_bar_grid: bool
     bar_grid_times: tuple[float, ...]
+    song_marker_times: tuple[float, ...]
+    selected_song_marker_index: int | None
 
 
 @dataclass
@@ -132,6 +134,8 @@ def timeline_static_signature(
         visibility_bucket=visibility_bucket(visibility),
         show_bar_grid=state.show_bar_grid,
         bar_grid_times=state.bar_grid_times,
+        song_marker_times=state.song_marker_times,
+        selected_song_marker_index=state.selected_song_marker_index,
     )
 
 

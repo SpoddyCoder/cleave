@@ -41,7 +41,7 @@ Build UI and editing only. No snap, preset generation, or beat-phase logic yet.
 
 - **Sticky selection:** the highlighted list row stays put until the user moves focus (Up/Down), deletes it, or drops a marker (select the new or replaced marker). Do **not** auto-follow the playhead.
 - **Enter** on a highlighted song marker seeks the playhead to that time (audition / verify placement). Timeline row arm uses **a**, so **Enter** is free for seek-to-marker.
-- **Delete** removes the highlighted song marker.
+- **Delete** prompts a confirm modal, then removes the highlighted song marker.
 - No nudge in v1 — delete and re-drop at the playhead is enough, with **Enter** to verify.
 
 ### Timeline display

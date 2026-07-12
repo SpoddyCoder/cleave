@@ -21,6 +21,7 @@ from cleave.config_schema import (
     ui_fade_display,
 )
 from cleave.extract import stem_control_label, stem_overlay_header
+from cleave.song_markers import format_marker_time
 from cleave.viz.fonts import render_overlay_font_display
 from cleave.viz.row_sections import (
     apply_expand_toggle,
@@ -857,6 +858,16 @@ def _format_track_user_preset_item(
     return user_preset_item_display_name(block.user_presets, desc.preset_index)
 
 
+def _format_song_markers_count(state: TuningViewState, _desc: RowDescriptor) -> str:
+    return f"({len(state.render_timeline.song_marker_times)})"
+
+
+def _format_song_marker_item(state: TuningViewState, desc: RowDescriptor) -> str:
+    assert desc.marker_index is not None
+    times = state.render_timeline.song_marker_times
+    return f"[{format_marker_time(times[desc.marker_index])}]"
+
+
 def _format_transport(_state: TuningViewState, _desc: RowDescriptor) -> str:
     return ""
 
@@ -1335,6 +1346,17 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         panel_label="snap to bars",
         present_style=RowPresentStyle.FULL_LINE,
     ),
+    RowKind.SONG_MARKERS_HEADER: RowFieldDef(
+        panel_label="song markers",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        format_value=_format_song_markers_count,
+        apply_horizontal=_apply_expand_subheader,
+    ),
+    RowKind.SONG_MARKER_ITEM: RowFieldDef(
+        panel_label="",
+        present_style=RowPresentStyle.FULL_LINE,
+        format_value=_format_song_marker_item,
+    ),
     RowKind.PANEL_NOTIFICATION: RowFieldDef(
         panel_label="",
         present_style=RowPresentStyle.FULL_LINE,
@@ -1380,7 +1402,13 @@ def expand_subheader_prefix(kind: RowKind) -> str:
 
 
 def format_expand_subheader_value(state: TuningViewState, desc: RowDescriptor) -> str:
-    return expand_arrow_for_header(state, desc.kind, desc.slot)
+    arrow = expand_arrow_for_header(state, desc.kind, desc.slot)
+    field = row_field_def(desc.kind)
+    if field.format_value is not None:
+        suffix = field.format_value(state, desc)
+        if suffix:
+            return f"{suffix} {arrow}"
+    return arrow
 
 
 def row_expand_subheader_display_text(
@@ -1468,6 +1496,11 @@ def row_full_line_display_text(state: TuningViewState, desc: RowDescriptor) -> s
         return field.format_value(state, desc)
     if desc.kind == RowKind.TRANSPORT:
         return ""
+    if field.format_value is not None:
+        return (
+            tree_branch_prefix(_full_line_branch_depth(desc.kind))
+            + field.format_value(state, desc)
+        )
     return full_line_prefix(desc.kind)
 
 

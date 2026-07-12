@@ -155,6 +155,19 @@ def default_timeline_runtime() -> TimelineRuntime:
 
 
 @dataclass
+class SongMarkerRuntime:
+    """Project-scoped song markers held live; not part of viz YAML."""
+
+    times: list[float] = field(default_factory=list)
+    selected_index: int | None = None
+    expanded: bool = False
+
+
+def default_song_marker_runtime() -> SongMarkerRuntime:
+    return SongMarkerRuntime()
+
+
+@dataclass
 class SettingsRuntime:
     expanded: bool = False
     ui_expanded: bool = False
@@ -200,6 +213,7 @@ class TuningSession:
     )
     render_post_fx_solo: bool = False
     timeline: TimelineRuntime = field(default_factory=default_timeline_runtime)
+    song_markers: SongMarkerRuntime = field(default_factory=default_song_marker_runtime)
     settings: SettingsRuntime = field(default_factory=SettingsRuntime)
     help_visible: bool = False
     preset_skip_notify_tracker: PresetSkipNotifyTracker = field(

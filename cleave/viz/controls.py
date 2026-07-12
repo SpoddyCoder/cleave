@@ -14,12 +14,14 @@ from cleave.config_schema import clamp_easter_egg
 from cleave.config_schema import PRESET_SWITCHING_MODES, PRESET_SWITCHING_SCOPES
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.extract import STEM_SOURCES
+from cleave.project import save_song_markers
+from cleave.song_markers import format_marker_time, nearest_index, place_marker
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.preset_curation_controls import PresetCurationController
 from cleave.viz.key_repeat import KeyRepeatController, add_current_preset_key_pressed, delete_key_pressed, mod_ctrl, mod_shift
 from cleave.viz.modal import ModalHost
 from cleave.viz.panel_notification import PanelNotificationHost
-from cleave.viz.playback import PlaybackState, seek, toggle_pause
+from cleave.viz.playback import PlaybackState, current_sec, seek, seek_to, toggle_pause
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.render_overlay_controls import RenderOverlayControls
 from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
@@ -298,6 +300,15 @@ class TuningControls:
 
         if delete_key_pressed(event):
             kind = self.focus_descriptor.kind
+            if kind == RowKind.SONG_MARKER_ITEM:
+                desc = self.focus_descriptor
+                if desc.marker_index is not None:
+                    if section_lock_blocks_mutation(
+                        self.session, self.focus_descriptor
+                    ):
+                        return True
+                    self._delete_song_marker(desc.marker_index)
+                return True
             if kind == RowKind.TRACK_USER_PRESET_ITEM:
                 slot = self.focus_descriptor.slot
                 desc = self.focus_descriptor
@@ -386,6 +397,17 @@ class TuningControls:
 
         if event.key == pygame.K_RETURN:
             kind = self.focus_descriptor.kind
+            if kind == RowKind.SONG_MARKER_ITEM:
+                desc = self.focus_descriptor
+                if desc.marker_index is not None:
+                    if section_lock_blocks_mutation(
+                        self.session, self.focus_descriptor
+                    ):
+                        return True
+                    times = self.session.song_markers.times
+                    if 0 <= desc.marker_index < len(times):
+                        self.seek_to(times[desc.marker_index])
+                return True
             if kind == RowKind.TRACK_USER_PRESET_ADD:
                 slot = self.focus_descriptor.slot
                 if slot is not None:
@@ -473,6 +495,14 @@ class TuningControls:
         self._focus_cursor = cursor
         if isinstance(cursor, TimelineFocus):
             self.session.timeline.focus_row = cursor.row
+            return
+        if isinstance(cursor, MainFocus):
+            desc = cursor.descriptor
+            if (
+                desc.kind == RowKind.SONG_MARKER_ITEM
+                and desc.marker_index is not None
+            ):
+                self.session.song_markers.selected_index = desc.marker_index
 
     def _normalize_focus_cursor(self) -> None:
         view = self.build_view_state(paused=self.playback.paused)
@@ -964,6 +994,12 @@ class TuningControls:
             return
         layer.user_presets_expanded = expanded
 
+    def _set_song_markers_expanded(self, expanded: bool) -> None:
+        markers = self.session.song_markers
+        if markers.expanded == expanded:
+            return
+        markers.expanded = expanded
+
     def _set_beat(self, slot: str, value: float) -> None:
         layer = self.session.layers[slot]
         layer.beat_sensitivity = clamp_beat_sensitivity(value)
@@ -975,6 +1011,88 @@ class TuningControls:
             self._layer_bindings.on_seek(delta_sec)
         else:
             seek(self.playback, delta_sec, self.duration_sec)
+
+    def seek_to(self, position_sec: float) -> None:
+        """Absolute seek; routes through ``on_seek`` (PCM flush + preset re-apply)."""
+        target = max(0.0, min(float(position_sec), self.duration_sec))
+        current = current_sec(self.playback, self.duration_sec)
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_seek(target - current)
+        else:
+            seek_to(self.playback, target, self.duration_sec)
+
+    def drop_song_marker(self) -> None:
+        """Drop or replace a song marker at the playhead; persist to project.yaml."""
+        if self.session.timeline.recording:
+            return
+        t = current_sec(self.playback, self.duration_sec)
+        markers = self.session.song_markers
+        new_times, replaced_index, replaced_time = place_marker(markers.times, t)
+        markers.times = list(new_times)
+        markers.expanded = True
+        self.session.timeline.panel_open = True
+        if replaced_index is not None:
+            markers.selected_index = replaced_index
+            assert replaced_time is not None
+            self.show_notification(
+                f"Song marker replaced "
+                f"{format_marker_time(replaced_time)} -> "
+                f"{format_marker_time(new_times[replaced_index])}"
+            )
+        else:
+            markers.selected_index = nearest_index(new_times, t)
+            self.show_notification(f"Song marker {format_marker_time(t)}")
+        if self.project_dir is not None:
+            save_song_markers(self.project_dir, markers.times)
+        selected = markers.selected_index
+        if selected is not None:
+            self._apply_focus_cursor(
+                MainFocus(
+                    RowDescriptor(RowKind.SONG_MARKER_ITEM, marker_index=selected)
+                )
+            )
+
+    def _delete_song_marker(self, index: int) -> None:
+        markers = self.session.song_markers
+        if index < 0 or index >= len(markers.times):
+            return
+        label = format_marker_time(markers.times[index])
+        self._modal_host.prompt_yes_no(
+            f"Remove song marker {label}?",
+            on_confirm=lambda: self._confirm_delete_song_marker(index),
+        )
+
+    def _confirm_delete_song_marker(self, index: int) -> None:
+        markers = self.session.song_markers
+        if index < 0 or index >= len(markers.times):
+            return
+        removed = markers.times.pop(index)
+        if not markers.times:
+            markers.selected_index = None
+        elif markers.selected_index is None:
+            pass
+        elif markers.selected_index == index:
+            markers.selected_index = min(index, len(markers.times) - 1)
+        elif markers.selected_index > index:
+            markers.selected_index -= 1
+        if self.project_dir is not None:
+            save_song_markers(self.project_dir, markers.times)
+        self.show_notification(
+            f"Song marker removed {format_marker_time(removed)}"
+        )
+        if markers.selected_index is not None:
+            self._apply_focus_cursor(
+                MainFocus(
+                    RowDescriptor(
+                        RowKind.SONG_MARKER_ITEM,
+                        marker_index=markers.selected_index,
+                    )
+                )
+            )
+        else:
+            self._apply_focus_cursor(
+                MainFocus(RowDescriptor(RowKind.SONG_MARKERS_HEADER))
+            )
 
     def show_notification(self, message: str) -> None:
         self._notification_host.show(message)

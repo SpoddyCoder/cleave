@@ -79,6 +79,8 @@ class RowKind(Enum):
     TIMELINE_BAR_GRID = auto()
     TIMELINE_SNAP_TO_BEATS = auto()
     TIMELINE_SNAP_TO_BARS = auto()
+    SONG_MARKERS_HEADER = auto()
+    SONG_MARKER_ITEM = auto()
     SETTINGS_HEADER = auto()
     SETTINGS_PREVIEW_QUALITY = auto()
     SETTINGS_UI_HEADER = auto()
@@ -96,6 +98,7 @@ class RowDescriptor:
     effect_id: str | None = None
     driver_slug: str | None = None
     preset_index: int | None = None
+    marker_index: int | None = None
 
 
 class RowAffordance(Enum):
@@ -748,6 +751,29 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "(irreversible).",
         ),
     ),
+    RowKind.SONG_MARKERS_HEADER: RowBehavior(
+        RowAffordance.EXPAND,
+        is_sub_header=True,
+        help_title="Song markers",
+        help_description=(
+            "Manual song markers for major transitions.",
+            "Ctrl+Enter drops a marker at the playhead.",
+        ),
+    ),
+    RowKind.SONG_MARKER_ITEM: RowBehavior(
+        RowAffordance.ACTION,
+        navigable=True,
+        blocked_by_section_lock=True,
+        help_title="Song marker",
+        help_entries=(
+            ("Enter", "seek to marker"),
+            ("Delete", "confirm remove"),
+        ),
+        help_description=(
+            "A song marker time. Enter seeks the playhead;",
+            "Delete asks to remove the marker.",
+        ),
+    ),
     RowKind.SETTINGS_HEADER: RowBehavior(
         RowAffordance.EXPAND,
         is_header=True,
@@ -842,6 +868,7 @@ TRACK_EFFECT_SUB_ROW_KINDS = frozenset({RowKind.TRACK_EFFECT})
 TRACK_USER_PRESET_SUB_ROW_KINDS = frozenset(
     {RowKind.TRACK_USER_PRESET_ITEM, RowKind.TRACK_USER_PRESET_ADD}
 )
+SONG_MARKER_SUB_ROW_KINDS = frozenset({RowKind.SONG_MARKER_ITEM})
 PRESET_FILE_ROW_KINDS = frozenset({RowKind.TRACK_PRESET, RowKind.TRACK_USER_PRESET_ITEM})
 
 _SECTION_LOCK_BLOCKING_AFFORDANCES = frozenset(
@@ -983,4 +1010,6 @@ def section_header_descriptor(desc: RowDescriptor) -> RowDescriptor:
         return RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, slot=desc.slot)
     if kind in TRACK_USER_PRESET_SUB_ROW_KINDS:
         return RowDescriptor(RowKind.TRACK_USER_PRESETS, slot=desc.slot)
+    if kind in SONG_MARKER_SUB_ROW_KINDS:
+        return RowDescriptor(RowKind.SONG_MARKERS_HEADER)
     return desc
