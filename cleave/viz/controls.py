@@ -14,7 +14,7 @@ from cleave.config_schema import clamp_easter_egg
 from cleave.config_schema import PRESET_SWITCHING_MODES, PRESET_SWITCHING_SCOPES
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.extract import STEM_SOURCES
-from cleave.song_markers import format_marker_time, nearest_index, place_marker
+from cleave.song_markers import format_marker_time, place_marker
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.preset_curation_controls import PresetCurationController
 from cleave.viz.key_repeat import KeyRepeatController, add_current_preset_key_pressed, delete_key_pressed, mod_ctrl, mod_shift
@@ -1027,12 +1027,35 @@ class TuningControls:
             return
         t = current_sec(self.playback, self.duration_sec)
         markers = self.session.song_markers
+        prior_selected_time: float | None = None
+        if (
+            markers.selected_index is not None
+            and 0 <= markers.selected_index < len(markers.times)
+        ):
+            prior_selected_time = markers.times[markers.selected_index]
         new_times, replaced_index, replaced_time = place_marker(markers.times, t)
         markers.times = list(new_times)
         markers.expanded = True
         self.session.timeline.panel_open = True
-        if replaced_index is not None:
+        # Never activate the newly placed marker; keep prior selection by time.
+        if prior_selected_time is None:
+            if markers.selected_index is not None and (
+                markers.selected_index < 0
+                or markers.selected_index >= len(markers.times)
+            ):
+                markers.selected_index = None
+        elif (
+            replaced_time is not None
+            and replaced_time == prior_selected_time
+            and replaced_index is not None
+        ):
             markers.selected_index = replaced_index
+        else:
+            try:
+                markers.selected_index = new_times.index(prior_selected_time)
+            except ValueError:
+                markers.selected_index = None
+        if replaced_index is not None:
             assert replaced_time is not None
             self.show_notification(
                 f"Song marker replaced "
@@ -1040,15 +1063,7 @@ class TuningControls:
                 f"{format_marker_time(new_times[replaced_index])}"
             )
         else:
-            markers.selected_index = nearest_index(new_times, t)
             self.show_notification(f"Song marker {format_marker_time(t)}")
-        selected = markers.selected_index
-        if selected is not None:
-            self._apply_focus_cursor(
-                MainFocus(
-                    RowDescriptor(RowKind.SONG_MARKER_ITEM, marker_index=selected)
-                )
-            )
 
     def _delete_song_marker(self, index: int) -> None:
         markers = self.session.song_markers

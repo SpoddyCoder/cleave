@@ -36,12 +36,12 @@ Build UI and editing only. No snap, preset generation, or beat-phase logic yet.
 
 ### Panel
 
-- New expandable child under **Render: Timeline**: header label `song markers (N)` with expand arrow (e.g. `song markers (4)`).
+- First expandable child under **Render: Timeline** (above apply a preset): header label `song markers (N)` with expand arrow (e.g. `song markers (4)`).
 - List of marker times in `[mm:ss.ms]` format.
 
 ### List interaction
 
-- **Sticky selection:** the highlighted list row stays put until the user moves focus (Up/Down), deletes it, or drops a marker (select the new or replaced marker). Do **not** auto-follow the playhead.
+- **Sticky selection:** the highlighted list row stays put until the user moves focus (Up/Down) or deletes it. Drop/replace does **not** select the new marker; prior selection is preserved (remapped by time if the list shifts). Do **not** auto-follow the playhead.
 - **Enter** on a highlighted song marker seeks the playhead to that time (audition / verify placement). Timeline row arm uses **a**, so **Enter** is free for seek-to-marker.
 - **Delete** prompts a confirm modal, then removes the highlighted song marker.
 - No nudge in v1 — delete and re-drop at the playhead is enough, with **Enter** to verify.

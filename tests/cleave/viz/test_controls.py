@@ -643,13 +643,16 @@ def test_disabled_render_timeline_can_open_panel() -> None:
     assert not isinstance(controls.focus_cursor, TimelineFocus)
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
+    markers_row = view.layout.find_by_kind(RowKind.SONG_MARKERS_HEADER)
     presets_row = view.layout.find_by_kind(RowKind.TIMELINE_PRESETS)
     assert _row_text(view, header_row).endswith(" ▼")
+    assert markers_row in view.layout.visible_indices(view)
+    assert markers_row in view.layout.navigable_indices(view)
     assert presets_row in view.layout.visible_indices(view)
     assert presets_row in view.layout.navigable_indices(view)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_descriptor == _desc(view, presets_row)
+    assert controls.focus_descriptor == _desc(view, markers_row)
 
     controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
@@ -2099,14 +2102,18 @@ def test_render_timeline_down_enters_submenu() -> None:
     controls.session.timeline.panel_open = True
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
+    markers_row = view.layout.find_by_kind(RowKind.SONG_MARKERS_HEADER)
     presets_row = view.layout.find_by_kind(RowKind.TIMELINE_PRESETS)
     phase_row = view.layout.find_by_kind(RowKind.TIMELINE_BAR_PHASE)
     grid_row = view.layout.find_by_kind(RowKind.TIMELINE_BAR_GRID)
     snap_beats_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_BEATS)
     snap_bars_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_BARS)
-    markers_row = view.layout.find_by_kind(RowKind.SONG_MARKERS_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.focus_row = 2
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_descriptor == _desc(view, markers_row)
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_descriptor == _desc(view, presets_row)
@@ -2126,10 +2133,6 @@ def test_render_timeline_down_enters_submenu() -> None:
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_descriptor == _desc(view, snap_bars_row)
-    assert not isinstance(controls.focus_cursor, TimelineFocus)
-
-    controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_descriptor == _desc(view, markers_row)
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
@@ -2280,7 +2283,7 @@ def test_render_timeline_submenu_up_returns_to_header() -> None:
 
     assert not isinstance(controls.focus_cursor, TimelineFocus)
     view = controls.build_view_state(paused=False)
-    assert controls.focus_descriptor == RowDescriptor(RowKind.SONG_MARKERS_HEADER)
+    assert controls.focus_descriptor == RowDescriptor(RowKind.TIMELINE_SNAP_TO_BARS)
 
 
 def test_render_timeline_submenu_entry_stops_repeat_on_keyup() -> None:
@@ -2289,8 +2292,8 @@ def test_render_timeline_submenu_entry_stops_repeat_on_keyup() -> None:
     controls = _make_controls(timeline_enabled=True)
     controls.session.timeline.panel_open = True
     view = controls.build_view_state(paused=False)
-    markers_row = view.layout.find_by_kind(RowKind.SONG_MARKERS_HEADER)
-    controls.focus_descriptor = _desc(view, markers_row)
+    snap_bars_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_BARS)
+    controls.focus_descriptor = _desc(view, snap_bars_row)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert isinstance(controls.focus_cursor, TimelineFocus)
@@ -2384,12 +2387,12 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
     view = controls.build_view_state(paused=False)
     for kind in (
         RowKind.RENDER_TIMELINE_HEADER,
+        RowKind.SONG_MARKERS_HEADER,
         RowKind.TIMELINE_PRESETS,
         RowKind.TIMELINE_BAR_PHASE,
         RowKind.TIMELINE_BAR_GRID,
         RowKind.TIMELINE_SNAP_TO_BEATS,
         RowKind.TIMELINE_SNAP_TO_BARS,
-        RowKind.SONG_MARKERS_HEADER,
     ):
         row = view.layout.find_by_kind(kind)
         assert _row_value_color(view, row) == DISABLED, kind
@@ -4296,20 +4299,55 @@ def test_ctrl_f_b_ignored_on_non_preset_rows() -> None:
     mock_curation.prompt_blacklist.assert_not_called()
 
 
-def test_drop_song_marker_opens_panel_focuses_item() -> None:
+def test_drop_song_marker_does_not_select_or_steal_focus() -> None:
     controls = _make_controls(("layer_1",))
+    prior_focus = RowDescriptor(RowKind.SETTINGS_HEADER)
+    controls.focus_descriptor = prior_focus
     controls.playback.player.seek(15.0)
     controls.drop_song_marker()
     markers = controls.session.song_markers
     assert markers.times == [15.0]
-    assert markers.selected_index == 0
+    assert markers.selected_index is None
     assert markers.expanded is True
     assert controls.session.timeline.panel_open is True
-    assert controls.focus_descriptor == RowDescriptor(
-        RowKind.SONG_MARKER_ITEM, marker_index=0
-    )
+    assert controls.focus_descriptor == prior_focus
     view = controls.build_view_state(paused=False)
     assert RowDescriptor(RowKind.SONG_MARKER_ITEM, marker_index=0) in view.layout.rows
+
+
+def test_drop_song_marker_insert_preserves_prior_selection_by_time() -> None:
+    """Insert before the selected marker remaps selected_index by prior time."""
+    controls = _make_controls(("layer_1",))
+    markers = controls.session.song_markers
+    markers.times = [20.0, 40.0]
+    markers.selected_index = 1
+    controls.playback.player.seek(10.0)
+    controls.drop_song_marker()
+    assert markers.times == [10.0, 20.0, 40.0]
+    # Prior selection was 40.0 at index 1; after insert it is index 2.
+    assert markers.selected_index == 2
+
+
+def test_drop_song_marker_replace_non_selected_does_not_select_replaced() -> None:
+    controls = _make_controls(("layer_1",))
+    markers = controls.session.song_markers
+    markers.times = [10.0, 40.0]
+    markers.selected_index = 0
+    controls.playback.player.seek(41.0)
+    controls.drop_song_marker()
+    assert markers.times == [10.0, 41.0]
+    assert markers.selected_index == 0
+
+
+def test_drop_song_marker_replace_selected_keeps_that_slot() -> None:
+    controls = _make_controls(("layer_1",))
+    markers = controls.session.song_markers
+    markers.times = [10.0, 40.0]
+    markers.selected_index = 1
+    controls.playback.player.seek(41.0)
+    controls.drop_song_marker()
+    assert markers.times == [10.0, 41.0]
+    assert markers.selected_index == 1
 
 
 def test_enter_on_song_marker_seeks() -> None:
