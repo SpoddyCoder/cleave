@@ -582,12 +582,26 @@ def test_draw_does_not_crash() -> None:
     surface.subsurface(panel)
 
 
-def test_draw_skipped_when_disabled() -> None:
+def test_draw_when_disabled() -> None:
     pygame.init()
     overlay = TimelineOverlay()
     state = _view_state(enabled=False)
     surface = pygame.Surface((640, 360), pygame.SRCALPHA)
     _draw(overlay, surface, state)
+    assert overlay.panel_rect is not None
+
+
+def test_draw_skipped_when_visibility_zero() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    state = _view_state(enabled=True)
+    composed = overlay.compose_panel(
+        state,
+        viewport_width=640,
+        viewport_height=360,
+        visibility=0.0,
+    )
+    assert composed is None
     assert overlay.panel_rect is None
 
 

@@ -634,6 +634,16 @@ def kinds_in_expand_section(section: ExpandSectionDef) -> frozenset[RowKind]:
 
 RENDER_OVERLAY_SECTION_KINDS = kinds_in_expand_section(RENDER_OVERLAY_SECTION)
 RENDER_POST_FX_SECTION_KINDS = kinds_in_expand_section(RENDER_POST_FX_SECTION)
+RENDER_TIMELINE_SECTION_KINDS = frozenset(
+    {
+        RowKind.RENDER_TIMELINE_HEADER,
+        RowKind.TIMELINE_PRESETS,
+        RowKind.TIMELINE_BAR_PHASE,
+        RowKind.TIMELINE_BAR_GRID,
+        RowKind.TIMELINE_SNAP_TO_BEATS,
+        RowKind.TIMELINE_SNAP_TO_BARS,
+    }
+)
 
 
 def _assign_indent_depth(

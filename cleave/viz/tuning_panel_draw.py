@@ -33,6 +33,7 @@ from cleave.extract import stem_overlay_header
 from cleave.viz.row_sections import (
     RENDER_OVERLAY_SECTION_KINDS,
     RENDER_POST_FX_SECTION_KINDS,
+    RENDER_TIMELINE_SECTION_KINDS,
     expand_arrow_glyph,
     row_tree_indent_depth,
 )
@@ -532,6 +533,10 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
     if kind == RowKind.PANEL_NOTIFICATION:
         return HIGHLIGHT
 
+    if kind in RENDER_TIMELINE_SECTION_KINDS:
+        if not state.render_timeline.enabled:
+            return DISABLED
+
     if kind in {
         RowKind.CONFIG_HEADER,
         RowKind.LAYER_MANAGEMENT_ADD,
@@ -555,10 +560,6 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
 
     if kind in RENDER_POST_FX_SECTION_KINDS:
         if not state.render_post_fx.enabled:
-            return DISABLED
-
-    if kind == RowKind.RENDER_TIMELINE_HEADER:
-        if not state.render_timeline.enabled:
             return DISABLED
 
     if (

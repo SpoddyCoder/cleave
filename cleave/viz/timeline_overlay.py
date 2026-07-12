@@ -922,7 +922,7 @@ class TimelineOverlay:
         self._visibility = visibility
         self._panel_rect = None
         self._header_badge_rect = None
-        if not state.enabled or visibility <= 0.01:
+        if visibility <= 0.01:
             return None
 
         layout = self._compute_layout(

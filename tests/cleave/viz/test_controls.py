@@ -625,6 +625,35 @@ def test_disabled_render_post_fx_can_expand_sub_rows() -> None:
     assert controls.focus_descriptor == _desc(view, fade_in_row)
 
 
+def test_disabled_render_timeline_can_open_panel() -> None:
+    controls = _make_controls(("layer_1",))
+    view = controls.build_view_state(paused=False)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
+    controls.focus_descriptor = _desc(view, header_row)
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert controls.session.timeline.enabled is False
+    assert controls.session.timeline.panel_open is False
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.timeline.enabled is False
+    assert controls.session.timeline.panel_open is True
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+    view = controls.build_view_state(paused=False)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
+    presets_row = view.layout.find_by_kind(RowKind.TIMELINE_PRESETS)
+    assert _row_text(view, header_row).endswith(" ▼")
+    assert presets_row in view.layout.visible_indices(view)
+    assert presets_row in view.layout.navigable_indices(view)
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_descriptor == _desc(view, presets_row)
+
+    controls.focus_descriptor = _desc(view, header_row)
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.timeline.panel_open is False
+    assert controls.session.timeline.enabled is False
+
+
 def test_beat_sensitivity_clamps() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
@@ -2290,6 +2319,23 @@ def test_render_timeline_header_eye_color_when_disabled() -> None:
     assert _row_value_color(view, header_row) == DISABLED
 
 
+def test_render_timeline_sub_rows_dim_when_disabled() -> None:
+    controls = _make_controls(timeline_enabled=True)
+    controls.session.timeline.panel_open = True
+    controls.session.timeline.enabled = False
+    view = controls.build_view_state(paused=False)
+    for kind in (
+        RowKind.RENDER_TIMELINE_HEADER,
+        RowKind.TIMELINE_PRESETS,
+        RowKind.TIMELINE_BAR_PHASE,
+        RowKind.TIMELINE_BAR_GRID,
+        RowKind.TIMELINE_SNAP_TO_BEATS,
+        RowKind.TIMELINE_SNAP_TO_BARS,
+    ):
+        row = view.layout.find_by_kind(kind)
+        assert _row_value_color(view, row) == DISABLED, kind
+
+
 def test_track_header_visible_follows_timeline_at_position() -> None:
     controls = _make_controls(("layer_1", "layer_2"), timeline_enabled=True)
     controls.session.timeline.lanes = {
@@ -2389,14 +2435,17 @@ def test_t_from_submenu_closes_and_focuses_render_timeline_header() -> None:
     assert controls.focus_descriptor == _desc(view, header_row)
 
 
-def test_t_notification_when_timeline_disabled() -> None:
+def test_t_opens_timeline_panel_when_disabled() -> None:
     controls = _make_controls()
     controls.session.timeline.enabled = False
+    controls.session.timeline.focus_row = 2
+    assert controls.session.timeline.panel_open is False
 
     controls.handle_keydown(_keydown(pygame.K_t))
-    assert controls.session.timeline.panel_open is False
-    view = controls.build_view_state(paused=False)
-    assert view.notification_message == "Enable timeline first"
+    assert controls.session.timeline.enabled is False
+    assert controls.session.timeline.panel_open is True
+    assert isinstance(controls.focus_cursor, TimelineFocus)
+    assert controls.session.timeline.focus_row == 0
 
 
 def test_t_ignored_during_move_mode() -> None:

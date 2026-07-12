@@ -46,16 +46,16 @@ def _timeline_open_state(
     )
 
 
-def test_timeline_strip_in_ring_requires_open_enabled_layers() -> None:
+def test_timeline_strip_in_ring_requires_open_layers() -> None:
     closed = _minimal_view_state(
         render_timeline=RenderTimelineBlock(enabled=True, expanded=False),
     )
     assert timeline_strip_in_ring(closed) is False
 
-    disabled = _minimal_view_state(
+    disabled_open = _minimal_view_state(
         render_timeline=RenderTimelineBlock(enabled=False, expanded=True),
     )
-    assert timeline_strip_in_ring(disabled) is False
+    assert timeline_strip_in_ring(disabled_open) is True
 
     empty = _minimal_view_state(layer_z_order=())
     assert timeline_strip_in_ring(empty) is False

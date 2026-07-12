@@ -25,7 +25,6 @@ def timeline_submenu_routes_to_timeline(
     """True when the key should route to timeline controls (submenu focused)."""
     return (
         tl.panel_open
-        and tl.enabled
         and isinstance(focus_cursor, TimelineFocus)
         and timeline_controls is not None
         and key not in (pygame.K_UP, pygame.K_DOWN)
