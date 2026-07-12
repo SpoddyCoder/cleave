@@ -152,7 +152,6 @@ class ExpandSectionDef:
     read_expanded: Callable[["TuningViewState", str | None], bool]
     toggle: ExpandToggleFn
     children: tuple[SectionNode, ...] = ()
-    collapse_on_disable: bool = False
     append_dynamic_children: AppendDynamicChildrenFn | None = None
 
 
@@ -324,7 +323,6 @@ RENDER_OVERLAY_SECTION = ExpandSectionDef(
     context="global",
     read_expanded=_render_overlay_expanded,
     toggle=_toggle_render_overlay,
-    collapse_on_disable=True,
     children=(
         SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_POSITION),
         SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_OPACITY),
@@ -385,7 +383,6 @@ RENDER_POST_FX_SECTION = ExpandSectionDef(
     context="global",
     read_expanded=_render_post_fx_expanded,
     toggle=_toggle_render_post_fx,
-    collapse_on_disable=True,
     children=(
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_IN),
         SectionNode(leaf_kind=RowKind.RENDER_POST_FX_FADE_OUT),
@@ -581,21 +578,11 @@ def _root_expand_sections(nodes: tuple[SectionNode, ...]) -> tuple[ExpandSection
 _GLOBAL_ROOT_EXPAND_SECTIONS = _root_expand_sections(ROOT_SECTION_NODES + RENDER_SECTION_NODES)
 
 
-def _section_enabled(state: TuningViewState, section: ExpandSectionDef) -> bool:
-    if section.header_kind == RowKind.RENDER_OVERLAY_HEADER:
-        return state.render_overlay.enabled
-    if section.header_kind == RowKind.RENDER_POST_FX_HEADER:
-        return state.render_post_fx.enabled
-    return True
-
-
 def expand_section_expanded(
     state: TuningViewState,
     section: ExpandSectionDef,
     slot: str | None,
 ) -> bool:
-    if section.collapse_on_disable and not _section_enabled(state, section):
-        return False
     return section.read_expanded(state, slot)
 
 

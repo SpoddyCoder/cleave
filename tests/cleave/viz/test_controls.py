@@ -581,6 +581,50 @@ def test_disabled_track_can_expand_sub_rows() -> None:
     assert controls.focus_descriptor == _desc(view, preset_dir_row)
 
 
+def test_disabled_render_overlay_can_expand_sub_rows() -> None:
+    controls = _make_controls(("layer_1",))
+    view = controls.build_view_state(paused=False)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_HEADER)
+    controls.focus_descriptor = _desc(view, header_row)
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert controls.session.render_overlay.enabled is False
+    assert controls.session.render_overlay.expanded is False
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.render_overlay.enabled is False
+    assert controls.session.render_overlay.expanded is True
+
+    view = controls.build_view_state(paused=False)
+    position_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_POSITION)
+    assert position_row in view.layout.visible_indices(view)
+    assert position_row in view.layout.navigable_indices(view)
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_descriptor == _desc(view, position_row)
+
+
+def test_disabled_render_post_fx_can_expand_sub_rows() -> None:
+    controls = _make_controls(("layer_1",))
+    view = controls.build_view_state(paused=False)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_POST_FX_HEADER)
+    controls.focus_descriptor = _desc(view, header_row)
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert controls.session.render_post_fx.enabled is False
+    assert controls.session.render_post_fx.expanded is False
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.render_post_fx.enabled is False
+    assert controls.session.render_post_fx.expanded is True
+
+    view = controls.build_view_state(paused=False)
+    fade_in_row = view.layout.find_by_kind(RowKind.RENDER_POST_FX_FADE_IN)
+    assert fade_in_row in view.layout.visible_indices(view)
+    assert fade_in_row in view.layout.navigable_indices(view)
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_descriptor == _desc(view, fade_in_row)
+
+
 def test_beat_sensitivity_clamps() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)

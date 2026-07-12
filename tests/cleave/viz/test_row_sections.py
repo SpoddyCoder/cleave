@@ -133,18 +133,18 @@ def test_track_layout_row_order_when_fully_expanded() -> None:
     assert all(kind == RowKind.TRACK_EFFECT for kind in kinds[effects_header + 1 : delete_idx])
 
 
-def test_expand_section_collapsed_when_block_disabled() -> None:
+def test_expand_section_respects_expanded_when_block_disabled() -> None:
     disabled_overlay = _minimal_view_state(
         render_overlay=RenderOverlayBlock(enabled=False, expanded=True),
     )
-    assert expand_section_expanded(disabled_overlay, RENDER_OVERLAY_SECTION, None) is False
+    assert expand_section_expanded(disabled_overlay, RENDER_OVERLAY_SECTION, None) is True
     opacity = RowDescriptor(RowKind.RENDER_OVERLAY_OPACITY)
-    assert sub_row_expand_visible(disabled_overlay, opacity) is False
+    assert sub_row_expand_visible(disabled_overlay, opacity) is True
 
     disabled_post_fx = _minimal_view_state(
         render_post_fx=RenderPostFxBlock(enabled=False, expanded=True),
     )
-    assert expand_section_expanded(disabled_post_fx, RENDER_POST_FX_SECTION, None) is False
+    assert expand_section_expanded(disabled_post_fx, RENDER_POST_FX_SECTION, None) is True
 
 
 def test_sub_row_expand_visible_nested_sections() -> None:
