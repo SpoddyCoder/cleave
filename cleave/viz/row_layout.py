@@ -237,7 +237,11 @@ class RowLayout:
         ]
 
     def quick_nav_indices(self) -> list[int]:
-        """Row indices for Ctrl+Up/Down: settings, transport, layer, and render headers."""
+        """Main-panel row indices for Ctrl+Up/Down section jumps.
+
+        The open timeline strip is appended separately in
+        ``focus_nav.build_quick_nav_ring``.
+        """
         return [
             index
             for index in range(len(self))

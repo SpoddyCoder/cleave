@@ -92,6 +92,96 @@ def move_focus(cursor: FocusCursor, delta: int, state: TuningViewState) -> Focus
     return ring[(pos + delta) % len(ring)]
 
 
+def build_quick_nav_ring(state: TuningViewState) -> list[FocusCursor]:
+    """Section stops for Ctrl+Up/Down: main quick-nav headers, then timeline strip."""
+    ring: list[FocusCursor] = [
+        MainFocus(state.layout.descriptor(index))
+        for index in state.layout.quick_nav_indices()
+    ]
+    if timeline_strip_in_ring(state):
+        ring.append(TimelineFocus(0))
+    return ring
+
+
+def _timeline_section_landing(cursor: FocusCursor) -> TimelineFocus:
+    if isinstance(cursor, TimelineFocus):
+        return TimelineFocus(cursor.row)
+    return TimelineFocus(0)
+
+
+def _coerce_quick_nav_target(
+    target: FocusCursor, cursor: FocusCursor
+) -> FocusCursor:
+    if isinstance(target, TimelineFocus):
+        return _timeline_section_landing(cursor)
+    return target
+
+
+def move_quick_focus(
+    cursor: FocusCursor, delta: int, state: TuningViewState
+) -> FocusCursor:
+    """Jump to the previous/next top-level section, including the timeline strip."""
+    ring = build_quick_nav_ring(state)
+    if not ring:
+        return cursor
+
+    if isinstance(cursor, TimelineFocus):
+        for index, item in enumerate(ring):
+            if isinstance(item, TimelineFocus):
+                return _coerce_quick_nav_target(
+                    ring[(index + delta) % len(ring)], cursor
+                )
+        cursor = MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+
+    assert isinstance(cursor, MainFocus)
+    descriptor = cursor.descriptor
+    for index, item in enumerate(ring):
+        if isinstance(item, MainFocus) and item.descriptor == descriptor:
+            return _coerce_quick_nav_target(
+                ring[(index + delta) % len(ring)], cursor
+            )
+
+    layout = state.layout
+    if layout.contains_descriptor(descriptor):
+        current_index = layout.find_descriptor(descriptor)
+    else:
+        resolved = layout.resolve_navigable(descriptor, state)
+        current_index = (
+            layout.find_descriptor(resolved)
+            if layout.contains_descriptor(resolved)
+            else -1
+        )
+
+    if delta > 0:
+        after = [
+            item
+            for item in ring
+            if isinstance(item, MainFocus)
+            and layout.find_descriptor(item.descriptor) > current_index
+        ]
+        if after:
+            return after[0]
+        if timeline_strip_in_ring(state) and layout.contains_descriptor(
+            RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+        ):
+            timeline_header_index = layout.find_descriptor(
+                RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+            )
+            if current_index >= timeline_header_index:
+                return _timeline_section_landing(cursor)
+        return _coerce_quick_nav_target(ring[0], cursor)
+
+    before = [
+        item
+        for item in ring
+        if isinstance(item, MainFocus)
+        and layout.find_descriptor(item.descriptor) < current_index
+    ]
+    if before:
+        return before[-1]
+    return _coerce_quick_nav_target(ring[-1], cursor)
+
+
 def cursor_main_descriptor(cursor: FocusCursor) -> RowDescriptor:
     if isinstance(cursor, MainFocus):
         return cursor.descriptor
