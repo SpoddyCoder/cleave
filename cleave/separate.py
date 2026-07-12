@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import sys
@@ -13,6 +14,7 @@ from cleave.config import ensure_project_viz_config
 from cleave.extract import stem_paths, stems_dir
 from cleave.paths import project_dir, project_slug, resolve_project
 from cleave.project import load_manifest, manifest_path, mix_path, write_manifest
+from cleave.signals import SIGNALS_VERSION
 
 
 def project_stems_complete(project_dir: Path) -> bool:
@@ -22,8 +24,18 @@ def project_stems_complete(project_dir: Path) -> bool:
 
 
 def signals_complete(project_dir: Path) -> bool:
-    """Return True when ``signals.json`` exists in *project_dir*."""
-    return (project_dir / "signals.json").is_file()
+    """Return True when ``signals.json`` exists at the current schema version."""
+    path = project_dir / "signals.json"
+    if not path.is_file():
+        return False
+    try:
+        with path.open(encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return False
+    if not isinstance(data, dict):
+        return False
+    return data.get("version") == SIGNALS_VERSION
 
 
 def resolve_separate_target(path_or_slug: Path | str) -> tuple[Path, Path]:
