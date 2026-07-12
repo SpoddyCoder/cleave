@@ -46,11 +46,32 @@ def test_signals_complete_false_when_missing(tmp_path: Path) -> None:
     assert signals_complete(project) is False
 
 
-def test_signals_complete_true_when_present(tmp_path: Path) -> None:
+def test_signals_complete_true_when_current_version(tmp_path: Path) -> None:
+    project = tmp_path / "my-track"
+    project.mkdir()
+    (project / "signals.json").write_text('{"version": 3}')
+    assert signals_complete(project) is True
+
+
+def test_signals_complete_false_when_stale_version(tmp_path: Path) -> None:
+    project = tmp_path / "my-track"
+    project.mkdir()
+    (project / "signals.json").write_text('{"version": 2}')
+    assert signals_complete(project) is False
+
+
+def test_signals_complete_false_when_corrupt(tmp_path: Path) -> None:
+    project = tmp_path / "my-track"
+    project.mkdir()
+    (project / "signals.json").write_text("not-json")
+    assert signals_complete(project) is False
+
+
+def test_signals_complete_false_when_missing_version(tmp_path: Path) -> None:
     project = tmp_path / "my-track"
     project.mkdir()
     (project / "signals.json").write_text("{}")
-    assert signals_complete(project) is True
+    assert signals_complete(project) is False
 
 
 def test_resolve_separate_target_audio_file(
@@ -98,7 +119,7 @@ def test_run_separate_writes_project_viz_config(
     project = tmp_path / "projects" / "my-track"
     project.mkdir(parents=True)
     _write_stub_stems(project)
-    (project / "signals.json").write_text("{}")
+    (project / "signals.json").write_text('{"version": 3}')
 
     with patch("cleave.separate._run_demucs") as run_demucs, patch(
         "cleave.separate.run_analyse"
@@ -123,7 +144,7 @@ def test_run_separate_noop_when_stems_and_signals_exist(
     project = tmp_path / "projects" / "my-track"
     project.mkdir(parents=True)
     _write_stub_stems(project)
-    (project / "signals.json").write_text("{}")
+    (project / "signals.json").write_text('{"version": 3}')
 
     with patch("cleave.separate._run_demucs") as run_demucs, patch(
         "cleave.separate.run_analyse"
@@ -133,6 +154,34 @@ def test_run_separate_noop_when_stems_and_signals_exist(
     assert result == project.resolve()
     run_demucs.assert_not_called()
     run_analyse.assert_not_called()
+
+
+def test_run_separate_analyse_only_when_stems_exist_stale_signals(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = tmp_path / "projects" / "my-track"
+    project.mkdir(parents=True)
+    _write_stub_stems(project)
+    mix = project / "my-track.flac"
+    mix.write_bytes(b"mix")
+    write_manifest(
+        project,
+        slug="my-track",
+        mix_filename="my-track.flac",
+        original_path=tmp_path / "my-track.flac",
+        demucs_model="htdemucs",
+    )
+    (project / "signals.json").write_text('{"version": 2}')
+
+    with patch("cleave.separate._run_demucs") as run_demucs, patch(
+        "cleave.separate.run_analyse", return_value=project / "signals.json"
+    ) as run_analyse:
+        result = run_separate("my-track")
+
+    assert result == project.resolve()
+    run_demucs.assert_not_called()
+    run_analyse.assert_called_once_with(project.resolve(), high_quality=False)
 
 
 def test_run_separate_analyse_only_when_stems_exist_no_signals(

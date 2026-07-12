@@ -203,6 +203,7 @@ git submodule update --init --recursive
 
 * [Milkdrop / projectM](https://github.com/projectM-visualizer/projectM) - visualizer engine
 * [Demucs](https://github.com/facebookresearch/demucs) - audio separation
+* [Beat This!](https://github.com/CPJKU/beat_this) - beat and downbeat detection
 * [FFmpeg](https://ffmpeg.org) - video encoding
 * [pygame](https://www.pygame.org/) - window, input, overlay UI, and SDL2 audio
 * [OpenGL](https://www.opengl.org/) / [PyOpenGL](https://pyopengl.sourceforge.io/) - layer compositing and rendering

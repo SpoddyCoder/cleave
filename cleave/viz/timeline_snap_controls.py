@@ -5,17 +5,15 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 
 from cleave.timeline import (
-    bar_phase_matching,
-    bar_times_at_phase,
     empty_lane,
+    shift_bars_by_beats,
     snap_lane_to_beats,
 )
 from cleave.viz.modal import ModalHost, ModalOption
 from cleave.viz.session import TuningSession
 
 _CANCEL_LABEL = "Cancel"
-_BEATS_PER_BAR = 4
-_BAR_PHASE_OFFSETS = (0, 1, 2, 3)
+_BAR_BEAT_OFFSETS = (0, 1, 2, 3)
 _BAR_SNAP_MESSAGE = "Snap timeline cues to nearest bar (choose bar phase)"
 
 
@@ -35,12 +33,6 @@ class TimelineSnapController:
         self._modal = modal_host
         self._beat_times = tuple(beat_times)
         self._bar_times = tuple(bar_times)
-        matched = bar_phase_matching(
-            self._beat_times,
-            self._bar_times,
-            beats_per_bar=_BEATS_PER_BAR,
-        )
-        self._bar_phase = 0 if matched is None else matched
         self._on_notification = on_notification
 
     def prompt(self) -> None:
@@ -70,22 +62,21 @@ class TimelineSnapController:
                 f"{offset:+d}",
                 lambda o=offset: self._snap_bars_at_offset(o),
             )
-            for offset in _BAR_PHASE_OFFSETS
+            for offset in _BAR_BEAT_OFFSETS
         ]
         options.append(ModalOption(_CANCEL_LABEL, dismiss))
         self._modal.prompt_choice(
             _BAR_SNAP_MESSAGE,
             options,
             on_dismiss=dismiss,
-            initial_focus_index=_BAR_PHASE_OFFSETS.index(0),
+            initial_focus_index=_BAR_BEAT_OFFSETS.index(0),
         )
 
     def _snap_bars_at_offset(self, offset: int) -> None:
-        phase = (self._bar_phase + offset) % _BEATS_PER_BAR
-        grid = bar_times_at_phase(
+        grid = shift_bars_by_beats(
+            self._bar_times,
             self._beat_times,
-            phase,
-            beats_per_bar=_BEATS_PER_BAR,
+            offset,
         )
         label = f"{offset:+d}"
         notify_msg = f"Snapped timeline cues to bars ({label})"

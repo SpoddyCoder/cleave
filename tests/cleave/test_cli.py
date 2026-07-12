@@ -66,7 +66,7 @@ def test_cmd_separate_noop_when_complete(
         original_path=tmp_path / "song.flac",
         demucs_model="htdemucs",
     )
-    (project / "signals.json").write_text("{}")
+    (project / "signals.json").write_text('{"version": 3}')
 
     with patch("cleave.cli.run_separate") as run_separate:
         cmd_separate(build_parser().parse_args(["separate", "song"]))
@@ -175,7 +175,7 @@ def _complete_project(tmp_path: Path, slug: str = "my-track") -> Path:
         original_path=tmp_path / f"{slug}.flac",
         demucs_model="htdemucs",
     )
-    (project / "signals.json").write_text("{}")
+    (project / "signals.json").write_text('{"version": 3}')
     return project
 
 
