@@ -51,6 +51,7 @@ _TRANSPORT_SECTION = HelpSection(
     (
         ("Enter", "play/pause"),
         ("Left/Right", "skip 10s"),
+        ("Shift + Left/Right", "skip 2s"),
         ("Ctrl + Left/Right", "skip 30s"),
     ),
 )
@@ -180,6 +181,7 @@ def timeline_strip_section(
         entries.extend(
             (
                 ("Left/Right", "skip 10s, fills range"),
+                ("Shift + Left/Right", "skip 2s, fills range"),
                 ("Ctrl + Left/Right", "skip 30s, fills range"),
             )
         )
@@ -187,6 +189,7 @@ def timeline_strip_section(
         entries.extend(
             (
                 ("Left/Right", "skip 10s"),
+                ("Shift + Left/Right", "skip 2s"),
                 ("Ctrl + Left/Right", "skip 30s"),
             )
         )

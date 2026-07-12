@@ -34,6 +34,7 @@ from cleave.viz.controls import (
     NOTIFICATION_TIMELINE_ENABLED_TEXT,
     SEEK_LONG,
     SEEK_SHORT,
+    SEEK_TINY,
     TuningControls,
 )
 from cleave.viz.panel_notification import NOTIFICATION_DURATION_SEC
@@ -3093,10 +3094,19 @@ def test_transport_seek_constants() -> None:
     controls.focus_descriptor = _desc(view, transport_row)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     controls.handle_keydown(_keydown(pygame.K_LEFT))
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_SHIFT))
     controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
 
-    assert seeks == [SEEK_SHORT, -SEEK_SHORT, SEEK_LONG, -SEEK_LONG]
+    assert seeks == [
+        SEEK_SHORT,
+        -SEEK_SHORT,
+        SEEK_TINY,
+        -SEEK_TINY,
+        SEEK_LONG,
+        -SEEK_LONG,
+    ]
 
 
 def test_effect_pulse_clamps() -> None:

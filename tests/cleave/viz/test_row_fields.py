@@ -351,7 +351,7 @@ def test_full_line_delete_layer_prefix() -> None:
 
 
 def test_apply_field_horizontal_transport_seeks() -> None:
-    from cleave.viz.controls import SEEK_LONG, SEEK_SHORT
+    from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, SEEK_TINY
 
     controls = _make_controls()
     controls.duration_sec = 120.0
@@ -363,7 +363,16 @@ def test_apply_field_horizontal_transport_seeks() -> None:
 
     apply_field_horizontal(controls, desc, True, False)
     apply_field_horizontal(controls, desc, False, False)
+    apply_field_horizontal(controls, desc, True, False, True)
+    apply_field_horizontal(controls, desc, False, False, True)
     apply_field_horizontal(controls, desc, True, True)
     apply_field_horizontal(controls, desc, False, True)
 
-    assert seeks == [SEEK_SHORT, -SEEK_SHORT, SEEK_LONG, -SEEK_LONG]
+    assert seeks == [
+        SEEK_SHORT,
+        -SEEK_SHORT,
+        SEEK_TINY,
+        -SEEK_TINY,
+        SEEK_LONG,
+        -SEEK_LONG,
+    ]

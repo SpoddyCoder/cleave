@@ -60,6 +60,7 @@ if TYPE_CHECKING:
 
 NOTIFICATION_TIMELINE_ENABLED_TEXT = "Timeline controls layer visibility"
 NOTIFICATION_TIMELINE_DISABLED_TEXT = "Layer panel controls visibility"
+SEEK_TINY = 2
 SEEK_SHORT = 10
 SEEK_LONG = 30
 
