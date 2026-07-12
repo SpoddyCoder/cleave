@@ -241,7 +241,7 @@ class TuningControls:
             if event.key == pygame.K_m:
                 self._confirm_move_mode()
                 return True
-            if event.key == pygame.K_RETURN:
+            if event.key in (pygame.K_RETURN, pygame.K_l):
                 return True
 
         if event.key == pygame.K_ESCAPE:
@@ -330,6 +330,14 @@ class TuningControls:
                     self.move_mode_slot = slot
                 return True
 
+        if event.key == pygame.K_l:
+            kind = self.focus_descriptor.kind
+            if kind == RowKind.TRACK_HEADER:
+                slot = self.focus_descriptor.slot
+                if slot is not None:
+                    self._toggle_locked(slot)
+                return True
+
         if add_current_preset_key_pressed(event.key, event.mod):
             kind = self.focus_descriptor.kind
             slot = self.focus_descriptor.slot
@@ -365,14 +373,6 @@ class TuningControls:
                         from_user_preset=(kind == RowKind.TRACK_USER_PRESET_ITEM),
                         user_preset_index=self.focus_descriptor.preset_index,
                     )
-                return True
-
-        if event.key == pygame.K_RETURN and mod_ctrl(event.mod):
-            kind = self.focus_descriptor.kind
-            if kind == RowKind.TRACK_HEADER:
-                slot = self.focus_descriptor.slot
-                if slot is not None:
-                    self._toggle_locked(slot)
                 return True
 
         if event.key == pygame.K_RETURN:

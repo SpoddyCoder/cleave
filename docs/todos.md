@@ -13,6 +13,8 @@ Outstanding bugs and issues.
 * It appears when a UI action that clears the cache happens - expanding a secion etc.
 * Fixing this need to be careful not to introduce performance issues that the cache is used to mitigate.
 
+* Same issue affects layer locking.
+
 ---
 
 ## Beat grid and cue snap
