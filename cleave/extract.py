@@ -10,6 +10,8 @@ import numpy as np
 import torch
 from beat_this.inference import File2Beats
 
+from cleave.project import mix_path
+
 HOP_LENGTH = 512
 BASS_RMS_HOP_MS = 0.02
 BASS_SPLIT_HZ = 120.0
@@ -24,6 +26,14 @@ STEM_SOURCES: tuple[StemSource, ...] = (
     "other",
     "full_mix",
 )
+BEAT_DETECTION_STEM_CHOICES = ("drums", "full-mix", "bass", "vocals", "other")
+_CLI_BEAT_DETECTION_STEM: dict[str, StemSource] = {
+    "drums": "drums",
+    "full-mix": "full_mix",
+    "bass": "bass",
+    "vocals": "vocals",
+    "other": "other",
+}
 STEMS_DIR = "stems"
 
 
@@ -39,6 +49,17 @@ def stem_control_label(stem: StemSource) -> str:
     return stem
 
 
+def parse_beat_detection_stem(cli_value: str) -> StemSource:
+    """Map a CLI ``--beat-detection-stem`` value to an internal :data:`StemSource`."""
+    try:
+        return _CLI_BEAT_DETECTION_STEM[cli_value]
+    except KeyError:
+        allowed = ", ".join(BEAT_DETECTION_STEM_CHOICES)
+        raise ValueError(
+            f"invalid beat detection stem {cli_value!r}; expected one of: {allowed}"
+        ) from None
+
+
 def stems_dir(project_dir: Path) -> Path:
     """Return the stem wav directory inside a Cleave project."""
     return project_dir / STEMS_DIR
@@ -48,6 +69,13 @@ def stem_paths(project_dir: Path) -> dict[str, Path]:
     """Map stem names to wav paths under a Cleave project."""
     base = stems_dir(project_dir)
     return {name: base / f"{name}.wav" for name in STEM_NAMES}
+
+
+def beat_detection_audio_path(project_dir: Path, stem: StemSource) -> Path:
+    """Return the wav path Beat This! should run on for *stem*."""
+    if stem == "full_mix":
+        return mix_path(project_dir)
+    return stem_paths(project_dir)[stem]
 
 
 class BassSignals(TypedDict):
@@ -103,9 +131,9 @@ def extract_drums_onset(path: Path | str) -> tuple[np.ndarray, np.ndarray]:
 
 
 def extract_beats_downbeats(path: Path | str) -> tuple[np.ndarray, np.ndarray]:
-    """Beat and downbeat times in seconds from the mixed source track.
+    """Beat and downbeat times in seconds from a wav path.
 
-    Runs Beat This! (`File2Beats`) on the mix path.
+    Runs Beat This! (`File2Beats`) on *path* (mix or a stem wav).
     """
     device = "cuda" if torch.cuda.is_available() else "cpu"
     file2beats = File2Beats(checkpoint_path="final0", device=device, dbn=False)

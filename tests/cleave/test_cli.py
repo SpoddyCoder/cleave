@@ -48,6 +48,21 @@ def test_separate_parser_uses_target_arg() -> None:
     assert args.target == "my-track.flac"
     assert not args.high_quality
     assert not args.force
+    assert args.beat_detection_stem is None
+
+
+def test_separate_parser_accepts_beat_detection_stem() -> None:
+    parser = build_parser()
+    args = parser.parse_args(
+        ["separate", "my-track.flac", "-bds", "drums"]
+    )
+    assert args.beat_detection_stem == "drums"
+    long_args = parser.parse_args(
+        ["separate", "song", "--beat-detection-stem", "full-mix"]
+    )
+    assert long_args.beat_detection_stem == "full-mix"
+    play_args = parser.parse_args(["play", "song", "-bds", "bass"])
+    assert play_args.beat_detection_stem == "bass"
 
 
 def test_cmd_separate_noop_when_complete(
@@ -75,6 +90,39 @@ def test_cmd_separate_noop_when_complete(
     out = capsys.readouterr().out
     assert "has stems and signals" in out
     assert "--force" in out
+
+
+def test_cmd_separate_does_not_noop_when_beat_stem_differs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = tmp_path / "projects" / "song"
+    project.mkdir(parents=True)
+    _write_stub_stems(project)
+    mix = project / "song.flac"
+    mix.write_bytes(b"mix")
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=tmp_path / "song.flac",
+        demucs_model="htdemucs",
+    )
+    (project / "signals.json").write_text(
+        '{"version": 3, "beat_detection_stem": "full_mix"}'
+    )
+
+    with patch("cleave.cli.run_separate", return_value=project.resolve()) as run_separate:
+        cmd_separate(
+            build_parser().parse_args(["separate", "song", "-bds", "drums"])
+        )
+
+    run_separate.assert_called_once_with(
+        Path("song"),
+        high_quality=False,
+        force=False,
+        beat_detection_stem="drums",
+    )
 
 
 def test_cmd_separate_analyse_only_message(
@@ -487,7 +535,9 @@ def test_cmd_play_calls_run_separate_when_incomplete(
     ):
         cmd_play(build_parser().parse_args(["play", "my-track"]))
 
-    run_separate.assert_called_once_with(Path("my-track"), high_quality=False)
+    run_separate.assert_called_once_with(
+        Path("my-track"), high_quality=False, beat_detection_stem=None
+    )
 
 
 def test_cmd_play_forwards_high_quality_to_run_separate(
@@ -502,7 +552,28 @@ def test_cmd_play_forwards_high_quality_to_run_separate(
     ):
         cmd_play(build_parser().parse_args(["play", "my-track", "--high-quality"]))
 
-    run_separate.assert_called_once_with(Path("my-track"), high_quality=True)
+    run_separate.assert_called_once_with(
+        Path("my-track"), high_quality=True, beat_detection_stem=None
+    )
+
+
+def test_cmd_play_forwards_beat_detection_stem(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = _complete_project(tmp_path)
+
+    with (
+        patch("cleave.cli.run_separate", return_value=project.resolve()) as run_separate,
+        patch("cleave.viz.launch"),
+    ):
+        cmd_play(
+            build_parser().parse_args(["play", "my-track", "-bds", "vocals"])
+        )
+
+    run_separate.assert_called_once_with(
+        Path("my-track"), high_quality=False, beat_detection_stem="vocals"
+    )
 
 
 def test_backup_parser_uses_project_dir_destination_and_options() -> None:
@@ -597,6 +668,10 @@ def test_shortcut_flags() -> None:
     assert parser.parse_args(["play", "song", "-hq"]).high_quality
     assert parser.parse_args(["play", "song", "-c", "cfg.yaml"]).config == Path(
         "cfg.yaml"
+    )
+    assert (
+        parser.parse_args(["separate", "song", "-bds", "other"]).beat_detection_stem
+        == "other"
     )
     render_args = parser.parse_args(
         ["render", "song", "-c", "cfg.yaml", "-o", "out.mp4", "--start", "5"]
@@ -1078,7 +1153,9 @@ def test_module_help_lists_subcommands() -> None:
         text=True,
         check=True,
     )
-    assert play.stdout.startswith("usage: cleave play [-h] [-hq] [-c CONFIG] target")
+    assert play.stdout.startswith(
+        "usage: cleave play [-h] [-hq] [-bds {drums,full-mix,bass,vocals,other}]"
+    )
 
     render = subprocess.run(
         [sys.executable, "-m", "cleave", "render", "--help"],

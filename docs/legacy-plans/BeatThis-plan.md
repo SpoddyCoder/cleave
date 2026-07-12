@@ -19,7 +19,7 @@ Prefer [Beat This!](https://github.com/CPJKU/beat_this) (ISMIR 2024, CPJKU) over
 
 ## Implemented
 
-- Analyse: [cleave/extract.py](../cleave/extract.py) `extract_beats_downbeats` runs Beat This! on the **mix**.
+- Analyse: [cleave/extract.py](../cleave/extract.py) `extract_beats_downbeats` runs Beat This! on a configurable source (default mix; `--beat-detection-stem` / `-bds`).
 - Persist: `signals.json` version 3 with `beat_times` and `downbeat_times` ([cleave/analyse.py](../cleave/analyse.py), [cleave/signals.py](../cleave/signals.py)). Non-v3 is stale for `separate.signals_complete`.
 - Wiring: [cleave/viz/wiring.py](../cleave/viz/wiring.py) sets `bar_times` from `signals.downbeat_times`.
 - Bar snap nudge: [cleave/timeline.py](../cleave/timeline.py) `shift_bars_by_beats` shifts each downbeat by N beats on the beat grid; [cleave/viz/timeline_snap_controls.py](../cleave/viz/timeline_snap_controls.py) offers `+0`/`+1`/`+2`/`+3`.

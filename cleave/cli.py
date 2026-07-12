@@ -38,7 +38,13 @@ def _experimental_notice() -> None:
         "warning: 'scan' is experimental; classification is only trusted on the golden set",
         file=sys.stderr,
     )
+from cleave.extract import (
+    BEAT_DETECTION_STEM_CHOICES,
+    StemSource,
+    parse_beat_detection_stem,
+)
 from cleave.separate import (
+    beat_detection_stem_mismatch,
     project_stems_complete,
     resolve_separate_target,
     run_separate,
@@ -83,6 +89,13 @@ def _render_scope_clause(segment: RenderSegment | None) -> str:
     return f"segment render {segment.start_sec}-{segment.end_label_sec}s"
 
 
+def _optional_beat_detection_stem(args: argparse.Namespace) -> StemSource | None:
+    raw = getattr(args, "beat_detection_stem", None)
+    if raw is None:
+        return None
+    return parse_beat_detection_stem(raw)
+
+
 def cmd_separate(args: argparse.Namespace) -> None:
     target = Path(args.target)
     try:
@@ -92,10 +105,12 @@ def cmd_separate(args: argparse.Namespace) -> None:
 
     ensure_project_viz_config(project_dir)
 
+    beat_stem = _optional_beat_detection_stem(args)
     if (
         project_stems_complete(project_dir)
         and signals_complete(project_dir)
         and not args.force
+        and not beat_detection_stem_mismatch(project_dir, beat_stem)
     ):
         print(
             f"project {project_dir} has stems and signals; "
@@ -110,7 +125,10 @@ def cmd_separate(args: argparse.Namespace) -> None:
     started = time.perf_counter()
     try:
         result = run_separate(
-            target, high_quality=args.high_quality, force=args.force
+            target,
+            high_quality=args.high_quality,
+            force=args.force,
+            beat_detection_stem=beat_stem,
         )
     except (FileNotFoundError, ValueError, RuntimeError) as e:
         _exit_error(f"error: {e}")
@@ -133,7 +151,11 @@ def cmd_separate(args: argparse.Namespace) -> None:
 def cmd_play(args: argparse.Namespace) -> None:
     target = Path(args.target)
     try:
-        project_dir = run_separate(target, high_quality=args.high_quality)
+        project_dir = run_separate(
+            target,
+            high_quality=args.high_quality,
+            beat_detection_stem=_optional_beat_detection_stem(args),
+        )
     except (FileNotFoundError, ValueError, RuntimeError) as e:
         _exit_error(f"error: {e}")
 
@@ -653,6 +675,19 @@ def cmd_restore(args: argparse.Namespace) -> None:
     print(f"Restored to {project_path}")
 
 
+def _add_beat_detection_stem_arg(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "-bds",
+        "--beat-detection-stem",
+        choices=BEAT_DETECTION_STEM_CHOICES,
+        default=None,
+        help=(
+            "Audio source for Beat This! beat/downbeat grid "
+            "(default: full-mix, or value stored in signals.json when re-analysing)"
+        ),
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="cleave",
@@ -689,6 +724,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Re-run Demucs and signal extraction even when outputs exist",
     )
+    _add_beat_detection_stem_arg(separate)
     separate.set_defaults(func=cmd_separate)
 
     play = subparsers.add_parser(
@@ -706,6 +742,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="htdemucs_ft for separation; pyin for vocal pitch (slower)",
     )
+    _add_beat_detection_stem_arg(play)
     play.add_argument(
         "-c",
         "--config",

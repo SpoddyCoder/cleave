@@ -9,9 +9,11 @@ import sys
 import tempfile
 from pathlib import Path
 
+from typing import cast
+
 from cleave.analyse import run_analyse
 from cleave.config import ensure_project_viz_config
-from cleave.extract import stem_paths, stems_dir
+from cleave.extract import STEM_SOURCES, StemSource, stem_paths, stems_dir
 from cleave.paths import project_dir, project_slug, resolve_project
 from cleave.project import load_manifest, manifest_path, mix_path, write_manifest
 from cleave.signals import SIGNALS_VERSION
@@ -36,6 +38,45 @@ def signals_complete(project_dir: Path) -> bool:
     if not isinstance(data, dict):
         return False
     return data.get("version") == SIGNALS_VERSION
+
+
+def signals_beat_detection_stem(project_dir: Path) -> StemSource | None:
+    """Return stored ``beat_detection_stem`` from ``signals.json``, or None."""
+    path = project_dir / "signals.json"
+    if not path.is_file():
+        return None
+    try:
+        with path.open(encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    raw = data.get("beat_detection_stem")
+    if isinstance(raw, str) and raw in STEM_SOURCES:
+        return cast(StemSource, raw)
+    return None
+
+
+def beat_detection_stem_mismatch(
+    project_dir: Path, requested: StemSource | None
+) -> bool:
+    """True when an explicit stem differs from stored (missing reads as ``full_mix``)."""
+    if requested is None or not signals_complete(project_dir):
+        return False
+    stored = signals_beat_detection_stem(project_dir)
+    effective = stored if stored is not None else "full_mix"
+    return requested != effective
+
+
+def resolve_beat_detection_stem(
+    project_dir: Path, requested: StemSource | None
+) -> StemSource:
+    """Explicit CLI value, else stored, else ``full_mix``."""
+    if requested is not None:
+        return requested
+    stored = signals_beat_detection_stem(project_dir)
+    return stored if stored is not None else "full_mix"
 
 
 def resolve_separate_target(path_or_slug: Path | str) -> tuple[Path, Path]:
@@ -143,24 +184,37 @@ def _run_demucs(
 
 
 def run_separate(
-    target: Path | str, *, high_quality: bool = False, force: bool = False
+    target: Path | str,
+    *,
+    high_quality: bool = False,
+    force: bool = False,
+    beat_detection_stem: StemSource | None = None,
 ) -> Path:
-    """Separate and/or analyse a Cleave project from an audio file or project slug."""
+    """Separate and/or analyse a Cleave project from an audio file or project slug.
+
+    *beat_detection_stem* is ``None`` when the CLI flag was omitted.
+    """
     project_dir, audio_path = resolve_separate_target(target)
     ensure_project_viz_config(project_dir)
 
     stems_complete = project_stems_complete(project_dir)
     signals_done = signals_complete(project_dir)
+    stem_mismatch = beat_detection_stem_mismatch(project_dir, beat_detection_stem)
 
-    if stems_complete and signals_done and not force:
+    if stems_complete and signals_done and not force and not stem_mismatch:
         return project_dir
 
     run_demucs = force or not stems_complete
     if run_demucs:
         _run_demucs(audio_path, project_dir, high_quality=high_quality, force=force)
 
-    if run_demucs or not signals_done:
+    if run_demucs or not signals_done or stem_mismatch:
+        source = resolve_beat_detection_stem(project_dir, beat_detection_stem)
         print("Extracting signals (may take a while on longer tracks)...", flush=True)
-        run_analyse(project_dir, high_quality=high_quality)
+        run_analyse(
+            project_dir,
+            high_quality=high_quality,
+            beat_detection_stem=source,
+        )
 
     return project_dir

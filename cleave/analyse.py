@@ -9,6 +9,8 @@ import librosa
 import numpy as np
 
 from cleave.extract import (
+    StemSource,
+    beat_detection_audio_path,
     extract_bass,
     extract_beats_downbeats,
     extract_drums_onset,
@@ -16,6 +18,7 @@ from cleave.extract import (
     extract_mix_rms,
     extract_other,
     extract_vocals,
+    stem_control_label,
     stem_paths,
 )
 from cleave.project import mix_path
@@ -30,29 +33,36 @@ def _nan_to_null(values: np.ndarray) -> list[float | None]:
     return [None if np.isnan(v) else float(v) for v in values]
 
 
-def run_analyse(project_dir: Path, *, high_quality: bool) -> Path:
+def run_analyse(
+    project_dir: Path,
+    *,
+    high_quality: bool,
+    beat_detection_stem: StemSource = "full_mix",
+) -> Path:
     paths = stem_paths(project_dir)
     mix = mix_path(project_dir)
+    beat_audio = beat_detection_audio_path(project_dir, beat_detection_stem)
     duration_sec = max(
         _stem_duration_sec(path) for path in (*paths.values(), mix)
     )
 
     drums_onset = extract_drums_onset(paths["drums"])
-    beats, downbeats = extract_beats_downbeats(mix)
+    beats, downbeats = extract_beats_downbeats(beat_audio)
     bass = extract_bass(paths["bass"])
     vocals = extract_vocals(paths["vocals"], high_quality=high_quality)
     other = extract_other(paths["other"])
     mix_onset = extract_mix_onset(mix)
     mix_rms = extract_mix_rms(mix)
 
+    source_label = stem_control_label(beat_detection_stem)
     if len(beats) == 0:
-        print("mix beat detection produced no useful data")
+        print(f"{source_label} beat detection produced no useful data")
         beat_times = []
     else:
         beat_times = [float(t) for t in beats]
 
     if len(downbeats) == 0:
-        print("mix downbeat detection produced no useful data")
+        print(f"{source_label} downbeat detection produced no useful data")
         downbeat_times = []
     else:
         downbeat_times = [float(t) for t in downbeats]
@@ -61,6 +71,7 @@ def run_analyse(project_dir: Path, *, high_quality: bool) -> Path:
         "version": 3,
         "sample_rate_hz": int(TARGET_HZ),
         "duration_sec": duration_sec,
+        "beat_detection_stem": beat_detection_stem,
         "beat_times": beat_times,
         "downbeat_times": downbeat_times,
         "drums": {
