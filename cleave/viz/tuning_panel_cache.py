@@ -9,10 +9,19 @@ import pygame
 
 from cleave.viz.overlay_profiler import OverlayDrawCounters
 from cleave.viz.overlay_upload import OverlayGpuState, UploadSignature
-from cleave.viz.row_semantics import RowKind
+from cleave.viz.row_semantics import RowKind, section_locked
 from cleave.viz.tuning_view_state import TuningViewState
 
 TextFitter = Callable[[pygame.font.Font, str, int], str]
+
+_LOCK_ICON_HEADER_KINDS = frozenset(
+    {
+        RowKind.TRACK_HEADER,
+        RowKind.RENDER_OVERLAY_HEADER,
+        RowKind.RENDER_POST_FX_HEADER,
+        RowKind.RENDER_TIMELINE_HEADER,
+    }
+)
 
 
 class RowBuilder(Protocol):
@@ -154,10 +163,8 @@ def row_render_key(
         cache=cache,
     )
     color_state = _row_value_color(state, index)
-    header_locked = (
-        kind == RowKind.TRACK_HEADER
-        and slot is not None
-        and state.tracks[slot].locked
+    header_locked = kind in _LOCK_ICON_HEADER_KINDS and section_locked(
+        state, state.layout.descriptor(index)
     )
     config_dirty_suffix = kind == RowKind.CONFIG_HEADER and state.config_dirty
     return RowRenderKey(

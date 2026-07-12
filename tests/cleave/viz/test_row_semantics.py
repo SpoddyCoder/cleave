@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from cleave.viz.row_semantics import (
     HEADER_ROW_KINDS,
     LABELED_SUB_ROW_KINDS,
@@ -10,15 +12,20 @@ from cleave.viz.row_semantics import (
     TRACK_EFFECT_SUB_ROW_KINDS,
     TRACK_SUB_ROW_KINDS,
     RowAffordance,
+    RowDescriptor,
     RowKind,
     expandable_row_kinds,
-    layer_lock_blocks_mutation,
-    row_blocked_by_layer_lock,
+    row_blocked_by_section_lock,
     row_behavior,
     row_is_pinned,
-    row_navigable_when_layer_locked,
+    row_navigable_when_section_locked,
     row_triggers_layer_delete,
+    section_lock_blocks_mutation,
 )
+
+
+def _track_lock_state(locked: bool) -> SimpleNamespace:
+    return SimpleNamespace(tracks={"layer_1": SimpleNamespace(locked=locked)})
 
 _EXPECTED_REPEAT_ROW_KINDS = frozenset(
     {
@@ -169,7 +176,7 @@ def test_track_effect_sub_row_kinds() -> None:
 
 def test_locked_navigable_sub_row_kinds() -> None:
     navigable = frozenset(
-        k for k in TRACK_SUB_ROW_KINDS if row_navigable_when_layer_locked(k)
+        k for k in TRACK_SUB_ROW_KINDS if row_navigable_when_section_locked(k)
     )
     assert navigable == frozenset(
         {
@@ -181,9 +188,9 @@ def test_locked_navigable_sub_row_kinds() -> None:
     )
 
 
-def test_track_value_rows_blocked_by_layer_lock() -> None:
+def test_track_value_rows_blocked_by_section_lock() -> None:
     blocked = frozenset(
-        k for k in TRACK_SUB_ROW_KINDS if row_blocked_by_layer_lock(k)
+        k for k in TRACK_SUB_ROW_KINDS if row_blocked_by_section_lock(k)
     )
     assert blocked == frozenset(
         {
@@ -209,11 +216,12 @@ def test_track_value_rows_blocked_by_layer_lock() -> None:
         }
     )
     for kind in blocked:
-        assert layer_lock_blocks_mutation(kind, locked=True) is True
-        assert layer_lock_blocks_mutation(kind, locked=False) is False
+        desc = RowDescriptor(kind, slot="layer_1")
+        assert section_lock_blocks_mutation(_track_lock_state(True), desc) is True
+        assert section_lock_blocks_mutation(_track_lock_state(False), desc) is False
 
 
-def test_only_effects_header_navigable_when_layer_locked() -> None:
+def test_only_effects_header_navigable_when_section_locked() -> None:
     navigable_when_locked = {
         RowKind.TRACK_PRESET_SWITCHING,
         RowKind.TRACK_USER_PRESETS,
@@ -221,7 +229,7 @@ def test_only_effects_header_navigable_when_layer_locked() -> None:
         RowKind.LAYER_MANAGEMENT_DELETE,
     }
     for kind in TRACK_SUB_ROW_KINDS:
-        assert row_navigable_when_layer_locked(kind) == (kind in navigable_when_locked)
+        assert row_navigable_when_section_locked(kind) == (kind in navigable_when_locked)
 
 
 def test_labeled_sub_row_kinds_exclude_headers() -> None:
@@ -234,6 +242,62 @@ def test_labeled_sub_row_kinds_exclude_headers() -> None:
             RowAffordance.PATH_PRESET,
         }
         assert not behavior.is_header
+
+
+def _render_lock_state(
+    *, overlay: bool = False, post_fx: bool = False, timeline: bool = False
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        render_overlay=SimpleNamespace(locked=overlay),
+        render_post_fx=SimpleNamespace(locked=post_fx),
+        render_timeline=SimpleNamespace(locked=timeline),
+    )
+
+
+def test_render_value_children_blocked_by_section_lock() -> None:
+    assert row_blocked_by_section_lock(RowKind.RENDER_OVERLAY_POSITION) is True
+    assert row_blocked_by_section_lock(RowKind.RENDER_OVERLAY_TITLE_FONT) is True
+    assert row_blocked_by_section_lock(RowKind.RENDER_POST_FX_FADE_IN) is True
+    assert row_blocked_by_section_lock(RowKind.RENDER_POST_FX_CHROMA_BOOST_AMOUNT) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESETS) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_BAR_PHASE) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_TO_BARS) is True
+
+
+def test_render_headers_navigable_when_section_locked() -> None:
+    for kind in (
+        RowKind.RENDER_OVERLAY_HEADER,
+        RowKind.RENDER_POST_FX_HEADER,
+        RowKind.RENDER_TIMELINE_HEADER,
+        RowKind.RENDER_OVERLAY_TITLE_HEADER,
+        RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER,
+    ):
+        assert row_navigable_when_section_locked(kind) is True
+    assert row_navigable_when_section_locked(RowKind.RENDER_OVERLAY_POSITION) is False
+    assert row_navigable_when_section_locked(RowKind.TIMELINE_PRESETS) is False
+
+
+def test_section_locked_resolves_render_sections() -> None:
+    overlay_desc = RowDescriptor(RowKind.RENDER_OVERLAY_POSITION)
+    post_fx_desc = RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN)
+    timeline_desc = RowDescriptor(RowKind.TIMELINE_PRESETS)
+    from cleave.viz.row_semantics import section_locked
+
+    assert section_locked(_render_lock_state(overlay=True), overlay_desc) is True
+    assert section_locked(_render_lock_state(), overlay_desc) is False
+    assert section_locked(_render_lock_state(post_fx=True), post_fx_desc) is True
+    assert section_locked(_render_lock_state(timeline=True), timeline_desc) is True
+
+
+def test_section_locked_reads_session_timeline_attribute() -> None:
+    from cleave.viz.row_semantics import section_locked
+
+    session_like = SimpleNamespace(
+        render_overlay=SimpleNamespace(locked=False),
+        render_post_fx=SimpleNamespace(locked=False),
+        timeline=SimpleNamespace(locked=True),
+    )
+    assert section_locked(session_like, RowDescriptor(RowKind.TIMELINE_PRESETS)) is True
 
 
 def test_row_triggers_layer_delete_for_track_rows_only() -> None:

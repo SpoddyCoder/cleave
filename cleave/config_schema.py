@@ -270,6 +270,7 @@ HIGHLIGHT_ROLLOFF_STRENGTH_PCT_MAX = 200
 # --- Timeline defaults ---
 
 DEFAULT_TIMELINE_ENABLED = True
+DEFAULT_TIMELINE_LOCKED = False
 
 FieldSource = Literal["cfg", "session", "both"]
 T = TypeVar("T")
@@ -715,6 +716,7 @@ def _build_render_overlay_config(parsed: dict[str, Any]) -> Any:
         display_time=parsed["display_time"],
         position=parsed["position"],
         background=parsed["background"],
+        locked=parsed["locked"],
     )
 
 
@@ -881,6 +883,13 @@ RENDER_OVERLAY_FIELDS: tuple[SchemaField, ...] = (
     FieldDescriptor(
         "enabled",
         True,
+        "session",
+        lambda raw, _ctx, _label: bool(raw),
+        _dump_scalar,
+    ),
+    FieldDescriptor(
+        "locked",
+        False,
         "session",
         lambda raw, _ctx, _label: bool(raw),
         _dump_scalar,
@@ -1158,6 +1167,13 @@ RENDER_POST_FX_FIELDS: tuple[SchemaField, ...] = (
     FieldDescriptor(
         "enabled",
         True,
+        "session",
+        lambda raw, _ctx, _label: bool(raw),
+        _dump_scalar,
+    ),
+    FieldDescriptor(
+        "locked",
+        False,
         "session",
         lambda raw, _ctx, _label: bool(raw),
         _dump_scalar,
@@ -1716,6 +1732,7 @@ def _overlay_persist_values(ctx: PersistCtx) -> dict[str, Any]:
     bg = base.background
     return {
         "enabled": runtime.enabled,
+        "locked": runtime.locked,
         "title": {
             "content": base.title.content,
             "font": runtime.title_font,
@@ -1757,6 +1774,7 @@ def persist_render(ctx: PersistCtx) -> dict[str, Any]:
     )
     post_fx_values = {
         "enabled": runtime_pp.enabled,
+        "locked": runtime_pp.locked,
         "fade_in": runtime_pp.fade_in,
         "fade_out": runtime_pp.fade_out,
         "highlight_rolloff": {
@@ -1796,10 +1814,11 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
         return None
     timeline_map = as_mapping(timeline, "timeline")
     enabled = bool(timeline_map.get("enabled", DEFAULT_TIMELINE_ENABLED))
+    locked = bool(timeline_map.get("locked", DEFAULT_TIMELINE_LOCKED))
     # Legacy timeline.cues is ignored (clean break; no migration).
     lanes_raw = timeline_map.get("lanes")
     if lanes_raw is None:
-        return TimelineConfig(enabled=enabled, lanes={})
+        return TimelineConfig(enabled=enabled, lanes={}, locked=locked)
     lanes_map = as_mapping(lanes_raw, "timeline.lanes")
     if ctx.layer_slots is None:
         raise ValueError("layer_slots required to parse timeline")
@@ -1842,12 +1861,12 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
             baseline=baseline,
             cues=canonicalize(baseline, cues),
         )
-    return TimelineConfig(enabled=enabled, lanes=lanes)
+    return TimelineConfig(enabled=enabled, lanes=lanes, locked=locked)
 
 
 def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
     runtime = ctx.session.timeline
-    out: dict[str, Any] = {"enabled": runtime.enabled}
+    out: dict[str, Any] = {"enabled": runtime.enabled, "locked": runtime.locked}
     lanes_out: dict[str, Any] = {}
     for slot in sorted(runtime.lanes):
         lane = runtime.lanes[slot]

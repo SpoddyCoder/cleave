@@ -739,6 +739,27 @@ def test_parse_render_overlay_rejects_invalid_position() -> None:
         parse_render_section(data)
 
 
+def test_parse_render_overlay_locked_defaults_false() -> None:
+    data = yaml.safe_load(_OVERLAY_YAML)
+    render = parse_render_section(data)
+    assert render is not None and render.overlay is not None
+    assert render.overlay.locked is False
+
+
+def test_parse_render_overlay_locked_true() -> None:
+    data = yaml.safe_load(_OVERLAY_YAML)
+    data["render"]["overlay"]["locked"] = True
+    render = parse_render_section(data)
+    assert render is not None and render.overlay is not None
+    assert render.overlay.locked is True
+
+
+def test_parse_render_post_fx_locked_true() -> None:
+    render = parse_render_section({"render": {"post_fx": {"locked": True}}})
+    assert render is not None and render.post_fx is not None
+    assert render.post_fx.locked is True
+
+
 def test_parse_render_width_height_defaults() -> None:
     render = parse_render_section({"render": {"fps": 24}})
     assert render is not None
@@ -1012,6 +1033,16 @@ def test_parse_timeline_defaults_enabled_true() -> None:
         _timeline_parse_ctx(),
     )
     assert timeline == TimelineConfig(enabled=True, lanes={})
+    assert timeline.locked is False
+
+
+def test_parse_timeline_reads_locked() -> None:
+    timeline = parse_timeline_section(
+        {"timeline": {"enabled": True, "locked": True}},
+        _timeline_parse_ctx(),
+    )
+    assert timeline is not None
+    assert timeline.locked is True
 
 
 def test_parse_timeline_reads_lanes() -> None:

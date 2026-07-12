@@ -122,6 +122,21 @@ def _mutate_render_overlay_enabled(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
 
 
+def _mutate_render_overlay_locked(controls: TuningControls) -> None:
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_l))
+
+
+def _mutate_render_post_fx_locked(controls: TuningControls) -> None:
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_l))
+
+
+def _mutate_timeline_locked(controls: TuningControls) -> None:
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_l))
+
+
 def _mutate_render_overlay_position(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     view = controls.build_view_state(paused=False)
@@ -340,6 +355,7 @@ _PERSISTED_MUTATIONS: list[
     ("stem.preset", _mutate_preset_path, ("layer_1",), {}),
     ("stem.preset_switching", _mutate_preset_switching, ("layer_1",), {}),
     ("render_overlay.enabled", _mutate_render_overlay_enabled, ("layer_1",), {}),
+    ("render_overlay.locked", _mutate_render_overlay_locked, ("layer_1",), {}),
     ("render_overlay.position", _mutate_render_overlay_position, ("layer_1",), {}),
     ("render_overlay.title_font_size", _mutate_render_overlay_title_font_size, ("layer_1",), {}),
     ("render_overlay.title_margin_bottom", _mutate_render_overlay_title_margin_bottom, ("layer_1",), {}),
@@ -349,6 +365,7 @@ _PERSISTED_MUTATIONS: list[
     ("render_overlay.start_delay", _mutate_render_overlay_start_delay, ("layer_1",), {}),
     ("render_overlay.display_time", _mutate_render_overlay_display_time, ("layer_1",), {}),
     ("render_post_fx.enabled", _mutate_render_post_fx_enabled, ("layer_1",), {}),
+    ("render_post_fx.locked", _mutate_render_post_fx_locked, ("layer_1",), {}),
     ("render_post_fx.fade_in", _mutate_render_post_fx_fade_in, ("layer_1",), {}),
     ("render_post_fx.fade_out", _mutate_render_post_fx_fade_out, ("layer_1",), {}),
     ("render_post_fx.highlight_rolloff.mode", _mutate_render_post_fx_highlight_rolloff_mode, ("layer_1",), {}),
@@ -362,6 +379,7 @@ _PERSISTED_MUTATIONS: list[
     ("render_post_fx.chroma_boost.variant", _mutate_render_post_fx_chroma_boost_variant, ("layer_1",), {}),
     ("render_post_fx.chroma_boost.amount_pct", _mutate_render_post_fx_chroma_boost_amount, ("layer_1",), {}),
     ("timeline.enabled", _mutate_timeline_enabled, ("layer_1",), {"timeline_enabled": True}),
+    ("timeline.locked", _mutate_timeline_locked, ("layer_1",), {}),
 ]
 
 

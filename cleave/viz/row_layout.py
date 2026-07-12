@@ -16,11 +16,11 @@ from cleave.viz.row_sections import (
 from cleave.viz.row_semantics import (
     RowDescriptor,
     RowKind,
-    TRACK_SUB_ROW_KINDS,
     row_behavior,
     row_is_pinned,
-    row_navigable_when_layer_locked,
+    row_navigable_when_section_locked,
     section_header_descriptor,
+    section_locked,
 )
 
 if TYPE_CHECKING:
@@ -42,11 +42,8 @@ def row_navigable(state: TuningViewState, desc: RowDescriptor) -> bool:
         return False
     if not _sub_row_expanded(state, desc):
         return False
-    slot = desc.slot
-    if slot is not None and desc.kind in TRACK_SUB_ROW_KINDS:
-        block = state.tracks[slot]
-        if block.locked and not row_navigable_when_layer_locked(desc.kind):
-            return False
+    if section_locked(state, desc) and not row_navigable_when_section_locked(desc.kind):
+        return False
     return True
 
 

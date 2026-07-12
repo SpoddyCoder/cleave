@@ -183,6 +183,7 @@ class RenderOverlayConfig:
     display_time: float
     position: RenderOverlayPosition
     background: RenderOverlayBackgroundConfig
+    locked: bool = False
 
 
 @dataclass(frozen=True)
@@ -210,6 +211,7 @@ class RenderPostFxConfig:
     fade_out: float
     highlight_rolloff: HighlightRolloffConfig
     chroma_boost: ChromaBoostConfig
+    locked: bool = False
 
 
 @dataclass(frozen=True)
@@ -226,6 +228,7 @@ class RenderConfig:
 class TimelineConfig:
     enabled: bool
     lanes: dict[str, TimelineLane]
+    locked: bool = False
 
 
 @dataclass

@@ -3083,6 +3083,84 @@ def test_l_toggles_lock() -> None:
     assert controls.session.layers["layer_1"].locked is False
 
 
+def test_l_toggles_render_overlay_lock() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_HEADER)
+    assert controls.session.render_overlay.locked is False
+    controls.handle_keydown(_keydown(pygame.K_l))
+    assert controls.session.render_overlay.locked is True
+    controls.handle_keydown(_keydown(pygame.K_l))
+    assert controls.session.render_overlay.locked is False
+
+
+def test_l_toggles_render_post_fx_lock() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
+    assert controls.session.render_post_fx.locked is False
+    controls.handle_keydown(_keydown(pygame.K_l))
+    assert controls.session.render_post_fx.locked is True
+
+
+def test_l_toggles_render_timeline_lock() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+    assert controls.session.timeline.locked is False
+    controls.handle_keydown(_keydown(pygame.K_l))
+    assert controls.session.timeline.locked is True
+
+
+def test_l_refused_on_timeline_header_while_recording() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.timeline.recording = True
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_l))
+    assert controls.session.timeline.locked is False
+
+
+def test_render_overlay_lock_blocks_ctrl_enable_disable() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.render_overlay.locked = True
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_HEADER)
+    assert controls.session.render_overlay.enabled is True
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert controls.session.render_overlay.enabled is True
+
+
+def test_render_overlay_lock_allows_solo() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.render_overlay.locked = True
+    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
+    assert controls.session.render_overlay_solo is True
+
+
+def test_render_overlay_locked_skips_children_in_nav() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.render_overlay.locked = True
+    controls.session.render_overlay.expanded = True
+    view = controls.build_view_state(paused=False)
+    header_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_HEADER)
+    position_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_POSITION)
+    navigable = view.layout.navigable_indices(view)
+    visible = view.layout.visible_indices(view)
+    assert header_row in navigable
+    assert position_row in visible
+    assert position_row not in navigable
+    assert _row_value_color(view, position_row) == LOCKED
+
+
+def test_render_timeline_locked_skips_main_children_in_nav() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.timeline.enabled = True
+    controls.session.timeline.locked = True
+    controls.session.timeline.panel_open = True
+    view = controls.build_view_state(paused=False)
+    presets_row = view.layout.find_by_kind(RowKind.TIMELINE_PRESETS)
+    navigable = view.layout.navigable_indices(view)
+    assert presets_row not in navigable
+    assert _row_value_color(view, presets_row) == LOCKED
+
+
 def test_locked_expanded_skips_sub_rows_in_nav() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].locked = True

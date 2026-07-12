@@ -41,8 +41,9 @@ from cleave.viz.row_semantics import (
     LABELED_SUB_ROW_KINDS,
     RowDescriptor,
     RowKind,
-    row_blocked_by_layer_lock,
+    row_blocked_by_section_lock,
     row_is_pinned,
+    section_locked,
 )
 from cleave.viz.fonts import render_overlay_font_display
 from cleave.viz.text_fit import (
@@ -533,6 +534,9 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
     if kind == RowKind.PANEL_NOTIFICATION:
         return HIGHLIGHT
 
+    desc = state.layout.descriptor(index)
+    locked_blocked = section_locked(state, desc) and row_blocked_by_section_lock(kind)
+
     if kind in RENDER_TIMELINE_SECTION_KINDS:
         if not state.render_timeline.enabled:
             return DISABLED
@@ -550,6 +554,8 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
             return DISABLED
         if kind == RowKind.LAYER_MANAGEMENT_DELETE and len(state.layer_z_order) == 1:
             return DISABLED
+        if locked_blocked:
+            return LOCKED
         return ACTION
 
     stem = state.layout.slot(index)
@@ -578,11 +584,7 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
     if stem is not None and _track_disabled(state, stem):
         return DISABLED
 
-    if (
-        stem is not None
-        and state.tracks[stem].locked
-        and row_blocked_by_layer_lock(kind)
-    ):
+    if locked_blocked:
         return LOCKED
 
     return VALUE
@@ -854,6 +856,8 @@ def _estimate_row_content_width(
             + font.size(stem_text)[0]
             + font.size(f" {expand_arrow}")[0]
         )
+        if section_locked(state, desc):
+            label_w += track_header_lock_suffix_width(line_h)
         return indent + prefix_w + label_w
 
     if kind == RowKind.RENDER_SECTION_GAP:
@@ -1258,6 +1262,7 @@ class TuningOverlay:
             desc = state.layout.descriptor(index)
             if kind == RowKind.RENDER_OVERLAY_HEADER:
                 block_ro = state.render_overlay
+                header_locked = block_ro.locked
                 prefix_surf = render_visibility_icon(
                     enabled=block_ro.enabled,
                     solo=block_ro.solo,
@@ -1265,6 +1270,7 @@ class TuningOverlay:
                 )
             elif kind == RowKind.RENDER_POST_FX_HEADER:
                 block_pp = state.render_post_fx
+                header_locked = block_pp.locked
                 prefix_surf = render_visibility_icon(
                     enabled=block_pp.enabled,
                     solo=block_pp.solo,
@@ -1272,6 +1278,7 @@ class TuningOverlay:
                 )
             else:
                 block_tl = state.render_timeline
+                header_locked = block_tl.locked
                 prefix_surf = render_visibility_icon(
                     enabled=block_tl.enabled,
                     solo=False,
@@ -1283,7 +1290,7 @@ class TuningOverlay:
                 stem_text=composite_header_suffix_part(state, desc),
                 value_color=color,
                 expand_arrow=format_composite_header_expand_value(state, desc),
-                locked=False,
+                locked=header_locked,
                 line_height=line_h,
                 counters=counters,
             )

@@ -785,6 +785,11 @@ def _apply_render_overlay_header(
             controls._render_overlay.exit_solo()
         return
     if ctrl:
+        if (
+            controls.session.render_overlay.locked
+            and row_behavior(desc.kind).can_enable_disable
+        ):
+            return
         controls._render_overlay.set_enabled(forward)
         return
     apply_expand_toggle(controls, desc.kind, desc.slot, forward)
@@ -804,6 +809,11 @@ def _apply_render_post_fx_header(
             controls._render_post_fx.exit_solo()
         return
     if ctrl:
+        if (
+            controls.session.render_post_fx.locked
+            and row_behavior(desc.kind).can_enable_disable
+        ):
+            return
         controls._render_post_fx.set_enabled(forward)
         return
     apply_expand_toggle(controls, desc.kind, desc.slot, forward)
@@ -817,6 +827,11 @@ def _apply_render_timeline_header(
     _shift: bool,
 ) -> None:
     if ctrl:
+        if (
+            controls.session.timeline.locked
+            and row_behavior(desc.kind).can_enable_disable
+        ):
+            return
         controls._set_render_timeline_enabled(forward)
         return
     apply_panel_anchor_toggle(controls, desc.kind, forward)

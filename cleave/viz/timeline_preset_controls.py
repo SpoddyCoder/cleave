@@ -45,6 +45,8 @@ class TimelinePresetController:
         self._on_notification = on_notification
 
     def prompt(self, duration_sec: float) -> None:
+        if self.session.timeline.locked:
+            return
         dismiss = lambda: None
         options = [
             ModalOption(

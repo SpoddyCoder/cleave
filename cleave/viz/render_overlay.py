@@ -80,6 +80,7 @@ def build_live_overlay_config(
                 width=runtime.border_width,
             ),
         ),
+        locked=runtime.locked,
     )
 
 
