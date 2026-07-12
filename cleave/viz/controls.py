@@ -434,6 +434,9 @@ class TuningControls:
             if kind == RowKind.TIMELINE_SNAP_TO_BARS:
                 self._timeline_snap.prompt_bars()
                 return True
+            if kind == RowKind.TIMELINE_SNAP_TO_SONG_MARKERS:
+                self._timeline_snap.prompt_song_markers()
+                return True
             if kind == RowKind.TRACK_PRESET_DIR:
                 slot = self.focus_descriptor.slot
                 if slot is not None:

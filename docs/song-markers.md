@@ -65,33 +65,30 @@ Song markers, list editing, seek-to-marker, and timeline drawing only. Value on 
 
 ## Phase 2 — Snap to song markers
 
-Add a **snap to song markers** action (button or row under the timeline section).
+Add a **snap to song markers** action under the timeline section (after snap to bars), with an adjacent proximity control.
 
-To facilitate an easy workflow for the user...
+Workflow:
 
-1) Apply a preset to the timeline
-2) Snap to bars
-3) Snap to song markers
-
-This gives a really simple and easy way for the user to setup a timeline that works with variation and has a good connection to the song.
+1. Apply a preset to the timeline
+2. Snap to bars
+3. Snap to song markers
 
 ### Behavior
 
-For **each song marker**, pull the **closest** timeline lane cue on the selected layer(s) toward that song marker.
+For each song marker (ascending time), pull the **closest** unclaimed timeline cue within proximity onto that marker. Each cue moves at most once (**exclusive assignment**). If no unclaimed cue lies within proximity, that marker is a no-op. Visibility flags are preserved; only cue times change. Lanes are canonicalized after moves.
 
-- If no lane cue lies within the proximity window, **no-op** for that song marker.
-- Default proximity window: **5 seconds** (configurable).
+Default proximity: **5.0s** (session-only; Left/Right on the proximity row, clamp 0.5..30.0, step 0.5).
 
-### UI
+### Layer scope modal
 
-Modal with layer scope:
+Enter on **snap to song markers** opens a choice modal:
 
-- Layer 1, Layer 2, … (per active layer)
-- All layers
-- Cancel
+- **Layer 1** … **Layer N** — only that lane (one option per `layer_z_order` entry)
+- **All layers (closest wins)** — for each marker, among cues in all lanes within proximity, move the single closest cue (tie: earlier cue time, then earlier layer in z-order)
+- **Each layer** — for each lane independently, each marker pulls that lane's closest unclaimed cue within proximity (claims are per-lane)
+- **Cancel**
 
-Include proximity in adjacent control so users can tune behavior before applying. Destructive multi-lane moves should be explicit; no silent wide snaps.
-
+Destructive multi-lane moves stay explicit via the modal; no silent wide snaps.
 
 ---
 

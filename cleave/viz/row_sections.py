@@ -673,6 +673,8 @@ RENDER_TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_BAR_GRID,
         RowKind.TIMELINE_SNAP_TO_BEATS,
         RowKind.TIMELINE_SNAP_TO_BARS,
+        RowKind.TIMELINE_SNAP_MARKER_PROXIMITY,
+        RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
     }
 )
 
@@ -717,6 +719,8 @@ def _build_row_tree_indent_depth() -> dict[RowKind, int]:
     depths[RowKind.TIMELINE_BAR_GRID] = 1
     depths[RowKind.TIMELINE_SNAP_TO_BEATS] = 1
     depths[RowKind.TIMELINE_SNAP_TO_BARS] = 1
+    depths[RowKind.TIMELINE_SNAP_MARKER_PROXIMITY] = 1
+    depths[RowKind.TIMELINE_SNAP_TO_SONG_MARKERS] = 1
     return depths
 
 
@@ -836,6 +840,8 @@ def append_render_section_rows(
                 row_list.append(RowDescriptor(RowKind.TIMELINE_BAR_GRID))
                 row_list.append(RowDescriptor(RowKind.TIMELINE_SNAP_TO_BEATS))
                 row_list.append(RowDescriptor(RowKind.TIMELINE_SNAP_TO_BARS))
+                row_list.append(RowDescriptor(RowKind.TIMELINE_SNAP_MARKER_PROXIMITY))
+                row_list.append(RowDescriptor(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS))
 
 
 def append_track_section_rows(

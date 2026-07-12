@@ -148,6 +148,7 @@ class TimelineRuntime:
     arm_flash_start_ms: dict[str, int] = field(default_factory=dict)
     bar_phase_offset: int = 0
     show_bar_grid: bool = False
+    song_marker_snap_proximity: float = 5.0
 
 
 def default_timeline_runtime() -> TimelineRuntime:

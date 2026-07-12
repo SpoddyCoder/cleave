@@ -123,6 +123,35 @@ def _apply_timeline_bar_grid(
     controls.session.timeline.show_bar_grid = forward
 
 
+_SONG_MARKER_SNAP_PROXIMITY_MIN = 0.5
+_SONG_MARKER_SNAP_PROXIMITY_MAX = 30.0
+_SONG_MARKER_SNAP_PROXIMITY_STEP = 0.5
+
+
+def _format_timeline_snap_marker_proximity(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return f"{state.render_timeline.song_marker_snap_proximity:.1f}s"
+
+
+def _apply_timeline_snap_marker_proximity(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    tl = controls.session.timeline
+    delta = _SONG_MARKER_SNAP_PROXIMITY_STEP if forward else -_SONG_MARKER_SNAP_PROXIMITY_STEP
+    tl.song_marker_snap_proximity = max(
+        _SONG_MARKER_SNAP_PROXIMITY_MIN,
+        min(
+            _SONG_MARKER_SNAP_PROXIMITY_MAX,
+            round(tl.song_marker_snap_proximity + delta, 1),
+        ),
+    )
+
+
 def _apply_settings_preview_quality(
     controls: TuningControls,
     _desc: RowDescriptor,
@@ -1344,6 +1373,16 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
     ),
     RowKind.TIMELINE_SNAP_TO_BARS: RowFieldDef(
         panel_label="snap to bars",
+        present_style=RowPresentStyle.FULL_LINE,
+    ),
+    RowKind.TIMELINE_SNAP_MARKER_PROXIMITY: RowFieldDef(
+        panel_label="snap marker proximity",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_timeline_snap_marker_proximity,
+        apply_horizontal=_apply_timeline_snap_marker_proximity,
+    ),
+    RowKind.TIMELINE_SNAP_TO_SONG_MARKERS: RowFieldDef(
+        panel_label="snap to song markers",
         present_style=RowPresentStyle.FULL_LINE,
     ),
     RowKind.SONG_MARKERS_HEADER: RowFieldDef(

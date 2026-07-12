@@ -79,6 +79,8 @@ class RowKind(Enum):
     TIMELINE_BAR_GRID = auto()
     TIMELINE_SNAP_TO_BEATS = auto()
     TIMELINE_SNAP_TO_BARS = auto()
+    TIMELINE_SNAP_MARKER_PROXIMITY = auto()
+    TIMELINE_SNAP_TO_SONG_MARKERS = auto()
     SONG_MARKERS_HEADER = auto()
     SONG_MARKER_ITEM = auto()
     SETTINGS_HEADER = auto()
@@ -749,6 +751,32 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_description=(
             "Snap all committed timeline cues to the nearest bar",
             "(irreversible).",
+        ),
+    ),
+    RowKind.TIMELINE_SNAP_MARKER_PROXIMITY: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        repeatable=True,
+        blocked_by_section_lock=True,
+        help_title="Song marker snap proximity",
+        help_entries=(
+            ("Left", "decrease proximity"),
+            ("Right", "increase proximity"),
+        ),
+        help_description=(
+            "Maximum distance for snap to song markers.",
+            "Tune before Enter on snap to song markers.",
+        ),
+    ),
+    RowKind.TIMELINE_SNAP_TO_SONG_MARKERS: RowBehavior(
+        RowAffordance.ACTION,
+        navigable=True,
+        blocked_by_section_lock=True,
+        help_title="Snap to song markers",
+        help_entries=(("Enter", "snap cues to song markers"),),
+        help_description=(
+            "Pull closest cues within proximity onto song markers",
+            "(irreversible; choose layer scope in the modal).",
         ),
     ),
     RowKind.SONG_MARKERS_HEADER: RowBehavior(
