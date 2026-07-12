@@ -10,7 +10,9 @@ Naming: use **song markers** everywhere in UI, docs, and code identifiers. Reser
 
 ## Scope and persistence
 
-**Project-scoped, not viz config.** Song markers are definitive information about the song. They live with the project (alongside `project.yaml` and `signals.json`) and persist across many viz YAML snapshots. They are not duplicated or lost when saving `unnamed-N.yaml` or switching configs.
+**Project-scoped, not viz config.** Song markers are definitive information about the song. On disk they live in `project.yaml` (alongside `signals.json`) and persist across many viz YAML snapshots. They are not written into viz YAML and are not lost when saving `unnamed-N.yaml` or switching configs.
+
+**Deferred write (session until Save).** Drop, replace, and delete update in-memory session state only. Markers are uncommitted until the user Saves (same Enter / config-row flow as viz config). A successful save writes the active viz YAML **and** flushes song markers to that project's `project.yaml`. Save-as-new still flushes markers to the same `project.yaml` (project-scoped). Marker edits mark the session dirty (config-row asterisk and quit-unsaved modal) the same way viz edits do.
 
 v1 is **manual only** — user-driven placement with streamlined UX. No auto-suggestion in the first release.
 
