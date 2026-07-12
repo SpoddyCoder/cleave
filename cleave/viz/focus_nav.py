@@ -23,7 +23,7 @@ FocusCursor = MainFocus | TimelineFocus
 
 def timeline_strip_in_ring(state: TuningViewState) -> bool:
     tl = state.render_timeline
-    return tl.expanded and tl.enabled and len(state.layer_z_order) > 0
+    return tl.expanded and len(state.layer_z_order) > 0
 
 
 def build_focus_ring(state: TuningViewState) -> list[FocusCursor]:

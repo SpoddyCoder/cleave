@@ -964,9 +964,6 @@ class TuningControls:
 
     def _open_timeline_panel(self, *, enter_submenu: bool = False) -> None:
         tl = self.session.timeline
-        if not tl.enabled:
-            self.show_notification("Enable timeline first")
-            return
         tl.panel_open = True
         if enter_submenu:
             self._apply_focus_cursor(TimelineFocus(0))

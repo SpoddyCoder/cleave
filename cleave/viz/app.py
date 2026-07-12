@@ -313,7 +313,7 @@ def _timeline_strip_visible(
     focus_cursor: FocusCursor,
 ) -> bool:
     """Show the bottom timeline strip while the main panel is visible or a row is focused."""
-    return tl.enabled and tl.panel_open and (
+    return tl.panel_open and (
         isinstance(focus_cursor, TimelineFocus) or overlay_visibility > 0.01
     )
 
@@ -423,9 +423,7 @@ def _tick_frame_live_overlay(
         overlay_visibility=overlay_visibility,
         modal_active=modal_active,
     ):
-        timeline_panel_open = (
-            tl.enabled and tl.panel_open and overlay_visibility > 0.01
-        )
+        timeline_panel_open = tl.panel_open and overlay_visibility > 0.01
         with profiler.time_section("panel_draw"):
             OverlayDrawer.draw_tuning(
                 runtime.compositor,
