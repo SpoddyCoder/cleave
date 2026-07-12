@@ -67,6 +67,14 @@ Song markers, list editing, seek-to-marker, and timeline drawing only. Value on 
 
 Add a **snap to song markers** action (button or row under the timeline section).
 
+To facilitate an easy workflow for the user...
+
+1) Apply a preset to the timeline
+2) Snap to bars
+3) Snap to song markers
+
+This gives a really simple and easy way for the user to setup a timeline that works with variation and has a good connection to the song.
+
 ### Behavior
 
 For **each song marker**, pull the **closest** timeline lane cue on the selected layer(s) toward that song marker.
@@ -82,7 +90,8 @@ Modal with layer scope:
 - All layers
 - Cancel
 
-Include proximity (and any other snap options) in the modal or an adjacent control so users can tune behavior before applying. Destructive multi-lane moves should be explicit; no silent wide snaps.
+Include proximity in adjacent control so users can tune behavior before applying. Destructive multi-lane moves should be explicit; no silent wide snaps.
+
 
 ---
 
