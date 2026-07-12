@@ -5,9 +5,9 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 
 from cleave.timeline import (
-    bar_period_sec,
+    bar_phase_matching,
+    bar_times_at_phase,
     empty_lane,
-    shift_lane_times,
     snap_lane_to_beats,
 )
 from cleave.viz.modal import ModalHost, ModalOption
@@ -15,8 +15,8 @@ from cleave.viz.session import TuningSession
 
 _CANCEL_LABEL = "Cancel"
 _BEATS_PER_BAR = 4
-_BAR_OFFSETS = (-3, -2, -1, 0, 1, 2, 3)
-_BAR_SNAP_MESSAGE = "Snap timeline cues to nearest bar (choose bar offset)"
+_BAR_PHASE_OFFSETS = (0, 1, 2, 3)
+_BAR_SNAP_MESSAGE = "Snap timeline cues to nearest bar (choose bar phase)"
 
 
 class TimelineSnapController:
@@ -35,6 +35,12 @@ class TimelineSnapController:
         self._modal = modal_host
         self._beat_times = tuple(beat_times)
         self._bar_times = tuple(bar_times)
+        matched = bar_phase_matching(
+            self._beat_times,
+            self._bar_times,
+            beats_per_bar=_BEATS_PER_BAR,
+        )
+        self._bar_phase = 0 if matched is None else matched
         self._on_notification = on_notification
 
     def prompt(self) -> None:
@@ -45,7 +51,7 @@ class TimelineSnapController:
             done_msg="Snapped timeline cues to beats",
         )
 
-    def prompt_bars(self, duration_sec: float) -> None:
+    def prompt_bars(self) -> None:
         tl = self.session.timeline
         if tl.recording:
             return
@@ -62,43 +68,33 @@ class TimelineSnapController:
         options: list[ModalOption] = [
             ModalOption(
                 f"{offset:+d}",
-                lambda o=offset: self._snap_bars_at_offset(o, duration_sec),
+                lambda o=offset: self._snap_bars_at_offset(o),
             )
-            for offset in _BAR_OFFSETS
+            for offset in _BAR_PHASE_OFFSETS
         ]
         options.append(ModalOption(_CANCEL_LABEL, dismiss))
         self._modal.prompt_choice(
             _BAR_SNAP_MESSAGE,
             options,
             on_dismiss=dismiss,
-            initial_focus_index=_BAR_OFFSETS.index(0),
+            initial_focus_index=_BAR_PHASE_OFFSETS.index(0),
         )
 
-    def _snap_bars_at_offset(self, offset: int, duration_sec: float) -> None:
-        grid = self._bar_times
+    def _snap_bars_at_offset(self, offset: int) -> None:
+        phase = (self._bar_phase + offset) % _BEATS_PER_BAR
+        grid = bar_times_at_phase(
+            self._beat_times,
+            phase,
+            beats_per_bar=_BEATS_PER_BAR,
+        )
         label = f"{offset:+d}"
         notify_msg = f"Snapped timeline cues to bars ({label})"
-        period = (
-            bar_period_sec(
-                grid, self._beat_times, beats_per_bar=_BEATS_PER_BAR
-            )
-            if offset != 0
-            else None
-        )
         tl = self.session.timeline
         for slot in list(tl.lanes):
-            lane = snap_lane_to_beats(
+            tl.lanes[slot] = snap_lane_to_beats(
                 tl.lanes.get(slot) or empty_lane(),
                 grid,
             )
-            if offset != 0 and period is not None:
-                lane = shift_lane_times(
-                    lane,
-                    offset * period,
-                    t_min=0.0,
-                    t_max=duration_sec,
-                )
-            tl.lanes[slot] = lane
         self._notify(notify_msg)
 
     def _prompt(

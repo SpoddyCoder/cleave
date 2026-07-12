@@ -101,9 +101,35 @@ def extract_drums_onset(path: Path | str) -> tuple[np.ndarray, np.ndarray]:
 
 
 def extract_drums_beats(path: Path | str) -> np.ndarray:
-    """Beat times in seconds from the drum stem."""
+    """Beat times in seconds from the drum stem.
+
+    Uses a per-frame tempo curve so the DP tracker can follow tempo changes.
+    Falls back to a global-tempo track if the dynamic run fails or finds no beats.
+    """
     y, sr = _load(path)
-    _tempo, frames = librosa.beat.beat_track(y=y, sr=sr, hop_length=HOP_LENGTH)
+    onset_env = librosa.onset.onset_strength(y=y, sr=sr, hop_length=HOP_LENGTH)
+    frames: np.ndarray
+    try:
+        dtempo = librosa.feature.tempo(
+            onset_envelope=onset_env,
+            sr=sr,
+            hop_length=HOP_LENGTH,
+            aggregate=None,
+        )
+        _tempo, frames = librosa.beat.beat_track(
+            onset_envelope=onset_env,
+            sr=sr,
+            hop_length=HOP_LENGTH,
+            bpm=dtempo,
+        )
+        if len(frames) == 0:
+            raise ValueError("dynamic beat_track returned no beats")
+    except Exception:
+        _tempo, frames = librosa.beat.beat_track(
+            onset_envelope=onset_env,
+            sr=sr,
+            hop_length=HOP_LENGTH,
+        )
     return librosa.frames_to_time(frames, sr=sr, hop_length=HOP_LENGTH)
 
 
