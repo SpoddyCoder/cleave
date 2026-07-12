@@ -150,6 +150,7 @@ class TimelineRuntime:
     show_bar_grid: bool = False
     song_marker_snap_proximity: float = 5.0
     song_marker_snap_scope: str = "each_layer"
+    song_marker_snap_expanded: bool = False
 
 
 def default_timeline_runtime() -> TimelineRuntime:

@@ -91,6 +91,14 @@ def _toggle_song_markers(controls: TuningControls, _slot: str | None, forward: b
     controls._set_song_markers_expanded(forward)
 
 
+def _toggle_song_marker_snap(controls: TuningControls, _slot: str | None, forward: bool) -> None:
+    controls._set_song_marker_snap_expanded(forward)
+
+
+def _song_marker_snap_expanded(state: TuningViewState, _slot: str | None) -> bool:
+    return state.render_timeline.song_marker_snap_expanded
+
+
 def _open_timeline_panel(controls: TuningControls, forward: bool) -> None:
     if forward:
         controls._open_timeline_panel()
@@ -541,6 +549,17 @@ SONG_MARKERS_SECTION = ExpandSectionDef(
     append_dynamic_children=_append_song_marker_rows,
 )
 
+SNAP_TO_SONG_MARKERS_SECTION = ExpandSectionDef(
+    header_kind=RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
+    context="global",
+    read_expanded=_song_marker_snap_expanded,
+    toggle=_toggle_song_marker_snap,
+    children=(
+        SectionNode(leaf_kind=RowKind.TIMELINE_SNAP_MARKER_PROXIMITY),
+        SectionNode(leaf_kind=RowKind.TIMELINE_SNAP_MARKER_SCOPE),
+    ),
+)
+
 
 def _collect_expand_sections(
     *roots: ExpandSectionDef,
@@ -573,6 +592,7 @@ _ALL_EXPAND_SECTIONS = _collect_expand_sections(
     SETTINGS_SECTION,
     TRACK_SECTION,
     SONG_MARKERS_SECTION,
+    SNAP_TO_SONG_MARKERS_SECTION,
     extra_nodes=RENDER_SECTION_NODES,
 )
 
@@ -842,9 +862,7 @@ def append_render_section_rows(
                 row_list.append(RowDescriptor(RowKind.TIMELINE_BAR_GRID))
                 row_list.append(RowDescriptor(RowKind.TIMELINE_SNAP_TO_BEATS))
                 row_list.append(RowDescriptor(RowKind.TIMELINE_SNAP_TO_BARS))
-                row_list.append(RowDescriptor(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS))
-                row_list.append(RowDescriptor(RowKind.TIMELINE_SNAP_MARKER_PROXIMITY))
-                row_list.append(RowDescriptor(RowKind.TIMELINE_SNAP_MARKER_SCOPE))
+                append_expand_section_rows(row_list, SNAP_TO_SONG_MARKERS_SECTION, state)
 
 
 def append_track_section_rows(

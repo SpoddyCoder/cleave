@@ -81,7 +81,7 @@ Default proximity: **5.0s** (session-only; Left/Right on the proximity row, clam
 
 ### Panel layout
 
-Under **snap to bars**, **snap to song markers** is an action row with two child parameter rows:
+Under **snap to bars**, **snap to song markers** is an expandable action row (Left/Right toggles; white expand arrow) with two child parameter rows when expanded:
 
 ```
 snap to song markers

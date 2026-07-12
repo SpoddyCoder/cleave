@@ -17,6 +17,7 @@ from cleave.viz.tuning_panel_draw import (
     _row_bg_color,
     _row_text,
     _action_parameter_label_color,
+    _expand_subheader_arrow_color,
     _row_value_color,
     fit_row_text,
     panel_content_max_width,
@@ -869,12 +870,15 @@ def test_action_row_value_color() -> None:
 
 def test_action_parameter_row_value_color() -> None:
     state = _minimal_view_state(
-        render_timeline=RenderTimelineBlock(enabled=True, expanded=True),
+        render_timeline=RenderTimelineBlock(
+            enabled=True, expanded=True, song_marker_snap_expanded=True
+        ),
     )
     snap_row = state.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
     prox_row = state.layout.find_by_kind(RowKind.TIMELINE_SNAP_MARKER_PROXIMITY)
     scope_row = state.layout.find_by_kind(RowKind.TIMELINE_SNAP_MARKER_SCOPE)
     assert _row_value_color(state, snap_row) == ACTION
+    assert _expand_subheader_arrow_color(state, snap_row) == VALUE
     assert _row_value_color(state, prox_row) == VALUE
     assert _row_value_color(state, scope_row) == VALUE
     assert _action_parameter_label_color(state, prox_row) == ACTION
@@ -884,6 +888,7 @@ def test_action_parameter_row_value_color() -> None:
         render_timeline=RenderTimelineBlock(
             enabled=True,
             expanded=True,
+            song_marker_snap_expanded=True,
             locked=True,
         ),
     )

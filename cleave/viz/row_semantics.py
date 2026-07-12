@@ -784,9 +784,14 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
     RowKind.TIMELINE_SNAP_TO_SONG_MARKERS: RowBehavior(
         RowAffordance.ACTION,
         navigable=True,
+        navigable_when_section_locked=True,
         blocked_by_section_lock=True,
         help_title="Snap to song markers",
-        help_entries=(("Enter", "snap cues to song markers"),),
+        help_entries=(
+            ("Enter", "snap cues to song markers"),
+            ("Left", "collapse"),
+            ("Right", "expand"),
+        ),
         help_description=(
             "Pull closest cues within proximity onto song markers",
             "(irreversible; confirm uses proximity and layer scope).",

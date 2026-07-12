@@ -134,6 +134,7 @@ class RenderTimelineBlock:
     show_bar_grid: bool = False
     song_marker_snap_proximity: float = 5.0
     song_marker_snap_scope: str = "each_layer"
+    song_marker_snap_expanded: bool = False
     locked: bool = False
     song_markers_expanded: bool = False
     song_marker_times: tuple[float, ...] = ()
@@ -309,6 +310,7 @@ def view_state_structure_signature(
             "panel_open": tl.panel_open,
             "song_markers_expanded": session.song_markers.expanded,
             "song_marker_count": len(session.song_markers.times),
+            "song_marker_snap_expanded": tl.song_marker_snap_expanded,
         },
         "timeline": {"enabled": tl.enabled},
     }
@@ -435,6 +437,7 @@ class TuningViewStateBuilder:
             show_bar_grid=tl.show_bar_grid,
             song_marker_snap_proximity=tl.song_marker_snap_proximity,
             song_marker_snap_scope=tl.song_marker_snap_scope,
+            song_marker_snap_expanded=tl.song_marker_snap_expanded,
             song_markers_expanded=self.session.song_markers.expanded,
             song_marker_times=tuple(self.session.song_markers.times),
         )
@@ -586,6 +589,7 @@ class TuningViewStateBuilder:
                 show_bar_grid=tl.show_bar_grid,
                 song_marker_snap_proximity=tl.song_marker_snap_proximity,
                 song_marker_snap_scope=tl.song_marker_snap_scope,
+                song_marker_snap_expanded=tl.song_marker_snap_expanded,
                 locked=tl.locked,
                 song_markers_expanded=self.session.song_markers.expanded,
                 song_marker_times=tuple(self.session.song_markers.times),

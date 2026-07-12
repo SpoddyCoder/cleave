@@ -173,6 +173,8 @@ def _row_text(state: TuningViewState, index: int) -> str:
             return row_action_parameter_display_text(state, desc)
         if field.present_style == RowPresentStyle.EXPAND_SUBHEADER:
             return row_expand_subheader_display_text(state, desc)
+        if field.present_style == RowPresentStyle.ACTION_EXPAND_SUBHEADER:
+            return row_expand_subheader_display_text(state, desc)
         if field.present_style == RowPresentStyle.COMPOSITE_HEADER:
             return row_composite_header_display_text(state, desc)
         if field.present_style == RowPresentStyle.PATH_ICON:
@@ -190,6 +192,27 @@ def _action_parameter_row_prefix(kind: RowKind) -> str:
 
 def _action_parameter_row_value(state: TuningViewState, index: int) -> str:
     return format_row_value(state, state.layout.descriptor(index))
+
+
+def _expand_subheader_arrow_color(
+    state: TuningViewState, index: int
+) -> tuple[int, int, int]:
+    """Expand arrow uses VALUE white (and focus/disabled/locked), not ACTION green."""
+    kind = state.layout.kind(index)
+    desc = state.layout.descriptor(index)
+    locked_blocked = section_locked(state, desc) and row_blocked_by_section_lock(kind)
+
+    if kind in RENDER_TIMELINE_SECTION_KINDS:
+        if not state.render_timeline.enabled:
+            return DISABLED
+
+    if locked_blocked:
+        return LOCKED
+
+    if _row_has_tree_focus(state, index):
+        return _row_highlight_color(state, index)
+
+    return VALUE
 
 
 def _action_parameter_label_color(
@@ -527,6 +550,8 @@ def fit_row_text(
     if field is not None and field.present_style == RowPresentStyle.COMPOSITE_HEADER:
         return row_composite_header_display_text(state, state.layout.descriptor(index))
     if field is not None and field.present_style == RowPresentStyle.EXPAND_SUBHEADER:
+        return row_expand_subheader_display_text(state, state.layout.descriptor(index))
+    if field is not None and field.present_style == RowPresentStyle.ACTION_EXPAND_SUBHEADER:
         return row_expand_subheader_display_text(state, state.layout.descriptor(index))
     if kind in ACTION_PARAMETER_SUB_ROW_KINDS:
         return _action_parameter_row_prefix(kind) + _fit_action_parameter_row_value(
@@ -943,7 +968,11 @@ def _estimate_row_content_width(
 
     if (
         ROW_FIELDS.get(kind) is not None
-        and ROW_FIELDS[kind].present_style == RowPresentStyle.EXPAND_SUBHEADER
+        and ROW_FIELDS[kind].present_style
+        in {
+            RowPresentStyle.EXPAND_SUBHEADER,
+            RowPresentStyle.ACTION_EXPAND_SUBHEADER,
+        }
     ):
         desc = state.layout.descriptor(index)
         prefix = expand_subheader_prefix(kind)
@@ -978,7 +1007,6 @@ def _estimate_row_content_width(
             RowKind.TIMELINE_PRESETS,
             RowKind.TIMELINE_SNAP_TO_BEATS,
             RowKind.TIMELINE_SNAP_TO_BARS,
-            RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
         }
     ):
         label = _row_text(state, index)
@@ -1439,6 +1467,22 @@ class TuningOverlay:
             )
             return surf, None, indent + surf.get_width()
 
+        if (
+            ROW_FIELDS.get(kind) is not None
+            and ROW_FIELDS[kind].present_style == RowPresentStyle.ACTION_EXPAND_SUBHEADER
+        ):
+            desc = state.layout.descriptor(index)
+            surf = _render_label_value_row(
+                font,
+                prefix=expand_subheader_prefix(kind),
+                value=format_expand_subheader_value(state, desc),
+                value_color=_expand_subheader_arrow_color(state, index),
+                prefix_color=_action_parameter_label_color(state, index),
+                line_height=line_h,
+                counters=counters,
+            )
+            return surf, None, indent + surf.get_width()
+
         if kind in ACTION_PARAMETER_SUB_ROW_KINDS:
             prefix = _action_parameter_row_prefix(kind)
             value = _fit_action_parameter_row_value(
@@ -1489,7 +1533,6 @@ class TuningOverlay:
                 RowKind.TIMELINE_PRESETS,
                 RowKind.TIMELINE_SNAP_TO_BEATS,
                 RowKind.TIMELINE_SNAP_TO_BARS,
-                RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
             }
         ):
             label = _row_text(state, index)
