@@ -20,6 +20,7 @@ from cleave.preset_playlist import PresetPlaylist
 from cleave.signals import Signals
 from cleave.pcm_io import load_mix_pcm
 from cleave.stem_pcm import StemPcmBank, load_stem_pcm, LIVE_PROJECTM_FPS, samples_for_dt, samples_per_frame
+from cleave.project import load_manifest
 from cleave.viz.bootstrap import load_stem_signals
 from cleave.viz.controls import TuningControls
 from cleave.viz.session import TimelineRuntime, TuningSession, session_from_cfg
@@ -111,6 +112,8 @@ def build_runtime_base(
     playlists: dict[str, PresetPlaylist],
 ) -> VisualizerSeed:
     pcm_bank = load_stem_pcm(project_dir)
+    session = session_from_cfg(cfg, playlists)
+    session.song_markers.times = list(load_manifest(project_dir).song_markers)
     return VisualizerSeed(
         project_dir=project_dir,
         audio_path=audio_path,
@@ -120,7 +123,7 @@ def build_runtime_base(
         display_width=cfg.editor.display_width,
         display_height=cfg.editor.display_height,
         window_title=f"Cleave — {project_dir.name}",
-        session=session_from_cfg(cfg, playlists),
+        session=session,
         cfg=cfg,
         pcm_bank=pcm_bank,
         duration_sec=pcm_bank.duration_sec,

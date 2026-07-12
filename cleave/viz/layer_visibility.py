@@ -260,4 +260,6 @@ def build_timeline_view_state(
         bar_grid_times=shift_bars_by_beats(
             bar_times, beat_times, tl.bar_phase_offset
         ),
+        song_marker_times=tuple(session.song_markers.times),
+        selected_song_marker_index=session.song_markers.selected_index,
     )

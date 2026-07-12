@@ -42,6 +42,8 @@ from cleave.viz.theme import (
     LABEL,
     PLAYHEAD,
     REC_BG,
+    SONG_MARKER,
+    SONG_MARKER_SELECTED,
     TIMELINE_BAR_ON,
     VALUE,
     timeline_panel_height_px,
@@ -99,6 +101,8 @@ class TimelineViewState:
     arm_flash_start_ms: dict[str, int] = field(default_factory=dict)
     show_bar_grid: bool = False
     bar_grid_times: tuple[float, ...] = ()
+    song_marker_times: tuple[float, ...] = ()
+    selected_song_marker_index: int | None = None
 
 
 def visibility_segments(
@@ -625,6 +629,17 @@ class TimelineOverlay:
                     ),
                     HIGHLIGHT,
                 )
+
+        for marker_i, marker_t in enumerate(state.song_marker_times):
+            marker_x = time_to_x(marker_t, bar_left, bar_width, state.duration_sec)
+            selected = marker_i == state.selected_song_marker_index
+            pygame.draw.line(
+                panel,
+                SONG_MARKER_SELECTED if selected else SONG_MARKER,
+                (marker_x, layout.bar_top),
+                (marker_x, layout.bar_bottom - 1),
+                4 if selected else 2,
+            )
 
         if BORDER_WIDTH > 0:
             pygame.draw.rect(
