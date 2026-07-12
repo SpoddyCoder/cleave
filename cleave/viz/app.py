@@ -440,11 +440,14 @@ def _tick_frame_live_overlay(
             )
 
     if timeline_strip_visible:
+        signals = runtime.seed.signals
         timeline_state = build_timeline_view_state(
             runtime.seed.session,
             t_sec,
             runtime.seed.duration_sec,
             focus_cursor=runtime.controls.focus_cursor,
+            bar_times=signals.downbeat_times if signals is not None else (),
+            beat_times=signals.beat_times if signals is not None else (),
         )
         OverlayDrawer.draw_timeline(
             runtime.compositor,

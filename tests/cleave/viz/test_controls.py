@@ -1477,6 +1477,13 @@ def _focus_timeline_bar_phase(controls: TuningControls) -> None:
     controls.focus_descriptor = _desc(view, phase_row)
 
 
+def _focus_timeline_bar_grid(controls: TuningControls) -> None:
+    controls.session.timeline.panel_open = True
+    view = controls.build_view_state(paused=False)
+    grid_row = view.layout.find_by_kind(RowKind.TIMELINE_BAR_GRID)
+    controls.focus_descriptor = _desc(view, grid_row)
+
+
 def _choose_modal_option(controls: TuningControls, label: str) -> None:
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
@@ -1737,6 +1744,27 @@ def test_timeline_bar_phase_right_nudges_cues_and_offset() -> None:
     assert "+1" in _row_text(view, phase_row)
 
 
+def test_timeline_bar_grid_right_shows_left_hides() -> None:
+    controls = _make_controls(("layer_1",))
+    assert controls.session.timeline.show_bar_grid is False
+    _focus_timeline_bar_grid(controls)
+    view = controls.build_view_state(paused=False)
+    grid_row = view.layout.find_by_kind(RowKind.TIMELINE_BAR_GRID)
+    assert "hide" in _row_text(view, grid_row)
+
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert controls.session.timeline.show_bar_grid is True
+    view = controls.build_view_state(paused=False)
+    grid_row = view.layout.find_by_kind(RowKind.TIMELINE_BAR_GRID)
+    assert "show" in _row_text(view, grid_row)
+
+    assert controls.handle_keydown(_keydown(pygame.K_LEFT)) is True
+    assert controls.session.timeline.show_bar_grid is False
+    view = controls.build_view_state(paused=False)
+    grid_row = view.layout.find_by_kind(RowKind.TIMELINE_BAR_GRID)
+    assert "hide" in _row_text(view, grid_row)
+
+
 def test_timeline_bar_phase_left_wraps_offset() -> None:
     controls = _make_controls(
         ("layer_1",),
@@ -1947,6 +1975,7 @@ def test_render_timeline_down_enters_submenu() -> None:
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     presets_row = view.layout.find_by_kind(RowKind.TIMELINE_PRESETS)
     phase_row = view.layout.find_by_kind(RowKind.TIMELINE_BAR_PHASE)
+    grid_row = view.layout.find_by_kind(RowKind.TIMELINE_BAR_GRID)
     snap_beats_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_BEATS)
     snap_bars_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_BARS)
     controls.focus_descriptor = _desc(view, header_row)
@@ -1958,6 +1987,10 @@ def test_render_timeline_down_enters_submenu() -> None:
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_descriptor == _desc(view, phase_row)
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_descriptor == _desc(view, grid_row)
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
@@ -1982,6 +2015,7 @@ def test_render_timeline_down_enters_submenu_and_routes_keys() -> None:
     controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.focus_row = 2
 
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     controls.handle_keydown(_keydown(pygame.K_DOWN))

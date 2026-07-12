@@ -71,6 +71,8 @@ def _view_state(
     timeline_visible: dict[str, bool] | None = None,
     override_slots: set[str] | None = None,
     arm_flash_start_ms: dict[str, int] | None = None,
+    show_bar_grid: bool = False,
+    bar_grid_times: tuple[float, ...] = (),
 ) -> TimelineViewState:
     order = list(layer_z_order or list(DEFAULT_LAYER_SLOTS))
     lane_map = dict(lanes or {})
@@ -111,6 +113,8 @@ def _view_state(
         enabled=enabled,
         submenu_focused=submenu_focused,
         arm_flash_start_ms=dict(arm_flash_start_ms or ()),
+        show_bar_grid=show_bar_grid,
+        bar_grid_times=bar_grid_times,
     )
 
 

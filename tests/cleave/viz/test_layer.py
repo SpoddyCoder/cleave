@@ -611,3 +611,33 @@ def test_timeline_bar_preserves_pre_first_cue_after_layer_toggle() -> None:
         (10.0, 15.0, False),
         (15.0, 60.0, True),
     ]
+
+def test_build_timeline_view_state_phase_shifts_bar_grid_times() -> None:
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+    )
+    session.timeline.show_bar_grid = True
+    session.timeline.bar_phase_offset = 1
+    beat_times = (0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0)
+    bar_times = (0.0, 4.0)
+    state = build_timeline_view_state(
+        session,
+        position_sec=0.0,
+        duration_sec=60.0,
+        bar_times=bar_times,
+        beat_times=beat_times,
+    )
+    assert state.show_bar_grid is True
+    assert state.bar_grid_times == (1.0, 5.0)
+
+
+def test_build_timeline_view_state_empty_signals_empty_bar_grid() -> None:
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+    )
+    session.timeline.show_bar_grid = True
+    state = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
+    assert state.show_bar_grid is True
+    assert state.bar_grid_times == ()
