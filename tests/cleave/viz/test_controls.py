@@ -1559,6 +1559,7 @@ def _focus_timeline_snap_song_markers(controls: TuningControls) -> None:
 
 def _focus_timeline_snap_marker_scope(controls: TuningControls) -> None:
     controls.session.timeline.panel_open = True
+    controls.session.timeline.song_marker_snap_expanded = True
     view = controls.build_view_state(paused=False)
     row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_MARKER_SCOPE)
     controls.focus_descriptor = _desc(view, row)
@@ -1566,6 +1567,7 @@ def _focus_timeline_snap_marker_scope(controls: TuningControls) -> None:
 
 def _focus_timeline_snap_marker_proximity(controls: TuningControls) -> None:
     controls.session.timeline.panel_open = True
+    controls.session.timeline.song_marker_snap_expanded = True
     view = controls.build_view_state(paused=False)
     row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_MARKER_PROXIMITY)
     controls.focus_descriptor = _desc(view, row)
@@ -2126,6 +2128,29 @@ def test_timeline_snap_song_markers_no_cues_notifies() -> None:
     assert view.notification_message == "No timeline cues to snap"
 
 
+def test_timeline_snap_song_markers_expand_collapse() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.timeline.panel_open = True
+    view = controls.build_view_state(paused=False)
+    snap_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
+    assert RowKind.TIMELINE_SNAP_MARKER_PROXIMITY not in {
+        desc.kind for desc in view.layout.rows
+    }
+    controls.focus_descriptor = _desc(view, snap_row)
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    view_expanded = controls.build_view_state(paused=False)
+    assert view_expanded.render_timeline.song_marker_snap_expanded is True
+    view_expanded.layout.find_by_kind(RowKind.TIMELINE_SNAP_MARKER_PROXIMITY)
+    assert "▼" in _row_text(view_expanded, snap_row)
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    view_collapsed = controls.build_view_state(paused=False)
+    assert view_collapsed.render_timeline.song_marker_snap_expanded is False
+    assert RowKind.TIMELINE_SNAP_MARKER_PROXIMITY not in {
+        desc.kind for desc in view_collapsed.layout.rows
+    }
+    assert "▶" in _row_text(view_collapsed, snap_row)
+
+
 def test_timeline_snap_marker_proximity_left_right() -> None:
     controls = _make_controls(("layer_1",))
     assert controls.session.timeline.song_marker_snap_proximity == 5.0
@@ -2293,6 +2318,7 @@ def test_render_timeline_right_opens_panel() -> None:
 def test_render_timeline_down_enters_submenu() -> None:
     controls = _make_controls(timeline_enabled=True)
     controls.session.timeline.panel_open = True
+    controls.session.timeline.song_marker_snap_expanded = True
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     markers_row = view.layout.find_by_kind(RowKind.SONG_MARKERS_HEADER)
@@ -2352,6 +2378,7 @@ def test_render_timeline_down_enters_submenu() -> None:
 def test_render_timeline_down_enters_submenu_and_routes_keys() -> None:
     controls = _make_controls(timeline_enabled=True)
     controls.session.timeline.panel_open = True
+    controls.session.timeline.song_marker_snap_expanded = True
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
@@ -2485,6 +2512,7 @@ def test_held_key_repeat_keeps_overlay_visible() -> None:
 def test_render_timeline_submenu_up_returns_to_header() -> None:
     controls = _make_controls(timeline_enabled=True)
     controls.session.timeline.panel_open = True
+    controls.session.timeline.song_marker_snap_expanded = True
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
@@ -2502,6 +2530,7 @@ def test_render_timeline_submenu_entry_stops_repeat_on_keyup() -> None:
 
     controls = _make_controls(timeline_enabled=True)
     controls.session.timeline.panel_open = True
+    controls.session.timeline.song_marker_snap_expanded = True
     view = controls.build_view_state(paused=False)
     snap_scope_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_MARKER_SCOPE)
     controls.focus_descriptor = _desc(view, snap_scope_row)
@@ -2594,6 +2623,7 @@ def test_render_timeline_header_eye_color_when_disabled() -> None:
 def test_render_timeline_sub_rows_dim_when_disabled() -> None:
     controls = _make_controls(timeline_enabled=True)
     controls.session.timeline.panel_open = True
+    controls.session.timeline.song_marker_snap_expanded = True
     controls.session.timeline.enabled = False
     view = controls.build_view_state(paused=False)
     for kind in (

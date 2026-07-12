@@ -170,17 +170,15 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert bar_grid in view_open.layout.rows
     assert snap_beats in view_open.layout.rows
     assert snap_bars in view_open.layout.rows
-    assert snap_prox in view_open.layout.rows
-    assert snap_scope in view_open.layout.rows
     assert snap_markers in view_open.layout.rows
+    assert snap_prox not in view_open.layout.rows
+    assert snap_scope not in view_open.layout.rows
     assert markers_header in view_open.layout.rows
     presets_idx = view_open.layout.rows.index(presets)
     bar_phase_idx = view_open.layout.rows.index(bar_phase)
     bar_grid_idx = view_open.layout.rows.index(bar_grid)
     snap_beats_idx = view_open.layout.rows.index(snap_beats)
     snap_bars_idx = view_open.layout.rows.index(snap_bars)
-    snap_prox_idx = view_open.layout.rows.index(snap_prox)
-    snap_scope_idx = view_open.layout.rows.index(snap_scope)
     snap_markers_idx = view_open.layout.rows.index(snap_markers)
     markers_idx = view_open.layout.rows.index(markers_header)
     assert presets_idx == markers_idx + 1
@@ -189,6 +187,13 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert snap_beats_idx == bar_grid_idx + 1
     assert snap_bars_idx == snap_beats_idx + 1
     assert snap_markers_idx == snap_bars_idx + 1
+
+    session.timeline.song_marker_snap_expanded = True
+    view_snap_expanded = builder.build(paused=False)
+    assert view_snap_expanded.layout is not view_open.layout
+    snap_prox_idx = view_snap_expanded.layout.rows.index(snap_prox)
+    snap_scope_idx = view_snap_expanded.layout.rows.index(snap_scope)
+    snap_markers_idx = view_snap_expanded.layout.rows.index(snap_markers)
     assert snap_prox_idx == snap_markers_idx + 1
     assert snap_scope_idx == snap_prox_idx + 1
 
@@ -318,6 +323,21 @@ def test_structure_signature_invalidates_on_song_markers_expanded() -> None:
         session, config_save, notification_active=False
     )
     session.song_markers.expanded = True
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_structure_signature_invalidates_on_song_marker_snap_expanded() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.timeline.song_marker_snap_expanded = False
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.timeline.song_marker_snap_expanded = True
     sig_after = view_state_structure_signature(
         session, config_save, notification_active=False
     )

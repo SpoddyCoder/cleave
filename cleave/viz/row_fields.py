@@ -46,6 +46,7 @@ class RowPresentStyle(Enum):
     LABELED_VALUE = auto()
     ACTION_PARAMETER = auto()
     EXPAND_SUBHEADER = auto()
+    ACTION_EXPAND_SUBHEADER = auto()
     COMPOSITE_HEADER = auto()
     PATH_ICON = auto()
     FULL_LINE = auto()
@@ -1418,7 +1419,8 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
     ),
     RowKind.TIMELINE_SNAP_TO_SONG_MARKERS: RowFieldDef(
         panel_label="snap to song markers",
-        present_style=RowPresentStyle.FULL_LINE,
+        present_style=RowPresentStyle.ACTION_EXPAND_SUBHEADER,
+        apply_horizontal=_apply_expand_subheader,
     ),
     RowKind.SONG_MARKERS_HEADER: RowFieldDef(
         panel_label="song markers",
