@@ -181,7 +181,9 @@ def test_run_separate_analyse_only_when_stems_exist_stale_signals(
 
     assert result == project.resolve()
     run_demucs.assert_not_called()
-    run_analyse.assert_called_once_with(project.resolve(), high_quality=False)
+    run_analyse.assert_called_once_with(
+        project.resolve(), high_quality=False, beat_detection_stem="full_mix"
+    )
 
 
 def test_run_separate_analyse_only_when_stems_exist_no_signals(
@@ -208,7 +210,89 @@ def test_run_separate_analyse_only_when_stems_exist_no_signals(
 
     assert result == project.resolve()
     run_demucs.assert_not_called()
-    run_analyse.assert_called_once_with(project.resolve(), high_quality=False)
+    run_analyse.assert_called_once_with(
+        project.resolve(), high_quality=False, beat_detection_stem="full_mix"
+    )
+
+
+def test_run_separate_reanalyses_on_explicit_beat_stem_mismatch(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = tmp_path / "projects" / "my-track"
+    project.mkdir(parents=True)
+    _write_stub_stems(project)
+    mix = project / "my-track.flac"
+    mix.write_bytes(b"mix")
+    write_manifest(
+        project,
+        slug="my-track",
+        mix_filename="my-track.flac",
+        original_path=tmp_path / "my-track.flac",
+        demucs_model="htdemucs",
+    )
+    (project / "signals.json").write_text(
+        '{"version": 3, "beat_detection_stem": "full_mix"}'
+    )
+
+    with patch("cleave.separate._run_demucs") as run_demucs, patch(
+        "cleave.separate.run_analyse", return_value=project / "signals.json"
+    ) as run_analyse:
+        result = run_separate("my-track", beat_detection_stem="drums")
+
+    assert result == project.resolve()
+    run_demucs.assert_not_called()
+    run_analyse.assert_called_once_with(
+        project.resolve(), high_quality=False, beat_detection_stem="drums"
+    )
+
+
+def test_run_separate_skips_when_explicit_beat_stem_matches_stored(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    audio = tmp_path / "my-track.flac"
+    audio.write_bytes(b"audio")
+
+    project = tmp_path / "projects" / "my-track"
+    project.mkdir(parents=True)
+    _write_stub_stems(project)
+    (project / "signals.json").write_text(
+        '{"version": 3, "beat_detection_stem": "drums"}'
+    )
+
+    with patch("cleave.separate._run_demucs") as run_demucs, patch(
+        "cleave.separate.run_analyse"
+    ) as run_analyse:
+        result = run_separate(audio, beat_detection_stem="drums")
+
+    assert result == project.resolve()
+    run_demucs.assert_not_called()
+    run_analyse.assert_not_called()
+
+
+def test_run_separate_skips_when_flag_omitted_even_if_stored_is_drums(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    audio = tmp_path / "my-track.flac"
+    audio.write_bytes(b"audio")
+
+    project = tmp_path / "projects" / "my-track"
+    project.mkdir(parents=True)
+    _write_stub_stems(project)
+    (project / "signals.json").write_text(
+        '{"version": 3, "beat_detection_stem": "drums"}'
+    )
+
+    with patch("cleave.separate._run_demucs") as run_demucs, patch(
+        "cleave.separate.run_analyse"
+    ) as run_analyse:
+        result = run_separate(audio)
+
+    assert result == project.resolve()
+    run_demucs.assert_not_called()
+    run_analyse.assert_not_called()
 
 
 def test_run_demucs_skips_copy_when_mix_in_project(
@@ -274,7 +358,75 @@ def test_run_separate_force_runs_demucs_and_analyse(
     run_demucs.assert_called_once_with(
         mix.resolve(), project.resolve(), high_quality=False, force=True
     )
-    run_analyse.assert_called_once_with(project.resolve(), high_quality=False)
+    run_analyse.assert_called_once_with(
+        project.resolve(), high_quality=False, beat_detection_stem="full_mix"
+    )
+
+
+def test_run_separate_force_uses_stored_beat_detection_stem(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = tmp_path / "projects" / "my-track"
+    project.mkdir(parents=True)
+    _write_stub_stems(project)
+    mix = project / "my-track.flac"
+    mix.write_bytes(b"mix")
+    write_manifest(
+        project,
+        slug="my-track",
+        mix_filename="my-track.flac",
+        original_path=tmp_path / "elsewhere.flac",
+        demucs_model="htdemucs",
+    )
+    (project / "signals.json").write_text(
+        '{"version": 3, "beat_detection_stem": "drums"}'
+    )
+
+    with patch("cleave.separate._run_demucs") as run_demucs, patch(
+        "cleave.separate.run_analyse", return_value=project / "signals.json"
+    ) as run_analyse:
+        result = run_separate("my-track", force=True)
+
+    assert result == project.resolve()
+    run_demucs.assert_called_once()
+    run_analyse.assert_called_once_with(
+        project.resolve(), high_quality=False, beat_detection_stem="drums"
+    )
+
+
+def test_run_separate_force_explicit_beat_stem_overrides_stored(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = tmp_path / "projects" / "my-track"
+    project.mkdir(parents=True)
+    _write_stub_stems(project)
+    mix = project / "my-track.flac"
+    mix.write_bytes(b"mix")
+    write_manifest(
+        project,
+        slug="my-track",
+        mix_filename="my-track.flac",
+        original_path=tmp_path / "elsewhere.flac",
+        demucs_model="htdemucs",
+    )
+    (project / "signals.json").write_text(
+        '{"version": 3, "beat_detection_stem": "drums"}'
+    )
+
+    with patch("cleave.separate._run_demucs") as run_demucs, patch(
+        "cleave.separate.run_analyse", return_value=project / "signals.json"
+    ) as run_analyse:
+        result = run_separate(
+            "my-track", force=True, beat_detection_stem="bass"
+        )
+
+    assert result == project.resolve()
+    run_demucs.assert_called_once()
+    run_analyse.assert_called_once_with(
+        project.resolve(), high_quality=False, beat_detection_stem="bass"
+    )
 
 
 def test_run_separate_creates_project_and_renders(
