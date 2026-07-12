@@ -24,6 +24,8 @@ class TimelinePhaseController:
 
     def nudge(self, *, forward: bool) -> None:
         tl = self.session.timeline
+        if tl.locked:
+            return
         if tl.recording:
             return
         if not any(lane.cues for lane in tl.lanes.values()):

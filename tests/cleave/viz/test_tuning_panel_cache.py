@@ -330,6 +330,30 @@ def test_lock_change_invalidates_track_header_row_key() -> None:
     assert key_after.header_locked
 
 
+def test_lock_change_invalidates_render_overlay_header_row_key() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    font = overlay._font_get()
+    cache = TuningPanelCache()
+    state = _minimal_view_state()
+    index = state.layout.find_by_kind(RowKind.RENDER_OVERLAY_HEADER)
+    line_h = font.get_linesize()
+    max_w = 400
+
+    key_before = row_render_key(
+        state, index, font, cache=cache, max_content_width=max_w, line_h=line_h
+    )
+    state_locked = replace(
+        state, render_overlay=replace(state.render_overlay, locked=True)
+    )
+    key_after = row_render_key(
+        state_locked, index, font, cache=cache, max_content_width=max_w, line_h=line_h
+    )
+    assert key_before != key_after
+    assert not key_before.header_locked
+    assert key_after.header_locked
+
+
 def test_lock_change_misses_warm_row_cache_for_track_header() -> None:
     pygame.init()
     overlay = TuningOverlay()

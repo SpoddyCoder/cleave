@@ -69,6 +69,17 @@ class TimelineControls:
                 self._close_panel()
             return True
 
+        if self.session.timeline.locked:
+            # Locked: strip stays viewable and seekable, but all cue/record
+            # mutations are blocked (transport seek only).
+            if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+                self._do_seek(
+                    event.key == pygame.K_RIGHT,
+                    long=mod_ctrl(event.mod),
+                    tiny=mod_shift(event.mod),
+                )
+            return True
+
         if event.key == pygame.K_r:
             if self.session.timeline.recording:
                 self._stop_record()

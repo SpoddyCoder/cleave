@@ -1026,7 +1026,7 @@ def test_write_session_snapshot_persists_timeline_disabled_without_cues(
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
-    assert data["timeline"] == {"enabled": False}
+    assert data["timeline"] == {"enabled": False, "locked": False}
 
 
 def _round_trip_preset_dirs(root: Path) -> Path:

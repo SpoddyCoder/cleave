@@ -70,6 +70,7 @@ class RenderOverlayRuntime:
     border_width: int
     start_delay: float
     display_time: float
+    locked: bool = False
 
 
 def default_render_overlay_runtime() -> RenderOverlayRuntime:
@@ -112,6 +113,7 @@ class RenderPostFxRuntime:
     highlight_rolloff_expanded: bool = False
     chroma_boost: ChromaBoostRuntime = field(default_factory=default_chroma_boost_runtime)
     chroma_boost_expanded: bool = False
+    locked: bool = False
 
 
 def default_render_post_fx_runtime() -> RenderPostFxRuntime:
@@ -128,6 +130,7 @@ def default_render_post_fx_runtime() -> RenderPostFxRuntime:
 @dataclass
 class TimelineRuntime:
     enabled: bool = True
+    locked: bool = False
     lanes: dict[str, TimelineLane] = field(default_factory=dict)
     panel_open: bool = False
     focus_row: int = 0
@@ -219,6 +222,7 @@ def render_overlay_runtime_from_cfg(cfg: CleaveConfig) -> RenderOverlayRuntime:
             border_width=overlay.background.border.width,
             start_delay=overlay.start_delay,
             display_time=overlay.display_time,
+            locked=overlay.locked,
         )
     return default_render_overlay_runtime()
 
@@ -233,6 +237,7 @@ def render_post_fx_runtime_from_cfg(
         return replace(
             default_render_post_fx_runtime(),
             enabled=post_fx.enabled,
+            locked=post_fx.locked,
             fade_in=post_fx.fade_in,
             fade_out=post_fx.fade_out,
             highlight_rolloff=replace(
@@ -258,6 +263,7 @@ def render_post_fx_runtime_from_cfg(
 def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
     timeline = cfg.timeline
     enabled = True if timeline is None else timeline.enabled
+    locked = False if timeline is None else timeline.locked
     source_lanes = {} if timeline is None else timeline.lanes
     lanes: dict[str, TimelineLane] = {}
     for slot in cfg.layer_z_order:
@@ -265,7 +271,7 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
             lanes[slot] = copy_lane(source_lanes[slot])
         else:
             lanes[slot] = empty_lane()
-    return TimelineRuntime(enabled=enabled, lanes=lanes)
+    return TimelineRuntime(enabled=enabled, locked=locked, lanes=lanes)
 
 
 def _beat_sensitivity(cfg: CleaveConfig, slot: str) -> float:

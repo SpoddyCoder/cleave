@@ -125,8 +125,8 @@ class RowBehavior:
     can_enter_move_mode: bool = False
     repeatable: bool = False
     parent_group: str | None = None
-    blocked_by_layer_lock: bool | None = None
-    navigable_when_layer_locked: bool | None = None
+    blocked_by_section_lock: bool | None = None
+    navigable_when_section_locked: bool | None = None
 
 
 ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
@@ -216,7 +216,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
     RowKind.TRACK_USER_PRESET_ADD: RowBehavior(
         RowAffordance.ACTION,
         parent_group="track",
-        blocked_by_layer_lock=True,
+        blocked_by_section_lock=True,
         help_title="Add Current Preset",
         help_description=(
             "Add the layer's current preset to the user-defined rotation set.",
@@ -397,8 +397,8 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         ),
         navigable=True,
         parent_group="track",
-        blocked_by_layer_lock=False,
-        navigable_when_layer_locked=True,
+        blocked_by_section_lock=False,
+        navigable_when_section_locked=True,
     ),
     RowKind.PANEL_NOTIFICATION: RowBehavior(
         RowAffordance.DISPLAY,
@@ -687,6 +687,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
     RowKind.TIMELINE_PRESETS: RowBehavior(
         RowAffordance.ACTION,
         navigable=True,
+        blocked_by_section_lock=True,
         help_title="Timeline presets",
         help_entries=(("Enter", "apply a preset"),),
         help_description=(
@@ -699,6 +700,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.VALUE_STEP,
         navigable=True,
         repeatable=True,
+        blocked_by_section_lock=True,
         help_title="Bar phase",
         help_entries=(
             ("Left", "shift cues -1 beat"),
@@ -713,6 +715,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
     RowKind.TIMELINE_BAR_GRID: RowBehavior(
         RowAffordance.VALUE_STEP,
         navigable=True,
+        blocked_by_section_lock=True,
         help_title="Bar grid",
         help_entries=(
             ("Left", "hide detected bar lines"),
@@ -726,6 +729,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
     RowKind.TIMELINE_SNAP_TO_BEATS: RowBehavior(
         RowAffordance.ACTION,
         navigable=True,
+        blocked_by_section_lock=True,
         help_title="Snap to beats",
         help_entries=(("Enter", "snap cues to beats"),),
         help_description=(
@@ -736,6 +740,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
     RowKind.TIMELINE_SNAP_TO_BARS: RowBehavior(
         RowAffordance.ACTION,
         navigable=True,
+        blocked_by_section_lock=True,
         help_title="Snap to bars",
         help_entries=(("Enter", "snap cues to bars"),),
         help_description=(
@@ -832,19 +837,30 @@ LABELED_SUB_ROW_KINDS = frozenset(
 TRACK_SUB_ROW_KINDS = frozenset(
     k for k, b in ROW_BEHAVIORS.items() if b.parent_group == "track"
 )
+TRACK_LOCK_KINDS = TRACK_SUB_ROW_KINDS | frozenset({RowKind.TRACK_HEADER})
 TRACK_EFFECT_SUB_ROW_KINDS = frozenset({RowKind.TRACK_EFFECT})
 TRACK_USER_PRESET_SUB_ROW_KINDS = frozenset(
     {RowKind.TRACK_USER_PRESET_ITEM, RowKind.TRACK_USER_PRESET_ADD}
 )
 PRESET_FILE_ROW_KINDS = frozenset({RowKind.TRACK_PRESET, RowKind.TRACK_USER_PRESET_ITEM})
 
-_LAYER_LOCK_BLOCKING_AFFORDANCES = frozenset(
+_SECTION_LOCK_BLOCKING_AFFORDANCES = frozenset(
     {
         RowAffordance.VALUE_STEP,
         RowAffordance.PATH_DIR,
         RowAffordance.PATH_PRESET,
     }
 )
+
+
+def _in_lockable_group(parent_group: str | None) -> bool:
+    if parent_group is None:
+        return False
+    return (
+        parent_group == "track"
+        or parent_group.startswith("render_overlay")
+        or parent_group.startswith("render_post_fx")
+    )
 
 
 def row_behavior(kind: RowKind) -> RowBehavior:
@@ -864,35 +880,82 @@ def expandable_row_kinds() -> frozenset[RowKind]:
     )
 
 
-def _derived_blocked_by_layer_lock(behavior: RowBehavior) -> bool:
-    if behavior.blocked_by_layer_lock is not None:
-        return behavior.blocked_by_layer_lock
+def _derived_blocked_by_section_lock(behavior: RowBehavior) -> bool:
+    if behavior.blocked_by_section_lock is not None:
+        return behavior.blocked_by_section_lock
     return (
-        behavior.parent_group == "track"
-        and behavior.affordance in _LAYER_LOCK_BLOCKING_AFFORDANCES
+        _in_lockable_group(behavior.parent_group)
+        and behavior.affordance in _SECTION_LOCK_BLOCKING_AFFORDANCES
     )
 
 
-def _derived_navigable_when_layer_locked(behavior: RowBehavior) -> bool:
-    if behavior.navigable_when_layer_locked is not None:
-        return behavior.navigable_when_layer_locked
-    return (
-        behavior.parent_group == "track"
-        and behavior.is_sub_header
-        and behavior.affordance == RowAffordance.EXPAND
-    )
+def _derived_navigable_when_section_locked(behavior: RowBehavior) -> bool:
+    if behavior.navigable_when_section_locked is not None:
+        return behavior.navigable_when_section_locked
+    # Section and sub-section headers stay navigable so the section can still be
+    # expanded and viewed while locked.
+    return behavior.affordance == RowAffordance.EXPAND
 
 
-def row_blocked_by_layer_lock(kind: RowKind) -> bool:
-    return _derived_blocked_by_layer_lock(row_behavior(kind))
+def row_blocked_by_section_lock(kind: RowKind) -> bool:
+    return _derived_blocked_by_section_lock(row_behavior(kind))
 
 
-def row_navigable_when_layer_locked(kind: RowKind) -> bool:
-    return _derived_navigable_when_layer_locked(row_behavior(kind))
+def row_navigable_when_section_locked(kind: RowKind) -> bool:
+    return _derived_navigable_when_section_locked(row_behavior(kind))
 
 
-def layer_lock_blocks_mutation(kind: RowKind, *, locked: bool) -> bool:
-    return locked and row_blocked_by_layer_lock(kind)
+def _state_track_locked(state: object, slot: str) -> bool:
+    tracks = getattr(state, "tracks", None)
+    if tracks is not None:
+        return bool(tracks[slot].locked)
+    return bool(state.layers[slot].locked)
+
+
+def _state_timeline_locked(state: object) -> bool:
+    render_timeline = getattr(state, "render_timeline", None)
+    if render_timeline is not None:
+        return bool(render_timeline.locked)
+    return bool(state.timeline.locked)
+
+
+def _row_lock_section(kind: RowKind) -> str | None:
+    if kind in TRACK_LOCK_KINDS:
+        return "track"
+    if kind in RENDER_OVERLAY_SECTION_KINDS:
+        return "render_overlay"
+    if kind in RENDER_POST_FX_SECTION_KINDS:
+        return "render_post_fx"
+    if kind in RENDER_TIMELINE_SECTION_KINDS:
+        return "timeline"
+    return None
+
+
+def section_locked(state: object, desc: RowDescriptor) -> bool:
+    """Whether the section owning *desc* is locked.
+
+    Accepts either a ``TuningViewState`` (tracks/render_timeline attributes)
+    or a ``TuningSession`` (layers/timeline attributes).
+    """
+    section = _row_lock_section(desc.kind)
+    if section is None:
+        return False
+    if section == "track":
+        slot = desc.slot
+        if slot is None:
+            return False
+        return _state_track_locked(state, slot)
+    if section == "render_overlay":
+        return bool(state.render_overlay.locked)
+    if section == "render_post_fx":
+        return bool(state.render_post_fx.locked)
+    if section == "timeline":
+        return _state_timeline_locked(state)
+    return False
+
+
+def section_lock_blocks_mutation(state: object, desc: RowDescriptor) -> bool:
+    return section_locked(state, desc) and row_blocked_by_section_lock(desc.kind)
 
 
 def row_triggers_layer_delete(kind: RowKind) -> bool:
@@ -902,7 +965,12 @@ def row_triggers_layer_delete(kind: RowKind) -> bool:
     return row_behavior(kind).parent_group == "track"
 
 
-from cleave.viz.row_sections import section_header_from_section_tree
+from cleave.viz.row_sections import (
+    RENDER_OVERLAY_SECTION_KINDS,
+    RENDER_POST_FX_SECTION_KINDS,
+    RENDER_TIMELINE_SECTION_KINDS,
+    section_header_from_section_tree,
+)
 
 
 def section_header_descriptor(desc: RowDescriptor) -> RowDescriptor:

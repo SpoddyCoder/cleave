@@ -48,9 +48,9 @@ from cleave.viz.row_semantics import (
     REPEAT_ROW_KINDS,
     RowDescriptor,
     RowKind,
-    layer_lock_blocks_mutation,
     row_behavior,
     row_triggers_layer_delete,
+    section_lock_blocks_mutation,
 )
 from cleave.viz.session import TuningSession
 from cleave.viz.tuning_view_state import TuningViewState, TuningViewStateBuilder
@@ -289,8 +289,8 @@ class TuningControls:
             if kind == RowKind.TRACK_PRESET_DIR:
                 slot = self.focus_descriptor.slot
                 if slot is not None:
-                    if layer_lock_blocks_mutation(
-                        kind, locked=self.session.layers[slot].locked
+                    if section_lock_blocks_mutation(
+                        self.session, self.focus_descriptor
                     ):
                         return True
                     self._parent_directory(slot)
@@ -302,8 +302,8 @@ class TuningControls:
                 slot = self.focus_descriptor.slot
                 desc = self.focus_descriptor
                 if slot is not None and desc.preset_index is not None:
-                    if layer_lock_blocks_mutation(
-                        kind, locked=self.session.layers[slot].locked
+                    if section_lock_blocks_mutation(
+                        self.session, self.focus_descriptor
                     ):
                         return True
                     self._delete_user_preset(slot, desc.preset_index)
@@ -337,6 +337,15 @@ class TuningControls:
                 if slot is not None:
                     self._toggle_locked(slot)
                 return True
+            if kind == RowKind.RENDER_OVERLAY_HEADER:
+                self._toggle_render_overlay_locked()
+                return True
+            if kind == RowKind.RENDER_POST_FX_HEADER:
+                self._toggle_render_post_fx_locked()
+                return True
+            if kind == RowKind.RENDER_TIMELINE_HEADER:
+                self._toggle_render_timeline_locked()
+                return True
 
         if add_current_preset_key_pressed(event.key, event.mod):
             kind = self.focus_descriptor.kind
@@ -346,8 +355,8 @@ class TuningControls:
                 and kind in {RowKind.TRACK_PRESET_DIR, RowKind.TRACK_PRESET}
                 and self.session.layers[slot].preset_switching == "user_defined"
             ):
-                if layer_lock_blocks_mutation(
-                    kind, locked=self.session.layers[slot].locked
+                if section_lock_blocks_mutation(
+                    self.session, self.focus_descriptor
                 ):
                     return True
                 self._add_current_preset(slot)
@@ -357,8 +366,8 @@ class TuningControls:
             kind = self.focus_descriptor.kind
             slot = self.focus_descriptor.slot
             if slot is not None and kind in PRESET_FILE_ROW_KINDS:
-                if layer_lock_blocks_mutation(
-                    kind, locked=self.session.layers[slot].locked
+                if section_lock_blocks_mutation(
+                    self.session, self.focus_descriptor
                 ):
                     return True
                 src = self._resolve_preset_file_path(slot, kind, self.focus_descriptor)
@@ -380,8 +389,8 @@ class TuningControls:
             if kind == RowKind.TRACK_USER_PRESET_ADD:
                 slot = self.focus_descriptor.slot
                 if slot is not None:
-                    if layer_lock_blocks_mutation(
-                        kind, locked=self.session.layers[slot].locked
+                    if section_lock_blocks_mutation(
+                        self.session, self.focus_descriptor
                     ):
                         return True
                     self._add_current_preset(slot)
@@ -406,8 +415,8 @@ class TuningControls:
             if kind == RowKind.TRACK_PRESET_DIR:
                 slot = self.focus_descriptor.slot
                 if slot is not None:
-                    if layer_lock_blocks_mutation(
-                        kind, locked=self.session.layers[slot].locked
+                    if section_lock_blocks_mutation(
+                        self.session, self.focus_descriptor
                     ):
                         return True
                     self._enter_directory(slot)
@@ -669,7 +678,6 @@ class TuningControls:
         self._move_mode_original_z_order = None
 
     def _apply_horizontal(self, key: int, mod: int, kind: RowKind) -> None:
-        slot = self.focus_descriptor.slot
         ctrl = mod_ctrl(mod)
         shift = mod_shift(mod)
         forward = key == pygame.K_RIGHT
@@ -685,12 +693,7 @@ class TuningControls:
             )
             return
 
-        if (
-            slot is not None
-            and layer_lock_blocks_mutation(
-                kind, locked=self.session.layers[slot].locked
-            )
-        ):
+        if section_lock_blocks_mutation(self.session, self.focus_descriptor):
             return
 
         apply_field_horizontal(
@@ -856,6 +859,20 @@ class TuningControls:
     def _toggle_locked(self, slot: str) -> None:
         layer = self.session.layers[slot]
         layer.locked = not layer.locked
+
+    def _toggle_render_overlay_locked(self) -> None:
+        overlay = self.session.render_overlay
+        overlay.locked = not overlay.locked
+
+    def _toggle_render_post_fx_locked(self) -> None:
+        post_fx = self.session.render_post_fx
+        post_fx.locked = not post_fx.locked
+
+    def _toggle_render_timeline_locked(self) -> None:
+        timeline = self.session.timeline
+        if timeline.recording:
+            return
+        timeline.locked = not timeline.locked
 
     def _set_expanded(self, slot: str, expanded: bool) -> None:
         layer = self.session.layers[slot]

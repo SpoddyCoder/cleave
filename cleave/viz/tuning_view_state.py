@@ -89,6 +89,7 @@ class RenderOverlayBlock:
     start_delay: float = _RO_OVERLAY_DEFAULTS["start_delay"]
     display_time: float = _RO_OVERLAY_DEFAULTS["display_time"]
     solo: bool = False
+    locked: bool = False
 
 
 @dataclass
@@ -122,6 +123,7 @@ class RenderPostFxBlock:
     )
     chroma_boost: ChromaBoostBlock = field(default_factory=ChromaBoostBlock)
     solo: bool = False
+    locked: bool = False
 
 
 @dataclass
@@ -130,6 +132,7 @@ class RenderTimelineBlock:
     expanded: bool = False
     bar_phase_offset: int = 0
     show_bar_grid: bool = False
+    locked: bool = False
 
 
 @dataclass
@@ -539,6 +542,7 @@ class TuningViewStateBuilder:
                 start_delay=ro.start_delay,
                 display_time=ro.display_time,
                 solo=self.session.render_overlay_solo,
+                locked=ro.locked,
             ),
             render_post_fx=replace(
                 structure.render_post_fx,
@@ -563,12 +567,14 @@ class TuningViewStateBuilder:
                     amount_pct=pp.chroma_boost.amount_pct,
                 ),
                 solo=self.session.render_post_fx_solo,
+                locked=pp.locked,
             ),
             render_timeline=replace(
                 structure.render_timeline,
                 expanded=tl.panel_open,
                 bar_phase_offset=tl.bar_phase_offset,
                 show_bar_grid=tl.show_bar_grid,
+                locked=tl.locked,
             ),
             settings=replace(
                 structure.settings,
