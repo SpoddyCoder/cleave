@@ -2538,6 +2538,40 @@ def test_ctrl_quick_nav_from_timeline_submenu_jumps_sections() -> None:
     assert timeline_header in quick
 
 
+def test_ctrl_quick_nav_includes_timeline_strip_when_open() -> None:
+    controls = _make_controls(("layer_1", "layer_2"), timeline_enabled=True)
+    view = controls.build_view_state(paused=False)
+    timeline_header = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
+    settings_row = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
+
+    controls.session.timeline.panel_open = True
+    controls.focus_descriptor = _desc(view, timeline_header)
+    controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
+    assert controls.focus_cursor == TimelineFocus(0)
+
+    controls.focus_descriptor = _desc(view, settings_row)
+    controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
+    assert controls.focus_cursor == TimelineFocus(0)
+
+    controls.focus_cursor = TimelineFocus(1)
+    controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
+    assert controls.focus_descriptor == _desc(view, timeline_header)
+    controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
+    assert controls.focus_cursor == TimelineFocus(0)
+
+
+def test_ctrl_quick_nav_skips_timeline_strip_when_closed() -> None:
+    controls = _make_controls(("layer_1", "layer_2"), timeline_enabled=True)
+    view = controls.build_view_state(paused=False)
+    timeline_header = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
+    settings_row = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
+
+    controls.session.timeline.panel_open = False
+    controls.focus_descriptor = _desc(view, timeline_header)
+    controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
+    assert controls.focus_descriptor == _desc(view, settings_row)
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+
 def _write_milk(path: Path) -> None:
     path.write_text("milk")
 

@@ -35,6 +35,7 @@ from cleave.viz.focus_nav import (
     TimelineFocus,
     cursor_main_descriptor,
     move_focus,
+    move_quick_focus,
     timeline_strip_in_ring,
 )
 from cleave.viz.row_fields import (
@@ -489,44 +490,8 @@ class TuningControls:
         self._apply_focus_cursor(move_focus(self.focus_cursor, delta, view))
 
     def _move_quick_focus(self, delta: int) -> None:
-        if isinstance(self.focus_cursor, TimelineFocus):
-            self._apply_focus_cursor(
-                MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
-            )
-            if delta < 0:
-                return
         view = self.build_view_state(paused=self.playback.paused)
-        quick_indices = view.layout.quick_nav_indices()
-        quick = [view.layout.descriptor(index) for index in quick_indices]
-        if not quick:
-            return
-        if view.layout.contains_descriptor(self.focus_descriptor):
-            current_index = view.layout.find_descriptor(self.focus_descriptor)
-        else:
-            resolved = view.layout.resolve_navigable(self.focus_descriptor, view)
-            current_index = (
-                view.layout.find_descriptor(resolved)
-                if view.layout.contains_descriptor(resolved)
-                else -1
-            )
-        if self.focus_descriptor in quick:
-            pos = quick.index(self.focus_descriptor)
-            self.focus_descriptor = quick[(pos + delta) % len(quick)]
-            return
-        if delta > 0:
-            after = [
-                desc
-                for desc in quick
-                if view.layout.find_descriptor(desc) > current_index
-            ]
-            self.focus_descriptor = after[0] if after else quick[0]
-        else:
-            before = [
-                desc
-                for desc in quick
-                if view.layout.find_descriptor(desc) < current_index
-            ]
-            self.focus_descriptor = before[-1] if before else quick[-1]
+        self._apply_focus_cursor(move_quick_focus(self.focus_cursor, delta, view))
 
     def _swap_stem_in_z_order(self, stem: str, direction: int) -> None:
         order = self.session.layer_z_order

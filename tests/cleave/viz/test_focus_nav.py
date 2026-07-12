@@ -8,7 +8,9 @@ from cleave.viz.focus_nav import (
     MainFocus,
     TimelineFocus,
     build_focus_ring,
+    build_quick_nav_ring,
     move_focus,
+    move_quick_focus,
     resolve_cursor,
     timeline_strip_in_ring,
 )
@@ -83,6 +85,34 @@ def test_build_focus_ring_includes_timeline_rows_when_strip_active() -> None:
     ]
     timeline_part = [TimelineFocus(row) for row in range(len(slots))]
     assert ring == main_part + timeline_part
+
+
+def test_build_quick_nav_ring_appends_timeline_strip_when_open() -> None:
+    state = _timeline_open_state(("layer_1", "layer_2"))
+    ring = build_quick_nav_ring(state)
+    main_part = [
+        MainFocus(state.layout.descriptor(index))
+        for index in state.layout.quick_nav_indices()
+    ]
+    assert ring == main_part + [TimelineFocus(0)]
+    assert isinstance(ring[-1], TimelineFocus)
+
+    closed = _minimal_view_state(
+        render_timeline=RenderTimelineBlock(enabled=True, expanded=False),
+    )
+    closed_ring = build_quick_nav_ring(closed)
+    assert all(isinstance(item, MainFocus) for item in closed_ring)
+
+
+def test_move_quick_focus_steps_onto_timeline_strip() -> None:
+    state = _timeline_open_state(("layer_1", "layer_2"))
+    header = MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+    settings = MainFocus(RowDescriptor(RowKind.SETTINGS_HEADER))
+
+    assert move_quick_focus(header, 1, state) == TimelineFocus(0)
+    assert move_quick_focus(settings, -1, state) == TimelineFocus(0)
+    assert move_quick_focus(TimelineFocus(1), -1, state) == header
+    assert move_quick_focus(TimelineFocus(1), 1, state) == settings
 
 
 def test_move_focus_down_from_last_timeline_row_wraps_to_settings() -> None:
