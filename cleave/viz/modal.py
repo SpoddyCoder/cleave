@@ -23,6 +23,13 @@ def modal_options_vertical(option_count: int) -> bool:
     return option_count > MODAL_VERTICAL_OPTION_THRESHOLD
 
 
+def clamp_modal_focus_index(index: int, option_count: int) -> int:
+    """Return ``index`` when in range, otherwise ``0`` (first option)."""
+    if option_count <= 0 or index < 0 or index >= option_count:
+        return 0
+    return index
+
+
 @dataclass
 class ModalOption:
     label: str
@@ -35,6 +42,7 @@ class ModalRequest:
     message: str | None
     options: list[ModalOption]
     on_dismiss: Callable[[], None] | None = None
+    initial_focus_index: int = 0
 
 
 @dataclass(frozen=True)
@@ -76,7 +84,10 @@ class ModalHost:
 
     def prompt(self, request: ModalRequest) -> None:
         self._request = request
-        self._focus_index = 0
+        self._focus_index = clamp_modal_focus_index(
+            request.initial_focus_index,
+            len(request.options),
+        )
 
     def prompt_yes_no(
         self,
@@ -107,6 +118,8 @@ class ModalHost:
         message: str,
         options: list[ModalOption],
         on_dismiss: Callable[[], None] | None = None,
+        *,
+        initial_focus_index: int = 0,
     ) -> None:
         self.prompt(
             ModalRequest(
@@ -114,6 +127,7 @@ class ModalHost:
                 message=message,
                 options=options,
                 on_dismiss=on_dismiss,
+                initial_focus_index=initial_focus_index,
             )
         )
 
