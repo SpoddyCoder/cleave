@@ -39,6 +39,7 @@ class TimelineStaticSignature:
     recording: bool
     submenu_focused: bool
     record_start_sec: float | None
+    record_slot_start_sec: tuple[tuple[str, float], ...]
     record_baseline: tuple[tuple[str, bool], ...]
     record_buffer_fingerprint: tuple[
         tuple[str, tuple[tuple[float, bool], ...]], ...
@@ -121,6 +122,7 @@ def timeline_static_signature(
         recording=state.recording,
         submenu_focused=state.submenu_focused,
         record_start_sec=state.record_start_sec,
+        record_slot_start_sec=tuple(sorted(state.record_slot_start_sec.items())),
         record_baseline=tuple(sorted(state.record_baseline.items())),
         record_buffer_fingerprint=_record_buffer_fingerprint(state.record_buffer),
         record_high_water_mark=state.record_high_water_mark,

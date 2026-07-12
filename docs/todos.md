@@ -10,17 +10,6 @@ Outstanding bugs and issues.
 
 ---
 
-## Beat grid and cue snap
-
-### Sparse song anchors (after the grid is solid)
-* Manual "drop song cue" at major transitions for guaranteed pops solves a
-  different problem from beat snap (structure vs pulse).
-* Prefer automation: auto-suggested anchors (energy / novelty / structure), with
-  optional manual drop only to correct or pin a few points.
-* Do not make dense hand-cueing the normal path.
-
----
-
 ## Architecture
 
 ### projectM

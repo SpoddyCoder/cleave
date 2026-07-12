@@ -157,7 +157,7 @@ def timeline_strip_section(
     recording: bool,
     override_active: bool,
 ) -> HelpSection:
-    entries: list[tuple[str, str]] = [("Enter", "toggle arm track")]
+    entries: list[tuple[str, str]] = [("a", "toggle arm track")]
 
     if not recording:
         entries.append(("Shift + Enter", "toggle override"))

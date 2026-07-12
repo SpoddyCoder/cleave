@@ -144,6 +144,7 @@ def test_discard_timeline_slot_strips_slot_from_timeline_state() -> None:
     session.timeline.armed_slots.add("layer_2")
     session.timeline.override_slots.add("layer_2")
     session.timeline.record_baseline["layer_2"] = True
+    session.timeline.record_slot_start_sec["layer_2"] = 1.5
     session.timeline.monitor["layer_2"] = False
     session.timeline.override_visible["layer_2"] = True
     session.timeline.arm_flash_start_ms["layer_2"] = 100
@@ -160,6 +161,7 @@ def test_discard_timeline_slot_strips_slot_from_timeline_state() -> None:
     assert "layer_2" not in session.timeline.armed_slots
     assert "layer_2" not in session.timeline.override_slots
     assert "layer_2" not in session.timeline.record_baseline
+    assert "layer_2" not in session.timeline.record_slot_start_sec
     assert "layer_2" not in session.timeline.monitor
     assert "layer_2" not in session.timeline.override_visible
     assert "layer_2" not in session.timeline.arm_flash_start_ms

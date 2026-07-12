@@ -98,16 +98,16 @@ def _make_timeline_controls(
     return controls, session, visibility_calls, close_calls, seeks, notifications
 
 
-def test_enter_toggles_arm_on_focused_stem() -> None:
+def test_a_toggles_arm_on_focused_stem() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(focus_row=1)
     assert session.timeline.armed_slots == set()
 
     before = pygame.time.get_ticks()
-    controls.handle_keydown(keydown(pygame.K_RETURN))
+    controls.handle_keydown(keydown(pygame.K_a))
     assert session.timeline.armed_slots == {"layer_2"}
     assert session.timeline.arm_flash_start_ms["layer_2"] >= before
 
-    controls.handle_keydown(keydown(pygame.K_RETURN))
+    controls.handle_keydown(keydown(pygame.K_a))
     assert session.timeline.armed_slots == set()
     assert session.timeline.arm_flash_start_ms["layer_2"] >= before
 
@@ -482,6 +482,35 @@ def test_record_start_stores_baseline_not_buffer() -> None:
     assert session.timeline.record_baseline == {"layer_1": True, "layer_2": False}
 
 
+def test_arm_during_recording_joins_take_and_accepts_toggle() -> None:
+    """Regression: mid-take arm must join record_baseline before number-key toggle."""
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        focus_row=1,
+        position_sec=4.0,
+    )
+    session.layers["layer_1"].enabled = True
+    session.layers["layer_2"].enabled = True
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    assert session.timeline.record_baseline == {"layer_1": True}
+    assert session.timeline.record_slot_start_sec == {"layer_1": 4.0}
+
+    controls.playback.player.seek(8.0)
+    controls.handle_keydown(keydown(pygame.K_a))
+    assert session.timeline.armed_slots == {"layer_1", "layer_2"}
+    assert session.timeline.record_baseline == {"layer_1": True, "layer_2": True}
+    assert session.timeline.record_slot_start_sec == {
+        "layer_1": 4.0,
+        "layer_2": 8.0,
+    }
+
+    controls.handle_keydown(keydown(pygame.K_2))
+    assert "layer_2" in session.timeline.record_buffer
+    assert session.timeline.record_buffer["layer_2"][0].visible is False
+    assert session.timeline.record_buffer["layer_2"][0].t == 8.0
+
+
 def test_layer_keys_only_affect_armed_stems() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
         armed_slots={"layer_1"},
@@ -537,7 +566,7 @@ def test_disarm_during_recording_commits_slot_and_exits_recording() -> None:
 
     controls.handle_keydown(keydown(pygame.K_r))
     controls.handle_keydown(keydown(pygame.K_1))
-    controls.handle_keydown(keydown(pygame.K_RETURN))
+    controls.handle_keydown(keydown(pygame.K_a))
     assert session.timeline.armed_slots == set()
     assert session.timeline.recording is False
     assert session.timeline.record_baseline == {}
@@ -561,7 +590,7 @@ def test_disarm_one_slot_keeps_recording_on_remaining_armed() -> None:
 
     controls.handle_keydown(keydown(pygame.K_r))
     controls.handle_keydown(keydown(pygame.K_1))
-    controls.handle_keydown(keydown(pygame.K_RETURN))
+    controls.handle_keydown(keydown(pygame.K_a))
     assert session.timeline.armed_slots == {"layer_2"}
     assert session.timeline.recording is True
     assert session.timeline.record_baseline == {"layer_2": False}

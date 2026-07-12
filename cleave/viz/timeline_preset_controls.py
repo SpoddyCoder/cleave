@@ -130,6 +130,7 @@ class TimelinePresetController:
         tl.recording = False
         tl.record_start_sec = None
         tl.record_baseline = {}
+        tl.record_slot_start_sec = {}
         tl.record_high_water_mark = None
         tl.armed_slots.clear()
         tl.override_slots.clear()

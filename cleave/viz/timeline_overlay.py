@@ -90,6 +90,7 @@ class TimelineViewState:
     armed_slots: set[str] = field(default_factory=set)
     recording: bool = False
     record_start_sec: float | None = None
+    record_slot_start_sec: dict[str, float] = field(default_factory=dict)
     record_baseline: dict[str, bool] = field(default_factory=dict)
     record_buffer: dict[str, list[SlotCue]] = field(default_factory=dict)
     record_high_water_mark: float | None = None
@@ -160,7 +161,7 @@ def bar_segments_for_row(
     if not (state.recording and slot in state.record_baseline):
         return visibility_segments(lane, duration, inherit=inherit)
 
-    record_start = state.record_start_sec
+    record_start = state.record_slot_start_sec.get(slot, state.record_start_sec)
     if record_start is None:
         record_start = state.position_sec
     record_start = max(0.0, min(record_start, duration))
@@ -198,7 +199,7 @@ def bar_tick_times_for_row(state: TimelineViewState, slot: str) -> list[float]:
     if not (state.recording and slot in state.record_baseline):
         return cue_times_for_stem(lane, duration)
 
-    record_start = state.record_start_sec
+    record_start = state.record_slot_start_sec.get(slot, state.record_start_sec)
     if record_start is None:
         record_start = state.position_sec
     playhead = state.position_sec
