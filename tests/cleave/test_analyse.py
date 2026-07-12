@@ -52,13 +52,16 @@ def _write_project(project: Path) -> None:
 @patch("cleave.analyse.extract_other", return_value=_stub_signal())
 @patch("cleave.analyse.extract_vocals", return_value=_stub_vocals())
 @patch("cleave.analyse.extract_bass", return_value=_stub_bass())
-@patch("cleave.analyse.extract_drums_beats", return_value=np.array([0.5, 1.0, 1.5]))
+@patch(
+    "cleave.analyse.extract_beats_downbeats",
+    return_value=(np.array([0.5, 1.0, 1.5]), np.array([0.5, 1.5])),
+)
 @patch("cleave.analyse.extract_drums_onset", return_value=_stub_signal())
 @patch("cleave.analyse._stem_duration_sec", return_value=1.0)
-def test_run_analyse_writes_version_2_full_mix(
+def test_run_analyse_writes_version_3_full_mix(
     _duration: object,
     _drums: object,
-    _drums_beats: object,
+    _beats_downbeats: object,
     _bass: object,
     _vocals: object,
     _other: object,
@@ -72,12 +75,13 @@ def test_run_analyse_writes_version_2_full_mix(
     signals_path = run_analyse(project, high_quality=False)
     data = json.loads(signals_path.read_text(encoding="utf-8"))
 
-    assert data["version"] == 2
+    assert data["version"] == 3
     assert "mix_onset_strength" not in data["drums"]
     assert set(data["full_mix"]) == {"onset_strength", "rms"}
     assert len(data["full_mix"]["onset_strength"]) > 0
     assert len(data["full_mix"]["rms"]) > 0
     assert data["beat_times"] == [0.5, 1.0, 1.5]
+    assert data["downbeat_times"] == [0.5, 1.5]
 
 
 @patch("cleave.analyse.extract_mix_rms", return_value=_stub_signal())
@@ -85,13 +89,16 @@ def test_run_analyse_writes_version_2_full_mix(
 @patch("cleave.analyse.extract_other", return_value=_stub_signal())
 @patch("cleave.analyse.extract_vocals", return_value=_stub_vocals())
 @patch("cleave.analyse.extract_bass", return_value=_stub_bass())
-@patch("cleave.analyse.extract_drums_beats", return_value=np.array([]))
+@patch(
+    "cleave.analyse.extract_beats_downbeats",
+    return_value=(np.array([]), np.array([])),
+)
 @patch("cleave.analyse.extract_drums_onset", return_value=_stub_signal())
 @patch("cleave.analyse._stem_duration_sec", return_value=1.0)
 def test_run_analyse_empty_beats_warns_and_persists_empty(
     _duration: object,
     _drums: object,
-    _drums_beats: object,
+    _beats_downbeats: object,
     _bass: object,
     _vocals: object,
     _other: object,
@@ -107,7 +114,10 @@ def test_run_analyse_empty_beats_warns_and_persists_empty(
     data = json.loads(signals_path.read_text(encoding="utf-8"))
 
     assert data["beat_times"] == []
-    assert "drum stem beat detection produced no useful data" in capsys.readouterr().out
+    assert data["downbeat_times"] == []
+    out = capsys.readouterr().out
+    assert "mix beat detection produced no useful data" in out
+    assert "mix downbeat detection produced no useful data" in out
 
 
 @patch(

@@ -1,8 +1,8 @@
 # Beat This! beat and downbeat plan
 
-High-level plan for stronger automatic beat and bar grids. Detail and implementation in a later session.
+Stronger automatic beat and bar grids via [Beat This!](https://github.com/CPJKU/beat_this).
 
-Tracked as must-do in [todos.md](todos.md) (Stronger beat and downbeat detection).
+Tracked under [todos.md](todos.md) (Stronger beat and downbeat detection).
 
 ## Goal
 
@@ -17,27 +17,25 @@ Prefer [Beat This!](https://github.com/CPJKU/beat_this) (ISMIR 2024, CPJKU) over
 - Installs on modern Python / numpy; madmom does not fit cleanly (legacy PyPI, numpy constraints).
 - Optional madmom DBN postprocessing is not needed for v1.
 
-Clean swapover: implement on a branch; compare by checking out the other branch and re-running analyse.
+## Implemented
 
-## Current state
+- Analyse: [cleave/extract.py](../cleave/extract.py) `extract_beats_downbeats` runs Beat This! on the **mix**.
+- Persist: `signals.json` version 3 with `beat_times` and `downbeat_times` ([cleave/analyse.py](../cleave/analyse.py), [cleave/signals.py](../cleave/signals.py)). Non-v3 is stale for `separate.signals_complete`.
+- Wiring: [cleave/viz/wiring.py](../cleave/viz/wiring.py) sets `bar_times` from `signals.downbeat_times`.
+- Bar snap nudge: [cleave/timeline.py](../cleave/timeline.py) `shift_bars_by_beats` shifts each downbeat by N beats on the beat grid; [cleave/viz/timeline_snap_controls.py](../cleave/viz/timeline_snap_controls.py) offers `+0`/`+1`/`+2`/`+3`.
 
-- Analyse: [cleave/extract.py](../cleave/extract.py) `extract_drums_beats` uses librosa with a per-frame tempo curve on the **drum stem**.
-- Persist: `beat_times` only in `signals.json` ([cleave/analyse.py](../cleave/analyse.py), [cleave/signals.py](../cleave/signals.py)).
-- Bars: not detected. [cleave/viz/wiring.py](../cleave/viz/wiring.py) invents 4/4 phase by maximizing drum `onset_strength` at every Nth beat ([cleave/timeline.py](../cleave/timeline.py) `bar_times_from_beats`).
-- Timeline snap uses those grids ([cleave/viz/timeline_snap_controls.py](../cleave/viz/timeline_snap_controls.py)).
+Re-analyse: `cleave separate <slug>` or `cleave play` (stems reused).
 
 ## Separation of concerns
 
 Beat This! owns the **timeline grid only**. Leave onset envelopes alone for cleave effects.
 
-| Consumer | Need | Source today | After swap |
-| --- | --- | --- | --- |
-| Timeline snap | Sparse event times (beat / bar 1) | `beat_times` + onset-derived bars | `beat_times` + persisted downbeats from Beat This! |
-| Effects (`pulse` / `flash` / `grit`) | Dense continuous energy | librosa `onset_strength` (drums / full_mix) at 100 Hz | Unchanged |
+| Consumer | Need | Source |
+| --- | --- | --- |
+| Timeline snap | Sparse event times (beat / bar 1) | `beat_times` + `downbeat_times` from Beat This! |
+| Effects (`pulse` / `flash` / `grit`) | Dense continuous energy | librosa `onset_strength` (drums / full_mix) at 100 Hz |
 
-Effects sample normalized envelopes every frame. Beat This! outputs event times (and beat/downbeat logits), not a general transient driver. Do not replace `onset_strength` with Beat This! output.
-
-The only current coupling is the bar-phase heuristic that samples onset at beat times. With real downbeats persisted, drop that bridge. Analyse still writes one `signals.json`; two field families, two consumers.
+Effects sample normalized envelopes every frame. Beat This! outputs event times, not a general transient driver.
 
 ```
 Demucs stems + mix
@@ -54,20 +52,8 @@ Demucs stems + mix
    (discrete grids)   (continuous curves)
 ```
 
-## Recommended approach (v1)
-
-1. **Spike** on a few real projects: Beat This! on mix vs drums vs current librosa; listen for snap-to-kick and bar-1 feel; note CPU/GPU analyse time.
-2. **Replace** `extract_drums_beats` with Beat This! in analyse. Default input: **mix** (models train on full music; drum-only can hurt sparse intros).
-3. **Persist** both grids in `signals.json` (bump version): keep `beat_times`, add `downbeat_times` (or equivalent). Load on `Signals`; wiring/snap use persisted bars, not runtime onset phase.
-4. **Dependency**: add `beat-this` (and its small torch extras). No madmom. Analyse stays offline/heavy; live play only reads JSON.
-5. **Ship bar accuracy first.** Do not solve half-time flips, unusual meters, or sparse song anchors in this pass.
-
 ## Out of scope / known limits
 
 - Quiet intros, drum-sparse sections, half-time and double-time flips, unusual meters: better models help; they do not remove the need for later sparse song anchors ([todos.md](todos.md)).
 - New effect drivers keyed to beats (e.g. explicit beat flash): possible later as a separate roster entry, not part of this swap.
 - Manual dense cueing: not the goal; automation first.
-
-## Next session
-
-Dig into API wiring, `signals.json` schema bump, dependency pinning, tests, and the concrete extract/analyse/signals/wiring change set.
