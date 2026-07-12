@@ -26,15 +26,21 @@ Build UI and editing only. No snap, preset generation, or beat-phase logic yet.
 - Drops a song marker at the current playhead time.
 - Shows a toast and appends the marker to the list.
 
+**When drop is allowed**
+
+- Allowed from the timeline strip and the main tuning panel.
+- **Not** while a centered modal is open (modals keep consuming keys).
+- **Not** while the timeline is recording.
+
 ### Panel
 
-- New expandable child under **Render: Timeline**: `song markers`.
+- New expandable child under **Render: Timeline**: header label `song markers (N)` with expand arrow (e.g. `song markers (4)`).
 - List of marker times in `[mm:ss.ms]` format.
-- Parent row should show a count when useful (e.g. `song markers (4)`).
 
 ### List interaction
 
-- **Enter** on a highlighted song marker seeks the playhead to that time (audition / verify placement).
+- **Sticky selection:** the highlighted list row stays put until the user moves focus (Up/Down), deletes it, or drops a marker (select the new or replaced marker). Do **not** auto-follow the playhead.
+- **Enter** on a highlighted song marker seeks the playhead to that time (audition / verify placement). Timeline row arm uses **a**, so **Enter** is free for seek-to-marker.
 - **Delete** removes the highlighted song marker.
 - No nudge in v1 — delete and re-drop at the playhead is enough, with **Enter** to verify.
 
