@@ -17,7 +17,8 @@ from cleave.timeline_presets import (
     build_dialogue_cues,
     build_pulse_cues,
 )
-from cleave.timeline_presets.busyness import chord_cost, in_climax_window
+from cleave.timeline_presets.characters import in_climax_window
+from cleave.timeline_presets.chords import chord_cost
 from cleave.timeline_presets.grid import thin_bar_times_for_arrange
 from cleave.timeline_presets.motifs import hamming_distance
 

@@ -6,8 +6,11 @@ import random
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from cleave.timeline_presets.busyness import MIN_SWITCH_GAP_BARS, MIN_SWITCH_GAP_SEC
 from cleave.timeline_presets.chords import ChordVocab
+
+# Minimum spacing between layer visibility transitions.
+MIN_SWITCH_GAP_BARS = 2
+MIN_SWITCH_GAP_SEC = 6.0
 
 
 @dataclass(frozen=True)

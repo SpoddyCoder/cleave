@@ -6,26 +6,29 @@ import random
 from collections.abc import Sequence
 
 from cleave.timeline import TimelineLane
-from cleave.timeline_presets.arrange import compose_timeline
-from cleave.timeline_presets.busyness import (
+from cleave.timeline_presets.arrange import PHRASE_SEC_MIN, compose_timeline
+from cleave.timeline_presets.characters import (
     ARC,
     BREATHING,
+    CHARACTER_HELP_ENTRIES,
     DIALOGUE,
-    MIN_SWITCH_GAP_BARS,
-    MIN_SWITCH_GAP_SEC,
-    PHI,
-    PHRASE_SEC_MAX,
-    PHRASE_SEC_MIN,
     PULSE,
-    TIMELINE_PRESET_HELP_ENTRIES,
+)
+from cleave.timeline_presets.motifs import MIN_SWITCH_GAP_BARS, MIN_SWITCH_GAP_SEC
+
+_RESET_HELP_ENTRIES: tuple[tuple[str, str], ...] = (
+    ("Reset (All Off)", "clear cues; every layer off for the whole track."),
+    ("Reset (All On)", "clear cues; every layer on for the whole track."),
+)
+
+TIMELINE_PRESET_HELP_ENTRIES: tuple[tuple[str, str], ...] = (
+    CHARACTER_HELP_ENTRIES + _RESET_HELP_ENTRIES
 )
 
 __all__ = (
     "ALL_BUILDERS",
     "MIN_SWITCH_GAP_BARS",
     "MIN_SWITCH_GAP_SEC",
-    "PHI",
-    "PHRASE_SEC_MAX",
     "PHRASE_SEC_MIN",
     "TIMELINE_PRESET_HELP_ENTRIES",
     "build_arc_cues",

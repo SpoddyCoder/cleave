@@ -1,34 +1,9 @@
-"""Busyness cost model and energy envelopes per timeline character."""
+"""Timeline preset characters: energy envelopes, profiles, and help copy."""
 
 from __future__ import annotations
 
-import math
 from collections.abc import Callable
 from dataclasses import dataclass
-
-MIN_SWITCH_GAP_BARS = 2
-MIN_SWITCH_GAP_SEC = 6.0
-PHRASE_BARS_MIN = 4
-PHRASE_BARS_MAX = 8
-PHRASE_SEC_MIN = 8.0
-PHRASE_SEC_MAX = 16.0
-PHI = (1.0 + math.sqrt(5.0)) / 2.0
-
-
-def chord_cost(n_active: int) -> float:
-    if n_active <= 0:
-        return 0.0
-    if n_active == 1:
-        return 1.0
-    if n_active == 2:
-        return 2.2
-    if n_active == 3:
-        return 4.0
-    return 7.0 + max(0, n_active - 4) * 1.5
-
-
-def chord_cost_for_active(active: frozenset[str]) -> float:
-    return chord_cost(len(active))
 
 
 def _arc_envelope(progress: float) -> float:
@@ -154,7 +129,7 @@ CHARACTERS: dict[str, CharacterProfile] = {
     "pulse": PULSE,
 }
 
-TIMELINE_PRESET_HELP_ENTRIES: tuple[tuple[str, str], ...] = (
+CHARACTER_HELP_ENTRIES: tuple[tuple[str, str], ...] = (
     ("Breathing", "sparse singles and rare duos; no tutti stacks."),
     ("Dialogue", "call/response and antiphony between layers."),
     ("Arc", "builds to one short climax flash, then breathes and resolves."),

@@ -1,10 +1,24 @@
-"""Curated concurrent layer chords for timeline composition."""
+"""Curated concurrent layer chords and stack-cost scoring."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from cleave.timeline_presets.busyness import chord_cost_for_active
+
+def chord_cost(n_active: int) -> float:
+    if n_active <= 0:
+        return 0.0
+    if n_active == 1:
+        return 1.0
+    if n_active == 2:
+        return 2.2
+    if n_active == 3:
+        return 4.0
+    return 7.0 + max(0, n_active - 4) * 1.5
+
+
+def chord_cost_for_active(active: frozenset[str]) -> float:
+    return chord_cost(len(active))
 
 
 @dataclass(frozen=True)
