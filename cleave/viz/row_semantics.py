@@ -719,8 +719,8 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             ("Right", "show detected bar lines"),
         ),
         help_description=(
-            "Overlay phase-shifted detected bars on the timeline strip.",
-            "Gaps mean missing detection, not a filled regular grid.",
+            "Show Beat This! bar detection points on the timeline strip.",
+            "Gaps mean missing detection (no drums)",
         ),
     ),
     RowKind.TIMELINE_SNAP_TO_BEATS: RowBehavior(

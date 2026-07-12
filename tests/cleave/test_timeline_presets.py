@@ -10,6 +10,7 @@ import pytest
 from cleave.timeline import Timeline, TimelineLane, lane_visible_at
 from cleave.timeline_presets import (
     MIN_SWITCH_GAP_BARS,
+    MIN_SWITCH_GAP_SEC,
     ALL_BUILDERS,
     build_arc_cues,
     build_breathing_cues,
@@ -17,6 +18,7 @@ from cleave.timeline_presets import (
     build_pulse_cues,
 )
 from cleave.timeline_presets.busyness import chord_cost, in_climax_window
+from cleave.timeline_presets.grid import thin_bar_times_for_arrange
 from cleave.timeline_presets.motifs import hamming_distance
 
 _DURATIONS = (3.0, 5.0, 12.0, 30.0, 90.0, 180.0)
@@ -33,6 +35,24 @@ def _bar_times_for(duration_sec: float, bar_sec: float = _BAR_SEC) -> list[float
     while t < duration_sec - 1e-9:
         bars.append(t)
         t += bar_sec
+    return bars
+
+
+def _dense_middle_bars(duration_sec: float = 60.0) -> list[float]:
+    """Sparse ~2s bars with a short dense ~0.25s burst (median stays ~2s)."""
+    bars: list[float] = []
+    t = 0.0
+    while t < 24.0 - 1e-9:
+        bars.append(round(t, 6))
+        t += 2.0
+    t = 24.0
+    while t < 28.0 - 1e-9:
+        bars.append(round(t, 6))
+        t += 0.25
+    t = 28.0
+    while t < duration_sec - 1e-9:
+        bars.append(round(t, 6))
+        t += 2.0
     return bars
 
 
@@ -96,16 +116,27 @@ def _assert_cues_on_bars(
             )
 
 
-def _assert_min_bar_gap(
+def _assert_min_gaps(
     lanes: dict[str, TimelineLane],
     bar_times: list[float],
+    duration_sec: float,
 ) -> None:
+    thinned = thin_bar_times_for_arrange(bar_times, duration_sec)
     times = _all_transition_times(lanes)
-    if len(times) < 2 or len(bar_times) < 2:
+    if len(times) < 2 or len(thinned) < 2:
         return
     for prev, cur in zip(times, times[1:]):
-        prev_idx = min(range(len(bar_times)), key=lambda i: (abs(bar_times[i] - prev), bar_times[i]))
-        cur_idx = min(range(len(bar_times)), key=lambda i: (abs(bar_times[i] - cur), bar_times[i]))
+        assert cur - prev >= MIN_SWITCH_GAP_SEC - 1e-6, (
+            f"cue gap {cur - prev:.3f}s < {MIN_SWITCH_GAP_SEC}s"
+        )
+        prev_idx = min(
+            range(len(thinned)),
+            key=lambda i: (abs(thinned[i] - prev), thinned[i]),
+        )
+        cur_idx = min(
+            range(len(thinned)),
+            key=lambda i: (abs(thinned[i] - cur), thinned[i]),
+        )
         assert cur_idx - prev_idx >= MIN_SWITCH_GAP_BARS
 
 
@@ -174,6 +205,42 @@ def _build(builder, slots, duration_sec, rng):
     return builder(slots, duration_sec, rng, bar_times=bars), bars
 
 
+def test_thin_bar_times_dense_middle() -> None:
+    duration_sec = 60.0
+    raw = _dense_middle_bars(duration_sec)
+    thinned = thin_bar_times_for_arrange(raw, duration_sec)
+    assert thinned[0] == raw[0]
+    assert abs(thinned[-1] - raw[-1]) < 1e-9
+
+    gaps = [thinned[i + 1] - thinned[i] for i in range(len(thinned) - 1)]
+    median_raw = statistics.median(
+        [raw[i + 1] - raw[i] for i in range(len(raw) - 1)]
+    )
+    assert median_raw == pytest.approx(2.0, abs=0.05)
+    assert min(gaps) >= 0.75 * median_raw - 1e-6
+    # Dense 0.25s chatter in the middle must not survive thinning.
+    middle = [g for t0, _t1, g in zip(thinned, thinned[1:], gaps) if 24.0 <= t0 < 28.0]
+    assert middle
+    assert min(middle) >= 1.4
+
+
+@pytest.mark.parametrize("builder", ALL_BUILDERS)
+def test_compose_dense_middle_respects_second_floors(builder) -> None:
+    duration_sec = 60.0
+    slots = _slots(4)
+    raw = _dense_middle_bars(duration_sec)
+    thinned = thin_bar_times_for_arrange(raw, duration_sec)
+    lanes = builder(slots, duration_sec, random.Random(7), bar_times=raw)
+    _assert_lanes_cover_slots(lanes, slots)
+    _assert_never_zero(lanes, slots, duration_sec)
+    _assert_cues_on_bars(lanes, thinned)
+    _assert_min_gaps(lanes, raw, duration_sec)
+    times = _all_transition_times(lanes)
+    dense_region_cues = [t for t in times if 24.0 <= t < 28.0]
+    for prev, cur in zip(dense_region_cues, dense_region_cues[1:]):
+        assert cur - prev >= MIN_SWITCH_GAP_SEC - 1e-6
+
+
 @pytest.mark.parametrize("builder", ALL_BUILDERS)
 @pytest.mark.parametrize("n", range(1, 9))
 @pytest.mark.parametrize("duration_sec", _DURATIONS)
@@ -185,8 +252,9 @@ def test_preset_invariants(builder, n: int, duration_sec: float) -> None:
     assert lanes
     _assert_lanes_cover_slots(lanes, slots)
     _assert_never_zero(lanes, slots, duration_sec)
-    _assert_cues_on_bars(lanes, bars)
-    _assert_min_bar_gap(lanes, bars)
+    thinned = thin_bar_times_for_arrange(bars, duration_sec)
+    _assert_cues_on_bars(lanes, thinned if thinned else bars)
+    _assert_min_gaps(lanes, bars, duration_sec)
     if n == 1:
         assert lanes[slots[0]].baseline is True
         assert lanes[slots[0]].cues == []
