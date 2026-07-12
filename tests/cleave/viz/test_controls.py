@@ -1550,6 +1550,20 @@ def _focus_timeline_snap_bars(controls: TuningControls) -> None:
     controls.focus_descriptor = _desc(view, snap_row)
 
 
+def _focus_timeline_snap_song_markers(controls: TuningControls) -> None:
+    controls.session.timeline.panel_open = True
+    view = controls.build_view_state(paused=False)
+    snap_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
+    controls.focus_descriptor = _desc(view, snap_row)
+
+
+def _focus_timeline_snap_marker_proximity(controls: TuningControls) -> None:
+    controls.session.timeline.panel_open = True
+    view = controls.build_view_state(paused=False)
+    row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_MARKER_PROXIMITY)
+    controls.focus_descriptor = _desc(view, row)
+
+
 def _focus_timeline_bar_phase(controls: TuningControls) -> None:
     controls.session.timeline.panel_open = True
     view = controls.build_view_state(paused=False)
@@ -1974,6 +1988,163 @@ def test_timeline_snap_bars_no_bars_notifies() -> None:
     assert view.notification_message == "No bars available; re-run separate"
 
 
+def test_timeline_snap_song_markers_enter_opens_choice_modal() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    controls.session.song_markers.times = [10.0, 40.0]
+    controls.session.timeline.lanes = {
+        "layer_1": _lane(None, (9.0, True)),
+    }
+    _focus_timeline_snap_song_markers(controls)
+    assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+    modal_view = controls.modal_host.view_state()
+    assert modal_view is not None
+    assert modal_view.kind == ModalKind.CHOICE
+    assert modal_view.options == (
+        "Layer 1",
+        "Layer 2",
+        "All layers (closest wins)",
+        "Each layer",
+        "Cancel",
+    )
+    assert "within 5.0s" in modal_view.message
+
+
+def test_timeline_snap_song_markers_layer_mutates_only_that_lane() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    controls.session.song_markers.times = [5.0]
+    controls.session.timeline.lanes = {
+        "layer_1": _lane(None, (4.0, True)),
+        "layer_2": _lane(None, (4.2, False)),
+    }
+    _focus_timeline_snap_song_markers(controls)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    _choose_modal_option(controls, "Layer 1")
+    assert not controls.modal_host.active
+    assert controls.session.timeline.lanes["layer_1"].cues == [
+        SlotCue(t=5.0, visible=True),
+    ]
+    assert controls.session.timeline.lanes["layer_2"].cues == [
+        SlotCue(t=4.2, visible=False),
+    ]
+    view = controls.build_view_state(paused=False)
+    assert view.notification_message == "Snapped 1 cue to song markers"
+
+
+def test_timeline_snap_song_markers_each_layer_vs_closest_wins() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    controls.session.song_markers.times = [5.0]
+    controls.session.timeline.lanes = {
+        "layer_1": _lane(None, (4.5, True)),
+        "layer_2": _lane(None, (4.8, False)),
+    }
+    _focus_timeline_snap_song_markers(controls)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    _choose_modal_option(controls, "Each layer")
+    assert controls.session.timeline.lanes["layer_1"].cues == [
+        SlotCue(t=5.0, visible=True),
+    ]
+    assert controls.session.timeline.lanes["layer_2"].cues == [
+        SlotCue(t=5.0, visible=False),
+    ]
+    view = controls.build_view_state(paused=False)
+    assert view.notification_message == "Snapped 2 cues to song markers"
+
+    controls.session.timeline.lanes = {
+        "layer_1": _lane(None, (4.5, True)),
+        "layer_2": _lane(None, (4.8, False)),
+    }
+    _focus_timeline_snap_song_markers(controls)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    _choose_modal_option(controls, "All layers (closest wins)")
+    assert controls.session.timeline.lanes["layer_1"].cues == [
+        SlotCue(t=4.5, visible=True),
+    ]
+    assert controls.session.timeline.lanes["layer_2"].cues == [
+        SlotCue(t=5.0, visible=False),
+    ]
+    view = controls.build_view_state(paused=False)
+    assert view.notification_message == "Snapped 1 cue to song markers"
+
+
+def test_timeline_snap_song_markers_recording_blocks() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.song_markers.times = [5.0]
+    prior = {"layer_1": _lane(None, (4.0, True))}
+    controls.session.timeline.lanes = dict(prior)
+    controls.session.timeline.recording = True
+    _focus_timeline_snap_song_markers(controls)
+    assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+    assert not controls.modal_host.active
+    assert controls.session.timeline.lanes == prior
+    view = controls.build_view_state(paused=False)
+    assert view.notification_message is None
+
+
+def test_timeline_snap_song_markers_no_markers_notifies() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.song_markers.times = []
+    controls.session.timeline.lanes = {
+        "layer_1": _lane(None, (4.0, True)),
+    }
+    _focus_timeline_snap_song_markers(controls)
+    assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+    assert not controls.modal_host.active
+    view = controls.build_view_state(paused=False)
+    assert view.notification_message == "No song markers to snap to"
+
+
+def test_timeline_snap_song_markers_no_cues_notifies() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.song_markers.times = [5.0]
+    controls.session.timeline.lanes = {}
+    _focus_timeline_snap_song_markers(controls)
+    assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+    assert not controls.modal_host.active
+    view = controls.build_view_state(paused=False)
+    assert view.notification_message == "No timeline cues to snap"
+
+
+def test_timeline_snap_marker_proximity_left_right() -> None:
+    controls = _make_controls(("layer_1",))
+    assert controls.session.timeline.song_marker_snap_proximity == 5.0
+    _focus_timeline_snap_marker_proximity(controls)
+    view = controls.build_view_state(paused=False)
+    prox_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_MARKER_PROXIMITY)
+    assert "5.0s" in _row_text(view, prox_row)
+
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert controls.session.timeline.song_marker_snap_proximity == 5.5
+    assert controls.handle_keydown(_keydown(pygame.K_LEFT)) is True
+    assert controls.session.timeline.song_marker_snap_proximity == 5.0
+
+    controls.session.timeline.song_marker_snap_proximity = 0.5
+    assert controls.handle_keydown(_keydown(pygame.K_LEFT)) is True
+    assert controls.session.timeline.song_marker_snap_proximity == 0.5
+    controls.session.timeline.song_marker_snap_proximity = 30.0
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert controls.session.timeline.song_marker_snap_proximity == 30.0
+
+
+def test_timeline_snap_song_markers_uses_proximity() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.song_markers.times = [5.0]
+    controls.session.timeline.song_marker_snap_proximity = 1.0
+    controls.session.timeline.lanes = {
+        "layer_1": _lane(None, (3.0, True)),
+    }
+    _focus_timeline_snap_song_markers(controls)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    modal_view = controls.modal_host.view_state()
+    assert modal_view is not None
+    assert "within 1.0s" in modal_view.message
+    _choose_modal_option(controls, "Layer 1")
+    assert controls.session.timeline.lanes["layer_1"].cues == [
+        SlotCue(t=3.0, visible=True),
+    ]
+    view = controls.build_view_state(paused=False)
+    assert view.notification_message == "No cues within snap proximity"
+
+
 def test_render_timeline_header_label_spacing() -> None:
     controls = _make_controls()
     view = controls.build_view_state(paused=False)
@@ -2108,6 +2279,8 @@ def test_render_timeline_down_enters_submenu() -> None:
     grid_row = view.layout.find_by_kind(RowKind.TIMELINE_BAR_GRID)
     snap_beats_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_BEATS)
     snap_bars_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_BARS)
+    snap_prox_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_MARKER_PROXIMITY)
+    snap_markers_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
     controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.focus_row = 2
 
@@ -2136,6 +2309,14 @@ def test_render_timeline_down_enters_submenu() -> None:
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_descriptor == _desc(view, snap_prox_row)
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_descriptor == _desc(view, snap_markers_row)
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.session.timeline.focus_row == 0
     assert controls.focus_descriptor == _desc(view, header_row)
@@ -2149,6 +2330,8 @@ def test_render_timeline_down_enters_submenu_and_routes_keys() -> None:
     controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.focus_row = 2
 
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     controls.handle_keydown(_keydown(pygame.K_DOWN))
@@ -2283,7 +2466,7 @@ def test_render_timeline_submenu_up_returns_to_header() -> None:
 
     assert not isinstance(controls.focus_cursor, TimelineFocus)
     view = controls.build_view_state(paused=False)
-    assert controls.focus_descriptor == RowDescriptor(RowKind.TIMELINE_SNAP_TO_BARS)
+    assert controls.focus_descriptor == RowDescriptor(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
 
 
 def test_render_timeline_submenu_entry_stops_repeat_on_keyup() -> None:
@@ -2292,8 +2475,8 @@ def test_render_timeline_submenu_entry_stops_repeat_on_keyup() -> None:
     controls = _make_controls(timeline_enabled=True)
     controls.session.timeline.panel_open = True
     view = controls.build_view_state(paused=False)
-    snap_bars_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_BARS)
-    controls.focus_descriptor = _desc(view, snap_bars_row)
+    snap_markers_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
+    controls.focus_descriptor = _desc(view, snap_markers_row)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert isinstance(controls.focus_cursor, TimelineFocus)
@@ -2393,6 +2576,8 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
         RowKind.TIMELINE_BAR_GRID,
         RowKind.TIMELINE_SNAP_TO_BEATS,
         RowKind.TIMELINE_SNAP_TO_BARS,
+        RowKind.TIMELINE_SNAP_MARKER_PROXIMITY,
+        RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
     ):
         row = view.layout.find_by_kind(kind)
         assert _row_value_color(view, row) == DISABLED, kind

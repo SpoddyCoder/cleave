@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from typing import Literal
 
 import numpy as np
 
@@ -305,3 +306,97 @@ def snap_lane_to_beats(
         baseline=lane.baseline,
         cues=canonicalize(lane.baseline, snapped),
     )
+
+
+SongMarkerSnapMode = Literal["each_layer", "closest_wins"]
+
+
+def snap_lanes_to_song_markers(
+    lanes: Mapping[str, TimelineLane],
+    song_marker_times: Sequence[float],
+    *,
+    proximity: float,
+    layer_z_order: Sequence[str],
+    slots: Sequence[str],
+    mode: SongMarkerSnapMode = "each_layer",
+) -> tuple[dict[str, TimelineLane], int]:
+    """Move closest cues within ``proximity`` onto song markers; exclusive claims.
+
+    Markers are processed in ascending time. Each cue moves at most once.
+    ``each_layer`` claims per lane; ``closest_wins`` shares one claim set across
+    ``slots`` (tie: earlier cue time, then earlier ``layer_z_order`` index).
+
+    Returns updated lanes for ``slots`` (other keys unchanged) and move count.
+    """
+    result = {slot: copy_lane(lane) for slot, lane in lanes.items()}
+    if proximity <= 0 or not song_marker_times or not slots:
+        return result, 0
+
+    markers = sorted(float(t) for t in song_marker_times)
+    target_slots = [slot for slot in slots if slot]
+    if not target_slots:
+        return result, 0
+
+    for slot in target_slots:
+        if slot not in result:
+            result[slot] = empty_lane()
+
+    working: dict[str, list[SlotCue]] = {
+        slot: list(result[slot].cues) for slot in target_slots
+    }
+    moved = 0
+
+    if mode == "each_layer":
+        for slot in target_slots:
+            claimed: set[int] = set()
+            cues = working[slot]
+            for marker in markers:
+                best_i: int | None = None
+                best_key: tuple[float, float] | None = None
+                for i, cue in enumerate(cues):
+                    if i in claimed:
+                        continue
+                    dist = abs(cue.t - marker)
+                    if dist > proximity:
+                        continue
+                    key = (dist, cue.t)
+                    if best_key is None or key < best_key:
+                        best_i = i
+                        best_key = key
+                if best_i is None:
+                    continue
+                old = cues[best_i]
+                cues[best_i] = SlotCue(t=marker, visible=old.visible)
+                claimed.add(best_i)
+                moved += 1
+    else:
+        z_index = {slot: i for i, slot in enumerate(layer_z_order)}
+        claimed_pairs: set[tuple[str, int]] = set()
+        for marker in markers:
+            best: tuple[float, float, int, str, int] | None = None
+            for slot in target_slots:
+                cues = working[slot]
+                for i, cue in enumerate(cues):
+                    if (slot, i) in claimed_pairs:
+                        continue
+                    dist = abs(cue.t - marker)
+                    if dist > proximity:
+                        continue
+                    key = (dist, cue.t, z_index.get(slot, len(layer_z_order)), slot, i)
+                    if best is None or key < best:
+                        best = key
+            if best is None:
+                continue
+            _dist, _t, _z, slot, cue_i = best
+            old = working[slot][cue_i]
+            working[slot][cue_i] = SlotCue(t=marker, visible=old.visible)
+            claimed_pairs.add((slot, cue_i))
+            moved += 1
+
+    for slot in target_slots:
+        baseline = result[slot].baseline
+        result[slot] = TimelineLane(
+            baseline=baseline,
+            cues=canonicalize(baseline, working[slot]),
+        )
+    return result, moved

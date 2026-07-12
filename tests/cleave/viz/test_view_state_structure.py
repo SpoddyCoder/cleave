@@ -148,12 +148,16 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     bar_grid = RowDescriptor(RowKind.TIMELINE_BAR_GRID)
     snap_beats = RowDescriptor(RowKind.TIMELINE_SNAP_TO_BEATS)
     snap_bars = RowDescriptor(RowKind.TIMELINE_SNAP_TO_BARS)
+    snap_prox = RowDescriptor(RowKind.TIMELINE_SNAP_MARKER_PROXIMITY)
+    snap_markers = RowDescriptor(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
     markers_header = RowDescriptor(RowKind.SONG_MARKERS_HEADER)
     assert presets not in view_closed.layout.rows
     assert bar_phase not in view_closed.layout.rows
     assert bar_grid not in view_closed.layout.rows
     assert snap_beats not in view_closed.layout.rows
     assert snap_bars not in view_closed.layout.rows
+    assert snap_prox not in view_closed.layout.rows
+    assert snap_markers not in view_closed.layout.rows
     assert markers_header not in view_closed.layout.rows
 
     session.timeline.panel_open = True
@@ -164,18 +168,24 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert bar_grid in view_open.layout.rows
     assert snap_beats in view_open.layout.rows
     assert snap_bars in view_open.layout.rows
+    assert snap_prox in view_open.layout.rows
+    assert snap_markers in view_open.layout.rows
     assert markers_header in view_open.layout.rows
     presets_idx = view_open.layout.rows.index(presets)
     bar_phase_idx = view_open.layout.rows.index(bar_phase)
     bar_grid_idx = view_open.layout.rows.index(bar_grid)
     snap_beats_idx = view_open.layout.rows.index(snap_beats)
     snap_bars_idx = view_open.layout.rows.index(snap_bars)
+    snap_prox_idx = view_open.layout.rows.index(snap_prox)
+    snap_markers_idx = view_open.layout.rows.index(snap_markers)
     markers_idx = view_open.layout.rows.index(markers_header)
     assert presets_idx == markers_idx + 1
     assert bar_phase_idx == presets_idx + 1
     assert bar_grid_idx == bar_phase_idx + 1
     assert snap_beats_idx == bar_grid_idx + 1
     assert snap_bars_idx == snap_beats_idx + 1
+    assert snap_prox_idx == snap_bars_idx + 1
+    assert snap_markers_idx == snap_prox_idx + 1
 
     session.timeline.panel_open = False
     view_closed_again = builder.build(paused=False)
@@ -185,6 +195,8 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert bar_grid not in view_closed_again.layout.rows
     assert snap_beats not in view_closed_again.layout.rows
     assert snap_bars not in view_closed_again.layout.rows
+    assert snap_prox not in view_closed_again.layout.rows
+    assert snap_markers not in view_closed_again.layout.rows
     assert markers_header not in view_closed_again.layout.rows
 
 
