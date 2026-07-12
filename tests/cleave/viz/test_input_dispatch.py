@@ -127,6 +127,7 @@ def test_ctrl_s_opens_save_dialog_from_timeline_context() -> None:
 
 def test_ctrl_enter_drops_song_marker_from_timeline_context() -> None:
     runtime = _make_runtime()
+    prior_focus = runtime.controls.focus_cursor
     runtime.controls.playback.player.seek(12.5)
     assert dispatch_keydown(
         keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL),
@@ -134,12 +135,10 @@ def test_ctrl_enter_drops_song_marker_from_timeline_context() -> None:
     ) is True
     markers = runtime.seed.session.song_markers
     assert markers.times == [12.5]
-    assert markers.selected_index == 0
+    assert markers.selected_index is None
     assert markers.expanded is True
     assert runtime.seed.session.timeline.panel_open is True
-    assert runtime.controls.focus_descriptor == RowDescriptor(
-        RowKind.SONG_MARKER_ITEM, marker_index=0
-    )
+    assert runtime.controls.focus_cursor == prior_focus
 
 
 def test_ctrl_enter_refused_while_recording() -> None:

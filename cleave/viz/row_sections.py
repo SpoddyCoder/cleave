@@ -666,13 +666,13 @@ RENDER_POST_FX_SECTION_KINDS = kinds_in_expand_section(RENDER_POST_FX_SECTION)
 RENDER_TIMELINE_SECTION_KINDS = frozenset(
     {
         RowKind.RENDER_TIMELINE_HEADER,
+        RowKind.SONG_MARKERS_HEADER,
+        RowKind.SONG_MARKER_ITEM,
         RowKind.TIMELINE_PRESETS,
         RowKind.TIMELINE_BAR_PHASE,
         RowKind.TIMELINE_BAR_GRID,
         RowKind.TIMELINE_SNAP_TO_BEATS,
         RowKind.TIMELINE_SNAP_TO_BARS,
-        RowKind.SONG_MARKERS_HEADER,
-        RowKind.SONG_MARKER_ITEM,
     }
 )
 
@@ -710,13 +710,13 @@ def _build_row_tree_indent_depth() -> dict[RowKind, int]:
     depths[RowKind.TRACK_EFFECT] = 2
     depths[RowKind.TRACK_USER_PRESET_ITEM] = 7
     depths[RowKind.TRACK_USER_PRESET_ADD] = 3
+    depths[RowKind.SONG_MARKERS_HEADER] = 1
+    depths[RowKind.SONG_MARKER_ITEM] = 2
     depths[RowKind.TIMELINE_PRESETS] = 1
     depths[RowKind.TIMELINE_BAR_PHASE] = 1
     depths[RowKind.TIMELINE_BAR_GRID] = 1
     depths[RowKind.TIMELINE_SNAP_TO_BEATS] = 1
     depths[RowKind.TIMELINE_SNAP_TO_BARS] = 1
-    depths[RowKind.SONG_MARKERS_HEADER] = 1
-    depths[RowKind.SONG_MARKER_ITEM] = 2
     return depths
 
 
@@ -830,12 +830,12 @@ def append_render_section_rows(
                 node.panel_anchor.header_kind == RowKind.RENDER_TIMELINE_HEADER
                 and state.render_timeline.expanded
             ):
+                append_expand_section_rows(row_list, SONG_MARKERS_SECTION, state)
                 row_list.append(RowDescriptor(RowKind.TIMELINE_PRESETS))
                 row_list.append(RowDescriptor(RowKind.TIMELINE_BAR_PHASE))
                 row_list.append(RowDescriptor(RowKind.TIMELINE_BAR_GRID))
                 row_list.append(RowDescriptor(RowKind.TIMELINE_SNAP_TO_BEATS))
                 row_list.append(RowDescriptor(RowKind.TIMELINE_SNAP_TO_BARS))
-                append_expand_section_rows(row_list, SONG_MARKERS_SECTION, state)
 
 
 def append_track_section_rows(

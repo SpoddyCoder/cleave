@@ -171,11 +171,11 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     snap_beats_idx = view_open.layout.rows.index(snap_beats)
     snap_bars_idx = view_open.layout.rows.index(snap_bars)
     markers_idx = view_open.layout.rows.index(markers_header)
+    assert presets_idx == markers_idx + 1
     assert bar_phase_idx == presets_idx + 1
     assert bar_grid_idx == bar_phase_idx + 1
     assert snap_beats_idx == bar_grid_idx + 1
     assert snap_bars_idx == snap_beats_idx + 1
-    assert markers_idx == snap_bars_idx + 1
 
     session.timeline.panel_open = False
     view_closed_again = builder.build(paused=False)
