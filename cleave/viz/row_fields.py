@@ -90,6 +90,22 @@ def _format_settings_ui_fade(
     return ui_fade_display(state.settings.ui_fade)
 
 
+def _format_timeline_bar_phase(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return f"+{state.render_timeline.bar_phase_offset}"
+
+
+def _apply_timeline_bar_phase(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls._timeline_phase.nudge(forward=forward)
+
+
 def _apply_settings_preview_quality(
     controls: TuningControls,
     _desc: RowDescriptor,
@@ -1262,6 +1278,12 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
     RowKind.TIMELINE_PRESETS: RowFieldDef(
         panel_label="apply a preset",
         present_style=RowPresentStyle.FULL_LINE,
+    ),
+    RowKind.TIMELINE_BAR_PHASE: RowFieldDef(
+        panel_label="bar phase",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_timeline_bar_phase,
+        apply_horizontal=_apply_timeline_bar_phase,
     ),
     RowKind.TIMELINE_SNAP_TO_BEATS: RowFieldDef(
         panel_label="snap to beats",

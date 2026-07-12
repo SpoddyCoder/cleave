@@ -103,7 +103,7 @@ Note: use `--help` on any command for options.
 * Press `h` to show context sensitive help and controls.
 * The editor may run at low frame rates with multiple layers - some Milkdrop presets use a lot of CPU.
   * Change the `preview quality` in the Editor Settings menu.
-  * The final render will still be at full quality.
+  * The final render will still be at full quality and full frame rate.
 
 #### Preset curation
 

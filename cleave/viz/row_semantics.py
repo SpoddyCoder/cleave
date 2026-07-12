@@ -75,6 +75,7 @@ class RowKind(Enum):
     RENDER_POST_FX_CHROMA_BOOST_AMOUNT = auto()
     RENDER_TIMELINE_HEADER = auto()
     TIMELINE_PRESETS = auto()
+    TIMELINE_BAR_PHASE = auto()
     TIMELINE_SNAP_TO_BEATS = auto()
     TIMELINE_SNAP_TO_BARS = auto()
     SETTINGS_HEADER = auto()
@@ -693,6 +694,21 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         ),
         help_mode_entries=TIMELINE_PRESET_HELP_ENTRIES,
     ),
+    RowKind.TIMELINE_BAR_PHASE: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        repeatable=True,
+        help_title="Bar phase",
+        help_entries=(
+            ("Left", "shift cues -1 beat"),
+            ("Right", "shift cues +1 beat"),
+        ),
+        help_description=(
+            "Nudge all committed timeline cues by one beat;",
+            "sticky session offset +0..+3 (mod 4).",
+            "Presets regenerate on this phase-shifted bar grid.",
+        ),
+    ),
     RowKind.TIMELINE_SNAP_TO_BEATS: RowBehavior(
         RowAffordance.ACTION,
         navigable=True,
@@ -707,11 +723,10 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.ACTION,
         navigable=True,
         help_title="Snap to bars",
-        help_entries=(("Enter", "choose bar phase"),),
+        help_entries=(("Enter", "snap cues to bars"),),
         help_description=(
-            "Snap all committed timeline cues to the nearest bar;",
-            "Enter opens a bar-phase choice +0..+3 (irreversible).",
-            "Phases are subsets of the beat grid.",
+            "Snap all committed timeline cues to the nearest bar",
+            "(irreversible).",
         ),
     ),
     RowKind.SETTINGS_HEADER: RowBehavior(

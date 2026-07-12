@@ -6,7 +6,9 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass
 
-MIN_SWITCH_GAP_SEC = 6.0
+MIN_SWITCH_GAP_BARS = 2
+PHRASE_BARS_MIN = 4
+PHRASE_BARS_MAX = 8
 PHI = (1.0 + math.sqrt(5.0)) / 2.0
 
 

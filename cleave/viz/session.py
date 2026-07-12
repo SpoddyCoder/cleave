@@ -142,6 +142,7 @@ class TimelineRuntime:
     override_slots: set[str] = field(default_factory=set)
     override_visible: dict[str, bool] = field(default_factory=dict)
     arm_flash_start_ms: dict[str, int] = field(default_factory=dict)
+    bar_phase_offset: int = 0
 
 
 def default_timeline_runtime() -> TimelineRuntime:

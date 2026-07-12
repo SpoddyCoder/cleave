@@ -7,7 +7,9 @@ from collections.abc import Sequence
 
 from cleave.timeline import TimelineLane
 from cleave.timeline_presets.busyness import (
-    MIN_SWITCH_GAP_SEC,
+    MIN_SWITCH_GAP_BARS,
+    PHRASE_BARS_MAX,
+    PHRASE_BARS_MIN,
     CharacterProfile,
     in_climax_window,
 )
@@ -27,6 +29,7 @@ def compose_timeline(
     duration_sec: float,
     profile: CharacterProfile,
     rng: random.Random,
+    bar_times: Sequence[float],
 ) -> dict[str, TimelineLane]:
     slot_list = list(slots)
     if not slot_list or duration_sec <= 0.0:
@@ -39,11 +42,12 @@ def compose_timeline(
     vocab = build_vocab(order)
     motifs = motifs_for_profile(profile.motif_ids)
 
-    if duration_sec <= MIN_SWITCH_GAP_SEC:
+    bars = [t for t in bar_times if 0.0 <= t < duration_sec - 1e-9]
+    if len(bars) < PHRASE_BARS_MIN:
         opening = frozenset({order[0]})
         return cues_from_states(slot_list, [(0.0, opening)])
 
-    phrases = _partition_phrases(duration_sec, rng)
+    phrases = _partition_phrases(bars, duration_sec, rng)
     if not phrases:
         opening = frozenset({order[0]})
         return cues_from_states(slot_list, [(0.0, opening)])
@@ -101,58 +105,104 @@ def compose_timeline(
             solo_rotation,
             phrase_start,
             phrase_end,
-            MIN_SWITCH_GAP_SEC,
+            bars,
             duration_sec=duration_sec,
             prev_time=states[-1][0] if states else None,
+            min_gap_bars=MIN_SWITCH_GAP_BARS,
         )
         solo_rotation += len(phrase_states)
 
         for t, active in phrase_states:
             if prev_active is not None and active == prev_active:
                 continue
-            if states and t - states[-1][0] < MIN_SWITCH_GAP_SEC:
-                t = states[-1][0] + MIN_SWITCH_GAP_SEC
+            if states:
+                t = _enforce_min_bar_gap(bars, states[-1][0], t, MIN_SWITCH_GAP_BARS)
+                if t is None:
+                    continue
             if t >= duration_sec:
                 break
             states.append((t, active))
             prev_active = active
-            phrase_dur = max(phrase_end - phrase_start, MIN_SWITCH_GAP_SEC * 0.5)
+            phrase_dur = max(phrase_end - phrase_start, 1e-6)
             for slot in active:
                 layer_airtime[slot] = layer_airtime.get(slot, 0.0) + phrase_dur / len(active)
 
-    if not states or states[0][0] != 0.0:
-        opening = states[0][1] if states else frozenset({order[0]})
-        if states and states[0][0] != 0.0:
-            states.insert(0, (0.0, opening))
-        elif not states:
-            states = [(0.0, opening)]
+    if not states:
+        opening = frozenset({order[0]})
+        states = [(0.0, opening)]
+    elif states[0][0] != 0.0:
+        states.insert(0, (0.0, states[0][1]))
 
-    _apply_resolve(profile, vocab, states, duration_sec, rng)
+    _apply_resolve(profile, vocab, states, duration_sec, bars, rng)
     states.sort(key=lambda item: item[0])
 
     return cues_from_states(slot_list, states)
 
 
-def _partition_phrases(duration_sec: float, rng: random.Random) -> list[tuple[float, float]]:
+def _partition_phrases(
+    bars: Sequence[float],
+    duration_sec: float,
+    rng: random.Random,
+) -> list[tuple[float, float]]:
     phrases: list[tuple[float, float]] = []
-    t = 0.0
-    while t < duration_sec - 1e-6:
-        remaining = duration_sec - t
-        if remaining <= MIN_SWITCH_GAP_SEC:
-            break
-        target = rng.uniform(8.0, min(16.0, remaining))
-        if remaining - target < MIN_SWITCH_GAP_SEC * 0.5 and len(phrases) > 0:
+    i = 0
+    n = len(bars)
+    while i < n:
+        remaining = n - i
+        if remaining <= PHRASE_BARS_MAX:
             target = remaining
-        phrase_end = min(t + target, duration_sec)
-        if phrase_end - t < MIN_SWITCH_GAP_SEC * 0.75 and phrases:
-            phrase_end = duration_sec
-        if phrase_end - t < 1e-6:
+        else:
+            target = rng.randint(PHRASE_BARS_MIN, PHRASE_BARS_MAX)
+            leftover = remaining - target
+            if 0 < leftover < PHRASE_BARS_MIN:
+                target = remaining
+
+        start = bars[i]
+        end_i = i + target
+        end = bars[end_i] if end_i < n else duration_sec
+        if end - start < 1e-6:
             break
-        phrases.append((t, phrase_end))
-        t = phrase_end
-        if t >= duration_sec - 1e-6:
+        phrases.append((start, end))
+        i = end_i
+        if end >= duration_sec - 1e-6:
             break
     return phrases
+
+
+def _nearest_bar_index(t: float, bars: Sequence[float]) -> int:
+    return min(range(len(bars)), key=lambda i: (abs(bars[i] - t), bars[i]))
+
+
+def _enforce_min_bar_gap(
+    bars: Sequence[float],
+    prev_t: float,
+    t: float,
+    min_gap_bars: int,
+) -> float | None:
+    if not bars:
+        return None
+    prev_idx = _nearest_bar_index(prev_t, bars)
+    t_idx = _nearest_bar_index(t, bars)
+    need_idx = prev_idx + min_gap_bars
+    if t_idx < need_idx:
+        if need_idx >= len(bars):
+            return None
+        return bars[need_idx]
+    return bars[t_idx]
+
+
+def _bar_after_gap(
+    bars: Sequence[float],
+    from_t: float,
+    gap_bars: int,
+) -> float | None:
+    if not bars:
+        return None
+    idx = _nearest_bar_index(from_t, bars)
+    target = idx + gap_bars
+    if target >= len(bars):
+        return None
+    return bars[target]
 
 
 def _climax_phrase_index(
@@ -250,12 +300,13 @@ def _apply_resolve(
     vocab: ChordVocab,
     states: list[tuple[float, frozenset[str]]],
     duration_sec: float,
+    bars: Sequence[float],
     rng: random.Random,
 ) -> None:
     """End-state shaping: Arc resolves to sparse; never tutti at song end."""
     if profile.name != "arc" or not states:
         return
-    if duration_sec < MIN_SWITCH_GAP_SEC * 3:
+    if len(bars) < PHRASE_BARS_MIN * 2:
         return
 
     last_t, last_active = states[-1]
@@ -272,8 +323,8 @@ def _apply_resolve(
     if len(vocab.slots) <= 1:
         return
 
-    final_t = states[-1][0] + MIN_SWITCH_GAP_SEC
-    if final_t >= duration_sec:
+    final_t = _bar_after_gap(bars, states[-1][0], MIN_SWITCH_GAP_BARS)
+    if final_t is None or final_t >= duration_sec:
         return
     solo = vocab.active_for(vocab.singles[rng.randint(0, len(vocab.singles) - 1)])
     if last_active != solo:

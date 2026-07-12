@@ -65,6 +65,7 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.SETTINGS_UI_WIDTH_MODE,
         RowKind.SETTINGS_UI_WIDTH,
         RowKind.SETTINGS_UI_FADE,
+        RowKind.TIMELINE_BAR_PHASE,
     }
 )
 
