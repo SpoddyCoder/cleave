@@ -31,7 +31,7 @@ def test_load_signals_minimal_fixture(
     minimal_signals_json_path: Path,
 ) -> None:
     raw = json.loads(minimal_signals_json_path.read_text(encoding="utf-8"))
-    assert raw["version"] == 2
+    assert raw["version"] == 3
 
     signals = load_signals(minimal_signals_json_path)
 
@@ -39,6 +39,7 @@ def test_load_signals_minimal_fixture(
     assert signals.sample_rate_hz == 100.0
     assert signals.duration_sec == pytest.approx(0.14)
     assert signals.beat_times == (0.0, 0.5, 1.0)
+    assert signals.downbeat_times == (0.0, 1.0)
 
     pitch = signals.array("vocals", "pitch_hz")
     assert math.isnan(pitch[2])
@@ -55,7 +56,7 @@ def test_load_signals_missing_beat_times_defaults_empty(tmp_path: Path) -> None:
     path.write_text(
         json.dumps(
             {
-                "version": 2,
+                "version": 3,
                 "sample_rate_hz": 100,
                 "duration_sec": 0.1,
                 "drums": {"onset_strength": [0.0]},
@@ -69,6 +70,7 @@ def test_load_signals_missing_beat_times_defaults_empty(tmp_path: Path) -> None:
     )
     signals = load_signals(path)
     assert signals.beat_times == ()
+    assert signals.downbeat_times == ()
 
 
 def test_load_signals_rejects_version_1(tmp_path: Path) -> None:
@@ -91,12 +93,34 @@ def test_load_signals_rejects_version_1(tmp_path: Path) -> None:
         load_signals(path)
 
 
-def test_load_signals_rejects_missing_full_mix(tmp_path: Path) -> None:
+def test_load_signals_rejects_version_2(tmp_path: Path) -> None:
     path = tmp_path / "signals.json"
     path.write_text(
         json.dumps(
             {
                 "version": 2,
+                "sample_rate_hz": 100,
+                "duration_sec": 0.1,
+                "beat_times": [0.0, 0.5],
+                "drums": {"onset_strength": [0.0]},
+                "bass": {"rms": [0.0], "sub_bass": [0.0], "mid_bass": [0.0]},
+                "vocals": {"rms": [0.0], "pitch_hz": [220.0]},
+                "other": {"spectral_centroid": [1000.0]},
+                "full_mix": {"onset_strength": [0.0], "rms": [0.0]},
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="unsupported signals.json version"):
+        load_signals(path)
+
+
+def test_load_signals_rejects_missing_full_mix(tmp_path: Path) -> None:
+    path = tmp_path / "signals.json"
+    path.write_text(
+        json.dumps(
+            {
+                "version": 3,
                 "sample_rate_hz": 100,
                 "duration_sec": 0.1,
                 "drums": {"onset_strength": [0.0]},

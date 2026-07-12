@@ -8,8 +8,10 @@ from pathlib import Path
 
 import numpy as np
 
-_META_KEYS = frozenset({"version", "sample_rate_hz", "duration_sec", "beat_times"})
-SIGNALS_VERSION = 2
+_META_KEYS = frozenset(
+    {"version", "sample_rate_hz", "duration_sec", "beat_times", "downbeat_times"}
+)
+SIGNALS_VERSION = 3
 _EXPECTED_STEMS = frozenset({"drums", "bass", "vocals", "other", "full_mix"})
 _FULL_MIX_KEYS = frozenset({"onset_strength", "rms"})
 
@@ -33,6 +35,7 @@ class Signals:
     path: Path
     stems: dict[str, dict[str, np.ndarray]] = field(repr=False)
     beat_times: tuple[float, ...] = ()
+    downbeat_times: tuple[float, ...] = ()
     _normalized_cache: dict[tuple[str, str, float], np.ndarray] = field(
         default_factory=dict, init=False, repr=False
     )
@@ -123,6 +126,8 @@ def load_signals(path: Path) -> Signals:
 
     raw_beats = data.get("beat_times", [])
     beat_times = tuple(float(t) for t in raw_beats)
+    raw_downbeats = data.get("downbeat_times", [])
+    downbeat_times = tuple(float(t) for t in raw_downbeats)
 
     return Signals(
         sample_rate_hz=float(data["sample_rate_hz"]),
@@ -130,4 +135,5 @@ def load_signals(path: Path) -> Signals:
         path=signals_path,
         stems=stems,
         beat_times=beat_times,
+        downbeat_times=downbeat_times,
     )

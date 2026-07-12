@@ -1,4 +1,4 @@
-"""Per-stem librosa feature extraction at native analysis rates."""
+"""Per-stem feature extraction at native analysis rates."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ from typing import Literal, TypedDict
 
 import librosa
 import numpy as np
+import torch
+from beat_this.inference import File2Beats
 
 HOP_LENGTH = 512
 BASS_RMS_HOP_MS = 0.02
@@ -100,37 +102,18 @@ def extract_drums_onset(path: Path | str) -> tuple[np.ndarray, np.ndarray]:
     return values, times
 
 
-def extract_drums_beats(path: Path | str) -> np.ndarray:
-    """Beat times in seconds from the drum stem.
+def extract_beats_downbeats(path: Path | str) -> tuple[np.ndarray, np.ndarray]:
+    """Beat and downbeat times in seconds from the mixed source track.
 
-    Uses a per-frame tempo curve so the DP tracker can follow tempo changes.
-    Falls back to a global-tempo track if the dynamic run fails or finds no beats.
+    Runs Beat This! (`File2Beats`) on the mix path.
     """
-    y, sr = _load(path)
-    onset_env = librosa.onset.onset_strength(y=y, sr=sr, hop_length=HOP_LENGTH)
-    frames: np.ndarray
-    try:
-        dtempo = librosa.feature.tempo(
-            onset_envelope=onset_env,
-            sr=sr,
-            hop_length=HOP_LENGTH,
-            aggregate=None,
-        )
-        _tempo, frames = librosa.beat.beat_track(
-            onset_envelope=onset_env,
-            sr=sr,
-            hop_length=HOP_LENGTH,
-            bpm=dtempo,
-        )
-        if len(frames) == 0:
-            raise ValueError("dynamic beat_track returned no beats")
-    except Exception:
-        _tempo, frames = librosa.beat.beat_track(
-            onset_envelope=onset_env,
-            sr=sr,
-            hop_length=HOP_LENGTH,
-        )
-    return librosa.frames_to_time(frames, sr=sr, hop_length=HOP_LENGTH)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    file2beats = File2Beats(checkpoint_path="final0", device=device, dbn=False)
+    beats, downbeats = file2beats(str(path))
+    return (
+        np.asarray(beats, dtype=np.float64),
+        np.asarray(downbeats, dtype=np.float64),
+    )
 
 
 def extract_mix_onset(path: Path | str) -> tuple[np.ndarray, np.ndarray]:
