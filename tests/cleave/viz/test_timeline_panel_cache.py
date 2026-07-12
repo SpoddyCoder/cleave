@@ -84,6 +84,18 @@ def test_static_signature_changes_on_playhead_while_recording() -> None:
     assert _static_sig(at_start) != _static_sig(advanced)
 
 
+def test_static_signature_changes_on_show_bar_grid() -> None:
+    hidden = _view_state(show_bar_grid=False, bar_grid_times=(0.0, 4.0))
+    shown = _view_state(show_bar_grid=True, bar_grid_times=(0.0, 4.0))
+    assert _static_sig(hidden) != _static_sig(shown)
+
+
+def test_static_signature_changes_on_bar_grid_times() -> None:
+    phase0 = _view_state(show_bar_grid=True, bar_grid_times=(0.0, 4.0))
+    phase1 = _view_state(show_bar_grid=True, bar_grid_times=(1.0, 5.0))
+    assert _static_sig(phase0) != _static_sig(phase1)
+
+
 def test_compose_rebuilds_static_panel_when_recording_playhead_moves() -> None:
     pygame.init()
     overlay = TimelineOverlay()

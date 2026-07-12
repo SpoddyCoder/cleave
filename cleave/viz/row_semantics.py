@@ -76,6 +76,7 @@ class RowKind(Enum):
     RENDER_TIMELINE_HEADER = auto()
     TIMELINE_PRESETS = auto()
     TIMELINE_BAR_PHASE = auto()
+    TIMELINE_BAR_GRID = auto()
     TIMELINE_SNAP_TO_BEATS = auto()
     TIMELINE_SNAP_TO_BARS = auto()
     SETTINGS_HEADER = auto()
@@ -707,6 +708,19 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "Nudge all committed timeline cues by one beat;",
             "sticky session offset +0..+3 (mod 4).",
             "Presets regenerate on this phase-shifted bar grid.",
+        ),
+    ),
+    RowKind.TIMELINE_BAR_GRID: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        help_title="Bar grid",
+        help_entries=(
+            ("Left", "hide detected bar lines"),
+            ("Right", "show detected bar lines"),
+        ),
+        help_description=(
+            "Overlay phase-shifted detected bars on the timeline strip.",
+            "Gaps mean missing detection, not a filled regular grid.",
         ),
     ),
     RowKind.TIMELINE_SNAP_TO_BEATS: RowBehavior(

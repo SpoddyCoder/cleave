@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from cleave.timeline import (
@@ -12,6 +13,7 @@ from cleave.timeline import (
     empty_lane,
     lane_visible_at,
     punch_lane,
+    shift_bars_by_beats,
     strip_lane_range,
 )
 from cleave.viz.focus_nav import (
@@ -206,6 +208,8 @@ def build_timeline_view_state(
     duration_sec: float,
     *,
     focus_cursor: FocusCursor | None = None,
+    bar_times: Sequence[float] = (),
+    beat_times: Sequence[float] = (),
 ) -> TimelineViewState:
     tl = session.timeline
     prune_expired_arm_flashes(tl.arm_flash_start_ms)
@@ -250,4 +254,8 @@ def build_timeline_view_state(
         enabled=tl.enabled,
         submenu_focused=submenu_focused,
         arm_flash_start_ms=dict(tl.arm_flash_start_ms),
+        show_bar_grid=tl.show_bar_grid,
+        bar_grid_times=shift_bars_by_beats(
+            bar_times, beat_times, tl.bar_phase_offset
+        ),
     )

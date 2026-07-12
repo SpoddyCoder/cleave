@@ -106,6 +106,22 @@ def _apply_timeline_bar_phase(
     controls._timeline_phase.nudge(forward=forward)
 
 
+def _format_timeline_bar_grid(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return "show" if state.render_timeline.show_bar_grid else "hide"
+
+
+def _apply_timeline_bar_grid(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls.session.timeline.show_bar_grid = forward
+
+
 def _apply_settings_preview_quality(
     controls: TuningControls,
     _desc: RowDescriptor,
@@ -1284,6 +1300,12 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_timeline_bar_phase,
         apply_horizontal=_apply_timeline_bar_phase,
+    ),
+    RowKind.TIMELINE_BAR_GRID: RowFieldDef(
+        panel_label="bar grid",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_timeline_bar_grid,
+        apply_horizontal=_apply_timeline_bar_grid,
     ),
     RowKind.TIMELINE_SNAP_TO_BEATS: RowFieldDef(
         panel_label="snap to beats",

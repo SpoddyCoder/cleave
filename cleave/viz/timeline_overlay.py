@@ -35,6 +35,7 @@ from cleave.viz.theme import (
     ARMED_BG,
     BACKGROUND,
     BACKGROUND_ALPHA,
+    BAR_GRID,
     BORDER_COLOR,
     BORDER_WIDTH,
     HIGHLIGHT,
@@ -95,6 +96,8 @@ class TimelineViewState:
     enabled: bool = False
     submenu_focused: bool = False
     arm_flash_start_ms: dict[str, int] = field(default_factory=dict)
+    show_bar_grid: bool = False
+    bar_grid_times: tuple[float, ...] = ()
 
 
 def visibility_segments(
@@ -505,6 +508,17 @@ class TimelineOverlay:
         panel.fill((*BACKGROUND, BACKGROUND_ALPHA))
         font = self._font_get()
         self._row_layout = []
+
+        if state.show_bar_grid and state.bar_grid_times:
+            for t in state.bar_grid_times:
+                grid_x = time_to_x(t, bar_left, bar_width, state.duration_sec)
+                pygame.draw.line(
+                    panel,
+                    BAR_GRID,
+                    (grid_x, layout.bar_top),
+                    (grid_x, layout.bar_bottom - 1),
+                    1,
+                )
 
         for display_i in range(row_count):
             row_index = display_i

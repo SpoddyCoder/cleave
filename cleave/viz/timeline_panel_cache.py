@@ -48,6 +48,8 @@ class TimelineStaticSignature:
     panel_w: int
     panel_h: int
     visibility_bucket: int
+    show_bar_grid: bool
+    bar_grid_times: tuple[float, ...]
 
 
 @dataclass
@@ -126,6 +128,8 @@ def timeline_static_signature(
         panel_w=panel_w,
         panel_h=panel_h,
         visibility_bucket=visibility_bucket(visibility),
+        show_bar_grid=state.show_bar_grid,
+        bar_grid_times=state.bar_grid_times,
     )
 
 

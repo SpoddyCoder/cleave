@@ -129,6 +129,7 @@ class RenderTimelineBlock:
     enabled: bool = False
     expanded: bool = False
     bar_phase_offset: int = 0
+    show_bar_grid: bool = False
 
 
 @dataclass
@@ -422,6 +423,7 @@ class TuningViewStateBuilder:
             enabled=tl.enabled,
             expanded=tl.panel_open,
             bar_phase_offset=tl.bar_phase_offset,
+            show_bar_grid=tl.show_bar_grid,
         )
         layout_state = TuningViewState(
             layer_z_order=layer_z_order,
@@ -566,6 +568,7 @@ class TuningViewStateBuilder:
                 structure.render_timeline,
                 expanded=tl.panel_open,
                 bar_phase_offset=tl.bar_phase_offset,
+                show_bar_grid=tl.show_bar_grid,
             ),
             settings=replace(
                 structure.settings,

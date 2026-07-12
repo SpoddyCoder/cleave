@@ -684,6 +684,7 @@ def _build_row_tree_indent_depth() -> dict[RowKind, int]:
     depths[RowKind.TRACK_USER_PRESET_ADD] = 3
     depths[RowKind.TIMELINE_PRESETS] = 1
     depths[RowKind.TIMELINE_BAR_PHASE] = 1
+    depths[RowKind.TIMELINE_BAR_GRID] = 1
     depths[RowKind.TIMELINE_SNAP_TO_BEATS] = 1
     depths[RowKind.TIMELINE_SNAP_TO_BARS] = 1
     return depths
@@ -801,6 +802,7 @@ def append_render_section_rows(
             ):
                 row_list.append(RowDescriptor(RowKind.TIMELINE_PRESETS))
                 row_list.append(RowDescriptor(RowKind.TIMELINE_BAR_PHASE))
+                row_list.append(RowDescriptor(RowKind.TIMELINE_BAR_GRID))
                 row_list.append(RowDescriptor(RowKind.TIMELINE_SNAP_TO_BEATS))
                 row_list.append(RowDescriptor(RowKind.TIMELINE_SNAP_TO_BARS))
 
