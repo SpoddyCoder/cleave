@@ -165,8 +165,8 @@ def test_preset_file_help_titles() -> None:
     entries = dict(keyboard.entries)
     assert entries["Left/Right"] == "next/previous preset"
     assert entries["Ctrl + Left/Right"] == "next/previous large step"
-    assert entries["Ctrl + f"] == "favourite preset"
-    assert entries["Ctrl + b"] == "blacklist preset"
+    assert entries["f"] == "favourite preset"
+    assert entries["b"] == "blacklist preset"
     assert "Shift + +" not in entries
 
 
@@ -370,8 +370,8 @@ def test_user_preset_item_help() -> None:
     assert description.title == "user preset entry"
     entries = dict(keyboard.entries)
     assert entries["Delete"] == "remove preset"
-    assert entries["Ctrl + f"] == "favourite preset"
-    assert entries["Ctrl + b"] == "blacklist preset"
+    assert entries["f"] == "favourite preset"
+    assert entries["b"] == "blacklist preset"
 
 
 def test_user_preset_add_help() -> None:

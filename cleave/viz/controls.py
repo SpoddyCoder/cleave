@@ -373,7 +373,7 @@ class TuningControls:
                 self._add_current_preset(slot)
                 return True
 
-        if mod_ctrl(event.mod) and event.key in (pygame.K_f, pygame.K_b):
+        if event.key in (pygame.K_f, pygame.K_b):
             kind = self.focus_descriptor.kind
             slot = self.focus_descriptor.slot
             if slot is not None and kind in PRESET_FILE_ROW_KINDS:
