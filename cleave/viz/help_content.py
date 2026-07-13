@@ -92,8 +92,8 @@ _PRESET_DIR_SECTION = HelpSection(
 )
 
 _PRESET_CURATION_SHORTCUTS = (
-    ("Ctrl + f", "favourite preset"),
-    ("Ctrl + b", "blacklist preset"),
+    ("f", "favourite preset"),
+    ("b", "blacklist preset"),
 )
 
 _PRESET_SECTION = HelpSection(

@@ -109,8 +109,8 @@ Note: use `--help` on any command for options.
 
 While focused on a preset **file** row:
 
-* `Ctrl + f` — **copy** the preset into `favourites/` (original stays in the pack).
-* `Ctrl + b` — **move** the preset into `blacklist/` (permanently removed from pack).
+* `f` — **copy** the preset into `favourites/` (original stays in the pack).
+* `b` — **move** the preset into `blacklist/` (permanently removed from pack).
 * Both folders live under `paths.preset_root` (default `~/.local/share/cleave/presets/`).
   * Browse them in the Editor like any other pack folder. 
 * Subdirectories inside `favourites/` or `blacklist/` appear as destination choices in the confirm modal, which makes it easy to categorise them in any way you choose, eg:
@@ -189,7 +189,7 @@ Signal-driven compositor modifiers on top of each layer. Tune depths (0-100%).
 
 ## Preset Scanning (Experimental, WIP)
 
-For day-to-day curation while browsing presets, use **Ctrl + f** / **Ctrl + b** in the editor (see Preset curation above). `cleave scan` remains an experimental batch classifier; its `--quarantine` flag is separate from editor favourites/blacklist.
+For day-to-day curation while browsing presets, use **f** / **b** in the editor (see Preset curation above). `cleave scan` remains an experimental batch classifier; its `--quarantine` flag is separate from editor favourites/blacklist.
 
 Clone with submodules so preset packs are available for `cleave scan-golden --probe` and other preset work:
 
