@@ -44,8 +44,6 @@ NAVIGATION_SECTION = HelpSection(
         ("Ctrl + Q", "quit"),
         ("Ctrl + S", "save config"),
         ("Ctrl + Enter", "place song marker"),
-        ("Ctrl + f", "favourite preset"),
-        ("Ctrl + b", "blacklist preset"),
     ),
 )
 
