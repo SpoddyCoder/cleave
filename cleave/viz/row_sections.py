@@ -581,6 +581,20 @@ BEAT_BAR_GRID_SECTION = ExpandSectionDef(
     ),
 )
 
+def _timeline_fades_enabled(state: TuningViewState, _desc: RowDescriptor) -> bool:
+    return state.render_timeline.fades_enabled
+
+
+TIMELINE_FADES_ACTIVE = ConditionalRowsDef(
+    name="timeline_fades_enabled",
+    predicate=_timeline_fades_enabled,
+    children=(
+        SectionNode(leaf_kind=RowKind.TIMELINE_FADE_IN),
+        SectionNode(leaf_kind=RowKind.TIMELINE_FADE_OUT),
+        SectionNode(leaf_kind=RowKind.TIMELINE_FADES_APPLY_TO),
+    ),
+)
+
 
 def _collect_expand_sections(
     *roots: ExpandSectionDef,
@@ -720,6 +734,10 @@ RENDER_TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
         RowKind.TIMELINE_SNAP_MARKER_PROXIMITY,
         RowKind.TIMELINE_SNAP_MARKER_SCOPE,
+        RowKind.TIMELINE_FADES,
+        RowKind.TIMELINE_FADE_IN,
+        RowKind.TIMELINE_FADE_OUT,
+        RowKind.TIMELINE_FADES_APPLY_TO,
     }
 )
 
@@ -763,6 +781,8 @@ def _build_row_tree_indent_depth() -> dict[RowKind, int]:
     depths[RowKind.TIMELINE_RESET] = 1
     _assign_expand_indent_depth(depths, SNAP_TO_SONG_MARKERS_SECTION, 1)
     _assign_expand_indent_depth(depths, BEAT_BAR_GRID_SECTION, 1)
+    depths[RowKind.TIMELINE_FADES] = 1
+    _assign_indent_depth(depths, TIMELINE_FADES_ACTIVE.children, 2)
     return depths
 
 
@@ -879,6 +899,14 @@ def append_render_section_rows(
                 append_expand_section_rows(row_list, SONG_MARKERS_SECTION, state)
                 append_expand_section_rows(row_list, SNAP_TO_SONG_MARKERS_SECTION, state)
                 append_expand_section_rows(row_list, BEAT_BAR_GRID_SECTION, state)
+                row_list.append(RowDescriptor(RowKind.TIMELINE_FADES))
+                _append_section_nodes(
+                    row_list,
+                    (SectionNode(conditional=TIMELINE_FADES_ACTIVE),),
+                    state,
+                    None,
+                    None,
+                )
                 row_list.append(RowDescriptor(RowKind.TIMELINE_PRESETS))
                 row_list.append(RowDescriptor(RowKind.TIMELINE_RESET))
 
@@ -931,6 +959,10 @@ def _build_section_header_parent_map() -> dict[RowKind, RowKind]:
     _walk_expand_section_for_headers(SONG_MARKERS_SECTION, out)
     _walk_expand_section_for_headers(SNAP_TO_SONG_MARKERS_SECTION, out)
     _walk_expand_section_for_headers(BEAT_BAR_GRID_SECTION, out)
+    out[RowKind.TIMELINE_FADES] = RowKind.RENDER_TIMELINE_HEADER
+    _register_section_header_parent(
+        out, RowKind.RENDER_TIMELINE_HEADER, TIMELINE_FADES_ACTIVE.children
+    )
     return out
 
 

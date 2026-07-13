@@ -153,6 +153,10 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     snap_markers = RowDescriptor(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
     snap_prox = RowDescriptor(RowKind.TIMELINE_SNAP_MARKER_PROXIMITY)
     snap_scope = RowDescriptor(RowKind.TIMELINE_SNAP_MARKER_SCOPE)
+    fades = RowDescriptor(RowKind.TIMELINE_FADES)
+    fade_in = RowDescriptor(RowKind.TIMELINE_FADE_IN)
+    fade_out = RowDescriptor(RowKind.TIMELINE_FADE_OUT)
+    fades_apply_to = RowDescriptor(RowKind.TIMELINE_FADES_APPLY_TO)
     markers_header = RowDescriptor(RowKind.SONG_MARKERS_HEADER)
     assert presets not in view_closed.layout.rows
     assert reset not in view_closed.layout.rows
@@ -164,6 +168,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert snap_prox not in view_closed.layout.rows
     assert snap_scope not in view_closed.layout.rows
     assert snap_markers not in view_closed.layout.rows
+    assert fades not in view_closed.layout.rows
     assert markers_header not in view_closed.layout.rows
 
     session.timeline.panel_open = True
@@ -179,15 +184,19 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert snap_markers in view_open.layout.rows
     assert snap_prox not in view_open.layout.rows
     assert snap_scope not in view_open.layout.rows
+    assert fades in view_open.layout.rows
+    assert fade_in not in view_open.layout.rows
     assert markers_header in view_open.layout.rows
     markers_idx = view_open.layout.rows.index(markers_header)
     snap_markers_idx = view_open.layout.rows.index(snap_markers)
     beat_bar_idx = view_open.layout.rows.index(beat_bar_header)
+    fades_idx = view_open.layout.rows.index(fades)
     presets_idx = view_open.layout.rows.index(presets)
     reset_idx = view_open.layout.rows.index(reset)
     assert snap_markers_idx == markers_idx + 1
     assert beat_bar_idx == snap_markers_idx + 1
-    assert presets_idx == beat_bar_idx + 1
+    assert fades_idx == beat_bar_idx + 1
+    assert presets_idx == fades_idx + 1
     assert reset_idx == presets_idx + 1
 
     session.timeline.song_marker_snap_expanded = True
@@ -207,18 +216,33 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     bar_grid_idx = view_beat_expanded.layout.rows.index(bar_grid)
     snap_beats_idx = view_beat_expanded.layout.rows.index(snap_beats)
     snap_bars_idx = view_beat_expanded.layout.rows.index(snap_bars)
+    fades_idx = view_beat_expanded.layout.rows.index(fades)
     assert bar_grid_idx == beat_bar_idx + 1
     assert bar_phase_idx == bar_grid_idx + 1
     assert snap_beats_idx == bar_phase_idx + 1
     assert snap_bars_idx == snap_beats_idx + 1
-    assert view_beat_expanded.layout.rows.index(presets) == snap_bars_idx + 1
-    assert view_beat_expanded.layout.rows.index(reset) == snap_bars_idx + 2
+    assert fades_idx == snap_bars_idx + 1
+    assert fade_in not in view_beat_expanded.layout.rows
+    assert fade_out not in view_beat_expanded.layout.rows
+    assert fades_apply_to not in view_beat_expanded.layout.rows
+    assert view_beat_expanded.layout.rows.index(presets) == fades_idx + 1
+    assert view_beat_expanded.layout.rows.index(reset) == fades_idx + 2
+
+    session.timeline.fades_enabled = True
+    view_fades_enabled = builder.build(paused=False)
+    assert view_fades_enabled.layout is not view_beat_expanded.layout
+    fades_idx = view_fades_enabled.layout.rows.index(fades)
+    assert view_fades_enabled.layout.rows.index(fade_in) == fades_idx + 1
+    assert view_fades_enabled.layout.rows.index(fade_out) == fades_idx + 2
+    assert view_fades_enabled.layout.rows.index(fades_apply_to) == fades_idx + 3
+    assert view_fades_enabled.layout.rows.index(presets) == fades_idx + 4
 
     session.timeline.panel_open = False
     view_closed_again = builder.build(paused=False)
     assert view_closed_again.layout is not view_open.layout
     assert presets not in view_closed_again.layout.rows
     assert reset not in view_closed_again.layout.rows
+    assert fades not in view_closed_again.layout.rows
     assert bar_phase not in view_closed_again.layout.rows
     assert bar_grid not in view_closed_again.layout.rows
     assert snap_beats not in view_closed_again.layout.rows
@@ -371,6 +395,21 @@ def test_structure_signature_invalidates_on_beat_bar_grid_expanded() -> None:
         session, config_save, notification_active=False
     )
     session.timeline.beat_bar_grid_expanded = True
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_structure_signature_invalidates_on_timeline_fades_enabled() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.timeline.fades_enabled = False
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.timeline.fades_enabled = True
     sig_after = view_state_structure_signature(
         session, config_save, notification_active=False
     )

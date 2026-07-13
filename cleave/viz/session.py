@@ -22,10 +22,15 @@ from cleave.config_schema import (
     DEFAULT_HARD_CUT_ENABLED,
     DEFAULT_EASTER_EGG,
     DEFAULT_PRESET_START_CLEAN,
+    DEFAULT_TIMELINE_FADES_APPLY_TO,
+    DEFAULT_TIMELINE_FADES_ENABLED,
+    DEFAULT_TIMELINE_FADE_IN,
+    DEFAULT_TIMELINE_FADE_OUT,
     HighlightRolloffApplyMode,
     HighlightRolloffCurve,
     PresetSwitchingMode,
     PresetSwitchingScope,
+    TimelineFadesApplyTo,
     default_render_overlay_runtime_values,
     default_highlight_rolloff_runtime_values,
     default_chroma_boost_runtime_values,
@@ -152,6 +157,10 @@ class TimelineRuntime:
     song_marker_snap_scope: str = "each_layer"
     song_marker_snap_expanded: bool = False
     beat_bar_grid_expanded: bool = False
+    fades_enabled: bool = DEFAULT_TIMELINE_FADES_ENABLED
+    fade_in: float = DEFAULT_TIMELINE_FADE_IN
+    fade_out: float = DEFAULT_TIMELINE_FADE_OUT
+    fades_apply_to: TimelineFadesApplyTo = DEFAULT_TIMELINE_FADES_APPLY_TO
 
 
 def default_timeline_runtime() -> TimelineRuntime:
@@ -284,13 +293,24 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
     enabled = True if timeline is None else timeline.enabled
     locked = False if timeline is None else timeline.locked
     source_lanes = {} if timeline is None else timeline.lanes
+    fades = None if timeline is None else timeline.fades
     lanes: dict[str, TimelineLane] = {}
     for slot in cfg.layer_z_order:
         if slot in source_lanes:
             lanes[slot] = copy_lane(source_lanes[slot])
         else:
             lanes[slot] = empty_lane()
-    return TimelineRuntime(enabled=enabled, locked=locked, lanes=lanes)
+    if fades is None:
+        return TimelineRuntime(enabled=enabled, locked=locked, lanes=lanes)
+    return TimelineRuntime(
+        enabled=enabled,
+        locked=locked,
+        lanes=lanes,
+        fades_enabled=fades.enabled,
+        fade_in=fades.fade_in,
+        fade_out=fades.fade_out,
+        fades_apply_to=fades.apply_to,
+    )
 
 
 def _beat_sensitivity(cfg: CleaveConfig, slot: str) -> float:

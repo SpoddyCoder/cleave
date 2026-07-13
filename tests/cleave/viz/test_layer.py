@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pygame
+import pytest
 
 from cleave.config_schema import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
@@ -24,7 +25,9 @@ from cleave.viz.layer_visibility import (
     snapshot_monitor_from_timeline,
     timeline_committed_visible,
     timeline_defaults,
+    timeline_fade_multiplier,
 )
+from cleave.viz.layer_pipeline import apply_effect_modifiers
 from cleave.viz.timeline_overlay import (
     bar_segments_for_row,
     bar_tick_times_for_row,
@@ -257,6 +260,129 @@ def test_apply_layer_visibility_sets_fbo_enabled_from_timeline() -> None:
     apply_layer_visibility(session, layers_by_slot, 3.0)
     assert layers_by_slot["layer_3"].fbo.enabled is False
     assert layers_by_slot["layer_1"].fbo.enabled is True
+
+
+def test_apply_layer_visibility_fades_enable_before_on_cue() -> None:
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+        lanes={"layer_1": _lane(False, (10.0, True), (20.0, False))},
+    )
+    session.timeline.fades_enabled = True
+    session.timeline.fade_in = 2.0
+    session.timeline.fade_out = 2.0
+    layers_by_slot = {slot: _stem_layer(slot) for slot in DEFAULT_LAYER_SLOTS}
+
+    apply_layer_visibility(session, layers_by_slot, 9.0)
+    assert layers_by_slot["layer_1"].fbo.enabled is True
+    assert 0.0 < layers_by_slot["layer_1"].timeline_fade < 1.0
+    assert effective_layer_enabled(session, "layer_1", 9.0) is False
+
+    apply_layer_visibility(session, layers_by_slot, 7.0)
+    assert layers_by_slot["layer_1"].fbo.enabled is False
+    assert layers_by_slot["layer_1"].timeline_fade == pytest.approx(0.0)
+
+
+def test_apply_layer_visibility_fades_off_stays_abrupt() -> None:
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+        lanes={"layer_1": _lane(False, (10.0, True), (20.0, False))},
+    )
+    session.timeline.fades_enabled = False
+    session.timeline.fade_in = 2.0
+    layers_by_slot = {slot: _stem_layer(slot) for slot in DEFAULT_LAYER_SLOTS}
+
+    apply_layer_visibility(session, layers_by_slot, 9.0)
+    assert layers_by_slot["layer_1"].fbo.enabled is False
+    assert layers_by_slot["layer_1"].timeline_fade == pytest.approx(1.0)
+
+
+def test_apply_layer_visibility_override_stays_abrupt_with_fades() -> None:
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+        lanes={"layer_1": _lane(False, (10.0, True), (20.0, False))},
+    )
+    session.timeline.fades_enabled = True
+    session.timeline.fade_in = 2.0
+    session.timeline.override_slots = {"layer_1"}
+    session.timeline.override_visible = {"layer_1": False}
+    layers_by_slot = {slot: _stem_layer(slot) for slot in DEFAULT_LAYER_SLOTS}
+
+    apply_layer_visibility(session, layers_by_slot, 9.0)
+    assert layers_by_slot["layer_1"].fbo.enabled is False
+    assert layers_by_slot["layer_1"].timeline_fade == pytest.approx(1.0)
+
+
+def test_apply_layer_visibility_preview_stays_abrupt_with_fades() -> None:
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+        lanes={"layer_1": _lane(False, (10.0, True), (20.0, False))},
+    )
+    session.timeline.fades_enabled = True
+    session.timeline.fade_in = 2.0
+    session.timeline.preview_active = True
+    session.timeline.monitor = {
+        "layer_1": False,
+        "layer_2": True,
+        "layer_3": True,
+        "layer_4": True,
+    }
+    layers_by_slot = {slot: _stem_layer(slot) for slot in DEFAULT_LAYER_SLOTS}
+
+    apply_layer_visibility(session, layers_by_slot, 9.0)
+    assert layers_by_slot["layer_1"].fbo.enabled is False
+    assert layers_by_slot["layer_1"].timeline_fade == pytest.approx(1.0)
+
+
+def test_apply_effect_modifiers_scales_opacity_by_timeline_fade() -> None:
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+    )
+    layer = _stem_layer("layer_1")
+    layer.fbo.enabled = True
+    layer.timeline_fade = 0.5
+    layer.fbo.opacity = 1.0
+    effect_runtime = MagicMock()
+    mod = MagicMock(
+        opacity=0.8,
+        flash_alpha=0.0,
+        bloom_strength=0.0,
+        hue_rgb=(1.0, 1.0, 1.0),
+        hue_mix=0.0,
+        grit_strength=0.0,
+        aberration_px=0.0,
+    )
+    effect_runtime.modifiers.return_value = {
+        slot: mod for slot in DEFAULT_LAYER_SLOTS
+    }
+    apply_effect_modifiers(
+        session,
+        {"layer_1": layer},
+        effect_runtime,
+        None,
+        0.0,
+        update=False,
+    )
+    assert layer.fbo.opacity == pytest.approx(0.4)
+
+
+def test_timeline_fade_multiplier_matches_lane_math() -> None:
+    from cleave.easing import smoothstep
+
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+        lanes={"layer_1": _lane(False, (10.0, True), (20.0, False))},
+    )
+    session.timeline.fade_in = 2.0
+    session.timeline.fade_out = 2.0
+    assert timeline_fade_multiplier(session, "layer_1", 9.0) == pytest.approx(
+        smoothstep(0.5)
+    )
 
 
 def test_header_toggle_blocked_when_timeline_enabled() -> None:

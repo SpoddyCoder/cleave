@@ -21,7 +21,6 @@ from cleave.viz.layer_preview_resolution import (
     preview_sizes_for_session,
     render_layer_size,
 )
-from cleave.viz.layer_visibility import effective_layer_enabled
 from cleave.viz.post_fx import (
     chroma_boost_active,
     chroma_boost_variant_index,
@@ -46,10 +45,10 @@ def apply_effect_modifiers(
         effect_runtime.update(session, signals, t_sec)
     modifiers = effect_runtime.modifiers(session)
     for slot, layer in layers_by_slot.items():
-        if not effective_layer_enabled(session, slot, t_sec):
+        if not layer.fbo.enabled:
             continue
         mod = modifiers[slot]
-        layer.fbo.opacity = mod.opacity
+        layer.fbo.opacity = mod.opacity * layer.timeline_fade
         layer.fbo.flash_alpha = mod.flash_alpha
         layer.fbo.bloom_strength = mod.bloom_strength
         layer.fbo.hue_rgb = mod.hue_rgb

@@ -20,6 +20,7 @@ from cleave.config import (
     RenderOverlayTextBlockConfig,
     RenderPostFxConfig,
     TimelineConfig,
+    TimelineFadesConfig,
     EditorConfig,
     clamp_beat_sensitivity,
     clamp_effect_pct,
@@ -52,6 +53,7 @@ from cleave.config_schema import (
     parse_timeline_section,
     parse_project_editor_section,
     persist_render,
+    persist_timeline,
     persist_project_editor_section,
     template_layer_entry,
     template_project_editor_section,
@@ -1034,6 +1036,71 @@ def test_parse_timeline_defaults_enabled_true() -> None:
     )
     assert timeline == TimelineConfig(enabled=True, lanes={})
     assert timeline.locked is False
+    assert timeline.fades == TimelineFadesConfig()
+
+
+def test_parse_timeline_reads_fades() -> None:
+    timeline = parse_timeline_section(
+        {
+            "timeline": {
+                "fades": {
+                    "enabled": True,
+                    "fade_in": 1.5,
+                    "fade_out": 3.0,
+                    "apply_to": "exclude_song_markers",
+                }
+            }
+        },
+        _timeline_parse_ctx(),
+    )
+    assert timeline is not None
+    assert timeline.fades == TimelineFadesConfig(
+        enabled=True,
+        fade_in=1.5,
+        fade_out=3.0,
+        apply_to="exclude_song_markers",
+    )
+
+
+def test_persist_timeline_fades_round_trip() -> None:
+    from cleave.viz.session import TimelineRuntime
+
+    session = TuningSession(
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
+        timeline=TimelineRuntime(
+            enabled=True,
+            fades_enabled=True,
+            fade_in=1.5,
+            fade_out=3.0,
+            fades_apply_to="exclude_song_markers",
+        ),
+    )
+    cfg = CleaveConfig(
+        paths=PathsConfig(preset_root=Path("/tmp"), texture_paths=()),
+        layers={},
+        editor=EditorConfig(),
+        config_path=Path("/tmp/cleave-viz.yaml"),
+        user_config_path=Path("/tmp/user.yaml"),
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
+    )
+    payload = persist_timeline(PersistCtx(cfg=cfg, session=session, cfg_dir=None))
+    assert payload["fades"] == {
+        "enabled": True,
+        "fade_in": 1.5,
+        "fade_out": 3.0,
+        "apply_to": "exclude_song_markers",
+    }
+    round_trip = parse_timeline_section(
+        {"timeline": payload},
+        _timeline_parse_ctx(),
+    )
+    assert round_trip is not None
+    assert round_trip.fades == TimelineFadesConfig(
+        enabled=True,
+        fade_in=1.5,
+        fade_out=3.0,
+        apply_to="exclude_song_markers",
+    )
 
 
 def test_parse_timeline_reads_locked() -> None:

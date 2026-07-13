@@ -2351,6 +2351,7 @@ def test_render_timeline_down_enters_submenu() -> None:
     grid_row = view.layout.find_by_kind(RowKind.TIMELINE_BAR_GRID)
     snap_beats_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_BEATS)
     snap_bars_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_BARS)
+    fades_row = view.layout.find_by_kind(RowKind.TIMELINE_FADES)
     presets_row = view.layout.find_by_kind(RowKind.TIMELINE_PRESETS)
     reset_row = view.layout.find_by_kind(RowKind.TIMELINE_RESET)
     controls.focus_descriptor = _desc(view, header_row)
@@ -2393,6 +2394,10 @@ def test_render_timeline_down_enters_submenu() -> None:
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_descriptor == _desc(view, fades_row)
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_descriptor == _desc(view, presets_row)
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
@@ -2416,7 +2421,7 @@ def test_render_timeline_down_enters_submenu_and_routes_keys() -> None:
     controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.focus_row = 2
 
-    for _ in range(12):
+    for _ in range(13):
         controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.session.timeline.focus_row == 0
@@ -2651,6 +2656,7 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
     controls.session.timeline.panel_open = True
     controls.session.timeline.song_marker_snap_expanded = True
     controls.session.timeline.beat_bar_grid_expanded = True
+    controls.session.timeline.fades_enabled = True
     controls.session.timeline.enabled = False
     view = controls.build_view_state(paused=False)
     for kind in (
@@ -2664,6 +2670,10 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
         RowKind.TIMELINE_BAR_GRID,
         RowKind.TIMELINE_SNAP_TO_BEATS,
         RowKind.TIMELINE_SNAP_TO_BARS,
+        RowKind.TIMELINE_FADES,
+        RowKind.TIMELINE_FADE_IN,
+        RowKind.TIMELINE_FADE_OUT,
+        RowKind.TIMELINE_FADES_APPLY_TO,
         RowKind.TIMELINE_PRESETS,
         RowKind.TIMELINE_RESET,
     ):
