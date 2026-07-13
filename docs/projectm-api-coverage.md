@@ -55,8 +55,8 @@ Related: [legacy-plans/presets-scan-plan.md](legacy-plans/presets-scan-plan.md) 
 | `projectm_set_preset_switch_requested_event_callback` | future | Custom switch policy without playlist |
 | `projectm_set_preset_switch_failed_event_callback` | bound, used | Enqueues `PresetLoadFailure`; drained per frame |
 | `projectm_set_texture_load_event_callback` | bound, ignored | Non-filesystem textures; bind ready for future |
-| `projectm_set_log_callback` | bound, used | Optional via `CLEAVE_PROJECTM_LOG=1` |
-| `projectm_set_log_level` | bound, used | With debug logging env |
+| `projectm_set_log_callback` | bound, used | Always registered; Warning+ queued for panel toasts |
+| `projectm_set_log_level` | bound, used | WARN by default; DEBUG when `CLEAVE_PROJECTM_LOG=1` |
 | `projectm_get_version_components` | bound, used | `ProjectM.version_info()` |
 | `projectm_get_version_string` | bound, used | `ProjectM.version_info()` |
 | `projectm_get_vcs_version_string` | bound, used | `ProjectM.version_info()` |
@@ -100,11 +100,12 @@ Related: [legacy-plans/presets-scan-plan.md](legacy-plans/presets-scan-plan.md) 
 - Per-instance `projectm_set_preset_switch_failed_event_callback` enqueues individual load failures.
 - Connected playlist `projectm_playlist_set_preset_switch_failed_event_callback` enqueues **exhausted** failures (`exhausted=True`).
 - [cleave/projectm_health.py](../cleave/projectm_health.py) drains queues each frame before layer render; rate-limited skip notifications and rotation-stall message via panel notification sink.
+- Warning+ libprojectM log lines are queued in [cleave/projectm.py](../cleave/projectm.py) and drained to panel toasts (`projectM: ...`) once per unique message per session.
 
 ## Environment
 
 | Variable | Effect |
 | --- | --- |
-| `CLEAVE_PROJECTM_LOG=1` | Register libprojectM log callback at DEBUG to stderr |
+| `CLEAVE_PROJECTM_LOG=1` | libprojectM log level DEBUG; mirror all callback messages to stderr (Warning+ still toast when live) |
 | `PROJECTM_LIB` | Override core library path |
 | `PROJECTM_PLAYLIST_LIB` | Override playlist library path |

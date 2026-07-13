@@ -38,7 +38,7 @@ from cleave.config_schema import (
 )
 from cleave.extract import StemSource
 from cleave.preset_playlist import PresetPlaylist, preset_browse_floor
-from cleave.projectm_health import PresetSkipNotifyTracker
+from cleave.projectm_health import PresetSkipNotifyTracker, ProjectMLogNotifyTracker
 from cleave.timeline import SlotCue, TimelineLane, copy_lane, empty_lane
 from cleave.blend_modes import BlendMode
 
@@ -231,6 +231,9 @@ class TuningSession:
     help_visible: bool = False
     preset_skip_notify_tracker: PresetSkipNotifyTracker = field(
         default_factory=PresetSkipNotifyTracker
+    )
+    projectm_log_notify_tracker: ProjectMLogNotifyTracker = field(
+        default_factory=ProjectMLogNotifyTracker
     )
 
 
