@@ -8,9 +8,12 @@ from typing import Literal
 
 import numpy as np
 
+from cleave.easing import smoothstep
 from cleave.extract import STEM_SOURCES, StemSource
 
 RECORD_DEBOUNCE_SEC = 0.08
+SONG_MARKER_FADE_MATCH_EPS = 1e-3
+_CUE_BOUNDARY_EPS = 1e-9
 
 _STEM_SOURCE_ABBREVIATIONS = {
     "drums": "D",
@@ -139,6 +142,85 @@ def lane_segments(
         visible = lane_visible_at(lane, clip_start, inherit=inherit)
         segments.append((clip_start, clip_end, visible))
     return segments
+
+
+def _boundary_has_cue(lane: TimelineLane, t: float) -> bool:
+    return any(abs(cue.t - t) <= _CUE_BOUNDARY_EPS for cue in lane.cues)
+
+
+def _matches_song_marker(t: float, markers: Sequence[float]) -> bool:
+    return any(abs(marker - t) <= SONG_MARKER_FADE_MATCH_EPS for marker in markers)
+
+
+def _segment_fade_envelope(
+    t_sec: float,
+    start: float,
+    end: float,
+    *,
+    fade_in: float,
+    fade_out: float,
+    fade_in_active: bool,
+    fade_out_active: bool,
+) -> float:
+    if start <= t_sec < end:
+        return 1.0
+    if fade_in_active and fade_in > 0.0 and start - fade_in <= t_sec < start:
+        return smoothstep((t_sec - (start - fade_in)) / fade_in)
+    if fade_out_active and fade_out > 0.0 and end <= t_sec < end + fade_out:
+        return smoothstep((end + fade_out - t_sec) / fade_out)
+    return 0.0
+
+
+def lane_fade_alpha(
+    lane: TimelineLane,
+    t_sec: float,
+    *,
+    inherit: bool,
+    fade_in: float,
+    fade_out: float,
+    duration_sec: float,
+    song_marker_times: Sequence[float] = (),
+    exclude_song_markers: bool = False,
+) -> float:
+    """Continuous opacity for visible segments with optional edge fades.
+
+    For each visible ``[A, B)`` from :func:`lane_segments`, fade-in starts
+    ``fade_in`` before ``A`` and reaches full at ``A``; fade-out starts at ``B``
+    and reaches zero ``fade_out`` after ``B``. Overlapping envelopes use max.
+    Song start/end without a cue at that edge do not fade. When
+    ``exclude_song_markers`` is set, boundaries matching a marker within
+    :data:`SONG_MARKER_FADE_MATCH_EPS` stay abrupt.
+    """
+    fade_in = max(0.0, float(fade_in))
+    fade_out = max(0.0, float(fade_out))
+    if duration_sec <= 0.0:
+        return 0.0
+    alpha = 0.0
+    for start, end, visible in lane_segments(lane, duration_sec, inherit=inherit):
+        if not visible:
+            continue
+        fade_in_active = True
+        if start <= 0.0 and not _boundary_has_cue(lane, start):
+            fade_in_active = False
+        elif exclude_song_markers and _matches_song_marker(start, song_marker_times):
+            fade_in_active = False
+        fade_out_active = True
+        if end >= duration_sec and not _boundary_has_cue(lane, end):
+            fade_out_active = False
+        elif exclude_song_markers and _matches_song_marker(end, song_marker_times):
+            fade_out_active = False
+        contrib = _segment_fade_envelope(
+            t_sec,
+            start,
+            end,
+            fade_in=fade_in,
+            fade_out=fade_out,
+            fade_in_active=fade_in_active,
+            fade_out_active=fade_out_active,
+        )
+        if contrib > alpha:
+            alpha = contrib
+    return alpha
 
 
 def lane_tick_times(lane: TimelineLane, duration_sec: float) -> list[float]:

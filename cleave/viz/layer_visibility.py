@@ -11,6 +11,7 @@ from cleave.timeline import (
     canonicalize,
     copy_lane,
     empty_lane,
+    lane_fade_alpha,
     lane_visible_at,
     punch_lane,
     shift_bars_by_beats,
@@ -206,13 +207,59 @@ def effective_layer_enabled(
     return timeline_committed_visible(session, slot, t_sec)
 
 
+def _timeline_fades_apply(session: TuningSession, slot: str) -> bool:
+    """True when continuous cue fades drive FBO enable/opacity for *slot*."""
+    if session.solo_slot is not None:
+        return False
+    tl = session.timeline
+    if not tl.enabled or not tl.fades_enabled:
+        return False
+    if tl.recording or tl.preview_active:
+        return False
+    if slot in tl.override_slots:
+        return False
+    return True
+
+
+def _fade_eval_duration(lane: TimelineLane, t_sec: float, fade_out: float) -> float:
+    last_cue = max((cue.t for cue in lane.cues), default=0.0)
+    pad = max(0.0, float(fade_out)) + 1.0
+    return max(t_sec + pad, last_cue + pad, 1.0)
+
+
+def timeline_fade_multiplier(
+    session: TuningSession,
+    slot: str,
+    t_sec: float,
+) -> float:
+    """Committed-lane fade opacity in ``[0, 1]`` (ignores solo/override/preview)."""
+    tl = session.timeline
+    lane = _lane_for_slot(session, slot)
+    return lane_fade_alpha(
+        lane,
+        t_sec,
+        inherit=_inherit_for_slot(session, slot),
+        fade_in=tl.fade_in,
+        fade_out=tl.fade_out,
+        duration_sec=_fade_eval_duration(lane, t_sec, tl.fade_out),
+        song_marker_times=session.song_markers.times,
+        exclude_song_markers=tl.fades_apply_to == "exclude_song_markers",
+    )
+
+
 def apply_layer_visibility(
     session: TuningSession,
     layers_by_slot: dict[str, StemLayer],
     t_sec: float,
 ) -> None:
     for slot, layer in layers_by_slot.items():
-        layer.fbo.enabled = effective_layer_enabled(session, slot, t_sec)
+        if _timeline_fades_apply(session, slot):
+            fade = timeline_fade_multiplier(session, slot, t_sec)
+            layer.timeline_fade = fade
+            layer.fbo.enabled = fade > 0.0
+        else:
+            layer.timeline_fade = 1.0
+            layer.fbo.enabled = effective_layer_enabled(session, slot, t_sec)
 
 
 def build_timeline_view_state(

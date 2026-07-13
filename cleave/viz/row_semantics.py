@@ -87,6 +87,10 @@ class RowKind(Enum):
     TIMELINE_SNAP_MARKER_PROXIMITY = auto()
     TIMELINE_SNAP_MARKER_SCOPE = auto()
     TIMELINE_SNAP_TO_SONG_MARKERS = auto()
+    TIMELINE_FADES = auto()
+    TIMELINE_FADE_IN = auto()
+    TIMELINE_FADE_OUT = auto()
+    TIMELINE_FADES_APPLY_TO = auto()
     SONG_MARKERS_HEADER = auto()
     SONG_MARKER_ITEM = auto()
     SETTINGS_HEADER = auto()
@@ -821,6 +825,57 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_description=(
             "Pull closest cues within proximity onto song markers",
             "(irreversible; confirm uses proximity and layer scope).",
+        ),
+    ),
+    RowKind.TIMELINE_FADES: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        repeatable=True,
+        blocked_by_section_lock=True,
+        help_title="Timeline fades",
+        help_entries=(("Left/Right", "enabled / disabled"),),
+        help_description=(
+            "Soft opacity fades around committed timeline cue boundaries.",
+            "Applies only during normal committed playback.",
+        ),
+    ),
+    RowKind.TIMELINE_FADE_IN: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        repeatable=True,
+        blocked_by_section_lock=True,
+        help_title="Fade in duration",
+        help_entries=(
+            ("Left", "decrease fade in"),
+            ("Right", "increase fade in"),
+        ),
+        help_description=(
+            "Seconds before an on-cue to ramp opacity from zero to full.",
+        ),
+    ),
+    RowKind.TIMELINE_FADE_OUT: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        repeatable=True,
+        blocked_by_section_lock=True,
+        help_title="Fade out duration",
+        help_entries=(
+            ("Left", "decrease fade out"),
+            ("Right", "increase fade out"),
+        ),
+        help_description=(
+            "Seconds after an off-cue to ramp opacity from full to zero.",
+        ),
+    ),
+    RowKind.TIMELINE_FADES_APPLY_TO: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        repeatable=True,
+        blocked_by_section_lock=True,
+        help_title="Apply fades to cues",
+        help_entries=(("Left/Right", "cycle apply-to mode"),),
+        help_description=(
+            "All cue edges, or keep edges on song markers abrupt.",
         ),
     ),
     RowKind.SONG_MARKERS_HEADER: RowBehavior(

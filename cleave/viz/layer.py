@@ -19,3 +19,4 @@ class StemLayer:
     playlist: PresetPlaylist
     projectm_playlist: ProjectMPlaylist | None = None
     auto_preset_path: Path | None = None
+    timeline_fade: float = 1.0

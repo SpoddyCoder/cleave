@@ -12,6 +12,7 @@ from cleave.timeline import (
     TimelineLane,
     canonicalize,
     empty_lane,
+    lane_fade_alpha,
     lane_visible_at,
     punch_lane,
     set_lane_cue,
@@ -194,3 +195,108 @@ def test_should_accept_toggle_debounces() -> None:
     assert should_accept_toggle(None, 1.0) is True
     assert should_accept_toggle(1.0, 1.0 + RECORD_DEBOUNCE_SEC - 0.01) is False
     assert should_accept_toggle(1.0, 1.0 + RECORD_DEBOUNCE_SEC) is True
+
+
+def test_lane_fade_alpha_full_inside_visible_segment() -> None:
+    lane = _lane(False, (5.0, True), (15.0, False))
+    assert lane_fade_alpha(
+        lane, 10.0, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=60.0
+    ) == pytest.approx(1.0)
+
+
+def test_lane_fade_alpha_fade_in_before_on_cue() -> None:
+    from cleave.easing import smoothstep
+
+    lane = _lane(False, (10.0, True), (20.0, False))
+    mid = lane_fade_alpha(
+        lane, 9.0, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=60.0
+    )
+    assert mid == pytest.approx(smoothstep(0.5))
+    assert lane_fade_alpha(
+        lane, 8.0, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=60.0
+    ) == pytest.approx(0.0)
+    assert lane_fade_alpha(
+        lane, 10.0, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=60.0
+    ) == pytest.approx(1.0)
+
+
+def test_lane_fade_alpha_fade_out_after_off_cue() -> None:
+    from cleave.easing import smoothstep
+
+    lane = _lane(False, (5.0, True), (15.0, False))
+    mid = lane_fade_alpha(
+        lane, 16.0, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=60.0
+    )
+    assert mid == pytest.approx(smoothstep(0.5))
+    assert lane_fade_alpha(
+        lane, 17.0, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=60.0
+    ) == pytest.approx(0.0)
+    assert lane_fade_alpha(
+        lane, 14.9, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=60.0
+    ) == pytest.approx(1.0)
+
+
+def test_lane_fade_alpha_no_fade_at_song_edges_without_cue() -> None:
+    lane = _lane(True)
+    assert lane_fade_alpha(
+        lane, 0.5, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=30.0
+    ) == pytest.approx(1.0)
+    assert lane_fade_alpha(
+        lane, 29.5, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=30.0
+    ) == pytest.approx(1.0)
+    assert lane_fade_alpha(
+        lane, 0.0, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=30.0
+    ) == pytest.approx(1.0)
+
+
+def test_lane_fade_alpha_zero_durations_match_boolean() -> None:
+    lane = _lane(False, (10.0, True), (20.0, False))
+    assert lane_fade_alpha(
+        lane, 9.9, inherit=False, fade_in=0.0, fade_out=0.0, duration_sec=60.0
+    ) == pytest.approx(0.0)
+    assert lane_fade_alpha(
+        lane, 10.0, inherit=False, fade_in=0.0, fade_out=0.0, duration_sec=60.0
+    ) == pytest.approx(1.0)
+    assert lane_fade_alpha(
+        lane, 20.0, inherit=False, fade_in=0.0, fade_out=0.0, duration_sec=60.0
+    ) == pytest.approx(0.0)
+
+
+def test_lane_fade_alpha_exclude_song_markers_makes_edge_abrupt() -> None:
+    lane = _lane(False, (10.0, True), (20.0, False))
+    before = lane_fade_alpha(
+        lane,
+        9.0,
+        inherit=False,
+        fade_in=2.0,
+        fade_out=2.0,
+        duration_sec=60.0,
+        song_marker_times=(10.0,),
+        exclude_song_markers=True,
+    )
+    assert before == pytest.approx(0.0)
+    after = lane_fade_alpha(
+        lane,
+        21.0,
+        inherit=False,
+        fade_in=2.0,
+        fade_out=2.0,
+        duration_sec=60.0,
+        song_marker_times=(20.0,),
+        exclude_song_markers=True,
+    )
+    assert after == pytest.approx(0.0)
+
+
+def test_lane_fade_alpha_overlapping_segments_take_max() -> None:
+    from cleave.easing import smoothstep
+
+    # Visible [5, 10) fading out and [11, 20) fading in overlap in gap with long fades.
+    lane = _lane(False, (5.0, True), (10.0, False), (11.0, True), (20.0, False))
+    t = 10.5
+    out_env = smoothstep((10.0 + 2.0 - t) / 2.0)
+    in_env = smoothstep((t - (11.0 - 2.0)) / 2.0)
+    alpha = lane_fade_alpha(
+        lane, t, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=60.0
+    )
+    assert alpha == pytest.approx(max(out_env, in_env))

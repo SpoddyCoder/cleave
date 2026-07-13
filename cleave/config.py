@@ -57,6 +57,11 @@ from cleave.config_schema import (
     DEFAULT_RENDER_POST_FX_FADE_OUT,
     DEFAULT_TEXTURE_PATHS,
     DEFAULT_TIMELINE_ENABLED,
+    DEFAULT_TIMELINE_FADES_APPLY_TO,
+    DEFAULT_TIMELINE_FADES_ENABLED,
+    DEFAULT_TIMELINE_FADE_IN,
+    DEFAULT_TIMELINE_FADE_OUT,
+    TimelineFadesApplyTo,
     DEFAULT_HDR_COMPOSITING,
     DEFAULT_RENDER_FPS,
     DEFAULT_RENDER_HEIGHT,
@@ -225,10 +230,19 @@ class RenderConfig:
 
 
 @dataclass(frozen=True)
+class TimelineFadesConfig:
+    enabled: bool = DEFAULT_TIMELINE_FADES_ENABLED
+    fade_in: float = DEFAULT_TIMELINE_FADE_IN
+    fade_out: float = DEFAULT_TIMELINE_FADE_OUT
+    apply_to: TimelineFadesApplyTo = DEFAULT_TIMELINE_FADES_APPLY_TO
+
+
+@dataclass(frozen=True)
 class TimelineConfig:
     enabled: bool
     lanes: dict[str, TimelineLane]
     locked: bool = False
+    fades: TimelineFadesConfig = field(default_factory=TimelineFadesConfig)
 
 
 @dataclass

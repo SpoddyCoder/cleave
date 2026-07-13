@@ -81,7 +81,7 @@ Default proximity: **5.0s** (session-only; Left/Right on the proximity row, clam
 
 ### Panel layout
 
-Under **Render: TIMELINE** (strip open), order is song markers, then **snap to song markers**, then beat / bar grid, then apply a timeline preset, then reset timeline. **snap to song markers** is an expandable action row (Left/Right toggles; white expand arrow) with two child parameter rows when expanded:
+Under **Render: TIMELINE** (strip open), order is song markers, then **snap to song markers**, then beat / bar grid, then timeline fades, then apply a timeline preset, then reset timeline. **snap to song markers** is an expandable action row (Left/Right toggles; white expand arrow) with two child parameter rows when expanded:
 
 ```
 snap to song markers

@@ -75,6 +75,10 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.TIMELINE_BAR_PHASE,
         RowKind.TIMELINE_SNAP_MARKER_PROXIMITY,
         RowKind.TIMELINE_SNAP_MARKER_SCOPE,
+        RowKind.TIMELINE_FADES,
+        RowKind.TIMELINE_FADE_IN,
+        RowKind.TIMELINE_FADE_OUT,
+        RowKind.TIMELINE_FADES_APPLY_TO,
     }
 )
 
