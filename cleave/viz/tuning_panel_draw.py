@@ -197,7 +197,7 @@ def _action_parameter_row_value(state: TuningViewState, index: int) -> str:
 def _expand_subheader_arrow_color(
     state: TuningViewState, index: int
 ) -> tuple[int, int, int]:
-    """Expand arrow uses VALUE white (and focus/disabled/locked), not ACTION green."""
+    """Expand arrow uses VALUE white (or disabled/locked), not ACTION green."""
     kind = state.layout.kind(index)
     desc = state.layout.descriptor(index)
     locked_blocked = section_locked(state, desc) and row_blocked_by_section_lock(kind)
@@ -208,9 +208,6 @@ def _expand_subheader_arrow_color(
 
     if locked_blocked:
         return LOCKED
-
-    if _row_has_tree_focus(state, index):
-        return _row_highlight_color(state, index)
 
     return VALUE
 
