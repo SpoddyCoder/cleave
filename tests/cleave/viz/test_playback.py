@@ -7,6 +7,7 @@ from cleave.viz.playback import (
     current_sec,
     format_mmss,
     seek,
+    seek_to,
     toggle_pause,
 )
 from tests.support.viz import StubMixPlayer
@@ -48,6 +49,22 @@ def test_seek_clamps_at_bounds() -> None:
 
     player.seek(2.0)
     seek(state, delta_sec=-10.0, duration_sec=120.0)
+    assert player.current_sec() == 0.0
+
+
+def test_seek_to_absolute() -> None:
+    player = StubMixPlayer(position_sec=10.0)
+    state = PlaybackState(player=player)
+    seek_to(state, position_sec=42.5, duration_sec=120.0)
+    assert player.current_sec() == 42.5
+
+
+def test_seek_to_clamps_at_bounds() -> None:
+    player = StubMixPlayer(position_sec=10.0)
+    state = PlaybackState(player=player)
+    seek_to(state, position_sec=200.0, duration_sec=120.0)
+    assert player.current_sec() == 120.0
+    seek_to(state, position_sec=-5.0, duration_sec=120.0)
     assert player.current_sec() == 0.0
 
 

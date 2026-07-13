@@ -73,6 +73,8 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.SETTINGS_UI_WIDTH,
         RowKind.SETTINGS_UI_FADE,
         RowKind.TIMELINE_BAR_PHASE,
+        RowKind.TIMELINE_SNAP_MARKER_PROXIMITY,
+        RowKind.TIMELINE_SNAP_MARKER_SCOPE,
     }
 )
 
@@ -262,6 +264,11 @@ def test_render_value_children_blocked_by_section_lock() -> None:
     assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESETS) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_BAR_PHASE) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_TO_BARS) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_MARKER_PROXIMITY) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_MARKER_SCOPE) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS) is True
+    assert row_blocked_by_section_lock(RowKind.SONG_MARKER_ITEM) is True
+    assert row_blocked_by_section_lock(RowKind.SONG_MARKERS_HEADER) is False
 
 
 def test_render_headers_navigable_when_section_locked() -> None:
@@ -271,10 +278,12 @@ def test_render_headers_navigable_when_section_locked() -> None:
         RowKind.RENDER_TIMELINE_HEADER,
         RowKind.RENDER_OVERLAY_TITLE_HEADER,
         RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER,
+        RowKind.SONG_MARKERS_HEADER,
     ):
         assert row_navigable_when_section_locked(kind) is True
     assert row_navigable_when_section_locked(RowKind.RENDER_OVERLAY_POSITION) is False
     assert row_navigable_when_section_locked(RowKind.TIMELINE_PRESETS) is False
+    assert row_navigable_when_section_locked(RowKind.SONG_MARKER_ITEM) is False
 
 
 def test_section_locked_resolves_render_sections() -> None:

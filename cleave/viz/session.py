@@ -148,10 +148,26 @@ class TimelineRuntime:
     arm_flash_start_ms: dict[str, int] = field(default_factory=dict)
     bar_phase_offset: int = 0
     show_bar_grid: bool = False
+    song_marker_snap_proximity: float = 5.0
+    song_marker_snap_scope: str = "each_layer"
+    song_marker_snap_expanded: bool = False
 
 
 def default_timeline_runtime() -> TimelineRuntime:
     return TimelineRuntime()
+
+
+@dataclass
+class SongMarkerRuntime:
+    """Project-scoped song markers held live; not part of viz YAML."""
+
+    times: list[float] = field(default_factory=list)
+    selected_index: int | None = None
+    expanded: bool = False
+
+
+def default_song_marker_runtime() -> SongMarkerRuntime:
+    return SongMarkerRuntime()
 
 
 @dataclass
@@ -200,6 +216,7 @@ class TuningSession:
     )
     render_post_fx_solo: bool = False
     timeline: TimelineRuntime = field(default_factory=default_timeline_runtime)
+    song_markers: SongMarkerRuntime = field(default_factory=default_song_marker_runtime)
     settings: SettingsRuntime = field(default_factory=SettingsRuntime)
     help_visible: bool = False
     preset_skip_notify_tracker: PresetSkipNotifyTracker = field(

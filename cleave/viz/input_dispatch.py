@@ -57,6 +57,12 @@ def _handle_global_keydown(
         runtime.controls.prompt_save_config()
         return True
 
+    if event.key == pygame.K_RETURN and mod_ctrl(event.mod):
+        if runtime.seed.session.timeline.recording:
+            return True
+        runtime.controls.drop_song_marker()
+        return True
+
     if event.key == pygame.K_h:
         runtime.seed.session.help_visible = not runtime.seed.session.help_visible
         return True

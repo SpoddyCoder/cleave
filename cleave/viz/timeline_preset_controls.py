@@ -101,6 +101,7 @@ class TimelinePresetController:
             duration_sec,
             random.Random(),
             bar_times=grid,
+            song_marker_times=list(self.session.song_markers.times),
         )
         for slot in self.session.layer_z_order:
             tl.lanes[slot] = copy_lane(built.get(slot, empty_lane()))

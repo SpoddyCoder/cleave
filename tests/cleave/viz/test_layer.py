@@ -641,3 +641,65 @@ def test_build_timeline_view_state_empty_signals_empty_bar_grid() -> None:
     state = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
     assert state.show_bar_grid is True
     assert state.bar_grid_times == ()
+
+
+def test_build_timeline_view_state_includes_song_markers() -> None:
+    from cleave.viz.focus_nav import MainFocus
+
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+    )
+    session.song_markers.times = [12.5, 64.0]
+    session.song_markers.selected_index = 1
+    # Sticky session selected_index alone must not highlight the strip.
+    state = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
+    assert state.song_marker_times == (12.5, 64.0)
+    assert state.selected_song_marker_index is None
+
+    focus = MainFocus(RowDescriptor(RowKind.SONG_MARKER_ITEM, marker_index=1))
+    state_focused = build_timeline_view_state(
+        session,
+        position_sec=0.0,
+        duration_sec=60.0,
+        focus_cursor=focus,
+    )
+    assert state_focused.selected_song_marker_index == 1
+
+
+def test_build_timeline_view_state_song_marker_highlight_requires_marker_focus() -> None:
+    from cleave.viz.focus_nav import MainFocus, TimelineFocus
+
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+    )
+    session.song_markers.times = [12.5, 64.0]
+    session.song_markers.selected_index = 0
+
+    other_main = MainFocus(RowDescriptor(RowKind.SONG_MARKERS_HEADER))
+    assert (
+        build_timeline_view_state(
+            session, position_sec=0.0, duration_sec=60.0, focus_cursor=other_main
+        ).selected_song_marker_index
+        is None
+    )
+    assert (
+        build_timeline_view_state(
+            session,
+            position_sec=0.0,
+            duration_sec=60.0,
+            focus_cursor=TimelineFocus(0),
+        ).selected_song_marker_index
+        is None
+    )
+
+
+def test_build_timeline_view_state_default_song_markers_empty() -> None:
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+    )
+    state = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
+    assert state.song_marker_times == ()
+    assert state.selected_song_marker_index is None

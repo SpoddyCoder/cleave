@@ -125,6 +125,32 @@ def test_ctrl_s_opens_save_dialog_from_timeline_context() -> None:
     assert modal_view.kind == ModalKind.SAVE_CHOICE
 
 
+def test_ctrl_enter_drops_song_marker_from_timeline_context() -> None:
+    runtime = _make_runtime()
+    prior_focus = runtime.controls.focus_cursor
+    runtime.controls.playback.player.seek(12.5)
+    assert dispatch_keydown(
+        keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL),
+        runtime,
+    ) is True
+    markers = runtime.seed.session.song_markers
+    assert markers.times == [12.5]
+    assert markers.selected_index is None
+    assert markers.expanded is True
+    assert runtime.seed.session.timeline.panel_open is True
+    assert runtime.controls.focus_cursor == prior_focus
+
+
+def test_ctrl_enter_refused_while_recording() -> None:
+    runtime = _make_runtime(recording=True)
+    runtime.controls.playback.player.seek(12.5)
+    assert dispatch_keydown(
+        keydown(pygame.K_RETURN, mod=pygame.KMOD_CTRL),
+        runtime,
+    ) is True
+    assert runtime.seed.session.song_markers.times == []
+
+
 def test_ctrl_s_blocked_while_solo_active() -> None:
     runtime = _make_runtime(submenu_focused=False)
     runtime.controls.session.solo_slot = "layer_1"

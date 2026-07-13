@@ -376,3 +376,129 @@ def test_empty_bar_times_returns_opening_only() -> None:
         lanes = builder(slots, 60.0, random.Random(1), bar_times=())
         assert all(not lane.cues for lane in lanes.values())
         _assert_never_zero(lanes, slots, 60.0)
+
+
+def test_partition_phrases_section_walls() -> None:
+    from cleave.timeline_presets.arrange import _partition_phrases
+
+    duration_sec = 120.0
+    bars = _bar_times_for(duration_sec)
+    markers = [30.5, 70.0]
+    phrases = _partition_phrases(bars, duration_sec, random.Random(1), markers)
+    assert phrases
+    starts = [start for start, _end in phrases]
+    assert 30.5 in starts
+    assert 70.0 in starts
+    for start, end in phrases:
+        for marker in markers:
+            assert not (start + 1e-9 < marker < end - 1e-9)
+
+
+def test_partition_phrases_without_markers_matches_bar_only() -> None:
+    from cleave.timeline_presets.arrange import _partition_phrases
+
+    duration_sec = 90.0
+    bars = thin_bar_times_for_arrange(_bar_times_for(duration_sec), duration_sec)
+    rng_seed = 17
+    a = _partition_phrases(bars, duration_sec, random.Random(rng_seed), ())
+    b = _partition_phrases(bars, duration_sec, random.Random(rng_seed))
+    assert a == b
+
+
+def test_soft_latch_time_prefers_nearby_marker() -> None:
+    from cleave.timeline_presets.motifs import soft_latch_time
+
+    bars = _bar_times_for(60.0)
+    claimed: set[float] = set()
+    latched = soft_latch_time(
+        20.0,
+        [21.5],
+        claimed,
+        bars=bars,
+        prev_time=10.0,
+        proximity=5.0,
+    )
+    assert latched == 21.5
+    assert 21.5 in claimed
+
+
+def test_soft_latch_time_exclusive_claim() -> None:
+    from cleave.timeline_presets.motifs import soft_latch_time
+
+    bars = _bar_times_for(60.0)
+    claimed: set[float] = set()
+    first = soft_latch_time(
+        20.0,
+        [21.0],
+        claimed,
+        bars=bars,
+        prev_time=10.0,
+        proximity=5.0,
+    )
+    second = soft_latch_time(
+        22.0,
+        [21.0],
+        claimed,
+        bars=bars,
+        prev_time=first,
+        proximity=5.0,
+    )
+    assert first == 21.0
+    assert second == 22.0
+
+
+def test_soft_latch_time_gap_veto() -> None:
+    from cleave.timeline_presets.motifs import soft_latch_time
+
+    bars = _bar_times_for(60.0)
+    claimed: set[float] = set()
+    # Marker is within proximity of planned 14.0, but only 2s after prev.
+    latched = soft_latch_time(
+        14.0,
+        [13.5],
+        claimed,
+        bars=bars,
+        prev_time=12.0,
+        proximity=5.0,
+    )
+    assert latched == 14.0
+    assert not claimed
+
+
+def test_compose_with_markers_allows_off_bar_cues() -> None:
+    slots = _slots(4)
+    duration_sec = 90.0
+    bars = _bar_times_for(duration_sec)
+    markers = [20.5, 50.25]
+    lanes = build_dialogue_cues(
+        slots,
+        duration_sec,
+        random.Random(3),
+        bar_times=bars,
+        song_marker_times=markers,
+    )
+    _assert_lanes_cover_slots(lanes, slots)
+    _assert_never_zero(lanes, slots, duration_sec)
+    times = _all_transition_times(lanes)
+    for prev, cur in zip(times, times[1:]):
+        assert cur - prev >= MIN_SWITCH_GAP_SEC - 1e-6
+    # At least one cue should soft-latch or land on a section-wall marker.
+    assert any(
+        any(abs(t - marker) < 1e-9 for marker in markers) for t in times
+    )
+
+
+def test_compose_ignores_out_of_range_markers() -> None:
+    slots = _slots(4)
+    duration_sec = 60.0
+    bars = _bar_times_for(duration_sec)
+    thinned = thin_bar_times_for_arrange(bars, duration_sec)
+    lanes = build_pulse_cues(
+        slots,
+        duration_sec,
+        random.Random(5),
+        bar_times=bars,
+        song_marker_times=[-1.0, 0.0, duration_sec, duration_sec + 5.0],
+    )
+    _assert_cues_on_bars(lanes, thinned)
+    _assert_min_gaps(lanes, bars, duration_sec)

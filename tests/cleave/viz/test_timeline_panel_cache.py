@@ -96,6 +96,31 @@ def test_static_signature_changes_on_bar_grid_times() -> None:
     assert _static_sig(phase0) != _static_sig(phase1)
 
 
+def test_static_signature_changes_on_song_marker_times() -> None:
+    empty = _view_state(song_marker_times=())
+    with_markers = _view_state(song_marker_times=(10.0, 40.0))
+    assert _static_sig(empty) != _static_sig(with_markers)
+    moved = _view_state(song_marker_times=(12.0, 40.0))
+    assert _static_sig(with_markers) != _static_sig(moved)
+
+
+def test_static_signature_changes_on_selected_song_marker_index() -> None:
+    none_selected = _view_state(
+        song_marker_times=(10.0, 40.0),
+        selected_song_marker_index=None,
+    )
+    first = _view_state(
+        song_marker_times=(10.0, 40.0),
+        selected_song_marker_index=0,
+    )
+    second = _view_state(
+        song_marker_times=(10.0, 40.0),
+        selected_song_marker_index=1,
+    )
+    assert _static_sig(none_selected) != _static_sig(first)
+    assert _static_sig(first) != _static_sig(second)
+
+
 def test_compose_rebuilds_static_panel_when_recording_playhead_moves() -> None:
     pygame.init()
     overlay = TimelineOverlay()

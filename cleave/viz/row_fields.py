@@ -21,6 +21,7 @@ from cleave.config_schema import (
     ui_fade_display,
 )
 from cleave.extract import stem_control_label, stem_overlay_header
+from cleave.song_markers import format_marker_time
 from cleave.viz.fonts import render_overlay_font_display
 from cleave.viz.row_sections import (
     apply_expand_toggle,
@@ -32,6 +33,10 @@ from cleave.viz.row_sections import (
 from cleave.viz.row_semantics import RowDescriptor, RowKind, row_behavior
 from cleave.viz.tuning_view_state import TrackBlock, TuningViewState
 from cleave.viz.user_presets import user_preset_item_display_name
+from cleave.viz.timeline_snap_controls import (
+    cycle_song_marker_snap_scope,
+    song_marker_snap_scope_label,
+)
 
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
@@ -39,7 +44,9 @@ if TYPE_CHECKING:
 
 class RowPresentStyle(Enum):
     LABELED_VALUE = auto()
+    ACTION_PARAMETER = auto()
     EXPAND_SUBHEADER = auto()
+    ACTION_EXPAND_SUBHEADER = auto()
     COMPOSITE_HEADER = auto()
     PATH_ICON = auto()
     FULL_LINE = auto()
@@ -120,6 +127,59 @@ def _apply_timeline_bar_grid(
     _shift: bool,
 ) -> None:
     controls.session.timeline.show_bar_grid = forward
+
+
+_SONG_MARKER_SNAP_PROXIMITY_MIN = 0.5
+_SONG_MARKER_SNAP_PROXIMITY_MAX = 30.0
+_SONG_MARKER_SNAP_PROXIMITY_STEP = 0.5
+
+
+def _format_timeline_snap_marker_proximity(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return f"{state.render_timeline.song_marker_snap_proximity:.1f}s"
+
+
+def _apply_timeline_snap_marker_proximity(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    tl = controls.session.timeline
+    delta = _SONG_MARKER_SNAP_PROXIMITY_STEP if forward else -_SONG_MARKER_SNAP_PROXIMITY_STEP
+    tl.song_marker_snap_proximity = max(
+        _SONG_MARKER_SNAP_PROXIMITY_MIN,
+        min(
+            _SONG_MARKER_SNAP_PROXIMITY_MAX,
+            round(tl.song_marker_snap_proximity + delta, 1),
+        ),
+    )
+
+
+def _format_timeline_snap_marker_scope(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return song_marker_snap_scope_label(
+        state.render_timeline.song_marker_snap_scope,
+        state.layer_z_order,
+    )
+
+
+def _apply_timeline_snap_marker_scope(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    tl = controls.session.timeline
+    tl.song_marker_snap_scope = cycle_song_marker_snap_scope(
+        tl.song_marker_snap_scope,
+        controls.session.layer_z_order,
+        forward=forward,
+    )
 
 
 def _apply_settings_preview_quality(
@@ -857,6 +917,16 @@ def _format_track_user_preset_item(
     return user_preset_item_display_name(block.user_presets, desc.preset_index)
 
 
+def _format_song_markers_count(state: TuningViewState, _desc: RowDescriptor) -> str:
+    return f"({len(state.render_timeline.song_marker_times)})"
+
+
+def _format_song_marker_item(state: TuningViewState, desc: RowDescriptor) -> str:
+    assert desc.marker_index is not None
+    times = state.render_timeline.song_marker_times
+    return f"[{format_marker_time(times[desc.marker_index])}]"
+
+
 def _format_transport(_state: TuningViewState, _desc: RowDescriptor) -> str:
     return ""
 
@@ -1335,6 +1405,34 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         panel_label="snap to bars",
         present_style=RowPresentStyle.FULL_LINE,
     ),
+    RowKind.TIMELINE_SNAP_MARKER_PROXIMITY: RowFieldDef(
+        panel_label="proximity",
+        present_style=RowPresentStyle.ACTION_PARAMETER,
+        format_value=_format_timeline_snap_marker_proximity,
+        apply_horizontal=_apply_timeline_snap_marker_proximity,
+    ),
+    RowKind.TIMELINE_SNAP_MARKER_SCOPE: RowFieldDef(
+        panel_label="layer scope",
+        present_style=RowPresentStyle.ACTION_PARAMETER,
+        format_value=_format_timeline_snap_marker_scope,
+        apply_horizontal=_apply_timeline_snap_marker_scope,
+    ),
+    RowKind.TIMELINE_SNAP_TO_SONG_MARKERS: RowFieldDef(
+        panel_label="snap to song markers",
+        present_style=RowPresentStyle.ACTION_EXPAND_SUBHEADER,
+        apply_horizontal=_apply_expand_subheader,
+    ),
+    RowKind.SONG_MARKERS_HEADER: RowFieldDef(
+        panel_label="song markers",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        format_value=_format_song_markers_count,
+        apply_horizontal=_apply_expand_subheader,
+    ),
+    RowKind.SONG_MARKER_ITEM: RowFieldDef(
+        panel_label="",
+        present_style=RowPresentStyle.FULL_LINE,
+        format_value=_format_song_marker_item,
+    ),
     RowKind.PANEL_NOTIFICATION: RowFieldDef(
         panel_label="",
         present_style=RowPresentStyle.FULL_LINE,
@@ -1374,13 +1472,25 @@ def row_labeled_display_text(state: TuningViewState, desc: RowDescriptor) -> str
     return labeled_row_prefix(desc.kind) + format_row_value(state, desc)
 
 
+def row_action_parameter_display_text(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    return labeled_row_prefix(desc.kind) + format_row_value(state, desc)
+
+
 def expand_subheader_prefix(kind: RowKind) -> str:
     depth = row_tree_indent_depth(kind)
     return tree_branch_prefix(depth) + row_panel_label(kind) + " "
 
 
 def format_expand_subheader_value(state: TuningViewState, desc: RowDescriptor) -> str:
-    return expand_arrow_for_header(state, desc.kind, desc.slot)
+    arrow = expand_arrow_for_header(state, desc.kind, desc.slot)
+    field = row_field_def(desc.kind)
+    if field.format_value is not None:
+        suffix = field.format_value(state, desc)
+        if suffix:
+            return f"{suffix} {arrow}"
+    return arrow
 
 
 def row_expand_subheader_display_text(
@@ -1468,6 +1578,11 @@ def row_full_line_display_text(state: TuningViewState, desc: RowDescriptor) -> s
         return field.format_value(state, desc)
     if desc.kind == RowKind.TRANSPORT:
         return ""
+    if field.format_value is not None:
+        return (
+            tree_branch_prefix(_full_line_branch_depth(desc.kind))
+            + field.format_value(state, desc)
+        )
     return full_line_prefix(desc.kind)
 
 

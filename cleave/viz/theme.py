@@ -3,13 +3,13 @@
 Typography roles for the live tuning overlay:
   LABEL    — light blue text for row labels and prefixes
   VALUE    — white text for values and state indicators (default)
-  ACTION   — dark mint text for rows that open a confirm modal on Enter
+  ACTION   — dark mint text for action rows and action-parameter label prefixes
   DISABLED — dimmed text when a row or control is inactive
   LOCKED   — tinted text for locked sub-rows that cannot be edited
 
 Accent colors for modes and icons (not label/value roles):
   HIGHLIGHT, HIGHLIGHT_MUTED, MOVE_MODE, LOCK_ICON, PRESET_ICON, PRESET_FILE_ICON,
-  TIMELINE_BAR_ON, BAR_GRID, PLAYHEAD
+  TIMELINE_BAR_ON, BAR_GRID, PLAYHEAD, SONG_MARKER, SONG_MARKER_SELECTED
 
 Layout scales:
   UI_SCALE (1.2) — main tuning panel, help, modals, and Material Icons spacing
@@ -172,6 +172,8 @@ REC_BG: tuple[int, int, int] = (220, 0, 0)
 TIMELINE_BAR_ON: tuple[int, int, int] = (200, 225, 255)
 BAR_GRID: tuple[int, int, int] = (70, 95, 130)
 PLAYHEAD: tuple[int, int, int] = (90, 50, 130)
+SONG_MARKER: tuple[int, int, int] = (220, 40, 40)
+SONG_MARKER_SELECTED: tuple[int, int, int] = (255, 170, 40)
 
 BORDER_WIDTH: int = 2
 SCROLLBAR_TRACK: tuple[int, int, int] = DISABLED

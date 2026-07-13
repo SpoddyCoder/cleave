@@ -16,6 +16,7 @@ from cleave.project import (
     mix_path,
     resolve_mix_path,
     rewrite_manifest_slug,
+    save_song_markers,
     write_manifest,
 )
 
@@ -183,6 +184,7 @@ def test_rewrite_manifest_slug_updates_slug_and_restored_from(tmp_path: Path) ->
         mix_filename="old-slug.flac",
         original_path=tmp_path / "source.flac",
         demucs_model="htdemucs",
+        song_markers=(12.5, 64.0),
     )
 
     rewrite_manifest_slug(project, "new-slug", restored_from="old-slug")
@@ -191,3 +193,88 @@ def test_rewrite_manifest_slug_updates_slug_and_restored_from(tmp_path: Path) ->
     assert manifest.slug == "new-slug"
     assert manifest.restored_from == "old-slug"
     assert manifest.mix_filename == "old-slug.flac"
+    assert manifest.song_markers == (12.5, 64.0)
+
+
+def test_manifest_round_trip_without_song_markers(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=tmp_path / "source.flac",
+        demucs_model="htdemucs",
+    )
+
+    with (project / PROJECT_FILENAME).open(encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+
+    assert "song-markers" not in data
+    assert load_manifest(project).song_markers == ()
+
+
+def test_manifest_round_trip_with_song_markers(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+    manifest = ProjectManifest(
+        version=1,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=str((tmp_path / "source.flac").resolve()),
+        separated_at="2026-06-08T20:15:00+00:00",
+        demucs_model="htdemucs",
+        restored_from="original-slug",
+        song_markers=(8.25, 64.5, 120.0),
+    )
+    with (project / PROJECT_FILENAME).open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(manifest.to_dict(), handle, sort_keys=False)
+
+    loaded = load_manifest(project)
+    assert loaded == manifest
+
+    with (project / PROJECT_FILENAME).open(encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+    assert data["version"] == 1
+    assert data["song-markers"] == [8.25, 64.5, 120.0]
+    assert data["restored-from"] == "original-slug"
+    assert data["ingest"]["demucs_model"] == "htdemucs"
+
+
+def test_save_song_markers_preserves_ingest(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+    original = tmp_path / "source.flac"
+    original.write_bytes(b"audio")
+    when = datetime(2026, 6, 8, 20, 15, tzinfo=timezone.utc)
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=original,
+        demucs_model="htdemucs_ft",
+        separated_at=when,
+    )
+    rewrite_manifest_slug(project, "song", restored_from="archived-slug")
+
+    save_song_markers(project, (10.0, 42.5))
+
+    manifest = load_manifest(project)
+    assert manifest.song_markers == (10.0, 42.5)
+    assert manifest.slug == "song"
+    assert manifest.mix_filename == "song.flac"
+    assert manifest.original_path == str(original.resolve())
+    assert manifest.separated_at == "2026-06-08T20:15:00+00:00"
+    assert manifest.demucs_model == "htdemucs_ft"
+    assert manifest.restored_from == "archived-slug"
+    assert manifest.version == 1
+
+    with (project / PROJECT_FILENAME).open(encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+    assert data["ingest"] == {
+        "original_path": str(original.resolve()),
+        "separated_at": "2026-06-08T20:15:00+00:00",
+        "demucs_model": "htdemucs_ft",
+    }
+    assert data["restored-from"] == "archived-slug"
+    assert data["song-markers"] == [10.0, 42.5]

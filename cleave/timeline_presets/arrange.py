@@ -13,11 +13,13 @@ from cleave.timeline_presets.grid import thin_bar_times_for_arrange
 from cleave.timeline_presets.motifs import (
     MIN_SWITCH_GAP_BARS,
     MIN_SWITCH_GAP_SEC,
+    SOFT_LATCH_PROXIMITY_SEC,
     MotifDef,
     expand_motif,
     hamming_distance,
     motif_max_cost_resolved,
     motifs_for_profile,
+    switch_gap_ok,
 )
 
 # Phrase length bounds for the arranger (bar counts and wall-clock seconds).
@@ -32,6 +34,7 @@ def compose_timeline(
     profile: CharacterProfile,
     rng: random.Random,
     bar_times: Sequence[float],
+    song_marker_times: Sequence[float] = (),
 ) -> dict[str, TimelineLane]:
     slot_list = list(slots)
     if not slot_list or duration_sec <= 0.0:
@@ -45,11 +48,12 @@ def compose_timeline(
     motifs = motifs_for_profile(profile.motif_ids)
 
     bars = thin_bar_times_for_arrange(bar_times, duration_sec)
-    if len(bars) < PHRASE_BARS_MIN:
+    markers = _normalize_song_markers(song_marker_times, duration_sec)
+    if len(bars) < PHRASE_BARS_MIN and not markers:
         opening = frozenset({order[0]})
         return cues_from_states(slot_list, [(0.0, opening)])
 
-    phrases = _partition_phrases(bars, duration_sec, rng)
+    phrases = _partition_phrases(bars, duration_sec, rng, markers)
     if not phrases:
         opening = frozenset({order[0]})
         return cues_from_states(slot_list, [(0.0, opening)])
@@ -61,6 +65,7 @@ def compose_timeline(
     climax_used = False
     solo_rotation = 0
     layer_airtime = {slot: 0.0 for slot in order}
+    claimed_markers: set[float] = set()
 
     climax_phrase_index = _climax_phrase_index(phrases, duration_sec)
 
@@ -112,6 +117,9 @@ def compose_timeline(
             prev_time=states[-1][0] if states else None,
             min_gap_bars=MIN_SWITCH_GAP_BARS,
             min_gap_sec=MIN_SWITCH_GAP_SEC,
+            song_marker_times=markers,
+            claimed_markers=claimed_markers,
+            soft_latch_proximity=SOFT_LATCH_PROXIMITY_SEC,
         )
         solo_rotation += len(phrase_states)
 
@@ -148,7 +156,78 @@ def compose_timeline(
     return cues_from_states(slot_list, states)
 
 
+def _normalize_song_markers(
+    song_marker_times: Sequence[float],
+    duration_sec: float,
+) -> list[float]:
+    """Sorted unique markers strictly inside ``(0, duration_sec)``."""
+    cleaned = sorted(
+        {
+            float(t)
+            for t in song_marker_times
+            if 0.0 < float(t) < duration_sec
+        }
+    )
+    return cleaned
+
+
+def _section_bounds(
+    markers: Sequence[float],
+    duration_sec: float,
+) -> list[tuple[float, float]]:
+    cuts = [0.0, *markers, duration_sec]
+    sections: list[tuple[float, float]] = []
+    for start, end in zip(cuts, cuts[1:]):
+        if end - start > 1e-6:
+            sections.append((start, end))
+    return sections
+
+
 def _partition_phrases(
+    bars: Sequence[float],
+    duration_sec: float,
+    rng: random.Random,
+    song_marker_times: Sequence[float] = (),
+) -> list[tuple[float, float]]:
+    markers = list(song_marker_times)
+    if not markers:
+        return _partition_phrases_on_bars(bars, duration_sec, rng)
+
+    phrases: list[tuple[float, float]] = []
+    for sec_start, sec_end in _section_bounds(markers, duration_sec):
+        section_bars = [t for t in bars if sec_start <= t < sec_end]
+        section_phrases = _partition_phrases_in_section(
+            section_bars, sec_start, sec_end, rng
+        )
+        phrases.extend(section_phrases)
+    return phrases
+
+
+def _partition_phrases_in_section(
+    section_bars: Sequence[float],
+    sec_start: float,
+    sec_end: float,
+    rng: random.Random,
+) -> list[tuple[float, float]]:
+    if sec_end - sec_start < 1e-6:
+        return []
+    if not section_bars:
+        return [(sec_start, sec_end)]
+
+    raw = _partition_phrases_on_bars(section_bars, sec_end, rng)
+    if not raw:
+        return [(sec_start, sec_end)]
+
+    adjusted: list[tuple[float, float]] = []
+    for i, (ps, pe) in enumerate(raw):
+        start = sec_start if i == 0 else ps
+        end = sec_end if i == len(raw) - 1 else pe
+        if end - start > 1e-6:
+            adjusted.append((start, end))
+    return adjusted if adjusted else [(sec_start, sec_end)]
+
+
+def _partition_phrases_on_bars(
     bars: Sequence[float],
     duration_sec: float,
     rng: random.Random,
@@ -196,6 +275,12 @@ def _enforce_min_bar_gap(
     min_gap_bars: int,
     min_gap_sec: float = MIN_SWITCH_GAP_SEC,
 ) -> float | None:
+    """Keep ``t`` when gaps are already met (incl. soft-latched markers).
+
+    Otherwise snap forward onto the bar grid.
+    """
+    if switch_gap_ok(prev_t, t, bars, min_gap_bars, min_gap_sec):
+        return t
     if not bars:
         return None
     prev_idx = _nearest_bar_index(prev_t, bars)

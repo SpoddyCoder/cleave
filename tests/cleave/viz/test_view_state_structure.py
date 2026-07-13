@@ -148,11 +148,19 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     bar_grid = RowDescriptor(RowKind.TIMELINE_BAR_GRID)
     snap_beats = RowDescriptor(RowKind.TIMELINE_SNAP_TO_BEATS)
     snap_bars = RowDescriptor(RowKind.TIMELINE_SNAP_TO_BARS)
+    snap_markers = RowDescriptor(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
+    snap_prox = RowDescriptor(RowKind.TIMELINE_SNAP_MARKER_PROXIMITY)
+    snap_scope = RowDescriptor(RowKind.TIMELINE_SNAP_MARKER_SCOPE)
+    markers_header = RowDescriptor(RowKind.SONG_MARKERS_HEADER)
     assert presets not in view_closed.layout.rows
     assert bar_phase not in view_closed.layout.rows
     assert bar_grid not in view_closed.layout.rows
     assert snap_beats not in view_closed.layout.rows
     assert snap_bars not in view_closed.layout.rows
+    assert snap_prox not in view_closed.layout.rows
+    assert snap_scope not in view_closed.layout.rows
+    assert snap_markers not in view_closed.layout.rows
+    assert markers_header not in view_closed.layout.rows
 
     session.timeline.panel_open = True
     view_open = builder.build(paused=False)
@@ -162,15 +170,32 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert bar_grid in view_open.layout.rows
     assert snap_beats in view_open.layout.rows
     assert snap_bars in view_open.layout.rows
+    assert snap_markers in view_open.layout.rows
+    assert snap_prox not in view_open.layout.rows
+    assert snap_scope not in view_open.layout.rows
+    assert markers_header in view_open.layout.rows
     presets_idx = view_open.layout.rows.index(presets)
     bar_phase_idx = view_open.layout.rows.index(bar_phase)
     bar_grid_idx = view_open.layout.rows.index(bar_grid)
     snap_beats_idx = view_open.layout.rows.index(snap_beats)
     snap_bars_idx = view_open.layout.rows.index(snap_bars)
+    snap_markers_idx = view_open.layout.rows.index(snap_markers)
+    markers_idx = view_open.layout.rows.index(markers_header)
+    assert presets_idx == markers_idx + 1
     assert bar_phase_idx == presets_idx + 1
     assert bar_grid_idx == bar_phase_idx + 1
     assert snap_beats_idx == bar_grid_idx + 1
     assert snap_bars_idx == snap_beats_idx + 1
+    assert snap_markers_idx == snap_bars_idx + 1
+
+    session.timeline.song_marker_snap_expanded = True
+    view_snap_expanded = builder.build(paused=False)
+    assert view_snap_expanded.layout is not view_open.layout
+    snap_prox_idx = view_snap_expanded.layout.rows.index(snap_prox)
+    snap_scope_idx = view_snap_expanded.layout.rows.index(snap_scope)
+    snap_markers_idx = view_snap_expanded.layout.rows.index(snap_markers)
+    assert snap_prox_idx == snap_markers_idx + 1
+    assert snap_scope_idx == snap_prox_idx + 1
 
     session.timeline.panel_open = False
     view_closed_again = builder.build(paused=False)
@@ -180,6 +205,10 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert bar_grid not in view_closed_again.layout.rows
     assert snap_beats not in view_closed_again.layout.rows
     assert snap_bars not in view_closed_again.layout.rows
+    assert snap_prox not in view_closed_again.layout.rows
+    assert snap_scope not in view_closed_again.layout.rows
+    assert snap_markers not in view_closed_again.layout.rows
+    assert markers_header not in view_closed_again.layout.rows
 
 
 def test_structure_signature_invalidates_on_highlight_rolloff_mode() -> None:
@@ -269,3 +298,76 @@ def test_minimal_view_state_still_builds_layout() -> None:
     assert state.layout is not None
     assert state.layout_frame is not None
     assert len(state.layout.rows) > 0
+
+
+def test_structure_signature_invalidates_on_song_marker_count() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.song_markers.times = [10.0, 20.0]
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_structure_signature_invalidates_on_song_markers_expanded() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.song_markers.expanded = False
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.song_markers.expanded = True
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_structure_signature_invalidates_on_song_marker_snap_expanded() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.timeline.song_marker_snap_expanded = False
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.timeline.song_marker_snap_expanded = True
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_row_layout_includes_song_marker_items_when_expanded() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    session.timeline.panel_open = True
+    session.song_markers.times = [8.0, 32.5, 64.0]
+    session.song_markers.expanded = True
+    builder = controls._view_state
+
+    view = builder.build(paused=False)
+    header = RowDescriptor(RowKind.SONG_MARKERS_HEADER)
+    assert header in view.layout.rows
+    items = [
+        desc
+        for desc in view.layout.rows
+        if desc.kind == RowKind.SONG_MARKER_ITEM
+    ]
+    assert len(items) == 3
+    assert [desc.marker_index for desc in items] == [0, 1, 2]
+    header_idx = view.layout.rows.index(header)
+    assert view.layout.rows.index(items[0]) == header_idx + 1
+
+    session.song_markers.expanded = False
+    view_collapsed = builder.build(paused=False)
+    assert header in view_collapsed.layout.rows
+    assert not any(
+        desc.kind == RowKind.SONG_MARKER_ITEM for desc in view_collapsed.layout.rows
+    )
