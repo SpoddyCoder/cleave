@@ -22,6 +22,7 @@ from cleave.viz.row_fields import (
     format_expand_subheader_value,
     format_row_value,
     labeled_row_prefix,
+    row_action_parameter_display_text,
     row_composite_header_display_text,
     row_dynamic_labeled_display_text,
     row_dynamic_labeled_prefix,
@@ -38,6 +39,7 @@ from cleave.viz.row_sections import (
     row_tree_indent_depth,
 )
 from cleave.viz.row_semantics import (
+    ACTION_PARAMETER_SUB_ROW_KINDS,
     LABELED_SUB_ROW_KINDS,
     RowDescriptor,
     RowKind,
@@ -167,7 +169,11 @@ def _row_text(state: TuningViewState, index: int) -> str:
     if field is not None:
         if field.present_style == RowPresentStyle.LABELED_VALUE:
             return row_labeled_display_text(state, desc)
+        if field.present_style == RowPresentStyle.ACTION_PARAMETER:
+            return row_action_parameter_display_text(state, desc)
         if field.present_style == RowPresentStyle.EXPAND_SUBHEADER:
+            return row_expand_subheader_display_text(state, desc)
+        if field.present_style == RowPresentStyle.ACTION_EXPAND_SUBHEADER:
             return row_expand_subheader_display_text(state, desc)
         if field.present_style == RowPresentStyle.COMPOSITE_HEADER:
             return row_composite_header_display_text(state, desc)
@@ -178,6 +184,69 @@ def _row_text(state: TuningViewState, index: int) -> str:
         if field.present_style == RowPresentStyle.DYNAMIC:
             return row_dynamic_labeled_display_text(state, desc)
     return ""
+
+
+def _action_parameter_row_prefix(kind: RowKind) -> str:
+    return labeled_row_prefix(kind)
+
+
+def _action_parameter_row_value(state: TuningViewState, index: int) -> str:
+    return format_row_value(state, state.layout.descriptor(index))
+
+
+def _expand_subheader_arrow_color(
+    state: TuningViewState, index: int
+) -> tuple[int, int, int]:
+    """Expand arrow uses VALUE white (and focus/disabled/locked), not ACTION green."""
+    kind = state.layout.kind(index)
+    desc = state.layout.descriptor(index)
+    locked_blocked = section_locked(state, desc) and row_blocked_by_section_lock(kind)
+
+    if kind in RENDER_TIMELINE_SECTION_KINDS:
+        if not state.render_timeline.enabled:
+            return DISABLED
+
+    if locked_blocked:
+        return LOCKED
+
+    if _row_has_tree_focus(state, index):
+        return _row_highlight_color(state, index)
+
+    return VALUE
+
+
+def _action_parameter_label_color(
+    state: TuningViewState, index: int
+) -> tuple[int, int, int]:
+    """ACTION green label prefix matching the parent action row."""
+    kind = state.layout.kind(index)
+    desc = state.layout.descriptor(index)
+    locked_blocked = section_locked(state, desc) and row_blocked_by_section_lock(kind)
+
+    if kind in RENDER_TIMELINE_SECTION_KINDS:
+        if not state.render_timeline.enabled:
+            return DISABLED
+
+    if locked_blocked:
+        return LOCKED
+
+    return ACTION
+
+
+def _fit_action_parameter_row_value(
+    font: pygame.font.Font,
+    state: TuningViewState,
+    index: int,
+    *,
+    max_content_width: int = PANEL_CONTENT_MAX_WIDTH,
+    cache: TuningPanelCache | None = None,
+) -> str:
+    budget = max_content_width - _row_indent(state, index)
+    budget -= font.size(_action_parameter_row_prefix(state.layout.kind(index)))[0]
+    value = _action_parameter_row_value(state, index)
+    if cache is None:
+        return fit_text_to_width(font, value, budget)
+    return cache.fit_text_cached("text", fit_text_to_width, font, value, budget)
 
 
 def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
@@ -482,6 +551,16 @@ def fit_row_text(
         return row_composite_header_display_text(state, state.layout.descriptor(index))
     if field is not None and field.present_style == RowPresentStyle.EXPAND_SUBHEADER:
         return row_expand_subheader_display_text(state, state.layout.descriptor(index))
+    if field is not None and field.present_style == RowPresentStyle.ACTION_EXPAND_SUBHEADER:
+        return row_expand_subheader_display_text(state, state.layout.descriptor(index))
+    if kind in ACTION_PARAMETER_SUB_ROW_KINDS:
+        return _action_parameter_row_prefix(kind) + _fit_action_parameter_row_value(
+            font,
+            state,
+            index,
+            max_content_width=max_content_width,
+            cache=cache,
+        )
     if kind in LABELED_SUB_ROW_KINDS:
         return _labeled_sub_row_prefix(state, index) + _fit_labeled_sub_row_value(
             font,
@@ -549,6 +628,7 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
         RowKind.TIMELINE_PRESETS,
         RowKind.TIMELINE_SNAP_TO_BEATS,
         RowKind.TIMELINE_SNAP_TO_BARS,
+        RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
     }:
         if kind == RowKind.CONFIG_HEADER and state.solo_active:
             return DISABLED
@@ -888,11 +968,25 @@ def _estimate_row_content_width(
 
     if (
         ROW_FIELDS.get(kind) is not None
-        and ROW_FIELDS[kind].present_style == RowPresentStyle.EXPAND_SUBHEADER
+        and ROW_FIELDS[kind].present_style
+        in {
+            RowPresentStyle.EXPAND_SUBHEADER,
+            RowPresentStyle.ACTION_EXPAND_SUBHEADER,
+        }
     ):
         desc = state.layout.descriptor(index)
         prefix = expand_subheader_prefix(kind)
         value = format_expand_subheader_value(state, desc)
+        return indent + font.size(prefix)[0] + font.size(value)[0]
+
+    if kind in ACTION_PARAMETER_SUB_ROW_KINDS:
+        prefix = _action_parameter_row_prefix(kind)
+        value = _fit_action_parameter_row_value(
+            font,
+            state,
+            index,
+            max_content_width=max_content_width,
+        )
         return indent + font.size(prefix)[0] + font.size(value)[0]
 
     if kind in LABELED_SUB_ROW_KINDS:
@@ -1368,6 +1462,42 @@ class TuningOverlay:
                 prefix=expand_subheader_prefix(kind),
                 value=format_expand_subheader_value(state, desc),
                 value_color=color,
+                line_height=line_h,
+                counters=counters,
+            )
+            return surf, None, indent + surf.get_width()
+
+        if (
+            ROW_FIELDS.get(kind) is not None
+            and ROW_FIELDS[kind].present_style == RowPresentStyle.ACTION_EXPAND_SUBHEADER
+        ):
+            desc = state.layout.descriptor(index)
+            surf = _render_label_value_row(
+                font,
+                prefix=expand_subheader_prefix(kind),
+                value=format_expand_subheader_value(state, desc),
+                value_color=_expand_subheader_arrow_color(state, index),
+                prefix_color=_action_parameter_label_color(state, index),
+                line_height=line_h,
+                counters=counters,
+            )
+            return surf, None, indent + surf.get_width()
+
+        if kind in ACTION_PARAMETER_SUB_ROW_KINDS:
+            prefix = _action_parameter_row_prefix(kind)
+            value = _fit_action_parameter_row_value(
+                font,
+                state,
+                index,
+                max_content_width=max_content_width,
+                cache=cache,
+            )
+            surf = _render_label_value_row(
+                font,
+                prefix=prefix,
+                value=value,
+                value_color=_row_value_color(state, index),
+                prefix_color=_action_parameter_label_color(state, index),
                 line_height=line_h,
                 counters=counters,
             )

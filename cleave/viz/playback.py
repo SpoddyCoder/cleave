@@ -22,10 +22,14 @@ def format_mmss(sec: float) -> str:
     return f"{s // 60:02d}:{s % 60:02d}"
 
 
+def seek_to(state: PlaybackState, position_sec: float, duration_sec: float) -> None:
+    clamped = max(0.0, min(float(position_sec), duration_sec))
+    state.player.seek(clamped)
+
+
 def seek(state: PlaybackState, delta_sec: float, duration_sec: float) -> None:
     t = current_sec(state, duration_sec)
-    position_sec = max(0.0, min(t + delta_sec, duration_sec))
-    state.player.seek(position_sec)
+    seek_to(state, t + delta_sec, duration_sec)
 
 
 def toggle_pause(state: PlaybackState, _duration_sec: float) -> None:

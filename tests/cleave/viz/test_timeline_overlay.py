@@ -17,6 +17,8 @@ from cleave.viz.theme import (
     OVERRIDE_GLYPH,
     OVERRIDE_GLYPH_OFF,
     SOLO_BG,
+    SONG_MARKER,
+    SONG_MARKER_SELECTED,
     timeline_ui_metrics,
 )
 from cleave.viz.timeline_overlay import (
@@ -73,6 +75,8 @@ def _view_state(
     arm_flash_start_ms: dict[str, int] | None = None,
     show_bar_grid: bool = False,
     bar_grid_times: tuple[float, ...] = (),
+    song_marker_times: tuple[float, ...] = (),
+    selected_song_marker_index: int | None = None,
 ) -> TimelineViewState:
     order = list(layer_z_order or list(DEFAULT_LAYER_SLOTS))
     lane_map = dict(lanes or {})
@@ -115,6 +119,8 @@ def _view_state(
         arm_flash_start_ms=dict(arm_flash_start_ms or ()),
         show_bar_grid=show_bar_grid,
         bar_grid_times=bar_grid_times,
+        song_marker_times=song_marker_times,
+        selected_song_marker_index=selected_song_marker_index,
     )
 
 
@@ -580,6 +586,31 @@ def test_draw_does_not_crash() -> None:
     assert px >= 0 and py >= 0
     assert px + pw <= sw and py + ph <= sh
     surface.subsurface(panel)
+
+
+def test_song_markers_drawn_on_static_panel() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    state = _view_state(
+        duration_sec=100.0,
+        song_marker_times=(25.0, 75.0),
+        selected_song_marker_index=1,
+    )
+    composed = overlay.compose_panel(
+        state,
+        viewport_width=1280,
+        viewport_height=720,
+    )
+    assert composed is not None
+    static = overlay._cache.panel
+    assert static is not None
+    assert overlay.bar_layout is not None
+    bar_left, bar_width, _ = overlay.bar_layout
+    mid_y = static.get_height() // 2
+    x_unselected = time_to_x(25.0, bar_left, bar_width, 100.0)
+    x_selected = time_to_x(75.0, bar_left, bar_width, 100.0)
+    assert static.get_at((x_unselected, mid_y))[:3] == SONG_MARKER
+    assert static.get_at((x_selected, mid_y))[:3] == SONG_MARKER_SELECTED
 
 
 def test_draw_when_disabled() -> None:

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Sequence
 
 import yaml
 
@@ -21,6 +22,7 @@ class ProjectManifest:
     separated_at: str
     demucs_model: str
     restored_from: str | None = None
+    song_markers: tuple[float, ...] = ()
 
     @classmethod
     def from_dict(cls, data: dict) -> ProjectManifest:
@@ -33,6 +35,13 @@ class ProjectManifest:
             raise ValueError("invalid project manifest: mix.filename")
         restored = data.get("restored-from")
         restored_from = None if restored is None else str(restored)
+        raw_markers = data.get("song-markers")
+        if raw_markers is None:
+            song_markers: tuple[float, ...] = ()
+        elif isinstance(raw_markers, list):
+            song_markers = tuple(float(x) for x in raw_markers)
+        else:
+            raise ValueError("invalid project manifest: song-markers")
         return cls(
             version=int(data["version"]),
             slug=str(data["slug"]),
@@ -41,6 +50,7 @@ class ProjectManifest:
             separated_at=str(ingest["separated_at"]),
             demucs_model=str(ingest["demucs_model"]),
             restored_from=restored_from,
+            song_markers=song_markers,
         )
 
     def to_dict(self) -> dict:
@@ -56,6 +66,8 @@ class ProjectManifest:
         }
         if self.restored_from is not None:
             data["restored-from"] = self.restored_from
+        if self.song_markers:
+            data["song-markers"] = [float(t) for t in self.song_markers]
         return data
 
 
@@ -71,15 +83,7 @@ def rewrite_manifest_slug(
 ) -> Path:
     """Update ``project.yaml`` *slug* and optional ``restored-from`` provenance."""
     manifest = load_manifest(project_dir)
-    updated = ProjectManifest(
-        version=manifest.version,
-        slug=slug,
-        mix_filename=manifest.mix_filename,
-        original_path=manifest.original_path,
-        separated_at=manifest.separated_at,
-        demucs_model=manifest.demucs_model,
-        restored_from=restored_from,
-    )
+    updated = replace(manifest, slug=slug, restored_from=restored_from)
     path = manifest_path(project_dir)
     with path.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(updated.to_dict(), handle, sort_keys=False)
@@ -105,6 +109,7 @@ def write_manifest(
     original_path: Path,
     demucs_model: str,
     separated_at: datetime | None = None,
+    song_markers: Sequence[float] = (),
 ) -> Path:
     when = separated_at or datetime.now(timezone.utc)
     manifest = ProjectManifest(
@@ -114,10 +119,21 @@ def write_manifest(
         original_path=str(original_path.resolve()),
         separated_at=when.isoformat(),
         demucs_model=demucs_model,
+        song_markers=tuple(float(t) for t in song_markers),
     )
     path = manifest_path(project_dir)
     with path.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(manifest.to_dict(), handle, sort_keys=False)
+    return path
+
+
+def save_song_markers(project_dir: Path, markers: Sequence[float]) -> Path:
+    """Replace ``song-markers`` in ``project.yaml``, preserving ingest and provenance."""
+    manifest = load_manifest(project_dir)
+    updated = replace(manifest, song_markers=tuple(float(t) for t in markers))
+    path = manifest_path(project_dir)
+    with path.open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(updated.to_dict(), handle, sort_keys=False)
     return path
 
 

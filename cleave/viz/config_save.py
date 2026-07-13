@@ -11,6 +11,7 @@ import pygame
 
 from cleave.config import VIZ_CONFIG_FILENAME, CleaveConfig
 from cleave.config_schema import persisted_session_payload
+from cleave.project import save_song_markers
 from cleave.viz.modal import ModalHost, ModalKind
 from cleave.viz.session import TuningSession, allow_overwrite_for_path
 
@@ -18,7 +19,12 @@ _DEFAULT_SAVE_FILENAME = "unnamed-1.yaml"
 
 
 class ConfigSaveController:
-    """Dirty tracking, save dialogs, and deferred quit."""
+    """Dirty tracking, save dialogs, and deferred quit.
+
+    Viz YAML fields use ``persisted_session_payload``. Song markers are
+    project-scoped (``project.yaml``) and participate in dirty via a separate
+    baseline of marker times; they flush on successful Save, not on each edit.
+    """
 
     def __init__(
         self,
@@ -26,6 +32,7 @@ class ConfigSaveController:
         cfg: CleaveConfig,
         modal_host: ModalHost,
         *,
+        project_dir: Path | None = None,
         launch_config_path: Path | None = None,
         repo_root_example: Path | None = None,
         on_save_new_config: Callable[[], Path | None] | None = None,
@@ -36,6 +43,7 @@ class ConfigSaveController:
         self.session = session
         self.cfg = cfg
         self._modal = modal_host
+        self._project_dir = project_dir
         self._active_config_path = launch_config_path
         self._repo_root_example = (
             repo_root_example
@@ -48,6 +56,7 @@ class ConfigSaveController:
         self._move_mode_signature = move_mode_signature
 
         self._saved_signature = self._persisted_signature()
+        self._saved_song_markers = tuple(session.song_markers.times)
         self._pending_exit = False
         self._quit_after_save = False
 
@@ -57,10 +66,24 @@ class ConfigSaveController:
 
     @property
     def config_dirty(self) -> bool:
-        return self._persisted_signature() != self._saved_signature
+        return (
+            self._persisted_signature() != self._saved_signature
+            or tuple(self.session.song_markers.times) != self._saved_song_markers
+        )
 
     def clear_config_dirty(self) -> None:
         self._saved_signature = self._persisted_signature()
+        self._saved_song_markers = tuple(self.session.song_markers.times)
+
+    def _flush_song_markers(self) -> None:
+        if self._project_dir is None:
+            return
+        save_song_markers(self._project_dir, self.session.song_markers.times)
+
+    def _commit_save(self) -> None:
+        """Flush project song markers (when available) and clear dirty baselines."""
+        self._flush_song_markers()
+        self.clear_config_dirty()
 
     def _persisted_signature(self) -> str:
         payload = persisted_session_payload(self.cfg, self.session)
@@ -129,7 +152,7 @@ class ConfigSaveController:
         else:
             self._active_config_path = saved_path
             filename = saved_path.name
-            self.clear_config_dirty()
+            self._commit_save()
         self._show_save_notification(f"Config saved to {filename}")
         self._finish_quit_after_save()
 
@@ -163,7 +186,7 @@ class ConfigSaveController:
                 written = basename
             if not written:
                 written = basename
-            self.clear_config_dirty()
+            self._commit_save()
             self._show_save_notification(f"Config overwritten: {written}")
             self._finish_quit_after_save()
 

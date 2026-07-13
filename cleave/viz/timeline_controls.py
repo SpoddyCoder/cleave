@@ -142,9 +142,6 @@ class TimelineControls:
                 self._refresh_visibility()
             return True
 
-        if event.key == pygame.K_RETURN and mod_ctrl(event.mod):
-            return True
-
         if event.key == pygame.K_RETURN and mod_shift(event.mod):
             if not self.session.timeline.recording:
                 self._toggle_override_focused_row()

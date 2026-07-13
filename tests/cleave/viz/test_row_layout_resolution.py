@@ -271,3 +271,6 @@ def test_section_header_descriptor_mappings() -> None:
     assert section_header_descriptor(
         RowDescriptor(RowKind.TRACK_PRESET_DURATION, slot="layer_1")
     ) == RowDescriptor(RowKind.TRACK_PRESET_SWITCHING, slot="layer_1")
+    assert section_header_descriptor(
+        RowDescriptor(RowKind.SONG_MARKER_ITEM, marker_index=0)
+    ) == RowDescriptor(RowKind.SONG_MARKERS_HEADER)

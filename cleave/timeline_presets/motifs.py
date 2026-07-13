@@ -11,6 +11,8 @@ from cleave.timeline_presets.chords import ChordVocab
 # Minimum spacing between layer visibility transitions.
 MIN_SWITCH_GAP_BARS = 2
 MIN_SWITCH_GAP_SEC = 6.0
+# Prefer planned switches onto nearby song markers (generation soft latch).
+SOFT_LATCH_PROXIMITY_SEC = 5.0
 
 
 @dataclass(frozen=True)
@@ -203,6 +205,131 @@ def _effective_step_bars(
     return step
 
 
+def switch_gap_ok(
+    prev_t: float,
+    t: float,
+    bars: Sequence[float],
+    min_gap_bars: int,
+    min_gap_sec: float,
+) -> bool:
+    """True when ``t`` meets second and bar-index floors relative to ``prev_t``."""
+    if t - prev_t < min_gap_sec - 1e-9:
+        return False
+    if not bars:
+        return True
+    prev_idx = _nearest_bar_index(prev_t, bars)
+    t_idx = _nearest_bar_index(t, bars)
+    return t_idx - prev_idx >= min_gap_bars
+
+
+def _marker_claimed(marker: float, claimed: set[float]) -> bool:
+    return any(abs(marker - c) < 1e-9 for c in claimed)
+
+
+def _claim_marker(marker: float, claimed: set[float]) -> None:
+    if not _marker_claimed(marker, claimed):
+        claimed.add(marker)
+
+
+def claim_marker_at_time(
+    t: float,
+    markers: Sequence[float],
+    claimed: set[float],
+) -> None:
+    """If ``t`` coincides with a song marker, mark that marker claimed."""
+    for marker in markers:
+        if abs(t - marker) < 1e-9:
+            _claim_marker(marker, claimed)
+            return
+
+
+def soft_latch_time(
+    planned: float,
+    markers: Sequence[float],
+    claimed: set[float],
+    *,
+    bars: Sequence[float],
+    prev_time: float | None,
+    proximity: float = SOFT_LATCH_PROXIMITY_SEC,
+    min_gap_bars: int = MIN_SWITCH_GAP_BARS,
+    min_gap_sec: float = MIN_SWITCH_GAP_SEC,
+) -> float:
+    """Nudge ``planned`` onto the nearest unclaimed marker within proximity.
+
+    Skips markers that would violate min switch gaps vs ``prev_time``.
+    """
+    best: tuple[float, float] | None = None
+    for marker in markers:
+        if _marker_claimed(marker, claimed):
+            continue
+        dist = abs(marker - planned)
+        if dist > proximity + 1e-9:
+            continue
+        if prev_time is not None and not switch_gap_ok(
+            prev_time, marker, bars, min_gap_bars, min_gap_sec
+        ):
+            continue
+        if (
+            best is None
+            or dist < best[0] - 1e-12
+            or (abs(dist - best[0]) < 1e-12 and marker < best[1])
+        ):
+            best = (dist, marker)
+    if best is None:
+        claim_marker_at_time(planned, markers, claimed)
+        return planned
+    _claim_marker(best[1], claimed)
+    return best[1]
+
+
+def _phrase_step_times(
+    phrase_start: float,
+    phrase_end: float,
+    bar_times: Sequence[float],
+) -> list[float]:
+    """Bar times in the phrase, always including ``phrase_start`` when off-grid."""
+    times = [t for t in bar_times if phrase_start <= t < phrase_end]
+    if not times:
+        return [phrase_start]
+    if abs(times[0] - phrase_start) > 1e-9:
+        return [phrase_start, *times]
+    return times
+
+
+def _soft_latch_states(
+    states: list[tuple[float, frozenset[str]]],
+    markers: Sequence[float],
+    claimed: set[float],
+    *,
+    bars: Sequence[float],
+    phrase_start: float,
+    phrase_end: float,
+    prev_time: float | None,
+    proximity: float,
+    min_gap_bars: int,
+    min_gap_sec: float,
+) -> list[tuple[float, frozenset[str]]]:
+    in_phrase = [m for m in markers if phrase_start <= m < phrase_end]
+    if not in_phrase:
+        return states
+    latched: list[tuple[float, frozenset[str]]] = []
+    local_prev = prev_time
+    for planned, active in states:
+        t = soft_latch_time(
+            planned,
+            in_phrase,
+            claimed,
+            bars=bars,
+            prev_time=local_prev,
+            proximity=proximity,
+            min_gap_bars=min_gap_bars,
+            min_gap_sec=min_gap_sec,
+        )
+        latched.append((t, active))
+        local_prev = t
+    return latched
+
+
 def _expand_flash_tutti(
     vocab: ChordVocab,
     rotation: int,
@@ -213,12 +340,29 @@ def _expand_flash_tutti(
     min_gap_bars: int,
     min_gap_sec: float,
     prev_time: float | None = None,
+    *,
+    song_marker_times: Sequence[float] = (),
+    claimed_markers: set[float] | None = None,
+    soft_latch_proximity: float = SOFT_LATCH_PROXIMITY_SEC,
 ) -> list[tuple[float, frozenset[str]]]:
+    claimed = claimed_markers if claimed_markers is not None else set()
     if vocab.tutti_id is None:
-        phrase_bars = [t for t in bar_times if phrase_start <= t < phrase_end]
+        phrase_bars = _phrase_step_times(phrase_start, phrase_end, bar_times)
         solo = vocab.active_for(_pick_single(vocab, rotation))
-        t0 = phrase_bars[0] if phrase_bars else phrase_start
-        return [(t0, solo)]
+        t0 = phrase_bars[0]
+        states = [(t0, solo)]
+        return _soft_latch_states(
+            states,
+            song_marker_times,
+            claimed,
+            bars=bar_times,
+            phrase_start=phrase_start,
+            phrase_end=phrase_end,
+            prev_time=prev_time,
+            proximity=soft_latch_proximity,
+            min_gap_bars=min_gap_bars,
+            min_gap_sec=min_gap_sec,
+        )
 
     duo = vocab.active_for(_pick_duo(vocab, rotation))
     tutti = vocab.active_for(_pick_tutti(vocab))
@@ -226,7 +370,19 @@ def _expand_flash_tutti(
 
     bars = list(bar_times)
     if not bars:
-        return [(phrase_start, tutti)]
+        states = [(phrase_start, tutti)]
+        return _soft_latch_states(
+            states,
+            song_marker_times,
+            claimed,
+            bars=bars,
+            phrase_start=phrase_start,
+            phrase_end=phrase_end,
+            prev_time=prev_time,
+            proximity=soft_latch_proximity,
+            min_gap_bars=min_gap_bars,
+            min_gap_sec=min_gap_sec,
+        )
 
     window_start = 0.70 * duration_sec
     window_end = 0.78 * duration_sec
@@ -248,7 +404,19 @@ def _expand_flash_tutti(
         prev_idx = _nearest_bar_index(prev_time, bars)
         earliest_idx = _index_after_gap(bars, prev_idx, min_gap_bars, min_gap_sec)
         if earliest_idx is None:
-            return [(phrase_start, duo)]
+            states = [(phrase_start, duo)]
+            return _soft_latch_states(
+                states,
+                song_marker_times,
+                claimed,
+                bars=bars,
+                phrase_start=phrase_start,
+                phrase_end=phrase_end,
+                prev_time=prev_time,
+                proximity=soft_latch_proximity,
+                min_gap_bars=min_gap_bars,
+                min_gap_sec=min_gap_sec,
+            )
         earliest = bars[earliest_idx]
 
     tutti_idx = _nearest_bar_index(tutti_t, bars)
@@ -270,7 +438,7 @@ def _expand_flash_tutti(
     duo_t = bars[duo_idx]
     solo_t = bars[solo_idx] if solo_idx is not None else bars[-1]
 
-    states: list[tuple[float, frozenset[str]]] = []
+    states = []
     if (
         duo_t >= earliest - 1e-9
         and duo_t >= phrase_start - 1e-9
@@ -284,7 +452,18 @@ def _expand_flash_tutti(
         and solo_t > tutti_t + 1e-9
     ):
         states.append((solo_t, solo))
-    return states
+    return _soft_latch_states(
+        states,
+        song_marker_times,
+        claimed,
+        bars=bars,
+        phrase_start=phrase_start,
+        phrase_end=phrase_end,
+        prev_time=prev_time,
+        proximity=soft_latch_proximity,
+        min_gap_bars=min_gap_bars,
+        min_gap_sec=min_gap_sec,
+    )
 
 
 def expand_motif(
@@ -300,8 +479,16 @@ def expand_motif(
     prev_time: float | None = None,
     min_gap_bars: int = MIN_SWITCH_GAP_BARS,
     min_gap_sec: float = MIN_SWITCH_GAP_SEC,
+    song_marker_times: Sequence[float] = (),
+    claimed_markers: set[float] | None = None,
+    soft_latch_proximity: float = SOFT_LATCH_PROXIMITY_SEC,
 ) -> list[tuple[float, frozenset[str]]]:
-    """Expand a motif into timed active sets on bar boundaries within a phrase."""
+    """Expand a motif into timed active sets within a phrase.
+
+    Steps land on the bar grid (plus phrase start when off-grid). Planned
+    times soft-latch onto nearby unclaimed song markers when provided.
+    """
+    claimed = claimed_markers if claimed_markers is not None else set()
     if motif.id == "flash_tutti":
         return _expand_flash_tutti(
             vocab,
@@ -313,32 +500,45 @@ def expand_motif(
             min_gap_bars,
             min_gap_sec,
             prev_time,
+            song_marker_times=song_marker_times,
+            claimed_markers=claimed,
+            soft_latch_proximity=soft_latch_proximity,
         )
 
     chord_ids = motif.resolve_steps(vocab, rng, rotation)
-    phrase_bars = [t for t in bar_times if phrase_start <= t < phrase_end]
-    if not phrase_bars:
-        phrase_bars = [phrase_start]
+    phrase_bars = _phrase_step_times(phrase_start, phrase_end, bar_times)
 
     n = len(chord_ids)
     step = _effective_step_bars(phrase_bars, min_gap_bars, min_gap_sec)
     if n == 1 or len(phrase_bars) < 1 + (n - 1) * step:
-        return [(phrase_bars[0], vocab.active_for(chord_ids[0]))]
+        states = [(phrase_bars[0], vocab.active_for(chord_ids[0]))]
+    else:
+        span = len(phrase_bars) - 1
+        min_needed = (n - 1) * step
+        if span < min_needed:
+            states = [(phrase_bars[0], vocab.active_for(chord_ids[0]))]
+        else:
+            step = max(step, span // n)
+            if step * (n - 1) > span:
+                step = _effective_step_bars(phrase_bars, min_gap_bars, min_gap_sec)
 
-    span = len(phrase_bars) - 1
-    min_needed = (n - 1) * step
-    if span < min_needed:
-        return [(phrase_bars[0], vocab.active_for(chord_ids[0]))]
+            states = []
+            for i, chord_id in enumerate(chord_ids):
+                idx = min(i * step, len(phrase_bars) - 1)
+                states.append((phrase_bars[idx], vocab.active_for(chord_id)))
 
-    step = max(step, span // n)
-    if step * (n - 1) > span:
-        step = _effective_step_bars(phrase_bars, min_gap_bars, min_gap_sec)
-
-    states: list[tuple[float, frozenset[str]]] = []
-    for i, chord_id in enumerate(chord_ids):
-        idx = min(i * step, len(phrase_bars) - 1)
-        states.append((phrase_bars[idx], vocab.active_for(chord_id)))
-    return states
+    return _soft_latch_states(
+        states,
+        song_marker_times,
+        claimed,
+        bars=bar_times,
+        phrase_start=phrase_start,
+        phrase_end=phrase_end,
+        prev_time=prev_time,
+        proximity=soft_latch_proximity,
+        min_gap_bars=min_gap_bars,
+        min_gap_sec=min_gap_sec,
+    )
 
 
 def hamming_distance(a: frozenset[str], b: frozenset[str]) -> int:

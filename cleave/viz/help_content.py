@@ -36,13 +36,14 @@ HelpContent = HelpSection | DescriptionSection
 KEYBOARD_CONTROLS_SECTION_TITLE = "Keyboard Controls"
 
 NAVIGATION_SECTION = HelpSection(
-    "Navigation",
+    "Navigation / Global",
     (
         ("Up/Down", "move row"),
         ("Ctrl + Up/Down", "jump section"),
         ("ESC", "hide UI"),
         ("Ctrl + Q", "quit"),
         ("Ctrl + S", "save config"),
+        ("Ctrl + Enter", "place song marker"),
     ),
 )
 
@@ -294,6 +295,8 @@ def sections_for(
                 (("Left/Right", "expand/collapse"),),
             )
     elif behavior.affordance == RowAffordance.VALUE_STEP:
+        primary = _value_step_section(row_kind)
+    elif behavior.affordance == RowAffordance.ACTION_PARAMETER:
         primary = _value_step_section(row_kind)
     elif row_kind == RowKind.TRACK_USER_PRESET_ITEM:
         primary = _USER_PRESET_ITEM_SECTION
