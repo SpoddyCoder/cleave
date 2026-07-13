@@ -884,6 +884,10 @@ def test_action_parameter_row_value_color() -> None:
     assert _action_parameter_label_color(state, prox_row) == ACTION
     assert _action_parameter_label_color(state, scope_row) == ACTION
 
+    state.focus_descriptor = state.layout.descriptor(snap_row)
+    assert _row_value_color(state, snap_row) == ACTION
+    assert _expand_subheader_arrow_color(state, snap_row) == VALUE
+
     locked = _minimal_view_state(
         render_timeline=RenderTimelineBlock(
             enabled=True,
