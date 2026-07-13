@@ -41,6 +41,7 @@ from cleave.viz.theme import (
     HIGHLIGHT,
     LABEL,
     PLAYHEAD,
+    PLAYHEAD_FLASH,
     REC_BG,
     SONG_MARKER,
     SONG_MARKER_SELECTED,
@@ -73,6 +74,7 @@ REC_BADGE_PAD_X: int = _timeline_ui.rec_badge_pad_x
 REC_BADGE_PAD_Y: int = _timeline_ui.rec_badge_pad_y
 REC_TIME_GAP: int = _timeline_ui.rec_time_gap
 REC_FLASH_MS: int = 500
+PLAYHEAD_FLASH_MS: int = 400
 ARM_FLASH_HALF_MS: int = 150
 ARM_FLASH_DURATION_MS: int = ARM_FLASH_HALF_MS * 4
 
@@ -227,6 +229,19 @@ def rec_flash_visible(ticks_ms: int | None = None) -> bool:
     return (ticks_ms // REC_FLASH_MS) % 2 == 0
 
 
+def playhead_flash_bright(ticks_ms: int | None = None) -> bool:
+    """True on the bright half of the playhead blink cycle."""
+    if ticks_ms is None:
+        ticks_ms = pygame.time.get_ticks()
+    return (ticks_ms // PLAYHEAD_FLASH_MS) % 2 == 0
+
+
+def playhead_color(ticks_ms: int | None = None) -> tuple[int, int, int]:
+    if playhead_flash_bright(ticks_ms):
+        return PLAYHEAD_FLASH
+    return PLAYHEAD
+
+
 def prune_expired_arm_flashes(
     flash_starts: dict[str, int],
     ticks_ms: int | None = None,
@@ -346,6 +361,7 @@ def timeline_live_signature(
         row_h,
         transport_time_text(state.position_sec),
         rec_flash,
+        playhead_flash_bright(ticks_ms),
         flash_sig,
     )
 
@@ -799,7 +815,7 @@ class TimelineOverlay:
         y1 = y_offset + layout.bar_bottom - 1
         pygame.draw.line(
             surface,
-            PLAYHEAD,
+            playhead_color(),
             (playhead_left, y0),
             (playhead_left, y1),
             PLAYHEAD_WIDTH,

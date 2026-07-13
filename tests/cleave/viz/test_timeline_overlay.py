@@ -16,6 +16,8 @@ from cleave.viz.theme import (
     OVERRIDE_BG,
     OVERRIDE_GLYPH,
     OVERRIDE_GLYPH_OFF,
+    PLAYHEAD,
+    PLAYHEAD_FLASH,
     SOLO_BG,
     SONG_MARKER,
     SONG_MARKER_SELECTED,
@@ -24,6 +26,7 @@ from cleave.viz.theme import (
 from cleave.viz.timeline_overlay import (
     ARM_FLASH_DURATION_MS,
     ARM_FLASH_HALF_MS,
+    PLAYHEAD_FLASH_MS,
     TimelineOverlay,
     TimelineViewState,
     arm_abbrev_flash_active,
@@ -33,6 +36,8 @@ from cleave.viz.timeline_overlay import (
     bar_tick_times_for_row,
     cue_times_for_stem,
     layer_num_prefix,
+    playhead_color,
+    playhead_flash_bright,
     playhead_x,
     prune_expired_arm_flashes,
     rec_flash_visible,
@@ -205,6 +210,17 @@ def test_rec_flash_visible_alternates_every_500ms() -> None:
     assert rec_flash_visible(500) is False
     assert rec_flash_visible(999) is False
     assert rec_flash_visible(1000) is True
+
+
+def test_playhead_flash_alternates_color() -> None:
+    half = PLAYHEAD_FLASH_MS
+    assert playhead_flash_bright(0) is True
+    assert playhead_flash_bright(half - 1) is True
+    assert playhead_flash_bright(half) is False
+    assert playhead_flash_bright(half * 2 - 1) is False
+    assert playhead_flash_bright(half * 2) is True
+    assert playhead_color(0) == PLAYHEAD_FLASH
+    assert playhead_color(half) == PLAYHEAD
 
 
 def test_arm_abbrev_flash_visible_blinks_twice() -> None:

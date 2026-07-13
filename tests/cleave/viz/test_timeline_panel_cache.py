@@ -159,6 +159,15 @@ def test_live_signature_changes_on_position_sec() -> None:
     )
 
 
+def test_live_signature_changes_on_playhead_flash() -> None:
+    pygame.init()
+    state = _view_state(position_sec=10.0)
+    kwargs = dict(playhead_px=100, bar_left=80, bar_width=900, row_count=4, row_h=20)
+    bright = timeline_live_signature(state, ticks_ms=0, **kwargs)
+    dim = timeline_live_signature(state, ticks_ms=400, **kwargs)
+    assert bright != dim
+
+
 def test_upload_plan_skip_when_paused_and_unchanged() -> None:
     pygame.init()
     overlay = TimelineOverlay()
