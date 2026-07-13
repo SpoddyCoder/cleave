@@ -215,12 +215,23 @@ def test_timeline_presets_help_lists_characters() -> None:
         "Dialogue",
         "Arc",
         "Pulse",
-        "Reset (All Off)",
-        "Reset (All On)",
     ]
     keyboard = _keyboard_section(sections)
     assert keyboard.title == KEYBOARD_CONTROLS_SECTION_TITLE
-    assert keyboard.entries == (("Enter", "apply a preset"),)
+    assert keyboard.entries == (("Enter", "apply a timeline preset"),)
+
+
+def test_timeline_reset_help_lists_choices() -> None:
+    from cleave.timeline_presets import TIMELINE_RESET_HELP_ENTRIES
+
+    sections = sections_for(RowKind.TIMELINE_RESET)
+    description = _description_section(sections)
+    assert description is not None
+    assert description.title == "Reset timeline"
+    assert description.entries == TIMELINE_RESET_HELP_ENTRIES
+    assert [name for name, _ in description.entries] == ["All Off", "All On"]
+    keyboard = _keyboard_section(sections)
+    assert keyboard.entries == (("Enter", "reset timeline"),)
 
 
 def test_preview_quality_help_lists_modes() -> None:
