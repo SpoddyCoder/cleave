@@ -35,8 +35,12 @@ PROJECTM_STEREO = 2
 
 _lib: ctypes.CDLL | None = None
 _log_callback: CFUNCTYPE | None = None
+_log_message_queue: deque[str] = deque()
 
 PROJECTM_LOG_LEVEL_DEBUG = 2
+PROJECTM_LOG_LEVEL_WARN = 4
+PROJECTM_LOG_LEVEL_ERROR = 5
+PROJECTM_LOG_LEVEL_FATAL = 6
 
 PresetSwitchFailedEvent = CFUNCTYPE(None, c_char_p, c_char_p, c_void_p)
 LogCallback = CFUNCTYPE(None, c_char_p, c_int32, c_void_p)
@@ -297,21 +301,42 @@ def _free_lib_string(lib: ctypes.CDLL, ptr: c_char_p) -> None:
         lib.projectm_free_string(ptr)
 
 
-def _enable_debug_logging(lib: ctypes.CDLL) -> None:
-    global _log_callback
-    if os.environ.get("CLEAVE_PROJECTM_LOG") != "1":
+def _handle_log_message(message: str, level: int) -> None:
+    stripped = message.strip()
+    if not stripped:
         return
+    if level >= PROJECTM_LOG_LEVEL_WARN:
+        _log_message_queue.append(stripped)
+    if os.environ.get("CLEAVE_PROJECTM_LOG") == "1":
+        print(stripped, file=sys.stderr)
+
+
+def drain_log_messages() -> list[str]:
+    """Pop queued Warning+ libprojectM log lines (FIFO)."""
+    messages = list(_log_message_queue)
+    _log_message_queue.clear()
+    return messages
+
+
+def _setup_logging(lib: ctypes.CDLL) -> None:
+    global _log_callback
     if not hasattr(lib, "projectm_set_log_callback"):
         return
 
-    def _on_log(message: bytes, _level: int, _user_data: c_void_p) -> None:
-        if message:
-            print(message.decode("utf-8", errors="replace"), file=sys.stderr)
+    def _on_log(message: bytes, level: int, _user_data: c_void_p) -> None:
+        if not message:
+            return
+        _handle_log_message(message.decode("utf-8", errors="replace"), level)
 
     _log_callback = LogCallback(_on_log)
     lib.projectm_set_log_callback(_log_callback, c_bool(False), c_void_p())
     if hasattr(lib, "projectm_set_log_level"):
-        lib.projectm_set_log_level(c_int32(PROJECTM_LOG_LEVEL_DEBUG), c_bool(False))
+        log_level = (
+            PROJECTM_LOG_LEVEL_DEBUG
+            if os.environ.get("CLEAVE_PROJECTM_LOG") == "1"
+            else PROJECTM_LOG_LEVEL_WARN
+        )
+        lib.projectm_set_log_level(c_int32(log_level), c_bool(False))
 
 
 def _get_lib() -> ctypes.CDLL:
@@ -327,7 +352,7 @@ def _get_lib() -> ctypes.CDLL:
         except (OSError, ProjectMLibraryError) as exc:
             errors.append(f"{path}: {exc}")
             continue
-        _enable_debug_logging(loaded)
+        _setup_logging(loaded)
         _lib = loaded
         return loaded
 

@@ -12,7 +12,10 @@ from cleave.gl_compositor import GlCompositor
 from cleave.gl_post_process import GlPostProcess
 from cleave.preset_playlist import PresetPlaylist
 from cleave.projectm import ProjectM
-from cleave.projectm_health import drain_stem_layers_preset_failures
+from cleave.projectm_health import (
+    drain_projectm_log_notifications,
+    drain_stem_layers_preset_failures,
+)
 from cleave.signals import Signals
 from cleave.stem_pcm import StemPcmBank
 from cleave.viz.layer import StemLayer
@@ -350,6 +353,10 @@ class LayerFramePipeline:
             layers,
             on_notification=on_panel_notification,
             skip_notify_tracker=session.preset_skip_notify_tracker,
+        )
+        drain_projectm_log_notifications(
+            on_notification=on_panel_notification,
+            log_notify_tracker=session.projectm_log_notify_tracker,
         )
 
         if not paused:
