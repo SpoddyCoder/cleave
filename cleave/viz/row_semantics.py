@@ -14,7 +14,10 @@ from cleave.config_schema import (
     PRESET_SWITCHING_MODE_HELP_ENTRIES,
     EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
 )
-from cleave.timeline_presets import TIMELINE_PRESET_HELP_ENTRIES
+from cleave.timeline_presets import (
+    TIMELINE_PRESET_HELP_ENTRIES,
+    TIMELINE_RESET_HELP_ENTRIES,
+)
 
 
 class RowKind(Enum):
@@ -75,6 +78,8 @@ class RowKind(Enum):
     RENDER_POST_FX_CHROMA_BOOST_AMOUNT = auto()
     RENDER_TIMELINE_HEADER = auto()
     TIMELINE_PRESETS = auto()
+    TIMELINE_RESET = auto()
+    TIMELINE_BEAT_BAR_GRID_HEADER = auto()
     TIMELINE_BAR_PHASE = auto()
     TIMELINE_BAR_GRID = auto()
     TIMELINE_SNAP_TO_BEATS = auto()
@@ -696,12 +701,33 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         navigable=True,
         blocked_by_section_lock=True,
         help_title="Timeline presets",
-        help_entries=(("Enter", "apply a preset"),),
+        help_entries=(("Enter", "apply a timeline preset"),),
         help_description=(
             "Apply a randomly generated timeline preset",
             "(this will overwrite the current timeline).",
         ),
         help_mode_entries=TIMELINE_PRESET_HELP_ENTRIES,
+    ),
+    RowKind.TIMELINE_RESET: RowBehavior(
+        RowAffordance.ACTION,
+        navigable=True,
+        blocked_by_section_lock=True,
+        help_title="Reset timeline",
+        help_entries=(("Enter", "reset timeline"),),
+        help_description=(
+            "Clear all timeline cues and set every layer",
+            "on or off for the whole track.",
+        ),
+        help_mode_entries=TIMELINE_RESET_HELP_ENTRIES,
+    ),
+    RowKind.TIMELINE_BEAT_BAR_GRID_HEADER: RowBehavior(
+        RowAffordance.EXPAND,
+        is_sub_header=True,
+        help_title="Beat / bar grid",
+        help_description=(
+            "AI beat detection powered by Beat This!",
+            "Bar phase, bar grid display, and snap cues to beats or bars.",
+        ),
     ),
     RowKind.TIMELINE_BAR_PHASE: RowBehavior(
         RowAffordance.VALUE_STEP,

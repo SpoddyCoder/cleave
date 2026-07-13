@@ -428,6 +428,9 @@ class TuningControls:
             if kind == RowKind.TIMELINE_PRESETS:
                 self._timeline_presets.prompt(self.duration_sec)
                 return True
+            if kind == RowKind.TIMELINE_RESET:
+                self._timeline_presets.prompt_reset()
+                return True
             if kind == RowKind.TIMELINE_SNAP_TO_BEATS:
                 self._timeline_snap.prompt()
                 return True
@@ -1012,6 +1015,12 @@ class TuningControls:
         if tl.song_marker_snap_expanded == expanded:
             return
         tl.song_marker_snap_expanded = expanded
+
+    def _set_beat_bar_grid_expanded(self, expanded: bool) -> None:
+        tl = self.session.timeline
+        if tl.beat_bar_grid_expanded == expanded:
+            return
+        tl.beat_bar_grid_expanded = expanded
 
     def _set_beat(self, slot: str, value: float) -> None:
         layer = self.session.layers[slot]

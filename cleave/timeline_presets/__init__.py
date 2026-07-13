@@ -21,13 +21,13 @@ from cleave.timeline_presets.motifs import (
 )
 
 _RESET_HELP_ENTRIES: tuple[tuple[str, str], ...] = (
-    ("Reset (All Off)", "clear cues; every layer off for the whole track."),
-    ("Reset (All On)", "clear cues; every layer on for the whole track."),
+    ("All Off", "clear cues; every layer off for the whole track."),
+    ("All On", "clear cues; every layer on for the whole track."),
 )
 
-TIMELINE_PRESET_HELP_ENTRIES: tuple[tuple[str, str], ...] = (
-    CHARACTER_HELP_ENTRIES + _RESET_HELP_ENTRIES
-)
+TIMELINE_PRESET_HELP_ENTRIES: tuple[tuple[str, str], ...] = CHARACTER_HELP_ENTRIES
+
+TIMELINE_RESET_HELP_ENTRIES: tuple[tuple[str, str], ...] = _RESET_HELP_ENTRIES
 
 __all__ = (
     "ALL_BUILDERS",
@@ -36,6 +36,7 @@ __all__ = (
     "PHRASE_SEC_MIN",
     "SOFT_LATCH_PROXIMITY_SEC",
     "TIMELINE_PRESET_HELP_ENTRIES",
+    "TIMELINE_RESET_HELP_ENTRIES",
     "build_arc_cues",
     "build_breathing_cues",
     "build_dialogue_cues",

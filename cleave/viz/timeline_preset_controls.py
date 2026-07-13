@@ -16,7 +16,8 @@ from cleave.viz.modal import ModalHost, ModalOption
 from cleave.viz.session import TuningSession
 
 _CANCEL_LABEL = "Cancel"
-_PROMPT_MESSAGE = "Which timeline preset do you wish to apply?"
+_PRESET_PROMPT_MESSAGE = "Which timeline preset do you wish to apply?"
+_RESET_PROMPT_MESSAGE = "Reset timeline?"
 
 _KIND_BUILDERS = {
     "breathing": (build_breathing_cues, "Applied Breathing timeline preset"),
@@ -65,17 +66,20 @@ class TimelinePresetController:
                 "Pulse",
                 lambda: self._apply("pulse", duration_sec),
             ),
-            ModalOption(
-                "Reset (All Off)",
-                lambda: self._reset(all_on=False),
-            ),
-            ModalOption(
-                "Reset (All On)",
-                lambda: self._reset(all_on=True),
-            ),
             ModalOption(_CANCEL_LABEL, dismiss),
         ]
-        self._modal.prompt_choice(_PROMPT_MESSAGE, options, on_dismiss=dismiss)
+        self._modal.prompt_choice(_PRESET_PROMPT_MESSAGE, options, on_dismiss=dismiss)
+
+    def prompt_reset(self) -> None:
+        if self.session.timeline.locked:
+            return
+        dismiss = lambda: None
+        options = [
+            ModalOption("All Off", lambda: self._reset(all_on=False)),
+            ModalOption("All On", lambda: self._reset(all_on=True)),
+            ModalOption(_CANCEL_LABEL, dismiss),
+        ]
+        self._modal.prompt_choice(_RESET_PROMPT_MESSAGE, options, on_dismiss=dismiss)
 
     def _apply(self, kind: str, duration_sec: float) -> None:
         if not self._bar_times:

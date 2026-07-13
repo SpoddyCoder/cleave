@@ -1382,8 +1382,17 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.FULL_LINE,
     ),
     RowKind.TIMELINE_PRESETS: RowFieldDef(
-        panel_label="apply a preset",
+        panel_label="apply a timeline preset",
         present_style=RowPresentStyle.FULL_LINE,
+    ),
+    RowKind.TIMELINE_RESET: RowFieldDef(
+        panel_label="reset timeline",
+        present_style=RowPresentStyle.FULL_LINE,
+    ),
+    RowKind.TIMELINE_BEAT_BAR_GRID_HEADER: RowFieldDef(
+        panel_label="beat / bar grid",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        apply_horizontal=_apply_expand_subheader,
     ),
     RowKind.TIMELINE_BAR_PHASE: RowFieldDef(
         panel_label="bar phase",
