@@ -290,7 +290,13 @@ def render(
 
         for frame_idx in range(frame_count):
             t_sec = (segment.start_frame + frame_idx) / fps
-            app.tick_frame(t_sec, paused=False, draw_overlay=False, n_pcm=n_pcm)
+            app.tick_frame(
+                t_sec,
+                paused=False,
+                draw_overlay=False,
+                n_pcm=n_pcm,
+                dt_sec=(0.0 if frame_idx == 0 else 1.0 / fps),
+            )
             finish_content_frame(
                 runtime,
                 t_sec,

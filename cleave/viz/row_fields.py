@@ -36,7 +36,6 @@ from cleave.viz.row_sections import (
 )
 from cleave.viz.row_semantics import RowDescriptor, RowKind, row_behavior
 from cleave.viz.tuning_view_state import TrackBlock, TuningViewState
-from cleave.viz.user_presets import user_preset_item_display_name
 from cleave.viz.timeline_snap_controls import (
     cycle_song_marker_snap_scope,
     song_marker_snap_scope_label,
@@ -991,7 +990,7 @@ def _format_track_user_preset_item(
 ) -> str:
     assert desc.preset_index is not None
     block = _track_block(state, desc)
-    return user_preset_item_display_name(block.user_presets, desc.preset_index)
+    return block.user_preset_labels[desc.preset_index]
 
 
 def _format_song_markers_count(state: TuningViewState, _desc: RowDescriptor) -> str:

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from cleave.preset_curation import (
+    PresetCurationIndex,
     blacklist_root,
     copy_to_favourites,
     favourites_root,
@@ -18,6 +20,8 @@ from cleave.viz.session import TuningSession
 
 _ROOT_DEST_LABEL = "(root)"
 _CANCEL_LABEL = "Cancel"
+ALREADY_IN_FAVOURITES_NOTIFICATION = "Already in favourites"
+ALREADY_IN_BLACKLIST_NOTIFICATION = "Already in blacklist"
 
 
 class PresetCurationController:
@@ -29,13 +33,21 @@ class PresetCurationController:
         preset_root: Path,
         modal_host: ModalHost,
         layer_bindings: LiveLayerBindings | None,
+        index: PresetCurationIndex,
+        *,
+        on_notification: Callable[[str], None] | None = None,
     ) -> None:
         self.session = session
         self._preset_root = preset_root
         self._modal = modal_host
         self._layer_bindings = layer_bindings
+        self._index = index
+        self._on_notification = on_notification
 
     def prompt_favourite(self, slot: str, src: Path) -> None:
+        if src.name in self._index.favourites:
+            self._notify(ALREADY_IN_FAVOURITES_NOTIFICATION)
+            return
         self._lock_preset(slot)
         message = f"Favourite preset: {src.name}?"
         root = favourites_root(self._preset_root)
@@ -75,6 +87,9 @@ class PresetCurationController:
         user_preset_index: int | None,
     ) -> None:
         del user_preset_index  # reserved for hotkey wiring in a later todo
+        if src.name in self._index.blacklist:
+            self._notify(ALREADY_IN_BLACKLIST_NOTIFICATION)
+            return
         self._lock_preset(slot)
         message = f"Blacklist preset: {src.name}?"
         root = blacklist_root(self._preset_root)
@@ -113,7 +128,7 @@ class PresetCurationController:
 
     def _confirm_favourite(self, slot: str, src: Path, dest_dir: Path) -> None:
         try:
-            copy_to_favourites(src, dest_dir)
+            self._index.mark_favourite(copy_to_favourites(src, dest_dir).name)
         finally:
             self._unlock_preset(slot)
 
@@ -126,7 +141,7 @@ class PresetCurationController:
         from_user_preset: bool,
     ) -> None:
         try:
-            move_to_blacklist(src, dest_dir)
+            self._index.mark_blacklisted(move_to_blacklist(src, dest_dir).name)
             playlist = self.session.layers[slot].playlist
             if not from_user_preset or (
                 playlist.current is not None
@@ -149,3 +164,7 @@ class PresetCurationController:
     def _unlock_preset(self, slot: str) -> None:
         if self._layer_bindings is not None:
             self._layer_bindings.unlock_preset_after_modal(slot)
+
+    def _notify(self, message: str) -> None:
+        if self._on_notification is not None:
+            self._on_notification(message)

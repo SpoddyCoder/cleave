@@ -36,6 +36,7 @@ from cleave.viz.tuning_panel_draw import TuningOverlay
 from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.timeline_overlay import TimelineOverlay
 from cleave.viz.playback import PlaybackState, current_sec, init_playback
+from cleave.viz.projectm_frame_clock import ProjectMFrameClock
 from cleave.viz.frame_finish import RenderOverlayPanelCache, finish_content_frame
 from cleave.viz.overlay_profiler import OverlayProfiler
 from cleave.viz.frame_rate import FrameRateMeter, ProjectMFpsGovernor
@@ -338,6 +339,7 @@ def tick_frame_core(
     paused: bool,
     was_paused: bool | None,
     n_pcm: int,
+    pm_time_sec: float,
 ) -> bool | None:
     """Shared frame tick for live and render. Returns updated was_paused."""
     if was_paused is not None and paused != was_paused:
@@ -361,6 +363,7 @@ def tick_frame_core(
         runtime.seed.signals,
         t_sec,
         paused=paused,
+        pm_time_sec=pm_time_sec,
         compositor=runtime.compositor,
         on_panel_notification=on_panel_notification,
     )
@@ -470,6 +473,7 @@ class VisualizerApp:
         self._runtime = runtime
         self._overlay_dt = 0.0
         self._was_paused: bool | None = None
+        self._pm_clock = ProjectMFrameClock()
 
     def tick_frame(
         self,
@@ -477,15 +481,18 @@ class VisualizerApp:
         *,
         paused: bool,
         n_pcm: int,
+        dt_sec: float = 0.0,
         draw_overlay: bool = True,
         display_fps: float | None = None,
     ) -> None:
+        pm_time_sec = self._pm_clock.advance(dt_sec, paused=paused)
         self._was_paused = tick_frame_core(
             self._runtime,
             t_sec,
             paused=paused,
             was_paused=self._was_paused,
             n_pcm=n_pcm,
+            pm_time_sec=pm_time_sec,
         )
         if draw_overlay:
             if not isinstance(self._runtime, LiveVisualizerRuntime):
@@ -547,7 +554,10 @@ class VisualizerApp:
                 return
 
             self.tick_frame(
-                0.0, paused=False, n_pcm=samples_per_frame(LIVE_PROJECTM_FPS)
+                0.0,
+                paused=False,
+                n_pcm=samples_per_frame(LIVE_PROJECTM_FPS),
+                dt_sec=0.0,
             )
             pygame.display.flip()
             rt.mix_player.start()
@@ -594,6 +604,7 @@ class VisualizerApp:
                     paused=rt.playback.paused,
                     display_fps=display_fps,
                     n_pcm=samples_for_dt(self._overlay_dt),
+                    dt_sec=self._overlay_dt,
                 )
 
                 pygame.display.flip()

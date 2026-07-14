@@ -28,7 +28,7 @@ Related: [legacy-plans/presets-scan-plan.md](legacy-plans/presets-scan-plan.md) 
 | `projectm_get_beat_sensitivity` | bound, ignored | Cleave caches sensitivity locally |
 | `projectm_set_fps` | bound, used | Live/offline frame rate |
 | `projectm_get_fps` | future | Diagnostics |
-| `projectm_set_frame_time` | bound, used | Transport sync |
+| `projectm_set_frame_time` | bound, used | Monotonic render clock (`ProjectMFrameClock`); not song playhead |
 | `projectm_get_last_frame_time` | future | Diagnostics |
 | `projectm_set_hard_cut_enabled` | bound, used | Preset switching |
 | `projectm_get_hard_cut_enabled` | future | Read-back for panel |
