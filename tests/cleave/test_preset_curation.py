@@ -13,9 +13,13 @@ from cleave.preset_curation import (
     PresetCurationIndex,
     blacklist_root,
     copy_to_favourites,
+    curated_milk_src,
     favourites_root,
+    find_milk_under,
     list_destination_subdirs,
     move_to_blacklist,
+    relocate_curated_milk,
+    rewrite_user_preset_paths,
     scrub_user_preset_paths,
 )
 
@@ -207,6 +211,100 @@ def test_move_to_blacklist_uses_dedup_dest() -> None:
 @dataclass
 class _LayerStub:
     user_presets: list[str] = field(default_factory=list)
+
+
+def test_relocate_curated_milk_moves_between_sibling_dirs() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / FAVOURITES_DIR / "keepers" / "preset.milk"
+        _write(src, "milk")
+        dest = root / FAVOURITES_DIR / "archive"
+        dest.mkdir(parents=True)
+
+        result = relocate_curated_milk(src, dest)
+
+        assert result == dest / "preset.milk"
+        assert result.read_text(encoding="utf-8") == "milk"
+        assert not src.exists()
+
+
+def test_relocate_curated_milk_to_parent_root() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        fav_root = root / FAVOURITES_DIR
+        src = fav_root / "keepers" / "preset.milk"
+        _write(src, "milk")
+
+        result = relocate_curated_milk(src, fav_root)
+
+        assert result == fav_root / "preset.milk"
+        assert not src.exists()
+
+
+def test_relocate_curated_milk_same_dir_is_noop() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        dest = root / FAVOURITES_DIR
+        src = dest / "preset.milk"
+        _write(src, "milk")
+
+        result = relocate_curated_milk(src, dest)
+
+        assert result == src.resolve()
+        assert src.exists()
+
+
+def test_relocate_curated_milk_with_textures() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src_dir = root / FAVOURITES_DIR / "keepers"
+        src = src_dir / "preset.milk"
+        _write(src, "milk")
+        _write(src_dir / "tex.jpg", "jpg")
+        dest = root / FAVOURITES_DIR / "archive"
+        dest.mkdir(parents=True)
+
+        relocate_curated_milk(src, dest, with_textures=True)
+
+        assert (dest / "preset.milk").exists()
+        assert (dest / "tex.jpg").read_text(encoding="utf-8") == "jpg"
+        assert not (src_dir / "tex.jpg").exists()
+
+
+def test_find_milk_under_and_curated_milk_src() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        fav = root / FAVOURITES_DIR
+        nested = fav / "keepers" / "preset.milk"
+        _write(nested, "milk")
+        pack = root / "pack" / "preset.milk"
+        _write(pack, "other")
+
+        assert find_milk_under(fav, "preset.milk") == nested
+        assert curated_milk_src(fav, nested) == nested
+        assert curated_milk_src(fav, pack) == nested
+
+
+def test_rewrite_user_preset_paths_updates_matching_entries() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        old = root / "old.milk"
+        new = root / "new.milk"
+        kept = root / "kept.milk"
+        _write(old, "old")
+        _write(new, "new")
+        _write(kept, "kept")
+
+        layers = {
+            "layer_1": _LayerStub(user_presets=[str(old), str(kept)]),
+            "layer_2": _LayerStub(user_presets=[str(kept)]),
+        }
+
+        affected = rewrite_user_preset_paths(layers, old, new)
+
+        assert affected == ["layer_1"]
+        assert layers["layer_1"].user_presets == [str(new), str(kept)]
+        assert layers["layer_2"].user_presets == [str(kept)]
 
 
 def test_scrub_user_preset_paths_removes_matching_entries() -> None:
