@@ -477,6 +477,7 @@ class ProjectM:
         return self._beat_sensitivity
 
     def set_frame_time(self, t_sec: float) -> None:
+        """Set projectM user time as seconds since first frame (monotonic)."""
         _get_lib().projectm_set_frame_time(self._handle, c_double(t_sec))
 
     def set_fps(self, fps: int) -> None:

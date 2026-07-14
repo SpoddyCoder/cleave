@@ -10,6 +10,7 @@ from cleave.preset_curation import (
     BLACKLIST_DIR,
     COLOCATED_TEXTURE_SUFFIXES,
     FAVOURITES_DIR,
+    PresetCurationIndex,
     blacklist_root,
     copy_to_favourites,
     favourites_root,
@@ -28,6 +29,49 @@ def test_favourites_and_blacklist_roots() -> None:
     preset_root = Path("/tmp/presets")
     assert favourites_root(preset_root) == preset_root / FAVOURITES_DIR
     assert blacklist_root(preset_root) == preset_root / BLACKLIST_DIR
+
+
+def test_preset_curation_index_build_scans_recursively() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        _write(root / FAVOURITES_DIR / "top.milk", "fav-top")
+        _write(root / FAVOURITES_DIR / "nested" / "deep.milk", "fav-deep")
+        _write(root / BLACKLIST_DIR / "reject.milk", "bl-top")
+        _write(root / BLACKLIST_DIR / "pack" / "inner.milk", "bl-inner")
+        _write(root / "pack" / "ignored.milk", "not-curated")
+
+        index = PresetCurationIndex.build(root)
+
+        assert index.favourites == {"top.milk", "deep.milk"}
+        assert index.blacklist == {"reject.milk", "inner.milk"}
+
+
+def test_preset_curation_index_build_missing_trees() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        index = PresetCurationIndex.build(Path(tmp))
+        assert index.favourites == set()
+        assert index.blacklist == set()
+
+
+def test_preset_curation_index_marker() -> None:
+    index = PresetCurationIndex(
+        favourites={"fav.milk", "both.milk"},
+        blacklist={"bl.milk", "both.milk"},
+    )
+    assert index.marker("fav.milk") == " [F]"
+    assert index.marker("bl.milk") == " [B]"
+    assert index.marker("both.milk") == " [F][B]"
+    assert index.marker("plain.milk") == ""
+
+
+def test_preset_curation_index_mark_updates_sets() -> None:
+    index = PresetCurationIndex(favourites=set(), blacklist=set())
+    index.mark_favourite("a.milk")
+    index.mark_blacklisted("b.milk")
+    assert index.favourites == {"a.milk"}
+    assert index.blacklist == {"b.milk"}
+    assert index.marker("a.milk") == " [F]"
+    assert index.marker("b.milk") == " [B]"
 
 
 def test_list_destination_subdirs_sorted_and_excludes_dot_dirs() -> None:

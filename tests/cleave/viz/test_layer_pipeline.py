@@ -232,6 +232,7 @@ def test_render_frame_applies_per_layer_highlight_rolloff_when_playing() -> None
             None,
             1.0,
             paused=False,
+            pm_time_sec=1.0,
             compositor=compositor,
         )
 
@@ -267,6 +268,7 @@ def test_render_frame_skips_per_layer_highlight_rolloff_when_post_fx_disabled() 
             None,
             1.0,
             paused=False,
+            pm_time_sec=1.0,
             compositor=compositor,
         )
 
@@ -303,6 +305,7 @@ def test_render_frame_paused_per_layer_uses_frozen_rolloff_source() -> None:
             None,
             1.0,
             paused=True,
+            pm_time_sec=1.0,
             compositor=compositor,
         )
 
@@ -342,6 +345,7 @@ def test_render_frame_applies_per_layer_chroma_boost_when_playing() -> None:
             None,
             1.0,
             paused=False,
+            pm_time_sec=1.0,
             compositor=compositor,
         )
 
@@ -378,6 +382,7 @@ def test_render_frame_skips_per_layer_chroma_boost_when_amount_zero() -> None:
             None,
             1.0,
             paused=False,
+            pm_time_sec=1.0,
             compositor=compositor,
         )
 

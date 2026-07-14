@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from cleave.viz.row_semantics import RowDescriptor, RowKind
 from cleave.viz.tuning_view_state import view_state_structure_signature
 from tests.cleave.viz.test_controls import _make_controls
@@ -443,3 +445,39 @@ def test_row_layout_includes_song_marker_items_when_expanded() -> None:
     assert not any(
         desc.kind == RowKind.SONG_MARKER_ITEM for desc in view_collapsed.layout.rows
     )
+
+
+def test_builder_appends_curation_markers_without_structure_change() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    index = controls._view_state._curation_index
+    layer = session.layers["layer_1"]
+    user_path = Path("/tmp/projects/my-track/user.milk")
+    user_path.parent.mkdir(parents=True, exist_ok=True)
+    user_path.write_text("milk", encoding="utf-8")
+    layer.user_presets = [str(user_path)]
+
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    view_before = controls.build_view_state(paused=False)
+    block_before = view_before.tracks["layer_1"]
+    assert block_before.preset_label == "preset-0.milk (1/3)"
+    assert block_before.user_preset_labels == ["user.milk"]
+
+    current_name = layer.playlist.current.name
+    assert current_name is not None
+    index.mark_favourite(current_name)
+    index.mark_favourite(user_path.name)
+    index.mark_blacklisted(user_path.name)
+
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before == sig_after
+
+    view_after = controls.build_view_state(paused=False)
+    block_after = view_after.tracks["layer_1"]
+    assert block_after.preset_label == "preset-0.milk (1/3) [F]"
+    assert block_after.user_preset_labels == ["user.milk [F][B]"]

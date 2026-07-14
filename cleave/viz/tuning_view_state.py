@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from cleave.config import RenderOverlayPosition
@@ -28,11 +29,13 @@ from cleave.config_schema import (
     default_render_post_fx_runtime_values,
 )
 from cleave.extract import StemSource
-from cleave.preset_playlist import preset_filename_display
+from cleave.preset_curation import PresetCurationIndex
+from cleave.preset_playlist import PresetPlaylist, preset_filename_display
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.playback import PlaybackState, current_sec
 from cleave.viz.row_semantics import RowDescriptor, RowKind
 from cleave.viz.session import TuningSession, config_path_display
+from cleave.viz.user_presets import user_preset_item_display_name
 
 if TYPE_CHECKING:
     from cleave.viz.focus_nav import FocusCursor
@@ -69,6 +72,7 @@ class TrackBlock:
     easter_egg: float = DEFAULT_EASTER_EGG
     preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN
     user_presets: list[str] = field(default_factory=list)
+    user_preset_labels: list[str] = field(default_factory=list)
     user_presets_expanded: bool = False
 
 
@@ -345,6 +349,7 @@ class TuningViewStateBuilder:
         playback: PlaybackState,
         duration_sec: float,
         preset_root,
+        curation_index: PresetCurationIndex,
         *,
         get_focus_cursor: Callable[[], FocusCursor],
         get_move_mode_slot: Callable[[], str | None],
@@ -355,11 +360,25 @@ class TuningViewStateBuilder:
         self.playback = playback
         self.duration_sec = duration_sec
         self.preset_root = preset_root
+        self._curation_index = curation_index
         self._get_focus_cursor = get_focus_cursor
         self._get_move_mode_slot = get_move_mode_slot
         self._config_save = config_save
         self._get_notification = get_notification
         self._structure: _ViewStateStructure | None = None
+
+    def _preset_label(self, playlist: PresetPlaylist) -> str:
+        label = preset_filename_display(playlist)
+        if playlist.current is not None:
+            label += self._curation_index.marker(playlist.current.name)
+        return label
+
+    def _user_preset_labels(self, paths: list[str]) -> list[str]:
+        return [
+            user_preset_item_display_name(paths, i)
+            + self._curation_index.marker(Path(paths[i]).name)
+            for i in range(len(paths))
+        ]
 
     def _build_structure(
         self,
@@ -378,7 +397,7 @@ class TuningViewStateBuilder:
                 preset_dir_label=layer.playlist.directory_display_label(
                     self.preset_root
                 ),
-                preset_label=preset_filename_display(layer.playlist),
+                preset_label=self._preset_label(layer.playlist),
                 blend_mode=layer.blend_mode,
                 opacity_pct=layer.opacity_pct,
                 effects=dict(layer.effects),
@@ -401,6 +420,7 @@ class TuningViewStateBuilder:
                 easter_egg=layer.easter_egg,
                 preset_start_clean=layer.preset_start_clean,
                 user_presets=list(layer.user_presets),
+                user_preset_labels=self._user_preset_labels(list(layer.user_presets)),
                 user_presets_expanded=layer.user_presets_expanded,
             )
 
@@ -502,7 +522,8 @@ class TuningViewStateBuilder:
                 blend_mode=layer.blend_mode,
                 opacity_pct=layer.opacity_pct,
                 beat_sensitivity=layer.beat_sensitivity,
-                preset_label=preset_filename_display(layer.playlist),
+                preset_label=self._preset_label(layer.playlist),
+                user_preset_labels=self._user_preset_labels(list(layer.user_presets)),
                 effects=dict(layer.effects),
             )
         return tracks

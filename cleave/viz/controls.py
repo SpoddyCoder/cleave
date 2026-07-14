@@ -15,6 +15,7 @@ from cleave.config_schema import PRESET_SWITCHING_MODES, PRESET_SWITCHING_SCOPES
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.extract import STEM_SOURCES
 from cleave.song_markers import format_marker_time, place_marker
+from cleave.preset_curation import PresetCurationIndex
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.preset_curation_controls import PresetCurationController
 from cleave.viz.key_repeat import KeyRepeatController, add_current_preset_key_pressed, delete_key_pressed, mod_ctrl, mod_shift
@@ -121,11 +122,14 @@ class TuningControls:
             on_notification=self.show_notification,
             move_mode_signature=self._move_mode_signature_payload,
         )
+        curation_index = PresetCurationIndex.build(preset_root)
         self._preset_curation = PresetCurationController(
             session,
             preset_root,
             self._modal_host,
             layer_bindings,
+            curation_index,
+            on_notification=self.show_notification,
         )
         self._timeline_presets = TimelinePresetController(
             session,
@@ -151,6 +155,7 @@ class TuningControls:
             playback,
             duration_sec,
             preset_root,
+            curation_index,
             get_focus_cursor=lambda: self.focus_cursor,
             get_move_mode_slot=lambda: self.move_mode_slot,
             config_save=self._config_save,

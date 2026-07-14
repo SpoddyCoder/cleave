@@ -346,6 +346,7 @@ class LayerFramePipeline:
         t_sec: float,
         *,
         paused: bool,
+        pm_time_sec: float,
         compositor: GlCompositor | None = None,
         on_panel_notification: Callable[[str], None] | None = None,
     ) -> None:
@@ -366,7 +367,7 @@ class LayerFramePipeline:
                 stem = session.layers[layer.slot].stem
                 pcm = pcm_bank.slice_pcm(stem, t_sec, n_pcm)
                 layer.pm.feed_pcm(pcm, channels=pcm_bank.channels(stem))
-                layer.pm.set_frame_time(t_sec)
+                layer.pm.set_frame_time(pm_time_sec)
 
         apply_effect_modifiers(
             session,

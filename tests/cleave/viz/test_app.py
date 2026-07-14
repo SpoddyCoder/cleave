@@ -250,7 +250,10 @@ def test_run_boot_order_audio_starts_after_first_frame(
     mock_init_heavy.assert_called_once()
     mock_tick_frame.assert_called()
     assert mock_tick_frame.call_args_list[0] == call(
-        0.0, paused=False, n_pcm=samples_per_frame(LIVE_PROJECTM_FPS)
+        0.0,
+        paused=False,
+        n_pcm=samples_per_frame(LIVE_PROJECTM_FPS),
+        dt_sec=0.0,
     )
     assert isinstance(app._runtime, LiveVisualizerRuntime)
     app._runtime.mix_player.start.assert_called_once()
