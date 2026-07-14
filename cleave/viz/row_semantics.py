@@ -94,6 +94,7 @@ class RowKind(Enum):
     SONG_MARKERS_HEADER = auto()
     SONG_MARKER_ITEM = auto()
     SETTINGS_HEADER = auto()
+    SETTINGS_EDITOR_MODE = auto()
     SETTINGS_PREVIEW_QUALITY = auto()
     SETTINGS_UI_HEADER = auto()
     SETTINGS_UI_WIDTH_MODE = auto()
@@ -907,6 +908,18 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Editor Settings",
         help_description=("Global editor settings (not per-layer).",),
         quick_nav_target=True,
+    ),
+    RowKind.SETTINGS_EDITOR_MODE: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        is_pinned=True,
+        repeatable=True,
+        parent_group="settings",
+        help_title="Editor mode",
+        help_entries=(("Left/Right", "cycle mode"),),
+        help_description=(
+            "Visualizer mode exposes the full tuning panel.",
+            "Preset curation mode limits the panel to preset favourites and blacklist.",
+        ),
     ),
     RowKind.SETTINGS_PREVIEW_QUALITY: RowBehavior(
         RowAffordance.VALUE_STEP,

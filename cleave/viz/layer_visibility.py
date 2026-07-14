@@ -189,9 +189,12 @@ def effective_layer_enabled(
     slot: str,
     t_sec: float,
 ) -> bool:
+    from cleave.viz.editor_mode_controls import is_preset_curation_mode
+
     if session.solo_slot is not None:
         return slot == session.solo_slot
-    if not session.timeline.enabled:
+    # Curation: ignore timeline cues so layer enable flags alone drive visibility.
+    if not session.timeline.enabled or is_preset_curation_mode(session):
         return session.layers[slot].enabled
     tl = session.timeline
     if tl.recording:
@@ -209,7 +212,11 @@ def effective_layer_enabled(
 
 def _timeline_fades_apply(session: TuningSession, slot: str) -> bool:
     """True when continuous cue fades drive FBO enable/opacity for *slot*."""
+    from cleave.viz.editor_mode_controls import is_preset_curation_mode
+
     if session.solo_slot is not None:
+        return False
+    if is_preset_curation_mode(session):
         return False
     tl = session.timeline
     if not tl.enabled or not tl.fades_enabled:

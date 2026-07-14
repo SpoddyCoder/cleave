@@ -69,6 +69,7 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.RENDER_POST_FX_CHROMA_BOOST_VARIANT,
         RowKind.RENDER_POST_FX_CHROMA_BOOST_AMOUNT,
         RowKind.SETTINGS_PREVIEW_QUALITY,
+        RowKind.SETTINGS_EDITOR_MODE,
         RowKind.SETTINGS_UI_WIDTH_MODE,
         RowKind.SETTINGS_UI_WIDTH,
         RowKind.SETTINGS_UI_FADE,
@@ -104,6 +105,7 @@ def test_row_is_pinned() -> None:
     assert row_is_pinned(RowKind.CONFIG_HEADER) is True
     assert row_is_pinned(RowKind.SETTINGS_HEADER) is True
     assert row_is_pinned(RowKind.SETTINGS_PREVIEW_QUALITY) is True
+    assert row_is_pinned(RowKind.SETTINGS_EDITOR_MODE) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_HEADER) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_FADE) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_WIDTH_MODE) is True

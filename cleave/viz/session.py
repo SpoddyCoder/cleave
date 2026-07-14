@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from pathlib import Path
+from typing import Literal
 
 from cleave.config import (
     CleaveConfig,
@@ -180,10 +181,20 @@ def default_song_marker_runtime() -> SongMarkerRuntime:
     return SongMarkerRuntime()
 
 
+EditorMode = Literal["visualizer", "preset_curation"]
+
+EDITOR_MODES: tuple[EditorMode, ...] = ("visualizer", "preset_curation")
+EDITOR_MODE_PANEL_LABELS: dict[EditorMode, str] = {
+    "visualizer": "visualizer",
+    "preset_curation": "preset curation",
+}
+
+
 @dataclass
 class SettingsRuntime:
     expanded: bool = False
     ui_expanded: bool = False
+    editor_mode: EditorMode = "visualizer"
 
 
 @dataclass

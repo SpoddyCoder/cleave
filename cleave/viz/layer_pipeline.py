@@ -24,6 +24,7 @@ from cleave.viz.layer_preview_resolution import (
     preview_sizes_for_session,
     render_layer_size,
 )
+from cleave.viz.editor_mode_controls import render_sections_active
 from cleave.viz.post_fx import (
     chroma_boost_active,
     chroma_boost_variant_index,
@@ -378,15 +379,18 @@ class LayerFramePipeline:
         )
 
         pp = session.render_post_fx
+        sections_on = render_sections_active(session)
         hr = pp.highlight_rolloff
         cb = pp.chroma_boost
         per_layer_rolloff = (
-            highlight_rolloff_active(pp, solo=False)
+            sections_on
+            and highlight_rolloff_active(pp, solo=False)
             and hr.mode == "per_layer"
             and compositor is not None
         )
         per_layer_chroma = (
-            chroma_boost_active(pp, solo=False)
+            sections_on
+            and chroma_boost_active(pp, solo=False)
             and cb.mode == "per_layer"
             and compositor is not None
         )
