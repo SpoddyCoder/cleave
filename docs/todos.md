@@ -13,47 +13,8 @@ Outstanding bugs and issues.
 ## Architecture
 
 ### Preset Curation Mode
-New 1st row select control inside Editor Settings:
 
-editor-mode: visualizer | preset curation
-
-visualizer mode is what we have now - full fat editing.
-
-preset-curator...
-
-1) If the user has unsaved changes:
-a) modal to ask if they want to save their changes before going into preset curation mode: YES, DISCARD CHANGES, CANCEL
-b) options should do what they imply
-
-2) Reduces the UI to only the reequired preset curation tools...
-
-a) Hides ALL top level (section) rows, EXCEPT:
-i) header: editor settings, transport controls
-ii) layers: layer 1
-
-b) The layer 1 section has ALL child rows hidden, EXCEPT...
-i) Preset directory, preset file name, driving stem, beat sensitivity
-
-3) Removes keyboard shortcuts no longer relevant to preset curation:
-
-a) Disable ALL Navigation / Global keyboard shortcuts, EXCEPT...
-i) Up/Down
-ii) Ctrl + Up/Down
-iii) ESC
-iv) Ctrl + q
-
-4) When the user changes the editr mode back to visualizer, the UI is restored.
-a) Load the previously active visualizer yaml
-b) Restore the UI to the full fat editing mode
-
-5) The editor-mode should be a session only state, not saved to either the project yaml or the visualizer yaml.
-a) When the visualizer is first launched it should be in visualizer mode.
-
-
-NOTE: the cases above have been carefully scoped to be ALL... EXCEPT...
-Because we want to be able to easily add more features to the visualizer mode in the future without having to explicitly remove them from the preset curation mode. Preset curation mode defines the small subset of rows and controls it needs - as this is unlikely to change much int he future.
-
-
+- [x] Session-only `editor_mode` under Settings; curation allowlists panel rows and keyboard shortcuts; dirty-entry save/discard; YAML reload on exit to visualizer.
 
 ### projectM
 

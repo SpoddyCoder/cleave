@@ -325,8 +325,22 @@ SETTINGS_SECTION = ExpandSectionDef(
     read_expanded=_settings_expanded,
     toggle=_toggle_settings,
     children=(
+        SectionNode(leaf_kind=RowKind.SETTINGS_EDITOR_MODE),
         SectionNode(leaf_kind=RowKind.SETTINGS_PREVIEW_QUALITY),
         SectionNode(expand=SETTINGS_UI_SECTION),
+    ),
+)
+
+CURATION_LAYER_SECTION = ExpandSectionDef(
+    header_kind=RowKind.TRACK_HEADER,
+    context="per_slot",
+    read_expanded=_track_header_expanded,
+    toggle=_toggle_track_header,
+    children=(
+        SectionNode(leaf_kind=RowKind.TRACK_PRESET_DIR),
+        SectionNode(leaf_kind=RowKind.TRACK_PRESET),
+        SectionNode(leaf_kind=RowKind.TRACK_STEM),
+        SectionNode(leaf_kind=RowKind.TRACK_BEAT),
     ),
 )
 

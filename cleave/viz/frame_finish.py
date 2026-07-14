@@ -33,6 +33,7 @@ from cleave.viz.post_fx import (
     highlight_rolloff_curve_index,
     live_frame_fade_alpha,
 )
+from cleave.viz.editor_mode_controls import render_sections_active
 from cleave.viz.render_overlay import (
     build_live_overlay_config,
     build_panel_surface,
@@ -79,7 +80,7 @@ def _composite_render_overlay(
     alpha = live_overlay_alpha(
         t_sec,
         cfg,
-        enabled=session.render_overlay.enabled,
+        enabled=session.render_overlay.enabled and render_sections_active(session),
         solo=overlay_solo,
     )
     if alpha <= 0.01:
@@ -121,8 +122,13 @@ def finish_content_frame(
         )
 
     pp = session.render_post_fx
+    sections_on = render_sections_active(session)
     hr = pp.highlight_rolloff
-    if highlight_rolloff_active(pp, solo=post_fx_solo) and hr.mode == "composite":
+    if (
+        sections_on
+        and highlight_rolloff_active(pp, solo=post_fx_solo)
+        and hr.mode == "composite"
+    ):
         core.post_process.apply_highlight_rolloff(
             compositor.content_texture_id,
             compositor.content_width,
@@ -135,7 +141,11 @@ def finish_content_frame(
             highlight_rolloff_curve_index(hr.curve),
         )
     cb = pp.chroma_boost
-    if chroma_boost_active(pp, solo=post_fx_solo) and cb.mode == "composite":
+    if (
+        sections_on
+        and chroma_boost_active(pp, solo=post_fx_solo)
+        and cb.mode == "composite"
+    ):
         core.post_process.apply_chroma_boost(
             compositor.content_texture_id,
             compositor.content_width,
@@ -148,7 +158,7 @@ def finish_content_frame(
         duration_sec,
         pp.fade_in,
         pp.fade_out,
-        enabled=pp.enabled,
+        enabled=pp.enabled and sections_on,
         solo=post_fx_solo,
     )
     core.compositor.apply_frame_fade(frame_fade_alpha)

@@ -17,6 +17,7 @@ from cleave.extract import STEM_SOURCES
 from cleave.song_markers import format_marker_time, place_marker
 from cleave.preset_curation import PresetCurationIndex
 from cleave.viz.config_save import ConfigSaveController
+from cleave.viz.editor_mode_controls import EditorModeController, is_preset_curation_mode
 from cleave.viz.preset_curation_controls import PresetCurationController
 from cleave.viz.key_repeat import KeyRepeatController, add_current_preset_key_pressed, delete_key_pressed, mod_ctrl, mod_shift
 from cleave.viz.modal import ModalHost
@@ -165,6 +166,16 @@ class TuningControls:
             session, bindings=render_post_fx_bindings
         )
         self._settings = SettingsControls(session, cfg)
+        self._editor_mode = EditorModeController(
+            session,
+            cfg,
+            self._config_save,
+            self._modal_host,
+            project_dir=project_dir,
+            layer_bindings=layer_bindings,
+            layer_manager=layer_manager,
+            on_mode_changed=self._on_editor_mode_changed,
+        )
         if session.timeline.enabled:
             self.show_notification(NOTIFICATION_TIMELINE_ENABLED_TEXT)
 
@@ -219,6 +230,9 @@ class TuningControls:
 
         if self.handle_modal_keydown(event):
             return True
+
+        if is_preset_curation_mode(self.session):
+            return self._handle_curation_keydown(event)
 
         if event.key == pygame.K_SPACE:
             toggle_pause(self.playback, self.duration_sec)
@@ -462,6 +476,88 @@ class TuningControls:
 
         return True
 
+    def _handle_curation_keydown(self, event: pygame.event.Event) -> bool:
+        if event.key == pygame.K_SPACE:
+            toggle_pause(self.playback, self.duration_sec)
+            return True
+
+        if event.key == pygame.K_ESCAPE:
+            self._hide_overlay_requested = True
+            return True
+
+        if event.key in (pygame.K_UP, pygame.K_DOWN):
+            delta = -1 if event.key == pygame.K_UP else 1
+            if mod_ctrl(event.mod):
+                self._move_quick_focus(delta)
+            else:
+                self._move_focus(delta)
+            self._key_repeat.on_keydown(
+                event.key,
+                event.mod,
+                accel=False,
+                on_repeat=lambda key, mod: (
+                    self._move_quick_focus(-1 if key == pygame.K_UP else 1)
+                    if mod_ctrl(mod)
+                    else self._move_focus(-1 if key == pygame.K_UP else 1)
+                ),
+            )
+            return True
+
+        if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+            view = self.build_view_state(paused=self.playback.paused)
+            desc = self.focus_descriptor
+            if not view.layout.contains_descriptor(desc):
+                return True
+            kind = desc.kind
+            # Layer header: expand/collapse only; no solo / enable-disable.
+            if kind == RowKind.TRACK_HEADER and (
+                mod_ctrl(event.mod) or mod_shift(event.mod)
+            ):
+                return True
+            self._apply_horizontal(event.key, event.mod, kind)
+            repeat = kind in REPEAT_ROW_KINDS
+            if repeat and kind == RowKind.TRACK_PRESET_DIR and mod_ctrl(event.mod):
+                repeat = False
+            if repeat:
+                self._key_repeat.on_keydown(
+                    event.key,
+                    event.mod,
+                    on_repeat=lambda key, mod: self._apply_horizontal(
+                        key,
+                        mod,
+                        self.focus_descriptor.kind,
+                    ),
+                )
+            return True
+
+        if event.key in (pygame.K_f, pygame.K_b):
+            view = self.build_view_state(paused=self.playback.paused)
+            desc = self.focus_descriptor
+            if not view.layout.contains_descriptor(desc):
+                return True
+            kind = desc.kind
+            slot = desc.slot
+            if slot is not None and kind in PRESET_FILE_ROW_KINDS:
+                if section_lock_blocks_mutation(
+                    self.session, self.focus_descriptor
+                ):
+                    return True
+                src = self._resolve_preset_file_path(slot, kind, self.focus_descriptor)
+                if src is None or not src.is_file():
+                    return True
+                if event.key == pygame.K_f:
+                    self._preset_curation.prompt_favourite(slot, src)
+                else:
+                    self._preset_curation.prompt_blacklist(
+                        slot,
+                        src,
+                        from_user_preset=(kind == RowKind.TRACK_USER_PRESET_ITEM),
+                        user_preset_index=self.focus_descriptor.preset_index,
+                    )
+                return True
+
+        return True
+
     def handle_keyup(self, event: pygame.event.Event) -> None:
         if event.type == pygame.KEYUP:
             self._key_repeat.on_keyup(event.key)
@@ -514,15 +610,30 @@ class TuningControls:
             ):
                 self.session.song_markers.selected_index = desc.marker_index
 
+    def _on_editor_mode_changed(self) -> None:
+        self._view_state._structure = None
+        view = self.build_view_state(paused=self.playback.paused)
+        if isinstance(self.focus_cursor, TimelineFocus):
+            self._apply_focus_cursor(MainFocus(RowDescriptor(RowKind.TRANSPORT)))
+        else:
+            focus_desc = cursor_main_descriptor(self.focus_cursor)
+            if not view.layout.contains_descriptor(focus_desc):
+                resolved = view.layout.resolve_navigable(focus_desc, view)
+                self._apply_focus_cursor(MainFocus(resolved))
+        self._normalize_focus_cursor()
+
     def _normalize_focus_cursor(self) -> None:
         view = self.build_view_state(paused=self.playback.paused)
         tl = self.session.timeline
         row_count = len(self.session.layer_z_order)
         if isinstance(self.focus_cursor, TimelineFocus):
             if not timeline_strip_in_ring(view):
-                self._apply_focus_cursor(
-                    MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+                fallback_kind = (
+                    RowKind.TRANSPORT
+                    if is_preset_curation_mode(self.session)
+                    else RowKind.RENDER_TIMELINE_HEADER
                 )
+                self._apply_focus_cursor(MainFocus(RowDescriptor(fallback_kind)))
                 return
             if row_count == 0:
                 self._apply_focus_cursor(

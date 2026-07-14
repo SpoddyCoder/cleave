@@ -18,6 +18,7 @@ from cleave.viz.help_content import (
     KEYBOARD_CONTROLS_SECTION_TITLE,
     NAVIGATION_SECTION,
     layer_section,
+    navigation_section,
     sections_for,
     timeline_strip_section,
 )
@@ -26,9 +27,13 @@ from cleave.viz.theme import LABEL, VALUE
 from cleave.viz.row_semantics import ROW_BEHAVIORS, RowKind
 
 
+def _is_navigation_section(section: object) -> bool:
+    return isinstance(section, HelpSection) and section.title == NAVIGATION_SECTION.title
+
+
 def _keyboard_section(sections: tuple[object, ...]) -> HelpSection:
     for section in sections:
-        if isinstance(section, HelpSection) and section is not NAVIGATION_SECTION:
+        if isinstance(section, HelpSection) and not _is_navigation_section(section):
             return section
     raise AssertionError("no keyboard help section found")
 
@@ -106,6 +111,15 @@ def test_layer_section_omits_visibility_when_timeline_enabled() -> None:
     section = layer_section(timeline_enabled=True)
     keys = [entry[0] for entry in section.entries]
     assert "Ctrl + Left/Right" not in keys
+
+
+def test_curation_layer_section_only_expand_collapse() -> None:
+    section = layer_section(timeline_enabled=False, preset_curation=True)
+    assert dict(section.entries) == {"Left/Right": "expand/collapse"}
+    header = _keyboard_section(
+        sections_for(RowKind.TRACK_HEADER, preset_curation=True)
+    )
+    assert dict(header.entries) == {"Left/Right": "expand/collapse"}
 
 
 def test_track_header_help_includes_delete() -> None:
@@ -424,7 +438,7 @@ def test_navigable_row_kinds_with_description_have_three_sections() -> None:
         assert len(sections) == 3, f"{row_kind} expected 3 sections, got {len(sections)}"
         assert isinstance(sections[0], DescriptionSection)
         assert isinstance(sections[1], HelpSection)
-        assert sections[2] is NAVIGATION_SECTION
+        assert sections[2] is navigation_section()
 
 
 def test_description_sections_use_control_name_not_about() -> None:
@@ -461,7 +475,23 @@ def test_timeline_submenu_help_has_three_sections() -> None:
     assert sections[0].title == "Timeline"
     assert isinstance(sections[1], HelpSection)
     assert sections[1].title == KEYBOARD_CONTROLS_SECTION_TITLE
-    assert sections[2] is NAVIGATION_SECTION
+    assert sections[2] is navigation_section()
+
+
+def test_curation_navigation_omits_disabled_global_hotkeys() -> None:
+    sections = sections_for(RowKind.TRACK_PRESET, preset_curation=True)
+    nav = sections[-1]
+    assert isinstance(nav, HelpSection)
+    assert nav is navigation_section(preset_curation=True)
+    keys = dict(nav.entries)
+    assert "Ctrl + S" not in keys
+    assert "Ctrl + Enter" not in keys
+    assert keys["Ctrl + Q"] == "quit"
+    assert keys["Up/Down"] == "move row"
+
+    visualizer_nav = sections_for(RowKind.TRACK_PRESET)[-1]
+    assert isinstance(visualizer_nav, HelpSection)
+    assert "Ctrl + S" in dict(visualizer_nav.entries)
 
 
 def test_timeline_strip_help_paused() -> None:

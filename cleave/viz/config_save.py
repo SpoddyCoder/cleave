@@ -59,6 +59,11 @@ class ConfigSaveController:
         self._saved_song_markers = tuple(session.song_markers.times)
         self._pending_exit = False
         self._quit_after_save = False
+        self._on_commit_save: list[Callable[[], None]] = []
+        self._pending_save_dismiss: Callable[[], None] | None = None
+
+    def add_on_commit_save(self, callback: Callable[[], None]) -> None:
+        self._on_commit_save.append(callback)
 
     @property
     def active_config_path(self) -> Path | None:
@@ -84,6 +89,9 @@ class ConfigSaveController:
         """Flush project song markers (when available) and clear dirty baselines."""
         self._flush_song_markers()
         self.clear_config_dirty()
+        self._pending_save_dismiss = None
+        for callback in self._on_commit_save:
+            callback()
 
     def _persisted_signature(self) -> str:
         payload = persisted_session_payload(self.cfg, self.session)
@@ -124,19 +132,28 @@ class ConfigSaveController:
             )
         return False
 
-    def prompt_save(self) -> None:
+    def prompt_save(self, *, on_dismiss: Callable[[], None] | None = None) -> None:
+        self._pending_save_dismiss = on_dismiss
         if not self.allow_overwrite():
             self._modal.prompt_save_as_new(
                 on_save_as_new=self._trigger_save_new,
-                on_dismiss=self._clear_quit_after_save,
+                on_dismiss=self._dismiss_save_flow,
             )
             return
 
         self._modal.prompt_save_choice(
             on_overwrite=self._prompt_overwrite,
             on_save_as_new=self._trigger_save_new,
-            on_dismiss=self._clear_quit_after_save,
+            on_dismiss=self._dismiss_save_flow,
         )
+
+    def _dismiss_save_flow(self) -> None:
+        dismiss = self._pending_save_dismiss
+        self._pending_save_dismiss = None
+        if dismiss is not None:
+            dismiss()
+        else:
+            self._clear_quit_after_save()
 
     def _clear_quit_after_save(self) -> None:
         if self._quit_after_save:
@@ -191,7 +208,7 @@ class ConfigSaveController:
             self._finish_quit_after_save()
 
         def on_cancel() -> None:
-            self._clear_quit_after_save()
+            self._dismiss_save_flow()
 
         self._modal.prompt_yes_no(
             message=message,

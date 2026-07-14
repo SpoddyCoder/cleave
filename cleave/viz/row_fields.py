@@ -82,6 +82,14 @@ def _format_settings_preview_quality(
     return state.settings.preview_quality
 
 
+def _format_settings_editor_mode(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    from cleave.viz.session import EDITOR_MODE_PANEL_LABELS
+
+    return EDITOR_MODE_PANEL_LABELS[state.settings.editor_mode]  # type: ignore[index]
+
+
 def _format_settings_ui_width_mode(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
@@ -256,6 +264,16 @@ def _apply_timeline_fades_apply_to(
         tl.fades_apply_to,
         forward=forward,
     )
+
+
+def _apply_settings_editor_mode(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls._editor_mode.cycle_editor_mode(forward=forward)
 
 
 def _apply_settings_preview_quality(
@@ -1108,6 +1126,12 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         panel_label="Editor Settings",
         present_style=RowPresentStyle.COMPOSITE_HEADER,
         apply_horizontal=_apply_settings_header,
+    ),
+    RowKind.SETTINGS_EDITOR_MODE: RowFieldDef(
+        panel_label="editor mode",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_settings_editor_mode,
+        apply_horizontal=_apply_settings_editor_mode,
     ),
     RowKind.SETTINGS_PREVIEW_QUALITY: RowFieldDef(
         panel_label="preview quality",

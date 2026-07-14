@@ -106,6 +106,7 @@ def _help_compose_kwargs(view_state: TuningViewState) -> dict[str, object]:
         "timeline_recording": view_state.timeline_recording,
         "timeline_override_active": view_state.timeline_override_active,
         "preset_switching": preset_switching,
+        "preset_curation": view_state.settings.editor_mode == "preset_curation",
     }
 
 
