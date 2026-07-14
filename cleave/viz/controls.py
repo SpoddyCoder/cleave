@@ -129,7 +129,6 @@ class TuningControls:
             self._modal_host,
             layer_bindings,
             curation_index,
-            on_notification=self.show_notification,
         )
         self._timeline_presets = TimelinePresetController(
             session,

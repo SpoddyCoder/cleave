@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import tempfile
-from collections.abc import Callable
 from pathlib import Path
 
 import pygame
@@ -11,11 +10,7 @@ import pygame
 from cleave.preset_curation import BLACKLIST_DIR, FAVOURITES_DIR, PresetCurationIndex
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.modal import ModalHost
-from cleave.viz.preset_curation_controls import (
-    ALREADY_IN_BLACKLIST_NOTIFICATION,
-    ALREADY_IN_FAVOURITES_NOTIFICATION,
-    PresetCurationController,
-)
+from cleave.viz.preset_curation_controls import PresetCurationController
 from cleave.viz.session import LayerRuntime, TuningSession
 from tests.support.viz import keydown, noop_layer_bindings
 
@@ -30,7 +25,6 @@ def _make_controller(
     preset_root: Path,
     modal: ModalHost | None = None,
     layer_bindings=noop_layer_bindings,
-    on_notification: Callable[[str], None] | None = None,
 ) -> tuple[PresetCurationController, TuningSession, ModalHost]:
     modal_host = modal if modal is not None else ModalHost()
     playlist = PresetPlaylist(
@@ -56,7 +50,6 @@ def _make_controller(
         modal_host,
         layer_bindings(),
         PresetCurationIndex.build(preset_root),
-        on_notification=on_notification,
     )
     return controller, session, modal_host
 
@@ -159,47 +152,64 @@ def test_confirm_blacklist_moves_and_updates_playlist_and_user_presets() -> None
         assert controller._index.marker("demo.milk") == " [B]"
 
 
-def test_prompt_favourite_already_in_favourites_notifies_without_modal() -> None:
+def test_prompt_favourite_already_in_favourites_uses_move_wording() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         src = root / "pack" / "demo.milk"
         _write(src, "milk")
         _write(root / FAVOURITES_DIR / "demo.milk", "milk")
-        notifications: list[str] = []
+        (root / FAVOURITES_DIR / "keepers").mkdir(parents=True)
         locked: list[str] = []
         controller, _session, modal = _make_controller(
             preset_root=root,
             layer_bindings=lambda: noop_layer_bindings(
                 lock_preset_for_modal=lambda slot: locked.append(slot),
             ),
-            on_notification=notifications.append,
         )
-        favourites_before = set(controller._index.favourites)
 
         controller.prompt_favourite("layer_1", src)
 
-        assert modal.view_state() is None
-        assert locked == []
-        assert notifications == [ALREADY_IN_FAVOURITES_NOTIFICATION]
-        assert controller._index.favourites == favourites_before
+        view = modal.view_state()
+        assert view is not None
+        assert view.message == "Move favourite preset: demo.milk?"
+        assert view.options == ("(root)", "keepers", "Cancel")
+        assert locked == ["layer_1"]
 
 
-def test_prompt_blacklist_already_in_blacklist_notifies_without_modal() -> None:
+def test_confirm_favourite_relocates_existing_favourite() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / "pack" / "demo.milk"
+        _write(src, "milk")
+        existing = root / FAVOURITES_DIR / "demo.milk"
+        _write(existing, "fav-content")
+        keepers = root / FAVOURITES_DIR / "keepers"
+        keepers.mkdir(parents=True)
+        controller, _session, modal = _make_controller(preset_root=root)
+
+        controller.prompt_favourite("layer_1", src)
+        modal.handle_keydown(keydown(pygame.K_RIGHT))  # keepers
+        modal.handle_keydown(keydown(pygame.K_RETURN))
+
+        assert not existing.exists()
+        assert (keepers / "demo.milk").read_text(encoding="utf-8") == "fav-content"
+        assert src.exists()
+
+
+def test_prompt_blacklist_already_in_blacklist_uses_move_wording() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         src = root / "pack" / "demo.milk"
         _write(src, "milk")
         _write(root / BLACKLIST_DIR / "demo.milk", "milk")
-        notifications: list[str] = []
+        (root / BLACKLIST_DIR / "reject").mkdir(parents=True)
         locked: list[str] = []
         controller, _session, modal = _make_controller(
             preset_root=root,
             layer_bindings=lambda: noop_layer_bindings(
                 lock_preset_for_modal=lambda slot: locked.append(slot),
             ),
-            on_notification=notifications.append,
         )
-        blacklist_before = set(controller._index.blacklist)
 
         controller.prompt_blacklist(
             "layer_1",
@@ -208,10 +218,36 @@ def test_prompt_blacklist_already_in_blacklist_notifies_without_modal() -> None:
             user_preset_index=None,
         )
 
-        assert modal.view_state() is None
-        assert locked == []
-        assert notifications == [ALREADY_IN_BLACKLIST_NOTIFICATION]
-        assert controller._index.blacklist == blacklist_before
+        view = modal.view_state()
+        assert view is not None
+        assert view.message == "Move blacklist preset: demo.milk?"
+        assert view.options == ("(root)", "reject", "Cancel")
+        assert locked == ["layer_1"]
+
+
+def test_confirm_blacklist_relocates_existing_blacklist() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / "pack" / "demo.milk"
+        _write(src, "milk")
+        existing = root / BLACKLIST_DIR / "demo.milk"
+        _write(existing, "bl-content")
+        reject = root / BLACKLIST_DIR / "reject"
+        reject.mkdir(parents=True)
+        controller, _session, modal = _make_controller(preset_root=root)
+
+        controller.prompt_blacklist(
+            "layer_1",
+            src,
+            from_user_preset=False,
+            user_preset_index=None,
+        )
+        modal.handle_keydown(keydown(pygame.K_RIGHT))  # reject
+        modal.handle_keydown(keydown(pygame.K_RETURN))
+
+        assert not existing.exists()
+        assert (reject / "demo.milk").read_text(encoding="utf-8") == "bl-content"
+        assert src.exists()
 
 
 def test_prompt_favourite_allows_when_only_blacklisted() -> None:
@@ -220,18 +256,13 @@ def test_prompt_favourite_allows_when_only_blacklisted() -> None:
         src = root / "pack" / "demo.milk"
         _write(src, "milk")
         _write(root / BLACKLIST_DIR / "demo.milk", "other")
-        notifications: list[str] = []
-        controller, _session, modal = _make_controller(
-            preset_root=root,
-            on_notification=notifications.append,
-        )
+        controller, _session, modal = _make_controller(preset_root=root)
 
         controller.prompt_favourite("layer_1", src)
 
         view = modal.view_state()
         assert view is not None
         assert view.message == "Favourite preset: demo.milk?"
-        assert notifications == []
 
 
 def test_blacklist_from_user_preset_skips_playlist_when_not_current() -> None:

@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from pathlib import Path
 
 from cleave.preset_curation import (
     PresetCurationIndex,
     blacklist_root,
     copy_to_favourites,
+    curated_milk_src,
     favourites_root,
     list_destination_subdirs,
     move_to_blacklist,
+    relocate_curated_milk,
+    rewrite_user_preset_paths,
     scrub_user_preset_paths,
 )
 from cleave.viz.live_layer_bindings import LiveLayerBindings
@@ -20,8 +22,6 @@ from cleave.viz.session import TuningSession
 
 _ROOT_DEST_LABEL = "(root)"
 _CANCEL_LABEL = "Cancel"
-ALREADY_IN_FAVOURITES_NOTIFICATION = "Already in favourites"
-ALREADY_IN_BLACKLIST_NOTIFICATION = "Already in blacklist"
 
 
 class PresetCurationController:
@@ -34,28 +34,29 @@ class PresetCurationController:
         modal_host: ModalHost,
         layer_bindings: LiveLayerBindings | None,
         index: PresetCurationIndex,
-        *,
-        on_notification: Callable[[str], None] | None = None,
     ) -> None:
         self.session = session
         self._preset_root = preset_root
         self._modal = modal_host
         self._layer_bindings = layer_bindings
         self._index = index
-        self._on_notification = on_notification
 
     def prompt_favourite(self, slot: str, src: Path) -> None:
-        if src.name in self._index.favourites:
-            self._notify(ALREADY_IN_FAVOURITES_NOTIFICATION)
-            return
+        relocating = src.name in self._index.favourites
         self._lock_preset(slot)
-        message = f"Favourite preset: {src.name}?"
+        message = (
+            f"Move favourite preset: {src.name}?"
+            if relocating
+            else f"Favourite preset: {src.name}?"
+        )
         root = favourites_root(self._preset_root)
         subdirs = list_destination_subdirs(root)
         if not subdirs:
             self._modal.prompt_yes_no(
                 message,
-                on_confirm=lambda: self._confirm_favourite(slot, src, root),
+                on_confirm=lambda: self._confirm_favourite(
+                    slot, src, root, relocating=relocating
+                ),
                 on_cancel=lambda: self._unlock_preset(slot),
             )
             return
@@ -64,7 +65,9 @@ class PresetCurationController:
         options: list[ModalOption] = [
             ModalOption(
                 _ROOT_DEST_LABEL,
-                lambda: self._confirm_favourite(slot, src, root),
+                lambda: self._confirm_favourite(
+                    slot, src, root, relocating=relocating
+                ),
             ),
         ]
         for name in subdirs:
@@ -72,7 +75,9 @@ class PresetCurationController:
             options.append(
                 ModalOption(
                     name,
-                    lambda dest=dest_dir: self._confirm_favourite(slot, src, dest),
+                    lambda dest=dest_dir: self._confirm_favourite(
+                        slot, src, dest, relocating=relocating
+                    ),
                 )
             )
         options.append(ModalOption(_CANCEL_LABEL, dismiss))
@@ -87,18 +92,24 @@ class PresetCurationController:
         user_preset_index: int | None,
     ) -> None:
         del user_preset_index  # reserved for hotkey wiring in a later todo
-        if src.name in self._index.blacklist:
-            self._notify(ALREADY_IN_BLACKLIST_NOTIFICATION)
-            return
+        relocating = src.name in self._index.blacklist
         self._lock_preset(slot)
-        message = f"Blacklist preset: {src.name}?"
+        message = (
+            f"Move blacklist preset: {src.name}?"
+            if relocating
+            else f"Blacklist preset: {src.name}?"
+        )
         root = blacklist_root(self._preset_root)
         subdirs = list_destination_subdirs(root)
         if not subdirs:
             self._modal.prompt_yes_no(
                 message,
                 on_confirm=lambda: self._confirm_blacklist(
-                    slot, src, root, from_user_preset=from_user_preset
+                    slot,
+                    src,
+                    root,
+                    from_user_preset=from_user_preset,
+                    relocating=relocating,
                 ),
                 on_cancel=lambda: self._unlock_preset(slot),
             )
@@ -109,7 +120,11 @@ class PresetCurationController:
             ModalOption(
                 _ROOT_DEST_LABEL,
                 lambda: self._confirm_blacklist(
-                    slot, src, root, from_user_preset=from_user_preset
+                    slot,
+                    src,
+                    root,
+                    from_user_preset=from_user_preset,
+                    relocating=relocating,
                 ),
             ),
         ]
@@ -119,16 +134,38 @@ class PresetCurationController:
                 ModalOption(
                     name,
                     lambda dest=dest_dir: self._confirm_blacklist(
-                        slot, src, dest, from_user_preset=from_user_preset
+                        slot,
+                        src,
+                        dest,
+                        from_user_preset=from_user_preset,
+                        relocating=relocating,
                     ),
                 )
             )
         options.append(ModalOption(_CANCEL_LABEL, dismiss))
         self._modal.prompt_choice(message, options, on_dismiss=dismiss)
 
-    def _confirm_favourite(self, slot: str, src: Path, dest_dir: Path) -> None:
+    def _confirm_favourite(
+        self,
+        slot: str,
+        src: Path,
+        dest_dir: Path,
+        *,
+        relocating: bool,
+    ) -> None:
         try:
-            self._index.mark_favourite(copy_to_favourites(src, dest_dir).name)
+            if relocating:
+                curated = curated_milk_src(favourites_root(self._preset_root), src)
+                if curated is None:
+                    return
+                old = curated.resolve()
+                new = relocate_curated_milk(
+                    curated, dest_dir, with_textures=True
+                ).resolve()
+                if old != new:
+                    self._rewrite_paths_after_relocate(old, new)
+            else:
+                self._index.mark_favourite(copy_to_favourites(src, dest_dir).name)
         finally:
             self._unlock_preset(slot)
 
@@ -139,8 +176,19 @@ class PresetCurationController:
         dest_dir: Path,
         *,
         from_user_preset: bool,
+        relocating: bool,
     ) -> None:
         try:
+            if relocating:
+                curated = curated_milk_src(blacklist_root(self._preset_root), src)
+                if curated is None:
+                    return
+                old = curated.resolve()
+                new = relocate_curated_milk(curated, dest_dir).resolve()
+                if old != new:
+                    self._rewrite_paths_after_relocate(old, new)
+                return
+
             self._index.mark_blacklisted(move_to_blacklist(src, dest_dir).name)
             playlist = self.session.layers[slot].playlist
             if not from_user_preset or (
@@ -157,6 +205,18 @@ class PresetCurationController:
         finally:
             self._unlock_preset(slot)
 
+    def _rewrite_paths_after_relocate(self, old: Path, new: Path) -> None:
+        for layer_slot, layer in self.session.layers.items():
+            playlist = layer.playlist
+            if any(path.resolve() == old for path in playlist.paths):
+                if playlist.remove_preset(old):
+                    if self._layer_bindings is not None:
+                        self._layer_bindings.on_preset_change(layer_slot, playlist)
+        affected = rewrite_user_preset_paths(self.session.layers, old, new)
+        if self._layer_bindings is not None:
+            for affected_slot in affected:
+                self._layer_bindings.on_preset_switching_change(affected_slot)
+
     def _lock_preset(self, slot: str) -> None:
         if self._layer_bindings is not None:
             self._layer_bindings.lock_preset_for_modal(slot)
@@ -164,7 +224,3 @@ class PresetCurationController:
     def _unlock_preset(self, slot: str) -> None:
         if self._layer_bindings is not None:
             self._layer_bindings.unlock_preset_after_modal(slot)
-
-    def _notify(self, message: str) -> None:
-        if self._on_notification is not None:
-            self._on_notification(message)
