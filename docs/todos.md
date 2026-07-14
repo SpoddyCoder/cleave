@@ -50,6 +50,8 @@ b) Restore the UI to the full fat editing mode
 a) When the visualizer is first launched it should be in visualizer mode.
 
 
+NOTE: the cases above have been carefully scoped to be ALL... EXCEPT...
+Because we want to be able to easily add more features to the visualizer mode in the future without having to explicitly remove them from the preset curation mode. Preset curation mode defines the small subset of rows and controls it needs - as this is unlikely to change much int he future.
 
 
 
