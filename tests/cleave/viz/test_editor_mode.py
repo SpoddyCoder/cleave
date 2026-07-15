@@ -152,6 +152,11 @@ def test_enter_curation_expands_layer_one() -> None:
     controls.focus_cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
 
     controls.handle_keydown(keydown(pygame.K_RIGHT))
+    assert controls.session.settings.editor_mode == "visualizer"
+    assert controls.session.settings.editor_mode_selection == "preset_curation"
+
+    controls.handle_keydown(keydown(pygame.K_RETURN))
+    assert not controls.modal_host.active
     assert controls.session.settings.editor_mode == "preset_curation"
     assert controls.session.layers["layer_1"].expanded is True
 
@@ -159,6 +164,7 @@ def test_enter_curation_expands_layer_one() -> None:
 def test_curation_allowlisted_keys_still_work() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.settings.editor_mode = "preset_curation"
+    controls.session.settings.editor_mode_selection = "preset_curation"
     controls.focus_cursor = MainFocus(
         RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
     )
@@ -179,6 +185,8 @@ def test_dirty_enter_modal_cancel_stays_visualizer() -> None:
     controls.focus_cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
 
     controls.handle_keydown(keydown(pygame.K_RIGHT))
+    assert controls.session.settings.editor_mode == "visualizer"
+    controls.handle_keydown(keydown(pygame.K_RETURN))
     assert controls.modal_host.active
     view = controls.modal_host.view_state()
     assert view.kind == ModalKind.CHOICE
@@ -187,12 +195,14 @@ def test_dirty_enter_modal_cancel_stays_visualizer() -> None:
     controls.handle_keydown(keydown(pygame.K_ESCAPE))
     assert not controls.modal_host.active
     assert controls.session.settings.editor_mode == "visualizer"
+    assert controls.session.settings.editor_mode_selection == "visualizer"
 
 
 def test_exit_curation_reloads_and_clears_dirty() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     session.settings.editor_mode = "preset_curation"
+    session.settings.editor_mode_selection = "preset_curation"
     session.layers["layer_1"].opacity_pct = 12
     controls._config_save.clear_config_dirty()
     session.layers["layer_1"].opacity_pct = 99
@@ -222,14 +232,60 @@ def test_exit_curation_reloads_and_clears_dirty() -> None:
         controls.session.settings.expanded = True
         controls.focus_cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
         controls.handle_keydown(keydown(pygame.K_LEFT))
+        assert controls.session.settings.editor_mode == "preset_curation"
+        assert controls.session.settings.editor_mode_selection == "visualizer"
+        controls.handle_keydown(keydown(pygame.K_RETURN))
+        assert not controls.modal_host.active
 
     assert controls.session.settings.editor_mode == "visualizer"
     assert not controls.config_dirty
 
 
+def test_horizontal_only_stages_editor_mode() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.settings.expanded = True
+    controls.focus_cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
+
+    controls.handle_keydown(keydown(pygame.K_RIGHT))
+    assert controls.session.settings.editor_mode == "visualizer"
+    assert controls.session.settings.editor_mode_selection == "preset_curation"
+    assert not controls.modal_host.active
+    state = controls.build_view_state(paused=True)
+    assert state.settings.editor_mode_selection == "preset_curation"
+    from cleave.viz.row_fields import format_row_value
+
+    assert (
+        format_row_value(state, RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
+        == "preset curation [Enter to confirm]"
+    )
+
+    controls.handle_keydown(keydown(pygame.K_LEFT))
+    assert controls.session.settings.editor_mode_selection == "visualizer"
+    state = controls.build_view_state(paused=True)
+    assert (
+        format_row_value(state, RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
+        == "visualizer"
+    )
+
+
+def test_navigate_away_reverts_editor_mode_selection() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.settings.expanded = True
+    controls.focus_cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
+
+    controls.handle_keydown(keydown(pygame.K_RIGHT))
+    assert controls.session.settings.editor_mode_selection == "preset_curation"
+
+    controls.handle_keydown(keydown(pygame.K_DOWN))
+    assert controls.session.settings.editor_mode == "visualizer"
+    assert controls.session.settings.editor_mode_selection == "visualizer"
+    assert controls.focus_descriptor.kind != RowKind.SETTINGS_EDITOR_MODE
+
+
 def test_editor_mode_absent_from_persisted_payload() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.settings.editor_mode = "preset_curation"
+    controls.session.settings.editor_mode_selection = "preset_curation"
     payload = persisted_session_payload(controls.cfg, controls.session)
     assert "editor_mode" not in payload
     settings_blob = payload.get("settings")

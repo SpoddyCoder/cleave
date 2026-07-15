@@ -415,6 +415,9 @@ class TuningControls:
 
         if event.key == pygame.K_RETURN:
             kind = self.focus_descriptor.kind
+            if kind == RowKind.SETTINGS_EDITOR_MODE:
+                self._editor_mode.confirm_editor_mode_selection()
+                return True
             if kind == RowKind.SONG_MARKER_ITEM:
                 desc = self.focus_descriptor
                 if desc.marker_index is not None:
@@ -556,6 +559,11 @@ class TuningControls:
                     )
                 return True
 
+        if event.key == pygame.K_RETURN:
+            if self.focus_descriptor.kind == RowKind.SETTINGS_EDITOR_MODE:
+                self._editor_mode.confirm_editor_mode_selection()
+                return True
+
         return True
 
     def handle_keyup(self, event: pygame.event.Event) -> None:
@@ -598,6 +606,16 @@ class TuningControls:
         self._apply_focus_cursor(cursor)
 
     def _apply_focus_cursor(self, cursor: FocusCursor) -> None:
+        leaving_editor_mode = (
+            isinstance(self._focus_cursor, MainFocus)
+            and self._focus_cursor.descriptor.kind == RowKind.SETTINGS_EDITOR_MODE
+            and not (
+                isinstance(cursor, MainFocus)
+                and cursor.descriptor.kind == RowKind.SETTINGS_EDITOR_MODE
+            )
+        )
+        if leaving_editor_mode:
+            self._editor_mode.sync_selection_to_mode()
         self._focus_cursor = cursor
         if isinstance(cursor, TimelineFocus):
             self.session.timeline.focus_row = cursor.row

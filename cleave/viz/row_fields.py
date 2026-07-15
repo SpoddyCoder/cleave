@@ -87,7 +87,10 @@ def _format_settings_editor_mode(
 ) -> str:
     from cleave.viz.session import EDITOR_MODE_PANEL_LABELS
 
-    return EDITOR_MODE_PANEL_LABELS[state.settings.editor_mode]  # type: ignore[index]
+    label = EDITOR_MODE_PANEL_LABELS[state.settings.editor_mode_selection]  # type: ignore[index]
+    if state.settings.editor_mode_selection != state.settings.editor_mode:
+        return f"{label} [Enter to confirm]"
+    return label
 
 
 def _format_settings_ui_width_mode(
@@ -273,7 +276,7 @@ def _apply_settings_editor_mode(
     _ctrl: bool,
     _shift: bool,
 ) -> None:
-    controls._editor_mode.cycle_editor_mode(forward=forward)
+    controls._editor_mode.cycle_editor_mode_selection(forward=forward)
 
 
 def _apply_settings_preview_quality(
@@ -1129,7 +1132,7 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
     ),
     RowKind.SETTINGS_EDITOR_MODE: RowFieldDef(
         panel_label="editor mode",
-        present_style=RowPresentStyle.LABELED_VALUE,
+        present_style=RowPresentStyle.ACTION_PARAMETER,
         format_value=_format_settings_editor_mode,
         apply_horizontal=_apply_settings_editor_mode,
     ),
