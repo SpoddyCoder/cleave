@@ -282,6 +282,72 @@ def test_navigate_away_reverts_editor_mode_selection() -> None:
     assert controls.focus_descriptor.kind != RowKind.SETTINGS_EDITOR_MODE
 
 
+def test_flexible_mode_expands_for_editor_mode_confirm_suffix() -> None:
+    """Staged confirm chrome must widen flexible panels even past ui_width max."""
+    import pygame
+    from cleave.viz.theme import panel_content_max_width_px
+    from cleave.viz.tuning_panel_draw import TuningOverlay, fit_row_text
+    from cleave.viz.tuning_view_state import SettingsBlock, TrackBlock
+    from tests.cleave.viz.test_overlay import _minimal_view_state
+
+    pygame.init()
+    long_preset = (
+        "very/long/path/to/presets/cream-of-the-crop/"
+        "Some Extremely Long Preset Name That Forces Max Width.milk"
+    )
+    tracks = {
+        "layer_1": TrackBlock(
+            stem="drums",
+            preset_dir_label="dir",
+            preset_label=long_preset,
+            blend_mode="black-key",
+            opacity_pct=50,
+            beat_sensitivity=1.0,
+            effects={},
+            expanded=True,
+        )
+    }
+
+    def _compose(mode: str, selection: str) -> tuple[int, str]:
+        state = _minimal_view_state(
+            settings=SettingsBlock(
+                expanded=True,
+                editor_mode="visualizer",
+                editor_mode_selection=selection,
+                ui_width_mode=mode,
+                ui_width=100,
+            ),
+            tracks=tracks,
+            layer_z_order=["layer_1"],
+        )
+        state.focus_cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
+        overlay = TuningOverlay()
+        overlay.notify_input()
+        composed = overlay.compose_panel(
+            state, viewport_width=1280, viewport_height=720
+        )
+        assert composed is not None
+        font = overlay._font_get()
+        idx = state.layout.find_by_kind(RowKind.SETTINGS_EDITOR_MODE)
+        text = fit_row_text(
+            font,
+            state,
+            idx,
+            max_content_width=panel_content_max_width_px(100),
+        )
+        return composed.panel_size[0], text
+
+    max_panel_w = panel_content_max_width_px(100) + 2 * TuningOverlay()._padding
+    flexible_w, flexible_text = _compose("flexible", "preset_curation")
+    assert " [Enter to confirm]" in flexible_text
+    assert "…" not in flexible_text
+    assert flexible_w > max_panel_w
+
+    fixed_w, fixed_text = _compose("fixed", "preset_curation")
+    assert fixed_w == max_panel_w
+    assert "…" in fixed_text
+
+
 def test_editor_mode_absent_from_persisted_payload() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.settings.editor_mode = "preset_curation"

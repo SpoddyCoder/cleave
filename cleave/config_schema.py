@@ -83,7 +83,7 @@ DEFAULT_EDITOR_PREVIEW_QUALITY: EditorPreviewQuality = "balanced"
 DEFAULT_UI_FADE_SEC = 10.0
 UI_FADE_MAX_SEC = 60.0
 DEFAULT_UI_WIDTH = 110
-UI_WIDTH_MIN = 20
+UI_WIDTH_MIN = 80
 UI_WIDTH_MAX = 200
 
 UiWidthMode = Literal["flexible", "fixed"]
