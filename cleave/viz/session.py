@@ -195,6 +195,8 @@ class SettingsRuntime:
     expanded: bool = False
     ui_expanded: bool = False
     editor_mode: EditorMode = "visualizer"
+    # Staged panel selection; Left/Right cycles, Enter commits.
+    editor_mode_selection: EditorMode = "visualizer"
 
 
 @dataclass

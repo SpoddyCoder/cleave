@@ -72,9 +72,9 @@ def _merge_session_state(
 
     target.settings.expanded = preserve_expanded
     target.settings.ui_expanded = preserve_ui_expanded
-    target.settings.editor_mode = (
-        editor_mode if editor_mode is not None else preserve_editor_mode
-    )
+    mode = editor_mode if editor_mode is not None else preserve_editor_mode
+    target.settings.editor_mode = mode
+    target.settings.editor_mode_selection = mode
     target.help_visible = preserve_help
     target.preset_skip_notify_tracker = skip_tracker
     target.projectm_log_notify_tracker = log_tracker
@@ -109,20 +109,26 @@ class EditorModeController:
         self._enter_curation_after_save = False
         self._config_save.add_on_commit_save(self._on_config_committed)
 
-    def cycle_editor_mode(self, *, forward: bool) -> None:
+    def cycle_editor_mode_selection(self, *, forward: bool) -> None:
         modes = EDITOR_MODES
-        current = self.session.settings.editor_mode
+        current = self.session.settings.editor_mode_selection
         try:
             index = modes.index(current)
         except ValueError:
             index = 0
-        new_mode = modes[(index + (1 if forward else -1)) % len(modes)]
-        if new_mode == current:
+        self.session.settings.editor_mode_selection = modes[
+            (index + (1 if forward else -1)) % len(modes)
+        ]
+
+    def confirm_editor_mode_selection(self) -> None:
+        selected = self.session.settings.editor_mode_selection
+        current = self.session.settings.editor_mode
+        if selected == current:
             return
-        if current == "visualizer" and new_mode == "preset_curation":
+        if current == "visualizer" and selected == "preset_curation":
             self.request_enter_curation()
             return
-        if current == "preset_curation" and new_mode == "visualizer":
+        if current == "preset_curation" and selected == "visualizer":
             self.request_exit_to_visualizer()
 
     def request_enter_curation(self) -> None:
@@ -148,6 +154,11 @@ class EditorModeController:
         self._config_save.clear_config_dirty()
         self._notify_mode_changed()
 
+    def sync_selection_to_mode(self) -> None:
+        self.session.settings.editor_mode_selection = (
+            self.session.settings.editor_mode
+        )
+
     def _enter_curation_via_save(self) -> None:
         self._enter_curation_after_save = True
         self._config_save.prompt_save(on_dismiss=self._cancel_enter_curation)
@@ -160,6 +171,7 @@ class EditorModeController:
 
     def _cancel_enter_curation(self) -> None:
         self._enter_curation_after_save = False
+        self.sync_selection_to_mode()
 
     def _on_config_committed(self) -> None:
         if not self._enter_curation_after_save:
@@ -177,6 +189,7 @@ class EditorModeController:
 
     def _enter_curation_mode(self) -> None:
         self.session.settings.editor_mode = "preset_curation"
+        self.session.settings.editor_mode_selection = "preset_curation"
         self.session.timeline.panel_open = False
         self._expand_layer_one()
         self._notify_mode_changed()

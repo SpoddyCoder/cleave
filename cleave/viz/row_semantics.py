@@ -910,15 +910,19 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         quick_nav_target=True,
     ),
     RowKind.SETTINGS_EDITOR_MODE: RowBehavior(
-        RowAffordance.VALUE_STEP,
+        RowAffordance.ACTION_PARAMETER,
         is_pinned=True,
         repeatable=True,
         parent_group="settings",
         help_title="Editor mode",
-        help_entries=(("Left/Right", "cycle mode"),),
+        help_entries=(
+            ("Left/Right", "cycle mode"),
+            ("Enter", "confirm switch"),
+        ),
         help_description=(
             "Visualizer mode exposes the full tuning panel.",
             "Preset curation mode limits the panel to preset favourites and blacklist.",
+            "Left/Right stages a mode; Enter confirms the switch.",
         ),
     ),
     RowKind.SETTINGS_PREVIEW_QUALITY: RowBehavior(
