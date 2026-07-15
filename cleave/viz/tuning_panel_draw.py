@@ -238,9 +238,13 @@ def _fit_action_parameter_row_value(
     max_content_width: int = PANEL_CONTENT_MAX_WIDTH,
     cache: TuningPanelCache | None = None,
 ) -> str:
+    value = _action_parameter_row_value(state, index)
+    # Flexible mode sizes the panel to content; keep the full value so chrome like
+    # editor-mode "[Enter to confirm]" can widen the panel past ui_width max.
+    if state.settings.ui_width_mode == "flexible":
+        return value
     budget = max_content_width - _row_indent(state, index)
     budget -= font.size(_action_parameter_row_prefix(state.layout.kind(index)))[0]
-    value = _action_parameter_row_value(state, index)
     if cache is None:
         return fit_text_to_width(font, value, budget)
     return cache.fit_text_cached("text", fit_text_to_width, font, value, budget)
@@ -2032,10 +2036,21 @@ class TuningOverlay:
                 )
 
         content_w = max(row_widths) if row_widths else 0
-        content_w = min(content_w, panel_max_width)
         if state.settings.ui_width_mode == "fixed":
             content_w = panel_max_width
+        else:
+            # Path rows are fitted to panel_max already. Allow natural
+            # action-parameter chrome (e.g. editor-mode confirm) to widen past
+            # the configured max, still capped by the viewport.
+            margin_x, _ = self._margin
+            viewport_content_max = max(
+                panel_max_width,
+                viewport_width - margin_x * 2 - self._padding * 2,
+            )
+            content_w = min(content_w, viewport_content_max)
         panel_w = content_w + self._padding * 2
+        if panel_w > capacity[0]:
+            capacity = (panel_w, capacity[1])
 
         alpha = int(BACKGROUND_ALPHA * self._visibility)
         if alpha < 2:

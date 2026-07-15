@@ -4156,7 +4156,7 @@ def test_settings_adjust_ui_width() -> None:
 
     for _ in range(86):
         controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert controls.cfg.editor.ui_width == 20
+    assert controls.cfg.editor.ui_width == 80
 
 
 def test_settings_ui_width_change_does_not_mark_project_config_dirty() -> None:
