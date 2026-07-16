@@ -181,6 +181,7 @@ def test_preset_file_help_titles() -> None:
     assert entries["Ctrl + Left/Right"] == "next/previous large step"
     assert entries["f"] == "favourite preset"
     assert entries["b"] == "blacklist preset"
+    assert entries["r"] == "remove favourite / restore blacklist"
     assert "Shift + +" not in entries
 
 
@@ -386,6 +387,7 @@ def test_user_preset_item_help() -> None:
     assert entries["Delete"] == "remove preset"
     assert entries["f"] == "favourite preset"
     assert entries["b"] == "blacklist preset"
+    assert entries["r"] == "remove favourite / restore blacklist"
 
 
 def test_user_preset_add_help() -> None:
