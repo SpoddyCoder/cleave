@@ -53,6 +53,10 @@ class TimelineStaticSignature:
     bar_grid_times: tuple[float, ...]
     song_marker_times: tuple[float, ...]
     selected_song_marker_index: int | None
+    fades_enabled: bool
+    fade_in: float
+    fade_out: float
+    fades_apply_to: str
 
 
 @dataclass
@@ -136,6 +140,10 @@ def timeline_static_signature(
         bar_grid_times=state.bar_grid_times,
         song_marker_times=state.song_marker_times,
         selected_song_marker_index=state.selected_song_marker_index,
+        fades_enabled=state.fades_enabled,
+        fade_in=state.fade_in,
+        fade_out=state.fade_out,
+        fades_apply_to=state.fades_apply_to,
     )
 
 

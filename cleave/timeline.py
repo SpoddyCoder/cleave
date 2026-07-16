@@ -152,6 +152,28 @@ def _matches_song_marker(t: float, markers: Sequence[float]) -> bool:
     return any(abs(marker - t) <= SONG_MARKER_FADE_MATCH_EPS for marker in markers)
 
 
+def _segment_fade_edges_active(
+    lane: TimelineLane,
+    start: float,
+    end: float,
+    *,
+    duration_sec: float,
+    song_marker_times: Sequence[float],
+    exclude_song_markers: bool,
+) -> tuple[bool, bool]:
+    fade_in_active = True
+    if start <= 0.0 and not _boundary_has_cue(lane, start):
+        fade_in_active = False
+    elif exclude_song_markers and _matches_song_marker(start, song_marker_times):
+        fade_in_active = False
+    fade_out_active = True
+    if end >= duration_sec and not _boundary_has_cue(lane, end):
+        fade_out_active = False
+    elif exclude_song_markers and _matches_song_marker(end, song_marker_times):
+        fade_out_active = False
+    return fade_in_active, fade_out_active
+
+
 def _segment_fade_envelope(
     t_sec: float,
     start: float,
@@ -169,6 +191,46 @@ def _segment_fade_envelope(
     if fade_out_active and fade_out > 0.0 and end <= t_sec < end + fade_out:
         return smoothstep((end + fade_out - t_sec) / fade_out)
     return 0.0
+
+
+def lane_fade_spans(
+    lane: TimelineLane,
+    *,
+    inherit: bool,
+    fade_in: float,
+    fade_out: float,
+    duration_sec: float,
+    song_marker_times: Sequence[float] = (),
+    exclude_song_markers: bool = False,
+) -> list[tuple[float, float, Literal["in", "out"]]]:
+    """Return clipped ``(t0, t1, kind)`` fade wedges for visible lane segments."""
+    fade_in = max(0.0, float(fade_in))
+    fade_out = max(0.0, float(fade_out))
+    if duration_sec <= 0.0:
+        return []
+    spans: list[tuple[float, float, Literal["in", "out"]]] = []
+    for start, end, visible in lane_segments(lane, duration_sec, inherit=inherit):
+        if not visible:
+            continue
+        fade_in_active, fade_out_active = _segment_fade_edges_active(
+            lane,
+            start,
+            end,
+            duration_sec=duration_sec,
+            song_marker_times=song_marker_times,
+            exclude_song_markers=exclude_song_markers,
+        )
+        if fade_in_active and fade_in > 0.0:
+            t0 = max(0.0, start - fade_in)
+            t1 = start
+            if t1 > t0:
+                spans.append((t0, t1, "in"))
+        if fade_out_active and fade_out > 0.0:
+            t0 = end
+            t1 = min(duration_sec, end + fade_out)
+            if t1 > t0:
+                spans.append((t0, t1, "out"))
+    return spans
 
 
 def lane_fade_alpha(
@@ -199,16 +261,14 @@ def lane_fade_alpha(
     for start, end, visible in lane_segments(lane, duration_sec, inherit=inherit):
         if not visible:
             continue
-        fade_in_active = True
-        if start <= 0.0 and not _boundary_has_cue(lane, start):
-            fade_in_active = False
-        elif exclude_song_markers and _matches_song_marker(start, song_marker_times):
-            fade_in_active = False
-        fade_out_active = True
-        if end >= duration_sec and not _boundary_has_cue(lane, end):
-            fade_out_active = False
-        elif exclude_song_markers and _matches_song_marker(end, song_marker_times):
-            fade_out_active = False
+        fade_in_active, fade_out_active = _segment_fade_edges_active(
+            lane,
+            start,
+            end,
+            duration_sec=duration_sec,
+            song_marker_times=song_marker_times,
+            exclude_song_markers=exclude_song_markers,
+        )
         contrib = _segment_fade_envelope(
             t_sec,
             start,
