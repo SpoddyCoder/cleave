@@ -13,6 +13,7 @@ from cleave.viz.tuning_panel_draw import render_visibility_icon
 from cleave.viz.theme import (
     ARMED_BG,
     DISABLED,
+    HIGHLIGHT,
     OVERRIDE_BG,
     OVERRIDE_GLYPH,
     OVERRIDE_GLYPH_OFF,
@@ -415,6 +416,29 @@ def test_armed_not_recording_abbrev_always_red() -> None:
 
     assert armed_color[0] > unarmed_color[0] + 40
     assert armed_color[0] > 150
+
+
+def test_armed_abbrev_letter_uses_highlight() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    state = _view_state(armed_slots={"layer_2"}, recording=False, focus_row=0)
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    _draw(overlay, surface, state)
+
+    bass_layout = next(row for row in overlay.row_layout if row[5] == "layer_2")
+    _, _, row_y, _, row_h, _ = bass_layout
+    panel = overlay.panel_rect
+    assert panel is not None
+    panel_x, panel_y, _, _ = panel
+    abbrev_x = overlay._padding + overlay._layer_num_width
+    left = panel_x + abbrev_x
+    top = panel_y + row_y
+    found_highlight = any(
+        surface.get_at((x, y))[:3] == HIGHLIGHT
+        for y in range(top, top + row_h)
+        for x in range(left, left + overlay._stem_abbrev_width)
+    )
+    assert found_highlight
 
 
 def test_unarmed_recording_monitor_eye_not_override_bg() -> None:

@@ -97,7 +97,7 @@ Colors live in [cleave/viz/theme.py](cleave/viz/theme.py). Label truncation uses
 | `LOCK_ICON` | Red padlock glyph on locked track and render section headers |
 | `SOLO_BG` | Solid red background behind the visibility eye when that stem is soloed |
 | `OVERRIDE_BG` | Solid gold background behind the timeline monitor eye when that stem is in override |
-| `ARMED_BG` | Solid red row background on armed timeline rows |
+| `ARMED_BG` | Solid red background behind the stem abbrev on armed timeline rows; abbrev letter uses `HIGHLIGHT` for contrast |
 | `PRESET_ICON` / `PRESET_FILE_ICON` | Folder and file glyphs on preset rows |
 
 ### Intentional exceptions

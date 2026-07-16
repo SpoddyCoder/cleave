@@ -573,10 +573,8 @@ class TimelineOverlay:
             )
             # Armed abbrev background and recording monitor flash are live-patched.
 
-            if focused:
+            if focused or armed:
                 label_color = HIGHLIGHT
-            elif armed:
-                label_color = VALUE
             else:
                 label_color = LABEL
             num_surf = font.render(layer_num_prefix(layer_num), True, label_color)
@@ -725,6 +723,13 @@ class TimelineOverlay:
             )
             armed_surf.fill((*ARMED_BG, ARMED_BG_ALPHA))
             upload.blit(armed_surf, (stem_abbrev_x, upload_y))
+            # Red fill is live-patched over the static glyph; redraw so it stays readable.
+            stem_source = state.slot_stems.get(slot, slot)
+            abbrev_surf = self._font_get().render(
+                stem_abbrev_label(stem_source), True, HIGHLIGHT
+            )
+            abbrev_y = upload_y + max(0, (row_h - abbrev_surf.get_height()) // 2)
+            upload.blit(abbrev_surf, (stem_abbrev_x, abbrev_y))
         dirty.append(abbrev_rect)
 
         monitor_rect = (monitor_eye_x, upload_y, eye_slot_w, row_h)
