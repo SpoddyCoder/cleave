@@ -101,7 +101,7 @@ def test_help_entry_columns_align_to_widest_key() -> None:
 def test_layer_section_includes_visibility_when_timeline_disabled() -> None:
     section = layer_section(timeline_enabled=False)
     entries = dict(section.entries)
-    assert entries.get("l") == "lock/unlock layer"
+    assert entries.get("L") == "lock/unlock layer"
     assert entries.get("Shift + Left/Right") == "solo layer"
     assert entries.get("Ctrl + Left/Right") == "enable/disable layer"
     assert entries.get("Delete") == "delete layer"
@@ -179,9 +179,9 @@ def test_preset_file_help_titles() -> None:
     entries = dict(keyboard.entries)
     assert entries["Left/Right"] == "next/previous preset"
     assert entries["Ctrl + Left/Right"] == "next/previous large step"
-    assert entries["f"] == "favourite preset"
-    assert entries["b"] == "blacklist preset"
-    assert entries["r"] == "remove favourite / restore blacklist"
+    assert entries["F"] == "favourite preset"
+    assert entries["B"] == "blacklist preset"
+    assert entries["R"] == "remove favourite / restore blacklist"
     assert "Shift + +" not in entries
 
 
@@ -385,9 +385,9 @@ def test_user_preset_item_help() -> None:
     assert description.title == "user preset entry"
     entries = dict(keyboard.entries)
     assert entries["Delete"] == "remove preset"
-    assert entries["f"] == "favourite preset"
-    assert entries["b"] == "blacklist preset"
-    assert entries["r"] == "remove favourite / restore blacklist"
+    assert entries["F"] == "favourite preset"
+    assert entries["B"] == "blacklist preset"
+    assert entries["R"] == "remove favourite / restore blacklist"
 
 
 def test_user_preset_add_help() -> None:
@@ -501,14 +501,14 @@ def test_timeline_strip_help_paused() -> None:
     keys = [key for key, _ in section.entries]
     assert keys.index("Shift + Enter") + 1 == keys.index("1-4")
     entries = dict(section.entries)
-    assert entries["a"] == "toggle arm track"
+    assert entries["A"] == "toggle arm track"
     assert entries["1-4"] == "toggle layer visibility"
     assert entries["Shift + Enter"] == "toggle override"
     assert "Ctrl + Enter" not in entries
     assert entries["Space"] == "play"
-    assert entries["Ctrl + Space / r"] == "start record"
+    assert entries["Ctrl + Space / R"] == "start record"
     keys = [key for key, _ in section.entries]
-    assert keys.index("Ctrl + Space / r") + 1 == keys.index("Space")
+    assert keys.index("Ctrl + Space / R") + 1 == keys.index("Space")
     assert "Left/Right" in entries
 
 
@@ -542,6 +542,6 @@ def test_timeline_strip_help_recording_while_playing() -> None:
     assert entries["Left/Right"] == "skip 10s, fills range"
     assert entries["Shift + Left/Right"] == "skip 2s, fills range"
     assert entries["Ctrl + Left/Right"] == "skip 30s, fills range"
-    assert entries["r"] == "stop record"
+    assert entries["R"] == "stop record"
     assert entries["Ctrl + Space / Space"] == "stop record and pause"
     assert "Space" not in entries

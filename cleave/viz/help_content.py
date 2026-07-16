@@ -74,8 +74,8 @@ _TRANSPORT_SECTION = HelpSection(
 )
 
 _LAYER_SECTION_BASE: tuple[tuple[str, str], ...] = (
-    ("m", "move z-order"),
-    ("l", "lock/unlock layer"),
+    ("M", "move z-order"),
+    ("L", "lock/unlock layer"),
     ("Shift + Left/Right", "solo layer"),
     ("Left/Right", "expand/collapse"),
     ("Delete", "delete layer"),
@@ -117,9 +117,9 @@ _PRESET_DIR_SECTION = HelpSection(
 )
 
 _PRESET_CURATION_SHORTCUTS = (
-    ("f", "favourite preset"),
-    ("b", "blacklist preset"),
-    ("r", "remove favourite / restore blacklist"),
+    ("F", "favourite preset"),
+    ("B", "blacklist preset"),
+    ("R", "remove favourite / restore blacklist"),
 )
 
 _PRESET_SECTION = HelpSection(
@@ -184,7 +184,7 @@ def timeline_strip_section(
     recording: bool,
     override_active: bool,
 ) -> HelpSection:
-    entries: list[tuple[str, str]] = [("a", "toggle arm track")]
+    entries: list[tuple[str, str]] = [("A", "toggle arm track")]
 
     if not recording:
         entries.append(("Shift + Enter", "toggle override"))
@@ -195,10 +195,10 @@ def timeline_strip_section(
         entries.append(("1-4", "toggle layer visibility"))
 
     if recording:
-        entries.append(("r", "stop record"))
+        entries.append(("R", "stop record"))
         entries.append(("Ctrl + Space / Space", "stop record and pause"))
     else:
-        entries.append(("Ctrl + Space / r", "start record"))
+        entries.append(("Ctrl + Space / R", "start record"))
         if paused:
             entries.append(("Space", "play"))
         else:

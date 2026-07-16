@@ -199,7 +199,7 @@ def test_help_hint_layout_avoids_scrollbar_column() -> None:
     pygame.init()
     overlay = TuningOverlay()
     font = overlay._font_get()
-    hint_w = font.render("h - help", True, LABEL).get_width()
+    hint_w = font.render("H - help", True, LABEL).get_width()
     panel_w = 320
     panel_h = 200
     without_bar = panel_help_hint_layout(

@@ -1801,7 +1801,7 @@ class TuningOverlay:
             cache.last_fps_rect = None
 
         if text_alpha >= 2:
-            help_hint = _render_text(font, "h - help", True, LABEL, counters=counters)
+            help_hint = _render_text(font, "H - help", True, LABEL, counters=counters)
             help_hint.set_alpha(text_alpha)
             hint_layout = panel_help_hint_layout(
                 panel_w=panel_w,
