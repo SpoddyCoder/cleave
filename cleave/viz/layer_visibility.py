@@ -328,4 +328,8 @@ def build_timeline_view_state(
         ),
         song_marker_times=tuple(session.song_markers.times),
         selected_song_marker_index=focused_song_marker_index(focus_cursor),
+        fades_enabled=tl.fades_enabled,
+        fade_in=tl.fade_in,
+        fade_out=tl.fade_out,
+        fades_apply_to=tl.fades_apply_to,
     )

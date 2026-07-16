@@ -13,6 +13,7 @@ from cleave.timeline import (
     canonicalize,
     empty_lane,
     lane_fade_alpha,
+    lane_fade_spans,
     lane_visible_at,
     punch_lane,
     set_lane_cue,
@@ -300,3 +301,63 @@ def test_lane_fade_alpha_overlapping_segments_take_max() -> None:
         lane, t, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=60.0
     )
     assert alpha == pytest.approx(max(out_env, in_env))
+
+
+def test_lane_fade_spans_fade_in_before_on_cue() -> None:
+    lane = _lane(False, (10.0, True), (20.0, False))
+    spans = lane_fade_spans(
+        lane, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=60.0
+    )
+    assert (8.0, 10.0, "in") in spans
+    assert (20.0, 22.0, "out") in spans
+
+
+def test_lane_fade_spans_no_fade_at_song_edges_without_cue() -> None:
+    lane = _lane(True)
+    spans = lane_fade_spans(
+        lane, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=30.0
+    )
+    assert spans == []
+
+
+def test_lane_fade_spans_zero_durations_empty() -> None:
+    lane = _lane(False, (10.0, True), (20.0, False))
+    assert (
+        lane_fade_spans(
+            lane, inherit=False, fade_in=0.0, fade_out=0.0, duration_sec=60.0
+        )
+        == []
+    )
+
+
+def test_lane_fade_spans_exclude_song_markers() -> None:
+    lane = _lane(False, (10.0, True), (20.0, False))
+    spans = lane_fade_spans(
+        lane,
+        inherit=False,
+        fade_in=2.0,
+        fade_out=2.0,
+        duration_sec=60.0,
+        song_marker_times=(10.0, 20.0),
+        exclude_song_markers=True,
+    )
+    assert (8.0, 10.0, "in") not in spans
+    assert (20.0, 22.0, "out") not in spans
+
+
+def test_lane_fade_spans_clips_to_duration() -> None:
+    lane = _lane(False, (50.0, True), (59.0, False))
+    spans = lane_fade_spans(
+        lane, inherit=False, fade_in=2.0, fade_out=5.0, duration_sec=60.0
+    )
+    fade_out = next(span for span in spans if span[2] == "out")
+    assert fade_out == (59.0, 60.0, "out")
+
+
+def test_lane_fade_spans_clips_fade_in_at_song_start() -> None:
+    lane = _lane(False, (1.0, True))
+    spans = lane_fade_spans(
+        lane, inherit=False, fade_in=5.0, fade_out=2.0, duration_sec=60.0
+    )
+    fade_in = next(span for span in spans if span[2] == "in")
+    assert fade_in == (0.0, 1.0, "in")

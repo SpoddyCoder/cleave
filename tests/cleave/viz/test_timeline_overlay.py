@@ -83,6 +83,10 @@ def _view_state(
     bar_grid_times: tuple[float, ...] = (),
     song_marker_times: tuple[float, ...] = (),
     selected_song_marker_index: int | None = None,
+    fades_enabled: bool = False,
+    fade_in: float = 2.0,
+    fade_out: float = 2.0,
+    fades_apply_to: str = "all",
 ) -> TimelineViewState:
     order = list(layer_z_order or list(DEFAULT_LAYER_SLOTS))
     lane_map = dict(lanes or {})
@@ -127,6 +131,10 @@ def _view_state(
         bar_grid_times=bar_grid_times,
         song_marker_times=song_marker_times,
         selected_song_marker_index=selected_song_marker_index,
+        fades_enabled=fades_enabled,
+        fade_in=fade_in,
+        fade_out=fade_out,
+        fades_apply_to=fades_apply_to,
     )
 
 

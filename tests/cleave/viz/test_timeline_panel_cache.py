@@ -121,6 +121,30 @@ def test_static_signature_changes_on_selected_song_marker_index() -> None:
     assert _static_sig(first) != _static_sig(second)
 
 
+def test_static_signature_changes_on_fades_enabled() -> None:
+    disabled = _view_state(fades_enabled=False)
+    enabled = _view_state(fades_enabled=True)
+    assert _static_sig(disabled) != _static_sig(enabled)
+
+
+def test_static_signature_changes_on_fade_in() -> None:
+    short = _view_state(fades_enabled=True, fade_in=2.0)
+    long = _view_state(fades_enabled=True, fade_in=4.0)
+    assert _static_sig(short) != _static_sig(long)
+
+
+def test_static_signature_changes_on_fade_out() -> None:
+    short = _view_state(fades_enabled=True, fade_out=2.0)
+    long = _view_state(fades_enabled=True, fade_out=4.0)
+    assert _static_sig(short) != _static_sig(long)
+
+
+def test_static_signature_changes_on_fades_apply_to() -> None:
+    all_markers = _view_state(fades_enabled=True, fades_apply_to="all")
+    exclude = _view_state(fades_enabled=True, fades_apply_to="exclude_song_markers")
+    assert _static_sig(all_markers) != _static_sig(exclude)
+
+
 def test_compose_rebuilds_static_panel_when_recording_playhead_moves() -> None:
     pygame.init()
     overlay = TimelineOverlay()
