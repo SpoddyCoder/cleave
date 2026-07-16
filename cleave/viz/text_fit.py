@@ -6,11 +6,25 @@ import re
 
 import pygame
 
-_COUNTER_SUFFIX = re.compile(r" \((\d+)/(\d+)\)$")
+# Playlist counter and/or curation markers after a filename or path.
+# Counter: " (N/TOTAL)". Markers: " [F]", " [B]", or " [F][B]".
+_META_SUFFIX = re.compile(
+    r"(?: \((\d+)/(\d+)\))(?: \[F\](?:\[B\])?| \[B\])?$"
+    r"|"
+    r"(?: \[F\](?:\[B\])?| \[B\])$"
+)
 
 
 def _text_width(font: pygame.font.Font, text: str) -> int:
     return font.size(text)[0]
+
+
+def _split_meta_suffix(label: str) -> tuple[str, str]:
+    """Split ``head`` from trailing `` (N/TOTAL)`` and/or `` [F]``/`` [B]``."""
+    match = _META_SUFFIX.search(label)
+    if match is None:
+        return label, ""
+    return label[: match.start()], match.group(0)
 
 
 def fit_text_to_width(font: pygame.font.Font, text: str, max_px: int) -> str:
@@ -60,14 +74,20 @@ def fit_path_label_to_width(font: pygame.font.Font, label: str, max_px: int) -> 
     return best
 
 
+def _fit_label_head(font: pygame.font.Font, head: str, max_px: int) -> str:
+    """Fit the non-meta head: path-style when it contains ``/``, else keep the start."""
+    if "/" in head:
+        return fit_path_label_to_width(font, head, max_px)
+    return fit_text_to_width(font, head, max_px)
+
+
 def fit_counter_label_to_width(font: pygame.font.Font, label: str, max_px: int) -> str:
-    """Shorten a path or filename to max_px; preserve a trailing ``(N/TOTAL)`` counter."""
-    match = _COUNTER_SUFFIX.search(label)
-    if match is None:
-        return fit_path_label_to_width(font, label, max_px)
-    head = label[: match.start()]
-    suffix = match.group(0)
+    """Shorten a path or filename to max_px; preserve counter and curation markers."""
+    head, suffix = _split_meta_suffix(label)
+    if not suffix:
+        return _fit_label_head(font, label, max_px)
     suffix_w = _text_width(font, suffix)
-    if suffix_w >= max_px:
-        return fit_text_to_width(font, label, max_px)
-    return fit_path_label_to_width(font, head, max_px - suffix_w) + suffix
+    head_budget = max_px - suffix_w
+    if head_budget <= 0:
+        return suffix
+    return _fit_label_head(font, head, head_budget) + suffix

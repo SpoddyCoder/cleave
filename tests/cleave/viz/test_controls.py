@@ -880,7 +880,8 @@ def test_preset_row_truncates_long_filenames() -> None:
     prefix_w = preset_row_prefix_width(font, font.get_linesize())
     assert font.size(label)[0] <= panel_w - TREE_INDENT - prefix_w
     assert label.endswith("(1/50)")
-    assert label.startswith("…")
+    assert label.startswith("Phat_Zylot")
+    assert "…" in label
     assert "…/" not in label
 
 
