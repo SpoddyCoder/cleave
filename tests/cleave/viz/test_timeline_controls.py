@@ -159,6 +159,31 @@ def test_space_toggles_pause() -> None:
     assert playback.paused is False
 
 
+def test_space_toggles_pause_when_locked() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls()
+    session.timeline.locked = True
+    playback = controls.playback
+
+    assert playback.paused is False
+    controls.handle_keydown(keydown(pygame.K_SPACE))
+    assert playback.paused is True
+    assert session.timeline.preview_active is True
+    controls.handle_keydown(keydown(pygame.K_SPACE))
+    assert playback.paused is False
+    assert session.timeline.preview_active is False
+
+
+def test_ctrl_space_blocked_when_locked() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+    )
+    session.timeline.locked = True
+
+    controls.handle_keydown(keydown(pygame.K_SPACE, mod=pygame.KMOD_CTRL))
+    assert session.timeline.recording is False
+    assert controls.playback.paused is False
+
+
 def test_pause_snapshots_monitor_and_sets_preview_active() -> None:
     controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
         position_sec=5.0,
