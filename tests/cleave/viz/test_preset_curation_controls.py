@@ -144,6 +144,9 @@ def test_confirm_blacklist_moves_and_updates_playlist_and_user_presets() -> None
         assert unlocked == ["layer_1"]
         assert not src.exists()
         assert (root / BLACKLIST_DIR / "demo.milk").exists()
+        assert (root / BLACKLIST_DIR / "demo.milk.origin").read_text(
+            encoding="utf-8"
+        ) == "pack/demo.milk"
         assert session.layers["layer_1"].playlist.paths == ()
         assert preset_changes == [("layer_1", 0)]
         assert switching_changes == ["layer_1"]
@@ -300,3 +303,280 @@ def test_blacklist_from_user_preset_skips_playlist_when_not_current() -> None:
         assert session.layers["layer_1"].playlist.current == current
         assert session.layers["layer_1"].user_presets == []
         assert not user_only.exists()
+
+
+def test_prompt_restore_favourite_uses_remove_modal() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / "pack" / "demo.milk"
+        _write(src, "milk")
+        _write(root / FAVOURITES_DIR / "demo.milk", "fav")
+        locked: list[str] = []
+        controller, _session, modal = _make_controller(
+            preset_root=root,
+            layer_bindings=lambda: noop_layer_bindings(
+                lock_preset_for_modal=lambda slot: locked.append(slot),
+            ),
+        )
+
+        controller.prompt_restore("layer_1", src)
+
+        view = modal.view_state()
+        assert view is not None
+        assert view.message == "Remove favourite: demo.milk?"
+        assert view.options == ("Yes", "No")
+        assert locked == ["layer_1"]
+
+
+def test_confirm_restore_removes_favourite() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / "pack" / "demo.milk"
+        _write(src, "milk")
+        fav = root / FAVOURITES_DIR / "demo.milk"
+        _write(fav, "fav")
+        unlocked: list[str] = []
+        controller, session, modal = _make_controller(
+            preset_root=root,
+            layer_bindings=lambda: noop_layer_bindings(
+                unlock_preset_after_modal=lambda slot: unlocked.append(slot),
+            ),
+        )
+        user_presets_before = list(session.layers["layer_1"].user_presets)
+
+        controller.prompt_restore("layer_1", src)
+        modal.handle_keydown(keydown(pygame.K_RETURN))
+
+        assert not fav.exists()
+        assert src.exists()
+        assert "demo.milk" not in controller._index.favourites
+        assert unlocked == ["layer_1"]
+        assert session.layers["layer_1"].user_presets == user_presets_before
+
+
+def test_confirm_remove_favourite_scrubs_playlist_and_user_presets() -> None:
+    """Removing a favourite while browsing favourites drops it from playlists."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        fav_dir = root / FAVOURITES_DIR
+        keep = fav_dir / "keep.milk"
+        remove = fav_dir / "remove.milk"
+        _write(keep, "keep")
+        _write(remove, "remove")
+        preset_changes: list[tuple[str, int]] = []
+        switching_changes: list[str] = []
+        unlocked: list[str] = []
+        controller, session, modal = _make_controller(
+            preset_root=root,
+            layer_bindings=lambda: noop_layer_bindings(
+                on_preset_change=lambda slot, playlist: preset_changes.append(
+                    (slot, playlist.index)
+                ),
+                on_preset_switching_change=lambda slot: switching_changes.append(slot),
+                unlock_preset_after_modal=lambda slot: unlocked.append(slot),
+            ),
+        )
+        session.layers["layer_1"].playlist = PresetPlaylist(
+            current_dir=fav_dir,
+            paths=(keep, remove),
+            index=1,
+        )
+        session.layers["layer_1"].user_presets = [str(remove)]
+
+        controller.prompt_restore("layer_1", remove)
+        modal.handle_keydown(keydown(pygame.K_RETURN))
+
+        assert not remove.exists()
+        assert keep.exists()
+        assert "remove.milk" not in controller._index.favourites
+        assert session.layers["layer_1"].playlist.paths == (keep,)
+        assert session.layers["layer_1"].playlist.current == keep
+        assert session.layers["layer_1"].user_presets == []
+        assert preset_changes == [("layer_1", 0)]
+        assert switching_changes == ["layer_1"]
+        assert unlocked == ["layer_1"]
+
+
+def test_confirm_restore_blacklist_scrubs_playlist_and_user_presets() -> None:
+    """Restoring while browsing blacklist drops the old path from playlists."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        pack = root / "pack"
+        pack.mkdir()
+        bl_dir = root / BLACKLIST_DIR
+        keep = bl_dir / "keep.milk"
+        restore = bl_dir / "restore.milk"
+        _write(keep, "keep")
+        _write(restore, "restore")
+        (bl_dir / "restore.milk.origin").write_text(
+            "pack/restore.milk", encoding="utf-8"
+        )
+        preset_changes: list[tuple[str, int]] = []
+        switching_changes: list[str] = []
+        unlocked: list[str] = []
+        controller, session, modal = _make_controller(
+            preset_root=root,
+            layer_bindings=lambda: noop_layer_bindings(
+                on_preset_change=lambda slot, playlist: preset_changes.append(
+                    (slot, playlist.index)
+                ),
+                on_preset_switching_change=lambda slot: switching_changes.append(slot),
+                unlock_preset_after_modal=lambda slot: unlocked.append(slot),
+            ),
+        )
+        session.layers["layer_1"].playlist = PresetPlaylist(
+            current_dir=bl_dir,
+            paths=(keep, restore),
+            index=1,
+        )
+        session.layers["layer_1"].user_presets = [str(restore)]
+
+        controller.prompt_restore("layer_1", restore)
+        modal.handle_keydown(keydown(pygame.K_RETURN))
+
+        restored = pack / "restore.milk"
+        assert restored.read_text(encoding="utf-8") == "restore"
+        assert not restore.exists()
+        assert keep.exists()
+        assert "restore.milk" not in controller._index.blacklist
+        assert session.layers["layer_1"].playlist.paths == (keep,)
+        assert session.layers["layer_1"].playlist.current == keep
+        assert session.layers["layer_1"].user_presets == []
+        assert preset_changes == [("layer_1", 0)]
+        assert switching_changes == ["layer_1"]
+        assert unlocked == ["layer_1"]
+
+
+def test_prompt_restore_blacklist_with_origin_uses_yes_no() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / BLACKLIST_DIR / "demo.milk"
+        _write(src, "milk")
+        (root / BLACKLIST_DIR / "demo.milk.origin").write_text(
+            "pack/demo.milk", encoding="utf-8"
+        )
+        controller, _session, modal = _make_controller(preset_root=root)
+
+        controller.prompt_restore("layer_1", src)
+
+        view = modal.view_state()
+        assert view is not None
+        assert view.message == "Restore blacklisted preset: demo.milk?"
+        assert view.options == ("Yes", "No")
+
+
+def test_confirm_restore_blacklist_moves_to_origin() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        pack = root / "pack"
+        pack.mkdir()
+        src = root / BLACKLIST_DIR / "demo.milk"
+        _write(src, "bl-content")
+        (root / BLACKLIST_DIR / "demo.milk.origin").write_text(
+            "pack/demo.milk", encoding="utf-8"
+        )
+        unlocked: list[str] = []
+        controller, session, modal = _make_controller(
+            preset_root=root,
+            layer_bindings=lambda: noop_layer_bindings(
+                unlock_preset_after_modal=lambda slot: unlocked.append(slot),
+            ),
+        )
+        playlist_before = session.layers["layer_1"].playlist.paths
+        user_presets_before = list(session.layers["layer_1"].user_presets)
+
+        controller.prompt_restore("layer_1", src)
+        modal.handle_keydown(keydown(pygame.K_RETURN))
+
+        restored = pack / "demo.milk"
+        assert restored.read_text(encoding="utf-8") == "bl-content"
+        assert not src.exists()
+        assert not (root / BLACKLIST_DIR / "demo.milk.origin").exists()
+        assert "demo.milk" not in controller._index.blacklist
+        assert unlocked == ["layer_1"]
+        assert session.layers["layer_1"].playlist.paths == playlist_before
+        assert session.layers["layer_1"].user_presets == user_presets_before
+
+
+def test_confirm_restore_blacklist_without_origin_uses_choice_modal() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / BLACKLIST_DIR / "demo.milk"
+        _write(src, "milk")
+        (root / "pack").mkdir()
+        (root / "other").mkdir()
+        (root / FAVOURITES_DIR).mkdir()
+        unlocked: list[str] = []
+        controller, _session, modal = _make_controller(
+            preset_root=root,
+            layer_bindings=lambda: noop_layer_bindings(
+                unlock_preset_after_modal=lambda slot: unlocked.append(slot),
+            ),
+        )
+
+        controller.prompt_restore("layer_1", src)
+        modal.handle_keydown(keydown(pygame.K_RETURN))
+
+        view = modal.view_state()
+        assert view is not None
+        assert view.message == "Restore blacklisted preset: demo.milk?"
+        assert view.options == ("(root)", "other", "pack", "Cancel")
+        assert unlocked == []
+
+        modal.handle_keydown(keydown(pygame.K_RIGHT))  # other
+        modal.handle_keydown(keydown(pygame.K_RETURN))
+
+        assert (root / "other" / "demo.milk").exists()
+        assert not src.exists()
+        assert "demo.milk" not in controller._index.blacklist
+        assert unlocked == ["layer_1"]
+
+
+def test_prompt_restore_both_markers_prefers_favourite() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / "pack" / "demo.milk"
+        _write(src, "milk")
+        _write(root / FAVOURITES_DIR / "demo.milk", "fav")
+        _write(root / BLACKLIST_DIR / "demo.milk", "bl")
+        controller, _session, modal = _make_controller(preset_root=root)
+
+        controller.prompt_restore("layer_1", src)
+
+        view = modal.view_state()
+        assert view is not None
+        assert view.message == "Remove favourite: demo.milk?"
+
+
+def test_prompt_restore_path_under_blacklist_wins_over_favourite_marker() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / BLACKLIST_DIR / "demo.milk"
+        _write(src, "bl")
+        _write(root / FAVOURITES_DIR / "demo.milk", "fav")
+        controller, _session, modal = _make_controller(preset_root=root)
+
+        controller.prompt_restore("layer_1", src)
+
+        view = modal.view_state()
+        assert view is not None
+        assert view.message == "Restore blacklisted preset: demo.milk?"
+
+
+def test_prompt_restore_neither_marker_is_noop() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / "pack" / "demo.milk"
+        _write(src, "milk")
+        locked: list[str] = []
+        controller, _session, modal = _make_controller(
+            preset_root=root,
+            layer_bindings=lambda: noop_layer_bindings(
+                lock_preset_for_modal=lambda slot: locked.append(slot),
+            ),
+        )
+
+        controller.prompt_restore("layer_1", src)
+
+        assert modal.view_state() is None
+        assert locked == []

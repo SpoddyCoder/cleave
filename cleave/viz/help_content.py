@@ -119,6 +119,7 @@ _PRESET_DIR_SECTION = HelpSection(
 _PRESET_CURATION_SHORTCUTS = (
     ("f", "favourite preset"),
     ("b", "blacklist preset"),
+    ("r", "remove favourite / restore blacklist"),
 )
 
 _PRESET_SECTION = HelpSection(
