@@ -285,6 +285,14 @@ TIMELINE_FADE_DURATION_MIN = 0.0
 TIMELINE_FADE_DURATION_MAX = 30.0
 TIMELINE_FADE_DURATION_STEP = 0.1
 
+TimelinePlacementSnap = Literal["off", "beat", "bar"]
+TIMELINE_PLACEMENT_SNAP_OPTIONS: tuple[TimelinePlacementSnap, ...] = (
+    "off",
+    "beat",
+    "bar",
+)
+DEFAULT_TIMELINE_PLACEMENT_SNAP: TimelinePlacementSnap = "beat"
+
 
 def timeline_fades_apply_to_label(value: str) -> str:
     if value == "exclude_song_markers":
@@ -302,6 +310,18 @@ def cycle_timeline_fades_apply_to(value: str, *, forward: bool) -> TimelineFades
     return options[(index + delta) % len(options)]
 
 
+def cycle_timeline_placement_snap(
+    value: str, *, forward: bool
+) -> TimelinePlacementSnap:
+    options = TIMELINE_PLACEMENT_SNAP_OPTIONS
+    try:
+        index = options.index(value)  # type: ignore[arg-type]
+    except ValueError:
+        index = options.index(DEFAULT_TIMELINE_PLACEMENT_SNAP)
+    delta = 1 if forward else -1
+    return options[(index + delta) % len(options)]
+
+
 def clamp_timeline_fade_duration(value: float) -> float:
     return max(
         TIMELINE_FADE_DURATION_MIN,
@@ -313,6 +333,14 @@ def parse_timeline_fades_apply_to(raw: Any, label: str) -> TimelineFadesApplyTo:
     value = str(raw)
     if value not in TIMELINE_FADES_APPLY_TO_OPTIONS:
         allowed = ", ".join(TIMELINE_FADES_APPLY_TO_OPTIONS)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return value  # type: ignore[return-value]
+
+
+def parse_timeline_placement_snap(raw: Any, label: str) -> TimelinePlacementSnap:
+    value = str(raw)
+    if value not in TIMELINE_PLACEMENT_SNAP_OPTIONS:
+        allowed = ", ".join(TIMELINE_PLACEMENT_SNAP_OPTIONS)
         raise ValueError(f"{label} must be one of: {allowed}")
     return value  # type: ignore[return-value]
 
@@ -1859,6 +1887,10 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
     timeline_map = as_mapping(timeline, "timeline")
     enabled = bool(timeline_map.get("enabled", DEFAULT_TIMELINE_ENABLED))
     locked = bool(timeline_map.get("locked", DEFAULT_TIMELINE_LOCKED))
+    placement_snap = parse_timeline_placement_snap(
+        timeline_map.get("placement_snap", DEFAULT_TIMELINE_PLACEMENT_SNAP),
+        "timeline.placement_snap",
+    )
     fades_raw = timeline_map.get("fades")
     if fades_raw is None:
         fades = TimelineFadesConfig()
@@ -1888,7 +1920,13 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
     # Legacy timeline.cues is ignored (clean break; no migration).
     lanes_raw = timeline_map.get("lanes")
     if lanes_raw is None:
-        return TimelineConfig(enabled=enabled, lanes={}, locked=locked, fades=fades)
+        return TimelineConfig(
+            enabled=enabled,
+            lanes={},
+            locked=locked,
+            fades=fades,
+            placement_snap=placement_snap,
+        )
     lanes_map = as_mapping(lanes_raw, "timeline.lanes")
     if ctx.layer_slots is None:
         raise ValueError("layer_slots required to parse timeline")
@@ -1931,7 +1969,13 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
             baseline=baseline,
             cues=canonicalize(baseline, cues),
         )
-    return TimelineConfig(enabled=enabled, lanes=lanes, locked=locked, fades=fades)
+    return TimelineConfig(
+        enabled=enabled,
+        lanes=lanes,
+        locked=locked,
+        fades=fades,
+        placement_snap=placement_snap,
+    )
 
 
 def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
@@ -1939,6 +1983,7 @@ def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
     out: dict[str, Any] = {
         "enabled": runtime.enabled,
         "locked": runtime.locked,
+        "placement_snap": runtime.placement_snap,
         "fades": {
             "enabled": runtime.fades_enabled,
             "fade_in": runtime.fade_in,

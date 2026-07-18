@@ -61,7 +61,9 @@ from cleave.config_schema import (
     DEFAULT_TIMELINE_FADES_ENABLED,
     DEFAULT_TIMELINE_FADE_IN,
     DEFAULT_TIMELINE_FADE_OUT,
+    DEFAULT_TIMELINE_PLACEMENT_SNAP,
     TimelineFadesApplyTo,
+    TimelinePlacementSnap,
     DEFAULT_HDR_COMPOSITING,
     DEFAULT_RENDER_FPS,
     DEFAULT_RENDER_HEIGHT,
@@ -243,6 +245,7 @@ class TimelineConfig:
     lanes: dict[str, TimelineLane]
     locked: bool = False
     fades: TimelineFadesConfig = field(default_factory=TimelineFadesConfig)
+    placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
 
 
 @dataclass

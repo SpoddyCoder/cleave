@@ -27,11 +27,13 @@ from cleave.config_schema import (
     DEFAULT_TIMELINE_FADES_ENABLED,
     DEFAULT_TIMELINE_FADE_IN,
     DEFAULT_TIMELINE_FADE_OUT,
+    DEFAULT_TIMELINE_PLACEMENT_SNAP,
     HighlightRolloffApplyMode,
     HighlightRolloffCurve,
     PresetSwitchingMode,
     PresetSwitchingScope,
     TimelineFadesApplyTo,
+    TimelinePlacementSnap,
     default_render_overlay_runtime_values,
     default_highlight_rolloff_runtime_values,
     default_chroma_boost_runtime_values,
@@ -158,6 +160,7 @@ class TimelineRuntime:
     song_marker_snap_scope: str = "each_layer"
     song_marker_snap_expanded: bool = False
     beat_bar_grid_expanded: bool = False
+    placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
     fades_enabled: bool = DEFAULT_TIMELINE_FADES_ENABLED
     fade_in: float = DEFAULT_TIMELINE_FADE_IN
     fade_out: float = DEFAULT_TIMELINE_FADE_OUT
@@ -310,6 +313,11 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
     locked = False if timeline is None else timeline.locked
     source_lanes = {} if timeline is None else timeline.lanes
     fades = None if timeline is None else timeline.fades
+    placement_snap = (
+        DEFAULT_TIMELINE_PLACEMENT_SNAP
+        if timeline is None
+        else timeline.placement_snap
+    )
     lanes: dict[str, TimelineLane] = {}
     for slot in cfg.layer_z_order:
         if slot in source_lanes:
@@ -317,11 +325,17 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
         else:
             lanes[slot] = empty_lane()
     if fades is None:
-        return TimelineRuntime(enabled=enabled, locked=locked, lanes=lanes)
+        return TimelineRuntime(
+            enabled=enabled,
+            locked=locked,
+            lanes=lanes,
+            placement_snap=placement_snap,
+        )
     return TimelineRuntime(
         enabled=enabled,
         locked=locked,
         lanes=lanes,
+        placement_snap=placement_snap,
         fades_enabled=fades.enabled,
         fade_in=fades.fade_in,
         fade_out=fades.fade_out,

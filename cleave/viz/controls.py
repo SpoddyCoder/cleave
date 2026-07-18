@@ -16,6 +16,7 @@ from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.extract import STEM_SOURCES
 from cleave.song_markers import format_marker_time, place_marker
 from cleave.preset_curation import PresetCurationIndex
+from cleave.timeline import snap_placement_time
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.editor_mode_controls import EditorModeController, is_preset_curation_mode
 from cleave.viz.preset_curation_controls import PresetCurationController
@@ -97,6 +98,8 @@ class TuningControls:
         self.project_dir = project_dir
         self.playback = playback
         self.duration_sec = duration_sec
+        self._beat_times = tuple(beat_times)
+        self._bar_times = tuple(bar_times)
         self._layer_bindings = layer_bindings
         self._render_post_fx_bindings = render_post_fx_bindings
         self._layer_manager = layer_manager
@@ -1184,7 +1187,12 @@ class TuningControls:
         """Drop or replace a song marker at the playhead (session until Save)."""
         if self.session.timeline.recording:
             return
-        t = current_sec(self.playback, self.duration_sec)
+        t = snap_placement_time(
+            current_sec(self.playback, self.duration_sec),
+            self.session.timeline.placement_snap,
+            beat_times=self._beat_times,
+            bar_times=self._bar_times,
+        )
         markers = self.session.song_markers
         prior_selected_time: float | None = None
         if (

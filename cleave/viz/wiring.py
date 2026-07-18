@@ -529,4 +529,6 @@ def make_timeline_controls(
         on_exit_submenu=on_exit_submenu,
         on_seek=on_seek,
         on_notification=on_notification,
+        beat_times=list(signals.beat_times) if signals is not None else (),
+        bar_times=list(signals.downbeat_times) if signals is not None else (),
     )

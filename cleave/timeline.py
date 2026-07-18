@@ -358,6 +358,29 @@ def _nearest_beat_index(t: float, beats: np.ndarray) -> int:
     )
 
 
+def snap_time_to_grid(t: float, grid: Sequence[float]) -> float:
+    """Nearest grid time (earlier on a tie). Empty grid returns ``t`` unchanged."""
+    if not grid:
+        return float(t)
+    beats = np.asarray(grid, dtype=np.float64)
+    return float(beats[_nearest_beat_index(float(t), beats)])
+
+
+def snap_placement_time(
+    t: float,
+    mode: str,
+    *,
+    beat_times: Sequence[float] = (),
+    bar_times: Sequence[float] = (),
+) -> float:
+    """Snap authoring time for ``timeline.placement_snap`` mode."""
+    if mode == "beat":
+        return snap_time_to_grid(t, beat_times)
+    if mode == "bar":
+        return snap_time_to_grid(t, bar_times)
+    return float(t)
+
+
 def shift_bars_by_beats(
     downbeat_times: Sequence[float],
     beat_times: Sequence[float],

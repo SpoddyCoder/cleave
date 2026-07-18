@@ -44,6 +44,8 @@ def _make_timeline_controls(
     enabled: bool = True,
     position_sec: float = 0.0,
     recording: bool = False,
+    beat_times: tuple[float, ...] = (),
+    bar_times: tuple[float, ...] = (),
 ) -> tuple[
     TimelineControls,
     TuningSession,
@@ -94,6 +96,8 @@ def _make_timeline_controls(
         ),
         on_seek=lambda delta: seeks.append(delta),
         on_notification=notifications.append,
+        beat_times=beat_times,
+        bar_times=bar_times,
     )
     return controls, session, visibility_calls, close_calls, seeks, notifications
 
@@ -722,6 +726,67 @@ def test_r_stop_punches_cues_and_clears_record_state() -> None:
     lane = session.timeline.lanes["layer_1"]
     assert SlotCue(t=10.0, visible=False) in lane.cues
     assert visibility_calls[-1] is True
+
+
+def test_record_start_snaps_to_beat() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=0.6,
+        beat_times=(0.0, 1.0, 2.0),
+    )
+    assert session.timeline.placement_snap == "beat"
+    controls.handle_keydown(keydown(pygame.K_r))
+    assert session.timeline.record_start_sec == 1.0
+    assert session.timeline.record_slot_start_sec == {"layer_1": 1.0}
+
+
+def test_record_toggle_snaps_cue_time() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=0.0,
+        beat_times=(0.0, 1.0, 2.0),
+    )
+    session.layers["layer_1"].enabled = True
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.playback.player.seek(0.6)
+    controls.handle_keydown(keydown(pygame.K_1))
+    assert session.timeline.record_buffer["layer_1"] == [
+        SlotCue(t=1.0, visible=False)
+    ]
+
+
+def test_record_stop_snaps_punch_end() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=0.0,
+        beat_times=(0.0, 1.0, 2.0, 3.0),
+    )
+    session.layers["layer_1"].enabled = True
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.playback.player.seek(0.6)
+    controls.handle_keydown(keydown(pygame.K_1))
+    controls.playback.player.seek(2.4)
+    controls.handle_keydown(keydown(pygame.K_r))
+    assert session.timeline.lanes["layer_1"].cues == [
+        SlotCue(t=1.0, visible=False),
+        SlotCue(t=2.0, visible=True),
+    ]
+
+
+def test_record_placement_snap_off_keeps_audible_times() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=0.6,
+        beat_times=(0.0, 1.0, 2.0),
+    )
+    session.timeline.placement_snap = "off"
+    session.layers["layer_1"].enabled = True
+    controls.handle_keydown(keydown(pygame.K_r))
+    assert session.timeline.record_start_sec == 0.6
+    controls.handle_keydown(keydown(pygame.K_1))
+    assert session.timeline.record_buffer["layer_1"] == [
+        SlotCue(t=0.6, visible=False)
+    ]
 
 
 

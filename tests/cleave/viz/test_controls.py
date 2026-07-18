@@ -2350,6 +2350,7 @@ def test_render_timeline_down_enters_submenu() -> None:
     beat_bar_row = view.layout.find_by_kind(RowKind.TIMELINE_BEAT_BAR_GRID_HEADER)
     phase_row = view.layout.find_by_kind(RowKind.TIMELINE_BAR_PHASE)
     grid_row = view.layout.find_by_kind(RowKind.TIMELINE_BAR_GRID)
+    placement_snap_row = view.layout.find_by_kind(RowKind.TIMELINE_PLACEMENT_SNAP)
     snap_beats_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_BEATS)
     snap_bars_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_BARS)
     fades_row = view.layout.find_by_kind(RowKind.TIMELINE_FADES)
@@ -2384,6 +2385,10 @@ def test_render_timeline_down_enters_submenu() -> None:
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_descriptor == _desc(view, phase_row)
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_descriptor == _desc(view, placement_snap_row)
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
@@ -2422,7 +2427,7 @@ def test_render_timeline_down_enters_submenu_and_routes_keys() -> None:
     controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.focus_row = 2
 
-    for _ in range(13):
+    for _ in range(14):
         controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.session.timeline.focus_row == 0
@@ -2669,6 +2674,7 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
         RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,
         RowKind.TIMELINE_BAR_PHASE,
         RowKind.TIMELINE_BAR_GRID,
+        RowKind.TIMELINE_PLACEMENT_SNAP,
         RowKind.TIMELINE_SNAP_TO_BEATS,
         RowKind.TIMELINE_SNAP_TO_BARS,
         RowKind.TIMELINE_FADES,
@@ -4876,3 +4882,57 @@ def test_no_project_dir_marker_edit_still_marks_dirty() -> None:
     assert controls.config_dirty
     controls.clear_config_dirty()
     assert not controls.config_dirty
+
+
+def test_drop_song_marker_snaps_to_beat_by_default() -> None:
+    controls = _make_controls(
+        ("layer_1",),
+        beat_times=(0.0, 1.0, 2.0),
+        bar_times=(0.0, 4.0),
+    )
+    assert controls.session.timeline.placement_snap == "beat"
+    controls.playback.player.seek(0.6)
+    controls.drop_song_marker()
+    assert controls.session.song_markers.times == [1.0]
+
+
+def test_drop_song_marker_placement_snap_off_keeps_audible_time() -> None:
+    controls = _make_controls(
+        ("layer_1",),
+        beat_times=(0.0, 1.0, 2.0),
+    )
+    controls.session.timeline.placement_snap = "off"
+    controls.playback.player.seek(0.6)
+    controls.drop_song_marker()
+    assert controls.session.song_markers.times == [0.6]
+
+
+def test_drop_song_marker_snaps_to_bar() -> None:
+    controls = _make_controls(
+        ("layer_1",),
+        beat_times=(0.0, 1.0, 2.0, 3.0, 4.0),
+        bar_times=(0.0, 4.0),
+    )
+    controls.session.timeline.placement_snap = "bar"
+    controls.playback.player.seek(1.5)
+    controls.drop_song_marker()
+    assert controls.session.song_markers.times == [0.0]
+
+
+def test_placement_snap_row_cycles() -> None:
+    controls = _make_controls(timeline_enabled=True)
+    controls.session.timeline.panel_open = True
+    controls.session.timeline.beat_bar_grid_expanded = True
+    view = controls.build_view_state(paused=False)
+    row = view.layout.find_by_kind(RowKind.TIMELINE_PLACEMENT_SNAP)
+    controls.focus_descriptor = _desc(view, row)
+    assert controls.session.timeline.placement_snap == "beat"
+    assert "beat" in _row_text(view, row)
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert controls.session.timeline.placement_snap == "bar"
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert controls.session.timeline.placement_snap == "off"
+    assert controls.handle_keydown(_keydown(pygame.K_LEFT)) is True
+    assert controls.session.timeline.placement_snap == "bar"
+    view = controls.build_view_state(paused=False)
+    assert "bar" in _row_text(view, row)
