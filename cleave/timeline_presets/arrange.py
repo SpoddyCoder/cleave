@@ -7,7 +7,11 @@ from collections.abc import Sequence
 
 from cleave.timeline import TimelineLane
 from cleave.timeline_presets.characters import CharacterProfile, in_climax_window
-from cleave.timeline_presets.chords import ChordVocab, build_vocab
+from cleave.timeline_presets.chords import (
+    ChordVocab,
+    build_vocab,
+    density_score_bonus,
+)
 from cleave.timeline_presets.emit import cues_from_states
 from cleave.timeline_presets.grid import thin_bar_times_for_arrange
 from cleave.timeline_presets.motifs import (
@@ -368,6 +372,8 @@ def _pick_motif(
         score = profile.motif_weights.get(motif.id, 1.0)
         steps = motif.resolve_steps(vocab, rng, solo_rotation)
         first_active = vocab.active_for(steps[0])
+        peak_card = max(len(vocab.active_for(step)) for step in steps)
+        score += density_score_bonus(len(vocab.slots), peak_card)
 
         if prev_active is not None:
             dist = hamming_distance(prev_active, first_active)
@@ -425,8 +431,9 @@ def _apply_resolve(
         states[-1] = (last_t, vocab.active_for(solo_id))
         last_active = states[-1][1]
     elif len(last_active) > 2:
-        duo_id = vocab.duos[0] if vocab.duos else vocab.singles[0]
-        states[-1] = (last_t, vocab.active_for(duo_id))
+        # Resolve dense end-states toward a duo (or solo when no duos).
+        resolve_id = vocab.duos[0] if vocab.duos else vocab.singles[0]
+        states[-1] = (last_t, vocab.active_for(resolve_id))
         last_active = states[-1][1]
 
     if len(vocab.slots) <= 1:

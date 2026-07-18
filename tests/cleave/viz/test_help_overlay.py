@@ -221,7 +221,8 @@ def test_timeline_presets_help_lists_characters() -> None:
     assert description is not None
     assert description.title == "Timeline presets"
     assert description.lines == (
-        "Apply a randomly generated timeline preset",
+        "Apply a randomly generated timeline preset.",
+        "If song-markers are present, they will be favoured for cue placement."
         "(this will overwrite the current timeline).",
     )
     assert description.entries == TIMELINE_PRESET_HELP_ENTRIES
