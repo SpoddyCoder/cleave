@@ -116,6 +116,7 @@ def _make_controls(
     beat_times: tuple[float, ...] = (),
     bar_times: tuple[float, ...] = (),
     project_dir: Path | None = None,
+    duration_sec: float = 120.0,
 ) -> TuningControls:
     preset_root = Path("/tmp/presets")
     cfg = make_test_cfg(slots, preset_root=preset_root, config_path=launch_config_path or _DEFAULT_ACTIVE_CONFIG)
@@ -138,7 +139,7 @@ def _make_controls(
         cfg,
         preset_root=preset_root,
         playback=stub_playback_state(),
-        duration_sec=120.0,
+        duration_sec=duration_sec,
         project_dir=project_dir,
         launch_config_path=launch_config_path,
         repo_root_example=repo_root_example,
@@ -1614,6 +1615,14 @@ def _lane(
     return TimelineLane(baseline=baseline, cues=canonicalize(baseline, cues))
 
 
+def _choose_timeline_preset(controls: TuningControls, label: str) -> None:
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    _choose_modal_option(controls, label)
+    modal_view = controls.modal_host.view_state()
+    if modal_view is not None and "crescendo" in (modal_view.message or "").lower():
+        _choose_modal_option(controls, "No")
+
+
 def test_timeline_presets_breathing_clears_and_applies() -> None:
     beats = tuple(float(i) for i in range(241))
     bars = tuple(float(i) for i in range(0, 241, 4))
@@ -1631,8 +1640,7 @@ def test_timeline_presets_breathing_clears_and_applies() -> None:
     controls.session.timeline.recording = True
     controls.session.timeline.armed_slots.add("layer_1")
     _focus_timeline_presets(controls)
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
-    _choose_modal_option(controls, "Breathing")
+    _choose_timeline_preset(controls, "Breathing")
     assert not controls.modal_host.active
     assert controls.session.timeline.enabled is True
     assert controls.session.timeline.recording is False
@@ -1656,14 +1664,60 @@ def test_timeline_presets_arc_clears_and_applies() -> None:
     controls.session.timeline.lanes = {"layer_1": _lane(True, (5.0, False))}
     controls.session.timeline.enabled = False
     _focus_timeline_presets(controls)
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
-    _choose_modal_option(controls, "Arc")
+    _choose_timeline_preset(controls, "Arc")
     assert not controls.modal_host.active
     assert controls.session.timeline.enabled is True
     lanes = controls.session.timeline.lanes
     assert lanes
     assert set(lanes) == {"layer_1", "layer_2"}
     assert all(lane.baseline is not None for lane in lanes.values())
+
+
+def test_timeline_presets_crescendo_modal_when_enough_markers() -> None:
+    beats = tuple(float(i) for i in range(241))
+    bars = tuple(float(i) for i in range(0, 241, 4))
+    controls = _make_controls(
+        ("layer_1", "layer_2", "layer_3", "layer_4"),
+        beat_times=beats,
+        bar_times=bars,
+        duration_sec=240.0,
+    )
+    controls.session.song_markers.times = [30.0, 90.0, 150.0, 200.0]
+    _focus_timeline_presets(controls)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    _choose_modal_option(controls, "Breathing")
+    modal_view = controls.modal_host.view_state()
+    assert modal_view is not None
+    assert modal_view.kind == ModalKind.CHOICE
+    assert modal_view.message == "Build to a crescendo?"
+    assert modal_view.options == (
+        "No",
+        "Last Song Marker",
+        "Penultimate Song Marker",
+        "Cancel",
+    )
+    _choose_modal_option(controls, "Last Song Marker")
+    assert not controls.modal_host.active
+    view = controls.build_view_state(paused=False)
+    assert view.notification_message == "Applied Breathing timeline preset (crescendo)"
+
+
+def test_timeline_presets_skips_crescendo_modal_without_enough_markers() -> None:
+    beats = tuple(float(i) for i in range(241))
+    bars = tuple(float(i) for i in range(0, 241, 4))
+    controls = _make_controls(
+        ("layer_1", "layer_2"),
+        beat_times=beats,
+        bar_times=bars,
+        duration_sec=240.0,
+    )
+    controls.session.song_markers.times = [30.0, 90.0]
+    _focus_timeline_presets(controls)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    _choose_modal_option(controls, "Pulse")
+    assert not controls.modal_host.active
+    view = controls.build_view_state(paused=False)
+    assert view.notification_message == "Applied Pulse timeline preset"
 
 
 def _focus_timeline_reset(controls: TuningControls) -> None:
@@ -1737,8 +1791,7 @@ def test_timeline_presets_refuse_without_bars() -> None:
     }
     controls.session.timeline.lanes = dict(prior)
     _focus_timeline_presets(controls)
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
-    _choose_modal_option(controls, "Breathing")
+    _choose_timeline_preset(controls, "Breathing")
     assert not controls.modal_host.active
     assert controls.session.timeline.lanes == prior
     view = controls.build_view_state(paused=False)

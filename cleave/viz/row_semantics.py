@@ -708,8 +708,9 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_entries=(("Enter", "apply a timeline preset"),),
         help_description=(
             "Apply a randomly generated timeline preset.",
-            "If song-markers are present, they will be favoured for cue placement."
-            "(this will overwrite the current timeline).",
+            "If song markers are present, they are favoured for cue placement.",
+            "With three or more song markers, you can optionally build to a crescendo.",
+            "This overwrites the current timeline.",
         ),
         help_mode_entries=TIMELINE_PRESET_HELP_ENTRIES,
     ),

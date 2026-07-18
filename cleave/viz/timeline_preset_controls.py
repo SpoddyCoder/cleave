@@ -12,11 +12,18 @@ from cleave.timeline_presets import (
     build_dialogue_cues,
     build_pulse_cues,
 )
+from cleave.timeline_presets.crescendo import (
+    CRESCENDO_MIN_MARKERS,
+    CrescendoTarget,
+    apply_crescendo,
+    normalize_crescendo_markers,
+)
 from cleave.viz.modal import ModalHost, ModalOption
 from cleave.viz.session import TuningSession
 
 _CANCEL_LABEL = "Cancel"
 _PRESET_PROMPT_MESSAGE = "Which timeline preset do you wish to apply?"
+_CRESCENDO_PROMPT_MESSAGE = "Build to a crescendo?"
 _RESET_PROMPT_MESSAGE = "Reset timeline?"
 
 _KIND_BUILDERS = {
@@ -52,19 +59,19 @@ class TimelinePresetController:
         options = [
             ModalOption(
                 "Breathing",
-                lambda: self._apply("breathing", duration_sec),
+                lambda: self._after_preset_choice("breathing", duration_sec),
             ),
             ModalOption(
                 "Dialogue",
-                lambda: self._apply("dialogue", duration_sec),
+                lambda: self._after_preset_choice("dialogue", duration_sec),
             ),
             ModalOption(
                 "Arc",
-                lambda: self._apply("arc", duration_sec),
+                lambda: self._after_preset_choice("arc", duration_sec),
             ),
             ModalOption(
                 "Pulse",
-                lambda: self._apply("pulse", duration_sec),
+                lambda: self._after_preset_choice("pulse", duration_sec),
             ),
             ModalOption(_CANCEL_LABEL, dismiss),
         ]
@@ -81,7 +88,46 @@ class TimelinePresetController:
         ]
         self._modal.prompt_choice(_RESET_PROMPT_MESSAGE, options, on_dismiss=dismiss)
 
-    def _apply(self, kind: str, duration_sec: float) -> None:
+    def _after_preset_choice(self, kind: str, duration_sec: float) -> None:
+        markers = normalize_crescendo_markers(
+            self.session.song_markers.times,
+            duration_sec,
+        )
+        if len(markers) < CRESCENDO_MIN_MARKERS:
+            self._apply(kind, duration_sec, crescendo=None)
+            return
+        self._prompt_crescendo(kind, duration_sec)
+
+    def _prompt_crescendo(self, kind: str, duration_sec: float) -> None:
+        dismiss = lambda: None
+        options = [
+            ModalOption(
+                "No",
+                lambda: self._apply(kind, duration_sec, crescendo=None),
+            ),
+            ModalOption(
+                "Last Song Marker",
+                lambda: self._apply(kind, duration_sec, crescendo="last"),
+            ),
+            ModalOption(
+                "Penultimate Song Marker",
+                lambda: self._apply(kind, duration_sec, crescendo="penultimate"),
+            ),
+            ModalOption(_CANCEL_LABEL, dismiss),
+        ]
+        self._modal.prompt_choice(
+            _CRESCENDO_PROMPT_MESSAGE,
+            options,
+            on_dismiss=dismiss,
+        )
+
+    def _apply(
+        self,
+        kind: str,
+        duration_sec: float,
+        *,
+        crescendo: CrescendoTarget | None,
+    ) -> None:
         if not self._bar_times:
             self._notify("No bars available; re-run separate")
             return
@@ -100,14 +146,28 @@ class TimelinePresetController:
         self._clear_timeline_state()
         tl = self.session.timeline
         tl.enabled = True
+        slots = list(self.session.layer_z_order)
+        markers = list(self.session.song_markers.times)
+        rng = random.Random()
         built = builder(
-            list(self.session.layer_z_order),
+            slots,
             duration_sec,
-            random.Random(),
+            rng,
             bar_times=grid,
-            song_marker_times=list(self.session.song_markers.times),
+            song_marker_times=markers,
         )
-        for slot in self.session.layer_z_order:
+        if crescendo is not None:
+            built = apply_crescendo(
+                built,
+                slots,
+                duration_sec=duration_sec,
+                bar_times=grid,
+                song_marker_times=markers,
+                target=crescendo,
+                rng=rng,
+            )
+            message = f"{message} (crescendo)"
+        for slot in slots:
             tl.lanes[slot] = copy_lane(built.get(slot, empty_lane()))
         self._notify(message)
 
