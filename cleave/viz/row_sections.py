@@ -360,10 +360,10 @@ CURATION_LAYER_SECTION = ExpandSectionDef(
     read_expanded=_track_header_expanded,
     toggle=_toggle_track_header,
     children=(
-        SectionNode(leaf_kind=RowKind.TRACK_PRESET_DIR),
-        SectionNode(leaf_kind=RowKind.TRACK_PRESET),
         SectionNode(leaf_kind=RowKind.TRACK_STEM),
         SectionNode(leaf_kind=RowKind.TRACK_BEAT),
+        SectionNode(leaf_kind=RowKind.TRACK_PRESET_DIR),
+        SectionNode(leaf_kind=RowKind.TRACK_PRESET),
     ),
 )
 
@@ -565,11 +565,11 @@ TRACK_SECTION = ExpandSectionDef(
     read_expanded=_track_header_expanded,
     toggle=_toggle_track_header,
     children=(
+        SectionNode(leaf_kind=RowKind.TRACK_STEM),
+        SectionNode(leaf_kind=RowKind.TRACK_BEAT),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_DIR),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET),
         SectionNode(expand=TRACK_PRESET_SWITCHING_SECTION),
-        SectionNode(leaf_kind=RowKind.TRACK_STEM),
-        SectionNode(leaf_kind=RowKind.TRACK_BEAT),
         SectionNode(leaf_kind=RowKind.TRACK_BLEND),
         SectionNode(leaf_kind=RowKind.TRACK_OPACITY),
         SectionNode(expand=TRACK_EFFECTS_SECTION),

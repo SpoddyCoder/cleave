@@ -548,8 +548,8 @@ def test_disable_auto_collapses_sub_rows() -> None:
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
-    assert controls.focus_descriptor == _desc(view, preset_dir_row)
+    stem_row = _row(view, "layer_1", RowKind.TRACK_STEM)
+    assert controls.focus_descriptor == _desc(view, stem_row)
 
     controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
@@ -576,12 +576,12 @@ def test_disabled_track_can_expand_sub_rows() -> None:
     assert controls.session.layers["layer_1"].expanded is True
 
     view = controls.build_view_state(paused=False)
-    preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
-    assert preset_dir_row in view.layout.visible_indices(view)
-    assert preset_dir_row in view.layout.navigable_indices(view)
+    stem_row = _row(view, "layer_1", RowKind.TRACK_STEM)
+    assert stem_row in view.layout.visible_indices(view)
+    assert stem_row in view.layout.navigable_indices(view)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_descriptor == _desc(view, preset_dir_row)
+    assert controls.focus_descriptor == _desc(view, stem_row)
 
 
 def test_disabled_render_overlay_can_expand_sub_rows() -> None:
@@ -2852,12 +2852,12 @@ def test_ctrl_quick_nav_does_not_affect_normal_up_down() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
-    preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
+    stem_row = _row(view, "layer_1", RowKind.TRACK_STEM)
     controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_descriptor == _desc(view, preset_dir_row)
+    assert controls.focus_descriptor == _desc(view, stem_row)
 
 
 def test_ctrl_quick_nav_from_timeline_submenu_jumps_sections() -> None:
