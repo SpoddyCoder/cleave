@@ -110,6 +110,8 @@ def test_track_layout_row_order_when_fully_expanded() -> None:
     assert effects_header < delete_idx
     assert kinds[:effects_header + 1] == [
         RowKind.TRACK_HEADER,
+        RowKind.TRACK_STEM,
+        RowKind.TRACK_BEAT,
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
         RowKind.TRACK_PRESET_SWITCHING,
@@ -123,8 +125,6 @@ def test_track_layout_row_order_when_fully_expanded() -> None:
         RowKind.TRACK_HARD_CUT_ENABLED,
         RowKind.TRACK_HARD_CUT_DURATION,
         RowKind.TRACK_HARD_CUT_SENSITIVITY,
-        RowKind.TRACK_STEM,
-        RowKind.TRACK_BEAT,
         RowKind.TRACK_BLEND,
         RowKind.TRACK_OPACITY,
         RowKind.TRACK_EFFECTS_HEADER,
