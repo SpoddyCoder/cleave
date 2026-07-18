@@ -10,13 +10,26 @@ from cleave.timeline import (
     snap_lane_to_beats,
     snap_lanes_to_song_markers,
 )
-from cleave.viz.modal import ModalHost
+from cleave.viz.modal import ModalHost, ModalOption
 from cleave.viz.session import TuningSession
 
 SONG_MARKER_SNAP_SCOPE_EACH_LAYER = "each_layer"
 SONG_MARKER_SNAP_SCOPE_CLOSEST_WINS = "closest_wins"
 _ALL_CLOSEST_LABEL = "closest wins"
 _EACH_LAYER_LABEL = "all layers"
+_CANCEL_LABEL = "Cancel"
+_PROXIMITY_PROMPT = "Snap proximity?"
+_SCOPE_PROMPT = "Layer scope?"
+SONG_MARKER_SNAP_PROXIMITY_OPTIONS: tuple[float, ...] = (
+    0.5,
+    1.0,
+    2.0,
+    5.0,
+    10.0,
+    15.0,
+    30.0,
+)
+_DEFAULT_PROXIMITY = 5.0
 
 
 def song_marker_snap_scope_options(layer_z_order: Sequence[str]) -> tuple[str, ...]:
@@ -39,23 +52,6 @@ def song_marker_snap_scope_label(
     return _EACH_LAYER_LABEL
 
 
-def cycle_song_marker_snap_scope(
-    current: str,
-    layer_z_order: Sequence[str],
-    *,
-    forward: bool,
-) -> str:
-    options = song_marker_snap_scope_options(layer_z_order)
-    if not options:
-        return SONG_MARKER_SNAP_SCOPE_EACH_LAYER
-    try:
-        index = options.index(current)
-    except ValueError:
-        index = len(options) - 1
-    delta = 1 if forward else -1
-    return options[(index + delta) % len(options)]
-
-
 def resolve_song_marker_snap(
     scope: str,
     layer_z_order: Sequence[str],
@@ -69,16 +65,8 @@ def resolve_song_marker_snap(
     return tuple(layer_z_order), "each_layer"
 
 
-def song_marker_snap_confirm_message(
-    proximity: float,
-    scope: str,
-    layer_z_order: Sequence[str],
-) -> str:
-    scope_label = song_marker_snap_scope_label(scope, layer_z_order)
-    return (
-        f"Snap closest cues within {proximity:.1f}s to song markers "
-        f"({scope_label})?"
-    )
+def song_marker_snap_proximity_label(proximity: float) -> str:
+    return f"{proximity:.1f}s"
 
 
 class TimelineSnapController:
@@ -128,40 +116,70 @@ class TimelineSnapController:
         if not any(lane.cues for lane in tl.lanes.values()):
             self._notify("No timeline cues to snap")
             return
-        layer_z_order = tuple(self.session.layer_z_order)
-        proximity = tl.song_marker_snap_proximity
-        scope = tl.song_marker_snap_scope
-        message = song_marker_snap_confirm_message(
-            proximity,
-            scope,
-            layer_z_order,
+        self._prompt_song_marker_proximity()
+
+    def _prompt_song_marker_proximity(self) -> None:
+        dismiss = lambda: None
+        default_index = SONG_MARKER_SNAP_PROXIMITY_OPTIONS.index(_DEFAULT_PROXIMITY)
+        options = [
+            ModalOption(
+                song_marker_snap_proximity_label(proximity),
+                lambda p=proximity: self._prompt_song_marker_scope(p),
+            )
+            for proximity in SONG_MARKER_SNAP_PROXIMITY_OPTIONS
+        ]
+        options.append(ModalOption(_CANCEL_LABEL, dismiss))
+        self._modal.prompt_choice(
+            _PROXIMITY_PROMPT,
+            options,
+            on_dismiss=dismiss,
+            initial_focus_index=default_index,
         )
-        slots, mode = resolve_song_marker_snap(scope, layer_z_order)
 
-        def on_confirm() -> None:
-            self._snap_song_markers(slots=slots, mode=mode)
-
-        self._modal.prompt_yes_no(
-            message,
-            on_confirm=on_confirm,
-            cancel_label="CANCEL",
+    def _prompt_song_marker_scope(self, proximity: float) -> None:
+        layer_z_order = tuple(self.session.layer_z_order)
+        scopes = song_marker_snap_scope_options(layer_z_order)
+        dismiss = lambda: None
+        default_scope = SONG_MARKER_SNAP_SCOPE_EACH_LAYER
+        try:
+            default_index = scopes.index(default_scope)
+        except ValueError:
+            default_index = 0
+        options = [
+            ModalOption(
+                song_marker_snap_scope_label(scope, layer_z_order),
+                lambda s=scope: self._snap_song_markers(
+                    proximity=proximity,
+                    scope=s,
+                ),
+            )
+            for scope in scopes
+        ]
+        options.append(ModalOption(_CANCEL_LABEL, dismiss))
+        self._modal.prompt_choice(
+            _SCOPE_PROMPT,
+            options,
+            on_dismiss=dismiss,
+            initial_focus_index=default_index,
         )
 
     def _snap_song_markers(
         self,
         *,
-        slots: Sequence[str],
-        mode: SongMarkerSnapMode,
+        proximity: float,
+        scope: str,
     ) -> None:
         tl = self.session.timeline
+        layer_z_order = tuple(self.session.layer_z_order)
+        slots, mode = resolve_song_marker_snap(scope, layer_z_order)
         if not any((tl.lanes.get(slot) or empty_lane()).cues for slot in slots):
             self._notify("No timeline cues to snap")
             return
         updated, moved = snap_lanes_to_song_markers(
             tl.lanes,
             self.session.song_markers.times,
-            proximity=tl.song_marker_snap_proximity,
-            layer_z_order=tuple(self.session.layer_z_order),
+            proximity=proximity,
+            layer_z_order=layer_z_order,
             slots=slots,
             mode=mode,
         )

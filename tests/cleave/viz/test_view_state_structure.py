@@ -154,8 +154,6 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     snap_beats = RowDescriptor(RowKind.TIMELINE_SNAP_TO_BEATS)
     snap_bars = RowDescriptor(RowKind.TIMELINE_SNAP_TO_BARS)
     snap_markers = RowDescriptor(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
-    snap_prox = RowDescriptor(RowKind.TIMELINE_SNAP_MARKER_PROXIMITY)
-    snap_scope = RowDescriptor(RowKind.TIMELINE_SNAP_MARKER_SCOPE)
     fades = RowDescriptor(RowKind.TIMELINE_FADES)
     fade_in = RowDescriptor(RowKind.TIMELINE_FADE_IN)
     fade_out = RowDescriptor(RowKind.TIMELINE_FADE_OUT)
@@ -169,8 +167,6 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert placement_snap not in view_closed.layout.rows
     assert snap_beats not in view_closed.layout.rows
     assert snap_bars not in view_closed.layout.rows
-    assert snap_prox not in view_closed.layout.rows
-    assert snap_scope not in view_closed.layout.rows
     assert snap_markers not in view_closed.layout.rows
     assert fades not in view_closed.layout.rows
     assert markers_header not in view_closed.layout.rows
@@ -187,8 +183,6 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert snap_beats not in view_open.layout.rows
     assert snap_bars not in view_open.layout.rows
     assert snap_markers in view_open.layout.rows
-    assert snap_prox not in view_open.layout.rows
-    assert snap_scope not in view_open.layout.rows
     assert fades in view_open.layout.rows
     assert fade_in not in view_open.layout.rows
     assert markers_header in view_open.layout.rows
@@ -204,18 +198,9 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert presets_idx == fades_idx + 1
     assert reset_idx == presets_idx + 1
 
-    session.timeline.song_marker_snap_expanded = True
-    view_snap_expanded = builder.build(paused=False)
-    assert view_snap_expanded.layout is not view_open.layout
-    snap_prox_idx = view_snap_expanded.layout.rows.index(snap_prox)
-    snap_scope_idx = view_snap_expanded.layout.rows.index(snap_scope)
-    snap_markers_idx = view_snap_expanded.layout.rows.index(snap_markers)
-    assert snap_prox_idx == snap_markers_idx + 1
-    assert snap_scope_idx == snap_prox_idx + 1
-
     session.timeline.beat_bar_grid_expanded = True
     view_beat_expanded = builder.build(paused=False)
-    assert view_beat_expanded.layout is not view_snap_expanded.layout
+    assert view_beat_expanded.layout is not view_open.layout
     beat_bar_idx = view_beat_expanded.layout.rows.index(beat_bar_header)
     bar_phase_idx = view_beat_expanded.layout.rows.index(bar_phase)
     bar_grid_idx = view_beat_expanded.layout.rows.index(bar_grid)
@@ -255,8 +240,6 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert placement_snap not in view_closed_again.layout.rows
     assert snap_beats not in view_closed_again.layout.rows
     assert snap_bars not in view_closed_again.layout.rows
-    assert snap_prox not in view_closed_again.layout.rows
-    assert snap_scope not in view_closed_again.layout.rows
     assert snap_markers not in view_closed_again.layout.rows
     assert markers_header not in view_closed_again.layout.rows
 
@@ -373,21 +356,6 @@ def test_structure_signature_invalidates_on_song_markers_expanded() -> None:
         session, config_save, notification_active=False
     )
     session.song_markers.expanded = True
-    sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_after
-
-
-def test_structure_signature_invalidates_on_song_marker_snap_expanded() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    session.timeline.song_marker_snap_expanded = False
-    sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    session.timeline.song_marker_snap_expanded = True
     sig_after = view_state_structure_signature(
         session, config_save, notification_active=False
     )

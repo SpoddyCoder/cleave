@@ -3,7 +3,7 @@
 Typography roles for the live tuning overlay:
   LABEL    — light blue text for row labels and prefixes
   VALUE    — white text for values and state indicators (default)
-  ACTION   — dark mint text for action rows and action-parameter label prefixes
+  ACTION   — dark mint text for action rows and staged action-parameter labels
   DISABLED — dimmed text when a row or control is inactive
   LOCKED   — tinted text for locked sub-rows that cannot be edited
 

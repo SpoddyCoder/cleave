@@ -946,11 +946,7 @@ class TuningControls:
         field = ROW_FIELDS.get(kind)
         if (
             field is not None
-            and field.present_style
-            in {
-                RowPresentStyle.EXPAND_SUBHEADER,
-                RowPresentStyle.ACTION_EXPAND_SUBHEADER,
-            }
+            and field.present_style == RowPresentStyle.EXPAND_SUBHEADER
             and field.apply_horizontal is not None
         ):
             field.apply_horizontal(
@@ -1234,12 +1230,6 @@ class TuningControls:
         if markers.expanded == expanded:
             return
         markers.expanded = expanded
-
-    def _set_song_marker_snap_expanded(self, expanded: bool) -> None:
-        tl = self.session.timeline
-        if tl.song_marker_snap_expanded == expanded:
-            return
-        tl.song_marker_snap_expanded = expanded
 
     def _set_beat_bar_grid_expanded(self, expanded: bool) -> None:
         tl = self.session.timeline
