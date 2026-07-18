@@ -65,7 +65,7 @@ if TYPE_CHECKING:
 
 NOTIFICATION_TIMELINE_ENABLED_TEXT = "Timeline controls layer visibility"
 NOTIFICATION_TIMELINE_DISABLED_TEXT = "Layer panel controls visibility"
-NOTIFICATION_RESIDUAL_DELAY_UNCHANGED_TEXT = (
+NOTIFICATION_RESIDUAL_LATENCY_UNCHANGED_TEXT = (
     "Existing marker and cue times unchanged"
 )
 SEEK_TINY = 2
@@ -182,11 +182,11 @@ class TuningControls:
             duration_sec,
             self._modal_host,
             on_notification=self.show_notification,
-            on_apply_residual_delay=self._apply_residual_delay,
+            on_apply_residual_latency=self._apply_residual_latency,
             on_calibration_ui_begin=self._begin_tap_sync_calibration_ui,
             on_calibration_ui_restore=self._restore_tap_sync_calibration_ui,
         )
-        self._apply_residual_delay()
+        self._apply_residual_latency()
         self._editor_mode = EditorModeController(
             session,
             cfg,
@@ -244,14 +244,14 @@ class TuningControls:
         if snapshot.overlay_visible and self._overlay_show is not None:
             self._overlay_show()
 
-    def _apply_residual_delay(self) -> None:
-        delay_sec = self.cfg.editor.residual_delay_ms / 1000.0
-        self.playback.player.set_residual_delay_sec(delay_sec)
+    def _apply_residual_latency(self) -> None:
+        latency_sec = self.cfg.editor.residual_latency_ms / 1000.0
+        self.playback.player.set_residual_latency_sec(latency_sec)
 
-    def _on_residual_delay_changed(self) -> None:
-        self._apply_residual_delay()
+    def _on_residual_latency_changed(self) -> None:
+        self._apply_residual_latency()
         if self._project_has_markers_or_cues():
-            self.show_notification(NOTIFICATION_RESIDUAL_DELAY_UNCHANGED_TEXT)
+            self.show_notification(NOTIFICATION_RESIDUAL_LATENCY_UNCHANGED_TEXT)
 
     def _project_has_markers_or_cues(self) -> bool:
         if self.session.song_markers.times:
@@ -505,7 +505,7 @@ class TuningControls:
             if kind == RowKind.SETTINGS_EDITOR_MODE:
                 self._editor_mode.confirm_editor_mode_selection()
                 return True
-            if kind == RowKind.SETTINGS_SYNC_BY_EAR:
+            if kind == RowKind.SETTINGS_MEASURE_LATENCY:
                 self._tap_sync.prompt_start()
                 return True
             if kind == RowKind.SONG_MARKER_ITEM:

@@ -70,7 +70,7 @@ from cleave.config_schema import (
     DEFAULT_RENDER_WIDTH,
     DEFAULT_EDITOR_HEIGHT,
     DEFAULT_UI_FADE_SEC,
-    DEFAULT_RESIDUAL_DELAY_MS,
+    DEFAULT_RESIDUAL_LATENCY_MS,
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
     DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
@@ -147,7 +147,7 @@ class EditorConfig:
     ui_width_mode: UiWidthMode = DEFAULT_UI_WIDTH_MODE
     ui_width: int = DEFAULT_UI_WIDTH
     ui_fade: float = DEFAULT_UI_FADE_SEC
-    residual_delay_ms: int = DEFAULT_RESIDUAL_DELAY_MS
+    residual_latency_ms: int = DEFAULT_RESIDUAL_LATENCY_MS
     @property
     def display_width(self) -> int:
         return max(1, round(self.width * self.upscale))

@@ -79,12 +79,12 @@ def test_audible_subtracts_latency_and_floors_at_zero() -> None:
     assert clock.audible_position_sec(now=1.0) == pytest.approx(0.0)
 
 
-def test_audible_subtracts_residual_delay() -> None:
+def test_audible_subtracts_residual_latency() -> None:
     clock = _clock(latency_frames=100)
-    clock.set_residual_delay_sec(0.2)
+    clock.set_residual_latency_sec(0.2)
     clock.reanchor(500, wall_time=0.0)
     assert clock.file_position_sec(now=0.0) == pytest.approx(0.5)
-    assert clock.audible_position_zero_residual_sec(now=0.0) == pytest.approx(0.4)
+    assert clock.audible_position_zero_residual_latency_sec(now=0.0) == pytest.approx(0.4)
     assert clock.audible_position_sec(now=0.0) == pytest.approx(0.2)
 
     clock.reanchor(100, wall_time=1.0)
@@ -92,12 +92,12 @@ def test_audible_subtracts_residual_delay() -> None:
     assert clock.file_position_sec(now=1.0) == pytest.approx(0.1)
 
 
-def test_set_residual_delay_sec_clamps() -> None:
+def test_set_residual_latency_sec_clamps() -> None:
     clock = _clock()
-    clock.set_residual_delay_sec(-1.0)
-    assert clock.residual_delay_sec == 0.0
-    clock.set_residual_delay_sec(5.0)
-    assert clock.residual_delay_sec == 2.0
+    clock.set_residual_latency_sec(-1.0)
+    assert clock.residual_latency_sec == 0.0
+    clock.set_residual_latency_sec(5.0)
+    assert clock.residual_latency_sec == 2.0
 
 
 def test_determinism_same_anchors_and_now_sequence() -> None:

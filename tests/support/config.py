@@ -168,7 +168,7 @@ def write_user_config_file(
             "ui_width_mode": editor.ui_width_mode,
             "ui_width": editor.ui_width,
             "ui_fade": editor.ui_fade,
-            "residual_delay_ms": editor.residual_delay_ms,
+            "residual_latency_ms": editor.residual_latency_ms,
         }
     if preset_root is not None or texture_paths is not None:
         paths: dict = {}

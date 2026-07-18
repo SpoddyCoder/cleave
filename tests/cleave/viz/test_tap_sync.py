@@ -15,8 +15,8 @@ from cleave.viz.tap_sync import (
     append_streak_delta,
     build_metronome_schedule,
     delta_spread_sec,
-    infer_residual_delay_sec,
-    mean_delay_from_deltas,
+    infer_residual_latency_sec,
+    mean_latency_from_deltas,
     metronome_accent_times,
     metronome_click_times,
     streak_ready_to_lock,
@@ -158,9 +158,9 @@ def test_streak_ready_to_lock_requires_full_window() -> None:
     assert streak_ready_to_lock(streak, window=CONSISTENCY_WINDOW) is False
 
 
-def test_mean_delay_from_deltas_uses_last_window() -> None:
+def test_mean_latency_from_deltas_uses_last_window() -> None:
     deltas = (0.10, 0.20, 0.21, 0.19, 0.20)
-    assert mean_delay_from_deltas(deltas) == pytest.approx(0.20)
+    assert mean_latency_from_deltas(deltas) == pytest.approx(0.20)
 
 
 def test_delta_spread_sec_requires_at_least_two_deltas() -> None:
@@ -173,30 +173,30 @@ def test_delta_spread_sec_uses_full_streak_buffer() -> None:
     assert delta_spread_sec(deltas) == pytest.approx(0.11)
 
 
-def test_infer_residual_delay_median_of_nearest_click_deltas() -> None:
+def test_infer_residual_latency_median_of_nearest_click_deltas() -> None:
     clicks = (0.0, 1.0, 2.0, 3.0)
     taps = (0.2, 1.2, 2.2, 3.2)
-    assert infer_residual_delay_sec(taps, clicks) == pytest.approx(0.2)
+    assert infer_residual_latency_sec(taps, clicks) == pytest.approx(0.2)
 
 
-def test_infer_residual_delay_clamps_high() -> None:
+def test_infer_residual_latency_clamps_high() -> None:
     clicks = (0.0, 10.0, 20.0, 30.0)
     taps = (5.0, 15.0, 25.0, 35.0)
-    assert infer_residual_delay_sec(taps, clicks) == pytest.approx(2.0)
+    assert infer_residual_latency_sec(taps, clicks) == pytest.approx(2.0)
 
 
-def test_infer_residual_delay_clamps_low() -> None:
+def test_infer_residual_latency_clamps_low() -> None:
     clicks = (1.0, 2.0, 3.0, 4.0)
     taps = (0.0, 0.1, 0.2, 0.3)
-    assert infer_residual_delay_sec(taps, clicks) == pytest.approx(0.0)
+    assert infer_residual_latency_sec(taps, clicks) == pytest.approx(0.0)
 
 
-def test_infer_residual_delay_requires_min_taps() -> None:
+def test_infer_residual_latency_requires_min_taps() -> None:
     clicks = (0.0, 1.0, 2.0, 3.0)
-    assert infer_residual_delay_sec((0.2, 1.2, 2.2), clicks) == 0.0
-    assert infer_residual_delay_sec((), clicks) == 0.0
+    assert infer_residual_latency_sec((0.2, 1.2, 2.2), clicks) == 0.0
+    assert infer_residual_latency_sec((), clicks) == 0.0
 
 
-def test_infer_residual_delay_empty_clicks() -> None:
+def test_infer_residual_latency_empty_clicks() -> None:
     taps = tuple(0.2 + i for i in range(MIN_TAP_COUNT))
-    assert infer_residual_delay_sec(taps, ()) == 0.0
+    assert infer_residual_latency_sec(taps, ()) == 0.0

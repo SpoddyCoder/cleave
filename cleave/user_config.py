@@ -15,7 +15,7 @@ from cleave.config_schema import (
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
     DEFAULT_EDITOR_PREVIEW_QUALITY,
-    DEFAULT_RESIDUAL_DELAY_MS,
+    DEFAULT_RESIDUAL_LATENCY_MS,
     UiWidthMode,
     EditorPreviewQuality,
     dump_editor_section,
@@ -42,7 +42,7 @@ class EditorSettings:
     ui_width_mode: UiWidthMode
     ui_width: int
     ui_fade: float
-    residual_delay_ms: int
+    residual_latency_ms: int
 
 
 @dataclass(frozen=True)
@@ -59,7 +59,7 @@ def default_editor_settings() -> EditorSettings:
         ui_width_mode=DEFAULT_UI_WIDTH_MODE,
         ui_width=DEFAULT_UI_WIDTH,
         ui_fade=DEFAULT_UI_FADE_SEC,
-        residual_delay_ms=DEFAULT_RESIDUAL_DELAY_MS,
+        residual_latency_ms=DEFAULT_RESIDUAL_LATENCY_MS,
     )
 
 
@@ -122,7 +122,7 @@ def editor_settings_from_config(cfg: EditorConfig) -> EditorSettings:
         ui_width_mode=cfg.ui_width_mode,
         ui_width=cfg.ui_width,
         ui_fade=cfg.ui_fade,
-        residual_delay_ms=cfg.residual_delay_ms,
+        residual_latency_ms=cfg.residual_latency_ms,
     )
 
 

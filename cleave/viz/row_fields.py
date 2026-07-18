@@ -112,16 +112,16 @@ def _format_settings_ui_fade(
     return ui_fade_display(state.settings.ui_fade)
 
 
-def _format_settings_residual_delay_ms(
+def _format_settings_residual_latency_ms(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.settings.residual_delay_ms} ms"
+    return f"{state.settings.residual_latency_ms} ms"
 
 
-def _format_settings_sync_by_ear(
+def _format_settings_measure_latency(
     _state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return "sync by ear"
+    return "measure latency"
 
 
 def _format_timeline_bar_phase(
@@ -344,15 +344,15 @@ def _apply_settings_ui_fade(
     controls._settings.adjust_ui_fade(forward=forward, ctrl=ctrl)
 
 
-def _apply_settings_residual_delay_ms(
+def _apply_settings_residual_latency_ms(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
     ctrl: bool,
     _shift: bool,
 ) -> None:
-    controls._settings.adjust_residual_delay_ms(forward=forward, ctrl=ctrl)
-    controls._on_residual_delay_changed()
+    controls._settings.adjust_residual_latency_ms(forward=forward, ctrl=ctrl)
+    controls._on_residual_latency_changed()
 
 
 def _track_block(state: TuningViewState, desc: RowDescriptor) -> TrackBlock:
@@ -1209,21 +1209,21 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         format_value=_format_settings_ui_fade,
         apply_horizontal=_apply_settings_ui_fade,
     ),
-    RowKind.SETTINGS_WIRELESS_DELAY_HEADER: RowFieldDef(
-        panel_label="Wireless delay",
+    RowKind.SETTINGS_LATENCY_COMPENSATION_HEADER: RowFieldDef(
+        panel_label="Latency Compensation",
         present_style=RowPresentStyle.EXPAND_SUBHEADER,
         apply_horizontal=_apply_expand_subheader,
     ),
-    RowKind.SETTINGS_RESIDUAL_DELAY_MS: RowFieldDef(
-        panel_label="residual delay",
+    RowKind.SETTINGS_RESIDUAL_LATENCY_MS: RowFieldDef(
+        panel_label="residual latency",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_settings_residual_delay_ms,
-        apply_horizontal=_apply_settings_residual_delay_ms,
+        format_value=_format_settings_residual_latency_ms,
+        apply_horizontal=_apply_settings_residual_latency_ms,
     ),
-    RowKind.SETTINGS_SYNC_BY_EAR: RowFieldDef(
-        panel_label="sync by ear",
+    RowKind.SETTINGS_MEASURE_LATENCY: RowFieldDef(
+        panel_label="measure latency",
         present_style=RowPresentStyle.FULL_LINE,
-        format_value=_format_settings_sync_by_ear,
+        format_value=_format_settings_measure_latency,
     ),
     RowKind.TRACK_HEADER: RowFieldDef(
         panel_label="Layer",

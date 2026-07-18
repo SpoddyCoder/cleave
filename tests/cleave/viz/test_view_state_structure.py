@@ -424,15 +424,15 @@ def test_structure_signature_invalidates_on_timeline_fades_enabled() -> None:
     assert sig_before != sig_after
 
 
-def test_structure_signature_invalidates_on_wireless_delay_expanded() -> None:
+def test_structure_signature_invalidates_on_latency_compensation_expanded() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
-    session.settings.wireless_delay_expanded = False
+    session.settings.latency_compensation_expanded = False
     sig_before = view_state_structure_signature(
         session, config_save, notification_active=False
     )
-    session.settings.wireless_delay_expanded = True
+    session.settings.latency_compensation_expanded = True
     sig_after = view_state_structure_signature(
         session, config_save, notification_active=False
     )

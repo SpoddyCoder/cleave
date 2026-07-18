@@ -29,7 +29,7 @@ class StubMixPlayer:
 
     def __init__(self, position_sec: float = 0.0) -> None:
         self._position_sec = position_sec
-        self._residual_delay_sec = 0.0
+        self._residual_latency_sec = 0.0
         self._click_only = False
 
     def start(self) -> None:
@@ -44,8 +44,8 @@ class StubMixPlayer:
     def seek(self, position_sec: float) -> None:
         self._position_sec = position_sec
 
-    def set_residual_delay_sec(self, sec: float) -> None:
-        self._residual_delay_sec = max(0.0, min(float(sec), 2.0))
+    def set_residual_latency_sec(self, sec: float) -> None:
+        self._residual_latency_sec = max(0.0, min(float(sec), 2.0))
 
     def set_click_schedule(self, _schedule) -> None:
         pass
@@ -57,9 +57,9 @@ class StubMixPlayer:
         return self._position_sec
 
     def audible_position_sec(self) -> float:
-        return max(0.0, self._position_sec - self._residual_delay_sec)
+        return max(0.0, self._position_sec - self._residual_latency_sec)
 
-    def audible_position_zero_residual_sec(self) -> float:
+    def audible_position_zero_residual_latency_sec(self) -> float:
         return self._position_sec
 
     def finished(self) -> bool:

@@ -11,7 +11,7 @@ import time
 from dataclasses import dataclass
 
 
-MAX_RESIDUAL_DELAY_SEC = 2.0
+MAX_RESIDUAL_LATENCY_SEC = 2.0
 
 
 @dataclass
@@ -22,7 +22,7 @@ class TransportClock:
     anchor_wall_time: float = 0.0
     sample_rate: int = 44100
     latency_frames: int = 0
-    residual_delay_sec: float = 0.0
+    residual_latency_sec: float = 0.0
     paused: bool = False
     total_frames: int = 0
     max_ahead_frames: int = 0
@@ -48,8 +48,8 @@ class TransportClock:
     def set_latency_frames(self, n: int) -> None:
         self.latency_frames = max(0, int(n))
 
-    def set_residual_delay_sec(self, sec: float) -> None:
-        self.residual_delay_sec = max(0.0, min(float(sec), MAX_RESIDUAL_DELAY_SEC))
+    def set_residual_latency_sec(self, sec: float) -> None:
+        self.residual_latency_sec = max(0.0, min(float(sec), MAX_RESIDUAL_LATENCY_SEC))
 
     def file_position_frames(self, now: float | None = None) -> float:
         if self.paused:
@@ -67,7 +67,7 @@ class TransportClock:
             return 0.0
         return self.file_position_frames(now) / self.sample_rate
 
-    def audible_position_zero_residual_sec(self, now: float | None = None) -> float:
+    def audible_position_zero_residual_latency_sec(self, now: float | None = None) -> float:
         if self.sample_rate <= 0:
             return 0.0
         file_frames = self.file_position_frames(now)
@@ -78,6 +78,8 @@ class TransportClock:
         if self.sample_rate <= 0:
             return 0.0
         file_frames = self.file_position_frames(now)
-        delay_frames = float(self.latency_frames) + self.residual_delay_sec * self.sample_rate
-        audible_frames = max(0.0, file_frames - delay_frames)
+        total_latency_frames = (
+            float(self.latency_frames) + self.residual_latency_sec * self.sample_rate
+        )
+        audible_frames = max(0.0, file_frames - total_latency_frames)
         return audible_frames / self.sample_rate

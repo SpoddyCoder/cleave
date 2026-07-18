@@ -1,4 +1,4 @@
-"""Tap-to-sync calibration orchestration for wireless delay."""
+"""Tap-to-sync calibration orchestration for latency compensation."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 
 from cleave.config import CleaveConfig
-from cleave.config_schema import clamp_residual_delay_ms
+from cleave.config_schema import clamp_residual_latency_ms
 from cleave.user_config import persist_editor_settings
 from cleave.viz.focus_nav import FocusCursor
 from cleave.viz.modal import ModalHost
@@ -16,17 +16,16 @@ from cleave.viz.tap_sync import (
     append_streak_delta,
     build_metronome_schedule,
     delta_spread_sec,
-    mean_delay_from_deltas,
+    mean_latency_from_deltas,
     metronome_accent_times,
     streak_ready_to_lock,
 )
-from cleave.viz.transport_clock import MAX_RESIDUAL_DELAY_SEC
+from cleave.viz.transport_clock import MAX_RESIDUAL_LATENCY_SEC
 
 _TAP_SYNC_CONFIRM_MESSAGE = (
-    "Song and visuals pause for calibration. A 140 BPM click track plays: "
-    "a loud click on beat 1 of each bar and quieter clicks on beats 2 to 4. "
-    "Tap Space on each loud beat (beat 1) until the delay is detected. "
-    "Other panels hide while detection runs."
+    "Measure Latency: "
+    "A 140 BPM click track will play. "
+    "Tap Space on each bar beat (beat 1) until the latency is detected."
 )
 
 
@@ -46,7 +45,7 @@ class TapSyncProgressView:
 
 
 class TapSyncControls:
-    """Thin controller for sync-by-ear calibration."""
+    """Thin controller for measure-latency calibration."""
 
     def __init__(
         self,
@@ -56,7 +55,7 @@ class TapSyncControls:
         modal_host: ModalHost,
         *,
         on_notification: Callable[[str], None],
-        on_apply_residual_delay: Callable[[], None],
+        on_apply_residual_latency: Callable[[], None],
         on_calibration_ui_begin: Callable[[], TapSyncUiSnapshot],
         on_calibration_ui_restore: Callable[[TapSyncUiSnapshot], None],
     ) -> None:
@@ -65,7 +64,7 @@ class TapSyncControls:
         self.duration_sec = duration_sec
         self._modal_host = modal_host
         self._on_notification = on_notification
-        self._on_apply_residual_delay = on_apply_residual_delay
+        self._on_apply_residual_latency = on_apply_residual_latency
         self._on_calibration_ui_begin = on_calibration_ui_begin
         self._on_calibration_ui_restore = on_calibration_ui_restore
         self._active = False
@@ -97,7 +96,7 @@ class TapSyncControls:
         )
         estimate_ms = None
         if self._streak_deltas:
-            estimate_sec = mean_delay_from_deltas(self._streak_deltas)
+            estimate_sec = mean_latency_from_deltas(self._streak_deltas)
             estimate_ms = int(round(estimate_sec * 1000.0))
         return TapSyncProgressView(
             streak=len(self._streak_deltas),
@@ -169,7 +168,7 @@ class TapSyncControls:
     def record_tap(self) -> None:
         if not self._active or self._awaiting_confirm:
             return
-        tap = self.playback.player.audible_position_zero_residual_sec()
+        tap = self.playback.player.audible_position_zero_residual_latency_sec()
         accent_index, delta = accept_tap_for_accent(
             tap,
             self._metronome_accent_times,
@@ -181,36 +180,36 @@ class TapSyncControls:
         self._taps.append(tap)
         self._streak_deltas = append_streak_delta(self._streak_deltas, delta)
         if streak_ready_to_lock(self._streak_deltas):
-            self._prompt_apply_detected_delay()
+            self._prompt_apply_detected_latency()
 
-    def _proposed_delay_sec(self) -> float:
+    def _proposed_latency_sec(self) -> float:
         return max(
             0.0,
-            min(mean_delay_from_deltas(self._streak_deltas), MAX_RESIDUAL_DELAY_SEC),
+            min(mean_latency_from_deltas(self._streak_deltas), MAX_RESIDUAL_LATENCY_SEC),
         )
 
-    def _prompt_apply_detected_delay(self) -> None:
+    def _prompt_apply_detected_latency(self) -> None:
         self.playback.player.set_click_schedule(None)
         self.playback.player.set_click_only(False)
         self._stop_click_device_leave_transport_paused()
         self._restore_calibration_ui()
         self._awaiting_confirm = True
-        delay_ms = clamp_residual_delay_ms(
-            int(round(self._proposed_delay_sec() * 1000.0))
+        latency_ms = clamp_residual_latency_ms(
+            int(round(self._proposed_latency_sec() * 1000.0))
         )
         self._modal_host.prompt_yes_no(
-            f"Detected wireless delay: {delay_ms} ms. Apply?",
-            on_confirm=lambda: self._apply_detected_delay(delay_ms),
+            f"Detected latency: {latency_ms} ms. Apply?",
+            on_confirm=lambda: self._apply_detected_latency(latency_ms),
             on_cancel=self._dismiss_without_apply,
             cancel_label="Cancel",
         )
 
-    def _apply_detected_delay(self, delay_ms: int) -> None:
-        self.cfg.editor = replace(self.cfg.editor, residual_delay_ms=delay_ms)
-        self._on_apply_residual_delay()
+    def _apply_detected_latency(self, latency_ms: int) -> None:
+        self.cfg.editor = replace(self.cfg.editor, residual_latency_ms=latency_ms)
+        self._on_apply_residual_latency()
         persist_editor_settings(self.cfg)
         self._finish_calibration()
-        self._on_notification(f"Wireless delay set to {delay_ms} ms")
+        self._on_notification(f"Latency compensation set to {latency_ms} ms")
 
     def _dismiss_without_apply(self) -> None:
         self._finish_calibration()

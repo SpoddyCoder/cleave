@@ -59,8 +59,8 @@ def _make_controls(
         duration_sec=duration_sec,
         modal_host=modal_host,
         on_notification=notifications.append,
-        on_apply_residual_delay=lambda: player.set_residual_delay_sec(
-            cfg.editor.residual_delay_ms / 1000.0
+        on_apply_residual_latency=lambda: player.set_residual_latency_sec(
+            cfg.editor.residual_latency_ms / 1000.0
         ),
         on_calibration_ui_begin=on_begin,
         on_calibration_ui_restore=on_restore,
@@ -84,11 +84,11 @@ def _tap_on_accents(
     playback: PlaybackState,
     accent_times: tuple[float, ...],
     *,
-    delay_sec: float,
+    latency_sec: float,
     count: int,
 ) -> None:
     for accent_time in accent_times[:count]:
-        playback.player.seek(accent_time + delay_sec)
+        playback.player.seek(accent_time + latency_sec)
         controls.record_tap()
 
 
@@ -174,23 +174,23 @@ def test_cancel_restores_normal_playback_and_ui() -> None:
     assert ui_log == ["hide", "restore"]
 
 
-def test_consistent_taps_open_apply_modal_with_mean_delay() -> None:
+def test_consistent_taps_open_apply_modal_with_mean_latency() -> None:
     controls, playback, modal, _notifications, ui_log = _make_controls(duration_sec=8.0)
     playback.player.seek(0.0)
-    delay_sec = 0.2
+    latency_sec = 0.2
 
     accent_times = _start_calibration(controls, modal, ui_log)
     _tap_on_accents(
         controls,
         playback,
         accent_times,
-        delay_sec=delay_sec,
+        latency_sec=latency_sec,
         count=4,
     )
 
     view = modal.view_state()
     assert view is not None
-    assert view.message == "Detected wireless delay: 200 ms. Apply?"
+    assert view.message == "Detected latency: 200 ms. Apply?"
     assert controls.active
     assert controls.awaiting_apply
     assert not controls.showing_progress
@@ -206,9 +206,9 @@ def test_inconsistent_taps_do_not_lock_in() -> None:
     playback.player.seek(0.0)
 
     accent_times = _start_calibration(controls, modal, ui_log)
-    delays = (0.10, 0.20, 0.30, 0.40)
-    for accent_time, delay_sec in zip(accent_times[:4], delays, strict=True):
-        playback.player.seek(accent_time + delay_sec)
+    latencies = (0.10, 0.20, 0.30, 0.40)
+    for accent_time, latency_sec in zip(accent_times[:4], latencies, strict=True):
+        playback.player.seek(accent_time + latency_sec)
         controls.record_tap()
 
     assert modal.view_state() is None
@@ -234,7 +234,7 @@ def test_double_tap_same_accent_is_ignored() -> None:
     assert len(controls._taps) == 4
     view = modal.view_state()
     assert view is not None
-    assert view.message == "Detected wireless delay: 200 ms. Apply?"
+    assert view.message == "Detected latency: 200 ms. Apply?"
     assert ui_log == ["hide", "restore"]
 
 
@@ -256,7 +256,7 @@ def test_quiet_quarter_tap_is_ignored() -> None:
     )
 
 
-def test_apply_modal_yes_sets_residual_delay_and_leaves_transport_paused() -> None:
+def test_apply_modal_yes_sets_residual_latency_and_leaves_transport_paused() -> None:
     controls, playback, modal, notifications, ui_log = _make_controls(duration_sec=8.0)
     playback.player.seek(0.0)
 
@@ -265,7 +265,7 @@ def test_apply_modal_yes_sets_residual_delay_and_leaves_transport_paused() -> No
         controls,
         playback,
         accent_times,
-        delay_sec=0.2,
+        latency_sec=0.2,
         count=4,
     )
     modal.handle_keydown(keydown(pygame.K_RETURN))
@@ -274,13 +274,13 @@ def test_apply_modal_yes_sets_residual_delay_and_leaves_transport_paused() -> No
     assert playback.paused
     assert playback.player._clock.paused
     assert playback.player._click_only is False
-    assert controls.cfg.editor.residual_delay_ms == pytest.approx(200, abs=1)
-    assert any("Wireless delay set" in msg for msg in notifications)
+    assert controls.cfg.editor.residual_latency_ms == pytest.approx(200, abs=1)
+    assert any("Latency compensation set" in msg for msg in notifications)
 
 
 def test_apply_modal_cancel_exits_without_applying() -> None:
     controls, playback, modal, notifications, ui_log = _make_controls(duration_sec=8.0)
-    original_delay = controls.cfg.editor.residual_delay_ms
+    original_latency = controls.cfg.editor.residual_latency_ms
     playback.player.seek(0.0)
 
     accent_times = _start_calibration(controls, modal, ui_log)
@@ -288,7 +288,7 @@ def test_apply_modal_cancel_exits_without_applying() -> None:
         controls,
         playback,
         accent_times,
-        delay_sec=0.2,
+        latency_sec=0.2,
         count=4,
     )
     modal.handle_keydown(keydown(pygame.K_LEFT))
@@ -298,8 +298,8 @@ def test_apply_modal_cancel_exits_without_applying() -> None:
     assert playback.paused
     assert playback.player._clock.paused
     assert playback.player._click_only is False
-    assert controls.cfg.editor.residual_delay_ms == original_delay
-    assert not any("Wireless delay set" in msg for msg in notifications)
+    assert controls.cfg.editor.residual_latency_ms == original_latency
+    assert not any("Latency compensation set" in msg for msg in notifications)
 
 
 def test_progress_view_updates_with_streak() -> None:
@@ -358,9 +358,9 @@ def test_wide_spread_resets_streak_before_lock() -> None:
     controls, playback, modal, _notifications, ui_log = _make_controls(duration_sec=8.0)
     playback.player.seek(0.0)
     accent_times = _start_calibration(controls, modal, ui_log)
-    delays = (0.18, 0.20, 0.22, 0.24)
-    for accent_time, delay_sec in zip(accent_times[:4], delays, strict=True):
-        playback.player.seek(accent_time + delay_sec)
+    latencies = (0.18, 0.20, 0.22, 0.24)
+    for accent_time, latency_sec in zip(accent_times[:4], latencies, strict=True):
+        playback.player.seek(accent_time + latency_sec)
         controls.record_tap()
 
     assert controls.progress_view() == TapSyncProgressView(
