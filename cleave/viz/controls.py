@@ -16,7 +16,9 @@ from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.extract import STEM_SOURCES
 from cleave.song_markers import format_marker_time, place_marker
 from cleave.preset_curation import PresetCurationIndex
+from cleave.timeline import snap_placement_time
 from cleave.viz.config_save import ConfigSaveController
+from cleave.viz.editor_mode_controls import EditorModeController, is_preset_curation_mode
 from cleave.viz.preset_curation_controls import PresetCurationController
 from cleave.viz.key_repeat import KeyRepeatController, add_current_preset_key_pressed, delete_key_pressed, mod_ctrl, mod_shift
 from cleave.viz.modal import ModalHost
@@ -27,6 +29,7 @@ from cleave.viz.render_overlay_controls import RenderOverlayControls
 from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
 from cleave.viz.render_post_fx_controls import RenderPostFxControls
 from cleave.viz.settings_controls import SettingsControls
+from cleave.viz.tap_sync_controls import TapSyncControls, TapSyncUiSnapshot
 from cleave.viz.timeline_phase_controls import TimelinePhaseController
 from cleave.viz.timeline_preset_controls import TimelinePresetController
 from cleave.viz.timeline_snap_controls import TimelineSnapController
@@ -62,6 +65,9 @@ if TYPE_CHECKING:
 
 NOTIFICATION_TIMELINE_ENABLED_TEXT = "Timeline controls layer visibility"
 NOTIFICATION_TIMELINE_DISABLED_TEXT = "Layer panel controls visibility"
+NOTIFICATION_RESIDUAL_LATENCY_UNCHANGED_TEXT = (
+    "Existing marker and cue times unchanged"
+)
 SEEK_TINY = 2
 SEEK_SHORT = 10
 SEEK_LONG = 30
@@ -96,6 +102,8 @@ class TuningControls:
         self.project_dir = project_dir
         self.playback = playback
         self.duration_sec = duration_sec
+        self._beat_times = tuple(beat_times)
+        self._bar_times = tuple(bar_times)
         self._layer_bindings = layer_bindings
         self._render_post_fx_bindings = render_post_fx_bindings
         self._layer_manager = layer_manager
@@ -109,6 +117,9 @@ class TuningControls:
         self._notification_host = PanelNotificationHost()
         self._key_repeat = KeyRepeatController()
         self._hide_overlay_requested = False
+        self._overlay_get_visible: Callable[[], bool] | None = None
+        self._overlay_hide: Callable[[], None] | None = None
+        self._overlay_show: Callable[[], None] | None = None
 
         self._config_save = ConfigSaveController(
             session,
@@ -165,8 +176,90 @@ class TuningControls:
             session, bindings=render_post_fx_bindings
         )
         self._settings = SettingsControls(session, cfg)
+        self._tap_sync = TapSyncControls(
+            cfg,
+            playback,
+            duration_sec,
+            self._modal_host,
+            on_notification=self.show_notification,
+            on_apply_residual_latency=self._apply_residual_latency,
+            on_calibration_ui_begin=self._begin_tap_sync_calibration_ui,
+            on_calibration_ui_restore=self._restore_tap_sync_calibration_ui,
+        )
+        self._apply_residual_latency()
+        self._editor_mode = EditorModeController(
+            session,
+            cfg,
+            self._config_save,
+            self._modal_host,
+            project_dir=project_dir,
+            layer_bindings=layer_bindings,
+            layer_manager=layer_manager,
+            on_mode_changed=self._on_editor_mode_changed,
+        )
         if session.timeline.enabled:
             self.show_notification(NOTIFICATION_TIMELINE_ENABLED_TEXT)
+
+    @property
+    def tap_sync(self) -> TapSyncControls:
+        return self._tap_sync
+
+    def bind_tap_sync_overlay(
+        self,
+        *,
+        get_visible: Callable[[], bool],
+        hide: Callable[[], None],
+        show: Callable[[], None],
+    ) -> None:
+        self._overlay_get_visible = get_visible
+        self._overlay_hide = hide
+        self._overlay_show = show
+
+    def _begin_tap_sync_calibration_ui(self) -> TapSyncUiSnapshot:
+        snapshot = TapSyncUiSnapshot(
+            help_visible=self.session.help_visible,
+            timeline_panel_open=self.session.timeline.panel_open,
+            focus_cursor=self.focus_cursor,
+            overlay_visible=(
+                self._overlay_get_visible()
+                if self._overlay_get_visible is not None
+                else True
+            ),
+        )
+        self.session.help_visible = False
+        if self.session.timeline.panel_open:
+            self.session.timeline.panel_open = False
+        if isinstance(self.focus_cursor, TimelineFocus):
+            self._apply_focus_cursor(
+                MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+            )
+        if self._overlay_hide is not None:
+            self._overlay_hide()
+        return snapshot
+
+    def _restore_tap_sync_calibration_ui(self, snapshot: TapSyncUiSnapshot) -> None:
+        self.session.help_visible = snapshot.help_visible
+        self.session.timeline.panel_open = snapshot.timeline_panel_open
+        self._apply_focus_cursor(snapshot.focus_cursor)
+        if snapshot.overlay_visible and self._overlay_show is not None:
+            self._overlay_show()
+
+    def _apply_residual_latency(self) -> None:
+        latency_sec = self.cfg.editor.residual_latency_ms / 1000.0
+        self.playback.player.set_residual_latency_sec(latency_sec)
+
+    def _on_residual_latency_changed(self) -> None:
+        self._apply_residual_latency()
+        if self._project_has_markers_or_cues():
+            self.show_notification(NOTIFICATION_RESIDUAL_LATENCY_UNCHANGED_TEXT)
+
+    def _project_has_markers_or_cues(self) -> bool:
+        if self.session.song_markers.times:
+            return True
+        for lane in self.session.timeline.lanes.values():
+            if lane.cues:
+                return True
+        return False
 
     def _move_mode_signature_payload(self) -> dict[str, list[str]] | None:
         if self.move_mode_slot is not None and self._move_mode_original_z_order is not None:
@@ -219,6 +312,12 @@ class TuningControls:
 
         if self.handle_modal_keydown(event):
             return True
+
+        if is_preset_curation_mode(self.session):
+            return self._handle_curation_keydown(event)
+
+        if self._tap_sync.active:
+            return self._tap_sync.handle_keydown(event) or True
 
         if event.key == pygame.K_SPACE:
             toggle_pause(self.playback, self.duration_sec)
@@ -377,7 +476,7 @@ class TuningControls:
                 self._add_current_preset(slot)
                 return True
 
-        if event.key in (pygame.K_f, pygame.K_b):
+        if event.key in (pygame.K_f, pygame.K_b, pygame.K_r):
             kind = self.focus_descriptor.kind
             slot = self.focus_descriptor.slot
             if slot is not None and kind in PRESET_FILE_ROW_KINDS:
@@ -390,17 +489,25 @@ class TuningControls:
                     return True
                 if event.key == pygame.K_f:
                     self._preset_curation.prompt_favourite(slot, src)
-                else:
+                elif event.key == pygame.K_b:
                     self._preset_curation.prompt_blacklist(
                         slot,
                         src,
                         from_user_preset=(kind == RowKind.TRACK_USER_PRESET_ITEM),
                         user_preset_index=self.focus_descriptor.preset_index,
                     )
+                else:
+                    self._preset_curation.prompt_restore(slot, src)
                 return True
 
         if event.key == pygame.K_RETURN:
             kind = self.focus_descriptor.kind
+            if kind == RowKind.SETTINGS_EDITOR_MODE:
+                self._editor_mode.confirm_editor_mode_selection()
+                return True
+            if kind == RowKind.SETTINGS_MEASURE_LATENCY:
+                self._tap_sync.prompt_start()
+                return True
             if kind == RowKind.SONG_MARKER_ITEM:
                 desc = self.focus_descriptor
                 if desc.marker_index is not None:
@@ -435,11 +542,8 @@ class TuningControls:
             if kind == RowKind.TIMELINE_RESET:
                 self._timeline_presets.prompt_reset()
                 return True
-            if kind == RowKind.TIMELINE_SNAP_TO_BEATS:
-                self._timeline_snap.prompt()
-                return True
-            if kind == RowKind.TIMELINE_SNAP_TO_BARS:
-                self._timeline_snap.prompt_bars()
+            if kind == RowKind.TIMELINE_SNAP_TO_GRID:
+                self._timeline_snap.prompt_grid()
                 return True
             if kind == RowKind.TIMELINE_SNAP_TO_SONG_MARKERS:
                 self._timeline_snap.prompt_song_markers()
@@ -458,6 +562,95 @@ class TuningControls:
                 return True
             if kind == RowKind.CONFIG_HEADER:
                 self.prompt_save_config()
+                return True
+
+        return True
+
+    def _handle_curation_keydown(self, event: pygame.event.Event) -> bool:
+        if event.key == pygame.K_SPACE:
+            toggle_pause(self.playback, self.duration_sec)
+            return True
+
+        if event.key == pygame.K_ESCAPE:
+            self._hide_overlay_requested = True
+            return True
+
+        if event.key in (pygame.K_UP, pygame.K_DOWN):
+            delta = -1 if event.key == pygame.K_UP else 1
+            if mod_ctrl(event.mod):
+                self._move_quick_focus(delta)
+            else:
+                self._move_focus(delta)
+            self._key_repeat.on_keydown(
+                event.key,
+                event.mod,
+                accel=False,
+                on_repeat=lambda key, mod: (
+                    self._move_quick_focus(-1 if key == pygame.K_UP else 1)
+                    if mod_ctrl(mod)
+                    else self._move_focus(-1 if key == pygame.K_UP else 1)
+                ),
+            )
+            return True
+
+        if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+            view = self.build_view_state(paused=self.playback.paused)
+            desc = self.focus_descriptor
+            if not view.layout.contains_descriptor(desc):
+                return True
+            kind = desc.kind
+            # Layer header: expand/collapse only; no solo / enable-disable.
+            if kind == RowKind.TRACK_HEADER and (
+                mod_ctrl(event.mod) or mod_shift(event.mod)
+            ):
+                return True
+            self._apply_horizontal(event.key, event.mod, kind)
+            repeat = kind in REPEAT_ROW_KINDS
+            if repeat and kind == RowKind.TRACK_PRESET_DIR and mod_ctrl(event.mod):
+                repeat = False
+            if repeat:
+                self._key_repeat.on_keydown(
+                    event.key,
+                    event.mod,
+                    on_repeat=lambda key, mod: self._apply_horizontal(
+                        key,
+                        mod,
+                        self.focus_descriptor.kind,
+                    ),
+                )
+            return True
+
+        if event.key in (pygame.K_f, pygame.K_b, pygame.K_r):
+            view = self.build_view_state(paused=self.playback.paused)
+            desc = self.focus_descriptor
+            if not view.layout.contains_descriptor(desc):
+                return True
+            kind = desc.kind
+            slot = desc.slot
+            if slot is not None and kind in PRESET_FILE_ROW_KINDS:
+                if section_lock_blocks_mutation(
+                    self.session, self.focus_descriptor
+                ):
+                    return True
+                src = self._resolve_preset_file_path(slot, kind, self.focus_descriptor)
+                if src is None or not src.is_file():
+                    return True
+                if event.key == pygame.K_f:
+                    self._preset_curation.prompt_favourite(slot, src)
+                elif event.key == pygame.K_b:
+                    self._preset_curation.prompt_blacklist(
+                        slot,
+                        src,
+                        from_user_preset=(kind == RowKind.TRACK_USER_PRESET_ITEM),
+                        user_preset_index=self.focus_descriptor.preset_index,
+                    )
+                else:
+                    self._preset_curation.prompt_restore(slot, src)
+                return True
+
+        if event.key == pygame.K_RETURN:
+            if self.focus_descriptor.kind == RowKind.SETTINGS_EDITOR_MODE:
+                self._editor_mode.confirm_editor_mode_selection()
                 return True
 
         return True
@@ -502,6 +695,16 @@ class TuningControls:
         self._apply_focus_cursor(cursor)
 
     def _apply_focus_cursor(self, cursor: FocusCursor) -> None:
+        leaving_editor_mode = (
+            isinstance(self._focus_cursor, MainFocus)
+            and self._focus_cursor.descriptor.kind == RowKind.SETTINGS_EDITOR_MODE
+            and not (
+                isinstance(cursor, MainFocus)
+                and cursor.descriptor.kind == RowKind.SETTINGS_EDITOR_MODE
+            )
+        )
+        if leaving_editor_mode:
+            self._editor_mode.sync_selection_to_mode()
         self._focus_cursor = cursor
         if isinstance(cursor, TimelineFocus):
             self.session.timeline.focus_row = cursor.row
@@ -514,15 +717,30 @@ class TuningControls:
             ):
                 self.session.song_markers.selected_index = desc.marker_index
 
+    def _on_editor_mode_changed(self) -> None:
+        self._view_state._structure = None
+        view = self.build_view_state(paused=self.playback.paused)
+        if isinstance(self.focus_cursor, TimelineFocus):
+            self._apply_focus_cursor(MainFocus(RowDescriptor(RowKind.TRANSPORT)))
+        else:
+            focus_desc = cursor_main_descriptor(self.focus_cursor)
+            if not view.layout.contains_descriptor(focus_desc):
+                resolved = view.layout.resolve_navigable(focus_desc, view)
+                self._apply_focus_cursor(MainFocus(resolved))
+        self._normalize_focus_cursor()
+
     def _normalize_focus_cursor(self) -> None:
         view = self.build_view_state(paused=self.playback.paused)
         tl = self.session.timeline
         row_count = len(self.session.layer_z_order)
         if isinstance(self.focus_cursor, TimelineFocus):
             if not timeline_strip_in_ring(view):
-                self._apply_focus_cursor(
-                    MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+                fallback_kind = (
+                    RowKind.TRANSPORT
+                    if is_preset_curation_mode(self.session)
+                    else RowKind.RENDER_TIMELINE_HEADER
                 )
+                self._apply_focus_cursor(MainFocus(RowDescriptor(fallback_kind)))
                 return
             if row_count == 0:
                 self._apply_focus_cursor(
@@ -725,11 +943,7 @@ class TuningControls:
         field = ROW_FIELDS.get(kind)
         if (
             field is not None
-            and field.present_style
-            in {
-                RowPresentStyle.EXPAND_SUBHEADER,
-                RowPresentStyle.ACTION_EXPAND_SUBHEADER,
-            }
+            and field.present_style == RowPresentStyle.EXPAND_SUBHEADER
             and field.apply_horizontal is not None
         ):
             field.apply_horizontal(
@@ -1014,17 +1228,17 @@ class TuningControls:
             return
         markers.expanded = expanded
 
-    def _set_song_marker_snap_expanded(self, expanded: bool) -> None:
-        tl = self.session.timeline
-        if tl.song_marker_snap_expanded == expanded:
-            return
-        tl.song_marker_snap_expanded = expanded
-
     def _set_beat_bar_grid_expanded(self, expanded: bool) -> None:
         tl = self.session.timeline
         if tl.beat_bar_grid_expanded == expanded:
             return
         tl.beat_bar_grid_expanded = expanded
+
+    def _set_timeline_fades_expanded(self, expanded: bool) -> None:
+        tl = self.session.timeline
+        if tl.fades_expanded == expanded:
+            return
+        tl.fades_expanded = expanded
 
     def _set_beat(self, slot: str, value: float) -> None:
         layer = self.session.layers[slot]
@@ -1051,7 +1265,12 @@ class TuningControls:
         """Drop or replace a song marker at the playhead (session until Save)."""
         if self.session.timeline.recording:
             return
-        t = current_sec(self.playback, self.duration_sec)
+        t = snap_placement_time(
+            current_sec(self.playback, self.duration_sec),
+            self.session.timeline.placement_snap,
+            beat_times=self._beat_times,
+            bar_times=self._bar_times,
+        )
         markers = self.session.song_markers
         prior_selected_time: float | None = None
         if (

@@ -14,7 +14,7 @@ class PlaybackState:
 
 
 def current_sec(state: PlaybackState, duration_sec: float) -> float:
-    return min(state.player.current_sec(), duration_sec)
+    return min(state.player.audible_position_sec(), duration_sec)
 
 
 def format_mmss(sec: float) -> str:
@@ -28,7 +28,7 @@ def seek_to(state: PlaybackState, position_sec: float, duration_sec: float) -> N
 
 
 def seek(state: PlaybackState, delta_sec: float, duration_sec: float) -> None:
-    t = current_sec(state, duration_sec)
+    t = min(state.player.file_position_sec(), duration_sec)
     seek_to(state, t + delta_sec, duration_sec)
 
 

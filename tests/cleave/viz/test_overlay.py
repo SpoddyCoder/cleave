@@ -17,7 +17,6 @@ from cleave.viz.tuning_panel_draw import (
     _row_bg_color,
     _row_text,
     _action_parameter_label_color,
-    _expand_subheader_arrow_color,
     _row_value_color,
     fit_row_text,
     panel_content_max_width,
@@ -199,7 +198,7 @@ def test_help_hint_layout_avoids_scrollbar_column() -> None:
     pygame.init()
     overlay = TuningOverlay()
     font = overlay._font_get()
-    hint_w = font.render("h - help", True, LABEL).get_width()
+    hint_w = font.render("H - help", True, LABEL).get_width()
     panel_w = 320
     panel_h = 200
     without_bar = panel_help_hint_layout(
@@ -868,36 +867,39 @@ def test_action_row_value_color() -> None:
     assert _row_value_color(state, delete_row) == ACTION
 
 
-def test_action_parameter_row_value_color() -> None:
+def test_measure_latency_row_uses_action_color() -> None:
+    from cleave.viz.tuning_view_state import SettingsBlock
+
     state = _minimal_view_state(
-        render_timeline=RenderTimelineBlock(
-            enabled=True, expanded=True, song_marker_snap_expanded=True
-        ),
+        settings=SettingsBlock(expanded=True, latency_compensation_expanded=True),
     )
-    snap_row = state.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
-    prox_row = state.layout.find_by_kind(RowKind.TIMELINE_SNAP_MARKER_PROXIMITY)
-    scope_row = state.layout.find_by_kind(RowKind.TIMELINE_SNAP_MARKER_SCOPE)
-    assert _row_value_color(state, snap_row) == ACTION
-    assert _expand_subheader_arrow_color(state, snap_row) == VALUE
-    assert _row_value_color(state, prox_row) == VALUE
-    assert _row_value_color(state, scope_row) == VALUE
-    assert _action_parameter_label_color(state, prox_row) == ACTION
-    assert _action_parameter_label_color(state, scope_row) == ACTION
+    sync_row = state.layout.find_by_kind(RowKind.SETTINGS_MEASURE_LATENCY)
+    assert sync_row is not None
+    assert _row_value_color(state, sync_row) == ACTION
 
-    state.focus_descriptor = state.layout.descriptor(snap_row)
-    assert _row_value_color(state, snap_row) == ACTION
-    assert _expand_subheader_arrow_color(state, snap_row) == VALUE
 
-    locked = _minimal_view_state(
+def test_snap_to_song_markers_row_uses_action_color() -> None:
+    state = _minimal_view_state(
         render_timeline=RenderTimelineBlock(
             enabled=True,
             expanded=True,
-            song_marker_snap_expanded=True,
-            locked=True,
+            song_markers_expanded=True,
         ),
     )
-    prox_locked = locked.layout.find_by_kind(RowKind.TIMELINE_SNAP_MARKER_PROXIMITY)
-    assert _row_value_color(locked, prox_locked) == LOCKED
+    snap_row = state.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
+    assert _row_value_color(state, snap_row) == ACTION
+    assert "▶" not in _row_text(state, snap_row)
+    assert "▼" not in _row_text(state, snap_row)
+
+
+def test_action_parameter_row_value_color() -> None:
+    from cleave.viz.tuning_view_state import SettingsBlock
+
+    state = _minimal_view_state(settings=SettingsBlock(expanded=True))
+    mode_row = state.layout.find_by_kind(RowKind.SETTINGS_EDITOR_MODE)
+    assert mode_row is not None
+    assert _action_parameter_label_color(state, mode_row) == ACTION
+    assert _row_value_color(state, mode_row) == VALUE
 
 
 def test_draw_layer_management_rows_without_error() -> None:

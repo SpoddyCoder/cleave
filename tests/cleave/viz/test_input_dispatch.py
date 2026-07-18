@@ -169,6 +169,39 @@ def test_h_toggles_help_when_timeline_submenu_focused() -> None:
     assert runtime.seed.session.help_visible is False
 
 
+def test_curation_dispatch_passes_navigation_keys() -> None:
+    runtime = _make_runtime(submenu_focused=False, panel_open=False)
+    session = runtime.seed.session
+    session.settings.editor_mode = "preset_curation"
+    session.settings.expanded = True
+    runtime.controls.focus_cursor = MainFocus(
+        RowDescriptor(RowKind.SETTINGS_EDITOR_MODE)
+    )
+    assert dispatch_keydown(keydown(pygame.K_DOWN), runtime) is True
+    assert runtime.controls.focus_cursor == MainFocus(
+        RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
+    )
+
+
+def test_curation_dispatch_allows_help_toggle() -> None:
+    runtime = _make_runtime(submenu_focused=False, panel_open=False, help_visible=False)
+    runtime.seed.session.settings.editor_mode = "preset_curation"
+    assert dispatch_keydown(keydown(pygame.K_h), runtime) is True
+    assert runtime.seed.session.help_visible is True
+    assert dispatch_keydown(keydown(pygame.K_h), runtime) is True
+    assert runtime.seed.session.help_visible is False
+
+
+def test_curation_dispatch_blocks_global_shortcuts() -> None:
+    runtime = _make_runtime(submenu_focused=False, panel_open=False)
+    runtime.seed.session.settings.editor_mode = "preset_curation"
+    assert dispatch_keydown(
+        keydown(pygame.K_s, mod=pygame.KMOD_CTRL),
+        runtime,
+    ) is True
+    assert runtime.modal_host.view_state() is None
+
+
 def test_ctrl_q_quit_from_timeline_context() -> None:
     runtime = _make_runtime()
     assert (

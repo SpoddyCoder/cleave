@@ -20,6 +20,7 @@ from cleave.config import (
     RenderOverlayTextBlockConfig,
     RenderPostFxConfig,
     TimelineConfig,
+    TimelineFadeGroupConfig,
     TimelineFadesConfig,
     EditorConfig,
     clamp_beat_sensitivity,
@@ -255,6 +256,7 @@ def test_parse_project_editor_section_accepts_editor_override() -> None:
         ui_width_mode="fixed",
         ui_width=80,
         ui_fade=25.0,
+        residual_latency_ms=0,
     )
     cfg = parse_project_editor_section(
         {"editor": {"preview_quality": "ultra-performance", "ui_fade": 99}},
@@ -274,6 +276,7 @@ def test_template_project_editor_section_omits_editor_fields() -> None:
     assert "ui_width_mode" not in section
     assert "ui_width" not in section
     assert "ui_fade" not in section
+    assert "residual_latency_ms" not in section
 
 
 def test_persist_project_editor_section_omits_editor_fields() -> None:
@@ -457,6 +460,7 @@ def test_load_config_editor_settings_from_user_config(tmp_path: Path) -> None:
         ui_width_mode="fixed",
         ui_width=80,
         ui_fade=25.0,
+        residual_latency_ms=0,
     )
     user_cfg_path = tmp_path / "user-config.yaml"
     write_user_config_file(user_cfg_path, editor=editor)
@@ -479,6 +483,7 @@ def test_load_config_ignores_editor_fields_in_project_yaml(tmp_path: Path) -> No
         ui_width_mode="fixed",
         ui_width=80,
         ui_fade=25.0,
+        residual_latency_ms=0,
     )
     user_cfg_path = tmp_path / "user-config.yaml"
     write_user_config_file(user_cfg_path, editor=user_editor)
@@ -1037,6 +1042,7 @@ def test_parse_timeline_defaults_enabled_true() -> None:
     assert timeline == TimelineConfig(enabled=True, lanes={})
     assert timeline.locked is False
     assert timeline.fades == TimelineFadesConfig()
+    assert timeline.placement_snap == "beat"
 
 
 def test_parse_timeline_reads_fades() -> None:
@@ -1044,10 +1050,16 @@ def test_parse_timeline_reads_fades() -> None:
         {
             "timeline": {
                 "fades": {
-                    "enabled": True,
-                    "fade_in": 1.5,
-                    "fade_out": 3.0,
-                    "apply_to": "exclude_song_markers",
+                    "song_markers": {
+                        "enabled": True,
+                        "fade_in": 1.5,
+                        "fade_out": 3.0,
+                    },
+                    "standard": {
+                        "enabled": False,
+                        "fade_in": 0.5,
+                        "fade_out": 4.0,
+                    },
                 }
             }
         },
@@ -1055,24 +1067,36 @@ def test_parse_timeline_reads_fades() -> None:
     )
     assert timeline is not None
     assert timeline.fades == TimelineFadesConfig(
-        enabled=True,
-        fade_in=1.5,
-        fade_out=3.0,
-        apply_to="exclude_song_markers",
+        song_markers=TimelineFadeGroupConfig(
+            enabled=True,
+            fade_in=1.5,
+            fade_out=3.0,
+        ),
+        standard=TimelineFadeGroupConfig(
+            enabled=False,
+            fade_in=0.5,
+            fade_out=4.0,
+        ),
     )
 
 
 def test_persist_timeline_fades_round_trip() -> None:
-    from cleave.viz.session import TimelineRuntime
+    from cleave.viz.session import TimelineFadeGroupRuntime, TimelineRuntime
 
     session = TuningSession(
         layer_z_order=list(DEFAULT_LAYER_SLOTS),
         timeline=TimelineRuntime(
             enabled=True,
-            fades_enabled=True,
-            fade_in=1.5,
-            fade_out=3.0,
-            fades_apply_to="exclude_song_markers",
+            song_marker_fades=TimelineFadeGroupRuntime(
+                enabled=True,
+                fade_in=1.5,
+                fade_out=3.0,
+            ),
+            standard_cue_fades=TimelineFadeGroupRuntime(
+                enabled=False,
+                fade_in=0.5,
+                fade_out=4.0,
+            ),
         ),
     )
     cfg = CleaveConfig(
@@ -1085,10 +1109,16 @@ def test_persist_timeline_fades_round_trip() -> None:
     )
     payload = persist_timeline(PersistCtx(cfg=cfg, session=session, cfg_dir=None))
     assert payload["fades"] == {
-        "enabled": True,
-        "fade_in": 1.5,
-        "fade_out": 3.0,
-        "apply_to": "exclude_song_markers",
+        "song_markers": {
+            "enabled": True,
+            "fade_in": 1.5,
+            "fade_out": 3.0,
+        },
+        "standard": {
+            "enabled": False,
+            "fade_in": 0.5,
+            "fade_out": 4.0,
+        },
     }
     round_trip = parse_timeline_section(
         {"timeline": payload},
@@ -1096,11 +1126,53 @@ def test_persist_timeline_fades_round_trip() -> None:
     )
     assert round_trip is not None
     assert round_trip.fades == TimelineFadesConfig(
-        enabled=True,
-        fade_in=1.5,
-        fade_out=3.0,
-        apply_to="exclude_song_markers",
+        song_markers=TimelineFadeGroupConfig(
+            enabled=True,
+            fade_in=1.5,
+            fade_out=3.0,
+        ),
+        standard=TimelineFadeGroupConfig(
+            enabled=False,
+            fade_in=0.5,
+            fade_out=4.0,
+        ),
     )
+
+
+def test_persist_timeline_placement_snap_round_trip() -> None:
+    from cleave.viz.session import TimelineRuntime
+
+    session = TuningSession(
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
+        timeline=TimelineRuntime(
+            enabled=True,
+            placement_snap="bar",
+        ),
+    )
+    cfg = CleaveConfig(
+        paths=PathsConfig(preset_root=Path("/tmp"), texture_paths=()),
+        layers={},
+        editor=EditorConfig(),
+        config_path=Path("/tmp/cleave-viz.yaml"),
+        user_config_path=Path("/tmp/user.yaml"),
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
+    )
+    payload = persist_timeline(PersistCtx(cfg=cfg, session=session, cfg_dir=None))
+    assert payload["placement_snap"] == "bar"
+    round_trip = parse_timeline_section(
+        {"timeline": payload},
+        _timeline_parse_ctx(),
+    )
+    assert round_trip is not None
+    assert round_trip.placement_snap == "bar"
+
+
+def test_parse_timeline_rejects_invalid_placement_snap() -> None:
+    with pytest.raises(ValueError, match="placement_snap"):
+        parse_timeline_section(
+            {"timeline": {"placement_snap": "onset"}},
+            _timeline_parse_ctx(),
+        )
 
 
 def test_parse_timeline_reads_locked() -> None:

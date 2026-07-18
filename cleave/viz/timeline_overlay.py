@@ -9,8 +9,10 @@ import pygame
 from cleave.extract import StemSource
 from cleave.timeline import (
     SlotCue,
+    TimelineFadeGroup,
     TimelineLane,
     empty_lane,
+    lane_fade_spans,
     lane_segments,
     lane_tick_times,
     stem_abbreviation,
@@ -105,6 +107,8 @@ class TimelineViewState:
     bar_grid_times: tuple[float, ...] = ()
     song_marker_times: tuple[float, ...] = ()
     selected_song_marker_index: int | None = None
+    song_marker_fades: TimelineFadeGroup = field(default_factory=TimelineFadeGroup)
+    standard_cue_fades: TimelineFadeGroup = field(default_factory=TimelineFadeGroup)
 
 
 def visibility_segments(
@@ -221,6 +225,102 @@ def bar_tick_times_for_row(state: TimelineViewState, slot: str) -> list[float]:
         if record_start <= t <= effective_end
     ]
     return sorted(set(committed_ticks) | set(live_ticks))
+
+
+def _clip_fade_spans(
+    spans: list[tuple[float, float, str]],
+    range_start: float,
+    range_end: float,
+) -> list[tuple[float, float, str]]:
+    clipped: list[tuple[float, float, str]] = []
+    for t0, t1, kind in spans:
+        clip_start = max(t0, range_start)
+        clip_end = min(t1, range_end)
+        if clip_end > clip_start:
+            clipped.append((clip_start, clip_end, kind))
+    return clipped
+
+
+def _fades_active(state: TimelineViewState) -> bool:
+    return state.song_marker_fades.enabled or state.standard_cue_fades.enabled
+
+
+def _fade_spans_for_lane(
+    state: TimelineViewState,
+    lane: TimelineLane,
+    slot: str,
+) -> list[tuple[float, float, str]]:
+    return lane_fade_spans(
+        lane,
+        inherit=_inherit_for_view(state, slot),
+        song_marker_fades=state.song_marker_fades,
+        standard_fades=state.standard_cue_fades,
+        duration_sec=state.duration_sec,
+        song_marker_times=state.song_marker_times,
+    )
+
+
+def bar_fade_spans_for_row(
+    state: TimelineViewState,
+    slot: str,
+) -> list[tuple[float, float, str]]:
+    """Fade wedge spans for one timeline row, including live record preview."""
+    duration = state.duration_sec
+    if duration <= 0 or not _fades_active(state):
+        return []
+    lane = _lane_for_view(state, slot)
+    if not (state.recording and slot in state.record_baseline):
+        return _fade_spans_for_lane(state, lane, slot)
+
+    record_start = state.record_slot_start_sec.get(slot, state.record_start_sec)
+    if record_start is None:
+        record_start = state.position_sec
+    record_start = max(0.0, min(record_start, duration))
+    playhead = max(0.0, min(state.position_sec, duration))
+    effective_end = max(playhead, state.record_high_water_mark or 0.0)
+
+    spans: list[tuple[float, float, str]] = []
+    committed_spans = _fade_spans_for_lane(state, lane, slot)
+    if record_start > 0.0:
+        spans.extend(_clip_fade_spans(committed_spans, 0.0, record_start))
+    if effective_end > record_start:
+        live_spans = lane_fade_spans(
+            _recording_view_lane(state, slot),
+            inherit=True,
+            song_marker_fades=state.song_marker_fades,
+            standard_fades=state.standard_cue_fades,
+            duration_sec=state.duration_sec,
+            song_marker_times=state.song_marker_times,
+        )
+        spans.extend(_clip_fade_spans(live_spans, record_start, effective_end))
+    if effective_end < duration:
+        spans.extend(_clip_fade_spans(committed_spans, effective_end, duration))
+    return spans
+
+
+def _draw_fade_wedge(
+    panel: pygame.Surface,
+    *,
+    t0: float,
+    t1: float,
+    kind: str,
+    bar_left: int,
+    bar_width: int,
+    duration_sec: float,
+    bar_rect: pygame.Rect,
+    color: tuple[int, int, int],
+) -> None:
+    x0 = time_to_x(t0, bar_left, bar_width, duration_sec)
+    x1 = time_to_x(t1, bar_left, bar_width, duration_sec)
+    if x1 <= x0:
+        return
+    top = bar_rect.y
+    bottom = bar_rect.bottom - 1
+    if kind == "in":
+        points = [(x0, bottom), (x1, bottom), (x1, top)]
+    else:
+        points = [(x0, top), (x0, bottom), (x1, bottom)]
+    pygame.draw.polygon(panel, color, points)
 
 
 def rec_flash_visible(ticks_ms: int | None = None) -> bool:
@@ -573,10 +673,8 @@ class TimelineOverlay:
             )
             # Armed abbrev background and recording monitor flash are live-patched.
 
-            if focused:
+            if focused or armed:
                 label_color = HIGHLIGHT
-            elif armed:
-                label_color = VALUE
             else:
                 label_color = LABEL
             num_surf = font.render(layer_num_prefix(layer_num), True, label_color)
@@ -618,6 +716,19 @@ class TimelineOverlay:
                 color = TIMELINE_BAR_ON if visible else OFF_SEGMENT_COLOR
                 seg_rect = pygame.Rect(x0, bar_rect.y, max(1, x1 - x0), bar_rect.h)
                 pygame.draw.rect(panel, color, seg_rect)
+
+            for t0, t1, kind in bar_fade_spans_for_row(state, slot):
+                _draw_fade_wedge(
+                    panel,
+                    t0=t0,
+                    t1=t1,
+                    kind=kind,
+                    bar_left=bar_left,
+                    bar_width=bar_width,
+                    duration_sec=state.duration_sec,
+                    bar_rect=bar_rect,
+                    color=TIMELINE_BAR_ON,
+                )
 
             for cue_t in bar_tick_times_for_row(state, slot):
                 tick_x = time_to_x(cue_t, bar_left, bar_width, state.duration_sec)
@@ -725,6 +836,13 @@ class TimelineOverlay:
             )
             armed_surf.fill((*ARMED_BG, ARMED_BG_ALPHA))
             upload.blit(armed_surf, (stem_abbrev_x, upload_y))
+            # Red fill is live-patched over the static glyph; redraw so it stays readable.
+            stem_source = state.slot_stems.get(slot, slot)
+            abbrev_surf = self._font_get().render(
+                stem_abbrev_label(stem_source), True, HIGHLIGHT
+            )
+            abbrev_y = upload_y + max(0, (row_h - abbrev_surf.get_height()) // 2)
+            upload.blit(abbrev_surf, (stem_abbrev_x, abbrev_y))
         dirty.append(abbrev_rect)
 
         monitor_rect = (monitor_eye_x, upload_y, eye_slot_w, row_h)

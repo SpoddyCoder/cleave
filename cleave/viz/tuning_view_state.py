@@ -131,19 +131,27 @@ class RenderPostFxBlock:
 
 
 @dataclass
+class TimelineFadeGroupBlock:
+    enabled: bool = False
+    fade_in: float = 2.0
+    fade_out: float = 2.0
+
+
+@dataclass
 class RenderTimelineBlock:
     enabled: bool = False
     expanded: bool = False
     bar_phase_offset: int = 0
     show_bar_grid: bool = False
-    song_marker_snap_proximity: float = 5.0
-    song_marker_snap_scope: str = "each_layer"
-    song_marker_snap_expanded: bool = False
     beat_bar_grid_expanded: bool = False
-    fades_enabled: bool = False
-    fade_in: float = 2.0
-    fade_out: float = 2.0
-    fades_apply_to: str = "all"
+    placement_snap: str = "beat"
+    fades_expanded: bool = False
+    song_marker_fades: TimelineFadeGroupBlock = field(
+        default_factory=TimelineFadeGroupBlock
+    )
+    standard_cue_fades: TimelineFadeGroupBlock = field(
+        default_factory=TimelineFadeGroupBlock
+    )
     locked: bool = False
     song_markers_expanded: bool = False
     song_marker_times: tuple[float, ...] = ()
@@ -153,10 +161,14 @@ class RenderTimelineBlock:
 class SettingsBlock:
     expanded: bool = False
     ui_expanded: bool = False
+    latency_compensation_expanded: bool = False
+    editor_mode: str = "visualizer"
+    editor_mode_selection: str = "visualizer"
     preview_quality: str = "balanced"
     ui_width_mode: str = DEFAULT_UI_WIDTH_MODE
     ui_width: int = DEFAULT_UI_WIDTH
     ui_fade: float = DEFAULT_UI_FADE_SEC
+    residual_latency_ms: int = 0
 
 
 @dataclass
@@ -297,6 +309,8 @@ def view_state_structure_signature(
         "settings": {
             "expanded": session.settings.expanded,
             "ui_expanded": session.settings.ui_expanded,
+            "latency_compensation_expanded": session.settings.latency_compensation_expanded,
+            "editor_mode": session.settings.editor_mode,
         },
         "notification_active": notification_active,
         "layers": layers,
@@ -319,9 +333,10 @@ def view_state_structure_signature(
             "panel_open": tl.panel_open,
             "song_markers_expanded": session.song_markers.expanded,
             "song_marker_count": len(session.song_markers.times),
-            "song_marker_snap_expanded": tl.song_marker_snap_expanded,
             "beat_bar_grid_expanded": tl.beat_bar_grid_expanded,
-            "fades_enabled": tl.fades_enabled,
+            "fades_expanded": tl.fades_expanded,
+            "song_marker_fades_enabled": tl.song_marker_fades.enabled,
+            "standard_cue_fades_enabled": tl.standard_cue_fades.enabled,
         },
         "timeline": {"enabled": tl.enabled},
     }
@@ -430,6 +445,9 @@ class TuningViewStateBuilder:
         settings = SettingsBlock(
             expanded=self.session.settings.expanded,
             ui_expanded=self.session.settings.ui_expanded,
+            latency_compensation_expanded=self.session.settings.latency_compensation_expanded,
+            editor_mode=self.session.settings.editor_mode,
+            editor_mode_selection=self.session.settings.editor_mode_selection,
         )
         render_overlay = RenderOverlayBlock(
             enabled=ro.enabled,
@@ -462,14 +480,19 @@ class TuningViewStateBuilder:
             expanded=tl.panel_open,
             bar_phase_offset=tl.bar_phase_offset,
             show_bar_grid=tl.show_bar_grid,
-            song_marker_snap_proximity=tl.song_marker_snap_proximity,
-            song_marker_snap_scope=tl.song_marker_snap_scope,
-            song_marker_snap_expanded=tl.song_marker_snap_expanded,
             beat_bar_grid_expanded=tl.beat_bar_grid_expanded,
-            fades_enabled=tl.fades_enabled,
-            fade_in=tl.fade_in,
-            fade_out=tl.fade_out,
-            fades_apply_to=tl.fades_apply_to,
+            placement_snap=tl.placement_snap,
+            fades_expanded=tl.fades_expanded,
+            song_marker_fades=TimelineFadeGroupBlock(
+                enabled=tl.song_marker_fades.enabled,
+                fade_in=tl.song_marker_fades.fade_in,
+                fade_out=tl.song_marker_fades.fade_out,
+            ),
+            standard_cue_fades=TimelineFadeGroupBlock(
+                enabled=tl.standard_cue_fades.enabled,
+                fade_in=tl.standard_cue_fades.fade_in,
+                fade_out=tl.standard_cue_fades.fade_out,
+            ),
             song_markers_expanded=self.session.song_markers.expanded,
             song_marker_times=tuple(self.session.song_markers.times),
         )
@@ -620,24 +643,35 @@ class TuningViewStateBuilder:
                 expanded=tl.panel_open,
                 bar_phase_offset=tl.bar_phase_offset,
                 show_bar_grid=tl.show_bar_grid,
-                song_marker_snap_proximity=tl.song_marker_snap_proximity,
-                song_marker_snap_scope=tl.song_marker_snap_scope,
-                song_marker_snap_expanded=tl.song_marker_snap_expanded,
                 beat_bar_grid_expanded=tl.beat_bar_grid_expanded,
-                fades_enabled=tl.fades_enabled,
-                fade_in=tl.fade_in,
-                fade_out=tl.fade_out,
-                fades_apply_to=tl.fades_apply_to,
+                placement_snap=tl.placement_snap,
+                fades_expanded=tl.fades_expanded,
+                song_marker_fades=TimelineFadeGroupBlock(
+                    enabled=tl.song_marker_fades.enabled,
+                    fade_in=tl.song_marker_fades.fade_in,
+                    fade_out=tl.song_marker_fades.fade_out,
+                ),
+                standard_cue_fades=TimelineFadeGroupBlock(
+                    enabled=tl.standard_cue_fades.enabled,
+                    fade_in=tl.standard_cue_fades.fade_in,
+                    fade_out=tl.standard_cue_fades.fade_out,
+                ),
                 locked=tl.locked,
                 song_markers_expanded=self.session.song_markers.expanded,
                 song_marker_times=tuple(self.session.song_markers.times),
             ),
             settings=replace(
                 structure.settings,
+                expanded=self.session.settings.expanded,
+                ui_expanded=self.session.settings.ui_expanded,
+                latency_compensation_expanded=self.session.settings.latency_compensation_expanded,
+                editor_mode=self.session.settings.editor_mode,
+                editor_mode_selection=self.session.settings.editor_mode_selection,
                 preview_quality=self._config_save.cfg.editor.preview_quality,
                 ui_width_mode=self._config_save.cfg.editor.ui_width_mode,
                 ui_width=self._config_save.cfg.editor.ui_width,
                 ui_fade=self._config_save.cfg.editor.ui_fade,
+                residual_latency_ms=self._config_save.cfg.editor.residual_latency_ms,
             ),
             timeline_recording=tl.recording,
             timeline_override_active=bool(tl.override_slots),

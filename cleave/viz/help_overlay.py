@@ -303,6 +303,7 @@ class HelpOverlay:
         timeline_recording: bool = False,
         timeline_override_active: bool = False,
         preset_switching: str | None = None,
+        preset_curation: bool = False,
     ) -> ComposedHelpPanel | None:
         self._panel_rect = None
         font = self._font_get()
@@ -314,6 +315,7 @@ class HelpOverlay:
             timeline_recording=timeline_recording,
             timeline_override_active=timeline_override_active,
             preset_switching=preset_switching,
+            preset_curation=preset_curation,
         )
         sections = sections_for(
             focus.kind,
@@ -324,6 +326,7 @@ class HelpOverlay:
             timeline_recording=timeline_recording,
             timeline_override_active=timeline_override_active,
             preset_switching=preset_switching,
+            preset_curation=preset_curation,
         )
         panel_w, panel_h = compute_help_panel_size(
             font,
@@ -413,6 +416,7 @@ class HelpOverlay:
         timeline_recording: bool = False,
         timeline_override_active: bool = False,
         preset_switching: str | None = None,
+        preset_curation: bool = False,
     ) -> None:
         composed = self.compose_panel(
             focus,
@@ -424,6 +428,7 @@ class HelpOverlay:
             timeline_recording=timeline_recording,
             timeline_override_active=timeline_override_active,
             preset_switching=preset_switching,
+            preset_curation=preset_curation,
         )
         if composed is None:
             self._panel_rect = None

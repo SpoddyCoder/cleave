@@ -149,6 +149,7 @@ _EDITOR_USER_CONFIG_KEYS = (
     "ui_width_mode",
     "ui_width",
     "ui_fade",
+    "residual_latency_ms",
 )
 
 
@@ -1029,11 +1030,18 @@ def test_write_session_snapshot_persists_timeline_disabled_without_cues(
     assert data["timeline"] == {
         "enabled": False,
         "locked": False,
+        "placement_snap": "beat",
         "fades": {
-            "enabled": False,
-            "fade_in": 2.0,
-            "fade_out": 2.0,
-            "apply_to": "all",
+            "song_markers": {
+                "enabled": False,
+                "fade_in": 2.0,
+                "fade_out": 2.0,
+            },
+            "standard": {
+                "enabled": False,
+                "fade_in": 2.0,
+                "fade_out": 2.0,
+            },
         },
     }
 

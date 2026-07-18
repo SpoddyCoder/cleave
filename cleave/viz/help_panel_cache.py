@@ -30,6 +30,7 @@ class HelpContentSignature:
     timeline_recording: bool
     timeline_override_active: bool
     preset_switching: str | None
+    preset_curation: bool = False
 
 
 @dataclass
@@ -49,6 +50,7 @@ def help_content_signature(
     timeline_recording: bool,
     timeline_override_active: bool,
     preset_switching: str | None,
+    preset_curation: bool = False,
 ) -> HelpContentSignature:
     return HelpContentSignature(
         kind=focus.kind,
@@ -59,6 +61,7 @@ def help_content_signature(
         timeline_recording=timeline_recording,
         timeline_override_active=timeline_override_active,
         preset_switching=preset_switching,
+        preset_curation=preset_curation,
     )
 
 
