@@ -866,6 +866,10 @@ def test_action_row_value_color() -> None:
     assert _row_value_color(state, add_row) == ACTION
     assert _row_value_color(state, delete_row) == ACTION
 
+    state.focus_descriptor = state.layout.descriptor(add_row)
+    assert _row_value_color(state, add_row) == HIGHLIGHT
+    assert _row_value_color(state, delete_row) == ACTION
+
 
 def test_measure_latency_row_uses_action_color() -> None:
     from cleave.viz.tuning_view_state import SettingsBlock
@@ -876,6 +880,8 @@ def test_measure_latency_row_uses_action_color() -> None:
     sync_row = state.layout.find_by_kind(RowKind.SETTINGS_MEASURE_LATENCY)
     assert sync_row is not None
     assert _row_value_color(state, sync_row) == ACTION
+    state.focus_descriptor = state.layout.descriptor(sync_row)
+    assert _row_value_color(state, sync_row) == HIGHLIGHT
 
 
 def test_snap_to_song_markers_row_uses_action_color() -> None:
@@ -890,6 +896,8 @@ def test_snap_to_song_markers_row_uses_action_color() -> None:
     assert _row_value_color(state, snap_row) == ACTION
     assert "▶" not in _row_text(state, snap_row)
     assert "▼" not in _row_text(state, snap_row)
+    state.focus_descriptor = state.layout.descriptor(snap_row)
+    assert _row_value_color(state, snap_row) == HIGHLIGHT
 
 
 def test_action_parameter_row_value_color() -> None:
@@ -900,6 +908,9 @@ def test_action_parameter_row_value_color() -> None:
     assert mode_row is not None
     assert _action_parameter_label_color(state, mode_row) == ACTION
     assert _row_value_color(state, mode_row) == VALUE
+    state.focus_descriptor = state.layout.descriptor(mode_row)
+    assert _action_parameter_label_color(state, mode_row) == HIGHLIGHT
+    assert _row_value_color(state, mode_row) == HIGHLIGHT
 
 
 def test_draw_layer_management_rows_without_error() -> None:
