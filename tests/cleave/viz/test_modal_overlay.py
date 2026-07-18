@@ -376,7 +376,7 @@ def test_info_panel_sections_include_blank_line_gaps() -> None:
     line_gap = 3
     line_h = font.get_linesize()
     state = modal_overlay.InfoPanelViewState(
-        title_lines=("Detection in progress", "Tap Space on each loud beat"),
+        title_lines=("Detection in progress", "Tap Space on each bar beat"),
         body_lines=(
             "Streak: 2/4",
             "Spread: 10 ms",

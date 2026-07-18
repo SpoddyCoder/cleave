@@ -128,7 +128,7 @@ def _tap_sync_progress_view_state(
     return modal_overlay.InfoPanelViewState(
         title_lines=(
             "Detection in progress",
-            "Tap Space on each loud beat",
+            "Tap Space on each bar beat",
         ),
         body_lines=(
             f"Streak: {progress.streak}/{CONSISTENCY_WINDOW}",

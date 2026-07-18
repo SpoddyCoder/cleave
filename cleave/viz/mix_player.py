@@ -181,9 +181,9 @@ class MixPlayer:
         self._click_quiet_sample = _make_quiet_click_sample(sample_rate)
         self._next_click_index = 0
 
-    def set_residual_delay_sec(self, sec: float) -> None:
+    def set_residual_latency_sec(self, sec: float) -> None:
         with self._lock:
-            self._clock.set_residual_delay_sec(sec)
+            self._clock.set_residual_latency_sec(sec)
 
     def set_click_schedule(
         self,
@@ -351,9 +351,9 @@ class MixPlayer:
         with self._lock:
             return self._clock.audible_position_sec()
 
-    def audible_position_zero_residual_sec(self) -> float:
+    def audible_position_zero_residual_latency_sec(self) -> float:
         with self._lock:
-            return self._clock.audible_position_zero_residual_sec()
+            return self._clock.audible_position_zero_residual_latency_sec()
 
     def finished(self) -> bool:
         with self._lock:

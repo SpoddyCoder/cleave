@@ -149,7 +149,7 @@ _EDITOR_USER_CONFIG_KEYS = (
     "ui_width_mode",
     "ui_width",
     "ui_fade",
-    "residual_delay_ms",
+    "residual_latency_ms",
 )
 
 

@@ -1,4 +1,4 @@
-"""Tap-to-sync inference for machine-local wireless delay."""
+"""Tap-to-sync inference for machine-local residual latency."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import statistics
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from cleave.viz.transport_clock import MAX_RESIDUAL_DELAY_SEC
+from cleave.viz.transport_clock import MAX_RESIDUAL_LATENCY_SEC
 
 MIN_TAP_COUNT = 4
 CONSISTENCY_WINDOW = 4
@@ -142,7 +142,7 @@ def streak_ready_to_lock(
     return max(window_deltas) - min(window_deltas) <= max_spread_sec
 
 
-def mean_delay_from_deltas(
+def mean_latency_from_deltas(
     deltas: Sequence[float],
     *,
     window: int = CONSISTENCY_WINDOW,
@@ -162,16 +162,16 @@ def delta_spread_sec(
     return max(deltas) - min(deltas)
 
 
-def infer_residual_delay_sec(
-    tap_audible_zero_residual: Sequence[float],
+def infer_residual_latency_sec(
+    tap_audible_zero_residual_latency: Sequence[float],
     click_times: Sequence[float],
 ) -> float:
-    """Infer residual delay from taps captured with residual forced to zero."""
-    if len(tap_audible_zero_residual) < MIN_TAP_COUNT or not click_times:
+    """Infer residual latency from taps captured with residual forced to zero."""
+    if len(tap_audible_zero_residual_latency) < MIN_TAP_COUNT or not click_times:
         return 0.0
 
     deltas: list[float] = []
-    for tap in tap_audible_zero_residual:
+    for tap in tap_audible_zero_residual_latency:
         delta = tap_delta_sec(tap, click_times)
         if delta is not None:
             deltas.append(delta)
@@ -179,4 +179,4 @@ def infer_residual_delay_sec(
     if len(deltas) < MIN_TAP_COUNT:
         return 0.0
 
-    return max(0.0, min(statistics.median(deltas), MAX_RESIDUAL_DELAY_SEC))
+    return max(0.0, min(statistics.median(deltas), MAX_RESIDUAL_LATENCY_SEC))

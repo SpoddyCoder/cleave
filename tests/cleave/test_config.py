@@ -255,7 +255,7 @@ def test_parse_project_editor_section_accepts_editor_override() -> None:
         ui_width_mode="fixed",
         ui_width=80,
         ui_fade=25.0,
-        residual_delay_ms=0,
+        residual_latency_ms=0,
     )
     cfg = parse_project_editor_section(
         {"editor": {"preview_quality": "ultra-performance", "ui_fade": 99}},
@@ -275,7 +275,7 @@ def test_template_project_editor_section_omits_editor_fields() -> None:
     assert "ui_width_mode" not in section
     assert "ui_width" not in section
     assert "ui_fade" not in section
-    assert "residual_delay_ms" not in section
+    assert "residual_latency_ms" not in section
 
 
 def test_persist_project_editor_section_omits_editor_fields() -> None:
@@ -459,7 +459,7 @@ def test_load_config_editor_settings_from_user_config(tmp_path: Path) -> None:
         ui_width_mode="fixed",
         ui_width=80,
         ui_fade=25.0,
-        residual_delay_ms=0,
+        residual_latency_ms=0,
     )
     user_cfg_path = tmp_path / "user-config.yaml"
     write_user_config_file(user_cfg_path, editor=editor)
@@ -482,7 +482,7 @@ def test_load_config_ignores_editor_fields_in_project_yaml(tmp_path: Path) -> No
         ui_width_mode="fixed",
         ui_width=80,
         ui_fade=25.0,
-        residual_delay_ms=0,
+        residual_latency_ms=0,
     )
     user_cfg_path = tmp_path / "user-config.yaml"
     write_user_config_file(user_cfg_path, editor=user_editor)

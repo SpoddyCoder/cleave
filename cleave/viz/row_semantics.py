@@ -101,9 +101,9 @@ class RowKind(Enum):
     SETTINGS_UI_WIDTH_MODE = auto()
     SETTINGS_UI_WIDTH = auto()
     SETTINGS_UI_FADE = auto()
-    SETTINGS_WIRELESS_DELAY_HEADER = auto()
-    SETTINGS_RESIDUAL_DELAY_MS = auto()
-    SETTINGS_SYNC_BY_EAR = auto()
+    SETTINGS_LATENCY_COMPENSATION_HEADER = auto()
+    SETTINGS_RESIDUAL_LATENCY_MS = auto()
+    SETTINGS_MEASURE_LATENCY = auto()
     CONFIG_HEADER = auto()
     TRANSPORT = auto()
 
@@ -1004,51 +1004,46 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "Maximum width of the main tuning panel.",
         ),
     ),
-    RowKind.SETTINGS_WIRELESS_DELAY_HEADER: RowBehavior(
+    RowKind.SETTINGS_LATENCY_COMPENSATION_HEADER: RowBehavior(
         RowAffordance.EXPAND,
         is_sub_header=True,
         is_pinned=True,
         parent_group="settings",
-        help_title="Wireless delay",
+        help_title="Latency Compensation",
         help_description=(
-            "Wireless delay the OS cannot report.",
-            "Affects live playhead and new placements only.",
-            "Saved markers, cues, and renders do not move when you change this.",
-            "Typical Bluetooth output is 150 to 300ms; some devices exceed 500ms.",
-            "Bluetooth keyboards add input lag too.",
-            "Or use Sync by ear.",
+            "Use this to correct for bluetooth/wireless latency.",
+            "Affects new timeline cue & song marker placements only.",
+            "Already saved markers and cues do not move when you change this."
         ),
     ),
-    RowKind.SETTINGS_RESIDUAL_DELAY_MS: RowBehavior(
+    RowKind.SETTINGS_RESIDUAL_LATENCY_MS: RowBehavior(
         RowAffordance.VALUE_STEP,
         is_pinned=True,
         repeatable=True,
-        parent_group="settings_wireless_delay",
-        help_title="Residual delay",
+        parent_group="settings_latency_compensation",
+        help_title="Residual latency",
         help_entries=(
-            ("Left/Right", "adjust delay (10 ms)"),
+            ("Left/Right", "adjust latency (10 ms)"),
             ("Ctrl + Left/Right", "large step (50 ms)"),
         ),
         help_description=(
-            "Compensates unmeasurable output and input lag for live monitoring",
-            "and free-form placement.",
+            "Compensates for unmeasurable input/output lag for live monitoring",
+            "and timeline cue/song marker placement.",
         ),
     ),
-    RowKind.SETTINGS_SYNC_BY_EAR: RowBehavior(
+    RowKind.SETTINGS_MEASURE_LATENCY: RowBehavior(
         RowAffordance.ACTION,
         is_pinned=True,
-        parent_group="settings_wireless_delay",
-        help_title="Sync by ear",
+        parent_group="settings_latency_compensation",
+        help_title="Measure latency",
         help_entries=(
             ("Enter", "start calibration"),
-            ("Space", "tap on each loud beat"),
+            ("Space", "tap on each bar beat"),
             ("Esc", "cancel"),
         ),
         help_description=(
-            "Pauses song and visuals for calibration.",
-            "Plays a 140 BPM click track: loud downbeat plus quieter quarters.",
-            "Other panels hide while you tap Space on each loud beat (beat 1).",
-            "When four consistent loud-beat taps are detected, confirm the measured delay.",
+            "Plays a 140 BPM click track.",
+            "Measurement is confirmed when four consistent taps are detected.",
         ),
     ),
 }

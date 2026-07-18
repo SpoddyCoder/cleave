@@ -868,13 +868,13 @@ def test_action_row_value_color() -> None:
     assert _row_value_color(state, delete_row) == ACTION
 
 
-def test_sync_by_ear_row_uses_action_color() -> None:
+def test_measure_latency_row_uses_action_color() -> None:
     from cleave.viz.tuning_view_state import SettingsBlock
 
     state = _minimal_view_state(
-        settings=SettingsBlock(expanded=True, wireless_delay_expanded=True),
+        settings=SettingsBlock(expanded=True, latency_compensation_expanded=True),
     )
-    sync_row = state.layout.find_by_kind(RowKind.SETTINGS_SYNC_BY_EAR)
+    sync_row = state.layout.find_by_kind(RowKind.SETTINGS_MEASURE_LATENCY)
     assert sync_row is not None
     assert _row_value_color(state, sync_row) == ACTION
 
