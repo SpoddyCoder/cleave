@@ -24,6 +24,10 @@ from cleave.timeline_presets.chords import (
     chord_cost,
     stack_density_level,
 )
+from cleave.timeline_presets.crescendo import (
+    apply_crescendo,
+    resolve_crescendo_window,
+)
 from cleave.timeline_presets.grid import thin_bar_times_for_arrange
 from cleave.timeline_presets.motifs import hamming_distance
 
@@ -560,6 +564,56 @@ def test_preset_never_exceeds_max_concurrent(builder, n: int) -> None:
     lanes, _bars = _build(builder, slots, duration_sec, random.Random(n * 17))
     counts = _sample_active_counts(lanes, slots, duration_sec, step=1.0)
     assert max(counts) <= MAX_CONCURRENT_LAYERS
+
+
+def test_resolve_crescendo_window_last_uses_marker_minus_two() -> None:
+    markers = [10.0, 40.0, 70.0, 100.0]
+    window = resolve_crescendo_window(markers, 120.0, "last")
+    assert window is not None
+    assert window.t_start == 40.0
+    assert window.t_full == 70.0
+    assert window.t_peak_end == 100.0
+
+
+def test_resolve_crescendo_window_penultimate_falls_back_without_minus_two() -> None:
+    markers = [20.0, 60.0, 100.0]
+    window = resolve_crescendo_window(markers, 120.0, "penultimate")
+    assert window is not None
+    assert window.t_peak_end == 60.0
+    assert window.t_full == 20.0
+    # Fallback 60 - 20% lands after t_full; clamp so the ramp still precedes it.
+    assert window.t_start == pytest.approx(0.0)
+    assert window.t_start < window.t_full <= window.t_peak_end
+
+
+def test_resolve_crescendo_window_requires_three_markers() -> None:
+    assert resolve_crescendo_window([10.0, 50.0], 100.0, "last") is None
+
+
+def test_apply_crescendo_ramps_holds_then_solos() -> None:
+    slots = _slots(4)
+    duration_sec = 120.0
+    markers = [20.0, 50.0, 80.0, 100.0]
+    bars = _bar_times_for(duration_sec)
+    base = build_breathing_cues(slots, duration_sec, random.Random(1), bar_times=bars)
+    lanes = apply_crescendo(
+        base,
+        slots,
+        duration_sec=duration_sec,
+        bar_times=bars,
+        song_marker_times=markers,
+        target="last",
+        rng=random.Random(2),
+    )
+    # Ramp start: one layer; full stack at marker-1; hold through selected; solo after.
+    assert _active_count_at(lanes, slots, 50.0) == 1
+    assert _active_count_at(lanes, slots, 80.0) == min(4, MAX_CONCURRENT_LAYERS)
+    assert _active_count_at(lanes, slots, 90.0) == min(4, MAX_CONCURRENT_LAYERS)
+    assert _active_count_at(lanes, slots, 100.0) == 1
+    assert _active_count_at(lanes, slots, 110.0) == 1
+    assert max(_sample_active_counts(lanes, slots, duration_sec, step=1.0)) <= (
+        MAX_CONCURRENT_LAYERS
+    )
 
 
 def test_pick_motif_density_bonus_favors_duos() -> None:
