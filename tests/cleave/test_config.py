@@ -1037,6 +1037,7 @@ def test_parse_timeline_defaults_enabled_true() -> None:
     assert timeline == TimelineConfig(enabled=True, lanes={})
     assert timeline.locked is False
     assert timeline.fades == TimelineFadesConfig()
+    assert timeline.placement_snap == "beat"
 
 
 def test_parse_timeline_reads_fades() -> None:
@@ -1101,6 +1102,42 @@ def test_persist_timeline_fades_round_trip() -> None:
         fade_out=3.0,
         apply_to="exclude_song_markers",
     )
+
+
+def test_persist_timeline_placement_snap_round_trip() -> None:
+    from cleave.viz.session import TimelineRuntime
+
+    session = TuningSession(
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
+        timeline=TimelineRuntime(
+            enabled=True,
+            placement_snap="bar",
+        ),
+    )
+    cfg = CleaveConfig(
+        paths=PathsConfig(preset_root=Path("/tmp"), texture_paths=()),
+        layers={},
+        editor=EditorConfig(),
+        config_path=Path("/tmp/cleave-viz.yaml"),
+        user_config_path=Path("/tmp/user.yaml"),
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
+    )
+    payload = persist_timeline(PersistCtx(cfg=cfg, session=session, cfg_dir=None))
+    assert payload["placement_snap"] == "bar"
+    round_trip = parse_timeline_section(
+        {"timeline": payload},
+        _timeline_parse_ctx(),
+    )
+    assert round_trip is not None
+    assert round_trip.placement_snap == "bar"
+
+
+def test_parse_timeline_rejects_invalid_placement_snap() -> None:
+    with pytest.raises(ValueError, match="placement_snap"):
+        parse_timeline_section(
+            {"timeline": {"placement_snap": "onset"}},
+            _timeline_parse_ctx(),
+        )
 
 
 def test_parse_timeline_reads_locked() -> None:

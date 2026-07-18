@@ -82,6 +82,7 @@ class RowKind(Enum):
     TIMELINE_BEAT_BAR_GRID_HEADER = auto()
     TIMELINE_BAR_PHASE = auto()
     TIMELINE_BAR_GRID = auto()
+    TIMELINE_PLACEMENT_SNAP = auto()
     TIMELINE_SNAP_TO_BEATS = auto()
     TIMELINE_SNAP_TO_BARS = auto()
     TIMELINE_SNAP_MARKER_PROXIMITY = auto()
@@ -731,7 +732,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Beat / bar grid",
         help_description=(
             "AI beat detection powered by Beat This!",
-            "Bar phase, bar grid display, and snap cues to beats or bars.",
+            "Bar phase, bar grid display, placement snap, and snap cues to beats or bars.",
         ),
     ),
     RowKind.TIMELINE_BAR_PHASE: RowBehavior(
@@ -762,6 +763,18 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_description=(
             "Show Beat This! bar detection points on the timeline strip.",
             "Gaps mean missing detection (no drums)",
+        ),
+    ),
+    RowKind.TIMELINE_PLACEMENT_SNAP: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        blocked_by_section_lock=True,
+        help_title="Placement snap",
+        help_entries=(("Left/Right", "cycle off / beat / bar"),),
+        help_description=(
+            "Snap stored song markers and timeline cue/record times",
+            "to the nearest beat or bar before saving.",
+            "Live playhead stays audible; default is nearest beat.",
         ),
     ),
     RowKind.TIMELINE_SNAP_TO_BEATS: RowBehavior(

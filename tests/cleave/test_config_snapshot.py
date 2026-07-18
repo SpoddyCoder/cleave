@@ -1029,6 +1029,7 @@ def test_write_session_snapshot_persists_timeline_disabled_without_cues(
     assert data["timeline"] == {
         "enabled": False,
         "locked": False,
+        "placement_snap": "beat",
         "fades": {
             "enabled": False,
             "fade_in": 2.0,

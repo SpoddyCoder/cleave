@@ -17,6 +17,7 @@ from cleave.config_schema import (
     TIMELINE_FADE_DURATION_STEP,
     clamp_timeline_fade_duration,
     cycle_timeline_fades_apply_to,
+    cycle_timeline_placement_snap,
     hard_cut_enabled_display,
     preset_start_clean_display,
     preset_switching_display,
@@ -141,6 +142,26 @@ def _apply_timeline_bar_grid(
     _shift: bool,
 ) -> None:
     controls.session.timeline.show_bar_grid = forward
+
+
+def _format_timeline_placement_snap(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return state.render_timeline.placement_snap
+
+
+def _apply_timeline_placement_snap(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    tl = controls.session.timeline
+    tl.placement_snap = cycle_timeline_placement_snap(
+        tl.placement_snap,
+        forward=forward,
+    )
 
 
 _SONG_MARKER_SNAP_PROXIMITY_MIN = 0.5
@@ -1508,6 +1529,12 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_timeline_bar_grid,
         apply_horizontal=_apply_timeline_bar_grid,
+    ),
+    RowKind.TIMELINE_PLACEMENT_SNAP: RowFieldDef(
+        panel_label="placement snap",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_timeline_placement_snap,
+        apply_horizontal=_apply_timeline_placement_snap,
     ),
     RowKind.TIMELINE_SNAP_TO_BEATS: RowFieldDef(
         panel_label="snap to beats",

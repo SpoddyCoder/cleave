@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 import pygame
 
-from cleave.timeline import SlotCue, canonicalize, should_accept_toggle
+from cleave.timeline import SlotCue, canonicalize, should_accept_toggle, snap_placement_time
 from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, SEEK_TINY
 from cleave.viz.session import TuningSession
 from cleave.viz.key_repeat import mod_ctrl, mod_shift
@@ -52,16 +52,28 @@ class TimelineControls:
         on_exit_submenu: Callable[[], None] | None = None,
         on_seek: Callable[[float], None] | None = None,
         on_notification: Callable[[str], None] | None = None,
+        beat_times: Sequence[float] = (),
+        bar_times: Sequence[float] = (),
     ) -> None:
         self.session = session
         self.playback = playback
         self.duration_sec = duration_sec
+        self._beat_times = tuple(beat_times)
+        self._bar_times = tuple(bar_times)
         self._on_visibility_change = on_visibility_change
         self._on_close = on_close
         self._on_exit_submenu = on_exit_submenu
         self._on_seek = on_seek
         self._on_notification = on_notification
         self._last_toggle_t: dict[str, float] = {}
+
+    def _snap_placement(self, t_sec: float) -> float:
+        return snap_placement_time(
+            t_sec,
+            self.session.timeline.placement_snap,
+            beat_times=self._beat_times,
+            bar_times=self._bar_times,
+        )
 
     def handle_keydown(self, event: pygame.event.Event) -> bool:
         if event.key in (pygame.K_ESCAPE, pygame.K_t):
@@ -194,7 +206,7 @@ class TimelineControls:
                 tl.record_baseline[slot] = effective_layer_enabled(
                     self.session, slot, t_sec
                 )
-                tl.record_slot_start_sec[slot] = t_sec
+                tl.record_slot_start_sec[slot] = self._snap_placement(t_sec)
                 self._last_toggle_t.pop(slot, None)
                 self._refresh_visibility()
         tl.arm_flash_start_ms[slot] = pygame.time.get_ticks()
@@ -205,8 +217,12 @@ class TimelineControls:
         if record_start is None or slot not in tl.record_baseline:
             return
 
-        record_stop = current_sec(self.playback, self.duration_sec)
-        punch_end = max(record_stop, tl.record_high_water_mark or record_stop)
+        record_stop = self._snap_placement(
+            current_sec(self.playback, self.duration_sec)
+        )
+        punch_end = self._snap_placement(
+            max(record_stop, tl.record_high_water_mark or record_stop)
+        )
         build_record_punch_cues(
             self.session,
             record_start,
@@ -237,11 +253,12 @@ class TimelineControls:
             return
 
         t_sec = current_sec(self.playback, self.duration_sec)
+        snapped = self._snap_placement(t_sec)
         tl.record_baseline = {
             stem: effective_layer_enabled(self.session, stem, t_sec)
             for stem in tl.armed_slots
         }
-        tl.record_slot_start_sec = {stem: t_sec for stem in tl.armed_slots}
+        tl.record_slot_start_sec = {stem: snapped for stem in tl.armed_slots}
 
         tl.preview_active = False
         tl.monitor = {}
@@ -250,7 +267,7 @@ class TimelineControls:
             toggle_pause(self.playback, self.duration_sec)
 
         tl.recording = True
-        tl.record_start_sec = t_sec
+        tl.record_start_sec = snapped
         tl.record_buffer = {}
         tl.record_high_water_mark = None
         self._last_toggle_t = {}
@@ -268,8 +285,12 @@ class TimelineControls:
             tl.record_high_water_mark = None
             return
 
-        record_stop = current_sec(self.playback, self.duration_sec)
-        punch_end = max(record_stop, tl.record_high_water_mark or record_stop)
+        record_stop = self._snap_placement(
+            current_sec(self.playback, self.duration_sec)
+        )
+        punch_end = self._snap_placement(
+            max(record_stop, tl.record_high_water_mark or record_stop)
+        )
         build_record_punch_cues(self.session, record_start, punch_end)
         tl.recording = False
         tl.record_start_sec = None
@@ -332,8 +353,9 @@ class TimelineControls:
             return
 
         current = armed_recording_visible(self.session, slot, t_sec)
+        snapped = self._snap_placement(t_sec)
         tl.record_buffer.setdefault(slot, []).append(
-            SlotCue(t=t_sec, visible=not current)
+            SlotCue(t=snapped, visible=not current)
         )
         self._last_toggle_t[slot] = t_sec
 

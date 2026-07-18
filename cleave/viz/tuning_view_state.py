@@ -140,6 +140,7 @@ class RenderTimelineBlock:
     song_marker_snap_scope: str = "each_layer"
     song_marker_snap_expanded: bool = False
     beat_bar_grid_expanded: bool = False
+    placement_snap: str = "beat"
     fades_enabled: bool = False
     fade_in: float = 2.0
     fade_out: float = 2.0
@@ -471,6 +472,7 @@ class TuningViewStateBuilder:
             song_marker_snap_scope=tl.song_marker_snap_scope,
             song_marker_snap_expanded=tl.song_marker_snap_expanded,
             beat_bar_grid_expanded=tl.beat_bar_grid_expanded,
+            placement_snap=tl.placement_snap,
             fades_enabled=tl.fades_enabled,
             fade_in=tl.fade_in,
             fade_out=tl.fade_out,
@@ -629,6 +631,7 @@ class TuningViewStateBuilder:
                 song_marker_snap_scope=tl.song_marker_snap_scope,
                 song_marker_snap_expanded=tl.song_marker_snap_expanded,
                 beat_bar_grid_expanded=tl.beat_bar_grid_expanded,
+                placement_snap=tl.placement_snap,
                 fades_enabled=tl.fades_enabled,
                 fade_in=tl.fade_in,
                 fade_out=tl.fade_out,
