@@ -156,9 +156,6 @@ class TimelineRuntime:
     arm_flash_start_ms: dict[str, int] = field(default_factory=dict)
     bar_phase_offset: int = 0
     show_bar_grid: bool = False
-    song_marker_snap_proximity: float = 5.0
-    song_marker_snap_scope: str = "each_layer"
-    song_marker_snap_expanded: bool = False
     beat_bar_grid_expanded: bool = False
     placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
     fades_enabled: bool = DEFAULT_TIMELINE_FADES_ENABLED

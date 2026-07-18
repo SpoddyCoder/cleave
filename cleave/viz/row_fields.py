@@ -37,11 +37,6 @@ from cleave.viz.row_sections import (
 )
 from cleave.viz.row_semantics import RowDescriptor, RowKind, row_behavior
 from cleave.viz.tuning_view_state import TrackBlock, TuningViewState
-from cleave.viz.timeline_snap_controls import (
-    cycle_song_marker_snap_scope,
-    song_marker_snap_scope_label,
-)
-
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
 
@@ -50,7 +45,6 @@ class RowPresentStyle(Enum):
     LABELED_VALUE = auto()
     ACTION_PARAMETER = auto()
     EXPAND_SUBHEADER = auto()
-    ACTION_EXPAND_SUBHEADER = auto()
     COMPOSITE_HEADER = auto()
     PATH_ICON = auto()
     FULL_LINE = auto()
@@ -172,59 +166,6 @@ def _apply_timeline_placement_snap(
     tl = controls.session.timeline
     tl.placement_snap = cycle_timeline_placement_snap(
         tl.placement_snap,
-        forward=forward,
-    )
-
-
-_SONG_MARKER_SNAP_PROXIMITY_MIN = 0.5
-_SONG_MARKER_SNAP_PROXIMITY_MAX = 30.0
-_SONG_MARKER_SNAP_PROXIMITY_STEP = 0.5
-
-
-def _format_timeline_snap_marker_proximity(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return f"{state.render_timeline.song_marker_snap_proximity:.1f}s"
-
-
-def _apply_timeline_snap_marker_proximity(
-    controls: TuningControls,
-    _desc: RowDescriptor,
-    forward: bool,
-    _ctrl: bool,
-    _shift: bool,
-) -> None:
-    tl = controls.session.timeline
-    delta = _SONG_MARKER_SNAP_PROXIMITY_STEP if forward else -_SONG_MARKER_SNAP_PROXIMITY_STEP
-    tl.song_marker_snap_proximity = max(
-        _SONG_MARKER_SNAP_PROXIMITY_MIN,
-        min(
-            _SONG_MARKER_SNAP_PROXIMITY_MAX,
-            round(tl.song_marker_snap_proximity + delta, 1),
-        ),
-    )
-
-
-def _format_timeline_snap_marker_scope(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return song_marker_snap_scope_label(
-        state.render_timeline.song_marker_snap_scope,
-        state.layer_z_order,
-    )
-
-
-def _apply_timeline_snap_marker_scope(
-    controls: TuningControls,
-    _desc: RowDescriptor,
-    forward: bool,
-    _ctrl: bool,
-    _shift: bool,
-) -> None:
-    tl = controls.session.timeline
-    tl.song_marker_snap_scope = cycle_song_marker_snap_scope(
-        tl.song_marker_snap_scope,
-        controls.session.layer_z_order,
         forward=forward,
     )
 
@@ -1583,22 +1524,9 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         panel_label="snap to bars",
         present_style=RowPresentStyle.FULL_LINE,
     ),
-    RowKind.TIMELINE_SNAP_MARKER_PROXIMITY: RowFieldDef(
-        panel_label="proximity",
-        present_style=RowPresentStyle.ACTION_PARAMETER,
-        format_value=_format_timeline_snap_marker_proximity,
-        apply_horizontal=_apply_timeline_snap_marker_proximity,
-    ),
-    RowKind.TIMELINE_SNAP_MARKER_SCOPE: RowFieldDef(
-        panel_label="layer scope",
-        present_style=RowPresentStyle.ACTION_PARAMETER,
-        format_value=_format_timeline_snap_marker_scope,
-        apply_horizontal=_apply_timeline_snap_marker_scope,
-    ),
     RowKind.TIMELINE_SNAP_TO_SONG_MARKERS: RowFieldDef(
         panel_label="snap to song markers",
-        present_style=RowPresentStyle.ACTION_EXPAND_SUBHEADER,
-        apply_horizontal=_apply_expand_subheader,
+        present_style=RowPresentStyle.FULL_LINE,
     ),
     RowKind.TIMELINE_FADES: RowFieldDef(
         panel_label="timeline fades",

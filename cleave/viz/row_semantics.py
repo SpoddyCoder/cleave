@@ -85,8 +85,6 @@ class RowKind(Enum):
     TIMELINE_PLACEMENT_SNAP = auto()
     TIMELINE_SNAP_TO_BEATS = auto()
     TIMELINE_SNAP_TO_BARS = auto()
-    TIMELINE_SNAP_MARKER_PROXIMITY = auto()
-    TIMELINE_SNAP_MARKER_SCOPE = auto()
     TIMELINE_SNAP_TO_SONG_MARKERS = auto()
     TIMELINE_FADES = auto()
     TIMELINE_FADE_IN = auto()
@@ -802,46 +800,15 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "(irreversible).",
         ),
     ),
-    RowKind.TIMELINE_SNAP_MARKER_PROXIMITY: RowBehavior(
-        RowAffordance.ACTION_PARAMETER,
-        navigable=True,
-        repeatable=True,
-        blocked_by_section_lock=True,
-        help_title="Snap proximity",
-        help_entries=(
-            ("Left", "decrease proximity"),
-            ("Right", "increase proximity"),
-        ),
-        help_description=(
-            "Maximum distance for snap to song markers.",
-        ),
-    ),
-    RowKind.TIMELINE_SNAP_MARKER_SCOPE: RowBehavior(
-        RowAffordance.ACTION_PARAMETER,
-        navigable=True,
-        repeatable=True,
-        blocked_by_section_lock=True,
-        help_title="Snap layer scope",
-        help_entries=(("Left/Right", "cycle layer scope"),),
-        help_description=(
-            "Which tracks snap to song markers.",
-            "Per-layer, closest wins, or all layers independently.",
-        ),
-    ),
     RowKind.TIMELINE_SNAP_TO_SONG_MARKERS: RowBehavior(
         RowAffordance.ACTION,
         navigable=True,
-        navigable_when_section_locked=True,
         blocked_by_section_lock=True,
         help_title="Snap to song markers",
-        help_entries=(
-            ("Enter", "snap cues to song markers"),
-            ("Left", "collapse"),
-            ("Right", "expand"),
-        ),
+        help_entries=(("Enter", "snap cues to song markers"),),
         help_description=(
             "Pull closest cues within proximity onto song markers",
-            "(irreversible; confirm uses proximity and layer scope).",
+            "(irreversible; Enter asks for proximity then layer scope).",
         ),
     ),
     RowKind.TIMELINE_FADES: RowBehavior(

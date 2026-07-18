@@ -97,14 +97,6 @@ def _toggle_song_markers(controls: TuningControls, _slot: str | None, forward: b
     controls._set_song_markers_expanded(forward)
 
 
-def _toggle_song_marker_snap(controls: TuningControls, _slot: str | None, forward: bool) -> None:
-    controls._set_song_marker_snap_expanded(forward)
-
-
-def _song_marker_snap_expanded(state: TuningViewState, _slot: str | None) -> bool:
-    return state.render_timeline.song_marker_snap_expanded
-
-
 def _toggle_beat_bar_grid(controls: TuningControls, _slot: str | None, forward: bool) -> None:
     controls._set_beat_bar_grid_expanded(forward)
 
@@ -593,17 +585,6 @@ SONG_MARKERS_SECTION = ExpandSectionDef(
     append_dynamic_children=_append_song_marker_rows,
 )
 
-SNAP_TO_SONG_MARKERS_SECTION = ExpandSectionDef(
-    header_kind=RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
-    context="global",
-    read_expanded=_song_marker_snap_expanded,
-    toggle=_toggle_song_marker_snap,
-    children=(
-        SectionNode(leaf_kind=RowKind.TIMELINE_SNAP_MARKER_PROXIMITY),
-        SectionNode(leaf_kind=RowKind.TIMELINE_SNAP_MARKER_SCOPE),
-    ),
-)
-
 BEAT_BAR_GRID_SECTION = ExpandSectionDef(
     header_kind=RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,
     context="global",
@@ -664,7 +645,6 @@ _ALL_EXPAND_SECTIONS = _collect_expand_sections(
     SETTINGS_SECTION,
     TRACK_SECTION,
     SONG_MARKERS_SECTION,
-    SNAP_TO_SONG_MARKERS_SECTION,
     BEAT_BAR_GRID_SECTION,
     extra_nodes=RENDER_SECTION_NODES,
 )
@@ -770,8 +750,6 @@ RENDER_TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_SNAP_TO_BEATS,
         RowKind.TIMELINE_SNAP_TO_BARS,
         RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
-        RowKind.TIMELINE_SNAP_MARKER_PROXIMITY,
-        RowKind.TIMELINE_SNAP_MARKER_SCOPE,
         RowKind.TIMELINE_FADES,
         RowKind.TIMELINE_FADE_IN,
         RowKind.TIMELINE_FADE_OUT,
@@ -815,9 +793,9 @@ def _build_row_tree_indent_depth() -> dict[RowKind, int]:
     depths[RowKind.TRACK_USER_PRESET_ADD] = 3
     depths[RowKind.SONG_MARKERS_HEADER] = 1
     depths[RowKind.SONG_MARKER_ITEM] = 2
+    depths[RowKind.TIMELINE_SNAP_TO_SONG_MARKERS] = 1
     depths[RowKind.TIMELINE_PRESETS] = 1
     depths[RowKind.TIMELINE_RESET] = 1
-    _assign_expand_indent_depth(depths, SNAP_TO_SONG_MARKERS_SECTION, 1)
     _assign_expand_indent_depth(depths, BEAT_BAR_GRID_SECTION, 1)
     depths[RowKind.TIMELINE_FADES] = 1
     _assign_indent_depth(depths, TIMELINE_FADES_ACTIVE.children, 2)
@@ -935,7 +913,7 @@ def append_render_section_rows(
                 and state.render_timeline.expanded
             ):
                 append_expand_section_rows(row_list, SONG_MARKERS_SECTION, state)
-                append_expand_section_rows(row_list, SNAP_TO_SONG_MARKERS_SECTION, state)
+                row_list.append(RowDescriptor(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS))
                 append_expand_section_rows(row_list, BEAT_BAR_GRID_SECTION, state)
                 row_list.append(RowDescriptor(RowKind.TIMELINE_FADES))
                 _append_section_nodes(
@@ -995,8 +973,8 @@ def _build_section_header_parent_map() -> dict[RowKind, RowKind]:
         _walk_expand_section_for_headers(section, out)
     _walk_expand_section_for_headers(TRACK_SECTION, out)
     _walk_expand_section_for_headers(SONG_MARKERS_SECTION, out)
-    _walk_expand_section_for_headers(SNAP_TO_SONG_MARKERS_SECTION, out)
     _walk_expand_section_for_headers(BEAT_BAR_GRID_SECTION, out)
+    out[RowKind.TIMELINE_SNAP_TO_SONG_MARKERS] = RowKind.RENDER_TIMELINE_HEADER
     out[RowKind.TIMELINE_FADES] = RowKind.RENDER_TIMELINE_HEADER
     _register_section_header_parent(
         out, RowKind.RENDER_TIMELINE_HEADER, TIMELINE_FADES_ACTIVE.children

@@ -136,9 +136,6 @@ class RenderTimelineBlock:
     expanded: bool = False
     bar_phase_offset: int = 0
     show_bar_grid: bool = False
-    song_marker_snap_proximity: float = 5.0
-    song_marker_snap_scope: str = "each_layer"
-    song_marker_snap_expanded: bool = False
     beat_bar_grid_expanded: bool = False
     placement_snap: str = "beat"
     fades_enabled: bool = False
@@ -326,7 +323,6 @@ def view_state_structure_signature(
             "panel_open": tl.panel_open,
             "song_markers_expanded": session.song_markers.expanded,
             "song_marker_count": len(session.song_markers.times),
-            "song_marker_snap_expanded": tl.song_marker_snap_expanded,
             "beat_bar_grid_expanded": tl.beat_bar_grid_expanded,
             "fades_enabled": tl.fades_enabled,
         },
@@ -472,9 +468,6 @@ class TuningViewStateBuilder:
             expanded=tl.panel_open,
             bar_phase_offset=tl.bar_phase_offset,
             show_bar_grid=tl.show_bar_grid,
-            song_marker_snap_proximity=tl.song_marker_snap_proximity,
-            song_marker_snap_scope=tl.song_marker_snap_scope,
-            song_marker_snap_expanded=tl.song_marker_snap_expanded,
             beat_bar_grid_expanded=tl.beat_bar_grid_expanded,
             placement_snap=tl.placement_snap,
             fades_enabled=tl.fades_enabled,
@@ -631,9 +624,6 @@ class TuningViewStateBuilder:
                 expanded=tl.panel_open,
                 bar_phase_offset=tl.bar_phase_offset,
                 show_bar_grid=tl.show_bar_grid,
-                song_marker_snap_proximity=tl.song_marker_snap_proximity,
-                song_marker_snap_scope=tl.song_marker_snap_scope,
-                song_marker_snap_expanded=tl.song_marker_snap_expanded,
                 beat_bar_grid_expanded=tl.beat_bar_grid_expanded,
                 placement_snap=tl.placement_snap,
                 fades_enabled=tl.fades_enabled,
