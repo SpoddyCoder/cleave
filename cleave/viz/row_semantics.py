@@ -83,8 +83,7 @@ class RowKind(Enum):
     TIMELINE_BAR_PHASE = auto()
     TIMELINE_BAR_GRID = auto()
     TIMELINE_PLACEMENT_SNAP = auto()
-    TIMELINE_SNAP_TO_BEATS = auto()
-    TIMELINE_SNAP_TO_BARS = auto()
+    TIMELINE_SNAP_TO_GRID = auto()
     TIMELINE_SNAP_TO_SONG_MARKERS = auto()
     TIMELINE_FADES = auto()
     TIMELINE_FADE_IN = auto()
@@ -733,7 +732,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Beat / bar grid",
         help_description=(
             "AI beat detection powered by Beat This!",
-            "Bar phase, bar grid display, placement snap, and snap cues to beats or bars.",
+            "Bar phase, bar grid display, placement snap, and snap cues to the grid.",
         ),
     ),
     RowKind.TIMELINE_BAR_PHASE: RowBehavior(
@@ -763,7 +762,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         ),
         help_description=(
             "Show Beat This! bar detection points on the timeline strip.",
-            "Gaps mean missing detection (no drums)",
+            "Gaps mean missing detection (no rhythm/drums).",
         ),
     ),
     RowKind.TIMELINE_PLACEMENT_SNAP: RowBehavior(
@@ -773,31 +772,20 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Placement snap",
         help_entries=(("Left/Right", "cycle off / beat / bar"),),
         help_description=(
-            "Snap stored song markers and timeline cue/record times",
-            "to the nearest beat or bar before saving.",
-            "Live playhead stays audible; default is nearest beat.",
+            "Applies when placing song markers and timeline cues",
+            "Snap to the nearest beat or bar.",
+            "Switch off when the beat detection is not accurate.",
         ),
     ),
-    RowKind.TIMELINE_SNAP_TO_BEATS: RowBehavior(
+    RowKind.TIMELINE_SNAP_TO_GRID: RowBehavior(
         RowAffordance.ACTION,
         navigable=True,
         blocked_by_section_lock=True,
-        help_title="Snap to beats",
-        help_entries=(("Enter", "snap cues to beats"),),
+        help_title="Snap to grid",
+        help_entries=(("Enter", "snap cues to beats or bars"),),
         help_description=(
-            "Snap all committed timeline cues to the nearest beat",
-            "(irreversible).",
-        ),
-    ),
-    RowKind.TIMELINE_SNAP_TO_BARS: RowBehavior(
-        RowAffordance.ACTION,
-        navigable=True,
-        blocked_by_section_lock=True,
-        help_title="Snap to bars",
-        help_entries=(("Enter", "snap cues to bars"),),
-        help_description=(
-            "Snap all committed timeline cues to the nearest bar",
-            "(irreversible).",
+            "Snap all committed timeline cues to the nearest beat or bar",
+            "(irreversible; Enter asks for beats or bars).",
         ),
     ),
     RowKind.TIMELINE_SNAP_TO_SONG_MARKERS: RowBehavior(

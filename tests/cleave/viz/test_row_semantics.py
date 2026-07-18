@@ -268,7 +268,7 @@ def test_render_value_children_blocked_by_section_lock() -> None:
     assert row_blocked_by_section_lock(RowKind.RENDER_POST_FX_CHROMA_BOOST_AMOUNT) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESETS) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_BAR_PHASE) is True
-    assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_TO_BARS) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_TO_GRID) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS) is True
     assert row_blocked_by_section_lock(RowKind.SONG_MARKER_ITEM) is True
     assert row_blocked_by_section_lock(RowKind.SONG_MARKERS_HEADER) is False
