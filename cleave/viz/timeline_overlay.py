@@ -6,10 +6,10 @@ from dataclasses import dataclass, field
 
 import pygame
 
-from cleave.config_schema import DEFAULT_TIMELINE_FADES_APPLY_TO, DEFAULT_TIMELINE_FADES_ENABLED, DEFAULT_TIMELINE_FADE_IN, DEFAULT_TIMELINE_FADE_OUT, TimelineFadesApplyTo
 from cleave.extract import StemSource
 from cleave.timeline import (
     SlotCue,
+    TimelineFadeGroup,
     TimelineLane,
     empty_lane,
     lane_fade_spans,
@@ -107,10 +107,8 @@ class TimelineViewState:
     bar_grid_times: tuple[float, ...] = ()
     song_marker_times: tuple[float, ...] = ()
     selected_song_marker_index: int | None = None
-    fades_enabled: bool = DEFAULT_TIMELINE_FADES_ENABLED
-    fade_in: float = DEFAULT_TIMELINE_FADE_IN
-    fade_out: float = DEFAULT_TIMELINE_FADE_OUT
-    fades_apply_to: TimelineFadesApplyTo = DEFAULT_TIMELINE_FADES_APPLY_TO
+    song_marker_fades: TimelineFadeGroup = field(default_factory=TimelineFadeGroup)
+    standard_cue_fades: TimelineFadeGroup = field(default_factory=TimelineFadeGroup)
 
 
 def visibility_segments(
@@ -243,20 +241,22 @@ def _clip_fade_spans(
     return clipped
 
 
+def _fades_active(state: TimelineViewState) -> bool:
+    return state.song_marker_fades.enabled or state.standard_cue_fades.enabled
+
+
 def _fade_spans_for_lane(
     state: TimelineViewState,
     lane: TimelineLane,
     slot: str,
 ) -> list[tuple[float, float, str]]:
-    exclude_song_markers = state.fades_apply_to == "exclude_song_markers"
     return lane_fade_spans(
         lane,
         inherit=_inherit_for_view(state, slot),
-        fade_in=state.fade_in,
-        fade_out=state.fade_out,
+        song_marker_fades=state.song_marker_fades,
+        standard_fades=state.standard_cue_fades,
         duration_sec=state.duration_sec,
         song_marker_times=state.song_marker_times,
-        exclude_song_markers=exclude_song_markers,
     )
 
 
@@ -266,7 +266,7 @@ def bar_fade_spans_for_row(
 ) -> list[tuple[float, float, str]]:
     """Fade wedge spans for one timeline row, including live record preview."""
     duration = state.duration_sec
-    if duration <= 0 or not state.fades_enabled:
+    if duration <= 0 or not _fades_active(state):
         return []
     lane = _lane_for_view(state, slot)
     if not (state.recording and slot in state.record_baseline):
@@ -284,15 +284,13 @@ def bar_fade_spans_for_row(
     if record_start > 0.0:
         spans.extend(_clip_fade_spans(committed_spans, 0.0, record_start))
     if effective_end > record_start:
-        exclude_song_markers = state.fades_apply_to == "exclude_song_markers"
         live_spans = lane_fade_spans(
             _recording_view_lane(state, slot),
             inherit=True,
-            fade_in=state.fade_in,
-            fade_out=state.fade_out,
+            song_marker_fades=state.song_marker_fades,
+            standard_fades=state.standard_cue_fades,
             duration_sec=state.duration_sec,
             song_marker_times=state.song_marker_times,
-            exclude_song_markers=exclude_song_markers,
         )
         spans.extend(_clip_fade_spans(live_spans, record_start, effective_end))
     if effective_end < duration:

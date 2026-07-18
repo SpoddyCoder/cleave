@@ -2263,7 +2263,7 @@ def test_render_timeline_down_enters_submenu() -> None:
     grid_row = view.layout.find_by_kind(RowKind.TIMELINE_BAR_GRID)
     placement_snap_row = view.layout.find_by_kind(RowKind.TIMELINE_PLACEMENT_SNAP)
     snap_grid_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_GRID)
-    fades_row = view.layout.find_by_kind(RowKind.TIMELINE_FADES)
+    fades_row = view.layout.find_by_kind(RowKind.TIMELINE_FADES_HEADER)
     presets_row = view.layout.find_by_kind(RowKind.TIMELINE_PRESETS)
     reset_row = view.layout.find_by_kind(RowKind.TIMELINE_RESET)
     controls.focus_descriptor = _desc(view, header_row)
@@ -2557,7 +2557,9 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
     controls.session.timeline.panel_open = True
     controls.session.song_markers.expanded = True
     controls.session.timeline.beat_bar_grid_expanded = True
-    controls.session.timeline.fades_enabled = True
+    controls.session.timeline.fades_expanded = True
+    controls.session.timeline.song_marker_fades.enabled = True
+    controls.session.timeline.standard_cue_fades.enabled = True
     controls.session.timeline.enabled = False
     view = controls.build_view_state(paused=False)
     for kind in (
@@ -2569,10 +2571,13 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
         RowKind.TIMELINE_BAR_GRID,
         RowKind.TIMELINE_PLACEMENT_SNAP,
         RowKind.TIMELINE_SNAP_TO_GRID,
-        RowKind.TIMELINE_FADES,
-        RowKind.TIMELINE_FADE_IN,
-        RowKind.TIMELINE_FADE_OUT,
-        RowKind.TIMELINE_FADES_APPLY_TO,
+        RowKind.TIMELINE_FADES_HEADER,
+        RowKind.TIMELINE_SONG_MARKER_FADES,
+        RowKind.TIMELINE_SONG_MARKER_FADE_IN,
+        RowKind.TIMELINE_SONG_MARKER_FADE_OUT,
+        RowKind.TIMELINE_STANDARD_CUE_FADES,
+        RowKind.TIMELINE_STANDARD_CUE_FADE_IN,
+        RowKind.TIMELINE_STANDARD_CUE_FADE_OUT,
         RowKind.TIMELINE_PRESETS,
         RowKind.TIMELINE_RESET,
     ):

@@ -9,6 +9,7 @@ from typing import Literal
 from cleave.config import (
     CleaveConfig,
     RenderOverlayPosition,
+    TimelineFadeGroupConfig,
     VIZ_CONFIG_FILENAME,
 )
 from cleave.config_schema import (
@@ -23,7 +24,6 @@ from cleave.config_schema import (
     DEFAULT_HARD_CUT_ENABLED,
     DEFAULT_EASTER_EGG,
     DEFAULT_PRESET_START_CLEAN,
-    DEFAULT_TIMELINE_FADES_APPLY_TO,
     DEFAULT_TIMELINE_FADES_ENABLED,
     DEFAULT_TIMELINE_FADE_IN,
     DEFAULT_TIMELINE_FADE_OUT,
@@ -32,7 +32,6 @@ from cleave.config_schema import (
     HighlightRolloffCurve,
     PresetSwitchingMode,
     PresetSwitchingScope,
-    TimelineFadesApplyTo,
     TimelinePlacementSnap,
     default_render_overlay_runtime_values,
     default_highlight_rolloff_runtime_values,
@@ -136,6 +135,17 @@ def default_render_post_fx_runtime() -> RenderPostFxRuntime:
 
 
 @dataclass
+class TimelineFadeGroupRuntime:
+    enabled: bool = DEFAULT_TIMELINE_FADES_ENABLED
+    fade_in: float = DEFAULT_TIMELINE_FADE_IN
+    fade_out: float = DEFAULT_TIMELINE_FADE_OUT
+
+
+def default_timeline_fade_group_runtime() -> TimelineFadeGroupRuntime:
+    return TimelineFadeGroupRuntime()
+
+
+@dataclass
 class TimelineRuntime:
     enabled: bool = True
     locked: bool = False
@@ -158,10 +168,13 @@ class TimelineRuntime:
     show_bar_grid: bool = False
     beat_bar_grid_expanded: bool = False
     placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
-    fades_enabled: bool = DEFAULT_TIMELINE_FADES_ENABLED
-    fade_in: float = DEFAULT_TIMELINE_FADE_IN
-    fade_out: float = DEFAULT_TIMELINE_FADE_OUT
-    fades_apply_to: TimelineFadesApplyTo = DEFAULT_TIMELINE_FADES_APPLY_TO
+    fades_expanded: bool = False
+    song_marker_fades: TimelineFadeGroupRuntime = field(
+        default_factory=default_timeline_fade_group_runtime
+    )
+    standard_cue_fades: TimelineFadeGroupRuntime = field(
+        default_factory=default_timeline_fade_group_runtime
+    )
 
 
 def default_timeline_runtime() -> TimelineRuntime:
@@ -305,6 +318,18 @@ def render_post_fx_runtime_from_cfg(
     return default_render_post_fx_runtime()
 
 
+def _fade_group_runtime_from_cfg(
+    group: TimelineFadeGroupConfig | None,
+) -> TimelineFadeGroupRuntime:
+    if group is None:
+        return TimelineFadeGroupRuntime()
+    return TimelineFadeGroupRuntime(
+        enabled=group.enabled,
+        fade_in=group.fade_in,
+        fade_out=group.fade_out,
+    )
+
+
 def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
     timeline = cfg.timeline
     enabled = True if timeline is None else timeline.enabled
@@ -334,10 +359,8 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
         locked=locked,
         lanes=lanes,
         placement_snap=placement_snap,
-        fades_enabled=fades.enabled,
-        fade_in=fades.fade_in,
-        fade_out=fades.fade_out,
-        fades_apply_to=fades.apply_to,
+        song_marker_fades=_fade_group_runtime_from_cfg(fades.song_markers),
+        standard_cue_fades=_fade_group_runtime_from_cfg(fades.standard),
     )
 
 

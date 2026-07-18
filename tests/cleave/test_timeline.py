@@ -9,6 +9,7 @@ from cleave.timeline import (
     RECORD_DEBOUNCE_SEC,
     SlotCue,
     Timeline,
+    TimelineFadeGroup,
     TimelineLane,
     canonicalize,
     empty_lane,
@@ -21,6 +22,17 @@ from cleave.timeline import (
     stem_abbreviation,
     strip_lane_range,
 )
+
+_OFF = TimelineFadeGroup(enabled=False)
+_STD = TimelineFadeGroup(enabled=True, fade_in=2.0, fade_out=2.0)
+
+
+def _std(*, fade_in: float = 2.0, fade_out: float = 2.0) -> TimelineFadeGroup:
+    return TimelineFadeGroup(enabled=True, fade_in=fade_in, fade_out=fade_out)
+
+
+def _markers(*, fade_in: float = 2.0, fade_out: float = 2.0) -> TimelineFadeGroup:
+    return TimelineFadeGroup(enabled=True, fade_in=fade_in, fade_out=fade_out)
 
 
 def _lane(
@@ -201,7 +213,12 @@ def test_should_accept_toggle_debounces() -> None:
 def test_lane_fade_alpha_full_inside_visible_segment() -> None:
     lane = _lane(False, (5.0, True), (15.0, False))
     assert lane_fade_alpha(
-        lane, 10.0, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=60.0
+        lane,
+        10.0,
+        inherit=False,
+        song_marker_fades=_OFF,
+        standard_fades=_STD,
+        duration_sec=60.0,
     ) == pytest.approx(1.0)
 
 
@@ -210,14 +227,29 @@ def test_lane_fade_alpha_fade_in_before_on_cue() -> None:
 
     lane = _lane(False, (10.0, True), (20.0, False))
     mid = lane_fade_alpha(
-        lane, 9.0, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=60.0
+        lane,
+        9.0,
+        inherit=False,
+        song_marker_fades=_OFF,
+        standard_fades=_STD,
+        duration_sec=60.0,
     )
     assert mid == pytest.approx(smoothstep(0.5))
     assert lane_fade_alpha(
-        lane, 8.0, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=60.0
+        lane,
+        8.0,
+        inherit=False,
+        song_marker_fades=_OFF,
+        standard_fades=_STD,
+        duration_sec=60.0,
     ) == pytest.approx(0.0)
     assert lane_fade_alpha(
-        lane, 10.0, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=60.0
+        lane,
+        10.0,
+        inherit=False,
+        song_marker_fades=_OFF,
+        standard_fades=_STD,
+        duration_sec=60.0,
     ) == pytest.approx(1.0)
 
 
@@ -226,67 +258,157 @@ def test_lane_fade_alpha_fade_out_after_off_cue() -> None:
 
     lane = _lane(False, (5.0, True), (15.0, False))
     mid = lane_fade_alpha(
-        lane, 16.0, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=60.0
+        lane,
+        16.0,
+        inherit=False,
+        song_marker_fades=_OFF,
+        standard_fades=_STD,
+        duration_sec=60.0,
     )
     assert mid == pytest.approx(smoothstep(0.5))
     assert lane_fade_alpha(
-        lane, 17.0, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=60.0
+        lane,
+        17.0,
+        inherit=False,
+        song_marker_fades=_OFF,
+        standard_fades=_STD,
+        duration_sec=60.0,
     ) == pytest.approx(0.0)
     assert lane_fade_alpha(
-        lane, 14.9, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=60.0
+        lane,
+        14.9,
+        inherit=False,
+        song_marker_fades=_OFF,
+        standard_fades=_STD,
+        duration_sec=60.0,
     ) == pytest.approx(1.0)
 
 
 def test_lane_fade_alpha_no_fade_at_song_edges_without_cue() -> None:
     lane = _lane(True)
     assert lane_fade_alpha(
-        lane, 0.5, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=30.0
+        lane,
+        0.5,
+        inherit=False,
+        song_marker_fades=_OFF,
+        standard_fades=_STD,
+        duration_sec=30.0,
     ) == pytest.approx(1.0)
     assert lane_fade_alpha(
-        lane, 29.5, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=30.0
+        lane,
+        29.5,
+        inherit=False,
+        song_marker_fades=_OFF,
+        standard_fades=_STD,
+        duration_sec=30.0,
     ) == pytest.approx(1.0)
     assert lane_fade_alpha(
-        lane, 0.0, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=30.0
+        lane,
+        0.0,
+        inherit=False,
+        song_marker_fades=_OFF,
+        standard_fades=_STD,
+        duration_sec=30.0,
     ) == pytest.approx(1.0)
 
 
 def test_lane_fade_alpha_zero_durations_match_boolean() -> None:
     lane = _lane(False, (10.0, True), (20.0, False))
+    zero = _std(fade_in=0.0, fade_out=0.0)
     assert lane_fade_alpha(
-        lane, 9.9, inherit=False, fade_in=0.0, fade_out=0.0, duration_sec=60.0
+        lane,
+        9.9,
+        inherit=False,
+        song_marker_fades=_OFF,
+        standard_fades=zero,
+        duration_sec=60.0,
     ) == pytest.approx(0.0)
     assert lane_fade_alpha(
-        lane, 10.0, inherit=False, fade_in=0.0, fade_out=0.0, duration_sec=60.0
+        lane,
+        10.0,
+        inherit=False,
+        song_marker_fades=_OFF,
+        standard_fades=zero,
+        duration_sec=60.0,
     ) == pytest.approx(1.0)
     assert lane_fade_alpha(
-        lane, 20.0, inherit=False, fade_in=0.0, fade_out=0.0, duration_sec=60.0
+        lane,
+        20.0,
+        inherit=False,
+        song_marker_fades=_OFF,
+        standard_fades=zero,
+        duration_sec=60.0,
     ) == pytest.approx(0.0)
 
 
-def test_lane_fade_alpha_exclude_song_markers_makes_edge_abrupt() -> None:
+def test_lane_fade_alpha_song_marker_group_disabled_makes_edge_abrupt() -> None:
     lane = _lane(False, (10.0, True), (20.0, False))
     before = lane_fade_alpha(
         lane,
         9.0,
         inherit=False,
-        fade_in=2.0,
-        fade_out=2.0,
+        song_marker_fades=_OFF,
+        standard_fades=_STD,
         duration_sec=60.0,
         song_marker_times=(10.0,),
-        exclude_song_markers=True,
     )
     assert before == pytest.approx(0.0)
     after = lane_fade_alpha(
         lane,
         21.0,
         inherit=False,
-        fade_in=2.0,
-        fade_out=2.0,
+        song_marker_fades=_OFF,
+        standard_fades=_STD,
         duration_sec=60.0,
         song_marker_times=(20.0,),
-        exclude_song_markers=True,
     )
     assert after == pytest.approx(0.0)
+
+
+def test_lane_fade_alpha_marker_edge_uses_song_marker_durations() -> None:
+    from cleave.easing import smoothstep
+
+    lane = _lane(False, (10.0, True), (20.0, False))
+    mid = lane_fade_alpha(
+        lane,
+        9.0,
+        inherit=False,
+        song_marker_fades=_markers(fade_in=2.0, fade_out=2.0),
+        standard_fades=_std(fade_in=4.0, fade_out=4.0),
+        duration_sec=60.0,
+        song_marker_times=(10.0,),
+    )
+    assert mid == pytest.approx(smoothstep(0.5))
+
+
+def test_lane_fade_alpha_non_marker_edge_uses_standard_durations() -> None:
+    from cleave.easing import smoothstep
+
+    lane = _lane(False, (10.0, True), (20.0, False))
+    mid = lane_fade_alpha(
+        lane,
+        8.0,
+        inherit=False,
+        song_marker_fades=_markers(fade_in=2.0, fade_out=2.0),
+        standard_fades=_std(fade_in=4.0, fade_out=4.0),
+        duration_sec=60.0,
+        song_marker_times=(20.0,),
+    )
+    assert mid == pytest.approx(smoothstep(0.5))
+
+
+def test_lane_fade_alpha_standard_group_disabled_makes_non_marker_abrupt() -> None:
+    lane = _lane(False, (10.0, True), (20.0, False))
+    before = lane_fade_alpha(
+        lane,
+        9.0,
+        inherit=False,
+        song_marker_fades=_markers(),
+        standard_fades=_OFF,
+        duration_sec=60.0,
+        song_marker_times=(),
+    )
+    assert before == pytest.approx(0.0)
 
 
 def test_lane_fade_alpha_overlapping_segments_take_max() -> None:
@@ -298,7 +420,12 @@ def test_lane_fade_alpha_overlapping_segments_take_max() -> None:
     out_env = smoothstep((10.0 + 2.0 - t) / 2.0)
     in_env = smoothstep((t - (11.0 - 2.0)) / 2.0)
     alpha = lane_fade_alpha(
-        lane, t, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=60.0
+        lane,
+        t,
+        inherit=False,
+        song_marker_fades=_OFF,
+        standard_fades=_STD,
+        duration_sec=60.0,
     )
     assert alpha == pytest.approx(max(out_env, in_env))
 
@@ -306,7 +433,11 @@ def test_lane_fade_alpha_overlapping_segments_take_max() -> None:
 def test_lane_fade_spans_fade_in_before_on_cue() -> None:
     lane = _lane(False, (10.0, True), (20.0, False))
     spans = lane_fade_spans(
-        lane, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=60.0
+        lane,
+        inherit=False,
+        song_marker_fades=_OFF,
+        standard_fades=_STD,
+        duration_sec=60.0,
     )
     assert (8.0, 10.0, "in") in spans
     assert (20.0, 22.0, "out") in spans
@@ -315,7 +446,11 @@ def test_lane_fade_spans_fade_in_before_on_cue() -> None:
 def test_lane_fade_spans_no_fade_at_song_edges_without_cue() -> None:
     lane = _lane(True)
     spans = lane_fade_spans(
-        lane, inherit=False, fade_in=2.0, fade_out=2.0, duration_sec=30.0
+        lane,
+        inherit=False,
+        song_marker_fades=_OFF,
+        standard_fades=_STD,
+        duration_sec=30.0,
     )
     assert spans == []
 
@@ -324,22 +459,25 @@ def test_lane_fade_spans_zero_durations_empty() -> None:
     lane = _lane(False, (10.0, True), (20.0, False))
     assert (
         lane_fade_spans(
-            lane, inherit=False, fade_in=0.0, fade_out=0.0, duration_sec=60.0
+            lane,
+            inherit=False,
+            song_marker_fades=_OFF,
+            standard_fades=_std(fade_in=0.0, fade_out=0.0),
+            duration_sec=60.0,
         )
         == []
     )
 
 
-def test_lane_fade_spans_exclude_song_markers() -> None:
+def test_lane_fade_spans_song_marker_group_disabled() -> None:
     lane = _lane(False, (10.0, True), (20.0, False))
     spans = lane_fade_spans(
         lane,
         inherit=False,
-        fade_in=2.0,
-        fade_out=2.0,
+        song_marker_fades=_OFF,
+        standard_fades=_STD,
         duration_sec=60.0,
         song_marker_times=(10.0, 20.0),
-        exclude_song_markers=True,
     )
     assert (8.0, 10.0, "in") not in spans
     assert (20.0, 22.0, "out") not in spans
@@ -348,7 +486,11 @@ def test_lane_fade_spans_exclude_song_markers() -> None:
 def test_lane_fade_spans_clips_to_duration() -> None:
     lane = _lane(False, (50.0, True), (59.0, False))
     spans = lane_fade_spans(
-        lane, inherit=False, fade_in=2.0, fade_out=5.0, duration_sec=60.0
+        lane,
+        inherit=False,
+        song_marker_fades=_OFF,
+        standard_fades=_std(fade_in=2.0, fade_out=5.0),
+        duration_sec=60.0,
     )
     fade_out = next(span for span in spans if span[2] == "out")
     assert fade_out == (59.0, 60.0, "out")
@@ -357,7 +499,11 @@ def test_lane_fade_spans_clips_to_duration() -> None:
 def test_lane_fade_spans_clips_fade_in_at_song_start() -> None:
     lane = _lane(False, (1.0, True))
     spans = lane_fade_spans(
-        lane, inherit=False, fade_in=5.0, fade_out=2.0, duration_sec=60.0
+        lane,
+        inherit=False,
+        song_marker_fades=_OFF,
+        standard_fades=_std(fade_in=5.0, fade_out=2.0),
+        duration_sec=60.0,
     )
     fade_in = next(span for span in spans if span[2] == "in")
     assert fade_in == (0.0, 1.0, "in")

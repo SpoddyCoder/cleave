@@ -1234,6 +1234,12 @@ class TuningControls:
             return
         tl.beat_bar_grid_expanded = expanded
 
+    def _set_timeline_fades_expanded(self, expanded: bool) -> None:
+        tl = self.session.timeline
+        if tl.fades_expanded == expanded:
+            return
+        tl.fades_expanded = expanded
+
     def _set_beat(self, slot: str, value: float) -> None:
         layer = self.session.layers[slot]
         layer.beat_sensitivity = clamp_beat_sensitivity(value)
