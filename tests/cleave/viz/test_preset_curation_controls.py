@@ -81,7 +81,7 @@ def test_prompt_favourite_with_subdirs_uses_choice_modal() -> None:
 
         view = modal.view_state()
         assert view is not None
-        assert view.options == ("(root)", "keepers", "Cancel")
+        assert view.options == ("(Root)", "Keepers", "Cancel")
 
 
 def test_confirm_favourite_copies_without_session_mutation() -> None:
@@ -175,7 +175,7 @@ def test_prompt_favourite_already_in_favourites_uses_move_wording() -> None:
         view = modal.view_state()
         assert view is not None
         assert view.message == "Move favourite preset: demo.milk?"
-        assert view.options == ("(root)", "keepers", "Cancel")
+        assert view.options == ("(Root)", "Keepers", "Cancel")
         assert locked == ["layer_1"]
 
 
@@ -224,7 +224,7 @@ def test_prompt_blacklist_already_in_blacklist_uses_move_wording() -> None:
         view = modal.view_state()
         assert view is not None
         assert view.message == "Move blacklist preset: demo.milk?"
-        assert view.options == ("(root)", "reject", "Cancel")
+        assert view.options == ("(Root)", "Reject", "Cancel")
         assert locked == ["layer_1"]
 
 
@@ -520,7 +520,7 @@ def test_confirm_restore_blacklist_without_origin_uses_choice_modal() -> None:
         view = modal.view_state()
         assert view is not None
         assert view.message == "Restore blacklisted preset: demo.milk?"
-        assert view.options == ("(root)", "other", "pack", "Cancel")
+        assert view.options == ("(Root)", "Other", "Pack", "Cancel")
         assert unlocked == []
 
         modal.handle_keydown(keydown(pygame.K_RIGHT))  # other

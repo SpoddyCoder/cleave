@@ -16,11 +16,20 @@ class ModalKind(Enum):
     CHOICE = "choice"
 
 
-MODAL_VERTICAL_OPTION_THRESHOLD = 5
+def capital_case_modal_option(label: str) -> str:
+    """Capital Case each whitespace-separated word; leave numeric tokens unchanged."""
 
+    def _word(word: str) -> str:
+        if not word:
+            return word
+        for index, char in enumerate(word):
+            if char.isalpha():
+                return word[:index] + char.upper() + word[index + 1 :].lower()
+            if char.isdigit():
+                return word
+        return word
 
-def modal_options_vertical(option_count: int) -> bool:
-    return option_count > MODAL_VERTICAL_OPTION_THRESHOLD
+    return " ".join(_word(part) for part in label.split(" "))
 
 
 def clamp_modal_focus_index(index: int, option_count: int) -> int:
@@ -52,10 +61,6 @@ class ModalViewState:
     options: tuple[str, ...]
     focus_index: int
 
-    @property
-    def options_vertical(self) -> bool:
-        return modal_options_vertical(len(self.options))
-
 
 _UNSAVED_QUIT_MESSAGE = "Unsaved changes - save changes before exit?"
 _SAVE_CHOICE_MESSAGE = "Save configuration?"
@@ -78,7 +83,10 @@ class ModalHost:
         return ModalViewState(
             kind=self._request.kind,
             message=self._request.message,
-            options=tuple(option.label for option in self._request.options),
+            options=tuple(
+                capital_case_modal_option(option.label)
+                for option in self._request.options
+            ),
             focus_index=self._focus_index,
         )
 
@@ -146,9 +154,9 @@ class ModalHost:
                 kind=ModalKind.SAVE_CHOICE,
                 message=_SAVE_CHOICE_MESSAGE,
                 options=[
-                    ModalOption("OVERWRITE", on_overwrite),
-                    ModalOption("SAVE AS NEW", on_save_as_new),
-                    ModalOption("CANCEL", on_cancel),
+                    ModalOption("Overwrite", on_overwrite),
+                    ModalOption("Save As New", on_save_as_new),
+                    ModalOption("Cancel", on_cancel),
                 ],
                 on_dismiss=on_dismiss,
             )
@@ -168,8 +176,8 @@ class ModalHost:
                 kind=ModalKind.SAVE_CHOICE,
                 message=_SAVE_CHOICE_MESSAGE,
                 options=[
-                    ModalOption("SAVE AS NEW", on_save_as_new),
-                    ModalOption("CANCEL", on_cancel),
+                    ModalOption("Save As New", on_save_as_new),
+                    ModalOption("Cancel", on_cancel),
                 ],
                 on_dismiss=on_dismiss,
             )
@@ -190,9 +198,9 @@ class ModalHost:
                 kind=ModalKind.UNSAVED_QUIT,
                 message=_UNSAVED_QUIT_MESSAGE,
                 options=[
-                    ModalOption("SAVE", on_save),
-                    ModalOption("DON'T SAVE", on_discard),
-                    ModalOption("CANCEL", on_cancel_action),
+                    ModalOption("Save", on_save),
+                    ModalOption("Don't Save", on_discard),
+                    ModalOption("Cancel", on_cancel_action),
                 ],
                 on_dismiss=on_cancel,
             )
@@ -208,17 +216,11 @@ class ModalHost:
             return True
 
         option_count = len(self._request.options)  # type: ignore[union-attr]
-        vertical = modal_options_vertical(option_count)
-        if vertical:
-            if event.key in (pygame.K_UP, pygame.K_LEFT):
-                self._focus_index = (self._focus_index - 1) % option_count
-                return True
-            if event.key in (pygame.K_DOWN, pygame.K_RIGHT):
-                self._focus_index = (self._focus_index + 1) % option_count
-                return True
-        elif event.key in (pygame.K_LEFT, pygame.K_RIGHT):
-            delta = -1 if event.key == pygame.K_LEFT else 1
-            self._focus_index = (self._focus_index + delta) % option_count
+        if event.key in (pygame.K_UP, pygame.K_LEFT):
+            self._focus_index = (self._focus_index - 1) % option_count
+            return True
+        if event.key in (pygame.K_DOWN, pygame.K_RIGHT):
+            self._focus_index = (self._focus_index + 1) % option_count
             return True
 
         if len(self._request.options) == 2:  # type: ignore[union-attr]

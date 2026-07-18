@@ -15,10 +15,9 @@ from cleave.viz.session import TuningSession
 
 SONG_MARKER_SNAP_SCOPE_EACH_LAYER = "each_layer"
 SONG_MARKER_SNAP_SCOPE_CLOSEST_WINS = "closest_wins"
-_ALL_CLOSEST_LABEL = "closest wins"
-_EACH_LAYER_LABEL = "all layers"
+_ALL_CLOSEST_LABEL = "Closest Wins"
+_EACH_LAYER_LABEL = "All Layers"
 _CANCEL_LABEL = "Cancel"
-_GRID_CANCEL_LABEL = "CANCEL"
 _GRID_PROMPT = "Snap cues to?"
 _PROXIMITY_PROMPT = "Snap proximity?"
 _SCOPE_PROMPT = "Layer scope?"
@@ -50,7 +49,7 @@ def song_marker_snap_scope_label(
     if scope == SONG_MARKER_SNAP_SCOPE_CLOSEST_WINS:
         return _ALL_CLOSEST_LABEL
     if scope in layer_z_order:
-        return f"layer {layer_z_order.index(scope) + 1}"
+        return f"Layer {layer_z_order.index(scope) + 1}"
     return _EACH_LAYER_LABEL
 
 
@@ -102,9 +101,9 @@ class TimelineSnapController:
         self._modal.prompt_choice(
             _GRID_PROMPT,
             [
-                ModalOption("BEATS", self._snap_to_beats),
-                ModalOption("BARS", self._snap_to_bars),
-                ModalOption(_GRID_CANCEL_LABEL, dismiss),
+                ModalOption("Beats", self._snap_to_beats),
+                ModalOption("Bars", self._snap_to_bars),
+                ModalOption(_CANCEL_LABEL, dismiss),
             ],
             on_dismiss=dismiss,
         )

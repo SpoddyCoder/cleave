@@ -24,7 +24,7 @@ from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.modal import ModalHost, ModalOption
 from cleave.viz.session import TuningSession
 
-_ROOT_DEST_LABEL = "(root)"
+_ROOT_DEST_LABEL = "(Root)"
 _CANCEL_LABEL = "Cancel"
 
 

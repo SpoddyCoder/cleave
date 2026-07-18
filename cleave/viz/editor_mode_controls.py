@@ -138,9 +138,9 @@ class EditorModeController:
             self._modal.prompt_choice(
                 _ENTER_CURATION_DIRTY_MESSAGE,
                 [
-                    ModalOption("YES", self._enter_curation_via_save),
-                    ModalOption("DISCARD CHANGES", self._enter_curation_via_discard),
-                    ModalOption("CANCEL", self._cancel_enter_curation),
+                    ModalOption("Yes", self._enter_curation_via_save),
+                    ModalOption("Discard Changes", self._enter_curation_via_discard),
+                    ModalOption("Cancel", self._cancel_enter_curation),
                 ],
                 on_dismiss=self._cancel_enter_curation,
             )
