@@ -735,7 +735,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Beat / bar grid",
         help_description=(
             "AI beat detection powered by Beat This!",
-            "Bar phase, bar grid display, placement snap, and snap cues to the grid.",
+            "Placement snap, bar grid display, bar phase, and snap cues to the grid.",
         ),
     ),
     RowKind.TIMELINE_BAR_PHASE: RowBehavior(

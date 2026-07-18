@@ -214,10 +214,10 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     placement_snap_idx = view_beat_expanded.layout.rows.index(placement_snap)
     snap_grid_idx = view_beat_expanded.layout.rows.index(snap_grid)
     fades_idx = view_beat_expanded.layout.rows.index(fades_header)
-    assert bar_grid_idx == beat_bar_idx + 1
+    assert placement_snap_idx == beat_bar_idx + 1
+    assert bar_grid_idx == placement_snap_idx + 1
     assert bar_phase_idx == bar_grid_idx + 1
-    assert placement_snap_idx == bar_phase_idx + 1
-    assert snap_grid_idx == placement_snap_idx + 1
+    assert snap_grid_idx == bar_phase_idx + 1
     assert fades_idx == snap_grid_idx + 1
     assert song_marker_fades not in view_beat_expanded.layout.rows
     assert standard_cue_fades not in view_beat_expanded.layout.rows
