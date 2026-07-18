@@ -28,7 +28,7 @@ def seek_to(state: PlaybackState, position_sec: float, duration_sec: float) -> N
 
 
 def seek(state: PlaybackState, delta_sec: float, duration_sec: float) -> None:
-    t = current_sec(state, duration_sec)
+    t = min(state.player.file_position_sec(), duration_sec)
     seek_to(state, t + delta_sec, duration_sec)
 
 

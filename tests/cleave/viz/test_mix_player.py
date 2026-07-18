@@ -11,6 +11,7 @@ from cleave.viz.mix_player import (
     MixPlayer,
     copy_mono_pcm_chunk_as_stereo,
     copy_stereo_pcm_chunk,
+    estimate_output_latency_frames,
 )
 
 
@@ -115,6 +116,21 @@ def test_copy_stereo_pcm_chunk_at_end_writes_silence() -> None:
     assert np.all(out == 0.0)
 
 
+def test_estimate_output_latency_frames_prefers_obtained() -> None:
+    assert estimate_output_latency_frames(512, 4096) == 512
+    assert estimate_output_latency_frames(256, 256) == 256
+
+
+def test_estimate_output_latency_frames_falls_back_to_requested() -> None:
+    assert estimate_output_latency_frames(None, 4096) == 4096
+    assert estimate_output_latency_frames(0, 256) == 256
+    assert estimate_output_latency_frames(-1, 128) == 128
+
+
+def test_estimate_output_latency_frames_clamps_negative_requested() -> None:
+    assert estimate_output_latency_frames(None, -10) == 0
+
+
 def test_mix_player_seek_file_and_audible_match_at_latency_zero() -> None:
     pcm = np.zeros(FREQUENCY_HZ * 2 * 2, dtype=np.float32)
     player = MixPlayer(pcm, FREQUENCY_HZ)
@@ -122,6 +138,20 @@ def test_mix_player_seek_file_and_audible_match_at_latency_zero() -> None:
     player.seek(1.5)
     assert player.file_position_sec() == pytest.approx(1.5)
     assert player.audible_position_sec() == pytest.approx(1.5)
+
+
+def test_mix_player_file_vs_audible_offset_with_latency() -> None:
+    latency_frames = 256
+    pcm = np.zeros(FREQUENCY_HZ * 2 * 2, dtype=np.float32)
+    player = MixPlayer(pcm, FREQUENCY_HZ)
+    with player._lock:
+        player._clock.set_latency_frames(latency_frames)
+    player.pause(True)
+    player.seek(1.0)
+    assert player.file_position_sec() == pytest.approx(1.0)
+    assert player.audible_position_sec() == pytest.approx(
+        1.0 - latency_frames / FREQUENCY_HZ
+    )
 
 
 def test_mix_player_seek_clamps_to_duration() -> None:
@@ -160,7 +190,7 @@ def test_mix_player_default_chunksize() -> None:
     assert player._chunksize == DEFAULT_CHUNKSIZE
 
 
-def test_mix_player_start_stop_smoke() -> None:
+def _require_sdl_audio() -> None:
     import pygame
     from pygame._sdl2 import INIT_AUDIO, get_audio_device_names
 
@@ -172,9 +202,23 @@ def test_mix_player_start_stop_smoke() -> None:
     except pygame.error:
         pytest.skip("SDL audio unavailable")
 
+
+def test_mix_player_start_stop_smoke() -> None:
+    _require_sdl_audio()
     pcm = np.zeros(FREQUENCY_HZ, dtype=np.float32)
     player = MixPlayer(pcm, FREQUENCY_HZ, chunksize=256)
     player.start()
     player.pause(True)
     player.pause(False)
     player.stop()
+
+
+def test_mix_player_start_sets_latency_from_chunksize() -> None:
+    _require_sdl_audio()
+    pcm = np.zeros(FREQUENCY_HZ, dtype=np.float32)
+    player = MixPlayer(pcm, FREQUENCY_HZ, chunksize=256)
+    player.start()
+    try:
+        assert player._clock.latency_frames == 256
+    finally:
+        player.stop()

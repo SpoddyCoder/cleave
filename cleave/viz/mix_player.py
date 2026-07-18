@@ -19,6 +19,15 @@ NUM_CHANNELS = 2
 DEFAULT_CHUNKSIZE = 4096
 
 
+def estimate_output_latency_frames(
+    obtained_chunksize: int | None,
+    requested_chunksize: int,
+) -> int:
+    if obtained_chunksize is not None and obtained_chunksize > 0:
+        return int(obtained_chunksize)
+    return max(0, int(requested_chunksize))
+
+
 def copy_stereo_pcm_chunk(
     pcm: np.ndarray,
     read_index: int,
@@ -171,6 +180,11 @@ class MixPlayer:
             allowed_changes=0,
             callback=callback,
         )
+        obtained = getattr(self._device, "chunksize", None)
+        with self._lock:
+            self._clock.set_latency_frames(
+                estimate_output_latency_frames(obtained, self._chunksize)
+            )
         self._device.pause(0)
 
     def stop(self) -> None:
