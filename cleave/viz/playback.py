@@ -14,7 +14,7 @@ class PlaybackState:
 
 
 def current_sec(state: PlaybackState, duration_sec: float) -> float:
-    return min(state.player.current_sec(), duration_sec)
+    return min(state.player.audible_position_sec(), duration_sec)
 
 
 def format_mmss(sec: float) -> str:

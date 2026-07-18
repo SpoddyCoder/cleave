@@ -9,6 +9,7 @@ import numpy as np
 from pygame._sdl2 import AUDIO_F32, AudioDevice, get_audio_device_names
 
 from cleave.extract import StemSource
+from cleave.viz.transport_clock import TransportClock
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -92,7 +93,13 @@ class MixPlayer:
         self._total_frames = len(self._pcm) // NUM_CHANNELS
         self._lock = threading.Lock()
         self._read_index = 0
-        self._samples_played = 0
+        self._clock = TransportClock(
+            sample_rate=sample_rate,
+            total_frames=self._total_frames,
+            max_ahead_frames=chunksize,
+            latency_frames=0,
+        )
+        self._clock.reanchor(0)
         self._device: AudioDevice | None = None
         self._callback: Callable[[AudioDevice, memoryview], None] | None = None
 
@@ -151,7 +158,7 @@ class MixPlayer:
                 )
             with self._lock:
                 self._read_index = new_index
-                self._samples_played = new_index
+                self._clock.reanchor(new_index)
 
         self._callback = callback
         self._device = AudioDevice(
@@ -174,6 +181,8 @@ class MixPlayer:
         self._callback = None
 
     def pause(self, on: bool) -> None:
+        with self._lock:
+            self._clock.set_paused(on)
         if self._device is not None:
             self._device.pause(1 if on else 0)
 
@@ -182,12 +191,16 @@ class MixPlayer:
         frame = min(frame, self._total_frames)
         with self._lock:
             self._read_index = frame
-            self._samples_played = frame
+            self._clock.reanchor(frame)
 
-    def current_sec(self) -> float:
+    def file_position_sec(self) -> float:
         with self._lock:
-            return self._samples_played / self._sample_rate
+            return self._clock.file_position_sec()
+
+    def audible_position_sec(self) -> float:
+        with self._lock:
+            return self._clock.audible_position_sec()
 
     def finished(self) -> bool:
         with self._lock:
-            return self._samples_played >= self._total_frames
+            return self._clock.file_position_frames() >= self._total_frames

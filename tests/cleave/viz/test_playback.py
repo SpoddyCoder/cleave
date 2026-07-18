@@ -38,34 +38,34 @@ def test_seek_relative() -> None:
     player = StubMixPlayer(position_sec=10.0)
     state = PlaybackState(player=player)
     seek(state, delta_sec=5.0, duration_sec=120.0)
-    assert player.current_sec() == 15.0
+    assert player.audible_position_sec() == 15.0
 
 
 def test_seek_clamps_at_bounds() -> None:
     player = StubMixPlayer(position_sec=118.0)
     state = PlaybackState(player=player)
     seek(state, delta_sec=10.0, duration_sec=120.0)
-    assert player.current_sec() == 120.0
+    assert player.audible_position_sec() == 120.0
 
     player.seek(2.0)
     seek(state, delta_sec=-10.0, duration_sec=120.0)
-    assert player.current_sec() == 0.0
+    assert player.audible_position_sec() == 0.0
 
 
 def test_seek_to_absolute() -> None:
     player = StubMixPlayer(position_sec=10.0)
     state = PlaybackState(player=player)
     seek_to(state, position_sec=42.5, duration_sec=120.0)
-    assert player.current_sec() == 42.5
+    assert player.audible_position_sec() == 42.5
 
 
 def test_seek_to_clamps_at_bounds() -> None:
     player = StubMixPlayer(position_sec=10.0)
     state = PlaybackState(player=player)
     seek_to(state, position_sec=200.0, duration_sec=120.0)
-    assert player.current_sec() == 120.0
+    assert player.audible_position_sec() == 120.0
     seek_to(state, position_sec=-5.0, duration_sec=120.0)
-    assert player.current_sec() == 0.0
+    assert player.audible_position_sec() == 0.0
 
 
 def test_toggle_pause_delegates_to_player() -> None:

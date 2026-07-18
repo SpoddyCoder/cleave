@@ -42,7 +42,10 @@ class StubMixPlayer:
     def seek(self, position_sec: float) -> None:
         self._position_sec = position_sec
 
-    def current_sec(self) -> float:
+    def file_position_sec(self) -> float:
+        return self._position_sec
+
+    def audible_position_sec(self) -> float:
         return self._position_sec
 
     def finished(self) -> bool:

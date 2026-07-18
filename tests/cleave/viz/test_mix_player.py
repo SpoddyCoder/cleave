@@ -115,26 +115,43 @@ def test_copy_stereo_pcm_chunk_at_end_writes_silence() -> None:
     assert np.all(out == 0.0)
 
 
-def test_mix_player_current_sec_from_samples_played() -> None:
+def test_mix_player_seek_file_and_audible_match_at_latency_zero() -> None:
     pcm = np.zeros(FREQUENCY_HZ * 2 * 2, dtype=np.float32)
     player = MixPlayer(pcm, FREQUENCY_HZ)
+    player.pause(True)
     player.seek(1.5)
-    assert player.current_sec() == pytest.approx(1.5)
+    assert player.file_position_sec() == pytest.approx(1.5)
+    assert player.audible_position_sec() == pytest.approx(1.5)
 
 
 def test_mix_player_seek_clamps_to_duration() -> None:
     pcm = np.zeros(FREQUENCY_HZ * 2, dtype=np.float32)
     player = MixPlayer(pcm, FREQUENCY_HZ)
+    player.pause(True)
     player.seek(99.0)
-    assert player.current_sec() == pytest.approx(1.0)
+    assert player.file_position_sec() == pytest.approx(1.0)
+    assert player.audible_position_sec() == pytest.approx(1.0)
     assert player.finished()
 
 
 def test_mix_player_finished_false_before_end() -> None:
     pcm = np.zeros(FREQUENCY_HZ * 4, dtype=np.float32)
     player = MixPlayer(pcm, FREQUENCY_HZ)
+    player.pause(True)
     player.seek(0.5)
     assert not player.finished()
+
+
+def test_mix_player_pause_freezes_audible_across_wall_time_gap() -> None:
+    pcm = np.zeros(FREQUENCY_HZ * 4, dtype=np.float32)
+    player = MixPlayer(pcm, FREQUENCY_HZ)
+    player.pause(True)
+    player.seek(0.5)
+    frozen = player.audible_position_sec()
+    assert frozen == pytest.approx(0.5)
+    # Wall time advances while paused; audible must stay put.
+    player._clock.anchor_wall_time -= 5.0
+    assert player.audible_position_sec() == pytest.approx(frozen)
 
 
 def test_mix_player_default_chunksize() -> None:
