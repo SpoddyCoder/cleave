@@ -81,6 +81,8 @@ EDITOR_PREVIEW_QUALITY_HELP_ENTRIES: tuple[
 
 DEFAULT_EDITOR_PREVIEW_QUALITY: EditorPreviewQuality = "balanced"
 DEFAULT_UI_FADE_SEC = 10.0
+DEFAULT_RESIDUAL_DELAY_MS = 0
+MAX_RESIDUAL_DELAY_MS = 2000
 UI_FADE_MAX_SEC = 60.0
 DEFAULT_UI_WIDTH = 110
 UI_WIDTH_MIN = 80
@@ -680,6 +682,10 @@ def clamp_ui_width(value: int | float) -> int:
     return max(UI_WIDTH_MIN, min(UI_WIDTH_MAX, int(round(value))))
 
 
+def clamp_residual_delay_ms(value: int | float) -> int:
+    return max(0, min(int(round(value)), MAX_RESIDUAL_DELAY_MS))
+
+
 def _parse_editor_preview_quality(
     value: Any, ctx: ParseCtx, label: str = "editor.preview_quality"
 ) -> EditorPreviewQuality:
@@ -1086,6 +1092,15 @@ EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
         ),
         lambda value, _ctx: clamp_ui_fade(value),
     ),
+    FieldDescriptor(
+        "residual_delay_ms",
+        DEFAULT_RESIDUAL_DELAY_MS,
+        "cfg",
+        lambda raw, ctx, label: clamp_residual_delay_ms(
+            int(require_non_negative_number(raw, label, as_int=True))
+        ),
+        lambda value, _ctx: clamp_residual_delay_ms(value),
+    ),
 )
 
 EDITOR_CONFIG_FIELDS: tuple[FieldDescriptor, ...] = (
@@ -1373,6 +1388,7 @@ def parse_editor_section(data: dict[str, Any]) -> Any:
         ui_width_mode=parsed["ui_width_mode"],
         ui_width=parsed["ui_width"],
         ui_fade=parsed["ui_fade"],
+        residual_delay_ms=parsed["residual_delay_ms"],
     )
 
 
@@ -1382,6 +1398,7 @@ def dump_editor_section(editor: Any) -> dict[str, Any]:
         "ui_width_mode": editor.ui_width_mode,
         "ui_width": editor.ui_width,
         "ui_fade": editor.ui_fade,
+        "residual_delay_ms": editor.residual_delay_ms,
     }
     ctx = PersistCtx(cfg=None, session=None)
     return _dump_fields(EDITOR_FIELDS, values, ctx)
@@ -1415,6 +1432,7 @@ def parse_project_editor_section(
         ui_width_mode=editor.ui_width_mode,
         ui_width=editor.ui_width,
         ui_fade=editor.ui_fade,
+        residual_delay_ms=editor.residual_delay_ms,
     )
 
 

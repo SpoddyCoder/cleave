@@ -29,6 +29,7 @@ from cleave.viz.render_overlay_controls import RenderOverlayControls
 from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
 from cleave.viz.render_post_fx_controls import RenderPostFxControls
 from cleave.viz.settings_controls import SettingsControls
+from cleave.viz.tap_sync_controls import TapSyncControls
 from cleave.viz.timeline_phase_controls import TimelinePhaseController
 from cleave.viz.timeline_preset_controls import TimelinePresetController
 from cleave.viz.timeline_snap_controls import TimelineSnapController
@@ -64,6 +65,9 @@ if TYPE_CHECKING:
 
 NOTIFICATION_TIMELINE_ENABLED_TEXT = "Timeline controls layer visibility"
 NOTIFICATION_TIMELINE_DISABLED_TEXT = "Layer panel controls visibility"
+NOTIFICATION_RESIDUAL_DELAY_UNCHANGED_TEXT = (
+    "Existing marker and cue times unchanged"
+)
 SEEK_TINY = 2
 SEEK_SHORT = 10
 SEEK_LONG = 30
@@ -169,6 +173,15 @@ class TuningControls:
             session, bindings=render_post_fx_bindings
         )
         self._settings = SettingsControls(session, cfg)
+        self._tap_sync = TapSyncControls(
+            cfg,
+            playback,
+            duration_sec,
+            beat_times,
+            on_notification=self.show_notification,
+            on_apply_residual_delay=self._apply_residual_delay,
+        )
+        self._apply_residual_delay()
         self._editor_mode = EditorModeController(
             session,
             cfg,
@@ -181,6 +194,27 @@ class TuningControls:
         )
         if session.timeline.enabled:
             self.show_notification(NOTIFICATION_TIMELINE_ENABLED_TEXT)
+
+    @property
+    def tap_sync(self) -> TapSyncControls:
+        return self._tap_sync
+
+    def _apply_residual_delay(self) -> None:
+        delay_sec = self.cfg.editor.residual_delay_ms / 1000.0
+        self.playback.player.set_residual_delay_sec(delay_sec)
+
+    def _on_residual_delay_changed(self) -> None:
+        self._apply_residual_delay()
+        if self._project_has_markers_or_cues():
+            self.show_notification(NOTIFICATION_RESIDUAL_DELAY_UNCHANGED_TEXT)
+
+    def _project_has_markers_or_cues(self) -> bool:
+        if self.session.song_markers.times:
+            return True
+        for lane in self.session.timeline.lanes.values():
+            if lane.cues:
+                return True
+        return False
 
     def _move_mode_signature_payload(self) -> dict[str, list[str]] | None:
         if self.move_mode_slot is not None and self._move_mode_original_z_order is not None:
@@ -236,6 +270,9 @@ class TuningControls:
 
         if is_preset_curation_mode(self.session):
             return self._handle_curation_keydown(event)
+
+        if self._tap_sync.active:
+            return self._tap_sync.handle_keydown(event) or True
 
         if event.key == pygame.K_SPACE:
             toggle_pause(self.playback, self.duration_sec)
@@ -422,6 +459,9 @@ class TuningControls:
             kind = self.focus_descriptor.kind
             if kind == RowKind.SETTINGS_EDITOR_MODE:
                 self._editor_mode.confirm_editor_mode_selection()
+                return True
+            if kind == RowKind.SETTINGS_SYNC_BY_EAR:
+                self._tap_sync.start()
                 return True
             if kind == RowKind.SONG_MARKER_ITEM:
                 desc = self.focus_descriptor

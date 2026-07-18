@@ -100,7 +100,7 @@ Optional compensation for unmeasurable residual delay (Bluetooth headphones, OS 
 ### UX
 
 - Optional, default 0. Calibrate before free-form authoring when wireless gear needs it; snap-on remains the robust default.
-- Machine-scoped, not project-scoped. Residual delay is a property of the current devices, not the song, so it must not live in per-project [cleave-viz.yaml](../cleave-viz.yaml). Decision needed: introduce a small machine-local editor setting, since cleave currently has per-project config only.
+- Machine-scoped, not project-scoped. Residual delay is a property of the current devices, not the song, so it must not live in per-project [cleave-viz.yaml](../cleave-viz.yaml). It persists in `~/.config/cleave/config.yaml` under `editor.residual_delay_ms`.
 - Help copy: "Wireless delay the OS cannot report. Affects live playhead and new placements only. Saved markers, cues, and renders do not move when you change this. Typical Bluetooth output is 150 to 300ms; some devices exceed 500ms. Bluetooth keyboards add input lag too. Or use Sync by ear."
 - If the value changes while a project already has markers or cues, a short note is enough: existing times unchanged; re-record if placement used a different delay.
 - Calibrate to the sound (or click track), not to existing free-form marks that may have been captured under a wrong delay.
@@ -141,7 +141,7 @@ Typical A2DP output latency for reference:
 - New: [cleave/viz/transport_clock.py](../cleave/viz/transport_clock.py)
 - Clock and playback: [cleave/viz/mix_player.py](../cleave/viz/mix_player.py), [cleave/viz/playback.py](../cleave/viz/playback.py)
 - Placement and cues: [cleave/viz/controls.py](../cleave/viz/controls.py), [cleave/viz/timeline_controls.py](../cleave/viz/timeline_controls.py), [cleave/song_markers.py](../cleave/song_markers.py), [cleave/timeline.py](../cleave/timeline.py)
-- Snap toggle and residual-delay UI and config: [cleave/config_schema.py](../cleave/config_schema.py), [cleave/viz/session.py](../cleave/viz/session.py), [cleave/viz/row_fields.py](../cleave/viz/row_fields.py), [cleave/viz/row_sections.py](../cleave/viz/row_sections.py), [cleave/viz/tuning_view_state.py](../cleave/viz/tuning_view_state.py), [cleave/viz/timeline_snap_controls.py](../cleave/viz/timeline_snap_controls.py), plus a machine-local settings store (location TBD)
+- Snap toggle and residual-delay UI and config: [cleave/config_schema.py](../cleave/config_schema.py), [cleave/viz/session.py](../cleave/viz/session.py), [cleave/viz/row_fields.py](../cleave/viz/row_fields.py), [cleave/viz/row_sections.py](../cleave/viz/row_sections.py), [cleave/viz/tuning_view_state.py](../cleave/viz/tuning_view_state.py), [cleave/viz/timeline_snap_controls.py](../cleave/viz/timeline_snap_controls.py), machine-local `editor.residual_delay_ms` in `~/.config/cleave/config.yaml`
 - Render test only: [cleave/viz/render.py](../cleave/viz/render.py)
 
 ---
@@ -157,9 +157,10 @@ Typical A2DP output latency for reference:
 
 ## Open decisions
 
-- Where the machine-local residual delay persists, given cleave currently has per-project config only.
 - Default snap target: beat or bar (implementation currently defaults to beat).
 - Whether the snap toggle defaults on (implementation currently defaults to beat snap).
+
+Machine-local residual delay persists in `~/.config/cleave/config.yaml` under `editor.residual_delay_ms` (default 0).
 
 ---
 

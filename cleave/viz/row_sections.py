@@ -31,6 +31,12 @@ def _toggle_settings_ui(controls: TuningControls, _slot: str | None, forward: bo
     controls._settings.set_ui_expanded(forward)
 
 
+def _toggle_settings_wireless_delay(
+    controls: TuningControls, _slot: str | None, forward: bool
+) -> None:
+    controls._settings.set_wireless_delay_expanded(forward)
+
+
 def _toggle_render_overlay(controls: TuningControls, _slot: str | None, forward: bool) -> None:
     controls._render_overlay.set_expanded(forward)
 
@@ -202,6 +208,10 @@ def _settings_ui_expanded(state: TuningViewState, _slot: str | None) -> bool:
     return state.settings.ui_expanded
 
 
+def _settings_wireless_delay_expanded(state: TuningViewState, _slot: str | None) -> bool:
+    return state.settings.wireless_delay_expanded
+
+
 def _render_overlay_expanded(state: TuningViewState, _slot: str | None) -> bool:
     return state.render_overlay.expanded
 
@@ -319,6 +329,17 @@ SETTINGS_UI_SECTION = ExpandSectionDef(
     ),
 )
 
+SETTINGS_WIRELESS_DELAY_SECTION = ExpandSectionDef(
+    header_kind=RowKind.SETTINGS_WIRELESS_DELAY_HEADER,
+    context="global",
+    read_expanded=_settings_wireless_delay_expanded,
+    toggle=_toggle_settings_wireless_delay,
+    children=(
+        SectionNode(leaf_kind=RowKind.SETTINGS_RESIDUAL_DELAY_MS),
+        SectionNode(leaf_kind=RowKind.SETTINGS_SYNC_BY_EAR),
+    ),
+)
+
 SETTINGS_SECTION = ExpandSectionDef(
     header_kind=RowKind.SETTINGS_HEADER,
     context="global",
@@ -328,6 +349,7 @@ SETTINGS_SECTION = ExpandSectionDef(
         SectionNode(leaf_kind=RowKind.SETTINGS_EDITOR_MODE),
         SectionNode(leaf_kind=RowKind.SETTINGS_PREVIEW_QUALITY),
         SectionNode(expand=SETTINGS_UI_SECTION),
+        SectionNode(expand=SETTINGS_WIRELESS_DELAY_SECTION),
     ),
 )
 

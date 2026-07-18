@@ -4002,7 +4002,7 @@ def test_settings_expand_collapse_and_sub_row_visibility() -> None:
     preview_quality_row = view.layout.find_by_kind(RowKind.SETTINGS_PREVIEW_QUALITY)
     assert preview_quality_row == 2
     assert preview_quality_row in view.layout.navigable_indices(view)
-    assert view.layout.header_row_count() == 6
+    assert view.layout.header_row_count() == 7
 
     controls.focus_descriptor = _desc(view, preview_quality_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
@@ -4031,7 +4031,7 @@ def test_settings_ui_expand_collapse_and_sub_row_visibility() -> None:
     view = controls.build_view_state(paused=False)
     ui_fade_row = view.layout.find_by_kind(RowKind.SETTINGS_UI_FADE)
     assert ui_fade_row in view.layout.navigable_indices(view)
-    assert view.layout.header_row_count() == 9
+    assert view.layout.header_row_count() == 10
 
     controls.focus_descriptor = _desc(view, ui_fade_row)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
@@ -4042,7 +4042,7 @@ def test_settings_ui_expand_collapse_and_sub_row_visibility() -> None:
     assert RowKind.SETTINGS_UI_FADE not in {
         view.layout.kind(i) for i in range(len(view.layout))
     }
-    assert view.layout.header_row_count() == 6
+    assert view.layout.header_row_count() == 7
 
 
 def test_settings_collapse_from_sub_row_refocuses_header() -> None:

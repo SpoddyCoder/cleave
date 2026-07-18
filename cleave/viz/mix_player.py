@@ -12,11 +12,44 @@ from cleave.extract import StemSource
 from cleave.viz.transport_clock import TransportClock
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
+else:
+    from collections.abc import Sequence
 
 FREQUENCY_HZ = 44100
 NUM_CHANNELS = 2
 DEFAULT_CHUNKSIZE = 4096
+CLICK_DURATION_SEC = 0.005
+CLICK_AMPLITUDE = 0.5
+
+
+def _make_click_sample(sample_rate: int, duration_sec: float = CLICK_DURATION_SEC) -> np.ndarray:
+    n = max(1, int(sample_rate * duration_sec))
+    t = np.arange(n, dtype=np.float32) / sample_rate
+    envelope = np.exp(-t * 800.0, dtype=np.float32)
+    tone = np.sin(2.0 * np.pi * 1000.0 * t, dtype=np.float32)
+    return (CLICK_AMPLITUDE * tone * envelope).astype(np.float32)
+
+
+def _mix_click_into_stereo(
+    out: np.ndarray,
+    click: np.ndarray,
+    *,
+    offset_frames: int,
+) -> None:
+    if offset_frames < 0:
+        return
+    sample_offset = offset_frames * 2
+    if sample_offset >= len(out):
+        return
+    click_samples = min(len(click), (len(out) - sample_offset) // 2)
+    if click_samples <= 0:
+        return
+    for i in range(click_samples):
+        sample = float(click[i])
+        idx = sample_offset + i * 2
+        out[idx] = min(1.0, max(-1.0, out[idx] + sample))
+        out[idx + 1] = min(1.0, max(-1.0, out[idx + 1] + sample))
 
 
 def estimate_output_latency_frames(
@@ -111,6 +144,47 @@ class MixPlayer:
         self._clock.reanchor(0)
         self._device: AudioDevice | None = None
         self._callback: Callable[[AudioDevice, memoryview], None] | None = None
+        self._click_beats: tuple[float, ...] | None = None
+        self._click_sample = _make_click_sample(sample_rate)
+        self._next_click_beat_index = 0
+
+    def set_residual_delay_sec(self, sec: float) -> None:
+        with self._lock:
+            self._clock.set_residual_delay_sec(sec)
+
+    def set_click_beats(self, beat_times: Sequence[float] | None) -> None:
+        with self._lock:
+            if beat_times is None:
+                self._click_beats = None
+                self._next_click_beat_index = 0
+                return
+            self._click_beats = tuple(float(t) for t in beat_times)
+            self._next_click_beat_index = 0
+
+    def _mix_click_beats(
+        self,
+        out: np.ndarray,
+        *,
+        read_index: int,
+        frames_written: int,
+    ) -> None:
+        click_beats = self._click_beats
+        if click_beats is None or frames_written <= 0:
+            return
+        chunk_start_sec = read_index / self._sample_rate
+        chunk_end_sec = (read_index + frames_written) / self._sample_rate
+        while self._next_click_beat_index < len(click_beats):
+            beat_sec = click_beats[self._next_click_beat_index]
+            if beat_sec >= chunk_end_sec:
+                break
+            if beat_sec >= chunk_start_sec:
+                offset_frames = int(round((beat_sec - chunk_start_sec) * self._sample_rate))
+                _mix_click_into_stereo(
+                    out,
+                    self._click_sample,
+                    offset_frames=offset_frames,
+                )
+            self._next_click_beat_index += 1
 
     def set_stem_pcm(self, stems: dict[str, tuple[np.ndarray, int]]) -> None:
         self._stem_pcm = {
@@ -166,6 +240,11 @@ class MixPlayer:
                     total_frames=self._total_frames,
                 )
             with self._lock:
+                self._mix_click_beats(
+                    out,
+                    read_index=read_index,
+                    frames_written=frames_written,
+                )
                 self._read_index = new_index
                 self._clock.reanchor(new_index)
 
@@ -214,6 +293,10 @@ class MixPlayer:
     def audible_position_sec(self) -> float:
         with self._lock:
             return self._clock.audible_position_sec()
+
+    def audible_position_zero_residual_sec(self) -> float:
+        with self._lock:
+            return self._clock.audible_position_zero_residual_sec()
 
     def finished(self) -> bool:
         with self._lock:

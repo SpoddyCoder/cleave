@@ -154,12 +154,14 @@ class RenderTimelineBlock:
 class SettingsBlock:
     expanded: bool = False
     ui_expanded: bool = False
+    wireless_delay_expanded: bool = False
     editor_mode: str = "visualizer"
     editor_mode_selection: str = "visualizer"
     preview_quality: str = "balanced"
     ui_width_mode: str = DEFAULT_UI_WIDTH_MODE
     ui_width: int = DEFAULT_UI_WIDTH
     ui_fade: float = DEFAULT_UI_FADE_SEC
+    residual_delay_ms: int = 0
 
 
 @dataclass
@@ -300,6 +302,7 @@ def view_state_structure_signature(
         "settings": {
             "expanded": session.settings.expanded,
             "ui_expanded": session.settings.ui_expanded,
+            "wireless_delay_expanded": session.settings.wireless_delay_expanded,
             "editor_mode": session.settings.editor_mode,
         },
         "notification_active": notification_active,
@@ -434,6 +437,7 @@ class TuningViewStateBuilder:
         settings = SettingsBlock(
             expanded=self.session.settings.expanded,
             ui_expanded=self.session.settings.ui_expanded,
+            wireless_delay_expanded=self.session.settings.wireless_delay_expanded,
             editor_mode=self.session.settings.editor_mode,
             editor_mode_selection=self.session.settings.editor_mode_selection,
         )
@@ -642,12 +646,16 @@ class TuningViewStateBuilder:
             ),
             settings=replace(
                 structure.settings,
+                expanded=self.session.settings.expanded,
+                ui_expanded=self.session.settings.ui_expanded,
+                wireless_delay_expanded=self.session.settings.wireless_delay_expanded,
                 editor_mode=self.session.settings.editor_mode,
                 editor_mode_selection=self.session.settings.editor_mode_selection,
                 preview_quality=self._config_save.cfg.editor.preview_quality,
                 ui_width_mode=self._config_save.cfg.editor.ui_width_mode,
                 ui_width=self._config_save.cfg.editor.ui_width,
                 ui_fade=self._config_save.cfg.editor.ui_fade,
+                residual_delay_ms=self._config_save.cfg.editor.residual_delay_ms,
             ),
             timeline_recording=tl.recording,
             timeline_override_active=bool(tl.override_slots),
