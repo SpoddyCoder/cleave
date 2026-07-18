@@ -177,7 +177,7 @@ class TuningControls:
             cfg,
             playback,
             duration_sec,
-            beat_times,
+            self._modal_host,
             on_notification=self.show_notification,
             on_apply_residual_delay=self._apply_residual_delay,
         )
@@ -461,7 +461,7 @@ class TuningControls:
                 self._editor_mode.confirm_editor_mode_selection()
                 return True
             if kind == RowKind.SETTINGS_SYNC_BY_EAR:
-                self._tap_sync.start()
+                self._tap_sync.prompt_start()
                 return True
             if kind == RowKind.SONG_MARKER_ITEM:
                 desc = self.focus_descriptor

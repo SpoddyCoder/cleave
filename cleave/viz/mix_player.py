@@ -21,14 +21,21 @@ NUM_CHANNELS = 2
 DEFAULT_CHUNKSIZE = 4096
 CLICK_DURATION_SEC = 0.005
 CLICK_AMPLITUDE = 0.5
+CLICK_ACCENT_AMPLITUDE = 0.9
+CLICK_QUIET_AMPLITUDE = 0.35
 
 
-def _make_click_sample(sample_rate: int, duration_sec: float = CLICK_DURATION_SEC) -> np.ndarray:
+def _make_click_sample(
+    sample_rate: int,
+    duration_sec: float = CLICK_DURATION_SEC,
+    *,
+    amplitude: float = CLICK_AMPLITUDE,
+) -> np.ndarray:
     n = max(1, int(sample_rate * duration_sec))
     t = np.arange(n, dtype=np.float32) / sample_rate
     envelope = np.exp(-t * 800.0, dtype=np.float32)
     tone = np.sin(2.0 * np.pi * 1000.0 * t, dtype=np.float32)
-    return (CLICK_AMPLITUDE * tone * envelope).astype(np.float32)
+    return (amplitude * tone * envelope).astype(np.float32)
 
 
 def _mix_click_into_stereo(
@@ -144,47 +151,120 @@ class MixPlayer:
         self._clock.reanchor(0)
         self._device: AudioDevice | None = None
         self._callback: Callable[[AudioDevice, memoryview], None] | None = None
-        self._click_beats: tuple[float, ...] | None = None
+        self._click_schedule: tuple[tuple[float, bool], ...] | None = None
+        self._click_only = False
         self._click_sample = _make_click_sample(sample_rate)
-        self._next_click_beat_index = 0
+        self._click_accent_sample = _make_click_sample(
+            sample_rate, amplitude=CLICK_ACCENT_AMPLITUDE
+        )
+        self._click_quiet_sample = _make_click_sample(
+            sample_rate, amplitude=CLICK_QUIET_AMPLITUDE
+        )
+        self._next_click_index = 0
 
     def set_residual_delay_sec(self, sec: float) -> None:
         with self._lock:
             self._clock.set_residual_delay_sec(sec)
 
-    def set_click_beats(self, beat_times: Sequence[float] | None) -> None:
+    def set_click_schedule(
+        self,
+        schedule: Sequence[tuple[float, bool]] | None,
+    ) -> None:
         with self._lock:
-            if beat_times is None:
-                self._click_beats = None
-                self._next_click_beat_index = 0
+            if schedule is None:
+                self._click_schedule = None
+                self._next_click_index = 0
                 return
-            self._click_beats = tuple(float(t) for t in beat_times)
-            self._next_click_beat_index = 0
+            self._click_schedule = tuple(
+                (float(time_sec), bool(accented)) for time_sec, accented in schedule
+            )
+            self._next_click_index = 0
 
-    def _mix_click_beats(
+    def set_click_only(self, on: bool) -> None:
+        with self._lock:
+            self._click_only = on
+
+    def _mix_click_schedule(
         self,
         out: np.ndarray,
         *,
         read_index: int,
         frames_written: int,
+        click_only: bool,
     ) -> None:
-        click_beats = self._click_beats
-        if click_beats is None or frames_written <= 0:
+        click_schedule = self._click_schedule
+        if click_schedule is None or frames_written <= 0:
             return
         chunk_start_sec = read_index / self._sample_rate
         chunk_end_sec = (read_index + frames_written) / self._sample_rate
-        while self._next_click_beat_index < len(click_beats):
-            beat_sec = click_beats[self._next_click_beat_index]
-            if beat_sec >= chunk_end_sec:
+        while self._next_click_index < len(click_schedule):
+            click_sec, accented = click_schedule[self._next_click_index]
+            if click_sec >= chunk_end_sec:
                 break
-            if beat_sec >= chunk_start_sec:
-                offset_frames = int(round((beat_sec - chunk_start_sec) * self._sample_rate))
+            if click_sec >= chunk_start_sec:
+                if click_only:
+                    click = (
+                        self._click_accent_sample
+                        if accented
+                        else self._click_quiet_sample
+                    )
+                else:
+                    click = self._click_sample
+                offset_frames = int(
+                    round((click_sec - chunk_start_sec) * self._sample_rate)
+                )
                 _mix_click_into_stereo(
                     out,
-                    self._click_sample,
+                    click,
                     offset_frames=offset_frames,
                 )
-            self._next_click_beat_index += 1
+            self._next_click_index += 1
+
+    def _fill_output_buffer(self, out: np.ndarray) -> None:
+        """Fill *out* from mix/stem PCM, mix beat clicks, and advance transport."""
+        with self._lock:
+            read_index = self._read_index
+            click_only = self._click_only
+            solo_source = None if click_only else self._solo_source
+            stem_pcm = self._stem_pcm.get(solo_source) if solo_source else None
+            stem_channels = (
+                self._stem_channels.get(solo_source, 1) if solo_source else 1
+            )
+        if stem_pcm is not None:
+            if stem_channels == 2:
+                total_frames = len(stem_pcm) // 2
+                frames_written, new_index = copy_stereo_pcm_chunk(
+                    stem_pcm,
+                    read_index,
+                    out,
+                    total_frames=total_frames,
+                )
+            else:
+                total_frames = len(stem_pcm)
+                frames_written, new_index = copy_mono_pcm_chunk_as_stereo(
+                    stem_pcm,
+                    read_index,
+                    out,
+                    total_frames=total_frames,
+                )
+        else:
+            frames_written, new_index = copy_stereo_pcm_chunk(
+                self._pcm,
+                read_index,
+                out,
+                total_frames=self._total_frames,
+            )
+        if click_only:
+            out.fill(0.0)
+        with self._lock:
+            self._mix_click_schedule(
+                out,
+                read_index=read_index,
+                frames_written=frames_written,
+                click_only=click_only,
+            )
+            self._read_index = new_index
+            self._clock.reanchor(new_index)
 
     def set_stem_pcm(self, stems: dict[str, tuple[np.ndarray, int]]) -> None:
         self._stem_pcm = {
@@ -204,49 +284,7 @@ class MixPlayer:
         def callback(_device: AudioDevice, memview: memoryview) -> None:
             n_samples = len(memview) // 4
             out = np.frombuffer(memview, dtype=np.float32, count=n_samples)
-            with self._lock:
-                read_index = self._read_index
-                solo_source = self._solo_source
-                stem_pcm = (
-                    self._stem_pcm.get(solo_source) if solo_source else None
-                )
-                stem_channels = (
-                    self._stem_channels.get(solo_source, 1)
-                    if solo_source
-                    else 1
-                )
-            if stem_pcm is not None:
-                if stem_channels == 2:
-                    total_frames = len(stem_pcm) // 2
-                    frames_written, new_index = copy_stereo_pcm_chunk(
-                        stem_pcm,
-                        read_index,
-                        out,
-                        total_frames=total_frames,
-                    )
-                else:
-                    total_frames = len(stem_pcm)
-                    frames_written, new_index = copy_mono_pcm_chunk_as_stereo(
-                        stem_pcm,
-                        read_index,
-                        out,
-                        total_frames=total_frames,
-                    )
-            else:
-                frames_written, new_index = copy_stereo_pcm_chunk(
-                    self._pcm,
-                    read_index,
-                    out,
-                    total_frames=self._total_frames,
-                )
-            with self._lock:
-                self._mix_click_beats(
-                    out,
-                    read_index=read_index,
-                    frames_written=frames_written,
-                )
-                self._read_index = new_index
-                self._clock.reanchor(new_index)
+            self._fill_output_buffer(out)
 
         self._callback = callback
         self._device = AudioDevice(

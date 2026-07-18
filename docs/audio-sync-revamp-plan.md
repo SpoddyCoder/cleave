@@ -114,7 +114,7 @@ Optional compensation for unmeasurable residual delay (Bluetooth headphones, OS 
 
 ### Tap to sync
 
-Cleave plays a click track, the user taps along, and cleave infers the offset and fills the field. Manual override remains available for users who know their device.
+Cleave plays a fixed 120 BPM metronome only (song and visuals pause): a loud downbeat on beat 1 of each bar and quieter quarter-note clicks on beats 2 to 4. The user taps Space in time with the clicks; when the last four tap deltas are consistent (within 25 ms), calibration pauses and a confirm modal proposes the detected delay. Apply persists the offset; Cancel exits without changing it. No song beat grid is required. Manual override remains available for users who know their device.
 
 Typical A2DP output latency for reference:
 

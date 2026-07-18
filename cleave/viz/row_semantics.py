@@ -1042,12 +1042,12 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_entries=(
             ("Enter", "start calibration"),
             ("Space", "tap on each click"),
-            ("Enter", "accept when at least 4 taps"),
             ("Esc", "cancel"),
         ),
         help_description=(
-            "Plays a click on each beat while transport runs.",
-            "Tap Space in time with the clicks; Enter accepts the inferred delay.",
+            "Pauses song and visuals for calibration.",
+            "Plays a 120 BPM click track: loud downbeat plus quieter quarters.",
+            "Tap Space in time with the clicks until the delay is detected.",
         ),
     ),
 }

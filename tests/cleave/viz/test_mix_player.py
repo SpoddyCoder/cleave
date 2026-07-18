@@ -222,3 +222,62 @@ def test_mix_player_start_sets_latency_from_chunksize() -> None:
         assert player._clock.latency_frames == 256
     finally:
         player.stop()
+
+
+def test_mix_player_click_only_zeros_mix_pcm() -> None:
+    mix = np.full(FREQUENCY_HZ * 2, 0.75, dtype=np.float32)
+    player = MixPlayer(mix, FREQUENCY_HZ)
+    player.set_click_only(True)
+    out = np.zeros(DEFAULT_CHUNKSIZE * 2, dtype=np.float32)
+    player._fill_output_buffer(out)
+    assert np.all(out == 0.0)
+
+
+def test_mix_player_click_only_mixes_loud_accent_click() -> None:
+    mix = np.full(FREQUENCY_HZ * 2, 0.75, dtype=np.float32)
+    player = MixPlayer(mix, FREQUENCY_HZ)
+    player.set_click_only(True)
+    player.set_click_schedule(((0.0, True),))
+    out = np.zeros(DEFAULT_CHUNKSIZE * 2, dtype=np.float32)
+    player._fill_output_buffer(out)
+    assert np.max(np.abs(out)) > 0.5
+
+
+def test_mix_player_click_only_quiet_click_is_softer_than_accent() -> None:
+    mix = np.full(FREQUENCY_HZ * 2, 0.75, dtype=np.float32)
+    accent_player = MixPlayer(mix, FREQUENCY_HZ)
+    quiet_player = MixPlayer(mix, FREQUENCY_HZ)
+    accent_player.set_click_only(True)
+    quiet_player.set_click_only(True)
+    accent_player.set_click_schedule(((0.0, True),))
+    quiet_player.set_click_schedule(((0.0, False),))
+    accent_out = np.zeros(DEFAULT_CHUNKSIZE * 2, dtype=np.float32)
+    quiet_out = np.zeros(DEFAULT_CHUNKSIZE * 2, dtype=np.float32)
+    accent_player._fill_output_buffer(accent_out)
+    quiet_player._fill_output_buffer(quiet_out)
+    assert np.max(np.abs(accent_out)) > np.max(np.abs(quiet_out))
+
+
+def test_mix_player_click_only_ignores_solo_stem() -> None:
+    mix = np.zeros(FREQUENCY_HZ * 2, dtype=np.float32)
+    drums = np.full(FREQUENCY_HZ, 0.9, dtype=np.float32)
+    player = MixPlayer(mix, FREQUENCY_HZ)
+    player.set_stem_pcm({"drums": (drums, 1)})
+    player.set_solo_source("drums")
+    player.set_click_only(True)
+    out = np.zeros(DEFAULT_CHUNKSIZE * 2, dtype=np.float32)
+    player._fill_output_buffer(out)
+    assert player._read_index > 0
+    assert np.all(out == 0.0)
+
+
+def test_mix_player_click_only_advances_transport_without_audible_mix() -> None:
+    mix = np.full(FREQUENCY_HZ * 4, 0.8, dtype=np.float32)
+    player = MixPlayer(mix, FREQUENCY_HZ, chunksize=256)
+    player.set_click_only(True)
+    player.pause(True)
+    player.seek(0.0)
+    out = np.zeros(512, dtype=np.float32)
+    player._fill_output_buffer(out)
+    assert player._read_index == 256
+    assert player.file_position_sec() == pytest.approx(256 / FREQUENCY_HZ)

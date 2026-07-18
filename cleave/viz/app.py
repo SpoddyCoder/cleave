@@ -340,6 +340,7 @@ def tick_frame_core(
     was_paused: bool | None,
     n_pcm: int,
     pm_time_sec: float,
+    blank_visualizers: bool = False,
 ) -> bool | None:
     """Shared frame tick for live and render. Returns updated was_paused."""
     if was_paused is not None and paused != was_paused:
@@ -352,25 +353,28 @@ def tick_frame_core(
     if isinstance(runtime, LiveVisualizerRuntime):
         on_panel_notification = runtime.controls.show_notification
 
-    LayerFramePipeline.render_frame(
-        runtime.seed.session,
-        runtime.layers,
-        runtime.layers_by_slot,
-        runtime.seed.pcm_bank,
-        n_pcm,
-        runtime.post_process,
-        runtime.seed.effect_runtime,
-        runtime.seed.signals,
-        t_sec,
-        paused=paused,
-        pm_time_sec=pm_time_sec,
-        compositor=runtime.compositor,
-        on_panel_notification=on_panel_notification,
-    )
+    if blank_visualizers:
+        runtime.compositor.composite([])
+    else:
+        LayerFramePipeline.render_frame(
+            runtime.seed.session,
+            runtime.layers,
+            runtime.layers_by_slot,
+            runtime.seed.pcm_bank,
+            n_pcm,
+            runtime.post_process,
+            runtime.seed.effect_runtime,
+            runtime.seed.signals,
+            t_sec,
+            paused=paused,
+            pm_time_sec=pm_time_sec,
+            compositor=runtime.compositor,
+            on_panel_notification=on_panel_notification,
+        )
 
-    LayerFramePipeline.composite(
-        runtime.compositor, runtime.layers_by_slot, runtime.seed.session
-    )
+        LayerFramePipeline.composite(
+            runtime.compositor, runtime.layers_by_slot, runtime.seed.session
+        )
     return was_paused
 
 
@@ -486,6 +490,10 @@ class VisualizerApp:
         display_fps: float | None = None,
     ) -> None:
         pm_time_sec = self._pm_clock.advance(dt_sec, paused=paused)
+        blank_visualizers = (
+            isinstance(self._runtime, LiveVisualizerRuntime)
+            and self._runtime.controls.tap_sync.active
+        )
         self._was_paused = tick_frame_core(
             self._runtime,
             t_sec,
@@ -493,6 +501,7 @@ class VisualizerApp:
             was_paused=self._was_paused,
             n_pcm=n_pcm,
             pm_time_sec=pm_time_sec,
+            blank_visualizers=blank_visualizers,
         )
         if draw_overlay:
             if not isinstance(self._runtime, LiveVisualizerRuntime):
