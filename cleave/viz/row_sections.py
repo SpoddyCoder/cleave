@@ -595,8 +595,7 @@ BEAT_BAR_GRID_SECTION = ExpandSectionDef(
         SectionNode(leaf_kind=RowKind.TIMELINE_BAR_GRID),
         SectionNode(leaf_kind=RowKind.TIMELINE_BAR_PHASE),
         SectionNode(leaf_kind=RowKind.TIMELINE_PLACEMENT_SNAP),
-        SectionNode(leaf_kind=RowKind.TIMELINE_SNAP_TO_BEATS),
-        SectionNode(leaf_kind=RowKind.TIMELINE_SNAP_TO_BARS),
+        SectionNode(leaf_kind=RowKind.TIMELINE_SNAP_TO_GRID),
     ),
 )
 
@@ -748,8 +747,7 @@ RENDER_TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_BAR_PHASE,
         RowKind.TIMELINE_BAR_GRID,
         RowKind.TIMELINE_PLACEMENT_SNAP,
-        RowKind.TIMELINE_SNAP_TO_BEATS,
-        RowKind.TIMELINE_SNAP_TO_BARS,
+        RowKind.TIMELINE_SNAP_TO_GRID,
         RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
         RowKind.TIMELINE_FADES,
         RowKind.TIMELINE_FADE_IN,
