@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from cleave.timeline import (
     SlotCue,
+    TimelineFadeGroup,
     TimelineLane,
     canonicalize,
     copy_lane,
@@ -17,6 +18,7 @@ from cleave.timeline import (
     shift_bars_by_beats,
     strip_lane_range,
 )
+from cleave.viz.session import TimelineFadeGroupRuntime, TuningSession
 from cleave.viz.focus_nav import (
     FocusCursor,
     MainFocus,
@@ -24,7 +26,6 @@ from cleave.viz.focus_nav import (
     cursor_timeline_submenu_focused,
 )
 from cleave.viz.row_semantics import RowKind
-from cleave.viz.session import TuningSession
 from cleave.viz.timeline_overlay import TimelineViewState, prune_expired_arm_flashes
 
 if TYPE_CHECKING:
@@ -189,9 +190,12 @@ def effective_layer_enabled(
     slot: str,
     t_sec: float,
 ) -> bool:
+    from cleave.viz.editor_mode_controls import is_preset_curation_mode
+
     if session.solo_slot is not None:
         return slot == session.solo_slot
-    if not session.timeline.enabled:
+    # Curation: ignore timeline cues so layer enable flags alone drive visibility.
+    if not session.timeline.enabled or is_preset_curation_mode(session):
         return session.layers[slot].enabled
     tl = session.timeline
     if tl.recording:
@@ -207,12 +211,26 @@ def effective_layer_enabled(
     return timeline_committed_visible(session, slot, t_sec)
 
 
+def _as_fade_group(group: TimelineFadeGroupRuntime) -> TimelineFadeGroup:
+    return TimelineFadeGroup(
+        enabled=group.enabled,
+        fade_in=group.fade_in,
+        fade_out=group.fade_out,
+    )
+
+
 def _timeline_fades_apply(session: TuningSession, slot: str) -> bool:
     """True when continuous cue fades drive FBO enable/opacity for *slot*."""
+    from cleave.viz.editor_mode_controls import is_preset_curation_mode
+
     if session.solo_slot is not None:
         return False
+    if is_preset_curation_mode(session):
+        return False
     tl = session.timeline
-    if not tl.enabled or not tl.fades_enabled:
+    if not tl.enabled:
+        return False
+    if not (tl.song_marker_fades.enabled or tl.standard_cue_fades.enabled):
         return False
     if tl.recording or tl.preview_active:
         return False
@@ -235,15 +253,21 @@ def timeline_fade_multiplier(
     """Committed-lane fade opacity in ``[0, 1]`` (ignores solo/override/preview)."""
     tl = session.timeline
     lane = _lane_for_slot(session, slot)
+    song_marker_fades = _as_fade_group(tl.song_marker_fades)
+    standard_fades = _as_fade_group(tl.standard_cue_fades)
+    max_fade_out = 0.0
+    if song_marker_fades.enabled:
+        max_fade_out = max(max_fade_out, song_marker_fades.fade_out)
+    if standard_fades.enabled:
+        max_fade_out = max(max_fade_out, standard_fades.fade_out)
     return lane_fade_alpha(
         lane,
         t_sec,
         inherit=_inherit_for_slot(session, slot),
-        fade_in=tl.fade_in,
-        fade_out=tl.fade_out,
-        duration_sec=_fade_eval_duration(lane, t_sec, tl.fade_out),
+        song_marker_fades=song_marker_fades,
+        standard_fades=standard_fades,
+        duration_sec=_fade_eval_duration(lane, t_sec, max_fade_out),
         song_marker_times=session.song_markers.times,
-        exclude_song_markers=tl.fades_apply_to == "exclude_song_markers",
     )
 
 
@@ -321,4 +345,6 @@ def build_timeline_view_state(
         ),
         song_marker_times=tuple(session.song_markers.times),
         selected_song_marker_index=focused_song_marker_index(focus_cursor),
+        song_marker_fades=_as_fade_group(tl.song_marker_fades),
+        standard_cue_fades=_as_fade_group(tl.standard_cue_fades),
     )

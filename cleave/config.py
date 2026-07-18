@@ -57,17 +57,18 @@ from cleave.config_schema import (
     DEFAULT_RENDER_POST_FX_FADE_OUT,
     DEFAULT_TEXTURE_PATHS,
     DEFAULT_TIMELINE_ENABLED,
-    DEFAULT_TIMELINE_FADES_APPLY_TO,
     DEFAULT_TIMELINE_FADES_ENABLED,
     DEFAULT_TIMELINE_FADE_IN,
     DEFAULT_TIMELINE_FADE_OUT,
-    TimelineFadesApplyTo,
+    DEFAULT_TIMELINE_PLACEMENT_SNAP,
+    TimelinePlacementSnap,
     DEFAULT_HDR_COMPOSITING,
     DEFAULT_RENDER_FPS,
     DEFAULT_RENDER_HEIGHT,
     DEFAULT_RENDER_WIDTH,
     DEFAULT_EDITOR_HEIGHT,
     DEFAULT_UI_FADE_SEC,
+    DEFAULT_RESIDUAL_LATENCY_MS,
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
     DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
@@ -144,7 +145,7 @@ class EditorConfig:
     ui_width_mode: UiWidthMode = DEFAULT_UI_WIDTH_MODE
     ui_width: int = DEFAULT_UI_WIDTH
     ui_fade: float = DEFAULT_UI_FADE_SEC
-
+    residual_latency_ms: int = DEFAULT_RESIDUAL_LATENCY_MS
     @property
     def display_width(self) -> int:
         return max(1, round(self.width * self.upscale))
@@ -230,11 +231,18 @@ class RenderConfig:
 
 
 @dataclass(frozen=True)
-class TimelineFadesConfig:
+class TimelineFadeGroupConfig:
     enabled: bool = DEFAULT_TIMELINE_FADES_ENABLED
     fade_in: float = DEFAULT_TIMELINE_FADE_IN
     fade_out: float = DEFAULT_TIMELINE_FADE_OUT
-    apply_to: TimelineFadesApplyTo = DEFAULT_TIMELINE_FADES_APPLY_TO
+
+
+@dataclass(frozen=True)
+class TimelineFadesConfig:
+    song_markers: TimelineFadeGroupConfig = field(
+        default_factory=TimelineFadeGroupConfig
+    )
+    standard: TimelineFadeGroupConfig = field(default_factory=TimelineFadeGroupConfig)
 
 
 @dataclass(frozen=True)
@@ -243,6 +251,7 @@ class TimelineConfig:
     lanes: dict[str, TimelineLane]
     locked: bool = False
     fades: TimelineFadesConfig = field(default_factory=TimelineFadesConfig)
+    placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
 
 
 @dataclass

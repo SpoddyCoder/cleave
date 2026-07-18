@@ -173,8 +173,6 @@ def _row_text(state: TuningViewState, index: int) -> str:
             return row_action_parameter_display_text(state, desc)
         if field.present_style == RowPresentStyle.EXPAND_SUBHEADER:
             return row_expand_subheader_display_text(state, desc)
-        if field.present_style == RowPresentStyle.ACTION_EXPAND_SUBHEADER:
-            return row_expand_subheader_display_text(state, desc)
         if field.present_style == RowPresentStyle.COMPOSITE_HEADER:
             return row_composite_header_display_text(state, desc)
         if field.present_style == RowPresentStyle.PATH_ICON:
@@ -194,35 +192,13 @@ def _action_parameter_row_value(state: TuningViewState, index: int) -> str:
     return format_row_value(state, state.layout.descriptor(index))
 
 
-def _expand_subheader_arrow_color(
-    state: TuningViewState, index: int
-) -> tuple[int, int, int]:
-    """Expand arrow uses VALUE white (or disabled/locked), not ACTION green."""
-    kind = state.layout.kind(index)
-    desc = state.layout.descriptor(index)
-    locked_blocked = section_locked(state, desc) and row_blocked_by_section_lock(kind)
-
-    if kind in RENDER_TIMELINE_SECTION_KINDS:
-        if not state.render_timeline.enabled:
-            return DISABLED
-
-    if locked_blocked:
-        return LOCKED
-
-    return VALUE
-
-
 def _action_parameter_label_color(
     state: TuningViewState, index: int
 ) -> tuple[int, int, int]:
-    """ACTION green label prefix matching the parent action row."""
+    """ACTION green label prefix for action-parameter rows (e.g. editor mode)."""
     kind = state.layout.kind(index)
     desc = state.layout.descriptor(index)
     locked_blocked = section_locked(state, desc) and row_blocked_by_section_lock(kind)
-
-    if kind in RENDER_TIMELINE_SECTION_KINDS:
-        if not state.render_timeline.enabled:
-            return DISABLED
 
     if locked_blocked:
         return LOCKED
@@ -238,9 +214,13 @@ def _fit_action_parameter_row_value(
     max_content_width: int = PANEL_CONTENT_MAX_WIDTH,
     cache: TuningPanelCache | None = None,
 ) -> str:
+    value = _action_parameter_row_value(state, index)
+    # Flexible mode sizes the panel to content; keep the full value so chrome like
+    # editor-mode "[Enter to confirm]" can widen the panel past ui_width max.
+    if state.settings.ui_width_mode == "flexible":
+        return value
     budget = max_content_width - _row_indent(state, index)
     budget -= font.size(_action_parameter_row_prefix(state.layout.kind(index)))[0]
-    value = _action_parameter_row_value(state, index)
     if cache is None:
         return fit_text_to_width(font, value, budget)
     return cache.fit_text_cached("text", fit_text_to_width, font, value, budget)
@@ -548,8 +528,6 @@ def fit_row_text(
         return row_composite_header_display_text(state, state.layout.descriptor(index))
     if field is not None and field.present_style == RowPresentStyle.EXPAND_SUBHEADER:
         return row_expand_subheader_display_text(state, state.layout.descriptor(index))
-    if field is not None and field.present_style == RowPresentStyle.ACTION_EXPAND_SUBHEADER:
-        return row_expand_subheader_display_text(state, state.layout.descriptor(index))
     if kind in ACTION_PARAMETER_SUB_ROW_KINDS:
         return _action_parameter_row_prefix(kind) + _fit_action_parameter_row_value(
             font,
@@ -624,9 +602,9 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
         RowKind.TRACK_USER_PRESET_ADD,
         RowKind.TIMELINE_PRESETS,
         RowKind.TIMELINE_RESET,
-        RowKind.TIMELINE_SNAP_TO_BEATS,
-        RowKind.TIMELINE_SNAP_TO_BARS,
+        RowKind.TIMELINE_SNAP_TO_GRID,
         RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
+        RowKind.SETTINGS_MEASURE_LATENCY,
     }:
         if kind == RowKind.CONFIG_HEADER and state.solo_active:
             return DISABLED
@@ -966,11 +944,7 @@ def _estimate_row_content_width(
 
     if (
         ROW_FIELDS.get(kind) is not None
-        and ROW_FIELDS[kind].present_style
-        in {
-            RowPresentStyle.EXPAND_SUBHEADER,
-            RowPresentStyle.ACTION_EXPAND_SUBHEADER,
-        }
+        and ROW_FIELDS[kind].present_style == RowPresentStyle.EXPAND_SUBHEADER
     ):
         desc = state.layout.descriptor(index)
         prefix = expand_subheader_prefix(kind)
@@ -1004,8 +978,9 @@ def _estimate_row_content_width(
             RowKind.TRACK_USER_PRESET_ADD,
             RowKind.TIMELINE_PRESETS,
             RowKind.TIMELINE_RESET,
-            RowKind.TIMELINE_SNAP_TO_BEATS,
-            RowKind.TIMELINE_SNAP_TO_BARS,
+            RowKind.TIMELINE_SNAP_TO_GRID,
+            RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
+            RowKind.SETTINGS_MEASURE_LATENCY,
         }
     ):
         label = _row_text(state, index)
@@ -1466,22 +1441,6 @@ class TuningOverlay:
             )
             return surf, None, indent + surf.get_width()
 
-        if (
-            ROW_FIELDS.get(kind) is not None
-            and ROW_FIELDS[kind].present_style == RowPresentStyle.ACTION_EXPAND_SUBHEADER
-        ):
-            desc = state.layout.descriptor(index)
-            surf = _render_label_value_row(
-                font,
-                prefix=expand_subheader_prefix(kind),
-                value=format_expand_subheader_value(state, desc),
-                value_color=_expand_subheader_arrow_color(state, index),
-                prefix_color=_action_parameter_label_color(state, index),
-                line_height=line_h,
-                counters=counters,
-            )
-            return surf, None, indent + surf.get_width()
-
         if kind in ACTION_PARAMETER_SUB_ROW_KINDS:
             prefix = _action_parameter_row_prefix(kind)
             value = _fit_action_parameter_row_value(
@@ -1531,8 +1490,9 @@ class TuningOverlay:
                 RowKind.TRACK_USER_PRESET_ADD,
                 RowKind.TIMELINE_PRESETS,
                 RowKind.TIMELINE_RESET,
-                RowKind.TIMELINE_SNAP_TO_BEATS,
-                RowKind.TIMELINE_SNAP_TO_BARS,
+                RowKind.TIMELINE_SNAP_TO_GRID,
+                RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
+                RowKind.SETTINGS_MEASURE_LATENCY,
             }
         ):
             label = _row_text(state, index)
@@ -1797,7 +1757,7 @@ class TuningOverlay:
             cache.last_fps_rect = None
 
         if text_alpha >= 2:
-            help_hint = _render_text(font, "h - help", True, LABEL, counters=counters)
+            help_hint = _render_text(font, "H - help", True, LABEL, counters=counters)
             help_hint.set_alpha(text_alpha)
             hint_layout = panel_help_hint_layout(
                 panel_w=panel_w,
@@ -2032,10 +1992,21 @@ class TuningOverlay:
                 )
 
         content_w = max(row_widths) if row_widths else 0
-        content_w = min(content_w, panel_max_width)
         if state.settings.ui_width_mode == "fixed":
             content_w = panel_max_width
+        else:
+            # Path rows are fitted to panel_max already. Allow natural
+            # action-parameter chrome (e.g. editor-mode confirm) to widen past
+            # the configured max, still capped by the viewport.
+            margin_x, _ = self._margin
+            viewport_content_max = max(
+                panel_max_width,
+                viewport_width - margin_x * 2 - self._padding * 2,
+            )
+            content_w = min(content_w, viewport_content_max)
         panel_w = content_w + self._padding * 2
+        if panel_w > capacity[0]:
+            capacity = (panel_w, capacity[1])
 
         alpha = int(BACKGROUND_ALPHA * self._visibility)
         if alpha < 2:

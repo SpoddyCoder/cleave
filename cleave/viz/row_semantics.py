@@ -82,23 +82,28 @@ class RowKind(Enum):
     TIMELINE_BEAT_BAR_GRID_HEADER = auto()
     TIMELINE_BAR_PHASE = auto()
     TIMELINE_BAR_GRID = auto()
-    TIMELINE_SNAP_TO_BEATS = auto()
-    TIMELINE_SNAP_TO_BARS = auto()
-    TIMELINE_SNAP_MARKER_PROXIMITY = auto()
-    TIMELINE_SNAP_MARKER_SCOPE = auto()
+    TIMELINE_PLACEMENT_SNAP = auto()
+    TIMELINE_SNAP_TO_GRID = auto()
     TIMELINE_SNAP_TO_SONG_MARKERS = auto()
-    TIMELINE_FADES = auto()
-    TIMELINE_FADE_IN = auto()
-    TIMELINE_FADE_OUT = auto()
-    TIMELINE_FADES_APPLY_TO = auto()
+    TIMELINE_FADES_HEADER = auto()
+    TIMELINE_SONG_MARKER_FADES = auto()
+    TIMELINE_SONG_MARKER_FADE_IN = auto()
+    TIMELINE_SONG_MARKER_FADE_OUT = auto()
+    TIMELINE_STANDARD_CUE_FADES = auto()
+    TIMELINE_STANDARD_CUE_FADE_IN = auto()
+    TIMELINE_STANDARD_CUE_FADE_OUT = auto()
     SONG_MARKERS_HEADER = auto()
     SONG_MARKER_ITEM = auto()
     SETTINGS_HEADER = auto()
+    SETTINGS_EDITOR_MODE = auto()
     SETTINGS_PREVIEW_QUALITY = auto()
     SETTINGS_UI_HEADER = auto()
     SETTINGS_UI_WIDTH_MODE = auto()
     SETTINGS_UI_WIDTH = auto()
     SETTINGS_UI_FADE = auto()
+    SETTINGS_LATENCY_COMPENSATION_HEADER = auto()
+    SETTINGS_RESIDUAL_LATENCY_MS = auto()
+    SETTINGS_MEASURE_LATENCY = auto()
     CONFIG_HEADER = auto()
     TRANSPORT = auto()
 
@@ -167,8 +172,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.EXPAND,
         help_title="Layer",
         help_description=(
-            "Layer header.",
-            "Contains blend mode, opacity, stem, and preset controls.",
+            "projectM visualiser layer.",
         ),
         can_enter_move_mode=True,
         can_solo=True,
@@ -431,8 +435,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         can_solo=True,
         help_title="Credits overlay",
         help_description=(
-            "Credits overlay burned into the offline render output.",
-            "Previewed live during playback.",
+            "Credits overlay.",
         ),
         quick_nav_target=True,
     ),
@@ -518,7 +521,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         parent_group="render_overlay",
         help_title="Start delay",
         help_description=(
-            "Seconds after the render starts before the overlay fades in.",
+            "The overlay fades in this many seconds after the song starts.",
         ),
     ),
     RowKind.RENDER_OVERLAY_DISPLAY_TIME: RowBehavior(
@@ -537,8 +540,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         can_solo=True,
         help_title="Post FX",
         help_description=(
-            "Post-processing effects applied during final compositing:",
-            "fade in, fade out, highlight rolloff, and chroma boost.",
+            "Post-processing effects applied during final compositing.",
         ),
         quick_nav_target=True,
     ),
@@ -693,10 +695,8 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         can_solo=False,
         help_title="Timeline",
         help_description=(
-            "Timeline automation for layer visibility.",
-            "Cues are burned into the offline render.",
-            "When enabled, standard layer visibility is disabled;",
-            "visibility is controlled by the timeline instead.",
+            "Layer visibility automation.",
+            "When enabled, standard layer visibility is disabled.",
         ),
         quick_nav_target=True,
     ),
@@ -730,7 +730,6 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Beat / bar grid",
         help_description=(
             "AI beat detection powered by Beat This!",
-            "Bar phase, bar grid display, and snap cues to beats or bars.",
         ),
     ),
     RowKind.TIMELINE_BAR_PHASE: RowBehavior(
@@ -744,9 +743,8 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             ("Right", "shift cues +1 beat"),
         ),
         help_description=(
-            "Nudge all committed timeline cues by one beat;",
-            "sticky session offset +0..+3 (mod 4).",
-            "Presets regenerate on this phase-shifted bar grid.",
+            "Nudge all timeline cues by one beat.",
+            "Tip: re-apply snap to song markers after adjusting this."
         ),
     ),
     RowKind.TIMELINE_BAR_GRID: RowBehavior(
@@ -760,122 +758,125 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         ),
         help_description=(
             "Show Beat This! bar detection points on the timeline strip.",
-            "Gaps mean missing detection (no drums)",
+            "Gaps mean missing detection (no rhythm/drums).",
         ),
     ),
-    RowKind.TIMELINE_SNAP_TO_BEATS: RowBehavior(
+    RowKind.TIMELINE_PLACEMENT_SNAP: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        blocked_by_section_lock=True,
+        help_title="Placement snap",
+        help_entries=(("Left/Right", "cycle off / beat / bar"),),
+        help_description=(
+            "Applies when placing song markers and timeline cues",
+            "Snap to the nearest beat or bar.",
+            "Switch off when the beat detection is not accurate.",
+        ),
+    ),
+    RowKind.TIMELINE_SNAP_TO_GRID: RowBehavior(
         RowAffordance.ACTION,
         navigable=True,
         blocked_by_section_lock=True,
-        help_title="Snap to beats",
-        help_entries=(("Enter", "snap cues to beats"),),
+        help_title="Snap to grid",
+        help_entries=(("Enter", "snap cues to beats or bars"),),
         help_description=(
-            "Snap all committed timeline cues to the nearest beat",
-            "(irreversible).",
-        ),
-    ),
-    RowKind.TIMELINE_SNAP_TO_BARS: RowBehavior(
-        RowAffordance.ACTION,
-        navigable=True,
-        blocked_by_section_lock=True,
-        help_title="Snap to bars",
-        help_entries=(("Enter", "snap cues to bars"),),
-        help_description=(
-            "Snap all committed timeline cues to the nearest bar",
-            "(irreversible).",
-        ),
-    ),
-    RowKind.TIMELINE_SNAP_MARKER_PROXIMITY: RowBehavior(
-        RowAffordance.ACTION_PARAMETER,
-        navigable=True,
-        repeatable=True,
-        blocked_by_section_lock=True,
-        help_title="Snap proximity",
-        help_entries=(
-            ("Left", "decrease proximity"),
-            ("Right", "increase proximity"),
-        ),
-        help_description=(
-            "Maximum distance for snap to song markers.",
-        ),
-    ),
-    RowKind.TIMELINE_SNAP_MARKER_SCOPE: RowBehavior(
-        RowAffordance.ACTION_PARAMETER,
-        navigable=True,
-        repeatable=True,
-        blocked_by_section_lock=True,
-        help_title="Snap layer scope",
-        help_entries=(("Left/Right", "cycle layer scope"),),
-        help_description=(
-            "Which tracks snap to song markers.",
-            "Per-layer, closest wins, or all layers independently.",
+            "Snap all timeline cues to the nearest beat or bar.",
         ),
     ),
     RowKind.TIMELINE_SNAP_TO_SONG_MARKERS: RowBehavior(
         RowAffordance.ACTION,
         navigable=True,
-        navigable_when_section_locked=True,
         blocked_by_section_lock=True,
         help_title="Snap to song markers",
-        help_entries=(
-            ("Enter", "snap cues to song markers"),
-            ("Left", "collapse"),
-            ("Right", "expand"),
-        ),
+        help_entries=(("Enter", "snap cues to song markers"),),
         help_description=(
-            "Pull closest cues within proximity onto song markers",
-            "(irreversible; confirm uses proximity and layer scope).",
+            "Pull closest cues within proximity onto song markers.",
         ),
     ),
-    RowKind.TIMELINE_FADES: RowBehavior(
+    RowKind.TIMELINE_FADES_HEADER: RowBehavior(
+        RowAffordance.EXPAND,
+        is_sub_header=True,
+        help_title="Timeline fades",
+        help_description=(
+            "Soft opacity fades in and out of timeline cue edges.",
+        ),
+    ),
+    RowKind.TIMELINE_SONG_MARKER_FADES: RowBehavior(
         RowAffordance.VALUE_STEP,
         navigable=True,
         repeatable=True,
         blocked_by_section_lock=True,
-        help_title="Timeline fades",
+        help_title="Song markers",
         help_entries=(("Left/Right", "enabled / disabled"),),
         help_description=(
-            "Soft opacity fades around committed timeline cue boundaries.",
-            "Applies only during normal committed playback.",
+            "Fade edges that land on a song marker.",
         ),
     ),
-    RowKind.TIMELINE_FADE_IN: RowBehavior(
+    RowKind.TIMELINE_SONG_MARKER_FADE_IN: RowBehavior(
         RowAffordance.VALUE_STEP,
         navigable=True,
         repeatable=True,
         blocked_by_section_lock=True,
-        help_title="Fade in duration",
+        help_title="Song marker fade in",
         help_entries=(
             ("Left", "decrease fade in"),
             ("Right", "increase fade in"),
         ),
         help_description=(
-            "Seconds before an on-cue to ramp opacity from zero to full.",
+            "The fade-in starts this many seconds before the song marker.",
         ),
     ),
-    RowKind.TIMELINE_FADE_OUT: RowBehavior(
+    RowKind.TIMELINE_SONG_MARKER_FADE_OUT: RowBehavior(
         RowAffordance.VALUE_STEP,
         navigable=True,
         repeatable=True,
         blocked_by_section_lock=True,
-        help_title="Fade out duration",
+        help_title="Song marker fade out",
         help_entries=(
             ("Left", "decrease fade out"),
             ("Right", "increase fade out"),
         ),
         help_description=(
-            "Seconds after an off-cue to ramp opacity from full to zero.",
+            "The fade-out starts this many seconds after the song marker.",
         ),
     ),
-    RowKind.TIMELINE_FADES_APPLY_TO: RowBehavior(
+    RowKind.TIMELINE_STANDARD_CUE_FADES: RowBehavior(
         RowAffordance.VALUE_STEP,
         navigable=True,
         repeatable=True,
         blocked_by_section_lock=True,
-        help_title="Apply fades to cues",
-        help_entries=(("Left/Right", "cycle apply-to mode"),),
+        help_title="Standard cue fades",
+        help_entries=(("Left/Right", "enabled / disabled"),),
         help_description=(
-            "All cue edges, or keep edges on song markers abrupt.",
+            "Fade edges that are not on a song marker.",
+        ),
+    ),
+    RowKind.TIMELINE_STANDARD_CUE_FADE_IN: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        repeatable=True,
+        blocked_by_section_lock=True,
+        help_title="Standard cue fade in",
+        help_entries=(
+            ("Left", "decrease fade in"),
+            ("Right", "increase fade in"),
+        ),
+        help_description=(
+            "The fade-in starts this many seconds before the cue.",
+        ),
+    ),
+    RowKind.TIMELINE_STANDARD_CUE_FADE_OUT: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        repeatable=True,
+        blocked_by_section_lock=True,
+        help_title="Standard cue fade out",
+        help_entries=(
+            ("Left", "decrease fade out"),
+            ("Right", "increase fade out"),
+        ),
+        help_description=(
+            "The fade-out starts this many seconds after the cue.",
         ),
     ),
     RowKind.SONG_MARKERS_HEADER: RowBehavior(
@@ -905,8 +906,24 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.EXPAND,
         is_header=True,
         help_title="Editor Settings",
-        help_description=("Global editor settings (not per-layer).",),
+        help_description=("Global editor settings (applies to all projects)",),
         quick_nav_target=True,
+    ),
+    RowKind.SETTINGS_EDITOR_MODE: RowBehavior(
+        RowAffordance.ACTION_PARAMETER,
+        is_pinned=True,
+        repeatable=True,
+        parent_group="settings",
+        help_title="Editor mode",
+        help_entries=(
+            ("Left/Right", "cycle mode"),
+            ("Enter", "confirm switch"),
+        ),
+        help_description=(
+            "Visualizer mode exposes the full tuning panel.",
+            "Preset curation mode limits the panel to preset favourites and blacklist.",
+            "Left/Right stages a mode; Enter confirms the switch.",
+        ),
     ),
     RowKind.SETTINGS_PREVIEW_QUALITY: RowBehavior(
         RowAffordance.VALUE_STEP,
@@ -969,6 +986,48 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         ),
         help_description=(
             "Maximum width of the main tuning panel.",
+        ),
+    ),
+    RowKind.SETTINGS_LATENCY_COMPENSATION_HEADER: RowBehavior(
+        RowAffordance.EXPAND,
+        is_sub_header=True,
+        is_pinned=True,
+        parent_group="settings",
+        help_title="Latency Compensation",
+        help_description=(
+            "Use this to correct for bluetooth/wireless latency.",
+            "Affects new timeline cue & song marker placements only.",
+            "Already saved markers and cues do not move when you change this."
+        ),
+    ),
+    RowKind.SETTINGS_RESIDUAL_LATENCY_MS: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        is_pinned=True,
+        repeatable=True,
+        parent_group="settings_latency_compensation",
+        help_title="Residual latency",
+        help_entries=(
+            ("Left/Right", "adjust latency (10 ms)"),
+            ("Ctrl + Left/Right", "large step (50 ms)"),
+        ),
+        help_description=(
+            "Compensates for unmeasurable input/output lag for live monitoring",
+            "and timeline cue/song marker placement.",
+        ),
+    ),
+    RowKind.SETTINGS_MEASURE_LATENCY: RowBehavior(
+        RowAffordance.ACTION,
+        is_pinned=True,
+        parent_group="settings_latency_compensation",
+        help_title="Measure latency",
+        help_entries=(
+            ("Enter", "start calibration"),
+            ("Space", "tap on each bar beat"),
+            ("Esc", "cancel"),
+        ),
+        help_description=(
+            "Plays a 140 BPM click track.",
+            "Measurement is confirmed when four consistent taps are detected.",
         ),
     ),
 }

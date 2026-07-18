@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from cleave.config_schema import MAX_LAYER_COUNT
 from cleave.viz.row_sections import (
+    CURATION_LAYER_SECTION,
     SETTINGS_SECTION,
     append_expand_section_rows,
     append_render_section_rows,
@@ -104,21 +105,28 @@ class RowLayout:
     @classmethod
     def build(cls, state: TuningViewState) -> RowLayout:
         row_list: list[RowDescriptor] = []
+        curation = state.settings.editor_mode == "preset_curation"
         append_expand_section_rows(row_list, SETTINGS_SECTION, state)
-        row_list.extend(
-            [
-                RowDescriptor(RowKind.CONFIG_HEADER),
-                RowDescriptor(RowKind.TRANSPORT),
-            ]
-        )
+        if not curation:
+            row_list.append(RowDescriptor(RowKind.CONFIG_HEADER))
+        row_list.append(RowDescriptor(RowKind.TRANSPORT))
         if state.notification_message and state.notification_remaining_sec > 0:
             row_list.append(RowDescriptor(RowKind.PANEL_NOTIFICATION))
-        for slot in state.layer_z_order:
-            append_track_section_rows(row_list, state, slot)
-        if len(state.layer_z_order) < MAX_LAYER_COUNT:
-            row_list.append(RowDescriptor(RowKind.LAYER_MANAGEMENT_ADD))
-        row_list.append(RowDescriptor(RowKind.RENDER_SECTION_GAP))
-        append_render_section_rows(row_list, state)
+        if curation:
+            if state.layer_z_order:
+                append_expand_section_rows(
+                    row_list,
+                    CURATION_LAYER_SECTION,
+                    state,
+                    state.layer_z_order[0],
+                )
+        else:
+            for slot in state.layer_z_order:
+                append_track_section_rows(row_list, state, slot)
+            if len(state.layer_z_order) < MAX_LAYER_COUNT:
+                row_list.append(RowDescriptor(RowKind.LAYER_MANAGEMENT_ADD))
+            row_list.append(RowDescriptor(RowKind.RENDER_SECTION_GAP))
+            append_render_section_rows(row_list, state)
         rows = tuple(row_list)
         return cls(
             rows=rows,

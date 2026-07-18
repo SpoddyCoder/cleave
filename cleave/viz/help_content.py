@@ -47,6 +47,22 @@ NAVIGATION_SECTION = HelpSection(
     ),
 )
 
+_CURATION_NAVIGATION_SECTION = HelpSection(
+    "Navigation / Global",
+    (
+        ("Up/Down", "move row"),
+        ("Ctrl + Up/Down", "jump section"),
+        ("ESC", "hide UI"),
+        ("Ctrl + Q", "quit"),
+    ),
+)
+
+
+def navigation_section(*, preset_curation: bool = False) -> HelpSection:
+    if preset_curation:
+        return _CURATION_NAVIGATION_SECTION
+    return NAVIGATION_SECTION
+
 _TRANSPORT_SECTION = HelpSection(
     "Transport Controls",
     (
@@ -58,8 +74,8 @@ _TRANSPORT_SECTION = HelpSection(
 )
 
 _LAYER_SECTION_BASE: tuple[tuple[str, str], ...] = (
-    ("m", "move z-order"),
-    ("l", "lock/unlock layer"),
+    ("M", "move z-order"),
+    ("L", "lock/unlock layer"),
     ("Shift + Left/Right", "solo layer"),
     ("Left/Right", "expand/collapse"),
     ("Delete", "delete layer"),
@@ -67,8 +83,17 @@ _LAYER_SECTION_BASE: tuple[tuple[str, str], ...] = (
 
 _LAYER_VISIBILITY_ENTRY = ("Ctrl + Left/Right", "enable/disable layer")
 
+_CURATION_LAYER_SECTION = HelpSection(
+    "Layer",
+    (("Left/Right", "expand/collapse"),),
+)
 
-def layer_section(*, timeline_enabled: bool) -> HelpSection:
+
+def layer_section(
+    *, timeline_enabled: bool, preset_curation: bool = False
+) -> HelpSection:
+    if preset_curation:
+        return _CURATION_LAYER_SECTION
     entries = list(_LAYER_SECTION_BASE)
     if not timeline_enabled:
         entries.append(_LAYER_VISIBILITY_ENTRY)
@@ -92,8 +117,9 @@ _PRESET_DIR_SECTION = HelpSection(
 )
 
 _PRESET_CURATION_SHORTCUTS = (
-    ("f", "favourite preset"),
-    ("b", "blacklist preset"),
+    ("F", "favourite preset"),
+    ("B", "blacklist preset"),
+    ("R", "remove favourite / restore blacklist"),
 )
 
 _PRESET_SECTION = HelpSection(
@@ -158,7 +184,7 @@ def timeline_strip_section(
     recording: bool,
     override_active: bool,
 ) -> HelpSection:
-    entries: list[tuple[str, str]] = [("a", "toggle arm track")]
+    entries: list[tuple[str, str]] = [("A", "toggle arm track")]
 
     if not recording:
         entries.append(("Shift + Enter", "toggle override"))
@@ -169,10 +195,10 @@ def timeline_strip_section(
         entries.append(("1-4", "toggle layer visibility"))
 
     if recording:
-        entries.append(("r", "stop record"))
+        entries.append(("R", "stop record"))
         entries.append(("Ctrl + Space / Space", "stop record and pause"))
     else:
-        entries.append(("Ctrl + Space / r", "start record"))
+        entries.append(("Ctrl + Space / R", "start record"))
         if paused:
             entries.append(("Space", "play"))
         else:
@@ -258,7 +284,9 @@ def sections_for(
     timeline_recording: bool = False,
     timeline_override_active: bool = False,
     preset_switching: str | None = None,
+    preset_curation: bool = False,
 ) -> tuple[HelpContent, ...]:
+    nav = navigation_section(preset_curation=preset_curation)
     if timeline_submenu_focused:
         strip = timeline_strip_section(
             paused=paused,
@@ -267,13 +295,13 @@ def sections_for(
         )
         description = _description_section(RowKind.RENDER_TIMELINE_HEADER)
         if description is not None:
-            return (description, _keyboard_section(strip), NAVIGATION_SECTION)
-        return (strip, NAVIGATION_SECTION)
+            return (description, _keyboard_section(strip), nav)
+        return (strip, nav)
 
     behavior = row_behavior(row_kind)
 
     if not behavior.navigable or behavior.affordance == RowAffordance.DISPLAY:
-        return (NAVIGATION_SECTION,)
+        return (nav,)
 
     primary: HelpSection | None = None
 
@@ -284,7 +312,10 @@ def sections_for(
                 (("Left/Right", "expand/collapse"),),
             )
         elif behavior.can_enter_move_mode:
-            primary = layer_section(timeline_enabled=timeline_enabled)
+            primary = layer_section(
+                timeline_enabled=timeline_enabled,
+                preset_curation=preset_curation,
+            )
         elif behavior.can_enable_disable and behavior.can_solo:
             primary = _RENDER_SECTION
         elif behavior.can_enable_disable:
@@ -332,9 +363,9 @@ def sections_for(
             primary = _SAVE_SECTION
 
     if primary is None:
-        return (NAVIGATION_SECTION,)
+        return (nav,)
 
     description = _description_section(row_kind, effect_id=effect_id)
     if description is not None:
-        return (description, _keyboard_section(primary), NAVIGATION_SECTION)
-    return (primary, NAVIGATION_SECTION)
+        return (description, _keyboard_section(primary), nav)
+    return (primary, nav)

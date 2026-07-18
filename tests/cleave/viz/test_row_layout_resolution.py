@@ -274,3 +274,6 @@ def test_section_header_descriptor_mappings() -> None:
     assert section_header_descriptor(
         RowDescriptor(RowKind.SONG_MARKER_ITEM, marker_index=0)
     ) == RowDescriptor(RowKind.SONG_MARKERS_HEADER)
+    assert section_header_descriptor(
+        RowDescriptor(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
+    ) == RowDescriptor(RowKind.SONG_MARKERS_HEADER)

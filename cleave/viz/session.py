@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from pathlib import Path
+from typing import Literal
 
 from cleave.config import (
     CleaveConfig,
     RenderOverlayPosition,
+    TimelineFadeGroupConfig,
     VIZ_CONFIG_FILENAME,
 )
 from cleave.config_schema import (
@@ -22,15 +24,15 @@ from cleave.config_schema import (
     DEFAULT_HARD_CUT_ENABLED,
     DEFAULT_EASTER_EGG,
     DEFAULT_PRESET_START_CLEAN,
-    DEFAULT_TIMELINE_FADES_APPLY_TO,
     DEFAULT_TIMELINE_FADES_ENABLED,
     DEFAULT_TIMELINE_FADE_IN,
     DEFAULT_TIMELINE_FADE_OUT,
+    DEFAULT_TIMELINE_PLACEMENT_SNAP,
     HighlightRolloffApplyMode,
     HighlightRolloffCurve,
     PresetSwitchingMode,
     PresetSwitchingScope,
-    TimelineFadesApplyTo,
+    TimelinePlacementSnap,
     default_render_overlay_runtime_values,
     default_highlight_rolloff_runtime_values,
     default_chroma_boost_runtime_values,
@@ -133,6 +135,17 @@ def default_render_post_fx_runtime() -> RenderPostFxRuntime:
 
 
 @dataclass
+class TimelineFadeGroupRuntime:
+    enabled: bool = DEFAULT_TIMELINE_FADES_ENABLED
+    fade_in: float = DEFAULT_TIMELINE_FADE_IN
+    fade_out: float = DEFAULT_TIMELINE_FADE_OUT
+
+
+def default_timeline_fade_group_runtime() -> TimelineFadeGroupRuntime:
+    return TimelineFadeGroupRuntime()
+
+
+@dataclass
 class TimelineRuntime:
     enabled: bool = True
     locked: bool = False
@@ -153,14 +166,15 @@ class TimelineRuntime:
     arm_flash_start_ms: dict[str, int] = field(default_factory=dict)
     bar_phase_offset: int = 0
     show_bar_grid: bool = False
-    song_marker_snap_proximity: float = 5.0
-    song_marker_snap_scope: str = "each_layer"
-    song_marker_snap_expanded: bool = False
     beat_bar_grid_expanded: bool = False
-    fades_enabled: bool = DEFAULT_TIMELINE_FADES_ENABLED
-    fade_in: float = DEFAULT_TIMELINE_FADE_IN
-    fade_out: float = DEFAULT_TIMELINE_FADE_OUT
-    fades_apply_to: TimelineFadesApplyTo = DEFAULT_TIMELINE_FADES_APPLY_TO
+    placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
+    fades_expanded: bool = False
+    song_marker_fades: TimelineFadeGroupRuntime = field(
+        default_factory=default_timeline_fade_group_runtime
+    )
+    standard_cue_fades: TimelineFadeGroupRuntime = field(
+        default_factory=default_timeline_fade_group_runtime
+    )
 
 
 def default_timeline_runtime() -> TimelineRuntime:
@@ -180,10 +194,23 @@ def default_song_marker_runtime() -> SongMarkerRuntime:
     return SongMarkerRuntime()
 
 
+EditorMode = Literal["visualizer", "preset_curation"]
+
+EDITOR_MODES: tuple[EditorMode, ...] = ("visualizer", "preset_curation")
+EDITOR_MODE_PANEL_LABELS: dict[EditorMode, str] = {
+    "visualizer": "visualizer",
+    "preset_curation": "preset curation",
+}
+
+
 @dataclass
 class SettingsRuntime:
     expanded: bool = False
     ui_expanded: bool = False
+    latency_compensation_expanded: bool = False
+    editor_mode: EditorMode = "visualizer"
+    # Staged panel selection; Left/Right cycles, Enter commits.
+    editor_mode_selection: EditorMode = "visualizer"
 
 
 @dataclass
@@ -291,12 +318,29 @@ def render_post_fx_runtime_from_cfg(
     return default_render_post_fx_runtime()
 
 
+def _fade_group_runtime_from_cfg(
+    group: TimelineFadeGroupConfig | None,
+) -> TimelineFadeGroupRuntime:
+    if group is None:
+        return TimelineFadeGroupRuntime()
+    return TimelineFadeGroupRuntime(
+        enabled=group.enabled,
+        fade_in=group.fade_in,
+        fade_out=group.fade_out,
+    )
+
+
 def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
     timeline = cfg.timeline
     enabled = True if timeline is None else timeline.enabled
     locked = False if timeline is None else timeline.locked
     source_lanes = {} if timeline is None else timeline.lanes
     fades = None if timeline is None else timeline.fades
+    placement_snap = (
+        DEFAULT_TIMELINE_PLACEMENT_SNAP
+        if timeline is None
+        else timeline.placement_snap
+    )
     lanes: dict[str, TimelineLane] = {}
     for slot in cfg.layer_z_order:
         if slot in source_lanes:
@@ -304,15 +348,19 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
         else:
             lanes[slot] = empty_lane()
     if fades is None:
-        return TimelineRuntime(enabled=enabled, locked=locked, lanes=lanes)
+        return TimelineRuntime(
+            enabled=enabled,
+            locked=locked,
+            lanes=lanes,
+            placement_snap=placement_snap,
+        )
     return TimelineRuntime(
         enabled=enabled,
         locked=locked,
         lanes=lanes,
-        fades_enabled=fades.enabled,
-        fade_in=fades.fade_in,
-        fade_out=fades.fade_out,
-        fades_apply_to=fades.apply_to,
+        placement_snap=placement_snap,
+        song_marker_fades=_fade_group_runtime_from_cfg(fades.song_markers),
+        standard_cue_fades=_fade_group_runtime_from_cfg(fades.standard),
     )
 
 

@@ -8,6 +8,8 @@ from cleave.timeline import (
     shift_bars_by_beats,
     shift_lane_cues_by_beats,
     snap_lane_to_beats,
+    snap_placement_time,
+    snap_time_to_grid,
 )
 
 
@@ -19,6 +21,34 @@ def _lane(
         baseline=baseline,
         cues=[SlotCue(t=t, visible=v) for t, v in transitions],
     )
+
+
+def test_snap_time_to_grid_nearest_beat() -> None:
+    assert snap_time_to_grid(0.4, (0.0, 1.0, 2.0)) == 0.0
+    assert snap_time_to_grid(0.6, (0.0, 1.0, 2.0)) == 1.0
+
+
+def test_snap_time_to_grid_nearest_bar() -> None:
+    bars = (0.0, 4.0, 8.0)
+    assert snap_time_to_grid(3.1, bars) == 4.0
+    assert snap_time_to_grid(1.0, bars) == 0.0
+
+
+def test_snap_time_to_grid_earlier_on_tie() -> None:
+    assert snap_time_to_grid(0.5, (0.0, 1.0)) == 0.0
+
+
+def test_snap_time_to_grid_empty_returns_t() -> None:
+    assert snap_time_to_grid(1.25, ()) == 1.25
+
+
+def test_snap_placement_time_modes() -> None:
+    beats = (0.0, 1.0, 2.0)
+    bars = (0.0, 4.0)
+    assert snap_placement_time(0.6, "off", beat_times=beats, bar_times=bars) == 0.6
+    assert snap_placement_time(0.6, "beat", beat_times=beats, bar_times=bars) == 1.0
+    assert snap_placement_time(1.5, "bar", beat_times=beats, bar_times=bars) == 0.0
+    assert snap_placement_time(0.6, "beat", beat_times=(), bar_times=bars) == 0.6
 
 
 def test_snap_empty_cues_noop() -> None:

@@ -69,16 +69,18 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.RENDER_POST_FX_CHROMA_BOOST_VARIANT,
         RowKind.RENDER_POST_FX_CHROMA_BOOST_AMOUNT,
         RowKind.SETTINGS_PREVIEW_QUALITY,
+        RowKind.SETTINGS_EDITOR_MODE,
         RowKind.SETTINGS_UI_WIDTH_MODE,
         RowKind.SETTINGS_UI_WIDTH,
         RowKind.SETTINGS_UI_FADE,
+        RowKind.SETTINGS_RESIDUAL_LATENCY_MS,
         RowKind.TIMELINE_BAR_PHASE,
-        RowKind.TIMELINE_SNAP_MARKER_PROXIMITY,
-        RowKind.TIMELINE_SNAP_MARKER_SCOPE,
-        RowKind.TIMELINE_FADES,
-        RowKind.TIMELINE_FADE_IN,
-        RowKind.TIMELINE_FADE_OUT,
-        RowKind.TIMELINE_FADES_APPLY_TO,
+        RowKind.TIMELINE_SONG_MARKER_FADES,
+        RowKind.TIMELINE_SONG_MARKER_FADE_IN,
+        RowKind.TIMELINE_SONG_MARKER_FADE_OUT,
+        RowKind.TIMELINE_STANDARD_CUE_FADES,
+        RowKind.TIMELINE_STANDARD_CUE_FADE_IN,
+        RowKind.TIMELINE_STANDARD_CUE_FADE_OUT,
     }
 )
 
@@ -104,6 +106,7 @@ def test_row_is_pinned() -> None:
     assert row_is_pinned(RowKind.CONFIG_HEADER) is True
     assert row_is_pinned(RowKind.SETTINGS_HEADER) is True
     assert row_is_pinned(RowKind.SETTINGS_PREVIEW_QUALITY) is True
+    assert row_is_pinned(RowKind.SETTINGS_EDITOR_MODE) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_HEADER) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_FADE) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_WIDTH_MODE) is True
@@ -267,9 +270,7 @@ def test_render_value_children_blocked_by_section_lock() -> None:
     assert row_blocked_by_section_lock(RowKind.RENDER_POST_FX_CHROMA_BOOST_AMOUNT) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESETS) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_BAR_PHASE) is True
-    assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_TO_BARS) is True
-    assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_MARKER_PROXIMITY) is True
-    assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_MARKER_SCOPE) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_TO_GRID) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS) is True
     assert row_blocked_by_section_lock(RowKind.SONG_MARKER_ITEM) is True
     assert row_blocked_by_section_lock(RowKind.SONG_MARKERS_HEADER) is False
@@ -287,6 +288,7 @@ def test_render_headers_navigable_when_section_locked() -> None:
         assert row_navigable_when_section_locked(kind) is True
     assert row_navigable_when_section_locked(RowKind.RENDER_OVERLAY_POSITION) is False
     assert row_navigable_when_section_locked(RowKind.TIMELINE_PRESETS) is False
+    assert row_navigable_when_section_locked(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS) is False
     assert row_navigable_when_section_locked(RowKind.SONG_MARKER_ITEM) is False
 
 

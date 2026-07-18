@@ -8,6 +8,7 @@ from cleave.config import CleaveConfig
 from cleave.config_schema import (
     UI_WIDTH_MODES,
     EDITOR_PREVIEW_QUALITIES,
+    clamp_residual_latency_ms,
     clamp_ui_fade,
     clamp_ui_width,
 )
@@ -36,6 +37,25 @@ class SettingsControls:
         if settings.ui_expanded == expanded:
             return
         settings.ui_expanded = expanded
+
+    def set_latency_compensation_expanded(self, expanded: bool) -> None:
+        settings = self.session.settings
+        if settings.latency_compensation_expanded == expanded:
+            return
+        settings.latency_compensation_expanded = expanded
+
+    def adjust_residual_latency_ms(self, *, forward: bool, ctrl: bool) -> None:
+        step = 50 if ctrl else 10
+        delta = step if forward else -step
+        current = self.cfg.editor.residual_latency_ms
+        new_value = clamp_residual_latency_ms(current + delta)
+        self.cfg.editor = replace(self.cfg.editor, residual_latency_ms=new_value)
+
+    def set_residual_latency_ms(self, ms: int) -> None:
+        self.cfg.editor = replace(
+            self.cfg.editor,
+            residual_latency_ms=clamp_residual_latency_ms(ms),
+        )
 
     def cycle_preview_quality(self, *, forward: bool) -> None:
         modes = EDITOR_PREVIEW_QUALITIES

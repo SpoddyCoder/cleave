@@ -16,12 +16,11 @@ from typing import TYPE_CHECKING
 from cleave.config_schema import (
     TIMELINE_FADE_DURATION_STEP,
     clamp_timeline_fade_duration,
-    cycle_timeline_fades_apply_to,
+    cycle_timeline_placement_snap,
     hard_cut_enabled_display,
     preset_start_clean_display,
     preset_switching_display,
     preset_switching_shuffle_display,
-    timeline_fades_apply_to_label,
     ui_fade_display,
 )
 from cleave.extract import stem_control_label, stem_overlay_header
@@ -36,11 +35,6 @@ from cleave.viz.row_sections import (
 )
 from cleave.viz.row_semantics import RowDescriptor, RowKind, row_behavior
 from cleave.viz.tuning_view_state import TrackBlock, TuningViewState
-from cleave.viz.timeline_snap_controls import (
-    cycle_song_marker_snap_scope,
-    song_marker_snap_scope_label,
-)
-
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
 
@@ -49,7 +43,6 @@ class RowPresentStyle(Enum):
     LABELED_VALUE = auto()
     ACTION_PARAMETER = auto()
     EXPAND_SUBHEADER = auto()
-    ACTION_EXPAND_SUBHEADER = auto()
     COMPOSITE_HEADER = auto()
     PATH_ICON = auto()
     FULL_LINE = auto()
@@ -82,6 +75,17 @@ def _format_settings_preview_quality(
     return state.settings.preview_quality
 
 
+def _format_settings_editor_mode(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    from cleave.viz.session import EDITOR_MODE_PANEL_LABELS
+
+    label = EDITOR_MODE_PANEL_LABELS[state.settings.editor_mode_selection]  # type: ignore[index]
+    if state.settings.editor_mode_selection != state.settings.editor_mode:
+        return f"{label} [Enter to confirm]"
+    return label
+
+
 def _format_settings_ui_width_mode(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
@@ -98,6 +102,18 @@ def _format_settings_ui_fade(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
     return ui_fade_display(state.settings.ui_fade)
+
+
+def _format_settings_residual_latency_ms(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return f"{state.settings.residual_latency_ms} ms"
+
+
+def _format_settings_measure_latency(
+    _state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return "measure latency"
 
 
 def _format_timeline_bar_phase(
@@ -132,18 +148,13 @@ def _apply_timeline_bar_grid(
     controls.session.timeline.show_bar_grid = forward
 
 
-_SONG_MARKER_SNAP_PROXIMITY_MIN = 0.5
-_SONG_MARKER_SNAP_PROXIMITY_MAX = 30.0
-_SONG_MARKER_SNAP_PROXIMITY_STEP = 0.5
-
-
-def _format_timeline_snap_marker_proximity(
+def _format_timeline_placement_snap(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_timeline.song_marker_snap_proximity:.1f}s"
+    return state.render_timeline.placement_snap
 
 
-def _apply_timeline_snap_marker_proximity(
+def _apply_timeline_placement_snap(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
@@ -151,111 +162,126 @@ def _apply_timeline_snap_marker_proximity(
     _shift: bool,
 ) -> None:
     tl = controls.session.timeline
-    delta = _SONG_MARKER_SNAP_PROXIMITY_STEP if forward else -_SONG_MARKER_SNAP_PROXIMITY_STEP
-    tl.song_marker_snap_proximity = max(
-        _SONG_MARKER_SNAP_PROXIMITY_MIN,
-        min(
-            _SONG_MARKER_SNAP_PROXIMITY_MAX,
-            round(tl.song_marker_snap_proximity + delta, 1),
-        ),
-    )
-
-
-def _format_timeline_snap_marker_scope(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return song_marker_snap_scope_label(
-        state.render_timeline.song_marker_snap_scope,
-        state.layer_z_order,
-    )
-
-
-def _apply_timeline_snap_marker_scope(
-    controls: TuningControls,
-    _desc: RowDescriptor,
-    forward: bool,
-    _ctrl: bool,
-    _shift: bool,
-) -> None:
-    tl = controls.session.timeline
-    tl.song_marker_snap_scope = cycle_song_marker_snap_scope(
-        tl.song_marker_snap_scope,
-        controls.session.layer_z_order,
+    tl.placement_snap = cycle_timeline_placement_snap(
+        tl.placement_snap,
         forward=forward,
     )
 
 
-def _format_timeline_fades_enabled(
+def _format_timeline_song_marker_fades_enabled(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return hard_cut_enabled_display(state.render_timeline.fades_enabled)
+    return hard_cut_enabled_display(state.render_timeline.song_marker_fades.enabled)
 
 
-def _apply_timeline_fades_enabled(
+def _apply_timeline_song_marker_fades_enabled(
     controls: TuningControls,
     _desc: RowDescriptor,
     _forward: bool,
     _ctrl: bool,
     _shift: bool,
 ) -> None:
-    tl = controls.session.timeline
-    tl.fades_enabled = not tl.fades_enabled
+    group = controls.session.timeline.song_marker_fades
+    group.enabled = not group.enabled
 
 
-def _format_timeline_fade_in(
+def _format_timeline_song_marker_fade_in(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_timeline.fade_in:.1f}s"
+    return f"{state.render_timeline.song_marker_fades.fade_in:.1f}s"
 
 
-def _apply_timeline_fade_in(
+def _apply_timeline_song_marker_fade_in(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
     _ctrl: bool,
     _shift: bool,
 ) -> None:
-    tl = controls.session.timeline
+    group = controls.session.timeline.song_marker_fades
     delta = TIMELINE_FADE_DURATION_STEP if forward else -TIMELINE_FADE_DURATION_STEP
-    tl.fade_in = clamp_timeline_fade_duration(round(tl.fade_in + delta, 1))
+    group.fade_in = clamp_timeline_fade_duration(round(group.fade_in + delta, 1))
 
 
-def _format_timeline_fade_out(
+def _format_timeline_song_marker_fade_out(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_timeline.fade_out:.1f}s"
+    return f"{state.render_timeline.song_marker_fades.fade_out:.1f}s"
 
 
-def _apply_timeline_fade_out(
+def _apply_timeline_song_marker_fade_out(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
     _ctrl: bool,
     _shift: bool,
 ) -> None:
-    tl = controls.session.timeline
+    group = controls.session.timeline.song_marker_fades
     delta = TIMELINE_FADE_DURATION_STEP if forward else -TIMELINE_FADE_DURATION_STEP
-    tl.fade_out = clamp_timeline_fade_duration(round(tl.fade_out + delta, 1))
+    group.fade_out = clamp_timeline_fade_duration(round(group.fade_out + delta, 1))
 
 
-def _format_timeline_fades_apply_to(
+def _format_timeline_standard_cue_fades_enabled(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return timeline_fades_apply_to_label(state.render_timeline.fades_apply_to)
+    return hard_cut_enabled_display(state.render_timeline.standard_cue_fades.enabled)
 
 
-def _apply_timeline_fades_apply_to(
+def _apply_timeline_standard_cue_fades_enabled(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    _forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    group = controls.session.timeline.standard_cue_fades
+    group.enabled = not group.enabled
+
+
+def _format_timeline_standard_cue_fade_in(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return f"{state.render_timeline.standard_cue_fades.fade_in:.1f}s"
+
+
+def _apply_timeline_standard_cue_fade_in(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
     _ctrl: bool,
     _shift: bool,
 ) -> None:
-    tl = controls.session.timeline
-    tl.fades_apply_to = cycle_timeline_fades_apply_to(
-        tl.fades_apply_to,
-        forward=forward,
-    )
+    group = controls.session.timeline.standard_cue_fades
+    delta = TIMELINE_FADE_DURATION_STEP if forward else -TIMELINE_FADE_DURATION_STEP
+    group.fade_in = clamp_timeline_fade_duration(round(group.fade_in + delta, 1))
+
+
+def _format_timeline_standard_cue_fade_out(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return f"{state.render_timeline.standard_cue_fades.fade_out:.1f}s"
+
+
+def _apply_timeline_standard_cue_fade_out(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    group = controls.session.timeline.standard_cue_fades
+    delta = TIMELINE_FADE_DURATION_STEP if forward else -TIMELINE_FADE_DURATION_STEP
+    group.fade_out = clamp_timeline_fade_duration(round(group.fade_out + delta, 1))
+
+
+def _apply_settings_editor_mode(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls._editor_mode.cycle_editor_mode_selection(forward=forward)
 
 
 def _apply_settings_preview_quality(
@@ -288,6 +314,17 @@ def _apply_settings_ui_fade(
     _shift: bool,
 ) -> None:
     controls._settings.adjust_ui_fade(forward=forward, ctrl=ctrl)
+
+
+def _apply_settings_residual_latency_ms(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls._settings.adjust_residual_latency_ms(forward=forward, ctrl=ctrl)
+    controls._on_residual_latency_changed()
 
 
 def _track_block(state: TuningViewState, desc: RowDescriptor) -> TrackBlock:
@@ -1109,6 +1146,12 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.COMPOSITE_HEADER,
         apply_horizontal=_apply_settings_header,
     ),
+    RowKind.SETTINGS_EDITOR_MODE: RowFieldDef(
+        panel_label="editor mode",
+        present_style=RowPresentStyle.ACTION_PARAMETER,
+        format_value=_format_settings_editor_mode,
+        apply_horizontal=_apply_settings_editor_mode,
+    ),
     RowKind.SETTINGS_PREVIEW_QUALITY: RowFieldDef(
         panel_label="preview quality",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -1137,6 +1180,22 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_settings_ui_fade,
         apply_horizontal=_apply_settings_ui_fade,
+    ),
+    RowKind.SETTINGS_LATENCY_COMPENSATION_HEADER: RowFieldDef(
+        panel_label="Latency Compensation",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        apply_horizontal=_apply_expand_subheader,
+    ),
+    RowKind.SETTINGS_RESIDUAL_LATENCY_MS: RowFieldDef(
+        panel_label="residual latency",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_settings_residual_latency_ms,
+        apply_horizontal=_apply_settings_residual_latency_ms,
+    ),
+    RowKind.SETTINGS_MEASURE_LATENCY: RowFieldDef(
+        panel_label="measure latency",
+        present_style=RowPresentStyle.FULL_LINE,
+        format_value=_format_settings_measure_latency,
     ),
     RowKind.TRACK_HEADER: RowFieldDef(
         panel_label="Layer",
@@ -1482,54 +1541,60 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         format_value=_format_timeline_bar_grid,
         apply_horizontal=_apply_timeline_bar_grid,
     ),
-    RowKind.TIMELINE_SNAP_TO_BEATS: RowFieldDef(
-        panel_label="snap to beats",
+    RowKind.TIMELINE_PLACEMENT_SNAP: RowFieldDef(
+        panel_label="placement snap",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_timeline_placement_snap,
+        apply_horizontal=_apply_timeline_placement_snap,
+    ),
+    RowKind.TIMELINE_SNAP_TO_GRID: RowFieldDef(
+        panel_label="snap to grid",
         present_style=RowPresentStyle.FULL_LINE,
-    ),
-    RowKind.TIMELINE_SNAP_TO_BARS: RowFieldDef(
-        panel_label="snap to bars",
-        present_style=RowPresentStyle.FULL_LINE,
-    ),
-    RowKind.TIMELINE_SNAP_MARKER_PROXIMITY: RowFieldDef(
-        panel_label="proximity",
-        present_style=RowPresentStyle.ACTION_PARAMETER,
-        format_value=_format_timeline_snap_marker_proximity,
-        apply_horizontal=_apply_timeline_snap_marker_proximity,
-    ),
-    RowKind.TIMELINE_SNAP_MARKER_SCOPE: RowFieldDef(
-        panel_label="layer scope",
-        present_style=RowPresentStyle.ACTION_PARAMETER,
-        format_value=_format_timeline_snap_marker_scope,
-        apply_horizontal=_apply_timeline_snap_marker_scope,
     ),
     RowKind.TIMELINE_SNAP_TO_SONG_MARKERS: RowFieldDef(
         panel_label="snap to song markers",
-        present_style=RowPresentStyle.ACTION_EXPAND_SUBHEADER,
+        present_style=RowPresentStyle.FULL_LINE,
+    ),
+    RowKind.TIMELINE_FADES_HEADER: RowFieldDef(
+        panel_label="timeline fades",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
         apply_horizontal=_apply_expand_subheader,
     ),
-    RowKind.TIMELINE_FADES: RowFieldDef(
-        panel_label="timeline fades",
+    RowKind.TIMELINE_SONG_MARKER_FADES: RowFieldDef(
+        panel_label="song markers",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_timeline_fades_enabled,
-        apply_horizontal=_apply_timeline_fades_enabled,
+        format_value=_format_timeline_song_marker_fades_enabled,
+        apply_horizontal=_apply_timeline_song_marker_fades_enabled,
     ),
-    RowKind.TIMELINE_FADE_IN: RowFieldDef(
+    RowKind.TIMELINE_SONG_MARKER_FADE_IN: RowFieldDef(
         panel_label="fade in duration",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_timeline_fade_in,
-        apply_horizontal=_apply_timeline_fade_in,
+        format_value=_format_timeline_song_marker_fade_in,
+        apply_horizontal=_apply_timeline_song_marker_fade_in,
     ),
-    RowKind.TIMELINE_FADE_OUT: RowFieldDef(
+    RowKind.TIMELINE_SONG_MARKER_FADE_OUT: RowFieldDef(
         panel_label="fade out duration",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_timeline_fade_out,
-        apply_horizontal=_apply_timeline_fade_out,
+        format_value=_format_timeline_song_marker_fade_out,
+        apply_horizontal=_apply_timeline_song_marker_fade_out,
     ),
-    RowKind.TIMELINE_FADES_APPLY_TO: RowFieldDef(
-        panel_label="apply to cues",
+    RowKind.TIMELINE_STANDARD_CUE_FADES: RowFieldDef(
+        panel_label="standard cues",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_timeline_fades_apply_to,
-        apply_horizontal=_apply_timeline_fades_apply_to,
+        format_value=_format_timeline_standard_cue_fades_enabled,
+        apply_horizontal=_apply_timeline_standard_cue_fades_enabled,
+    ),
+    RowKind.TIMELINE_STANDARD_CUE_FADE_IN: RowFieldDef(
+        panel_label="fade in duration",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_timeline_standard_cue_fade_in,
+        apply_horizontal=_apply_timeline_standard_cue_fade_in,
+    ),
+    RowKind.TIMELINE_STANDARD_CUE_FADE_OUT: RowFieldDef(
+        panel_label="fade out duration",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_timeline_standard_cue_fade_out,
+        apply_horizontal=_apply_timeline_standard_cue_fade_out,
     ),
     RowKind.SONG_MARKERS_HEADER: RowFieldDef(
         panel_label="song markers",

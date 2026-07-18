@@ -12,6 +12,7 @@ from cleave.config_schema import (
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
     DEFAULT_EDITOR_PREVIEW_QUALITY,
+    DEFAULT_RESIDUAL_LATENCY_MS,
 )
 from dataclasses import replace
 
@@ -39,6 +40,7 @@ def test_load_user_config_missing_file_returns_defaults(tmp_path: Path) -> None:
     assert cfg.editor.ui_width_mode == DEFAULT_UI_WIDTH_MODE
     assert cfg.editor.ui_width == DEFAULT_UI_WIDTH
     assert cfg.editor.ui_fade == DEFAULT_UI_FADE_SEC
+    assert cfg.editor.residual_latency_ms == DEFAULT_RESIDUAL_LATENCY_MS
 
 
 def test_default_editor_settings_matches_schema_defaults() -> None:
@@ -47,6 +49,7 @@ def test_default_editor_settings_matches_schema_defaults() -> None:
     assert editor.ui_width_mode == DEFAULT_UI_WIDTH_MODE
     assert editor.ui_width == DEFAULT_UI_WIDTH
     assert editor.ui_fade == DEFAULT_UI_FADE_SEC
+    assert editor.residual_latency_ms == DEFAULT_RESIDUAL_LATENCY_MS
 
 
 def test_load_user_config_empty_file_returns_defaults(tmp_path: Path) -> None:
@@ -131,6 +134,7 @@ def test_write_user_config_preserves_paths_and_rewrites_editor(tmp_path: Path) -
         ui_width_mode="fixed",
         ui_width=90,
         ui_fade=30.0,
+        residual_latency_ms=210,
     )
     write_user_config(new_editor, config_path)
 
@@ -141,6 +145,7 @@ def test_write_user_config_preserves_paths_and_rewrites_editor(tmp_path: Path) -
     assert data["editor"]["ui_width_mode"] == "fixed"
     assert data["editor"]["ui_width"] == 90
     assert data["editor"]["ui_fade"] == 30.0
+    assert data["editor"]["residual_latency_ms"] == 210
     assert data["paths"]["preset_root"] == str(preset_root)
     assert data["paths"]["texture_paths"] == [str(tmp_path / "tex.png")]
     assert data["future_key"] == {"keep": True}
@@ -152,6 +157,7 @@ def test_editor_settings_from_config() -> None:
         ui_width_mode="fixed",
         ui_width=75,
         ui_fade=22.5,
+        residual_latency_ms=150,
     )
     editor = editor_settings_from_config(vis)
     assert editor == EditorSettings(
@@ -159,6 +165,7 @@ def test_editor_settings_from_config() -> None:
         ui_width_mode="fixed",
         ui_width=75,
         ui_fade=22.5,
+        residual_latency_ms=150,
     )
 
 
@@ -174,6 +181,7 @@ def test_persist_editor_settings_writes_visualizer_editor_fields(
             ui_width_mode="fixed",
             ui_width=88,
             ui_fade=17.5,
+            residual_latency_ms=200,
         ),
     )
 
@@ -184,6 +192,7 @@ def test_persist_editor_settings_writes_visualizer_editor_fields(
     assert loaded.editor.ui_width_mode == "fixed"
     assert loaded.editor.ui_width == 88
     assert loaded.editor.ui_fade == 17.5
+    assert loaded.editor.residual_latency_ms == 200
 
 
 def test_user_config_path_respects_xdg_config_home(

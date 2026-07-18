@@ -14,13 +14,20 @@ from cleave.preset_curation import (
     blacklist_root,
     copy_to_favourites,
     curated_milk_src,
+    delete_favourite_milk,
     favourites_root,
     find_milk_under,
     list_destination_subdirs,
+    list_restore_destination_subdirs,
     move_to_blacklist,
+    origin_sidecar_path,
+    read_blacklist_origin,
     relocate_curated_milk,
+    resolve_blacklist_origin_dir,
+    restore_from_blacklist,
     rewrite_user_preset_paths,
     scrub_user_preset_paths,
+    write_blacklist_origin,
 )
 
 
@@ -76,6 +83,12 @@ def test_preset_curation_index_mark_updates_sets() -> None:
     assert index.blacklist == {"b.milk"}
     assert index.marker("a.milk") == " [F]"
     assert index.marker("b.milk") == " [B]"
+    index.unmark_favourite("a.milk")
+    index.unmark_blacklisted("b.milk")
+    assert index.favourites == set()
+    assert index.blacklist == set()
+    assert index.marker("a.milk") == ""
+    assert index.marker("b.milk") == ""
 
 
 def test_list_destination_subdirs_sorted_and_excludes_dot_dirs() -> None:
@@ -91,6 +104,18 @@ def test_list_destination_subdirs_sorted_and_excludes_dot_dirs() -> None:
 
 def test_list_destination_subdirs_missing_base() -> None:
     assert list_destination_subdirs(Path("/nonexistent/path")) == ()
+
+
+def test_list_restore_destination_subdirs_excludes_curation_dirs() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "pack").mkdir()
+        (root / "other").mkdir()
+        (root / FAVOURITES_DIR).mkdir()
+        (root / BLACKLIST_DIR).mkdir()
+        (root / ".hidden").mkdir()
+
+        assert list_restore_destination_subdirs(root) == ("other", "pack")
 
 
 def test_copy_to_favourites_skips_identical_milk() -> None:
@@ -181,13 +206,14 @@ def test_move_to_blacklist_moves_milk_only() -> None:
         _write(texture, "jpg")
 
         dest_dir = root / BLACKLIST_DIR
-        result = move_to_blacklist(src_milk, dest_dir)
+        result = move_to_blacklist(src_milk, dest_dir, root)
 
         assert result == dest_dir / "reject.milk"
         assert result.exists()
         assert not src_milk.exists()
         assert texture.exists()
         assert texture.read_text(encoding="utf-8") == "jpg"
+        assert read_blacklist_origin(result) == Path("pack/reject.milk")
 
 
 def test_move_to_blacklist_uses_dedup_dest() -> None:
@@ -202,10 +228,116 @@ def test_move_to_blacklist_uses_dedup_dest() -> None:
         dest_dir.mkdir()
         _write(dest_dir / "reject.milk", "old")
 
-        result = move_to_blacklist(src_milk, dest_dir)
+        result = move_to_blacklist(src_milk, dest_dir, root)
 
         assert result == dest_dir / "reject_2.milk"
         assert result.read_text(encoding="utf-8") == "new"
+        assert read_blacklist_origin(result) == Path("pack/reject.milk")
+
+
+def test_move_to_blacklist_skips_origin_when_src_outside_preset_root() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        outside = root / "outside"
+        preset_root = root / "presets"
+        preset_root.mkdir()
+        src_milk = outside / "reject.milk"
+        _write(src_milk, "milk")
+        dest_dir = preset_root / BLACKLIST_DIR
+
+        result = move_to_blacklist(src_milk, dest_dir, preset_root)
+
+        assert result == dest_dir / "reject.milk"
+        assert not origin_sidecar_path(result).exists()
+        assert read_blacklist_origin(result) is None
+
+
+def test_origin_sidecar_read_write_and_resolve() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        milk = root / BLACKLIST_DIR / "reject.milk"
+        _write(milk, "milk")
+
+        write_blacklist_origin(milk, "pack/nested/reject.milk")
+        assert read_blacklist_origin(milk) == Path("pack/nested/reject.milk")
+        assert resolve_blacklist_origin_dir(root, milk) == root / "pack" / "nested"
+
+        write_blacklist_origin(milk, "../escape.milk")
+        assert resolve_blacklist_origin_dir(root, milk) is None
+
+
+def test_relocate_curated_milk_moves_origin_sidecar() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / BLACKLIST_DIR / "reject.milk"
+        _write(src, "milk")
+        write_blacklist_origin(src, "pack/reject.milk")
+        dest = root / BLACKLIST_DIR / "archive"
+        dest.mkdir(parents=True)
+
+        result = relocate_curated_milk(src, dest)
+
+        assert result == dest / "reject.milk"
+        assert not origin_sidecar_path(src).exists()
+        assert read_blacklist_origin(result) == Path("pack/reject.milk")
+
+
+def test_restore_from_blacklist_moves_and_deletes_sidecar() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        milk = root / BLACKLIST_DIR / "reject.milk"
+        _write(milk, "milk")
+        write_blacklist_origin(milk, "pack/reject.milk")
+        dest = root / "pack"
+        dest.mkdir()
+
+        result = restore_from_blacklist(milk, dest)
+
+        assert result == dest / "reject.milk"
+        assert result.read_text(encoding="utf-8") == "milk"
+        assert not milk.exists()
+        assert not origin_sidecar_path(milk).exists()
+        assert not origin_sidecar_path(result).exists()
+
+
+def test_restore_from_blacklist_without_sidecar() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        milk = root / BLACKLIST_DIR / "reject.milk"
+        _write(milk, "milk")
+        dest = root / "pack"
+        dest.mkdir()
+        _write(dest / "reject.milk", "existing")
+
+        result = restore_from_blacklist(milk, dest)
+
+        assert result == dest / "reject_2.milk"
+        assert not milk.exists()
+
+
+def test_delete_favourite_milk_leaves_textures() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        fav_dir = root / FAVOURITES_DIR / "keepers"
+        milk = fav_dir / "preset.milk"
+        texture = fav_dir / "tex.jpg"
+        _write(milk, "milk")
+        _write(texture, "jpg")
+        pack = root / "pack" / "preset.milk"
+        _write(pack, "other")
+
+        deleted = delete_favourite_milk(root, pack)
+
+        assert deleted == milk
+        assert not milk.exists()
+        assert texture.exists()
+        assert pack.exists()
+
+
+def test_delete_favourite_milk_missing_returns_none() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        assert delete_favourite_milk(root, root / "missing.milk") is None
 
 
 @dataclass
