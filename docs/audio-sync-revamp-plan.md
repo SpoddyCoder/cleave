@@ -1,6 +1,6 @@
 # Audio sync revamp plan
 
-Make timeline sync to audio consistent and repeatable across sessions and machines. Song markers, timeline cues, and offline render must all align to the same true, file-relative audio position, with no user latency configuration required for correctness.
+Make timeline sync to audio consistent and repeatable across sessions and machines. Song markers, timeline cues, and offline render must all align to the same true, file-relative audio position. Measurable buffer latency is automatic; beat snap covers most wireless residual; an optional machine-local delay compensates free-form placement and live monitoring when the user needs it.
 
 Related: [song-markers.md](song-markers.md), [timeline-idea.md](timeline-idea.md), [architecture-principles](../.cursor/rules/architecture-principles.mdc), [project-context](../.cursor/rules/project-context.mdc).
 
@@ -25,14 +25,15 @@ Render ([cleave/viz/render.py](../cleave/viz/render.py)) is already sample-accur
 
 Split the clock into two concerns and never mix them:
 
-- Authoring truth: the true, file-relative audio position. This is what gets stored and what render consumes. Deterministic, device-independent, latency-free.
-- Live monitoring: the audible-estimate position for the playhead and tap capture. Corrected by whatever latency cleave can measure automatically. Any residual (Bluetooth) is neutralised by beat snapping and never leaks into stored data.
+- Authoring truth: the true, file-relative audio position. This is what gets stored and what render consumes. Deterministic, device-independent; never stores a latency field on the cue.
+- Live audible clock: the estimate of what the user is hearing, used for the playhead, live cue comparison, and tap capture. Corrected by measurable buffer latency (Phase 2) plus an optional machine-local residual delay (Phase 5). Beat snap (Phase 3) snaps that capture onto the offline grid when enabled.
 
 Confirmed decisions:
 
 - The user uses Bluetooth or varying output devices, so true acoustic latency is not measurable in software.
-- Hybrid placement: exact file clock plus an optional beat or downbeat snap toggle.
-- Separate stored value (exact) from live display (best effort).
+- Hybrid placement: audible clock plus an optional beat or bar snap toggle (default beat).
+- Stored values are plain file times. Latency compensation happens in the live clock at write and live read, not by rewriting or tagging saved cues.
+- Phase 5 residual delay, when non-zero, is factored into new placements and live monitoring. Changing it never moves already-saved markers or cues. Render never applies it.
 - No migration. Existing projects will be re-recorded.
 
 ---
@@ -56,8 +57,8 @@ Outcome: no staircase quantisation, no decode-versus-audible confusion, exact se
 
 - On device open, read the SDL obtained buffer size or device period and set `latency_frames` from it, falling back to `chunksize` if the wrapper does not expose it. Optionally add a small conservative platform constant.
 - This is automatic and portable for the measurable part (SDL and driver buffer, tens of milliseconds).
-- Known limit: OS mixer and Bluetooth codec delay are not reportable in software, so on wireless output a free-form tap can still carry residual error. Phase 3 removes that residual from stored data. Phase 5 adds an optional preview-only comfort control.
-- No user-facing offset is required for correctness.
+- Known limit: OS mixer, Bluetooth codec, and Bluetooth input delay are not reportable in software, so on wireless setups a free-form tap can still carry residual error. Phase 3 removes that residual when snap is on. Phase 5 lets the user dial in the remainder for free-form placement and live monitoring.
+- No user-facing offset is required when snap is on; free-form on wireless may need Phase 5.
 
 ---
 
@@ -67,7 +68,7 @@ Outcome: no staircase quantisation, no decode-versus-audible confusion, exact se
 
 - Add a snap toggle for song-marker placement, mirroring the existing timeline snap UI in [cleave/viz/timeline_snap_controls.py](../cleave/viz/timeline_snap_controls.py). When on, `drop_song_marker` snaps the captured audible time to the nearest beat or downbeat before `place_marker` (see [cleave/song_markers.py](../cleave/song_markers.py)).
 - Apply the same snap to live timeline cue writes and record stop in [cleave/viz/timeline_controls.py](../cleave/viz/timeline_controls.py) so recorded cues are equally exact.
-- Because snapping resolves to offline grid times, snapped markers and cues are exact file time, so render is perfect and reproducible on any device including Bluetooth. This is the reliable path for wireless setups; free-form placement (snap off) stays as good as the Phase 2 estimate.
+- Because snapping resolves to offline grid times, snapped markers and cues are exact file time, so render is perfect and reproducible on any device including Bluetooth. This is the reliable default path for wireless setups. Free-form placement (snap off) is as good as the audible clock (Phase 2 plus any Phase 5 residual delay).
 - Persist the toggle through the descriptor system in [cleave/config_schema.py](../cleave/config_schema.py), with session state in [cleave/viz/session.py](../cleave/viz/session.py) and a panel row registered via the manifest ([cleave/viz/row_fields.py](../cleave/viz/row_fields.py), [cleave/viz/row_sections.py](../cleave/viz/row_sections.py), [cleave/viz/tuning_view_state.py](../cleave/viz/tuning_view_state.py)).
 - Suggested default: snap on to nearest beat, given the Bluetooth reality.
 
@@ -81,15 +82,39 @@ Outcome: no staircase quantisation, no decode-versus-audible confusion, exact se
 
 ---
 
-## Phase 5 - Preview-only Bluetooth latency control and tap to sync
+## Phase 5 - Machine-local residual delay and tap to sync
 
-A live-preview comfort feature only. It shifts the displayed playhead and monitor to match what the user hears on wireless output. It never changes stored markers, timeline cues, or render.
+Optional compensation for unmeasurable residual delay (Bluetooth headphones, OS mixer, Bluetooth keyboard, and similar). It adjusts the **live audible clock** used for playhead, live cue comparison, and new marker/cue capture. It is not a per-cue or per-project field.
 
-- Preview-only guardrail: this offset applies to the live display and tap capture, not to any written value. Stored times stay on the file timeline; render stays exact.
-- Optional, default 0 or auto. Phase 2 covers measurable buffer latency; this control covers the unmeasurable Bluetooth and OS remainder.
-- Machine-scoped, not project-scoped. Bluetooth latency is a property of the current output device, not the song, so it must not live in per-project [cleave-viz.yaml](../cleave-viz.yaml). Decision needed: introduce a small machine-local editor setting, since cleave currently has per-project config only.
-- Tap to sync: cleave plays a click track, the user taps along, and cleave infers the offset and fills the field. This honours automatic behaviour while keeping a manual override for users who know their device.
-- Help copy: "Bluetooth adds output delay the OS cannot report. Adjust only the live preview alignment (does not affect saved markers or renders). Typical Bluetooth latency is 150 to 300ms; some devices exceed 500ms. Or use Sync by ear."
+### Model
+
+- Phase 2 covers measurable SDL/driver buffer latency.
+- This control covers the remainder the OS cannot report. One number is "total residual for this setup," not headphones alone.
+- Apply the offset in the audible clock:
+  - **Write:** new song markers and timeline cues capture `audible_position` (buffer latency plus residual delay), then optional snap. What is stored is a plain file time.
+  - **Live read:** compare saved file times to the same audible clock so cues fire when the user hears that file time.
+  - **Render:** always uses saved file times on the file timeline. Never applies this offset.
+- Changing the offset never rewrites already-saved markers or cues. Old times keep playing at the file positions they were recorded with. Only new placements use the new value.
+- Tap to sync sets this live offset only; it must not batch-shift existing markers or cues.
+
+### UX
+
+- Optional, default 0. Calibrate before free-form authoring when wireless gear needs it; snap-on remains the robust default.
+- Machine-scoped, not project-scoped. Residual delay is a property of the current devices, not the song, so it must not live in per-project [cleave-viz.yaml](../cleave-viz.yaml). Decision needed: introduce a small machine-local editor setting, since cleave currently has per-project config only.
+- Help copy: "Wireless delay the OS cannot report. Affects live playhead and new placements only. Saved markers, cues, and renders do not move when you change this. Typical Bluetooth output is 150 to 300ms; some devices exceed 500ms. Bluetooth keyboards add input lag too. Or use Sync by ear."
+- If the value changes while a project already has markers or cues, a short note is enough: existing times unchanged; re-record if placement used a different delay.
+- Calibrate to the sound (or click track), not to existing free-form marks that may have been captured under a wrong delay.
+
+### Gotchas
+
+- Free-form takes recorded under the wrong delay stay wrong until re-tapped; fixing the knob later does not heal history.
+- Mixing free-form takes under different delay values in one project yields inconsistent file times; render will honour that inconsistency.
+- Snap-on placements are usually unaffected by residual delay; prefer snap when the beat grid is trusted.
+- Another machine needs its own delay for monitoring and new taps; already-saved file times remain valid for render everywhere.
+
+### Tap to sync
+
+Cleave plays a click track, the user taps along, and cleave infers the offset and fills the field. Manual override remains available for users who know their device.
 
 Typical A2DP output latency for reference:
 
@@ -105,7 +130,7 @@ Typical A2DP output latency for reference:
 - `TransportClock` units: monotonic, no overshoot beyond bounds, exact after seek, pause, and resume, latency subtraction, determinism (same consumed-sample sequence gives the same output regardless of device).
 - Marker and cue snapping units: nearest beat and nearest downbeat, tie behaviour, snap-off passthrough.
 - Render alignment test (Phase 4).
-- Preview offset units: the offset changes displayed position only and never the stored value; tap to sync inference from tap timestamps.
+- Residual delay units: offset is included in the audible clock for display and new capture; changing it does not mutate existing saved times; render paths ignore it; tap to sync inference from tap timestamps.
 - Update existing tests in [tests/cleave/test_song_markers.py](../tests/cleave/test_song_markers.py) and the timeline and overlay tests for the new placement path.
 - Run headless with [tests/run_unit_tests.py](../tests/run_unit_tests.py); the clock, snapping, and offset logic need no editor or GL.
 
@@ -116,14 +141,15 @@ Typical A2DP output latency for reference:
 - New: [cleave/viz/transport_clock.py](../cleave/viz/transport_clock.py)
 - Clock and playback: [cleave/viz/mix_player.py](../cleave/viz/mix_player.py), [cleave/viz/playback.py](../cleave/viz/playback.py)
 - Placement and cues: [cleave/viz/controls.py](../cleave/viz/controls.py), [cleave/viz/timeline_controls.py](../cleave/viz/timeline_controls.py), [cleave/song_markers.py](../cleave/song_markers.py), [cleave/timeline.py](../cleave/timeline.py)
-- Snap toggle and preview offset UI and config: [cleave/config_schema.py](../cleave/config_schema.py), [cleave/viz/session.py](../cleave/viz/session.py), [cleave/viz/row_fields.py](../cleave/viz/row_fields.py), [cleave/viz/row_sections.py](../cleave/viz/row_sections.py), [cleave/viz/tuning_view_state.py](../cleave/viz/tuning_view_state.py), [cleave/viz/timeline_snap_controls.py](../cleave/viz/timeline_snap_controls.py)
+- Snap toggle and residual-delay UI and config: [cleave/config_schema.py](../cleave/config_schema.py), [cleave/viz/session.py](../cleave/viz/session.py), [cleave/viz/row_fields.py](../cleave/viz/row_fields.py), [cleave/viz/row_sections.py](../cleave/viz/row_sections.py), [cleave/viz/tuning_view_state.py](../cleave/viz/tuning_view_state.py), [cleave/viz/timeline_snap_controls.py](../cleave/viz/timeline_snap_controls.py), plus a machine-local settings store (location TBD)
 - Render test only: [cleave/viz/render.py](../cleave/viz/render.py)
 
 ---
 
 ## Limitations
 
-- On Bluetooth, live playhead review may still visually lead the sound by the unmeasurable Bluetooth delay while playing, unless the user sets the Phase 5 preview offset. Stored markers and rendered output are unaffected and exact.
+- With Phase 5 at 0, live playhead and free-form taps can still lead or lag the sound by the unmeasurable residual. Snap-on placements and render of already-correct file times stay exact.
+- Changing the residual delay does not migrate old free-form times; recovery is re-record or replace.
 - Fully automatic true acoustic latency needs mic loopback calibration, which is out of scope unless requested later.
 - No migration. Existing projects re-recorded.
 
@@ -131,9 +157,9 @@ Typical A2DP output latency for reference:
 
 ## Open decisions
 
-- Where the machine-local preview offset persists, given cleave currently has per-project config only.
-- Default snap target: beat or downbeat.
-- Whether the snap toggle defaults on.
+- Where the machine-local residual delay persists, given cleave currently has per-project config only.
+- Default snap target: beat or bar (implementation currently defaults to beat).
+- Whether the snap toggle defaults on (implementation currently defaults to beat snap).
 
 ---
 
