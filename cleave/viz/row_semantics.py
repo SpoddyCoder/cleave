@@ -172,8 +172,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.EXPAND,
         help_title="Layer",
         help_description=(
-            "Layer header.",
-            "Contains blend mode, opacity, stem, and preset controls.",
+            "projectM visualiser layer.",
         ),
         can_enter_move_mode=True,
         can_solo=True,
@@ -436,8 +435,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         can_solo=True,
         help_title="Credits overlay",
         help_description=(
-            "Credits overlay burned into the offline render output.",
-            "Previewed live during playback.",
+            "Credits overlay.",
         ),
         quick_nav_target=True,
     ),
@@ -523,7 +521,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         parent_group="render_overlay",
         help_title="Start delay",
         help_description=(
-            "Seconds after the render starts before the overlay fades in.",
+            "The overlay fades in this many seconds after the song starts.",
         ),
     ),
     RowKind.RENDER_OVERLAY_DISPLAY_TIME: RowBehavior(
@@ -542,8 +540,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         can_solo=True,
         help_title="Post FX",
         help_description=(
-            "Post-processing effects applied during final compositing:",
-            "fade in, fade out, highlight rolloff, and chroma boost.",
+            "Post-processing effects applied during final compositing.",
         ),
         quick_nav_target=True,
     ),
@@ -698,10 +695,8 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         can_solo=False,
         help_title="Timeline",
         help_description=(
-            "Timeline automation for layer visibility.",
-            "Cues are burned into the offline render.",
-            "When enabled, standard layer visibility is disabled;",
-            "visibility is controlled by the timeline instead.",
+            "Layer visibility automation.",
+            "When enabled, standard layer visibility is disabled.",
         ),
         quick_nav_target=True,
     ),
@@ -735,7 +730,6 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Beat / bar grid",
         help_description=(
             "AI beat detection powered by Beat This!",
-            "Placement snap, bar grid display, bar phase, and snap cues to the grid.",
         ),
     ),
     RowKind.TIMELINE_BAR_PHASE: RowBehavior(
@@ -749,9 +743,8 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             ("Right", "shift cues +1 beat"),
         ),
         help_description=(
-            "Nudge all committed timeline cues by one beat;",
-            "sticky session offset +0..+3 (mod 4).",
-            "Presets regenerate on this phase-shifted bar grid.",
+            "Nudge all timeline cues by one beat.",
+            "Tip: re-apply snap to song markers after adjusting this."
         ),
     ),
     RowKind.TIMELINE_BAR_GRID: RowBehavior(
@@ -787,8 +780,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Snap to grid",
         help_entries=(("Enter", "snap cues to beats or bars"),),
         help_description=(
-            "Snap all committed timeline cues to the nearest beat or bar",
-            "(irreversible; Enter asks for beats or bars).",
+            "Snap all timeline cues to the nearest beat or bar.",
         ),
     ),
     RowKind.TIMELINE_SNAP_TO_SONG_MARKERS: RowBehavior(
@@ -798,8 +790,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Snap to song markers",
         help_entries=(("Enter", "snap cues to song markers"),),
         help_description=(
-            "Pull closest cues within proximity onto song markers",
-            "(irreversible; Enter asks for proximity then layer scope).",
+            "Pull closest cues within proximity onto song markers.",
         ),
     ),
     RowKind.TIMELINE_FADES_HEADER: RowBehavior(
@@ -807,9 +798,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         is_sub_header=True,
         help_title="Timeline fades",
         help_description=(
-            "Soft opacity fades around committed timeline cue boundaries.",
-            "Song-marker edges and standard cue edges have separate settings.",
-            "Applies only during normal committed playback.",
+            "Soft opacity fades in and out of timeline cue edges.",
         ),
     ),
     RowKind.TIMELINE_SONG_MARKER_FADES: RowBehavior(
@@ -834,7 +823,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             ("Right", "increase fade in"),
         ),
         help_description=(
-            "Seconds before a song-marker on-cue to ramp opacity from zero to full.",
+            "The fade-in starts this many seconds before the song marker.",
         ),
     ),
     RowKind.TIMELINE_SONG_MARKER_FADE_OUT: RowBehavior(
@@ -848,7 +837,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             ("Right", "increase fade out"),
         ),
         help_description=(
-            "Seconds after a song-marker off-cue to ramp opacity from full to zero.",
+            "The fade-out starts this many seconds after the song marker.",
         ),
     ),
     RowKind.TIMELINE_STANDARD_CUE_FADES: RowBehavior(
@@ -873,7 +862,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             ("Right", "increase fade in"),
         ),
         help_description=(
-            "Seconds before a standard on-cue to ramp opacity from zero to full.",
+            "The fade-in starts this many seconds before the cue.",
         ),
     ),
     RowKind.TIMELINE_STANDARD_CUE_FADE_OUT: RowBehavior(
@@ -887,7 +876,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             ("Right", "increase fade out"),
         ),
         help_description=(
-            "Seconds after a standard off-cue to ramp opacity from full to zero.",
+            "The fade-out starts this many seconds after the cue.",
         ),
     ),
     RowKind.SONG_MARKERS_HEADER: RowBehavior(
@@ -917,7 +906,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.EXPAND,
         is_header=True,
         help_title="Editor Settings",
-        help_description=("Global editor settings (not per-layer).",),
+        help_description=("Global editor settings (applies to all projects)",),
         quick_nav_target=True,
     ),
     RowKind.SETTINGS_EDITOR_MODE: RowBehavior(
