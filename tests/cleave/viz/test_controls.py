@@ -4644,7 +4644,7 @@ def test_enter_on_song_marker_seeks() -> None:
     )
     controls.playback.player.seek(0.0)
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
-    assert controls.playback.player.current_sec() == 40.0
+    assert controls.playback.player.audible_position_sec() == 40.0
 
 
 def test_delete_song_marker_opens_confirm_modal() -> None:
