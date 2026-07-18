@@ -10,8 +10,9 @@ from cleave.viz.transport_clock import MAX_RESIDUAL_DELAY_SEC
 
 MIN_TAP_COUNT = 4
 CONSISTENCY_WINDOW = 4
-MAX_DELTA_SPREAD_SEC = 0.025
-METRONOME_BPM = 120
+MAX_DELTA_SPREAD_SEC = 0.030
+MAX_ACCENT_ACCEPT_SEC = 0.75
+METRONOME_BPM = 140
 METRONOME_BEATS_PER_BAR = 4
 METRONOME_QUARTER_SEC = 60.0 / METRONOME_BPM
 
@@ -48,6 +49,11 @@ def metronome_click_times(schedule: Sequence[MetronomeClick]) -> tuple[float, ..
     return tuple(click.time_sec for click in schedule)
 
 
+def metronome_accent_times(schedule: Sequence[MetronomeClick]) -> tuple[float, ...]:
+    """Return accented click times (downbeats) from a metronome schedule."""
+    return tuple(click.time_sec for click in schedule if click.accented)
+
+
 def _nearest_click_index(tap_sec: float, click_times: Sequence[float]) -> int | None:
     if not click_times:
         return None
@@ -62,30 +68,77 @@ def tap_delta_sec(tap_sec: float, click_times: Sequence[float]) -> float | None:
     return tap_sec - click_times[index]
 
 
-def accept_tap_for_click(
+def _nearest_forward_accent_index(
     tap_sec: float,
-    click_times: Sequence[float],
-    last_click_index: int | None,
+    accent_times: Sequence[float],
+    last_accent_index: int | None,
+    *,
+    max_accept_sec: float = MAX_ACCENT_ACCEPT_SEC,
+) -> int | None:
+    if not accent_times:
+        return None
+    start = 0 if last_accent_index is None else last_accent_index + 1
+    if start >= len(accent_times):
+        return None
+    best_index: int | None = None
+    best_distance = float("inf")
+    for index in range(start, len(accent_times)):
+        distance = abs(tap_sec - accent_times[index])
+        if distance < best_distance:
+            best_distance = distance
+            best_index = index
+    if best_index is None or best_distance > max_accept_sec:
+        return None
+    return best_index
+
+
+def accept_tap_for_accent(
+    tap_sec: float,
+    accent_times: Sequence[float],
+    last_accent_index: int | None,
+    *,
+    max_accept_sec: float = MAX_ACCENT_ACCEPT_SEC,
 ) -> tuple[int | None, float | None]:
-    """Accept a tap only when it maps to a new nearest click."""
-    index = _nearest_click_index(tap_sec, click_times)
+    """Accept a tap when it maps to a new forward accent within *max_accept_sec*."""
+    index = _nearest_forward_accent_index(
+        tap_sec,
+        accent_times,
+        last_accent_index,
+        max_accept_sec=max_accept_sec,
+    )
     if index is None:
         return None, None
-    if last_click_index is not None and index == last_click_index:
+    if last_accent_index is not None and index <= last_accent_index:
         return None, None
-    return index, tap_sec - click_times[index]
+    return index, tap_sec - accent_times[index]
 
 
-def consecutive_deltas_consistent(
-    deltas: Sequence[float],
+def append_streak_delta(
+    streak: Sequence[float],
+    new_delta: float,
+    *,
+    max_spread_sec: float = MAX_DELTA_SPREAD_SEC,
+) -> list[float]:
+    """Append *new_delta* to the streak buffer, resetting when spread breaks."""
+    buffer = list(streak)
+    if buffer:
+        trial = buffer + [new_delta]
+        if max(trial) - min(trial) > max_spread_sec:
+            return [new_delta]
+    buffer.append(new_delta)
+    return buffer
+
+
+def streak_ready_to_lock(
+    streak: Sequence[float],
     *,
     window: int = CONSISTENCY_WINDOW,
     max_spread_sec: float = MAX_DELTA_SPREAD_SEC,
 ) -> bool:
-    """True when the last *window* deltas differ by at most *max_spread_sec*."""
-    if len(deltas) < window:
+    """True when the streak buffer has *window* deltas within *max_spread_sec*."""
+    if len(streak) < window:
         return False
-    window_deltas = deltas[-window:]
+    window_deltas = streak[-window:]
     return max(window_deltas) - min(window_deltas) <= max_spread_sec
 
 
@@ -96,6 +149,17 @@ def mean_delay_from_deltas(
 ) -> float:
     """Mean of the last *window* tap deltas."""
     return statistics.mean(deltas[-window:])
+
+
+def delta_spread_sec(
+    deltas: Sequence[float],
+    *,
+    min_count: int = 2,
+) -> float | None:
+    """Spread (max - min) of the streak buffer, or None when too few deltas."""
+    if len(deltas) < min_count:
+        return None
+    return max(deltas) - min(deltas)
 
 
 def infer_residual_delay_sec(

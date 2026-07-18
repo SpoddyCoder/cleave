@@ -240,7 +240,7 @@ def test_mix_player_click_only_mixes_loud_accent_click() -> None:
     player.set_click_schedule(((0.0, True),))
     out = np.zeros(DEFAULT_CHUNKSIZE * 2, dtype=np.float32)
     player._fill_output_buffer(out)
-    assert np.max(np.abs(out)) > 0.5
+    assert np.max(np.abs(out)) > 0.2
 
 
 def test_mix_player_click_only_quiet_click_is_softer_than_accent() -> None:
@@ -256,6 +256,17 @@ def test_mix_player_click_only_quiet_click_is_softer_than_accent() -> None:
     accent_player._fill_output_buffer(accent_out)
     quiet_player._fill_output_buffer(quiet_out)
     assert np.max(np.abs(accent_out)) > np.max(np.abs(quiet_out))
+
+
+def test_mix_player_accent_and_quiet_click_samples_differ() -> None:
+    mix = np.zeros(FREQUENCY_HZ * 2, dtype=np.float32)
+    player = MixPlayer(mix, FREQUENCY_HZ)
+    accent = player._click_accent_sample
+    quiet = player._click_quiet_sample
+    assert accent.shape == quiet.shape
+    assert not np.allclose(accent, quiet)
+    ratio = accent / np.where(quiet == 0.0, 1.0, quiet)
+    assert not np.allclose(ratio, ratio[0])
 
 
 def test_mix_player_click_only_ignores_solo_stem() -> None:

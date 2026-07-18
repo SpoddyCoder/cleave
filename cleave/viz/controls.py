@@ -29,7 +29,7 @@ from cleave.viz.render_overlay_controls import RenderOverlayControls
 from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
 from cleave.viz.render_post_fx_controls import RenderPostFxControls
 from cleave.viz.settings_controls import SettingsControls
-from cleave.viz.tap_sync_controls import TapSyncControls
+from cleave.viz.tap_sync_controls import TapSyncControls, TapSyncUiSnapshot
 from cleave.viz.timeline_phase_controls import TimelinePhaseController
 from cleave.viz.timeline_preset_controls import TimelinePresetController
 from cleave.viz.timeline_snap_controls import TimelineSnapController
@@ -117,6 +117,9 @@ class TuningControls:
         self._notification_host = PanelNotificationHost()
         self._key_repeat = KeyRepeatController()
         self._hide_overlay_requested = False
+        self._overlay_get_visible: Callable[[], bool] | None = None
+        self._overlay_hide: Callable[[], None] | None = None
+        self._overlay_show: Callable[[], None] | None = None
 
         self._config_save = ConfigSaveController(
             session,
@@ -180,6 +183,8 @@ class TuningControls:
             self._modal_host,
             on_notification=self.show_notification,
             on_apply_residual_delay=self._apply_residual_delay,
+            on_calibration_ui_begin=self._begin_tap_sync_calibration_ui,
+            on_calibration_ui_restore=self._restore_tap_sync_calibration_ui,
         )
         self._apply_residual_delay()
         self._editor_mode = EditorModeController(
@@ -198,6 +203,46 @@ class TuningControls:
     @property
     def tap_sync(self) -> TapSyncControls:
         return self._tap_sync
+
+    def bind_tap_sync_overlay(
+        self,
+        *,
+        get_visible: Callable[[], bool],
+        hide: Callable[[], None],
+        show: Callable[[], None],
+    ) -> None:
+        self._overlay_get_visible = get_visible
+        self._overlay_hide = hide
+        self._overlay_show = show
+
+    def _begin_tap_sync_calibration_ui(self) -> TapSyncUiSnapshot:
+        snapshot = TapSyncUiSnapshot(
+            help_visible=self.session.help_visible,
+            timeline_panel_open=self.session.timeline.panel_open,
+            focus_cursor=self.focus_cursor,
+            overlay_visible=(
+                self._overlay_get_visible()
+                if self._overlay_get_visible is not None
+                else True
+            ),
+        )
+        self.session.help_visible = False
+        if self.session.timeline.panel_open:
+            self.session.timeline.panel_open = False
+        if isinstance(self.focus_cursor, TimelineFocus):
+            self._apply_focus_cursor(
+                MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER))
+            )
+        if self._overlay_hide is not None:
+            self._overlay_hide()
+        return snapshot
+
+    def _restore_tap_sync_calibration_ui(self, snapshot: TapSyncUiSnapshot) -> None:
+        self.session.help_visible = snapshot.help_visible
+        self.session.timeline.panel_open = snapshot.timeline_panel_open
+        self._apply_focus_cursor(snapshot.focus_cursor)
+        if snapshot.overlay_visible and self._overlay_show is not None:
+            self._overlay_show()
 
     def _apply_residual_delay(self) -> None:
         delay_sec = self.cfg.editor.residual_delay_ms / 1000.0

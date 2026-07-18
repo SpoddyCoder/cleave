@@ -239,7 +239,7 @@ def init_gl_resources_heavy(
         tuning_controls=controls,
     )
 
-    return LiveVisualizerRuntime(
+    runtime = LiveVisualizerRuntime(
         seed=seed,
         layers=layers,
         layers_by_slot=layers_by_slot,
@@ -254,6 +254,16 @@ def init_gl_resources_heavy(
         help_overlay=HelpOverlay(),
         timeline_overlay=TimelineOverlay(),
         overlay_surface=overlay_surface,
+    )
+    bind_live_runtime_overlay_hooks(runtime)
+    return runtime
+
+
+def bind_live_runtime_overlay_hooks(runtime: LiveVisualizerRuntime) -> None:
+    runtime.controls.bind_tap_sync_overlay(
+        get_visible=runtime.overlay.is_visible,
+        hide=runtime.overlay.hide_immediately,
+        show=runtime.overlay.notify_input,
     )
 
 
@@ -298,8 +308,14 @@ def _live_overlay_ui_active(
     overlay_visibility: float,
     modal_active: bool,
     timeline_strip_visible: bool,
+    tap_sync_progress: bool,
 ) -> bool:
-    return overlay_visibility > 0.01 or modal_active or timeline_strip_visible
+    return (
+        overlay_visibility > 0.01
+        or modal_active
+        or timeline_strip_visible
+        or tap_sync_progress
+    )
 
 
 def _tuning_view_state_needed(
@@ -401,24 +417,40 @@ def _tick_frame_live_overlay(
 
     overlay_visibility = runtime.overlay.visibility
     modal_active = runtime.modal_host.active
+    tap_sync_progress = runtime.controls.tap_sync.showing_progress
     tl = runtime.seed.session.timeline
-    timeline_strip_visible = _timeline_strip_visible(
-        tl,
-        overlay_visibility=overlay_visibility,
-        focus_cursor=runtime.controls.focus_cursor,
+    timeline_strip_visible = (
+        not tap_sync_progress
+        and _timeline_strip_visible(
+            tl,
+            overlay_visibility=overlay_visibility,
+            focus_cursor=runtime.controls.focus_cursor,
+        )
     )
 
     if not _live_overlay_ui_active(
         overlay_visibility=overlay_visibility,
         modal_active=modal_active,
         timeline_strip_visible=timeline_strip_visible,
+        tap_sync_progress=tap_sync_progress,
     ):
         profiler.note_skipped_frame()
         profiler.finish_frame()
         return
 
     view_state = None
-    if _tuning_view_state_needed(
+    if tap_sync_progress:
+        progress = runtime.controls.tap_sync.progress_view()
+        if progress is not None:
+            with profiler.time_section("panel_draw"):
+                OverlayDrawer.draw_tap_sync_progress(
+                    runtime.compositor,
+                    runtime.overlay,
+                    runtime.overlay_surface,
+                    progress,
+                    profiler=profiler,
+                )
+    elif _tuning_view_state_needed(
         overlay_visibility=overlay_visibility,
         modal_active=modal_active,
     ):
@@ -429,9 +461,12 @@ def _tick_frame_live_overlay(
                 fps=display_fps,
             )
 
-    if _tuning_view_state_needed(
-        overlay_visibility=overlay_visibility,
-        modal_active=modal_active,
+    if (
+        not tap_sync_progress
+        and _tuning_view_state_needed(
+            overlay_visibility=overlay_visibility,
+            modal_active=modal_active,
+        )
     ):
         timeline_panel_open = tl.panel_open and overlay_visibility > 0.01
         with profiler.time_section("panel_draw"):
