@@ -112,6 +112,18 @@ def _format_settings_ui_fade(
     return ui_fade_display(state.settings.ui_fade)
 
 
+def _format_settings_residual_delay_ms(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return f"{state.settings.residual_delay_ms} ms"
+
+
+def _format_settings_sync_by_ear(
+    _state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return "sync by ear"
+
+
 def _format_timeline_bar_phase(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
@@ -330,6 +342,17 @@ def _apply_settings_ui_fade(
     _shift: bool,
 ) -> None:
     controls._settings.adjust_ui_fade(forward=forward, ctrl=ctrl)
+
+
+def _apply_settings_residual_delay_ms(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls._settings.adjust_residual_delay_ms(forward=forward, ctrl=ctrl)
+    controls._on_residual_delay_changed()
 
 
 def _track_block(state: TuningViewState, desc: RowDescriptor) -> TrackBlock:
@@ -1185,6 +1208,22 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_settings_ui_fade,
         apply_horizontal=_apply_settings_ui_fade,
+    ),
+    RowKind.SETTINGS_WIRELESS_DELAY_HEADER: RowFieldDef(
+        panel_label="Wireless delay",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        apply_horizontal=_apply_expand_subheader,
+    ),
+    RowKind.SETTINGS_RESIDUAL_DELAY_MS: RowFieldDef(
+        panel_label="residual delay",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_settings_residual_delay_ms,
+        apply_horizontal=_apply_settings_residual_delay_ms,
+    ),
+    RowKind.SETTINGS_SYNC_BY_EAR: RowFieldDef(
+        panel_label="sync by ear",
+        present_style=RowPresentStyle.FULL_LINE,
+        format_value=_format_settings_sync_by_ear,
     ),
     RowKind.TRACK_HEADER: RowFieldDef(
         panel_label="Layer",

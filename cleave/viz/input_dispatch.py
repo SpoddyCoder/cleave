@@ -86,6 +86,10 @@ def _handle_global_keydown(
         return True
 
     tl = runtime.seed.session.timeline
+    if runtime.controls.tap_sync.active:
+        if runtime.controls.tap_sync.handle_keydown(event):
+            return True
+
     if tl.recording:
         if event.key == pygame.K_ESCAPE:
             runtime.timeline_controls.stop_recording()

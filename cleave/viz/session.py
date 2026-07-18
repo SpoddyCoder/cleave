@@ -197,6 +197,7 @@ EDITOR_MODE_PANEL_LABELS: dict[EditorMode, str] = {
 class SettingsRuntime:
     expanded: bool = False
     ui_expanded: bool = False
+    wireless_delay_expanded: bool = False
     editor_mode: EditorMode = "visualizer"
     # Staged panel selection; Left/Right cycles, Enter commits.
     editor_mode_selection: EditorMode = "visualizer"
