@@ -182,21 +182,28 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert placement_snap not in view_open.layout.rows
     assert snap_beats not in view_open.layout.rows
     assert snap_bars not in view_open.layout.rows
-    assert snap_markers in view_open.layout.rows
+    assert snap_markers not in view_open.layout.rows
     assert fades in view_open.layout.rows
     assert fade_in not in view_open.layout.rows
     assert markers_header in view_open.layout.rows
     markers_idx = view_open.layout.rows.index(markers_header)
-    snap_markers_idx = view_open.layout.rows.index(snap_markers)
     beat_bar_idx = view_open.layout.rows.index(beat_bar_header)
     fades_idx = view_open.layout.rows.index(fades)
     presets_idx = view_open.layout.rows.index(presets)
     reset_idx = view_open.layout.rows.index(reset)
-    assert snap_markers_idx == markers_idx + 1
-    assert beat_bar_idx == snap_markers_idx + 1
+    assert beat_bar_idx == markers_idx + 1
     assert fades_idx == beat_bar_idx + 1
     assert presets_idx == fades_idx + 1
     assert reset_idx == presets_idx + 1
+
+    session.song_markers.expanded = True
+    view_markers_expanded = builder.build(paused=False)
+    assert snap_markers in view_markers_expanded.layout.rows
+    markers_idx = view_markers_expanded.layout.rows.index(markers_header)
+    snap_markers_idx = view_markers_expanded.layout.rows.index(snap_markers)
+    beat_bar_idx = view_markers_expanded.layout.rows.index(beat_bar_header)
+    assert snap_markers_idx == markers_idx + 1
+    assert beat_bar_idx == snap_markers_idx + 1
 
     session.timeline.beat_bar_grid_expanded = True
     view_beat_expanded = builder.build(paused=False)
@@ -427,6 +434,9 @@ def test_row_layout_includes_song_marker_items_when_expanded() -> None:
     assert [desc.marker_index for desc in items] == [0, 1, 2]
     header_idx = view.layout.rows.index(header)
     assert view.layout.rows.index(items[0]) == header_idx + 1
+    snap_row = RowDescriptor(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
+    assert snap_row in view.layout.rows
+    assert view.layout.rows.index(snap_row) == header_idx + len(items) + 1
 
     session.song_markers.expanded = False
     view_collapsed = builder.build(paused=False)
@@ -434,6 +444,7 @@ def test_row_layout_includes_song_marker_items_when_expanded() -> None:
     assert not any(
         desc.kind == RowKind.SONG_MARKER_ITEM for desc in view_collapsed.layout.rows
     )
+    assert snap_row not in view_collapsed.layout.rows
 
 
 def test_builder_appends_curation_markers_without_structure_change() -> None:

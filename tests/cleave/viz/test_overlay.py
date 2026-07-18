@@ -880,7 +880,11 @@ def test_measure_latency_row_uses_action_color() -> None:
 
 def test_snap_to_song_markers_row_uses_action_color() -> None:
     state = _minimal_view_state(
-        render_timeline=RenderTimelineBlock(enabled=True, expanded=True),
+        render_timeline=RenderTimelineBlock(
+            enabled=True,
+            expanded=True,
+            song_markers_expanded=True,
+        ),
     )
     snap_row = state.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
     assert _row_value_color(state, snap_row) == ACTION

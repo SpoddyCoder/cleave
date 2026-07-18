@@ -1555,6 +1555,7 @@ def _focus_timeline_snap_bars(controls: TuningControls) -> None:
 
 def _focus_timeline_snap_song_markers(controls: TuningControls) -> None:
     controls.session.timeline.panel_open = True
+    controls.session.song_markers.expanded = True
     view = controls.build_view_state(paused=False)
     snap_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
     controls.focus_descriptor = _desc(view, snap_row)
@@ -2136,6 +2137,7 @@ def test_timeline_snap_song_markers_no_cues_notifies() -> None:
 def test_timeline_snap_song_markers_is_plain_action_row() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.timeline.panel_open = True
+    controls.session.song_markers.expanded = True
     view = controls.build_view_state(paused=False)
     snap_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
     text = _row_text(view, snap_row)
@@ -2289,6 +2291,7 @@ def test_render_timeline_right_opens_panel() -> None:
 def test_render_timeline_down_enters_submenu() -> None:
     controls = _make_controls(timeline_enabled=True)
     controls.session.timeline.panel_open = True
+    controls.session.song_markers.expanded = True
     controls.session.timeline.beat_bar_grid_expanded = True
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
@@ -2365,7 +2368,7 @@ def test_render_timeline_down_enters_submenu_and_routes_keys() -> None:
     controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.focus_row = 2
 
-    for _ in range(12):
+    for _ in range(11):
         controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.session.timeline.focus_row == 0
@@ -2596,6 +2599,7 @@ def test_render_timeline_header_eye_color_when_disabled() -> None:
 def test_render_timeline_sub_rows_dim_when_disabled() -> None:
     controls = _make_controls(timeline_enabled=True)
     controls.session.timeline.panel_open = True
+    controls.session.song_markers.expanded = True
     controls.session.timeline.beat_bar_grid_expanded = True
     controls.session.timeline.fades_enabled = True
     controls.session.timeline.enabled = False

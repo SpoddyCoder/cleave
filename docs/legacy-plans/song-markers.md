@@ -36,8 +36,8 @@ Build UI and editing only. No preset generation or beat-phase logic yet.
 
 ### Panel
 
-- First expandable child under **Render: Timeline** (above snap to song markers): header label `song markers (N)` with expand arrow (e.g. `song markers (4)`).
-- List of marker times in `[mm:ss.ms]` format.
+- First expandable child under **Render: Timeline**: header label `song markers (N)` with expand arrow (e.g. `song markers (4)`).
+- When expanded: list of marker times in `[mm:ss.ms]` format, then **snap to song markers** as the last row (green action row; no expand arrow).
 
 ### List interaction
 
@@ -65,13 +65,13 @@ Song markers, list editing, seek-to-marker, and timeline drawing only. Value on 
 
 ## Phase 2 — Snap to song markers (done)
 
-Add a **snap to song markers** action under the timeline section (directly below song markers).
+Add a **snap to song markers** action inside the song markers section (last row when that section is expanded).
 
 Workflow:
 
 1. Apply a preset to the timeline
 2. Snap to bars (under beat / bar grid)
-3. Snap to song markers
+3. Expand song markers and run **snap to song markers**
 
 ### Behavior
 
@@ -79,7 +79,7 @@ For each song marker (ascending time), pull the **closest** unclaimed timeline c
 
 ### Panel layout
 
-Under **Render: TIMELINE** (strip open), order is song markers, then **snap to song markers**, then beat / bar grid, then timeline fades, then apply a timeline preset, then reset timeline. **snap to song markers** is a green action row (no expand arrow), same style as snap to beats / apply a timeline preset.
+Under **Render: TIMELINE** (strip open), order is song markers (expandable; marker items and **snap to song markers** when expanded), then beat / bar grid, then timeline fades, then apply a timeline preset, then reset timeline. **snap to song markers** is a green action row inside the song markers section (last child after marker items), same style as snap to beats / apply a timeline preset.
 
 ### Confirm (one modal step per parameter)
 
