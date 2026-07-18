@@ -107,8 +107,8 @@ Colors live in [cleave/viz/theme.py](cleave/viz/theme.py). Label truncation uses
 These rows do not split label and value; the implementation is deliberate:
 
 - **Settings** header (`SETTINGS_HEADER`): `Settings` prefix in `ACTION`; expand arrow in row value color.
-- **Active config path** (`CONFIG_HEADER`): path in `ACTION`; dirty asterisk stays `CONFIG_DIRTY` (row uses `DISABLED` while solo is active).
-- **Layer management** (`LAYER_MANAGEMENT_ADD`, `LAYER_MANAGEMENT_DELETE`) and timeline actions (`TIMELINE_SNAP_TO_SONG_MARKERS`, `TIMELINE_SNAP_TO_GRID`, presets, reset): entire row in `ACTION` (delete uses `DISABLED` when only one layer remains).
+- **Active config path** (`CONFIG_HEADER`): path in `ACTION` (or `HIGHLIGHT` when focused); dirty asterisk stays `CONFIG_DIRTY` (row uses `DISABLED` while solo is active).
+- **Layer management** (`LAYER_MANAGEMENT_ADD`, `LAYER_MANAGEMENT_DELETE`) and timeline actions (`TIMELINE_SNAP_TO_SONG_MARKERS`, `TIMELINE_SNAP_TO_GRID`, presets, reset): entire row in `ACTION` when unfocused, `HIGHLIGHT` when focused (delete uses `DISABLED` when only one layer remains).
 - **Preset dir / preset filename**: single-color row text plus Material Icons (icon colors above).
 - **Transport**: single-color header row in row value color.
 - **Panel notifications** (`RowKind.PANEL_NOTIFICATION`): pinned under Transport; full-line text in `HIGHLIGHT`; 5 second duration; non-blocking.

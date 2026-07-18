@@ -203,6 +203,9 @@ def _action_parameter_label_color(
     if locked_blocked:
         return LOCKED
 
+    if _row_has_tree_focus(state, index):
+        return _row_highlight_color(state, index)
+
     return ACTION
 
 
@@ -612,6 +615,8 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
             return DISABLED
         if locked_blocked:
             return LOCKED
+        if _row_has_tree_focus(state, index):
+            return _row_highlight_color(state, index)
         return ACTION
 
     stem = state.layout.slot(index)
