@@ -723,6 +723,26 @@ def panel_fps_layout(
     )
 
 
+def settings_header_highlight_width(
+    *,
+    panel_w: int,
+    padding: int,
+    font: pygame.font.Font,
+    fps: float,
+    show_scrollbar: bool,
+) -> int:
+    """Settings-header focus tint: full row width minus FPS text and one character."""
+    fps_text_width = font.size(format_fps_display(fps))[0]
+    char_w = max(1, font.size("M")[0])
+    fps_layout = panel_fps_layout(
+        panel_w=panel_w,
+        padding=padding,
+        text_width=fps_text_width,
+        show_scrollbar=show_scrollbar,
+    )
+    return max(0, fps_layout.x - padding - char_w)
+
+
 def tuning_panel_max_dimensions(
     viewport_w: int,
     viewport_h: int,
@@ -1191,10 +1211,26 @@ class TuningOverlay:
         text_alpha: int,
         panel_w: int,
         line_h: int,
+        font: pygame.font.Font | None = None,
+        show_scrollbar: bool = False,
     ) -> None:
-        row_rect = (self._padding, y, panel_w - self._padding * 2, line_h)
+        row_w = panel_w - self._padding * 2
         panel_bg_alpha = int(BACKGROUND_ALPHA * self._visibility)
         bg = _row_bg_color(state, index)
+        if (
+            bg is not None
+            and state.layout.kind(index) == RowKind.SETTINGS_HEADER
+            and state.fps is not None
+            and font is not None
+        ):
+            row_w = settings_header_highlight_width(
+                panel_w=panel_w,
+                padding=self._padding,
+                font=font,
+                fps=state.fps,
+                show_scrollbar=show_scrollbar,
+            )
+        row_rect = (self._padding, y, row_w, line_h)
         tint_alpha = (
             int(FOCUS_ROW_BG_ALPHA * self._visibility) if bg is not None else 0
         )
@@ -1641,6 +1677,7 @@ class TuningOverlay:
         state: TuningViewState,
         built_rows: dict[int, RowRenderEntry],
         *,
+        font: pygame.font.Font,
         metrics: PanelScrollMetrics,
         visible_indices: list[int],
         first_scrollable_visible: int | None,
@@ -1664,6 +1701,8 @@ class TuningOverlay:
                     text_alpha=text_alpha,
                     panel_w=panel_w,
                     line_h=line_h,
+                    font=font,
+                    show_scrollbar=metrics.show_scrollbar,
                 )
 
             scroll_top = self._padding + metrics.header_block_h
@@ -1694,6 +1733,8 @@ class TuningOverlay:
                     text_alpha=text_alpha,
                     panel_w=panel_w,
                     line_h=line_h,
+                    font=font,
+                    show_scrollbar=metrics.show_scrollbar,
                 )
             panel.set_clip(old_clip)
 
@@ -1722,6 +1763,8 @@ class TuningOverlay:
                     text_alpha=text_alpha,
                     panel_w=panel_w,
                     line_h=line_h,
+                    font=font,
+                    show_scrollbar=metrics.show_scrollbar,
                 )
                 row_y += line_h + self._line_gap
 
@@ -2036,6 +2079,7 @@ class TuningOverlay:
             panel,
             state,
             built_rows,
+            font=font,
             metrics=metrics,
             visible_indices=visible_indices,
             first_scrollable_visible=first_scrollable_visible,
