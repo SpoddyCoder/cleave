@@ -24,9 +24,11 @@ from cleave.viz.tuning_panel_draw import (
     panel_help_hint_layout,
     preset_row_prefix_width,
     render_visibility_icon,
+    settings_header_highlight_width,
     TREE_INDENT,
     scroll_metrics,
 )
+from cleave.viz.ui_tint import composite_row_background
 from cleave.viz.controls import (
     NOTIFICATION_TIMELINE_ENABLED_TEXT,
 )
@@ -39,8 +41,11 @@ from cleave.viz.tuning_view_state import (
 from cleave.config_schema import DEFAULT_UI_FADE_SEC
 from cleave.viz.theme import (
     ACTION,
+    BACKGROUND,
+    BACKGROUND_ALPHA,
     BORDER_WIDTH,
     DISABLED,
+    FOCUS_ROW_BG_ALPHA,
     HIGHLIGHT,
     HIGHLIGHT_MUTED,
     LABEL,
@@ -388,6 +393,75 @@ def test_fps_color_ignores_transport_focus() -> None:
     sampled = with_fps.get_at((layout.x + 2, layout.y + font.get_linesize() // 2))
     assert sampled[:3] == VALUE
     assert sampled[:3] != HIGHLIGHT
+
+
+def test_settings_header_highlight_width_reserves_fps() -> None:
+    pygame.init()
+    font = pygame.font.SysFont("monospace", 14)
+    panel_w = 400
+    padding = 8
+    fps = 30.0
+    fps_w = font.size(format_fps_display(fps))[0]
+    char_w = font.size("M")[0]
+    width = settings_header_highlight_width(
+        panel_w=panel_w,
+        padding=padding,
+        font=font,
+        fps=fps,
+        show_scrollbar=False,
+    )
+    assert width == panel_w - 2 * padding - fps_w - char_w
+    with_scroll = settings_header_highlight_width(
+        panel_w=panel_w,
+        padding=padding,
+        font=font,
+        fps=fps,
+        show_scrollbar=True,
+    )
+    assert with_scroll == (
+        panel_w
+        - 2 * padding
+        - SCROLLBAR_WIDTH
+        - SCROLLBAR_CONTENT_GAP
+        - fps_w
+        - char_w
+    )
+
+
+def test_settings_header_highlight_stops_before_fps() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    state = _minimal_view_state(
+        fps=30.0,
+        focus_cursor=MainFocus(RowDescriptor(RowKind.SETTINGS_HEADER)),
+    )
+    panel = _copy_panel_surface(overlay, state)
+    font = overlay._font_get()
+    metrics = _panel_scroll_metrics(overlay, state)
+    fps_w = font.size(format_fps_display(30.0))[0]
+    layout = panel_fps_layout(
+        panel_w=panel.get_width(),
+        padding=overlay._padding,
+        text_width=fps_w,
+        show_scrollbar=metrics.show_scrollbar,
+    )
+    highlight_w = settings_header_highlight_width(
+        panel_w=panel.get_width(),
+        padding=overlay._padding,
+        font=font,
+        fps=30.0,
+        show_scrollbar=metrics.show_scrollbar,
+    )
+    expected_tint, _ = composite_row_background(
+        BACKGROUND, BACKGROUND_ALPHA, HIGHLIGHT, FOCUS_ROW_BG_ALPHA
+    )
+    mid_y = layout.y + font.get_linesize() // 2
+    tinted = panel.get_at((overlay._padding + highlight_w // 2, mid_y))[:3]
+    gap = panel.get_at((layout.x - max(1, font.size("M")[0]) // 2, mid_y))[:3]
+    under_fps = panel.get_at((layout.x + 2, mid_y))[:3]
+    assert tinted == expected_tint
+    assert gap == BACKGROUND
+    assert under_fps != expected_tint
 
 
 def test_panel_content_max_width_reserves_scrollbar() -> None:
