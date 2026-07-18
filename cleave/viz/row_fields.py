@@ -1561,7 +1561,7 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         apply_horizontal=_apply_expand_subheader,
     ),
     RowKind.TIMELINE_SONG_MARKER_FADES: RowFieldDef(
-        panel_label="song marker fades",
+        panel_label="song markers",
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_timeline_song_marker_fades_enabled,
         apply_horizontal=_apply_timeline_song_marker_fades_enabled,
