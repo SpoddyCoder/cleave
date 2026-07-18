@@ -817,7 +817,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         navigable=True,
         repeatable=True,
         blocked_by_section_lock=True,
-        help_title="Song marker fades",
+        help_title="Song markers",
         help_entries=(("Left/Right", "enabled / disabled"),),
         help_description=(
             "Fade edges that land on a song marker.",
