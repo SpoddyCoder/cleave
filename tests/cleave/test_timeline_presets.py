@@ -18,7 +18,12 @@ from cleave.timeline_presets import (
     build_pulse_cues,
 )
 from cleave.timeline_presets.characters import in_climax_window
-from cleave.timeline_presets.chords import chord_cost
+from cleave.timeline_presets.chords import (
+    MAX_CONCURRENT_LAYERS,
+    build_vocab,
+    chord_cost,
+    stack_density_level,
+)
 from cleave.timeline_presets.grid import thin_bar_times_for_arrange
 from cleave.timeline_presets.motifs import hamming_distance
 
@@ -305,7 +310,8 @@ def test_high_cost_time_is_bounded(duration_sec: float) -> None:
     for builder in ALL_BUILDERS:
         lanes, _bars = _build(builder, slots, duration_sec, random.Random(99))
         frac = _high_cost_fraction(lanes, slots, duration_sec)
-        assert frac < 0.15, f"{builder.__name__} high-cost fraction {frac:.2f}"
+        # n=4 raises trio density; allow a little more dense time than sparse chars.
+        assert frac < 0.25, f"{builder.__name__} high-cost fraction {frac:.2f}"
 
 
 @pytest.mark.parametrize("duration_sec", (90.0, 180.0))
@@ -502,3 +508,127 @@ def test_compose_ignores_out_of_range_markers() -> None:
     )
     _assert_cues_on_bars(lanes, thinned)
     _assert_min_gaps(lanes, bars, duration_sec)
+
+
+def test_stack_density_level_ramp() -> None:
+    assert stack_density_level(1, 2) == 0
+    assert stack_density_level(2, 2) == 0
+    assert stack_density_level(2, 3) == 0
+    assert stack_density_level(3, 2) == 1
+    assert stack_density_level(3, 3) == 0
+    assert stack_density_level(4, 2) == 2
+    assert stack_density_level(4, 3) == 1
+    assert stack_density_level(4, 4) == 0
+    assert stack_density_level(5, 2) == 2
+    assert stack_density_level(5, 3) == 2
+    assert stack_density_level(5, 4) == 1
+    assert stack_density_level(6, 2) == 2
+    assert stack_density_level(6, 3) == 2
+    assert stack_density_level(6, 4) == 2
+    assert stack_density_level(8, 4) == 2
+
+
+def test_build_vocab_caps_concurrent_stacks() -> None:
+    for n in range(2, 9):
+        vocab = build_vocab(_slots(n))
+        for active in vocab.chords.values():
+            assert len(active) <= MAX_CONCURRENT_LAYERS
+        if vocab.tutti_id is not None:
+            assert len(vocab.active_for(vocab.tutti_id)) == min(n, MAX_CONCURRENT_LAYERS)
+        if n >= 4:
+            assert vocab.quartets
+
+
+def test_chord_cost_baseline_unchanged_without_layer_count() -> None:
+    assert chord_cost(1) == 1.0
+    assert chord_cost(2) == 2.2
+    assert chord_cost(3) == 4.0
+    assert chord_cost(4) == 7.0
+    assert chord_cost(2, n_layers=2) == 2.2
+    assert chord_cost(2, n_layers=3) < 2.2
+    assert chord_cost(2, n_layers=4) < chord_cost(2, n_layers=3)
+    assert chord_cost(3, n_layers=4) < 4.0
+    assert chord_cost(4, n_layers=5) == pytest.approx(4.0)
+    assert chord_cost(4, n_layers=6) == pytest.approx(3.0)
+
+
+@pytest.mark.parametrize("builder", ALL_BUILDERS)
+@pytest.mark.parametrize("n", range(5, 9))
+def test_preset_never_exceeds_max_concurrent(builder, n: int) -> None:
+    slots = _slots(n)
+    duration_sec = 180.0
+    lanes, _bars = _build(builder, slots, duration_sec, random.Random(n * 17))
+    counts = _sample_active_counts(lanes, slots, duration_sec, step=1.0)
+    assert max(counts) <= MAX_CONCURRENT_LAYERS
+
+
+def test_pick_motif_density_bonus_favors_duos() -> None:
+    """At n>=3 the density bonus should make duo-peak motifs win more often."""
+    from cleave.timeline_presets.arrange import _pick_motif
+    from cleave.timeline_presets.characters import BREATHING
+    from cleave.timeline_presets.motifs import motifs_for_profile
+
+    motifs = motifs_for_profile(BREATHING.motif_ids)
+    duo_rates: dict[int, float] = {}
+    for n in (2, 3, 4):
+        vocab = build_vocab(_slots(n))
+        duo_picks = 0
+        trials = 200
+        for seed in range(trials):
+            motif = _pick_motif(
+                motifs=motifs,
+                profile=BREATHING,
+                vocab=vocab,
+                rng=random.Random(seed),
+                budget=2.2,
+                climax_window=False,
+                climax_used=True,
+                prev_active=None,
+                prev_motif_id=None,
+                motif_streak=0,
+                solo_rotation=seed,
+                layer_airtime={s: 0.0 for s in vocab.slots},
+                duration_sec=120.0,
+            )
+            steps = motif.resolve_steps(vocab, random.Random(seed), seed)
+            if max(len(vocab.active_for(step)) for step in steps) >= 2:
+                duo_picks += 1
+        duo_rates[n] = duo_picks / trials
+    assert duo_rates[3] > duo_rates[2]
+    assert duo_rates[4] >= duo_rates[3]
+
+
+def test_pick_motif_density_unlocks_trios_and_quartets() -> None:
+    from cleave.timeline_presets.arrange import _pick_motif
+    from cleave.timeline_presets.characters import ARC
+    from cleave.timeline_presets.motifs import motifs_for_profile
+
+    motifs = motifs_for_profile(ARC.motif_ids)
+    peak_rates: dict[tuple[int, int], float] = {}
+    for n, need, budget in ((4, 3, 4.0), (5, 3, 4.0), (5, 4, 4.0), (6, 4, 4.0)):
+        vocab = build_vocab(_slots(n))
+        hits = 0
+        trials = 200
+        for seed in range(trials):
+            motif = _pick_motif(
+                motifs=motifs,
+                profile=ARC,
+                vocab=vocab,
+                rng=random.Random(seed),
+                budget=budget,
+                climax_window=False,
+                climax_used=True,
+                prev_active=None,
+                prev_motif_id=None,
+                motif_streak=0,
+                solo_rotation=seed,
+                layer_airtime={s: 0.0 for s in vocab.slots},
+                duration_sec=120.0,
+            )
+            steps = motif.resolve_steps(vocab, random.Random(seed), seed)
+            if max(len(vocab.active_for(step)) for step in steps) >= need:
+                hits += 1
+        peak_rates[(n, need)] = hits / trials
+    assert peak_rates[(5, 3)] > peak_rates[(4, 3)]
+    assert peak_rates[(6, 4)] >= peak_rates[(5, 4)]
+    assert peak_rates[(5, 4)] > 0.0

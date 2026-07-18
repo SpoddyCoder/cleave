@@ -6,7 +6,7 @@ import random
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from cleave.timeline_presets.chords import ChordVocab
+from cleave.timeline_presets.chords import ChordVocab, stack_density_level
 
 # Minimum spacing between layer visibility transitions.
 MIN_SWITCH_GAP_BARS = 2
@@ -41,9 +41,20 @@ def _pick_trio(vocab: ChordVocab, index: int) -> str:
     return vocab.trios[index % len(vocab.trios)]
 
 
+def _pick_quartet(vocab: ChordVocab, index: int) -> str:
+    if not vocab.quartets:
+        return _pick_trio(vocab, index)
+    return vocab.quartets[index % len(vocab.quartets)]
+
+
 def _pick_tutti(vocab: ChordVocab) -> str:
     assert vocab.tutti_id is not None
     return vocab.tutti_id
+
+
+def _prefer_quartets(vocab: ChordVocab) -> bool:
+    """Use 4-stacks once density for cardinality 4 has been raised."""
+    return bool(vocab.quartets) and stack_density_level(len(vocab.slots), 4) >= 1
 
 
 def _resolve_solo_hold(vocab: ChordVocab, rng: random.Random, rotation: int) -> tuple[str, ...]:
@@ -65,12 +76,20 @@ def _resolve_call_response(vocab: ChordVocab, rng: random.Random, rotation: int)
 def _resolve_stack_up(vocab: ChordVocab, rng: random.Random, rotation: int) -> tuple[str, ...]:
     solo = _pick_single(vocab, rotation)
     duo = _pick_duo(vocab, rotation)
+    if _prefer_quartets(vocab):
+        return (solo, duo, _pick_quartet(vocab, rotation))
     if vocab.trios:
         return (solo, duo, _pick_trio(vocab, rotation))
     return (solo, duo)
 
 
 def _resolve_shed(vocab: ChordVocab, rng: random.Random, rotation: int) -> tuple[str, ...]:
+    if _prefer_quartets(vocab):
+        return (
+            _pick_quartet(vocab, rotation),
+            _pick_duo(vocab, rotation),
+            _pick_single(vocab, rotation),
+        )
     if vocab.trios:
         return (_pick_trio(vocab, rotation), _pick_duo(vocab, rotation), _pick_single(vocab, rotation))
     duo = _pick_duo(vocab, rotation)
