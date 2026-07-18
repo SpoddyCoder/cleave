@@ -1032,10 +1032,16 @@ def test_write_session_snapshot_persists_timeline_disabled_without_cues(
         "locked": False,
         "placement_snap": "beat",
         "fades": {
-            "enabled": False,
-            "fade_in": 2.0,
-            "fade_out": 2.0,
-            "apply_to": "all",
+            "song_markers": {
+                "enabled": False,
+                "fade_in": 2.0,
+                "fade_out": 2.0,
+            },
+            "standard": {
+                "enabled": False,
+                "fade_in": 2.0,
+                "fade_out": 2.0,
+            },
         },
     }
 

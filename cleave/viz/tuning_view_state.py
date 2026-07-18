@@ -131,6 +131,13 @@ class RenderPostFxBlock:
 
 
 @dataclass
+class TimelineFadeGroupBlock:
+    enabled: bool = False
+    fade_in: float = 2.0
+    fade_out: float = 2.0
+
+
+@dataclass
 class RenderTimelineBlock:
     enabled: bool = False
     expanded: bool = False
@@ -138,10 +145,13 @@ class RenderTimelineBlock:
     show_bar_grid: bool = False
     beat_bar_grid_expanded: bool = False
     placement_snap: str = "beat"
-    fades_enabled: bool = False
-    fade_in: float = 2.0
-    fade_out: float = 2.0
-    fades_apply_to: str = "all"
+    fades_expanded: bool = False
+    song_marker_fades: TimelineFadeGroupBlock = field(
+        default_factory=TimelineFadeGroupBlock
+    )
+    standard_cue_fades: TimelineFadeGroupBlock = field(
+        default_factory=TimelineFadeGroupBlock
+    )
     locked: bool = False
     song_markers_expanded: bool = False
     song_marker_times: tuple[float, ...] = ()
@@ -324,7 +334,9 @@ def view_state_structure_signature(
             "song_markers_expanded": session.song_markers.expanded,
             "song_marker_count": len(session.song_markers.times),
             "beat_bar_grid_expanded": tl.beat_bar_grid_expanded,
-            "fades_enabled": tl.fades_enabled,
+            "fades_expanded": tl.fades_expanded,
+            "song_marker_fades_enabled": tl.song_marker_fades.enabled,
+            "standard_cue_fades_enabled": tl.standard_cue_fades.enabled,
         },
         "timeline": {"enabled": tl.enabled},
     }
@@ -470,10 +482,17 @@ class TuningViewStateBuilder:
             show_bar_grid=tl.show_bar_grid,
             beat_bar_grid_expanded=tl.beat_bar_grid_expanded,
             placement_snap=tl.placement_snap,
-            fades_enabled=tl.fades_enabled,
-            fade_in=tl.fade_in,
-            fade_out=tl.fade_out,
-            fades_apply_to=tl.fades_apply_to,
+            fades_expanded=tl.fades_expanded,
+            song_marker_fades=TimelineFadeGroupBlock(
+                enabled=tl.song_marker_fades.enabled,
+                fade_in=tl.song_marker_fades.fade_in,
+                fade_out=tl.song_marker_fades.fade_out,
+            ),
+            standard_cue_fades=TimelineFadeGroupBlock(
+                enabled=tl.standard_cue_fades.enabled,
+                fade_in=tl.standard_cue_fades.fade_in,
+                fade_out=tl.standard_cue_fades.fade_out,
+            ),
             song_markers_expanded=self.session.song_markers.expanded,
             song_marker_times=tuple(self.session.song_markers.times),
         )
@@ -626,10 +645,17 @@ class TuningViewStateBuilder:
                 show_bar_grid=tl.show_bar_grid,
                 beat_bar_grid_expanded=tl.beat_bar_grid_expanded,
                 placement_snap=tl.placement_snap,
-                fades_enabled=tl.fades_enabled,
-                fade_in=tl.fade_in,
-                fade_out=tl.fade_out,
-                fades_apply_to=tl.fades_apply_to,
+                fades_expanded=tl.fades_expanded,
+                song_marker_fades=TimelineFadeGroupBlock(
+                    enabled=tl.song_marker_fades.enabled,
+                    fade_in=tl.song_marker_fades.fade_in,
+                    fade_out=tl.song_marker_fades.fade_out,
+                ),
+                standard_cue_fades=TimelineFadeGroupBlock(
+                    enabled=tl.standard_cue_fades.enabled,
+                    fade_in=tl.standard_cue_fades.fade_in,
+                    fade_out=tl.standard_cue_fades.fade_out,
+                ),
                 locked=tl.locked,
                 song_markers_expanded=self.session.song_markers.expanded,
                 song_marker_times=tuple(self.session.song_markers.times),

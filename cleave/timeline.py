@@ -148,30 +148,87 @@ def _boundary_has_cue(lane: TimelineLane, t: float) -> bool:
     return any(abs(cue.t - t) <= _CUE_BOUNDARY_EPS for cue in lane.cues)
 
 
+@dataclass(frozen=True)
+class TimelineFadeGroup:
+    """Per-edge fade settings for song-marker or standard cue boundaries."""
+
+    enabled: bool = False
+    fade_in: float = 2.0
+    fade_out: float = 2.0
+
+
 def _matches_song_marker(t: float, markers: Sequence[float]) -> bool:
     return any(abs(marker - t) <= SONG_MARKER_FADE_MATCH_EPS for marker in markers)
 
 
-def _segment_fade_edges_active(
+def _fade_group_for_edge(
+    t: float,
+    *,
+    song_marker_times: Sequence[float],
+    song_marker_fades: TimelineFadeGroup,
+    standard_fades: TimelineFadeGroup,
+) -> TimelineFadeGroup:
+    if _matches_song_marker(t, song_marker_times):
+        return song_marker_fades
+    return standard_fades
+
+
+def _edge_fade_duration(
+    lane: TimelineLane,
+    t: float,
+    *,
+    is_fade_in: bool,
+    duration_sec: float,
+    song_marker_times: Sequence[float],
+    song_marker_fades: TimelineFadeGroup,
+    standard_fades: TimelineFadeGroup,
+) -> float:
+    if is_fade_in:
+        if t <= 0.0 and not _boundary_has_cue(lane, t):
+            return 0.0
+    elif t >= duration_sec and not _boundary_has_cue(lane, t):
+        return 0.0
+    group = _fade_group_for_edge(
+        t,
+        song_marker_times=song_marker_times,
+        song_marker_fades=song_marker_fades,
+        standard_fades=standard_fades,
+    )
+    if not group.enabled:
+        return 0.0
+    duration = group.fade_in if is_fade_in else group.fade_out
+    return max(0.0, float(duration))
+
+
+def _segment_fade_durations(
     lane: TimelineLane,
     start: float,
     end: float,
     *,
     duration_sec: float,
     song_marker_times: Sequence[float],
-    exclude_song_markers: bool,
-) -> tuple[bool, bool]:
-    fade_in_active = True
-    if start <= 0.0 and not _boundary_has_cue(lane, start):
-        fade_in_active = False
-    elif exclude_song_markers and _matches_song_marker(start, song_marker_times):
-        fade_in_active = False
-    fade_out_active = True
-    if end >= duration_sec and not _boundary_has_cue(lane, end):
-        fade_out_active = False
-    elif exclude_song_markers and _matches_song_marker(end, song_marker_times):
-        fade_out_active = False
-    return fade_in_active, fade_out_active
+    song_marker_fades: TimelineFadeGroup,
+    standard_fades: TimelineFadeGroup,
+) -> tuple[float, float]:
+    fade_in = _edge_fade_duration(
+        lane,
+        start,
+        is_fade_in=True,
+        duration_sec=duration_sec,
+        song_marker_times=song_marker_times,
+        song_marker_fades=song_marker_fades,
+        standard_fades=standard_fades,
+    )
+    fade_out = _edge_fade_duration(
+        lane,
+        end,
+        is_fade_in=False,
+        duration_sec=duration_sec,
+        song_marker_times=song_marker_times,
+        song_marker_fades=song_marker_fades,
+        standard_fades=standard_fades,
+    )
+    return fade_in, fade_out
 
 
 def _segment_fade_envelope(
@@ -181,14 +238,12 @@ def _segment_fade_envelope(
     *,
     fade_in: float,
     fade_out: float,
-    fade_in_active: bool,
-    fade_out_active: bool,
 ) -> float:
     if start <= t_sec < end:
         return 1.0
-    if fade_in_active and fade_in > 0.0 and start - fade_in <= t_sec < start:
+    if fade_in > 0.0 and start - fade_in <= t_sec < start:
         return smoothstep((t_sec - (start - fade_in)) / fade_in)
-    if fade_out_active and fade_out > 0.0 and end <= t_sec < end + fade_out:
+    if fade_out > 0.0 and end <= t_sec < end + fade_out:
         return smoothstep((end + fade_out - t_sec) / fade_out)
     return 0.0
 
@@ -197,35 +252,33 @@ def lane_fade_spans(
     lane: TimelineLane,
     *,
     inherit: bool,
-    fade_in: float,
-    fade_out: float,
+    song_marker_fades: TimelineFadeGroup,
+    standard_fades: TimelineFadeGroup,
     duration_sec: float,
     song_marker_times: Sequence[float] = (),
-    exclude_song_markers: bool = False,
 ) -> list[tuple[float, float, Literal["in", "out"]]]:
     """Return clipped ``(t0, t1, kind)`` fade wedges for visible lane segments."""
-    fade_in = max(0.0, float(fade_in))
-    fade_out = max(0.0, float(fade_out))
     if duration_sec <= 0.0:
         return []
     spans: list[tuple[float, float, Literal["in", "out"]]] = []
     for start, end, visible in lane_segments(lane, duration_sec, inherit=inherit):
         if not visible:
             continue
-        fade_in_active, fade_out_active = _segment_fade_edges_active(
+        fade_in, fade_out = _segment_fade_durations(
             lane,
             start,
             end,
             duration_sec=duration_sec,
             song_marker_times=song_marker_times,
-            exclude_song_markers=exclude_song_markers,
+            song_marker_fades=song_marker_fades,
+            standard_fades=standard_fades,
         )
-        if fade_in_active and fade_in > 0.0:
+        if fade_in > 0.0:
             t0 = max(0.0, start - fade_in)
             t1 = start
             if t1 > t0:
                 spans.append((t0, t1, "in"))
-        if fade_out_active and fade_out > 0.0:
+        if fade_out > 0.0:
             t0 = end
             t1 = min(duration_sec, end + fade_out)
             if t1 > t0:
@@ -238,36 +291,35 @@ def lane_fade_alpha(
     t_sec: float,
     *,
     inherit: bool,
-    fade_in: float,
-    fade_out: float,
+    song_marker_fades: TimelineFadeGroup,
+    standard_fades: TimelineFadeGroup,
     duration_sec: float,
     song_marker_times: Sequence[float] = (),
-    exclude_song_markers: bool = False,
 ) -> float:
     """Continuous opacity for visible segments with optional edge fades.
 
     For each visible ``[A, B)`` from :func:`lane_segments`, fade-in starts
-    ``fade_in`` before ``A`` and reaches full at ``A``; fade-out starts at ``B``
-    and reaches zero ``fade_out`` after ``B``. Overlapping envelopes use max.
-    Song start/end without a cue at that edge do not fade. When
-    ``exclude_song_markers`` is set, boundaries matching a marker within
-    :data:`SONG_MARKER_FADE_MATCH_EPS` stay abrupt.
+    before ``A`` and reaches full at ``A``; fade-out starts at ``B`` and
+    reaches zero after ``B``. Durations come from the song-marker group when
+    the edge matches a marker within :data:`SONG_MARKER_FADE_MATCH_EPS`, else
+    the standard group. Disabled groups (or zero duration) stay abrupt.
+    Overlapping envelopes use max. Song start/end without a cue at that edge
+    do not fade.
     """
-    fade_in = max(0.0, float(fade_in))
-    fade_out = max(0.0, float(fade_out))
     if duration_sec <= 0.0:
         return 0.0
     alpha = 0.0
     for start, end, visible in lane_segments(lane, duration_sec, inherit=inherit):
         if not visible:
             continue
-        fade_in_active, fade_out_active = _segment_fade_edges_active(
+        fade_in, fade_out = _segment_fade_durations(
             lane,
             start,
             end,
             duration_sec=duration_sec,
             song_marker_times=song_marker_times,
-            exclude_song_markers=exclude_song_markers,
+            song_marker_fades=song_marker_fades,
+            standard_fades=standard_fades,
         )
         contrib = _segment_fade_envelope(
             t_sec,
@@ -275,8 +327,6 @@ def lane_fade_alpha(
             end,
             fade_in=fade_in,
             fade_out=fade_out,
-            fade_in_active=fade_in_active,
-            fade_out_active=fade_out_active,
         )
         if contrib > alpha:
             alpha = contrib

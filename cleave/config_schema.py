@@ -274,15 +274,9 @@ HIGHLIGHT_ROLLOFF_STRENGTH_PCT_MAX = 200
 DEFAULT_TIMELINE_ENABLED = True
 DEFAULT_TIMELINE_LOCKED = False
 
-TimelineFadesApplyTo = Literal["all", "exclude_song_markers"]
-TIMELINE_FADES_APPLY_TO_OPTIONS: tuple[TimelineFadesApplyTo, ...] = (
-    "all",
-    "exclude_song_markers",
-)
 DEFAULT_TIMELINE_FADES_ENABLED = False
 DEFAULT_TIMELINE_FADE_IN = 2.0
 DEFAULT_TIMELINE_FADE_OUT = 2.0
-DEFAULT_TIMELINE_FADES_APPLY_TO: TimelineFadesApplyTo = "all"
 TIMELINE_FADE_DURATION_MIN = 0.0
 TIMELINE_FADE_DURATION_MAX = 30.0
 TIMELINE_FADE_DURATION_STEP = 0.1
@@ -294,22 +288,6 @@ TIMELINE_PLACEMENT_SNAP_OPTIONS: tuple[TimelinePlacementSnap, ...] = (
     "bar",
 )
 DEFAULT_TIMELINE_PLACEMENT_SNAP: TimelinePlacementSnap = "beat"
-
-
-def timeline_fades_apply_to_label(value: str) -> str:
-    if value == "exclude_song_markers":
-        return "exclude song markers"
-    return "all"
-
-
-def cycle_timeline_fades_apply_to(value: str, *, forward: bool) -> TimelineFadesApplyTo:
-    options = TIMELINE_FADES_APPLY_TO_OPTIONS
-    try:
-        index = options.index(value)  # type: ignore[arg-type]
-    except ValueError:
-        index = 0
-    delta = 1 if forward else -1
-    return options[(index + delta) % len(options)]
 
 
 def cycle_timeline_placement_snap(
@@ -329,14 +307,6 @@ def clamp_timeline_fade_duration(value: float) -> float:
         TIMELINE_FADE_DURATION_MIN,
         min(TIMELINE_FADE_DURATION_MAX, float(value)),
     )
-
-
-def parse_timeline_fades_apply_to(raw: Any, label: str) -> TimelineFadesApplyTo:
-    value = str(raw)
-    if value not in TIMELINE_FADES_APPLY_TO_OPTIONS:
-        allowed = ", ".join(TIMELINE_FADES_APPLY_TO_OPTIONS)
-        raise ValueError(f"{label} must be one of: {allowed}")
-    return value  # type: ignore[return-value]
 
 
 def parse_timeline_placement_snap(raw: Any, label: str) -> TimelinePlacementSnap:
@@ -1896,6 +1866,29 @@ def persist_render(ctx: PersistCtx) -> dict[str, Any]:
     }
 
 
+def _parse_timeline_fade_group(raw: Any, label: str) -> Any:
+    from cleave.config import TimelineFadeGroupConfig
+
+    if raw is None:
+        return TimelineFadeGroupConfig()
+    group_map = as_mapping(raw, label)
+    return TimelineFadeGroupConfig(
+        enabled=bool(group_map.get("enabled", DEFAULT_TIMELINE_FADES_ENABLED)),
+        fade_in=clamp_timeline_fade_duration(
+            require_non_negative_number(
+                group_map.get("fade_in", DEFAULT_TIMELINE_FADE_IN),
+                f"{label}.fade_in",
+            )
+        ),
+        fade_out=clamp_timeline_fade_duration(
+            require_non_negative_number(
+                group_map.get("fade_out", DEFAULT_TIMELINE_FADE_OUT),
+                f"{label}.fade_out",
+            )
+        ),
+    )
+
+
 def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
     from cleave.config import TimelineConfig, TimelineFadesConfig
 
@@ -1915,24 +1908,13 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
     else:
         fades_map = as_mapping(fades_raw, "timeline.fades")
         fades = TimelineFadesConfig(
-            enabled=bool(
-                fades_map.get("enabled", DEFAULT_TIMELINE_FADES_ENABLED)
+            song_markers=_parse_timeline_fade_group(
+                fades_map.get("song_markers"),
+                "timeline.fades.song_markers",
             ),
-            fade_in=clamp_timeline_fade_duration(
-                require_non_negative_number(
-                    fades_map.get("fade_in", DEFAULT_TIMELINE_FADE_IN),
-                    "timeline.fades.fade_in",
-                )
-            ),
-            fade_out=clamp_timeline_fade_duration(
-                require_non_negative_number(
-                    fades_map.get("fade_out", DEFAULT_TIMELINE_FADE_OUT),
-                    "timeline.fades.fade_out",
-                )
-            ),
-            apply_to=parse_timeline_fades_apply_to(
-                fades_map.get("apply_to", DEFAULT_TIMELINE_FADES_APPLY_TO),
-                "timeline.fades.apply_to",
+            standard=_parse_timeline_fade_group(
+                fades_map.get("standard"),
+                "timeline.fades.standard",
             ),
         )
     # Legacy timeline.cues is ignored (clean break; no migration).
@@ -1996,6 +1978,14 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
     )
 
 
+def _persist_timeline_fade_group(group: Any) -> dict[str, Any]:
+    return {
+        "enabled": group.enabled,
+        "fade_in": group.fade_in,
+        "fade_out": group.fade_out,
+    }
+
+
 def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
     runtime = ctx.session.timeline
     out: dict[str, Any] = {
@@ -2003,10 +1993,8 @@ def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
         "locked": runtime.locked,
         "placement_snap": runtime.placement_snap,
         "fades": {
-            "enabled": runtime.fades_enabled,
-            "fade_in": runtime.fade_in,
-            "fade_out": runtime.fade_out,
-            "apply_to": runtime.fades_apply_to,
+            "song_markers": _persist_timeline_fade_group(runtime.song_marker_fades),
+            "standard": _persist_timeline_fade_group(runtime.standard_cue_fades),
         },
     }
     lanes_out: dict[str, Any] = {}

@@ -105,6 +105,14 @@ def _beat_bar_grid_expanded(state: TuningViewState, _slot: str | None) -> bool:
     return state.render_timeline.beat_bar_grid_expanded
 
 
+def _toggle_timeline_fades(controls: TuningControls, _slot: str | None, forward: bool) -> None:
+    controls._set_timeline_fades_expanded(forward)
+
+
+def _timeline_fades_expanded(state: TuningViewState, _slot: str | None) -> bool:
+    return state.render_timeline.fades_expanded
+
+
 def _open_timeline_panel(controls: TuningControls, forward: bool) -> None:
     if forward:
         controls._open_timeline_panel()
@@ -599,17 +607,47 @@ BEAT_BAR_GRID_SECTION = ExpandSectionDef(
     ),
 )
 
-def _timeline_fades_enabled(state: TuningViewState, _desc: RowDescriptor) -> bool:
-    return state.render_timeline.fades_enabled
+
+def _timeline_song_marker_fades_enabled(
+    state: TuningViewState, _desc: RowDescriptor
+) -> bool:
+    return state.render_timeline.song_marker_fades.enabled
 
 
-TIMELINE_FADES_ACTIVE = ConditionalRowsDef(
-    name="timeline_fades_enabled",
-    predicate=_timeline_fades_enabled,
+def _timeline_standard_cue_fades_enabled(
+    state: TuningViewState, _desc: RowDescriptor
+) -> bool:
+    return state.render_timeline.standard_cue_fades.enabled
+
+
+TIMELINE_SONG_MARKER_FADES_ACTIVE = ConditionalRowsDef(
+    name="timeline_song_marker_fades_enabled",
+    predicate=_timeline_song_marker_fades_enabled,
     children=(
-        SectionNode(leaf_kind=RowKind.TIMELINE_FADE_IN),
-        SectionNode(leaf_kind=RowKind.TIMELINE_FADE_OUT),
-        SectionNode(leaf_kind=RowKind.TIMELINE_FADES_APPLY_TO),
+        SectionNode(leaf_kind=RowKind.TIMELINE_SONG_MARKER_FADE_IN),
+        SectionNode(leaf_kind=RowKind.TIMELINE_SONG_MARKER_FADE_OUT),
+    ),
+)
+
+TIMELINE_STANDARD_CUE_FADES_ACTIVE = ConditionalRowsDef(
+    name="timeline_standard_cue_fades_enabled",
+    predicate=_timeline_standard_cue_fades_enabled,
+    children=(
+        SectionNode(leaf_kind=RowKind.TIMELINE_STANDARD_CUE_FADE_IN),
+        SectionNode(leaf_kind=RowKind.TIMELINE_STANDARD_CUE_FADE_OUT),
+    ),
+)
+
+TIMELINE_FADES_SECTION = ExpandSectionDef(
+    header_kind=RowKind.TIMELINE_FADES_HEADER,
+    context="global",
+    read_expanded=_timeline_fades_expanded,
+    toggle=_toggle_timeline_fades,
+    children=(
+        SectionNode(leaf_kind=RowKind.TIMELINE_SONG_MARKER_FADES),
+        SectionNode(conditional=TIMELINE_SONG_MARKER_FADES_ACTIVE),
+        SectionNode(leaf_kind=RowKind.TIMELINE_STANDARD_CUE_FADES),
+        SectionNode(conditional=TIMELINE_STANDARD_CUE_FADES_ACTIVE),
     ),
 )
 
@@ -646,6 +684,7 @@ _ALL_EXPAND_SECTIONS = _collect_expand_sections(
     TRACK_SECTION,
     SONG_MARKERS_SECTION,
     BEAT_BAR_GRID_SECTION,
+    TIMELINE_FADES_SECTION,
     extra_nodes=RENDER_SECTION_NODES,
 )
 
@@ -749,10 +788,13 @@ RENDER_TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_PLACEMENT_SNAP,
         RowKind.TIMELINE_SNAP_TO_GRID,
         RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
-        RowKind.TIMELINE_FADES,
-        RowKind.TIMELINE_FADE_IN,
-        RowKind.TIMELINE_FADE_OUT,
-        RowKind.TIMELINE_FADES_APPLY_TO,
+        RowKind.TIMELINE_FADES_HEADER,
+        RowKind.TIMELINE_SONG_MARKER_FADES,
+        RowKind.TIMELINE_SONG_MARKER_FADE_IN,
+        RowKind.TIMELINE_SONG_MARKER_FADE_OUT,
+        RowKind.TIMELINE_STANDARD_CUE_FADES,
+        RowKind.TIMELINE_STANDARD_CUE_FADE_IN,
+        RowKind.TIMELINE_STANDARD_CUE_FADE_OUT,
     }
 )
 
@@ -796,8 +838,11 @@ def _build_row_tree_indent_depth() -> dict[RowKind, int]:
     depths[RowKind.TIMELINE_PRESETS] = 1
     depths[RowKind.TIMELINE_RESET] = 1
     _assign_expand_indent_depth(depths, BEAT_BAR_GRID_SECTION, 1)
-    depths[RowKind.TIMELINE_FADES] = 1
-    _assign_indent_depth(depths, TIMELINE_FADES_ACTIVE.children, 2)
+    _assign_expand_indent_depth(depths, TIMELINE_FADES_SECTION, 1)
+    depths[RowKind.TIMELINE_SONG_MARKER_FADE_IN] = 3
+    depths[RowKind.TIMELINE_SONG_MARKER_FADE_OUT] = 3
+    depths[RowKind.TIMELINE_STANDARD_CUE_FADE_IN] = 3
+    depths[RowKind.TIMELINE_STANDARD_CUE_FADE_OUT] = 3
     return depths
 
 
@@ -913,14 +958,7 @@ def append_render_section_rows(
             ):
                 append_expand_section_rows(row_list, SONG_MARKERS_SECTION, state)
                 append_expand_section_rows(row_list, BEAT_BAR_GRID_SECTION, state)
-                row_list.append(RowDescriptor(RowKind.TIMELINE_FADES))
-                _append_section_nodes(
-                    row_list,
-                    (SectionNode(conditional=TIMELINE_FADES_ACTIVE),),
-                    state,
-                    None,
-                    None,
-                )
+                append_expand_section_rows(row_list, TIMELINE_FADES_SECTION, state)
                 row_list.append(RowDescriptor(RowKind.TIMELINE_PRESETS))
                 row_list.append(RowDescriptor(RowKind.TIMELINE_RESET))
 
@@ -972,11 +1010,9 @@ def _build_section_header_parent_map() -> dict[RowKind, RowKind]:
     _walk_expand_section_for_headers(TRACK_SECTION, out)
     _walk_expand_section_for_headers(SONG_MARKERS_SECTION, out)
     _walk_expand_section_for_headers(BEAT_BAR_GRID_SECTION, out)
+    _walk_expand_section_for_headers(TIMELINE_FADES_SECTION, out)
     out[RowKind.TIMELINE_SNAP_TO_SONG_MARKERS] = RowKind.SONG_MARKERS_HEADER
-    out[RowKind.TIMELINE_FADES] = RowKind.RENDER_TIMELINE_HEADER
-    _register_section_header_parent(
-        out, RowKind.RENDER_TIMELINE_HEADER, TIMELINE_FADES_ACTIVE.children
-    )
+    out[RowKind.TIMELINE_FADES_HEADER] = RowKind.RENDER_TIMELINE_HEADER
     return out
 
 

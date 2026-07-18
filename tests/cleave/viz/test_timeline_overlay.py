@@ -7,7 +7,14 @@ import pygame
 from cleave.config_schema import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
-from cleave.timeline import SlotCue, TimelineLane, canonicalize, lane_visible_at, stem_abbreviation
+from cleave.timeline import (
+    SlotCue,
+    TimelineFadeGroup,
+    TimelineLane,
+    canonicalize,
+    lane_visible_at,
+    stem_abbreviation,
+)
 from cleave.viz.material_icons import visibility_icon_slot_width
 from cleave.viz.tuning_panel_draw import render_visibility_icon
 from cleave.viz.theme import (
@@ -83,10 +90,12 @@ def _view_state(
     bar_grid_times: tuple[float, ...] = (),
     song_marker_times: tuple[float, ...] = (),
     selected_song_marker_index: int | None = None,
-    fades_enabled: bool = False,
-    fade_in: float = 2.0,
-    fade_out: float = 2.0,
-    fades_apply_to: str = "all",
+    song_marker_fades_enabled: bool = False,
+    song_marker_fade_in: float = 2.0,
+    song_marker_fade_out: float = 2.0,
+    standard_cue_fades_enabled: bool = False,
+    standard_cue_fade_in: float = 2.0,
+    standard_cue_fade_out: float = 2.0,
 ) -> TimelineViewState:
     order = list(layer_z_order or list(DEFAULT_LAYER_SLOTS))
     lane_map = dict(lanes or {})
@@ -131,10 +140,16 @@ def _view_state(
         bar_grid_times=bar_grid_times,
         song_marker_times=song_marker_times,
         selected_song_marker_index=selected_song_marker_index,
-        fades_enabled=fades_enabled,
-        fade_in=fade_in,
-        fade_out=fade_out,
-        fades_apply_to=fades_apply_to,
+        song_marker_fades=TimelineFadeGroup(
+            enabled=song_marker_fades_enabled,
+            fade_in=song_marker_fade_in,
+            fade_out=song_marker_fade_out,
+        ),
+        standard_cue_fades=TimelineFadeGroup(
+            enabled=standard_cue_fades_enabled,
+            fade_in=standard_cue_fade_in,
+            fade_out=standard_cue_fade_out,
+        ),
     )
 
 

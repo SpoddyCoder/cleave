@@ -268,9 +268,9 @@ def test_apply_layer_visibility_fades_enable_before_on_cue() -> None:
         timeline_enabled=True,
         lanes={"layer_1": _lane(False, (10.0, True), (20.0, False))},
     )
-    session.timeline.fades_enabled = True
-    session.timeline.fade_in = 2.0
-    session.timeline.fade_out = 2.0
+    session.timeline.standard_cue_fades.enabled = True
+    session.timeline.standard_cue_fades.fade_in = 2.0
+    session.timeline.standard_cue_fades.fade_out = 2.0
     layers_by_slot = {slot: _stem_layer(slot) for slot in DEFAULT_LAYER_SLOTS}
 
     apply_layer_visibility(session, layers_by_slot, 9.0)
@@ -289,8 +289,8 @@ def test_apply_layer_visibility_fades_off_stays_abrupt() -> None:
         timeline_enabled=True,
         lanes={"layer_1": _lane(False, (10.0, True), (20.0, False))},
     )
-    session.timeline.fades_enabled = False
-    session.timeline.fade_in = 2.0
+    session.timeline.standard_cue_fades.enabled = False
+    session.timeline.standard_cue_fades.fade_in = 2.0
     layers_by_slot = {slot: _stem_layer(slot) for slot in DEFAULT_LAYER_SLOTS}
 
     apply_layer_visibility(session, layers_by_slot, 9.0)
@@ -304,8 +304,8 @@ def test_apply_layer_visibility_override_stays_abrupt_with_fades() -> None:
         timeline_enabled=True,
         lanes={"layer_1": _lane(False, (10.0, True), (20.0, False))},
     )
-    session.timeline.fades_enabled = True
-    session.timeline.fade_in = 2.0
+    session.timeline.standard_cue_fades.enabled = True
+    session.timeline.standard_cue_fades.fade_in = 2.0
     session.timeline.override_slots = {"layer_1"}
     session.timeline.override_visible = {"layer_1": False}
     layers_by_slot = {slot: _stem_layer(slot) for slot in DEFAULT_LAYER_SLOTS}
@@ -321,8 +321,8 @@ def test_apply_layer_visibility_preview_stays_abrupt_with_fades() -> None:
         timeline_enabled=True,
         lanes={"layer_1": _lane(False, (10.0, True), (20.0, False))},
     )
-    session.timeline.fades_enabled = True
-    session.timeline.fade_in = 2.0
+    session.timeline.standard_cue_fades.enabled = True
+    session.timeline.standard_cue_fades.fade_in = 2.0
     session.timeline.preview_active = True
     session.timeline.monitor = {
         "layer_1": False,
@@ -378,8 +378,9 @@ def test_timeline_fade_multiplier_matches_lane_math() -> None:
         timeline_enabled=True,
         lanes={"layer_1": _lane(False, (10.0, True), (20.0, False))},
     )
-    session.timeline.fade_in = 2.0
-    session.timeline.fade_out = 2.0
+    session.timeline.standard_cue_fades.enabled = True
+    session.timeline.standard_cue_fades.fade_in = 2.0
+    session.timeline.standard_cue_fades.fade_out = 2.0
     assert timeline_fade_multiplier(session, "layer_1", 9.0) == pytest.approx(
         smoothstep(0.5)
     )
