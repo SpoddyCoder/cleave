@@ -22,7 +22,7 @@ Unsaved config edits show an asterisk on the active config path row. **Ctrl+Q** 
 
 ## Centered modals
 
-Confirm, save-choice, and unsaved-quit prompts are drawn by [cleave/viz/modal_overlay.py](cleave/viz/modal_overlay.py) via [cleave/viz/modal.py](cleave/viz/modal.py) `ModalHost`. They appear centered on the viewport with a full-frame scrim (`MODAL_SCRIM_ALPHA` in [cleave/viz/theme.py](cleave/viz/theme.py)); [cleave/viz/overlay_draw.py](cleave/viz/overlay_draw.py) uploads the full overlay surface while a modal is active. Keys route through `TuningControls.handle_modal_keydown` before context handlers ([cleave/viz/input_dispatch.py](cleave/viz/input_dispatch.py)).
+Confirm, save-choice, and unsaved-quit prompts are drawn by [cleave/viz/modal_overlay.py](cleave/viz/modal_overlay.py) via [cleave/viz/modal.py](cleave/viz/modal.py) `ModalHost`. They appear centered on the viewport with a full-frame scrim (`MODAL_SCRIM_ALPHA` in [cleave/viz/theme.py](cleave/viz/theme.py)); [cleave/viz/overlay_draw.py](cleave/viz/overlay_draw.py) uploads the full overlay surface while a modal is active. Keys route through `TuningControls.handle_modal_keydown` before context handlers ([cleave/viz/input_dispatch.py](cleave/viz/input_dispatch.py)). Options are always a vertical Capital Case list; focus highlight spans the panel width minus one character of padding on each side.
 
 **Parameterized actions:** when an action row needs one or more parameters, keep the panel row as a plain green `ACTION` line (no expand arrow, no child parameter rows). On Enter, chain one `prompt_choice` (or yes/no) modal per parameter, then apply. Example: snap to song markers asks for proximity, then layer scope ([cleave/viz/timeline_snap_controls.py](cleave/viz/timeline_snap_controls.py)).
 
@@ -63,7 +63,7 @@ The pinned top block before a visual gap (`header_gap` in `draw()`): `header_row
 - Row kinds: `RowKind.SETTINGS_HEADER`, optional `RowKind.SETTINGS_PREVIEW_QUALITY` when `session.settings.expanded`, `RowKind.CONFIG_HEADER` (active config path; Enter saves), `RowKind.TRANSPORT`, optional `RowKind.PANEL_NOTIFICATION` (transient message under Transport).
 - Layout order in `RowLayout.build`: settings header, optional render-mode sub-row, config header, transport.
 - **Settings** header: label `Settings` in `ACTION`, expand arrow in value color; Left/Right toggles `session.settings.expanded` (UI-only). Sub-row when expanded: `└─ preview quality: {mode}` cycles `editor.preview_quality` in config (`full-quality`, `balanced`, `performance`, `ultra-performance`; default `balanced`).
-- Enter on `CONFIG_HEADER` opens an `OVERWRITE` / `SAVE AS NEW` / `CANCEL` centered modal when overwrite is allowed (`allow_overwrite`; false for repo-root `cleave-viz.yaml`). When overwrite is not allowed, a `SAVE AS NEW` / `CANCEL` modal appears (Enter confirms the focused option, Esc dismisses). Overwrite still uses a yes/cancel centered modal (`Yes` / `CANCEL`).
+- Enter on `CONFIG_HEADER` opens an `Overwrite` / `Save As New` / `Cancel` centered modal when overwrite is allowed (`allow_overwrite`; false for repo-root `cleave-viz.yaml`). When overwrite is not allowed, a `Save As New` / `Cancel` modal appears (Enter confirms the focused option, Esc dismisses). Overwrite still uses a yes/cancel centered modal (`Yes` / `Cancel`).
 
 ## Whole panel
 

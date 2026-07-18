@@ -67,7 +67,6 @@ class TuningUiMetrics:
     visibility_icon_pad_x: int
     modal_panel_pad_x: int
     modal_panel_pad_y: int
-    modal_option_gap: int
 
 
 @dataclass(frozen=True)
@@ -106,7 +105,6 @@ def tuning_ui_metrics(
         visibility_icon_pad_x=scale_px(2, scale=scale),
         modal_panel_pad_x=scale_px(12, scale=scale),
         modal_panel_pad_y=scale_px(10, scale=scale),
-        modal_option_gap=scale_px(16, scale=scale),
     )
 
 

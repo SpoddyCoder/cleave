@@ -190,7 +190,7 @@ def test_dirty_enter_modal_cancel_stays_visualizer() -> None:
     assert controls.modal_host.active
     view = controls.modal_host.view_state()
     assert view.kind == ModalKind.CHOICE
-    assert list(view.options) == ["YES", "DISCARD CHANGES", "CANCEL"]
+    assert list(view.options) == ["Yes", "Discard Changes", "Cancel"]
 
     controls.handle_keydown(keydown(pygame.K_ESCAPE))
     assert not controls.modal_host.active

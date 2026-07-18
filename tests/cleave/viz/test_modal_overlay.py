@@ -10,7 +10,7 @@ from cleave.viz.modal import (
     ModalKind,
     ModalOption,
     ModalViewState,
-    modal_options_vertical,
+    capital_case_modal_option,
 )
 from cleave.viz.theme import HIGHLIGHT, MODAL_SCRIM_ALPHA
 from cleave.viz.ui_tint import blit_tint
@@ -110,9 +110,11 @@ def test_message_options_vertical_spacing() -> None:
 def test_modal_focused_option_has_highlight_background() -> None:
     pygame.init()
     font = _font()
-    panel = pygame.Surface((200, 40), pygame.SRCALPHA)
-    panel.fill((0, 0, 0, 255))
+    labels = ("Yes", "No")
+    line_gap = 3
     line_h = font.get_linesize()
+    panel = pygame.Surface((200, 80), pygame.SRCALPHA)
+    panel.fill((0, 0, 0, 255))
     pad_x = modal_overlay._PANEL_PAD_X
     pad_y = modal_overlay._PANEL_PAD_Y
     content_w = panel.get_width() - pad_x * 2
@@ -122,34 +124,77 @@ def test_modal_focused_option_has_highlight_background() -> None:
         x=pad_x,
         content_width=content_w,
         y=pad_y,
-        labels=("Yes", "No"),
+        labels=labels,
         focus_index=0,
         text_alpha=255,
-        line_gap=3,
+        line_gap=line_gap,
     )
 
-    yes_w = font.size(modal_overlay._option_text("Yes"))[0]
-    options_w, _ = modal_overlay._measure_options(font, ("Yes", "No"), line_gap=3)
-    option_x = pad_x + (content_w - options_w) // 2
+    highlight_x, _, highlight_w, _ = modal_overlay._focus_highlight_rect(
+        font, panel_width=panel.get_width(), y=pad_y, line_h=line_h
+    )
     tint_probe = pygame.Surface((4, 4), pygame.SRCALPHA)
     tint_probe.fill((0, 0, 0, 255))
     blit_tint(tint_probe, (0, 0, 4, 4), HIGHLIGHT)
     expected = tint_probe.get_at((2, 2))[:3]
     focused_pixels = [
-        panel.get_at((option_x + x, pad_y + y))
-        for x in range(yes_w)
+        panel.get_at((highlight_x + x, pad_y + y))
+        for x in range(highlight_w)
         for y in range(line_h)
     ]
     assert any(pixel[:3] == expected for pixel in focused_pixels)
 
-    no_x = option_x + yes_w + modal_overlay._OPTION_GAP
-    no_w = font.size(modal_overlay._option_text("No"))[0]
+    no_y = pad_y + line_h + line_gap
     unfocused_pixels = [
-        panel.get_at((no_x + x, pad_y + y))
-        for x in range(no_w)
+        panel.get_at((highlight_x + x, no_y + y))
+        for x in range(highlight_w)
         for y in range(line_h)
     ]
     assert not any(pixel[:3] == expected for pixel in unfocused_pixels)
+
+
+def test_modal_focus_highlight_spans_panel_minus_one_char_padding() -> None:
+    pygame.init()
+    font = _font()
+    labels = ("Yes", "Don't Save", "Cancel")
+    line_gap = 3
+    line_h = font.get_linesize()
+    panel = pygame.Surface((280, 120), pygame.SRCALPHA)
+    panel.fill((0, 0, 0, 255))
+    pad_x = modal_overlay._PANEL_PAD_X
+    pad_y = modal_overlay._PANEL_PAD_Y
+    content_w = panel.get_width() - pad_x * 2
+    highlight_x, _, highlight_w, _ = modal_overlay._focus_highlight_rect(
+        font, panel_width=panel.get_width(), y=pad_y, line_h=line_h
+    )
+    char_w = font.size("M")[0]
+    assert highlight_x == char_w
+    assert highlight_w == panel.get_width() - 2 * char_w
+    tint_probe = pygame.Surface((4, 4), pygame.SRCALPHA)
+    tint_probe.fill((0, 0, 0, 255))
+    blit_tint(tint_probe, (0, 0, 4, 4), HIGHLIGHT)
+    expected = tint_probe.get_at((2, 2))[:3]
+
+    for focus_index in range(len(labels)):
+        panel.fill((0, 0, 0, 255))
+        modal_overlay._draw_options(
+            panel,
+            font,
+            x=pad_x,
+            content_width=content_w,
+            y=pad_y,
+            labels=labels,
+            focus_index=focus_index,
+            text_alpha=255,
+            line_gap=line_gap,
+        )
+        row_y = pad_y + focus_index * (line_h + line_gap)
+        assert panel.get_at((highlight_x + 1, row_y + line_h // 2))[:3] == expected
+        assert panel.get_at(
+            (highlight_x + highlight_w - 2, row_y + line_h // 2)
+        )[:3] == expected
+        assert panel.get_at((0, row_y + line_h // 2))[:3] != expected
+        assert panel.get_at((panel.get_width() - 1, row_y + line_h // 2))[:3] != expected
 
 
 def test_modal_options_centered_when_message_is_wider() -> None:
@@ -207,7 +252,7 @@ def test_long_message_wraps_to_half_screen_width() -> None:
     assert content_w <= max_msg_w
     line_h = font.get_linesize()
     msg_h = len(lines) * line_h + (len(lines) - 1) * line_gap
-    options_h = font.get_linesize()
+    options_h = 2 * line_h + line_gap
     expected_h = (
         modal_overlay._PANEL_PAD_Y * 2 + msg_h + line_h + line_gap + options_h
     )
@@ -230,17 +275,20 @@ def test_prompt_choice_renders_n_options() -> None:
     view = modal.view_state()
     assert view is not None
     assert view.kind == ModalKind.CHOICE
-    assert view.options == ("(root)", "keepers", "wip", "Cancel")
+    assert view.options == ("(Root)", "Keepers", "Wip", "Cancel")
 
     options_w, options_h = modal_overlay._measure_options(font, view.options, line_gap=3)
-    assert options_h == font.get_linesize()
-    assert options_w > font.size(modal_overlay._option_text("(root)"))[0]
+    line_h = font.get_linesize()
+    assert options_h == 4 * line_h + 3 * 3
+    assert options_w == max(
+        font.size(modal_overlay._option_text(label))[0] for label in view.options
+    )
 
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     modal_overlay.draw(surface, view, font=font)
 
 
-def test_prompt_choice_left_right_cycles_options() -> None:
+def test_prompt_choice_up_down_and_left_right_cycle_options() -> None:
     modal = ModalHost()
     modal.prompt_choice(
         "Blacklist preset: demo.milk?",
@@ -254,44 +302,48 @@ def test_prompt_choice_left_right_cycles_options() -> None:
     assert view is not None
     assert view.focus_index == 0
 
-    modal.handle_keydown(_keydown(pygame.K_RIGHT))
+    modal.handle_keydown(_keydown(pygame.K_DOWN))
     assert modal.view_state() is not None
     assert modal.view_state().focus_index == 1
 
     modal.handle_keydown(_keydown(pygame.K_RIGHT))
     assert modal.view_state().focus_index == 2
 
-    modal.handle_keydown(_keydown(pygame.K_RIGHT))
+    modal.handle_keydown(_keydown(pygame.K_DOWN))
     assert modal.view_state().focus_index == 0
 
-    modal.handle_keydown(_keydown(pygame.K_LEFT))
+    modal.handle_keydown(_keydown(pygame.K_UP))
     assert modal.view_state().focus_index == 2
 
+    modal.handle_keydown(_keydown(pygame.K_LEFT))
+    assert modal.view_state().focus_index == 1
 
-def test_modal_options_vertical_threshold() -> None:
+
+def test_modal_options_always_vertical() -> None:
     pygame.init()
     font = _font()
     line_gap = 3
     line_h = font.get_linesize()
-    horizontal_labels = ("a", "b", "c", "d", "e")
-    vertical_labels = horizontal_labels + ("f",)
+    labels = ("A", "B", "C")
 
-    assert not modal_options_vertical(len(horizontal_labels))
-    assert modal_options_vertical(len(vertical_labels))
-
-    horiz_w, horiz_h = modal_overlay._measure_options(
-        font, horizontal_labels, line_gap=line_gap
-    )
-    vert_w, vert_h = modal_overlay._measure_options(
-        font, vertical_labels, line_gap=line_gap
+    options_w, options_h = modal_overlay._measure_options(
+        font, labels, line_gap=line_gap
     )
 
-    assert horiz_h == line_h
-    assert horiz_w > font.size(modal_overlay._option_text("a"))[0]
-    assert vert_h == 6 * line_h + 5 * line_gap
-    assert vert_w == max(
-        font.size(modal_overlay._option_text(label))[0] for label in vertical_labels
+    assert options_h == 3 * line_h + 2 * line_gap
+    assert options_w == max(
+        font.size(modal_overlay._option_text(label))[0] for label in labels
     )
+
+
+def test_capital_case_modal_option() -> None:
+    assert capital_case_modal_option("YES") == "Yes"
+    assert capital_case_modal_option("save as new") == "Save As New"
+    assert capital_case_modal_option("DON'T SAVE") == "Don't Save"
+    assert capital_case_modal_option("(root)") == "(Root)"
+    assert capital_case_modal_option("keepers") == "Keepers"
+    assert capital_case_modal_option("5.0s") == "5.0s"
+    assert capital_case_modal_option("a-tier") == "A-tier"
 
 
 def test_modal_vertical_focused_option_has_highlight_background() -> None:
@@ -299,7 +351,7 @@ def test_modal_vertical_focused_option_has_highlight_background() -> None:
     font = _font()
     line_gap = 3
     line_h = font.get_linesize()
-    labels = ("(root)", "a-tier", "b-tier", "c-tier", "d-tier", "Cancel")
+    labels = ("(Root)", "A-tier", "B-tier", "C-tier", "D-tier", "Cancel")
     panel = pygame.Surface((200, 200), pygame.SRCALPHA)
     panel.fill((0, 0, 0, 255))
     pad_x = modal_overlay._PANEL_PAD_X
@@ -317,11 +369,9 @@ def test_modal_vertical_focused_option_has_highlight_background() -> None:
         line_gap=line_gap,
     )
 
-    options_w, _ = modal_overlay._measure_options(font, labels, line_gap=line_gap)
-    option_x = pad_x + (content_w - options_w) // 2
-    focused_label = labels[1]
-    text_w = font.size(modal_overlay._option_text(focused_label))[0]
-    row_x = option_x + max(0, (options_w - text_w) // 2)
+    highlight_x, _, highlight_w, _ = modal_overlay._focus_highlight_rect(
+        font, panel_width=panel.get_width(), y=pad_y, line_h=line_h
+    )
     row_y = pad_y + line_h + line_gap
 
     tint_probe = pygame.Surface((4, 4), pygame.SRCALPHA)
@@ -329,45 +379,11 @@ def test_modal_vertical_focused_option_has_highlight_background() -> None:
     blit_tint(tint_probe, (0, 0, 4, 4), HIGHLIGHT)
     expected = tint_probe.get_at((2, 2))[:3]
     focused_pixels = [
-        panel.get_at((row_x + x, row_y + y))
-        for x in range(text_w)
+        panel.get_at((highlight_x + x, row_y + y))
+        for x in range(highlight_w)
         for y in range(line_h)
     ]
     assert any(pixel[:3] == expected for pixel in focused_pixels)
-
-
-def test_prompt_choice_vertical_up_down_cycles_options() -> None:
-    modal = ModalHost()
-    modal.prompt_choice(
-        "Favourite preset: demo.milk?",
-        [
-            ModalOption("(root)", lambda: None),
-            ModalOption("a-tier", lambda: None),
-            ModalOption("b-tier", lambda: None),
-            ModalOption("c-tier", lambda: None),
-            ModalOption("d-tier", lambda: None),
-            ModalOption("Cancel", lambda: None),
-        ],
-    )
-    view = modal.view_state()
-    assert view is not None
-    assert view.options_vertical
-    assert view.focus_index == 0
-
-    modal.handle_keydown(_keydown(pygame.K_DOWN))
-    assert modal.view_state().focus_index == 1
-
-    modal.handle_keydown(_keydown(pygame.K_DOWN))
-    assert modal.view_state().focus_index == 2
-
-    modal.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert modal.view_state().focus_index == 3
-
-    modal.handle_keydown(_keydown(pygame.K_UP))
-    assert modal.view_state().focus_index == 2
-
-    modal.handle_keydown(_keydown(pygame.K_LEFT))
-    assert modal.view_state().focus_index == 1
 
 
 def test_info_panel_sections_include_blank_line_gaps() -> None:

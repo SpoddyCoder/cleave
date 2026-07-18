@@ -202,7 +202,7 @@ def _choose_save_as_new(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
-    target = modal_view.options.index("SAVE AS NEW")
+    target = modal_view.options.index("Save As New")
     while controls.modal_host.view_state().focus_index != target:
         controls.handle_keydown(_keydown(pygame.K_RIGHT))
     controls.handle_keydown(_keydown(pygame.K_RETURN))
@@ -974,7 +974,7 @@ def test_repo_root_save_shows_save_as_new_only_modal() -> None:
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
     assert modal_view.kind == ModalKind.SAVE_CHOICE
-    assert modal_view.options == ("SAVE AS NEW", "CANCEL")
+    assert modal_view.options == ("Save As New", "Cancel")
 
     controls.handle_modal_keydown(_keydown(pygame.K_ESCAPE))
     assert not controls.modal_host.active
@@ -1079,7 +1079,7 @@ def test_save_choice_with_overwrite_includes_cancel() -> None:
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
     assert modal_view.kind == ModalKind.SAVE_CHOICE
-    assert modal_view.options == ("OVERWRITE", "SAVE AS NEW", "CANCEL")
+    assert modal_view.options == ("Overwrite", "Save As New", "Cancel")
 
     controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
     controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
@@ -1110,7 +1110,7 @@ def test_overwrite_shows_confirm_before_write() -> None:
     assert modal_view is not None
     assert modal_view.kind == ModalKind.YES_NO
     assert modal_view.message == "Overwrite cleave.config.yaml?"
-    assert modal_view.options == ("Yes", "CANCEL")
+    assert modal_view.options == ("Yes", "Cancel")
     assert writes == []
 
     assert controls.handle_keydown(_keydown(pygame.K_n)) is True
@@ -1558,7 +1558,7 @@ def _confirm_snap_song_markers(
     controls: TuningControls,
     *,
     proximity_label: str = "5.0s",
-    scope_label: str = "all layers",
+    scope_label: str = "All Layers",
 ) -> None:
     controls.handle_keydown(_keydown(pygame.K_RETURN))
     _choose_modal_option(controls, proximity_label)
@@ -1834,7 +1834,7 @@ def test_timeline_snap_grid_enter_opens_beats_bars_cancel_modal() -> None:
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
     assert modal_view.kind == ModalKind.CHOICE
-    assert modal_view.options == ("BEATS", "BARS", "CANCEL")
+    assert modal_view.options == ("Beats", "Bars", "Cancel")
     assert modal_view.message == "Snap cues to?"
 
 
@@ -1849,7 +1849,7 @@ def test_timeline_snap_grid_beats_mutates_cues() -> None:
     }
     _focus_timeline_snap_grid(controls)
     controls.handle_keydown(_keydown(pygame.K_RETURN))
-    _choose_modal_option(controls, "BEATS")
+    _choose_modal_option(controls, "Beats")
     assert not controls.modal_host.active
     assert controls.session.timeline.lanes["layer_1"].cues == [
         SlotCue(t=0.0, visible=True),
@@ -1873,7 +1873,7 @@ def test_timeline_snap_grid_bars_mutates_cues() -> None:
     }
     _focus_timeline_snap_grid(controls)
     controls.handle_keydown(_keydown(pygame.K_RETURN))
-    _choose_modal_option(controls, "BARS")
+    _choose_modal_option(controls, "Bars")
     assert not controls.modal_host.active
     assert controls.session.timeline.lanes["layer_1"].cues == [
         SlotCue(t=0.0, visible=True),
@@ -2005,7 +2005,7 @@ def test_timeline_snap_grid_no_bars_notifies() -> None:
     }
     _focus_timeline_snap_grid(controls)
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
-    _choose_modal_option(controls, "BARS")
+    _choose_modal_option(controls, "Bars")
     assert not controls.modal_host.active
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "No bars available; re-run separate"
@@ -2022,7 +2022,7 @@ def test_timeline_snap_grid_no_beats_notifies() -> None:
     }
     _focus_timeline_snap_grid(controls)
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
-    _choose_modal_option(controls, "BEATS")
+    _choose_modal_option(controls, "Beats")
     assert not controls.modal_host.active
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "No beats available; re-run separate"
@@ -2049,11 +2049,11 @@ def test_timeline_snap_song_markers_enter_opens_proximity_then_scope_modals() ->
     assert scope_view is not None
     assert scope_view.kind == ModalKind.CHOICE
     assert scope_view.message == "Layer scope?"
-    assert "all layers" in scope_view.options
-    assert "closest wins" in scope_view.options
-    assert "layer 1" in scope_view.options
+    assert "All Layers" in scope_view.options
+    assert "Closest Wins" in scope_view.options
+    assert "Layer 1" in scope_view.options
     assert scope_view.options[-1] == "Cancel"
-    assert scope_view.options[scope_view.focus_index] == "all layers"
+    assert scope_view.options[scope_view.focus_index] == "All Layers"
 
 
 def test_timeline_snap_song_markers_layer_mutates_only_that_lane() -> None:
@@ -2064,7 +2064,7 @@ def test_timeline_snap_song_markers_layer_mutates_only_that_lane() -> None:
         "layer_2": _lane(None, (4.2, False)),
     }
     _focus_timeline_snap_song_markers(controls)
-    _confirm_snap_song_markers(controls, scope_label="layer 1")
+    _confirm_snap_song_markers(controls, scope_label="Layer 1")
     assert not controls.modal_host.active
     assert controls.session.timeline.lanes["layer_1"].cues == [
         SlotCue(t=5.0, visible=True),
@@ -2084,7 +2084,7 @@ def test_timeline_snap_song_markers_each_layer_vs_closest_wins() -> None:
         "layer_2": _lane(None, (4.8, False)),
     }
     _focus_timeline_snap_song_markers(controls)
-    _confirm_snap_song_markers(controls, scope_label="all layers")
+    _confirm_snap_song_markers(controls, scope_label="All Layers")
     assert controls.session.timeline.lanes["layer_1"].cues == [
         SlotCue(t=5.0, visible=True),
     ]
@@ -2099,7 +2099,7 @@ def test_timeline_snap_song_markers_each_layer_vs_closest_wins() -> None:
         "layer_2": _lane(None, (4.8, False)),
     }
     _focus_timeline_snap_song_markers(controls)
-    _confirm_snap_song_markers(controls, scope_label="closest wins")
+    _confirm_snap_song_markers(controls, scope_label="Closest Wins")
     assert controls.session.timeline.lanes["layer_1"].cues == [
         SlotCue(t=4.5, visible=True),
     ]
