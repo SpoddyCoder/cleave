@@ -11,12 +11,17 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from cleave.config import VIZ_CONFIG_FILENAME, RenderConfig, load_config
+from cleave.preset_playlist import PresetPlaylist
+from cleave.timeline import SlotCue, TimelineLane, canonicalize
+from cleave.viz.layer_visibility import effective_layer_enabled
 from cleave.viz.session import (
+    LayerRuntime,
+    TimelineRuntime,
     TuningSession,
     default_render_overlay_runtime,
     session_from_cfg,
 )
-from tests.support.config import default_render_post_fx_runtime
+from tests.support.config import TEST_LAYER_STEMS, default_render_post_fx_runtime
 from cleave.paths import repo_root
 from cleave.config_schema import (
     DEFAULT_LAYER_SLOTS,
@@ -60,6 +65,34 @@ def _attach_render_post_fx_session(
         expanded=False,
         fade_in=fade_in,
         fade_out=fade_out,
+    )
+
+
+def _playlist(slot: str) -> PresetPlaylist:
+    current_dir = Path(f"/tmp/presets/{slot}")
+    paths = tuple(current_dir / f"preset-{i}.milk" for i in range(2))
+    return PresetPlaylist(current_dir=current_dir, paths=paths, index=0)
+
+
+def _session_with_enable_cue_at(beat_t: float) -> TuningSession:
+    """Timeline on; layer_1 off until a cue at beat_t turns it on."""
+    cues = canonicalize(False, [SlotCue(t=beat_t, visible=True)])
+    lane = TimelineLane(baseline=False, cues=cues)
+    return TuningSession(
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
+        timeline=TimelineRuntime(
+            enabled=True,
+            lanes={"layer_1": lane},
+        ),
+        layers={
+            slot: LayerRuntime(
+                playlist=_playlist(slot),
+                browse_floor=Path(f"/tmp/presets/{slot}"),
+                stem=TEST_LAYER_STEMS[slot],
+                enabled=True,
+            )
+            for slot in DEFAULT_LAYER_SLOTS
+        },
     )
 
 
@@ -550,6 +583,102 @@ def test_render_segment_frame_count_tick_times_and_ffmpeg_trim(
     assert cmd[audio_idx - 3] == "-t"
     assert cmd[audio_idx - 4] == str(start_sec)
     assert cmd[audio_idx - 5] == "-ss"
+
+
+@patch.object(render_mod, "pygame")
+@patch.object(render_mod, "shutil")
+@patch.object(render_mod, "subprocess")
+@patch.object(render_mod, "init_gl_resources_render")
+@patch.object(render_mod, "build_runtime_base")
+@patch.object(render_mod, "scan_all_layers", return_value={})
+@patch.object(render_mod, "VisualizerApp")
+@pytest.mark.parametrize(
+    "start_sec,end_sec,duration_sec,beat_t",
+    [
+        (None, None, 5.0, 1.5),
+        (10, 20, 60.0, 12.0),
+    ],
+    ids=["full_song", "partial_segment"],
+)
+def test_render_cue_at_beat_aligns_with_file_timeline_and_mux(
+    mock_app_cls: MagicMock,
+    _mock_scan: MagicMock,
+    mock_build: MagicMock,
+    mock_init_gl: MagicMock,
+    mock_subprocess: MagicMock,
+    mock_shutil: MagicMock,
+    _mock_pygame: MagicMock,
+    tmp_path: Path,
+    start_sec: int | None,
+    end_sec: int | None,
+    duration_sec: float,
+    beat_t: float,
+) -> None:
+    """Cue at on-grid beat t flips at round(t*fps); tick times match ffmpeg mux."""
+    mock_shutil.which.return_value = "/usr/bin/ffmpeg"
+    fps = 30
+    project = _setup_render_project(tmp_path, render_fps=fps)
+    width, height = 4, 4
+
+    compositor = MagicMock()
+    compositor.read_rgba_frame.return_value = _render_frame_bytes()
+
+    seed, runtime = _mock_render_runtime(
+        width=width, height=height, fps=fps, duration_sec=duration_sec
+    )
+    runtime.compositor = compositor
+    mock_build.return_value = seed
+    mock_init_gl.return_value = runtime
+
+    mock_app = MagicMock()
+    mock_app_cls.return_value = mock_app
+
+    proc = MagicMock()
+    proc.stdin = MagicMock()
+    proc.wait.return_value = 0
+    mock_subprocess.Popen.return_value = proc
+
+    _attach_render_post_fx_session(runtime)
+
+    render_kwargs: dict = {}
+    if start_sec is not None:
+        render_kwargs["start_sec"] = start_sec
+    if end_sec is not None:
+        render_kwargs["end_sec"] = end_sec
+    render_mod.render(project, **render_kwargs)
+
+    segment = _resolve_segment(
+        start_sec, end_sec, duration_sec=duration_sec, fps=fps
+    )
+    tick_times = [call.args[0] for call in mock_app.tick_frame.call_args_list]
+    assert len(tick_times) == segment.frame_count
+    for frame_idx, t_sec in enumerate(tick_times):
+        assert t_sec == pytest.approx(
+            (segment.start_frame + frame_idx) / fps
+        )
+
+    transition_abs_frame = round(beat_t * fps)
+    transition_frame_idx = transition_abs_frame - segment.start_frame
+    assert 0 <= transition_frame_idx < segment.frame_count
+    assert tick_times[transition_frame_idx] == pytest.approx(beat_t)
+
+    session = _session_with_enable_cue_at(beat_t)
+    for frame_idx, t_sec in enumerate(tick_times):
+        visible = effective_layer_enabled(session, "layer_1", t_sec)
+        if frame_idx < transition_frame_idx:
+            assert visible is False
+        else:
+            assert visible is True
+
+    cmd = mock_subprocess.Popen.call_args[0][0]
+    audio_path = str(project / "my-track.flac")
+    audio_idx = cmd.index(audio_path)
+    assert cmd[cmd.index("-ss") + 1] == str(segment.start_sec)
+    assert cmd[cmd.index("-t") + 1] == str(segment.frame_count / fps)
+    assert cmd[audio_idx - 5] == "-ss"
+    assert cmd[audio_idx - 4] == str(segment.start_sec)
+    assert cmd[audio_idx - 3] == "-t"
+    assert cmd[audio_idx - 2] == str(segment.frame_count / fps)
 
 
 @patch("cleave.viz.frame_finish.live_frame_fade_alpha", return_value=1.0)
