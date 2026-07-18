@@ -21,8 +21,10 @@ NUM_CHANNELS = 2
 DEFAULT_CHUNKSIZE = 4096
 CLICK_DURATION_SEC = 0.005
 CLICK_AMPLITUDE = 0.5
-CLICK_ACCENT_AMPLITUDE = 0.9
-CLICK_QUIET_AMPLITUDE = 0.35
+CLICK_ACCENT_AMPLITUDE = 0.85
+CLICK_QUIET_AMPLITUDE = 0.28
+CLICK_QUIET_FREQ_HZ = 900.0
+CLICK_ACCENT_FREQ_HZ = 3200.0
 
 
 def _make_click_sample(
@@ -30,12 +32,33 @@ def _make_click_sample(
     duration_sec: float = CLICK_DURATION_SEC,
     *,
     amplitude: float = CLICK_AMPLITUDE,
+    frequency_hz: float = 1000.0,
 ) -> np.ndarray:
     n = max(1, int(sample_rate * duration_sec))
     t = np.arange(n, dtype=np.float32) / sample_rate
     envelope = np.exp(-t * 800.0, dtype=np.float32)
-    tone = np.sin(2.0 * np.pi * 1000.0 * t, dtype=np.float32)
+    tone = np.sin(2.0 * np.pi * frequency_hz * t, dtype=np.float32)
     return (amplitude * tone * envelope).astype(np.float32)
+
+
+def _make_quiet_click_sample(sample_rate: int) -> np.ndarray:
+    return _make_click_sample(
+        sample_rate,
+        amplitude=CLICK_QUIET_AMPLITUDE,
+        frequency_hz=CLICK_QUIET_FREQ_HZ,
+    )
+
+
+def _make_accent_click_sample(sample_rate: int) -> np.ndarray:
+    n = max(1, int(sample_rate * CLICK_DURATION_SEC))
+    t = np.arange(n, dtype=np.float32) / sample_rate
+    envelope = np.exp(-t * 1400.0, dtype=np.float32)
+    ding = np.sin(2.0 * np.pi * CLICK_ACCENT_FREQ_HZ * t, dtype=np.float32)
+    shimmer = np.sin(2.0 * np.pi * 73.0 * t, dtype=np.float32) * np.sin(
+        2.0 * np.pi * 211.0 * t, dtype=np.float32
+    )
+    tone = ding + 0.45 * shimmer
+    return (CLICK_ACCENT_AMPLITUDE * tone * envelope).astype(np.float32)
 
 
 def _mix_click_into_stereo(
@@ -154,12 +177,8 @@ class MixPlayer:
         self._click_schedule: tuple[tuple[float, bool], ...] | None = None
         self._click_only = False
         self._click_sample = _make_click_sample(sample_rate)
-        self._click_accent_sample = _make_click_sample(
-            sample_rate, amplitude=CLICK_ACCENT_AMPLITUDE
-        )
-        self._click_quiet_sample = _make_click_sample(
-            sample_rate, amplitude=CLICK_QUIET_AMPLITUDE
-        )
+        self._click_accent_sample = _make_accent_click_sample(sample_rate)
+        self._click_quiet_sample = _make_quiet_click_sample(sample_rate)
         self._next_click_index = 0
 
     def set_residual_delay_sec(self, sec: float) -> None:

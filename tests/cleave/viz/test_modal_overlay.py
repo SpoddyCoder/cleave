@@ -35,8 +35,10 @@ def test_modal_panel_is_centered() -> None:
 
     modal_overlay.draw(surface, view, font=font)
 
-    panel_w, panel_h = modal_overlay._measure_panel(font, view, line_gap=3)
     sw, sh = surface.get_size()
+    panel_w, panel_h = modal_overlay._measure_panel(
+        font, view, line_gap=3, screen_w=sw
+    )
     expected_x = (sw - panel_w) // 2
     expected_y = (sh - panel_h) // 2
     left_margin = expected_x
@@ -65,7 +67,9 @@ def test_modal_scrim_covers_viewport() -> None:
         assert pixel[:3] == (0, 0, 0)
         assert pixel[3] == MODAL_SCRIM_ALPHA
 
-    panel_w, panel_h = modal_overlay._measure_panel(font, view, line_gap=3)
+    panel_w, panel_h = modal_overlay._measure_panel(
+        font, view, line_gap=3, screen_w=sw
+    )
     panel_x = (sw - panel_w) // 2
     panel_y = (sh - panel_h) // 2
     outside = surface.get_at((panel_x // 2, sh // 2))
@@ -79,6 +83,7 @@ def test_message_options_vertical_spacing() -> None:
     font = _font()
     line_gap = 3
     line_h = font.get_linesize()
+    screen_w = 1280
     with_message = ModalViewState(
         kind=ModalKind.YES_NO,
         message="Save configuration?",
@@ -93,10 +98,10 @@ def test_message_options_vertical_spacing() -> None:
     )
 
     _, height_with_message = modal_overlay._measure_panel(
-        font, with_message, line_gap=line_gap
+        font, with_message, line_gap=line_gap, screen_w=screen_w
     )
     _, height_options_only = modal_overlay._measure_panel(
-        font, options_only, line_gap=line_gap
+        font, options_only, line_gap=line_gap, screen_w=screen_w
     )
 
     assert height_with_message - height_options_only == line_h + line_h + line_gap
@@ -151,13 +156,16 @@ def test_modal_options_centered_when_message_is_wider() -> None:
     pygame.init()
     font = _font()
     line_gap = 3
+    screen_w = 1280
     view = ModalViewState(
         kind=ModalKind.YES_NO,
         message="Overwrite cleave-viz.yaml?",
         options=("Yes", "No"),
         focus_index=0,
     )
-    panel_w, _ = modal_overlay._measure_panel(font, view, line_gap=line_gap)
+    panel_w, _ = modal_overlay._measure_panel(
+        font, view, line_gap=line_gap, screen_w=screen_w
+    )
     content_w = panel_w - modal_overlay._PANEL_PAD_X * 2
     options_w, _ = modal_overlay._measure_options(font, view.options, line_gap=line_gap)
     msg_w = font.size(view.message)[0]
@@ -165,6 +173,45 @@ def test_modal_options_centered_when_message_is_wider() -> None:
     assert msg_w > options_w
     assert content_w == msg_w
     assert modal_overlay._PANEL_PAD_X + (content_w - options_w) // 2 > modal_overlay._PANEL_PAD_X
+
+
+def test_long_message_wraps_to_half_screen_width() -> None:
+    pygame.init()
+    font = _font()
+    line_gap = 3
+    screen_w = 640
+    message = (
+        "Song and visuals pause for calibration. A 140 BPM click track plays: "
+        "a loud click on beat 1 of each bar and quieter clicks on beats 2 to 4. "
+        "Tap Space in time with each click until the delay is detected automatically. "
+        "Esc cancels."
+    )
+    view = ModalViewState(
+        kind=ModalKind.YES_NO,
+        message=message,
+        options=("Yes", "Cancel"),
+        focus_index=0,
+    )
+    assert font.size(message)[0] > screen_w // 2
+
+    lines = modal_overlay._message_lines(font, message, screen_w=screen_w)
+    assert len(lines) > 1
+    max_msg_w = modal_overlay._message_max_width(screen_w)
+    assert all(font.size(line)[0] <= max_msg_w for line in lines)
+    assert any(line.endswith(".") for line in lines[:-1])
+
+    panel_w, panel_h = modal_overlay._measure_panel(
+        font, view, line_gap=line_gap, screen_w=screen_w
+    )
+    content_w = panel_w - modal_overlay._PANEL_PAD_X * 2
+    assert content_w <= max_msg_w
+    line_h = font.get_linesize()
+    msg_h = len(lines) * line_h + (len(lines) - 1) * line_gap
+    options_h = font.get_linesize()
+    expected_h = (
+        modal_overlay._PANEL_PAD_Y * 2 + msg_h + line_h + line_gap + options_h
+    )
+    assert panel_h == expected_h
 
 
 def test_prompt_choice_renders_n_options() -> None:
@@ -321,3 +368,30 @@ def test_prompt_choice_vertical_up_down_cycles_options() -> None:
 
     modal.handle_keydown(_keydown(pygame.K_LEFT))
     assert modal.view_state().focus_index == 1
+
+
+def test_info_panel_sections_include_blank_line_gaps() -> None:
+    pygame.init()
+    font = _font()
+    line_gap = 3
+    line_h = font.get_linesize()
+    state = modal_overlay.InfoPanelViewState(
+        title_lines=("Detection in progress", "Tap Space on each loud beat"),
+        body_lines=(
+            "Streak: 2/4",
+            "Spread: 10 ms",
+            "Estimate: 205 ms",
+        ),
+        footer_line="Esc to cancel",
+    )
+    panel_w, panel_h = modal_overlay._measure_info_panel(
+        font, state, line_gap=line_gap, screen_w=1280
+    )
+    title_h = 2 * line_h + line_gap
+    body_h = 3 * line_h + 2 * line_gap
+    footer_h = line_h
+    section_gap = line_h + line_gap
+    expected_h = (
+        modal_overlay._PANEL_PAD_Y * 2 + title_h + section_gap + body_h + section_gap + footer_h
+    )
+    assert panel_h == expected_h

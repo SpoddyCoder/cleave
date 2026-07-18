@@ -1041,13 +1041,14 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Sync by ear",
         help_entries=(
             ("Enter", "start calibration"),
-            ("Space", "tap on each click"),
+            ("Space", "tap on each loud beat"),
             ("Esc", "cancel"),
         ),
         help_description=(
             "Pauses song and visuals for calibration.",
-            "Plays a 120 BPM click track: loud downbeat plus quieter quarters.",
-            "Tap Space in time with the clicks until the delay is detected.",
+            "Plays a 140 BPM click track: loud downbeat plus quieter quarters.",
+            "Other panels hide while you tap Space on each loud beat (beat 1).",
+            "When four consistent loud-beat taps are detected, confirm the measured delay.",
         ),
     ),
 }

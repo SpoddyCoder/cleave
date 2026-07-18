@@ -40,6 +40,9 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
     )
     controls = MagicMock()
     controls.build_view_state.return_value = MagicMock()
+    controls.tap_sync.active = False
+    controls.tap_sync.showing_progress = False
+    controls.tap_sync.progress_view.return_value = None
     overlay = TuningOverlay()
     modal_host = ModalHost()
     seed = VisualizerSeed(
@@ -719,16 +722,34 @@ def test_tick_frame_draws_tuning_when_modal_active_and_panel_hidden(
 
 def test_live_overlay_ui_active_gating() -> None:
     assert not _live_overlay_ui_active(
-        overlay_visibility=0.0, modal_active=False, timeline_strip_visible=False
+        overlay_visibility=0.0,
+        modal_active=False,
+        timeline_strip_visible=False,
+        tap_sync_progress=False,
     )
     assert _live_overlay_ui_active(
-        overlay_visibility=0.5, modal_active=False, timeline_strip_visible=False
+        overlay_visibility=0.5,
+        modal_active=False,
+        timeline_strip_visible=False,
+        tap_sync_progress=False,
     )
     assert _live_overlay_ui_active(
-        overlay_visibility=0.0, modal_active=True, timeline_strip_visible=False
+        overlay_visibility=0.0,
+        modal_active=True,
+        timeline_strip_visible=False,
+        tap_sync_progress=False,
     )
     assert _live_overlay_ui_active(
-        overlay_visibility=0.0, modal_active=False, timeline_strip_visible=True
+        overlay_visibility=0.0,
+        modal_active=False,
+        timeline_strip_visible=True,
+        tap_sync_progress=False,
+    )
+    assert _live_overlay_ui_active(
+        overlay_visibility=0.0,
+        modal_active=False,
+        timeline_strip_visible=False,
+        tap_sync_progress=True,
     )
 
 

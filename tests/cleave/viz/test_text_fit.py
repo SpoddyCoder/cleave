@@ -6,6 +6,7 @@ from cleave.viz.text_fit import (
     fit_counter_label_to_width,
     fit_path_label_to_width,
     fit_text_to_width,
+    wrap_text_to_width,
 )
 from tests.support.viz import overlay_font
 
@@ -125,3 +126,24 @@ def test_fit_counter_label_suffix_only_when_budget_tiny() -> None:
     suffix = " (1/2) [B]"
     fitted = fit_counter_label_to_width(font, label, font.size(suffix)[0] - 1)
     assert fitted == suffix
+
+
+def test_wrap_text_to_width_keeps_short_line() -> None:
+    font = overlay_font()
+    text = "Short title?"
+    assert wrap_text_to_width(font, text, font.size(text)[0] + 10) == [text]
+
+
+def test_wrap_text_to_width_prefers_sentence_breaks() -> None:
+    font = overlay_font()
+    text = (
+        "First sentence ends here. Second sentence continues with more words. "
+        "Third sentence wraps as needed."
+    )
+    # Narrow enough that the full string wraps, but wide enough for each sentence.
+    max_px = max(font.size(part)[0] for part in text.split(". ") if part) + font.size(".")[0]
+    lines = wrap_text_to_width(font, text, max_px)
+    assert len(lines) >= 2
+    assert all(font.size(line)[0] <= max_px for line in lines)
+    assert lines[0].endswith(".")
+    assert " ".join(lines) == " ".join(text.split())

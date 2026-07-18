@@ -8,6 +8,8 @@ from cleave.gl_compositor import GlCompositor, OverlayTextureSlot
 from cleave.viz import modal_overlay
 from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.modal import ModalHost
+from cleave.viz.tap_sync import CONSISTENCY_WINDOW
+from cleave.viz.tap_sync_controls import TapSyncProgressView
 from cleave.viz.tuning_panel_draw import TuningOverlay
 from cleave.viz.tuning_view_state import TuningViewState
 from cleave.viz.overlay_profiler import OverlayProfiler
@@ -108,6 +110,33 @@ def _help_compose_kwargs(view_state: TuningViewState) -> dict[str, object]:
         "preset_switching": preset_switching,
         "preset_curation": view_state.settings.editor_mode == "preset_curation",
     }
+
+
+def _tap_sync_progress_view_state(
+    progress: TapSyncProgressView,
+) -> modal_overlay.InfoPanelViewState:
+    spread_text = (
+        "--"
+        if progress.spread_ms is None
+        else f"{progress.spread_ms} ms"
+    )
+    estimate_text = (
+        "--"
+        if progress.estimate_ms is None
+        else f"{progress.estimate_ms} ms"
+    )
+    return modal_overlay.InfoPanelViewState(
+        title_lines=(
+            "Detection in progress",
+            "Tap Space on each loud beat",
+        ),
+        body_lines=(
+            f"Streak: {progress.streak}/{CONSISTENCY_WINDOW}",
+            f"Spread: {spread_text}",
+            f"Estimate: {estimate_text}",
+        ),
+        footer_line="Esc to cancel",
+    )
 
 
 class OverlayDrawer:
@@ -227,6 +256,40 @@ class OverlayDrawer:
                     help_composed.screen_rect,
                     help_tex_uv,
                 )
+
+    @staticmethod
+    def draw_tap_sync_progress(
+        compositor: GlCompositor,
+        overlay: TuningOverlay,
+        overlay_surface: pygame.Surface,
+        progress: TapSyncProgressView,
+        *,
+        profiler: OverlayProfiler | None = None,
+    ) -> None:
+        viewport_w, viewport_h = overlay_surface.get_size()
+        overlay_surface.fill((0, 0, 0, 0))
+        modal_overlay.draw_info(
+            overlay_surface,
+            _tap_sync_progress_view_state(progress),
+            font=overlay._font_get(),
+            line_gap=overlay._line_gap,
+        )
+
+        def _upload(surface: pygame.Surface) -> int:
+            if profiler is not None:
+                with profiler.time_section("upload"):
+                    return compositor.upload_overlay_texture(surface)
+            return compositor.upload_overlay_texture(surface)
+
+        def _present(tex_id: int) -> None:
+            if profiler is not None:
+                with profiler.time_section("overlay_present"):
+                    compositor.draw_overlay(tex_id, 0, 0, viewport_w, viewport_h)
+            else:
+                compositor.draw_overlay(tex_id, 0, 0, viewport_w, viewport_h)
+
+        tex_id = _upload(overlay_surface)
+        _present(tex_id)
 
     @staticmethod
     def draw_timeline(
