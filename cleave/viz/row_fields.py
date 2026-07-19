@@ -80,10 +80,12 @@ def _format_settings_editor_mode(
 ) -> str:
     from cleave.viz.session import EDITOR_MODE_PANEL_LABELS
 
-    label = EDITOR_MODE_PANEL_LABELS[state.settings.editor_mode_selection]  # type: ignore[index]
-    if state.settings.editor_mode_selection != state.settings.editor_mode:
-        return f"{label} [Enter to confirm]"
-    return label
+    return EDITOR_MODE_PANEL_LABELS[state.settings.editor_mode_selection]  # type: ignore[index]
+
+
+def editor_mode_confirm_pending(state: TuningViewState) -> bool:
+    """True when Left/Right staged a mode that still needs Enter."""
+    return state.settings.editor_mode_selection != state.settings.editor_mode
 
 
 def _format_settings_ui_width_mode(

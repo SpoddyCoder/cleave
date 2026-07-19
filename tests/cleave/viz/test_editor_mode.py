@@ -282,12 +282,13 @@ def test_horizontal_only_stages_editor_mode() -> None:
     assert not controls.modal_host.active
     state = controls.build_view_state(paused=True)
     assert state.settings.editor_mode_selection == "preset_curation"
-    from cleave.viz.row_fields import format_row_value
+    from cleave.viz.row_fields import editor_mode_confirm_pending, format_row_value
 
     assert (
         format_row_value(state, RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
-        == "preset curation [Enter to confirm]"
+        == "preset curation"
     )
+    assert editor_mode_confirm_pending(state) is True
 
     controls.handle_keydown(keydown(pygame.K_LEFT))
     assert controls.session.settings.editor_mode_selection == "visualizer"
@@ -313,8 +314,9 @@ def test_navigate_away_reverts_editor_mode_selection() -> None:
 
 
 def test_flexible_mode_expands_for_editor_mode_confirm_suffix() -> None:
-    """Staged confirm chrome must widen flexible panels even past ui_width max."""
+    """Staged confirm icon must widen the editor-mode row (and flexible panels)."""
     import pygame
+    from cleave.viz.material_icons import action_enter_icon_suffix_width
     from cleave.viz.theme import panel_content_max_width_px
     from cleave.viz.tuning_panel_draw import TuningOverlay, fit_row_text
     from cleave.viz.tuning_view_state import SettingsBlock, TrackBlock
@@ -338,13 +340,18 @@ def test_flexible_mode_expands_for_editor_mode_confirm_suffix() -> None:
         )
     }
 
-    def _compose(mode: str, selection: str) -> tuple[int, str]:
+    def _compose(
+        *,
+        ui_width_mode: str,
+        editor_mode: str,
+        selection: str,
+    ) -> tuple[int, str, int, int]:
         state = _minimal_view_state(
             settings=SettingsBlock(
                 expanded=True,
-                editor_mode="visualizer",
+                editor_mode=editor_mode,
                 editor_mode_selection=selection,
-                ui_width_mode=mode,
+                ui_width_mode=ui_width_mode,
                 ui_width=100,
             ),
             tracks=tracks,
@@ -358,6 +365,7 @@ def test_flexible_mode_expands_for_editor_mode_confirm_suffix() -> None:
         )
         assert composed is not None
         font = overlay._font_get()
+        line_h = font.get_linesize()
         idx = state.layout.find_by_kind(RowKind.SETTINGS_EDITOR_MODE)
         text = fit_row_text(
             font,
@@ -365,17 +373,39 @@ def test_flexible_mode_expands_for_editor_mode_confirm_suffix() -> None:
             idx,
             max_content_width=panel_content_max_width_px(100),
         )
-        return composed.panel_size[0], text
+        _, _, row_w = overlay._build_row_at_index(
+            font,
+            state,
+            idx,
+            max_content_width=panel_content_max_width_px(100),
+            line_h=line_h,
+        )
+        return composed.panel_size[0], text, row_w, line_h
 
     max_panel_w = panel_content_max_width_px(100) + 2 * TuningOverlay()._padding
-    flexible_w, flexible_text = _compose("flexible", "preset_curation")
-    assert " [Enter to confirm]" in flexible_text
-    assert "…" not in flexible_text
-    assert flexible_w > max_panel_w
+    pending_w, pending_text, pending_row_w, line_h = _compose(
+        ui_width_mode="flexible",
+        editor_mode="visualizer",
+        selection="preset_curation",
+    )
+    _, confirmed_text, confirmed_row_w, _ = _compose(
+        ui_width_mode="flexible",
+        editor_mode="preset_curation",
+        selection="preset_curation",
+    )
+    assert "[Enter to confirm]" not in pending_text
+    assert "preset curation" in pending_text
+    assert "preset curation" in confirmed_text
+    assert pending_row_w == confirmed_row_w + action_enter_icon_suffix_width(line_h)
+    assert pending_w > max_panel_w
 
-    fixed_w, fixed_text = _compose("fixed", "preset_curation")
+    fixed_w, fixed_text, _, _ = _compose(
+        ui_width_mode="fixed",
+        editor_mode="visualizer",
+        selection="preset_curation",
+    )
     assert fixed_w == max_panel_w
-    assert "…" in fixed_text
+    assert "[Enter to confirm]" not in fixed_text
 
 
 def test_editor_mode_absent_from_persisted_payload() -> None:

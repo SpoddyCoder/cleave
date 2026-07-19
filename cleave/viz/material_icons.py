@@ -19,7 +19,10 @@ LOCK_GLYPH = "\ue897"
 SETTINGS_GLYPH = "\ue8b8"
 VISIBILITY_GLYPH = "\ue8f4"
 VISIBILITY_OFF_GLYPH = "\ue8f5"
-KEYBOARD_RETURN_GLYPH = "\ue31c"
+# Classic ↵ return corner (subdirectory_arrow_left). Material Icons is single-weight;
+# bold is faked in render_action_enter_icon via offset blits.
+RETURN_ARROW_GLYPH = "\ue5d9"
+_RETURN_ARROW_BOLD_PAD = 1
 
 _tuning_ui = tuning_ui_metrics()
 _SUFFIX_ICON_GAP = _tuning_ui.icon_suffix_gap
@@ -121,6 +124,30 @@ def track_header_lock_suffix_width(line_height: int) -> int:
     return _SUFFIX_ICON_GAP + _suffix_icon_width(line_height, LOCK_GLYPH)
 
 
+def render_action_enter_icon(
+    *,
+    color: tuple[int, int, int],
+    line_height: int,
+) -> pygame.Surface:
+    """Bold-looking return corner for focused action rows."""
+    icon_h = _icon_height(line_height)
+    font = material_font(icon_h)
+    glyph_surf = font.render(RETURN_ARROW_GLYPH, True, color)
+    pad = _RETURN_ARROW_BOLD_PAD
+    surf = pygame.Surface(
+        (glyph_surf.get_width() + pad, line_height), pygame.SRCALPHA
+    )
+    y = (line_height - glyph_surf.get_height()) // 2
+    # Offset blits thicken strokes; Material Icons has no bold face.
+    for dx, dy in ((0, 0), (pad, 0), (0, pad), (pad, pad)):
+        surf.blit(glyph_surf, (dx, y + dy))
+    return surf
+
+
 def action_enter_icon_suffix_width(line_height: int) -> int:
-    """Gap plus keyboard-return glyph width for focused action rows."""
-    return _SUFFIX_ICON_GAP + _suffix_icon_width(line_height, KEYBOARD_RETURN_GLYPH)
+    """Gap plus bold return-arrow width for focused action rows."""
+    return (
+        _SUFFIX_ICON_GAP
+        + _suffix_icon_width(line_height, RETURN_ARROW_GLYPH)
+        + _RETURN_ARROW_BOLD_PAD
+    )

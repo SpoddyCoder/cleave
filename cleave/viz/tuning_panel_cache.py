@@ -49,6 +49,7 @@ class RowRenderKey:
     line_h: int
     header_locked: bool = False
     config_dirty_suffix: bool = False
+    enter_icon_suffix: bool = False
 
 
 @dataclass
@@ -148,6 +149,7 @@ def row_render_key(
     line_h: int,
 ) -> RowRenderKey:
     from cleave.viz.tuning_panel_draw import (
+        _row_shows_enter_icon,
         _row_value_color,
         fit_row_text,
         row_visibility_icon_key,
@@ -167,6 +169,7 @@ def row_render_key(
         state, state.layout.descriptor(index)
     )
     config_dirty_suffix = kind == RowKind.CONFIG_HEADER and state.config_dirty
+    enter_icon_suffix = _row_shows_enter_icon(state, index)
     return RowRenderKey(
         kind=kind,
         slot=slot,
@@ -175,6 +178,7 @@ def row_render_key(
         visibility_icon=row_visibility_icon_key(state, index),
         header_locked=header_locked,
         config_dirty_suffix=config_dirty_suffix,
+        enter_icon_suffix=enter_icon_suffix,
         max_width=max_content_width,
         line_h=line_h,
     )
@@ -213,6 +217,7 @@ def static_row_keys(
                 key.line_h,
                 key.header_locked,
                 key.config_dirty_suffix,
+                key.enter_icon_suffix,
             )
         )
     return tuple(keys)

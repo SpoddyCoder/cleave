@@ -12,8 +12,9 @@ from cleave.viz.frame_rate import FPS_DISPLAY_LABEL
 from cleave.viz.focus_nav import MainFocus
 from cleave.viz.row_semantics import RowDescriptor, RowKind, row_is_pinned
 from cleave.viz.material_icons import (
-    KEYBOARD_RETURN_GLYPH,
+    RETURN_ARROW_GLYPH,
     action_enter_icon_suffix_width,
+    render_action_enter_icon,
     render_glyph,
 )
 from cleave.viz.tuning_panel_draw import (
@@ -1284,10 +1285,10 @@ def test_focused_action_row_shows_enter_hint() -> None:
     )
     assert width_focused == width_unfocused + action_enter_icon_suffix_width(line_h)
 
-    enter = render_glyph(
-        KEYBOARD_RETURN_GLYPH, color=HIGHLIGHT, line_height=line_h
-    )
-    assert pygame.mask.from_surface(enter).count() > 0
+    enter = render_action_enter_icon(color=HIGHLIGHT, line_height=line_h)
+    plain = render_glyph(RETURN_ARROW_GLYPH, color=HIGHLIGHT, line_height=line_h)
+    assert pygame.mask.from_surface(enter).count() > pygame.mask.from_surface(plain).count()
+    assert enter.get_width() == plain.get_width() + 1
 
 
 def test_disabled_action_row_hides_enter_hint() -> None:
