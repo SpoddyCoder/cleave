@@ -3580,6 +3580,30 @@ def test_locked_sub_rows_use_locked_color() -> None:
     assert _row_value_color(focused_header, preset_dir_row) == LOCKED
 
 
+def test_locked_disabled_layer_sub_rows_prefer_locked_color() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].locked = True
+    controls.session.layers["layer_1"].enabled = False
+    controls.session.layers["layer_1"].expanded = True
+    view = controls.build_view_state(paused=False)
+    header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
+    preset_dir_row = _row(view, "layer_1", RowKind.TRACK_PRESET_DIR)
+    unfocused = TuningViewState(
+        layer_z_order=view.layer_z_order,
+        tracks=view.tracks,
+        paused=view.paused,
+        position_sec=view.position_sec,
+        focus_cursor=MainFocus(view.layout.descriptor(len(view.layout) - 1)),
+        move_mode_slot=view.move_mode_slot,
+        notification_message=view.notification_message,
+        notification_remaining_sec=view.notification_remaining_sec,
+        active_config_label=view.active_config_label,
+        allow_overwrite=view.allow_overwrite,
+    )
+    assert _row_value_color(unfocused, header_row) == DISABLED
+    assert _row_value_color(unfocused, preset_dir_row) == LOCKED
+
+
 def test_locked_not_toggleable_during_move_mode() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     view = controls.build_view_state(paused=False)
