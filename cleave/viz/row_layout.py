@@ -48,6 +48,39 @@ def row_navigable(state: TuningViewState, desc: RowDescriptor) -> bool:
     return True
 
 
+def _quick_nav_section_open(state: TuningViewState, desc: RowDescriptor) -> bool:
+    """Whether a skippable quick-nav header is currently expanded/open."""
+    if desc.kind == RowKind.TRACK_HEADER:
+        if desc.slot is None:
+            return False
+        return state.tracks[desc.slot].expanded
+    if desc.kind == RowKind.RENDER_POST_FX_HEADER:
+        return state.render_post_fx.expanded
+    if desc.kind == RowKind.RENDER_TIMELINE_HEADER:
+        return state.render_timeline.expanded
+    return True
+
+
+def quick_nav_stop_included(state: TuningViewState, desc: RowDescriptor) -> bool:
+    """Whether Ctrl+Up/Down should land on this main-panel descriptor.
+
+    Section tops (Settings, Transport, Layer 1, Render: OVERLAY) always stop.
+    Other quick-nav headers stop only when open.
+    """
+    behavior = row_behavior(desc.kind)
+    if not behavior.quick_nav_target:
+        return False
+    if behavior.quick_nav_always:
+        return True
+    if (
+        desc.kind == RowKind.TRACK_HEADER
+        and state.layer_z_order
+        and desc.slot == state.layer_z_order[0]
+    ):
+        return True
+    return _quick_nav_section_open(state, desc)
+
+
 def resolve_navigable_descriptor(
     desc: RowDescriptor,
     navigable_descriptors: tuple[RowDescriptor, ...] | list[RowDescriptor],
@@ -241,14 +274,16 @@ class RowLayout:
             if row_navigable(state, self.descriptor(index))
         ]
 
-    def quick_nav_indices(self) -> list[int]:
+    def quick_nav_indices(self, state: TuningViewState) -> list[int]:
         """Main-panel row indices for Ctrl+Up/Down section jumps.
 
-        The open timeline strip is appended separately in
+        Always includes section tops (Settings, Transport, Layer 1,
+        Render: OVERLAY). Other quick-nav headers are included only when
+        open. The open timeline strip is appended separately in
         ``focus_nav.build_quick_nav_ring``.
         """
         return [
             index
             for index in range(len(self))
-            if row_behavior(self.kind(index)).quick_nav_target
+            if quick_nav_stop_included(state, self.descriptor(index))
         ]
