@@ -340,6 +340,58 @@ def lane_tick_times(lane: TimelineLane, duration_sec: float) -> list[float]:
     )
 
 
+def lane_on_transition_trigger_times(
+    lane: TimelineLane,
+    *,
+    song_marker_times: Sequence[float] = (),
+    song_marker_fades: TimelineFadeGroup,
+    standard_fades: TimelineFadeGroup,
+) -> list[float]:
+    """Preset-switch trigger times for each rising edge (``visible=True`` cue).
+
+    Canonical cues alternate, so every ``visible=True`` cue is an off->on edge.
+    Trigger is ``cue.t - fade_in(edge)`` using the song-marker vs standard fade
+    group for that edge (same selection as :func:`lane_fade_alpha`). When the
+    matching group is disabled or ``fade_in`` is 0, the trigger is ``cue.t``.
+    """
+    triggers: list[float] = []
+    for cue in lane.cues:
+        if not cue.visible:
+            continue
+        fade_in = _edge_fade_duration(
+            lane,
+            cue.t,
+            is_fade_in=True,
+            duration_sec=0.0,
+            song_marker_times=song_marker_times,
+            song_marker_fades=song_marker_fades,
+            standard_fades=standard_fades,
+        )
+        triggers.append(cue.t - fade_in)
+    return triggers
+
+
+def lane_on_transition_count(
+    lane: TimelineLane,
+    t_sec: float,
+    *,
+    song_marker_times: Sequence[float] = (),
+    song_marker_fades: TimelineFadeGroup,
+    standard_fades: TimelineFadeGroup,
+) -> int:
+    """Number of on-transition triggers at or before ``t_sec`` (seek-stable)."""
+    return sum(
+        1
+        for trigger in lane_on_transition_trigger_times(
+            lane,
+            song_marker_times=song_marker_times,
+            song_marker_fades=song_marker_fades,
+            standard_fades=standard_fades,
+        )
+        if trigger <= t_sec
+    )
+
+
 def punch_lane(
     lane: TimelineLane,
     start_sec: float,

@@ -97,6 +97,14 @@ def test_track_layout_omits_conditional_rows_when_predicates_fail() -> None:
     hard_cut_off = _track_row_kinds(hard_cut_enabled=False)
     assert RowKind.TRACK_HARD_CUT_DURATION not in hard_cut_off
 
+    timeline_kinds = _track_row_kinds(preset_switching="timeline")
+    assert RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET in timeline_kinds
+    assert RowKind.TRACK_PRESET_SWITCHING_SHUFFLE in timeline_kinds
+    assert RowKind.TRACK_PRESET_START_CLEAN in timeline_kinds
+    assert RowKind.TRACK_PRESET_DURATION not in timeline_kinds
+    assert RowKind.TRACK_SOFT_CUT_DURATION not in timeline_kinds
+    assert RowKind.TRACK_HARD_CUT_ENABLED not in timeline_kinds
+
 
 def test_track_layout_effect_roster_when_expanded() -> None:
     kinds = _track_row_kinds(effects_expanded=True)
@@ -118,9 +126,9 @@ def test_track_layout_row_order_when_fully_expanded() -> None:
         RowKind.TRACK_PRESET_SWITCHING,
         RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET,
         RowKind.TRACK_PRESET_SWITCHING_SHUFFLE,
+        RowKind.TRACK_PRESET_START_CLEAN,
         RowKind.TRACK_PRESET_DURATION,
         RowKind.TRACK_EASTER_EGG,
-        RowKind.TRACK_PRESET_START_CLEAN,
         RowKind.TRACK_SOFT_CUT_DURATION,
         RowKind.TRACK_HARD_CUT_ENABLED,
         RowKind.TRACK_HARD_CUT_DURATION,

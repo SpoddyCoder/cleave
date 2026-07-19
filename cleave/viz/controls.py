@@ -70,6 +70,9 @@ if TYPE_CHECKING:
 
 NOTIFICATION_TIMELINE_ENABLED_TEXT = "Timeline controls layer visibility"
 NOTIFICATION_TIMELINE_DISABLED_TEXT = "Layer panel controls visibility"
+NOTIFICATION_TIMELINE_PRESET_SWITCHING_TEXT = (
+    "Enable timeline for timeline preset switching"
+)
 NOTIFICATION_RESIDUAL_LATENCY_UNCHANGED_TEXT = (
     "Existing marker and cue times unchanged"
 )
@@ -1024,6 +1027,11 @@ class TuningControls:
             layer.preset_switching = modes[(index + 1) % len(modes)]
         else:
             layer.preset_switching = modes[(index - 1) % len(modes)]
+        if (
+            layer.preset_switching == "timeline"
+            and not self.session.timeline.enabled
+        ):
+            self.show_notification(NOTIFICATION_TIMELINE_PRESET_SWITCHING_TEXT)
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)
 

@@ -224,6 +224,10 @@ def test_switching_mode_help_lists_modes() -> None:
         "Controls how and when presets change during playback.",
     )
     assert description.entries == PRESET_SWITCHING_MODE_HELP_ENTRIES
+    modes = [mode for mode, _ in description.entries]
+    assert modes == ["none", "projectm", "timeline"]
+    timeline_help = dict(description.entries)["timeline"]
+    assert "timeline on-transition" in timeline_help
 
 
 def test_rotation_set_help_lists_rotation_sets() -> None:

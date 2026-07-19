@@ -17,10 +17,12 @@ from cleave.config_schema import (
 from cleave.preset_playlist import PresetPlaylist
 from cleave.projectm import ProjectM
 from cleave.viz.layer import StemLayer
+from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.preset_switching import (
     EMPTY_ROTATION_NOTIFICATION,
     EMPTY_USER_PRESETS_NOTIFICATION,
     active_auto_preset_path,
+    advance_timeline_preset_switching,
     apply_preset_switching,
     load_manual_preset_clean,
     reapply_projectm_preset_switching,
@@ -435,3 +437,122 @@ def test_reapply_on_backward_seek_restarts_tracked_preset() -> None:
     playlist.connect.assert_called_once()
     layer.pm.load_preset.assert_called_once_with(_MILK[2].resolve(), smooth=False)
     layer.pm.lock_preset.assert_called_with(False)
+
+
+def _timeline_session(layer: StemLayer, *, enabled: bool = True) -> TuningSession:
+    session = TuningSession(
+        layer_z_order=["layer_1"],
+        layers={
+            "layer_1": LayerRuntime(
+                playlist=layer.playlist,
+                browse_floor=layer.playlist.current_dir,
+                stem="drums",
+                preset_switching="timeline",
+            ),
+        },
+    )
+    session.timeline.enabled = enabled
+    session.timeline.lanes["layer_1"] = TimelineLane(
+        baseline=False,
+        cues=[
+            SlotCue(t=5.0, visible=True),
+            SlotCue(t=10.0, visible=False),
+            SlotCue(t=15.0, visible=True),
+        ],
+    )
+    return session
+
+
+@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
+def test_apply_timeline_locks_and_loads_anchor(_mock_milk: MagicMock) -> None:
+    layer = _stem_layer(paths=_MILK, index=1)
+    apply_preset_switching(layer, mode="timeline", rotation_set="directory")
+    layer.pm.lock_preset.assert_called_with(True)
+    layer.pm.set_hard_cut_enabled.assert_called_with(False)
+    assert layer.preset_rotation is not None
+    assert layer.rotation_anchor == 1
+    assert layer.timeline_switch_count == 0
+    layer.pm.load_preset.assert_called_once_with(_MILK[1], smooth=False)
+
+
+@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
+def test_advance_timeline_loads_next_on_rising_edge(_mock_milk: MagicMock) -> None:
+    layer = _stem_layer(paths=_MILK, index=0)
+    session = _timeline_session(layer)
+    apply_preset_switching(layer, mode="timeline", rotation_set="directory")
+    layer.pm.load_preset.reset_mock()
+
+    advance_timeline_preset_switching(session, {"layer_1": layer}, 4.9)
+    layer.pm.load_preset.assert_not_called()
+    assert layer.timeline_switch_count == 0
+
+    advance_timeline_preset_switching(session, {"layer_1": layer}, 5.0)
+    layer.pm.load_preset.assert_called_once_with(_MILK[1], smooth=False)
+    assert layer.timeline_switch_count == 1
+
+    layer.pm.load_preset.reset_mock()
+    advance_timeline_preset_switching(session, {"layer_1": layer}, 15.0)
+    layer.pm.load_preset.assert_called_once_with(_MILK[2], smooth=False)
+    assert layer.timeline_switch_count == 2
+
+
+@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
+def test_advance_timeline_noop_when_timeline_disabled(_mock_milk: MagicMock) -> None:
+    layer = _stem_layer(paths=_MILK, index=0)
+    session = _timeline_session(layer, enabled=False)
+    apply_preset_switching(layer, mode="timeline", rotation_set="directory")
+    layer.pm.load_preset.reset_mock()
+
+    advance_timeline_preset_switching(session, {"layer_1": layer}, 15.0)
+    layer.pm.load_preset.assert_not_called()
+    assert layer.timeline_switch_count == 0
+
+
+def test_tick_frame_core_advances_timeline_when_playing() -> None:
+    from cleave.viz.app import tick_frame_core
+
+    runtime = MagicMock()
+    runtime.seed.session = MagicMock()
+    runtime.layers_by_slot = {}
+    runtime.layers = []
+    with (
+        patch("cleave.viz.app.apply_layer_visibility"),
+        patch("cleave.viz.app.advance_timeline_preset_switching") as mock_advance,
+        patch("cleave.viz.app.LayerFramePipeline.render_frame"),
+        patch("cleave.viz.app.LayerFramePipeline.composite"),
+    ):
+        tick_frame_core(
+            runtime,
+            1.0,
+            paused=False,
+            was_paused=False,
+            n_pcm=0,
+            pm_time_sec=1.0,
+            blank_visualizers=False,
+        )
+    mock_advance.assert_called_once_with(runtime.seed.session, {}, 1.0)
+
+
+def test_tick_frame_core_skips_advance_when_paused() -> None:
+    from cleave.viz.app import tick_frame_core
+
+    runtime = MagicMock()
+    runtime.seed.session = MagicMock()
+    runtime.layers_by_slot = {}
+    runtime.layers = []
+    with (
+        patch("cleave.viz.app.apply_layer_visibility"),
+        patch("cleave.viz.app.advance_timeline_preset_switching") as mock_advance,
+        patch("cleave.viz.app.LayerFramePipeline.render_frame"),
+        patch("cleave.viz.app.LayerFramePipeline.composite"),
+    ):
+        tick_frame_core(
+            runtime,
+            1.0,
+            paused=True,
+            was_paused=True,
+            n_pcm=0,
+            pm_time_sec=1.0,
+            blank_visualizers=False,
+        )
+    mock_advance.assert_not_called()

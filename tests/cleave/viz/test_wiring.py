@@ -266,6 +266,7 @@ def test_on_seek_reapplies_projectm_preset_switching() -> None:
 
     with (
         patch("cleave.viz.wiring.reapply_projectm_preset_switching") as mock_reapply,
+        patch("cleave.viz.wiring.resync_timeline_preset_switching") as mock_resync,
         patch("cleave.viz.wiring.LayerFramePipeline.flush_pcm"),
         patch("cleave.viz.wiring.seek"),
     ):
@@ -287,3 +288,78 @@ def test_on_seek_reapplies_projectm_preset_switching() -> None:
 
     mock_reapply.assert_called_once()
     assert mock_reapply.call_args.kwargs["delta_sec"] == 5.0
+    mock_resync.assert_called_once()
+
+
+def test_on_preset_change_timeline_reanchors_and_stays_locked() -> None:
+    session = _session_with_mode("timeline")
+    cfg = make_test_cfg(("layer_1",))
+    pm = ProjectM.__new__(ProjectM)
+    pm.lock_preset = MagicMock()
+    pm.load_preset = MagicMock()
+    pm.set_preset_start_clean = MagicMock()
+    pm.set_hard_cut_enabled = MagicMock()
+    layer = StemLayer(
+        slot="layer_1",
+        pm=pm,
+        fbo=MagicMock(),
+        playlist=session.layers["layer_1"].playlist,
+    )
+    playlist = session.layers["layer_1"].playlist
+
+    with (
+        patch("cleave.viz.wiring.apply_preset_switching"),
+        patch("cleave.viz.wiring.reanchor_timeline_preset_after_browse") as mock_reanchor,
+    ):
+        controls = make_tuning_controls(
+            session=session,
+            cfg=cfg,
+            preset_root=cfg.paths.preset_root,
+            project_dir=Path("/tmp/project"),
+            layers_by_slot={"layer_1": layer},
+            layers=[layer],
+            playback=stub_playback_state(),
+            duration_sec=120.0,
+            signals=None,
+            effect_runtime=MagicMock(),
+        )
+        bindings = controls._layer_bindings
+        assert bindings is not None
+        playlist.load_into = MagicMock()
+        bindings.on_preset_change("layer_1", playlist)
+
+    playlist.load_into.assert_called_once_with(pm, smooth=False)
+    mock_reanchor.assert_called_once()
+    assert mock_reanchor.call_args.args[0] is layer
+
+
+def test_unlock_preset_after_modal_keeps_timeline_locked() -> None:
+    session = _session_with_mode("timeline")
+    cfg = make_test_cfg(("layer_1",))
+    pm = ProjectM.__new__(ProjectM)
+    pm.lock_preset = MagicMock()
+    layer = StemLayer(
+        slot="layer_1",
+        pm=pm,
+        fbo=MagicMock(),
+        playlist=session.layers["layer_1"].playlist,
+    )
+
+    with patch("cleave.viz.wiring.apply_preset_switching"):
+        controls = make_tuning_controls(
+            session=session,
+            cfg=cfg,
+            preset_root=cfg.paths.preset_root,
+            project_dir=Path("/tmp/project"),
+            layers_by_slot={"layer_1": layer},
+            layers=[layer],
+            playback=stub_playback_state(),
+            duration_sec=120.0,
+            signals=None,
+            effect_runtime=MagicMock(),
+        )
+
+    bindings = controls._layer_bindings
+    assert bindings is not None
+    bindings.unlock_preset_after_modal("layer_1")
+    pm.lock_preset.assert_called_with(True)

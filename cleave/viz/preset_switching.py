@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from cleave.config_schema import (
@@ -18,8 +18,14 @@ from cleave.config_schema import (
     PresetSwitchingRotationSet,
 )
 from cleave.preset_playlist import milk_files_in_dir
+from cleave.preset_rotation import PresetRotation, rotation_seed
 from cleave.projectm import ProjectM
 from cleave.projectm_playlist import ProjectMPlaylist
+from cleave.timeline import (
+    TimelineFadeGroup,
+    empty_lane,
+    lane_on_transition_count,
+)
 from cleave.viz.layer import StemLayer
 
 EMPTY_ROTATION_NOTIFICATION = "No presets in directory for auto switching"
@@ -44,6 +50,12 @@ def _apply_projectm_timing(
     pm.set_hard_cut_enabled(hard_cut_enabled)
     pm.set_hard_cut_duration(hard_cut_duration)
     pm.set_hard_cut_sensitivity(hard_cut_sensitivity)
+
+
+def _clear_timeline_rotation(layer: StemLayer) -> None:
+    layer.preset_rotation = None
+    layer.timeline_switch_count = 0
+    layer.rotation_anchor = 0
 
 
 def reapply_projectm_preset_switching(
@@ -112,10 +124,24 @@ def apply_preset_switching(
         layer.projectm_playlist.destroy()
         layer.projectm_playlist = None
 
+    if mode != "timeline":
+        _clear_timeline_rotation(layer)
+
     if mode == "none":
         layer.auto_preset_path = None
         pm.lock_preset(True)
         pm.set_hard_cut_enabled(False)
+        return
+
+    if mode == "timeline":
+        _apply_timeline_preset_switching(
+            layer,
+            rotation_set=rotation_set,
+            user_presets=user_presets,
+            shuffle=shuffle,
+            preset_start_clean=preset_start_clean,
+            on_empty=on_empty,
+        )
         return
 
     pm.lock_preset(False)
@@ -165,6 +191,202 @@ def apply_preset_switching(
     layer.projectm_playlist = playlist
     _sync_projectm_playlist_position(layer)
     restart_projectm_preset_timer(layer)
+
+
+def _rotation_paths(
+    layer: StemLayer,
+    *,
+    rotation_set: PresetSwitchingRotationSet,
+    user_presets: list[str] | None,
+) -> list[Path]:
+    if rotation_set == "user_defined":
+        return [Path(path) for path in (user_presets or [])]
+    return list(milk_files_in_dir(layer.playlist.current_dir))
+
+
+def _anchor_index(layer: StemLayer, paths: Sequence[Path]) -> int:
+    current = layer.playlist.current
+    if current is None or not paths:
+        return 0
+    resolved = current.resolve()
+    for index, candidate in enumerate(paths):
+        if candidate.resolve() == resolved:
+            return index
+    return 0
+
+
+def _apply_timeline_preset_switching(
+    layer: StemLayer,
+    *,
+    rotation_set: PresetSwitchingRotationSet,
+    user_presets: list[str] | None,
+    shuffle: bool,
+    preset_start_clean: bool,
+    on_empty: Callable[[], None] | None,
+) -> None:
+    pm = layer.pm
+    pm.lock_preset(True)
+    pm.set_hard_cut_enabled(False)
+    pm.set_preset_start_clean(preset_start_clean)
+
+    paths = _rotation_paths(
+        layer, rotation_set=rotation_set, user_presets=user_presets
+    )
+    if not paths:
+        _clear_timeline_rotation(layer)
+        layer.auto_preset_path = None
+        if on_empty is not None:
+            on_empty()
+        return
+
+    anchor = _anchor_index(layer, paths)
+    layer.rotation_anchor = anchor
+    layer.timeline_switch_count = 0
+    layer.preset_rotation = PresetRotation(
+        paths=tuple(paths),
+        shuffle=shuffle,
+        seed=rotation_seed(paths, salt=layer.slot),
+        anchor=anchor,
+    )
+    path = layer.preset_rotation.path_for(0)
+    if path is None:
+        return
+    _load_timeline_preset(layer, path, preset_start_clean=preset_start_clean)
+
+
+def _load_timeline_preset(
+    layer: StemLayer,
+    path: Path,
+    *,
+    preset_start_clean: bool,
+) -> None:
+    pm = layer.pm
+    pm.set_preset_start_clean(preset_start_clean)
+    pm.load_preset(path, smooth=False)
+    _record_auto_preset(layer, path)
+
+
+def _timeline_fade_groups(session) -> tuple[
+    TimelineFadeGroup, TimelineFadeGroup, Sequence[float]
+]:
+    tl = session.timeline
+    song_marker_fades = TimelineFadeGroup(
+        enabled=tl.song_marker_fades.enabled,
+        fade_in=tl.song_marker_fades.fade_in,
+        fade_out=tl.song_marker_fades.fade_out,
+    )
+    standard_fades = TimelineFadeGroup(
+        enabled=tl.standard_cue_fades.enabled,
+        fade_in=tl.standard_cue_fades.fade_in,
+        fade_out=tl.standard_cue_fades.fade_out,
+    )
+    return song_marker_fades, standard_fades, session.song_markers.times
+
+
+def advance_timeline_preset_switching(
+    session,
+    layers_by_slot: dict[str, StemLayer],
+    t_sec: float,
+) -> None:
+    """Load the seek-stable rotation preset when a layer's on-transition count changes.
+
+    Uses committed lane cues only. No-op when timeline is disabled, in preset
+    curation, or when the count is unchanged (preset holds).
+    """
+    from cleave.viz.editor_mode_controls import preset_switching_active
+
+    if not preset_switching_active(session):
+        return
+    if not session.timeline.enabled:
+        return
+
+    song_marker_fades, standard_fades, song_marker_times = _timeline_fade_groups(
+        session
+    )
+    tl = session.timeline
+
+    for slot, layer in layers_by_slot.items():
+        runtime = session.layers[slot]
+        if runtime.preset_switching != "timeline":
+            continue
+        rotation = layer.preset_rotation
+        if rotation is None:
+            continue
+        lane = tl.lanes.get(slot) or empty_lane()
+        count = lane_on_transition_count(
+            lane,
+            t_sec,
+            song_marker_times=song_marker_times,
+            song_marker_fades=song_marker_fades,
+            standard_fades=standard_fades,
+        )
+        if count == layer.timeline_switch_count:
+            continue
+        path = rotation.path_for(count)
+        layer.timeline_switch_count = count
+        if path is None:
+            continue
+        _load_timeline_preset(
+            layer,
+            path,
+            preset_start_clean=runtime.preset_start_clean,
+        )
+
+
+def resync_timeline_preset_switching(
+    session,
+    layers_by_slot: dict[str, StemLayer],
+    t_sec: float,
+) -> None:
+    """Resync timeline-mode layers after seek (load preset for transition count)."""
+    advance_timeline_preset_switching(session, layers_by_slot, t_sec)
+
+
+def reanchor_timeline_preset_after_browse(
+    layer: StemLayer,
+    session,
+    t_sec: float,
+    *,
+    rotation_set: PresetSwitchingRotationSet,
+    user_presets: list[str] | None = None,
+    shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE,
+) -> None:
+    """Keep the browsed preset; next on-transition advances from the following entry."""
+    pm = layer.pm
+    pm.lock_preset(True)
+    pm.set_hard_cut_enabled(False)
+
+    paths = _rotation_paths(
+        layer, rotation_set=rotation_set, user_presets=user_presets
+    )
+    if not paths:
+        _clear_timeline_rotation(layer)
+        return
+
+    count = 0
+    if session.timeline.enabled:
+        song_marker_fades, standard_fades, song_marker_times = _timeline_fade_groups(
+            session
+        )
+        lane = session.timeline.lanes.get(layer.slot) or empty_lane()
+        count = lane_on_transition_count(
+            lane,
+            t_sec,
+            song_marker_times=song_marker_times,
+            song_marker_fades=song_marker_fades,
+            standard_fades=standard_fades,
+        )
+
+    browse_index = _anchor_index(layer, paths)
+    anchor = (browse_index - count) % len(paths)
+    layer.rotation_anchor = anchor
+    layer.timeline_switch_count = count
+    layer.preset_rotation = PresetRotation(
+        paths=tuple(paths),
+        shuffle=shuffle,
+        seed=rotation_seed(paths, salt=layer.slot),
+        anchor=anchor,
+    )
 
 
 def load_manual_preset_clean(

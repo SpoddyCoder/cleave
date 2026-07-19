@@ -29,15 +29,20 @@ DEFAULT_BEAT_SENSITIVITY = 2.0
 BEAT_SENSITIVITY_MIN = 0.0
 BEAT_SENSITIVITY_MAX = 5.0
 
-PresetSwitchingMode = Literal["none", "projectm"]
+PresetSwitchingMode = Literal["none", "projectm", "timeline"]
 PresetSwitchingRotationSet = Literal["directory", "user_defined"]
 PRESET_SWITCHING_MODES: tuple[PresetSwitchingMode, ...] = (
     "none",
     "projectm",
+    "timeline",
 )
 PRESET_SWITCHING_MODE_HELP_ENTRIES: tuple[tuple[PresetSwitchingMode, str], ...] = (
     ("none", "keeps the current preset indefinitely."),
     ("projectm", "libprojectM switches automatically using beat detection."),
+    (
+        "timeline",
+        "advances the preset on each committed timeline on-transition for this layer.",
+    ),
 )
 PRESET_SWITCHING_ROTATION_SETS: tuple[PresetSwitchingRotationSet, ...] = (
     "directory",
@@ -461,6 +466,8 @@ def clamp_easter_egg(value: float) -> float:
 def preset_switching_display(mode: PresetSwitchingMode) -> str:
     if mode == "projectm":
         return "projectM"
+    if mode == "timeline":
+        return "timeline"
     return "none"
 
 
