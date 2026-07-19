@@ -321,7 +321,7 @@ def test_finish_content_frame_hdr_on_post_fx_solo_still_applies_display_shoulder
 def test_finish_content_frame_skips_render_sections_in_curation() -> None:
     from cleave.viz.frame_finish import _composite_render_overlay
 
-    core = _make_core(hdr_compositing=False)
+    core = _make_core(hdr_compositing=True)
     core.seed.session.settings.editor_mode = "preset_curation"
     core.seed.session.render_overlay.enabled = True
     core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
@@ -332,11 +332,12 @@ def test_finish_content_frame_skips_render_sections_in_curation() -> None:
     core.seed.session.render_post_fx.fade_out = 2.0
 
     with (
-        patch("cleave.viz.frame_finish.apply_hdr_display_shoulder"),
+        patch("cleave.viz.frame_finish.apply_hdr_display_shoulder") as shoulder,
         patch("cleave.viz.frame_finish._composite_render_overlay"),
     ):
         finish_content_frame(core, 1.0)
 
+    shoulder.assert_not_called()
     core.post_process.apply_highlight_rolloff.assert_not_called()
     core.post_process.apply_chroma_boost.assert_not_called()
     core.compositor.apply_frame_fade.assert_called_once_with(1.0)

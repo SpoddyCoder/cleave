@@ -36,6 +36,23 @@ def render_sections_active(session: TuningSession) -> bool:
     return not is_preset_curation_mode(session)
 
 
+def preset_switching_active(session: TuningSession) -> bool:
+    """False in preset curation: auto rotation must not run or notify."""
+    return not is_preset_curation_mode(session)
+
+
+def projectm_notifications_active(session: TuningSession) -> bool:
+    """False in preset curation: skip/log toasts must not interrupt browsing."""
+    return not is_preset_curation_mode(session)
+
+
+def curation_focus_slot(session: TuningSession) -> str | None:
+    """Layer under curation (first in z-order), or None when not curating."""
+    if not is_preset_curation_mode(session) or not session.layer_z_order:
+        return None
+    return session.layer_z_order[0]
+
+
 def _replace_cfg(target: CleaveConfig, fresh: CleaveConfig) -> None:
     target.paths = fresh.paths
     target.layers = fresh.layers
@@ -166,7 +183,7 @@ class EditorModeController:
     def _enter_curation_via_discard(self) -> None:
         self._reload_active_config(editor_mode="preset_curation", panel_open=False)
         self._config_save.clear_config_dirty()
-        self._expand_layer_one()
+        self._prepare_curation_runtime()
         self._notify_mode_changed()
 
     def _cancel_enter_curation(self) -> None:
@@ -190,9 +207,25 @@ class EditorModeController:
     def _enter_curation_mode(self) -> None:
         self.session.settings.editor_mode = "preset_curation"
         self.session.settings.editor_mode_selection = "preset_curation"
+        self._prepare_curation_runtime()
+        self._notify_mode_changed()
+
+    def _prepare_curation_runtime(self) -> None:
+        """Session-only curation defaults: full-mix focus layer, no solo/auto-switch."""
+        self.session.solo_slot = None
         self.session.timeline.panel_open = False
         self._expand_layer_one()
-        self._notify_mode_changed()
+        focus = curation_focus_slot(self.session)
+        if focus is not None:
+            self.session.layers[focus].stem = "full_mix"
+        bindings = self._layer_bindings
+        if bindings is None:
+            return
+        for slot in self.session.layer_z_order:
+            bindings.on_preset_switching_change(slot)
+        if focus is not None:
+            bindings.on_stem_change(focus, self.session.layers[focus].stem)
+        bindings.on_solo_change()
 
     def _reload_active_config(
         self,
@@ -237,6 +270,7 @@ class EditorModeController:
             bindings.on_layer_enabled_change(slot, layer.enabled)
             bindings.on_beat_change(slot, layer.beat_sensitivity)
             bindings.on_preset_switching_change(slot)
+        bindings.on_solo_change()
         bindings.on_timeline_enabled_change()
         if self._layer_manager is not None:
             self._layer_manager.apply_preview_resolutions()

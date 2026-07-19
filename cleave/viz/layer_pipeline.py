@@ -24,7 +24,11 @@ from cleave.viz.layer_preview_resolution import (
     preview_sizes_for_session,
     render_layer_size,
 )
-from cleave.viz.editor_mode_controls import render_sections_active
+from cleave.viz.editor_mode_controls import (
+    is_preset_curation_mode,
+    projectm_notifications_active,
+    render_sections_active,
+)
 from cleave.viz.post_fx import (
     chroma_boost_active,
     chroma_boost_variant_index,
@@ -36,6 +40,22 @@ from cleave.viz.session import ChromaBoostRuntime, HighlightRolloffRuntime, Tuni
 from OpenGL.GL import GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, glClear, glClearColor, glViewport
 
 
+def _apply_curation_layer_modifiers(layers_by_slot: dict[str, StemLayer]) -> None:
+    """Identity compositing for judging presets: full opacity, no effects, black-key."""
+    for layer in layers_by_slot.values():
+        if not layer.fbo.enabled:
+            continue
+        fbo = layer.fbo
+        fbo.opacity = 1.0
+        fbo.flash_alpha = 0.0
+        fbo.bloom_strength = 0.0
+        fbo.hue_rgb = (1.0, 1.0, 1.0)
+        fbo.hue_mix = 0.0
+        fbo.grit_strength = 0.0
+        fbo.aberration_px = 0.0
+        fbo.blend_mode = "black-key"
+
+
 def apply_effect_modifiers(
     session: TuningSession,
     layers_by_slot: dict[str, StemLayer],
@@ -45,6 +65,9 @@ def apply_effect_modifiers(
     *,
     update: bool = True,
 ) -> None:
+    if is_preset_curation_mode(session):
+        _apply_curation_layer_modifiers(layers_by_slot)
+        return
     if update:
         effect_runtime.update(session, signals, t_sec)
     modifiers = effect_runtime.modifiers(session)
@@ -351,13 +374,18 @@ class LayerFramePipeline:
         compositor: GlCompositor | None = None,
         on_panel_notification: Callable[[str], None] | None = None,
     ) -> None:
+        notify = (
+            on_panel_notification
+            if projectm_notifications_active(session)
+            else None
+        )
         drain_stem_layers_preset_failures(
             layers,
-            on_notification=on_panel_notification,
+            on_notification=notify,
             skip_notify_tracker=session.preset_skip_notify_tracker,
         )
         drain_projectm_log_notifications(
-            on_notification=on_panel_notification,
+            on_notification=notify,
             log_notify_tracker=session.projectm_log_notify_tracker,
         )
 

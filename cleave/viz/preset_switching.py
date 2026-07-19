@@ -53,6 +53,10 @@ def reapply_projectm_preset_switching(
     delta_sec: float = 0.0,
 ) -> None:
     """Re-attach projectM playlist switching after seek without reloading browse preset."""
+    from cleave.viz.editor_mode_controls import preset_switching_active
+
+    if not preset_switching_active(session):
+        return
     for slot, layer in layers_by_slot.items():
         runtime = session.layers[slot]
         if runtime.preset_switching != "projectm":

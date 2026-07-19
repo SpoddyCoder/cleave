@@ -33,7 +33,10 @@ from cleave.viz.post_fx import (
     highlight_rolloff_curve_index,
     live_frame_fade_alpha,
 )
-from cleave.viz.editor_mode_controls import render_sections_active
+from cleave.viz.editor_mode_controls import (
+    is_preset_curation_mode,
+    render_sections_active,
+)
 from cleave.viz.render_overlay import (
     build_live_overlay_config,
     build_panel_surface,
@@ -113,7 +116,10 @@ def finish_content_frame(
     duration_sec = core.seed.duration_sec if duration_sec is None else duration_sec
 
     compositor = core.compositor
-    if hdr_display_shoulder_active(core.seed.cfg):
+    if (
+        not is_preset_curation_mode(session)
+        and hdr_display_shoulder_active(core.seed.cfg)
+    ):
         apply_hdr_display_shoulder(
             core.post_process,
             compositor.content_texture_id,

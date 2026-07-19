@@ -370,6 +370,44 @@ def test_apply_effect_modifiers_scales_opacity_by_timeline_fade() -> None:
     assert layer.fbo.opacity == pytest.approx(0.4)
 
 
+def test_apply_effect_modifiers_identity_in_curation_mode() -> None:
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+    )
+    session.settings.editor_mode = "preset_curation"
+    session.layers["layer_1"].opacity_pct = 40
+    session.layers["layer_1"].effects = {"pulse": {"drums": 80}}
+    layer = _stem_layer("layer_1")
+    layer.fbo.enabled = True
+    layer.fbo.opacity = 0.4
+    layer.fbo.bloom_strength = 0.9
+    layer.fbo.flash_alpha = 0.5
+    layer.fbo.hue_mix = 0.7
+    layer.fbo.grit_strength = 0.3
+    layer.fbo.aberration_px = 2.0
+    layer.fbo.blend_mode = "add"
+    effect_runtime = MagicMock()
+
+    apply_effect_modifiers(
+        session,
+        {"layer_1": layer},
+        effect_runtime,
+        None,
+        0.0,
+        update=False,
+    )
+
+    effect_runtime.update.assert_not_called()
+    effect_runtime.modifiers.assert_not_called()
+    assert layer.fbo.opacity == pytest.approx(1.0)
+    assert layer.fbo.bloom_strength == pytest.approx(0.0)
+    assert layer.fbo.flash_alpha == pytest.approx(0.0)
+    assert layer.fbo.hue_mix == pytest.approx(0.0)
+    assert layer.fbo.grit_strength == pytest.approx(0.0)
+    assert layer.fbo.aberration_px == pytest.approx(0.0)
+    assert layer.fbo.blend_mode == "black-key"
+
+
 def test_timeline_fade_multiplier_matches_lane_math() -> None:
     from cleave.easing import smoothstep
 

@@ -132,15 +132,16 @@ def test_curation_ignores_non_allowlisted_keys() -> None:
     assert layer.opacity_pct == before_opacity
 
 
-def test_curation_ignores_timeline_for_layer_visibility() -> None:
+def test_curation_shows_only_focus_layer() -> None:
     from cleave.viz.layer_visibility import effective_layer_enabled
 
     controls = _make_controls(("layer_1", "layer_2"))
     session = controls.session
     session.settings.editor_mode = "preset_curation"
     session.timeline.enabled = True
-    session.layers["layer_1"].enabled = True
-    session.layers["layer_2"].enabled = False
+    session.solo_slot = "layer_2"
+    session.layers["layer_1"].enabled = False
+    session.layers["layer_2"].enabled = True
     assert effective_layer_enabled(session, "layer_1", 0.0) is True
     assert effective_layer_enabled(session, "layer_2", 0.0) is False
 
@@ -159,6 +160,36 @@ def test_enter_curation_expands_layer_one() -> None:
     assert not controls.modal_host.active
     assert controls.session.settings.editor_mode == "preset_curation"
     assert controls.session.layers["layer_1"].expanded is True
+
+
+def test_enter_curation_defaults_full_mix_and_disables_rotation() -> None:
+    """Regression: session projectM rotation must not keep running in curation."""
+    controls = _make_controls(("layer_1", "layer_2"))
+    controls.session.settings.expanded = True
+    controls.session.solo_slot = "layer_2"
+    controls.session.layers["layer_1"].stem = "drums"
+    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls._config_save.clear_config_dirty()
+    controls.focus_cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
+    mock_bindings = MagicMock()
+    controls._editor_mode._layer_bindings = mock_bindings
+    controls._layer_bindings = mock_bindings
+
+    controls.handle_keydown(keydown(pygame.K_RIGHT))
+    controls.handle_keydown(keydown(pygame.K_RETURN))
+
+    assert not controls.modal_host.active
+    assert controls.session.settings.editor_mode == "preset_curation"
+    assert controls.session.solo_slot is None
+    assert controls.session.layers["layer_1"].stem == "full_mix"
+    # Session YAML mode is left intact; live apply is forced to none via bindings.
+    assert controls.session.layers["layer_1"].preset_switching == "projectm"
+    assert mock_bindings.on_preset_switching_change.call_args_list == [
+        (("layer_1",), {}),
+        (("layer_2",), {}),
+    ]
+    mock_bindings.on_stem_change.assert_called_once_with("layer_1", "full_mix")
+    mock_bindings.on_solo_change.assert_called_once_with()
 
 
 def test_curation_allowlisted_keys_still_work() -> None:

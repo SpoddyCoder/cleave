@@ -22,6 +22,7 @@ from cleave.paths import repo_root
 from cleave.preset_playlist import PresetPlaylist, preset_browse_floor, scan_single_layer
 from cleave.signals import Signals
 from cleave.viz.controls import TuningControls
+from cleave.viz.editor_mode_controls import preset_switching_active
 from cleave.viz.layer_preview_resolution import preview_layer_size
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
@@ -178,13 +179,18 @@ def make_tuning_controls(
     compositor: GlCompositor | None = None,
     post_process: GlPostProcess | None = None,
 ) -> TuningControls:
-    def _empty_rotation_notify(slot: str) -> Callable[[], None]:
-        runtime = session.layers[slot]
+    def _effective_preset_switching(slot: str) -> str:
+        if not preset_switching_active(session):
+            return "none"
+        return session.layers[slot].preset_switching
 
+    def _empty_rotation_notify(slot: str) -> Callable[[], None]:
         def on_empty() -> None:
+            if not preset_switching_active(session):
+                return
             notify = notification_sink.get("fn")
             if notify is not None:
-                if runtime.preset_switching_rotation_set == "user_defined":
+                if session.layers[slot].preset_switching_rotation_set == "user_defined":
                     notify(EMPTY_USER_PRESETS_NOTIFICATION)
                 else:
                     notify(EMPTY_ROTATION_NOTIFICATION)
@@ -195,7 +201,7 @@ def make_tuning_controls(
         layer = layers_by_slot[slot]
         layer.playlist = playlist
         runtime = session.layers[slot]
-        mode = runtime.preset_switching
+        mode = _effective_preset_switching(slot)
         rotation_set = runtime.preset_switching_rotation_set
         if mode == "projectm" and rotation_set == "directory":
             current = playlist.current
@@ -203,7 +209,7 @@ def make_tuning_controls(
                 layer.auto_preset_path = current.resolve()
             apply_preset_switching(
                 layer,
-                mode=runtime.preset_switching,
+                mode=mode,
                 rotation_set=runtime.preset_switching_rotation_set,
                 user_presets=runtime.user_presets,
                 preset_duration=runtime.preset_duration,
@@ -233,7 +239,7 @@ def make_tuning_controls(
         runtime = session.layers[slot]
         apply_preset_switching(
             layer,
-            mode=runtime.preset_switching,
+            mode=_effective_preset_switching(slot),
             rotation_set=runtime.preset_switching_rotation_set,
             user_presets=runtime.user_presets,
             preset_duration=runtime.preset_duration,
@@ -251,8 +257,7 @@ def make_tuning_controls(
         layers_by_slot[slot].pm.lock_preset(True)
 
     def unlock_preset_after_modal(slot: str) -> None:
-        runtime = session.layers[slot]
-        if runtime.preset_switching == "none":
+        if _effective_preset_switching(slot) == "none":
             layers_by_slot[slot].pm.lock_preset(True)
         else:
             layers_by_slot[slot].pm.lock_preset(False)
