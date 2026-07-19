@@ -19,6 +19,7 @@ LOCK_GLYPH = "\ue897"
 SETTINGS_GLYPH = "\ue8b8"
 VISIBILITY_GLYPH = "\ue8f4"
 VISIBILITY_OFF_GLYPH = "\ue8f5"
+KEYBOARD_RETURN_GLYPH = "\ue31c"
 
 _tuning_ui = tuning_ui_metrics()
 _SUFFIX_ICON_GAP = _tuning_ui.icon_suffix_gap
@@ -118,3 +119,8 @@ def visibility_icon_prefix_width(line_height: int) -> int:
 
 def track_header_lock_suffix_width(line_height: int) -> int:
     return _SUFFIX_ICON_GAP + _suffix_icon_width(line_height, LOCK_GLYPH)
+
+
+def action_enter_icon_suffix_width(line_height: int) -> int:
+    """Gap plus keyboard-return glyph width for focused action rows."""
+    return _SUFFIX_ICON_GAP + _suffix_icon_width(line_height, KEYBOARD_RETURN_GLYPH)
