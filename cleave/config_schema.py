@@ -60,6 +60,7 @@ PRESET_SWITCHING_ROTATION_SET_HELP_ENTRIES: tuple[
 DEFAULT_PRESET_SWITCHING: PresetSwitchingMode = "none"
 DEFAULT_PRESET_SWITCHING_ROTATION_SET: PresetSwitchingRotationSet = "directory"
 DEFAULT_PRESET_SWITCHING_SHUFFLE = False
+DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT = 0
 DEFAULT_PRESET_DURATION = 30.0
 DEFAULT_SOFT_CUT_DURATION = 0.0
 DEFAULT_HARD_CUT_DURATION = 20.0
@@ -1576,6 +1577,12 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
                 "preset_switching_shuffle", DEFAULT_PRESET_SWITCHING_SHUFFLE
             )
         )
+        preset_switching_shuffle_salt = int(
+            layer_raw.get(
+                "preset_switching_shuffle_salt",
+                DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT,
+            )
+        )
         preset_duration = float(
             layer_raw.get("preset_duration", DEFAULT_PRESET_DURATION)
         )
@@ -1614,6 +1621,7 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
             preset_switching=preset_switching,
             preset_switching_rotation_set=preset_switching_rotation_set,
             preset_switching_shuffle=preset_switching_shuffle,
+            preset_switching_shuffle_salt=preset_switching_shuffle_salt,
             preset_duration=preset_duration,
             soft_cut_duration=soft_cut_duration,
             hard_cut_duration=hard_cut_duration,
@@ -1648,6 +1656,7 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             preset_switching = runtime.preset_switching
             preset_switching_rotation_set = runtime.preset_switching_rotation_set
             preset_switching_shuffle = runtime.preset_switching_shuffle
+            preset_switching_shuffle_salt = runtime.preset_switching_shuffle_salt
             preset_duration = runtime.preset_duration
             soft_cut_duration = runtime.soft_cut_duration
             hard_cut_duration = runtime.hard_cut_duration
@@ -1668,6 +1677,7 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             preset_switching = layer_cfg.preset_switching
             preset_switching_rotation_set = layer_cfg.preset_switching_rotation_set
             preset_switching_shuffle = layer_cfg.preset_switching_shuffle
+            preset_switching_shuffle_salt = layer_cfg.preset_switching_shuffle_salt
             preset_duration = layer_cfg.preset_duration
             soft_cut_duration = layer_cfg.soft_cut_duration
             hard_cut_duration = layer_cfg.hard_cut_duration
@@ -1703,6 +1713,8 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             layer_out["preset_switching_rotation_set"] = preset_switching_rotation_set
         if preset_switching_shuffle != DEFAULT_PRESET_SWITCHING_SHUFFLE:
             layer_out["preset_switching_shuffle"] = preset_switching_shuffle
+        if preset_switching_shuffle_salt != DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT:
+            layer_out["preset_switching_shuffle_salt"] = preset_switching_shuffle_salt
         if preset_duration != DEFAULT_PRESET_DURATION:
             layer_out["preset_duration"] = preset_duration
         if soft_cut_duration != DEFAULT_SOFT_CUT_DURATION:

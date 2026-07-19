@@ -33,6 +33,7 @@ from cleave.viz.render_post_fx_controls import RenderPostFxControls
 from cleave.viz.settings_controls import SettingsControls
 from cleave.viz.tap_sync_controls import TapSyncControls, TapSyncUiSnapshot
 from cleave.viz.timeline_phase_controls import TimelinePhaseController
+from cleave.viz.preset_seed_controls import PresetSeedController
 from cleave.viz.timeline_preset_controls import TimelinePresetController
 from cleave.viz.timeline_snap_controls import TimelineSnapController
 from cleave.viz.user_presets import (
@@ -162,6 +163,20 @@ class TuningControls:
             beat_times,
             bar_times,
             on_notification=self.show_notification,
+        )
+        layers_by_slot = (
+            layer_manager.layers_by_slot if layer_manager is not None else {}
+        )
+        on_switching = (
+            None
+            if layer_bindings is None
+            else layer_bindings.on_preset_switching_change
+        )
+        self._preset_seed = PresetSeedController(
+            session,
+            self._modal_host,
+            layers_by_slot,
+            on_preset_switching_change=on_switching,
         )
         self._timeline_phase = TimelinePhaseController(
             session,
@@ -557,6 +572,15 @@ class TuningControls:
                 return True
             if kind == RowKind.TIMELINE_RESET:
                 self._timeline_presets.prompt_reset()
+                return True
+            if kind == RowKind.TRACK_PRESET_SWITCHING_SEED:
+                slot = self.focus_descriptor.slot
+                if slot is not None:
+                    if section_lock_blocks_mutation(
+                        self.session, self.focus_descriptor
+                    ):
+                        return True
+                    self._preset_seed.prompt(slot)
                 return True
             if kind == RowKind.TIMELINE_SNAP_TO_GRID:
                 self._timeline_snap.prompt_grid()

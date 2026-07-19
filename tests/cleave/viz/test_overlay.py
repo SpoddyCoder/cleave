@@ -1226,6 +1226,35 @@ def test_action_parameter_row_value_color() -> None:
     assert _row_value_color(state, mode_row) == HIGHLIGHT
 
 
+def test_preset_switching_seed_uses_action_parameter_colors() -> None:
+    state = _minimal_view_state(
+        tracks={
+            "layer_1": TrackBlock(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                expanded=True,
+                preset_switching="projectm",
+                preset_switching_shuffle=True,
+                preset_switching_shuffle_salt=7,
+            )
+        },
+        layer_z_order=["layer_1"],
+    )
+    seed_row = state.layout.find_by_kind(RowKind.TRACK_PRESET_SWITCHING_SEED)
+    assert seed_row is not None
+    assert _action_parameter_label_color(state, seed_row) == ACTION
+    assert _row_value_color(state, seed_row) == VALUE
+    state.focus_descriptor = state.layout.descriptor(seed_row)
+    assert _action_parameter_label_color(state, seed_row) == HIGHLIGHT
+    assert _row_value_color(state, seed_row) == HIGHLIGHT
+    assert _row_shows_action_enter_hint(state, seed_row) is True
+
+
 def test_focused_action_row_shows_enter_hint() -> None:
     pygame.init()
     state = _minimal_view_state(

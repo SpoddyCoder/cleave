@@ -393,6 +393,12 @@ def _format_track_preset_switching_shuffle(
     )
 
 
+def _format_track_preset_switching_seed(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    return str(_track_block(state, desc).preset_switching_shuffle_salt)
+
+
 def _format_track_hard_cut_enabled(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
@@ -1269,6 +1275,11 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_track_preset_switching_shuffle,
         apply_horizontal=_apply_track_preset_switching_shuffle,
+    ),
+    RowKind.TRACK_PRESET_SWITCHING_SEED: RowFieldDef(
+        panel_label="seed",
+        present_style=RowPresentStyle.ACTION_PARAMETER,
+        format_value=_format_track_preset_switching_seed,
     ),
     RowKind.TRACK_PRESET_DURATION: RowFieldDef(
         panel_label="preset duration",

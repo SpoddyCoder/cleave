@@ -27,6 +27,7 @@ from cleave.config_schema import (
     DEFAULT_PRESET_SWITCHING,
     DEFAULT_PRESET_SWITCHING_ROTATION_SET,
     DEFAULT_PRESET_SWITCHING_SHUFFLE,
+    DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT,
     DEFAULT_PRESET_DURATION,
     DEFAULT_SOFT_CUT_DURATION,
     DEFAULT_HARD_CUT_DURATION,
@@ -124,6 +125,7 @@ class LayerConfig:
     preset_switching: PresetSwitchingMode = DEFAULT_PRESET_SWITCHING
     preset_switching_rotation_set: PresetSwitchingRotationSet = DEFAULT_PRESET_SWITCHING_ROTATION_SET
     preset_switching_shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE
+    preset_switching_shuffle_salt: int = DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT
     preset_duration: float = DEFAULT_PRESET_DURATION
     soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION
     hard_cut_duration: float = DEFAULT_HARD_CUT_DURATION

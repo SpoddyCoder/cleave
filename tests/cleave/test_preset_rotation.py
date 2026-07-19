@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cleave.preset_rotation import PresetRotation, rotation_seed
+from cleave.preset_rotation import (
+    PresetRotation,
+    first_shuffle_bag_order,
+    layer_rotation_seed,
+    rotation_seed,
+)
 
 
 def _paths(*names: str) -> tuple[Path, ...]:
@@ -72,3 +77,28 @@ def test_rotation_seed_stable_across_calls() -> None:
     assert rotation_seed(paths, salt="layer_1") != rotation_seed(
         paths, salt="layer_2"
     )
+
+
+def test_layer_rotation_seed_mixes_slot_and_salt() -> None:
+    paths = _paths("a.milk", "b.milk", "c.milk")
+    same_a = layer_rotation_seed(paths, slot="layer_1", shuffle_salt=7)
+    same_b = layer_rotation_seed(paths, slot="layer_1", shuffle_salt=7)
+    other_salt = layer_rotation_seed(paths, slot="layer_1", shuffle_salt=8)
+    other_slot = layer_rotation_seed(paths, slot="layer_2", shuffle_salt=7)
+    assert same_a == same_b
+    assert same_a != other_salt
+    assert same_a != other_slot
+    assert same_a == rotation_seed(paths, salt="layer_1:7")
+
+
+def test_first_shuffle_bag_order_deterministic_by_salt() -> None:
+    paths = list(_paths("a.milk", "b.milk", "c.milk", "d.milk"))
+    seed_a = layer_rotation_seed(paths, slot="layer_1", shuffle_salt=3)
+    seed_b = layer_rotation_seed(paths, slot="layer_1", shuffle_salt=4)
+    order_a = first_shuffle_bag_order(paths, seed=seed_a)
+    order_a_again = first_shuffle_bag_order(paths, seed=seed_a)
+    order_b = first_shuffle_bag_order(paths, seed=seed_b)
+    assert order_a == order_a_again
+    assert order_a != order_b
+    assert sorted(order_a) == sorted(paths)
+    assert len(set(order_a)) == len(paths)

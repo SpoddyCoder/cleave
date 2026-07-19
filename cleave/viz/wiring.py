@@ -222,6 +222,7 @@ def make_tuning_controls(
                 hard_cut_duration=runtime.hard_cut_duration,
                 hard_cut_sensitivity=runtime.hard_cut_sensitivity,
                 shuffle=runtime.preset_switching_shuffle,
+                shuffle_salt=runtime.preset_switching_shuffle_salt,
                 on_empty=_empty_rotation_notify(slot),
             )
             return
@@ -241,6 +242,7 @@ def make_tuning_controls(
                 rotation_set=runtime.preset_switching_rotation_set,
                 user_presets=runtime.user_presets,
                 shuffle=runtime.preset_switching_shuffle,
+                shuffle_salt=runtime.preset_switching_shuffle_salt,
             )
             return
         layer.pm.lock_preset(False)
@@ -262,6 +264,7 @@ def make_tuning_controls(
             hard_cut_duration=runtime.hard_cut_duration,
             hard_cut_sensitivity=runtime.hard_cut_sensitivity,
             shuffle=runtime.preset_switching_shuffle,
+            shuffle_salt=runtime.preset_switching_shuffle_salt,
             on_empty=_empty_rotation_notify(slot),
         )
 
