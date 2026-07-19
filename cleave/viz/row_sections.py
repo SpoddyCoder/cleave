@@ -466,7 +466,7 @@ RENDER_POST_FX_SECTION = ExpandSectionDef(
 def _preset_switching_user_defined(state: TuningViewState, desc: RowDescriptor) -> bool:
     if desc.slot is None:
         return False
-    return state.tracks[desc.slot].preset_switching_scope == "user_defined"
+    return state.tracks[desc.slot].preset_switching_rotation_set == "user_defined"
 
 
 def _hard_cut_enabled(state: TuningViewState, desc: RowDescriptor) -> bool:
@@ -505,7 +505,7 @@ TRACK_PRESET_SWITCHING_SECTION = ExpandSectionDef(
     read_expanded=_track_preset_switching_expanded,
     toggle=_toggle_preset_switching,
     children=(
-        SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_SCOPE),
+        SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET),
         SectionNode(conditional=PRESET_SWITCHING_USER_DEFINED),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_SHUFFLE),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_DURATION),

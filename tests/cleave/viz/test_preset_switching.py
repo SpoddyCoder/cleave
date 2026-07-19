@@ -93,7 +93,7 @@ def test_apply_none_locks_and_disables_hard_cuts() -> None:
     layer.projectm_playlist = mock_pl
     layer.auto_preset_path = _MILK[2]
 
-    apply_preset_switching(layer, mode="none", scope="directory")
+    apply_preset_switching(layer, mode="none", rotation_set="directory")
 
     mock_pl.destroy.assert_called_once()
     assert layer.projectm_playlist is None
@@ -116,7 +116,7 @@ def test_apply_projectm_connects_playlist(
     on_empty = MagicMock()
 
     apply_preset_switching(
-        layer, mode="projectm", scope="directory", on_empty=on_empty
+        layer, mode="projectm", rotation_set="directory", on_empty=on_empty
     )
 
     layer.pm.lock_preset.assert_called_with(False)
@@ -158,7 +158,7 @@ def test_apply_projectm_shuffle_enabled(
     apply_preset_switching(
         layer,
         mode="projectm",
-        scope="directory",
+        rotation_set="directory",
         shuffle=True,
     )
 
@@ -180,7 +180,7 @@ def test_apply_projectm_respects_hard_cut_disabled(
     apply_preset_switching(
         layer,
         mode="projectm",
-        scope="directory",
+        rotation_set="directory",
         hard_cut_enabled=False,
     )
 
@@ -226,7 +226,7 @@ def test_apply_projectm_empty_dir_falls_back(mock_playlist_cls: MagicMock) -> No
     on_empty = MagicMock()
 
     apply_preset_switching(
-        layer, mode="projectm", scope="directory", on_empty=on_empty
+        layer, mode="projectm", rotation_set="directory", on_empty=on_empty
     )
 
     mock_playlist_cls.create.assert_not_called()
@@ -243,7 +243,7 @@ def test_empty_user_presets_notification_text() -> None:
 
 
 @patch("cleave.viz.preset_switching.ProjectMPlaylist")
-def test_apply_user_defined_scope_adds_presets(
+def test_apply_user_defined_rotation_set_adds_presets(
     mock_playlist_cls: MagicMock,
 ) -> None:
     layer = _stem_layer(paths=_MILK)
@@ -256,7 +256,7 @@ def test_apply_user_defined_scope_adds_presets(
     apply_preset_switching(
         layer,
         mode="projectm",
-        scope="user_defined",
+        rotation_set="user_defined",
         user_presets=[str(_MILK[0]), str(_MILK[1])],
         on_empty=on_empty,
     )
@@ -272,7 +272,7 @@ def test_apply_user_defined_scope_adds_presets(
 
 
 @patch("cleave.viz.preset_switching.ProjectMPlaylist")
-def test_apply_user_defined_scope_empty_falls_back(
+def test_apply_user_defined_rotation_set_empty_falls_back(
     mock_playlist_cls: MagicMock,
 ) -> None:
     layer = _stem_layer(paths=_MILK)
@@ -281,7 +281,7 @@ def test_apply_user_defined_scope_empty_falls_back(
     apply_preset_switching(
         layer,
         mode="projectm",
-        scope="user_defined",
+        rotation_set="user_defined",
         user_presets=[],
         on_empty=on_empty,
     )
@@ -377,7 +377,7 @@ def test_reapply_without_playlist_does_not_notify_empty(
     )
 
     apply_preset_switching(
-        layer, mode="projectm", scope="directory", on_empty=on_empty
+        layer, mode="projectm", rotation_set="directory", on_empty=on_empty
     )
     on_empty.assert_called_once()
     on_empty.reset_mock()

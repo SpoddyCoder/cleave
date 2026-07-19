@@ -14,7 +14,7 @@ from tests.support.viz import make_test_cfg, stub_playback_state
 
 
 def _session_with_mode(
-    mode: str, *, scope: str = "directory"
+    mode: str, *, rotation_set: str = "directory"
 ) -> TuningSession:
     preset_root = Path("/tmp/presets")
     playlist = PresetPlaylist(
@@ -30,7 +30,7 @@ def _session_with_mode(
                 browse_floor=preset_root / "layer_1",
                 stem="drums",
                 preset_switching=mode,  # type: ignore[arg-type]
-                preset_switching_scope=scope,  # type: ignore[arg-type]
+                preset_switching_rotation_set=rotation_set,  # type: ignore[arg-type]
             )
         },
     )
@@ -77,8 +77,8 @@ def test_on_preset_change_rebuilds_rotation_in_projectm_mode() -> None:
     assert layer.auto_preset_path == playlist.current.resolve()
 
 
-def test_on_preset_change_loads_preset_in_user_defined_scope() -> None:
-    session = _session_with_mode("projectm", scope="user_defined")
+def test_on_preset_change_loads_preset_in_user_defined_rotation_set() -> None:
+    session = _session_with_mode("projectm", rotation_set="user_defined")
     cfg = make_test_cfg(("layer_1",))
     pm = ProjectM.__new__(ProjectM)
     pm.lock_preset = MagicMock()

@@ -25,7 +25,7 @@ from cleave.config_schema import (
     DEFAULT_BEAT_SENSITIVITY,
     DEFAULT_LAYER_Z_ORDER,
     DEFAULT_PRESET_SWITCHING,
-    DEFAULT_PRESET_SWITCHING_SCOPE,
+    DEFAULT_PRESET_SWITCHING_ROTATION_SET,
     DEFAULT_PRESET_SWITCHING_SHUFFLE,
     DEFAULT_PRESET_DURATION,
     DEFAULT_SOFT_CUT_DURATION,
@@ -36,7 +36,7 @@ from cleave.config_schema import (
     DEFAULT_PRESET_START_CLEAN,
     DEFAULT_PRESET_ROOT,
     PresetSwitchingMode,
-    PresetSwitchingScope,
+    PresetSwitchingRotationSet,
     DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR,
     DEFAULT_RENDER_OVERLAY_BACKGROUND_MARGIN,
     DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
@@ -122,7 +122,7 @@ class LayerConfig:
     blend_mode: BlendMode = "black-key"
     locked: bool = False
     preset_switching: PresetSwitchingMode = DEFAULT_PRESET_SWITCHING
-    preset_switching_scope: PresetSwitchingScope = DEFAULT_PRESET_SWITCHING_SCOPE
+    preset_switching_rotation_set: PresetSwitchingRotationSet = DEFAULT_PRESET_SWITCHING_ROTATION_SET
     preset_switching_shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE
     preset_duration: float = DEFAULT_PRESET_DURATION
     soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION

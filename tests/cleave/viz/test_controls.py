@@ -4303,10 +4303,10 @@ def test_projectm_mode_allows_preset_browse() -> None:
     assert playlist.current_dir.resolve() == siblings[1].resolve()
 
 
-def test_user_defined_scope_allows_preset_browse() -> None:
+def test_user_defined_rotation_set_allows_preset_browse() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_switching = "projectm"
-    controls.session.layers["layer_1"].preset_switching_scope = "user_defined"
+    controls.session.layers["layer_1"].preset_switching_rotation_set = "user_defined"
     controls.session.layers["layer_1"].expanded = True
     changed: list[str] = []
     controls._layer_bindings = noop_layer_bindings(
@@ -4322,7 +4322,7 @@ def test_user_defined_scope_allows_preset_browse() -> None:
     root, siblings = _make_sibling_dir_tree(3)
     dir_controls = _controls_with_playlist(root, siblings[0])
     dir_controls.session.layers["layer_1"].preset_switching = "projectm"
-    dir_controls.session.layers["layer_1"].preset_switching_scope = "user_defined"
+    dir_controls.session.layers["layer_1"].preset_switching_rotation_set = "user_defined"
     dir_controls.session.layers["layer_1"].expanded = True
     dir_controls.focus_descriptor = _desc(
         dir_controls.build_view_state(paused=False), _preset_dir_row(dir_controls)
@@ -4335,8 +4335,8 @@ def test_user_defined_scope_allows_preset_browse() -> None:
 def test_scope_row_hidden_when_mode_none() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    with pytest.raises(ValueError, match="TRACK_PRESET_SWITCHING_SCOPE"):
-        _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_SCOPE)
+    with pytest.raises(ValueError, match="TRACK_PRESET_SWITCHING_ROTATION_SET"):
+        _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET)
 
 
 def test_scope_row_visible_when_mode_projectm() -> None:
@@ -4344,10 +4344,10 @@ def test_scope_row_visible_when_mode_projectm() -> None:
     controls.session.layers["layer_1"].preset_switching = "projectm"
     controls.session.layers["layer_1"].expanded = True
     view = controls.build_view_state(paused=False)
-    _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_SCOPE)
+    _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET)
 
 
-def test_preset_switching_scope_cycles_directory_and_user_defined() -> None:
+def test_preset_switching_rotation_set_cycles_directory_and_user_defined() -> None:
     controls = _make_controls(("layer_1",))
     switched: list[str] = []
     controls._layer_bindings = noop_layer_bindings(
@@ -4356,32 +4356,32 @@ def test_preset_switching_scope_cycles_directory_and_user_defined() -> None:
     controls.session.layers["layer_1"].preset_switching = "projectm"
     controls.session.layers["layer_1"].expanded = True
     view = controls.build_view_state(paused=False)
-    row = _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_SCOPE)
+    row = _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET)
     controls.focus_descriptor = view.layout.descriptor(row)
-    assert controls.session.layers["layer_1"].preset_switching_scope == "directory"
+    assert controls.session.layers["layer_1"].preset_switching_rotation_set == "directory"
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.session.layers["layer_1"].preset_switching_scope == "user_defined"
+    assert controls.session.layers["layer_1"].preset_switching_rotation_set == "user_defined"
     assert controls.session.layers["layer_1"].user_presets_expanded is True
     assert switched == ["layer_1"]
 
     controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert controls.session.layers["layer_1"].preset_switching_scope == "directory"
+    assert controls.session.layers["layer_1"].preset_switching_rotation_set == "directory"
     assert controls.session.layers["layer_1"].user_presets_expanded is True
 
 
-def test_preset_switching_scope_user_defined_auto_expands_user_presets() -> None:
+def test_preset_switching_rotation_set_user_defined_auto_expands_user_presets() -> None:
     controls = _make_controls(("layer_1",))
     layer = controls.session.layers["layer_1"]
     layer.preset_switching = "projectm"
     layer.expanded = True
     layer.user_presets_expanded = False
     view = controls.build_view_state(paused=False)
-    row = _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_SCOPE)
+    row = _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET)
     controls.focus_descriptor = view.layout.descriptor(row)
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert layer.preset_switching_scope == "user_defined"
+    assert layer.preset_switching_rotation_set == "user_defined"
     assert layer.user_presets_expanded is True
 
 
@@ -4530,7 +4530,7 @@ def _focus_user_preset_item_row(
 ) -> tuple[RowDescriptor, Path]:
     layer = controls.session.layers["layer_1"]
     layer.preset_switching = "projectm"
-    layer.preset_switching_scope = "user_defined"
+    layer.preset_switching_rotation_set = "user_defined"
     layer.user_presets_expanded = True
     layer.expanded = True
     path = preset_path or Path("/tmp/projects/my-track/user-preset-0.milk")

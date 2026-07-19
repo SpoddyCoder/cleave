@@ -15,7 +15,7 @@ from cleave.config_schema import (
     DEFAULT_PRESET_START_CLEAN,
     DEFAULT_PRESET_DURATION,
     DEFAULT_PRESET_SWITCHING,
-    DEFAULT_PRESET_SWITCHING_SCOPE,
+    DEFAULT_PRESET_SWITCHING_ROTATION_SET,
     DEFAULT_PRESET_SWITCHING_SHUFFLE,
     DEFAULT_SOFT_CUT_DURATION,
     ParseCtx,
@@ -46,7 +46,7 @@ def test_parse_layers_preset_switching_defaults_omitted() -> None:
     layers = parse_layers_section(data, ParseCtx(preset_root=preset_root))
     layer = layers["layer_1"]
     assert layer.preset_switching == DEFAULT_PRESET_SWITCHING
-    assert layer.preset_switching_scope == DEFAULT_PRESET_SWITCHING_SCOPE
+    assert layer.preset_switching_rotation_set == DEFAULT_PRESET_SWITCHING_ROTATION_SET
     assert layer.preset_switching_shuffle == DEFAULT_PRESET_SWITCHING_SHUFFLE
     assert layer.preset_duration == DEFAULT_PRESET_DURATION
     assert layer.soft_cut_duration == DEFAULT_SOFT_CUT_DURATION
@@ -75,14 +75,14 @@ def test_parse_layers_rejects_user_defined_mode() -> None:
         parse_layers_section(data, ParseCtx(preset_root=preset_root))
 
 
-def test_parse_layers_preset_switching_scope_user_defined() -> None:
+def test_parse_layers_preset_switching_rotation_set_user_defined() -> None:
     preset_root = Path("/tmp/presets")
     data = {"layers": _layer_yaml()}
     data["layers"]["layer_1"]["preset_switching"] = "projectm"
-    data["layers"]["layer_1"]["preset_switching_scope"] = "user_defined"
+    data["layers"]["layer_1"]["preset_switching_rotation_set"] = "user_defined"
     layers = parse_layers_section(data, ParseCtx(preset_root=preset_root))
     assert layers["layer_1"].preset_switching == "projectm"
-    assert layers["layer_1"].preset_switching_scope == "user_defined"
+    assert layers["layer_1"].preset_switching_rotation_set == "user_defined"
 
 
 def test_parse_layers_preset_switching_timing() -> None:
@@ -141,7 +141,7 @@ def test_persist_layers_omits_default_preset_switching() -> None:
     cfg, session = _cfg_and_session()
     out = persist_layers(PersistCtx(cfg=cfg, session=session))
     assert "preset_switching" not in out["layer_1"]
-    assert "preset_switching_scope" not in out["layer_1"]
+    assert "preset_switching_rotation_set" not in out["layer_1"]
     assert "preset_switching_shuffle" not in out["layer_1"]
     assert "preset_duration" not in out["layer_1"]
     assert "soft_cut_duration" not in out["layer_1"]
@@ -211,12 +211,12 @@ def test_persist_layers_writes_hard_cut_disabled() -> None:
     assert out["layer_1"]["hard_cut_enabled"] is False
 
 
-def test_persist_layers_writes_user_defined_scope() -> None:
+def test_persist_layers_writes_user_defined_rotation_set() -> None:
     cfg, session = _cfg_and_session(preset_switching="projectm")
-    session.layers["layer_1"].preset_switching_scope = "user_defined"
+    session.layers["layer_1"].preset_switching_rotation_set = "user_defined"
     out = persist_layers(PersistCtx(cfg=cfg, session=session))
     assert out["layer_1"]["preset_switching"] == "projectm"
-    assert out["layer_1"]["preset_switching_scope"] == "user_defined"
+    assert out["layer_1"]["preset_switching_rotation_set"] == "user_defined"
 
 
 def test_persist_layers_writes_projectm_mode(tmp_path: Path) -> None:
@@ -253,7 +253,7 @@ def test_persist_layers_writes_projectm_mode(tmp_path: Path) -> None:
     )
     out = persist_layers(PersistCtx(cfg=cfg, session=session))
     assert out["layer_1"]["preset_switching"] == "projectm"
-    assert "preset_switching_scope" not in out["layer_1"]
+    assert "preset_switching_rotation_set" not in out["layer_1"]
 
     path = tmp_path / "snap.yaml"
     write_session_snapshot(path, cfg=cfg, session=session)

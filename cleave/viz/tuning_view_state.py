@@ -61,7 +61,7 @@ class TrackBlock:
     locked: bool = False
     preset_empty: bool = False
     preset_switching: str = "none"
-    preset_switching_scope: str = "directory"
+    preset_switching_rotation_set: str = "directory"
     preset_switching_shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE
     preset_duration: float = DEFAULT_PRESET_DURATION
     soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION
@@ -282,7 +282,7 @@ def view_state_structure_signature(
             "effects_expanded": layer.effects_expanded,
             "user_presets_expanded": layer.user_presets_expanded,
             "preset_switching": layer.preset_switching,
-            "preset_switching_scope": layer.preset_switching_scope,
+            "preset_switching_rotation_set": layer.preset_switching_rotation_set,
             "preset_switching_shuffle": layer.preset_switching_shuffle,
             "preset_duration": layer.preset_duration,
             "soft_cut_duration": layer.soft_cut_duration,
@@ -436,7 +436,7 @@ class TuningViewStateBuilder:
                 locked=layer.locked,
                 preset_empty=not layer.playlist.paths,
                 preset_switching=layer.preset_switching,
-                preset_switching_scope=layer.preset_switching_scope,
+                preset_switching_rotation_set=layer.preset_switching_rotation_set,
                 preset_switching_shuffle=layer.preset_switching_shuffle,
                 preset_duration=layer.preset_duration,
                 soft_cut_duration=layer.soft_cut_duration,

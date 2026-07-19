@@ -2,7 +2,7 @@
 
 Proposal for per-layer automatic preset rotation. Supersedes the [Auto-switching presets (projectM mode)](roadmap.md#auto-switching-presets-projectm-mode) roadmap item; Cleave-native preset cycling is out of scope (see [Decisions](#decisions)).
 
-**Status:** Implemented through v2 (none, projectM, user-defined list with add/remove UI). Shuffle toggle shipped; v3 subtree scope and filters not scheduled.
+**Status:** Implemented through v2 (none, projectM, user-defined list with add/remove UI). Shuffle toggle shipped; v3 subtree rotation set and filters not scheduled.
 
 ## Overview
 
@@ -21,7 +21,7 @@ This proposal adds a per-layer **preset switching** mode with three values:
 | Mode | Summary |
 | --- | --- |
 | **none** (default) | Current behavior. Fixed preset until manual browse. |
-| **projectM** | libprojectM drives when and how to transition; rotation set filled automatically from a browse scope. |
+| **projectM** | libprojectM drives when and how to transition; rotation set filled automatically from the browse directory. |
 | **user-defined** | Same transition engine as **projectM**; rotation set is an explicit user-curated list. |
 
 ## How libprojectM preset switching works
@@ -71,9 +71,9 @@ No change from today. Locked preset, hard cuts off, manual browse via preset dir
 
 ### projectM
 
-Unlock preset. Enable projectM's transition engine. Connect a libprojectM playlist populated automatically from the layer's browse scope.
+Unlock preset. Enable projectM's transition engine. Connect a libprojectM playlist populated automatically from the layer's browse directory.
 
-| Scope | Playlist API | Behavior |
+| Rotation set | Playlist API | Behavior |
 | --- | --- | --- |
 | **directory** (default; v1) | `add_path(current_dir, recurse=false)` | Siblings in the layer's current preset directory |
 | **subtree** | `add_path(browse_floor, recurse=true)` | All `.milk` files under the layer browse floor |
@@ -101,12 +101,12 @@ preset switching: none | projectM | user-defined
 | Mode | Additional UI (sketch) |
 | --- | --- |
 | **none** | None |
-| **projectM** | Child row for scope (`directory` in v1; `subtree` later); shuffle toggle in a later phase. Timing parameters in v1.1+ (see phasing). |
+| **projectM** | Child row for rotation set (`directory` in v1; `subtree` later); shuffle toggle in a later phase. Timing parameters in v1.1+ (see phasing). |
 | **user-defined** | Expandable sub-row listing selected presets; affordances to add (from current browse position) and remove entries |
 
 Row placement follows [live-tuning-ui](.cursor/rules/live-tuning-ui.mdc): insert after preset file, before stem row.
 
-**v1 UI:** preset switching row plus scope child row for **projectM** (`directory` only).
+**v1 UI:** preset switching row plus rotation set child row for **projectM** (`directory` only).
 
 Layer lock rules should match other preset sub-rows (blocked when layer locked). Preset dir and preset file rows are also locked while **projectM** or **user-defined** is active (see [Decisions](#decisions)).
 
@@ -115,7 +115,7 @@ Layer lock rules should match other preset sub-rows (blocked when layer locked).
 | Mode | `lock_preset` | `hard_cut_enabled` | Switch handler | Population |
 | --- | --- | --- | --- | --- |
 | none | true | false | n/a | Cleave browse only |
-| projectM | false | true | connected playlist lib | auto from scope |
+| projectM | false | true | connected playlist lib | auto from rotation set |
 | user-defined | false | true | connected playlist lib + `add_presets` | persisted path list |
 
 **Mode change:** rebuild playlist state, load current preset, apply lock/hard-cut settings.
@@ -138,9 +138,9 @@ layers:
     preset: presets/drums/some-preset.milk
     preset_switching: none          # none | projectm
     # when projectm:
-    preset_switching_scope: directory   # directory | user_defined
+    preset_switching_rotation_set: directory   # directory | user_defined
     preset_switching_shuffle: false
-    # when scope is user_defined:
+    # when rotation set is user_defined:
     preset_switching_presets:
       - presets/drums/a.milk
       - presets/drums/b.milk
@@ -151,11 +151,11 @@ layers:
     # hard_cut_sensitivity: 2.0
 ```
 
-Defaults: `preset_switching: none`, `preset_switching_scope: directory`. Omit optional keys when they match defaults. Timing/hard-cut apply whenever mode is **projectM**.
+Defaults: `preset_switching: none`, `preset_switching_rotation_set: directory`. Omit optional keys when they match defaults. Timing/hard-cut apply whenever mode is **projectM**.
 
 ## Feature scope
 
-Mode is on/off (`none` | `projectM`); scope selects the rotation set (`directory` | `user-defined`). There is no fourth Cleave-native cycling mode; instant stepping without Milkdrop blends is out of scope.
+Mode is on/off (`none` | `projectM`); `preset_switching_rotation_set` selects the playlist source (`directory` | `user-defined`). There is no fourth Cleave-native cycling mode; instant stepping without Milkdrop blends is out of scope.
 
 ## Implementation notes
 
@@ -175,10 +175,10 @@ Mode is on/off (`none` | `projectM`); scope selects the rotation set (`directory
 
 | Phase | Scope |
 | --- | --- |
-| **v1** | **none** + **projectM**; preset switching row and scope child row (`directory` only); hard cuts enabled; libprojectM default timing; shuffle off |
+| **v1** | **none** + **projectM**; preset switching row and rotation set child row (`directory` only); hard cuts enabled; libprojectM default timing; shuffle off |
 | **v1.1** | Expose the most important timing parameters in the tuning panel (`preset_duration`, `soft_cut_duration`, hard-cut duration/sensitivity) |
 | **v2** (done) | **user-defined** list + UI to add/remove presets |
-| **v3** | `subtree` scope, shuffle toggle, gitignore-style filter patterns |
+| **v3** | `subtree` rotation set, shuffle toggle, gitignore-style filter patterns |
 | **v4** | Remaining optional timing parameters (e.g. `easter_egg`) |
 
 ## Decisions
@@ -191,9 +191,9 @@ Mode is on/off (`none` | `projectM`); scope selects the rotation set (`directory
 
 4. **Feature scope.** **none**, **projectM**, and **user-defined** are the only modes. Cleave-native preset cycling is dropped; no fourth mode.
 
-5. **Playlist integration.** Use libprojectM playlist library + `add_presets` for **user-defined** (and `add_path` for **projectM** scope).
+5. **Playlist integration.** Use libprojectM playlist library + `add_presets` for **user-defined** (and `add_path` for **projectM** directory rotation set).
 
-6. **Scope UI in v1.** Ship the scope child row in v1; only `directory` is available until a later phase adds `subtree`.
+6. **Rotation set UI in v1.** Ship the rotation set child row in v1; only `directory` is available until a later phase adds `subtree`.
 
 7. **Empty rotation set.** Keep the mode, stay on the current preset, notify via `show_notification` / `PanelNotificationHost`.
 

@@ -30,7 +30,7 @@ BEAT_SENSITIVITY_MIN = 0.0
 BEAT_SENSITIVITY_MAX = 5.0
 
 PresetSwitchingMode = Literal["none", "projectm"]
-PresetSwitchingScope = Literal["directory", "user_defined"]
+PresetSwitchingRotationSet = Literal["directory", "user_defined"]
 PRESET_SWITCHING_MODES: tuple[PresetSwitchingMode, ...] = (
     "none",
     "projectm",
@@ -39,12 +39,12 @@ PRESET_SWITCHING_MODE_HELP_ENTRIES: tuple[tuple[PresetSwitchingMode, str], ...] 
     ("none", "keeps the current preset indefinitely."),
     ("projectm", "libprojectM switches automatically using beat detection."),
 )
-PRESET_SWITCHING_SCOPES: tuple[PresetSwitchingScope, ...] = (
+PRESET_SWITCHING_ROTATION_SETS: tuple[PresetSwitchingRotationSet, ...] = (
     "directory",
     "user_defined",
 )
-PRESET_SWITCHING_SCOPE_HELP_ENTRIES: tuple[
-    tuple[PresetSwitchingScope, str], ...
+PRESET_SWITCHING_ROTATION_SET_HELP_ENTRIES: tuple[
+    tuple[PresetSwitchingRotationSet, str], ...
 ] = (
     ("directory", "rotate through Milkdrop presets in the current browse directory."),
     (
@@ -53,7 +53,7 @@ PRESET_SWITCHING_SCOPE_HELP_ENTRIES: tuple[
     ),
 )
 DEFAULT_PRESET_SWITCHING: PresetSwitchingMode = "none"
-DEFAULT_PRESET_SWITCHING_SCOPE: PresetSwitchingScope = "directory"
+DEFAULT_PRESET_SWITCHING_ROTATION_SET: PresetSwitchingRotationSet = "directory"
 DEFAULT_PRESET_SWITCHING_SHUFFLE = False
 DEFAULT_PRESET_DURATION = 30.0
 DEFAULT_SOFT_CUT_DURATION = 0.0
@@ -140,7 +140,7 @@ def new_layer_config(slot: str, preset: Path, preset_root: Path) -> Any:
         blend_mode=DEFAULT_BLEND_MODE[DEFAULT_NEW_LAYER_STEM],
         locked=False,
         preset_switching=DEFAULT_PRESET_SWITCHING,
-        preset_switching_scope=DEFAULT_PRESET_SWITCHING_SCOPE,
+        preset_switching_rotation_set=DEFAULT_PRESET_SWITCHING_ROTATION_SET,
         preset_switching_presets=[],
     )
 
@@ -343,12 +343,12 @@ def _parse_preset_switching(raw: Any, label: str) -> PresetSwitchingMode:
     return mode
 
 
-def _parse_preset_switching_scope(raw: Any, label: str) -> PresetSwitchingScope:
-    scope = str(raw)
-    if scope not in PRESET_SWITCHING_SCOPES:
-        allowed = ", ".join(PRESET_SWITCHING_SCOPES)
+def _parse_preset_switching_rotation_set(raw: Any, label: str) -> PresetSwitchingRotationSet:
+    rotation_set = str(raw)
+    if rotation_set not in PRESET_SWITCHING_ROTATION_SETS:
+        allowed = ", ".join(PRESET_SWITCHING_ROTATION_SETS)
         raise ValueError(f"{label} must be one of: {allowed}")
-    return scope
+    return rotation_set
 
 
 def hard_cut_enabled_display(enabled: bool) -> str:
@@ -464,8 +464,10 @@ def preset_switching_display(mode: PresetSwitchingMode) -> str:
     return "none"
 
 
-def preset_switching_scope_display(scope: PresetSwitchingScope) -> str:
-    if scope == "user_defined":
+def preset_switching_rotation_set_display(
+    rotation_set: PresetSwitchingRotationSet,
+) -> str:
+    if rotation_set == "user_defined":
         return "user-defined"
     return "directory"
 
@@ -1558,9 +1560,9 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
             layer_raw.get("preset_switching", DEFAULT_PRESET_SWITCHING),
             f"layers.{slot}.preset_switching",
         )
-        preset_switching_scope = _parse_preset_switching_scope(
-            layer_raw.get("preset_switching_scope", DEFAULT_PRESET_SWITCHING_SCOPE),
-            f"layers.{slot}.preset_switching_scope",
+        preset_switching_rotation_set = _parse_preset_switching_rotation_set(
+            layer_raw.get("preset_switching_rotation_set", DEFAULT_PRESET_SWITCHING_ROTATION_SET),
+            f"layers.{slot}.preset_switching_rotation_set",
         )
         preset_switching_shuffle = bool(
             layer_raw.get(
@@ -1603,7 +1605,7 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
             blend_mode=parse_blend_mode(slot, stem, layer_raw),
             locked=bool(layer_raw.get("locked", False)),
             preset_switching=preset_switching,
-            preset_switching_scope=preset_switching_scope,
+            preset_switching_rotation_set=preset_switching_rotation_set,
             preset_switching_shuffle=preset_switching_shuffle,
             preset_duration=preset_duration,
             soft_cut_duration=soft_cut_duration,
@@ -1637,7 +1639,7 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             effects = runtime.effects
             locked = runtime.locked
             preset_switching = runtime.preset_switching
-            preset_switching_scope = runtime.preset_switching_scope
+            preset_switching_rotation_set = runtime.preset_switching_rotation_set
             preset_switching_shuffle = runtime.preset_switching_shuffle
             preset_duration = runtime.preset_duration
             soft_cut_duration = runtime.soft_cut_duration
@@ -1657,7 +1659,7 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             blend_mode = layer_cfg.blend_mode
             locked = layer_cfg.locked
             preset_switching = layer_cfg.preset_switching
-            preset_switching_scope = layer_cfg.preset_switching_scope
+            preset_switching_rotation_set = layer_cfg.preset_switching_rotation_set
             preset_switching_shuffle = layer_cfg.preset_switching_shuffle
             preset_duration = layer_cfg.preset_duration
             soft_cut_duration = layer_cfg.soft_cut_duration
@@ -1690,8 +1692,8 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             layer_out["effects"] = sparse
         if preset_switching != DEFAULT_PRESET_SWITCHING:
             layer_out["preset_switching"] = preset_switching
-        if preset_switching_scope != DEFAULT_PRESET_SWITCHING_SCOPE:
-            layer_out["preset_switching_scope"] = preset_switching_scope
+        if preset_switching_rotation_set != DEFAULT_PRESET_SWITCHING_ROTATION_SET:
+            layer_out["preset_switching_rotation_set"] = preset_switching_rotation_set
         if preset_switching_shuffle != DEFAULT_PRESET_SWITCHING_SHUFFLE:
             layer_out["preset_switching_shuffle"] = preset_switching_shuffle
         if preset_duration != DEFAULT_PRESET_DURATION:

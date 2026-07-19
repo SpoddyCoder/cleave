@@ -1,12 +1,12 @@
 ---
-description: Keep cleave scan preset derivation aligned with preset_switching_scope
+description: Keep cleave scan preset derivation aligned with preset_switching_rotation_set
 globs: cleave/config_schema.py,cleave/viz/preset_switching.py,cleave/preset_scan*.py,cleave/cli.py
 alwaysApply: false
 ---
 
-# Preset scan and switching scope
+# Preset scan and rotation set
 
-When changing `PresetSwitchingScope`, `PRESET_SWITCHING_SCOPES`, or how [cleave/viz/preset_switching.py](cleave/viz/preset_switching.py) builds the projectM playlist (`add_path` recurse flag, directory vs user-defined list), also update **scan set derivation** for `cleave scan`.
+When changing `PresetSwitchingRotationSet`, `PRESET_SWITCHING_ROTATION_SETS`, or how [cleave/viz/preset_switching.py](cleave/viz/preset_switching.py) builds the projectM playlist (`add_path` recurse flag, directory vs user-defined list), also update **scan set derivation** for `cleave scan`.
 
 Plan: [docs/legacy-plans/presets-scan-plan.md](docs/legacy-plans/presets-scan-plan.md).
 
@@ -17,13 +17,13 @@ Plan: [docs/legacy-plans/presets-scan-plan.md](docs/legacy-plans/presets-scan-pl
 ## Current contract
 
 - Mode (`preset_switching`): `none` | `projectm`.
-- Scope (`preset_switching_scope`): `directory` | `user_defined` (used when mode is `projectm`).
+- Rotation set (`preset_switching_rotation_set`): `directory` | `user_defined` (used when mode is `projectm`).
 - **directory** live rotation: immediate `*.milk` siblings in `playlist.current_dir`, **non-recursive** (`recurse=False`), then `sort()`.
 - **user_defined** live rotation: `preset_switching_presets` via `add_presets(..., allow_duplicates=True)` (no sort).
-- Project scan includes the anchor directory for **every** layer (even `preset_switching: none` or `enabled: false`), plus `preset_switching_presets` when `preset_switching_scope` is `user_defined`.
+- Project scan includes the anchor directory for **every** layer (even `preset_switching: none` or `enabled: false`), plus `preset_switching_presets` when `preset_switching_rotation_set` is `user_defined`.
 - Bulk mode uses `--presets-dir` with optional `--recursive`; project mode does not recurse into subfolders.
 
-## When scope expands
+## When rotation set expands
 
 1. Mirror the new live rule in the scan-target builder (same module family as [cleave/preset_scan.py](cleave/preset_scan.py)).
 2. Extend JSON report `layers` / metadata if attribution changes.
