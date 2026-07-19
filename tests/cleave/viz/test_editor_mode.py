@@ -178,6 +178,36 @@ def test_curation_allowlisted_keys_still_work() -> None:
     assert controls.playback.paused != was_paused
 
 
+def test_curation_ignores_layer_lock() -> None:
+    from cleave.viz.row_layout import row_navigable
+    from cleave.viz.row_semantics import section_locked
+    from cleave.viz.theme import VALUE
+    from cleave.viz.tuning_panel_draw import _row_value_color
+
+    controls = _make_controls(("layer_1",))
+    controls.session.settings.editor_mode = "preset_curation"
+    controls.session.settings.editor_mode_selection = "preset_curation"
+    layer = controls.session.layers["layer_1"]
+    layer.locked = True
+    layer.expanded = True
+
+    view = controls.build_view_state(paused=True)
+    header = RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1")
+    preset = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
+    assert section_locked(view, header) is False
+    assert section_locked(controls.session, preset) is False
+    assert view.tracks["layer_1"].locked is True
+    assert row_navigable(view, preset) is True
+    preset_index = view.layout.find_descriptor(preset)
+    assert _row_value_color(view, preset_index) == VALUE
+
+    controls.focus_cursor = MainFocus(preset)
+    mock_curation = MagicMock()
+    controls._preset_curation = mock_curation
+    controls.handle_keydown(keydown(pygame.K_f))
+    mock_curation.prompt_favourite.assert_called_once()
+
+
 def test_dirty_enter_modal_cancel_stays_visualizer() -> None:
     controls = _make_controls(("layer_1",))
     _mutate_dirty(controls)

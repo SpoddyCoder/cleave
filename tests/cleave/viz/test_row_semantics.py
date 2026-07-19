@@ -315,6 +315,25 @@ def test_section_locked_reads_session_timeline_attribute() -> None:
     assert section_locked(session_like, RowDescriptor(RowKind.TIMELINE_PRESETS)) is True
 
 
+def test_section_locked_ignored_in_preset_curation() -> None:
+    from cleave.viz.row_semantics import section_locked
+
+    state = SimpleNamespace(
+        settings=SimpleNamespace(editor_mode="preset_curation"),
+        tracks={"layer_1": SimpleNamespace(locked=True)},
+        render_overlay=SimpleNamespace(locked=True),
+        render_post_fx=SimpleNamespace(locked=True),
+        render_timeline=SimpleNamespace(locked=True),
+    )
+    assert (
+        section_locked(state, RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1"))
+        is False
+    )
+    assert (
+        section_locked(state, RowDescriptor(RowKind.RENDER_OVERLAY_POSITION)) is False
+    )
+
+
 def test_row_triggers_layer_delete_for_track_rows_only() -> None:
     assert row_triggers_layer_delete(RowKind.TRACK_HEADER) is True
     assert row_triggers_layer_delete(RowKind.LAYER_MANAGEMENT_DELETE) is True

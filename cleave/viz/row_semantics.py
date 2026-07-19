@@ -1157,7 +1157,15 @@ def section_locked(state: object, desc: RowDescriptor) -> bool:
 
     Accepts either a ``TuningViewState`` (tracks/render_timeline attributes)
     or a ``TuningSession`` (layers/timeline attributes).
+
+    Section locks are ignored in preset curation mode so layer browse and
+    favourite / blacklist / restore stay available.
     """
+    settings = getattr(state, "settings", None)
+    if settings is not None and getattr(settings, "editor_mode", None) == (
+        "preset_curation"
+    ):
+        return False
     section = _row_lock_section(desc.kind)
     if section is None:
         return False
