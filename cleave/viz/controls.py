@@ -16,6 +16,7 @@ from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.extract import STEM_SOURCES
 from cleave.song_markers import format_marker_time, place_marker
 from cleave.preset_curation import PresetCurationIndex
+from cleave.preset_playlist import is_top_level_browse_dir
 from cleave.timeline import snap_placement_time
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.editor_mode_controls import EditorModeController, is_preset_curation_mode
@@ -963,6 +964,10 @@ class TuningControls:
         playlist = layer.playlist
         delta = 1 if forward else -1
         if playlist.step_sibling(delta, preset_root=self.preset_root):
+            # Pack hop at preset_root: move the ascent floor with the playlist
+            # so Ctrl+Left still works after diving into the new pack.
+            if is_top_level_browse_dir(playlist.current_dir, self.preset_root):
+                layer.browse_floor = playlist.current_dir.resolve()
             if self._layer_bindings is not None:
                 self._layer_bindings.on_preset_change(slot, playlist)
 
