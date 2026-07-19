@@ -53,7 +53,10 @@ from cleave.viz.text_fit import (
     fit_path_label_to_width,
     fit_text_to_width,
 )
-from cleave.viz.frame_rate import format_fps_display
+from cleave.viz.frame_rate import (
+    FPS_DISPLAY_LABEL,
+    format_fps_value,
+)
 from cleave.viz.playback import format_mmss
 from cleave.viz.material_icons import (
     FILE_GLYPH,
@@ -767,6 +770,27 @@ def panel_fps_layout(
     )
 
 
+def fps_display_text_width(font: pygame.font.Font, fps: float) -> int:
+    """Width of the two-tone FPS readout (label + value)."""
+    return font.size(FPS_DISPLAY_LABEL)[0] + font.size(format_fps_value(fps))[0]
+
+
+def _render_fps_display(
+    font: pygame.font.Font,
+    fps: float,
+    *,
+    counters: OverlayDrawCounters | None = None,
+) -> pygame.Surface:
+    return _render_label_value_row(
+        font,
+        prefix=FPS_DISPLAY_LABEL,
+        value=format_fps_value(fps),
+        value_color=VALUE,
+        line_height=font.get_linesize(),
+        counters=counters,
+    )
+
+
 def settings_header_highlight_width(
     *,
     panel_w: int,
@@ -776,7 +800,7 @@ def settings_header_highlight_width(
     show_scrollbar: bool,
 ) -> int:
     """Settings-header focus tint: full row width minus FPS text and one character."""
-    fps_text_width = font.size(format_fps_display(fps))[0]
+    fps_text_width = fps_display_text_width(font, fps)
     char_w = max(1, font.size("M")[0])
     fps_layout = panel_fps_layout(
         panel_w=panel_w,
@@ -1704,9 +1728,7 @@ class TuningOverlay:
         if state.fps is not None and text_alpha >= 2:
             if cache.last_fps_rect is not None and bg_alpha >= 2:
                 pygame.draw.rect(panel, (*BACKGROUND, bg_alpha), cache.last_fps_rect)
-            fps_surf = _render_text(
-                font, format_fps_display(state.fps), True, VALUE, counters=counters
-            )
+            fps_surf = _render_fps_display(font, state.fps, counters=counters)
             fps_surf.set_alpha(text_alpha)
             fps_layout = panel_fps_layout(
                 panel_w=panel_w,
@@ -1847,9 +1869,7 @@ class TuningOverlay:
     ) -> None:
         cache = self._panel_cache
         if draw_fps and state.fps is not None and text_alpha >= 2:
-            fps_surf = _render_text(
-                font, format_fps_display(state.fps), True, VALUE, counters=counters
-            )
+            fps_surf = _render_fps_display(font, state.fps, counters=counters)
             fps_surf.set_alpha(text_alpha)
             fps_layout = panel_fps_layout(
                 panel_w=panel_w,

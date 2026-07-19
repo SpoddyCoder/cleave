@@ -8,7 +8,7 @@ import pytest
 from cleave.config_schema import DEFAULT_LAYER_SLOTS, MAX_LAYER_COUNT
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
-from cleave.viz.frame_rate import format_fps_display
+from cleave.viz.frame_rate import FPS_DISPLAY_LABEL
 from cleave.viz.focus_nav import MainFocus
 from cleave.viz.row_semantics import RowDescriptor, RowKind, row_is_pinned
 from cleave.viz.tuning_panel_draw import (
@@ -21,6 +21,7 @@ from cleave.viz.tuning_panel_draw import (
     _row_value_color,
     bottom_row_highlight_width,
     fit_row_text,
+    fps_display_text_width,
     panel_bottom_row_index,
     panel_content_max_width,
     panel_fps_layout,
@@ -177,6 +178,23 @@ def _copy_panel_surface(overlay: TuningOverlay, state: TuningViewState) -> pygam
     return surface.subsurface(panel).copy()
 
 
+def _find_pixel_color(
+    surface: pygame.Surface,
+    start_x: int,
+    start_y: int,
+    *,
+    color: tuple[int, int, int],
+    max_dx: int,
+    max_dy: int = 1,
+) -> bool:
+    """True if ``color`` appears in the given rectangle."""
+    for dy in range(max(1, max_dy)):
+        for dx in range(max(1, max_dx)):
+            if surface.get_at((start_x + dx, start_y + dy))[:3] == color:
+                return True
+    return False
+
+
 def test_header_rows_pinned_when_scrolled() -> None:
     pygame.init()
     state_top = _effects_expanded_view_state()
@@ -263,7 +281,7 @@ def test_fps_layout_top_right_on_transport_row() -> None:
     pygame.init()
     overlay = TuningOverlay()
     font = overlay._font_get()
-    fps_w = font.render(format_fps_display(30.0), True, (255, 255, 255)).get_width()
+    fps_w = fps_display_text_width(font, 30.0)
     panel_w = 320
     without_bar = panel_fps_layout(
         panel_w=panel_w,
@@ -392,17 +410,28 @@ def test_draw_fps_counter_when_present() -> None:
     )
 
     font = overlay._font_get()
-    fps_text = format_fps_display(28.4)
-    fps_surf = font.render(fps_text, True, VALUE)
+    line_h = font.get_linesize()
+    fps_w = fps_display_text_width(font, 28.4)
+    label_w = font.render(FPS_DISPLAY_LABEL, True, LABEL).get_width()
+    value_w = fps_w - label_w
     metrics = _panel_scroll_metrics(overlay, state)
     layout = panel_fps_layout(
         panel_w=with_fps.get_width(),
         padding=overlay._padding,
-        text_width=fps_surf.get_width(),
+        text_width=fps_w,
         show_scrollbar=metrics.show_scrollbar,
     )
-    sampled = with_fps.get_at((layout.x + 2, layout.y + font.get_linesize() // 2))
-    assert sampled[:3] == VALUE
+    assert _find_pixel_color(
+        with_fps, layout.x, layout.y, color=LABEL, max_dx=label_w, max_dy=line_h
+    )
+    assert _find_pixel_color(
+        with_fps,
+        layout.x + label_w,
+        layout.y,
+        color=VALUE,
+        max_dx=value_w,
+        max_dy=line_h,
+    )
 
 
 def test_fps_color_ignores_transport_focus() -> None:
@@ -415,17 +444,31 @@ def test_fps_color_ignores_transport_focus() -> None:
 
     with_fps = _copy_panel_surface(overlay, state)
     font = overlay._font_get()
-    fps_surf = font.render(format_fps_display(30.0), True, VALUE)
+    line_h = font.get_linesize()
+    fps_w = fps_display_text_width(font, 30.0)
+    label_w = font.render(FPS_DISPLAY_LABEL, True, LABEL).get_width()
+    value_w = fps_w - label_w
     metrics = _panel_scroll_metrics(overlay, state)
     layout = panel_fps_layout(
         panel_w=with_fps.get_width(),
         padding=overlay._padding,
-        text_width=fps_surf.get_width(),
+        text_width=fps_w,
         show_scrollbar=metrics.show_scrollbar,
     )
-    sampled = with_fps.get_at((layout.x + 2, layout.y + font.get_linesize() // 2))
-    assert sampled[:3] == VALUE
-    assert sampled[:3] != HIGHLIGHT
+    assert _find_pixel_color(
+        with_fps, layout.x, layout.y, color=LABEL, max_dx=label_w, max_dy=line_h
+    )
+    assert _find_pixel_color(
+        with_fps,
+        layout.x + label_w,
+        layout.y,
+        color=VALUE,
+        max_dx=value_w,
+        max_dy=line_h,
+    )
+    assert not _find_pixel_color(
+        with_fps, layout.x, layout.y, color=HIGHLIGHT, max_dx=fps_w, max_dy=line_h
+    )
 
 
 def test_settings_header_highlight_width_reserves_fps() -> None:
@@ -434,7 +477,7 @@ def test_settings_header_highlight_width_reserves_fps() -> None:
     panel_w = 400
     padding = 8
     fps = 30.0
-    fps_w = font.size(format_fps_display(fps))[0]
+    fps_w = fps_display_text_width(font, fps)
     char_w = font.size("M")[0]
     width = settings_header_highlight_width(
         panel_w=panel_w,
@@ -471,7 +514,7 @@ def test_settings_header_highlight_stops_before_fps() -> None:
     panel = _copy_panel_surface(overlay, state)
     font = overlay._font_get()
     metrics = _panel_scroll_metrics(overlay, state)
-    fps_w = font.size(format_fps_display(30.0))[0]
+    fps_w = fps_display_text_width(font, 30.0)
     layout = panel_fps_layout(
         panel_w=panel.get_width(),
         padding=overlay._padding,
@@ -489,9 +532,11 @@ def test_settings_header_highlight_stops_before_fps() -> None:
         BACKGROUND, BACKGROUND_ALPHA, HIGHLIGHT, FOCUS_ROW_BG_ALPHA
     )
     mid_y = layout.y + font.get_linesize() // 2
-    tinted = panel.get_at((overlay._padding + highlight_w // 2, mid_y))[:3]
+    # Sample near the left edge so label glyphs cannot obscure the tint.
+    tinted = panel.get_at((overlay._padding + 2, mid_y))[:3]
     gap = panel.get_at((layout.x - max(1, font.size("M")[0]) // 2, mid_y))[:3]
     under_fps = panel.get_at((layout.x + 2, mid_y))[:3]
+    assert highlight_w > 0
     assert tinted == expected_tint
     assert gap == BACKGROUND
     assert under_fps != expected_tint
