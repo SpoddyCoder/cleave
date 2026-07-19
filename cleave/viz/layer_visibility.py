@@ -190,12 +190,15 @@ def effective_layer_enabled(
     slot: str,
     t_sec: float,
 ) -> bool:
-    from cleave.viz.editor_mode_controls import is_preset_curation_mode
+    from cleave.viz.editor_mode_controls import curation_focus_slot
 
+    focus = curation_focus_slot(session)
+    if focus is not None:
+        # Curation: only the focus layer renders (ignore solo, timeline, enable flags).
+        return slot == focus
     if session.solo_slot is not None:
         return slot == session.solo_slot
-    # Curation: ignore timeline cues so layer enable flags alone drive visibility.
-    if not session.timeline.enabled or is_preset_curation_mode(session):
+    if not session.timeline.enabled:
         return session.layers[slot].enabled
     tl = session.timeline
     if tl.recording:

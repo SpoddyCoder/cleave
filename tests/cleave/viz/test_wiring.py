@@ -36,6 +36,102 @@ def _session_with_mode(
     )
 
 
+def test_on_preset_change_forces_none_in_curation_mode() -> None:
+    session = _session_with_mode("projectm")
+    session.settings.editor_mode = "preset_curation"
+    cfg = make_test_cfg(("layer_1",))
+    pm = ProjectM.__new__(ProjectM)
+    pm.lock_preset = MagicMock()
+    pm.load_preset = MagicMock()
+    pm.set_preset_start_clean = MagicMock()
+    pm.set_hard_cut_enabled = MagicMock()
+    layer = StemLayer(
+        slot="layer_1",
+        pm=pm,
+        fbo=MagicMock(),
+        playlist=session.layers["layer_1"].playlist,
+    )
+    layers_by_slot = {"layer_1": layer}
+    playlist = session.layers["layer_1"].playlist
+    notify = MagicMock()
+
+    with patch("cleave.viz.wiring.apply_preset_switching") as mock_apply:
+        controls = make_tuning_controls(
+            session=session,
+            cfg=cfg,
+            preset_root=cfg.paths.preset_root,
+            project_dir=Path("/tmp/project"),
+            layers_by_slot=layers_by_slot,
+            layers=[layer],
+            playback=stub_playback_state(),
+            duration_sec=120.0,
+            signals=None,
+            effect_runtime=MagicMock(),
+        )
+        controls.show_notification = notify
+        bindings = controls._layer_bindings
+        assert bindings is not None
+        playlist.load_into = MagicMock()
+        bindings.on_preset_change("layer_1", playlist)
+
+    mock_apply.assert_not_called()
+    playlist.load_into.assert_called_once_with(pm, smooth=False)
+    pm.lock_preset.assert_called_with(True)
+    notify.assert_not_called()
+
+
+def test_on_preset_switching_change_forces_none_in_curation_mode() -> None:
+    session = _session_with_mode("projectm")
+    session.settings.editor_mode = "preset_curation"
+    cfg = make_test_cfg(("layer_1",))
+    pm = ProjectM.__new__(ProjectM)
+    layer = StemLayer(
+        slot="layer_1",
+        pm=pm,
+        fbo=MagicMock(),
+        playlist=session.layers["layer_1"].playlist,
+    )
+
+    with patch("cleave.viz.wiring.apply_preset_switching") as mock_apply:
+        controls = make_tuning_controls(
+            session=session,
+            cfg=cfg,
+            preset_root=cfg.paths.preset_root,
+            project_dir=Path("/tmp/project"),
+            layers_by_slot={"layer_1": layer},
+            layers=[layer],
+            playback=stub_playback_state(),
+            duration_sec=120.0,
+            signals=None,
+            effect_runtime=MagicMock(),
+        )
+        bindings = controls._layer_bindings
+        assert bindings is not None
+        bindings.on_preset_switching_change("layer_1")
+
+    mock_apply.assert_called_once()
+    assert mock_apply.call_args.kwargs["mode"] == "none"
+
+
+def test_reapply_projectm_preset_switching_noop_in_curation_mode() -> None:
+    from cleave.viz.preset_switching import reapply_projectm_preset_switching
+
+    session = _session_with_mode("projectm")
+    session.settings.editor_mode = "preset_curation"
+    pm = ProjectM.__new__(ProjectM)
+    layer = StemLayer(
+        slot="layer_1",
+        pm=pm,
+        fbo=MagicMock(),
+        playlist=session.layers["layer_1"].playlist,
+    )
+    with patch(
+        "cleave.viz.preset_switching.apply_preset_switching"
+    ) as mock_apply:
+        reapply_projectm_preset_switching(session, {"layer_1": layer}, delta_sec=5.0)
+    mock_apply.assert_not_called()
+
+
 def test_on_preset_change_rebuilds_rotation_in_projectm_mode() -> None:
     session = _session_with_mode("projectm")
     cfg = make_test_cfg(("layer_1",))
