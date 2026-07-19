@@ -12,9 +12,6 @@ Outstanding bugs and issues.
 
 ## Architecture
 
-### Preset Curation Mode
-
-- [x] Session-only `editor_mode` under Settings; curation allowlists panel rows and keyboard shortcuts; dirty-entry save/discard; YAML reload on exit to visualizer.
 
 ### projectM
 
