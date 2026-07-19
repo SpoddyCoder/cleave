@@ -976,7 +976,9 @@ class TuningControls:
     def _parent_directory(self, slot: str) -> None:
         layer = self.session.layers[slot]
         playlist = layer.playlist
-        if playlist.go_parent(self.preset_root):
+        if playlist.go_parent(
+            self.preset_root, browse_floor=layer.browse_floor
+        ):
             if self._layer_bindings is not None:
                 self._layer_bindings.on_preset_change(slot, playlist)
 

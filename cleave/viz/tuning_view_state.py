@@ -410,7 +410,8 @@ class TuningViewStateBuilder:
             tracks[slot] = TrackBlock(
                 stem=layer.stem,
                 preset_dir_label=layer.playlist.directory_display_label(
-                    self.preset_root
+                    self.preset_root,
+                    browse_floor=layer.browse_floor,
                 ),
                 preset_label=self._preset_label(layer.playlist),
                 blend_mode=layer.blend_mode,

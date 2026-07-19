@@ -159,12 +159,30 @@ def test_go_parent_clamps_at_preset_root_when_browse_floor_is_root() -> None:
         _write_milk(child / "child.milk")
 
         playlist = playlist_at_dir(child)
-        assert playlist.go_parent(root) is True
+        assert playlist.go_parent(root, browse_floor=root) is True
         assert playlist.current_dir.resolve() == parent.resolve()
 
         at_root = scan_preset_playlist(root)
-        assert at_root.go_parent(root) is False
+        assert at_root.go_parent(root, browse_floor=root) is False
         assert at_root.current_dir.resolve() == root.resolve()
+
+
+def test_go_parent_clamps_at_browse_floor() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        pack = root / "pack-a"
+        pack.mkdir()
+        _write_milk(pack / "pack.milk")
+        child = pack / "child"
+        child.mkdir()
+        _write_milk(child / "child.milk")
+
+        playlist = playlist_at_dir(child)
+        assert playlist.go_parent(root, browse_floor=pack) is True
+        assert playlist.current_dir.resolve() == pack.resolve()
+
+        assert playlist.go_parent(root, browse_floor=pack) is False
+        assert playlist.current_dir.resolve() == pack.resolve()
 
 
 def test_preset_browse_floor_uses_first_configured_path_segment() -> None:
@@ -348,13 +366,20 @@ def test_directory_display_label_tree_markers() -> None:
         _write_milk(child / "child.milk")
 
         at_root = scan_preset_playlist(root)
-        assert directory_display(at_root, root) == "./ (1/1) [▼]"
+        assert directory_display(at_root, root, browse_floor=root) == "./ (1/1) [▼]"
 
         at_pack = playlist_at_dir(pack)
-        assert directory_display(at_pack, root) == "pack/ (1/1) [▲▼]"
+        assert directory_display(at_pack, root, browse_floor=root) == (
+            "pack/ (1/1) [▲▼]"
+        )
+        assert directory_display(at_pack, root, browse_floor=pack) == (
+            "pack/ (1/1) [▼]"
+        )
 
         at_child = playlist_at_dir(child)
-        assert directory_display(at_child, root) == "pack/child/ (1/1) [▲]"
+        assert directory_display(at_child, root, browse_floor=pack) == (
+            "pack/child/ (1/1) [▲]"
+        )
 
 
 def test_empty_directory_display_and_config_path() -> None:
