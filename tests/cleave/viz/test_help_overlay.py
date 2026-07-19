@@ -180,6 +180,10 @@ def test_preset_file_help_titles() -> None:
     keyboard = _keyboard_section(sections)
     assert description is not None
     assert description.title == "Milkdrop Preset File"
+    assert description.lines == (
+        "Currently active Milkdrop preset for this layer.",
+        "[F/B] indicates favourited/blacklisted.",
+    )
     entries = dict(keyboard.entries)
     assert entries["Left/Right"] == "next/previous preset"
     assert entries["Ctrl + Left/Right"] == "next/previous large step"
@@ -389,6 +393,10 @@ def test_user_preset_item_help() -> None:
     keyboard = _keyboard_section(sections)
     assert description is not None
     assert description.title == "user preset entry"
+    assert description.lines == (
+        "Preset in the user-defined rotation set for this layer.",
+        "[F/B] indicates favourited/blacklisted.",
+    )
     entries = dict(keyboard.entries)
     assert entries["Delete"] == "remove preset"
     assert entries["F"] == "favourite preset"

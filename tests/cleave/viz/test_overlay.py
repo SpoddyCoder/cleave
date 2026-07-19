@@ -51,7 +51,6 @@ from cleave.viz.theme import (
     DISABLED,
     FOCUS_ROW_BG_ALPHA,
     HIGHLIGHT,
-    HIGHLIGHT_MUTED,
     LABEL,
     LOCKED,
     PANEL_CONTENT_MAX_WIDTH,
@@ -1358,7 +1357,7 @@ def test_draw_track_header_with_solo_eye() -> None:
     assert header_row == state.layout.find_by_kind( RowKind.TRACK_HEADER)
 
 
-def test_disabled_track_focus_uses_muted_highlight() -> None:
+def test_disabled_track_focus_uses_standard_highlight() -> None:
     state = _minimal_view_state(
         tracks={
             "layer_1": TrackBlock(
@@ -1375,10 +1374,8 @@ def test_disabled_track_focus_uses_muted_highlight() -> None:
     )
     header_row = state.layout.find_by_kind( RowKind.TRACK_HEADER)
     state.focus_descriptor = state.layout.descriptor(header_row)
-    assert _row_value_color(state, header_row) == HIGHLIGHT_MUTED
-    assert _row_bg_color(state, header_row) == HIGHLIGHT_MUTED
-    assert _row_value_color(state, header_row) != HIGHLIGHT
-    assert _row_value_color(state, header_row) != DISABLED
+    assert _row_value_color(state, header_row) == HIGHLIGHT
+    assert _row_bg_color(state, header_row) == HIGHLIGHT
 
 
 def test_main_tree_rows_not_highlighted_when_timeline_submenu_focused() -> None:
