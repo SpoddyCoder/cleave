@@ -92,16 +92,21 @@ def test_build_quick_nav_ring_appends_timeline_strip_when_open() -> None:
     ring = build_quick_nav_ring(state)
     main_part = [
         MainFocus(state.layout.descriptor(index))
-        for index in state.layout.quick_nav_indices()
+        for index in state.layout.quick_nav_indices(state)
     ]
     assert ring == main_part + [TimelineFocus(0)]
     assert isinstance(ring[-1], TimelineFocus)
+    assert MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)) in main_part
+    assert MainFocus(
+        RowDescriptor(RowKind.TRACK_HEADER, slot="layer_2")
+    ) not in main_part
 
     closed = _minimal_view_state(
         render_timeline=RenderTimelineBlock(enabled=True, expanded=False),
     )
     closed_ring = build_quick_nav_ring(closed)
     assert all(isinstance(item, MainFocus) for item in closed_ring)
+    assert MainFocus(RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)) not in closed_ring
 
 
 def test_move_quick_focus_steps_onto_timeline_strip() -> None:

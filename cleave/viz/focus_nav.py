@@ -93,10 +93,10 @@ def move_focus(cursor: FocusCursor, delta: int, state: TuningViewState) -> Focus
 
 
 def build_quick_nav_ring(state: TuningViewState) -> list[FocusCursor]:
-    """Section stops for Ctrl+Up/Down: main quick-nav headers, then timeline strip."""
+    """Section stops for Ctrl+Up/Down: open/anchor headers, then timeline strip."""
     ring: list[FocusCursor] = [
         MainFocus(state.layout.descriptor(index))
-        for index in state.layout.quick_nav_indices()
+        for index in state.layout.quick_nav_indices(state)
     ]
     if timeline_strip_in_ring(state):
         ring.append(TimelineFocus(0))
@@ -120,7 +120,7 @@ def _coerce_quick_nav_target(
 def move_quick_focus(
     cursor: FocusCursor, delta: int, state: TuningViewState
 ) -> FocusCursor:
-    """Jump to the previous/next top-level section, including the timeline strip."""
+    """Jump to the previous/next section stop, including the timeline strip."""
     ring = build_quick_nav_ring(state)
     if not ring:
         return cursor

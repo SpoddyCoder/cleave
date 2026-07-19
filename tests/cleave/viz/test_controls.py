@@ -2792,56 +2792,66 @@ def test_space_toggles_pause_from_any_focus() -> None:
     assert controls.playback.paused is False
 
 
-def test_quick_nav_row_indices_headers_and_transport_only() -> None:
+def test_quick_nav_row_indices_anchors_and_open_sections() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     controls.session.layers["layer_1"].enabled = False
+    controls.session.layers["layer_1"].expanded = False
+    controls.session.layers["layer_2"].expanded = False
     view = controls.build_view_state(paused=False)
 
-    quick = view.layout.quick_nav_indices()
-    assert len(quick) == 7
-    for index in quick:
-        kind = view.layout.kind( index)
-        assert kind in (
-            RowKind.SETTINGS_HEADER,
-            RowKind.TRACK_HEADER,
-            RowKind.RENDER_OVERLAY_HEADER,
-            RowKind.RENDER_POST_FX_HEADER,
-            RowKind.RENDER_TIMELINE_HEADER,
-            RowKind.TRANSPORT,
-        )
-
+    quick = view.layout.quick_nav_indices(view)
     settings_row = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
-    drums_header = next(
+    layer1_header = next(
         i
         for i in range(len(view.layout))
-        if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_1"
-    )
-    bass_header = next(
-        i
-        for i in range(len(view.layout))
-        if view.layout.kind(i) == RowKind.TRACK_HEADER and view.layout.slot( i) == "layer_2"
+        if view.layout.kind(i) == RowKind.TRACK_HEADER
+        and view.layout.slot(i) == "layer_1"
     )
     render_overlay_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_HEADER)
-    render_post_fx_row = view.layout.find_by_kind(RowKind.RENDER_POST_FX_HEADER)
-    render_timeline_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
-    transport_row = next(
-        i for i in range(len(view.layout)) if view.layout.kind(i) == RowKind.TRANSPORT
+    transport_row = view.layout.find_by_kind(RowKind.TRANSPORT)
+    assert quick == [
+        settings_row,
+        transport_row,
+        layer1_header,
+        render_overlay_row,
+    ]
+
+    controls.session.layers["layer_2"].expanded = True
+    controls.session.render_post_fx.expanded = True
+    controls.session.timeline.panel_open = True
+    view = controls.build_view_state(paused=False)
+    quick = view.layout.quick_nav_indices(view)
+    settings_row = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
+    transport_row = view.layout.find_by_kind(RowKind.TRANSPORT)
+    layer1_header = next(
+        i
+        for i in range(len(view.layout))
+        if view.layout.kind(i) == RowKind.TRACK_HEADER
+        and view.layout.slot(i) == "layer_1"
+    )
+    layer2_header = next(
+        i
+        for i in range(len(view.layout))
+        if view.layout.kind(i) == RowKind.TRACK_HEADER
+        and view.layout.slot(i) == "layer_2"
     )
     assert quick == [
         settings_row,
         transport_row,
-        drums_header,
-        bass_header,
-        render_overlay_row,
-        render_post_fx_row,
-        render_timeline_row,
+        layer1_header,
+        layer2_header,
+        view.layout.find_by_kind(RowKind.RENDER_OVERLAY_HEADER),
+        view.layout.find_by_kind(RowKind.RENDER_POST_FX_HEADER),
+        view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER),
     ]
 
 
 def test_ctrl_quick_nav_cycles_headers_and_transport() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
+    controls.session.render_post_fx.expanded = True
+    controls.session.timeline.panel_open = True
     view = controls.build_view_state(paused=False)
-    quick = view.layout.quick_nav_indices()
+    quick = view.layout.quick_nav_indices(view)
 
     controls.focus_descriptor = _desc(view, quick[0])
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
@@ -2863,16 +2873,43 @@ def test_ctrl_quick_nav_cycles_headers_and_transport() -> None:
     assert controls.focus_descriptor == _desc(view, quick[6])
 
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
+    assert controls.focus_cursor == TimelineFocus(0)
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
     assert controls.focus_descriptor == _desc(view, quick[0])
 
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
-    assert controls.focus_descriptor == _desc(view, quick[6])
+    assert controls.focus_cursor == TimelineFocus(0)
+
+
+def test_ctrl_quick_nav_skips_closed_layer_and_render_sections() -> None:
+    controls = _make_controls(("layer_1", "layer_2", "layer_3"))
+    controls.session.layers["layer_2"].expanded = False
+    controls.session.layers["layer_3"].expanded = False
+    controls.session.render_post_fx.expanded = False
+    controls.session.timeline.panel_open = False
+    view = controls.build_view_state(paused=False)
+    layer1 = next(
+        i
+        for i in range(len(view.layout))
+        if view.layout.kind(i) == RowKind.TRACK_HEADER
+        and view.layout.slot(i) == "layer_1"
+    )
+    overlay = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_HEADER)
+    settings = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
+
+    controls.focus_descriptor = _desc(view, layer1)
+    controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
+    assert controls.focus_descriptor == _desc(view, overlay)
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
+    assert controls.focus_descriptor == _desc(view, settings)
 
 
 def test_ctrl_quick_nav_from_sub_row_jumps_forward() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
     view = controls.build_view_state(paused=False)
-    quick = view.layout.quick_nav_indices()
+    quick = view.layout.quick_nav_indices(view)
     preset_row = next(
         i for i in range(12) if view.layout.kind(i) == RowKind.TRACK_PRESET
     )
@@ -2889,7 +2926,7 @@ def test_ctrl_quick_nav_from_sub_row_jumps_forward() -> None:
 def test_ctrl_quick_nav_from_config_header_row() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    quick = view.layout.quick_nav_indices()
+    quick = view.layout.quick_nav_indices(view)
     config_row = _config_header_row(view)
 
     controls.focus_descriptor = _desc(view, config_row)
@@ -2915,12 +2952,12 @@ def test_ctrl_quick_nav_does_not_affect_normal_up_down() -> None:
 
 def test_ctrl_quick_nav_from_timeline_submenu_jumps_sections() -> None:
     controls = _make_controls(("layer_1", "layer_2"), timeline_enabled=True)
+    controls.session.timeline.panel_open = True
     view = controls.build_view_state(paused=False)
-    quick = view.layout.quick_nav_indices()
     timeline_header = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     settings_row = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
+    assert timeline_header in view.layout.quick_nav_indices(view)
 
-    controls.session.timeline.panel_open = True
     controls.focus_cursor = TimelineFocus(1)
 
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
@@ -2931,16 +2968,15 @@ def test_ctrl_quick_nav_from_timeline_submenu_jumps_sections() -> None:
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
     assert not isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.focus_descriptor == _desc(view, settings_row)
-    assert timeline_header in quick
 
 
 def test_ctrl_quick_nav_includes_timeline_strip_when_open() -> None:
     controls = _make_controls(("layer_1", "layer_2"), timeline_enabled=True)
+    controls.session.timeline.panel_open = True
     view = controls.build_view_state(paused=False)
     timeline_header = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     settings_row = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
 
-    controls.session.timeline.panel_open = True
     controls.focus_descriptor = _desc(view, timeline_header)
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
     assert controls.focus_cursor == TimelineFocus(0)
@@ -2960,10 +2996,18 @@ def test_ctrl_quick_nav_skips_timeline_strip_when_closed() -> None:
     controls = _make_controls(("layer_1", "layer_2"), timeline_enabled=True)
     view = controls.build_view_state(paused=False)
     timeline_header = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
+    overlay_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_HEADER)
     settings_row = view.layout.find_by_kind(RowKind.SETTINGS_HEADER)
 
     controls.session.timeline.panel_open = False
+    assert timeline_header not in view.layout.quick_nav_indices(view)
+
     controls.focus_descriptor = _desc(view, timeline_header)
+    controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
+    assert controls.focus_descriptor == _desc(view, settings_row)
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+
+    controls.focus_descriptor = _desc(view, overlay_row)
     controls.handle_keydown(_keydown(pygame.K_DOWN, mod=pygame.KMOD_CTRL))
     assert controls.focus_descriptor == _desc(view, settings_row)
     assert not isinstance(controls.focus_cursor, TimelineFocus)

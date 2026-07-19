@@ -138,6 +138,8 @@ class RowBehavior:
     help_mode_entries: tuple[tuple[str, str], ...] | None = None
     navigable: bool = True
     quick_nav_target: bool = False
+    # When True with quick_nav_target, Ctrl+Up/Down always lands here even if collapsed.
+    quick_nav_always: bool = False
     is_header: bool = False
     is_sub_header: bool = False
     is_pinned: bool = False
@@ -158,6 +160,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         is_header=True,
         repeatable=True,
         quick_nav_target=True,
+        quick_nav_always=True,
     ),
     RowKind.CONFIG_HEADER: RowBehavior(
         RowAffordance.ACTION,
@@ -433,6 +436,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "Credits overlay.",
         ),
         quick_nav_target=True,
+        quick_nav_always=True,
     ),
     RowKind.RENDER_OVERLAY_POSITION: RowBehavior(
         RowAffordance.VALUE_STEP,
@@ -905,6 +909,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Editor Settings",
         help_description=("Global editor settings (applies to all projects)",),
         quick_nav_target=True,
+        quick_nav_always=True,
     ),
     RowKind.SETTINGS_EDITOR_MODE: RowBehavior(
         RowAffordance.ACTION_PARAMETER,
