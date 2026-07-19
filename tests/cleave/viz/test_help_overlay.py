@@ -171,7 +171,7 @@ def test_preset_dir_help_includes_add_shortcut_in_user_defined_mode() -> None:
         preset_switching="user_defined",
     )
     entries = dict(_keyboard_section(sections).entries)
-    assert entries["+"] == "add current preset to rotation set"
+    assert entries["U"] == "add current preset to user-defined list"
 
 
 def test_preset_file_help_titles() -> None:
@@ -199,7 +199,7 @@ def test_preset_file_help_includes_add_shortcut_in_user_defined_mode() -> None:
         preset_switching="user_defined",
     )
     entries = dict(_keyboard_section(sections).entries)
-    assert entries["+"] == "add current preset to rotation set"
+    assert entries["U"] == "add current preset to user-defined list"
 
 
 def test_blend_mode_help_lists_modes() -> None:

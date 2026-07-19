@@ -244,7 +244,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_description=(
             "Add the layer's current preset to the user-defined rotation set.",
             "Copies the preset file into the project presets folder.",
-            "+ on the preset dir or preset file row is the same action.",
+            "U on the preset dir or preset file row is the same action.",
         ),
     ),
     RowKind.TRACK_PRESET_SWITCHING_SCOPE: RowBehavior(
