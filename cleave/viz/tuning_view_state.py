@@ -382,10 +382,20 @@ class TuningViewStateBuilder:
         self._get_notification = get_notification
         self._structure: _ViewStateStructure | None = None
 
-    def _preset_label(self, playlist: PresetPlaylist) -> str:
+    def _user_preset_basenames(self) -> set[str]:
+        names: set[str] = set()
+        for layer in self.session.layers.values():
+            for path in layer.user_presets:
+                names.add(Path(path).name)
+        return names
+
+    def _preset_label(
+        self, playlist: PresetPlaylist, *, user_names: set[str]
+    ) -> str:
         label = preset_filename_display(playlist)
         if playlist.current is not None:
-            label += self._curation_index.marker(playlist.current.name)
+            name = playlist.current.name
+            label += self._curation_index.marker(name, user=name in user_names)
         return label
 
     def _user_preset_labels(self, paths: list[str]) -> list[str]:
@@ -400,6 +410,7 @@ class TuningViewStateBuilder:
         *,
         signature: str,
         notification_active: bool,
+        user_names: set[str],
     ) -> _ViewStateStructure:
         from cleave.viz.focus_nav import MainFocus
 
@@ -413,7 +424,9 @@ class TuningViewStateBuilder:
                     self.preset_root,
                     browse_floor=layer.browse_floor,
                 ),
-                preset_label=self._preset_label(layer.playlist),
+                preset_label=self._preset_label(
+                    layer.playlist, user_names=user_names
+                ),
                 blend_mode=layer.blend_mode,
                 opacity_pct=layer.opacity_pct,
                 effects=dict(layer.effects),
@@ -529,6 +542,7 @@ class TuningViewStateBuilder:
         structure: _ViewStateStructure,
         *,
         position_sec: float,
+        user_names: set[str],
     ) -> dict[str, TrackBlock]:
         from cleave.viz.layer_visibility import effective_layer_enabled
 
@@ -546,7 +560,9 @@ class TuningViewStateBuilder:
                 blend_mode=layer.blend_mode,
                 opacity_pct=layer.opacity_pct,
                 beat_sensitivity=layer.beat_sensitivity,
-                preset_label=self._preset_label(layer.playlist),
+                preset_label=self._preset_label(
+                    layer.playlist, user_names=user_names
+                ),
                 user_preset_labels=self._user_preset_labels(list(layer.user_presets)),
                 effects=dict(layer.effects),
             )
@@ -566,6 +582,7 @@ class TuningViewStateBuilder:
         notification_active = bool(
             notification_message and notification_remaining_sec > 0
         )
+        user_names = self._user_preset_basenames()
         signature = view_state_structure_signature(
             self.session,
             self._config_save,
@@ -575,10 +592,13 @@ class TuningViewStateBuilder:
             self._structure = self._build_structure(
                 signature=signature,
                 notification_active=notification_active,
+                user_names=user_names,
             )
         structure = self._structure
 
-        tracks = self._patch_tracks(structure, position_sec=position_sec)
+        tracks = self._patch_tracks(
+            structure, position_sec=position_sec, user_names=user_names
+        )
 
         ro = self.session.render_overlay
         pp = self.session.render_post_fx

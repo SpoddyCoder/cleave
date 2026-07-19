@@ -520,4 +520,41 @@ def test_builder_appends_curation_markers_without_structure_change() -> None:
     view_after = controls.build_view_state(paused=False)
     block_after = view_after.tracks["layer_1"]
     assert block_after.preset_label == "preset-0.milk (1/3) [F]"
-    assert block_after.user_preset_labels == ["user.milk [F][B]"]
+    # User-preset rows never append U; F/B only in single-bracket form.
+    assert block_after.user_preset_labels == ["user.milk [FB]"]
+
+
+def test_builder_appends_user_defined_marker_on_track_preset() -> None:
+    controls = _make_controls(("layer_1", "layer_2"))
+    session = controls.session
+    config_save = controls._config_save
+    index = controls._view_state._curation_index
+    layer_1 = session.layers["layer_1"]
+    layer_2 = session.layers["layer_2"]
+    current = layer_1.playlist.current
+    assert current is not None
+    current_name = current.name
+    assert current_name is not None
+
+    # Basename listed on another layer still marks TRACK_PRESET with U.
+    other_path = Path("/tmp/projects/my-track") / current_name
+    other_path.parent.mkdir(parents=True, exist_ok=True)
+    other_path.write_text("milk", encoding="utf-8")
+    layer_2.user_presets = [str(other_path)]
+
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    view_u = controls.build_view_state(paused=False)
+    assert view_u.tracks["layer_1"].preset_label == f"{current_name} (1/3) [U]"
+    assert view_u.tracks["layer_2"].user_preset_labels == [current_name]
+
+    index.mark_favourite(current_name)
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before == sig_after
+
+    view_fu = controls.build_view_state(paused=False)
+    assert view_fu.tracks["layer_1"].preset_label == f"{current_name} (1/3) [FU]"
+    assert view_fu.tracks["layer_2"].user_preset_labels == [f"{current_name} [F]"]

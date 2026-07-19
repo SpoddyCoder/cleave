@@ -71,8 +71,12 @@ def test_preset_curation_index_marker() -> None:
     )
     assert index.marker("fav.milk") == " [F]"
     assert index.marker("bl.milk") == " [B]"
-    assert index.marker("both.milk") == " [F][B]"
+    assert index.marker("both.milk") == " [FB]"
     assert index.marker("plain.milk") == ""
+    assert index.marker("plain.milk", user=True) == " [U]"
+    assert index.marker("fav.milk", user=True) == " [FU]"
+    assert index.marker("bl.milk", user=True) == " [BU]"
+    assert index.marker("both.milk", user=True) == " [FBU]"
 
 
 def test_preset_curation_index_mark_updates_sets() -> None:

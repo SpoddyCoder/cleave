@@ -74,8 +74,28 @@ def test_fit_counter_label_preserves_curation_marker() -> None:
 
 def test_fit_counter_label_preserves_favourite_and_blacklist_markers() -> None:
     font = overlay_font()
-    label = "long-name-without-much-room-left.milk (1/9) [F][B]"
-    suffix = " (1/9) [F][B]"
+    label = "long-name-without-much-room-left.milk (1/9) [FB]"
+    suffix = " (1/9) [FB]"
+    width = font.size(suffix)[0] + font.size("long-name…")[0]
+    fitted = fit_counter_label_to_width(font, label, width)
+    assert fitted.endswith(suffix)
+    assert font.size(fitted)[0] <= width
+
+
+def test_fit_counter_label_preserves_user_defined_marker() -> None:
+    font = overlay_font()
+    label = "long-name-without-much-room-left.milk (1/9) [FU]"
+    suffix = " (1/9) [FU]"
+    width = font.size(suffix)[0] + font.size("long-name…")[0]
+    fitted = fit_counter_label_to_width(font, label, width)
+    assert fitted.endswith(suffix)
+    assert font.size(fitted)[0] <= width
+
+
+def test_fit_counter_label_preserves_full_fbu_marker() -> None:
+    font = overlay_font()
+    label = "long-name-without-much-room-left.milk (2/8) [FBU]"
+    suffix = " (2/8) [FBU]"
     width = font.size(suffix)[0] + font.size("long-name…")[0]
     fitted = fit_counter_label_to_width(font, label, width)
     assert fitted.endswith(suffix)
