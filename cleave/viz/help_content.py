@@ -131,7 +131,7 @@ _PRESET_SECTION = HelpSection(
     ),
 )
 
-_USER_PRESET_ADD_SHORTCUT = ("+", "add current preset to rotation set")
+_USER_PRESET_ADD_SHORTCUT = ("U", "add current preset to user-defined list")
 
 _USER_PRESET_ITEM_SECTION = HelpSection(
     "Edit",

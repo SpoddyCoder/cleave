@@ -35,10 +35,9 @@ def delete_key_pressed(event: pygame.event.Event) -> bool:
 
 
 def add_current_preset_key_pressed(key: int, mod: int) -> bool:
-    """True for + keys that add the current preset in user-defined mode."""
-    if key in (pygame.K_PLUS, pygame.K_KP_PLUS):
-        return True
-    return key == pygame.K_EQUALS and mod_shift(mod)
+    """True for the U key that adds the current preset in user-defined mode."""
+    del mod
+    return key == pygame.K_u
 
 
 @dataclass
