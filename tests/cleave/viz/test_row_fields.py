@@ -17,6 +17,7 @@ from cleave.viz.row_fields import (
     format_row_value,
     full_line_prefix,
     labeled_row_prefix,
+    row_action_parameter_display_text,
     row_composite_header_display_text,
     row_dynamic_labeled_display_text,
     row_dynamic_labeled_prefix,
@@ -266,6 +267,31 @@ def test_composite_header_render_overlay_metadata() -> None:
     assert row_composite_header_display_text(state, desc) == "Render: OVERLAY ▶"
 
 
+def test_preset_switching_seed_is_action_parameter_with_value() -> None:
+    field = row_field_def(RowKind.TRACK_PRESET_SWITCHING_SEED)
+    assert field.present_style == RowPresentStyle.ACTION_PARAMETER
+    state = _minimal_view_state(
+        tracks={
+            "layer_1": TrackBlock(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                expanded=True,
+                preset_switching="projectm",
+                preset_switching_shuffle=True,
+                preset_switching_shuffle_salt=42,
+            )
+        }
+    )
+    desc = RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_SEED, slot="layer_1")
+    assert format_row_value(state, desc) == "42"
+    assert row_action_parameter_display_text(state, desc) == "    └─ seed: 42"
+
+
 def test_apply_field_horizontal_expand_subheader_when_layer_locked() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].locked = True
@@ -293,7 +319,7 @@ def test_apply_field_horizontal_track_header_solo_and_expand() -> None:
 
 
 def test_row_fields_count() -> None:
-        assert len(ROW_FIELDS) == 83
+        assert len(ROW_FIELDS) == 84
 
 
 def test_row_kinds_requiring_fields_registry_complete() -> None:

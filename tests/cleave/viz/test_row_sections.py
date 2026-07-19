@@ -10,6 +10,7 @@ from cleave.viz.row_sections import (
     RENDER_POST_FX_SECTION,
     append_track_section_rows,
     expand_section_expanded,
+    row_tree_indent_depth,
     section_header_from_section_tree,
     sub_row_expand_visible,
 )
@@ -73,7 +74,19 @@ def test_track_layout_conditional_rows_when_predicates_pass() -> None:
     )
     assert RowKind.TRACK_PRESET_DURATION in kinds
     assert RowKind.TRACK_PRESET_SWITCHING_SHUFFLE in kinds
+    assert RowKind.TRACK_PRESET_SWITCHING_SEED not in kinds
     assert RowKind.TRACK_HARD_CUT_DURATION in kinds
+
+    shuffle_on_kinds = _track_row_kinds(
+        preset_switching="projectm",
+        preset_switching_shuffle=True,
+        hard_cut_enabled=True,
+        effects_expanded=False,
+    )
+    assert RowKind.TRACK_PRESET_SWITCHING_SEED in shuffle_on_kinds
+    assert row_tree_indent_depth(RowKind.TRACK_PRESET_SWITCHING_SEED) == (
+        row_tree_indent_depth(RowKind.TRACK_PRESET_SWITCHING_SHUFFLE) + 1
+    )
 
     user_defined_kinds = _track_row_kinds(
         preset_switching="projectm",
@@ -93,6 +106,7 @@ def test_track_layout_omits_conditional_rows_when_predicates_fail() -> None:
     none_kinds = _track_row_kinds(preset_switching="none")
     assert RowKind.TRACK_PRESET_DURATION not in none_kinds
     assert RowKind.TRACK_PRESET_SWITCHING_SHUFFLE not in none_kinds
+    assert RowKind.TRACK_PRESET_SWITCHING_SEED not in none_kinds
 
     hard_cut_off = _track_row_kinds(hard_cut_enabled=False)
     assert RowKind.TRACK_HARD_CUT_DURATION not in hard_cut_off
@@ -100,6 +114,7 @@ def test_track_layout_omits_conditional_rows_when_predicates_fail() -> None:
     timeline_kinds = _track_row_kinds(preset_switching="timeline")
     assert RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET in timeline_kinds
     assert RowKind.TRACK_PRESET_SWITCHING_SHUFFLE in timeline_kinds
+    assert RowKind.TRACK_PRESET_SWITCHING_SEED not in timeline_kinds
     assert RowKind.TRACK_PRESET_START_CLEAN in timeline_kinds
     assert RowKind.TRACK_PRESET_DURATION not in timeline_kinds
     assert RowKind.TRACK_SOFT_CUT_DURATION not in timeline_kinds

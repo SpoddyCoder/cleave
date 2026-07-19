@@ -57,3 +57,35 @@ def rotation_seed(paths: Sequence[Path], *, salt: str = "") -> int:
         digest.update(b"\0")
         digest.update(str(path).encode("utf-8"))
     return int.from_bytes(digest.digest()[:8], "big")
+
+
+def layer_rotation_seed(
+    paths: Sequence[Path],
+    *,
+    slot: str,
+    shuffle_salt: int = 0,
+) -> int:
+    """Seed for a layer's shuffled rotation (slot + persisted salt)."""
+    return rotation_seed(paths, salt=f"{slot}:{int(shuffle_salt)}")
+
+
+def first_shuffle_bag_order(
+    paths: Sequence[Path],
+    *,
+    seed: int,
+) -> list[Path]:
+    """Return the first shuffle-bag order for ``paths`` under ``seed``."""
+    if not paths:
+        return []
+    rotation = PresetRotation(
+        paths=tuple(paths),
+        shuffle=True,
+        seed=seed,
+        anchor=0,
+    )
+    ordered: list[Path] = []
+    for i in range(len(paths)):
+        path = rotation.path_for(i)
+        if path is not None:
+            ordered.append(path)
+    return ordered

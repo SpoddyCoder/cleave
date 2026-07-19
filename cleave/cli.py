@@ -1,56 +1,29 @@
+from __future__ import annotations
+
 import argparse
 import os
 import sys
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from cleave.config import (
-    VIZ_CONFIG_FILENAME,
-    ensure_project_viz_config,
-    find_config_path,
-    load_config,
-)
-from cleave.paths import resolve_project
-from cleave.preset_scan import (
-    PresetScanResult,
-    PresetResultCategory,
-    ProbeProfile,
-    ScanMode,
-    ScanReport,
-    build_scan_report,
-    delete_presets,
-    destructive_scan_categories,
-    existing_report_status,
-    load_resume_results,
-    probe_profile,
-    quarantine_presets,
-    run_scan,
-    scan_report_summary,
-    scanned_preset_dirs,
-    validate_quarantine_dir,
-    write_scan_report,
-)
-from cleave.preset_scan_targets import ScanTargets, build_bulk_targets, build_project_targets
-
-
-def _experimental_notice() -> None:
-    print(
-        "warning: 'scan' is experimental; classification is only trusted on the golden set",
-        file=sys.stderr,
+if TYPE_CHECKING:
+    from cleave.extract import StemSource
+    from cleave.preset_scan import (
+        PresetResultCategory,
+        PresetScanResult,
+        ProbeProfile,
+        ScanMode,
+        ScanReport,
     )
-from cleave.extract import (
-    BEAT_DETECTION_STEM_CHOICES,
-    StemSource,
-    parse_beat_detection_stem,
-)
-from cleave.separate import (
-    beat_detection_stem_mismatch,
-    project_stems_complete,
-    resolve_separate_target,
-    run_separate,
-    signals_complete,
-)
-from cleave.viz.render import RenderSegment
+    from cleave.preset_scan_targets import ScanTargets
+    from cleave.viz.render import RenderSegment
+
+# Parser/help constants (must match defining modules; avoid importing them for -h).
+VIZ_CONFIG_FILENAME = "cleave-viz.yaml"
+BEAT_DETECTION_STEM_CHOICES = ("drums", "full-mix", "bass", "vocals", "other")
+_GOLDEN_SET_HELP_DEFAULT = "tests/fixtures/preset_scan_golden_set.yaml"
+_GOLDEN_METRICS_HELP_DEFAULT = "tests/fixtures/preset_scan_golden_metrics.json"
 
 SIGNALS_FILENAME = "signals.json"
 _TARGET_HELP = "Source audio file or cleave project (path or slug)"
@@ -90,13 +63,31 @@ def _render_scope_clause(segment: RenderSegment | None) -> str:
 
 
 def _optional_beat_detection_stem(args: argparse.Namespace) -> StemSource | None:
+    from cleave.extract import parse_beat_detection_stem
+
     raw = getattr(args, "beat_detection_stem", None)
     if raw is None:
         return None
     return parse_beat_detection_stem(raw)
 
 
+def _experimental_notice() -> None:
+    print(
+        "warning: 'scan' is experimental; classification is only trusted on the golden set",
+        file=sys.stderr,
+    )
+
+
 def cmd_separate(args: argparse.Namespace) -> None:
+    from cleave.config import ensure_project_viz_config
+    from cleave.separate import (
+        beat_detection_stem_mismatch,
+        project_stems_complete,
+        resolve_separate_target,
+        run_separate,
+        signals_complete,
+    )
+
     target = Path(args.target)
     try:
         project_dir, audio_path = resolve_separate_target(target)
@@ -149,6 +140,10 @@ def cmd_separate(args: argparse.Namespace) -> None:
 
 
 def cmd_play(args: argparse.Namespace) -> None:
+    os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
+    from cleave.separate import run_separate
+    from cleave.viz import launch
+
     target = Path(args.target)
     try:
         project_dir = run_separate(
@@ -159,9 +154,6 @@ def cmd_play(args: argparse.Namespace) -> None:
     except (FileNotFoundError, ValueError, RuntimeError) as e:
         _exit_error(f"error: {e}")
 
-    os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
-    from cleave.viz import launch
-
     launch(
         project_dir,
         config=args.config,
@@ -169,12 +161,14 @@ def cmd_play(args: argparse.Namespace) -> None:
 
 
 def cmd_render(args: argparse.Namespace) -> None:
+    os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
+    from cleave.paths import resolve_project
+    from cleave.viz.render import render
+
     try:
         project_dir = resolve_project(Path(args.project_dir))
     except (FileNotFoundError, ValueError) as e:
         _exit_error(f"error: {e}")
-
-    from cleave.viz.render import render
 
     started = time.perf_counter()
     try:
@@ -201,12 +195,13 @@ def cmd_render(args: argparse.Namespace) -> None:
 
 
 def cmd_backup(args: argparse.Namespace) -> None:
+    from cleave.archive import backup_project
+    from cleave.paths import resolve_project
+
     try:
         project_dir = resolve_project(Path(args.project_dir))
     except (FileNotFoundError, ValueError) as e:
         _exit_error(f"error: {e}")
-
-    from cleave.archive import backup_project
 
     try:
         archive_path = backup_project(
@@ -304,6 +299,8 @@ def _guard_incomplete_report(
     args: argparse.Namespace,
     target_total: int,
 ) -> None:
+    from cleave.preset_scan import existing_report_status
+
     if report_path is None or args.resume or not report_path.is_file():
         return
     try:
@@ -325,6 +322,8 @@ def _handle_scan_keyboard_interrupt(
     args: argparse.Namespace,
     target_total: int,
 ) -> None:
+    from cleave.preset_scan import existing_report_status
+
     if report_path is None:
         print(
             "Scan interrupted; results were not saved "
@@ -358,6 +357,8 @@ def _execute_preset_scan(
     project_dir: Path | None = None,
     config_path: Path | None = None,
 ) -> tuple[list[PresetScanResult], ScanReport]:
+    from cleave.preset_scan import build_scan_report, run_scan, write_scan_report
+
     target_total = len(scan_targets.presets)
     _guard_incomplete_report(report_path, args, target_total)
 
@@ -399,6 +400,26 @@ def _execute_preset_scan(
 
 
 def cmd_scan(args: argparse.Namespace) -> None:
+    os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
+    from cleave.config import find_config_path, load_config
+    from cleave.paths import resolve_project
+    from cleave.preset_scan import (
+        delete_presets,
+        destructive_scan_categories,
+        load_resume_results,
+        probe_profile,
+        quarantine_presets,
+        scan_report_summary,
+        scanned_preset_dirs,
+        validate_quarantine_dir,
+        write_scan_report,
+    )
+    from cleave.preset_scan_targets import (
+        ScanTargets,
+        build_bulk_targets,
+        build_project_targets,
+    )
+
     _experimental_notice()
     bulk_mode = args.presets_dir is not None
 
@@ -583,7 +604,7 @@ def cmd_scan(args: argparse.Namespace) -> None:
 
 
 def cmd_scan_golden(args: argparse.Namespace) -> None:
-    _experimental_notice()
+    os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
     from cleave.preset_scan_golden import (
         DEFAULT_GOLDEN_SET_PATH,
         DEFAULT_METRICS_CACHE_PATH,
@@ -599,6 +620,8 @@ def cmd_scan_golden(args: argparse.Namespace) -> None:
         probe_profile,
         sweep,
     )
+
+    _experimental_notice()
 
     golden_path = (
         args.golden.expanduser().resolve()
@@ -936,12 +959,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     scan.set_defaults(func=cmd_scan)
 
-    from cleave.paths import repo_root
-    from cleave.preset_scan_golden import (
-        DEFAULT_GOLDEN_SET_PATH,
-        DEFAULT_METRICS_CACHE_PATH,
-    )
-
     scan_golden = subparsers.add_parser(
         "scan-golden",
         prog="cleave scan-golden",
@@ -983,7 +1000,7 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="PATH",
         help=(
             "Metrics cache JSON path "
-            f"(default: {DEFAULT_METRICS_CACHE_PATH.relative_to(repo_root())})"
+            f"(default: {_GOLDEN_METRICS_HELP_DEFAULT})"
         ),
     )
     scan_golden.add_argument(
@@ -992,7 +1009,7 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="PATH",
         help=(
             "Golden set YAML path "
-            f"(default: {DEFAULT_GOLDEN_SET_PATH.relative_to(repo_root())})"
+            f"(default: {_GOLDEN_SET_HELP_DEFAULT})"
         ),
     )
     scan_golden.set_defaults(func=cmd_scan_golden)

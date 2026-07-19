@@ -237,6 +237,7 @@ class LayerFramePipeline:
             hard_cut_duration=layer_cfg.hard_cut_duration,
             hard_cut_sensitivity=layer_cfg.hard_cut_sensitivity,
             shuffle=layer_cfg.preset_switching_shuffle,
+            shuffle_salt=layer_cfg.preset_switching_shuffle_salt,
         )
         return layer
 

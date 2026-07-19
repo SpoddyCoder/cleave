@@ -41,7 +41,6 @@ from cleave.viz.row_sections import (
     row_tree_indent_depth,
 )
 from cleave.viz.row_semantics import (
-    ACTION_PARAMETER_SUB_ROW_KINDS,
     ACTION_ROW_KINDS,
     LABELED_SUB_ROW_KINDS,
     RowDescriptor,
@@ -250,6 +249,11 @@ def _row_text(state: TuningViewState, index: int) -> str:
         if field.present_style == RowPresentStyle.DYNAMIC:
             return row_dynamic_labeled_display_text(state, desc)
     return ""
+
+
+def _is_action_parameter_style(kind: RowKind) -> bool:
+    field = ROW_FIELDS.get(kind)
+    return field is not None and field.present_style == RowPresentStyle.ACTION_PARAMETER
 
 
 def _action_parameter_row_prefix(kind: RowKind) -> str:
@@ -609,7 +613,7 @@ def fit_row_text(
         return row_composite_header_display_text(state, state.layout.descriptor(index))
     if field is not None and field.present_style == RowPresentStyle.EXPAND_SUBHEADER:
         return row_expand_subheader_display_text(state, state.layout.descriptor(index))
-    if kind in ACTION_PARAMETER_SUB_ROW_KINDS:
+    if _is_action_parameter_style(kind):
         return _action_parameter_row_prefix(kind) + _fit_action_parameter_row_value(
             font,
             state,
@@ -1142,7 +1146,7 @@ def _estimate_row_content_width_base(
         value = format_expand_subheader_value(state, desc)
         return indent + font.size(prefix)[0] + font.size(value)[0]
 
-    if kind in ACTION_PARAMETER_SUB_ROW_KINDS:
+    if _is_action_parameter_style(kind):
         prefix = _action_parameter_row_prefix(kind)
         value = _fit_action_parameter_row_value(
             font,
@@ -1672,7 +1676,7 @@ class TuningOverlay:
             )
             return _finish(surf, None, indent + surf.get_width())
 
-        if kind in ACTION_PARAMETER_SUB_ROW_KINDS:
+        if _is_action_parameter_style(kind):
             prefix = _action_parameter_row_prefix(kind)
             value = _fit_action_parameter_row_value(
                 font,

@@ -31,6 +31,7 @@ class RowKind(Enum):
     TRACK_USER_PRESET_ADD = auto()
     TRACK_PRESET_SWITCHING_ROTATION_SET = auto()
     TRACK_PRESET_SWITCHING_SHUFFLE = auto()
+    TRACK_PRESET_SWITCHING_SEED = auto()
     TRACK_PRESET_DURATION = auto()
     TRACK_SOFT_CUT_DURATION = auto()
     TRACK_EASTER_EGG = auto()
@@ -258,9 +259,20 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Shuffle",
         help_entries=(("Left/Right", "off / on"),),
         help_description=(
-            "When on, each auto switch picks a random preset from the rotation set",
-            "instead of the next in order. Preset position (N/X) may jump.",
-            "Manual Left/Right on the preset file row is unchanged.",
+            "When on, auto switching uses a fixed shuffled order",
+            "(same in live preview and offline render).",
+            "Use the seed row to roll a new order.",
+        ),
+    ),
+    RowKind.TRACK_PRESET_SWITCHING_SEED: RowBehavior(
+        RowAffordance.ACTION,
+        parent_group="track",
+        blocked_by_section_lock=True,
+        help_title="Seed",
+        help_entries=(("Enter", "generate a new seed"),),
+        help_description=(
+            "Current shuffle seed for this layer.",
+            "Enter rolls a new seed and rebuilds the shuffled preset order.",
         ),
     ),
     RowKind.TRACK_PRESET_DURATION: RowBehavior(
@@ -1036,11 +1048,6 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
 
 HEADER_ROW_KINDS = frozenset(k for k, b in ROW_BEHAVIORS.items() if b.is_header)
 REPEAT_ROW_KINDS = frozenset(k for k, b in ROW_BEHAVIORS.items() if b.repeatable)
-ACTION_PARAMETER_SUB_ROW_KINDS = frozenset(
-    k
-    for k, b in ROW_BEHAVIORS.items()
-    if b.affordance == RowAffordance.ACTION_PARAMETER and not b.is_header
-)
 ACTION_ROW_KINDS = frozenset(
     k for k, b in ROW_BEHAVIORS.items() if b.affordance == RowAffordance.ACTION
 )

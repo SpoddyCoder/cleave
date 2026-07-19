@@ -26,6 +26,7 @@ from cleave.viz.preset_switching import (
     apply_preset_switching,
     load_manual_preset_clean,
     reapply_projectm_preset_switching,
+    rebuild_timeline_preset_rotation_preserving_count,
     reset_projectm_preset_timer,
     restart_projectm_preset_timer,
 )
@@ -151,20 +152,29 @@ def test_apply_projectm_shuffle_enabled(
     mock_playlist_cls: MagicMock,
     _mock_milk: MagicMock,
 ) -> None:
+    from cleave.preset_rotation import first_shuffle_bag_order, layer_rotation_seed
+
     layer = _stem_layer(paths=_MILK)
     playlist = MagicMock()
     playlist.size.return_value = 3
     playlist.item.side_effect = lambda i: _MILK[i]
     mock_playlist_cls.create.return_value = playlist
+    salt = 11
+    seed = layer_rotation_seed(_MILK, slot="layer_1", shuffle_salt=salt)
+    ordered = first_shuffle_bag_order(_MILK, seed=seed)
 
     apply_preset_switching(
         layer,
         mode="projectm",
         rotation_set="directory",
         shuffle=True,
+        shuffle_salt=salt,
     )
 
-    playlist.set_shuffle.assert_called_once_with(True)
+    playlist.add_path.assert_not_called()
+    playlist.sort.assert_not_called()
+    playlist.add_presets.assert_called_once_with(ordered, allow_duplicates=True)
+    playlist.set_shuffle.assert_called_once_with(False)
 
 
 @patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
@@ -506,6 +516,96 @@ def test_advance_timeline_noop_when_timeline_disabled(_mock_milk: MagicMock) -> 
     advance_timeline_preset_switching(session, {"layer_1": layer}, 15.0)
     layer.pm.load_preset.assert_not_called()
     assert layer.timeline_switch_count == 0
+
+
+@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
+def test_rebuild_timeline_preserves_switch_count(_mock_milk: MagicMock) -> None:
+    layer = _stem_layer(paths=_MILK, index=0)
+    apply_preset_switching(
+        layer,
+        mode="timeline",
+        rotation_set="directory",
+        shuffle=True,
+        shuffle_salt=1,
+    )
+    layer.timeline_switch_count = 2
+    layer.rotation_anchor = 1
+    old_seed = layer.preset_rotation.seed
+    layer.pm.load_preset.reset_mock()
+
+    rebuild_timeline_preset_rotation_preserving_count(
+        layer,
+        rotation_set="directory",
+        shuffle=True,
+        shuffle_salt=2,
+    )
+
+    assert layer.timeline_switch_count == 2
+    assert layer.rotation_anchor == 1
+    assert layer.preset_rotation is not None
+    assert layer.preset_rotation.seed != old_seed
+    expected = layer.preset_rotation.path_for(2)
+    layer.pm.load_preset.assert_called_once_with(expected, smooth=False)
+
+
+@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
+def test_apply_timeline_shuffle_toggle_preserves_switch_count(
+    _mock_milk: MagicMock,
+) -> None:
+    """Re-apply while already in timeline (e.g. shuffle toggle) must not reset count."""
+    layer = _stem_layer(paths=_MILK, index=0)
+    apply_preset_switching(
+        layer,
+        mode="timeline",
+        rotation_set="directory",
+        shuffle=False,
+        shuffle_salt=7,
+    )
+    layer.timeline_switch_count = 2
+    layer.rotation_anchor = 0
+    seed_before = layer.preset_rotation.seed
+    layer.pm.load_preset.reset_mock()
+
+    apply_preset_switching(
+        layer,
+        mode="timeline",
+        rotation_set="directory",
+        shuffle=True,
+        shuffle_salt=7,
+    )
+
+    assert layer.timeline_switch_count == 2
+    assert layer.rotation_anchor == 0
+    assert layer.preset_rotation is not None
+    assert layer.preset_rotation.shuffle is True
+    assert layer.preset_rotation.seed == seed_before
+    expected = layer.preset_rotation.path_for(2)
+    layer.pm.load_preset.assert_called_once_with(expected, smooth=False)
+    assert expected != layer.preset_rotation.path_for(0)
+
+
+@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
+def test_apply_timeline_first_enable_still_resets_count(
+    _mock_milk: MagicMock,
+) -> None:
+    layer = _stem_layer(paths=_MILK, index=1)
+    layer.timeline_switch_count = 5
+    layer.rotation_anchor = 2
+    assert layer.preset_rotation is None
+
+    apply_preset_switching(
+        layer,
+        mode="timeline",
+        rotation_set="directory",
+        shuffle=True,
+        shuffle_salt=3,
+    )
+
+    assert layer.timeline_switch_count == 0
+    assert layer.rotation_anchor == 1
+    layer.pm.load_preset.assert_called_once_with(
+        layer.preset_rotation.path_for(0), smooth=False
+    )
 
 
 def test_tick_frame_core_advances_timeline_when_playing() -> None:

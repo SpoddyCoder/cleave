@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -40,6 +41,37 @@ def test_format_elapsed() -> None:
     assert _format_elapsed(0.4) == "0 mins 0 secs"
     assert _format_elapsed(65.4) == "1 mins 5 secs"
     assert _format_elapsed(3723.6) == "62 mins 4 secs"
+
+
+def test_cli_beat_detection_stem_choices_match_extract() -> None:
+    from cleave import cli
+    from cleave.extract import BEAT_DETECTION_STEM_CHOICES
+
+    assert cli.BEAT_DETECTION_STEM_CHOICES == BEAT_DETECTION_STEM_CHOICES
+
+
+def test_cli_import_and_build_parser_stay_light() -> None:
+    """Fresh process: import cli + build_parser must not load pygame/torch/librosa."""
+    repo_root = Path(__file__).resolve().parents[2]
+    script = """
+import sys
+from cleave.cli import build_parser
+
+build_parser()
+heavy = [name for name in ("pygame", "torch", "librosa") if name in sys.modules]
+if heavy:
+    raise SystemExit(f"unexpected heavy imports: {heavy}")
+"""
+    env = {**os.environ, "PYTHONPATH": str(repo_root)}
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+        cwd=str(repo_root),
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_separate_parser_uses_target_arg() -> None:
@@ -83,7 +115,7 @@ def test_cmd_separate_noop_when_complete(
     )
     (project / "signals.json").write_text('{"version": 3}')
 
-    with patch("cleave.cli.run_separate") as run_separate:
+    with patch("cleave.separate.run_separate") as run_separate:
         cmd_separate(build_parser().parse_args(["separate", "song"]))
 
     run_separate.assert_not_called()
@@ -112,7 +144,7 @@ def test_cmd_separate_does_not_noop_when_beat_stem_differs(
         '{"version": 3, "beat_detection_stem": "full_mix"}'
     )
 
-    with patch("cleave.cli.run_separate", return_value=project.resolve()) as run_separate:
+    with patch("cleave.separate.run_separate", return_value=project.resolve()) as run_separate:
         cmd_separate(
             build_parser().parse_args(["separate", "song", "-bds", "drums"])
         )
@@ -143,7 +175,7 @@ def test_cmd_separate_analyse_only_message(
     )
     signals_path = project / "signals.json"
 
-    with patch("cleave.cli.run_separate", return_value=project.resolve()):
+    with patch("cleave.separate.run_separate", return_value=project.resolve()):
         cmd_separate(build_parser().parse_args(["separate", "my-track"]))
 
     out = capsys.readouterr().out
@@ -170,7 +202,7 @@ def test_cmd_separate_force_message(
     )
     (project / "signals.json").write_text("{}")
 
-    with patch("cleave.cli.run_separate", return_value=project.resolve()):
+    with patch("cleave.separate.run_separate", return_value=project.resolve()):
         cmd_separate(build_parser().parse_args(["separate", "song", "--force"]))
 
     out = capsys.readouterr().out
@@ -263,7 +295,7 @@ def test_cmd_separate_high_quality_completion_message(
         demucs_model="htdemucs",
     )
 
-    with patch("cleave.cli.run_separate", return_value=project.resolve()):
+    with patch("cleave.separate.run_separate", return_value=project.resolve()):
         cmd_separate(build_parser().parse_args(["separate", "song", "-hq"]))
 
     out = capsys.readouterr().out
@@ -530,7 +562,7 @@ def test_cmd_play_calls_run_separate_when_incomplete(
     )
 
     with (
-        patch("cleave.cli.run_separate", return_value=project.resolve()) as run_separate,
+        patch("cleave.separate.run_separate", return_value=project.resolve()) as run_separate,
         patch("cleave.viz.launch"),
     ):
         cmd_play(build_parser().parse_args(["play", "my-track"]))
@@ -547,7 +579,7 @@ def test_cmd_play_forwards_high_quality_to_run_separate(
     project = _complete_project(tmp_path)
 
     with (
-        patch("cleave.cli.run_separate", return_value=project.resolve()) as run_separate,
+        patch("cleave.separate.run_separate", return_value=project.resolve()) as run_separate,
         patch("cleave.viz.launch"),
     ):
         cmd_play(build_parser().parse_args(["play", "my-track", "--high-quality"]))
@@ -564,7 +596,7 @@ def test_cmd_play_forwards_beat_detection_stem(
     project = _complete_project(tmp_path)
 
     with (
-        patch("cleave.cli.run_separate", return_value=project.resolve()) as run_separate,
+        patch("cleave.separate.run_separate", return_value=project.resolve()) as run_separate,
         patch("cleave.viz.launch"),
     ):
         cmd_play(
@@ -753,8 +785,8 @@ def test_cmd_scan_blocks_incomplete_report_without_resume(
     )
 
     with (
-        patch("cleave.cli.build_project_targets", return_value=targets),
-        patch("cleave.cli.run_scan") as run_scan_mock,
+        patch("cleave.preset_scan_targets.build_project_targets", return_value=targets),
+        patch("cleave.preset_scan.run_scan") as run_scan_mock,
     ):
         with pytest.raises(SystemExit) as exc_info:
             cmd_scan(
@@ -795,7 +827,7 @@ def test_cmd_scan_resume_rejects_complete_report(
         encoding="utf-8",
     )
 
-    with patch("cleave.cli.build_project_targets") as build_targets_mock:
+    with patch("cleave.preset_scan_targets.build_project_targets") as build_targets_mock:
         with pytest.raises(SystemExit) as exc_info:
             cmd_scan(
                 build_parser().parse_args(
@@ -885,8 +917,8 @@ def test_cmd_scan_project_mode_smoke(
 
     report_path = tmp_path / "scan-report.json"
     with (
-        patch("cleave.cli.build_project_targets", return_value=targets),
-        patch("cleave.cli.run_scan", return_value=preset_results),
+        patch("cleave.preset_scan_targets.build_project_targets", return_value=targets),
+        patch("cleave.preset_scan.run_scan", return_value=preset_results),
     ):
         cmd_scan(
             build_parser().parse_args(
@@ -918,8 +950,8 @@ def test_cmd_scan_bulk_mode_smoke(
     )
 
     with (
-        patch("cleave.cli.build_bulk_targets", return_value=targets),
-        patch("cleave.cli.run_scan", return_value=preset_results) as run_scan,
+        patch("cleave.preset_scan_targets.build_bulk_targets", return_value=targets),
+        patch("cleave.preset_scan.run_scan", return_value=preset_results) as run_scan,
     ):
         cmd_scan(
             build_parser().parse_args(
@@ -961,8 +993,8 @@ def test_cmd_scan_delete_requires_yes_without_tty(
     monkeypatch.setattr("sys.stdin.isatty", lambda: False)
 
     with (
-        patch("cleave.cli.build_bulk_targets", return_value=targets),
-        patch("cleave.cli.run_scan", return_value=preset_results),
+        patch("cleave.preset_scan_targets.build_bulk_targets", return_value=targets),
+        patch("cleave.preset_scan.run_scan", return_value=preset_results),
         pytest.raises(SystemExit) as exc_info,
     ):
         cmd_scan(
@@ -1005,8 +1037,8 @@ def test_cmd_scan_delete_with_yes(
     monkeypatch.setattr("sys.stdin.isatty", lambda: False)
 
     with (
-        patch("cleave.cli.build_bulk_targets", return_value=targets),
-        patch("cleave.cli.run_scan", return_value=preset_results),
+        patch("cleave.preset_scan_targets.build_bulk_targets", return_value=targets),
+        patch("cleave.preset_scan.run_scan", return_value=preset_results),
     ):
         cmd_scan(
             build_parser().parse_args(
@@ -1063,8 +1095,8 @@ def test_cmd_scan_include_flags_warn_without_destructive_action(
     )
 
     with (
-        patch("cleave.cli.build_bulk_targets", return_value=targets),
-        patch("cleave.cli.run_scan", return_value=preset_results),
+        patch("cleave.preset_scan_targets.build_bulk_targets", return_value=targets),
+        patch("cleave.preset_scan.run_scan", return_value=preset_results),
     ):
         cmd_scan(
             build_parser().parse_args(
@@ -1106,8 +1138,8 @@ def test_cmd_scan_delete_skips_dim_without_include_dim(
     monkeypatch.setattr("sys.stdin.isatty", lambda: False)
 
     with (
-        patch("cleave.cli.build_bulk_targets", return_value=targets),
-        patch("cleave.cli.run_scan", return_value=preset_results),
+        patch("cleave.preset_scan_targets.build_bulk_targets", return_value=targets),
+        patch("cleave.preset_scan.run_scan", return_value=preset_results),
     ):
         cmd_scan(
             build_parser().parse_args(

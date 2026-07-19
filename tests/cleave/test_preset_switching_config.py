@@ -17,6 +17,7 @@ from cleave.config_schema import (
     DEFAULT_PRESET_SWITCHING,
     DEFAULT_PRESET_SWITCHING_ROTATION_SET,
     DEFAULT_PRESET_SWITCHING_SHUFFLE,
+    DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT,
     DEFAULT_SOFT_CUT_DURATION,
     ParseCtx,
     parse_layers_section,
@@ -48,6 +49,7 @@ def test_parse_layers_preset_switching_defaults_omitted() -> None:
     assert layer.preset_switching == DEFAULT_PRESET_SWITCHING
     assert layer.preset_switching_rotation_set == DEFAULT_PRESET_SWITCHING_ROTATION_SET
     assert layer.preset_switching_shuffle == DEFAULT_PRESET_SWITCHING_SHUFFLE
+    assert layer.preset_switching_shuffle_salt == DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT
     assert layer.preset_duration == DEFAULT_PRESET_DURATION
     assert layer.soft_cut_duration == DEFAULT_SOFT_CUT_DURATION
     assert layer.hard_cut_duration == DEFAULT_HARD_CUT_DURATION
@@ -151,6 +153,7 @@ def test_persist_layers_omits_default_preset_switching() -> None:
     assert "preset_switching" not in out["layer_1"]
     assert "preset_switching_rotation_set" not in out["layer_1"]
     assert "preset_switching_shuffle" not in out["layer_1"]
+    assert "preset_switching_shuffle_salt" not in out["layer_1"]
     assert "preset_duration" not in out["layer_1"]
     assert "soft_cut_duration" not in out["layer_1"]
     assert "hard_cut_duration" not in out["layer_1"]
@@ -187,6 +190,28 @@ def test_persist_layers_writes_shuffle_when_enabled() -> None:
     session.layers["layer_1"].preset_switching_shuffle = True
     out = persist_layers(PersistCtx(cfg=cfg, session=session))
     assert out["layer_1"]["preset_switching_shuffle"] is True
+
+
+def test_parse_layers_preset_switching_shuffle_salt() -> None:
+    preset_root = Path("/tmp/presets")
+    data = {"layers": _layer_yaml()}
+    data["layers"]["layer_1"]["preset_switching_shuffle_salt"] = 42
+    layers = parse_layers_section(data, ParseCtx(preset_root=preset_root))
+    assert layers["layer_1"].preset_switching_shuffle_salt == 42
+
+
+def test_persist_layers_writes_shuffle_salt_when_nonzero() -> None:
+    cfg, session = _cfg_and_session(preset_switching="projectm")
+    session.layers["layer_1"].preset_switching_shuffle_salt = 99
+    out = persist_layers(PersistCtx(cfg=cfg, session=session))
+    assert out["layer_1"]["preset_switching_shuffle_salt"] == 99
+
+
+def test_persist_layers_omits_zero_shuffle_salt() -> None:
+    cfg, session = _cfg_and_session(preset_switching="projectm")
+    session.layers["layer_1"].preset_switching_shuffle_salt = 0
+    out = persist_layers(PersistCtx(cfg=cfg, session=session))
+    assert "preset_switching_shuffle_salt" not in out["layer_1"]
 
 
 def test_parse_layers_preset_switching_easter_egg_and_start_clean() -> None:

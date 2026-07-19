@@ -276,6 +276,30 @@ def test_timeline_reset_help_lists_choices() -> None:
     assert keyboard.entries == (("Enter", "reset timeline"),)
 
 
+def test_shuffle_help_describes_fixed_order() -> None:
+    sections = sections_for(RowKind.TRACK_PRESET_SWITCHING_SHUFFLE)
+    description = _description_section(sections)
+    assert description is not None
+    assert description.title == "Shuffle"
+    joined = " ".join(description.lines)
+    assert "fixed shuffled order" in joined
+    assert "seed row" in joined
+    keyboard = _keyboard_section(sections)
+    assert keyboard.entries == (("Left/Right", "off / on"),)
+
+
+def test_seed_help_describes_generate_action() -> None:
+    sections = sections_for(RowKind.TRACK_PRESET_SWITCHING_SEED)
+    description = _description_section(sections)
+    assert description is not None
+    assert description.title == "Seed"
+    joined = " ".join(description.lines)
+    assert "shuffle seed" in joined
+    assert "new seed" in joined
+    keyboard = _keyboard_section(sections)
+    assert keyboard.entries == (("Enter", "generate a new seed"),)
+
+
 def test_preview_quality_help_lists_modes() -> None:
     description = _description_section(sections_for(RowKind.SETTINGS_PREVIEW_QUALITY))
     assert description is not None

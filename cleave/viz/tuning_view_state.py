@@ -21,6 +21,7 @@ from cleave.config_schema import (
     DEFAULT_PRESET_START_CLEAN,
     DEFAULT_PRESET_DURATION,
     DEFAULT_PRESET_SWITCHING_SHUFFLE,
+    DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT,
     DEFAULT_SOFT_CUT_DURATION,
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_WIDTH,
@@ -63,6 +64,7 @@ class TrackBlock:
     preset_switching: str = "none"
     preset_switching_rotation_set: str = "directory"
     preset_switching_shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE
+    preset_switching_shuffle_salt: int = DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT
     preset_duration: float = DEFAULT_PRESET_DURATION
     soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION
     hard_cut_duration: float = DEFAULT_HARD_CUT_DURATION
@@ -438,6 +440,7 @@ class TuningViewStateBuilder:
                 preset_switching=layer.preset_switching,
                 preset_switching_rotation_set=layer.preset_switching_rotation_set,
                 preset_switching_shuffle=layer.preset_switching_shuffle,
+                preset_switching_shuffle_salt=layer.preset_switching_shuffle_salt,
                 preset_duration=layer.preset_duration,
                 soft_cut_duration=layer.soft_cut_duration,
                 hard_cut_duration=layer.hard_cut_duration,
@@ -557,6 +560,7 @@ class TuningViewStateBuilder:
                 blend_mode=layer.blend_mode,
                 opacity_pct=layer.opacity_pct,
                 beat_sensitivity=layer.beat_sensitivity,
+                preset_switching_shuffle_salt=layer.preset_switching_shuffle_salt,
                 preset_label=self._preset_label(
                     layer.playlist, user_names=user_names
                 ),

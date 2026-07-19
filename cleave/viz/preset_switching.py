@@ -13,12 +13,17 @@ from cleave.config_schema import (
     DEFAULT_PRESET_DURATION,
     DEFAULT_PRESET_START_CLEAN,
     DEFAULT_PRESET_SWITCHING_SHUFFLE,
+    DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT,
     DEFAULT_SOFT_CUT_DURATION,
     PresetSwitchingMode,
     PresetSwitchingRotationSet,
 )
 from cleave.preset_playlist import milk_files_in_dir
-from cleave.preset_rotation import PresetRotation, rotation_seed
+from cleave.preset_rotation import (
+    PresetRotation,
+    first_shuffle_bag_order,
+    layer_rotation_seed,
+)
 from cleave.projectm import ProjectM
 from cleave.projectm_playlist import ProjectMPlaylist
 from cleave.timeline import (
@@ -80,6 +85,7 @@ def reapply_projectm_preset_switching(
                 rotation_set=runtime.preset_switching_rotation_set,
                 user_presets=runtime.user_presets,
                 shuffle=runtime.preset_switching_shuffle,
+                shuffle_salt=runtime.preset_switching_shuffle_salt,
                 preset_duration=runtime.preset_duration,
                 soft_cut_duration=runtime.soft_cut_duration,
                 easter_egg=runtime.easter_egg,
@@ -109,6 +115,7 @@ def apply_preset_switching(
     rotation_set: PresetSwitchingRotationSet,
     user_presets: list[str] | None = None,
     shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE,
+    shuffle_salt: int = DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT,
     preset_duration: float = DEFAULT_PRESET_DURATION,
     soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION,
     easter_egg: float = DEFAULT_EASTER_EGG,
@@ -134,11 +141,24 @@ def apply_preset_switching(
         return
 
     if mode == "timeline":
+        # Already rotating: rebuild in place (shuffle/salt/paths) without
+        # resetting anchor or switch count. First enable still re-anchors.
+        if layer.preset_rotation is not None:
+            rebuild_timeline_preset_rotation_preserving_count(
+                layer,
+                rotation_set=rotation_set,
+                user_presets=user_presets,
+                shuffle=shuffle,
+                shuffle_salt=shuffle_salt,
+                preset_start_clean=preset_start_clean,
+            )
+            return
         _apply_timeline_preset_switching(
             layer,
             rotation_set=rotation_set,
             user_presets=user_presets,
             shuffle=shuffle,
+            shuffle_salt=shuffle_salt,
             preset_start_clean=preset_start_clean,
             on_empty=on_empty,
         )
@@ -156,26 +176,10 @@ def apply_preset_switching(
         hard_cut_sensitivity=hard_cut_sensitivity,
     )
 
-    if rotation_set == "user_defined":
-        paths = [Path(path) for path in (user_presets or [])]
-        if not paths:
-            layer.auto_preset_path = None
-            pm.lock_preset(True)
-            if on_empty is not None:
-                on_empty()
-            return
-
-        playlist = ProjectMPlaylist.create()
-        playlist.connect(pm, on_preset_loaded=_auto_preset_loaded_callback(layer))
-        playlist.add_presets(paths, allow_duplicates=True)
-        playlist.set_shuffle(shuffle)
-        layer.projectm_playlist = playlist
-        _sync_projectm_playlist_position(layer)
-        restart_projectm_preset_timer(layer)
-        return
-
-    preset_dir = layer.playlist.current_dir
-    if not milk_files_in_dir(preset_dir):
+    paths = _rotation_paths(
+        layer, rotation_set=rotation_set, user_presets=user_presets
+    )
+    if not paths:
         layer.auto_preset_path = None
         pm.lock_preset(True)
         if on_empty is not None:
@@ -184,10 +188,22 @@ def apply_preset_switching(
 
     playlist = ProjectMPlaylist.create()
     playlist.connect(pm, on_preset_loaded=_auto_preset_loaded_callback(layer))
-    playlist.add_path(preset_dir, recurse=False, allow_duplicates=False)
-    # Match Cleave browse order (sorted filenames); add_path uses readdir order.
-    playlist.sort()
-    playlist.set_shuffle(shuffle)
+    if shuffle:
+        seed = layer_rotation_seed(
+            paths, slot=layer.slot, shuffle_salt=shuffle_salt
+        )
+        ordered = first_shuffle_bag_order(paths, seed=seed)
+        playlist.add_presets(ordered, allow_duplicates=True)
+    elif rotation_set == "user_defined":
+        playlist.add_presets(paths, allow_duplicates=True)
+    else:
+        playlist.add_path(
+            layer.playlist.current_dir, recurse=False, allow_duplicates=False
+        )
+        # Match Cleave browse order (sorted filenames); add_path uses readdir order.
+        playlist.sort()
+    # Deterministic Cleave order when shuffle is on; never use libprojectM shuffle.
+    playlist.set_shuffle(False)
     layer.projectm_playlist = playlist
     _sync_projectm_playlist_position(layer)
     restart_projectm_preset_timer(layer)
@@ -221,6 +237,7 @@ def _apply_timeline_preset_switching(
     rotation_set: PresetSwitchingRotationSet,
     user_presets: list[str] | None,
     shuffle: bool,
+    shuffle_salt: int,
     preset_start_clean: bool,
     on_empty: Callable[[], None] | None,
 ) -> None:
@@ -245,10 +262,50 @@ def _apply_timeline_preset_switching(
     layer.preset_rotation = PresetRotation(
         paths=tuple(paths),
         shuffle=shuffle,
-        seed=rotation_seed(paths, salt=layer.slot),
+        seed=layer_rotation_seed(
+            paths, slot=layer.slot, shuffle_salt=shuffle_salt
+        ),
         anchor=anchor,
     )
     path = layer.preset_rotation.path_for(0)
+    if path is None:
+        return
+    _load_timeline_preset(layer, path, preset_start_clean=preset_start_clean)
+
+
+def rebuild_timeline_preset_rotation_preserving_count(
+    layer: StemLayer,
+    *,
+    rotation_set: PresetSwitchingRotationSet,
+    user_presets: list[str] | None = None,
+    shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE,
+    shuffle_salt: int = DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT,
+    preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN,
+) -> None:
+    """Rebuild timeline rotation; keep anchor and switch count.
+
+    Used after shuffle/salt changes (and other in-place timeline rebuilds) so the
+    active ``path_for(count)`` stays aligned with the playhead-derived count.
+    """
+    paths = _rotation_paths(
+        layer, rotation_set=rotation_set, user_presets=user_presets
+    )
+    if not paths:
+        _clear_timeline_rotation(layer)
+        layer.auto_preset_path = None
+        return
+
+    anchor = layer.rotation_anchor
+    count = layer.timeline_switch_count
+    layer.preset_rotation = PresetRotation(
+        paths=tuple(paths),
+        shuffle=shuffle,
+        seed=layer_rotation_seed(
+            paths, slot=layer.slot, shuffle_salt=shuffle_salt
+        ),
+        anchor=anchor,
+    )
+    path = layer.preset_rotation.path_for(count)
     if path is None:
         return
     _load_timeline_preset(layer, path, preset_start_clean=preset_start_clean)
@@ -350,6 +407,7 @@ def reanchor_timeline_preset_after_browse(
     rotation_set: PresetSwitchingRotationSet,
     user_presets: list[str] | None = None,
     shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE,
+    shuffle_salt: int = DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT,
 ) -> None:
     """Keep the browsed preset; next on-transition advances from the following entry."""
     pm = layer.pm
@@ -384,7 +442,9 @@ def reanchor_timeline_preset_after_browse(
     layer.preset_rotation = PresetRotation(
         paths=tuple(paths),
         shuffle=shuffle,
-        seed=rotation_seed(paths, salt=layer.slot),
+        seed=layer_rotation_seed(
+            paths, slot=layer.slot, shuffle_salt=shuffle_salt
+        ),
         anchor=anchor,
     )
 

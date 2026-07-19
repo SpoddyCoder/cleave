@@ -392,13 +392,19 @@ def test_builder_updates_shuffle_display_when_shuffle_changes() -> None:
 
     view_off = builder.build(paused=False)
     shuffle_row = RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_SHUFFLE, slot="layer_1")
+    seed_row = RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_SEED, slot="layer_1")
     assert shuffle_row in view_off.layout.rows
+    assert seed_row not in view_off.layout.rows
     assert view_off.tracks["layer_1"].preset_switching_shuffle is False
 
     session.layers["layer_1"].preset_switching_shuffle = True
     view_on = builder.build(paused=False)
     assert shuffle_row in view_on.layout.rows
+    assert seed_row in view_on.layout.rows
     assert view_on.tracks["layer_1"].preset_switching_shuffle is True
+    shuffle_idx = view_on.layout.rows.index(shuffle_row)
+    seed_idx = view_on.layout.rows.index(seed_row)
+    assert seed_idx == shuffle_idx + 1
 
 
 def test_minimal_view_state_still_builds_layout() -> None:

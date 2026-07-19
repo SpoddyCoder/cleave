@@ -137,11 +137,17 @@ PredicateFn = Callable[["TuningViewState", RowDescriptor], bool]
 
 @dataclass(frozen=True)
 class ConditionalRowsDef:
-    """Value-gated sibling rows (no expand arrow or expanded flag)."""
+    """Value-gated rows (no expand arrow or expanded flag).
+
+    By default children share the parent's tree depth (siblings of the gating
+    control). Set ``child_indent_offset`` to nest them visually under that
+    control (e.g. seed under shuffle).
+    """
 
     name: str
     predicate: PredicateFn
     children: tuple["SectionNode", ...]
+    child_indent_offset: int = 0
 
 
 @dataclass(frozen=True)
@@ -481,6 +487,12 @@ def _hard_cut_enabled(state: TuningViewState, desc: RowDescriptor) -> bool:
     return state.tracks[desc.slot].hard_cut_enabled
 
 
+def _preset_switching_shuffle_on(state: TuningViewState, desc: RowDescriptor) -> bool:
+    if desc.slot is None:
+        return False
+    return state.tracks[desc.slot].preset_switching_shuffle
+
+
 HARD_CUT_ENABLED = ConditionalRowsDef(
     name="hard_cut_enabled",
     predicate=_hard_cut_enabled,
@@ -488,6 +500,13 @@ HARD_CUT_ENABLED = ConditionalRowsDef(
         SectionNode(leaf_kind=RowKind.TRACK_HARD_CUT_DURATION),
         SectionNode(leaf_kind=RowKind.TRACK_HARD_CUT_SENSITIVITY),
     ),
+)
+
+PRESET_SWITCHING_SHUFFLE_ON = ConditionalRowsDef(
+    name="preset_switching_shuffle_on",
+    predicate=_preset_switching_shuffle_on,
+    children=(SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_SEED),),
+    child_indent_offset=1,
 )
 
 USER_PRESETS_SECTION = ExpandSectionDef(
@@ -526,6 +545,7 @@ TRACK_PRESET_SWITCHING_SECTION = ExpandSectionDef(
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET),
         SectionNode(conditional=PRESET_SWITCHING_USER_DEFINED),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_SHUFFLE),
+        SectionNode(conditional=PRESET_SWITCHING_SHUFFLE_ON),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_START_CLEAN),
         SectionNode(conditional=PRESET_SWITCHING_PROJECTM),
     ),
@@ -799,7 +819,11 @@ def _assign_indent_depth(
         elif child.expand is not None:
             _assign_expand_indent_depth(depths, child.expand, depth)
         elif child.conditional is not None:
-            _assign_indent_depth(depths, child.conditional.children, depth)
+            _assign_indent_depth(
+                depths,
+                child.conditional.children,
+                depth + child.conditional.child_indent_offset,
+            )
 
 
 def _assign_expand_indent_depth(
