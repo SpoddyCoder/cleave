@@ -43,11 +43,13 @@ def launch(
     from cleave.projectm import ProjectMLibraryError
     from cleave.viz.app import VisualizerApp, build_runtime_base
     from cleave.viz.bootstrap import resolve_config_path, resolve_mix_path
+    from cleave.viz.user_presets import cleanup_unreferenced_user_presets
 
     audio_path = resolve_mix_path(project_dir)
     config_path = resolve_config_path(config, project_dir)
 
     try:
+        cleanup_unreferenced_user_presets(project_dir)
         cfg = load_config(config_path, repo_root())
         playlists = scan_all_layers(cfg)
         runtime = build_runtime_base(cfg, project_dir, audio_path, playlists)

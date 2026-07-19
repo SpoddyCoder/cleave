@@ -34,7 +34,11 @@ from cleave.viz.tap_sync_controls import TapSyncControls, TapSyncUiSnapshot
 from cleave.viz.timeline_phase_controls import TimelinePhaseController
 from cleave.viz.timeline_preset_controls import TimelinePresetController
 from cleave.viz.timeline_snap_controls import TimelineSnapController
-from cleave.viz.user_presets import resolve_user_preset_dest, user_preset_item_display_name
+from cleave.viz.user_presets import (
+    resolve_user_preset_dest,
+    user_preset_item_display_name,
+    user_preset_referenced_on_disk,
+)
 from cleave.viz.focus_nav import (
     FocusCursor,
     MainFocus,
@@ -924,7 +928,14 @@ class TuningControls:
             except ValueError:
                 pass
             else:
-                if not self._user_preset_path_referenced(removed):
+                still_needed = self._user_preset_path_referenced(removed)
+                if not still_needed and self.project_dir is not None:
+                    still_needed = user_preset_referenced_on_disk(
+                        self.project_dir,
+                        removed_path,
+                        skip_config=self._config_save.active_config_path,
+                    )
+                if not still_needed:
                     removed_path.unlink(missing_ok=True)
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)
