@@ -3,16 +3,13 @@
 Aspirational ideas. Not scheduled; revisit when the core workflow feels solid.
 
 
-## Timeline v2
+## Undo feature
 
-Base: per-track lane model (`TimelineLane` / `SlotCue` in [cleave/timeline.py](../cleave/timeline.py); `timeline.lanes` in YAML). Tracks are isolated by construction.
+Session undo/redo for timeline and config edits.
 
-- Fade in/out on layer transitions (attach to `SlotCue`)
-- External timeline file for very long cue lists (per-lane snapshots)
-- Richer cue types as `SlotCue` subtypes; undo as per-lane snapshots
+## Timeline richer cue types
 
-Beat and downbeat accuracy, and sparse song anchors, are tracked in
-[todos.md](todos.md) (Beat grid and cue snap).
+Extend cues beyond visibility toggles so timeline events can control more layer and render parameters.
 
 ## MIDI out
 
