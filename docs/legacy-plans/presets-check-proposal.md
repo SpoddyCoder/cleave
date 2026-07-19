@@ -32,7 +32,7 @@ See [presets-scan-plan.md](presets-scan-plan.md) and [presets-scan-learnings.md]
 
 ### Live visualizer (shipped)
 
-Manual preset browse (`preset_switching` `none` or `user_defined`) forces a clean black boot so presets can be judged without feedback carry-over from the previous preset. Auto `projectm` rotation unchanged.
+Manual preset browse (`preset_switching` `none`, or `projectm` with `preset_switching_scope` `user_defined`) forces a clean black boot so presets can be judged without feedback carry-over from the previous preset. Auto `projectm` + `directory` rotation rebuilds the playlist on browse.
 
 | Result | Meaning | Default quarantine/delete |
 | --- | --- | --- |

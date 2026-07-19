@@ -20,6 +20,7 @@ from cleave.config_schema import (
     hard_cut_enabled_display,
     preset_start_clean_display,
     preset_switching_display,
+    preset_switching_scope_display,
     preset_switching_shuffle_display,
     ui_fade_display,
 )
@@ -359,7 +360,9 @@ def _format_track_preset_switching_mode(
 def _format_track_preset_switching_scope(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
-    return _track_block(state, desc).preset_switching_scope
+    return preset_switching_scope_display(
+        _track_block(state, desc).preset_switching_scope
+    )
 
 
 def _format_track_preset_duration(state: TuningViewState, desc: RowDescriptor) -> str:
@@ -1207,7 +1210,8 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
     RowKind.TRACK_PRESET_SWITCHING: RowFieldDef(
         panel_label="preset switching",
         present_style=RowPresentStyle.EXPAND_SUBHEADER,
-        apply_horizontal=_apply_expand_subheader,
+        format_value=_format_track_preset_switching_mode,
+        apply_horizontal=_apply_track_preset_switching_mode,
     ),
     RowKind.TRACK_EFFECTS_HEADER: RowFieldDef(
         panel_label="cleave effects",
@@ -1237,12 +1241,6 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_track_beat,
         apply_horizontal=_apply_track_beat,
-    ),
-    RowKind.TRACK_PRESET_SWITCHING_MODE: RowFieldDef(
-        panel_label="switching mode",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_track_preset_switching_mode,
-        apply_horizontal=_apply_track_preset_switching_mode,
     ),
     RowKind.TRACK_USER_PRESETS: RowFieldDef(
         panel_label="user presets",

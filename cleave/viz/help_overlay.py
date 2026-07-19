@@ -302,7 +302,7 @@ class HelpOverlay:
         paused: bool = False,
         timeline_recording: bool = False,
         timeline_override_active: bool = False,
-        preset_switching: str | None = None,
+        preset_switching_scope: str | None = None,
         preset_curation: bool = False,
     ) -> ComposedHelpPanel | None:
         self._panel_rect = None
@@ -314,7 +314,7 @@ class HelpOverlay:
             paused=paused,
             timeline_recording=timeline_recording,
             timeline_override_active=timeline_override_active,
-            preset_switching=preset_switching,
+            preset_switching_scope=preset_switching_scope,
             preset_curation=preset_curation,
         )
         sections = sections_for(
@@ -325,7 +325,7 @@ class HelpOverlay:
             paused=paused,
             timeline_recording=timeline_recording,
             timeline_override_active=timeline_override_active,
-            preset_switching=preset_switching,
+            preset_switching_scope=preset_switching_scope,
             preset_curation=preset_curation,
         )
         panel_w, panel_h = compute_help_panel_size(
@@ -415,7 +415,7 @@ class HelpOverlay:
         paused: bool = False,
         timeline_recording: bool = False,
         timeline_override_active: bool = False,
-        preset_switching: str | None = None,
+        preset_switching_scope: str | None = None,
         preset_curation: bool = False,
     ) -> None:
         composed = self.compose_panel(
@@ -427,7 +427,7 @@ class HelpOverlay:
             paused=paused,
             timeline_recording=timeline_recording,
             timeline_override_active=timeline_override_active,
-            preset_switching=preset_switching,
+            preset_switching_scope=preset_switching_scope,
             preset_curation=preset_curation,
         )
         if composed is None:

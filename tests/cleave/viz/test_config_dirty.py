@@ -108,10 +108,9 @@ def _mutate_preset_path(controls: TuningControls) -> None:
 
 def _mutate_preset_switching(controls: TuningControls) -> None:
     _expand_layer_1(controls)
-    controls.session.layers["layer_1"].preset_switching_expanded = True
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = view.layout.descriptor(
-        _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_MODE)
+        _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING)
     )
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 

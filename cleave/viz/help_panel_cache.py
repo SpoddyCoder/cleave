@@ -29,7 +29,7 @@ class HelpContentSignature:
     paused: bool
     timeline_recording: bool
     timeline_override_active: bool
-    preset_switching: str | None
+    preset_switching_scope: str | None
     preset_curation: bool = False
 
 
@@ -49,7 +49,7 @@ def help_content_signature(
     paused: bool,
     timeline_recording: bool,
     timeline_override_active: bool,
-    preset_switching: str | None,
+    preset_switching_scope: str | None,
     preset_curation: bool = False,
 ) -> HelpContentSignature:
     return HelpContentSignature(
@@ -60,7 +60,7 @@ def help_content_signature(
         paused=paused,
         timeline_recording=timeline_recording,
         timeline_override_active=timeline_override_active,
-        preset_switching=preset_switching,
+        preset_switching_scope=preset_switching_scope,
         preset_curation=preset_curation,
     )
 
@@ -245,11 +245,11 @@ def help_panel_max_dimensions(
         )
         for effect_id in effect_ids:
             for flags in _help_flag_variants():
-                for preset_switching in (None, "user_defined"):
+                for preset_switching_scope in (None, "user_defined"):
                     sections = sections_for(
                         row_kind,
                         effect_id=effect_id,
-                        preset_switching=preset_switching,
+                        preset_switching_scope=preset_switching_scope,
                         **flags,
                     )
                     panel_w, panel_h = compute_help_panel_size(

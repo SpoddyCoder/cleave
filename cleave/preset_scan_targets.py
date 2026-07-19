@@ -45,7 +45,7 @@ def build_project_targets(cfg: CleaveConfig) -> ScanTargets:
         for preset_path in milk_files_in_dir(anchor_dir):
             _register_preset(by_path, preset_path, slot)
 
-        if layer.preset_switching == "user_defined":
+        if layer.preset_switching_scope == "user_defined":
             for preset_path in layer.preset_switching_presets:
                 sources.append(preset_path)
                 _register_preset(by_path, preset_path, slot)

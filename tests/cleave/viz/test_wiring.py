@@ -13,7 +13,9 @@ from cleave.viz.wiring import make_tuning_controls
 from tests.support.viz import make_test_cfg, stub_playback_state
 
 
-def _session_with_mode(mode: str) -> TuningSession:
+def _session_with_mode(
+    mode: str, *, scope: str = "directory"
+) -> TuningSession:
     preset_root = Path("/tmp/presets")
     playlist = PresetPlaylist(
         current_dir=preset_root / "layer_1",
@@ -27,7 +29,8 @@ def _session_with_mode(mode: str) -> TuningSession:
                 playlist=playlist,
                 browse_floor=preset_root / "layer_1",
                 stem="drums",
-                preset_switching=mode,
+                preset_switching=mode,  # type: ignore[arg-type]
+                preset_switching_scope=scope,  # type: ignore[arg-type]
             )
         },
     )
@@ -74,8 +77,8 @@ def test_on_preset_change_rebuilds_rotation_in_projectm_mode() -> None:
     assert layer.auto_preset_path == playlist.current.resolve()
 
 
-def test_on_preset_change_loads_preset_in_user_defined_mode() -> None:
-    session = _session_with_mode("user_defined")
+def test_on_preset_change_loads_preset_in_user_defined_scope() -> None:
+    session = _session_with_mode("projectm", scope="user_defined")
     cfg = make_test_cfg(("layer_1",))
     pm = ProjectM.__new__(ProjectM)
     pm.lock_preset = MagicMock()

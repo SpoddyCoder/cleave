@@ -12,6 +12,7 @@ from cleave.config_schema import (
     HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES,
     PRESET_SWITCHING_MODE_HELP_ENTRIES,
+    PRESET_SWITCHING_SCOPE_HELP_ENTRIES,
     EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
 )
 from cleave.timeline_presets import (
@@ -25,7 +26,6 @@ class RowKind(Enum):
     TRACK_PRESET_DIR = auto()
     TRACK_PRESET = auto()
     TRACK_PRESET_SWITCHING = auto()
-    TRACK_PRESET_SWITCHING_MODE = auto()
     TRACK_USER_PRESETS = auto()
     TRACK_USER_PRESET_ITEM = auto()
     TRACK_USER_PRESET_ADD = auto()
@@ -200,21 +200,14 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         parent_group="track",
     ),
     RowKind.TRACK_PRESET_SWITCHING: RowBehavior(
-        RowAffordance.EXPAND,
-        is_sub_header=True,
-        parent_group="track",
-        help_title="Preset switching",
-        help_description=(
-            "Controls how and when presets change during playback.",
-        ),
-    ),
-    RowKind.TRACK_PRESET_SWITCHING_MODE: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
         parent_group="track",
-        help_title="Switching mode",
+        help_title="Preset switching",
         help_entries=(("Left/Right", "cycle mode"),),
-        help_description=(),
+        help_description=(
+            "Controls how and when presets change during playback.",
+        ),
         help_mode_entries=PRESET_SWITCHING_MODE_HELP_ENTRIES,
     ),
     RowKind.TRACK_USER_PRESETS: RowBehavior(
@@ -251,10 +244,9 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         RowAffordance.VALUE_STEP,
         parent_group="track",
         help_title="Preset switching scope",
-        help_entries=(("Left/Right", "directory only in v1"),),
-        help_description=(
-            "Which preset files are eligible when projectM switches.",
-        ),
+        help_entries=(("Left/Right", "cycle scope"),),
+        help_description=(),
+        help_mode_entries=PRESET_SWITCHING_SCOPE_HELP_ENTRIES,
     ),
     RowKind.TRACK_PRESET_SWITCHING_SHUFFLE: RowBehavior(
         RowAffordance.VALUE_STEP,

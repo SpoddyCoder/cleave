@@ -25,7 +25,7 @@ def test_help_content_signature_stable_for_same_inputs() -> None:
         paused=False,
         timeline_recording=False,
         timeline_override_active=False,
-        preset_switching=None,
+        preset_switching_scope=None,
     )
     sig_b = help_content_signature(
         focus,
@@ -34,7 +34,7 @@ def test_help_content_signature_stable_for_same_inputs() -> None:
         paused=False,
         timeline_recording=False,
         timeline_override_active=False,
-        preset_switching=None,
+        preset_switching_scope=None,
     )
     assert sig_a == sig_b
 
@@ -47,7 +47,7 @@ def test_help_content_signature_changes_on_focus_change() -> None:
         paused=False,
         timeline_recording=False,
         timeline_override_active=False,
-        preset_switching=None,
+        preset_switching_scope=None,
     )
     track = help_content_signature(
         RowDescriptor(RowKind.TRACK_HEADER, slot="layer_1"),
@@ -56,7 +56,7 @@ def test_help_content_signature_changes_on_focus_change() -> None:
         paused=False,
         timeline_recording=False,
         timeline_override_active=False,
-        preset_switching=None,
+        preset_switching_scope=None,
     )
     assert transport != track
 
@@ -73,7 +73,7 @@ def test_compose_panel_cpu_cache_hit_reuses_panel_surface() -> None:
         paused=False,
         timeline_recording=False,
         timeline_override_active=False,
-        preset_switching=None,
+        preset_switching_scope=None,
     )
 
     with patch.object(overlay, "_build_panel_surface", wraps=overlay._build_panel_surface) as build:
@@ -146,7 +146,7 @@ def test_help_upload_signature_uses_screen_rect_active_size() -> None:
         paused=False,
         timeline_recording=False,
         timeline_override_active=False,
-        preset_switching=None,
+        preset_switching_scope=None,
     )
     screen_rect = (1000, 10, 260, 180)
     upload_sig = help_upload_signature(content_sig, screen_rect, (260, 180))

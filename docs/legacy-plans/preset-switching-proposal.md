@@ -136,11 +136,11 @@ New fields per layer, parsed and persisted through [cleave/config_schema.py](cle
 layers:
   layer_1:
     preset: presets/drums/some-preset.milk
-    preset_switching: none          # none | projectm | user_defined
-    # projectM mode:
-    preset_switching_scope: directory   # directory | subtree
+    preset_switching: none          # none | projectm
+    # when projectm:
+    preset_switching_scope: directory   # directory | user_defined
     preset_switching_shuffle: false
-    # user_defined mode:
+    # when scope is user_defined:
     preset_switching_presets:
       - presets/drums/a.milk
       - presets/drums/b.milk
@@ -151,11 +151,11 @@ layers:
     # hard_cut_sensitivity: 2.0
 ```
 
-Defaults: `preset_switching: none`. Omit optional keys when they match defaults. `hard_cut_enabled` is not persisted; Cleave sets it to true whenever **projectM** or **user-defined** is active.
+Defaults: `preset_switching: none`, `preset_switching_scope: directory`. Omit optional keys when they match defaults. Timing/hard-cut apply whenever mode is **projectM**.
 
 ## Feature scope
 
-**none**, **projectM**, and **user-defined** are the complete feature set. There is no fourth Cleave-native cycling mode; instant stepping without Milkdrop blends is out of scope.
+Mode is on/off (`none` | `projectM`); scope selects the rotation set (`directory` | `user-defined`). There is no fourth Cleave-native cycling mode; instant stepping without Milkdrop blends is out of scope.
 
 ## Implementation notes
 

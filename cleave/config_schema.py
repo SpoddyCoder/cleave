@@ -29,22 +29,29 @@ DEFAULT_BEAT_SENSITIVITY = 2.0
 BEAT_SENSITIVITY_MIN = 0.0
 BEAT_SENSITIVITY_MAX = 5.0
 
-PresetSwitchingMode = Literal["none", "projectm", "user_defined"]
-PresetSwitchingScope = Literal["directory"]
+PresetSwitchingMode = Literal["none", "projectm"]
+PresetSwitchingScope = Literal["directory", "user_defined"]
 PRESET_SWITCHING_MODES: tuple[PresetSwitchingMode, ...] = (
     "none",
     "projectm",
-    "user_defined",
 )
 PRESET_SWITCHING_MODE_HELP_ENTRIES: tuple[tuple[PresetSwitchingMode, str], ...] = (
     ("none", "keeps the current preset indefinitely."),
     ("projectm", "libprojectM switches automatically using beat detection."),
+)
+PRESET_SWITCHING_SCOPES: tuple[PresetSwitchingScope, ...] = (
+    "directory",
+    "user_defined",
+)
+PRESET_SWITCHING_SCOPE_HELP_ENTRIES: tuple[
+    tuple[PresetSwitchingScope, str], ...
+] = (
+    ("directory", "rotate through Milkdrop presets in the current browse directory."),
     (
         "user_defined",
-        "cycles through a fixed list of presets defined in config.",
+        "rotate through a fixed list of presets defined in config.",
     ),
 )
-PRESET_SWITCHING_SCOPES: tuple[PresetSwitchingScope, ...] = ("directory",)
 DEFAULT_PRESET_SWITCHING: PresetSwitchingMode = "none"
 DEFAULT_PRESET_SWITCHING_SCOPE: PresetSwitchingScope = "directory"
 DEFAULT_PRESET_SWITCHING_SHUFFLE = False
@@ -454,9 +461,13 @@ def clamp_easter_egg(value: float) -> float:
 def preset_switching_display(mode: PresetSwitchingMode) -> str:
     if mode == "projectm":
         return "projectM"
-    if mode == "user_defined":
-        return "user-defined"
     return "none"
+
+
+def preset_switching_scope_display(scope: PresetSwitchingScope) -> str:
+    if scope == "user_defined":
+        return "user-defined"
+    return "directory"
 
 
 @dataclass(frozen=True)

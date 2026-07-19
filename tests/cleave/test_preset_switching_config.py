@@ -65,6 +65,26 @@ def test_parse_layers_preset_switching_projectm() -> None:
     assert layers["layer_1"].preset_switching == "projectm"
 
 
+def test_parse_layers_rejects_user_defined_mode() -> None:
+    import pytest
+
+    preset_root = Path("/tmp/presets")
+    data = {"layers": _layer_yaml()}
+    data["layers"]["layer_1"]["preset_switching"] = "user_defined"
+    with pytest.raises(ValueError, match="preset_switching"):
+        parse_layers_section(data, ParseCtx(preset_root=preset_root))
+
+
+def test_parse_layers_preset_switching_scope_user_defined() -> None:
+    preset_root = Path("/tmp/presets")
+    data = {"layers": _layer_yaml()}
+    data["layers"]["layer_1"]["preset_switching"] = "projectm"
+    data["layers"]["layer_1"]["preset_switching_scope"] = "user_defined"
+    layers = parse_layers_section(data, ParseCtx(preset_root=preset_root))
+    assert layers["layer_1"].preset_switching == "projectm"
+    assert layers["layer_1"].preset_switching_scope == "user_defined"
+
+
 def test_parse_layers_preset_switching_timing() -> None:
     preset_root = Path("/tmp/presets")
     data = {"layers": _layer_yaml()}
@@ -189,6 +209,14 @@ def test_persist_layers_writes_hard_cut_disabled() -> None:
     session.layers["layer_1"].hard_cut_enabled = False
     out = persist_layers(PersistCtx(cfg=cfg, session=session))
     assert out["layer_1"]["hard_cut_enabled"] is False
+
+
+def test_persist_layers_writes_user_defined_scope() -> None:
+    cfg, session = _cfg_and_session(preset_switching="projectm")
+    session.layers["layer_1"].preset_switching_scope = "user_defined"
+    out = persist_layers(PersistCtx(cfg=cfg, session=session))
+    assert out["layer_1"]["preset_switching"] == "projectm"
+    assert out["layer_1"]["preset_switching_scope"] == "user_defined"
 
 
 def test_persist_layers_writes_projectm_mode(tmp_path: Path) -> None:

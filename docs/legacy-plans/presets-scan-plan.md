@@ -71,10 +71,10 @@ cleave scan --presets-dir <dir> --texture-path <dir> [--texture-path ...] [optio
 
 Build the preset list from parsed [CleaveConfig](../../cleave/config.py) **on disk** (not live session). For each layer in `layer_z_order` (including **disabled** layers):
 
-1. **Anchor directory** — resolve `layers.<slot>.preset` under `paths.preset_root` via [scan_preset_playlist](../../cleave/preset_playlist.py); take `playlist.current_dir`. Collect all `*.milk` files **directly in that directory** (non-recursive), same as projectM rotation in [apply_preset_switching](../../cleave/viz/preset_switching.py) (`add_path(..., recurse=False)`).
+1. **Anchor directory** — resolve `layers.<slot>.preset` under `paths.preset_root` via [scan_preset_playlist](../../cleave/preset_playlist.py); take `playlist.current_dir`. Collect all `*.milk` files **directly in that directory** (non-recursive), same as projectM directory rotation in [apply_preset_switching](../../cleave/viz/preset_switching.py) (`add_path(..., recurse=False)`).
 2. **Include anchor directory even when `preset_switching` is `none`** — user may enable projectM later; scanning only the locked file would miss siblings they will rotate into.
-3. **projectM rotation** — when `preset_switching` is `projectm`, step 1 already matches live rotation (`scope == "directory"` today).
-4. **User-defined rotation** — when `preset_switching` is `user_defined`, add every path in `layers.<slot>.preset_switching_presets` (resolved relative to project dir per [config_schema](../../cleave/config_schema.py)).
+3. **projectM directory rotation** — when `preset_switching` is `projectm` and `preset_switching_scope` is `directory`, step 1 already matches live rotation.
+4. **User-defined rotation** — when `preset_switching_scope` is `user_defined`, add every path in `layers.<slot>.preset_switching_presets` (resolved relative to project dir per [config_schema](../../cleave/config_schema.py)).
 5. **Deduplicate** by resolved absolute `.milk` path. Keep metadata: which layer slot(s) referenced each file.
 
 Do **not** scan `browse_floor`, full `preset_root`, or subfolders under the anchor directory unless bulk mode with `--recursive`.
