@@ -15,7 +15,7 @@ from cleave.config import (
 from cleave.config_schema import (
     DEFAULT_BEAT_SENSITIVITY,
     DEFAULT_PRESET_SWITCHING,
-    DEFAULT_PRESET_SWITCHING_SCOPE,
+    DEFAULT_PRESET_SWITCHING_ROTATION_SET,
     DEFAULT_PRESET_SWITCHING_SHUFFLE,
     DEFAULT_PRESET_DURATION,
     DEFAULT_SOFT_CUT_DURATION,
@@ -31,7 +31,7 @@ from cleave.config_schema import (
     HighlightRolloffApplyMode,
     HighlightRolloffCurve,
     PresetSwitchingMode,
-    PresetSwitchingScope,
+    PresetSwitchingRotationSet,
     TimelinePlacementSnap,
     default_render_overlay_runtime_values,
     default_highlight_rolloff_runtime_values,
@@ -227,7 +227,7 @@ class LayerRuntime:
     expanded: bool = False
     locked: bool = False
     preset_switching: PresetSwitchingMode = DEFAULT_PRESET_SWITCHING
-    preset_switching_scope: PresetSwitchingScope = DEFAULT_PRESET_SWITCHING_SCOPE
+    preset_switching_rotation_set: PresetSwitchingRotationSet = DEFAULT_PRESET_SWITCHING_ROTATION_SET
     preset_switching_shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE
     preset_duration: float = DEFAULT_PRESET_DURATION
     soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION
@@ -397,7 +397,7 @@ def session_from_cfg(
                 enabled=layer_cfg.enabled,
                 locked=layer_cfg.locked,
                 preset_switching=layer_cfg.preset_switching,
-                preset_switching_scope=layer_cfg.preset_switching_scope,
+                preset_switching_rotation_set=layer_cfg.preset_switching_rotation_set,
                 preset_switching_shuffle=layer_cfg.preset_switching_shuffle,
                 preset_duration=layer_cfg.preset_duration,
                 soft_cut_duration=layer_cfg.soft_cut_duration,

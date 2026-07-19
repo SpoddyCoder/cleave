@@ -20,7 +20,7 @@ from cleave.config_schema import (
     hard_cut_enabled_display,
     preset_start_clean_display,
     preset_switching_display,
-    preset_switching_scope_display,
+    preset_switching_rotation_set_display,
     preset_switching_shuffle_display,
     ui_fade_display,
 )
@@ -357,11 +357,11 @@ def _format_track_preset_switching_mode(
     return preset_switching_display(_track_block(state, desc).preset_switching)
 
 
-def _format_track_preset_switching_scope(
+def _format_track_preset_switching_rotation_set(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
-    return preset_switching_scope_display(
-        _track_block(state, desc).preset_switching_scope
+    return preset_switching_rotation_set_display(
+        _track_block(state, desc).preset_switching_rotation_set
     )
 
 
@@ -596,7 +596,7 @@ def _apply_track_preset_switching_mode(
     controls._cycle_preset_switching(desc.slot, forward=forward)
 
 
-def _apply_track_preset_switching_scope(
+def _apply_track_preset_switching_rotation_set(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
@@ -605,7 +605,7 @@ def _apply_track_preset_switching_scope(
 ) -> None:
     if desc.slot is None:
         return
-    controls._cycle_preset_switching_scope(desc.slot, forward=forward)
+    controls._cycle_preset_switching_rotation_set(desc.slot, forward=forward)
 
 
 def _apply_track_preset_duration(
@@ -1258,11 +1258,11 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.FULL_LINE,
         apply_horizontal=_noop_horizontal,
     ),
-    RowKind.TRACK_PRESET_SWITCHING_SCOPE: RowFieldDef(
-        panel_label="scope",
+    RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET: RowFieldDef(
+        panel_label="rotation set",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_track_preset_switching_scope,
-        apply_horizontal=_apply_track_preset_switching_scope,
+        format_value=_format_track_preset_switching_rotation_set,
+        apply_horizontal=_apply_track_preset_switching_rotation_set,
     ),
     RowKind.TRACK_PRESET_SWITCHING_SHUFFLE: RowFieldDef(
         panel_label="shuffle",

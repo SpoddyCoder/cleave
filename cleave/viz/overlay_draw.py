@@ -95,11 +95,11 @@ def _present_overlay(
 
 def _help_compose_kwargs(view_state: TuningViewState) -> dict[str, object]:
     focus = view_state.focus_descriptor
-    preset_switching_scope = None
+    preset_switching_rotation_set = None
     if focus.slot is not None:
         track = view_state.tracks.get(focus.slot)
         if track is not None:
-            preset_switching_scope = track.preset_switching_scope
+            preset_switching_rotation_set = track.preset_switching_rotation_set
     return {
         "focus": focus,
         "timeline_enabled": view_state.render_timeline.enabled,
@@ -107,7 +107,7 @@ def _help_compose_kwargs(view_state: TuningViewState) -> dict[str, object]:
         "paused": view_state.paused,
         "timeline_recording": view_state.timeline_recording,
         "timeline_override_active": view_state.timeline_override_active,
-        "preset_switching_scope": preset_switching_scope,
+        "preset_switching_rotation_set": preset_switching_rotation_set,
         "preset_curation": view_state.settings.editor_mode == "preset_curation",
     }
 

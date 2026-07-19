@@ -64,7 +64,7 @@ def test_labeled_row_prefix_settings_children() -> None:
 
 def test_labeled_row_prefix_track_depths() -> None:
     assert labeled_row_prefix(RowKind.TRACK_STEM) == "└─ driving stem: "
-    assert labeled_row_prefix(RowKind.TRACK_PRESET_SWITCHING_SCOPE) == "  └─ scope: "
+    assert labeled_row_prefix(RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET) == "  └─ rotation set: "
 
 
 def test_format_row_value_settings() -> None:

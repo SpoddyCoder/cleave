@@ -15,7 +15,7 @@ from cleave.config_schema import (
     DEFAULT_PRESET_SWITCHING_SHUFFLE,
     DEFAULT_SOFT_CUT_DURATION,
     PresetSwitchingMode,
-    PresetSwitchingScope,
+    PresetSwitchingRotationSet,
 )
 from cleave.preset_playlist import milk_files_in_dir
 from cleave.projectm import ProjectM
@@ -61,7 +61,7 @@ def reapply_projectm_preset_switching(
             apply_preset_switching(
                 layer,
                 mode=runtime.preset_switching,
-                scope=runtime.preset_switching_scope,
+                rotation_set=runtime.preset_switching_rotation_set,
                 user_presets=runtime.user_presets,
                 shuffle=runtime.preset_switching_shuffle,
                 preset_duration=runtime.preset_duration,
@@ -90,7 +90,7 @@ def apply_preset_switching(
     layer: StemLayer,
     *,
     mode: PresetSwitchingMode,
-    scope: PresetSwitchingScope,
+    rotation_set: PresetSwitchingRotationSet,
     user_presets: list[str] | None = None,
     shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE,
     preset_duration: float = DEFAULT_PRESET_DURATION,
@@ -126,7 +126,7 @@ def apply_preset_switching(
         hard_cut_sensitivity=hard_cut_sensitivity,
     )
 
-    if scope == "user_defined":
+    if rotation_set == "user_defined":
         paths = [Path(path) for path in (user_presets or [])]
         if not paths:
             layer.auto_preset_path = None

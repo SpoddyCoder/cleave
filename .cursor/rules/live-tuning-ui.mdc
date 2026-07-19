@@ -11,7 +11,7 @@ The focus-driven tree panel ([cleave/viz/tuning_panel_draw.py](cleave/viz/tuning
 **Collapsible UI lexicon** (full inventory and recipes: [docs/legacy-plans/collapsable-sections-refactor.md](docs/legacy-plans/collapsable-sections-refactor.md)):
 
 - **Expandable section** — header with expand arrow; Left/Right toggles a session-only `expanded` flag; children live in `RowLayout` and are omitted when collapsed.
-- **Conditional rows** — sibling rows shown or hidden by a value predicate (e.g. `preset_switching_projectm`, `hard_cut_enabled`); no arrow or expanded flag.
+- **Conditional rows** — sibling rows shown or hidden by a value predicate (e.g. `preset_switching_user_defined`, `hard_cut_enabled`); no arrow or expanded flag.
 - **Panel anchor** — header looks like an expandable section but content lives in a separate host (timeline strip); registered as `PanelAnchorDef` in `row_sections.py`.
 
 **Layout structure cache:** `RowLayout` is rebuilt only when `view_state_structure_signature()` in [cleave/viz/tuning_view_state.py](cleave/viz/tuning_view_state.py) changes. Conditional rows are included or omitted at **build time** via `ConditionalRowsDef` predicates in [cleave/viz/row_sections.py](cleave/viz/row_sections.py), not on every frame. When a new conditional group is gated by a session or view field, add that field to the signature (same pattern as `preset_switching` on layers or `highlight_rolloff_mode` under `render_post_fx`). Omit value-only fields that do not add or remove rows (e.g. `threshold_pct`). Add a `test_structure_signature_invalidates_on_*` test in [tests/cleave/viz/test_view_state_structure.py](tests/cleave/viz/test_view_state_structure.py). Expandable sections already invalidate via their `*_expanded` flags in the signature.

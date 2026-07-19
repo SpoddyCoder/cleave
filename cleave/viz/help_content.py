@@ -283,7 +283,7 @@ def sections_for(
     paused: bool = False,
     timeline_recording: bool = False,
     timeline_override_active: bool = False,
-    preset_switching_scope: str | None = None,
+    preset_switching_rotation_set: str | None = None,
     preset_curation: bool = False,
 ) -> tuple[HelpContent, ...]:
     nav = navigation_section(preset_curation=preset_curation)
@@ -335,11 +335,11 @@ def sections_for(
         primary = _USER_PRESET_ADD_SECTION
     elif behavior.affordance == RowAffordance.PATH_DIR:
         primary = _preset_dir_section(
-            user_defined=preset_switching_scope == "user_defined"
+            user_defined=preset_switching_rotation_set == "user_defined"
         )
     elif behavior.affordance == RowAffordance.PATH_PRESET:
         primary = _preset_section(
-            user_defined=preset_switching_scope == "user_defined"
+            user_defined=preset_switching_rotation_set == "user_defined"
         )
     elif behavior.affordance == RowAffordance.SEEK:
         primary = _TRANSPORT_SECTION

@@ -48,8 +48,8 @@ Every collapsible or gated instance in the live tuning UI today, mapped to the l
 | Layer N: STEM | Expandable section | `LayerRuntime.expanded` | `TRACK_HEADER` | 0 (per slot) | Toggle `_set_expanded`; children via `TRACK_SECTION` tree walk |
 | preset switching | Expandable section | `LayerRuntime.preset_switching_expanded` | `TRACK_PRESET_SWITCHING` | 1 | Toggle `_set_preset_switching_expanded`; submenu **build-time** omit |
 | switching mode | Child (expandable) | (parent gates) | `TRACK_PRESET_SWITCHING_MODE` | 2 | Build-time when `preset_switching_expanded`; runtime track ancestor gate |
-| preset switching scope | Conditional | `LayerRuntime.preset_switching` | `TRACK_PRESET_SWITCHING_SCOPE` | 2 | Build-time `preset_switching == "projectm"` |
-| user presets | Conditional | `LayerRuntime.preset_switching_scope` | `TRACK_USER_PRESETS` | 2 | Build-time `preset_switching_scope == "user_defined"` |
+| rotation set | Conditional | `LayerRuntime.preset_switching` | `TRACK_PRESET_SWITCHING_ROTATION_SET` | 2 | Build-time `preset_switching == "projectm"` |
+| user presets | Conditional | `LayerRuntime.preset_switching_rotation_set` | `TRACK_USER_PRESETS` | 2 | Build-time `preset_switching_rotation_set == "user_defined"` |
 | preset duration | Conditional | `LayerRuntime.preset_switching` | `TRACK_PRESET_DURATION` | 2 | Build-time `preset_switching == "projectm"` |
 | soft cut | Conditional | `LayerRuntime.preset_switching` | `TRACK_SOFT_CUT_DURATION` | 2 | Build-time `preset_switching == "projectm"` |
 | easter egg | Conditional | `LayerRuntime.preset_switching` | `TRACK_EASTER_EGG` | 2 | Build-time `preset_switching == "projectm"` |
@@ -184,8 +184,8 @@ Execute in order; keep unit tests green after each step.
   | Predicate name | Condition |
   | --- | --- |
   | `preset_switching_submenu_open` | `preset_switching_expanded` (expand gate, not value) |
-  | `preset_switching_projectm` | `preset_switching == "projectm"` (scope row) |
-  | `preset_switching_user_defined` | `preset_switching_scope == "user_defined"` |
+  | `preset_switching_projectm` | `preset_switching == "projectm"` (rotation set and timing children) |
+  | `preset_switching_user_defined` | `preset_switching_rotation_set == "user_defined"` |
   | `preset_switching_auto` | `preset_switching == "projectm"` (shuffle + timing) |
   | `hard_cut_enabled` | `hard_cut_enabled` |
 

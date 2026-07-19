@@ -55,7 +55,7 @@ def test_track_layout_collapsed_layer() -> None:
 def test_track_layout_collapsed_preset_switching() -> None:
     kinds = _track_row_kinds(preset_switching="none")
     assert RowKind.TRACK_PRESET_SWITCHING in kinds
-    assert RowKind.TRACK_PRESET_SWITCHING_SCOPE not in kinds
+    assert RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET not in kinds
     assert RowKind.TRACK_PRESET_DURATION not in kinds
 
 
@@ -77,7 +77,7 @@ def test_track_layout_conditional_rows_when_predicates_pass() -> None:
 
     user_defined_kinds = _track_row_kinds(
         preset_switching="projectm",
-        preset_switching_scope="user_defined",
+        preset_switching_rotation_set="user_defined",
         hard_cut_enabled=True,
         effects_expanded=False,
     )
@@ -85,7 +85,7 @@ def test_track_layout_conditional_rows_when_predicates_pass() -> None:
     assert RowKind.TRACK_PRESET_SWITCHING_SHUFFLE in user_defined_kinds
     assert RowKind.TRACK_HARD_CUT_ENABLED in user_defined_kinds
     assert RowKind.TRACK_HARD_CUT_DURATION in user_defined_kinds
-    assert RowKind.TRACK_PRESET_SWITCHING_SCOPE in user_defined_kinds
+    assert RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET in user_defined_kinds
     assert RowKind.TRACK_USER_PRESETS in user_defined_kinds
 
 
@@ -116,7 +116,7 @@ def test_track_layout_row_order_when_fully_expanded() -> None:
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
         RowKind.TRACK_PRESET_SWITCHING,
-        RowKind.TRACK_PRESET_SWITCHING_SCOPE,
+        RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET,
         RowKind.TRACK_PRESET_SWITCHING_SHUFFLE,
         RowKind.TRACK_PRESET_DURATION,
         RowKind.TRACK_EASTER_EGG,
@@ -209,8 +209,10 @@ def test_layout_includes_conditional_rows_when_predicates_pass() -> None:
 
 
 def test_section_header_from_tree_preset_switching_submenu() -> None:
-    scope = RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_SCOPE, slot="layer_1")
-    assert section_header_from_section_tree(scope) == RowDescriptor(
+    rotation_set = RowDescriptor(
+        RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET, slot="layer_1"
+    )
+    assert section_header_from_section_tree(rotation_set) == RowDescriptor(
         RowKind.TRACK_PRESET_SWITCHING, slot="layer_1"
     )
     hard_cut = RowDescriptor(RowKind.TRACK_HARD_CUT_SENSITIVITY, slot="layer_1")

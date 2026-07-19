@@ -202,7 +202,7 @@ class LayerFramePipeline:
         apply_preset_switching(
             layer,
             mode=layer_cfg.preset_switching,
-            scope=layer_cfg.preset_switching_scope,
+            rotation_set=layer_cfg.preset_switching_rotation_set,
             user_presets=[
                 str(path) for path in layer_cfg.preset_switching_presets
             ],

@@ -11,7 +11,7 @@ import pygame
 
 from cleave.config import CleaveConfig, clamp_beat_sensitivity, clamp_effect_pct
 from cleave.config_schema import clamp_easter_egg
-from cleave.config_schema import PRESET_SWITCHING_MODES, PRESET_SWITCHING_SCOPES
+from cleave.config_schema import PRESET_SWITCHING_MODES, PRESET_SWITCHING_ROTATION_SETS
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.extract import STEM_SOURCES
 from cleave.song_markers import format_marker_time, place_marker
@@ -472,7 +472,7 @@ class TuningControls:
             if (
                 slot is not None
                 and kind in {RowKind.TRACK_PRESET_DIR, RowKind.TRACK_PRESET}
-                and self.session.layers[slot].preset_switching_scope
+                and self.session.layers[slot].preset_switching_rotation_set
                 == "user_defined"
             ):
                 if section_lock_blocks_mutation(
@@ -1027,18 +1027,18 @@ class TuningControls:
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)
 
-    def _cycle_preset_switching_scope(self, slot: str, *, forward: bool) -> None:
+    def _cycle_preset_switching_rotation_set(self, slot: str, *, forward: bool) -> None:
         layer = self.session.layers[slot]
-        scopes = PRESET_SWITCHING_SCOPES
+        rotation_sets = PRESET_SWITCHING_ROTATION_SETS
         try:
-            index = scopes.index(layer.preset_switching_scope)
+            index = rotation_sets.index(layer.preset_switching_rotation_set)
         except ValueError:
             index = 0
         if forward:
-            layer.preset_switching_scope = scopes[(index + 1) % len(scopes)]
+            layer.preset_switching_rotation_set = rotation_sets[(index + 1) % len(rotation_sets)]
         else:
-            layer.preset_switching_scope = scopes[(index - 1) % len(scopes)]
-        if layer.preset_switching_scope == "user_defined":
+            layer.preset_switching_rotation_set = rotation_sets[(index - 1) % len(rotation_sets)]
+        if layer.preset_switching_rotation_set == "user_defined":
             layer.user_presets_expanded = True
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)

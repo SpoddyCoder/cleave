@@ -12,7 +12,7 @@ from cleave.config_schema import (
     HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES,
     PRESET_SWITCHING_MODE_HELP_ENTRIES,
-    PRESET_SWITCHING_SCOPE_HELP_ENTRIES,
+    PRESET_SWITCHING_ROTATION_SET_HELP_ENTRIES,
     EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
 )
 from cleave.timeline_presets import (
@@ -29,7 +29,7 @@ class RowKind(Enum):
     TRACK_USER_PRESETS = auto()
     TRACK_USER_PRESET_ITEM = auto()
     TRACK_USER_PRESET_ADD = auto()
-    TRACK_PRESET_SWITCHING_SCOPE = auto()
+    TRACK_PRESET_SWITCHING_ROTATION_SET = auto()
     TRACK_PRESET_SWITCHING_SHUFFLE = auto()
     TRACK_PRESET_DURATION = auto()
     TRACK_SOFT_CUT_DURATION = auto()
@@ -240,13 +240,13 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "U on the preset dir or preset file row is the same action.",
         ),
     ),
-    RowKind.TRACK_PRESET_SWITCHING_SCOPE: RowBehavior(
+    RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET: RowBehavior(
         RowAffordance.VALUE_STEP,
         parent_group="track",
-        help_title="Preset switching scope",
-        help_entries=(("Left/Right", "cycle scope"),),
+        help_title="Rotation set",
+        help_entries=(("Left/Right", "cycle rotation set"),),
         help_description=(),
-        help_mode_entries=PRESET_SWITCHING_SCOPE_HELP_ENTRIES,
+        help_mode_entries=PRESET_SWITCHING_ROTATION_SET_HELP_ENTRIES,
     ),
     RowKind.TRACK_PRESET_SWITCHING_SHUFFLE: RowBehavior(
         RowAffordance.VALUE_STEP,
