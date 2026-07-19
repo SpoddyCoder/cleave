@@ -429,7 +429,8 @@ def test_repeated_compose_panel_near_zero_font_renders_when_idle() -> None:
     )
 
     assert counters.font_renders <= 8
-    assert counters.surface_builds == 0
+    # Live FPS is a two-tone label+value composite; one surface per idle patch.
+    assert counters.surface_builds == 2
 
 
 def test_row_cache_hits_on_full_recompose_with_warm_cache() -> None:

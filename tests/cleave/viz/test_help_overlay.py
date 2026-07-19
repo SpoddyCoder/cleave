@@ -411,7 +411,7 @@ def test_user_preset_add_help() -> None:
     assert description is not None
     assert description.title == "Add Current Preset"
     assert dict(keyboard.entries)["Enter"] == "add current preset"
-    assert any("+" in line and "preset dir" in line for line in description.lines)
+    assert any("U" in line and "preset dir" in line for line in description.lines)
 
 
 def test_navigable_row_kinds_have_help_sections() -> None:
