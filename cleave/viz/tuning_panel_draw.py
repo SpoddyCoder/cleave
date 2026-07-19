@@ -17,6 +17,7 @@ from cleave.viz.row_fields import (
     RowPresentStyle,
     composite_header_prefix_part,
     composite_header_suffix_part,
+    editor_mode_confirm_pending,
     expand_subheader_prefix,
     format_composite_header_expand_value,
     format_expand_subheader_value,
@@ -62,7 +63,6 @@ from cleave.viz.playback import format_mmss
 from cleave.viz.material_icons import (
     FILE_GLYPH,
     FOLDER_GLYPH,
-    KEYBOARD_RETURN_GLYPH,
     LOCK_GLYPH,
     SETTINGS_GLYPH,
     VISIBILITY_GLYPH,
@@ -70,6 +70,7 @@ from cleave.viz.material_icons import (
     VISIBILITY_ICON_PAD_X,
     action_enter_icon_suffix_width,
     material_font,
+    render_action_enter_icon,
     render_glyph,
     render_transport_icons,
     row_icon_prefix_width,
@@ -161,13 +162,21 @@ ROW_ICON_SUFFIX_GAP = _tuning_ui.row_icon_suffix_gap
 
 
 def _row_shows_action_enter_hint(state: TuningViewState, index: int) -> bool:
-    """Focused ACTION rows that are activatable show a keyboard-return suffix."""
+    """Focused ACTION rows that are activatable show a return-corner suffix."""
     kind = state.layout.kind(index)
     if kind not in ACTION_ROW_KINDS:
         return False
     if not _row_has_tree_focus(state, index):
         return False
     return _row_value_color(state, index) == HIGHLIGHT
+
+
+def _row_shows_enter_icon(state: TuningViewState, index: int) -> bool:
+    """Return-corner suffix for ACTION rows or staged editor-mode confirm."""
+    if _row_shows_action_enter_hint(state, index):
+        return True
+    kind = state.layout.kind(index)
+    return kind == RowKind.SETTINGS_EDITOR_MODE and editor_mode_confirm_pending(state)
 
 
 def _append_action_enter_icon(
@@ -177,9 +186,7 @@ def _append_action_enter_icon(
     line_height: int,
     counters: OverlayDrawCounters | None = None,
 ) -> pygame.Surface:
-    icon = render_glyph(
-        KEYBOARD_RETURN_GLYPH, color=color, line_height=line_height
-    )
+    icon = render_action_enter_icon(color=color, line_height=line_height)
     gap = ROW_ICON_SUFFIX_GAP
     out = _compose_surface(
         (surf.get_width() + gap + icon.get_width(), line_height),
@@ -279,11 +286,13 @@ def _fit_action_parameter_row_value(
 ) -> str:
     value = _action_parameter_row_value(state, index)
     # Flexible mode sizes the panel to content; keep the full value so chrome like
-    # editor-mode "[Enter to confirm]" can widen the panel past ui_width max.
+    # the editor-mode return-corner icon can widen the panel past ui_width max.
     if state.settings.ui_width_mode == "flexible":
         return value
     budget = max_content_width - _row_indent(state, index)
     budget -= font.size(_action_parameter_row_prefix(state.layout.kind(index)))[0]
+    if _row_shows_enter_icon(state, index):
+        budget -= action_enter_icon_suffix_width(font.get_linesize())
     if cache is None:
         return fit_text_to_width(font, value, budget)
     return cache.fit_text_cached("text", fit_text_to_width, font, value, budget)
@@ -1018,7 +1027,7 @@ def _estimate_row_content_width(
         max_content_width=max_content_width,
         line_h=line_h,
     )
-    if _row_shows_action_enter_hint(state, index):
+    if _row_shows_enter_icon(state, index):
         width += action_enter_icon_suffix_width(line_h)
     return width
 
@@ -1662,13 +1671,26 @@ class TuningOverlay:
                 max_content_width=max_content_width,
                 cache=cache,
             )
+            value_color = _row_value_color(state, index)
+            suffix_surf = None
+            suffix_gap = 0
+            if (
+                kind == RowKind.SETTINGS_EDITOR_MODE
+                and editor_mode_confirm_pending(state)
+            ):
+                suffix_surf = render_action_enter_icon(
+                    color=value_color, line_height=line_h
+                )
+                suffix_gap = ROW_ICON_SUFFIX_GAP
             surf = _render_label_value_row(
                 font,
                 prefix=prefix,
                 value=value,
-                value_color=_row_value_color(state, index),
+                value_color=value_color,
                 prefix_color=_action_parameter_label_color(state, index),
                 line_height=line_h,
+                suffix_surf=suffix_surf,
+                suffix_gap=suffix_gap,
                 counters=counters,
             )
             return _finish(surf, None, indent + surf.get_width())
