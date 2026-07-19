@@ -3079,14 +3079,24 @@ def test_directory_ctrl_arrows_descend_and_ascend() -> None:
     assert playlist.current_dir.resolve() == siblings[0].resolve()
 
 
-def test_ctrl_left_at_preset_root_is_noop() -> None:
+def test_ctrl_left_at_browse_floor_is_noop() -> None:
     root, siblings = _make_sibling_dir_tree(2)
     controls = _controls_with_playlist(root, siblings[0])
     controls.focus_descriptor = _desc(controls.build_view_state(paused=False), _preset_dir_row(controls))
     playlist = controls.session.layers["layer_1"].playlist
 
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
-    assert playlist.current_dir.resolve() == root.resolve()
+    assert playlist.current_dir.resolve() == siblings[0].resolve()
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert playlist.current_dir.resolve() == siblings[0].resolve()
+
+
+def test_ctrl_left_at_preset_root_is_noop_when_floor_is_root() -> None:
+    root, siblings = _make_sibling_dir_tree(2)
+    controls = _controls_with_playlist(root, root, browse_floor=root)
+    controls.focus_descriptor = _desc(controls.build_view_state(paused=False), _preset_dir_row(controls))
+    playlist = controls.session.layers["layer_1"].playlist
 
     controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
     assert playlist.current_dir.resolve() == root.resolve()
@@ -3110,35 +3120,36 @@ def test_directory_ctrl_arrows_do_not_repeat_parent_climb() -> None:
     assert playlist.current_dir.resolve() == siblings[0].resolve()
 
 
-def test_backspace_at_preset_root_is_noop() -> None:
+def test_backspace_at_browse_floor_is_noop() -> None:
     root, siblings = _make_sibling_dir_tree(2)
     controls = _controls_with_playlist(root, siblings[0])
     controls.focus_descriptor = _desc(controls.build_view_state(paused=False), _preset_dir_row(controls))
     playlist = controls.session.layers["layer_1"].playlist
 
     controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
-    assert playlist.current_dir.resolve() == root.resolve()
+    assert playlist.current_dir.resolve() == siblings[0].resolve()
 
     controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
-    assert playlist.current_dir.resolve() == root.resolve()
+    assert playlist.current_dir.resolve() == siblings[0].resolve()
 
 
-def test_directory_parent_round_trip_reaches_preset_root() -> None:
+def test_directory_parent_round_trip_reaches_browse_floor() -> None:
     root, siblings = _make_sibling_dir_tree(2)
     child = siblings[0] / "child"
     controls = _controls_with_playlist(root, child)
     controls.focus_descriptor = _desc(controls.build_view_state(paused=False), _preset_dir_row(controls))
     playlist = controls.session.layers["layer_1"].playlist
+    floor = siblings[0]
 
     for _ in range(3):
         controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
-    assert playlist.current_dir.resolve() == root.resolve()
+    assert playlist.current_dir.resolve() == floor.resolve()
 
     controls.handle_keydown(_keydown(pygame.K_RETURN))
-    assert playlist.current_dir.resolve() != root.resolve()
+    assert playlist.current_dir.resolve() != floor.resolve()
 
     controls.handle_keydown(_keydown(pygame.K_BACKSPACE))
-    assert playlist.current_dir.resolve() == root.resolve()
+    assert playlist.current_dir.resolve() == floor.resolve()
 
 
 def test_preset_lr_noop_when_paths_empty() -> None:
@@ -3264,7 +3275,7 @@ def test_preset_overlay_shows_directory_and_position() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     block = view.tracks["layer_1"]
-    assert block.preset_dir_label == "layer_1/ (1/1) [▲]"
+    assert block.preset_dir_label == "layer_1/ (1/1)"
     assert block.preset_label == "preset-0.milk (1/3)"
 
     controls.session.layers["layer_1"].playlist.index = 1
