@@ -712,11 +712,11 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
     if _row_has_tree_focus(state, index):
         return HIGHLIGHT
 
-    if stem is not None and _track_disabled(state, stem):
-        return DISABLED
-
     if locked_blocked:
         return LOCKED
+
+    if stem is not None and _track_disabled(state, stem):
+        return DISABLED
 
     return VALUE
 
