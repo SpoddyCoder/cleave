@@ -727,7 +727,7 @@ def test_live_upload_signature_transport_and_fps() -> None:
     state_with_fps = _minimal_view_state(fps=30.0, position_sec=65.0)
     state_no_fps = _minimal_view_state(fps=None, position_sec=12.0)
 
-    assert live_upload_signature(state_with_fps) == ("01:05", "FPS: 30.0")
+    assert live_upload_signature(state_with_fps) == ("01:05", "FPS: 30")
     assert live_upload_signature(state_no_fps) == ("00:12", None)
 
 

@@ -8,16 +8,19 @@ import pytest
 
 from cleave.stem_pcm import LIVE_PROJECTM_FPS
 from cleave.viz.frame_rate import (
+    FPS_DISPLAY_LABEL,
     LIVE_PROJECTM_FPS_FLOOR,
     FrameRateMeter,
     ProjectMFpsGovernor,
     format_fps_display,
+    format_fps_value,
 )
 from cleave.viz.layer import StemLayer
 
 
 def test_format_fps_display() -> None:
-    assert format_fps_display(29.87) == "FPS: 29.9"
+    assert format_fps_value(29.87) == "30"
+    assert format_fps_display(29.87) == f"{FPS_DISPLAY_LABEL}30"
 
 
 def test_frame_rate_meter_first_frame() -> None:
@@ -39,6 +42,36 @@ def test_frame_rate_meter_smoothing() -> None:
         meter.begin_frame()
         fps = meter.end_frame()
     assert fps == pytest.approx(15.0)
+
+
+def test_frame_rate_meter_display_fps_throttled() -> None:
+    meter = FrameRateMeter(smoothing=1.0, display_interval_sec=1.0)
+    with patch(
+        "cleave.viz.frame_rate.time.perf_counter",
+        side_effect=[0.0, 0.05, 0.5, 0.60],
+    ):
+        meter.begin_frame()
+        assert meter.end_frame() == pytest.approx(20.0)
+        assert meter.display_fps == pytest.approx(20.0)
+
+        meter.begin_frame()
+        assert meter.end_frame() == pytest.approx(10.0)
+        assert meter.display_fps == pytest.approx(20.0)
+
+
+def test_frame_rate_meter_display_fps_updates_after_interval() -> None:
+    meter = FrameRateMeter(smoothing=1.0, display_interval_sec=1.0)
+    with patch(
+        "cleave.viz.frame_rate.time.perf_counter",
+        side_effect=[0.0, 0.05, 1.0, 1.10],
+    ):
+        meter.begin_frame()
+        assert meter.end_frame() == pytest.approx(20.0)
+        assert meter.display_fps == pytest.approx(20.0)
+
+        meter.begin_frame()
+        assert meter.end_frame() == pytest.approx(10.0)
+        assert meter.display_fps == pytest.approx(10.0)
 
 
 def _mock_layers() -> list[StemLayer]:

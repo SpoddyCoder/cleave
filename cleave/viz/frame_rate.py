@@ -9,17 +9,32 @@ from cleave.stem_pcm import LIVE_PROJECTM_FPS
 LIVE_PROJECTM_FPS_FLOOR = 48
 
 
+FPS_DISPLAY_LABEL = "FPS: "
+
+
+def format_fps_value(fps: float) -> str:
+    return str(round(fps))
+
+
 def format_fps_display(fps: float) -> str:
-    return f"FPS: {fps:.1f}"
+    return f"{FPS_DISPLAY_LABEL}{format_fps_value(fps)}"
 
 
 class FrameRateMeter:
     """Track achieved FPS from full main-loop iterations."""
 
-    def __init__(self, *, smoothing: float = 0.1) -> None:
+    def __init__(
+        self,
+        *,
+        smoothing: float = 0.1,
+        display_interval_sec: float = 1.0,
+    ) -> None:
         self._smoothing = smoothing
+        self._display_interval_sec = display_interval_sec
         self._frame_start: float | None = None
         self._fps: float | None = None
+        self._display_fps: float | None = None
+        self._display_updated_at: float | None = None
 
     def begin_frame(self) -> None:
         self._frame_start = time.perf_counter()
@@ -28,7 +43,8 @@ class FrameRateMeter:
         start = self._frame_start
         if start is None:
             return self._fps
-        dt = time.perf_counter() - start
+        now = time.perf_counter()
+        dt = now - start
         self._frame_start = None
         if dt <= 0:
             return self._fps
@@ -37,11 +53,23 @@ class FrameRateMeter:
             self._fps = instant
         else:
             self._fps += self._smoothing * (instant - self._fps)
+        if (
+            self._display_fps is None
+            or self._display_updated_at is None
+            or now - self._display_updated_at >= self._display_interval_sec
+        ):
+            self._display_fps = self._fps
+            self._display_updated_at = now
         return self._fps
 
     @property
     def fps(self) -> float | None:
         return self._fps
+
+    @property
+    def display_fps(self) -> float | None:
+        """FPS shown in the UI; updates at most once per display_interval_sec."""
+        return self._display_fps
 
 
 class ProjectMFpsGovernor:

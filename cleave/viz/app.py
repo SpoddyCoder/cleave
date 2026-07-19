@@ -609,7 +609,7 @@ class VisualizerApp:
             running = True
             frame_rate = FrameRateMeter()
             pm_fps_governor = ProjectMFpsGovernor(nominal_fps=LIVE_PROJECTM_FPS)
-            display_fps: float | None = None
+            measured_fps: float | None = None
             while running:
                 frame_rate.begin_frame()
                 for event in pygame.event.get():
@@ -638,7 +638,7 @@ class VisualizerApp:
                 if rt.controls.key_repeat_armed:
                     rt.overlay.notify_input()
 
-                pm_fps_governor.observe(display_fps)
+                pm_fps_governor.observe(measured_fps)
                 pm_fps_governor.apply_if_changed(rt.layers)
                 rt.overlay_profiler.note_projectm_fps(pm_fps_governor.target_fps)
 
@@ -646,13 +646,13 @@ class VisualizerApp:
                 self.tick_frame(
                     t_sec,
                     paused=rt.playback.paused,
-                    display_fps=display_fps,
+                    display_fps=frame_rate.display_fps,
                     n_pcm=samples_for_dt(self._overlay_dt),
                     dt_sec=self._overlay_dt,
                 )
 
                 pygame.display.flip()
-                display_fps = frame_rate.end_frame()
+                measured_fps = frame_rate.end_frame()
 
         finally:
             if rt is not None:
