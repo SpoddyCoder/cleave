@@ -328,7 +328,6 @@ def test_builder_updates_shuffle_display_when_shuffle_changes() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     session.layers["layer_1"].preset_switching = "projectm"
-    session.layers["layer_1"].preset_switching_expanded = True
     session.layers["layer_1"].expanded = True
     builder = controls._view_state
 

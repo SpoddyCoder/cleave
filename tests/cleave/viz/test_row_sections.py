@@ -35,7 +35,6 @@ def _track_block(**overrides: object) -> TrackBlock:
         effects={},
         expanded=True,
         preset_switching="projectm",
-        preset_switching_expanded=True,
         hard_cut_enabled=True,
     )
     base.update(overrides)
@@ -54,9 +53,9 @@ def test_track_layout_collapsed_layer() -> None:
 
 
 def test_track_layout_collapsed_preset_switching() -> None:
-    kinds = _track_row_kinds(preset_switching_expanded=False)
+    kinds = _track_row_kinds(preset_switching="none")
     assert RowKind.TRACK_PRESET_SWITCHING in kinds
-    assert RowKind.TRACK_PRESET_SWITCHING_MODE not in kinds
+    assert RowKind.TRACK_PRESET_SWITCHING_SCOPE not in kinds
     assert RowKind.TRACK_PRESET_DURATION not in kinds
 
 
@@ -77,7 +76,8 @@ def test_track_layout_conditional_rows_when_predicates_pass() -> None:
     assert RowKind.TRACK_HARD_CUT_DURATION in kinds
 
     user_defined_kinds = _track_row_kinds(
-        preset_switching="user_defined",
+        preset_switching="projectm",
+        preset_switching_scope="user_defined",
         hard_cut_enabled=True,
         effects_expanded=False,
     )
@@ -85,7 +85,8 @@ def test_track_layout_conditional_rows_when_predicates_pass() -> None:
     assert RowKind.TRACK_PRESET_SWITCHING_SHUFFLE in user_defined_kinds
     assert RowKind.TRACK_HARD_CUT_ENABLED in user_defined_kinds
     assert RowKind.TRACK_HARD_CUT_DURATION in user_defined_kinds
-    assert RowKind.TRACK_PRESET_SWITCHING_SCOPE not in user_defined_kinds
+    assert RowKind.TRACK_PRESET_SWITCHING_SCOPE in user_defined_kinds
+    assert RowKind.TRACK_USER_PRESETS in user_defined_kinds
 
 
 def test_track_layout_omits_conditional_rows_when_predicates_fail() -> None:
@@ -115,7 +116,6 @@ def test_track_layout_row_order_when_fully_expanded() -> None:
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
         RowKind.TRACK_PRESET_SWITCHING,
-        RowKind.TRACK_PRESET_SWITCHING_MODE,
         RowKind.TRACK_PRESET_SWITCHING_SCOPE,
         RowKind.TRACK_PRESET_SWITCHING_SHUFFLE,
         RowKind.TRACK_PRESET_DURATION,

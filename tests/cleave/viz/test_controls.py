@@ -4263,9 +4263,8 @@ def test_preset_switching_row_cycles_none_and_projectm() -> None:
         on_preset_switching_change=lambda slot: switched.append(slot)
     )
     controls.session.layers["layer_1"].expanded = True
-    controls.session.layers["layer_1"].preset_switching_expanded = True
     view = controls.build_view_state(paused=False)
-    row = _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_MODE)
+    row = _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING)
     controls.focus_descriptor = view.layout.descriptor(row)
     assert controls.session.layers["layer_1"].preset_switching == "none"
 
@@ -4304,9 +4303,10 @@ def test_projectm_mode_allows_preset_browse() -> None:
     assert playlist.current_dir.resolve() == siblings[1].resolve()
 
 
-def test_user_defined_mode_allows_preset_browse() -> None:
+def test_user_defined_scope_allows_preset_browse() -> None:
     controls = _make_controls(("layer_1",))
-    controls.session.layers["layer_1"].preset_switching = "user_defined"
+    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].preset_switching_scope = "user_defined"
     controls.session.layers["layer_1"].expanded = True
     changed: list[str] = []
     controls._layer_bindings = noop_layer_bindings(
@@ -4321,7 +4321,8 @@ def test_user_defined_mode_allows_preset_browse() -> None:
 
     root, siblings = _make_sibling_dir_tree(3)
     dir_controls = _controls_with_playlist(root, siblings[0])
-    dir_controls.session.layers["layer_1"].preset_switching = "user_defined"
+    dir_controls.session.layers["layer_1"].preset_switching = "projectm"
+    dir_controls.session.layers["layer_1"].preset_switching_scope = "user_defined"
     dir_controls.session.layers["layer_1"].expanded = True
     dir_controls.focus_descriptor = _desc(
         dir_controls.build_view_state(paused=False), _preset_dir_row(dir_controls)
@@ -4341,16 +4342,52 @@ def test_scope_row_hidden_when_mode_none() -> None:
 def test_scope_row_visible_when_mode_projectm() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_switching = "projectm"
-    controls.session.layers["layer_1"].preset_switching_expanded = True
     controls.session.layers["layer_1"].expanded = True
     view = controls.build_view_state(paused=False)
     _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_SCOPE)
 
 
+def test_preset_switching_scope_cycles_directory_and_user_defined() -> None:
+    controls = _make_controls(("layer_1",))
+    switched: list[str] = []
+    controls._layer_bindings = noop_layer_bindings(
+        on_preset_switching_change=lambda slot: switched.append(slot)
+    )
+    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].expanded = True
+    view = controls.build_view_state(paused=False)
+    row = _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_SCOPE)
+    controls.focus_descriptor = view.layout.descriptor(row)
+    assert controls.session.layers["layer_1"].preset_switching_scope == "directory"
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].preset_switching_scope == "user_defined"
+    assert controls.session.layers["layer_1"].user_presets_expanded is True
+    assert switched == ["layer_1"]
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.layers["layer_1"].preset_switching_scope == "directory"
+    assert controls.session.layers["layer_1"].user_presets_expanded is True
+
+
+def test_preset_switching_scope_user_defined_auto_expands_user_presets() -> None:
+    controls = _make_controls(("layer_1",))
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "projectm"
+    layer.expanded = True
+    layer.user_presets_expanded = False
+    view = controls.build_view_state(paused=False)
+    row = _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_SCOPE)
+    controls.focus_descriptor = view.layout.descriptor(row)
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert layer.preset_switching_scope == "user_defined"
+    assert layer.user_presets_expanded is True
+
+
 def test_preset_duration_ctrl_step_is_ten_seconds() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_switching = "projectm"
-    controls.session.layers["layer_1"].preset_switching_expanded = True
     controls.session.layers["layer_1"].expanded = True
     view = controls.build_view_state(paused=False)
     row = _row(view, "layer_1", RowKind.TRACK_PRESET_DURATION)
@@ -4367,7 +4404,6 @@ def test_preset_duration_ctrl_step_is_ten_seconds() -> None:
 def test_hard_cut_enabled_cycles_and_hides_child_rows() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_switching = "projectm"
-    controls.session.layers["layer_1"].preset_switching_expanded = True
     controls.session.layers["layer_1"].expanded = True
     switched: list[str] = []
     controls._layer_bindings = noop_layer_bindings(
@@ -4398,7 +4434,6 @@ def test_hard_cut_enabled_cycles_and_hides_child_rows() -> None:
 def test_easter_egg_steps_with_standard_and_large_increments() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_switching = "projectm"
-    controls.session.layers["layer_1"].preset_switching_expanded = True
     controls.session.layers["layer_1"].expanded = True
     switched: list[str] = []
     controls._layer_bindings = noop_layer_bindings(
@@ -4420,7 +4455,6 @@ def test_easter_egg_steps_with_standard_and_large_increments() -> None:
 def test_preset_start_clean_cycles_yes_no() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_switching = "projectm"
-    controls.session.layers["layer_1"].preset_switching_expanded = True
     controls.session.layers["layer_1"].expanded = True
     view = controls.build_view_state(paused=False)
     row = _row(view, "layer_1", RowKind.TRACK_PRESET_START_CLEAN)
@@ -4436,8 +4470,7 @@ def test_preset_start_clean_cycles_yes_no() -> None:
 
 def test_preset_switching_shuffle_cycles_off_on() -> None:
     controls = _make_controls(("layer_1",))
-    controls.session.layers["layer_1"].preset_switching = "user_defined"
-    controls.session.layers["layer_1"].preset_switching_expanded = True
+    controls.session.layers["layer_1"].preset_switching = "projectm"
     controls.session.layers["layer_1"].expanded = True
     switched: list[str] = []
     controls._layer_bindings = noop_layer_bindings(
@@ -4459,7 +4492,6 @@ def test_preset_switching_shuffle_cycles_off_on() -> None:
 def test_hard_cut_sensitivity_steps_like_beat_sensitivity() -> None:
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_switching = "projectm"
-    controls.session.layers["layer_1"].preset_switching_expanded = True
     controls.session.layers["layer_1"].expanded = True
     controls.session.layers["layer_1"].hard_cut_enabled = True
     view = controls.build_view_state(paused=False)
@@ -4497,8 +4529,8 @@ def _focus_user_preset_item_row(
     preset_path: Path | None = None,
 ) -> tuple[RowDescriptor, Path]:
     layer = controls.session.layers["layer_1"]
-    layer.preset_switching = "user_defined"
-    layer.preset_switching_expanded = True
+    layer.preset_switching = "projectm"
+    layer.preset_switching_scope = "user_defined"
     layer.user_presets_expanded = True
     layer.expanded = True
     path = preset_path or Path("/tmp/projects/my-track/user-preset-0.milk")

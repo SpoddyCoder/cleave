@@ -9,6 +9,7 @@ from cleave.config_schema import (
     HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_CURVES,
     PRESET_SWITCHING_MODE_HELP_ENTRIES,
+    PRESET_SWITCHING_SCOPE_HELP_ENTRIES,
     EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
 )
 from cleave.timeline_presets import TIMELINE_PRESET_HELP_ENTRIES
@@ -165,10 +166,10 @@ def test_preset_dir_help_titles() -> None:
     assert "Shift + +" not in entries
 
 
-def test_preset_dir_help_includes_add_shortcut_in_user_defined_mode() -> None:
+def test_preset_dir_help_includes_add_shortcut_in_user_defined_scope() -> None:
     sections = sections_for(
         RowKind.TRACK_PRESET_DIR,
-        preset_switching="user_defined",
+        preset_switching_scope="user_defined",
     )
     entries = dict(_keyboard_section(sections).entries)
     assert entries["U"] == "add current preset to user-defined list"
@@ -193,10 +194,10 @@ def test_preset_file_help_titles() -> None:
     assert "Shift + +" not in entries
 
 
-def test_preset_file_help_includes_add_shortcut_in_user_defined_mode() -> None:
+def test_preset_file_help_includes_add_shortcut_in_user_defined_scope() -> None:
     sections = sections_for(
         RowKind.TRACK_PRESET,
-        preset_switching="user_defined",
+        preset_switching_scope="user_defined",
     )
     entries = dict(_keyboard_section(sections).entries)
     assert entries["U"] == "add current preset to user-defined list"
@@ -215,12 +216,24 @@ def test_blend_mode_help_lists_modes() -> None:
 
 def test_switching_mode_help_lists_modes() -> None:
     description = _description_section(
-        sections_for(RowKind.TRACK_PRESET_SWITCHING_MODE)
+        sections_for(RowKind.TRACK_PRESET_SWITCHING)
     )
     assert description is not None
-    assert description.title == "Switching mode"
-    assert description.lines == ()
+    assert description.title == "Preset switching"
+    assert description.lines == (
+        "Controls how and when presets change during playback.",
+    )
     assert description.entries == PRESET_SWITCHING_MODE_HELP_ENTRIES
+
+
+def test_switching_scope_help_lists_scopes() -> None:
+    description = _description_section(
+        sections_for(RowKind.TRACK_PRESET_SWITCHING_SCOPE)
+    )
+    assert description is not None
+    assert description.title == "Preset switching scope"
+    assert description.lines == ()
+    assert description.entries == PRESET_SWITCHING_SCOPE_HELP_ENTRIES
 
 
 def test_timeline_presets_help_lists_characters() -> None:

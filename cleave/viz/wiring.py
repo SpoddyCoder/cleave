@@ -184,7 +184,7 @@ def make_tuning_controls(
         def on_empty() -> None:
             notify = notification_sink.get("fn")
             if notify is not None:
-                if runtime.preset_switching == "user_defined":
+                if runtime.preset_switching_scope == "user_defined":
                     notify(EMPTY_USER_PRESETS_NOTIFICATION)
                 else:
                     notify(EMPTY_ROTATION_NOTIFICATION)
@@ -196,7 +196,8 @@ def make_tuning_controls(
         layer.playlist = playlist
         runtime = session.layers[slot]
         mode = runtime.preset_switching
-        if mode == "projectm":
+        scope = runtime.preset_switching_scope
+        if mode == "projectm" and scope == "directory":
             current = playlist.current
             if current is not None:
                 layer.auto_preset_path = current.resolve()

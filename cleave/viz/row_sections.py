@@ -78,7 +78,7 @@ def _toggle_track_header(controls: TuningControls, slot: str | None, forward: bo
 def _toggle_preset_switching(controls: TuningControls, slot: str | None, forward: bool) -> None:
     if slot is None:
         return
-    controls._set_preset_switching_expanded(slot, forward)
+    controls._cycle_preset_switching(slot, forward=forward)
 
 
 def _toggle_effects_header(controls: TuningControls, slot: str | None, forward: bool) -> None:
@@ -249,7 +249,7 @@ def _track_header_expanded(state: TuningViewState, slot: str | None) -> bool:
 def _track_preset_switching_expanded(state: TuningViewState, slot: str | None) -> bool:
     if slot is None:
         return True
-    return state.tracks[slot].preset_switching_expanded
+    return state.tracks[slot].preset_switching == "projectm"
 
 
 def _track_effects_expanded(state: TuningViewState, slot: str | None) -> bool:
@@ -463,22 +463,10 @@ RENDER_POST_FX_SECTION = ExpandSectionDef(
     ),
 )
 
-def _preset_switching_auto(state: TuningViewState, desc: RowDescriptor) -> bool:
-    if desc.slot is None:
-        return False
-    return state.tracks[desc.slot].preset_switching in ("projectm", "user_defined")
-
-
-def _preset_switching_projectm(state: TuningViewState, desc: RowDescriptor) -> bool:
-    if desc.slot is None:
-        return False
-    return state.tracks[desc.slot].preset_switching == "projectm"
-
-
 def _preset_switching_user_defined(state: TuningViewState, desc: RowDescriptor) -> bool:
     if desc.slot is None:
         return False
-    return state.tracks[desc.slot].preset_switching == "user_defined"
+    return state.tracks[desc.slot].preset_switching_scope == "user_defined"
 
 
 def _hard_cut_enabled(state: TuningViewState, desc: RowDescriptor) -> bool:
@@ -494,31 +482,6 @@ HARD_CUT_ENABLED = ConditionalRowsDef(
         SectionNode(leaf_kind=RowKind.TRACK_HARD_CUT_DURATION),
         SectionNode(leaf_kind=RowKind.TRACK_HARD_CUT_SENSITIVITY),
     ),
-)
-
-PRESET_SWITCHING_SHUFFLE = ConditionalRowsDef(
-    name="preset_switching_shuffle",
-    predicate=_preset_switching_auto,
-    children=(SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_SHUFFLE),),
-)
-
-PRESET_SWITCHING_TIMING = ConditionalRowsDef(
-    name="preset_switching_timing",
-    predicate=_preset_switching_auto,
-    children=(
-        SectionNode(leaf_kind=RowKind.TRACK_PRESET_DURATION),
-        SectionNode(leaf_kind=RowKind.TRACK_EASTER_EGG),
-        SectionNode(leaf_kind=RowKind.TRACK_SOFT_CUT_DURATION),
-        SectionNode(leaf_kind=RowKind.TRACK_PRESET_START_CLEAN),
-        SectionNode(leaf_kind=RowKind.TRACK_HARD_CUT_ENABLED),
-        SectionNode(conditional=HARD_CUT_ENABLED),
-    ),
-)
-
-PRESET_SWITCHING_PROJECTM = ConditionalRowsDef(
-    name="preset_switching_projectm",
-    predicate=_preset_switching_projectm,
-    children=(SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_SCOPE),),
 )
 
 USER_PRESETS_SECTION = ExpandSectionDef(
@@ -542,11 +505,15 @@ TRACK_PRESET_SWITCHING_SECTION = ExpandSectionDef(
     read_expanded=_track_preset_switching_expanded,
     toggle=_toggle_preset_switching,
     children=(
-        SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_MODE),
-        SectionNode(conditional=PRESET_SWITCHING_PROJECTM),
+        SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_SCOPE),
         SectionNode(conditional=PRESET_SWITCHING_USER_DEFINED),
-        SectionNode(conditional=PRESET_SWITCHING_SHUFFLE),
-        SectionNode(conditional=PRESET_SWITCHING_TIMING),
+        SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_SHUFFLE),
+        SectionNode(leaf_kind=RowKind.TRACK_PRESET_DURATION),
+        SectionNode(leaf_kind=RowKind.TRACK_EASTER_EGG),
+        SectionNode(leaf_kind=RowKind.TRACK_SOFT_CUT_DURATION),
+        SectionNode(leaf_kind=RowKind.TRACK_PRESET_START_CLEAN),
+        SectionNode(leaf_kind=RowKind.TRACK_HARD_CUT_ENABLED),
+        SectionNode(conditional=HARD_CUT_ENABLED),
     ),
 )
 

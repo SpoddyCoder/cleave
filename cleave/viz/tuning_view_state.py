@@ -55,7 +55,6 @@ class TrackBlock:
     beat_sensitivity: float
     effects: dict[str, dict[str, int]]
     effects_expanded: bool = False
-    preset_switching_expanded: bool = False
     enabled: bool = True
     visible: bool = True
     expanded: bool = False
@@ -281,7 +280,6 @@ def view_state_structure_signature(
         layers[slot] = {
             "expanded": layer.expanded,
             "effects_expanded": layer.effects_expanded,
-            "preset_switching_expanded": layer.preset_switching_expanded,
             "user_presets_expanded": layer.user_presets_expanded,
             "preset_switching": layer.preset_switching,
             "preset_switching_scope": layer.preset_switching_scope,
@@ -431,7 +429,6 @@ class TuningViewStateBuilder:
                 opacity_pct=layer.opacity_pct,
                 effects=dict(layer.effects),
                 effects_expanded=layer.effects_expanded,
-                preset_switching_expanded=layer.preset_switching_expanded,
                 beat_sensitivity=layer.beat_sensitivity,
                 enabled=layer.enabled,
                 visible=layer.enabled,

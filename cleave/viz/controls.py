@@ -472,7 +472,8 @@ class TuningControls:
             if (
                 slot is not None
                 and kind in {RowKind.TRACK_PRESET_DIR, RowKind.TRACK_PRESET}
-                and self.session.layers[slot].preset_switching == "user_defined"
+                and self.session.layers[slot].preset_switching_scope
+                == "user_defined"
             ):
                 if section_lock_blocks_mutation(
                     self.session, self.focus_descriptor
@@ -1037,6 +1038,8 @@ class TuningControls:
             layer.preset_switching_scope = scopes[(index + 1) % len(scopes)]
         else:
             layer.preset_switching_scope = scopes[(index - 1) % len(scopes)]
+        if layer.preset_switching_scope == "user_defined":
+            layer.user_presets_expanded = True
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)
 
@@ -1221,12 +1224,6 @@ class TuningControls:
             layer.effects.setdefault(effect_id, {})[driver_slug] = clamped
         if self._layer_bindings is not None:
             self._layer_bindings.on_opacity_change(slot, layer.opacity_pct)
-
-    def _set_preset_switching_expanded(self, slot: str, expanded: bool) -> None:
-        layer = self.session.layers[slot]
-        if layer.preset_switching_expanded == expanded:
-            return
-        layer.preset_switching_expanded = expanded
 
     def _set_effects_expanded(self, slot: str, expanded: bool) -> None:
         layer = self.session.layers[slot]

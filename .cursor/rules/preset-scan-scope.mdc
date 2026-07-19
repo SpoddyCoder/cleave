@@ -6,7 +6,7 @@ alwaysApply: false
 
 # Preset scan and switching scope
 
-When changing `PresetSwitchingScope`, `PRESET_SWITCHING_SCOPES`, or how [cleave/viz/preset_switching.py](cleave/viz/preset_switching.py) builds the projectM playlist (`add_path` recurse flag, directory vs other roots), also update **scan set derivation** for `cleave scan`.
+When changing `PresetSwitchingScope`, `PRESET_SWITCHING_SCOPES`, or how [cleave/viz/preset_switching.py](cleave/viz/preset_switching.py) builds the projectM playlist (`add_path` recurse flag, directory vs user-defined list), also update **scan set derivation** for `cleave scan`.
 
 Plan: [docs/legacy-plans/presets-scan-plan.md](docs/legacy-plans/presets-scan-plan.md).
 
@@ -14,11 +14,13 @@ Plan: [docs/legacy-plans/presets-scan-plan.md](docs/legacy-plans/presets-scan-pl
 
 `cleave scan` and `cleave scan-golden` are **experimental**. Classifier thresholds are tuned on the golden set only; treat project and bulk scan results as best-effort until validated on a pack. CLI prints a stderr warning on every `scan` / `scan-golden` invocation.
 
-## Current contract (v1)
+## Current contract
 
-- Only scope value today: `directory`.
-- Live rotation: immediate `*.milk` siblings in `playlist.current_dir`, **non-recursive** (`recurse=False`).
-- Project scan includes that same directory for **every** layer (even `preset_switching: none` or `enabled: false`), plus `preset_switching_presets` when mode is `user_defined`.
+- Mode (`preset_switching`): `none` | `projectm`.
+- Scope (`preset_switching_scope`): `directory` | `user_defined` (used when mode is `projectm`).
+- **directory** live rotation: immediate `*.milk` siblings in `playlist.current_dir`, **non-recursive** (`recurse=False`), then `sort()`.
+- **user_defined** live rotation: `preset_switching_presets` via `add_presets(..., allow_duplicates=True)` (no sort).
+- Project scan includes the anchor directory for **every** layer (even `preset_switching: none` or `enabled: false`), plus `preset_switching_presets` when `preset_switching_scope` is `user_defined`.
 - Bulk mode uses `--presets-dir` with optional `--recursive`; project mode does not recurse into subfolders.
 
 ## When scope expands

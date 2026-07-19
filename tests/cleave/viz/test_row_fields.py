@@ -64,7 +64,7 @@ def test_labeled_row_prefix_settings_children() -> None:
 
 def test_labeled_row_prefix_track_depths() -> None:
     assert labeled_row_prefix(RowKind.TRACK_STEM) == "└─ driving stem: "
-    assert labeled_row_prefix(RowKind.TRACK_PRESET_SWITCHING_MODE) == "  └─ switching mode: "
+    assert labeled_row_prefix(RowKind.TRACK_PRESET_SWITCHING_SCOPE) == "  └─ scope: "
 
 
 def test_format_row_value_settings() -> None:
@@ -111,7 +111,7 @@ def test_format_row_value_track_and_render() -> None:
     )
     slot_desc = RowDescriptor(RowKind.TRACK_BLEND, slot="layer_1")
     assert format_row_value(state, slot_desc) == "add"
-    mode_desc = RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_MODE, slot="layer_1")
+    mode_desc = RowDescriptor(RowKind.TRACK_PRESET_SWITCHING, slot="layer_1")
     assert format_row_value(state, mode_desc) == "projectM"
     duration_desc = RowDescriptor(RowKind.TRACK_PRESET_DURATION, slot="layer_1")
     assert format_row_value(state, duration_desc) == "45s"
@@ -220,7 +220,7 @@ def test_apply_field_horizontal_via_controls_keydown() -> None:
 def test_expand_subheader_prefix_preset_switching() -> None:
     assert (
         expand_subheader_prefix(RowKind.TRACK_PRESET_SWITCHING)
-        == "└─ preset switching "
+        == "└─ preset switching"
     )
     assert expand_subheader_prefix(RowKind.RENDER_OVERLAY_TITLE_HEADER) == "└─ title "
     assert (
@@ -233,7 +233,10 @@ def test_expand_subheader_prefix_preset_switching() -> None:
 def test_row_expand_subheader_display_text() -> None:
     state = _minimal_view_state()
     desc = RowDescriptor(RowKind.TRACK_PRESET_SWITCHING, slot="layer_1")
-    assert row_expand_subheader_display_text(state, desc) == "└─ preset switching ▶"
+    assert (
+        row_expand_subheader_display_text(state, desc)
+        == "└─ preset switching: none ▶"
+    )
 
 
 def test_song_markers_expand_subheader_includes_count() -> None:
@@ -290,7 +293,7 @@ def test_apply_field_horizontal_track_header_solo_and_expand() -> None:
 
 
 def test_row_fields_count() -> None:
-        assert len(ROW_FIELDS) == 84
+        assert len(ROW_FIELDS) == 83
 
 
 def test_row_kinds_requiring_fields_registry_complete() -> None:

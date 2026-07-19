@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Literal
 
 from cleave.config_schema import (
     DEFAULT_EASTER_EGG,
@@ -15,14 +14,13 @@ from cleave.config_schema import (
     DEFAULT_PRESET_START_CLEAN,
     DEFAULT_PRESET_SWITCHING_SHUFFLE,
     DEFAULT_SOFT_CUT_DURATION,
+    PresetSwitchingMode,
+    PresetSwitchingScope,
 )
 from cleave.preset_playlist import milk_files_in_dir
 from cleave.projectm import ProjectM
 from cleave.projectm_playlist import ProjectMPlaylist
 from cleave.viz.layer import StemLayer
-
-PresetSwitchingMode = Literal["none", "projectm", "user_defined"]
-PresetSwitchingScope = Literal["directory"]
 
 EMPTY_ROTATION_NOTIFICATION = "No presets in directory for auto switching"
 EMPTY_USER_PRESETS_NOTIFICATION = "No presets in user-defined rotation set"
@@ -57,7 +55,7 @@ def reapply_projectm_preset_switching(
     """Re-attach projectM playlist switching after seek without reloading browse preset."""
     for slot, layer in layers_by_slot.items():
         runtime = session.layers[slot]
-        if runtime.preset_switching not in ("projectm", "user_defined"):
+        if runtime.preset_switching != "projectm":
             continue
         if layer.projectm_playlist is None:
             apply_preset_switching(
@@ -128,7 +126,7 @@ def apply_preset_switching(
         hard_cut_sensitivity=hard_cut_sensitivity,
     )
 
-    if mode == "user_defined":
+    if scope == "user_defined":
         paths = [Path(path) for path in (user_presets or [])]
         if not paths:
             layer.auto_preset_path = None
@@ -146,24 +144,23 @@ def apply_preset_switching(
         restart_projectm_preset_timer(layer)
         return
 
-    if scope == "directory":
-        preset_dir = layer.playlist.current_dir
-        if not milk_files_in_dir(preset_dir):
-            layer.auto_preset_path = None
-            pm.lock_preset(True)
-            if on_empty is not None:
-                on_empty()
-            return
+    preset_dir = layer.playlist.current_dir
+    if not milk_files_in_dir(preset_dir):
+        layer.auto_preset_path = None
+        pm.lock_preset(True)
+        if on_empty is not None:
+            on_empty()
+        return
 
-        playlist = ProjectMPlaylist.create()
-        playlist.connect(pm, on_preset_loaded=_auto_preset_loaded_callback(layer))
-        playlist.add_path(preset_dir, recurse=False, allow_duplicates=False)
-        # Match Cleave browse order (sorted filenames); add_path uses readdir order.
-        playlist.sort()
-        playlist.set_shuffle(shuffle)
-        layer.projectm_playlist = playlist
-        _sync_projectm_playlist_position(layer)
-        restart_projectm_preset_timer(layer)
+    playlist = ProjectMPlaylist.create()
+    playlist.connect(pm, on_preset_loaded=_auto_preset_loaded_callback(layer))
+    playlist.add_path(preset_dir, recurse=False, allow_duplicates=False)
+    # Match Cleave browse order (sorted filenames); add_path uses readdir order.
+    playlist.sort()
+    playlist.set_shuffle(shuffle)
+    layer.projectm_playlist = playlist
+    _sync_projectm_playlist_position(layer)
+    restart_projectm_preset_timer(layer)
 
 
 def load_manual_preset_clean(

@@ -19,6 +19,7 @@ from cleave.projectm import ProjectM
 from cleave.viz.layer import StemLayer
 from cleave.viz.preset_switching import (
     EMPTY_ROTATION_NOTIFICATION,
+    EMPTY_USER_PRESETS_NOTIFICATION,
     active_auto_preset_path,
     apply_preset_switching,
     load_manual_preset_clean,
@@ -235,6 +236,59 @@ def test_apply_projectm_empty_dir_falls_back(mock_playlist_cls: MagicMock) -> No
 
 def test_empty_rotation_notification_text() -> None:
     assert "No presets" in EMPTY_ROTATION_NOTIFICATION
+
+
+def test_empty_user_presets_notification_text() -> None:
+    assert "user-defined" in EMPTY_USER_PRESETS_NOTIFICATION
+
+
+@patch("cleave.viz.preset_switching.ProjectMPlaylist")
+def test_apply_user_defined_scope_adds_presets(
+    mock_playlist_cls: MagicMock,
+) -> None:
+    layer = _stem_layer(paths=_MILK)
+    playlist = MagicMock()
+    playlist.size.return_value = 2
+    playlist.item.side_effect = lambda i: _MILK[i]
+    mock_playlist_cls.create.return_value = playlist
+    on_empty = MagicMock()
+
+    apply_preset_switching(
+        layer,
+        mode="projectm",
+        scope="user_defined",
+        user_presets=[str(_MILK[0]), str(_MILK[1])],
+        on_empty=on_empty,
+    )
+
+    layer.pm.lock_preset.assert_called_with(False)
+    playlist.add_presets.assert_called_once_with(
+        [Path(str(_MILK[0])), Path(str(_MILK[1]))],
+        allow_duplicates=True,
+    )
+    playlist.sort.assert_not_called()
+    playlist.add_path.assert_not_called()
+    on_empty.assert_not_called()
+
+
+@patch("cleave.viz.preset_switching.ProjectMPlaylist")
+def test_apply_user_defined_scope_empty_falls_back(
+    mock_playlist_cls: MagicMock,
+) -> None:
+    layer = _stem_layer(paths=_MILK)
+    on_empty = MagicMock()
+
+    apply_preset_switching(
+        layer,
+        mode="projectm",
+        scope="user_defined",
+        user_presets=[],
+        on_empty=on_empty,
+    )
+
+    mock_playlist_cls.create.assert_not_called()
+    layer.pm.lock_preset.assert_called_with(True)
+    on_empty.assert_called_once()
 
 
 def test_reapply_projectm_preset_switching_only_projectm_layers() -> None:

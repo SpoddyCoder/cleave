@@ -30,6 +30,7 @@ def _layer_config(
     stem: str = "drums",
     enabled: bool = True,
     preset_switching: str = "projectm",
+    preset_switching_scope: str = "directory",
     preset_switching_presets: list[Path] | None = None,
 ) -> LayerConfig:
     return LayerConfig(
@@ -37,6 +38,7 @@ def _layer_config(
         stem=stem,  # type: ignore[arg-type]
         enabled=enabled,
         preset_switching=preset_switching,  # type: ignore[arg-type]
+        preset_switching_scope=preset_switching_scope,  # type: ignore[arg-type]
         preset_switching_presets=preset_switching_presets or [],
     )
 
@@ -152,7 +154,8 @@ def test_project_targets_user_defined_adds_rotation_presets() -> None:
             layers={
                 "layer_1": _layer_config(
                     anchor,
-                    preset_switching="user_defined",
+                    preset_switching="projectm",
+                    preset_switching_scope="user_defined",
                     preset_switching_presets=[extra],
                 ),
             },
