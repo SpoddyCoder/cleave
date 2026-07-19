@@ -28,6 +28,7 @@ from cleave.viz.mix_player import MixPlayer
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline
 from cleave.viz.layer_visibility import apply_layer_visibility, build_timeline_view_state
+from cleave.viz.preset_switching import advance_timeline_preset_switching
 from cleave.viz.modal import ModalHost
 from cleave.viz.overlay_draw import OverlayDrawer
 from cleave.viz.loading import draw_loading_screen
@@ -365,6 +366,11 @@ def tick_frame_core(
     was_paused = paused
 
     apply_layer_visibility(runtime.seed.session, runtime.layers_by_slot, t_sec)
+
+    if not paused and not blank_visualizers:
+        advance_timeline_preset_switching(
+            runtime.seed.session, runtime.layers_by_slot, t_sec
+        )
 
     on_panel_notification = None
     if isinstance(runtime, LiveVisualizerRuntime):

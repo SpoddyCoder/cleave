@@ -4300,12 +4300,15 @@ def test_default_focus_stays_on_transport() -> None:
     assert controls.focus_descriptor == RowDescriptor(RowKind.TRANSPORT)
 
 
-def test_preset_switching_row_cycles_none_and_projectm() -> None:
+def test_preset_switching_row_cycles_none_projectm_and_timeline() -> None:
     controls = _make_controls(("layer_1",))
     switched: list[str] = []
+    notifications: list[str] = []
     controls._layer_bindings = noop_layer_bindings(
         on_preset_switching_change=lambda slot: switched.append(slot)
     )
+    controls.show_notification = notifications.append
+    controls.session.timeline.enabled = False
     controls.session.layers["layer_1"].expanded = True
     view = controls.build_view_state(paused=False)
     row = _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING)
@@ -4315,8 +4318,13 @@ def test_preset_switching_row_cycles_none_and_projectm() -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.layers["layer_1"].preset_switching == "projectm"
     assert switched == ["layer_1"]
+    assert notifications == []
 
-    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].preset_switching == "timeline"
+    assert "Enable timeline" in notifications[-1]
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.layers["layer_1"].preset_switching == "none"
 
 

@@ -249,7 +249,7 @@ def _track_header_expanded(state: TuningViewState, slot: str | None) -> bool:
 def _track_preset_switching_expanded(state: TuningViewState, slot: str | None) -> bool:
     if slot is None:
         return True
-    return state.tracks[slot].preset_switching == "projectm"
+    return state.tracks[slot].preset_switching in ("projectm", "timeline")
 
 
 def _track_effects_expanded(state: TuningViewState, slot: str | None) -> bool:
@@ -469,6 +469,12 @@ def _preset_switching_user_defined(state: TuningViewState, desc: RowDescriptor) 
     return state.tracks[desc.slot].preset_switching_rotation_set == "user_defined"
 
 
+def _preset_switching_projectm(state: TuningViewState, desc: RowDescriptor) -> bool:
+    if desc.slot is None:
+        return False
+    return state.tracks[desc.slot].preset_switching == "projectm"
+
+
 def _hard_cut_enabled(state: TuningViewState, desc: RowDescriptor) -> bool:
     if desc.slot is None:
         return False
@@ -499,6 +505,18 @@ PRESET_SWITCHING_USER_DEFINED = ConditionalRowsDef(
     children=(SectionNode(expand=USER_PRESETS_SECTION),),
 )
 
+PRESET_SWITCHING_PROJECTM = ConditionalRowsDef(
+    name="preset_switching_projectm",
+    predicate=_preset_switching_projectm,
+    children=(
+        SectionNode(leaf_kind=RowKind.TRACK_PRESET_DURATION),
+        SectionNode(leaf_kind=RowKind.TRACK_EASTER_EGG),
+        SectionNode(leaf_kind=RowKind.TRACK_SOFT_CUT_DURATION),
+        SectionNode(leaf_kind=RowKind.TRACK_HARD_CUT_ENABLED),
+        SectionNode(conditional=HARD_CUT_ENABLED),
+    ),
+)
+
 TRACK_PRESET_SWITCHING_SECTION = ExpandSectionDef(
     header_kind=RowKind.TRACK_PRESET_SWITCHING,
     context="per_slot",
@@ -508,12 +526,8 @@ TRACK_PRESET_SWITCHING_SECTION = ExpandSectionDef(
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET),
         SectionNode(conditional=PRESET_SWITCHING_USER_DEFINED),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_SHUFFLE),
-        SectionNode(leaf_kind=RowKind.TRACK_PRESET_DURATION),
-        SectionNode(leaf_kind=RowKind.TRACK_EASTER_EGG),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_START_CLEAN),
-        SectionNode(leaf_kind=RowKind.TRACK_SOFT_CUT_DURATION),
-        SectionNode(leaf_kind=RowKind.TRACK_HARD_CUT_ENABLED),
-        SectionNode(conditional=HARD_CUT_ENABLED),
+        SectionNode(conditional=PRESET_SWITCHING_PROJECTM),
     ),
 )
 
@@ -742,6 +756,14 @@ def kinds_in_expand_section(section: ExpandSectionDef) -> frozenset[RowKind]:
 
 RENDER_OVERLAY_SECTION_KINDS = kinds_in_expand_section(RENDER_OVERLAY_SECTION)
 RENDER_POST_FX_SECTION_KINDS = kinds_in_expand_section(RENDER_POST_FX_SECTION)
+PRESET_SWITCHING_CHILD_KINDS = frozenset(
+    kinds_in_expand_section(TRACK_PRESET_SWITCHING_SECTION)
+    - {RowKind.TRACK_PRESET_SWITCHING}
+    | {
+        RowKind.TRACK_USER_PRESET_ITEM,
+        RowKind.TRACK_USER_PRESET_ADD,
+    }
+)
 RENDER_TIMELINE_SECTION_KINDS = frozenset(
     {
         RowKind.RENDER_TIMELINE_HEADER,

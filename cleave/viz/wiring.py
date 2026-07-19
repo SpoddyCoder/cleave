@@ -43,7 +43,9 @@ from cleave.viz.preset_switching import (
     EMPTY_USER_PRESETS_NOTIFICATION,
     apply_preset_switching,
     load_manual_preset_clean,
+    reanchor_timeline_preset_after_browse,
     reapply_projectm_preset_switching,
+    resync_timeline_preset_switching,
     sync_manual_browse_with_user_defined_rotation,
 )
 from cleave.stem_pcm import StemPcmBank
@@ -231,6 +233,16 @@ def make_tuning_controls(
         if mode == "none":
             layer.pm.lock_preset(True)
             return
+        if mode == "timeline":
+            reanchor_timeline_preset_after_browse(
+                layer,
+                session,
+                current_sec(playback, duration_sec),
+                rotation_set=runtime.preset_switching_rotation_set,
+                user_presets=runtime.user_presets,
+                shuffle=runtime.preset_switching_shuffle,
+            )
+            return
         layer.pm.lock_preset(False)
         sync_manual_browse_with_user_defined_rotation(layer)
 
@@ -257,7 +269,8 @@ def make_tuning_controls(
         layers_by_slot[slot].pm.lock_preset(True)
 
     def unlock_preset_after_modal(slot: str) -> None:
-        if _effective_preset_switching(slot) == "none":
+        mode = _effective_preset_switching(slot)
+        if mode in ("none", "timeline"):
             layers_by_slot[slot].pm.lock_preset(True)
         else:
             layers_by_slot[slot].pm.lock_preset(False)
@@ -342,6 +355,11 @@ def make_tuning_controls(
             session,
             layers_by_slot,
             delta_sec=delta_sec,
+        )
+        resync_timeline_preset_switching(
+            session,
+            layers_by_slot,
+            current_sec(playback, duration_sec),
         )
 
     def on_highlight_rolloff_apply_mode_change(old_mode: str, new_mode: str) -> None:
@@ -524,6 +542,11 @@ def make_timeline_controls(
             session,
             layers_by_slot,
             delta_sec=delta_sec,
+        )
+        resync_timeline_preset_switching(
+            session,
+            layers_by_slot,
+            current_sec(playback, duration_sec),
         )
 
     return TimelineControls(

@@ -33,6 +33,7 @@ from cleave.viz.row_fields import (
 )
 from cleave.extract import stem_overlay_header
 from cleave.viz.row_sections import (
+    PRESET_SWITCHING_CHILD_KINDS,
     RENDER_OVERLAY_SECTION_KINDS,
     RENDER_POST_FX_SECTION_KINDS,
     RENDER_TIMELINE_SECTION_KINDS,
@@ -666,6 +667,15 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
 
     if kind in RENDER_TIMELINE_SECTION_KINDS:
         if not state.render_timeline.enabled:
+            return DISABLED
+
+    if kind in PRESET_SWITCHING_CHILD_KINDS:
+        stem_for_switching = state.layout.slot(index)
+        if (
+            stem_for_switching is not None
+            and state.tracks[stem_for_switching].preset_switching == "timeline"
+            and not state.render_timeline.enabled
+        ):
             return DISABLED
 
     if kind in {

@@ -324,6 +324,65 @@ def test_structure_signature_invalidates_on_preset_switching_shuffle() -> None:
     assert sig_before != sig_after
 
 
+def test_structure_signature_invalidates_on_preset_switching_timeline_mode() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.layers["layer_1"].preset_switching = "projectm"
+    sig_projectm = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.layers["layer_1"].preset_switching = "timeline"
+    sig_timeline = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_projectm != sig_timeline
+    session.layers["layer_1"].preset_switching = "none"
+    sig_none = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_timeline != sig_none
+
+
+def test_timeline_preset_switching_hides_projectm_only_rows() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    session.layers["layer_1"].expanded = True
+    session.layers["layer_1"].preset_switching = "timeline"
+    builder = controls._view_state
+    view = builder.build(paused=False)
+    slot = "layer_1"
+    assert RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET, slot=slot) in (
+        view.layout.rows
+    )
+    assert RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_SHUFFLE, slot=slot) in (
+        view.layout.rows
+    )
+    assert RowDescriptor(RowKind.TRACK_PRESET_START_CLEAN, slot=slot) in view.layout.rows
+    assert RowDescriptor(RowKind.TRACK_PRESET_DURATION, slot=slot) not in view.layout.rows
+    assert RowDescriptor(RowKind.TRACK_EASTER_EGG, slot=slot) not in view.layout.rows
+    assert RowDescriptor(RowKind.TRACK_SOFT_CUT_DURATION, slot=slot) not in (
+        view.layout.rows
+    )
+    assert RowDescriptor(RowKind.TRACK_HARD_CUT_ENABLED, slot=slot) not in (
+        view.layout.rows
+    )
+
+
+def test_timeline_mode_row_set_unchanged_when_timeline_enabled_toggles() -> None:
+    """Dimming when timeline is disabled does not add or remove preset-switching rows."""
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    session.layers["layer_1"].expanded = True
+    session.layers["layer_1"].preset_switching = "timeline"
+    session.timeline.enabled = True
+    builder = controls._view_state
+    kinds_on = [desc.kind for desc in builder.build(paused=False).layout.rows]
+    session.timeline.enabled = False
+    kinds_off = [desc.kind for desc in builder.build(paused=False).layout.rows]
+    assert kinds_on == kinds_off
+
+
 def test_builder_updates_shuffle_display_when_shuffle_changes() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session

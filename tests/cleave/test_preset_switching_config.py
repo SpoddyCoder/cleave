@@ -65,6 +65,14 @@ def test_parse_layers_preset_switching_projectm() -> None:
     assert layers["layer_1"].preset_switching == "projectm"
 
 
+def test_parse_layers_preset_switching_timeline() -> None:
+    preset_root = Path("/tmp/presets")
+    data = {"layers": _layer_yaml()}
+    data["layers"]["layer_1"]["preset_switching"] = "timeline"
+    layers = parse_layers_section(data, ParseCtx(preset_root=preset_root))
+    assert layers["layer_1"].preset_switching == "timeline"
+
+
 def test_parse_layers_rejects_user_defined_mode() -> None:
     import pytest
 
@@ -288,3 +296,49 @@ def test_load_config_round_trip_preset_switching(tmp_path: Path) -> None:
     )
     cfg = load_config(config_path)
     assert cfg.layers["layer_1"].preset_switching == "projectm"
+
+
+def test_load_config_round_trip_preset_switching_timeline(tmp_path: Path) -> None:
+    preset_root = tmp_path / "presets"
+    preset_root.mkdir()
+    milk = preset_root / "drums" / "drums.milk"
+    milk.parent.mkdir(parents=True)
+    milk.write_text("; test\n", encoding="utf-8")
+    config_path = tmp_path / "cleave.config.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "paths": {
+                    "preset_root": str(preset_root),
+                    "texture_paths": [str(preset_root / "textures")],
+                },
+                "layers": {
+                    "layer_1": {
+                        "stem": "drums",
+                        "preset": "drums/drums.milk",
+                        "preset_switching": "timeline",
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    cfg = load_config(config_path)
+    assert cfg.layers["layer_1"].preset_switching == "timeline"
+    session = TuningSession(
+        layer_z_order=["layer_1"],
+        layers={
+            "layer_1": LayerRuntime(
+                playlist=PresetPlaylist(
+                    current_dir=milk.parent,
+                    paths=(milk,),
+                    index=0,
+                ),
+                browse_floor=milk.parent,
+                stem="drums",
+                preset_switching="timeline",
+            )
+        },
+    )
+    out = persist_layers(PersistCtx(cfg=cfg, session=session))
+    assert out["layer_1"]["preset_switching"] == "timeline"

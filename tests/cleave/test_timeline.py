@@ -15,6 +15,8 @@ from cleave.timeline import (
     empty_lane,
     lane_fade_alpha,
     lane_fade_spans,
+    lane_on_transition_count,
+    lane_on_transition_trigger_times,
     lane_visible_at,
     punch_lane,
     set_lane_cue,
@@ -507,3 +509,66 @@ def test_lane_fade_spans_clips_fade_in_at_song_start() -> None:
     )
     fade_in = next(span for span in spans if span[2] == "in")
     assert fade_in == (0.0, 1.0, "in")
+
+
+def test_on_transition_triggers_at_cue_when_fades_off() -> None:
+    lane = _lane(False, (5.0, True), (10.0, False), (15.0, True))
+    triggers = lane_on_transition_trigger_times(
+        lane,
+        song_marker_fades=_OFF,
+        standard_fades=_OFF,
+    )
+    assert triggers == [5.0, 15.0]
+
+
+def test_on_transition_triggers_lead_by_standard_fade_in() -> None:
+    lane = _lane(False, (10.0, True), (20.0, False), (30.0, True))
+    triggers = lane_on_transition_trigger_times(
+        lane,
+        song_marker_fades=_OFF,
+        standard_fades=_std(fade_in=2.0, fade_out=3.0),
+    )
+    assert triggers == [8.0, 28.0]
+
+
+def test_on_transition_triggers_song_marker_vs_standard() -> None:
+    lane = _lane(False, (10.0, True), (20.0, False), (30.0, True))
+    triggers = lane_on_transition_trigger_times(
+        lane,
+        song_marker_times=(10.0,),
+        song_marker_fades=_markers(fade_in=1.0, fade_out=1.0),
+        standard_fades=_std(fade_in=4.0, fade_out=4.0),
+    )
+    assert triggers == [9.0, 26.0]
+
+
+def test_on_transition_count_seek_stable() -> None:
+    lane = _lane(False, (10.0, True), (20.0, False), (30.0, True))
+    kwargs = dict(
+        song_marker_fades=_OFF,
+        standard_fades=_std(fade_in=2.0, fade_out=2.0),
+    )
+    assert lane_on_transition_count(lane, 7.9, **kwargs) == 0
+    assert lane_on_transition_count(lane, 8.0, **kwargs) == 1
+    assert lane_on_transition_count(lane, 27.9, **kwargs) == 1
+    assert lane_on_transition_count(lane, 28.0, **kwargs) == 2
+    # Same t always same count.
+    assert lane_on_transition_count(lane, 28.0, **kwargs) == 2
+    assert lane_on_transition_count(lane, 100.0, **kwargs) == 2
+
+
+def test_on_transition_count_hard_cut_uses_cue_time() -> None:
+    lane = _lane(False, (10.0, True))
+    zero = _std(fade_in=0.0, fade_out=2.0)
+    assert lane_on_transition_count(
+        lane,
+        9.9,
+        song_marker_fades=_OFF,
+        standard_fades=zero,
+    ) == 0
+    assert lane_on_transition_count(
+        lane,
+        10.0,
+        song_marker_fades=_OFF,
+        standard_fades=zero,
+    ) == 1
