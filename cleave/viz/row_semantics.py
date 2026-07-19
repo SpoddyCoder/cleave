@@ -1044,6 +1044,9 @@ ACTION_PARAMETER_SUB_ROW_KINDS = frozenset(
     for k, b in ROW_BEHAVIORS.items()
     if b.affordance == RowAffordance.ACTION_PARAMETER and not b.is_header
 )
+ACTION_ROW_KINDS = frozenset(
+    k for k, b in ROW_BEHAVIORS.items() if b.affordance == RowAffordance.ACTION
+)
 LABELED_SUB_ROW_KINDS = frozenset(
     k
     for k, b in ROW_BEHAVIORS.items()

@@ -40,6 +40,7 @@ from cleave.viz.row_sections import (
 )
 from cleave.viz.row_semantics import (
     ACTION_PARAMETER_SUB_ROW_KINDS,
+    ACTION_ROW_KINDS,
     LABELED_SUB_ROW_KINDS,
     RowDescriptor,
     RowKind,
@@ -61,11 +62,13 @@ from cleave.viz.playback import format_mmss
 from cleave.viz.material_icons import (
     FILE_GLYPH,
     FOLDER_GLYPH,
+    KEYBOARD_RETURN_GLYPH,
     LOCK_GLYPH,
     SETTINGS_GLYPH,
     VISIBILITY_GLYPH,
     VISIBILITY_OFF_GLYPH,
     VISIBILITY_ICON_PAD_X,
+    action_enter_icon_suffix_width,
     material_font,
     render_glyph,
     render_transport_icons,
@@ -155,6 +158,61 @@ _tuning_ui = tuning_ui_metrics()
 TREE_INDENT = _tuning_ui.tree_indent
 TREE_BRANCH = "└"
 ROW_ICON_SUFFIX_GAP = _tuning_ui.row_icon_suffix_gap
+
+
+def _row_shows_action_enter_hint(state: TuningViewState, index: int) -> bool:
+    """Focused ACTION rows that are activatable show a keyboard-return suffix."""
+    kind = state.layout.kind(index)
+    if kind not in ACTION_ROW_KINDS:
+        return False
+    if not _row_has_tree_focus(state, index):
+        return False
+    return _row_value_color(state, index) == HIGHLIGHT
+
+
+def _append_action_enter_icon(
+    surf: pygame.Surface,
+    *,
+    color: tuple[int, int, int],
+    line_height: int,
+    counters: OverlayDrawCounters | None = None,
+) -> pygame.Surface:
+    icon = render_glyph(
+        KEYBOARD_RETURN_GLYPH, color=color, line_height=line_height
+    )
+    gap = ROW_ICON_SUFFIX_GAP
+    out = _compose_surface(
+        (surf.get_width() + gap + icon.get_width(), line_height),
+        counters=counters,
+    )
+    out.blit(surf, (0, 0))
+    out.blit(icon, (surf.get_width() + gap, 0))
+    return out
+
+
+def _with_action_enter_hint(
+    primary: pygame.Surface,
+    secondary: pygame.Surface | None,
+    width: int,
+    *,
+    state: TuningViewState,
+    index: int,
+    indent: int,
+    line_h: int,
+    counters: OverlayDrawCounters | None = None,
+) -> tuple[pygame.Surface, pygame.Surface | None, int]:
+    if not _row_shows_action_enter_hint(state, index):
+        return primary, secondary, width
+    color = _row_value_color(state, index)
+    if secondary is not None:
+        secondary = _append_action_enter_icon(
+            secondary, color=color, line_height=line_h, counters=counters
+        )
+        return primary, secondary, indent + primary.get_width() + secondary.get_width()
+    primary = _append_action_enter_icon(
+        primary, color=color, line_height=line_h, counters=counters
+    )
+    return primary, None, indent + primary.get_width()
 
 
 def track_sub_rows_visible(state: TuningViewState, slot: str) -> bool:
@@ -495,8 +553,16 @@ def fit_row_text(
         if kind == RowKind.CONFIG_HEADER:
             icon_w = row_icon_prefix_width(line_h)
             suffix_w = font.size("*")[0] if state.config_dirty else 0
+            enter_w = (
+                action_enter_icon_suffix_width(line_h)
+                if _row_shows_action_enter_hint(state, index)
+                else 0
+            )
             return _fit(
-                "path", fit_path_label_to_width, text, budget - icon_w - suffix_w
+                "path",
+                fit_path_label_to_width,
+                text,
+                budget - icon_w - suffix_w - enter_w,
             )
         prefix_w = preset_row_prefix_width(font, line_h)
         return _fit("counter", fit_counter_label_to_width, text, budget - prefix_w)
@@ -944,6 +1010,28 @@ def _estimate_row_content_width(
     max_content_width: int,
     line_h: int,
 ) -> int:
+    width = _estimate_row_content_width_base(
+        padding=padding,
+        font=font,
+        state=state,
+        index=index,
+        max_content_width=max_content_width,
+        line_h=line_h,
+    )
+    if _row_shows_action_enter_hint(state, index):
+        width += action_enter_icon_suffix_width(line_h)
+    return width
+
+
+def _estimate_row_content_width_base(
+    *,
+    padding: int,
+    font: pygame.font.Font,
+    state: TuningViewState,
+    index: int,
+    max_content_width: int,
+    line_h: int,
+) -> int:
     indent = padding + _row_indent(state, index)
     kind = state.layout.kind(index)
 
@@ -1368,6 +1456,22 @@ class TuningOverlay:
         indent = self._padding + _row_indent(state, index)
         color = _row_value_color(state, index)
 
+        def _finish(
+            primary: pygame.Surface,
+            secondary: pygame.Surface | None,
+            width: int,
+        ) -> tuple[pygame.Surface, pygame.Surface | None, int]:
+            return _with_action_enter_hint(
+                primary,
+                secondary,
+                width,
+                state=state,
+                index=index,
+                indent=indent,
+                line_h=line_h,
+                counters=counters,
+            )
+
         if kind == RowKind.TRANSPORT:
             icons_surf = render_transport_icons(
                 color=color,
@@ -1377,7 +1481,7 @@ class TuningOverlay:
             time_text = f" [{format_mmss(state.position_sec)}]"
             time_surf = _render_text(font, time_text, True, color, counters=counters)
             width = indent + icons_surf.get_width() + time_surf.get_width()
-            return icons_surf, time_surf, width
+            return _finish(icons_surf, time_surf, width)
 
         if kind == RowKind.TRACK_HEADER:
             stem = state.layout.slot(index)
@@ -1413,7 +1517,7 @@ class TuningOverlay:
                 counters=counters,
             )
             width = indent + prefix_surf.get_width() + label_surf.get_width()
-            return prefix_surf, label_surf, width
+            return _finish(prefix_surf, label_surf, width)
 
         if kind == RowKind.SETTINGS_HEADER:
             desc = state.layout.descriptor(index)
@@ -1428,7 +1532,7 @@ class TuningOverlay:
                 counters=counters,
             )
             width = indent + icon_surf.get_width() + label_surf.get_width()
-            return icon_surf, label_surf, width
+            return _finish(icon_surf, label_surf, width)
 
         if kind in {
             RowKind.RENDER_OVERLAY_HEADER,
@@ -1471,11 +1575,11 @@ class TuningOverlay:
                 counters=counters,
             )
             width = indent + prefix_surf.get_width() + label_surf.get_width()
-            return prefix_surf, label_surf, width
+            return _finish(prefix_surf, label_surf, width)
 
         if kind == RowKind.RENDER_SECTION_GAP:
             gap_surf = _compose_surface((1, line_h), counters=counters)
-            return gap_surf, None, indent + gap_surf.get_width()
+            return _finish(gap_surf, None, indent + gap_surf.get_width())
 
         if (
             ROW_FIELDS.get(kind) is not None
@@ -1532,7 +1636,7 @@ class TuningOverlay:
                 )
                 label_surf = _render_text(font, label, True, color, counters=counters)
             width = indent + icon_surf.get_width() + label_surf.get_width()
-            return icon_surf, label_surf, width
+            return _finish(icon_surf, label_surf, width)
 
         if (
             ROW_FIELDS.get(kind) is not None
@@ -1547,7 +1651,7 @@ class TuningOverlay:
                 line_height=line_h,
                 counters=counters,
             )
-            return surf, None, indent + surf.get_width()
+            return _finish(surf, None, indent + surf.get_width())
 
         if kind in ACTION_PARAMETER_SUB_ROW_KINDS:
             prefix = _action_parameter_row_prefix(kind)
@@ -1567,7 +1671,7 @@ class TuningOverlay:
                 line_height=line_h,
                 counters=counters,
             )
-            return surf, None, indent + surf.get_width()
+            return _finish(surf, None, indent + surf.get_width())
 
         if kind in LABELED_SUB_ROW_KINDS:
             prefix = _labeled_sub_row_prefix(state, index)
@@ -1586,7 +1690,7 @@ class TuningOverlay:
                 line_height=line_h,
                 counters=counters,
             )
-            return surf, None, indent + surf.get_width()
+            return _finish(surf, None, indent + surf.get_width())
 
         if (
             ROW_FIELDS.get(kind) is not None
@@ -1606,13 +1710,13 @@ class TuningOverlay:
             label = _row_text(state, index)
             label_color = _row_value_color(state, index)
             surf = _render_text(font, label, True, label_color, counters=counters)
-            return surf, None, indent + surf.get_width()
+            return _finish(surf, None, indent + surf.get_width())
 
         text = fit_row_text(
             font, state, index, max_content_width=max_content_width, cache=cache
         )
         surf = _render_text(font, text, True, color, counters=counters)
-        return surf, None, indent + surf.get_width()
+        return _finish(surf, None, indent + surf.get_width())
 
     def _max_content_width(
         self,

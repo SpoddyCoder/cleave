@@ -11,11 +11,17 @@ from cleave.extract import STEM_NAMES
 from cleave.viz.frame_rate import FPS_DISPLAY_LABEL
 from cleave.viz.focus_nav import MainFocus
 from cleave.viz.row_semantics import RowDescriptor, RowKind, row_is_pinned
+from cleave.viz.material_icons import (
+    KEYBOARD_RETURN_GLYPH,
+    action_enter_icon_suffix_width,
+    render_glyph,
+)
 from cleave.viz.tuning_panel_draw import (
     HELP_HINT_LABEL,
     PanelScrollMetrics,
     TuningOverlay,
     _row_bg_color,
+    _row_shows_action_enter_hint,
     _row_text,
     _action_parameter_label_color,
     _row_value_color,
@@ -1217,6 +1223,94 @@ def test_action_parameter_row_value_color() -> None:
     state.focus_descriptor = state.layout.descriptor(mode_row)
     assert _action_parameter_label_color(state, mode_row) == HIGHLIGHT
     assert _row_value_color(state, mode_row) == HIGHLIGHT
+
+
+def test_focused_action_row_shows_enter_hint() -> None:
+    pygame.init()
+    state = _minimal_view_state(
+        tracks={
+            "layer_1": TrackBlock(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                expanded=True,
+            ),
+            "layer_2": TrackBlock(
+                stem="bass",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                expanded=True,
+            ),
+        },
+        layer_z_order=["layer_1", "layer_2"],
+    )
+    add_row = state.layout.find_by_kind(RowKind.LAYER_MANAGEMENT_ADD)
+    assert add_row is not None
+    assert _row_shows_action_enter_hint(state, add_row) is False
+
+    state.focus_descriptor = state.layout.descriptor(add_row)
+    assert _row_shows_action_enter_hint(state, add_row) is True
+
+    overlay = TuningOverlay()
+    font = pygame.font.Font(None, 24)
+    line_h = font.get_linesize()
+    state_unfocused = _minimal_view_state(
+        tracks=state.tracks,
+        layer_z_order=state.layer_z_order,
+    )
+    add_unfocused = state_unfocused.layout.find_by_kind(RowKind.LAYER_MANAGEMENT_ADD)
+    assert add_unfocused is not None
+    _, _, width_unfocused = overlay._build_row_at_index(
+        font,
+        state_unfocused,
+        add_unfocused,
+        max_content_width=PANEL_CONTENT_MAX_WIDTH,
+        line_h=line_h,
+    )
+    _, _, width_focused = overlay._build_row_at_index(
+        font,
+        state,
+        add_row,
+        max_content_width=PANEL_CONTENT_MAX_WIDTH,
+        line_h=line_h,
+    )
+    assert width_focused == width_unfocused + action_enter_icon_suffix_width(line_h)
+
+    enter = render_glyph(
+        KEYBOARD_RETURN_GLYPH, color=HIGHLIGHT, line_height=line_h
+    )
+    assert pygame.mask.from_surface(enter).count() > 0
+
+
+def test_disabled_action_row_hides_enter_hint() -> None:
+    state = _minimal_view_state(
+        tracks={
+            "layer_1": TrackBlock(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                expanded=True,
+            ),
+        },
+        layer_z_order=["layer_1"],
+    )
+    delete_row = state.layout.find("layer_1", RowKind.LAYER_MANAGEMENT_DELETE)
+    assert delete_row is not None
+    state.focus_descriptor = state.layout.descriptor(delete_row)
+    assert _row_value_color(state, delete_row) == DISABLED
+    assert _row_shows_action_enter_hint(state, delete_row) is False
 
 
 def test_draw_layer_management_rows_without_error() -> None:

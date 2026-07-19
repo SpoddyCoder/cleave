@@ -5,6 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from cleave.viz.row_semantics import (
+    ACTION_ROW_KINDS,
     HEADER_ROW_KINDS,
     LABELED_SUB_ROW_KINDS,
     REPEAT_ROW_KINDS,
@@ -99,6 +100,15 @@ def test_header_row_kinds() -> None:
             RowKind.SETTINGS_HEADER,
         }
     )
+
+
+def test_action_row_kinds_match_affordance() -> None:
+    assert ACTION_ROW_KINDS == frozenset(
+        k for k, b in ROW_BEHAVIORS.items() if b.affordance == RowAffordance.ACTION
+    )
+    assert RowKind.LAYER_MANAGEMENT_ADD in ACTION_ROW_KINDS
+    assert RowKind.CONFIG_HEADER in ACTION_ROW_KINDS
+    assert RowKind.SETTINGS_EDITOR_MODE not in ACTION_ROW_KINDS
 
 
 def test_row_is_pinned() -> None:
