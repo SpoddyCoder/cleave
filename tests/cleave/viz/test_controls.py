@@ -3264,7 +3264,7 @@ def test_preset_overlay_shows_directory_and_position() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     block = view.tracks["layer_1"]
-    assert block.preset_dir_label == "layer_1/ (1/1)"
+    assert block.preset_dir_label == "layer_1/ (1/1) [▲]"
     assert block.preset_label == "preset-0.milk (1/3)"
 
     controls.session.layers["layer_1"].playlist.index = 1
@@ -3287,7 +3287,7 @@ def test_scan_file_anchor_builds_parent_directory_playlist() -> None:
         assert playlist.paths == (first.resolve(), second.resolve())
         assert playlist.index == 1
         assert preset_filename_display(playlist) == "beta.milk (2/2)"
-        assert directory_display(playlist, root) == "pack/Aurora/ (1/1)"
+        assert directory_display(playlist, root) == "pack/Aurora/ (1/1) [▲]"
 
 
 def _header_row(

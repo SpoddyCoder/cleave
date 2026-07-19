@@ -128,6 +128,34 @@ def test_fit_counter_label_suffix_only_when_budget_tiny() -> None:
     assert fitted == suffix
 
 
+def test_fit_counter_label_preserves_directory_tree_marker() -> None:
+    font = overlay_font()
+    for marker in ("[▲]", "[▼]", "[▲▼]"):
+        label = f"presets/very/long/directory/path/for/testing/ (12/99) {marker}"
+        suffix = f" (12/99) {marker}"
+        width = font.size(suffix)[0] + font.size("…testing/")[0]
+        fitted = fit_counter_label_to_width(font, label, width)
+        assert fitted.endswith(suffix)
+        assert font.size(fitted)[0] <= width
+
+
+def test_fit_counter_label_both_tree_markers_reserve_full_width() -> None:
+    """Both-direction suffix is longer; truncation must keep the whole marker."""
+    font = overlay_font()
+    label = "presets/very/long/directory/path/for/testing/ (3/9) [▲▼]"
+    suffix = " (3/9) [▲▼]"
+    single = " (3/9) [▲]"
+    # Budget fits counter + both arrows + a short head; if the fitter reserved
+    # only a single-arrow width, the second triangle would be truncated away.
+    width = font.size(suffix)[0] + font.size("…testing/")[0]
+    fitted = fit_counter_label_to_width(font, label, width)
+    assert fitted.endswith(suffix)
+    assert not fitted.endswith(single)
+    assert font.size(fitted)[0] <= width
+    tiny = fit_counter_label_to_width(font, label, font.size(suffix)[0] - 1)
+    assert tiny == suffix
+
+
 def test_wrap_text_to_width_keeps_short_line() -> None:
     font = overlay_font()
     text = "Short title?"

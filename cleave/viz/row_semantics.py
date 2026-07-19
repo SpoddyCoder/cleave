@@ -184,6 +184,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Preset Directory",
         help_description=(
             "Directory from which presets are browsed for this layer.",
+            "[▲▼] marks when a parent and/or child directory is available.",
         ),
         repeatable=True,
         parent_group="track",

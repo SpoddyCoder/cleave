@@ -81,6 +81,27 @@ def navigable_parent(current_dir: Path, preset_root: Path) -> Path:
     return preset_root.resolve()
 
 
+def _can_go_parent(current_dir: Path, preset_root: Path) -> bool:
+    """True when Ctrl+Left would ascend (same gate as ``go_parent``)."""
+    parent = current_dir.parent
+    if parent == current_dir:
+        return False
+    return _path_at_or_below(parent, preset_root)
+
+
+def directory_tree_marker(current_dir: Path, preset_root: Path) -> str:
+    """Must-include suffix: `` [▲]``, `` [▼]``, or `` [▲▼]`` for parent/child."""
+    can_up = _can_go_parent(current_dir, preset_root)
+    can_down = bool(list_navigable_dirs(current_dir))
+    if can_up and can_down:
+        return " [▲▼]"
+    if can_up:
+        return " [▲]"
+    if can_down:
+        return " [▼]"
+    return ""
+
+
 @dataclass
 class PresetPlaylist:
     current_dir: Path
@@ -104,8 +125,9 @@ class PresetPlaylist:
         siblings = list_navigable_dirs(
             navigable_parent(self.current_dir, preset_root)
         )
+        marker = directory_tree_marker(self.current_dir, preset_root)
         if not siblings:
-            return f"{rel} (1/1)"
+            return f"{rel} (1/1){marker}"
         resolved_current = self.current_dir.resolve()
         try:
             position = (
@@ -118,7 +140,7 @@ class PresetPlaylist:
             )
         except StopIteration:
             position = 1
-        return f"{rel} ({position}/{len(siblings)})"
+        return f"{rel} ({position}/{len(siblings)}){marker}"
 
     def directory_display_label(self, preset_root: Path) -> str:
         resolved_root = preset_root.resolve()
