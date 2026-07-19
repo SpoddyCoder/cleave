@@ -3345,7 +3345,7 @@ def test_scan_file_anchor_builds_parent_directory_playlist() -> None:
         assert playlist.paths == (first.resolve(), second.resolve())
         assert playlist.index == 1
         assert preset_filename_display(playlist) == "beta.milk (2/2)"
-        assert directory_display(playlist, root) == "pack/Aurora/ (1/1) [▲]"
+        assert directory_display(playlist, root) == "[▲]pack/Aurora/ (1/1)"
 
 
 def _header_row(

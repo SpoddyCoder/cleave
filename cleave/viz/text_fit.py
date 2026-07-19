@@ -6,13 +6,16 @@ import re
 
 import pygame
 
-# Playlist counter and/or must-include markers after a filename or path.
+# Must-include directory tree prefix: "[▲]", "[▼]", or "[▲▼]".
+_TREE_MARKER_PREFIX = re.compile(r"^(\[▲▼\]|\[▲\]|\[▼\])")
+
+# Playlist counter and/or must-include curation markers after a filename or path.
 # Counter: " (N/TOTAL)".
-# Markers: " [F]", " [B]", " [F][B]", or directory tree " [▲]", " [▼]", " [▲▼]".
+# Markers: " [F]", " [B]", or " [F][B]".
 _META_SUFFIX = re.compile(
-    r"(?: \((\d+)/(\d+)\))(?: \[F\](?:\[B\])?| \[B\]| \[▲▼\]| \[▲\]| \[▼\])?$"
+    r"(?: \((\d+)/(\d+)\))(?: \[F\](?:\[B\])?| \[B\])?$"
     r"|"
-    r"(?: \[F\](?:\[B\])?| \[B\]| \[▲▼\]| \[▲\]| \[▼\])$"
+    r"(?: \[F\](?:\[B\])?| \[B\])$"
 )
 
 
@@ -88,6 +91,18 @@ def _split_meta_suffix(label: str) -> tuple[str, str]:
     return label[: match.start()], match.group(0)
 
 
+def _split_meta_parts(label: str) -> tuple[str, str, str]:
+    """Split into (tree prefix, head, counter/curation suffix)."""
+    prefix = ""
+    rest = label
+    match = _TREE_MARKER_PREFIX.match(label)
+    if match is not None:
+        prefix = match.group(0)
+        rest = label[match.end() :]
+    head, suffix = _split_meta_suffix(rest)
+    return prefix, head, suffix
+
+
 def fit_text_to_width(font: pygame.font.Font, text: str, max_px: int) -> str:
     """Shorten text with a trailing ellipsis until it fits max_px."""
     if not text or max_px <= 0:
@@ -144,11 +159,12 @@ def _fit_label_head(font: pygame.font.Font, head: str, max_px: int) -> str:
 
 def fit_counter_label_to_width(font: pygame.font.Font, label: str, max_px: int) -> str:
     """Shorten a path or filename to max_px; preserve counter and must-include markers."""
-    head, suffix = _split_meta_suffix(label)
-    if not suffix:
+    prefix, head, suffix = _split_meta_parts(label)
+    if not prefix and not suffix:
         return _fit_label_head(font, label, max_px)
-    suffix_w = _text_width(font, suffix)
-    head_budget = max_px - suffix_w
+    reserved = prefix + suffix
+    reserved_w = _text_width(font, reserved)
+    head_budget = max_px - reserved_w
     if head_budget <= 0:
-        return suffix
-    return _fit_label_head(font, head, head_budget) + suffix
+        return reserved
+    return prefix + _fit_label_head(font, head, head_budget) + suffix

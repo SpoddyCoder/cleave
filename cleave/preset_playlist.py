@@ -139,17 +139,17 @@ def directory_tree_marker(
     *,
     browse_floor: Path | None = None,
 ) -> str:
-    """Must-include suffix: `` [▲]``, `` [▼]``, or `` [▲▼]`` for parent/child."""
+    """Must-include prefix: ``[▲]``, ``[▼]``, or ``[▲▼]`` for parent/child."""
     can_up = _can_go_parent(
         current_dir, preset_root, browse_floor=browse_floor
     )
     can_down = bool(list_navigable_dirs(current_dir))
     if can_up and can_down:
-        return " [▲▼]"
+        return "[▲▼]"
     if can_up:
-        return " [▲]"
+        return "[▲]"
     if can_down:
-        return " [▼]"
+        return "[▼]"
     return ""
 
 
@@ -185,7 +185,7 @@ class PresetPlaylist:
             self.current_dir, preset_root, browse_floor=browse_floor
         )
         if not siblings:
-            return f"{rel} (1/1){marker}"
+            return f"{marker}{rel} (1/1)"
         resolved_current = self.current_dir.resolve()
         try:
             position = (
@@ -198,7 +198,7 @@ class PresetPlaylist:
             )
         except StopIteration:
             position = 1
-        return f"{rel} ({position}/{len(siblings)}){marker}"
+        return f"{marker}{rel} ({position}/{len(siblings)})"
 
     def directory_display_label(
         self,
