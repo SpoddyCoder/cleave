@@ -410,8 +410,8 @@ def _fit_track_header_stem(
     stem = state.layout.slot(index)
     assert stem is not None
     block = state.tracks[stem]
-    locked = block.locked
     desc = RowDescriptor(RowKind.TRACK_HEADER, slot=stem)
+    locked = section_locked(state, desc)
     budget = max_content_width - _row_indent(state, index)
     budget -= track_header_prefix_width(font)
     budget -= font.size(_track_header_layer_prefix(state, index))[0]
@@ -893,9 +893,8 @@ def _estimate_row_content_width(
 
     if kind == RowKind.TRACK_HEADER:
         stem = state.layout.slot(index)
-        block = state.tracks[stem] if stem is not None else None
-        locked = block.locked if block is not None else False
         desc = RowDescriptor(RowKind.TRACK_HEADER, slot=stem)
+        locked = section_locked(state, desc)
         prefix_w = visibility_icon_slot_width(line_h)
         layer_prefix = composite_header_prefix_part(state, desc)
         stem_text = _fit_track_header_stem(
@@ -1317,8 +1316,8 @@ class TuningOverlay:
             block = state.tracks[stem] if stem is not None else None
             enabled = block.visible if block is not None else True
             solo = stem is not None and state.solo_slot == stem
-            locked = block.locked if block is not None else False
             desc = RowDescriptor(RowKind.TRACK_HEADER, slot=stem)
+            locked = section_locked(state, desc)
             prefix_surf = render_visibility_icon(
                 enabled=enabled, solo=solo, line_height=line_h
             )
