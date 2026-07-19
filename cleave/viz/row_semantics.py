@@ -194,7 +194,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Milkdrop Preset File",
         help_description=(
             "Currently active Milkdrop preset for this layer.",
-            "[F/B] indicates favourited/blacklisted.",
+            "[F/B/U] indicates favourited/blacklisted/user-defined.",
         ),
         repeatable=True,
         parent_group="track",

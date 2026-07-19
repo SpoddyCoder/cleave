@@ -75,16 +75,15 @@ class PresetCurationIndex:
             blacklist=_milk_names_under(blacklist_root(preset_root)),
         )
 
-    def marker(self, name: str) -> str:
-        fav = name in self.favourites
-        bl = name in self.blacklist
-        if fav and bl:
-            return " [F][B]"
-        if fav:
-            return " [F]"
-        if bl:
-            return " [B]"
-        return ""
+    def marker(self, name: str, *, user: bool = False) -> str:
+        letters = ""
+        if name in self.favourites:
+            letters += "F"
+        if name in self.blacklist:
+            letters += "B"
+        if user:
+            letters += "U"
+        return f" [{letters}]" if letters else ""
 
     def mark_favourite(self, name: str) -> None:
         self.favourites.add(name)

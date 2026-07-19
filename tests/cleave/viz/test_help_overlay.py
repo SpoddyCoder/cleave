@@ -182,7 +182,7 @@ def test_preset_file_help_titles() -> None:
     assert description.title == "Milkdrop Preset File"
     assert description.lines == (
         "Currently active Milkdrop preset for this layer.",
-        "[F/B] indicates favourited/blacklisted.",
+        "[F/B/U] indicates favourited/blacklisted/user-defined.",
     )
     entries = dict(keyboard.entries)
     assert entries["Left/Right"] == "next/previous preset"

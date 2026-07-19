@@ -11,11 +11,11 @@ _TREE_MARKER_PREFIX = re.compile(r"^(\[▲▼\]|\[▲\]|\[▼\])")
 
 # Playlist counter and/or must-include curation markers after a filename or path.
 # Counter: " (N/TOTAL)".
-# Markers: " [F]", " [B]", or " [F][B]".
+# Markers: single bracket with letters in F then B then U order, e.g. " [FBU]".
 _META_SUFFIX = re.compile(
-    r"(?: \((\d+)/(\d+)\))(?: \[F\](?:\[B\])?| \[B\])?$"
+    r"(?: \((\d+)/(\d+)\))(?: \[[FBU]+\])?$"
     r"|"
-    r"(?: \[F\](?:\[B\])?| \[B\])$"
+    r"(?: \[[FBU]+\])$"
 )
 
 
