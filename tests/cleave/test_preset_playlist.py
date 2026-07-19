@@ -222,7 +222,7 @@ def test_go_parent_recovers_when_outside_browse_floor() -> None:
         playlist = playlist_at_dir(child)
         assert directory_display(
             playlist, root, browse_floor=pack_a
-        ) == "pack-b/child/ (1/1) [▲]"
+        ) == "[▲]pack-b/child/ (1/1)"
         assert playlist.go_parent(root, browse_floor=pack_a) is True
         assert playlist.current_dir.resolve() == pack_b.resolve()
         assert playlist.go_parent(root, browse_floor=pack_a) is False
@@ -260,7 +260,7 @@ def test_directory_display_clamps_sibling_parent_at_preset_root() -> None:
 
         playlist = scan_preset_playlist(root)
         label = directory_display(playlist, root)
-        assert label == "./ (1/2) [▼]"
+        assert label == "[▼]./ (1/2)"
 
 
 def test_directory_display_label_caches_on_repeated_calls() -> None:
@@ -279,7 +279,7 @@ def test_directory_display_label_caches_on_repeated_calls() -> None:
         ) as mock_list:
             first = playlist.directory_display_label(root)
             second = playlist.directory_display_label(root)
-            assert first == second == "./ (1/2) [▼]"
+            assert first == second == "[▼]./ (1/2)"
             # Sibling listing plus child listing for the tree marker.
             assert mock_list.call_count == 2
 
@@ -357,7 +357,7 @@ def test_directory_display_label_invalidated_after_step_sibling() -> None:
             playlist.step_sibling(1, preset_root=root)
             label = playlist.directory_display_label(root)
             assert mock_list.call_count >= 1
-            assert label == "beta/ (2/3) [▲]"
+            assert label == "[▲]beta/ (2/3)"
 
 
 def test_directory_display_label_invalidated_after_enter_child() -> None:
@@ -377,7 +377,7 @@ def test_directory_display_label_invalidated_after_enter_child() -> None:
             playlist.enter_child(root)
             label = playlist.directory_display_label(root)
             assert mock_list.call_count >= 1
-            assert label == "parent/child-a/ (1/1) [▲]"
+            assert label == "[▲]parent/child-a/ (1/1)"
 
 
 def test_directory_display_label_invalidated_after_go_parent() -> None:
@@ -397,7 +397,7 @@ def test_directory_display_label_invalidated_after_go_parent() -> None:
             playlist.go_parent(root)
             label = playlist.directory_display_label(root)
             assert mock_list.call_count >= 1
-            assert label == "pack-a/ (1/1) [▲▼]"
+            assert label == "[▲▼]pack-a/ (1/1)"
 
 
 def test_directory_display_label_tree_markers() -> None:
@@ -411,19 +411,19 @@ def test_directory_display_label_tree_markers() -> None:
         _write_milk(child / "child.milk")
 
         at_root = scan_preset_playlist(root)
-        assert directory_display(at_root, root, browse_floor=root) == "./ (1/1) [▼]"
+        assert directory_display(at_root, root, browse_floor=root) == "[▼]./ (1/1)"
 
         at_pack = playlist_at_dir(pack)
         assert directory_display(at_pack, root, browse_floor=root) == (
-            "pack/ (1/1) [▲▼]"
+            "[▲▼]pack/ (1/1)"
         )
         assert directory_display(at_pack, root, browse_floor=pack) == (
-            "pack/ (1/1) [▼]"
+            "[▼]pack/ (1/1)"
         )
 
         at_child = playlist_at_dir(child)
         assert directory_display(at_child, root, browse_floor=pack) == (
-            "pack/child/ (1/1) [▲]"
+            "[▲]pack/child/ (1/1)"
         )
 
 
@@ -579,4 +579,5 @@ def test_remove_preset_invalidates_dir_display_cache() -> None:
         ) as mock_list:
             playlist.remove_preset(alpha)
             playlist.directory_display_label(root)
-            assert mock_list.call_count == 1
+            # Sibling listing plus child listing for the tree marker.
+            assert mock_list.call_count == 2

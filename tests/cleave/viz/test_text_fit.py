@@ -131,29 +131,32 @@ def test_fit_counter_label_suffix_only_when_budget_tiny() -> None:
 def test_fit_counter_label_preserves_directory_tree_marker() -> None:
     font = overlay_font()
     for marker in ("[▲]", "[▼]", "[▲▼]"):
-        label = f"presets/very/long/directory/path/for/testing/ (12/99) {marker}"
-        suffix = f" (12/99) {marker}"
-        width = font.size(suffix)[0] + font.size("…testing/")[0]
+        label = f"{marker}presets/very/long/directory/path/for/testing/ (12/99)"
+        suffix = " (12/99)"
+        reserved = f"{marker}{suffix}"
+        width = font.size(reserved)[0] + font.size("…testing/")[0]
         fitted = fit_counter_label_to_width(font, label, width)
+        assert fitted.startswith(marker)
         assert fitted.endswith(suffix)
         assert font.size(fitted)[0] <= width
 
 
 def test_fit_counter_label_both_tree_markers_reserve_full_width() -> None:
-    """Both-direction suffix is longer; truncation must keep the whole marker."""
+    """Both-direction prefix is longer; truncation must keep the whole marker."""
     font = overlay_font()
-    label = "presets/very/long/directory/path/for/testing/ (3/9) [▲▼]"
-    suffix = " (3/9) [▲▼]"
-    single = " (3/9) [▲]"
-    # Budget fits counter + both arrows + a short head; if the fitter reserved
+    label = "[▲▼]presets/very/long/directory/path/for/testing/ (3/9)"
+    reserved = "[▲▼] (3/9)"
+    single = "[▲] (3/9)"
+    # Budget fits both arrows + counter + a short head; if the fitter reserved
     # only a single-arrow width, the second triangle would be truncated away.
-    width = font.size(suffix)[0] + font.size("…testing/")[0]
+    width = font.size(reserved)[0] + font.size("…testing/")[0]
     fitted = fit_counter_label_to_width(font, label, width)
-    assert fitted.endswith(suffix)
-    assert not fitted.endswith(single)
+    assert fitted.startswith("[▲▼]")
+    assert fitted.endswith(" (3/9)")
     assert font.size(fitted)[0] <= width
-    tiny = fit_counter_label_to_width(font, label, font.size(suffix)[0] - 1)
-    assert tiny == suffix
+    tiny = fit_counter_label_to_width(font, label, font.size(reserved)[0] - 1)
+    assert tiny == reserved
+    assert tiny != single
 
 
 def test_wrap_text_to_width_keeps_short_line() -> None:
