@@ -13,7 +13,7 @@ import pygame
 from cleave.config import CleaveConfig, render_fps, render_hdr_compositing
 from cleave.user_config import persist_editor_settings
 from cleave.effects.runtime import EffectRuntime
-from cleave.gl_color_format import GlColorFormat, resolve_compositor_format
+from cleave.gl_color_format import GlColorFormat, resolve_live_compositor_format
 from cleave.gl_compositor import GlCompositor
 from cleave.gl_post_process import GlPostProcess
 from cleave.preset_playlist import PresetPlaylist
@@ -137,12 +137,17 @@ def build_runtime_base(
     )
 
 
-def _compositor_color_format(cfg: CleaveConfig) -> GlColorFormat:
-    return resolve_compositor_format(render_hdr_compositing(cfg))
+def _compositor_color_format(seed: VisualizerSeed) -> GlColorFormat:
+    from cleave.viz.editor_mode_controls import is_preset_curation_mode
+
+    return resolve_live_compositor_format(
+        render_hdr_compositing(seed.cfg),
+        preset_curation=is_preset_curation_mode(seed.session),
+    )
 
 
 def _make_compositor(seed: VisualizerSeed) -> GlCompositor:
-    color_format = _compositor_color_format(seed.cfg)
+    color_format = _compositor_color_format(seed)
     c = GlCompositor(
         seed.width,
         seed.height,
@@ -157,7 +162,7 @@ def _make_compositor(seed: VisualizerSeed) -> GlCompositor:
 def _init_compositor_and_post(
     seed: VisualizerSeed,
 ) -> tuple[GlCompositor, GlPostProcess]:
-    color_format = _compositor_color_format(seed.cfg)
+    color_format = _compositor_color_format(seed)
     compositor = _make_compositor(seed)
     post_process = GlPostProcess(color_format=color_format)
     post_process.init()
@@ -276,7 +281,7 @@ def init_gl_resources_render(
     output_height: int,
     viz_quality: bool = False,
 ) -> RenderVisualizerRuntime:
-    color_format = _compositor_color_format(seed.cfg)
+    color_format = _compositor_color_format(seed)
     compositor = GlCompositor(
         seed.width,
         seed.height,

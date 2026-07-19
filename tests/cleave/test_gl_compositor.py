@@ -131,6 +131,46 @@ def test_resize_layer_fbo_noop_when_same_size() -> None:
     fbo.destroy.assert_not_called()
 
 
+def test_set_color_format_noop_when_unchanged() -> None:
+    from cleave.gl_color_format import RGBA8
+
+    compositor = GlCompositor.__new__(GlCompositor)
+    compositor._color_format = RGBA8
+    compositor._initialized = True
+    compositor._destroy_content_fbo = MagicMock()
+    compositor._allocate_content_fbo = MagicMock()
+    compositor._layers = []
+
+    compositor.set_color_format(RGBA8)
+
+    compositor._destroy_content_fbo.assert_not_called()
+    compositor._allocate_content_fbo.assert_not_called()
+
+
+def test_set_color_format_reallocates_content_and_layers() -> None:
+    from cleave.gl_color_format import RGBA8, RGBA16F
+
+    compositor = GlCompositor.__new__(GlCompositor)
+    compositor._color_format = RGBA16F
+    compositor._initialized = True
+    compositor.content_width = 64
+    compositor.content_height = 64
+    compositor._destroy_content_fbo = MagicMock()
+    compositor._allocate_content_fbo = MagicMock()
+    compositor._replace_layer_framebuffer = MagicMock()
+    layer = MagicMock(spec=LayerFbo)
+    layer.width = 640
+    layer.height = 360
+    compositor._layers = [layer]
+
+    compositor.set_color_format(RGBA8)
+
+    assert compositor.color_format is RGBA8
+    compositor._destroy_content_fbo.assert_called_once()
+    compositor._allocate_content_fbo.assert_called_once()
+    compositor._replace_layer_framebuffer.assert_called_once_with(layer, 640, 360)
+
+
 def test_resize_layer_fbo_unknown_name_raises() -> None:
     compositor = GlCompositor.__new__(GlCompositor)
     compositor._layers = []

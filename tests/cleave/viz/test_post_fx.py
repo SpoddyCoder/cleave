@@ -9,11 +9,14 @@ from cleave.viz.post_fx import (
     apply_chroma_boost_rgb,
     chroma_boost_active,
     compress_highlight_luminance,
+    effective_hdr_compositing,
     highlight_desaturation_mix,
     highlight_rolloff_active,
     live_frame_fade_alpha,
 )
 from tests.support.config import default_render_post_fx_runtime
+from tests.support.viz import make_test_cfg
+from cleave.viz.session import TuningSession
 
 HIGHLIGHT_ROLLOFF_CURVES = ("rolloff", "smoothstep", "aces_fit")
 
@@ -239,4 +242,16 @@ def test_apply_chroma_boost_rgb_vibrance_spares_saturated_pixels() -> None:
     saturated_sat_delta = float(np.abs(saturated_sat - saturated).sum())
     saturated_vib_delta = float(np.abs(saturated_vib - saturated).sum())
     assert saturated_vib_delta < saturated_sat_delta
+
+
+def test_effective_hdr_compositing_off_in_preset_curation() -> None:
+    from cleave.config import RenderConfig
+
+    cfg = make_test_cfg(("layer_1",))
+    cfg.render = RenderConfig(hdr_compositing=True)
+    session = TuningSession(layer_z_order=["layer_1"], layers={})
+    assert effective_hdr_compositing(cfg, session) is True
+    session.settings.editor_mode = "preset_curation"
+    assert effective_hdr_compositing(cfg, session) is False
+    assert effective_hdr_compositing(cfg) is True
 

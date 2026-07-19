@@ -459,6 +459,8 @@ def make_tuning_controls(
         "layer_bindings": layer_bindings,
         "render_post_fx_bindings": render_post_fx_bindings,
         "layer_manager": layer_manager,
+        "compositor": compositor,
+        "post_process": post_process,
         "beat_times": beat_times,
         "bar_times": bar_times,
     }

@@ -63,6 +63,17 @@ def resolve_compositor_format(hdr_compositing: bool) -> GlColorFormat:
     return RGBA16F if hdr_compositing else RGBA8
 
 
+def resolve_live_compositor_format(
+    hdr_compositing: bool,
+    *,
+    preset_curation: bool,
+) -> GlColorFormat:
+    """Live play format: curation always uses 8-bit (no multi-layer HDR stack)."""
+    if preset_curation:
+        return RGBA8
+    return resolve_compositor_format(hdr_compositing)
+
+
 def probe_rgba16f_framebuffer(width: int = 1, height: int = 1) -> bool:
     """Return True when a throwaway RGBA16F color attachment is framebuffer-complete."""
     texture_id = _gl_name(glGenTextures)
