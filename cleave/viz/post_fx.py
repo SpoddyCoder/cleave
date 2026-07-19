@@ -9,9 +9,11 @@ import numpy as np
 from cleave.config import CleaveConfig, render_hdr_compositing
 from cleave.config_schema import DEFAULT_HIGHLIGHT_ROLLOFF_CURVE, HighlightRolloffCurve
 from cleave.easing import fade_alpha
-from cleave.viz.session import RenderPostFxRuntime
+from cleave.gl_color_format import resolve_live_compositor_format
+from cleave.viz.session import RenderPostFxRuntime, TuningSession
 
 if TYPE_CHECKING:
+    from cleave.gl_compositor import GlCompositor
     from cleave.gl_post_process import GlPostProcess
 
 ACES_AT_ONE = 2.54 / 3.16
@@ -220,8 +222,41 @@ def apply_highlight_rolloff_rgba(
     return out.tobytes()
 
 
-def hdr_display_shoulder_active(cfg: CleaveConfig) -> bool:
+def effective_hdr_compositing(
+    cfg: CleaveConfig,
+    session: TuningSession | None = None,
+) -> bool:
+    """True when the live/offline path should use RGBA16F compositing."""
+    if session is not None:
+        from cleave.viz.editor_mode_controls import is_preset_curation_mode
+
+        if is_preset_curation_mode(session):
+            return False
     return render_hdr_compositing(cfg)
+
+
+def hdr_display_shoulder_active(
+    cfg: CleaveConfig,
+    session: TuningSession | None = None,
+) -> bool:
+    return effective_hdr_compositing(cfg, session)
+
+
+def sync_live_compositor_format(
+    cfg: CleaveConfig,
+    session: TuningSession,
+    compositor: GlCompositor,
+    post_process: GlPostProcess,
+) -> None:
+    """Match compositor/post-process attachments to editor mode (8-bit in curation)."""
+    from cleave.viz.editor_mode_controls import is_preset_curation_mode
+
+    fmt = resolve_live_compositor_format(
+        render_hdr_compositing(cfg),
+        preset_curation=is_preset_curation_mode(session),
+    )
+    compositor.set_color_format(fmt)
+    post_process.set_color_format(fmt)
 
 
 def apply_hdr_display_shoulder(

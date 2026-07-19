@@ -400,6 +400,28 @@ class GlPostProcess:
         self._external_textures: dict[tuple[int, int, int], moderngl.Texture] = {}
         self._dest_fbos: dict[tuple[int, int, int], moderngl.Framebuffer] = {}
 
+    @property
+    def color_format(self) -> GlColorFormat:
+        return self._color_format
+
+    def set_color_format(self, color_format: GlColorFormat) -> None:
+        """Switch ping-pong / external texture dtype; no-op when unchanged."""
+        if color_format is self._color_format:
+            return
+        self._color_format = color_format
+        self._release_format_dependent_buffers()
+
+    def _release_format_dependent_buffers(self) -> None:
+        for fbo in self._dest_fbos.values():
+            fbo.release()
+        self._dest_fbos.clear()
+        for tex in self._external_textures.values():
+            tex.release()
+        self._external_textures.clear()
+        for buffers in self._buffers.values():
+            buffers.release()
+        self._buffers.clear()
+
     def init(self) -> None:
         """Attach to the current pygame OpenGL context."""
         self._ctx = moderngl.create_context()
@@ -773,15 +795,7 @@ class GlPostProcess:
         return texture_id
 
     def destroy(self) -> None:
-        for fbo in self._dest_fbos.values():
-            fbo.release()
-        self._dest_fbos.clear()
-        for tex in self._external_textures.values():
-            tex.release()
-        self._external_textures.clear()
-        for buffers in self._buffers.values():
-            buffers.release()
-        self._buffers.clear()
+        self._release_format_dependent_buffers()
         for vao in self._quad_vaos.values():
             vao.release()
         self._quad_vaos.clear()

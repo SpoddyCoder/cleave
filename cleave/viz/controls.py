@@ -20,6 +20,7 @@ from cleave.preset_playlist import is_top_level_browse_dir
 from cleave.timeline import snap_placement_time
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.editor_mode_controls import EditorModeController, is_preset_curation_mode
+from cleave.viz.post_fx import sync_live_compositor_format
 from cleave.viz.preset_curation_controls import PresetCurationController
 from cleave.viz.key_repeat import KeyRepeatController, add_current_preset_key_pressed, delete_key_pressed, mod_ctrl, mod_shift
 from cleave.viz.modal import ModalHost
@@ -66,6 +67,8 @@ from cleave.viz.session import TuningSession
 from cleave.viz.tuning_view_state import TuningViewState, TuningViewStateBuilder
 
 if TYPE_CHECKING:
+    from cleave.gl_compositor import GlCompositor
+    from cleave.gl_post_process import GlPostProcess
     from cleave.viz.wiring import LayerManager
 
 NOTIFICATION_TIMELINE_ENABLED_TEXT = "Timeline controls layer visibility"
@@ -101,6 +104,8 @@ class TuningControls:
         repo_root_example: Path | None = None,
         modal_host: ModalHost | None = None,
         layer_manager: LayerManager | None = None,
+        compositor: GlCompositor | None = None,
+        post_process: GlPostProcess | None = None,
         beat_times: Sequence[float] = (),
         bar_times: Sequence[float] = (),
     ) -> None:
@@ -115,6 +120,8 @@ class TuningControls:
         self._layer_bindings = layer_bindings
         self._render_post_fx_bindings = render_post_fx_bindings
         self._layer_manager = layer_manager
+        self._compositor = compositor
+        self._post_process = post_process
         self._modal_host = modal_host if modal_host is not None else ModalHost()
 
         self._focus_cursor: FocusCursor = MainFocus(
@@ -727,6 +734,7 @@ class TuningControls:
                 self.session.song_markers.selected_index = desc.marker_index
 
     def _on_editor_mode_changed(self) -> None:
+        self._sync_live_compositor_format()
         self._view_state._structure = None
         view = self.build_view_state(paused=self.playback.paused)
         if isinstance(self.focus_cursor, TimelineFocus):
@@ -737,6 +745,16 @@ class TuningControls:
                 resolved = view.layout.resolve_navigable(focus_desc, view)
                 self._apply_focus_cursor(MainFocus(resolved))
         self._normalize_focus_cursor()
+
+    def _sync_live_compositor_format(self) -> None:
+        if self._compositor is None or self._post_process is None:
+            return
+        sync_live_compositor_format(
+            self.cfg,
+            self.session,
+            self._compositor,
+            self._post_process,
+        )
 
     def _normalize_focus_cursor(self) -> None:
         view = self.build_view_state(paused=self.playback.paused)

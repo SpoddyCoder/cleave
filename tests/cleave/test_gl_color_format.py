@@ -18,6 +18,7 @@ from cleave.gl_color_format import (  # noqa: E402
     RGBA8,
     probe_rgba16f_framebuffer,
     resolve_compositor_format,
+    resolve_live_compositor_format,
 )
 
 
@@ -29,6 +30,16 @@ def test_resolve_compositor_format_8bit_path() -> None:
 def test_resolve_compositor_format_hdr_path() -> None:
     fmt = resolve_compositor_format(True)
     assert fmt is RGBA16F
+
+
+def test_resolve_live_compositor_format_forces_8bit_in_curation() -> None:
+    assert resolve_live_compositor_format(True, preset_curation=True) is RGBA8
+    assert resolve_live_compositor_format(False, preset_curation=True) is RGBA8
+
+
+def test_resolve_live_compositor_format_follows_hdr_outside_curation() -> None:
+    assert resolve_live_compositor_format(True, preset_curation=False) is RGBA16F
+    assert resolve_live_compositor_format(False, preset_curation=False) is RGBA8
 
 
 def test_rgba8_constants() -> None:

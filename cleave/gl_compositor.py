@@ -458,6 +458,71 @@ class GlCompositor:
         self._layers.append(layer)
         return layer
 
+    @property
+    def color_format(self) -> GlColorFormat:
+        return self._color_format
+
+    def set_color_format(self, color_format: GlColorFormat) -> None:
+        """Switch content/layer attachment format; no-op when unchanged."""
+        if color_format is self._color_format:
+            return
+        if color_format is RGBA16F and not probe_rgba16f_framebuffer(
+            self.content_width, self.content_height
+        ):
+            raise RuntimeError(
+                "HDR compositing requires RGBA16F framebuffer support; "
+                "set render.hdr_compositing: false to use 8-bit compositing"
+            )
+        self._color_format = color_format
+        if not self._initialized:
+            return
+        self._destroy_content_fbo()
+        self._allocate_content_fbo()
+        for layer in self._layers:
+            self._replace_layer_framebuffer(layer, layer.width, layer.height)
+
+    def _replace_layer_framebuffer(
+        self,
+        layer: LayerFbo,
+        width: int,
+        height: int,
+    ) -> None:
+        """Reallocate *layer* FBO and rolloff/chroma sources; keep compositor fields."""
+        enabled = layer.enabled
+        opacity = layer.opacity
+        blend_mode = layer.blend_mode
+        flash_alpha = layer.flash_alpha
+        bloom_strength = layer.bloom_strength
+        hue_rgb = layer.hue_rgb
+        hue_mix = layer.hue_mix
+        grit_strength = layer.grit_strength
+        aberration_px = layer.aberration_px
+        name = layer.name
+
+        layer.destroy()
+        fbo_id, texture_id, depth_rbo_id = self._allocate_layer_framebuffer(
+            name, width, height
+        )
+
+        layer.width = width
+        layer.height = height
+        layer.fbo_id = fbo_id
+        layer.texture_id = texture_id
+        layer.depth_rbo_id = depth_rbo_id
+        layer.enabled = enabled
+        layer.opacity = opacity
+        layer.blend_mode = blend_mode
+        layer.flash_alpha = flash_alpha
+        layer.bloom_strength = bloom_strength
+        layer.hue_rgb = hue_rgb
+        layer.hue_mix = hue_mix
+        layer.grit_strength = grit_strength
+        layer.aberration_px = aberration_px
+        self._destroy_rolloff_source(name)
+        self._destroy_chroma_source(name)
+        self._ensure_rolloff_source(name, width, height)
+        self._ensure_chroma_source(name, width, height)
+
     def resize_layer_fbo(self, name: str, width: int, height: int) -> None:
         """Resize an existing layer FBO, preserving compositor state fields."""
         for layer in self._layers:
@@ -465,40 +530,7 @@ class GlCompositor:
                 continue
             if layer.width == width and layer.height == height:
                 return
-
-            enabled = layer.enabled
-            opacity = layer.opacity
-            blend_mode = layer.blend_mode
-            flash_alpha = layer.flash_alpha
-            bloom_strength = layer.bloom_strength
-            hue_rgb = layer.hue_rgb
-            hue_mix = layer.hue_mix
-            grit_strength = layer.grit_strength
-            aberration_px = layer.aberration_px
-
-            layer.destroy()
-            fbo_id, texture_id, depth_rbo_id = self._allocate_layer_framebuffer(
-                name, width, height
-            )
-
-            layer.width = width
-            layer.height = height
-            layer.fbo_id = fbo_id
-            layer.texture_id = texture_id
-            layer.depth_rbo_id = depth_rbo_id
-            layer.enabled = enabled
-            layer.opacity = opacity
-            layer.blend_mode = blend_mode
-            layer.flash_alpha = flash_alpha
-            layer.bloom_strength = bloom_strength
-            layer.hue_rgb = hue_rgb
-            layer.hue_mix = hue_mix
-            layer.grit_strength = grit_strength
-            layer.aberration_px = aberration_px
-            self._destroy_rolloff_source(name)
-            self._destroy_chroma_source(name)
-            self._ensure_rolloff_source(name, width, height)
-            self._ensure_chroma_source(name, width, height)
+            self._replace_layer_framebuffer(layer, width, height)
             return
 
         raise ValueError(f"no layer FBO named {name!r}")

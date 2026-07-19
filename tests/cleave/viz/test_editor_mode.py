@@ -162,6 +162,30 @@ def test_enter_curation_expands_layer_one() -> None:
     assert controls.session.layers["layer_1"].expanded is True
 
 
+def test_editor_mode_change_syncs_compositor_format() -> None:
+    from cleave.config import RenderConfig
+    from cleave.gl_color_format import RGBA8, RGBA16F
+
+    controls = _make_controls(("layer_1",))
+    controls.cfg.render = RenderConfig(hdr_compositing=True)
+    compositor = MagicMock()
+    post_process = MagicMock()
+    controls._compositor = compositor
+    controls._post_process = post_process
+
+    controls.session.settings.editor_mode = "preset_curation"
+    controls._on_editor_mode_changed()
+    compositor.set_color_format.assert_called_with(RGBA8)
+    post_process.set_color_format.assert_called_with(RGBA8)
+
+    compositor.reset_mock()
+    post_process.reset_mock()
+    controls.session.settings.editor_mode = "visualizer"
+    controls._on_editor_mode_changed()
+    compositor.set_color_format.assert_called_with(RGBA16F)
+    post_process.set_color_format.assert_called_with(RGBA16F)
+
+
 def test_enter_curation_defaults_full_mix_and_disables_rotation() -> None:
     """Regression: session projectM rotation must not keep running in curation."""
     controls = _make_controls(("layer_1", "layer_2"))
