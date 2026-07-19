@@ -6,12 +6,13 @@ import re
 
 import pygame
 
-# Playlist counter and/or curation markers after a filename or path.
-# Counter: " (N/TOTAL)". Markers: " [F]", " [B]", or " [F][B]".
+# Playlist counter and/or must-include markers after a filename or path.
+# Counter: " (N/TOTAL)".
+# Markers: " [F]", " [B]", " [F][B]", or directory tree " [▲]", " [▼]", " [▲▼]".
 _META_SUFFIX = re.compile(
-    r"(?: \((\d+)/(\d+)\))(?: \[F\](?:\[B\])?| \[B\])?$"
+    r"(?: \((\d+)/(\d+)\))(?: \[F\](?:\[B\])?| \[B\]| \[▲▼\]| \[▲\]| \[▼\])?$"
     r"|"
-    r"(?: \[F\](?:\[B\])?| \[B\])$"
+    r"(?: \[F\](?:\[B\])?| \[B\]| \[▲▼\]| \[▲\]| \[▼\])$"
 )
 
 
@@ -80,7 +81,7 @@ def wrap_text_to_width(
 
 
 def _split_meta_suffix(label: str) -> tuple[str, str]:
-    """Split ``head`` from trailing `` (N/TOTAL)`` and/or `` [F]``/`` [B]``."""
+    """Split ``head`` from trailing counter and/or must-include markers."""
     match = _META_SUFFIX.search(label)
     if match is None:
         return label, ""
@@ -142,7 +143,7 @@ def _fit_label_head(font: pygame.font.Font, head: str, max_px: int) -> str:
 
 
 def fit_counter_label_to_width(font: pygame.font.Font, label: str, max_px: int) -> str:
-    """Shorten a path or filename to max_px; preserve counter and curation markers."""
+    """Shorten a path or filename to max_px; preserve counter and must-include markers."""
     head, suffix = _split_meta_suffix(label)
     if not suffix:
         return _fit_label_head(font, label, max_px)

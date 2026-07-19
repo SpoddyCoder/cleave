@@ -197,7 +197,7 @@ def test_directory_display_clamps_sibling_parent_at_preset_root() -> None:
 
         playlist = scan_preset_playlist(root)
         label = directory_display(playlist, root)
-        assert label == "./ (1/2)"
+        assert label == "./ (1/2) [▼]"
 
 
 def test_directory_display_label_caches_on_repeated_calls() -> None:
@@ -216,8 +216,9 @@ def test_directory_display_label_caches_on_repeated_calls() -> None:
         ) as mock_list:
             first = playlist.directory_display_label(root)
             second = playlist.directory_display_label(root)
-            assert first == second == "./ (1/2)"
-            assert mock_list.call_count == 1
+            assert first == second == "./ (1/2) [▼]"
+            # Sibling listing plus child listing for the tree marker.
+            assert mock_list.call_count == 2
 
 
 def _playlist_with_siblings(root: Path) -> tuple:
@@ -245,7 +246,7 @@ def test_directory_display_label_invalidated_after_next() -> None:
         ) as mock_list:
             playlist.next()
             playlist.directory_display_label(root)
-            assert mock_list.call_count == 1
+            assert mock_list.call_count == 2
 
 
 def test_directory_display_label_invalidated_after_prev() -> None:
@@ -262,7 +263,7 @@ def test_directory_display_label_invalidated_after_prev() -> None:
         ) as mock_list:
             playlist.prev()
             playlist.directory_display_label(root)
-            assert mock_list.call_count == 1
+            assert mock_list.call_count == 2
 
 
 def test_directory_display_label_invalidated_after_step_by() -> None:
@@ -279,7 +280,7 @@ def test_directory_display_label_invalidated_after_step_by() -> None:
         ) as mock_list:
             playlist.step_by(1)
             playlist.directory_display_label(root)
-            assert mock_list.call_count == 1
+            assert mock_list.call_count == 2
 
 
 def test_directory_display_label_invalidated_after_step_sibling() -> None:
@@ -293,7 +294,7 @@ def test_directory_display_label_invalidated_after_step_sibling() -> None:
             playlist.step_sibling(1, preset_root=root)
             label = playlist.directory_display_label(root)
             assert mock_list.call_count >= 1
-            assert label == f"beta/ (2/3)"
+            assert label == "beta/ (2/3) [▲]"
 
 
 def test_directory_display_label_invalidated_after_enter_child() -> None:
@@ -313,7 +314,7 @@ def test_directory_display_label_invalidated_after_enter_child() -> None:
             playlist.enter_child(root)
             label = playlist.directory_display_label(root)
             assert mock_list.call_count >= 1
-            assert label == "parent/child-a/ (1/1)"
+            assert label == "parent/child-a/ (1/1) [▲]"
 
 
 def test_directory_display_label_invalidated_after_go_parent() -> None:
@@ -333,7 +334,27 @@ def test_directory_display_label_invalidated_after_go_parent() -> None:
             playlist.go_parent(root)
             label = playlist.directory_display_label(root)
             assert mock_list.call_count >= 1
-            assert label == "pack-a/ (1/1)"
+            assert label == "pack-a/ (1/1) [▲▼]"
+
+
+def test_directory_display_label_tree_markers() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        pack = root / "pack"
+        pack.mkdir()
+        _write_milk(pack / "pack.milk")
+        child = pack / "child"
+        child.mkdir()
+        _write_milk(child / "child.milk")
+
+        at_root = scan_preset_playlist(root)
+        assert directory_display(at_root, root) == "./ (1/1) [▼]"
+
+        at_pack = playlist_at_dir(pack)
+        assert directory_display(at_pack, root) == "pack/ (1/1) [▲▼]"
+
+        at_child = playlist_at_dir(child)
+        assert directory_display(at_child, root) == "pack/child/ (1/1) [▲]"
 
 
 def test_empty_directory_display_and_config_path() -> None:
