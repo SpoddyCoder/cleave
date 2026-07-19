@@ -3041,13 +3041,60 @@ def _preset_row(controls: TuningControls) -> int:
 def test_directory_row_lr_changes_current_dir() -> None:
     root, siblings = _make_sibling_dir_tree(3)
     controls = _controls_with_playlist(root, siblings[0])
-    controls.focus_descriptor = _desc(controls.build_view_state(paused=False), _preset_dir_row(controls))
+    controls.focus_descriptor = _desc(
+        controls.build_view_state(paused=False), _preset_dir_row(controls)
+    )
     playlist = controls.session.layers["layer_1"].playlist
+    layer = controls.session.layers["layer_1"]
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert playlist.current_dir.resolve() == siblings[1].resolve()
+    assert layer.browse_floor.resolve() == siblings[1].resolve()
 
     controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert playlist.current_dir.resolve() == siblings[0].resolve()
+    assert layer.browse_floor.resolve() == siblings[0].resolve()
+
+
+def test_directory_pack_hop_then_enter_ctrl_left_still_ascends() -> None:
+    root, siblings = _make_sibling_dir_tree(2)
+    other = siblings[1]
+    child = other / "nested"
+    child.mkdir()
+    _write_milk(child / "nested.milk")
+    controls = _controls_with_playlist(root, siblings[0])
+    controls.focus_descriptor = _desc(
+        controls.build_view_state(paused=False), _preset_dir_row(controls)
+    )
+    playlist = controls.session.layers["layer_1"].playlist
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert playlist.current_dir.resolve() == other.resolve()
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert playlist.current_dir.resolve() == child.resolve()
+    view = controls.build_view_state(paused=False)
+    assert "[▲]" in view.tracks["layer_1"].preset_dir_label
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert playlist.current_dir.resolve() == other.resolve()
+
+
+def test_directory_enter_then_ctrl_left_ascends_within_pack() -> None:
+    root, siblings = _make_sibling_dir_tree(2)
+    controls = _controls_with_playlist(root, siblings[0])
+    controls.focus_descriptor = _desc(
+        controls.build_view_state(paused=False), _preset_dir_row(controls)
+    )
+    playlist = controls.session.layers["layer_1"].playlist
+    child = siblings[0] / "child"
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert playlist.current_dir.resolve() == child.resolve()
+    view = controls.build_view_state(paused=False)
+    assert "[▲]" in view.tracks["layer_1"].preset_dir_label
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
     assert playlist.current_dir.resolve() == siblings[0].resolve()
 
 

@@ -81,6 +81,40 @@ def navigable_parent(current_dir: Path, preset_root: Path) -> Path:
     return preset_root.resolve()
 
 
+def _effective_browse_floor(
+    current_dir: Path,
+    preset_root: Path,
+    *,
+    browse_floor: Path | None = None,
+) -> Path:
+    """Floor for ascent clamps; local pack if ``current_dir`` escaped."""
+    resolved_root = preset_root.resolve()
+    floor = (
+        browse_floor if browse_floor is not None else preset_root
+    ).resolve()
+    resolved = current_dir.resolve()
+    if _path_at_or_below(resolved, floor):
+        return floor
+    return preset_browse_floor(resolved, resolved_root)
+
+
+def list_browse_siblings(
+    current_dir: Path,
+    preset_root: Path,
+) -> tuple[Path, ...]:
+    """Navigable peer dirs for Left/Right (parent clamped at ``preset_root``)."""
+    return list_navigable_dirs(navigable_parent(current_dir, preset_root))
+
+
+def is_top_level_browse_dir(current_dir: Path, preset_root: Path) -> bool:
+    """True when ``current_dir`` is a direct child of ``preset_root``."""
+    resolved = current_dir.resolve()
+    resolved_root = preset_root.resolve()
+    if resolved == resolved_root:
+        return False
+    return resolved.parent.resolve() == resolved_root
+
+
 def _can_go_parent(
     current_dir: Path,
     preset_root: Path,
@@ -91,10 +125,12 @@ def _can_go_parent(
     parent = current_dir.parent
     if parent == current_dir:
         return False
-    floor = browse_floor if browse_floor is not None else preset_root
-    return _path_at_or_below(parent, floor) and _path_at_or_below(
-        parent, preset_root
+    if not _path_at_or_below(parent, preset_root):
+        return False
+    floor = _effective_browse_floor(
+        current_dir, preset_root, browse_floor=browse_floor
     )
+    return _path_at_or_below(parent, floor)
 
 
 def directory_tree_marker(
@@ -144,9 +180,7 @@ class PresetPlaylist:
         browse_floor: Path | None = None,
     ) -> str:
         rel = to_config_relative(self.current_dir, preset_root).rstrip("/") + "/"
-        siblings = list_navigable_dirs(
-            navigable_parent(self.current_dir, preset_root)
-        )
+        siblings = list_browse_siblings(self.current_dir, preset_root)
         marker = directory_tree_marker(
             self.current_dir, preset_root, browse_floor=browse_floor
         )
@@ -240,7 +274,7 @@ class PresetPlaylist:
         return self.current
 
     def step_sibling(self, delta: int = 1, *, preset_root: Path) -> bool:
-        siblings = list_navigable_dirs(navigable_parent(self.current_dir, preset_root))
+        siblings = list_browse_siblings(self.current_dir, preset_root)
         if not siblings:
             return False
         resolved_current = self.current_dir.resolve()

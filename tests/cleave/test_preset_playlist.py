@@ -185,6 +185,51 @@ def test_go_parent_clamps_at_browse_floor() -> None:
         assert playlist.current_dir.resolve() == pack.resolve()
 
 
+def test_step_sibling_hops_top_level_packs() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        pack_a = root / "pack-a"
+        pack_b = root / "pack-b"
+        pack_a.mkdir()
+        pack_b.mkdir()
+        _write_milk(pack_a / "a.milk")
+        _write_milk(pack_b / "b.milk")
+
+        playlist = playlist_at_dir(pack_a)
+        assert directory_display(
+            playlist, root, browse_floor=pack_a
+        ) == "pack-a/ (1/2)"
+        assert playlist.step_sibling(1, preset_root=root) is True
+        assert playlist.current_dir.resolve() == pack_b.resolve()
+        assert directory_display(
+            playlist, root, browse_floor=pack_b
+        ) == "pack-b/ (2/2)"
+
+
+def test_go_parent_recovers_when_outside_browse_floor() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        pack_a = root / "pack-a"
+        pack_b = root / "pack-b"
+        pack_a.mkdir()
+        pack_b.mkdir()
+        _write_milk(pack_a / "a.milk")
+        _write_milk(pack_b / "b.milk")
+        child = pack_b / "child"
+        child.mkdir()
+        _write_milk(child / "c.milk")
+
+        playlist = playlist_at_dir(child)
+        assert directory_display(
+            playlist, root, browse_floor=pack_a
+        ) == "pack-b/child/ (1/1) [▲]"
+        assert playlist.go_parent(root, browse_floor=pack_a) is True
+        assert playlist.current_dir.resolve() == pack_b.resolve()
+        assert playlist.go_parent(root, browse_floor=pack_a) is False
+        assert playlist.step_sibling(1, preset_root=root) is True
+        assert playlist.current_dir.resolve() == pack_a.resolve()
+
+
 def test_preset_browse_floor_uses_first_configured_path_segment() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
