@@ -566,7 +566,8 @@ def _resolve_preset(preset: str | Path, preset_root: Path) -> Path:
     return (preset_root / path).resolve()
 
 
-def _resolve_user_preset(preset: str | Path, cfg_dir: Path) -> Path:
+def resolve_user_preset(preset: str | Path, cfg_dir: Path) -> Path:
+    """Resolve a preset path from a viz config relative to ``cfg_dir``."""
     path = Path(os.path.expanduser(str(preset)))
     if path.is_absolute():
         return path.resolve()
@@ -599,7 +600,7 @@ def _parse_preset_switching_presets(
             raise ValueError(
                 f"layers.{slot}.preset_switching_presets[{index}] must be a string"
             )
-        presets.append(_resolve_user_preset(entry, ctx.cfg_dir))
+        presets.append(resolve_user_preset(entry, ctx.cfg_dir))
     return presets
 
 

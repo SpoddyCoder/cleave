@@ -46,6 +46,7 @@ from cleave.viz.input_dispatch import (
     dispatch_keyup,
     dispatch_should_notify_overlay,
 )
+from cleave.viz.user_presets import cleanup_unreferenced_user_presets
 from cleave.viz.wiring import LayerManager, make_timeline_controls, make_tuning_controls
 
 
@@ -661,4 +662,5 @@ class VisualizerApp:
                 rt.compositor.destroy()
                 rt.post_process.destroy()
                 rt.mix_player.stop()
+                cleanup_unreferenced_user_presets(rt.seed.project_dir)
             pygame.quit()
