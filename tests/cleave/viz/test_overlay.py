@@ -12,13 +12,16 @@ from cleave.viz.frame_rate import format_fps_display
 from cleave.viz.focus_nav import MainFocus
 from cleave.viz.row_semantics import RowDescriptor, RowKind, row_is_pinned
 from cleave.viz.tuning_panel_draw import (
+    HELP_HINT_LABEL,
     PanelScrollMetrics,
     TuningOverlay,
     _row_bg_color,
     _row_text,
     _action_parameter_label_color,
     _row_value_color,
+    bottom_row_highlight_width,
     fit_row_text,
+    panel_bottom_row_index,
     panel_content_max_width,
     panel_fps_layout,
     panel_help_hint_layout,
@@ -203,7 +206,7 @@ def test_help_hint_layout_avoids_scrollbar_column() -> None:
     pygame.init()
     overlay = TuningOverlay()
     font = overlay._font_get()
-    hint_w = font.render("H - help", True, LABEL).get_width()
+    hint_w = font.render(HELP_HINT_LABEL, True, LABEL).get_width()
     panel_w = 320
     panel_h = 200
     without_bar = panel_help_hint_layout(
@@ -224,6 +227,36 @@ def test_help_hint_layout_avoids_scrollbar_column() -> None:
     )
     assert with_bar.y == without_bar.y
     assert with_bar.x == without_bar.x - SCROLLBAR_WIDTH - SCROLLBAR_CONTENT_GAP
+
+
+def test_bottom_row_highlight_width_reserves_help_hint() -> None:
+    pygame.init()
+    font = pygame.font.SysFont("monospace", 14)
+    panel_w = 400
+    padding = 8
+    hint_w = font.size(HELP_HINT_LABEL)[0]
+    char_w = font.size("M")[0]
+    width = bottom_row_highlight_width(
+        panel_w=panel_w,
+        padding=padding,
+        font=font,
+        show_scrollbar=False,
+    )
+    assert width == panel_w - 2 * padding - hint_w - char_w
+    with_scroll = bottom_row_highlight_width(
+        panel_w=panel_w,
+        padding=padding,
+        font=font,
+        show_scrollbar=True,
+    )
+    assert with_scroll == (
+        panel_w
+        - 2 * padding
+        - SCROLLBAR_WIDTH
+        - SCROLLBAR_CONTENT_GAP
+        - hint_w
+        - char_w
+    )
 
 
 def test_fps_layout_top_right_on_transport_row() -> None:
@@ -462,6 +495,161 @@ def test_settings_header_highlight_stops_before_fps() -> None:
     assert tinted == expected_tint
     assert gap == BACKGROUND
     assert under_fps != expected_tint
+
+
+def test_bottom_row_highlight_stops_before_help_hint() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    state = _minimal_view_state(
+        tracks={
+            "layer_1": TrackBlock(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                expanded=True,
+            )
+        },
+    )
+    visible = state.layout.visible_indices(state)
+    state.focus_descriptor = state.layout.descriptor(visible[-1])
+    panel = _copy_panel_surface(overlay, state)
+    font = overlay._font_get()
+    metrics = _panel_scroll_metrics(overlay, state)
+    line_h = font.get_linesize()
+    bottom_index = panel_bottom_row_index(
+        visible_indices=visible,
+        metrics=metrics,
+        scroll_y=overlay._scroll_y,
+        padding=overlay._padding,
+        line_h=line_h,
+        panel_h=panel.get_height(),
+    )
+    assert bottom_index == visible[-1]
+
+    hint_w = font.size(HELP_HINT_LABEL)[0]
+    hint_layout = panel_help_hint_layout(
+        panel_w=panel.get_width(),
+        panel_h=panel.get_height(),
+        padding=overlay._padding,
+        line_h=line_h,
+        hint_width=hint_w,
+        show_scrollbar=metrics.show_scrollbar,
+    )
+    highlight_w = bottom_row_highlight_width(
+        panel_w=panel.get_width(),
+        padding=overlay._padding,
+        font=font,
+        show_scrollbar=metrics.show_scrollbar,
+    )
+    expected_tint, _ = composite_row_background(
+        BACKGROUND, BACKGROUND_ALPHA, HIGHLIGHT, FOCUS_ROW_BG_ALPHA
+    )
+    mid_y = hint_layout.y + line_h // 2
+    tinted = panel.get_at((overlay._padding + highlight_w // 2, mid_y))[:3]
+    gap = panel.get_at((hint_layout.x - max(1, font.size("M")[0]) // 2, mid_y))[:3]
+    under_help = panel.get_at((hint_layout.x + 2, mid_y))[:3]
+    assert tinted == expected_tint
+    assert gap == BACKGROUND
+    assert under_help != expected_tint
+
+
+def test_bottom_row_rebuilt_with_help_hint_content_width() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    state = _minimal_view_state(
+        tracks={
+            "layer_1": TrackBlock(
+                stem="drums",
+                preset_dir_label="dir",
+                preset_label="preset.milk",
+                blend_mode="black-key",
+                opacity_pct=50,
+                beat_sensitivity=1.0,
+                effects={},
+                expanded=True,
+            )
+        },
+    )
+    visible = state.layout.visible_indices(state)
+    state.focus_descriptor = state.layout.descriptor(visible[-1])
+    overlay.notify_input()
+    composed = overlay.compose_panel(
+        state,
+        viewport_width=1280,
+        viewport_height=720,
+    )
+    assert composed is not None
+    panel = overlay._panel_cache.panel
+    assert panel is not None
+    font = overlay._font_get()
+    metrics = _panel_scroll_metrics(overlay, state)
+    line_h = font.get_linesize()
+    bottom_index = panel_bottom_row_index(
+        visible_indices=visible,
+        metrics=metrics,
+        scroll_y=overlay._scroll_y,
+        padding=overlay._padding,
+        line_h=line_h,
+        panel_h=panel.get_height(),
+    )
+    assert bottom_index == visible[-1]
+    bottom_max = bottom_row_highlight_width(
+        panel_w=panel.get_width(),
+        padding=overlay._padding,
+        font=font,
+        show_scrollbar=metrics.show_scrollbar,
+    )
+    unconstrained = panel_content_max_width(
+        index=bottom_index,
+        scrollable_indices=frozenset(metrics.scrollable_indices),
+        show_scrollbar=metrics.show_scrollbar,
+    )
+    assert bottom_max < unconstrained
+    assert any(
+        key.max_width == bottom_max
+        and key.kind == state.layout.kind(bottom_index)
+        for key in overlay._panel_cache.row_surfaces
+    )
+
+
+def test_long_preset_fits_within_bottom_row_budget() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    long_preset = (
+        "presets/very/long/filename/for/testing-bottom-row-text-clash-"
+        "with-the-help-label.milk"
+    )
+    state = _effects_expanded_view_state()
+    state.tracks["layer_1"].preset_label = long_preset
+    preset_idx = state.layout.find_by_kind(RowKind.TRACK_PRESET)
+    font = overlay._font_get()
+    metrics = _panel_scroll_metrics(overlay, state)
+    panel_w = PANEL_CONTENT_MAX_WIDTH + overlay._padding * 2
+    bottom_max = bottom_row_highlight_width(
+        panel_w=panel_w,
+        padding=overlay._padding,
+        font=font,
+        show_scrollbar=metrics.show_scrollbar,
+    )
+    unconstrained = panel_content_max_width(
+        index=preset_idx,
+        scrollable_indices=frozenset(metrics.scrollable_indices),
+        show_scrollbar=metrics.show_scrollbar,
+    )
+    label = fit_row_text(
+        font, state, preset_idx, max_content_width=bottom_max
+    )
+    wide_label = fit_row_text(
+        font, state, preset_idx, max_content_width=unconstrained
+    )
+    prefix_w = preset_row_prefix_width(font, font.get_linesize())
+    budget = bottom_max - TREE_INDENT - prefix_w
+    assert font.size(label)[0] <= budget
+    assert font.size(label)[0] < font.size(wide_label)[0]
 
 
 def test_panel_content_max_width_reserves_scrollbar() -> None:

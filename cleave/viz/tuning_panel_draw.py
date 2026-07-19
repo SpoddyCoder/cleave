@@ -675,6 +675,9 @@ class PanelScrollMetrics:
     show_scrollbar: bool
 
 
+HELP_HINT_LABEL = "H - help"
+
+
 @dataclass(frozen=True)
 class PanelHelpHintLayout:
     x: int
@@ -698,6 +701,47 @@ def panel_help_hint_layout(
         x=panel_w - padding - right_reserve - hint_width,
         y=panel_h - padding - line_h,
     )
+
+
+def bottom_row_highlight_width(
+    *,
+    panel_w: int,
+    padding: int,
+    font: pygame.font.Font,
+    show_scrollbar: bool,
+) -> int:
+    """Bottom-row focus tint and text budget: full width minus help and one character."""
+    hint_width = font.size(HELP_HINT_LABEL)[0]
+    char_w = max(1, font.size("M")[0])
+    right_reserve = (
+        SCROLLBAR_WIDTH + SCROLLBAR_CONTENT_GAP if show_scrollbar else 0
+    )
+    hint_x = panel_w - padding - right_reserve - hint_width
+    return max(0, hint_x - padding - char_w)
+
+
+def panel_bottom_row_index(
+    *,
+    visible_indices: list[int],
+    metrics: PanelScrollMetrics,
+    scroll_y: int,
+    padding: int,
+    line_h: int,
+    panel_h: int,
+) -> int | None:
+    """Index of the row drawn on the help-hint line, if any."""
+    if not visible_indices:
+        return None
+    help_y = panel_h - padding - line_h
+    if not metrics.needs_scroll:
+        return visible_indices[-1]
+    scroll_top = padding + metrics.header_block_h
+    bottom_index: int | None = None
+    for row_index, index in enumerate(metrics.scrollable_indices):
+        y = scroll_top + row_index * metrics.row_stride - scroll_y
+        if y <= help_y < y + line_h:
+            bottom_index = index
+    return bottom_index
 
 
 @dataclass(frozen=True)
@@ -1212,11 +1256,19 @@ class TuningOverlay:
         line_h: int,
         font: pygame.font.Font | None = None,
         show_scrollbar: bool = False,
+        clip_for_help_hint: bool = False,
     ) -> None:
         row_w = panel_w - self._padding * 2
         panel_bg_alpha = int(BACKGROUND_ALPHA * self._visibility)
         bg = _row_bg_color(state, index)
-        if (
+        if clip_for_help_hint and font is not None:
+            row_w = bottom_row_highlight_width(
+                panel_w=panel_w,
+                padding=self._padding,
+                font=font,
+                show_scrollbar=show_scrollbar,
+            )
+        elif (
             bg is not None
             and state.layout.kind(index) == RowKind.SETTINGS_HEADER
             and state.fps is not None
@@ -1681,10 +1733,19 @@ class TuningOverlay:
         visible_indices: list[int],
         first_scrollable_visible: int | None,
         panel_w: int,
+        panel_h: int,
         line_h: int,
         text_alpha: int,
         header_gap: int,
     ) -> None:
+        bottom_index = panel_bottom_row_index(
+            visible_indices=visible_indices,
+            metrics=metrics,
+            scroll_y=self._scroll_y,
+            padding=self._padding,
+            line_h=line_h,
+            panel_h=panel_h,
+        )
         if metrics.needs_scroll:
             header_y = self._padding
             for row_index, index in enumerate(metrics.header_indices):
@@ -1702,6 +1763,7 @@ class TuningOverlay:
                     line_h=line_h,
                     font=font,
                     show_scrollbar=metrics.show_scrollbar,
+                    clip_for_help_hint=index == bottom_index,
                 )
 
             scroll_top = self._padding + metrics.header_block_h
@@ -1734,6 +1796,7 @@ class TuningOverlay:
                     line_h=line_h,
                     font=font,
                     show_scrollbar=metrics.show_scrollbar,
+                    clip_for_help_hint=index == bottom_index,
                 )
             panel.set_clip(old_clip)
 
@@ -1764,6 +1827,7 @@ class TuningOverlay:
                     line_h=line_h,
                     font=font,
                     show_scrollbar=metrics.show_scrollbar,
+                    clip_for_help_hint=index == bottom_index,
                 )
                 row_y += line_h + self._line_gap
 
@@ -1804,7 +1868,9 @@ class TuningOverlay:
             cache.last_fps_rect = None
 
         if text_alpha >= 2:
-            help_hint = _render_text(font, "H - help", True, LABEL, counters=counters)
+            help_hint = _render_text(
+                font, HELP_HINT_LABEL, True, LABEL, counters=counters
+            )
             help_hint.set_alpha(text_alpha)
             hint_layout = panel_help_hint_layout(
                 panel_w=panel_w,
@@ -2055,6 +2121,33 @@ class TuningOverlay:
         if panel_w > capacity[0]:
             capacity = (panel_w, capacity[1])
 
+        bottom_index = panel_bottom_row_index(
+            visible_indices=visible_indices,
+            metrics=metrics,
+            scroll_y=self._scroll_y,
+            padding=self._padding,
+            line_h=line_h,
+            panel_h=panel_h,
+        )
+        if bottom_index is not None and bottom_index in raster_indices:
+            bottom_max = bottom_row_highlight_width(
+                panel_w=panel_w,
+                padding=self._padding,
+                font=font,
+                show_scrollbar=metrics.show_scrollbar,
+            )
+            if bottom_max != max_content_width_for(bottom_index):
+                built_rows[bottom_index] = ensure_row_surface(
+                    cache,
+                    state,
+                    bottom_index,
+                    font,
+                    self._build_row_at_index,
+                    max_content_width=bottom_max,
+                    line_h=line_h,
+                    counters=counters,
+                )
+
         alpha = int(BACKGROUND_ALPHA * self._visibility)
         if alpha < 2:
             return None
@@ -2083,6 +2176,7 @@ class TuningOverlay:
             visible_indices=visible_indices,
             first_scrollable_visible=first_scrollable_visible,
             panel_w=panel_w,
+            panel_h=panel_h,
             line_h=line_h,
             text_alpha=text_alpha,
             header_gap=header_gap,
