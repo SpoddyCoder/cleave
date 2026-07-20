@@ -44,6 +44,8 @@ from cleave.preset_playlist import PresetPlaylist, preset_browse_floor
 from cleave.projectm_health import PresetSkipNotifyTracker, ProjectMLogNotifyTracker
 from cleave.timeline import SlotCue, TimelineLane, copy_lane, empty_lane
 from cleave.blend_modes import BlendMode
+from cleave.timeline_presets.characters import DEFAULT_TIMELINE_PRESET_KIND
+from cleave.timeline_presets.crescendo import CrescendoTarget
 
 
 def config_path_display(path: Path | None) -> str:
@@ -170,6 +172,9 @@ class TimelineRuntime:
     beat_bar_grid_expanded: bool = False
     placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
     fades_expanded: bool = False
+    timeline_presets_expanded: bool = False
+    timeline_preset_kind: str = DEFAULT_TIMELINE_PRESET_KIND
+    timeline_preset_crescendo: CrescendoTarget | None = None
     song_marker_fades: TimelineFadeGroupRuntime = field(
         default_factory=default_timeline_fade_group_runtime
     )

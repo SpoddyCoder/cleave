@@ -16,6 +16,34 @@ CrescendoTarget = Literal["last", "penultimate"]
 CRESCENDO_MIN_MARKERS = 3
 _FALLBACK_START_FRACTION = 0.20
 
+TIMELINE_PRESET_CRESCENDO_OPTIONS: tuple[CrescendoTarget | None, ...] = (
+    None,
+    "last",
+    "penultimate",
+)
+
+_CRESCENDO_DISPLAY: dict[CrescendoTarget | None, str] = {
+    None: "No",
+    "last": "Last Song Marker",
+    "penultimate": "Penultimate Song Marker",
+}
+
+
+def timeline_preset_crescendo_display(target: CrescendoTarget | None) -> str:
+    return _CRESCENDO_DISPLAY.get(target, _CRESCENDO_DISPLAY[None])
+
+
+def cycle_timeline_preset_crescendo(
+    value: CrescendoTarget | None, *, forward: bool
+) -> CrescendoTarget | None:
+    options = TIMELINE_PRESET_CRESCENDO_OPTIONS
+    try:
+        index = options.index(value)
+    except ValueError:
+        index = 0
+    delta = 1 if forward else -1
+    return options[(index + delta) % len(options)]
+
 
 @dataclass(frozen=True)
 class CrescendoWindow:

@@ -26,6 +26,14 @@ from cleave.config_schema import (
 )
 from cleave.extract import stem_control_label, stem_overlay_header
 from cleave.song_markers import format_marker_time
+from cleave.timeline_presets.characters import (
+    cycle_timeline_preset_kind,
+    timeline_preset_kind_display,
+)
+from cleave.timeline_presets.crescendo import (
+    cycle_timeline_preset_crescendo,
+    timeline_preset_crescendo_display,
+)
 from cleave.viz.fonts import render_overlay_font_display
 from cleave.viz.row_sections import (
     apply_expand_toggle,
@@ -167,6 +175,48 @@ def _apply_timeline_placement_snap(
     tl = controls.session.timeline
     tl.placement_snap = cycle_timeline_placement_snap(
         tl.placement_snap,
+        forward=forward,
+    )
+
+
+def _format_timeline_preset_character(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return timeline_preset_kind_display(state.render_timeline.timeline_preset_kind)
+
+
+def _apply_timeline_preset_character(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    tl = controls.session.timeline
+    tl.timeline_preset_kind = cycle_timeline_preset_kind(
+        tl.timeline_preset_kind,
+        forward=forward,
+    )
+
+
+def _format_timeline_preset_crescendo(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return timeline_preset_crescendo_display(
+        state.render_timeline.timeline_preset_crescendo
+    )
+
+
+def _apply_timeline_preset_crescendo(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    tl = controls.session.timeline
+    tl.timeline_preset_crescendo = cycle_timeline_preset_crescendo(
+        tl.timeline_preset_crescendo,
         forward=forward,
     )
 
@@ -1527,8 +1577,25 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         panel_label="Delete Layer",
         present_style=RowPresentStyle.FULL_LINE,
     ),
+    RowKind.TIMELINE_PRESETS_HEADER: RowFieldDef(
+        panel_label="timeline preset",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        apply_horizontal=_apply_expand_subheader,
+    ),
+    RowKind.TIMELINE_PRESET_CHARACTER: RowFieldDef(
+        panel_label="character",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_timeline_preset_character,
+        apply_horizontal=_apply_timeline_preset_character,
+    ),
+    RowKind.TIMELINE_PRESET_CRESCENDO: RowFieldDef(
+        panel_label="crescendo",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_timeline_preset_crescendo,
+        apply_horizontal=_apply_timeline_preset_crescendo,
+    ),
     RowKind.TIMELINE_PRESETS: RowFieldDef(
-        panel_label="apply a timeline preset",
+        panel_label="apply timeline preset",
         present_style=RowPresentStyle.FULL_LINE,
     ),
     RowKind.TIMELINE_RESET: RowFieldDef(

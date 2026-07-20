@@ -1305,6 +1305,12 @@ class TuningControls:
             return
         tl.fades_expanded = expanded
 
+    def _set_timeline_presets_expanded(self, expanded: bool) -> None:
+        tl = self.session.timeline
+        if tl.timeline_presets_expanded == expanded:
+            return
+        tl.timeline_presets_expanded = expanded
+
     def _set_beat(self, slot: str, value: float) -> None:
         layer = self.session.layers[slot]
         layer.beat_sensitivity = clamp_beat_sensitivity(value)

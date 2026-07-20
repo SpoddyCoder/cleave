@@ -645,12 +645,12 @@ def test_disabled_render_timeline_can_open_panel() -> None:
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     markers_row = view.layout.find_by_kind(RowKind.SONG_MARKERS_HEADER)
-    presets_row = view.layout.find_by_kind(RowKind.TIMELINE_PRESETS)
+    presets_header_row = view.layout.find_by_kind(RowKind.TIMELINE_PRESETS_HEADER)
     assert _row_text(view, header_row).endswith(" ▼")
     assert markers_row in view.layout.visible_indices(view)
     assert markers_row in view.layout.navigable_indices(view)
-    assert presets_row in view.layout.visible_indices(view)
-    assert presets_row in view.layout.navigable_indices(view)
+    assert presets_header_row in view.layout.visible_indices(view)
+    assert presets_header_row in view.layout.navigable_indices(view)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_descriptor == _desc(view, markers_row)
@@ -1533,6 +1533,7 @@ def test_render_timeline_header_after_post_fx() -> None:
 
 def _focus_timeline_presets(controls: TuningControls) -> None:
     controls.session.timeline.panel_open = True
+    controls.session.timeline.timeline_presets_expanded = True
     view = controls.build_view_state(paused=False)
     presets_row = view.layout.find_by_kind(RowKind.TIMELINE_PRESETS)
     controls.focus_descriptor = _desc(view, presets_row)
@@ -1590,21 +1591,21 @@ def _choose_modal_option(controls: TuningControls, label: str) -> None:
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
 
 
-def test_timeline_presets_enter_opens_choice_modal() -> None:
+def test_timeline_presets_enter_opens_yes_cancel_modal() -> None:
     controls = _make_controls(("layer_1", "layer_2", "layer_3", "layer_4"))
+    controls.session.timeline.timeline_preset_kind = "arc"
+    controls.session.timeline.timeline_preset_crescendo = "last"
     _focus_timeline_presets(controls)
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
     modal_view = controls.modal_host.view_state()
     assert modal_view is not None
-    assert modal_view.kind == ModalKind.CHOICE
-    assert modal_view.options == (
-        "Breathing",
-        "Dialogue",
-        "Arc",
-        "Pulse",
-        "Cancel",
+    assert modal_view.kind == ModalKind.YES_NO
+    assert modal_view.options == ("Yes", "Cancel")
+    assert modal_view.message == (
+        "Apply timeline preset?\n"
+        "Character: Arc\n"
+        "Crescendo: Last Song Marker"
     )
-    assert "timeline preset" in modal_view.message.lower()
 
 
 def _lane(
@@ -1615,12 +1616,9 @@ def _lane(
     return TimelineLane(baseline=baseline, cues=canonicalize(baseline, cues))
 
 
-def _choose_timeline_preset(controls: TuningControls, label: str) -> None:
+def _confirm_timeline_preset(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_RETURN))
-    _choose_modal_option(controls, label)
-    modal_view = controls.modal_host.view_state()
-    if modal_view is not None and "crescendo" in (modal_view.message or "").lower():
-        _choose_modal_option(controls, "No")
+    _choose_modal_option(controls, "Yes")
 
 
 def test_timeline_presets_breathing_clears_and_applies() -> None:
@@ -1639,8 +1637,10 @@ def test_timeline_presets_breathing_clears_and_applies() -> None:
     controls.session.timeline.enabled = False
     controls.session.timeline.recording = True
     controls.session.timeline.armed_slots.add("layer_1")
+    controls.session.timeline.timeline_preset_kind = "breathing"
+    controls.session.timeline.timeline_preset_crescendo = None
     _focus_timeline_presets(controls)
-    _choose_timeline_preset(controls, "Breathing")
+    _confirm_timeline_preset(controls)
     assert not controls.modal_host.active
     assert controls.session.timeline.enabled is True
     assert controls.session.timeline.recording is False
@@ -1663,8 +1663,10 @@ def test_timeline_presets_arc_clears_and_applies() -> None:
     )
     controls.session.timeline.lanes = {"layer_1": _lane(True, (5.0, False))}
     controls.session.timeline.enabled = False
+    controls.session.timeline.timeline_preset_kind = "arc"
+    controls.session.timeline.timeline_preset_crescendo = None
     _focus_timeline_presets(controls)
-    _choose_timeline_preset(controls, "Arc")
+    _confirm_timeline_preset(controls)
     assert not controls.modal_host.active
     assert controls.session.timeline.enabled is True
     lanes = controls.session.timeline.lanes
@@ -1673,7 +1675,7 @@ def test_timeline_presets_arc_clears_and_applies() -> None:
     assert all(lane.baseline is not None for lane in lanes.values())
 
 
-def test_timeline_presets_crescendo_modal_when_enough_markers() -> None:
+def test_timeline_presets_crescendo_when_enough_markers() -> None:
     beats = tuple(float(i) for i in range(241))
     bars = tuple(float(i) for i in range(0, 241, 4))
     controls = _make_controls(
@@ -1683,26 +1685,16 @@ def test_timeline_presets_crescendo_modal_when_enough_markers() -> None:
         duration_sec=240.0,
     )
     controls.session.song_markers.times = [30.0, 90.0, 150.0, 200.0]
+    controls.session.timeline.timeline_preset_kind = "breathing"
+    controls.session.timeline.timeline_preset_crescendo = "last"
     _focus_timeline_presets(controls)
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
-    _choose_modal_option(controls, "Breathing")
-    modal_view = controls.modal_host.view_state()
-    assert modal_view is not None
-    assert modal_view.kind == ModalKind.CHOICE
-    assert modal_view.message == "Build to a crescendo?"
-    assert modal_view.options == (
-        "No",
-        "Last Song Marker",
-        "Penultimate Song Marker",
-        "Cancel",
-    )
-    _choose_modal_option(controls, "Last Song Marker")
+    _confirm_timeline_preset(controls)
     assert not controls.modal_host.active
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "Applied Breathing timeline preset (crescendo)"
 
 
-def test_timeline_presets_skips_crescendo_modal_without_enough_markers() -> None:
+def test_timeline_presets_skips_crescendo_without_enough_markers() -> None:
     beats = tuple(float(i) for i in range(241))
     bars = tuple(float(i) for i in range(0, 241, 4))
     controls = _make_controls(
@@ -1712,9 +1704,10 @@ def test_timeline_presets_skips_crescendo_modal_without_enough_markers() -> None
         duration_sec=240.0,
     )
     controls.session.song_markers.times = [30.0, 90.0]
+    controls.session.timeline.timeline_preset_kind = "pulse"
+    controls.session.timeline.timeline_preset_crescendo = "last"
     _focus_timeline_presets(controls)
-    controls.handle_keydown(_keydown(pygame.K_RETURN))
-    _choose_modal_option(controls, "Pulse")
+    _confirm_timeline_preset(controls)
     assert not controls.modal_host.active
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "Applied Pulse timeline preset"
@@ -1790,12 +1783,14 @@ def test_timeline_presets_refuse_without_bars() -> None:
         "layer_2": _lane(True, (3.0, False)),
     }
     controls.session.timeline.lanes = dict(prior)
+    controls.session.timeline.timeline_preset_kind = "breathing"
     _focus_timeline_presets(controls)
-    _choose_timeline_preset(controls, "Breathing")
+    _confirm_timeline_preset(controls)
     assert not controls.modal_host.active
     assert controls.session.timeline.lanes == prior
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "No bars available; re-run separate"
+
 
 def test_timeline_presets_cancel_and_escape_leave_unchanged() -> None:
     controls = _make_controls(("layer_1", "layer_2"))
@@ -2317,7 +2312,7 @@ def test_render_timeline_down_enters_submenu() -> None:
     placement_snap_row = view.layout.find_by_kind(RowKind.TIMELINE_PLACEMENT_SNAP)
     snap_grid_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_GRID)
     fades_row = view.layout.find_by_kind(RowKind.TIMELINE_FADES_HEADER)
-    presets_row = view.layout.find_by_kind(RowKind.TIMELINE_PRESETS)
+    presets_header_row = view.layout.find_by_kind(RowKind.TIMELINE_PRESETS_HEADER)
     reset_row = view.layout.find_by_kind(RowKind.TIMELINE_RESET)
     controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.focus_row = 2
@@ -2355,7 +2350,7 @@ def test_render_timeline_down_enters_submenu() -> None:
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_descriptor == _desc(view, presets_row)
+    assert controls.focus_descriptor == _desc(view, presets_header_row)
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
@@ -2611,6 +2606,7 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
     controls.session.song_markers.expanded = True
     controls.session.timeline.beat_bar_grid_expanded = True
     controls.session.timeline.fades_expanded = True
+    controls.session.timeline.timeline_presets_expanded = True
     controls.session.timeline.song_marker_fades.enabled = True
     controls.session.timeline.standard_cue_fades.enabled = True
     controls.session.timeline.enabled = False
@@ -2631,6 +2627,9 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
         RowKind.TIMELINE_STANDARD_CUE_FADES,
         RowKind.TIMELINE_STANDARD_CUE_FADE_IN,
         RowKind.TIMELINE_STANDARD_CUE_FADE_OUT,
+        RowKind.TIMELINE_PRESETS_HEADER,
+        RowKind.TIMELINE_PRESET_CHARACTER,
+        RowKind.TIMELINE_PRESET_CRESCENDO,
         RowKind.TIMELINE_PRESETS,
         RowKind.TIMELINE_RESET,
     ):
@@ -3509,11 +3508,17 @@ def test_render_timeline_locked_skips_main_children_in_nav() -> None:
     controls.session.timeline.enabled = True
     controls.session.timeline.locked = True
     controls.session.timeline.panel_open = True
+    controls.session.timeline.timeline_presets_expanded = True
     view = controls.build_view_state(paused=False)
+    presets_header_row = view.layout.find_by_kind(RowKind.TIMELINE_PRESETS_HEADER)
     presets_row = view.layout.find_by_kind(RowKind.TIMELINE_PRESETS)
+    character_row = view.layout.find_by_kind(RowKind.TIMELINE_PRESET_CHARACTER)
     navigable = view.layout.navigable_indices(view)
+    assert presets_header_row in navigable
     assert presets_row not in navigable
+    assert character_row not in navigable
     assert _row_value_color(view, presets_row) == LOCKED
+    assert _row_value_color(view, character_row) == LOCKED
 
 
 def test_locked_expanded_skips_sub_rows_in_nav() -> None:

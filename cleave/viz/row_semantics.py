@@ -78,6 +78,9 @@ class RowKind(Enum):
     RENDER_POST_FX_CHROMA_BOOST_VARIANT = auto()
     RENDER_POST_FX_CHROMA_BOOST_AMOUNT = auto()
     RENDER_TIMELINE_HEADER = auto()
+    TIMELINE_PRESETS_HEADER = auto()
+    TIMELINE_PRESET_CHARACTER = auto()
+    TIMELINE_PRESET_CRESCENDO = auto()
     TIMELINE_PRESETS = auto()
     TIMELINE_RESET = auto()
     TIMELINE_BEAT_BAR_GRID_HEADER = auto()
@@ -711,19 +714,48 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         ),
         quick_nav_target=True,
     ),
+    RowKind.TIMELINE_PRESETS_HEADER: RowBehavior(
+        RowAffordance.EXPAND,
+        is_sub_header=True,
+        help_title="Timeline preset",
+        help_description=(
+            "Stage character and crescendo, then apply a randomly",
+            "generated timeline preset. This overwrites the current timeline.",
+        ),
+    ),
+    RowKind.TIMELINE_PRESET_CHARACTER: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        blocked_by_section_lock=True,
+        help_title="Character",
+        help_entries=(("Left/Right", "cycle character"),),
+        help_description=(
+            "Procedural timeline character used when applying a preset.",
+            "If song markers are present, they are favoured for cue placement.",
+        ),
+        help_mode_entries=TIMELINE_PRESET_HELP_ENTRIES,
+    ),
+    RowKind.TIMELINE_PRESET_CRESCENDO: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        blocked_by_section_lock=True,
+        help_title="Crescendo",
+        help_entries=(("Left/Right", "cycle crescendo target"),),
+        help_description=(
+            "Optional build to a crescendo at a song marker.",
+            "Requires three or more song markers; otherwise apply skips crescendo.",
+        ),
+    ),
     RowKind.TIMELINE_PRESETS: RowBehavior(
         RowAffordance.ACTION,
         navigable=True,
         blocked_by_section_lock=True,
-        help_title="Timeline presets",
-        help_entries=(("Enter", "apply a timeline preset"),),
+        help_title="Apply timeline preset",
+        help_entries=(("Enter", "apply timeline preset"),),
         help_description=(
-            "Apply a randomly generated timeline preset.",
-            "If song markers are present, they are favoured for cue placement.",
-            "With three or more song markers, you can optionally build to a crescendo.",
+            "Apply the staged character and crescendo.",
             "This overwrites the current timeline.",
         ),
-        help_mode_entries=TIMELINE_PRESET_HELP_ENTRIES,
     ),
     RowKind.TIMELINE_RESET: RowBehavior(
         RowAffordance.ACTION,

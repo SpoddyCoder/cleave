@@ -50,12 +50,12 @@ def _preferred_wrap_break(chunk: str) -> int:
     return len(chunk)
 
 
-def wrap_text_to_width(
+def _wrap_paragraph_to_width(
     font: pygame.font.Font, text: str, max_px: int
 ) -> list[str]:
-    """Wrap text to max_px; prefer breaks after sentence endings, then spaces."""
+    """Wrap a single paragraph (no newlines) to max_px."""
     if not text:
-        return []
+        return [""]
     if max_px <= 0 or _text_width(font, text) <= max_px:
         return [text]
 
@@ -80,6 +80,21 @@ def wrap_text_to_width(
         elif remaining:
             lines.append(remaining[0])
             remaining = remaining[1:]
+    return lines
+
+
+def wrap_text_to_width(
+    font: pygame.font.Font, text: str, max_px: int
+) -> list[str]:
+    """Wrap text to max_px; prefer breaks after sentence endings, then spaces.
+
+    Explicit newlines are preserved as hard line breaks.
+    """
+    if not text:
+        return []
+    lines: list[str] = []
+    for paragraph in text.split("\n"):
+        lines.extend(_wrap_paragraph_to_width(font, paragraph, max_px))
     return lines
 
 
