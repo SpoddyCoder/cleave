@@ -32,6 +32,7 @@ from cleave.config_schema import (
 from cleave.extract import StemSource
 from cleave.preset_curation import PresetCurationIndex
 from cleave.preset_playlist import PresetPlaylist, preset_filename_display
+from cleave.timeline_presets.crescendo import CrescendoTarget
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.playback import PlaybackState, current_sec
 from cleave.viz.row_semantics import RowDescriptor, RowKind
@@ -147,6 +148,9 @@ class RenderTimelineBlock:
     beat_bar_grid_expanded: bool = False
     placement_snap: str = "beat"
     fades_expanded: bool = False
+    timeline_presets_expanded: bool = False
+    timeline_preset_kind: str = "breathing"
+    timeline_preset_crescendo: CrescendoTarget | None = None
     song_marker_fades: TimelineFadeGroupBlock = field(
         default_factory=TimelineFadeGroupBlock
     )
@@ -335,6 +339,7 @@ def view_state_structure_signature(
             "song_marker_count": len(session.song_markers.times),
             "beat_bar_grid_expanded": tl.beat_bar_grid_expanded,
             "fades_expanded": tl.fades_expanded,
+            "timeline_presets_expanded": tl.timeline_presets_expanded,
             "song_marker_fades_enabled": tl.song_marker_fades.enabled,
             "standard_cue_fades_enabled": tl.standard_cue_fades.enabled,
         },
@@ -497,6 +502,9 @@ class TuningViewStateBuilder:
             beat_bar_grid_expanded=tl.beat_bar_grid_expanded,
             placement_snap=tl.placement_snap,
             fades_expanded=tl.fades_expanded,
+            timeline_presets_expanded=tl.timeline_presets_expanded,
+            timeline_preset_kind=tl.timeline_preset_kind,
+            timeline_preset_crescendo=tl.timeline_preset_crescendo,
             song_marker_fades=TimelineFadeGroupBlock(
                 enabled=tl.song_marker_fades.enabled,
                 fade_in=tl.song_marker_fades.fade_in,
@@ -668,6 +676,9 @@ class TuningViewStateBuilder:
                 beat_bar_grid_expanded=tl.beat_bar_grid_expanded,
                 placement_snap=tl.placement_snap,
                 fades_expanded=tl.fades_expanded,
+                timeline_presets_expanded=tl.timeline_presets_expanded,
+                timeline_preset_kind=tl.timeline_preset_kind,
+                timeline_preset_crescendo=tl.timeline_preset_crescendo,
                 song_marker_fades=TimelineFadeGroupBlock(
                     enabled=tl.song_marker_fades.enabled,
                     fade_in=tl.song_marker_fades.fade_in,

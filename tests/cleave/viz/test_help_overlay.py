@@ -241,15 +241,13 @@ def test_rotation_set_help_lists_rotation_sets() -> None:
 
 
 def test_timeline_presets_help_lists_characters() -> None:
-    sections = sections_for(RowKind.TIMELINE_PRESETS)
+    sections = sections_for(RowKind.TIMELINE_PRESET_CHARACTER)
     description = _description_section(sections)
     assert description is not None
-    assert description.title == "Timeline presets"
+    assert description.title == "Character"
     assert description.lines == (
-        "Apply a randomly generated timeline preset.",
+        "Procedural timeline character used when applying a preset.",
         "If song markers are present, they are favoured for cue placement.",
-        "With three or more song markers, you can optionally build to a crescendo.",
-        "This overwrites the current timeline.",
     )
     assert description.entries == TIMELINE_PRESET_HELP_ENTRIES
     assert [name for name, _ in description.entries] == [
@@ -260,7 +258,7 @@ def test_timeline_presets_help_lists_characters() -> None:
     ]
     keyboard = _keyboard_section(sections)
     assert keyboard.title == KEYBOARD_CONTROLS_SECTION_TITLE
-    assert keyboard.entries == (("Enter", "apply a timeline preset"),)
+    assert keyboard.entries == (("Left/Right", "cycle character"),)
 
 
 def test_timeline_reset_help_lists_choices() -> None:

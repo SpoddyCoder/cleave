@@ -1,4 +1,4 @@
-"""Timeline preset choice modal and clear+apply orchestration."""
+"""Timeline preset confirm modal and clear+apply orchestration."""
 
 from __future__ import annotations
 
@@ -12,18 +12,18 @@ from cleave.timeline_presets import (
     build_dialogue_cues,
     build_pulse_cues,
 )
+from cleave.timeline_presets.characters import timeline_preset_kind_display
 from cleave.timeline_presets.crescendo import (
     CRESCENDO_MIN_MARKERS,
     CrescendoTarget,
     apply_crescendo,
     normalize_crescendo_markers,
+    timeline_preset_crescendo_display,
 )
 from cleave.viz.modal import ModalHost, ModalOption
 from cleave.viz.session import TuningSession
 
 _CANCEL_LABEL = "Cancel"
-_PRESET_PROMPT_MESSAGE = "Which timeline preset do you wish to apply?"
-_CRESCENDO_PROMPT_MESSAGE = "Build to a crescendo?"
 _RESET_PROMPT_MESSAGE = "Reset timeline?"
 
 _KIND_BUILDERS = {
@@ -56,26 +56,20 @@ class TimelinePresetController:
         if self.session.timeline.locked:
             return
         dismiss = lambda: None
-        options = [
-            ModalOption(
-                "Breathing",
-                lambda: self._after_preset_choice("breathing", duration_sec),
-            ),
-            ModalOption(
-                "Dialogue",
-                lambda: self._after_preset_choice("dialogue", duration_sec),
-            ),
-            ModalOption(
-                "Arc",
-                lambda: self._after_preset_choice("arc", duration_sec),
-            ),
-            ModalOption(
-                "Pulse",
-                lambda: self._after_preset_choice("pulse", duration_sec),
-            ),
-            ModalOption(_CANCEL_LABEL, dismiss),
-        ]
-        self._modal.prompt_choice(_PRESET_PROMPT_MESSAGE, options, on_dismiss=dismiss)
+        self._modal.prompt_yes_no(
+            self._apply_prompt_message(),
+            on_confirm=lambda: self._confirm_apply(duration_sec),
+            on_cancel=dismiss,
+            cancel_label=_CANCEL_LABEL,
+        )
+
+    def _apply_prompt_message(self) -> str:
+        tl = self.session.timeline
+        choice_lines = (
+            f"Character: {timeline_preset_kind_display(tl.timeline_preset_kind)}",
+            f"Crescendo: {timeline_preset_crescendo_display(tl.timeline_preset_crescendo)}",
+        )
+        return "\n".join(("Apply timeline preset?", *choice_lines))
 
     def prompt_reset(self) -> None:
         if self.session.timeline.locked:
@@ -88,38 +82,18 @@ class TimelinePresetController:
         ]
         self._modal.prompt_choice(_RESET_PROMPT_MESSAGE, options, on_dismiss=dismiss)
 
-    def _after_preset_choice(self, kind: str, duration_sec: float) -> None:
-        markers = normalize_crescendo_markers(
-            self.session.song_markers.times,
-            duration_sec,
-        )
-        if len(markers) < CRESCENDO_MIN_MARKERS:
-            self._apply(kind, duration_sec, crescendo=None)
-            return
-        self._prompt_crescendo(kind, duration_sec)
-
-    def _prompt_crescendo(self, kind: str, duration_sec: float) -> None:
-        dismiss = lambda: None
-        options = [
-            ModalOption(
-                "No",
-                lambda: self._apply(kind, duration_sec, crescendo=None),
-            ),
-            ModalOption(
-                "Last Song Marker",
-                lambda: self._apply(kind, duration_sec, crescendo="last"),
-            ),
-            ModalOption(
-                "Penultimate Song Marker",
-                lambda: self._apply(kind, duration_sec, crescendo="penultimate"),
-            ),
-            ModalOption(_CANCEL_LABEL, dismiss),
-        ]
-        self._modal.prompt_choice(
-            _CRESCENDO_PROMPT_MESSAGE,
-            options,
-            on_dismiss=dismiss,
-        )
+    def _confirm_apply(self, duration_sec: float) -> None:
+        tl = self.session.timeline
+        kind = tl.timeline_preset_kind
+        crescendo = tl.timeline_preset_crescendo
+        if crescendo is not None:
+            markers = normalize_crescendo_markers(
+                self.session.song_markers.times,
+                duration_sec,
+            )
+            if len(markers) < CRESCENDO_MIN_MARKERS:
+                crescendo = None
+        self._apply(kind, duration_sec, crescendo=crescendo)
 
     def _apply(
         self,

@@ -145,7 +145,10 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     builder = controls._view_state
 
     view_closed = builder.build(paused=False)
-    presets = RowDescriptor(RowKind.TIMELINE_PRESETS)
+    presets_header = RowDescriptor(RowKind.TIMELINE_PRESETS_HEADER)
+    preset_character = RowDescriptor(RowKind.TIMELINE_PRESET_CHARACTER)
+    preset_crescendo = RowDescriptor(RowKind.TIMELINE_PRESET_CRESCENDO)
+    presets_apply = RowDescriptor(RowKind.TIMELINE_PRESETS)
     reset = RowDescriptor(RowKind.TIMELINE_RESET)
     beat_bar_header = RowDescriptor(RowKind.TIMELINE_BEAT_BAR_GRID_HEADER)
     bar_phase = RowDescriptor(RowKind.TIMELINE_BAR_PHASE)
@@ -161,7 +164,8 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     standard_cue_fade_in = RowDescriptor(RowKind.TIMELINE_STANDARD_CUE_FADE_IN)
     standard_cue_fade_out = RowDescriptor(RowKind.TIMELINE_STANDARD_CUE_FADE_OUT)
     markers_header = RowDescriptor(RowKind.SONG_MARKERS_HEADER)
-    assert presets not in view_closed.layout.rows
+    assert presets_header not in view_closed.layout.rows
+    assert presets_apply not in view_closed.layout.rows
     assert reset not in view_closed.layout.rows
     assert beat_bar_header not in view_closed.layout.rows
     assert bar_phase not in view_closed.layout.rows
@@ -175,7 +179,10 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     session.timeline.panel_open = True
     view_open = builder.build(paused=False)
     assert view_open.layout is not view_closed.layout
-    assert presets in view_open.layout.rows
+    assert presets_header in view_open.layout.rows
+    assert preset_character not in view_open.layout.rows
+    assert preset_crescendo not in view_open.layout.rows
+    assert presets_apply not in view_open.layout.rows
     assert reset in view_open.layout.rows
     assert beat_bar_header in view_open.layout.rows
     assert bar_phase not in view_open.layout.rows
@@ -189,12 +196,12 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     markers_idx = view_open.layout.rows.index(markers_header)
     beat_bar_idx = view_open.layout.rows.index(beat_bar_header)
     fades_idx = view_open.layout.rows.index(fades_header)
-    presets_idx = view_open.layout.rows.index(presets)
+    presets_header_idx = view_open.layout.rows.index(presets_header)
     reset_idx = view_open.layout.rows.index(reset)
     assert beat_bar_idx == markers_idx + 1
     assert fades_idx == beat_bar_idx + 1
-    assert presets_idx == fades_idx + 1
-    assert reset_idx == presets_idx + 1
+    assert presets_header_idx == fades_idx + 1
+    assert reset_idx == presets_header_idx + 1
 
     session.song_markers.expanded = True
     view_markers_expanded = builder.build(paused=False)
@@ -221,7 +228,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert fades_idx == snap_grid_idx + 1
     assert song_marker_fades not in view_beat_expanded.layout.rows
     assert standard_cue_fades not in view_beat_expanded.layout.rows
-    assert view_beat_expanded.layout.rows.index(presets) == fades_idx + 1
+    assert view_beat_expanded.layout.rows.index(presets_header) == fades_idx + 1
     assert view_beat_expanded.layout.rows.index(reset) == fades_idx + 2
 
     session.timeline.fades_expanded = True
@@ -232,7 +239,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert view_fades_expanded.layout.rows.index(standard_cue_fades) == fades_idx + 2
     assert song_marker_fade_in not in view_fades_expanded.layout.rows
     assert standard_cue_fade_in not in view_fades_expanded.layout.rows
-    assert view_fades_expanded.layout.rows.index(presets) == fades_idx + 3
+    assert view_fades_expanded.layout.rows.index(presets_header) == fades_idx + 3
 
     session.timeline.song_marker_fades.enabled = True
     session.timeline.standard_cue_fades.enabled = True
@@ -245,12 +252,36 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert view_fades_enabled.layout.rows.index(standard_cue_fades) == fades_idx + 4
     assert view_fades_enabled.layout.rows.index(standard_cue_fade_in) == fades_idx + 5
     assert view_fades_enabled.layout.rows.index(standard_cue_fade_out) == fades_idx + 6
-    assert view_fades_enabled.layout.rows.index(presets) == fades_idx + 7
+    assert view_fades_enabled.layout.rows.index(presets_header) == fades_idx + 7
+
+    session.timeline.timeline_presets_expanded = True
+    view_presets_expanded = builder.build(paused=False)
+    assert view_presets_expanded.layout is not view_fades_enabled.layout
+    presets_header_idx = view_presets_expanded.layout.rows.index(presets_header)
+    assert view_presets_expanded.layout.rows.index(preset_character) == (
+        presets_header_idx + 1
+    )
+    assert view_presets_expanded.layout.rows.index(preset_crescendo) == (
+        presets_header_idx + 2
+    )
+    assert view_presets_expanded.layout.rows.index(presets_apply) == (
+        presets_header_idx + 3
+    )
+    assert view_presets_expanded.layout.rows.index(reset) == presets_header_idx + 4
+
+    session.timeline.timeline_presets_expanded = False
+    view_presets_collapsed = builder.build(paused=False)
+    assert view_presets_collapsed.layout is not view_presets_expanded.layout
+    assert preset_character not in view_presets_collapsed.layout.rows
+    assert preset_crescendo not in view_presets_collapsed.layout.rows
+    assert presets_apply not in view_presets_collapsed.layout.rows
+    assert presets_header in view_presets_collapsed.layout.rows
 
     session.timeline.panel_open = False
     view_closed_again = builder.build(paused=False)
     assert view_closed_again.layout is not view_open.layout
-    assert presets not in view_closed_again.layout.rows
+    assert presets_header not in view_closed_again.layout.rows
+    assert presets_apply not in view_closed_again.layout.rows
     assert reset not in view_closed_again.layout.rows
     assert fades_header not in view_closed_again.layout.rows
     assert bar_phase not in view_closed_again.layout.rows
@@ -467,6 +498,21 @@ def test_structure_signature_invalidates_on_timeline_fades_expanded() -> None:
         session, config_save, notification_active=False
     )
     session.timeline.fades_expanded = True
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_structure_signature_invalidates_on_timeline_presets_expanded() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.timeline.timeline_presets_expanded = False
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.timeline.timeline_presets_expanded = True
     sig_after = view_state_structure_signature(
         session, config_save, notification_active=False
     )

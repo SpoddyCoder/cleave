@@ -185,6 +185,17 @@ def test_wrap_text_to_width_keeps_short_line() -> None:
     assert wrap_text_to_width(font, text, font.size(text)[0] + 10) == [text]
 
 
+def test_wrap_text_to_width_preserves_explicit_newlines() -> None:
+    font = overlay_font()
+    text = "Apply timeline preset?\nCharacter: Arc\nCrescendo: No"
+    max_px = max(font.size(part)[0] for part in text.split("\n")) + 10
+    assert wrap_text_to_width(font, text, max_px) == [
+        "Apply timeline preset?",
+        "Character: Arc",
+        "Crescendo: No",
+    ]
+
+
 def test_wrap_text_to_width_prefers_sentence_breaks() -> None:
     font = overlay_font()
     text = (

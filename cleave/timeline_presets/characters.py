@@ -129,9 +129,33 @@ CHARACTERS: dict[str, CharacterProfile] = {
     "pulse": PULSE,
 }
 
+TIMELINE_PRESET_KIND_OPTIONS: tuple[str, ...] = tuple(CHARACTERS)
+DEFAULT_TIMELINE_PRESET_KIND = "breathing"
+
+_CHARACTER_DISPLAY: dict[str, str] = {
+    "breathing": "Breathing",
+    "dialogue": "Dialogue",
+    "arc": "Arc",
+    "pulse": "Pulse",
+}
+
 CHARACTER_HELP_ENTRIES: tuple[tuple[str, str], ...] = (
     ("Breathing", "sparse singles and rare duos; no tutti stacks."),
     ("Dialogue", "call/response and antiphony between layers."),
     ("Arc", "builds to one short climax flash, then breathes and resolves."),
     ("Pulse", "rotates solo layers with sparse duo accents."),
 )
+
+
+def timeline_preset_kind_display(kind: str) -> str:
+    return _CHARACTER_DISPLAY.get(kind, _CHARACTER_DISPLAY[DEFAULT_TIMELINE_PRESET_KIND])
+
+
+def cycle_timeline_preset_kind(value: str, *, forward: bool) -> str:
+    options = TIMELINE_PRESET_KIND_OPTIONS
+    try:
+        index = options.index(value)
+    except ValueError:
+        index = options.index(DEFAULT_TIMELINE_PRESET_KIND)
+    delta = 1 if forward else -1
+    return options[(index + delta) % len(options)]
