@@ -54,6 +54,7 @@ def build_breathing_cues(
     rng: random.Random | None = None,
     bar_times: Sequence[float] = (),
     song_marker_times: Sequence[float] = (),
+    density_bias: int = 0,
 ) -> dict[str, TimelineLane]:
     return compose_timeline(
         slots,
@@ -62,6 +63,7 @@ def build_breathing_cues(
         _rng(rng),
         bar_times,
         song_marker_times=song_marker_times,
+        density_bias=density_bias,
     )
 
 
@@ -71,6 +73,7 @@ def build_dialogue_cues(
     rng: random.Random | None = None,
     bar_times: Sequence[float] = (),
     song_marker_times: Sequence[float] = (),
+    density_bias: int = 0,
 ) -> dict[str, TimelineLane]:
     return compose_timeline(
         slots,
@@ -79,6 +82,7 @@ def build_dialogue_cues(
         _rng(rng),
         bar_times,
         song_marker_times=song_marker_times,
+        density_bias=density_bias,
     )
 
 
@@ -88,6 +92,7 @@ def build_arc_cues(
     rng: random.Random | None = None,
     bar_times: Sequence[float] = (),
     song_marker_times: Sequence[float] = (),
+    density_bias: int = 0,
 ) -> dict[str, TimelineLane]:
     return compose_timeline(
         slots,
@@ -96,6 +101,7 @@ def build_arc_cues(
         _rng(rng),
         bar_times,
         song_marker_times=song_marker_times,
+        density_bias=density_bias,
     )
 
 
@@ -105,6 +111,7 @@ def build_pulse_cues(
     rng: random.Random | None = None,
     bar_times: Sequence[float] = (),
     song_marker_times: Sequence[float] = (),
+    density_bias: int = 0,
 ) -> dict[str, TimelineLane]:
     return compose_timeline(
         slots,
@@ -113,6 +120,7 @@ def build_pulse_cues(
         _rng(rng),
         bar_times,
         song_marker_times=song_marker_times,
+        density_bias=density_bias,
     )
 
 

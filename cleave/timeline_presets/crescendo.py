@@ -23,9 +23,9 @@ TIMELINE_PRESET_CRESCENDO_OPTIONS: tuple[CrescendoTarget | None, ...] = (
 )
 
 _CRESCENDO_DISPLAY: dict[CrescendoTarget | None, str] = {
-    None: "No",
-    "last": "Last Song Marker",
-    "penultimate": "Penultimate Song Marker",
+    None: "no",
+    "last": "last song marker",
+    "penultimate": "penultimate song marker",
 }
 
 

@@ -81,6 +81,7 @@ class RowKind(Enum):
     TIMELINE_PRESETS_HEADER = auto()
     TIMELINE_PRESET_CHARACTER = auto()
     TIMELINE_PRESET_CRESCENDO = auto()
+    TIMELINE_PRESET_DENSITY = auto()
     TIMELINE_PRESETS = auto()
     TIMELINE_RESET = auto()
     TIMELINE_BEAT_BAR_GRID_HEADER = auto()
@@ -719,7 +720,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         is_sub_header=True,
         help_title="Timeline preset",
         help_description=(
-            "Stage character and crescendo, then apply a randomly",
+            "Stage character, crescendo, and density, then apply a randomly",
             "generated timeline preset. This overwrites the current timeline.",
         ),
     ),
@@ -746,6 +747,17 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "Requires three or more song markers; otherwise apply skips crescendo.",
         ),
     ),
+    RowKind.TIMELINE_PRESET_DENSITY: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        blocked_by_section_lock=True,
+        help_title="Density",
+        help_entries=(("Left/Right", "cycle density"),),
+        help_description=(
+            "How aggressively the generator favors denser layer stacks.",
+            "Normal matches the default stack-cost ramp for the layer count.",
+        ),
+    ),
     RowKind.TIMELINE_PRESETS: RowBehavior(
         RowAffordance.ACTION,
         navigable=True,
@@ -753,7 +765,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Apply timeline preset",
         help_entries=(("Enter", "apply timeline preset"),),
         help_description=(
-            "Apply the staged character and crescendo.",
+            "Apply the staged character, crescendo, and density.",
             "This overwrites the current timeline.",
         ),
     ),

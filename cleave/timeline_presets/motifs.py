@@ -6,7 +6,10 @@ import random
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from cleave.timeline_presets.chords import ChordVocab, stack_density_level
+from cleave.timeline_presets.chords import (
+    ChordVocab,
+    effective_stack_density_level,
+)
 
 # Minimum spacing between layer visibility transitions.
 MIN_SWITCH_GAP_BARS = 2
@@ -54,7 +57,23 @@ def _pick_tutti(vocab: ChordVocab) -> str:
 
 def _prefer_quartets(vocab: ChordVocab) -> bool:
     """Use 4-stacks once density for cardinality 4 has been raised."""
-    return bool(vocab.quartets) and stack_density_level(len(vocab.slots), 4) >= 1
+    return bool(vocab.quartets) and effective_stack_density_level(
+        len(vocab.slots), 4, vocab.density_bias
+    ) >= 1
+
+
+def _prefer_trios(vocab: ChordVocab) -> bool:
+    """Use 3-stacks once density bias raises trio preference above bias 0."""
+    # Require positive bias so normal (bias 0) keeps duo_breathe as solo-duo-solo;
+    # at n>=4 trio density is already raised without bias.
+    return (
+        bool(vocab.trios)
+        and vocab.density_bias > 0
+        and effective_stack_density_level(
+            len(vocab.slots), 3, vocab.density_bias
+        )
+        >= 1
+    )
 
 
 def _resolve_solo_hold(vocab: ChordVocab, rng: random.Random, rotation: int) -> tuple[str, ...]:
@@ -63,8 +82,12 @@ def _resolve_solo_hold(vocab: ChordVocab, rng: random.Random, rotation: int) -> 
 
 def _resolve_duo_breathe(vocab: ChordVocab, rng: random.Random, rotation: int) -> tuple[str, ...]:
     solo = _pick_single(vocab, rotation)
-    duo = _pick_duo(vocab, rotation)
-    return (solo, duo, solo)
+    mid = (
+        _pick_trio(vocab, rotation)
+        if _prefer_trios(vocab)
+        else _pick_duo(vocab, rotation)
+    )
+    return (solo, mid, solo)
 
 
 def _resolve_call_response(vocab: ChordVocab, rng: random.Random, rotation: int) -> tuple[str, ...]:

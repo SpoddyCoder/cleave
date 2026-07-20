@@ -187,12 +187,13 @@ def test_wrap_text_to_width_keeps_short_line() -> None:
 
 def test_wrap_text_to_width_preserves_explicit_newlines() -> None:
     font = overlay_font()
-    text = "Apply timeline preset?\nCharacter: Arc\nCrescendo: No"
+    text = "Apply timeline preset?\ncharacter: arc\ncrescendo: no\ndensity: normal"
     max_px = max(font.size(part)[0] for part in text.split("\n")) + 10
     assert wrap_text_to_width(font, text, max_px) == [
         "Apply timeline preset?",
-        "Character: Arc",
-        "Crescendo: No",
+        "character: arc",
+        "crescendo: no",
+        "density: normal",
     ]
 
 

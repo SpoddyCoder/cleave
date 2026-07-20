@@ -26,6 +26,20 @@ _DENSITY_COST_DELTA: dict[int, tuple[float, float]] = {
 # Motif-pick score bonus for a chord peak at density level 1 / 2.
 _DENSITY_SCORE_BONUS: tuple[float, float] = (1.25, 2.5)
 
+# Multiplier applied to the character envelope budget by density bias.
+_BUDGET_SCALE_BY_BIAS: dict[int, float] = {
+    -2: 0.55,
+    -1: 0.78,
+    0: 1.0,
+    1: 1.45,
+    2: 1.9,
+}
+
+
+def budget_scale_for(density_bias: int) -> float:
+    """Envelope budget multiplier for ``density_bias``; unknown keys leave budget alone."""
+    return _BUDGET_SCALE_BY_BIAS.get(density_bias, 1.0)
+
 
 def stack_density_level(n_layers: int, cardinality: int) -> int:
     """How aggressively to favor ``cardinality``-stacks for this layer count.
@@ -50,14 +64,31 @@ def stack_density_level(n_layers: int, cardinality: int) -> int:
     return 1 if n_layers == 5 else 2
 
 
-def density_score_bonus(n_layers: int, cardinality: int) -> float:
-    level = stack_density_level(n_layers, cardinality)
+def effective_stack_density_level(
+    n_layers: int,
+    cardinality: int,
+    density_bias: int = 0,
+) -> int:
+    """Clamp ``stack_density_level`` shifted by session density bias to 0..2."""
+    return max(0, min(2, stack_density_level(n_layers, cardinality) + density_bias))
+
+
+def density_score_bonus(
+    n_layers: int,
+    cardinality: int,
+    density_bias: int = 0,
+) -> float:
+    level = effective_stack_density_level(n_layers, cardinality, density_bias)
     if level <= 0:
         return 0.0
     return _DENSITY_SCORE_BONUS[level - 1]
 
 
-def chord_cost(n_active: int, n_layers: int | None = None) -> float:
+def chord_cost(
+    n_active: int,
+    n_layers: int | None = None,
+    density_bias: int = 0,
+) -> float:
     if n_active <= 0:
         return 0.0
     capped = min(n_active, MAX_CONCURRENT_LAYERS)
@@ -67,7 +98,7 @@ def chord_cost(n_active: int, n_layers: int | None = None) -> float:
     base = _BASE_COST[capped]
     if n_layers is None or capped <= 1:
         return base
-    level = stack_density_level(n_layers, capped)
+    level = effective_stack_density_level(n_layers, capped, density_bias)
     if level <= 0:
         return base
     delta = _DENSITY_COST_DELTA[capped][level - 1]
@@ -77,8 +108,9 @@ def chord_cost(n_active: int, n_layers: int | None = None) -> float:
 def chord_cost_for_active(
     active: frozenset[str],
     n_layers: int | None = None,
+    density_bias: int = 0,
 ) -> float:
-    return chord_cost(len(active), n_layers)
+    return chord_cost(len(active), n_layers, density_bias)
 
 
 @dataclass(frozen=True)
@@ -91,15 +123,20 @@ class ChordVocab:
     quartets: tuple[str, ...]
     groups: tuple[str, ...]
     tutti_id: str | None
+    density_bias: int = 0
 
     def active_for(self, chord_id: str) -> frozenset[str]:
         return self.chords[chord_id]
 
     def cost_for(self, chord_id: str) -> float:
-        return chord_cost_for_active(self.chords[chord_id], len(self.slots))
+        return chord_cost_for_active(
+            self.chords[chord_id],
+            len(self.slots),
+            self.density_bias,
+        )
 
 
-def build_vocab(slots: list[str]) -> ChordVocab:
+def build_vocab(slots: list[str], density_bias: int = 0) -> ChordVocab:
     n = len(slots)
     chords: dict[str, frozenset[str]] = {}
     singles: list[str] = []
@@ -167,4 +204,5 @@ def build_vocab(slots: list[str]) -> ChordVocab:
         quartets=tuple(quartets),
         groups=tuple(groups),
         tutti_id=tutti_id,
+        density_bias=density_bias,
     )

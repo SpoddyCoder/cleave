@@ -9,6 +9,7 @@ from cleave.timeline import TimelineLane
 from cleave.timeline_presets.characters import CharacterProfile, in_climax_window
 from cleave.timeline_presets.chords import (
     ChordVocab,
+    budget_scale_for,
     build_vocab,
     density_score_bonus,
 )
@@ -31,6 +32,9 @@ PHRASE_BARS_MIN = 4
 PHRASE_BARS_MAX = 8
 PHRASE_SEC_MIN = 8.0
 
+# Motif-pick score weight: favors fuller peaks when density_bias > 0.
+_DENSITY_PICK_WEIGHT = 1.0
+
 
 def compose_timeline(
     slots: Sequence[str],
@@ -39,6 +43,7 @@ def compose_timeline(
     rng: random.Random,
     bar_times: Sequence[float],
     song_marker_times: Sequence[float] = (),
+    density_bias: int = 0,
 ) -> dict[str, TimelineLane]:
     slot_list = list(slots)
     if not slot_list or duration_sec <= 0.0:
@@ -48,7 +53,7 @@ def compose_timeline(
 
     order = list(slot_list)
     rng.shuffle(order)
-    vocab = build_vocab(order)
+    vocab = build_vocab(order, density_bias=density_bias)
     motifs = motifs_for_profile(profile.motif_ids)
 
     bars = thin_bar_times_for_arrange(bar_times, duration_sec)
@@ -72,10 +77,11 @@ def compose_timeline(
     claimed_markers: set[float] = set()
 
     climax_phrase_index = _climax_phrase_index(phrases, duration_sec)
+    budget_scale = budget_scale_for(density_bias)
 
     for phrase_i, (phrase_start, phrase_end) in enumerate(phrases):
         progress = (phrase_start + phrase_end) * 0.5 / duration_sec
-        budget = profile.envelope(progress)
+        budget = max(1.0, profile.envelope(progress) * budget_scale)
         climax_window = in_climax_window(progress)
         force_climax = (
             profile.climax_motif_id is not None
@@ -373,7 +379,10 @@ def _pick_motif(
         steps = motif.resolve_steps(vocab, rng, solo_rotation)
         first_active = vocab.active_for(steps[0])
         peak_card = max(len(vocab.active_for(step)) for step in steps)
-        score += density_score_bonus(len(vocab.slots), peak_card)
+        score += density_score_bonus(
+            len(vocab.slots), peak_card, vocab.density_bias
+        )
+        score += _DENSITY_PICK_WEIGHT * vocab.density_bias * (peak_card - 1)
 
         if prev_active is not None:
             dist = hamming_distance(prev_active, first_active)
