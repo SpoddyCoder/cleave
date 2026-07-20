@@ -20,10 +20,14 @@ from cleave.timeline_presets import (
 from cleave.timeline_presets.characters import in_climax_window
 from cleave.timeline_presets.chords import (
     MAX_CONCURRENT_LAYERS,
+    budget_scale_for,
     build_vocab,
     chord_cost,
+    density_score_bonus,
+    effective_stack_density_level,
     stack_density_level,
 )
+from cleave.timeline_presets.density import density_bias_for
 from cleave.timeline_presets.crescendo import (
     apply_crescendo,
     resolve_crescendo_window,
@@ -210,9 +214,18 @@ def _transition_hamming_distances(
     return distances
 
 
-def _build(builder, slots, duration_sec, rng):
+def _build(builder, slots, duration_sec, rng, density_bias: int = 0):
     bars = _bar_times_for(duration_sec)
-    return builder(slots, duration_sec, rng, bar_times=bars), bars
+    return (
+        builder(
+            slots,
+            duration_sec,
+            rng,
+            bar_times=bars,
+            density_bias=density_bias,
+        ),
+        bars,
+    )
 
 
 def test_thin_bar_times_dense_middle() -> None:
@@ -532,6 +545,54 @@ def test_stack_density_level_ramp() -> None:
     assert stack_density_level(8, 4) == 2
 
 
+def test_effective_stack_density_level_clamps_bias() -> None:
+    assert effective_stack_density_level(4, 4, density_bias=0) == 0
+    assert effective_stack_density_level(4, 4, density_bias=1) == 1
+    assert effective_stack_density_level(4, 4, density_bias=2) == 2
+    assert effective_stack_density_level(4, 4, density_bias=3) == 2
+    assert effective_stack_density_level(3, 2, density_bias=-1) == 0
+    assert effective_stack_density_level(3, 2, density_bias=-2) == 0
+    assert effective_stack_density_level(6, 4, density_bias=-1) == 1
+    assert density_bias_for("normal") == 0
+    assert density_bias_for("very sparse") == -2
+    assert density_bias_for("very dense") == 2
+
+
+def test_density_bias_zero_matches_unbiased_costs_and_bonuses() -> None:
+    for n_layers in range(2, 9):
+        for card in range(2, 5):
+            assert chord_cost(card, n_layers=n_layers, density_bias=0) == chord_cost(
+                card, n_layers=n_layers
+            )
+            assert density_score_bonus(n_layers, card, density_bias=0) == (
+                density_score_bonus(n_layers, card)
+            )
+    vocab = build_vocab(_slots(4), density_bias=0)
+    assert vocab.density_bias == 0
+    assert vocab.cost_for(vocab.quartets[0]) == chord_cost(4, n_layers=4)
+
+
+def test_positive_density_bias_unlocks_denser_stacks_earlier() -> None:
+    # Four layers: quartets stay baseline without bias; +1 raises them.
+    assert stack_density_level(4, 4) == 0
+    assert chord_cost(4, n_layers=4, density_bias=1) < chord_cost(4, n_layers=4)
+    assert density_score_bonus(4, 4, density_bias=1) > 0.0
+    assert density_score_bonus(4, 4, density_bias=0) == 0.0
+    vocab = build_vocab(_slots(4), density_bias=1)
+    assert vocab.cost_for(vocab.quartets[0]) < chord_cost(4, n_layers=4)
+
+
+def test_negative_density_bias_keeps_stacks_costlier() -> None:
+    # Three layers: duos are raised at bias 0; -1 returns them to baseline.
+    assert stack_density_level(3, 2) == 1
+    assert chord_cost(2, n_layers=3, density_bias=-1) == chord_cost(2)
+    assert chord_cost(2, n_layers=3, density_bias=-1) > chord_cost(
+        2, n_layers=3, density_bias=0
+    )
+    assert density_score_bonus(3, 2, density_bias=-1) == 0.0
+    assert density_score_bonus(3, 2, density_bias=0) > 0.0
+
+
 def test_build_vocab_caps_concurrent_stacks() -> None:
     for n in range(2, 9):
         vocab = build_vocab(_slots(n))
@@ -558,12 +619,73 @@ def test_chord_cost_baseline_unchanged_without_layer_count() -> None:
 
 @pytest.mark.parametrize("builder", ALL_BUILDERS)
 @pytest.mark.parametrize("n", range(5, 9))
-def test_preset_never_exceeds_max_concurrent(builder, n: int) -> None:
+@pytest.mark.parametrize("density_bias", (0, 2))
+def test_preset_never_exceeds_max_concurrent(
+    builder, n: int, density_bias: int
+) -> None:
     slots = _slots(n)
     duration_sec = 180.0
-    lanes, _bars = _build(builder, slots, duration_sec, random.Random(n * 17))
+    lanes, _bars = _build(
+        builder, slots, duration_sec, random.Random(n * 17), density_bias=density_bias
+    )
     counts = _sample_active_counts(lanes, slots, duration_sec, step=1.0)
     assert max(counts) <= MAX_CONCURRENT_LAYERS
+
+
+def test_budget_scale_for_bias_zero_is_identity() -> None:
+    assert budget_scale_for(0) == 1.0
+    assert budget_scale_for(99) == 1.0
+    assert budget_scale_for(-2) < budget_scale_for(-1) < 1.0
+    assert 1.0 < budget_scale_for(1) < budget_scale_for(2)
+
+
+@pytest.mark.parametrize("builder", ALL_BUILDERS)
+def test_density_bias_zero_output_unchanged(builder) -> None:
+    slots = _slots(4)
+    duration_sec = 120.0
+    bars = _bar_times_for(duration_sec)
+    seed = 4242
+    a = builder(slots, duration_sec, random.Random(seed), bar_times=bars)
+    b = builder(
+        slots, duration_sec, random.Random(seed), bar_times=bars, density_bias=0
+    )
+    assert a == b
+
+
+@pytest.mark.parametrize("builder", ALL_BUILDERS)
+def test_density_bias_monotonic_active_counts(builder) -> None:
+    slots = _slots(4)
+    duration_sec = 180.0
+    biases = (-2, -1, 0, 1, 2)
+    means: list[float] = []
+    high_fracs: list[float] = []
+    for bias in biases:
+        seed_counts: list[int] = []
+        seed_fracs: list[float] = []
+        for seed in range(8):
+            lanes, _bars = _build(
+                builder,
+                slots,
+                duration_sec,
+                random.Random(seed * 100 + bias + 17),
+                density_bias=bias,
+            )
+            counts = _sample_active_counts(lanes, slots, duration_sec, step=2.0)
+            seed_counts.extend(counts)
+            seed_fracs.append(_high_cost_fraction(lanes, slots, duration_sec))
+            assert max(counts) <= MAX_CONCURRENT_LAYERS
+        means.append(statistics.mean(seed_counts))
+        high_fracs.append(statistics.mean(seed_fracs))
+    for lo, hi in zip(means, means[1:]):
+        assert hi + 1e-9 >= lo, f"{builder.__name__} mean {means} not monotonic"
+    for lo, hi in zip(high_fracs, high_fracs[1:]):
+        assert hi + 1e-9 >= lo, (
+            f"{builder.__name__} high-cost frac {high_fracs} not monotonic"
+        )
+    assert means[-1] > means[0], (
+        f"{builder.__name__} very dense mean {means[-1]} "
+        f"not greater than very sparse {means[0]}"
+    )
 
 
 def test_resolve_crescendo_window_last_uses_marker_minus_two() -> None:

@@ -1603,8 +1603,9 @@ def test_timeline_presets_enter_opens_yes_cancel_modal() -> None:
     assert modal_view.options == ("Yes", "Cancel")
     assert modal_view.message == (
         "Apply timeline preset?\n"
-        "Character: Arc\n"
-        "Crescendo: Last Song Marker"
+        "character: arc\n"
+        "crescendo: last song marker\n"
+        "density: normal"
     )
 
 
@@ -2630,6 +2631,7 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
         RowKind.TIMELINE_PRESETS_HEADER,
         RowKind.TIMELINE_PRESET_CHARACTER,
         RowKind.TIMELINE_PRESET_CRESCENDO,
+        RowKind.TIMELINE_PRESET_DENSITY,
         RowKind.TIMELINE_PRESETS,
         RowKind.TIMELINE_RESET,
     ):

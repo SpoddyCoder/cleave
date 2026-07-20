@@ -148,6 +148,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     presets_header = RowDescriptor(RowKind.TIMELINE_PRESETS_HEADER)
     preset_character = RowDescriptor(RowKind.TIMELINE_PRESET_CHARACTER)
     preset_crescendo = RowDescriptor(RowKind.TIMELINE_PRESET_CRESCENDO)
+    preset_density = RowDescriptor(RowKind.TIMELINE_PRESET_DENSITY)
     presets_apply = RowDescriptor(RowKind.TIMELINE_PRESETS)
     reset = RowDescriptor(RowKind.TIMELINE_RESET)
     beat_bar_header = RowDescriptor(RowKind.TIMELINE_BEAT_BAR_GRID_HEADER)
@@ -182,6 +183,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert presets_header in view_open.layout.rows
     assert preset_character not in view_open.layout.rows
     assert preset_crescendo not in view_open.layout.rows
+    assert preset_density not in view_open.layout.rows
     assert presets_apply not in view_open.layout.rows
     assert reset in view_open.layout.rows
     assert beat_bar_header in view_open.layout.rows
@@ -264,16 +266,20 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert view_presets_expanded.layout.rows.index(preset_crescendo) == (
         presets_header_idx + 2
     )
-    assert view_presets_expanded.layout.rows.index(presets_apply) == (
+    assert view_presets_expanded.layout.rows.index(preset_density) == (
         presets_header_idx + 3
     )
-    assert view_presets_expanded.layout.rows.index(reset) == presets_header_idx + 4
+    assert view_presets_expanded.layout.rows.index(presets_apply) == (
+        presets_header_idx + 4
+    )
+    assert view_presets_expanded.layout.rows.index(reset) == presets_header_idx + 5
 
     session.timeline.timeline_presets_expanded = False
     view_presets_collapsed = builder.build(paused=False)
     assert view_presets_collapsed.layout is not view_presets_expanded.layout
     assert preset_character not in view_presets_collapsed.layout.rows
     assert preset_crescendo not in view_presets_collapsed.layout.rows
+    assert preset_density not in view_presets_collapsed.layout.rows
     assert presets_apply not in view_presets_collapsed.layout.rows
     assert presets_header in view_presets_collapsed.layout.rows
 

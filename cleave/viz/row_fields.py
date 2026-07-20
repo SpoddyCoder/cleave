@@ -34,6 +34,10 @@ from cleave.timeline_presets.crescendo import (
     cycle_timeline_preset_crescendo,
     timeline_preset_crescendo_display,
 )
+from cleave.timeline_presets.density import (
+    cycle_timeline_preset_density,
+    timeline_preset_density_display,
+)
 from cleave.viz.fonts import render_overlay_font_display
 from cleave.viz.row_sections import (
     apply_expand_toggle,
@@ -217,6 +221,28 @@ def _apply_timeline_preset_crescendo(
     tl = controls.session.timeline
     tl.timeline_preset_crescendo = cycle_timeline_preset_crescendo(
         tl.timeline_preset_crescendo,
+        forward=forward,
+    )
+
+
+def _format_timeline_preset_density(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return timeline_preset_density_display(
+        state.render_timeline.timeline_preset_density
+    )
+
+
+def _apply_timeline_preset_density(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    tl = controls.session.timeline
+    tl.timeline_preset_density = cycle_timeline_preset_density(
+        tl.timeline_preset_density,
         forward=forward,
     )
 
@@ -1593,6 +1619,12 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_timeline_preset_crescendo,
         apply_horizontal=_apply_timeline_preset_crescendo,
+    ),
+    RowKind.TIMELINE_PRESET_DENSITY: RowFieldDef(
+        panel_label="density",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_timeline_preset_density,
+        apply_horizontal=_apply_timeline_preset_density,
     ),
     RowKind.TIMELINE_PRESETS: RowFieldDef(
         panel_label="apply timeline preset",

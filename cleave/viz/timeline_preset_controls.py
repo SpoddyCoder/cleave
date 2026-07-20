@@ -20,6 +20,10 @@ from cleave.timeline_presets.crescendo import (
     normalize_crescendo_markers,
     timeline_preset_crescendo_display,
 )
+from cleave.timeline_presets.density import (
+    density_bias_for,
+    timeline_preset_density_display,
+)
 from cleave.viz.modal import ModalHost, ModalOption
 from cleave.viz.session import TuningSession
 
@@ -66,8 +70,9 @@ class TimelinePresetController:
     def _apply_prompt_message(self) -> str:
         tl = self.session.timeline
         choice_lines = (
-            f"Character: {timeline_preset_kind_display(tl.timeline_preset_kind)}",
-            f"Crescendo: {timeline_preset_crescendo_display(tl.timeline_preset_crescendo)}",
+            f"character: {timeline_preset_kind_display(tl.timeline_preset_kind)}",
+            f"crescendo: {timeline_preset_crescendo_display(tl.timeline_preset_crescendo)}",
+            f"density: {timeline_preset_density_display(tl.timeline_preset_density)}",
         )
         return "\n".join(("Apply timeline preset?", *choice_lines))
 
@@ -129,6 +134,7 @@ class TimelinePresetController:
             rng,
             bar_times=grid,
             song_marker_times=markers,
+            density_bias=density_bias_for(tl.timeline_preset_density),
         )
         if crescendo is not None:
             built = apply_crescendo(

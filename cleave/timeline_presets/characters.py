@@ -133,10 +133,10 @@ TIMELINE_PRESET_KIND_OPTIONS: tuple[str, ...] = tuple(CHARACTERS)
 DEFAULT_TIMELINE_PRESET_KIND = "breathing"
 
 _CHARACTER_DISPLAY: dict[str, str] = {
-    "breathing": "Breathing",
-    "dialogue": "Dialogue",
-    "arc": "Arc",
-    "pulse": "Pulse",
+    "breathing": "breathing",
+    "dialogue": "dialogue",
+    "arc": "arc",
+    "pulse": "pulse",
 }
 
 CHARACTER_HELP_ENTRIES: tuple[tuple[str, str], ...] = (
