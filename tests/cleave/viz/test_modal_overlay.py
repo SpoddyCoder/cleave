@@ -214,10 +214,30 @@ def test_modal_options_centered_when_message_is_wider() -> None:
     content_w = panel_w - modal_overlay._PANEL_PAD_X * 2
     options_w, _ = modal_overlay._measure_options(font, view.options, line_gap=line_gap)
     msg_w = font.size(view.message)[0]
+    min_content_w = (
+        modal_overlay._panel_min_width(screen_w) - modal_overlay._PANEL_PAD_X * 2
+    )
 
     assert msg_w > options_w
-    assert content_w == msg_w
+    assert content_w == max(msg_w, min_content_w)
     assert modal_overlay._PANEL_PAD_X + (content_w - options_w) // 2 > modal_overlay._PANEL_PAD_X
+
+
+def test_modal_panel_min_width_is_20_percent_of_screen() -> None:
+    pygame.init()
+    font = _font()
+    screen_w = 1280
+    view = ModalViewState(
+        kind=ModalKind.YES_NO,
+        message="Save?",
+        options=("Yes", "No"),
+        focus_index=0,
+    )
+    panel_w, _ = modal_overlay._measure_panel(
+        font, view, line_gap=3, screen_w=screen_w
+    )
+    assert panel_w >= modal_overlay._panel_min_width(screen_w)
+    assert modal_overlay._panel_min_width(screen_w) == int(screen_w * 0.2)
 
 
 def test_long_message_wraps_to_half_screen_width() -> None:

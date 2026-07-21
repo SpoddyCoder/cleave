@@ -25,6 +25,8 @@ from cleave.viz.ui_tint import blit_tint
 
 # Modal title/message content width cap as a fraction of the viewport.
 _MESSAGE_MAX_SCREEN_FRACTION = 0.5
+# Modal panel minimum width as a fraction of the viewport.
+_PANEL_MIN_SCREEN_FRACTION = 0.2
 
 
 def draw_rect(
@@ -54,6 +56,10 @@ _PANEL_PAD_Y = _tuning_ui.modal_panel_pad_y
 
 def _message_max_width(screen_w: int) -> int:
     return max(1, int(screen_w * _MESSAGE_MAX_SCREEN_FRACTION))
+
+
+def _panel_min_width(screen_w: int) -> int:
+    return max(1, int(screen_w * _PANEL_MIN_SCREEN_FRACTION))
 
 
 def _message_lines(
@@ -170,7 +176,7 @@ def _measure_info_panel(
         content_h += line_h
 
     return (
-        content_w + _PANEL_PAD_X * 2,
+        max(content_w + _PANEL_PAD_X * 2, _panel_min_width(screen_w)),
         content_h + _PANEL_PAD_Y * 2,
     )
 
@@ -264,7 +270,7 @@ def _measure_panel(
         content_h += options_h
 
     return (
-        content_w + _PANEL_PAD_X * 2,
+        max(content_w + _PANEL_PAD_X * 2, _panel_min_width(screen_w)),
         content_h + _PANEL_PAD_Y * 2,
     )
 
