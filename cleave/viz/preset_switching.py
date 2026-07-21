@@ -575,15 +575,12 @@ def _auto_preset_loaded_callback(layer: StemLayer) -> Callable[[Path], None]:
 
 
 def _record_auto_preset(layer: StemLayer, path: Path) -> None:
-    resolved = path.resolve()
-    layer.auto_preset_path = resolved
-    browse = layer.playlist
-    if browse.current_dir.resolve() != resolved.parent:
-        return
-    for index, candidate in enumerate(browse.paths):
-        if candidate.resolve() == resolved:
-            browse.index = index
-            return
+    """Track the playing auto-switch preset without moving browse selection.
+
+    Browse ``playlist.index`` is the saved/manual preset; mutating it here
+    would dirty config during ordinary playback.
+    """
+    layer.auto_preset_path = path.resolve()
 
 
 def _sync_projectm_playlist_position(layer: StemLayer) -> None:
