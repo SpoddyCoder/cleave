@@ -102,6 +102,12 @@ from cleave.config_schema import (
     require_non_negative_number,
 )
 from cleave.timeline import TimelineLane
+from cleave.timeline_presets.characters import DEFAULT_TIMELINE_PRESET_KIND
+from cleave.timeline_presets.crescendo import CrescendoTarget
+from cleave.timeline_presets.density import (
+    DEFAULT_TIMELINE_PRESET_DENSITY,
+    TimelinePresetDensity,
+)
 
 VIZ_CONFIG_FILENAME = "cleave-viz.yaml"
 
@@ -248,12 +254,22 @@ class TimelineFadesConfig:
 
 
 @dataclass(frozen=True)
+class TimelinePresetConfig:
+    """Staged character / crescendo / density for the timeline preset action."""
+
+    character: str = DEFAULT_TIMELINE_PRESET_KIND
+    crescendo: CrescendoTarget | None = None
+    density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
+
+
+@dataclass(frozen=True)
 class TimelineConfig:
     enabled: bool
     lanes: dict[str, TimelineLane]
     locked: bool = False
     fades: TimelineFadesConfig = field(default_factory=TimelineFadesConfig)
     placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
+    preset: TimelinePresetConfig = field(default_factory=TimelinePresetConfig)
 
 
 @dataclass
