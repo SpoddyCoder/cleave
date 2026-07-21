@@ -14,6 +14,16 @@ from cleave.effects.constants import clamp_effect_pct
 from cleave.effects.registry import validate_effect_entry
 from cleave.extract import STEM_SOURCES, StemSource
 from cleave.timeline import SlotCue, TimelineLane, canonicalize
+from cleave.timeline_presets.characters import (
+    DEFAULT_TIMELINE_PRESET_KIND,
+    TIMELINE_PRESET_KIND_OPTIONS,
+)
+from cleave.timeline_presets.crescendo import CrescendoTarget
+from cleave.timeline_presets.density import (
+    DEFAULT_TIMELINE_PRESET_DENSITY,
+    TIMELINE_PRESET_DENSITY_OPTIONS,
+    TimelinePresetDensity,
+)
 
 # --- Editor defaults ---
 
@@ -328,6 +338,32 @@ def parse_timeline_placement_snap(raw: Any, label: str) -> TimelinePlacementSnap
         allowed = ", ".join(TIMELINE_PLACEMENT_SNAP_OPTIONS)
         raise ValueError(f"{label} must be one of: {allowed}")
     return value  # type: ignore[return-value]
+
+
+def parse_timeline_preset_character(raw: Any, label: str) -> str:
+    value = str(raw)
+    if value not in TIMELINE_PRESET_KIND_OPTIONS:
+        allowed = ", ".join(TIMELINE_PRESET_KIND_OPTIONS)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return value
+
+
+def parse_timeline_preset_crescendo(raw: Any, label: str) -> CrescendoTarget | None:
+    if raw is None:
+        return None
+    value = str(raw)
+    if value not in ("last", "penultimate"):
+        raise ValueError(f"{label} must be one of: last, penultimate, or null")
+    return value  # type: ignore[return-value]
+
+
+def parse_timeline_preset_density(raw: Any, label: str) -> TimelinePresetDensity:
+    value = str(raw)
+    if value not in TIMELINE_PRESET_DENSITY_OPTIONS:
+        allowed = ", ".join(TIMELINE_PRESET_DENSITY_OPTIONS)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return value  # type: ignore[return-value]
+
 
 FieldSource = Literal["cfg", "session", "both"]
 T = TypeVar("T")
@@ -1922,6 +1958,28 @@ def _parse_timeline_fade_group(raw: Any, label: str) -> Any:
     )
 
 
+def _parse_timeline_preset(raw: Any) -> Any:
+    from cleave.config import TimelinePresetConfig
+
+    if raw is None:
+        return TimelinePresetConfig()
+    preset_map = as_mapping(raw, "timeline.preset")
+    return TimelinePresetConfig(
+        character=parse_timeline_preset_character(
+            preset_map.get("character", DEFAULT_TIMELINE_PRESET_KIND),
+            "timeline.preset.character",
+        ),
+        crescendo=parse_timeline_preset_crescendo(
+            preset_map.get("crescendo"),
+            "timeline.preset.crescendo",
+        ),
+        density=parse_timeline_preset_density(
+            preset_map.get("density", DEFAULT_TIMELINE_PRESET_DENSITY),
+            "timeline.preset.density",
+        ),
+    )
+
+
 def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
     from cleave.config import TimelineConfig, TimelineFadesConfig
 
@@ -1950,6 +2008,7 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
                 "timeline.fades.standard",
             ),
         )
+    preset = _parse_timeline_preset(timeline_map.get("preset"))
     # Legacy timeline.cues is ignored (clean break; no migration).
     lanes_raw = timeline_map.get("lanes")
     if lanes_raw is None:
@@ -1959,6 +2018,7 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
             locked=locked,
             fades=fades,
             placement_snap=placement_snap,
+            preset=preset,
         )
     lanes_map = as_mapping(lanes_raw, "timeline.lanes")
     if ctx.layer_slots is None:
@@ -2008,6 +2068,7 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
         locked=locked,
         fades=fades,
         placement_snap=placement_snap,
+        preset=preset,
     )
 
 
@@ -2028,6 +2089,11 @@ def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
         "fades": {
             "song_markers": _persist_timeline_fade_group(runtime.song_marker_fades),
             "standard": _persist_timeline_fade_group(runtime.standard_cue_fades),
+        },
+        "preset": {
+            "character": runtime.timeline_preset_kind,
+            "crescendo": runtime.timeline_preset_crescendo,
+            "density": runtime.timeline_preset_density,
         },
     }
     lanes_out: dict[str, Any] = {}

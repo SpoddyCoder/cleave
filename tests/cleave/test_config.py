@@ -22,6 +22,7 @@ from cleave.config import (
     TimelineConfig,
     TimelineFadeGroupConfig,
     TimelineFadesConfig,
+    TimelinePresetConfig,
     EditorConfig,
     clamp_beat_sensitivity,
     clamp_effect_pct,
@@ -1043,6 +1044,7 @@ def test_parse_timeline_defaults_enabled_true() -> None:
     assert timeline.locked is False
     assert timeline.fades == TimelineFadesConfig()
     assert timeline.placement_snap == "beat"
+    assert timeline.preset == TimelinePresetConfig()
 
 
 def test_parse_timeline_reads_fades() -> None:
@@ -1167,10 +1169,96 @@ def test_persist_timeline_placement_snap_round_trip() -> None:
     assert round_trip.placement_snap == "bar"
 
 
+def test_persist_timeline_preset_round_trip() -> None:
+    from cleave.viz.session import TimelineRuntime
+
+    session = TuningSession(
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
+        timeline=TimelineRuntime(
+            enabled=True,
+            timeline_preset_kind="arc",
+            timeline_preset_crescendo="penultimate",
+            timeline_preset_density="very dense",
+        ),
+    )
+    cfg = CleaveConfig(
+        paths=PathsConfig(preset_root=Path("/tmp"), texture_paths=()),
+        layers={},
+        editor=EditorConfig(),
+        config_path=Path("/tmp/cleave-viz.yaml"),
+        user_config_path=Path("/tmp/user.yaml"),
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
+    )
+    payload = persist_timeline(PersistCtx(cfg=cfg, session=session, cfg_dir=None))
+    assert payload["preset"] == {
+        "character": "arc",
+        "crescendo": "penultimate",
+        "density": "very dense",
+    }
+    round_trip = parse_timeline_section(
+        {"timeline": payload},
+        _timeline_parse_ctx(),
+    )
+    assert round_trip is not None
+    assert round_trip.preset == TimelinePresetConfig(
+        character="arc",
+        crescendo="penultimate",
+        density="very dense",
+    )
+
+
+def test_parse_timeline_reads_preset() -> None:
+    timeline = parse_timeline_section(
+        {
+            "timeline": {
+                "preset": {
+                    "character": "pulse",
+                    "crescendo": "last",
+                    "density": "sparse",
+                }
+            }
+        },
+        _timeline_parse_ctx(),
+    )
+    assert timeline is not None
+    assert timeline.preset == TimelinePresetConfig(
+        character="pulse",
+        crescendo="last",
+        density="sparse",
+    )
+
+
+def test_parse_timeline_preset_null_crescendo() -> None:
+    timeline = parse_timeline_section(
+        {"timeline": {"preset": {"character": "dialogue", "crescendo": None}}},
+        _timeline_parse_ctx(),
+    )
+    assert timeline is not None
+    assert timeline.preset.character == "dialogue"
+    assert timeline.preset.crescendo is None
+    assert timeline.preset.density == "normal"
+
+
 def test_parse_timeline_rejects_invalid_placement_snap() -> None:
     with pytest.raises(ValueError, match="placement_snap"):
         parse_timeline_section(
             {"timeline": {"placement_snap": "onset"}},
+            _timeline_parse_ctx(),
+        )
+
+
+def test_parse_timeline_rejects_invalid_preset_character() -> None:
+    with pytest.raises(ValueError, match="character"):
+        parse_timeline_section(
+            {"timeline": {"preset": {"character": "waltz"}}},
+            _timeline_parse_ctx(),
+        )
+
+
+def test_parse_timeline_rejects_invalid_preset_density() -> None:
+    with pytest.raises(ValueError, match="density"):
+        parse_timeline_section(
+            {"timeline": {"preset": {"density": "extreme"}}},
             _timeline_parse_ctx(),
         )
 

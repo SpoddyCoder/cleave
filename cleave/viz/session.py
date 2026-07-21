@@ -352,6 +352,14 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
         if timeline is None
         else timeline.placement_snap
     )
+    preset = None if timeline is None else timeline.preset
+    preset_kind = (
+        DEFAULT_TIMELINE_PRESET_KIND if preset is None else preset.character
+    )
+    preset_crescendo = None if preset is None else preset.crescendo
+    preset_density = (
+        DEFAULT_TIMELINE_PRESET_DENSITY if preset is None else preset.density
+    )
     lanes: dict[str, TimelineLane] = {}
     for slot in cfg.layer_z_order:
         if slot in source_lanes:
@@ -364,12 +372,18 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
             locked=locked,
             lanes=lanes,
             placement_snap=placement_snap,
+            timeline_preset_kind=preset_kind,
+            timeline_preset_crescendo=preset_crescendo,
+            timeline_preset_density=preset_density,
         )
     return TimelineRuntime(
         enabled=enabled,
         locked=locked,
         lanes=lanes,
         placement_snap=placement_snap,
+        timeline_preset_kind=preset_kind,
+        timeline_preset_crescendo=preset_crescendo,
+        timeline_preset_density=preset_density,
         song_marker_fades=_fade_group_runtime_from_cfg(fades.song_markers),
         standard_cue_fades=_fade_group_runtime_from_cfg(fades.standard),
     )

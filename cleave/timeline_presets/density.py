@@ -1,4 +1,4 @@
-"""Session-only stack-density staging for timeline presets."""
+"""Stack-density staging for timeline presets (persisted under timeline.preset)."""
 
 from __future__ import annotations
 
