@@ -499,11 +499,38 @@ def test_advance_timeline_loads_next_on_rising_edge(_mock_milk: MagicMock) -> No
     advance_timeline_preset_switching(session, {"layer_1": layer}, 5.0)
     layer.pm.load_preset.assert_called_once_with(_MILK[1], smooth=False)
     assert layer.timeline_switch_count == 1
+    assert layer.auto_preset_path == _MILK[1].resolve()
+    assert layer.playlist.index == 0
 
     layer.pm.load_preset.reset_mock()
     advance_timeline_preset_switching(session, {"layer_1": layer}, 15.0)
     layer.pm.load_preset.assert_called_once_with(_MILK[2], smooth=False)
     assert layer.timeline_switch_count == 2
+    assert layer.auto_preset_path == _MILK[2].resolve()
+    assert layer.playlist.index == 0
+
+
+@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
+def test_advance_timeline_does_not_mark_config_dirty(_mock_milk: MagicMock) -> None:
+    from cleave.viz.config_save import ConfigSaveController
+    from cleave.viz.modal import ModalHost
+    from tests.support.viz import make_test_cfg
+
+    layer = _stem_layer(paths=_MILK, index=0)
+    session = _timeline_session(layer)
+    cfg = make_test_cfg(("layer_1",), preset_root=Path("/tmp/presets"))
+    save = ConfigSaveController(session, cfg, ModalHost())
+    assert not save.config_dirty
+
+    apply_preset_switching(layer, mode="timeline", rotation_set="directory")
+    save.clear_config_dirty()
+
+    advance_timeline_preset_switching(session, {"layer_1": layer}, 5.0)
+    advance_timeline_preset_switching(session, {"layer_1": layer}, 15.0)
+
+    assert layer.auto_preset_path == _MILK[2].resolve()
+    assert layer.playlist.index == 0
+    assert not save.config_dirty
 
 
 @patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
