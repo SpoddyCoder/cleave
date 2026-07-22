@@ -12,7 +12,12 @@ import soundfile as sf
 from cleave.extract import STEM_NAMES, stems_dir
 from cleave.pcm_io import SAMPLE_RATE_HZ, _to_mono_float32
 from cleave.project import write_manifest
-from cleave.stem_pcm import StemPcmBank, load_stem_pcm, samples_per_frame
+from cleave.stem_pcm import (
+    StemPcmBank,
+    fold_pcm_to_max_samples,
+    load_stem_pcm,
+    samples_per_frame,
+)
 
 
 def _make_bank(*, duration_samples: int = 4410) -> StemPcmBank:
@@ -189,3 +194,67 @@ def test_load_stem_pcm_stereo_preserves_channels(tmp_path: Path) -> None:
         bank.pcm("drums"),
         np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32),
     )
+
+
+def test_fold_pcm_to_max_samples_identity_when_short() -> None:
+    pcm = np.linspace(0.0, 1.0, 100, dtype=np.float32)
+    out = fold_pcm_to_max_samples(pcm, channels=1, max_samples=480)
+    np.testing.assert_array_equal(out, pcm)
+
+
+def test_fold_pcm_to_max_samples_mono_30fps_length() -> None:
+    n_pcm = samples_per_frame(fps=30)
+    assert n_pcm == 1470
+    pcm = np.zeros(n_pcm, dtype=np.float32)
+    out = fold_pcm_to_max_samples(pcm, channels=1, max_samples=480)
+    assert out.shape == (480,)
+    assert out.dtype == np.float32
+
+
+def test_fold_pcm_to_max_samples_stereo_interleaved_length() -> None:
+    n_pcm = samples_per_frame(fps=30)
+    pcm = np.zeros(n_pcm * 2, dtype=np.float32)
+    out = fold_pcm_to_max_samples(pcm, channels=2, max_samples=480)
+    assert out.shape == (480 * 2,)
+    assert out.dtype == np.float32
+
+
+def test_fold_pcm_to_max_samples_preserves_early_spike() -> None:
+    n_pcm = samples_per_frame(fps=30)
+    pcm = np.zeros(n_pcm, dtype=np.float32)
+    spike_idx = n_pcm // 6
+    pcm[spike_idx] = 1.0
+    out = fold_pcm_to_max_samples(pcm, channels=1, max_samples=480)
+    assert np.max(np.abs(out)) == 1.0
+    assert np.any(out == 1.0)
+
+
+def test_fold_pcm_to_max_samples_stereo_early_spike_per_channel() -> None:
+    n_pcm = samples_per_frame(fps=30)
+    pcm = np.zeros(n_pcm * 2, dtype=np.float32)
+    pcm[0] = 0.9
+    pcm[1] = -0.8
+    out = fold_pcm_to_max_samples(pcm, channels=2, max_samples=480)
+    assert out[0] == 0.9
+    assert out[1] == -0.8
+
+
+def test_fold_pcm_to_max_samples_noop_when_max_non_positive() -> None:
+    pcm = np.arange(1000, dtype=np.float32)
+    out = fold_pcm_to_max_samples(pcm, channels=1, max_samples=0)
+    np.testing.assert_array_equal(out, pcm)
+
+
+def test_fold_pcm_captures_early_spike_lost_by_tail_only_feed() -> None:
+    """At 30 fps only the last 480 samples reach projectM without folding."""
+    n_pcm = samples_per_frame(fps=30)
+    max_pcm = 480
+    pcm = np.zeros(n_pcm, dtype=np.float32)
+    spike_idx = n_pcm // 6
+    pcm[spike_idx] = 1.0
+
+    tail_only = pcm[-max_pcm:]
+    assert np.max(np.abs(tail_only)) == 0.0
+
+    folded = fold_pcm_to_max_samples(pcm, channels=1, max_samples=max_pcm)
+    assert np.max(np.abs(folded)) == 1.0
