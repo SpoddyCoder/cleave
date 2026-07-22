@@ -19,6 +19,14 @@ Emit MIDI notes or CC from drum onsets (and other signals in `signals.json`) to 
 
 Investigate PCM feeding strategy for the projectM buffer. Only the last ~11 ms (480 samples at 44.1 kHz) is actively used per render; at low FPS Cleave feeds a much longer timeslice per frame. Explore whether sampling or aggregating across the full frame timeslice (not just the tail) improves visual matchup with audio. Uncertain payoff; worth exploring.
 
+## projectM beat sensitivity
+
+Cleave multiplies PCM by beat sensitivity in [cleave/projectm.py](../cleave/projectm.py) `feed_pcm` (default 2.0). That is intentional: after projectM's 2023 audio rewrite ([69d2134](https://github.com/projectM-visualizer/projectm/commit/69d2134fa2c39901eb354eac546c09e1be5c794b)), `projectm_set_beat_sensitivity` became a store-only stub. Older projectM applied sensitivity as a PCM scale via `BeatDetect::GetPCMScale()` (see [issue #161](https://github.com/projectM-visualizer/projectm/issues/161)); Cleave recreates that outside the library so presets stay reactive.
+
+Side effect: louder PCM also affects hard-cut detection, so the beat-sensitivity knob is not fully independent of hard-cut sensitivity.
+
+Watch upstream: if libprojectM wires beat sensitivity back into the audio path, drop the PCM pre-scale and rely on the native API again. Until then, keep the workaround.
+
 ## Web / browser port
 
 Port playback and compositing to the browser. `signals.json` is already portable JSON; [Butterchurn](https://github.com/jberg/butterchurn) is a JS Milkdrop renderer that could replace libprojectM for a shareable viewer.
