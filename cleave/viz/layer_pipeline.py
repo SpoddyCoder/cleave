@@ -11,13 +11,13 @@ from cleave.effects.runtime import EffectRuntime
 from cleave.gl_compositor import GlCompositor
 from cleave.gl_post_process import GlPostProcess
 from cleave.preset_playlist import PresetPlaylist
-from cleave.projectm import ProjectM
+from cleave.projectm import ProjectM, pcm_max_samples_per_channel
 from cleave.projectm_health import (
     drain_projectm_log_notifications,
     drain_stem_layers_preset_failures,
 )
 from cleave.signals import Signals
-from cleave.stem_pcm import StemPcmBank
+from cleave.stem_pcm import StemPcmBank, fold_pcm_to_max_samples
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_preview_resolution import (
     preview_layer_size,
@@ -396,7 +396,13 @@ class LayerFramePipeline:
                     continue
                 stem = session.layers[layer.slot].stem
                 pcm = pcm_bank.slice_pcm(stem, t_sec, n_pcm)
-                layer.pm.feed_pcm(pcm, channels=pcm_bank.channels(stem))
+                ch = pcm_bank.channels(stem)
+                max_pcm = pcm_max_samples_per_channel()
+                if max_pcm > 0:
+                    pcm = fold_pcm_to_max_samples(
+                        pcm, channels=ch, max_samples=max_pcm
+                    )
+                layer.pm.feed_pcm(pcm, channels=ch)
                 layer.pm.set_frame_time(pm_time_sec)
 
         apply_effect_modifiers(

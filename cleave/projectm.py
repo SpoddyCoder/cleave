@@ -363,6 +363,11 @@ def _get_lib() -> ctypes.CDLL:
     )
 
 
+def pcm_max_samples_per_channel() -> int:
+    """Per-channel sample count libprojectM uses for one PCM feed window."""
+    return int(_get_lib().projectm_pcm_get_max_samples())
+
+
 class ProjectM:
     """Context-manager-friendly wrapper around a libprojectM instance."""
 
