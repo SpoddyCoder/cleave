@@ -64,6 +64,70 @@ def samples_for_dt(dt_sec: float) -> int:
     return max(1, round(dt_sec * SAMPLE_RATE_HZ))
 
 
+def _fold_channel_block_peak(channel: np.ndarray, target: int) -> np.ndarray:
+    """Fold one channel from *len(channel)* samples to *target* via block-peak."""
+    n = int(channel.shape[0])
+    if n <= target:
+        return np.ascontiguousarray(channel, dtype=np.float32)
+    out = np.zeros(target, dtype=np.float32)
+    for i in range(target):
+        start = i * n // target
+        end = (i + 1) * n // target
+        block = channel[start:end]
+        if block.size == 0:
+            continue
+        out[i] = block[int(np.argmax(np.abs(block)))]
+    return out
+
+
+def fold_pcm_to_max_samples(
+    samples: np.ndarray,
+    *,
+    channels: int,
+    max_samples: int,
+) -> np.ndarray:
+    """Compress per-channel PCM to at most *max_samples* via block-peak aggregation.
+
+    When the frame timeslice exceeds libprojectM's PCM window, feeding the raw
+    slice leaves only the tail in the ring buffer. Block-peak folding maps energy
+    from the full interval into the buffer while preserving percussive transients.
+    """
+    if max_samples <= 0:
+        return samples
+
+    if isinstance(samples, np.ndarray):
+        if samples.size == 0:
+            return samples
+        arr = np.ascontiguousarray(samples, dtype=np.float32).ravel()
+    else:
+        try:
+            if len(samples) == 0:
+                return samples
+        except TypeError:
+            pass
+        arr = np.ascontiguousarray(np.asarray(samples, dtype=np.float32)).ravel()
+    if arr.size == 0:
+        return arr
+    if channels == 2:
+        n_frames = arr.size // 2
+        arr = arr[: n_frames * 2]
+        if n_frames <= max_samples:
+            return arr
+        frames = arr.reshape(n_frames, 2)
+        folded = np.column_stack(
+            (
+                _fold_channel_block_peak(frames[:, 0], max_samples),
+                _fold_channel_block_peak(frames[:, 1], max_samples),
+            )
+        )
+        return np.ascontiguousarray(folded.ravel(), dtype=np.float32)
+
+    n_frames = arr.size
+    if n_frames <= max_samples:
+        return arr
+    return _fold_channel_block_peak(arr, max_samples)
+
+
 def load_stem_pcm(project_dir: Path) -> StemPcmBank:
     """Load five audio sources from *project_dir* into memory."""
     project_dir = project_dir.resolve()

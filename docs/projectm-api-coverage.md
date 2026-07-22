@@ -20,7 +20,7 @@ Related: [legacy-plans/presets-scan-plan.md](legacy-plans/presets-scan-plan.md) 
 | `projectm_pcm_add_float` | bound, used | Stem PCM feed |
 | `projectm_pcm_add_int16` | ignored | Cleave normalizes to float32 |
 | `projectm_pcm_add_uint8` | ignored | Cleave normalizes to float32 |
-| `projectm_pcm_get_max_samples` | bound, used | Chunk sizing |
+| `projectm_pcm_get_max_samples` | bound, used | Chunk sizing; also target for block-peak PCM fold |
 | `projectm_opengl_render_frame` | ignored | Cleave renders to layer FBOs |
 | `projectm_opengl_render_frame_fbo` | bound, used | Per-layer render |
 | `projectm_opengl_burn_texture` | ignored | No burn pass in Cleave |
@@ -101,6 +101,10 @@ Related: [legacy-plans/presets-scan-plan.md](legacy-plans/presets-scan-plan.md) 
 - Connected playlist `projectm_playlist_set_preset_switch_failed_event_callback` enqueues **exhausted** failures (`exhausted=True`).
 - [cleave/projectm_health.py](../cleave/projectm_health.py) drains queues each frame before layer render; rate-limited skip notifications and rotation-stall message via panel notification sink.
 - Warning+ libprojectM log lines are queued in [cleave/projectm.py](../cleave/projectm.py) and drained to panel toasts (`projectM: ...`) once per unique message per session.
+
+## PCM feeding
+
+libprojectM 4.x keeps a **576**-sample circular buffer per channel; presets read **480** waveform samples and a **512**-bin spectrum from it. Cleave slices each frame's song playhead interval (`samples_per_frame` offline, `samples_for_dt` live) and, when that interval exceeds `projectm_pcm_get_max_samples`, folds it with block-peak aggregation in [cleave/stem_pcm.py](../cleave/stem_pcm.py) `fold_pcm_to_max_samples` before [cleave/viz/layer_pipeline.py](../cleave/viz/layer_pipeline.py) calls `feed_pcm`. Without folding, low-FPS frames only retain the tail of the timeslice in the ring buffer.
 
 ## Environment
 
