@@ -109,19 +109,44 @@ def write_manifest(
     original_path: Path,
     demucs_model: str,
     separated_at: datetime | None = None,
-    song_markers: Sequence[float] = (),
+    song_markers: Sequence[float] | None = None,
 ) -> Path:
+    """Create or update ``project.yaml`` mix and ingest fields.
+
+    When the file already exists, only ``slug``, ``mix.filename``, and
+    ``ingest`` are updated. ``song-markers``, ``restored-from``, and other
+    fields are preserved unless ``song_markers`` is passed explicitly.
+    """
     when = separated_at or datetime.now(timezone.utc)
-    manifest = ProjectManifest(
-        version=1,
-        slug=slug,
-        mix_filename=mix_filename,
-        original_path=str(original_path.resolve()),
-        separated_at=when.isoformat(),
-        demucs_model=demucs_model,
-        song_markers=tuple(float(t) for t in song_markers),
-    )
     path = manifest_path(project_dir)
+    original = str(original_path.resolve())
+    separated = when.isoformat()
+    if path.is_file():
+        existing = load_manifest(project_dir)
+        markers = (
+            tuple(float(t) for t in song_markers)
+            if song_markers is not None
+            else existing.song_markers
+        )
+        manifest = replace(
+            existing,
+            slug=slug,
+            mix_filename=mix_filename,
+            original_path=original,
+            separated_at=separated,
+            demucs_model=demucs_model,
+            song_markers=markers,
+        )
+    else:
+        manifest = ProjectManifest(
+            version=1,
+            slug=slug,
+            mix_filename=mix_filename,
+            original_path=original,
+            separated_at=separated,
+            demucs_model=demucs_model,
+            song_markers=tuple(float(t) for t in (song_markers or ())),
+        )
     with path.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(manifest.to_dict(), handle, sort_keys=False)
     return path

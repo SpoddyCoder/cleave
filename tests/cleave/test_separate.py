@@ -10,7 +10,12 @@ import yaml
 
 from cleave.config import VIZ_CONFIG_FILENAME
 from cleave.extract import STEM_NAMES, stems_dir
-from cleave.project import PROJECT_FILENAME, load_manifest, write_manifest
+from cleave.project import (
+    PROJECT_FILENAME,
+    load_manifest,
+    rewrite_manifest_slug,
+    write_manifest,
+)
 from cleave.separate import (
     _run_demucs,
     project_stems_complete,
@@ -513,3 +518,43 @@ def test_run_separate_force_deletes_stale_mix(
     assert (project / "song.wav").read_bytes() == b"new"
     manifest = load_manifest(project)
     assert manifest.mix_filename == "song.wav"
+
+
+def test_run_separate_force_preserves_song_markers(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CLEAVE_DATA", str(tmp_path))
+    project = tmp_path / "projects" / "song"
+    project.mkdir(parents=True)
+    (project / "renders").mkdir()
+    _write_stub_stems(project)
+    mix = project / "song.flac"
+    mix.write_bytes(b"mix")
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=tmp_path / "elsewhere.flac",
+        demucs_model="htdemucs",
+        song_markers=(12.5, 64.0, 120.0),
+    )
+    rewrite_manifest_slug(project, "song", restored_from="archived-slug")
+
+    def fake_run(cmd: list[str], *, check: bool) -> None:
+        out_flag = cmd.index("-o")
+        out_root = Path(cmd[out_flag + 1])
+        target = out_root / "htdemucs" / "song"
+        target.mkdir(parents=True, exist_ok=True)
+        for name in STEM_NAMES:
+            (target / f"{name}.wav").write_bytes(b"wav")
+
+    with patch("cleave.separate.subprocess.run", side_effect=fake_run), patch(
+        "cleave.separate.run_analyse", return_value=project / "signals.json"
+    ):
+        run_separate("song", force=True)
+
+    manifest = load_manifest(project)
+    assert manifest.song_markers == (12.5, 64.0, 120.0)
+    assert manifest.restored_from == "archived-slug"
+    assert manifest.demucs_model == "htdemucs"
+    assert manifest.mix_filename == "song.flac"

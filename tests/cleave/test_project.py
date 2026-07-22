@@ -241,6 +241,47 @@ def test_manifest_round_trip_with_song_markers(tmp_path: Path) -> None:
     assert data["ingest"]["demucs_model"] == "htdemucs"
 
 
+def test_write_manifest_update_preserves_song_markers_and_restored_from(
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+    original = tmp_path / "source.flac"
+    original.write_bytes(b"audio")
+    when = datetime(2026, 6, 8, 20, 15, tzinfo=timezone.utc)
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.flac",
+        original_path=original,
+        demucs_model="htdemucs",
+        separated_at=when,
+        song_markers=(10.0, 42.5),
+    )
+    rewrite_manifest_slug(project, "song", restored_from="archived-slug")
+
+    new_original = tmp_path / "new-source.wav"
+    new_original.write_bytes(b"new")
+    later = datetime(2026, 7, 22, 12, 0, tzinfo=timezone.utc)
+    write_manifest(
+        project,
+        slug="song",
+        mix_filename="song.wav",
+        original_path=new_original,
+        demucs_model="htdemucs_ft",
+        separated_at=later,
+    )
+
+    manifest = load_manifest(project)
+    assert manifest.mix_filename == "song.wav"
+    assert manifest.original_path == str(new_original.resolve())
+    assert manifest.separated_at == "2026-07-22T12:00:00+00:00"
+    assert manifest.demucs_model == "htdemucs_ft"
+    assert manifest.song_markers == (10.0, 42.5)
+    assert manifest.restored_from == "archived-slug"
+    assert manifest.version == 1
+
+
 def test_save_song_markers_preserves_ingest(tmp_path: Path) -> None:
     project = tmp_path / "song"
     project.mkdir()
