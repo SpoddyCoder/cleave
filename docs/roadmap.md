@@ -15,10 +15,6 @@ Extend cues beyond visibility toggles so timeline events can control more layer 
 
 Emit MIDI notes or CC from drum onsets (and other signals in `signals.json`) to drive hardware lighting, drum pads, or synths during playback or export.
 
-## projectM PCM feeding
-
-Investigate PCM feeding strategy for the projectM buffer. Only the last ~11 ms (480 samples at 44.1 kHz) is actively used per render; at low FPS Cleave feeds a much longer timeslice per frame. Explore whether sampling or aggregating across the full frame timeslice (not just the tail) improves visual matchup with audio. Uncertain payoff; worth exploring.
-
 ## projectM beat sensitivity
 
 Cleave multiplies PCM by beat sensitivity in [cleave/projectm.py](../cleave/projectm.py) `feed_pcm` (default 2.0). That is intentional: after projectM's 2023 audio rewrite ([69d2134](https://github.com/projectM-visualizer/projectm/commit/69d2134fa2c39901eb354eac546c09e1be5c794b)), `projectm_set_beat_sensitivity` became a store-only stub. Older projectM applied sensitivity as a PCM scale via `BeatDetect::GetPCMScale()` (see [issue #161](https://github.com/projectM-visualizer/projectm/issues/161)); Cleave recreates that outside the library so presets stay reactive.
