@@ -15,4 +15,3 @@ Outstanding bugs and issues.
 
 ### projectM
 
-- **Robustness and API coverage:** Done. See [projectm-api-coverage.md](projectm-api-coverage.md). Native playlist load path (no custom `preset_load` callback), switch-failed draining, optional debug logging.
