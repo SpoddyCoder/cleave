@@ -108,7 +108,13 @@ def test_render_frame_feeds_pm_time_not_song_time() -> None:
         )
     }
 
-    with patch("cleave.viz.layer_pipeline._render_layer_fbo"):
+    with (
+        patch("cleave.viz.layer_pipeline._render_layer_fbo"),
+        patch(
+            "cleave.viz.layer_pipeline.pcm_max_samples_per_channel",
+            return_value=2048,
+        ),
+    ):
         LayerFramePipeline.render_frame(
             session,
             [layer],
