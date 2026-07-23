@@ -21,23 +21,22 @@ Built on [projectM](https://github.com/projectM-visualizer/projectM) and [Demucs
 ./wsl-builder.sh media ffmpeg,libprojectm
 ```
 
-### WSL2
-
-#### Audio
-If you are experiencing audio glitches, try disabling `systemd-timesyncd`.
+### WSL2 Audio
+If you are experiencing audio glitches try disabling `systemd-timesyncd`.
 [microsoft/wslg#1257](https://github.com/microsoft/wslg/issues/1257). 
 
-#### OpenGL + GPU
-If Milkdrop feels CPU-bound, check that Mesa is using the GPU (not software `llvmpipe`):
+### WSL2 OpenGL + GPU
+If the visual editor feels sluggish and CPU-bound, check that Mesa is using the GPU (not software `llvmpipe`)...
 
 ```bash
 glxinfo | grep "OpenGL renderer"
-# bad:  llvmpipe (...)
-# good: D3D12 (NVIDIA GeForce ...) / D3D12 (AMD ...) / D3D12 (Intel ...)
+# bad:  llvmpipe
+# good: D3D12
 
 # if you see llvmpipe, force Mesa's D3D12 driver...
 export GALLIUM_DRIVER=d3d12
 ```
+[microsoft/wslg#1332](https://github.com/microsoft/wslg/issues/1332)
 
 ## Setup
 
