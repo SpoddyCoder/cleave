@@ -544,13 +544,25 @@ def _format_render_overlay_border_width(
 def _format_render_overlay_start_delay(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_overlay.start_delay:.1f}s"
+    return f"{state.render_overlay.animation.start_delay:.1f}s"
 
 
 def _format_render_overlay_display_time(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_overlay.display_time:.1f}s"
+    return f"{state.render_overlay.animation.display_time:.1f}s"
+
+
+def _format_render_overlay_animation_type(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return state.render_overlay.animation.type
+
+
+def _format_render_overlay_slide_direction(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return state.render_overlay.animation.slide_direction
 
 
 def _format_render_post_fx_fade_in(
@@ -849,7 +861,7 @@ def _apply_render_overlay_start_delay(
     step = 30.0 if ctrl else 1.0
     delta = step if forward else -step
     controls._render_overlay.set_start_delay(
-        controls.session.render_overlay.start_delay + delta
+        controls.session.render_overlay.animation.start_delay + delta
     )
 
 
@@ -860,8 +872,22 @@ def _apply_render_overlay_display_time(
     step = 30.0 if ctrl else 1.0
     delta = step if forward else -step
     controls._render_overlay.set_display_time(
-        controls.session.render_overlay.display_time + delta
+        controls.session.render_overlay.animation.display_time + delta
     )
+
+
+def _apply_render_overlay_animation_type(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls._render_overlay.cycle_animation_type(forward=forward)
+
+
+def _apply_render_overlay_slide_direction(
+    controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls._render_overlay.cycle_slide_direction(forward=forward)
 
 
 def _apply_render_post_fx_fade_in(
@@ -1463,6 +1489,23 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_render_overlay_border_width,
         apply_horizontal=_apply_render_overlay_border_width,
+    ),
+    RowKind.RENDER_OVERLAY_ANIMATION_HEADER: RowFieldDef(
+        panel_label="animation",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        apply_horizontal=_apply_expand_subheader,
+    ),
+    RowKind.RENDER_OVERLAY_ANIMATION_TYPE: RowFieldDef(
+        panel_label="type",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_overlay_animation_type,
+        apply_horizontal=_apply_render_overlay_animation_type,
+    ),
+    RowKind.RENDER_OVERLAY_ANIMATION_SLIDE_DIRECTION: RowFieldDef(
+        panel_label="slide-direction",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_overlay_slide_direction,
+        apply_horizontal=_apply_render_overlay_slide_direction,
     ),
     RowKind.RENDER_OVERLAY_START_DELAY: RowFieldDef(
         panel_label="start delay",

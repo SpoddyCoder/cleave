@@ -56,8 +56,7 @@ def _snapshot_render_overlay(
     overlay["enabled"] = overlay_payload["enabled"]
     overlay["title"] = overlay_payload["title"]
     overlay["body"] = overlay_payload["body"]
-    overlay["start_delay"] = overlay_payload["start_delay"]
-    overlay["display_time"] = overlay_payload["display_time"]
+    overlay["animation"] = overlay_payload["animation"]
     overlay["position"] = overlay_payload["position"]
 
     background = orig_overlay.get("background")
@@ -78,6 +77,8 @@ def _snapshot_render_overlay(
     background_out["border"] = border_out
     overlay["background"] = background_out
     overlay.pop("font", None)
+    overlay.pop("start_delay", None)
+    overlay.pop("display_time", None)
 
     orig_pp: dict[str, Any] = {}
     if isinstance(orig_render, dict):

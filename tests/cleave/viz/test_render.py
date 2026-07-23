@@ -835,7 +835,7 @@ def test_render_output_must_be_mp4(tmp_path: Path) -> None:
 
 
 @patch("cleave.viz.frame_finish.live_overlay_alpha", return_value=1.0)
-@patch("cleave.viz.frame_finish.build_panel_surface")
+@patch("cleave.viz.frame_finish.build_overlay_layers")
 @patch("cleave.viz.frame_finish.composite_render_overlay_with_alpha")
 @patch.object(render_mod, "pygame")
 @patch.object(render_mod, "shutil")
@@ -855,7 +855,7 @@ def test_render_calls_overlay_compositing_when_enabled(
     mock_shutil: MagicMock,
     _mock_pygame: MagicMock,
     mock_composite: MagicMock,
-    mock_build_panel: MagicMock,
+    mock_build_layers: MagicMock,
     _mock_overlay_alpha: MagicMock,
     tmp_path: Path,
 ) -> None:
@@ -871,8 +871,8 @@ def test_render_calls_overlay_compositing_when_enabled(
         base_cfg, render=RenderConfig(fps=fps, overlay=overlay_cfg, post_fx=None)
     )
 
-    overlay_panel = MagicMock()
-    mock_build_panel.return_value = overlay_panel
+    overlay_layers = MagicMock()
+    mock_build_layers.return_value = overlay_layers
 
     compositor = MagicMock()
     compositor.read_rgba_frame.return_value = _render_frame_bytes()
@@ -898,16 +898,18 @@ def test_render_calls_overlay_compositing_when_enabled(
     expected_cfg = resolve_overlay_config(
         mock_load_config.return_value, runtime.seed.session
     )
-    mock_build_panel.assert_called_once_with(expected_cfg)
+    mock_build_layers.assert_called_once_with(expected_cfg)
     assert mock_composite.call_count == frame_count
     for call in mock_composite.call_args_list:
         assert call.args[0] == compositor
         assert call.args[1] == expected_cfg
         assert call.args[3:5] == (width, height)
-        assert call.kwargs == {"panel": overlay_panel}
+        assert call.kwargs["layers"] is overlay_layers
+        assert call.kwargs["solo"] is False
+        assert "t_sec" in call.kwargs
 
 
-@patch("cleave.viz.frame_finish.build_panel_surface")
+@patch("cleave.viz.frame_finish.build_overlay_layers")
 @patch("cleave.viz.frame_finish.composite_render_overlay_with_alpha")
 @patch.object(render_mod, "pygame")
 @patch.object(render_mod, "shutil")
@@ -927,7 +929,7 @@ def test_render_skips_overlay_when_disabled(
     mock_shutil: MagicMock,
     _mock_pygame: MagicMock,
     mock_composite: MagicMock,
-    mock_build_panel: MagicMock,
+    mock_build_layers: MagicMock,
     tmp_path: Path,
 ) -> None:
     mock_shutil.which.return_value = "/usr/bin/ffmpeg"
@@ -961,7 +963,7 @@ def test_render_skips_overlay_when_disabled(
 
     render_mod.render(project)
 
-    mock_build_panel.assert_not_called()
+    mock_build_layers.assert_not_called()
     mock_composite.assert_not_called()
 
 
@@ -1205,7 +1207,7 @@ def test_render_present_content_every_frame_at_upscale_one(
 
 
 @patch("cleave.viz.frame_finish.live_overlay_alpha", return_value=1.0)
-@patch("cleave.viz.frame_finish.build_panel_surface")
+@patch("cleave.viz.frame_finish.build_overlay_layers")
 @patch.object(render_mod, "pygame")
 @patch.object(render_mod, "shutil")
 @patch.object(render_mod, "subprocess")
@@ -1223,7 +1225,7 @@ def test_render_upscale_overlay_frame_order_uses_content_dims(
     mock_subprocess: MagicMock,
     mock_shutil: MagicMock,
     _mock_pygame: MagicMock,
-    mock_build_panel: MagicMock,
+    mock_build_layers: MagicMock,
     _mock_overlay_alpha: MagicMock,
     tmp_path: Path,
 ) -> None:
@@ -1245,8 +1247,8 @@ def test_render_upscale_overlay_frame_order_uses_content_dims(
             fps=fps, width=render_w, height=render_h, overlay=overlay_cfg, post_fx=None
         ),
     )
-    overlay_panel = MagicMock()
-    mock_build_panel.return_value = overlay_panel
+    overlay_layers = MagicMock()
+    mock_build_layers.return_value = overlay_layers
 
     compositor = MagicMock()
     compositor.read_rgba_frame.return_value = b"\xff" * (render_w * render_h * 4)

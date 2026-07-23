@@ -14,6 +14,8 @@ from cleave.config_schema import (
     PRESET_SWITCHING_MODE_HELP_ENTRIES,
     PRESET_SWITCHING_ROTATION_SET_HELP_ENTRIES,
     EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
+    RENDER_OVERLAY_ANIMATION_TYPE_HELP_ENTRIES,
+    RENDER_OVERLAY_SLIDE_DIRECTION_HELP_ENTRIES,
 )
 from cleave.timeline_presets import (
     TIMELINE_PRESET_HELP_ENTRIES,
@@ -50,6 +52,9 @@ class RowKind(Enum):
     PANEL_NOTIFICATION = auto()
     RENDER_SECTION_GAP = auto()
     RENDER_OVERLAY_HEADER = auto()
+    RENDER_OVERLAY_ANIMATION_HEADER = auto()
+    RENDER_OVERLAY_ANIMATION_TYPE = auto()
+    RENDER_OVERLAY_ANIMATION_SLIDE_DIRECTION = auto()
     RENDER_OVERLAY_POSITION = auto()
     RENDER_OVERLAY_TITLE_HEADER = auto()
     RENDER_OVERLAY_TITLE_FONT_SIZE = auto()
@@ -454,6 +459,35 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         quick_nav_target=True,
         quick_nav_always=True,
     ),
+    RowKind.RENDER_OVERLAY_ANIMATION_HEADER: RowBehavior(
+        RowAffordance.EXPAND,
+        is_sub_header=True,
+        parent_group="render_overlay",
+        help_title="Overlay animation",
+        help_description=(
+            "Entrance and exit motion for the credits overlay.",
+        ),
+    ),
+    RowKind.RENDER_OVERLAY_ANIMATION_TYPE: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="render_overlay_animation",
+        help_title="Animation type",
+        help_entries=(("Left/Right", "cycle type"),),
+        help_description=("How the overlay enters and leaves the screen.",),
+        help_mode_entries=RENDER_OVERLAY_ANIMATION_TYPE_HELP_ENTRIES,
+    ),
+    RowKind.RENDER_OVERLAY_ANIMATION_SLIDE_DIRECTION: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="render_overlay_animation",
+        help_title="Slide direction",
+        help_entries=(("Left/Right", "cycle direction"),),
+        help_description=(
+            "Edge the overlay travels from on entrance (reverse on exit).",
+        ),
+        help_mode_entries=RENDER_OVERLAY_SLIDE_DIRECTION_HELP_ENTRIES,
+    ),
     RowKind.RENDER_OVERLAY_POSITION: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
@@ -533,19 +567,19 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
     RowKind.RENDER_OVERLAY_START_DELAY: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
-        parent_group="render_overlay",
+        parent_group="render_overlay_animation",
         help_title="Start delay",
         help_description=(
-            "The overlay fades in this many seconds after the song starts.",
+            "The overlay appears this many seconds after the song starts.",
         ),
     ),
     RowKind.RENDER_OVERLAY_DISPLAY_TIME: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
-        parent_group="render_overlay",
+        parent_group="render_overlay_animation",
         help_title="Display time",
         help_description=(
-            "Duration the overlay stays fully visible before fading out.",
+            "Duration the overlay stays on screen including entrance and exit.",
             "0 = stays on.",
         ),
     ),

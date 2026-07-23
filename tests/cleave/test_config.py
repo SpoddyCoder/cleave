@@ -13,6 +13,7 @@ from cleave.config import (
     CleaveConfig,
     LayerConfig,
     PathsConfig,
+    RenderOverlayAnimationConfig,
     RenderOverlayBackgroundConfig,
     RenderOverlayBorderConfig,
     RenderConfig,
@@ -656,8 +657,11 @@ render:
       font-size: 18
       colour: "#ffffff"
       background-colour: "#3333ff"
-    start_delay: 10
-    display_time: 30
+    animation:
+      type: fade
+      slide-direction: left
+      start_delay: 10
+      display_time: 30
     position: bottom-left
     background:
       margin: 40
@@ -696,8 +700,12 @@ def test_parse_render_overlay_full_template() -> None:
             colour=(255, 255, 255),
             background_colour=(51, 51, 255),
         ),
-        start_delay=10.0,
-        display_time=30.0,
+        animation=RenderOverlayAnimationConfig(
+            type="fade",
+            slide_direction="left",
+            start_delay=10.0,
+            display_time=30.0,
+        ),
         position="bottom-left",
         background=RenderOverlayBackgroundConfig(
             margin=40,

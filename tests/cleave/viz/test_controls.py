@@ -599,12 +599,12 @@ def test_disabled_render_overlay_can_expand_sub_rows() -> None:
     assert controls.session.render_overlay.expanded is True
 
     view = controls.build_view_state(paused=False)
-    position_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_POSITION)
-    assert position_row in view.layout.visible_indices(view)
-    assert position_row in view.layout.navigable_indices(view)
+    animation_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_ANIMATION_HEADER)
+    assert animation_row in view.layout.visible_indices(view)
+    assert animation_row in view.layout.navigable_indices(view)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_descriptor == _desc(view, position_row)
+    assert controls.focus_descriptor == _desc(view, animation_row)
 
 
 def test_disabled_render_post_fx_can_expand_sub_rows() -> None:

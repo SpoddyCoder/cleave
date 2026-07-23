@@ -8,7 +8,11 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from cleave.config import RenderOverlayPosition
+from cleave.config import (
+    RenderOverlayAnimationType,
+    RenderOverlayPosition,
+    RenderOverlaySlideDirection,
+)
 from cleave.config_schema import (
     DEFAULT_CHROMA_BOOST_APPLY_MODE,
     DEFAULT_CHROMA_BOOST_VARIANT,
@@ -22,6 +26,10 @@ from cleave.config_schema import (
     DEFAULT_PRESET_DURATION,
     DEFAULT_PRESET_SWITCHING_SHUFFLE,
     DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT,
+    DEFAULT_RENDER_OVERLAY_ANIMATION_TYPE,
+    DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
+    DEFAULT_RENDER_OVERLAY_SLIDE_DIRECTION,
+    DEFAULT_RENDER_OVERLAY_START_DELAY,
     DEFAULT_SOFT_CUT_DURATION,
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_WIDTH,
@@ -83,6 +91,17 @@ class TrackBlock:
 
 
 @dataclass
+class RenderOverlayAnimationBlock:
+    expanded: bool = False
+    type: RenderOverlayAnimationType = DEFAULT_RENDER_OVERLAY_ANIMATION_TYPE
+    slide_direction: RenderOverlaySlideDirection = (
+        DEFAULT_RENDER_OVERLAY_SLIDE_DIRECTION
+    )
+    start_delay: float = DEFAULT_RENDER_OVERLAY_START_DELAY
+    display_time: float = DEFAULT_RENDER_OVERLAY_DISPLAY_TIME
+
+
+@dataclass
 class RenderOverlayBlock:
     enabled: bool = _RO_OVERLAY_DEFAULTS["enabled"]
     expanded: bool = _RO_OVERLAY_DEFAULTS["expanded"]
@@ -96,8 +115,9 @@ class RenderOverlayBlock:
     body_font: str = _RO_OVERLAY_DEFAULTS["body_font"]
     opacity_pct: int = _RO_OVERLAY_DEFAULTS["opacity_pct"]
     border_width: int = _RO_OVERLAY_DEFAULTS["border_width"]
-    start_delay: float = _RO_OVERLAY_DEFAULTS["start_delay"]
-    display_time: float = _RO_OVERLAY_DEFAULTS["display_time"]
+    animation: RenderOverlayAnimationBlock = field(
+        default_factory=RenderOverlayAnimationBlock
+    )
     solo: bool = False
     locked: bool = False
 
@@ -328,6 +348,8 @@ def view_state_structure_signature(
             "expanded": ro.expanded,
             "title_expanded": ro.title_expanded,
             "body_expanded": ro.body_expanded,
+            "animation_expanded": ro.animation_expanded,
+            "animation_type": ro.animation.type,
         },
         "render_post_fx": {
             "enabled": pp.enabled,
@@ -478,6 +500,10 @@ class TuningViewStateBuilder:
             expanded=ro.expanded,
             title_expanded=ro.title_expanded,
             body_expanded=ro.body_expanded,
+            animation=RenderOverlayAnimationBlock(
+                expanded=ro.animation_expanded,
+                type=ro.animation.type,
+            ),
         )
         render_post_fx = RenderPostFxBlock(
             enabled=pp.enabled,
@@ -644,8 +670,14 @@ class TuningViewStateBuilder:
                 body_font=ro.body_font,
                 opacity_pct=ro.opacity_pct,
                 border_width=ro.border_width,
-                start_delay=ro.start_delay,
-                display_time=ro.display_time,
+                animation=replace(
+                    structure.render_overlay.animation,
+                    expanded=ro.animation_expanded,
+                    type=ro.animation.type,
+                    slide_direction=ro.animation.slide_direction,
+                    start_delay=ro.animation.start_delay,
+                    display_time=ro.animation.display_time,
+                ),
                 solo=self.session.render_overlay_solo,
                 locked=ro.locked,
             ),

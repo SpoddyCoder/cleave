@@ -193,6 +193,53 @@ DEFAULT_RENDER_OVERLAY_BODY = (
 )
 DEFAULT_RENDER_OVERLAY_START_DELAY = 10.0
 DEFAULT_RENDER_OVERLAY_DISPLAY_TIME = 30.0
+
+RenderOverlayAnimationType = Literal[
+    "fade", "slide", "slide-fade", "cascade", "wipe", "cascade-wipe"
+]
+
+RENDER_OVERLAY_ANIMATION_TYPES: tuple[RenderOverlayAnimationType, ...] = (
+    "fade",
+    "slide",
+    "slide-fade",
+    "cascade",
+    "wipe",
+    "cascade-wipe",
+)
+
+RENDER_OVERLAY_ANIMATION_TYPE_HELP_ENTRIES: tuple[
+    tuple[RenderOverlayAnimationType, str], ...
+] = (
+    ("fade", "Smooth fade in and out"),
+    ("slide", "Panel slides in from an edge"),
+    ("slide-fade", "Slide plus fade"),
+    ("cascade", "Staggered slide of panel elements"),
+    ("wipe", "Directional wipe reveal in place"),
+    ("cascade-wipe", "Staggered wipe of panel elements"),
+)
+
+DEFAULT_RENDER_OVERLAY_ANIMATION_TYPE: RenderOverlayAnimationType = "fade"
+
+RenderOverlaySlideDirection = Literal["left", "right", "top", "bottom"]
+
+RENDER_OVERLAY_SLIDE_DIRECTIONS: tuple[RenderOverlaySlideDirection, ...] = (
+    "left",
+    "right",
+    "top",
+    "bottom",
+)
+
+RENDER_OVERLAY_SLIDE_DIRECTION_HELP_ENTRIES: tuple[
+    tuple[RenderOverlaySlideDirection, str], ...
+] = (
+    ("left", "Enter from the left"),
+    ("right", "Enter from the right"),
+    ("top", "Enter from the top"),
+    ("bottom", "Enter from the bottom"),
+)
+
+DEFAULT_RENDER_OVERLAY_SLIDE_DIRECTION: RenderOverlaySlideDirection = "left"
+
 DEFAULT_RENDER_OVERLAY_POSITION: RenderOverlayPosition = "bottom-left"
 DEFAULT_RENDER_OVERLAY_FONT = "monospace"
 DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE = 24
@@ -694,6 +741,32 @@ def _parse_render_overlay_position(
     return value
 
 
+def _parse_render_overlay_animation_type(
+    value: Any,
+    ctx: ParseCtx,
+    label: str = "render.overlay.animation.type",
+) -> RenderOverlayAnimationType:
+    if not isinstance(value, str):
+        raise ValueError(f"{label} must be a string")
+    if value not in RENDER_OVERLAY_ANIMATION_TYPES:
+        allowed = ", ".join(f"'{item}'" for item in RENDER_OVERLAY_ANIMATION_TYPES)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return value
+
+
+def _parse_render_overlay_slide_direction(
+    value: Any,
+    ctx: ParseCtx,
+    label: str = "render.overlay.animation.slide-direction",
+) -> RenderOverlaySlideDirection:
+    if not isinstance(value, str):
+        raise ValueError(f"{label} must be a string")
+    if value not in RENDER_OVERLAY_SLIDE_DIRECTIONS:
+        allowed = ", ".join(f"'{item}'" for item in RENDER_OVERLAY_SLIDE_DIRECTIONS)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return value
+
+
 def clamp_ui_fade(value: float) -> float:
     return max(0.0, min(UI_FADE_MAX_SEC, float(value)))
 
@@ -811,6 +884,17 @@ def _build_render_overlay_background(parsed: dict[str, Any]) -> Any:
     )
 
 
+def _build_render_overlay_animation_config(parsed: dict[str, Any]) -> Any:
+    from cleave.config import RenderOverlayAnimationConfig
+
+    return RenderOverlayAnimationConfig(
+        type=parsed["type"],
+        slide_direction=parsed["slide_direction"],
+        start_delay=parsed["start_delay"],
+        display_time=parsed["display_time"],
+    )
+
+
 def _build_render_overlay_config(parsed: dict[str, Any]) -> Any:
     from cleave.config import RenderOverlayConfig
 
@@ -818,8 +902,7 @@ def _build_render_overlay_config(parsed: dict[str, Any]) -> Any:
         enabled=parsed["enabled"],
         title=parsed["title"],
         body=parsed["body"],
-        start_delay=parsed["start_delay"],
-        display_time=parsed["display_time"],
+        animation=parsed["animation"],
         position=parsed["position"],
         background=parsed["background"],
         locked=parsed["locked"],
@@ -985,6 +1068,46 @@ RENDER_OVERLAY_BACKGROUND_SECTION = SectionDescriptor(
     build=_build_render_overlay_background,
 )
 
+RENDER_OVERLAY_ANIMATION_SECTION = SectionDescriptor(
+    yaml_key="animation",
+    fields=(
+        FieldDescriptor(
+            "type",
+            DEFAULT_RENDER_OVERLAY_ANIMATION_TYPE,
+            "session",
+            _parse_render_overlay_animation_type,
+            _dump_scalar,
+        ),
+        FieldDescriptor(
+            "slide-direction",
+            DEFAULT_RENDER_OVERLAY_SLIDE_DIRECTION,
+            "session",
+            _parse_render_overlay_slide_direction,
+            _dump_scalar,
+            attr_key="slide_direction",
+        ),
+        FieldDescriptor(
+            "start_delay",
+            DEFAULT_RENDER_OVERLAY_START_DELAY,
+            "session",
+            _parse_non_negative_float,
+            _dump_scalar,
+        ),
+        FieldDescriptor(
+            "display_time",
+            DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
+            "session",
+            _parse_non_negative_float,
+            _dump_scalar,
+        ),
+    ),
+    build=_build_render_overlay_animation_config,
+    optional=True,
+    default_factory=lambda: _build_render_overlay_animation_config(
+        _section_field_defaults(RENDER_OVERLAY_ANIMATION_SECTION)
+    ),
+)
+
 RENDER_OVERLAY_FIELDS: tuple[SchemaField, ...] = (
     FieldDescriptor(
         "enabled",
@@ -1002,20 +1125,7 @@ RENDER_OVERLAY_FIELDS: tuple[SchemaField, ...] = (
     ),
     RENDER_OVERLAY_TITLE_SECTION,
     RENDER_OVERLAY_BODY_SECTION,
-    FieldDescriptor(
-        "start_delay",
-        DEFAULT_RENDER_OVERLAY_START_DELAY,
-        "session",
-        _parse_non_negative_float,
-        _dump_scalar,
-    ),
-    FieldDescriptor(
-        "display_time",
-        DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
-        "session",
-        _parse_non_negative_float,
-        _dump_scalar,
-    ),
+    RENDER_OVERLAY_ANIMATION_SECTION,
     FieldDescriptor(
         "position",
         DEFAULT_RENDER_OVERLAY_POSITION,
@@ -1859,6 +1969,7 @@ def _overlay_persist_values(ctx: PersistCtx) -> dict[str, Any]:
     runtime = ctx.session.render_overlay
     base = render_overlay_base(ctx.cfg)
     bg = base.background
+    anim = runtime.animation
     return {
         "enabled": runtime.enabled,
         "locked": runtime.locked,
@@ -1878,8 +1989,12 @@ def _overlay_persist_values(ctx: PersistCtx) -> dict[str, Any]:
             "background_colour": base.body.background_colour,
             "margin_bottom": 0,
         },
-        "start_delay": runtime.start_delay,
-        "display_time": runtime.display_time,
+        "animation": {
+            "type": anim.type,
+            "slide_direction": anim.slide_direction,
+            "start_delay": anim.start_delay,
+            "display_time": anim.display_time,
+        },
         "position": runtime.position,
         "background": {
             "margin": bg.margin,
@@ -2128,6 +2243,15 @@ def persisted_session_payload(cfg: Any, session: Any) -> dict[str, Any]:
     }
 
 
+def default_render_overlay_animation_runtime_values() -> dict[str, Any]:
+    return {
+        "type": DEFAULT_RENDER_OVERLAY_ANIMATION_TYPE,
+        "slide_direction": DEFAULT_RENDER_OVERLAY_SLIDE_DIRECTION,
+        "start_delay": DEFAULT_RENDER_OVERLAY_START_DELAY,
+        "display_time": DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
+    }
+
+
 def default_render_overlay_runtime_values() -> dict[str, Any]:
     return {
         "enabled": True,
@@ -2142,8 +2266,8 @@ def default_render_overlay_runtime_values() -> dict[str, Any]:
         "body_font": DEFAULT_RENDER_OVERLAY_FONT,
         "opacity_pct": int(round(DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY * 100)),
         "border_width": DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
-        "start_delay": DEFAULT_RENDER_OVERLAY_START_DELAY,
-        "display_time": DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
+        "animation": default_render_overlay_animation_runtime_values(),
+        "animation_expanded": False,
     }
 
 

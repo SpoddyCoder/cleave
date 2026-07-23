@@ -313,6 +313,37 @@ def test_structure_signature_invalidates_on_highlight_rolloff_mode() -> None:
     assert sig_before != sig_after
 
 
+def test_structure_signature_invalidates_on_animation_type() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.render_overlay.animation.type = "fade"
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.render_overlay.animation.type = "slide"
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_builder_rebuilds_layout_when_animation_type_changes() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    session.render_overlay.expanded = True
+    session.render_overlay.animation_expanded = True
+    session.render_overlay.animation.type = "fade"
+    view_fade = controls.build_view_state(paused=False)
+    kinds_fade = [row.kind for row in view_fade.layout.rows]
+    assert RowKind.RENDER_OVERLAY_ANIMATION_SLIDE_DIRECTION not in kinds_fade
+
+    session.render_overlay.animation.type = "slide"
+    view_slide = controls.build_view_state(paused=False)
+    kinds_slide = [row.kind for row in view_slide.layout.rows]
+    assert RowKind.RENDER_OVERLAY_ANIMATION_SLIDE_DIRECTION in kinds_slide
+
+
 def test_structure_signature_invalidates_on_chroma_boost_mode() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
