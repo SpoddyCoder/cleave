@@ -220,7 +220,13 @@ def test_render_frame_applies_per_layer_highlight_rolloff_when_playing() -> None
         hue_mix=0.0, grit_strength=0.0, aberration_px=0.0,
     )}
 
-    with patch("cleave.viz.layer_pipeline._render_layer_fbo"):
+    with (
+        patch("cleave.viz.layer_pipeline._render_layer_fbo"),
+        patch(
+            "cleave.viz.layer_pipeline.pcm_max_samples_per_channel",
+            return_value=2048,
+        ),
+    ):
         LayerFramePipeline.render_frame(
             session,
             [layer],
@@ -256,7 +262,13 @@ def test_render_frame_skips_per_layer_highlight_rolloff_when_post_fx_disabled() 
         hue_mix=0.0, grit_strength=0.0, aberration_px=0.0,
     )}
 
-    with patch("cleave.viz.layer_pipeline._render_layer_fbo"):
+    with (
+        patch("cleave.viz.layer_pipeline._render_layer_fbo"),
+        patch(
+            "cleave.viz.layer_pipeline.pcm_max_samples_per_channel",
+            return_value=2048,
+        ),
+    ):
         LayerFramePipeline.render_frame(
             session,
             [layer],
@@ -333,7 +345,13 @@ def test_render_frame_applies_per_layer_chroma_boost_when_playing() -> None:
         hue_mix=0.0, grit_strength=0.0, aberration_px=0.0,
     )}
 
-    with patch("cleave.viz.layer_pipeline._render_layer_fbo"):
+    with (
+        patch("cleave.viz.layer_pipeline._render_layer_fbo"),
+        patch(
+            "cleave.viz.layer_pipeline.pcm_max_samples_per_channel",
+            return_value=2048,
+        ),
+    ):
         LayerFramePipeline.render_frame(
             session,
             [layer],
@@ -370,7 +388,13 @@ def test_render_frame_skips_per_layer_chroma_boost_when_amount_zero() -> None:
         hue_mix=0.0, grit_strength=0.0, aberration_px=0.0,
     )}
 
-    with patch("cleave.viz.layer_pipeline._render_layer_fbo"):
+    with (
+        patch("cleave.viz.layer_pipeline._render_layer_fbo"),
+        patch(
+            "cleave.viz.layer_pipeline.pcm_max_samples_per_channel",
+            return_value=2048,
+        ),
+    ):
         LayerFramePipeline.render_frame(
             session,
             [layer],
