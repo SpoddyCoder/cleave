@@ -35,8 +35,9 @@ from cleave.viz.post_fx import (
 )
 from cleave.viz.editor_mode_controls import render_sections_active
 from cleave.viz.render_overlay import (
+    OverlayLayerSet,
     build_live_overlay_config,
-    build_panel_surface,
+    build_overlay_layers,
     composite_render_overlay_with_alpha,
     live_overlay_alpha,
     panel_surface_key,
@@ -47,18 +48,27 @@ from cleave.viz.session import TuningSession
 @dataclass
 class RenderOverlayPanelCache:
     panel: pygame.Surface | None = None
+    layers: OverlayLayerSet | None = None
     key: tuple | None = None
+
+
+def ensure_render_overlay_layers(
+    cache: RenderOverlayPanelCache, cfg: RenderOverlayConfig
+) -> OverlayLayerSet:
+    key = panel_surface_key(cfg)
+    if cache.layers is not None and cache.key == key:
+        return cache.layers
+    layers = build_overlay_layers(cfg)
+    cache.layers = layers
+    cache.panel = layers.settled_panel
+    cache.key = key
+    return layers
 
 
 def ensure_render_overlay_panel(
     cache: RenderOverlayPanelCache, cfg: RenderOverlayConfig
 ) -> pygame.Surface:
-    key = panel_surface_key(cfg)
-    if cache.panel is not None and cache.key == key:
-        return cache.panel
-    cache.panel = build_panel_surface(cfg)
-    cache.key = key
-    return cache.panel
+    return ensure_render_overlay_layers(cache, cfg).settled_panel
 
 
 def resolve_overlay_config(
@@ -85,16 +95,18 @@ def _composite_render_overlay(
     )
     if alpha <= 0.01:
         return
-    panel = None
+    layers = None
     if panel_cache is not None:
-        panel = ensure_render_overlay_panel(panel_cache, cfg)
+        layers = ensure_render_overlay_layers(panel_cache, cfg)
     composite_render_overlay_with_alpha(
         core.compositor,
         cfg,
         alpha,
         core.seed.width,
         core.seed.height,
-        panel=panel,
+        layers=layers,
+        t_sec=t_sec,
+        solo=overlay_solo,
     )
 
 

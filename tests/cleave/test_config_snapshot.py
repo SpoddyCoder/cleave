@@ -12,6 +12,7 @@ from cleave.config import (
     CleaveConfig,
     LayerConfig,
     PathsConfig,
+    RenderOverlayAnimationConfig,
     RenderOverlayBackgroundConfig,
     RenderOverlayBorderConfig,
     RenderConfig,
@@ -51,6 +52,7 @@ from cleave.preset_playlist import playlist_at_dir
 from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.session import (
     LayerRuntime,
+    RenderOverlayAnimationRuntime,
     RenderOverlayRuntime,
     TuningSession,
     session_from_cfg,
@@ -675,8 +677,12 @@ def _render_overlay_cfg() -> RenderOverlayConfig:
             colour=(255, 255, 255),
             background_colour=(51, 51, 255),
         ),
-        start_delay=10.0,
-        display_time=30.0,
+        animation=RenderOverlayAnimationConfig(
+            type="fade",
+            slide_direction="left",
+            start_delay=10.0,
+            display_time=30.0,
+        ),
         position="bottom-left",
         background=RenderOverlayBackgroundConfig(
             margin=10,
@@ -720,8 +726,12 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
                             "colour": "#ffffff",
                             "background-colour": "#3333ff",
                         },
-                        "start_delay": 10,
-                        "display_time": 30,
+                        "animation": {
+                            "type": "fade",
+                            "slide-direction": "left",
+                            "start_delay": 10,
+                            "display_time": 30,
+                        },
                         "position": "bottom-left",
                         "background": {
                             "margin": 10,
@@ -775,8 +785,12 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
             body_font="ubuntumono",
             opacity_pct=75,
             border_width=4,
-            start_delay=20.0,
-            display_time=40.0,
+            animation=RenderOverlayAnimationRuntime(
+                type="fade",
+                slide_direction="left",
+                start_delay=20.0,
+                display_time=40.0,
+            ),
         ),
         layers={
             slot: LayerRuntime(
@@ -801,8 +815,8 @@ def test_write_session_snapshot_persists_render_overlay(tmp_path: Path) -> None:
     assert overlay["enabled"] is True
     assert overlay["title"]["content"] == "My Title"
     assert overlay["body"]["content"] == "Line one\nLine two\n"
-    assert overlay["start_delay"] == 20.0
-    assert overlay["display_time"] == 40.0
+    assert overlay["animation"]["start_delay"] == 20.0
+    assert overlay["animation"]["display_time"] == 40.0
     assert overlay["position"] == "top-right"
     assert overlay["title"]["font-size"] == 14
     assert overlay["title"]["font"] == "dejavusans"
@@ -822,7 +836,7 @@ def test_write_session_snapshot_persists_render_overlay(tmp_path: Path) -> None:
     assert round_trip is not None
     assert round_trip.overlay is not None
     assert round_trip.overlay.enabled is True
-    assert round_trip.overlay.start_delay == 20.0
+    assert round_trip.overlay.animation.start_delay == 20.0
     assert round_trip.overlay.title.font_size == 14
     assert round_trip.overlay.title.font == "dejavusans"
     assert round_trip.overlay.title.margin_bottom == 6
@@ -1164,8 +1178,12 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
                     },
                     "overlay": {
                         "enabled": True,
-                        "start_delay": 10,
-                        "display_time": 30,
+                        "animation": {
+                            "type": "fade",
+                            "slide-direction": "left",
+                            "start_delay": 10,
+                            "display_time": 30,
+                        },
                         "position": "bottom-left",
                         "title": {
                             "content": "Round Trip Title",
@@ -1216,8 +1234,8 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
     session.layers["layer_2"].beat_sensitivity = 2.5
     session.layers["layer_3"].enabled = True
     session.layers["layer_3"].effects = {"flash": {"rms": 15}}
-    session.render_overlay.display_time = 55.0
-    session.render_overlay.start_delay = 8.0
+    session.render_overlay.animation.display_time = 55.0
+    session.render_overlay.animation.start_delay = 8.0
     session.render_overlay.position = "top-right"
     session.render_overlay.opacity_pct = 80
     session.render_post_fx.fade_in = 18.0

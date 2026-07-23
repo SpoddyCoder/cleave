@@ -1377,18 +1377,51 @@ def test_render_overlay_row_layout_includes_header_and_sub_rows_when_expanded() 
     )
     kinds = [row.kind for row in state.layout.rows]
     assert RowKind.RENDER_OVERLAY_HEADER in kinds
+    assert RowKind.RENDER_OVERLAY_ANIMATION_HEADER in kinds
     assert RowKind.RENDER_OVERLAY_POSITION in kinds
     assert RowKind.RENDER_OVERLAY_TITLE_HEADER in kinds
     assert RowKind.RENDER_OVERLAY_BODY_HEADER in kinds
     assert RowKind.RENDER_OVERLAY_OPACITY in kinds
     assert RowKind.RENDER_OVERLAY_BORDER_WIDTH in kinds
-    assert RowKind.RENDER_OVERLAY_START_DELAY in kinds
-    assert RowKind.RENDER_OVERLAY_DISPLAY_TIME in kinds
+    assert RowKind.RENDER_OVERLAY_START_DELAY not in kinds
+    assert RowKind.RENDER_OVERLAY_DISPLAY_TIME not in kinds
     assert RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE not in kinds
     assert RowKind.RENDER_OVERLAY_BODY_FONT_SIZE not in kinds
     header_idx = state.layout.find_by_kind( RowKind.RENDER_OVERLAY_HEADER)
     config_idx = state.layout.find_by_kind( RowKind.CONFIG_HEADER)
     assert config_idx < header_idx
+
+
+def test_render_overlay_animation_rows_when_expanded() -> None:
+    from cleave.viz.tuning_view_state import RenderOverlayAnimationBlock
+
+    state = _minimal_view_state(
+        render_overlay=RenderOverlayBlock(
+            expanded=True,
+            animation=RenderOverlayAnimationBlock(expanded=True, type="slide"),
+        ),
+    )
+    kinds = [row.kind for row in state.layout.rows]
+    assert RowKind.RENDER_OVERLAY_ANIMATION_TYPE in kinds
+    assert RowKind.RENDER_OVERLAY_ANIMATION_SLIDE_DIRECTION in kinds
+    assert RowKind.RENDER_OVERLAY_START_DELAY in kinds
+    assert RowKind.RENDER_OVERLAY_DISPLAY_TIME in kinds
+
+
+def test_render_overlay_animation_hides_slide_direction_for_fade() -> None:
+    from cleave.viz.tuning_view_state import RenderOverlayAnimationBlock
+
+    state = _minimal_view_state(
+        render_overlay=RenderOverlayBlock(
+            expanded=True,
+            animation=RenderOverlayAnimationBlock(expanded=True, type="fade"),
+        ),
+    )
+    kinds = [row.kind for row in state.layout.rows]
+    assert RowKind.RENDER_OVERLAY_ANIMATION_TYPE in kinds
+    assert RowKind.RENDER_OVERLAY_ANIMATION_SLIDE_DIRECTION not in kinds
+    assert RowKind.RENDER_OVERLAY_START_DELAY in kinds
+    assert RowKind.RENDER_OVERLAY_DISPLAY_TIME in kinds
 
 
 def test_render_overlay_title_and_body_font_rows_when_expanded() -> None:
@@ -1419,7 +1452,7 @@ def test_render_overlay_collapsed_hides_sub_rows() -> None:
     assert RowKind.RENDER_OVERLAY_HEADER in collapsed_kinds
     assert RowKind.RENDER_OVERLAY_POSITION not in collapsed_kinds
     assert RowKind.RENDER_OVERLAY_TITLE_HEADER not in collapsed_kinds
-    assert len(collapsed.layout.visible_indices(collapsed)) + 7 == len(expanded.layout.visible_indices(expanded))
+    assert len(collapsed.layout.visible_indices(collapsed)) + 6 == len(expanded.layout.visible_indices(expanded))
 
 
 def test_draw_render_overlay_header_without_error() -> None:

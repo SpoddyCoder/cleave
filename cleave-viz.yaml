@@ -29,8 +29,11 @@ render:
 
   overlay:
     enabled: true
-    start_delay: 5
-    display_time: 30
+    animation:
+      type: fade
+      slide-direction: left
+      start_delay: 5
+      display_time: 30
     position: bottom-left
     title:
       content: |

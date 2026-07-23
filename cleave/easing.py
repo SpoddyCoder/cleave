@@ -8,6 +8,28 @@ def smoothstep(u: float) -> float:
     return u * u * (3.0 - 2.0 * u)
 
 
+def ease_out_cubic(u: float) -> float:
+    u = max(0.0, min(1.0, u))
+    return 1.0 - (1.0 - u) ** 3
+
+
+def ease_out_expo(u: float) -> float:
+    u = max(0.0, min(1.0, u))
+    if u >= 1.0:
+        return 1.0
+    if u <= 0.0:
+        return 0.0
+    return 1.0 - 2.0 ** (-10.0 * u)
+
+
+def ease_out_back(u: float, *, overshoot: float = 1.525) -> float:
+    """Ease-out back with configurable overshoot (default ~8%)."""
+    u = max(0.0, min(1.0, u))
+    c1 = overshoot
+    c3 = c1 + 1.0
+    return 1.0 + c3 * (u - 1.0) ** 3 + c1 * (u - 1.0) ** 2
+
+
 def fade_alpha(
     t_sec: float, duration_sec: float, fade_in: float, fade_out: float
 ) -> float:

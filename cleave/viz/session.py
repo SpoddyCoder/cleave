@@ -8,7 +8,9 @@ from typing import Literal
 
 from cleave.config import (
     CleaveConfig,
+    RenderOverlayAnimationType,
     RenderOverlayPosition,
+    RenderOverlaySlideDirection,
     TimelineFadeGroupConfig,
     VIZ_CONFIG_FILENAME,
 )
@@ -34,6 +36,7 @@ from cleave.config_schema import (
     PresetSwitchingMode,
     PresetSwitchingRotationSet,
     TimelinePlacementSnap,
+    default_render_overlay_animation_runtime_values,
     default_render_overlay_runtime_values,
     default_highlight_rolloff_runtime_values,
     default_chroma_boost_runtime_values,
@@ -69,6 +72,20 @@ def allow_overwrite_for_path(
 
 
 @dataclass
+class RenderOverlayAnimationRuntime:
+    type: RenderOverlayAnimationType
+    slide_direction: RenderOverlaySlideDirection
+    start_delay: float
+    display_time: float
+
+
+def default_render_overlay_animation_runtime() -> RenderOverlayAnimationRuntime:
+    return RenderOverlayAnimationRuntime(
+        **default_render_overlay_animation_runtime_values()
+    )
+
+
+@dataclass
 class RenderOverlayRuntime:
     enabled: bool
     expanded: bool
@@ -82,13 +99,15 @@ class RenderOverlayRuntime:
     body_font: str
     opacity_pct: int
     border_width: int
-    start_delay: float
-    display_time: float
+    animation: RenderOverlayAnimationRuntime
+    animation_expanded: bool = False
     locked: bool = False
 
 
 def default_render_overlay_runtime() -> RenderOverlayRuntime:
-    return RenderOverlayRuntime(**default_render_overlay_runtime_values())
+    values = default_render_overlay_runtime_values()
+    animation = RenderOverlayAnimationRuntime(**values.pop("animation"))
+    return RenderOverlayRuntime(animation=animation, **values)
 
 
 @dataclass
@@ -278,6 +297,7 @@ class TuningSession:
 def render_overlay_runtime_from_cfg(cfg: CleaveConfig) -> RenderOverlayRuntime:
     overlay = cfg.render.overlay if cfg.render is not None else None
     if overlay is not None:
+        anim = overlay.animation
         return replace(
             default_render_overlay_runtime(),
             enabled=overlay.enabled,
@@ -289,8 +309,13 @@ def render_overlay_runtime_from_cfg(cfg: CleaveConfig) -> RenderOverlayRuntime:
             body_font=overlay.body.font,
             opacity_pct=int(round(overlay.background.opacity * 100)),
             border_width=overlay.background.border.width,
-            start_delay=overlay.start_delay,
-            display_time=overlay.display_time,
+            animation=replace(
+                default_render_overlay_animation_runtime(),
+                type=anim.type,
+                slide_direction=anim.slide_direction,
+                start_delay=anim.start_delay,
+                display_time=anim.display_time,
+            ),
             locked=overlay.locked,
         )
     return default_render_overlay_runtime()

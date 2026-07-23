@@ -49,11 +49,13 @@ from cleave.config_schema import (
     DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
     DEFAULT_RENDER_OVERLAY_FONT,
     DEFAULT_RENDER_OVERLAY_POSITION,
+    DEFAULT_RENDER_OVERLAY_SLIDE_DIRECTION,
     DEFAULT_RENDER_OVERLAY_START_DELAY,
     DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
     DEFAULT_RENDER_OVERLAY_TITLE,
     DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
     DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
+    DEFAULT_RENDER_OVERLAY_ANIMATION_TYPE,
     DEFAULT_RENDER_POST_FX_FADE_IN,
     DEFAULT_RENDER_POST_FX_FADE_OUT,
     DEFAULT_TEXTURE_PATHS,
@@ -81,14 +83,18 @@ from cleave.config_schema import (
     CHROMA_BOOST_VARIANTS,
     HIGHLIGHT_ROLLOFF_APPLY_MODES,
     HIGHLIGHT_ROLLOFF_CURVES,
+    RENDER_OVERLAY_ANIMATION_TYPES,
     RENDER_OVERLAY_POSITIONS,
+    RENDER_OVERLAY_SLIDE_DIRECTIONS,
     UPSCALE_MIN,
     EDITOR_PREVIEW_QUALITIES,
     ChromaBoostApplyMode,
     ChromaBoostVariant,
     HighlightRolloffApplyMode,
     HighlightRolloffCurve,
+    RenderOverlayAnimationType,
     RenderOverlayPosition,
+    RenderOverlaySlideDirection,
     UiWidthMode,
     EditorPreviewQuality,
     as_mapping,
@@ -189,12 +195,19 @@ class RenderOverlayBackgroundConfig:
 
 
 @dataclass(frozen=True)
+class RenderOverlayAnimationConfig:
+    type: RenderOverlayAnimationType
+    slide_direction: RenderOverlaySlideDirection
+    start_delay: float
+    display_time: float
+
+
+@dataclass(frozen=True)
 class RenderOverlayConfig:
     enabled: bool
     title: RenderOverlayTextBlockConfig
     body: RenderOverlayTextBlockConfig
-    start_delay: float
-    display_time: float
+    animation: RenderOverlayAnimationConfig
     position: RenderOverlayPosition
     background: RenderOverlayBackgroundConfig
     locked: bool = False

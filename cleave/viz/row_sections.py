@@ -53,6 +53,12 @@ def _toggle_render_overlay_body(
     controls._render_overlay.set_body_expanded(forward)
 
 
+def _toggle_render_overlay_animation(
+    controls: TuningControls, _slot: str | None, forward: bool
+) -> None:
+    controls._render_overlay.set_animation_expanded(forward)
+
+
 def _toggle_render_post_fx(controls: TuningControls, _slot: str | None, forward: bool) -> None:
     controls._render_post_fx.set_expanded(forward)
 
@@ -238,6 +244,12 @@ def _render_overlay_body_expanded(state: TuningViewState, _slot: str | None) -> 
     return state.render_overlay.body_expanded
 
 
+def _render_overlay_animation_expanded(
+    state: TuningViewState, _slot: str | None
+) -> bool:
+    return state.render_overlay.animation.expanded
+
+
 def _render_post_fx_expanded(state: TuningViewState, _slot: str | None) -> bool:
     return state.render_post_fx.expanded
 
@@ -404,17 +416,37 @@ RENDER_OVERLAY_BODY_SECTION = ExpandSectionDef(
     ),
 )
 
+RENDER_OVERLAY_ANIMATION_SLIDE_DIRECTION = ConditionalRowsDef(
+    name="overlay_animation_slide_direction",
+    predicate=lambda state, _desc: state.render_overlay.animation.type != "fade",
+    children=(
+        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_ANIMATION_SLIDE_DIRECTION),
+    ),
+)
+
+RENDER_OVERLAY_ANIMATION_SECTION = ExpandSectionDef(
+    header_kind=RowKind.RENDER_OVERLAY_ANIMATION_HEADER,
+    context="global",
+    read_expanded=_render_overlay_animation_expanded,
+    toggle=_toggle_render_overlay_animation,
+    children=(
+        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_ANIMATION_TYPE),
+        SectionNode(conditional=RENDER_OVERLAY_ANIMATION_SLIDE_DIRECTION),
+        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_START_DELAY),
+        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_DISPLAY_TIME),
+    ),
+)
+
 RENDER_OVERLAY_SECTION = ExpandSectionDef(
     header_kind=RowKind.RENDER_OVERLAY_HEADER,
     context="global",
     read_expanded=_render_overlay_expanded,
     toggle=_toggle_render_overlay,
     children=(
+        SectionNode(expand=RENDER_OVERLAY_ANIMATION_SECTION),
         SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_POSITION),
         SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_OPACITY),
         SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_BORDER_WIDTH),
-        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_START_DELAY),
-        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_DISPLAY_TIME),
         SectionNode(expand=RENDER_OVERLAY_TITLE_SECTION),
         SectionNode(expand=RENDER_OVERLAY_BODY_SECTION),
     ),

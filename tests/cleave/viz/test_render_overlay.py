@@ -4,29 +4,37 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
 import pygame
 
 from tests.support.compositor_mock import recording_compositor
 
 from cleave.config import (
+    RenderOverlayAnimationConfig,
     RenderOverlayBackgroundConfig,
     RenderOverlayBorderConfig,
     RenderOverlayConfig,
     RenderOverlayTextBlockConfig,
 )
-from cleave.easing import smoothstep
+from cleave.easing import ease_out_expo, smoothstep
 from cleave.viz.render_overlay import (
+    OVERLAY_MOTION_DURATION_SEC,
+    OVERLAY_MOTION_STAGGER_SEC,
     _background_pixel_alpha,
     build_live_overlay_config,
     build_panel_surface,
     composite_render_overlay,
     composite_render_overlay_with_alpha,
     live_overlay_alpha,
+    overlay_animation_state,
     overlay_visible_alpha,
     panel_position,
     panel_surface_key,
 )
-from cleave.viz.session import RenderOverlayRuntime
+from cleave.viz.session import (
+    RenderOverlayAnimationRuntime,
+    RenderOverlayRuntime,
+)
 from cleave.viz.theme import FADE_DURATION_SEC
 
 
@@ -54,6 +62,8 @@ def _overlay_cfg(
     enabled: bool = True,
     start_delay: float = 10.0,
     display_time: float = 30.0,
+    animation_type: str = "fade",
+    slide_direction: str = "left",
     position: str = "bottom-left",
     margin: int = 10,
     padding: int = 10,
@@ -61,13 +71,22 @@ def _overlay_cfg(
     body_font_size: int = 10,
     opacity: float = 1.0,
     border_width: int = 2,
+    title_background_colour: tuple[int, int, int] | None = None,
 ) -> RenderOverlayConfig:
     return RenderOverlayConfig(
         enabled=enabled,
-        title=_text_block("Title", font_size=title_font_size),
+        title=_text_block(
+            "Title",
+            font_size=title_font_size,
+            background_colour=title_background_colour,
+        ),
         body=_text_block("Line one\nLine two", font_size=body_font_size),
-        start_delay=start_delay,
-        display_time=display_time,
+        animation=RenderOverlayAnimationConfig(
+            type=animation_type,  # type: ignore[arg-type]
+            slide_direction=slide_direction,  # type: ignore[arg-type]
+            start_delay=start_delay,
+            display_time=display_time,
+        ),
         position=position,  # type: ignore[arg-type]
         background=RenderOverlayBackgroundConfig(
             margin=margin,
@@ -161,15 +180,21 @@ def test_build_live_overlay_config_overrides_runtime_fields() -> None:
         body_font="dejavuserif",
         opacity_pct=75,
         border_width=4,
-        start_delay=20.0,
-        display_time=40.0,
+        animation=RenderOverlayAnimationRuntime(
+            type="slide",
+            slide_direction="right",
+            start_delay=20.0,
+            display_time=40.0,
+        ),
     )
     merged = build_live_overlay_config(base, runtime)
     assert merged.enabled is True
     assert merged.title.content == base.title.content
     assert merged.body.content == base.body.content
-    assert merged.start_delay == 20.0
-    assert merged.display_time == 40.0
+    assert merged.animation.start_delay == 20.0
+    assert merged.animation.display_time == 40.0
+    assert merged.animation.type == "slide"
+    assert merged.animation.slide_direction == "right"
     assert merged.position == "bottom-right"
     assert merged.title.font_size == 14
     assert merged.title.font == "dejavusans"
@@ -234,8 +259,12 @@ def test_text_line_backgrounds_are_tight_to_glyphs() -> None:
             font_size=10,
             background_colour=(255, 51, 51),
         ),
-        start_delay=10.0,
-        display_time=30.0,
+        animation=RenderOverlayAnimationConfig(
+            type="fade",
+            slide_direction="left",
+            start_delay=10.0,
+            display_time=30.0,
+        ),
         position="bottom-left",
         background=RenderOverlayBackgroundConfig(
             margin=10,
@@ -277,8 +306,12 @@ def test_text_line_without_background_skips_tight_rect() -> None:
         enabled=True,
         title=_text_block("Title", font_size=12, background_colour=(51, 51, 255)),
         body=_text_block("Line one", font_size=10, background_colour=None),
-        start_delay=10.0,
-        display_time=30.0,
+        animation=RenderOverlayAnimationConfig(
+            type="fade",
+            slide_direction="left",
+            start_delay=10.0,
+            display_time=30.0,
+        ),
         position="bottom-left",
         background=RenderOverlayBackgroundConfig(
             margin=10,
@@ -421,3 +454,50 @@ def test_panel_surface_key_ignores_position() -> None:
     cfg_a = _overlay_cfg(position="top-left")
     cfg_b = _overlay_cfg(position="bottom-right")
     assert panel_surface_key(cfg_a) == panel_surface_key(cfg_b)
+
+
+def test_slide_animation_offset_mid_entrance() -> None:
+    cfg = _overlay_cfg(animation_type="slide", slide_direction="left", start_delay=0.0)
+    panel_w, panel_h = 200, 100
+    mid = OVERLAY_MOTION_DURATION_SEC * 0.5
+    state = overlay_animation_state(mid, cfg, panel_w=panel_w, panel_h=panel_h)
+    expected_progress = ease_out_expo(0.5)
+    assert state.visible is True
+    assert state.settled is False
+    assert state.panel_offset_x == pytest.approx(-panel_w * (1.0 - expected_progress))
+    assert state.panel_offset_y == 0.0
+
+
+def test_wipe_animation_clip_progress() -> None:
+    cfg = _overlay_cfg(animation_type="wipe", slide_direction="left", start_delay=0.0)
+    mid = OVERLAY_MOTION_DURATION_SEC * 0.5
+    state = overlay_animation_state(mid, cfg, panel_w=200, panel_h=100)
+    expected = ease_out_expo(0.5)
+    assert state.layers["background"].wipe_progress == pytest.approx(expected)
+    assert state.panel_offset_x == 0.0
+
+
+def test_cascade_stagger_phases() -> None:
+    cfg = _overlay_cfg(
+        animation_type="cascade",
+        slide_direction="left",
+        start_delay=0.0,
+        title_background_colour=(10, 20, 30),
+    )
+    layer_names = ("background", "title_bar", "title", "body")
+    # Just after first layer starts, second still at rest.
+    t = OVERLAY_MOTION_STAGGER_SEC * 0.5
+    state = overlay_animation_state(
+        t, cfg, panel_w=200, panel_h=100, layer_names=layer_names
+    )
+    assert state.layers["background"].offset_x < 0.0
+    assert state.layers["title_bar"].offset_x == pytest.approx(-200.0)
+    assert state.layers["title"].offset_x == pytest.approx(-200.0)
+
+
+def test_non_fade_visible_alpha_is_binary_window() -> None:
+    cfg = _overlay_cfg(animation_type="slide", start_delay=10.0, display_time=30.0)
+    assert overlay_visible_alpha(9.9, cfg) == 0.0
+    assert overlay_visible_alpha(25.0, cfg) == 1.0
+    assert overlay_visible_alpha(41.0, cfg) == 0.0
+

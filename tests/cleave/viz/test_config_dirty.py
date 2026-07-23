@@ -199,6 +199,7 @@ def _mutate_render_overlay_border_width(controls: TuningControls) -> None:
 
 def _mutate_render_overlay_start_delay(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
+    controls.session.render_overlay.animation_expanded = True
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_START_DELAY)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
@@ -206,6 +207,7 @@ def _mutate_render_overlay_start_delay(controls: TuningControls) -> None:
 
 def _mutate_render_overlay_display_time(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
+    controls.session.render_overlay.animation_expanded = True
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_DISPLAY_TIME)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
@@ -361,8 +363,8 @@ _PERSISTED_MUTATIONS: list[
     ("render_overlay.body_font_size", _mutate_render_overlay_body_font_size, ("layer_1",), {}),
     ("render_overlay.opacity_pct", _mutate_render_overlay_opacity, ("layer_1",), {}),
     ("render_overlay.border_width", _mutate_render_overlay_border_width, ("layer_1",), {}),
-    ("render_overlay.start_delay", _mutate_render_overlay_start_delay, ("layer_1",), {}),
-    ("render_overlay.display_time", _mutate_render_overlay_display_time, ("layer_1",), {}),
+    ("render_overlay.animation.start_delay", _mutate_render_overlay_start_delay, ("layer_1",), {}),
+    ("render_overlay.animation.display_time", _mutate_render_overlay_display_time, ("layer_1",), {}),
     ("render_post_fx.enabled", _mutate_render_post_fx_enabled, ("layer_1",), {}),
     ("render_post_fx.locked", _mutate_render_post_fx_locked, ("layer_1",), {}),
     ("render_post_fx.fade_in", _mutate_render_post_fx_fade_in, ("layer_1",), {}),
@@ -425,7 +427,7 @@ def test_render_overlay_display_time_keyboard_regression() -> None:
     assert not controls.config_dirty
     _mutate_render_overlay_display_time(controls)
     assert controls.config_dirty
-    assert controls.session.render_overlay.display_time > 0.0
+    assert controls.session.render_overlay.animation.display_time > 0.0
 
 
 def test_display_time_mutation_clears_dirty_after_save() -> None:
