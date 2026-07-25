@@ -463,11 +463,11 @@ def _timeline_session(layer: StemLayer, *, enabled: bool = True) -> TuningSessio
     )
     session.timeline.enabled = enabled
     session.timeline.lanes["layer_1"] = TimelineLane(
-        baseline=False,
+        baseline=0.0,
         cues=[
-            SlotCue(t=5.0, visible=True),
-            SlotCue(t=10.0, visible=False),
-            SlotCue(t=15.0, visible=True),
+            SlotCue(t=5.0, level=1.0),
+            SlotCue(t=10.0, level=0.0),
+            SlotCue(t=15.0, level=1.0),
         ],
     )
     return session

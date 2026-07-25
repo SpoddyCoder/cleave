@@ -20,7 +20,7 @@ class StemLayer:
     playlist: PresetPlaylist
     projectm_playlist: ProjectMPlaylist | None = None
     auto_preset_path: Path | None = None
-    timeline_fade: float = 1.0
+    timeline_level: float = 1.0
     preset_rotation: PresetRotation | None = None
     timeline_switch_count: int = 0
     rotation_anchor: int = 0

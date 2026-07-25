@@ -1,9 +1,9 @@
-"""Per-lane timeline evaluation and editing for layer visibility."""
+"""Per-lane timeline evaluation and editing for layer levels."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
@@ -13,7 +13,8 @@ from cleave.extract import STEM_SOURCES, StemSource
 
 RECORD_DEBOUNCE_SEC = 0.08
 SONG_MARKER_FADE_MATCH_EPS = 1e-3
-_CUE_BOUNDARY_EPS = 1e-9
+LEVEL_QUANTUM = 0.25
+LEVEL_EPS = 1e-6
 
 _STEM_SOURCE_ABBREVIATIONS = {
     "drums": "D",
@@ -27,36 +28,13 @@ _STEM_SOURCE_ABBREVIATIONS = {
 @dataclass(frozen=True)
 class SlotCue:
     t: float
-    visible: bool
+    level: float
 
 
 @dataclass
 class TimelineLane:
-    baseline: bool | None  # None = inherit session.layers[slot].enabled
+    baseline: float | None  # None = inherit session.layers[slot].enabled as 1.0/0.0
     cues: list[SlotCue]  # canonical: strictly increasing t, no redundant transitions
-
-
-@dataclass
-class Timeline:
-    enabled: bool = True
-    lanes: dict[str, TimelineLane] = field(default_factory=dict)
-
-    def visible_at(self, slot: str, t_sec: float, *, inherit: bool) -> bool:
-        lane = self.lanes.get(slot)
-        if lane is None:
-            return inherit
-        return lane_visible_at(lane, t_sec, inherit=inherit)
-
-    def visible_state_at(
-        self,
-        slots: Sequence[str],
-        t_sec: float,
-        inherits: Mapping[str, bool],
-    ) -> dict[str, bool]:
-        return {
-            slot: self.visible_at(slot, t_sec, inherit=inherits[slot])
-            for slot in slots
-        }
 
 
 def empty_lane() -> TimelineLane:
@@ -74,13 +52,27 @@ def stem_abbreviation(stem: StemSource) -> str:
     return _STEM_SOURCE_ABBREVIATIONS[stem]
 
 
+def clamp_level(level: float) -> float:
+    return max(0.0, min(1.0, float(level)))
+
+
+def quantize_level(level: float) -> float:
+    clamped = clamp_level(level)
+    steps = round(clamped / LEVEL_QUANTUM)
+    return clamp_level(steps * LEVEL_QUANTUM)
+
+
+def levels_equal(a: float, b: float) -> bool:
+    return abs(float(a) - float(b)) <= LEVEL_EPS
+
+
 def canonicalize(
-    baseline: bool | None,
+    baseline: float | None,
     cues: Sequence[SlotCue],
 ) -> list[SlotCue]:
     """Drop redundant/no-op transitions; last-wins at equal ``t``.
 
-    Returns strictly increasing ``t`` cues where each changes visibility from
+    Returns strictly increasing ``t`` cues where each changes level from
     the previous state (``baseline``, or the prior cue when baseline is None).
     """
     if not cues:
@@ -95,39 +87,39 @@ def canonicalize(
     result: list[SlotCue] = []
     current = baseline
     for cue in collapsed:
-        if current is not None and cue.visible == current:
+        if current is not None and levels_equal(cue.level, current):
             continue
         result.append(cue)
-        current = cue.visible
+        current = cue.level
     return result
 
 
-def lane_visible_at(
+def lane_level_at(
     lane: TimelineLane,
     t_sec: float,
     *,
-    inherit: bool,
-) -> bool:
-    """Visibility at ``t_sec``. If ``baseline`` is None, use ``inherit`` until the first cue."""
-    visible = inherit if lane.baseline is None else lane.baseline
+    inherit: float,
+) -> float:
+    """Stepped level at ``t_sec``. If ``baseline`` is None, use ``inherit`` until the first cue."""
+    level = inherit if lane.baseline is None else lane.baseline
     for cue in lane.cues:
         if cue.t > t_sec:
             break
-        visible = cue.visible
-    return visible
+        level = cue.level
+    return level
 
 
-def lane_segments(
+def lane_level_segments(
     lane: TimelineLane,
     duration_sec: float,
     *,
-    inherit: bool,
-) -> list[tuple[float, float, bool]]:
-    """Return ``(start_t, end_t, visible)`` segments over ``[0, duration_sec]``."""
+    inherit: float,
+) -> list[tuple[float, float, float]]:
+    """Return ``(start_t, end_t, level)`` segments over ``[0, duration_sec]``."""
     if duration_sec <= 0:
         return []
     boundaries = sorted({0.0, duration_sec} | {cue.t for cue in lane.cues})
-    segments: list[tuple[float, float, bool]] = []
+    segments: list[tuple[float, float, float]] = []
     for index in range(len(boundaries) - 1):
         start_t = boundaries[index]
         end_t = boundaries[index + 1]
@@ -139,13 +131,9 @@ def lane_segments(
         clip_end = min(end_t, duration_sec)
         if clip_end <= clip_start:
             continue
-        visible = lane_visible_at(lane, clip_start, inherit=inherit)
-        segments.append((clip_start, clip_end, visible))
+        level = lane_level_at(lane, clip_start, inherit=inherit)
+        segments.append((clip_start, clip_end, level))
     return segments
-
-
-def _boundary_has_cue(lane: TimelineLane, t: float) -> bool:
-    return any(abs(cue.t - t) <= _CUE_BOUNDARY_EPS for cue in lane.cues)
 
 
 @dataclass(frozen=True)
@@ -173,164 +161,121 @@ def _fade_group_for_edge(
     return standard_fades
 
 
-def _edge_fade_duration(
-    lane: TimelineLane,
+def _append_breakpoint(
+    breakpoints: list[tuple[float, float]],
     t: float,
-    *,
-    is_fade_in: bool,
-    duration_sec: float,
-    song_marker_times: Sequence[float],
-    song_marker_fades: TimelineFadeGroup,
-    standard_fades: TimelineFadeGroup,
-) -> float:
-    if is_fade_in:
-        if t <= 0.0 and not _boundary_has_cue(lane, t):
-            return 0.0
-    elif t >= duration_sec and not _boundary_has_cue(lane, t):
-        return 0.0
-    group = _fade_group_for_edge(
-        t,
-        song_marker_times=song_marker_times,
-        song_marker_fades=song_marker_fades,
-        standard_fades=standard_fades,
-    )
-    if not group.enabled:
-        return 0.0
-    duration = group.fade_in if is_fade_in else group.fade_out
-    return max(0.0, float(duration))
+    level: float,
+) -> None:
+    if breakpoints and t < breakpoints[-1][0]:
+        t = breakpoints[-1][0]
+    if (
+        breakpoints
+        and breakpoints[-1][0] == t
+        and levels_equal(breakpoints[-1][1], level)
+    ):
+        return
+    breakpoints.append((float(t), float(level)))
 
 
-def _segment_fade_durations(
-    lane: TimelineLane,
-    start: float,
-    end: float,
-    *,
-    duration_sec: float,
-    song_marker_times: Sequence[float],
-    song_marker_fades: TimelineFadeGroup,
-    standard_fades: TimelineFadeGroup,
-) -> tuple[float, float]:
-    fade_in = _edge_fade_duration(
-        lane,
-        start,
-        is_fade_in=True,
-        duration_sec=duration_sec,
-        song_marker_times=song_marker_times,
-        song_marker_fades=song_marker_fades,
-        standard_fades=standard_fades,
-    )
-    fade_out = _edge_fade_duration(
-        lane,
-        end,
-        is_fade_in=False,
-        duration_sec=duration_sec,
-        song_marker_times=song_marker_times,
-        song_marker_fades=song_marker_fades,
-        standard_fades=standard_fades,
-    )
-    return fade_in, fade_out
-
-
-def _segment_fade_envelope(
-    t_sec: float,
-    start: float,
-    end: float,
-    *,
-    fade_in: float,
-    fade_out: float,
-) -> float:
-    if start <= t_sec < end:
-        return 1.0
-    if fade_in > 0.0 and start - fade_in <= t_sec < start:
-        return smoothstep((t_sec - (start - fade_in)) / fade_in)
-    if fade_out > 0.0 and end <= t_sec < end + fade_out:
-        return smoothstep((end + fade_out - t_sec) / fade_out)
-    return 0.0
-
-
-def lane_fade_spans(
+def lane_level_breakpoints(
     lane: TimelineLane,
     *,
-    inherit: bool,
+    inherit: float,
     song_marker_fades: TimelineFadeGroup,
     standard_fades: TimelineFadeGroup,
     duration_sec: float,
     song_marker_times: Sequence[float] = (),
-) -> list[tuple[float, float, Literal["in", "out"]]]:
-    """Return clipped ``(t0, t1, kind)`` fade wedges for visible lane segments."""
-    if duration_sec <= 0.0:
-        return []
-    spans: list[tuple[float, float, Literal["in", "out"]]] = []
-    for start, end, visible in lane_segments(lane, duration_sec, inherit=inherit):
-        if not visible:
-            continue
-        fade_in, fade_out = _segment_fade_durations(
-            lane,
-            start,
-            end,
-            duration_sec=duration_sec,
-            song_marker_times=song_marker_times,
-            song_marker_fades=song_marker_fades,
-            standard_fades=standard_fades,
-        )
-        if fade_in > 0.0:
-            t0 = max(0.0, start - fade_in)
-            t1 = start
-            if t1 > t0:
-                spans.append((t0, t1, "in"))
-        if fade_out > 0.0:
-            t0 = end
-            t1 = min(duration_sec, end + fade_out)
-            if t1 > t0:
-                spans.append((t0, t1, "out"))
-    return spans
+) -> list[tuple[float, float]]:
+    """Build a monotone ``(t, level)`` polyline for the lane envelope.
 
-
-def lane_fade_alpha(
-    lane: TimelineLane,
-    t_sec: float,
-    *,
-    inherit: bool,
-    song_marker_fades: TimelineFadeGroup,
-    standard_fades: TimelineFadeGroup,
-    duration_sec: float,
-    song_marker_times: Sequence[float] = (),
-) -> float:
-    """Continuous opacity for visible segments with optional edge fades.
-
-    For each visible ``[A, B)`` from :func:`lane_segments`, fade-in starts
-    before ``A`` and reaches full at ``A``; fade-out starts at ``B`` and
-    reaches zero after ``B``. Durations come from the song-marker group when
-    the edge matches a marker within :data:`SONG_MARKER_FADE_MATCH_EPS`, else
-    the standard group. Disabled groups (or zero duration) stay abrupt.
-    Overlapping envelopes use max. Song start/end without a cue at that edge
-    do not fade.
+    For a transition at ``t`` from level ``a`` to ``b``, fade durations act as
+    slopes: a full-scale move takes the configured duration. Rise completes at
+    the cue time; fall starts at the cue time. Disabled groups or zero duration
+    collapse to a hard step. Overlapping rise starts clamp forward.
     """
     if duration_sec <= 0.0:
-        return 0.0
-    alpha = 0.0
-    for start, end, visible in lane_segments(lane, duration_sec, inherit=inherit):
-        if not visible:
+        return []
+    level = inherit if lane.baseline is None else float(lane.baseline)
+    if not lane.cues:
+        return [(0.0, float(level))]
+
+    breakpoints: list[tuple[float, float]] = []
+    previous = float(level)
+    for cue in lane.cues:
+        a = previous
+        b = float(cue.level)
+        t = float(cue.t)
+        previous = b
+        if levels_equal(a, b):
             continue
-        fade_in, fade_out = _segment_fade_durations(
-            lane,
-            start,
-            end,
-            duration_sec=duration_sec,
+        group = _fade_group_for_edge(
+            t,
             song_marker_times=song_marker_times,
             song_marker_fades=song_marker_fades,
             standard_fades=standard_fades,
         )
-        contrib = _segment_fade_envelope(
-            t_sec,
-            start,
-            end,
-            fade_in=fade_in,
-            fade_out=fade_out,
-        )
-        if contrib > alpha:
-            alpha = contrib
-    return alpha
+        if b > a:
+            delta = b - a
+            fade_in = max(0.0, float(group.fade_in)) if group.enabled else 0.0
+            ramp = fade_in * delta
+            if ramp <= 0.0:
+                _append_breakpoint(breakpoints, t, a)
+                _append_breakpoint(breakpoints, t, b)
+                continue
+            t_start = t - ramp
+            if breakpoints and t_start < breakpoints[-1][0]:
+                t_start = breakpoints[-1][0]
+            if t_start >= t:
+                _append_breakpoint(breakpoints, t, a)
+                _append_breakpoint(breakpoints, t, b)
+            else:
+                _append_breakpoint(breakpoints, t_start, a)
+                _append_breakpoint(breakpoints, t, b)
+        else:
+            delta = a - b
+            fade_out = max(0.0, float(group.fade_out)) if group.enabled else 0.0
+            ramp = fade_out * delta
+            if ramp <= 0.0:
+                _append_breakpoint(breakpoints, t, a)
+                _append_breakpoint(breakpoints, t, b)
+                continue
+            _append_breakpoint(breakpoints, t, a)
+            _append_breakpoint(breakpoints, t + ramp, b)
+
+    if not breakpoints:
+        return [(0.0, float(level))]
+    return breakpoints
+
+
+def lane_level_envelope(
+    t_sec: float,
+    breakpoints: Sequence[tuple[float, float]],
+) -> float:
+    """Interpolate level at ``t_sec`` along breakpoints with smoothstep easing."""
+    if not breakpoints:
+        return 0.0
+    if t_sec < breakpoints[0][0]:
+        return float(breakpoints[0][1])
+    if t_sec > breakpoints[-1][0]:
+        return float(breakpoints[-1][1])
+    for index in range(len(breakpoints) - 1):
+        t0, v0 = breakpoints[index]
+        t1, v1 = breakpoints[index + 1]
+        # Half-open [t0, t1) so a hard step at t1 wins over the prior segment end.
+        if t_sec >= t1:
+            continue
+        if t1 <= t0:
+            # Hard step: settle to the last value at this instant.
+            last = index + 1
+            while (
+                last + 1 < len(breakpoints)
+                and breakpoints[last + 1][0] <= t0
+            ):
+                last += 1
+            return float(breakpoints[last][1])
+        u = (t_sec - t0) / (t1 - t0)
+        return float(v0 + (v1 - v0) * smoothstep(u))
+    return float(breakpoints[-1][1])
 
 
 def lane_tick_times(lane: TimelineLane, duration_sec: float) -> list[float]:
@@ -347,27 +292,30 @@ def lane_on_transition_trigger_times(
     song_marker_fades: TimelineFadeGroup,
     standard_fades: TimelineFadeGroup,
 ) -> list[float]:
-    """Preset-switch trigger times for each rising edge (``visible=True`` cue).
+    """Preset-switch trigger times for each rise from zero.
 
-    Canonical cues alternate, so every ``visible=True`` cue is an off->on edge.
-    Trigger is ``cue.t - fade_in(edge)`` using the song-marker vs standard fade
-    group for that edge (same selection as :func:`lane_fade_alpha`). When the
-    matching group is disabled or ``fade_in`` is 0, the trigger is ``cue.t``.
+    Fires when ``previous <= LEVEL_EPS < cue.level``, with ``previous`` from
+    ``baseline`` or ``0.0`` when baseline is None. Trigger is
+    ``cue.t - fade_in * cue.level`` using the song-marker vs standard fade
+    group for that edge. When the matching group is disabled or ``fade_in`` is
+    0, the trigger is ``cue.t``.
     """
     triggers: list[float] = []
+    previous = 0.0 if lane.baseline is None else float(lane.baseline)
     for cue in lane.cues:
-        if not cue.visible:
-            continue
-        fade_in = _edge_fade_duration(
-            lane,
-            cue.t,
-            is_fade_in=True,
-            duration_sec=0.0,
-            song_marker_times=song_marker_times,
-            song_marker_fades=song_marker_fades,
-            standard_fades=standard_fades,
-        )
-        triggers.append(cue.t - fade_in)
+        if previous <= LEVEL_EPS < cue.level:
+            group = _fade_group_for_edge(
+                cue.t,
+                song_marker_times=song_marker_times,
+                song_marker_fades=song_marker_fades,
+                standard_fades=standard_fades,
+            )
+            if not group.enabled or group.fade_in <= 0.0:
+                ramp = 0.0
+            else:
+                ramp = max(0.0, float(group.fade_in)) * float(cue.level)
+            triggers.append(cue.t - ramp)
+        previous = float(cue.level)
     return triggers
 
 
@@ -426,13 +374,13 @@ def strip_lane_range(
 def set_lane_cue(
     lane: TimelineLane,
     t: float,
-    visible: bool,
+    level: float,
 ) -> TimelineLane:
     """Set or replace the transition at ``t``; canonicalize."""
     others = [cue for cue in lane.cues if cue.t != t]
     return TimelineLane(
         baseline=lane.baseline,
-        cues=canonicalize(lane.baseline, others + [SlotCue(t=t, visible=visible)]),
+        cues=canonicalize(lane.baseline, others + [SlotCue(t=t, level=level)]),
     )
 
 
@@ -521,7 +469,7 @@ def shift_lane_cues_by_beats(
             t=float(
                 beats[max(0, min(last, _nearest_beat_index(cue.t, beats) + delta))]
             ),
-            visible=cue.visible,
+            level=cue.level,
         )
         for cue in lane.cues
     ]
@@ -542,7 +490,7 @@ def snap_lane_to_beats(
     beats = np.asarray(beat_times, dtype=np.float64)
     if beats.size == 1:
         sole = float(beats[0])
-        snapped = [SlotCue(t=sole, visible=cue.visible) for cue in lane.cues]
+        snapped = [SlotCue(t=sole, level=cue.level) for cue in lane.cues]
         return TimelineLane(
             baseline=lane.baseline,
             cues=canonicalize(lane.baseline, snapped),
@@ -568,7 +516,7 @@ def snap_lane_to_beats(
             (first + lo * interval, first + (lo + 1) * interval),
         )
 
-    snapped = [SlotCue(t=snap_t(cue.t), visible=cue.visible) for cue in lane.cues]
+    snapped = [SlotCue(t=snap_t(cue.t), level=cue.level) for cue in lane.cues]
     return TimelineLane(
         baseline=lane.baseline,
         cues=canonicalize(lane.baseline, snapped),
@@ -633,7 +581,7 @@ def snap_lanes_to_song_markers(
                 if best_i is None:
                     continue
                 old = cues[best_i]
-                cues[best_i] = SlotCue(t=marker, visible=old.visible)
+                cues[best_i] = SlotCue(t=marker, level=old.level)
                 claimed.add(best_i)
                 moved += 1
     else:
@@ -656,7 +604,7 @@ def snap_lanes_to_song_markers(
                 continue
             _dist, _t, _z, slot, cue_i = best
             old = working[slot][cue_i]
-            working[slot][cue_i] = SlotCue(t=marker, visible=old.visible)
+            working[slot][cue_i] = SlotCue(t=marker, level=old.level)
             claimed_pairs.add((slot, cue_i))
             moved += 1
 

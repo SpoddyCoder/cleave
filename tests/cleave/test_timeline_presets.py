@@ -7,7 +7,7 @@ import statistics
 
 import pytest
 
-from cleave.timeline import Timeline, TimelineLane, lane_visible_at
+from cleave.timeline import LEVEL_EPS, TimelineLane, empty_lane, lane_level_at
 from cleave.timeline_presets import (
     MIN_SWITCH_GAP_BARS,
     MIN_SWITCH_GAP_SEC,
@@ -70,12 +70,20 @@ def _dense_middle_bars(duration_sec: float = 60.0) -> list[float]:
     return bars
 
 
-def _inherits_false(slots: list[str]) -> dict[str, bool]:
-    return {slot: False for slot in slots}
+def _inherits_zero(slots: list[str]) -> dict[str, float]:
+    return {slot: 0.0 for slot in slots}
 
 
-def _timeline(lanes: dict[str, TimelineLane]) -> Timeline:
-    return Timeline(lanes=lanes)
+def _level_at(
+    lanes: dict[str, TimelineLane],
+    slots: list[str],
+    t: float,
+) -> dict[str, float]:
+    inherits = _inherits_zero(slots)
+    return {
+        slot: lane_level_at(lanes.get(slot) or empty_lane(), t, inherit=inherits[slot])
+        for slot in slots
+    }
 
 
 def _visible_at(
@@ -83,8 +91,7 @@ def _visible_at(
     slots: list[str],
     t: float,
 ) -> dict[str, bool]:
-    inherits = _inherits_false(slots)
-    return _timeline(lanes).visible_state_at(slots, t, inherits)
+    return {slot: level > LEVEL_EPS for slot, level in _level_at(lanes, slots, t).items()}
 
 
 def _all_transition_times(lanes: dict[str, TimelineLane]) -> list[float]:
@@ -279,7 +286,7 @@ def test_preset_invariants(builder, n: int, duration_sec: float) -> None:
     _assert_cues_on_bars(lanes, thinned if thinned else bars)
     _assert_min_gaps(lanes, bars, duration_sec)
     if n == 1:
-        assert lanes[slots[0]].baseline is True
+        assert lanes[slots[0]].baseline == 1.0
         assert lanes[slots[0]].cues == []
 
 
@@ -374,17 +381,17 @@ def test_pulse_rotates_singles() -> None:
     for t in _all_transition_times(lanes):
         if t == 0.0:
             continue
-        active = [s for s in slots if lane_visible_at(lanes[s], t, inherit=False)]
+        active = [s for s in slots if lane_level_at(lanes[s], t, inherit=0.0)]
         if len(active) == 1:
             solo_seen.add(active[0])
     assert len(solo_seen) >= 2
 
 
-def test_lane_visible_at_with_all_false_inherits() -> None:
+def test_lane_level_at_with_all_false_inherits() -> None:
     slots = _slots(3)
     lanes, _bars = _build(build_dialogue_cues, slots, 60.0, random.Random(3))
     for slot in slots:
-        lane_visible_at(lanes[slot], 0.0, inherit=False)
+        lane_level_at(lanes[slot], 0.0, inherit=0.0)
 
 
 def test_in_climax_window_bounds() -> None:
@@ -710,6 +717,30 @@ def test_resolve_crescendo_window_penultimate_falls_back_without_minus_two() -> 
 
 def test_resolve_crescendo_window_requires_three_markers() -> None:
     assert resolve_crescendo_window([10.0, 50.0], 100.0, "last") is None
+
+
+def test_crescendo_states_emit_half_entrant_then_full_stack() -> None:
+    from cleave.timeline_presets.crescendo import CrescendoWindow, _crescendo_states
+
+    slots = _slots(4)
+    bars = _bar_times_for(120.0)
+    window = CrescendoWindow(t_start=50.0, t_full=80.0, t_peak_end=100.0)
+    states = _crescendo_states(
+        slots,
+        window,
+        duration_sec=120.0,
+        bar_times=bars,
+        rng=random.Random(0),
+    )
+    assert states
+    # Steps before t_full include a 0.5 entrant; t_full is a full stack.
+    half_steps = [levels for t, levels in states if t < window.t_full - 1e-9]
+    assert half_steps
+    for levels in half_steps:
+        assert 0.5 in levels.values()
+    full = next(levels for t, levels in states if abs(t - window.t_full) < 1e-9)
+    assert set(full.values()) == {1.0}
+    assert len(full) == min(4, MAX_CONCURRENT_LAYERS)
 
 
 def test_apply_crescendo_ramps_holds_then_solos() -> None:

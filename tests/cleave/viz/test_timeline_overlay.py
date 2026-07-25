@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import pygame
+import pytest
 
 from cleave.config_schema import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
 from cleave.timeline import (
+    LEVEL_EPS,
     SlotCue,
     TimelineFadeGroup,
     TimelineLane,
     canonicalize,
-    lane_visible_at,
+    lane_level_at,
+    lane_level_segments,
     stem_abbreviation,
 )
 from cleave.viz.material_icons import visibility_icon_slot_width
@@ -40,7 +43,7 @@ from cleave.viz.timeline_overlay import (
     arm_abbrev_flash_active,
     arm_abbrev_flash_visible,
     armed_abbrev_bg_visible,
-    bar_segments_for_row,
+    bar_level_breakpoints_for_row,
     bar_tick_times_for_row,
     cue_times_for_stem,
     layer_num_prefix,
@@ -54,22 +57,31 @@ from cleave.viz.timeline_overlay import (
     stem_label_text,
     transport_time_text,
     time_to_x,
-    visibility_segments,
+    clip_breakpoints,
 )
 
 
+def _as_level(value):
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    return float(value)
+
+
 def _lane(
-    baseline: bool | None,
-    *transitions: tuple[float, bool],
+    baseline,
+    *transitions,
 ) -> TimelineLane:
-    cues = [SlotCue(t=t, visible=v) for t, v in transitions]
-    return TimelineLane(baseline=baseline, cues=canonicalize(baseline, cues))
+    base = _as_level(baseline)
+    cues = [SlotCue(t=t, level=float(_as_level(level))) for t, level in transitions]
+    return TimelineLane(baseline=base, cues=canonicalize(base, cues))
 
 
 def _view_state(
     *,
     lanes: dict[str, TimelineLane] | None = None,
-    defaults: dict[str, bool] | None = None,
+    defaults: dict[str, float] | None = None,
     position_sec: float = 0.0,
     duration_sec: float = 100.0,
     focus_row: int = 0,
@@ -77,13 +89,13 @@ def _view_state(
     armed_slots: set[str] | None = None,
     recording: bool = False,
     record_start_sec: float | None = None,
-    record_baseline: dict[str, bool] | None = None,
+    record_baseline: dict[str, float] | None = None,
     record_buffer: dict[str, list[SlotCue]] | None = None,
     record_high_water_mark: float | None = None,
     enabled: bool = True,
     layer_z_order: list[str] | None = None,
     monitor_visible: dict[str, bool] | None = None,
-    timeline_visible: dict[str, bool] | None = None,
+    timeline_level: dict[str, float] | None = None,
     override_slots: set[str] | None = None,
     arm_flash_start_ms: dict[str, int] | None = None,
     show_bar_grid: bool = False,
@@ -99,20 +111,31 @@ def _view_state(
 ) -> TimelineViewState:
     order = list(layer_z_order or list(DEFAULT_LAYER_SLOTS))
     lane_map = dict(lanes or {})
-    default_map = dict(
-        defaults or {slot: True for slot in (layer_z_order or list(DEFAULT_LAYER_SLOTS))}
-    )
-    if monitor_visible is None:
-        monitor_visible = {
-            stem: lane_visible_at(
-                lane_map.get(stem) or TimelineLane(baseline=None, cues=[]),
-                position_sec,
-                inherit=default_map[stem],
+    default_map = {
+        slot: float(_as_level(level))
+        for slot, level in (
+            defaults or {slot: 1.0 for slot in (layer_z_order or list(DEFAULT_LAYER_SLOTS))}
+        ).items()
+    }
+    if timeline_level is None:
+        timeline_level = {
+            stem: float(
+                lane_level_at(
+                    lane_map.get(stem) or TimelineLane(baseline=None, cues=[]),
+                    position_sec,
+                    inherit=float(_as_level(default_map[stem])),
+                )
             )
             for stem in order
         }
-    if timeline_visible is None:
-        timeline_visible = dict(monitor_visible)
+    else:
+        timeline_level = {
+            slot: float(_as_level(level)) for slot, level in timeline_level.items()
+        }
+    if monitor_visible is None:
+        monitor_visible = {
+            stem: timeline_level[stem] > LEVEL_EPS for stem in order
+        }
     return TimelineViewState(
         layer_z_order=order,
         slot_stems={
@@ -125,12 +148,12 @@ def _view_state(
         duration_sec=duration_sec,
         focus_row=focus_row,
         monitor_visible=monitor_visible,
-        timeline_visible=timeline_visible,
+        timeline_level=timeline_level,
         override_slots=set(override_slots or ()),
         armed_slots=set(armed_slots or ()),
         recording=recording,
         record_start_sec=record_start_sec,
-        record_baseline=dict(record_baseline or ()),
+        record_baseline={slot: float(_as_level(level)) for slot, level in dict(record_baseline or ()).items()},
         record_buffer=dict(record_buffer or ()),
         record_high_water_mark=record_high_water_mark,
         enabled=enabled,
@@ -562,7 +585,7 @@ def test_draw_dual_eye_state_does_not_crash() -> None:
         armed_slots={"layer_2"},
         recording=True,
         monitor_visible={"layer_1": True, "layer_2": False, "layer_3": True, "layer_4": True},
-        timeline_visible={"layer_1": False, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_level={"layer_1": 0.0, "layer_2": 1.0, "layer_3": 1.0, "layer_4": 1.0},
         override_slots={"layer_1"},
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
@@ -570,26 +593,48 @@ def test_draw_dual_eye_state_does_not_crash() -> None:
     assert overlay.panel_rect is not None
 
 
-def test_visibility_segments_default_only() -> None:
-    lane = TimelineLane(baseline=False, cues=[])
-    segments = visibility_segments(lane, 60.0, inherit=True)
-    assert segments == [(0.0, 60.0, False)]
+def test_clip_breakpoints_interpolates_at_edges() -> None:
+    bps = [(0.0, 0.0), (10.0, 1.0), (20.0, 0.5)]
+    clipped = clip_breakpoints(bps, 5.0, 15.0)
+    assert clipped[0][0] == 5.0
+    assert clipped[0][1] == pytest.approx(0.5)
+    assert clipped[-1][0] == 15.0
+    assert clipped[-1][1] == pytest.approx(0.75)
+    assert any(abs(t - 10.0) < 1e-9 for t, _ in clipped)
 
 
-def test_visibility_segments_from_cues() -> None:
+def test_partial_level_bar_shorter_than_full() -> None:
+    """Partial level yields a shorter filled height than level 1.0."""
+    import pygame as _pygame
+
+    from cleave.viz.timeline_overlay import bar_level_y
+
+    bar_rect = _pygame.Rect(0, 0, 100, 20)
+    assert bar_level_y(bar_rect, 0.25) > bar_level_y(bar_rect, 1.0)
+    assert bar_level_y(bar_rect, 0.0) == bar_rect.bottom
+    assert bar_level_y(bar_rect, 1.0) == bar_rect.y
+
+
+def test_lane_level_segments_default_only() -> None:
+    lane = TimelineLane(baseline=0.0, cues=[])
+    segments = lane_level_segments(lane, 60.0, inherit=1.0)
+    assert segments == [(0.0, 60.0, 0.0)]
+
+
+def test_lane_level_segments_from_cues() -> None:
     lane = _lane(True, (10.0, False), (30.0, True))
-    segments = visibility_segments(lane, 60.0, inherit=True)
+    segments = lane_level_segments(lane, 60.0, inherit=1.0)
     assert segments == [
-        (0.0, 10.0, True),
-        (10.0, 30.0, False),
-        (30.0, 60.0, True),
+        (0.0, 10.0, 1.0),
+        (10.0, 30.0, 0.0),
+        (30.0, 60.0, 1.0),
     ]
 
 
-def test_visibility_segments_other_stem_unchanged_across_unrelated_cue() -> None:
+def test_lane_level_segments_other_stem_unchanged_across_unrelated_cue() -> None:
     lane = _lane(True)
-    segments = visibility_segments(lane, 20.0, inherit=True)
-    assert segments == [(0.0, 20.0, True)]
+    segments = lane_level_segments(lane, 20.0, inherit=1.0)
+    assert segments == [(0.0, 20.0, 1.0)]
 
 
 def test_cue_times_for_stem_lists_lane_transitions() -> None:
@@ -790,18 +835,24 @@ def test_upscale_expands_bar_width_not_row_height() -> None:
     assert upscaled_panel[2] > baseline_panel[2]
 
 
+def _bar_level_at(
+    state: TimelineViewState,
+    slot: str,
+    t: float,
+) -> float:
+    """Return the strip level for a slot at time t from breakpoints."""
+    from cleave.viz.timeline_overlay import level_at_breakpoints
+
+    bps = bar_level_breakpoints_for_row(state, slot)
+    return level_at_breakpoints(bps, t)
+
+
 def _bar_visible_at(
     state: TimelineViewState,
     slot: str,
     t: float,
 ) -> bool:
-    """Return the bar's visibility value for a slot at time t."""
-    segs = bar_segments_for_row(state, slot)
-    visible = False
-    for seg_start, seg_end, seg_visible in segs:
-        if seg_start <= t < seg_end:
-            visible = seg_visible
-    return visible
+    return _bar_level_at(state, slot, t) > LEVEL_EPS
 
 
 def test_bar_shows_fill_for_backward_skipped_range() -> None:
@@ -815,7 +866,7 @@ def test_bar_shows_fill_for_backward_skipped_range() -> None:
         recording=True,
         record_start_sec=20.0,
         record_baseline={"layer_1": True},
-        record_buffer={"layer_1": [SlotCue(t=20.0, visible=False)]},
+        record_buffer={"layer_1": [SlotCue(t=20.0, level=0.0)]},
         record_high_water_mark=30.0,
     )
     assert _bar_visible_at(state, slot, 25.0) is False
@@ -834,7 +885,7 @@ def test_bar_shows_fill_for_backward_seek_with_expanded_punch_start() -> None:
         recording=True,
         record_start_sec=10.0,
         record_baseline={"layer_1": False},
-        record_buffer={"layer_1": [SlotCue(t=10.0, visible=True)]},
+        record_buffer={"layer_1": [SlotCue(t=10.0, level=1.0)]},
         record_high_water_mark=20.0,
     )
     assert _bar_visible_at(state, slot, 15.0) is True
@@ -853,7 +904,7 @@ def test_bar_without_high_water_mark_behaves_as_before() -> None:
         recording=True,
         record_start_sec=20.0,
         record_baseline={"layer_1": True},
-        record_buffer={"layer_1": [SlotCue(t=20.0, visible=False)]},
+        record_buffer={"layer_1": [SlotCue(t=20.0, level=0.0)]},
         record_high_water_mark=None,
     )
     assert _bar_visible_at(state, slot, 22.0) is False

@@ -9,13 +9,22 @@ from cleave.timeline import (
 )
 
 
+def _as_level(value):
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    return float(value)
+
+
 def _lane(
-    baseline: bool | None,
-    *transitions: tuple[float, bool],
+    baseline,
+    *transitions,
 ) -> TimelineLane:
+    base = _as_level(baseline)
     return TimelineLane(
-        baseline=baseline,
-        cues=[SlotCue(t=t, visible=v) for t, v in transitions],
+        baseline=base,
+        cues=[SlotCue(t=t, level=float(_as_level(level))) for t, level in transitions],
     )
 
 
@@ -29,7 +38,7 @@ def test_proximity_no_op_when_outside_window() -> None:
         slots=("layer_1",),
     )
     assert moved == 0
-    assert result["layer_1"].cues == [SlotCue(t=10.0, visible=True)]
+    assert result["layer_1"].cues == [SlotCue(t=10.0, level=1.0)]
 
 
 def test_proximity_zero_no_op() -> None:
@@ -42,7 +51,7 @@ def test_proximity_zero_no_op() -> None:
         slots=("layer_1",),
     )
     assert moved == 0
-    assert result["layer_1"].cues == [SlotCue(t=1.0, visible=True)]
+    assert result["layer_1"].cues == [SlotCue(t=1.0, level=1.0)]
 
 
 def test_empty_markers_no_op() -> None:
@@ -55,7 +64,7 @@ def test_empty_markers_no_op() -> None:
         slots=("layer_1",),
     )
     assert moved == 0
-    assert result["layer_1"].cues == [SlotCue(t=1.0, visible=True)]
+    assert result["layer_1"].cues == [SlotCue(t=1.0, level=1.0)]
 
 
 def test_closest_pick_within_proximity() -> None:
@@ -69,8 +78,8 @@ def test_closest_pick_within_proximity() -> None:
     )
     assert moved == 1
     assert result["layer_1"].cues == [
-        SlotCue(t=5.0, visible=True),
-        SlotCue(t=8.0, visible=False),
+        SlotCue(t=5.0, level=1.0),
+        SlotCue(t=8.0, level=0.0),
     ]
 
 
@@ -85,8 +94,8 @@ def test_distance_tie_prefers_earlier_cue_time() -> None:
     )
     assert moved == 1
     assert result["layer_1"].cues == [
-        SlotCue(t=5.0, visible=True),
-        SlotCue(t=6.0, visible=False),
+        SlotCue(t=5.0, level=1.0),
+        SlotCue(t=6.0, level=0.0),
     ]
 
 
@@ -103,8 +112,8 @@ def test_exclusive_claim_later_marker_skips_claimed_cue() -> None:
     # remaining cue within 5s of an unclaimed cue (12.0 is 6s away).
     assert moved == 1
     assert result["layer_1"].cues == [
-        SlotCue(t=5.5, visible=True),
-        SlotCue(t=12.0, visible=False),
+        SlotCue(t=5.5, level=1.0),
+        SlotCue(t=12.0, level=0.0),
     ]
 
 
@@ -119,8 +128,8 @@ def test_exclusive_claim_second_marker_takes_next_cue() -> None:
     )
     assert moved == 2
     assert result["layer_1"].cues == [
-        SlotCue(t=5.5, visible=True),
-        SlotCue(t=10.0, visible=False),
+        SlotCue(t=5.5, level=1.0),
+        SlotCue(t=10.0, level=0.0),
     ]
 
 
@@ -141,8 +150,8 @@ def test_each_layer_vs_closest_wins() -> None:
         mode="each_layer",
     )
     assert each_moved == 2
-    assert each["layer_1"].cues == [SlotCue(t=5.0, visible=True)]
-    assert each["layer_2"].cues == [SlotCue(t=5.0, visible=False)]
+    assert each["layer_1"].cues == [SlotCue(t=5.0, level=1.0)]
+    assert each["layer_2"].cues == [SlotCue(t=5.0, level=0.0)]
 
     closest, closest_moved = snap_lanes_to_song_markers(
         lanes,
@@ -153,8 +162,8 @@ def test_each_layer_vs_closest_wins() -> None:
         mode="closest_wins",
     )
     assert closest_moved == 1
-    assert closest["layer_1"].cues == [SlotCue(t=4.5, visible=True)]
-    assert closest["layer_2"].cues == [SlotCue(t=5.0, visible=False)]
+    assert closest["layer_1"].cues == [SlotCue(t=4.5, level=1.0)]
+    assert closest["layer_2"].cues == [SlotCue(t=5.0, level=0.0)]
 
 
 def test_closest_wins_tie_prefers_earlier_layer_in_z_order() -> None:
@@ -172,8 +181,8 @@ def test_closest_wins_tie_prefers_earlier_layer_in_z_order() -> None:
         mode="closest_wins",
     )
     assert moved == 1
-    assert result["layer_1"].cues == [SlotCue(t=5.0, visible=True)]
-    assert result["layer_2"].cues == [SlotCue(t=6.0, visible=False)]
+    assert result["layer_1"].cues == [SlotCue(t=5.0, level=1.0)]
+    assert result["layer_2"].cues == [SlotCue(t=6.0, level=0.0)]
 
     # Equal distance and equal times: earlier z-order wins.
     lanes_eq = {
@@ -189,8 +198,8 @@ def test_closest_wins_tie_prefers_earlier_layer_in_z_order() -> None:
         mode="closest_wins",
     )
     assert moved_eq == 1
-    assert result_eq["layer_1"].cues == [SlotCue(t=5.0, visible=True)]
-    assert result_eq["layer_2"].cues == [SlotCue(t=4.5, visible=False)]
+    assert result_eq["layer_1"].cues == [SlotCue(t=5.0, level=1.0)]
+    assert result_eq["layer_2"].cues == [SlotCue(t=4.5, level=0.0)]
 
 
 def test_canonicalize_after_collision() -> None:
@@ -218,8 +227,8 @@ def test_preserves_visibility_and_baseline() -> None:
         slots=("layer_1",),
     )
     assert moved == 1
-    assert result["layer_1"].baseline is True
-    assert result["layer_1"].cues == [SlotCue(t=5.0, visible=False)]
+    assert result["layer_1"].baseline == 1.0
+    assert result["layer_1"].cues == [SlotCue(t=5.0, level=0.0)]
 
 
 def test_single_slot_leaves_other_lanes_unchanged() -> None:
@@ -235,5 +244,5 @@ def test_single_slot_leaves_other_lanes_unchanged() -> None:
         slots=("layer_1",),
     )
     assert moved == 1
-    assert result["layer_1"].cues == [SlotCue(t=5.0, visible=True)]
-    assert result["layer_2"].cues == [SlotCue(t=4.0, visible=False)]
+    assert result["layer_1"].cues == [SlotCue(t=5.0, level=1.0)]
+    assert result["layer_2"].cues == [SlotCue(t=4.0, level=0.0)]

@@ -156,7 +156,7 @@ class TimelinePresetController:
         tl = self.session.timeline
         tl.enabled = True
         tl.lanes = {
-            slot: TimelineLane(baseline=all_on, cues=[])
+            slot: TimelineLane(baseline=1.0 if all_on else 0.0, cues=[])
             for slot in self.session.layer_z_order
         }
         message = (

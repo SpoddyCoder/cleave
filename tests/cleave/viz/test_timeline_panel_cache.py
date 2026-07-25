@@ -30,12 +30,18 @@ def test_static_signature_stable_for_same_state() -> None:
     assert _static_sig(state) == _static_sig(state)
 
 
-def _lane(
-    baseline: bool | None,
-    *transitions: tuple[float, bool],
-) -> TimelineLane:
-    cues = [SlotCue(t=t, visible=v) for t, v in transitions]
-    return TimelineLane(baseline=baseline, cues=canonicalize(baseline, cues))
+def _as_level(value):
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    return float(value)
+
+
+def _lane(baseline, *transitions) -> TimelineLane:
+    base = _as_level(baseline)
+    cues = [SlotCue(t=t, level=float(_as_level(level))) for t, level in transitions]
+    return TimelineLane(baseline=base, cues=canonicalize(base, cues))
 
 
 def test_static_signature_changes_on_cue_edit() -> None:
@@ -48,7 +54,7 @@ def test_static_signature_changes_on_layer_add() -> None:
     four = _view_state()
     five = _view_state(
         layer_z_order=["layer_1", "layer_2", "layer_3", "layer_4", "layer_5"],
-        defaults={f"layer_{i}": True for i in range(1, 6)},
+        defaults={f"layer_{i}": 1.0 for i in range(1, 6)},
     )
     assert _static_sig(four) != _static_sig(five, panel_h=200)
 
@@ -72,14 +78,14 @@ def test_static_signature_changes_on_playhead_while_recording() -> None:
         recording=True,
         armed_slots={"layer_1"},
         record_start_sec=10.0,
-        record_baseline={"layer_1": True},
+        record_baseline={"layer_1": 1.0},
     )
     advanced = _view_state(
         position_sec=15.0,
         recording=True,
         armed_slots={"layer_1"},
         record_start_sec=10.0,
-        record_baseline={"layer_1": True},
+        record_baseline={"layer_1": 1.0},
     )
     assert _static_sig(at_start) != _static_sig(advanced)
 
@@ -154,7 +160,7 @@ def test_compose_rebuilds_static_panel_when_recording_playhead_moves() -> None:
         recording=True,
         armed_slots={"layer_1"},
         record_start_sec=10.0,
-        record_baseline={"layer_1": True},
+        record_baseline={"layer_1": 1.0},
     )
     first = overlay.compose_panel(first_state, **kwargs)
     assert first is not None
@@ -166,7 +172,7 @@ def test_compose_rebuilds_static_panel_when_recording_playhead_moves() -> None:
         recording=True,
         armed_slots={"layer_1"},
         record_start_sec=10.0,
-        record_baseline={"layer_1": True},
+        record_baseline={"layer_1": 1.0},
     )
     second = overlay.compose_panel(second_state, **kwargs)
     assert second is not None

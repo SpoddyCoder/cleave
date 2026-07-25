@@ -526,7 +526,7 @@ def test_structure_signature_invalidates_on_beat_bar_grid_expanded() -> None:
     assert sig_before != sig_after
 
 
-def test_structure_signature_invalidates_on_timeline_fades_expanded() -> None:
+def test_structure_signature_invalidates_on_timeline_levels_expanded() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
