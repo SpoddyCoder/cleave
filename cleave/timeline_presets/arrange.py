@@ -13,7 +13,7 @@ from cleave.timeline_presets.chords import (
     build_vocab,
     density_score_bonus,
 )
-from cleave.timeline_presets.emit import cues_from_states
+from cleave.timeline_presets.emit import cues_from_states, levels_from_active
 from cleave.timeline_presets.grid import thin_bar_times_for_arrange
 from cleave.timeline_presets.motifs import (
     MIN_SWITCH_GAP_BARS,
@@ -49,7 +49,9 @@ def compose_timeline(
     if not slot_list or duration_sec <= 0.0:
         return {}
     if len(slot_list) == 1:
-        return cues_from_states(slot_list, [(0.0, frozenset({slot_list[0]}))])
+        return cues_from_states(
+            slot_list, [(0.0, levels_from_active({slot_list[0]}))]
+        )
 
     order = list(slot_list)
     rng.shuffle(order)
@@ -60,12 +62,12 @@ def compose_timeline(
     markers = _normalize_song_markers(song_marker_times, duration_sec)
     if len(bars) < PHRASE_BARS_MIN and not markers:
         opening = frozenset({order[0]})
-        return cues_from_states(slot_list, [(0.0, opening)])
+        return cues_from_states(slot_list, [(0.0, levels_from_active(opening))])
 
     phrases = _partition_phrases(bars, duration_sec, rng, markers)
     if not phrases:
         opening = frozenset({order[0]})
-        return cues_from_states(slot_list, [(0.0, opening)])
+        return cues_from_states(slot_list, [(0.0, levels_from_active(opening))])
 
     states: list[tuple[float, frozenset[str]]] = []
     prev_active: frozenset[str] | None = None
@@ -163,7 +165,10 @@ def compose_timeline(
     _apply_resolve(profile, vocab, states, duration_sec, bars, rng)
     states.sort(key=lambda item: item[0])
 
-    return cues_from_states(slot_list, states)
+    return cues_from_states(
+        slot_list,
+        [(t, levels_from_active(active)) for t, active in states],
+    )
 
 
 def _normalize_song_markers(

@@ -1609,12 +1609,21 @@ def test_timeline_presets_enter_opens_yes_cancel_modal() -> None:
     )
 
 
+def _as_level(value):
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    return float(value)
+
+
 def _lane(
-    baseline: bool | None,
-    *transitions: tuple[float, bool],
+    baseline,
+    *transitions,
 ) -> TimelineLane:
-    cues = [SlotCue(t=t, visible=v) for t, v in transitions]
-    return TimelineLane(baseline=baseline, cues=canonicalize(baseline, cues))
+    base = _as_level(baseline)
+    cues = [SlotCue(t=t, level=float(_as_level(level))) for t, level in transitions]
+    return TimelineLane(baseline=base, cues=canonicalize(base, cues))
 
 
 def _confirm_timeline_preset(controls: TuningControls) -> None:
@@ -1750,7 +1759,7 @@ def test_timeline_reset_all_off() -> None:
     assert not controls.session.timeline.armed_slots
     lanes = controls.session.timeline.lanes
     assert set(lanes) == {"layer_1", "layer_2", "layer_3"}
-    assert all(lane.baseline is False and lane.cues == [] for lane in lanes.values())
+    assert all(lane.baseline == 0.0 and lane.cues == [] for lane in lanes.values())
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "Reset timeline: all layers off"
 
@@ -1768,7 +1777,7 @@ def test_timeline_reset_all_on() -> None:
     assert controls.session.timeline.enabled is True
     lanes = controls.session.timeline.lanes
     assert set(lanes) == {"layer_1", "layer_2"}
-    assert all(lane.baseline is True and lane.cues == [] for lane in lanes.values())
+    assert all(lane.baseline == 1.0 and lane.cues == [] for lane in lanes.values())
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "Reset timeline: all layers on"
 
@@ -1848,10 +1857,10 @@ def test_timeline_snap_grid_beats_mutates_cues() -> None:
     _choose_modal_option(controls, "Beats")
     assert not controls.modal_host.active
     assert controls.session.timeline.lanes["layer_1"].cues == [
-        SlotCue(t=0.0, visible=True),
+        SlotCue(t=0.0, level=1.0),
     ]
     assert controls.session.timeline.lanes["layer_2"].cues == [
-        SlotCue(t=2.0, visible=False),
+        SlotCue(t=2.0, level=0.0),
     ]
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "Snapped timeline cues to beats"
@@ -1872,10 +1881,10 @@ def test_timeline_snap_grid_bars_mutates_cues() -> None:
     _choose_modal_option(controls, "Bars")
     assert not controls.modal_host.active
     assert controls.session.timeline.lanes["layer_1"].cues == [
-        SlotCue(t=0.0, visible=True),
+        SlotCue(t=0.0, level=1.0),
     ]
     assert controls.session.timeline.lanes["layer_2"].cues == [
-        SlotCue(t=4.0, visible=False),
+        SlotCue(t=4.0, level=0.0),
     ]
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "Snapped timeline cues to bars"
@@ -1925,10 +1934,10 @@ def test_timeline_bar_phase_right_nudges_cues_and_offset() -> None:
     assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
     assert controls.session.timeline.bar_phase_offset == 1
     assert controls.session.timeline.lanes["layer_1"].cues == [
-        SlotCue(t=1.0, visible=True),
+        SlotCue(t=1.0, level=1.0),
     ]
     assert controls.session.timeline.lanes["layer_2"].cues == [
-        SlotCue(t=5.0, visible=False),
+        SlotCue(t=5.0, level=0.0),
     ]
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "Bar phase +1"
@@ -1970,7 +1979,7 @@ def test_timeline_bar_phase_left_wraps_offset() -> None:
     assert controls.handle_keydown(_keydown(pygame.K_LEFT)) is True
     assert controls.session.timeline.bar_phase_offset == 3
     assert controls.session.timeline.lanes["layer_1"].cues == [
-        SlotCue(t=0.0, visible=True),
+        SlotCue(t=0.0, level=1.0),
     ]
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "Bar phase +3"
@@ -2063,10 +2072,10 @@ def test_timeline_snap_song_markers_layer_mutates_only_that_lane() -> None:
     _confirm_snap_song_markers(controls, scope_label="Layer 1")
     assert not controls.modal_host.active
     assert controls.session.timeline.lanes["layer_1"].cues == [
-        SlotCue(t=5.0, visible=True),
+        SlotCue(t=5.0, level=1.0),
     ]
     assert controls.session.timeline.lanes["layer_2"].cues == [
-        SlotCue(t=4.2, visible=False),
+        SlotCue(t=4.2, level=0.0),
     ]
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "Snapped 1 cue to song markers"
@@ -2082,10 +2091,10 @@ def test_timeline_snap_song_markers_each_layer_vs_closest_wins() -> None:
     _focus_timeline_snap_song_markers(controls)
     _confirm_snap_song_markers(controls, scope_label="All Layers")
     assert controls.session.timeline.lanes["layer_1"].cues == [
-        SlotCue(t=5.0, visible=True),
+        SlotCue(t=5.0, level=1.0),
     ]
     assert controls.session.timeline.lanes["layer_2"].cues == [
-        SlotCue(t=5.0, visible=False),
+        SlotCue(t=5.0, level=0.0),
     ]
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "Snapped 2 cues to song markers"
@@ -2097,10 +2106,10 @@ def test_timeline_snap_song_markers_each_layer_vs_closest_wins() -> None:
     _focus_timeline_snap_song_markers(controls)
     _confirm_snap_song_markers(controls, scope_label="Closest Wins")
     assert controls.session.timeline.lanes["layer_1"].cues == [
-        SlotCue(t=4.5, visible=True),
+        SlotCue(t=4.5, level=1.0),
     ]
     assert controls.session.timeline.lanes["layer_2"].cues == [
-        SlotCue(t=5.0, visible=False),
+        SlotCue(t=5.0, level=0.0),
     ]
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "Snapped 1 cue to song markers"
@@ -2169,7 +2178,7 @@ def test_timeline_snap_song_markers_uses_proximity() -> None:
     _focus_timeline_snap_song_markers(controls)
     _confirm_snap_song_markers(controls, proximity_label="1.0s")
     assert controls.session.timeline.lanes["layer_1"].cues == [
-        SlotCue(t=3.0, visible=True),
+        SlotCue(t=3.0, level=1.0),
     ]
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "No cues within snap proximity"

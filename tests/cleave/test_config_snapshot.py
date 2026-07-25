@@ -948,16 +948,16 @@ def test_write_session_snapshot_persists_timeline_at_bottom(tmp_path: Path) -> N
     session.timeline.enabled = True
     session.timeline.lanes = {
         "layer_1": TimelineLane(
-            baseline=False,
-            cues=[SlotCue(t=2.5, visible=True)],
+            baseline=0.0,
+            cues=[SlotCue(t=2.5, level=1.0)],
         ),
         "layer_2": TimelineLane(
-            baseline=False,
-            cues=[SlotCue(t=2.5, visible=True)],
+            baseline=0.0,
+            cues=[SlotCue(t=2.5, level=1.0)],
         ),
         "layer_3": TimelineLane(
-            baseline=True,
-            cues=[SlotCue(t=10.0, visible=False)],
+            baseline=1.0,
+            cues=[SlotCue(t=10.0, level=0.0)],
         ),
     }
     write_session_snapshot(out_path, cfg=cfg, session=session)
@@ -967,9 +967,9 @@ def test_write_session_snapshot_persists_timeline_at_bottom(tmp_path: Path) -> N
     assert list(data.keys())[-1] == "timeline"
     assert data["timeline"]["enabled"] is True
     assert data["timeline"]["lanes"] == {
-        "layer_1": {"baseline": False, "cues": [{"t": 2.5, "visible": True}]},
-        "layer_2": {"baseline": False, "cues": [{"t": 2.5, "visible": True}]},
-        "layer_3": {"baseline": True, "cues": [{"t": 10.0, "visible": False}]},
+        "layer_1": {"baseline": 0.0, "cues": [{"t": 2.5, "level": 1.0}]},
+        "layer_2": {"baseline": 0.0, "cues": [{"t": 2.5, "level": 1.0}]},
+        "layer_3": {"baseline": 1.0, "cues": [{"t": 10.0, "level": 0.0}]},
     }
 
     timeline = parse_timeline_section(
@@ -999,8 +999,8 @@ def test_write_session_snapshot_round_trips_lane_baseline_and_cues(tmp_path: Pat
     session.timeline.enabled = True
     session.timeline.lanes = {
         "layer_1": TimelineLane(
-            baseline=True,
-            cues=[SlotCue(t=12.0, visible=False)],
+            baseline=1.0,
+            cues=[SlotCue(t=12.0, level=0.0)],
         ),
     }
     write_session_snapshot(out_path, cfg=cfg, session=session)
@@ -1008,8 +1008,8 @@ def test_write_session_snapshot_round_trips_lane_baseline_and_cues(tmp_path: Pat
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
     assert data["timeline"]["lanes"] == {
         "layer_1": {
-            "baseline": True,
-            "cues": [{"t": 12.0, "visible": False}],
+            "baseline": 1.0,
+            "cues": [{"t": 12.0, "level": 0.0}],
         },
     }
 
@@ -1209,12 +1209,12 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
                     "enabled": True,
                     "lanes": {
                         "layer_1": {
-                            "baseline": False,
-                            "cues": [{"t": 1.0, "visible": False}],
+                            "baseline": 0.0,
+                            "cues": [{"t": 1.0, "level": 0.0}],
                         },
                         "layer_2": {
-                            "baseline": False,
-                            "cues": [{"t": 1.0, "visible": True}],
+                            "baseline": 0.0,
+                            "cues": [{"t": 1.0, "level": 1.0}],
                         },
                     },
                 },
@@ -1242,20 +1242,20 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
     session.render_post_fx.fade_out = 2.0
     session.timeline.lanes = {
         "layer_1": TimelineLane(
-            baseline=False,
-            cues=[SlotCue(t=1.0, visible=True)],
+            baseline=0.0,
+            cues=[SlotCue(t=1.0, level=1.0)],
         ),
         "layer_2": TimelineLane(
-            baseline=False,
-            cues=[SlotCue(t=1.0, visible=True)],
+            baseline=0.0,
+            cues=[SlotCue(t=1.0, level=1.0)],
         ),
         "layer_3": TimelineLane(
-            baseline=True,
-            cues=[SlotCue(t=12.5, visible=False)],
+            baseline=1.0,
+            cues=[SlotCue(t=12.5, level=0.0)],
         ),
         "layer_4": TimelineLane(
-            baseline=True,
-            cues=[SlotCue(t=12.5, visible=False)],
+            baseline=1.0,
+            cues=[SlotCue(t=12.5, level=0.0)],
         ),
     }
 

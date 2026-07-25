@@ -76,8 +76,8 @@ def _playlist(slot: str) -> PresetPlaylist:
 
 def _session_with_enable_cue_at(beat_t: float) -> TuningSession:
     """Timeline on; layer_1 off until a cue at beat_t turns it on."""
-    cues = canonicalize(False, [SlotCue(t=beat_t, visible=True)])
-    lane = TimelineLane(baseline=False, cues=cues)
+    cues = canonicalize(0.0, [SlotCue(t=beat_t, level=1.0)])
+    lane = TimelineLane(baseline=0.0, cues=cues)
     return TuningSession(
         layer_z_order=list(DEFAULT_LAYER_SLOTS),
         timeline=TimelineRuntime(

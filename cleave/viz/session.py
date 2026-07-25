@@ -181,7 +181,7 @@ class TimelineRuntime:
     armed_slots: set[str] = field(default_factory=set)
     recording: bool = False
     record_buffer: dict[str, list[SlotCue]] = field(default_factory=dict)
-    record_baseline: dict[str, bool] = field(default_factory=dict)
+    record_baseline: dict[str, float] = field(default_factory=dict)
     record_start_sec: float | None = None
     record_slot_start_sec: dict[str, float] = field(default_factory=dict)
     record_high_water_mark: float | None = None

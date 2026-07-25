@@ -149,10 +149,10 @@ def test_discard_timeline_slot_strips_slot_from_timeline_state() -> None:
     session.timeline.override_visible["layer_2"] = True
     session.timeline.arm_flash_start_ms["layer_2"] = 100
     session.timeline.record_buffer = {
-        "layer_1": [SlotCue(t=1.0, visible=True)],
+        "layer_1": [SlotCue(t=1.0, level=1.0)],
         "layer_2": [
-            SlotCue(t=1.0, visible=False),
-            SlotCue(t=2.0, visible=True),
+            SlotCue(t=1.0, level=0.0),
+            SlotCue(t=2.0, level=1.0),
         ],
     }
 
@@ -167,5 +167,5 @@ def test_discard_timeline_slot_strips_slot_from_timeline_state() -> None:
     assert "layer_2" not in session.timeline.arm_flash_start_ms
     assert "layer_2" not in session.timeline.record_buffer
     assert session.timeline.record_buffer == {
-        "layer_1": [SlotCue(t=1.0, visible=True)],
+        "layer_1": [SlotCue(t=1.0, level=1.0)],
     }

@@ -6,12 +6,18 @@ from collections.abc import Callable, Sequence
 
 import pygame
 
-from cleave.timeline import SlotCue, canonicalize, should_accept_toggle, snap_placement_time
+from cleave.timeline import (
+    LEVEL_EPS,
+    SlotCue,
+    canonicalize,
+    should_accept_toggle,
+    snap_placement_time,
+)
 from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, SEEK_TINY
 from cleave.viz.session import TuningSession
 from cleave.viz.key_repeat import mod_ctrl, mod_shift
 from cleave.viz.layer_visibility import (
-    armed_recording_visible,
+    armed_recording_level,
     build_record_punch_cues,
     effective_layer_enabled,
     snapshot_monitor_from_output,
@@ -203,8 +209,10 @@ class TimelineControls:
             armed.add(slot)
             if tl.recording:
                 t_sec = current_sec(self.playback, self.duration_sec)
-                tl.record_baseline[slot] = effective_layer_enabled(
-                    self.session, slot, t_sec
+                tl.record_baseline[slot] = (
+                    1.0
+                    if effective_layer_enabled(self.session, slot, t_sec)
+                    else 0.0
                 )
                 tl.record_slot_start_sec[slot] = self._snap_placement(t_sec)
                 self._last_toggle_t.pop(slot, None)
@@ -255,7 +263,11 @@ class TimelineControls:
         t_sec = current_sec(self.playback, self.duration_sec)
         snapped = self._snap_placement(t_sec)
         tl.record_baseline = {
-            stem: effective_layer_enabled(self.session, stem, t_sec)
+            stem: (
+                1.0
+                if effective_layer_enabled(self.session, stem, t_sec)
+                else 0.0
+            )
             for stem in tl.armed_slots
         }
         tl.record_slot_start_sec = {stem: snapped for stem in tl.armed_slots}
@@ -352,10 +364,10 @@ class TimelineControls:
         if not should_accept_toggle(self._last_toggle_t.get(slot), t_sec):
             return
 
-        current = armed_recording_visible(self.session, slot, t_sec)
+        current_on = armed_recording_level(self.session, slot, t_sec) > LEVEL_EPS
         snapped = self._snap_placement(t_sec)
         tl.record_buffer.setdefault(slot, []).append(
-            SlotCue(t=snapped, visible=not current)
+            SlotCue(t=snapped, level=0.0 if current_on else 1.0)
         )
         self._last_toggle_t[slot] = t_sec
 
@@ -369,14 +381,14 @@ class TimelineControls:
         for slot in list(tl.armed_slots):
             if slot not in tl.record_baseline:
                 continue
-            v = armed_recording_visible(self.session, slot, old_t)
+            level = armed_recording_level(self.session, slot, old_t)
             buf = tl.record_buffer.get(slot, [])
             kept = [
                 cue for cue in buf if not (skip_start <= cue.t <= skip_end)
             ]
             tl.record_buffer[slot] = canonicalize(
                 tl.record_baseline[slot],
-                kept + [SlotCue(t=skip_start, visible=v)],
+                kept + [SlotCue(t=skip_start, level=level)],
             )
             self._last_toggle_t.pop(slot, None)
         tl.record_high_water_mark = max(tl.record_high_water_mark or 0.0, old_t)

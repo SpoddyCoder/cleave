@@ -13,7 +13,7 @@ from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.effects.constants import clamp_effect_pct
 from cleave.effects.registry import validate_effect_entry
 from cleave.extract import STEM_SOURCES, StemSource
-from cleave.timeline import SlotCue, TimelineLane, canonicalize
+from cleave.timeline import SlotCue, TimelineLane, canonicalize, clamp_level
 from cleave.timeline_presets.characters import (
     DEFAULT_TIMELINE_PRESET_KIND,
     TIMELINE_PRESET_KIND_OPTIONS,
@@ -2149,9 +2149,9 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
     lanes: dict[str, TimelineLane] = {}
     for slot, lane_raw in lanes_map.items():
         lane_map = as_mapping(lane_raw, f"timeline.lanes.{slot}")
-        baseline: bool | None
+        baseline: float | None
         if "baseline" in lane_map:
-            baseline = bool(lane_map["baseline"])
+            baseline = clamp_level(float(lane_map["baseline"]))
         else:
             baseline = None
         cues_raw = lane_map.get("cues", [])
@@ -2162,9 +2162,9 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
         cues: list[SlotCue] = []
         for index, item in enumerate(cues_raw):
             cue_map = as_mapping(item, f"timeline.lanes.{slot}.cues[{index}]")
-            if "visible" not in cue_map:
+            if "level" not in cue_map:
                 raise ValueError(
-                    f"timeline.lanes.{slot}.cues[{index}] missing visible"
+                    f"timeline.lanes.{slot}.cues[{index}] missing level"
                 )
             t = float(
                 require_non_negative_number(
@@ -2172,7 +2172,12 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
                     f"timeline.lanes.{slot}.cues[{index}].t",
                 )
             )
-            cues.append(SlotCue(t=t, visible=bool(cue_map["visible"])))
+            cues.append(
+                SlotCue(
+                    t=t,
+                    level=clamp_level(float(cue_map["level"])),
+                )
+            )
         lanes[str(slot)] = TimelineLane(
             baseline=baseline,
             cues=canonicalize(baseline, cues),
@@ -2221,7 +2226,7 @@ def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
             entry["baseline"] = lane.baseline
         if lane.cues:
             entry["cues"] = [
-                {"t": cue.t, "visible": cue.visible}
+                {"t": cue.t, "level": cue.level}
                 for cue in lane.cues
             ]
         lanes_out[slot] = entry
