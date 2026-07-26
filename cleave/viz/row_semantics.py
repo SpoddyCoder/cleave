@@ -87,6 +87,7 @@ class RowKind(Enum):
     TIMELINE_PRESET_CHARACTER = auto()
     TIMELINE_PRESET_CRESCENDO = auto()
     TIMELINE_PRESET_DENSITY = auto()
+    TIMELINE_PRESET_CONDUCTOR = auto()
     TIMELINE_PRESETS = auto()
     TIMELINE_RESET = auto()
     TIMELINE_BEAT_BAR_GRID_HEADER = auto()
@@ -754,8 +755,8 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         is_sub_header=True,
         help_title="Timeline preset",
         help_description=(
-            "Stage character, crescendo, and density, then apply a randomly",
-            "generated timeline preset. This overwrites the current timeline.",
+            "Stage character, crescendo, density, and conductor, then apply a",
+            "randomly generated timeline preset. This overwrites the current timeline.",
         ),
     ),
     RowKind.TIMELINE_PRESET_CHARACTER: RowBehavior(
@@ -792,6 +793,17 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "Normal matches the default stack-cost ramp for the layer count.",
         ),
     ),
+    RowKind.TIMELINE_PRESET_CONDUCTOR: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        blocked_by_section_lock=True,
+        help_title="Conductor",
+        help_entries=(("Left/Right", "toggle conductor on/off"),),
+        help_description=(
+            "When on, stem energy shapes motif casting and cue levels.",
+            "Requires project signals; otherwise apply skips the conductor.",
+        ),
+    ),
     RowKind.TIMELINE_PRESETS: RowBehavior(
         RowAffordance.ACTION,
         navigable=True,
@@ -799,7 +811,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Apply timeline preset",
         help_entries=(("Enter", "apply timeline preset"),),
         help_description=(
-            "Apply the staged character, crescendo, and density.",
+            "Apply the staged character, crescendo, density, and conductor.",
             "This overwrites the current timeline.",
         ),
     ),

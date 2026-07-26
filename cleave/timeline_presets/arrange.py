@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import random
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
+from cleave.extract import StemSource
+from cleave.signals import Signals
 from cleave.timeline import TimelineLane
 from cleave.timeline_presets.characters import CharacterProfile, in_climax_window
 from cleave.timeline_presets.chords import (
@@ -13,6 +15,7 @@ from cleave.timeline_presets.chords import (
     build_vocab,
     density_score_bonus,
 )
+from cleave.timeline_presets.conductor import PhraseWeights, StemConductor
 from cleave.timeline_presets.emit import cues_from_states, levels_from_active
 from cleave.timeline_presets.grid import thin_bar_times_for_arrange
 from cleave.timeline_presets.motifs import (
@@ -34,6 +37,8 @@ PHRASE_SEC_MIN = 8.0
 
 # Motif-pick score weight: favors fuller peaks when density_bias > 0.
 _DENSITY_PICK_WEIGHT = 1.0
+# Soft bias toward chords whose stems are active in the current phrase.
+_CONDUCTOR_PICK_WEIGHT = 2.0
 
 
 def compose_timeline(
@@ -44,6 +49,8 @@ def compose_timeline(
     bar_times: Sequence[float],
     song_marker_times: Sequence[float] = (),
     density_bias: int = 0,
+    signals: Signals | None = None,
+    slot_stems: Mapping[str, StemSource] | None = None,
 ) -> dict[str, TimelineLane]:
     slot_list = list(slots)
     if not slot_list or duration_sec <= 0.0:
@@ -69,6 +76,10 @@ def compose_timeline(
         opening = frozenset({order[0]})
         return cues_from_states(slot_list, [(0.0, levels_from_active(opening))])
 
+    conductor = StemConductor.build(
+        signals, slot_stems, phrases, density_bias=density_bias
+    )
+
     states: list[tuple[float, frozenset[str]]] = []
     prev_active: frozenset[str] | None = None
     prev_motif_id: str | None = None
@@ -82,14 +93,23 @@ def compose_timeline(
     budget_scale = budget_scale_for(density_bias)
 
     for phrase_i, (phrase_start, phrase_end) in enumerate(phrases):
-        progress = (phrase_start + phrase_end) * 0.5 / duration_sec
-        budget = max(1.0, profile.envelope(progress) * budget_scale)
+        midpoint = (phrase_start + phrase_end) * 0.5
+        progress = midpoint / duration_sec
+        weights = None if conductor is None else conductor.phrase_at(midpoint)
+        budget_gain = 1.0 if weights is None else weights.budget_gain
+        budget = max(1.0, profile.envelope(progress) * budget_scale * budget_gain)
         climax_window = in_climax_window(progress)
         force_climax = (
             profile.climax_motif_id is not None
             and phrase_i == climax_phrase_index
             and not climax_used
         )
+
+        rotation = solo_rotation
+        if conductor is not None and weights is not None:
+            # vocab.slots is index-aligned with vocab.singles, so the returned
+            # index feeds the motif rotation directly.
+            rotation = conductor.rotation_for(vocab.slots, weights, layer_airtime)
 
         motif = _pick_motif(
             motifs=motifs,
@@ -102,10 +122,12 @@ def compose_timeline(
             prev_active=prev_active,
             prev_motif_id=prev_motif_id,
             motif_streak=motif_streak,
-            solo_rotation=solo_rotation,
+            solo_rotation=rotation,
             layer_airtime=layer_airtime,
             duration_sec=duration_sec,
             force_climax=force_climax,
+            conductor=conductor,
+            phrase_weights=weights,
         )
 
         if motif.id == profile.climax_motif_id and climax_window:
@@ -121,7 +143,7 @@ def compose_timeline(
             motif,
             vocab,
             rng,
-            solo_rotation,
+            rotation,
             phrase_start,
             phrase_end,
             bars,
@@ -165,10 +187,12 @@ def compose_timeline(
     _apply_resolve(profile, vocab, states, duration_sec, bars, rng)
     states.sort(key=lambda item: item[0])
 
-    return cues_from_states(
-        slot_list,
-        [(t, levels_from_active(active)) for t, active in states],
+    level_states = (
+        [(t, levels_from_active(active)) for t, active in states]
+        if conductor is None
+        else conductor.level_states(states, duration_sec)
     )
+    return cues_from_states(slot_list, level_states)
 
 
 def _normalize_song_markers(
@@ -361,6 +385,8 @@ def _pick_motif(
     layer_airtime: dict[str, float],
     duration_sec: float,
     force_climax: bool = False,
+    conductor: StemConductor | None = None,
+    phrase_weights: PhraseWeights | None = None,
 ) -> MotifDef:
     if force_climax and profile.climax_motif_id is not None:
         forced = next((m for m in motifs if m.id == profile.climax_motif_id), None)
@@ -388,6 +414,11 @@ def _pick_motif(
             len(vocab.slots), peak_card, vocab.density_bias
         )
         score += _DENSITY_PICK_WEIGHT * vocab.density_bias * (peak_card - 1)
+
+        if conductor is not None and phrase_weights is not None:
+            score += _CONDUCTOR_PICK_WEIGHT * conductor.chord_score(
+                first_active, phrase_weights
+            )
 
         if prev_active is not None:
             dist = hamming_distance(prev_active, first_active)

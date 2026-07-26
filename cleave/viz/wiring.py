@@ -467,6 +467,7 @@ def make_tuning_controls(
         "post_process": post_process,
         "beat_times": beat_times,
         "bar_times": bar_times,
+        "signals": signals,
     }
     if modal_host is not None:
         kwargs["modal_host"] = modal_host

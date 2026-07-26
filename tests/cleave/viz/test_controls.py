@@ -117,6 +117,7 @@ def _make_controls(
     bar_times: tuple[float, ...] = (),
     project_dir: Path | None = None,
     duration_sec: float = 120.0,
+    signals=None,
 ) -> TuningControls:
     preset_root = Path("/tmp/presets")
     cfg = make_test_cfg(slots, preset_root=preset_root, config_path=launch_config_path or _DEFAULT_ACTIVE_CONFIG)
@@ -145,6 +146,7 @@ def _make_controls(
         repo_root_example=repo_root_example,
         beat_times=beat_times,
         bar_times=bar_times,
+        signals=signals,
     )
 
 
@@ -1595,6 +1597,7 @@ def test_timeline_presets_enter_opens_yes_cancel_modal() -> None:
     controls = _make_controls(("layer_1", "layer_2", "layer_3", "layer_4"))
     controls.session.timeline.timeline_preset_kind = "arc"
     controls.session.timeline.timeline_preset_crescendo = "last"
+    controls.session.timeline.timeline_preset_conductor = True
     _focus_timeline_presets(controls)
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
     modal_view = controls.modal_host.view_state()
@@ -1605,7 +1608,8 @@ def test_timeline_presets_enter_opens_yes_cancel_modal() -> None:
         "Apply timeline preset?\n"
         "character: arc\n"
         "crescendo: last song marker\n"
-        "density: normal"
+        "density: normal\n"
+        "conductor: on"
     )
 
 
@@ -1800,6 +1804,88 @@ def test_timeline_presets_refuse_without_bars() -> None:
     assert controls.session.timeline.lanes == prior
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "No bars available; re-run separate"
+
+
+def test_timeline_presets_conductor_passes_signals_to_builder() -> None:
+    from cleave.signals import Signals
+    import numpy as np
+
+    beats = tuple(float(i) for i in range(241))
+    bars = tuple(float(i) for i in range(0, 241, 4))
+    n = 100
+    ones = np.ones(n, dtype=np.float64)
+    signals = Signals(
+        sample_rate_hz=100.0,
+        duration_sec=1.0,
+        path=Path("."),
+        stems={
+            "drums": {"onset_strength": ones},
+            "bass": {"rms": ones, "sub_bass": ones, "mid_bass": ones},
+            "vocals": {"rms": ones, "pitch_hz": ones},
+            "other": {"spectral_centroid": ones, "rms": ones},
+            "full_mix": {"onset_strength": ones, "rms": ones},
+        },
+    )
+    controls = _make_controls(
+        ("layer_1", "layer_2", "layer_3", "layer_4"),
+        beat_times=beats,
+        bar_times=bars,
+        signals=signals,
+    )
+    controls.session.timeline.timeline_preset_kind = "breathing"
+    controls.session.timeline.timeline_preset_conductor = True
+    captured: dict = {}
+
+    def _fake_builder(slots, duration_sec, rng, **kwargs):
+        captured["kwargs"] = kwargs
+        return {slot: TimelineLane(baseline=1.0, cues=[]) for slot in slots}
+
+    with patch.dict(
+        "cleave.viz.timeline_preset_controls._KIND_BUILDERS",
+        {"breathing": (_fake_builder, "Applied Breathing timeline preset")},
+    ):
+        _focus_timeline_presets(controls)
+        _confirm_timeline_preset(controls)
+    assert captured["kwargs"]["signals"] is signals
+    assert captured["kwargs"]["slot_stems"] == {
+        "layer_1": "drums",
+        "layer_2": "bass",
+        "layer_3": "vocals",
+        "layer_4": "other",
+    }
+    view = controls.build_view_state(paused=False)
+    assert view.notification_message == "Applied Breathing timeline preset"
+
+
+def test_timeline_presets_conductor_skips_without_signals() -> None:
+    beats = tuple(float(i) for i in range(241))
+    bars = tuple(float(i) for i in range(0, 241, 4))
+    controls = _make_controls(
+        ("layer_1", "layer_2"),
+        beat_times=beats,
+        bar_times=bars,
+        signals=None,
+    )
+    controls.session.timeline.timeline_preset_kind = "breathing"
+    controls.session.timeline.timeline_preset_conductor = True
+    captured: dict = {}
+
+    def _fake_builder(slots, duration_sec, rng, **kwargs):
+        captured["kwargs"] = kwargs
+        return {slot: TimelineLane(baseline=1.0, cues=[]) for slot in slots}
+
+    with patch.dict(
+        "cleave.viz.timeline_preset_controls._KIND_BUILDERS",
+        {"breathing": (_fake_builder, "Applied Breathing timeline preset")},
+    ):
+        _focus_timeline_presets(controls)
+        _confirm_timeline_preset(controls)
+    assert "signals" not in captured["kwargs"]
+    assert "slot_stems" not in captured["kwargs"]
+    assert controls.session.timeline.enabled is True
+    assert set(controls.session.timeline.lanes) == {"layer_1", "layer_2"}
+    view = controls.build_view_state(paused=False)
+    assert view.notification_message == "No signals; conductor skipped"
 
 
 def test_timeline_presets_cancel_and_escape_leave_unchanged() -> None:
@@ -2641,6 +2727,7 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
         RowKind.TIMELINE_PRESET_CHARACTER,
         RowKind.TIMELINE_PRESET_CRESCENDO,
         RowKind.TIMELINE_PRESET_DENSITY,
+        RowKind.TIMELINE_PRESET_CONDUCTOR,
         RowKind.TIMELINE_PRESETS,
         RowKind.TIMELINE_RESET,
     ):

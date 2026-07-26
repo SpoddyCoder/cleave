@@ -7,7 +7,15 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal
 
-from cleave.timeline import LEVEL_EPS, TimelineLane, lane_level_at, levels_equal
+from cleave.timeline import (
+    LEVEL_EPS,
+    LEVEL_QUANTUM,
+    TimelineLane,
+    clamp_level,
+    lane_level_at,
+    levels_equal,
+    quantize_level,
+)
 from cleave.timeline_presets.chords import MAX_CONCURRENT_LAYERS
 from cleave.timeline_presets.emit import cues_from_states
 
@@ -15,6 +23,10 @@ CrescendoTarget = Literal["last", "penultimate"]
 
 CRESCENDO_MIN_MARKERS = 3
 _FALLBACK_START_FRACTION = 0.20
+# An entrant appears at the dimmest visible level and climbs to full by t_full.
+CRESCENDO_ENTRY_LEVEL = LEVEL_QUANTUM
+# Enough steps for a lane to climb through every quantised level on the way up.
+CRESCENDO_RAMP_STEPS = int(round(1.0 / LEVEL_QUANTUM))
 
 TIMELINE_PRESET_CRESCENDO_OPTIONS: tuple[CrescendoTarget | None, ...] = (
     None,
@@ -27,6 +39,10 @@ _CRESCENDO_DISPLAY: dict[CrescendoTarget | None, str] = {
     "last": "last song marker",
     "penultimate": "penultimate song marker",
 }
+
+
+def _lerp(a: float, b: float, t: float) -> float:
+    return a + (b - a) * float(t)
 
 
 def timeline_preset_crescendo_display(target: CrescendoTarget | None) -> str:
@@ -188,15 +204,26 @@ def _crescendo_states(
     rng.shuffle(order)
     max_n = min(len(order), MAX_CONCURRENT_LAYERS)
     stack = order[:max_n]
-    times = _spread_times(window.t_start, window.t_full, max_n, bar_times)
+    # One more step than entrants so the last layer also fades in rather than
+    # appearing at full level on the final step.
+    step_count = max(max_n + 1, CRESCENDO_RAMP_STEPS)
+    entry_steps = [int(j * step_count / max_n) for j in range(max_n)]
+    times = _spread_times(window.t_start, window.t_full, step_count, bar_times)
     states: list[tuple[float, dict[str, float]]] = []
     last_i = len(times) - 1
     for i, t in enumerate(times):
         if i == last_i:
             levels = {slot: 1.0 for slot in stack}
         else:
-            levels = {slot: 1.0 for slot in stack[:i]}
-            levels[stack[i]] = 0.5
+            levels = {}
+            for j, slot in enumerate(stack):
+                entry = entry_steps[j]
+                if entry > i:
+                    continue
+                progress = (i - entry) / max(1, last_i - entry)
+                levels[slot] = quantize_level(
+                    clamp_level(_lerp(CRESCENDO_ENTRY_LEVEL, 1.0, progress))
+                )
         states.append((float(t), levels))
     # Drop to a single layer at the selected marker; hold through song end.
     solo = {stack[0]: 1.0}
@@ -220,7 +247,7 @@ def _spread_times(
     count: int,
     bar_times: Sequence[float],
 ) -> list[float]:
-    """``count`` times from ``t_start`` to ``t_full`` inclusive, preferring bars."""
+    """``count`` times evenly from ``t_start`` to ``t_full`` inclusive, snapped to bars."""
     if count <= 1:
         return [float(t_start)]
     if t_full <= t_start + 1e-9:
@@ -229,26 +256,40 @@ def _spread_times(
     if count == 2:
         return [float(t_start), float(t_full)]
 
-    interior_need = count - 2
     bars = [float(t) for t in bar_times if t_start + 1e-9 < float(t) < t_full - 1e-9]
-    if len(bars) >= interior_need:
-        interior = [
-            bars[_even_index(i, interior_need, len(bars))]
-            for i in range(interior_need)
-        ]
-    else:
-        span = t_full - t_start
-        interior = [
-            t_start + span * (i + 1) / (count - 1)
-            for i in range(interior_need)
-        ]
-    return [float(t_start), *[float(t) for t in interior], float(t_full)]
+    span = t_full - t_start
+    ideal_step = span / (count - 1)
+    times = [float(t_start)]
+    for i in range(1, count - 1):
+        target = t_start + span * i / (count - 1)
+        snapped = _nearest_bar_after(
+            bars, target, times[-1], tolerance=0.5 * ideal_step
+        )
+        times.append(snapped if snapped is not None else max(target, times[-1]))
+    times.append(float(t_full))
+    return times
 
 
-def _even_index(i: int, need: int, n: int) -> int:
-    if need <= 1:
-        return n // 2
-    return int(round(i * (n - 1) / (need - 1)))
+def _nearest_bar_after(
+    bars: Sequence[float],
+    target: float,
+    previous: float,
+    *,
+    tolerance: float,
+) -> float | None:
+    """Bar nearest ``target`` within ``tolerance`` and later than ``previous``.
+
+    A sparse grid should not distort the ramp, so a distant bar is refused and
+    the caller falls back to the evenly spaced time.
+    """
+    candidates = [
+        t
+        for t in bars
+        if t > previous + 1e-9 and abs(t - target) <= tolerance + 1e-9
+    ]
+    if not candidates:
+        return None
+    return min(candidates, key=lambda t: (abs(t - target), t))
 
 
 def _merge_states(

@@ -1187,6 +1187,7 @@ def test_persist_timeline_preset_round_trip() -> None:
             timeline_preset_kind="arc",
             timeline_preset_crescendo="penultimate",
             timeline_preset_density="very dense",
+            timeline_preset_conductor=True,
         ),
     )
     cfg = CleaveConfig(
@@ -1202,6 +1203,7 @@ def test_persist_timeline_preset_round_trip() -> None:
         "character": "arc",
         "crescendo": "penultimate",
         "density": "very dense",
+        "conductor": True,
     }
     round_trip = parse_timeline_section(
         {"timeline": payload},
@@ -1212,6 +1214,7 @@ def test_persist_timeline_preset_round_trip() -> None:
         character="arc",
         crescendo="penultimate",
         density="very dense",
+        conductor=True,
     )
 
 
@@ -1223,6 +1226,7 @@ def test_parse_timeline_reads_preset() -> None:
                     "character": "pulse",
                     "crescendo": "last",
                     "density": "sparse",
+                    "conductor": True,
                 }
             }
         },
@@ -1233,6 +1237,7 @@ def test_parse_timeline_reads_preset() -> None:
         character="pulse",
         crescendo="last",
         density="sparse",
+        conductor=True,
     )
 
 
@@ -1245,6 +1250,7 @@ def test_parse_timeline_preset_null_crescendo() -> None:
     assert timeline.preset.character == "dialogue"
     assert timeline.preset.crescendo is None
     assert timeline.preset.density == "normal"
+    assert timeline.preset.conductor is False
 
 
 def test_parse_timeline_rejects_invalid_placement_snap() -> None:
@@ -1267,6 +1273,14 @@ def test_parse_timeline_rejects_invalid_preset_density() -> None:
     with pytest.raises(ValueError, match="density"):
         parse_timeline_section(
             {"timeline": {"preset": {"density": "extreme"}}},
+            _timeline_parse_ctx(),
+        )
+
+
+def test_parse_timeline_rejects_invalid_preset_conductor() -> None:
+    with pytest.raises(ValueError, match="conductor"):
+        parse_timeline_section(
+            {"timeline": {"preset": {"conductor": "on"}}},
             _timeline_parse_ctx(),
         )
 

@@ -19,6 +19,7 @@ from cleave.timeline_presets.characters import (
     DEFAULT_TIMELINE_PRESET_KIND,
     TIMELINE_PRESET_KIND_OPTIONS,
 )
+from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
 from cleave.timeline_presets.crescendo import CrescendoTarget
 from cleave.timeline_presets.density import (
     DEFAULT_TIMELINE_PRESET_DENSITY,
@@ -411,6 +412,12 @@ def parse_timeline_preset_density(raw: Any, label: str) -> TimelinePresetDensity
         allowed = ", ".join(TIMELINE_PRESET_DENSITY_OPTIONS)
         raise ValueError(f"{label} must be one of: {allowed}")
     return value  # type: ignore[return-value]
+
+
+def parse_timeline_preset_conductor(raw: Any, label: str) -> bool:
+    if not isinstance(raw, bool):
+        raise ValueError(f"{label} must be true or false")
+    return raw
 
 
 FieldSource = Literal["cfg", "session", "both"]
@@ -2104,6 +2111,10 @@ def _parse_timeline_preset(raw: Any) -> Any:
             preset_map.get("density", DEFAULT_TIMELINE_PRESET_DENSITY),
             "timeline.preset.density",
         ),
+        conductor=parse_timeline_preset_conductor(
+            preset_map.get("conductor", DEFAULT_TIMELINE_PRESET_CONDUCTOR),
+            "timeline.preset.conductor",
+        ),
     )
 
 
@@ -2240,6 +2251,7 @@ def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
             "character": runtime.timeline_preset_kind,
             "crescendo": runtime.timeline_preset_crescendo,
             "density": runtime.timeline_preset_density,
+            "conductor": runtime.timeline_preset_conductor,
         },
     }
     lanes_out: dict[str, Any] = {}

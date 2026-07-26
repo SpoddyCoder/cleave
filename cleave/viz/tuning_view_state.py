@@ -40,6 +40,7 @@ from cleave.config_schema import (
 from cleave.extract import StemSource
 from cleave.preset_curation import PresetCurationIndex
 from cleave.preset_playlist import PresetPlaylist, preset_filename_display
+from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
 from cleave.timeline_presets.crescendo import CrescendoTarget
 from cleave.timeline_presets.density import (
     DEFAULT_TIMELINE_PRESET_DENSITY,
@@ -176,6 +177,7 @@ class RenderTimelineBlock:
     timeline_preset_kind: str = "breathing"
     timeline_preset_crescendo: CrescendoTarget | None = None
     timeline_preset_density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
+    timeline_preset_conductor: bool = DEFAULT_TIMELINE_PRESET_CONDUCTOR
     song_marker_fades: TimelineFadeGroupBlock = field(
         default_factory=TimelineFadeGroupBlock
     )
@@ -537,6 +539,7 @@ class TuningViewStateBuilder:
             timeline_preset_kind=tl.timeline_preset_kind,
             timeline_preset_crescendo=tl.timeline_preset_crescendo,
             timeline_preset_density=tl.timeline_preset_density,
+            timeline_preset_conductor=tl.timeline_preset_conductor,
             song_marker_fades=TimelineFadeGroupBlock(
                 enabled=tl.song_marker_fades.enabled,
                 fade_in=tl.song_marker_fades.fade_in,
@@ -718,6 +721,7 @@ class TuningViewStateBuilder:
                 timeline_preset_kind=tl.timeline_preset_kind,
                 timeline_preset_crescendo=tl.timeline_preset_crescendo,
                 timeline_preset_density=tl.timeline_preset_density,
+                timeline_preset_conductor=tl.timeline_preset_conductor,
                 song_marker_fades=TimelineFadeGroupBlock(
                     enabled=tl.song_marker_fades.enabled,
                     fade_in=tl.song_marker_fades.fade_in,
