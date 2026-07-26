@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 
 import numpy as np
 
+from cleave.blend_modes import BlendMode
+from cleave.cue_roles import CueRole
 from cleave.easing import smoothstep
 from cleave.extract import STEM_SOURCES, StemSource
 
@@ -29,6 +31,8 @@ _STEM_SOURCE_ABBREVIATIONS = {
 class SlotCue:
     t: float
     level: float
+    blend: BlendMode | None = None
+    role: CueRole | None = None
 
 
 @dataclass
@@ -66,14 +70,31 @@ def levels_equal(a: float, b: float) -> bool:
     return abs(float(a) - float(b)) <= LEVEL_EPS
 
 
+def cue_editable_for_blend_role(cue: SlotCue) -> bool:
+    """True when ``cue`` may carry blend/role and is in the strip nav set.
+
+    Off cues (``level <= LEVEL_EPS``) are level transitions only; cast and blend
+    are authored on the next on / visible period.
+    """
+    return float(cue.level) > LEVEL_EPS
+
+
+def navigable_cue_times(lane: TimelineLane) -> list[float]:
+    """Cue times eligible for ``,`` / ``.`` selection (level above off)."""
+    return [cue.t for cue in lane.cues if cue_editable_for_blend_role(cue)]
+
+
 def canonicalize(
     baseline: float | None,
     cues: Sequence[SlotCue],
 ) -> list[SlotCue]:
     """Drop redundant/no-op transitions; last-wins at equal ``t``.
 
-    Returns strictly increasing ``t`` cues where each changes level from
-    the previous state (``baseline``, or the prior cue when baseline is None).
+    Returns strictly increasing ``t`` cues where each changes level and/or
+    blend from the previous state (``baseline`` with blend inherit ``None``,
+    or the prior cue when baseline is None). Role is not part of the
+    comparison. Off cues (``level <= LEVEL_EPS``) always have ``blend`` and
+    ``role`` cleared before compare and emit.
     """
     if not cues:
         return []
@@ -85,12 +106,20 @@ def canonicalize(
         else:
             collapsed.append(cue)
     result: list[SlotCue] = []
-    current = baseline
+    current_level = baseline
+    current_blend: BlendMode | None = None
     for cue in collapsed:
-        if current is not None and levels_equal(cue.level, current):
+        if not cue_editable_for_blend_role(cue):
+            cue = replace(cue, blend=None, role=None)
+        if (
+            current_level is not None
+            and levels_equal(cue.level, current_level)
+            and cue.blend == current_blend
+        ):
             continue
         result.append(cue)
-        current = cue.level
+        current_level = cue.level
+        current_blend = cue.blend
     return result
 
 
@@ -107,6 +136,20 @@ def lane_level_at(
             break
         level = cue.level
     return level
+
+
+def lane_blend_at(lane: TimelineLane, t_sec: float) -> BlendMode | None:
+    """Held blend at ``t_sec``: last cue's ``blend`` at or before ``t``.
+
+    ``None`` means inherit the layer's static ``blend_mode``. A later cue may
+    set ``blend`` back to ``None`` to revert.
+    """
+    blend: BlendMode | None = None
+    for cue in lane.cues:
+        if cue.t > t_sec:
+            break
+        blend = cue.blend
+    return blend
 
 
 def lane_level_segments(
@@ -285,14 +328,14 @@ def lane_tick_times(lane: TimelineLane, duration_sec: float) -> list[float]:
     )
 
 
-def lane_on_transition_trigger_times(
+def lane_on_transition_cues(
     lane: TimelineLane,
     *,
     song_marker_times: Sequence[float] = (),
     song_marker_fades: TimelineFadeGroup,
     standard_fades: TimelineFadeGroup,
-) -> list[float]:
-    """Preset-switch trigger times for each rise from zero.
+) -> list[tuple[float, SlotCue]]:
+    """Preset-switch ``(trigger_t, cue)`` pairs for each rise from zero.
 
     Fires when ``previous <= LEVEL_EPS < cue.level``, with ``previous`` from
     ``baseline`` or ``0.0`` when baseline is None. Trigger is
@@ -300,7 +343,7 @@ def lane_on_transition_trigger_times(
     group for that edge. When the matching group is disabled or ``fade_in`` is
     0, the trigger is ``cue.t``.
     """
-    triggers: list[float] = []
+    results: list[tuple[float, SlotCue]] = []
     previous = 0.0 if lane.baseline is None else float(lane.baseline)
     for cue in lane.cues:
         if previous <= LEVEL_EPS < cue.level:
@@ -314,9 +357,28 @@ def lane_on_transition_trigger_times(
                 ramp = 0.0
             else:
                 ramp = max(0.0, float(group.fade_in)) * float(cue.level)
-            triggers.append(cue.t - ramp)
+            results.append((cue.t - ramp, cue))
         previous = float(cue.level)
-    return triggers
+    return results
+
+
+def lane_on_transition_trigger_times(
+    lane: TimelineLane,
+    *,
+    song_marker_times: Sequence[float] = (),
+    song_marker_fades: TimelineFadeGroup,
+    standard_fades: TimelineFadeGroup,
+) -> list[float]:
+    """Preset-switch trigger times for each rise from zero."""
+    return [
+        trigger
+        for trigger, _cue in lane_on_transition_cues(
+            lane,
+            song_marker_times=song_marker_times,
+            song_marker_fades=song_marker_fades,
+            standard_fades=standard_fades,
+        )
+    ]
 
 
 def lane_on_transition_count(
@@ -376,11 +438,37 @@ def set_lane_cue(
     t: float,
     level: float,
 ) -> TimelineLane:
-    """Set or replace the transition at ``t``; canonicalize."""
+    """Set or replace the transition at ``t``; canonicalize.
+
+    Replacing an existing cue keeps its ``blend`` and ``role``.
+    """
     others = [cue for cue in lane.cues if cue.t != t]
+    existing = next((cue for cue in lane.cues if cue.t == t), None)
+    if existing is not None:
+        new_cue = replace(existing, level=level)
+    else:
+        new_cue = SlotCue(t=t, level=level)
     return TimelineLane(
         baseline=lane.baseline,
-        cues=canonicalize(lane.baseline, others + [SlotCue(t=t, level=level)]),
+        cues=canonicalize(lane.baseline, others + [new_cue]),
+    )
+
+
+def update_lane_cue(
+    lane: TimelineLane,
+    cue_t: float,
+    *,
+    blend: BlendMode | None,
+    role: CueRole | None,
+) -> TimelineLane:
+    """Update ``blend`` / ``role`` on the cue at ``cue_t`` without changing level."""
+    updated = [
+        replace(cue, blend=blend, role=role) if cue.t == cue_t else cue
+        for cue in lane.cues
+    ]
+    return TimelineLane(
+        baseline=lane.baseline,
+        cues=canonicalize(lane.baseline, updated),
     )
 
 
@@ -465,11 +553,11 @@ def shift_lane_cues_by_beats(
     beats = np.asarray(beat_times, dtype=np.float64)
     last = len(beats) - 1
     shifted = [
-        SlotCue(
+        replace(
+            cue,
             t=float(
                 beats[max(0, min(last, _nearest_beat_index(cue.t, beats) + delta))]
             ),
-            level=cue.level,
         )
         for cue in lane.cues
     ]
@@ -490,7 +578,7 @@ def snap_lane_to_beats(
     beats = np.asarray(beat_times, dtype=np.float64)
     if beats.size == 1:
         sole = float(beats[0])
-        snapped = [SlotCue(t=sole, level=cue.level) for cue in lane.cues]
+        snapped = [replace(cue, t=sole) for cue in lane.cues]
         return TimelineLane(
             baseline=lane.baseline,
             cues=canonicalize(lane.baseline, snapped),
@@ -516,7 +604,7 @@ def snap_lane_to_beats(
             (first + lo * interval, first + (lo + 1) * interval),
         )
 
-    snapped = [SlotCue(t=snap_t(cue.t), level=cue.level) for cue in lane.cues]
+    snapped = [replace(cue, t=snap_t(cue.t)) for cue in lane.cues]
     return TimelineLane(
         baseline=lane.baseline,
         cues=canonicalize(lane.baseline, snapped),
@@ -581,7 +669,7 @@ def snap_lanes_to_song_markers(
                 if best_i is None:
                     continue
                 old = cues[best_i]
-                cues[best_i] = SlotCue(t=marker, level=old.level)
+                cues[best_i] = replace(old, t=marker)
                 claimed.add(best_i)
                 moved += 1
     else:
@@ -604,7 +692,7 @@ def snap_lanes_to_song_markers(
                 continue
             _dist, _t, _z, slot, cue_i = best
             old = working[slot][cue_i]
-            working[slot][cue_i] = SlotCue(t=marker, level=old.level)
+            working[slot][cue_i] = replace(old, t=marker)
             claimed_pairs.add((slot, cue_i))
             moved += 1
 

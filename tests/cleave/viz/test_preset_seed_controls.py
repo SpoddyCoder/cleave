@@ -44,7 +44,7 @@ def _session(*runtimes: tuple[str, LayerRuntime]) -> TuningSession:
 
 def test_prompt_opens_yes_cancel_when_shuffle_on() -> None:
     session = _session(("layer_1", _runtime(mode="projectm", shuffle=True, salt=1)))
-    controller = PresetSeedController(session, ModalHost(), {})
+    controller = PresetSeedController(session, ModalHost(), {}, preset_root=Path("/tmp/presets"))
     controller.prompt("layer_1")
     assert controller._modal.active is True
     view = controller._modal.view_state()
@@ -55,14 +55,14 @@ def test_prompt_opens_yes_cancel_when_shuffle_on() -> None:
 
 def test_prompt_noop_when_shuffle_off() -> None:
     session = _session(("layer_1", _runtime(mode="projectm", shuffle=False)))
-    controller = PresetSeedController(session, ModalHost(), {})
+    controller = PresetSeedController(session, ModalHost(), {}, preset_root=Path("/tmp/presets"))
     controller.prompt("layer_1")
     assert controller._modal.active is False
 
 
 def test_prompt_noop_when_switching_none() -> None:
     session = _session(("layer_1", _runtime(mode="none", shuffle=True)))
-    controller = PresetSeedController(session, ModalHost(), {})
+    controller = PresetSeedController(session, ModalHost(), {}, preset_root=Path("/tmp/presets"))
     controller.prompt("layer_1")
     assert controller._modal.active is False
 
@@ -76,6 +76,7 @@ def test_confirm_changes_salt_and_rebuilds_projectm() -> None:
         session,
         ModalHost(),
         {},
+        preset_root=Path("/tmp/presets"),
         on_preset_switching_change=switched.append,
     )
     controller._confirm("layer_1")
@@ -107,6 +108,7 @@ def test_confirm_timeline_preserves_switch_count(
         session,
         ModalHost(),
         {"layer_1": layer},
+        preset_root=Path("/tmp/presets"),
     )
     controller._confirm("layer_1")
     assert runtime.preset_switching_shuffle_salt != 5

@@ -272,6 +272,66 @@ def test_apply_layer_visibility_sets_fbo_enabled_from_timeline() -> None:
     assert layers_by_slot["layer_1"].fbo.enabled is True
 
 
+def test_apply_layer_visibility_writes_cue_blend_with_layer_fallback() -> None:
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+        lanes={
+            "layer_1": TimelineLane(
+                baseline=0.0,
+                cues=[
+                    SlotCue(t=1.0, level=1.0, blend="add"),
+                    SlotCue(t=2.0, level=1.0, blend=None),
+                ],
+            ),
+        },
+    )
+    session.layers["layer_1"].blend_mode = "screen"
+    layers_by_slot = {slot: _stem_layer(slot) for slot in DEFAULT_LAYER_SLOTS}
+    layers_by_slot["layer_1"].fbo.blend_mode = "black-key"
+
+    apply_layer_visibility(session, layers_by_slot, 0.5)
+    assert layers_by_slot["layer_1"].fbo.blend_mode == "screen"
+
+    apply_layer_visibility(session, layers_by_slot, 1.0)
+    assert layers_by_slot["layer_1"].fbo.blend_mode == "add"
+
+    apply_layer_visibility(session, layers_by_slot, 2.0)
+    assert layers_by_slot["layer_1"].fbo.blend_mode == "screen"
+
+
+def test_apply_layer_visibility_cue_blend_then_curation_forces_black_key() -> None:
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+        lanes={
+            "layer_1": TimelineLane(
+                baseline=0.0,
+                cues=[SlotCue(t=1.0, level=1.0, blend="add")],
+            ),
+        },
+    )
+    session.layers["layer_1"].blend_mode = "screen"
+    layers_by_slot = {slot: _stem_layer(slot) for slot in DEFAULT_LAYER_SLOTS}
+    layers_by_slot["layer_1"].fbo.enabled = True
+
+    apply_layer_visibility(session, layers_by_slot, 1.0)
+    assert layers_by_slot["layer_1"].fbo.blend_mode == "add"
+
+    session.settings.editor_mode = "preset_curation"
+    apply_layer_visibility(session, layers_by_slot, 1.0)
+    assert layers_by_slot["layer_1"].fbo.blend_mode == "screen"
+    apply_effect_modifiers(
+        session,
+        {"layer_1": layers_by_slot["layer_1"]},
+        MagicMock(),
+        None,
+        1.0,
+        update=False,
+    )
+    assert layers_by_slot["layer_1"].fbo.blend_mode == "black-key"
+
+
 def test_apply_layer_visibility_fades_enable_before_on_cue() -> None:
     session = _session(
         layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
@@ -887,3 +947,17 @@ def test_build_timeline_view_state_default_song_markers_empty() -> None:
     state = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
     assert state.song_marker_times == ()
     assert state.selected_song_marker_index is None
+
+
+def test_build_timeline_view_state_includes_selected_cue_t() -> None:
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+    )
+    session.timeline.selected_cue_t = {"layer_1": 12.5}
+    session.timeline.selected_cue_flash_start_ms = 1234
+    state = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
+    assert state.selected_cue_t == {"layer_1": 12.5}
+    assert state.selected_cue_flash_start_ms == 1234
+    state.selected_cue_t["layer_1"] = 99.0
+    assert session.timeline.selected_cue_t == {"layer_1": 12.5}

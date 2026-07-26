@@ -117,6 +117,7 @@ def test_list_restore_destination_subdirs_excludes_curation_dirs() -> None:
         (root / "other").mkdir()
         (root / FAVOURITES_DIR).mkdir()
         (root / BLACKLIST_DIR).mkdir()
+        (root / "roles").mkdir()
         (root / ".hidden").mkdir()
 
         assert list_restore_destination_subdirs(root) == ("other", "pack")

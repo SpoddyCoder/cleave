@@ -176,6 +176,7 @@ class TuningControls:
             session,
             self._modal_host,
             layers_by_slot,
+            preset_root=preset_root,
             on_preset_switching_change=on_switching,
         )
         self._timeline_phase = TimelinePhaseController(
@@ -747,7 +748,12 @@ class TuningControls:
             self._editor_mode.sync_selection_to_mode()
         self._focus_cursor = cursor
         if isinstance(cursor, TimelineFocus):
-            self.session.timeline.focus_row = cursor.row
+            tl = self.session.timeline
+            if cursor.row != tl.focus_row:
+                # Drop in-progress cue flash so returning to a remembered
+                # selection shows the settled tick, not a restart blink.
+                tl.selected_cue_flash_start_ms = None
+            tl.focus_row = cursor.row
             return
         if isinstance(cursor, MainFocus):
             desc = cursor.descriptor
@@ -1168,8 +1174,6 @@ class TuningControls:
             layer.blend_mode = BLEND_MODES[(index + 1) % len(BLEND_MODES)]
         else:
             layer.blend_mode = BLEND_MODES[(index - 1) % len(BLEND_MODES)]
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_blend_change(slot, layer.blend_mode)
 
     def _cycle_stem(self, slot: str, *, forward: bool) -> None:
         layer = self.session.layers[slot]

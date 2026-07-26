@@ -1032,6 +1032,85 @@ def test_write_session_snapshot_round_trips_lane_baseline_and_cues(tmp_path: Pat
     assert session2.timeline.lanes["layer_1"] == session.timeline.lanes["layer_1"]
 
 
+def test_write_session_snapshot_round_trips_cue_blend_and_role(tmp_path: Path) -> None:
+    cfg, session, out_path = _snapshot_fixture(tmp_path)
+    session.timeline.enabled = True
+    session.timeline.lanes = {
+        "layer_1": TimelineLane(
+            baseline=0.0,
+            cues=[
+                SlotCue(t=2.5, level=1.0, blend="add", role="pulse"),
+                SlotCue(t=5.0, level=0.0),
+            ],
+        ),
+    }
+    write_session_snapshot(out_path, cfg=cfg, session=session)
+
+    data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    assert data["timeline"]["lanes"]["layer_1"]["cues"] == [
+        {"t": 2.5, "level": 1.0, "blend": "add", "role": "pulse"},
+        {"t": 5.0, "level": 0.0},
+    ]
+
+    timeline = parse_timeline_section(
+        data,
+        ParseCtx(layer_slots=tuple(cfg.layer_z_order)),
+    )
+    assert timeline is not None
+    playlists = _round_trip_playlists(cfg.paths.preset_root)
+    cfg_with_timeline = CleaveConfig(
+        paths=cfg.paths,
+        layers=cfg.layers,
+        editor=cfg.editor,
+        config_path=out_path,
+        user_config_path=cfg.user_config_path,
+        render=cfg.render,
+        timeline=timeline,
+    )
+    session2 = session_from_cfg(cfg_with_timeline, playlists)
+    assert session2.timeline.lanes["layer_1"] == session.timeline.lanes["layer_1"]
+
+
+def test_persisted_session_signature_moves_when_cue_blend_changes(
+    tmp_path: Path,
+) -> None:
+    cfg, session, _out_path = _snapshot_fixture(tmp_path)
+    session.timeline.enabled = True
+    session.timeline.lanes = {
+        "layer_1": TimelineLane(
+            baseline=0.0,
+            cues=[SlotCue(t=1.0, level=1.0)],
+        ),
+    }
+    before = persisted_session_signature(cfg, session)
+    session.timeline.lanes = {
+        "layer_1": TimelineLane(
+            baseline=0.0,
+            cues=[SlotCue(t=1.0, level=1.0, blend="add")],
+        ),
+    }
+    assert persisted_session_signature(cfg, session) != before
+
+
+def test_write_session_snapshot_level_only_cues_omit_blend_role_keys(
+    tmp_path: Path,
+) -> None:
+    cfg, session, out_path = _snapshot_fixture(tmp_path)
+    session.timeline.enabled = True
+    session.timeline.lanes = {
+        "layer_1": TimelineLane(
+            baseline=0.0,
+            cues=[SlotCue(t=2.5, level=1.0)],
+        ),
+    }
+    write_session_snapshot(out_path, cfg=cfg, session=session)
+    data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    cues = data["timeline"]["lanes"]["layer_1"]["cues"]
+    assert cues == [{"t": 2.5, "level": 1.0}]
+    assert "blend" not in cues[0]
+    assert "role" not in cues[0]
+
+
 def test_write_session_snapshot_persists_timeline_disabled_without_cues(
     tmp_path: Path,
 ) -> None:

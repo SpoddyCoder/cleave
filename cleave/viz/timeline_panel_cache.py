@@ -59,6 +59,7 @@ class TimelineStaticSignature:
     standard_cue_fades_enabled: bool
     standard_cue_fade_in: float
     standard_cue_fade_out: float
+    selected_cue_t: tuple[tuple[str, float], ...]
 
 
 @dataclass
@@ -71,6 +72,7 @@ class TimelinePanelCache:
     last_playhead_rect: tuple[int, int, int, int] | None = None
     last_badge_rect: tuple[int, int, int, int] | None = None
     last_flash_rects: tuple[tuple[int, int, int, int], ...] = ()
+    last_glyph_rects: tuple[tuple[int, int, int, int], ...] = ()
 
 
 def visibility_bucket(visibility: float) -> int:
@@ -81,19 +83,22 @@ def visibility_bucket(visibility: float) -> int:
 
 def _slot_cues_fingerprint(
     cues: list[SlotCue],
-) -> tuple[tuple[float, float], ...]:
-    return tuple((cue.t, cue.level) for cue in cues)
+) -> tuple[tuple[float, float, str | None, str | None], ...]:
+    return tuple((cue.t, cue.level, cue.blend, cue.role) for cue in cues)
 
 
 def _lane_fingerprint(
     lane: TimelineLane,
-) -> tuple[float | None, tuple[tuple[float, float], ...]]:
+) -> tuple[float | None, tuple[tuple[float, float, str | None, str | None], ...]]:
     return (lane.baseline, _slot_cues_fingerprint(lane.cues))
 
 
 def _lanes_fingerprint(
     lanes: dict[str, TimelineLane],
-) -> tuple[tuple[str, float | None, tuple[tuple[float, float], ...]], ...]:
+) -> tuple[
+    tuple[str, float | None, tuple[tuple[float, float, str | None, str | None], ...]],
+    ...,
+]:
     return tuple(
         (slot, *_lane_fingerprint(lane))
         for slot, lane in sorted(lanes.items())
@@ -102,7 +107,7 @@ def _lanes_fingerprint(
 
 def _record_buffer_fingerprint(
     record_buffer: dict[str, list[SlotCue]],
-) -> tuple[tuple[str, tuple[tuple[float, float], ...]], ...]:
+) -> tuple[tuple[str, tuple[tuple[float, float, str | None, str | None], ...]], ...]:
     return tuple(
         (slot, _slot_cues_fingerprint(cues))
         for slot, cues in sorted(record_buffer.items())
@@ -148,6 +153,7 @@ def timeline_static_signature(
         standard_cue_fades_enabled=state.standard_cue_fades.enabled,
         standard_cue_fade_in=state.standard_cue_fades.fade_in,
         standard_cue_fade_out=state.standard_cue_fades.fade_out,
+        selected_cue_t=tuple(sorted(state.selected_cue_t.items())),
     )
 
 

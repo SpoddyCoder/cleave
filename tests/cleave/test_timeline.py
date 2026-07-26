@@ -14,14 +14,18 @@ from cleave.timeline import (
     TimelineLane,
     canonicalize,
     empty_lane,
+    lane_blend_at,
     lane_level_at,
     lane_level_breakpoints,
     lane_level_envelope,
     lane_on_transition_count,
+    lane_on_transition_cues,
     lane_on_transition_trigger_times,
     punch_lane,
     set_lane_cue,
+    shift_lane_cues_by_beats,
     should_accept_toggle,
+    snap_lane_to_beats,
     stem_abbreviation,
     strip_lane_range,
 )
@@ -150,6 +154,132 @@ def test_canonicalize_drops_redundant_transitions() -> None:
         [SlotCue(t=1.0, level=0.0), SlotCue(t=2.0, level=1.0)],
     )
     assert cues == [SlotCue(t=2.0, level=1.0)]
+
+
+def test_canonicalize_keeps_blend_only_change() -> None:
+    cues = canonicalize(
+        0.0,
+        [
+            SlotCue(t=1.0, level=1.0),
+            SlotCue(t=2.0, level=1.0, blend="add"),
+        ],
+    )
+    assert cues == [
+        SlotCue(t=1.0, level=1.0),
+        SlotCue(t=2.0, level=1.0, blend="add"),
+    ]
+
+
+def test_canonicalize_drops_full_noop_including_blend() -> None:
+    cues = canonicalize(
+        0.0,
+        [
+            SlotCue(t=1.0, level=1.0, blend="add"),
+            SlotCue(t=2.0, level=1.0, blend="add", role="pulse"),
+        ],
+    )
+    assert cues == [SlotCue(t=1.0, level=1.0, blend="add")]
+
+
+def test_canonicalize_strips_blend_and_role_on_off_cues() -> None:
+    cues = canonicalize(
+        0.0,
+        [
+            SlotCue(t=1.0, level=1.0, blend="add", role="lead"),
+            SlotCue(t=2.0, level=0.0, blend="screen", role="accent"),
+            SlotCue(t=3.0, level=0.5, blend="add", role="pulse"),
+        ],
+    )
+    assert cues == [
+        SlotCue(t=1.0, level=1.0, blend="add", role="lead"),
+        SlotCue(t=2.0, level=0.0),
+        SlotCue(t=3.0, level=0.5, blend="add", role="pulse"),
+    ]
+
+
+def test_canonicalize_off_with_dead_metadata_still_level_only() -> None:
+    """Stripping off metadata must not invent blend-only keep/drop bugs."""
+    cues = canonicalize(
+        1.0,
+        [SlotCue(t=1.0, level=0.0, blend="add", role="pulse")],
+    )
+    assert cues == [SlotCue(t=1.0, level=0.0)]
+
+
+def test_cue_editable_and_navigable_times() -> None:
+    from cleave.timeline import cue_editable_for_blend_role, navigable_cue_times
+
+    on = SlotCue(t=1.0, level=0.5)
+    mid = SlotCue(t=2.0, level=1.0)
+    off = SlotCue(t=3.0, level=0.0, blend="add", role="lead")
+    assert cue_editable_for_blend_role(on)
+    assert cue_editable_for_blend_role(mid)
+    assert not cue_editable_for_blend_role(off)
+    lane = TimelineLane(baseline=0.0, cues=[on, mid, off])
+    assert navigable_cue_times(lane) == [1.0, 2.0]
+
+
+def test_lane_blend_at_holds_and_reverts() -> None:
+    lane = TimelineLane(
+        baseline=0.0,
+        cues=[
+            SlotCue(t=1.0, level=1.0, blend="add"),
+            SlotCue(t=2.0, level=1.0, blend=None),
+            SlotCue(t=3.0, level=0.0),
+            SlotCue(t=4.0, level=1.0, blend="screen"),
+        ],
+    )
+    assert lane_blend_at(lane, 0.5) is None
+    assert lane_blend_at(lane, 1.0) == "add"
+    assert lane_blend_at(lane, 1.5) == "add"
+    assert lane_blend_at(lane, 2.0) is None
+    assert lane_blend_at(lane, 3.0) is None
+    assert lane_blend_at(lane, 4.0) == "screen"
+
+
+def test_snap_and_shift_preserve_blend_and_role_on_ons_strip_offs() -> None:
+    lane = TimelineLane(
+        baseline=0.0,
+        cues=[
+            SlotCue(t=0.4, level=1.0, blend="add", role="lead"),
+            SlotCue(t=1.6, level=0.0, blend="screen", role="accent"),
+        ],
+    )
+    snapped = snap_lane_to_beats(lane, (0.0, 1.0, 2.0))
+    assert snapped.cues == [
+        SlotCue(t=0.0, level=1.0, blend="add", role="lead"),
+        SlotCue(t=2.0, level=0.0),
+    ]
+    shifted = shift_lane_cues_by_beats(lane, (0.0, 1.0, 2.0, 3.0), 1)
+    assert shifted.cues == [
+        SlotCue(t=1.0, level=1.0, blend="add", role="lead"),
+        SlotCue(t=3.0, level=0.0),
+    ]
+
+
+def test_lane_on_transition_cues_returns_cue_per_trigger() -> None:
+    lane = TimelineLane(
+        baseline=0.0,
+        cues=[
+            SlotCue(t=10.0, level=1.0, role="bed"),
+            SlotCue(t=20.0, level=0.0),
+            SlotCue(t=30.0, level=1.0, blend="add", role="pulse"),
+        ],
+    )
+    pairs = lane_on_transition_cues(
+        lane,
+        song_marker_fades=_OFF,
+        standard_fades=_std(fade_in=2.0, fade_out=2.0),
+    )
+    assert [(t, cue.t, cue.role, cue.blend) for t, cue in pairs] == [
+        (8.0, 10.0, "bed", None),
+        (28.0, 30.0, "pulse", "add"),
+    ]
+    assert lane_on_transition_trigger_times(
+        lane,
+        song_marker_fades=_OFF,
+        standard_fades=_std(fade_in=2.0, fade_out=2.0),
+    ) == [8.0, 28.0]
 
 
 def test_punch_lane_replaces_cues_in_range() -> None:

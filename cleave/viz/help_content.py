@@ -221,6 +221,15 @@ def timeline_strip_section(
             )
         )
 
+    if not recording:
+        entries.extend(
+            (
+                (", / .", "select previous / next on cue"),
+                ("B / Shift+B", "cycle on-cue blend"),
+                ("C / Shift+C", "cycle on-cue cast"),
+            )
+        )
+
     entries.append(("Esc", "close timeline"))
     return HelpSection("Timeline", tuple(entries))
 

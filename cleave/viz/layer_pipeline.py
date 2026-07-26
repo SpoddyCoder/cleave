@@ -197,6 +197,7 @@ class LayerFramePipeline:
         *,
         width: int,
         height: int,
+        preset_root: Path,
     ) -> StemLayer:
         w, h = width, height
 
@@ -238,6 +239,7 @@ class LayerFramePipeline:
             hard_cut_sensitivity=layer_cfg.hard_cut_sensitivity,
             shuffle=layer_cfg.preset_switching_shuffle,
             shuffle_salt=layer_cfg.preset_switching_shuffle_salt,
+            preset_root=preset_root,
         )
         return layer
 
@@ -286,6 +288,7 @@ class LayerFramePipeline:
                 z_index = z_order.index(slot)
                 return render_layer_size(cfg, z_index, viz_quality=viz_quality)
 
+        preset_root = cfg.paths.preset_root
         for slot, layer_cfg in cfg.layers_in_z_order():
             width, height = layer_size(slot)
             runtimes.append(
@@ -299,6 +302,7 @@ class LayerFramePipeline:
                     _beat_sensitivity(cfg, slot),
                     width=width,
                     height=height,
+                    preset_root=preset_root,
                 )
             )
 

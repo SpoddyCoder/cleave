@@ -13,6 +13,7 @@ from cleave.timeline import (
     canonicalize,
     copy_lane,
     empty_lane,
+    lane_blend_at,
     lane_level_at,
     lane_level_breakpoints,
     lane_level_envelope,
@@ -29,7 +30,11 @@ from cleave.viz.focus_nav import (
     cursor_timeline_submenu_focused,
 )
 from cleave.viz.row_semantics import RowKind
-from cleave.viz.timeline_overlay import TimelineViewState, prune_expired_arm_flashes
+from cleave.viz.timeline_overlay import (
+    TimelineViewState,
+    prune_expired_arm_flashes,
+    prune_expired_selected_cue_flash,
+)
 
 if TYPE_CHECKING:
     from cleave.viz.layer import StemLayer
@@ -275,9 +280,15 @@ def apply_layer_visibility(
             level = timeline_level_multiplier(session, slot, t_sec)
             layer.timeline_level = level
             layer.fbo.enabled = level > LEVEL_EPS
+            cue_blend = lane_blend_at(_lane_for_slot(session, slot), t_sec)
+            if cue_blend is not None:
+                layer.fbo.blend_mode = cue_blend
+            else:
+                layer.fbo.blend_mode = session.layers[slot].blend_mode
         else:
             layer.timeline_level = 1.0
             layer.fbo.enabled = effective_layer_enabled(session, slot, t_sec)
+            layer.fbo.blend_mode = session.layers[slot].blend_mode
 
 
 def build_timeline_view_state(
@@ -291,6 +302,9 @@ def build_timeline_view_state(
 ) -> TimelineViewState:
     tl = session.timeline
     prune_expired_arm_flashes(tl.arm_flash_start_ms)
+    tl.selected_cue_flash_start_ms = prune_expired_selected_cue_flash(
+        tl.selected_cue_flash_start_ms
+    )
     submenu_focused = (
         focus_cursor is not None and cursor_timeline_submenu_focused(focus_cursor)
     )
@@ -341,4 +355,6 @@ def build_timeline_view_state(
         selected_song_marker_index=focused_song_marker_index(focus_cursor),
         song_marker_fades=_as_fade_group(tl.song_marker_fades),
         standard_cue_fades=_as_fade_group(tl.standard_cue_fades),
+        selected_cue_t=dict(tl.selected_cue_t),
+        selected_cue_flash_start_ms=tl.selected_cue_flash_start_ms,
     )

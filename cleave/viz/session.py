@@ -190,6 +190,8 @@ class TimelineRuntime:
     override_slots: set[str] = field(default_factory=set)
     override_visible: dict[str, bool] = field(default_factory=dict)
     arm_flash_start_ms: dict[str, int] = field(default_factory=dict)
+    selected_cue_t: dict[str, float] = field(default_factory=dict)
+    selected_cue_flash_start_ms: int | None = None
     bar_phase_offset: int = 0
     show_bar_grid: bool = False
     beat_bar_grid_expanded: bool = False

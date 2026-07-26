@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from cleave.blend_modes import BlendMode
 from cleave.extract import StemSource
 from cleave.preset_playlist import PresetPlaylist
 
@@ -16,7 +15,6 @@ class LiveLayerBindings:
     on_preset_switching_change: Callable[[str], None]
     lock_preset_for_modal: Callable[[str], None]
     unlock_preset_after_modal: Callable[[str], None]
-    on_blend_change: Callable[[str, BlendMode], None]
     on_stem_change: Callable[[str, StemSource], None]
     on_opacity_change: Callable[[str, int], None]
     on_layer_enabled_change: Callable[[str, bool], None]
