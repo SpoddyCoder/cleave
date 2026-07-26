@@ -30,6 +30,10 @@ from cleave.timeline_presets.characters import (
     cycle_timeline_preset_kind,
     timeline_preset_kind_display,
 )
+from cleave.timeline_presets.conductor import (
+    cycle_timeline_preset_conductor,
+    timeline_preset_conductor_display,
+)
 from cleave.timeline_presets.crescendo import (
     cycle_timeline_preset_crescendo,
     timeline_preset_crescendo_display,
@@ -243,6 +247,28 @@ def _apply_timeline_preset_density(
     tl = controls.session.timeline
     tl.timeline_preset_density = cycle_timeline_preset_density(
         tl.timeline_preset_density,
+        forward=forward,
+    )
+
+
+def _format_timeline_preset_conductor(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return timeline_preset_conductor_display(
+        state.render_timeline.timeline_preset_conductor
+    )
+
+
+def _apply_timeline_preset_conductor(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    tl = controls.session.timeline
+    tl.timeline_preset_conductor = cycle_timeline_preset_conductor(
+        tl.timeline_preset_conductor,
         forward=forward,
     )
 
@@ -1668,6 +1694,12 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_timeline_preset_density,
         apply_horizontal=_apply_timeline_preset_density,
+    ),
+    RowKind.TIMELINE_PRESET_CONDUCTOR: RowFieldDef(
+        panel_label="conductor",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_timeline_preset_conductor,
+        apply_horizontal=_apply_timeline_preset_conductor,
     ),
     RowKind.TIMELINE_PRESETS: RowFieldDef(
         panel_label="apply timeline preset",

@@ -1140,6 +1140,7 @@ def test_write_session_snapshot_persists_timeline_disabled_without_cues(
             "character": "breathing",
             "crescendo": None,
             "density": "normal",
+            "conductor": False,
         },
     }
 
@@ -1149,6 +1150,7 @@ def test_write_session_snapshot_round_trips_timeline_preset(tmp_path: Path) -> N
     session.timeline.timeline_preset_kind = "arc"
     session.timeline.timeline_preset_crescendo = "last"
     session.timeline.timeline_preset_density = "dense"
+    session.timeline.timeline_preset_conductor = True
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
@@ -1156,6 +1158,7 @@ def test_write_session_snapshot_round_trips_timeline_preset(tmp_path: Path) -> N
         "character": "arc",
         "crescendo": "last",
         "density": "dense",
+        "conductor": True,
     }
 
     timeline = parse_timeline_section(
@@ -1177,6 +1180,7 @@ def test_write_session_snapshot_round_trips_timeline_preset(tmp_path: Path) -> N
     assert session2.timeline.timeline_preset_kind == "arc"
     assert session2.timeline.timeline_preset_crescendo == "last"
     assert session2.timeline.timeline_preset_density == "dense"
+    assert session2.timeline.timeline_preset_conductor is True
 
 
 def _round_trip_preset_dirs(root: Path) -> Path:

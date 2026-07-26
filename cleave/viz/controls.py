@@ -14,6 +14,7 @@ from cleave.config_schema import clamp_easter_egg
 from cleave.config_schema import PRESET_SWITCHING_MODES, PRESET_SWITCHING_ROTATION_SETS
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.extract import STEM_SOURCES
+from cleave.signals import Signals
 from cleave.song_markers import format_marker_time, place_marker
 from cleave.preset_curation import PresetCurationIndex
 from cleave.preset_playlist import is_top_level_browse_dir
@@ -109,6 +110,7 @@ class TuningControls:
         post_process: GlPostProcess | None = None,
         beat_times: Sequence[float] = (),
         bar_times: Sequence[float] = (),
+        signals: Signals | None = None,
     ) -> None:
         self.session = session
         self.cfg = cfg
@@ -162,6 +164,7 @@ class TuningControls:
             self._modal_host,
             beat_times,
             bar_times,
+            signals=signals,
             on_notification=self.show_notification,
         )
         layers_by_slot = (

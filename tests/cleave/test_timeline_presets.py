@@ -719,8 +719,12 @@ def test_resolve_crescendo_window_requires_three_markers() -> None:
     assert resolve_crescendo_window([10.0, 50.0], 100.0, "last") is None
 
 
-def test_crescendo_states_emit_half_entrant_then_full_stack() -> None:
-    from cleave.timeline_presets.crescendo import CrescendoWindow, _crescendo_states
+def test_crescendo_states_ramp_through_quantised_levels() -> None:
+    from cleave.timeline_presets.crescendo import (
+        CRESCENDO_ENTRY_LEVEL,
+        CrescendoWindow,
+        _crescendo_states,
+    )
 
     slots = _slots(4)
     bars = _bar_times_for(120.0)
@@ -733,14 +737,34 @@ def test_crescendo_states_emit_half_entrant_then_full_stack() -> None:
         rng=random.Random(0),
     )
     assert states
-    # Steps before t_full include a 0.5 entrant; t_full is a full stack.
-    half_steps = [levels for t, levels in states if t < window.t_full - 1e-9]
-    assert half_steps
-    for levels in half_steps:
-        assert 0.5 in levels.values()
+    ramp = [levels for t, levels in states if t < window.t_full - 1e-9]
+    # A build, not a switch: more than two steps and each is dimmer than the last.
+    assert len(ramp) > 2
+    weights = [sum(levels.values()) for levels in ramp]
+    assert weights == sorted(weights)
+    assert weights[0] == pytest.approx(CRESCENDO_ENTRY_LEVEL)
+    distinct_levels = {level for levels in ramp for level in levels.values()}
+    assert len(distinct_levels) > 2
+    # Entrant count grows monotonically toward the full stack.
+    counts = [len(levels) for levels in ramp]
+    assert counts == sorted(counts)
     full = next(levels for t, levels in states if abs(t - window.t_full) < 1e-9)
     assert set(full.values()) == {1.0}
     assert len(full) == min(4, MAX_CONCURRENT_LAYERS)
+
+
+def test_crescendo_spread_times_are_evenly_spaced() -> None:
+    from cleave.timeline_presets.crescendo import _spread_times
+
+    bars = _bar_times_for(120.0)
+    times = _spread_times(50.0, 80.0, 4, bars)
+    assert len(times) == 4
+    assert times[0] == pytest.approx(50.0)
+    assert times[-1] == pytest.approx(80.0)
+    gaps = [b - a for a, b in zip(times, times[1:])]
+    assert all(gap > 0.0 for gap in gaps)
+    # Interior steps land mid-window, not bunched against either end.
+    assert max(gaps) <= 2.0 * min(gaps)
 
 
 def test_apply_crescendo_ramps_holds_then_solos() -> None:

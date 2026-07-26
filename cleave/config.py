@@ -109,6 +109,7 @@ from cleave.config_schema import (
 )
 from cleave.timeline import TimelineLane
 from cleave.timeline_presets.characters import DEFAULT_TIMELINE_PRESET_KIND
+from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
 from cleave.timeline_presets.crescendo import CrescendoTarget
 from cleave.timeline_presets.density import (
     DEFAULT_TIMELINE_PRESET_DENSITY,
@@ -268,11 +269,12 @@ class TimelineFadesConfig:
 
 @dataclass(frozen=True)
 class TimelinePresetConfig:
-    """Staged character / crescendo / density for the timeline preset action."""
+    """Staged character / crescendo / density / conductor for the timeline preset action."""
 
     character: str = DEFAULT_TIMELINE_PRESET_KIND
     crescendo: CrescendoTarget | None = None
     density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
+    conductor: bool = DEFAULT_TIMELINE_PRESET_CONDUCTOR
 
 
 @dataclass(frozen=True)

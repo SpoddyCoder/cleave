@@ -89,6 +89,11 @@ class VocalSignals(TypedDict):
     pitch_hz: tuple[np.ndarray, np.ndarray]
 
 
+class OtherSignals(TypedDict):
+    spectral_centroid: tuple[np.ndarray, np.ndarray]
+    rms: tuple[np.ndarray, np.ndarray]
+
+
 def _load(path: Path | str) -> tuple[np.ndarray, float]:
     y, sr = librosa.load(path, sr=None, mono=True)
     return y, float(sr)
@@ -203,11 +208,14 @@ def extract_vocals(path: Path | str, *, high_quality: bool = False) -> VocalSign
     }
 
 
-def extract_other(path: Path | str) -> tuple[np.ndarray, np.ndarray]:
-    """Spectral centroid over time."""
+def extract_other(path: Path | str) -> OtherSignals:
+    """Spectral centroid and RMS envelope over time."""
     y, sr = _load(path)
-    values = librosa.feature.spectral_centroid(
+    centroid = librosa.feature.spectral_centroid(
         y=y, sr=sr, hop_length=HOP_LENGTH, n_fft=N_FFT
     )[0]
-    times = _frame_times(len(values), sr, HOP_LENGTH)
-    return values, times
+    centroid_times = _frame_times(len(centroid), sr, HOP_LENGTH)
+    return {
+        "spectral_centroid": (centroid, centroid_times),
+        "rms": _rms_envelope(y, sr, HOP_LENGTH),
+    }

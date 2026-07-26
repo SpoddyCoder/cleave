@@ -11,9 +11,10 @@ import numpy as np
 _META_KEYS = frozenset(
     {"version", "sample_rate_hz", "duration_sec", "beat_times", "downbeat_times"}
 )
-SIGNALS_VERSION = 3
+SIGNALS_VERSION = 4
 _EXPECTED_STEMS = frozenset({"drums", "bass", "vocals", "other", "full_mix"})
 _FULL_MIX_KEYS = frozenset({"onset_strength", "rms"})
+_OTHER_KEYS = frozenset({"spectral_centroid", "rms"})
 
 
 def resolve_signals_path(path: Path) -> Path:
@@ -75,6 +76,33 @@ class Signals:
         self._normalized_cache[cache_key] = result
         return result
 
+    def window_mean(
+        self,
+        stem: str,
+        key: str,
+        t0: float,
+        t1: float,
+        *,
+        percentile: float = 99.0,
+    ) -> float:
+        """Mean of the percentile-normalized envelope over ``[t0, t1)``; NaN-safe."""
+        values = self.normalized(stem, key, percentile)
+        if len(values) == 0:
+            return 0.0
+        i0 = int(t0 * self.sample_rate_hz)
+        i1 = int(t1 * self.sample_rate_hz)
+        i0 = max(0, min(len(values), i0))
+        i1 = max(0, min(len(values), i1))
+        if i1 <= i0:
+            return 0.0
+        window = values[i0:i1]
+        if np.all(np.isnan(window)):
+            return 0.0
+        mean = float(np.nanmean(window))
+        if np.isnan(mean):
+            return 0.0
+        return mean
+
     @property
     def onset_normalized(self) -> np.ndarray:
         return self.normalized("drums", "onset_strength")
@@ -85,7 +113,7 @@ def _validate_signals_data(data: dict, stems: dict[str, dict[str, np.ndarray]]) 
     if version != SIGNALS_VERSION:
         raise ValueError(
             f"unsupported signals.json version {version!r}; "
-            f"re-run: python -m cleave analyse <project>"
+            f"re-run: python -m cleave separate <project>"
         )
 
     missing_stems = _EXPECTED_STEMS - set(stems)
@@ -96,7 +124,7 @@ def _validate_signals_data(data: dict, stems: dict[str, dict[str, np.ndarray]]) 
     if "mix_onset_strength" in stems.get("drums", {}):
         raise ValueError(
             "signals.json drums.mix_onset_strength is obsolete; "
-            "re-run: python -m cleave analyse <project>"
+            "re-run: python -m cleave separate <project>"
         )
 
     full_mix_keys = set(stems.get("full_mix", {}))
@@ -104,6 +132,12 @@ def _validate_signals_data(data: dict, stems: dict[str, dict[str, np.ndarray]]) 
     if missing_full_mix:
         missing = ", ".join(sorted(missing_full_mix))
         raise ValueError(f"signals.json full_mix missing key(s): {missing}")
+
+    other_keys = set(stems.get("other", {}))
+    missing_other = _OTHER_KEYS - other_keys
+    if missing_other:
+        missing = ", ".join(sorted(missing_other))
+        raise ValueError(f"signals.json other missing key(s): {missing}")
 
 
 def load_signals(path: Path) -> Signals:

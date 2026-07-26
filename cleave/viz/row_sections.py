@@ -701,6 +701,7 @@ TIMELINE_PRESETS_SECTION = ExpandSectionDef(
         SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_CHARACTER),
         SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_CRESCENDO),
         SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_DENSITY),
+        SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_CONDUCTOR),
         SectionNode(leaf_kind=RowKind.TIMELINE_PRESETS),
     ),
 )
@@ -847,6 +848,7 @@ RENDER_TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_PRESET_CHARACTER,
         RowKind.TIMELINE_PRESET_CRESCENDO,
         RowKind.TIMELINE_PRESET_DENSITY,
+        RowKind.TIMELINE_PRESET_CONDUCTOR,
         RowKind.TIMELINE_PRESETS,
         RowKind.TIMELINE_RESET,
         RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,

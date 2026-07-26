@@ -54,7 +54,7 @@ def test_signals_complete_false_when_missing(tmp_path: Path) -> None:
 def test_signals_complete_true_when_current_version(tmp_path: Path) -> None:
     project = tmp_path / "my-track"
     project.mkdir()
-    (project / "signals.json").write_text('{"version": 3}')
+    (project / "signals.json").write_text('{"version": 4}')
     assert signals_complete(project) is True
 
 
@@ -124,7 +124,7 @@ def test_run_separate_writes_project_viz_config(
     project = tmp_path / "projects" / "my-track"
     project.mkdir(parents=True)
     _write_stub_stems(project)
-    (project / "signals.json").write_text('{"version": 3}')
+    (project / "signals.json").write_text('{"version": 4}')
 
     with patch("cleave.separate._run_demucs") as run_demucs, patch(
         "cleave.separate.run_analyse"
@@ -149,7 +149,7 @@ def test_run_separate_noop_when_stems_and_signals_exist(
     project = tmp_path / "projects" / "my-track"
     project.mkdir(parents=True)
     _write_stub_stems(project)
-    (project / "signals.json").write_text('{"version": 3}')
+    (project / "signals.json").write_text('{"version": 4}')
 
     with patch("cleave.separate._run_demucs") as run_demucs, patch(
         "cleave.separate.run_analyse"
@@ -237,7 +237,7 @@ def test_run_separate_reanalyses_on_explicit_beat_stem_mismatch(
         demucs_model="htdemucs",
     )
     (project / "signals.json").write_text(
-        '{"version": 3, "beat_detection_stem": "full_mix"}'
+        '{"version": 4, "beat_detection_stem": "full_mix"}'
     )
 
     with patch("cleave.separate._run_demucs") as run_demucs, patch(
@@ -263,7 +263,7 @@ def test_run_separate_skips_when_explicit_beat_stem_matches_stored(
     project.mkdir(parents=True)
     _write_stub_stems(project)
     (project / "signals.json").write_text(
-        '{"version": 3, "beat_detection_stem": "drums"}'
+        '{"version": 4, "beat_detection_stem": "drums"}'
     )
 
     with patch("cleave.separate._run_demucs") as run_demucs, patch(
@@ -287,7 +287,7 @@ def test_run_separate_skips_when_flag_omitted_even_if_stored_is_drums(
     project.mkdir(parents=True)
     _write_stub_stems(project)
     (project / "signals.json").write_text(
-        '{"version": 3, "beat_detection_stem": "drums"}'
+        '{"version": 4, "beat_detection_stem": "drums"}'
     )
 
     with patch("cleave.separate._run_demucs") as run_demucs, patch(
@@ -385,7 +385,7 @@ def test_run_separate_force_uses_stored_beat_detection_stem(
         demucs_model="htdemucs",
     )
     (project / "signals.json").write_text(
-        '{"version": 3, "beat_detection_stem": "drums"}'
+        '{"version": 4, "beat_detection_stem": "drums"}'
     )
 
     with patch("cleave.separate._run_demucs") as run_demucs, patch(
@@ -417,7 +417,7 @@ def test_run_separate_force_explicit_beat_stem_overrides_stored(
         demucs_model="htdemucs",
     )
     (project / "signals.json").write_text(
-        '{"version": 3, "beat_detection_stem": "drums"}'
+        '{"version": 4, "beat_detection_stem": "drums"}'
     )
 
     with patch("cleave.separate._run_demucs") as run_demucs, patch(

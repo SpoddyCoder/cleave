@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import random
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
+from cleave.extract import StemSource
+from cleave.signals import Signals
 from cleave.timeline import TimelineLane
 from cleave.timeline_presets.arrange import PHRASE_SEC_MIN, compose_timeline
 from cleave.timeline_presets.characters import (
@@ -55,6 +57,8 @@ def build_breathing_cues(
     bar_times: Sequence[float] = (),
     song_marker_times: Sequence[float] = (),
     density_bias: int = 0,
+    signals: Signals | None = None,
+    slot_stems: Mapping[str, StemSource] | None = None,
 ) -> dict[str, TimelineLane]:
     return compose_timeline(
         slots,
@@ -64,6 +68,8 @@ def build_breathing_cues(
         bar_times,
         song_marker_times=song_marker_times,
         density_bias=density_bias,
+        signals=signals,
+        slot_stems=slot_stems,
     )
 
 
@@ -74,6 +80,8 @@ def build_dialogue_cues(
     bar_times: Sequence[float] = (),
     song_marker_times: Sequence[float] = (),
     density_bias: int = 0,
+    signals: Signals | None = None,
+    slot_stems: Mapping[str, StemSource] | None = None,
 ) -> dict[str, TimelineLane]:
     return compose_timeline(
         slots,
@@ -83,6 +91,8 @@ def build_dialogue_cues(
         bar_times,
         song_marker_times=song_marker_times,
         density_bias=density_bias,
+        signals=signals,
+        slot_stems=slot_stems,
     )
 
 
@@ -93,6 +103,8 @@ def build_arc_cues(
     bar_times: Sequence[float] = (),
     song_marker_times: Sequence[float] = (),
     density_bias: int = 0,
+    signals: Signals | None = None,
+    slot_stems: Mapping[str, StemSource] | None = None,
 ) -> dict[str, TimelineLane]:
     return compose_timeline(
         slots,
@@ -102,6 +114,8 @@ def build_arc_cues(
         bar_times,
         song_marker_times=song_marker_times,
         density_bias=density_bias,
+        signals=signals,
+        slot_stems=slot_stems,
     )
 
 
@@ -112,6 +126,8 @@ def build_pulse_cues(
     bar_times: Sequence[float] = (),
     song_marker_times: Sequence[float] = (),
     density_bias: int = 0,
+    signals: Signals | None = None,
+    slot_stems: Mapping[str, StemSource] | None = None,
 ) -> dict[str, TimelineLane]:
     return compose_timeline(
         slots,
@@ -121,6 +137,8 @@ def build_pulse_cues(
         bar_times,
         song_marker_times=song_marker_times,
         density_bias=density_bias,
+        signals=signals,
+        slot_stems=slot_stems,
     )
 
 

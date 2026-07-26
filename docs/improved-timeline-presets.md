@@ -17,26 +17,25 @@ What works today:
 - Each layer is its own projectM instance fed stem PCM; black-key (and other) blends stack them in [cleave/gl_compositor.py](../cleave/gl_compositor.py).
 - Cue levels drive continuous opacity: `lane_level_breakpoints` / `lane_level_envelope` in [cleave/timeline.py](../cleave/timeline.py) feed `layer.timeline_level` via `apply_layer_visibility` in [cleave/viz/layer_visibility.py](../cleave/viz/layer_visibility.py). The strip draws the same breakpoints as variable-height bars.
 - `preset_switching: timeline` advances a seek-stable rotation on each rise from zero; the milk file is not chosen per cue.
-- Per-stem envelopes in `signals.json` drive live Cleave effects ([cleave/effects/](../cleave/effects/)), not timeline generation.
+- Per-stem envelopes in `signals.json` (version 4) drive live Cleave effects ([cleave/effects/](../cleave/effects/)) and, when the staged conductor row is on, generative timeline Apply via [cleave/timeline_presets/conductor.py](../cleave/timeline_presets/conductor.py).
 
 Gaps the ideas below target:
 
-1. The arranger still emits level-only cues; it does not yet assign blend or role automatically.
-2. The arranger is musically phrased but not stem-content-aware: it never looks at what the drums or vocals are doing.
-3. Song form still needs manual markers for the best results.
-4. Busy collisions often come from milk personality; role casting helps when pools are curated, but automatic pool fill needs Idea 3 fingerprints.
-5. Nothing recurs. Chorus 2 gets a fresh roll of the dice, so the output reads as plausible-but-random rather than composed.
+1. The arranger still does not assign blend or role automatically (levels and stem gating are shipped; automatic mix assignment remains deferred).
+2. Song form still needs manual markers for the best results.
+3. Busy collisions often come from milk personality; role casting helps when pools are curated, but automatic pool fill needs Idea 3 fingerprints.
+4. Nothing recurs. Chorus 2 gets a fresh roll of the dice, so the output reads as plausible-but-random rather than composed.
 
 ---
 
 ## Idea 1: Arrangement as a mix, not a gate (shipped: levels, blend, role)
 
-**Shipped:** cues are level keyframes with optional blend and role (`SlotCue(t, level, blend?, role?)`), fade groups become constant-slope ramps on a piecewise-linear envelope, the strip draws variable-height bars, and crescendo ramps entrants in at `0.5` before a full stack. Layer opacity stays the static fader; the lane multiplies into `fbo.opacity` as before. Per-cue blend writes `LayerFbo.blend_mode` each frame ([cleave/blend_modes.py](../cleave/blend_modes.py)); per-cue role casts from `preset_root/roles/<role>/` on rises from zero. Blend and role are authored on on / visible cues (the next period), not on disable cues; off cues are stripped of both in `canonicalize`.
+**Shipped:** cues are level keyframes with optional blend and role (`SlotCue(t, level, blend?, role?)`), fade groups become constant-slope ramps on a piecewise-linear envelope, the strip draws variable-height bars, and crescendo ramps entrants in from `LEVEL_QUANTUM` through every quantised step to a full stack. Layer opacity stays the static fader; the lane multiplies into `fbo.opacity` as before. Per-cue blend writes `LayerFbo.blend_mode` each frame ([cleave/blend_modes.py](../cleave/blend_modes.py)); per-cue role casts from `preset_root/roles/<role>/` on rises from zero. Blend and role are authored on on / visible cues (the next period), not on disable cues; off cues are stripped of both in `canonicalize`.
 
 **Deferred** (still part of the mix vision, not implemented):
 
 - Manual level authoring in the strip (record toggles still write `0.0` / `1.0`).
-- Automatic blend/role assignment from the generative arranger (Idea 2 / Idea 3).
+- Automatic blend/role assignment from the generative arranger (Idea 3).
 
 ### Intent
 
@@ -51,13 +50,13 @@ Gaps the ideas below target:
 2. Envelope: `lane_level_breakpoints` / `lane_level_envelope` replace edge-only fade alpha; rise completes at cue time, fall starts at cue time; slopes scale with level delta.
 3. Runtime: `timeline_level` / `timeline_level_multiplier`; levels apply even when both fade groups are disabled (piecewise-constant envelope).
 4. Preset-switch trigger: rise from zero only; `cue.t - fade_in * cue.level`.
-5. Generator: `cues_from_states` emits level mappings; crescendo uses `0.5` entrants.
+5. Generator: `cues_from_states` emits level mappings; crescendo climbs each entrant from `LEVEL_QUANTUM` to full.
 6. Strip: polygon fill from breakpoints; committed eye alpha follows level.
 7. Blend: held like level via `lane_blend_at`; applied per frame in `apply_layer_visibility` with layer static fallback.
 8. Role: event property on on-transitions; seek-stable per-role pools in [cleave/viz/preset_switching.py](../cleave/viz/preset_switching.py); empty pool falls back to the main rotation.
 9. Strip authoring: `,` / `.` select on cues (`level > 0`, including mid-on changes; offs skipped); `b` / `c` cycle blend and cast on those only; selected tick highlight, role glyphs on on cues, and badge readout.
 
-Overlaps [roadmap.md](roadmap.md) richer cue types; automatic assignment from stem content and fingerprints remains Idea 2 / Idea 3.
+Overlaps [roadmap.md](roadmap.md) richer cue types; automatic blend/role assignment from stem content and fingerprints remains Idea 3.
 
 ### User effort
 
@@ -65,9 +64,15 @@ None for 0/1 lanes. Partial levels come from generative Apply (crescendo). Blend
 
 ---
 
-## Idea 2: Stem conductor
+## Idea 2: Stem conductor (shipped: opt-in audio-aware arrange)
 
-Treat each layer as a player that may only enter when its stem has something to say. Visibility becomes a consequence of audio, not only of motif vocabulary.
+**Shipped:** an opt-in staged `conductor` row under timeline preset. When on and `signals.json` is present (version 4), Apply builds a [StemConductor](../cleave/timeline_presets/conductor.py) from full-mix energy ranks and per-slot stem presence, scales the character budget, biases solo rotation and chord picks toward active stems, and emits continuous cue levels quantised to `LEVEL_QUANTUM` (active slots never land between 0 and 0.25; near-silent phrases keep one slot at 0.25). Missing signals notify and fall through to plain arrangement. `other` now carries `rms` alongside `spectral_centroid`.
+
+**Deferred** (still part of the conductor vision, not implemented):
+
+- Section-role bias from auto form (Idea 4).
+- Closed-loop visual limiter (companion below).
+- Automatic blend or role assignment from stem content (Idea 1 deferred / Idea 3).
 
 ### Intent
 
@@ -75,34 +80,54 @@ Treat each layer as a player that may only enter when its stem has something to 
 - Cap how much of the stack is hot at once so the composite stays readable.
 - Keep Breathing / Dialogue / Arc / Pulse as feel knobs (switch rate, climax shape) while the conductor supplies who speaks and how loudly.
 
-### Design sketch
+### What landed
 
-1. From full-mix energy and onset novelty, build a **target weight curve** over time (sparse verse near one layer of weight, chorus two to three, drop to zero then punch back in).
-2. **Gate and weight each slot** by its assigned stem using the `signals.json` envelopes that already exist at 100 Hz:
+1. Signals: `other.rms` in extract/analyse; `SIGNALS_VERSION = 4`; `Signals.window_mean` for phrase and state windows.
+2. Conductor module: phrase energy ranks, per-slot activity, rotation hint, chord score, `level_states`; staging helpers mirror density.
+3. Arranger hooks: optional `signals` / `slot_stems` on all four builders into `compose_timeline`; UI toggle expressed by whether Apply passes those kwargs.
+4. Panel: `timeline.preset.conductor` persisted; confirm modal lists `conductor: on|off`.
+
+### Tuning notes
+
+Raw stem envelopes are not comparable across stems: drum onset strength is
+spiky and low-mean while rms is dense and high-mean, so a raw comparison hands
+the same slot the lead in nearly every phrase. The conductor therefore
+standardises each slot **within the song**: `slot_activity` is a rank fraction
+across phrases, so activity reads as "busier than usual for this stem" and every
+slot averages the same. A raw presence below `_SLOT_SILENCE_FLOOR` gates to
+zero so a dead stem never ranks as a lead, and a flat envelope resolves to the
+neutral midpoint instead of a spurious ranking.
+
+The rest of the curve exists to keep the conductor a redistribution rather than
+a global attenuator:
+
+| Constant | Role | Turn it when |
+| --- | --- | --- |
+| `CONDUCTOR_GAIN_MIN` / `CONDUCTOR_GAIN_MAX` | Budget multiplier by phrase energy rank; the pair sums to 2.0 so the mean gain is exactly 1.0 | Loud phrases should unlock denser chords (raise the max, lower the min to match) |
+| `CONDUCTOR_CEILING_MIN` / `CONDUCTOR_CEILING_EXPONENT` | Lead level from phrase energy relative to the song peak, not its rank, so only genuinely quiet passages dim; exponent steeps the curve so compressed masters still span quantised steps | Quiet passages should read darker (lower the min) or mid-song levels stay pinned at 1.0 (raise the exponent) |
+| `CONDUCTOR_SUPPORT_FLOOR_BY_BIAS` | Lowest fraction of the lead level a supporting slot may take, per density bias; kept below ~0.70 so dense stacks still duck into 0.5/0.75 | Overlap still reads as one layer plus ghosts (raise the table carefully; too high flattens to binary) |
+| `AIRTIME_PENALTY` | Penalty on a slot's share of accumulated airtime above an even share | One slot still holds too much screen time |
+| `CONDUCTOR_ACTIVITY_MIDPOINT` | Neutral point subtracted in `chord_score`, so chord size is scored on quality only and larger chords are not penalised | Never, it is fixed by the rank standardisation |
+
+Crescendo shares the level model: entrants appear at `LEVEL_QUANTUM` and climb
+through every quantised step to a full stack at `t_full`, spread over
+`max(entrants + 1, 1 / LEVEL_QUANTUM)` evenly spaced times snapped to nearby
+bars. Ramps are only visible when a timeline fade group is enabled; both groups
+default to disabled, which turns every level change into a hard step.
+
+### Stem presence keys
 
 | Stem | Fields | Reads as |
 | --- | --- | --- |
 | drums | `onset_strength` | onset density, fills |
 | bass | `rms`, `sub_bass`, `mid_bass` | foundation presence |
 | vocals | `rms`, `pitch_hz` | lead activity, phrase ends |
-| other | `spectral_centroid` | color and brightness |
+| other | `rms`, `spectral_centroid` | presence plus color/brightness |
 | full_mix | `onset_strength`, `rms` | global energy, section contrast |
-
-3. Apply **anti-busy rules** while filling the budget: prefer one bright accent over several; solo when one stem dominates; duck competing hot layers instead of cutting them (needs Idea 1 levels, which are available).
-4. Emit ordinary lane cues. Phrase grid and song-marker walls still bound switch times.
-
-### Fits existing code
-
-- Arranger entry: [cleave/timeline_presets/arrange.py](../cleave/timeline_presets/arrange.py) `compose_timeline`, which already computes a per-phrase `budget` from the character envelope. The conductor replaces that scalar with an audio-derived curve and adds per-slot eligibility to motif scoring.
-- Signal load: [cleave/signals.py](../cleave/signals.py); extract path: [cleave/extract.py](../cleave/extract.py). No new analyse output required.
-
-### Libraries
-
-Current stack; librosa envelopes are already written at analyse time. Optional later: [madmom](https://github.com/CPJKU/madmom) for cleaner onsets.
 
 ### User effort
 
-Run `separate` (already required for beats), then Apply. No new markers.
+Run `separate` (required for beats and v4 envelopes; re-run on existing projects after the schema bump), stage conductor on, then Apply. No new markers.
 
 ---
 
@@ -218,14 +243,14 @@ Breathing / Dialogue / Arc / Pulse remain character profiles that bias switch ra
 | --- | --- | --- | --- | --- |
 | 1 | Rich cues: levels (Idea 1, shipped) | Enabler; everything else wants levels, not booleans | Better output immediately, even with today's arranger | Done |
 | 1b | Rich cues: blend and role (Idea 1, shipped) | Completes the mix vision; casting uses the cue role field | Medium | Done |
-| 2 | Stem conductor (Idea 2) | Uses data already in `signals.json`; first thing that makes lanes song-tied | High | Medium (arranger plus signals) |
+| 2 | Stem conductor (Idea 2, shipped) | Uses data already in `signals.json`; first thing that makes lanes song-tied | High | Done |
 | 3 | Closed-loop limiter (companion) | Cheap once levels exist; buys headroom before casting lands | Medium | Low |
 | 4 | Reactivity fingerprints and casting (Idea 3) | Probe harness exists; fixes busy-on-busy at the milk level | High | High (probe set, metrics, pools, casting) |
 | 5 | Reprise and auto form (Idea 4) | Highest ceiling, most analysis risk; benefits from 1 to 4 being in place | High | High (analyse dependency, marker suggestions, arranger restructure) |
 
 Sequencing notes:
 
-- Levels (1) and stem conductor (2) are independently shippable and together cover most of the "feels tied to the song" goal.
+- Levels (1) and stem conductor (2) are shipped and together cover most of the "feels tied to the song" goal.
 - Step 4 can ship in halves: fingerprints and a scan report first, casting second.
 - Step 5 can ship in halves: suggested markers first (useful alone), cluster reprise second.
 
