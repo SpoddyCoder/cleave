@@ -1142,6 +1142,11 @@ def test_write_session_snapshot_persists_timeline_disabled_without_cues(
             "density": "normal",
             "conductor": False,
         },
+        "limiter": {
+            "enabled": True,
+            "threshold": 0.65,
+            "release": 0.45,
+        },
     }
 
 

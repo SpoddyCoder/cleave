@@ -75,7 +75,7 @@ def apply_effect_modifiers(
         if not layer.fbo.enabled:
             continue
         mod = modifiers[slot]
-        layer.fbo.opacity = mod.opacity * layer.timeline_level
+        layer.fbo.opacity = mod.opacity * layer.timeline_level * layer.limiter_gain
         layer.fbo.flash_alpha = mod.flash_alpha
         layer.fbo.bloom_strength = mod.bloom_strength
         layer.fbo.hue_rgb = mod.hue_rgb

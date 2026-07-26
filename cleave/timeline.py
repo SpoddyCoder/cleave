@@ -152,6 +152,20 @@ def lane_blend_at(lane: TimelineLane, t_sec: float) -> BlendMode | None:
     return blend
 
 
+def lane_role_at(lane: TimelineLane, t_sec: float) -> CueRole | None:
+    """Held role at ``t_sec``: last cue's ``role`` at or before ``t``.
+
+    ``None`` means no cast (limiter treats unset as ``pulse``). A later cue may
+    set ``role`` back to ``None`` to clear.
+    """
+    role: CueRole | None = None
+    for cue in lane.cues:
+        if cue.t > t_sec:
+            break
+        role = cue.role
+    return role
+
+
 def lane_level_segments(
     lane: TimelineLane,
     duration_sec: float,

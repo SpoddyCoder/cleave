@@ -15,7 +15,11 @@ from typing import TYPE_CHECKING
 
 from cleave.config_schema import (
     TIMELINE_FADE_DURATION_STEP,
+    VISUAL_LIMITER_RELEASE_STEP,
+    VISUAL_LIMITER_THRESHOLD_STEP,
     clamp_timeline_fade_duration,
+    clamp_visual_limiter_release,
+    clamp_visual_limiter_threshold,
     cycle_timeline_placement_snap,
     hard_cut_enabled_display,
     preset_start_clean_display,
@@ -271,6 +275,70 @@ def _apply_timeline_preset_conductor(
         tl.timeline_preset_conductor,
         forward=forward,
     )
+
+
+def _format_visual_limiter_enabled(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return hard_cut_enabled_display(state.render_timeline.limiter.enabled)
+
+
+def _apply_visual_limiter_header(
+    controls: TuningControls,
+    desc: RowDescriptor,
+    forward: bool,
+    ctrl: bool,
+    _shift: bool,
+) -> None:
+    if ctrl:
+        if (
+            controls.session.timeline.locked
+            and row_behavior(desc.kind).can_enable_disable
+        ):
+            return
+        controls._set_visual_limiter_enabled(forward)
+        return
+    apply_expand_toggle(controls, desc.kind, desc.slot, forward)
+
+
+def _format_visual_limiter_threshold(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return f"{int(round(state.render_timeline.limiter.threshold * 100))}%"
+
+
+def _apply_visual_limiter_threshold(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    del _ctrl, _shift
+    lim = controls.session.timeline.limiter
+    delta = VISUAL_LIMITER_THRESHOLD_STEP if forward else -VISUAL_LIMITER_THRESHOLD_STEP
+    lim.threshold = clamp_visual_limiter_threshold(
+        round(lim.threshold + delta, 2)
+    )
+
+
+def _format_visual_limiter_release(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return f"{state.render_timeline.limiter.release:.1f}s"
+
+
+def _apply_visual_limiter_release(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    del _ctrl, _shift
+    lim = controls.session.timeline.limiter
+    delta = VISUAL_LIMITER_RELEASE_STEP if forward else -VISUAL_LIMITER_RELEASE_STEP
+    lim.release = clamp_visual_limiter_release(round(lim.release + delta, 1))
 
 
 def _format_timeline_song_marker_fades_enabled(
@@ -1704,6 +1772,24 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
     RowKind.TIMELINE_PRESETS: RowFieldDef(
         panel_label="apply timeline preset",
         present_style=RowPresentStyle.FULL_LINE,
+    ),
+    RowKind.TIMELINE_VISUAL_LIMITER_HEADER: RowFieldDef(
+        panel_label="visual limiter",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        format_value=_format_visual_limiter_enabled,
+        apply_horizontal=_apply_visual_limiter_header,
+    ),
+    RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD: RowFieldDef(
+        panel_label="threshold",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_visual_limiter_threshold,
+        apply_horizontal=_apply_visual_limiter_threshold,
+    ),
+    RowKind.TIMELINE_VISUAL_LIMITER_RELEASE: RowFieldDef(
+        panel_label="release",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_visual_limiter_release,
+        apply_horizontal=_apply_visual_limiter_release,
     ),
     RowKind.TIMELINE_RESET: RowFieldDef(
         panel_label="reset timeline",

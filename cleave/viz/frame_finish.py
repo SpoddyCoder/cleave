@@ -2,8 +2,9 @@
 
 After layer compositing, both paths run the same sequence: HDR display
 shoulder (when ``render.hdr_compositing`` is enabled and not in preset
-curation), optional user highlight rolloff, post-FX fade, render overlay
-composite, then present to the display framebuffer.
+curation), visual-limiter busyness sample, optional user highlight rolloff,
+chroma boost, post-FX fade, render overlay composite, then present to the
+display framebuffer.
 
 When ``cfg.render`` is absent, overlay resolution matches live WYSIWYG:
 ``render_overlay_base(cfg)`` falls back to ``default_render_overlay_config()``,
@@ -43,6 +44,7 @@ from cleave.viz.render_overlay import (
     panel_surface_key,
 )
 from cleave.viz.session import TuningSession
+from cleave.viz.visual_limiter import observe_frame_busyness
 
 
 @dataclass
@@ -132,6 +134,8 @@ def finish_content_frame(
             compositor.content_width,
             compositor.content_height,
         )
+
+    observe_frame_busyness(core, t_sec, session)
 
     pp = session.render_post_fx
     sections_on = render_sections_active(session)

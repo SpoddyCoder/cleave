@@ -12,6 +12,7 @@ from cleave.config import (
     RenderOverlayPosition,
     RenderOverlaySlideDirection,
     TimelineFadeGroupConfig,
+    TimelineLimiterConfig,
     VIZ_CONFIG_FILENAME,
 )
 from cleave.config_schema import (
@@ -31,6 +32,9 @@ from cleave.config_schema import (
     DEFAULT_TIMELINE_FADE_IN,
     DEFAULT_TIMELINE_FADE_OUT,
     DEFAULT_TIMELINE_PLACEMENT_SNAP,
+    DEFAULT_VISUAL_LIMITER_ENABLED,
+    DEFAULT_VISUAL_LIMITER_THRESHOLD,
+    DEFAULT_VISUAL_LIMITER_RELEASE,
     HighlightRolloffApplyMode,
     HighlightRolloffCurve,
     PresetSwitchingMode,
@@ -173,6 +177,17 @@ def default_timeline_fade_group_runtime() -> TimelineFadeGroupRuntime:
 
 
 @dataclass
+class VisualLimiterRuntime:
+    enabled: bool = DEFAULT_VISUAL_LIMITER_ENABLED
+    threshold: float = DEFAULT_VISUAL_LIMITER_THRESHOLD
+    release: float = DEFAULT_VISUAL_LIMITER_RELEASE
+
+
+def default_visual_limiter_runtime() -> VisualLimiterRuntime:
+    return VisualLimiterRuntime()
+
+
+@dataclass
 class TimelineRuntime:
     enabled: bool = True
     locked: bool = False
@@ -199,6 +214,7 @@ class TimelineRuntime:
     placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
     fades_expanded: bool = False
     timeline_presets_expanded: bool = False
+    visual_limiter_expanded: bool = False
     timeline_preset_kind: str = DEFAULT_TIMELINE_PRESET_KIND
     timeline_preset_crescendo: CrescendoTarget | None = None
     timeline_preset_density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
@@ -209,6 +225,7 @@ class TimelineRuntime:
     standard_cue_fades: TimelineFadeGroupRuntime = field(
         default_factory=default_timeline_fade_group_runtime
     )
+    limiter: VisualLimiterRuntime = field(default_factory=default_visual_limiter_runtime)
 
 
 def default_timeline_runtime() -> TimelineRuntime:
@@ -370,6 +387,18 @@ def _fade_group_runtime_from_cfg(
     )
 
 
+def _limiter_runtime_from_cfg(
+    limiter: TimelineLimiterConfig | None,
+) -> VisualLimiterRuntime:
+    if limiter is None:
+        return VisualLimiterRuntime()
+    return VisualLimiterRuntime(
+        enabled=limiter.enabled,
+        threshold=limiter.threshold,
+        release=limiter.release,
+    )
+
+
 def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
     timeline = cfg.timeline
     enabled = True if timeline is None else timeline.enabled
@@ -382,6 +411,7 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
         else timeline.placement_snap
     )
     preset = None if timeline is None else timeline.preset
+    limiter_cfg = None if timeline is None else timeline.limiter
     preset_kind = (
         DEFAULT_TIMELINE_PRESET_KIND if preset is None else preset.character
     )
@@ -398,6 +428,7 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
             lanes[slot] = copy_lane(source_lanes[slot])
         else:
             lanes[slot] = empty_lane()
+    limiter = _limiter_runtime_from_cfg(limiter_cfg)
     if fades is None:
         return TimelineRuntime(
             enabled=enabled,
@@ -408,6 +439,7 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
             timeline_preset_crescendo=preset_crescendo,
             timeline_preset_density=preset_density,
             timeline_preset_conductor=preset_conductor,
+            limiter=limiter,
         )
     return TimelineRuntime(
         enabled=enabled,
@@ -420,6 +452,7 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
         timeline_preset_conductor=preset_conductor,
         song_marker_fades=_fade_group_runtime_from_cfg(fades.song_markers),
         standard_cue_fades=_fade_group_runtime_from_cfg(fades.standard),
+        limiter=limiter,
     )
 
 

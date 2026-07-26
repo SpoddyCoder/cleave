@@ -64,6 +64,9 @@ from cleave.config_schema import (
     DEFAULT_TIMELINE_FADE_IN,
     DEFAULT_TIMELINE_FADE_OUT,
     DEFAULT_TIMELINE_PLACEMENT_SNAP,
+    DEFAULT_VISUAL_LIMITER_ENABLED,
+    DEFAULT_VISUAL_LIMITER_THRESHOLD,
+    DEFAULT_VISUAL_LIMITER_RELEASE,
     TimelinePlacementSnap,
     DEFAULT_HDR_COMPOSITING,
     DEFAULT_RENDER_FPS,
@@ -278,6 +281,15 @@ class TimelinePresetConfig:
 
 
 @dataclass(frozen=True)
+class TimelineLimiterConfig:
+    """Live visual limiter knobs under ``timeline.limiter``."""
+
+    enabled: bool = DEFAULT_VISUAL_LIMITER_ENABLED
+    threshold: float = DEFAULT_VISUAL_LIMITER_THRESHOLD
+    release: float = DEFAULT_VISUAL_LIMITER_RELEASE
+
+
+@dataclass(frozen=True)
 class TimelineConfig:
     enabled: bool
     lanes: dict[str, TimelineLane]
@@ -285,6 +297,7 @@ class TimelineConfig:
     fades: TimelineFadesConfig = field(default_factory=TimelineFadesConfig)
     placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
     preset: TimelinePresetConfig = field(default_factory=TimelinePresetConfig)
+    limiter: TimelineLimiterConfig = field(default_factory=TimelineLimiterConfig)
 
 
 @dataclass

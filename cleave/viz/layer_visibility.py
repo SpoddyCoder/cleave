@@ -220,7 +220,7 @@ def _as_fade_group(group: TimelineFadeGroupRuntime) -> TimelineFadeGroup:
     )
 
 
-def _timeline_levels_apply(session: TuningSession, slot: str) -> bool:
+def timeline_levels_apply(session: TuningSession, slot: str) -> bool:
     """True when the timeline level envelope drives FBO enable/opacity for *slot*."""
     from cleave.viz.editor_mode_controls import is_preset_curation_mode
 
@@ -276,7 +276,7 @@ def apply_layer_visibility(
     t_sec: float,
 ) -> None:
     for slot, layer in layers_by_slot.items():
-        if _timeline_levels_apply(session, slot):
+        if timeline_levels_apply(session, slot):
             level = timeline_level_multiplier(session, slot, t_sec)
             layer.timeline_level = level
             layer.fbo.enabled = level > LEVEL_EPS
