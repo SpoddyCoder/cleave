@@ -27,7 +27,7 @@ Reuse or add `*_active()` helpers in `post_fx.py` that check `render.post_fx.ena
 
 When enabled, compositor FBOs use `GL_RGBA16F` ([cleave/gl_color_format.py](cleave/gl_color_format.py)). `GlPostProcess` must match via `moderngl_external_dtype` / `moderngl_internal_dtype` (`f2` half-float, `f1` for 8-bit internal). **Never `u1` for 8-bit internal buffers** (breaks copy/bloom/grit). Skip output clamp when wired for `RGBA16F` (`hdr` uniform). 8-bit black-key stacking washes bright layers before tone curves.
 
-`finish_content_frame` order: HDR display shoulder (fixed constants in `post_fx.py`; not gated on post-FX `enabled`) -> user composite highlight rolloff -> user composite chroma boost -> frame fade -> overlay -> present (8-bit clamp). Per-layer rolloff/chroma_boost keep frozen compositor source textures for paused live tuning.
+`finish_content_frame` order: HDR display shoulder (fixed constants in `post_fx.py`; not gated on post-FX `enabled`) -> visual-limiter busyness sample ([cleave/viz/visual_limiter.py](cleave/viz/visual_limiter.py)) -> user composite highlight rolloff -> user composite chroma boost -> frame fade -> overlay -> present (8-bit clamp). Per-layer rolloff/chroma_boost keep frozen compositor source textures for paused live tuning.
 
 ## Known pitfalls (GlPostProcess)
 

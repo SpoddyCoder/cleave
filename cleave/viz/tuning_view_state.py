@@ -34,6 +34,9 @@ from cleave.config_schema import (
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
+    DEFAULT_VISUAL_LIMITER_ENABLED,
+    DEFAULT_VISUAL_LIMITER_THRESHOLD,
+    DEFAULT_VISUAL_LIMITER_RELEASE,
     default_render_overlay_runtime_values,
     default_render_post_fx_runtime_values,
 )
@@ -165,6 +168,13 @@ class TimelineFadeGroupBlock:
 
 
 @dataclass
+class VisualLimiterBlock:
+    enabled: bool = DEFAULT_VISUAL_LIMITER_ENABLED
+    threshold: float = DEFAULT_VISUAL_LIMITER_THRESHOLD
+    release: float = DEFAULT_VISUAL_LIMITER_RELEASE
+
+
+@dataclass
 class RenderTimelineBlock:
     enabled: bool = False
     expanded: bool = False
@@ -174,6 +184,7 @@ class RenderTimelineBlock:
     placement_snap: str = "beat"
     fades_expanded: bool = False
     timeline_presets_expanded: bool = False
+    visual_limiter_expanded: bool = False
     timeline_preset_kind: str = "breathing"
     timeline_preset_crescendo: CrescendoTarget | None = None
     timeline_preset_density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
@@ -184,6 +195,7 @@ class RenderTimelineBlock:
     standard_cue_fades: TimelineFadeGroupBlock = field(
         default_factory=TimelineFadeGroupBlock
     )
+    limiter: VisualLimiterBlock = field(default_factory=VisualLimiterBlock)
     locked: bool = False
     song_markers_expanded: bool = False
     song_marker_times: tuple[float, ...] = ()
@@ -369,8 +381,10 @@ def view_state_structure_signature(
             "beat_bar_grid_expanded": tl.beat_bar_grid_expanded,
             "fades_expanded": tl.fades_expanded,
             "timeline_presets_expanded": tl.timeline_presets_expanded,
+            "visual_limiter_expanded": tl.visual_limiter_expanded,
             "song_marker_fades_enabled": tl.song_marker_fades.enabled,
             "standard_cue_fades_enabled": tl.standard_cue_fades.enabled,
+            "visual_limiter_enabled": tl.limiter.enabled,
         },
         "timeline": {"enabled": tl.enabled},
     }
@@ -536,6 +550,7 @@ class TuningViewStateBuilder:
             placement_snap=tl.placement_snap,
             fades_expanded=tl.fades_expanded,
             timeline_presets_expanded=tl.timeline_presets_expanded,
+            visual_limiter_expanded=tl.visual_limiter_expanded,
             timeline_preset_kind=tl.timeline_preset_kind,
             timeline_preset_crescendo=tl.timeline_preset_crescendo,
             timeline_preset_density=tl.timeline_preset_density,
@@ -549,6 +564,11 @@ class TuningViewStateBuilder:
                 enabled=tl.standard_cue_fades.enabled,
                 fade_in=tl.standard_cue_fades.fade_in,
                 fade_out=tl.standard_cue_fades.fade_out,
+            ),
+            limiter=VisualLimiterBlock(
+                enabled=tl.limiter.enabled,
+                threshold=tl.limiter.threshold,
+                release=tl.limiter.release,
             ),
             song_markers_expanded=self.session.song_markers.expanded,
             song_marker_times=tuple(self.session.song_markers.times),
@@ -718,6 +738,7 @@ class TuningViewStateBuilder:
                 placement_snap=tl.placement_snap,
                 fades_expanded=tl.fades_expanded,
                 timeline_presets_expanded=tl.timeline_presets_expanded,
+                visual_limiter_expanded=tl.visual_limiter_expanded,
                 timeline_preset_kind=tl.timeline_preset_kind,
                 timeline_preset_crescendo=tl.timeline_preset_crescendo,
                 timeline_preset_density=tl.timeline_preset_density,
@@ -731,6 +752,11 @@ class TuningViewStateBuilder:
                     enabled=tl.standard_cue_fades.enabled,
                     fade_in=tl.standard_cue_fades.fade_in,
                     fade_out=tl.standard_cue_fades.fade_out,
+                ),
+                limiter=VisualLimiterBlock(
+                    enabled=tl.limiter.enabled,
+                    threshold=tl.limiter.threshold,
+                    release=tl.limiter.release,
                 ),
                 locked=tl.locked,
                 song_markers_expanded=self.session.song_markers.expanded,

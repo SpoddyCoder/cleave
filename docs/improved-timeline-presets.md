@@ -71,7 +71,6 @@ None for 0/1 lanes. Partial levels come from generative Apply (crescendo). Blend
 **Deferred** (still part of the conductor vision, not implemented):
 
 - Section-role bias from auto form (Idea 4).
-- Closed-loop visual limiter (companion below).
 - Automatic blend or role assignment from stem content (Idea 1 deferred / Idea 3).
 
 ### Intent
@@ -214,11 +213,50 @@ Run `separate`, glance at suggested markers, Apply. Manual drop remains for stub
 
 ---
 
-## Companion: closed-loop visual limiter
+## Companion: closed-loop visual limiter (shipped)
 
-Small, cheap, and catches collisions no offline classifier predicted. The post-FX stack in [cleave/gl_post_process.py](../cleave/gl_post_process.py) already resolves the composited frame, so a coarse mean-luma and frame-delta reduction per frame costs almost nothing. When the stack exceeds a busyness threshold, duck the lowest-priority hot layer; release when it drops. A sidechain compressor for the composite.
+**Shipped:** a runtime sidechain-style limiter shared by live play and offline render. After the composite (and HDR display shoulder when active), [cleave/viz/visual_limiter.py](../cleave/viz/visual_limiter.py) samples a downsampled luma grid, combines mean luma with mean absolute frame delta into busyness, and on the next frame multiplies a separate `StemLayer.limiter_gain` into opacity (authored `timeline_level` and strip eyes are unchanged). Active when timeline levels apply and `timeline.limiter.enabled` is true; skipped for blank visualizers, preset curation, solo, recording, preview, and when the panel toggle is off.
 
-Depends on Idea 1 levels (available) and on offline determinism: the limiter must be a pure function of frame content so live preview and offline render in [cleave/viz/render.py](../cleave/viz/render.py) agree.
+### Panel (Render: TIMELINE)
+
+Sibling expandable section after **timeline preset** (before **reset timeline**), not under the Apply-staged preset knobs:
+
+```
+Render: TIMELINE
+  ...
+  └─ visual limiter: enabled / disabled
+       └─ threshold
+       └─ release
+```
+
+Left/Right expands/collapses (like other timeline subsections). Ctrl+Left/Right disables/enables (same eye semantics as render section headers); the header value shows enabled/disabled. Threshold and release appear when the section is expanded and enabled. Locked with the timeline section.
+
+| Knob | YAML | Default | Range / display |
+| --- | --- | --- | --- |
+| enabled | `timeline.limiter.enabled` | `true` | on/off |
+| threshold | `timeline.limiter.threshold` | `0.65` | 0.40-0.90; panel shows 40%-90%. Maps to trip-on; off-threshold stays 0.17 below |
+| release | `timeline.limiter.release` | `0.45` | 0.15-1.5 s; panel shows seconds. Maps to release ramp; hold time scales at 0.75/0.45 |
+
+Attack, duck gain, and delta weight stay fixed (not panel knobs).
+
+### What landed
+
+1. Sensor in [cleave/viz/frame_finish.py](../cleave/viz/frame_finish.py) after the HDR shoulder, before highlight rolloff / chroma / fade / overlay.
+2. Controller state on `VisualizerCore.visual_limiter` (gains / hysteresis; not YAML): role/z-order victim pick, playhead-timed attack/release ramps, seek reset. Trip and release times come from session `timeline.limiter`.
+3. Actuator: `limiter_gain` on [cleave/viz/layer.py](../cleave/viz/layer.py); opacity multiply in [cleave/viz/layer_pipeline.py](../cleave/viz/layer_pipeline.py); gains applied in `tick_frame_core` after `apply_layer_visibility`.
+4. Priority via `lane_role_at` in [cleave/timeline.py](../cleave/timeline.py): duck `bed` before `accent` before `pulse` before `lead`; missing role ranks as `pulse`; ties break on lower level, then earlier `layer_z_order`.
+
+### Fixed constants
+
+| Constant | Value | Role |
+| --- | --- | --- |
+| `DELTA_WEIGHT` | 0.85 | Motion term in `mean_luma + k * mean_abs_delta` |
+| `DUCK_GAIN` | 0.50 | Opacity multiplier floor while ducked |
+| `ATTACK_SEC` | 0.15 | Playhead seconds to ramp gain down to `DUCK_GAIN` |
+| `SEEK_JUMP_SEC` | 0.25 | Playhead jump that clears gains and prev grid |
+| `GRID_WIDTH` x `GRID_HEIGHT` | 32 x 18 | Downsample readback grid |
+
+Schema defaults for threshold / release match the tuned constants above. Attack and release are playhead-timed ramps (not wall-clock or fps) so live and offline stay aligned without instant opacity snaps.
 
 ---
 
@@ -244,7 +282,7 @@ Breathing / Dialogue / Arc / Pulse remain character profiles that bias switch ra
 | 1 | Rich cues: levels (Idea 1, shipped) | Enabler; everything else wants levels, not booleans | Better output immediately, even with today's arranger | Done |
 | 1b | Rich cues: blend and role (Idea 1, shipped) | Completes the mix vision; casting uses the cue role field | Medium | Done |
 | 2 | Stem conductor (Idea 2, shipped) | Uses data already in `signals.json`; first thing that makes lanes song-tied | High | Done |
-| 3 | Closed-loop limiter (companion) | Cheap once levels exist; buys headroom before casting lands | Medium | Low |
+| 3 | Closed-loop limiter (companion, shipped) | Cheap once levels exist; buys headroom before casting lands | Medium | Done |
 | 4 | Reactivity fingerprints and casting (Idea 3) | Probe harness exists; fixes busy-on-busy at the milk level | High | High (probe set, metrics, pools, casting) |
 | 5 | Reprise and auto form (Idea 4) | Highest ceiling, most analysis risk; benefits from 1 to 4 being in place | High | High (analyse dependency, marker suggestions, arranger restructure) |
 

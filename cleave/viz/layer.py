@@ -22,6 +22,7 @@ class StemLayer:
     projectm_playlist: ProjectMPlaylist | None = None
     auto_preset_path: Path | None = None
     timeline_level: float = 1.0
+    limiter_gain: float = 1.0
     preset_rotation: PresetRotation | None = None
     role_rotations: dict[CueRole, PresetRotation] = field(default_factory=dict)
     timeline_switch_count: int = 0

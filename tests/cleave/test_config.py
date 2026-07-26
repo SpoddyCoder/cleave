@@ -23,6 +23,7 @@ from cleave.config import (
     TimelineConfig,
     TimelineFadeGroupConfig,
     TimelineFadesConfig,
+    TimelineLimiterConfig,
     TimelinePresetConfig,
     EditorConfig,
     clamp_beat_sensitivity,
@@ -1175,6 +1176,46 @@ def test_persist_timeline_placement_snap_round_trip() -> None:
     )
     assert round_trip is not None
     assert round_trip.placement_snap == "bar"
+
+
+def test_persist_timeline_limiter_round_trip() -> None:
+    from cleave.viz.session import TimelineRuntime, VisualLimiterRuntime
+
+    session = TuningSession(
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
+        timeline=TimelineRuntime(
+            enabled=True,
+            limiter=VisualLimiterRuntime(
+                enabled=False,
+                threshold=0.72,
+                release=0.6,
+            ),
+        ),
+    )
+    cfg = CleaveConfig(
+        paths=PathsConfig(preset_root=Path("/tmp"), texture_paths=()),
+        layers={},
+        editor=EditorConfig(),
+        config_path=Path("/tmp/cleave-viz.yaml"),
+        user_config_path=Path("/tmp/user.yaml"),
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
+    )
+    payload = persist_timeline(PersistCtx(cfg=cfg, session=session, cfg_dir=None))
+    assert payload["limiter"] == {
+        "enabled": False,
+        "threshold": 0.72,
+        "release": 0.6,
+    }
+    round_trip = parse_timeline_section(
+        {"timeline": payload},
+        _timeline_parse_ctx(),
+    )
+    assert round_trip is not None
+    assert round_trip.limiter == TimelineLimiterConfig(
+        enabled=False,
+        threshold=0.72,
+        release=0.6,
+    )
 
 
 def test_persist_timeline_preset_round_trip() -> None:

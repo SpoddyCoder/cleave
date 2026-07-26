@@ -127,6 +127,16 @@ def _timeline_presets_expanded(state: TuningViewState, _slot: str | None) -> boo
     return state.render_timeline.timeline_presets_expanded
 
 
+def _toggle_visual_limiter(
+    controls: TuningControls, _slot: str | None, forward: bool
+) -> None:
+    controls._set_visual_limiter_expanded(forward)
+
+
+def _visual_limiter_expanded(state: TuningViewState, _slot: str | None) -> bool:
+    return state.render_timeline.visual_limiter_expanded
+
+
 def _open_timeline_panel(controls: TuningControls, forward: bool) -> None:
     if forward:
         controls._open_timeline_panel()
@@ -707,6 +717,32 @@ TIMELINE_PRESETS_SECTION = ExpandSectionDef(
 )
 
 
+def _visual_limiter_enabled(
+    state: TuningViewState, _desc: RowDescriptor
+) -> bool:
+    return state.render_timeline.limiter.enabled
+
+
+TIMELINE_VISUAL_LIMITER_ACTIVE = ConditionalRowsDef(
+    name="visual_limiter_enabled",
+    predicate=_visual_limiter_enabled,
+    children=(
+        SectionNode(leaf_kind=RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD),
+        SectionNode(leaf_kind=RowKind.TIMELINE_VISUAL_LIMITER_RELEASE),
+    ),
+)
+
+TIMELINE_VISUAL_LIMITER_SECTION = ExpandSectionDef(
+    header_kind=RowKind.TIMELINE_VISUAL_LIMITER_HEADER,
+    context="global",
+    read_expanded=_visual_limiter_expanded,
+    toggle=_toggle_visual_limiter,
+    children=(
+        SectionNode(conditional=TIMELINE_VISUAL_LIMITER_ACTIVE),
+    ),
+)
+
+
 def _collect_expand_sections(
     *roots: ExpandSectionDef,
     extra_nodes: tuple[SectionNode, ...] = (),
@@ -741,6 +777,7 @@ _ALL_EXPAND_SECTIONS = _collect_expand_sections(
     BEAT_BAR_GRID_SECTION,
     TIMELINE_FADES_SECTION,
     TIMELINE_PRESETS_SECTION,
+    TIMELINE_VISUAL_LIMITER_SECTION,
     extra_nodes=RENDER_SECTION_NODES,
 )
 
@@ -850,6 +887,9 @@ RENDER_TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_PRESET_DENSITY,
         RowKind.TIMELINE_PRESET_CONDUCTOR,
         RowKind.TIMELINE_PRESETS,
+        RowKind.TIMELINE_VISUAL_LIMITER_HEADER,
+        RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD,
+        RowKind.TIMELINE_VISUAL_LIMITER_RELEASE,
         RowKind.TIMELINE_RESET,
         RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,
         RowKind.TIMELINE_PLACEMENT_SNAP,
@@ -912,10 +952,13 @@ def _build_row_tree_indent_depth() -> dict[RowKind, int]:
     _assign_expand_indent_depth(depths, BEAT_BAR_GRID_SECTION, 1)
     _assign_expand_indent_depth(depths, TIMELINE_FADES_SECTION, 1)
     _assign_expand_indent_depth(depths, TIMELINE_PRESETS_SECTION, 1)
+    _assign_expand_indent_depth(depths, TIMELINE_VISUAL_LIMITER_SECTION, 1)
     depths[RowKind.TIMELINE_SONG_MARKER_FADE_IN] = 3
     depths[RowKind.TIMELINE_SONG_MARKER_FADE_OUT] = 3
     depths[RowKind.TIMELINE_STANDARD_CUE_FADE_IN] = 3
     depths[RowKind.TIMELINE_STANDARD_CUE_FADE_OUT] = 3
+    depths[RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD] = 2
+    depths[RowKind.TIMELINE_VISUAL_LIMITER_RELEASE] = 2
     return depths
 
 
@@ -1033,6 +1076,9 @@ def append_render_section_rows(
                 append_expand_section_rows(row_list, BEAT_BAR_GRID_SECTION, state)
                 append_expand_section_rows(row_list, TIMELINE_FADES_SECTION, state)
                 append_expand_section_rows(row_list, TIMELINE_PRESETS_SECTION, state)
+                append_expand_section_rows(
+                    row_list, TIMELINE_VISUAL_LIMITER_SECTION, state
+                )
                 row_list.append(RowDescriptor(RowKind.TIMELINE_RESET))
 
 
@@ -1085,9 +1131,11 @@ def _build_section_header_parent_map() -> dict[RowKind, RowKind]:
     _walk_expand_section_for_headers(BEAT_BAR_GRID_SECTION, out)
     _walk_expand_section_for_headers(TIMELINE_FADES_SECTION, out)
     _walk_expand_section_for_headers(TIMELINE_PRESETS_SECTION, out)
+    _walk_expand_section_for_headers(TIMELINE_VISUAL_LIMITER_SECTION, out)
     out[RowKind.TIMELINE_SNAP_TO_SONG_MARKERS] = RowKind.SONG_MARKERS_HEADER
     out[RowKind.TIMELINE_FADES_HEADER] = RowKind.RENDER_TIMELINE_HEADER
     out[RowKind.TIMELINE_PRESETS_HEADER] = RowKind.RENDER_TIMELINE_HEADER
+    out[RowKind.TIMELINE_VISUAL_LIMITER_HEADER] = RowKind.RENDER_TIMELINE_HEADER
     return out
 
 

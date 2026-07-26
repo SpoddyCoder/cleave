@@ -15,6 +15,7 @@ from cleave.timeline import (
     canonicalize,
     empty_lane,
     lane_blend_at,
+    lane_role_at,
     lane_level_at,
     lane_level_breakpoints,
     lane_level_envelope,
@@ -235,6 +236,24 @@ def test_lane_blend_at_holds_and_reverts() -> None:
     assert lane_blend_at(lane, 2.0) is None
     assert lane_blend_at(lane, 3.0) is None
     assert lane_blend_at(lane, 4.0) == "screen"
+
+
+def test_lane_role_at_holds_and_clears() -> None:
+    lane = TimelineLane(
+        baseline=0.0,
+        cues=[
+            SlotCue(t=1.0, level=1.0, role="lead"),
+            SlotCue(t=2.0, level=1.0, role="bed"),
+            SlotCue(t=3.0, level=0.0, role=None),
+            SlotCue(t=4.0, level=1.0, role="accent"),
+        ],
+    )
+    assert lane_role_at(lane, 0.5) is None
+    assert lane_role_at(lane, 1.0) == "lead"
+    assert lane_role_at(lane, 1.5) == "lead"
+    assert lane_role_at(lane, 2.0) == "bed"
+    assert lane_role_at(lane, 3.0) is None
+    assert lane_role_at(lane, 4.0) == "accent"
 
 
 def test_snap_and_shift_preserve_blend_and_role_on_ons_strip_offs() -> None:

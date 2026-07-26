@@ -353,6 +353,42 @@ TIMELINE_FADE_DURATION_MIN = 0.0
 TIMELINE_FADE_DURATION_MAX = 30.0
 TIMELINE_FADE_DURATION_STEP = 0.1
 
+# Visual limiter (timeline.limiter); module defaults match these.
+DEFAULT_VISUAL_LIMITER_ENABLED = True
+DEFAULT_VISUAL_LIMITER_THRESHOLD = 0.65
+DEFAULT_VISUAL_LIMITER_RELEASE = 0.45
+VISUAL_LIMITER_THRESHOLD_MIN = 0.40
+VISUAL_LIMITER_THRESHOLD_MAX = 0.90
+VISUAL_LIMITER_THRESHOLD_STEP = 0.01
+VISUAL_LIMITER_THRESHOLD_GAP = 0.17
+VISUAL_LIMITER_RELEASE_MIN = 0.15
+VISUAL_LIMITER_RELEASE_MAX = 1.5
+VISUAL_LIMITER_RELEASE_STEP = 0.1
+# RELEASE_SEC / RELEASE_RAMP_SEC at the tuned defaults (0.75 / 0.45).
+VISUAL_LIMITER_RELEASE_HOLD_RATIO = 0.75 / 0.45
+
+
+def clamp_visual_limiter_threshold(value: float) -> float:
+    return max(
+        VISUAL_LIMITER_THRESHOLD_MIN,
+        min(VISUAL_LIMITER_THRESHOLD_MAX, float(value)),
+    )
+
+
+def clamp_visual_limiter_release(value: float) -> float:
+    return max(
+        VISUAL_LIMITER_RELEASE_MIN,
+        min(VISUAL_LIMITER_RELEASE_MAX, float(value)),
+    )
+
+
+def visual_limiter_threshold_off(threshold_on: float) -> float:
+    return max(0.0, float(threshold_on) - VISUAL_LIMITER_THRESHOLD_GAP)
+
+
+def visual_limiter_release_hold_sec(release_ramp_sec: float) -> float:
+    return float(release_ramp_sec) * VISUAL_LIMITER_RELEASE_HOLD_RATIO
+
 TimelinePlacementSnap = Literal["off", "beat", "bar"]
 TIMELINE_PLACEMENT_SNAP_OPTIONS: tuple[TimelinePlacementSnap, ...] = (
     "off",
@@ -2118,6 +2154,31 @@ def _parse_timeline_preset(raw: Any) -> Any:
     )
 
 
+def _parse_timeline_limiter(raw: Any) -> Any:
+    from cleave.config import TimelineLimiterConfig
+
+    if raw is None:
+        return TimelineLimiterConfig()
+    limiter_map = as_mapping(raw, "timeline.limiter")
+    return TimelineLimiterConfig(
+        enabled=bool(
+            limiter_map.get("enabled", DEFAULT_VISUAL_LIMITER_ENABLED)
+        ),
+        threshold=clamp_visual_limiter_threshold(
+            require_non_negative_number(
+                limiter_map.get("threshold", DEFAULT_VISUAL_LIMITER_THRESHOLD),
+                "timeline.limiter.threshold",
+            )
+        ),
+        release=clamp_visual_limiter_release(
+            require_non_negative_number(
+                limiter_map.get("release", DEFAULT_VISUAL_LIMITER_RELEASE),
+                "timeline.limiter.release",
+            )
+        ),
+    )
+
+
 def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
     from cleave.config import TimelineConfig, TimelineFadesConfig
 
@@ -2147,6 +2208,7 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
             ),
         )
     preset = _parse_timeline_preset(timeline_map.get("preset"))
+    limiter = _parse_timeline_limiter(timeline_map.get("limiter"))
     # Legacy timeline.cues is ignored (clean break; no migration).
     lanes_raw = timeline_map.get("lanes")
     if lanes_raw is None:
@@ -2157,6 +2219,7 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
             fades=fades,
             placement_snap=placement_snap,
             preset=preset,
+            limiter=limiter,
         )
     lanes_map = as_mapping(lanes_raw, "timeline.lanes")
     if ctx.layer_slots is None:
@@ -2226,6 +2289,7 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
         fades=fades,
         placement_snap=placement_snap,
         preset=preset,
+        limiter=limiter,
     )
 
 
@@ -2234,6 +2298,14 @@ def _persist_timeline_fade_group(group: Any) -> dict[str, Any]:
         "enabled": group.enabled,
         "fade_in": group.fade_in,
         "fade_out": group.fade_out,
+    }
+
+
+def _persist_timeline_limiter(limiter: Any) -> dict[str, Any]:
+    return {
+        "enabled": limiter.enabled,
+        "threshold": limiter.threshold,
+        "release": limiter.release,
     }
 
 
@@ -2253,6 +2325,7 @@ def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
             "density": runtime.timeline_preset_density,
             "conductor": runtime.timeline_preset_conductor,
         },
+        "limiter": _persist_timeline_limiter(runtime.limiter),
     }
     lanes_out: dict[str, Any] = {}
     for slot in sorted(runtime.lanes):

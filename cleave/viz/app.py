@@ -48,6 +48,7 @@ from cleave.viz.input_dispatch import (
     dispatch_should_notify_overlay,
 )
 from cleave.viz.user_presets import cleanup_unreferenced_user_presets
+from cleave.viz.visual_limiter import VisualLimiterState, apply_visual_limiter_gains
 from cleave.viz.wiring import LayerManager, make_timeline_controls, make_tuning_controls
 
 
@@ -82,6 +83,9 @@ class VisualizerCore:
     layers_by_slot: dict[str, StemLayer]
     compositor: GlCompositor
     post_process: GlPostProcess
+    visual_limiter: VisualLimiterState = field(
+        default_factory=VisualLimiterState, kw_only=True
+    )
 
 
 @dataclass
@@ -372,6 +376,7 @@ def tick_frame_core(
     was_paused = paused
 
     apply_layer_visibility(runtime.seed.session, runtime.layers_by_slot, t_sec)
+    apply_visual_limiter_gains(runtime, blank_visualizers=blank_visualizers)
 
     if not paused and not blank_visualizers:
         advance_timeline_preset_switching(
