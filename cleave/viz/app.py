@@ -241,6 +241,7 @@ def init_gl_resources_heavy(
         layers=layers,
         signals=seed.signals,
         effect_runtime=seed.effect_runtime,
+        preset_root=seed.preset_root,
         mix_player=mix_player,
         on_notification=controls.show_notification,
         tuning_controls=controls,

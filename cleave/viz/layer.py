@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
+from cleave.cue_roles import CueRole
 from cleave.gl_compositor import LayerFbo
 from cleave.preset_playlist import PresetPlaylist
 from cleave.preset_rotation import PresetRotation
@@ -22,5 +23,6 @@ class StemLayer:
     auto_preset_path: Path | None = None
     timeline_level: float = 1.0
     preset_rotation: PresetRotation | None = None
+    role_rotations: dict[CueRole, PresetRotation] = field(default_factory=dict)
     timeline_switch_count: int = 0
     rotation_anchor: int = 0

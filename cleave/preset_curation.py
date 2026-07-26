@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from cleave.cue_roles import CUE_ROLE_DIR
 from cleave.viz.user_presets import copy_with_dedup, resolve_user_preset_dest
 
 FAVOURITES_DIR = "favourites"
@@ -111,11 +112,11 @@ def list_destination_subdirs(base: Path) -> tuple[str, ...]:
 
 
 def list_restore_destination_subdirs(preset_root: Path) -> tuple[str, ...]:
-    """Top-level dirs under ``preset_root`` excluding favourites/ and blacklist/."""
+    """Top-level dirs under ``preset_root`` excluding curation and role pools."""
     return tuple(
         name
         for name in list_destination_subdirs(preset_root)
-        if name not in (FAVOURITES_DIR, BLACKLIST_DIR)
+        if name not in (FAVOURITES_DIR, BLACKLIST_DIR, CUE_ROLE_DIR)
     )
 
 

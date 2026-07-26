@@ -2960,6 +2960,26 @@ def test_ctrl_quick_nav_does_not_affect_normal_up_down() -> None:
     assert controls.focus_descriptor == _desc(view, stem_row)
 
 
+def test_timeline_focus_change_clears_selected_cue_flash() -> None:
+    controls = _make_controls(("layer_1", "layer_2"), timeline_enabled=True)
+    controls.session.timeline.panel_open = True
+    controls.focus_cursor = TimelineFocus(0)
+    controls.session.timeline.selected_cue_t = {"layer_1": 10.0, "layer_2": 20.0}
+    controls.session.timeline.selected_cue_flash_start_ms = 1234
+
+    controls.focus_cursor = TimelineFocus(1)
+    assert controls.session.timeline.focus_row == 1
+    assert controls.session.timeline.selected_cue_t == {
+        "layer_1": 10.0,
+        "layer_2": 20.0,
+    }
+    assert controls.session.timeline.selected_cue_flash_start_ms is None
+
+    controls.session.timeline.selected_cue_flash_start_ms = 5678
+    controls.focus_cursor = TimelineFocus(1)
+    assert controls.session.timeline.selected_cue_flash_start_ms == 5678
+
+
 def test_ctrl_quick_nav_from_timeline_submenu_jumps_sections() -> None:
     controls = _make_controls(("layer_1", "layer_2"), timeline_enabled=True)
     controls.session.timeline.panel_open = True

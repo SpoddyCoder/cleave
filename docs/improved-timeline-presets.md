@@ -21,44 +21,47 @@ What works today:
 
 Gaps the ideas below target:
 
-1. Cues carry a level but not yet blend mode or preset role, so milk personality and per-cue casting remain out of reach of the arranger.
+1. The arranger still emits level-only cues; it does not yet assign blend or role automatically.
 2. The arranger is musically phrased but not stem-content-aware: it never looks at what the drums or vocals are doing.
 3. Song form still needs manual markers for the best results.
-4. Busy collisions often come from milk personality, which level-only cues cannot fix alone.
+4. Busy collisions often come from milk personality; role casting helps when pools are curated, but automatic pool fill needs Idea 3 fingerprints.
 5. Nothing recurs. Chorus 2 gets a fresh roll of the dice, so the output reads as plausible-but-random rather than composed.
 
 ---
 
-## Idea 1: Arrangement as a mix, not a gate (shipped: levels)
+## Idea 1: Arrangement as a mix, not a gate (shipped: levels, blend, role)
 
-**Shipped:** cues are level keyframes (`SlotCue(t, level)`), fade groups become constant-slope ramps on a piecewise-linear envelope, the strip draws variable-height bars, and crescendo ramps entrants in at `0.5` before a full stack. Layer opacity stays the static fader; the lane multiplies into `fbo.opacity` as before.
+**Shipped:** cues are level keyframes with optional blend and role (`SlotCue(t, level, blend?, role?)`), fade groups become constant-slope ramps on a piecewise-linear envelope, the strip draws variable-height bars, and crescendo ramps entrants in at `0.5` before a full stack. Layer opacity stays the static fader; the lane multiplies into `fbo.opacity` as before. Per-cue blend writes `LayerFbo.blend_mode` each frame ([cleave/blend_modes.py](../cleave/blend_modes.py)); per-cue role casts from `preset_root/roles/<role>/` on rises from zero. Blend and role are authored on on / visible cues (the next period), not on disable cues; off cues are stripped of both in `canonicalize`.
 
 **Deferred** (still part of the mix vision, not implemented):
 
-- Per-cue blend mode writing `LayerFbo.blend_mode` ([cleave/blend_modes.py](../cleave/blend_modes.py)).
-- Per-cue preset role for content-aware casting (Idea 3).
 - Manual level authoring in the strip (record toggles still write `0.0` / `1.0`).
+- Automatic blend/role assignment from the generative arranger (Idea 2 / Idea 3).
 
 ### Intent
 
 - Let the arranger duck a layer instead of muting it. A chorus becomes one lead at full weight and a bed at half, rather than "four layers on".
 - Turn the anti-busy rule into a mix rule (total visual weight budget) instead of a layer count.
 - Reuse compositing capability the renderer already has but the timeline could not address with booleans alone.
+- Let a cue pick a milk personality via role without replacing the whole layer rotation.
 
 ### What landed
 
-1. Cue model and persist: `level` required in YAML; baseline is `float | None` ([cleave/config_schema.py](../cleave/config_schema.py)).
+1. Cue model and persist: `level` required in YAML; optional `blend` / `role`; baseline is `float | None` ([cleave/config_schema.py](../cleave/config_schema.py)).
 2. Envelope: `lane_level_breakpoints` / `lane_level_envelope` replace edge-only fade alpha; rise completes at cue time, fall starts at cue time; slopes scale with level delta.
 3. Runtime: `timeline_level` / `timeline_level_multiplier`; levels apply even when both fade groups are disabled (piecewise-constant envelope).
 4. Preset-switch trigger: rise from zero only; `cue.t - fade_in * cue.level`.
 5. Generator: `cues_from_states` emits level mappings; crescendo uses `0.5` entrants.
 6. Strip: polygon fill from breakpoints; committed eye alpha follows level.
+7. Blend: held like level via `lane_blend_at`; applied per frame in `apply_layer_visibility` with layer static fallback.
+8. Role: event property on on-transitions; seek-stable per-role pools in [cleave/viz/preset_switching.py](../cleave/viz/preset_switching.py); empty pool falls back to the main rotation.
+9. Strip authoring: `,` / `.` select on cues (`level > 0`, including mid-on changes; offs skipped); `b` / `c` cycle blend and cast on those only; selected tick highlight, role glyphs on on cues, and badge readout.
 
-Overlaps [roadmap.md](roadmap.md) richer cue types; blend and role are the remaining slice.
+Overlaps [roadmap.md](roadmap.md) richer cue types; automatic assignment from stem content and fingerprints remains Idea 2 / Idea 3.
 
 ### User effort
 
-None for 0/1 lanes. Partial levels come from generative Apply (crescendo) until manual authoring lands.
+None for 0/1 lanes. Partial levels come from generative Apply (crescendo). Blend and role are authorable on selected on cues in the strip; place milk files under `preset_root/roles/<role>/` for casting.
 
 ---
 
@@ -130,7 +133,7 @@ The probe harness is most of the way there already. [cleave/preset_scan.py](../c
 | Lead | high busyness or brightness | at most one hot at a time |
 | Accent | short bright bursts, high delta | chorus hits, marker edges |
 
-5. Cast on each on-transition in [cleave/viz/preset_switching.py](../cleave/viz/preset_switching.py), or explicitly through a role carried on a rich cue (deferred Idea 1 work). Keep play and scan in agreement on the rotation set (see [.cursor/rules/preset-scan-rotation-set.mdc](../.cursor/rules/preset-scan-rotation-set.mdc)).
+5. Cast on each on-transition in [cleave/viz/preset_switching.py](../cleave/viz/preset_switching.py) through the cue `role` field (Idea 1b): when set, index `role_rotations[role]` by per-role occurrence; when unset or the pool is empty, use the main rotation. Idea 3 fills those role pools from fingerprints instead of hand curation. Keep play and scan in agreement on the rotation set (see [.cursor/rules/preset-scan-rotation-set.mdc](../.cursor/rules/preset-scan-rotation-set.mdc)).
 
 ### Fits existing code
 
@@ -214,7 +217,7 @@ Breathing / Dialogue / Arc / Pulse remain character profiles that bias switch ra
 | Order | Item | Why here | Payoff | Effort |
 | --- | --- | --- | --- | --- |
 | 1 | Rich cues: levels (Idea 1, shipped) | Enabler; everything else wants levels, not booleans | Better output immediately, even with today's arranger | Done |
-| 1b | Rich cues: blend and role (deferred) | Completes the mix vision; casting needs role | Medium | Medium (cue fields, strip, persist, record) |
+| 1b | Rich cues: blend and role (Idea 1, shipped) | Completes the mix vision; casting uses the cue role field | Medium | Done |
 | 2 | Stem conductor (Idea 2) | Uses data already in `signals.json`; first thing that makes lanes song-tied | High | Medium (arranger plus signals) |
 | 3 | Closed-loop limiter (companion) | Cheap once levels exist; buys headroom before casting lands | Medium | Low |
 | 4 | Reactivity fingerprints and casting (Idea 3) | Probe harness exists; fixes busy-on-busy at the milk level | High | High (probe set, metrics, pools, casting) |
@@ -234,4 +237,4 @@ Sequencing notes:
 - MIDI out, web or Butterchurn port, live sliding-window Demucs.
 - Six-stem Demucs as a prerequisite; named guitar and piano voices would strengthen the conductor but are not required by any step above.
 - Replacing manual timeline edit, arm and record, or snap tools. Generative Apply remains a starting point the user can polish.
-- Per-cue arbitrary parameter automation (effect depths, post-FX). Idea 1's remaining slice is blend and preset role only.
+- Per-cue arbitrary parameter automation (effect depths, post-FX). Idea 1 blend and preset role are shipped; further cue fields stay out of scope here.

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Callable, Literal, TypeVar
 
 from cleave.blend_modes import BLEND_MODES, BlendMode
+from cleave.cue_roles import CUE_ROLES, CueRole
 from cleave.effects.constants import clamp_effect_pct
 from cleave.effects.registry import validate_effect_entry
 from cleave.extract import STEM_SOURCES, StemSource
@@ -1613,14 +1614,25 @@ def persist_layer_z_order(ctx: PersistCtx) -> list[str]:
     return cfg_order
 
 
+def validate_blend_mode(raw: Any, *, path: str) -> BlendMode:
+    if raw not in BLEND_MODES:
+        allowed = ", ".join(f"'{mode}'" for mode in BLEND_MODES)
+        raise ValueError(f"{path} must be one of: {allowed}")
+    return raw
+
+
+def validate_cue_role(raw: Any, *, path: str) -> CueRole:
+    if raw not in CUE_ROLES:
+        allowed = ", ".join(f"'{role}'" for role in CUE_ROLES)
+        raise ValueError(f"{path} must be one of: {allowed}")
+    return raw
+
+
 def parse_blend_mode(slot: str, stem: StemSource, layer_raw: dict[str, Any]) -> BlendMode:
     raw = layer_raw.get("blend_mode")
     if raw is None:
         return DEFAULT_BLEND_MODE[stem]
-    if raw not in BLEND_MODES:
-        allowed = ", ".join(f"'{mode}'" for mode in BLEND_MODES)
-        raise ValueError(f"layers.{slot}.blend_mode must be one of: {allowed}")
-    return raw
+    return validate_blend_mode(raw, path=f"layers.{slot}.blend_mode")
 
 
 def _parse_stem(slot: str, layer_raw: dict[str, Any]) -> StemSource:
@@ -2172,10 +2184,24 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
                     f"timeline.lanes.{slot}.cues[{index}].t",
                 )
             )
+            blend: BlendMode | None = None
+            if "blend" in cue_map and cue_map["blend"] is not None:
+                blend = validate_blend_mode(
+                    cue_map["blend"],
+                    path=f"timeline.lanes.{slot}.cues[{index}].blend",
+                )
+            role: CueRole | None = None
+            if "role" in cue_map and cue_map["role"] is not None:
+                role = validate_cue_role(
+                    cue_map["role"],
+                    path=f"timeline.lanes.{slot}.cues[{index}].role",
+                )
             cues.append(
                 SlotCue(
                     t=t,
                     level=clamp_level(float(cue_map["level"])),
+                    blend=blend,
+                    role=role,
                 )
             )
         lanes[str(slot)] = TimelineLane(
@@ -2225,10 +2251,15 @@ def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
         if lane.baseline is not None:
             entry["baseline"] = lane.baseline
         if lane.cues:
-            entry["cues"] = [
-                {"t": cue.t, "level": cue.level}
-                for cue in lane.cues
-            ]
+            cues_out: list[dict[str, Any]] = []
+            for cue in lane.cues:
+                cue_out: dict[str, Any] = {"t": cue.t, "level": cue.level}
+                if cue.blend is not None:
+                    cue_out["blend"] = cue.blend
+                if cue.role is not None:
+                    cue_out["role"] = cue.role
+                cues_out.append(cue_out)
+            entry["cues"] = cues_out
         lanes_out[slot] = entry
     if lanes_out:
         out["lanes"] = lanes_out

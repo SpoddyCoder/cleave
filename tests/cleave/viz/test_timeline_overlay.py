@@ -37,10 +37,21 @@ from cleave.viz.theme import (
 from cleave.viz.timeline_overlay import (
     ARM_FLASH_DURATION_MS,
     ARM_FLASH_HALF_MS,
+    BAR_VERTICAL_INSET,
     PLAYHEAD_FLASH_MS,
+    ROLE_GLYPH_BOTTOM_PAD,
+    ROLE_GLYPH_TICK_GAP,
+    SELECTED_CUE_COLOR,
+    SELECTED_CUE_FLASH_DURATION_MS,
+    SELECTED_CUE_FLASH_HALF_MS,
+    SELECTED_CUE_FLASH_RED,
+    SELECTED_CUE_FLASH_TICK_WIDTH,
+    SELECTED_CUE_FLASH_YELLOW,
+    SELECTED_CUE_TICK_WIDTH,
     TimelineOverlay,
     TimelineViewState,
     arm_abbrev_flash_active,
+    blit_role_glyph_xor,
     arm_abbrev_flash_visible,
     armed_abbrev_bg_visible,
     bar_level_breakpoints_for_row,
@@ -51,8 +62,16 @@ from cleave.viz.timeline_overlay import (
     playhead_flash_bright,
     playhead_x,
     prune_expired_arm_flashes,
+    prune_expired_selected_cue_flash,
     rec_flash_visible,
+    role_glyph_anchor,
+    role_glyph_previous_level,
+    role_glyph_side,
     row_prefix_width,
+    selected_cue_flash_active,
+    selected_cue_flash_bright,
+    selected_cue_readout_text,
+    selected_cue_tick_color,
     stem_abbrev_label,
     stem_label_text,
     transport_time_text,
@@ -108,6 +127,8 @@ def _view_state(
     standard_cue_fades_enabled: bool = False,
     standard_cue_fade_in: float = 2.0,
     standard_cue_fade_out: float = 2.0,
+    selected_cue_t: dict[str, float] | None = None,
+    selected_cue_flash_start_ms: int | None = None,
 ) -> TimelineViewState:
     order = list(layer_z_order or list(DEFAULT_LAYER_SLOTS))
     lane_map = dict(lanes or {})
@@ -173,6 +194,8 @@ def _view_state(
             fade_in=standard_cue_fade_in,
             fade_out=standard_cue_fade_out,
         ),
+        selected_cue_t=dict(selected_cue_t or ()),
+        selected_cue_flash_start_ms=selected_cue_flash_start_ms,
     )
 
 
@@ -909,6 +932,407 @@ def test_bar_without_high_water_mark_behaves_as_before() -> None:
     )
     assert _bar_visible_at(state, slot, 22.0) is False
     assert _bar_visible_at(state, slot, 30.0) is True
+
+
+def test_selected_cue_readout_text_format() -> None:
+    assert selected_cue_readout_text(
+        SlotCue(t=65.0, level=1.0, blend="add", role="lead")
+    ) == "[01:05] lvl 1.00 blend add cast lead"
+    assert selected_cue_readout_text(
+        SlotCue(t=0.0, level=0.25, blend=None, role=None)
+    ) == "[00:00] lvl 0.25 blend - cast -"
+
+
+def test_draw_with_selected_cue_and_role_does_not_crash() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    state = _view_state(
+        lanes={
+            "layer_1": TimelineLane(
+                baseline=0.0,
+                cues=[
+                    SlotCue(t=10.0, level=1.0, blend="add", role="lead"),
+                    SlotCue(t=20.0, level=0.0),
+                ],
+            )
+        },
+        position_sec=12.0,
+        focus_row=0,
+        submenu_focused=True,
+        selected_cue_t={"layer_1": 10.0},
+    )
+    surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
+    _draw(overlay, surface, state)
+    assert overlay.panel_rect is not None
+    assert overlay.header_badge_rect is not None
+
+
+def test_role_glyph_not_drawn_on_off_cue() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    # Bypass canonicalize so an off cue can still carry a stale role.
+    state = _view_state(
+        layer_z_order=["layer_1"],
+        defaults={"layer_1": 1.0},
+        lanes={
+            "layer_1": TimelineLane(
+                baseline=1.0,
+                cues=[SlotCue(t=25.0, level=0.0, role="pulse")],
+            )
+        },
+        duration_sec=100.0,
+        focus_row=0,
+        position_sec=0.0,
+    )
+    composed = overlay.compose_panel(
+        state,
+        viewport_width=1280,
+        viewport_height=720,
+    )
+    assert composed is not None
+    assert not overlay._cache.last_glyph_rects
+
+
+def test_selected_cue_highlight_drawn_on_static_panel() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    state = _view_state(
+        layer_z_order=["layer_1"],
+        defaults={"layer_1": 1.0},
+        lanes={
+            "layer_1": TimelineLane(
+                baseline=0.0,
+                cues=[SlotCue(t=25.0, level=1.0)],
+            )
+        },
+        duration_sec=100.0,
+        focus_row=0,
+        selected_cue_t={"layer_1": 25.0},
+    )
+    composed = overlay.compose_panel(
+        state,
+        viewport_width=1280,
+        viewport_height=720,
+    )
+    assert composed is not None
+    static = overlay._cache.panel
+    assert static is not None
+    assert overlay.bar_layout is not None
+    bar_left, bar_width, _ = overlay.bar_layout
+    tick_x = time_to_x(25.0, bar_left, bar_width, 100.0)
+    row_h = overlay.row_layout[0][4]
+    padding = overlay._padding
+    # Settled selected tick: full-height HIGHLIGHT, thinner than flash width.
+    assert SELECTED_CUE_COLOR == HIGHLIGHT
+    assert SELECTED_CUE_TICK_WIDTH < SELECTED_CUE_FLASH_TICK_WIDTH
+    assert static.get_at((tick_x, padding + 1))[:3] == SELECTED_CUE_COLOR
+    assert static.get_at((tick_x, padding + row_h // 2))[:3] == SELECTED_CUE_COLOR
+    # Thicker than a 1px tick: neighbours within SELECTED_CUE_TICK_WIDTH stay selected.
+    half = SELECTED_CUE_TICK_WIDTH // 2
+    assert static.get_at((tick_x - half, padding + row_h // 2))[:3] == SELECTED_CUE_COLOR
+    assert static.get_at((tick_x + half, padding + row_h // 2))[:3] == SELECTED_CUE_COLOR
+    # Settled width does not reach flash thickness.
+    flash_half = SELECTED_CUE_FLASH_TICK_WIDTH // 2
+    assert static.get_at((tick_x - flash_half, padding + row_h // 2))[:3] != SELECTED_CUE_COLOR
+    assert static.get_at((tick_x + flash_half, padding + row_h // 2))[:3] != SELECTED_CUE_COLOR
+
+
+def test_selected_cue_marker_only_on_focused_track() -> None:
+    """Remembered selections stay in selected_cue_t; only focus_row draws the marker."""
+    pygame.init()
+    overlay = TimelineOverlay()
+    lanes = {
+        "layer_1": TimelineLane(
+            baseline=0.0,
+            cues=[SlotCue(t=25.0, level=1.0)],
+        ),
+        "layer_2": TimelineLane(
+            baseline=0.0,
+            cues=[SlotCue(t=50.0, level=1.0)],
+        ),
+    }
+    selected = {"layer_1": 25.0, "layer_2": 50.0}
+    base_kwargs = dict(
+        layer_z_order=["layer_1", "layer_2"],
+        defaults={"layer_1": 1.0, "layer_2": 1.0},
+        lanes=lanes,
+        duration_sec=100.0,
+        selected_cue_t=selected,
+    )
+
+    def _compose(focus_row: int):
+        return overlay.compose_panel(
+            _view_state(focus_row=focus_row, **base_kwargs),
+            viewport_width=1280,
+            viewport_height=720,
+        )
+
+    def _tick_rgb(cue_t: float, row_index: int) -> tuple[int, int, int]:
+        static = overlay._cache.panel
+        assert static is not None
+        assert overlay.bar_layout is not None
+        bar_left, bar_width, _ = overlay.bar_layout
+        tick_x = time_to_x(cue_t, bar_left, bar_width, 100.0)
+        row_h = overlay.row_layout[row_index][4]
+        y = overlay._padding + row_index * (row_h + overlay._row_gap) + row_h // 2
+        return static.get_at((tick_x, y))[:3]
+
+    assert _compose(0) is not None
+    assert _tick_rgb(25.0, 0) == SELECTED_CUE_COLOR
+    assert _tick_rgb(50.0, 1) != SELECTED_CUE_COLOR
+
+    assert _compose(1) is not None
+    assert _tick_rgb(25.0, 0) != SELECTED_CUE_COLOR
+    assert _tick_rgb(50.0, 1) == SELECTED_CUE_COLOR
+
+    assert _compose(0) is not None
+    assert _tick_rgb(25.0, 0) == SELECTED_CUE_COLOR
+    assert _tick_rgb(50.0, 1) != SELECTED_CUE_COLOR
+
+
+def test_prune_expired_selected_cue_flash() -> None:
+    assert prune_expired_selected_cue_flash(None, ticks_ms=0) is None
+    assert prune_expired_selected_cue_flash(1000, ticks_ms=1000) == 1000
+    assert (
+        prune_expired_selected_cue_flash(
+            1000, ticks_ms=1000 + SELECTED_CUE_FLASH_DURATION_MS - 1
+        )
+        == 1000
+    )
+    assert (
+        prune_expired_selected_cue_flash(
+            1000, ticks_ms=1000 + SELECTED_CUE_FLASH_DURATION_MS
+        )
+        is None
+    )
+
+
+def test_selected_cue_flash_blink_colors() -> None:
+    start = 1000
+    assert selected_cue_flash_active(start, ticks_ms=start)
+    assert selected_cue_flash_bright(start, ticks_ms=start)
+    assert selected_cue_tick_color(start, ticks_ms=start) == SELECTED_CUE_FLASH_YELLOW
+    assert SELECTED_CUE_FLASH_YELLOW == HIGHLIGHT
+    assert SELECTED_CUE_COLOR == HIGHLIGHT
+    assert SELECTED_CUE_FLASH_RED == ARMED_BG
+    alt_t = start + SELECTED_CUE_FLASH_HALF_MS
+    assert selected_cue_flash_active(start, ticks_ms=alt_t)
+    assert not selected_cue_flash_bright(start, ticks_ms=alt_t)
+    assert selected_cue_tick_color(start, ticks_ms=alt_t) == SELECTED_CUE_FLASH_RED
+    expired = start + SELECTED_CUE_FLASH_DURATION_MS
+    assert not selected_cue_flash_active(start, ticks_ms=expired)
+    assert not selected_cue_flash_bright(start, ticks_ms=expired)
+    assert selected_cue_tick_color(start, ticks_ms=expired) == SELECTED_CUE_COLOR
+
+
+def test_selected_cue_flash_live_patches_yellow(monkeypatch) -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    start = 5000
+    state = _view_state(
+        layer_z_order=["layer_1"],
+        defaults={"layer_1": 1.0},
+        lanes={
+            "layer_1": TimelineLane(
+                baseline=0.0,
+                cues=[SlotCue(t=25.0, level=1.0)],
+            )
+        },
+        duration_sec=100.0,
+        focus_row=0,
+        selected_cue_t={"layer_1": 25.0},
+        selected_cue_flash_start_ms=start,
+    )
+    # Yellow half of the blink: thick live-patch over the thinner settled static tick.
+    monkeypatch.setattr(pygame.time, "get_ticks", lambda: start)
+    composed = overlay.compose_panel(
+        state,
+        viewport_width=1280,
+        viewport_height=720,
+    )
+    assert composed is not None
+    upload = composed.upload_surface
+    assert overlay.bar_layout is not None
+    bar_left, bar_width, _ = overlay.bar_layout
+    tick_x = time_to_x(25.0, bar_left, bar_width, 100.0)
+    from cleave.viz.timeline_panel_cache import timeline_badge_reserve_px
+
+    y = timeline_badge_reserve_px() + overlay._padding + overlay.row_layout[0][4] // 2
+    assert upload.get_at((tick_x, y))[:3] == SELECTED_CUE_FLASH_YELLOW
+    flash_half = SELECTED_CUE_FLASH_TICK_WIDTH // 2
+    assert upload.get_at((tick_x - flash_half, y))[:3] == SELECTED_CUE_FLASH_YELLOW
+    assert upload.get_at((tick_x + flash_half, y))[:3] == SELECTED_CUE_FLASH_YELLOW
+    static = overlay._cache.panel
+    assert static is not None
+    static_y = overlay._padding + overlay.row_layout[0][4] // 2
+    assert static.get_at((tick_x, static_y))[:3] == SELECTED_CUE_COLOR
+    assert static.get_at((tick_x - flash_half, static_y))[:3] != SELECTED_CUE_COLOR
+
+
+def test_blit_role_glyph_xor_inverts_destination_rgb() -> None:
+    pygame.init()
+    panel = pygame.Surface((48, 48), pygame.SRCALPHA)
+    bg = (40, 80, 120)
+    panel.fill((*bg, 255))
+    font = pygame.font.SysFont("monospace", 16, bold=True)
+    touched = blit_role_glyph_xor(panel, "L", x=8, y=8, font=font)
+    assert touched is not None
+    expected = (bg[0] ^ 255, bg[1] ^ 255, bg[2] ^ 255)
+    found = False
+    x0, y0, w, h = touched
+    for y in range(y0, y0 + h):
+        for x in range(x0, x0 + w):
+            if panel.get_at((x, y))[:3] == expected:
+                found = True
+                break
+        if found:
+            break
+    assert found
+
+
+def test_role_glyph_side_on_right_off_left() -> None:
+    assert role_glyph_side(previous_level=0.0, cue_level=1.0) == "right"
+    assert role_glyph_side(previous_level=LEVEL_EPS, cue_level=0.5) == "right"
+    assert role_glyph_side(previous_level=1.0, cue_level=0.0) == "left"
+    assert role_glyph_side(previous_level=0.25, cue_level=LEVEL_EPS) == "left"
+
+
+def test_role_glyph_side_both_enabled_prefers_right() -> None:
+    assert role_glyph_side(previous_level=0.25, cue_level=1.0) == "right"
+    assert role_glyph_side(previous_level=1.0, cue_level=0.5) == "right"
+
+
+def test_role_glyph_previous_level_before_cue() -> None:
+    lane = TimelineLane(
+        baseline=0.0,
+        cues=[
+            SlotCue(t=10.0, level=1.0, role="lead"),
+            SlotCue(t=20.0, level=0.0),
+        ],
+    )
+    assert role_glyph_previous_level(lane, 10.0, inherit=1.0) == pytest.approx(0.0)
+    assert role_glyph_previous_level(lane, 20.0, inherit=1.0) == pytest.approx(1.0)
+    assert role_glyph_previous_level(lane, 0.0, inherit=1.0) == pytest.approx(0.0)
+
+
+def test_role_glyph_anchor_bottom_and_side_offset() -> None:
+    pygame.init()
+    bar_rect = pygame.Rect(40, 10, 200, 20)
+    tick_x = 100
+    glyph_w, glyph_h = 8, 12
+    right_x, right_y = role_glyph_anchor(
+        tick_x=tick_x,
+        bar_rect=bar_rect,
+        glyph_w=glyph_w,
+        glyph_h=glyph_h,
+        side="right",
+    )
+    left_x, left_y = role_glyph_anchor(
+        tick_x=tick_x,
+        bar_rect=bar_rect,
+        glyph_w=glyph_w,
+        glyph_h=glyph_h,
+        side="left",
+    )
+    assert right_x == tick_x + ROLE_GLYPH_TICK_GAP
+    assert left_x == tick_x - ROLE_GLYPH_TICK_GAP - glyph_w
+    assert right_y == left_y == bar_rect.bottom - glyph_h - ROLE_GLYPH_BOTTOM_PAD
+    assert right_y + glyph_h <= bar_rect.bottom
+    assert right_y >= bar_rect.top
+    assert ROLE_GLYPH_TICK_GAP >= SELECTED_CUE_FLASH_TICK_WIDTH // 2
+
+
+def test_role_glyph_anchor_clamps_inside_bar() -> None:
+    pygame.init()
+    bar_rect = pygame.Rect(40, 10, 30, 16)
+    glyph_w, glyph_h = 20, 20
+    left_x, left_y = role_glyph_anchor(
+        tick_x=bar_rect.left + 2,
+        bar_rect=bar_rect,
+        glyph_w=glyph_w,
+        glyph_h=glyph_h,
+        side="left",
+    )
+    right_x, right_y = role_glyph_anchor(
+        tick_x=bar_rect.right - 2,
+        bar_rect=bar_rect,
+        glyph_w=glyph_w,
+        glyph_h=glyph_h,
+        side="right",
+    )
+    assert left_x == bar_rect.left
+    assert right_x == bar_rect.right - glyph_w
+    assert left_y == bar_rect.top
+    assert right_y == bar_rect.top
+
+
+def test_role_glyph_xor_drawn_late_on_upload_not_static() -> None:
+    pygame.init()
+    overlay = TimelineOverlay()
+    state = _view_state(
+        layer_z_order=["layer_1"],
+        defaults={"layer_1": 1.0},
+        lanes={
+            "layer_1": TimelineLane(
+                baseline=0.0,
+                cues=[SlotCue(t=25.0, level=1.0, role="lead")],
+            )
+        },
+        duration_sec=100.0,
+        focus_row=0,
+        position_sec=0.0,
+    )
+    composed = overlay.compose_panel(
+        state,
+        viewport_width=1280,
+        viewport_height=720,
+    )
+    assert composed is not None
+    static = overlay._cache.panel
+    assert static is not None
+    upload = composed.upload_surface
+    assert overlay.bar_layout is not None
+    bar_left, bar_width, _ = overlay.bar_layout
+    tick_x = time_to_x(25.0, bar_left, bar_width, 100.0)
+    row_h = overlay.row_layout[0][4]
+    row_y = overlay._padding
+    bar_rect = pygame.Rect(
+        bar_left,
+        row_y + BAR_VERTICAL_INSET,
+        bar_width,
+        max(1, row_h - BAR_VERTICAL_INSET * 2),
+    )
+    bold = pygame.font.SysFont(
+        "monospace", timeline_ui_metrics().font_size, bold=True
+    )
+    glyph_w, glyph_h = bold.size("L")
+    # On cue (baseline 0 -> level 1): glyph to the right of the tick, bar bottom.
+    glyph_x, glyph_y = role_glyph_anchor(
+        tick_x=tick_x,
+        bar_rect=bar_rect,
+        glyph_w=glyph_w,
+        glyph_h=glyph_h,
+        side="right",
+    )
+    assert role_glyph_side(previous_level=0.0, cue_level=1.0) == "right"
+    assert glyph_x > tick_x
+    assert glyph_y + glyph_h <= bar_rect.bottom
+    from cleave.viz.timeline_panel_cache import timeline_badge_reserve_px
+
+    upload_y = timeline_badge_reserve_px() + glyph_y
+    # Static panel omits glyphs (drawn late on the upload surface after playhead).
+    assert overlay._cache.last_glyph_rects
+    diff_found = False
+    for dy in range(glyph_h):
+        for dx in range(glyph_w):
+            static_px = static.get_at((glyph_x + dx, glyph_y + dy))[:3]
+            upload_px = upload.get_at((glyph_x + dx, upload_y + dy))[:3]
+            if static_px != upload_px:
+                diff_found = True
+                break
+        if diff_found:
+            break
+    assert diff_found
 
 
 def test_row_height_constant_across_layer_counts() -> None:
