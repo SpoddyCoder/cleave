@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
@@ -826,3 +827,36 @@ def test_advance_timeline_absent_role_uses_main_rotation(
     expected = layer.preset_rotation.path_for(3)
     assert layer.pm.load_preset.call_args_list[-1] == call(expected, smooth=False)
     assert layer.timeline_switch_count == 3
+
+
+def test_apply_preset_switching_rebuilds_role_rotations_from_disk() -> None:
+    """Cast add/remove updates on-disk pools; switching change rebuilds role_rotations."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        pack = root / "pack"
+        pack.mkdir()
+        main = pack / "main.milk"
+        main.write_text("main", encoding="utf-8")
+        layer = _stem_layer(paths=(main,), index=0)
+        layer.playlist = PresetPlaylist(current_dir=pack, paths=(main,), index=0)
+
+        apply_preset_switching(
+            layer, mode="timeline", rotation_set="directory", preset_root=root
+        )
+        assert layer.role_rotations == {}
+
+        cast = root / "roles" / "bed" / "cast.milk"
+        cast.parent.mkdir(parents=True)
+        cast.write_text("cast", encoding="utf-8")
+
+        apply_preset_switching(
+            layer, mode="timeline", rotation_set="directory", preset_root=root
+        )
+        assert "bed" in layer.role_rotations
+        assert layer.role_rotations["bed"].paths == (cast,)
+
+        cast.unlink()
+        apply_preset_switching(
+            layer, mode="timeline", rotation_set="directory", preset_root=root
+        )
+        assert layer.role_rotations == {}

@@ -511,7 +511,7 @@ class TuningControls:
                 self._add_current_preset(slot)
                 return True
 
-        if event.key in (pygame.K_f, pygame.K_b, pygame.K_r):
+        if event.key in (pygame.K_f, pygame.K_b, pygame.K_r, pygame.K_c):
             kind = self.focus_descriptor.kind
             slot = self.focus_descriptor.slot
             if slot is not None and kind in PRESET_FILE_ROW_KINDS:
@@ -531,6 +531,8 @@ class TuningControls:
                         from_user_preset=(kind == RowKind.TRACK_USER_PRESET_ITEM),
                         user_preset_index=self.focus_descriptor.preset_index,
                     )
+                elif event.key == pygame.K_c:
+                    self._preset_curation.prompt_cast(slot, src)
                 else:
                     self._preset_curation.prompt_restore(slot, src)
                 return True
@@ -664,7 +666,7 @@ class TuningControls:
                 )
             return True
 
-        if event.key in (pygame.K_f, pygame.K_b, pygame.K_r):
+        if event.key in (pygame.K_f, pygame.K_b, pygame.K_r, pygame.K_c):
             view = self.build_view_state(paused=self.playback.paused)
             desc = self.focus_descriptor
             if not view.layout.contains_descriptor(desc):
@@ -688,6 +690,8 @@ class TuningControls:
                         from_user_preset=(kind == RowKind.TRACK_USER_PRESET_ITEM),
                         user_preset_index=self.focus_descriptor.preset_index,
                     )
+                elif event.key == pygame.K_c:
+                    self._preset_curation.prompt_cast(slot, src)
                 else:
                     self._preset_curation.prompt_restore(slot, src)
                 return True

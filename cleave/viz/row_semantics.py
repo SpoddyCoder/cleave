@@ -17,6 +17,7 @@ from cleave.config_schema import (
     RENDER_OVERLAY_ANIMATION_TYPE_HELP_ENTRIES,
     RENDER_OVERLAY_SLIDE_DIRECTION_HELP_ENTRIES,
 )
+from cleave.cue_roles import CUE_ROLE_MARKER_HELP_ENTRIES
 from cleave.timeline_presets import (
     TIMELINE_PRESET_HELP_ENTRIES,
     TIMELINE_RESET_HELP_ENTRIES,
@@ -212,7 +213,9 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_description=(
             "Currently active Milkdrop preset for this layer.",
             "[F/B/U] indicates favourited/blacklisted/user-defined.",
+            "[R:X] indicates cast role.",
         ),
+        help_mode_entries=CUE_ROLE_MARKER_HELP_ENTRIES,
         repeatable=True,
         parent_group="track",
     ),
@@ -244,7 +247,9 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_description=(
             "Preset in the user-defined rotation set for this layer.",
             "[F/B] indicates favourited/blacklisted.",
+            "[R:X] indicates cast role.",
         ),
+        help_mode_entries=CUE_ROLE_MARKER_HELP_ENTRIES,
     ),
     RowKind.TRACK_USER_PRESET_ADD: RowBehavior(
         RowAffordance.ACTION,
