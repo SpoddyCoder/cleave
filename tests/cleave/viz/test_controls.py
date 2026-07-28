@@ -4739,6 +4739,17 @@ def test_f_on_preset_file_prompts_favourite() -> None:
     mock_curation.prompt_favourite.assert_called_once_with("layer_1", current)
 
 
+def test_c_on_preset_file_prompts_cast() -> None:
+    controls = _make_controls(("layer_1",))
+    current = _focus_preset_file_row(controls)
+    mock_curation = MagicMock()
+    controls._preset_curation = mock_curation
+
+    assert controls.handle_keydown(_keydown(pygame.K_c)) is True
+
+    mock_curation.prompt_cast.assert_called_once_with("layer_1", current)
+
+
 def test_b_on_preset_file_prompts_blacklist() -> None:
     controls = _make_controls(("layer_1",))
     current = _focus_preset_file_row(controls)
@@ -4821,6 +4832,19 @@ def test_f_b_allowed_in_projectm_mode() -> None:
     assert controls.handle_keydown(_keydown(pygame.K_f)) is True
 
     mock_curation.prompt_favourite.assert_called_once_with("layer_1", current)
+
+
+def test_c_on_preset_file_in_curation_mode_prompts_cast() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.settings.editor_mode = "preset_curation"
+    controls.session.settings.editor_mode_selection = "preset_curation"
+    current = _focus_preset_file_row(controls)
+    mock_curation = MagicMock()
+    controls._preset_curation = mock_curation
+
+    assert controls.handle_keydown(_keydown(pygame.K_c)) is True
+
+    mock_curation.prompt_cast.assert_called_once_with("layer_1", current)
 
 
 def test_f_b_ignored_on_non_preset_rows() -> None:

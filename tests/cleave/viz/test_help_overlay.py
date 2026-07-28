@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES, BLEND_MODES
+from cleave.cue_roles import CUE_ROLE_MARKER_HELP_ENTRIES
 from cleave.config_schema import (
     HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_APPLY_MODES,
@@ -184,13 +185,22 @@ def test_preset_file_help_titles() -> None:
     assert description.lines == (
         "Currently active Milkdrop preset for this layer.",
         "[F/B/U] indicates favourited/blacklisted/user-defined.",
+        "[R:X] indicates cast role.",
     )
+    assert description.entries == CUE_ROLE_MARKER_HELP_ENTRIES
+    assert dict(description.entries) == {
+        "[R:B]": "bed",
+        "[R:P]": "pulse",
+        "[R:L]": "lead",
+        "[R:A]": "accent",
+    }
     entries = dict(keyboard.entries)
     assert entries["Left/Right"] == "next/previous preset"
     assert entries["Ctrl + Left/Right"] == "next/previous large step"
     assert entries["F"] == "favourite preset"
     assert entries["B"] == "blacklist preset"
-    assert entries["R"] == "remove favourite / restore blacklist"
+    assert entries["C"] == "cast preset (bed/pulse/lead/accent)"
+    assert entries["R"] == "remove favourite / restore blacklist / remove cast"
     assert "Shift + +" not in entries
 
 
@@ -435,12 +445,15 @@ def test_user_preset_item_help() -> None:
     assert description.lines == (
         "Preset in the user-defined rotation set for this layer.",
         "[F/B] indicates favourited/blacklisted.",
+        "[R:X] indicates cast role.",
     )
+    assert description.entries == CUE_ROLE_MARKER_HELP_ENTRIES
     entries = dict(keyboard.entries)
     assert entries["Delete"] == "remove preset"
     assert entries["F"] == "favourite preset"
     assert entries["B"] == "blacklist preset"
-    assert entries["R"] == "remove favourite / restore blacklist"
+    assert entries["C"] == "cast preset (bed/pulse/lead/accent)"
+    assert entries["R"] == "remove favourite / restore blacklist / remove cast"
 
 
 def test_user_preset_add_help() -> None:

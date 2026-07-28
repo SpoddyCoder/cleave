@@ -227,6 +227,8 @@ def test_curation_allowlisted_keys_still_work() -> None:
     controls._preset_curation = mock_curation
     controls.handle_keydown(keydown(pygame.K_f))
     mock_curation.prompt_favourite.assert_called_once()
+    controls.handle_keydown(keydown(pygame.K_c))
+    mock_curation.prompt_cast.assert_called_once()
 
     was_paused = controls.playback.paused
     controls.handle_keydown(keydown(pygame.K_SPACE))

@@ -532,7 +532,7 @@ def test_confirm_restore_blacklist_without_origin_uses_choice_modal() -> None:
         assert unlocked == ["layer_1"]
 
 
-def test_prompt_restore_both_markers_prefers_favourite() -> None:
+def test_prompt_restore_both_markers_uses_choice_modal() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         src = root / "pack" / "demo.milk"
@@ -545,10 +545,11 @@ def test_prompt_restore_both_markers_prefers_favourite() -> None:
 
         view = modal.view_state()
         assert view is not None
-        assert view.message == "Remove favourite: demo.milk?"
+        assert view.message == "Remove from: demo.milk?"
+        assert view.options == ("Favourites", "Blacklist", "Cancel")
 
 
-def test_prompt_restore_path_under_blacklist_wins_over_favourite_marker() -> None:
+def test_prompt_restore_path_under_blacklist_with_favourite_uses_choice() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         src = root / BLACKLIST_DIR / "demo.milk"
@@ -560,7 +561,243 @@ def test_prompt_restore_path_under_blacklist_wins_over_favourite_marker() -> Non
 
         view = modal.view_state()
         assert view is not None
-        assert view.message == "Restore blacklisted preset: demo.milk?"
+        assert view.message == "Remove from: demo.milk?"
+        assert view.options == ("Favourites", "Blacklist", "Cancel")
+
+
+def test_prompt_cast_not_yet_cast_uses_role_choice() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / "pack" / "demo.milk"
+        _write(src, "milk")
+        locked: list[str] = []
+        controller, _session, modal = _make_controller(
+            preset_root=root,
+            layer_bindings=lambda: noop_layer_bindings(
+                lock_preset_for_modal=lambda slot: locked.append(slot),
+            ),
+        )
+
+        controller.prompt_cast("layer_1", src)
+
+        view = modal.view_state()
+        assert view is not None
+        assert view.message == "Cast preset: demo.milk?"
+        assert view.options == ("Bed", "Pulse", "Lead", "Accent", "Cancel")
+        assert locked == ["layer_1"]
+
+
+def test_confirm_cast_copies_marks_and_rebuilds_timeline() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / "pack" / "demo.milk"
+        _write(src, "milk")
+        switching_changes: list[str] = []
+        unlocked: list[str] = []
+        controller, session, modal = _make_controller(
+            preset_root=root,
+            layer_bindings=lambda: noop_layer_bindings(
+                on_preset_switching_change=lambda slot: switching_changes.append(slot),
+                unlock_preset_after_modal=lambda slot: unlocked.append(slot),
+            ),
+        )
+        session.layers["layer_1"].preset_switching = "timeline"
+
+        controller.prompt_cast("layer_1", src)
+        modal.handle_keydown(keydown(pygame.K_RETURN))  # bed
+
+        assert (root / "roles" / "bed" / "demo.milk").exists()
+        assert src.exists()
+        assert controller._index.roles.get("demo.milk") == {"bed"}
+        assert controller._index.marker("demo.milk") == " [R:B]"
+        assert switching_changes == ["layer_1"]
+        assert unlocked == ["layer_1"]
+
+
+def test_prompt_cast_already_cast_uses_move_wording() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / "pack" / "demo.milk"
+        _write(src, "milk")
+        _write(root / "roles" / "bed" / "demo.milk", "cast")
+        controller, _session, modal = _make_controller(preset_root=root)
+
+        controller.prompt_cast("layer_1", src)
+
+        view = modal.view_state()
+        assert view is not None
+        assert view.message == "Move cast: demo.milk?"
+        assert view.options == ("Bed", "Pulse", "Lead", "Accent", "Cancel")
+
+
+def test_confirm_cast_move_deletes_old_role_and_copies_new() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / "pack" / "demo.milk"
+        _write(src, "milk")
+        old = root / "roles" / "bed" / "demo.milk"
+        _write(old, "cast")
+        switching_changes: list[str] = []
+        unlocked: list[str] = []
+        controller, session, modal = _make_controller(
+            preset_root=root,
+            layer_bindings=lambda: noop_layer_bindings(
+                on_preset_switching_change=lambda slot: switching_changes.append(slot),
+                unlock_preset_after_modal=lambda slot: unlocked.append(slot),
+            ),
+        )
+        session.layers["layer_1"].preset_switching = "timeline"
+
+        controller.prompt_cast("layer_1", src)
+        modal.handle_keydown(keydown(pygame.K_RIGHT))  # pulse
+        modal.handle_keydown(keydown(pygame.K_RETURN))
+
+        assert not old.exists()
+        assert (root / "roles" / "pulse" / "demo.milk").exists()
+        assert controller._index.roles.get("demo.milk") == {"pulse"}
+        assert switching_changes == ["layer_1"]
+        assert unlocked == ["layer_1"]
+
+
+def test_prompt_restore_role_only_uses_yes_no() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / "pack" / "demo.milk"
+        _write(src, "milk")
+        _write(root / "roles" / "lead" / "demo.milk", "cast")
+        locked: list[str] = []
+        controller, _session, modal = _make_controller(
+            preset_root=root,
+            layer_bindings=lambda: noop_layer_bindings(
+                lock_preset_for_modal=lambda slot: locked.append(slot),
+            ),
+        )
+
+        controller.prompt_restore("layer_1", src)
+
+        view = modal.view_state()
+        assert view is not None
+        assert view.message == "Remove cast (lead)?"
+        assert view.options == ("Yes", "No")
+        assert locked == ["layer_1"]
+
+
+def test_confirm_restore_removes_role_cast() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / "pack" / "demo.milk"
+        _write(src, "milk")
+        cast = root / "roles" / "bed" / "demo.milk"
+        _write(cast, "cast")
+        switching_changes: list[str] = []
+        unlocked: list[str] = []
+        controller, session, modal = _make_controller(
+            preset_root=root,
+            layer_bindings=lambda: noop_layer_bindings(
+                on_preset_switching_change=lambda slot: switching_changes.append(slot),
+                unlock_preset_after_modal=lambda slot: unlocked.append(slot),
+            ),
+        )
+        session.layers["layer_1"].preset_switching = "timeline"
+
+        controller.prompt_restore("layer_1", src)
+        modal.handle_keydown(keydown(pygame.K_RETURN))
+
+        assert not cast.exists()
+        assert "demo.milk" not in controller._index.roles
+        assert switching_changes == ["layer_1"]
+        assert unlocked == ["layer_1"]
+
+
+def test_prompt_restore_favourite_and_role_uses_choice_modal() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / "pack" / "demo.milk"
+        _write(src, "milk")
+        _write(root / FAVOURITES_DIR / "demo.milk", "fav")
+        _write(root / "roles" / "bed" / "demo.milk", "cast")
+        _write(root / "roles" / "lead" / "demo.milk", "cast")
+        controller, _session, modal = _make_controller(preset_root=root)
+
+        controller.prompt_restore("layer_1", src)
+
+        view = modal.view_state()
+        assert view is not None
+        assert view.message == "Remove from: demo.milk?"
+        assert view.options == (
+            "Favourites",
+            "Cast (Bed)",
+            "Cast (Lead)",
+            "Cancel",
+        )
+
+
+def test_confirm_restore_choice_removes_only_selected_set() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / "pack" / "demo.milk"
+        _write(src, "milk")
+        fav = root / FAVOURITES_DIR / "demo.milk"
+        cast = root / "roles" / "bed" / "demo.milk"
+        _write(fav, "fav")
+        _write(cast, "cast")
+        switching_changes: list[str] = []
+        unlocked: list[str] = []
+        controller, session, modal = _make_controller(
+            preset_root=root,
+            layer_bindings=lambda: noop_layer_bindings(
+                on_preset_switching_change=lambda slot: switching_changes.append(slot),
+                unlock_preset_after_modal=lambda slot: unlocked.append(slot),
+            ),
+        )
+        session.layers["layer_1"].preset_switching = "timeline"
+
+        controller.prompt_restore("layer_1", src)
+        modal.handle_keydown(keydown(pygame.K_RIGHT))  # cast (bed)
+        modal.handle_keydown(keydown(pygame.K_RETURN))
+
+        assert fav.exists()
+        assert not cast.exists()
+        assert "demo.milk" in controller._index.favourites
+        assert "demo.milk" not in controller._index.roles
+        assert switching_changes == ["layer_1"]
+        assert unlocked == ["layer_1"]
+
+
+def test_cast_rebuild_skips_non_timeline_slots() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / "pack" / "demo.milk"
+        _write(src, "milk")
+        switching_changes: list[str] = []
+        controller, session, modal = _make_controller(
+            preset_root=root,
+            layer_bindings=lambda: noop_layer_bindings(
+                on_preset_switching_change=lambda slot: switching_changes.append(slot),
+            ),
+        )
+        session.layers["layer_1"].preset_switching = "projectm"
+
+        controller.prompt_cast("layer_1", src)
+        modal.handle_keydown(keydown(pygame.K_RETURN))  # bed
+
+        assert (root / "roles" / "bed" / "demo.milk").exists()
+        assert switching_changes == []
+
+
+def test_prompt_restore_path_under_roles_uses_remove_cast() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / "roles" / "accent" / "demo.milk"
+        _write(src, "cast")
+        controller, _session, modal = _make_controller(preset_root=root)
+
+        controller.prompt_restore("layer_1", src)
+
+        view = modal.view_state()
+        assert view is not None
+        assert view.message == "Remove cast (accent)?"
+        assert view.options == ("Yes", "No")
 
 
 def test_prompt_restore_neither_marker_is_noop() -> None:
