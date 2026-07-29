@@ -18,8 +18,19 @@ CUE_ROLE_MARKER_LETTER: dict[CueRole, str] = {
     "accent": "A",
 }
 
+CUE_ROLE_HELP_BLURB: dict[CueRole, str] = {
+    "bed": "calm dark foundation",
+    "pulse": "beat-reactive mid-ground",
+    "lead": "busy bright hero",
+    "accent": "short bright hits",
+}
+
 CUE_ROLE_MARKER_HELP_ENTRIES: tuple[tuple[str, str], ...] = tuple(
-    (f"[R:{CUE_ROLE_MARKER_LETTER[role]}]", role) for role in CUE_ROLES
+    (
+        f"[R:{CUE_ROLE_MARKER_LETTER[role]}]",
+        f"{role} ({CUE_ROLE_HELP_BLURB[role]})",
+    )
+    for role in CUE_ROLES
 )
 
 

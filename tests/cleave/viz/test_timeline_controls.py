@@ -1128,6 +1128,59 @@ def test_recorded_timeline_bar_unchanged_after_disable_layer_toggle_reenable() -
     assert expected[0][0] == 0.0
 
 
+def test_comma_period_selects_opening_baseline_cue() -> None:
+    lanes = {
+        "layer_1": TimelineLane(
+            baseline=0.5,
+            cues=canonicalize(
+                0.5,
+                [
+                    SlotCue(t=10.0, level=0.0),
+                    SlotCue(t=20.0, level=1.0),
+                ],
+            ),
+        ),
+    }
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        lanes=lanes,
+        position_sec=0.0,
+    )
+    controls.handle_keydown(keydown(pygame.K_PERIOD))
+    assert session.timeline.selected_cue_t["layer_1"] == 0.0
+    controls.handle_keydown(keydown(pygame.K_PERIOD))
+    assert session.timeline.selected_cue_t["layer_1"] == 20.0
+    controls.handle_keydown(keydown(pygame.K_COMMA))
+    assert session.timeline.selected_cue_t["layer_1"] == 0.0
+
+
+def test_c_casts_opening_baseline_materializing_cue_at_zero() -> None:
+    from cleave.cue_roles import CUE_ROLES
+
+    lanes = {
+        "layer_1": TimelineLane(
+            baseline=0.5,
+            cues=canonicalize(
+                0.5,
+                [
+                    SlotCue(t=10.0, level=0.0),
+                    SlotCue(t=20.0, level=1.0),
+                ],
+            ),
+        ),
+    }
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        lanes=lanes,
+        position_sec=0.0,
+    )
+    controls.handle_keydown(keydown(pygame.K_PERIOD))
+    assert session.timeline.selected_cue_t["layer_1"] == 0.0
+    controls.handle_keydown(keydown(pygame.K_c))
+    lane = session.timeline.lanes["layer_1"]
+    assert lane.baseline == 0.0
+    assert lane.cues[0] == SlotCue(t=0.0, level=0.5, role=CUE_ROLES[0])
+    assert session.timeline.selected_cue_t["layer_1"] == 0.0
+
+
 def test_comma_period_select_nearest_then_step_cues() -> None:
     # Off at 10 is skipped; navigable on cues are 4 and 16.
     lanes = {

@@ -208,7 +208,12 @@ def test_canonicalize_off_with_dead_metadata_still_level_only() -> None:
 
 
 def test_cue_editable_and_navigable_times() -> None:
-    from cleave.timeline import cue_editable_for_blend_role, navigable_cue_times
+    from cleave.timeline import (
+        cue_editable_for_blend_role,
+        navigable_cue_times,
+        opening_baseline_editable,
+        opening_cue,
+    )
 
     on = SlotCue(t=1.0, level=0.5)
     mid = SlotCue(t=2.0, level=1.0)
@@ -218,6 +223,36 @@ def test_cue_editable_and_navigable_times() -> None:
     assert not cue_editable_for_blend_role(off)
     lane = TimelineLane(baseline=0.0, cues=[on, mid, off])
     assert navigable_cue_times(lane) == [1.0, 2.0]
+    assert not opening_baseline_editable(lane)
+    assert opening_cue(lane) is None
+
+    opening_on = TimelineLane(baseline=0.5, cues=[SlotCue(t=10.0, level=0.0)])
+    assert opening_baseline_editable(opening_on)
+    assert opening_cue(opening_on) == SlotCue(t=0.0, level=0.5)
+    assert navigable_cue_times(opening_on) == [0.0]
+
+    already_at_zero = TimelineLane(
+        baseline=0.0,
+        cues=[SlotCue(t=0.0, level=0.5), SlotCue(t=10.0, level=0.0)],
+    )
+    assert not opening_baseline_editable(already_at_zero)
+    assert navigable_cue_times(already_at_zero) == [0.0]
+
+
+def test_update_lane_cue_materializes_opening_baseline() -> None:
+    from cleave.timeline import update_lane_cue
+
+    lane = TimelineLane(
+        baseline=0.5,
+        cues=[SlotCue(t=10.0, level=0.0), SlotCue(t=20.0, level=1.0)],
+    )
+    updated = update_lane_cue(lane, 0.0, blend="add", role="lead")
+    assert updated.baseline == 0.0
+    assert updated.cues[0] == SlotCue(t=0.0, level=0.5, blend="add", role="lead")
+    assert updated.cues[1:] == [
+        SlotCue(t=10.0, level=0.0),
+        SlotCue(t=20.0, level=1.0),
+    ]
 
 
 def test_lane_blend_at_holds_and_reverts() -> None:

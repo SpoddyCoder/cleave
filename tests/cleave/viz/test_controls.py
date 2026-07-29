@@ -24,7 +24,7 @@ from cleave.preset_playlist import (
     preset_filename_display,
     scan_preset_playlist,
 )
-from cleave.timeline import SlotCue, TimelineLane, canonicalize
+from cleave.timeline import SlotCue, TimelineLane, canonicalize, lane_level_at
 from cleave.project import load_manifest, write_manifest
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.key_repeat import mod_shift
@@ -1664,7 +1664,9 @@ def test_timeline_presets_breathing_clears_and_applies() -> None:
     assert lanes != prior
     assert set(lanes) == set(controls.session.layer_z_order)
     assert all(lane.baseline is not None for lane in lanes.values())
-    assert any(lane.baseline for lane in lanes.values())
+    assert any(
+        lane_level_at(lane, 0.0, inherit=0.0) > 0.0 for lane in lanes.values()
+    )
 
 
 def test_timeline_presets_arc_clears_and_applies() -> None:

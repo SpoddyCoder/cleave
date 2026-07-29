@@ -7,7 +7,7 @@ import statistics
 
 import pytest
 
-from cleave.timeline import LEVEL_EPS, TimelineLane, empty_lane, lane_level_at
+from cleave.timeline import LEVEL_EPS, SlotCue, TimelineLane, empty_lane, lane_level_at
 from cleave.timeline_presets import (
     MIN_SWITCH_GAP_BARS,
     MIN_SWITCH_GAP_SEC,
@@ -286,8 +286,8 @@ def test_preset_invariants(builder, n: int, duration_sec: float) -> None:
     _assert_cues_on_bars(lanes, thinned if thinned else bars)
     _assert_min_gaps(lanes, bars, duration_sec)
     if n == 1:
-        assert lanes[slots[0]].baseline == 1.0
-        assert lanes[slots[0]].cues == []
+        assert lanes[slots[0]].baseline == 0.0
+        assert lanes[slots[0]].cues == [SlotCue(t=0.0, level=1.0)]
 
 
 @pytest.mark.parametrize("builder", ALL_BUILDERS)
@@ -313,9 +313,19 @@ def test_short_duration_still_never_zero() -> None:
     slots = _slots(4)
     for builder in ALL_BUILDERS:
         lanes, bars = _build(builder, slots, 4.0, random.Random(7))
-        assert all(not lane.cues for lane in lanes.values())
+        # Opening-only: cues only at t=0 (no mid-song transitions).
+        assert all(
+            all(cue.t == 0.0 for cue in lane.cues) for lane in lanes.values()
+        )
         _assert_never_zero(lanes, slots, 4.0)
-        assert sum(1 for lane in lanes.values() if lane.baseline) >= 1
+        assert (
+            sum(
+                1
+                for lane in lanes.values()
+                if lane_level_at(lane, 0.0, inherit=0.0) > LEVEL_EPS
+            )
+            >= 1
+        )
         _assert_cues_on_bars(lanes, bars)
 
 
@@ -371,7 +381,14 @@ def test_voice_leading_mostly_smooth(builder) -> None:
 def test_breathing_starts_with_one_layer() -> None:
     slots = _slots(5)
     lanes, _bars = _build(build_breathing_cues, slots, 120.0, random.Random(11))
-    assert sum(1 for lane in lanes.values() if lane.baseline) == 1
+    assert (
+        sum(
+            1
+            for lane in lanes.values()
+            if lane_level_at(lane, 0.0, inherit=0.0) > LEVEL_EPS
+        )
+        == 1
+    )
 
 
 def test_pulse_rotates_singles() -> None:
@@ -404,7 +421,9 @@ def test_empty_bar_times_returns_opening_only() -> None:
     slots = _slots(4)
     for builder in ALL_BUILDERS:
         lanes = builder(slots, 60.0, random.Random(1), bar_times=())
-        assert all(not lane.cues for lane in lanes.values())
+        assert all(
+            all(cue.t == 0.0 for cue in lane.cues) for lane in lanes.values()
+        )
         _assert_never_zero(lanes, slots, 60.0)
 
 

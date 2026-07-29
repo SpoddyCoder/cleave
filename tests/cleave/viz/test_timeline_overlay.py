@@ -993,6 +993,25 @@ def test_role_glyph_not_drawn_on_off_cue() -> None:
     assert not overlay._cache.last_glyph_rects
 
 
+def test_bar_cues_include_synthetic_opening_baseline() -> None:
+    from cleave.viz.timeline_overlay import bar_cues_for_row
+
+    state = _view_state(
+        layer_z_order=["layer_1"],
+        defaults={"layer_1": 1.0},
+        lanes={
+            "layer_1": TimelineLane(
+                baseline=0.5,
+                cues=[SlotCue(t=10.0, level=0.0), SlotCue(t=20.0, level=1.0)],
+            )
+        },
+        duration_sec=100.0,
+    )
+    cues = bar_cues_for_row(state, "layer_1")
+    assert cues[0] == SlotCue(t=0.0, level=0.5)
+    assert [cue.t for cue in cues] == [0.0, 10.0, 20.0]
+
+
 def test_selected_cue_highlight_drawn_on_static_panel() -> None:
     pygame.init()
     overlay = TimelineOverlay()
