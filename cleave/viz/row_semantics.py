@@ -213,7 +213,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_description=(
             "Currently active Milkdrop preset for this layer.",
             "[F/B/U] indicates favourited/blacklisted/user-defined.",
-            "[R:X] indicates cast role.",
+            "[R:X] indicates the chosen cast role.",
         ),
         help_mode_entries=CUE_ROLE_MARKER_HELP_ENTRIES,
         repeatable=True,
@@ -247,7 +247,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_description=(
             "Preset in the user-defined rotation set for this layer.",
             "[F/B] indicates favourited/blacklisted.",
-            "[R:X] indicates cast role.",
+            "[R:X] indicates the chosen cast role.",
         ),
         help_mode_entries=CUE_ROLE_MARKER_HELP_ENTRIES,
     ),

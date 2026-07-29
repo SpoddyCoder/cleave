@@ -19,6 +19,7 @@ from cleave.timeline import (
     lane_level_breakpoints,
     lane_tick_times,
     levels_equal,
+    opening_cue,
     stem_abbreviation,
 )
 from cleave.viz.material_icons import visibility_icon_slot_width
@@ -310,11 +311,19 @@ def bar_level_breakpoints_for_row(
 
 
 def bar_cues_for_row(state: TimelineViewState, slot: str) -> list[SlotCue]:
-    """Cues whose ticks are drawn for one timeline row."""
+    """Cues whose ticks are drawn for one timeline row.
+
+    Includes a synthetic ``t=0`` cue when the opening period is on via baseline
+    only, so the first section can be selected for cast/blend.
+    """
     duration = state.duration_sec
     lane = _lane_for_view(state, slot)
     if not (state.recording and slot in state.record_baseline):
-        return [cue for cue in lane.cues if 0.0 <= cue.t <= duration]
+        cues = [cue for cue in lane.cues if 0.0 <= cue.t <= duration]
+        synthetic = opening_cue(lane)
+        if synthetic is not None and duration >= 0.0:
+            cues = [synthetic, *cues]
+        return cues
 
     record_start = state.record_slot_start_sec.get(slot, state.record_start_sec)
     if record_start is None:
@@ -335,6 +344,9 @@ def bar_cues_for_row(state: TimelineViewState, slot: str) -> list[SlotCue]:
     by_t = {cue.t: cue for cue in committed}
     for cue in live:
         by_t[cue.t] = cue
+    synthetic = opening_cue(lane)
+    if synthetic is not None and 0.0 not in by_t and duration >= 0.0:
+        by_t[0.0] = synthetic
     return [by_t[t] for t in sorted(by_t)]
 
 

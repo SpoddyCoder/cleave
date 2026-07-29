@@ -12,6 +12,7 @@ from cleave.timeline import (
     LEVEL_EPS,
     SlotCue,
     canonicalize,
+    cue_at_time,
     cue_editable_for_blend_role,
     empty_lane,
     navigable_cue_times,
@@ -259,10 +260,10 @@ class TimelineControls:
         if selected is None:
             return None
         lane = tl.lanes.get(slot) or empty_lane()
-        for cue in lane.cues:
-            if cue.t == selected:
-                return slot, cue
-        return None
+        cue = cue_at_time(lane, selected)
+        if cue is None:
+            return None
+        return slot, cue
 
     def _cycle_selected_cue_blend(self, *, forward: bool) -> None:
         if not self._cue_edits_allowed():

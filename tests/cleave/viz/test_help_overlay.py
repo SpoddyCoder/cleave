@@ -185,14 +185,14 @@ def test_preset_file_help_titles() -> None:
     assert description.lines == (
         "Currently active Milkdrop preset for this layer.",
         "[F/B/U] indicates favourited/blacklisted/user-defined.",
-        "[R:X] indicates cast role.",
+        "[R:X] indicates the chosen cast role.",
     )
     assert description.entries == CUE_ROLE_MARKER_HELP_ENTRIES
     assert dict(description.entries) == {
-        "[R:B]": "bed",
-        "[R:P]": "pulse",
-        "[R:L]": "lead",
-        "[R:A]": "accent",
+        "[R:B]": "bed (calm dark foundation)",
+        "[R:P]": "pulse (beat-reactive mid-ground)",
+        "[R:L]": "lead (busy bright hero)",
+        "[R:A]": "accent (short bright hits)",
     }
     entries = dict(keyboard.entries)
     assert entries["Left/Right"] == "next/previous preset"
@@ -445,7 +445,7 @@ def test_user_preset_item_help() -> None:
     assert description.lines == (
         "Preset in the user-defined rotation set for this layer.",
         "[F/B] indicates favourited/blacklisted.",
-        "[R:X] indicates cast role.",
+        "[R:X] indicates the chosen cast role.",
     )
     assert description.entries == CUE_ROLE_MARKER_HELP_ENTRIES
     entries = dict(keyboard.entries)

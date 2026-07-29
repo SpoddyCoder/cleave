@@ -79,9 +79,45 @@ def cue_editable_for_blend_role(cue: SlotCue) -> bool:
     return float(cue.level) > LEVEL_EPS
 
 
+def opening_baseline_editable(lane: TimelineLane) -> bool:
+    """True when the opening period is on via ``baseline`` with no cue at ``t=0``.
+
+    Generative Apply stores the first on-level in ``baseline``, so there is no
+    stored cue to select for cast/blend until one is materialized at ``0.0``.
+    """
+    return (
+        lane.baseline is not None
+        and float(lane.baseline) > LEVEL_EPS
+        and not any(cue.t == 0.0 for cue in lane.cues)
+    )
+
+
+def opening_cue(lane: TimelineLane) -> SlotCue | None:
+    """Synthetic on-cue at ``t=0`` for an editable opening baseline, else None."""
+    if not opening_baseline_editable(lane):
+        return None
+    return SlotCue(t=0.0, level=float(lane.baseline))
+
+
+def cue_at_time(lane: TimelineLane, cue_t: float) -> SlotCue | None:
+    """Stored cue at ``cue_t``, or the synthetic opening cue when ``cue_t`` is 0."""
+    for cue in lane.cues:
+        if cue.t == cue_t:
+            return cue
+    if cue_t == 0.0:
+        return opening_cue(lane)
+    return None
+
+
 def navigable_cue_times(lane: TimelineLane) -> list[float]:
-    """Cue times eligible for ``,`` / ``.`` selection (level above off)."""
-    return [cue.t for cue in lane.cues if cue_editable_for_blend_role(cue)]
+    """Cue times eligible for ``,`` / ``.`` selection (level above off).
+
+    Includes ``0.0`` when the opening period is on via baseline only.
+    """
+    times = [cue.t for cue in lane.cues if cue_editable_for_blend_role(cue)]
+    if opening_baseline_editable(lane):
+        times.insert(0, 0.0)
+    return times
 
 
 def canonicalize(
@@ -475,7 +511,21 @@ def update_lane_cue(
     blend: BlendMode | None,
     role: CueRole | None,
 ) -> TimelineLane:
-    """Update ``blend`` / ``role`` on the cue at ``cue_t`` without changing level."""
+    """Update ``blend`` / ``role`` on the cue at ``cue_t`` without changing level.
+
+    When ``cue_t`` is ``0.0`` and the opening period is only a baseline on-level,
+    materialize a real cue at ``0.0`` (baseline becomes ``0.0``) so cast/blend
+    persist and preset-switch rises can read the role.
+    """
+    if cue_t == 0.0 and opening_baseline_editable(lane):
+        level = float(lane.baseline)
+        return TimelineLane(
+            baseline=0.0,
+            cues=canonicalize(
+                0.0,
+                [SlotCue(t=0.0, level=level, blend=blend, role=role), *lane.cues],
+            ),
+        )
     updated = [
         replace(cue, blend=blend, role=role) if cue.t == cue_t else cue
         for cue in lane.cues
