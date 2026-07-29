@@ -937,10 +937,10 @@ def test_bar_without_high_water_mark_behaves_as_before() -> None:
 def test_selected_cue_readout_text_format() -> None:
     assert selected_cue_readout_text(
         SlotCue(t=65.0, level=1.0, blend="add", role="lead")
-    ) == "[01:05] opacity 100% blend add cast lead"
+    ) == "[01:05] opacity: 100% blend: add cast: lead"
     assert selected_cue_readout_text(
         SlotCue(t=0.0, level=0.25, blend=None, role=None)
-    ) == "[00:00] opacity 25% blend - cast -"
+    ) == "[00:00] opacity: 25% blend: - cast: -"
 
 
 def test_draw_with_selected_cue_and_role_does_not_crash() -> None:
