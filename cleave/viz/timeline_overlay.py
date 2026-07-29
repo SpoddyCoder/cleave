@@ -355,15 +355,45 @@ def bar_tick_times_for_row(state: TimelineViewState, slot: str) -> list[float]:
     return [cue.t for cue in bar_cues_for_row(state, slot)]
 
 
-def selected_cue_readout_text(cue: SlotCue) -> str:
-    """Badge-strip text for a selected cue's time, opacity, blend, and cast."""
+def selected_cue_readout_segments(
+    cue: SlotCue,
+) -> list[tuple[str, tuple[int, int, int]]]:
+    """Label/value segments for the selected-cue badge readout."""
     blend = cue.blend if cue.blend is not None else "-"
     cast = cue.role if cue.role is not None else "-"
     opacity_pct = int(round(float(cue.level) * 100.0))
-    return (
-        f"[{format_mmss(cue.t)}] opacity {opacity_pct}% "
-        f"blend {blend} cast {cast}"
-    )
+    return [
+        (f"[{format_mmss(cue.t)}] ", VALUE),
+        ("opacity: ", LABEL),
+        (f"{opacity_pct}% ", VALUE),
+        ("blend: ", LABEL),
+        (f"{blend} ", VALUE),
+        ("cast: ", LABEL),
+        (str(cast), VALUE),
+    ]
+
+
+def selected_cue_readout_text(cue: SlotCue) -> str:
+    """Plain-text form of the selected-cue badge readout."""
+    return "".join(text for text, _ in selected_cue_readout_segments(cue))
+
+
+def render_selected_cue_readout(
+    font: pygame.font.Font, cue: SlotCue
+) -> pygame.Surface:
+    """Badge-strip surface: LABEL prefixes, VALUE for time and field values."""
+    surfs = [
+        font.render(text, True, color)
+        for text, color in selected_cue_readout_segments(cue)
+    ]
+    width = sum(surf.get_width() for surf in surfs)
+    height = max((surf.get_height() for surf in surfs), default=0)
+    out = pygame.Surface((width, height), pygame.SRCALPHA)
+    x = 0
+    for surf in surfs:
+        out.blit(surf, (x, 0))
+        x += surf.get_width()
+    return out
 
 
 def _selected_cue_for_focus(state: TimelineViewState) -> SlotCue | None:
@@ -1366,7 +1396,7 @@ class TimelineOverlay:
         recording: bool,
         *,
         y_offset: int = 0,
-        cue_readout: str | None = None,
+        cue_readout: pygame.Surface | None = None,
     ) -> tuple[int, int, int, int]:
         time_surf = font.render(transport_time_text(position_sec), True, VALUE)
         time_w = time_surf.get_width() + REC_BADGE_PAD_X * 2
@@ -1385,14 +1415,13 @@ class TimelineOverlay:
         badge_y = y_offset
 
         readout_w = 0
-        if cue_readout:
-            readout_surf = font.render(cue_readout, True, VALUE)
-            readout_w = readout_surf.get_width() + REC_BADGE_PAD_X * 2
+        if cue_readout is not None:
+            readout_w = cue_readout.get_width() + REC_BADGE_PAD_X * 2
             pygame.draw.rect(
                 surface, BACKGROUND, (0, badge_y, readout_w, badge_h)
             )
             surface.blit(
-                readout_surf,
+                cue_readout,
                 (REC_BADGE_PAD_X, badge_y + REC_BADGE_PAD_Y),
             )
 
@@ -1470,7 +1499,9 @@ class TimelineOverlay:
 
         selected_cue = _selected_cue_for_focus(state)
         cue_readout = (
-            selected_cue_readout_text(selected_cue) if selected_cue is not None else None
+            render_selected_cue_readout(font, selected_cue)
+            if selected_cue is not None
+            else None
         )
         badge_rect = self._draw_header_badges_on_surface(
             upload,
