@@ -103,6 +103,19 @@ def test_up_down_keys_arm_repeat() -> None:
         assert repeats == [(key, 0)]
 
 
+def test_comma_period_keys_arm_repeat() -> None:
+    for key in (pygame.K_COMMA, pygame.K_PERIOD):
+        controller = KeyRepeatController()
+        repeats: list[tuple[int, int]] = []
+        controller.on_keydown(
+            key,
+            pygame.KMOD_SHIFT,
+            on_repeat=lambda k, mod: repeats.append((k, mod)),
+        )
+        controller.tick(INITIAL_DELAY_SEC)
+        assert repeats == [(key, pygame.KMOD_SHIFT)]
+
+
 def test_navigation_repeat_stays_at_constant_interval() -> None:
     controller = KeyRepeatController()
     repeats: list[tuple[int, int]] = []

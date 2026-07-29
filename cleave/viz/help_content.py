@@ -225,9 +225,11 @@ def timeline_strip_section(
     if not recording:
         entries.extend(
             (
-                (", / .", "select previous / next on cue"),
-                ("B / Shift+B", "cycle on-cue blend"),
-                ("C / Shift+C", "cycle on-cue cast"),
+                (", / .", "select previous / next cue"),
+                ("Shift + , / .", "nudge cue opacity -/+ 1%"),
+                ("Ctrl + , / .", "nudge cue opacity -/+ 10%"),
+                ("B / Shift+B", "cycle cue blend"),
+                ("C / Shift+C", "cycle cue cast"),
             )
         )
 

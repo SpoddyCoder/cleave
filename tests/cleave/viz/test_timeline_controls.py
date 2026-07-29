@@ -13,6 +13,7 @@ from cleave.timeline import SlotCue, TimelineLane, canonicalize, copy_lane, empt
 from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, SEEK_TINY, TuningControls
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.layer_visibility import armed_recording_level, effective_layer_enabled
+from cleave.viz.key_repeat import INITIAL_DELAY_SEC, SLOW_INTERVAL_SEC
 from cleave.viz.timeline_controls import TimelineControls
 from tests.support.viz import keydown, make_playlist, stub_playback_state
 
@@ -1363,6 +1364,139 @@ def test_b_and_c_noop_on_off_cue() -> None:
     assert on_cue.role == CUE_ROLES[0]
 
 
+def test_shift_comma_period_nudges_selected_cue_opacity() -> None:
+    lanes = {
+        "layer_1": TimelineLane(
+            baseline=0.0,
+            cues=canonicalize(
+                0.0,
+                [SlotCue(t=5.0, level=1.0)],
+            ),
+        ),
+    }
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        lanes=lanes,
+        position_sec=5.0,
+    )
+    controls.handle_keydown(keydown(pygame.K_PERIOD))
+    assert session.timeline.selected_cue_t["layer_1"] == 5.0
+
+    controls.handle_keydown(keydown(pygame.K_COMMA, mod=pygame.KMOD_SHIFT))
+    assert session.timeline.lanes["layer_1"].cues[0].level == 0.99
+
+    controls.handle_keydown(keydown(pygame.K_COMMA, mod=pygame.KMOD_CTRL))
+    assert session.timeline.lanes["layer_1"].cues[0].level == 0.89
+
+    controls.handle_keydown(keydown(pygame.K_PERIOD, mod=pygame.KMOD_SHIFT))
+    assert session.timeline.lanes["layer_1"].cues[0].level == 0.90
+
+    # Ctrl wins over Shift when both are held.
+    controls.handle_keydown(
+        keydown(pygame.K_PERIOD, mod=pygame.KMOD_CTRL | pygame.KMOD_SHIFT)
+    )
+    assert session.timeline.lanes["layer_1"].cues[0].level == 1.0
+
+
+def test_opacity_nudge_key_repeat_after_delay() -> None:
+    lanes = {
+        "layer_1": TimelineLane(
+            baseline=0.0,
+            cues=canonicalize(
+                0.0,
+                [SlotCue(t=5.0, level=1.0)],
+            ),
+        ),
+    }
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        lanes=lanes,
+        position_sec=5.0,
+    )
+    controls.handle_keydown(keydown(pygame.K_PERIOD))
+    controls.handle_keydown(keydown(pygame.K_COMMA, mod=pygame.KMOD_SHIFT))
+    assert session.timeline.lanes["layer_1"].cues[0].level == 0.99
+    assert controls.key_repeat_armed
+
+    controls.tick(INITIAL_DELAY_SEC - 0.01)
+    assert session.timeline.lanes["layer_1"].cues[0].level == 0.99
+
+    controls.tick(0.01)
+    assert session.timeline.lanes["layer_1"].cues[0].level == 0.98
+
+    controls.tick(SLOW_INTERVAL_SEC)
+    assert session.timeline.lanes["layer_1"].cues[0].level == 0.97
+
+    controls.handle_keyup(
+        pygame.event.Event(pygame.KEYUP, key=pygame.K_COMMA, mod=0)
+    )
+    assert not controls.key_repeat_armed
+    controls.tick(INITIAL_DELAY_SEC + 1.0)
+    assert session.timeline.lanes["layer_1"].cues[0].level == 0.97
+
+
+def test_bare_comma_does_not_arm_key_repeat() -> None:
+    lanes = {
+        "layer_1": _lane(False, (5.0, True), (10.0, True)),
+    }
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        lanes=lanes,
+        position_sec=5.0,
+    )
+    controls.handle_keydown(keydown(pygame.K_PERIOD))
+    controls.handle_keydown(keydown(pygame.K_COMMA))
+    assert not controls.key_repeat_armed
+    controls.tick(INITIAL_DELAY_SEC + 1.0)
+    assert session.timeline.selected_cue_t["layer_1"] == 5.0
+
+
+def test_nudge_cue_opacity_floors_at_ten_percent() -> None:
+    lanes = {
+        "layer_1": TimelineLane(
+            baseline=0.0,
+            cues=canonicalize(
+                0.0,
+                [SlotCue(t=5.0, level=0.12)],
+            ),
+        ),
+    }
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        lanes=lanes,
+        position_sec=5.0,
+    )
+    controls.handle_keydown(keydown(pygame.K_PERIOD))
+    assert session.timeline.selected_cue_t["layer_1"] == 5.0
+    controls.handle_keydown(keydown(pygame.K_COMMA, mod=pygame.KMOD_CTRL))
+    assert session.timeline.lanes["layer_1"].cues[0].level == 0.10
+    assert session.timeline.selected_cue_t["layer_1"] == 5.0
+    # Already at floor: further down nudges are no-ops.
+    controls.handle_keydown(keydown(pygame.K_COMMA, mod=pygame.KMOD_SHIFT))
+    assert session.timeline.lanes["layer_1"].cues[0].level == 0.10
+
+
+def test_shift_nudge_opening_baseline_opacity() -> None:
+    lanes = {
+        "layer_1": TimelineLane(
+            baseline=0.5,
+            cues=canonicalize(
+                0.5,
+                [
+                    SlotCue(t=10.0, level=0.0),
+                    SlotCue(t=20.0, level=1.0),
+                ],
+            ),
+        ),
+    }
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        lanes=lanes,
+        position_sec=0.0,
+    )
+    controls.handle_keydown(keydown(pygame.K_PERIOD))
+    assert session.timeline.selected_cue_t["layer_1"] == 0.0
+    controls.handle_keydown(keydown(pygame.K_PERIOD, mod=pygame.KMOD_SHIFT))
+    assert session.timeline.lanes["layer_1"].baseline == 0.51
+    assert session.timeline.selected_cue_t["layer_1"] == 0.0
+    assert not any(cue.t == 0.0 for cue in session.timeline.lanes["layer_1"].cues)
+
+
 def test_cue_edit_keys_refused_when_locked() -> None:
     lanes = {
         "layer_1": _lane(False, (5.0, True)),
@@ -1376,8 +1510,10 @@ def test_cue_edit_keys_refused_when_locked() -> None:
     assert session.timeline.selected_cue_t == {}
     controls.handle_keydown(keydown(pygame.K_b))
     controls.handle_keydown(keydown(pygame.K_c))
+    controls.handle_keydown(keydown(pygame.K_COMMA, mod=pygame.KMOD_SHIFT))
     assert session.timeline.lanes["layer_1"].cues[0].blend is None
     assert session.timeline.lanes["layer_1"].cues[0].role is None
+    assert session.timeline.lanes["layer_1"].cues[0].level == 1.0
 
 
 def test_cue_edit_keys_refused_when_recording() -> None:
@@ -1394,5 +1530,7 @@ def test_cue_edit_keys_refused_when_recording() -> None:
     assert session.timeline.selected_cue_t == {}
     controls.handle_keydown(keydown(pygame.K_b))
     controls.handle_keydown(keydown(pygame.K_c))
+    controls.handle_keydown(keydown(pygame.K_PERIOD, mod=pygame.KMOD_CTRL))
     assert session.timeline.lanes["layer_1"].cues[0].blend is None
     assert session.timeline.lanes["layer_1"].cues[0].role is None
+    assert session.timeline.lanes["layer_1"].cues[0].level == 1.0

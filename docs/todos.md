@@ -15,11 +15,10 @@ Outstanding bugs and issues.
 
 ## Timeline follow-ups
 
-Rich cue levels are shipped (see [improved-timeline-presets.md](improved-timeline-presets.md) Idea 1). Remaining mix-cue work:
+Rich cue levels, per-cue blend/role, and manual timeline-opacity nudges are shipped (see [improved-timeline-presets.md](improved-timeline-presets.md) Idea 1). Remaining mix-cue work:
 
-- **Per-cue blend mode.** Carry an optional blend on `SlotCue` and write `LayerFbo.blend_mode` from the active cue so the arranger can switch compositing per transition ([cleave/blend_modes.py](../cleave/blend_modes.py)).
-- **Per-cue preset role.** Optional role on the cue for content-aware casting once reactivity fingerprints exist (Idea 3).
-- **Manual level authoring.** Strip and record path still toggle `0.0` / `1.0`; add a way to set partial levels by hand without Apply.
+- **Record still writes 0/1.** Armed record toggles punch full on/off only; partial opacities stay Apply or `Shift`/`Ctrl` + `,`/`.` on a selected cue.
+- **Automatic blend/role assignment** from the generative arranger once reactivity fingerprints exist (Idea 3).
 
 ---
 

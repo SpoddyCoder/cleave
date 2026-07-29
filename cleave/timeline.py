@@ -16,6 +16,10 @@ from cleave.extract import STEM_SOURCES, StemSource
 RECORD_DEBOUNCE_SEC = 0.08
 SONG_MARKER_FADE_MATCH_EPS = 1e-3
 LEVEL_QUANTUM = 0.25
+# Manual strip nudges (percent of full); generative Apply still uses LEVEL_QUANTUM.
+LEVEL_STEP_SMALL = 0.01
+LEVEL_STEP_LARGE = 0.10
+LEVEL_EDIT_MIN = 0.10
 LEVEL_EPS = 1e-6
 
 _STEM_SOURCE_ABBREVIATIONS = {
@@ -510,26 +514,44 @@ def update_lane_cue(
     *,
     blend: BlendMode | None,
     role: CueRole | None,
+    level: float | None = None,
 ) -> TimelineLane:
-    """Update ``blend`` / ``role`` on the cue at ``cue_t`` without changing level.
+    """Update ``blend`` / ``role`` / optional ``level`` on the cue at ``cue_t``.
 
-    When ``cue_t`` is ``0.0`` and the opening period is only a baseline on-level,
-    materialize a real cue at ``0.0`` (baseline becomes ``0.0``) so cast/blend
-    persist and preset-switch rises can read the role.
+    When ``cue_t`` is ``0.0`` and the opening period is only a baseline on-level:
+    level-only edits (``blend`` and ``role`` both ``None``) update ``baseline``
+    in place; otherwise materialize a real cue at ``0.0`` (baseline becomes
+    ``0.0``) so cast/blend persist and preset-switch rises can read the role.
     """
     if cue_t == 0.0 and opening_baseline_editable(lane):
-        level = float(lane.baseline)
+        new_level = (
+            float(lane.baseline) if level is None else clamp_level(level)
+        )
+        if blend is None and role is None:
+            if level is None:
+                return copy_lane(lane)
+            baseline = 0.0 if new_level <= LEVEL_EPS else new_level
+            return TimelineLane(
+                baseline=baseline,
+                cues=canonicalize(baseline, list(lane.cues)),
+            )
         return TimelineLane(
             baseline=0.0,
             cues=canonicalize(
                 0.0,
-                [SlotCue(t=0.0, level=level, blend=blend, role=role), *lane.cues],
+                [
+                    SlotCue(t=0.0, level=new_level, blend=blend, role=role),
+                    *lane.cues,
+                ],
             ),
         )
-    updated = [
-        replace(cue, blend=blend, role=role) if cue.t == cue_t else cue
-        for cue in lane.cues
-    ]
+    updated: list[SlotCue] = []
+    for cue in lane.cues:
+        if cue.t != cue_t:
+            updated.append(cue)
+            continue
+        new_level = cue.level if level is None else clamp_level(level)
+        updated.append(replace(cue, level=new_level, blend=blend, role=role))
     return TimelineLane(
         baseline=lane.baseline,
         cues=canonicalize(lane.baseline, updated),
