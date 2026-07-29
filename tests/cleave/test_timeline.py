@@ -255,6 +255,36 @@ def test_update_lane_cue_materializes_opening_baseline() -> None:
     ]
 
 
+def test_update_lane_cue_level_only_keeps_opening_baseline() -> None:
+    from cleave.timeline import update_lane_cue
+
+    lane = TimelineLane(
+        baseline=0.5,
+        cues=[SlotCue(t=10.0, level=0.0), SlotCue(t=20.0, level=1.0)],
+    )
+    updated = update_lane_cue(lane, 0.0, blend=None, role=None, level=0.75)
+    assert updated.baseline == 0.75
+    assert updated.cues == [
+        SlotCue(t=10.0, level=0.0),
+        SlotCue(t=20.0, level=1.0),
+    ]
+
+
+def test_update_lane_cue_changes_stored_cue_level() -> None:
+    from cleave.timeline import update_lane_cue
+
+    lane = TimelineLane(
+        baseline=0.0,
+        cues=[SlotCue(t=5.0, level=1.0, blend="add", role="lead")],
+    )
+    updated = update_lane_cue(
+        lane, 5.0, blend="add", role="lead", level=0.25
+    )
+    assert updated.cues == [
+        SlotCue(t=5.0, level=0.25, blend="add", role="lead"),
+    ]
+
+
 def test_lane_blend_at_holds_and_reverts() -> None:
     lane = TimelineLane(
         baseline=0.0,

@@ -9,12 +9,16 @@ import pygame
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.cue_roles import CUE_ROLES, CueRole
 from cleave.timeline import (
+    LEVEL_EDIT_MIN,
     LEVEL_EPS,
+    LEVEL_STEP_LARGE,
+    LEVEL_STEP_SMALL,
     SlotCue,
     canonicalize,
     cue_at_time,
     cue_editable_for_blend_role,
     empty_lane,
+    levels_equal,
     navigable_cue_times,
     should_accept_toggle,
     snap_placement_time,
@@ -22,7 +26,7 @@ from cleave.timeline import (
 )
 from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, SEEK_TINY
 from cleave.viz.session import TuningSession
-from cleave.viz.key_repeat import mod_ctrl, mod_shift
+from cleave.viz.key_repeat import KeyRepeatController, mod_ctrl, mod_shift
 from cleave.viz.layer_visibility import (
     armed_recording_level,
     build_record_punch_cues,
@@ -79,6 +83,7 @@ class TimelineControls:
         self._on_seek = on_seek
         self._on_notification = on_notification
         self._last_toggle_t: dict[str, float] = {}
+        self._key_repeat = KeyRepeatController()
 
     def _snap_placement(self, t_sec: float) -> float:
         return snap_placement_time(
@@ -179,11 +184,37 @@ class TimelineControls:
             return True
 
         if event.key == pygame.K_COMMA:
-            self._step_selected_cue(forward=False)
+            if mod_ctrl(event.mod) or mod_shift(event.mod):
+                self._nudge_selected_cue_level(
+                    forward=False, large=mod_ctrl(event.mod)
+                )
+                if self._cue_edits_allowed():
+                    self._key_repeat.on_keydown(
+                        event.key,
+                        event.mod,
+                        on_repeat=lambda key, mod: self._nudge_selected_cue_level(
+                            forward=False, large=mod_ctrl(mod)
+                        ),
+                    )
+            else:
+                self._step_selected_cue(forward=False)
             return True
 
         if event.key == pygame.K_PERIOD:
-            self._step_selected_cue(forward=True)
+            if mod_ctrl(event.mod) or mod_shift(event.mod):
+                self._nudge_selected_cue_level(
+                    forward=True, large=mod_ctrl(event.mod)
+                )
+                if self._cue_edits_allowed():
+                    self._key_repeat.on_keydown(
+                        event.key,
+                        event.mod,
+                        on_repeat=lambda key, mod: self._nudge_selected_cue_level(
+                            forward=True, large=mod_ctrl(mod)
+                        ),
+                    )
+            else:
+                self._step_selected_cue(forward=True)
             return True
 
         if event.key == pygame.K_b:
@@ -197,7 +228,15 @@ class TimelineControls:
         return True
 
     def handle_keyup(self, event: pygame.event.Event) -> None:
-        del event
+        if event.type == pygame.KEYUP:
+            self._key_repeat.on_keyup(event.key)
+
+    @property
+    def key_repeat_armed(self) -> bool:
+        return self._key_repeat.is_armed
+
+    def tick(self, dt_sec: float) -> None:
+        self._key_repeat.tick(dt_sec)
 
     def stop_recording(self) -> None:
         """Stop an in-progress timeline take without closing the panel."""
@@ -265,6 +304,30 @@ class TimelineControls:
             return None
         return slot, cue
 
+    def _nudge_selected_cue_level(self, *, forward: bool, large: bool) -> None:
+        """Adjust selected on-cue timeline opacity (multiplies into layer opacity)."""
+        if not self._cue_edits_allowed():
+            return
+        selected = self._selected_cue()
+        if selected is None:
+            return
+        slot, cue = selected
+        if not cue_editable_for_blend_role(cue):
+            return
+        # Integer percent math matches the layer opacity fader (1% / 10%).
+        step_pct = int(round(
+            (LEVEL_STEP_LARGE if large else LEVEL_STEP_SMALL) * 100.0
+        ))
+        min_pct = int(round(LEVEL_EDIT_MIN * 100.0))
+        pct = int(round(float(cue.level) * 100.0))
+        new_pct = max(min_pct, min(100, pct + (step_pct if forward else -step_pct)))
+        new_level = new_pct / 100.0
+        if levels_equal(new_level, cue.level):
+            return
+        self._apply_selected_cue_update(
+            slot, cue.t, blend=cue.blend, role=cue.role, level=new_level
+        )
+
     def _cycle_selected_cue_blend(self, *, forward: bool) -> None:
         if not self._cue_edits_allowed():
             return
@@ -312,12 +375,15 @@ class TimelineControls:
         *,
         blend: BlendMode | None,
         role: CueRole | None,
+        level: float | None = None,
     ) -> None:
         tl = self.session.timeline
         lane = tl.lanes.get(slot) or empty_lane()
-        updated = update_lane_cue(lane, cue_t, blend=blend, role=role)
+        updated = update_lane_cue(
+            lane, cue_t, blend=blend, role=role, level=level
+        )
         tl.lanes[slot] = updated
-        if not any(cue.t == cue_t for cue in updated.cues):
+        if cue_t not in navigable_cue_times(updated):
             tl.selected_cue_t.pop(slot, None)
             tl.selected_cue_flash_start_ms = None
 

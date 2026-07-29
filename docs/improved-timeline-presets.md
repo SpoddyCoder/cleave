@@ -34,7 +34,7 @@ Gaps the ideas below target:
 
 **Deferred** (still part of the mix vision, not implemented):
 
-- Manual level authoring in the strip (record toggles still write `0.0` / `1.0`).
+- Record toggles still write `0.0` / `1.0` (partial timeline opacity is Apply or strip nudge).
 - Automatic blend/role assignment from the generative arranger (Idea 3).
 
 ### Intent
@@ -54,13 +54,13 @@ Gaps the ideas below target:
 6. Strip: polygon fill from breakpoints; committed eye alpha follows level.
 7. Blend: held like level via `lane_blend_at`; applied per frame in `apply_layer_visibility` with layer static fallback.
 8. Role: event property on on-transitions; seek-stable per-role pools in [cleave/viz/preset_switching.py](../cleave/viz/preset_switching.py); empty pool falls back to the main rotation.
-9. Strip authoring: `,` / `.` select on cues (`level > 0`, including mid-on changes; offs skipped); `b` / `c` cycle blend and cast on those only; selected tick highlight, role glyphs on on cues, and badge readout.
+9. Strip authoring: `,` / `.` select on cues (`level > 0`, including mid-on changes; offs skipped); `Shift` / `Ctrl` + `,` / `.` nudge selected cue timeline opacity by 1% / 10% (floor 10% so the cue is not erased; multiplies into the layer opacity fader; YAML field stays `level`); `b` / `c` cycle blend and cast on those only; selected tick highlight, role glyphs on on cues, and badge readout (`opacity N%`).
 
 Overlaps [roadmap.md](roadmap.md) richer cue types; automatic blend/role assignment from stem content and fingerprints remains Idea 3.
 
 ### User effort
 
-None for 0/1 lanes. Partial levels come from generative Apply (crescendo). Blend and role are authorable on selected on cues in the strip; place milk files under `preset_root/roles/<role>/` for casting.
+None for 0/1 lanes. Partial timeline opacity comes from generative Apply (crescendo / conductor) or manual `Shift`/`Ctrl` + `,`/`.` on a selected on cue. Blend and role are authorable on selected on cues in the strip; place milk files under `preset_root/roles/<role>/` for casting.
 
 ---
 

@@ -356,10 +356,14 @@ def bar_tick_times_for_row(state: TimelineViewState, slot: str) -> list[float]:
 
 
 def selected_cue_readout_text(cue: SlotCue) -> str:
-    """Badge-strip text for a selected cue's time, level, blend, and cast."""
+    """Badge-strip text for a selected cue's time, opacity, blend, and cast."""
     blend = cue.blend if cue.blend is not None else "-"
     cast = cue.role if cue.role is not None else "-"
-    return f"[{format_mmss(cue.t)}] lvl {cue.level:.2f} blend {blend} cast {cast}"
+    opacity_pct = int(round(float(cue.level) * 100.0))
+    return (
+        f"[{format_mmss(cue.t)}] opacity {opacity_pct}% "
+        f"blend {blend} cast {cast}"
+    )
 
 
 def _selected_cue_for_focus(state: TimelineViewState) -> SlotCue | None:

@@ -653,7 +653,11 @@ class VisualizerApp:
 
                 self._overlay_dt = clock.tick() / 1000.0
                 rt.controls.tick(self._overlay_dt)
-                if rt.controls.key_repeat_armed:
+                rt.timeline_controls.tick(self._overlay_dt)
+                if (
+                    rt.controls.key_repeat_armed
+                    or rt.timeline_controls.key_repeat_armed
+                ):
                     rt.overlay.notify_input()
 
                 pm_fps_governor.observe(measured_fps)
