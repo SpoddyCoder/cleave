@@ -201,8 +201,8 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert fades_header in view_open.layout.rows
     assert song_marker_fades not in view_open.layout.rows
     assert limiter_header in view_open.layout.rows
-    assert limiter_threshold not in view_open.layout.rows
-    assert limiter_release not in view_open.layout.rows
+    assert limiter_threshold in view_open.layout.rows
+    assert limiter_release in view_open.layout.rows
     assert markers_header in view_open.layout.rows
     markers_idx = view_open.layout.rows.index(markers_header)
     beat_bar_idx = view_open.layout.rows.index(beat_bar_header)
@@ -214,7 +214,9 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert fades_idx == beat_bar_idx + 1
     assert presets_header_idx == fades_idx + 1
     assert limiter_header_idx == presets_header_idx + 1
-    assert reset_idx == limiter_header_idx + 1
+    assert view_open.layout.rows.index(limiter_threshold) == limiter_header_idx + 1
+    assert view_open.layout.rows.index(limiter_release) == limiter_header_idx + 2
+    assert reset_idx == limiter_header_idx + 3
 
     session.song_markers.expanded = True
     view_markers_expanded = builder.build(paused=False)
@@ -243,7 +245,9 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert standard_cue_fades not in view_beat_expanded.layout.rows
     assert view_beat_expanded.layout.rows.index(presets_header) == fades_idx + 1
     assert view_beat_expanded.layout.rows.index(limiter_header) == fades_idx + 2
-    assert view_beat_expanded.layout.rows.index(reset) == fades_idx + 3
+    assert view_beat_expanded.layout.rows.index(limiter_threshold) == fades_idx + 3
+    assert view_beat_expanded.layout.rows.index(limiter_release) == fades_idx + 4
+    assert view_beat_expanded.layout.rows.index(reset) == fades_idx + 5
 
     session.timeline.fades_expanded = True
     view_fades_expanded = builder.build(paused=False)
@@ -290,7 +294,13 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert view_presets_expanded.layout.rows.index(limiter_header) == (
         presets_header_idx + 6
     )
-    assert view_presets_expanded.layout.rows.index(reset) == presets_header_idx + 7
+    assert view_presets_expanded.layout.rows.index(limiter_threshold) == (
+        presets_header_idx + 7
+    )
+    assert view_presets_expanded.layout.rows.index(limiter_release) == (
+        presets_header_idx + 8
+    )
+    assert view_presets_expanded.layout.rows.index(reset) == presets_header_idx + 9
 
     session.timeline.timeline_presets_expanded = False
     view_presets_collapsed = builder.build(paused=False)
@@ -609,27 +619,11 @@ def test_structure_signature_invalidates_on_visual_limiter_enabled() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
-    session.timeline.visual_limiter_expanded = True
     session.timeline.limiter.enabled = True
     sig_before = view_state_structure_signature(
         session, config_save, notification_active=False
     )
     session.timeline.limiter.enabled = False
-    sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_after
-
-
-def test_structure_signature_invalidates_on_visual_limiter_expanded() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    session.timeline.visual_limiter_expanded = False
-    sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    session.timeline.visual_limiter_expanded = True
     sig_after = view_state_structure_signature(
         session, config_save, notification_active=False
     )

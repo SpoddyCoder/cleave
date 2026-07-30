@@ -397,6 +397,13 @@ def test_render_timeline_help_has_no_solo() -> None:
     assert dict(section.entries)["Left/Right"] == "expand/collapse"
 
 
+def test_visual_limiter_header_help_disable_enable() -> None:
+    section = _keyboard_section(
+        sections_for(RowKind.TIMELINE_VISUAL_LIMITER_HEADER)
+    )
+    assert dict(section.entries) == {"Left/Right": "disable / enable"}
+
+
 def test_render_overlay_sub_header_help_expand_collapse() -> None:
     for row_kind in (
         RowKind.RENDER_OVERLAY_TITLE_HEADER,

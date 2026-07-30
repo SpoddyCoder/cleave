@@ -184,7 +184,6 @@ class RenderTimelineBlock:
     placement_snap: str = "beat"
     fades_expanded: bool = False
     timeline_presets_expanded: bool = False
-    visual_limiter_expanded: bool = False
     timeline_preset_kind: str = "breathing"
     timeline_preset_crescendo: CrescendoTarget | None = None
     timeline_preset_density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
@@ -381,7 +380,6 @@ def view_state_structure_signature(
             "beat_bar_grid_expanded": tl.beat_bar_grid_expanded,
             "fades_expanded": tl.fades_expanded,
             "timeline_presets_expanded": tl.timeline_presets_expanded,
-            "visual_limiter_expanded": tl.visual_limiter_expanded,
             "song_marker_fades_enabled": tl.song_marker_fades.enabled,
             "standard_cue_fades_enabled": tl.standard_cue_fades.enabled,
             "visual_limiter_enabled": tl.limiter.enabled,
@@ -550,7 +548,6 @@ class TuningViewStateBuilder:
             placement_snap=tl.placement_snap,
             fades_expanded=tl.fades_expanded,
             timeline_presets_expanded=tl.timeline_presets_expanded,
-            visual_limiter_expanded=tl.visual_limiter_expanded,
             timeline_preset_kind=tl.timeline_preset_kind,
             timeline_preset_crescendo=tl.timeline_preset_crescendo,
             timeline_preset_density=tl.timeline_preset_density,
@@ -738,7 +735,6 @@ class TuningViewStateBuilder:
                 placement_snap=tl.placement_snap,
                 fades_expanded=tl.fades_expanded,
                 timeline_presets_expanded=tl.timeline_presets_expanded,
-                visual_limiter_expanded=tl.visual_limiter_expanded,
                 timeline_preset_kind=tl.timeline_preset_kind,
                 timeline_preset_crescendo=tl.timeline_preset_crescendo,
                 timeline_preset_density=tl.timeline_preset_density,

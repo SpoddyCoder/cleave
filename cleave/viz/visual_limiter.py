@@ -13,14 +13,6 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import numpy as np
-from OpenGL.GL import (
-    GL_FLOAT,
-    GL_FRAMEBUFFER,
-    GL_RGBA,
-    GL_UNSIGNED_BYTE,
-    glBindFramebuffer,
-    glReadPixels,
-)
 
 from cleave.config_schema import (
     DEFAULT_VISUAL_LIMITER_RELEASE,
@@ -29,13 +21,13 @@ from cleave.config_schema import (
     visual_limiter_threshold_off,
 )
 from cleave.cue_roles import CueRole
-from cleave.gl_color_format import RGBA16F
 from cleave.timeline import LEVEL_EPS, empty_lane, lane_role_at
 from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.layer_visibility import timeline_levels_apply
 
 if TYPE_CHECKING:
     from cleave.gl_compositor import GlCompositor
+    from cleave.gl_post_process import GlPostProcess
     from cleave.viz.app import VisualizerCore
     from cleave.viz.layer import StemLayer
     from cleave.viz.session import TuningSession, VisualLimiterRuntime
@@ -52,10 +44,6 @@ ATTACK_SEC = 0.15
 SEEK_JUMP_SEC = 0.25
 GRID_WIDTH = 32
 GRID_HEIGHT = 18
-
-_LUMA_R = 0.2126
-_LUMA_G = 0.7152
-_LUMA_B = 0.0722
 
 # Lower rank is ducked first: bed < accent < pulse < lead.
 _ROLE_RANK: dict[CueRole, int] = {
@@ -274,38 +262,19 @@ def update_limiter_state(
 
 def read_luma_grid(
     compositor: GlCompositor,
+    post_process: GlPostProcess,
     *,
     grid_width: int = GRID_WIDTH,
     grid_height: int = GRID_HEIGHT,
 ) -> np.ndarray:
     """Downsampled display-referred luma grid from the content FBO."""
-    width = compositor.content_width
-    height = compositor.content_height
-    if width <= 0 or height <= 0:
-        return np.zeros((grid_height, grid_width), dtype=np.float32)
-
-    xs = np.linspace(0, width - 1, grid_width, dtype=np.int32)
-    ys = np.linspace(0, height - 1, grid_height, dtype=np.int32)
-    hdr = compositor.color_format is RGBA16F
-    glBindFramebuffer(GL_FRAMEBUFFER, compositor.content_fbo_id)
-
-    grid = np.empty((grid_height, grid_width), dtype=np.float32)
-    for row_i, y in enumerate(ys):
-        if hdr:
-            raw = glReadPixels(0, int(y), width, 1, GL_RGBA, GL_FLOAT)
-            rgba = np.frombuffer(raw, dtype=np.float32).reshape(width, 4)
-            rgb = np.clip(rgba[:, :3], 0.0, 1.0)
-        else:
-            raw = glReadPixels(0, int(y), width, 1, GL_RGBA, GL_UNSIGNED_BYTE)
-            rgba = np.frombuffer(raw, dtype=np.uint8).reshape(width, 4)
-            rgb = rgba[:, :3].astype(np.float32) / 255.0
-        samples = rgb[xs]
-        grid[row_i] = (
-            _LUMA_R * samples[:, 0]
-            + _LUMA_G * samples[:, 1]
-            + _LUMA_B * samples[:, 2]
-        )
-    return grid
+    return post_process.read_luma_grid(
+        compositor.content_texture_id,
+        compositor.content_width,
+        compositor.content_height,
+        grid_width=grid_width,
+        grid_height=grid_height,
+    )
 
 
 def metrics_from_grid(
@@ -358,7 +327,7 @@ def observe_frame_busyness(
     if width <= 0 or height <= 0:
         return
     reset_if_seek(state, t_sec)
-    luma_grid = read_luma_grid(core.compositor)
+    luma_grid = read_luma_grid(core.compositor, core.post_process)
     mean_luma, mean_abs_delta = metrics_from_grid(state, luma_grid)
     hot = collect_hot_layers(session, core.layers_by_slot, t_sec)
     update_limiter_state(

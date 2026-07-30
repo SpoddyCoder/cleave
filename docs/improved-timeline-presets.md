@@ -229,7 +229,7 @@ Render: TIMELINE
        └─ release
 ```
 
-Left/Right expands/collapses (like other timeline subsections). Ctrl+Left/Right disables/enables (same eye semantics as render section headers); the header value shows enabled/disabled. Threshold and release appear when the section is expanded and enabled. Locked with the timeline section.
+**Right** enables and expands (threshold and release visible). **Left** disables and collapses. Expand follows `timeline.limiter.enabled` (no separate flag). Header value shows enabled/disabled. Locked with the timeline section.
 
 | Knob | YAML | Default | Range / display |
 | --- | --- | --- | --- |
