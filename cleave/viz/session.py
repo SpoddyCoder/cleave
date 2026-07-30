@@ -214,7 +214,6 @@ class TimelineRuntime:
     placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
     fades_expanded: bool = False
     timeline_presets_expanded: bool = False
-    visual_limiter_expanded: bool = False
     timeline_preset_kind: str = DEFAULT_TIMELINE_PRESET_KIND
     timeline_preset_crescendo: CrescendoTarget | None = None
     timeline_preset_density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY

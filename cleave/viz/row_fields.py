@@ -287,16 +287,13 @@ def _apply_visual_limiter_header(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
-    ctrl: bool,
+    _ctrl: bool,
     _shift: bool,
 ) -> None:
-    if ctrl:
-        if (
-            controls.session.timeline.locked
-            and row_behavior(desc.kind).can_enable_disable
-        ):
-            return
-        controls._set_visual_limiter_enabled(forward)
+    if (
+        controls.session.timeline.locked
+        and row_behavior(desc.kind).can_enable_disable
+    ):
         return
     apply_expand_toggle(controls, desc.kind, desc.slot, forward)
 

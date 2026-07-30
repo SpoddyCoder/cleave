@@ -1322,19 +1322,11 @@ class TuningControls:
             return
         tl.timeline_presets_expanded = expanded
 
-    def _set_visual_limiter_expanded(self, expanded: bool) -> None:
-        tl = self.session.timeline
-        if tl.visual_limiter_expanded == expanded:
-            return
-        tl.visual_limiter_expanded = expanded
-
     def _set_visual_limiter_enabled(self, enabled: bool) -> None:
         lim = self.session.timeline.limiter
         if lim.enabled == enabled:
             return
         lim.enabled = enabled
-        # Match render-header disable: collapse when off; open knobs when on.
-        self.session.timeline.visual_limiter_expanded = enabled
 
     def _set_beat(self, slot: str, value: float) -> None:
         layer = self.session.layers[slot]

@@ -319,9 +319,10 @@ def sections_for(
 
     if behavior.affordance == RowAffordance.EXPAND:
         if behavior.is_sub_header:
+            entries = behavior.help_entries
             primary = HelpSection(
                 behavior.help_title or "Edit",
-                (("Left/Right", "expand/collapse"),),
+                entries if entries is not None else (("Left/Right", "expand/collapse"),),
             )
         elif behavior.can_enter_move_mode:
             primary = layer_section(

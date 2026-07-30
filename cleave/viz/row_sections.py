@@ -130,11 +130,11 @@ def _timeline_presets_expanded(state: TuningViewState, _slot: str | None) -> boo
 def _toggle_visual_limiter(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
-    controls._set_visual_limiter_expanded(forward)
+    controls._set_visual_limiter_enabled(forward)
 
 
 def _visual_limiter_expanded(state: TuningViewState, _slot: str | None) -> bool:
-    return state.render_timeline.visual_limiter_expanded
+    return state.render_timeline.limiter.enabled
 
 
 def _open_timeline_panel(controls: TuningControls, forward: bool) -> None:

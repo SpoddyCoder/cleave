@@ -2414,6 +2414,12 @@ def test_render_timeline_down_enters_submenu() -> None:
     limiter_header_row = view.layout.find_by_kind(
         RowKind.TIMELINE_VISUAL_LIMITER_HEADER
     )
+    limiter_threshold_row = view.layout.find_by_kind(
+        RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD
+    )
+    limiter_release_row = view.layout.find_by_kind(
+        RowKind.TIMELINE_VISUAL_LIMITER_RELEASE
+    )
     reset_row = view.layout.find_by_kind(RowKind.TIMELINE_RESET)
     controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.focus_row = 2
@@ -2459,6 +2465,14 @@ def test_render_timeline_down_enters_submenu() -> None:
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_descriptor == _desc(view, limiter_threshold_row)
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_descriptor == _desc(view, limiter_release_row)
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_descriptor == _desc(view, reset_row)
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
@@ -2466,6 +2480,31 @@ def test_render_timeline_down_enters_submenu() -> None:
     assert isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.session.timeline.focus_row == 0
     assert controls.focus_descriptor == _desc(view, header_row)
+
+
+def test_visual_limiter_left_right_couples_enabled_and_children() -> None:
+    controls = _make_controls(timeline_enabled=True)
+    controls.session.timeline.panel_open = True
+    view = controls.build_view_state(paused=False)
+    limiter_header = view.layout.find_by_kind(
+        RowKind.TIMELINE_VISUAL_LIMITER_HEADER
+    )
+    threshold_row = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD)
+
+    assert controls.session.timeline.limiter.enabled is True
+    assert threshold_row in view.layout.rows
+
+    controls.focus_descriptor = _desc(view, limiter_header)
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+
+    assert controls.session.timeline.limiter.enabled is False
+    view_disabled = controls.build_view_state(paused=False)
+    assert threshold_row not in view_disabled.layout.rows
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.timeline.limiter.enabled is True
+    view_enabled = controls.build_view_state(paused=False)
+    assert threshold_row in view_enabled.layout.rows
 
 
 def test_render_timeline_down_enters_submenu_and_routes_keys() -> None:
@@ -2477,7 +2516,7 @@ def test_render_timeline_down_enters_submenu_and_routes_keys() -> None:
     controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.focus_row = 2
 
-    for _ in range(11):
+    for _ in range(13):
         controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.session.timeline.focus_row == 0

@@ -393,6 +393,28 @@ def test_full_line_delete_layer_prefix() -> None:
     assert row_panel_label(RowKind.LAYER_MANAGEMENT_ADD) == "Add Layer"
 
 
+def test_apply_field_horizontal_visual_limiter_couples_enabled() -> None:
+    controls = _make_controls(timeline_enabled=True)
+    controls.session.timeline.limiter.enabled = True
+    desc = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_HEADER)
+
+    apply_field_horizontal(controls, desc, False, False)
+    assert controls.session.timeline.limiter.enabled is False
+
+    apply_field_horizontal(controls, desc, True, False)
+    assert controls.session.timeline.limiter.enabled is True
+
+
+def test_apply_field_horizontal_visual_limiter_blocked_when_timeline_locked() -> None:
+    controls = _make_controls(timeline_enabled=True)
+    controls.session.timeline.limiter.enabled = True
+    controls.session.timeline.locked = True
+    desc = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_HEADER)
+
+    apply_field_horizontal(controls, desc, False, False)
+    assert controls.session.timeline.limiter.enabled is True
+
+
 def test_apply_field_horizontal_transport_seeks() -> None:
     from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, SEEK_TINY
 

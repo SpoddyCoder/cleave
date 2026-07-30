@@ -18,6 +18,8 @@ from cleave.viz.session import LayerRuntime, TimelineRuntime, TuningSession
 from cleave.viz.visual_limiter import (
     ATTACK_SEC,
     DUCK_GAIN,
+    GRID_HEIGHT,
+    GRID_WIDTH,
     RELEASE_RAMP_SEC,
     RELEASE_SEC,
     THRESHOLD_OFF,
@@ -28,7 +30,9 @@ from cleave.viz.visual_limiter import (
     apply_visual_limiter_gains,
     busyness,
     collect_hot_layers,
+    metrics_from_grid,
     pick_victim,
+    read_luma_grid,
     role_rank,
     reset_if_seek,
     update_limiter_state,
@@ -369,3 +373,34 @@ def test_update_limiter_state_uses_session_params() -> None:
         params=params,
     )
     assert state.gain_for("layer_1") == pytest.approx(DUCK_GAIN)
+
+
+def test_read_luma_grid_delegates_to_post_process() -> None:
+    compositor = MagicMock(content_texture_id=9, content_width=1280, content_height=720)
+    post_process = MagicMock()
+    expected = np.full((GRID_HEIGHT, GRID_WIDTH), 0.42, dtype=np.float32)
+    post_process.read_luma_grid.return_value = expected
+
+    grid = read_luma_grid(compositor, post_process)
+
+    post_process.read_luma_grid.assert_called_once_with(
+        9,
+        1280,
+        720,
+        grid_width=GRID_WIDTH,
+        grid_height=GRID_HEIGHT,
+    )
+    assert grid is expected
+
+
+def test_metrics_from_grid_tracks_mean_and_delta() -> None:
+    state = VisualLimiterState()
+    grid_a = np.full((2, 2), 0.2, dtype=np.float32)
+    mean_luma, mean_delta = metrics_from_grid(state, grid_a)
+    assert mean_luma == pytest.approx(0.2)
+    assert mean_delta == pytest.approx(0.0)
+
+    grid_b = np.full((2, 2), 0.4, dtype=np.float32)
+    mean_luma, mean_delta = metrics_from_grid(state, grid_b)
+    assert mean_luma == pytest.approx(0.4)
+    assert mean_delta == pytest.approx(0.2)

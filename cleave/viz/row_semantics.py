@@ -828,13 +828,10 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         is_sub_header=True,
         can_enable_disable=True,
         help_title="Visual limiter",
-        help_entries=(
-            ("Left/Right", "collapse / expand"),
-            ("Ctrl + Left/Right", "disable / enable"),
-        ),
+        help_entries=(("Left/Right", "disable / enable"),),
         help_description=(
             "Duck busy stacked layers using post-composite busyness.",
-            "When enabled and expanded, threshold and release are shown below.",
+            "When enabled, threshold and release rows appear below.",
         ),
     ),
     RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD: RowBehavior(
