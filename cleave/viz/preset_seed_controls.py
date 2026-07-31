@@ -74,7 +74,10 @@ class PresetSeedController:
                 shuffle=runtime.preset_switching_shuffle,
                 shuffle_salt=runtime.preset_switching_shuffle_salt,
                 preset_start_clean=runtime.preset_start_clean,
+                cast_roles_default_role=runtime.cast_roles_default_role,
+                cast_roles_timeline_behaviour=runtime.cast_roles_timeline_behaviour,
                 preset_root=self._preset_root,
+                session=self.session,
             )
             return
         if self._on_preset_switching_change is not None:

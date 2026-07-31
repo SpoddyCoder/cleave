@@ -14,6 +14,8 @@ from cleave.config import (
     RenderOverlaySlideDirection,
 )
 from cleave.config_schema import (
+    DEFAULT_CAST_ROLES_DEFAULT_ROLE,
+    DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR,
     DEFAULT_CHROMA_BOOST_APPLY_MODE,
     DEFAULT_CHROMA_BOOST_VARIANT,
     DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
@@ -37,13 +39,16 @@ from cleave.config_schema import (
     DEFAULT_VISUAL_LIMITER_ENABLED,
     DEFAULT_VISUAL_LIMITER_THRESHOLD,
     DEFAULT_VISUAL_LIMITER_RELEASE,
+    CastRolesTimelineBehaviour,
     default_render_overlay_runtime_values,
     default_render_post_fx_runtime_values,
 )
+from cleave.cue_roles import CueRole
 from cleave.extract import StemSource
 from cleave.preset_curation import PresetCurationIndex
 from cleave.preset_playlist import PresetPlaylist, preset_filename_display
 from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
+from cleave.viz.panel_notification import PanelNotificationActive
 from cleave.timeline_presets.crescendo import CrescendoTarget
 from cleave.timeline_presets.density import (
     DEFAULT_TIMELINE_PRESET_DENSITY,
@@ -80,6 +85,10 @@ class TrackBlock:
     preset_empty: bool = False
     preset_switching: str = "none"
     preset_switching_rotation_set: str = "directory"
+    cast_roles_timeline_behaviour: CastRolesTimelineBehaviour = (
+        DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR
+    )
+    cast_roles_default_role: CueRole = DEFAULT_CAST_ROLES_DEFAULT_ROLE
     preset_switching_shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE
     preset_switching_shuffle_salt: int = DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT
     preset_duration: float = DEFAULT_PRESET_DURATION
@@ -222,6 +231,7 @@ class TuningViewState:
     position_sec: float
     focus_cursor: FocusCursor
     move_mode_slot: str | None
+    persistent_notification_message: str | None = None
     notification_message: str | None = None
     notification_remaining_sec: float = 0.0
     allow_overwrite: bool = True
@@ -316,6 +326,7 @@ def view_state_structure_signature(
     config_save: ConfigSaveController,
     *,
     notification_active: bool,
+    persistent_notification_active: bool = False,
 ) -> str:
     layers: dict[str, object] = {}
     for slot in session.layer_z_order:
@@ -327,6 +338,8 @@ def view_state_structure_signature(
             "user_presets_expanded": layer.user_presets_expanded,
             "preset_switching": layer.preset_switching,
             "preset_switching_rotation_set": layer.preset_switching_rotation_set,
+            "cast_roles_timeline_behaviour": layer.cast_roles_timeline_behaviour,
+            "cast_roles_default_role": layer.cast_roles_default_role,
             "preset_switching_shuffle": layer.preset_switching_shuffle,
             "preset_duration": layer.preset_duration,
             "soft_cut_duration": layer.soft_cut_duration,
@@ -355,6 +368,7 @@ def view_state_structure_signature(
             "editor_mode": session.settings.editor_mode,
         },
         "notification_active": notification_active,
+        "persistent_notification_active": persistent_notification_active,
         "layers": layers,
         "render_overlay": {
             "enabled": ro.enabled,
@@ -415,7 +429,7 @@ class TuningViewStateBuilder:
         get_focus_cursor: Callable[[], FocusCursor],
         get_move_mode_slot: Callable[[], str | None],
         config_save: ConfigSaveController,
-        get_notification: Callable[[], tuple[str | None, float]],
+        get_notification: Callable[[], PanelNotificationActive],
     ) -> None:
         self.session = session
         self.playback = playback
@@ -456,6 +470,7 @@ class TuningViewStateBuilder:
         *,
         signature: str,
         notification_active: bool,
+        persistent_notification_active: bool,
         user_names: set[str],
     ) -> _ViewStateStructure:
         from cleave.viz.focus_nav import MainFocus
@@ -485,6 +500,8 @@ class TuningViewStateBuilder:
                 preset_empty=not layer.playlist.paths,
                 preset_switching=layer.preset_switching,
                 preset_switching_rotation_set=layer.preset_switching_rotation_set,
+                cast_roles_timeline_behaviour=layer.cast_roles_timeline_behaviour,
+                cast_roles_default_role=layer.cast_roles_default_role,
                 preset_switching_shuffle=layer.preset_switching_shuffle,
                 preset_switching_shuffle_salt=layer.preset_switching_shuffle_salt,
                 preset_duration=layer.preset_duration,
@@ -577,6 +594,9 @@ class TuningViewStateBuilder:
             position_sec=0.0,
             focus_cursor=MainFocus(RowDescriptor(RowKind.TRANSPORT)),
             move_mode_slot=None,
+            persistent_notification_message=(
+                "…" if persistent_notification_active else None
+            ),
             notification_message="…" if notification_active else None,
             notification_remaining_sec=1.0 if notification_active else 0.0,
             render_overlay=render_overlay,
@@ -639,20 +659,26 @@ class TuningViewStateBuilder:
         if position_sec is None:
             position_sec = current_sec(self.playback, self.duration_sec)
 
-        notification_message, notification_remaining_sec = self._get_notification()
+        notification = self._get_notification()
+        notification_message = notification.message
+        notification_remaining_sec = notification.remaining_sec
+        persistent_notification_message = notification.persistent_message
         notification_active = bool(
             notification_message and notification_remaining_sec > 0
         )
+        persistent_notification_active = bool(persistent_notification_message)
         user_names = self._user_preset_basenames()
         signature = view_state_structure_signature(
             self.session,
             self._config_save,
             notification_active=notification_active,
+            persistent_notification_active=persistent_notification_active,
         )
         if self._structure is None or self._structure.signature != signature:
             self._structure = self._build_structure(
                 signature=signature,
                 notification_active=notification_active,
+                persistent_notification_active=persistent_notification_active,
                 user_names=user_names,
             )
         structure = self._structure
@@ -671,6 +697,7 @@ class TuningViewStateBuilder:
             position_sec=position_sec,
             focus_cursor=self._get_focus_cursor(),
             move_mode_slot=self._get_move_mode_slot(),
+            persistent_notification_message=persistent_notification_message,
             notification_message=notification_message,
             notification_remaining_sec=notification_remaining_sec,
             allow_overwrite=self._config_save.allow_overwrite(),

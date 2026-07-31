@@ -16,6 +16,7 @@ import yaml
 _YAML_DUMP_WIDTH = 2**31 - 1
 
 from cleave.blend_modes import BlendMode
+from cleave.cue_roles import CueRole
 from cleave.effects.constants import clamp_effect_pct
 from cleave.extract import StemSource
 from cleave.config_schema import (
@@ -24,6 +25,8 @@ from cleave.config_schema import (
     BEAT_SENSITIVITY_MIN,
     DEFAULT_BEAT_SENSITIVITY,
     DEFAULT_LAYER_Z_ORDER,
+    DEFAULT_CAST_ROLES_DEFAULT_ROLE,
+    DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR,
     DEFAULT_PRESET_SWITCHING,
     DEFAULT_PRESET_SWITCHING_ROTATION_SET,
     DEFAULT_PRESET_SWITCHING_SHUFFLE,
@@ -36,6 +39,7 @@ from cleave.config_schema import (
     DEFAULT_EASTER_EGG,
     DEFAULT_PRESET_START_CLEAN,
     DEFAULT_PRESET_ROOT,
+    CastRolesTimelineBehaviour,
     PresetSwitchingMode,
     PresetSwitchingRotationSet,
     DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR,
@@ -140,6 +144,10 @@ class LayerConfig:
     locked: bool = False
     preset_switching: PresetSwitchingMode = DEFAULT_PRESET_SWITCHING
     preset_switching_rotation_set: PresetSwitchingRotationSet = DEFAULT_PRESET_SWITCHING_ROTATION_SET
+    cast_roles_timeline_behaviour: CastRolesTimelineBehaviour = (
+        DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR
+    )
+    cast_roles_default_role: CueRole = DEFAULT_CAST_ROLES_DEFAULT_ROLE
     preset_switching_shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE
     preset_switching_shuffle_salt: int = DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT
     preset_duration: float = DEFAULT_PRESET_DURATION

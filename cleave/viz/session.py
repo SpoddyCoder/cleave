@@ -17,6 +17,8 @@ from cleave.config import (
 )
 from cleave.config_schema import (
     DEFAULT_BEAT_SENSITIVITY,
+    DEFAULT_CAST_ROLES_DEFAULT_ROLE,
+    DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR,
     DEFAULT_PRESET_SWITCHING,
     DEFAULT_PRESET_SWITCHING_ROTATION_SET,
     DEFAULT_PRESET_SWITCHING_SHUFFLE,
@@ -35,6 +37,7 @@ from cleave.config_schema import (
     DEFAULT_VISUAL_LIMITER_ENABLED,
     DEFAULT_VISUAL_LIMITER_THRESHOLD,
     DEFAULT_VISUAL_LIMITER_RELEASE,
+    CastRolesTimelineBehaviour,
     HighlightRolloffApplyMode,
     HighlightRolloffCurve,
     PresetSwitchingMode,
@@ -46,6 +49,7 @@ from cleave.config_schema import (
     default_chroma_boost_runtime_values,
     default_render_post_fx_runtime_values,
 )
+from cleave.cue_roles import CueRole
 from cleave.extract import StemSource
 from cleave.preset_playlist import PresetPlaylist, preset_browse_floor
 from cleave.projectm_health import PresetSkipNotifyTracker, ProjectMLogNotifyTracker
@@ -278,6 +282,10 @@ class LayerRuntime:
     locked: bool = False
     preset_switching: PresetSwitchingMode = DEFAULT_PRESET_SWITCHING
     preset_switching_rotation_set: PresetSwitchingRotationSet = DEFAULT_PRESET_SWITCHING_ROTATION_SET
+    cast_roles_timeline_behaviour: CastRolesTimelineBehaviour = (
+        DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR
+    )
+    cast_roles_default_role: CueRole = DEFAULT_CAST_ROLES_DEFAULT_ROLE
     preset_switching_shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE
     preset_switching_shuffle_salt: int = DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT
     preset_duration: float = DEFAULT_PRESET_DURATION
@@ -490,6 +498,8 @@ def session_from_cfg(
                 locked=layer_cfg.locked,
                 preset_switching=layer_cfg.preset_switching,
                 preset_switching_rotation_set=layer_cfg.preset_switching_rotation_set,
+                cast_roles_timeline_behaviour=layer_cfg.cast_roles_timeline_behaviour,
+                cast_roles_default_role=layer_cfg.cast_roles_default_role,
                 preset_switching_shuffle=layer_cfg.preset_switching_shuffle,
                 preset_switching_shuffle_salt=layer_cfg.preset_switching_shuffle_salt,
                 preset_duration=layer_cfg.preset_duration,

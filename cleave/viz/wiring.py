@@ -225,8 +225,11 @@ def make_tuning_controls(
                 hard_cut_sensitivity=runtime.hard_cut_sensitivity,
                 shuffle=runtime.preset_switching_shuffle,
                 shuffle_salt=runtime.preset_switching_shuffle_salt,
+                cast_roles_default_role=runtime.cast_roles_default_role,
+                cast_roles_timeline_behaviour=runtime.cast_roles_timeline_behaviour,
                 preset_root=preset_root,
                 on_empty=_empty_rotation_notify(slot),
+                session=session,
             )
             return
         if playlist.current is None:
@@ -246,6 +249,8 @@ def make_tuning_controls(
                 user_presets=runtime.user_presets,
                 shuffle=runtime.preset_switching_shuffle,
                 shuffle_salt=runtime.preset_switching_shuffle_salt,
+                cast_roles_default_role=runtime.cast_roles_default_role,
+                preset_root=preset_root,
             )
             return
         layer.pm.lock_preset(False)
@@ -268,8 +273,11 @@ def make_tuning_controls(
             hard_cut_sensitivity=runtime.hard_cut_sensitivity,
             shuffle=runtime.preset_switching_shuffle,
             shuffle_salt=runtime.preset_switching_shuffle_salt,
+            cast_roles_default_role=runtime.cast_roles_default_role,
+            cast_roles_timeline_behaviour=runtime.cast_roles_timeline_behaviour,
             preset_root=preset_root,
             on_empty=_empty_rotation_notify(slot),
+            session=session,
         )
 
     def lock_preset_for_modal(slot: str) -> None:

@@ -11,8 +11,13 @@ import pygame
 
 from cleave.config import CleaveConfig, clamp_beat_sensitivity, clamp_effect_pct
 from cleave.config_schema import clamp_easter_egg
-from cleave.config_schema import PRESET_SWITCHING_MODES, PRESET_SWITCHING_ROTATION_SETS
+from cleave.config_schema import (
+    CAST_ROLES_TIMELINE_BEHAVIOURS,
+    PRESET_SWITCHING_MODES,
+    PRESET_SWITCHING_ROTATION_SETS,
+)
 from cleave.blend_modes import BLEND_MODES, BlendMode
+from cleave.cue_roles import CUE_ROLES, role_pool_paths
 from cleave.extract import STEM_SOURCES
 from cleave.signals import Signals
 from cleave.song_markers import format_marker_time, place_marker
@@ -714,6 +719,7 @@ class TuningControls:
     def tick(self, dt_sec: float) -> None:
         self._key_repeat.tick(dt_sec)
         self._notification_host.clear_expired()
+        self._sync_cast_roles_pool_notification()
 
     def build_view_state(
         self,
@@ -722,9 +728,23 @@ class TuningControls:
         position_sec: float | None = None,
         fps: float | None = None,
     ) -> TuningViewState:
+        self._sync_cast_roles_pool_notification()
         return self._view_state.build(
             paused=paused, position_sec=position_sec, fps=fps
         )
+
+    def _sync_cast_roles_pool_notification(self) -> None:
+        for slot in self.session.layer_z_order:
+            layer = self.session.layers[slot]
+            if layer.preset_switching_rotation_set != "cast_roles":
+                continue
+            role = layer.cast_roles_default_role
+            if not role_pool_paths(self.preset_root, role):
+                self._notification_host.set_persistent(
+                    f"No presets in {role} roles folder"
+                )
+                return
+        self._notification_host.set_persistent(None)
 
     @property
     def focus_descriptor(self) -> RowDescriptor:
@@ -1083,6 +1103,11 @@ class TuningControls:
         else:
             layer.preset_switching = modes[(index - 1) % len(modes)]
         if (
+            layer.preset_switching != "timeline"
+            and layer.preset_switching_rotation_set == "cast_roles"
+        ):
+            layer.preset_switching_rotation_set = "directory"
+        if (
             layer.preset_switching == "timeline"
             and not self.session.timeline.enabled
         ):
@@ -1092,17 +1117,59 @@ class TuningControls:
 
     def _cycle_preset_switching_rotation_set(self, slot: str, *, forward: bool) -> None:
         layer = self.session.layers[slot]
-        rotation_sets = PRESET_SWITCHING_ROTATION_SETS
+        rotation_sets = tuple(
+            value
+            for value in PRESET_SWITCHING_ROTATION_SETS
+            if value != "cast_roles" or layer.preset_switching == "timeline"
+        )
         try:
             index = rotation_sets.index(layer.preset_switching_rotation_set)
         except ValueError:
             index = 0
         if forward:
-            layer.preset_switching_rotation_set = rotation_sets[(index + 1) % len(rotation_sets)]
+            layer.preset_switching_rotation_set = rotation_sets[
+                (index + 1) % len(rotation_sets)
+            ]
         else:
-            layer.preset_switching_rotation_set = rotation_sets[(index - 1) % len(rotation_sets)]
+            layer.preset_switching_rotation_set = rotation_sets[
+                (index - 1) % len(rotation_sets)
+            ]
         if layer.preset_switching_rotation_set == "user_defined":
             layer.user_presets_expanded = True
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_preset_switching_change(slot)
+
+    def _cycle_cast_roles_timeline_behaviour(
+        self, slot: str, *, forward: bool
+    ) -> None:
+        layer = self.session.layers[slot]
+        options = CAST_ROLES_TIMELINE_BEHAVIOURS
+        try:
+            index = options.index(layer.cast_roles_timeline_behaviour)
+        except ValueError:
+            index = 0
+        if forward:
+            layer.cast_roles_timeline_behaviour = options[
+                (index + 1) % len(options)
+            ]
+        else:
+            layer.cast_roles_timeline_behaviour = options[
+                (index - 1) % len(options)
+            ]
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_preset_switching_change(slot)
+
+    def _cycle_cast_roles_default_role(self, slot: str, *, forward: bool) -> None:
+        layer = self.session.layers[slot]
+        options = CUE_ROLES
+        try:
+            index = options.index(layer.cast_roles_default_role)
+        except ValueError:
+            index = 0
+        if forward:
+            layer.cast_roles_default_role = options[(index + 1) % len(options)]
+        else:
+            layer.cast_roles_default_role = options[(index - 1) % len(options)]
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)
 

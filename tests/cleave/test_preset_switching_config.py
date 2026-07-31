@@ -8,6 +8,8 @@ import yaml
 
 from cleave.config import CleaveConfig, LayerConfig, PathsConfig, EditorConfig, load_config
 from cleave.config_schema import (
+    DEFAULT_CAST_ROLES_DEFAULT_ROLE,
+    DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR,
     DEFAULT_EASTER_EGG,
     DEFAULT_HARD_CUT_DURATION,
     DEFAULT_HARD_CUT_ENABLED,
@@ -48,6 +50,8 @@ def test_parse_layers_preset_switching_defaults_omitted() -> None:
     layer = layers["layer_1"]
     assert layer.preset_switching == DEFAULT_PRESET_SWITCHING
     assert layer.preset_switching_rotation_set == DEFAULT_PRESET_SWITCHING_ROTATION_SET
+    assert layer.cast_roles_timeline_behaviour == DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR
+    assert layer.cast_roles_default_role == DEFAULT_CAST_ROLES_DEFAULT_ROLE
     assert layer.preset_switching_shuffle == DEFAULT_PRESET_SWITCHING_SHUFFLE
     assert layer.preset_switching_shuffle_salt == DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT
     assert layer.preset_duration == DEFAULT_PRESET_DURATION
@@ -93,6 +97,30 @@ def test_parse_layers_preset_switching_rotation_set_user_defined() -> None:
     layers = parse_layers_section(data, ParseCtx(preset_root=preset_root))
     assert layers["layer_1"].preset_switching == "projectm"
     assert layers["layer_1"].preset_switching_rotation_set == "user_defined"
+
+
+def test_parse_layers_preset_switching_rotation_set_cast_roles() -> None:
+    preset_root = Path("/tmp/presets")
+    data = {"layers": _layer_yaml()}
+    data["layers"]["layer_1"]["preset_switching"] = "timeline"
+    data["layers"]["layer_1"]["preset_switching_rotation_set"] = "cast_roles"
+    data["layers"]["layer_1"]["cast_roles_timeline_behaviour"] = "hold_current"
+    data["layers"]["layer_1"]["cast_roles_default_role"] = "pulse"
+    layers = parse_layers_section(data, ParseCtx(preset_root=preset_root))
+    layer = layers["layer_1"]
+    assert layer.preset_switching_rotation_set == "cast_roles"
+    assert layer.cast_roles_timeline_behaviour == "hold_current"
+    assert layer.cast_roles_default_role == "pulse"
+
+
+def test_parse_layers_rejects_invalid_cast_roles_timeline_behaviour() -> None:
+    import pytest
+
+    preset_root = Path("/tmp/presets")
+    data = {"layers": _layer_yaml()}
+    data["layers"]["layer_1"]["cast_roles_timeline_behaviour"] = "always"
+    with pytest.raises(ValueError, match="cast_roles_timeline_behaviour"):
+        parse_layers_section(data, ParseCtx(preset_root=preset_root))
 
 
 def test_parse_layers_preset_switching_timing() -> None:
@@ -152,6 +180,8 @@ def test_persist_layers_omits_default_preset_switching() -> None:
     out = persist_layers(PersistCtx(cfg=cfg, session=session))
     assert "preset_switching" not in out["layer_1"]
     assert "preset_switching_rotation_set" not in out["layer_1"]
+    assert "cast_roles_timeline_behaviour" not in out["layer_1"]
+    assert "cast_roles_default_role" not in out["layer_1"]
     assert "preset_switching_shuffle" not in out["layer_1"]
     assert "preset_switching_shuffle_salt" not in out["layer_1"]
     assert "preset_duration" not in out["layer_1"]
@@ -250,6 +280,18 @@ def test_persist_layers_writes_user_defined_rotation_set() -> None:
     out = persist_layers(PersistCtx(cfg=cfg, session=session))
     assert out["layer_1"]["preset_switching"] == "projectm"
     assert out["layer_1"]["preset_switching_rotation_set"] == "user_defined"
+
+
+def test_persist_layers_writes_cast_roles_fields() -> None:
+    cfg, session = _cfg_and_session(preset_switching="timeline")
+    runtime = session.layers["layer_1"]
+    runtime.preset_switching_rotation_set = "cast_roles"
+    runtime.cast_roles_timeline_behaviour = "hold_current"
+    runtime.cast_roles_default_role = "accent"
+    out = persist_layers(PersistCtx(cfg=cfg, session=session))
+    assert out["layer_1"]["preset_switching_rotation_set"] == "cast_roles"
+    assert out["layer_1"]["cast_roles_timeline_behaviour"] == "hold_current"
+    assert out["layer_1"]["cast_roles_default_role"] == "accent"
 
 
 def test_persist_layers_writes_projectm_mode(tmp_path: Path) -> None:

@@ -7,6 +7,8 @@ from enum import Enum, auto
 
 from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES
 from cleave.config_schema import (
+    CAST_ROLES_DEFAULT_ROLE_HELP_ENTRIES,
+    CAST_ROLES_TIMELINE_BEHAVIOUR_HELP_ENTRIES,
     CHROMA_BOOST_APPLY_MODE_HELP_ENTRIES,
     CHROMA_BOOST_VARIANT_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES,
@@ -33,6 +35,8 @@ class RowKind(Enum):
     TRACK_USER_PRESET_ITEM = auto()
     TRACK_USER_PRESET_ADD = auto()
     TRACK_PRESET_SWITCHING_ROTATION_SET = auto()
+    TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR = auto()
+    TRACK_CAST_ROLES_DEFAULT_ROLE = auto()
     TRACK_PRESET_SWITCHING_SHUFFLE = auto()
     TRACK_PRESET_SWITCHING_SEED = auto()
     TRACK_PRESET_DURATION = auto()
@@ -269,6 +273,24 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_entries=(("Left/Right", "cycle rotation set"),),
         help_description=(),
         help_mode_entries=PRESET_SWITCHING_ROTATION_SET_HELP_ENTRIES,
+    ),
+    RowKind.TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="track",
+        help_title="Timeline behaviour",
+        help_entries=(("Left/Right", "cycle behaviour"),),
+        help_description=(),
+        help_mode_entries=CAST_ROLES_TIMELINE_BEHAVIOUR_HELP_ENTRIES,
+    ),
+    RowKind.TRACK_CAST_ROLES_DEFAULT_ROLE: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="track",
+        help_title="Default role",
+        help_entries=(("Left/Right", "cycle role"),),
+        help_description=(),
+        help_mode_entries=CAST_ROLES_DEFAULT_ROLE_HELP_ENTRIES,
     ),
     RowKind.TRACK_PRESET_SWITCHING_SHUFFLE: RowBehavior(
         RowAffordance.VALUE_STEP,

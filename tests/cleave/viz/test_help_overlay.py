@@ -5,6 +5,8 @@ from __future__ import annotations
 from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES, BLEND_MODES
 from cleave.cue_roles import CUE_ROLE_MARKER_HELP_ENTRIES
 from cleave.config_schema import (
+    CAST_ROLES_DEFAULT_ROLE_HELP_ENTRIES,
+    CAST_ROLES_TIMELINE_BEHAVIOUR_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_APPLY_MODES,
     HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES,
@@ -248,6 +250,30 @@ def test_rotation_set_help_lists_rotation_sets() -> None:
     assert description.title == "Rotation set"
     assert description.lines == ()
     assert description.entries == PRESET_SWITCHING_ROTATION_SET_HELP_ENTRIES
+    modes = [mode for mode, _ in description.entries]
+    assert modes == ["directory", "user_defined", "cast_roles"]
+
+
+def test_cast_roles_timeline_behaviour_help_lists_options() -> None:
+    description = _description_section(
+        sections_for(RowKind.TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR)
+    )
+    assert description is not None
+    assert description.title == "Timeline behaviour"
+    assert description.entries == CAST_ROLES_TIMELINE_BEHAVIOUR_HELP_ENTRIES
+    assert [mode for mode, _ in description.entries] == [
+        "hold_current",
+        "on_transition",
+    ]
+
+
+def test_cast_roles_default_role_help_lists_roles() -> None:
+    description = _description_section(
+        sections_for(RowKind.TRACK_CAST_ROLES_DEFAULT_ROLE)
+    )
+    assert description is not None
+    assert description.title == "Default role"
+    assert description.entries == CAST_ROLES_DEFAULT_ROLE_HELP_ENTRIES
 
 
 def test_timeline_presets_help_lists_characters() -> None:
@@ -580,6 +606,9 @@ def test_timeline_strip_help_paused() -> None:
     assert "Ctrl + Enter" not in entries
     assert entries["Space"] == "play"
     assert entries["Ctrl + Space / R"] == "start record"
+    assert entries["C / Shift+C"] == (
+        "cycle cue cast (requires cast roles rotation set)"
+    )
     keys = [key for key, _ in section.entries]
     assert keys.index("Ctrl + Space / R") + 1 == keys.index("Space")
     assert "Left/Right" in entries

@@ -525,6 +525,12 @@ def _preset_switching_user_defined(state: TuningViewState, desc: RowDescriptor) 
     return state.tracks[desc.slot].preset_switching_rotation_set == "user_defined"
 
 
+def _preset_switching_cast_roles(state: TuningViewState, desc: RowDescriptor) -> bool:
+    if desc.slot is None:
+        return False
+    return state.tracks[desc.slot].preset_switching_rotation_set == "cast_roles"
+
+
 def _preset_switching_projectm(state: TuningViewState, desc: RowDescriptor) -> bool:
     if desc.slot is None:
         return False
@@ -574,6 +580,15 @@ PRESET_SWITCHING_USER_DEFINED = ConditionalRowsDef(
     children=(SectionNode(expand=USER_PRESETS_SECTION),),
 )
 
+PRESET_SWITCHING_CAST_ROLES = ConditionalRowsDef(
+    name="preset_switching_cast_roles",
+    predicate=_preset_switching_cast_roles,
+    children=(
+        SectionNode(leaf_kind=RowKind.TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR),
+        SectionNode(leaf_kind=RowKind.TRACK_CAST_ROLES_DEFAULT_ROLE),
+    ),
+)
+
 PRESET_SWITCHING_PROJECTM = ConditionalRowsDef(
     name="preset_switching_projectm",
     predicate=_preset_switching_projectm,
@@ -594,6 +609,7 @@ TRACK_PRESET_SWITCHING_SECTION = ExpandSectionDef(
     children=(
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET),
         SectionNode(conditional=PRESET_SWITCHING_USER_DEFINED),
+        SectionNode(conditional=PRESET_SWITCHING_CAST_ROLES),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_SHUFFLE),
         SectionNode(conditional=PRESET_SWITCHING_SHUFFLE_ON),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_START_CLEAN),
