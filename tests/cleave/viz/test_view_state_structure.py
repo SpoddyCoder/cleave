@@ -441,6 +441,78 @@ def test_structure_signature_invalidates_on_preset_switching_timeline_mode() -> 
     assert sig_timeline != sig_none
 
 
+def test_structure_signature_invalidates_on_cast_roles_rotation_set() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.layers["layer_1"].preset_switching = "timeline"
+    session.layers["layer_1"].preset_switching_rotation_set = "directory"
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.layers["layer_1"].preset_switching_rotation_set = "cast_roles"
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+    builder = controls._view_state
+    view_cast = builder.build(paused=False)
+    behaviour = RowDescriptor(
+        RowKind.TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR, slot="layer_1"
+    )
+    assert behaviour in view_cast.layout.rows
+
+    session.layers["layer_1"].preset_switching_rotation_set = "directory"
+    view_dir = builder.build(paused=False)
+    assert view_dir.layout is not view_cast.layout
+    assert behaviour not in view_dir.layout.rows
+
+
+def test_structure_signature_invalidates_on_cast_roles_fields() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.layers["layer_1"].preset_switching = "timeline"
+    session.layers["layer_1"].preset_switching_rotation_set = "cast_roles"
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.layers["layer_1"].cast_roles_timeline_behaviour = "hold_current"
+    sig_behaviour = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_behaviour
+    session.layers["layer_1"].cast_roles_default_role = "pulse"
+    sig_role = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_behaviour != sig_role
+
+
+def test_structure_signature_invalidates_on_persistent_notification() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    sig_inactive = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    sig_persistent = view_state_structure_signature(
+        session,
+        config_save,
+        notification_active=False,
+        persistent_notification_active=True,
+    )
+    assert sig_inactive != sig_persistent
+    sig_both = view_state_structure_signature(
+        session,
+        config_save,
+        notification_active=True,
+        persistent_notification_active=True,
+    )
+    assert sig_persistent != sig_both
+
+
 def test_timeline_preset_switching_hides_projectm_only_rows() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session

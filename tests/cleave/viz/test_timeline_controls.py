@@ -1173,6 +1173,7 @@ def test_c_casts_opening_baseline_materializing_cue_at_zero() -> None:
         lanes=lanes,
         position_sec=0.0,
     )
+    session.layers["layer_1"].preset_switching_rotation_set = "cast_roles"
     controls.handle_keydown(keydown(pygame.K_PERIOD))
     assert session.timeline.selected_cue_t["layer_1"] == 0.0
     controls.handle_keydown(keydown(pygame.K_c))
@@ -1324,6 +1325,7 @@ def test_c_cycles_selected_cue_role_including_none() -> None:
         lanes=lanes,
         position_sec=5.0,
     )
+    session.layers["layer_1"].preset_switching_rotation_set = "cast_roles"
     controls.handle_keydown(keydown(pygame.K_PERIOD))
     assert session.timeline.lanes["layer_1"].cues[0].role is None
 
@@ -1333,6 +1335,29 @@ def test_c_cycles_selected_cue_role_including_none() -> None:
     for _ in range(len(CUE_ROLES)):
         controls.handle_keydown(keydown(pygame.K_c))
     assert session.timeline.lanes["layer_1"].cues[0].role is None
+
+
+def test_c_noop_when_rotation_set_is_not_cast_roles() -> None:
+    lanes = {
+        "layer_1": TimelineLane(
+            baseline=0.0,
+            cues=canonicalize(
+                0.0,
+                [SlotCue(t=5.0, level=1.0)],
+            ),
+        ),
+    }
+    controls, session, _, _, _, notifications = _make_timeline_controls(
+        lanes=lanes,
+        position_sec=5.0,
+    )
+    assert session.layers["layer_1"].preset_switching_rotation_set == "directory"
+    controls.handle_keydown(keydown(pygame.K_PERIOD))
+    controls.handle_keydown(keydown(pygame.K_c))
+    assert session.timeline.lanes["layer_1"].cues[0].role is None
+    assert notifications == [
+        "Set rotation set to cast roles to assign cast"
+    ]
 
 
 def test_b_and_c_noop_on_off_cue() -> None:
@@ -1346,6 +1371,7 @@ def test_b_and_c_noop_on_off_cue() -> None:
         lanes=lanes,
         position_sec=10.0,
     )
+    session.layers["layer_1"].preset_switching_rotation_set = "cast_roles"
     session.timeline.selected_cue_t["layer_1"] = 10.0
     off_before = session.timeline.lanes["layer_1"].cues[1]
     assert off_before.level == 0.0

@@ -40,6 +40,7 @@ from cleave.viz.controls import (
 )
 from cleave.viz.panel_notification import NOTIFICATION_DURATION_SEC
 from cleave.viz.modal import ModalKind
+from cleave.viz.theme import ERROR_NOTIFICATION, HIGHLIGHT
 from cleave.viz.session import (
     LayerRuntime,
     TimelineRuntime,
@@ -4591,6 +4592,101 @@ def test_preset_switching_rotation_set_cycles_directory_and_user_defined() -> No
     controls.handle_keydown(_keydown(pygame.K_LEFT))
     assert controls.session.layers["layer_1"].preset_switching_rotation_set == "directory"
     assert controls.session.layers["layer_1"].user_presets_expanded is True
+
+
+def test_preset_switching_rotation_set_skips_cast_roles_in_projectm_mode() -> None:
+    controls = _make_controls(("layer_1",))
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "projectm"
+    layer.expanded = True
+    layer.preset_switching_rotation_set = "directory"
+    view = controls.build_view_state(paused=False)
+    row = _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET)
+    controls.focus_descriptor = view.layout.descriptor(row)
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert layer.preset_switching_rotation_set == "user_defined"
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert layer.preset_switching_rotation_set == "directory"
+    assert layer.preset_switching_rotation_set != "cast_roles"
+
+
+def test_preset_switching_rotation_set_includes_cast_roles_in_timeline_mode() -> None:
+    controls = _make_controls(("layer_1",))
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "timeline"
+    layer.expanded = True
+    layer.preset_switching_rotation_set = "directory"
+    view = controls.build_view_state(paused=False)
+    row = _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET)
+    controls.focus_descriptor = view.layout.descriptor(row)
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert layer.preset_switching_rotation_set == "user_defined"
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert layer.preset_switching_rotation_set == "cast_roles"
+
+
+def test_cast_roles_empty_pool_sets_persistent_notification() -> None:
+    controls = _make_controls(("layer_1",))
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "timeline"
+    layer.preset_switching_rotation_set = "cast_roles"
+    layer.cast_roles_default_role = "bed"
+
+    with patch(
+        "cleave.viz.controls.role_pool_paths",
+        return_value=(),
+    ):
+        view = controls.build_view_state(paused=False)
+
+    assert view.persistent_notification_message == "No presets in bed roles folder"
+    notification_rows = [
+        row
+        for row in view.layout.rows
+        if row.kind == RowKind.PANEL_NOTIFICATION
+    ]
+    assert len(notification_rows) == 1
+    assert notification_rows[0].marker_index == 0
+    idx = view.layout.find_descriptor(notification_rows[0])
+    assert _row_value_color(view, idx) == ERROR_NOTIFICATION
+
+    layer.preset_switching_rotation_set = "directory"
+    with patch(
+        "cleave.viz.controls.role_pool_paths",
+        return_value=(),
+    ):
+        cleared = controls.build_view_state(paused=False)
+    assert cleared.persistent_notification_message is None
+
+
+def test_persistent_and_timed_notifications_stack() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_switching = "timeline"
+    controls.session.layers["layer_1"].preset_switching_rotation_set = "cast_roles"
+
+    with patch.object(time, "monotonic", return_value=1000.0):
+        with patch(
+            "cleave.viz.controls.role_pool_paths",
+            return_value=(),
+        ):
+            controls.show_notification("Saved")
+            view = controls.build_view_state(paused=False)
+
+    assert view.persistent_notification_message == "No presets in bed roles folder"
+    assert view.notification_message == "Saved"
+    notification_rows = [
+        row
+        for row in view.layout.rows
+        if row.kind == RowKind.PANEL_NOTIFICATION
+    ]
+    assert [row.marker_index for row in notification_rows] == [0, 1]
+    persistent_idx = view.layout.find_descriptor(notification_rows[0])
+    timed_idx = view.layout.find_descriptor(notification_rows[1])
+    assert _row_value_color(view, persistent_idx) == ERROR_NOTIFICATION
+    assert _row_value_color(view, timed_idx) == HIGHLIGHT
+    assert _row_text(view, persistent_idx) == "No presets in bed roles folder"
+    assert _row_text(view, timed_idx) == "Saved"
 
 
 def test_preset_switching_rotation_set_user_defined_auto_expands_user_presets() -> None:

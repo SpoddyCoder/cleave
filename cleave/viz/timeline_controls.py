@@ -355,6 +355,15 @@ class TimelineControls:
         if selected is None:
             return
         slot, cue = selected
+        if (
+            self.session.layers[slot].preset_switching_rotation_set
+            != "cast_roles"
+        ):
+            if self._on_notification is not None:
+                self._on_notification(
+                    "Set rotation set to cast roles to assign cast"
+                )
+            return
         if not cue_editable_for_blend_role(cue):
             return
         options: tuple[CueRole | None, ...] = (None, *CUE_ROLES)

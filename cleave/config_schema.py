@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Callable, Literal, TypeVar
 
 from cleave.blend_modes import BLEND_MODES, BlendMode
-from cleave.cue_roles import CUE_ROLES, CueRole
+from cleave.cue_roles import CUE_ROLE_HELP_BLURB, CUE_ROLES, CueRole
 from cleave.effects.constants import clamp_effect_pct
 from cleave.effects.registry import validate_effect_entry
 from cleave.extract import STEM_SOURCES, StemSource
@@ -42,7 +42,8 @@ BEAT_SENSITIVITY_MIN = 0.0
 BEAT_SENSITIVITY_MAX = 5.0
 
 PresetSwitchingMode = Literal["none", "projectm", "timeline"]
-PresetSwitchingRotationSet = Literal["directory", "user_defined"]
+PresetSwitchingRotationSet = Literal["directory", "user_defined", "cast_roles"]
+CastRolesTimelineBehaviour = Literal["hold_current", "on_transition"]
 PRESET_SWITCHING_MODES: tuple[PresetSwitchingMode, ...] = (
     "none",
     "projectm",
@@ -59,6 +60,7 @@ PRESET_SWITCHING_MODE_HELP_ENTRIES: tuple[tuple[PresetSwitchingMode, str], ...] 
 PRESET_SWITCHING_ROTATION_SETS: tuple[PresetSwitchingRotationSet, ...] = (
     "directory",
     "user_defined",
+    "cast_roles",
 )
 PRESET_SWITCHING_ROTATION_SET_HELP_ENTRIES: tuple[
     tuple[PresetSwitchingRotationSet, str], ...
@@ -68,9 +70,35 @@ PRESET_SWITCHING_ROTATION_SET_HELP_ENTRIES: tuple[
         "user_defined",
         "rotate through a fixed list of presets defined in config.",
     ),
+    (
+        "cast_roles",
+        "rotate through Milkdrop presets in roles/<role>/ pools keyed by cue cast.",
+    ),
+)
+CAST_ROLES_TIMELINE_BEHAVIOURS: tuple[CastRolesTimelineBehaviour, ...] = (
+    "hold_current",
+    "on_transition",
+)
+CAST_ROLES_TIMELINE_BEHAVIOUR_HELP_ENTRIES: tuple[
+    tuple[CastRolesTimelineBehaviour, str], ...
+] = (
+    (
+        "hold_current",
+        "only change preset when a new cue cast marker is encountered.",
+    ),
+    (
+        "on_transition",
+        "change to a new preset in the last specified role.",
+    ),
+)
+CAST_ROLES_DEFAULT_ROLE_HELP_ENTRIES: tuple[tuple[CueRole, str], ...] = tuple(
+    (role, f"{role} ({CUE_ROLE_HELP_BLURB[role]}).")
+    for role in CUE_ROLES
 )
 DEFAULT_PRESET_SWITCHING: PresetSwitchingMode = "none"
 DEFAULT_PRESET_SWITCHING_ROTATION_SET: PresetSwitchingRotationSet = "directory"
+DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR: CastRolesTimelineBehaviour = "on_transition"
+DEFAULT_CAST_ROLES_DEFAULT_ROLE: CueRole = "bed"
 DEFAULT_PRESET_SWITCHING_SHUFFLE = False
 DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT = 0
 DEFAULT_PRESET_DURATION = 30.0
@@ -159,6 +187,8 @@ def new_layer_config(slot: str, preset: Path, preset_root: Path) -> Any:
         locked=False,
         preset_switching=DEFAULT_PRESET_SWITCHING,
         preset_switching_rotation_set=DEFAULT_PRESET_SWITCHING_ROTATION_SET,
+        cast_roles_timeline_behaviour=DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR,
+        cast_roles_default_role=DEFAULT_CAST_ROLES_DEFAULT_ROLE,
         preset_switching_presets=[],
     )
 
@@ -484,6 +514,16 @@ def _parse_preset_switching_rotation_set(raw: Any, label: str) -> PresetSwitchin
     return rotation_set
 
 
+def _parse_cast_roles_timeline_behaviour(
+    raw: Any, label: str
+) -> CastRolesTimelineBehaviour:
+    behaviour = str(raw)
+    if behaviour not in CAST_ROLES_TIMELINE_BEHAVIOURS:
+        allowed = ", ".join(CAST_ROLES_TIMELINE_BEHAVIOURS)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return behaviour  # type: ignore[return-value]
+
+
 def hard_cut_enabled_display(enabled: bool) -> str:
     return "enabled" if enabled else "disabled"
 
@@ -604,7 +644,21 @@ def preset_switching_rotation_set_display(
 ) -> str:
     if rotation_set == "user_defined":
         return "user-defined"
+    if rotation_set == "cast_roles":
+        return "cast roles"
     return "directory"
+
+
+def cast_roles_timeline_behaviour_display(
+    behaviour: CastRolesTimelineBehaviour,
+) -> str:
+    if behaviour == "hold_current":
+        return "hold current"
+    return "on transition"
+
+
+def cast_roles_default_role_display(role: CueRole) -> str:
+    return role
 
 
 @dataclass(frozen=True)
@@ -1773,6 +1827,19 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
             layer_raw.get("preset_switching_rotation_set", DEFAULT_PRESET_SWITCHING_ROTATION_SET),
             f"layers.{slot}.preset_switching_rotation_set",
         )
+        cast_roles_timeline_behaviour = _parse_cast_roles_timeline_behaviour(
+            layer_raw.get(
+                "cast_roles_timeline_behaviour",
+                DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR,
+            ),
+            f"layers.{slot}.cast_roles_timeline_behaviour",
+        )
+        cast_roles_default_role = validate_cue_role(
+            layer_raw.get(
+                "cast_roles_default_role", DEFAULT_CAST_ROLES_DEFAULT_ROLE
+            ),
+            path=f"layers.{slot}.cast_roles_default_role",
+        )
         preset_switching_shuffle = bool(
             layer_raw.get(
                 "preset_switching_shuffle", DEFAULT_PRESET_SWITCHING_SHUFFLE
@@ -1821,6 +1888,8 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
             locked=bool(layer_raw.get("locked", False)),
             preset_switching=preset_switching,
             preset_switching_rotation_set=preset_switching_rotation_set,
+            cast_roles_timeline_behaviour=cast_roles_timeline_behaviour,
+            cast_roles_default_role=cast_roles_default_role,
             preset_switching_shuffle=preset_switching_shuffle,
             preset_switching_shuffle_salt=preset_switching_shuffle_salt,
             preset_duration=preset_duration,
@@ -1856,6 +1925,8 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             locked = runtime.locked
             preset_switching = runtime.preset_switching
             preset_switching_rotation_set = runtime.preset_switching_rotation_set
+            cast_roles_timeline_behaviour = runtime.cast_roles_timeline_behaviour
+            cast_roles_default_role = runtime.cast_roles_default_role
             preset_switching_shuffle = runtime.preset_switching_shuffle
             preset_switching_shuffle_salt = runtime.preset_switching_shuffle_salt
             preset_duration = runtime.preset_duration
@@ -1877,6 +1948,8 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             locked = layer_cfg.locked
             preset_switching = layer_cfg.preset_switching
             preset_switching_rotation_set = layer_cfg.preset_switching_rotation_set
+            cast_roles_timeline_behaviour = layer_cfg.cast_roles_timeline_behaviour
+            cast_roles_default_role = layer_cfg.cast_roles_default_role
             preset_switching_shuffle = layer_cfg.preset_switching_shuffle
             preset_switching_shuffle_salt = layer_cfg.preset_switching_shuffle_salt
             preset_duration = layer_cfg.preset_duration
@@ -1912,6 +1985,10 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             layer_out["preset_switching"] = preset_switching
         if preset_switching_rotation_set != DEFAULT_PRESET_SWITCHING_ROTATION_SET:
             layer_out["preset_switching_rotation_set"] = preset_switching_rotation_set
+        if cast_roles_timeline_behaviour != DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR:
+            layer_out["cast_roles_timeline_behaviour"] = cast_roles_timeline_behaviour
+        if cast_roles_default_role != DEFAULT_CAST_ROLES_DEFAULT_ROLE:
+            layer_out["cast_roles_default_role"] = cast_roles_default_role
         if preset_switching_shuffle != DEFAULT_PRESET_SWITCHING_SHUFFLE:
             layer_out["preset_switching_shuffle"] = preset_switching_shuffle
         if preset_switching_shuffle_salt != DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT:

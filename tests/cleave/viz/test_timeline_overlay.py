@@ -129,6 +129,7 @@ def _view_state(
     standard_cue_fade_out: float = 2.0,
     selected_cue_t: dict[str, float] | None = None,
     selected_cue_flash_start_ms: int | None = None,
+    slot_rotation_sets: dict[str, str] | None = None,
 ) -> TimelineViewState:
     order = list(layer_z_order or list(DEFAULT_LAYER_SLOTS))
     lane_map = dict(lanes or {})
@@ -196,6 +197,11 @@ def _view_state(
         ),
         selected_cue_t=dict(selected_cue_t or ()),
         selected_cue_flash_start_ms=selected_cue_flash_start_ms,
+        slot_rotation_sets=dict(
+            slot_rotation_sets
+            if slot_rotation_sets is not None
+            else {slot: "directory" for slot in order}
+        ),
     )
 
 
@@ -937,9 +943,14 @@ def test_bar_without_high_water_mark_behaves_as_before() -> None:
 def test_selected_cue_readout_text_format() -> None:
     assert selected_cue_readout_text(
         SlotCue(t=65.0, level=1.0, blend="add", role="lead")
+    ) == "[01:05] opacity: 100% blend: add"
+    assert selected_cue_readout_text(
+        SlotCue(t=65.0, level=1.0, blend="add", role="lead"),
+        show_cast=True,
     ) == "[01:05] opacity: 100% blend: add cast: lead"
     assert selected_cue_readout_text(
-        SlotCue(t=0.0, level=0.25, blend=None, role=None)
+        SlotCue(t=0.0, level=0.25, blend=None, role=None),
+        show_cast=True,
     ) == "[00:00] opacity: 25% blend: - cast: -"
 
 
@@ -960,6 +971,7 @@ def test_draw_with_selected_cue_and_role_does_not_crash() -> None:
         focus_row=0,
         submenu_focused=True,
         selected_cue_t={"layer_1": 10.0},
+        slot_rotation_sets={"layer_1": "cast_roles"},
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, state)
@@ -983,6 +995,7 @@ def test_role_glyph_not_drawn_on_off_cue() -> None:
         duration_sec=100.0,
         focus_row=0,
         position_sec=0.0,
+        slot_rotation_sets={"layer_1": "cast_roles"},
     )
     composed = overlay.compose_panel(
         state,
@@ -1300,6 +1313,7 @@ def test_role_glyph_xor_drawn_late_on_upload_not_static() -> None:
         duration_sec=100.0,
         focus_row=0,
         position_sec=0.0,
+        slot_rotation_sets={"layer_1": "cast_roles"},
     )
     composed = overlay.compose_panel(
         state,

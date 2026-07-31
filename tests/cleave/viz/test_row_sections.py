@@ -100,6 +100,16 @@ def test_track_layout_conditional_rows_when_predicates_pass() -> None:
     assert RowKind.TRACK_HARD_CUT_DURATION in user_defined_kinds
     assert RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET in user_defined_kinds
     assert RowKind.TRACK_USER_PRESETS in user_defined_kinds
+    assert RowKind.TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR not in user_defined_kinds
+
+    cast_roles_kinds = _track_row_kinds(
+        preset_switching="timeline",
+        preset_switching_rotation_set="cast_roles",
+        effects_expanded=False,
+    )
+    assert RowKind.TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR in cast_roles_kinds
+    assert RowKind.TRACK_CAST_ROLES_DEFAULT_ROLE in cast_roles_kinds
+    assert RowKind.TRACK_USER_PRESETS not in cast_roles_kinds
 
 
 def test_track_layout_omits_conditional_rows_when_predicates_fail() -> None:

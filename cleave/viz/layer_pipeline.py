@@ -239,6 +239,8 @@ class LayerFramePipeline:
             hard_cut_sensitivity=layer_cfg.hard_cut_sensitivity,
             shuffle=layer_cfg.preset_switching_shuffle,
             shuffle_salt=layer_cfg.preset_switching_shuffle_salt,
+            cast_roles_default_role=layer_cfg.cast_roles_default_role,
+            cast_roles_timeline_behaviour=layer_cfg.cast_roles_timeline_behaviour,
             preset_root=preset_root,
         )
         return layer

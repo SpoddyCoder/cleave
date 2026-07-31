@@ -17,6 +17,8 @@ from cleave.config_schema import (
     TIMELINE_FADE_DURATION_STEP,
     VISUAL_LIMITER_RELEASE_STEP,
     VISUAL_LIMITER_THRESHOLD_STEP,
+    cast_roles_default_role_display,
+    cast_roles_timeline_behaviour_display,
     clamp_timeline_fade_duration,
     clamp_visual_limiter_release,
     clamp_visual_limiter_threshold,
@@ -532,6 +534,22 @@ def _format_track_preset_switching_rotation_set(
     )
 
 
+def _format_track_cast_roles_timeline_behaviour(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    return cast_roles_timeline_behaviour_display(
+        _track_block(state, desc).cast_roles_timeline_behaviour
+    )
+
+
+def _format_track_cast_roles_default_role(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    return cast_roles_default_role_display(
+        _track_block(state, desc).cast_roles_default_role
+    )
+
+
 def _format_track_preset_duration(state: TuningViewState, desc: RowDescriptor) -> str:
     return f"{_track_block(state, desc).preset_duration:g}s"
 
@@ -791,6 +809,30 @@ def _apply_track_preset_switching_rotation_set(
     if desc.slot is None:
         return
     controls._cycle_preset_switching_rotation_set(desc.slot, forward=forward)
+
+
+def _apply_track_cast_roles_timeline_behaviour(
+    controls: TuningControls,
+    desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    if desc.slot is None:
+        return
+    controls._cycle_cast_roles_timeline_behaviour(desc.slot, forward=forward)
+
+
+def _apply_track_cast_roles_default_role(
+    controls: TuningControls,
+    desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    if desc.slot is None:
+        return
+    controls._cycle_cast_roles_default_role(desc.slot, forward=forward)
 
 
 def _apply_track_preset_duration(
@@ -1248,7 +1290,9 @@ def _format_transport(_state: TuningViewState, _desc: RowDescriptor) -> str:
     return ""
 
 
-def _format_panel_notification(state: TuningViewState, _desc: RowDescriptor) -> str:
+def _format_panel_notification(state: TuningViewState, desc: RowDescriptor) -> str:
+    if desc.marker_index == 0:
+        return state.persistent_notification_message or ""
     return state.notification_message or ""
 
 
@@ -1462,6 +1506,18 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_track_preset_switching_rotation_set,
         apply_horizontal=_apply_track_preset_switching_rotation_set,
+    ),
+    RowKind.TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR: RowFieldDef(
+        panel_label="timeline behaviour",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_track_cast_roles_timeline_behaviour,
+        apply_horizontal=_apply_track_cast_roles_timeline_behaviour,
+    ),
+    RowKind.TRACK_CAST_ROLES_DEFAULT_ROLE: RowFieldDef(
+        panel_label="default role",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_track_cast_roles_default_role,
+        apply_horizontal=_apply_track_cast_roles_default_role,
     ),
     RowKind.TRACK_PRESET_SWITCHING_SHUFFLE: RowFieldDef(
         panel_label="shuffle",

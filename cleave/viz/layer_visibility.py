@@ -357,4 +357,8 @@ def build_timeline_view_state(
         standard_cue_fades=_as_fade_group(tl.standard_cue_fades),
         selected_cue_t=dict(tl.selected_cue_t),
         selected_cue_flash_start_ms=tl.selected_cue_flash_start_ms,
+        slot_rotation_sets={
+            slot: session.layers[slot].preset_switching_rotation_set
+            for slot in session.layer_z_order
+        },
     )
