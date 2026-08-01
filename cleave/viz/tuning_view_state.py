@@ -46,7 +46,11 @@ from cleave.config_schema import (
 from cleave.cue_roles import CueRole
 from cleave.extract import StemSource
 from cleave.preset_curation import PresetCurationIndex
-from cleave.preset_playlist import PresetPlaylist, preset_filename_display
+from cleave.preset_playlist import (
+    PresetPlaylist,
+    preset_filename_display,
+    scan_preset_playlist,
+)
 from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
 from cleave.viz.panel_notification import PanelNotificationActive
 from cleave.timeline_presets.crescendo import CrescendoTarget
@@ -57,11 +61,12 @@ from cleave.timeline_presets.density import (
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.playback import PlaybackState, current_sec
 from cleave.viz.row_semantics import RowDescriptor, RowKind
-from cleave.viz.session import TuningSession, config_path_display
+from cleave.viz.session import LayerRuntime, TuningSession, config_path_display
 from cleave.viz.user_presets import user_preset_item_display_name
 
 if TYPE_CHECKING:
     from cleave.viz.focus_nav import FocusCursor
+    from cleave.viz.layer import StemLayer
     from cleave.viz.row_layout import RowLayout, RowLayoutFrame
 
 _RO_OVERLAY_DEFAULTS = default_render_overlay_runtime_values()
@@ -355,6 +360,11 @@ def view_state_structure_signature(
                 "paths": [str(path) for path in playlist.paths],
                 "index": playlist.index,
             },
+            "auto_preset_path": (
+                None
+                if layer.auto_preset_path is None
+                else str(layer.auto_preset_path)
+            ),
         }
     ro = session.render_overlay
     pp = session.render_post_fx
@@ -430,6 +440,7 @@ class TuningViewStateBuilder:
         get_move_mode_slot: Callable[[], str | None],
         config_save: ConfigSaveController,
         get_notification: Callable[[], PanelNotificationActive],
+        layers_by_slot: dict[str, StemLayer] | None = None,
     ) -> None:
         self.session = session
         self.playback = playback
@@ -440,7 +451,18 @@ class TuningViewStateBuilder:
         self._get_move_mode_slot = get_move_mode_slot
         self._config_save = config_save
         self._get_notification = get_notification
+        self._layers_by_slot = layers_by_slot
+        self._auto_display_cache: dict[Path, PresetPlaylist] = {}
         self._structure: _ViewStateStructure | None = None
+
+    def _sync_auto_preset_paths(self) -> None:
+        """Mirror StemLayer playing paths onto session for panel display."""
+        if not self._layers_by_slot:
+            return
+        for slot, stem in self._layers_by_slot.items():
+            runtime = self.session.layers.get(slot)
+            if runtime is not None:
+                runtime.auto_preset_path = stem.auto_preset_path
 
     def _user_preset_basenames(self) -> set[str]:
         names: set[str] = set()
@@ -448,6 +470,21 @@ class TuningViewStateBuilder:
             for path in layer.user_presets:
                 names.add(Path(path).name)
         return names
+
+    def _display_playlist(self, layer: LayerRuntime) -> PresetPlaylist:
+        """Playlist for dir/file rows: playing auto-switch preset when set."""
+        auto = layer.auto_preset_path
+        if auto is None:
+            return layer.playlist
+        cached = self._auto_display_cache.get(auto)
+        if cached is not None:
+            return cached
+        try:
+            playlist = scan_preset_playlist(auto)
+        except (OSError, ValueError):
+            return layer.playlist
+        self._auto_display_cache[auto] = playlist
+        return playlist
 
     def _preset_label(
         self, playlist: PresetPlaylist, *, user_names: set[str]
@@ -479,14 +516,15 @@ class TuningViewStateBuilder:
         tracks: dict[str, TrackBlock] = {}
         for slot in layer_z_order:
             layer = self.session.layers[slot]
+            display = self._display_playlist(layer)
             tracks[slot] = TrackBlock(
                 stem=layer.stem,
-                preset_dir_label=layer.playlist.directory_display_label(
+                preset_dir_label=display.directory_display_label(
                     self.preset_root,
                     browse_floor=layer.browse_floor,
                 ),
                 preset_label=self._preset_label(
-                    layer.playlist, user_names=user_names
+                    display, user_names=user_names
                 ),
                 blend_mode=layer.blend_mode,
                 opacity_pct=layer.opacity_pct,
@@ -497,7 +535,7 @@ class TuningViewStateBuilder:
                 visible=layer.enabled,
                 expanded=layer.expanded,
                 locked=layer.locked,
-                preset_empty=not layer.playlist.paths,
+                preset_empty=not display.paths,
                 preset_switching=layer.preset_switching,
                 preset_switching_rotation_set=layer.preset_switching_rotation_set,
                 cast_roles_timeline_behaviour=layer.cast_roles_timeline_behaviour,
@@ -630,6 +668,7 @@ class TuningViewStateBuilder:
         for slot in structure.layer_z_order:
             base = structure.tracks[slot]
             layer = self.session.layers[slot]
+            display = self._display_playlist(layer)
             visible = effective_layer_enabled(self.session, slot, position_sec)
             tracks[slot] = replace(
                 base,
@@ -642,7 +681,7 @@ class TuningViewStateBuilder:
                 beat_sensitivity=layer.beat_sensitivity,
                 preset_switching_shuffle_salt=layer.preset_switching_shuffle_salt,
                 preset_label=self._preset_label(
-                    layer.playlist, user_names=user_names
+                    display, user_names=user_names
                 ),
                 user_preset_labels=self._user_preset_labels(list(layer.user_presets)),
                 effects=dict(layer.effects),
@@ -658,6 +697,8 @@ class TuningViewStateBuilder:
     ) -> TuningViewState:
         if position_sec is None:
             position_sec = current_sec(self.playback, self.duration_sec)
+
+        self._sync_auto_preset_paths()
 
         notification = self._get_notification()
         notification_message = notification.message

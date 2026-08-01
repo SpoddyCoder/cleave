@@ -441,6 +441,54 @@ def test_structure_signature_invalidates_on_preset_switching_timeline_mode() -> 
     assert sig_timeline != sig_none
 
 
+def test_structure_signature_invalidates_on_auto_preset_path() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    layer = session.layers["layer_1"]
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    layer.auto_preset_path = layer.playlist.paths[1].resolve()
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_builder_shows_auto_preset_in_dir_and_file_rows() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    layer = session.layers["layer_1"]
+    layer.preset_switching = "timeline"
+    layer.preset_switching_rotation_set = "cast_roles"
+    root = controls._view_state.preset_root
+    bed = root / "roles" / "bed"
+    pulse = root / "roles" / "pulse"
+    bed.mkdir(parents=True, exist_ok=True)
+    pulse.mkdir(parents=True, exist_ok=True)
+    bed_a = bed / "bed-a.milk"
+    bed_b = bed / "bed-b.milk"
+    pulse_a = pulse / "pulse-a.milk"
+    for path in (bed_a, bed_b, pulse_a):
+        path.write_text("milk", encoding="utf-8")
+
+    view_browse = controls.build_view_state(paused=False)
+    assert "roles/" not in view_browse.tracks["layer_1"].preset_dir_label
+
+    layer.auto_preset_path = bed_b.resolve()
+    view_bed = controls.build_view_state(paused=False)
+    assert "roles/bed/" in view_bed.tracks["layer_1"].preset_dir_label
+    assert view_bed.tracks["layer_1"].preset_label.startswith("bed-b.milk (2/2)")
+
+    layer.auto_preset_path = pulse_a.resolve()
+    view_pulse = controls.build_view_state(paused=False)
+    assert "roles/pulse/" in view_pulse.tracks["layer_1"].preset_dir_label
+    assert view_pulse.tracks["layer_1"].preset_label.startswith("pulse-a.milk (1/1)")
+    # Browse playlist unchanged (config stays clean).
+    assert layer.playlist.index == 0
+
+
 def test_structure_signature_invalidates_on_cast_roles_rotation_set() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session

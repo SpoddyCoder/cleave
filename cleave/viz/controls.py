@@ -209,6 +209,7 @@ class TuningControls:
             get_move_mode_slot=lambda: self.move_mode_slot,
             config_save=self._config_save,
             get_notification=self._notification_host.active,
+            layers_by_slot=layers_by_slot,
         )
         self._render_overlay = RenderOverlayControls(session)
         self._render_post_fx = RenderPostFxControls(

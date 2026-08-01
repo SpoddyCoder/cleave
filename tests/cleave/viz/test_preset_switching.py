@@ -69,6 +69,7 @@ def test_load_manual_preset_clean_forces_black_boot_then_restores() -> None:
         call(False),
     ]
     layer.playlist.load_into.assert_called_once_with(layer.pm, smooth=False)
+    assert layer.auto_preset_path == _MILK[0].resolve()
 
 
 def test_load_manual_preset_clean_restores_configured_start_clean() -> None:
