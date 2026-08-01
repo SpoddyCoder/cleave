@@ -5,11 +5,20 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
+from cleave.blend_modes import BlendMode
+
 CueRole = Literal["bed", "pulse", "lead", "accent"]
 
 CUE_ROLES: tuple[CueRole, ...] = ("bed", "pulse", "lead", "accent")
 
 CUE_ROLE_DIR = "roles"
+
+CUE_ROLE_BLEND: dict[CueRole, BlendMode] = {
+    "bed": "black-key",
+    "pulse": "add",
+    "lead": "black-key",
+    "accent": "add",
+}
 
 CUE_ROLE_MARKER_LETTER: dict[CueRole, str] = {
     "bed": "B",
