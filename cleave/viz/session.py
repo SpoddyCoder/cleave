@@ -297,6 +297,9 @@ class LayerRuntime:
     preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN
     user_presets: list[str] = field(default_factory=list)  # absolute paths
     user_presets_expanded: bool = False
+    # Playing auto-switch preset (panel display); not persisted. Mirrored from
+    # StemLayer.auto_preset_path while the live layer map is available.
+    auto_preset_path: Path | None = None
 
 
 @dataclass

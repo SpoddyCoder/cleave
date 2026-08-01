@@ -687,11 +687,13 @@ def load_manual_preset_clean(
     then restores the layer's configured value for later auto-switch transitions.
     """
     pm = layer.pm
-    if layer.playlist.current is None:
+    current = layer.playlist.current
+    if current is None:
         return
     pm.set_preset_start_clean(True)
     layer.playlist.load_into(pm, smooth=False)
     pm.set_preset_start_clean(preset_start_clean)
+    layer.auto_preset_path = current.resolve()
 
 
 def sync_manual_browse_with_user_defined_rotation(layer: StemLayer) -> None:
