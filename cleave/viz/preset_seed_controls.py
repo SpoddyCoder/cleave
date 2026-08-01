@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import random
 from collections.abc import Callable, Mapping
+from pathlib import Path
 
 from cleave.viz.layer import StemLayer
 from cleave.viz.modal import ModalHost
@@ -29,11 +30,13 @@ class PresetSeedController:
         modal_host: ModalHost,
         layers_by_slot: Mapping[str, StemLayer],
         *,
+        preset_root: Path,
         on_preset_switching_change: Callable[[str], None] | None = None,
     ) -> None:
         self.session = session
         self._modal = modal_host
         self._layers_by_slot = layers_by_slot
+        self._preset_root = preset_root
         self._on_preset_switching_change = on_preset_switching_change
 
     def prompt(self, slot: str) -> None:
@@ -71,6 +74,10 @@ class PresetSeedController:
                 shuffle=runtime.preset_switching_shuffle,
                 shuffle_salt=runtime.preset_switching_shuffle_salt,
                 preset_start_clean=runtime.preset_start_clean,
+                cast_roles_default_role=runtime.cast_roles_default_role,
+                cast_roles_timeline_behaviour=runtime.cast_roles_timeline_behaviour,
+                preset_root=self._preset_root,
+                session=self.session,
             )
             return
         if self._on_preset_switching_change is not None:

@@ -30,6 +30,11 @@ def _stub_vocals() -> dict[str, tuple[np.ndarray, np.ndarray]]:
     return {"rms": (values, times), "pitch_hz": (values, times)}
 
 
+def _stub_other() -> dict[str, tuple[np.ndarray, np.ndarray]]:
+    signal = _stub_signal()
+    return {"spectral_centroid": signal, "rms": signal}
+
+
 def _write_project(project: Path) -> None:
     project.mkdir()
     stem_root = stems_dir(project)
@@ -49,7 +54,7 @@ def _write_project(project: Path) -> None:
 
 @patch("cleave.analyse.extract_mix_rms", return_value=_stub_signal())
 @patch("cleave.analyse.extract_mix_onset", return_value=_stub_signal())
-@patch("cleave.analyse.extract_other", return_value=_stub_signal())
+@patch("cleave.analyse.extract_other", return_value=_stub_other())
 @patch("cleave.analyse.extract_vocals", return_value=_stub_vocals())
 @patch("cleave.analyse.extract_bass", return_value=_stub_bass())
 @patch(
@@ -58,7 +63,7 @@ def _write_project(project: Path) -> None:
 )
 @patch("cleave.analyse.extract_drums_onset", return_value=_stub_signal())
 @patch("cleave.analyse._stem_duration_sec", return_value=1.0)
-def test_run_analyse_writes_version_3_full_mix(
+def test_run_analyse_writes_version_4_full_mix(
     _duration: object,
     _drums: object,
     beats_downbeats: object,
@@ -75,12 +80,14 @@ def test_run_analyse_writes_version_3_full_mix(
     signals_path = run_analyse(project, high_quality=False)
     data = json.loads(signals_path.read_text(encoding="utf-8"))
 
-    assert data["version"] == 3
+    assert data["version"] == 4
     assert data["beat_detection_stem"] == "full_mix"
     assert "mix_onset_strength" not in data["drums"]
     assert set(data["full_mix"]) == {"onset_strength", "rms"}
+    assert set(data["other"]) == {"spectral_centroid", "rms"}
     assert len(data["full_mix"]["onset_strength"]) > 0
     assert len(data["full_mix"]["rms"]) > 0
+    assert len(data["other"]["rms"]) > 0
     assert data["beat_times"] == [0.5, 1.0, 1.5]
     assert data["downbeat_times"] == [0.5, 1.5]
     beats_downbeats.assert_called_once_with(project / "mix.wav")
@@ -88,7 +95,7 @@ def test_run_analyse_writes_version_3_full_mix(
 
 @patch("cleave.analyse.extract_mix_rms", return_value=_stub_signal())
 @patch("cleave.analyse.extract_mix_onset", return_value=_stub_signal())
-@patch("cleave.analyse.extract_other", return_value=_stub_signal())
+@patch("cleave.analyse.extract_other", return_value=_stub_other())
 @patch("cleave.analyse.extract_vocals", return_value=_stub_vocals())
 @patch("cleave.analyse.extract_bass", return_value=_stub_bass())
 @patch(
@@ -122,7 +129,7 @@ def test_run_analyse_uses_beat_detection_stem_path(
 
 @patch("cleave.analyse.extract_mix_rms", return_value=_stub_signal())
 @patch("cleave.analyse.extract_mix_onset", return_value=_stub_signal())
-@patch("cleave.analyse.extract_other", return_value=_stub_signal())
+@patch("cleave.analyse.extract_other", return_value=_stub_other())
 @patch("cleave.analyse.extract_vocals", return_value=_stub_vocals())
 @patch("cleave.analyse.extract_bass", return_value=_stub_bass())
 @patch(

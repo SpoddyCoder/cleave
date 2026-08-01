@@ -76,8 +76,8 @@ def _playlist(slot: str) -> PresetPlaylist:
 
 def _session_with_enable_cue_at(beat_t: float) -> TuningSession:
     """Timeline on; layer_1 off until a cue at beat_t turns it on."""
-    cues = canonicalize(False, [SlotCue(t=beat_t, visible=True)])
-    lane = TimelineLane(baseline=False, cues=cues)
+    cues = canonicalize(0.0, [SlotCue(t=beat_t, level=1.0)])
+    lane = TimelineLane(baseline=0.0, cues=cues)
     return TuningSession(
         layer_z_order=list(DEFAULT_LAYER_SLOTS),
         timeline=TimelineRuntime(
@@ -175,7 +175,7 @@ def _setup_render_project(
         overrides["editor"] = editor
     write_minimal_config(project, preset_root, **overrides)
     _write_stub_stems(project)
-    (project / "signals.json").write_text('{"version": 3}')
+    (project / "signals.json").write_text('{"version": 4}')
     mix = project / "my-track.flac"
     mix.write_bytes(b"mix")
     write_manifest(
@@ -233,7 +233,7 @@ def test_validate_render_project_missing_viz_config(tmp_path: Path) -> None:
     project = tmp_path / "my-track"
     project.mkdir()
     _write_stub_stems(project)
-    (project / "signals.json").write_text('{"version": 3}')
+    (project / "signals.json").write_text('{"version": 4}')
     mix = project / "my-track.flac"
     mix.write_bytes(b"mix")
     write_manifest(
@@ -252,7 +252,7 @@ def test_validate_render_project_missing_mix(tmp_path: Path) -> None:
     project = tmp_path / "my-track"
     write_minimal_config(project, preset_root)
     _write_stub_stems(project)
-    (project / "signals.json").write_text('{"version": 3}')
+    (project / "signals.json").write_text('{"version": 4}')
     write_manifest(
         project,
         slug="my-track",

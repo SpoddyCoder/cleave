@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
+from cleave.cue_roles import CUE_ROLES, CueRole
 from cleave.preset_curation import (
     PresetCurationIndex,
     blacklist_root,
     copy_to_favourites,
+    copy_to_role,
     curated_milk_src,
     delete_favourite_milk,
+    delete_role_milk,
     favourites_root,
     list_destination_subdirs,
     list_restore_destination_subdirs,
@@ -18,6 +22,7 @@ from cleave.preset_curation import (
     resolve_blacklist_origin_dir,
     restore_from_blacklist,
     rewrite_user_preset_paths,
+    roles_root,
     scrub_user_preset_paths,
 )
 from cleave.viz.live_layer_bindings import LiveLayerBindings
@@ -26,6 +31,9 @@ from cleave.viz.session import TuningSession
 
 _ROOT_DEST_LABEL = "(Root)"
 _CANCEL_LABEL = "Cancel"
+
+_RestoreKind = Literal["favourite", "blacklist", "role"]
+_RestoreMembership = tuple[_RestoreKind, CueRole | None]
 
 
 def _path_under(path: Path, root: Path) -> bool:
@@ -53,21 +61,112 @@ class PresetCurationController:
         self._layer_bindings = layer_bindings
         self._index = index
 
+    def prompt_cast(self, slot: str, src: Path) -> None:
+        """Copy or move a preset into a role pool (hotkey **c**)."""
+        relocating = src.name in self._index.roles
+        self._lock_preset(slot)
+        message = (
+            f"Move cast: {src.name}?"
+            if relocating
+            else f"Cast preset: {src.name}?"
+        )
+        dismiss = lambda: self._unlock_preset(slot)
+        options: list[ModalOption] = [
+            ModalOption(
+                role,
+                lambda r=role: self._confirm_cast(
+                    slot, src, r, relocating=relocating
+                ),
+            )
+            for role in CUE_ROLES
+        ]
+        options.append(ModalOption(_CANCEL_LABEL, dismiss))
+        self._modal.prompt_choice(message, options, on_dismiss=dismiss)
+
     def prompt_restore(self, slot: str, src: Path) -> None:
-        """Remove a favourite or restore a blacklisted preset (hotkey **r**)."""
+        """Remove from favourites / cast, or restore a blacklisted preset (hotkey **r**)."""
+        memberships = self._restore_memberships(src)
+        if not memberships:
+            return
+        if len(memberships) == 1:
+            kind, role = memberships[0]
+            if kind == "favourite":
+                self._prompt_remove_favourite(slot, src)
+            elif kind == "blacklist":
+                self._prompt_restore_blacklist(slot, src)
+            else:
+                assert role is not None
+                self._prompt_remove_cast(slot, src, role)
+            return
+        self._prompt_restore_choice(slot, src, memberships)
+
+    def _restore_memberships(self, src: Path) -> list[_RestoreMembership]:
         under_fav = _path_under(src, favourites_root(self._preset_root))
         under_bl = _path_under(src, blacklist_root(self._preset_root))
-        if under_fav:
-            self._prompt_remove_favourite(slot, src)
-            return
-        if under_bl:
-            self._prompt_restore_blacklist(slot, src)
-            return
-        if src.name in self._index.favourites:
-            self._prompt_remove_favourite(slot, src)
-            return
-        if src.name in self._index.blacklist:
-            self._prompt_restore_blacklist(slot, src)
+        memberships: list[_RestoreMembership] = []
+        if under_fav or src.name in self._index.favourites:
+            memberships.append(("favourite", None))
+        if under_bl or src.name in self._index.blacklist:
+            memberships.append(("blacklist", None))
+        for role in CUE_ROLES:
+            if role in self._roles_for_src(src):
+                memberships.append(("role", role))
+        return memberships
+
+    def _roles_for_src(self, src: Path) -> set[CueRole]:
+        roles = set(self._index.roles.get(src.name, ()))
+        root = roles_root(self._preset_root)
+        if not _path_under(src, root):
+            return roles
+        try:
+            rel = src.resolve().relative_to(root.resolve())
+        except ValueError:
+            return roles
+        head = rel.parts[0] if rel.parts else ""
+        for role in CUE_ROLES:
+            if head == role:
+                roles.add(role)
+                break
+        return roles
+
+    def _prompt_restore_choice(
+        self,
+        slot: str,
+        src: Path,
+        memberships: list[_RestoreMembership],
+    ) -> None:
+        self._lock_preset(slot)
+        dismiss = lambda: self._unlock_preset(slot)
+        options: list[ModalOption] = []
+        for kind, role in memberships:
+            if kind == "favourite":
+                options.append(
+                    ModalOption(
+                        "Favourites",
+                        lambda: self._confirm_remove_favourite(slot, src),
+                    )
+                )
+            elif kind == "blacklist":
+                options.append(
+                    ModalOption(
+                        "Blacklist",
+                        lambda: self._confirm_restore_blacklist(slot, src),
+                    )
+                )
+            else:
+                assert role is not None
+                options.append(
+                    ModalOption(
+                        f"Cast ({role})",
+                        lambda r=role: self._confirm_remove_cast(slot, src, r),
+                    )
+                )
+        options.append(ModalOption(_CANCEL_LABEL, dismiss))
+        self._modal.prompt_choice(
+            f"Remove from: {src.name}?",
+            options,
+            on_dismiss=dismiss,
+        )
 
     def prompt_favourite(self, slot: str, src: Path) -> None:
         relocating = src.name in self._index.favourites
@@ -173,6 +272,35 @@ class PresetCurationController:
         options.append(ModalOption(_CANCEL_LABEL, dismiss))
         self._modal.prompt_choice(message, options, on_dismiss=dismiss)
 
+    def _confirm_cast(
+        self,
+        slot: str,
+        src: Path,
+        role: CueRole,
+        *,
+        relocating: bool,
+    ) -> None:
+        try:
+            if relocating:
+                old_roles = set(self._index.roles.get(src.name, ()))
+                dest = copy_to_role(src, self._preset_root, role)
+                self._index.mark_role(dest.name, role)
+                for old_role in old_roles:
+                    if old_role == role:
+                        continue
+                    deleted = delete_role_milk(self._preset_root, src, old_role)
+                    if deleted is not None:
+                        self._index.unmark_role(deleted.name, old_role)
+                        self._rewrite_paths_after_relocate(
+                            deleted.resolve(), dest.resolve()
+                        )
+            else:
+                dest = copy_to_role(src, self._preset_root, role)
+                self._index.mark_role(dest.name, role)
+            self._rebuild_timeline_role_rotations()
+        finally:
+            self._unlock_preset(slot)
+
     def _confirm_favourite(
         self,
         slot: str,
@@ -252,6 +380,24 @@ class PresetCurationController:
         finally:
             self._unlock_preset(slot)
 
+    def _prompt_remove_cast(self, slot: str, src: Path, role: CueRole) -> None:
+        self._lock_preset(slot)
+        self._modal.prompt_yes_no(
+            f"Remove cast ({role})?",
+            on_confirm=lambda: self._confirm_remove_cast(slot, src, role),
+            on_cancel=lambda: self._unlock_preset(slot),
+        )
+
+    def _confirm_remove_cast(self, slot: str, src: Path, role: CueRole) -> None:
+        try:
+            deleted = delete_role_milk(self._preset_root, src, role)
+            if deleted is not None:
+                self._index.unmark_role(deleted.name, role)
+                self._scrub_deleted_preset(deleted)
+            self._rebuild_timeline_role_rotations()
+        finally:
+            self._unlock_preset(slot)
+
     def _scrub_deleted_preset(self, removed: Path) -> None:
         """Drop ``removed`` from layer playlists and user preset lists."""
         for layer_slot, layer in self.session.layers.items():
@@ -263,6 +409,13 @@ class PresetCurationController:
         if self._layer_bindings is not None:
             for affected_slot in affected:
                 self._layer_bindings.on_preset_switching_change(affected_slot)
+
+    def _rebuild_timeline_role_rotations(self) -> None:
+        if self._layer_bindings is None:
+            return
+        for layer_slot, layer in self.session.layers.items():
+            if layer.preset_switching == "timeline":
+                self._layer_bindings.on_preset_switching_change(layer_slot)
 
     def _prompt_restore_blacklist(self, slot: str, src: Path) -> None:
         self._lock_preset(slot)

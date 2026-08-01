@@ -102,6 +102,47 @@ def test_fit_counter_label_preserves_full_fbu_marker() -> None:
     assert font.size(fitted)[0] <= width
 
 
+def test_fit_counter_label_preserves_role_marker() -> None:
+    font = overlay_font()
+    label = "very-long-cast-preset-filename-that-needs-truncation.milk [R:B]"
+    suffix = " [R:B]"
+    width = font.size(suffix)[0] + font.size("very-long-cast…")[0]
+    fitted = fit_counter_label_to_width(font, label, width)
+    assert fitted.endswith(suffix)
+    assert fitted.startswith("very")
+    assert font.size(fitted)[0] <= width
+
+
+def test_fit_counter_label_preserves_favourite_and_role_markers() -> None:
+    font = overlay_font()
+    label = "long-name-without-much-room-left.milk [F] [R:L]"
+    suffix = " [F] [R:L]"
+    width = font.size(suffix)[0] + font.size("long-name…")[0]
+    fitted = fit_counter_label_to_width(font, label, width)
+    assert fitted.endswith(suffix)
+    assert font.size(fitted)[0] <= width
+
+
+def test_fit_counter_label_preserves_counter_fav_and_role_markers() -> None:
+    font = overlay_font()
+    label = "long-name-without-much-room-left.milk (2/5) [FB] [R:B] [R:A]"
+    suffix = " (2/5) [FB] [R:B] [R:A]"
+    width = font.size(suffix)[0] + font.size("long-name…")[0]
+    fitted = fit_counter_label_to_width(font, label, width)
+    assert fitted.endswith(suffix)
+    assert font.size(fitted)[0] <= width
+
+
+def test_fit_counter_label_preserves_multiple_role_markers_only() -> None:
+    font = overlay_font()
+    label = "very-long-cast-preset-filename-that-needs-truncation.milk [R:B] [R:L]"
+    suffix = " [R:B] [R:L]"
+    width = font.size(suffix)[0] + font.size("very-long-cast…")[0]
+    fitted = fit_counter_label_to_width(font, label, width)
+    assert fitted.endswith(suffix)
+    assert font.size(fitted)[0] <= width
+
+
 def test_fit_counter_label_marker_only_user_preset() -> None:
     font = overlay_font()
     label = "very-long-user-preset-filename-that-needs-truncation.milk [B]"
@@ -187,13 +228,20 @@ def test_wrap_text_to_width_keeps_short_line() -> None:
 
 def test_wrap_text_to_width_preserves_explicit_newlines() -> None:
     font = overlay_font()
-    text = "Apply timeline preset?\ncharacter: arc\ncrescendo: no\ndensity: normal"
+    text = (
+        "Apply timeline preset?\n"
+        "character: arc\n"
+        "crescendo: no\n"
+        "density: normal\n"
+        "conductor: off"
+    )
     max_px = max(font.size(part)[0] for part in text.split("\n")) + 10
     assert wrap_text_to_width(font, text, max_px) == [
         "Apply timeline preset?",
         "character: arc",
         "crescendo: no",
         "density: normal",
+        "conductor: off",
     ]
 
 

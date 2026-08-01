@@ -143,8 +143,15 @@ class RowLayout:
         if not curation:
             row_list.append(RowDescriptor(RowKind.CONFIG_HEADER))
         row_list.append(RowDescriptor(RowKind.TRANSPORT))
+        # marker_index 0 = persistent error; 1 = timed toast (may stack).
+        if state.persistent_notification_message:
+            row_list.append(
+                RowDescriptor(RowKind.PANEL_NOTIFICATION, marker_index=0)
+            )
         if state.notification_message and state.notification_remaining_sec > 0:
-            row_list.append(RowDescriptor(RowKind.PANEL_NOTIFICATION))
+            row_list.append(
+                RowDescriptor(RowKind.PANEL_NOTIFICATION, marker_index=1)
+            )
         if curation:
             if state.layer_z_order:
                 append_expand_section_rows(

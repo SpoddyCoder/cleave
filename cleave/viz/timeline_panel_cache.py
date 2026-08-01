@@ -22,17 +22,17 @@ class TimelineStaticSignature:
     """Everything affecting strip chrome except live transport/playhead.
 
     While recording, ``record_playhead_sec`` is included because armed-row bars
-    grow with the playhead (see ``bar_segments_for_row``). Outside recording the
-    playhead is live-patched only.
+    grow with the playhead (see ``bar_level_breakpoints_for_row``). Outside
+    recording the playhead is live-patched only.
     """
 
     layer_z_order: tuple[str, ...]
-    lanes_fingerprint: tuple[tuple[str, bool | None, tuple[tuple[float, bool], ...]], ...]
-    defaults: tuple[tuple[str, bool], ...]
+    lanes_fingerprint: tuple[tuple[str, float | None, tuple[tuple[float, float], ...]], ...]
+    defaults: tuple[tuple[str, float], ...]
     duration_sec: float
     focus_row: int
     monitor_visible: tuple[tuple[str, bool], ...]
-    timeline_visible: tuple[tuple[str, bool], ...]
+    timeline_level: tuple[tuple[str, float], ...]
     slot_stems: tuple[tuple[str, str], ...]
     override_slots: frozenset[str]
     armed_slots: frozenset[str]
@@ -40,9 +40,9 @@ class TimelineStaticSignature:
     submenu_focused: bool
     record_start_sec: float | None
     record_slot_start_sec: tuple[tuple[str, float], ...]
-    record_baseline: tuple[tuple[str, bool], ...]
+    record_baseline: tuple[tuple[str, float], ...]
     record_buffer_fingerprint: tuple[
-        tuple[str, tuple[tuple[float, bool], ...]], ...
+        tuple[str, tuple[tuple[float, float], ...]], ...
     ]
     record_high_water_mark: float | None
     record_playhead_sec: float | None
@@ -59,6 +59,7 @@ class TimelineStaticSignature:
     standard_cue_fades_enabled: bool
     standard_cue_fade_in: float
     standard_cue_fade_out: float
+    selected_cue_t: tuple[tuple[str, float], ...]
 
 
 @dataclass
@@ -71,6 +72,7 @@ class TimelinePanelCache:
     last_playhead_rect: tuple[int, int, int, int] | None = None
     last_badge_rect: tuple[int, int, int, int] | None = None
     last_flash_rects: tuple[tuple[int, int, int, int], ...] = ()
+    last_glyph_rects: tuple[tuple[int, int, int, int], ...] = ()
 
 
 def visibility_bucket(visibility: float) -> int:
@@ -81,19 +83,22 @@ def visibility_bucket(visibility: float) -> int:
 
 def _slot_cues_fingerprint(
     cues: list[SlotCue],
-) -> tuple[tuple[float, bool], ...]:
-    return tuple((cue.t, cue.visible) for cue in cues)
+) -> tuple[tuple[float, float, str | None, str | None], ...]:
+    return tuple((cue.t, cue.level, cue.blend, cue.role) for cue in cues)
 
 
 def _lane_fingerprint(
     lane: TimelineLane,
-) -> tuple[bool | None, tuple[tuple[float, bool], ...]]:
+) -> tuple[float | None, tuple[tuple[float, float, str | None, str | None], ...]]:
     return (lane.baseline, _slot_cues_fingerprint(lane.cues))
 
 
 def _lanes_fingerprint(
     lanes: dict[str, TimelineLane],
-) -> tuple[tuple[str, bool | None, tuple[tuple[float, bool], ...]], ...]:
+) -> tuple[
+    tuple[str, float | None, tuple[tuple[float, float, str | None, str | None], ...]],
+    ...,
+]:
     return tuple(
         (slot, *_lane_fingerprint(lane))
         for slot, lane in sorted(lanes.items())
@@ -102,7 +107,7 @@ def _lanes_fingerprint(
 
 def _record_buffer_fingerprint(
     record_buffer: dict[str, list[SlotCue]],
-) -> tuple[tuple[str, tuple[tuple[float, bool], ...]], ...]:
+) -> tuple[tuple[str, tuple[tuple[float, float, str | None, str | None], ...]], ...]:
     return tuple(
         (slot, _slot_cues_fingerprint(cues))
         for slot, cues in sorted(record_buffer.items())
@@ -123,7 +128,7 @@ def timeline_static_signature(
         duration_sec=state.duration_sec,
         focus_row=state.focus_row,
         monitor_visible=tuple(sorted(state.monitor_visible.items())),
-        timeline_visible=tuple(sorted(state.timeline_visible.items())),
+        timeline_level=tuple(sorted(state.timeline_level.items())),
         slot_stems=tuple(sorted((k, str(v)) for k, v in state.slot_stems.items())),
         override_slots=frozenset(state.override_slots),
         armed_slots=frozenset(state.armed_slots),
@@ -148,6 +153,7 @@ def timeline_static_signature(
         standard_cue_fades_enabled=state.standard_cue_fades.enabled,
         standard_cue_fade_in=state.standard_cue_fades.fade_in,
         standard_cue_fade_out=state.standard_cue_fades.fade_out,
+        selected_cue_t=tuple(sorted(state.selected_cue_t.items())),
     )
 
 

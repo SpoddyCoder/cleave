@@ -6,6 +6,8 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from cleave.config_schema import (
+    DEFAULT_CAST_ROLES_DEFAULT_ROLE,
+    DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR,
     DEFAULT_EASTER_EGG,
     DEFAULT_HARD_CUT_DURATION,
     DEFAULT_HARD_CUT_ENABLED,
@@ -15,9 +17,11 @@ from cleave.config_schema import (
     DEFAULT_PRESET_SWITCHING_SHUFFLE,
     DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT,
     DEFAULT_SOFT_CUT_DURATION,
+    CastRolesTimelineBehaviour,
     PresetSwitchingMode,
     PresetSwitchingRotationSet,
 )
+from cleave.cue_roles import CUE_ROLES, CueRole, role_pool_paths
 from cleave.preset_playlist import milk_files_in_dir
 from cleave.preset_rotation import (
     PresetRotation,
@@ -30,6 +34,7 @@ from cleave.timeline import (
     TimelineFadeGroup,
     empty_lane,
     lane_on_transition_count,
+    lane_on_transition_cues,
 )
 from cleave.viz.layer import StemLayer
 
@@ -59,14 +64,108 @@ def _apply_projectm_timing(
 
 def _clear_timeline_rotation(layer: StemLayer) -> None:
     layer.preset_rotation = None
+    layer.role_rotations = {}
+    layer.last_cast_role = None
     layer.timeline_switch_count = 0
     layer.rotation_anchor = 0
+
+
+def _build_role_rotations(
+    layer: StemLayer,
+    preset_root: Path,
+    *,
+    shuffle: bool,
+    shuffle_salt: int,
+) -> dict[CueRole, PresetRotation]:
+    role_rotations: dict[CueRole, PresetRotation] = {}
+    for role in CUE_ROLES:
+        pool = role_pool_paths(preset_root, role)
+        if not pool:
+            continue
+        role_rotations[role] = PresetRotation(
+            paths=pool,
+            shuffle=shuffle,
+            seed=layer_rotation_seed(
+                pool, slot=layer.slot, shuffle_salt=shuffle_salt
+            ),
+            anchor=0,
+        )
+    return role_rotations
+
+
+def _timeline_path_for_count(
+    layer: StemLayer,
+    *,
+    count: int,
+) -> Path | None:
+    """Seek-stable path for transition ``count`` from the main rotation only."""
+    rotation = layer.preset_rotation
+    if rotation is None:
+        return None
+    return rotation.path_for(count)
+
+
+def _cast_roles_path_for_count(
+    layer: StemLayer,
+    *,
+    count: int,
+    lane,
+    song_marker_times: Sequence[float],
+    song_marker_fades: TimelineFadeGroup,
+    standard_fades: TimelineFadeGroup,
+    behaviour: CastRolesTimelineBehaviour,
+    default_role: CueRole,
+) -> Path | None:
+    """Seek-stable path after ``count`` on-transitions for cast-roles rotation.
+
+    ``on_transition``: every rise advances; null cue role uses ``last_cast_role``
+    (initialised to ``default_role``).
+    ``hold_current``: only role-marked cues advance; null-role cues keep the
+    prior path (caller skips reload when unchanged).
+    Count 0 uses default-role pool entry 0.
+    """
+    default_rotation = layer.role_rotations.get(default_role) or layer.preset_rotation
+    if default_rotation is None:
+        return None
+    if count < 1:
+        layer.last_cast_role = default_role
+        return default_rotation.path_for(0)
+
+    cues = lane_on_transition_cues(
+        lane,
+        song_marker_times=song_marker_times,
+        song_marker_fades=song_marker_fades,
+        standard_fades=standard_fades,
+    )
+    last_role: CueRole = default_role
+    role_use_count: dict[CueRole, int] = {role: 0 for role in CUE_ROLES}
+    active_path: Path | None = default_rotation.path_for(0)
+    limit = min(count, len(cues))
+
+    for index in range(limit):
+        cue = cues[index][1]
+        if behaviour == "hold_current":
+            if cue.role is None:
+                continue
+            role = cue.role
+        else:
+            role = cue.role if cue.role is not None else last_role
+        last_role = role
+        role_rotation = layer.role_rotations.get(role)
+        if role_rotation is None:
+            continue
+        active_path = role_rotation.path_for(role_use_count[role])
+        role_use_count[role] += 1
+
+    layer.last_cast_role = last_role
+    return active_path
 
 
 def reapply_projectm_preset_switching(
     session,
     layers_by_slot: dict[str, StemLayer],
     *,
+    preset_root: Path,
     delta_sec: float = 0.0,
 ) -> None:
     """Re-attach projectM playlist switching after seek without reloading browse preset."""
@@ -93,6 +192,9 @@ def reapply_projectm_preset_switching(
                 hard_cut_enabled=runtime.hard_cut_enabled,
                 hard_cut_duration=runtime.hard_cut_duration,
                 hard_cut_sensitivity=runtime.hard_cut_sensitivity,
+                cast_roles_default_role=runtime.cast_roles_default_role,
+                cast_roles_timeline_behaviour=runtime.cast_roles_timeline_behaviour,
+                preset_root=preset_root,
             )
             continue
         _reapply_on_seek(
@@ -113,6 +215,7 @@ def apply_preset_switching(
     *,
     mode: PresetSwitchingMode,
     rotation_set: PresetSwitchingRotationSet,
+    preset_root: Path,
     user_presets: list[str] | None = None,
     shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE,
     shuffle_salt: int = DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT,
@@ -123,7 +226,12 @@ def apply_preset_switching(
     hard_cut_enabled: bool = DEFAULT_HARD_CUT_ENABLED,
     hard_cut_duration: float = DEFAULT_HARD_CUT_DURATION,
     hard_cut_sensitivity: float = DEFAULT_HARD_CUT_SENSITIVITY,
+    cast_roles_default_role: CueRole = DEFAULT_CAST_ROLES_DEFAULT_ROLE,
+    cast_roles_timeline_behaviour: CastRolesTimelineBehaviour = (
+        DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR
+    ),
     on_empty: Callable[[], None] | None = None,
+    session=None,
 ) -> None:
     pm = layer.pm
 
@@ -151,6 +259,10 @@ def apply_preset_switching(
                 shuffle=shuffle,
                 shuffle_salt=shuffle_salt,
                 preset_start_clean=preset_start_clean,
+                cast_roles_default_role=cast_roles_default_role,
+                cast_roles_timeline_behaviour=cast_roles_timeline_behaviour,
+                preset_root=preset_root,
+                session=session,
             )
             return
         _apply_timeline_preset_switching(
@@ -160,6 +272,8 @@ def apply_preset_switching(
             shuffle=shuffle,
             shuffle_salt=shuffle_salt,
             preset_start_clean=preset_start_clean,
+            cast_roles_default_role=cast_roles_default_role,
+            preset_root=preset_root,
             on_empty=on_empty,
         )
         return
@@ -176,8 +290,16 @@ def apply_preset_switching(
         hard_cut_sensitivity=hard_cut_sensitivity,
     )
 
+    # cast_roles is timeline-only; projectM mode uses the browse directory.
+    effective_rotation: PresetSwitchingRotationSet = (
+        "directory" if rotation_set == "cast_roles" else rotation_set
+    )
     paths = _rotation_paths(
-        layer, rotation_set=rotation_set, user_presets=user_presets
+        layer,
+        rotation_set=effective_rotation,
+        user_presets=user_presets,
+        preset_root=preset_root,
+        cast_roles_default_role=cast_roles_default_role,
     )
     if not paths:
         layer.auto_preset_path = None
@@ -194,7 +316,7 @@ def apply_preset_switching(
         )
         ordered = first_shuffle_bag_order(paths, seed=seed)
         playlist.add_presets(ordered, allow_duplicates=True)
-    elif rotation_set == "user_defined":
+    elif effective_rotation == "user_defined":
         playlist.add_presets(paths, allow_duplicates=True)
     else:
         playlist.add_path(
@@ -214,9 +336,15 @@ def _rotation_paths(
     *,
     rotation_set: PresetSwitchingRotationSet,
     user_presets: list[str] | None,
+    preset_root: Path | None = None,
+    cast_roles_default_role: CueRole = DEFAULT_CAST_ROLES_DEFAULT_ROLE,
 ) -> list[Path]:
     if rotation_set == "user_defined":
         return [Path(path) for path in (user_presets or [])]
+    if rotation_set == "cast_roles":
+        if preset_root is None:
+            return []
+        return list(role_pool_paths(preset_root, cast_roles_default_role))
     return list(milk_files_in_dir(layer.playlist.current_dir))
 
 
@@ -239,6 +367,8 @@ def _apply_timeline_preset_switching(
     shuffle: bool,
     shuffle_salt: int,
     preset_start_clean: bool,
+    cast_roles_default_role: CueRole,
+    preset_root: Path,
     on_empty: Callable[[], None] | None,
 ) -> None:
     pm = layer.pm
@@ -247,7 +377,11 @@ def _apply_timeline_preset_switching(
     pm.set_preset_start_clean(preset_start_clean)
 
     paths = _rotation_paths(
-        layer, rotation_set=rotation_set, user_presets=user_presets
+        layer,
+        rotation_set=rotation_set,
+        user_presets=user_presets,
+        preset_root=preset_root,
+        cast_roles_default_role=cast_roles_default_role,
     )
     if not paths:
         _clear_timeline_rotation(layer)
@@ -259,6 +393,9 @@ def _apply_timeline_preset_switching(
     anchor = _anchor_index(layer, paths)
     layer.rotation_anchor = anchor
     layer.timeline_switch_count = 0
+    layer.last_cast_role = (
+        cast_roles_default_role if rotation_set == "cast_roles" else None
+    )
     layer.preset_rotation = PresetRotation(
         paths=tuple(paths),
         shuffle=shuffle,
@@ -267,6 +404,24 @@ def _apply_timeline_preset_switching(
         ),
         anchor=anchor,
     )
+    if rotation_set == "cast_roles":
+        layer.role_rotations = _build_role_rotations(
+            layer,
+            preset_root,
+            shuffle=shuffle,
+            shuffle_salt=shuffle_salt,
+        )
+        default_rotation = layer.role_rotations.get(cast_roles_default_role)
+        if default_rotation is not None:
+            layer.preset_rotation = PresetRotation(
+                paths=default_rotation.paths,
+                shuffle=shuffle,
+                seed=default_rotation.seed,
+                anchor=0,
+            )
+            layer.rotation_anchor = 0
+    else:
+        layer.role_rotations = {}
     path = layer.preset_rotation.path_for(0)
     if path is None:
         return
@@ -277,10 +432,16 @@ def rebuild_timeline_preset_rotation_preserving_count(
     layer: StemLayer,
     *,
     rotation_set: PresetSwitchingRotationSet,
+    preset_root: Path,
     user_presets: list[str] | None = None,
     shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE,
     shuffle_salt: int = DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT,
     preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN,
+    cast_roles_default_role: CueRole = DEFAULT_CAST_ROLES_DEFAULT_ROLE,
+    cast_roles_timeline_behaviour: CastRolesTimelineBehaviour = (
+        DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR
+    ),
+    session=None,
 ) -> None:
     """Rebuild timeline rotation; keep anchor and switch count.
 
@@ -288,7 +449,11 @@ def rebuild_timeline_preset_rotation_preserving_count(
     active ``path_for(count)`` stays aligned with the playhead-derived count.
     """
     paths = _rotation_paths(
-        layer, rotation_set=rotation_set, user_presets=user_presets
+        layer,
+        rotation_set=rotation_set,
+        user_presets=user_presets,
+        preset_root=preset_root,
+        cast_roles_default_role=cast_roles_default_role,
     )
     if not paths:
         _clear_timeline_rotation(layer)
@@ -305,7 +470,43 @@ def rebuild_timeline_preset_rotation_preserving_count(
         ),
         anchor=anchor,
     )
-    path = layer.preset_rotation.path_for(count)
+    if rotation_set == "cast_roles":
+        layer.role_rotations = _build_role_rotations(
+            layer,
+            preset_root,
+            shuffle=shuffle,
+            shuffle_salt=shuffle_salt,
+        )
+        default_rotation = layer.role_rotations.get(cast_roles_default_role)
+        if default_rotation is not None:
+            layer.preset_rotation = PresetRotation(
+                paths=default_rotation.paths,
+                shuffle=shuffle,
+                seed=default_rotation.seed,
+                anchor=0,
+            )
+    else:
+        layer.role_rotations = {}
+        layer.last_cast_role = None
+
+    path: Path | None
+    if rotation_set == "cast_roles" and session is not None:
+        song_marker_fades, standard_fades, song_marker_times = _timeline_fade_groups(
+            session
+        )
+        lane = session.timeline.lanes.get(layer.slot) or empty_lane()
+        path = _cast_roles_path_for_count(
+            layer,
+            count=count,
+            lane=lane,
+            song_marker_times=song_marker_times,
+            song_marker_fades=song_marker_fades,
+            standard_fades=standard_fades,
+            behaviour=cast_roles_timeline_behaviour,
+            default_role=cast_roles_default_role,
+        )
+    else:
+        path = layer.preset_rotation.path_for(count)
     if path is None:
         return
     _load_timeline_preset(layer, path, preset_start_clean=preset_start_clean)
@@ -379,9 +580,26 @@ def advance_timeline_preset_switching(
         )
         if count == layer.timeline_switch_count:
             continue
-        path = rotation.path_for(count)
+        if runtime.preset_switching_rotation_set == "cast_roles":
+            path = _cast_roles_path_for_count(
+                layer,
+                count=count,
+                lane=lane,
+                song_marker_times=song_marker_times,
+                song_marker_fades=song_marker_fades,
+                standard_fades=standard_fades,
+                behaviour=runtime.cast_roles_timeline_behaviour,
+                default_role=runtime.cast_roles_default_role,
+            )
+        else:
+            path = _timeline_path_for_count(layer, count=count)
         layer.timeline_switch_count = count
         if path is None:
+            continue
+        if (
+            layer.auto_preset_path is not None
+            and path.resolve() == layer.auto_preset_path
+        ):
             continue
         _load_timeline_preset(
             layer,
@@ -408,6 +626,8 @@ def reanchor_timeline_preset_after_browse(
     user_presets: list[str] | None = None,
     shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE,
     shuffle_salt: int = DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT,
+    cast_roles_default_role: CueRole = DEFAULT_CAST_ROLES_DEFAULT_ROLE,
+    preset_root: Path | None = None,
 ) -> None:
     """Keep the browsed preset; next on-transition advances from the following entry."""
     pm = layer.pm
@@ -415,7 +635,11 @@ def reanchor_timeline_preset_after_browse(
     pm.set_hard_cut_enabled(False)
 
     paths = _rotation_paths(
-        layer, rotation_set=rotation_set, user_presets=user_presets
+        layer,
+        rotation_set=rotation_set,
+        user_presets=user_presets,
+        preset_root=preset_root,
+        cast_roles_default_role=cast_roles_default_role,
     )
     if not paths:
         _clear_timeline_rotation(layer)
@@ -463,11 +687,13 @@ def load_manual_preset_clean(
     then restores the layer's configured value for later auto-switch transitions.
     """
     pm = layer.pm
-    if layer.playlist.current is None:
+    current = layer.playlist.current
+    if current is None:
         return
     pm.set_preset_start_clean(True)
     layer.playlist.load_into(pm, smooth=False)
     pm.set_preset_start_clean(preset_start_clean)
+    layer.auto_preset_path = current.resolve()
 
 
 def sync_manual_browse_with_user_defined_rotation(layer: StemLayer) -> None:

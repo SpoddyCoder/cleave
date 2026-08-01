@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from cleave.config import CleaveConfig
+from cleave.cue_roles import CUE_ROLES, role_pool_paths
 from cleave.preset_playlist import milk_files_in_dir, scan_preset_playlist
 
 
@@ -32,6 +33,7 @@ def build_project_targets(cfg: CleaveConfig) -> ScanTargets:
     """Collect presets from on-disk config, matching live rotation set rules."""
     by_path: dict[Path, list[str]] = {}
     layer_sources: dict[str, tuple[Path, ...]] = {}
+    preset_root = cfg.paths.preset_root
 
     for slot in cfg.layer_z_order:
         layer = cfg.layers.get(slot)
@@ -52,10 +54,25 @@ def build_project_targets(cfg: CleaveConfig) -> ScanTargets:
 
         layer_sources[slot] = tuple(sources)
 
+    # Role pools under preset_root/roles/<role>/ are part of timeline casting.
+    role_slots = tuple(layer_sources)
+    for role in CUE_ROLES:
+        pool = role_pool_paths(preset_root, role)
+        if not pool:
+            continue
+        role_dir = pool[0].parent.resolve()
+        for slot in role_slots:
+            sources = list(layer_sources[slot])
+            if role_dir not in sources:
+                sources.append(role_dir)
+            layer_sources[slot] = tuple(sources)
+            for preset_path in pool:
+                _register_preset(by_path, preset_path, slot)
+
     presets = _finalize_presets(by_path)
     return ScanTargets(
         presets=presets,
-        preset_root=cfg.paths.preset_root.resolve(),
+        preset_root=preset_root.resolve(),
         texture_paths=tuple(p.resolve() for p in cfg.paths.texture_paths),
         layer_sources=layer_sources,
     )

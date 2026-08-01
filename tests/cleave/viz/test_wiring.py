@@ -128,7 +128,7 @@ def test_reapply_projectm_preset_switching_noop_in_curation_mode() -> None:
     with patch(
         "cleave.viz.preset_switching.apply_preset_switching"
     ) as mock_apply:
-        reapply_projectm_preset_switching(session, {"layer_1": layer}, delta_sec=5.0)
+        reapply_projectm_preset_switching(session, {"layer_1": layer}, preset_root=Path("/tmp/presets"), delta_sec=5.0)
     mock_apply.assert_not_called()
 
 

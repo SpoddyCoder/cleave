@@ -3,18 +3,23 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Literal
 
 import pygame
 
+from cleave.cue_roles import CueRole
 from cleave.extract import StemSource
 from cleave.timeline import (
+    LEVEL_EPS,
     SlotCue,
     TimelineFadeGroup,
     TimelineLane,
     empty_lane,
-    lane_fade_spans,
-    lane_segments,
+    lane_level_at,
+    lane_level_breakpoints,
     lane_tick_times,
+    levels_equal,
+    opening_cue,
     stem_abbreviation,
 )
 from cleave.viz.material_icons import visibility_icon_slot_width
@@ -57,6 +62,17 @@ from cleave.viz.ui_tint import blit_tint
 _timeline_ui = timeline_ui_metrics()
 TIMELINE_PANEL_GAP: int = _timeline_ui.panel_gap
 OFF_SEGMENT_COLOR: tuple[int, int, int] = (40, 40, 40)
+# Dim end of the level-bar colour ramp (quarter beds stay readable).
+_BAR_LEVEL_DIM: tuple[int, int, int] = tuple(
+    int(round(OFF_SEGMENT_COLOR[i] + (TIMELINE_BAR_ON[i] - OFF_SEGMENT_COLOR[i]) * 0.4))
+    for i in range(3)
+)
+_ROLE_GLYPH: dict[CueRole, str] = {
+    "bed": "B",
+    "pulse": "P",
+    "lead": "L",
+    "accent": "A",
+}
 
 
 def timeline_viewport_reserve_px(row_count: int, *, margin: int | None = None) -> int:
@@ -70,6 +86,11 @@ def timeline_viewport_reserve_px(row_count: int, *, margin: int | None = None) -
 BAR_VERTICAL_INSET: int = _timeline_ui.bar_vertical_inset
 ARMED_BG_ALPHA: int = 220
 CUE_TICK_ALPHA: int = 120
+CUE_TICK_WIDTH: int = 1
+# Settled selected tick (thinner than flash; still thicker than a normal cue tick).
+SELECTED_CUE_TICK_WIDTH: int = 3
+# Thick width while the selection flash is active.
+SELECTED_CUE_FLASH_TICK_WIDTH: int = 7
 PLAYHEAD_WIDTH: int = _timeline_ui.playhead_width
 REC_BADGE_GAP: int = _timeline_ui.rec_badge_gap
 REC_BADGE_PAD_X: int = _timeline_ui.rec_badge_pad_x
@@ -79,25 +100,35 @@ REC_FLASH_MS: int = 500
 PLAYHEAD_FLASH_MS: int = 400
 ARM_FLASH_HALF_MS: int = 150
 ARM_FLASH_DURATION_MS: int = ARM_FLASH_HALF_MS * 4
+# Selected-cue flash: same blink cadence as arm flash, held for 3s.
+SELECTED_CUE_FLASH_HALF_MS: int = ARM_FLASH_HALF_MS
+SELECTED_CUE_FLASH_DURATION_MS: int = 3000
+# Settled selected tick (HIGHLIGHT yellow); flash pulses yellow/red at flash width.
+SELECTED_CUE_COLOR: tuple[int, int, int] = HIGHLIGHT
+SELECTED_CUE_FLASH_YELLOW: tuple[int, int, int] = HIGHLIGHT
+SELECTED_CUE_FLASH_RED: tuple[int, int, int] = ARMED_BG
+# Clear half the flash tick plus 1px so glyphs sit beside the thick marker.
+ROLE_GLYPH_TICK_GAP: int = SELECTED_CUE_FLASH_TICK_WIDTH // 2 + 1
+ROLE_GLYPH_BOTTOM_PAD: int = 1
 
 
 @dataclass
 class TimelineViewState:
     layer_z_order: list[str]
     lanes: dict[str, TimelineLane]
-    defaults: dict[str, bool]
+    defaults: dict[str, float]
     position_sec: float
     duration_sec: float
     focus_row: int  # 0..N-1, index into layer_z_order (0 = bottom stem)
     monitor_visible: dict[str, bool]
-    timeline_visible: dict[str, bool]
+    timeline_level: dict[str, float]
     slot_stems: dict[str, StemSource] = field(default_factory=dict)
     override_slots: set[str] = field(default_factory=set)
     armed_slots: set[str] = field(default_factory=set)
     recording: bool = False
     record_start_sec: float | None = None
     record_slot_start_sec: dict[str, float] = field(default_factory=dict)
-    record_baseline: dict[str, bool] = field(default_factory=dict)
+    record_baseline: dict[str, float] = field(default_factory=dict)
     record_buffer: dict[str, list[SlotCue]] = field(default_factory=dict)
     record_high_water_mark: float | None = None
     enabled: bool = False
@@ -109,16 +140,9 @@ class TimelineViewState:
     selected_song_marker_index: int | None = None
     song_marker_fades: TimelineFadeGroup = field(default_factory=TimelineFadeGroup)
     standard_cue_fades: TimelineFadeGroup = field(default_factory=TimelineFadeGroup)
-
-
-def visibility_segments(
-    lane: TimelineLane,
-    duration_sec: float,
-    *,
-    inherit: bool,
-) -> list[tuple[float, float, bool]]:
-    """Return ``(start_t, end_t, visible)`` segments over ``[0, duration_sec]``."""
-    return lane_segments(lane, duration_sec, inherit=inherit)
+    selected_cue_t: dict[str, float] = field(default_factory=dict)
+    selected_cue_flash_start_ms: int | None = None
+    slot_rotation_sets: dict[str, str] = field(default_factory=dict)
 
 
 def cue_times_for_stem(
@@ -133,8 +157,8 @@ def _lane_for_view(state: TimelineViewState, slot: str) -> TimelineLane:
     return state.lanes.get(slot) or empty_lane()
 
 
-def _inherit_for_view(state: TimelineViewState, slot: str) -> bool:
-    return state.defaults.get(slot, True)
+def _inherit_for_view(state: TimelineViewState, slot: str) -> float:
+    return float(state.defaults.get(slot, 1.0))
 
 
 def _recording_view_lane(state: TimelineViewState, slot: str) -> TimelineLane:
@@ -144,32 +168,115 @@ def _recording_view_lane(state: TimelineViewState, slot: str) -> TimelineLane:
     )
 
 
-def _clip_segments(
-    segments: list[tuple[float, float, bool]],
-    range_start: float,
-    range_end: float,
-) -> list[tuple[float, float, bool]]:
-    clipped: list[tuple[float, float, bool]] = []
-    for start_t, end_t, visible in segments:
-        clip_start = max(start_t, range_start)
-        clip_end = min(end_t, range_end)
-        if clip_end > clip_start:
-            clipped.append((clip_start, clip_end, visible))
+def level_at_breakpoints(
+    breakpoints: list[tuple[float, float]],
+    t: float,
+) -> float:
+    """Linear level along a breakpoint polyline (strip geometry, not smoothstep)."""
+    if not breakpoints:
+        return 0.0
+    if t <= breakpoints[0][0]:
+        return float(breakpoints[0][1])
+    if t >= breakpoints[-1][0]:
+        return float(breakpoints[-1][1])
+    for index in range(len(breakpoints) - 1):
+        t0, v0 = breakpoints[index]
+        t1, v1 = breakpoints[index + 1]
+        # Half-open [t0, t1) so a hard step at t1 wins over the prior segment end.
+        if t >= t1:
+            continue
+        if t1 <= t0:
+            last = index + 1
+            while (
+                last + 1 < len(breakpoints)
+                and breakpoints[last + 1][0] <= t0
+            ):
+                last += 1
+            return float(breakpoints[last][1])
+        u = (t - t0) / (t1 - t0)
+        return float(v0 + (v1 - v0) * u)
+    return float(breakpoints[-1][1])
+
+
+def clip_breakpoints(
+    breakpoints: list[tuple[float, float]],
+    start: float,
+    end: float,
+) -> list[tuple[float, float]]:
+    """Clip a breakpoint polyline to ``[start, end]``, interpolating at the edges."""
+    if end <= start or not breakpoints:
+        return []
+    clipped: list[tuple[float, float]] = [
+        (start, level_at_breakpoints(breakpoints, start))
+    ]
+    for t, level in breakpoints:
+        if start < t < end:
+            clipped.append((float(t), float(level)))
+    end_level = level_at_breakpoints(breakpoints, end)
+    if clipped[-1][0] < end:
+        clipped.append((end, end_level))
+    elif not levels_equal(clipped[-1][1], end_level):
+        clipped[-1] = (end, end_level)
     return clipped
 
 
-def bar_segments_for_row(
+def _span_breakpoints_for_lane(
+    state: TimelineViewState,
+    lane: TimelineLane,
+    *,
+    inherit: float,
+    duration_sec: float,
+) -> list[tuple[float, float]]:
+    """Breakpoints covering ``[0, duration_sec]`` for strip drawing."""
+    if duration_sec <= 0.0:
+        return []
+    breakpoints = lane_level_breakpoints(
+        lane,
+        inherit=inherit,
+        song_marker_fades=state.song_marker_fades,
+        standard_fades=state.standard_cue_fades,
+        duration_sec=duration_sec,
+        song_marker_times=state.song_marker_times,
+    )
+    if not breakpoints:
+        level = inherit if lane.baseline is None else float(lane.baseline)
+        return [(0.0, level), (duration_sec, level)]
+    spanned = list(breakpoints)
+    if spanned[0][0] > 0.0:
+        spanned.insert(0, (0.0, spanned[0][1]))
+    if spanned[-1][0] < duration_sec:
+        spanned.append((duration_sec, spanned[-1][1]))
+    return spanned
+
+
+def _extend_breakpoints(
+    dest: list[tuple[float, float]],
+    more: list[tuple[float, float]],
+) -> None:
+    for t, level in more:
+        if (
+            dest
+            and dest[-1][0] == t
+            and levels_equal(dest[-1][1], level)
+        ):
+            continue
+        dest.append((t, level))
+
+
+def bar_level_breakpoints_for_row(
     state: TimelineViewState,
     slot: str,
-) -> list[tuple[float, float, bool]]:
-    """Visibility segments for one timeline row, including live record preview."""
+) -> list[tuple[float, float]]:
+    """Level breakpoints for one timeline row, including live record preview."""
     duration = state.duration_sec
     if duration <= 0:
         return []
     inherit = _inherit_for_view(state, slot)
     lane = _lane_for_view(state, slot)
     if not (state.recording and slot in state.record_baseline):
-        return visibility_segments(lane, duration, inherit=inherit)
+        return _span_breakpoints_for_lane(
+            state, lane, inherit=inherit, duration_sec=duration
+        )
 
     record_start = state.record_slot_start_sec.get(slot, state.record_start_sec)
     if record_start is None:
@@ -177,150 +284,214 @@ def bar_segments_for_row(
     record_start = max(0.0, min(record_start, duration))
     playhead = max(0.0, min(state.position_sec, duration))
 
-    segments: list[tuple[float, float, bool]] = []
-    committed = visibility_segments(lane, duration, inherit=inherit)
+    committed = _span_breakpoints_for_lane(
+        state, lane, inherit=inherit, duration_sec=duration
+    )
+    result: list[tuple[float, float]] = []
 
     if record_start > 0.0:
-        segments.extend(_clip_segments(committed, 0.0, record_start))
+        _extend_breakpoints(result, clip_breakpoints(committed, 0.0, record_start))
 
     effective_end = max(playhead, state.record_high_water_mark or 0.0)
     if effective_end > record_start:
-        segments.extend(
-            _clip_segments(
-                visibility_segments(
-                    _recording_view_lane(state, slot),
-                    effective_end,
-                    inherit=True,
-                ),
-                record_start,
-                effective_end,
-            )
+        live = _span_breakpoints_for_lane(
+            state,
+            _recording_view_lane(state, slot),
+            inherit=1.0,
+            duration_sec=effective_end,
+        )
+        _extend_breakpoints(
+            result, clip_breakpoints(live, record_start, effective_end)
         )
 
     if effective_end < duration:
-        segments.extend(_clip_segments(committed, effective_end, duration))
-    return segments
+        _extend_breakpoints(
+            result, clip_breakpoints(committed, effective_end, duration)
+        )
+    return result
 
 
-def bar_tick_times_for_row(state: TimelineViewState, slot: str) -> list[float]:
-    """Cue tick times for one timeline row."""
+def bar_cues_for_row(state: TimelineViewState, slot: str) -> list[SlotCue]:
+    """Cues whose ticks are drawn for one timeline row.
+
+    Includes a synthetic ``t=0`` cue when the opening period is on via baseline
+    only, so the first section can be selected for cast/blend.
+    """
     duration = state.duration_sec
     lane = _lane_for_view(state, slot)
     if not (state.recording and slot in state.record_baseline):
-        return cue_times_for_stem(lane, duration)
+        cues = [cue for cue in lane.cues if 0.0 <= cue.t <= duration]
+        synthetic = opening_cue(lane)
+        if synthetic is not None and duration >= 0.0:
+            cues = [synthetic, *cues]
+        return cues
 
     record_start = state.record_slot_start_sec.get(slot, state.record_start_sec)
     if record_start is None:
         record_start = state.position_sec
     playhead = state.position_sec
     effective_end = max(playhead, state.record_high_water_mark or 0.0)
-    committed_ticks = [
-        t
-        for t in cue_times_for_stem(lane, duration)
-        if t < record_start or t > effective_end
+    committed = [
+        cue
+        for cue in lane.cues
+        if 0.0 <= cue.t <= duration
+        and (cue.t < record_start or cue.t > effective_end)
     ]
-    live_ticks = [
-        t
-        for t in cue_times_for_stem(_recording_view_lane(state, slot), duration)
-        if record_start <= t <= effective_end
+    live = [
+        cue
+        for cue in _recording_view_lane(state, slot).cues
+        if record_start <= cue.t <= effective_end and cue.t <= duration
     ]
-    return sorted(set(committed_ticks) | set(live_ticks))
+    by_t = {cue.t: cue for cue in committed}
+    for cue in live:
+        by_t[cue.t] = cue
+    synthetic = opening_cue(lane)
+    if synthetic is not None and 0.0 not in by_t and duration >= 0.0:
+        by_t[0.0] = synthetic
+    return [by_t[t] for t in sorted(by_t)]
 
 
-def _clip_fade_spans(
-    spans: list[tuple[float, float, str]],
-    range_start: float,
-    range_end: float,
-) -> list[tuple[float, float, str]]:
-    clipped: list[tuple[float, float, str]] = []
-    for t0, t1, kind in spans:
-        clip_start = max(t0, range_start)
-        clip_end = min(t1, range_end)
-        if clip_end > clip_start:
-            clipped.append((clip_start, clip_end, kind))
-    return clipped
+def bar_tick_times_for_row(state: TimelineViewState, slot: str) -> list[float]:
+    """Cue tick times for one timeline row."""
+    return [cue.t for cue in bar_cues_for_row(state, slot)]
 
 
-def _fades_active(state: TimelineViewState) -> bool:
-    return state.song_marker_fades.enabled or state.standard_cue_fades.enabled
+def selected_cue_readout_segments(
+    cue: SlotCue,
+    *,
+    show_cast: bool = False,
+) -> list[tuple[str, tuple[int, int, int]]]:
+    """Label/value segments for the selected-cue badge readout."""
+    blend = cue.blend if cue.blend is not None else "-"
+    opacity_pct = int(round(float(cue.level) * 100.0))
+    segments: list[tuple[str, tuple[int, int, int]]] = [
+        (f"[{format_mmss(cue.t)}] ", VALUE),
+        ("opacity: ", LABEL),
+        (f"{opacity_pct}% ", VALUE),
+        ("blend: ", LABEL),
+        (f"{blend}" if not show_cast else f"{blend} ", VALUE),
+    ]
+    if show_cast:
+        cast = cue.role if cue.role is not None else "-"
+        segments.extend(
+            [
+                ("cast: ", LABEL),
+                (str(cast), VALUE),
+            ]
+        )
+    return segments
 
 
-def _fade_spans_for_lane(
-    state: TimelineViewState,
-    lane: TimelineLane,
-    slot: str,
-) -> list[tuple[float, float, str]]:
-    return lane_fade_spans(
-        lane,
-        inherit=_inherit_for_view(state, slot),
-        song_marker_fades=state.song_marker_fades,
-        standard_fades=state.standard_cue_fades,
-        duration_sec=state.duration_sec,
-        song_marker_times=state.song_marker_times,
+def selected_cue_readout_text(cue: SlotCue, *, show_cast: bool = False) -> str:
+    """Plain-text form of the selected-cue badge readout."""
+    return "".join(
+        text for text, _ in selected_cue_readout_segments(cue, show_cast=show_cast)
     )
 
 
-def bar_fade_spans_for_row(
-    state: TimelineViewState,
-    slot: str,
-) -> list[tuple[float, float, str]]:
-    """Fade wedge spans for one timeline row, including live record preview."""
-    duration = state.duration_sec
-    if duration <= 0 or not _fades_active(state):
-        return []
+def render_selected_cue_readout(
+    font: pygame.font.Font, cue: SlotCue, *, show_cast: bool = False
+) -> pygame.Surface:
+    """Badge-strip surface: LABEL prefixes, VALUE for time and field values."""
+    surfs = [
+        font.render(text, True, color)
+        for text, color in selected_cue_readout_segments(cue, show_cast=show_cast)
+    ]
+    width = sum(surf.get_width() for surf in surfs)
+    height = max((surf.get_height() for surf in surfs), default=0)
+    out = pygame.Surface((width, height), pygame.SRCALPHA)
+    x = 0
+    for surf in surfs:
+        out.blit(surf, (x, 0))
+        x += surf.get_width()
+    return out
+
+
+def _selected_cue_for_focus(state: TimelineViewState) -> SlotCue | None:
+    if not state.layer_z_order:
+        return None
+    focus = state.focus_row
+    if focus < 0 or focus >= len(state.layer_z_order):
+        return None
+    slot = state.layer_z_order[focus]
+    selected_t = state.selected_cue_t.get(slot)
+    if selected_t is None:
+        return None
+    for cue in bar_cues_for_row(state, slot):
+        if cue.t == selected_t:
+            return cue
     lane = _lane_for_view(state, slot)
-    if not (state.recording and slot in state.record_baseline):
-        return _fade_spans_for_lane(state, lane, slot)
-
-    record_start = state.record_slot_start_sec.get(slot, state.record_start_sec)
-    if record_start is None:
-        record_start = state.position_sec
-    record_start = max(0.0, min(record_start, duration))
-    playhead = max(0.0, min(state.position_sec, duration))
-    effective_end = max(playhead, state.record_high_water_mark or 0.0)
-
-    spans: list[tuple[float, float, str]] = []
-    committed_spans = _fade_spans_for_lane(state, lane, slot)
-    if record_start > 0.0:
-        spans.extend(_clip_fade_spans(committed_spans, 0.0, record_start))
-    if effective_end > record_start:
-        live_spans = lane_fade_spans(
-            _recording_view_lane(state, slot),
-            inherit=True,
-            song_marker_fades=state.song_marker_fades,
-            standard_fades=state.standard_cue_fades,
-            duration_sec=state.duration_sec,
-            song_marker_times=state.song_marker_times,
-        )
-        spans.extend(_clip_fade_spans(live_spans, record_start, effective_end))
-    if effective_end < duration:
-        spans.extend(_clip_fade_spans(committed_spans, effective_end, duration))
-    return spans
+    for cue in lane.cues:
+        if cue.t == selected_t:
+            return cue
+    return None
 
 
-def _draw_fade_wedge(
+def _lerp_rgb(
+    a: tuple[int, int, int],
+    b: tuple[int, int, int],
+    t: float,
+) -> tuple[int, int, int]:
+    u = max(0.0, min(1.0, float(t)))
+    return (
+        int(round(a[0] + (b[0] - a[0]) * u)),
+        int(round(a[1] + (b[1] - a[1]) * u)),
+        int(round(a[2] + (b[2] - a[2]) * u)),
+    )
+
+
+def bar_level_y(bar_rect: pygame.Rect, level: float) -> int:
+    """Y of the top of a bottom-filled level within ``bar_rect``."""
+    filled = max(0.0, min(1.0, float(level))) * bar_rect.h
+    return bar_rect.bottom - int(round(filled))
+
+
+def _draw_level_bar(
     panel: pygame.Surface,
     *,
-    t0: float,
-    t1: float,
-    kind: str,
+    breakpoints: list[tuple[float, float]],
     bar_left: int,
     bar_width: int,
     duration_sec: float,
     bar_rect: pygame.Rect,
-    color: tuple[int, int, int],
 ) -> None:
-    x0 = time_to_x(t0, bar_left, bar_width, duration_sec)
-    x1 = time_to_x(t1, bar_left, bar_width, duration_sec)
-    if x1 <= x0:
+    pygame.draw.rect(panel, OFF_SEGMENT_COLOR, bar_rect)
+    if duration_sec <= 0.0 or len(breakpoints) < 2:
         return
-    top = bar_rect.y
-    bottom = bar_rect.bottom - 1
-    if kind == "in":
-        points = [(x0, bottom), (x1, bottom), (x1, top)]
-    else:
-        points = [(x0, top), (x0, bottom), (x1, bottom)]
-    pygame.draw.polygon(panel, color, points)
+    bottom = bar_rect.bottom
+    for index in range(len(breakpoints) - 1):
+        t0, level0 = breakpoints[index]
+        t1, level1 = breakpoints[index + 1]
+        if t1 <= t0:
+            continue
+        x0 = time_to_x(t0, bar_left, bar_width, duration_sec)
+        x1 = time_to_x(t1, bar_left, bar_width, duration_sec)
+        if x1 <= x0:
+            continue
+        if level0 <= LEVEL_EPS and level1 <= LEVEL_EPS:
+            continue
+        y0 = bar_level_y(bar_rect, level0)
+        y1 = bar_level_y(bar_rect, level1)
+        mean_level = 0.5 * (level0 + level1)
+        color = _lerp_rgb(_BAR_LEVEL_DIM, TIMELINE_BAR_ON, mean_level)
+        pygame.draw.polygon(
+            panel,
+            color,
+            [(x0, y0), (x1, y1), (x1, bottom), (x0, bottom)],
+        )
+
+
+def _render_committed_level_icon(level: float, *, line_height: int) -> pygame.Surface:
+    """Far-right committed eye: full at 1.0, dimmed when partial, DISABLED at 0."""
+    if level <= LEVEL_EPS:
+        return render_visibility_icon(enabled=False, line_height=line_height)
+    icon = render_visibility_icon(enabled=True, line_height=line_height)
+    if level >= 1.0 - LEVEL_EPS:
+        return icon
+    faded = icon.copy()
+    alpha = max(1, min(255, int(round(level * 255))))
+    faded.fill((255, 255, 255, alpha), special_flags=pygame.BLEND_RGBA_MULT)
+    return faded
 
 
 def rec_flash_visible(ticks_ms: int | None = None) -> bool:
@@ -357,6 +528,19 @@ def prune_expired_arm_flashes(
         flash_starts.pop(slot, None)
 
 
+def prune_expired_selected_cue_flash(
+    flash_start_ms: int | None,
+    ticks_ms: int | None = None,
+) -> int | None:
+    if flash_start_ms is None:
+        return None
+    if ticks_ms is None:
+        ticks_ms = pygame.time.get_ticks()
+    if ticks_ms - flash_start_ms >= SELECTED_CUE_FLASH_DURATION_MS:
+        return None
+    return flash_start_ms
+
+
 def arm_abbrev_flash_active(
     flash_starts: dict[str, int],
     slot: str,
@@ -384,6 +568,42 @@ def arm_abbrev_flash_visible(
     return (elapsed // ARM_FLASH_HALF_MS) % 2 == 0
 
 
+def selected_cue_flash_active(
+    flash_start_ms: int | None,
+    ticks_ms: int | None = None,
+) -> bool:
+    if flash_start_ms is None:
+        return False
+    if ticks_ms is None:
+        ticks_ms = pygame.time.get_ticks()
+    return ticks_ms - flash_start_ms < SELECTED_CUE_FLASH_DURATION_MS
+
+
+def selected_cue_flash_bright(
+    flash_start_ms: int | None,
+    ticks_ms: int | None = None,
+) -> bool:
+    """True on the yellow (HIGHLIGHT) half of the selected-cue blink cycle."""
+    if not selected_cue_flash_active(flash_start_ms, ticks_ms=ticks_ms):
+        return False
+    if ticks_ms is None:
+        ticks_ms = pygame.time.get_ticks()
+    assert flash_start_ms is not None
+    elapsed = ticks_ms - flash_start_ms
+    return (elapsed // SELECTED_CUE_FLASH_HALF_MS) % 2 == 0
+
+
+def selected_cue_tick_color(
+    flash_start_ms: int | None,
+    ticks_ms: int | None = None,
+) -> tuple[int, int, int]:
+    if selected_cue_flash_bright(flash_start_ms, ticks_ms=ticks_ms):
+        return SELECTED_CUE_FLASH_YELLOW
+    if selected_cue_flash_active(flash_start_ms, ticks_ms=ticks_ms):
+        return SELECTED_CUE_FLASH_RED
+    return SELECTED_CUE_COLOR
+
+
 def armed_abbrev_bg_visible(
     *,
     armed: bool,
@@ -395,6 +615,118 @@ def armed_abbrev_bg_visible(
     if arm_abbrev_flash_active(flash_starts, slot, ticks_ms=ticks_ms):
         return arm_abbrev_flash_visible(flash_starts, slot, ticks_ms=ticks_ms)
     return armed and (not recording or rec_flash_visible(ticks_ms))
+
+
+def blit_role_glyph_xor(
+    panel: pygame.Surface,
+    glyph: str,
+    *,
+    x: int,
+    y: int,
+    font: pygame.font.Font,
+) -> tuple[int, int, int, int] | None:
+    """Bold role letter via per-pixel RGB XOR (pygame 2.6 has no ``BLEND_XOR``).
+
+    Opaque glyph samples invert the destination RGB so the letter stays readable
+    on both bright level bars and dark beds. Returns the touched panel rect, or
+    ``None`` when the glyph is fully clipped.
+    """
+    src = font.render(glyph, True, (255, 255, 255))
+    gw, gh = src.get_width(), src.get_height()
+    if gw <= 0 or gh <= 0:
+        return None
+    dest_rect = pygame.Rect(x, y, gw, gh).clip(panel.get_rect())
+    if dest_rect.w <= 0 or dest_rect.h <= 0:
+        return None
+    src_x = dest_rect.x - x
+    src_y = dest_rect.y - y
+    src_view = src.subsurface((src_x, src_y, dest_rect.w, dest_rect.h))
+    # surfarray axes are (x, y); threshold soft edges to a binary XOR mask.
+    # Manual XOR: pygame 2.6 exposes no BLEND_XOR blit flag.
+    dest_rgb = pygame.surfarray.pixels3d(panel)
+    alpha = pygame.surfarray.array_alpha(src_view)
+    x0, y0 = dest_rect.x, dest_rect.y
+    region = dest_rgb[x0 : x0 + dest_rect.w, y0 : y0 + dest_rect.h]
+    mask = alpha > 127
+    region[mask] ^= 255
+    del dest_rgb
+    return (dest_rect.x, dest_rect.y, dest_rect.w, dest_rect.h)
+
+
+def role_glyph_side(*, previous_level: float, cue_level: float) -> Literal["left", "right"]:
+    """Which side of the cue tick hosts the role glyph (enabled segment).
+
+    On cues (off -> on) place right; off cues (on -> off) place left. When both
+    sides are enabled, prefer right (toward the new state). When both are off,
+    prefer right as a stable default.
+    """
+    prev_on = float(previous_level) > LEVEL_EPS
+    next_on = float(cue_level) > LEVEL_EPS
+    if next_on and not prev_on:
+        return "right"
+    if prev_on and not next_on:
+        return "left"
+    if next_on:
+        return "right"
+    if prev_on:
+        return "left"
+    return "right"
+
+
+def role_glyph_previous_level(
+    lane: TimelineLane,
+    cue_t: float,
+    *,
+    inherit: float,
+) -> float:
+    """Stepped lane level immediately before ``cue_t``."""
+    if cue_t <= 0.0:
+        return inherit if lane.baseline is None else float(lane.baseline)
+    return float(lane_level_at(lane, cue_t - 1e-9, inherit=inherit))
+
+
+def role_glyph_anchor(
+    *,
+    tick_x: int,
+    bar_rect: pygame.Rect,
+    glyph_w: int,
+    glyph_h: int,
+    side: Literal["left", "right"],
+) -> tuple[int, int]:
+    """Top-left of a role glyph at the bar bottom, beside its cue tick."""
+    if side == "right":
+        glyph_x = tick_x + ROLE_GLYPH_TICK_GAP
+    else:
+        glyph_x = tick_x - ROLE_GLYPH_TICK_GAP - glyph_w
+    glyph_y = bar_rect.bottom - glyph_h - ROLE_GLYPH_BOTTOM_PAD
+    max_x = bar_rect.right - glyph_w
+    if max_x >= bar_rect.left:
+        glyph_x = max(bar_rect.left, min(glyph_x, max_x))
+    else:
+        glyph_x = bar_rect.left
+    max_y = bar_rect.bottom - glyph_h
+    if max_y >= bar_rect.top:
+        glyph_y = max(bar_rect.top, min(glyph_y, max_y))
+    else:
+        glyph_y = bar_rect.top
+    return glyph_x, glyph_y
+
+
+def _glyph_lane_for_cue(
+    state: TimelineViewState,
+    slot: str,
+    cue_t: float,
+) -> tuple[TimelineLane, float]:
+    """Lane and inherit used for stepped previous-level at a drawn cue."""
+    inherit = _inherit_for_view(state, slot)
+    if state.recording and slot in state.record_baseline:
+        record_start = state.record_slot_start_sec.get(slot, state.record_start_sec)
+        if record_start is None:
+            record_start = state.position_sec
+        effective_end = max(state.position_sec, state.record_high_water_mark or 0.0)
+        if record_start <= cue_t <= effective_end:
+            return _recording_view_lane(state, slot), 1.0
+    return _lane_for_view(state, slot), inherit
 
 
 def time_to_x(t_sec: float, bar_left: int, bar_width: int, duration_sec: float) -> int:
@@ -520,6 +852,7 @@ class TimelineOverlay:
         self._padding = padding
         self._row_gap = row_gap
         self._font: pygame.font.Font | None = None
+        self._bold_font: pygame.font.Font | None = None
         self._panel_rect: tuple[int, int, int, int] | None = None
         self._header_badge_rect: tuple[int, int, int, int] | None = None
         self._layer_num_width: int = 0
@@ -535,6 +868,13 @@ class TimelineOverlay:
         if self._font is None:
             self._font = pygame.font.SysFont("monospace", self._font_size)
         return self._font
+
+    def _bold_font_get(self) -> pygame.font.Font:
+        if self._bold_font is None:
+            self._bold_font = pygame.font.SysFont(
+                "monospace", self._font_size, bold=True
+            )
+        return self._bold_font
 
     @property
     def gpu_state(self):
@@ -685,7 +1025,7 @@ class TimelineOverlay:
             panel.blit(abbrev_surf, (stem_abbrev_x, abbrev_y))
 
             monitor_enabled = state.monitor_visible.get(slot, True)
-            timeline_enabled = state.timeline_visible.get(slot, True)
+            timeline_level = float(state.timeline_level.get(slot, 1.0))
             monitor_override = (
                 slot in state.override_slots
                 and not (state.recording and armed)
@@ -697,10 +1037,8 @@ class TimelineOverlay:
                     line_height=row_h,
                 )
                 panel.blit(monitor_icon, (monitor_eye_x, row_y))
-            timeline_icon = render_visibility_icon(
-                enabled=timeline_enabled,
-                solo=False,
-                line_height=row_h,
+            timeline_icon = _render_committed_level_icon(
+                timeline_level, line_height=row_h
             )
             panel.blit(timeline_icon, (timeline_eye_x, row_y))
 
@@ -708,37 +1046,42 @@ class TimelineOverlay:
             if focused:
                 blit_tint(panel, bar_column_rect, HIGHLIGHT)
 
-            for start_t, end_t, visible in bar_segments_for_row(state, slot):
-                x0 = time_to_x(start_t, bar_left, bar_width, state.duration_sec)
-                x1 = time_to_x(end_t, bar_left, bar_width, state.duration_sec)
-                if x1 <= x0:
-                    continue
-                color = TIMELINE_BAR_ON if visible else OFF_SEGMENT_COLOR
-                seg_rect = pygame.Rect(x0, bar_rect.y, max(1, x1 - x0), bar_rect.h)
-                pygame.draw.rect(panel, color, seg_rect)
+            _draw_level_bar(
+                panel,
+                breakpoints=bar_level_breakpoints_for_row(state, slot),
+                bar_left=bar_left,
+                bar_width=bar_width,
+                duration_sec=state.duration_sec,
+                bar_rect=bar_rect,
+            )
 
-            for t0, t1, kind in bar_fade_spans_for_row(state, slot):
-                _draw_fade_wedge(
-                    panel,
-                    t0=t0,
-                    t1=t1,
-                    kind=kind,
-                    bar_left=bar_left,
-                    bar_width=bar_width,
-                    duration_sec=state.duration_sec,
-                    bar_rect=bar_rect,
-                    color=TIMELINE_BAR_ON,
-                )
-
-            for cue_t in bar_tick_times_for_row(state, slot):
-                tick_x = time_to_x(cue_t, bar_left, bar_width, state.duration_sec)
-                pygame.draw.line(
-                    panel,
-                    (*LABEL, CUE_TICK_ALPHA),
-                    (tick_x, bar_rect.y),
-                    (tick_x, bar_rect.bottom - 1),
-                    1,
-                )
+            row_cues = bar_cues_for_row(state, slot)
+            # Per-slot selection memory stays in selected_cue_t; only the focused
+            # row draws the selected marker (settled yellow / flash / badge).
+            selected_t = (
+                state.selected_cue_t.get(slot)
+                if row_index == state.focus_row
+                else None
+            )
+            for cue in row_cues:
+                tick_x = time_to_x(cue.t, bar_left, bar_width, state.duration_sec)
+                selected = selected_t is not None and cue.t == selected_t
+                if selected:
+                    pygame.draw.line(
+                        panel,
+                        SELECTED_CUE_COLOR,
+                        (tick_x, row_y),
+                        (tick_x, row_y + row_h - 1),
+                        SELECTED_CUE_TICK_WIDTH,
+                    )
+                else:
+                    pygame.draw.line(
+                        panel,
+                        (*LABEL, CUE_TICK_ALPHA),
+                        (tick_x, bar_rect.y),
+                        (tick_x, bar_rect.bottom - 1),
+                        CUE_TICK_WIDTH,
+                    )
 
             if focused and BAR_VERTICAL_INSET > 0:
                 blit_tint(
@@ -776,6 +1119,61 @@ class TimelineOverlay:
                 width=BORDER_WIDTH,
             )
         return panel
+
+    def _draw_role_glyphs(
+        self,
+        surface: pygame.Surface,
+        state: TimelineViewState,
+        layout: _TimelineLayout,
+        *,
+        y_offset: int = 0,
+    ) -> list[tuple[int, int, int, int]]:
+        """XOR role letters after bars/ticks/markers/playhead so they stay on top."""
+        bold_font = self._bold_font_get()
+        dirty: list[tuple[int, int, int, int]] = []
+        row_h = layout.row_h
+        for display_i, slot in enumerate(state.layer_z_order):
+            row_y = self._row_y(display_i, row_h)
+            bar_rect = pygame.Rect(
+                layout.bar_left,
+                row_y + BAR_VERTICAL_INSET,
+                layout.bar_width,
+                max(1, row_h - BAR_VERTICAL_INSET * 2),
+            )
+            if state.slot_rotation_sets.get(slot) != "cast_roles":
+                continue
+            for cue in bar_cues_for_row(state, slot):
+                if cue.role is None or cue.level <= LEVEL_EPS:
+                    continue
+                letter = _ROLE_GLYPH.get(cue.role)
+                if letter is None:
+                    continue
+                lane, inherit = _glyph_lane_for_cue(state, slot, cue.t)
+                previous = role_glyph_previous_level(lane, cue.t, inherit=inherit)
+                side = role_glyph_side(
+                    previous_level=previous, cue_level=cue.level
+                )
+                tick_x = time_to_x(
+                    cue.t, layout.bar_left, layout.bar_width, state.duration_sec
+                )
+                glyph_w, glyph_h = bold_font.size(letter)
+                glyph_x, glyph_y = role_glyph_anchor(
+                    tick_x=tick_x,
+                    bar_rect=bar_rect,
+                    glyph_w=glyph_w,
+                    glyph_h=glyph_h,
+                    side=side,
+                )
+                touched = blit_role_glyph_xor(
+                    surface,
+                    letter,
+                    x=glyph_x,
+                    y=glyph_y + y_offset,
+                    font=bold_font,
+                )
+                if touched is not None:
+                    dirty.append(touched)
+        return dirty
 
     def _row_y(self, display_i: int, row_h: int) -> int:
         return self._padding + display_i * (row_h + self._row_gap)
@@ -864,10 +1262,50 @@ class TimelineOverlay:
         )
         upload.blit(monitor_icon, (monitor_eye_x, upload_y))
         dirty.append(monitor_rect)
+
+        selected_t = (
+            state.selected_cue_t.get(slot) if row_index == state.focus_row else None
+        )
+        if selected_t is not None and selected_cue_flash_active(
+            state.selected_cue_flash_start_ms
+        ):
+            tick_x = time_to_x(
+                selected_t, layout.bar_left, layout.bar_width, state.duration_sec
+            )
+            half_w = SELECTED_CUE_FLASH_TICK_WIDTH // 2 + 1
+            tick_rect = (
+                max(layout.bar_left, tick_x - half_w),
+                upload_y,
+                min(layout.bar_width, half_w * 2 + 1),
+                row_h,
+            )
+            # Clamp width if tick sits near the bar edge.
+            tick_rect = (
+                tick_rect[0],
+                tick_rect[1],
+                min(tick_rect[2], layout.bar_left + layout.bar_width - tick_rect[0]),
+                tick_rect[3],
+            )
+            if tick_rect[2] > 0:
+                self._restore_upload_rect_from_static(
+                    upload,
+                    static_panel,
+                    tick_rect,
+                    panel_y_offset=panel_y_offset,
+                )
+                pygame.draw.line(
+                    upload,
+                    selected_cue_tick_color(state.selected_cue_flash_start_ms),
+                    (tick_x, upload_y),
+                    (tick_x, upload_y + row_h - 1),
+                    SELECTED_CUE_FLASH_TICK_WIDTH,
+                )
+                dirty.append(tick_rect)
         return dirty
 
     def _live_flash_row_indices(self, state: TimelineViewState) -> tuple[int, ...]:
         indices: list[int] = []
+        cue_flash = selected_cue_flash_active(state.selected_cue_flash_start_ms)
         for row_index, slot in enumerate(state.layer_z_order):
             armed = slot in state.armed_slots
             if arm_abbrev_flash_active(state.arm_flash_start_ms, slot):
@@ -876,10 +1314,21 @@ class TimelineOverlay:
                 indices.append(row_index)
             elif armed and not state.recording:
                 indices.append(row_index)
+            elif (
+                cue_flash
+                and row_index == state.focus_row
+                and slot in state.selected_cue_t
+            ):
+                indices.append(row_index)
         return tuple(indices)
 
     def _live_flash_signature(self, state: TimelineViewState) -> tuple:
         parts: list[tuple] = []
+        cue_flash_bright = (
+            selected_cue_flash_bright(state.selected_cue_flash_start_ms)
+            if selected_cue_flash_active(state.selected_cue_flash_start_ms)
+            else None
+        )
         for row_index in self._live_flash_row_indices(state):
             slot = state.layer_z_order[row_index]
             armed = slot in state.armed_slots
@@ -895,6 +1344,17 @@ class TimelineOverlay:
                     (
                         (slot in state.override_slots and not (state.recording and armed))
                         or (state.recording and armed and rec_flash_visible())
+                    ),
+                    (
+                        state.selected_cue_t.get(slot)
+                        if cue_flash_bright is not None
+                        and row_index == state.focus_row
+                        else None
+                    ),
+                    (
+                        cue_flash_bright
+                        if row_index == state.focus_row and slot in state.selected_cue_t
+                        else None
                     ),
                 )
             )
@@ -949,6 +1409,7 @@ class TimelineOverlay:
         recording: bool,
         *,
         y_offset: int = 0,
+        cue_readout: pygame.Surface | None = None,
     ) -> tuple[int, int, int, int]:
         time_surf = font.render(transport_time_text(position_sec), True, VALUE)
         time_w = time_surf.get_width() + REC_BADGE_PAD_X * 2
@@ -962,9 +1423,20 @@ class TimelineOverlay:
 
         badge_h = time_h
         gap = REC_TIME_GAP if recording else 0
-        total_w = time_w + gap + rec_w
+        right_w = time_w + gap + rec_w
         time_x = panel_w - time_w
         badge_y = y_offset
+
+        readout_w = 0
+        if cue_readout is not None:
+            readout_w = cue_readout.get_width() + REC_BADGE_PAD_X * 2
+            pygame.draw.rect(
+                surface, BACKGROUND, (0, badge_y, readout_w, badge_h)
+            )
+            surface.blit(
+                cue_readout,
+                (REC_BADGE_PAD_X, badge_y + REC_BADGE_PAD_Y),
+            )
 
         pygame.draw.rect(surface, BACKGROUND, (time_x, badge_y, time_w, badge_h))
         surface.blit(
@@ -983,7 +1455,9 @@ class TimelineOverlay:
                 (rec_x + REC_BADGE_PAD_X, badge_y + REC_BADGE_PAD_Y),
             )
 
-        return (header_x, badge_y, total_w, badge_h)
+        if readout_w > 0:
+            return (0, badge_y, panel_w, badge_h)
+        return (header_x, badge_y, right_w, badge_h)
 
     def _ensure_upload_scratch(
         self,
@@ -1036,6 +1510,21 @@ class TimelineOverlay:
             bx, by, bw, bh = cache.last_badge_rect
             upload.fill((0, 0, 0, 0), (bx, by, bw, bh))
 
+        selected_cue = _selected_cue_for_focus(state)
+        focused_slot = (
+            state.layer_z_order[state.focus_row]
+            if 0 <= state.focus_row < len(state.layer_z_order)
+            else None
+        )
+        show_cast = (
+            focused_slot is not None
+            and state.slot_rotation_sets.get(focused_slot) == "cast_roles"
+        )
+        cue_readout = (
+            render_selected_cue_readout(font, selected_cue, show_cast=show_cast)
+            if selected_cue is not None
+            else None
+        )
         badge_rect = self._draw_header_badges_on_surface(
             upload,
             font,
@@ -1043,6 +1532,7 @@ class TimelineOverlay:
             state.position_sec,
             state.recording,
             y_offset=badge_top,
+            cue_readout=cue_readout,
         )
         cache.last_badge_rect = badge_rect
 
@@ -1059,6 +1549,16 @@ class TimelineOverlay:
                 )
             )
         cache.last_flash_rects = tuple(flash_dirty)
+
+        # Role glyphs last (after playhead / flash) so XOR letters sit on top.
+        glyph_dirty = self._draw_role_glyphs(
+            upload,
+            state,
+            layout,
+            y_offset=panel_y_offset,
+        )
+        cache.last_glyph_rects = tuple(glyph_dirty)
+        flash_dirty.extend(glyph_dirty)
         return flash_dirty
 
     def compose_panel(
@@ -1110,6 +1610,7 @@ class TimelineOverlay:
             cache.last_playhead_rect = None
             cache.last_badge_rect = None
             cache.last_flash_rects = ()
+            cache.last_glyph_rects = ()
             cache.last_live_signature = None
             incremental = False
 
@@ -1128,6 +1629,7 @@ class TimelineOverlay:
         prev_playhead = cache.last_playhead_rect
         prev_badge = cache.last_badge_rect
         prev_flash = cache.last_flash_rects
+        prev_glyphs = cache.last_glyph_rects
         flash_dirty = self._patch_live_overlay(
             upload,
             static_panel,
@@ -1191,6 +1693,8 @@ class TimelineOverlay:
             for rect in (
                 *prev_flash,
                 *flash_dirty,
+                *prev_glyphs,
+                *cache.last_glyph_rects,
                 prev_playhead,
                 cache.last_playhead_rect,
                 prev_badge,

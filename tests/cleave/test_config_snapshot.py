@@ -948,16 +948,16 @@ def test_write_session_snapshot_persists_timeline_at_bottom(tmp_path: Path) -> N
     session.timeline.enabled = True
     session.timeline.lanes = {
         "layer_1": TimelineLane(
-            baseline=False,
-            cues=[SlotCue(t=2.5, visible=True)],
+            baseline=0.0,
+            cues=[SlotCue(t=2.5, level=1.0)],
         ),
         "layer_2": TimelineLane(
-            baseline=False,
-            cues=[SlotCue(t=2.5, visible=True)],
+            baseline=0.0,
+            cues=[SlotCue(t=2.5, level=1.0)],
         ),
         "layer_3": TimelineLane(
-            baseline=True,
-            cues=[SlotCue(t=10.0, visible=False)],
+            baseline=1.0,
+            cues=[SlotCue(t=10.0, level=0.0)],
         ),
     }
     write_session_snapshot(out_path, cfg=cfg, session=session)
@@ -967,9 +967,9 @@ def test_write_session_snapshot_persists_timeline_at_bottom(tmp_path: Path) -> N
     assert list(data.keys())[-1] == "timeline"
     assert data["timeline"]["enabled"] is True
     assert data["timeline"]["lanes"] == {
-        "layer_1": {"baseline": False, "cues": [{"t": 2.5, "visible": True}]},
-        "layer_2": {"baseline": False, "cues": [{"t": 2.5, "visible": True}]},
-        "layer_3": {"baseline": True, "cues": [{"t": 10.0, "visible": False}]},
+        "layer_1": {"baseline": 0.0, "cues": [{"t": 2.5, "level": 1.0}]},
+        "layer_2": {"baseline": 0.0, "cues": [{"t": 2.5, "level": 1.0}]},
+        "layer_3": {"baseline": 1.0, "cues": [{"t": 10.0, "level": 0.0}]},
     }
 
     timeline = parse_timeline_section(
@@ -999,8 +999,8 @@ def test_write_session_snapshot_round_trips_lane_baseline_and_cues(tmp_path: Pat
     session.timeline.enabled = True
     session.timeline.lanes = {
         "layer_1": TimelineLane(
-            baseline=True,
-            cues=[SlotCue(t=12.0, visible=False)],
+            baseline=1.0,
+            cues=[SlotCue(t=12.0, level=0.0)],
         ),
     }
     write_session_snapshot(out_path, cfg=cfg, session=session)
@@ -1008,8 +1008,8 @@ def test_write_session_snapshot_round_trips_lane_baseline_and_cues(tmp_path: Pat
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
     assert data["timeline"]["lanes"] == {
         "layer_1": {
-            "baseline": True,
-            "cues": [{"t": 12.0, "visible": False}],
+            "baseline": 1.0,
+            "cues": [{"t": 12.0, "level": 0.0}],
         },
     }
 
@@ -1030,6 +1030,85 @@ def test_write_session_snapshot_round_trips_lane_baseline_and_cues(tmp_path: Pat
     )
     session2 = session_from_cfg(cfg_with_timeline, playlists)
     assert session2.timeline.lanes["layer_1"] == session.timeline.lanes["layer_1"]
+
+
+def test_write_session_snapshot_round_trips_cue_blend_and_role(tmp_path: Path) -> None:
+    cfg, session, out_path = _snapshot_fixture(tmp_path)
+    session.timeline.enabled = True
+    session.timeline.lanes = {
+        "layer_1": TimelineLane(
+            baseline=0.0,
+            cues=[
+                SlotCue(t=2.5, level=1.0, blend="add", role="pulse"),
+                SlotCue(t=5.0, level=0.0),
+            ],
+        ),
+    }
+    write_session_snapshot(out_path, cfg=cfg, session=session)
+
+    data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    assert data["timeline"]["lanes"]["layer_1"]["cues"] == [
+        {"t": 2.5, "level": 1.0, "blend": "add", "role": "pulse"},
+        {"t": 5.0, "level": 0.0},
+    ]
+
+    timeline = parse_timeline_section(
+        data,
+        ParseCtx(layer_slots=tuple(cfg.layer_z_order)),
+    )
+    assert timeline is not None
+    playlists = _round_trip_playlists(cfg.paths.preset_root)
+    cfg_with_timeline = CleaveConfig(
+        paths=cfg.paths,
+        layers=cfg.layers,
+        editor=cfg.editor,
+        config_path=out_path,
+        user_config_path=cfg.user_config_path,
+        render=cfg.render,
+        timeline=timeline,
+    )
+    session2 = session_from_cfg(cfg_with_timeline, playlists)
+    assert session2.timeline.lanes["layer_1"] == session.timeline.lanes["layer_1"]
+
+
+def test_persisted_session_signature_moves_when_cue_blend_changes(
+    tmp_path: Path,
+) -> None:
+    cfg, session, _out_path = _snapshot_fixture(tmp_path)
+    session.timeline.enabled = True
+    session.timeline.lanes = {
+        "layer_1": TimelineLane(
+            baseline=0.0,
+            cues=[SlotCue(t=1.0, level=1.0)],
+        ),
+    }
+    before = persisted_session_signature(cfg, session)
+    session.timeline.lanes = {
+        "layer_1": TimelineLane(
+            baseline=0.0,
+            cues=[SlotCue(t=1.0, level=1.0, blend="add")],
+        ),
+    }
+    assert persisted_session_signature(cfg, session) != before
+
+
+def test_write_session_snapshot_level_only_cues_omit_blend_role_keys(
+    tmp_path: Path,
+) -> None:
+    cfg, session, out_path = _snapshot_fixture(tmp_path)
+    session.timeline.enabled = True
+    session.timeline.lanes = {
+        "layer_1": TimelineLane(
+            baseline=0.0,
+            cues=[SlotCue(t=2.5, level=1.0)],
+        ),
+    }
+    write_session_snapshot(out_path, cfg=cfg, session=session)
+    data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    cues = data["timeline"]["lanes"]["layer_1"]["cues"]
+    assert cues == [{"t": 2.5, "level": 1.0}]
+    assert "blend" not in cues[0]
+    assert "role" not in cues[0]
 
 
 def test_write_session_snapshot_persists_timeline_disabled_without_cues(
@@ -1061,6 +1140,12 @@ def test_write_session_snapshot_persists_timeline_disabled_without_cues(
             "character": "breathing",
             "crescendo": None,
             "density": "normal",
+            "conductor": False,
+        },
+        "limiter": {
+            "enabled": True,
+            "threshold": 0.65,
+            "release": 0.45,
         },
     }
 
@@ -1070,6 +1155,7 @@ def test_write_session_snapshot_round_trips_timeline_preset(tmp_path: Path) -> N
     session.timeline.timeline_preset_kind = "arc"
     session.timeline.timeline_preset_crescendo = "last"
     session.timeline.timeline_preset_density = "dense"
+    session.timeline.timeline_preset_conductor = True
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
@@ -1077,6 +1163,7 @@ def test_write_session_snapshot_round_trips_timeline_preset(tmp_path: Path) -> N
         "character": "arc",
         "crescendo": "last",
         "density": "dense",
+        "conductor": True,
     }
 
     timeline = parse_timeline_section(
@@ -1098,6 +1185,7 @@ def test_write_session_snapshot_round_trips_timeline_preset(tmp_path: Path) -> N
     assert session2.timeline.timeline_preset_kind == "arc"
     assert session2.timeline.timeline_preset_crescendo == "last"
     assert session2.timeline.timeline_preset_density == "dense"
+    assert session2.timeline.timeline_preset_conductor is True
 
 
 def _round_trip_preset_dirs(root: Path) -> Path:
@@ -1209,12 +1297,12 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
                     "enabled": True,
                     "lanes": {
                         "layer_1": {
-                            "baseline": False,
-                            "cues": [{"t": 1.0, "visible": False}],
+                            "baseline": 0.0,
+                            "cues": [{"t": 1.0, "level": 0.0}],
                         },
                         "layer_2": {
-                            "baseline": False,
-                            "cues": [{"t": 1.0, "visible": True}],
+                            "baseline": 0.0,
+                            "cues": [{"t": 1.0, "level": 1.0}],
                         },
                     },
                 },
@@ -1242,20 +1330,20 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
     session.render_post_fx.fade_out = 2.0
     session.timeline.lanes = {
         "layer_1": TimelineLane(
-            baseline=False,
-            cues=[SlotCue(t=1.0, visible=True)],
+            baseline=0.0,
+            cues=[SlotCue(t=1.0, level=1.0)],
         ),
         "layer_2": TimelineLane(
-            baseline=False,
-            cues=[SlotCue(t=1.0, visible=True)],
+            baseline=0.0,
+            cues=[SlotCue(t=1.0, level=1.0)],
         ),
         "layer_3": TimelineLane(
-            baseline=True,
-            cues=[SlotCue(t=12.5, visible=False)],
+            baseline=1.0,
+            cues=[SlotCue(t=12.5, level=0.0)],
         ),
         "layer_4": TimelineLane(
-            baseline=True,
-            cues=[SlotCue(t=12.5, visible=False)],
+            baseline=1.0,
+            cues=[SlotCue(t=12.5, level=0.0)],
         ),
     }
 

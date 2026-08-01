@@ -963,6 +963,30 @@ def test_panel_notification_pinned_under_transport() -> None:
     assert _row_text(active, notification_idx) == NOTIFICATION_TIMELINE_ENABLED_TEXT
 
 
+def test_persistent_and_timed_panel_notifications_stack() -> None:
+    from cleave.viz.theme import ERROR_NOTIFICATION
+
+    stacked = _minimal_view_state(
+        persistent_notification_message="No presets in bed roles folder",
+        notification_message="Saved",
+        notification_remaining_sec=5.0,
+    )
+    notification_rows = [
+        row
+        for row in stacked.layout.rows
+        if row.kind == RowKind.PANEL_NOTIFICATION
+    ]
+    assert [row.marker_index for row in notification_rows] == [0, 1]
+    persistent_idx = stacked.layout.find_descriptor(notification_rows[0])
+    timed_idx = stacked.layout.find_descriptor(notification_rows[1])
+    transport_idx = stacked.layout.find_by_kind(RowKind.TRANSPORT)
+    assert transport_idx < persistent_idx < timed_idx
+    assert _row_value_color(stacked, persistent_idx) == ERROR_NOTIFICATION
+    assert _row_value_color(stacked, timed_idx) == HIGHLIGHT
+    assert _row_text(stacked, persistent_idx) == "No presets in bed roles folder"
+    assert _row_text(stacked, timed_idx) == "Saved"
+
+
 def test_draw_panel_notification_without_error() -> None:
     pygame.init()
     overlay = TuningOverlay()

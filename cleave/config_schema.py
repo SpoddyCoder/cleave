@@ -10,14 +10,16 @@ from pathlib import Path
 from typing import Any, Callable, Literal, TypeVar
 
 from cleave.blend_modes import BLEND_MODES, BlendMode
+from cleave.cue_roles import CUE_ROLE_HELP_BLURB, CUE_ROLES, CueRole
 from cleave.effects.constants import clamp_effect_pct
 from cleave.effects.registry import validate_effect_entry
 from cleave.extract import STEM_SOURCES, StemSource
-from cleave.timeline import SlotCue, TimelineLane, canonicalize
+from cleave.timeline import SlotCue, TimelineLane, canonicalize, clamp_level
 from cleave.timeline_presets.characters import (
     DEFAULT_TIMELINE_PRESET_KIND,
     TIMELINE_PRESET_KIND_OPTIONS,
 )
+from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
 from cleave.timeline_presets.crescendo import CrescendoTarget
 from cleave.timeline_presets.density import (
     DEFAULT_TIMELINE_PRESET_DENSITY,
@@ -40,7 +42,8 @@ BEAT_SENSITIVITY_MIN = 0.0
 BEAT_SENSITIVITY_MAX = 5.0
 
 PresetSwitchingMode = Literal["none", "projectm", "timeline"]
-PresetSwitchingRotationSet = Literal["directory", "user_defined"]
+PresetSwitchingRotationSet = Literal["directory", "user_defined", "cast_roles"]
+CastRolesTimelineBehaviour = Literal["hold_current", "on_transition"]
 PRESET_SWITCHING_MODES: tuple[PresetSwitchingMode, ...] = (
     "none",
     "projectm",
@@ -57,6 +60,7 @@ PRESET_SWITCHING_MODE_HELP_ENTRIES: tuple[tuple[PresetSwitchingMode, str], ...] 
 PRESET_SWITCHING_ROTATION_SETS: tuple[PresetSwitchingRotationSet, ...] = (
     "directory",
     "user_defined",
+    "cast_roles",
 )
 PRESET_SWITCHING_ROTATION_SET_HELP_ENTRIES: tuple[
     tuple[PresetSwitchingRotationSet, str], ...
@@ -66,9 +70,35 @@ PRESET_SWITCHING_ROTATION_SET_HELP_ENTRIES: tuple[
         "user_defined",
         "rotate through a fixed list of presets defined in config.",
     ),
+    (
+        "cast_roles",
+        "rotate through Milkdrop presets in roles/<role>/ pools keyed by cue cast.",
+    ),
+)
+CAST_ROLES_TIMELINE_BEHAVIOURS: tuple[CastRolesTimelineBehaviour, ...] = (
+    "hold_current",
+    "on_transition",
+)
+CAST_ROLES_TIMELINE_BEHAVIOUR_HELP_ENTRIES: tuple[
+    tuple[CastRolesTimelineBehaviour, str], ...
+] = (
+    (
+        "hold_current",
+        "only change preset when a new cue cast marker is encountered.",
+    ),
+    (
+        "on_transition",
+        "change to a new preset in the last specified role.",
+    ),
+)
+CAST_ROLES_DEFAULT_ROLE_HELP_ENTRIES: tuple[tuple[CueRole, str], ...] = tuple(
+    (role, f"{role} ({CUE_ROLE_HELP_BLURB[role]}).")
+    for role in CUE_ROLES
 )
 DEFAULT_PRESET_SWITCHING: PresetSwitchingMode = "none"
 DEFAULT_PRESET_SWITCHING_ROTATION_SET: PresetSwitchingRotationSet = "directory"
+DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR: CastRolesTimelineBehaviour = "on_transition"
+DEFAULT_CAST_ROLES_DEFAULT_ROLE: CueRole = "bed"
 DEFAULT_PRESET_SWITCHING_SHUFFLE = False
 DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT = 0
 DEFAULT_PRESET_DURATION = 30.0
@@ -157,6 +187,8 @@ def new_layer_config(slot: str, preset: Path, preset_root: Path) -> Any:
         locked=False,
         preset_switching=DEFAULT_PRESET_SWITCHING,
         preset_switching_rotation_set=DEFAULT_PRESET_SWITCHING_ROTATION_SET,
+        cast_roles_timeline_behaviour=DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR,
+        cast_roles_default_role=DEFAULT_CAST_ROLES_DEFAULT_ROLE,
         preset_switching_presets=[],
     )
 
@@ -351,6 +383,42 @@ TIMELINE_FADE_DURATION_MIN = 0.0
 TIMELINE_FADE_DURATION_MAX = 30.0
 TIMELINE_FADE_DURATION_STEP = 0.1
 
+# Visual limiter (timeline.limiter); module defaults match these.
+DEFAULT_VISUAL_LIMITER_ENABLED = True
+DEFAULT_VISUAL_LIMITER_THRESHOLD = 0.65
+DEFAULT_VISUAL_LIMITER_RELEASE = 0.45
+VISUAL_LIMITER_THRESHOLD_MIN = 0.40
+VISUAL_LIMITER_THRESHOLD_MAX = 0.90
+VISUAL_LIMITER_THRESHOLD_STEP = 0.01
+VISUAL_LIMITER_THRESHOLD_GAP = 0.17
+VISUAL_LIMITER_RELEASE_MIN = 0.15
+VISUAL_LIMITER_RELEASE_MAX = 1.5
+VISUAL_LIMITER_RELEASE_STEP = 0.1
+# RELEASE_SEC / RELEASE_RAMP_SEC at the tuned defaults (0.75 / 0.45).
+VISUAL_LIMITER_RELEASE_HOLD_RATIO = 0.75 / 0.45
+
+
+def clamp_visual_limiter_threshold(value: float) -> float:
+    return max(
+        VISUAL_LIMITER_THRESHOLD_MIN,
+        min(VISUAL_LIMITER_THRESHOLD_MAX, float(value)),
+    )
+
+
+def clamp_visual_limiter_release(value: float) -> float:
+    return max(
+        VISUAL_LIMITER_RELEASE_MIN,
+        min(VISUAL_LIMITER_RELEASE_MAX, float(value)),
+    )
+
+
+def visual_limiter_threshold_off(threshold_on: float) -> float:
+    return max(0.0, float(threshold_on) - VISUAL_LIMITER_THRESHOLD_GAP)
+
+
+def visual_limiter_release_hold_sec(release_ramp_sec: float) -> float:
+    return float(release_ramp_sec) * VISUAL_LIMITER_RELEASE_HOLD_RATIO
+
 TimelinePlacementSnap = Literal["off", "beat", "bar"]
 TIMELINE_PLACEMENT_SNAP_OPTIONS: tuple[TimelinePlacementSnap, ...] = (
     "off",
@@ -412,6 +480,12 @@ def parse_timeline_preset_density(raw: Any, label: str) -> TimelinePresetDensity
     return value  # type: ignore[return-value]
 
 
+def parse_timeline_preset_conductor(raw: Any, label: str) -> bool:
+    if not isinstance(raw, bool):
+        raise ValueError(f"{label} must be true or false")
+    return raw
+
+
 FieldSource = Literal["cfg", "session", "both"]
 T = TypeVar("T")
 
@@ -438,6 +512,16 @@ def _parse_preset_switching_rotation_set(raw: Any, label: str) -> PresetSwitchin
         allowed = ", ".join(PRESET_SWITCHING_ROTATION_SETS)
         raise ValueError(f"{label} must be one of: {allowed}")
     return rotation_set
+
+
+def _parse_cast_roles_timeline_behaviour(
+    raw: Any, label: str
+) -> CastRolesTimelineBehaviour:
+    behaviour = str(raw)
+    if behaviour not in CAST_ROLES_TIMELINE_BEHAVIOURS:
+        allowed = ", ".join(CAST_ROLES_TIMELINE_BEHAVIOURS)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return behaviour  # type: ignore[return-value]
 
 
 def hard_cut_enabled_display(enabled: bool) -> str:
@@ -560,7 +644,21 @@ def preset_switching_rotation_set_display(
 ) -> str:
     if rotation_set == "user_defined":
         return "user-defined"
+    if rotation_set == "cast_roles":
+        return "cast roles"
     return "directory"
+
+
+def cast_roles_timeline_behaviour_display(
+    behaviour: CastRolesTimelineBehaviour,
+) -> str:
+    if behaviour == "hold_current":
+        return "hold current"
+    return "on transition"
+
+
+def cast_roles_default_role_display(role: CueRole) -> str:
+    return role
 
 
 @dataclass(frozen=True)
@@ -1613,14 +1711,25 @@ def persist_layer_z_order(ctx: PersistCtx) -> list[str]:
     return cfg_order
 
 
+def validate_blend_mode(raw: Any, *, path: str) -> BlendMode:
+    if raw not in BLEND_MODES:
+        allowed = ", ".join(f"'{mode}'" for mode in BLEND_MODES)
+        raise ValueError(f"{path} must be one of: {allowed}")
+    return raw
+
+
+def validate_cue_role(raw: Any, *, path: str) -> CueRole:
+    if raw not in CUE_ROLES:
+        allowed = ", ".join(f"'{role}'" for role in CUE_ROLES)
+        raise ValueError(f"{path} must be one of: {allowed}")
+    return raw
+
+
 def parse_blend_mode(slot: str, stem: StemSource, layer_raw: dict[str, Any]) -> BlendMode:
     raw = layer_raw.get("blend_mode")
     if raw is None:
         return DEFAULT_BLEND_MODE[stem]
-    if raw not in BLEND_MODES:
-        allowed = ", ".join(f"'{mode}'" for mode in BLEND_MODES)
-        raise ValueError(f"layers.{slot}.blend_mode must be one of: {allowed}")
-    return raw
+    return validate_blend_mode(raw, path=f"layers.{slot}.blend_mode")
 
 
 def _parse_stem(slot: str, layer_raw: dict[str, Any]) -> StemSource:
@@ -1718,6 +1827,19 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
             layer_raw.get("preset_switching_rotation_set", DEFAULT_PRESET_SWITCHING_ROTATION_SET),
             f"layers.{slot}.preset_switching_rotation_set",
         )
+        cast_roles_timeline_behaviour = _parse_cast_roles_timeline_behaviour(
+            layer_raw.get(
+                "cast_roles_timeline_behaviour",
+                DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR,
+            ),
+            f"layers.{slot}.cast_roles_timeline_behaviour",
+        )
+        cast_roles_default_role = validate_cue_role(
+            layer_raw.get(
+                "cast_roles_default_role", DEFAULT_CAST_ROLES_DEFAULT_ROLE
+            ),
+            path=f"layers.{slot}.cast_roles_default_role",
+        )
         preset_switching_shuffle = bool(
             layer_raw.get(
                 "preset_switching_shuffle", DEFAULT_PRESET_SWITCHING_SHUFFLE
@@ -1766,6 +1888,8 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
             locked=bool(layer_raw.get("locked", False)),
             preset_switching=preset_switching,
             preset_switching_rotation_set=preset_switching_rotation_set,
+            cast_roles_timeline_behaviour=cast_roles_timeline_behaviour,
+            cast_roles_default_role=cast_roles_default_role,
             preset_switching_shuffle=preset_switching_shuffle,
             preset_switching_shuffle_salt=preset_switching_shuffle_salt,
             preset_duration=preset_duration,
@@ -1801,6 +1925,8 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             locked = runtime.locked
             preset_switching = runtime.preset_switching
             preset_switching_rotation_set = runtime.preset_switching_rotation_set
+            cast_roles_timeline_behaviour = runtime.cast_roles_timeline_behaviour
+            cast_roles_default_role = runtime.cast_roles_default_role
             preset_switching_shuffle = runtime.preset_switching_shuffle
             preset_switching_shuffle_salt = runtime.preset_switching_shuffle_salt
             preset_duration = runtime.preset_duration
@@ -1822,6 +1948,8 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             locked = layer_cfg.locked
             preset_switching = layer_cfg.preset_switching
             preset_switching_rotation_set = layer_cfg.preset_switching_rotation_set
+            cast_roles_timeline_behaviour = layer_cfg.cast_roles_timeline_behaviour
+            cast_roles_default_role = layer_cfg.cast_roles_default_role
             preset_switching_shuffle = layer_cfg.preset_switching_shuffle
             preset_switching_shuffle_salt = layer_cfg.preset_switching_shuffle_salt
             preset_duration = layer_cfg.preset_duration
@@ -1857,6 +1985,10 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
             layer_out["preset_switching"] = preset_switching
         if preset_switching_rotation_set != DEFAULT_PRESET_SWITCHING_ROTATION_SET:
             layer_out["preset_switching_rotation_set"] = preset_switching_rotation_set
+        if cast_roles_timeline_behaviour != DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR:
+            layer_out["cast_roles_timeline_behaviour"] = cast_roles_timeline_behaviour
+        if cast_roles_default_role != DEFAULT_CAST_ROLES_DEFAULT_ROLE:
+            layer_out["cast_roles_default_role"] = cast_roles_default_role
         if preset_switching_shuffle != DEFAULT_PRESET_SWITCHING_SHUFFLE:
             layer_out["preset_switching_shuffle"] = preset_switching_shuffle
         if preset_switching_shuffle_salt != DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT:
@@ -2092,6 +2224,35 @@ def _parse_timeline_preset(raw: Any) -> Any:
             preset_map.get("density", DEFAULT_TIMELINE_PRESET_DENSITY),
             "timeline.preset.density",
         ),
+        conductor=parse_timeline_preset_conductor(
+            preset_map.get("conductor", DEFAULT_TIMELINE_PRESET_CONDUCTOR),
+            "timeline.preset.conductor",
+        ),
+    )
+
+
+def _parse_timeline_limiter(raw: Any) -> Any:
+    from cleave.config import TimelineLimiterConfig
+
+    if raw is None:
+        return TimelineLimiterConfig()
+    limiter_map = as_mapping(raw, "timeline.limiter")
+    return TimelineLimiterConfig(
+        enabled=bool(
+            limiter_map.get("enabled", DEFAULT_VISUAL_LIMITER_ENABLED)
+        ),
+        threshold=clamp_visual_limiter_threshold(
+            require_non_negative_number(
+                limiter_map.get("threshold", DEFAULT_VISUAL_LIMITER_THRESHOLD),
+                "timeline.limiter.threshold",
+            )
+        ),
+        release=clamp_visual_limiter_release(
+            require_non_negative_number(
+                limiter_map.get("release", DEFAULT_VISUAL_LIMITER_RELEASE),
+                "timeline.limiter.release",
+            )
+        ),
     )
 
 
@@ -2124,6 +2285,7 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
             ),
         )
     preset = _parse_timeline_preset(timeline_map.get("preset"))
+    limiter = _parse_timeline_limiter(timeline_map.get("limiter"))
     # Legacy timeline.cues is ignored (clean break; no migration).
     lanes_raw = timeline_map.get("lanes")
     if lanes_raw is None:
@@ -2134,6 +2296,7 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
             fades=fades,
             placement_snap=placement_snap,
             preset=preset,
+            limiter=limiter,
         )
     lanes_map = as_mapping(lanes_raw, "timeline.lanes")
     if ctx.layer_slots is None:
@@ -2149,9 +2312,9 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
     lanes: dict[str, TimelineLane] = {}
     for slot, lane_raw in lanes_map.items():
         lane_map = as_mapping(lane_raw, f"timeline.lanes.{slot}")
-        baseline: bool | None
+        baseline: float | None
         if "baseline" in lane_map:
-            baseline = bool(lane_map["baseline"])
+            baseline = clamp_level(float(lane_map["baseline"]))
         else:
             baseline = None
         cues_raw = lane_map.get("cues", [])
@@ -2162,9 +2325,9 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
         cues: list[SlotCue] = []
         for index, item in enumerate(cues_raw):
             cue_map = as_mapping(item, f"timeline.lanes.{slot}.cues[{index}]")
-            if "visible" not in cue_map:
+            if "level" not in cue_map:
                 raise ValueError(
-                    f"timeline.lanes.{slot}.cues[{index}] missing visible"
+                    f"timeline.lanes.{slot}.cues[{index}] missing level"
                 )
             t = float(
                 require_non_negative_number(
@@ -2172,7 +2335,26 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
                     f"timeline.lanes.{slot}.cues[{index}].t",
                 )
             )
-            cues.append(SlotCue(t=t, visible=bool(cue_map["visible"])))
+            blend: BlendMode | None = None
+            if "blend" in cue_map and cue_map["blend"] is not None:
+                blend = validate_blend_mode(
+                    cue_map["blend"],
+                    path=f"timeline.lanes.{slot}.cues[{index}].blend",
+                )
+            role: CueRole | None = None
+            if "role" in cue_map and cue_map["role"] is not None:
+                role = validate_cue_role(
+                    cue_map["role"],
+                    path=f"timeline.lanes.{slot}.cues[{index}].role",
+                )
+            cues.append(
+                SlotCue(
+                    t=t,
+                    level=clamp_level(float(cue_map["level"])),
+                    blend=blend,
+                    role=role,
+                )
+            )
         lanes[str(slot)] = TimelineLane(
             baseline=baseline,
             cues=canonicalize(baseline, cues),
@@ -2184,6 +2366,7 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
         fades=fades,
         placement_snap=placement_snap,
         preset=preset,
+        limiter=limiter,
     )
 
 
@@ -2192,6 +2375,14 @@ def _persist_timeline_fade_group(group: Any) -> dict[str, Any]:
         "enabled": group.enabled,
         "fade_in": group.fade_in,
         "fade_out": group.fade_out,
+    }
+
+
+def _persist_timeline_limiter(limiter: Any) -> dict[str, Any]:
+    return {
+        "enabled": limiter.enabled,
+        "threshold": limiter.threshold,
+        "release": limiter.release,
     }
 
 
@@ -2209,7 +2400,9 @@ def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
             "character": runtime.timeline_preset_kind,
             "crescendo": runtime.timeline_preset_crescendo,
             "density": runtime.timeline_preset_density,
+            "conductor": runtime.timeline_preset_conductor,
         },
+        "limiter": _persist_timeline_limiter(runtime.limiter),
     }
     lanes_out: dict[str, Any] = {}
     for slot in sorted(runtime.lanes):
@@ -2220,10 +2413,15 @@ def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
         if lane.baseline is not None:
             entry["baseline"] = lane.baseline
         if lane.cues:
-            entry["cues"] = [
-                {"t": cue.t, "visible": cue.visible}
-                for cue in lane.cues
-            ]
+            cues_out: list[dict[str, Any]] = []
+            for cue in lane.cues:
+                cue_out: dict[str, Any] = {"t": cue.t, "level": cue.level}
+                if cue.blend is not None:
+                    cue_out["blend"] = cue.blend
+                if cue.role is not None:
+                    cue_out["role"] = cue.role
+                cues_out.append(cue_out)
+            entry["cues"] = cues_out
         lanes_out[slot] = entry
     if lanes_out:
         out["lanes"] = lanes_out

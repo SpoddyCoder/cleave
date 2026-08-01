@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES, BLEND_MODES
+from cleave.cue_roles import CUE_ROLE_MARKER_HELP_ENTRIES
 from cleave.config_schema import (
+    CAST_ROLES_DEFAULT_ROLE_HELP_ENTRIES,
+    CAST_ROLES_TIMELINE_BEHAVIOUR_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_APPLY_MODES,
     HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES,
@@ -184,13 +187,22 @@ def test_preset_file_help_titles() -> None:
     assert description.lines == (
         "Currently active Milkdrop preset for this layer.",
         "[F/B/U] indicates favourited/blacklisted/user-defined.",
+        "[R:X] indicates the chosen cast role.",
     )
+    assert description.entries == CUE_ROLE_MARKER_HELP_ENTRIES
+    assert dict(description.entries) == {
+        "[R:B]": "bed (calm dark foundation)",
+        "[R:P]": "pulse (beat-reactive mid-ground)",
+        "[R:L]": "lead (busy bright hero)",
+        "[R:A]": "accent (short bright hits)",
+    }
     entries = dict(keyboard.entries)
     assert entries["Left/Right"] == "next/previous preset"
     assert entries["Ctrl + Left/Right"] == "next/previous large step"
     assert entries["F"] == "favourite preset"
     assert entries["B"] == "blacklist preset"
-    assert entries["R"] == "remove favourite / restore blacklist"
+    assert entries["C"] == "cast preset (bed/pulse/lead/accent)"
+    assert entries["R"] == "remove favourite / restore blacklist / remove cast"
     assert "Shift + +" not in entries
 
 
@@ -238,6 +250,30 @@ def test_rotation_set_help_lists_rotation_sets() -> None:
     assert description.title == "Rotation set"
     assert description.lines == ()
     assert description.entries == PRESET_SWITCHING_ROTATION_SET_HELP_ENTRIES
+    modes = [mode for mode, _ in description.entries]
+    assert modes == ["directory", "user_defined", "cast_roles"]
+
+
+def test_cast_roles_timeline_behaviour_help_lists_options() -> None:
+    description = _description_section(
+        sections_for(RowKind.TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR)
+    )
+    assert description is not None
+    assert description.title == "Timeline behaviour"
+    assert description.entries == CAST_ROLES_TIMELINE_BEHAVIOUR_HELP_ENTRIES
+    assert [mode for mode, _ in description.entries] == [
+        "hold_current",
+        "on_transition",
+    ]
+
+
+def test_cast_roles_default_role_help_lists_roles() -> None:
+    description = _description_section(
+        sections_for(RowKind.TRACK_CAST_ROLES_DEFAULT_ROLE)
+    )
+    assert description is not None
+    assert description.title == "Default role"
+    assert description.entries == CAST_ROLES_DEFAULT_ROLE_HELP_ENTRIES
 
 
 def test_timeline_presets_help_lists_characters() -> None:
@@ -387,6 +423,13 @@ def test_render_timeline_help_has_no_solo() -> None:
     assert dict(section.entries)["Left/Right"] == "expand/collapse"
 
 
+def test_visual_limiter_header_help_disable_enable() -> None:
+    section = _keyboard_section(
+        sections_for(RowKind.TIMELINE_VISUAL_LIMITER_HEADER)
+    )
+    assert dict(section.entries) == {"Left/Right": "disable / enable"}
+
+
 def test_render_overlay_sub_header_help_expand_collapse() -> None:
     for row_kind in (
         RowKind.RENDER_OVERLAY_TITLE_HEADER,
@@ -435,12 +478,15 @@ def test_user_preset_item_help() -> None:
     assert description.lines == (
         "Preset in the user-defined rotation set for this layer.",
         "[F/B] indicates favourited/blacklisted.",
+        "[R:X] indicates the chosen cast role.",
     )
+    assert description.entries == CUE_ROLE_MARKER_HELP_ENTRIES
     entries = dict(keyboard.entries)
     assert entries["Delete"] == "remove preset"
     assert entries["F"] == "favourite preset"
     assert entries["B"] == "blacklist preset"
-    assert entries["R"] == "remove favourite / restore blacklist"
+    assert entries["C"] == "cast preset (bed/pulse/lead/accent)"
+    assert entries["R"] == "remove favourite / restore blacklist / remove cast"
 
 
 def test_user_preset_add_help() -> None:
@@ -560,6 +606,9 @@ def test_timeline_strip_help_paused() -> None:
     assert "Ctrl + Enter" not in entries
     assert entries["Space"] == "play"
     assert entries["Ctrl + Space / R"] == "start record"
+    assert entries["C / Shift+C"] == (
+        "cycle cue cast (requires cast roles rotation set)"
+    )
     keys = [key for key, _ in section.entries]
     assert keys.index("Ctrl + Space / R") + 1 == keys.index("Space")
     assert "Left/Right" in entries

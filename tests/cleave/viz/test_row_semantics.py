@@ -34,6 +34,8 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
         RowKind.TRACK_PRESET_SWITCHING,
+        RowKind.TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR,
+        RowKind.TRACK_CAST_ROLES_DEFAULT_ROLE,
         RowKind.TRACK_PRESET_DURATION,
         RowKind.TRACK_SOFT_CUT_DURATION,
         RowKind.TRACK_EASTER_EGG,
@@ -84,6 +86,8 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.TIMELINE_STANDARD_CUE_FADES,
         RowKind.TIMELINE_STANDARD_CUE_FADE_IN,
         RowKind.TIMELINE_STANDARD_CUE_FADE_OUT,
+        RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD,
+        RowKind.TIMELINE_VISUAL_LIMITER_RELEASE,
     }
 )
 
@@ -171,6 +175,8 @@ def test_track_sub_row_kinds() -> None:
             RowKind.TRACK_USER_PRESET_ITEM,
             RowKind.TRACK_USER_PRESET_ADD,
             RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET,
+            RowKind.TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR,
+            RowKind.TRACK_CAST_ROLES_DEFAULT_ROLE,
             RowKind.TRACK_PRESET_SWITCHING_SHUFFLE,
             RowKind.TRACK_PRESET_SWITCHING_SEED,
             RowKind.TRACK_PRESET_DURATION,
@@ -218,6 +224,8 @@ def test_track_value_rows_blocked_by_section_lock() -> None:
             RowKind.TRACK_PRESET,
             RowKind.TRACK_PRESET_SWITCHING,
             RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET,
+            RowKind.TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR,
+            RowKind.TRACK_CAST_ROLES_DEFAULT_ROLE,
             RowKind.TRACK_PRESET_SWITCHING_SHUFFLE,
             RowKind.TRACK_PRESET_SWITCHING_SEED,
             RowKind.TRACK_PRESET_DURATION,
@@ -291,6 +299,7 @@ def test_render_value_children_blocked_by_section_lock() -> None:
     assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_CHARACTER) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_CRESCENDO) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_DENSITY) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_CONDUCTOR) is True
     assert row_blocked_by_section_lock(RowKind.TRACK_PRESET_SWITCHING_SEED) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_BAR_PHASE) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_TO_GRID) is True

@@ -12,10 +12,13 @@ from cleave.config import (
     RenderOverlayPosition,
     RenderOverlaySlideDirection,
     TimelineFadeGroupConfig,
+    TimelineLimiterConfig,
     VIZ_CONFIG_FILENAME,
 )
 from cleave.config_schema import (
     DEFAULT_BEAT_SENSITIVITY,
+    DEFAULT_CAST_ROLES_DEFAULT_ROLE,
+    DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR,
     DEFAULT_PRESET_SWITCHING,
     DEFAULT_PRESET_SWITCHING_ROTATION_SET,
     DEFAULT_PRESET_SWITCHING_SHUFFLE,
@@ -31,6 +34,10 @@ from cleave.config_schema import (
     DEFAULT_TIMELINE_FADE_IN,
     DEFAULT_TIMELINE_FADE_OUT,
     DEFAULT_TIMELINE_PLACEMENT_SNAP,
+    DEFAULT_VISUAL_LIMITER_ENABLED,
+    DEFAULT_VISUAL_LIMITER_THRESHOLD,
+    DEFAULT_VISUAL_LIMITER_RELEASE,
+    CastRolesTimelineBehaviour,
     HighlightRolloffApplyMode,
     HighlightRolloffCurve,
     PresetSwitchingMode,
@@ -42,12 +49,14 @@ from cleave.config_schema import (
     default_chroma_boost_runtime_values,
     default_render_post_fx_runtime_values,
 )
+from cleave.cue_roles import CueRole
 from cleave.extract import StemSource
 from cleave.preset_playlist import PresetPlaylist, preset_browse_floor
 from cleave.projectm_health import PresetSkipNotifyTracker, ProjectMLogNotifyTracker
 from cleave.timeline import SlotCue, TimelineLane, copy_lane, empty_lane
 from cleave.blend_modes import BlendMode
 from cleave.timeline_presets.characters import DEFAULT_TIMELINE_PRESET_KIND
+from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
 from cleave.timeline_presets.crescendo import CrescendoTarget
 from cleave.timeline_presets.density import (
     DEFAULT_TIMELINE_PRESET_DENSITY,
@@ -172,6 +181,17 @@ def default_timeline_fade_group_runtime() -> TimelineFadeGroupRuntime:
 
 
 @dataclass
+class VisualLimiterRuntime:
+    enabled: bool = DEFAULT_VISUAL_LIMITER_ENABLED
+    threshold: float = DEFAULT_VISUAL_LIMITER_THRESHOLD
+    release: float = DEFAULT_VISUAL_LIMITER_RELEASE
+
+
+def default_visual_limiter_runtime() -> VisualLimiterRuntime:
+    return VisualLimiterRuntime()
+
+
+@dataclass
 class TimelineRuntime:
     enabled: bool = True
     locked: bool = False
@@ -181,7 +201,7 @@ class TimelineRuntime:
     armed_slots: set[str] = field(default_factory=set)
     recording: bool = False
     record_buffer: dict[str, list[SlotCue]] = field(default_factory=dict)
-    record_baseline: dict[str, bool] = field(default_factory=dict)
+    record_baseline: dict[str, float] = field(default_factory=dict)
     record_start_sec: float | None = None
     record_slot_start_sec: dict[str, float] = field(default_factory=dict)
     record_high_water_mark: float | None = None
@@ -190,6 +210,8 @@ class TimelineRuntime:
     override_slots: set[str] = field(default_factory=set)
     override_visible: dict[str, bool] = field(default_factory=dict)
     arm_flash_start_ms: dict[str, int] = field(default_factory=dict)
+    selected_cue_t: dict[str, float] = field(default_factory=dict)
+    selected_cue_flash_start_ms: int | None = None
     bar_phase_offset: int = 0
     show_bar_grid: bool = False
     beat_bar_grid_expanded: bool = False
@@ -199,12 +221,14 @@ class TimelineRuntime:
     timeline_preset_kind: str = DEFAULT_TIMELINE_PRESET_KIND
     timeline_preset_crescendo: CrescendoTarget | None = None
     timeline_preset_density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
+    timeline_preset_conductor: bool = DEFAULT_TIMELINE_PRESET_CONDUCTOR
     song_marker_fades: TimelineFadeGroupRuntime = field(
         default_factory=default_timeline_fade_group_runtime
     )
     standard_cue_fades: TimelineFadeGroupRuntime = field(
         default_factory=default_timeline_fade_group_runtime
     )
+    limiter: VisualLimiterRuntime = field(default_factory=default_visual_limiter_runtime)
 
 
 def default_timeline_runtime() -> TimelineRuntime:
@@ -258,6 +282,10 @@ class LayerRuntime:
     locked: bool = False
     preset_switching: PresetSwitchingMode = DEFAULT_PRESET_SWITCHING
     preset_switching_rotation_set: PresetSwitchingRotationSet = DEFAULT_PRESET_SWITCHING_ROTATION_SET
+    cast_roles_timeline_behaviour: CastRolesTimelineBehaviour = (
+        DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR
+    )
+    cast_roles_default_role: CueRole = DEFAULT_CAST_ROLES_DEFAULT_ROLE
     preset_switching_shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE
     preset_switching_shuffle_salt: int = DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT
     preset_duration: float = DEFAULT_PRESET_DURATION
@@ -269,6 +297,9 @@ class LayerRuntime:
     preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN
     user_presets: list[str] = field(default_factory=list)  # absolute paths
     user_presets_expanded: bool = False
+    # Playing auto-switch preset (panel display); not persisted. Mirrored from
+    # StemLayer.auto_preset_path while the live layer map is available.
+    auto_preset_path: Path | None = None
 
 
 @dataclass
@@ -366,6 +397,18 @@ def _fade_group_runtime_from_cfg(
     )
 
 
+def _limiter_runtime_from_cfg(
+    limiter: TimelineLimiterConfig | None,
+) -> VisualLimiterRuntime:
+    if limiter is None:
+        return VisualLimiterRuntime()
+    return VisualLimiterRuntime(
+        enabled=limiter.enabled,
+        threshold=limiter.threshold,
+        release=limiter.release,
+    )
+
+
 def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
     timeline = cfg.timeline
     enabled = True if timeline is None else timeline.enabled
@@ -378,6 +421,7 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
         else timeline.placement_snap
     )
     preset = None if timeline is None else timeline.preset
+    limiter_cfg = None if timeline is None else timeline.limiter
     preset_kind = (
         DEFAULT_TIMELINE_PRESET_KIND if preset is None else preset.character
     )
@@ -385,12 +429,16 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
     preset_density = (
         DEFAULT_TIMELINE_PRESET_DENSITY if preset is None else preset.density
     )
+    preset_conductor = (
+        DEFAULT_TIMELINE_PRESET_CONDUCTOR if preset is None else preset.conductor
+    )
     lanes: dict[str, TimelineLane] = {}
     for slot in cfg.layer_z_order:
         if slot in source_lanes:
             lanes[slot] = copy_lane(source_lanes[slot])
         else:
             lanes[slot] = empty_lane()
+    limiter = _limiter_runtime_from_cfg(limiter_cfg)
     if fades is None:
         return TimelineRuntime(
             enabled=enabled,
@@ -400,6 +448,8 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
             timeline_preset_kind=preset_kind,
             timeline_preset_crescendo=preset_crescendo,
             timeline_preset_density=preset_density,
+            timeline_preset_conductor=preset_conductor,
+            limiter=limiter,
         )
     return TimelineRuntime(
         enabled=enabled,
@@ -409,8 +459,10 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
         timeline_preset_kind=preset_kind,
         timeline_preset_crescendo=preset_crescendo,
         timeline_preset_density=preset_density,
+        timeline_preset_conductor=preset_conductor,
         song_marker_fades=_fade_group_runtime_from_cfg(fades.song_markers),
         standard_cue_fades=_fade_group_runtime_from_cfg(fades.standard),
+        limiter=limiter,
     )
 
 
@@ -449,6 +501,8 @@ def session_from_cfg(
                 locked=layer_cfg.locked,
                 preset_switching=layer_cfg.preset_switching,
                 preset_switching_rotation_set=layer_cfg.preset_switching_rotation_set,
+                cast_roles_timeline_behaviour=layer_cfg.cast_roles_timeline_behaviour,
+                cast_roles_default_role=layer_cfg.cast_roles_default_role,
                 preset_switching_shuffle=layer_cfg.preset_switching_shuffle,
                 preset_switching_shuffle_salt=layer_cfg.preset_switching_shuffle_salt,
                 preset_duration=layer_cfg.preset_duration,

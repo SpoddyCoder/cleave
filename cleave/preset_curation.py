@@ -4,9 +4,16 @@ from __future__ import annotations
 
 import shutil
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
+from cleave.cue_roles import (
+    CUE_ROLE_DIR,
+    CUE_ROLE_MARKER_LETTER,
+    CUE_ROLES,
+    CueRole,
+    ensure_role_dirs,
+)
 from cleave.viz.user_presets import copy_with_dedup, resolve_user_preset_dest
 
 FAVOURITES_DIR = "favourites"
@@ -21,6 +28,10 @@ def favourites_root(preset_root: Path) -> Path:
 
 def blacklist_root(preset_root: Path) -> Path:
     return preset_root / BLACKLIST_DIR
+
+
+def roles_root(preset_root: Path) -> Path:
+    return preset_root / CUE_ROLE_DIR
 
 
 def origin_sidecar_path(milk_path: Path) -> Path:
@@ -67,12 +78,22 @@ def _milk_names_under(root: Path) -> set[str]:
 class PresetCurationIndex:
     favourites: set[str]
     blacklist: set[str]
+    roles: dict[str, set[CueRole]] = field(default_factory=dict)
 
     @classmethod
     def build(cls, preset_root: Path) -> PresetCurationIndex:
+        roles: dict[str, set[CueRole]] = {}
+        for role in CUE_ROLES:
+            role_dir = roles_root(preset_root) / role
+            if not role_dir.is_dir():
+                continue
+            for path in role_dir.glob("*.milk"):
+                if path.is_file():
+                    roles.setdefault(path.name, set()).add(role)
         return cls(
             favourites=_milk_names_under(favourites_root(preset_root)),
             blacklist=_milk_names_under(blacklist_root(preset_root)),
+            roles=roles,
         )
 
     def marker(self, name: str, *, user: bool = False) -> str:
@@ -83,7 +104,17 @@ class PresetCurationIndex:
             letters += "B"
         if user:
             letters += "U"
-        return f" [{letters}]" if letters else ""
+        parts: list[str] = []
+        if letters:
+            parts.append(f"[{letters}]")
+        role_set = self.roles.get(name)
+        if role_set:
+            for role in CUE_ROLES:
+                if role in role_set:
+                    parts.append(f"[R:{CUE_ROLE_MARKER_LETTER[role]}]")
+        if not parts:
+            return ""
+        return " " + " ".join(parts)
 
     def mark_favourite(self, name: str) -> None:
         self.favourites.add(name)
@@ -91,11 +122,22 @@ class PresetCurationIndex:
     def mark_blacklisted(self, name: str) -> None:
         self.blacklist.add(name)
 
+    def mark_role(self, name: str, role: CueRole) -> None:
+        self.roles.setdefault(name, set()).add(role)
+
     def unmark_favourite(self, name: str) -> None:
         self.favourites.discard(name)
 
     def unmark_blacklisted(self, name: str) -> None:
         self.blacklist.discard(name)
+
+    def unmark_role(self, name: str, role: CueRole) -> None:
+        role_set = self.roles.get(name)
+        if role_set is None:
+            return
+        role_set.discard(role)
+        if not role_set:
+            del self.roles[name]
 
 
 def list_destination_subdirs(base: Path) -> tuple[str, ...]:
@@ -111,11 +153,11 @@ def list_destination_subdirs(base: Path) -> tuple[str, ...]:
 
 
 def list_restore_destination_subdirs(preset_root: Path) -> tuple[str, ...]:
-    """Top-level dirs under ``preset_root`` excluding favourites/ and blacklist/."""
+    """Top-level dirs under ``preset_root`` excluding curation and role pools."""
     return tuple(
         name
         for name in list_destination_subdirs(preset_root)
-        if name not in (FAVOURITES_DIR, BLACKLIST_DIR)
+        if name not in (FAVOURITES_DIR, BLACKLIST_DIR, CUE_ROLE_DIR)
     )
 
 
@@ -151,6 +193,12 @@ def copy_to_favourites(src_milk: Path, dest_dir: Path) -> Path:
     return dest_milk
 
 
+def copy_to_role(src_milk: Path, preset_root: Path, role: CueRole) -> Path:
+    """Copy ``src_milk`` and co-located textures into ``roles/<role>/``."""
+    ensure_role_dirs(preset_root)
+    return copy_to_favourites(src_milk, roles_root(preset_root) / role)
+
+
 def move_to_blacklist(
     src_milk: Path,
     dest_dir: Path,
@@ -178,6 +226,15 @@ def move_to_blacklist(
 def delete_favourite_milk(preset_root: Path, src: Path) -> Path | None:
     """Delete the curated favourites ``.milk`` for ``src``; leave textures alone."""
     curated = curated_milk_src(favourites_root(preset_root), src)
+    if curated is None:
+        return None
+    curated.unlink()
+    return curated
+
+
+def delete_role_milk(preset_root: Path, src: Path, role: CueRole) -> Path | None:
+    """Delete the curated role-pool ``.milk`` for ``src``; leave textures alone."""
+    curated = curated_milk_src(roles_root(preset_root) / role, src)
     if curated is None:
         return None
     curated.unlink()

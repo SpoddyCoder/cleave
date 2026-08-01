@@ -119,7 +119,8 @@ _PRESET_DIR_SECTION = HelpSection(
 _PRESET_CURATION_SHORTCUTS = (
     ("F", "favourite preset"),
     ("B", "blacklist preset"),
-    ("R", "remove favourite / restore blacklist"),
+    ("C", "cast preset (bed/pulse/lead/accent)"),
+    ("R", "remove favourite / restore blacklist / remove cast"),
 )
 
 _PRESET_SECTION = HelpSection(
@@ -221,6 +222,20 @@ def timeline_strip_section(
             )
         )
 
+    if not recording:
+        entries.extend(
+            (
+                (", / .", "select previous / next cue"),
+                ("Shift + , / .", "nudge cue opacity -/+ 1%"),
+                ("Ctrl + , / .", "nudge cue opacity -/+ 10%"),
+                ("B / Shift+B", "cycle cue blend"),
+                (
+                    "C / Shift+C",
+                    "cycle cue cast (requires cast roles rotation set)",
+                ),
+            )
+        )
+
     entries.append(("Esc", "close timeline"))
     return HelpSection("Timeline", tuple(entries))
 
@@ -307,9 +322,10 @@ def sections_for(
 
     if behavior.affordance == RowAffordance.EXPAND:
         if behavior.is_sub_header:
+            entries = behavior.help_entries
             primary = HelpSection(
                 behavior.help_title or "Edit",
-                (("Left/Right", "expand/collapse"),),
+                entries if entries is not None else (("Left/Right", "expand/collapse"),),
             )
         elif behavior.can_enter_move_mode:
             primary = layer_section(

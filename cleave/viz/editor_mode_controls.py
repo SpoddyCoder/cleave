@@ -265,7 +265,6 @@ class EditorModeController:
             layer.playlist = playlist
             bindings.on_preset_change(slot, playlist)
             bindings.on_stem_change(slot, layer.stem)
-            bindings.on_blend_change(slot, layer.blend_mode)
             bindings.on_opacity_change(slot, layer.opacity_pct)
             bindings.on_layer_enabled_change(slot, layer.enabled)
             bindings.on_beat_change(slot, layer.beat_sensitivity)

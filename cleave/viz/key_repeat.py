@@ -13,7 +13,14 @@ FAST_INTERVAL_SEC = 0.03
 ACCEL_AFTER_SEC = 1.0
 
 _REPEAT_KEYS = frozenset(
-    {pygame.K_LEFT, pygame.K_RIGHT, pygame.K_UP, pygame.K_DOWN}
+    {
+        pygame.K_LEFT,
+        pygame.K_RIGHT,
+        pygame.K_UP,
+        pygame.K_DOWN,
+        pygame.K_COMMA,
+        pygame.K_PERIOD,
+    }
 )
 
 

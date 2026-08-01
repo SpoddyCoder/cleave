@@ -177,6 +177,9 @@ def _heavy_init_side_effect(
     controls.build_view_state.return_value = MagicMock()
     controls.tick = MagicMock()
     controls.consume_hide_overlay.return_value = False
+    controls.key_repeat_armed = False
+    timeline_controls = MagicMock()
+    timeline_controls.key_repeat_armed = False
     playback = MagicMock()
     playback.paused = False
     mix_player = MagicMock()
@@ -188,7 +191,7 @@ def _heavy_init_side_effect(
         compositor=compositor,
         post_process=post_process,
         controls=controls,
-        timeline_controls=MagicMock(),
+        timeline_controls=timeline_controls,
         modal_host=modal_host,
         mix_player=mix_player,
         playback=playback,
