@@ -21,10 +21,9 @@ What works today:
 
 Gaps the ideas below target:
 
-1. The arranger still does not assign blend or role automatically (levels and stem gating are shipped; automatic mix assignment remains deferred).
-2. Song form still needs manual markers for the best results.
-3. Busy collisions often come from milk personality; role casting helps when pools are curated, but automatic pool fill needs Idea 3 fingerprints.
-4. Nothing recurs. Chorus 2 gets a fresh roll of the dice, so the output reads as plausible-but-random rather than composed.
+1. Song form still needs manual markers for the best results.
+2. Busy collisions often come from milk personality; role casting helps when pools are curated, but automatic pool fill needs Idea 3 fingerprints.
+3. Nothing recurs. Chorus 2 gets a fresh roll of the dice, so the output reads as plausible-but-random rather than composed.
 
 ---
 
@@ -35,7 +34,7 @@ Gaps the ideas below target:
 **Deferred** (still part of the mix vision, not implemented):
 
 - Record toggles still write `0.0` / `1.0` (partial timeline opacity is Apply or strip nudge).
-- Automatic blend/role assignment from the generative arranger (Idea 3).
+- Fingerprint-driven role pool fill (Idea 3); conductor stem casting of blend/role is shipped under Idea 2.
 
 ### Intent
 
@@ -56,7 +55,7 @@ Gaps the ideas below target:
 8. Role: event property on on-transitions; seek-stable per-role pools in [cleave/viz/preset_switching.py](../cleave/viz/preset_switching.py); empty pool falls back to the main rotation.
 9. Strip authoring: `,` / `.` select on cues (`level > 0`, including mid-on changes; offs skipped); `Shift` / `Ctrl` + `,` / `.` nudge selected cue timeline opacity by 1% / 10% (floor 10% so the cue is not erased; multiplies into the layer opacity fader; YAML field stays `level`); `b` / `c` cycle blend and cast on those only; selected tick highlight, role glyphs on on cues, and badge readout (`opacity N%`).
 
-Overlaps [roadmap.md](roadmap.md) richer cue types; automatic blend/role assignment from stem content and fingerprints remains Idea 3.
+Overlaps [roadmap.md](roadmap.md) richer cue types; fingerprint-driven pool fill remains Idea 3.
 
 ### User effort
 
@@ -66,12 +65,12 @@ None for 0/1 lanes. Partial timeline opacity comes from generative Apply (cresce
 
 ## Idea 2: Stem conductor (shipped: opt-in audio-aware arrange)
 
-**Shipped:** an opt-in staged `conductor` row under timeline preset. When on and `signals.json` is present (version 4), Apply builds a [StemConductor](../cleave/timeline_presets/conductor.py) from full-mix energy ranks and per-slot stem presence, scales the character budget, biases solo rotation and chord picks toward active stems, and emits continuous cue levels quantised to `LEVEL_QUANTUM` (active slots never land between 0 and 0.25; near-silent phrases keep one slot at 0.25). Missing signals notify and fall through to plain arrangement. `other` now carries `rms` alongside `spectral_centroid`.
+**Shipped:** an opt-in staged `conductor` row under timeline preset. When on and `signals.json` is present (version 4), Apply builds a [StemConductor](../cleave/timeline_presets/conductor.py) from full-mix energy ranks and per-slot stem presence, scales the character budget, biases solo rotation and chord picks toward active stems, emits continuous cue levels quantised to `LEVEL_QUANTUM` (active slots never land between 0 and 0.25; near-silent phrases keep one slot at 0.25), and assigns per-slot cast roles and blends on on-cues (`cast_for_state`: drums with activity -> pulse/add; highest non-pulse -> lead; rest -> bed; near-silent -> bed; one lead max). Missing signals notify and fall through to plain arrangement. `other` now carries `rms` alongside `spectral_centroid`.
 
 **Deferred** (still part of the conductor vision, not implemented):
 
 - Section-role bias from auto form (Idea 4).
-- Automatic blend or role assignment from stem content (Idea 1 deferred / Idea 3).
+- Fingerprint-driven role pool fill and accent casting (Idea 3).
 
 ### Intent
 
@@ -82,7 +81,7 @@ None for 0/1 lanes. Partial timeline opacity comes from generative Apply (cresce
 ### What landed
 
 1. Signals: `other.rms` in extract/analyse; `SIGNALS_VERSION = 4`; `Signals.window_mean` for phrase and state windows.
-2. Conductor module: phrase energy ranks, per-slot activity, rotation hint, chord score, `level_states`; staging helpers mirror density.
+2. Conductor module: phrase energy ranks, per-slot activity, rotation hint, chord score, `level_states`, `cast_for_state`; staging helpers mirror density.
 3. Arranger hooks: optional `signals` / `slot_stems` on all four builders into `compose_timeline`; UI toggle expressed by whether Apply passes those kwargs.
 4. Panel: `timeline.preset.conductor` persisted; confirm modal lists `conductor: on|off`.
 

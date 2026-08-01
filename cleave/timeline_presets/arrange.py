@@ -192,7 +192,13 @@ def compose_timeline(
         if conductor is None
         else conductor.level_states(states, duration_sec)
     )
-    return cues_from_states(slot_list, level_states)
+    casts = None
+    if conductor is not None:
+        casts = [
+            conductor.cast_for_state(active, conductor.phrase_at(t))
+            for t, active in states
+        ]
+    return cues_from_states(slot_list, level_states, casts)
 
 
 def _normalize_song_markers(

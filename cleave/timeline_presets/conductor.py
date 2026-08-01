@@ -7,6 +7,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from cleave.blend_modes import BlendMode
+from cleave.cue_roles import CUE_ROLE_BLEND, CueRole
 from cleave.extract import StemSource
 from cleave.signals import Signals
 from cleave.timeline import LEVEL_QUANTUM, clamp_level, quantize_level
@@ -244,6 +246,52 @@ class StemConductor:
             for slot in active
         )
         return total / len(active)
+
+    def cast_for_state(
+        self,
+        active: frozenset[str] | set[str],
+        weights: PhraseWeights,
+    ) -> dict[str, tuple[CueRole, BlendMode]]:
+        """Assign one role and blend per active slot for a state.
+
+        Near-silent phrases cast every active slot as bed. Otherwise drums with
+        non-trivial activity become pulse; the highest-activity non-pulse slot
+        is lead (solo states are always lead); remaining slots are bed. At most
+        one lead; accent is never assigned.
+        """
+        if not active:
+            return {}
+
+        def _role(role: CueRole) -> tuple[CueRole, BlendMode]:
+            return (role, CUE_ROLE_BLEND[role])
+
+        if weights.near_silent:
+            return {slot: _role("bed") for slot in active}
+
+        if len(active) == 1:
+            slot = next(iter(active))
+            return {slot: _role("lead")}
+
+        cast: dict[str, tuple[CueRole, BlendMode]] = {}
+        pulse_slots: set[str] = set()
+        for slot in active:
+            if (
+                self._slot_stems.get(slot) == "drums"
+                and weights.slot_activity.get(slot, 0.0) > 0.0
+            ):
+                cast[slot] = _role("pulse")
+                pulse_slots.add(slot)
+
+        candidates = sorted(slot for slot in active if slot not in pulse_slots)
+        if candidates:
+            lead = max(
+                candidates, key=lambda s: weights.slot_activity.get(s, 0.0)
+            )
+            cast[lead] = _role("lead")
+            for slot in candidates:
+                if slot != lead:
+                    cast[slot] = _role("bed")
+        return cast
 
     def level_states(
         self,

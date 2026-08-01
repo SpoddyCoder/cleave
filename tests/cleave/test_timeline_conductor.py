@@ -8,9 +8,16 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from cleave.cue_roles import CUE_ROLE_BLEND
 from cleave.extract import StemSource
 from cleave.signals import Signals
-from cleave.timeline import LEVEL_QUANTUM, TimelineLane, empty_lane, lane_level_at
+from cleave.timeline import (
+    LEVEL_QUANTUM,
+    SlotCue,
+    TimelineLane,
+    empty_lane,
+    lane_level_at,
+)
 from cleave.timeline_presets import ALL_BUILDERS, build_breathing_cues, build_pulse_cues
 from cleave.timeline_presets.conductor import (
     CONDUCTOR_ACTIVITY_MIDPOINT,
@@ -29,6 +36,7 @@ from cleave.timeline_presets.crescendo import (
     apply_crescendo,
     resolve_crescendo_window,
 )
+from cleave.timeline_presets.emit import cues_from_states
 
 _SR = 100.0
 _DUR = 20.0
@@ -260,6 +268,131 @@ def test_deterministic_for_same_inputs() -> None:
     assert a.rotation_for(["layer_1", "layer_2"], weights, airtime) == b.rotation_for(
         ["layer_1", "layer_2"], weights, airtime
     )
+
+
+def test_cast_for_state_near_silent_all_bed() -> None:
+    mix_rms = _envelope(0.001, 1.0)
+    mix_onset = _envelope(0.001, 1.0)
+    signals = _make_signals(mix_rms=mix_rms, mix_onset=mix_onset)
+    conductor = StemConductor.build(signals, _slot_stems(), _phrases())
+    assert conductor is not None
+    weights = conductor.phrase_at(5.0)
+    assert weights.near_silent
+    active = frozenset({"layer_1", "layer_2", "layer_3"})
+    cast = conductor.cast_for_state(active, weights)
+    assert set(cast) == active
+    for role, blend in cast.values():
+        assert role == "bed"
+        assert blend == CUE_ROLE_BLEND["bed"]
+
+
+def test_cast_for_state_drums_pulse_and_one_lead() -> None:
+    conductor = StemConductor.build(_make_signals(), _slot_stems(), _phrases())
+    assert conductor is not None
+    weights = conductor.phrase_at(15.0)
+    assert not weights.near_silent
+    assert weights.slot_activity["layer_1"] > 0.0
+    active = frozenset({"layer_1", "layer_2", "layer_3", "layer_4"})
+    cast = conductor.cast_for_state(active, weights)
+    assert cast["layer_1"] == ("pulse", CUE_ROLE_BLEND["pulse"])
+    roles = {role for role, _blend in cast.values()}
+    assert roles == {"pulse", "lead", "bed"}
+    leads = [slot for slot, (role, _) in cast.items() if role == "lead"]
+    assert len(leads) == 1
+    lead = leads[0]
+    assert lead != "layer_1"
+    non_pulse = [s for s in active if s != "layer_1"]
+    expected_lead = max(
+        sorted(non_pulse), key=lambda s: weights.slot_activity.get(s, 0.0)
+    )
+    assert lead == expected_lead
+    for slot in non_pulse:
+        if slot != lead:
+            assert cast[slot] == ("bed", CUE_ROLE_BLEND["bed"])
+    assert "accent" not in roles
+
+
+def test_cast_for_state_solo_is_lead() -> None:
+    conductor = StemConductor.build(_make_signals(), _slot_stems(), _phrases())
+    assert conductor is not None
+    weights = conductor.phrase_at(15.0)
+    # Solo drums still casts as lead (solo overrides pulse).
+    cast = conductor.cast_for_state(frozenset({"layer_1"}), weights)
+    assert cast == {"layer_1": ("lead", CUE_ROLE_BLEND["lead"])}
+    cast_bass = conductor.cast_for_state(frozenset({"layer_2"}), weights)
+    assert cast_bass == {"layer_2": ("lead", CUE_ROLE_BLEND["lead"])}
+
+
+def test_cast_for_state_silent_drums_not_pulse() -> None:
+    drums = np.zeros(_N, dtype=np.float64)
+    signals = _make_signals(drums=drums)
+    conductor = StemConductor.build(signals, _slot_stems(), _phrases())
+    assert conductor is not None
+    weights = conductor.phrase_at(15.0)
+    assert weights.slot_activity["layer_1"] == pytest.approx(0.0)
+    cast = conductor.cast_for_state(
+        frozenset({"layer_1", "layer_2", "layer_3"}), weights
+    )
+    assert cast["layer_1"][0] != "pulse"
+    leads = [slot for slot, (role, _) in cast.items() if role == "lead"]
+    assert len(leads) == 1
+
+
+def test_cues_from_states_writes_cast_on_on_transitions() -> None:
+    slots = ["layer_1", "layer_2"]
+    states = [
+        (0.0, {"layer_1": 1.0, "layer_2": 0.0}),
+        (4.0, {"layer_1": 0.0, "layer_2": 0.5}),
+        (8.0, {"layer_1": 0.0, "layer_2": 1.0}),
+    ]
+    casts = [
+        {"layer_1": ("lead", "black-key")},
+        {"layer_2": ("pulse", "add")},
+        {"layer_2": ("pulse", "add")},
+    ]
+    lanes = cues_from_states(slots, states, casts)
+    assert lanes["layer_1"].cues == [
+        SlotCue(t=0.0, level=1.0, blend="black-key", role="lead"),
+        SlotCue(t=4.0, level=0.0),
+    ]
+    assert lanes["layer_2"].cues == [
+        SlotCue(t=4.0, level=0.5, blend="add", role="pulse"),
+        SlotCue(t=8.0, level=1.0, blend="add", role="pulse"),
+    ]
+
+
+def test_cues_from_states_without_casts_omits_role_blend() -> None:
+    slots = ["layer_1"]
+    lanes = cues_from_states(slots, [(0.0, {"layer_1": 1.0})])
+    assert lanes["layer_1"].cues == [SlotCue(t=0.0, level=1.0)]
+
+
+def test_arranger_with_conductor_emits_roles_and_blends() -> None:
+    slots = ["layer_1", "layer_2", "layer_3", "layer_4"]
+    duration_sec = 20.0
+    bars = _bar_times(duration_sec)
+    lanes = build_breathing_cues(
+        slots,
+        duration_sec,
+        random.Random(7),
+        bar_times=bars,
+        signals=_make_signals(),
+        slot_stems=_slot_stems(),
+    )
+    on_cues = [
+        cue
+        for lane in lanes.values()
+        for cue in lane.cues
+        if cue.level > 0.0
+    ]
+    assert on_cues
+    assert any(cue.role is not None and cue.blend is not None for cue in on_cues)
+    for cue in on_cues:
+        if cue.role is None:
+            continue
+        assert cue.role in ("bed", "pulse", "lead")
+        assert cue.blend == CUE_ROLE_BLEND[cue.role]
+        assert cue.role != "accent"
 
 
 def test_chord_score_is_centred_mean_activity() -> None:
@@ -733,3 +866,97 @@ def test_arranger_conductor_crescendo_preserves_prefix_levels() -> None:
                 lane_level_at(base[slot], t, inherit=0.0)
             )
         t += 1.0
+
+
+def test_arranger_conductor_crescendo_preserves_prefix_roles() -> None:
+    """Regression: apply_crescendo must not strip conductor casts on rebuild."""
+    slots = ["layer_1", "layer_2", "layer_3", "layer_4"]
+    duration_sec = 120.0
+    bars = _bar_times(duration_sec)
+    n = int(duration_sec * _SR)
+    mix_rms = np.linspace(0.15, 1.0, n, dtype=np.float64)
+    mix_onset = np.linspace(0.1, 0.9, n, dtype=np.float64)
+    stem = np.linspace(0.2, 0.9, n, dtype=np.float64)
+    signals = Signals(
+        sample_rate_hz=_SR,
+        duration_sec=duration_sec,
+        path=Path("."),
+        stems={
+            "drums": {"onset_strength": stem},
+            "bass": {"rms": stem, "sub_bass": stem, "mid_bass": stem},
+            "vocals": {"rms": stem, "pitch_hz": stem},
+            "other": {"spectral_centroid": stem * 1000.0, "rms": stem},
+            "full_mix": {"onset_strength": mix_onset, "rms": mix_rms},
+        },
+    )
+    markers = [20.0, 50.0, 80.0, 100.0]
+    window = resolve_crescendo_window(markers, duration_sec, "last")
+    assert window is not None
+    base = build_breathing_cues(
+        slots,
+        duration_sec,
+        random.Random(5),
+        bar_times=bars,
+        signals=signals,
+        slot_stems=_slot_stems(),
+    )
+    base_prefix_on = [
+        cue
+        for lane in base.values()
+        for cue in lane.cues
+        if cue.t < window.t_start - 1e-9 and cue.level > 0.0
+    ]
+    assert base_prefix_on
+    assert any(cue.role is not None for cue in base_prefix_on)
+
+    after = apply_crescendo(
+        base,
+        slots,
+        duration_sec=duration_sec,
+        bar_times=bars,
+        song_marker_times=markers,
+        target="last",
+        rng=random.Random(6),
+    )
+    after_prefix_on = [
+        cue
+        for lane in after.values()
+        for cue in lane.cues
+        if cue.t < window.t_start - 1e-9 and cue.level > 0.0
+    ]
+    assert after_prefix_on
+    assert all(cue.role is not None for cue in after_prefix_on)
+    for cue in after_prefix_on:
+        assert cue.blend == CUE_ROLE_BLEND[cue.role]
+
+    # Crescendo ramp itself also gets lead/bed casts (not left null).
+    ramp_on = [
+        cue
+        for lane in after.values()
+        for cue in lane.cues
+        if cue.t >= window.t_start - 1e-9 and cue.level > 0.0
+    ]
+    assert ramp_on
+    assert all(cue.role in ("lead", "bed") for cue in ramp_on)
+    assert all(cue.blend == CUE_ROLE_BLEND[cue.role] for cue in ramp_on)
+
+
+def test_apply_crescendo_without_roles_stays_role_free() -> None:
+    slots = ["layer_1", "layer_2", "layer_3", "layer_4"]
+    duration_sec = 120.0
+    bars = _bar_times(duration_sec)
+    markers = [20.0, 50.0, 80.0, 100.0]
+    base = build_breathing_cues(
+        slots, duration_sec, random.Random(1), bar_times=bars
+    )
+    assert all(cue.role is None for lane in base.values() for cue in lane.cues)
+    after = apply_crescendo(
+        base,
+        slots,
+        duration_sec=duration_sec,
+        bar_times=bars,
+        song_marker_times=markers,
+        target="last",
+        rng=random.Random(2),
+    )
+    assert all(cue.role is None for lane in after.values() for cue in lane.cues)

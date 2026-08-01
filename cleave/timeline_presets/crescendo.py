@@ -7,12 +7,16 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal
 
+from cleave.blend_modes import BlendMode
+from cleave.cue_roles import CUE_ROLE_BLEND, CueRole
 from cleave.timeline import (
     LEVEL_EPS,
     LEVEL_QUANTUM,
     TimelineLane,
     clamp_level,
+    lane_blend_at,
     lane_level_at,
+    lane_role_at,
     levels_equal,
     quantize_level,
 )
@@ -119,7 +123,12 @@ def apply_crescendo(
     target: CrescendoTarget,
     rng: random.Random,
 ) -> dict[str, TimelineLane]:
-    """Rewrite ``lanes`` from the crescendo window through song end."""
+    """Rewrite ``lanes`` from the crescendo window through song end.
+
+    When the source lanes carry cast roles (e.g. conductor Apply), the prefix
+    keeps those held role/blend values and the crescendo ramp assigns a simple
+    lead/bed cast so ``cues_from_states`` does not strip them.
+    """
     slot_list = list(slots)
     if not slot_list or duration_sec <= 0.0:
         return lanes
@@ -138,7 +147,12 @@ def apply_crescendo(
     merged = _merge_states(prefix, crescendo)
     if not merged:
         return lanes
-    return cues_from_states(slot_list, merged)
+    casts = None
+    if _lanes_have_roles(lanes):
+        casts = _casts_for_merged(
+            lanes, slot_list, merged, t_start=window.t_start
+        )
+    return cues_from_states(slot_list, merged, casts)
 
 
 def _levels_equal_maps(
@@ -151,6 +165,67 @@ def _levels_equal_maps(
         levels_equal(float(a.get(slot, 0.0)), float(b.get(slot, 0.0)))
         for slot in keys
     )
+
+
+def _lanes_have_roles(lanes: Mapping[str, TimelineLane]) -> bool:
+    return any(
+        cue.role is not None for lane in lanes.values() for cue in lane.cues
+    )
+
+
+def _cast_at_from_lanes(
+    lanes: Mapping[str, TimelineLane],
+    slots: Sequence[str],
+    t: float,
+    levels: Mapping[str, float],
+) -> dict[str, tuple[CueRole, BlendMode]]:
+    """Held role/blend at ``t`` for slots that are on in ``levels``."""
+    cast: dict[str, tuple[CueRole, BlendMode]] = {}
+    for slot in slots:
+        if float(levels.get(slot, 0.0)) <= LEVEL_EPS:
+            continue
+        lane = lanes.get(slot) or TimelineLane(baseline=0.0, cues=[])
+        role = lane_role_at(lane, t)
+        if role is None:
+            continue
+        blend = lane_blend_at(lane, t)
+        if blend is None:
+            blend = CUE_ROLE_BLEND[role]
+        cast[slot] = (role, blend)
+    return cast
+
+
+def _crescendo_cast_for_levels(
+    levels: Mapping[str, float],
+) -> dict[str, tuple[CueRole, BlendMode]]:
+    """Simple ramp cast: first active slot (stack order) is lead; rest bed."""
+    active = [
+        slot for slot, level in levels.items() if float(level) > LEVEL_EPS
+    ]
+    if not active:
+        return {}
+    lead = active[0]
+    cast: dict[str, tuple[CueRole, BlendMode]] = {}
+    for slot in active:
+        role: CueRole = "lead" if slot == lead else "bed"
+        cast[slot] = (role, CUE_ROLE_BLEND[role])
+    return cast
+
+
+def _casts_for_merged(
+    lanes: Mapping[str, TimelineLane],
+    slots: Sequence[str],
+    merged: Sequence[tuple[float, Mapping[str, float]]],
+    *,
+    t_start: float,
+) -> list[dict[str, tuple[CueRole, BlendMode]]]:
+    casts: list[dict[str, tuple[CueRole, BlendMode]]] = []
+    for t, levels in merged:
+        if t < t_start - 1e-9:
+            casts.append(_cast_at_from_lanes(lanes, slots, t, levels))
+        else:
+            casts.append(_crescendo_cast_for_levels(levels))
+    return casts
 
 
 def _states_before(
