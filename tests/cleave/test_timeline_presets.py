@@ -7,7 +7,7 @@ import statistics
 
 import pytest
 
-from cleave.timeline import Timeline, TimelineLane, lane_visible_at
+from cleave.timeline import LEVEL_EPS, SlotCue, TimelineLane, empty_lane, lane_level_at
 from cleave.timeline_presets import (
     MIN_SWITCH_GAP_BARS,
     MIN_SWITCH_GAP_SEC,
@@ -70,12 +70,20 @@ def _dense_middle_bars(duration_sec: float = 60.0) -> list[float]:
     return bars
 
 
-def _inherits_false(slots: list[str]) -> dict[str, bool]:
-    return {slot: False for slot in slots}
+def _inherits_zero(slots: list[str]) -> dict[str, float]:
+    return {slot: 0.0 for slot in slots}
 
 
-def _timeline(lanes: dict[str, TimelineLane]) -> Timeline:
-    return Timeline(lanes=lanes)
+def _level_at(
+    lanes: dict[str, TimelineLane],
+    slots: list[str],
+    t: float,
+) -> dict[str, float]:
+    inherits = _inherits_zero(slots)
+    return {
+        slot: lane_level_at(lanes.get(slot) or empty_lane(), t, inherit=inherits[slot])
+        for slot in slots
+    }
 
 
 def _visible_at(
@@ -83,8 +91,7 @@ def _visible_at(
     slots: list[str],
     t: float,
 ) -> dict[str, bool]:
-    inherits = _inherits_false(slots)
-    return _timeline(lanes).visible_state_at(slots, t, inherits)
+    return {slot: level > LEVEL_EPS for slot, level in _level_at(lanes, slots, t).items()}
 
 
 def _all_transition_times(lanes: dict[str, TimelineLane]) -> list[float]:
@@ -279,8 +286,8 @@ def test_preset_invariants(builder, n: int, duration_sec: float) -> None:
     _assert_cues_on_bars(lanes, thinned if thinned else bars)
     _assert_min_gaps(lanes, bars, duration_sec)
     if n == 1:
-        assert lanes[slots[0]].baseline is True
-        assert lanes[slots[0]].cues == []
+        assert lanes[slots[0]].baseline == 0.0
+        assert lanes[slots[0]].cues == [SlotCue(t=0.0, level=1.0)]
 
 
 @pytest.mark.parametrize("builder", ALL_BUILDERS)
@@ -306,9 +313,19 @@ def test_short_duration_still_never_zero() -> None:
     slots = _slots(4)
     for builder in ALL_BUILDERS:
         lanes, bars = _build(builder, slots, 4.0, random.Random(7))
-        assert all(not lane.cues for lane in lanes.values())
+        # Opening-only: cues only at t=0 (no mid-song transitions).
+        assert all(
+            all(cue.t == 0.0 for cue in lane.cues) for lane in lanes.values()
+        )
         _assert_never_zero(lanes, slots, 4.0)
-        assert sum(1 for lane in lanes.values() if lane.baseline) >= 1
+        assert (
+            sum(
+                1
+                for lane in lanes.values()
+                if lane_level_at(lane, 0.0, inherit=0.0) > LEVEL_EPS
+            )
+            >= 1
+        )
         _assert_cues_on_bars(lanes, bars)
 
 
@@ -364,7 +381,14 @@ def test_voice_leading_mostly_smooth(builder) -> None:
 def test_breathing_starts_with_one_layer() -> None:
     slots = _slots(5)
     lanes, _bars = _build(build_breathing_cues, slots, 120.0, random.Random(11))
-    assert sum(1 for lane in lanes.values() if lane.baseline) == 1
+    assert (
+        sum(
+            1
+            for lane in lanes.values()
+            if lane_level_at(lane, 0.0, inherit=0.0) > LEVEL_EPS
+        )
+        == 1
+    )
 
 
 def test_pulse_rotates_singles() -> None:
@@ -374,17 +398,17 @@ def test_pulse_rotates_singles() -> None:
     for t in _all_transition_times(lanes):
         if t == 0.0:
             continue
-        active = [s for s in slots if lane_visible_at(lanes[s], t, inherit=False)]
+        active = [s for s in slots if lane_level_at(lanes[s], t, inherit=0.0)]
         if len(active) == 1:
             solo_seen.add(active[0])
     assert len(solo_seen) >= 2
 
 
-def test_lane_visible_at_with_all_false_inherits() -> None:
+def test_lane_level_at_with_all_false_inherits() -> None:
     slots = _slots(3)
     lanes, _bars = _build(build_dialogue_cues, slots, 60.0, random.Random(3))
     for slot in slots:
-        lane_visible_at(lanes[slot], 0.0, inherit=False)
+        lane_level_at(lanes[slot], 0.0, inherit=0.0)
 
 
 def test_in_climax_window_bounds() -> None:
@@ -397,7 +421,9 @@ def test_empty_bar_times_returns_opening_only() -> None:
     slots = _slots(4)
     for builder in ALL_BUILDERS:
         lanes = builder(slots, 60.0, random.Random(1), bar_times=())
-        assert all(not lane.cues for lane in lanes.values())
+        assert all(
+            all(cue.t == 0.0 for cue in lane.cues) for lane in lanes.values()
+        )
         _assert_never_zero(lanes, slots, 60.0)
 
 
@@ -710,6 +736,54 @@ def test_resolve_crescendo_window_penultimate_falls_back_without_minus_two() -> 
 
 def test_resolve_crescendo_window_requires_three_markers() -> None:
     assert resolve_crescendo_window([10.0, 50.0], 100.0, "last") is None
+
+
+def test_crescendo_states_ramp_through_quantised_levels() -> None:
+    from cleave.timeline_presets.crescendo import (
+        CRESCENDO_ENTRY_LEVEL,
+        CrescendoWindow,
+        _crescendo_states,
+    )
+
+    slots = _slots(4)
+    bars = _bar_times_for(120.0)
+    window = CrescendoWindow(t_start=50.0, t_full=80.0, t_peak_end=100.0)
+    states = _crescendo_states(
+        slots,
+        window,
+        duration_sec=120.0,
+        bar_times=bars,
+        rng=random.Random(0),
+    )
+    assert states
+    ramp = [levels for t, levels in states if t < window.t_full - 1e-9]
+    # A build, not a switch: more than two steps and each is dimmer than the last.
+    assert len(ramp) > 2
+    weights = [sum(levels.values()) for levels in ramp]
+    assert weights == sorted(weights)
+    assert weights[0] == pytest.approx(CRESCENDO_ENTRY_LEVEL)
+    distinct_levels = {level for levels in ramp for level in levels.values()}
+    assert len(distinct_levels) > 2
+    # Entrant count grows monotonically toward the full stack.
+    counts = [len(levels) for levels in ramp]
+    assert counts == sorted(counts)
+    full = next(levels for t, levels in states if abs(t - window.t_full) < 1e-9)
+    assert set(full.values()) == {1.0}
+    assert len(full) == min(4, MAX_CONCURRENT_LAYERS)
+
+
+def test_crescendo_spread_times_are_evenly_spaced() -> None:
+    from cleave.timeline_presets.crescendo import _spread_times
+
+    bars = _bar_times_for(120.0)
+    times = _spread_times(50.0, 80.0, 4, bars)
+    assert len(times) == 4
+    assert times[0] == pytest.approx(50.0)
+    assert times[-1] == pytest.approx(80.0)
+    gaps = [b - a for a, b in zip(times, times[1:])]
+    assert all(gap > 0.0 for gap in gaps)
+    # Interior steps land mid-window, not bunched against either end.
+    assert max(gaps) <= 2.0 * min(gaps)
 
 
 def test_apply_crescendo_ramps_holds_then_solos() -> None:

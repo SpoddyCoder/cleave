@@ -75,9 +75,10 @@ Build the preset list from parsed [CleaveConfig](../../cleave/config.py) **on di
 2. **Include anchor directory even when `preset_switching` is `none`** — user may enable projectM later; scanning only the locked file would miss siblings they will rotate into.
 3. **projectM directory rotation** — when `preset_switching` is `projectm` and `preset_switching_rotation_set` is `directory`, step 1 already matches live rotation.
 4. **User-defined rotation** — when `preset_switching_rotation_set` is `user_defined`, add every path in `layers.<slot>.preset_switching_presets` (resolved relative to project dir per [config_schema](../../cleave/config_schema.py)).
-5. **Deduplicate** by resolved absolute `.milk` path. Keep metadata: which layer slot(s) referenced each file.
+5. **Role pools** — include non-recursive `*.milk` under each `paths.preset_root/roles/<role>/` (`bed`, `pulse`, `lead`, `accent`), matching timeline role casting in [preset_switching](../../cleave/viz/preset_switching.py). Attribute those presets to every layer slot already in the scan set.
+6. **Deduplicate** by resolved absolute `.milk` path. Keep metadata: which layer slot(s) referenced each file.
 
-Do **not** scan `browse_floor`, full `preset_root`, or subfolders under the anchor directory unless bulk mode with `--recursive`.
+Do **not** scan `browse_floor`, full `preset_root`, or subfolders under the anchor directory unless bulk mode with `--recursive`. Role pool dirs are an explicit exception (step 5).
 
 ### Texture paths
 

@@ -268,6 +268,46 @@ def test_bulk_targets_recursive() -> None:
         ]
 
 
+def test_project_targets_include_role_pool_presets() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        preset_dir = root / "presets" / "pack"
+        preset_dir.mkdir(parents=True)
+        anchor = preset_dir / "anchor.milk"
+        _write_milk(anchor)
+
+        pulse_dir = root / "presets" / "roles" / "pulse"
+        pulse_dir.mkdir(parents=True)
+        pulse_a = pulse_dir / "a.milk"
+        pulse_b = pulse_dir / "b.milk"
+        nested = pulse_dir / "nested"
+        nested.mkdir()
+        _write_milk(pulse_a)
+        _write_milk(pulse_b)
+        _write_milk(nested / "deep.milk")
+
+        bed_dir = root / "presets" / "roles" / "bed"
+        bed_dir.mkdir(parents=True)
+        bed = bed_dir / "bed.milk"
+        _write_milk(bed)
+
+        cfg = _project_cfg(
+            root,
+            layers={
+                "layer_1": _layer_config(anchor, preset_switching="timeline"),
+            },
+        )
+        targets = build_project_targets(cfg)
+
+        paths = {target.path for target in targets.presets}
+        assert pulse_a.resolve() in paths
+        assert pulse_b.resolve() in paths
+        assert bed.resolve() in paths
+        assert (nested / "deep.milk").resolve() not in paths
+        assert pulse_dir.resolve() in targets.layer_sources["layer_1"]
+        assert bed_dir.resolve() in targets.layer_sources["layer_1"]
+
+
 def test_build_project_targets_uses_user_config_preset_root(tmp_path: Path) -> None:
     import yaml
 

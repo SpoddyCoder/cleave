@@ -23,6 +23,7 @@ from cleave.config import (
     TimelineConfig,
     TimelineFadeGroupConfig,
     TimelineFadesConfig,
+    TimelineLimiterConfig,
     TimelinePresetConfig,
     EditorConfig,
     clamp_beat_sensitivity,
@@ -1090,7 +1091,7 @@ def test_parse_timeline_reads_fades() -> None:
     )
 
 
-def test_persist_timeline_fades_round_trip() -> None:
+def test_persist_timeline_levels_round_trip() -> None:
     from cleave.viz.session import TimelineFadeGroupRuntime, TimelineRuntime
 
     session = TuningSession(
@@ -1177,6 +1178,46 @@ def test_persist_timeline_placement_snap_round_trip() -> None:
     assert round_trip.placement_snap == "bar"
 
 
+def test_persist_timeline_limiter_round_trip() -> None:
+    from cleave.viz.session import TimelineRuntime, VisualLimiterRuntime
+
+    session = TuningSession(
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
+        timeline=TimelineRuntime(
+            enabled=True,
+            limiter=VisualLimiterRuntime(
+                enabled=False,
+                threshold=0.72,
+                release=0.6,
+            ),
+        ),
+    )
+    cfg = CleaveConfig(
+        paths=PathsConfig(preset_root=Path("/tmp"), texture_paths=()),
+        layers={},
+        editor=EditorConfig(),
+        config_path=Path("/tmp/cleave-viz.yaml"),
+        user_config_path=Path("/tmp/user.yaml"),
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
+    )
+    payload = persist_timeline(PersistCtx(cfg=cfg, session=session, cfg_dir=None))
+    assert payload["limiter"] == {
+        "enabled": False,
+        "threshold": 0.72,
+        "release": 0.6,
+    }
+    round_trip = parse_timeline_section(
+        {"timeline": payload},
+        _timeline_parse_ctx(),
+    )
+    assert round_trip is not None
+    assert round_trip.limiter == TimelineLimiterConfig(
+        enabled=False,
+        threshold=0.72,
+        release=0.6,
+    )
+
+
 def test_persist_timeline_preset_round_trip() -> None:
     from cleave.viz.session import TimelineRuntime
 
@@ -1187,6 +1228,7 @@ def test_persist_timeline_preset_round_trip() -> None:
             timeline_preset_kind="arc",
             timeline_preset_crescendo="penultimate",
             timeline_preset_density="very dense",
+            timeline_preset_conductor=True,
         ),
     )
     cfg = CleaveConfig(
@@ -1202,6 +1244,7 @@ def test_persist_timeline_preset_round_trip() -> None:
         "character": "arc",
         "crescendo": "penultimate",
         "density": "very dense",
+        "conductor": True,
     }
     round_trip = parse_timeline_section(
         {"timeline": payload},
@@ -1212,6 +1255,7 @@ def test_persist_timeline_preset_round_trip() -> None:
         character="arc",
         crescendo="penultimate",
         density="very dense",
+        conductor=True,
     )
 
 
@@ -1223,6 +1267,7 @@ def test_parse_timeline_reads_preset() -> None:
                     "character": "pulse",
                     "crescendo": "last",
                     "density": "sparse",
+                    "conductor": True,
                 }
             }
         },
@@ -1233,6 +1278,7 @@ def test_parse_timeline_reads_preset() -> None:
         character="pulse",
         crescendo="last",
         density="sparse",
+        conductor=True,
     )
 
 
@@ -1245,6 +1291,7 @@ def test_parse_timeline_preset_null_crescendo() -> None:
     assert timeline.preset.character == "dialogue"
     assert timeline.preset.crescendo is None
     assert timeline.preset.density == "normal"
+    assert timeline.preset.conductor is False
 
 
 def test_parse_timeline_rejects_invalid_placement_snap() -> None:
@@ -1271,6 +1318,14 @@ def test_parse_timeline_rejects_invalid_preset_density() -> None:
         )
 
 
+def test_parse_timeline_rejects_invalid_preset_conductor() -> None:
+    with pytest.raises(ValueError, match="conductor"):
+        parse_timeline_section(
+            {"timeline": {"preset": {"conductor": "on"}}},
+            _timeline_parse_ctx(),
+        )
+
+
 def test_parse_timeline_reads_locked() -> None:
     timeline = parse_timeline_section(
         {"timeline": {"enabled": True, "locked": True}},
@@ -1287,12 +1342,12 @@ def test_parse_timeline_reads_lanes() -> None:
                 "enabled": True,
                 "lanes": {
                     "layer_1": {
-                        "baseline": True,
-                        "cues": [{"t": 10.0, "visible": False}],
+                        "baseline": 1.0,
+                        "cues": [{"t": 10.0, "level": 0.0}],
                     },
                     "layer_2": {
-                        "baseline": False,
-                        "cues": [{"t": 2.5, "visible": True}],
+                        "baseline": 0.0,
+                        "cues": [{"t": 2.5, "level": 1.0}],
                     },
                 },
             }
@@ -1302,13 +1357,163 @@ def test_parse_timeline_reads_lanes() -> None:
     assert timeline is not None
     assert timeline.enabled is True
     assert timeline.lanes["layer_1"] == TimelineLane(
-        baseline=True,
-        cues=[SlotCue(t=10.0, visible=False)],
+        baseline=1.0,
+        cues=[SlotCue(t=10.0, level=0.0)],
     )
     assert timeline.lanes["layer_2"] == TimelineLane(
-        baseline=False,
-        cues=[SlotCue(t=2.5, visible=True)],
+        baseline=0.0,
+        cues=[SlotCue(t=2.5, level=1.0)],
     )
+
+
+def test_persist_timeline_cue_levels_round_trip() -> None:
+    from cleave.viz.session import TimelineRuntime
+
+    session = TuningSession(
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
+        timeline=TimelineRuntime(
+            enabled=True,
+            lanes={
+                "layer_1": TimelineLane(
+                    baseline=1.0,
+                    cues=[SlotCue(t=4.0, level=0.5), SlotCue(t=8.0, level=0.0)],
+                ),
+            },
+        ),
+    )
+    cfg = CleaveConfig(
+        paths=PathsConfig(preset_root=Path("/tmp"), texture_paths=()),
+        layers={},
+        editor=EditorConfig(),
+        config_path=Path("/tmp/cleave-viz.yaml"),
+        user_config_path=Path("/tmp/user.yaml"),
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
+    )
+    payload = persist_timeline(PersistCtx(cfg=cfg, session=session, cfg_dir=None))
+    assert payload["lanes"]["layer_1"] == {
+        "baseline": 1.0,
+        "cues": [{"t": 4.0, "level": 0.5}, {"t": 8.0, "level": 0.0}],
+    }
+    round_trip = parse_timeline_section(
+        {"timeline": payload},
+        _timeline_parse_ctx(),
+    )
+    assert round_trip is not None
+    assert round_trip.lanes["layer_1"] == session.timeline.lanes["layer_1"]
+
+
+def test_persist_timeline_cue_blend_and_role_round_trip() -> None:
+    from cleave.viz.session import TimelineRuntime
+
+    session = TuningSession(
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
+        timeline=TimelineRuntime(
+            enabled=True,
+            lanes={
+                "layer_1": TimelineLane(
+                    baseline=0.0,
+                    cues=[
+                        SlotCue(t=1.0, level=1.0, blend="add", role="lead"),
+                        SlotCue(t=2.0, level=0.0),
+                    ],
+                ),
+            },
+        ),
+    )
+    cfg = CleaveConfig(
+        paths=PathsConfig(preset_root=Path("/tmp"), texture_paths=()),
+        layers={},
+        editor=EditorConfig(),
+        config_path=Path("/tmp/cleave-viz.yaml"),
+        user_config_path=Path("/tmp/user.yaml"),
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
+    )
+    payload = persist_timeline(PersistCtx(cfg=cfg, session=session, cfg_dir=None))
+    assert payload["lanes"]["layer_1"]["cues"] == [
+        {"t": 1.0, "level": 1.0, "blend": "add", "role": "lead"},
+        {"t": 2.0, "level": 0.0},
+    ]
+    round_trip = parse_timeline_section(
+        {"timeline": payload},
+        _timeline_parse_ctx(),
+    )
+    assert round_trip is not None
+    assert round_trip.lanes["layer_1"] == session.timeline.lanes["layer_1"]
+
+
+def test_parse_timeline_reads_cue_blend_and_role() -> None:
+    timeline = parse_timeline_section(
+        {
+            "timeline": {
+                "lanes": {
+                    "layer_1": {
+                        "baseline": 0.0,
+                        "cues": [
+                            {
+                                "t": 1.0,
+                                "level": 1.0,
+                                "blend": "screen",
+                                "role": "accent",
+                            },
+                        ],
+                    },
+                },
+            }
+        },
+        _timeline_parse_ctx(),
+    )
+    assert timeline is not None
+    assert timeline.lanes["layer_1"].cues == [
+        SlotCue(t=1.0, level=1.0, blend="screen", role="accent"),
+    ]
+
+
+def test_parse_timeline_rejects_invalid_cue_blend() -> None:
+    with pytest.raises(ValueError, match="blend must be one of"):
+        parse_timeline_section(
+            {
+                "timeline": {
+                    "lanes": {
+                        "layer_1": {
+                            "cues": [{"t": 1.0, "level": 1.0, "blend": "glow"}],
+                        }
+                    }
+                }
+            },
+            _timeline_parse_ctx(),
+        )
+
+
+def test_parse_timeline_rejects_invalid_cue_role() -> None:
+    with pytest.raises(ValueError, match="role must be one of"):
+        parse_timeline_section(
+            {
+                "timeline": {
+                    "lanes": {
+                        "layer_1": {
+                            "cues": [{"t": 1.0, "level": 1.0, "role": "solo"}],
+                        }
+                    }
+                }
+            },
+            _timeline_parse_ctx(),
+        )
+
+
+def test_parse_timeline_rejects_cue_missing_level() -> None:
+    with pytest.raises(ValueError, match="missing level"):
+        parse_timeline_section(
+            {
+                "timeline": {
+                    "lanes": {
+                        "layer_1": {
+                            "cues": [{"t": 1.0}],
+                        }
+                    }
+                }
+            },
+            _timeline_parse_ctx(),
+        )
 
 
 def test_parse_timeline_ignores_legacy_cues() -> None:
@@ -1331,7 +1536,7 @@ def test_parse_timeline_rejects_unknown_lane_slot() -> None:
             {
                 "timeline": {
                     "lanes": {
-                        "layer_9": {"baseline": True, "cues": []},
+                        "layer_9": {"baseline": 1.0, "cues": []},
                     }
                 }
             },
@@ -1346,7 +1551,7 @@ def test_parse_timeline_rejects_negative_t() -> None:
                 "timeline": {
                     "lanes": {
                         "layer_1": {
-                            "cues": [{"t": -1.0, "visible": False}],
+                            "cues": [{"t": -1.0, "level": 0.0}],
                         }
                     }
                 }
@@ -1362,8 +1567,8 @@ def test_load_config_reads_timeline(minimal_project: Path) -> None:
         "enabled": True,
         "lanes": {
             "layer_3": {
-                "baseline": True,
-                "cues": [{"t": 3.0, "visible": False}],
+                "baseline": 1.0,
+                "cues": [{"t": 3.0, "level": 0.0}],
             }
         },
     }
@@ -1374,8 +1579,8 @@ def test_load_config_reads_timeline(minimal_project: Path) -> None:
     assert cfg.timeline is not None
     assert cfg.timeline.enabled is True
     assert cfg.timeline.lanes["layer_3"] == TimelineLane(
-        baseline=True,
-        cues=[SlotCue(t=3.0, visible=False)],
+        baseline=1.0,
+        cues=[SlotCue(t=3.0, level=0.0)],
     )
 
 
@@ -1423,7 +1628,7 @@ def test_parse_timeline_rejects_layer_not_in_config(tmp_path: Path) -> None:
     data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     data["timeline"] = {
         "lanes": {
-            "layer_3": {"baseline": True, "cues": [{"t": 1.0, "visible": True}]},
+            "layer_3": {"baseline": 1.0, "cues": [{"t": 1.0, "level": 1.0}]},
         }
     }
     with cfg_path.open("w", encoding="utf-8") as handle:

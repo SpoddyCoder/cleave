@@ -13,13 +13,22 @@ from cleave.timeline import (
 )
 
 
+def _as_level(value):
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    return float(value)
+
+
 def _lane(
-    baseline: bool | None,
-    *transitions: tuple[float, bool],
+    baseline,
+    *transitions,
 ) -> TimelineLane:
+    base = _as_level(baseline)
     return TimelineLane(
-        baseline=baseline,
-        cues=[SlotCue(t=t, visible=v) for t, v in transitions],
+        baseline=base,
+        cues=[SlotCue(t=t, level=float(_as_level(level))) for t, level in transitions],
     )
 
 
@@ -59,57 +68,57 @@ def test_snap_empty_cues_noop() -> None:
 def test_snap_empty_beats_noop() -> None:
     lane = _lane(None, (0.4, True))
     result = snap_lane_to_beats(lane, [])
-    assert result.cues == [SlotCue(t=0.4, visible=True)]
+    assert result.cues == [SlotCue(t=0.4, level=1.0)]
 
 
 def test_snap_nearest_beat() -> None:
     lane = _lane(False, (0.1, True), (0.9, False))
     result = snap_lane_to_beats(lane, (0.0, 1.0, 2.0))
     assert result.cues == [
-        SlotCue(t=0.0, visible=True),
-        SlotCue(t=1.0, visible=False),
+        SlotCue(t=0.0, level=1.0),
+        SlotCue(t=1.0, level=0.0),
     ]
 
 
 def test_snap_midpoint_tie_prefers_earlier() -> None:
     lane = _lane(False, (0.5, True))
     result = snap_lane_to_beats(lane, (0.0, 1.0))
-    assert result.cues == [SlotCue(t=0.0, visible=True)]
+    assert result.cues == [SlotCue(t=0.0, level=1.0)]
 
 
 def test_snap_extrapolates_outside_range_via_median_interval() -> None:
     lane = _lane(False, (-0.4, True), (4.4, False))
     result = snap_lane_to_beats(lane, (1.0, 2.0, 3.0))
     assert result.cues == [
-        SlotCue(t=0.0, visible=True),
-        SlotCue(t=4.0, visible=False),
+        SlotCue(t=0.0, level=1.0),
+        SlotCue(t=4.0, level=0.0),
     ]
 
 
 def test_snap_extrapolation_midpoint_prefers_earlier() -> None:
     lane = _lane(False, (3.5, True))
     result = snap_lane_to_beats(lane, (1.0, 2.0, 3.0))
-    assert result.cues == [SlotCue(t=3.0, visible=True)]
+    assert result.cues == [SlotCue(t=3.0, level=1.0)]
 
 
 def test_snap_merges_collisions_within_lane() -> None:
     lane = _lane(False, (0.1, True), (0.2, False), (0.9, True))
     result = snap_lane_to_beats(lane, (0.0, 1.0))
     # 0.1 and 0.2 both snap to 0.0; last-wins -> False; 0.9 -> 1.0 True
-    assert result.cues == [SlotCue(t=1.0, visible=True)]
+    assert result.cues == [SlotCue(t=1.0, level=1.0)]
 
 
 def test_snap_single_beat_snaps_everything() -> None:
     lane = _lane(True, (0.0, True), (10.0, False))
     result = snap_lane_to_beats(lane, (2.5,))
-    assert result.cues == [SlotCue(t=2.5, visible=False)]
+    assert result.cues == [SlotCue(t=2.5, level=0.0)]
 
 
 def test_snap_preserves_baseline() -> None:
     lane = _lane(True, (0.1, False))
     result = snap_lane_to_beats(lane, (0.0, 1.0))
-    assert result.baseline is True
-    assert result.cues == [SlotCue(t=0.0, visible=False)]
+    assert result.baseline == 1.0
+    assert result.cues == [SlotCue(t=0.0, level=0.0)]
 
 
 def test_shift_bars_by_beats_offsets() -> None:
@@ -138,8 +147,8 @@ def test_shift_lane_cues_by_beats_offsets() -> None:
     lane = _lane(False, (0.1, True), (2.1, False))
     result = shift_lane_cues_by_beats(lane, (0.0, 1.0, 2.0, 3.0), 1)
     assert result.cues == [
-        SlotCue(t=1.0, visible=True),
-        SlotCue(t=3.0, visible=False),
+        SlotCue(t=1.0, level=1.0),
+        SlotCue(t=3.0, level=0.0),
     ]
 
 
@@ -152,10 +161,10 @@ def test_shift_lane_cues_by_beats_clamps_and_canonicalizes() -> None:
     assert result_fwd.cues == []
     lane_on = _lane(False, (0.0, True), (0.9, True))
     result_on = shift_lane_cues_by_beats(lane_on, (0.0, 1.0), 1)
-    assert result_on.cues == [SlotCue(t=1.0, visible=True)]
+    assert result_on.cues == [SlotCue(t=1.0, level=1.0)]
 
 
 def test_shift_lane_cues_by_beats_empty_noop() -> None:
     lane = _lane(None, (0.4, True))
-    assert shift_lane_cues_by_beats(lane, (), 1).cues == [SlotCue(t=0.4, visible=True)]
+    assert shift_lane_cues_by_beats(lane, (), 1).cues == [SlotCue(t=0.4, level=1.0)]
     assert shift_lane_cues_by_beats(_lane(True), (0.0, 1.0), 1).cues == []

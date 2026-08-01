@@ -149,6 +149,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     preset_character = RowDescriptor(RowKind.TIMELINE_PRESET_CHARACTER)
     preset_crescendo = RowDescriptor(RowKind.TIMELINE_PRESET_CRESCENDO)
     preset_density = RowDescriptor(RowKind.TIMELINE_PRESET_DENSITY)
+    preset_conductor = RowDescriptor(RowKind.TIMELINE_PRESET_CONDUCTOR)
     presets_apply = RowDescriptor(RowKind.TIMELINE_PRESETS)
     reset = RowDescriptor(RowKind.TIMELINE_RESET)
     beat_bar_header = RowDescriptor(RowKind.TIMELINE_BEAT_BAR_GRID_HEADER)
@@ -164,6 +165,9 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     standard_cue_fades = RowDescriptor(RowKind.TIMELINE_STANDARD_CUE_FADES)
     standard_cue_fade_in = RowDescriptor(RowKind.TIMELINE_STANDARD_CUE_FADE_IN)
     standard_cue_fade_out = RowDescriptor(RowKind.TIMELINE_STANDARD_CUE_FADE_OUT)
+    limiter_header = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_HEADER)
+    limiter_threshold = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD)
+    limiter_release = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_RELEASE)
     markers_header = RowDescriptor(RowKind.SONG_MARKERS_HEADER)
     assert presets_header not in view_closed.layout.rows
     assert presets_apply not in view_closed.layout.rows
@@ -175,6 +179,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert snap_grid not in view_closed.layout.rows
     assert snap_markers not in view_closed.layout.rows
     assert fades_header not in view_closed.layout.rows
+    assert limiter_header not in view_closed.layout.rows
     assert markers_header not in view_closed.layout.rows
 
     session.timeline.panel_open = True
@@ -184,6 +189,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert preset_character not in view_open.layout.rows
     assert preset_crescendo not in view_open.layout.rows
     assert preset_density not in view_open.layout.rows
+    assert preset_conductor not in view_open.layout.rows
     assert presets_apply not in view_open.layout.rows
     assert reset in view_open.layout.rows
     assert beat_bar_header in view_open.layout.rows
@@ -194,16 +200,23 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert snap_markers not in view_open.layout.rows
     assert fades_header in view_open.layout.rows
     assert song_marker_fades not in view_open.layout.rows
+    assert limiter_header in view_open.layout.rows
+    assert limiter_threshold in view_open.layout.rows
+    assert limiter_release in view_open.layout.rows
     assert markers_header in view_open.layout.rows
     markers_idx = view_open.layout.rows.index(markers_header)
     beat_bar_idx = view_open.layout.rows.index(beat_bar_header)
     fades_idx = view_open.layout.rows.index(fades_header)
     presets_header_idx = view_open.layout.rows.index(presets_header)
+    limiter_header_idx = view_open.layout.rows.index(limiter_header)
     reset_idx = view_open.layout.rows.index(reset)
     assert beat_bar_idx == markers_idx + 1
     assert fades_idx == beat_bar_idx + 1
     assert presets_header_idx == fades_idx + 1
-    assert reset_idx == presets_header_idx + 1
+    assert limiter_header_idx == presets_header_idx + 1
+    assert view_open.layout.rows.index(limiter_threshold) == limiter_header_idx + 1
+    assert view_open.layout.rows.index(limiter_release) == limiter_header_idx + 2
+    assert reset_idx == limiter_header_idx + 3
 
     session.song_markers.expanded = True
     view_markers_expanded = builder.build(paused=False)
@@ -231,7 +244,10 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert song_marker_fades not in view_beat_expanded.layout.rows
     assert standard_cue_fades not in view_beat_expanded.layout.rows
     assert view_beat_expanded.layout.rows.index(presets_header) == fades_idx + 1
-    assert view_beat_expanded.layout.rows.index(reset) == fades_idx + 2
+    assert view_beat_expanded.layout.rows.index(limiter_header) == fades_idx + 2
+    assert view_beat_expanded.layout.rows.index(limiter_threshold) == fades_idx + 3
+    assert view_beat_expanded.layout.rows.index(limiter_release) == fades_idx + 4
+    assert view_beat_expanded.layout.rows.index(reset) == fades_idx + 5
 
     session.timeline.fades_expanded = True
     view_fades_expanded = builder.build(paused=False)
@@ -269,10 +285,22 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert view_presets_expanded.layout.rows.index(preset_density) == (
         presets_header_idx + 3
     )
-    assert view_presets_expanded.layout.rows.index(presets_apply) == (
+    assert view_presets_expanded.layout.rows.index(preset_conductor) == (
         presets_header_idx + 4
     )
-    assert view_presets_expanded.layout.rows.index(reset) == presets_header_idx + 5
+    assert view_presets_expanded.layout.rows.index(presets_apply) == (
+        presets_header_idx + 5
+    )
+    assert view_presets_expanded.layout.rows.index(limiter_header) == (
+        presets_header_idx + 6
+    )
+    assert view_presets_expanded.layout.rows.index(limiter_threshold) == (
+        presets_header_idx + 7
+    )
+    assert view_presets_expanded.layout.rows.index(limiter_release) == (
+        presets_header_idx + 8
+    )
+    assert view_presets_expanded.layout.rows.index(reset) == presets_header_idx + 9
 
     session.timeline.timeline_presets_expanded = False
     view_presets_collapsed = builder.build(paused=False)
@@ -280,6 +308,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert preset_character not in view_presets_collapsed.layout.rows
     assert preset_crescendo not in view_presets_collapsed.layout.rows
     assert preset_density not in view_presets_collapsed.layout.rows
+    assert preset_conductor not in view_presets_collapsed.layout.rows
     assert presets_apply not in view_presets_collapsed.layout.rows
     assert presets_header in view_presets_collapsed.layout.rows
 
@@ -412,6 +441,126 @@ def test_structure_signature_invalidates_on_preset_switching_timeline_mode() -> 
     assert sig_timeline != sig_none
 
 
+def test_structure_signature_invalidates_on_auto_preset_path() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    layer = session.layers["layer_1"]
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    layer.auto_preset_path = layer.playlist.paths[1].resolve()
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_builder_shows_auto_preset_in_dir_and_file_rows() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    layer = session.layers["layer_1"]
+    layer.preset_switching = "timeline"
+    layer.preset_switching_rotation_set = "cast_roles"
+    root = controls._view_state.preset_root
+    bed = root / "roles" / "bed"
+    pulse = root / "roles" / "pulse"
+    bed.mkdir(parents=True, exist_ok=True)
+    pulse.mkdir(parents=True, exist_ok=True)
+    bed_a = bed / "bed-a.milk"
+    bed_b = bed / "bed-b.milk"
+    pulse_a = pulse / "pulse-a.milk"
+    for path in (bed_a, bed_b, pulse_a):
+        path.write_text("milk", encoding="utf-8")
+
+    view_browse = controls.build_view_state(paused=False)
+    assert "roles/" not in view_browse.tracks["layer_1"].preset_dir_label
+
+    layer.auto_preset_path = bed_b.resolve()
+    view_bed = controls.build_view_state(paused=False)
+    assert "roles/bed/" in view_bed.tracks["layer_1"].preset_dir_label
+    assert view_bed.tracks["layer_1"].preset_label.startswith("bed-b.milk (2/2)")
+
+    layer.auto_preset_path = pulse_a.resolve()
+    view_pulse = controls.build_view_state(paused=False)
+    assert "roles/pulse/" in view_pulse.tracks["layer_1"].preset_dir_label
+    assert view_pulse.tracks["layer_1"].preset_label.startswith("pulse-a.milk (1/1)")
+    # Browse playlist unchanged (config stays clean).
+    assert layer.playlist.index == 0
+
+
+def test_structure_signature_invalidates_on_cast_roles_rotation_set() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.layers["layer_1"].preset_switching = "timeline"
+    session.layers["layer_1"].preset_switching_rotation_set = "directory"
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.layers["layer_1"].preset_switching_rotation_set = "cast_roles"
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+    builder = controls._view_state
+    view_cast = builder.build(paused=False)
+    behaviour = RowDescriptor(
+        RowKind.TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR, slot="layer_1"
+    )
+    assert behaviour in view_cast.layout.rows
+
+    session.layers["layer_1"].preset_switching_rotation_set = "directory"
+    view_dir = builder.build(paused=False)
+    assert view_dir.layout is not view_cast.layout
+    assert behaviour not in view_dir.layout.rows
+
+
+def test_structure_signature_invalidates_on_cast_roles_fields() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.layers["layer_1"].preset_switching = "timeline"
+    session.layers["layer_1"].preset_switching_rotation_set = "cast_roles"
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.layers["layer_1"].cast_roles_timeline_behaviour = "hold_current"
+    sig_behaviour = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_behaviour
+    session.layers["layer_1"].cast_roles_default_role = "pulse"
+    sig_role = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_behaviour != sig_role
+
+
+def test_structure_signature_invalidates_on_persistent_notification() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    sig_inactive = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    sig_persistent = view_state_structure_signature(
+        session,
+        config_save,
+        notification_active=False,
+        persistent_notification_active=True,
+    )
+    assert sig_inactive != sig_persistent
+    sig_both = view_state_structure_signature(
+        session,
+        config_save,
+        notification_active=True,
+        persistent_notification_active=True,
+    )
+    assert sig_persistent != sig_both
+
+
 def test_timeline_preset_switching_hides_projectm_only_rows() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
@@ -526,7 +675,7 @@ def test_structure_signature_invalidates_on_beat_bar_grid_expanded() -> None:
     assert sig_before != sig_after
 
 
-def test_structure_signature_invalidates_on_timeline_fades_expanded() -> None:
+def test_structure_signature_invalidates_on_timeline_levels_expanded() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
@@ -580,6 +729,21 @@ def test_structure_signature_invalidates_on_standard_cue_fades_enabled() -> None
         session, config_save, notification_active=False
     )
     session.timeline.standard_cue_fades.enabled = True
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_structure_signature_invalidates_on_visual_limiter_enabled() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.timeline.limiter.enabled = True
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.timeline.limiter.enabled = False
     sig_after = view_state_structure_signature(
         session, config_save, notification_active=False
     )

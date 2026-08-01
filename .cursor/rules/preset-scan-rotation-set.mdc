@@ -20,7 +20,7 @@ Plan: [docs/legacy-plans/presets-scan-plan.md](docs/legacy-plans/presets-scan-pl
 - Rotation set (`preset_switching_rotation_set`): `directory` | `user_defined` (used when mode is `projectm` or `timeline`).
 - **directory** live rotation: immediate `*.milk` siblings in `playlist.current_dir`, **non-recursive** (`recurse=False`), then `sort()`.
 - **user_defined** live rotation: `preset_switching_presets` via `add_presets(..., allow_duplicates=True)` (no sort).
-- Project scan includes the anchor directory for **every** layer (even `preset_switching: none` or `enabled: false`), plus `preset_switching_presets` when `preset_switching_rotation_set` is `user_defined`.
+- Project scan includes the anchor directory for **every** layer (even `preset_switching: none` or `enabled: false`), plus `preset_switching_presets` when `preset_switching_rotation_set` is `user_defined`, plus non-recursive `*.milk` in each `preset_root/roles/<role>/` pool (`bed`, `pulse`, `lead`, `accent`). Role pools are part of the live rotation surface: timeline cues with a `role` cast from those directories via `role_rotations` in [cleave/viz/preset_switching.py](cleave/viz/preset_switching.py), so scan must enumerate the same files.
 - Bulk mode uses `--presets-dir` with optional `--recursive`; project mode does not recurse into subfolders.
 
 ## When rotation set expands

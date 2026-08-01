@@ -7,6 +7,8 @@ from enum import Enum, auto
 
 from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES
 from cleave.config_schema import (
+    CAST_ROLES_DEFAULT_ROLE_HELP_ENTRIES,
+    CAST_ROLES_TIMELINE_BEHAVIOUR_HELP_ENTRIES,
     CHROMA_BOOST_APPLY_MODE_HELP_ENTRIES,
     CHROMA_BOOST_VARIANT_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES,
@@ -17,6 +19,7 @@ from cleave.config_schema import (
     RENDER_OVERLAY_ANIMATION_TYPE_HELP_ENTRIES,
     RENDER_OVERLAY_SLIDE_DIRECTION_HELP_ENTRIES,
 )
+from cleave.cue_roles import CUE_ROLE_MARKER_HELP_ENTRIES
 from cleave.timeline_presets import (
     TIMELINE_PRESET_HELP_ENTRIES,
     TIMELINE_RESET_HELP_ENTRIES,
@@ -32,6 +35,8 @@ class RowKind(Enum):
     TRACK_USER_PRESET_ITEM = auto()
     TRACK_USER_PRESET_ADD = auto()
     TRACK_PRESET_SWITCHING_ROTATION_SET = auto()
+    TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR = auto()
+    TRACK_CAST_ROLES_DEFAULT_ROLE = auto()
     TRACK_PRESET_SWITCHING_SHUFFLE = auto()
     TRACK_PRESET_SWITCHING_SEED = auto()
     TRACK_PRESET_DURATION = auto()
@@ -87,7 +92,11 @@ class RowKind(Enum):
     TIMELINE_PRESET_CHARACTER = auto()
     TIMELINE_PRESET_CRESCENDO = auto()
     TIMELINE_PRESET_DENSITY = auto()
+    TIMELINE_PRESET_CONDUCTOR = auto()
     TIMELINE_PRESETS = auto()
+    TIMELINE_VISUAL_LIMITER_HEADER = auto()
+    TIMELINE_VISUAL_LIMITER_THRESHOLD = auto()
+    TIMELINE_VISUAL_LIMITER_RELEASE = auto()
     TIMELINE_RESET = auto()
     TIMELINE_BEAT_BAR_GRID_HEADER = auto()
     TIMELINE_BAR_PHASE = auto()
@@ -208,7 +217,9 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_description=(
             "Currently active Milkdrop preset for this layer.",
             "[F/B/U] indicates favourited/blacklisted/user-defined.",
+            "[R:X] indicates the chosen cast role.",
         ),
+        help_mode_entries=CUE_ROLE_MARKER_HELP_ENTRIES,
         repeatable=True,
         parent_group="track",
     ),
@@ -240,7 +251,9 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_description=(
             "Preset in the user-defined rotation set for this layer.",
             "[F/B] indicates favourited/blacklisted.",
+            "[R:X] indicates the chosen cast role.",
         ),
+        help_mode_entries=CUE_ROLE_MARKER_HELP_ENTRIES,
     ),
     RowKind.TRACK_USER_PRESET_ADD: RowBehavior(
         RowAffordance.ACTION,
@@ -260,6 +273,24 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_entries=(("Left/Right", "cycle rotation set"),),
         help_description=(),
         help_mode_entries=PRESET_SWITCHING_ROTATION_SET_HELP_ENTRIES,
+    ),
+    RowKind.TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="track",
+        help_title="Timeline behaviour",
+        help_entries=(("Left/Right", "cycle behaviour"),),
+        help_description=(),
+        help_mode_entries=CAST_ROLES_TIMELINE_BEHAVIOUR_HELP_ENTRIES,
+    ),
+    RowKind.TRACK_CAST_ROLES_DEFAULT_ROLE: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="track",
+        help_title="Default role",
+        help_entries=(("Left/Right", "cycle role"),),
+        help_description=(),
+        help_mode_entries=CAST_ROLES_DEFAULT_ROLE_HELP_ENTRIES,
     ),
     RowKind.TRACK_PRESET_SWITCHING_SHUFFLE: RowBehavior(
         RowAffordance.VALUE_STEP,
@@ -754,8 +785,8 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         is_sub_header=True,
         help_title="Timeline preset",
         help_description=(
-            "Stage character, crescendo, and density, then apply a randomly",
-            "generated timeline preset. This overwrites the current timeline.",
+            "Stage character, crescendo, density, and conductor, then apply a",
+            "randomly generated timeline preset. This overwrites the current timeline.",
         ),
     ),
     RowKind.TIMELINE_PRESET_CHARACTER: RowBehavior(
@@ -792,6 +823,17 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "Normal matches the default stack-cost ramp for the layer count.",
         ),
     ),
+    RowKind.TIMELINE_PRESET_CONDUCTOR: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        blocked_by_section_lock=True,
+        help_title="Conductor",
+        help_entries=(("Left/Right", "toggle conductor on/off"),),
+        help_description=(
+            "When on, stem energy shapes motif casting and cue levels.",
+            "Requires project signals; otherwise apply skips the conductor.",
+        ),
+    ),
     RowKind.TIMELINE_PRESETS: RowBehavior(
         RowAffordance.ACTION,
         navigable=True,
@@ -799,8 +841,49 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Apply timeline preset",
         help_entries=(("Enter", "apply timeline preset"),),
         help_description=(
-            "Apply the staged character, crescendo, and density.",
+            "Apply the staged character, crescendo, density, and conductor.",
             "This overwrites the current timeline.",
+        ),
+    ),
+    RowKind.TIMELINE_VISUAL_LIMITER_HEADER: RowBehavior(
+        RowAffordance.EXPAND,
+        is_sub_header=True,
+        can_enable_disable=True,
+        help_title="Visual limiter",
+        help_entries=(("Left/Right", "disable / enable"),),
+        help_description=(
+            "Duck busy stacked layers using post-composite busyness.",
+            "When enabled, threshold and release rows appear below.",
+        ),
+    ),
+    RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        repeatable=True,
+        blocked_by_section_lock=True,
+        help_title="Visual limiter threshold",
+        help_entries=(
+            ("Left", "decrease threshold"),
+            ("Right", "increase threshold"),
+        ),
+        help_description=(
+            "Busyness level that starts ducking hot layers.",
+            "Off-threshold stays a fixed gap below this value.",
+        ),
+    ),
+    RowKind.TIMELINE_VISUAL_LIMITER_RELEASE: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        repeatable=True,
+        blocked_by_section_lock=True,
+        help_title="Visual limiter release",
+        help_entries=(
+            ("Left", "decrease release ramp"),
+            ("Right", "increase release ramp"),
+        ),
+        help_description=(
+            "Playhead seconds to ramp ducked layers back to full opacity.",
+            "Release hold before the ramp scales with this value.",
         ),
     ),
     RowKind.TIMELINE_RESET: RowBehavior(

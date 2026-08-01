@@ -24,7 +24,7 @@ from cleave.preset_playlist import (
     preset_filename_display,
     scan_preset_playlist,
 )
-from cleave.timeline import SlotCue, TimelineLane, canonicalize
+from cleave.timeline import SlotCue, TimelineLane, canonicalize, lane_level_at
 from cleave.project import load_manifest, write_manifest
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.key_repeat import mod_shift
@@ -40,6 +40,7 @@ from cleave.viz.controls import (
 )
 from cleave.viz.panel_notification import NOTIFICATION_DURATION_SEC
 from cleave.viz.modal import ModalKind
+from cleave.viz.theme import ERROR_NOTIFICATION, HIGHLIGHT
 from cleave.viz.session import (
     LayerRuntime,
     TimelineRuntime,
@@ -117,6 +118,7 @@ def _make_controls(
     bar_times: tuple[float, ...] = (),
     project_dir: Path | None = None,
     duration_sec: float = 120.0,
+    signals=None,
 ) -> TuningControls:
     preset_root = Path("/tmp/presets")
     cfg = make_test_cfg(slots, preset_root=preset_root, config_path=launch_config_path or _DEFAULT_ACTIVE_CONFIG)
@@ -145,6 +147,7 @@ def _make_controls(
         repo_root_example=repo_root_example,
         beat_times=beat_times,
         bar_times=bar_times,
+        signals=signals,
     )
 
 
@@ -1595,6 +1598,7 @@ def test_timeline_presets_enter_opens_yes_cancel_modal() -> None:
     controls = _make_controls(("layer_1", "layer_2", "layer_3", "layer_4"))
     controls.session.timeline.timeline_preset_kind = "arc"
     controls.session.timeline.timeline_preset_crescendo = "last"
+    controls.session.timeline.timeline_preset_conductor = True
     _focus_timeline_presets(controls)
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
     modal_view = controls.modal_host.view_state()
@@ -1605,16 +1609,26 @@ def test_timeline_presets_enter_opens_yes_cancel_modal() -> None:
         "Apply timeline preset?\n"
         "character: arc\n"
         "crescendo: last song marker\n"
-        "density: normal"
+        "density: normal\n"
+        "conductor: on"
     )
 
 
+def _as_level(value):
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    return float(value)
+
+
 def _lane(
-    baseline: bool | None,
-    *transitions: tuple[float, bool],
+    baseline,
+    *transitions,
 ) -> TimelineLane:
-    cues = [SlotCue(t=t, visible=v) for t, v in transitions]
-    return TimelineLane(baseline=baseline, cues=canonicalize(baseline, cues))
+    base = _as_level(baseline)
+    cues = [SlotCue(t=t, level=float(_as_level(level))) for t, level in transitions]
+    return TimelineLane(baseline=base, cues=canonicalize(base, cues))
 
 
 def _confirm_timeline_preset(controls: TuningControls) -> None:
@@ -1651,7 +1665,9 @@ def test_timeline_presets_breathing_clears_and_applies() -> None:
     assert lanes != prior
     assert set(lanes) == set(controls.session.layer_z_order)
     assert all(lane.baseline is not None for lane in lanes.values())
-    assert any(lane.baseline for lane in lanes.values())
+    assert any(
+        lane_level_at(lane, 0.0, inherit=0.0) > 0.0 for lane in lanes.values()
+    )
 
 
 def test_timeline_presets_arc_clears_and_applies() -> None:
@@ -1750,7 +1766,7 @@ def test_timeline_reset_all_off() -> None:
     assert not controls.session.timeline.armed_slots
     lanes = controls.session.timeline.lanes
     assert set(lanes) == {"layer_1", "layer_2", "layer_3"}
-    assert all(lane.baseline is False and lane.cues == [] for lane in lanes.values())
+    assert all(lane.baseline == 0.0 and lane.cues == [] for lane in lanes.values())
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "Reset timeline: all layers off"
 
@@ -1768,7 +1784,7 @@ def test_timeline_reset_all_on() -> None:
     assert controls.session.timeline.enabled is True
     lanes = controls.session.timeline.lanes
     assert set(lanes) == {"layer_1", "layer_2"}
-    assert all(lane.baseline is True and lane.cues == [] for lane in lanes.values())
+    assert all(lane.baseline == 1.0 and lane.cues == [] for lane in lanes.values())
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "Reset timeline: all layers on"
 
@@ -1791,6 +1807,88 @@ def test_timeline_presets_refuse_without_bars() -> None:
     assert controls.session.timeline.lanes == prior
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "No bars available; re-run separate"
+
+
+def test_timeline_presets_conductor_passes_signals_to_builder() -> None:
+    from cleave.signals import Signals
+    import numpy as np
+
+    beats = tuple(float(i) for i in range(241))
+    bars = tuple(float(i) for i in range(0, 241, 4))
+    n = 100
+    ones = np.ones(n, dtype=np.float64)
+    signals = Signals(
+        sample_rate_hz=100.0,
+        duration_sec=1.0,
+        path=Path("."),
+        stems={
+            "drums": {"onset_strength": ones},
+            "bass": {"rms": ones, "sub_bass": ones, "mid_bass": ones},
+            "vocals": {"rms": ones, "pitch_hz": ones},
+            "other": {"spectral_centroid": ones, "rms": ones},
+            "full_mix": {"onset_strength": ones, "rms": ones},
+        },
+    )
+    controls = _make_controls(
+        ("layer_1", "layer_2", "layer_3", "layer_4"),
+        beat_times=beats,
+        bar_times=bars,
+        signals=signals,
+    )
+    controls.session.timeline.timeline_preset_kind = "breathing"
+    controls.session.timeline.timeline_preset_conductor = True
+    captured: dict = {}
+
+    def _fake_builder(slots, duration_sec, rng, **kwargs):
+        captured["kwargs"] = kwargs
+        return {slot: TimelineLane(baseline=1.0, cues=[]) for slot in slots}
+
+    with patch.dict(
+        "cleave.viz.timeline_preset_controls._KIND_BUILDERS",
+        {"breathing": (_fake_builder, "Applied Breathing timeline preset")},
+    ):
+        _focus_timeline_presets(controls)
+        _confirm_timeline_preset(controls)
+    assert captured["kwargs"]["signals"] is signals
+    assert captured["kwargs"]["slot_stems"] == {
+        "layer_1": "drums",
+        "layer_2": "bass",
+        "layer_3": "vocals",
+        "layer_4": "other",
+    }
+    view = controls.build_view_state(paused=False)
+    assert view.notification_message == "Applied Breathing timeline preset"
+
+
+def test_timeline_presets_conductor_skips_without_signals() -> None:
+    beats = tuple(float(i) for i in range(241))
+    bars = tuple(float(i) for i in range(0, 241, 4))
+    controls = _make_controls(
+        ("layer_1", "layer_2"),
+        beat_times=beats,
+        bar_times=bars,
+        signals=None,
+    )
+    controls.session.timeline.timeline_preset_kind = "breathing"
+    controls.session.timeline.timeline_preset_conductor = True
+    captured: dict = {}
+
+    def _fake_builder(slots, duration_sec, rng, **kwargs):
+        captured["kwargs"] = kwargs
+        return {slot: TimelineLane(baseline=1.0, cues=[]) for slot in slots}
+
+    with patch.dict(
+        "cleave.viz.timeline_preset_controls._KIND_BUILDERS",
+        {"breathing": (_fake_builder, "Applied Breathing timeline preset")},
+    ):
+        _focus_timeline_presets(controls)
+        _confirm_timeline_preset(controls)
+    assert "signals" not in captured["kwargs"]
+    assert "slot_stems" not in captured["kwargs"]
+    assert controls.session.timeline.enabled is True
+    assert set(controls.session.timeline.lanes) == {"layer_1", "layer_2"}
+    view = controls.build_view_state(paused=False)
+    assert view.notification_message == "No signals; conductor skipped"
 
 
 def test_timeline_presets_cancel_and_escape_leave_unchanged() -> None:
@@ -1848,10 +1946,10 @@ def test_timeline_snap_grid_beats_mutates_cues() -> None:
     _choose_modal_option(controls, "Beats")
     assert not controls.modal_host.active
     assert controls.session.timeline.lanes["layer_1"].cues == [
-        SlotCue(t=0.0, visible=True),
+        SlotCue(t=0.0, level=1.0),
     ]
     assert controls.session.timeline.lanes["layer_2"].cues == [
-        SlotCue(t=2.0, visible=False),
+        SlotCue(t=2.0, level=0.0),
     ]
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "Snapped timeline cues to beats"
@@ -1872,10 +1970,10 @@ def test_timeline_snap_grid_bars_mutates_cues() -> None:
     _choose_modal_option(controls, "Bars")
     assert not controls.modal_host.active
     assert controls.session.timeline.lanes["layer_1"].cues == [
-        SlotCue(t=0.0, visible=True),
+        SlotCue(t=0.0, level=1.0),
     ]
     assert controls.session.timeline.lanes["layer_2"].cues == [
-        SlotCue(t=4.0, visible=False),
+        SlotCue(t=4.0, level=0.0),
     ]
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "Snapped timeline cues to bars"
@@ -1925,10 +2023,10 @@ def test_timeline_bar_phase_right_nudges_cues_and_offset() -> None:
     assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
     assert controls.session.timeline.bar_phase_offset == 1
     assert controls.session.timeline.lanes["layer_1"].cues == [
-        SlotCue(t=1.0, visible=True),
+        SlotCue(t=1.0, level=1.0),
     ]
     assert controls.session.timeline.lanes["layer_2"].cues == [
-        SlotCue(t=5.0, visible=False),
+        SlotCue(t=5.0, level=0.0),
     ]
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "Bar phase +1"
@@ -1970,7 +2068,7 @@ def test_timeline_bar_phase_left_wraps_offset() -> None:
     assert controls.handle_keydown(_keydown(pygame.K_LEFT)) is True
     assert controls.session.timeline.bar_phase_offset == 3
     assert controls.session.timeline.lanes["layer_1"].cues == [
-        SlotCue(t=0.0, visible=True),
+        SlotCue(t=0.0, level=1.0),
     ]
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "Bar phase +3"
@@ -2063,10 +2161,10 @@ def test_timeline_snap_song_markers_layer_mutates_only_that_lane() -> None:
     _confirm_snap_song_markers(controls, scope_label="Layer 1")
     assert not controls.modal_host.active
     assert controls.session.timeline.lanes["layer_1"].cues == [
-        SlotCue(t=5.0, visible=True),
+        SlotCue(t=5.0, level=1.0),
     ]
     assert controls.session.timeline.lanes["layer_2"].cues == [
-        SlotCue(t=4.2, visible=False),
+        SlotCue(t=4.2, level=0.0),
     ]
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "Snapped 1 cue to song markers"
@@ -2082,10 +2180,10 @@ def test_timeline_snap_song_markers_each_layer_vs_closest_wins() -> None:
     _focus_timeline_snap_song_markers(controls)
     _confirm_snap_song_markers(controls, scope_label="All Layers")
     assert controls.session.timeline.lanes["layer_1"].cues == [
-        SlotCue(t=5.0, visible=True),
+        SlotCue(t=5.0, level=1.0),
     ]
     assert controls.session.timeline.lanes["layer_2"].cues == [
-        SlotCue(t=5.0, visible=False),
+        SlotCue(t=5.0, level=0.0),
     ]
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "Snapped 2 cues to song markers"
@@ -2097,10 +2195,10 @@ def test_timeline_snap_song_markers_each_layer_vs_closest_wins() -> None:
     _focus_timeline_snap_song_markers(controls)
     _confirm_snap_song_markers(controls, scope_label="Closest Wins")
     assert controls.session.timeline.lanes["layer_1"].cues == [
-        SlotCue(t=4.5, visible=True),
+        SlotCue(t=4.5, level=1.0),
     ]
     assert controls.session.timeline.lanes["layer_2"].cues == [
-        SlotCue(t=5.0, visible=False),
+        SlotCue(t=5.0, level=0.0),
     ]
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "Snapped 1 cue to song markers"
@@ -2169,7 +2267,7 @@ def test_timeline_snap_song_markers_uses_proximity() -> None:
     _focus_timeline_snap_song_markers(controls)
     _confirm_snap_song_markers(controls, proximity_label="1.0s")
     assert controls.session.timeline.lanes["layer_1"].cues == [
-        SlotCue(t=3.0, visible=True),
+        SlotCue(t=3.0, level=1.0),
     ]
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "No cues within snap proximity"
@@ -2314,6 +2412,15 @@ def test_render_timeline_down_enters_submenu() -> None:
     snap_grid_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_GRID)
     fades_row = view.layout.find_by_kind(RowKind.TIMELINE_FADES_HEADER)
     presets_header_row = view.layout.find_by_kind(RowKind.TIMELINE_PRESETS_HEADER)
+    limiter_header_row = view.layout.find_by_kind(
+        RowKind.TIMELINE_VISUAL_LIMITER_HEADER
+    )
+    limiter_threshold_row = view.layout.find_by_kind(
+        RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD
+    )
+    limiter_release_row = view.layout.find_by_kind(
+        RowKind.TIMELINE_VISUAL_LIMITER_RELEASE
+    )
     reset_row = view.layout.find_by_kind(RowKind.TIMELINE_RESET)
     controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.focus_row = 2
@@ -2355,6 +2462,18 @@ def test_render_timeline_down_enters_submenu() -> None:
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_descriptor == _desc(view, limiter_header_row)
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_descriptor == _desc(view, limiter_threshold_row)
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_descriptor == _desc(view, limiter_release_row)
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_descriptor == _desc(view, reset_row)
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
@@ -2362,6 +2481,31 @@ def test_render_timeline_down_enters_submenu() -> None:
     assert isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.session.timeline.focus_row == 0
     assert controls.focus_descriptor == _desc(view, header_row)
+
+
+def test_visual_limiter_left_right_couples_enabled_and_children() -> None:
+    controls = _make_controls(timeline_enabled=True)
+    controls.session.timeline.panel_open = True
+    view = controls.build_view_state(paused=False)
+    limiter_header = view.layout.find_by_kind(
+        RowKind.TIMELINE_VISUAL_LIMITER_HEADER
+    )
+    threshold_row = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD)
+
+    assert controls.session.timeline.limiter.enabled is True
+    assert threshold_row in view.layout.rows
+
+    controls.focus_descriptor = _desc(view, limiter_header)
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+
+    assert controls.session.timeline.limiter.enabled is False
+    view_disabled = controls.build_view_state(paused=False)
+    assert threshold_row not in view_disabled.layout.rows
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert controls.session.timeline.limiter.enabled is True
+    view_enabled = controls.build_view_state(paused=False)
+    assert threshold_row in view_enabled.layout.rows
 
 
 def test_render_timeline_down_enters_submenu_and_routes_keys() -> None:
@@ -2373,7 +2517,7 @@ def test_render_timeline_down_enters_submenu_and_routes_keys() -> None:
     controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.focus_row = 2
 
-    for _ in range(10):
+    for _ in range(13):
         controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.session.timeline.focus_row == 0
@@ -2632,6 +2776,7 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
         RowKind.TIMELINE_PRESET_CHARACTER,
         RowKind.TIMELINE_PRESET_CRESCENDO,
         RowKind.TIMELINE_PRESET_DENSITY,
+        RowKind.TIMELINE_PRESET_CONDUCTOR,
         RowKind.TIMELINE_PRESETS,
         RowKind.TIMELINE_RESET,
     ):
@@ -2949,6 +3094,26 @@ def test_ctrl_quick_nav_does_not_affect_normal_up_down() -> None:
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_descriptor == _desc(view, stem_row)
+
+
+def test_timeline_focus_change_clears_selected_cue_flash() -> None:
+    controls = _make_controls(("layer_1", "layer_2"), timeline_enabled=True)
+    controls.session.timeline.panel_open = True
+    controls.focus_cursor = TimelineFocus(0)
+    controls.session.timeline.selected_cue_t = {"layer_1": 10.0, "layer_2": 20.0}
+    controls.session.timeline.selected_cue_flash_start_ms = 1234
+
+    controls.focus_cursor = TimelineFocus(1)
+    assert controls.session.timeline.focus_row == 1
+    assert controls.session.timeline.selected_cue_t == {
+        "layer_1": 10.0,
+        "layer_2": 20.0,
+    }
+    assert controls.session.timeline.selected_cue_flash_start_ms is None
+
+    controls.session.timeline.selected_cue_flash_start_ms = 5678
+    controls.focus_cursor = TimelineFocus(1)
+    assert controls.session.timeline.selected_cue_flash_start_ms == 5678
 
 
 def test_ctrl_quick_nav_from_timeline_submenu_jumps_sections() -> None:
@@ -4429,6 +4594,101 @@ def test_preset_switching_rotation_set_cycles_directory_and_user_defined() -> No
     assert controls.session.layers["layer_1"].user_presets_expanded is True
 
 
+def test_preset_switching_rotation_set_skips_cast_roles_in_projectm_mode() -> None:
+    controls = _make_controls(("layer_1",))
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "projectm"
+    layer.expanded = True
+    layer.preset_switching_rotation_set = "directory"
+    view = controls.build_view_state(paused=False)
+    row = _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET)
+    controls.focus_descriptor = view.layout.descriptor(row)
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert layer.preset_switching_rotation_set == "user_defined"
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert layer.preset_switching_rotation_set == "directory"
+    assert layer.preset_switching_rotation_set != "cast_roles"
+
+
+def test_preset_switching_rotation_set_includes_cast_roles_in_timeline_mode() -> None:
+    controls = _make_controls(("layer_1",))
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "timeline"
+    layer.expanded = True
+    layer.preset_switching_rotation_set = "directory"
+    view = controls.build_view_state(paused=False)
+    row = _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET)
+    controls.focus_descriptor = view.layout.descriptor(row)
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert layer.preset_switching_rotation_set == "user_defined"
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+    assert layer.preset_switching_rotation_set == "cast_roles"
+
+
+def test_cast_roles_empty_pool_sets_persistent_notification() -> None:
+    controls = _make_controls(("layer_1",))
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "timeline"
+    layer.preset_switching_rotation_set = "cast_roles"
+    layer.cast_roles_default_role = "bed"
+
+    with patch(
+        "cleave.viz.controls.role_pool_paths",
+        return_value=(),
+    ):
+        view = controls.build_view_state(paused=False)
+
+    assert view.persistent_notification_message == "No presets in bed roles folder"
+    notification_rows = [
+        row
+        for row in view.layout.rows
+        if row.kind == RowKind.PANEL_NOTIFICATION
+    ]
+    assert len(notification_rows) == 1
+    assert notification_rows[0].marker_index == 0
+    idx = view.layout.find_descriptor(notification_rows[0])
+    assert _row_value_color(view, idx) == ERROR_NOTIFICATION
+
+    layer.preset_switching_rotation_set = "directory"
+    with patch(
+        "cleave.viz.controls.role_pool_paths",
+        return_value=(),
+    ):
+        cleared = controls.build_view_state(paused=False)
+    assert cleared.persistent_notification_message is None
+
+
+def test_persistent_and_timed_notifications_stack() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_switching = "timeline"
+    controls.session.layers["layer_1"].preset_switching_rotation_set = "cast_roles"
+
+    with patch.object(time, "monotonic", return_value=1000.0):
+        with patch(
+            "cleave.viz.controls.role_pool_paths",
+            return_value=(),
+        ):
+            controls.show_notification("Saved")
+            view = controls.build_view_state(paused=False)
+
+    assert view.persistent_notification_message == "No presets in bed roles folder"
+    assert view.notification_message == "Saved"
+    notification_rows = [
+        row
+        for row in view.layout.rows
+        if row.kind == RowKind.PANEL_NOTIFICATION
+    ]
+    assert [row.marker_index for row in notification_rows] == [0, 1]
+    persistent_idx = view.layout.find_descriptor(notification_rows[0])
+    timed_idx = view.layout.find_descriptor(notification_rows[1])
+    assert _row_value_color(view, persistent_idx) == ERROR_NOTIFICATION
+    assert _row_value_color(view, timed_idx) == HIGHLIGHT
+    assert _row_text(view, persistent_idx) == "No presets in bed roles folder"
+    assert _row_text(view, timed_idx) == "Saved"
+
+
 def test_preset_switching_rotation_set_user_defined_auto_expands_user_presets() -> None:
     controls = _make_controls(("layer_1",))
     layer = controls.session.layers["layer_1"]
@@ -4616,6 +4876,17 @@ def test_f_on_preset_file_prompts_favourite() -> None:
     mock_curation.prompt_favourite.assert_called_once_with("layer_1", current)
 
 
+def test_c_on_preset_file_prompts_cast() -> None:
+    controls = _make_controls(("layer_1",))
+    current = _focus_preset_file_row(controls)
+    mock_curation = MagicMock()
+    controls._preset_curation = mock_curation
+
+    assert controls.handle_keydown(_keydown(pygame.K_c)) is True
+
+    mock_curation.prompt_cast.assert_called_once_with("layer_1", current)
+
+
 def test_b_on_preset_file_prompts_blacklist() -> None:
     controls = _make_controls(("layer_1",))
     current = _focus_preset_file_row(controls)
@@ -4698,6 +4969,19 @@ def test_f_b_allowed_in_projectm_mode() -> None:
     assert controls.handle_keydown(_keydown(pygame.K_f)) is True
 
     mock_curation.prompt_favourite.assert_called_once_with("layer_1", current)
+
+
+def test_c_on_preset_file_in_curation_mode_prompts_cast() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.settings.editor_mode = "preset_curation"
+    controls.session.settings.editor_mode_selection = "preset_curation"
+    current = _focus_preset_file_row(controls)
+    mock_curation = MagicMock()
+    controls._preset_curation = mock_curation
+
+    assert controls.handle_keydown(_keydown(pygame.K_c)) is True
+
+    mock_curation.prompt_cast.assert_called_once_with("layer_1", current)
 
 
 def test_f_b_ignored_on_non_preset_rows() -> None:

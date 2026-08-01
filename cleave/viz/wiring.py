@@ -62,6 +62,7 @@ def _discard_timeline_slot(session: TuningSession, slot: str) -> None:
     timeline.monitor.pop(slot, None)
     timeline.override_visible.pop(slot, None)
     timeline.arm_flash_start_ms.pop(slot, None)
+    timeline.selected_cue_t.pop(slot, None)
     timeline.record_buffer.pop(slot, None)
 
 
@@ -118,6 +119,7 @@ class LayerManager:
             beat_sensitivity=self.cfg.editor.beat_sensitivity,
             width=width,
             height=height,
+            preset_root=self.preset_root,
         )
         self.layers.append(stem_layer)
         self.layers_by_slot[slot] = stem_layer
@@ -223,7 +225,11 @@ def make_tuning_controls(
                 hard_cut_sensitivity=runtime.hard_cut_sensitivity,
                 shuffle=runtime.preset_switching_shuffle,
                 shuffle_salt=runtime.preset_switching_shuffle_salt,
+                cast_roles_default_role=runtime.cast_roles_default_role,
+                cast_roles_timeline_behaviour=runtime.cast_roles_timeline_behaviour,
+                preset_root=preset_root,
                 on_empty=_empty_rotation_notify(slot),
+                session=session,
             )
             return
         if playlist.current is None:
@@ -243,6 +249,8 @@ def make_tuning_controls(
                 user_presets=runtime.user_presets,
                 shuffle=runtime.preset_switching_shuffle,
                 shuffle_salt=runtime.preset_switching_shuffle_salt,
+                cast_roles_default_role=runtime.cast_roles_default_role,
+                preset_root=preset_root,
             )
             return
         layer.pm.lock_preset(False)
@@ -265,7 +273,11 @@ def make_tuning_controls(
             hard_cut_sensitivity=runtime.hard_cut_sensitivity,
             shuffle=runtime.preset_switching_shuffle,
             shuffle_salt=runtime.preset_switching_shuffle_salt,
+            cast_roles_default_role=runtime.cast_roles_default_role,
+            cast_roles_timeline_behaviour=runtime.cast_roles_timeline_behaviour,
+            preset_root=preset_root,
             on_empty=_empty_rotation_notify(slot),
+            session=session,
         )
 
     def lock_preset_for_modal(slot: str) -> None:
@@ -279,9 +291,6 @@ def make_tuning_controls(
             layers_by_slot[slot].pm.lock_preset(False)
 
     notification_sink: dict[str, Callable[[str], None] | None] = {"fn": None}
-
-    def on_blend_change(slot: str, blend_mode) -> None:
-        layers_by_slot[slot].fbo.blend_mode = blend_mode
 
     def on_stem_change(slot: str, stem) -> None:
         LayerFramePipeline.flush_pcm(layers)
@@ -357,6 +366,7 @@ def make_tuning_controls(
         reapply_projectm_preset_switching(
             session,
             layers_by_slot,
+            preset_root=preset_root,
             delta_sec=delta_sec,
         )
         resync_timeline_preset_switching(
@@ -436,7 +446,6 @@ def make_tuning_controls(
         on_preset_switching_change=on_preset_switching_change,
         lock_preset_for_modal=lock_preset_for_modal,
         unlock_preset_after_modal=unlock_preset_after_modal,
-        on_blend_change=on_blend_change,
         on_stem_change=on_stem_change,
         on_opacity_change=on_opacity_change,
         on_layer_enabled_change=on_layer_enabled_change,
@@ -466,6 +475,7 @@ def make_tuning_controls(
         "post_process": post_process,
         "beat_times": beat_times,
         "bar_times": bar_times,
+        "signals": signals,
     }
     if modal_host is not None:
         kwargs["modal_host"] = modal_host
@@ -513,6 +523,7 @@ def make_timeline_controls(
     layers: list[StemLayer],
     signals: Signals | None,
     effect_runtime: EffectRuntime,
+    preset_root: Path,
     mix_player: MixPlayer | None = None,
     on_notification: Callable[[str], None] | None = None,
     tuning_controls: TuningControls | None = None,
@@ -546,6 +557,7 @@ def make_timeline_controls(
         reapply_projectm_preset_switching(
             session,
             layers_by_slot,
+            preset_root=preset_root,
             delta_sec=delta_sec,
         )
         resync_timeline_preset_switching(

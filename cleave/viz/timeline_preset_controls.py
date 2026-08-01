@@ -5,6 +5,7 @@ from __future__ import annotations
 import random
 from collections.abc import Callable, Sequence
 
+from cleave.signals import Signals
 from cleave.timeline import TimelineLane, copy_lane, empty_lane, shift_bars_by_beats
 from cleave.timeline_presets import (
     build_arc_cues,
@@ -13,6 +14,7 @@ from cleave.timeline_presets import (
     build_pulse_cues,
 )
 from cleave.timeline_presets.characters import timeline_preset_kind_display
+from cleave.timeline_presets.conductor import timeline_preset_conductor_display
 from cleave.timeline_presets.crescendo import (
     CRESCENDO_MIN_MARKERS,
     CrescendoTarget,
@@ -48,12 +50,14 @@ class TimelinePresetController:
         beat_times: Sequence[float] = (),
         bar_times: Sequence[float] = (),
         *,
+        signals: Signals | None = None,
         on_notification: Callable[[str], None] | None = None,
     ) -> None:
         self.session = session
         self._modal = modal_host
         self._beat_times = tuple(beat_times)
         self._bar_times = tuple(bar_times)
+        self._signals = signals
         self._on_notification = on_notification
 
     def prompt(self, duration_sec: float) -> None:
@@ -73,6 +77,7 @@ class TimelinePresetController:
             f"character: {timeline_preset_kind_display(tl.timeline_preset_kind)}",
             f"crescendo: {timeline_preset_crescendo_display(tl.timeline_preset_crescendo)}",
             f"density: {timeline_preset_density_display(tl.timeline_preset_density)}",
+            f"conductor: {timeline_preset_conductor_display(tl.timeline_preset_conductor)}",
         )
         return "\n".join(("Apply timeline preset?", *choice_lines))
 
@@ -128,13 +133,25 @@ class TimelinePresetController:
         slots = list(self.session.layer_z_order)
         markers = list(self.session.song_markers.times)
         rng = random.Random()
+        builder_kwargs: dict = {
+            "bar_times": grid,
+            "song_marker_times": markers,
+            "density_bias": density_bias_for(tl.timeline_preset_density),
+        }
+        conductor_skipped = False
+        if tl.timeline_preset_conductor:
+            if self._signals is None:
+                conductor_skipped = True
+            else:
+                builder_kwargs["signals"] = self._signals
+                builder_kwargs["slot_stems"] = {
+                    slot: self.session.layers[slot].stem for slot in slots
+                }
         built = builder(
             slots,
             duration_sec,
             rng,
-            bar_times=grid,
-            song_marker_times=markers,
-            density_bias=density_bias_for(tl.timeline_preset_density),
+            **builder_kwargs,
         )
         if crescendo is not None:
             built = apply_crescendo(
@@ -149,14 +166,17 @@ class TimelinePresetController:
             message = f"{message} (crescendo)"
         for slot in slots:
             tl.lanes[slot] = copy_lane(built.get(slot, empty_lane()))
-        self._notify(message)
+        if conductor_skipped:
+            self._notify("No signals; conductor skipped")
+        else:
+            self._notify(message)
 
     def _reset(self, *, all_on: bool) -> None:
         self._clear_timeline_state()
         tl = self.session.timeline
         tl.enabled = True
         tl.lanes = {
-            slot: TimelineLane(baseline=all_on, cues=[])
+            slot: TimelineLane(baseline=1.0 if all_on else 0.0, cues=[])
             for slot in self.session.layer_z_order
         }
         message = (

@@ -68,7 +68,7 @@ def run_analyse(
         downbeat_times = [float(t) for t in downbeats]
 
     output: dict = {
-        "version": 3,
+        "version": 4,
         "sample_rate_hz": int(TARGET_HZ),
         "duration_sec": duration_sec,
         "beat_detection_stem": beat_detection_stem,
@@ -91,7 +91,10 @@ def run_analyse(
             ),
         },
         "other": {
-            "spectral_centroid": resample_to_100hz(*other, duration_sec).tolist(),
+            "spectral_centroid": resample_to_100hz(
+                *other["spectral_centroid"], duration_sec
+            ).tolist(),
+            "rms": resample_to_100hz(*other["rms"], duration_sec).tolist(),
         },
         "full_mix": {
             "onset_strength": resample_to_100hz(*mix_onset, duration_sec).tolist(),

@@ -11,9 +11,15 @@ import pygame
 
 from cleave.config import CleaveConfig, clamp_beat_sensitivity, clamp_effect_pct
 from cleave.config_schema import clamp_easter_egg
-from cleave.config_schema import PRESET_SWITCHING_MODES, PRESET_SWITCHING_ROTATION_SETS
+from cleave.config_schema import (
+    CAST_ROLES_TIMELINE_BEHAVIOURS,
+    PRESET_SWITCHING_MODES,
+    PRESET_SWITCHING_ROTATION_SETS,
+)
 from cleave.blend_modes import BLEND_MODES, BlendMode
+from cleave.cue_roles import CUE_ROLES, role_pool_paths
 from cleave.extract import STEM_SOURCES
+from cleave.signals import Signals
 from cleave.song_markers import format_marker_time, place_marker
 from cleave.preset_curation import PresetCurationIndex
 from cleave.preset_playlist import is_top_level_browse_dir
@@ -109,6 +115,7 @@ class TuningControls:
         post_process: GlPostProcess | None = None,
         beat_times: Sequence[float] = (),
         bar_times: Sequence[float] = (),
+        signals: Signals | None = None,
     ) -> None:
         self.session = session
         self.cfg = cfg
@@ -162,6 +169,7 @@ class TuningControls:
             self._modal_host,
             beat_times,
             bar_times,
+            signals=signals,
             on_notification=self.show_notification,
         )
         layers_by_slot = (
@@ -176,6 +184,7 @@ class TuningControls:
             session,
             self._modal_host,
             layers_by_slot,
+            preset_root=preset_root,
             on_preset_switching_change=on_switching,
         )
         self._timeline_phase = TimelinePhaseController(
@@ -200,6 +209,7 @@ class TuningControls:
             get_move_mode_slot=lambda: self.move_mode_slot,
             config_save=self._config_save,
             get_notification=self._notification_host.active,
+            layers_by_slot=layers_by_slot,
         )
         self._render_overlay = RenderOverlayControls(session)
         self._render_post_fx = RenderPostFxControls(
@@ -507,7 +517,7 @@ class TuningControls:
                 self._add_current_preset(slot)
                 return True
 
-        if event.key in (pygame.K_f, pygame.K_b, pygame.K_r):
+        if event.key in (pygame.K_f, pygame.K_b, pygame.K_r, pygame.K_c):
             kind = self.focus_descriptor.kind
             slot = self.focus_descriptor.slot
             if slot is not None and kind in PRESET_FILE_ROW_KINDS:
@@ -527,6 +537,8 @@ class TuningControls:
                         from_user_preset=(kind == RowKind.TRACK_USER_PRESET_ITEM),
                         user_preset_index=self.focus_descriptor.preset_index,
                     )
+                elif event.key == pygame.K_c:
+                    self._preset_curation.prompt_cast(slot, src)
                 else:
                     self._preset_curation.prompt_restore(slot, src)
                 return True
@@ -660,7 +672,7 @@ class TuningControls:
                 )
             return True
 
-        if event.key in (pygame.K_f, pygame.K_b, pygame.K_r):
+        if event.key in (pygame.K_f, pygame.K_b, pygame.K_r, pygame.K_c):
             view = self.build_view_state(paused=self.playback.paused)
             desc = self.focus_descriptor
             if not view.layout.contains_descriptor(desc):
@@ -684,6 +696,8 @@ class TuningControls:
                         from_user_preset=(kind == RowKind.TRACK_USER_PRESET_ITEM),
                         user_preset_index=self.focus_descriptor.preset_index,
                     )
+                elif event.key == pygame.K_c:
+                    self._preset_curation.prompt_cast(slot, src)
                 else:
                     self._preset_curation.prompt_restore(slot, src)
                 return True
@@ -706,6 +720,7 @@ class TuningControls:
     def tick(self, dt_sec: float) -> None:
         self._key_repeat.tick(dt_sec)
         self._notification_host.clear_expired()
+        self._sync_cast_roles_pool_notification()
 
     def build_view_state(
         self,
@@ -714,9 +729,23 @@ class TuningControls:
         position_sec: float | None = None,
         fps: float | None = None,
     ) -> TuningViewState:
+        self._sync_cast_roles_pool_notification()
         return self._view_state.build(
             paused=paused, position_sec=position_sec, fps=fps
         )
+
+    def _sync_cast_roles_pool_notification(self) -> None:
+        for slot in self.session.layer_z_order:
+            layer = self.session.layers[slot]
+            if layer.preset_switching_rotation_set != "cast_roles":
+                continue
+            role = layer.cast_roles_default_role
+            if not role_pool_paths(self.preset_root, role):
+                self._notification_host.set_persistent(
+                    f"No presets in {role} roles folder"
+                )
+                return
+        self._notification_host.set_persistent(None)
 
     @property
     def focus_descriptor(self) -> RowDescriptor:
@@ -747,7 +776,12 @@ class TuningControls:
             self._editor_mode.sync_selection_to_mode()
         self._focus_cursor = cursor
         if isinstance(cursor, TimelineFocus):
-            self.session.timeline.focus_row = cursor.row
+            tl = self.session.timeline
+            if cursor.row != tl.focus_row:
+                # Drop in-progress cue flash so returning to a remembered
+                # selection shows the settled tick, not a restart blink.
+                tl.selected_cue_flash_start_ms = None
+            tl.focus_row = cursor.row
             return
         if isinstance(cursor, MainFocus):
             desc = cursor.descriptor
@@ -1070,6 +1104,11 @@ class TuningControls:
         else:
             layer.preset_switching = modes[(index - 1) % len(modes)]
         if (
+            layer.preset_switching != "timeline"
+            and layer.preset_switching_rotation_set == "cast_roles"
+        ):
+            layer.preset_switching_rotation_set = "directory"
+        if (
             layer.preset_switching == "timeline"
             and not self.session.timeline.enabled
         ):
@@ -1079,17 +1118,59 @@ class TuningControls:
 
     def _cycle_preset_switching_rotation_set(self, slot: str, *, forward: bool) -> None:
         layer = self.session.layers[slot]
-        rotation_sets = PRESET_SWITCHING_ROTATION_SETS
+        rotation_sets = tuple(
+            value
+            for value in PRESET_SWITCHING_ROTATION_SETS
+            if value != "cast_roles" or layer.preset_switching == "timeline"
+        )
         try:
             index = rotation_sets.index(layer.preset_switching_rotation_set)
         except ValueError:
             index = 0
         if forward:
-            layer.preset_switching_rotation_set = rotation_sets[(index + 1) % len(rotation_sets)]
+            layer.preset_switching_rotation_set = rotation_sets[
+                (index + 1) % len(rotation_sets)
+            ]
         else:
-            layer.preset_switching_rotation_set = rotation_sets[(index - 1) % len(rotation_sets)]
+            layer.preset_switching_rotation_set = rotation_sets[
+                (index - 1) % len(rotation_sets)
+            ]
         if layer.preset_switching_rotation_set == "user_defined":
             layer.user_presets_expanded = True
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_preset_switching_change(slot)
+
+    def _cycle_cast_roles_timeline_behaviour(
+        self, slot: str, *, forward: bool
+    ) -> None:
+        layer = self.session.layers[slot]
+        options = CAST_ROLES_TIMELINE_BEHAVIOURS
+        try:
+            index = options.index(layer.cast_roles_timeline_behaviour)
+        except ValueError:
+            index = 0
+        if forward:
+            layer.cast_roles_timeline_behaviour = options[
+                (index + 1) % len(options)
+            ]
+        else:
+            layer.cast_roles_timeline_behaviour = options[
+                (index - 1) % len(options)
+            ]
+        if self._layer_bindings is not None:
+            self._layer_bindings.on_preset_switching_change(slot)
+
+    def _cycle_cast_roles_default_role(self, slot: str, *, forward: bool) -> None:
+        layer = self.session.layers[slot]
+        options = CUE_ROLES
+        try:
+            index = options.index(layer.cast_roles_default_role)
+        except ValueError:
+            index = 0
+        if forward:
+            layer.cast_roles_default_role = options[(index + 1) % len(options)]
+        else:
+            layer.cast_roles_default_role = options[(index - 1) % len(options)]
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)
 
@@ -1168,8 +1249,6 @@ class TuningControls:
             layer.blend_mode = BLEND_MODES[(index + 1) % len(BLEND_MODES)]
         else:
             layer.blend_mode = BLEND_MODES[(index - 1) % len(BLEND_MODES)]
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_blend_change(slot, layer.blend_mode)
 
     def _cycle_stem(self, slot: str, *, forward: bool) -> None:
         layer = self.session.layers[slot]
@@ -1310,6 +1389,12 @@ class TuningControls:
         if tl.timeline_presets_expanded == expanded:
             return
         tl.timeline_presets_expanded = expanded
+
+    def _set_visual_limiter_enabled(self, enabled: bool) -> None:
+        lim = self.session.timeline.limiter
+        if lim.enabled == enabled:
+            return
+        lim.enabled = enabled
 
     def _set_beat(self, slot: str, value: float) -> None:
         layer = self.session.layers[slot]

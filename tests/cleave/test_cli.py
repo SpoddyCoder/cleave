@@ -113,7 +113,7 @@ def test_cmd_separate_noop_when_complete(
         original_path=tmp_path / "song.flac",
         demucs_model="htdemucs",
     )
-    (project / "signals.json").write_text('{"version": 3}')
+    (project / "signals.json").write_text('{"version": 4}')
 
     with patch("cleave.separate.run_separate") as run_separate:
         cmd_separate(build_parser().parse_args(["separate", "song"]))
@@ -141,7 +141,7 @@ def test_cmd_separate_does_not_noop_when_beat_stem_differs(
         demucs_model="htdemucs",
     )
     (project / "signals.json").write_text(
-        '{"version": 3, "beat_detection_stem": "full_mix"}'
+        '{"version": 4, "beat_detection_stem": "full_mix"}'
     )
 
     with patch("cleave.separate.run_separate", return_value=project.resolve()) as run_separate:
@@ -255,7 +255,7 @@ def _complete_project(tmp_path: Path, slug: str = "my-track") -> Path:
         original_path=tmp_path / f"{slug}.flac",
         demucs_model="htdemucs",
     )
-    (project / "signals.json").write_text('{"version": 3}')
+    (project / "signals.json").write_text('{"version": 4}')
     return project
 
 

@@ -85,6 +85,7 @@ from cleave.viz.theme import (
     BORDER_COLOR,
     BORDER_WIDTH,
     DISABLED,
+    ERROR_NOTIFICATION,
     FADE_DURATION_SEC,
     FOCUS_ROW_BG_ALPHA,
     HIGHLIGHT,
@@ -598,9 +599,12 @@ def fit_row_text(
     if kind == RowKind.RENDER_SECTION_GAP:
         return ""
     if kind == RowKind.PANEL_NOTIFICATION:
-        return _fit(
-            "text", fit_text_to_width, state.notification_message or "", budget
-        )
+        desc = state.layout.descriptor(index)
+        if desc.marker_index == 0:
+            text = state.persistent_notification_message or ""
+        else:
+            text = state.notification_message or ""
+        return _fit("text", fit_text_to_width, text, budget)
     field = ROW_FIELDS.get(kind)
     if field is not None and field.present_style == RowPresentStyle.FULL_LINE:
         if kind in {
@@ -664,6 +668,9 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
     """Return the VALUE-role color for a row (before label/value split rendering)."""
     kind = state.layout.kind(index)
     if kind == RowKind.PANEL_NOTIFICATION:
+        desc = state.layout.descriptor(index)
+        if desc.marker_index == 0:
+            return ERROR_NOTIFICATION
         return HIGHLIGHT
 
     desc = state.layout.descriptor(index)

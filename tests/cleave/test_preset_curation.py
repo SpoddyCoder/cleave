@@ -6,6 +6,7 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from cleave.cue_roles import CUE_ROLE_DIR, CUE_ROLES, ensure_role_dirs
 from cleave.preset_curation import (
     BLACKLIST_DIR,
     COLOCATED_TEXTURE_SUFFIXES,
@@ -13,8 +14,10 @@ from cleave.preset_curation import (
     PresetCurationIndex,
     blacklist_root,
     copy_to_favourites,
+    copy_to_role,
     curated_milk_src,
     delete_favourite_milk,
+    delete_role_milk,
     favourites_root,
     find_milk_under,
     list_destination_subdirs,
@@ -26,6 +29,7 @@ from cleave.preset_curation import (
     resolve_blacklist_origin_dir,
     restore_from_blacklist,
     rewrite_user_preset_paths,
+    roles_root,
     scrub_user_preset_paths,
     write_blacklist_origin,
 )
@@ -40,6 +44,18 @@ def test_favourites_and_blacklist_roots() -> None:
     preset_root = Path("/tmp/presets")
     assert favourites_root(preset_root) == preset_root / FAVOURITES_DIR
     assert blacklist_root(preset_root) == preset_root / BLACKLIST_DIR
+    assert roles_root(preset_root) == preset_root / CUE_ROLE_DIR
+
+
+def test_ensure_role_dirs_creates_tree() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        ensure_role_dirs(root)
+        assert (root / CUE_ROLE_DIR).is_dir()
+        for role in CUE_ROLES:
+            assert (root / CUE_ROLE_DIR / role).is_dir()
+        ensure_role_dirs(root)
+        assert (root / CUE_ROLE_DIR).is_dir()
 
 
 def test_preset_curation_index_build_scans_recursively() -> None:
@@ -50,11 +66,19 @@ def test_preset_curation_index_build_scans_recursively() -> None:
         _write(root / BLACKLIST_DIR / "reject.milk", "bl-top")
         _write(root / BLACKLIST_DIR / "pack" / "inner.milk", "bl-inner")
         _write(root / "pack" / "ignored.milk", "not-curated")
+        _write(root / CUE_ROLE_DIR / "bed" / "cast.milk", "bed")
+        _write(root / CUE_ROLE_DIR / "lead" / "cast.milk", "lead")
+        _write(root / CUE_ROLE_DIR / "pulse" / "pulse_only.milk", "pulse")
+        _write(root / CUE_ROLE_DIR / "bed" / "nested" / "ignored.milk", "nested")
 
         index = PresetCurationIndex.build(root)
 
         assert index.favourites == {"top.milk", "deep.milk"}
         assert index.blacklist == {"reject.milk", "inner.milk"}
+        assert index.roles == {
+            "cast.milk": {"bed", "lead"},
+            "pulse_only.milk": {"pulse"},
+        }
 
 
 def test_preset_curation_index_build_missing_trees() -> None:
@@ -62,37 +86,56 @@ def test_preset_curation_index_build_missing_trees() -> None:
         index = PresetCurationIndex.build(Path(tmp))
         assert index.favourites == set()
         assert index.blacklist == set()
+        assert index.roles == {}
 
 
 def test_preset_curation_index_marker() -> None:
     index = PresetCurationIndex(
         favourites={"fav.milk", "both.milk"},
         blacklist={"bl.milk", "both.milk"},
+        roles={
+            "cast.milk": {"bed"},
+            "multi.milk": {"accent", "bed", "lead"},
+            "fav.milk": {"pulse"},
+        },
     )
-    assert index.marker("fav.milk") == " [F]"
+    assert index.marker("fav.milk") == " [F] [R:P]"
     assert index.marker("bl.milk") == " [B]"
     assert index.marker("both.milk") == " [FB]"
+    assert index.marker("cast.milk") == " [R:B]"
+    assert index.marker("multi.milk") == " [R:B] [R:L] [R:A]"
     assert index.marker("plain.milk") == ""
     assert index.marker("plain.milk", user=True) == " [U]"
-    assert index.marker("fav.milk", user=True) == " [FU]"
+    assert index.marker("fav.milk", user=True) == " [FU] [R:P]"
     assert index.marker("bl.milk", user=True) == " [BU]"
     assert index.marker("both.milk", user=True) == " [FBU]"
+    assert index.marker("cast.milk", user=True) == " [U] [R:B]"
 
 
 def test_preset_curation_index_mark_updates_sets() -> None:
     index = PresetCurationIndex(favourites=set(), blacklist=set())
     index.mark_favourite("a.milk")
     index.mark_blacklisted("b.milk")
+    index.mark_role("c.milk", "bed")
+    index.mark_role("c.milk", "lead")
     assert index.favourites == {"a.milk"}
     assert index.blacklist == {"b.milk"}
+    assert index.roles == {"c.milk": {"bed", "lead"}}
     assert index.marker("a.milk") == " [F]"
     assert index.marker("b.milk") == " [B]"
+    assert index.marker("c.milk") == " [R:B] [R:L]"
     index.unmark_favourite("a.milk")
     index.unmark_blacklisted("b.milk")
+    index.unmark_role("c.milk", "bed")
     assert index.favourites == set()
     assert index.blacklist == set()
+    assert index.roles == {"c.milk": {"lead"}}
     assert index.marker("a.milk") == ""
     assert index.marker("b.milk") == ""
+    assert index.marker("c.milk") == " [R:L]"
+    index.unmark_role("c.milk", "lead")
+    assert index.roles == {}
+    assert index.marker("c.milk") == ""
 
 
 def test_list_destination_subdirs_sorted_and_excludes_dot_dirs() -> None:
@@ -117,6 +160,7 @@ def test_list_restore_destination_subdirs_excludes_curation_dirs() -> None:
         (root / "other").mkdir()
         (root / FAVOURITES_DIR).mkdir()
         (root / BLACKLIST_DIR).mkdir()
+        (root / "roles").mkdir()
         (root / ".hidden").mkdir()
 
         assert list_restore_destination_subdirs(root) == ("other", "pack")
@@ -342,6 +386,51 @@ def test_delete_favourite_milk_missing_returns_none() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         assert delete_favourite_milk(root, root / "missing.milk") is None
+
+
+def test_copy_to_role_creates_dirs_and_copies_textures() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src_dir = root / "pack"
+        src_milk = src_dir / "preset.milk"
+        _write(src_milk, "milk")
+        _write(src_dir / "cover.jpg", "jpg-bytes")
+
+        result = copy_to_role(src_milk, root, "bed")
+
+        assert result == root / CUE_ROLE_DIR / "bed" / "preset.milk"
+        assert result.read_text(encoding="utf-8") == "milk"
+        assert (root / CUE_ROLE_DIR / "bed" / "cover.jpg").read_text(
+            encoding="utf-8"
+        ) == "jpg-bytes"
+        for role in CUE_ROLES:
+            assert (root / CUE_ROLE_DIR / role).is_dir()
+        assert src_milk.exists()
+
+
+def test_delete_role_milk_leaves_textures() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        role_dir = root / CUE_ROLE_DIR / "pulse"
+        milk = role_dir / "preset.milk"
+        texture = role_dir / "tex.jpg"
+        _write(milk, "milk")
+        _write(texture, "jpg")
+        pack = root / "pack" / "preset.milk"
+        _write(pack, "other")
+
+        deleted = delete_role_milk(root, pack, "pulse")
+
+        assert deleted == milk
+        assert not milk.exists()
+        assert texture.exists()
+        assert pack.exists()
+
+
+def test_delete_role_milk_missing_returns_none() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        assert delete_role_milk(root, root / "missing.milk", "accent") is None
 
 
 @dataclass

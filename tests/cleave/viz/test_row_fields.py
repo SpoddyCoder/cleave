@@ -319,7 +319,7 @@ def test_apply_field_horizontal_track_header_solo_and_expand() -> None:
 
 
 def test_row_fields_count() -> None:
-        assert len(ROW_FIELDS) == 91
+        assert len(ROW_FIELDS) == 97
 
 
 def test_row_kinds_requiring_fields_registry_complete() -> None:
@@ -391,6 +391,28 @@ def test_track_effect_dynamic_label_and_prefix() -> None:
 def test_full_line_delete_layer_prefix() -> None:
     assert full_line_prefix(RowKind.LAYER_MANAGEMENT_DELETE) == "└─ Delete Layer"
     assert row_panel_label(RowKind.LAYER_MANAGEMENT_ADD) == "Add Layer"
+
+
+def test_apply_field_horizontal_visual_limiter_couples_enabled() -> None:
+    controls = _make_controls(timeline_enabled=True)
+    controls.session.timeline.limiter.enabled = True
+    desc = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_HEADER)
+
+    apply_field_horizontal(controls, desc, False, False)
+    assert controls.session.timeline.limiter.enabled is False
+
+    apply_field_horizontal(controls, desc, True, False)
+    assert controls.session.timeline.limiter.enabled is True
+
+
+def test_apply_field_horizontal_visual_limiter_blocked_when_timeline_locked() -> None:
+    controls = _make_controls(timeline_enabled=True)
+    controls.session.timeline.limiter.enabled = True
+    controls.session.timeline.locked = True
+    desc = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_HEADER)
+
+    apply_field_horizontal(controls, desc, False, False)
+    assert controls.session.timeline.limiter.enabled is True
 
 
 def test_apply_field_horizontal_transport_seeks() -> None:

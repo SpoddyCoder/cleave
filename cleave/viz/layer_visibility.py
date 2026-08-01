@@ -1,4 +1,4 @@
-"""Timeline visibility algebra and per-frame layer enablement."""
+"""Timeline level algebra and per-frame layer enablement."""
 
 from __future__ import annotations
 
@@ -6,14 +6,18 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from cleave.timeline import (
+    LEVEL_EPS,
     SlotCue,
     TimelineFadeGroup,
     TimelineLane,
     canonicalize,
     copy_lane,
     empty_lane,
-    lane_fade_alpha,
-    lane_visible_at,
+    lane_blend_at,
+    lane_level_at,
+    lane_level_breakpoints,
+    lane_level_envelope,
+    levels_equal,
     punch_lane,
     shift_bars_by_beats,
     strip_lane_range,
@@ -26,7 +30,11 @@ from cleave.viz.focus_nav import (
     cursor_timeline_submenu_focused,
 )
 from cleave.viz.row_semantics import RowKind
-from cleave.viz.timeline_overlay import TimelineViewState, prune_expired_arm_flashes
+from cleave.viz.timeline_overlay import (
+    TimelineViewState,
+    prune_expired_arm_flashes,
+    prune_expired_selected_cue_flash,
+)
 
 if TYPE_CHECKING:
     from cleave.viz.layer import StemLayer
@@ -46,43 +54,33 @@ def _lane_for_slot(session: TuningSession, slot: str) -> TimelineLane:
     return session.timeline.lanes.get(slot) or empty_lane()
 
 
-def _inherit_for_slot(session: TuningSession, slot: str) -> bool:
-    return session.layers[slot].enabled
+def _inherit_for_slot(session: TuningSession, slot: str) -> float:
+    return 1.0 if session.layers[slot].enabled else 0.0
 
 
-def timeline_defaults(session: TuningSession) -> dict[str, bool]:
-    """Per-slot inherit values: concrete lane baseline, else ``layers[slot].enabled``."""
+def timeline_defaults(session: TuningSession) -> dict[str, float]:
+    """Per-slot inherit values: concrete lane baseline, else layer enabled as 1/0."""
     return {
         slot: (
-            lane.baseline
+            float(lane.baseline)
             if (lane := session.timeline.lanes.get(slot)) is not None
             and lane.baseline is not None
-            else session.layers[slot].enabled
+            else _inherit_for_slot(session, slot)
         )
         for slot in session.layer_z_order
     }
 
 
-def timeline_committed_visible(
+def timeline_committed_level(
     session: TuningSession,
     slot: str,
     t_sec: float,
-) -> bool:
-    return lane_visible_at(
+) -> float:
+    return lane_level_at(
         _lane_for_slot(session, slot),
         t_sec,
         inherit=_inherit_for_slot(session, slot),
     )
-
-
-def snapshot_monitor_from_timeline(
-    session: TuningSession,
-    t_sec: float,
-) -> dict[str, bool]:
-    return {
-        slot: timeline_committed_visible(session, slot, t_sec)
-        for slot in session.layer_z_order
-    }
 
 
 def snapshot_monitor_from_output(
@@ -95,7 +93,7 @@ def snapshot_monitor_from_output(
     }
 
 
-def armed_recording_defaults(session: TuningSession) -> dict[str, bool]:
+def armed_recording_defaults(session: TuningSession) -> dict[str, float]:
     defaults = timeline_defaults(session)
     defaults.update(session.timeline.record_baseline)
     return defaults
@@ -107,28 +105,28 @@ def _recording_lane(session: TuningSession, slot: str) -> TimelineLane:
     return TimelineLane(baseline=baseline, cues=list(cues))
 
 
-def armed_recording_visible(
+def armed_recording_level(
     session: TuningSession,
     slot: str,
     t_sec: float,
-) -> bool:
-    """Visibility for a record-pass slot during an active take."""
-    return lane_visible_at(_recording_lane(session, slot), t_sec, inherit=True)
+) -> float:
+    """Level for a record-pass slot during an active take."""
+    return lane_level_at(_recording_lane(session, slot), t_sec, inherit=1.0)
 
 
-def committed_visible_outside_punch(
+def committed_level_outside_punch(
     session: TuningSession,
     slot: str,
     record_start: float,
     record_stop: float,
-) -> bool:
-    """Committed visibility at *record_stop* ignoring cues inside the punch."""
+) -> float:
+    """Committed level at *record_stop* ignoring cues inside the punch."""
     stripped = strip_lane_range(
         _lane_for_slot(session, slot),
         record_start,
         record_stop,
     )
-    return lane_visible_at(
+    return lane_level_at(
         stripped,
         record_stop,
         inherit=_inherit_for_slot(session, slot),
@@ -156,13 +154,13 @@ def _punch_cues_for_slot(
     tl = session.timeline
     punch: list[SlotCue] = []
     baseline = tl.record_baseline[slot]
-    if baseline != timeline_committed_visible(session, slot, record_start):
-        punch.append(SlotCue(t=record_start, visible=baseline))
+    if not levels_equal(baseline, timeline_committed_level(session, slot, record_start)):
+        punch.append(SlotCue(t=record_start, level=baseline))
     punch.extend(tl.record_buffer.get(slot, []))
-    end_visible = armed_recording_visible(session, slot, record_stop)
-    committed_at_stop = timeline_committed_visible(session, slot, record_stop)
-    if end_visible != committed_at_stop:
-        punch.append(SlotCue(t=record_stop, visible=committed_at_stop))
+    end_level = armed_recording_level(session, slot, record_stop)
+    committed_at_stop = timeline_committed_level(session, slot, record_stop)
+    if not levels_equal(end_level, committed_at_stop):
+        punch.append(SlotCue(t=record_stop, level=committed_at_stop))
     return punch
 
 
@@ -203,15 +201,15 @@ def effective_layer_enabled(
     tl = session.timeline
     if tl.recording:
         if slot in tl.record_baseline:
-            return armed_recording_visible(session, slot, t_sec)
+            return armed_recording_level(session, slot, t_sec) > LEVEL_EPS
         if slot in tl.override_slots:
             return tl.override_visible.get(slot, True)
-        return timeline_committed_visible(session, slot, t_sec)
+        return timeline_committed_level(session, slot, t_sec) > LEVEL_EPS
     if tl.preview_active:
         return tl.monitor[slot]
     if slot in tl.override_slots:
         return tl.override_visible.get(slot, True)
-    return timeline_committed_visible(session, slot, t_sec)
+    return timeline_committed_level(session, slot, t_sec) > LEVEL_EPS
 
 
 def _as_fade_group(group: TimelineFadeGroupRuntime) -> TimelineFadeGroup:
@@ -222,8 +220,8 @@ def _as_fade_group(group: TimelineFadeGroupRuntime) -> TimelineFadeGroup:
     )
 
 
-def _timeline_fades_apply(session: TuningSession, slot: str) -> bool:
-    """True when continuous cue fades drive FBO enable/opacity for *slot*."""
+def timeline_levels_apply(session: TuningSession, slot: str) -> bool:
+    """True when the timeline level envelope drives FBO enable/opacity for *slot*."""
     from cleave.viz.editor_mode_controls import is_preset_curation_mode
 
     if session.solo_slot is not None:
@@ -233,8 +231,6 @@ def _timeline_fades_apply(session: TuningSession, slot: str) -> bool:
     tl = session.timeline
     if not tl.enabled:
         return False
-    if not (tl.song_marker_fades.enabled or tl.standard_cue_fades.enabled):
-        return False
     if tl.recording or tl.preview_active:
         return False
     if slot in tl.override_slots:
@@ -242,18 +238,18 @@ def _timeline_fades_apply(session: TuningSession, slot: str) -> bool:
     return True
 
 
-def _fade_eval_duration(lane: TimelineLane, t_sec: float, fade_out: float) -> float:
+def _level_eval_duration(lane: TimelineLane, t_sec: float, fade_out: float) -> float:
     last_cue = max((cue.t for cue in lane.cues), default=0.0)
     pad = max(0.0, float(fade_out)) + 1.0
     return max(t_sec + pad, last_cue + pad, 1.0)
 
 
-def timeline_fade_multiplier(
+def timeline_level_multiplier(
     session: TuningSession,
     slot: str,
     t_sec: float,
 ) -> float:
-    """Committed-lane fade opacity in ``[0, 1]`` (ignores solo/override/preview)."""
+    """Committed-lane level in ``[0, 1]`` (ignores solo/override/preview)."""
     tl = session.timeline
     lane = _lane_for_slot(session, slot)
     song_marker_fades = _as_fade_group(tl.song_marker_fades)
@@ -263,15 +259,15 @@ def timeline_fade_multiplier(
         max_fade_out = max(max_fade_out, song_marker_fades.fade_out)
     if standard_fades.enabled:
         max_fade_out = max(max_fade_out, standard_fades.fade_out)
-    return lane_fade_alpha(
+    breakpoints = lane_level_breakpoints(
         lane,
-        t_sec,
         inherit=_inherit_for_slot(session, slot),
         song_marker_fades=song_marker_fades,
         standard_fades=standard_fades,
-        duration_sec=_fade_eval_duration(lane, t_sec, max_fade_out),
+        duration_sec=_level_eval_duration(lane, t_sec, max_fade_out),
         song_marker_times=session.song_markers.times,
     )
+    return lane_level_envelope(t_sec, breakpoints)
 
 
 def apply_layer_visibility(
@@ -280,13 +276,19 @@ def apply_layer_visibility(
     t_sec: float,
 ) -> None:
     for slot, layer in layers_by_slot.items():
-        if _timeline_fades_apply(session, slot):
-            fade = timeline_fade_multiplier(session, slot, t_sec)
-            layer.timeline_fade = fade
-            layer.fbo.enabled = fade > 0.0
+        if timeline_levels_apply(session, slot):
+            level = timeline_level_multiplier(session, slot, t_sec)
+            layer.timeline_level = level
+            layer.fbo.enabled = level > LEVEL_EPS
+            cue_blend = lane_blend_at(_lane_for_slot(session, slot), t_sec)
+            if cue_blend is not None:
+                layer.fbo.blend_mode = cue_blend
+            else:
+                layer.fbo.blend_mode = session.layers[slot].blend_mode
         else:
-            layer.timeline_fade = 1.0
+            layer.timeline_level = 1.0
             layer.fbo.enabled = effective_layer_enabled(session, slot, t_sec)
+            layer.fbo.blend_mode = session.layers[slot].blend_mode
 
 
 def build_timeline_view_state(
@@ -300,6 +302,9 @@ def build_timeline_view_state(
 ) -> TimelineViewState:
     tl = session.timeline
     prune_expired_arm_flashes(tl.arm_flash_start_ms)
+    tl.selected_cue_flash_start_ms = prune_expired_selected_cue_flash(
+        tl.selected_cue_flash_start_ms
+    )
     submenu_focused = (
         focus_cursor is not None and cursor_timeline_submenu_focused(focus_cursor)
     )
@@ -312,8 +317,8 @@ def build_timeline_view_state(
         slot: effective_layer_enabled(session, slot, position_sec)
         for slot in session.layer_z_order
     }
-    timeline_visible = {
-        slot: timeline_committed_visible(session, slot, position_sec)
+    timeline_level = {
+        slot: timeline_committed_level(session, slot, position_sec)
         for slot in session.layer_z_order
     }
     return TimelineViewState(
@@ -327,7 +332,7 @@ def build_timeline_view_state(
         duration_sec=duration_sec,
         focus_row=focus_row,
         monitor_visible=monitor_visible,
-        timeline_visible=timeline_visible,
+        timeline_level=timeline_level,
         slot_stems={slot: session.layers[slot].stem for slot in session.layer_z_order},
         override_slots=set(tl.override_slots),
         armed_slots=set(tl.armed_slots),
@@ -350,4 +355,10 @@ def build_timeline_view_state(
         selected_song_marker_index=focused_song_marker_index(focus_cursor),
         song_marker_fades=_as_fade_group(tl.song_marker_fades),
         standard_cue_fades=_as_fade_group(tl.standard_cue_fades),
+        selected_cue_t=dict(tl.selected_cue_t),
+        selected_cue_flash_start_ms=tl.selected_cue_flash_start_ms,
+        slot_rotation_sets={
+            slot: session.layers[slot].preset_switching_rotation_set
+            for slot in session.layer_z_order
+        },
     )

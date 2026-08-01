@@ -220,6 +220,23 @@ void main() {
 }
 """
 
+_LUMA_DOWNSAMPLE_FRAG = """
+#version 330
+uniform sampler2D image;
+uniform bool hdr;
+in vec2 uv;
+out vec4 fragColor;
+
+void main() {
+    vec3 rgb = texture(image, uv).rgb;
+    if (hdr) {
+        rgb = clamp(rgb, 0.0, 1.0);
+    }
+    float luma = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
+    fragColor = vec4(luma, 0.0, 0.0, 1.0);
+}
+"""
+
 _CHROMA_BOOST_FRAG = """
 #version 330
 uniform sampler2D image;
@@ -365,6 +382,16 @@ def _prepare_fixed_function_gl() -> None:
 
 
 @dataclass
+class _LumaGridBuffers:
+    tex: moderngl.Texture
+    fbo: moderngl.Framebuffer
+
+    def release(self) -> None:
+        self.fbo.release()
+        self.tex.release()
+
+
+@dataclass
 class _PingPongBuffers:
     copy_tex: moderngl.Texture
     copy_fbo: moderngl.Framebuffer
@@ -396,6 +423,8 @@ class GlPostProcess:
         self._grit_prog: moderngl.Program | None = None
         self._highlight_rolloff_prog: moderngl.Program | None = None
         self._chroma_boost_prog: moderngl.Program | None = None
+        self._luma_downsample_prog: moderngl.Program | None = None
+        self._luma_grid_buffers: dict[tuple[int, int], _LumaGridBuffers] = {}
         self._buffers: dict[tuple[int, int], _PingPongBuffers] = {}
         self._external_textures: dict[tuple[int, int, int], moderngl.Texture] = {}
         self._dest_fbos: dict[tuple[int, int, int], moderngl.Framebuffer] = {}
@@ -449,6 +478,10 @@ class GlPostProcess:
             vertex_shader=_QUAD_VERT,
             fragment_shader=_CHROMA_BOOST_FRAG,
         )
+        self._luma_downsample_prog = self._ctx.program(
+            vertex_shader=_QUAD_VERT,
+            fragment_shader=_LUMA_DOWNSAMPLE_FRAG,
+        )
         # Binary float32 quad: (x, y, u, v) per vertex covering NDC [-1,1] x [-1,1].
         self._quad_buffer = self._ctx.buffer(
             np.array(
@@ -465,6 +498,28 @@ class GlPostProcess:
     def _ensure_init(self) -> None:
         if self._ctx is None:
             self.init()
+
+    def _ensure_luma_grid_buffers(
+        self, grid_width: int, grid_height: int
+    ) -> _LumaGridBuffers:
+        self._ensure_init()
+        assert self._ctx is not None
+        key = (grid_width, grid_height)
+        cached = self._luma_grid_buffers.get(key)
+        if cached is not None:
+            return cached
+        tex = self._ctx.texture(
+            key,
+            1,
+            dtype="f4",
+        )
+        tex.filter = (moderngl.LINEAR, moderngl.LINEAR)
+        tex.repeat_x = False
+        tex.repeat_y = False
+        fbo = self._ctx.framebuffer(color_attachments=[tex])
+        buffers = _LumaGridBuffers(tex=tex, fbo=fbo)
+        self._luma_grid_buffers[key] = buffers
+        return buffers
 
     def _ensure_buffers(self, width: int, height: int) -> _PingPongBuffers:
         self._ensure_init()
@@ -559,6 +614,41 @@ class GlPostProcess:
             for name, value in extra_uniforms.items():
                 program[name].value = value
         self._quad_vao_for(program).render(moderngl.TRIANGLE_STRIP)
+
+    def read_luma_grid(
+        self,
+        texture_id: int,
+        width: int,
+        height: int,
+        *,
+        grid_width: int = 32,
+        grid_height: int = 18,
+    ) -> np.ndarray:
+        """Downsample *texture_id* to a luma grid via one GPU pass and readback."""
+        empty = np.zeros((grid_height, grid_width), dtype=np.float32)
+        if texture_id == 0 or width <= 0 or height <= 0:
+            return empty
+
+        self._ensure_init()
+        assert self._luma_downsample_prog is not None
+
+        saved = _save_gl_state()
+        try:
+            src = self._external_layer_texture(texture_id, width, height)
+            grid_buffers = self._ensure_luma_grid_buffers(grid_width, grid_height)
+            self._draw_quad(
+                self._luma_downsample_prog,
+                grid_buffers.fbo,
+                texture=src,
+                extra_uniforms={"hdr": self._color_format is RGBA16F},
+            )
+            raw = grid_buffers.fbo.read(components=1, alignment=1, dtype="f4")
+        finally:
+            _restore_gl_state(saved)
+            _prepare_fixed_function_gl()
+
+        grid = np.frombuffer(raw, dtype=np.float32).reshape((grid_height, grid_width))
+        return np.array(grid, dtype=np.float32)
 
     def apply_bloom(
         self,
@@ -795,6 +885,9 @@ class GlPostProcess:
         return texture_id
 
     def destroy(self) -> None:
+        for buffers in self._luma_grid_buffers.values():
+            buffers.release()
+        self._luma_grid_buffers.clear()
         self._release_format_dependent_buffers()
         for vao in self._quad_vaos.values():
             vao.release()
@@ -811,3 +904,4 @@ class GlPostProcess:
         self._grit_prog = None
         self._highlight_rolloff_prog = None
         self._chroma_boost_prog = None
+        self._luma_downsample_prog = None

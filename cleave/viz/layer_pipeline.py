@@ -75,7 +75,7 @@ def apply_effect_modifiers(
         if not layer.fbo.enabled:
             continue
         mod = modifiers[slot]
-        layer.fbo.opacity = mod.opacity * layer.timeline_fade
+        layer.fbo.opacity = mod.opacity * layer.timeline_level * layer.limiter_gain
         layer.fbo.flash_alpha = mod.flash_alpha
         layer.fbo.bloom_strength = mod.bloom_strength
         layer.fbo.hue_rgb = mod.hue_rgb
@@ -197,6 +197,7 @@ class LayerFramePipeline:
         *,
         width: int,
         height: int,
+        preset_root: Path,
     ) -> StemLayer:
         w, h = width, height
 
@@ -238,6 +239,9 @@ class LayerFramePipeline:
             hard_cut_sensitivity=layer_cfg.hard_cut_sensitivity,
             shuffle=layer_cfg.preset_switching_shuffle,
             shuffle_salt=layer_cfg.preset_switching_shuffle_salt,
+            cast_roles_default_role=layer_cfg.cast_roles_default_role,
+            cast_roles_timeline_behaviour=layer_cfg.cast_roles_timeline_behaviour,
+            preset_root=preset_root,
         )
         return layer
 
@@ -286,6 +290,7 @@ class LayerFramePipeline:
                 z_index = z_order.index(slot)
                 return render_layer_size(cfg, z_index, viz_quality=viz_quality)
 
+        preset_root = cfg.paths.preset_root
         for slot, layer_cfg in cfg.layers_in_z_order():
             width, height = layer_size(slot)
             runtimes.append(
@@ -299,6 +304,7 @@ class LayerFramePipeline:
                     _beat_sensitivity(cfg, slot),
                     width=width,
                     height=height,
+                    preset_root=preset_root,
                 )
             )
 

@@ -16,6 +16,7 @@ import yaml
 _YAML_DUMP_WIDTH = 2**31 - 1
 
 from cleave.blend_modes import BlendMode
+from cleave.cue_roles import CueRole
 from cleave.effects.constants import clamp_effect_pct
 from cleave.extract import StemSource
 from cleave.config_schema import (
@@ -24,6 +25,8 @@ from cleave.config_schema import (
     BEAT_SENSITIVITY_MIN,
     DEFAULT_BEAT_SENSITIVITY,
     DEFAULT_LAYER_Z_ORDER,
+    DEFAULT_CAST_ROLES_DEFAULT_ROLE,
+    DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR,
     DEFAULT_PRESET_SWITCHING,
     DEFAULT_PRESET_SWITCHING_ROTATION_SET,
     DEFAULT_PRESET_SWITCHING_SHUFFLE,
@@ -36,6 +39,7 @@ from cleave.config_schema import (
     DEFAULT_EASTER_EGG,
     DEFAULT_PRESET_START_CLEAN,
     DEFAULT_PRESET_ROOT,
+    CastRolesTimelineBehaviour,
     PresetSwitchingMode,
     PresetSwitchingRotationSet,
     DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR,
@@ -64,6 +68,9 @@ from cleave.config_schema import (
     DEFAULT_TIMELINE_FADE_IN,
     DEFAULT_TIMELINE_FADE_OUT,
     DEFAULT_TIMELINE_PLACEMENT_SNAP,
+    DEFAULT_VISUAL_LIMITER_ENABLED,
+    DEFAULT_VISUAL_LIMITER_THRESHOLD,
+    DEFAULT_VISUAL_LIMITER_RELEASE,
     TimelinePlacementSnap,
     DEFAULT_HDR_COMPOSITING,
     DEFAULT_RENDER_FPS,
@@ -109,6 +116,7 @@ from cleave.config_schema import (
 )
 from cleave.timeline import TimelineLane
 from cleave.timeline_presets.characters import DEFAULT_TIMELINE_PRESET_KIND
+from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
 from cleave.timeline_presets.crescendo import CrescendoTarget
 from cleave.timeline_presets.density import (
     DEFAULT_TIMELINE_PRESET_DENSITY,
@@ -136,6 +144,10 @@ class LayerConfig:
     locked: bool = False
     preset_switching: PresetSwitchingMode = DEFAULT_PRESET_SWITCHING
     preset_switching_rotation_set: PresetSwitchingRotationSet = DEFAULT_PRESET_SWITCHING_ROTATION_SET
+    cast_roles_timeline_behaviour: CastRolesTimelineBehaviour = (
+        DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR
+    )
+    cast_roles_default_role: CueRole = DEFAULT_CAST_ROLES_DEFAULT_ROLE
     preset_switching_shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE
     preset_switching_shuffle_salt: int = DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT
     preset_duration: float = DEFAULT_PRESET_DURATION
@@ -268,11 +280,21 @@ class TimelineFadesConfig:
 
 @dataclass(frozen=True)
 class TimelinePresetConfig:
-    """Staged character / crescendo / density for the timeline preset action."""
+    """Staged character / crescendo / density / conductor for the timeline preset action."""
 
     character: str = DEFAULT_TIMELINE_PRESET_KIND
     crescendo: CrescendoTarget | None = None
     density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
+    conductor: bool = DEFAULT_TIMELINE_PRESET_CONDUCTOR
+
+
+@dataclass(frozen=True)
+class TimelineLimiterConfig:
+    """Live visual limiter knobs under ``timeline.limiter``."""
+
+    enabled: bool = DEFAULT_VISUAL_LIMITER_ENABLED
+    threshold: float = DEFAULT_VISUAL_LIMITER_THRESHOLD
+    release: float = DEFAULT_VISUAL_LIMITER_RELEASE
 
 
 @dataclass(frozen=True)
@@ -283,6 +305,7 @@ class TimelineConfig:
     fades: TimelineFadesConfig = field(default_factory=TimelineFadesConfig)
     placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
     preset: TimelinePresetConfig = field(default_factory=TimelinePresetConfig)
+    limiter: TimelineLimiterConfig = field(default_factory=TimelineLimiterConfig)
 
 
 @dataclass

@@ -17,19 +17,19 @@ from cleave.viz.row_semantics import RowDescriptor, RowKind
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_visibility import (
     apply_layer_visibility,
-    armed_recording_visible,
+    armed_recording_level,
     build_record_punch_cues,
     build_timeline_view_state,
-    committed_visible_outside_punch,
+    committed_level_outside_punch,
     effective_layer_enabled,
-    snapshot_monitor_from_timeline,
-    timeline_committed_visible,
+    snapshot_monitor_from_output,
+    timeline_committed_level,
     timeline_defaults,
-    timeline_fade_multiplier,
+    timeline_level_multiplier,
 )
 from cleave.viz.layer_pipeline import apply_effect_modifiers
 from cleave.viz.timeline_overlay import (
-    bar_segments_for_row,
+    bar_level_breakpoints_for_row,
     bar_tick_times_for_row,
     cue_times_for_stem,
 )
@@ -45,12 +45,21 @@ def _playlist(name: str) -> PresetPlaylist:
 DEFAULT_LAYER_SLOTS_LIST = list(DEFAULT_LAYER_SLOTS)
 
 
+def _as_level(value):
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    return float(value)
+
+
 def _lane(
-    baseline: bool | None,
-    *transitions: tuple[float, bool],
+    baseline,
+    *transitions,
 ) -> TimelineLane:
-    cues = [SlotCue(t=t, visible=v) for t, v in transitions]
-    return TimelineLane(baseline=baseline, cues=canonicalize(baseline, cues))
+    base = _as_level(baseline)
+    cues = [SlotCue(t=t, level=float(_as_level(level))) for t, level in transitions]
+    return TimelineLane(baseline=base, cues=canonicalize(base, cues))
 
 
 def _session(
@@ -91,11 +100,12 @@ def _stem_layer(slot: str) -> StemLayer:
 
 def test_timeline_defaults_from_layer_runtime() -> None:
     session = _session(layer_enabled={"layer_1": False, "layer_2": True, "layer_3": True, "layer_4": False})
+    # float defaults from layer.enabled
     assert timeline_defaults(session) == {
-        "layer_1": False,
-        "layer_2": True,
-        "layer_3": True,
-        "layer_4": False,
+        "layer_1": 0.0,
+        "layer_2": 1.0,
+        "layer_3": 1.0,
+        "layer_4": 0.0,
     }
 
 
@@ -203,8 +213,8 @@ def test_effective_layer_enabled_uses_record_buffer_while_recording() -> None:
     )
     session.timeline.recording = True
     session.timeline.armed_slots = {"layer_1"}
-    session.timeline.record_baseline = {"layer_1": True}
-    session.timeline.record_buffer = {"layer_1": [SlotCue(t=1.0, visible=False)]}
+    session.timeline.record_baseline={"layer_1": 1.0}
+    session.timeline.record_buffer = {"layer_1": [SlotCue(t=1.0, level=0.0)]}
     assert effective_layer_enabled(session, "layer_1", 1.0) is False
     assert effective_layer_enabled(session, "layer_2", 1.0) is True
 
@@ -227,11 +237,11 @@ def test_timeline_record_buffer_visible_while_recording() -> None:
     session = _session(timeline_enabled=True, lanes={"layer_1": _lane(False)})
     session.timeline.recording = True
     session.timeline.armed_slots = {"layer_1"}
-    session.timeline.record_baseline = {"layer_1": True}
-    session.timeline.record_buffer = {"layer_1": [SlotCue(t=1.0, visible=False)]}
+    session.timeline.record_baseline={"layer_1": 1.0}
+    session.timeline.record_buffer = {"layer_1": [SlotCue(t=1.0, level=0.0)]}
     assert effective_layer_enabled(session, "layer_1", 1.0) is False
     assert session.timeline.lanes["layer_1"] == _lane(False)
-    assert session.timeline.record_buffer["layer_1"] == [SlotCue(t=1.0, visible=False)]
+    assert session.timeline.record_buffer["layer_1"] == [SlotCue(t=1.0, level=0.0)]
 
 
 def test_build_timeline_view_state_uses_record_buffer_while_recording() -> None:
@@ -240,10 +250,10 @@ def test_build_timeline_view_state_uses_record_buffer_while_recording() -> None:
         lanes={"layer_1": _lane(False)},
     )
     session.timeline.recording = True
-    session.timeline.record_buffer = {"layer_2": [SlotCue(t=1.0, visible=False)]}
+    session.timeline.record_buffer = {"layer_2": [SlotCue(t=1.0, level=0.0)]}
     state = build_timeline_view_state(session, position_sec=1.0, duration_sec=60.0)
     assert state.lanes["layer_1"] == _lane(False)
-    assert state.record_buffer == {"layer_2": [SlotCue(t=1.0, visible=False)]}
+    assert state.record_buffer == {"layer_2": [SlotCue(t=1.0, level=0.0)]}
 
 
 def test_apply_layer_visibility_sets_fbo_enabled_from_timeline() -> None:
@@ -262,6 +272,66 @@ def test_apply_layer_visibility_sets_fbo_enabled_from_timeline() -> None:
     assert layers_by_slot["layer_1"].fbo.enabled is True
 
 
+def test_apply_layer_visibility_writes_cue_blend_with_layer_fallback() -> None:
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+        lanes={
+            "layer_1": TimelineLane(
+                baseline=0.0,
+                cues=[
+                    SlotCue(t=1.0, level=1.0, blend="add"),
+                    SlotCue(t=2.0, level=1.0, blend=None),
+                ],
+            ),
+        },
+    )
+    session.layers["layer_1"].blend_mode = "screen"
+    layers_by_slot = {slot: _stem_layer(slot) for slot in DEFAULT_LAYER_SLOTS}
+    layers_by_slot["layer_1"].fbo.blend_mode = "black-key"
+
+    apply_layer_visibility(session, layers_by_slot, 0.5)
+    assert layers_by_slot["layer_1"].fbo.blend_mode == "screen"
+
+    apply_layer_visibility(session, layers_by_slot, 1.0)
+    assert layers_by_slot["layer_1"].fbo.blend_mode == "add"
+
+    apply_layer_visibility(session, layers_by_slot, 2.0)
+    assert layers_by_slot["layer_1"].fbo.blend_mode == "screen"
+
+
+def test_apply_layer_visibility_cue_blend_then_curation_forces_black_key() -> None:
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+        lanes={
+            "layer_1": TimelineLane(
+                baseline=0.0,
+                cues=[SlotCue(t=1.0, level=1.0, blend="add")],
+            ),
+        },
+    )
+    session.layers["layer_1"].blend_mode = "screen"
+    layers_by_slot = {slot: _stem_layer(slot) for slot in DEFAULT_LAYER_SLOTS}
+    layers_by_slot["layer_1"].fbo.enabled = True
+
+    apply_layer_visibility(session, layers_by_slot, 1.0)
+    assert layers_by_slot["layer_1"].fbo.blend_mode == "add"
+
+    session.settings.editor_mode = "preset_curation"
+    apply_layer_visibility(session, layers_by_slot, 1.0)
+    assert layers_by_slot["layer_1"].fbo.blend_mode == "screen"
+    apply_effect_modifiers(
+        session,
+        {"layer_1": layers_by_slot["layer_1"]},
+        MagicMock(),
+        None,
+        1.0,
+        update=False,
+    )
+    assert layers_by_slot["layer_1"].fbo.blend_mode == "black-key"
+
+
 def test_apply_layer_visibility_fades_enable_before_on_cue() -> None:
     session = _session(
         layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
@@ -275,12 +345,12 @@ def test_apply_layer_visibility_fades_enable_before_on_cue() -> None:
 
     apply_layer_visibility(session, layers_by_slot, 9.0)
     assert layers_by_slot["layer_1"].fbo.enabled is True
-    assert 0.0 < layers_by_slot["layer_1"].timeline_fade < 1.0
+    assert 0.0 < layers_by_slot["layer_1"].timeline_level < 1.0
     assert effective_layer_enabled(session, "layer_1", 9.0) is False
 
     apply_layer_visibility(session, layers_by_slot, 7.0)
     assert layers_by_slot["layer_1"].fbo.enabled is False
-    assert layers_by_slot["layer_1"].timeline_fade == pytest.approx(0.0)
+    assert layers_by_slot["layer_1"].timeline_level == pytest.approx(0.0)
 
 
 def test_apply_layer_visibility_fades_off_stays_abrupt() -> None:
@@ -295,7 +365,10 @@ def test_apply_layer_visibility_fades_off_stays_abrupt() -> None:
 
     apply_layer_visibility(session, layers_by_slot, 9.0)
     assert layers_by_slot["layer_1"].fbo.enabled is False
-    assert layers_by_slot["layer_1"].timeline_fade == pytest.approx(1.0)
+    assert layers_by_slot["layer_1"].timeline_level == pytest.approx(0.0)
+    apply_layer_visibility(session, layers_by_slot, 10.0)
+    assert layers_by_slot["layer_1"].fbo.enabled is True
+    assert layers_by_slot["layer_1"].timeline_level == pytest.approx(1.0)
 
 
 def test_apply_layer_visibility_override_stays_abrupt_with_fades() -> None:
@@ -312,7 +385,7 @@ def test_apply_layer_visibility_override_stays_abrupt_with_fades() -> None:
 
     apply_layer_visibility(session, layers_by_slot, 9.0)
     assert layers_by_slot["layer_1"].fbo.enabled is False
-    assert layers_by_slot["layer_1"].timeline_fade == pytest.approx(1.0)
+    assert layers_by_slot["layer_1"].timeline_level == pytest.approx(1.0)
 
 
 def test_apply_layer_visibility_preview_stays_abrupt_with_fades() -> None:
@@ -334,17 +407,17 @@ def test_apply_layer_visibility_preview_stays_abrupt_with_fades() -> None:
 
     apply_layer_visibility(session, layers_by_slot, 9.0)
     assert layers_by_slot["layer_1"].fbo.enabled is False
-    assert layers_by_slot["layer_1"].timeline_fade == pytest.approx(1.0)
+    assert layers_by_slot["layer_1"].timeline_level == pytest.approx(1.0)
 
 
-def test_apply_effect_modifiers_scales_opacity_by_timeline_fade() -> None:
+def test_apply_effect_modifiers_scales_opacity_by_timeline_level() -> None:
     session = _session(
         layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
         timeline_enabled=True,
     )
     layer = _stem_layer("layer_1")
     layer.fbo.enabled = True
-    layer.timeline_fade = 0.5
+    layer.timeline_level = 0.5
     layer.fbo.opacity = 1.0
     effect_runtime = MagicMock()
     mod = MagicMock(
@@ -408,7 +481,7 @@ def test_apply_effect_modifiers_identity_in_curation_mode() -> None:
     assert layer.fbo.blend_mode == "black-key"
 
 
-def test_timeline_fade_multiplier_matches_lane_math() -> None:
+def test_timeline_level_multiplier_matches_lane_math() -> None:
     from cleave.easing import smoothstep
 
     session = _session(
@@ -419,7 +492,7 @@ def test_timeline_fade_multiplier_matches_lane_math() -> None:
     session.timeline.standard_cue_fades.enabled = True
     session.timeline.standard_cue_fades.fade_in = 2.0
     session.timeline.standard_cue_fades.fade_out = 2.0
-    assert timeline_fade_multiplier(session, "layer_1", 9.0) == pytest.approx(
+    assert timeline_level_multiplier(session, "layer_1", 9.0) == pytest.approx(
         smoothstep(0.5)
     )
 
@@ -464,23 +537,23 @@ def test_build_record_punch_cues_writes_baseline_only_when_it_differs() -> None:
         lanes={"layer_1": _lane(False)},
     )
     session.timeline.armed_slots = {"layer_1"}
-    session.timeline.record_baseline = {"layer_1": True}
-    session.timeline.record_buffer = {"layer_1": [SlotCue(t=12.0, visible=False)]}
+    session.timeline.record_baseline={"layer_1": 1.0}
+    session.timeline.record_buffer = {"layer_1": [SlotCue(t=12.0, level=0.0)]}
 
     build_record_punch_cues(session, record_start=10.0, record_stop=20.0)
     lane = session.timeline.lanes["layer_1"]
-    assert lane.baseline is False
-    assert SlotCue(t=10.0, visible=True) in lane.cues
-    assert SlotCue(t=12.0, visible=False) in lane.cues
+    assert lane.baseline == 0.0
+    assert SlotCue(t=10.0, level=1.0) in lane.cues
+    assert SlotCue(t=12.0, level=0.0) in lane.cues
 
-    session.timeline.record_baseline = {"layer_1": False}
+    session.timeline.record_baseline={"layer_1": 0.0}
     session.timeline.record_buffer = {}
     unchanged = _session(
         layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
         timeline_enabled=True,
         lanes={"layer_1": _lane(False)},
     )
-    unchanged.timeline.record_baseline = {"layer_1": False}
+    unchanged.timeline.record_baseline={"layer_1": 0.0}
     build_record_punch_cues(unchanged, record_start=10.0, record_stop=20.0)
     assert unchanged.timeline.lanes["layer_1"] == _lane(False)
 
@@ -494,12 +567,12 @@ def test_effective_layer_enabled_recording_armed_ignores_committed_cues() -> Non
     session.timeline.recording = True
     session.timeline.record_start_sec = 10.0
     session.timeline.armed_slots = {"layer_1"}
-    session.timeline.record_baseline = {"layer_1": True}
+    session.timeline.record_baseline={"layer_1": 1.0}
     session.timeline.record_buffer = {}
 
     assert effective_layer_enabled(session, "layer_1", 11.5) is True
-    assert armed_recording_visible(session, "layer_1", 11.5) is True
-    assert timeline_committed_visible(session, "layer_1", 11.5) is False
+    assert armed_recording_level(session, "layer_1", 11.5) == 1.0
+    assert timeline_committed_level(session, "layer_1", 11.5) == 0.0
 
 
 def test_build_timeline_view_state_recording_baseline_not_in_cue_ticks() -> None:
@@ -511,7 +584,7 @@ def test_build_timeline_view_state_recording_baseline_not_in_cue_ticks() -> None
     session.timeline.recording = True
     session.timeline.record_start_sec = 10.0
     session.timeline.armed_slots = {"layer_1"}
-    session.timeline.record_baseline = {"layer_1": True}
+    session.timeline.record_baseline={"layer_1": 1.0}
     session.timeline.record_buffer = {}
 
     state = build_timeline_view_state(session, position_sec=10.0, duration_sec=60.0)
@@ -527,12 +600,12 @@ def test_build_timeline_view_state_armed_recording_monitor_ignores_committed() -
     session.timeline.recording = True
     session.timeline.record_start_sec = 10.0
     session.timeline.armed_slots = {"layer_1"}
-    session.timeline.record_baseline = {"layer_1": True}
+    session.timeline.record_baseline={"layer_1": 1.0}
     session.timeline.record_buffer = {}
 
     state = build_timeline_view_state(session, position_sec=11.5, duration_sec=60.0)
     assert state.monitor_visible["layer_1"] is True
-    assert state.timeline_visible["layer_1"] is False
+    assert state.timeline_level["layer_1"] == 0.0
 
 
 def test_effective_layer_enabled_recording_armed_vs_unarmed() -> None:
@@ -543,13 +616,13 @@ def test_effective_layer_enabled_recording_armed_vs_unarmed() -> None:
     )
     session.timeline.recording = True
     session.timeline.armed_slots = {"layer_1"}
-    session.timeline.record_baseline = {"layer_1": True}
-    session.timeline.record_buffer = {"layer_1": [SlotCue(t=1.0, visible=False)], "layer_2": [SlotCue(t=1.0, visible=True)]}
+    session.timeline.record_baseline={"layer_1": 1.0}
+    session.timeline.record_buffer = {"layer_1": [SlotCue(t=1.0, level=0.0)], "layer_2": [SlotCue(t=1.0, level=1.0)]}
     assert effective_layer_enabled(session, "layer_1", 1.0) is False
     assert effective_layer_enabled(session, "layer_2", 1.0) is False
 
 
-def test_timeline_committed_visible_ignores_record_buffer() -> None:
+def test_timeline_committed_level_ignores_record_buffer() -> None:
     session = _session(
         layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
         timeline_enabled=True,
@@ -557,9 +630,9 @@ def test_timeline_committed_visible_ignores_record_buffer() -> None:
     )
     session.timeline.recording = True
     session.timeline.armed_slots = {"layer_1"}
-    session.timeline.record_buffer = {"layer_1": [SlotCue(t=1.0, visible=False)], "layer_2": [SlotCue(t=1.0, visible=True)]}
-    assert timeline_committed_visible(session, "layer_1", 1.0) is True
-    assert timeline_committed_visible(session, "layer_2", 1.0) is False
+    session.timeline.record_buffer = {"layer_1": [SlotCue(t=1.0, level=0.0)], "layer_2": [SlotCue(t=1.0, level=1.0)]}
+    assert timeline_committed_level(session, "layer_1", 1.0) == 1.0
+    assert timeline_committed_level(session, "layer_2", 1.0) == 0.0
 
 
 def test_build_timeline_view_state_populates_visibility_playing() -> None:
@@ -573,8 +646,8 @@ def test_build_timeline_view_state_populates_visibility_playing() -> None:
     state = build_timeline_view_state(session, position_sec=5.0, duration_sec=60.0)
     assert state.monitor_visible["layer_1"] is False
     assert state.monitor_visible["layer_2"] is True
-    assert state.timeline_visible["layer_1"] is False
-    assert state.timeline_visible["layer_2"] is True
+    assert state.timeline_level["layer_1"] == 0.0
+    assert state.timeline_level["layer_2"] == 1.0
     assert state.override_slots == {"layer_2"}
 
 
@@ -593,11 +666,11 @@ def test_build_timeline_view_state_monitor_preview_active() -> None:
     }
     state = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
     assert state.monitor_visible == session.timeline.monitor
-    assert state.timeline_visible["layer_1"] is False
-    assert state.timeline_visible["layer_2"] is True
+    assert state.timeline_level["layer_1"] == 0.0
+    assert state.timeline_level["layer_2"] == 1.0
 
 
-def test_snapshot_monitor_from_timeline_populates_from_committed() -> None:
+def test_snapshot_monitor_from_output_populates_from_committed() -> None:
     session = _session(
         layer_enabled={"layer_1": False, "layer_2": True, "layer_3": True, "layer_4": False},
         timeline_enabled=True,
@@ -606,7 +679,7 @@ def test_snapshot_monitor_from_timeline_populates_from_committed() -> None:
             "layer_3": _lane(True, (2.0, False)),
         },
     )
-    monitor = snapshot_monitor_from_timeline(session, 2.5)
+    monitor = snapshot_monitor_from_output(session, 2.5)
     assert monitor == {
         "layer_1": True,
         "layer_2": True,
@@ -624,16 +697,19 @@ def test_armed_recording_bar_blends_committed_and_live() -> None:
     session.timeline.recording = True
     session.timeline.record_start_sec = 10.0
     session.timeline.armed_slots = {"layer_1"}
-    session.timeline.record_baseline = {"layer_1": True}
-    session.timeline.record_buffer = {"layer_1": [SlotCue(t=12.0, visible=False)]}
+    session.timeline.record_baseline={"layer_1": 1.0}
+    session.timeline.record_buffer = {"layer_1": [SlotCue(t=12.0, level=0.0)]}
 
     state = build_timeline_view_state(session, position_sec=12.0, duration_sec=60.0)
-    segments = bar_segments_for_row(state, "layer_1")
+    segments = bar_level_breakpoints_for_row(state, "layer_1")
     assert segments == [
-        (0.0, 10.0, False),
-        (10.0, 12.0, True),
-        (12.0, 30.0, False),
-        (30.0, 60.0, True),
+        (0.0, 0.0),
+        (10.0, 0.0),
+        (10.0, 1.0),
+        (12.0, 0.0),
+        (30.0, 0.0),
+        (30.0, 1.0),
+        (60.0, 1.0),
     ]
 
 
@@ -645,15 +721,18 @@ def test_armed_recording_bar_uses_committed_timeline_after_disarm() -> None:
     )
     session.timeline.recording = False
     session.timeline.armed_slots = set()
-    session.timeline.record_baseline = {}
+    session.timeline.record_baseline={}
     session.timeline.record_buffer = {}
 
     state = build_timeline_view_state(session, position_sec=12.0, duration_sec=60.0)
-    segments = bar_segments_for_row(state, "layer_1")
+    segments = bar_level_breakpoints_for_row(state, "layer_1")
     assert segments == [
-        (0.0, 10.0, False),
-        (10.0, 12.0, True),
-        (12.0, 60.0, False),
+        (0.0, 0.0),
+        (10.0, 0.0),
+        (10.0, 1.0),
+        (12.0, 1.0),
+        (12.0, 0.0),
+        (60.0, 0.0),
     ]
     assert effective_layer_enabled(session, "layer_1", 12.0) is False
 
@@ -666,12 +745,12 @@ def test_build_record_punch_cues_uses_record_baseline_when_disarmed() -> None:
     )
     session.timeline.recording = True
     session.timeline.armed_slots = set()
-    session.timeline.record_baseline = {"layer_1": True}
-    session.timeline.record_buffer = {"layer_1": [SlotCue(t=12.0, visible=False)]}
+    session.timeline.record_baseline={"layer_1": 1.0}
+    session.timeline.record_buffer = {"layer_1": [SlotCue(t=12.0, level=0.0)]}
 
     build_record_punch_cues(session, record_start=10.0, record_stop=15.0)
     lane = session.timeline.lanes["layer_1"]
-    assert SlotCue(t=12.0, visible=False) in lane.cues
+    assert SlotCue(t=12.0, level=0.0) in lane.cues
 
 
 def test_build_record_punch_cues_restores_committed_at_stop() -> None:
@@ -681,14 +760,14 @@ def test_build_record_punch_cues_restores_committed_at_stop() -> None:
         lanes={"layer_1": _lane(False, (30.0, True))},
     )
     session.timeline.armed_slots = {"layer_1"}
-    session.timeline.record_baseline = {"layer_1": False}
-    session.timeline.record_buffer = {"layer_1": [SlotCue(t=15.0, visible=True)]}
+    session.timeline.record_baseline={"layer_1": 0.0}
+    session.timeline.record_buffer = {"layer_1": [SlotCue(t=15.0, level=1.0)]}
 
     build_record_punch_cues(session, record_start=10.0, record_stop=20.0)
     lane = session.timeline.lanes["layer_1"]
-    assert SlotCue(t=15.0, visible=True) in lane.cues
-    assert SlotCue(t=20.0, visible=False) in lane.cues
-    assert timeline_committed_visible(session, "layer_1", 20.0) is False
+    assert SlotCue(t=15.0, level=1.0) in lane.cues
+    assert SlotCue(t=20.0, level=0.0) in lane.cues
+    assert timeline_committed_level(session, "layer_1", 20.0) == 0.0
 
 
 def test_build_record_punch_cues_restores_when_disable_only_inside_punch() -> None:
@@ -698,23 +777,23 @@ def test_build_record_punch_cues_restores_when_disable_only_inside_punch() -> No
         lanes={"layer_1": _lane(True, (15.0, False), (25.0, True))},
     )
     session.timeline.armed_slots = {"layer_1"}
-    session.timeline.record_baseline = {"layer_1": True}
-    session.timeline.record_buffer = {"layer_1": [SlotCue(t=18.0, visible=True)]}
+    session.timeline.record_baseline={"layer_1": 1.0}
+    session.timeline.record_buffer = {"layer_1": [SlotCue(t=18.0, level=1.0)]}
 
     build_record_punch_cues(session, record_start=10.0, record_stop=22.0)
     lane = session.timeline.lanes["layer_1"]
-    assert SlotCue(t=22.0, visible=False) in lane.cues
-    assert committed_visible_outside_punch(session, "layer_1", 10.0, 22.0) is True
-    assert timeline_committed_visible(session, "layer_1", 22.0) is False
+    assert SlotCue(t=22.0, level=0.0) in lane.cues
+    assert committed_level_outside_punch(session, "layer_1", 10.0, 22.0) == 1.0
+    assert timeline_committed_level(session, "layer_1", 22.0) == 0.0
 
 
 def test_timeline_defaults_tracks_layer_enabled_before_first_record() -> None:
     session = _session(
         layer_enabled={"layer_1": False, "layer_2": True, "layer_3": True, "layer_4": True},
     )
-    assert timeline_defaults(session)["layer_1"] is False
+    assert timeline_defaults(session)["layer_1"] == 0.0
     session.layers["layer_1"].enabled = True
-    assert timeline_defaults(session)["layer_1"] is True
+    assert timeline_defaults(session)["layer_1"] == 1.0
 
 
 def test_timeline_defaults_stable_after_layer_toggle_when_slot_has_cues() -> None:
@@ -723,11 +802,11 @@ def test_timeline_defaults_stable_after_layer_toggle_when_slot_has_cues() -> Non
         timeline_enabled=True,
         lanes={"layer_1": _lane(False, (5.0, True), (10.0, False), (15.0, True))},
     )
-    assert timeline_defaults(session)["layer_1"] is False
+    assert timeline_defaults(session)["layer_1"] == 0.0
     session.layers["layer_1"].enabled = False
-    assert timeline_defaults(session)["layer_1"] is False
-    assert timeline_committed_visible(session, "layer_1", 2.0) is False
-    assert timeline_committed_visible(session, "layer_1", 7.0) is True
+    assert timeline_defaults(session)["layer_1"] == 0.0
+    assert timeline_committed_level(session, "layer_1", 2.0) == 0.0
+    assert timeline_committed_level(session, "layer_1", 7.0) == 1.0
 
 
 def test_build_record_punch_cues_adds_t0_anchor_on_first_record() -> None:
@@ -737,21 +816,21 @@ def test_build_record_punch_cues_adds_t0_anchor_on_first_record() -> None:
         lanes={},
     )
     session.timeline.armed_slots = {"layer_1"}
-    session.timeline.record_baseline = {"layer_1": False}
+    session.timeline.record_baseline={"layer_1": 0.0}
     session.timeline.record_buffer = {
         "layer_1": [
-            SlotCue(t=5.0, visible=True),
-            SlotCue(t=10.0, visible=False),
-            SlotCue(t=15.0, visible=True),
+            SlotCue(t=5.0, level=1.0),
+            SlotCue(t=10.0, level=0.0),
+            SlotCue(t=15.0, level=1.0),
         ],
     }
 
     build_record_punch_cues(session, record_start=2.0, record_stop=20.0)
     lane = session.timeline.lanes["layer_1"]
-    assert lane.baseline is False
-    assert SlotCue(t=5.0, visible=True) in lane.cues
-    assert SlotCue(t=10.0, visible=False) in lane.cues
-    assert SlotCue(t=15.0, visible=True) in lane.cues
+    assert lane.baseline == 0.0
+    assert SlotCue(t=5.0, level=1.0) in lane.cues
+    assert SlotCue(t=10.0, level=0.0) in lane.cues
+    assert SlotCue(t=15.0, level=1.0) in lane.cues
 
 
 def test_timeline_bar_preserves_pre_first_cue_after_layer_toggle() -> None:
@@ -760,22 +839,22 @@ def test_timeline_bar_preserves_pre_first_cue_after_layer_toggle() -> None:
         timeline_enabled=True,
         lanes={"layer_1": _lane(False, (5.0, True), (10.0, False), (15.0, True))},
     )
-    state = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
-    assert bar_segments_for_row(state, "layer_1") == [
-        (0.0, 5.0, False),
-        (5.0, 10.0, True),
-        (10.0, 15.0, False),
-        (15.0, 60.0, True),
+    expected = [
+        (0.0, 0.0),
+        (5.0, 0.0),
+        (5.0, 1.0),
+        (10.0, 1.0),
+        (10.0, 0.0),
+        (15.0, 0.0),
+        (15.0, 1.0),
+        (60.0, 1.0),
     ]
+    state = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
+    assert bar_level_breakpoints_for_row(state, "layer_1") == expected
 
     session.layers["layer_1"].enabled = True
     state = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
-    assert bar_segments_for_row(state, "layer_1") == [
-        (0.0, 5.0, False),
-        (5.0, 10.0, True),
-        (10.0, 15.0, False),
-        (15.0, 60.0, True),
-    ]
+    assert bar_level_breakpoints_for_row(state, "layer_1") == expected
 
 def test_build_timeline_view_state_phase_shifts_bar_grid_times() -> None:
     session = _session(
@@ -868,3 +947,17 @@ def test_build_timeline_view_state_default_song_markers_empty() -> None:
     state = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
     assert state.song_marker_times == ()
     assert state.selected_song_marker_index is None
+
+
+def test_build_timeline_view_state_includes_selected_cue_t() -> None:
+    session = _session(
+        layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
+        timeline_enabled=True,
+    )
+    session.timeline.selected_cue_t = {"layer_1": 12.5}
+    session.timeline.selected_cue_flash_start_ms = 1234
+    state = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
+    assert state.selected_cue_t == {"layer_1": 12.5}
+    assert state.selected_cue_flash_start_ms == 1234
+    state.selected_cue_t["layer_1"] = 99.0
+    assert session.timeline.selected_cue_t == {"layer_1": 12.5}
