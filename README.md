@@ -116,31 +116,43 @@ Note: use `--help` on any command for options.
 ### Editor
 
 * Press `h` to show context sensitive help and controls.
-* The editor may run at low frame rates with multiple layers - some Milkdrop presets use a lot of CPU.
-  * Change the `preview quality` in the Editor Settings menu.
+  * The help will change as you move around the interface with the arrow keys.
+* If you're using CPU to render, the editor may run at low frame rates with multiple layers
+  * Change `Editor Settings` -> `preview quality` to help with this.
   * The final render will still be at full quality and full frame rate.
 
 #### Preset curation
-
-While focused on a preset **file** row:
-
-* `f` — **copy** the preset into `favourites/` (original stays in the pack).
-* `b` — **move** the preset into `blacklist/` (permanently removed from pack).
-* Both folders live under `paths.preset_root` (default `~/.local/share/cleave/presets/`).
+The editor has a preset curation mode that provides a simple way to categorise presets into folders for future use.
+`Editor Settings` -> `editor mode` -> `preset curation`. While focused on a preset **file** row:
+* `f` - **copy** the preset into `favourites/` (original stays in the pack).
+* `c` - **copy** the preset into a cast role directory (see below for more info on cast roles)
+* `b` - **move** the preset into `blacklist/` (permanently removed from pack).
+* All preset folders live under `paths.preset_root` (default `~/.local/share/cleave/presets/`).
   * Browse them in the Editor like any other pack folder. 
 * Subdirectories inside `favourites/` or `blacklist/` appear as destination choices in the confirm modal, which makes it easy to categorise them in any way you choose, eg:
 ```
 favourites/a-tier/
 favourites/b-tier/
-favourites/good-for-top-layer/
-favourites/good-for-bottom-layer/
-favourites/good-for-drums/
-favourites/good-for-full-mix/
 favourites/lots-of-black/
 favourites/full-colour-wash/
 ```
 
-#### Timeline
+#### Timeline layer automation
+The timeline provides a comprehensive way to automate layer visibility, preset choice, opacity and blend.
+When enabled, the standard layer visibility controls are disabled, the timeline takes over.
+
+##### `Song Markers`
+* Provide a simple way to mark specific points in the song for preset cuts.
+* Press `Ctrl + Enter` to drop a song marker at any point in the song.
+* These can be used as snap points and are also used by the `timeline preset` as anchor points for generation.
+
+##### `Beat / Bar Grid`
+* Powered by Beat This! which uses AI to try to detect beats and bars in the song.
+* By default it will use the full-mix stem for analysis.
+  * Choose a different stem with the `--beat-detection-stem` switch.
+* You can snap cues to the grid either on record or after record.
+
+##### `Timeline Presets`
 * TODO: Document
 
 ### Project Directory

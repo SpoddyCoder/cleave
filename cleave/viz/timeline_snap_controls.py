@@ -18,7 +18,8 @@ SONG_MARKER_SNAP_SCOPE_CLOSEST_WINS = "closest_wins"
 _ALL_CLOSEST_LABEL = "Closest Wins"
 _EACH_LAYER_LABEL = "All Layers"
 _CANCEL_LABEL = "Cancel"
-_GRID_PROMPT = "Snap cues to?"
+_BEATS_PROMPT = "Snap timeline cues to beats?"
+_BARS_PROMPT = "Snap timeline cues to bars?"
 _PROXIMITY_PROMPT = "Snap proximity?"
 _SCOPE_PROMPT = "Layer scope?"
 SONG_MARKER_SNAP_PROXIMITY_OPTIONS: tuple[float, ...] = (
@@ -88,7 +89,23 @@ class TimelineSnapController:
         self._bar_times = tuple(bar_times)
         self._on_notification = on_notification
 
-    def prompt_grid(self) -> None:
+    def prompt_beats(self) -> None:
+        self._prompt_grid_snap(
+            _BEATS_PROMPT,
+            self._snap_to_beats,
+        )
+
+    def prompt_bars(self) -> None:
+        self._prompt_grid_snap(
+            _BARS_PROMPT,
+            self._snap_to_bars,
+        )
+
+    def _prompt_grid_snap(
+        self,
+        message: str,
+        on_confirm: Callable[[], None],
+    ) -> None:
         tl = self.session.timeline
         if tl.locked:
             return
@@ -98,14 +115,11 @@ class TimelineSnapController:
             self._notify("No timeline cues to snap")
             return
         dismiss = lambda: None
-        self._modal.prompt_choice(
-            _GRID_PROMPT,
-            [
-                ModalOption("Beats", self._snap_to_beats),
-                ModalOption("Bars", self._snap_to_bars),
-                ModalOption(_CANCEL_LABEL, dismiss),
-            ],
-            on_dismiss=dismiss,
+        self._modal.prompt_yes_no(
+            message,
+            on_confirm=on_confirm,
+            on_cancel=dismiss,
+            cancel_label=_CANCEL_LABEL,
         )
 
     def prompt_song_markers(self) -> None:

@@ -284,5 +284,14 @@ def test_section_header_descriptor_mappings() -> None:
         RowDescriptor(RowKind.SONG_MARKER_ITEM, marker_index=0)
     ) == RowDescriptor(RowKind.SONG_MARKERS_HEADER)
     assert section_header_descriptor(
+        RowDescriptor(RowKind.TIMELINE_SNAP_TO_BEATS)
+    ) == RowDescriptor(RowKind.TIMELINE_SNAP_CUES_HEADER)
+    assert section_header_descriptor(
+        RowDescriptor(RowKind.TIMELINE_SNAP_TO_BARS)
+    ) == RowDescriptor(RowKind.TIMELINE_SNAP_CUES_HEADER)
+    assert section_header_descriptor(
         RowDescriptor(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
-    ) == RowDescriptor(RowKind.SONG_MARKERS_HEADER)
+    ) == RowDescriptor(RowKind.TIMELINE_SNAP_CUES_HEADER)
+    assert section_header_descriptor(
+        RowDescriptor(RowKind.TIMELINE_SNAP_CUES_HEADER)
+    ) == RowDescriptor(RowKind.RENDER_TIMELINE_HEADER)

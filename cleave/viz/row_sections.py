@@ -143,6 +143,14 @@ def _beat_bar_grid_expanded(state: TuningViewState, _slot: str | None) -> bool:
     return state.render_timeline.beat_bar_grid_expanded
 
 
+def _toggle_snap_cues(controls: TuningControls, _slot: str | None, forward: bool) -> None:
+    controls._set_snap_cues_expanded(forward)
+
+
+def _snap_cues_expanded(state: TuningViewState, _slot: str | None) -> bool:
+    return state.render_timeline.snap_cues_expanded
+
+
 def _toggle_timeline_fades(controls: TuningControls, _slot: str | None, forward: bool) -> None:
     controls._set_timeline_fades_expanded(forward)
 
@@ -417,7 +425,6 @@ def _append_song_marker_rows(
         row_list.append(
             RowDescriptor(RowKind.SONG_MARKER_ITEM, marker_index=index)
         )
-    row_list.append(RowDescriptor(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS))
 
 
 SETTINGS_UI_SECTION = ExpandSectionDef(
@@ -831,7 +838,18 @@ BEAT_BAR_GRID_SECTION = ExpandSectionDef(
         SectionNode(leaf_kind=RowKind.TIMELINE_PLACEMENT_SNAP),
         SectionNode(leaf_kind=RowKind.TIMELINE_BAR_GRID),
         SectionNode(leaf_kind=RowKind.TIMELINE_BAR_PHASE),
-        SectionNode(leaf_kind=RowKind.TIMELINE_SNAP_TO_GRID),
+    ),
+)
+
+SNAP_CUES_SECTION = ExpandSectionDef(
+    header_kind=RowKind.TIMELINE_SNAP_CUES_HEADER,
+    context="global",
+    read_expanded=_snap_cues_expanded,
+    toggle=_toggle_snap_cues,
+    children=(
+        SectionNode(leaf_kind=RowKind.TIMELINE_SNAP_TO_BEATS),
+        SectionNode(leaf_kind=RowKind.TIMELINE_SNAP_TO_BARS),
+        SectionNode(leaf_kind=RowKind.TIMELINE_SNAP_TO_SONG_MARKERS),
     ),
 )
 
@@ -952,6 +970,7 @@ _ALL_EXPAND_SECTIONS = _collect_expand_sections(
     TRACK_SECTION,
     SONG_MARKERS_SECTION,
     BEAT_BAR_GRID_SECTION,
+    SNAP_CUES_SECTION,
     TIMELINE_FADES_SECTION,
     TIMELINE_PRESETS_SECTION,
     TIMELINE_VISUAL_LIMITER_SECTION,
@@ -1072,7 +1091,9 @@ RENDER_TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_PLACEMENT_SNAP,
         RowKind.TIMELINE_BAR_GRID,
         RowKind.TIMELINE_BAR_PHASE,
-        RowKind.TIMELINE_SNAP_TO_GRID,
+        RowKind.TIMELINE_SNAP_CUES_HEADER,
+        RowKind.TIMELINE_SNAP_TO_BEATS,
+        RowKind.TIMELINE_SNAP_TO_BARS,
         RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
         RowKind.TIMELINE_FADES_HEADER,
         RowKind.TIMELINE_SONG_MARKER_FADES,
@@ -1124,9 +1145,9 @@ def _build_row_tree_indent_depth() -> dict[RowKind, int]:
     depths[RowKind.TRACK_USER_PRESET_ADD] = 3
     depths[RowKind.SONG_MARKERS_HEADER] = 1
     depths[RowKind.SONG_MARKER_ITEM] = 2
-    depths[RowKind.TIMELINE_SNAP_TO_SONG_MARKERS] = 2
     depths[RowKind.TIMELINE_RESET] = 1
     _assign_expand_indent_depth(depths, BEAT_BAR_GRID_SECTION, 1)
+    _assign_expand_indent_depth(depths, SNAP_CUES_SECTION, 1)
     _assign_expand_indent_depth(depths, TIMELINE_FADES_SECTION, 1)
     _assign_expand_indent_depth(depths, TIMELINE_PRESETS_SECTION, 1)
     _assign_expand_indent_depth(depths, TIMELINE_VISUAL_LIMITER_SECTION, 1)
@@ -1254,6 +1275,7 @@ def append_render_section_rows(
             ):
                 append_expand_section_rows(row_list, SONG_MARKERS_SECTION, state)
                 append_expand_section_rows(row_list, BEAT_BAR_GRID_SECTION, state)
+                append_expand_section_rows(row_list, SNAP_CUES_SECTION, state)
                 append_expand_section_rows(row_list, TIMELINE_FADES_SECTION, state)
                 append_expand_section_rows(row_list, TIMELINE_PRESETS_SECTION, state)
                 append_expand_section_rows(
@@ -1309,10 +1331,11 @@ def _build_section_header_parent_map() -> dict[RowKind, RowKind]:
     _walk_expand_section_for_headers(TRACK_SECTION, out)
     _walk_expand_section_for_headers(SONG_MARKERS_SECTION, out)
     _walk_expand_section_for_headers(BEAT_BAR_GRID_SECTION, out)
+    _walk_expand_section_for_headers(SNAP_CUES_SECTION, out)
     _walk_expand_section_for_headers(TIMELINE_FADES_SECTION, out)
     _walk_expand_section_for_headers(TIMELINE_PRESETS_SECTION, out)
     _walk_expand_section_for_headers(TIMELINE_VISUAL_LIMITER_SECTION, out)
-    out[RowKind.TIMELINE_SNAP_TO_SONG_MARKERS] = RowKind.SONG_MARKERS_HEADER
+    out[RowKind.TIMELINE_SNAP_CUES_HEADER] = RowKind.RENDER_TIMELINE_HEADER
     out[RowKind.TIMELINE_FADES_HEADER] = RowKind.RENDER_TIMELINE_HEADER
     out[RowKind.TIMELINE_PRESETS_HEADER] = RowKind.RENDER_TIMELINE_HEADER
     out[RowKind.TIMELINE_VISUAL_LIMITER_HEADER] = RowKind.RENDER_TIMELINE_HEADER
