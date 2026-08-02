@@ -55,9 +55,12 @@ def compose_timeline(
     slot_list = list(slots)
     if not slot_list or duration_sec <= 0.0:
         return {}
+    markers = _normalize_song_markers(song_marker_times, duration_sec)
     if len(slot_list) == 1:
         return cues_from_states(
-            slot_list, [(0.0, levels_from_active({slot_list[0]}))]
+            slot_list,
+            [(0.0, levels_from_active({slot_list[0]}))],
+            song_marker_times=markers,
         )
 
     order = list(slot_list)
@@ -66,15 +69,22 @@ def compose_timeline(
     motifs = motifs_for_profile(profile.motif_ids)
 
     bars = thin_bar_times_for_arrange(bar_times, duration_sec)
-    markers = _normalize_song_markers(song_marker_times, duration_sec)
     if len(bars) < PHRASE_BARS_MIN and not markers:
         opening = frozenset({order[0]})
-        return cues_from_states(slot_list, [(0.0, levels_from_active(opening))])
+        return cues_from_states(
+            slot_list,
+            [(0.0, levels_from_active(opening))],
+            song_marker_times=markers,
+        )
 
     phrases = _partition_phrases(bars, duration_sec, rng, markers)
     if not phrases:
         opening = frozenset({order[0]})
-        return cues_from_states(slot_list, [(0.0, levels_from_active(opening))])
+        return cues_from_states(
+            slot_list,
+            [(0.0, levels_from_active(opening))],
+            song_marker_times=markers,
+        )
 
     conductor = StemConductor.build(
         signals, slot_stems, phrases, density_bias=density_bias
@@ -198,7 +208,12 @@ def compose_timeline(
             conductor.cast_for_state(active, conductor.phrase_at(t))
             for t, active in states
         ]
-    return cues_from_states(slot_list, level_states, casts)
+    return cues_from_states(
+        slot_list,
+        level_states,
+        casts,
+        song_marker_times=markers,
+    )
 
 
 def _normalize_song_markers(

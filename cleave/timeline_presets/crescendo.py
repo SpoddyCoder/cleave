@@ -152,7 +152,12 @@ def apply_crescendo(
         casts = _casts_for_merged(
             lanes, slot_list, merged, t_start=window.t_start
         )
-    return cues_from_states(slot_list, merged, casts)
+    return cues_from_states(
+        slot_list,
+        merged,
+        casts,
+        song_marker_times=song_marker_times,
+    )
 
 
 def _levels_equal_maps(

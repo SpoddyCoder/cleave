@@ -286,11 +286,9 @@ class TimelineFadeGroupConfig:
 
 
 @dataclass(frozen=True)
-class TimelineFadesConfig:
-    song_markers: TimelineFadeGroupConfig = field(
-        default_factory=TimelineFadeGroupConfig
-    )
-    standard: TimelineFadeGroupConfig = field(default_factory=TimelineFadeGroupConfig)
+class TimelineCutsConfig:
+    hard: TimelineFadeGroupConfig = field(default_factory=TimelineFadeGroupConfig)
+    soft: TimelineFadeGroupConfig = field(default_factory=TimelineFadeGroupConfig)
 
 
 @dataclass(frozen=True)
@@ -317,7 +315,7 @@ class TimelineConfig:
     enabled: bool
     lanes: dict[str, TimelineLane]
     locked: bool = False
-    fades: TimelineFadesConfig = field(default_factory=TimelineFadesConfig)
+    cuts: TimelineCutsConfig = field(default_factory=TimelineCutsConfig)
     placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
     preset: TimelinePresetConfig = field(default_factory=TimelinePresetConfig)
     limiter: TimelineLimiterConfig = field(default_factory=TimelineLimiterConfig)

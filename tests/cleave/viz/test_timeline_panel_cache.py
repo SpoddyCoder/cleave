@@ -177,27 +177,61 @@ def test_static_signature_changes_on_cue_blend_and_role() -> None:
     assert _static_sig(with_blend) != _static_sig(with_role)
 
 
-def test_static_signature_changes_on_standard_cue_fades_enabled() -> None:
-    disabled = _view_state(standard_cue_fades_enabled=False)
-    enabled = _view_state(standard_cue_fades_enabled=True)
+def test_static_signature_changes_on_cue_cut() -> None:
+    none_cut = _view_state(
+        lanes={
+            "layer_1": TimelineLane(
+                baseline=0.0,
+                cues=canonicalize(0.0, [SlotCue(t=10.0, level=1.0)]),
+            )
+        }
+    )
+    hard_cut = _view_state(
+        lanes={
+            "layer_1": TimelineLane(
+                baseline=0.0,
+                cues=canonicalize(
+                    0.0, [SlotCue(t=10.0, level=1.0, cut="hard")]
+                ),
+            )
+        }
+    )
+    soft_cut = _view_state(
+        lanes={
+            "layer_1": TimelineLane(
+                baseline=0.0,
+                cues=canonicalize(
+                    0.0, [SlotCue(t=10.0, level=1.0, cut="soft")]
+                ),
+            )
+        }
+    )
+    assert _static_sig(none_cut) != _static_sig(hard_cut)
+    assert _static_sig(none_cut) != _static_sig(soft_cut)
+    assert _static_sig(hard_cut) != _static_sig(soft_cut)
+
+
+def test_static_signature_changes_on_soft_cut_fades_enabled() -> None:
+    disabled = _view_state(soft_cut_fades_enabled=False)
+    enabled = _view_state(soft_cut_fades_enabled=True)
     assert _static_sig(disabled) != _static_sig(enabled)
 
 
-def test_static_signature_changes_on_song_marker_fades_enabled() -> None:
-    disabled = _view_state(song_marker_fades_enabled=False)
-    enabled = _view_state(song_marker_fades_enabled=True)
+def test_static_signature_changes_on_hard_cut_fades_enabled() -> None:
+    disabled = _view_state(hard_cut_fades_enabled=False)
+    enabled = _view_state(hard_cut_fades_enabled=True)
     assert _static_sig(disabled) != _static_sig(enabled)
 
 
-def test_static_signature_changes_on_standard_cue_fade_in() -> None:
-    short = _view_state(standard_cue_fades_enabled=True, standard_cue_fade_in=2.0)
-    long = _view_state(standard_cue_fades_enabled=True, standard_cue_fade_in=4.0)
+def test_static_signature_changes_on_soft_cut_fade_in() -> None:
+    short = _view_state(soft_cut_fades_enabled=True, soft_cut_fade_in=2.0)
+    long = _view_state(soft_cut_fades_enabled=True, soft_cut_fade_in=4.0)
     assert _static_sig(short) != _static_sig(long)
 
 
-def test_static_signature_changes_on_song_marker_fade_out() -> None:
-    short = _view_state(song_marker_fades_enabled=True, song_marker_fade_out=2.0)
-    long = _view_state(song_marker_fades_enabled=True, song_marker_fade_out=4.0)
+def test_static_signature_changes_on_hard_cut_fade_out() -> None:
+    short = _view_state(hard_cut_fades_enabled=True, hard_cut_fade_out=2.0)
+    long = _view_state(hard_cut_fades_enabled=True, hard_cut_fade_out=4.0)
     assert _static_sig(short) != _static_sig(long)
 
 

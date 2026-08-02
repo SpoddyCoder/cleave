@@ -187,7 +187,7 @@ def test_preset_file_help_titles() -> None:
     assert description.lines == (
         "Currently active Milkdrop preset for this layer.",
         "[F/B/U] indicates favourited/blacklisted/user-defined.",
-        "[R:X] indicates the chosen cast role.",
+        "[R:X] indicates the chosen role.",
     )
     assert description.entries == CUE_ROLE_MARKER_HELP_ENTRIES
     assert dict(description.entries) == {
@@ -478,7 +478,7 @@ def test_user_preset_item_help() -> None:
     assert description.lines == (
         "Preset in the user-defined rotation set for this layer.",
         "[F/B] indicates favourited/blacklisted.",
-        "[R:X] indicates the chosen cast role.",
+        "[R:X] indicates the chosen role.",
     )
     assert description.entries == CUE_ROLE_MARKER_HELP_ENTRIES
     entries = dict(keyboard.entries)
@@ -606,9 +606,9 @@ def test_timeline_strip_help_paused() -> None:
     assert "Ctrl + Enter" not in entries
     assert entries["Space"] == "play"
     assert entries["Ctrl + Space / R"] == "start record"
-    assert entries["C / Shift+C"] == (
-        "cycle cue cast (requires cast roles rotation set)"
-    )
+    assert entries["B"] == "cycle cue blend"
+    assert entries["C"] == "cycle cue cut type"
+    assert entries["O"] == "cycle cue role (requires cast roles rotation set)"
     keys = [key for key, _ in section.entries]
     assert keys.index("Ctrl + Space / R") + 1 == keys.index("Space")
     assert "Left/Right" in entries

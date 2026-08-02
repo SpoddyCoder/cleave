@@ -54,10 +54,11 @@ def _as_level(value: float | bool | None) -> float | None:
 def _lane(
     baseline: float | bool | None,
     *transitions: tuple[float, float | bool],
+    cut: str | None = None,
 ) -> TimelineLane:
     base = _as_level(baseline)
     cues = [
-        SlotCue(t=t, level=float(_as_level(level)))
+        SlotCue(t=t, level=float(_as_level(level)), cut=cut)  # type: ignore[arg-type]
         for t, level in transitions
     ]
     return TimelineLane(baseline=base, cues=canonicalize(base, cues))
@@ -68,18 +69,16 @@ def _env(
     t_sec: float,
     *,
     inherit: float | bool,
-    song_marker_fades: TimelineFadeGroup,
-    standard_fades: TimelineFadeGroup,
+    hard_cut_fades: TimelineFadeGroup,
+    soft_cut_fades: TimelineFadeGroup,
     duration_sec: float,
-    song_marker_times: tuple[float, ...] = (),
 ) -> float:
     breakpoints = lane_level_breakpoints(
         lane,
         inherit=float(_as_level(inherit) or 0.0),
-        song_marker_fades=song_marker_fades,
-        standard_fades=standard_fades,
+        hard_cut_fades=hard_cut_fades,
+        soft_cut_fades=soft_cut_fades,
         duration_sec=duration_sec,
-        song_marker_times=song_marker_times,
     )
     return lane_level_envelope(t_sec, breakpoints)
 
@@ -187,13 +186,13 @@ def test_canonicalize_strips_blend_and_role_on_off_cues() -> None:
         0.0,
         [
             SlotCue(t=1.0, level=1.0, blend="add", role="lead"),
-            SlotCue(t=2.0, level=0.0, blend="screen", role="accent"),
+            SlotCue(t=2.0, level=0.0, blend="screen", role="accent", cut="hard"),
             SlotCue(t=3.0, level=0.5, blend="add", role="pulse"),
         ],
     )
     assert cues == [
         SlotCue(t=1.0, level=1.0, blend="add", role="lead"),
-        SlotCue(t=2.0, level=0.0),
+        SlotCue(t=2.0, level=0.0, cut="hard"),
         SlotCue(t=3.0, level=0.5, blend="add", role="pulse"),
     ]
 
@@ -205,6 +204,14 @@ def test_canonicalize_off_with_dead_metadata_still_level_only() -> None:
         [SlotCue(t=1.0, level=0.0, blend="add", role="pulse")],
     )
     assert cues == [SlotCue(t=1.0, level=0.0)]
+
+
+def test_canonicalize_preserves_cut_on_off_cues() -> None:
+    cues = canonicalize(
+        1.0,
+        [SlotCue(t=1.0, level=0.0, blend="add", role="pulse", cut="soft")],
+    )
+    assert cues == [SlotCue(t=1.0, level=0.0, cut="soft")]
 
 
 def test_cue_editable_and_navigable_times() -> None:
@@ -222,21 +229,21 @@ def test_cue_editable_and_navigable_times() -> None:
     assert cue_editable_for_blend_role(mid)
     assert not cue_editable_for_blend_role(off)
     lane = TimelineLane(baseline=0.0, cues=[on, mid, off])
-    assert navigable_cue_times(lane) == [1.0, 2.0]
+    assert navigable_cue_times(lane) == [1.0, 2.0, 3.0]
     assert not opening_baseline_editable(lane)
     assert opening_cue(lane) is None
 
     opening_on = TimelineLane(baseline=0.5, cues=[SlotCue(t=10.0, level=0.0)])
     assert opening_baseline_editable(opening_on)
     assert opening_cue(opening_on) == SlotCue(t=0.0, level=0.5)
-    assert navigable_cue_times(opening_on) == [0.0]
+    assert navigable_cue_times(opening_on) == [0.0, 10.0]
 
     already_at_zero = TimelineLane(
         baseline=0.0,
         cues=[SlotCue(t=0.0, level=0.5), SlotCue(t=10.0, level=0.0)],
     )
     assert not opening_baseline_editable(already_at_zero)
-    assert navigable_cue_times(already_at_zero) == [0.0]
+    assert navigable_cue_times(already_at_zero) == [0.0, 10.0]
 
 
 def test_update_lane_cue_materializes_opening_baseline() -> None:
@@ -345,15 +352,15 @@ def test_lane_on_transition_cues_returns_cue_per_trigger() -> None:
     lane = TimelineLane(
         baseline=0.0,
         cues=[
-            SlotCue(t=10.0, level=1.0, role="bed"),
-            SlotCue(t=20.0, level=0.0),
-            SlotCue(t=30.0, level=1.0, blend="add", role="pulse"),
+            SlotCue(t=10.0, level=1.0, role="bed", cut="soft"),
+            SlotCue(t=20.0, level=0.0, cut="soft"),
+            SlotCue(t=30.0, level=1.0, blend="add", role="pulse", cut="soft"),
         ],
     )
     pairs = lane_on_transition_cues(
         lane,
-        song_marker_fades=_OFF,
-        standard_fades=_std(fade_in=2.0, fade_out=2.0),
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_std(fade_in=2.0, fade_out=2.0),
     )
     assert [(t, cue.t, cue.role, cue.blend) for t, cue in pairs] == [
         (8.0, 10.0, "bed", None),
@@ -361,8 +368,8 @@ def test_lane_on_transition_cues_returns_cue_per_trigger() -> None:
     ]
     assert lane_on_transition_trigger_times(
         lane,
-        song_marker_fades=_OFF,
-        standard_fades=_std(fade_in=2.0, fade_out=2.0),
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_std(fade_in=2.0, fade_out=2.0),
     ) == [8.0, 28.0]
 
 
@@ -440,25 +447,25 @@ def test_should_accept_toggle_debounces() -> None:
 
 
 def test_lane_level_envelope_full_inside_segment() -> None:
-    lane = _lane(0.0, (5.0, 1.0), (15.0, 0.0))
+    lane = _lane(0.0, (5.0, 1.0), (15.0, 0.0), cut="soft")
     assert _env(
         lane,
         10.0,
         inherit=0.0,
-        song_marker_fades=_OFF,
-        standard_fades=_STD,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_STD,
         duration_sec=60.0,
     ) == pytest.approx(1.0)
 
 
 def test_lane_level_envelope_rise_completes_at_cue_time() -> None:
-    lane = _lane(0.0, (10.0, 1.0), (20.0, 0.0))
+    lane = _lane(0.0, (10.0, 1.0), (20.0, 0.0), cut="soft")
     mid = _env(
         lane,
         9.0,
         inherit=0.0,
-        song_marker_fades=_OFF,
-        standard_fades=_STD,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_STD,
         duration_sec=60.0,
     )
     assert mid == pytest.approx(smoothstep(0.5))
@@ -466,28 +473,28 @@ def test_lane_level_envelope_rise_completes_at_cue_time() -> None:
         lane,
         8.0,
         inherit=0.0,
-        song_marker_fades=_OFF,
-        standard_fades=_STD,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_STD,
         duration_sec=60.0,
     ) == pytest.approx(0.0)
     assert _env(
         lane,
         10.0,
         inherit=0.0,
-        song_marker_fades=_OFF,
-        standard_fades=_STD,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_STD,
         duration_sec=60.0,
     ) == pytest.approx(1.0)
 
 
 def test_lane_level_envelope_fall_starts_at_cue_time() -> None:
-    lane = _lane(0.0, (5.0, 1.0), (15.0, 0.0))
+    lane = _lane(0.0, (5.0, 1.0), (15.0, 0.0), cut="soft")
     mid = _env(
         lane,
         16.0,
         inherit=0.0,
-        song_marker_fades=_OFF,
-        standard_fades=_STD,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_STD,
         duration_sec=60.0,
     )
     assert mid == pytest.approx(1.0 - smoothstep(0.5))
@@ -495,37 +502,37 @@ def test_lane_level_envelope_fall_starts_at_cue_time() -> None:
         lane,
         17.0,
         inherit=0.0,
-        song_marker_fades=_OFF,
-        standard_fades=_STD,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_STD,
         duration_sec=60.0,
     ) == pytest.approx(0.0)
     assert _env(
         lane,
         14.9,
         inherit=0.0,
-        song_marker_fades=_OFF,
-        standard_fades=_STD,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_STD,
         duration_sec=60.0,
     ) == pytest.approx(1.0)
 
 
 def test_lane_level_envelope_constant_slope_partial_fall() -> None:
     """A 1.0 to 0.5 fall with 2s fade-out reaches 0.5 at t + 1.0."""
-    lane = _lane(1.0, (10.0, 0.5))
+    lane = _lane(0.0, (0.0, 1.0), (10.0, 0.5), cut="soft")
     assert _env(
         lane,
         11.0,
         inherit=1.0,
-        song_marker_fades=_OFF,
-        standard_fades=_STD,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_STD,
         duration_sec=60.0,
     ) == pytest.approx(0.5)
     mid = _env(
         lane,
         10.5,
         inherit=1.0,
-        song_marker_fades=_OFF,
-        standard_fades=_STD,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_STD,
         duration_sec=60.0,
     )
     assert mid == pytest.approx(1.0 + (0.5 - 1.0) * smoothstep(0.5))
@@ -537,126 +544,183 @@ def test_lane_level_envelope_no_fade_at_song_edges_without_cue() -> None:
         lane,
         0.5,
         inherit=0.0,
-        song_marker_fades=_OFF,
-        standard_fades=_STD,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_STD,
         duration_sec=30.0,
     ) == pytest.approx(1.0)
     assert _env(
         lane,
         29.5,
         inherit=0.0,
-        song_marker_fades=_OFF,
-        standard_fades=_STD,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_STD,
         duration_sec=30.0,
     ) == pytest.approx(1.0)
 
 
 def test_lane_level_envelope_zero_durations_match_stepped() -> None:
-    lane = _lane(0.0, (10.0, 1.0), (20.0, 0.0))
+    lane = _lane(0.0, (10.0, 1.0), (20.0, 0.0), cut="soft")
     zero = _std(fade_in=0.0, fade_out=0.0)
     assert _env(
         lane,
         9.9,
         inherit=0.0,
-        song_marker_fades=_OFF,
-        standard_fades=zero,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=zero,
         duration_sec=60.0,
     ) == pytest.approx(0.0)
     assert _env(
         lane,
         10.0,
         inherit=0.0,
-        song_marker_fades=_OFF,
-        standard_fades=zero,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=zero,
         duration_sec=60.0,
     ) == pytest.approx(1.0)
     assert _env(
         lane,
         20.0,
         inherit=0.0,
-        song_marker_fades=_OFF,
-        standard_fades=zero,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=zero,
         duration_sec=60.0,
     ) == pytest.approx(0.0)
 
 
 def test_lane_level_envelope_fades_disabled_piecewise_constant() -> None:
-    lane = _lane(0.0, (10.0, 0.5), (20.0, 1.0))
+    lane = _lane(0.0, (10.0, 0.5), (20.0, 1.0), cut="soft")
     assert _env(
         lane,
         9.0,
         inherit=0.0,
-        song_marker_fades=_OFF,
-        standard_fades=_OFF,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_OFF,
         duration_sec=60.0,
     ) == pytest.approx(0.0)
     assert _env(
         lane,
         10.0,
         inherit=0.0,
-        song_marker_fades=_OFF,
-        standard_fades=_OFF,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_OFF,
         duration_sec=60.0,
     ) == pytest.approx(0.5)
     assert _env(
         lane,
         20.0,
         inherit=0.0,
-        song_marker_fades=_OFF,
-        standard_fades=_OFF,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_OFF,
         duration_sec=60.0,
     ) == pytest.approx(1.0)
 
 
-def test_lane_level_envelope_song_marker_group_disabled_makes_edge_abrupt() -> None:
-    lane = _lane(0.0, (10.0, 1.0), (20.0, 0.0))
+def test_lane_level_envelope_hard_cut_group_disabled_makes_edge_abrupt() -> None:
+    lane = _lane(0.0, (10.0, 1.0), (20.0, 0.0), cut="hard")
     before = _env(
         lane,
         9.0,
         inherit=0.0,
-        song_marker_fades=_OFF,
-        standard_fades=_STD,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_STD,
         duration_sec=60.0,
-        song_marker_times=(10.0,),
     )
     assert before == pytest.approx(0.0)
 
 
-def test_lane_level_envelope_marker_edge_uses_song_marker_durations() -> None:
-    lane = _lane(0.0, (10.0, 1.0), (20.0, 0.0))
+def test_lane_level_envelope_hard_cut_uses_hard_durations() -> None:
+    lane = _lane(0.0, (10.0, 1.0), (20.0, 0.0), cut="hard")
     mid = _env(
         lane,
         9.0,
         inherit=0.0,
-        song_marker_fades=_markers(fade_in=2.0, fade_out=2.0),
-        standard_fades=_std(fade_in=4.0, fade_out=4.0),
+        hard_cut_fades=_markers(fade_in=2.0, fade_out=2.0),
+        soft_cut_fades=_std(fade_in=4.0, fade_out=4.0),
         duration_sec=60.0,
-        song_marker_times=(10.0,),
     )
     assert mid == pytest.approx(smoothstep(0.5))
 
 
-def test_lane_level_envelope_non_marker_edge_uses_standard_durations() -> None:
-    lane = _lane(0.0, (10.0, 1.0), (20.0, 0.0))
+def test_lane_level_envelope_soft_cut_uses_soft_durations() -> None:
+    lane = _lane(0.0, (10.0, 1.0), (20.0, 0.0), cut="soft")
     mid = _env(
         lane,
         8.0,
         inherit=0.0,
-        song_marker_fades=_markers(fade_in=2.0, fade_out=2.0),
-        standard_fades=_std(fade_in=4.0, fade_out=4.0),
+        hard_cut_fades=_markers(fade_in=2.0, fade_out=2.0),
+        soft_cut_fades=_std(fade_in=4.0, fade_out=4.0),
         duration_sec=60.0,
-        song_marker_times=(20.0,),
     )
     assert mid == pytest.approx(smoothstep(0.5))
 
 
+def test_lane_level_envelope_unset_cut_is_hard_step() -> None:
+    lane = _lane(0.0, (10.0, 1.0), (20.0, 0.0), cut=None)
+    mid = _env(
+        lane,
+        9.0,
+        inherit=0.0,
+        hard_cut_fades=_markers(fade_in=2.0, fade_out=2.0),
+        soft_cut_fades=_STD,
+        duration_sec=60.0,
+    )
+    assert mid == pytest.approx(0.0)
+
+
+def test_lane_level_envelope_fall_uses_off_cue_cut() -> None:
+    """Fall edge uses the off-cue cut, not the preceding on-cue cut."""
+    lane = TimelineLane(
+        baseline=0.0,
+        cues=canonicalize(
+            0.0,
+            [
+                SlotCue(t=10.0, level=1.0, cut="hard"),
+                SlotCue(t=20.0, level=0.0, cut="soft"),
+            ],
+        ),
+    )
+    # Soft fade_out=4s from t=20; hard would be 2s. Mid of soft ramp at t=22.
+    mid = _env(
+        lane,
+        22.0,
+        inherit=0.0,
+        hard_cut_fades=_markers(fade_in=2.0, fade_out=2.0),
+        soft_cut_fades=_std(fade_in=4.0, fade_out=4.0),
+        duration_sec=60.0,
+    )
+    assert mid == pytest.approx(1.0 - smoothstep(0.5))
+
+
+def test_lane_level_envelope_fall_hard_off_cue_cut() -> None:
+    """Off-cue hard cut selects the hard fade-out ramp."""
+    lane = TimelineLane(
+        baseline=0.0,
+        cues=canonicalize(
+            0.0,
+            [
+                SlotCue(t=10.0, level=1.0, cut="soft"),
+                SlotCue(t=20.0, level=0.0, cut="hard"),
+            ],
+        ),
+    )
+    mid = _env(
+        lane,
+        21.0,
+        inherit=0.0,
+        hard_cut_fades=_markers(fade_in=2.0, fade_out=2.0),
+        soft_cut_fades=_std(fade_in=4.0, fade_out=4.0),
+        duration_sec=60.0,
+    )
+    assert mid == pytest.approx(1.0 - smoothstep(0.5))
+
+
 def test_lane_level_breakpoints_rise_and_fall() -> None:
-    lane = _lane(0.0, (10.0, 1.0), (20.0, 0.0))
+    lane = _lane(0.0, (10.0, 1.0), (20.0, 0.0), cut="soft")
     bps = lane_level_breakpoints(
         lane,
         inherit=0.0,
-        song_marker_fades=_OFF,
-        standard_fades=_STD,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_STD,
         duration_sec=60.0,
     )
     assert (8.0, 0.0) in bps
@@ -670,20 +734,20 @@ def test_lane_level_breakpoints_no_cues_holds_baseline() -> None:
     bps = lane_level_breakpoints(
         lane,
         inherit=0.0,
-        song_marker_fades=_OFF,
-        standard_fades=_STD,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_STD,
         duration_sec=30.0,
     )
     assert bps == [(0.0, 1.0)]
 
 
 def test_lane_level_breakpoints_zero_durations_hard_step() -> None:
-    lane = _lane(0.0, (10.0, 1.0), (20.0, 0.0))
+    lane = _lane(0.0, (10.0, 1.0), (20.0, 0.0), cut="soft")
     bps = lane_level_breakpoints(
         lane,
         inherit=0.0,
-        song_marker_fades=_OFF,
-        standard_fades=_std(fade_in=0.0, fade_out=0.0),
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_std(fade_in=0.0, fade_out=0.0),
         duration_sec=60.0,
     )
     assert bps == [(10.0, 0.0), (10.0, 1.0), (20.0, 1.0), (20.0, 0.0)]
@@ -691,12 +755,12 @@ def test_lane_level_breakpoints_zero_durations_hard_step() -> None:
 
 def test_lane_level_breakpoints_overlapping_rise_clamped_monotone() -> None:
     """Overlapping ramps stay monotone in t (clamped rise start)."""
-    lane = _lane(0.0, (5.0, 1.0), (10.0, 0.0), (11.0, 1.0))
+    lane = _lane(0.0, (5.0, 1.0), (10.0, 0.0), (11.0, 1.0), cut="soft")
     bps = lane_level_breakpoints(
         lane,
         inherit=0.0,
-        song_marker_fades=_OFF,
-        standard_fades=_STD,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_STD,
         duration_sec=60.0,
     )
     times = [t for t, _ in bps]
@@ -709,49 +773,58 @@ def test_on_transition_triggers_at_cue_when_fades_off() -> None:
     lane = _lane(0.0, (5.0, 1.0), (10.0, 0.0), (15.0, 1.0))
     triggers = lane_on_transition_trigger_times(
         lane,
-        song_marker_fades=_OFF,
-        standard_fades=_OFF,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_OFF,
     )
     assert triggers == [5.0, 15.0]
 
 
 def test_on_transition_triggers_lead_by_standard_fade_in() -> None:
-    lane = _lane(0.0, (10.0, 1.0), (20.0, 0.0), (30.0, 1.0))
+    lane = _lane(0.0, (10.0, 1.0), (20.0, 0.0), (30.0, 1.0), cut="soft")
     triggers = lane_on_transition_trigger_times(
         lane,
-        song_marker_fades=_OFF,
-        standard_fades=_std(fade_in=2.0, fade_out=3.0),
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_std(fade_in=2.0, fade_out=3.0),
     )
     assert triggers == [8.0, 28.0]
 
 
 def test_on_transition_triggers_ignores_non_zero_rise() -> None:
     """Ignores 0.25 to 0.75; fires on 0 to 0.5 at t - fade_in * 0.5."""
-    lane = _lane(0.25, (10.0, 0.75), (20.0, 0.0), (30.0, 0.5))
+    lane = _lane(0.25, (10.0, 0.75), (20.0, 0.0), (30.0, 0.5), cut="soft")
     triggers = lane_on_transition_trigger_times(
         lane,
-        song_marker_fades=_OFF,
-        standard_fades=_std(fade_in=2.0, fade_out=2.0),
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_std(fade_in=2.0, fade_out=2.0),
     )
     assert triggers == [30.0 - 2.0 * 0.5]
 
 
-def test_on_transition_triggers_song_marker_vs_standard() -> None:
-    lane = _lane(0.0, (10.0, 1.0), (20.0, 0.0), (30.0, 1.0))
+def test_on_transition_triggers_hard_cut_vs_soft_cut() -> None:
+    lane = TimelineLane(
+        baseline=0.0,
+        cues=canonicalize(
+            0.0,
+            [
+                SlotCue(t=10.0, level=1.0, cut="hard"),
+                SlotCue(t=20.0, level=0.0, cut="soft"),
+                SlotCue(t=30.0, level=1.0, cut="soft"),
+            ],
+        ),
+    )
     triggers = lane_on_transition_trigger_times(
         lane,
-        song_marker_times=(10.0,),
-        song_marker_fades=_markers(fade_in=1.0, fade_out=1.0),
-        standard_fades=_std(fade_in=4.0, fade_out=4.0),
+        hard_cut_fades=_markers(fade_in=1.0, fade_out=1.0),
+        soft_cut_fades=_std(fade_in=4.0, fade_out=4.0),
     )
     assert triggers == [9.0, 26.0]
 
 
 def test_on_transition_count_seek_stable() -> None:
-    lane = _lane(0.0, (10.0, 1.0), (20.0, 0.0), (30.0, 1.0))
+    lane = _lane(0.0, (10.0, 1.0), (20.0, 0.0), (30.0, 1.0), cut="soft")
     kwargs = dict(
-        song_marker_fades=_OFF,
-        standard_fades=_std(fade_in=2.0, fade_out=2.0),
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_std(fade_in=2.0, fade_out=2.0),
     )
     assert lane_on_transition_count(lane, 7.9, **kwargs) == 0
     assert lane_on_transition_count(lane, 8.0, **kwargs) == 1
@@ -767,14 +840,14 @@ def test_on_transition_count_hard_cut_uses_cue_time() -> None:
     assert lane_on_transition_count(
         lane,
         9.9,
-        song_marker_fades=_OFF,
-        standard_fades=zero,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=zero,
     ) == 0
     assert lane_on_transition_count(
         lane,
         10.0,
-        song_marker_fades=_OFF,
-        standard_fades=zero,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=zero,
     ) == 1
 
 

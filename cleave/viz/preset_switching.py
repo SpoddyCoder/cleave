@@ -110,9 +110,8 @@ def _cast_roles_path_for_count(
     *,
     count: int,
     lane,
-    song_marker_times: Sequence[float],
-    song_marker_fades: TimelineFadeGroup,
-    standard_fades: TimelineFadeGroup,
+    hard_cut_fades: TimelineFadeGroup,
+    soft_cut_fades: TimelineFadeGroup,
     behaviour: CastRolesTimelineBehaviour,
     default_role: CueRole,
 ) -> Path | None:
@@ -133,9 +132,8 @@ def _cast_roles_path_for_count(
 
     cues = lane_on_transition_cues(
         lane,
-        song_marker_times=song_marker_times,
-        song_marker_fades=song_marker_fades,
-        standard_fades=standard_fades,
+        hard_cut_fades=hard_cut_fades,
+        soft_cut_fades=soft_cut_fades,
     )
     last_role: CueRole = default_role
     role_use_count: dict[CueRole, int] = {role: 0 for role in CUE_ROLES}
@@ -491,17 +489,14 @@ def rebuild_timeline_preset_rotation_preserving_count(
 
     path: Path | None
     if rotation_set == "cast_roles" and session is not None:
-        song_marker_fades, standard_fades, song_marker_times = _timeline_fade_groups(
-            session
-        )
+        hard_cut_fades, soft_cut_fades = _timeline_fade_groups(session)
         lane = session.timeline.lanes.get(layer.slot) or empty_lane()
         path = _cast_roles_path_for_count(
             layer,
             count=count,
             lane=lane,
-            song_marker_times=song_marker_times,
-            song_marker_fades=song_marker_fades,
-            standard_fades=standard_fades,
+            hard_cut_fades=hard_cut_fades,
+            soft_cut_fades=soft_cut_fades,
             behaviour=cast_roles_timeline_behaviour,
             default_role=cast_roles_default_role,
         )
@@ -524,21 +519,19 @@ def _load_timeline_preset(
     _record_auto_preset(layer, path)
 
 
-def _timeline_fade_groups(session) -> tuple[
-    TimelineFadeGroup, TimelineFadeGroup, Sequence[float]
-]:
+def _timeline_fade_groups(session) -> tuple[TimelineFadeGroup, TimelineFadeGroup]:
     tl = session.timeline
-    song_marker_fades = TimelineFadeGroup(
-        enabled=tl.song_marker_fades.enabled,
-        fade_in=tl.song_marker_fades.fade_in,
-        fade_out=tl.song_marker_fades.fade_out,
+    hard_cut_fades = TimelineFadeGroup(
+        enabled=tl.hard_cut_fades.enabled,
+        fade_in=tl.hard_cut_fades.fade_in,
+        fade_out=tl.hard_cut_fades.fade_out,
     )
-    standard_fades = TimelineFadeGroup(
-        enabled=tl.standard_cue_fades.enabled,
-        fade_in=tl.standard_cue_fades.fade_in,
-        fade_out=tl.standard_cue_fades.fade_out,
+    soft_cut_fades = TimelineFadeGroup(
+        enabled=tl.soft_cut_fades.enabled,
+        fade_in=tl.soft_cut_fades.fade_in,
+        fade_out=tl.soft_cut_fades.fade_out,
     )
-    return song_marker_fades, standard_fades, session.song_markers.times
+    return hard_cut_fades, soft_cut_fades
 
 
 def advance_timeline_preset_switching(
@@ -558,9 +551,7 @@ def advance_timeline_preset_switching(
     if not session.timeline.enabled:
         return
 
-    song_marker_fades, standard_fades, song_marker_times = _timeline_fade_groups(
-        session
-    )
+    hard_cut_fades, soft_cut_fades = _timeline_fade_groups(session)
     tl = session.timeline
 
     for slot, layer in layers_by_slot.items():
@@ -574,9 +565,8 @@ def advance_timeline_preset_switching(
         count = lane_on_transition_count(
             lane,
             t_sec,
-            song_marker_times=song_marker_times,
-            song_marker_fades=song_marker_fades,
-            standard_fades=standard_fades,
+            hard_cut_fades=hard_cut_fades,
+            soft_cut_fades=soft_cut_fades,
         )
         if count == layer.timeline_switch_count:
             continue
@@ -585,9 +575,8 @@ def advance_timeline_preset_switching(
                 layer,
                 count=count,
                 lane=lane,
-                song_marker_times=song_marker_times,
-                song_marker_fades=song_marker_fades,
-                standard_fades=standard_fades,
+                hard_cut_fades=hard_cut_fades,
+                soft_cut_fades=soft_cut_fades,
                 behaviour=runtime.cast_roles_timeline_behaviour,
                 default_role=runtime.cast_roles_default_role,
             )
@@ -647,16 +636,13 @@ def reanchor_timeline_preset_after_browse(
 
     count = 0
     if session.timeline.enabled:
-        song_marker_fades, standard_fades, song_marker_times = _timeline_fade_groups(
-            session
-        )
+        hard_cut_fades, soft_cut_fades = _timeline_fade_groups(session)
         lane = session.timeline.lanes.get(layer.slot) or empty_lane()
         count = lane_on_transition_count(
             lane,
             t_sec,
-            song_marker_times=song_marker_times,
-            song_marker_fades=song_marker_fades,
-            standard_fades=standard_fades,
+            hard_cut_fades=hard_cut_fades,
+            soft_cut_fades=soft_cut_fades,
         )
 
     browse_index = _anchor_index(layer, paths)

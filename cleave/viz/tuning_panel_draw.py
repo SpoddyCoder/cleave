@@ -704,6 +704,8 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
         RowKind.TIMELINE_SNAP_TO_BEATS,
         RowKind.TIMELINE_SNAP_TO_BARS,
         RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
+        RowKind.TIMELINE_APPLY_SOFT_CUTS,
+        RowKind.TIMELINE_APPLY_HARD_CUTS,
         RowKind.SETTINGS_MEASURE_LATENCY,
     }:
         if kind == RowKind.CONFIG_HEADER and state.solo_active:
@@ -1192,6 +1194,8 @@ def _estimate_row_content_width_base(
             RowKind.TIMELINE_SNAP_TO_BEATS,
             RowKind.TIMELINE_SNAP_TO_BARS,
             RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
+            RowKind.TIMELINE_APPLY_SOFT_CUTS,
+            RowKind.TIMELINE_APPLY_HARD_CUTS,
             RowKind.SETTINGS_MEASURE_LATENCY,
         }
     ):
@@ -1761,6 +1765,8 @@ class TuningOverlay:
                 RowKind.TIMELINE_SNAP_TO_BEATS,
                 RowKind.TIMELINE_SNAP_TO_BARS,
                 RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
+                RowKind.TIMELINE_APPLY_SOFT_CUTS,
+                RowKind.TIMELINE_APPLY_HARD_CUTS,
                 RowKind.SETTINGS_MEASURE_LATENCY,
             }
         ):

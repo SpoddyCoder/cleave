@@ -9,7 +9,16 @@ import pygame
 from cleave.config_schema import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
-from cleave.timeline import SlotCue, TimelineLane, canonicalize, copy_lane, empty_lane, lane_level_at
+from cleave.timeline import (
+    SlotCue,
+    TimelineFadeGroup,
+    TimelineLane,
+    canonicalize,
+    copy_lane,
+    empty_lane,
+    lane_level_at,
+    lane_level_breakpoints,
+)
 from cleave.viz.controls import SEEK_LONG, SEEK_SHORT, SEEK_TINY, TuningControls
 from cleave.viz.session import LayerRuntime, TuningSession
 from cleave.viz.layer_visibility import armed_recording_level, effective_layer_enabled
@@ -1149,12 +1158,16 @@ def test_comma_period_selects_opening_baseline_cue() -> None:
     controls.handle_keydown(keydown(pygame.K_PERIOD))
     assert session.timeline.selected_cue_t["layer_1"] == 0.0
     controls.handle_keydown(keydown(pygame.K_PERIOD))
+    assert session.timeline.selected_cue_t["layer_1"] == 10.0
+    controls.handle_keydown(keydown(pygame.K_PERIOD))
     assert session.timeline.selected_cue_t["layer_1"] == 20.0
+    controls.handle_keydown(keydown(pygame.K_COMMA))
+    assert session.timeline.selected_cue_t["layer_1"] == 10.0
     controls.handle_keydown(keydown(pygame.K_COMMA))
     assert session.timeline.selected_cue_t["layer_1"] == 0.0
 
 
-def test_c_casts_opening_baseline_materializing_cue_at_zero() -> None:
+def test_o_casts_opening_baseline_materializing_cue_at_zero() -> None:
     from cleave.cue_roles import CUE_ROLES
 
     lanes = {
@@ -1176,7 +1189,7 @@ def test_c_casts_opening_baseline_materializing_cue_at_zero() -> None:
     session.layers["layer_1"].preset_switching_rotation_set = "cast_roles"
     controls.handle_keydown(keydown(pygame.K_PERIOD))
     assert session.timeline.selected_cue_t["layer_1"] == 0.0
-    controls.handle_keydown(keydown(pygame.K_c))
+    controls.handle_keydown(keydown(pygame.K_o))
     lane = session.timeline.lanes["layer_1"]
     assert lane.baseline == 0.0
     assert lane.cues[0] == SlotCue(t=0.0, level=0.5, role=CUE_ROLES[0])
@@ -1184,7 +1197,7 @@ def test_c_casts_opening_baseline_materializing_cue_at_zero() -> None:
 
 
 def test_comma_period_select_nearest_then_step_cues() -> None:
-    # Off at 10 is skipped; navigable on cues are 4 and 16.
+    # All cues navigable, including the off at 10.
     lanes = {
         "layer_1": _lane(False, (4.0, True), (10.0, False), (16.0, True)),
     }
@@ -1197,8 +1210,8 @@ def test_comma_period_select_nearest_then_step_cues() -> None:
 
     before = pygame.time.get_ticks()
     controls.handle_keydown(keydown(pygame.K_PERIOD))
-    # Nearest on cue to playhead 9 is 4 (not the off at 10).
-    assert session.timeline.selected_cue_t["layer_1"] == 4.0
+    # Nearest cue to playhead 9 is the off at 10.
+    assert session.timeline.selected_cue_t["layer_1"] == 10.0
     first_flash = session.timeline.selected_cue_flash_start_ms
     assert first_flash is not None and first_flash >= before
 
@@ -1208,12 +1221,14 @@ def test_comma_period_select_nearest_then_step_cues() -> None:
     assert second_flash is not None and second_flash >= first_flash
 
     controls.handle_keydown(keydown(pygame.K_COMMA))
-    assert session.timeline.selected_cue_t["layer_1"] == 4.0
-    at_start_flash = session.timeline.selected_cue_flash_start_ms
+    assert session.timeline.selected_cue_t["layer_1"] == 10.0
 
     controls.handle_keydown(keydown(pygame.K_COMMA))
     assert session.timeline.selected_cue_t["layer_1"] == 4.0
-    # No new target: flash start is unchanged.
+    # Clamp at first cue: another comma does not move selection.
+    at_start_flash = session.timeline.selected_cue_flash_start_ms
+    controls.handle_keydown(keydown(pygame.K_COMMA))
+    assert session.timeline.selected_cue_t["layer_1"] == 4.0
     assert session.timeline.selected_cue_flash_start_ms == at_start_flash
 
 
@@ -1241,7 +1256,7 @@ def test_comma_period_keeps_mid_on_level_changes() -> None:
     assert session.timeline.selected_cue_t["layer_1"] == 10.0
 
 
-def test_comma_period_from_off_selection_jumps_to_nearest_on() -> None:
+def test_comma_period_steps_through_off_selection() -> None:
     lanes = {
         "layer_1": _lane(False, (4.0, True), (10.0, False), (16.0, True)),
     }
@@ -1251,7 +1266,9 @@ def test_comma_period_from_off_selection_jumps_to_nearest_on() -> None:
     )
     session.timeline.selected_cue_t["layer_1"] = 10.0
     controls.handle_keydown(keydown(pygame.K_PERIOD))
-    assert session.timeline.selected_cue_t["layer_1"] == 4.0
+    assert session.timeline.selected_cue_t["layer_1"] == 16.0
+    controls.handle_keydown(keydown(pygame.K_COMMA))
+    assert session.timeline.selected_cue_t["layer_1"] == 10.0
 
 
 def test_cue_selection_memory_is_per_track() -> None:
@@ -1275,7 +1292,7 @@ def test_cue_selection_memory_is_per_track() -> None:
     session.timeline.focus_row = 0
     assert session.timeline.selected_cue_t["layer_1"] == 4.0
     controls.handle_keydown(keydown(pygame.K_PERIOD))
-    assert session.timeline.selected_cue_t["layer_1"] == 16.0
+    assert session.timeline.selected_cue_t["layer_1"] == 10.0
     assert session.timeline.selected_cue_t["layer_2"] == 8.0
 
 
@@ -1309,7 +1326,7 @@ def test_b_cycles_selected_cue_blend_including_none() -> None:
     assert cue.blend is None
 
 
-def test_c_cycles_selected_cue_role_including_none() -> None:
+def test_o_cycles_selected_cue_role_including_none() -> None:
     from cleave.cue_roles import CUE_ROLES
 
     lanes = {
@@ -1329,15 +1346,15 @@ def test_c_cycles_selected_cue_role_including_none() -> None:
     controls.handle_keydown(keydown(pygame.K_PERIOD))
     assert session.timeline.lanes["layer_1"].cues[0].role is None
 
-    controls.handle_keydown(keydown(pygame.K_c))
+    controls.handle_keydown(keydown(pygame.K_o))
     assert session.timeline.lanes["layer_1"].cues[0].role == CUE_ROLES[0]
 
     for _ in range(len(CUE_ROLES)):
-        controls.handle_keydown(keydown(pygame.K_c))
+        controls.handle_keydown(keydown(pygame.K_o))
     assert session.timeline.lanes["layer_1"].cues[0].role is None
 
 
-def test_c_noop_when_rotation_set_is_not_cast_roles() -> None:
+def test_o_noop_when_rotation_set_is_not_cast_roles() -> None:
     lanes = {
         "layer_1": TimelineLane(
             baseline=0.0,
@@ -1353,16 +1370,17 @@ def test_c_noop_when_rotation_set_is_not_cast_roles() -> None:
     )
     assert session.layers["layer_1"].preset_switching_rotation_set == "directory"
     controls.handle_keydown(keydown(pygame.K_PERIOD))
-    controls.handle_keydown(keydown(pygame.K_c))
+    controls.handle_keydown(keydown(pygame.K_o))
     assert session.timeline.lanes["layer_1"].cues[0].role is None
     assert notifications == [
         "Set rotation set to cast roles to assign cast"
     ]
 
 
-def test_b_and_c_noop_on_off_cue() -> None:
+def test_b_and_o_noop_on_off_cue_c_cycles_cut() -> None:
     from cleave.blend_modes import BLEND_MODES
     from cleave.cue_roles import CUE_ROLES
+    from cleave.cut_types import CUT_TYPES
 
     lanes = {
         "layer_1": _lane(False, (5.0, True), (10.0, False)),
@@ -1375,19 +1393,96 @@ def test_b_and_c_noop_on_off_cue() -> None:
     session.timeline.selected_cue_t["layer_1"] = 10.0
     off_before = session.timeline.lanes["layer_1"].cues[1]
     assert off_before.level == 0.0
+    assert off_before.cut is None
     controls.handle_keydown(keydown(pygame.K_b))
-    controls.handle_keydown(keydown(pygame.K_c))
+    controls.handle_keydown(keydown(pygame.K_o))
     off_after = session.timeline.lanes["layer_1"].cues[1]
-    assert off_after == off_before
     assert off_after.blend is None
     assert off_after.role is None
+    assert off_after.cut is None
+    controls.handle_keydown(keydown(pygame.K_c))
+    off_cut = session.timeline.lanes["layer_1"].cues[1]
+    assert off_cut.cut == CUT_TYPES[1]  # none -> hard
+    assert session.timeline.selected_cue_t["layer_1"] == 10.0
     # On cue at 5 still editable when selected.
     session.timeline.selected_cue_t["layer_1"] = 5.0
     controls.handle_keydown(keydown(pygame.K_b))
-    controls.handle_keydown(keydown(pygame.K_c))
+    controls.handle_keydown(keydown(pygame.K_o))
     on_cue = session.timeline.lanes["layer_1"].cues[0]
     assert on_cue.blend == BLEND_MODES[0]
     assert on_cue.role == CUE_ROLES[0]
+
+
+def test_cycling_off_cue_cut_changes_fall_triangle() -> None:
+    """Off-cue cut owns the fall edge; cycling c reshapes the envelope."""
+    hard = TimelineFadeGroup(enabled=True, fade_in=2.0, fade_out=2.0)
+    soft = TimelineFadeGroup(enabled=True, fade_in=4.0, fade_out=4.0)
+    lanes = {
+        "layer_1": TimelineLane(
+            baseline=0.0,
+            cues=canonicalize(
+                0.0,
+                [
+                    SlotCue(t=5.0, level=1.0, cut="soft"),
+                    SlotCue(t=10.0, level=0.0, cut="none"),
+                ],
+            ),
+        ),
+    }
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        lanes=lanes,
+        position_sec=10.0,
+    )
+    session.timeline.selected_cue_t["layer_1"] = 10.0
+
+    def _fall_end(lane: TimelineLane) -> float | None:
+        bps = lane_level_breakpoints(
+            lane,
+            inherit=0.0,
+            hard_cut_fades=hard,
+            soft_cut_fades=soft,
+            duration_sec=60.0,
+        )
+        for t, level in bps:
+            if t >= 10.0 and level == 0.0:
+                return t
+        return None
+
+    assert _fall_end(session.timeline.lanes["layer_1"]) == 10.0  # hard step
+    controls.handle_keydown(keydown(pygame.K_c))  # none -> hard
+    assert session.timeline.lanes["layer_1"].cues[1].cut == "hard"
+    assert _fall_end(session.timeline.lanes["layer_1"]) == 12.0
+    controls.handle_keydown(keydown(pygame.K_c))  # hard -> soft
+    assert session.timeline.lanes["layer_1"].cues[1].cut == "soft"
+    assert _fall_end(session.timeline.lanes["layer_1"]) == 14.0
+
+
+def test_c_cycles_selected_cue_cut() -> None:
+    from cleave.cut_types import CUT_TYPES
+
+    lanes = {
+        "layer_1": TimelineLane(
+            baseline=0.0,
+            cues=canonicalize(
+                0.0,
+                [SlotCue(t=5.0, level=1.0)],
+            ),
+        ),
+    }
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        lanes=lanes,
+        position_sec=5.0,
+    )
+    controls.handle_keydown(keydown(pygame.K_PERIOD))
+    assert session.timeline.lanes["layer_1"].cues[0].cut is None
+
+    controls.handle_keydown(keydown(pygame.K_c))
+    assert session.timeline.lanes["layer_1"].cues[0].cut == "hard"
+    controls.handle_keydown(keydown(pygame.K_c))
+    assert session.timeline.lanes["layer_1"].cues[0].cut == "soft"
+    controls.handle_keydown(keydown(pygame.K_c))
+    assert session.timeline.lanes["layer_1"].cues[0].cut == "none"
+    assert CUT_TYPES == ("none", "hard", "soft")
 
 
 def test_shift_comma_period_nudges_selected_cue_opacity() -> None:
@@ -1535,10 +1630,12 @@ def test_cue_edit_keys_refused_when_locked() -> None:
     controls.handle_keydown(keydown(pygame.K_PERIOD))
     assert session.timeline.selected_cue_t == {}
     controls.handle_keydown(keydown(pygame.K_b))
+    controls.handle_keydown(keydown(pygame.K_o))
     controls.handle_keydown(keydown(pygame.K_c))
     controls.handle_keydown(keydown(pygame.K_COMMA, mod=pygame.KMOD_SHIFT))
     assert session.timeline.lanes["layer_1"].cues[0].blend is None
     assert session.timeline.lanes["layer_1"].cues[0].role is None
+    assert session.timeline.lanes["layer_1"].cues[0].cut is None
     assert session.timeline.lanes["layer_1"].cues[0].level == 1.0
 
 
@@ -1555,8 +1652,10 @@ def test_cue_edit_keys_refused_when_recording() -> None:
     controls.handle_keydown(keydown(pygame.K_PERIOD))
     assert session.timeline.selected_cue_t == {}
     controls.handle_keydown(keydown(pygame.K_b))
+    controls.handle_keydown(keydown(pygame.K_o))
     controls.handle_keydown(keydown(pygame.K_c))
     controls.handle_keydown(keydown(pygame.K_PERIOD, mod=pygame.KMOD_CTRL))
     assert session.timeline.lanes["layer_1"].cues[0].blend is None
     assert session.timeline.lanes["layer_1"].cues[0].role is None
+    assert session.timeline.lanes["layer_1"].cues[0].cut is None
     assert session.timeline.lanes["layer_1"].cues[0].level == 1.0

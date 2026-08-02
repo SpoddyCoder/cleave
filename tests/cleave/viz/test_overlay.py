@@ -1239,6 +1239,30 @@ def test_snap_to_song_markers_row_uses_action_color() -> None:
     assert _row_value_color(state, snap_row) == HIGHLIGHT
 
 
+def test_apply_cuts_to_cues_rows_use_action_color() -> None:
+    state = _minimal_view_state(
+        render_timeline=RenderTimelineBlock(
+            enabled=True,
+            expanded=True,
+            cuts_expanded=True,
+        ),
+    )
+    soft_row = state.layout.find_by_kind(RowKind.TIMELINE_APPLY_SOFT_CUTS)
+    hard_row = state.layout.find_by_kind(RowKind.TIMELINE_APPLY_HARD_CUTS)
+    assert _row_value_color(state, soft_row) == ACTION
+    assert _row_value_color(state, hard_row) == ACTION
+    assert "▶" not in _row_text(state, soft_row)
+    assert "▼" not in _row_text(state, soft_row)
+    assert "▶" not in _row_text(state, hard_row)
+    assert "▼" not in _row_text(state, hard_row)
+    state.focus_descriptor = state.layout.descriptor(soft_row)
+    assert _row_value_color(state, soft_row) == HIGHLIGHT
+    assert _row_value_color(state, hard_row) == ACTION
+    state.focus_descriptor = state.layout.descriptor(hard_row)
+    assert _row_value_color(state, hard_row) == HIGHLIGHT
+    assert _row_value_color(state, soft_row) == ACTION
+
+
 def test_action_parameter_row_value_color() -> None:
     from cleave.viz.tuning_view_state import SettingsBlock
 

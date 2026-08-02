@@ -121,12 +121,12 @@ def _view_state(
     bar_grid_times: tuple[float, ...] = (),
     song_marker_times: tuple[float, ...] = (),
     selected_song_marker_index: int | None = None,
-    song_marker_fades_enabled: bool = False,
-    song_marker_fade_in: float = 2.0,
-    song_marker_fade_out: float = 2.0,
-    standard_cue_fades_enabled: bool = False,
-    standard_cue_fade_in: float = 2.0,
-    standard_cue_fade_out: float = 2.0,
+    hard_cut_fades_enabled: bool = False,
+    hard_cut_fade_in: float = 2.0,
+    hard_cut_fade_out: float = 2.0,
+    soft_cut_fades_enabled: bool = False,
+    soft_cut_fade_in: float = 2.0,
+    soft_cut_fade_out: float = 2.0,
     selected_cue_t: dict[str, float] | None = None,
     selected_cue_flash_start_ms: int | None = None,
     slot_rotation_sets: dict[str, str] | None = None,
@@ -185,15 +185,15 @@ def _view_state(
         bar_grid_times=bar_grid_times,
         song_marker_times=song_marker_times,
         selected_song_marker_index=selected_song_marker_index,
-        song_marker_fades=TimelineFadeGroup(
-            enabled=song_marker_fades_enabled,
-            fade_in=song_marker_fade_in,
-            fade_out=song_marker_fade_out,
+        hard_cut_fades=TimelineFadeGroup(
+            enabled=hard_cut_fades_enabled,
+            fade_in=hard_cut_fade_in,
+            fade_out=hard_cut_fade_out,
         ),
-        standard_cue_fades=TimelineFadeGroup(
-            enabled=standard_cue_fades_enabled,
-            fade_in=standard_cue_fade_in,
-            fade_out=standard_cue_fade_out,
+        soft_cut_fades=TimelineFadeGroup(
+            enabled=soft_cut_fades_enabled,
+            fade_in=soft_cut_fade_in,
+            fade_out=soft_cut_fade_out,
         ),
         selected_cue_t=dict(selected_cue_t or ()),
         selected_cue_flash_start_ms=selected_cue_flash_start_ms,
@@ -942,16 +942,23 @@ def test_bar_without_high_water_mark_behaves_as_before() -> None:
 
 def test_selected_cue_readout_text_format() -> None:
     assert selected_cue_readout_text(
-        SlotCue(t=65.0, level=1.0, blend="add", role="lead")
-    ) == "[01:05] opacity: 100% blend: add"
+        SlotCue(t=65.0, level=1.0, blend="add", role="lead", cut="soft")
+    ) == "[01:05] opacity: 100% cut: soft blend: add"
     assert selected_cue_readout_text(
-        SlotCue(t=65.0, level=1.0, blend="add", role="lead"),
-        show_cast=True,
-    ) == "[01:05] opacity: 100% blend: add cast: lead"
+        SlotCue(t=65.0, level=1.0, blend="add", role="lead", cut="soft"),
+        show_role=True,
+    ) == "[01:05] opacity: 100% cut: soft blend: add role: lead"
     assert selected_cue_readout_text(
         SlotCue(t=0.0, level=0.25, blend=None, role=None),
-        show_cast=True,
-    ) == "[00:00] opacity: 25% blend: - cast: -"
+        show_role=True,
+    ) == "[00:00] opacity: 25% cut: none blend: - role: -"
+    assert selected_cue_readout_text(
+        SlotCue(t=65.0, level=0.0, cut="hard"),
+    ) == "[01:05] cut: hard"
+    assert selected_cue_readout_text(
+        SlotCue(t=65.0, level=0.0, blend="add", role="lead", cut="hard"),
+        show_role=True,
+    ) == "[01:05] cut: hard"
 
 
 def test_draw_with_selected_cue_and_role_does_not_crash() -> None:

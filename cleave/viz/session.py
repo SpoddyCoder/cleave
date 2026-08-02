@@ -266,16 +266,16 @@ class TimelineRuntime:
     beat_bar_grid_expanded: bool = False
     snap_cues_expanded: bool = False
     placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
-    fades_expanded: bool = False
+    cuts_expanded: bool = False
     timeline_presets_expanded: bool = False
     timeline_preset_kind: str = DEFAULT_TIMELINE_PRESET_KIND
     timeline_preset_crescendo: CrescendoTarget | None = None
     timeline_preset_density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
     timeline_preset_conductor: bool = DEFAULT_TIMELINE_PRESET_CONDUCTOR
-    song_marker_fades: TimelineFadeGroupRuntime = field(
+    hard_cut_fades: TimelineFadeGroupRuntime = field(
         default_factory=default_timeline_fade_group_runtime
     )
-    standard_cue_fades: TimelineFadeGroupRuntime = field(
+    soft_cut_fades: TimelineFadeGroupRuntime = field(
         default_factory=default_timeline_fade_group_runtime
     )
     limiter: VisualLimiterRuntime = field(default_factory=default_visual_limiter_runtime)
@@ -488,7 +488,7 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
     enabled = True if timeline is None else timeline.enabled
     locked = False if timeline is None else timeline.locked
     source_lanes = {} if timeline is None else timeline.lanes
-    fades = None if timeline is None else timeline.fades
+    cuts = None if timeline is None else timeline.cuts
     placement_snap = (
         DEFAULT_TIMELINE_PLACEMENT_SNAP
         if timeline is None
@@ -513,7 +513,7 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
         else:
             lanes[slot] = empty_lane()
     limiter = _limiter_runtime_from_cfg(limiter_cfg)
-    if fades is None:
+    if cuts is None:
         return TimelineRuntime(
             enabled=enabled,
             locked=locked,
@@ -534,8 +534,8 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
         timeline_preset_crescendo=preset_crescendo,
         timeline_preset_density=preset_density,
         timeline_preset_conductor=preset_conductor,
-        song_marker_fades=_fade_group_runtime_from_cfg(fades.song_markers),
-        standard_cue_fades=_fade_group_runtime_from_cfg(fades.standard),
+        hard_cut_fades=_fade_group_runtime_from_cfg(cuts.hard),
+        soft_cut_fades=_fade_group_runtime_from_cfg(cuts.soft),
         limiter=limiter,
     )
 

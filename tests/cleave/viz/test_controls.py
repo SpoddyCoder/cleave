@@ -1578,6 +1578,22 @@ def _focus_timeline_snap_song_markers(controls: TuningControls) -> None:
     controls.focus_descriptor = _desc(view, snap_row)
 
 
+def _focus_timeline_apply_soft_cuts(controls: TuningControls) -> None:
+    controls.session.timeline.panel_open = True
+    controls.session.timeline.cuts_expanded = True
+    view = controls.build_view_state(paused=False)
+    row = view.layout.find_by_kind(RowKind.TIMELINE_APPLY_SOFT_CUTS)
+    controls.focus_descriptor = _desc(view, row)
+
+
+def _focus_timeline_apply_hard_cuts(controls: TuningControls) -> None:
+    controls.session.timeline.panel_open = True
+    controls.session.timeline.cuts_expanded = True
+    view = controls.build_view_state(paused=False)
+    row = view.layout.find_by_kind(RowKind.TIMELINE_APPLY_HARD_CUTS)
+    controls.focus_descriptor = _desc(view, row)
+
+
 def _confirm_snap_song_markers(
     controls: TuningControls,
     *,
@@ -2311,6 +2327,92 @@ def test_timeline_snap_song_markers_uses_proximity() -> None:
     assert view.notification_message == "No cues within snap proximity"
 
 
+def test_timeline_apply_soft_cuts_enter_opens_scope_modal() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.timeline.lanes = {
+        "layer_1": _lane(None, (4.0, True), (10.0, False)),
+    }
+    _focus_timeline_apply_soft_cuts(controls)
+    assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
+    modal_view = controls.modal_host.view_state()
+    assert modal_view is not None
+    assert modal_view.kind == ModalKind.CHOICE
+    assert modal_view.message == "Apply soft cuts to cues?"
+    assert modal_view.options == (
+        "All Cues",
+        "All Cues Except Song Marker Cues",
+        "Song Marker Cues Only",
+        "Cancel",
+    )
+
+
+def test_timeline_apply_hard_cuts_markers_only() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.song_markers.times = [10.0]
+    controls.session.timeline.lanes = {
+        "layer_1": TimelineLane(
+            baseline=None,
+            cues=[
+                SlotCue(t=4.0, level=1.0, cut="soft"),
+                SlotCue(t=10.0, level=0.0, cut="soft"),
+            ],
+        ),
+    }
+    _focus_timeline_apply_hard_cuts(controls)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    _choose_modal_option(controls, "Song Marker Cues Only")
+    assert not controls.modal_host.active
+    assert controls.session.timeline.lanes["layer_1"].cues == [
+        SlotCue(t=4.0, level=1.0, cut="soft"),
+        SlotCue(t=10.0, level=0.0, cut="hard"),
+    ]
+    view = controls.build_view_state(paused=False)
+    assert view.notification_message == "Applied hard cuts to 1 cue"
+
+
+def test_timeline_apply_hard_cuts_all_updates_on_and_off() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.timeline.lanes = {
+        "layer_1": TimelineLane(
+            baseline=None,
+            cues=[
+                SlotCue(t=4.0, level=1.0, cut="soft"),
+                SlotCue(t=10.0, level=0.0, cut="soft"),
+            ],
+        ),
+    }
+    _focus_timeline_apply_hard_cuts(controls)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    _choose_modal_option(controls, "All Cues")
+    assert controls.session.timeline.lanes["layer_1"].cues == [
+        SlotCue(t=4.0, level=1.0, cut="hard"),
+        SlotCue(t=10.0, level=0.0, cut="hard"),
+    ]
+    view = controls.build_view_state(paused=False)
+    assert view.notification_message == "Applied hard cuts to 2 cues"
+
+
+def test_timeline_apply_soft_cuts_except_markers() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.song_markers.times = [10.0]
+    controls.session.timeline.lanes = {
+        "layer_1": TimelineLane(
+            baseline=None,
+            cues=[
+                SlotCue(t=4.0, level=1.0),
+                SlotCue(t=10.0, level=0.0),
+            ],
+        ),
+    }
+    _focus_timeline_apply_soft_cuts(controls)
+    controls.handle_keydown(_keydown(pygame.K_RETURN))
+    _choose_modal_option(controls, "All Cues Except Song Marker Cues")
+    assert controls.session.timeline.lanes["layer_1"].cues == [
+        SlotCue(t=4.0, level=1.0, cut="soft"),
+        SlotCue(t=10.0, level=0.0),
+    ]
+
+
 def test_render_timeline_header_label_spacing() -> None:
     controls = _make_controls()
     view = controls.build_view_state(paused=False)
@@ -2451,7 +2553,7 @@ def test_render_timeline_down_enters_submenu() -> None:
     snap_beats_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_BEATS)
     snap_bars_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_BARS)
     snap_markers_row = view.layout.find_by_kind(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
-    fades_row = view.layout.find_by_kind(RowKind.TIMELINE_FADES_HEADER)
+    cuts_row = view.layout.find_by_kind(RowKind.TIMELINE_CUTS_HEADER)
     presets_header_row = view.layout.find_by_kind(RowKind.TIMELINE_PRESETS_HEADER)
     limiter_header_row = view.layout.find_by_kind(
         RowKind.TIMELINE_VISUAL_LIMITER_HEADER
@@ -2503,7 +2605,7 @@ def test_render_timeline_down_enters_submenu() -> None:
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
-    assert controls.focus_descriptor == _desc(view, fades_row)
+    assert controls.focus_descriptor == _desc(view, cuts_row)
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
@@ -2800,10 +2902,10 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
     controls.session.song_markers.expanded = True
     controls.session.timeline.beat_bar_grid_expanded = True
     controls.session.timeline.snap_cues_expanded = True
-    controls.session.timeline.fades_expanded = True
+    controls.session.timeline.cuts_expanded = True
     controls.session.timeline.timeline_presets_expanded = True
-    controls.session.timeline.song_marker_fades.enabled = True
-    controls.session.timeline.standard_cue_fades.enabled = True
+    controls.session.timeline.hard_cut_fades.enabled = True
+    controls.session.timeline.soft_cut_fades.enabled = True
     controls.session.timeline.enabled = False
     view = controls.build_view_state(paused=False)
     for kind in (
@@ -2817,13 +2919,15 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
         RowKind.TIMELINE_SNAP_TO_BEATS,
         RowKind.TIMELINE_SNAP_TO_BARS,
         RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
-        RowKind.TIMELINE_FADES_HEADER,
-        RowKind.TIMELINE_SONG_MARKER_FADES,
-        RowKind.TIMELINE_SONG_MARKER_FADE_IN,
-        RowKind.TIMELINE_SONG_MARKER_FADE_OUT,
-        RowKind.TIMELINE_STANDARD_CUE_FADES,
-        RowKind.TIMELINE_STANDARD_CUE_FADE_IN,
-        RowKind.TIMELINE_STANDARD_CUE_FADE_OUT,
+        RowKind.TIMELINE_CUTS_HEADER,
+        RowKind.TIMELINE_HARD_CUTS,
+        RowKind.TIMELINE_HARD_CUT_FADE_IN,
+        RowKind.TIMELINE_HARD_CUT_FADE_OUT,
+        RowKind.TIMELINE_SOFT_CUTS,
+        RowKind.TIMELINE_SOFT_CUT_FADE_IN,
+        RowKind.TIMELINE_SOFT_CUT_FADE_OUT,
+        RowKind.TIMELINE_APPLY_SOFT_CUTS,
+        RowKind.TIMELINE_APPLY_HARD_CUTS,
         RowKind.TIMELINE_PRESETS_HEADER,
         RowKind.TIMELINE_PRESET_CHARACTER,
         RowKind.TIMELINE_PRESET_CRESCENDO,
