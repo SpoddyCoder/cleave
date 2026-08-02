@@ -54,7 +54,8 @@ from cleave.config_schema import (
     DEFAULT_RENDER_OVERLAY_FONT,
     DEFAULT_RENDER_OVERLAY_POSITION,
     DEFAULT_RENDER_OVERLAY_SLIDE_DIRECTION,
-    DEFAULT_RENDER_OVERLAY_START_DELAY,
+    DEFAULT_RENDER_OVERLAY_APPEAR_AT,
+    DEFAULT_RENDER_OVERLAY_DISAPPEAR_AT,
     DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
     DEFAULT_RENDER_OVERLAY_TITLE,
     DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
@@ -210,18 +211,32 @@ class RenderOverlayBackgroundConfig:
 class RenderOverlayAnimationConfig:
     type: RenderOverlayAnimationType
     slide_direction: RenderOverlaySlideDirection
-    start_delay: float
+    appear_at: float
     display_time: float
 
 
 @dataclass(frozen=True)
-class RenderOverlayConfig:
+class RenderOverlayClosingAnimationConfig:
+    type: RenderOverlayAnimationType
+    slide_direction: RenderOverlaySlideDirection
+    disappear_at: float
+    display_time: float
+
+
+@dataclass(frozen=True)
+class RenderOverlayCardConfig:
     enabled: bool
     title: RenderOverlayTextBlockConfig
     body: RenderOverlayTextBlockConfig
-    animation: RenderOverlayAnimationConfig
+    animation: RenderOverlayAnimationConfig | RenderOverlayClosingAnimationConfig
     position: RenderOverlayPosition
     background: RenderOverlayBackgroundConfig
+
+
+@dataclass(frozen=True)
+class RenderOverlaysConfig:
+    opening_card: RenderOverlayCardConfig
+    closing_card: RenderOverlayCardConfig
     locked: bool = False
 
 
@@ -259,7 +274,7 @@ class RenderConfig:
     width: int = DEFAULT_RENDER_WIDTH
     height: int = DEFAULT_RENDER_HEIGHT
     hdr_compositing: bool = DEFAULT_HDR_COMPOSITING
-    overlay: RenderOverlayConfig | None = None
+    overlays: RenderOverlaysConfig | None = None
     post_fx: RenderPostFxConfig | None = None
 
 

@@ -71,7 +71,7 @@ def test_curation_layout_allowlist() -> None:
     assert RowKind.TRANSPORT in kinds
     assert RowKind.CONFIG_HEADER not in kinds
     assert RowKind.RENDER_SECTION_GAP not in kinds
-    assert RowKind.RENDER_OVERLAY_HEADER not in kinds
+    assert RowKind.RENDER_OVERLAYS_HEADER not in kinds
     assert RowKind.RENDER_TIMELINE_HEADER not in kinds
     assert RowKind.LAYER_MANAGEMENT_ADD not in kinds
 

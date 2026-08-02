@@ -44,7 +44,9 @@ from cleave.viz.controls import (
     NOTIFICATION_TIMELINE_ENABLED_TEXT,
 )
 from cleave.viz.tuning_view_state import (
-    RenderOverlayBlock,
+    RenderOverlayAnimationBlock,
+    RenderOverlayCardBlock,
+    RenderOverlaysBlock,
     RenderTimelineBlock,
     TrackBlock,
     TuningViewState,
@@ -1007,7 +1009,7 @@ def test_build_row_layout_includes_add_before_render_gap() -> None:
     state = _minimal_view_state()
     add_idx = state.layout.find_by_kind( RowKind.LAYER_MANAGEMENT_ADD)
     gap_idx = state.layout.find_by_kind( RowKind.RENDER_SECTION_GAP)
-    overlay_idx = state.layout.find_by_kind( RowKind.RENDER_OVERLAY_HEADER)
+    overlay_idx = state.layout.find_by_kind( RowKind.RENDER_OVERLAYS_HEADER)
     assert add_idx < gap_idx < overlay_idx
 
 
@@ -1397,94 +1399,107 @@ def test_draw_layer_management_rows_without_error() -> None:
 
 def test_render_overlay_row_layout_includes_header_and_sub_rows_when_expanded() -> None:
     state = _minimal_view_state(
-        render_overlay=RenderOverlayBlock(expanded=True),
+        render_overlays=RenderOverlaysBlock(
+            expanded=True,
+            opening_card=RenderOverlayCardBlock(expanded=True),
+        ),
     )
     kinds = [row.kind for row in state.layout.rows]
-    assert RowKind.RENDER_OVERLAY_HEADER in kinds
-    assert RowKind.RENDER_OVERLAY_ANIMATION_HEADER in kinds
-    assert RowKind.RENDER_OVERLAY_POSITION in kinds
-    assert RowKind.RENDER_OVERLAY_TITLE_HEADER in kinds
-    assert RowKind.RENDER_OVERLAY_BODY_HEADER in kinds
-    assert RowKind.RENDER_OVERLAY_OPACITY in kinds
-    assert RowKind.RENDER_OVERLAY_BORDER_WIDTH in kinds
-    assert RowKind.RENDER_OVERLAY_START_DELAY not in kinds
-    assert RowKind.RENDER_OVERLAY_DISPLAY_TIME not in kinds
-    assert RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE not in kinds
-    assert RowKind.RENDER_OVERLAY_BODY_FONT_SIZE not in kinds
-    header_idx = state.layout.find_by_kind( RowKind.RENDER_OVERLAY_HEADER)
-    config_idx = state.layout.find_by_kind( RowKind.CONFIG_HEADER)
+    assert RowKind.RENDER_OVERLAYS_HEADER in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_CARD_HEADER in kinds
+    assert RowKind.RENDER_OVERLAY_CLOSING_CARD_HEADER in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_ANIMATION_HEADER in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_POSITION in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_BODY_HEADER in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_OPACITY in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_BORDER_WIDTH in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_APPEAR_AT not in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_DISPLAY_TIME not in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT_SIZE not in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_BODY_FONT_SIZE not in kinds
+    header_idx = state.layout.find_by_kind(RowKind.RENDER_OVERLAYS_HEADER)
+    config_idx = state.layout.find_by_kind(RowKind.CONFIG_HEADER)
     assert config_idx < header_idx
 
 
 def test_render_overlay_animation_rows_when_expanded() -> None:
-    from cleave.viz.tuning_view_state import RenderOverlayAnimationBlock
-
     state = _minimal_view_state(
-        render_overlay=RenderOverlayBlock(
+        render_overlays=RenderOverlaysBlock(
             expanded=True,
-            animation=RenderOverlayAnimationBlock(expanded=True, type="slide"),
+            opening_card=RenderOverlayCardBlock(
+                expanded=True,
+                animation=RenderOverlayAnimationBlock(expanded=True, type="slide"),
+            ),
         ),
     )
     kinds = [row.kind for row in state.layout.rows]
-    assert RowKind.RENDER_OVERLAY_ANIMATION_TYPE in kinds
-    assert RowKind.RENDER_OVERLAY_ANIMATION_SLIDE_DIRECTION in kinds
-    assert RowKind.RENDER_OVERLAY_START_DELAY in kinds
-    assert RowKind.RENDER_OVERLAY_DISPLAY_TIME in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_ANIMATION_TYPE in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_ANIMATION_SLIDE_DIRECTION in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_APPEAR_AT in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_DISPLAY_TIME in kinds
 
 
 def test_render_overlay_animation_hides_slide_direction_for_fade() -> None:
-    from cleave.viz.tuning_view_state import RenderOverlayAnimationBlock
-
     state = _minimal_view_state(
-        render_overlay=RenderOverlayBlock(
+        render_overlays=RenderOverlaysBlock(
             expanded=True,
-            animation=RenderOverlayAnimationBlock(expanded=True, type="fade"),
+            opening_card=RenderOverlayCardBlock(
+                expanded=True,
+                animation=RenderOverlayAnimationBlock(expanded=True, type="fade"),
+            ),
         ),
     )
     kinds = [row.kind for row in state.layout.rows]
-    assert RowKind.RENDER_OVERLAY_ANIMATION_TYPE in kinds
-    assert RowKind.RENDER_OVERLAY_ANIMATION_SLIDE_DIRECTION not in kinds
-    assert RowKind.RENDER_OVERLAY_START_DELAY in kinds
-    assert RowKind.RENDER_OVERLAY_DISPLAY_TIME in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_ANIMATION_TYPE in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_ANIMATION_SLIDE_DIRECTION not in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_APPEAR_AT in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_DISPLAY_TIME in kinds
 
 
 def test_render_overlay_title_and_body_font_rows_when_expanded() -> None:
     state = _minimal_view_state(
-        render_overlay=RenderOverlayBlock(
+        render_overlays=RenderOverlaysBlock(
             expanded=True,
-            title_expanded=True,
-            body_expanded=True,
+            opening_card=RenderOverlayCardBlock(
+                expanded=True,
+                title_expanded=True,
+                body_expanded=True,
+            ),
         ),
     )
     kinds = [row.kind for row in state.layout.rows]
-    assert RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE in kinds
-    assert RowKind.RENDER_OVERLAY_TITLE_FONT in kinds
-    assert RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM in kinds
-    assert RowKind.RENDER_OVERLAY_BODY_FONT_SIZE in kinds
-    assert RowKind.RENDER_OVERLAY_BODY_FONT in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT_SIZE in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_TITLE_MARGIN_BOTTOM in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_BODY_FONT_SIZE in kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_BODY_FONT in kinds
 
 
 def test_render_overlay_collapsed_hides_sub_rows() -> None:
     collapsed = _minimal_view_state(
-        render_overlay=RenderOverlayBlock(expanded=False),
+        render_overlays=RenderOverlaysBlock(expanded=False),
     )
     expanded = _minimal_view_state(
-        render_overlay=RenderOverlayBlock(expanded=True),
+        render_overlays=RenderOverlaysBlock(expanded=True),
     )
     collapsed_kinds = {row.kind for row in collapsed.layout.rows}
     expanded_kinds = {row.kind for row in expanded.layout.rows}
-    assert RowKind.RENDER_OVERLAY_HEADER in collapsed_kinds
-    assert RowKind.RENDER_OVERLAY_POSITION not in collapsed_kinds
-    assert RowKind.RENDER_OVERLAY_TITLE_HEADER not in collapsed_kinds
-    assert len(collapsed.layout.visible_indices(collapsed)) + 6 == len(expanded.layout.visible_indices(expanded))
+    assert RowKind.RENDER_OVERLAYS_HEADER in collapsed_kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_CARD_HEADER not in collapsed_kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_CARD_HEADER in expanded_kinds
+    assert RowKind.RENDER_OVERLAY_CLOSING_CARD_HEADER in expanded_kinds
+    assert RowKind.RENDER_OVERLAY_OPENING_POSITION not in collapsed_kinds
+    assert len(collapsed.layout.visible_indices(collapsed)) + 2 == len(
+        expanded.layout.visible_indices(expanded)
+    )
 
 
 def test_draw_render_overlay_header_without_error() -> None:
     pygame.init()
     overlay = TuningOverlay()
     state = _minimal_view_state(
-        render_overlay=RenderOverlayBlock(
-            enabled=True,
+        render_overlays=RenderOverlaysBlock(
             expanded=False,
             solo=True,
         ),
@@ -1493,7 +1508,7 @@ def test_draw_render_overlay_header_without_error() -> None:
     overlay.notify_input()
     overlay.draw(surface, state)
     assert overlay.panel_rect is not None
-    header_row = state.layout.find_by_kind( RowKind.RENDER_OVERLAY_HEADER)
+    header_row = state.layout.find_by_kind(RowKind.RENDER_OVERLAYS_HEADER)
     assert header_row in state.layout.visible_indices(state)
 
 

@@ -7,21 +7,21 @@ chroma boost, post-FX fade, render overlay composite, then present to the
 display framebuffer.
 
 When ``cfg.render`` is absent, overlay resolution matches live WYSIWYG:
-``render_overlay_base(cfg)`` falls back to ``default_render_overlay_config()``,
+``render_overlays_base(cfg)`` falls back to ``default_render_overlays_config()``,
 merged with session bootstrap values from ``session_from_cfg`` (same as config
 snapshot overlay persistence). Offline render uses the frozen bootstrap session;
-live play may mutate ``session.render_overlay`` at runtime.
+live play may mutate ``session.render_overlays`` at runtime.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Literal
 
 import pygame
 
-from cleave.config import CleaveConfig, RenderOverlayConfig
-from cleave.config_schema import render_overlay_base
+from cleave.config import CleaveConfig, RenderOverlayCardConfig
+from cleave.config_schema import render_overlays_base
 
 if TYPE_CHECKING:
     from cleave.viz.app import VisualizerCore
@@ -46,6 +46,8 @@ from cleave.viz.render_overlay import (
 from cleave.viz.session import TuningSession
 from cleave.viz.visual_limiter import observe_frame_busyness
 
+OverlayCardName = Literal["opening", "closing"]
+
 
 @dataclass
 class RenderOverlayPanelCache:
@@ -54,8 +56,14 @@ class RenderOverlayPanelCache:
     key: tuple | None = None
 
 
+@dataclass
+class RenderOverlaysPanelCache:
+    opening: RenderOverlayPanelCache = field(default_factory=RenderOverlayPanelCache)
+    closing: RenderOverlayPanelCache = field(default_factory=RenderOverlayPanelCache)
+
+
 def ensure_render_overlay_layers(
-    cache: RenderOverlayPanelCache, cfg: RenderOverlayConfig
+    cache: RenderOverlayPanelCache, cfg: RenderOverlayCardConfig
 ) -> OverlayLayerSet:
     key = panel_surface_key(cfg)
     if cache.layers is not None and cache.key == key:
@@ -68,16 +76,68 @@ def ensure_render_overlay_layers(
 
 
 def ensure_render_overlay_panel(
-    cache: RenderOverlayPanelCache, cfg: RenderOverlayConfig
+    cache: RenderOverlayPanelCache, cfg: RenderOverlayCardConfig
 ) -> pygame.Surface:
     return ensure_render_overlay_layers(cache, cfg).settled_panel
 
 
-def resolve_overlay_config(
+def resolve_overlay_card_config(
+    cfg: CleaveConfig,
+    session: TuningSession,
+    card: OverlayCardName,
+) -> RenderOverlayCardConfig:
+    base = render_overlays_base(cfg)
+    if card == "opening":
+        return build_live_overlay_config(
+            base.opening_card, session.render_overlays.opening_card
+        )
+    return build_live_overlay_config(
+        base.closing_card, session.render_overlays.closing_card
+    )
+
+
+def resolve_overlay_configs(
     cfg: CleaveConfig, session: TuningSession
-) -> RenderOverlayConfig:
-    base = render_overlay_base(cfg)
-    return build_live_overlay_config(base, session.render_overlay)
+) -> tuple[RenderOverlayCardConfig, RenderOverlayCardConfig]:
+    return (
+        resolve_overlay_card_config(cfg, session, "opening"),
+        resolve_overlay_card_config(cfg, session, "closing"),
+    )
+
+
+def _composite_one_overlay_card(
+    core: VisualizerCore,  # noqa: F821 — TYPE_CHECKING import
+    t_sec: float,
+    *,
+    card_cfg: RenderOverlayCardConfig,
+    enabled: bool,
+    overlay_solo: bool,
+    panel_cache: RenderOverlayPanelCache | None,
+    song_duration: float | None,
+) -> None:
+    alpha = live_overlay_alpha(
+        t_sec,
+        card_cfg,
+        enabled=enabled,
+        solo=overlay_solo,
+        song_duration=song_duration,
+    )
+    if alpha <= 0.01:
+        return
+    layers = None
+    if panel_cache is not None:
+        layers = ensure_render_overlay_layers(panel_cache, card_cfg)
+    composite_render_overlay_with_alpha(
+        core.compositor,
+        card_cfg,
+        alpha,
+        core.seed.width,
+        core.seed.height,
+        layers=layers,
+        t_sec=t_sec,
+        solo=overlay_solo,
+        song_duration=song_duration,
+    )
 
 
 def _composite_render_overlay(
@@ -86,29 +146,31 @@ def _composite_render_overlay(
     session: TuningSession,
     *,
     overlay_solo: bool,
-    panel_cache: RenderOverlayPanelCache | None,
+    panel_cache: RenderOverlaysPanelCache | None,
+    song_duration: float | None,
 ) -> None:
-    cfg = resolve_overlay_config(core.seed.cfg, session)
-    alpha = live_overlay_alpha(
+    opening_cfg, closing_cfg = resolve_overlay_configs(core.seed.cfg, session)
+    sections_on = render_sections_active(session)
+    overlays = session.render_overlays
+    opening_cache = None if panel_cache is None else panel_cache.opening
+    closing_cache = None if panel_cache is None else panel_cache.closing
+    _composite_one_overlay_card(
+        core,
         t_sec,
-        cfg,
-        enabled=session.render_overlay.enabled and render_sections_active(session),
-        solo=overlay_solo,
+        card_cfg=opening_cfg,
+        enabled=overlays.opening_card.enabled and sections_on,
+        overlay_solo=overlay_solo,
+        panel_cache=opening_cache,
+        song_duration=song_duration,
     )
-    if alpha <= 0.01:
-        return
-    layers = None
-    if panel_cache is not None:
-        layers = ensure_render_overlay_layers(panel_cache, cfg)
-    composite_render_overlay_with_alpha(
-        core.compositor,
-        cfg,
-        alpha,
-        core.seed.width,
-        core.seed.height,
-        layers=layers,
-        t_sec=t_sec,
-        solo=overlay_solo,
+    _composite_one_overlay_card(
+        core,
+        t_sec,
+        card_cfg=closing_cfg,
+        enabled=overlays.closing_card.enabled and sections_on,
+        overlay_solo=overlay_solo,
+        panel_cache=closing_cache,
+        song_duration=song_duration,
     )
 
 
@@ -120,7 +182,7 @@ def finish_content_frame(
     session: TuningSession | None = None,
     post_fx_solo: bool = False,
     overlay_solo: bool = False,
-    panel_cache: RenderOverlayPanelCache | None = None,
+    panel_cache: RenderOverlaysPanelCache | None = None,
 ) -> None:
     """Apply post-FX fade, render overlay, and present content."""
     session = core.seed.session if session is None else session
@@ -184,5 +246,6 @@ def finish_content_frame(
         session,
         overlay_solo=overlay_solo,
         panel_cache=panel_cache,
+        song_duration=duration_sec,
     )
     core.compositor.present_content()

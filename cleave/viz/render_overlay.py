@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import pygame
 
 from cleave.config import (
-    RenderOverlayConfig,
+    RenderOverlayCardConfig,
     RenderOverlayTextBlockConfig,
 )
 from cleave.easing import (
@@ -16,7 +16,7 @@ from cleave.easing import (
     fade_alpha,
 )
 from cleave.gl_compositor import GlCompositor
-from cleave.viz.session import RenderOverlayRuntime
+from cleave.viz.session import RenderOverlayCardRuntime
 from cleave.viz.theme import FADE_DURATION_SEC
 
 LINE_GAP = 3
@@ -97,7 +97,7 @@ def _text_block_surface_key(block: RenderOverlayTextBlockConfig) -> tuple:
     )
 
 
-def panel_surface_key(cfg: RenderOverlayConfig) -> tuple:
+def panel_surface_key(cfg: RenderOverlayCardConfig) -> tuple:
     """Hashable key for cached panel surfaces (appearance only, not placement)."""
     bg = cfg.background
     return (
@@ -113,17 +113,35 @@ def panel_surface_key(cfg: RenderOverlayConfig) -> tuple:
 
 
 def build_live_overlay_config(
-    base: RenderOverlayConfig, runtime: RenderOverlayRuntime
-) -> RenderOverlayConfig:
+    base: RenderOverlayCardConfig, runtime: RenderOverlayCardRuntime
+) -> RenderOverlayCardConfig:
     """Merge static YAML fields with live-tuned runtime overrides."""
     from cleave.config import (
         RenderOverlayAnimationConfig,
         RenderOverlayBackgroundConfig,
         RenderOverlayBorderConfig,
+        RenderOverlayClosingAnimationConfig,
     )
+    from cleave.viz.session import RenderOverlayClosingAnimationRuntime
 
     anim = runtime.animation
-    return RenderOverlayConfig(
+    if isinstance(anim, RenderOverlayClosingAnimationRuntime):
+        animation: (
+            RenderOverlayAnimationConfig | RenderOverlayClosingAnimationConfig
+        ) = RenderOverlayClosingAnimationConfig(
+            type=anim.type,
+            slide_direction=anim.slide_direction,
+            disappear_at=anim.disappear_at,
+            display_time=anim.display_time,
+        )
+    else:
+        animation = RenderOverlayAnimationConfig(
+            type=anim.type,
+            slide_direction=anim.slide_direction,
+            appear_at=anim.appear_at,
+            display_time=anim.display_time,
+        )
+    return RenderOverlayCardConfig(
         enabled=runtime.enabled,
         title=RenderOverlayTextBlockConfig(
             content=base.title.content,
@@ -140,12 +158,7 @@ def build_live_overlay_config(
             colour=base.body.colour,
             background_colour=base.body.background_colour,
         ),
-        animation=RenderOverlayAnimationConfig(
-            type=anim.type,
-            slide_direction=anim.slide_direction,
-            start_delay=anim.start_delay,
-            display_time=anim.display_time,
-        ),
+        animation=animation,
         position=runtime.position,
         background=RenderOverlayBackgroundConfig(
             margin=base.background.margin,
@@ -157,45 +170,110 @@ def build_live_overlay_config(
                 width=runtime.border_width,
             ),
         ),
-        locked=runtime.locked,
     )
 
 
-def live_overlay_alpha(
+def closing_card_start_time(
+    disappear_at: float, display_time: float, song_duration: float
+) -> float:
+    """Absolute start time for a closing card window."""
+    return song_duration - disappear_at - display_time
+
+
+def overlay_card_start_time(
+    cfg: RenderOverlayCardConfig,
+    *,
+    song_duration: float | None = None,
+) -> float:
+    """Absolute window start for an opening or closing card config."""
+    anim = cfg.animation
+    disappear_at = getattr(anim, "disappear_at", None)
+    if disappear_at is not None:
+        if song_duration is None:
+            raise ValueError("song_duration is required for closing overlay cards")
+        return closing_card_start_time(
+            float(disappear_at), anim.display_time, song_duration
+        )
+    return float(getattr(anim, "appear_at", 0.0))
+
+
+def _overlay_window_alpha(
     t_sec: float,
-    cfg: RenderOverlayConfig,
     *,
     enabled: bool,
-    solo: bool,
+    start: float,
+    display_time: float,
+    animation_type: str,
 ) -> float:
-    """Visibility multiplier for the live render overlay at *t_sec*."""
     if not enabled:
         return 0.0
-    if solo:
-        return 1.0
-    return overlay_visible_alpha(t_sec, cfg)
-
-
-def overlay_visible_alpha(t_sec: float, cfg: RenderOverlayConfig) -> float:
-    """Combined visibility multiplier for the render overlay at *t_sec*."""
-    if not cfg.enabled:
+    local_t = t_sec - start
+    if local_t < 0.0 or local_t > display_time:
         return 0.0
-    anim = cfg.animation
-    local_t = t_sec - anim.start_delay
-    if local_t < 0.0 or local_t > anim.display_time:
-        return 0.0
-    if anim.type == "fade":
+    if animation_type == "fade":
         return fade_alpha(
             local_t,
-            anim.display_time,
+            display_time,
             FADE_DURATION_SEC,
             FADE_DURATION_SEC,
         )
     return 1.0
 
 
+def live_overlay_alpha(
+    t_sec: float,
+    cfg: RenderOverlayCardConfig,
+    *,
+    enabled: bool,
+    solo: bool,
+    song_duration: float | None = None,
+) -> float:
+    """Visibility multiplier for a live overlay card at *t_sec*."""
+    if not enabled:
+        return 0.0
+    if solo:
+        return 1.0
+    if getattr(cfg.animation, "disappear_at", None) is not None:
+        if song_duration is None:
+            return 0.0
+        return closing_overlay_visible_alpha(t_sec, cfg, song_duration)
+    return overlay_visible_alpha(t_sec, cfg)
+
+
+def overlay_visible_alpha(t_sec: float, cfg: RenderOverlayCardConfig) -> float:
+    """Visibility multiplier for an opening card at *t_sec*."""
+    anim = cfg.animation
+    return _overlay_window_alpha(
+        t_sec,
+        enabled=cfg.enabled,
+        start=float(getattr(anim, "appear_at", 0.0)),
+        display_time=anim.display_time,
+        animation_type=anim.type,
+    )
+
+
+def closing_overlay_visible_alpha(
+    t_sec: float,
+    cfg: RenderOverlayCardConfig,
+    song_duration: float,
+) -> float:
+    """Visibility multiplier for a closing card at *t_sec*."""
+    anim = cfg.animation
+    disappear_at = float(getattr(anim, "disappear_at", 0.0))
+    start = closing_card_start_time(
+        disappear_at, anim.display_time, song_duration
+    )
+    return _overlay_window_alpha(
+        t_sec,
+        enabled=cfg.enabled,
+        start=start,
+        display_time=anim.display_time,
+        animation_type=anim.type,
+    )
+
+
 def panel_position(
-    cfg: RenderOverlayConfig,
+    cfg: RenderOverlayCardConfig,
     panel_w: int,
     panel_h: int,
     screen_w: int,
@@ -217,15 +295,15 @@ def panel_position(
     return (screen_w - panel_w - margin, screen_h - panel_h - margin)
 
 
-def _body_font(cfg: RenderOverlayConfig) -> pygame.font.Font:
+def _body_font(cfg: RenderOverlayCardConfig) -> pygame.font.Font:
     return pygame.font.SysFont(cfg.body.font, cfg.body.font_size)
 
 
-def _title_font(cfg: RenderOverlayConfig) -> pygame.font.Font:
+def _title_font(cfg: RenderOverlayCardConfig) -> pygame.font.Font:
     return pygame.font.SysFont(cfg.title.font, cfg.title.font_size, bold=True)
 
 
-def _background_pixel_alpha(cfg: RenderOverlayConfig) -> int:
+def _background_pixel_alpha(cfg: RenderOverlayCardConfig) -> int:
     return int(round(255 * cfg.background.opacity))
 
 
@@ -296,7 +374,7 @@ def _layer_unit(
 
 def overlay_animation_state(
     local_t: float,
-    cfg: RenderOverlayConfig,
+    cfg: RenderOverlayCardConfig,
     *,
     panel_w: int,
     panel_h: int,
@@ -411,7 +489,7 @@ def _blit_text_only(
     panel.blit(surf, pos)
 
 
-def build_overlay_layers(cfg: RenderOverlayConfig) -> OverlayLayerSet:
+def build_overlay_layers(cfg: RenderOverlayCardConfig) -> OverlayLayerSet:
     """Build cached layer surfaces and a settled full-panel composite."""
     body_font = _body_font(cfg)
     title_font = _title_font(cfg)
@@ -518,7 +596,7 @@ def build_overlay_layers(cfg: RenderOverlayConfig) -> OverlayLayerSet:
     )
 
 
-def build_panel_surface(cfg: RenderOverlayConfig) -> pygame.Surface:
+def build_panel_surface(cfg: RenderOverlayCardConfig) -> pygame.Surface:
     """Static SRCALPHA panel with background, border, title, and body text."""
     return build_overlay_layers(cfg).settled_panel
 
@@ -592,7 +670,7 @@ def _clip_rect_to_bounds(
 
 def composite_render_overlay_with_alpha(
     compositor: GlCompositor,
-    cfg: RenderOverlayConfig,
+    cfg: RenderOverlayCardConfig,
     alpha: float,
     width: int,
     height: int,
@@ -601,6 +679,7 @@ def composite_render_overlay_with_alpha(
     layers: OverlayLayerSet | None = None,
     t_sec: float | None = None,
     solo: bool = False,
+    song_duration: float | None = None,
 ) -> None:
     """Upload and draw the render overlay at *alpha* visibility."""
     if alpha <= _ALPHA_EPSILON:
@@ -629,7 +708,7 @@ def composite_render_overlay_with_alpha(
         )
         return
 
-    local_t = t_sec - cfg.animation.start_delay
+    local_t = t_sec - overlay_card_start_time(cfg, song_duration=song_duration)
     anim_state = overlay_animation_state(
         local_t,
         cfg,
@@ -704,7 +783,7 @@ def _upload_and_draw(
 
 def composite_render_overlay(
     compositor: GlCompositor,
-    cfg: RenderOverlayConfig,
+    cfg: RenderOverlayCardConfig,
     t_sec: float,
     width: int,
     height: int,

@@ -602,76 +602,103 @@ def _format_track_hard_cut_sensitivity(
     return f"{_track_block(state, desc).hard_cut_sensitivity:.2f}"
 
 
-def _format_render_overlay_position(
+def _opening_card(state: TuningViewState):
+    return state.render_overlays.opening_card
+
+
+def _closing_card(state: TuningViewState):
+    return state.render_overlays.closing_card
+
+
+def _format_overlay_card_position(card_getter):
+    def format_value(state: TuningViewState, _desc: RowDescriptor) -> str:
+        return card_getter(state).position
+
+    return format_value
+
+
+def _format_overlay_card_title_font_size(card_getter):
+    def format_value(state: TuningViewState, _desc: RowDescriptor) -> str:
+        return f"{card_getter(state).title_font_size}px"
+
+    return format_value
+
+
+def _format_overlay_card_title_font(card_getter):
+    def format_value(state: TuningViewState, _desc: RowDescriptor) -> str:
+        return render_overlay_font_display(card_getter(state).title_font)
+
+    return format_value
+
+
+def _format_overlay_card_title_margin_bottom(card_getter):
+    def format_value(state: TuningViewState, _desc: RowDescriptor) -> str:
+        return f"{card_getter(state).title_margin_bottom}px"
+
+    return format_value
+
+
+def _format_overlay_card_body_font_size(card_getter):
+    def format_value(state: TuningViewState, _desc: RowDescriptor) -> str:
+        return f"{card_getter(state).body_font_size}px"
+
+    return format_value
+
+
+def _format_overlay_card_body_font(card_getter):
+    def format_value(state: TuningViewState, _desc: RowDescriptor) -> str:
+        return render_overlay_font_display(card_getter(state).body_font)
+
+    return format_value
+
+
+def _format_overlay_card_opacity(card_getter):
+    def format_value(state: TuningViewState, _desc: RowDescriptor) -> str:
+        return f"{card_getter(state).opacity_pct}%"
+
+    return format_value
+
+
+def _format_overlay_card_border_width(card_getter):
+    def format_value(state: TuningViewState, _desc: RowDescriptor) -> str:
+        return f"{card_getter(state).border_width}px"
+
+    return format_value
+
+
+def _format_overlay_card_appear_at(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return state.render_overlay.position
+    anim = state.render_overlays.opening_card.animation
+    return f"{getattr(anim, 'appear_at', 0.0):.1f}s"
 
 
-def _format_render_overlay_title_font_size(
+def _format_overlay_card_disappear_at(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_overlay.title_font_size}px"
+    anim = state.render_overlays.closing_card.animation
+    return f"{getattr(anim, 'disappear_at', 0.0):.1f}s"
 
 
-def _format_render_overlay_title_font(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return render_overlay_font_display(state.render_overlay.title_font)
+def _format_overlay_card_display_time(card_getter):
+    def format_value(state: TuningViewState, _desc: RowDescriptor) -> str:
+        return f"{card_getter(state).animation.display_time:.1f}s"
+
+    return format_value
 
 
-def _format_render_overlay_title_margin_bottom(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return f"{state.render_overlay.title_margin_bottom}px"
+def _format_overlay_card_animation_type(card_getter):
+    def format_value(state: TuningViewState, _desc: RowDescriptor) -> str:
+        return card_getter(state).animation.type
+
+    return format_value
 
 
-def _format_render_overlay_body_font_size(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return f"{state.render_overlay.body_font_size}px"
+def _format_overlay_card_slide_direction(card_getter):
+    def format_value(state: TuningViewState, _desc: RowDescriptor) -> str:
+        return card_getter(state).animation.slide_direction
 
-
-def _format_render_overlay_body_font(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return render_overlay_font_display(state.render_overlay.body_font)
-
-
-def _format_render_overlay_opacity(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return f"{state.render_overlay.opacity_pct}%"
-
-
-def _format_render_overlay_border_width(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return f"{state.render_overlay.border_width}px"
-
-
-def _format_render_overlay_start_delay(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return f"{state.render_overlay.animation.start_delay:.1f}s"
-
-
-def _format_render_overlay_display_time(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return f"{state.render_overlay.animation.display_time:.1f}s"
-
-
-def _format_render_overlay_animation_type(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return state.render_overlay.animation.type
-
-
-def _format_render_overlay_slide_direction(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return state.render_overlay.animation.slide_direction
+    return format_value
 
 
 def _format_render_post_fx_fade_in(
@@ -911,116 +938,203 @@ def _apply_track_hard_cut_sensitivity(
     )
 
 
-def _apply_render_overlay_position(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
-    _shift: bool,
-) -> None:
-    controls._render_overlay.cycle_position(forward=forward)
+def _card_controls(controls: TuningControls, card_name: str):
+    return getattr(controls._render_overlays, card_name)
 
 
-def _apply_render_overlay_title_font_size(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
-) -> None:
-    step = 10 if ctrl else 1
-    delta = step if forward else -step
-    controls._render_overlay.set_title_font_size(
-        controls.session.render_overlay.title_font_size + delta
-    )
+def _apply_overlay_card_position(card_name: str):
+    def apply(
+        controls: TuningControls,
+        _desc: RowDescriptor,
+        forward: bool,
+        _ctrl: bool,
+        _shift: bool,
+    ) -> None:
+        _card_controls(controls, card_name).cycle_position(forward=forward)
+
+    return apply
 
 
-def _apply_render_overlay_title_font(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
-    _shift: bool,
-) -> None:
-    controls._render_overlay.cycle_title_font(forward=forward)
+def _apply_overlay_card_title_font_size(card_name: str):
+    def apply(
+        controls: TuningControls,
+        _desc: RowDescriptor,
+        forward: bool,
+        ctrl: bool,
+        _shift: bool,
+    ) -> None:
+        step = 10 if ctrl else 1
+        delta = step if forward else -step
+        card = getattr(controls.session.render_overlays, card_name)
+        _card_controls(controls, card_name).set_title_font_size(
+            card.title_font_size + delta
+        )
+
+    return apply
 
 
-def _apply_render_overlay_title_margin_bottom(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
-) -> None:
-    step = 10 if ctrl else 1
-    delta = step if forward else -step
-    controls._render_overlay.set_title_margin_bottom(
-        controls.session.render_overlay.title_margin_bottom + delta
-    )
+def _apply_overlay_card_title_font(card_name: str):
+    def apply(
+        controls: TuningControls,
+        _desc: RowDescriptor,
+        forward: bool,
+        _ctrl: bool,
+        _shift: bool,
+    ) -> None:
+        _card_controls(controls, card_name).cycle_title_font(forward=forward)
+
+    return apply
 
 
-def _apply_render_overlay_body_font_size(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
-) -> None:
-    step = 10 if ctrl else 1
-    delta = step if forward else -step
-    controls._render_overlay.set_body_font_size(
-        controls.session.render_overlay.body_font_size + delta
-    )
+def _apply_overlay_card_title_margin_bottom(card_name: str):
+    def apply(
+        controls: TuningControls,
+        _desc: RowDescriptor,
+        forward: bool,
+        ctrl: bool,
+        _shift: bool,
+    ) -> None:
+        step = 10 if ctrl else 1
+        delta = step if forward else -step
+        card = getattr(controls.session.render_overlays, card_name)
+        _card_controls(controls, card_name).set_title_margin_bottom(
+            card.title_margin_bottom + delta
+        )
+
+    return apply
 
 
-def _apply_render_overlay_body_font(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
-    _shift: bool,
-) -> None:
-    controls._render_overlay.cycle_body_font(forward=forward)
+def _apply_overlay_card_body_font_size(card_name: str):
+    def apply(
+        controls: TuningControls,
+        _desc: RowDescriptor,
+        forward: bool,
+        ctrl: bool,
+        _shift: bool,
+    ) -> None:
+        step = 10 if ctrl else 1
+        delta = step if forward else -step
+        card = getattr(controls.session.render_overlays, card_name)
+        _card_controls(controls, card_name).set_body_font_size(
+            card.body_font_size + delta
+        )
+
+    return apply
 
 
-def _apply_render_overlay_opacity(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
-) -> None:
-    step = 10 if ctrl else 1
-    delta = step if forward else -step
-    controls._render_overlay.set_opacity(
-        controls.session.render_overlay.opacity_pct + delta
-    )
+def _apply_overlay_card_body_font(card_name: str):
+    def apply(
+        controls: TuningControls,
+        _desc: RowDescriptor,
+        forward: bool,
+        _ctrl: bool,
+        _shift: bool,
+    ) -> None:
+        _card_controls(controls, card_name).cycle_body_font(forward=forward)
+
+    return apply
 
 
-def _apply_render_overlay_border_width(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
-    _shift: bool,
-) -> None:
-    step = 10 if ctrl else 1
-    delta = step if forward else -step
-    controls._render_overlay.set_border_width(
-        controls.session.render_overlay.border_width + delta
-    )
+def _apply_overlay_card_opacity(card_name: str):
+    def apply(
+        controls: TuningControls,
+        _desc: RowDescriptor,
+        forward: bool,
+        ctrl: bool,
+        _shift: bool,
+    ) -> None:
+        step = 10 if ctrl else 1
+        delta = step if forward else -step
+        card = getattr(controls.session.render_overlays, card_name)
+        _card_controls(controls, card_name).set_opacity(card.opacity_pct + delta)
+
+    return apply
 
 
-def _apply_render_overlay_start_delay(
+def _apply_overlay_card_border_width(card_name: str):
+    def apply(
+        controls: TuningControls,
+        _desc: RowDescriptor,
+        forward: bool,
+        ctrl: bool,
+        _shift: bool,
+    ) -> None:
+        step = 10 if ctrl else 1
+        delta = step if forward else -step
+        card = getattr(controls.session.render_overlays, card_name)
+        _card_controls(controls, card_name).set_border_width(
+            card.border_width + delta
+        )
+
+    return apply
+
+
+def _apply_overlay_card_appear_at(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
     _shift: bool,
 ) -> None:
     step = 30.0 if ctrl else 1.0
     delta = step if forward else -step
-    controls._render_overlay.set_start_delay(
-        controls.session.render_overlay.animation.start_delay + delta
+    anim = controls.session.render_overlays.opening_card.animation
+    controls._render_overlays.opening_card.set_appear_at(
+        getattr(anim, "appear_at", 0.0) + delta
     )
 
 
-def _apply_render_overlay_display_time(
+def _apply_overlay_card_disappear_at(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
     _shift: bool,
 ) -> None:
     step = 30.0 if ctrl else 1.0
     delta = step if forward else -step
-    controls._render_overlay.set_display_time(
-        controls.session.render_overlay.animation.display_time + delta
+    anim = controls.session.render_overlays.closing_card.animation
+    controls._render_overlays.closing_card.set_disappear_at(
+        getattr(anim, "disappear_at", 0.0) + delta
     )
 
 
-def _apply_render_overlay_animation_type(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
-    _shift: bool,
-) -> None:
-    controls._render_overlay.cycle_animation_type(forward=forward)
+def _apply_overlay_card_display_time(card_name: str):
+    def apply(
+        controls: TuningControls,
+        _desc: RowDescriptor,
+        forward: bool,
+        ctrl: bool,
+        _shift: bool,
+    ) -> None:
+        step = 30.0 if ctrl else 1.0
+        delta = step if forward else -step
+        card = getattr(controls.session.render_overlays, card_name)
+        _card_controls(controls, card_name).set_display_time(
+            card.animation.display_time + delta
+        )
+
+    return apply
 
 
-def _apply_render_overlay_slide_direction(
-    controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
-    _shift: bool,
-) -> None:
-    controls._render_overlay.cycle_slide_direction(forward=forward)
+def _apply_overlay_card_animation_type(card_name: str):
+    def apply(
+        controls: TuningControls,
+        _desc: RowDescriptor,
+        forward: bool,
+        _ctrl: bool,
+        _shift: bool,
+    ) -> None:
+        _card_controls(controls, card_name).cycle_animation_type(forward=forward)
+
+    return apply
+
+
+def _apply_overlay_card_slide_direction(card_name: str):
+    def apply(
+        controls: TuningControls,
+        _desc: RowDescriptor,
+        forward: bool,
+        _ctrl: bool,
+        _shift: bool,
+    ) -> None:
+        _card_controls(controls, card_name).cycle_slide_direction(forward=forward)
+
+    return apply
 
 
 def _apply_render_post_fx_fade_in(
@@ -1190,7 +1304,7 @@ def _apply_track_header(
     apply_expand_toggle(controls, desc.kind, slot, forward)
 
 
-def _apply_render_overlay_header(
+def _apply_render_overlays_header(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
@@ -1199,19 +1313,40 @@ def _apply_render_overlay_header(
 ) -> None:
     if shift:
         if forward:
-            controls._render_overlay.enter_solo()
+            controls._render_overlays.enter_solo()
         else:
-            controls._render_overlay.exit_solo()
+            controls._render_overlays.exit_solo()
         return
     if ctrl:
         if (
-            controls.session.render_overlay.locked
+            controls.session.render_overlays.locked
             and row_behavior(desc.kind).can_enable_disable
         ):
             return
-        controls._render_overlay.set_enabled(forward)
+        controls._render_overlays.set_enabled(forward)
         return
     apply_expand_toggle(controls, desc.kind, desc.slot, forward)
+
+
+def _apply_overlay_card_header(card_name: str):
+    def apply(
+        controls: TuningControls,
+        desc: RowDescriptor,
+        forward: bool,
+        ctrl: bool,
+        _shift: bool,
+    ) -> None:
+        if ctrl:
+            if (
+                controls.session.render_overlays.locked
+                and row_behavior(desc.kind).can_enable_disable
+            ):
+                return
+            _card_controls(controls, card_name).set_enabled(forward)
+            return
+        apply_expand_toggle(controls, desc.kind, desc.slot, forward)
+
+    return apply
 
 
 def _apply_render_post_fx_header(
@@ -1572,99 +1707,196 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         format_value=_format_track_hard_cut_sensitivity,
         apply_horizontal=_apply_track_hard_cut_sensitivity,
     ),
-    RowKind.RENDER_OVERLAY_POSITION: RowFieldDef(
-        panel_label="position",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_overlay_position,
-        apply_horizontal=_apply_render_overlay_position,
-    ),
-    RowKind.RENDER_OVERLAY_HEADER: RowFieldDef(
-        panel_label="OVERLAY",
+    RowKind.RENDER_OVERLAYS_HEADER: RowFieldDef(
+        panel_label="OVERLAYS",
         present_style=RowPresentStyle.COMPOSITE_HEADER,
         header_prefix="Render: ",
-        header_suffix="OVERLAY",
-        apply_horizontal=_apply_render_overlay_header,
+        header_suffix="OVERLAYS",
+        apply_horizontal=_apply_render_overlays_header,
     ),
-    RowKind.RENDER_OVERLAY_TITLE_HEADER: RowFieldDef(
+    RowKind.RENDER_OVERLAY_OPENING_CARD_HEADER: RowFieldDef(
+        panel_label="opening card",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        apply_horizontal=_apply_overlay_card_header("opening_card"),
+    ),
+    RowKind.RENDER_OVERLAY_CLOSING_CARD_HEADER: RowFieldDef(
+        panel_label="closing card",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        apply_horizontal=_apply_overlay_card_header("closing_card"),
+    ),
+    RowKind.RENDER_OVERLAY_OPENING_POSITION: RowFieldDef(
+        panel_label="position",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_position(_opening_card),
+        apply_horizontal=_apply_overlay_card_position("opening_card"),
+    ),
+    RowKind.RENDER_OVERLAY_CLOSING_POSITION: RowFieldDef(
+        panel_label="position",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_position(_closing_card),
+        apply_horizontal=_apply_overlay_card_position("closing_card"),
+    ),
+    RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER: RowFieldDef(
         panel_label="title",
         present_style=RowPresentStyle.EXPAND_SUBHEADER,
         apply_horizontal=_apply_expand_subheader,
     ),
-    RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE: RowFieldDef(
+    RowKind.RENDER_OVERLAY_CLOSING_TITLE_HEADER: RowFieldDef(
+        panel_label="title",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        apply_horizontal=_apply_expand_subheader,
+    ),
+    RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT_SIZE: RowFieldDef(
         panel_label="font size",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_overlay_title_font_size,
-        apply_horizontal=_apply_render_overlay_title_font_size,
+        format_value=_format_overlay_card_title_font_size(_opening_card),
+        apply_horizontal=_apply_overlay_card_title_font_size("opening_card"),
     ),
-    RowKind.RENDER_OVERLAY_TITLE_FONT: RowFieldDef(
+    RowKind.RENDER_OVERLAY_CLOSING_TITLE_FONT_SIZE: RowFieldDef(
+        panel_label="font size",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_title_font_size(_closing_card),
+        apply_horizontal=_apply_overlay_card_title_font_size("closing_card"),
+    ),
+    RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT: RowFieldDef(
         panel_label="font",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_overlay_title_font,
-        apply_horizontal=_apply_render_overlay_title_font,
+        format_value=_format_overlay_card_title_font(_opening_card),
+        apply_horizontal=_apply_overlay_card_title_font("opening_card"),
     ),
-    RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM: RowFieldDef(
+    RowKind.RENDER_OVERLAY_CLOSING_TITLE_FONT: RowFieldDef(
+        panel_label="font",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_title_font(_closing_card),
+        apply_horizontal=_apply_overlay_card_title_font("closing_card"),
+    ),
+    RowKind.RENDER_OVERLAY_OPENING_TITLE_MARGIN_BOTTOM: RowFieldDef(
         panel_label="margin bottom",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_overlay_title_margin_bottom,
-        apply_horizontal=_apply_render_overlay_title_margin_bottom,
+        format_value=_format_overlay_card_title_margin_bottom(_opening_card),
+        apply_horizontal=_apply_overlay_card_title_margin_bottom("opening_card"),
     ),
-    RowKind.RENDER_OVERLAY_BODY_FONT_SIZE: RowFieldDef(
+    RowKind.RENDER_OVERLAY_CLOSING_TITLE_MARGIN_BOTTOM: RowFieldDef(
+        panel_label="margin bottom",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_title_margin_bottom(_closing_card),
+        apply_horizontal=_apply_overlay_card_title_margin_bottom("closing_card"),
+    ),
+    RowKind.RENDER_OVERLAY_OPENING_BODY_FONT_SIZE: RowFieldDef(
         panel_label="font size",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_overlay_body_font_size,
-        apply_horizontal=_apply_render_overlay_body_font_size,
+        format_value=_format_overlay_card_body_font_size(_opening_card),
+        apply_horizontal=_apply_overlay_card_body_font_size("opening_card"),
     ),
-    RowKind.RENDER_OVERLAY_BODY_FONT: RowFieldDef(
+    RowKind.RENDER_OVERLAY_CLOSING_BODY_FONT_SIZE: RowFieldDef(
+        panel_label="font size",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_body_font_size(_closing_card),
+        apply_horizontal=_apply_overlay_card_body_font_size("closing_card"),
+    ),
+    RowKind.RENDER_OVERLAY_OPENING_BODY_FONT: RowFieldDef(
         panel_label="font",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_overlay_body_font,
-        apply_horizontal=_apply_render_overlay_body_font,
+        format_value=_format_overlay_card_body_font(_opening_card),
+        apply_horizontal=_apply_overlay_card_body_font("opening_card"),
     ),
-    RowKind.RENDER_OVERLAY_BODY_HEADER: RowFieldDef(
+    RowKind.RENDER_OVERLAY_CLOSING_BODY_FONT: RowFieldDef(
+        panel_label="font",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_body_font(_closing_card),
+        apply_horizontal=_apply_overlay_card_body_font("closing_card"),
+    ),
+    RowKind.RENDER_OVERLAY_OPENING_BODY_HEADER: RowFieldDef(
         panel_label="body",
         present_style=RowPresentStyle.EXPAND_SUBHEADER,
         apply_horizontal=_apply_expand_subheader,
     ),
-    RowKind.RENDER_OVERLAY_OPACITY: RowFieldDef(
+    RowKind.RENDER_OVERLAY_CLOSING_BODY_HEADER: RowFieldDef(
+        panel_label="body",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        apply_horizontal=_apply_expand_subheader,
+    ),
+    RowKind.RENDER_OVERLAY_OPENING_OPACITY: RowFieldDef(
         panel_label="background opacity",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_overlay_opacity,
-        apply_horizontal=_apply_render_overlay_opacity,
+        format_value=_format_overlay_card_opacity(_opening_card),
+        apply_horizontal=_apply_overlay_card_opacity("opening_card"),
     ),
-    RowKind.RENDER_OVERLAY_BORDER_WIDTH: RowFieldDef(
+    RowKind.RENDER_OVERLAY_CLOSING_OPACITY: RowFieldDef(
+        panel_label="background opacity",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_opacity(_closing_card),
+        apply_horizontal=_apply_overlay_card_opacity("closing_card"),
+    ),
+    RowKind.RENDER_OVERLAY_OPENING_BORDER_WIDTH: RowFieldDef(
         panel_label="border width",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_overlay_border_width,
-        apply_horizontal=_apply_render_overlay_border_width,
+        format_value=_format_overlay_card_border_width(_opening_card),
+        apply_horizontal=_apply_overlay_card_border_width("opening_card"),
     ),
-    RowKind.RENDER_OVERLAY_ANIMATION_HEADER: RowFieldDef(
+    RowKind.RENDER_OVERLAY_CLOSING_BORDER_WIDTH: RowFieldDef(
+        panel_label="border width",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_border_width(_closing_card),
+        apply_horizontal=_apply_overlay_card_border_width("closing_card"),
+    ),
+    RowKind.RENDER_OVERLAY_OPENING_ANIMATION_HEADER: RowFieldDef(
         panel_label="animation",
         present_style=RowPresentStyle.EXPAND_SUBHEADER,
         apply_horizontal=_apply_expand_subheader,
     ),
-    RowKind.RENDER_OVERLAY_ANIMATION_TYPE: RowFieldDef(
+    RowKind.RENDER_OVERLAY_CLOSING_ANIMATION_HEADER: RowFieldDef(
+        panel_label="animation",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        apply_horizontal=_apply_expand_subheader,
+    ),
+    RowKind.RENDER_OVERLAY_OPENING_ANIMATION_TYPE: RowFieldDef(
         panel_label="type",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_overlay_animation_type,
-        apply_horizontal=_apply_render_overlay_animation_type,
+        format_value=_format_overlay_card_animation_type(_opening_card),
+        apply_horizontal=_apply_overlay_card_animation_type("opening_card"),
     ),
-    RowKind.RENDER_OVERLAY_ANIMATION_SLIDE_DIRECTION: RowFieldDef(
+    RowKind.RENDER_OVERLAY_CLOSING_ANIMATION_TYPE: RowFieldDef(
+        panel_label="type",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_animation_type(_closing_card),
+        apply_horizontal=_apply_overlay_card_animation_type("closing_card"),
+    ),
+    RowKind.RENDER_OVERLAY_OPENING_ANIMATION_SLIDE_DIRECTION: RowFieldDef(
         panel_label="slide-direction",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_overlay_slide_direction,
-        apply_horizontal=_apply_render_overlay_slide_direction,
+        format_value=_format_overlay_card_slide_direction(_opening_card),
+        apply_horizontal=_apply_overlay_card_slide_direction("opening_card"),
     ),
-    RowKind.RENDER_OVERLAY_START_DELAY: RowFieldDef(
-        panel_label="start delay",
+    RowKind.RENDER_OVERLAY_CLOSING_ANIMATION_SLIDE_DIRECTION: RowFieldDef(
+        panel_label="slide-direction",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_overlay_start_delay,
-        apply_horizontal=_apply_render_overlay_start_delay,
+        format_value=_format_overlay_card_slide_direction(_closing_card),
+        apply_horizontal=_apply_overlay_card_slide_direction("closing_card"),
     ),
-    RowKind.RENDER_OVERLAY_DISPLAY_TIME: RowFieldDef(
+    RowKind.RENDER_OVERLAY_OPENING_APPEAR_AT: RowFieldDef(
+        panel_label="appear at",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_appear_at,
+        apply_horizontal=_apply_overlay_card_appear_at,
+    ),
+    RowKind.RENDER_OVERLAY_CLOSING_DISAPPEAR_AT: RowFieldDef(
+        panel_label="disappear at",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_disappear_at,
+        apply_horizontal=_apply_overlay_card_disappear_at,
+    ),
+    RowKind.RENDER_OVERLAY_OPENING_DISPLAY_TIME: RowFieldDef(
         panel_label="display time",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_overlay_display_time,
-        apply_horizontal=_apply_render_overlay_display_time,
+        format_value=_format_overlay_card_display_time(_opening_card),
+        apply_horizontal=_apply_overlay_card_display_time("opening_card"),
+    ),
+    RowKind.RENDER_OVERLAY_CLOSING_DISPLAY_TIME: RowFieldDef(
+        panel_label="display time",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_overlay_card_display_time(_closing_card),
+        apply_horizontal=_apply_overlay_card_display_time("closing_card"),
     ),
     RowKind.RENDER_POST_FX_FADE_IN: RowFieldDef(
         panel_label="fade in",

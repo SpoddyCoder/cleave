@@ -336,7 +336,7 @@ def test_lock_change_invalidates_render_overlay_header_row_key() -> None:
     font = overlay._font_get()
     cache = TuningPanelCache()
     state = _minimal_view_state()
-    index = state.layout.find_by_kind(RowKind.RENDER_OVERLAY_HEADER)
+    index = state.layout.find_by_kind(RowKind.RENDER_OVERLAYS_HEADER)
     line_h = font.get_linesize()
     max_w = 400
 
@@ -344,7 +344,7 @@ def test_lock_change_invalidates_render_overlay_header_row_key() -> None:
         state, index, font, cache=cache, max_content_width=max_w, line_h=line_h
     )
     state_locked = replace(
-        state, render_overlay=replace(state.render_overlay, locked=True)
+        state, render_overlays=replace(state.render_overlays, locked=True)
     )
     key_after = row_render_key(
         state_locked, index, font, cache=cache, max_content_width=max_w, line_h=line_h

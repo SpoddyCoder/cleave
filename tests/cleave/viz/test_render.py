@@ -18,7 +18,7 @@ from cleave.viz.session import (
     LayerRuntime,
     TimelineRuntime,
     TuningSession,
-    default_render_overlay_runtime,
+    default_render_overlays_runtime,
     session_from_cfg,
 )
 from tests.support.config import TEST_LAYER_STEMS, default_render_post_fx_runtime
@@ -35,7 +35,7 @@ from cleave.project import write_manifest
 from cleave.separate import project_stems_complete
 
 render_mod = importlib.import_module("cleave.viz.render")
-from cleave.viz.frame_finish import resolve_overlay_config
+from cleave.viz.frame_finish import resolve_overlay_card_config, resolve_overlay_configs
 from cleave.viz.render import (  # noqa: E402
     RenderSegment,
     _default_output_path,
@@ -43,7 +43,11 @@ from cleave.viz.render import (  # noqa: E402
     _resolve_segment,
     validate_render_project,
 )
-from tests.cleave.viz.test_render_overlay import _overlay_cfg
+from tests.cleave.viz.test_render_overlay import (
+    _closing_overlay_cfg,
+    _overlay_cfg,
+    _overlays_cfg,
+)
 from tests.support.config import write_minimal_config
 
 
@@ -131,7 +135,15 @@ def _mock_render_runtime(
     seed.cfg.render = RenderConfig(fps=fps, width=render_w, height=render_h)
     seed.session = TuningSession(
         layer_z_order=list(DEFAULT_LAYER_SLOTS),
-        render_overlay=replace(default_render_overlay_runtime(), enabled=False),
+        render_overlays=replace(
+            default_render_overlays_runtime(),
+            opening_card=replace(
+                default_render_overlays_runtime().opening_card, enabled=False
+            ),
+            closing_card=replace(
+                default_render_overlays_runtime().closing_card, enabled=False
+            ),
+        ),
         render_post_fx=default_render_post_fx_runtime(
             enabled=False,
             expanded=False,
@@ -834,7 +846,10 @@ def test_render_output_must_be_mp4(tmp_path: Path) -> None:
         render_mod.render(project, output=tmp_path / "out.mkv")
 
 
-@patch("cleave.viz.frame_finish.live_overlay_alpha", return_value=1.0)
+@patch(
+    "cleave.viz.frame_finish.live_overlay_alpha",
+    side_effect=lambda *a, enabled=True, solo=False, **k: (1.0 if enabled else 0.0),
+)
 @patch("cleave.viz.frame_finish.build_overlay_layers")
 @patch("cleave.viz.frame_finish.composite_render_overlay_with_alpha")
 @patch.object(render_mod, "pygame")
@@ -865,10 +880,18 @@ def test_render_calls_overlay_compositing_when_enabled(
     duration_sec = 2.0
     frame_count = math.ceil(duration_sec * fps)
 
-    overlay_cfg = _overlay_cfg(start_delay=0.0)
+    overlay_cfg = _overlay_cfg(appear_at=0.0)
     base_cfg = load_config(project / VIZ_CONFIG_FILENAME, repo_root())
     mock_load_config.return_value = replace(
-        base_cfg, render=RenderConfig(fps=fps, overlay=overlay_cfg, post_fx=None)
+        base_cfg,
+        render=RenderConfig(
+            fps=fps,
+            overlays=_overlays_cfg(
+                opening=overlay_cfg,
+                closing=_closing_overlay_cfg(enabled=False),
+            ),
+            post_fx=None,
+        ),
     )
 
     overlay_layers = MagicMock()
@@ -895,9 +918,10 @@ def test_render_calls_overlay_compositing_when_enabled(
 
     render_mod.render(project)
 
-    expected_cfg = resolve_overlay_config(
+    expected_opening, expected_closing = resolve_overlay_configs(
         mock_load_config.return_value, runtime.seed.session
     )
+    expected_cfg = expected_opening
     mock_build_layers.assert_called_once_with(expected_cfg)
     assert mock_composite.call_count == frame_count
     for call in mock_composite.call_args_list:
@@ -939,7 +963,15 @@ def test_render_skips_overlay_when_disabled(
     base_cfg = load_config(project / VIZ_CONFIG_FILENAME, repo_root())
     fps = base_cfg.render.fps if base_cfg.render is not None else 10
     mock_load_config.return_value = replace(
-        base_cfg, render=RenderConfig(fps=fps, overlay=overlay_cfg, post_fx=None)
+        base_cfg,
+        render=RenderConfig(
+            fps=fps,
+            overlays=_overlays_cfg(
+                opening=overlay_cfg,
+                closing=_closing_overlay_cfg(enabled=False),
+            ),
+            post_fx=None,
+        ),
     )
 
     width, height = 4, 4
@@ -967,7 +999,10 @@ def test_render_skips_overlay_when_disabled(
     mock_composite.assert_not_called()
 
 
-@patch("cleave.viz.frame_finish.live_overlay_alpha", return_value=1.0)
+@patch(
+    "cleave.viz.frame_finish.live_overlay_alpha",
+    side_effect=lambda *a, enabled=True, solo=False, **k: (1.0 if enabled else 0.0),
+)
 @patch("cleave.viz.frame_finish.composite_render_overlay_with_alpha")
 @patch.object(render_mod, "pygame")
 @patch.object(render_mod, "shutil")
@@ -1020,7 +1055,8 @@ def test_render_composites_default_overlay_when_render_absent(
 
     render_mod.render(project, start_sec=start_sec, end_sec=end_sec)
 
-    assert mock_composite.call_count == frame_count
+    # Default overlays enable both opening and closing cards.
+    assert mock_composite.call_count == frame_count * 2
 
 
 @patch.object(render_mod, "pygame")
@@ -1206,7 +1242,10 @@ def test_render_present_content_every_frame_at_upscale_one(
     assert compositor.present_content.call_count == math.ceil(duration_sec * fps)
 
 
-@patch("cleave.viz.frame_finish.live_overlay_alpha", return_value=1.0)
+@patch(
+    "cleave.viz.frame_finish.live_overlay_alpha",
+    side_effect=lambda *a, enabled=True, solo=False, **k: (1.0 if enabled else 0.0),
+)
 @patch("cleave.viz.frame_finish.build_overlay_layers")
 @patch.object(render_mod, "pygame")
 @patch.object(render_mod, "shutil")
@@ -1239,12 +1278,19 @@ def test_render_upscale_overlay_frame_order_uses_content_dims(
     duration_sec = 2.0
     frame_count = math.ceil(duration_sec * fps)
 
-    overlay_cfg = _overlay_cfg(start_delay=0.0, display_time=30.0)
+    overlay_cfg = _overlay_cfg(appear_at=0.0, display_time=30.0)
     base_cfg = load_config(project / VIZ_CONFIG_FILENAME, repo_root())
     mock_load_config.return_value = replace(
         base_cfg,
         render=RenderConfig(
-            fps=fps, width=render_w, height=render_h, overlay=overlay_cfg, post_fx=None
+            fps=fps,
+            width=render_w,
+            height=render_h,
+            overlays=_overlays_cfg(
+                opening=overlay_cfg,
+                closing=_closing_overlay_cfg(enabled=False),
+            ),
+            post_fx=None,
         ),
     )
     overlay_layers = MagicMock()

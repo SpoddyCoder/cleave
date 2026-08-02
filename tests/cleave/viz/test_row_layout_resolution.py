@@ -6,7 +6,8 @@ import pytest
 
 from cleave.viz.tuning_view_state import (
     HighlightRolloffBlock,
-    RenderOverlayBlock,
+    RenderOverlayCardBlock,
+    RenderOverlaysBlock,
     RenderPostFxBlock,
     SettingsBlock,
     TrackBlock,
@@ -185,21 +186,26 @@ def test_resolve_navigable_track_effect_collapsed_effects() -> None:
 
 
 def test_resolve_navigable_render_overlay_sub_row_collapsed() -> None:
-    state = _minimal_view_state(render_overlay=RenderOverlayBlock(expanded=False))
-    opacity = RowDescriptor(RowKind.RENDER_OVERLAY_OPACITY)
+    state = _minimal_view_state(render_overlays=RenderOverlaysBlock(expanded=False))
+    opacity = RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_OPACITY)
     assert opacity not in state.layout.rows
     assert state.layout.resolve_navigable(opacity, state) == RowDescriptor(
-        RowKind.RENDER_OVERLAY_HEADER
+        RowKind.RENDER_OVERLAYS_HEADER
     )
 
 
 def test_resolve_navigable_render_overlay_title_nested_collapsed() -> None:
     state = _minimal_view_state(
-        render_overlay=RenderOverlayBlock(expanded=True, title_expanded=False),
+        render_overlays=RenderOverlaysBlock(
+            expanded=True,
+            opening_card=RenderOverlayCardBlock(
+                expanded=True, title_expanded=False
+            ),
+        ),
     )
-    font = RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_FONT)
+    font = RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT)
     assert font not in state.layout.rows
-    title_header = RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_HEADER)
+    title_header = RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER)
     assert state.layout.resolve_navigable(font, state) == title_header
 
 
@@ -243,14 +249,17 @@ def test_section_header_descriptor_mappings() -> None:
         RowKind.SETTINGS_HEADER
     )
     assert section_header_descriptor(
-        RowDescriptor(RowKind.RENDER_OVERLAY_OPACITY)
-    ) == RowDescriptor(RowKind.RENDER_OVERLAY_HEADER)
+        RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_OPACITY)
+    ) == RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_CARD_HEADER)
     assert section_header_descriptor(
-        RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_FONT)
-    ) == RowDescriptor(RowKind.RENDER_OVERLAY_TITLE_HEADER)
+        RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_CARD_HEADER)
+    ) == RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
     assert section_header_descriptor(
-        RowDescriptor(RowKind.RENDER_OVERLAY_BODY_FONT)
-    ) == RowDescriptor(RowKind.RENDER_OVERLAY_BODY_HEADER)
+        RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT)
+    ) == RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER)
+    assert section_header_descriptor(
+        RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_BODY_FONT)
+    ) == RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_BODY_HEADER)
     assert section_header_descriptor(RowDescriptor(RowKind.RENDER_POST_FX_FADE_OUT)) == RowDescriptor(
         RowKind.RENDER_POST_FX_HEADER
     )

@@ -27,34 +27,63 @@ render:
       variant: vibrance
       amount_pct: 25
 
-  overlay:
-    enabled: true
-    animation:
-      type: fade
-      slide-direction: left
-      start_delay: 5
-      display_time: 30
-    position: bottom-left
-    title:
-      content: |
-        Your Track Title
-      font-size: 28
-      font-colour: "#f0f4ff"
-      background-colour: "#5b6fd6"
-      margin-bottom: 12
-    body:
-      content: |
-        Artist Name  ·  Album  ·  2026
-      font-size: 16
-      colour: "#b8c4e0"
-    background:
-      margin: 36
-      padding: 24
-      colour: "#0c1020"
-      opacity: 0.85
-      border:
-        colour: "#5b6fd6"
-        width: 2
+  overlays:
+    opening-card:
+      enabled: true
+      animation:
+        type: fade
+        slide-direction: left
+        appear-at: 5
+        display-time: 30
+      position: bottom-left
+      title:
+        content: |
+          Your Track Title
+        font-size: 28
+        font-colour: "#f0f4ff"
+        background-colour: "#5b6fd6"
+        margin-bottom: 12
+      body:
+        content: |
+          Artist Name  ·  Album  ·  2026
+        font-size: 16
+        colour: "#b8c4e0"
+      background:
+        margin: 36
+        padding: 24
+        colour: "#0c1020"
+        opacity: 0.85
+        border:
+          colour: "#5b6fd6"
+          width: 2
+    closing-card:
+      enabled: true
+      animation:
+        type: fade
+        slide-direction: left
+        disappear-at: 0
+        display-time: 30
+      position: bottom-left
+      title:
+        content: |
+          Your Track Title
+        font-size: 28
+        font-colour: "#f0f4ff"
+        background-colour: "#5b6fd6"
+        margin-bottom: 12
+      body:
+        content: |
+          Artist Name  ·  Album  ·  2026
+        font-size: 16
+        colour: "#b8c4e0"
+      background:
+        margin: 36
+        padding: 24
+        colour: "#0c1020"
+        opacity: 0.85
+        border:
+          colour: "#5b6fd6"
+          width: 2
 
 layer_z_order:
   - layer_1

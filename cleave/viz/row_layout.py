@@ -87,9 +87,16 @@ def resolve_navigable_descriptor(
 ) -> RowDescriptor:
     if desc in navigable_descriptors:
         return desc
-    header = section_header_descriptor(desc)
-    if header in navigable_descriptors:
-        return header
+    seen: set[RowDescriptor] = set()
+    current = desc
+    while current not in seen:
+        seen.add(current)
+        header = section_header_descriptor(current)
+        if header == current:
+            break
+        if header in navigable_descriptors:
+            return header
+        current = header
     return RowDescriptor(RowKind.TRANSPORT)
 
 

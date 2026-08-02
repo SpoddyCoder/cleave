@@ -16,7 +16,9 @@ from cleave.config import (
     RenderOverlayBackgroundConfig,
     RenderOverlayBorderConfig,
     RenderConfig,
-    RenderOverlayConfig,
+    RenderOverlayCardConfig,
+    RenderOverlayClosingAnimationConfig,
+    RenderOverlaysConfig,
     RenderOverlayTextBlockConfig,
     RenderPostFxConfig,
     EditorConfig,
@@ -53,8 +55,11 @@ from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.session import (
     LayerRuntime,
     RenderOverlayAnimationRuntime,
-    RenderOverlayRuntime,
+    RenderOverlayCardRuntime,
+    RenderOverlayClosingAnimationRuntime,
+    RenderOverlaysRuntime,
     TuningSession,
+    default_render_overlay_card_runtime,
     session_from_cfg,
 )
 
@@ -659,11 +664,32 @@ def test_write_session_snapshot_omits_all_zero_effects() -> None:
         assert "effects" not in data["layers"]["layer_3"]
 
 
-def _render_overlay_cfg() -> RenderOverlayConfig:
-    return RenderOverlayConfig(
+def _render_overlay_card_cfg(
+    *,
+    closing: bool = False,
+    content_title: str = "My Title",
+    content_body: str = "Line one\nLine two",
+) -> RenderOverlayCardConfig:
+    if closing:
+        animation: (
+            RenderOverlayAnimationConfig | RenderOverlayClosingAnimationConfig
+        ) = RenderOverlayClosingAnimationConfig(
+            type="fade",
+            slide_direction="left",
+            disappear_at=0.0,
+            display_time=30.0,
+        )
+    else:
+        animation = RenderOverlayAnimationConfig(
+            type="fade",
+            slide_direction="left",
+            appear_at=10.0,
+            display_time=30.0,
+        )
+    return RenderOverlayCardConfig(
         enabled=True,
         title=RenderOverlayTextBlockConfig(
-            content="My Title",
+            content=content_title,
             font="monospace",
             font_size=24,
             colour=(255, 255, 255),
@@ -671,18 +697,13 @@ def _render_overlay_cfg() -> RenderOverlayConfig:
             margin_bottom=10,
         ),
         body=RenderOverlayTextBlockConfig(
-            content="Line one\nLine two",
+            content=content_body,
             font="monospace",
             font_size=18,
             colour=(255, 255, 255),
             background_colour=(51, 51, 255),
         ),
-        animation=RenderOverlayAnimationConfig(
-            type="fade",
-            slide_direction="left",
-            start_delay=10.0,
-            display_time=30.0,
-        ),
+        animation=animation,
         position="bottom-left",
         background=RenderOverlayBackgroundConfig(
             margin=10,
@@ -694,6 +715,48 @@ def _render_overlay_cfg() -> RenderOverlayConfig:
     )
 
 
+def _render_overlays_cfg() -> RenderOverlaysConfig:
+    return RenderOverlaysConfig(
+        opening_card=_render_overlay_card_cfg(),
+        closing_card=_render_overlay_card_cfg(
+            closing=True, content_title="Closing", content_body="End"
+        ),
+    )
+
+
+def _opening_card_yaml() -> dict:
+    return {
+        "enabled": True,
+        "title": {
+            "content": "My Title",
+            "font-size": 24,
+            "font-colour": "#ffffff",
+            "background-colour": "#3333ff",
+            "margin-bottom": 10,
+        },
+        "body": {
+            "content": "Line one\nLine two\n",
+            "font-size": 18,
+            "colour": "#ffffff",
+            "background-colour": "#3333ff",
+        },
+        "animation": {
+            "type": "fade",
+            "slide-direction": "left",
+            "appear-at": 10,
+            "display-time": 30,
+        },
+        "position": "bottom-left",
+        "background": {
+            "margin": 10,
+            "padding": 10,
+            "colour": "#223344",
+            "opacity": 1.0,
+            "border": {"colour": "#223344", "width": 2},
+        },
+    }
+
+
 def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path]:
     root = tmp_path
     preset_root = root / "presets"
@@ -703,7 +766,13 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
     config_path.write_text(
         yaml.safe_dump(
             {
-                "layers": {slot: {**template_layer_entry(slot), "preset": f"presets/{TEST_LAYER_STEMS[slot]}/anchor.milk"} for slot in DEFAULT_LAYER_SLOTS},
+                "layers": {
+                    slot: {
+                        **template_layer_entry(slot),
+                        "preset": f"presets/{TEST_LAYER_STEMS[slot]}/anchor.milk",
+                    }
+                    for slot in DEFAULT_LAYER_SLOTS
+                },
                 "render": {
                     "fps": 30,
                     "post_fx": {
@@ -711,34 +780,34 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
                         "fade_in": 30,
                         "fade_out": 4,
                     },
-                    "overlay": {
-                        "enabled": True,
-                        "title": {
-                            "content": "My Title",
-                            "font-size": 24,
-                            "font-colour": "#ffffff",
-                            "background-colour": "#3333ff",
-                            "margin-bottom": 10,
-                        },
-                        "body": {
-                            "content": "Line one\nLine two\n",
-                            "font-size": 18,
-                            "colour": "#ffffff",
-                            "background-colour": "#3333ff",
-                        },
-                        "animation": {
-                            "type": "fade",
-                            "slide-direction": "left",
-                            "start_delay": 10,
-                            "display_time": 30,
-                        },
-                        "position": "bottom-left",
-                        "background": {
-                            "margin": 10,
-                            "padding": 10,
-                            "colour": "#223344",
-                            "opacity": 1.0,
-                            "border": {"colour": "#223344", "width": 2},
+                    "overlays": {
+                        "opening-card": _opening_card_yaml(),
+                        "closing-card": {
+                            "enabled": True,
+                            "title": {
+                                "content": "Closing",
+                                "font-size": 24,
+                                "font-colour": "#ffffff",
+                            },
+                            "body": {
+                                "content": "End\n",
+                                "font-size": 18,
+                                "colour": "#ffffff",
+                            },
+                            "animation": {
+                                "type": "fade",
+                                "slide-direction": "left",
+                                "disappear-at": 0,
+                                "display-time": 30,
+                            },
+                            "position": "bottom-left",
+                            "background": {
+                                "margin": 10,
+                                "padding": 10,
+                                "colour": "#223344",
+                                "opacity": 1.0,
+                                "border": {"colour": "#223344", "width": 2},
+                            },
                         },
                     },
                 },
@@ -760,8 +829,28 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
         config_path=config_path,
         user_config_path=root / "user-config.yaml",
         render=RenderConfig(
-            overlay=_render_overlay_cfg(),
+            overlays=_render_overlays_cfg(),
             post_fx=default_render_post_fx_config(enabled=True, fade_in=30.0, fade_out=4.0),
+        ),
+    )
+    opening = RenderOverlayCardRuntime(
+        enabled=True,
+        expanded=False,
+        position="top-right",
+        title_expanded=False,
+        body_expanded=False,
+        title_font_size=14,
+        title_font="dejavusans",
+        title_margin_bottom=6,
+        body_font_size=18,
+        body_font="ubuntumono",
+        opacity_pct=75,
+        border_width=4,
+        animation=RenderOverlayAnimationRuntime(
+            type="fade",
+            slide_direction="left",
+            appear_at=20.0,
+            display_time=40.0,
         ),
     )
     session = TuningSession(
@@ -772,25 +861,10 @@ def _snapshot_fixture(tmp_path: Path) -> tuple[CleaveConfig, TuningSession, Path
             fade_in=12.0,
             fade_out=3.0,
         ),
-        render_overlay=RenderOverlayRuntime(
-            enabled=True,
+        render_overlays=RenderOverlaysRuntime(
             expanded=False,
-            position="top-right",
-            title_expanded=False,
-            body_expanded=False,
-            title_font_size=14,
-            title_font="dejavusans",
-            title_margin_bottom=6,
-            body_font_size=18,
-            body_font="ubuntumono",
-            opacity_pct=75,
-            border_width=4,
-            animation=RenderOverlayAnimationRuntime(
-                type="fade",
-                slide_direction="left",
-                start_delay=20.0,
-                display_time=40.0,
-            ),
+            opening_card=opening,
+            closing_card=default_render_overlay_card_runtime(closing=True),
         ),
         layers={
             slot: LayerRuntime(
@@ -811,51 +885,58 @@ def test_write_session_snapshot_persists_render_overlay(tmp_path: Path) -> None:
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
     assert data["render"]["width"] == DEFAULT_RENDER_WIDTH
     assert data["render"]["height"] == DEFAULT_RENDER_HEIGHT
-    overlay = data["render"]["overlay"]
-    assert overlay["enabled"] is True
-    assert overlay["title"]["content"] == "My Title"
-    assert overlay["body"]["content"] == "Line one\nLine two\n"
-    assert overlay["animation"]["start_delay"] == 20.0
-    assert overlay["animation"]["display_time"] == 40.0
-    assert overlay["position"] == "top-right"
-    assert overlay["title"]["font-size"] == 14
-    assert overlay["title"]["font"] == "dejavusans"
-    assert overlay["title"]["margin-bottom"] == 6
-    assert overlay["body"]["font-size"] == 18
-    assert overlay["body"]["font"] == "ubuntumono"
-    assert overlay["title"]["font-colour"] == "#ffffff"
-    assert overlay["body"]["colour"] == "#ffffff"
-    assert overlay["background"]["margin"] == 10
-    assert overlay["background"]["padding"] == 10
-    assert overlay["background"]["colour"] == "#223344"
-    assert overlay["background"]["opacity"] == 0.75
-    assert overlay["background"]["border"]["colour"] == "#223344"
-    assert overlay["background"]["border"]["width"] == 4
+    overlays = data["render"]["overlays"]
+    opening = overlays["opening-card"]
+    assert "overlay" not in data["render"]
+    assert opening["enabled"] is True
+    assert opening["title"]["content"] == "My Title"
+    assert opening["body"]["content"] == "Line one\nLine two\n"
+    assert opening["animation"]["appear-at"] == 20.0
+    assert opening["animation"]["display-time"] == 40.0
+    assert opening["position"] == "top-right"
+    assert opening["title"]["font-size"] == 14
+    assert opening["title"]["font"] == "dejavusans"
+    assert opening["title"]["margin-bottom"] == 6
+    assert opening["body"]["font-size"] == 18
+    assert opening["body"]["font"] == "ubuntumono"
+    assert opening["title"]["font-colour"] == "#ffffff"
+    assert opening["body"]["colour"] == "#ffffff"
+    assert opening["background"]["margin"] == 10
+    assert opening["background"]["padding"] == 10
+    assert opening["background"]["colour"] == "#223344"
+    assert opening["background"]["opacity"] == 0.75
+    assert opening["background"]["border"]["colour"] == "#223344"
+    assert opening["background"]["border"]["width"] == 4
+    assert "closing-card" in overlays
 
     round_trip = parse_render_section(data)
     assert round_trip is not None
-    assert round_trip.overlay is not None
-    assert round_trip.overlay.enabled is True
-    assert round_trip.overlay.animation.start_delay == 20.0
-    assert round_trip.overlay.title.font_size == 14
-    assert round_trip.overlay.title.font == "dejavusans"
-    assert round_trip.overlay.title.margin_bottom == 6
-    assert round_trip.overlay.body.font_size == 18
-    assert round_trip.overlay.body.font == "ubuntumono"
-    assert round_trip.overlay.background.opacity == 0.75
-    assert round_trip.overlay.background.border.width == 4
+    assert round_trip.overlays is not None
+    assert round_trip.overlays.opening_card.enabled is True
+    assert round_trip.overlays.opening_card.animation.appear_at == 20.0
+    assert round_trip.overlays.opening_card.title.font_size == 14
+    assert round_trip.overlays.opening_card.title.font == "dejavusans"
+    assert round_trip.overlays.opening_card.title.margin_bottom == 6
+    assert round_trip.overlays.opening_card.body.font_size == 18
+    assert round_trip.overlays.opening_card.body.font == "ubuntumono"
+    assert round_trip.overlays.opening_card.background.opacity == 0.75
+    assert round_trip.overlays.opening_card.background.border.width == 4
 
 
 def test_write_session_snapshot_strips_legacy_overlay_font(tmp_path: Path) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
     config_path = tmp_path / "cleave.config.yaml"
     data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    data["render"]["overlay"]["font"] = {"size": 10, "colour": "#ffaa00"}
+    data["render"]["overlays"]["opening-card"]["font"] = {
+        "size": 10,
+        "colour": "#ffaa00",
+    }
     config_path.write_text(yaml.safe_dump(data), encoding="utf-8")
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     snapshot = yaml.safe_load(out_path.read_text(encoding="utf-8"))
-    assert "font" not in snapshot["render"]["overlay"]
+    assert "font" not in snapshot["render"]["overlays"]["opening-card"]
+    assert "overlay" not in snapshot["render"]
 
 
 def test_write_session_snapshot_persists_render_post_fx(tmp_path: Path) -> None:
@@ -915,12 +996,12 @@ def test_write_session_snapshot_render_overlay_solo_does_not_affect_enabled(
     tmp_path: Path,
 ) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
-    session.render_overlay.enabled = False
+    session.render_overlays.opening_card.enabled = False
     session.render_overlay_solo = True
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
-    assert data["render"]["overlay"]["enabled"] is False
+    assert data["render"]["overlays"]["opening-card"]["enabled"] is False
     assert "render_overlay_solo" not in yaml.safe_dump(data)
 
 
@@ -937,10 +1018,10 @@ def test_write_session_snapshot_render_overlay_without_cfg_render(tmp_path: Path
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
-    overlay = data["render"]["overlay"]
-    assert overlay["title"]["content"] == "Cleave Final Render"
-    assert overlay["position"] == "top-right"
-    assert overlay["title"]["font-size"] == 14
+    opening = data["render"]["overlays"]["opening-card"]
+    assert opening["title"]["content"] == "Cleave Final Render"
+    assert opening["position"] == "top-right"
+    assert opening["title"]["font-size"] == 14
 
 
 def test_write_session_snapshot_persists_timeline_at_bottom(tmp_path: Path) -> None:
@@ -1264,32 +1345,61 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
                         "fade_in": 30,
                         "fade_out": 4,
                     },
-                    "overlay": {
-                        "enabled": True,
-                        "animation": {
-                            "type": "fade",
-                            "slide-direction": "left",
-                            "start_delay": 10,
-                            "display_time": 30,
+                    "overlays": {
+                        "opening-card": {
+                            "enabled": True,
+                            "animation": {
+                                "type": "fade",
+                                "slide-direction": "left",
+                                "appear-at": 10,
+                                "display-time": 30,
+                            },
+                            "position": "bottom-left",
+                            "title": {
+                                "content": "Round Trip Title",
+                                "font-size": 24,
+                                "font-colour": "#ffffff",
+                                "margin-bottom": 10,
+                            },
+                            "body": {
+                                "content": "Round trip body",
+                                "font-size": 18,
+                                "colour": "#ffffff",
+                            },
+                            "background": {
+                                "margin": 40,
+                                "padding": 20,
+                                "colour": "#000000",
+                                "opacity": 0.7,
+                                "border": {"colour": "#ffffff", "width": 4},
+                            },
                         },
-                        "position": "bottom-left",
-                        "title": {
-                            "content": "Round Trip Title",
-                            "font-size": 24,
-                            "font-colour": "#ffffff",
-                            "margin-bottom": 10,
-                        },
-                        "body": {
-                            "content": "Round trip body",
-                            "font-size": 18,
-                            "colour": "#ffffff",
-                        },
-                        "background": {
-                            "margin": 40,
-                            "padding": 20,
-                            "colour": "#000000",
-                            "opacity": 0.7,
-                            "border": {"colour": "#ffffff", "width": 4},
+                        "closing-card": {
+                            "enabled": True,
+                            "animation": {
+                                "type": "fade",
+                                "slide-direction": "left",
+                                "disappear-at": 0,
+                                "display-time": 30,
+                            },
+                            "position": "bottom-left",
+                            "title": {
+                                "content": "Closing",
+                                "font-size": 24,
+                                "font-colour": "#ffffff",
+                            },
+                            "body": {
+                                "content": "End",
+                                "font-size": 18,
+                                "colour": "#ffffff",
+                            },
+                            "background": {
+                                "margin": 40,
+                                "padding": 20,
+                                "colour": "#000000",
+                                "opacity": 0.7,
+                                "border": {"colour": "#ffffff", "width": 4},
+                            },
                         },
                     },
                 },
@@ -1322,10 +1432,10 @@ def test_session_snapshot_full_round_trip(tmp_path: Path) -> None:
     session.layers["layer_2"].beat_sensitivity = 2.5
     session.layers["layer_3"].enabled = True
     session.layers["layer_3"].effects = {"flash": {"rms": 15}}
-    session.render_overlay.animation.display_time = 55.0
-    session.render_overlay.animation.start_delay = 8.0
-    session.render_overlay.position = "top-right"
-    session.render_overlay.opacity_pct = 80
+    session.render_overlays.opening_card.animation.display_time = 55.0
+    session.render_overlays.opening_card.animation.appear_at = 8.0
+    session.render_overlays.opening_card.position = "top-right"
+    session.render_overlays.opening_card.opacity_pct = 80
     session.render_post_fx.fade_in = 18.0
     session.render_post_fx.fade_out = 2.0
     session.timeline.lanes = {
