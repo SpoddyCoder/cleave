@@ -165,14 +165,6 @@ class TuningControls:
             layer_bindings,
             curation_index,
         )
-        self._timeline_presets = TimelinePresetController(
-            session,
-            self._modal_host,
-            beat_times,
-            bar_times,
-            signals=signals,
-            on_notification=self.show_notification,
-        )
         layers_by_slot = (
             layer_manager.layers_by_slot if layer_manager is not None else {}
         )
@@ -187,6 +179,15 @@ class TuningControls:
             layers_by_slot,
             preset_root=preset_root,
             on_preset_switching_change=on_switching,
+        )
+        self._timeline_presets = TimelinePresetController(
+            session,
+            self._modal_host,
+            beat_times,
+            bar_times,
+            signals=signals,
+            on_notification=self.show_notification,
+            on_reshuffle=self._preset_seed.reroll_all,
         )
         self._timeline_phase = TimelinePhaseController(
             session,

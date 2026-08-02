@@ -84,6 +84,27 @@ def test_confirm_changes_salt_and_rebuilds_projectm() -> None:
     assert switched == ["layer_1"]
 
 
+def test_reroll_all_updates_every_layer_salt() -> None:
+    session = _session(
+        ("layer_1", _runtime(mode="projectm", shuffle=True, salt=1)),
+        ("layer_2", _runtime(mode="none", shuffle=False, salt=2)),
+        ("layer_3", _runtime(mode="timeline", shuffle=True, salt=3)),
+    )
+    switched: list[str] = []
+    controller = PresetSeedController(
+        session,
+        ModalHost(),
+        {},
+        preset_root=Path("/tmp/presets"),
+        on_preset_switching_change=switched.append,
+    )
+    controller.reroll_all()
+    assert session.layers["layer_1"].preset_switching_shuffle_salt != 1
+    assert session.layers["layer_2"].preset_switching_shuffle_salt != 2
+    assert session.layers["layer_3"].preset_switching_shuffle_salt != 3
+    assert switched == ["layer_1"]
+
+
 @patch("cleave.viz.preset_seed_controls.rebuild_timeline_preset_rotation_preserving_count")
 def test_confirm_timeline_preserves_switch_count(
     mock_rebuild: MagicMock,

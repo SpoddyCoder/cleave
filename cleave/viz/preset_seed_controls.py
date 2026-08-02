@@ -14,7 +14,7 @@ from cleave.viz.session import LayerRuntime, TuningSession
 _PROMPT = "Generate a new seed?"
 
 
-def _new_salt(current: int) -> int:
+def new_shuffle_salt(current: int) -> int:
     while True:
         candidate = random.getrandbits(31)
         if candidate != current:
@@ -51,13 +51,28 @@ class PresetSeedController:
             cancel_label="Cancel",
         )
 
+    def reroll_all(self) -> None:
+        """Roll a new shuffle salt for every layer and rebuild active rotations."""
+        for slot in self.session.layer_z_order:
+            runtime = self.session.layers.get(slot)
+            if runtime is None:
+                continue
+            runtime.preset_switching_shuffle_salt = new_shuffle_salt(
+                runtime.preset_switching_shuffle_salt
+            )
+            if not runtime.preset_switching_shuffle:
+                continue
+            if runtime.preset_switching not in ("projectm", "timeline"):
+                continue
+            self._rebuild(slot, runtime)
+
     def _confirm(self, slot: str) -> None:
         runtime = self.session.layers.get(slot)
         if runtime is None or not runtime.preset_switching_shuffle:
             return
         if runtime.preset_switching not in ("projectm", "timeline"):
             return
-        runtime.preset_switching_shuffle_salt = _new_salt(
+        runtime.preset_switching_shuffle_salt = new_shuffle_salt(
             runtime.preset_switching_shuffle_salt
         )
         self._rebuild(slot, runtime)

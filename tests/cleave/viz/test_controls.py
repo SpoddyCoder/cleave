@@ -1649,6 +1649,7 @@ def test_timeline_presets_enter_opens_yes_cancel_modal() -> None:
         ModalLabeledLine("cue snap", "none"),
         ModalLabeledLine("song marker snap", "none"),
         ModalLabeledLine("timeline cuts", "by marker"),
+        ModalLabeledLine("reshuffle", "off"),
         ModalLabeledLine("conductor", "on"),
     )
 
@@ -1705,6 +1706,22 @@ def test_timeline_preset_timeline_cuts_row_cycles() -> None:
     assert controls.session.timeline.timeline_preset_timeline_cuts == "all soft"
     view = controls.build_view_state(paused=False)
     assert "all soft" in _row_text(view, row)
+
+
+def test_timeline_preset_reshuffle_row_cycles() -> None:
+    controls = _make_controls(timeline_enabled=True)
+    controls.session.timeline.panel_open = True
+    controls.session.timeline.timeline_presets_expanded = True
+    view = controls.build_view_state(paused=False)
+    row = view.layout.find_by_kind(RowKind.TIMELINE_PRESET_RESHUFFLE)
+    controls.focus_descriptor = _desc(view, row)
+    assert controls.session.timeline.timeline_preset_reshuffle is False
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert controls.session.timeline.timeline_preset_reshuffle is True
+    assert controls.handle_keydown(_keydown(pygame.K_LEFT)) is True
+    assert controls.session.timeline.timeline_preset_reshuffle is False
+    view = controls.build_view_state(paused=False)
+    assert "off" in _row_text(view, row)
 
 
 def test_timeline_presets_cuts_none_keeps_cut_none() -> None:
@@ -1995,6 +2012,60 @@ def test_timeline_presets_conductor_passes_signals_to_builder() -> None:
     }
     view = controls.build_view_state(paused=False)
     assert view.notification_message == "Applied Breathing timeline preset"
+
+
+def test_timeline_presets_reshuffle_on_rerolls_layer_salts() -> None:
+    beats = tuple(float(i) for i in range(241))
+    bars = tuple(float(i) for i in range(0, 241, 4))
+    controls = _make_controls(
+        ("layer_1", "layer_2"),
+        beat_times=beats,
+        bar_times=bars,
+    )
+    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].preset_switching_shuffle = True
+    controls.session.layers["layer_1"].preset_switching_shuffle_salt = 11
+    controls.session.layers["layer_2"].preset_switching_shuffle_salt = 22
+    controls.session.timeline.timeline_preset_kind = "breathing"
+    controls.session.timeline.timeline_preset_reshuffle = True
+
+    def _fake_builder(slots, duration_sec, rng, **kwargs):
+        return {slot: TimelineLane(baseline=1.0, cues=[]) for slot in slots}
+
+    with patch.dict(
+        "cleave.viz.timeline_preset_controls._KIND_BUILDERS",
+        {"breathing": (_fake_builder, "Applied Breathing timeline preset")},
+    ):
+        _focus_timeline_presets(controls)
+        _confirm_timeline_preset(controls)
+    assert controls.session.layers["layer_1"].preset_switching_shuffle_salt != 11
+    assert controls.session.layers["layer_2"].preset_switching_shuffle_salt != 22
+
+
+def test_timeline_presets_reshuffle_off_keeps_layer_salts() -> None:
+    beats = tuple(float(i) for i in range(241))
+    bars = tuple(float(i) for i in range(0, 241, 4))
+    controls = _make_controls(
+        ("layer_1", "layer_2"),
+        beat_times=beats,
+        bar_times=bars,
+    )
+    controls.session.layers["layer_1"].preset_switching_shuffle_salt = 11
+    controls.session.layers["layer_2"].preset_switching_shuffle_salt = 22
+    controls.session.timeline.timeline_preset_kind = "breathing"
+    controls.session.timeline.timeline_preset_reshuffle = False
+
+    def _fake_builder(slots, duration_sec, rng, **kwargs):
+        return {slot: TimelineLane(baseline=1.0, cues=[]) for slot in slots}
+
+    with patch.dict(
+        "cleave.viz.timeline_preset_controls._KIND_BUILDERS",
+        {"breathing": (_fake_builder, "Applied Breathing timeline preset")},
+    ):
+        _focus_timeline_presets(controls)
+        _confirm_timeline_preset(controls)
+    assert controls.session.layers["layer_1"].preset_switching_shuffle_salt == 11
+    assert controls.session.layers["layer_2"].preset_switching_shuffle_salt == 22
 
 
 def test_timeline_presets_conductor_skips_without_signals() -> None:
@@ -3036,6 +3107,7 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
         RowKind.TIMELINE_PRESET_CUE_SNAP,
         RowKind.TIMELINE_PRESET_SONG_MARKER_SNAP,
         RowKind.TIMELINE_PRESET_TIMELINE_CUTS,
+        RowKind.TIMELINE_PRESET_RESHUFFLE,
         RowKind.TIMELINE_PRESET_CONDUCTOR,
         RowKind.TIMELINE_PRESETS,
         RowKind.TIMELINE_RESET,

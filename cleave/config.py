@@ -127,6 +127,7 @@ from cleave.timeline_presets.density import (
     DEFAULT_TIMELINE_PRESET_DENSITY,
     TimelinePresetDensity,
 )
+from cleave.timeline_presets.reshuffle import DEFAULT_TIMELINE_PRESET_RESHUFFLE
 from cleave.timeline_presets.song_marker_snap import (
     DEFAULT_TIMELINE_PRESET_SONG_MARKER_SNAP,
     TimelinePresetSongMarkerSnap,
@@ -315,6 +316,7 @@ class TimelinePresetConfig:
         DEFAULT_TIMELINE_PRESET_SONG_MARKER_SNAP
     )
     timeline_cuts: TimelinePresetTimelineCuts = DEFAULT_TIMELINE_PRESET_TIMELINE_CUTS
+    reshuffle: bool = DEFAULT_TIMELINE_PRESET_RESHUFFLE
     conductor: bool = DEFAULT_TIMELINE_PRESET_CONDUCTOR
 
 

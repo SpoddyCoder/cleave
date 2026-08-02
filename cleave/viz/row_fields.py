@@ -40,6 +40,10 @@ from cleave.timeline_presets.conductor import (
     cycle_timeline_preset_conductor,
     timeline_preset_conductor_display,
 )
+from cleave.timeline_presets.reshuffle import (
+    cycle_timeline_preset_reshuffle,
+    timeline_preset_reshuffle_display,
+)
 from cleave.timeline_presets.crescendo import (
     cycle_timeline_preset_crescendo,
     timeline_preset_crescendo_display,
@@ -331,6 +335,28 @@ def _apply_timeline_preset_timeline_cuts(
     tl = controls.session.timeline
     tl.timeline_preset_timeline_cuts = cycle_timeline_preset_timeline_cuts(
         tl.timeline_preset_timeline_cuts,
+        forward=forward,
+    )
+
+
+def _format_timeline_preset_reshuffle(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return timeline_preset_reshuffle_display(
+        state.render_timeline.timeline_preset_reshuffle
+    )
+
+
+def _apply_timeline_preset_reshuffle(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    tl = controls.session.timeline
+    tl.timeline_preset_reshuffle = cycle_timeline_preset_reshuffle(
+        tl.timeline_preset_reshuffle,
         forward=forward,
     )
 
@@ -2143,6 +2169,12 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_timeline_preset_timeline_cuts,
         apply_horizontal=_apply_timeline_preset_timeline_cuts,
+    ),
+    RowKind.TIMELINE_PRESET_RESHUFFLE: RowFieldDef(
+        panel_label="reshuffle",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_timeline_preset_reshuffle,
+        apply_horizontal=_apply_timeline_preset_reshuffle,
     ),
     RowKind.TIMELINE_PRESET_CONDUCTOR: RowFieldDef(
         panel_label="conductor",
