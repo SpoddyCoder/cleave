@@ -244,6 +244,7 @@ class TimelineFadeGroup:
     enabled: bool = False
     fade_in: float = 2.0
     fade_out: float = 2.0
+    crossfade: bool = False
 
 
 def matches_song_marker(
@@ -297,10 +298,13 @@ def lane_level_breakpoints(
     """Build a monotone ``(t, level)`` polyline for the lane envelope.
 
     For a transition at ``t`` from level ``a`` to ``b``, fade durations act as
-    slopes: a full-scale move takes the configured duration. Rise completes at
-    the cue time; fall starts at the cue time. Cut type ``none`` / unset,
-    disabled groups, or zero duration collapse to a hard step. Each cue's cut
-    controls its own edge (rise or fall). Overlapping rise starts clamp forward.
+    slopes: a full-scale move takes the configured duration. By default, rise
+    completes at the cue time and fall starts at the cue time. With
+    ``crossfade`` enabled on the fade group, rise and fall ramps are centered on
+    the cue time (``t - ramp/2`` through ``t + ramp/2``). Cut type ``none`` /
+    unset, disabled groups, or zero duration collapse to a hard step. Each cue's
+    cut controls its own edge (rise or fall). Overlapping rise starts clamp
+    forward.
     """
     if duration_sec <= 0.0:
         return []
@@ -333,6 +337,18 @@ def lane_level_breakpoints(
             if ramp <= 0.0:
                 _append_breakpoint(breakpoints, t, a)
                 _append_breakpoint(breakpoints, t, b)
+            elif group is not None and group.crossfade:
+                half = ramp / 2.0
+                t_start = t - half
+                t_end = t + half
+                if breakpoints and t_start < breakpoints[-1][0]:
+                    t_start = breakpoints[-1][0]
+                if t_start >= t_end:
+                    _append_breakpoint(breakpoints, t, a)
+                    _append_breakpoint(breakpoints, t, b)
+                else:
+                    _append_breakpoint(breakpoints, t_start, a)
+                    _append_breakpoint(breakpoints, t_end, b)
             else:
                 t_start = t - ramp
                 if breakpoints and t_start < breakpoints[-1][0]:
@@ -354,6 +370,18 @@ def lane_level_breakpoints(
             if ramp <= 0.0:
                 _append_breakpoint(breakpoints, t, a)
                 _append_breakpoint(breakpoints, t, b)
+            elif group is not None and group.crossfade:
+                half = ramp / 2.0
+                t_start = t - half
+                t_end = t + half
+                if breakpoints and t_start < breakpoints[-1][0]:
+                    t_start = breakpoints[-1][0]
+                if t_start >= t_end:
+                    _append_breakpoint(breakpoints, t, a)
+                    _append_breakpoint(breakpoints, t, b)
+                else:
+                    _append_breakpoint(breakpoints, t_start, a)
+                    _append_breakpoint(breakpoints, t_end, b)
             else:
                 _append_breakpoint(breakpoints, t, a)
                 _append_breakpoint(breakpoints, t + ramp, b)
@@ -411,10 +439,11 @@ def lane_on_transition_cues(
     """Preset-switch ``(trigger_t, cue)`` pairs for each rise from zero.
 
     Fires when ``previous <= LEVEL_EPS < cue.level``, with ``previous`` from
-    ``baseline`` or ``0.0`` when baseline is None. Trigger is
-    ``cue.t - fade_in * cue.level`` using the on-cue's cut type to select the
-    fade group. When cut is ``none`` / unset, the group is disabled, or
-    ``fade_in`` is 0, the trigger is ``cue.t``.
+    ``baseline`` or ``0.0`` when baseline is None. Trigger is ``cue.t - ramp``
+    using the on-cue's cut type to select the fade group, where ``ramp`` is
+    ``fade_in * cue.level``. With ``crossfade`` enabled, trigger is
+    ``cue.t - ramp/2`` (visual onset). When cut is ``none`` / unset, the group
+    is disabled, or ``fade_in`` is 0, the trigger is ``cue.t``.
     """
     results: list[tuple[float, SlotCue]] = []
     previous = 0.0 if lane.baseline is None else float(lane.baseline)
@@ -429,6 +458,8 @@ def lane_on_transition_cues(
                 ramp = 0.0
             else:
                 ramp = max(0.0, float(group.fade_in)) * float(cue.level)
+                if group.crossfade:
+                    ramp /= 2.0
             results.append((cue.t - ramp, cue))
         previous = float(cue.level)
     return results

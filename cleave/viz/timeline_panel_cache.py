@@ -64,9 +64,11 @@ class TimelineStaticSignature:
     hard_cut_fades_enabled: bool
     hard_cut_fade_in: float
     hard_cut_fade_out: float
+    hard_cut_crossfade: bool
     soft_cut_fades_enabled: bool
     soft_cut_fade_in: float
     soft_cut_fade_out: float
+    soft_cut_crossfade: bool
     selected_cue_t: tuple[tuple[str, float], ...]
 
 
@@ -167,9 +169,11 @@ def timeline_static_signature(
         hard_cut_fades_enabled=state.hard_cut_fades.enabled,
         hard_cut_fade_in=state.hard_cut_fades.fade_in,
         hard_cut_fade_out=state.hard_cut_fades.fade_out,
+        hard_cut_crossfade=state.hard_cut_fades.crossfade,
         soft_cut_fades_enabled=state.soft_cut_fades.enabled,
         soft_cut_fade_in=state.soft_cut_fades.fade_in,
         soft_cut_fade_out=state.soft_cut_fades.fade_out,
+        soft_cut_crossfade=state.soft_cut_fades.crossfade,
         selected_cue_t=tuple(sorted(state.selected_cue_t.items())),
     )
 

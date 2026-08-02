@@ -525,11 +525,13 @@ def _timeline_fade_groups(session) -> tuple[TimelineFadeGroup, TimelineFadeGroup
         enabled=tl.hard_cut_fades.enabled,
         fade_in=tl.hard_cut_fades.fade_in,
         fade_out=tl.hard_cut_fades.fade_out,
+        crossfade=tl.hard_cut_fades.crossfade,
     )
     soft_cut_fades = TimelineFadeGroup(
         enabled=tl.soft_cut_fades.enabled,
         fade_in=tl.soft_cut_fades.fade_in,
         fade_out=tl.soft_cut_fades.fade_out,
+        crossfade=tl.soft_cut_fades.crossfade,
     )
     return hard_cut_fades, soft_cut_fades
 

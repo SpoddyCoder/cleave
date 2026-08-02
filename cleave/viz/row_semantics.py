@@ -131,9 +131,11 @@ class RowKind(Enum):
     TIMELINE_HARD_CUTS = auto()
     TIMELINE_HARD_CUT_FADE_IN = auto()
     TIMELINE_HARD_CUT_FADE_OUT = auto()
+    TIMELINE_HARD_CUT_CROSSFADE = auto()
     TIMELINE_SOFT_CUTS = auto()
     TIMELINE_SOFT_CUT_FADE_IN = auto()
     TIMELINE_SOFT_CUT_FADE_OUT = auto()
+    TIMELINE_SOFT_CUT_CROSSFADE = auto()
     TIMELINE_APPLY_SOFT_CUTS = auto()
     TIMELINE_APPLY_HARD_CUTS = auto()
     SONG_MARKERS_HEADER = auto()
@@ -1241,6 +1243,17 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "The fade-out starts this many seconds after a hard-cut cue.",
         ),
     ),
+    RowKind.TIMELINE_HARD_CUT_CROSSFADE: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        repeatable=True,
+        blocked_by_section_lock=True,
+        help_title="Hard cut crossfade",
+        help_entries=(("Left/Right", "off / on"),),
+        help_description=(
+            "Center hard-cut fade ramps on the cue time instead of aligning to an edge.",
+        ),
+    ),
     RowKind.TIMELINE_SOFT_CUTS: RowBehavior(
         RowAffordance.VALUE_STEP,
         navigable=True,
@@ -1278,6 +1291,17 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         ),
         help_description=(
             "The fade-out starts this many seconds after a soft-cut cue.",
+        ),
+    ),
+    RowKind.TIMELINE_SOFT_CUT_CROSSFADE: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        repeatable=True,
+        blocked_by_section_lock=True,
+        help_title="Soft cut crossfade",
+        help_entries=(("Left/Right", "off / on"),),
+        help_description=(
+            "Center soft-cut fade ramps on the cue time instead of aligning to an edge.",
         ),
     ),
     RowKind.TIMELINE_APPLY_SOFT_CUTS: RowBehavior(
