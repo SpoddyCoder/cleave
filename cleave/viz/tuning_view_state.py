@@ -286,8 +286,10 @@ class TuningViewState:
     focus_cursor: FocusCursor
     move_mode_slot: str | None
     persistent_notification_message: str | None = None
+    persistent_notification_elapsed_sec: float = 0.0
     notification_message: str | None = None
     notification_remaining_sec: float = 0.0
+    notification_elapsed_sec: float = 0.0
     allow_overwrite: bool = True
     active_config_label: str = "cleave-viz.yaml"
     config_dirty: bool = False
@@ -788,7 +790,9 @@ class TuningViewStateBuilder:
         notification = self._get_notification()
         notification_message = notification.message
         notification_remaining_sec = notification.remaining_sec
+        notification_elapsed_sec = notification.elapsed_sec
         persistent_notification_message = notification.persistent_message
+        persistent_notification_elapsed_sec = notification.persistent_elapsed_sec
         notification_active = bool(
             notification_message and notification_remaining_sec > 0
         )
@@ -826,8 +830,10 @@ class TuningViewStateBuilder:
             focus_cursor=self._get_focus_cursor(),
             move_mode_slot=self._get_move_mode_slot(),
             persistent_notification_message=persistent_notification_message,
+            persistent_notification_elapsed_sec=persistent_notification_elapsed_sec,
             notification_message=notification_message,
             notification_remaining_sec=notification_remaining_sec,
+            notification_elapsed_sec=notification_elapsed_sec,
             allow_overwrite=self._config_save.allow_overwrite(),
             active_config_label=config_path_display(
                 self._config_save.active_config_path

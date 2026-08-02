@@ -77,6 +77,7 @@ from cleave.viz.material_icons import (
     track_header_lock_suffix_width,
     visibility_icon_slot_width,
 )
+from cleave.viz.panel_notification import notification_attention
 from cleave.viz.ui_tint import draw_opaque_row_background
 from cleave.viz.theme import (
     ACTION,
@@ -93,6 +94,7 @@ from cleave.viz.theme import (
     LOCKED,
     LOCK_ICON,
     MOVE_MODE,
+    NOTIFICATION_ON_FILL,
     PANEL_CONTENT_MAX_WIDTH,
     panel_content_max_width_px,
     PRESET_FILE_ICON,
@@ -669,14 +671,30 @@ def _row_has_tree_focus(state: TuningViewState, index: int) -> bool:
     return index == state.focus_index
 
 
+def _notification_elapsed(state: TuningViewState, marker_index: int | None) -> float:
+    if marker_index == 0:
+        return state.persistent_notification_elapsed_sec
+    return state.notification_elapsed_sec
+
+
+def _notification_accent(marker_index: int | None) -> tuple[int, int, int]:
+    if marker_index == 0:
+        return ERROR_NOTIFICATION
+    return HIGHLIGHT
+
+
 def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
     """Return the VALUE-role color for a row (before label/value split rendering)."""
     kind = state.layout.kind(index)
     if kind == RowKind.PANEL_NOTIFICATION:
         desc = state.layout.descriptor(index)
-        if desc.marker_index == 0:
-            return ERROR_NOTIFICATION
-        return HIGHLIGHT
+        accent = _notification_accent(desc.marker_index)
+        attention = notification_attention(
+            _notification_elapsed(state, desc.marker_index)
+        )
+        if attention.text_on_fill:
+            return NOTIFICATION_ON_FILL
+        return accent
 
     desc = state.layout.descriptor(index)
     locked_blocked = section_locked(state, desc) and row_blocked_by_section_lock(kind)
@@ -1390,6 +1408,39 @@ class TuningOverlay:
             )
         return self._panel_scratch
 
+    def _draw_notification_attention_fill(
+        self,
+        panel: pygame.Surface,
+        *,
+        state: TuningViewState,
+        index: int,
+        row_rect: tuple[int, int, int, int],
+    ) -> None:
+        desc = state.layout.descriptor(index)
+        attention = notification_attention(
+            _notification_elapsed(state, desc.marker_index)
+        )
+        if attention.fill_progress <= 0.001:
+            return
+        x, y, row_w, line_h = row_rect
+        if attention.fill_progress >= 0.999:
+            fill_w = row_w
+        else:
+            fill_w = max(1, int(round(row_w * attention.fill_progress)))
+        if attention.fill_from_left:
+            fill_x = x
+        else:
+            fill_x = x + max(0, row_w - fill_w)
+        accent = _notification_accent(desc.marker_index)
+        fill_alpha = int(255 * self._visibility)
+        if fill_alpha < 2:
+            return
+        pygame.draw.rect(
+            panel,
+            (*accent, fill_alpha),
+            (fill_x, y, fill_w, line_h),
+        )
+
     def _blit_row(
         self,
         panel: pygame.Surface,
@@ -1441,6 +1492,13 @@ class TuningOverlay:
             bg,
             tint_alpha=tint_alpha,
         )
+        if state.layout.kind(index) == RowKind.PANEL_NOTIFICATION:
+            self._draw_notification_attention_fill(
+                panel,
+                state=state,
+                index=index,
+                row_rect=row_rect,
+            )
 
         indent = self._padding + _row_indent(state, index)
         if text_alpha >= 2:
