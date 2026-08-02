@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import pygame
 
-from cleave.viz.modal import ModalViewState
+from cleave.viz.modal import ModalLabeledLine, ModalViewState
 from cleave.viz.text_fit import wrap_text_to_width
 from cleave.viz.theme import (
     ACTION,
@@ -97,7 +97,9 @@ def draw(
 
     cur_y = _PANEL_PAD_Y
     line_h = font.get_linesize()
-    if state.message is not None:
+    has_message = state.message is not None
+    has_labeled = bool(state.labeled_lines)
+    if has_message:
         cur_y = _draw_message(
             panel,
             font,
@@ -108,9 +110,21 @@ def draw(
             line_gap=line_gap,
             screen_w=sw,
         )
+    if has_labeled:
+        if has_message:
+            cur_y += line_h + line_gap
+        cur_y = _draw_labeled_lines(
+            panel,
+            font,
+            x=_PANEL_PAD_X,
+            y=cur_y,
+            lines=state.labeled_lines,
+            text_alpha=text_alpha,
+            line_gap=line_gap,
+        )
 
     if state.options:
-        if state.message is not None:
+        if has_message or has_labeled:
             cur_y += line_h + line_gap
         content_w = panel_w - _PANEL_PAD_X * 2
         _draw_options(
@@ -255,15 +269,26 @@ def _measure_panel(
     line_h = font.get_linesize()
     content_w = 0
     content_h = 0
+    has_message = state.message is not None
+    has_labeled = bool(state.labeled_lines)
 
-    if state.message is not None:
+    if has_message:
         lines = _message_lines(font, state.message, screen_w=screen_w)
         msg_w = max((font.size(line)[0] for line in lines), default=0)
         content_w = max(content_w, msg_w)
         content_h += len(lines) * line_h + max(0, len(lines) - 1) * line_gap
 
+    if has_labeled:
+        if has_message:
+            content_h += line_h + line_gap
+        labeled_w, labeled_h = _measure_labeled_lines(
+            font, state.labeled_lines, line_gap=line_gap
+        )
+        content_w = max(content_w, labeled_w)
+        content_h += labeled_h
+
     if state.options:
-        if state.message is not None:
+        if has_message or has_labeled:
             content_h += line_h + line_gap
         options_w, options_h = _measure_options(font, state.options, line_gap=line_gap)
         content_w = max(content_w, options_w)
@@ -273,6 +298,47 @@ def _measure_panel(
         max(content_w + _PANEL_PAD_X * 2, _panel_min_width(screen_w)),
         content_h + _PANEL_PAD_Y * 2,
     )
+
+
+def _measure_labeled_lines(
+    font: pygame.font.Font,
+    lines: tuple[ModalLabeledLine, ...],
+    *,
+    line_gap: int,
+) -> tuple[int, int]:
+    line_h = font.get_linesize()
+    if not lines:
+        return 0, 0
+    widths = [font.size(line.display_text())[0] for line in lines]
+    count = len(lines)
+    total_h = count * line_h + max(0, count - 1) * line_gap
+    return max(widths), total_h
+
+
+def _draw_labeled_lines(
+    surface: pygame.Surface,
+    font: pygame.font.Font,
+    *,
+    x: int,
+    y: int,
+    lines: tuple[ModalLabeledLine, ...],
+    text_alpha: int,
+    line_gap: int,
+) -> int:
+    line_h = font.get_linesize()
+    cur_y = y
+    for index, line in enumerate(lines):
+        prefix_surf = font.render(line.prefix(), True, LABEL)
+        value_surf = font.render(line.value, True, VALUE)
+        if text_alpha >= 2:
+            prefix_surf.set_alpha(text_alpha)
+            value_surf.set_alpha(text_alpha)
+            surface.blit(prefix_surf, (x, cur_y))
+            surface.blit(value_surf, (x + prefix_surf.get_width(), cur_y))
+        cur_y += line_h
+        if index + 1 < len(lines):
+            cur_y += line_gap
+    return cur_y
 
 
 def _option_text(label: str) -> str:

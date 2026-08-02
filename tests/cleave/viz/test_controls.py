@@ -39,7 +39,7 @@ from cleave.viz.controls import (
     TuningControls,
 )
 from cleave.viz.panel_notification import NOTIFICATION_DURATION_SEC
-from cleave.viz.modal import ModalKind
+from cleave.viz.modal import ModalKind, ModalLabeledLine
 from cleave.viz.theme import ERROR_NOTIFICATION, HIGHLIGHT
 from cleave.viz.session import (
     LayerRuntime,
@@ -1641,15 +1641,15 @@ def test_timeline_presets_enter_opens_yes_cancel_modal() -> None:
     assert modal_view is not None
     assert modal_view.kind == ModalKind.YES_NO
     assert modal_view.options == ("Yes", "Cancel")
-    assert modal_view.message == (
-        "Apply timeline preset?\n"
-        "character: arc\n"
-        "crescendo: last song marker\n"
-        "density: normal\n"
-        "cue snap: none\n"
-        "song marker snap: none\n"
-        "timeline cuts: by marker\n"
-        "conductor: on"
+    assert modal_view.message == "Apply timeline preset?"
+    assert modal_view.labeled_lines == (
+        ModalLabeledLine("character", "arc"),
+        ModalLabeledLine("crescendo", "last song marker"),
+        ModalLabeledLine("density", "normal"),
+        ModalLabeledLine("cue snap", "none"),
+        ModalLabeledLine("song marker snap", "none"),
+        ModalLabeledLine("timeline cuts", "by marker"),
+        ModalLabeledLine("conductor", "on"),
     )
 
 

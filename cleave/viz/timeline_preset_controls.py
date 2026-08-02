@@ -41,11 +41,12 @@ from cleave.timeline_presets.timeline_cuts import (
     TimelinePresetTimelineCuts,
     timeline_preset_timeline_cuts_display,
 )
-from cleave.viz.modal import ModalHost, ModalOption
+from cleave.viz.modal import ModalHost, ModalLabeledLine, ModalOption
 from cleave.viz.session import TuningSession
 from cleave.viz.timeline_cut_controls import apply_cut_to_lanes
 
 _CANCEL_LABEL = "Cancel"
+_APPLY_PROMPT_TITLE = "Apply timeline preset?"
 _RESET_PROMPT_MESSAGE = "Reset timeline?"
 
 _KIND_BUILDERS = {
@@ -81,24 +82,45 @@ class TimelinePresetController:
             return
         dismiss = lambda: None
         self._modal.prompt_yes_no(
-            self._apply_prompt_message(),
+            _APPLY_PROMPT_TITLE,
             on_confirm=lambda: self._confirm_apply(duration_sec),
             on_cancel=dismiss,
             cancel_label=_CANCEL_LABEL,
+            labeled_lines=self._apply_prompt_labeled_lines(),
         )
 
-    def _apply_prompt_message(self) -> str:
+    def _apply_prompt_labeled_lines(self) -> tuple[ModalLabeledLine, ...]:
         tl = self.session.timeline
-        choice_lines = (
-            f"character: {timeline_preset_kind_display(tl.timeline_preset_kind)}",
-            f"crescendo: {timeline_preset_crescendo_display(tl.timeline_preset_crescendo)}",
-            f"density: {timeline_preset_density_display(tl.timeline_preset_density)}",
-            f"cue snap: {timeline_preset_cue_snap_display(tl.timeline_preset_cue_snap)}",
-            f"song marker snap: {timeline_preset_song_marker_snap_display(tl.timeline_preset_song_marker_snap)}",
-            f"timeline cuts: {timeline_preset_timeline_cuts_display(tl.timeline_preset_timeline_cuts)}",
-            f"conductor: {timeline_preset_conductor_display(tl.timeline_preset_conductor)}",
+        return (
+            ModalLabeledLine(
+                "character", timeline_preset_kind_display(tl.timeline_preset_kind)
+            ),
+            ModalLabeledLine(
+                "crescendo",
+                timeline_preset_crescendo_display(tl.timeline_preset_crescendo),
+            ),
+            ModalLabeledLine(
+                "density", timeline_preset_density_display(tl.timeline_preset_density)
+            ),
+            ModalLabeledLine(
+                "cue snap",
+                timeline_preset_cue_snap_display(tl.timeline_preset_cue_snap),
+            ),
+            ModalLabeledLine(
+                "song marker snap",
+                timeline_preset_song_marker_snap_display(
+                    tl.timeline_preset_song_marker_snap
+                ),
+            ),
+            ModalLabeledLine(
+                "timeline cuts",
+                timeline_preset_timeline_cuts_display(tl.timeline_preset_timeline_cuts),
+            ),
+            ModalLabeledLine(
+                "conductor",
+                timeline_preset_conductor_display(tl.timeline_preset_conductor),
+            ),
         )
-        return "\n".join(("Apply timeline preset?", *choice_lines))
 
     def prompt_reset(self) -> None:
         if self.session.timeline.locked:
