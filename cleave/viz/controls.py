@@ -594,8 +594,11 @@ class TuningControls:
                         return True
                     self._preset_seed.prompt(slot)
                 return True
-            if kind == RowKind.TIMELINE_SNAP_TO_GRID:
-                self._timeline_snap.prompt_grid()
+            if kind == RowKind.TIMELINE_SNAP_TO_BEATS:
+                self._timeline_snap.prompt_beats()
+                return True
+            if kind == RowKind.TIMELINE_SNAP_TO_BARS:
+                self._timeline_snap.prompt_bars()
                 return True
             if kind == RowKind.TIMELINE_SNAP_TO_SONG_MARKERS:
                 self._timeline_snap.prompt_song_markers()
@@ -1376,6 +1379,12 @@ class TuningControls:
         if tl.beat_bar_grid_expanded == expanded:
             return
         tl.beat_bar_grid_expanded = expanded
+
+    def _set_snap_cues_expanded(self, expanded: bool) -> None:
+        tl = self.session.timeline
+        if tl.snap_cues_expanded == expanded:
+            return
+        tl.snap_cues_expanded = expanded
 
     def _set_timeline_fades_expanded(self, expanded: bool) -> None:
         tl = self.session.timeline

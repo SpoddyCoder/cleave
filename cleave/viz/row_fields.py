@@ -2103,8 +2103,17 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         format_value=_format_timeline_placement_snap,
         apply_horizontal=_apply_timeline_placement_snap,
     ),
-    RowKind.TIMELINE_SNAP_TO_GRID: RowFieldDef(
-        panel_label="snap to grid",
+    RowKind.TIMELINE_SNAP_CUES_HEADER: RowFieldDef(
+        panel_label="snap cues",
+        present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        apply_horizontal=_apply_expand_subheader,
+    ),
+    RowKind.TIMELINE_SNAP_TO_BEATS: RowFieldDef(
+        panel_label="snap to beats",
+        present_style=RowPresentStyle.FULL_LINE,
+    ),
+    RowKind.TIMELINE_SNAP_TO_BARS: RowFieldDef(
+        panel_label="snap to bars",
         present_style=RowPresentStyle.FULL_LINE,
     ),
     RowKind.TIMELINE_SNAP_TO_SONG_MARKERS: RowFieldDef(

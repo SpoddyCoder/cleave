@@ -264,6 +264,7 @@ class TimelineRuntime:
     bar_phase_offset: int = 0
     show_bar_grid: bool = False
     beat_bar_grid_expanded: bool = False
+    snap_cues_expanded: bool = False
     placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
     fades_expanded: bool = False
     timeline_presets_expanded: bool = False

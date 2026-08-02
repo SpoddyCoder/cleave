@@ -701,7 +701,8 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
         RowKind.TRACK_USER_PRESET_ADD,
         RowKind.TIMELINE_PRESETS,
         RowKind.TIMELINE_RESET,
-        RowKind.TIMELINE_SNAP_TO_GRID,
+        RowKind.TIMELINE_SNAP_TO_BEATS,
+        RowKind.TIMELINE_SNAP_TO_BARS,
         RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
         RowKind.SETTINGS_MEASURE_LATENCY,
     }:
@@ -1188,7 +1189,8 @@ def _estimate_row_content_width_base(
             RowKind.TRACK_USER_PRESET_ADD,
             RowKind.TIMELINE_PRESETS,
             RowKind.TIMELINE_RESET,
-            RowKind.TIMELINE_SNAP_TO_GRID,
+            RowKind.TIMELINE_SNAP_TO_BEATS,
+            RowKind.TIMELINE_SNAP_TO_BARS,
             RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
             RowKind.SETTINGS_MEASURE_LATENCY,
         }
@@ -1756,7 +1758,8 @@ class TuningOverlay:
                 RowKind.TRACK_USER_PRESET_ADD,
                 RowKind.TIMELINE_PRESETS,
                 RowKind.TIMELINE_RESET,
-                RowKind.TIMELINE_SNAP_TO_GRID,
+                RowKind.TIMELINE_SNAP_TO_BEATS,
+                RowKind.TIMELINE_SNAP_TO_BARS,
                 RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
                 RowKind.SETTINGS_MEASURE_LATENCY,
             }
