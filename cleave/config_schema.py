@@ -223,7 +223,8 @@ DEFAULT_RENDER_OVERLAY_BODY = (
     "Like musician names, year of release etc.\n"
     "Edit the cleave-viz.yaml to modify this message, colours etc."
 )
-DEFAULT_RENDER_OVERLAY_START_DELAY = 10.0
+DEFAULT_RENDER_OVERLAY_APPEAR_AT = 10.0
+DEFAULT_RENDER_OVERLAY_DISAPPEAR_AT = 0.0
 DEFAULT_RENDER_OVERLAY_DISPLAY_TIME = 30.0
 
 RenderOverlayAnimationType = Literal[
@@ -829,7 +830,7 @@ def _parse_beat_sensitivity(raw: Any, ctx: ParseCtx, label: str) -> float:
 
 
 def _parse_render_overlay_position(
-    value: Any, ctx: ParseCtx, label: str = "render.overlay.position"
+    value: Any, ctx: ParseCtx, label: str = "render.overlays.position"
 ) -> RenderOverlayPosition:
     if not isinstance(value, str):
         raise ValueError(f"{label} must be a string")
@@ -842,7 +843,7 @@ def _parse_render_overlay_position(
 def _parse_render_overlay_animation_type(
     value: Any,
     ctx: ParseCtx,
-    label: str = "render.overlay.animation.type",
+    label: str = "render.overlays.animation.type",
 ) -> RenderOverlayAnimationType:
     if not isinstance(value, str):
         raise ValueError(f"{label} must be a string")
@@ -855,7 +856,7 @@ def _parse_render_overlay_animation_type(
 def _parse_render_overlay_slide_direction(
     value: Any,
     ctx: ParseCtx,
-    label: str = "render.overlay.animation.slide-direction",
+    label: str = "render.overlays.animation.slide-direction",
 ) -> RenderOverlaySlideDirection:
     if not isinstance(value, str):
         raise ValueError(f"{label} must be a string")
@@ -988,21 +989,41 @@ def _build_render_overlay_animation_config(parsed: dict[str, Any]) -> Any:
     return RenderOverlayAnimationConfig(
         type=parsed["type"],
         slide_direction=parsed["slide_direction"],
-        start_delay=parsed["start_delay"],
+        appear_at=parsed["appear_at"],
         display_time=parsed["display_time"],
     )
 
 
-def _build_render_overlay_config(parsed: dict[str, Any]) -> Any:
-    from cleave.config import RenderOverlayConfig
+def _build_render_overlay_closing_animation_config(parsed: dict[str, Any]) -> Any:
+    from cleave.config import RenderOverlayClosingAnimationConfig
 
-    return RenderOverlayConfig(
+    return RenderOverlayClosingAnimationConfig(
+        type=parsed["type"],
+        slide_direction=parsed["slide_direction"],
+        disappear_at=parsed["disappear_at"],
+        display_time=parsed["display_time"],
+    )
+
+
+def _build_render_overlay_card_config(parsed: dict[str, Any]) -> Any:
+    from cleave.config import RenderOverlayCardConfig
+
+    return RenderOverlayCardConfig(
         enabled=parsed["enabled"],
         title=parsed["title"],
         body=parsed["body"],
         animation=parsed["animation"],
         position=parsed["position"],
         background=parsed["background"],
+    )
+
+
+def _build_render_overlays_config(parsed: dict[str, Any]) -> Any:
+    from cleave.config import RenderOverlaysConfig
+
+    return RenderOverlaysConfig(
+        opening_card=parsed["opening_card"],
+        closing_card=parsed["closing_card"],
         locked=parsed["locked"],
     )
 
@@ -1166,9 +1187,8 @@ RENDER_OVERLAY_BACKGROUND_SECTION = SectionDescriptor(
     build=_build_render_overlay_background,
 )
 
-RENDER_OVERLAY_ANIMATION_SECTION = SectionDescriptor(
-    yaml_key="animation",
-    fields=(
+def _render_overlay_animation_shared_fields() -> tuple[FieldDescriptor, ...]:
+    return (
         FieldDescriptor(
             "type",
             DEFAULT_RENDER_OVERLAY_ANIMATION_TYPE,
@@ -1184,36 +1204,129 @@ RENDER_OVERLAY_ANIMATION_SECTION = SectionDescriptor(
             _dump_scalar,
             attr_key="slide_direction",
         ),
+    )
+
+
+def _render_overlay_display_time_field() -> FieldDescriptor:
+    return FieldDescriptor(
+        "display-time",
+        DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
+        "session",
+        _parse_non_negative_float,
+        _dump_scalar,
+        attr_key="display_time",
+    )
+
+
+RENDER_OVERLAY_OPENING_ANIMATION_SECTION = SectionDescriptor(
+    yaml_key="animation",
+    fields=(
+        *_render_overlay_animation_shared_fields(),
         FieldDescriptor(
-            "start_delay",
-            DEFAULT_RENDER_OVERLAY_START_DELAY,
+            "appear-at",
+            DEFAULT_RENDER_OVERLAY_APPEAR_AT,
             "session",
             _parse_non_negative_float,
             _dump_scalar,
+            attr_key="appear_at",
         ),
-        FieldDescriptor(
-            "display_time",
-            DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
-            "session",
-            _parse_non_negative_float,
-            _dump_scalar,
-        ),
+        _render_overlay_display_time_field(),
     ),
     build=_build_render_overlay_animation_config,
     optional=True,
     default_factory=lambda: _build_render_overlay_animation_config(
-        _section_field_defaults(RENDER_OVERLAY_ANIMATION_SECTION)
+        _section_field_defaults(RENDER_OVERLAY_OPENING_ANIMATION_SECTION)
     ),
 )
 
-RENDER_OVERLAY_FIELDS: tuple[SchemaField, ...] = (
-    FieldDescriptor(
-        "enabled",
-        True,
-        "session",
-        lambda raw, _ctx, _label: bool(raw),
-        _dump_scalar,
+RENDER_OVERLAY_CLOSING_ANIMATION_SECTION = SectionDescriptor(
+    yaml_key="animation",
+    fields=(
+        *_render_overlay_animation_shared_fields(),
+        FieldDescriptor(
+            "disappear-at",
+            DEFAULT_RENDER_OVERLAY_DISAPPEAR_AT,
+            "session",
+            _parse_non_negative_float,
+            _dump_scalar,
+            attr_key="disappear_at",
+        ),
+        _render_overlay_display_time_field(),
     ),
+    build=_build_render_overlay_closing_animation_config,
+    optional=True,
+    default_factory=lambda: _build_render_overlay_closing_animation_config(
+        _section_field_defaults(RENDER_OVERLAY_CLOSING_ANIMATION_SECTION)
+    ),
+)
+
+
+def _render_overlay_card_fields(
+    animation_section: SectionDescriptor,
+) -> tuple[SchemaField, ...]:
+    return (
+        FieldDescriptor(
+            "enabled",
+            True,
+            "session",
+            lambda raw, _ctx, _label: bool(raw),
+            _dump_scalar,
+        ),
+        RENDER_OVERLAY_TITLE_SECTION,
+        RENDER_OVERLAY_BODY_SECTION,
+        animation_section,
+        FieldDescriptor(
+            "position",
+            DEFAULT_RENDER_OVERLAY_POSITION,
+            "session",
+            _parse_render_overlay_position,
+            _dump_scalar,
+        ),
+        RENDER_OVERLAY_BACKGROUND_SECTION,
+    )
+
+
+RENDER_OVERLAY_OPENING_CARD_FIELDS: tuple[SchemaField, ...] = (
+    _render_overlay_card_fields(RENDER_OVERLAY_OPENING_ANIMATION_SECTION)
+)
+
+RENDER_OVERLAY_CLOSING_CARD_FIELDS: tuple[SchemaField, ...] = (
+    _render_overlay_card_fields(RENDER_OVERLAY_CLOSING_ANIMATION_SECTION)
+)
+
+RENDER_OVERLAY_OPENING_CARD_SECTION = SectionDescriptor(
+    yaml_key="opening-card",
+    fields=RENDER_OVERLAY_OPENING_CARD_FIELDS,
+    build=_build_render_overlay_card_config,
+    optional=True,
+    default_factory=lambda: _build_render_overlay_card_config(
+        _parse_overlay_fields(
+            {},
+            RENDER_OVERLAY_OPENING_CARD_FIELDS,
+            ParseCtx(),
+            "render.overlays.opening-card",
+        )
+    ),
+    attr_key="opening_card",
+)
+
+RENDER_OVERLAY_CLOSING_CARD_SECTION = SectionDescriptor(
+    yaml_key="closing-card",
+    fields=RENDER_OVERLAY_CLOSING_CARD_FIELDS,
+    build=_build_render_overlay_card_config,
+    optional=True,
+    default_factory=lambda: _build_render_overlay_card_config(
+        _parse_overlay_fields(
+            {},
+            RENDER_OVERLAY_CLOSING_CARD_FIELDS,
+            ParseCtx(),
+            "render.overlays.closing-card",
+        )
+    ),
+    attr_key="closing_card",
+)
+
+RENDER_OVERLAYS_FIELDS: tuple[SchemaField, ...] = (
     FieldDescriptor(
         "locked",
         False,
@@ -1221,17 +1334,8 @@ RENDER_OVERLAY_FIELDS: tuple[SchemaField, ...] = (
         lambda raw, _ctx, _label: bool(raw),
         _dump_scalar,
     ),
-    RENDER_OVERLAY_TITLE_SECTION,
-    RENDER_OVERLAY_BODY_SECTION,
-    RENDER_OVERLAY_ANIMATION_SECTION,
-    FieldDescriptor(
-        "position",
-        DEFAULT_RENDER_OVERLAY_POSITION,
-        "session",
-        _parse_render_overlay_position,
-        _dump_scalar,
-    ),
-    RENDER_OVERLAY_BACKGROUND_SECTION,
+    RENDER_OVERLAY_OPENING_CARD_SECTION,
+    RENDER_OVERLAY_CLOSING_CARD_SECTION,
 )
 
 
@@ -2022,14 +2126,14 @@ def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
     return layers_out
 
 
-def _parse_render_overlay_section(overlay_map: dict[str, Any]) -> Any:
+def _parse_render_overlays_section(overlays_map: dict[str, Any]) -> Any:
     parsed = _parse_overlay_fields(
-        overlay_map,
-        RENDER_OVERLAY_FIELDS,
+        overlays_map,
+        RENDER_OVERLAYS_FIELDS,
         ParseCtx(),
-        "render.overlay",
+        "render.overlays",
     )
-    return _build_render_overlay_config(parsed)
+    return _build_render_overlays_config(parsed)
 
 
 def _build_render_post_fx_config(parsed: dict[str, Any]) -> Any:
@@ -2061,11 +2165,11 @@ def parse_render_section(data: dict[str, Any]) -> Any | None:
     width = DEFAULT_RENDER_WIDTH if width_raw is None else int(width_raw)
     height_raw = render_map.get("height")
     height = DEFAULT_RENDER_HEIGHT if height_raw is None else int(height_raw)
-    overlay_raw = render_map.get("overlay")
+    overlays_raw = render_map.get("overlays")
     post_fx_raw = render_map.get("post_fx")
-    overlay = (
-        _parse_render_overlay_section(as_mapping(overlay_raw, "render.overlay"))
-        if overlay_raw is not None
+    overlays = (
+        _parse_render_overlays_section(as_mapping(overlays_raw, "render.overlays"))
+        if overlays_raw is not None
         else None
     )
     post_fx = (
@@ -2082,51 +2186,55 @@ def parse_render_section(data: dict[str, Any]) -> Any | None:
         width=width,
         height=height,
         hdr_compositing=hdr_compositing,
-        overlay=overlay,
+        overlays=overlays,
         post_fx=post_fx,
     )
 
 
-def default_render_overlay_config() -> Any:
-    return _parse_render_overlay_section({})
+def default_render_overlays_config() -> Any:
+    return _parse_render_overlays_section({})
 
 
-def render_overlay_base(cfg: Any) -> Any:
-    if cfg.render is not None and cfg.render.overlay is not None:
-        return cfg.render.overlay
-    return default_render_overlay_config()
+def render_overlays_base(cfg: Any) -> Any:
+    if cfg.render is not None and cfg.render.overlays is not None:
+        return cfg.render.overlays
+    return default_render_overlays_config()
 
 
-def _overlay_persist_values(ctx: PersistCtx) -> dict[str, Any]:
-    runtime = ctx.session.render_overlay
-    base = render_overlay_base(ctx.cfg)
-    bg = base.background
+def _overlay_card_persist_values(
+    runtime: Any,
+    base_card: Any,
+) -> dict[str, Any]:
+    bg = base_card.background
     anim = runtime.animation
+    animation_values: dict[str, Any] = {
+        "type": anim.type,
+        "slide_direction": anim.slide_direction,
+        "display_time": anim.display_time,
+    }
+    if hasattr(anim, "appear_at"):
+        animation_values["appear_at"] = anim.appear_at
+    else:
+        animation_values["disappear_at"] = anim.disappear_at
     return {
         "enabled": runtime.enabled,
-        "locked": runtime.locked,
         "title": {
-            "content": base.title.content,
+            "content": base_card.title.content,
             "font": runtime.title_font,
             "font_size": runtime.title_font_size,
-            "colour": base.title.colour,
-            "background_colour": base.title.background_colour,
+            "colour": base_card.title.colour,
+            "background_colour": base_card.title.background_colour,
             "margin_bottom": runtime.title_margin_bottom,
         },
         "body": {
-            "content": base.body.content,
+            "content": base_card.body.content,
             "font": runtime.body_font,
             "font_size": runtime.body_font_size,
-            "colour": base.body.colour,
-            "background_colour": base.body.background_colour,
+            "colour": base_card.body.colour,
+            "background_colour": base_card.body.background_colour,
             "margin_bottom": 0,
         },
-        "animation": {
-            "type": anim.type,
-            "slide_direction": anim.slide_direction,
-            "start_delay": anim.start_delay,
-            "display_time": anim.display_time,
-        },
+        "animation": animation_values,
         "position": runtime.position,
         "background": {
             "margin": bg.margin,
@@ -2141,11 +2249,25 @@ def _overlay_persist_values(ctx: PersistCtx) -> dict[str, Any]:
     }
 
 
+def _overlays_persist_values(ctx: PersistCtx) -> dict[str, Any]:
+    runtime = ctx.session.render_overlays
+    base = render_overlays_base(ctx.cfg)
+    return {
+        "locked": runtime.locked,
+        "opening_card": _overlay_card_persist_values(
+            runtime.opening_card, base.opening_card
+        ),
+        "closing_card": _overlay_card_persist_values(
+            runtime.closing_card, base.closing_card
+        ),
+    }
+
+
 def persist_render(ctx: PersistCtx) -> dict[str, Any]:
     runtime_pp = ctx.session.render_post_fx
-    overlay = _dump_overlay_fields(
-        RENDER_OVERLAY_FIELDS,
-        _overlay_persist_values(ctx),
+    overlays = _dump_overlay_fields(
+        RENDER_OVERLAYS_FIELDS,
+        _overlays_persist_values(ctx),
         ctx,
     )
     post_fx_values = {
@@ -2177,7 +2299,7 @@ def persist_render(ctx: PersistCtx) -> dict[str, Any]:
         "width": width,
         "height": height,
         "hdr_compositing": render_hdr_compositing(ctx.cfg),
-        "overlay": overlay,
+        "overlays": overlays,
         "post_fx": post_fx,
     }
 
@@ -2445,12 +2567,29 @@ def default_render_overlay_animation_runtime_values() -> dict[str, Any]:
     return {
         "type": DEFAULT_RENDER_OVERLAY_ANIMATION_TYPE,
         "slide_direction": DEFAULT_RENDER_OVERLAY_SLIDE_DIRECTION,
-        "start_delay": DEFAULT_RENDER_OVERLAY_START_DELAY,
+        "appear_at": DEFAULT_RENDER_OVERLAY_APPEAR_AT,
         "display_time": DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
     }
 
 
-def default_render_overlay_runtime_values() -> dict[str, Any]:
+def default_render_overlay_closing_animation_runtime_values() -> dict[str, Any]:
+    return {
+        "type": DEFAULT_RENDER_OVERLAY_ANIMATION_TYPE,
+        "slide_direction": DEFAULT_RENDER_OVERLAY_SLIDE_DIRECTION,
+        "disappear_at": DEFAULT_RENDER_OVERLAY_DISAPPEAR_AT,
+        "display_time": DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
+    }
+
+
+def default_render_overlay_card_runtime_values(
+    *,
+    closing: bool = False,
+) -> dict[str, Any]:
+    animation = (
+        default_render_overlay_closing_animation_runtime_values()
+        if closing
+        else default_render_overlay_animation_runtime_values()
+    )
     return {
         "enabled": True,
         "expanded": False,
@@ -2464,8 +2603,17 @@ def default_render_overlay_runtime_values() -> dict[str, Any]:
         "body_font": DEFAULT_RENDER_OVERLAY_FONT,
         "opacity_pct": int(round(DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY * 100)),
         "border_width": DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
-        "animation": default_render_overlay_animation_runtime_values(),
+        "animation": animation,
         "animation_expanded": False,
+    }
+
+
+def default_render_overlays_runtime_values() -> dict[str, Any]:
+    return {
+        "expanded": False,
+        "opening_card": default_render_overlay_card_runtime_values(closing=False),
+        "closing_card": default_render_overlay_card_runtime_values(closing=True),
+        "locked": False,
     }
 
 

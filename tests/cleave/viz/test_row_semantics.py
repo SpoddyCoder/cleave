@@ -49,18 +49,30 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.TRACK_OPACITY,
         RowKind.TRACK_BEAT,
         RowKind.TRACK_EFFECT,
-        RowKind.RENDER_OVERLAY_POSITION,
-        RowKind.RENDER_OVERLAY_ANIMATION_TYPE,
-        RowKind.RENDER_OVERLAY_ANIMATION_SLIDE_DIRECTION,
-        RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE,
-        RowKind.RENDER_OVERLAY_TITLE_FONT,
-        RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
-        RowKind.RENDER_OVERLAY_BODY_FONT_SIZE,
-        RowKind.RENDER_OVERLAY_BODY_FONT,
-        RowKind.RENDER_OVERLAY_OPACITY,
-        RowKind.RENDER_OVERLAY_BORDER_WIDTH,
-        RowKind.RENDER_OVERLAY_START_DELAY,
-        RowKind.RENDER_OVERLAY_DISPLAY_TIME,
+        RowKind.RENDER_OVERLAY_OPENING_POSITION,
+        RowKind.RENDER_OVERLAY_OPENING_ANIMATION_TYPE,
+        RowKind.RENDER_OVERLAY_OPENING_ANIMATION_SLIDE_DIRECTION,
+        RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT,
+        RowKind.RENDER_OVERLAY_OPENING_TITLE_MARGIN_BOTTOM,
+        RowKind.RENDER_OVERLAY_OPENING_BODY_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_OPENING_BODY_FONT,
+        RowKind.RENDER_OVERLAY_OPENING_OPACITY,
+        RowKind.RENDER_OVERLAY_OPENING_BORDER_WIDTH,
+        RowKind.RENDER_OVERLAY_OPENING_APPEAR_AT,
+        RowKind.RENDER_OVERLAY_OPENING_DISPLAY_TIME,
+        RowKind.RENDER_OVERLAY_CLOSING_POSITION,
+        RowKind.RENDER_OVERLAY_CLOSING_ANIMATION_TYPE,
+        RowKind.RENDER_OVERLAY_CLOSING_ANIMATION_SLIDE_DIRECTION,
+        RowKind.RENDER_OVERLAY_CLOSING_TITLE_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_CLOSING_TITLE_FONT,
+        RowKind.RENDER_OVERLAY_CLOSING_TITLE_MARGIN_BOTTOM,
+        RowKind.RENDER_OVERLAY_CLOSING_BODY_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_CLOSING_BODY_FONT,
+        RowKind.RENDER_OVERLAY_CLOSING_OPACITY,
+        RowKind.RENDER_OVERLAY_CLOSING_BORDER_WIDTH,
+        RowKind.RENDER_OVERLAY_CLOSING_DISAPPEAR_AT,
+        RowKind.RENDER_OVERLAY_CLOSING_DISPLAY_TIME,
         RowKind.RENDER_POST_FX_FADE_IN,
         RowKind.RENDER_POST_FX_FADE_OUT,
         RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE,
@@ -128,7 +140,7 @@ def test_row_is_pinned() -> None:
     assert row_is_pinned(RowKind.SETTINGS_UI_WIDTH_MODE) is True
     assert row_is_pinned(RowKind.SETTINGS_UI_WIDTH) is True
     assert row_is_pinned(RowKind.TRACK_HEADER) is False
-    assert row_is_pinned(RowKind.RENDER_OVERLAY_HEADER) is False
+    assert row_is_pinned(RowKind.RENDER_OVERLAYS_HEADER) is False
 
 
 def test_repeat_row_kinds() -> None:
@@ -136,8 +148,8 @@ def test_repeat_row_kinds() -> None:
 
 
 def test_render_overlay_sub_headers_expand() -> None:
-    title = row_behavior(RowKind.RENDER_OVERLAY_TITLE_HEADER)
-    body = row_behavior(RowKind.RENDER_OVERLAY_BODY_HEADER)
+    title = row_behavior(RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER)
+    body = row_behavior(RowKind.RENDER_OVERLAY_OPENING_BODY_HEADER)
     assert title.affordance == RowAffordance.EXPAND
     assert title.is_sub_header is True
     assert body.affordance == RowAffordance.EXPAND
@@ -157,9 +169,15 @@ def test_expandable_row_kinds() -> None:
 
 def test_parent_group_on_row_behaviors() -> None:
     assert row_behavior(RowKind.TRACK_STEM).parent_group == "track"
-    assert row_behavior(RowKind.RENDER_OVERLAY_POSITION).parent_group == "render_overlay"
-    assert row_behavior(RowKind.RENDER_OVERLAY_TITLE_FONT).parent_group == "render_overlay_title"
-    assert row_behavior(RowKind.RENDER_OVERLAY_BODY_FONT).parent_group == "render_overlay_body"
+    assert row_behavior(RowKind.RENDER_OVERLAY_OPENING_POSITION).parent_group == (
+        "render_overlay_opening"
+    )
+    assert row_behavior(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT).parent_group == (
+        "render_overlay_opening_title"
+    )
+    assert row_behavior(RowKind.RENDER_OVERLAY_OPENING_BODY_FONT).parent_group == (
+        "render_overlay_opening_body"
+    )
     assert row_behavior(RowKind.RENDER_POST_FX_FADE_IN).parent_group == "render_post_fx"
     assert row_behavior(RowKind.SETTINGS_PREVIEW_QUALITY).parent_group == "settings"
     assert row_behavior(RowKind.SETTINGS_UI_WIDTH_MODE).parent_group == "settings_ui"
@@ -284,15 +302,15 @@ def _render_lock_state(
     *, overlay: bool = False, post_fx: bool = False, timeline: bool = False
 ) -> SimpleNamespace:
     return SimpleNamespace(
-        render_overlay=SimpleNamespace(locked=overlay),
+        render_overlays=SimpleNamespace(locked=overlay),
         render_post_fx=SimpleNamespace(locked=post_fx),
         render_timeline=SimpleNamespace(locked=timeline),
     )
 
 
 def test_render_value_children_blocked_by_section_lock() -> None:
-    assert row_blocked_by_section_lock(RowKind.RENDER_OVERLAY_POSITION) is True
-    assert row_blocked_by_section_lock(RowKind.RENDER_OVERLAY_TITLE_FONT) is True
+    assert row_blocked_by_section_lock(RowKind.RENDER_OVERLAY_OPENING_POSITION) is True
+    assert row_blocked_by_section_lock(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT) is True
     assert row_blocked_by_section_lock(RowKind.RENDER_POST_FX_FADE_IN) is True
     assert row_blocked_by_section_lock(RowKind.RENDER_POST_FX_CHROMA_BOOST_AMOUNT) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESETS) is True
@@ -311,16 +329,16 @@ def test_render_value_children_blocked_by_section_lock() -> None:
 
 def test_render_headers_navigable_when_section_locked() -> None:
     for kind in (
-        RowKind.RENDER_OVERLAY_HEADER,
+        RowKind.RENDER_OVERLAYS_HEADER,
         RowKind.RENDER_POST_FX_HEADER,
         RowKind.RENDER_TIMELINE_HEADER,
-        RowKind.RENDER_OVERLAY_TITLE_HEADER,
+        RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER,
         RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER,
         RowKind.SONG_MARKERS_HEADER,
         RowKind.TIMELINE_PRESETS_HEADER,
     ):
         assert row_navigable_when_section_locked(kind) is True
-    assert row_navigable_when_section_locked(RowKind.RENDER_OVERLAY_POSITION) is False
+    assert row_navigable_when_section_locked(RowKind.RENDER_OVERLAY_OPENING_POSITION) is False
     assert row_navigable_when_section_locked(RowKind.TIMELINE_PRESETS) is False
     assert row_navigable_when_section_locked(RowKind.TIMELINE_PRESET_CHARACTER) is False
     assert row_navigable_when_section_locked(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS) is False
@@ -328,7 +346,7 @@ def test_render_headers_navigable_when_section_locked() -> None:
 
 
 def test_section_locked_resolves_render_sections() -> None:
-    overlay_desc = RowDescriptor(RowKind.RENDER_OVERLAY_POSITION)
+    overlay_desc = RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_POSITION)
     post_fx_desc = RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN)
     timeline_desc = RowDescriptor(RowKind.TIMELINE_PRESETS)
     from cleave.viz.row_semantics import section_locked
@@ -343,7 +361,7 @@ def test_section_locked_reads_session_timeline_attribute() -> None:
     from cleave.viz.row_semantics import section_locked
 
     session_like = SimpleNamespace(
-        render_overlay=SimpleNamespace(locked=False),
+        render_overlays=SimpleNamespace(locked=False),
         render_post_fx=SimpleNamespace(locked=False),
         timeline=SimpleNamespace(locked=True),
     )
@@ -356,7 +374,7 @@ def test_section_locked_ignored_in_preset_curation() -> None:
     state = SimpleNamespace(
         settings=SimpleNamespace(editor_mode="preset_curation"),
         tracks={"layer_1": SimpleNamespace(locked=True)},
-        render_overlay=SimpleNamespace(locked=True),
+        render_overlays=SimpleNamespace(locked=True),
         render_post_fx=SimpleNamespace(locked=True),
         render_timeline=SimpleNamespace(locked=True),
     )
@@ -365,7 +383,7 @@ def test_section_locked_ignored_in_preset_curation() -> None:
         is False
     )
     assert (
-        section_locked(state, RowDescriptor(RowKind.RENDER_OVERLAY_POSITION)) is False
+        section_locked(state, RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_POSITION)) is False
     )
 
 

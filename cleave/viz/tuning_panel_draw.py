@@ -339,8 +339,10 @@ def _fit_labeled_sub_row_value(
     budget -= font.size(_labeled_sub_row_prefix(state, index))[0]
     value = _labeled_sub_row_value(state, index)
     if kind in {
-        RowKind.RENDER_OVERLAY_TITLE_FONT,
-        RowKind.RENDER_OVERLAY_BODY_FONT,
+        RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT,
+        RowKind.RENDER_OVERLAY_OPENING_BODY_FONT,
+        RowKind.RENDER_OVERLAY_CLOSING_TITLE_FONT,
+        RowKind.RENDER_OVERLAY_CLOSING_BODY_FONT,
     }:
         if cache is None:
             return fit_counter_label_to_width(font, value, budget)
@@ -405,9 +407,12 @@ def row_visibility_icon_key(
             return None
         block = state.tracks[stem]
         return (block.visible, state.solo_slot == stem)
-    if kind == RowKind.RENDER_OVERLAY_HEADER:
-        block = state.render_overlay
-        return (block.enabled, block.solo)
+    if kind == RowKind.RENDER_OVERLAYS_HEADER:
+        block = state.render_overlays
+        any_enabled = (
+            block.opening_card.enabled or block.closing_card.enabled
+        )
+        return (any_enabled, block.solo)
     if kind == RowKind.RENDER_POST_FX_HEADER:
         block = state.render_post_fx
         return (block.enabled, block.solo)
@@ -640,7 +645,7 @@ def _row_indent(state: TuningViewState, index: int) -> int:
     kind = state.layout.kind(index)
     if kind in {
         RowKind.TRACK_HEADER,
-        RowKind.RENDER_OVERLAY_HEADER,
+        RowKind.RENDER_OVERLAYS_HEADER,
         RowKind.RENDER_POST_FX_HEADER,
         RowKind.RENDER_TIMELINE_HEADER,
     }:
@@ -713,7 +718,10 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
     stem = state.layout.slot(index)
 
     if kind in RENDER_OVERLAY_SECTION_KINDS:
-        if not state.render_overlay.enabled:
+        overlays = state.render_overlays
+        if not (
+            overlays.opening_card.enabled or overlays.closing_card.enabled
+        ):
             return DISABLED
 
     if kind in RENDER_POST_FX_SECTION_KINDS:
@@ -1100,7 +1108,7 @@ def _estimate_row_content_width_base(
         return indent + icon_w + font.size(prefix)[0] + font.size(value)[0]
 
     if kind in {
-        RowKind.RENDER_OVERLAY_HEADER,
+        RowKind.RENDER_OVERLAYS_HEADER,
         RowKind.RENDER_POST_FX_HEADER,
         RowKind.RENDER_TIMELINE_HEADER,
     }:
@@ -1565,16 +1573,19 @@ class TuningOverlay:
             return _finish(icon_surf, label_surf, width)
 
         if kind in {
-            RowKind.RENDER_OVERLAY_HEADER,
+            RowKind.RENDER_OVERLAYS_HEADER,
             RowKind.RENDER_POST_FX_HEADER,
             RowKind.RENDER_TIMELINE_HEADER,
         }:
             desc = state.layout.descriptor(index)
-            if kind == RowKind.RENDER_OVERLAY_HEADER:
-                block_ro = state.render_overlay
+            if kind == RowKind.RENDER_OVERLAYS_HEADER:
+                block_ro = state.render_overlays
                 header_locked = block_ro.locked
                 prefix_surf = render_visibility_icon(
-                    enabled=block_ro.enabled,
+                    enabled=(
+                        block_ro.opening_card.enabled
+                        or block_ro.closing_card.enabled
+                    ),
                     solo=block_ro.solo,
                     line_height=line_h,
                 )

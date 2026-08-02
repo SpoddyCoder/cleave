@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from cleave.config import (
     CleaveConfig,
@@ -44,7 +44,9 @@ from cleave.config_schema import (
     PresetSwitchingRotationSet,
     TimelinePlacementSnap,
     default_render_overlay_animation_runtime_values,
-    default_render_overlay_runtime_values,
+    default_render_overlay_closing_animation_runtime_values,
+    default_render_overlay_card_runtime_values,
+    default_render_overlays_runtime_values,
     default_highlight_rolloff_runtime_values,
     default_chroma_boost_runtime_values,
     default_render_post_fx_runtime_values,
@@ -84,7 +86,15 @@ def allow_overwrite_for_path(
 class RenderOverlayAnimationRuntime:
     type: RenderOverlayAnimationType
     slide_direction: RenderOverlaySlideDirection
-    start_delay: float
+    appear_at: float
+    display_time: float
+
+
+@dataclass
+class RenderOverlayClosingAnimationRuntime:
+    type: RenderOverlayAnimationType
+    slide_direction: RenderOverlaySlideDirection
+    disappear_at: float
     display_time: float
 
 
@@ -94,8 +104,16 @@ def default_render_overlay_animation_runtime() -> RenderOverlayAnimationRuntime:
     )
 
 
+def default_render_overlay_closing_animation_runtime() -> (
+    RenderOverlayClosingAnimationRuntime
+):
+    return RenderOverlayClosingAnimationRuntime(
+        **default_render_overlay_closing_animation_runtime_values()
+    )
+
+
 @dataclass
-class RenderOverlayRuntime:
+class RenderOverlayCardRuntime:
     enabled: bool
     expanded: bool
     position: RenderOverlayPosition
@@ -108,15 +126,46 @@ class RenderOverlayRuntime:
     body_font: str
     opacity_pct: int
     border_width: int
-    animation: RenderOverlayAnimationRuntime
+    animation: RenderOverlayAnimationRuntime | RenderOverlayClosingAnimationRuntime
     animation_expanded: bool = False
+
+
+@dataclass
+class RenderOverlaysRuntime:
+    expanded: bool
+    opening_card: RenderOverlayCardRuntime
+    closing_card: RenderOverlayCardRuntime
     locked: bool = False
 
 
-def default_render_overlay_runtime() -> RenderOverlayRuntime:
-    values = default_render_overlay_runtime_values()
-    animation = RenderOverlayAnimationRuntime(**values.pop("animation"))
-    return RenderOverlayRuntime(animation=animation, **values)
+def _card_runtime_from_values(values: dict[str, Any]) -> RenderOverlayCardRuntime:
+    values = dict(values)
+    animation_values = dict(values.pop("animation"))
+    if "appear_at" in animation_values:
+        animation: RenderOverlayAnimationRuntime | RenderOverlayClosingAnimationRuntime = (
+            RenderOverlayAnimationRuntime(**animation_values)
+        )
+    else:
+        animation = RenderOverlayClosingAnimationRuntime(**animation_values)
+    return RenderOverlayCardRuntime(animation=animation, **values)
+
+
+def default_render_overlay_card_runtime(
+    *, closing: bool = False
+) -> RenderOverlayCardRuntime:
+    return _card_runtime_from_values(
+        default_render_overlay_card_runtime_values(closing=closing)
+    )
+
+
+def default_render_overlays_runtime() -> RenderOverlaysRuntime:
+    values = default_render_overlays_runtime_values()
+    return RenderOverlaysRuntime(
+        expanded=values["expanded"],
+        opening_card=_card_runtime_from_values(dict(values["opening_card"])),
+        closing_card=_card_runtime_from_values(dict(values["closing_card"])),
+        locked=values["locked"],
+    )
 
 
 @dataclass
@@ -307,7 +356,9 @@ class TuningSession:
     layer_z_order: list[str]
     layers: dict[str, LayerRuntime] = field(default_factory=dict)
     solo_slot: str | None = None
-    render_overlay: RenderOverlayRuntime = field(default_factory=default_render_overlay_runtime)
+    render_overlays: RenderOverlaysRuntime = field(
+        default_factory=default_render_overlays_runtime
+    )
     render_overlay_solo: bool = False
     render_post_fx: RenderPostFxRuntime = field(
         default_factory=default_render_post_fx_runtime
@@ -325,31 +376,53 @@ class TuningSession:
     )
 
 
-def render_overlay_runtime_from_cfg(cfg: CleaveConfig) -> RenderOverlayRuntime:
-    overlay = cfg.render.overlay if cfg.render is not None else None
-    if overlay is not None:
-        anim = overlay.animation
-        return replace(
-            default_render_overlay_runtime(),
-            enabled=overlay.enabled,
-            position=overlay.position,
-            title_font_size=overlay.title.font_size,
-            title_font=overlay.title.font,
-            title_margin_bottom=overlay.title.margin_bottom,
-            body_font_size=overlay.body.font_size,
-            body_font=overlay.body.font,
-            opacity_pct=int(round(overlay.background.opacity * 100)),
-            border_width=overlay.background.border.width,
-            animation=replace(
+def _card_runtime_from_cfg(card: Any) -> RenderOverlayCardRuntime:
+    anim = card.animation
+    if hasattr(anim, "appear_at"):
+        animation: RenderOverlayAnimationRuntime | RenderOverlayClosingAnimationRuntime = (
+            replace(
                 default_render_overlay_animation_runtime(),
                 type=anim.type,
                 slide_direction=anim.slide_direction,
-                start_delay=anim.start_delay,
+                appear_at=anim.appear_at,
                 display_time=anim.display_time,
-            ),
-            locked=overlay.locked,
+            )
         )
-    return default_render_overlay_runtime()
+        closing = False
+    else:
+        animation = replace(
+            default_render_overlay_closing_animation_runtime(),
+            type=anim.type,
+            slide_direction=anim.slide_direction,
+            disappear_at=anim.disappear_at,
+            display_time=anim.display_time,
+        )
+        closing = True
+    return replace(
+        default_render_overlay_card_runtime(closing=closing),
+        enabled=card.enabled,
+        position=card.position,
+        title_font_size=card.title.font_size,
+        title_font=card.title.font,
+        title_margin_bottom=card.title.margin_bottom,
+        body_font_size=card.body.font_size,
+        body_font=card.body.font,
+        opacity_pct=int(round(card.background.opacity * 100)),
+        border_width=card.background.border.width,
+        animation=animation,
+    )
+
+
+def render_overlays_runtime_from_cfg(cfg: CleaveConfig) -> RenderOverlaysRuntime:
+    overlays = cfg.render.overlays if cfg.render is not None else None
+    if overlays is not None:
+        return replace(
+            default_render_overlays_runtime(),
+            opening_card=_card_runtime_from_cfg(overlays.opening_card),
+            closing_card=_card_runtime_from_cfg(overlays.closing_card),
+            locked=overlays.locked,
+        )
+    return default_render_overlays_runtime()
 
 
 def render_post_fx_runtime_from_cfg(
@@ -480,7 +553,7 @@ def session_from_cfg(
     preset_root = cfg.paths.preset_root
     return TuningSession(
         layer_z_order=list(cfg.layer_z_order),
-        render_overlay=render_overlay_runtime_from_cfg(cfg),
+        render_overlays=render_overlays_runtime_from_cfg(cfg),
         render_post_fx=render_post_fx_runtime_from_cfg(cfg),
         timeline=timeline_runtime_from_cfg(cfg),
         layers={

@@ -323,7 +323,7 @@ def test_finish_content_frame_skips_render_sections_in_curation() -> None:
 
     core = _make_core(hdr_compositing=True)
     core.seed.session.settings.editor_mode = "preset_curation"
-    core.seed.session.render_overlay.enabled = True
+    core.seed.session.render_overlays.opening_card.enabled = True
     core.seed.session.render_post_fx = default_render_post_fx_runtime(enabled=True)
     core.seed.session.render_post_fx.highlight_rolloff.mode = "composite"
     core.seed.session.render_post_fx.chroma_boost.mode = "composite"
@@ -344,8 +344,8 @@ def test_finish_content_frame_skips_render_sections_in_curation() -> None:
 
     with (
         patch(
-            "cleave.viz.frame_finish.resolve_overlay_config",
-            return_value=MagicMock(),
+            "cleave.viz.frame_finish.resolve_overlay_configs",
+            return_value=(MagicMock(), MagicMock()),
         ),
         patch(
             "cleave.viz.frame_finish.live_overlay_alpha",
@@ -359,5 +359,7 @@ def test_finish_content_frame_skips_render_sections_in_curation() -> None:
             core.seed.session,
             overlay_solo=False,
             panel_cache=None,
+            song_duration=core.seed.duration_sec,
         )
-    assert alpha.call_args.kwargs["enabled"] is False
+    assert alpha.call_count == 2
+    assert all(call.kwargs["enabled"] is False for call in alpha.call_args_list)

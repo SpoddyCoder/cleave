@@ -35,35 +35,22 @@ def _load_original_dict(cfg: CleaveConfig) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
-
-def _snapshot_render_overlay(
-    cfg: CleaveConfig,
-    session: TuningSession,
-    original: dict[str, Any],
+def _merge_overlay_card(
+    orig_card: dict[str, Any],
+    card_payload: dict[str, Any],
 ) -> dict[str, Any]:
-    payload = persisted_session_payload(cfg, session)
-    overlay_payload = payload["render"]["overlay"]
-    post_fx_payload = payload["render"]["post_fx"]
+    card: dict[str, Any] = dict(orig_card)
+    card["enabled"] = card_payload["enabled"]
+    card["title"] = card_payload["title"]
+    card["body"] = card_payload["body"]
+    card["animation"] = card_payload["animation"]
+    card["position"] = card_payload["position"]
 
-    orig_render = original.get("render")
-    orig_overlay: dict[str, Any] = {}
-    if isinstance(orig_render, dict):
-        orig_overlay_raw = orig_render.get("overlay")
-        if isinstance(orig_overlay_raw, dict):
-            orig_overlay = dict(orig_overlay_raw)
-
-    overlay: dict[str, Any] = dict(orig_overlay)
-    overlay["enabled"] = overlay_payload["enabled"]
-    overlay["title"] = overlay_payload["title"]
-    overlay["body"] = overlay_payload["body"]
-    overlay["animation"] = overlay_payload["animation"]
-    overlay["position"] = overlay_payload["position"]
-
-    background = orig_overlay.get("background")
+    background = orig_card.get("background")
     background_out: dict[str, Any] = (
         dict(background) if isinstance(background, dict) else {}
     )
-    bg_payload = overlay_payload["background"]
+    bg_payload = card_payload["background"]
     background_out["margin"] = bg_payload["margin"]
     background_out["padding"] = bg_payload["padding"]
     background_out["colour"] = bg_payload["colour"]
@@ -75,10 +62,42 @@ def _snapshot_render_overlay(
     border_out["colour"] = border_payload["colour"]
     border_out["width"] = border_payload["width"]
     background_out["border"] = border_out
-    overlay["background"] = background_out
-    overlay.pop("font", None)
-    overlay.pop("start_delay", None)
-    overlay.pop("display_time", None)
+    card["background"] = background_out
+    card.pop("font", None)
+    card.pop("start_delay", None)
+    card.pop("display_time", None)
+    return card
+
+
+def _snapshot_render_overlays(
+    cfg: CleaveConfig,
+    session: TuningSession,
+    original: dict[str, Any],
+) -> dict[str, Any]:
+    payload = persisted_session_payload(cfg, session)
+    overlays_payload = payload["render"]["overlays"]
+    post_fx_payload = payload["render"]["post_fx"]
+
+    orig_render = original.get("render")
+    orig_overlays: dict[str, Any] = {}
+    if isinstance(orig_render, dict):
+        orig_overlays_raw = orig_render.get("overlays")
+        if isinstance(orig_overlays_raw, dict):
+            orig_overlays = dict(orig_overlays_raw)
+
+    orig_opening = orig_overlays.get("opening-card")
+    orig_closing = orig_overlays.get("closing-card")
+    overlays: dict[str, Any] = {
+        "locked": overlays_payload["locked"],
+        "opening-card": _merge_overlay_card(
+            dict(orig_opening) if isinstance(orig_opening, dict) else {},
+            overlays_payload["opening-card"],
+        ),
+        "closing-card": _merge_overlay_card(
+            dict(orig_closing) if isinstance(orig_closing, dict) else {},
+            overlays_payload["closing-card"],
+        ),
+    }
 
     orig_pp: dict[str, Any] = {}
     if isinstance(orig_render, dict):
@@ -116,13 +135,13 @@ def _snapshot_render_overlay(
         render_out = {
             key: value
             for key, value in orig_render.items()
-            if key not in ("overlay", "post_fx")
+            if key not in ("overlay", "overlays", "post_fx")
         }
     render_payload = payload["render"]
     render_out["fps"] = render_payload["fps"]
     render_out["width"] = render_payload["width"]
     render_out["height"] = render_payload["height"]
-    render_out["overlay"] = overlay
+    render_out["overlays"] = overlays
     render_out["post_fx"] = post_fx
     return render_out
 
@@ -156,7 +175,7 @@ def write_session_snapshot(
         "editor": editor_out,
         "layer_z_order": payload["layer_z_order"],
         "layers": payload["layers"],
-        "render": _snapshot_render_overlay(cfg, session, original),
+        "render": _snapshot_render_overlays(cfg, session, original),
         "timeline": payload["timeline"],
     }
 

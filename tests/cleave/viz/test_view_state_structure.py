@@ -346,11 +346,11 @@ def test_structure_signature_invalidates_on_animation_type() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
-    session.render_overlay.animation.type = "fade"
+    session.render_overlays.opening_card.animation.type = "fade"
     sig_before = view_state_structure_signature(
         session, config_save, notification_active=False
     )
-    session.render_overlay.animation.type = "slide"
+    session.render_overlays.opening_card.animation.type = "slide"
     sig_after = view_state_structure_signature(
         session, config_save, notification_active=False
     )
@@ -360,17 +360,49 @@ def test_structure_signature_invalidates_on_animation_type() -> None:
 def test_builder_rebuilds_layout_when_animation_type_changes() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
-    session.render_overlay.expanded = True
-    session.render_overlay.animation_expanded = True
-    session.render_overlay.animation.type = "fade"
+    session.render_overlays.expanded = True
+    session.render_overlays.opening_card.expanded = True
+    session.render_overlays.opening_card.animation_expanded = True
+    session.render_overlays.opening_card.animation.type = "fade"
     view_fade = controls.build_view_state(paused=False)
     kinds_fade = [row.kind for row in view_fade.layout.rows]
-    assert RowKind.RENDER_OVERLAY_ANIMATION_SLIDE_DIRECTION not in kinds_fade
+    assert RowKind.RENDER_OVERLAY_OPENING_ANIMATION_SLIDE_DIRECTION not in kinds_fade
 
-    session.render_overlay.animation.type = "slide"
+    session.render_overlays.opening_card.animation.type = "slide"
     view_slide = controls.build_view_state(paused=False)
     kinds_slide = [row.kind for row in view_slide.layout.rows]
-    assert RowKind.RENDER_OVERLAY_ANIMATION_SLIDE_DIRECTION in kinds_slide
+    assert RowKind.RENDER_OVERLAY_OPENING_ANIMATION_SLIDE_DIRECTION in kinds_slide
+
+
+def test_structure_signature_invalidates_on_opening_card_expanded() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.render_overlays.expanded = True
+    session.render_overlays.opening_card.expanded = False
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.render_overlays.opening_card.expanded = True
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_structure_signature_invalidates_on_closing_card_animation_type() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.render_overlays.closing_card.animation.type = "fade"
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.render_overlays.closing_card.animation.type = "slide"
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
 
 
 def test_structure_signature_invalidates_on_chroma_boost_mode() -> None:

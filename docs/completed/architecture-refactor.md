@@ -514,13 +514,13 @@ Acceptance: no cross-module underscore imports remain; no `_parse_*` aliases; su
 
 ### Task 5.2: Complete the single config schema
 
-`visualizer` and `render.post_fx` are descriptor driven, but `render.overlay`, `layers`,
+`visualizer` and `render.post_fx` are descriptor driven, but `render.overlays`, `layers`,
 and `timeline` still have a hand-written parse path separate from their persist path,
 the divergence risk this refactor set out to remove.
 
 - Add a nested section schema on top of `FieldDescriptor` (for example a
   `SectionDescriptor` with nested fields and kebab and British-spelling key support) and
-  migrate `render.overlay` (title and body blocks, background, border) so parse,
+  migrate `render.overlays` (opening/closing cards, title and body blocks, background, border) so parse,
   serialize, and default derive from one descriptor set.
 - Preserve the Task 3.1 constraints: merge unknown keys in `paths` and `render` with the
   original file; keep `colour` and `font-colour` keys; keep the content trailing-newline
@@ -567,7 +567,7 @@ Acceptance: no `assert isinstance(state, ...)` in effect modules; effect typing 
 static; suite green.
 
 Phase 5 exit criteria: no cross-module underscore imports, no compat aliases, no
-closure-bag DI; `render.overlay` parse, serialize, and default derive from one schema
+closure-bag DI; `render.overlays` parse, serialize, and default derive from one schema
 (layers and timeline migrated or documented); effect handlers typed; suite green.
 
 ---

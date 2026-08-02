@@ -17,7 +17,9 @@ from cleave.config import (
     RenderOverlayBackgroundConfig,
     RenderOverlayBorderConfig,
     RenderConfig,
-    RenderOverlayConfig,
+    RenderOverlayCardConfig,
+    RenderOverlayClosingAnimationConfig,
+    RenderOverlaysConfig,
     RenderOverlayTextBlockConfig,
     RenderPostFxConfig,
     TimelineConfig,
@@ -641,46 +643,69 @@ def test_load_config_validation_errors(
 
 _OVERLAY_YAML = """\
 render:
-  overlay:
-    enabled: true
-    title:
-      content: |
-        Cleave Final Render
-      font-size: 24
-      font-colour: "#ffffff"
-      background-colour: "#3333ff"
-      margin-bottom: 10
-    body:
-      content: |
-        Place anything you like here
-        Like musician names, year of release etc.
-        Edit the cleave-viz.yaml to modify this message, colours etc.
-      font-size: 18
-      colour: "#ffffff"
-      background-colour: "#3333ff"
-    animation:
-      type: fade
-      slide-direction: left
-      start_delay: 10
-      display_time: 30
-    position: bottom-left
-    background:
-      margin: 40
-      padding: 20
-      colour: "#000000"
-      opacity: 0.7
-      border:
+  overlays:
+    opening-card:
+      enabled: true
+      title:
+        content: |
+          Cleave Final Render
+        font-size: 24
+        font-colour: "#ffffff"
+        background-colour: "#3333ff"
+        margin-bottom: 10
+      body:
+        content: |
+          Place anything you like here
+          Like musician names, year of release etc.
+          Edit the cleave-viz.yaml to modify this message, colours etc.
+        font-size: 18
         colour: "#ffffff"
-        width: 4
+        background-colour: "#3333ff"
+      animation:
+        type: fade
+        slide-direction: left
+        appear-at: 10
+        display-time: 30
+      position: bottom-left
+      background:
+        margin: 40
+        padding: 20
+        colour: "#000000"
+        opacity: 0.7
+        border:
+          colour: "#ffffff"
+          width: 4
+    closing-card:
+      enabled: true
+      title:
+        content: |
+          Closing
+        font-size: 24
+        font-colour: "#ffffff"
+      body:
+        content: |
+          End credits
+        font-size: 18
+        colour: "#ffffff"
+      animation:
+        type: fade
+        slide-direction: left
+        disappear-at: 0
+        display-time: 30
+      position: bottom-left
+      background:
+        margin: 40
+        padding: 20
+        colour: "#000000"
+        opacity: 0.7
+        border:
+          colour: "#ffffff"
+          width: 4
 """
 
 
-def test_parse_render_overlay_full_template() -> None:
-    data = yaml.safe_load(_OVERLAY_YAML)
-    render = parse_render_section(data)
-    assert render is not None
-    overlay = render.overlay
-    assert overlay == RenderOverlayConfig(
+def _expected_opening_card() -> RenderOverlayCardConfig:
+    return RenderOverlayCardConfig(
         enabled=True,
         title=RenderOverlayTextBlockConfig(
             content="Cleave Final Render",
@@ -704,7 +729,7 @@ def test_parse_render_overlay_full_template() -> None:
         animation=RenderOverlayAnimationConfig(
             type="fade",
             slide_direction="left",
-            start_delay=10.0,
+            appear_at=10.0,
             display_time=30.0,
         ),
         position="bottom-left",
@@ -715,6 +740,21 @@ def test_parse_render_overlay_full_template() -> None:
             opacity=0.7,
             border=RenderOverlayBorderConfig(colour=(255, 255, 255), width=4),
         ),
+    )
+
+
+def test_parse_render_overlay_full_template() -> None:
+    data = yaml.safe_load(_OVERLAY_YAML)
+    render = parse_render_section(data)
+    assert render is not None
+    overlays = render.overlays
+    assert overlays is not None
+    assert overlays.opening_card == _expected_opening_card()
+    assert overlays.closing_card.animation == RenderOverlayClosingAnimationConfig(
+        type="fade",
+        slide_direction="left",
+        disappear_at=0.0,
+        display_time=30.0,
     )
 
 
@@ -732,43 +772,43 @@ def testparse_hex_colour(value: str, expected: tuple[int, int, int]) -> None:
 
 def test_parse_render_overlay_empty_background_colour() -> None:
     data = yaml.safe_load(_OVERLAY_YAML)
-    data["render"]["overlay"]["body"]["background-colour"] = ""
+    data["render"]["overlays"]["opening-card"]["body"]["background-colour"] = ""
     render = parse_render_section(data)
     assert render is not None
-    assert render.overlay is not None
-    assert render.overlay.body.background_colour is None
-    assert render.overlay.title.background_colour == (51, 51, 255)
+    assert render.overlays is not None
+    assert render.overlays.opening_card.body.background_colour is None
+    assert render.overlays.opening_card.title.background_colour == (51, 51, 255)
 
 
 def test_parse_render_overlay_missing_background_colour() -> None:
     data = yaml.safe_load(_OVERLAY_YAML)
-    del data["render"]["overlay"]["title"]["background-colour"]
+    del data["render"]["overlays"]["opening-card"]["title"]["background-colour"]
     render = parse_render_section(data)
     assert render is not None
-    assert render.overlay is not None
-    assert render.overlay.title.background_colour is None
+    assert render.overlays is not None
+    assert render.overlays.opening_card.title.background_colour is None
 
 
 def test_parse_render_overlay_rejects_invalid_position() -> None:
     data = yaml.safe_load(_OVERLAY_YAML)
-    data["render"]["overlay"]["position"] = "middle"
-    with pytest.raises(ValueError, match="render.overlay.position must be one of"):
+    data["render"]["overlays"]["opening-card"]["position"] = "middle"
+    with pytest.raises(ValueError, match="render.overlays.opening-card.position must be one of"):
         parse_render_section(data)
 
 
 def test_parse_render_overlay_locked_defaults_false() -> None:
     data = yaml.safe_load(_OVERLAY_YAML)
     render = parse_render_section(data)
-    assert render is not None and render.overlay is not None
-    assert render.overlay.locked is False
+    assert render is not None and render.overlays is not None
+    assert render.overlays.locked is False
 
 
 def test_parse_render_overlay_locked_true() -> None:
     data = yaml.safe_load(_OVERLAY_YAML)
-    data["render"]["overlay"]["locked"] = True
+    data["render"]["overlays"]["locked"] = True
     render = parse_render_section(data)
-    assert render is not None and render.overlay is not None
-    assert render.overlay.locked is True
+    assert render is not None and render.overlays is not None
+    assert render.overlays.locked is True
 
 
 def test_parse_render_post_fx_locked_true() -> None:
@@ -866,7 +906,7 @@ render:
     )
     render = parse_render_section(data)
     assert render == RenderConfig(
-        overlay=None,
+        overlays=None,
         post_fx=default_render_post_fx_config(enabled=True, fade_in=12.0, fade_out=3.0),
     )
 

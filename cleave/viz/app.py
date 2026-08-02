@@ -38,7 +38,7 @@ from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.timeline_overlay import TimelineOverlay
 from cleave.viz.playback import PlaybackState, current_sec, init_playback
 from cleave.viz.projectm_frame_clock import ProjectMFrameClock
-from cleave.viz.frame_finish import RenderOverlayPanelCache, finish_content_frame
+from cleave.viz.frame_finish import RenderOverlaysPanelCache, finish_content_frame
 from cleave.viz.overlay_profiler import OverlayProfiler
 from cleave.viz.frame_rate import FrameRateMeter, ProjectMFpsGovernor
 from cleave.viz.focus_nav import FocusCursor, TimelineFocus
@@ -101,8 +101,8 @@ class LiveVisualizerRuntime(VisualizerCore):
     help_overlay: HelpOverlay
     timeline_overlay: TimelineOverlay
     overlay_surface: pygame.Surface
-    render_overlay_panel_cache: RenderOverlayPanelCache = field(
-        default_factory=RenderOverlayPanelCache
+    render_overlays_panel_cache: RenderOverlaysPanelCache = field(
+        default_factory=RenderOverlaysPanelCache
     )
     overlay_profiler: OverlayProfiler = field(default_factory=OverlayProfiler.from_env)
 
@@ -427,7 +427,7 @@ def _tick_frame_live_overlay(
         t_sec,
         post_fx_solo=runtime.seed.session.render_post_fx_solo,
         overlay_solo=runtime.seed.session.render_overlay_solo,
-        panel_cache=runtime.render_overlay_panel_cache,
+        panel_cache=runtime.render_overlays_panel_cache,
     )
 
     runtime.overlay.set_hold_idle_sec(runtime.seed.cfg.editor.ui_fade)

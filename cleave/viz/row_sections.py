@@ -37,26 +37,58 @@ def _toggle_settings_latency_compensation(
     controls._settings.set_latency_compensation_expanded(forward)
 
 
-def _toggle_render_overlay(controls: TuningControls, _slot: str | None, forward: bool) -> None:
-    controls._render_overlay.set_expanded(forward)
-
-
-def _toggle_render_overlay_title(
+def _toggle_render_overlays(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
-    controls._render_overlay.set_title_expanded(forward)
+    controls._render_overlays.set_expanded(forward)
 
 
-def _toggle_render_overlay_body(
+def _toggle_render_overlay_opening_card(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
-    controls._render_overlay.set_body_expanded(forward)
+    controls._render_overlays.opening_card.set_expanded(forward)
 
 
-def _toggle_render_overlay_animation(
+def _toggle_render_overlay_closing_card(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
-    controls._render_overlay.set_animation_expanded(forward)
+    controls._render_overlays.closing_card.set_expanded(forward)
+
+
+def _toggle_render_overlay_opening_title(
+    controls: TuningControls, _slot: str | None, forward: bool
+) -> None:
+    controls._render_overlays.opening_card.set_title_expanded(forward)
+
+
+def _toggle_render_overlay_closing_title(
+    controls: TuningControls, _slot: str | None, forward: bool
+) -> None:
+    controls._render_overlays.closing_card.set_title_expanded(forward)
+
+
+def _toggle_render_overlay_opening_body(
+    controls: TuningControls, _slot: str | None, forward: bool
+) -> None:
+    controls._render_overlays.opening_card.set_body_expanded(forward)
+
+
+def _toggle_render_overlay_closing_body(
+    controls: TuningControls, _slot: str | None, forward: bool
+) -> None:
+    controls._render_overlays.closing_card.set_body_expanded(forward)
+
+
+def _toggle_render_overlay_opening_animation(
+    controls: TuningControls, _slot: str | None, forward: bool
+) -> None:
+    controls._render_overlays.opening_card.set_animation_expanded(forward)
+
+
+def _toggle_render_overlay_closing_animation(
+    controls: TuningControls, _slot: str | None, forward: bool
+) -> None:
+    controls._render_overlays.closing_card.set_animation_expanded(forward)
 
 
 def _toggle_render_post_fx(controls: TuningControls, _slot: str | None, forward: bool) -> None:
@@ -242,22 +274,56 @@ def _settings_latency_compensation_expanded(state: TuningViewState, _slot: str |
     return state.settings.latency_compensation_expanded
 
 
-def _render_overlay_expanded(state: TuningViewState, _slot: str | None) -> bool:
-    return state.render_overlay.expanded
+def _render_overlays_expanded(state: TuningViewState, _slot: str | None) -> bool:
+    return state.render_overlays.expanded
 
 
-def _render_overlay_title_expanded(state: TuningViewState, _slot: str | None) -> bool:
-    return state.render_overlay.title_expanded
-
-
-def _render_overlay_body_expanded(state: TuningViewState, _slot: str | None) -> bool:
-    return state.render_overlay.body_expanded
-
-
-def _render_overlay_animation_expanded(
+def _render_overlay_opening_card_expanded(
     state: TuningViewState, _slot: str | None
 ) -> bool:
-    return state.render_overlay.animation.expanded
+    return state.render_overlays.opening_card.expanded
+
+
+def _render_overlay_closing_card_expanded(
+    state: TuningViewState, _slot: str | None
+) -> bool:
+    return state.render_overlays.closing_card.expanded
+
+
+def _render_overlay_opening_title_expanded(
+    state: TuningViewState, _slot: str | None
+) -> bool:
+    return state.render_overlays.opening_card.title_expanded
+
+
+def _render_overlay_closing_title_expanded(
+    state: TuningViewState, _slot: str | None
+) -> bool:
+    return state.render_overlays.closing_card.title_expanded
+
+
+def _render_overlay_opening_body_expanded(
+    state: TuningViewState, _slot: str | None
+) -> bool:
+    return state.render_overlays.opening_card.body_expanded
+
+
+def _render_overlay_closing_body_expanded(
+    state: TuningViewState, _slot: str | None
+) -> bool:
+    return state.render_overlays.closing_card.body_expanded
+
+
+def _render_overlay_opening_animation_expanded(
+    state: TuningViewState, _slot: str | None
+) -> bool:
+    return state.render_overlays.opening_card.animation.expanded
+
+
+def _render_overlay_closing_animation_expanded(
+    state: TuningViewState, _slot: str | None
+) -> bool:
+    return state.render_overlays.closing_card.animation.expanded
 
 
 def _render_post_fx_expanded(state: TuningViewState, _slot: str | None) -> bool:
@@ -403,62 +469,157 @@ CURATION_LAYER_SECTION = ExpandSectionDef(
     ),
 )
 
-RENDER_OVERLAY_TITLE_SECTION = ExpandSectionDef(
-    header_kind=RowKind.RENDER_OVERLAY_TITLE_HEADER,
-    context="global",
-    read_expanded=_render_overlay_title_expanded,
-    toggle=_toggle_render_overlay_title,
-    children=(
-        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_TITLE_FONT),
-        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_TITLE_FONT_SIZE),
-        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_TITLE_MARGIN_BOTTOM),
-    ),
+def _build_render_overlay_card_section(
+    *,
+    card_attr: Literal["opening_card", "closing_card"],
+    card_header: RowKind,
+    animation_header: RowKind,
+    animation_type: RowKind,
+    slide_direction: RowKind,
+    timing_kind: RowKind,
+    display_time: RowKind,
+    position: RowKind,
+    opacity: RowKind,
+    border_width: RowKind,
+    title_header: RowKind,
+    title_font: RowKind,
+    title_font_size: RowKind,
+    title_margin_bottom: RowKind,
+    body_header: RowKind,
+    body_font: RowKind,
+    body_font_size: RowKind,
+    read_card_expanded: Callable[["TuningViewState", str | None], bool],
+    toggle_card: ExpandToggleFn,
+    read_title_expanded: Callable[["TuningViewState", str | None], bool],
+    toggle_title: ExpandToggleFn,
+    read_body_expanded: Callable[["TuningViewState", str | None], bool],
+    toggle_body: ExpandToggleFn,
+    read_animation_expanded: Callable[["TuningViewState", str | None], bool],
+    toggle_animation: ExpandToggleFn,
+) -> ExpandSectionDef:
+    title_section = ExpandSectionDef(
+        header_kind=title_header,
+        context="global",
+        read_expanded=read_title_expanded,
+        toggle=toggle_title,
+        children=(
+            SectionNode(leaf_kind=title_font),
+            SectionNode(leaf_kind=title_font_size),
+            SectionNode(leaf_kind=title_margin_bottom),
+        ),
+    )
+    body_section = ExpandSectionDef(
+        header_kind=body_header,
+        context="global",
+        read_expanded=read_body_expanded,
+        toggle=toggle_body,
+        children=(
+            SectionNode(leaf_kind=body_font),
+            SectionNode(leaf_kind=body_font_size),
+        ),
+    )
+    slide_conditional = ConditionalRowsDef(
+        name=f"overlay_{card_attr}_animation_slide_direction",
+        predicate=(
+            lambda state, _desc, attr=card_attr: getattr(
+                state.render_overlays, attr
+            ).animation.type
+            != "fade"
+        ),
+        children=(SectionNode(leaf_kind=slide_direction),),
+    )
+    animation_section = ExpandSectionDef(
+        header_kind=animation_header,
+        context="global",
+        read_expanded=read_animation_expanded,
+        toggle=toggle_animation,
+        children=(
+            SectionNode(leaf_kind=animation_type),
+            SectionNode(conditional=slide_conditional),
+            SectionNode(leaf_kind=timing_kind),
+            SectionNode(leaf_kind=display_time),
+        ),
+    )
+    return ExpandSectionDef(
+        header_kind=card_header,
+        context="global",
+        read_expanded=read_card_expanded,
+        toggle=toggle_card,
+        children=(
+            SectionNode(expand=animation_section),
+            SectionNode(leaf_kind=position),
+            SectionNode(leaf_kind=opacity),
+            SectionNode(leaf_kind=border_width),
+            SectionNode(expand=title_section),
+            SectionNode(expand=body_section),
+        ),
+    )
+
+
+RENDER_OVERLAY_OPENING_CARD_SECTION = _build_render_overlay_card_section(
+    card_attr="opening_card",
+    card_header=RowKind.RENDER_OVERLAY_OPENING_CARD_HEADER,
+    animation_header=RowKind.RENDER_OVERLAY_OPENING_ANIMATION_HEADER,
+    animation_type=RowKind.RENDER_OVERLAY_OPENING_ANIMATION_TYPE,
+    slide_direction=RowKind.RENDER_OVERLAY_OPENING_ANIMATION_SLIDE_DIRECTION,
+    timing_kind=RowKind.RENDER_OVERLAY_OPENING_APPEAR_AT,
+    display_time=RowKind.RENDER_OVERLAY_OPENING_DISPLAY_TIME,
+    position=RowKind.RENDER_OVERLAY_OPENING_POSITION,
+    opacity=RowKind.RENDER_OVERLAY_OPENING_OPACITY,
+    border_width=RowKind.RENDER_OVERLAY_OPENING_BORDER_WIDTH,
+    title_header=RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER,
+    title_font=RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT,
+    title_font_size=RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT_SIZE,
+    title_margin_bottom=RowKind.RENDER_OVERLAY_OPENING_TITLE_MARGIN_BOTTOM,
+    body_header=RowKind.RENDER_OVERLAY_OPENING_BODY_HEADER,
+    body_font=RowKind.RENDER_OVERLAY_OPENING_BODY_FONT,
+    body_font_size=RowKind.RENDER_OVERLAY_OPENING_BODY_FONT_SIZE,
+    read_card_expanded=_render_overlay_opening_card_expanded,
+    toggle_card=_toggle_render_overlay_opening_card,
+    read_title_expanded=_render_overlay_opening_title_expanded,
+    toggle_title=_toggle_render_overlay_opening_title,
+    read_body_expanded=_render_overlay_opening_body_expanded,
+    toggle_body=_toggle_render_overlay_opening_body,
+    read_animation_expanded=_render_overlay_opening_animation_expanded,
+    toggle_animation=_toggle_render_overlay_opening_animation,
 )
 
-RENDER_OVERLAY_BODY_SECTION = ExpandSectionDef(
-    header_kind=RowKind.RENDER_OVERLAY_BODY_HEADER,
-    context="global",
-    read_expanded=_render_overlay_body_expanded,
-    toggle=_toggle_render_overlay_body,
-    children=(
-        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_BODY_FONT),
-        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_BODY_FONT_SIZE),
-    ),
+RENDER_OVERLAY_CLOSING_CARD_SECTION = _build_render_overlay_card_section(
+    card_attr="closing_card",
+    card_header=RowKind.RENDER_OVERLAY_CLOSING_CARD_HEADER,
+    animation_header=RowKind.RENDER_OVERLAY_CLOSING_ANIMATION_HEADER,
+    animation_type=RowKind.RENDER_OVERLAY_CLOSING_ANIMATION_TYPE,
+    slide_direction=RowKind.RENDER_OVERLAY_CLOSING_ANIMATION_SLIDE_DIRECTION,
+    timing_kind=RowKind.RENDER_OVERLAY_CLOSING_DISAPPEAR_AT,
+    display_time=RowKind.RENDER_OVERLAY_CLOSING_DISPLAY_TIME,
+    position=RowKind.RENDER_OVERLAY_CLOSING_POSITION,
+    opacity=RowKind.RENDER_OVERLAY_CLOSING_OPACITY,
+    border_width=RowKind.RENDER_OVERLAY_CLOSING_BORDER_WIDTH,
+    title_header=RowKind.RENDER_OVERLAY_CLOSING_TITLE_HEADER,
+    title_font=RowKind.RENDER_OVERLAY_CLOSING_TITLE_FONT,
+    title_font_size=RowKind.RENDER_OVERLAY_CLOSING_TITLE_FONT_SIZE,
+    title_margin_bottom=RowKind.RENDER_OVERLAY_CLOSING_TITLE_MARGIN_BOTTOM,
+    body_header=RowKind.RENDER_OVERLAY_CLOSING_BODY_HEADER,
+    body_font=RowKind.RENDER_OVERLAY_CLOSING_BODY_FONT,
+    body_font_size=RowKind.RENDER_OVERLAY_CLOSING_BODY_FONT_SIZE,
+    read_card_expanded=_render_overlay_closing_card_expanded,
+    toggle_card=_toggle_render_overlay_closing_card,
+    read_title_expanded=_render_overlay_closing_title_expanded,
+    toggle_title=_toggle_render_overlay_closing_title,
+    read_body_expanded=_render_overlay_closing_body_expanded,
+    toggle_body=_toggle_render_overlay_closing_body,
+    read_animation_expanded=_render_overlay_closing_animation_expanded,
+    toggle_animation=_toggle_render_overlay_closing_animation,
 )
 
-RENDER_OVERLAY_ANIMATION_SLIDE_DIRECTION = ConditionalRowsDef(
-    name="overlay_animation_slide_direction",
-    predicate=lambda state, _desc: state.render_overlay.animation.type != "fade",
-    children=(
-        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_ANIMATION_SLIDE_DIRECTION),
-    ),
-)
-
-RENDER_OVERLAY_ANIMATION_SECTION = ExpandSectionDef(
-    header_kind=RowKind.RENDER_OVERLAY_ANIMATION_HEADER,
+RENDER_OVERLAYS_SECTION = ExpandSectionDef(
+    header_kind=RowKind.RENDER_OVERLAYS_HEADER,
     context="global",
-    read_expanded=_render_overlay_animation_expanded,
-    toggle=_toggle_render_overlay_animation,
+    read_expanded=_render_overlays_expanded,
+    toggle=_toggle_render_overlays,
     children=(
-        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_ANIMATION_TYPE),
-        SectionNode(conditional=RENDER_OVERLAY_ANIMATION_SLIDE_DIRECTION),
-        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_START_DELAY),
-        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_DISPLAY_TIME),
-    ),
-)
-
-RENDER_OVERLAY_SECTION = ExpandSectionDef(
-    header_kind=RowKind.RENDER_OVERLAY_HEADER,
-    context="global",
-    read_expanded=_render_overlay_expanded,
-    toggle=_toggle_render_overlay,
-    children=(
-        SectionNode(expand=RENDER_OVERLAY_ANIMATION_SECTION),
-        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_POSITION),
-        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_OPACITY),
-        SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_BORDER_WIDTH),
-        SectionNode(expand=RENDER_OVERLAY_TITLE_SECTION),
-        SectionNode(expand=RENDER_OVERLAY_BODY_SECTION),
+        SectionNode(expand=RENDER_OVERLAY_OPENING_CARD_SECTION),
+        SectionNode(expand=RENDER_OVERLAY_CLOSING_CARD_SECTION),
     ),
 )
 
@@ -647,7 +808,7 @@ TRACK_SECTION = ExpandSectionDef(
 ROOT_SECTION_NODES: tuple[SectionNode, ...] = (SectionNode(expand=SETTINGS_SECTION),)
 
 RENDER_SECTION_NODES: tuple[SectionNode, ...] = (
-    SectionNode(expand=RENDER_OVERLAY_SECTION),
+    SectionNode(expand=RENDER_OVERLAYS_SECTION),
     SectionNode(expand=RENDER_POST_FX_SECTION),
     SectionNode(panel_anchor=TIMELINE_PANEL_ANCHOR),
 )
@@ -882,7 +1043,7 @@ def kinds_in_expand_section(section: ExpandSectionDef) -> frozenset[RowKind]:
     return frozenset(kinds)
 
 
-RENDER_OVERLAY_SECTION_KINDS = kinds_in_expand_section(RENDER_OVERLAY_SECTION)
+RENDER_OVERLAY_SECTION_KINDS = kinds_in_expand_section(RENDER_OVERLAYS_SECTION)
 RENDER_POST_FX_SECTION_KINDS = kinds_in_expand_section(RENDER_POST_FX_SECTION)
 PRESET_SWITCHING_CHILD_KINDS = frozenset(
     kinds_in_expand_section(TRACK_PRESET_SWITCHING_SECTION)
@@ -986,22 +1147,26 @@ def row_tree_indent_depth(kind: RowKind) -> int:
     return ROW_TREE_INDENT_DEPTH.get(kind, 0)
 
 
-def _find_expand_ancestor(
+def _expand_path_to_kind(
     section: ExpandSectionDef,
     kind: RowKind,
-) -> ExpandSectionDef | None:
+) -> list[ExpandSectionDef] | None:
+    """Expand sections from *section* (inclusive) down to the owner of *kind*."""
+    if kind == section.header_kind:
+        return [section]
     for child in section.children:
         if child.leaf_kind == kind:
-            return section
-        if child.expand is not None:
-            if child.expand.header_kind == kind:
-                return section
-            if _find_expand_ancestor(child.expand, kind) is not None:
-                return child.expand
+            return [section]
         if child.conditional is not None and kind in _leaf_kinds_in_nodes(
             child.conditional.children
         ):
-            return section
+            return [section]
+        if child.expand is not None:
+            if child.expand.header_kind == kind:
+                return [section]
+            nested = _expand_path_to_kind(child.expand, kind)
+            if nested is not None:
+                return [section, *nested]
     return None
 
 
@@ -1016,13 +1181,12 @@ def expand_section_sub_row_visible(
     slot = desc.slot if section.context == "per_slot" else None
     if kind not in leaf_kinds_in_expand_section(section):
         return None
-    ancestor = _find_expand_ancestor(section, kind)
-    if ancestor is None:
+    path = _expand_path_to_kind(section, kind)
+    if path is None:
         return None
-    if not expand_section_expanded(state, section, slot):
-        return False
-    if ancestor is not section and not expand_section_expanded(state, ancestor, slot):
-        return False
+    for ancestor in path:
+        if not expand_section_expanded(state, ancestor, slot):
+            return False
     return True
 
 

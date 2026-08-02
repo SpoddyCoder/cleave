@@ -31,7 +31,8 @@ from cleave.viz.row_fields import (
 )
 from cleave.viz.row_semantics import RowDescriptor, RowKind
 from cleave.viz.tuning_view_state import (
-    RenderOverlayBlock,
+    RenderOverlayCardBlock,
+    RenderOverlaysBlock,
     RenderPostFxBlock,
     SettingsBlock,
     TrackBlock,
@@ -107,7 +108,11 @@ def test_format_row_value_track_and_render() -> None:
                 preset_duration=45.0,
             )
         },
-        render_overlay=RenderOverlayBlock(position="top-left", opacity_pct=80),
+        render_overlays=RenderOverlaysBlock(
+            opening_card=RenderOverlayCardBlock(
+                position="top-left", opacity_pct=80
+            ),
+        ),
         render_post_fx=RenderPostFxBlock(fade_in=2.5, fade_out=3.0),
     )
     slot_desc = RowDescriptor(RowKind.TRACK_BLEND, slot="layer_1")
@@ -116,11 +121,11 @@ def test_format_row_value_track_and_render() -> None:
     assert format_row_value(state, mode_desc) == "projectM"
     duration_desc = RowDescriptor(RowKind.TRACK_PRESET_DURATION, slot="layer_1")
     assert format_row_value(state, duration_desc) == "45s"
-    assert format_row_value(state, RowDescriptor(RowKind.RENDER_OVERLAY_POSITION)) == (
+    assert format_row_value(state, RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_POSITION)) == (
         "top-left"
     )
     assert (
-        format_row_value(state, RowDescriptor(RowKind.RENDER_OVERLAY_OPACITY)) == "80%"
+        format_row_value(state, RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_OPACITY)) == "80%"
     )
     assert format_row_value(state, RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN)) == (
         "2.5s"
@@ -185,11 +190,11 @@ def test_apply_field_horizontal_track_blend() -> None:
 
 def test_apply_field_horizontal_render_overlay_opacity() -> None:
     controls = _make_controls()
-    desc = RowDescriptor(RowKind.RENDER_OVERLAY_OPACITY)
-    before = controls.session.render_overlay.opacity_pct
+    desc = RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_OPACITY)
+    before = controls.session.render_overlays.opening_card.opacity_pct
 
     assert apply_field_horizontal(controls, desc, True, False) is True
-    assert controls.session.render_overlay.opacity_pct == before + 1
+    assert controls.session.render_overlays.opening_card.opacity_pct == before + 1
 
 
 def test_apply_field_horizontal_adjusts_ui_fade() -> None:
@@ -223,7 +228,9 @@ def test_expand_subheader_prefix_preset_switching() -> None:
         expand_subheader_prefix(RowKind.TRACK_PRESET_SWITCHING)
         == "└─ preset switching"
     )
-    assert expand_subheader_prefix(RowKind.RENDER_OVERLAY_TITLE_HEADER) == "└─ title "
+    assert expand_subheader_prefix(RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER) == (
+        "  └─ title "
+    )
     assert (
         expand_subheader_prefix(RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_HEADER)
         == "└─ highlight rolloff "
@@ -255,16 +262,16 @@ def test_song_markers_expand_subheader_includes_count() -> None:
 
 
 def test_composite_header_render_overlay_metadata() -> None:
-    field = row_field_def(RowKind.RENDER_OVERLAY_HEADER)
+    field = row_field_def(RowKind.RENDER_OVERLAYS_HEADER)
     assert field.present_style == RowPresentStyle.COMPOSITE_HEADER
     assert field.header_prefix == "Render: "
-    assert field.header_suffix == "OVERLAY"
+    assert field.header_suffix == "OVERLAYS"
 
     state = _minimal_view_state()
-    desc = RowDescriptor(RowKind.RENDER_OVERLAY_HEADER)
+    desc = RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
     assert composite_header_prefix_part(state, desc) == "Render: "
-    assert composite_header_suffix_part(state, desc) == "OVERLAY"
-    assert row_composite_header_display_text(state, desc) == "Render: OVERLAY ▶"
+    assert composite_header_suffix_part(state, desc) == "OVERLAYS"
+    assert row_composite_header_display_text(state, desc) == "Render: OVERLAYS ▶"
 
 
 def test_preset_switching_seed_is_action_parameter_with_value() -> None:
@@ -319,7 +326,7 @@ def test_apply_field_horizontal_track_header_solo_and_expand() -> None:
 
 
 def test_row_fields_count() -> None:
-        assert len(ROW_FIELDS) == 97
+    assert len(ROW_FIELDS) == 114
 
 
 def test_row_kinds_requiring_fields_registry_complete() -> None:

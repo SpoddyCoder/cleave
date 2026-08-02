@@ -29,9 +29,10 @@ from cleave.config_schema import (
     DEFAULT_PRESET_SWITCHING_SHUFFLE,
     DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT,
     DEFAULT_RENDER_OVERLAY_ANIMATION_TYPE,
+    DEFAULT_RENDER_OVERLAY_APPEAR_AT,
+    DEFAULT_RENDER_OVERLAY_DISAPPEAR_AT,
     DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
     DEFAULT_RENDER_OVERLAY_SLIDE_DIRECTION,
-    DEFAULT_RENDER_OVERLAY_START_DELAY,
     DEFAULT_SOFT_CUT_DURATION,
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_WIDTH,
@@ -40,7 +41,8 @@ from cleave.config_schema import (
     DEFAULT_VISUAL_LIMITER_THRESHOLD,
     DEFAULT_VISUAL_LIMITER_RELEASE,
     CastRolesTimelineBehaviour,
-    default_render_overlay_runtime_values,
+    default_render_overlay_card_runtime_values,
+    default_render_overlays_runtime_values,
     default_render_post_fx_runtime_values,
 )
 from cleave.cue_roles import CueRole
@@ -69,7 +71,8 @@ if TYPE_CHECKING:
     from cleave.viz.layer import StemLayer
     from cleave.viz.row_layout import RowLayout, RowLayoutFrame
 
-_RO_OVERLAY_DEFAULTS = default_render_overlay_runtime_values()
+_RO_CARD_DEFAULTS = default_render_overlay_card_runtime_values(closing=False)
+_RO_OVERLAYS_DEFAULTS = default_render_overlays_runtime_values()
 _RO_POST_FX_DEFAULTS = default_render_post_fx_runtime_values()
 
 
@@ -115,26 +118,50 @@ class RenderOverlayAnimationBlock:
     slide_direction: RenderOverlaySlideDirection = (
         DEFAULT_RENDER_OVERLAY_SLIDE_DIRECTION
     )
-    start_delay: float = DEFAULT_RENDER_OVERLAY_START_DELAY
+    appear_at: float = DEFAULT_RENDER_OVERLAY_APPEAR_AT
     display_time: float = DEFAULT_RENDER_OVERLAY_DISPLAY_TIME
 
 
 @dataclass
-class RenderOverlayBlock:
-    enabled: bool = _RO_OVERLAY_DEFAULTS["enabled"]
-    expanded: bool = _RO_OVERLAY_DEFAULTS["expanded"]
-    position: RenderOverlayPosition = _RO_OVERLAY_DEFAULTS["position"]
-    title_expanded: bool = _RO_OVERLAY_DEFAULTS["title_expanded"]
-    body_expanded: bool = _RO_OVERLAY_DEFAULTS["body_expanded"]
-    title_font_size: int = _RO_OVERLAY_DEFAULTS["title_font_size"]
-    title_font: str = _RO_OVERLAY_DEFAULTS["title_font"]
-    title_margin_bottom: int = _RO_OVERLAY_DEFAULTS["title_margin_bottom"]
-    body_font_size: int = _RO_OVERLAY_DEFAULTS["body_font_size"]
-    body_font: str = _RO_OVERLAY_DEFAULTS["body_font"]
-    opacity_pct: int = _RO_OVERLAY_DEFAULTS["opacity_pct"]
-    border_width: int = _RO_OVERLAY_DEFAULTS["border_width"]
-    animation: RenderOverlayAnimationBlock = field(
+class RenderOverlayClosingAnimationBlock:
+    expanded: bool = False
+    type: RenderOverlayAnimationType = DEFAULT_RENDER_OVERLAY_ANIMATION_TYPE
+    slide_direction: RenderOverlaySlideDirection = (
+        DEFAULT_RENDER_OVERLAY_SLIDE_DIRECTION
+    )
+    disappear_at: float = DEFAULT_RENDER_OVERLAY_DISAPPEAR_AT
+    display_time: float = DEFAULT_RENDER_OVERLAY_DISPLAY_TIME
+
+
+@dataclass
+class RenderOverlayCardBlock:
+    enabled: bool = _RO_CARD_DEFAULTS["enabled"]
+    expanded: bool = _RO_CARD_DEFAULTS["expanded"]
+    position: RenderOverlayPosition = _RO_CARD_DEFAULTS["position"]
+    title_expanded: bool = _RO_CARD_DEFAULTS["title_expanded"]
+    body_expanded: bool = _RO_CARD_DEFAULTS["body_expanded"]
+    title_font_size: int = _RO_CARD_DEFAULTS["title_font_size"]
+    title_font: str = _RO_CARD_DEFAULTS["title_font"]
+    title_margin_bottom: int = _RO_CARD_DEFAULTS["title_margin_bottom"]
+    body_font_size: int = _RO_CARD_DEFAULTS["body_font_size"]
+    body_font: str = _RO_CARD_DEFAULTS["body_font"]
+    opacity_pct: int = _RO_CARD_DEFAULTS["opacity_pct"]
+    border_width: int = _RO_CARD_DEFAULTS["border_width"]
+    animation: RenderOverlayAnimationBlock | RenderOverlayClosingAnimationBlock = field(
         default_factory=RenderOverlayAnimationBlock
+    )
+
+
+@dataclass
+class RenderOverlaysBlock:
+    expanded: bool = _RO_OVERLAYS_DEFAULTS["expanded"]
+    opening_card: RenderOverlayCardBlock = field(
+        default_factory=RenderOverlayCardBlock
+    )
+    closing_card: RenderOverlayCardBlock = field(
+        default_factory=lambda: RenderOverlayCardBlock(
+            animation=RenderOverlayClosingAnimationBlock()
+        )
     )
     solo: bool = False
     locked: bool = False
@@ -244,7 +271,7 @@ class TuningViewState:
     config_dirty: bool = False
     solo_slot: str | None = None
     solo_active: bool = False
-    render_overlay: RenderOverlayBlock = field(default_factory=RenderOverlayBlock)
+    render_overlays: RenderOverlaysBlock = field(default_factory=RenderOverlaysBlock)
     render_post_fx: RenderPostFxBlock = field(
         default_factory=RenderPostFxBlock
     )
@@ -366,7 +393,7 @@ def view_state_structure_signature(
                 else str(layer.auto_preset_path)
             ),
         }
-    ro = session.render_overlay
+    ro = session.render_overlays
     pp = session.render_post_fx
     tl = session.timeline
     payload = {
@@ -380,13 +407,24 @@ def view_state_structure_signature(
         "notification_active": notification_active,
         "persistent_notification_active": persistent_notification_active,
         "layers": layers,
-        "render_overlay": {
-            "enabled": ro.enabled,
+        "render_overlays": {
             "expanded": ro.expanded,
-            "title_expanded": ro.title_expanded,
-            "body_expanded": ro.body_expanded,
-            "animation_expanded": ro.animation_expanded,
-            "animation_type": ro.animation.type,
+            "opening_card": {
+                "enabled": ro.opening_card.enabled,
+                "expanded": ro.opening_card.expanded,
+                "title_expanded": ro.opening_card.title_expanded,
+                "body_expanded": ro.opening_card.body_expanded,
+                "animation_expanded": ro.opening_card.animation_expanded,
+                "animation_type": ro.opening_card.animation.type,
+            },
+            "closing_card": {
+                "enabled": ro.closing_card.enabled,
+                "expanded": ro.closing_card.expanded,
+                "title_expanded": ro.closing_card.title_expanded,
+                "body_expanded": ro.closing_card.body_expanded,
+                "animation_expanded": ro.closing_card.animation_expanded,
+                "animation_type": ro.closing_card.animation.type,
+            },
         },
         "render_post_fx": {
             "enabled": pp.enabled,
@@ -419,10 +457,33 @@ class _ViewStateStructure:
     layer_z_order: tuple[str, ...]
     tracks: dict[str, TrackBlock]
     settings: SettingsBlock
-    render_overlay: RenderOverlayBlock
+    render_overlays: RenderOverlaysBlock
     render_post_fx: RenderPostFxBlock
     render_timeline: RenderTimelineBlock
     layout: RowLayout
+
+
+def _card_block_from_runtime(card, *, closing: bool) -> RenderOverlayCardBlock:
+    anim = card.animation
+    if closing:
+        animation: RenderOverlayAnimationBlock | RenderOverlayClosingAnimationBlock = (
+            RenderOverlayClosingAnimationBlock(
+                expanded=card.animation_expanded,
+                type=anim.type,
+            )
+        )
+    else:
+        animation = RenderOverlayAnimationBlock(
+            expanded=card.animation_expanded,
+            type=anim.type,
+        )
+    return RenderOverlayCardBlock(
+        enabled=card.enabled,
+        expanded=card.expanded,
+        title_expanded=card.title_expanded,
+        body_expanded=card.body_expanded,
+        animation=animation,
+    )
 
 
 class TuningViewStateBuilder:
@@ -554,7 +615,7 @@ class TuningViewStateBuilder:
                 user_presets_expanded=layer.user_presets_expanded,
             )
 
-        ro = self.session.render_overlay
+        ro = self.session.render_overlays
         pp = self.session.render_post_fx
         tl = self.session.timeline
         settings = SettingsBlock(
@@ -564,15 +625,11 @@ class TuningViewStateBuilder:
             editor_mode=self.session.settings.editor_mode,
             editor_mode_selection=self.session.settings.editor_mode_selection,
         )
-        render_overlay = RenderOverlayBlock(
-            enabled=ro.enabled,
+        render_overlays = RenderOverlaysBlock(
             expanded=ro.expanded,
-            title_expanded=ro.title_expanded,
-            body_expanded=ro.body_expanded,
-            animation=RenderOverlayAnimationBlock(
-                expanded=ro.animation_expanded,
-                type=ro.animation.type,
-            ),
+            opening_card=_card_block_from_runtime(ro.opening_card, closing=False),
+            closing_card=_card_block_from_runtime(ro.closing_card, closing=True),
+            locked=ro.locked,
         )
         render_post_fx = RenderPostFxBlock(
             enabled=pp.enabled,
@@ -637,7 +694,7 @@ class TuningViewStateBuilder:
             ),
             notification_message="…" if notification_active else None,
             notification_remaining_sec=1.0 if notification_active else 0.0,
-            render_overlay=render_overlay,
+            render_overlays=render_overlays,
             render_post_fx=render_post_fx,
             render_timeline=render_timeline,
             settings=settings,
@@ -649,7 +706,7 @@ class TuningViewStateBuilder:
             layer_z_order=layer_z_order,
             tracks=tracks,
             settings=settings,
-            render_overlay=render_overlay,
+            render_overlays=render_overlays,
             render_post_fx=render_post_fx,
             render_timeline=render_timeline,
             layout=layout,
@@ -728,9 +785,11 @@ class TuningViewStateBuilder:
             structure, position_sec=position_sec, user_names=user_names
         )
 
-        ro = self.session.render_overlay
+        ro = self.session.render_overlays
         pp = self.session.render_post_fx
         tl = self.session.timeline
+        opening = ro.opening_card
+        closing = ro.closing_card
         state = TuningViewState(
             layer_z_order=structure.layer_z_order,
             tracks=tracks,
@@ -748,23 +807,56 @@ class TuningViewStateBuilder:
             config_dirty=self._config_save.config_dirty,
             solo_slot=self.session.solo_slot,
             solo_active=self.session.solo_slot is not None,
-            render_overlay=replace(
-                structure.render_overlay,
-                position=ro.position,
-                title_font_size=ro.title_font_size,
-                title_font=ro.title_font,
-                title_margin_bottom=ro.title_margin_bottom,
-                body_font_size=ro.body_font_size,
-                body_font=ro.body_font,
-                opacity_pct=ro.opacity_pct,
-                border_width=ro.border_width,
-                animation=replace(
-                    structure.render_overlay.animation,
-                    expanded=ro.animation_expanded,
-                    type=ro.animation.type,
-                    slide_direction=ro.animation.slide_direction,
-                    start_delay=ro.animation.start_delay,
-                    display_time=ro.animation.display_time,
+            render_overlays=replace(
+                structure.render_overlays,
+                expanded=ro.expanded,
+                opening_card=replace(
+                    structure.render_overlays.opening_card,
+                    enabled=opening.enabled,
+                    expanded=opening.expanded,
+                    position=opening.position,
+                    title_expanded=opening.title_expanded,
+                    body_expanded=opening.body_expanded,
+                    title_font_size=opening.title_font_size,
+                    title_font=opening.title_font,
+                    title_margin_bottom=opening.title_margin_bottom,
+                    body_font_size=opening.body_font_size,
+                    body_font=opening.body_font,
+                    opacity_pct=opening.opacity_pct,
+                    border_width=opening.border_width,
+                    animation=replace(
+                        structure.render_overlays.opening_card.animation,
+                        expanded=opening.animation_expanded,
+                        type=opening.animation.type,
+                        slide_direction=opening.animation.slide_direction,
+                        appear_at=getattr(opening.animation, "appear_at", 0.0),
+                        display_time=opening.animation.display_time,
+                    ),
+                ),
+                closing_card=replace(
+                    structure.render_overlays.closing_card,
+                    enabled=closing.enabled,
+                    expanded=closing.expanded,
+                    position=closing.position,
+                    title_expanded=closing.title_expanded,
+                    body_expanded=closing.body_expanded,
+                    title_font_size=closing.title_font_size,
+                    title_font=closing.title_font,
+                    title_margin_bottom=closing.title_margin_bottom,
+                    body_font_size=closing.body_font_size,
+                    body_font=closing.body_font,
+                    opacity_pct=closing.opacity_pct,
+                    border_width=closing.border_width,
+                    animation=replace(
+                        structure.render_overlays.closing_card.animation,
+                        expanded=closing.animation_expanded,
+                        type=closing.animation.type,
+                        slide_direction=closing.animation.slide_direction,
+                        disappear_at=getattr(
+                            closing.animation, "disappear_at", 0.0
+                        ),
+                        display_time=closing.animation.display_time,
+                    ),
                 ),
                 solo=self.session.render_overlay_solo,
                 locked=ro.locked,

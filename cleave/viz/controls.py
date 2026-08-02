@@ -33,7 +33,7 @@ from cleave.viz.modal import ModalHost
 from cleave.viz.panel_notification import PanelNotificationHost
 from cleave.viz.playback import PlaybackState, current_sec, seek, seek_to, toggle_pause
 from cleave.viz.live_layer_bindings import LiveLayerBindings
-from cleave.viz.render_overlay_controls import RenderOverlayControls
+from cleave.viz.render_overlay_controls import RenderOverlaysControls
 from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
 from cleave.viz.render_post_fx_controls import RenderPostFxControls
 from cleave.viz.settings_controls import SettingsControls
@@ -211,7 +211,7 @@ class TuningControls:
             get_notification=self._notification_host.active,
             layers_by_slot=layers_by_slot,
         )
-        self._render_overlay = RenderOverlayControls(session)
+        self._render_overlays = RenderOverlaysControls(session)
         self._render_post_fx = RenderPostFxControls(
             session, bindings=render_post_fx_bindings
         )
@@ -491,7 +491,7 @@ class TuningControls:
                 if slot is not None:
                     self._toggle_locked(slot)
                 return True
-            if kind == RowKind.RENDER_OVERLAY_HEADER:
+            if kind == RowKind.RENDER_OVERLAYS_HEADER:
                 self._toggle_render_overlay_locked()
                 return True
             if kind == RowKind.RENDER_POST_FX_HEADER:
@@ -891,7 +891,7 @@ class TuningControls:
             and not view_after.layout.contains_descriptor(self.focus_descriptor)
         ):
             self._apply_focus_cursor(
-                MainFocus(RowDescriptor(RowKind.RENDER_OVERLAY_HEADER))
+                MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER))
             )
 
     def _delete_layer(self, slot: str) -> None:
@@ -1269,8 +1269,7 @@ class TuningControls:
         layer.locked = not layer.locked
 
     def _toggle_render_overlay_locked(self) -> None:
-        overlay = self.session.render_overlay
-        overlay.locked = not overlay.locked
+        self._render_overlays.toggle_locked()
 
     def _toggle_render_post_fx_locked(self) -> None:
         post_fx = self.session.render_post_fx

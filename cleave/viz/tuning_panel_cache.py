@@ -17,7 +17,7 @@ TextFitter = Callable[[pygame.font.Font, str, int], str]
 _LOCK_ICON_HEADER_KINDS = frozenset(
     {
         RowKind.TRACK_HEADER,
-        RowKind.RENDER_OVERLAY_HEADER,
+        RowKind.RENDER_OVERLAYS_HEADER,
         RowKind.RENDER_POST_FX_HEADER,
         RowKind.RENDER_TIMELINE_HEADER,
     }

@@ -81,7 +81,7 @@ def _merge_session_state(
     target.layer_z_order = list(fresh.layer_z_order)
     target.layers = dict(fresh.layers)
     target.solo_slot = fresh.solo_slot
-    target.render_overlay = fresh.render_overlay
+    target.render_overlays = fresh.render_overlays
     target.render_overlay_solo = fresh.render_overlay_solo
     target.render_post_fx = fresh.render_post_fx
     target.render_post_fx_solo = fresh.render_post_fx_solo
