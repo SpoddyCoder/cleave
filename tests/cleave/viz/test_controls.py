@@ -1646,8 +1646,109 @@ def test_timeline_presets_enter_opens_yes_cancel_modal() -> None:
         "character: arc\n"
         "crescendo: last song marker\n"
         "density: normal\n"
+        "cue snap: none\n"
+        "song marker snap: none\n"
+        "timeline cuts: by marker\n"
         "conductor: on"
     )
+
+
+def test_timeline_preset_cue_snap_row_cycles() -> None:
+    controls = _make_controls(timeline_enabled=True)
+    controls.session.timeline.panel_open = True
+    controls.session.timeline.timeline_presets_expanded = True
+    view = controls.build_view_state(paused=False)
+    row = view.layout.find_by_kind(RowKind.TIMELINE_PRESET_CUE_SNAP)
+    controls.focus_descriptor = _desc(view, row)
+    assert controls.session.timeline.timeline_preset_cue_snap == "none"
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert controls.session.timeline.timeline_preset_cue_snap == "beats"
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert controls.session.timeline.timeline_preset_cue_snap == "bars"
+    assert controls.handle_keydown(_keydown(pygame.K_LEFT)) is True
+    assert controls.session.timeline.timeline_preset_cue_snap == "beats"
+    view = controls.build_view_state(paused=False)
+    assert "beats" in _row_text(view, row)
+
+
+def test_timeline_preset_song_marker_snap_row_cycles() -> None:
+    controls = _make_controls(timeline_enabled=True)
+    controls.session.timeline.panel_open = True
+    controls.session.timeline.timeline_presets_expanded = True
+    view = controls.build_view_state(paused=False)
+    row = view.layout.find_by_kind(RowKind.TIMELINE_PRESET_SONG_MARKER_SNAP)
+    controls.focus_descriptor = _desc(view, row)
+    assert controls.session.timeline.timeline_preset_song_marker_snap is None
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert controls.session.timeline.timeline_preset_song_marker_snap == 0.5
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert controls.session.timeline.timeline_preset_song_marker_snap == 1.0
+    assert controls.handle_keydown(_keydown(pygame.K_LEFT)) is True
+    assert controls.session.timeline.timeline_preset_song_marker_snap == 0.5
+    view = controls.build_view_state(paused=False)
+    assert "0.5s" in _row_text(view, row)
+
+
+def test_timeline_preset_timeline_cuts_row_cycles() -> None:
+    controls = _make_controls(timeline_enabled=True)
+    controls.session.timeline.panel_open = True
+    controls.session.timeline.timeline_presets_expanded = True
+    view = controls.build_view_state(paused=False)
+    row = view.layout.find_by_kind(RowKind.TIMELINE_PRESET_TIMELINE_CUTS)
+    controls.focus_descriptor = _desc(view, row)
+    assert controls.session.timeline.timeline_preset_timeline_cuts == "by marker"
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert controls.session.timeline.timeline_preset_timeline_cuts == "all soft"
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert controls.session.timeline.timeline_preset_timeline_cuts == "all hard"
+    assert controls.handle_keydown(_keydown(pygame.K_LEFT)) is True
+    assert controls.session.timeline.timeline_preset_timeline_cuts == "all soft"
+    view = controls.build_view_state(paused=False)
+    assert "all soft" in _row_text(view, row)
+
+
+def test_timeline_presets_cuts_none_keeps_cut_none() -> None:
+    beats = tuple(float(i) for i in range(241))
+    bars = tuple(float(i) for i in range(0, 241, 4))
+    controls = _make_controls(
+        ("layer_1", "layer_2"),
+        beat_times=beats,
+        bar_times=bars,
+    )
+    controls.session.timeline.timeline_preset_kind = "breathing"
+    controls.session.timeline.timeline_preset_crescendo = None
+    controls.session.timeline.timeline_preset_timeline_cuts = "none"
+    _focus_timeline_presets(controls)
+    _confirm_timeline_preset(controls)
+    assert not controls.modal_host.active
+    for lane in controls.session.timeline.lanes.values():
+        assert all(cue.cut == "none" for cue in lane.cues)
+
+
+def test_timeline_presets_by_marker_cuts_assign_soft_or_hard() -> None:
+    beats = tuple(float(i) for i in range(241))
+    bars = tuple(float(i) for i in range(0, 241, 4))
+    controls = _make_controls(
+        ("layer_1", "layer_2", "layer_3", "layer_4"),
+        beat_times=beats,
+        bar_times=bars,
+        duration_sec=240.0,
+    )
+    controls.session.song_markers.times = [30.0, 90.0, 150.0]
+    controls.session.timeline.timeline_preset_kind = "breathing"
+    controls.session.timeline.timeline_preset_crescendo = None
+    controls.session.timeline.timeline_preset_timeline_cuts = "by marker"
+    _focus_timeline_presets(controls)
+    _confirm_timeline_preset(controls)
+    assert not controls.modal_host.active
+    cuts = {
+        cue.cut
+        for lane in controls.session.timeline.lanes.values()
+        for cue in lane.cues
+    }
+    assert cuts
+    assert cuts <= {"soft", "hard"}
+    assert "soft" in cuts
 
 
 def _as_level(value):
@@ -2932,6 +3033,9 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
         RowKind.TIMELINE_PRESET_CHARACTER,
         RowKind.TIMELINE_PRESET_CRESCENDO,
         RowKind.TIMELINE_PRESET_DENSITY,
+        RowKind.TIMELINE_PRESET_CUE_SNAP,
+        RowKind.TIMELINE_PRESET_SONG_MARKER_SNAP,
+        RowKind.TIMELINE_PRESET_TIMELINE_CUTS,
         RowKind.TIMELINE_PRESET_CONDUCTOR,
         RowKind.TIMELINE_PRESETS,
         RowKind.TIMELINE_RESET,

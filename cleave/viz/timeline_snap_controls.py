@@ -10,6 +10,10 @@ from cleave.timeline import (
     snap_lane_to_beats,
     snap_lanes_to_song_markers,
 )
+from cleave.timeline_presets.song_marker_snap import (
+    SONG_MARKER_SNAP_PROXIMITY_OPTIONS,
+    song_marker_snap_proximity_label,
+)
 from cleave.viz.modal import ModalHost, ModalOption
 from cleave.viz.session import TuningSession
 
@@ -22,15 +26,6 @@ _BEATS_PROMPT = "Snap timeline cues to beats?"
 _BARS_PROMPT = "Snap timeline cues to bars?"
 _PROXIMITY_PROMPT = "Snap proximity?"
 _SCOPE_PROMPT = "Layer scope?"
-SONG_MARKER_SNAP_PROXIMITY_OPTIONS: tuple[float, ...] = (
-    0.5,
-    1.0,
-    2.0,
-    5.0,
-    10.0,
-    15.0,
-    30.0,
-)
 _DEFAULT_PROXIMITY = 5.0
 
 
@@ -65,10 +60,6 @@ def resolve_song_marker_snap(
     if scope in layer_z_order:
         return (scope,), "each_layer"
     return tuple(layer_z_order), "each_layer"
-
-
-def song_marker_snap_proximity_label(proximity: float) -> str:
-    return f"{proximity:.1f}s"
 
 
 class TimelineSnapController:

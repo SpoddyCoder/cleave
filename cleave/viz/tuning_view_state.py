@@ -56,9 +56,21 @@ from cleave.preset_playlist import (
 from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
 from cleave.viz.panel_notification import PanelNotificationActive
 from cleave.timeline_presets.crescendo import CrescendoTarget
+from cleave.timeline_presets.cue_snap import (
+    DEFAULT_TIMELINE_PRESET_CUE_SNAP,
+    TimelinePresetCueSnap,
+)
 from cleave.timeline_presets.density import (
     DEFAULT_TIMELINE_PRESET_DENSITY,
     TimelinePresetDensity,
+)
+from cleave.timeline_presets.song_marker_snap import (
+    DEFAULT_TIMELINE_PRESET_SONG_MARKER_SNAP,
+    TimelinePresetSongMarkerSnap,
+)
+from cleave.timeline_presets.timeline_cuts import (
+    DEFAULT_TIMELINE_PRESET_TIMELINE_CUTS,
+    TimelinePresetTimelineCuts,
 )
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.playback import PlaybackState, current_sec
@@ -229,6 +241,13 @@ class RenderTimelineBlock:
     timeline_preset_kind: str = "breathing"
     timeline_preset_crescendo: CrescendoTarget | None = None
     timeline_preset_density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
+    timeline_preset_cue_snap: TimelinePresetCueSnap = DEFAULT_TIMELINE_PRESET_CUE_SNAP
+    timeline_preset_song_marker_snap: TimelinePresetSongMarkerSnap = (
+        DEFAULT_TIMELINE_PRESET_SONG_MARKER_SNAP
+    )
+    timeline_preset_timeline_cuts: TimelinePresetTimelineCuts = (
+        DEFAULT_TIMELINE_PRESET_TIMELINE_CUTS
+    )
     timeline_preset_conductor: bool = DEFAULT_TIMELINE_PRESET_CONDUCTOR
     hard_cut_fades: TimelineFadeGroupBlock = field(
         default_factory=TimelineFadeGroupBlock
@@ -666,6 +685,9 @@ class TuningViewStateBuilder:
             timeline_preset_kind=tl.timeline_preset_kind,
             timeline_preset_crescendo=tl.timeline_preset_crescendo,
             timeline_preset_density=tl.timeline_preset_density,
+            timeline_preset_cue_snap=tl.timeline_preset_cue_snap,
+            timeline_preset_song_marker_snap=tl.timeline_preset_song_marker_snap,
+            timeline_preset_timeline_cuts=tl.timeline_preset_timeline_cuts,
             timeline_preset_conductor=tl.timeline_preset_conductor,
             hard_cut_fades=TimelineFadeGroupBlock(
                 enabled=tl.hard_cut_fades.enabled,
@@ -902,6 +924,9 @@ class TuningViewStateBuilder:
                 timeline_preset_kind=tl.timeline_preset_kind,
                 timeline_preset_crescendo=tl.timeline_preset_crescendo,
                 timeline_preset_density=tl.timeline_preset_density,
+                timeline_preset_cue_snap=tl.timeline_preset_cue_snap,
+                timeline_preset_song_marker_snap=tl.timeline_preset_song_marker_snap,
+                timeline_preset_timeline_cuts=tl.timeline_preset_timeline_cuts,
                 timeline_preset_conductor=tl.timeline_preset_conductor,
                 hard_cut_fades=TimelineFadeGroupBlock(
                     enabled=tl.hard_cut_fades.enabled,

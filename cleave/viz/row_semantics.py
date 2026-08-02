@@ -109,6 +109,9 @@ class RowKind(Enum):
     TIMELINE_PRESET_CHARACTER = auto()
     TIMELINE_PRESET_CRESCENDO = auto()
     TIMELINE_PRESET_DENSITY = auto()
+    TIMELINE_PRESET_CUE_SNAP = auto()
+    TIMELINE_PRESET_SONG_MARKER_SNAP = auto()
+    TIMELINE_PRESET_TIMELINE_CUTS = auto()
     TIMELINE_PRESET_CONDUCTOR = auto()
     TIMELINE_PRESETS = auto()
     TIMELINE_VISUAL_LIMITER_HEADER = auto()
@@ -984,6 +987,39 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "Normal matches the default stack-cost ramp for the layer count.",
         ),
     ),
+    RowKind.TIMELINE_PRESET_CUE_SNAP: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        blocked_by_section_lock=True,
+        help_title="Cue snap",
+        help_entries=(("Left/Right", "cycle cue snap"),),
+        help_description=(
+            "After build, snap cues to the beat or bar grid.",
+            "None leaves cue times from the generator unchanged.",
+        ),
+    ),
+    RowKind.TIMELINE_PRESET_SONG_MARKER_SNAP: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        blocked_by_section_lock=True,
+        help_title="Song marker snap",
+        help_entries=(("Left/Right", "cycle song marker snap proximity"),),
+        help_description=(
+            "After cue snap, pull nearby cues onto song markers.",
+            "Applies each_layer scope across all slots; none skips.",
+        ),
+    ),
+    RowKind.TIMELINE_PRESET_TIMELINE_CUTS: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        blocked_by_section_lock=True,
+        help_title="Timeline cuts",
+        help_entries=(("Left/Right", "cycle timeline cuts"),),
+        help_description=(
+            "After snaps, assign hard/soft cut types to cues.",
+            "By marker sets soft everywhere then hard on song markers.",
+        ),
+    ),
     RowKind.TIMELINE_PRESET_CONDUCTOR: RowBehavior(
         RowAffordance.VALUE_STEP,
         navigable=True,
@@ -1002,7 +1038,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Apply timeline preset",
         help_entries=(("Enter", "apply timeline preset"),),
         help_description=(
-            "Apply the staged character, crescendo, density, and conductor.",
+            "Apply the staged character, crescendo, density, snaps, cuts, and conductor.",
             "This overwrites the current timeline.",
         ),
     ),

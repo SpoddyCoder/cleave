@@ -352,22 +352,22 @@ def test_cues_from_states_writes_cast_on_on_transitions() -> None:
     ]
     lanes = cues_from_states(slots, states, casts)
     assert lanes["layer_1"].cues == [
-        SlotCue(t=0.0, level=1.0, blend="black-key", role="lead", cut="soft"),
-        SlotCue(t=4.0, level=0.0, cut="soft"),
+        SlotCue(t=0.0, level=1.0, blend="black-key", role="lead", cut="none"),
+        SlotCue(t=4.0, level=0.0, cut="none"),
     ]
     assert lanes["layer_2"].cues == [
-        SlotCue(t=4.0, level=0.5, blend="add", role="pulse", cut="soft"),
-        SlotCue(t=8.0, level=1.0, blend="add", role="pulse", cut="soft"),
+        SlotCue(t=4.0, level=0.5, blend="add", role="pulse", cut="none"),
+        SlotCue(t=8.0, level=1.0, blend="add", role="pulse", cut="none"),
     ]
 
 
 def test_cues_from_states_without_casts_omits_role_blend() -> None:
     slots = ["layer_1"]
     lanes = cues_from_states(slots, [(0.0, {"layer_1": 1.0})])
-    assert lanes["layer_1"].cues == [SlotCue(t=0.0, level=1.0, cut="soft")]
+    assert lanes["layer_1"].cues == [SlotCue(t=0.0, level=1.0, cut="none")]
 
 
-def test_cues_from_states_marks_song_marker_on_cues_hard() -> None:
+def test_cues_from_states_always_assigns_cut_none() -> None:
     slots = ["layer_1"]
     lanes = cues_from_states(
         slots,
@@ -376,33 +376,11 @@ def test_cues_from_states_marks_song_marker_on_cues_hard() -> None:
             (10.0, {"layer_1": 0.0}),
             (20.0, {"layer_1": 1.0}),
         ],
-        song_marker_times=(10.0, 20.0),
     )
     assert lanes["layer_1"].cues == [
-        SlotCue(t=0.0, level=1.0, cut="soft"),
-        # Off at a marker still inherits cut from the preceding on-cue.
-        SlotCue(t=10.0, level=0.0, cut="soft"),
-        SlotCue(t=20.0, level=1.0, cut="hard"),
-    ]
-
-
-def test_cues_from_states_off_inherits_preceding_on_cut() -> None:
-    slots = ["layer_1"]
-    lanes = cues_from_states(
-        slots,
-        [
-            (0.0, {"layer_1": 1.0}),
-            (10.0, {"layer_1": 0.0}),
-            (20.0, {"layer_1": 1.0}),
-            (30.0, {"layer_1": 0.0}),
-        ],
-        song_marker_times=(0.0,),
-    )
-    assert lanes["layer_1"].cues == [
-        SlotCue(t=0.0, level=1.0, cut="hard"),
-        SlotCue(t=10.0, level=0.0, cut="hard"),
-        SlotCue(t=20.0, level=1.0, cut="soft"),
-        SlotCue(t=30.0, level=0.0, cut="soft"),
+        SlotCue(t=0.0, level=1.0, cut="none"),
+        SlotCue(t=10.0, level=0.0, cut="none"),
+        SlotCue(t=20.0, level=1.0, cut="none"),
     ]
 
 

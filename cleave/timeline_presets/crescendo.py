@@ -156,7 +156,6 @@ def apply_crescendo(
         slot_list,
         merged,
         casts,
-        song_marker_times=song_marker_times,
     )
 
 

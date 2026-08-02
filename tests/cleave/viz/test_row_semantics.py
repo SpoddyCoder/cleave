@@ -317,6 +317,9 @@ def test_render_value_children_blocked_by_section_lock() -> None:
     assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_CHARACTER) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_CRESCENDO) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_DENSITY) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_CUE_SNAP) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_SONG_MARKER_SNAP) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_TIMELINE_CUTS) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_CONDUCTOR) is True
     assert row_blocked_by_section_lock(RowKind.TRACK_PRESET_SWITCHING_SEED) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_BAR_PHASE) is True
