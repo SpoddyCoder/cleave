@@ -8,11 +8,12 @@ from cleave.viz import modal_overlay
 from cleave.viz.modal import (
     ModalHost,
     ModalKind,
+    ModalLabeledLine,
     ModalOption,
     ModalViewState,
     capital_case_modal_option,
 )
-from cleave.viz.theme import HIGHLIGHT, MODAL_SCRIM_ALPHA
+from cleave.viz.theme import HIGHLIGHT, LABEL, MODAL_SCRIM_ALPHA, VALUE
 from cleave.viz.ui_tint import blit_tint
 
 
@@ -431,3 +432,101 @@ def test_info_panel_sections_include_blank_line_gaps() -> None:
         modal_overlay._PANEL_PAD_Y * 2 + title_h + section_gap + body_h + section_gap + footer_h
     )
     assert panel_h == expected_h
+
+
+def test_labeled_lines_blank_gaps_and_height() -> None:
+    pygame.init()
+    font = _font()
+    line_gap = 3
+    line_h = font.get_linesize()
+    screen_w = 1280
+    labeled = (
+        ModalLabeledLine("character", "breathing"),
+        ModalLabeledLine("density", "normal"),
+    )
+    view = ModalViewState(
+        kind=ModalKind.YES_NO,
+        message="Apply timeline preset?",
+        options=("Yes", "Cancel"),
+        focus_index=0,
+        labeled_lines=labeled,
+    )
+    _, panel_h = modal_overlay._measure_panel(
+        font, view, line_gap=line_gap, screen_w=screen_w
+    )
+    title_h = line_h
+    labeled_h = 2 * line_h + line_gap
+    options_h = 2 * line_h + line_gap
+    section_gap = line_h + line_gap
+    expected_h = (
+        modal_overlay._PANEL_PAD_Y * 2
+        + title_h
+        + section_gap
+        + labeled_h
+        + section_gap
+        + options_h
+    )
+    assert panel_h == expected_h
+
+    without_labeled = ModalViewState(
+        kind=ModalKind.YES_NO,
+        message="Apply timeline preset?",
+        options=("Yes", "Cancel"),
+        focus_index=0,
+    )
+    _, height_without = modal_overlay._measure_panel(
+        font, without_labeled, line_gap=line_gap, screen_w=screen_w
+    )
+    assert panel_h - height_without == section_gap + labeled_h
+
+
+def test_labeled_lines_draw_label_and_value_colors() -> None:
+    pygame.init()
+    font = _font()
+    line = ModalLabeledLine("character", "breathing")
+    panel = pygame.Surface((400, 40), pygame.SRCALPHA)
+    panel.fill((0, 0, 0, 255))
+    modal_overlay._draw_labeled_lines(
+        panel,
+        font,
+        x=0,
+        y=0,
+        lines=(line,),
+        text_alpha=255,
+        line_gap=3,
+    )
+    prefix_w = font.size(line.prefix())[0]
+    value_w = font.size(line.value)[0]
+    line_h = font.get_linesize()
+    mid_y = line_h // 2
+
+    def _has_color(
+        x0: int, x1: int, color: tuple[int, int, int]
+    ) -> bool:
+        return any(
+            panel.get_at((x, mid_y))[:3] == color for x in range(x0, x1)
+        )
+
+    assert _has_color(0, prefix_w, LABEL)
+    assert _has_color(prefix_w, prefix_w + value_w, VALUE)
+    assert not _has_color(0, prefix_w, VALUE)
+    assert not _has_color(prefix_w, prefix_w + value_w, LABEL)
+
+
+def test_prompt_yes_no_passes_labeled_lines() -> None:
+    modal = ModalHost()
+    labeled = (
+        ModalLabeledLine("character", "arc"),
+        ModalLabeledLine("conductor", "on"),
+    )
+    modal.prompt_yes_no(
+        "Apply timeline preset?",
+        on_confirm=lambda: None,
+        cancel_label="Cancel",
+        labeled_lines=labeled,
+    )
+    view = modal.view_state()
+    assert view is not None
+    assert view.message == "Apply timeline preset?"
+    assert view.labeled_lines == labeled
+    assert view.options == ("Yes", "Cancel")

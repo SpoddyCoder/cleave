@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import Enum
 
@@ -45,6 +45,20 @@ class ModalOption:
     action: Callable[[], None]
 
 
+@dataclass(frozen=True)
+class ModalLabeledLine:
+    """Setting-style modal body line: LABEL prefix ``label: `` plus VALUE text."""
+
+    label: str
+    value: str
+
+    def prefix(self) -> str:
+        return f"{self.label}: "
+
+    def display_text(self) -> str:
+        return f"{self.label}: {self.value}"
+
+
 @dataclass
 class ModalRequest:
     kind: ModalKind
@@ -52,6 +66,7 @@ class ModalRequest:
     options: list[ModalOption]
     on_dismiss: Callable[[], None] | None = None
     initial_focus_index: int = 0
+    labeled_lines: tuple[ModalLabeledLine, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -60,6 +75,7 @@ class ModalViewState:
     message: str | None
     options: tuple[str, ...]
     focus_index: int
+    labeled_lines: tuple[ModalLabeledLine, ...] = ()
 
 
 _UNSAVED_QUIT_MESSAGE = "Unsaved changes - save changes before exit?"
@@ -88,6 +104,7 @@ class ModalHost:
                 for option in self._request.options
             ),
             focus_index=self._focus_index,
+            labeled_lines=self._request.labeled_lines,
         )
 
     def prompt(self, request: ModalRequest) -> None:
@@ -104,6 +121,7 @@ class ModalHost:
         on_cancel: Callable[[], None] | None = None,
         *,
         cancel_label: str = "No",
+        labeled_lines: Sequence[ModalLabeledLine] = (),
     ) -> None:
         def on_cancel_action() -> None:
             if on_cancel is not None:
@@ -118,6 +136,7 @@ class ModalHost:
                     ModalOption(cancel_label, on_cancel_action),
                 ],
                 on_dismiss=on_cancel,
+                labeled_lines=tuple(labeled_lines),
             )
         )
 
