@@ -56,9 +56,13 @@ def _as_level(value):
 def _lane(
     baseline,
     *transitions,
+    cut: str | None = None,
 ) -> TimelineLane:
     base = _as_level(baseline)
-    cues = [SlotCue(t=t, level=float(_as_level(level))) for t, level in transitions]
+    cues = [
+        SlotCue(t=t, level=float(_as_level(level)), cut=cut)  # type: ignore[arg-type]
+        for t, level in transitions
+    ]
     return TimelineLane(baseline=base, cues=canonicalize(base, cues))
 
 
@@ -336,11 +340,11 @@ def test_apply_layer_visibility_fades_enable_before_on_cue() -> None:
     session = _session(
         layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
         timeline_enabled=True,
-        lanes={"layer_1": _lane(False, (10.0, True), (20.0, False))},
+        lanes={"layer_1": _lane(False, (10.0, True), (20.0, False), cut="soft")},
     )
-    session.timeline.standard_cue_fades.enabled = True
-    session.timeline.standard_cue_fades.fade_in = 2.0
-    session.timeline.standard_cue_fades.fade_out = 2.0
+    session.timeline.soft_cut_fades.enabled = True
+    session.timeline.soft_cut_fades.fade_in = 2.0
+    session.timeline.soft_cut_fades.fade_out = 2.0
     layers_by_slot = {slot: _stem_layer(slot) for slot in DEFAULT_LAYER_SLOTS}
 
     apply_layer_visibility(session, layers_by_slot, 9.0)
@@ -359,8 +363,8 @@ def test_apply_layer_visibility_fades_off_stays_abrupt() -> None:
         timeline_enabled=True,
         lanes={"layer_1": _lane(False, (10.0, True), (20.0, False))},
     )
-    session.timeline.standard_cue_fades.enabled = False
-    session.timeline.standard_cue_fades.fade_in = 2.0
+    session.timeline.soft_cut_fades.enabled = False
+    session.timeline.soft_cut_fades.fade_in = 2.0
     layers_by_slot = {slot: _stem_layer(slot) for slot in DEFAULT_LAYER_SLOTS}
 
     apply_layer_visibility(session, layers_by_slot, 9.0)
@@ -375,10 +379,10 @@ def test_apply_layer_visibility_override_stays_abrupt_with_fades() -> None:
     session = _session(
         layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
         timeline_enabled=True,
-        lanes={"layer_1": _lane(False, (10.0, True), (20.0, False))},
+        lanes={"layer_1": _lane(False, (10.0, True), (20.0, False), cut="soft")},
     )
-    session.timeline.standard_cue_fades.enabled = True
-    session.timeline.standard_cue_fades.fade_in = 2.0
+    session.timeline.soft_cut_fades.enabled = True
+    session.timeline.soft_cut_fades.fade_in = 2.0
     session.timeline.override_slots = {"layer_1"}
     session.timeline.override_visible = {"layer_1": False}
     layers_by_slot = {slot: _stem_layer(slot) for slot in DEFAULT_LAYER_SLOTS}
@@ -392,10 +396,10 @@ def test_apply_layer_visibility_preview_stays_abrupt_with_fades() -> None:
     session = _session(
         layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
         timeline_enabled=True,
-        lanes={"layer_1": _lane(False, (10.0, True), (20.0, False))},
+        lanes={"layer_1": _lane(False, (10.0, True), (20.0, False), cut="soft")},
     )
-    session.timeline.standard_cue_fades.enabled = True
-    session.timeline.standard_cue_fades.fade_in = 2.0
+    session.timeline.soft_cut_fades.enabled = True
+    session.timeline.soft_cut_fades.fade_in = 2.0
     session.timeline.preview_active = True
     session.timeline.monitor = {
         "layer_1": False,
@@ -487,11 +491,11 @@ def test_timeline_level_multiplier_matches_lane_math() -> None:
     session = _session(
         layer_enabled={"layer_1": True, "layer_2": True, "layer_3": True, "layer_4": True},
         timeline_enabled=True,
-        lanes={"layer_1": _lane(False, (10.0, True), (20.0, False))},
+        lanes={"layer_1": _lane(False, (10.0, True), (20.0, False), cut="soft")},
     )
-    session.timeline.standard_cue_fades.enabled = True
-    session.timeline.standard_cue_fades.fade_in = 2.0
-    session.timeline.standard_cue_fades.fade_out = 2.0
+    session.timeline.soft_cut_fades.enabled = True
+    session.timeline.soft_cut_fades.fade_in = 2.0
+    session.timeline.soft_cut_fades.fade_out = 2.0
     assert timeline_level_multiplier(session, "layer_1", 9.0) == pytest.approx(
         smoothstep(0.5)
     )
@@ -955,9 +959,10 @@ def test_build_timeline_view_state_includes_selected_cue_t() -> None:
         timeline_enabled=True,
     )
     session.timeline.selected_cue_t = {"layer_1": 12.5}
-    session.timeline.selected_cue_flash_start_ms = 1234
+    flash_start = pygame.time.get_ticks()
+    session.timeline.selected_cue_flash_start_ms = flash_start
     state = build_timeline_view_state(session, position_sec=0.0, duration_sec=60.0)
     assert state.selected_cue_t == {"layer_1": 12.5}
-    assert state.selected_cue_flash_start_ms == 1234
+    assert state.selected_cue_flash_start_ms == flash_start
     state.selected_cue_t["layer_1"] = 99.0
     assert session.timeline.selected_cue_t == {"layer_1": 12.5}

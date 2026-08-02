@@ -160,13 +160,15 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     snap_beats = RowDescriptor(RowKind.TIMELINE_SNAP_TO_BEATS)
     snap_bars = RowDescriptor(RowKind.TIMELINE_SNAP_TO_BARS)
     snap_markers = RowDescriptor(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS)
-    fades_header = RowDescriptor(RowKind.TIMELINE_FADES_HEADER)
-    song_marker_fades = RowDescriptor(RowKind.TIMELINE_SONG_MARKER_FADES)
-    song_marker_fade_in = RowDescriptor(RowKind.TIMELINE_SONG_MARKER_FADE_IN)
-    song_marker_fade_out = RowDescriptor(RowKind.TIMELINE_SONG_MARKER_FADE_OUT)
-    standard_cue_fades = RowDescriptor(RowKind.TIMELINE_STANDARD_CUE_FADES)
-    standard_cue_fade_in = RowDescriptor(RowKind.TIMELINE_STANDARD_CUE_FADE_IN)
-    standard_cue_fade_out = RowDescriptor(RowKind.TIMELINE_STANDARD_CUE_FADE_OUT)
+    cuts_header = RowDescriptor(RowKind.TIMELINE_CUTS_HEADER)
+    hard_cut_fades = RowDescriptor(RowKind.TIMELINE_HARD_CUTS)
+    hard_cut_fade_in = RowDescriptor(RowKind.TIMELINE_HARD_CUT_FADE_IN)
+    hard_cut_fade_out = RowDescriptor(RowKind.TIMELINE_HARD_CUT_FADE_OUT)
+    soft_cut_fades = RowDescriptor(RowKind.TIMELINE_SOFT_CUTS)
+    soft_cut_fade_in = RowDescriptor(RowKind.TIMELINE_SOFT_CUT_FADE_IN)
+    soft_cut_fade_out = RowDescriptor(RowKind.TIMELINE_SOFT_CUT_FADE_OUT)
+    apply_soft_cuts = RowDescriptor(RowKind.TIMELINE_APPLY_SOFT_CUTS)
+    apply_hard_cuts = RowDescriptor(RowKind.TIMELINE_APPLY_HARD_CUTS)
     limiter_header = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_HEADER)
     limiter_threshold = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD)
     limiter_release = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_RELEASE)
@@ -182,7 +184,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert snap_beats not in view_closed.layout.rows
     assert snap_bars not in view_closed.layout.rows
     assert snap_markers not in view_closed.layout.rows
-    assert fades_header not in view_closed.layout.rows
+    assert cuts_header not in view_closed.layout.rows
     assert limiter_header not in view_closed.layout.rows
     assert markers_header not in view_closed.layout.rows
 
@@ -204,8 +206,8 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert snap_beats not in view_open.layout.rows
     assert snap_bars not in view_open.layout.rows
     assert snap_markers not in view_open.layout.rows
-    assert fades_header in view_open.layout.rows
-    assert song_marker_fades not in view_open.layout.rows
+    assert cuts_header in view_open.layout.rows
+    assert hard_cut_fades not in view_open.layout.rows
     assert limiter_header in view_open.layout.rows
     assert limiter_threshold in view_open.layout.rows
     assert limiter_release in view_open.layout.rows
@@ -213,14 +215,14 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     markers_idx = view_open.layout.rows.index(markers_header)
     beat_bar_idx = view_open.layout.rows.index(beat_bar_header)
     snap_cues_idx = view_open.layout.rows.index(snap_cues_header)
-    fades_idx = view_open.layout.rows.index(fades_header)
+    cuts_idx = view_open.layout.rows.index(cuts_header)
     presets_header_idx = view_open.layout.rows.index(presets_header)
     limiter_header_idx = view_open.layout.rows.index(limiter_header)
     reset_idx = view_open.layout.rows.index(reset)
     assert beat_bar_idx == markers_idx + 1
     assert snap_cues_idx == beat_bar_idx + 1
-    assert fades_idx == snap_cues_idx + 1
-    assert presets_header_idx == fades_idx + 1
+    assert cuts_idx == snap_cues_idx + 1
+    assert presets_header_idx == cuts_idx + 1
     assert limiter_header_idx == presets_header_idx + 1
     assert view_open.layout.rows.index(limiter_threshold) == limiter_header_idx + 1
     assert view_open.layout.rows.index(limiter_release) == limiter_header_idx + 2
@@ -241,22 +243,22 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     bar_grid_idx = view_beat_expanded.layout.rows.index(bar_grid)
     placement_snap_idx = view_beat_expanded.layout.rows.index(placement_snap)
     snap_cues_idx = view_beat_expanded.layout.rows.index(snap_cues_header)
-    fades_idx = view_beat_expanded.layout.rows.index(fades_header)
+    cuts_idx = view_beat_expanded.layout.rows.index(cuts_header)
     assert placement_snap_idx == beat_bar_idx + 1
     assert bar_grid_idx == placement_snap_idx + 1
     assert bar_phase_idx == bar_grid_idx + 1
     assert snap_cues_idx == bar_phase_idx + 1
-    assert fades_idx == snap_cues_idx + 1
+    assert cuts_idx == snap_cues_idx + 1
     assert snap_beats not in view_beat_expanded.layout.rows
     assert snap_bars not in view_beat_expanded.layout.rows
     assert snap_markers not in view_beat_expanded.layout.rows
-    assert song_marker_fades not in view_beat_expanded.layout.rows
-    assert standard_cue_fades not in view_beat_expanded.layout.rows
-    assert view_beat_expanded.layout.rows.index(presets_header) == fades_idx + 1
-    assert view_beat_expanded.layout.rows.index(limiter_header) == fades_idx + 2
-    assert view_beat_expanded.layout.rows.index(limiter_threshold) == fades_idx + 3
-    assert view_beat_expanded.layout.rows.index(limiter_release) == fades_idx + 4
-    assert view_beat_expanded.layout.rows.index(reset) == fades_idx + 5
+    assert hard_cut_fades not in view_beat_expanded.layout.rows
+    assert soft_cut_fades not in view_beat_expanded.layout.rows
+    assert view_beat_expanded.layout.rows.index(presets_header) == cuts_idx + 1
+    assert view_beat_expanded.layout.rows.index(limiter_header) == cuts_idx + 2
+    assert view_beat_expanded.layout.rows.index(limiter_threshold) == cuts_idx + 3
+    assert view_beat_expanded.layout.rows.index(limiter_release) == cuts_idx + 4
+    assert view_beat_expanded.layout.rows.index(reset) == cuts_idx + 5
 
     session.timeline.snap_cues_expanded = True
     view_snap_expanded = builder.build(paused=False)
@@ -265,38 +267,42 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     snap_beats_idx = view_snap_expanded.layout.rows.index(snap_beats)
     snap_bars_idx = view_snap_expanded.layout.rows.index(snap_bars)
     snap_markers_idx = view_snap_expanded.layout.rows.index(snap_markers)
-    fades_idx = view_snap_expanded.layout.rows.index(fades_header)
+    cuts_idx = view_snap_expanded.layout.rows.index(cuts_header)
     assert snap_beats_idx == snap_cues_idx + 1
     assert snap_bars_idx == snap_beats_idx + 1
     assert snap_markers_idx == snap_bars_idx + 1
-    assert fades_idx == snap_markers_idx + 1
+    assert cuts_idx == snap_markers_idx + 1
 
-    session.timeline.fades_expanded = True
-    view_fades_expanded = builder.build(paused=False)
-    assert view_fades_expanded.layout is not view_snap_expanded.layout
-    fades_idx = view_fades_expanded.layout.rows.index(fades_header)
-    assert view_fades_expanded.layout.rows.index(song_marker_fades) == fades_idx + 1
-    assert view_fades_expanded.layout.rows.index(standard_cue_fades) == fades_idx + 2
-    assert song_marker_fade_in not in view_fades_expanded.layout.rows
-    assert standard_cue_fade_in not in view_fades_expanded.layout.rows
-    assert view_fades_expanded.layout.rows.index(presets_header) == fades_idx + 3
+    session.timeline.cuts_expanded = True
+    view_cuts_expanded = builder.build(paused=False)
+    assert view_cuts_expanded.layout is not view_snap_expanded.layout
+    cuts_idx = view_cuts_expanded.layout.rows.index(cuts_header)
+    assert view_cuts_expanded.layout.rows.index(hard_cut_fades) == cuts_idx + 1
+    assert view_cuts_expanded.layout.rows.index(soft_cut_fades) == cuts_idx + 2
+    assert view_cuts_expanded.layout.rows.index(apply_soft_cuts) == cuts_idx + 3
+    assert view_cuts_expanded.layout.rows.index(apply_hard_cuts) == cuts_idx + 4
+    assert hard_cut_fade_in not in view_cuts_expanded.layout.rows
+    assert soft_cut_fade_in not in view_cuts_expanded.layout.rows
+    assert view_cuts_expanded.layout.rows.index(presets_header) == cuts_idx + 5
 
-    session.timeline.song_marker_fades.enabled = True
-    session.timeline.standard_cue_fades.enabled = True
-    view_fades_enabled = builder.build(paused=False)
-    assert view_fades_enabled.layout is not view_fades_expanded.layout
-    fades_idx = view_fades_enabled.layout.rows.index(fades_header)
-    assert view_fades_enabled.layout.rows.index(song_marker_fades) == fades_idx + 1
-    assert view_fades_enabled.layout.rows.index(song_marker_fade_in) == fades_idx + 2
-    assert view_fades_enabled.layout.rows.index(song_marker_fade_out) == fades_idx + 3
-    assert view_fades_enabled.layout.rows.index(standard_cue_fades) == fades_idx + 4
-    assert view_fades_enabled.layout.rows.index(standard_cue_fade_in) == fades_idx + 5
-    assert view_fades_enabled.layout.rows.index(standard_cue_fade_out) == fades_idx + 6
-    assert view_fades_enabled.layout.rows.index(presets_header) == fades_idx + 7
+    session.timeline.hard_cut_fades.enabled = True
+    session.timeline.soft_cut_fades.enabled = True
+    view_cuts_enabled = builder.build(paused=False)
+    assert view_cuts_enabled.layout is not view_cuts_expanded.layout
+    cuts_idx = view_cuts_enabled.layout.rows.index(cuts_header)
+    assert view_cuts_enabled.layout.rows.index(hard_cut_fades) == cuts_idx + 1
+    assert view_cuts_enabled.layout.rows.index(hard_cut_fade_in) == cuts_idx + 2
+    assert view_cuts_enabled.layout.rows.index(hard_cut_fade_out) == cuts_idx + 3
+    assert view_cuts_enabled.layout.rows.index(soft_cut_fades) == cuts_idx + 4
+    assert view_cuts_enabled.layout.rows.index(soft_cut_fade_in) == cuts_idx + 5
+    assert view_cuts_enabled.layout.rows.index(soft_cut_fade_out) == cuts_idx + 6
+    assert view_cuts_enabled.layout.rows.index(apply_soft_cuts) == cuts_idx + 7
+    assert view_cuts_enabled.layout.rows.index(apply_hard_cuts) == cuts_idx + 8
+    assert view_cuts_enabled.layout.rows.index(presets_header) == cuts_idx + 9
 
     session.timeline.timeline_presets_expanded = True
     view_presets_expanded = builder.build(paused=False)
-    assert view_presets_expanded.layout is not view_fades_enabled.layout
+    assert view_presets_expanded.layout is not view_cuts_enabled.layout
     presets_header_idx = view_presets_expanded.layout.rows.index(presets_header)
     assert view_presets_expanded.layout.rows.index(preset_character) == (
         presets_header_idx + 1
@@ -340,7 +346,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert presets_header not in view_closed_again.layout.rows
     assert presets_apply not in view_closed_again.layout.rows
     assert reset not in view_closed_again.layout.rows
-    assert fades_header not in view_closed_again.layout.rows
+    assert cuts_header not in view_closed_again.layout.rows
     assert bar_phase not in view_closed_again.layout.rows
     assert bar_grid not in view_closed_again.layout.rows
     assert placement_snap not in view_closed_again.layout.rows
@@ -734,11 +740,11 @@ def test_structure_signature_invalidates_on_timeline_levels_expanded() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
-    session.timeline.fades_expanded = False
+    session.timeline.cuts_expanded = False
     sig_before = view_state_structure_signature(
         session, config_save, notification_active=False
     )
-    session.timeline.fades_expanded = True
+    session.timeline.cuts_expanded = True
     sig_after = view_state_structure_signature(
         session, config_save, notification_active=False
     )
@@ -760,30 +766,30 @@ def test_structure_signature_invalidates_on_timeline_presets_expanded() -> None:
     assert sig_before != sig_after
 
 
-def test_structure_signature_invalidates_on_song_marker_fades_enabled() -> None:
+def test_structure_signature_invalidates_on_hard_cut_fades_enabled() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
-    session.timeline.song_marker_fades.enabled = False
+    session.timeline.hard_cut_fades.enabled = False
     sig_before = view_state_structure_signature(
         session, config_save, notification_active=False
     )
-    session.timeline.song_marker_fades.enabled = True
+    session.timeline.hard_cut_fades.enabled = True
     sig_after = view_state_structure_signature(
         session, config_save, notification_active=False
     )
     assert sig_before != sig_after
 
 
-def test_structure_signature_invalidates_on_standard_cue_fades_enabled() -> None:
+def test_structure_signature_invalidates_on_soft_cut_fades_enabled() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
-    session.timeline.standard_cue_fades.enabled = False
+    session.timeline.soft_cut_fades.enabled = False
     sig_before = view_state_structure_signature(
         session, config_save, notification_active=False
     )
-    session.timeline.standard_cue_fades.enabled = True
+    session.timeline.soft_cut_fades.enabled = True
     sig_after = view_state_structure_signature(
         session, config_save, notification_active=False
     )

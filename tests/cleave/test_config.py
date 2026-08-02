@@ -24,7 +24,7 @@ from cleave.config import (
     RenderPostFxConfig,
     TimelineConfig,
     TimelineFadeGroupConfig,
-    TimelineFadesConfig,
+    TimelineCutsConfig,
     TimelineLimiterConfig,
     TimelinePresetConfig,
     EditorConfig,
@@ -1091,22 +1091,22 @@ def test_parse_timeline_defaults_enabled_true() -> None:
     )
     assert timeline == TimelineConfig(enabled=True, lanes={})
     assert timeline.locked is False
-    assert timeline.fades == TimelineFadesConfig()
+    assert timeline.cuts == TimelineCutsConfig()
     assert timeline.placement_snap == "beat"
     assert timeline.preset == TimelinePresetConfig()
 
 
-def test_parse_timeline_reads_fades() -> None:
+def test_parse_timeline_reads_cuts() -> None:
     timeline = parse_timeline_section(
         {
             "timeline": {
-                "fades": {
-                    "song_markers": {
+                "cuts": {
+                    "hard": {
                         "enabled": True,
                         "fade_in": 1.5,
                         "fade_out": 3.0,
                     },
-                    "standard": {
+                    "soft": {
                         "enabled": False,
                         "fade_in": 0.5,
                         "fade_out": 4.0,
@@ -1117,13 +1117,13 @@ def test_parse_timeline_reads_fades() -> None:
         _timeline_parse_ctx(),
     )
     assert timeline is not None
-    assert timeline.fades == TimelineFadesConfig(
-        song_markers=TimelineFadeGroupConfig(
+    assert timeline.cuts == TimelineCutsConfig(
+        hard=TimelineFadeGroupConfig(
             enabled=True,
             fade_in=1.5,
             fade_out=3.0,
         ),
-        standard=TimelineFadeGroupConfig(
+        soft=TimelineFadeGroupConfig(
             enabled=False,
             fade_in=0.5,
             fade_out=4.0,
@@ -1138,12 +1138,12 @@ def test_persist_timeline_levels_round_trip() -> None:
         layer_z_order=list(DEFAULT_LAYER_SLOTS),
         timeline=TimelineRuntime(
             enabled=True,
-            song_marker_fades=TimelineFadeGroupRuntime(
+            hard_cut_fades=TimelineFadeGroupRuntime(
                 enabled=True,
                 fade_in=1.5,
                 fade_out=3.0,
             ),
-            standard_cue_fades=TimelineFadeGroupRuntime(
+            soft_cut_fades=TimelineFadeGroupRuntime(
                 enabled=False,
                 fade_in=0.5,
                 fade_out=4.0,
@@ -1159,13 +1159,13 @@ def test_persist_timeline_levels_round_trip() -> None:
         layer_z_order=list(DEFAULT_LAYER_SLOTS),
     )
     payload = persist_timeline(PersistCtx(cfg=cfg, session=session, cfg_dir=None))
-    assert payload["fades"] == {
-        "song_markers": {
+    assert payload["cuts"] == {
+        "hard": {
             "enabled": True,
             "fade_in": 1.5,
             "fade_out": 3.0,
         },
-        "standard": {
+        "soft": {
             "enabled": False,
             "fade_in": 0.5,
             "fade_out": 4.0,
@@ -1176,13 +1176,13 @@ def test_persist_timeline_levels_round_trip() -> None:
         _timeline_parse_ctx(),
     )
     assert round_trip is not None
-    assert round_trip.fades == TimelineFadesConfig(
-        song_markers=TimelineFadeGroupConfig(
+    assert round_trip.cuts == TimelineCutsConfig(
+        hard=TimelineFadeGroupConfig(
             enabled=True,
             fade_in=1.5,
             fade_out=3.0,
         ),
-        standard=TimelineFadeGroupConfig(
+        soft=TimelineFadeGroupConfig(
             enabled=False,
             fade_in=0.5,
             fade_out=4.0,
@@ -1442,7 +1442,7 @@ def test_persist_timeline_cue_levels_round_trip() -> None:
     assert round_trip.lanes["layer_1"] == session.timeline.lanes["layer_1"]
 
 
-def test_persist_timeline_cue_blend_and_role_round_trip() -> None:
+def test_persist_timeline_cue_blend_role_and_cut_round_trip() -> None:
     from cleave.viz.session import TimelineRuntime
 
     session = TuningSession(
@@ -1453,8 +1453,10 @@ def test_persist_timeline_cue_blend_and_role_round_trip() -> None:
                 "layer_1": TimelineLane(
                     baseline=0.0,
                     cues=[
-                        SlotCue(t=1.0, level=1.0, blend="add", role="lead"),
-                        SlotCue(t=2.0, level=0.0),
+                        SlotCue(
+                            t=1.0, level=1.0, blend="add", role="lead", cut="hard"
+                        ),
+                        SlotCue(t=2.0, level=0.0, cut="soft"),
                     ],
                 ),
             },
@@ -1470,8 +1472,8 @@ def test_persist_timeline_cue_blend_and_role_round_trip() -> None:
     )
     payload = persist_timeline(PersistCtx(cfg=cfg, session=session, cfg_dir=None))
     assert payload["lanes"]["layer_1"]["cues"] == [
-        {"t": 1.0, "level": 1.0, "blend": "add", "role": "lead"},
-        {"t": 2.0, "level": 0.0},
+        {"t": 1.0, "level": 1.0, "blend": "add", "role": "lead", "cut": "hard"},
+        {"t": 2.0, "level": 0.0, "cut": "soft"},
     ]
     round_trip = parse_timeline_section(
         {"timeline": payload},
@@ -1481,7 +1483,7 @@ def test_persist_timeline_cue_blend_and_role_round_trip() -> None:
     assert round_trip.lanes["layer_1"] == session.timeline.lanes["layer_1"]
 
 
-def test_parse_timeline_reads_cue_blend_and_role() -> None:
+def test_parse_timeline_reads_cue_blend_role_and_cut() -> None:
     timeline = parse_timeline_section(
         {
             "timeline": {
@@ -1494,6 +1496,7 @@ def test_parse_timeline_reads_cue_blend_and_role() -> None:
                                 "level": 1.0,
                                 "blend": "screen",
                                 "role": "accent",
+                                "cut": "soft",
                             },
                         ],
                     },
@@ -1504,7 +1507,7 @@ def test_parse_timeline_reads_cue_blend_and_role() -> None:
     )
     assert timeline is not None
     assert timeline.lanes["layer_1"].cues == [
-        SlotCue(t=1.0, level=1.0, blend="screen", role="accent"),
+        SlotCue(t=1.0, level=1.0, blend="screen", role="accent", cut="soft"),
     ]
 
 
@@ -1532,6 +1535,22 @@ def test_parse_timeline_rejects_invalid_cue_role() -> None:
                     "lanes": {
                         "layer_1": {
                             "cues": [{"t": 1.0, "level": 1.0, "role": "solo"}],
+                        }
+                    }
+                }
+            },
+            _timeline_parse_ctx(),
+        )
+
+
+def test_parse_timeline_rejects_invalid_cue_cut() -> None:
+    with pytest.raises(ValueError, match="cut must be one of"):
+        parse_timeline_section(
+            {
+                "timeline": {
+                    "lanes": {
+                        "layer_1": {
+                            "cues": [{"t": 1.0, "level": 1.0, "cut": "sharp"}],
                         }
                     }
                 }

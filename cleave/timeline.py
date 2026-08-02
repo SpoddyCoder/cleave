@@ -10,11 +10,13 @@ import numpy as np
 
 from cleave.blend_modes import BlendMode
 from cleave.cue_roles import CueRole
+from cleave.cut_types import CutType
 from cleave.easing import smoothstep
 from cleave.extract import STEM_SOURCES, StemSource
 
 RECORD_DEBOUNCE_SEC = 0.08
-SONG_MARKER_FADE_MATCH_EPS = 1e-3
+# Epsilon for apply-cut scoping against song marker times (not fade selection).
+SONG_MARKER_CUT_MATCH_EPS = 1e-3
 LEVEL_QUANTUM = 0.25
 # Manual strip nudges (percent of full); generative Apply still uses LEVEL_QUANTUM.
 LEVEL_STEP_SMALL = 0.01
@@ -37,6 +39,7 @@ class SlotCue:
     level: float
     blend: BlendMode | None = None
     role: CueRole | None = None
+    cut: CutType | None = None
 
 
 @dataclass
@@ -75,10 +78,10 @@ def levels_equal(a: float, b: float) -> bool:
 
 
 def cue_editable_for_blend_role(cue: SlotCue) -> bool:
-    """True when ``cue`` may carry blend/role and is in the strip nav set.
+    """True when ``cue`` may carry blend/role (on cues only).
 
-    Off cues (``level <= LEVEL_EPS``) are level transitions only; cast and blend
-    are authored on the next on / visible period.
+    Off cues (``level <= LEVEL_EPS``) are level transitions; cast and blend are
+    authored on the next on / visible period. Cut may still be set on offs.
     """
     return float(cue.level) > LEVEL_EPS
 
@@ -114,11 +117,12 @@ def cue_at_time(lane: TimelineLane, cue_t: float) -> SlotCue | None:
 
 
 def navigable_cue_times(lane: TimelineLane) -> list[float]:
-    """Cue times eligible for ``,`` / ``.`` selection (level above off).
+    """Cue times eligible for ``,`` / ``.`` selection.
 
-    Includes ``0.0`` when the opening period is on via baseline only.
+    All stored cues are navigable (including offs). Includes ``0.0`` when the
+    opening period is on via baseline only.
     """
-    times = [cue.t for cue in lane.cues if cue_editable_for_blend_role(cue)]
+    times = [cue.t for cue in lane.cues]
     if opening_baseline_editable(lane):
         times.insert(0, 0.0)
     return times
@@ -132,9 +136,9 @@ def canonicalize(
 
     Returns strictly increasing ``t`` cues where each changes level and/or
     blend from the previous state (``baseline`` with blend inherit ``None``,
-    or the prior cue when baseline is None). Role is not part of the
+    or the prior cue when baseline is None). Role and cut are not part of the
     comparison. Off cues (``level <= LEVEL_EPS``) always have ``blend`` and
-    ``role`` cleared before compare and emit.
+    ``role`` cleared before compare and emit; ``cut`` is preserved.
     """
     if not cues:
         return []
@@ -235,27 +239,35 @@ def lane_level_segments(
 
 @dataclass(frozen=True)
 class TimelineFadeGroup:
-    """Per-edge fade settings for song-marker or standard cue boundaries."""
+    """Per-edge fade settings for hard-cut or soft-cut cue boundaries."""
 
     enabled: bool = False
     fade_in: float = 2.0
     fade_out: float = 2.0
 
 
-def _matches_song_marker(t: float, markers: Sequence[float]) -> bool:
-    return any(abs(marker - t) <= SONG_MARKER_FADE_MATCH_EPS for marker in markers)
+def matches_song_marker(
+    t: float,
+    markers: Sequence[float],
+    *,
+    eps: float = SONG_MARKER_CUT_MATCH_EPS,
+) -> bool:
+    """True when ``t`` is within ``eps`` of any song marker time."""
+    return any(abs(marker - t) <= eps for marker in markers)
 
 
 def _fade_group_for_edge(
-    t: float,
+    cue: SlotCue,
     *,
-    song_marker_times: Sequence[float],
-    song_marker_fades: TimelineFadeGroup,
-    standard_fades: TimelineFadeGroup,
-) -> TimelineFadeGroup:
-    if _matches_song_marker(t, song_marker_times):
-        return song_marker_fades
-    return standard_fades
+    hard_cut_fades: TimelineFadeGroup,
+    soft_cut_fades: TimelineFadeGroup,
+) -> TimelineFadeGroup | None:
+    """Select fade group from ``cue.cut``; ``none`` / unset means a hard step."""
+    if cue.cut == "hard":
+        return hard_cut_fades
+    if cue.cut == "soft":
+        return soft_cut_fades
+    return None
 
 
 def _append_breakpoint(
@@ -278,17 +290,17 @@ def lane_level_breakpoints(
     lane: TimelineLane,
     *,
     inherit: float,
-    song_marker_fades: TimelineFadeGroup,
-    standard_fades: TimelineFadeGroup,
+    hard_cut_fades: TimelineFadeGroup,
+    soft_cut_fades: TimelineFadeGroup,
     duration_sec: float,
-    song_marker_times: Sequence[float] = (),
 ) -> list[tuple[float, float]]:
     """Build a monotone ``(t, level)`` polyline for the lane envelope.
 
     For a transition at ``t`` from level ``a`` to ``b``, fade durations act as
     slopes: a full-scale move takes the configured duration. Rise completes at
-    the cue time; fall starts at the cue time. Disabled groups or zero duration
-    collapse to a hard step. Overlapping rise starts clamp forward.
+    the cue time; fall starts at the cue time. Cut type ``none`` / unset,
+    disabled groups, or zero duration collapse to a hard step. Each cue's cut
+    controls its own edge (rise or fall). Overlapping rise starts clamp forward.
     """
     if duration_sec <= 0.0:
         return []
@@ -302,42 +314,50 @@ def lane_level_breakpoints(
         a = previous
         b = float(cue.level)
         t = float(cue.t)
-        previous = b
         if levels_equal(a, b):
+            previous = b
             continue
         group = _fade_group_for_edge(
-            t,
-            song_marker_times=song_marker_times,
-            song_marker_fades=song_marker_fades,
-            standard_fades=standard_fades,
+            cue,
+            hard_cut_fades=hard_cut_fades,
+            soft_cut_fades=soft_cut_fades,
         )
         if b > a:
             delta = b - a
-            fade_in = max(0.0, float(group.fade_in)) if group.enabled else 0.0
+            fade_in = (
+                max(0.0, float(group.fade_in))
+                if group is not None and group.enabled
+                else 0.0
+            )
             ramp = fade_in * delta
             if ramp <= 0.0:
                 _append_breakpoint(breakpoints, t, a)
                 _append_breakpoint(breakpoints, t, b)
-                continue
-            t_start = t - ramp
-            if breakpoints and t_start < breakpoints[-1][0]:
-                t_start = breakpoints[-1][0]
-            if t_start >= t:
-                _append_breakpoint(breakpoints, t, a)
-                _append_breakpoint(breakpoints, t, b)
             else:
-                _append_breakpoint(breakpoints, t_start, a)
-                _append_breakpoint(breakpoints, t, b)
+                t_start = t - ramp
+                if breakpoints and t_start < breakpoints[-1][0]:
+                    t_start = breakpoints[-1][0]
+                if t_start >= t:
+                    _append_breakpoint(breakpoints, t, a)
+                    _append_breakpoint(breakpoints, t, b)
+                else:
+                    _append_breakpoint(breakpoints, t_start, a)
+                    _append_breakpoint(breakpoints, t, b)
         else:
             delta = a - b
-            fade_out = max(0.0, float(group.fade_out)) if group.enabled else 0.0
+            fade_out = (
+                max(0.0, float(group.fade_out))
+                if group is not None and group.enabled
+                else 0.0
+            )
             ramp = fade_out * delta
             if ramp <= 0.0:
                 _append_breakpoint(breakpoints, t, a)
                 _append_breakpoint(breakpoints, t, b)
-                continue
-            _append_breakpoint(breakpoints, t, a)
-            _append_breakpoint(breakpoints, t + ramp, b)
+            else:
+                _append_breakpoint(breakpoints, t, a)
+                _append_breakpoint(breakpoints, t + ramp, b)
+        previous = b
 
     if not breakpoints:
         return [(0.0, float(level))]
@@ -385,29 +405,27 @@ def lane_tick_times(lane: TimelineLane, duration_sec: float) -> list[float]:
 def lane_on_transition_cues(
     lane: TimelineLane,
     *,
-    song_marker_times: Sequence[float] = (),
-    song_marker_fades: TimelineFadeGroup,
-    standard_fades: TimelineFadeGroup,
+    hard_cut_fades: TimelineFadeGroup,
+    soft_cut_fades: TimelineFadeGroup,
 ) -> list[tuple[float, SlotCue]]:
     """Preset-switch ``(trigger_t, cue)`` pairs for each rise from zero.
 
     Fires when ``previous <= LEVEL_EPS < cue.level``, with ``previous`` from
     ``baseline`` or ``0.0`` when baseline is None. Trigger is
-    ``cue.t - fade_in * cue.level`` using the song-marker vs standard fade
-    group for that edge. When the matching group is disabled or ``fade_in`` is
-    0, the trigger is ``cue.t``.
+    ``cue.t - fade_in * cue.level`` using the on-cue's cut type to select the
+    fade group. When cut is ``none`` / unset, the group is disabled, or
+    ``fade_in`` is 0, the trigger is ``cue.t``.
     """
     results: list[tuple[float, SlotCue]] = []
     previous = 0.0 if lane.baseline is None else float(lane.baseline)
     for cue in lane.cues:
         if previous <= LEVEL_EPS < cue.level:
             group = _fade_group_for_edge(
-                cue.t,
-                song_marker_times=song_marker_times,
-                song_marker_fades=song_marker_fades,
-                standard_fades=standard_fades,
+                cue,
+                hard_cut_fades=hard_cut_fades,
+                soft_cut_fades=soft_cut_fades,
             )
-            if not group.enabled or group.fade_in <= 0.0:
+            if group is None or not group.enabled or group.fade_in <= 0.0:
                 ramp = 0.0
             else:
                 ramp = max(0.0, float(group.fade_in)) * float(cue.level)
@@ -419,18 +437,16 @@ def lane_on_transition_cues(
 def lane_on_transition_trigger_times(
     lane: TimelineLane,
     *,
-    song_marker_times: Sequence[float] = (),
-    song_marker_fades: TimelineFadeGroup,
-    standard_fades: TimelineFadeGroup,
+    hard_cut_fades: TimelineFadeGroup,
+    soft_cut_fades: TimelineFadeGroup,
 ) -> list[float]:
     """Preset-switch trigger times for each rise from zero."""
     return [
         trigger
         for trigger, _cue in lane_on_transition_cues(
             lane,
-            song_marker_times=song_marker_times,
-            song_marker_fades=song_marker_fades,
-            standard_fades=standard_fades,
+            hard_cut_fades=hard_cut_fades,
+            soft_cut_fades=soft_cut_fades,
         )
     ]
 
@@ -439,18 +455,16 @@ def lane_on_transition_count(
     lane: TimelineLane,
     t_sec: float,
     *,
-    song_marker_times: Sequence[float] = (),
-    song_marker_fades: TimelineFadeGroup,
-    standard_fades: TimelineFadeGroup,
+    hard_cut_fades: TimelineFadeGroup,
+    soft_cut_fades: TimelineFadeGroup,
 ) -> int:
     """Number of on-transition triggers at or before ``t_sec`` (seek-stable)."""
     return sum(
         1
         for trigger in lane_on_transition_trigger_times(
             lane,
-            song_marker_times=song_marker_times,
-            song_marker_fades=song_marker_fades,
-            standard_fades=standard_fades,
+            hard_cut_fades=hard_cut_fades,
+            soft_cut_fades=soft_cut_fades,
         )
         if trigger <= t_sec
     )
@@ -494,7 +508,7 @@ def set_lane_cue(
 ) -> TimelineLane:
     """Set or replace the transition at ``t``; canonicalize.
 
-    Replacing an existing cue keeps its ``blend`` and ``role``.
+    Replacing an existing cue keeps its ``blend``, ``role``, and ``cut``.
     """
     others = [cue for cue in lane.cues if cue.t != t]
     existing = next((cue for cue in lane.cues if cue.t == t), None)
@@ -515,19 +529,22 @@ def update_lane_cue(
     blend: BlendMode | None,
     role: CueRole | None,
     level: float | None = None,
+    cut: CutType | None = None,
 ) -> TimelineLane:
-    """Update ``blend`` / ``role`` / optional ``level`` on the cue at ``cue_t``.
+    """Update ``blend`` / ``role`` / ``cut`` / optional ``level`` on the cue at ``cue_t``.
 
     When ``cue_t`` is ``0.0`` and the opening period is only a baseline on-level:
-    level-only edits (``blend`` and ``role`` both ``None``) update ``baseline``
-    in place; otherwise materialize a real cue at ``0.0`` (baseline becomes
-    ``0.0``) so cast/blend persist and preset-switch rises can read the role.
+    level-only edits (``blend`` and ``role`` both ``None``, and ``cut`` unset or
+    ``none``) update ``baseline`` in place; otherwise materialize a real cue at
+    ``0.0`` (baseline becomes ``0.0``) so cast/blend/cut persist and
+    preset-switch rises can read the role.
     """
+    cut_needs_cue = cut is not None and cut != "none"
     if cue_t == 0.0 and opening_baseline_editable(lane):
         new_level = (
             float(lane.baseline) if level is None else clamp_level(level)
         )
-        if blend is None and role is None:
+        if blend is None and role is None and not cut_needs_cue:
             if level is None:
                 return copy_lane(lane)
             baseline = 0.0 if new_level <= LEVEL_EPS else new_level
@@ -540,7 +557,13 @@ def update_lane_cue(
             cues=canonicalize(
                 0.0,
                 [
-                    SlotCue(t=0.0, level=new_level, blend=blend, role=role),
+                    SlotCue(
+                        t=0.0,
+                        level=new_level,
+                        blend=blend,
+                        role=role,
+                        cut=cut,
+                    ),
                     *lane.cues,
                 ],
             ),
@@ -551,7 +574,9 @@ def update_lane_cue(
             updated.append(cue)
             continue
         new_level = cue.level if level is None else clamp_level(level)
-        updated.append(replace(cue, level=new_level, blend=blend, role=role))
+        updated.append(
+            replace(cue, level=new_level, blend=blend, role=role, cut=cut)
+        )
     return TimelineLane(
         baseline=lane.baseline,
         cues=canonicalize(lane.baseline, updated),

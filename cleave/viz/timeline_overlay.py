@@ -138,8 +138,8 @@ class TimelineViewState:
     bar_grid_times: tuple[float, ...] = ()
     song_marker_times: tuple[float, ...] = ()
     selected_song_marker_index: int | None = None
-    song_marker_fades: TimelineFadeGroup = field(default_factory=TimelineFadeGroup)
-    standard_cue_fades: TimelineFadeGroup = field(default_factory=TimelineFadeGroup)
+    hard_cut_fades: TimelineFadeGroup = field(default_factory=TimelineFadeGroup)
+    soft_cut_fades: TimelineFadeGroup = field(default_factory=TimelineFadeGroup)
     selected_cue_t: dict[str, float] = field(default_factory=dict)
     selected_cue_flash_start_ms: int | None = None
     slot_rotation_sets: dict[str, str] = field(default_factory=dict)
@@ -233,10 +233,9 @@ def _span_breakpoints_for_lane(
     breakpoints = lane_level_breakpoints(
         lane,
         inherit=inherit,
-        song_marker_fades=state.song_marker_fades,
-        standard_fades=state.standard_cue_fades,
+        hard_cut_fades=state.hard_cut_fades,
+        soft_cut_fades=state.soft_cut_fades,
         duration_sec=duration_sec,
-        song_marker_times=state.song_marker_times,
     )
     if not breakpoints:
         level = inherit if lane.baseline is None else float(lane.baseline)
@@ -359,43 +358,58 @@ def bar_tick_times_for_row(state: TimelineViewState, slot: str) -> list[float]:
 def selected_cue_readout_segments(
     cue: SlotCue,
     *,
-    show_cast: bool = False,
+    show_role: bool = False,
 ) -> list[tuple[str, tuple[int, int, int]]]:
     """Label/value segments for the selected-cue badge readout."""
-    blend = cue.blend if cue.blend is not None else "-"
-    opacity_pct = int(round(float(cue.level) * 100.0))
+    cut = cue.cut if cue.cut is not None else "none"
     segments: list[tuple[str, tuple[int, int, int]]] = [
         (f"[{format_mmss(cue.t)}] ", VALUE),
-        ("opacity: ", LABEL),
-        (f"{opacity_pct}% ", VALUE),
-        ("blend: ", LABEL),
-        (f"{blend}" if not show_cast else f"{blend} ", VALUE),
     ]
-    if show_cast:
-        cast = cue.role if cue.role is not None else "-"
+    if float(cue.level) <= LEVEL_EPS:
         segments.extend(
             [
-                ("cast: ", LABEL),
-                (str(cast), VALUE),
+                ("cut: ", LABEL),
+                (str(cut), VALUE),
+            ]
+        )
+        return segments
+    blend = cue.blend if cue.blend is not None else "-"
+    opacity_pct = int(round(float(cue.level) * 100.0))
+    segments.extend(
+        [
+            ("opacity: ", LABEL),
+            (f"{opacity_pct}% ", VALUE),
+            ("cut: ", LABEL),
+            (f"{cut} ", VALUE),
+            ("blend: ", LABEL),
+            (f"{blend}" if not show_role else f"{blend} ", VALUE),
+        ]
+    )
+    if show_role:
+        role = cue.role if cue.role is not None else "-"
+        segments.extend(
+            [
+                ("role: ", LABEL),
+                (str(role), VALUE),
             ]
         )
     return segments
 
 
-def selected_cue_readout_text(cue: SlotCue, *, show_cast: bool = False) -> str:
+def selected_cue_readout_text(cue: SlotCue, *, show_role: bool = False) -> str:
     """Plain-text form of the selected-cue badge readout."""
     return "".join(
-        text for text, _ in selected_cue_readout_segments(cue, show_cast=show_cast)
+        text for text, _ in selected_cue_readout_segments(cue, show_role=show_role)
     )
 
 
 def render_selected_cue_readout(
-    font: pygame.font.Font, cue: SlotCue, *, show_cast: bool = False
+    font: pygame.font.Font, cue: SlotCue, *, show_role: bool = False
 ) -> pygame.Surface:
     """Badge-strip surface: LABEL prefixes, VALUE for time and field values."""
     surfs = [
         font.render(text, True, color)
-        for text, color in selected_cue_readout_segments(cue, show_cast=show_cast)
+        for text, color in selected_cue_readout_segments(cue, show_role=show_role)
     ]
     width = sum(surf.get_width() for surf in surfs)
     height = max((surf.get_height() for surf in surfs), default=0)
@@ -1516,12 +1530,12 @@ class TimelineOverlay:
             if 0 <= state.focus_row < len(state.layer_z_order)
             else None
         )
-        show_cast = (
+        show_role = (
             focused_slot is not None
             and state.slot_rotation_sets.get(focused_slot) == "cast_roles"
         )
         cue_readout = (
-            render_selected_cue_readout(font, selected_cue, show_cast=show_cast)
+            render_selected_cue_readout(font, selected_cue, show_role=show_role)
             if selected_cue is not None
             else None
         )

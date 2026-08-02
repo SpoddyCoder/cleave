@@ -252,20 +252,19 @@ def timeline_level_multiplier(
     """Committed-lane level in ``[0, 1]`` (ignores solo/override/preview)."""
     tl = session.timeline
     lane = _lane_for_slot(session, slot)
-    song_marker_fades = _as_fade_group(tl.song_marker_fades)
-    standard_fades = _as_fade_group(tl.standard_cue_fades)
+    hard_cut_fades = _as_fade_group(tl.hard_cut_fades)
+    soft_cut_fades = _as_fade_group(tl.soft_cut_fades)
     max_fade_out = 0.0
-    if song_marker_fades.enabled:
-        max_fade_out = max(max_fade_out, song_marker_fades.fade_out)
-    if standard_fades.enabled:
-        max_fade_out = max(max_fade_out, standard_fades.fade_out)
+    if hard_cut_fades.enabled:
+        max_fade_out = max(max_fade_out, hard_cut_fades.fade_out)
+    if soft_cut_fades.enabled:
+        max_fade_out = max(max_fade_out, soft_cut_fades.fade_out)
     breakpoints = lane_level_breakpoints(
         lane,
         inherit=_inherit_for_slot(session, slot),
-        song_marker_fades=song_marker_fades,
-        standard_fades=standard_fades,
+        hard_cut_fades=hard_cut_fades,
+        soft_cut_fades=soft_cut_fades,
         duration_sec=_level_eval_duration(lane, t_sec, max_fade_out),
-        song_marker_times=session.song_markers.times,
     )
     return lane_level_envelope(t_sec, breakpoints)
 
@@ -353,8 +352,8 @@ def build_timeline_view_state(
         ),
         song_marker_times=tuple(session.song_markers.times),
         selected_song_marker_index=focused_song_marker_index(focus_cursor),
-        song_marker_fades=_as_fade_group(tl.song_marker_fades),
-        standard_cue_fades=_as_fade_group(tl.standard_cue_fades),
+        hard_cut_fades=_as_fade_group(tl.hard_cut_fades),
+        soft_cut_fades=_as_fade_group(tl.soft_cut_fades),
         selected_cue_t=dict(tl.selected_cue_t),
         selected_cue_flash_start_ms=tl.selected_cue_flash_start_ms,
         slot_rotation_sets={

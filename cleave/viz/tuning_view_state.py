@@ -224,16 +224,16 @@ class RenderTimelineBlock:
     beat_bar_grid_expanded: bool = False
     snap_cues_expanded: bool = False
     placement_snap: str = "beat"
-    fades_expanded: bool = False
+    cuts_expanded: bool = False
     timeline_presets_expanded: bool = False
     timeline_preset_kind: str = "breathing"
     timeline_preset_crescendo: CrescendoTarget | None = None
     timeline_preset_density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
     timeline_preset_conductor: bool = DEFAULT_TIMELINE_PRESET_CONDUCTOR
-    song_marker_fades: TimelineFadeGroupBlock = field(
+    hard_cut_fades: TimelineFadeGroupBlock = field(
         default_factory=TimelineFadeGroupBlock
     )
-    standard_cue_fades: TimelineFadeGroupBlock = field(
+    soft_cut_fades: TimelineFadeGroupBlock = field(
         default_factory=TimelineFadeGroupBlock
     )
     limiter: VisualLimiterBlock = field(default_factory=VisualLimiterBlock)
@@ -442,10 +442,10 @@ def view_state_structure_signature(
             "song_marker_count": len(session.song_markers.times),
             "beat_bar_grid_expanded": tl.beat_bar_grid_expanded,
             "snap_cues_expanded": tl.snap_cues_expanded,
-            "fades_expanded": tl.fades_expanded,
+            "cuts_expanded": tl.cuts_expanded,
             "timeline_presets_expanded": tl.timeline_presets_expanded,
-            "song_marker_fades_enabled": tl.song_marker_fades.enabled,
-            "standard_cue_fades_enabled": tl.standard_cue_fades.enabled,
+            "hard_cut_fades_enabled": tl.hard_cut_fades.enabled,
+            "soft_cut_fades_enabled": tl.soft_cut_fades.enabled,
             "visual_limiter_enabled": tl.limiter.enabled,
         },
         "timeline": {"enabled": tl.enabled},
@@ -661,21 +661,21 @@ class TuningViewStateBuilder:
             beat_bar_grid_expanded=tl.beat_bar_grid_expanded,
             snap_cues_expanded=tl.snap_cues_expanded,
             placement_snap=tl.placement_snap,
-            fades_expanded=tl.fades_expanded,
+            cuts_expanded=tl.cuts_expanded,
             timeline_presets_expanded=tl.timeline_presets_expanded,
             timeline_preset_kind=tl.timeline_preset_kind,
             timeline_preset_crescendo=tl.timeline_preset_crescendo,
             timeline_preset_density=tl.timeline_preset_density,
             timeline_preset_conductor=tl.timeline_preset_conductor,
-            song_marker_fades=TimelineFadeGroupBlock(
-                enabled=tl.song_marker_fades.enabled,
-                fade_in=tl.song_marker_fades.fade_in,
-                fade_out=tl.song_marker_fades.fade_out,
+            hard_cut_fades=TimelineFadeGroupBlock(
+                enabled=tl.hard_cut_fades.enabled,
+                fade_in=tl.hard_cut_fades.fade_in,
+                fade_out=tl.hard_cut_fades.fade_out,
             ),
-            standard_cue_fades=TimelineFadeGroupBlock(
-                enabled=tl.standard_cue_fades.enabled,
-                fade_in=tl.standard_cue_fades.fade_in,
-                fade_out=tl.standard_cue_fades.fade_out,
+            soft_cut_fades=TimelineFadeGroupBlock(
+                enabled=tl.soft_cut_fades.enabled,
+                fade_in=tl.soft_cut_fades.fade_in,
+                fade_out=tl.soft_cut_fades.fade_out,
             ),
             limiter=VisualLimiterBlock(
                 enabled=tl.limiter.enabled,
@@ -897,21 +897,21 @@ class TuningViewStateBuilder:
                 beat_bar_grid_expanded=tl.beat_bar_grid_expanded,
                 snap_cues_expanded=tl.snap_cues_expanded,
                 placement_snap=tl.placement_snap,
-                fades_expanded=tl.fades_expanded,
+                cuts_expanded=tl.cuts_expanded,
                 timeline_presets_expanded=tl.timeline_presets_expanded,
                 timeline_preset_kind=tl.timeline_preset_kind,
                 timeline_preset_crescendo=tl.timeline_preset_crescendo,
                 timeline_preset_density=tl.timeline_preset_density,
                 timeline_preset_conductor=tl.timeline_preset_conductor,
-                song_marker_fades=TimelineFadeGroupBlock(
-                    enabled=tl.song_marker_fades.enabled,
-                    fade_in=tl.song_marker_fades.fade_in,
-                    fade_out=tl.song_marker_fades.fade_out,
+                hard_cut_fades=TimelineFadeGroupBlock(
+                    enabled=tl.hard_cut_fades.enabled,
+                    fade_in=tl.hard_cut_fades.fade_in,
+                    fade_out=tl.hard_cut_fades.fade_out,
                 ),
-                standard_cue_fades=TimelineFadeGroupBlock(
-                    enabled=tl.standard_cue_fades.enabled,
-                    fade_in=tl.standard_cue_fades.fade_in,
-                    fade_out=tl.standard_cue_fades.fade_out,
+                soft_cut_fades=TimelineFadeGroupBlock(
+                    enabled=tl.soft_cut_fades.enabled,
+                    fade_in=tl.soft_cut_fades.fade_in,
+                    fade_out=tl.soft_cut_fades.fade_out,
                 ),
                 limiter=VisualLimiterBlock(
                     enabled=tl.limiter.enabled,

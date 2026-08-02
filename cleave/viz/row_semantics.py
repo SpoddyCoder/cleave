@@ -123,13 +123,15 @@ class RowKind(Enum):
     TIMELINE_SNAP_TO_BEATS = auto()
     TIMELINE_SNAP_TO_BARS = auto()
     TIMELINE_SNAP_TO_SONG_MARKERS = auto()
-    TIMELINE_FADES_HEADER = auto()
-    TIMELINE_SONG_MARKER_FADES = auto()
-    TIMELINE_SONG_MARKER_FADE_IN = auto()
-    TIMELINE_SONG_MARKER_FADE_OUT = auto()
-    TIMELINE_STANDARD_CUE_FADES = auto()
-    TIMELINE_STANDARD_CUE_FADE_IN = auto()
-    TIMELINE_STANDARD_CUE_FADE_OUT = auto()
+    TIMELINE_CUTS_HEADER = auto()
+    TIMELINE_HARD_CUTS = auto()
+    TIMELINE_HARD_CUT_FADE_IN = auto()
+    TIMELINE_HARD_CUT_FADE_OUT = auto()
+    TIMELINE_SOFT_CUTS = auto()
+    TIMELINE_SOFT_CUT_FADE_IN = auto()
+    TIMELINE_SOFT_CUT_FADE_OUT = auto()
+    TIMELINE_APPLY_SOFT_CUTS = auto()
+    TIMELINE_APPLY_HARD_CUTS = auto()
     SONG_MARKERS_HEADER = auto()
     SONG_MARKER_ITEM = auto()
     SETTINGS_HEADER = auto()
@@ -236,7 +238,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_description=(
             "Currently active Milkdrop preset for this layer.",
             "[F/B/U] indicates favourited/blacklisted/user-defined.",
-            "[R:X] indicates the chosen cast role.",
+            "[R:X] indicates the chosen role.",
         ),
         help_mode_entries=CUE_ROLE_MARKER_HELP_ENTRIES,
         repeatable=True,
@@ -270,7 +272,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_description=(
             "Preset in the user-defined rotation set for this layer.",
             "[F/B] indicates favourited/blacklisted.",
-            "[R:X] indicates the chosen cast role.",
+            "[R:X] indicates the chosen role.",
         ),
         help_mode_entries=CUE_ROLE_MARKER_HELP_ENTRIES,
     ),
@@ -1144,90 +1146,110 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "Pull closest cues within proximity onto song markers.",
         ),
     ),
-    RowKind.TIMELINE_FADES_HEADER: RowBehavior(
+    RowKind.TIMELINE_CUTS_HEADER: RowBehavior(
         RowAffordance.EXPAND,
         is_sub_header=True,
-        help_title="Timeline fades",
+        help_title="Timeline cuts",
         help_description=(
-            "Soft opacity fades in and out of timeline cue edges.",
+            "Opacity fade in and out for timeline cue edges by cut type.",
         ),
     ),
-    RowKind.TIMELINE_SONG_MARKER_FADES: RowBehavior(
+    RowKind.TIMELINE_HARD_CUTS: RowBehavior(
         RowAffordance.VALUE_STEP,
         navigable=True,
         repeatable=True,
         blocked_by_section_lock=True,
-        help_title="Song markers",
+        help_title="Hard cuts",
         help_entries=(("Left/Right", "enabled / disabled"),),
         help_description=(
-            "Fade edges that land on a song marker.",
+            "Fade edges on cues with cut set to hard.",
         ),
     ),
-    RowKind.TIMELINE_SONG_MARKER_FADE_IN: RowBehavior(
+    RowKind.TIMELINE_HARD_CUT_FADE_IN: RowBehavior(
         RowAffordance.VALUE_STEP,
         navigable=True,
         repeatable=True,
         blocked_by_section_lock=True,
-        help_title="Song marker fade in",
+        help_title="Hard cut fade in",
         help_entries=(
             ("Left", "decrease fade in"),
             ("Right", "increase fade in"),
         ),
         help_description=(
-            "The fade-in starts this many seconds before the song marker.",
+            "The fade-in starts this many seconds before a hard-cut cue.",
         ),
     ),
-    RowKind.TIMELINE_SONG_MARKER_FADE_OUT: RowBehavior(
+    RowKind.TIMELINE_HARD_CUT_FADE_OUT: RowBehavior(
         RowAffordance.VALUE_STEP,
         navigable=True,
         repeatable=True,
         blocked_by_section_lock=True,
-        help_title="Song marker fade out",
+        help_title="Hard cut fade out",
         help_entries=(
             ("Left", "decrease fade out"),
             ("Right", "increase fade out"),
         ),
         help_description=(
-            "The fade-out starts this many seconds after the song marker.",
+            "The fade-out starts this many seconds after a hard-cut cue.",
         ),
     ),
-    RowKind.TIMELINE_STANDARD_CUE_FADES: RowBehavior(
+    RowKind.TIMELINE_SOFT_CUTS: RowBehavior(
         RowAffordance.VALUE_STEP,
         navigable=True,
         repeatable=True,
         blocked_by_section_lock=True,
-        help_title="Standard cue fades",
+        help_title="Soft cuts",
         help_entries=(("Left/Right", "enabled / disabled"),),
         help_description=(
-            "Fade edges that are not on a song marker.",
+            "Fade edges on cues with cut set to soft.",
         ),
     ),
-    RowKind.TIMELINE_STANDARD_CUE_FADE_IN: RowBehavior(
+    RowKind.TIMELINE_SOFT_CUT_FADE_IN: RowBehavior(
         RowAffordance.VALUE_STEP,
         navigable=True,
         repeatable=True,
         blocked_by_section_lock=True,
-        help_title="Standard cue fade in",
+        help_title="Soft cut fade in",
         help_entries=(
             ("Left", "decrease fade in"),
             ("Right", "increase fade in"),
         ),
         help_description=(
-            "The fade-in starts this many seconds before the cue.",
+            "The fade-in starts this many seconds before a soft-cut cue.",
         ),
     ),
-    RowKind.TIMELINE_STANDARD_CUE_FADE_OUT: RowBehavior(
+    RowKind.TIMELINE_SOFT_CUT_FADE_OUT: RowBehavior(
         RowAffordance.VALUE_STEP,
         navigable=True,
         repeatable=True,
         blocked_by_section_lock=True,
-        help_title="Standard cue fade out",
+        help_title="Soft cut fade out",
         help_entries=(
             ("Left", "decrease fade out"),
             ("Right", "increase fade out"),
         ),
         help_description=(
-            "The fade-out starts this many seconds after the cue.",
+            "The fade-out starts this many seconds after a soft-cut cue.",
+        ),
+    ),
+    RowKind.TIMELINE_APPLY_SOFT_CUTS: RowBehavior(
+        RowAffordance.ACTION,
+        navigable=True,
+        blocked_by_section_lock=True,
+        help_title="Apply soft cuts to cues",
+        help_entries=(("Enter", "apply soft cuts"),),
+        help_description=(
+            "Set cut type soft on all cues, song-marker cues, or all except markers.",
+        ),
+    ),
+    RowKind.TIMELINE_APPLY_HARD_CUTS: RowBehavior(
+        RowAffordance.ACTION,
+        navigable=True,
+        blocked_by_section_lock=True,
+        help_title="Apply hard cuts to cues",
+        help_entries=(("Enter", "apply hard cuts"),),
+        help_description=(
+            "Set cut type hard on all cues, song-marker cues, or all except markers.",
         ),
     ),
     RowKind.SONG_MARKERS_HEADER: RowBehavior(

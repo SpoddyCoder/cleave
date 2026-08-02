@@ -8,6 +8,7 @@ import pygame
 
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.cue_roles import CUE_ROLES, CueRole
+from cleave.cut_types import CUT_TYPES, CutType
 from cleave.timeline import (
     LEVEL_EDIT_MIN,
     LEVEL_EPS,
@@ -218,11 +219,15 @@ class TimelineControls:
             return True
 
         if event.key == pygame.K_b:
-            self._cycle_selected_cue_blend(forward=not mod_shift(event.mod))
+            self._cycle_selected_cue_blend()
+            return True
+
+        if event.key == pygame.K_o:
+            self._cycle_selected_cue_role()
             return True
 
         if event.key == pygame.K_c:
-            self._cycle_selected_cue_role(forward=not mod_shift(event.mod))
+            self._cycle_selected_cue_cut()
             return True
 
         return True
@@ -325,10 +330,15 @@ class TimelineControls:
         if levels_equal(new_level, cue.level):
             return
         self._apply_selected_cue_update(
-            slot, cue.t, blend=cue.blend, role=cue.role, level=new_level
+            slot,
+            cue.t,
+            blend=cue.blend,
+            role=cue.role,
+            cut=cue.cut,
+            level=new_level,
         )
 
-    def _cycle_selected_cue_blend(self, *, forward: bool) -> None:
+    def _cycle_selected_cue_blend(self) -> None:
         if not self._cue_edits_allowed():
             return
         selected = self._selected_cue()
@@ -342,13 +352,12 @@ class TimelineControls:
             index = options.index(cue.blend)
         except ValueError:
             index = 0
-        if forward:
-            index = (index + 1) % len(options)
-        else:
-            index = (index - 1) % len(options)
-        self._apply_selected_cue_update(slot, cue.t, blend=options[index], role=cue.role)
+        index = (index + 1) % len(options)
+        self._apply_selected_cue_update(
+            slot, cue.t, blend=options[index], role=cue.role, cut=cue.cut
+        )
 
-    def _cycle_selected_cue_role(self, *, forward: bool) -> None:
+    def _cycle_selected_cue_role(self) -> None:
         if not self._cue_edits_allowed():
             return
         selected = self._selected_cue()
@@ -371,11 +380,23 @@ class TimelineControls:
             index = options.index(cue.role)
         except ValueError:
             index = 0
-        if forward:
-            index = (index + 1) % len(options)
-        else:
-            index = (index - 1) % len(options)
-        self._apply_selected_cue_update(slot, cue.t, blend=cue.blend, role=options[index])
+        index = (index + 1) % len(options)
+        self._apply_selected_cue_update(
+            slot, cue.t, blend=cue.blend, role=options[index], cut=cue.cut
+        )
+
+    def _cycle_selected_cue_cut(self) -> None:
+        if not self._cue_edits_allowed():
+            return
+        selected = self._selected_cue()
+        if selected is None:
+            return
+        slot, cue = selected
+        current: CutType = cue.cut if cue.cut in CUT_TYPES else "none"
+        index = (CUT_TYPES.index(current) + 1) % len(CUT_TYPES)
+        self._apply_selected_cue_update(
+            slot, cue.t, blend=cue.blend, role=cue.role, cut=CUT_TYPES[index]
+        )
 
     def _apply_selected_cue_update(
         self,
@@ -384,12 +405,13 @@ class TimelineControls:
         *,
         blend: BlendMode | None,
         role: CueRole | None,
+        cut: CutType | None = None,
         level: float | None = None,
     ) -> None:
         tl = self.session.timeline
         lane = tl.lanes.get(slot) or empty_lane()
         updated = update_lane_cue(
-            lane, cue_t, blend=blend, role=role, level=level
+            lane, cue_t, blend=blend, role=role, level=level, cut=cut
         )
         tl.lanes[slot] = updated
         if cue_t not in navigable_cue_times(updated):

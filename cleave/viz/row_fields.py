@@ -340,108 +340,108 @@ def _apply_visual_limiter_release(
     lim.release = clamp_visual_limiter_release(round(lim.release + delta, 1))
 
 
-def _format_timeline_song_marker_fades_enabled(
+def _format_timeline_hard_cut_fades_enabled(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return hard_cut_enabled_display(state.render_timeline.song_marker_fades.enabled)
+    return hard_cut_enabled_display(state.render_timeline.hard_cut_fades.enabled)
 
 
-def _apply_timeline_song_marker_fades_enabled(
+def _apply_timeline_hard_cut_fades_enabled(
     controls: TuningControls,
     _desc: RowDescriptor,
     _forward: bool,
     _ctrl: bool,
     _shift: bool,
 ) -> None:
-    group = controls.session.timeline.song_marker_fades
+    group = controls.session.timeline.hard_cut_fades
     group.enabled = not group.enabled
 
 
-def _format_timeline_song_marker_fade_in(
+def _format_timeline_hard_cut_fade_in(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_timeline.song_marker_fades.fade_in:.1f}s"
+    return f"{state.render_timeline.hard_cut_fades.fade_in:.1f}s"
 
 
-def _apply_timeline_song_marker_fade_in(
+def _apply_timeline_hard_cut_fade_in(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
     _ctrl: bool,
     _shift: bool,
 ) -> None:
-    group = controls.session.timeline.song_marker_fades
+    group = controls.session.timeline.hard_cut_fades
     delta = TIMELINE_FADE_DURATION_STEP if forward else -TIMELINE_FADE_DURATION_STEP
     group.fade_in = clamp_timeline_fade_duration(round(group.fade_in + delta, 1))
 
 
-def _format_timeline_song_marker_fade_out(
+def _format_timeline_hard_cut_fade_out(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_timeline.song_marker_fades.fade_out:.1f}s"
+    return f"{state.render_timeline.hard_cut_fades.fade_out:.1f}s"
 
 
-def _apply_timeline_song_marker_fade_out(
+def _apply_timeline_hard_cut_fade_out(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
     _ctrl: bool,
     _shift: bool,
 ) -> None:
-    group = controls.session.timeline.song_marker_fades
+    group = controls.session.timeline.hard_cut_fades
     delta = TIMELINE_FADE_DURATION_STEP if forward else -TIMELINE_FADE_DURATION_STEP
     group.fade_out = clamp_timeline_fade_duration(round(group.fade_out + delta, 1))
 
 
-def _format_timeline_standard_cue_fades_enabled(
+def _format_timeline_soft_cut_fades_enabled(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return hard_cut_enabled_display(state.render_timeline.standard_cue_fades.enabled)
+    return hard_cut_enabled_display(state.render_timeline.soft_cut_fades.enabled)
 
 
-def _apply_timeline_standard_cue_fades_enabled(
+def _apply_timeline_soft_cut_fades_enabled(
     controls: TuningControls,
     _desc: RowDescriptor,
     _forward: bool,
     _ctrl: bool,
     _shift: bool,
 ) -> None:
-    group = controls.session.timeline.standard_cue_fades
+    group = controls.session.timeline.soft_cut_fades
     group.enabled = not group.enabled
 
 
-def _format_timeline_standard_cue_fade_in(
+def _format_timeline_soft_cut_fade_in(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_timeline.standard_cue_fades.fade_in:.1f}s"
+    return f"{state.render_timeline.soft_cut_fades.fade_in:.1f}s"
 
 
-def _apply_timeline_standard_cue_fade_in(
+def _apply_timeline_soft_cut_fade_in(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
     _ctrl: bool,
     _shift: bool,
 ) -> None:
-    group = controls.session.timeline.standard_cue_fades
+    group = controls.session.timeline.soft_cut_fades
     delta = TIMELINE_FADE_DURATION_STEP if forward else -TIMELINE_FADE_DURATION_STEP
     group.fade_in = clamp_timeline_fade_duration(round(group.fade_in + delta, 1))
 
 
-def _format_timeline_standard_cue_fade_out(
+def _format_timeline_soft_cut_fade_out(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{state.render_timeline.standard_cue_fades.fade_out:.1f}s"
+    return f"{state.render_timeline.soft_cut_fades.fade_out:.1f}s"
 
 
-def _apply_timeline_standard_cue_fade_out(
+def _apply_timeline_soft_cut_fade_out(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
     _ctrl: bool,
     _shift: bool,
 ) -> None:
-    group = controls.session.timeline.standard_cue_fades
+    group = controls.session.timeline.soft_cut_fades
     delta = TIMELINE_FADE_DURATION_STEP if forward else -TIMELINE_FADE_DURATION_STEP
     group.fade_out = clamp_timeline_fade_duration(round(group.fade_out + delta, 1))
 
@@ -2120,46 +2120,54 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         panel_label="snap to song markers",
         present_style=RowPresentStyle.FULL_LINE,
     ),
-    RowKind.TIMELINE_FADES_HEADER: RowFieldDef(
-        panel_label="timeline fades",
+    RowKind.TIMELINE_CUTS_HEADER: RowFieldDef(
+        panel_label="timeline cuts",
         present_style=RowPresentStyle.EXPAND_SUBHEADER,
         apply_horizontal=_apply_expand_subheader,
     ),
-    RowKind.TIMELINE_SONG_MARKER_FADES: RowFieldDef(
-        panel_label="song markers",
+    RowKind.TIMELINE_HARD_CUTS: RowFieldDef(
+        panel_label="hard cuts",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_timeline_song_marker_fades_enabled,
-        apply_horizontal=_apply_timeline_song_marker_fades_enabled,
+        format_value=_format_timeline_hard_cut_fades_enabled,
+        apply_horizontal=_apply_timeline_hard_cut_fades_enabled,
     ),
-    RowKind.TIMELINE_SONG_MARKER_FADE_IN: RowFieldDef(
+    RowKind.TIMELINE_HARD_CUT_FADE_IN: RowFieldDef(
         panel_label="fade in duration",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_timeline_song_marker_fade_in,
-        apply_horizontal=_apply_timeline_song_marker_fade_in,
+        format_value=_format_timeline_hard_cut_fade_in,
+        apply_horizontal=_apply_timeline_hard_cut_fade_in,
     ),
-    RowKind.TIMELINE_SONG_MARKER_FADE_OUT: RowFieldDef(
+    RowKind.TIMELINE_HARD_CUT_FADE_OUT: RowFieldDef(
         panel_label="fade out duration",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_timeline_song_marker_fade_out,
-        apply_horizontal=_apply_timeline_song_marker_fade_out,
+        format_value=_format_timeline_hard_cut_fade_out,
+        apply_horizontal=_apply_timeline_hard_cut_fade_out,
     ),
-    RowKind.TIMELINE_STANDARD_CUE_FADES: RowFieldDef(
-        panel_label="standard cues",
+    RowKind.TIMELINE_SOFT_CUTS: RowFieldDef(
+        panel_label="soft cuts",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_timeline_standard_cue_fades_enabled,
-        apply_horizontal=_apply_timeline_standard_cue_fades_enabled,
+        format_value=_format_timeline_soft_cut_fades_enabled,
+        apply_horizontal=_apply_timeline_soft_cut_fades_enabled,
     ),
-    RowKind.TIMELINE_STANDARD_CUE_FADE_IN: RowFieldDef(
+    RowKind.TIMELINE_SOFT_CUT_FADE_IN: RowFieldDef(
         panel_label="fade in duration",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_timeline_standard_cue_fade_in,
-        apply_horizontal=_apply_timeline_standard_cue_fade_in,
+        format_value=_format_timeline_soft_cut_fade_in,
+        apply_horizontal=_apply_timeline_soft_cut_fade_in,
     ),
-    RowKind.TIMELINE_STANDARD_CUE_FADE_OUT: RowFieldDef(
+    RowKind.TIMELINE_SOFT_CUT_FADE_OUT: RowFieldDef(
         panel_label="fade out duration",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_timeline_standard_cue_fade_out,
-        apply_horizontal=_apply_timeline_standard_cue_fade_out,
+        format_value=_format_timeline_soft_cut_fade_out,
+        apply_horizontal=_apply_timeline_soft_cut_fade_out,
+    ),
+    RowKind.TIMELINE_APPLY_SOFT_CUTS: RowFieldDef(
+        panel_label="apply soft cuts to cues",
+        present_style=RowPresentStyle.FULL_LINE,
+    ),
+    RowKind.TIMELINE_APPLY_HARD_CUTS: RowFieldDef(
+        panel_label="apply hard cuts to cues",
+        present_style=RowPresentStyle.FULL_LINE,
     ),
     RowKind.SONG_MARKERS_HEADER: RowFieldDef(
         panel_label="song markers",

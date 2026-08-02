@@ -41,6 +41,7 @@ from cleave.viz.tap_sync_controls import TapSyncControls, TapSyncUiSnapshot
 from cleave.viz.timeline_phase_controls import TimelinePhaseController
 from cleave.viz.preset_seed_controls import PresetSeedController
 from cleave.viz.timeline_preset_controls import TimelinePresetController
+from cleave.viz.timeline_cut_controls import TimelineCutController
 from cleave.viz.timeline_snap_controls import TimelineSnapController
 from cleave.viz.user_presets import (
     resolve_user_preset_dest,
@@ -197,6 +198,11 @@ class TuningControls:
             self._modal_host,
             beat_times,
             bar_times,
+            on_notification=self.show_notification,
+        )
+        self._timeline_cuts = TimelineCutController(
+            session,
+            self._modal_host,
             on_notification=self.show_notification,
         )
         self._view_state = TuningViewStateBuilder(
@@ -602,6 +608,12 @@ class TuningControls:
                 return True
             if kind == RowKind.TIMELINE_SNAP_TO_SONG_MARKERS:
                 self._timeline_snap.prompt_song_markers()
+                return True
+            if kind == RowKind.TIMELINE_APPLY_SOFT_CUTS:
+                self._timeline_cuts.prompt_soft()
+                return True
+            if kind == RowKind.TIMELINE_APPLY_HARD_CUTS:
+                self._timeline_cuts.prompt_hard()
                 return True
             if kind == RowKind.TRACK_PRESET_DIR:
                 slot = self.focus_descriptor.slot
@@ -1386,11 +1398,11 @@ class TuningControls:
             return
         tl.snap_cues_expanded = expanded
 
-    def _set_timeline_fades_expanded(self, expanded: bool) -> None:
+    def _set_timeline_cuts_expanded(self, expanded: bool) -> None:
         tl = self.session.timeline
-        if tl.fades_expanded == expanded:
+        if tl.cuts_expanded == expanded:
             return
-        tl.fades_expanded = expanded
+        tl.cuts_expanded = expanded
 
     def _set_timeline_presets_expanded(self, expanded: bool) -> None:
         tl = self.session.timeline

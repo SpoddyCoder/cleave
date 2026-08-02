@@ -11,6 +11,7 @@ from typing import Any, Callable, Literal, TypeVar
 
 from cleave.blend_modes import BLEND_MODES, BlendMode
 from cleave.cue_roles import CUE_ROLE_HELP_BLURB, CUE_ROLES, CueRole
+from cleave.cut_types import CUT_TYPES, CutType
 from cleave.effects.constants import clamp_effect_pct
 from cleave.effects.registry import validate_effect_entry
 from cleave.extract import STEM_SOURCES, StemSource
@@ -1829,6 +1830,13 @@ def validate_cue_role(raw: Any, *, path: str) -> CueRole:
     return raw
 
 
+def validate_cut_type(raw: Any, *, path: str) -> CutType:
+    if raw not in CUT_TYPES:
+        allowed = ", ".join(f"'{cut}'" for cut in CUT_TYPES)
+        raise ValueError(f"{path} must be one of: {allowed}")
+    return raw
+
+
 def parse_blend_mode(slot: str, stem: StemSource, layer_raw: dict[str, Any]) -> BlendMode:
     raw = layer_raw.get("blend_mode")
     if raw is None:
@@ -2379,7 +2387,7 @@ def _parse_timeline_limiter(raw: Any) -> Any:
 
 
 def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
-    from cleave.config import TimelineConfig, TimelineFadesConfig
+    from cleave.config import TimelineConfig, TimelineCutsConfig
 
     timeline = data.get("timeline")
     if timeline is None:
@@ -2391,19 +2399,19 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
         timeline_map.get("placement_snap", DEFAULT_TIMELINE_PLACEMENT_SNAP),
         "timeline.placement_snap",
     )
-    fades_raw = timeline_map.get("fades")
-    if fades_raw is None:
-        fades = TimelineFadesConfig()
+    cuts_raw = timeline_map.get("cuts")
+    if cuts_raw is None:
+        cuts = TimelineCutsConfig()
     else:
-        fades_map = as_mapping(fades_raw, "timeline.fades")
-        fades = TimelineFadesConfig(
-            song_markers=_parse_timeline_fade_group(
-                fades_map.get("song_markers"),
-                "timeline.fades.song_markers",
+        cuts_map = as_mapping(cuts_raw, "timeline.cuts")
+        cuts = TimelineCutsConfig(
+            hard=_parse_timeline_fade_group(
+                cuts_map.get("hard"),
+                "timeline.cuts.hard",
             ),
-            standard=_parse_timeline_fade_group(
-                fades_map.get("standard"),
-                "timeline.fades.standard",
+            soft=_parse_timeline_fade_group(
+                cuts_map.get("soft"),
+                "timeline.cuts.soft",
             ),
         )
     preset = _parse_timeline_preset(timeline_map.get("preset"))
@@ -2415,7 +2423,7 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
             enabled=enabled,
             lanes={},
             locked=locked,
-            fades=fades,
+            cuts=cuts,
             placement_snap=placement_snap,
             preset=preset,
             limiter=limiter,
@@ -2469,12 +2477,19 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
                     cue_map["role"],
                     path=f"timeline.lanes.{slot}.cues[{index}].role",
                 )
+            cut: CutType | None = None
+            if "cut" in cue_map and cue_map["cut"] is not None:
+                cut = validate_cut_type(
+                    cue_map["cut"],
+                    path=f"timeline.lanes.{slot}.cues[{index}].cut",
+                )
             cues.append(
                 SlotCue(
                     t=t,
                     level=clamp_level(float(cue_map["level"])),
                     blend=blend,
                     role=role,
+                    cut=cut,
                 )
             )
         lanes[str(slot)] = TimelineLane(
@@ -2485,7 +2500,7 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
         enabled=enabled,
         lanes=lanes,
         locked=locked,
-        fades=fades,
+        cuts=cuts,
         placement_snap=placement_snap,
         preset=preset,
         limiter=limiter,
@@ -2514,9 +2529,9 @@ def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
         "enabled": runtime.enabled,
         "locked": runtime.locked,
         "placement_snap": runtime.placement_snap,
-        "fades": {
-            "song_markers": _persist_timeline_fade_group(runtime.song_marker_fades),
-            "standard": _persist_timeline_fade_group(runtime.standard_cue_fades),
+        "cuts": {
+            "hard": _persist_timeline_fade_group(runtime.hard_cut_fades),
+            "soft": _persist_timeline_fade_group(runtime.soft_cut_fades),
         },
         "preset": {
             "character": runtime.timeline_preset_kind,
@@ -2542,6 +2557,8 @@ def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
                     cue_out["blend"] = cue.blend
                 if cue.role is not None:
                     cue_out["role"] = cue.role
+                if cue.cut is not None:
+                    cue_out["cut"] = cue.cut
                 cues_out.append(cue_out)
             entry["cues"] = cues_out
         lanes_out[slot] = entry

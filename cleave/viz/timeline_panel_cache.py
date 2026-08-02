@@ -27,7 +27,14 @@ class TimelineStaticSignature:
     """
 
     layer_z_order: tuple[str, ...]
-    lanes_fingerprint: tuple[tuple[str, float | None, tuple[tuple[float, float], ...]], ...]
+    lanes_fingerprint: tuple[
+        tuple[
+            str,
+            float | None,
+            tuple[tuple[float, float, str | None, str | None, str | None], ...],
+        ],
+        ...,
+    ]
     defaults: tuple[tuple[str, float], ...]
     duration_sec: float
     focus_row: int
@@ -42,7 +49,8 @@ class TimelineStaticSignature:
     record_slot_start_sec: tuple[tuple[str, float], ...]
     record_baseline: tuple[tuple[str, float], ...]
     record_buffer_fingerprint: tuple[
-        tuple[str, tuple[tuple[float, float], ...]], ...
+        tuple[str, tuple[tuple[float, float, str | None, str | None, str | None], ...]],
+        ...,
     ]
     record_high_water_mark: float | None
     record_playhead_sec: float | None
@@ -53,12 +61,12 @@ class TimelineStaticSignature:
     bar_grid_times: tuple[float, ...]
     song_marker_times: tuple[float, ...]
     selected_song_marker_index: int | None
-    song_marker_fades_enabled: bool
-    song_marker_fade_in: float
-    song_marker_fade_out: float
-    standard_cue_fades_enabled: bool
-    standard_cue_fade_in: float
-    standard_cue_fade_out: float
+    hard_cut_fades_enabled: bool
+    hard_cut_fade_in: float
+    hard_cut_fade_out: float
+    soft_cut_fades_enabled: bool
+    soft_cut_fade_in: float
+    soft_cut_fade_out: float
     selected_cue_t: tuple[tuple[str, float], ...]
 
 
@@ -83,20 +91,26 @@ def visibility_bucket(visibility: float) -> int:
 
 def _slot_cues_fingerprint(
     cues: list[SlotCue],
-) -> tuple[tuple[float, float, str | None, str | None], ...]:
-    return tuple((cue.t, cue.level, cue.blend, cue.role) for cue in cues)
+) -> tuple[tuple[float, float, str | None, str | None, str | None], ...]:
+    return tuple((cue.t, cue.level, cue.blend, cue.role, cue.cut) for cue in cues)
 
 
 def _lane_fingerprint(
     lane: TimelineLane,
-) -> tuple[float | None, tuple[tuple[float, float, str | None, str | None], ...]]:
+) -> tuple[
+    float | None, tuple[tuple[float, float, str | None, str | None, str | None], ...]
+]:
     return (lane.baseline, _slot_cues_fingerprint(lane.cues))
 
 
 def _lanes_fingerprint(
     lanes: dict[str, TimelineLane],
 ) -> tuple[
-    tuple[str, float | None, tuple[tuple[float, float, str | None, str | None], ...]],
+    tuple[
+        str,
+        float | None,
+        tuple[tuple[float, float, str | None, str | None, str | None], ...],
+    ],
     ...,
 ]:
     return tuple(
@@ -107,7 +121,10 @@ def _lanes_fingerprint(
 
 def _record_buffer_fingerprint(
     record_buffer: dict[str, list[SlotCue]],
-) -> tuple[tuple[str, tuple[tuple[float, float, str | None, str | None], ...]], ...]:
+) -> tuple[
+    tuple[str, tuple[tuple[float, float, str | None, str | None, str | None], ...]],
+    ...,
+]:
     return tuple(
         (slot, _slot_cues_fingerprint(cues))
         for slot, cues in sorted(record_buffer.items())
@@ -147,12 +164,12 @@ def timeline_static_signature(
         bar_grid_times=state.bar_grid_times,
         song_marker_times=state.song_marker_times,
         selected_song_marker_index=state.selected_song_marker_index,
-        song_marker_fades_enabled=state.song_marker_fades.enabled,
-        song_marker_fade_in=state.song_marker_fades.fade_in,
-        song_marker_fade_out=state.song_marker_fades.fade_out,
-        standard_cue_fades_enabled=state.standard_cue_fades.enabled,
-        standard_cue_fade_in=state.standard_cue_fades.fade_in,
-        standard_cue_fade_out=state.standard_cue_fades.fade_out,
+        hard_cut_fades_enabled=state.hard_cut_fades.enabled,
+        hard_cut_fade_in=state.hard_cut_fades.fade_in,
+        hard_cut_fade_out=state.hard_cut_fades.fade_out,
+        soft_cut_fades_enabled=state.soft_cut_fades.enabled,
+        soft_cut_fade_in=state.soft_cut_fades.fade_in,
+        soft_cut_fade_out=state.soft_cut_fades.fade_out,
         selected_cue_t=tuple(sorted(state.selected_cue_t.items())),
     )
 
