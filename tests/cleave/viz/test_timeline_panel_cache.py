@@ -235,6 +235,18 @@ def test_static_signature_changes_on_hard_cut_fade_out() -> None:
     assert _static_sig(short) != _static_sig(long)
 
 
+def test_static_signature_changes_on_hard_cut_crossfade() -> None:
+    edge = _view_state(hard_cut_fades_enabled=True, hard_cut_crossfade=False)
+    centered = _view_state(hard_cut_fades_enabled=True, hard_cut_crossfade=True)
+    assert _static_sig(edge) != _static_sig(centered)
+
+
+def test_static_signature_changes_on_soft_cut_crossfade() -> None:
+    edge = _view_state(soft_cut_fades_enabled=True, soft_cut_crossfade=False)
+    centered = _view_state(soft_cut_fades_enabled=True, soft_cut_crossfade=True)
+    assert _static_sig(edge) != _static_sig(centered)
+
+
 def test_compose_rebuilds_static_panel_when_recording_playhead_moves() -> None:
     pygame.init()
     overlay = TimelineOverlay()

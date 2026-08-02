@@ -33,6 +33,7 @@ from cleave.config_schema import (
     DEFAULT_TIMELINE_FADES_ENABLED,
     DEFAULT_TIMELINE_FADE_IN,
     DEFAULT_TIMELINE_FADE_OUT,
+    DEFAULT_TIMELINE_CROSSFADE,
     DEFAULT_TIMELINE_PLACEMENT_SNAP,
     DEFAULT_VISUAL_LIMITER_ENABLED,
     DEFAULT_VISUAL_LIMITER_THRESHOLD,
@@ -236,6 +237,7 @@ class TimelineFadeGroupRuntime:
     enabled: bool = DEFAULT_TIMELINE_FADES_ENABLED
     fade_in: float = DEFAULT_TIMELINE_FADE_IN
     fade_out: float = DEFAULT_TIMELINE_FADE_OUT
+    crossfade: bool = DEFAULT_TIMELINE_CROSSFADE
 
 
 def default_timeline_fade_group_runtime() -> TimelineFadeGroupRuntime:
@@ -489,6 +491,7 @@ def _fade_group_runtime_from_cfg(
         enabled=group.enabled,
         fade_in=group.fade_in,
         fade_out=group.fade_out,
+        crossfade=group.crossfade,
     )
 
 

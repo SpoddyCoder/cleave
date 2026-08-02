@@ -1105,11 +1105,13 @@ def test_parse_timeline_reads_cuts() -> None:
                         "enabled": True,
                         "fade_in": 1.5,
                         "fade_out": 3.0,
+                        "crossfade": True,
                     },
                     "soft": {
                         "enabled": False,
                         "fade_in": 0.5,
                         "fade_out": 4.0,
+                        "crossfade": False,
                     },
                 }
             }
@@ -1122,11 +1124,13 @@ def test_parse_timeline_reads_cuts() -> None:
             enabled=True,
             fade_in=1.5,
             fade_out=3.0,
+            crossfade=True,
         ),
         soft=TimelineFadeGroupConfig(
             enabled=False,
             fade_in=0.5,
             fade_out=4.0,
+            crossfade=False,
         ),
     )
 
@@ -1142,11 +1146,13 @@ def test_persist_timeline_levels_round_trip() -> None:
                 enabled=True,
                 fade_in=1.5,
                 fade_out=3.0,
+                crossfade=True,
             ),
             soft_cut_fades=TimelineFadeGroupRuntime(
                 enabled=False,
                 fade_in=0.5,
                 fade_out=4.0,
+                crossfade=False,
             ),
         ),
     )
@@ -1164,11 +1170,13 @@ def test_persist_timeline_levels_round_trip() -> None:
             "enabled": True,
             "fade_in": 1.5,
             "fade_out": 3.0,
+            "crossfade": True,
         },
         "soft": {
             "enabled": False,
             "fade_in": 0.5,
             "fade_out": 4.0,
+            "crossfade": False,
         },
     }
     round_trip = parse_timeline_section(
@@ -1181,11 +1189,13 @@ def test_persist_timeline_levels_round_trip() -> None:
             enabled=True,
             fade_in=1.5,
             fade_out=3.0,
+            crossfade=True,
         ),
         soft=TimelineFadeGroupConfig(
             enabled=False,
             fade_in=0.5,
             fade_out=4.0,
+            crossfade=False,
         ),
     )
 

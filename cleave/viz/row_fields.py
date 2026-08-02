@@ -23,11 +23,13 @@ from cleave.config_schema import (
     clamp_visual_limiter_release,
     clamp_visual_limiter_threshold,
     cycle_timeline_placement_snap,
+    cycle_timeline_crossfade,
     hard_cut_enabled_display,
     preset_start_clean_display,
     preset_switching_display,
     preset_switching_rotation_set_display,
     preset_switching_shuffle_display,
+    timeline_crossfade_display,
     ui_fade_display,
 )
 from cleave.extract import stem_control_label, stem_overlay_header
@@ -548,6 +550,40 @@ def _apply_timeline_soft_cut_fade_out(
     group = controls.session.timeline.soft_cut_fades
     delta = TIMELINE_FADE_DURATION_STEP if forward else -TIMELINE_FADE_DURATION_STEP
     group.fade_out = clamp_timeline_fade_duration(round(group.fade_out + delta, 1))
+
+
+def _format_timeline_hard_cut_crossfade(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return timeline_crossfade_display(state.render_timeline.hard_cut_fades.crossfade)
+
+
+def _apply_timeline_hard_cut_crossfade(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    group = controls.session.timeline.hard_cut_fades
+    group.crossfade = cycle_timeline_crossfade(group.crossfade, forward=forward)
+
+
+def _format_timeline_soft_cut_crossfade(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return timeline_crossfade_display(state.render_timeline.soft_cut_fades.crossfade)
+
+
+def _apply_timeline_soft_cut_crossfade(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    group = controls.session.timeline.soft_cut_fades
+    group.crossfade = cycle_timeline_crossfade(group.crossfade, forward=forward)
 
 
 def _apply_settings_editor_mode(
@@ -2271,6 +2307,12 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         format_value=_format_timeline_hard_cut_fade_out,
         apply_horizontal=_apply_timeline_hard_cut_fade_out,
     ),
+    RowKind.TIMELINE_HARD_CUT_CROSSFADE: RowFieldDef(
+        panel_label="crossfade",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_timeline_hard_cut_crossfade,
+        apply_horizontal=_apply_timeline_hard_cut_crossfade,
+    ),
     RowKind.TIMELINE_SOFT_CUTS: RowFieldDef(
         panel_label="soft cuts",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -2288,6 +2330,12 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_timeline_soft_cut_fade_out,
         apply_horizontal=_apply_timeline_soft_cut_fade_out,
+    ),
+    RowKind.TIMELINE_SOFT_CUT_CROSSFADE: RowFieldDef(
+        panel_label="crossfade",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_timeline_soft_cut_crossfade,
+        apply_horizontal=_apply_timeline_soft_cut_crossfade,
     ),
     RowKind.TIMELINE_APPLY_SOFT_CUTS: RowFieldDef(
         panel_label="apply soft cuts to cues",

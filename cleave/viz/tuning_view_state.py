@@ -219,6 +219,7 @@ class TimelineFadeGroupBlock:
     enabled: bool = False
     fade_in: float = 2.0
     fade_out: float = 2.0
+    crossfade: bool = False
 
 
 @dataclass
@@ -698,11 +699,13 @@ class TuningViewStateBuilder:
                 enabled=tl.hard_cut_fades.enabled,
                 fade_in=tl.hard_cut_fades.fade_in,
                 fade_out=tl.hard_cut_fades.fade_out,
+                crossfade=tl.hard_cut_fades.crossfade,
             ),
             soft_cut_fades=TimelineFadeGroupBlock(
                 enabled=tl.soft_cut_fades.enabled,
                 fade_in=tl.soft_cut_fades.fade_in,
                 fade_out=tl.soft_cut_fades.fade_out,
+                crossfade=tl.soft_cut_fades.crossfade,
             ),
             limiter=VisualLimiterBlock(
                 enabled=tl.limiter.enabled,
@@ -942,11 +945,13 @@ class TuningViewStateBuilder:
                     enabled=tl.hard_cut_fades.enabled,
                     fade_in=tl.hard_cut_fades.fade_in,
                     fade_out=tl.hard_cut_fades.fade_out,
+                    crossfade=tl.hard_cut_fades.crossfade,
                 ),
                 soft_cut_fades=TimelineFadeGroupBlock(
                     enabled=tl.soft_cut_fades.enabled,
                     fade_in=tl.soft_cut_fades.fade_in,
                     fade_out=tl.soft_cut_fades.fade_out,
+                    crossfade=tl.soft_cut_fades.crossfade,
                 ),
                 limiter=VisualLimiterBlock(
                     enabled=tl.limiter.enabled,

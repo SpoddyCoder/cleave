@@ -217,6 +217,7 @@ def _as_fade_group(group: TimelineFadeGroupRuntime) -> TimelineFadeGroup:
         enabled=group.enabled,
         fade_in=group.fade_in,
         fade_out=group.fade_out,
+        crossfade=group.crossfade,
     )
 
 

@@ -1205,18 +1205,20 @@ def test_write_session_snapshot_persists_timeline_disabled_without_cues(
         "enabled": False,
         "locked": False,
         "placement_snap": "beat",
-        "cuts": {
-            "hard": {
-                "enabled": False,
-                "fade_in": 2.0,
-                "fade_out": 2.0,
+            "cuts": {
+                "hard": {
+                    "enabled": False,
+                    "fade_in": 2.0,
+                    "fade_out": 2.0,
+                    "crossfade": False,
+                },
+                "soft": {
+                    "enabled": False,
+                    "fade_in": 2.0,
+                    "fade_out": 2.0,
+                    "crossfade": False,
+                },
             },
-            "soft": {
-                "enabled": False,
-                "fade_in": 2.0,
-                "fade_out": 2.0,
-            },
-        },
         "preset": {
             "character": "breathing",
             "crescendo": None,

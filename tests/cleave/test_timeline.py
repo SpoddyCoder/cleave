@@ -43,6 +43,17 @@ def _markers(*, fade_in: float = 2.0, fade_out: float = 2.0) -> TimelineFadeGrou
     return TimelineFadeGroup(enabled=True, fade_in=fade_in, fade_out=fade_out)
 
 
+def _crossfade(
+    *, fade_in: float = 2.0, fade_out: float = 2.0
+) -> TimelineFadeGroup:
+    return TimelineFadeGroup(
+        enabled=True,
+        fade_in=fade_in,
+        fade_out=fade_out,
+        crossfade=True,
+    )
+
+
 def _as_level(value: float | bool | None) -> float | None:
     if value is None:
         return None
@@ -729,6 +740,50 @@ def test_lane_level_breakpoints_rise_and_fall() -> None:
     assert (22.0, 0.0) in bps
 
 
+def test_lane_level_breakpoints_crossfade_rise_centering() -> None:
+    lane = _lane(0.0, (10.0, 1.0), cut="soft")
+    bps = lane_level_breakpoints(
+        lane,
+        inherit=0.0,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_crossfade(fade_in=2.0, fade_out=2.0),
+        duration_sec=60.0,
+    )
+    assert (9.0, 0.0) in bps
+    assert (11.0, 1.0) in bps
+    assert (10.0, 1.0) not in bps
+
+
+def test_lane_level_breakpoints_crossfade_fall_centering() -> None:
+    lane = _lane(0.0, (10.0, 1.0), (20.0, 0.0), cut="soft")
+    bps = lane_level_breakpoints(
+        lane,
+        inherit=0.0,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_crossfade(fade_in=2.0, fade_out=2.0),
+        duration_sec=60.0,
+    )
+    assert (19.0, 1.0) in bps
+    assert (21.0, 0.0) in bps
+    assert (20.0, 1.0) not in bps
+    assert (20.0, 0.0) not in bps
+
+
+def test_lane_level_breakpoints_crossfade_overlapping_rise_clamped_monotone() -> None:
+    lane = _lane(0.0, (5.0, 1.0), (10.0, 0.0), (11.0, 1.0), cut="soft")
+    bps = lane_level_breakpoints(
+        lane,
+        inherit=0.0,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_crossfade(fade_in=2.0, fade_out=2.0),
+        duration_sec=60.0,
+    )
+    times = [t for t, _ in bps]
+    assert times == sorted(times)
+    for prev, cur in zip(times, times[1:]):
+        assert cur >= prev
+
+
 def test_lane_level_breakpoints_no_cues_holds_baseline() -> None:
     lane = _lane(1.0)
     bps = lane_level_breakpoints(
@@ -787,6 +842,16 @@ def test_on_transition_triggers_lead_by_standard_fade_in() -> None:
         soft_cut_fades=_std(fade_in=2.0, fade_out=3.0),
     )
     assert triggers == [8.0, 28.0]
+
+
+def test_on_transition_triggers_crossfade_lead_by_half_ramp() -> None:
+    lane = _lane(0.0, (10.0, 1.0), (20.0, 0.0), (30.0, 1.0), cut="soft")
+    triggers = lane_on_transition_trigger_times(
+        lane,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_crossfade(fade_in=2.0, fade_out=3.0),
+    )
+    assert triggers == [9.0, 29.0]
 
 
 def test_on_transition_triggers_ignores_non_zero_rise() -> None:

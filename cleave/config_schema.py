@@ -397,6 +397,7 @@ DEFAULT_TIMELINE_LOCKED = False
 DEFAULT_TIMELINE_FADES_ENABLED = False
 DEFAULT_TIMELINE_FADE_IN = 2.0
 DEFAULT_TIMELINE_FADE_OUT = 2.0
+DEFAULT_TIMELINE_CROSSFADE = False
 TIMELINE_FADE_DURATION_MIN = 0.0
 TIMELINE_FADE_DURATION_MAX = 30.0
 TIMELINE_FADE_DURATION_STEP = 0.1
@@ -592,6 +593,20 @@ def _parse_cast_roles_timeline_behaviour(
 
 def hard_cut_enabled_display(enabled: bool) -> str:
     return "enabled" if enabled else "disabled"
+
+
+def timeline_crossfade_display(crossfade: bool) -> str:
+    return "on" if crossfade else "off"
+
+
+def cycle_timeline_crossfade(value: bool, *, forward: bool) -> bool:
+    options = (False, True)
+    try:
+        index = options.index(bool(value))
+    except ValueError:
+        index = options.index(DEFAULT_TIMELINE_CROSSFADE)
+    delta = 1 if forward else -1
+    return options[(index + delta) % len(options)]
 
 
 def preset_switching_shuffle_display(enabled: bool) -> str:
@@ -2396,6 +2411,7 @@ def _parse_timeline_fade_group(raw: Any, label: str) -> Any:
                 f"{label}.fade_out",
             )
         ),
+        crossfade=bool(group_map.get("crossfade", DEFAULT_TIMELINE_CROSSFADE)),
     )
 
 
@@ -2596,6 +2612,7 @@ def _persist_timeline_fade_group(group: Any) -> dict[str, Any]:
         "enabled": group.enabled,
         "fade_in": group.fade_in,
         "fade_out": group.fade_out,
+        "crossfade": group.crossfade,
     }
 
 
