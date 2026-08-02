@@ -112,6 +112,7 @@ class RowKind(Enum):
     TIMELINE_PRESET_CUE_SNAP = auto()
     TIMELINE_PRESET_SONG_MARKER_SNAP = auto()
     TIMELINE_PRESET_TIMELINE_CUTS = auto()
+    TIMELINE_PRESET_RESHUFFLE = auto()
     TIMELINE_PRESET_CONDUCTOR = auto()
     TIMELINE_PRESETS = auto()
     TIMELINE_VISUAL_LIMITER_HEADER = auto()
@@ -949,8 +950,8 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         is_sub_header=True,
         help_title="Timeline preset",
         help_description=(
-            "Stage character, crescendo, density, and conductor, then apply a",
-            "randomly generated timeline preset. This overwrites the current timeline.",
+            "Stage character, crescendo, density, reshuffle, and conductor, then",
+            "apply a randomly generated timeline preset. Overwrites the current timeline.",
         ),
     ),
     RowKind.TIMELINE_PRESET_CHARACTER: RowBehavior(
@@ -1020,6 +1021,17 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "By marker sets soft everywhere then hard on song markers.",
         ),
     ),
+    RowKind.TIMELINE_PRESET_RESHUFFLE: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        blocked_by_section_lock=True,
+        help_title="Reshuffle",
+        help_entries=(("Left/Right", "toggle reshuffle on/off"),),
+        help_description=(
+            "When on, Apply rolls a new shuffle seed for every layer.",
+            "When off, each layer keeps its existing seed (presets unchanged).",
+        ),
+    ),
     RowKind.TIMELINE_PRESET_CONDUCTOR: RowBehavior(
         RowAffordance.VALUE_STEP,
         navigable=True,
@@ -1038,8 +1050,8 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Apply timeline preset",
         help_entries=(("Enter", "apply timeline preset"),),
         help_description=(
-            "Apply the staged character, crescendo, density, snaps, cuts, and conductor.",
-            "This overwrites the current timeline.",
+            "Apply the staged character, crescendo, density, snaps, cuts,",
+            "reshuffle, and conductor. This overwrites the current timeline.",
         ),
     ),
     RowKind.TIMELINE_VISUAL_LIMITER_HEADER: RowBehavior(
