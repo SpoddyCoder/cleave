@@ -60,9 +60,21 @@ from cleave.blend_modes import BlendMode
 from cleave.timeline_presets.characters import DEFAULT_TIMELINE_PRESET_KIND
 from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
 from cleave.timeline_presets.crescendo import CrescendoTarget
+from cleave.timeline_presets.cue_snap import (
+    DEFAULT_TIMELINE_PRESET_CUE_SNAP,
+    TimelinePresetCueSnap,
+)
 from cleave.timeline_presets.density import (
     DEFAULT_TIMELINE_PRESET_DENSITY,
     TimelinePresetDensity,
+)
+from cleave.timeline_presets.song_marker_snap import (
+    DEFAULT_TIMELINE_PRESET_SONG_MARKER_SNAP,
+    TimelinePresetSongMarkerSnap,
+)
+from cleave.timeline_presets.timeline_cuts import (
+    DEFAULT_TIMELINE_PRESET_TIMELINE_CUTS,
+    TimelinePresetTimelineCuts,
 )
 
 
@@ -271,6 +283,13 @@ class TimelineRuntime:
     timeline_preset_kind: str = DEFAULT_TIMELINE_PRESET_KIND
     timeline_preset_crescendo: CrescendoTarget | None = None
     timeline_preset_density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
+    timeline_preset_cue_snap: TimelinePresetCueSnap = DEFAULT_TIMELINE_PRESET_CUE_SNAP
+    timeline_preset_song_marker_snap: TimelinePresetSongMarkerSnap = (
+        DEFAULT_TIMELINE_PRESET_SONG_MARKER_SNAP
+    )
+    timeline_preset_timeline_cuts: TimelinePresetTimelineCuts = (
+        DEFAULT_TIMELINE_PRESET_TIMELINE_CUTS
+    )
     timeline_preset_conductor: bool = DEFAULT_TIMELINE_PRESET_CONDUCTOR
     hard_cut_fades: TimelineFadeGroupRuntime = field(
         default_factory=default_timeline_fade_group_runtime
@@ -503,6 +522,19 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
     preset_density = (
         DEFAULT_TIMELINE_PRESET_DENSITY if preset is None else preset.density
     )
+    preset_cue_snap = (
+        DEFAULT_TIMELINE_PRESET_CUE_SNAP if preset is None else preset.cue_snap
+    )
+    preset_song_marker_snap = (
+        DEFAULT_TIMELINE_PRESET_SONG_MARKER_SNAP
+        if preset is None
+        else preset.song_marker_snap
+    )
+    preset_timeline_cuts = (
+        DEFAULT_TIMELINE_PRESET_TIMELINE_CUTS
+        if preset is None
+        else preset.timeline_cuts
+    )
     preset_conductor = (
         DEFAULT_TIMELINE_PRESET_CONDUCTOR if preset is None else preset.conductor
     )
@@ -522,6 +554,9 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
             timeline_preset_kind=preset_kind,
             timeline_preset_crescendo=preset_crescendo,
             timeline_preset_density=preset_density,
+            timeline_preset_cue_snap=preset_cue_snap,
+            timeline_preset_song_marker_snap=preset_song_marker_snap,
+            timeline_preset_timeline_cuts=preset_timeline_cuts,
             timeline_preset_conductor=preset_conductor,
             limiter=limiter,
         )
@@ -533,6 +568,9 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
         timeline_preset_kind=preset_kind,
         timeline_preset_crescendo=preset_crescendo,
         timeline_preset_density=preset_density,
+        timeline_preset_cue_snap=preset_cue_snap,
+        timeline_preset_song_marker_snap=preset_song_marker_snap,
+        timeline_preset_timeline_cuts=preset_timeline_cuts,
         timeline_preset_conductor=preset_conductor,
         hard_cut_fades=_fade_group_runtime_from_cfg(cuts.hard),
         soft_cut_fades=_fade_group_runtime_from_cfg(cuts.soft),

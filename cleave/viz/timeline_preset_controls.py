@@ -6,7 +6,14 @@ import random
 from collections.abc import Callable, Sequence
 
 from cleave.signals import Signals
-from cleave.timeline import TimelineLane, copy_lane, empty_lane, shift_bars_by_beats
+from cleave.timeline import (
+    TimelineLane,
+    copy_lane,
+    empty_lane,
+    shift_bars_by_beats,
+    snap_lane_to_beats,
+    snap_lanes_to_song_markers,
+)
 from cleave.timeline_presets import (
     build_arc_cues,
     build_breathing_cues,
@@ -22,12 +29,21 @@ from cleave.timeline_presets.crescendo import (
     normalize_crescendo_markers,
     timeline_preset_crescendo_display,
 )
+from cleave.timeline_presets.cue_snap import timeline_preset_cue_snap_display
 from cleave.timeline_presets.density import (
     density_bias_for,
     timeline_preset_density_display,
 )
+from cleave.timeline_presets.song_marker_snap import (
+    timeline_preset_song_marker_snap_display,
+)
+from cleave.timeline_presets.timeline_cuts import (
+    TimelinePresetTimelineCuts,
+    timeline_preset_timeline_cuts_display,
+)
 from cleave.viz.modal import ModalHost, ModalOption
 from cleave.viz.session import TuningSession
+from cleave.viz.timeline_cut_controls import apply_cut_to_lanes
 
 _CANCEL_LABEL = "Cancel"
 _RESET_PROMPT_MESSAGE = "Reset timeline?"
@@ -77,6 +93,9 @@ class TimelinePresetController:
             f"character: {timeline_preset_kind_display(tl.timeline_preset_kind)}",
             f"crescendo: {timeline_preset_crescendo_display(tl.timeline_preset_crescendo)}",
             f"density: {timeline_preset_density_display(tl.timeline_preset_density)}",
+            f"cue snap: {timeline_preset_cue_snap_display(tl.timeline_preset_cue_snap)}",
+            f"song marker snap: {timeline_preset_song_marker_snap_display(tl.timeline_preset_song_marker_snap)}",
+            f"timeline cuts: {timeline_preset_timeline_cuts_display(tl.timeline_preset_timeline_cuts)}",
             f"conductor: {timeline_preset_conductor_display(tl.timeline_preset_conductor)}",
         )
         return "\n".join(("Apply timeline preset?", *choice_lines))
@@ -164,12 +183,79 @@ class TimelinePresetController:
                 rng=rng,
             )
             message = f"{message} (crescendo)"
+        built = {
+            slot: copy_lane(built.get(slot, empty_lane())) for slot in slots
+        }
+        self._apply_cue_snap(built, grid)
+        self._apply_song_marker_snap(built, markers, slots)
+        self._apply_timeline_cuts(built, markers, tl.timeline_preset_timeline_cuts)
         for slot in slots:
-            tl.lanes[slot] = copy_lane(built.get(slot, empty_lane()))
+            tl.lanes[slot] = built[slot]
         if conductor_skipped:
             self._notify("No signals; conductor skipped")
         else:
             self._notify(message)
+
+    def _apply_cue_snap(
+        self,
+        lanes: dict[str, TimelineLane],
+        bar_grid: Sequence[float],
+    ) -> None:
+        cue_snap = self.session.timeline.timeline_preset_cue_snap
+        if cue_snap == "beats":
+            grid = self._beat_times
+        elif cue_snap == "bars":
+            grid = bar_grid
+        else:
+            return
+        for slot in list(lanes):
+            lanes[slot] = snap_lane_to_beats(lanes[slot], grid)
+
+    def _apply_song_marker_snap(
+        self,
+        lanes: dict[str, TimelineLane],
+        markers: Sequence[float],
+        slots: Sequence[str],
+    ) -> None:
+        proximity = self.session.timeline.timeline_preset_song_marker_snap
+        if proximity is None:
+            return
+        updated, _moved = snap_lanes_to_song_markers(
+            lanes,
+            markers,
+            proximity=float(proximity),
+            layer_z_order=slots,
+            slots=slots,
+            mode="each_layer",
+        )
+        for slot in slots:
+            lanes[slot] = updated[slot]
+
+    def _apply_timeline_cuts(
+        self,
+        lanes: dict[str, TimelineLane],
+        markers: Sequence[float],
+        cuts: TimelinePresetTimelineCuts,
+    ) -> None:
+        if cuts == "none":
+            return
+        if cuts == "by marker":
+            apply_cut_to_lanes(
+                lanes, "soft", song_marker_times=markers, scope="all"
+            )
+            apply_cut_to_lanes(
+                lanes, "hard", song_marker_times=markers, scope="markers_only"
+            )
+            return
+        if cuts == "all soft":
+            apply_cut_to_lanes(
+                lanes, "soft", song_marker_times=markers, scope="all"
+            )
+            return
+        if cuts == "all hard":
+            apply_cut_to_lanes(
+                lanes, "hard", song_marker_times=markers, scope="all"
+            )
 
     def _reset(self, *, all_on: bool) -> None:
         self._clear_timeline_state()

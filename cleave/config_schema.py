@@ -22,10 +22,25 @@ from cleave.timeline_presets.characters import (
 )
 from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
 from cleave.timeline_presets.crescendo import CrescendoTarget
+from cleave.timeline_presets.cue_snap import (
+    DEFAULT_TIMELINE_PRESET_CUE_SNAP,
+    TIMELINE_PRESET_CUE_SNAP_OPTIONS,
+    TimelinePresetCueSnap,
+)
 from cleave.timeline_presets.density import (
     DEFAULT_TIMELINE_PRESET_DENSITY,
     TIMELINE_PRESET_DENSITY_OPTIONS,
     TimelinePresetDensity,
+)
+from cleave.timeline_presets.song_marker_snap import (
+    DEFAULT_TIMELINE_PRESET_SONG_MARKER_SNAP,
+    TIMELINE_PRESET_SONG_MARKER_SNAP_OPTIONS,
+    TimelinePresetSongMarkerSnap,
+)
+from cleave.timeline_presets.timeline_cuts import (
+    DEFAULT_TIMELINE_PRESET_TIMELINE_CUTS,
+    TIMELINE_PRESET_TIMELINE_CUTS_OPTIONS,
+    TimelinePresetTimelineCuts,
 )
 
 # --- Editor defaults ---
@@ -478,6 +493,48 @@ def parse_timeline_preset_density(raw: Any, label: str) -> TimelinePresetDensity
     value = str(raw)
     if value not in TIMELINE_PRESET_DENSITY_OPTIONS:
         allowed = ", ".join(TIMELINE_PRESET_DENSITY_OPTIONS)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return value  # type: ignore[return-value]
+
+
+def parse_timeline_preset_cue_snap(raw: Any, label: str) -> TimelinePresetCueSnap:
+    value = str(raw)
+    if value not in TIMELINE_PRESET_CUE_SNAP_OPTIONS:
+        allowed = ", ".join(TIMELINE_PRESET_CUE_SNAP_OPTIONS)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return value  # type: ignore[return-value]
+
+
+_SONG_MARKER_SNAP_PROXIMITY_SET = frozenset(
+    float(opt)
+    for opt in TIMELINE_PRESET_SONG_MARKER_SNAP_OPTIONS
+    if opt is not None
+)
+
+
+def parse_timeline_preset_song_marker_snap(
+    raw: Any, label: str
+) -> TimelinePresetSongMarkerSnap:
+    if raw is None:
+        return None
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+        raise ValueError(f"{label} must be a number of seconds, or null")
+    value = float(raw)
+    if value not in _SONG_MARKER_SNAP_PROXIMITY_SET:
+        allowed = ", ".join(
+            "null" if opt is None else str(opt)
+            for opt in TIMELINE_PRESET_SONG_MARKER_SNAP_OPTIONS
+        )
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return value
+
+
+def parse_timeline_preset_timeline_cuts(
+    raw: Any, label: str
+) -> TimelinePresetTimelineCuts:
+    value = str(raw)
+    if value not in TIMELINE_PRESET_TIMELINE_CUTS_OPTIONS:
+        allowed = ", ".join(TIMELINE_PRESET_TIMELINE_CUTS_OPTIONS)
         raise ValueError(f"{label} must be one of: {allowed}")
     return value  # type: ignore[return-value]
 
@@ -2354,6 +2411,22 @@ def _parse_timeline_preset(raw: Any) -> Any:
             preset_map.get("density", DEFAULT_TIMELINE_PRESET_DENSITY),
             "timeline.preset.density",
         ),
+        cue_snap=parse_timeline_preset_cue_snap(
+            preset_map.get("cue_snap", DEFAULT_TIMELINE_PRESET_CUE_SNAP),
+            "timeline.preset.cue_snap",
+        ),
+        song_marker_snap=parse_timeline_preset_song_marker_snap(
+            preset_map.get(
+                "song_marker_snap", DEFAULT_TIMELINE_PRESET_SONG_MARKER_SNAP
+            ),
+            "timeline.preset.song_marker_snap",
+        ),
+        timeline_cuts=parse_timeline_preset_timeline_cuts(
+            preset_map.get(
+                "timeline_cuts", DEFAULT_TIMELINE_PRESET_TIMELINE_CUTS
+            ),
+            "timeline.preset.timeline_cuts",
+        ),
         conductor=parse_timeline_preset_conductor(
             preset_map.get("conductor", DEFAULT_TIMELINE_PRESET_CONDUCTOR),
             "timeline.preset.conductor",
@@ -2537,6 +2610,9 @@ def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
             "character": runtime.timeline_preset_kind,
             "crescendo": runtime.timeline_preset_crescendo,
             "density": runtime.timeline_preset_density,
+            "cue_snap": runtime.timeline_preset_cue_snap,
+            "song_marker_snap": runtime.timeline_preset_song_marker_snap,
+            "timeline_cuts": runtime.timeline_preset_timeline_cuts,
             "conductor": runtime.timeline_preset_conductor,
         },
         "limiter": _persist_timeline_limiter(runtime.limiter),

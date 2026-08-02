@@ -1221,6 +1221,9 @@ def test_write_session_snapshot_persists_timeline_disabled_without_cues(
             "character": "breathing",
             "crescendo": None,
             "density": "normal",
+            "cue_snap": "none",
+            "song_marker_snap": None,
+            "timeline_cuts": "by marker",
             "conductor": False,
         },
         "limiter": {
@@ -1236,6 +1239,9 @@ def test_write_session_snapshot_round_trips_timeline_preset(tmp_path: Path) -> N
     session.timeline.timeline_preset_kind = "arc"
     session.timeline.timeline_preset_crescendo = "last"
     session.timeline.timeline_preset_density = "dense"
+    session.timeline.timeline_preset_cue_snap = "beats"
+    session.timeline.timeline_preset_song_marker_snap = 5.0
+    session.timeline.timeline_preset_timeline_cuts = "all soft"
     session.timeline.timeline_preset_conductor = True
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
@@ -1244,6 +1250,9 @@ def test_write_session_snapshot_round_trips_timeline_preset(tmp_path: Path) -> N
         "character": "arc",
         "crescendo": "last",
         "density": "dense",
+        "cue_snap": "beats",
+        "song_marker_snap": 5.0,
+        "timeline_cuts": "all soft",
         "conductor": True,
     }
 
@@ -1266,6 +1275,9 @@ def test_write_session_snapshot_round_trips_timeline_preset(tmp_path: Path) -> N
     assert session2.timeline.timeline_preset_kind == "arc"
     assert session2.timeline.timeline_preset_crescendo == "last"
     assert session2.timeline.timeline_preset_density == "dense"
+    assert session2.timeline.timeline_preset_cue_snap == "beats"
+    assert session2.timeline.timeline_preset_song_marker_snap == 5.0
+    assert session2.timeline.timeline_preset_timeline_cuts == "all soft"
     assert session2.timeline.timeline_preset_conductor is True
 
 

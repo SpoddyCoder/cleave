@@ -60,7 +60,6 @@ def compose_timeline(
         return cues_from_states(
             slot_list,
             [(0.0, levels_from_active({slot_list[0]}))],
-            song_marker_times=markers,
         )
 
     order = list(slot_list)
@@ -74,7 +73,6 @@ def compose_timeline(
         return cues_from_states(
             slot_list,
             [(0.0, levels_from_active(opening))],
-            song_marker_times=markers,
         )
 
     phrases = _partition_phrases(bars, duration_sec, rng, markers)
@@ -83,7 +81,6 @@ def compose_timeline(
         return cues_from_states(
             slot_list,
             [(0.0, levels_from_active(opening))],
-            song_marker_times=markers,
         )
 
     conductor = StemConductor.build(
@@ -212,7 +209,6 @@ def compose_timeline(
         slot_list,
         level_states,
         casts,
-        song_marker_times=markers,
     )
 
 

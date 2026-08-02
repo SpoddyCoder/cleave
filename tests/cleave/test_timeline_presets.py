@@ -287,7 +287,7 @@ def test_preset_invariants(builder, n: int, duration_sec: float) -> None:
     _assert_min_gaps(lanes, bars, duration_sec)
     if n == 1:
         assert lanes[slots[0]].baseline == 0.0
-        assert lanes[slots[0]].cues == [SlotCue(t=0.0, level=1.0, cut="soft")]
+        assert lanes[slots[0]].cues == [SlotCue(t=0.0, level=1.0, cut="none")]
 
 
 @pytest.mark.parametrize("builder", ALL_BUILDERS)

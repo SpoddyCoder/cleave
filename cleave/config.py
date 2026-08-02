@@ -119,9 +119,21 @@ from cleave.timeline import TimelineLane
 from cleave.timeline_presets.characters import DEFAULT_TIMELINE_PRESET_KIND
 from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
 from cleave.timeline_presets.crescendo import CrescendoTarget
+from cleave.timeline_presets.cue_snap import (
+    DEFAULT_TIMELINE_PRESET_CUE_SNAP,
+    TimelinePresetCueSnap,
+)
 from cleave.timeline_presets.density import (
     DEFAULT_TIMELINE_PRESET_DENSITY,
     TimelinePresetDensity,
+)
+from cleave.timeline_presets.song_marker_snap import (
+    DEFAULT_TIMELINE_PRESET_SONG_MARKER_SNAP,
+    TimelinePresetSongMarkerSnap,
+)
+from cleave.timeline_presets.timeline_cuts import (
+    DEFAULT_TIMELINE_PRESET_TIMELINE_CUTS,
+    TimelinePresetTimelineCuts,
 )
 
 VIZ_CONFIG_FILENAME = "cleave-viz.yaml"
@@ -293,11 +305,16 @@ class TimelineCutsConfig:
 
 @dataclass(frozen=True)
 class TimelinePresetConfig:
-    """Staged character / crescendo / density / conductor for the timeline preset action."""
+    """Staged character / crescendo / density / post-process / conductor for Apply."""
 
     character: str = DEFAULT_TIMELINE_PRESET_KIND
     crescendo: CrescendoTarget | None = None
     density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
+    cue_snap: TimelinePresetCueSnap = DEFAULT_TIMELINE_PRESET_CUE_SNAP
+    song_marker_snap: TimelinePresetSongMarkerSnap = (
+        DEFAULT_TIMELINE_PRESET_SONG_MARKER_SNAP
+    )
+    timeline_cuts: TimelinePresetTimelineCuts = DEFAULT_TIMELINE_PRESET_TIMELINE_CUTS
     conductor: bool = DEFAULT_TIMELINE_PRESET_CONDUCTOR
 
 
