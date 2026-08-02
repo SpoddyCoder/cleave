@@ -688,7 +688,7 @@ def snap_lane_to_beats(
 
     beats = np.asarray(beat_times, dtype=np.float64)
     if beats.size == 1:
-        sole = float(beats[0])
+        sole = max(0.0, float(beats[0]))
         snapped = [replace(cue, t=sole) for cue in lane.cues]
         return TimelineLane(
             baseline=lane.baseline,
@@ -707,13 +707,17 @@ def snap_lane_to_beats(
                 candidates.append(float(beats[idx - 1]))
             if idx < len(beats):
                 candidates.append(float(beats[idx]))
-            return _nearest_with_earlier_tie(t, candidates)
-        raw = (t - first) / interval
-        lo = int(np.floor(raw))
-        return _nearest_with_earlier_tie(
-            t,
-            (first + lo * interval, first + (lo + 1) * interval),
-        )
+            snapped_t = _nearest_with_earlier_tie(t, candidates)
+        else:
+            raw = (t - first) / interval
+            lo = int(np.floor(raw))
+            snapped_t = _nearest_with_earlier_tie(
+                t,
+                (first + lo * interval, first + (lo + 1) * interval),
+            )
+        # Extrapolation before the first beat can land on a virtual negative
+        # grid point; persisted cues must stay non-negative.
+        return max(0.0, snapped_t)
 
     snapped = [replace(cue, t=snap_t(cue.t)) for cue in lane.cues]
     return TimelineLane(

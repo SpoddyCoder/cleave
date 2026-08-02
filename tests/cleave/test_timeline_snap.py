@@ -95,6 +95,13 @@ def test_snap_extrapolates_outside_range_via_median_interval() -> None:
     ]
 
 
+def test_snap_extrapolation_before_zero_clamps_non_negative() -> None:
+    # Late first beat: cue at 0 must not snap to a virtual negative grid point.
+    lane = _lane(False, (0.0, True))
+    result = snap_lane_to_beats(lane, (6.24, 6.82, 7.4, 7.98))
+    assert result.cues == [SlotCue(t=0.0, level=1.0)]
+
+
 def test_snap_extrapolation_midpoint_prefers_earlier() -> None:
     lane = _lane(False, (3.5, True))
     result = snap_lane_to_beats(lane, (1.0, 2.0, 3.0))
