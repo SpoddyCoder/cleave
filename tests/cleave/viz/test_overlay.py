@@ -941,6 +941,9 @@ def test_locked_stem_row_not_navigable_and_uses_locked_color() -> None:
 
 
 def test_panel_notification_pinned_under_transport() -> None:
+    from cleave.viz.panel_notification import NOTIFICATION_ATTENTION_DURATION_SEC
+    from cleave.viz.theme import NOTIFICATION_ON_FILL
+
     inactive = _minimal_view_state(
         render_timeline=RenderTimelineBlock(enabled=True),
         notification_message=None,
@@ -950,6 +953,13 @@ def test_panel_notification_pinned_under_transport() -> None:
         render_timeline=RenderTimelineBlock(enabled=True),
         notification_message=NOTIFICATION_TIMELINE_ENABLED_TEXT,
         notification_remaining_sec=5.0,
+        notification_elapsed_sec=NOTIFICATION_ATTENTION_DURATION_SEC + 0.1,
+    )
+    attention = _minimal_view_state(
+        render_timeline=RenderTimelineBlock(enabled=True),
+        notification_message=NOTIFICATION_TIMELINE_ENABLED_TEXT,
+        notification_remaining_sec=5.0,
+        notification_elapsed_sec=0.0,
     )
     inactive_kinds = [row.kind for row in inactive.layout.rows]
     active_kinds = [row.kind for row in active.layout.rows]
@@ -962,16 +972,21 @@ def test_panel_notification_pinned_under_transport() -> None:
     assert row_is_pinned(RowKind.PANEL_NOTIFICATION)
     assert notification_idx not in active.layout.navigable_indices(active)
     assert _row_value_color(active, notification_idx) == HIGHLIGHT
+    attention_idx = attention.layout.find_by_kind(RowKind.PANEL_NOTIFICATION)
+    assert _row_value_color(attention, attention_idx) == NOTIFICATION_ON_FILL
     assert _row_text(active, notification_idx) == NOTIFICATION_TIMELINE_ENABLED_TEXT
 
 
 def test_persistent_and_timed_panel_notifications_stack() -> None:
+    from cleave.viz.panel_notification import NOTIFICATION_ATTENTION_DURATION_SEC
     from cleave.viz.theme import ERROR_NOTIFICATION
 
     stacked = _minimal_view_state(
         persistent_notification_message="No presets in bed roles folder",
+        persistent_notification_elapsed_sec=NOTIFICATION_ATTENTION_DURATION_SEC + 0.1,
         notification_message="Saved",
         notification_remaining_sec=5.0,
+        notification_elapsed_sec=NOTIFICATION_ATTENTION_DURATION_SEC + 0.1,
     )
     notification_rows = [
         row

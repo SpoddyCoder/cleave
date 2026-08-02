@@ -8,7 +8,8 @@ Typography roles for the live tuning overlay:
   LOCKED   — tinted text for locked sub-rows that cannot be edited
 
 Accent colors for modes and icons (not label/value roles):
-  HIGHLIGHT, ERROR_NOTIFICATION, MOVE_MODE, LOCK_ICON, PRESET_ICON, PRESET_FILE_ICON,
+  HIGHLIGHT, ERROR_NOTIFICATION, NOTIFICATION_ON_FILL, MOVE_MODE, LOCK_ICON,
+  PRESET_ICON, PRESET_FILE_ICON,
   TIMELINE_BAR_ON, BAR_GRID, PLAYHEAD, PLAYHEAD_FLASH, SONG_MARKER, SONG_MARKER_SELECTED
 
 Layout scales:
@@ -153,6 +154,7 @@ ACTION: tuple[int, int, int] = (80, 190, 125)
 DISABLED: tuple[int, int, int] = (140, 140, 140)
 HIGHLIGHT: tuple[int, int, int] = (255, 235, 130)
 ERROR_NOTIFICATION: tuple[int, int, int] = (255, 140, 140)
+NOTIFICATION_ON_FILL: tuple[int, int, int] = (0, 0, 0)
 
 PRESET_ICON: tuple[int, int, int] = (255, 195, 90)
 PRESET_FILE_ICON: tuple[int, int, int] = (255, 250, 235)

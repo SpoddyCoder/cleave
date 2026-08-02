@@ -38,7 +38,7 @@ from cleave.viz.controls import (
     SEEK_TINY,
     TuningControls,
 )
-from cleave.viz.panel_notification import NOTIFICATION_DURATION_SEC
+from cleave.viz.panel_notification import NOTIFICATION_TOTAL_DURATION_SEC
 from cleave.viz.modal import ModalKind, ModalLabeledLine
 from cleave.viz.theme import ERROR_NOTIFICATION, HIGHLIGHT
 from cleave.viz.session import (
@@ -777,7 +777,7 @@ def test_save_as_new_triggers_notification_without_blocking_input() -> None:
         assert "Config saved to unnamed-1.yaml" in stderr.getvalue()
         state = controls.build_view_state(paused=False)
         assert state.notification_message == "Config saved to unnamed-1.yaml"
-        assert state.notification_remaining_sec == NOTIFICATION_DURATION_SEC
+        assert state.notification_remaining_sec == NOTIFICATION_TOTAL_DURATION_SEC
 
         before = controls.focus_descriptor
         assert controls.handle_keydown(_keydown(pygame.K_DOWN)) is True
@@ -1028,7 +1028,9 @@ def test_overwrite_after_save_uses_new_active_path() -> None:
         controls.handle_keydown(_keydown(pygame.K_RETURN))
         controls.handle_keydown(_keydown(pygame.K_RETURN))
 
-    with patch.object(time, "monotonic", return_value=3000.0 + NOTIFICATION_DURATION_SEC + 1):
+    with patch.object(
+        time, "monotonic", return_value=3000.0 + NOTIFICATION_TOTAL_DURATION_SEC + 1
+    ):
         state = controls.build_view_state(paused=False)
         save_row = _config_header_row(state)
         controls.focus_descriptor = _desc(view, save_row)
@@ -2629,7 +2631,7 @@ def test_timeline_enabled_startup_shows_notification() -> None:
         view = controls.build_view_state(paused=False)
     assert view.notification_message == NOTIFICATION_TIMELINE_ENABLED_TEXT
     assert view.notification_remaining_sec == pytest.approx(
-        NOTIFICATION_DURATION_SEC, abs=0.01
+        NOTIFICATION_TOTAL_DURATION_SEC, abs=0.01
     )
     assert RowKind.PANEL_NOTIFICATION in [row.kind for row in view.layout.rows]
 
@@ -2658,7 +2660,7 @@ def test_panel_notification_expires_after_duration() -> None:
     with patch.object(
         time,
         "monotonic",
-        return_value=5000.0 + NOTIFICATION_DURATION_SEC + 0.1,
+        return_value=5000.0 + NOTIFICATION_TOTAL_DURATION_SEC + 0.1,
     ):
         controls.tick(0.0)
         view = controls.build_view_state(paused=False)
@@ -4961,17 +4963,30 @@ def test_preset_switching_rotation_set_includes_cast_roles_in_timeline_mode() ->
 
 
 def test_cast_roles_empty_pool_sets_persistent_notification() -> None:
+    from cleave.viz.panel_notification import NOTIFICATION_ATTENTION_DURATION_SEC
+
     controls = _make_controls(("layer_1",))
     layer = controls.session.layers["layer_1"]
     layer.preset_switching = "timeline"
     layer.preset_switching_rotation_set = "cast_roles"
     layer.cast_roles_default_role = "bed"
 
-    with patch(
-        "cleave.viz.controls.role_pool_paths",
-        return_value=(),
+    with patch.object(time, "monotonic", return_value=1000.0):
+        with patch(
+            "cleave.viz.controls.role_pool_paths",
+            return_value=(),
+        ):
+            controls.build_view_state(paused=False)
+    with patch.object(
+        time,
+        "monotonic",
+        return_value=1000.0 + NOTIFICATION_ATTENTION_DURATION_SEC + 0.1,
     ):
-        view = controls.build_view_state(paused=False)
+        with patch(
+            "cleave.viz.controls.role_pool_paths",
+            return_value=(),
+        ):
+            view = controls.build_view_state(paused=False)
 
     assert view.persistent_notification_message == "No presets in bed roles folder"
     notification_rows = [
@@ -4994,6 +5009,8 @@ def test_cast_roles_empty_pool_sets_persistent_notification() -> None:
 
 
 def test_persistent_and_timed_notifications_stack() -> None:
+    from cleave.viz.panel_notification import NOTIFICATION_ATTENTION_DURATION_SEC
+
     controls = _make_controls(("layer_1",))
     controls.session.layers["layer_1"].preset_switching = "timeline"
     controls.session.layers["layer_1"].preset_switching_rotation_set = "cast_roles"
@@ -5004,6 +5021,16 @@ def test_persistent_and_timed_notifications_stack() -> None:
             return_value=(),
         ):
             controls.show_notification("Saved")
+            controls.build_view_state(paused=False)
+    with patch.object(
+        time,
+        "monotonic",
+        return_value=1000.0 + NOTIFICATION_ATTENTION_DURATION_SEC + 0.1,
+    ):
+        with patch(
+            "cleave.viz.controls.role_pool_paths",
+            return_value=(),
+        ):
             view = controls.build_view_state(paused=False)
 
     assert view.persistent_notification_message == "No presets in bed roles folder"
