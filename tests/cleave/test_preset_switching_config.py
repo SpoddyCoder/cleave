@@ -1,15 +1,14 @@
-"""Config parse/persist for preset switching fields."""
+"""Config parse/persist for unified preset switching fields."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import yaml
 
-from cleave.config import CleaveConfig, LayerConfig, PathsConfig, EditorConfig, load_config
+from cleave.config import CleaveConfig, LayerConfig, PathsConfig, EditorConfig
 from cleave.config_schema import (
-    DEFAULT_CAST_ROLES_DEFAULT_ROLE,
-    DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR,
     DEFAULT_EASTER_EGG,
     DEFAULT_HARD_CUT_DURATION,
     DEFAULT_HARD_CUT_ENABLED,
@@ -17,9 +16,7 @@ from cleave.config_schema import (
     DEFAULT_PRESET_START_CLEAN,
     DEFAULT_PRESET_DURATION,
     DEFAULT_PRESET_SWITCHING,
-    DEFAULT_PRESET_SWITCHING_ROTATION_SET,
-    DEFAULT_PRESET_SWITCHING_SHUFFLE,
-    DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT,
+    DEFAULT_PRESET_SWITCHING_TRIGGER,
     DEFAULT_SOFT_CUT_DURATION,
     ParseCtx,
     parse_layers_section,
@@ -49,11 +46,7 @@ def test_parse_layers_preset_switching_defaults_omitted() -> None:
     layers = parse_layers_section(data, ParseCtx(preset_root=preset_root))
     layer = layers["layer_1"]
     assert layer.preset_switching == DEFAULT_PRESET_SWITCHING
-    assert layer.preset_switching_rotation_set == DEFAULT_PRESET_SWITCHING_ROTATION_SET
-    assert layer.cast_roles_timeline_behaviour == DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR
-    assert layer.cast_roles_default_role == DEFAULT_CAST_ROLES_DEFAULT_ROLE
-    assert layer.preset_switching_shuffle == DEFAULT_PRESET_SWITCHING_SHUFFLE
-    assert layer.preset_switching_shuffle_salt == DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT
+    assert layer.preset_switching_trigger == DEFAULT_PRESET_SWITCHING_TRIGGER
     assert layer.preset_duration == DEFAULT_PRESET_DURATION
     assert layer.soft_cut_duration == DEFAULT_SOFT_CUT_DURATION
     assert layer.hard_cut_duration == DEFAULT_HARD_CUT_DURATION
@@ -61,99 +54,157 @@ def test_parse_layers_preset_switching_defaults_omitted() -> None:
     assert layer.hard_cut_enabled == DEFAULT_HARD_CUT_ENABLED
     assert layer.easter_egg == DEFAULT_EASTER_EGG
     assert layer.preset_start_clean == DEFAULT_PRESET_START_CLEAN
+    assert layer.preset_switching_list == []
 
 
-def test_parse_layers_preset_switching_projectm() -> None:
+def test_parse_layers_preset_switching_on() -> None:
     preset_root = Path("/tmp/presets")
     data = {"layers": _layer_yaml()}
-    data["layers"]["layer_1"]["preset_switching"] = "projectm"
+    data["layers"]["layer_1"]["preset_switching"] = "on"
+    data["layers"]["layer_1"]["preset_switching_trigger"] = "projectm"
     layers = parse_layers_section(data, ParseCtx(preset_root=preset_root))
-    assert layers["layer_1"].preset_switching == "projectm"
+    assert layers["layer_1"].preset_switching == "on"
+    assert layers["layer_1"].preset_switching_trigger == "projectm"
 
 
-def test_parse_layers_preset_switching_timeline() -> None:
+def test_parse_layers_rejects_legacy_modes() -> None:
+    preset_root = Path("/tmp/presets")
+    for mode in ("none", "projectm", "timeline", "user_defined"):
+        data = {"layers": _layer_yaml()}
+        data["layers"]["layer_1"]["preset_switching"] = mode
+        with pytest.raises(ValueError, match="preset_switching"):
+            parse_layers_section(data, ParseCtx(preset_root=preset_root))
+
+
+def test_parse_layers_rejects_bad_trigger() -> None:
     preset_root = Path("/tmp/presets")
     data = {"layers": _layer_yaml()}
-    data["layers"]["layer_1"]["preset_switching"] = "timeline"
-    layers = parse_layers_section(data, ParseCtx(preset_root=preset_root))
-    assert layers["layer_1"].preset_switching == "timeline"
-
-
-def test_parse_layers_rejects_user_defined_mode() -> None:
-    import pytest
-
-    preset_root = Path("/tmp/presets")
-    data = {"layers": _layer_yaml()}
-    data["layers"]["layer_1"]["preset_switching"] = "user_defined"
-    with pytest.raises(ValueError, match="preset_switching"):
+    data["layers"]["layer_1"]["preset_switching_trigger"] = "beat"
+    with pytest.raises(ValueError, match="preset_switching_trigger"):
         parse_layers_section(data, ParseCtx(preset_root=preset_root))
 
 
-def test_parse_layers_preset_switching_rotation_set_user_defined() -> None:
+def test_parse_layers_accepts_timeline_trigger() -> None:
     preset_root = Path("/tmp/presets")
     data = {"layers": _layer_yaml()}
-    data["layers"]["layer_1"]["preset_switching"] = "projectm"
-    data["layers"]["layer_1"]["preset_switching_rotation_set"] = "user_defined"
+    data["layers"]["layer_1"]["preset_switching"] = "on"
+    data["layers"]["layer_1"]["preset_switching_trigger"] = "timeline"
     layers = parse_layers_section(data, ParseCtx(preset_root=preset_root))
-    assert layers["layer_1"].preset_switching == "projectm"
-    assert layers["layer_1"].preset_switching_rotation_set == "user_defined"
+    assert layers["layer_1"].preset_switching_trigger == "timeline"
 
 
-def test_parse_layers_preset_switching_rotation_set_cast_roles() -> None:
-    preset_root = Path("/tmp/presets")
+def test_parse_preset_switching_list_relative_to_cfg_dir(tmp_path: Path) -> None:
+    milk = tmp_path / "user-presets" / "a.milk"
+    milk.parent.mkdir()
+    milk.write_text("MILK")
+    preset_root = tmp_path / "presets"
+    preset_root.mkdir()
     data = {"layers": _layer_yaml()}
-    data["layers"]["layer_1"]["preset_switching"] = "timeline"
-    data["layers"]["layer_1"]["preset_switching_rotation_set"] = "cast_roles"
-    data["layers"]["layer_1"]["cast_roles_timeline_behaviour"] = "hold_current"
-    data["layers"]["layer_1"]["cast_roles_default_role"] = "pulse"
-    layers = parse_layers_section(data, ParseCtx(preset_root=preset_root))
-    layer = layers["layer_1"]
-    assert layer.preset_switching_rotation_set == "cast_roles"
-    assert layer.cast_roles_timeline_behaviour == "hold_current"
-    assert layer.cast_roles_default_role == "pulse"
-
-
-def test_parse_layers_rejects_invalid_cast_roles_timeline_behaviour() -> None:
-    import pytest
-
-    preset_root = Path("/tmp/presets")
-    data = {"layers": _layer_yaml()}
-    data["layers"]["layer_1"]["cast_roles_timeline_behaviour"] = "always"
-    with pytest.raises(ValueError, match="cast_roles_timeline_behaviour"):
-        parse_layers_section(data, ParseCtx(preset_root=preset_root))
-
-
-def test_parse_layers_preset_switching_timing() -> None:
-    preset_root = Path("/tmp/presets")
-    data = {"layers": _layer_yaml()}
-    data["layers"]["layer_1"].update(
-        {
-            "preset_duration": 45.0,
-            "soft_cut_duration": 1.5,
-            "hard_cut_duration": 30.0,
-            "hard_cut_sensitivity": 3.5,
-        }
+    data["layers"]["layer_1"]["preset_switching"] = "on"
+    data["layers"]["layer_1"]["preset_switching_list"] = ["user-presets/a.milk"]
+    layers = parse_layers_section(
+        data, ParseCtx(preset_root=preset_root, cfg_dir=tmp_path)
     )
-    layers = parse_layers_section(data, ParseCtx(preset_root=preset_root))
-    layer = layers["layer_1"]
-    assert layer.preset_duration == 45.0
-    assert layer.soft_cut_duration == 1.5
-    assert layer.hard_cut_duration == 30.0
-    assert layer.hard_cut_sensitivity == 3.5
+    assert layers["layer_1"].preset_switching_list == [milk.resolve()]
 
 
-def _cfg_and_session(*, preset_switching: str = "none") -> tuple[CleaveConfig, TuningSession]:
-    preset_root = Path("/tmp/presets")
+def test_persist_omits_defaults() -> None:
     cfg = CleaveConfig(
-        paths=PathsConfig(preset_root=preset_root, texture_paths=(preset_root / "tex",)),
+        paths=PathsConfig(
+            preset_root=Path("/tmp/presets"),
+            texture_paths=(Path("/tmp/textures"),),
+        ),
         layers={
             "layer_1": LayerConfig(
-                preset=preset_root / "drums" / "drums.milk",
+                preset=Path("/tmp/presets/drums/a.milk"),
                 stem="drums",
             )
         },
-        layer_z_order=["layer_1"],
         editor=EditorConfig(),
+        layer_z_order=["layer_1"],
+        config_path=Path("/tmp/cleave.config.yaml"),
+        user_config_path=Path("/tmp/user-config.yaml"),
+    )
+    session = TuningSession(
+        layer_z_order=["layer_1"],
+        layers={
+            "layer_1": LayerRuntime(
+                playlist=PresetPlaylist(
+                    current_dir=Path("/tmp/presets/drums"),
+                    paths=(Path("/tmp/presets/drums/a.milk"),),
+                    index=0,
+                ),
+                browse_floor=Path("/tmp/presets/drums"),
+                stem="drums",
+            )
+        },
+    )
+    out = persist_layers(PersistCtx(cfg=cfg, session=session, cfg_dir=Path("/tmp")))
+    layer_out = out["layer_1"]
+    assert "preset_switching" not in layer_out
+    assert "preset_switching_trigger" not in layer_out
+    assert "preset_switching_list" not in layer_out
+
+
+def test_persist_writes_non_defaults(tmp_path: Path) -> None:
+    milk = tmp_path / "user-presets" / "a.milk"
+    milk.parent.mkdir()
+    milk.write_text("MILK")
+    cfg = CleaveConfig(
+        paths=PathsConfig(
+            preset_root=tmp_path / "presets",
+            texture_paths=(tmp_path / "textures",),
+        ),
+        layers={
+            "layer_1": LayerConfig(
+                preset=tmp_path / "presets" / "drums" / "a.milk",
+                stem="drums",
+            )
+        },
+        editor=EditorConfig(),
+        layer_z_order=["layer_1"],
+        config_path=tmp_path / "cleave.config.yaml",
+        user_config_path=tmp_path / "user-config.yaml",
+    )
+    session = TuningSession(
+        layer_z_order=["layer_1"],
+        layers={
+            "layer_1": LayerRuntime(
+                playlist=PresetPlaylist(
+                    current_dir=tmp_path / "presets" / "drums",
+                    paths=(tmp_path / "presets" / "drums" / "a.milk",),
+                    index=0,
+                ),
+                browse_floor=tmp_path / "presets" / "drums",
+                stem="drums",
+                preset_switching="on",
+                preset_switching_trigger="projectm",
+                preset_list=[str(milk.resolve())],
+            )
+        },
+    )
+    out = persist_layers(PersistCtx(cfg=cfg, session=session, cfg_dir=tmp_path))
+    layer_out = out["layer_1"]
+    assert layer_out["preset_switching"] == "on"
+    assert layer_out["preset_switching_trigger"] == "projectm"
+    assert layer_out["preset_switching_list"] == ["user-presets/a.milk"]
+
+
+def test_persist_list_outside_cfg_dir_keeps_absolute() -> None:
+    outside = Path("/tmp/presets/layer_1/a.milk")
+    cfg = CleaveConfig(
+        paths=PathsConfig(
+            preset_root=Path("/tmp/presets"),
+            texture_paths=(),
+        ),
+        layers={
+            "layer_1": LayerConfig(
+                preset=outside,
+                stem="drums",
+            )
+        },
+        editor=EditorConfig(),
+        layer_z_order=["layer_1"],
         config_path=Path("/tmp/test/cleave.config.yaml"),
         user_config_path=Path("/tmp/user-config.yaml"),
     )
@@ -162,250 +213,71 @@ def _cfg_and_session(*, preset_switching: str = "none") -> tuple[CleaveConfig, T
         layers={
             "layer_1": LayerRuntime(
                 playlist=PresetPlaylist(
-                    current_dir=preset_root / "drums",
-                    paths=(preset_root / "drums" / "drums.milk",),
+                    current_dir=Path("/tmp/presets/layer_1"),
+                    paths=(outside,),
                     index=0,
                 ),
-                browse_floor=preset_root / "drums",
+                browse_floor=Path("/tmp/presets/layer_1"),
                 stem="drums",
-                preset_switching=preset_switching,
+                preset_switching="on",
+                preset_list=[str(outside)],
             )
         },
     )
-    return cfg, session
-
-
-def test_persist_layers_omits_default_preset_switching() -> None:
-    cfg, session = _cfg_and_session()
-    out = persist_layers(PersistCtx(cfg=cfg, session=session))
-    assert "preset_switching" not in out["layer_1"]
-    assert "preset_switching_rotation_set" not in out["layer_1"]
-    assert "cast_roles_timeline_behaviour" not in out["layer_1"]
-    assert "cast_roles_default_role" not in out["layer_1"]
-    assert "preset_switching_shuffle" not in out["layer_1"]
-    assert "preset_switching_shuffle_salt" not in out["layer_1"]
-    assert "preset_duration" not in out["layer_1"]
-    assert "soft_cut_duration" not in out["layer_1"]
-    assert "hard_cut_duration" not in out["layer_1"]
-    assert "hard_cut_sensitivity" not in out["layer_1"]
-    assert "hard_cut_enabled" not in out["layer_1"]
-    assert "easter_egg" not in out["layer_1"]
-    assert "preset_start_clean" not in out["layer_1"]
-
-
-def test_persist_layers_writes_timing_overrides() -> None:
-    cfg, session = _cfg_and_session(preset_switching="projectm")
-    runtime = session.layers["layer_1"]
-    runtime.preset_duration = 45.0
-    runtime.soft_cut_duration = 1.5
-    runtime.hard_cut_duration = 30.0
-    runtime.hard_cut_sensitivity = 3.5
-    out = persist_layers(PersistCtx(cfg=cfg, session=session))
-    assert out["layer_1"]["preset_duration"] == 45.0
-    assert out["layer_1"]["soft_cut_duration"] == 1.5
-    assert out["layer_1"]["hard_cut_duration"] == 30.0
-    assert out["layer_1"]["hard_cut_sensitivity"] == 3.5
-
-
-def test_parse_layers_preset_switching_shuffle() -> None:
-    preset_root = Path("/tmp/presets")
-    data = {"layers": _layer_yaml()}
-    data["layers"]["layer_1"]["preset_switching_shuffle"] = True
-    layers = parse_layers_section(data, ParseCtx(preset_root=preset_root))
-    assert layers["layer_1"].preset_switching_shuffle is True
-
-
-def test_persist_layers_writes_shuffle_when_enabled() -> None:
-    cfg, session = _cfg_and_session(preset_switching="projectm")
-    session.layers["layer_1"].preset_switching_shuffle = True
-    out = persist_layers(PersistCtx(cfg=cfg, session=session))
-    assert out["layer_1"]["preset_switching_shuffle"] is True
-
-
-def test_parse_layers_preset_switching_shuffle_salt() -> None:
-    preset_root = Path("/tmp/presets")
-    data = {"layers": _layer_yaml()}
-    data["layers"]["layer_1"]["preset_switching_shuffle_salt"] = 42
-    layers = parse_layers_section(data, ParseCtx(preset_root=preset_root))
-    assert layers["layer_1"].preset_switching_shuffle_salt == 42
-
-
-def test_persist_layers_writes_shuffle_salt_when_nonzero() -> None:
-    cfg, session = _cfg_and_session(preset_switching="projectm")
-    session.layers["layer_1"].preset_switching_shuffle_salt = 99
-    out = persist_layers(PersistCtx(cfg=cfg, session=session))
-    assert out["layer_1"]["preset_switching_shuffle_salt"] == 99
-
-
-def test_persist_layers_omits_zero_shuffle_salt() -> None:
-    cfg, session = _cfg_and_session(preset_switching="projectm")
-    session.layers["layer_1"].preset_switching_shuffle_salt = 0
-    out = persist_layers(PersistCtx(cfg=cfg, session=session))
-    assert "preset_switching_shuffle_salt" not in out["layer_1"]
-
-
-def test_parse_layers_preset_switching_easter_egg_and_start_clean() -> None:
-    preset_root = Path("/tmp/presets")
-    data = {"layers": _layer_yaml()}
-    data["layers"]["layer_1"].update(
-        {
-            "easter_egg": 2.5,
-            "preset_start_clean": True,
-        }
+    out = persist_layers(
+        PersistCtx(cfg=cfg, session=session, cfg_dir=Path("/tmp/test"))
     )
-    layers = parse_layers_section(data, ParseCtx(preset_root=preset_root))
-    layer = layers["layer_1"]
-    assert layer.easter_egg == 2.5
-    assert layer.preset_start_clean is True
+    assert out["layer_1"]["preset_switching_list"] == [outside.resolve().as_posix()]
 
 
-def test_parse_layers_easter_egg_clamps() -> None:
-    preset_root = Path("/tmp/presets")
-    data = {"layers": _layer_yaml()}
-    data["layers"]["layer_1"]["easter_egg"] = 99.0
-    layers = parse_layers_section(data, ParseCtx(preset_root=preset_root))
-    assert layers["layer_1"].easter_egg == 5.0
-
-
-def test_persist_layers_writes_hard_cut_disabled() -> None:
-    cfg, session = _cfg_and_session(preset_switching="projectm")
-    session.layers["layer_1"].hard_cut_enabled = False
-    out = persist_layers(PersistCtx(cfg=cfg, session=session))
-    assert out["layer_1"]["hard_cut_enabled"] is False
-
-
-def test_persist_layers_writes_user_defined_rotation_set() -> None:
-    cfg, session = _cfg_and_session(preset_switching="projectm")
-    session.layers["layer_1"].preset_switching_rotation_set = "user_defined"
-    out = persist_layers(PersistCtx(cfg=cfg, session=session))
-    assert out["layer_1"]["preset_switching"] == "projectm"
-    assert out["layer_1"]["preset_switching_rotation_set"] == "user_defined"
-
-
-def test_persist_layers_writes_cast_roles_fields() -> None:
-    cfg, session = _cfg_and_session(preset_switching="timeline")
-    runtime = session.layers["layer_1"]
-    runtime.preset_switching_rotation_set = "cast_roles"
-    runtime.cast_roles_timeline_behaviour = "hold_current"
-    runtime.cast_roles_default_role = "accent"
-    out = persist_layers(PersistCtx(cfg=cfg, session=session))
-    assert out["layer_1"]["preset_switching_rotation_set"] == "cast_roles"
-    assert out["layer_1"]["cast_roles_timeline_behaviour"] == "hold_current"
-    assert out["layer_1"]["cast_roles_default_role"] == "accent"
-
-
-def test_persist_layers_writes_projectm_mode(tmp_path: Path) -> None:
-    preset_root = Path("/tmp/presets")
-    config_path = tmp_path / "cleave.config.yaml"
-    config_path.write_text("layers: {}\n", encoding="utf-8")
+def test_round_trip_snapshot(tmp_path: Path) -> None:
+    presets = tmp_path / "presets" / "drums"
+    presets.mkdir(parents=True)
+    milk = presets / "a.milk"
+    milk.write_text("MILK")
+    user = tmp_path / "user-presets"
+    user.mkdir()
+    copied = user / "b.milk"
+    copied.write_text("MILK2")
+    cfg_path = tmp_path / "unnamed-1.yaml"
+    cfg_path.write_text("layers:\n  layer_1: {}\n", encoding="utf-8")
     cfg = CleaveConfig(
-        paths=PathsConfig(preset_root=preset_root, texture_paths=(preset_root / "tex",)),
+        paths=PathsConfig(
+            preset_root=tmp_path / "presets",
+            texture_paths=(tmp_path / "textures",),
+        ),
         layers={
             "layer_1": LayerConfig(
-                preset=preset_root / "drums" / "drums.milk",
+                preset=milk,
                 stem="drums",
+                preset_switching="on",
+                preset_switching_trigger="timer",
+                preset_switching_list=[copied],
             )
         },
-        layer_z_order=["layer_1"],
         editor=EditorConfig(),
-        config_path=config_path,
-        user_config_path=Path("/tmp/user-config.yaml"),
+        config_path=cfg_path,
+        user_config_path=tmp_path / "user-config.yaml",
+        layer_z_order=["layer_1"],
     )
     session = TuningSession(
         layer_z_order=["layer_1"],
         layers={
             "layer_1": LayerRuntime(
                 playlist=PresetPlaylist(
-                    current_dir=preset_root / "drums",
-                    paths=(preset_root / "drums" / "drums.milk",),
-                    index=0,
+                    current_dir=presets, paths=(milk,), index=0
                 ),
-                browse_floor=preset_root / "drums",
+                browse_floor=presets,
                 stem="drums",
-                preset_switching="projectm",
+                preset_switching="on",
+                preset_switching_trigger="timer",
+                preset_list=[str(copied.resolve())],
             )
         },
     )
-    out = persist_layers(PersistCtx(cfg=cfg, session=session))
-    assert out["layer_1"]["preset_switching"] == "projectm"
-    assert "preset_switching_rotation_set" not in out["layer_1"]
-
-    path = tmp_path / "snap.yaml"
-    write_session_snapshot(path, cfg=cfg, session=session)
-    data = yaml.safe_load(path.read_text())
-    assert data["layers"]["layer_1"]["preset_switching"] == "projectm"
-
-
-def test_load_config_round_trip_preset_switching(tmp_path: Path) -> None:
-    preset_root = tmp_path / "presets"
-    preset_root.mkdir()
-    milk = preset_root / "drums" / "drums.milk"
-    milk.parent.mkdir(parents=True)
-    milk.write_text("; test\n", encoding="utf-8")
-    config_path = tmp_path / "cleave.config.yaml"
-    config_path.write_text(
-        yaml.safe_dump(
-            {
-                "paths": {
-                    "preset_root": str(preset_root),
-                    "texture_paths": [str(preset_root / "textures")],
-                },
-                "layers": {
-                    "layer_1": {
-                        "stem": "drums",
-                        "preset": "drums/drums.milk",
-                        "preset_switching": "projectm",
-                    }
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
-    cfg = load_config(config_path)
-    assert cfg.layers["layer_1"].preset_switching == "projectm"
-
-
-def test_load_config_round_trip_preset_switching_timeline(tmp_path: Path) -> None:
-    preset_root = tmp_path / "presets"
-    preset_root.mkdir()
-    milk = preset_root / "drums" / "drums.milk"
-    milk.parent.mkdir(parents=True)
-    milk.write_text("; test\n", encoding="utf-8")
-    config_path = tmp_path / "cleave.config.yaml"
-    config_path.write_text(
-        yaml.safe_dump(
-            {
-                "paths": {
-                    "preset_root": str(preset_root),
-                    "texture_paths": [str(preset_root / "textures")],
-                },
-                "layers": {
-                    "layer_1": {
-                        "stem": "drums",
-                        "preset": "drums/drums.milk",
-                        "preset_switching": "timeline",
-                    }
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
-    cfg = load_config(config_path)
-    assert cfg.layers["layer_1"].preset_switching == "timeline"
-    session = TuningSession(
-        layer_z_order=["layer_1"],
-        layers={
-            "layer_1": LayerRuntime(
-                playlist=PresetPlaylist(
-                    current_dir=milk.parent,
-                    paths=(milk,),
-                    index=0,
-                ),
-                browse_floor=milk.parent,
-                stem="drums",
-                preset_switching="timeline",
-            )
-        },
-    )
-    out = persist_layers(PersistCtx(cfg=cfg, session=session))
-    assert out["layer_1"]["preset_switching"] == "timeline"
+    write_session_snapshot(cfg_path, cfg=cfg, session=session)
+    loaded = yaml.safe_load(cfg_path.read_text())
+    assert loaded["layers"]["layer_1"]["preset_switching"] == "on"
+    assert loaded["layers"]["layer_1"]["preset_switching_list"] == [
+        "user-presets/b.milk"
+    ]

@@ -99,6 +99,15 @@ class TuningPanelCache:
         self.text_fit.clear()
         self.row_cache_structure = None
 
+    def retain_row_surfaces(self, keep: set[RowRenderKey]) -> None:
+        """Drop row surfaces not in keep (incremental eviction on structure change)."""
+        if not keep:
+            self.row_surfaces.clear()
+            return
+        stale = [key for key in self.row_surfaces if key not in keep]
+        for key in stale:
+            del self.row_surfaces[key]
+
     def clear_panel(self) -> None:
         self.panel = None
         self.panel_signature = None
@@ -190,12 +199,17 @@ def static_row_keys(
     *,
     font: pygame.font.Font,
     cache: TuningPanelCache,
-    visible_indices: tuple[int, ...],
+    indices: tuple[int, ...],
     max_content_width_for_index: Callable[[int], int],
     line_h: int,
 ) -> tuple[tuple, ...]:
+    """Build the static panel signature fragment for the given row indices.
+
+    Callers should pass viewport-visible (raster) indices only; off-screen
+    rows do not affect the composed panel pixels.
+    """
     keys: list[tuple] = []
-    for index in visible_indices:
+    for index in indices:
         if state.layout.kind(index) == RowKind.TRANSPORT:
             continue
         max_w = max_content_width_for_index(index)
@@ -278,6 +292,7 @@ def ensure_row_surface(
     max_content_width: int,
     line_h: int,
     counters: OverlayDrawCounters | None = None,
+    used_keys: set[RowRenderKey] | None = None,
 ) -> RowRenderEntry:
     kind = state.layout.kind(index)
     if kind == RowKind.TRANSPORT:
@@ -302,6 +317,8 @@ def ensure_row_surface(
         max_content_width=max_content_width,
         line_h=line_h,
     )
+    if used_keys is not None:
+        used_keys.add(key)
     entry = cache.row_surfaces.get(key)
     if entry is not None:
         if counters is not None:

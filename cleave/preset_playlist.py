@@ -57,6 +57,11 @@ def _path_at_or_below(path: Path, root: Path) -> bool:
         return False
 
 
+def path_under_preset_root(path: Path, preset_root: Path) -> bool:
+    """True when ``path`` is ``preset_root`` or a descendant."""
+    return _path_at_or_below(path, preset_root)
+
+
 def preset_browse_floor(anchor: Path, preset_root: Path) -> Path:
     """Lowest directory this layer may ascend to when browsing presets."""
     resolved_root = preset_root.resolve()
@@ -179,7 +184,12 @@ class PresetPlaylist:
         *,
         browse_floor: Path | None = None,
     ) -> str:
-        rel = to_config_relative(self.current_dir, preset_root).rstrip("/") + "/"
+        try:
+            rel = to_config_relative(self.current_dir, preset_root).rstrip("/") + "/"
+        except ValueError:
+            # Project user-presets (and other off-root copies) are not under
+            # preset_root; show an absolute path instead of crashing the panel.
+            rel = self.current_dir.resolve().as_posix().rstrip("/") + "/"
         siblings = list_browse_siblings(self.current_dir, preset_root)
         marker = directory_tree_marker(
             self.current_dir, preset_root, browse_floor=browse_floor

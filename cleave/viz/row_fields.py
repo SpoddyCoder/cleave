@@ -17,8 +17,6 @@ from cleave.config_schema import (
     TIMELINE_FADE_DURATION_STEP,
     VISUAL_LIMITER_RELEASE_STEP,
     VISUAL_LIMITER_THRESHOLD_STEP,
-    cast_roles_default_role_display,
-    cast_roles_timeline_behaviour_display,
     clamp_timeline_fade_duration,
     clamp_visual_limiter_release,
     clamp_visual_limiter_threshold,
@@ -27,8 +25,7 @@ from cleave.config_schema import (
     hard_cut_enabled_display,
     preset_start_clean_display,
     preset_switching_display,
-    preset_switching_rotation_set_display,
-    preset_switching_shuffle_display,
+    preset_switching_trigger_display,
     timeline_crossfade_display,
     ui_fade_display,
 )
@@ -103,11 +100,18 @@ class RowFieldDef:
     header_suffix: str | None = None
 
 
+def tree_branch_leading_spaces(depth: int) -> str:
+    """Leading spaces before a branch glyph for nested tree depth."""
+    if depth <= 1:
+        return ""
+    return " " * (2 * (depth - 1))
+
+
 def tree_branch_prefix(depth: int) -> str:
     """Branch glyph for tree depth; pixel indent comes from row_tree_indent_depth."""
     if depth <= 0:
         return ""
-    return " " * (2 * (depth - 1)) + "└─ "
+    return tree_branch_leading_spaces(depth) + "└─ "
 
 
 def _format_settings_preview_quality(
@@ -666,27 +670,11 @@ def _format_track_preset_switching_mode(
     return preset_switching_display(_track_block(state, desc).preset_switching)
 
 
-def _format_track_preset_switching_rotation_set(
+def _format_track_preset_switching_trigger(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
-    return preset_switching_rotation_set_display(
-        _track_block(state, desc).preset_switching_rotation_set
-    )
-
-
-def _format_track_cast_roles_timeline_behaviour(
-    state: TuningViewState, desc: RowDescriptor
-) -> str:
-    return cast_roles_timeline_behaviour_display(
-        _track_block(state, desc).cast_roles_timeline_behaviour
-    )
-
-
-def _format_track_cast_roles_default_role(
-    state: TuningViewState, desc: RowDescriptor
-) -> str:
-    return cast_roles_default_role_display(
-        _track_block(state, desc).cast_roles_default_role
+    return preset_switching_trigger_display(
+        _track_block(state, desc).preset_switching_trigger
     )
 
 
@@ -708,20 +696,6 @@ def _format_track_preset_start_clean(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
     return preset_start_clean_display(_track_block(state, desc).preset_start_clean)
-
-
-def _format_track_preset_switching_shuffle(
-    state: TuningViewState, desc: RowDescriptor
-) -> str:
-    return preset_switching_shuffle_display(
-        _track_block(state, desc).preset_switching_shuffle
-    )
-
-
-def _format_track_preset_switching_seed(
-    state: TuningViewState, desc: RowDescriptor
-) -> str:
-    return str(_track_block(state, desc).preset_switching_shuffle_salt)
 
 
 def _format_track_hard_cut_enabled(
@@ -966,7 +940,7 @@ def _apply_track_preset_switching_mode(
     controls._cycle_preset_switching(desc.slot, forward=forward)
 
 
-def _apply_track_preset_switching_rotation_set(
+def _apply_track_preset_switching_trigger(
     controls: TuningControls,
     desc: RowDescriptor,
     forward: bool,
@@ -975,31 +949,7 @@ def _apply_track_preset_switching_rotation_set(
 ) -> None:
     if desc.slot is None:
         return
-    controls._cycle_preset_switching_rotation_set(desc.slot, forward=forward)
-
-
-def _apply_track_cast_roles_timeline_behaviour(
-    controls: TuningControls,
-    desc: RowDescriptor,
-    forward: bool,
-    _ctrl: bool,
-    _shift: bool,
-) -> None:
-    if desc.slot is None:
-        return
-    controls._cycle_cast_roles_timeline_behaviour(desc.slot, forward=forward)
-
-
-def _apply_track_cast_roles_default_role(
-    controls: TuningControls,
-    desc: RowDescriptor,
-    forward: bool,
-    _ctrl: bool,
-    _shift: bool,
-) -> None:
-    if desc.slot is None:
-        return
-    controls._cycle_cast_roles_default_role(desc.slot, forward=forward)
+    controls._cycle_preset_switching_trigger(desc.slot, forward=forward)
 
 
 def _apply_track_preset_duration(
@@ -1036,15 +986,6 @@ def _apply_track_preset_start_clean(
     if desc.slot is None:
         return
     controls._cycle_preset_start_clean(desc.slot, forward=forward)
-
-
-def _apply_track_preset_switching_shuffle(
-    controls: TuningControls, desc: RowDescriptor, forward: bool, _ctrl: bool,
-    _shift: bool,
-) -> None:
-    if desc.slot is None:
-        return
-    controls._cycle_preset_switching_shuffle(desc.slot, forward=forward)
 
 
 def _apply_track_hard_cut_enabled(
@@ -1543,12 +1484,18 @@ def _format_track_preset(state: TuningViewState, desc: RowDescriptor) -> str:
     return _track_block(state, desc).preset_label
 
 
-def _format_track_user_preset_item(
+def _format_track_preset_list_count(
+    state: TuningViewState, desc: RowDescriptor
+) -> str:
+    return str(len(_track_block(state, desc).preset_list))
+
+
+def _format_track_preset_list_item(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
     assert desc.preset_index is not None
     block = _track_block(state, desc)
-    return block.user_preset_labels[desc.preset_index]
+    return block.preset_list_labels[desc.preset_index]
 
 
 def _format_song_markers_count(state: TuningViewState, _desc: RowDescriptor) -> str:
@@ -1760,53 +1707,36 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         format_value=_format_track_beat,
         apply_horizontal=_apply_track_beat,
     ),
-    RowKind.TRACK_USER_PRESETS: RowFieldDef(
-        panel_label="user presets",
+    RowKind.TRACK_PRESET_SWITCHING_TRIGGER: RowFieldDef(
+        panel_label="trigger",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_track_preset_switching_trigger,
+        apply_horizontal=_apply_track_preset_switching_trigger,
+    ),
+    RowKind.TRACK_PRESET_LIST: RowFieldDef(
+        panel_label="preset list",
         present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        format_value=_format_track_preset_list_count,
         apply_horizontal=_apply_expand_subheader,
     ),
-    RowKind.TRACK_USER_PRESET_ITEM: RowFieldDef(
+    RowKind.TRACK_PRESET_LIST_ITEM: RowFieldDef(
         panel_label="preset",
         present_style=RowPresentStyle.PATH_ICON,
-        format_value=_format_track_user_preset_item,
+        format_value=_format_track_preset_list_item,
         apply_horizontal=_noop_horizontal,
     ),
-    RowKind.TRACK_USER_PRESET_ADD: RowFieldDef(
-        panel_label="Add Current Preset",
+    RowKind.TRACK_PRESET_LIST_ADD: RowFieldDef(
+        panel_label="add current preset",
         present_style=RowPresentStyle.FULL_LINE,
         apply_horizontal=_noop_horizontal,
     ),
-    RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET: RowFieldDef(
-        panel_label="rotation set",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_track_preset_switching_rotation_set,
-        apply_horizontal=_apply_track_preset_switching_rotation_set,
-    ),
-    RowKind.TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR: RowFieldDef(
-        panel_label="timeline behaviour",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_track_cast_roles_timeline_behaviour,
-        apply_horizontal=_apply_track_cast_roles_timeline_behaviour,
-    ),
-    RowKind.TRACK_CAST_ROLES_DEFAULT_ROLE: RowFieldDef(
-        panel_label="default role",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_track_cast_roles_default_role,
-        apply_horizontal=_apply_track_cast_roles_default_role,
-    ),
-    RowKind.TRACK_PRESET_SWITCHING_SHUFFLE: RowFieldDef(
-        panel_label="shuffle",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_track_preset_switching_shuffle,
-        apply_horizontal=_apply_track_preset_switching_shuffle,
-    ),
-    RowKind.TRACK_PRESET_SWITCHING_SEED: RowFieldDef(
-        panel_label="seed",
-        present_style=RowPresentStyle.ACTION_PARAMETER,
-        format_value=_format_track_preset_switching_seed,
+    RowKind.TRACK_PRESET_LIST_POPULATE: RowFieldDef(
+        panel_label="populate presets",
+        present_style=RowPresentStyle.FULL_LINE,
+        apply_horizontal=_noop_horizontal,
     ),
     RowKind.TRACK_PRESET_DURATION: RowFieldDef(
-        panel_label="preset duration",
+        panel_label="duration",
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_track_preset_duration,
         apply_horizontal=_apply_track_preset_duration,

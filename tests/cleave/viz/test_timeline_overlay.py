@@ -131,7 +131,6 @@ def _view_state(
     soft_cut_crossfade: bool = False,
     selected_cue_t: dict[str, float] | None = None,
     selected_cue_flash_start_ms: int | None = None,
-    slot_rotation_sets: dict[str, str] | None = None,
 ) -> TimelineViewState:
     order = list(layer_z_order or list(DEFAULT_LAYER_SLOTS))
     lane_map = dict(lanes or {})
@@ -201,11 +200,6 @@ def _view_state(
         ),
         selected_cue_t=dict(selected_cue_t or ()),
         selected_cue_flash_start_ms=selected_cue_flash_start_ms,
-        slot_rotation_sets=dict(
-            slot_rotation_sets
-            if slot_rotation_sets is not None
-            else {slot: "directory" for slot in order}
-        ),
     )
 
 
@@ -982,7 +976,6 @@ def test_draw_with_selected_cue_and_role_does_not_crash() -> None:
         focus_row=0,
         submenu_focused=True,
         selected_cue_t={"layer_1": 10.0},
-        slot_rotation_sets={"layer_1": "cast_roles"},
     )
     surface = pygame.Surface((1280, 720), pygame.SRCALPHA)
     _draw(overlay, surface, state)
@@ -1006,7 +999,6 @@ def test_role_glyph_not_drawn_on_off_cue() -> None:
         duration_sec=100.0,
         focus_row=0,
         position_sec=0.0,
-        slot_rotation_sets={"layer_1": "cast_roles"},
     )
     composed = overlay.compose_panel(
         state,
@@ -1324,7 +1316,6 @@ def test_role_glyph_xor_drawn_late_on_upload_not_static() -> None:
         duration_sec=100.0,
         focus_row=0,
         position_sec=0.0,
-        slot_rotation_sets={"layer_1": "cast_roles"},
     )
     composed = overlay.compose_panel(
         state,

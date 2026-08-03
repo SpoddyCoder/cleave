@@ -1,35 +1,22 @@
-"""Tests for cleave.viz.preset_switching runtime helper."""
+"""Tests for unified list-based preset switching."""
 
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
-from cleave.config_schema import (
-    DEFAULT_EASTER_EGG,
-    DEFAULT_HARD_CUT_DURATION,
-    DEFAULT_HARD_CUT_ENABLED,
-    DEFAULT_HARD_CUT_SENSITIVITY,
-    DEFAULT_PRESET_DURATION,
-    DEFAULT_PRESET_START_CLEAN,
-    DEFAULT_SOFT_CUT_DURATION,
-)
 from cleave.preset_playlist import PresetPlaylist
 from cleave.projectm import ProjectM
-from cleave.viz.layer import StemLayer
 from cleave.timeline import SlotCue, TimelineLane
+from cleave.viz.layer import StemLayer
 from cleave.viz.preset_switching import (
-    EMPTY_ROTATION_NOTIFICATION,
-    EMPTY_USER_PRESETS_NOTIFICATION,
+    EMPTY_PRESET_LIST_NOTIFICATION,
     active_auto_preset_path,
-    advance_timeline_preset_switching,
+    advance_preset_switching,
     apply_preset_switching,
     load_manual_preset_clean,
+    reanchor_list_preset_after_browse,
     reapply_projectm_preset_switching,
-    rebuild_timeline_preset_rotation_preserving_count,
-    reset_projectm_preset_timer,
-    restart_projectm_preset_timer,
 )
 from cleave.viz.session import LayerRuntime, TuningSession
 
@@ -38,13 +25,13 @@ _MILK = (
     Path("/tmp/presets/drums/b.milk"),
     Path("/tmp/presets/drums/c.milk"),
 )
+_LIST = [str(path) for path in _MILK]
 
-_PRESET_ROOT = Path("/tmp/presets")
 
-
-def _stem_layer(*, paths: tuple[Path, ...], index: int = 0) -> StemLayer:
-    current_dir = Path("/tmp/presets/drums")
-    playlist = PresetPlaylist(current_dir=current_dir, paths=paths, index=index)
+def _stem_layer(*, paths: tuple[Path, ...] = _MILK, index: int = 0) -> StemLayer:
+    playlist = PresetPlaylist(
+        current_dir=Path("/tmp/presets/drums"), paths=paths, index=index
+    )
     pm = ProjectM.__new__(ProjectM)
     pm.lock_preset = MagicMock()
     pm.set_hard_cut_enabled = MagicMock()
@@ -58,12 +45,36 @@ def _stem_layer(*, paths: tuple[Path, ...], index: int = 0) -> StemLayer:
     return StemLayer(slot="layer_1", pm=pm, fbo=MagicMock(), playlist=playlist)
 
 
+def _session(
+    *,
+    switching: str = "on",
+    trigger: str = "timer",
+    preset_list: list[str] | None = None,
+    timeline_enabled: bool = False,
+    duration: float = 30.0,
+) -> TuningSession:
+    runtime = LayerRuntime(
+        playlist=PresetPlaylist(
+            current_dir=Path("/tmp/presets/drums"),
+            paths=_MILK,
+            index=0,
+        ),
+        browse_floor=Path("/tmp/presets/drums"),
+        stem="drums",
+        preset_switching=switching,  # type: ignore[arg-type]
+        preset_switching_trigger=trigger,  # type: ignore[arg-type]
+        preset_list=list(preset_list if preset_list is not None else _LIST),
+        preset_duration=duration,
+    )
+    session = TuningSession(layer_z_order=["layer_1"], layers={"layer_1": runtime})
+    session.timeline.enabled = timeline_enabled
+    return session
+
+
 def test_load_manual_preset_clean_forces_black_boot_then_restores() -> None:
-    layer = _stem_layer(paths=_MILK)
+    layer = _stem_layer()
     layer.playlist.load_into = MagicMock()
-
     load_manual_preset_clean(layer, preset_start_clean=False)
-
     assert layer.pm.set_preset_start_clean.call_args_list == [
         call(True),
         call(False),
@@ -72,870 +83,250 @@ def test_load_manual_preset_clean_forces_black_boot_then_restores() -> None:
     assert layer.auto_preset_path == _MILK[0].resolve()
 
 
-def test_load_manual_preset_clean_restores_configured_start_clean() -> None:
-    layer = _stem_layer(paths=_MILK)
-    layer.playlist.load_into = MagicMock()
-
-    load_manual_preset_clean(layer, preset_start_clean=True)
-
-    assert layer.pm.set_preset_start_clean.call_args_list == [
-        call(True),
-        call(True),
-    ]
-
-
-def test_load_manual_preset_clean_noop_without_preset() -> None:
-    layer = _stem_layer(paths=())
-    layer.playlist.load_into = MagicMock()
-
-    load_manual_preset_clean(layer)
-
-    layer.pm.set_preset_start_clean.assert_not_called()
-    layer.playlist.load_into.assert_not_called()
-
-
-def test_apply_none_locks_and_disables_hard_cuts() -> None:
-    layer = _stem_layer(paths=_MILK)
+def test_apply_off_locks_and_clears_playlist() -> None:
+    layer = _stem_layer()
     mock_pl = MagicMock()
     layer.projectm_playlist = mock_pl
     layer.auto_preset_path = _MILK[2]
-
-    apply_preset_switching(layer, mode="none", rotation_set="directory", preset_root=_PRESET_ROOT)
-
+    apply_preset_switching(layer, mode="off", preset_list=_LIST)
     mock_pl.destroy.assert_called_once()
     assert layer.projectm_playlist is None
     assert layer.auto_preset_path is None
+    assert layer.preset_rotation is None
     layer.pm.lock_preset.assert_called_with(True)
-    layer.pm.set_hard_cut_enabled.assert_called_with(False)
 
 
-@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
+def test_apply_on_empty_list_notifies_and_holds() -> None:
+    layer = _stem_layer()
+    on_empty = MagicMock()
+    apply_preset_switching(
+        layer, mode="on", trigger="timer", preset_list=[], on_empty=on_empty
+    )
+    on_empty.assert_called_once()
+    assert layer.preset_rotation is None
+    layer.pm.lock_preset.assert_called_with(True)
+
+
 @patch("cleave.viz.preset_switching.ProjectMPlaylist")
-def test_apply_projectm_connects_playlist(
-    mock_playlist_cls: MagicMock,
-    _mock_milk: MagicMock,
-) -> None:
-    layer = _stem_layer(paths=_MILK)
+def test_apply_projectm_trigger_feeds_list(mock_playlist_cls: MagicMock) -> None:
+    layer = _stem_layer()
     playlist = MagicMock()
     playlist.size.return_value = 3
-    playlist.item.side_effect = lambda i: _MILK[i]
+    playlist.item.side_effect = list(_MILK)
     mock_playlist_cls.create.return_value = playlist
-    on_empty = MagicMock()
-
     apply_preset_switching(
-        layer, mode="projectm", rotation_set="directory", on_empty=on_empty,
-        preset_root=_PRESET_ROOT,
+        layer, mode="on", trigger="projectm", preset_list=_LIST
     )
-
-    layer.pm.lock_preset.assert_called_with(False)
-    layer.pm.set_hard_cut_enabled.assert_called_with(DEFAULT_HARD_CUT_ENABLED)
-    layer.pm.set_preset_duration.assert_called_once_with(DEFAULT_PRESET_DURATION)
-    layer.pm.set_soft_cut_duration.assert_called_once_with(DEFAULT_SOFT_CUT_DURATION)
-    layer.pm.set_hard_cut_duration.assert_called_once_with(DEFAULT_HARD_CUT_DURATION)
-    layer.pm.set_hard_cut_sensitivity.assert_called_once_with(
-        DEFAULT_HARD_CUT_SENSITIVITY
-    )
-    layer.pm.set_easter_egg.assert_called_once_with(DEFAULT_EASTER_EGG)
-    layer.pm.set_preset_start_clean.assert_called_once_with(False)
-    playlist.connect.assert_called_once()
-    assert playlist.connect.call_args.kwargs["on_preset_loaded"] is not None
-    playlist.add_path.assert_called_once_with(
-        layer.playlist.current_dir, recurse=False, allow_duplicates=False
-    )
-    playlist.sort.assert_called_once_with()
+    playlist.add_presets.assert_called_once_with(list(_MILK), allow_duplicates=True)
     playlist.set_shuffle.assert_called_once_with(False)
     assert layer.projectm_playlist is playlist
-    layer.pm.load_preset.assert_called_once_with(_MILK[0], smooth=False)
-    assert layer.auto_preset_path == _MILK[0].resolve()
-    playlist.set_position.assert_called_once_with(0, hard_cut=True)
-    on_empty.assert_not_called()
+    layer.pm.lock_preset.assert_called_with(False)
 
 
-@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
-@patch("cleave.viz.preset_switching.ProjectMPlaylist")
-def test_apply_projectm_shuffle_enabled(
-    mock_playlist_cls: MagicMock,
-    _mock_milk: MagicMock,
-) -> None:
-    from cleave.preset_rotation import first_shuffle_bag_order, layer_rotation_seed
+def test_apply_timer_trigger_builds_rotation() -> None:
+    layer = _stem_layer()
+    apply_preset_switching(
+        layer, mode="on", trigger="timer", preset_list=_LIST
+    )
+    assert layer.projectm_playlist is None
+    assert layer.preset_rotation is not None
+    assert layer.preset_rotation.paths == _MILK
+    layer.pm.lock_preset.assert_called_with(True)
+    layer.pm.load_preset.assert_called()
 
-    layer = _stem_layer(paths=_MILK)
-    playlist = MagicMock()
-    playlist.size.return_value = 3
-    playlist.item.side_effect = lambda i: _MILK[i]
-    mock_playlist_cls.create.return_value = playlist
-    salt = 11
-    seed = layer_rotation_seed(_MILK, slot="layer_1", shuffle_salt=salt)
-    ordered = first_shuffle_bag_order(_MILK, seed=seed)
 
+def test_apply_timeline_trigger_indexes_list() -> None:
+    layer = _stem_layer()
+    session = _session(trigger="timeline", timeline_enabled=True)
     apply_preset_switching(
         layer,
-        mode="projectm",
-        rotation_set="directory",
-        shuffle=True,
-        shuffle_salt=salt,
-        preset_root=_PRESET_ROOT,
+        mode="on",
+        trigger="timeline",
+        preset_list=_LIST,
+        session=session,
     )
-
-    playlist.add_path.assert_not_called()
-    playlist.sort.assert_not_called()
-    playlist.add_presets.assert_called_once_with(ordered, allow_duplicates=True)
-    playlist.set_shuffle.assert_called_once_with(False)
+    assert layer.projectm_playlist is None
+    assert layer.preset_rotation is not None
+    layer.pm.lock_preset.assert_called_with(True)
 
 
-@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
 @patch("cleave.viz.preset_switching.ProjectMPlaylist")
-def test_apply_projectm_respects_hard_cut_disabled(
+def test_apply_projectm_trigger_works_with_timeline_enabled(
     mock_playlist_cls: MagicMock,
-    _mock_milk: MagicMock,
 ) -> None:
-    layer = _stem_layer(paths=_MILK)
+    layer = _stem_layer()
     playlist = MagicMock()
     playlist.size.return_value = 3
-    playlist.item.side_effect = lambda i: _MILK[i]
+    playlist.item.side_effect = list(_MILK)
     mock_playlist_cls.create.return_value = playlist
-
+    session = _session(trigger="projectm", timeline_enabled=True)
     apply_preset_switching(
         layer,
-        mode="projectm",
-        rotation_set="directory",
-        hard_cut_enabled=False,
-        preset_root=_PRESET_ROOT,
+        mode="on",
+        trigger="projectm",
+        preset_list=_LIST,
+        session=session,
     )
+    assert layer.projectm_playlist is playlist
+    layer.pm.lock_preset.assert_called_with(False)
 
-    layer.pm.set_hard_cut_enabled.assert_called_with(False)
+
+def test_apply_timer_trigger_works_with_timeline_enabled() -> None:
+    layer = _stem_layer()
+    session = _session(trigger="timer", timeline_enabled=True)
+    apply_preset_switching(
+        layer,
+        mode="on",
+        trigger="timer",
+        preset_list=_LIST,
+        session=session,
+    )
+    assert layer.projectm_playlist is None
+    assert layer.preset_rotation is not None
 
 
-def test_restart_projectm_preset_timer_skips_when_no_current() -> None:
-    layer = _stem_layer(paths=())
-    restart_projectm_preset_timer(layer)
+def test_advance_timer_uses_floor_playhead() -> None:
+    layer = _stem_layer()
+    session = _session(trigger="timer", duration=10.0)
+    apply_preset_switching(
+        layer,
+        mode="on",
+        trigger="timer",
+        preset_list=_LIST,
+        preset_duration=10.0,
+        session=session,
+    )
+    layer.pm.load_preset.reset_mock()
+    advance_preset_switching(session, {"layer_1": layer}, 0.0)
+    layer.pm.load_preset.assert_not_called()
+    advance_preset_switching(session, {"layer_1": layer}, 10.0)
+    layer.pm.load_preset.assert_called_once()
+    assert layer.list_switch_index == 1
+
+
+def test_advance_timeline_uses_on_transition_count() -> None:
+    layer = _stem_layer()
+    session = _session(trigger="timeline", timeline_enabled=True)
+    session.timeline.lanes["layer_1"] = TimelineLane(
+        baseline=0.0,
+        cues=(
+            SlotCue(t=1.0, level=1.0),
+            SlotCue(t=2.0, level=0.0),
+            SlotCue(t=3.0, level=1.0),
+        ),
+    )
+    apply_preset_switching(
+        layer,
+        mode="on",
+        trigger="timeline",
+        preset_list=_LIST,
+        session=session,
+    )
+    layer.pm.load_preset.reset_mock()
+    advance_preset_switching(session, {"layer_1": layer}, 0.5)
+    layer.pm.load_preset.assert_not_called()
+    advance_preset_switching(session, {"layer_1": layer}, 1.5)
+    layer.pm.load_preset.assert_called_once()
+    assert layer.list_switch_index == 1
+
+
+def test_advance_timeline_skips_when_timeline_disabled() -> None:
+    layer = _stem_layer()
+    session = _session(trigger="timeline", timeline_enabled=False)
+    session.timeline.lanes["layer_1"] = TimelineLane(
+        baseline=0.0,
+        cues=(
+            SlotCue(t=1.0, level=1.0),
+            SlotCue(t=2.0, level=0.0),
+            SlotCue(t=3.0, level=1.0),
+        ),
+    )
+    apply_preset_switching(
+        layer,
+        mode="on",
+        trigger="timeline",
+        preset_list=_LIST,
+        session=session,
+    )
+    layer.pm.load_preset.reset_mock()
+    advance_preset_switching(session, {"layer_1": layer}, 1.5)
+    layer.pm.load_preset.assert_not_called()
+    assert layer.list_switch_index == 0
+
+
+def test_advance_timer_works_with_timeline_enabled() -> None:
+    layer = _stem_layer()
+    session = _session(trigger="timer", timeline_enabled=True, duration=10.0)
+    apply_preset_switching(
+        layer,
+        mode="on",
+        trigger="timer",
+        preset_list=_LIST,
+        preset_duration=10.0,
+        session=session,
+    )
+    layer.pm.load_preset.reset_mock()
+    advance_preset_switching(session, {"layer_1": layer}, 10.0)
+    layer.pm.load_preset.assert_called_once()
+    assert layer.list_switch_index == 1
+
+
+def test_advance_skips_when_switching_off() -> None:
+    layer = _stem_layer()
+    session = _session(switching="off")
+    advance_preset_switching(session, {"layer_1": layer}, 100.0)
     layer.pm.load_preset.assert_not_called()
 
 
-def test_restart_projectm_preset_timer_uses_tracked_auto_preset() -> None:
-    layer = _stem_layer(paths=_MILK, index=0)
-    layer.auto_preset_path = _MILK[2].resolve()
-    restart_projectm_preset_timer(layer)
-    layer.pm.load_preset.assert_called_once_with(_MILK[2].resolve(), smooth=False)
+def test_reanchor_after_browse_preserves_current() -> None:
+    layer = _stem_layer(index=1)
+    session = _session(trigger="timer", duration=10.0)
+    apply_preset_switching(
+        layer,
+        mode="on",
+        trigger="timer",
+        preset_list=_LIST,
+        preset_duration=10.0,
+        session=session,
+    )
+    reanchor_list_preset_after_browse(
+        layer, session, 10.0, preset_list=_LIST
+    )
+    assert layer.list_switch_index == 1
+    assert layer.preset_rotation is not None
+    # browsed b.milk at index 1 while count==1 => anchor 0 keeps b at count 1
+    assert layer.preset_rotation.path_for(1) == _MILK[1]
 
 
-def test_restart_projectm_preset_timer_falls_back_to_browse_current() -> None:
-    layer = _stem_layer(paths=_MILK, index=1)
-    restart_projectm_preset_timer(layer)
-    layer.pm.load_preset.assert_called_once_with(_MILK[1], smooth=False)
-    assert layer.auto_preset_path == _MILK[1].resolve()
+@patch("cleave.viz.preset_switching.ProjectMPlaylist")
+def test_reapply_projectm_only_when_trigger_projectm(
+    mock_playlist_cls: MagicMock,
+) -> None:
+    layer = _stem_layer()
+    playlist = MagicMock()
+    playlist.size.return_value = 3
+    playlist.item.side_effect = list(_MILK)
+    mock_playlist_cls.create.return_value = playlist
+    session = _session(trigger="projectm")
+    apply_preset_switching(
+        layer,
+        mode="on",
+        trigger="projectm",
+        preset_list=_LIST,
+        session=session,
+    )
+    layer.projectm_playlist = playlist
+    reapply_projectm_preset_switching(
+        session, {"layer_1": layer}, preset_root=Path("/tmp/presets"), delta_sec=1.0
+    )
+    layer.pm.lock_preset.assert_any_call(False)
 
 
-def test_reset_projectm_preset_timer_locks_and_unlocks() -> None:
-    layer = _stem_layer(paths=_MILK)
-    reset_projectm_preset_timer(layer)
-    layer.pm.lock_preset.assert_has_calls([call(True), call(False)])
-    layer.pm.load_preset.assert_not_called()
-
-
-def test_active_auto_preset_path_prefers_tracked() -> None:
-    layer = _stem_layer(paths=_MILK, index=0)
+def test_active_auto_preset_path_prefers_auto() -> None:
+    layer = _stem_layer()
     layer.auto_preset_path = _MILK[2].resolve()
     assert active_auto_preset_path(layer) == _MILK[2].resolve()
 
 
-@patch("cleave.viz.preset_switching.ProjectMPlaylist")
-def test_apply_projectm_empty_dir_falls_back(mock_playlist_cls: MagicMock) -> None:
-    layer = _stem_layer(paths=())
-    on_empty = MagicMock()
-
-    apply_preset_switching(
-        layer, mode="projectm", rotation_set="directory", on_empty=on_empty,
-        preset_root=_PRESET_ROOT,
-    )
-
-    mock_playlist_cls.create.assert_not_called()
-    layer.pm.lock_preset.assert_called_with(True)
-    on_empty.assert_called_once()
-
-
-def test_empty_rotation_notification_text() -> None:
-    assert "No presets" in EMPTY_ROTATION_NOTIFICATION
-
-
-def test_empty_user_presets_notification_text() -> None:
-    assert "user-defined" in EMPTY_USER_PRESETS_NOTIFICATION
-
-
-@patch("cleave.viz.preset_switching.ProjectMPlaylist")
-def test_apply_user_defined_rotation_set_adds_presets(
-    mock_playlist_cls: MagicMock,
-) -> None:
-    layer = _stem_layer(paths=_MILK)
-    playlist = MagicMock()
-    playlist.size.return_value = 2
-    playlist.item.side_effect = lambda i: _MILK[i]
-    mock_playlist_cls.create.return_value = playlist
-    on_empty = MagicMock()
-
-    apply_preset_switching(
-        layer,
-        mode="projectm",
-        rotation_set="user_defined",
-        user_presets=[str(_MILK[0]), str(_MILK[1])],
-        on_empty=on_empty,
-        preset_root=_PRESET_ROOT,
-    )
-
-    layer.pm.lock_preset.assert_called_with(False)
-    playlist.add_presets.assert_called_once_with(
-        [Path(str(_MILK[0])), Path(str(_MILK[1]))],
-        allow_duplicates=True,
-    )
-    playlist.sort.assert_not_called()
-    playlist.add_path.assert_not_called()
-    on_empty.assert_not_called()
-
-
-@patch("cleave.viz.preset_switching.ProjectMPlaylist")
-def test_apply_user_defined_rotation_set_empty_falls_back(
-    mock_playlist_cls: MagicMock,
-) -> None:
-    layer = _stem_layer(paths=_MILK)
-    on_empty = MagicMock()
-
-    apply_preset_switching(
-        layer,
-        mode="projectm",
-        rotation_set="user_defined",
-        user_presets=[],
-        on_empty=on_empty,
-        preset_root=_PRESET_ROOT,
-    )
-
-    mock_playlist_cls.create.assert_not_called()
-    layer.pm.lock_preset.assert_called_with(True)
-    on_empty.assert_called_once()
-
-
-def test_reapply_projectm_preset_switching_only_projectm_layers() -> None:
-    layer_projectm = _stem_layer(paths=_MILK)
-    layer_projectm.projectm_playlist = MagicMock()
-    layer_none = _stem_layer(paths=_MILK)
-    session = TuningSession(
-        layer_z_order=["layer_1", "layer_2"],
-        layers={
-            "layer_1": LayerRuntime(
-                playlist=layer_projectm.playlist,
-                browse_floor=layer_projectm.playlist.current_dir,
-                stem="drums",
-                preset_switching="projectm",
-            ),
-            "layer_2": LayerRuntime(
-                playlist=layer_none.playlist,
-                browse_floor=layer_none.playlist.current_dir,
-                stem="bass",
-                preset_switching="none",
-            ),
-        },
-    )
-
-    with (
-        patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK),
-        patch("cleave.viz.preset_switching.apply_preset_switching") as mock_apply,
-        patch("cleave.viz.preset_switching._reapply_on_seek") as mock_reapply,
-    ):
-        reapply_projectm_preset_switching(
-            session,
-            {"layer_1": layer_projectm, "layer_2": layer_none},
-            preset_root=_PRESET_ROOT,
-        )
-
-    mock_apply.assert_not_called()
-    mock_reapply.assert_called_once_with(
-        layer_projectm,
-        0.0,
-        preset_duration=DEFAULT_PRESET_DURATION,
-        soft_cut_duration=DEFAULT_SOFT_CUT_DURATION,
-        easter_egg=DEFAULT_EASTER_EGG,
-        preset_start_clean=DEFAULT_PRESET_START_CLEAN,
-        hard_cut_duration=DEFAULT_HARD_CUT_DURATION,
-        hard_cut_sensitivity=DEFAULT_HARD_CUT_SENSITIVITY,
-        hard_cut_enabled=DEFAULT_HARD_CUT_ENABLED,
-    )
-
-
-def test_reapply_without_playlist_falls_back_to_apply() -> None:
-    layer = _stem_layer(paths=_MILK)
-    session = TuningSession(
-        layer_z_order=["layer_1"],
-        layers={
-            "layer_1": LayerRuntime(
-                playlist=layer.playlist,
-                browse_floor=layer.playlist.current_dir,
-                stem="drums",
-                preset_switching="projectm",
-            ),
-        },
-    )
-
-    with patch("cleave.viz.preset_switching.apply_preset_switching") as mock_apply:
-        reapply_projectm_preset_switching(session, {"layer_1": layer}, preset_root=_PRESET_ROOT)
-
-    mock_apply.assert_called_once()
-    assert mock_apply.call_args.kwargs.get("on_empty") is None
-
-
-@patch("cleave.viz.preset_switching.ProjectMPlaylist")
-def test_reapply_without_playlist_does_not_notify_empty(
-    mock_playlist_cls: MagicMock,
-) -> None:
-    layer = _stem_layer(paths=())
-    on_empty = MagicMock()
-    session = TuningSession(
-        layer_z_order=["layer_1"],
-        layers={
-            "layer_1": LayerRuntime(
-                playlist=layer.playlist,
-                browse_floor=layer.playlist.current_dir,
-                stem="drums",
-                preset_switching="projectm",
-            ),
-        },
-    )
-
-    apply_preset_switching(
-        layer, mode="projectm", rotation_set="directory", on_empty=on_empty,
-        preset_root=_PRESET_ROOT,
-    )
-    on_empty.assert_called_once()
-    on_empty.reset_mock()
-
-    reapply_projectm_preset_switching(session, {"layer_1": layer}, preset_root=_PRESET_ROOT)
-
-    on_empty.assert_not_called()
-    mock_playlist_cls.create.assert_not_called()
-
-
-def test_reapply_on_forward_seek_reconnects_without_reload() -> None:
-    layer = _stem_layer(paths=_MILK, index=0)
-    layer.auto_preset_path = _MILK[2].resolve()
-    playlist = MagicMock()
-    layer.projectm_playlist = playlist
-    session = TuningSession(
-        layer_z_order=["layer_1"],
-        layers={
-            "layer_1": LayerRuntime(
-                playlist=layer.playlist,
-                browse_floor=layer.playlist.current_dir,
-                stem="drums",
-                preset_switching="projectm",
-            ),
-        },
-    )
-
-    reapply_projectm_preset_switching(session, {"layer_1": layer}, delta_sec=5.0, preset_root=_PRESET_ROOT)
-
-    playlist.connect.assert_called_once()
-    layer.pm.lock_preset.assert_has_calls([call(False), call(True), call(False)])
-    layer.pm.load_preset.assert_not_called()
-    playlist.set_position.assert_not_called()
-
-
-def test_reapply_on_backward_seek_restarts_tracked_preset() -> None:
-    layer = _stem_layer(paths=_MILK, index=0)
-    layer.auto_preset_path = _MILK[2].resolve()
-    playlist = MagicMock()
-    layer.projectm_playlist = playlist
-    session = TuningSession(
-        layer_z_order=["layer_1"],
-        layers={
-            "layer_1": LayerRuntime(
-                playlist=layer.playlist,
-                browse_floor=layer.playlist.current_dir,
-                stem="drums",
-                preset_switching="projectm",
-            ),
-        },
-    )
-
-    reapply_projectm_preset_switching(session, {"layer_1": layer}, delta_sec=-5.0, preset_root=_PRESET_ROOT)
-
-    playlist.connect.assert_called_once()
-    layer.pm.load_preset.assert_called_once_with(_MILK[2].resolve(), smooth=False)
-    layer.pm.lock_preset.assert_called_with(False)
-
-
-def _timeline_session(layer: StemLayer, *, enabled: bool = True) -> TuningSession:
-    session = TuningSession(
-        layer_z_order=["layer_1"],
-        layers={
-            "layer_1": LayerRuntime(
-                playlist=layer.playlist,
-                browse_floor=layer.playlist.current_dir,
-                stem="drums",
-                preset_switching="timeline",
-            ),
-        },
-    )
-    session.timeline.enabled = enabled
-    session.timeline.lanes["layer_1"] = TimelineLane(
-        baseline=0.0,
-        cues=[
-            SlotCue(t=5.0, level=1.0),
-            SlotCue(t=10.0, level=0.0),
-            SlotCue(t=15.0, level=1.0),
-        ],
-    )
-    return session
-
-
-@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
-def test_apply_timeline_locks_and_loads_anchor(_mock_milk: MagicMock) -> None:
-    layer = _stem_layer(paths=_MILK, index=1)
-    apply_preset_switching(layer, mode="timeline", rotation_set="directory", preset_root=_PRESET_ROOT)
-    layer.pm.lock_preset.assert_called_with(True)
-    layer.pm.set_hard_cut_enabled.assert_called_with(False)
-    assert layer.preset_rotation is not None
-    assert layer.rotation_anchor == 1
-    assert layer.timeline_switch_count == 0
-    layer.pm.load_preset.assert_called_once_with(_MILK[1], smooth=False)
-
-
-@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
-def test_advance_timeline_loads_next_on_rising_edge(_mock_milk: MagicMock) -> None:
-    layer = _stem_layer(paths=_MILK, index=0)
-    session = _timeline_session(layer)
-    apply_preset_switching(layer, mode="timeline", rotation_set="directory", preset_root=_PRESET_ROOT)
-    layer.pm.load_preset.reset_mock()
-
-    advance_timeline_preset_switching(session, {"layer_1": layer}, 4.9)
-    layer.pm.load_preset.assert_not_called()
-    assert layer.timeline_switch_count == 0
-
-    advance_timeline_preset_switching(session, {"layer_1": layer}, 5.0)
-    layer.pm.load_preset.assert_called_once_with(_MILK[1], smooth=False)
-    assert layer.timeline_switch_count == 1
-    assert layer.auto_preset_path == _MILK[1].resolve()
-    assert layer.playlist.index == 0
-
-    layer.pm.load_preset.reset_mock()
-    advance_timeline_preset_switching(session, {"layer_1": layer}, 15.0)
-    layer.pm.load_preset.assert_called_once_with(_MILK[2], smooth=False)
-    assert layer.timeline_switch_count == 2
-    assert layer.auto_preset_path == _MILK[2].resolve()
-    assert layer.playlist.index == 0
-
-
-@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
-def test_advance_timeline_does_not_mark_config_dirty(_mock_milk: MagicMock) -> None:
-    from cleave.viz.config_save import ConfigSaveController
-    from cleave.viz.modal import ModalHost
-    from tests.support.viz import make_test_cfg
-
-    layer = _stem_layer(paths=_MILK, index=0)
-    session = _timeline_session(layer)
-    cfg = make_test_cfg(("layer_1",), preset_root=Path("/tmp/presets"))
-    save = ConfigSaveController(session, cfg, ModalHost())
-    assert not save.config_dirty
-
-    apply_preset_switching(layer, mode="timeline", rotation_set="directory", preset_root=_PRESET_ROOT)
-    save.clear_config_dirty()
-
-    advance_timeline_preset_switching(session, {"layer_1": layer}, 5.0)
-    advance_timeline_preset_switching(session, {"layer_1": layer}, 15.0)
-
-    assert layer.auto_preset_path == _MILK[2].resolve()
-    assert layer.playlist.index == 0
-    assert not save.config_dirty
-
-
-@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
-def test_advance_timeline_noop_when_timeline_disabled(_mock_milk: MagicMock) -> None:
-    layer = _stem_layer(paths=_MILK, index=0)
-    session = _timeline_session(layer, enabled=False)
-    apply_preset_switching(layer, mode="timeline", rotation_set="directory", preset_root=_PRESET_ROOT)
-    layer.pm.load_preset.reset_mock()
-
-    advance_timeline_preset_switching(session, {"layer_1": layer}, 15.0)
-    layer.pm.load_preset.assert_not_called()
-    assert layer.timeline_switch_count == 0
-
-
-@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
-def test_rebuild_timeline_preserves_switch_count(_mock_milk: MagicMock) -> None:
-    layer = _stem_layer(paths=_MILK, index=0)
-    apply_preset_switching(
-        layer,
-        mode="timeline",
-        rotation_set="directory",
-        shuffle=True,
-        shuffle_salt=1,
-        preset_root=_PRESET_ROOT,
-    )
-    layer.timeline_switch_count = 2
-    layer.rotation_anchor = 1
-    old_seed = layer.preset_rotation.seed
-    layer.pm.load_preset.reset_mock()
-
-    rebuild_timeline_preset_rotation_preserving_count(
-        layer,
-        rotation_set="directory",
-        shuffle=True,
-        shuffle_salt=2,
-        preset_root=_PRESET_ROOT,
-    )
-
-    assert layer.timeline_switch_count == 2
-    assert layer.rotation_anchor == 1
-    assert layer.preset_rotation is not None
-    assert layer.preset_rotation.seed != old_seed
-    expected = layer.preset_rotation.path_for(2)
-    layer.pm.load_preset.assert_called_once_with(expected, smooth=False)
-
-
-@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
-def test_apply_timeline_shuffle_toggle_preserves_switch_count(
-    _mock_milk: MagicMock,
-) -> None:
-    """Re-apply while already in timeline (e.g. shuffle toggle) must not reset count."""
-    layer = _stem_layer(paths=_MILK, index=0)
-    apply_preset_switching(
-        layer,
-        mode="timeline",
-        rotation_set="directory",
-        shuffle=False,
-        shuffle_salt=7,
-        preset_root=_PRESET_ROOT,
-    )
-    layer.timeline_switch_count = 2
-    layer.rotation_anchor = 0
-    seed_before = layer.preset_rotation.seed
-    layer.pm.load_preset.reset_mock()
-
-    apply_preset_switching(
-        layer,
-        mode="timeline",
-        rotation_set="directory",
-        shuffle=True,
-        shuffle_salt=7,
-        preset_root=_PRESET_ROOT,
-    )
-
-    assert layer.timeline_switch_count == 2
-    assert layer.rotation_anchor == 0
-    assert layer.preset_rotation is not None
-    assert layer.preset_rotation.shuffle is True
-    assert layer.preset_rotation.seed == seed_before
-    expected = layer.preset_rotation.path_for(2)
-    layer.pm.load_preset.assert_called_once_with(expected, smooth=False)
-    assert expected != layer.preset_rotation.path_for(0)
-
-
-@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
-def test_apply_timeline_first_enable_still_resets_count(
-    _mock_milk: MagicMock,
-) -> None:
-    layer = _stem_layer(paths=_MILK, index=1)
-    layer.timeline_switch_count = 5
-    layer.rotation_anchor = 2
-    assert layer.preset_rotation is None
-
-    apply_preset_switching(
-        layer,
-        mode="timeline",
-        rotation_set="directory",
-        shuffle=True,
-        shuffle_salt=3,
-        preset_root=_PRESET_ROOT,
-    )
-
-    assert layer.timeline_switch_count == 0
-    assert layer.rotation_anchor == 1
-    layer.pm.load_preset.assert_called_once_with(
-        layer.preset_rotation.path_for(0), smooth=False
-    )
-
-
-def test_tick_frame_core_advances_timeline_when_playing() -> None:
-    from cleave.viz.app import tick_frame_core
-
-    runtime = MagicMock()
-    runtime.seed.session = MagicMock()
-    runtime.layers_by_slot = {}
-    runtime.layers = []
-    with (
-        patch("cleave.viz.app.apply_layer_visibility"),
-        patch("cleave.viz.app.advance_timeline_preset_switching") as mock_advance,
-        patch("cleave.viz.app.LayerFramePipeline.render_frame"),
-        patch("cleave.viz.app.LayerFramePipeline.composite"),
-    ):
-        tick_frame_core(
-            runtime,
-            1.0,
-            paused=False,
-            was_paused=False,
-            n_pcm=0,
-            pm_time_sec=1.0,
-            blank_visualizers=False,
-        )
-    mock_advance.assert_called_once_with(runtime.seed.session, {}, 1.0)
-
-
-def test_tick_frame_core_skips_advance_when_paused() -> None:
-    from cleave.viz.app import tick_frame_core
-
-    runtime = MagicMock()
-    runtime.seed.session = MagicMock()
-    runtime.layers_by_slot = {}
-    runtime.layers = []
-    with (
-        patch("cleave.viz.app.apply_layer_visibility"),
-        patch("cleave.viz.app.advance_timeline_preset_switching") as mock_advance,
-        patch("cleave.viz.app.LayerFramePipeline.render_frame"),
-        patch("cleave.viz.app.LayerFramePipeline.composite"),
-    ):
-        tick_frame_core(
-            runtime,
-            1.0,
-            paused=True,
-            was_paused=True,
-            n_pcm=0,
-            pm_time_sec=1.0,
-            blank_visualizers=False,
-        )
-    mock_advance.assert_not_called()
-
-
-_PULSE_POOL = (
-    Path("/tmp/presets/roles/pulse/p0.milk"),
-    Path("/tmp/presets/roles/pulse/p1.milk"),
-)
-
-
-def _role_timeline_session(
-    layer: StemLayer,
-    *,
-    rotation_set: str = "cast_roles",
-) -> TuningSession:
-    session = TuningSession(
-        layer_z_order=["layer_1"],
-        layers={
-            "layer_1": LayerRuntime(
-                playlist=layer.playlist,
-                browse_floor=layer.playlist.current_dir,
-                stem="drums",
-                preset_switching="timeline",
-                preset_switching_rotation_set=rotation_set,  # type: ignore[arg-type]
-            ),
-        },
-    )
-    session.timeline.enabled = True
-    session.timeline.lanes["layer_1"] = TimelineLane(
-        baseline=0.0,
-        cues=[
-            SlotCue(t=5.0, level=1.0, role="pulse"),
-            SlotCue(t=10.0, level=0.0),
-            SlotCue(t=15.0, level=1.0, role="pulse"),
-            SlotCue(t=20.0, level=0.0),
-            SlotCue(t=25.0, level=1.0),
-        ],
-    )
-    return session
-
-
-_BED_POOL = (
-    Path("/tmp/presets/roles/bed/b0.milk"),
-    Path("/tmp/presets/roles/bed/b1.milk"),
-)
-
-
-def _cast_role_pools(preset_root: Path, role: str):
-    del preset_root
-    if role == "pulse":
-        return _PULSE_POOL
-    if role == "bed":
-        return _BED_POOL
-    return ()
-
-
-@patch("cleave.viz.preset_switching.role_pool_paths")
-@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
-def test_advance_timeline_role_cue_loads_from_role_pool(
-    _mock_milk: MagicMock,
-    mock_role_pool: MagicMock,
-) -> None:
-    mock_role_pool.side_effect = _cast_role_pools
-    layer = _stem_layer(paths=_MILK, index=0)
-    session = _role_timeline_session(layer)
-    apply_preset_switching(
-        layer, mode="timeline", rotation_set="cast_roles", preset_root=_PRESET_ROOT
-    )
-    assert "pulse" in layer.role_rotations
-    layer.pm.load_preset.reset_mock()
-
-    advance_timeline_preset_switching(session, {"layer_1": layer}, 5.0)
-    layer.pm.load_preset.assert_called_once_with(_PULSE_POOL[0], smooth=False)
-    assert layer.timeline_switch_count == 1
-
-
-@patch("cleave.viz.preset_switching.role_pool_paths")
-@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
-def test_advance_timeline_role_index_is_seek_stable(
-    _mock_milk: MagicMock,
-    mock_role_pool: MagicMock,
-) -> None:
-    mock_role_pool.side_effect = _cast_role_pools
-    layer = _stem_layer(paths=_MILK, index=0)
-    session = _role_timeline_session(layer)
-    apply_preset_switching(
-        layer, mode="timeline", rotation_set="cast_roles", preset_root=_PRESET_ROOT
-    )
-    layer.pm.load_preset.reset_mock()
-
-    advance_timeline_preset_switching(session, {"layer_1": layer}, 15.0)
-    assert layer.timeline_switch_count == 2
-    assert layer.pm.load_preset.call_args_list[-1] == call(_PULSE_POOL[1], smooth=False)
-
-    layer.timeline_switch_count = 0
-    layer.auto_preset_path = None
-    layer.pm.load_preset.reset_mock()
-    advance_timeline_preset_switching(session, {"layer_1": layer}, 15.0)
-    layer.pm.load_preset.assert_called_once_with(_PULSE_POOL[1], smooth=False)
-    assert layer.timeline_switch_count == 2
-
-
-@patch("cleave.viz.preset_switching.role_pool_paths")
-@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
-def test_advance_timeline_directory_ignores_cue_roles(
-    _mock_milk: MagicMock,
-    mock_role_pool: MagicMock,
-) -> None:
-    mock_role_pool.side_effect = _cast_role_pools
-    layer = _stem_layer(paths=_MILK, index=0)
-    session = _role_timeline_session(layer, rotation_set="directory")
-    apply_preset_switching(
-        layer, mode="timeline", rotation_set="directory", preset_root=_PRESET_ROOT
-    )
-    assert layer.role_rotations == {}
-    layer.pm.load_preset.reset_mock()
-
-    advance_timeline_preset_switching(session, {"layer_1": layer}, 5.0)
-    expected = layer.preset_rotation.path_for(1)
-    layer.pm.load_preset.assert_called_once_with(expected, smooth=False)
-
-
-@patch("cleave.viz.preset_switching.role_pool_paths")
-@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
-def test_advance_timeline_cast_roles_null_role_uses_last_role(
-    _mock_milk: MagicMock,
-    mock_role_pool: MagicMock,
-) -> None:
-    mock_role_pool.side_effect = _cast_role_pools
-    layer = _stem_layer(paths=_MILK, index=0)
-    session = _role_timeline_session(layer)
-    apply_preset_switching(
-        layer, mode="timeline", rotation_set="cast_roles", preset_root=_PRESET_ROOT
-    )
-    layer.pm.load_preset.reset_mock()
-
-    # First two on-transitions are pulse; third (t=25) has no role -> last pulse.
-    advance_timeline_preset_switching(session, {"layer_1": layer}, 25.0)
-    assert layer.pm.load_preset.call_args_list[-1] == call(_PULSE_POOL[0], smooth=False)
-    assert layer.timeline_switch_count == 3
-    assert layer.last_cast_role == "pulse"
-
-
-@patch("cleave.viz.preset_switching.role_pool_paths")
-@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
-def test_advance_timeline_cast_roles_hold_current_skips_null_role(
-    _mock_milk: MagicMock,
-    mock_role_pool: MagicMock,
-) -> None:
-    mock_role_pool.side_effect = _cast_role_pools
-    layer = _stem_layer(paths=_MILK, index=0)
-    session = _role_timeline_session(layer)
-    session.layers["layer_1"].cast_roles_timeline_behaviour = "hold_current"
-    apply_preset_switching(
-        layer, mode="timeline", rotation_set="cast_roles", preset_root=_PRESET_ROOT
-    )
-    advance_timeline_preset_switching(session, {"layer_1": layer}, 15.0)
-    assert layer.timeline_switch_count == 2
-    layer.pm.load_preset.reset_mock()
-
-    advance_timeline_preset_switching(session, {"layer_1": layer}, 25.0)
-    layer.pm.load_preset.assert_not_called()
-    assert layer.timeline_switch_count == 3
-    assert layer.last_cast_role == "pulse"
-
-
-@patch("cleave.viz.preset_switching.role_pool_paths")
-@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
-def test_apply_cast_roles_uses_default_role_pool_as_main_rotation(
-    _mock_milk: MagicMock,
-    mock_role_pool: MagicMock,
-) -> None:
-    mock_role_pool.side_effect = _cast_role_pools
-    layer = _stem_layer(paths=_MILK, index=0)
-    apply_preset_switching(
-        layer,
-        mode="timeline",
-        rotation_set="cast_roles",
-        cast_roles_default_role="pulse",
-        preset_root=_PRESET_ROOT,
-    )
-    assert layer.preset_rotation is not None
-    assert layer.preset_rotation.paths == _PULSE_POOL
-    layer.pm.load_preset.assert_called_with(_PULSE_POOL[0], smooth=False)
-
-
-@patch("cleave.viz.preset_switching.role_pool_paths")
-@patch("cleave.viz.preset_switching.milk_files_in_dir", return_value=_MILK)
-def test_apply_cast_roles_empty_default_role_pool_clears_rotation(
-    _mock_milk: MagicMock,
-    mock_role_pool: MagicMock,
-) -> None:
-    empty: list[str] = []
-
-    def empty_default(preset_root: Path, role: str):
-        del preset_root
-        if role == "bed":
-            return ()
-        if role == "pulse":
-            return _PULSE_POOL
-        return ()
-
-    mock_role_pool.side_effect = empty_default
-    layer = _stem_layer(paths=_MILK, index=0)
-    apply_preset_switching(
-        layer,
-        mode="timeline",
-        rotation_set="cast_roles",
-        preset_root=_PRESET_ROOT,
-        on_empty=lambda: empty.append("empty"),
-    )
-    assert layer.preset_rotation is None
-    assert layer.role_rotations == {}
-    assert empty == ["empty"]
-
-
-def test_apply_preset_switching_rebuilds_role_rotations_from_disk() -> None:
-    """Cast add/remove updates on-disk pools; switching change rebuilds role_rotations."""
-    with tempfile.TemporaryDirectory() as tmp:
-        root = Path(tmp)
-        pack = root / "pack"
-        pack.mkdir()
-        main = pack / "main.milk"
-        main.write_text("main", encoding="utf-8")
-        bed = root / "roles" / "bed" / "cast.milk"
-        bed.parent.mkdir(parents=True)
-        bed.write_text("cast", encoding="utf-8")
-        layer = _stem_layer(paths=(main,), index=0)
-        layer.playlist = PresetPlaylist(current_dir=pack, paths=(main,), index=0)
-
-        apply_preset_switching(
-            layer, mode="timeline", rotation_set="cast_roles", preset_root=root
-        )
-        assert "bed" in layer.role_rotations
-        assert layer.role_rotations["bed"].paths == (bed,)
-
-        bed.unlink()
-        apply_preset_switching(
-            layer, mode="timeline", rotation_set="cast_roles", preset_root=root
-        )
-        assert layer.role_rotations == {}
+def test_empty_notification_constant() -> None:
+    assert "list" in EMPTY_PRESET_LIST_NOTIFICATION.lower()

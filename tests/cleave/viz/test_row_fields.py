@@ -51,6 +51,16 @@ def test_tree_branch_prefix() -> None:
     assert tree_branch_prefix(0) == ""
     assert tree_branch_prefix(1) == "└─ "
     assert tree_branch_prefix(2) == "  └─ "
+    assert tree_branch_prefix(3) == "    └─ "
+
+
+def test_tree_branch_leading_spaces() -> None:
+    from cleave.viz.row_fields import tree_branch_leading_spaces
+
+    assert tree_branch_leading_spaces(0) == ""
+    assert tree_branch_leading_spaces(1) == ""
+    assert tree_branch_leading_spaces(2) == "  "
+    assert tree_branch_leading_spaces(3) == "    "
 
 
 def test_row_panel_label_settings_header() -> None:
@@ -66,7 +76,7 @@ def test_labeled_row_prefix_settings_children() -> None:
 
 def test_labeled_row_prefix_track_depths() -> None:
     assert labeled_row_prefix(RowKind.TRACK_STEM) == "└─ driving stem: "
-    assert labeled_row_prefix(RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET) == "  └─ rotation set: "
+    assert labeled_row_prefix(RowKind.TRACK_PRESET_SWITCHING_TRIGGER) == "  └─ trigger: "
 
 
 def test_format_row_value_settings() -> None:
@@ -104,7 +114,7 @@ def test_format_row_value_track_and_render() -> None:
                 opacity_pct=75,
                 beat_sensitivity=1.25,
                 effects={},
-                preset_switching="projectm",
+                preset_switching="on",
                 preset_duration=45.0,
             )
         },
@@ -118,7 +128,7 @@ def test_format_row_value_track_and_render() -> None:
     slot_desc = RowDescriptor(RowKind.TRACK_BLEND, slot="layer_1")
     assert format_row_value(state, slot_desc) == "add"
     mode_desc = RowDescriptor(RowKind.TRACK_PRESET_SWITCHING, slot="layer_1")
-    assert format_row_value(state, mode_desc) == "projectM"
+    assert format_row_value(state, mode_desc) == "on"
     duration_desc = RowDescriptor(RowKind.TRACK_PRESET_DURATION, slot="layer_1")
     assert format_row_value(state, duration_desc) == "45s"
     assert format_row_value(state, RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_POSITION)) == (
@@ -243,7 +253,7 @@ def test_row_expand_subheader_display_text() -> None:
     desc = RowDescriptor(RowKind.TRACK_PRESET_SWITCHING, slot="layer_1")
     assert (
         row_expand_subheader_display_text(state, desc)
-        == "└─ preset switching: none ▶"
+        == "└─ preset switching: off ▶"
     )
 
 
@@ -274,29 +284,31 @@ def test_composite_header_render_overlay_metadata() -> None:
     assert row_composite_header_display_text(state, desc) == "Render: OVERLAYS ▶"
 
 
-def test_preset_switching_seed_is_action_parameter_with_value() -> None:
-    field = row_field_def(RowKind.TRACK_PRESET_SWITCHING_SEED)
-    assert field.present_style == RowPresentStyle.ACTION_PARAMETER
-    state = _minimal_view_state(
-        tracks={
-            "layer_1": TrackBlock(
-                stem="drums",
-                preset_dir_label="dir",
-                preset_label="preset.milk",
-                blend_mode="black-key",
-                opacity_pct=50,
-                beat_sensitivity=1.0,
-                effects={},
-                expanded=True,
-                preset_switching="projectm",
-                preset_switching_shuffle=True,
-                preset_switching_shuffle_salt=42,
-            )
-        }
+def test_preset_list_populate_is_full_line_action() -> None:
+    field = row_field_def(RowKind.TRACK_PRESET_LIST_POPULATE)
+    assert field.present_style == RowPresentStyle.FULL_LINE
+    assert field.panel_label == "populate presets"
+    add_field = row_field_def(RowKind.TRACK_PRESET_LIST_ADD)
+    assert add_field.present_style == RowPresentStyle.FULL_LINE
+    assert add_field.panel_label == "add current preset"
+
+
+def test_preset_list_add_populate_share_list_item_tree_chrome() -> None:
+    """FULL_LINE actions nest under the preset list header like list items."""
+    from cleave.viz.row_sections import row_tree_indent_depth
+
+    item_depth = row_tree_indent_depth(RowKind.TRACK_PRESET_LIST_ITEM)
+    branch = tree_branch_prefix(item_depth)
+    assert branch == "    └─ "
+    assert full_line_prefix(RowKind.TRACK_PRESET_LIST_ADD) == (
+        branch + "add current preset"
     )
-    desc = RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_SEED, slot="layer_1")
-    assert format_row_value(state, desc) == "42"
-    assert row_action_parameter_display_text(state, desc) == "    └─ seed: 42"
+    populate_depth = row_tree_indent_depth(RowKind.TRACK_PRESET_LIST_POPULATE)
+    populate_branch = tree_branch_prefix(populate_depth)
+    assert full_line_prefix(RowKind.TRACK_PRESET_LIST_POPULATE) == (
+        populate_branch + "populate presets"
+    )
+    assert labeled_row_prefix(RowKind.TRACK_PRESET_LIST_ITEM).startswith(branch)
 
 
 def test_apply_field_horizontal_expand_subheader_when_layer_locked() -> None:
@@ -326,7 +338,7 @@ def test_apply_field_horizontal_track_header_solo_and_expand() -> None:
 
 
 def test_row_fields_count() -> None:
-    assert len(ROW_FIELDS) == 124
+    assert len(ROW_FIELDS) == 121
 
 
 def test_row_kinds_requiring_fields_registry_complete() -> None:

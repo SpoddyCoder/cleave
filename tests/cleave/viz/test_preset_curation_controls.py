@@ -40,7 +40,7 @@ def _make_controller(
                 browse_floor=preset_root,
                 stem="drums",
                 opacity_pct=50,
-                user_presets=[str(preset_root / "pack" / "demo.milk")],
+                preset_list=[str(preset_root / "pack" / "demo.milk")],
             ),
         },
     )
@@ -98,7 +98,7 @@ def test_confirm_favourite_copies_without_session_mutation() -> None:
                 unlock_preset_after_modal=lambda slot: unlocked.append(slot),
             ),
         )
-        user_presets_before = list(session.layers["layer_1"].user_presets)
+        user_presets_before = list(session.layers["layer_1"].preset_list)
 
         controller.prompt_favourite("layer_1", src)
         modal.handle_keydown(keydown(pygame.K_RETURN))
@@ -106,7 +106,7 @@ def test_confirm_favourite_copies_without_session_mutation() -> None:
         assert locked == ["layer_1"]
         assert unlocked == ["layer_1"]
         assert (root / FAVOURITES_DIR / "demo.milk").exists()
-        assert session.layers["layer_1"].user_presets == user_presets_before
+        assert session.layers["layer_1"].preset_list == user_presets_before
         assert "demo.milk" in controller._index.favourites
         assert controller._index.marker("demo.milk") == " [F]"
 
@@ -150,7 +150,7 @@ def test_confirm_blacklist_moves_and_updates_playlist_and_user_presets() -> None
         assert session.layers["layer_1"].playlist.paths == ()
         assert preset_changes == [("layer_1", 0)]
         assert switching_changes == ["layer_1"]
-        assert session.layers["layer_1"].user_presets == []
+        assert session.layers["layer_1"].preset_list == []
         assert "demo.milk" in controller._index.blacklist
         assert controller._index.marker("demo.milk") == " [B]"
 
@@ -288,7 +288,7 @@ def test_blacklist_from_user_preset_skips_playlist_when_not_current() -> None:
             paths=(current, user_only),
             index=0,
         )
-        session.layers["layer_1"].user_presets = [str(user_only)]
+        session.layers["layer_1"].preset_list = [str(user_only)]
 
         controller.prompt_blacklist(
             "layer_1",
@@ -301,7 +301,7 @@ def test_blacklist_from_user_preset_skips_playlist_when_not_current() -> None:
         assert preset_changes == []
         assert session.layers["layer_1"].playlist.paths == (current, user_only)
         assert session.layers["layer_1"].playlist.current == current
-        assert session.layers["layer_1"].user_presets == []
+        assert session.layers["layer_1"].preset_list == []
         assert not user_only.exists()
 
 
@@ -342,7 +342,7 @@ def test_confirm_restore_removes_favourite() -> None:
                 unlock_preset_after_modal=lambda slot: unlocked.append(slot),
             ),
         )
-        user_presets_before = list(session.layers["layer_1"].user_presets)
+        user_presets_before = list(session.layers["layer_1"].preset_list)
 
         controller.prompt_restore("layer_1", src)
         modal.handle_keydown(keydown(pygame.K_RETURN))
@@ -351,7 +351,7 @@ def test_confirm_restore_removes_favourite() -> None:
         assert src.exists()
         assert "demo.milk" not in controller._index.favourites
         assert unlocked == ["layer_1"]
-        assert session.layers["layer_1"].user_presets == user_presets_before
+        assert session.layers["layer_1"].preset_list == user_presets_before
 
 
 def test_confirm_remove_favourite_scrubs_playlist_and_user_presets() -> None:
@@ -381,7 +381,7 @@ def test_confirm_remove_favourite_scrubs_playlist_and_user_presets() -> None:
             paths=(keep, remove),
             index=1,
         )
-        session.layers["layer_1"].user_presets = [str(remove)]
+        session.layers["layer_1"].preset_list = [str(remove)]
 
         controller.prompt_restore("layer_1", remove)
         modal.handle_keydown(keydown(pygame.K_RETURN))
@@ -391,7 +391,7 @@ def test_confirm_remove_favourite_scrubs_playlist_and_user_presets() -> None:
         assert "remove.milk" not in controller._index.favourites
         assert session.layers["layer_1"].playlist.paths == (keep,)
         assert session.layers["layer_1"].playlist.current == keep
-        assert session.layers["layer_1"].user_presets == []
+        assert session.layers["layer_1"].preset_list == []
         assert preset_changes == [("layer_1", 0)]
         assert switching_changes == ["layer_1"]
         assert unlocked == ["layer_1"]
@@ -429,7 +429,7 @@ def test_confirm_restore_blacklist_scrubs_playlist_and_user_presets() -> None:
             paths=(keep, restore),
             index=1,
         )
-        session.layers["layer_1"].user_presets = [str(restore)]
+        session.layers["layer_1"].preset_list = [str(restore)]
 
         controller.prompt_restore("layer_1", restore)
         modal.handle_keydown(keydown(pygame.K_RETURN))
@@ -441,7 +441,7 @@ def test_confirm_restore_blacklist_scrubs_playlist_and_user_presets() -> None:
         assert "restore.milk" not in controller._index.blacklist
         assert session.layers["layer_1"].playlist.paths == (keep,)
         assert session.layers["layer_1"].playlist.current == keep
-        assert session.layers["layer_1"].user_presets == []
+        assert session.layers["layer_1"].preset_list == []
         assert preset_changes == [("layer_1", 0)]
         assert switching_changes == ["layer_1"]
         assert unlocked == ["layer_1"]
@@ -483,7 +483,7 @@ def test_confirm_restore_blacklist_moves_to_origin() -> None:
             ),
         )
         playlist_before = session.layers["layer_1"].playlist.paths
-        user_presets_before = list(session.layers["layer_1"].user_presets)
+        user_presets_before = list(session.layers["layer_1"].preset_list)
 
         controller.prompt_restore("layer_1", src)
         modal.handle_keydown(keydown(pygame.K_RETURN))
@@ -495,7 +495,7 @@ def test_confirm_restore_blacklist_moves_to_origin() -> None:
         assert "demo.milk" not in controller._index.blacklist
         assert unlocked == ["layer_1"]
         assert session.layers["layer_1"].playlist.paths == playlist_before
-        assert session.layers["layer_1"].user_presets == user_presets_before
+        assert session.layers["layer_1"].preset_list == user_presets_before
 
 
 def test_confirm_restore_blacklist_without_origin_uses_choice_modal() -> None:
@@ -601,7 +601,7 @@ def test_confirm_cast_copies_marks_and_rebuilds_timeline() -> None:
                 unlock_preset_after_modal=lambda slot: unlocked.append(slot),
             ),
         )
-        session.layers["layer_1"].preset_switching = "timeline"
+        session.layers["layer_1"].preset_switching = "on"
 
         controller.prompt_cast("layer_1", src)
         modal.handle_keydown(keydown(pygame.K_RETURN))  # bed
@@ -646,7 +646,7 @@ def test_confirm_cast_move_deletes_old_role_and_copies_new() -> None:
                 unlock_preset_after_modal=lambda slot: unlocked.append(slot),
             ),
         )
-        session.layers["layer_1"].preset_switching = "timeline"
+        session.layers["layer_1"].preset_switching = "on"
 
         controller.prompt_cast("layer_1", src)
         modal.handle_keydown(keydown(pygame.K_RIGHT))  # pulse
@@ -698,7 +698,7 @@ def test_confirm_restore_removes_role_cast() -> None:
                 unlock_preset_after_modal=lambda slot: unlocked.append(slot),
             ),
         )
-        session.layers["layer_1"].preset_switching = "timeline"
+        session.layers["layer_1"].preset_switching = "on"
 
         controller.prompt_restore("layer_1", src)
         modal.handle_keydown(keydown(pygame.K_RETURN))
@@ -750,7 +750,7 @@ def test_confirm_restore_choice_removes_only_selected_set() -> None:
                 unlock_preset_after_modal=lambda slot: unlocked.append(slot),
             ),
         )
-        session.layers["layer_1"].preset_switching = "timeline"
+        session.layers["layer_1"].preset_switching = "on"
 
         controller.prompt_restore("layer_1", src)
         modal.handle_keydown(keydown(pygame.K_RIGHT))  # cast (bed)
@@ -764,7 +764,7 @@ def test_confirm_restore_choice_removes_only_selected_set() -> None:
         assert unlocked == ["layer_1"]
 
 
-def test_cast_rebuild_skips_non_timeline_slots() -> None:
+def test_cast_rebuild_skips_switching_off_slots() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         src = root / "pack" / "demo.milk"
@@ -776,7 +776,7 @@ def test_cast_rebuild_skips_non_timeline_slots() -> None:
                 on_preset_switching_change=lambda slot: switching_changes.append(slot),
             ),
         )
-        session.layers["layer_1"].preset_switching = "projectm"
+        session.layers["layer_1"].preset_switching = "off"
 
         controller.prompt_cast("layer_1", src)
         modal.handle_keydown(keydown(pygame.K_RETURN))  # bed

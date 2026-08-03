@@ -16,7 +16,6 @@ import yaml
 _YAML_DUMP_WIDTH = 2**31 - 1
 
 from cleave.blend_modes import BlendMode
-from cleave.cue_roles import CueRole
 from cleave.effects.constants import clamp_effect_pct
 from cleave.extract import StemSource
 from cleave.config_schema import (
@@ -25,12 +24,8 @@ from cleave.config_schema import (
     BEAT_SENSITIVITY_MIN,
     DEFAULT_BEAT_SENSITIVITY,
     DEFAULT_LAYER_Z_ORDER,
-    DEFAULT_CAST_ROLES_DEFAULT_ROLE,
-    DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR,
     DEFAULT_PRESET_SWITCHING,
-    DEFAULT_PRESET_SWITCHING_ROTATION_SET,
-    DEFAULT_PRESET_SWITCHING_SHUFFLE,
-    DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT,
+    DEFAULT_PRESET_SWITCHING_TRIGGER,
     DEFAULT_PRESET_DURATION,
     DEFAULT_SOFT_CUT_DURATION,
     DEFAULT_HARD_CUT_DURATION,
@@ -39,9 +34,8 @@ from cleave.config_schema import (
     DEFAULT_EASTER_EGG,
     DEFAULT_PRESET_START_CLEAN,
     DEFAULT_PRESET_ROOT,
-    CastRolesTimelineBehaviour,
     PresetSwitchingMode,
-    PresetSwitchingRotationSet,
+    PresetSwitchingTrigger,
     DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR,
     DEFAULT_RENDER_OVERLAY_BACKGROUND_MARGIN,
     DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
@@ -158,13 +152,7 @@ class LayerConfig:
     blend_mode: BlendMode = "black-key"
     locked: bool = False
     preset_switching: PresetSwitchingMode = DEFAULT_PRESET_SWITCHING
-    preset_switching_rotation_set: PresetSwitchingRotationSet = DEFAULT_PRESET_SWITCHING_ROTATION_SET
-    cast_roles_timeline_behaviour: CastRolesTimelineBehaviour = (
-        DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR
-    )
-    cast_roles_default_role: CueRole = DEFAULT_CAST_ROLES_DEFAULT_ROLE
-    preset_switching_shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE
-    preset_switching_shuffle_salt: int = DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT
+    preset_switching_trigger: PresetSwitchingTrigger = DEFAULT_PRESET_SWITCHING_TRIGGER
     preset_duration: float = DEFAULT_PRESET_DURATION
     soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION
     hard_cut_duration: float = DEFAULT_HARD_CUT_DURATION
@@ -172,7 +160,7 @@ class LayerConfig:
     hard_cut_enabled: bool = DEFAULT_HARD_CUT_ENABLED
     easter_egg: float = DEFAULT_EASTER_EGG
     preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN
-    preset_switching_presets: list[Path] = field(default_factory=list)
+    preset_switching_list: list[Path] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

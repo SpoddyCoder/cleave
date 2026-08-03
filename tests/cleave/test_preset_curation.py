@@ -435,7 +435,7 @@ def test_delete_role_milk_missing_returns_none() -> None:
 
 @dataclass
 class _LayerStub:
-    user_presets: list[str] = field(default_factory=list)
+    preset_list: list[str] = field(default_factory=list)
 
 
 def test_relocate_curated_milk_moves_between_sibling_dirs() -> None:
@@ -521,15 +521,15 @@ def test_rewrite_user_preset_paths_updates_matching_entries() -> None:
         _write(kept, "kept")
 
         layers = {
-            "layer_1": _LayerStub(user_presets=[str(old), str(kept)]),
-            "layer_2": _LayerStub(user_presets=[str(kept)]),
+            "layer_1": _LayerStub(preset_list=[str(old), str(kept)]),
+            "layer_2": _LayerStub(preset_list=[str(kept)]),
         }
 
         affected = rewrite_user_preset_paths(layers, old, new)
 
         assert affected == ["layer_1"]
-        assert layers["layer_1"].user_presets == [str(new), str(kept)]
-        assert layers["layer_2"].user_presets == [str(kept)]
+        assert layers["layer_1"].preset_list == [str(new), str(kept)]
+        assert layers["layer_2"].preset_list == [str(kept)]
 
 
 def test_scrub_user_preset_paths_removes_matching_entries() -> None:
@@ -543,21 +543,21 @@ def test_scrub_user_preset_paths_removes_matching_entries() -> None:
         _write(other, "other")
 
         layers = {
-            "layer_1": _LayerStub(user_presets=[str(removed), str(kept)]),
-            "layer_2": _LayerStub(user_presets=[str(other)]),
-            "layer_3": _LayerStub(user_presets=[str(removed.resolve())]),
+            "layer_1": _LayerStub(preset_list=[str(removed), str(kept)]),
+            "layer_2": _LayerStub(preset_list=[str(other)]),
+            "layer_3": _LayerStub(preset_list=[str(removed.resolve())]),
         }
 
         affected = scrub_user_preset_paths(layers, removed)
 
         assert affected == ["layer_1", "layer_3"]
-        assert layers["layer_1"].user_presets == [str(kept)]
-        assert layers["layer_2"].user_presets == [str(other)]
-        assert layers["layer_3"].user_presets == []
+        assert layers["layer_1"].preset_list == [str(kept)]
+        assert layers["layer_2"].preset_list == [str(other)]
+        assert layers["layer_3"].preset_list == []
 
 
 def test_scrub_user_preset_paths_no_match() -> None:
-    layers = {"layer_1": _LayerStub(user_presets=["/tmp/a.milk"])}
+    layers = {"layer_1": _LayerStub(preset_list=["/tmp/a.milk"])}
     assert scrub_user_preset_paths(layers, Path("/tmp/missing.milk")) == []
 
 

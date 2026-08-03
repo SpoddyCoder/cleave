@@ -1,4 +1,4 @@
-"""Helpers for per-layer user-defined preset lists."""
+"""Helpers for per-layer preset switching lists (project user-presets copies)."""
 
 from __future__ import annotations
 
@@ -15,8 +15,8 @@ from cleave.project import PROJECT_FILENAME
 USER_PRESETS_DIRNAME = "user-presets"
 
 
-def user_preset_item_display_name(paths: list[str], index: int) -> str:
-    """Format a user preset row label, numbering duplicate paths in the list."""
+def preset_list_item_display_name(paths: list[str], index: int) -> str:
+    """Format a preset-list row label, numbering duplicate paths in the list."""
     path = paths[index]
     resolved = Path(path).resolve()
     name = Path(path).name
@@ -147,7 +147,7 @@ def _preset_refs_from_viz_yaml(path: Path) -> set[Path]:
     for layer_raw in layers.values():
         if not isinstance(layer_raw, dict):
             continue
-        raw = layer_raw.get("preset_switching_presets")
+        raw = layer_raw.get("preset_switching_list")
         if not isinstance(raw, list):
             continue
         for entry in raw:

@@ -414,7 +414,7 @@ class PresetCurationController:
         if self._layer_bindings is None:
             return
         for layer_slot, layer in self.session.layers.items():
-            if layer.preset_switching == "timeline":
+            if layer.preset_switching == "on":
                 self._layer_bindings.on_preset_switching_change(layer_slot)
 
     def _prompt_restore_blacklist(self, slot: str, src: Path) -> None:

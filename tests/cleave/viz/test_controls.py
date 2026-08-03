@@ -2016,58 +2016,6 @@ def test_timeline_presets_conductor_passes_signals_to_builder() -> None:
     assert view.notification_message == "Applied Breathing timeline preset"
 
 
-def test_timeline_presets_reshuffle_on_rerolls_layer_salts() -> None:
-    beats = tuple(float(i) for i in range(241))
-    bars = tuple(float(i) for i in range(0, 241, 4))
-    controls = _make_controls(
-        ("layer_1", "layer_2"),
-        beat_times=beats,
-        bar_times=bars,
-    )
-    controls.session.layers["layer_1"].preset_switching = "projectm"
-    controls.session.layers["layer_1"].preset_switching_shuffle = True
-    controls.session.layers["layer_1"].preset_switching_shuffle_salt = 11
-    controls.session.layers["layer_2"].preset_switching_shuffle_salt = 22
-    controls.session.timeline.timeline_preset_kind = "breathing"
-    controls.session.timeline.timeline_preset_reshuffle = True
-
-    def _fake_builder(slots, duration_sec, rng, **kwargs):
-        return {slot: TimelineLane(baseline=1.0, cues=[]) for slot in slots}
-
-    with patch.dict(
-        "cleave.viz.timeline_preset_controls._KIND_BUILDERS",
-        {"breathing": (_fake_builder, "Applied Breathing timeline preset")},
-    ):
-        _focus_timeline_presets(controls)
-        _confirm_timeline_preset(controls)
-    assert controls.session.layers["layer_1"].preset_switching_shuffle_salt != 11
-    assert controls.session.layers["layer_2"].preset_switching_shuffle_salt != 22
-
-
-def test_timeline_presets_reshuffle_off_keeps_layer_salts() -> None:
-    beats = tuple(float(i) for i in range(241))
-    bars = tuple(float(i) for i in range(0, 241, 4))
-    controls = _make_controls(
-        ("layer_1", "layer_2"),
-        beat_times=beats,
-        bar_times=bars,
-    )
-    controls.session.layers["layer_1"].preset_switching_shuffle_salt = 11
-    controls.session.layers["layer_2"].preset_switching_shuffle_salt = 22
-    controls.session.timeline.timeline_preset_kind = "breathing"
-    controls.session.timeline.timeline_preset_reshuffle = False
-
-    def _fake_builder(slots, duration_sec, rng, **kwargs):
-        return {slot: TimelineLane(baseline=1.0, cues=[]) for slot in slots}
-
-    with patch.dict(
-        "cleave.viz.timeline_preset_controls._KIND_BUILDERS",
-        {"breathing": (_fake_builder, "Applied Breathing timeline preset")},
-    ):
-        _focus_timeline_presets(controls)
-        _confirm_timeline_preset(controls)
-    assert controls.session.layers["layer_1"].preset_switching_shuffle_salt == 11
-    assert controls.session.layers["layer_2"].preset_switching_shuffle_salt == 22
 
 
 def test_timeline_presets_conductor_skips_without_signals() -> None:
@@ -3672,6 +3620,38 @@ def test_directory_ctrl_arrows_descend_and_ascend() -> None:
     assert playlist.current_dir.resolve() == siblings[0].resolve()
 
 
+def test_directory_ctrl_arrows_follow_browse_while_auto_preset_elsewhere() -> None:
+    """Dir row must track browse nav even when switching plays a cast/list path."""
+    root, siblings = _make_sibling_dir_tree(2)
+    roles_bed = root / "roles" / "bed"
+    roles_bed.mkdir(parents=True)
+    cast = roles_bed / "cast.milk"
+    _write_milk(cast)
+    controls = _controls_with_playlist(root, siblings[0])
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "on"
+    layer.auto_preset_path = cast.resolve()
+    controls.focus_descriptor = _desc(
+        controls.build_view_state(paused=False), _preset_dir_row(controls)
+    )
+    child = siblings[0] / "child"
+
+    before = controls.build_view_state(paused=False).tracks["layer_1"].preset_dir_label
+    assert "roles/" not in before
+
+    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_CTRL))
+    assert layer.playlist.current_dir.resolve() == child.resolve()
+    after_down = controls.build_view_state(paused=False).tracks["layer_1"]
+    assert "roles/" not in after_down.preset_dir_label
+    assert "[▲]" in after_down.preset_dir_label
+    assert after_down.preset_label.startswith("cast.milk")
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT, mod=pygame.KMOD_CTRL))
+    assert layer.playlist.current_dir.resolve() == siblings[0].resolve()
+    after_up = controls.build_view_state(paused=False).tracks["layer_1"].preset_dir_label
+    assert after_up == before
+
+
 def test_ctrl_left_at_browse_floor_is_noop() -> None:
     root, siblings = _make_sibling_dir_tree(2)
     controls = _controls_with_playlist(root, siblings[0])
@@ -3824,6 +3804,39 @@ def test_move_mode_colors_focused_track_header() -> None:
     assert _row_bg_color(view, header_row) == MOVE_MODE
     assert _row_value_color(view, child_row) == MOVE_MODE
     assert _row_bg_color(view, child_row) == MOVE_MODE
+
+
+def test_move_mode_colors_preset_list_item() -> None:
+    controls = _make_controls(("layer_1",))
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "on"
+    layer.preset_list = ["/tmp/presets/a.milk", "/tmp/presets/b.milk"]
+    layer.preset_list_expanded = True
+
+    view = controls.build_view_state(paused=False)
+    item_row = view.layout.find_descriptor(
+        RowDescriptor(
+            RowKind.TRACK_PRESET_LIST_ITEM,
+            slot="layer_1",
+            preset_index=0,
+        )
+    )
+    sibling_row = view.layout.find_descriptor(
+        RowDescriptor(
+            RowKind.TRACK_PRESET_LIST_ITEM,
+            slot="layer_1",
+            preset_index=1,
+        )
+    )
+    controls.focus_descriptor = _desc(view, item_row)
+    assert controls.handle_keydown(_keydown(_MOVE_MODE_KEY)) is True
+    assert controls.move_mode_preset == ("layer_1", 0)
+
+    view = controls.build_view_state(paused=False)
+    assert _row_value_color(view, item_row) == MOVE_MODE
+    assert _row_bg_color(view, item_row) == MOVE_MODE
+    assert _row_value_color(view, sibling_row) != MOVE_MODE
+    assert _row_bg_color(view, sibling_row) != MOVE_MODE
 
 
 def test_row_value_color_dim_for_focused_empty_preset() -> None:
@@ -4809,37 +4822,10 @@ def test_default_focus_stays_on_transport() -> None:
     assert controls.focus_descriptor == RowDescriptor(RowKind.TRANSPORT)
 
 
-def test_preset_switching_row_cycles_none_projectm_and_timeline() -> None:
-    controls = _make_controls(("layer_1",))
-    switched: list[str] = []
-    notifications: list[str] = []
-    controls._layer_bindings = noop_layer_bindings(
-        on_preset_switching_change=lambda slot: switched.append(slot)
-    )
-    controls.show_notification = notifications.append
-    controls.session.timeline.enabled = False
-    controls.session.layers["layer_1"].expanded = True
-    view = controls.build_view_state(paused=False)
-    row = _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING)
-    controls.focus_descriptor = view.layout.descriptor(row)
-    assert controls.session.layers["layer_1"].preset_switching == "none"
-
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.session.layers["layer_1"].preset_switching == "projectm"
-    assert switched == ["layer_1"]
-    assert notifications == []
-
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.session.layers["layer_1"].preset_switching == "timeline"
-    assert "Enable timeline" in notifications[-1]
-
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.session.layers["layer_1"].preset_switching == "none"
-
 
 def test_projectm_mode_allows_preset_browse() -> None:
     controls = _make_controls(("layer_1",))
-    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].preset_switching = "on"
     controls.session.layers["layer_1"].expanded = True
     changed: list[str] = []
     controls._layer_bindings = noop_layer_bindings(
@@ -4854,7 +4840,7 @@ def test_projectm_mode_allows_preset_browse() -> None:
 
     root, siblings = _make_sibling_dir_tree(3)
     dir_controls = _controls_with_playlist(root, siblings[0])
-    dir_controls.session.layers["layer_1"].preset_switching = "projectm"
+    dir_controls.session.layers["layer_1"].preset_switching = "on"
     dir_controls.session.layers["layer_1"].expanded = True
     dir_controls.focus_descriptor = _desc(
         dir_controls.build_view_state(paused=False), _preset_dir_row(dir_controls)
@@ -4864,178 +4850,43 @@ def test_projectm_mode_allows_preset_browse() -> None:
     assert playlist.current_dir.resolve() == siblings[1].resolve()
 
 
-def test_user_defined_rotation_set_allows_preset_browse() -> None:
-    controls = _make_controls(("layer_1",))
-    controls.session.layers["layer_1"].preset_switching = "projectm"
-    controls.session.layers["layer_1"].preset_switching_rotation_set = "user_defined"
-    controls.session.layers["layer_1"].expanded = True
-    changed: list[str] = []
-    controls._layer_bindings = noop_layer_bindings(
-        on_preset_change=lambda slot, _pl: changed.append(slot)
-    )
-    view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = view.layout.descriptor(
-        _row(view, "layer_1", RowKind.TRACK_PRESET)
-    )
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert changed == ["layer_1"]
 
-    root, siblings = _make_sibling_dir_tree(3)
-    dir_controls = _controls_with_playlist(root, siblings[0])
-    dir_controls.session.layers["layer_1"].preset_switching = "projectm"
-    dir_controls.session.layers["layer_1"].preset_switching_rotation_set = "user_defined"
-    dir_controls.session.layers["layer_1"].expanded = True
-    dir_controls.focus_descriptor = _desc(
-        dir_controls.build_view_state(paused=False), _preset_dir_row(dir_controls)
-    )
-    playlist = dir_controls.session.layers["layer_1"].playlist
-    dir_controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert playlist.current_dir.resolve() == siblings[1].resolve()
-
-
-def test_scope_row_hidden_when_mode_none() -> None:
+def test_trigger_row_hidden_when_switching_off() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
-    with pytest.raises(ValueError, match="TRACK_PRESET_SWITCHING_ROTATION_SET"):
-        _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET)
+    with pytest.raises(ValueError, match="TRACK_PRESET_SWITCHING_TRIGGER"):
+        _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_TRIGGER)
 
 
-def test_scope_row_visible_when_mode_projectm() -> None:
+def test_trigger_row_visible_when_switching_on() -> None:
     controls = _make_controls(("layer_1",))
-    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].preset_switching = "on"
     controls.session.layers["layer_1"].expanded = True
     view = controls.build_view_state(paused=False)
-    _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET)
+    _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_TRIGGER)
 
 
-def test_preset_switching_rotation_set_cycles_directory_and_user_defined() -> None:
-    controls = _make_controls(("layer_1",))
-    switched: list[str] = []
-    controls._layer_bindings = noop_layer_bindings(
-        on_preset_switching_change=lambda slot: switched.append(slot)
-    )
-    controls.session.layers["layer_1"].preset_switching = "projectm"
-    controls.session.layers["layer_1"].expanded = True
-    view = controls.build_view_state(paused=False)
-    row = _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET)
-    controls.focus_descriptor = view.layout.descriptor(row)
-    assert controls.session.layers["layer_1"].preset_switching_rotation_set == "directory"
-
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.session.layers["layer_1"].preset_switching_rotation_set == "user_defined"
-    assert controls.session.layers["layer_1"].user_presets_expanded is True
-    assert switched == ["layer_1"]
-
-    controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert controls.session.layers["layer_1"].preset_switching_rotation_set == "directory"
-    assert controls.session.layers["layer_1"].user_presets_expanded is True
 
 
-def test_preset_switching_rotation_set_skips_cast_roles_in_projectm_mode() -> None:
-    controls = _make_controls(("layer_1",))
-    layer = controls.session.layers["layer_1"]
-    layer.preset_switching = "projectm"
-    layer.expanded = True
-    layer.preset_switching_rotation_set = "directory"
-    view = controls.build_view_state(paused=False)
-    row = _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET)
-    controls.focus_descriptor = view.layout.descriptor(row)
-
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert layer.preset_switching_rotation_set == "user_defined"
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert layer.preset_switching_rotation_set == "directory"
-    assert layer.preset_switching_rotation_set != "cast_roles"
-
-
-def test_preset_switching_rotation_set_includes_cast_roles_in_timeline_mode() -> None:
-    controls = _make_controls(("layer_1",))
-    layer = controls.session.layers["layer_1"]
-    layer.preset_switching = "timeline"
-    layer.expanded = True
-    layer.preset_switching_rotation_set = "directory"
-    view = controls.build_view_state(paused=False)
-    row = _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET)
-    controls.focus_descriptor = view.layout.descriptor(row)
-
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert layer.preset_switching_rotation_set == "user_defined"
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert layer.preset_switching_rotation_set == "cast_roles"
-
-
-def test_cast_roles_empty_pool_sets_persistent_notification() -> None:
-    from cleave.viz.panel_notification import NOTIFICATION_ATTENTION_DURATION_SEC
-
-    controls = _make_controls(("layer_1",))
-    layer = controls.session.layers["layer_1"]
-    layer.preset_switching = "timeline"
-    layer.preset_switching_rotation_set = "cast_roles"
-    layer.cast_roles_default_role = "bed"
-
-    with patch.object(time, "monotonic", return_value=1000.0):
-        with patch(
-            "cleave.viz.controls.role_pool_paths",
-            return_value=(),
-        ):
-            controls.build_view_state(paused=False)
-    with patch.object(
-        time,
-        "monotonic",
-        return_value=1000.0 + NOTIFICATION_ATTENTION_DURATION_SEC + 0.1,
-    ):
-        with patch(
-            "cleave.viz.controls.role_pool_paths",
-            return_value=(),
-        ):
-            view = controls.build_view_state(paused=False)
-
-    assert view.persistent_notification_message == "No presets in bed roles folder"
-    notification_rows = [
-        row
-        for row in view.layout.rows
-        if row.kind == RowKind.PANEL_NOTIFICATION
-    ]
-    assert len(notification_rows) == 1
-    assert notification_rows[0].marker_index == 0
-    idx = view.layout.find_descriptor(notification_rows[0])
-    assert _row_value_color(view, idx) == ERROR_NOTIFICATION
-
-    layer.preset_switching_rotation_set = "directory"
-    with patch(
-        "cleave.viz.controls.role_pool_paths",
-        return_value=(),
-    ):
-        cleared = controls.build_view_state(paused=False)
-    assert cleared.persistent_notification_message is None
 
 
 def test_persistent_and_timed_notifications_stack() -> None:
     from cleave.viz.panel_notification import NOTIFICATION_ATTENTION_DURATION_SEC
+    from cleave.viz.preset_switching import EMPTY_PRESET_LIST_NOTIFICATION
 
     controls = _make_controls(("layer_1",))
-    controls.session.layers["layer_1"].preset_switching = "timeline"
-    controls.session.layers["layer_1"].preset_switching_rotation_set = "cast_roles"
-
     with patch.object(time, "monotonic", return_value=1000.0):
-        with patch(
-            "cleave.viz.controls.role_pool_paths",
-            return_value=(),
-        ):
-            controls.show_notification("Saved")
-            controls.build_view_state(paused=False)
+        controls._notification_host.set_persistent(EMPTY_PRESET_LIST_NOTIFICATION)
+        controls.show_notification("Saved")
+        controls.build_view_state(paused=False)
     with patch.object(
         time,
         "monotonic",
         return_value=1000.0 + NOTIFICATION_ATTENTION_DURATION_SEC + 0.1,
     ):
-        with patch(
-            "cleave.viz.controls.role_pool_paths",
-            return_value=(),
-        ):
-            view = controls.build_view_state(paused=False)
+        view = controls.build_view_state(paused=False)
 
-    assert view.persistent_notification_message == "No presets in bed roles folder"
+    assert view.persistent_notification_message == EMPTY_PRESET_LIST_NOTIFICATION
     assert view.notification_message == "Saved"
     notification_rows = [
         row
@@ -5047,28 +4898,14 @@ def test_persistent_and_timed_notifications_stack() -> None:
     timed_idx = view.layout.find_descriptor(notification_rows[1])
     assert _row_value_color(view, persistent_idx) == ERROR_NOTIFICATION
     assert _row_value_color(view, timed_idx) == HIGHLIGHT
-    assert _row_text(view, persistent_idx) == "No presets in bed roles folder"
+    assert _row_text(view, persistent_idx) == EMPTY_PRESET_LIST_NOTIFICATION
     assert _row_text(view, timed_idx) == "Saved"
 
-
-def test_preset_switching_rotation_set_user_defined_auto_expands_user_presets() -> None:
-    controls = _make_controls(("layer_1",))
-    layer = controls.session.layers["layer_1"]
-    layer.preset_switching = "projectm"
-    layer.expanded = True
-    layer.user_presets_expanded = False
-    view = controls.build_view_state(paused=False)
-    row = _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET)
-    controls.focus_descriptor = view.layout.descriptor(row)
-
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert layer.preset_switching_rotation_set == "user_defined"
-    assert layer.user_presets_expanded is True
 
 
 def test_preset_duration_ctrl_step_is_ten_seconds() -> None:
     controls = _make_controls(("layer_1",))
-    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].preset_switching = "on"
     controls.session.layers["layer_1"].expanded = True
     view = controls.build_view_state(paused=False)
     row = _row(view, "layer_1", RowKind.TRACK_PRESET_DURATION)
@@ -5084,7 +4921,8 @@ def test_preset_duration_ctrl_step_is_ten_seconds() -> None:
 
 def test_hard_cut_enabled_cycles_and_hides_child_rows() -> None:
     controls = _make_controls(("layer_1",))
-    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].preset_switching = "on"
+    controls.session.layers["layer_1"].preset_switching_trigger = "projectm"
     controls.session.layers["layer_1"].expanded = True
     switched: list[str] = []
     controls._layer_bindings = noop_layer_bindings(
@@ -5114,7 +4952,8 @@ def test_hard_cut_enabled_cycles_and_hides_child_rows() -> None:
 
 def test_easter_egg_steps_with_standard_and_large_increments() -> None:
     controls = _make_controls(("layer_1",))
-    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].preset_switching = "on"
+    controls.session.layers["layer_1"].preset_switching_trigger = "projectm"
     controls.session.layers["layer_1"].expanded = True
     switched: list[str] = []
     controls._layer_bindings = noop_layer_bindings(
@@ -5135,7 +4974,7 @@ def test_easter_egg_steps_with_standard_and_large_increments() -> None:
 
 def test_preset_start_clean_cycles_yes_no() -> None:
     controls = _make_controls(("layer_1",))
-    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].preset_switching = "on"
     controls.session.layers["layer_1"].expanded = True
     view = controls.build_view_state(paused=False)
     row = _row(view, "layer_1", RowKind.TRACK_PRESET_START_CLEAN)
@@ -5149,30 +4988,11 @@ def test_preset_start_clean_cycles_yes_no() -> None:
     assert controls.session.layers["layer_1"].preset_start_clean is False
 
 
-def test_preset_switching_shuffle_cycles_off_on() -> None:
-    controls = _make_controls(("layer_1",))
-    controls.session.layers["layer_1"].preset_switching = "projectm"
-    controls.session.layers["layer_1"].expanded = True
-    switched: list[str] = []
-    controls._layer_bindings = noop_layer_bindings(
-        on_preset_switching_change=lambda slot: switched.append(slot)
-    )
-    view = controls.build_view_state(paused=False)
-    row = _row(view, "layer_1", RowKind.TRACK_PRESET_SWITCHING_SHUFFLE)
-    controls.focus_descriptor = view.layout.descriptor(row)
-    assert controls.session.layers["layer_1"].preset_switching_shuffle is False
-
-    controls.handle_keydown(_keydown(pygame.K_RIGHT))
-    assert controls.session.layers["layer_1"].preset_switching_shuffle is True
-    assert switched == ["layer_1"]
-
-    controls.handle_keydown(_keydown(pygame.K_LEFT))
-    assert controls.session.layers["layer_1"].preset_switching_shuffle is False
-
 
 def test_hard_cut_sensitivity_steps_like_beat_sensitivity() -> None:
     controls = _make_controls(("layer_1",))
-    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].preset_switching = "on"
+    controls.session.layers["layer_1"].preset_switching_trigger = "projectm"
     controls.session.layers["layer_1"].expanded = True
     controls.session.layers["layer_1"].hard_cut_enabled = True
     view = controls.build_view_state(paused=False)
@@ -5210,16 +5030,15 @@ def _focus_user_preset_item_row(
     preset_path: Path | None = None,
 ) -> tuple[RowDescriptor, Path]:
     layer = controls.session.layers["layer_1"]
-    layer.preset_switching = "projectm"
-    layer.preset_switching_rotation_set = "user_defined"
-    layer.user_presets_expanded = True
+    layer.preset_switching = "on"
+    layer.preset_list_expanded = True
     layer.expanded = True
     path = preset_path or Path("/tmp/projects/my-track/user-preset-0.milk")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("milk", encoding="utf-8")
-    layer.user_presets = [str(path)]
+    layer.preset_list = [str(path)]
     desc = RowDescriptor(
-        RowKind.TRACK_USER_PRESET_ITEM,
+        RowKind.TRACK_PRESET_LIST_ITEM,
         slot="layer_1",
         preset_index=0,
     )
@@ -5323,7 +5142,7 @@ def test_f_b_blocked_when_layer_locked() -> None:
 
 def test_f_b_allowed_in_projectm_mode() -> None:
     controls = _make_controls(("layer_1",))
-    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].preset_switching = "on"
     current = _focus_preset_file_row(controls)
     mock_curation = MagicMock()
     controls._preset_curation = mock_curation
@@ -5705,3 +5524,158 @@ def test_placement_snap_row_cycles() -> None:
     assert controls.session.timeline.placement_snap == "bar"
     view = controls.build_view_state(paused=False)
     assert "bar" in _row_text(view, row)
+
+def test_preset_switching_row_cycles_off_on() -> None:
+    from tests.support.viz import make_controls, keydown, noop_layer_bindings
+    import pygame
+    from cleave.viz.row_semantics import RowDescriptor, RowKind
+    from cleave.viz.focus_nav import MainFocus
+
+    switched: list[str] = []
+    controls = make_controls(("layer_1",))
+    controls._layer_bindings = noop_layer_bindings(
+        on_preset_switching_change=lambda slot: switched.append(slot)
+    )
+    controls.focus_cursor = MainFocus(
+        RowDescriptor(RowKind.TRACK_PRESET_SWITCHING, slot="layer_1")
+    )
+    assert controls.session.layers["layer_1"].preset_switching == "off"
+    controls.handle_keydown(keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].preset_switching == "on"
+    assert switched == ["layer_1"]
+    controls.handle_keydown(keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].preset_switching == "off"
+
+
+def test_preset_switching_trigger_cycles() -> None:
+    from tests.support.viz import make_controls, keydown
+    import pygame
+    from cleave.viz.row_semantics import RowDescriptor, RowKind
+    from cleave.viz.focus_nav import MainFocus
+
+    controls = make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_switching = "on"
+    controls.session.timeline.enabled = True
+    controls.focus_cursor = MainFocus(
+        RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_TRIGGER, slot="layer_1")
+    )
+    assert controls.session.layers["layer_1"].preset_switching_trigger == "timer"
+    controls.handle_keydown(keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].preset_switching_trigger == "projectm"
+    controls.handle_keydown(keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].preset_switching_trigger == "timeline"
+    controls.handle_keydown(keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].preset_switching_trigger == "timer"
+
+
+def test_timeline_trigger_hides_duration_row() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_switching = "on"
+    controls.session.layers["layer_1"].preset_switching_trigger = "timeline"
+    controls.session.layers["layer_1"].expanded = True
+    view = controls.build_view_state(paused=False)
+    with pytest.raises(ValueError, match="TRACK_PRESET_DURATION"):
+        _row(view, "layer_1", RowKind.TRACK_PRESET_DURATION)
+
+
+def test_timeline_trigger_while_disabled_shows_warning() -> None:
+    from cleave.viz.controls import NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT
+    from tests.support.viz import make_controls, keydown, noop_layer_bindings
+    import pygame
+    from cleave.viz.row_semantics import RowDescriptor, RowKind
+    from cleave.viz.focus_nav import MainFocus
+
+    controls = make_controls(("layer_1",))
+    controls._layer_bindings = noop_layer_bindings()
+    controls.session.layers["layer_1"].preset_switching = "on"
+    controls.session.timeline.enabled = False
+    controls.focus_cursor = MainFocus(
+        RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_TRIGGER, slot="layer_1")
+    )
+    controls.session.layers["layer_1"].preset_switching_trigger = "projectm"
+    controls.handle_keydown(keydown(pygame.K_RIGHT))
+    assert controls.session.layers["layer_1"].preset_switching_trigger == "timeline"
+    view = controls.build_view_state(paused=False)
+    assert view.notification_message == NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT
+
+
+def test_populate_modal_options_keyed_by_timeline_trigger() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.layers["layer_1"].preset_switching = "on"
+    controls.session.layers["layer_1"].preset_switching_trigger = "timeline"
+    controls.session.timeline.enabled = False
+    prompted: list[tuple[str, list[str]]] = []
+
+    def capture_prompt(title, options, on_dismiss=None):
+        del on_dismiss
+        prompted.append((title, [opt.label for opt in options]))
+
+    controls._modal_host.prompt_choice = capture_prompt  # type: ignore[method-assign]
+    controls.project_dir = Path("/tmp/project")
+    controls._prompt_populate_presets("layer_1")
+    assert prompted
+    assert prompted[0][0] == "Populate the preset list with 1 presets?"
+    labels = prompted[0][1]
+    assert labels == [
+        "Using Cue Marker Roles (random)",
+        "From Current Directory (random)",
+        "From Current Directory (sequential)",
+        "Cancel",
+    ]
+
+    prompted.clear()
+    controls.session.layers["layer_1"].preset_switching_trigger = "timer"
+    controls.session.timeline.enabled = True
+    controls._prompt_populate_presets("layer_1")
+    # 120s song / 30s duration = 4 needed; fixture browse dir has 1 milk
+    assert prompted[0][0] == "Populate the preset list with 1 presets?"
+    labels = prompted[0][1]
+    assert labels == [
+        "From Current Directory (random)",
+        "From Current Directory (sequential)",
+        "Cancel",
+    ]
+    assert "Using Cue Marker Roles (random)" not in labels
+
+
+def test_step_preset_duration_toasts_when_list_too_short() -> None:
+    controls = _make_controls(("layer_1",), duration_sec=120.0)
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "on"
+    layer.preset_switching_trigger = "timer"
+    layer.preset_duration = 30.0
+    layer.preset_list = ["a.milk", "b.milk", "c.milk", "d.milk"]
+    noted: list[str] = []
+    controls.show_notification = noted.append  # type: ignore[method-assign]
+    controls._step_preset_duration("layer_1", forward=False)
+    assert layer.preset_duration == 29.0
+    assert noted == ["Preset list may need more presets"]
+
+
+def test_cycle_preset_switching_trigger_toasts_when_list_nonempty() -> None:
+    controls = _make_controls(("layer_1",))
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "on"
+    layer.preset_switching_trigger = "timer"
+    layer.preset_list = ["a.milk"]
+    noted: list[str] = []
+    controls.show_notification = noted.append  # type: ignore[method-assign]
+    controls._cycle_preset_switching_trigger("layer_1", forward=True)
+    assert layer.preset_switching_trigger != "timer"
+    assert noted == ["Preset list may need adjusting"]
+
+
+def test_cycle_preset_switching_trigger_skips_list_toast_for_timeline_disabled() -> None:
+    from cleave.viz.controls import NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT
+
+    controls = _make_controls(("layer_1",))
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "on"
+    layer.preset_switching_trigger = "projectm"
+    layer.preset_list = ["a.milk"]
+    controls.session.timeline.enabled = False
+    noted: list[str] = []
+    controls.show_notification = noted.append  # type: ignore[method-assign]
+    controls._cycle_preset_switching_trigger("layer_1", forward=True)
+    assert layer.preset_switching_trigger == "timeline"
+    assert noted == [NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT]

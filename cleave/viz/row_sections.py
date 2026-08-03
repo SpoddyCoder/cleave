@@ -125,10 +125,10 @@ def _toggle_effects_header(controls: TuningControls, slot: str | None, forward: 
     controls._set_effects_expanded(slot, forward)
 
 
-def _toggle_user_presets(controls: TuningControls, slot: str | None, forward: bool) -> None:
+def _toggle_preset_list(controls: TuningControls, slot: str | None, forward: bool) -> None:
     if slot is None:
         return
-    controls._set_user_presets_expanded(slot, forward)
+    controls._set_preset_list_expanded(slot, forward)
 
 
 def _toggle_song_markers(controls: TuningControls, _slot: str | None, forward: bool) -> None:
@@ -359,7 +359,7 @@ def _track_header_expanded(state: TuningViewState, slot: str | None) -> bool:
 def _track_preset_switching_expanded(state: TuningViewState, slot: str | None) -> bool:
     if slot is None:
         return True
-    return state.tracks[slot].preset_switching in ("projectm", "timeline")
+    return state.tracks[slot].preset_switching == "on"
 
 
 def _track_effects_expanded(state: TuningViewState, slot: str | None) -> bool:
@@ -368,10 +368,10 @@ def _track_effects_expanded(state: TuningViewState, slot: str | None) -> bool:
     return state.tracks[slot].effects_expanded
 
 
-def _user_presets_expanded(state: TuningViewState, slot: str | None) -> bool:
+def _preset_list_expanded(state: TuningViewState, slot: str | None) -> bool:
     if slot is None:
         return True
-    return state.tracks[slot].user_presets_expanded
+    return state.tracks[slot].preset_list_expanded
 
 
 def _song_markers_expanded(state: TuningViewState, _slot: str | None) -> bool:
@@ -397,7 +397,7 @@ def _append_track_effect_rows(
         )
 
 
-def _append_user_preset_rows(
+def _append_preset_list_rows(
     row_list: list[RowDescriptor],
     state: TuningViewState,
     slot: str | None,
@@ -405,15 +405,16 @@ def _append_user_preset_rows(
     if slot is None:
         return
     block = state.tracks[slot]
-    for index, _path in enumerate(block.user_presets):
+    for index, _path in enumerate(block.preset_list):
         row_list.append(
             RowDescriptor(
-                RowKind.TRACK_USER_PRESET_ITEM,
+                RowKind.TRACK_PRESET_LIST_ITEM,
                 slot=slot,
                 preset_index=index,
             )
         )
-    row_list.append(RowDescriptor(RowKind.TRACK_USER_PRESET_ADD, slot=slot))
+    row_list.append(RowDescriptor(RowKind.TRACK_PRESET_LIST_ADD, slot=slot))
+    row_list.append(RowDescriptor(RowKind.TRACK_PRESET_LIST_POPULATE, slot=slot))
 
 
 def _append_song_marker_rows(
@@ -687,34 +688,26 @@ RENDER_POST_FX_SECTION = ExpandSectionDef(
     ),
 )
 
-def _preset_switching_user_defined(state: TuningViewState, desc: RowDescriptor) -> bool:
+def _preset_switching_projectm_trigger(
+    state: TuningViewState, desc: RowDescriptor
+) -> bool:
     if desc.slot is None:
         return False
-    return state.tracks[desc.slot].preset_switching_rotation_set == "user_defined"
+    return state.tracks[desc.slot].preset_switching_trigger == "projectm"
 
 
-def _preset_switching_cast_roles(state: TuningViewState, desc: RowDescriptor) -> bool:
+def _preset_switching_uses_duration(
+    state: TuningViewState, desc: RowDescriptor
+) -> bool:
     if desc.slot is None:
         return False
-    return state.tracks[desc.slot].preset_switching_rotation_set == "cast_roles"
-
-
-def _preset_switching_projectm(state: TuningViewState, desc: RowDescriptor) -> bool:
-    if desc.slot is None:
-        return False
-    return state.tracks[desc.slot].preset_switching == "projectm"
+    return state.tracks[desc.slot].preset_switching_trigger != "timeline"
 
 
 def _hard_cut_enabled(state: TuningViewState, desc: RowDescriptor) -> bool:
     if desc.slot is None:
         return False
     return state.tracks[desc.slot].hard_cut_enabled
-
-
-def _preset_switching_shuffle_on(state: TuningViewState, desc: RowDescriptor) -> bool:
-    if desc.slot is None:
-        return False
-    return state.tracks[desc.slot].preset_switching_shuffle
 
 
 HARD_CUT_ENABLED = ConditionalRowsDef(
@@ -726,42 +719,27 @@ HARD_CUT_ENABLED = ConditionalRowsDef(
     ),
 )
 
-PRESET_SWITCHING_SHUFFLE_ON = ConditionalRowsDef(
-    name="preset_switching_shuffle_on",
-    predicate=_preset_switching_shuffle_on,
-    children=(SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_SEED),),
-    child_indent_offset=1,
-)
-
-USER_PRESETS_SECTION = ExpandSectionDef(
-    header_kind=RowKind.TRACK_USER_PRESETS,
+PRESET_LIST_SECTION = ExpandSectionDef(
+    header_kind=RowKind.TRACK_PRESET_LIST,
     context="per_slot",
-    read_expanded=_user_presets_expanded,
-    toggle=_toggle_user_presets,
+    read_expanded=_preset_list_expanded,
+    toggle=_toggle_preset_list,
     children=(),
-    append_dynamic_children=_append_user_preset_rows,
+    append_dynamic_children=_append_preset_list_rows,
 )
 
-PRESET_SWITCHING_USER_DEFINED = ConditionalRowsDef(
-    name="preset_switching_user_defined",
-    predicate=_preset_switching_user_defined,
-    children=(SectionNode(expand=USER_PRESETS_SECTION),),
-)
-
-PRESET_SWITCHING_CAST_ROLES = ConditionalRowsDef(
-    name="preset_switching_cast_roles",
-    predicate=_preset_switching_cast_roles,
+PRESET_SWITCHING_USES_DURATION = ConditionalRowsDef(
+    name="preset_switching_uses_duration",
+    predicate=_preset_switching_uses_duration,
     children=(
-        SectionNode(leaf_kind=RowKind.TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR),
-        SectionNode(leaf_kind=RowKind.TRACK_CAST_ROLES_DEFAULT_ROLE),
+        SectionNode(leaf_kind=RowKind.TRACK_PRESET_DURATION),
     ),
 )
 
-PRESET_SWITCHING_PROJECTM = ConditionalRowsDef(
-    name="preset_switching_projectm",
-    predicate=_preset_switching_projectm,
+PRESET_SWITCHING_PROJECTM_TRIGGER = ConditionalRowsDef(
+    name="preset_switching_projectm_trigger",
+    predicate=_preset_switching_projectm_trigger,
     children=(
-        SectionNode(leaf_kind=RowKind.TRACK_PRESET_DURATION),
         SectionNode(leaf_kind=RowKind.TRACK_EASTER_EGG),
         SectionNode(leaf_kind=RowKind.TRACK_SOFT_CUT_DURATION),
         SectionNode(leaf_kind=RowKind.TRACK_HARD_CUT_ENABLED),
@@ -775,13 +753,11 @@ TRACK_PRESET_SWITCHING_SECTION = ExpandSectionDef(
     read_expanded=_track_preset_switching_expanded,
     toggle=_toggle_preset_switching,
     children=(
-        SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET),
-        SectionNode(conditional=PRESET_SWITCHING_USER_DEFINED),
-        SectionNode(conditional=PRESET_SWITCHING_CAST_ROLES),
-        SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_SHUFFLE),
-        SectionNode(conditional=PRESET_SWITCHING_SHUFFLE_ON),
+        SectionNode(leaf_kind=RowKind.TRACK_PRESET_SWITCHING_TRIGGER),
+        SectionNode(conditional=PRESET_SWITCHING_USES_DURATION),
+        SectionNode(conditional=PRESET_SWITCHING_PROJECTM_TRIGGER),
         SectionNode(leaf_kind=RowKind.TRACK_PRESET_START_CLEAN),
-        SectionNode(conditional=PRESET_SWITCHING_PROJECTM),
+        SectionNode(expand=PRESET_LIST_SECTION),
     ),
 )
 
@@ -1076,8 +1052,9 @@ PRESET_SWITCHING_CHILD_KINDS = frozenset(
     kinds_in_expand_section(TRACK_PRESET_SWITCHING_SECTION)
     - {RowKind.TRACK_PRESET_SWITCHING}
     | {
-        RowKind.TRACK_USER_PRESET_ITEM,
-        RowKind.TRACK_USER_PRESET_ADD,
+        RowKind.TRACK_PRESET_LIST_ITEM,
+        RowKind.TRACK_PRESET_LIST_ADD,
+        RowKind.TRACK_PRESET_LIST_POPULATE,
     }
 )
 RENDER_TIMELINE_SECTION_KINDS = frozenset(
@@ -1157,8 +1134,12 @@ def _build_row_tree_indent_depth() -> dict[RowKind, int]:
         if node.expand is not None:
             _assign_expand_indent_depth(depths, node.expand, 0)
     depths[RowKind.TRACK_EFFECT] = 2
-    depths[RowKind.TRACK_USER_PRESET_ITEM] = 7
-    depths[RowKind.TRACK_USER_PRESET_ADD] = 3
+    # Dynamic preset list rows nest under the preset list header.
+    preset_list_depth = depths[RowKind.TRACK_PRESET_LIST]
+    preset_list_item_depth = preset_list_depth + 1
+    depths[RowKind.TRACK_PRESET_LIST_ITEM] = preset_list_item_depth
+    depths[RowKind.TRACK_PRESET_LIST_ADD] = preset_list_item_depth
+    depths[RowKind.TRACK_PRESET_LIST_POPULATE] = preset_list_item_depth
     depths[RowKind.SONG_MARKERS_HEADER] = 1
     depths[RowKind.SONG_MARKER_ITEM] = 2
     depths[RowKind.TIMELINE_RESET] = 1
