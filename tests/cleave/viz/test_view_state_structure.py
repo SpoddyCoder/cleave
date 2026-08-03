@@ -927,3 +927,87 @@ def test_builder_caches_preset_list_base_labels(monkeypatch) -> None:
     view_marked = controls.build_view_state(paused=False)
     assert view_marked.tracks["layer_1"].preset_list_labels == ["user.milk [F]"]
     assert calls == [1]
+
+
+def test_structure_signature_invalidates_on_preset_list_change() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    layer = session.layers["layer_1"]
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    layer.preset_list = ["/tmp/a.milk"]
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_structure_signature_uses_digest_not_full_paths() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    layer = session.layers["layer_1"]
+    long_path = "/tmp/projects/my-track/very-long-directory-name/preset.milk"
+    layer.preset_list = [long_path]
+    sig = view_state_structure_signature(
+        session, controls._config_save, notification_active=False
+    )
+    assert long_path not in sig
+    assert '"digest"' in sig
+    assert '"len":1' in sig.replace(" ", "")
+
+
+def test_structure_signature_stable_for_long_preset_list() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    layer = session.layers["layer_1"]
+    layer.preset_list = [f"/tmp/preset-{i}.milk" for i in range(40)]
+    sig_a = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    sig_b = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_a == sig_b
+
+
+def test_builder_caches_labels_across_idle_builds(monkeypatch) -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    layer = session.layers["layer_1"]
+    layer.preset_list = [f"/tmp/preset-{i}.milk" for i in range(40)]
+    layer.preset_list_expanded = False
+
+    calls: list[int] = []
+    original = __import__(
+        "cleave.viz.user_presets", fromlist=["preset_list_display_names"]
+    ).preset_list_display_names
+
+    def counting_display_names(paths: list[str]) -> list[str]:
+        calls.append(1)
+        return original(paths)
+
+    monkeypatch.setattr(
+        "cleave.viz.tuning_view_state.preset_list_display_names",
+        counting_display_names,
+    )
+
+    controls.build_view_state(paused=False)
+    controls.build_view_state(paused=False)
+    assert calls == [1]
+
+
+def test_collapsed_preset_list_omits_item_rows() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    layer = session.layers["layer_1"]
+    layer.preset_switching = "on"
+    layer.preset_list = [f"/tmp/preset-{i}.milk" for i in range(5)]
+    layer.preset_list_expanded = False
+    view = controls.build_view_state(paused=False)
+    kinds = {desc.kind for desc in view.layout.rows}
+    assert RowKind.TRACK_PRESET_LIST in kinds
+    assert RowKind.TRACK_PRESET_LIST_ITEM not in kinds
+    assert RowKind.TRACK_PRESET_LIST_ADD not in kinds

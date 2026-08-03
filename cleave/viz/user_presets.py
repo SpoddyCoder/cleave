@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import filecmp
+import hashlib
 import os
 import shutil
+from collections.abc import Sequence
 from pathlib import Path
 
 import yaml
@@ -13,6 +15,18 @@ from cleave.config_schema import resolve_user_preset
 from cleave.project import PROJECT_FILENAME
 
 USER_PRESETS_DIRNAME = "user-presets"
+
+
+def path_list_digest(paths: Sequence[str]) -> str:
+    """Stable digest for ordered path strings (empty list -> empty digest)."""
+    if not paths:
+        return ""
+    return hashlib.sha1("\0".join(paths).encode()).hexdigest()
+
+
+def path_list_identity(paths: Sequence[str]) -> dict[str, int | str]:
+    """Compact structure-signature identity for an ordered path list."""
+    return {"len": len(paths), "digest": path_list_digest(paths)}
 
 
 def preset_list_display_names(paths: list[str]) -> list[str]:

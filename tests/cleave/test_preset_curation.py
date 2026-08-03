@@ -135,6 +135,13 @@ def test_preset_curation_index_mark_updates_sets() -> None:
     assert index.marker("c.milk") == " [R:L]"
     index.unmark_role("c.milk", "lead")
     assert index.roles == {}
+
+
+def test_curation_stamp_changes_on_mark() -> None:
+    index = PresetCurationIndex(favourites=set(), blacklist=set())
+    stamp_before = index.curation_stamp
+    index.mark_favourite("foo.milk")
+    assert index.curation_stamp != stamp_before
     assert index.marker("c.milk") == ""
 
 
