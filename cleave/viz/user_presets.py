@@ -15,20 +15,28 @@ from cleave.project import PROJECT_FILENAME
 USER_PRESETS_DIRNAME = "user-presets"
 
 
+def preset_list_display_names(paths: list[str]) -> list[str]:
+    """Format preset-list row labels, numbering duplicate paths in the list."""
+    if not paths:
+        return []
+    resolved = [Path(path).resolve() for path in paths]
+    by_resolved: dict[Path, list[int]] = {}
+    for index, path in enumerate(resolved):
+        by_resolved.setdefault(path, []).append(index)
+    labels = [""] * len(paths)
+    for indices in by_resolved.values():
+        if len(indices) == 1:
+            index = indices[0]
+            labels[index] = Path(paths[index]).name
+            continue
+        for instance, index in enumerate(indices, start=1):
+            labels[index] = f"{Path(paths[index]).name} ({instance})"
+    return labels
+
+
 def preset_list_item_display_name(paths: list[str], index: int) -> str:
     """Format a preset-list row label, numbering duplicate paths in the list."""
-    path = paths[index]
-    resolved = Path(path).resolve()
-    name = Path(path).name
-    matching = [
-        position
-        for position, candidate in enumerate(paths)
-        if Path(candidate).resolve() == resolved
-    ]
-    if len(matching) <= 1:
-        return name
-    instance = matching.index(index) + 1
-    return f"{name} ({instance})"
+    return preset_list_display_names(paths)[index]
 
 
 def copy_with_dedup(dest_dir: Path, src_path: Path) -> Path:

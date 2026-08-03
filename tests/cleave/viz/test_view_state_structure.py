@@ -891,3 +891,39 @@ def test_builder_appends_user_defined_marker_on_track_preset() -> None:
     view_fu = controls.build_view_state(paused=False)
     assert view_fu.tracks["layer_1"].preset_label == f"{current_name} (1/3) [FU]"
     assert view_fu.tracks["layer_2"].preset_list_labels == [f"{current_name} [F]"]
+
+
+def test_builder_caches_preset_list_base_labels(monkeypatch) -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    layer = session.layers["layer_1"]
+    user_path = Path("/tmp/projects/my-track/user.milk")
+    user_path.parent.mkdir(parents=True, exist_ok=True)
+    user_path.write_text("milk", encoding="utf-8")
+    layer.preset_list = [str(user_path)]
+
+    calls: list[int] = []
+    original = __import__(
+        "cleave.viz.user_presets", fromlist=["preset_list_display_names"]
+    ).preset_list_display_names
+
+    def counting_display_names(paths: list[str]) -> list[str]:
+        calls.append(1)
+        return original(paths)
+
+    monkeypatch.setattr(
+        "cleave.viz.tuning_view_state.preset_list_display_names",
+        counting_display_names,
+    )
+
+    view_first = controls.build_view_state(paused=False)
+    view_second = controls.build_view_state(paused=False)
+    assert view_first.tracks["layer_1"].preset_list_labels == ["user.milk"]
+    assert view_second.tracks["layer_1"].preset_list_labels == ["user.milk"]
+    assert calls == [1]
+
+    index = controls._view_state._curation_index
+    index.mark_favourite(user_path.name)
+    view_marked = controls.build_view_state(paused=False)
+    assert view_marked.tracks["layer_1"].preset_list_labels == ["user.milk [F]"]
+    assert calls == [1]
