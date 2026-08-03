@@ -8,6 +8,8 @@ from cleave.project import PROJECT_FILENAME
 from cleave.viz.user_presets import (
     cleanup_unreferenced_user_presets,
     iter_project_viz_config_paths,
+    path_list_digest,
+    path_list_identity,
     preset_list_display_names,
     preset_list_item_display_name,
     resolve_user_preset_dest,
@@ -65,6 +67,36 @@ def test_preset_list_display_names_duplicates() -> None:
 
 def test_preset_list_display_names_empty() -> None:
     assert preset_list_display_names([]) == []
+
+
+def test_path_list_digest_empty() -> None:
+    assert path_list_digest([]) == ""
+
+
+def test_path_list_digest_changes_on_content() -> None:
+    a = path_list_digest(["/a/foo.milk"])
+    b = path_list_digest(["/a/bar.milk"])
+    assert a != b
+
+
+def test_path_list_digest_changes_on_order() -> None:
+    first = path_list_digest(["/a/foo.milk", "/a/bar.milk"])
+    second = path_list_digest(["/a/bar.milk", "/a/foo.milk"])
+    assert first != second
+
+
+def test_path_list_digest_stable_for_same_paths() -> None:
+    paths = ["/a/foo.milk", "/a/bar.milk"]
+    assert path_list_digest(paths) == path_list_digest(paths)
+
+
+def test_path_list_identity() -> None:
+    paths = ["/a/foo.milk", "/a/bar.milk"]
+    identity = path_list_identity(paths)
+    assert identity == {
+        "len": 2,
+        "digest": path_list_digest(paths),
+    }
 
 
 def test_resolve_user_preset_dest_creates_canonical_path(tmp_path: Path) -> None:

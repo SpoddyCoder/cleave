@@ -71,7 +71,10 @@ from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.playback import PlaybackState, current_sec
 from cleave.viz.row_semantics import RowDescriptor, RowKind
 from cleave.viz.session import LayerRuntime, TuningSession, config_path_display
-from cleave.viz.user_presets import preset_list_display_names
+from cleave.viz.user_presets import (
+    path_list_identity,
+    preset_list_display_names,
+)
 
 if TYPE_CHECKING:
     from cleave.viz.focus_nav import FocusCursor
@@ -392,10 +395,12 @@ def view_state_structure_signature(
             "easter_egg": layer.easter_egg,
             "preset_start_clean": layer.preset_start_clean,
             "effects": sorted(layer.effects.keys()),
-            "preset_list": list(layer.preset_list),
+            "preset_list": path_list_identity(layer.preset_list),
             "playlist": {
                 "current_dir": str(playlist.current_dir),
-                "paths": [str(path) for path in playlist.paths],
+                "paths": path_list_identity(
+                    [str(path) for path in playlist.paths]
+                ),
                 "index": playlist.index,
             },
             "auto_preset_path": (
@@ -528,7 +533,11 @@ class TuningViewStateBuilder:
         self._get_notification = get_notification
         self._layers_by_slot = layers_by_slot
         self._auto_display_cache: dict[Path, PresetPlaylist] = {}
-        self._preset_list_label_cache: dict[tuple[str, ...], list[str]] = {}
+        self._base_preset_list_label_cache: dict[tuple[str, ...], list[str]] = {}
+        self._annotated_preset_list_label_cache: dict[
+            tuple[tuple[str, ...], str], list[str]
+        ] = {}
+        self._user_basenames_cache: dict[tuple[tuple[str, ...], ...], set[str]] = {}
         self._structure: _ViewStateStructure | None = None
 
     def _sync_auto_preset_paths(self) -> None:
@@ -540,11 +549,22 @@ class TuningViewStateBuilder:
             if runtime is not None:
                 runtime.auto_preset_path = stem.auto_preset_path
 
+    def _preset_list_paths_key(self) -> tuple[tuple[str, ...], ...]:
+        return tuple(
+            tuple(self.session.layers[slot].preset_list)
+            for slot in self.session.layer_z_order
+        )
+
     def _user_preset_basenames(self) -> set[str]:
+        key = self._preset_list_paths_key()
+        cached = self._user_basenames_cache.get(key)
+        if cached is not None:
+            return cached
         names: set[str] = set()
-        for layer in self.session.layers.values():
-            for path in layer.preset_list:
+        for slot in self.session.layer_z_order:
+            for path in self.session.layers[slot].preset_list:
                 names.add(Path(path).name)
+        self._user_basenames_cache[key] = names
         return names
 
     def _display_playlist(self, layer: LayerRuntime) -> PresetPlaylist:
@@ -572,15 +592,21 @@ class TuningViewStateBuilder:
         return label
 
     def _preset_list_labels(self, paths: list[str]) -> list[str]:
-        key = tuple(paths)
-        base = self._preset_list_label_cache.get(key)
+        paths_key = tuple(paths)
+        annotated_key = (paths_key, self._curation_index.curation_stamp)
+        cached = self._annotated_preset_list_label_cache.get(annotated_key)
+        if cached is not None:
+            return cached
+        base = self._base_preset_list_label_cache.get(paths_key)
         if base is None:
             base = preset_list_display_names(paths)
-            self._preset_list_label_cache[key] = base
-        return [
+            self._base_preset_list_label_cache[paths_key] = base
+        labels = [
             base[i] + self._curation_index.marker(Path(paths[i]).name)
             for i in range(len(paths))
         ]
+        self._annotated_preset_list_label_cache[annotated_key] = labels
+        return labels
 
     def _build_structure(
         self,

@@ -96,6 +96,23 @@ class PresetCurationIndex:
             roles=roles,
         )
 
+    @property
+    def curation_stamp(self) -> str:
+        """Cheap identity for label caches; changes when curation sets mutate."""
+        role_pairs = tuple(
+            sorted(
+                (name, role)
+                for name, role_set in self.roles.items()
+                for role in role_set
+            )
+        )
+        payload = (
+            tuple(sorted(self.favourites)),
+            tuple(sorted(self.blacklist)),
+            role_pairs,
+        )
+        return repr(payload)
+
     def marker(self, name: str, *, user: bool = False) -> str:
         letters = ""
         if name in self.favourites:
