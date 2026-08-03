@@ -7,14 +7,12 @@ from enum import Enum, auto
 
 from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES
 from cleave.config_schema import (
-    CAST_ROLES_DEFAULT_ROLE_HELP_ENTRIES,
-    CAST_ROLES_TIMELINE_BEHAVIOUR_HELP_ENTRIES,
     CHROMA_BOOST_APPLY_MODE_HELP_ENTRIES,
     CHROMA_BOOST_VARIANT_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES,
     PRESET_SWITCHING_MODE_HELP_ENTRIES,
-    PRESET_SWITCHING_ROTATION_SET_HELP_ENTRIES,
+    PRESET_SWITCHING_TRIGGER_HELP_ENTRIES,
     EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
     RENDER_OVERLAY_ANIMATION_TYPE_HELP_ENTRIES,
     RENDER_OVERLAY_SLIDE_DIRECTION_HELP_ENTRIES,
@@ -31,14 +29,11 @@ class RowKind(Enum):
     TRACK_PRESET_DIR = auto()
     TRACK_PRESET = auto()
     TRACK_PRESET_SWITCHING = auto()
-    TRACK_USER_PRESETS = auto()
-    TRACK_USER_PRESET_ITEM = auto()
-    TRACK_USER_PRESET_ADD = auto()
-    TRACK_PRESET_SWITCHING_ROTATION_SET = auto()
-    TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR = auto()
-    TRACK_CAST_ROLES_DEFAULT_ROLE = auto()
-    TRACK_PRESET_SWITCHING_SHUFFLE = auto()
-    TRACK_PRESET_SWITCHING_SEED = auto()
+    TRACK_PRESET_SWITCHING_TRIGGER = auto()
+    TRACK_PRESET_LIST = auto()
+    TRACK_PRESET_LIST_ITEM = auto()
+    TRACK_PRESET_LIST_ADD = auto()
+    TRACK_PRESET_LIST_POPULATE = auto()
     TRACK_PRESET_DURATION = auto()
     TRACK_SOFT_CUT_DURATION = auto()
     TRACK_EASTER_EGG = auto()
@@ -255,91 +250,67 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         repeatable=True,
         parent_group="track",
         help_title="Preset switching",
-        help_entries=(("Left/Right", "cycle mode"),),
+        help_entries=(("Left/Right", "off / on"),),
         help_description=(
-            "Controls how and when presets change during playback.",
+            "When on, advances through this layer's ordered preset list.",
+            "The trigger chooses timer, projectM, or timeline on-transitions.",
         ),
         help_mode_entries=PRESET_SWITCHING_MODE_HELP_ENTRIES,
     ),
-    RowKind.TRACK_USER_PRESETS: RowBehavior(
+    RowKind.TRACK_PRESET_SWITCHING_TRIGGER: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="track",
+        help_title="Trigger",
+        help_entries=(("Left/Right", "cycle trigger"),),
+        help_description=(
+            "How the ordered preset list advances while switching is on.",
+            "Timeline trigger needs Render: TIMELINE enabled.",
+        ),
+        help_mode_entries=PRESET_SWITCHING_TRIGGER_HELP_ENTRIES,
+    ),
+    RowKind.TRACK_PRESET_LIST: RowBehavior(
         RowAffordance.EXPAND,
         is_sub_header=True,
         parent_group="track",
-        help_title="user presets",
+        help_title="preset list",
         help_description=(
-            "Presets in the rotation set for user-defined switching.",
-            "Expand to list entries and add from the current browse position.",
+            "Ordered presets used for automatic switching on this layer.",
+            "Expand to reorder, delete, or add the current browse preset.",
         ),
     ),
-    RowKind.TRACK_USER_PRESET_ITEM: RowBehavior(
+    RowKind.TRACK_PRESET_LIST_ITEM: RowBehavior(
         RowAffordance.PATH_PRESET,
         parent_group="track",
-        help_title="user preset entry",
+        can_enter_move_mode=True,
+        help_title="preset list entry",
         help_description=(
-            "Preset in the user-defined rotation set for this layer.",
+            "Preset in this layer's switching list.",
             "[F/B] indicates favourited/blacklisted.",
             "[R:X] indicates the chosen role.",
         ),
         help_mode_entries=CUE_ROLE_MARKER_HELP_ENTRIES,
     ),
-    RowKind.TRACK_USER_PRESET_ADD: RowBehavior(
+    RowKind.TRACK_PRESET_LIST_ADD: RowBehavior(
         RowAffordance.ACTION,
         parent_group="track",
         blocked_by_section_lock=True,
         help_title="Add Current Preset",
         help_description=(
-            "Add the layer's current preset to the user-defined rotation set.",
-            "Copies the preset file into the project presets folder.",
-            "U on the preset dir or preset file row is the same action.",
+            "Add the layer's current browse preset to the end of the list.",
+            "Copies the preset file into the project user-presets folder.",
+            "U on any row in the layer is the same action.",
         ),
     ),
-    RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET: RowBehavior(
-        RowAffordance.VALUE_STEP,
-        parent_group="track",
-        help_title="Rotation set",
-        help_entries=(("Left/Right", "cycle rotation set"),),
-        help_description=(),
-        help_mode_entries=PRESET_SWITCHING_ROTATION_SET_HELP_ENTRIES,
-    ),
-    RowKind.TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR: RowBehavior(
-        RowAffordance.VALUE_STEP,
-        repeatable=True,
-        parent_group="track",
-        help_title="Timeline behaviour",
-        help_entries=(("Left/Right", "cycle behaviour"),),
-        help_description=(),
-        help_mode_entries=CAST_ROLES_TIMELINE_BEHAVIOUR_HELP_ENTRIES,
-    ),
-    RowKind.TRACK_CAST_ROLES_DEFAULT_ROLE: RowBehavior(
-        RowAffordance.VALUE_STEP,
-        repeatable=True,
-        parent_group="track",
-        help_title="Default role",
-        help_entries=(("Left/Right", "cycle role"),),
-        help_description=(),
-        help_mode_entries=CAST_ROLES_DEFAULT_ROLE_HELP_ENTRIES,
-    ),
-    RowKind.TRACK_PRESET_SWITCHING_SHUFFLE: RowBehavior(
-        RowAffordance.VALUE_STEP,
-        repeatable=True,
-        parent_group="track",
-        help_title="Shuffle",
-        help_entries=(("Left/Right", "off / on"),),
-        help_description=(
-            "When on, auto switching uses a fixed shuffled order",
-            "(same in live preview and offline render).",
-            "Use the seed row to roll a new order.",
-        ),
-    ),
-    RowKind.TRACK_PRESET_SWITCHING_SEED: RowBehavior(
+    RowKind.TRACK_PRESET_LIST_POPULATE: RowBehavior(
         RowAffordance.ACTION,
         parent_group="track",
         blocked_by_section_lock=True,
-        help_title="Seed",
-        help_entries=(("Enter", "generate a new seed"),),
+        help_title="Populate Presets",
         help_description=(
-            "Current shuffle seed for this layer.",
-            "Enter rolls a new seed and rebuilds the shuffled preset order.",
+            "Replace the entire preset list from the current directory "
+            "(random or sequential) or random cue marker role pools.",
+            "Enter opens a choice modal.",
         ),
     ),
     RowKind.TRACK_PRESET_DURATION: RowBehavior(
@@ -349,7 +320,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Preset duration",
         help_entries=(("Left/Right", "step value"),),
         help_description=(
-            "How long a preset plays before projectM transitions to the next.",
+            "Seconds between timer advances, and projectM preset duration.",
         ),
     ),
     RowKind.TRACK_SOFT_CUT_DURATION: RowBehavior(
@@ -1500,11 +1471,15 @@ TRACK_SUB_ROW_KINDS = frozenset(
 )
 TRACK_LOCK_KINDS = TRACK_SUB_ROW_KINDS | frozenset({RowKind.TRACK_HEADER})
 TRACK_EFFECT_SUB_ROW_KINDS = frozenset({RowKind.TRACK_EFFECT})
-TRACK_USER_PRESET_SUB_ROW_KINDS = frozenset(
-    {RowKind.TRACK_USER_PRESET_ITEM, RowKind.TRACK_USER_PRESET_ADD}
+TRACK_PRESET_LIST_SUB_ROW_KINDS = frozenset(
+    {
+        RowKind.TRACK_PRESET_LIST_ITEM,
+        RowKind.TRACK_PRESET_LIST_ADD,
+        RowKind.TRACK_PRESET_LIST_POPULATE,
+    }
 )
 SONG_MARKER_SUB_ROW_KINDS = frozenset({RowKind.SONG_MARKER_ITEM})
-PRESET_FILE_ROW_KINDS = frozenset({RowKind.TRACK_PRESET, RowKind.TRACK_USER_PRESET_ITEM})
+PRESET_FILE_ROW_KINDS = frozenset({RowKind.TRACK_PRESET, RowKind.TRACK_PRESET_LIST_ITEM})
 
 _SECTION_LOCK_BLOCKING_AFFORDANCES = frozenset(
     {
@@ -1652,8 +1627,8 @@ def section_header_descriptor(desc: RowDescriptor) -> RowDescriptor:
     kind = desc.kind
     if kind in TRACK_EFFECT_SUB_ROW_KINDS:
         return RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, slot=desc.slot)
-    if kind in TRACK_USER_PRESET_SUB_ROW_KINDS:
-        return RowDescriptor(RowKind.TRACK_USER_PRESETS, slot=desc.slot)
+    if kind in TRACK_PRESET_LIST_SUB_ROW_KINDS:
+        return RowDescriptor(RowKind.TRACK_PRESET_LIST, slot=desc.slot)
     if kind in SONG_MARKER_SUB_ROW_KINDS:
         return RowDescriptor(RowKind.SONG_MARKERS_HEADER)
     return desc

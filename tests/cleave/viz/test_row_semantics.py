@@ -34,14 +34,12 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.TRACK_PRESET_DIR,
         RowKind.TRACK_PRESET,
         RowKind.TRACK_PRESET_SWITCHING,
-        RowKind.TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR,
-        RowKind.TRACK_CAST_ROLES_DEFAULT_ROLE,
-        RowKind.TRACK_PRESET_DURATION,
+        RowKind.TRACK_PRESET_SWITCHING_TRIGGER,
+                        RowKind.TRACK_PRESET_DURATION,
         RowKind.TRACK_SOFT_CUT_DURATION,
         RowKind.TRACK_EASTER_EGG,
         RowKind.TRACK_PRESET_START_CLEAN,
-        RowKind.TRACK_PRESET_SWITCHING_SHUFFLE,
-        RowKind.TRACK_HARD_CUT_ENABLED,
+                RowKind.TRACK_HARD_CUT_ENABLED,
         RowKind.TRACK_HARD_CUT_DURATION,
         RowKind.TRACK_HARD_CUT_SENSITIVITY,
         RowKind.TRACK_STEM,
@@ -191,14 +189,11 @@ def test_track_sub_row_kinds() -> None:
             RowKind.TRACK_PRESET_DIR,
             RowKind.TRACK_PRESET,
             RowKind.TRACK_PRESET_SWITCHING,
-            RowKind.TRACK_USER_PRESETS,
-            RowKind.TRACK_USER_PRESET_ITEM,
-            RowKind.TRACK_USER_PRESET_ADD,
-            RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET,
-            RowKind.TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR,
-            RowKind.TRACK_CAST_ROLES_DEFAULT_ROLE,
-            RowKind.TRACK_PRESET_SWITCHING_SHUFFLE,
-            RowKind.TRACK_PRESET_SWITCHING_SEED,
+            RowKind.TRACK_PRESET_SWITCHING_TRIGGER,
+            RowKind.TRACK_PRESET_LIST,
+            RowKind.TRACK_PRESET_LIST_ITEM,
+            RowKind.TRACK_PRESET_LIST_ADD,
+            RowKind.TRACK_PRESET_LIST_POPULATE,
             RowKind.TRACK_PRESET_DURATION,
             RowKind.TRACK_SOFT_CUT_DURATION,
             RowKind.TRACK_EASTER_EGG,
@@ -227,7 +222,7 @@ def test_locked_navigable_sub_row_kinds() -> None:
     )
     assert navigable == frozenset(
         {
-            RowKind.TRACK_USER_PRESETS,
+            RowKind.TRACK_PRESET_LIST,
             RowKind.TRACK_EFFECTS_HEADER,
             RowKind.LAYER_MANAGEMENT_DELETE,
         }
@@ -243,11 +238,7 @@ def test_track_value_rows_blocked_by_section_lock() -> None:
             RowKind.TRACK_PRESET_DIR,
             RowKind.TRACK_PRESET,
             RowKind.TRACK_PRESET_SWITCHING,
-            RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET,
-            RowKind.TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR,
-            RowKind.TRACK_CAST_ROLES_DEFAULT_ROLE,
-            RowKind.TRACK_PRESET_SWITCHING_SHUFFLE,
-            RowKind.TRACK_PRESET_SWITCHING_SEED,
+            RowKind.TRACK_PRESET_SWITCHING_TRIGGER,
             RowKind.TRACK_PRESET_DURATION,
             RowKind.TRACK_SOFT_CUT_DURATION,
             RowKind.TRACK_EASTER_EGG,
@@ -260,8 +251,9 @@ def test_track_value_rows_blocked_by_section_lock() -> None:
             RowKind.TRACK_OPACITY,
             RowKind.TRACK_BEAT,
             RowKind.TRACK_EFFECT,
-            RowKind.TRACK_USER_PRESET_ITEM,
-            RowKind.TRACK_USER_PRESET_ADD,
+            RowKind.TRACK_PRESET_LIST_ITEM,
+            RowKind.TRACK_PRESET_LIST_ADD,
+            RowKind.TRACK_PRESET_LIST_POPULATE,
         }
     )
     for kind in blocked:
@@ -272,7 +264,7 @@ def test_track_value_rows_blocked_by_section_lock() -> None:
 
 def test_only_effects_header_navigable_when_section_locked() -> None:
     navigable_when_locked = {
-        RowKind.TRACK_USER_PRESETS,
+        RowKind.TRACK_PRESET_LIST,
         RowKind.TRACK_EFFECTS_HEADER,
         RowKind.LAYER_MANAGEMENT_DELETE,
     }
@@ -292,12 +284,14 @@ def test_labeled_sub_row_kinds_exclude_headers() -> None:
         assert not behavior.is_header
 
 
-def test_preset_switching_seed_is_action_row() -> None:
-    assert RowKind.TRACK_PRESET_SWITCHING_SEED in ACTION_ROW_KINDS
-    assert RowKind.TRACK_PRESET_SWITCHING_SEED not in LABELED_SUB_ROW_KINDS
-    assert row_behavior(RowKind.TRACK_PRESET_SWITCHING_SEED).affordance == (
-        RowAffordance.ACTION
-    )
+def test_preset_list_actions_are_action_rows() -> None:
+    for kind in (
+        RowKind.TRACK_PRESET_LIST_POPULATE,
+        RowKind.TRACK_PRESET_LIST_ADD,
+    ):
+        assert kind in ACTION_ROW_KINDS
+        assert kind not in LABELED_SUB_ROW_KINDS
+        assert row_behavior(kind).affordance == RowAffordance.ACTION
 
 
 def _render_lock_state(
@@ -324,7 +318,7 @@ def test_render_value_children_blocked_by_section_lock() -> None:
     assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_TIMELINE_CUTS) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_RESHUFFLE) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_CONDUCTOR) is True
-    assert row_blocked_by_section_lock(RowKind.TRACK_PRESET_SWITCHING_SEED) is True
+    assert row_blocked_by_section_lock(RowKind.TRACK_PRESET_LIST_POPULATE) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_BAR_PHASE) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_TO_BEATS) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_TO_BARS) is True

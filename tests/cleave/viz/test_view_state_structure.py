@@ -495,39 +495,31 @@ def test_builder_rebuilds_layout_when_highlight_rolloff_mode_changes() -> None:
     assert threshold not in view_off.layout.rows
 
 
-def test_structure_signature_invalidates_on_preset_switching_shuffle() -> None:
+
+def test_structure_signature_invalidates_on_preset_switching_trigger() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     config_save = controls._config_save
-    session.layers["layer_1"].preset_switching = "projectm"
-    sig_before = view_state_structure_signature(
+    session.layers["layer_1"].preset_switching = "on"
+    session.layers["layer_1"].preset_switching_trigger = "timer"
+    sig_timer = view_state_structure_signature(
         session, config_save, notification_active=False
     )
-    session.layers["layer_1"].preset_switching_shuffle = True
-    sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_after
-
-
-def test_structure_signature_invalidates_on_preset_switching_timeline_mode() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    session.layers["layer_1"].preset_switching = "projectm"
+    session.layers["layer_1"].preset_switching_trigger = "projectm"
     sig_projectm = view_state_structure_signature(
         session, config_save, notification_active=False
     )
-    session.layers["layer_1"].preset_switching = "timeline"
+    assert sig_timer != sig_projectm
+    session.layers["layer_1"].preset_switching_trigger = "timeline"
     sig_timeline = view_state_structure_signature(
         session, config_save, notification_active=False
     )
     assert sig_projectm != sig_timeline
-    session.layers["layer_1"].preset_switching = "none"
-    sig_none = view_state_structure_signature(
+    session.layers["layer_1"].preset_switching = "off"
+    sig_off = view_state_structure_signature(
         session, config_save, notification_active=False
     )
-    assert sig_timeline != sig_none
+    assert sig_timeline != sig_off
 
 
 def test_structure_signature_invalidates_on_auto_preset_path() -> None:
@@ -545,12 +537,11 @@ def test_structure_signature_invalidates_on_auto_preset_path() -> None:
     assert sig_before != sig_after
 
 
-def test_builder_shows_auto_preset_in_dir_and_file_rows() -> None:
+def test_builder_shows_auto_preset_in_file_row_only() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session
     layer = session.layers["layer_1"]
-    layer.preset_switching = "timeline"
-    layer.preset_switching_rotation_set = "cast_roles"
+    layer.preset_switching = "on"
     root = controls._view_state.preset_root
     bed = root / "roles" / "bed"
     pulse = root / "roles" / "pulse"
@@ -563,68 +554,43 @@ def test_builder_shows_auto_preset_in_dir_and_file_rows() -> None:
         path.write_text("milk", encoding="utf-8")
 
     view_browse = controls.build_view_state(paused=False)
-    assert "roles/" not in view_browse.tracks["layer_1"].preset_dir_label
+    browse_dir_label = view_browse.tracks["layer_1"].preset_dir_label
+    assert "roles/" not in browse_dir_label
 
     layer.auto_preset_path = bed_b.resolve()
     view_bed = controls.build_view_state(paused=False)
-    assert "roles/bed/" in view_bed.tracks["layer_1"].preset_dir_label
+    assert view_bed.tracks["layer_1"].preset_dir_label == browse_dir_label
     assert view_bed.tracks["layer_1"].preset_label.startswith("bed-b.milk (2/2)")
 
     layer.auto_preset_path = pulse_a.resolve()
     view_pulse = controls.build_view_state(paused=False)
-    assert "roles/pulse/" in view_pulse.tracks["layer_1"].preset_dir_label
+    assert view_pulse.tracks["layer_1"].preset_dir_label == browse_dir_label
     assert view_pulse.tracks["layer_1"].preset_label.startswith("pulse-a.milk (1/1)")
     # Browse playlist unchanged (config stays clean).
     assert layer.playlist.index == 0
 
 
-def test_structure_signature_invalidates_on_cast_roles_rotation_set() -> None:
+def test_builder_shows_off_root_auto_preset_without_crashing(
+    tmp_path: Path,
+) -> None:
+    """Playing a project user-presets copy must not break directory display."""
     controls = _make_controls(("layer_1",))
     session = controls.session
-    config_save = controls._config_save
-    session.layers["layer_1"].preset_switching = "timeline"
-    session.layers["layer_1"].preset_switching_rotation_set = "directory"
-    sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    session.layers["layer_1"].preset_switching_rotation_set = "cast_roles"
-    sig_after = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_after
+    layer = session.layers["layer_1"]
+    layer.preset_switching = "on"
+    browse_dir_label = controls.build_view_state(paused=False).tracks[
+        "layer_1"
+    ].preset_dir_label
 
-    builder = controls._view_state
-    view_cast = builder.build(paused=False)
-    behaviour = RowDescriptor(
-        RowKind.TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR, slot="layer_1"
-    )
-    assert behaviour in view_cast.layout.rows
+    user_dir = tmp_path / "user-presets"
+    user_dir.mkdir()
+    playing = user_dir / "copied.milk"
+    playing.write_text("milk", encoding="utf-8")
+    layer.auto_preset_path = playing.resolve()
 
-    session.layers["layer_1"].preset_switching_rotation_set = "directory"
-    view_dir = builder.build(paused=False)
-    assert view_dir.layout is not view_cast.layout
-    assert behaviour not in view_dir.layout.rows
-
-
-def test_structure_signature_invalidates_on_cast_roles_fields() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    config_save = controls._config_save
-    session.layers["layer_1"].preset_switching = "timeline"
-    session.layers["layer_1"].preset_switching_rotation_set = "cast_roles"
-    sig_before = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    session.layers["layer_1"].cast_roles_timeline_behaviour = "hold_current"
-    sig_behaviour = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_before != sig_behaviour
-    session.layers["layer_1"].cast_roles_default_role = "pulse"
-    sig_role = view_state_structure_signature(
-        session, config_save, notification_active=False
-    )
-    assert sig_behaviour != sig_role
+    view = controls.build_view_state(paused=False)
+    assert view.tracks["layer_1"].preset_dir_label == browse_dir_label
+    assert view.tracks["layer_1"].preset_label.startswith("copied.milk")
 
 
 def test_structure_signature_invalidates_on_persistent_notification() -> None:
@@ -650,37 +616,13 @@ def test_structure_signature_invalidates_on_persistent_notification() -> None:
     assert sig_persistent != sig_both
 
 
-def test_timeline_preset_switching_hides_projectm_only_rows() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    session.layers["layer_1"].expanded = True
-    session.layers["layer_1"].preset_switching = "timeline"
-    builder = controls._view_state
-    view = builder.build(paused=False)
-    slot = "layer_1"
-    assert RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET, slot=slot) in (
-        view.layout.rows
-    )
-    assert RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_SHUFFLE, slot=slot) in (
-        view.layout.rows
-    )
-    assert RowDescriptor(RowKind.TRACK_PRESET_START_CLEAN, slot=slot) in view.layout.rows
-    assert RowDescriptor(RowKind.TRACK_PRESET_DURATION, slot=slot) not in view.layout.rows
-    assert RowDescriptor(RowKind.TRACK_EASTER_EGG, slot=slot) not in view.layout.rows
-    assert RowDescriptor(RowKind.TRACK_SOFT_CUT_DURATION, slot=slot) not in (
-        view.layout.rows
-    )
-    assert RowDescriptor(RowKind.TRACK_HARD_CUT_ENABLED, slot=slot) not in (
-        view.layout.rows
-    )
-
 
 def test_timeline_mode_row_set_unchanged_when_timeline_enabled_toggles() -> None:
     """Dimming when timeline is disabled does not add or remove preset-switching rows."""
     controls = _make_controls(("layer_1",))
     session = controls.session
     session.layers["layer_1"].expanded = True
-    session.layers["layer_1"].preset_switching = "timeline"
+    session.layers["layer_1"].preset_switching = "on"
     session.timeline.enabled = True
     builder = controls._view_state
     kinds_on = [desc.kind for desc in builder.build(paused=False).layout.rows]
@@ -688,29 +630,6 @@ def test_timeline_mode_row_set_unchanged_when_timeline_enabled_toggles() -> None
     kinds_off = [desc.kind for desc in builder.build(paused=False).layout.rows]
     assert kinds_on == kinds_off
 
-
-def test_builder_updates_shuffle_display_when_shuffle_changes() -> None:
-    controls = _make_controls(("layer_1",))
-    session = controls.session
-    session.layers["layer_1"].preset_switching = "projectm"
-    session.layers["layer_1"].expanded = True
-    builder = controls._view_state
-
-    view_off = builder.build(paused=False)
-    shuffle_row = RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_SHUFFLE, slot="layer_1")
-    seed_row = RowDescriptor(RowKind.TRACK_PRESET_SWITCHING_SEED, slot="layer_1")
-    assert shuffle_row in view_off.layout.rows
-    assert seed_row not in view_off.layout.rows
-    assert view_off.tracks["layer_1"].preset_switching_shuffle is False
-
-    session.layers["layer_1"].preset_switching_shuffle = True
-    view_on = builder.build(paused=False)
-    assert shuffle_row in view_on.layout.rows
-    assert seed_row in view_on.layout.rows
-    assert view_on.tracks["layer_1"].preset_switching_shuffle is True
-    shuffle_idx = view_on.layout.rows.index(shuffle_row)
-    seed_idx = view_on.layout.rows.index(seed_row)
-    assert seed_idx == shuffle_idx + 1
 
 
 def test_minimal_view_state_still_builds_layout() -> None:
@@ -910,7 +829,7 @@ def test_builder_appends_curation_markers_without_structure_change() -> None:
     user_path = Path("/tmp/projects/my-track/user.milk")
     user_path.parent.mkdir(parents=True, exist_ok=True)
     user_path.write_text("milk", encoding="utf-8")
-    layer.user_presets = [str(user_path)]
+    layer.preset_list = [str(user_path)]
 
     sig_before = view_state_structure_signature(
         session, config_save, notification_active=False
@@ -918,7 +837,7 @@ def test_builder_appends_curation_markers_without_structure_change() -> None:
     view_before = controls.build_view_state(paused=False)
     block_before = view_before.tracks["layer_1"]
     assert block_before.preset_label == "preset-0.milk (1/3)"
-    assert block_before.user_preset_labels == ["user.milk"]
+    assert block_before.preset_list_labels == ["user.milk"]
 
     current_name = layer.playlist.current.name
     assert current_name is not None
@@ -935,7 +854,7 @@ def test_builder_appends_curation_markers_without_structure_change() -> None:
     block_after = view_after.tracks["layer_1"]
     assert block_after.preset_label == "preset-0.milk (1/3) [F]"
     # User-preset rows never append U; F/B only in single-bracket form.
-    assert block_after.user_preset_labels == ["user.milk [FB]"]
+    assert block_after.preset_list_labels == ["user.milk [FB]"]
 
 
 def test_builder_appends_user_defined_marker_on_track_preset() -> None:
@@ -954,14 +873,14 @@ def test_builder_appends_user_defined_marker_on_track_preset() -> None:
     other_path = Path("/tmp/projects/my-track") / current_name
     other_path.parent.mkdir(parents=True, exist_ok=True)
     other_path.write_text("milk", encoding="utf-8")
-    layer_2.user_presets = [str(other_path)]
+    layer_2.preset_list = [str(other_path)]
 
     sig_before = view_state_structure_signature(
         session, config_save, notification_active=False
     )
     view_u = controls.build_view_state(paused=False)
     assert view_u.tracks["layer_1"].preset_label == f"{current_name} (1/3) [U]"
-    assert view_u.tracks["layer_2"].user_preset_labels == [current_name]
+    assert view_u.tracks["layer_2"].preset_list_labels == [current_name]
 
     index.mark_favourite(current_name)
     sig_after = view_state_structure_signature(
@@ -971,4 +890,4 @@ def test_builder_appends_user_defined_marker_on_track_preset() -> None:
 
     view_fu = controls.build_view_state(paused=False)
     assert view_fu.tracks["layer_1"].preset_label == f"{current_name} (1/3) [FU]"
-    assert view_fu.tracks["layer_2"].user_preset_labels == [f"{current_name} [F]"]
+    assert view_fu.tracks["layer_2"].preset_list_labels == [f"{current_name} [F]"]

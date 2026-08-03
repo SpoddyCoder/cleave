@@ -10,7 +10,7 @@ from pathlib import Path
 
 from cleave.projectm import drain_log_messages
 from cleave.viz.layer import StemLayer
-from cleave.viz.preset_switching import EMPTY_ROTATION_NOTIFICATION
+from cleave.viz.preset_switching import EMPTY_PRESET_LIST_NOTIFICATION
 
 PRESET_SKIP_NOTIFICATION_INTERVAL_SEC = 10.0
 PROJECTM_LOG_NOTIFICATION_PREFIX = "projectM: "
@@ -66,7 +66,7 @@ def drain_stem_layers_preset_failures(
         for failure in failures:
             if failure.exhausted:
                 if on_notification is not None:
-                    on_notification(EMPTY_ROTATION_NOTIFICATION)
+                    on_notification(EMPTY_PRESET_LIST_NOTIFICATION)
                 continue
             if on_notification is None:
                 continue

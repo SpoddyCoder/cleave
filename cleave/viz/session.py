@@ -17,12 +17,8 @@ from cleave.config import (
 )
 from cleave.config_schema import (
     DEFAULT_BEAT_SENSITIVITY,
-    DEFAULT_CAST_ROLES_DEFAULT_ROLE,
-    DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR,
     DEFAULT_PRESET_SWITCHING,
-    DEFAULT_PRESET_SWITCHING_ROTATION_SET,
-    DEFAULT_PRESET_SWITCHING_SHUFFLE,
-    DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT,
+    DEFAULT_PRESET_SWITCHING_TRIGGER,
     DEFAULT_PRESET_DURATION,
     DEFAULT_SOFT_CUT_DURATION,
     DEFAULT_HARD_CUT_DURATION,
@@ -38,11 +34,10 @@ from cleave.config_schema import (
     DEFAULT_VISUAL_LIMITER_ENABLED,
     DEFAULT_VISUAL_LIMITER_THRESHOLD,
     DEFAULT_VISUAL_LIMITER_RELEASE,
-    CastRolesTimelineBehaviour,
     HighlightRolloffApplyMode,
     HighlightRolloffCurve,
     PresetSwitchingMode,
-    PresetSwitchingRotationSet,
+    PresetSwitchingTrigger,
     TimelinePlacementSnap,
     default_render_overlay_animation_runtime_values,
     default_render_overlay_closing_animation_runtime_values,
@@ -52,7 +47,6 @@ from cleave.config_schema import (
     default_chroma_boost_runtime_values,
     default_render_post_fx_runtime_values,
 )
-from cleave.cue_roles import CueRole
 from cleave.extract import StemSource
 from cleave.preset_playlist import PresetPlaylist, preset_browse_floor
 from cleave.projectm_health import PresetSkipNotifyTracker, ProjectMLogNotifyTracker
@@ -354,13 +348,7 @@ class LayerRuntime:
     expanded: bool = False
     locked: bool = False
     preset_switching: PresetSwitchingMode = DEFAULT_PRESET_SWITCHING
-    preset_switching_rotation_set: PresetSwitchingRotationSet = DEFAULT_PRESET_SWITCHING_ROTATION_SET
-    cast_roles_timeline_behaviour: CastRolesTimelineBehaviour = (
-        DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR
-    )
-    cast_roles_default_role: CueRole = DEFAULT_CAST_ROLES_DEFAULT_ROLE
-    preset_switching_shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE
-    preset_switching_shuffle_salt: int = DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT
+    preset_switching_trigger: PresetSwitchingTrigger = DEFAULT_PRESET_SWITCHING_TRIGGER
     preset_duration: float = DEFAULT_PRESET_DURATION
     soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION
     hard_cut_duration: float = DEFAULT_HARD_CUT_DURATION
@@ -368,8 +356,8 @@ class LayerRuntime:
     hard_cut_enabled: bool = DEFAULT_HARD_CUT_ENABLED
     easter_egg: float = DEFAULT_EASTER_EGG
     preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN
-    user_presets: list[str] = field(default_factory=list)  # absolute paths
-    user_presets_expanded: bool = False
+    preset_list: list[str] = field(default_factory=list)  # absolute paths
+    preset_list_expanded: bool = False
     # Playing auto-switch preset (panel display); not persisted. Mirrored from
     # StemLayer.auto_preset_path while the live layer map is available.
     auto_preset_path: Path | None = None
@@ -622,11 +610,7 @@ def session_from_cfg(
                 enabled=layer_cfg.enabled,
                 locked=layer_cfg.locked,
                 preset_switching=layer_cfg.preset_switching,
-                preset_switching_rotation_set=layer_cfg.preset_switching_rotation_set,
-                cast_roles_timeline_behaviour=layer_cfg.cast_roles_timeline_behaviour,
-                cast_roles_default_role=layer_cfg.cast_roles_default_role,
-                preset_switching_shuffle=layer_cfg.preset_switching_shuffle,
-                preset_switching_shuffle_salt=layer_cfg.preset_switching_shuffle_salt,
+                preset_switching_trigger=layer_cfg.preset_switching_trigger,
                 preset_duration=layer_cfg.preset_duration,
                 soft_cut_duration=layer_cfg.soft_cut_duration,
                 hard_cut_duration=layer_cfg.hard_cut_duration,
@@ -634,9 +618,8 @@ def session_from_cfg(
                 hard_cut_enabled=layer_cfg.hard_cut_enabled,
                 easter_egg=layer_cfg.easter_egg,
                 preset_start_clean=layer_cfg.preset_start_clean,
-                user_presets=[
-                    path.as_posix()
-                    for path in layer_cfg.preset_switching_presets
+                preset_list=[
+                    path.as_posix() for path in layer_cfg.preset_switching_list
                 ],
             )
             for slot, layer_cfg in cfg.layers.items()

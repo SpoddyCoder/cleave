@@ -9,7 +9,7 @@ from cleave.viz.user_presets import (
     cleanup_unreferenced_user_presets,
     iter_project_viz_config_paths,
     resolve_user_preset_dest,
-    user_preset_item_display_name,
+    preset_list_item_display_name,
     user_preset_referenced_on_disk,
 )
 
@@ -22,26 +22,26 @@ def _write_viz_yaml(path: Path, preset_relpaths: list[str]) -> None:
     path.write_text(
         "layers:\n"
         "  layer_1:\n"
-        "    preset_switching_presets:\n"
+        "    preset_switching_list:\n"
         f"{presets}\n",
         encoding="utf-8",
     )
 
 
-def test_user_preset_item_display_name_single() -> None:
+def test_preset_list_item_display_name_single() -> None:
     paths = ["/tmp/user-presets/foo.milk"]
-    assert user_preset_item_display_name(paths, 0) == "foo.milk"
+    assert preset_list_item_display_name(paths, 0) == "foo.milk"
 
 
-def test_user_preset_item_display_name_duplicates() -> None:
+def test_preset_list_item_display_name_duplicates() -> None:
     paths = [
         "/tmp/user-presets/foo.milk",
         "/tmp/user-presets/foo.milk",
         "/tmp/user-presets/bar.milk",
     ]
-    assert user_preset_item_display_name(paths, 0) == "foo.milk (1)"
-    assert user_preset_item_display_name(paths, 1) == "foo.milk (2)"
-    assert user_preset_item_display_name(paths, 2) == "bar.milk"
+    assert preset_list_item_display_name(paths, 0) == "foo.milk (1)"
+    assert preset_list_item_display_name(paths, 1) == "foo.milk (2)"
+    assert preset_list_item_display_name(paths, 2) == "bar.milk"
 
 
 def test_resolve_user_preset_dest_creates_canonical_path(tmp_path: Path) -> None:
@@ -140,7 +140,7 @@ def test_cleanup_ignores_project_yaml_and_non_viz_yaml(tmp_path: Path) -> None:
         "ingest:\n  original: /tmp/a.wav\n  separated_at: t\n  demucs_model: htdemucs\n"
         "layers:\n"
         "  layer_1:\n"
-        "    preset_switching_presets:\n"
+        "    preset_switching_list:\n"
         "      - user-presets/orphan.milk\n",
         encoding="utf-8",
     )

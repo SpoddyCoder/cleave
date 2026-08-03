@@ -52,7 +52,7 @@ def _static_keys(
         state,
         font=font,
         cache=cache,
-        visible_indices=visible,
+        indices=visible,
         max_content_width_for_index=max_w,
         line_h=font.get_linesize(),
     )
@@ -84,6 +84,39 @@ def test_row_render_key_stable_across_fps_and_position() -> None:
         line_h=font.get_linesize(),
     )
     assert key_a == key_b
+
+
+def test_static_row_keys_only_includes_requested_indices() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    font = overlay._font_get()
+    cache = TuningPanelCache()
+    state = _minimal_view_state()
+    visible = tuple(state.layout.visible_indices(state))
+    assert len(visible) >= 2
+    subset = visible[:2]
+
+    def max_w(_index: int) -> int:
+        return 400
+
+    keys_all = static_row_keys(
+        state,
+        font=font,
+        cache=cache,
+        indices=visible,
+        max_content_width_for_index=max_w,
+        line_h=font.get_linesize(),
+    )
+    keys_subset = static_row_keys(
+        state,
+        font=font,
+        cache=cache,
+        indices=subset,
+        max_content_width_for_index=max_w,
+        line_h=font.get_linesize(),
+    )
+    assert len(keys_subset) < len(keys_all)
+    assert keys_subset == keys_all[: len(keys_subset)]
 
 
 def test_focus_change_changes_static_row_keys_for_affected_rows() -> None:
@@ -458,11 +491,39 @@ def test_row_cache_hits_on_full_recompose_with_warm_cache() -> None:
     assert counters.row_cache_misses > 0
 
 
-def test_expand_collapse_invalidates_row_cache() -> None:
+def test_retain_row_surfaces_keeps_only_requested_keys() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    font = overlay._font_get()
+    cache = TuningPanelCache()
+    state = _minimal_view_state()
+    line_h = font.get_linesize()
+    indices = [
+        i
+        for i in state.layout.visible_indices(state)
+        if state.layout.kind(i) != RowKind.TRANSPORT
+    ][:2]
+    assert len(indices) == 2
+    for index in indices:
+        ensure_row_surface(
+            cache,
+            state,
+            index,
+            font,
+            overlay._build_row_at_index,
+            max_content_width=300,
+            line_h=line_h,
+        )
+    assert len(cache.row_surfaces) == 2
+    keep = {next(iter(cache.row_surfaces))}
+    cache.retain_row_surfaces(keep)
+    assert set(cache.row_surfaces.keys()) == keep
+
+
+def test_expand_collapse_incrementally_evicts_row_cache() -> None:
     pygame.init()
     overlay = TuningOverlay()
     overlay.notify_input()
-    font = overlay._font_get()
     cache = overlay._panel_cache
 
     collapsed = _minimal_view_state(
@@ -499,15 +560,19 @@ def test_expand_collapse_invalidates_row_cache() -> None:
         viewport_width=1280,
         viewport_height=720,
     )
-    assert len(cache.row_surfaces) > 0
+    keys_collapsed = set(cache.row_surfaces.keys())
+    assert keys_collapsed
 
     overlay.compose_panel(
         expanded,
         viewport_width=1280,
         viewport_height=720,
     )
+    keys_expanded = set(cache.row_surfaces.keys())
     assert cache.row_cache_structure == tuple(expanded.layout.visible_indices(expanded))
-    assert len(cache.row_surfaces) > 0
+    assert keys_expanded
+    # Shared viewport rows keep content-keyed surfaces across structure change.
+    assert keys_collapsed & keys_expanded
 
 
 def test_ensure_row_surface_cache_hit_miss_counters() -> None:

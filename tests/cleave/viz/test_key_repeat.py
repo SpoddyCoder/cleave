@@ -155,7 +155,8 @@ def test_delete_key_pressed_matches_keysym_and_scancode() -> None:
 
 
 def test_add_current_preset_key_pressed() -> None:
-    assert add_current_preset_key_pressed(pygame.K_u, 0)
+    assert add_current_preset_key_pressed(pygame.K_p, 0)
+    assert not add_current_preset_key_pressed(pygame.K_u, 0)
     assert not add_current_preset_key_pressed(pygame.K_PLUS, 0)
     assert not add_current_preset_key_pressed(pygame.K_KP_PLUS, 0)
     assert not add_current_preset_key_pressed(
