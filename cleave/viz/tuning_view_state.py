@@ -71,7 +71,7 @@ from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.playback import PlaybackState, current_sec
 from cleave.viz.row_semantics import RowDescriptor, RowKind
 from cleave.viz.session import LayerRuntime, TuningSession, config_path_display
-from cleave.viz.user_presets import preset_list_item_display_name
+from cleave.viz.user_presets import preset_list_display_names
 
 if TYPE_CHECKING:
     from cleave.viz.focus_nav import FocusCursor
@@ -528,6 +528,7 @@ class TuningViewStateBuilder:
         self._get_notification = get_notification
         self._layers_by_slot = layers_by_slot
         self._auto_display_cache: dict[Path, PresetPlaylist] = {}
+        self._preset_list_label_cache: dict[tuple[str, ...], list[str]] = {}
         self._structure: _ViewStateStructure | None = None
 
     def _sync_auto_preset_paths(self) -> None:
@@ -571,9 +572,13 @@ class TuningViewStateBuilder:
         return label
 
     def _preset_list_labels(self, paths: list[str]) -> list[str]:
+        key = tuple(paths)
+        base = self._preset_list_label_cache.get(key)
+        if base is None:
+            base = preset_list_display_names(paths)
+            self._preset_list_label_cache[key] = base
         return [
-            preset_list_item_display_name(paths, i)
-            + self._curation_index.marker(Path(paths[i]).name)
+            base[i] + self._curation_index.marker(Path(paths[i]).name)
             for i in range(len(paths))
         ]
 

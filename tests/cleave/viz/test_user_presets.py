@@ -8,8 +8,9 @@ from cleave.project import PROJECT_FILENAME
 from cleave.viz.user_presets import (
     cleanup_unreferenced_user_presets,
     iter_project_viz_config_paths,
-    resolve_user_preset_dest,
+    preset_list_display_names,
     preset_list_item_display_name,
+    resolve_user_preset_dest,
     user_preset_referenced_on_disk,
 )
 
@@ -42,6 +43,28 @@ def test_preset_list_item_display_name_duplicates() -> None:
     assert preset_list_item_display_name(paths, 0) == "foo.milk (1)"
     assert preset_list_item_display_name(paths, 1) == "foo.milk (2)"
     assert preset_list_item_display_name(paths, 2) == "bar.milk"
+
+
+def test_preset_list_display_names_single() -> None:
+    paths = ["/tmp/user-presets/foo.milk"]
+    assert preset_list_display_names(paths) == ["foo.milk"]
+
+
+def test_preset_list_display_names_duplicates() -> None:
+    paths = [
+        "/tmp/user-presets/foo.milk",
+        "/tmp/user-presets/foo.milk",
+        "/tmp/user-presets/bar.milk",
+    ]
+    assert preset_list_display_names(paths) == [
+        "foo.milk (1)",
+        "foo.milk (2)",
+        "bar.milk",
+    ]
+
+
+def test_preset_list_display_names_empty() -> None:
+    assert preset_list_display_names([]) == []
 
 
 def test_resolve_user_preset_dest_creates_canonical_path(tmp_path: Path) -> None:
