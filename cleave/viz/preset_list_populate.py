@@ -163,26 +163,28 @@ def populate_from_cue_marker_roles(
     return list(layer.preset_list)
 
 
-def auto_populate_for_reshuffle(
+def repopulate_preset_lists(
     session: TuningSession,
     *,
+    mode: str,
     project_dir: Path,
     preset_root: Path,
     rng: random.Random | None = None,
 ) -> None:
     """Repopulate layers with timeline-trigger switching after a preset apply.
 
-    Uses cue-marker roles when conductor is active; otherwise directory picks.
+    ``mode`` is a staged ``TimelinePresetRepopulate`` value. ``no`` is a no-op.
     """
+    if mode == "no":
+        return
     rng = rng or random.Random()
-    use_roles = bool(session.timeline.timeline_preset_conductor)
     for slot in session.layer_z_order:
         runtime = session.layers.get(slot)
         if runtime is None or runtime.preset_switching != "on":
             continue
         if runtime.preset_switching_trigger != "timeline":
             continue
-        if use_roles:
+        if mode == "cue roles":
             populate_from_cue_marker_roles(
                 session,
                 slot,
@@ -190,10 +192,19 @@ def auto_populate_for_reshuffle(
                 preset_root=preset_root,
                 rng=rng,
             )
+        elif mode == "directory sequential":
+            populate_from_directory(
+                session,
+                slot,
+                project_dir=project_dir,
+                order="sequential",
+                rng=rng,
+            )
         else:
             populate_from_directory(
                 session,
                 slot,
                 project_dir=project_dir,
+                order="random",
                 rng=rng,
             )

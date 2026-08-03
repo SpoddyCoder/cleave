@@ -34,7 +34,7 @@ from cleave.timeline_presets.density import (
     density_bias_for,
     timeline_preset_density_display,
 )
-from cleave.timeline_presets.reshuffle import timeline_preset_reshuffle_display
+from cleave.timeline_presets.repopulate import timeline_preset_repopulate_display
 from cleave.timeline_presets.song_marker_snap import (
     timeline_preset_song_marker_snap_display,
 )
@@ -70,7 +70,7 @@ class TimelinePresetController:
         *,
         signals: Signals | None = None,
         on_notification: Callable[[str], None] | None = None,
-        on_reshuffle: Callable[[], None] | None = None,
+        on_repopulate: Callable[[], None] | None = None,
     ) -> None:
         self.session = session
         self._modal = modal_host
@@ -78,7 +78,7 @@ class TimelinePresetController:
         self._bar_times = tuple(bar_times)
         self._signals = signals
         self._on_notification = on_notification
-        self._on_reshuffle = on_reshuffle
+        self._on_repopulate = on_repopulate
 
     def prompt(self, duration_sec: float) -> None:
         if self.session.timeline.locked:
@@ -120,8 +120,8 @@ class TimelinePresetController:
                 timeline_preset_timeline_cuts_display(tl.timeline_preset_timeline_cuts),
             ),
             ModalLabeledLine(
-                "reshuffle",
-                timeline_preset_reshuffle_display(tl.timeline_preset_reshuffle),
+                "re-populate preset lists",
+                timeline_preset_repopulate_display(tl.timeline_preset_repopulate),
             ),
             ModalLabeledLine(
                 "conductor",
@@ -178,8 +178,6 @@ class TimelinePresetController:
         self._clear_timeline_state()
         tl = self.session.timeline
         tl.enabled = True
-        if tl.timeline_preset_reshuffle and self._on_reshuffle is not None:
-            self._on_reshuffle()
         slots = list(self.session.layer_z_order)
         markers = list(self.session.song_markers.times)
         rng = random.Random()
@@ -222,6 +220,11 @@ class TimelinePresetController:
         self._apply_timeline_cuts(built, markers, tl.timeline_preset_timeline_cuts)
         for slot in slots:
             tl.lanes[slot] = built[slot]
+        if (
+            tl.timeline_preset_repopulate != "no"
+            and self._on_repopulate is not None
+        ):
+            self._on_repopulate()
         if conductor_skipped:
             self._notify("No signals; conductor skipped")
         else:
