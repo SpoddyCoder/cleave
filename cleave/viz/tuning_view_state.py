@@ -48,7 +48,6 @@ from cleave.preset_playlist import (
     scan_preset_playlist,
 )
 from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
-from cleave.timeline_presets.reshuffle import DEFAULT_TIMELINE_PRESET_RESHUFFLE
 from cleave.viz.panel_notification import PanelNotificationActive
 from cleave.timeline_presets.crescendo import CrescendoTarget
 from cleave.timeline_presets.cue_snap import (
@@ -58,6 +57,10 @@ from cleave.timeline_presets.cue_snap import (
 from cleave.timeline_presets.density import (
     DEFAULT_TIMELINE_PRESET_DENSITY,
     TimelinePresetDensity,
+)
+from cleave.timeline_presets.repopulate import (
+    DEFAULT_TIMELINE_PRESET_REPOPULATE,
+    TimelinePresetRepopulate,
 )
 from cleave.timeline_presets.song_marker_snap import (
     DEFAULT_TIMELINE_PRESET_SONG_MARKER_SNAP,
@@ -241,7 +244,9 @@ class RenderTimelineBlock:
     timeline_preset_timeline_cuts: TimelinePresetTimelineCuts = (
         DEFAULT_TIMELINE_PRESET_TIMELINE_CUTS
     )
-    timeline_preset_reshuffle: bool = DEFAULT_TIMELINE_PRESET_RESHUFFLE
+    timeline_preset_repopulate: TimelinePresetRepopulate = (
+        DEFAULT_TIMELINE_PRESET_REPOPULATE
+    )
     timeline_preset_conductor: bool = DEFAULT_TIMELINE_PRESET_CONDUCTOR
     hard_cut_fades: TimelineFadeGroupBlock = field(
         default_factory=TimelineFadeGroupBlock
@@ -711,7 +716,7 @@ class TuningViewStateBuilder:
             timeline_preset_cue_snap=tl.timeline_preset_cue_snap,
             timeline_preset_song_marker_snap=tl.timeline_preset_song_marker_snap,
             timeline_preset_timeline_cuts=tl.timeline_preset_timeline_cuts,
-            timeline_preset_reshuffle=tl.timeline_preset_reshuffle,
+            timeline_preset_repopulate=tl.timeline_preset_repopulate,
             timeline_preset_conductor=tl.timeline_preset_conductor,
             hard_cut_fades=TimelineFadeGroupBlock(
                 enabled=tl.hard_cut_fades.enabled,
@@ -957,7 +962,7 @@ class TuningViewStateBuilder:
                 timeline_preset_cue_snap=tl.timeline_preset_cue_snap,
                 timeline_preset_song_marker_snap=tl.timeline_preset_song_marker_snap,
                 timeline_preset_timeline_cuts=tl.timeline_preset_timeline_cuts,
-                timeline_preset_reshuffle=tl.timeline_preset_reshuffle,
+                timeline_preset_repopulate=tl.timeline_preset_repopulate,
                 timeline_preset_conductor=tl.timeline_preset_conductor,
                 hard_cut_fades=TimelineFadeGroupBlock(
                     enabled=tl.hard_cut_fades.enabled,

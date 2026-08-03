@@ -1281,7 +1281,7 @@ def test_persist_timeline_preset_round_trip() -> None:
             timeline_preset_cue_snap="bars",
             timeline_preset_song_marker_snap=2.0,
             timeline_preset_timeline_cuts="all hard",
-            timeline_preset_reshuffle=True,
+            timeline_preset_repopulate="cue roles",
             timeline_preset_conductor=True,
         ),
     )
@@ -1301,7 +1301,7 @@ def test_persist_timeline_preset_round_trip() -> None:
         "cue_snap": "bars",
         "song_marker_snap": 2.0,
         "timeline_cuts": "all hard",
-        "reshuffle": True,
+        "repopulate": "cue roles",
         "conductor": True,
     }
     round_trip = parse_timeline_section(
@@ -1316,7 +1316,7 @@ def test_persist_timeline_preset_round_trip() -> None:
         cue_snap="bars",
         song_marker_snap=2.0,
         timeline_cuts="all hard",
-        reshuffle=True,
+        repopulate="cue roles",
         conductor=True,
     )
 
@@ -1332,7 +1332,7 @@ def test_parse_timeline_reads_preset() -> None:
                     "cue_snap": "beats",
                     "song_marker_snap": 1.0,
                     "timeline_cuts": "none",
-                    "reshuffle": True,
+                    "repopulate": "directory sequential",
                     "conductor": True,
                 }
             }
@@ -1347,7 +1347,7 @@ def test_parse_timeline_reads_preset() -> None:
         cue_snap="beats",
         song_marker_snap=1.0,
         timeline_cuts="none",
-        reshuffle=True,
+        repopulate="directory sequential",
         conductor=True,
     )
 
@@ -1364,7 +1364,7 @@ def test_parse_timeline_preset_null_crescendo() -> None:
     assert timeline.preset.cue_snap == "none"
     assert timeline.preset.song_marker_snap is None
     assert timeline.preset.timeline_cuts == "by marker"
-    assert timeline.preset.reshuffle is False
+    assert timeline.preset.repopulate == "no"
     assert timeline.preset.conductor is False
 
 
@@ -1416,10 +1416,10 @@ def test_parse_timeline_rejects_invalid_preset_timeline_cuts() -> None:
         )
 
 
-def test_parse_timeline_rejects_invalid_preset_reshuffle() -> None:
-    with pytest.raises(ValueError, match="reshuffle"):
+def test_parse_timeline_rejects_invalid_preset_repopulate() -> None:
+    with pytest.raises(ValueError, match="repopulate"):
         parse_timeline_section(
-            {"timeline": {"preset": {"reshuffle": "on"}}},
+            {"timeline": {"preset": {"repopulate": "on"}}},
             _timeline_parse_ctx(),
         )
 

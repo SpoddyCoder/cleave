@@ -39,11 +39,11 @@ from cleave.viz.tap_sync_controls import TapSyncControls, TapSyncUiSnapshot
 from cleave.viz.timeline_phase_controls import TimelinePhaseController
 from cleave.viz.timeline_preset_controls import TimelinePresetController
 from cleave.viz.preset_list_populate import (
-    auto_populate_for_reshuffle,
     needed_preset_count,
     on_segment_populate_count,
     populate_from_cue_marker_roles,
     populate_from_directory,
+    repopulate_preset_lists,
 )
 from cleave.viz.timeline_cut_controls import TimelineCutController
 from cleave.viz.timeline_snap_controls import TimelineSnapController
@@ -181,7 +181,7 @@ class TuningControls:
             bar_times,
             signals=signals,
             on_notification=self.show_notification,
-            on_reshuffle=self._reshuffle_populate_lists,
+            on_repopulate=self._repopulate_preset_lists,
         )
         self._timeline_phase = TimelinePhaseController(
             session,
@@ -1081,11 +1081,12 @@ class TuningControls:
             )
         )
 
-    def _reshuffle_populate_lists(self) -> None:
+    def _repopulate_preset_lists(self) -> None:
         if self.project_dir is None:
             return
-        auto_populate_for_reshuffle(
+        repopulate_preset_lists(
             self.session,
+            mode=self.session.timeline.timeline_preset_repopulate,
             project_dir=self.project_dir,
             preset_root=self.preset_root,
         )

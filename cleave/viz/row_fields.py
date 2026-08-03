@@ -39,9 +39,9 @@ from cleave.timeline_presets.conductor import (
     cycle_timeline_preset_conductor,
     timeline_preset_conductor_display,
 )
-from cleave.timeline_presets.reshuffle import (
-    cycle_timeline_preset_reshuffle,
-    timeline_preset_reshuffle_display,
+from cleave.timeline_presets.repopulate import (
+    cycle_timeline_preset_repopulate,
+    timeline_preset_repopulate_display,
 )
 from cleave.timeline_presets.crescendo import (
     cycle_timeline_preset_crescendo,
@@ -345,15 +345,15 @@ def _apply_timeline_preset_timeline_cuts(
     )
 
 
-def _format_timeline_preset_reshuffle(
+def _format_timeline_preset_repopulate(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return timeline_preset_reshuffle_display(
-        state.render_timeline.timeline_preset_reshuffle
+    return timeline_preset_repopulate_display(
+        state.render_timeline.timeline_preset_repopulate
     )
 
 
-def _apply_timeline_preset_reshuffle(
+def _apply_timeline_preset_repopulate(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
@@ -361,8 +361,8 @@ def _apply_timeline_preset_reshuffle(
     _shift: bool,
 ) -> None:
     tl = controls.session.timeline
-    tl.timeline_preset_reshuffle = cycle_timeline_preset_reshuffle(
-        tl.timeline_preset_reshuffle,
+    tl.timeline_preset_repopulate = cycle_timeline_preset_repopulate(
+        tl.timeline_preset_repopulate,
         forward=forward,
     )
 
@@ -2136,11 +2136,11 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         format_value=_format_timeline_preset_timeline_cuts,
         apply_horizontal=_apply_timeline_preset_timeline_cuts,
     ),
-    RowKind.TIMELINE_PRESET_RESHUFFLE: RowFieldDef(
-        panel_label="reshuffle",
+    RowKind.TIMELINE_PRESET_REPOPULATE: RowFieldDef(
+        panel_label="re-populate preset lists",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_timeline_preset_reshuffle,
-        apply_horizontal=_apply_timeline_preset_reshuffle,
+        format_value=_format_timeline_preset_repopulate,
+        apply_horizontal=_apply_timeline_preset_repopulate,
     ),
     RowKind.TIMELINE_PRESET_CONDUCTOR: RowFieldDef(
         panel_label="conductor",

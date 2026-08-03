@@ -152,7 +152,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     preset_cue_snap = RowDescriptor(RowKind.TIMELINE_PRESET_CUE_SNAP)
     preset_song_marker_snap = RowDescriptor(RowKind.TIMELINE_PRESET_SONG_MARKER_SNAP)
     preset_timeline_cuts = RowDescriptor(RowKind.TIMELINE_PRESET_TIMELINE_CUTS)
-    preset_reshuffle = RowDescriptor(RowKind.TIMELINE_PRESET_RESHUFFLE)
+    preset_repopulate = RowDescriptor(RowKind.TIMELINE_PRESET_REPOPULATE)
     preset_conductor = RowDescriptor(RowKind.TIMELINE_PRESET_CONDUCTOR)
     presets_apply = RowDescriptor(RowKind.TIMELINE_PRESETS)
     reset = RowDescriptor(RowKind.TIMELINE_RESET)
@@ -204,7 +204,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert preset_cue_snap not in view_open.layout.rows
     assert preset_song_marker_snap not in view_open.layout.rows
     assert preset_timeline_cuts not in view_open.layout.rows
-    assert preset_reshuffle not in view_open.layout.rows
+    assert preset_repopulate not in view_open.layout.rows
     assert preset_conductor not in view_open.layout.rows
     assert presets_apply not in view_open.layout.rows
     assert reset in view_open.layout.rows
@@ -334,7 +334,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert view_presets_expanded.layout.rows.index(preset_timeline_cuts) == (
         presets_header_idx + 6
     )
-    assert view_presets_expanded.layout.rows.index(preset_reshuffle) == (
+    assert view_presets_expanded.layout.rows.index(preset_repopulate) == (
         presets_header_idx + 7
     )
     assert view_presets_expanded.layout.rows.index(preset_conductor) == (
@@ -363,7 +363,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert preset_cue_snap not in view_presets_collapsed.layout.rows
     assert preset_song_marker_snap not in view_presets_collapsed.layout.rows
     assert preset_timeline_cuts not in view_presets_collapsed.layout.rows
-    assert preset_reshuffle not in view_presets_collapsed.layout.rows
+    assert preset_repopulate not in view_presets_collapsed.layout.rows
     assert preset_conductor not in view_presets_collapsed.layout.rows
     assert presets_apply not in view_presets_collapsed.layout.rows
     assert presets_header in view_presets_collapsed.layout.rows

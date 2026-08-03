@@ -1651,7 +1651,7 @@ def test_timeline_presets_enter_opens_yes_cancel_modal() -> None:
         ModalLabeledLine("cue snap", "none"),
         ModalLabeledLine("song marker snap", "none"),
         ModalLabeledLine("timeline cuts", "by marker"),
-        ModalLabeledLine("reshuffle", "off"),
+        ModalLabeledLine("re-populate preset lists", "no"),
         ModalLabeledLine("conductor", "on"),
     )
 
@@ -1710,20 +1710,25 @@ def test_timeline_preset_timeline_cuts_row_cycles() -> None:
     assert "all soft" in _row_text(view, row)
 
 
-def test_timeline_preset_reshuffle_row_cycles() -> None:
+def test_timeline_preset_repopulate_row_cycles() -> None:
     controls = _make_controls(timeline_enabled=True)
     controls.session.timeline.panel_open = True
     controls.session.timeline.timeline_presets_expanded = True
     view = controls.build_view_state(paused=False)
-    row = view.layout.find_by_kind(RowKind.TIMELINE_PRESET_RESHUFFLE)
+    row = view.layout.find_by_kind(RowKind.TIMELINE_PRESET_REPOPULATE)
     controls.focus_descriptor = _desc(view, row)
-    assert controls.session.timeline.timeline_preset_reshuffle is False
+    assert controls.session.timeline.timeline_preset_repopulate == "no"
     assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
-    assert controls.session.timeline.timeline_preset_reshuffle is True
+    assert controls.session.timeline.timeline_preset_repopulate == "cue roles"
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert (
+        controls.session.timeline.timeline_preset_repopulate
+        == "directory random"
+    )
     assert controls.handle_keydown(_keydown(pygame.K_LEFT)) is True
-    assert controls.session.timeline.timeline_preset_reshuffle is False
+    assert controls.session.timeline.timeline_preset_repopulate == "cue roles"
     view = controls.build_view_state(paused=False)
-    assert "off" in _row_text(view, row)
+    assert "cue roles" in _row_text(view, row)
 
 
 def test_timeline_presets_cuts_none_keeps_cut_none() -> None:
@@ -3059,7 +3064,7 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
         RowKind.TIMELINE_PRESET_CUE_SNAP,
         RowKind.TIMELINE_PRESET_SONG_MARKER_SNAP,
         RowKind.TIMELINE_PRESET_TIMELINE_CUTS,
-        RowKind.TIMELINE_PRESET_RESHUFFLE,
+        RowKind.TIMELINE_PRESET_REPOPULATE,
         RowKind.TIMELINE_PRESET_CONDUCTOR,
         RowKind.TIMELINE_PRESETS,
         RowKind.TIMELINE_RESET,

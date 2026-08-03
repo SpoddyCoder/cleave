@@ -9,10 +9,10 @@ from unittest.mock import patch
 from cleave.preset_playlist import PresetPlaylist
 from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.preset_list_populate import (
-    auto_populate_for_reshuffle,
     needed_preset_count,
     populate_from_cue_marker_roles,
     populate_from_directory,
+    repopulate_preset_lists,
 )
 from cleave.viz.session import LayerRuntime, TuningSession
 
@@ -22,7 +22,6 @@ def _session(
     *,
     timeline_enabled: bool = False,
     trigger: str = "timer",
-    conductor: bool = False,
     cues: tuple[SlotCue, ...] = (),
 ) -> TuningSession:
     browse = tmp / "presets" / "pack"
@@ -36,7 +35,6 @@ def _session(
     )
     session = TuningSession(layer_z_order=["layer_1"], layers={"layer_1": runtime})
     session.timeline.enabled = timeline_enabled
-    session.timeline.timeline_preset_conductor = conductor
     if cues:
         session.timeline.lanes["layer_1"] = TimelineLane(baseline=0.0, cues=cues)
     return session
@@ -230,12 +228,11 @@ def test_populate_from_cue_marker_roles(tmp_path: Path) -> None:
     assert [Path(path).name for path in out] == ["pulse.milk", "lead.milk"]
 
 
-def test_auto_populate_for_reshuffle_uses_roles_when_conductor(tmp_path: Path) -> None:
+def test_repopulate_preset_lists_cue_roles(tmp_path: Path) -> None:
     session = _session(
         tmp_path,
         trigger="timeline",
         timeline_enabled=True,
-        conductor=True,
         cues=(SlotCue(t=1.0, level=1.0, role="accent"),),
     )
     role_dir = tmp_path / "presets" / "roles" / "accent"
@@ -245,8 +242,9 @@ def test_auto_populate_for_reshuffle_uses_roles_when_conductor(tmp_path: Path) -
         "cleave.viz.preset_list_populate.copy_with_dedup",
         side_effect=lambda dest, src: dest / src.name,
     ):
-        auto_populate_for_reshuffle(
+        repopulate_preset_lists(
             session,
+            mode="cue roles",
             project_dir=tmp_path,
             preset_root=tmp_path / "presets",
             rng=random.Random(0),
@@ -254,11 +252,13 @@ def test_auto_populate_for_reshuffle_uses_roles_when_conductor(tmp_path: Path) -
     assert Path(session.layers["layer_1"].preset_list[0]).name == "accent.milk"
 
 
-def test_auto_populate_skips_layers_with_switching_off(tmp_path: Path) -> None:
+def test_repopulate_preset_lists_no_is_noop(tmp_path: Path) -> None:
     session = _session(tmp_path, trigger="timeline", timeline_enabled=True)
-    session.layers["layer_1"].preset_switching = "off"
-    auto_populate_for_reshuffle(
+    browse = session.layers["layer_1"].playlist.current_dir
+    (browse / "a.milk").write_text("MILK")
+    repopulate_preset_lists(
         session,
+        mode="no",
         project_dir=tmp_path,
         preset_root=tmp_path / "presets",
         rng=random.Random(0),
@@ -266,12 +266,28 @@ def test_auto_populate_skips_layers_with_switching_off(tmp_path: Path) -> None:
     assert session.layers["layer_1"].preset_list == []
 
 
-def test_auto_populate_skips_non_timeline_trigger(tmp_path: Path) -> None:
+def test_repopulate_skips_layers_with_switching_off(tmp_path: Path) -> None:
+    session = _session(tmp_path, trigger="timeline", timeline_enabled=True)
+    session.layers["layer_1"].preset_switching = "off"
+    browse = session.layers["layer_1"].playlist.current_dir
+    (browse / "a.milk").write_text("MILK")
+    repopulate_preset_lists(
+        session,
+        mode="directory random",
+        project_dir=tmp_path,
+        preset_root=tmp_path / "presets",
+        rng=random.Random(0),
+    )
+    assert session.layers["layer_1"].preset_list == []
+
+
+def test_repopulate_skips_non_timeline_trigger(tmp_path: Path) -> None:
     session = _session(tmp_path, trigger="timer", timeline_enabled=True)
     browse = session.layers["layer_1"].playlist.current_dir
     (browse / "a.milk").write_text("MILK")
-    auto_populate_for_reshuffle(
+    repopulate_preset_lists(
         session,
+        mode="directory random",
         project_dir=tmp_path,
         preset_root=tmp_path / "presets",
         rng=random.Random(0),

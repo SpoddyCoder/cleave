@@ -21,7 +21,6 @@ from cleave.timeline_presets.characters import (
     TIMELINE_PRESET_KIND_OPTIONS,
 )
 from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
-from cleave.timeline_presets.reshuffle import DEFAULT_TIMELINE_PRESET_RESHUFFLE
 from cleave.timeline_presets.crescendo import CrescendoTarget
 from cleave.timeline_presets.cue_snap import (
     DEFAULT_TIMELINE_PRESET_CUE_SNAP,
@@ -32,6 +31,11 @@ from cleave.timeline_presets.density import (
     DEFAULT_TIMELINE_PRESET_DENSITY,
     TIMELINE_PRESET_DENSITY_OPTIONS,
     TimelinePresetDensity,
+)
+from cleave.timeline_presets.repopulate import (
+    DEFAULT_TIMELINE_PRESET_REPOPULATE,
+    TIMELINE_PRESET_REPOPULATE_OPTIONS,
+    TimelinePresetRepopulate,
 )
 from cleave.timeline_presets.song_marker_snap import (
     DEFAULT_TIMELINE_PRESET_SONG_MARKER_SNAP,
@@ -512,10 +516,14 @@ def parse_timeline_preset_timeline_cuts(
     return value  # type: ignore[return-value]
 
 
-def parse_timeline_preset_reshuffle(raw: Any, label: str) -> bool:
-    if not isinstance(raw, bool):
-        raise ValueError(f"{label} must be true or false")
-    return raw
+def parse_timeline_preset_repopulate(
+    raw: Any, label: str
+) -> TimelinePresetRepopulate:
+    value = str(raw)
+    if value not in TIMELINE_PRESET_REPOPULATE_OPTIONS:
+        allowed = ", ".join(TIMELINE_PRESET_REPOPULATE_OPTIONS)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return value  # type: ignore[return-value]
 
 
 def parse_timeline_preset_conductor(raw: Any, label: str) -> bool:
@@ -2349,9 +2357,9 @@ def _parse_timeline_preset(raw: Any) -> Any:
             ),
             "timeline.preset.timeline_cuts",
         ),
-        reshuffle=parse_timeline_preset_reshuffle(
-            preset_map.get("reshuffle", DEFAULT_TIMELINE_PRESET_RESHUFFLE),
-            "timeline.preset.reshuffle",
+        repopulate=parse_timeline_preset_repopulate(
+            preset_map.get("repopulate", DEFAULT_TIMELINE_PRESET_REPOPULATE),
+            "timeline.preset.repopulate",
         ),
         conductor=parse_timeline_preset_conductor(
             preset_map.get("conductor", DEFAULT_TIMELINE_PRESET_CONDUCTOR),
@@ -2540,7 +2548,7 @@ def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
             "cue_snap": runtime.timeline_preset_cue_snap,
             "song_marker_snap": runtime.timeline_preset_song_marker_snap,
             "timeline_cuts": runtime.timeline_preset_timeline_cuts,
-            "reshuffle": runtime.timeline_preset_reshuffle,
+            "repopulate": runtime.timeline_preset_repopulate,
             "conductor": runtime.timeline_preset_conductor,
         },
         "limiter": _persist_timeline_limiter(runtime.limiter),
