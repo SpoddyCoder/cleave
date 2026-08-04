@@ -380,16 +380,17 @@ TIMELINE_FADE_DURATION_STEP = 0.1
 # Visual limiter (timeline.limiter); module defaults match these.
 DEFAULT_VISUAL_LIMITER_ENABLED = True
 DEFAULT_VISUAL_LIMITER_THRESHOLD = 0.65
+DEFAULT_VISUAL_LIMITER_RATIO = 3.0
 DEFAULT_VISUAL_LIMITER_RELEASE = 0.45
-VISUAL_LIMITER_THRESHOLD_MIN = 0.40
-VISUAL_LIMITER_THRESHOLD_MAX = 0.90
+VISUAL_LIMITER_THRESHOLD_MIN = 0.30
+VISUAL_LIMITER_THRESHOLD_MAX = 0.95
 VISUAL_LIMITER_THRESHOLD_STEP = 0.01
-VISUAL_LIMITER_THRESHOLD_GAP = 0.17
-VISUAL_LIMITER_RELEASE_MIN = 0.15
-VISUAL_LIMITER_RELEASE_MAX = 1.5
+VISUAL_LIMITER_RATIO_MIN = 1.5
+VISUAL_LIMITER_RATIO_MAX = 8.0
+VISUAL_LIMITER_RATIO_STEP = 0.5
+VISUAL_LIMITER_RELEASE_MIN = 0.2
+VISUAL_LIMITER_RELEASE_MAX = 3.0
 VISUAL_LIMITER_RELEASE_STEP = 0.1
-# RELEASE_SEC / RELEASE_RAMP_SEC at the tuned defaults (0.75 / 0.45).
-VISUAL_LIMITER_RELEASE_HOLD_RATIO = 0.75 / 0.45
 
 
 def clamp_visual_limiter_threshold(value: float) -> float:
@@ -399,19 +400,18 @@ def clamp_visual_limiter_threshold(value: float) -> float:
     )
 
 
+def clamp_visual_limiter_ratio(value: float) -> float:
+    return max(
+        VISUAL_LIMITER_RATIO_MIN,
+        min(VISUAL_LIMITER_RATIO_MAX, float(value)),
+    )
+
+
 def clamp_visual_limiter_release(value: float) -> float:
     return max(
         VISUAL_LIMITER_RELEASE_MIN,
         min(VISUAL_LIMITER_RELEASE_MAX, float(value)),
     )
-
-
-def visual_limiter_threshold_off(threshold_on: float) -> float:
-    return max(0.0, float(threshold_on) - VISUAL_LIMITER_THRESHOLD_GAP)
-
-
-def visual_limiter_release_hold_sec(release_ramp_sec: float) -> float:
-    return float(release_ramp_sec) * VISUAL_LIMITER_RELEASE_HOLD_RATIO
 
 TimelinePlacementSnap = Literal["off", "beat", "bar"]
 TIMELINE_PLACEMENT_SNAP_OPTIONS: tuple[TimelinePlacementSnap, ...] = (
@@ -2384,6 +2384,12 @@ def _parse_timeline_limiter(raw: Any) -> Any:
                 "timeline.limiter.threshold",
             )
         ),
+        ratio=clamp_visual_limiter_ratio(
+            require_non_negative_number(
+                limiter_map.get("ratio", DEFAULT_VISUAL_LIMITER_RATIO),
+                "timeline.limiter.ratio",
+            )
+        ),
         release=clamp_visual_limiter_release(
             require_non_negative_number(
                 limiter_map.get("release", DEFAULT_VISUAL_LIMITER_RELEASE),
@@ -2527,6 +2533,7 @@ def _persist_timeline_limiter(limiter: Any) -> dict[str, Any]:
     return {
         "enabled": limiter.enabled,
         "threshold": limiter.threshold,
+        "ratio": limiter.ratio,
         "release": limiter.release,
     }
 

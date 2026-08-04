@@ -33,6 +33,7 @@ from cleave.config_schema import (
     DEFAULT_TIMELINE_PLACEMENT_SNAP,
     DEFAULT_VISUAL_LIMITER_ENABLED,
     DEFAULT_VISUAL_LIMITER_THRESHOLD,
+    DEFAULT_VISUAL_LIMITER_RATIO,
     DEFAULT_VISUAL_LIMITER_RELEASE,
     HighlightRolloffApplyMode,
     HighlightRolloffCurve,
@@ -245,6 +246,7 @@ def default_timeline_fade_group_runtime() -> TimelineFadeGroupRuntime:
 class VisualLimiterRuntime:
     enabled: bool = DEFAULT_VISUAL_LIMITER_ENABLED
     threshold: float = DEFAULT_VISUAL_LIMITER_THRESHOLD
+    ratio: float = DEFAULT_VISUAL_LIMITER_RATIO
     release: float = DEFAULT_VISUAL_LIMITER_RELEASE
 
 
@@ -496,6 +498,7 @@ def _limiter_runtime_from_cfg(
     return VisualLimiterRuntime(
         enabled=limiter.enabled,
         threshold=limiter.threshold,
+        ratio=limiter.ratio,
         release=limiter.release,
     )
 

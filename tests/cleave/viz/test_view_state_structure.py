@@ -177,6 +177,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     apply_hard_cuts = RowDescriptor(RowKind.TIMELINE_APPLY_HARD_CUTS)
     limiter_header = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_HEADER)
     limiter_threshold = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD)
+    limiter_ratio = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_RATIO)
     limiter_release = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_RELEASE)
     markers_header = RowDescriptor(RowKind.SONG_MARKERS_HEADER)
     assert presets_header not in view_closed.layout.rows
@@ -220,6 +221,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert hard_cut_fades not in view_open.layout.rows
     assert limiter_header in view_open.layout.rows
     assert limiter_threshold in view_open.layout.rows
+    assert limiter_ratio in view_open.layout.rows
     assert limiter_release in view_open.layout.rows
     assert markers_header in view_open.layout.rows
     markers_idx = view_open.layout.rows.index(markers_header)
@@ -235,8 +237,9 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert presets_header_idx == cuts_idx + 1
     assert limiter_header_idx == presets_header_idx + 1
     assert view_open.layout.rows.index(limiter_threshold) == limiter_header_idx + 1
-    assert view_open.layout.rows.index(limiter_release) == limiter_header_idx + 2
-    assert reset_idx == limiter_header_idx + 3
+    assert view_open.layout.rows.index(limiter_ratio) == limiter_header_idx + 2
+    assert view_open.layout.rows.index(limiter_release) == limiter_header_idx + 3
+    assert reset_idx == limiter_header_idx + 4
 
     session.song_markers.expanded = True
     view_markers_expanded = builder.build(paused=False)
@@ -267,8 +270,9 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert view_beat_expanded.layout.rows.index(presets_header) == cuts_idx + 1
     assert view_beat_expanded.layout.rows.index(limiter_header) == cuts_idx + 2
     assert view_beat_expanded.layout.rows.index(limiter_threshold) == cuts_idx + 3
-    assert view_beat_expanded.layout.rows.index(limiter_release) == cuts_idx + 4
-    assert view_beat_expanded.layout.rows.index(reset) == cuts_idx + 5
+    assert view_beat_expanded.layout.rows.index(limiter_ratio) == cuts_idx + 4
+    assert view_beat_expanded.layout.rows.index(limiter_release) == cuts_idx + 5
+    assert view_beat_expanded.layout.rows.index(reset) == cuts_idx + 6
 
     session.timeline.snap_cues_expanded = True
     view_snap_expanded = builder.build(paused=False)
@@ -349,10 +353,13 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert view_presets_expanded.layout.rows.index(limiter_threshold) == (
         presets_header_idx + 11
     )
-    assert view_presets_expanded.layout.rows.index(limiter_release) == (
+    assert view_presets_expanded.layout.rows.index(limiter_ratio) == (
         presets_header_idx + 12
     )
-    assert view_presets_expanded.layout.rows.index(reset) == presets_header_idx + 13
+    assert view_presets_expanded.layout.rows.index(limiter_release) == (
+        presets_header_idx + 13
+    )
+    assert view_presets_expanded.layout.rows.index(reset) == presets_header_idx + 14
 
     session.timeline.timeline_presets_expanded = False
     view_presets_collapsed = builder.build(paused=False)

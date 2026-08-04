@@ -1,24 +1,24 @@
-"""Closed-loop visual limiter: duck lowest-priority hot layers when busy.
+"""Feed-forward visual limiter: proportional compressor on stacked layer opacity.
 
 When enabled and timeline levels apply, measures post-composite busyness
-(mean luma + frame delta) after the HDR display shoulder, decides ducks for
-the next frame, and multiplies ``StemLayer.limiter_gain`` into opacity.
-Persisted knobs live under ``timeline.limiter``; attack / duck / delta stay
-fixed module constants.
+(mean luma + frame delta) after the HDR display shoulder, runs a gain-
+compensated envelope follower with ratio-based gain reduction, and multiplies
+``StemLayer.limiter_gain`` into opacity. Persisted knobs live under
+``timeline.limiter``; attack and delta weight stay fixed module constants.
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import numpy as np
 
 from cleave.config_schema import (
+    DEFAULT_VISUAL_LIMITER_RATIO,
     DEFAULT_VISUAL_LIMITER_RELEASE,
     DEFAULT_VISUAL_LIMITER_THRESHOLD,
-    visual_limiter_release_hold_sec,
-    visual_limiter_threshold_off,
 )
 from cleave.cue_roles import CueRole
 from cleave.timeline import LEVEL_EPS, empty_lane, lane_role_at
@@ -33,19 +33,17 @@ if TYPE_CHECKING:
     from cleave.viz.session import TuningSession, VisualLimiterRuntime
 
 # Busyness = mean_luma + DELTA_WEIGHT * mean_abs_delta (both in [0, 1]).
-# ON / OFF / release defaults match schema; runtime values come from session.
-THRESHOLD_ON = DEFAULT_VISUAL_LIMITER_THRESHOLD
-THRESHOLD_OFF = visual_limiter_threshold_off(THRESHOLD_ON)
+DEFAULT_THRESHOLD = DEFAULT_VISUAL_LIMITER_THRESHOLD
+DEFAULT_RATIO = DEFAULT_VISUAL_LIMITER_RATIO
+DEFAULT_RELEASE_TC = DEFAULT_VISUAL_LIMITER_RELEASE
 DELTA_WEIGHT = 0.85
-DUCK_GAIN = 0.50
-RELEASE_RAMP_SEC = DEFAULT_VISUAL_LIMITER_RELEASE
-RELEASE_SEC = visual_limiter_release_hold_sec(RELEASE_RAMP_SEC)
-ATTACK_SEC = 0.15
+ATTACK_TC = 0.08
+GAIN_FLOOR = 0.10
 SEEK_JUMP_SEC = 0.25
 GRID_WIDTH = 32
 GRID_HEIGHT = 18
 
-# Lower rank is ducked first: bed < accent < pulse < lead.
+# Lower rank absorbs more reduction: bed < accent < pulse < lead.
 _ROLE_RANK: dict[CueRole, int] = {
     "bed": 0,
     "accent": 1,
@@ -53,23 +51,21 @@ _ROLE_RANK: dict[CueRole, int] = {
     "lead": 3,
 }
 _DEFAULT_ROLE_RANK = _ROLE_RANK["pulse"]
+_PRIORITY_WEIGHT_BY_RANK: tuple[float, ...] = (1.0, 0.7, 0.4, 0.15)
 
 
 @dataclass(frozen=True)
 class VisualLimiterParams:
-    threshold_on: float = THRESHOLD_ON
-    threshold_off: float = THRESHOLD_OFF
-    release_ramp_sec: float = RELEASE_RAMP_SEC
-    release_sec: float = RELEASE_SEC
+    threshold: float = DEFAULT_THRESHOLD
+    ratio: float = DEFAULT_RATIO
+    release_tc: float = DEFAULT_RELEASE_TC
 
     @classmethod
     def from_runtime(cls, limiter: VisualLimiterRuntime) -> VisualLimiterParams:
-        ramp = float(limiter.release)
         return cls(
-            threshold_on=float(limiter.threshold),
-            threshold_off=visual_limiter_threshold_off(limiter.threshold),
-            release_ramp_sec=ramp,
-            release_sec=visual_limiter_release_hold_sec(ramp),
+            threshold=float(limiter.threshold),
+            ratio=float(limiter.ratio),
+            release_tc=float(limiter.release),
         )
 
 
@@ -85,14 +81,14 @@ class HotLayerRef:
 class VisualLimiterState:
     prev_luma: np.ndarray | None = None
     gains: dict[str, float] = field(default_factory=dict)
-    under_off_since: float | None = None
+    envelope: float = 0.0
     last_t_sec: float | None = None
     controller_t_sec: float | None = None
 
     def reset(self) -> None:
         self.prev_luma = None
         self.gains.clear()
-        self.under_off_since = None
+        self.envelope = 0.0
         self.last_t_sec = None
         self.controller_t_sec = None
 
@@ -130,27 +126,60 @@ def role_rank(role: CueRole | None) -> int:
     return _ROLE_RANK.get(role, _DEFAULT_ROLE_RANK)
 
 
+def priority_weight(role_rank_value: int) -> float:
+    if 0 <= role_rank_value < len(_PRIORITY_WEIGHT_BY_RANK):
+        return _PRIORITY_WEIGHT_BY_RANK[role_rank_value]
+    return _PRIORITY_WEIGHT_BY_RANK[_DEFAULT_ROLE_RANK]
+
+
 def busyness(mean_luma: float, mean_abs_delta: float) -> float:
     return float(mean_luma) + DELTA_WEIGHT * float(mean_abs_delta)
 
 
-def pick_victim(
-    hot: list[HotLayerRef],
+def compensated_busyness(
+    raw_busyness: float,
     gains: dict[str, float],
-) -> str | None:
-    """Lowest-priority hot layer still above the duck floor."""
-    candidates = [
-        layer
-        for layer in hot
-        if gains.get(layer.slot, 1.0) > DUCK_GAIN + LEVEL_EPS
-    ]
-    if not candidates:
-        return None
-    chosen = min(
-        candidates,
-        key=lambda layer: (layer.role_rank, layer.timeline_level, layer.z_index),
-    )
-    return chosen.slot
+) -> float:
+    if not gains:
+        return raw_busyness
+    avg_gain = sum(gains.values()) / len(gains)
+    return raw_busyness / max(avg_gain, GAIN_FLOOR)
+
+
+def target_bus_gain(envelope: float, *, threshold: float, ratio: float) -> float:
+    if envelope <= threshold + LEVEL_EPS:
+        return 1.0
+    over_db = 20.0 * math.log10(envelope / threshold)
+    reduce_db = over_db * (1.0 - 1.0 / ratio)
+    gain = 10.0 ** (-reduce_db / 20.0)
+    return max(gain, GAIN_FLOOR)
+
+
+def layer_gain_from_target(target_gain: float, weight: float) -> float:
+    return 1.0 - weight * (1.0 - target_gain)
+
+
+def distribute_gain(
+    state: VisualLimiterState,
+    hot: list[HotLayerRef],
+    target_gain: float,
+) -> None:
+    hot_slots = {layer.slot for layer in hot}
+    for slot in list(state.gains):
+        if slot not in hot_slots:
+            del state.gains[slot]
+
+    if target_gain >= 1.0 - LEVEL_EPS:
+        state.gains.clear()
+        return
+
+    for layer in hot:
+        weight = priority_weight(layer.role_rank)
+        gain = layer_gain_from_target(target_gain, weight)
+        if gain >= 1.0 - LEVEL_EPS:
+            state.gains.pop(layer.slot, None)
+        else:
+            state.gains[layer.slot] = gain
 
 
 def collect_hot_layers(
@@ -198,33 +227,10 @@ def _playhead_dt(state: VisualLimiterState, t_sec: float) -> float:
     return max(0.0, t_sec - prev)
 
 
-def _ramp_gain_toward(current: float, target: float, dt: float, duration_sec: float) -> float:
-    """Move ``current`` toward ``target`` over ``duration_sec`` of playhead time."""
-    if duration_sec <= LEVEL_EPS or dt <= LEVEL_EPS:
-        return current
-    span = abs(1.0 - DUCK_GAIN)
-    if span <= LEVEL_EPS:
-        return target
-    step = span * (dt / duration_sec)
-    if current > target:
-        return max(target, current - step)
-    return min(target, current + step)
-
-
-def _ramp_release(
-    state: VisualLimiterState, dt: float, *, release_ramp_sec: float
-) -> None:
-    finished: list[str] = []
-    for slot, gain in state.gains.items():
-        new_gain = _ramp_gain_toward(gain, 1.0, dt, release_ramp_sec)
-        if new_gain >= 1.0 - LEVEL_EPS:
-            finished.append(slot)
-        else:
-            state.gains[slot] = new_gain
-    for slot in finished:
-        del state.gains[slot]
-    if not state.gains:
-        state.under_off_since = None
+def _envelope_coeff(dt: float, time_constant: float) -> float:
+    if dt <= LEVEL_EPS or time_constant <= LEVEL_EPS:
+        return 0.0
+    return 1.0 - math.exp(-dt / time_constant)
 
 
 def update_limiter_state(
@@ -239,25 +245,21 @@ def update_limiter_state(
     """Pure controller step from measured busyness and hot-layer refs."""
     knobs = params if params is not None else VisualLimiterParams()
     dt = _playhead_dt(state, t_sec)
-    score = busyness(mean_luma, mean_abs_delta)
-    if score > knobs.threshold_on:
-        state.under_off_since = None
-        victim = pick_victim(hot, state.gains)
-        if victim is not None:
-            current = state.gains.get(victim, 1.0)
-            new_gain = _ramp_gain_toward(current, DUCK_GAIN, dt, ATTACK_SEC)
-            if new_gain < 1.0 - LEVEL_EPS:
-                state.gains[victim] = new_gain
-        return
+    raw = busyness(mean_luma, mean_abs_delta)
+    compensated = compensated_busyness(raw, state.gains)
 
-    if score < knobs.threshold_off:
-        if state.under_off_since is None:
-            state.under_off_since = t_sec
-        elif t_sec - state.under_off_since >= knobs.release_sec:
-            _ramp_release(state, dt, release_ramp_sec=knobs.release_ramp_sec)
-        return
+    if compensated > state.envelope:
+        coeff = _envelope_coeff(dt, ATTACK_TC)
+    else:
+        coeff = _envelope_coeff(dt, knobs.release_tc)
+    state.envelope += coeff * (compensated - state.envelope)
 
-    state.under_off_since = None
+    target_gain = target_bus_gain(
+        state.envelope,
+        threshold=knobs.threshold,
+        ratio=knobs.ratio,
+    )
+    distribute_gain(state, hot, target_gain)
 
 
 def read_luma_grid(

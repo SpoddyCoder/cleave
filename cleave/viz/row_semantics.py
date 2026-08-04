@@ -112,6 +112,7 @@ class RowKind(Enum):
     TIMELINE_PRESETS = auto()
     TIMELINE_VISUAL_LIMITER_HEADER = auto()
     TIMELINE_VISUAL_LIMITER_THRESHOLD = auto()
+    TIMELINE_VISUAL_LIMITER_RATIO = auto()
     TIMELINE_VISUAL_LIMITER_RELEASE = auto()
     TIMELINE_RESET = auto()
     TIMELINE_BEAT_BAR_GRID_HEADER = auto()
@@ -1036,7 +1037,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_entries=(("Left/Right", "disable / enable"),),
         help_description=(
             "Duck busy stacked layers using post-composite busyness.",
-            "When enabled, threshold and release rows appear below.",
+            "When enabled, threshold, ratio, and release rows appear below.",
         ),
     ),
     RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD: RowBehavior(
@@ -1050,8 +1051,22 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             ("Right", "increase threshold"),
         ),
         help_description=(
-            "Busyness level that starts ducking hot layers.",
-            "Off-threshold stays a fixed gap below this value.",
+            "Busyness level above which compression engages.",
+        ),
+    ),
+    RowKind.TIMELINE_VISUAL_LIMITER_RATIO: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        repeatable=True,
+        blocked_by_section_lock=True,
+        help_title="Visual limiter ratio",
+        help_entries=(
+            ("Left", "decrease ratio"),
+            ("Right", "increase ratio"),
+        ),
+        help_description=(
+            "Compression aggressiveness above the threshold.",
+            "Higher ratios duck hot layers more.",
         ),
     ),
     RowKind.TIMELINE_VISUAL_LIMITER_RELEASE: RowBehavior(
@@ -1061,12 +1076,12 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         blocked_by_section_lock=True,
         help_title="Visual limiter release",
         help_entries=(
-            ("Left", "decrease release ramp"),
-            ("Right", "increase release ramp"),
+            ("Left", "decrease release"),
+            ("Right", "increase release"),
         ),
         help_description=(
-            "Playhead seconds to ramp ducked layers back to full opacity.",
-            "Release hold before the ramp scales with this value.",
+            "Envelope release time constant in seconds.",
+            "Controls how quickly ducking eases off.",
         ),
     ),
     RowKind.TIMELINE_RESET: RowBehavior(

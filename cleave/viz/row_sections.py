@@ -907,6 +907,7 @@ TIMELINE_VISUAL_LIMITER_ACTIVE = ConditionalRowsDef(
     predicate=_visual_limiter_enabled,
     children=(
         SectionNode(leaf_kind=RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD),
+        SectionNode(leaf_kind=RowKind.TIMELINE_VISUAL_LIMITER_RATIO),
         SectionNode(leaf_kind=RowKind.TIMELINE_VISUAL_LIMITER_RELEASE),
     ),
 )
@@ -1074,6 +1075,7 @@ RENDER_TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_PRESETS,
         RowKind.TIMELINE_VISUAL_LIMITER_HEADER,
         RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD,
+        RowKind.TIMELINE_VISUAL_LIMITER_RATIO,
         RowKind.TIMELINE_VISUAL_LIMITER_RELEASE,
         RowKind.TIMELINE_RESET,
         RowKind.TIMELINE_BEAT_BAR_GRID_HEADER,
@@ -1155,6 +1157,7 @@ def _build_row_tree_indent_depth() -> dict[RowKind, int]:
     depths[RowKind.TIMELINE_SOFT_CUT_FADE_OUT] = 3
     depths[RowKind.TIMELINE_SOFT_CUT_CROSSFADE] = 3
     depths[RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD] = 2
+    depths[RowKind.TIMELINE_VISUAL_LIMITER_RATIO] = 2
     depths[RowKind.TIMELINE_VISUAL_LIMITER_RELEASE] = 2
     return depths
 

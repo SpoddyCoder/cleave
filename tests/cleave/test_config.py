@@ -1238,6 +1238,7 @@ def test_persist_timeline_limiter_round_trip() -> None:
             limiter=VisualLimiterRuntime(
                 enabled=False,
                 threshold=0.72,
+                ratio=4.0,
                 release=0.6,
             ),
         ),
@@ -1254,6 +1255,7 @@ def test_persist_timeline_limiter_round_trip() -> None:
     assert payload["limiter"] == {
         "enabled": False,
         "threshold": 0.72,
+        "ratio": 4.0,
         "release": 0.6,
     }
     round_trip = parse_timeline_section(
@@ -1264,6 +1266,7 @@ def test_persist_timeline_limiter_round_trip() -> None:
     assert round_trip.limiter == TimelineLimiterConfig(
         enabled=False,
         threshold=0.72,
+        ratio=4.0,
         release=0.6,
     )
 

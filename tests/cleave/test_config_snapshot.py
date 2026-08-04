@@ -1232,6 +1232,7 @@ def test_write_session_snapshot_persists_timeline_disabled_without_cues(
         "limiter": {
             "enabled": True,
             "threshold": 0.65,
+            "ratio": 3.0,
             "release": 0.45,
         },
     }
