@@ -15,9 +15,11 @@ from typing import TYPE_CHECKING
 
 from cleave.config_schema import (
     TIMELINE_FADE_DURATION_STEP,
+    VISUAL_LIMITER_RATIO_STEP,
     VISUAL_LIMITER_RELEASE_STEP,
     VISUAL_LIMITER_THRESHOLD_STEP,
     clamp_timeline_fade_duration,
+    clamp_visual_limiter_ratio,
     clamp_visual_limiter_release,
     clamp_visual_limiter_threshold,
     cycle_timeline_placement_snap,
@@ -429,6 +431,25 @@ def _apply_visual_limiter_threshold(
     lim.threshold = clamp_visual_limiter_threshold(
         round(lim.threshold + delta, 2)
     )
+
+
+def _format_visual_limiter_ratio(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return f"{state.render_timeline.limiter.ratio:.1f}:1"
+
+
+def _apply_visual_limiter_ratio(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    del _ctrl, _shift
+    lim = controls.session.timeline.limiter
+    delta = VISUAL_LIMITER_RATIO_STEP if forward else -VISUAL_LIMITER_RATIO_STEP
+    lim.ratio = clamp_visual_limiter_ratio(round(lim.ratio + delta, 1))
 
 
 def _format_visual_limiter_release(
@@ -2163,6 +2184,12 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_visual_limiter_threshold,
         apply_horizontal=_apply_visual_limiter_threshold,
+    ),
+    RowKind.TIMELINE_VISUAL_LIMITER_RATIO: RowFieldDef(
+        panel_label="ratio",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_visual_limiter_ratio,
+        apply_horizontal=_apply_visual_limiter_ratio,
     ),
     RowKind.TIMELINE_VISUAL_LIMITER_RELEASE: RowFieldDef(
         panel_label="release",

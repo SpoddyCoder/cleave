@@ -2688,6 +2688,9 @@ def test_render_timeline_down_enters_submenu() -> None:
     limiter_threshold_row = view.layout.find_by_kind(
         RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD
     )
+    limiter_ratio_row = view.layout.find_by_kind(
+        RowKind.TIMELINE_VISUAL_LIMITER_RATIO
+    )
     limiter_release_row = view.layout.find_by_kind(
         RowKind.TIMELINE_VISUAL_LIMITER_RELEASE
     )
@@ -2748,6 +2751,10 @@ def test_render_timeline_down_enters_submenu() -> None:
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_descriptor == _desc(view, limiter_ratio_row)
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_descriptor == _desc(view, limiter_release_row)
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
@@ -2795,7 +2802,7 @@ def test_render_timeline_down_enters_submenu_and_routes_keys() -> None:
     controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.focus_row = 2
 
-    for _ in range(13):
+    for _ in range(14):
         controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.session.timeline.focus_row == 0

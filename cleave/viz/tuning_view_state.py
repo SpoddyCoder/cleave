@@ -35,6 +35,7 @@ from cleave.config_schema import (
     DEFAULT_UI_WIDTH_MODE,
     DEFAULT_VISUAL_LIMITER_ENABLED,
     DEFAULT_VISUAL_LIMITER_THRESHOLD,
+    DEFAULT_VISUAL_LIMITER_RATIO,
     DEFAULT_VISUAL_LIMITER_RELEASE,
     default_render_overlay_card_runtime_values,
     default_render_overlays_runtime_values,
@@ -220,6 +221,7 @@ class TimelineFadeGroupBlock:
 class VisualLimiterBlock:
     enabled: bool = DEFAULT_VISUAL_LIMITER_ENABLED
     threshold: float = DEFAULT_VISUAL_LIMITER_THRESHOLD
+    ratio: float = DEFAULT_VISUAL_LIMITER_RATIO
     release: float = DEFAULT_VISUAL_LIMITER_RELEASE
 
 
@@ -733,6 +735,7 @@ class TuningViewStateBuilder:
             limiter=VisualLimiterBlock(
                 enabled=tl.limiter.enabled,
                 threshold=tl.limiter.threshold,
+                ratio=tl.limiter.ratio,
                 release=tl.limiter.release,
             ),
             song_markers_expanded=self.session.song_markers.expanded,
@@ -979,6 +982,7 @@ class TuningViewStateBuilder:
                 limiter=VisualLimiterBlock(
                     enabled=tl.limiter.enabled,
                     threshold=tl.limiter.threshold,
+                    ratio=tl.limiter.ratio,
                     release=tl.limiter.release,
                 ),
                 locked=tl.locked,
