@@ -3851,6 +3851,44 @@ def test_move_mode_colors_preset_list_item() -> None:
     assert _row_bg_color(view, sibling_row) != MOVE_MODE
 
 
+def test_active_preset_list_item_uses_highlight_color() -> None:
+    controls = _make_controls(("layer_1",))
+    layer = controls.session.layers["layer_1"]
+    layer.preset_switching = "on"
+    a = Path("/tmp/presets/list-a.milk").resolve()
+    b = Path("/tmp/presets/list-b.milk").resolve()
+    layer.preset_list = [str(a), str(b)]
+    layer.preset_list_expanded = True
+    layer.auto_preset_path = b
+
+    controls.focus_descriptor = RowDescriptor(RowKind.TRANSPORT)
+    view = controls.build_view_state(paused=False)
+    assert view.tracks["layer_1"].active_preset_list_index == 1
+    active_row = view.layout.find_descriptor(
+        RowDescriptor(
+            RowKind.TRACK_PRESET_LIST_ITEM,
+            slot="layer_1",
+            preset_index=1,
+        )
+    )
+    idle_row = view.layout.find_descriptor(
+        RowDescriptor(
+            RowKind.TRACK_PRESET_LIST_ITEM,
+            slot="layer_1",
+            preset_index=0,
+        )
+    )
+    assert _row_value_color(view, active_row) == HIGHLIGHT
+    assert _row_value_color(view, idle_row) == VALUE
+    assert _row_bg_color(view, active_row) is None
+
+    layer.auto_preset_path = a
+    view = controls.build_view_state(paused=False)
+    assert view.tracks["layer_1"].active_preset_list_index == 0
+    assert _row_value_color(view, active_row) == VALUE
+    assert _row_value_color(view, idle_row) == HIGHLIGHT
+
+
 def test_row_value_color_dim_for_focused_empty_preset() -> None:
     state = TuningViewState(
         layer_z_order=("layer_1",),

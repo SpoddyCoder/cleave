@@ -148,6 +148,99 @@ def test_focus_change_changes_static_row_keys_for_affected_rows() -> None:
     assert track_key_when_track_focused != track_key_when_transport_focused
 
 
+def test_active_preset_list_index_changes_row_render_color_state() -> None:
+    """Active-list highlight is carried by color_state so only affected rows miss."""
+    pygame.init()
+    overlay = TuningOverlay()
+    font = overlay._font_get()
+    cache = TuningPanelCache()
+    tracks = {
+        "layer_1": TrackBlock(
+            stem="drums",
+            preset_dir_label="dir",
+            preset_label="preset.milk",
+            blend_mode="black-key",
+            opacity_pct=50,
+            beat_sensitivity=1.0,
+            effects={},
+            expanded=True,
+            preset_switching="on",
+            preset_list=["/tmp/a.milk", "/tmp/b.milk"],
+            preset_list_labels=["a.milk", "b.milk"],
+            preset_list_expanded=True,
+            active_preset_list_index=0,
+        )
+    }
+    state = _minimal_view_state(
+        layer_z_order=("layer_1",),
+        tracks=tracks,
+        focus_cursor=MainFocus(RowDescriptor(RowKind.TRANSPORT)),
+    )
+    active_index = state.layout.find_descriptor(
+        RowDescriptor(
+            RowKind.TRACK_PRESET_LIST_ITEM,
+            slot="layer_1",
+            preset_index=0,
+        )
+    )
+    idle_index = state.layout.find_descriptor(
+        RowDescriptor(
+            RowKind.TRACK_PRESET_LIST_ITEM,
+            slot="layer_1",
+            preset_index=1,
+        )
+    )
+    line_h = font.get_linesize()
+    max_w = 400
+    key_active_before = row_render_key(
+        state,
+        active_index,
+        font,
+        cache=cache,
+        max_content_width=max_w,
+        line_h=line_h,
+    )
+    key_idle_before = row_render_key(
+        state,
+        idle_index,
+        font,
+        cache=cache,
+        max_content_width=max_w,
+        line_h=line_h,
+    )
+    switched = replace(
+        state,
+        tracks={
+            "layer_1": replace(
+                state.tracks["layer_1"],
+                active_preset_list_index=1,
+            )
+        },
+    )
+    key_active_after = row_render_key(
+        switched,
+        active_index,
+        font,
+        cache=cache,
+        max_content_width=max_w,
+        line_h=line_h,
+    )
+    key_idle_after = row_render_key(
+        switched,
+        idle_index,
+        font,
+        cache=cache,
+        max_content_width=max_w,
+        line_h=line_h,
+    )
+    assert key_active_before != key_active_after
+    assert key_idle_before != key_idle_after
+    assert key_active_before.color_state != key_active_after.color_state
+    assert key_idle_before.color_state != key_idle_after.color_state
+    assert key_active_before.display_text == key_active_after.display_text
+    assert key_idle_before.display_text == key_idle_after.display_text
+
+
 def test_solo_change_invalidates_track_header_row_key() -> None:
     pygame.init()
     overlay = TuningOverlay()
