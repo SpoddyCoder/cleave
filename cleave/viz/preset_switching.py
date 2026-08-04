@@ -57,6 +57,16 @@ def _clear_list_rotation(layer: StemLayer) -> None:
     layer.rotation_anchor = 0
 
 
+def _timeline_list_index(on_transition_count: int) -> int:
+    """0-based list index for timeline switching.
+
+    ``lane_on_transition_count`` is how many on-transitions have fired
+    (1 after the first section starts). Populate builds one preset per
+    on-segment, so the first section maps to index 0.
+    """
+    return max(0, int(on_transition_count) - 1)
+
+
 def _preset_paths(preset_list: list[str] | None) -> list[Path]:
     return [Path(path) for path in (preset_list or [])]
 
@@ -320,10 +330,11 @@ def _advance_timeline_indexed(
             hard_cut_fades=hard_cut_fades,
             soft_cut_fades=soft_cut_fades,
         )
-        if count == layer.list_switch_index:
+        index = _timeline_list_index(count)
+        if index == layer.list_switch_index:
             continue
-        path = rotation.path_for(count)
-        layer.list_switch_index = count
+        path = rotation.path_for(index)
+        layer.list_switch_index = index
         if path is None:
             continue
         if (
@@ -389,7 +400,7 @@ def reanchor_list_preset_after_browse(
         _clear_list_rotation(layer)
         return
 
-    count = 0
+    index = 0
     runtime = session.layers.get(layer.slot)
     if (
         runtime is not None
@@ -397,23 +408,25 @@ def reanchor_list_preset_after_browse(
     ):
         hard_cut_fades, soft_cut_fades = _timeline_fade_groups(session)
         lane = session.timeline.lanes.get(layer.slot) or empty_lane()
-        count = lane_on_transition_count(
-            lane,
-            t_sec,
-            hard_cut_fades=hard_cut_fades,
-            soft_cut_fades=soft_cut_fades,
+        index = _timeline_list_index(
+            lane_on_transition_count(
+                lane,
+                t_sec,
+                hard_cut_fades=hard_cut_fades,
+                soft_cut_fades=soft_cut_fades,
+            )
         )
     elif (
         runtime is not None
         and runtime.preset_switching_trigger == "timer"
     ):
         duration = max(0.001, float(runtime.preset_duration))
-        count = int(math.floor(max(0.0, t_sec) / duration))
+        index = int(math.floor(max(0.0, t_sec) / duration))
 
     browse_index = _anchor_index(layer, paths)
-    anchor = (browse_index - count) % len(paths)
+    anchor = (browse_index - index) % len(paths)
     layer.rotation_anchor = anchor
-    layer.list_switch_index = count
+    layer.list_switch_index = index
     layer.preset_rotation = PresetRotation(paths=tuple(paths), anchor=anchor)
 
 
