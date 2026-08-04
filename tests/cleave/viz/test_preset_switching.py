@@ -213,6 +213,8 @@ def test_advance_timeline_uses_on_transition_count() -> None:
             SlotCue(t=1.0, level=1.0),
             SlotCue(t=2.0, level=0.0),
             SlotCue(t=3.0, level=1.0),
+            SlotCue(t=4.0, level=0.0),
+            SlotCue(t=5.0, level=1.0),
         ),
     )
     apply_preset_switching(
@@ -223,11 +225,27 @@ def test_advance_timeline_uses_on_transition_count() -> None:
         session=session,
     )
     layer.pm.load_preset.reset_mock()
+    # Before first on-section: stay on list[0].
     advance_preset_switching(session, {"layer_1": layer}, 0.5)
     layer.pm.load_preset.assert_not_called()
+    assert layer.list_switch_index == 0
+    assert layer.auto_preset_path == _MILK[0].resolve()
+    # First on-section: still list[0] (on-transition count 1 -> index 0).
     advance_preset_switching(session, {"layer_1": layer}, 1.5)
+    layer.pm.load_preset.assert_not_called()
+    assert layer.list_switch_index == 0
+    assert layer.auto_preset_path == _MILK[0].resolve()
+    # Second on-section: list[1].
+    advance_preset_switching(session, {"layer_1": layer}, 3.5)
     layer.pm.load_preset.assert_called_once()
     assert layer.list_switch_index == 1
+    assert layer.auto_preset_path == _MILK[1].resolve()
+    # Third (last) on-section: list[2], not wrapped to list[0].
+    layer.pm.load_preset.reset_mock()
+    advance_preset_switching(session, {"layer_1": layer}, 5.5)
+    layer.pm.load_preset.assert_called_once()
+    assert layer.list_switch_index == 2
+    assert layer.auto_preset_path == _MILK[2].resolve()
 
 
 def test_advance_timeline_skips_when_timeline_disabled() -> None:
@@ -296,6 +314,36 @@ def test_reanchor_after_browse_preserves_current() -> None:
     assert layer.preset_rotation is not None
     # browsed b.milk at index 1 while count==1 => anchor 0 keeps b at count 1
     assert layer.preset_rotation.path_for(1) == _MILK[1]
+
+
+def test_reanchor_timeline_uses_zero_based_section_index() -> None:
+    layer = _stem_layer(index=0)
+    session = _session(trigger="timeline", timeline_enabled=True)
+    session.timeline.lanes["layer_1"] = TimelineLane(
+        baseline=0.0,
+        cues=(
+            SlotCue(t=1.0, level=1.0),
+            SlotCue(t=2.0, level=0.0),
+            SlotCue(t=3.0, level=1.0),
+        ),
+    )
+    apply_preset_switching(
+        layer,
+        mode="on",
+        trigger="timeline",
+        preset_list=_LIST,
+        session=session,
+    )
+    # Browse to c.milk during the first on-section (transition count 1 -> index 0).
+    layer.playlist = PresetPlaylist(
+        current_dir=Path("/tmp/presets/drums"), paths=_MILK, index=2
+    )
+    reanchor_list_preset_after_browse(
+        layer, session, 1.5, preset_list=_LIST
+    )
+    assert layer.list_switch_index == 0
+    assert layer.preset_rotation is not None
+    assert layer.preset_rotation.path_for(0) == _MILK[2]
 
 
 @patch("cleave.viz.preset_switching.ProjectMPlaylist")
