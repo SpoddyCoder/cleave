@@ -117,6 +117,9 @@ class TrackBlock:
     preset_list: list[str] = field(default_factory=list)
     preset_list_labels: list[str] = field(default_factory=list)
     preset_list_expanded: bool = False
+    # Index into preset_list of the currently playing preset, when present.
+    # Baked at structure build (signature includes auto_preset_path / playlist).
+    active_preset_list_index: int | None = None
 
 
 @dataclass
@@ -615,6 +618,37 @@ class TuningViewStateBuilder:
         self._annotated_preset_list_label_cache[annotated_key] = labels
         return labels
 
+    @staticmethod
+    def _active_preset_list_index(layer: LayerRuntime) -> int | None:
+        """Return the preset_list index matching the playing preset, if any.
+
+        Computed only when the view structure rebuilds (``auto_preset_path`` and
+        playlist index are part of ``view_state_structure_signature``), so the
+        draw path can read a precomputed index without resolving paths per frame.
+        """
+        paths = layer.preset_list
+        if not paths:
+            return None
+        active = layer.auto_preset_path
+        if active is None:
+            current = layer.playlist.current
+            if current is None:
+                return None
+            active = current.resolve()
+        target = active.resolve()
+        target_str = str(target)
+        target_posix = target.as_posix()
+        for index, raw in enumerate(paths):
+            if raw == target_str or raw == target_posix:
+                return index
+        for index, raw in enumerate(paths):
+            try:
+                if Path(raw).resolve() == target:
+                    return index
+            except OSError:
+                continue
+        return None
+
     def _build_structure(
         self,
         *,
@@ -664,6 +698,7 @@ class TuningViewStateBuilder:
                 preset_list=list(layer.preset_list),
                 preset_list_labels=self._preset_list_labels(list(layer.preset_list)),
                 preset_list_expanded=layer.preset_list_expanded,
+                active_preset_list_index=self._active_preset_list_index(layer),
             )
 
         ro = self.session.render_overlays

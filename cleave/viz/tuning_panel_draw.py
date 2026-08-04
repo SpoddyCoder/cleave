@@ -770,6 +770,16 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
     if stem is not None and _track_disabled(state, stem):
         return DISABLED
 
+    if (
+        kind == RowKind.TRACK_PRESET_LIST_ITEM
+        and stem is not None
+        and desc.preset_index is not None
+        and state.tracks[stem].active_preset_list_index == desc.preset_index
+    ):
+        # HIGHLIGHT yellow; color_state is part of RowRenderKey so only the
+        # previous/next active rows miss the row-surface cache on switch.
+        return HIGHLIGHT
+
     return VALUE
 
 
