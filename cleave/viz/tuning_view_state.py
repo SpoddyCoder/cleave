@@ -14,9 +14,7 @@ from cleave.config import (
     RenderOverlaySlideDirection,
 )
 from cleave.config_schema import (
-    DEFAULT_CAST_ROLES_DEFAULT_ROLE,
-    DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR,
-    DEFAULT_CHROMA_BOOST_APPLY_MODE,
+            DEFAULT_CHROMA_BOOST_APPLY_MODE,
     DEFAULT_CHROMA_BOOST_VARIANT,
     DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
     DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
@@ -26,9 +24,7 @@ from cleave.config_schema import (
     DEFAULT_EASTER_EGG,
     DEFAULT_PRESET_START_CLEAN,
     DEFAULT_PRESET_DURATION,
-    DEFAULT_PRESET_SWITCHING_SHUFFLE,
-    DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT,
-    DEFAULT_RENDER_OVERLAY_ANIMATION_TYPE,
+            DEFAULT_RENDER_OVERLAY_ANIMATION_TYPE,
     DEFAULT_RENDER_OVERLAY_APPEAR_AT,
     DEFAULT_RENDER_OVERLAY_DISAPPEAR_AT,
     DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
@@ -39,13 +35,12 @@ from cleave.config_schema import (
     DEFAULT_UI_WIDTH_MODE,
     DEFAULT_VISUAL_LIMITER_ENABLED,
     DEFAULT_VISUAL_LIMITER_THRESHOLD,
+    DEFAULT_VISUAL_LIMITER_RATIO,
     DEFAULT_VISUAL_LIMITER_RELEASE,
-    CastRolesTimelineBehaviour,
     default_render_overlay_card_runtime_values,
     default_render_overlays_runtime_values,
     default_render_post_fx_runtime_values,
 )
-from cleave.cue_roles import CueRole
 from cleave.extract import StemSource
 from cleave.preset_curation import PresetCurationIndex
 from cleave.preset_playlist import (
@@ -54,7 +49,6 @@ from cleave.preset_playlist import (
     scan_preset_playlist,
 )
 from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
-from cleave.timeline_presets.reshuffle import DEFAULT_TIMELINE_PRESET_RESHUFFLE
 from cleave.viz.panel_notification import PanelNotificationActive
 from cleave.timeline_presets.crescendo import CrescendoTarget
 from cleave.timeline_presets.cue_snap import (
@@ -64,6 +58,10 @@ from cleave.timeline_presets.cue_snap import (
 from cleave.timeline_presets.density import (
     DEFAULT_TIMELINE_PRESET_DENSITY,
     TimelinePresetDensity,
+)
+from cleave.timeline_presets.repopulate import (
+    DEFAULT_TIMELINE_PRESET_REPOPULATE,
+    TimelinePresetRepopulate,
 )
 from cleave.timeline_presets.song_marker_snap import (
     DEFAULT_TIMELINE_PRESET_SONG_MARKER_SNAP,
@@ -77,7 +75,10 @@ from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.playback import PlaybackState, current_sec
 from cleave.viz.row_semantics import RowDescriptor, RowKind
 from cleave.viz.session import LayerRuntime, TuningSession, config_path_display
-from cleave.viz.user_presets import user_preset_item_display_name
+from cleave.viz.user_presets import (
+    path_list_identity,
+    preset_list_display_names,
+)
 
 if TYPE_CHECKING:
     from cleave.viz.focus_nav import FocusCursor
@@ -104,14 +105,8 @@ class TrackBlock:
     expanded: bool = False
     locked: bool = False
     preset_empty: bool = False
-    preset_switching: str = "none"
-    preset_switching_rotation_set: str = "directory"
-    cast_roles_timeline_behaviour: CastRolesTimelineBehaviour = (
-        DEFAULT_CAST_ROLES_TIMELINE_BEHAVIOUR
-    )
-    cast_roles_default_role: CueRole = DEFAULT_CAST_ROLES_DEFAULT_ROLE
-    preset_switching_shuffle: bool = DEFAULT_PRESET_SWITCHING_SHUFFLE
-    preset_switching_shuffle_salt: int = DEFAULT_PRESET_SWITCHING_SHUFFLE_SALT
+    preset_switching: str = "off"
+    preset_switching_trigger: str = "timer"
     preset_duration: float = DEFAULT_PRESET_DURATION
     soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION
     hard_cut_duration: float = DEFAULT_HARD_CUT_DURATION
@@ -119,9 +114,12 @@ class TrackBlock:
     hard_cut_enabled: bool = DEFAULT_HARD_CUT_ENABLED
     easter_egg: float = DEFAULT_EASTER_EGG
     preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN
-    user_presets: list[str] = field(default_factory=list)
-    user_preset_labels: list[str] = field(default_factory=list)
-    user_presets_expanded: bool = False
+    preset_list: list[str] = field(default_factory=list)
+    preset_list_labels: list[str] = field(default_factory=list)
+    preset_list_expanded: bool = False
+    # Index into preset_list of the currently playing preset, when present.
+    # Baked at structure build (signature includes auto_preset_path / playlist).
+    active_preset_list_index: int | None = None
 
 
 @dataclass
@@ -226,6 +224,7 @@ class TimelineFadeGroupBlock:
 class VisualLimiterBlock:
     enabled: bool = DEFAULT_VISUAL_LIMITER_ENABLED
     threshold: float = DEFAULT_VISUAL_LIMITER_THRESHOLD
+    ratio: float = DEFAULT_VISUAL_LIMITER_RATIO
     release: float = DEFAULT_VISUAL_LIMITER_RELEASE
 
 
@@ -250,7 +249,9 @@ class RenderTimelineBlock:
     timeline_preset_timeline_cuts: TimelinePresetTimelineCuts = (
         DEFAULT_TIMELINE_PRESET_TIMELINE_CUTS
     )
-    timeline_preset_reshuffle: bool = DEFAULT_TIMELINE_PRESET_RESHUFFLE
+    timeline_preset_repopulate: TimelinePresetRepopulate = (
+        DEFAULT_TIMELINE_PRESET_REPOPULATE
+    )
     timeline_preset_conductor: bool = DEFAULT_TIMELINE_PRESET_CONDUCTOR
     hard_cut_fades: TimelineFadeGroupBlock = field(
         default_factory=TimelineFadeGroupBlock
@@ -286,6 +287,7 @@ class TuningViewState:
     position_sec: float
     focus_cursor: FocusCursor
     move_mode_slot: str | None
+    move_mode_preset: tuple[str, int] | None = None
     persistent_notification_message: str | None = None
     persistent_notification_elapsed_sec: float = 0.0
     notification_message: str | None = None
@@ -392,12 +394,9 @@ def view_state_structure_signature(
         layers[slot] = {
             "expanded": layer.expanded,
             "effects_expanded": layer.effects_expanded,
-            "user_presets_expanded": layer.user_presets_expanded,
+            "preset_list_expanded": layer.preset_list_expanded,
             "preset_switching": layer.preset_switching,
-            "preset_switching_rotation_set": layer.preset_switching_rotation_set,
-            "cast_roles_timeline_behaviour": layer.cast_roles_timeline_behaviour,
-            "cast_roles_default_role": layer.cast_roles_default_role,
-            "preset_switching_shuffle": layer.preset_switching_shuffle,
+            "preset_switching_trigger": layer.preset_switching_trigger,
             "preset_duration": layer.preset_duration,
             "soft_cut_duration": layer.soft_cut_duration,
             "hard_cut_duration": layer.hard_cut_duration,
@@ -406,10 +405,12 @@ def view_state_structure_signature(
             "easter_egg": layer.easter_egg,
             "preset_start_clean": layer.preset_start_clean,
             "effects": sorted(layer.effects.keys()),
-            "user_presets": list(layer.user_presets),
+            "preset_list": path_list_identity(layer.preset_list),
             "playlist": {
                 "current_dir": str(playlist.current_dir),
-                "paths": [str(path) for path in playlist.paths],
+                "paths": path_list_identity(
+                    [str(path) for path in playlist.paths]
+                ),
                 "index": playlist.index,
             },
             "auto_preset_path": (
@@ -525,6 +526,7 @@ class TuningViewStateBuilder:
         *,
         get_focus_cursor: Callable[[], FocusCursor],
         get_move_mode_slot: Callable[[], str | None],
+        get_move_mode_preset: Callable[[], tuple[str, int] | None],
         config_save: ConfigSaveController,
         get_notification: Callable[[], PanelNotificationActive],
         layers_by_slot: dict[str, StemLayer] | None = None,
@@ -536,10 +538,16 @@ class TuningViewStateBuilder:
         self._curation_index = curation_index
         self._get_focus_cursor = get_focus_cursor
         self._get_move_mode_slot = get_move_mode_slot
+        self._get_move_mode_preset = get_move_mode_preset
         self._config_save = config_save
         self._get_notification = get_notification
         self._layers_by_slot = layers_by_slot
         self._auto_display_cache: dict[Path, PresetPlaylist] = {}
+        self._base_preset_list_label_cache: dict[tuple[str, ...], list[str]] = {}
+        self._annotated_preset_list_label_cache: dict[
+            tuple[tuple[str, ...], str], list[str]
+        ] = {}
+        self._user_basenames_cache: dict[tuple[tuple[str, ...], ...], set[str]] = {}
         self._structure: _ViewStateStructure | None = None
 
     def _sync_auto_preset_paths(self) -> None:
@@ -551,11 +559,22 @@ class TuningViewStateBuilder:
             if runtime is not None:
                 runtime.auto_preset_path = stem.auto_preset_path
 
+    def _preset_list_paths_key(self) -> tuple[tuple[str, ...], ...]:
+        return tuple(
+            tuple(self.session.layers[slot].preset_list)
+            for slot in self.session.layer_z_order
+        )
+
     def _user_preset_basenames(self) -> set[str]:
+        key = self._preset_list_paths_key()
+        cached = self._user_basenames_cache.get(key)
+        if cached is not None:
+            return cached
         names: set[str] = set()
-        for layer in self.session.layers.values():
-            for path in layer.user_presets:
+        for slot in self.session.layer_z_order:
+            for path in self.session.layers[slot].preset_list:
                 names.add(Path(path).name)
+        self._user_basenames_cache[key] = names
         return names
 
     def _display_playlist(self, layer: LayerRuntime) -> PresetPlaylist:
@@ -582,12 +601,53 @@ class TuningViewStateBuilder:
             label += self._curation_index.marker(name, user=name in user_names)
         return label
 
-    def _user_preset_labels(self, paths: list[str]) -> list[str]:
-        return [
-            user_preset_item_display_name(paths, i)
-            + self._curation_index.marker(Path(paths[i]).name)
+    def _preset_list_labels(self, paths: list[str]) -> list[str]:
+        paths_key = tuple(paths)
+        annotated_key = (paths_key, self._curation_index.curation_stamp)
+        cached = self._annotated_preset_list_label_cache.get(annotated_key)
+        if cached is not None:
+            return cached
+        base = self._base_preset_list_label_cache.get(paths_key)
+        if base is None:
+            base = preset_list_display_names(paths)
+            self._base_preset_list_label_cache[paths_key] = base
+        labels = [
+            base[i] + self._curation_index.marker(Path(paths[i]).name)
             for i in range(len(paths))
         ]
+        self._annotated_preset_list_label_cache[annotated_key] = labels
+        return labels
+
+    @staticmethod
+    def _active_preset_list_index(layer: LayerRuntime) -> int | None:
+        """Return the preset_list index matching the playing preset, if any.
+
+        Computed only when the view structure rebuilds (``auto_preset_path`` and
+        playlist index are part of ``view_state_structure_signature``), so the
+        draw path can read a precomputed index without resolving paths per frame.
+        """
+        paths = layer.preset_list
+        if not paths:
+            return None
+        active = layer.auto_preset_path
+        if active is None:
+            current = layer.playlist.current
+            if current is None:
+                return None
+            active = current.resolve()
+        target = active.resolve()
+        target_str = str(target)
+        target_posix = target.as_posix()
+        for index, raw in enumerate(paths):
+            if raw == target_str or raw == target_posix:
+                return index
+        for index, raw in enumerate(paths):
+            try:
+                if Path(raw).resolve() == target:
+                    return index
+            except OSError:
+                continue
+        return None
 
     def _build_structure(
         self,
@@ -604,9 +664,12 @@ class TuningViewStateBuilder:
         for slot in layer_z_order:
             layer = self.session.layers[slot]
             display = self._display_playlist(layer)
+            # Directory row always reflects browse navigation (Ctrl+Left/Right).
+            # The file row alone follows auto_preset_path when switching plays
+            # a cast/list preset outside the browse directory.
             tracks[slot] = TrackBlock(
                 stem=layer.stem,
-                preset_dir_label=display.directory_display_label(
+                preset_dir_label=layer.playlist.directory_display_label(
                     self.preset_root,
                     browse_floor=layer.browse_floor,
                 ),
@@ -624,11 +687,7 @@ class TuningViewStateBuilder:
                 locked=layer.locked,
                 preset_empty=not display.paths,
                 preset_switching=layer.preset_switching,
-                preset_switching_rotation_set=layer.preset_switching_rotation_set,
-                cast_roles_timeline_behaviour=layer.cast_roles_timeline_behaviour,
-                cast_roles_default_role=layer.cast_roles_default_role,
-                preset_switching_shuffle=layer.preset_switching_shuffle,
-                preset_switching_shuffle_salt=layer.preset_switching_shuffle_salt,
+                preset_switching_trigger=layer.preset_switching_trigger,
                 preset_duration=layer.preset_duration,
                 soft_cut_duration=layer.soft_cut_duration,
                 hard_cut_duration=layer.hard_cut_duration,
@@ -636,9 +695,10 @@ class TuningViewStateBuilder:
                 hard_cut_enabled=layer.hard_cut_enabled,
                 easter_egg=layer.easter_egg,
                 preset_start_clean=layer.preset_start_clean,
-                user_presets=list(layer.user_presets),
-                user_preset_labels=self._user_preset_labels(list(layer.user_presets)),
-                user_presets_expanded=layer.user_presets_expanded,
+                preset_list=list(layer.preset_list),
+                preset_list_labels=self._preset_list_labels(list(layer.preset_list)),
+                preset_list_expanded=layer.preset_list_expanded,
+                active_preset_list_index=self._active_preset_list_index(layer),
             )
 
         ro = self.session.render_overlays
@@ -693,7 +753,7 @@ class TuningViewStateBuilder:
             timeline_preset_cue_snap=tl.timeline_preset_cue_snap,
             timeline_preset_song_marker_snap=tl.timeline_preset_song_marker_snap,
             timeline_preset_timeline_cuts=tl.timeline_preset_timeline_cuts,
-            timeline_preset_reshuffle=tl.timeline_preset_reshuffle,
+            timeline_preset_repopulate=tl.timeline_preset_repopulate,
             timeline_preset_conductor=tl.timeline_preset_conductor,
             hard_cut_fades=TimelineFadeGroupBlock(
                 enabled=tl.hard_cut_fades.enabled,
@@ -710,6 +770,7 @@ class TuningViewStateBuilder:
             limiter=VisualLimiterBlock(
                 enabled=tl.limiter.enabled,
                 threshold=tl.limiter.threshold,
+                ratio=tl.limiter.ratio,
                 release=tl.limiter.release,
             ),
             song_markers_expanded=self.session.song_markers.expanded,
@@ -769,11 +830,10 @@ class TuningViewStateBuilder:
                 blend_mode=layer.blend_mode,
                 opacity_pct=layer.opacity_pct,
                 beat_sensitivity=layer.beat_sensitivity,
-                preset_switching_shuffle_salt=layer.preset_switching_shuffle_salt,
                 preset_label=self._preset_label(
                     display, user_names=user_names
                 ),
-                user_preset_labels=self._user_preset_labels(list(layer.user_presets)),
+                preset_list_labels=self._preset_list_labels(list(layer.preset_list)),
                 effects=dict(layer.effects),
             )
         return tracks
@@ -832,6 +892,7 @@ class TuningViewStateBuilder:
             position_sec=position_sec,
             focus_cursor=self._get_focus_cursor(),
             move_mode_slot=self._get_move_mode_slot(),
+            move_mode_preset=self._get_move_mode_preset(),
             persistent_notification_message=persistent_notification_message,
             persistent_notification_elapsed_sec=persistent_notification_elapsed_sec,
             notification_message=notification_message,
@@ -939,7 +1000,7 @@ class TuningViewStateBuilder:
                 timeline_preset_cue_snap=tl.timeline_preset_cue_snap,
                 timeline_preset_song_marker_snap=tl.timeline_preset_song_marker_snap,
                 timeline_preset_timeline_cuts=tl.timeline_preset_timeline_cuts,
-                timeline_preset_reshuffle=tl.timeline_preset_reshuffle,
+                timeline_preset_repopulate=tl.timeline_preset_repopulate,
                 timeline_preset_conductor=tl.timeline_preset_conductor,
                 hard_cut_fades=TimelineFadeGroupBlock(
                     enabled=tl.hard_cut_fades.enabled,
@@ -956,6 +1017,7 @@ class TuningViewStateBuilder:
                 limiter=VisualLimiterBlock(
                     enabled=tl.limiter.enabled,
                     threshold=tl.limiter.threshold,
+                    ratio=tl.limiter.ratio,
                     release=tl.limiter.release,
                 ),
                 locked=tl.locked,

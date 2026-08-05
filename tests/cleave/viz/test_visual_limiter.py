@@ -1,4 +1,4 @@
-"""Pure logic tests for the closed-loop visual limiter (no GL)."""
+"""Pure logic tests for the feed-forward visual limiter (no GL)."""
 
 from __future__ import annotations
 
@@ -16,32 +16,35 @@ from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import apply_effect_modifiers
 from cleave.viz.session import LayerRuntime, TimelineRuntime, TuningSession
 from cleave.viz.visual_limiter import (
-    ATTACK_SEC,
-    DUCK_GAIN,
+    ATTACK_TC,
+    DEFAULT_RATIO,
+    DEFAULT_RELEASE_TC,
+    DEFAULT_THRESHOLD,
     GRID_HEIGHT,
     GRID_WIDTH,
-    RELEASE_RAMP_SEC,
-    RELEASE_SEC,
-    THRESHOLD_OFF,
-    THRESHOLD_ON,
     HotLayerRef,
     VisualLimiterParams,
     VisualLimiterState,
     apply_visual_limiter_gains,
     busyness,
     collect_hot_layers,
+    compensated_busyness,
+    distribute_gain,
+    layer_gain_from_target,
     metrics_from_grid,
-    pick_victim,
+    priority_weight,
     read_luma_grid,
     role_rank,
     reset_if_seek,
+    target_bus_gain,
     update_limiter_state,
     visual_limiter_active,
 )
 from tests.support.config import TEST_LAYER_STEMS
 
-_OVER = THRESHOLD_ON + 0.01
-_UNDER = THRESHOLD_OFF - 0.01
+_OVER = DEFAULT_THRESHOLD + 0.10
+_UNDER = DEFAULT_THRESHOLD - 0.10
+_SAMPLE_GAIN = 0.6
 
 
 def _playlist(slot: str) -> PresetPlaylist:
@@ -100,6 +103,7 @@ def _drive(
     t_sec: float,
     hot: list[HotLayerRef],
     mean_abs_delta: float = 0.0,
+    params: VisualLimiterParams | None = None,
 ) -> None:
     update_limiter_state(
         state,
@@ -107,157 +111,156 @@ def _drive(
         mean_abs_delta=mean_abs_delta,
         t_sec=t_sec,
         hot=hot,
+        params=params,
     )
-
-
-def _fully_duck(
-    state: VisualLimiterState,
-    hot: list[HotLayerRef],
-    *,
-    t0: float = 0.0,
-) -> float:
-    """Advance playhead through a full attack; return final t_sec."""
-    _drive(state, mean_luma=_OVER, t_sec=t0, hot=hot)
-    t1 = t0 + ATTACK_SEC + 0.01
-    _drive(state, mean_luma=_OVER, t_sec=t1, hot=hot)
-    return t1
-
-
-def test_pick_victim_prefers_bed_over_lead() -> None:
-    hot = [
-        _hot("layer_1", role="lead", z_index=0),
-        _hot("layer_2", role="bed", z_index=1),
-    ]
-    assert pick_victim(hot, {}) == "layer_2"
 
 
 def test_unset_role_ranks_as_pulse() -> None:
     assert role_rank(None) == role_rank("pulse")
-    hot = [
-        _hot("layer_1", role="lead", z_index=0),
-        _hot("layer_2", role=None, z_index=1),
-        _hot("layer_3", role="bed", z_index=2),
-    ]
-    assert pick_victim(hot, {}) == "layer_3"
-    assert pick_victim(hot, {"layer_3": DUCK_GAIN}) == "layer_2"
 
 
-def test_tie_break_level_then_z_order() -> None:
-    hot = [
-        _hot("layer_1", role="pulse", level=1.0, z_index=0),
-        _hot("layer_2", role="pulse", level=0.5, z_index=1),
-    ]
-    assert pick_victim(hot, {}) == "layer_2"
-
-    hot_same_level = [
-        _hot("layer_1", role="pulse", level=1.0, z_index=0),
-        _hot("layer_2", role="pulse", level=1.0, z_index=1),
-    ]
-    assert pick_victim(hot_same_level, {}) == "layer_1"
+def test_priority_weight_favors_bed_over_lead() -> None:
+    assert priority_weight(role_rank("bed")) > priority_weight(role_rank("lead"))
 
 
-def test_attack_ramps_over_playhead_time() -> None:
+def test_layer_gain_from_target_spreads_by_weight() -> None:
+    target = 0.6
+    assert layer_gain_from_target(target, 1.0) == pytest.approx(0.6)
+    assert layer_gain_from_target(target, 0.15) == pytest.approx(0.94)
+
+
+def test_target_bus_gain_below_threshold_is_unity() -> None:
+    assert target_bus_gain(0.5, threshold=0.65, ratio=3.0) == pytest.approx(1.0)
+
+
+def test_target_bus_gain_higher_ratio_reduces_more() -> None:
+    envelope = 0.85
+    gentle = target_bus_gain(envelope, threshold=0.65, ratio=2.0)
+    aggressive = target_bus_gain(envelope, threshold=0.65, ratio=8.0)
+    assert gentle < 1.0
+    assert aggressive < gentle
+
+
+def test_compensated_busyness_undoes_applied_gains() -> None:
+    raw = 0.5
+    gains = {"layer_1": 0.5, "layer_2": 0.5}
+    assert compensated_busyness(raw, gains) == pytest.approx(1.0)
+
+
+def test_envelope_attacks_on_sustained_high_busyness() -> None:
     state = VisualLimiterState()
     hot = [_hot("layer_1", role="bed")]
+    params = VisualLimiterParams(release_tc=1.0)
+    unducked = _OVER
 
-    _drive(state, mean_luma=_OVER, t_sec=0.0, hot=hot)
-    assert state.gain_for("layer_1") == pytest.approx(1.0)
+    _drive(state, mean_luma=unducked, t_sec=0.0, hot=hot, params=params)
+    assert state.envelope == pytest.approx(0.0)
 
-    _drive(state, mean_luma=_OVER, t_sec=ATTACK_SEC * 0.5, hot=hot)
-    mid = state.gain_for("layer_1")
-    assert DUCK_GAIN < mid < 1.0
+    _drive(state, mean_luma=unducked, t_sec=ATTACK_TC * 0.5, hot=hot, params=params)
+    assert 0.0 < state.envelope < unducked
 
-    _drive(state, mean_luma=_OVER, t_sec=ATTACK_SEC + 0.01, hot=hot)
-    assert state.gain_for("layer_1") == pytest.approx(DUCK_GAIN)
-
-
-def test_hysteresis_holds_until_release_ramp() -> None:
-    state = VisualLimiterState()
-    hot = [_hot("layer_1", role="bed"), _hot("layer_2", role="lead")]
-    t = _fully_duck(state, hot)
-    assert state.gain_for("layer_1") == pytest.approx(DUCK_GAIN)
-
-    under_start = t + 0.1
-    _drive(state, mean_luma=_UNDER, t_sec=under_start, hot=hot)
-    assert state.gain_for("layer_1") == pytest.approx(DUCK_GAIN)
-
-    _drive(
-        state,
-        mean_luma=_UNDER,
-        t_sec=under_start + RELEASE_SEC * 0.5,
-        hot=hot,
-    )
-    assert state.gain_for("layer_1") == pytest.approx(DUCK_GAIN)
-
-    # Cross the hold with a small dt so the first release step is partial.
-    hold_end = under_start + RELEASE_SEC
-    _drive(state, mean_luma=_UNDER, t_sec=hold_end - 0.01, hot=hot)
-    _drive(state, mean_luma=_UNDER, t_sec=hold_end + 0.02, hot=hot)
-    mid_gain = state.gain_for("layer_1")
-    assert DUCK_GAIN < mid_gain < 1.0
-
-    _drive(
-        state,
-        mean_luma=_UNDER,
-        t_sec=hold_end + RELEASE_RAMP_SEC + 0.01,
-        hot=hot,
-    )
-    assert state.gain_for("layer_1") == pytest.approx(1.0)
+    for step in range(20):
+        t = ATTACK_TC + step * 0.05
+        avg_gain = (
+            sum(state.gains.values()) / len(state.gains) if state.gains else 1.0
+        )
+        _drive(
+            state,
+            mean_luma=unducked * avg_gain,
+            t_sec=t,
+            hot=hot,
+            params=params,
+        )
+    assert state.envelope > DEFAULT_THRESHOLD
+    assert state.gain_for("layer_1") < 1.0
 
 
-def test_between_thresholds_cancels_release() -> None:
+def test_envelope_releases_when_busyness_drops() -> None:
     state = VisualLimiterState()
     hot = [_hot("layer_1", role="bed")]
-    mid = (THRESHOLD_ON + THRESHOLD_OFF) / 2.0
-    t = _fully_duck(state, hot)
+    params = VisualLimiterParams(release_tc=0.3)
 
-    under_start = t + 0.1
-    _drive(state, mean_luma=_UNDER, t_sec=under_start, hot=hot)
-    _drive(state, mean_luma=mid, t_sec=under_start + 0.1, hot=hot)
-    _drive(
-        state,
-        mean_luma=_UNDER,
-        t_sec=under_start + 0.1 + RELEASE_SEC + RELEASE_RAMP_SEC + 0.01,
-        hot=hot,
-    )
-    # Release timer restarted after the mid-band cancel; one under tick is not
-    # enough hold time, so the duck remains.
-    assert state.gain_for("layer_1") == pytest.approx(DUCK_GAIN)
+    for step in range(30):
+        _drive(
+            state,
+            mean_luma=_OVER,
+            t_sec=step * 0.05,
+            hot=hot,
+            params=params,
+        )
+    peak_envelope = state.envelope
+    assert peak_envelope > DEFAULT_THRESHOLD
+    assert state.gain_for("layer_1") < 1.0
+
+    for step in range(40):
+        _drive(
+            state,
+            mean_luma=_UNDER,
+            t_sec=1.5 + step * 0.05,
+            hot=hot,
+            params=params,
+        )
+    assert state.envelope < peak_envelope
+    assert state.gain_for("layer_1") == pytest.approx(1.0, abs=0.05)
 
 
-def test_seek_clears_ducks() -> None:
+def test_gain_compensation_stabilizes_under_feedback() -> None:
+    state = VisualLimiterState()
+    hot = [_hot("layer_1", role="bed")]
+    params = VisualLimiterParams(release_tc=DEFAULT_RELEASE_TC)
+    unducked = _OVER
+
+    for step in range(80):
+        t = step * 0.05
+        avg_gain = (
+            sum(state.gains.values()) / len(state.gains) if state.gains else 1.0
+        )
+        measured_luma = unducked * avg_gain
+        _drive(state, mean_luma=measured_luma, t_sec=t, hot=hot, params=params)
+
+    assert state.envelope > DEFAULT_THRESHOLD
+    final_gain = state.gain_for("layer_1")
+    for step in range(10):
+        t = 4.0 + step * 0.05
+        avg_gain = (
+            sum(state.gains.values()) / len(state.gains) if state.gains else 1.0
+        )
+        measured_luma = unducked * avg_gain
+        _drive(state, mean_luma=measured_luma, t_sec=t, hot=hot, params=params)
+        assert abs(state.gain_for("layer_1") - final_gain) < 0.08
+        final_gain = state.gain_for("layer_1")
+
+
+def test_distribute_gain_bed_ducks_more_than_lead() -> None:
+    state = VisualLimiterState()
+    hot = [
+        _hot("layer_1", role="bed", z_index=0),
+        _hot("layer_2", role="lead", z_index=1),
+    ]
+    distribute_gain(state, hot, 0.6)
+    assert state.gain_for("layer_1") == pytest.approx(0.6)
+    assert state.gain_for("layer_2") == pytest.approx(0.94)
+
+
+def test_seek_clears_state() -> None:
     state = VisualLimiterState()
     hot = [_hot("layer_1", role="bed")]
 
     state.last_t_sec = 10.0
-    _fully_duck(state, hot, t0=10.0)
-    assert state.gain_for("layer_1") == pytest.approx(DUCK_GAIN)
+    for step in range(20):
+        _drive(state, mean_luma=_OVER, t_sec=10.0 + step * 0.05, hot=hot)
+    assert state.gain_for("layer_1") < 1.0
     state.prev_luma = np.zeros((2, 2), dtype=np.float32)
 
     assert reset_if_seek(state, 1.0) is True
     assert state.gains == {}
     assert state.prev_luma is None
+    assert state.envelope == pytest.approx(0.0)
     assert state.last_t_sec == pytest.approx(1.0)
     assert state.controller_t_sec is None
 
-    # Quiet frame after seek: no release hold inherited from the prior duck.
     _drive(state, mean_luma=_UNDER, t_sec=1.0, hot=hot)
     assert state.gains == {}
-
-
-def test_cascading_ducks_next_victim() -> None:
-    state = VisualLimiterState()
-    hot = [
-        _hot("layer_1", role="bed", z_index=0),
-        _hot("layer_2", role="accent", z_index=1),
-    ]
-    t = _fully_duck(state, hot)
-    assert state.gain_for("layer_1") == pytest.approx(DUCK_GAIN)
-    assert state.gain_for("layer_2") == pytest.approx(1.0)
-
-    t = _fully_duck(state, hot, t0=t)
-    assert state.gain_for("layer_1") == pytest.approx(DUCK_GAIN)
-    assert state.gain_for("layer_2") == pytest.approx(DUCK_GAIN)
 
 
 def test_busyness_includes_delta_weight() -> None:
@@ -286,13 +289,12 @@ def test_collect_hot_layers_uses_role_and_level() -> None:
     }
     hot = collect_hot_layers(session, layers, 1.0)
     assert [h.slot for h in hot] == ["layer_1", "layer_2"]
-    assert pick_victim(hot, {}) == "layer_2"
 
 
 def test_apply_effect_modifiers_includes_limiter_gain() -> None:
     session = _session(timeline_enabled=False)
     layer = _stem("layer_1", timeline_level=0.5)
-    layer.limiter_gain = DUCK_GAIN
+    layer.limiter_gain = _SAMPLE_GAIN
     effect_runtime = MagicMock()
     mod = MagicMock(
         opacity=0.8,
@@ -314,13 +316,7 @@ def test_apply_effect_modifiers_includes_limiter_gain() -> None:
         0.0,
         update=False,
     )
-    assert layer.fbo.opacity == pytest.approx(0.8 * 0.5 * DUCK_GAIN)
-
-
-def test_thresholds_leave_hysteresis_gap() -> None:
-    assert THRESHOLD_OFF < THRESHOLD_ON
-    assert THRESHOLD_ON - THRESHOLD_OFF >= 0.15
-    assert DUCK_GAIN > 0.25
+    assert layer.fbo.opacity == pytest.approx(0.8 * 0.5 * _SAMPLE_GAIN)
 
 
 def test_visual_limiter_inactive_when_disabled() -> None:
@@ -334,9 +330,9 @@ def test_apply_visual_limiter_gains_resets_when_disabled() -> None:
     session = _session(timeline_enabled=True)
     session.timeline.limiter.enabled = False
     state = VisualLimiterState()
-    state.gains["layer_1"] = DUCK_GAIN
+    state.gains["layer_1"] = _SAMPLE_GAIN
     layer = _stem("layer_1", timeline_level=1.0)
-    layer.limiter_gain = DUCK_GAIN
+    layer.limiter_gain = _SAMPLE_GAIN
     runtime = MagicMock()
     runtime.visual_limiter = state
     runtime.seed.session = session
@@ -349,30 +345,20 @@ def test_apply_visual_limiter_gains_resets_when_disabled() -> None:
 def test_update_limiter_state_uses_session_params() -> None:
     state = VisualLimiterState()
     hot = [_hot("layer_1", role="bed")]
-    params = VisualLimiterParams(
-        threshold_on=0.80,
-        threshold_off=0.63,
-        release_ramp_sec=0.45,
-        release_sec=0.75,
-    )
-    update_limiter_state(
-        state,
-        mean_luma=0.70,
-        mean_abs_delta=0.0,
-        t_sec=0.0,
-        hot=hot,
-        params=params,
-    )
+    params = VisualLimiterParams(threshold=0.80, ratio=3.0, release_tc=0.45)
+
+    _drive(state, mean_luma=0.70, t_sec=0.0, hot=hot, params=params)
     assert state.gains == {}
-    update_limiter_state(
-        state,
-        mean_luma=0.81,
-        mean_abs_delta=0.0,
-        t_sec=ATTACK_SEC + 0.01,
-        hot=hot,
-        params=params,
-    )
-    assert state.gain_for("layer_1") == pytest.approx(DUCK_GAIN)
+
+    for step in range(30):
+        _drive(
+            state,
+            mean_luma=0.90,
+            t_sec=0.05 + step * 0.05,
+            hot=hot,
+            params=params,
+        )
+    assert state.gain_for("layer_1") < 1.0
 
 
 def test_read_luma_grid_delegates_to_post_process() -> None:

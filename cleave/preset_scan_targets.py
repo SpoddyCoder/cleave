@@ -47,14 +47,13 @@ def build_project_targets(cfg: CleaveConfig) -> ScanTargets:
         for preset_path in milk_files_in_dir(anchor_dir):
             _register_preset(by_path, preset_path, slot)
 
-        if layer.preset_switching_rotation_set == "user_defined":
-            for preset_path in layer.preset_switching_presets:
-                sources.append(preset_path)
-                _register_preset(by_path, preset_path, slot)
+        for preset_path in layer.preset_switching_list:
+            sources.append(preset_path)
+            _register_preset(by_path, preset_path, slot)
 
         layer_sources[slot] = tuple(sources)
 
-    # Role pools under preset_root/roles/<role>/ are part of timeline casting.
+    # Role pools under preset_root/roles/<role>/ feed populate-from-role actions.
     role_slots = tuple(layer_sources)
     for role in CUE_ROLES:
         pool = role_pool_paths(preset_root, role)

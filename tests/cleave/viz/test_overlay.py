@@ -566,6 +566,7 @@ def test_bottom_row_highlight_stops_before_help_hint() -> None:
                 expanded=True,
             )
         },
+        render_timeline=RenderTimelineBlock(enabled=True),
     )
     visible = state.layout.visible_indices(state)
     state.focus_descriptor = state.layout.descriptor(visible[-1])
@@ -603,11 +604,11 @@ def test_bottom_row_highlight_stops_before_help_hint() -> None:
     )
     mid_y = hint_layout.y + line_h // 2
     tinted = panel.get_at((overlay._padding + highlight_w // 2, mid_y))[:3]
-    gap = panel.get_at((hint_layout.x - max(1, font.size("M")[0]) // 2, mid_y))[:3]
     under_help = panel.get_at((hint_layout.x + 2, mid_y))[:3]
     assert tinted == expected_tint
-    assert gap == BACKGROUND
+    # Help CTA must not sit on the focus tint (glyph AA may occupy the 1ch gap).
     assert under_help != expected_tint
+    assert highlight_w < hint_layout.x - overlay._padding
 
 
 def test_bottom_row_rebuilt_with_help_hint_content_width() -> None:
@@ -1291,7 +1292,7 @@ def test_action_parameter_row_value_color() -> None:
     assert _row_value_color(state, mode_row) == HIGHLIGHT
 
 
-def test_preset_switching_seed_uses_action_parameter_colors() -> None:
+def test_preset_list_populate_uses_full_line_action_colors() -> None:
     state = _minimal_view_state(
         tracks={
             "layer_1": TrackBlock(
@@ -1303,21 +1304,18 @@ def test_preset_switching_seed_uses_action_parameter_colors() -> None:
                 beat_sensitivity=1.0,
                 effects={},
                 expanded=True,
-                preset_switching="projectm",
-                preset_switching_shuffle=True,
-                preset_switching_shuffle_salt=7,
+                preset_switching="on",
+                preset_list_expanded=True,
             )
         },
         layer_z_order=["layer_1"],
     )
-    seed_row = state.layout.find_by_kind(RowKind.TRACK_PRESET_SWITCHING_SEED)
-    assert seed_row is not None
-    assert _action_parameter_label_color(state, seed_row) == ACTION
-    assert _row_value_color(state, seed_row) == VALUE
-    state.focus_descriptor = state.layout.descriptor(seed_row)
-    assert _action_parameter_label_color(state, seed_row) == HIGHLIGHT
-    assert _row_value_color(state, seed_row) == HIGHLIGHT
-    assert _row_shows_action_enter_hint(state, seed_row) is True
+    populate_row = state.layout.find_by_kind(RowKind.TRACK_PRESET_LIST_POPULATE)
+    assert populate_row is not None
+    assert _row_value_color(state, populate_row) == ACTION
+    state.focus_descriptor = state.layout.descriptor(populate_row)
+    assert _row_value_color(state, populate_row) == HIGHLIGHT
+    assert _row_shows_action_enter_hint(state, populate_row) is True
 
 
 def test_focused_action_row_shows_enter_hint() -> None:

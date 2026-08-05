@@ -52,7 +52,7 @@ def _static_keys(
         state,
         font=font,
         cache=cache,
-        visible_indices=visible,
+        indices=visible,
         max_content_width_for_index=max_w,
         line_h=font.get_linesize(),
     )
@@ -86,6 +86,39 @@ def test_row_render_key_stable_across_fps_and_position() -> None:
     assert key_a == key_b
 
 
+def test_static_row_keys_only_includes_requested_indices() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    font = overlay._font_get()
+    cache = TuningPanelCache()
+    state = _minimal_view_state()
+    visible = tuple(state.layout.visible_indices(state))
+    assert len(visible) >= 2
+    subset = visible[:2]
+
+    def max_w(_index: int) -> int:
+        return 400
+
+    keys_all = static_row_keys(
+        state,
+        font=font,
+        cache=cache,
+        indices=visible,
+        max_content_width_for_index=max_w,
+        line_h=font.get_linesize(),
+    )
+    keys_subset = static_row_keys(
+        state,
+        font=font,
+        cache=cache,
+        indices=subset,
+        max_content_width_for_index=max_w,
+        line_h=font.get_linesize(),
+    )
+    assert len(keys_subset) < len(keys_all)
+    assert keys_subset == keys_all[: len(keys_subset)]
+
+
 def test_focus_change_changes_static_row_keys_for_affected_rows() -> None:
     pygame.init()
     overlay = TuningOverlay()
@@ -113,6 +146,99 @@ def test_focus_change_changes_static_row_keys_for_affected_rows() -> None:
     )
 
     assert track_key_when_track_focused != track_key_when_transport_focused
+
+
+def test_active_preset_list_index_changes_row_render_color_state() -> None:
+    """Active-list highlight is carried by color_state so only affected rows miss."""
+    pygame.init()
+    overlay = TuningOverlay()
+    font = overlay._font_get()
+    cache = TuningPanelCache()
+    tracks = {
+        "layer_1": TrackBlock(
+            stem="drums",
+            preset_dir_label="dir",
+            preset_label="preset.milk",
+            blend_mode="black-key",
+            opacity_pct=50,
+            beat_sensitivity=1.0,
+            effects={},
+            expanded=True,
+            preset_switching="on",
+            preset_list=["/tmp/a.milk", "/tmp/b.milk"],
+            preset_list_labels=["a.milk", "b.milk"],
+            preset_list_expanded=True,
+            active_preset_list_index=0,
+        )
+    }
+    state = _minimal_view_state(
+        layer_z_order=("layer_1",),
+        tracks=tracks,
+        focus_cursor=MainFocus(RowDescriptor(RowKind.TRANSPORT)),
+    )
+    active_index = state.layout.find_descriptor(
+        RowDescriptor(
+            RowKind.TRACK_PRESET_LIST_ITEM,
+            slot="layer_1",
+            preset_index=0,
+        )
+    )
+    idle_index = state.layout.find_descriptor(
+        RowDescriptor(
+            RowKind.TRACK_PRESET_LIST_ITEM,
+            slot="layer_1",
+            preset_index=1,
+        )
+    )
+    line_h = font.get_linesize()
+    max_w = 400
+    key_active_before = row_render_key(
+        state,
+        active_index,
+        font,
+        cache=cache,
+        max_content_width=max_w,
+        line_h=line_h,
+    )
+    key_idle_before = row_render_key(
+        state,
+        idle_index,
+        font,
+        cache=cache,
+        max_content_width=max_w,
+        line_h=line_h,
+    )
+    switched = replace(
+        state,
+        tracks={
+            "layer_1": replace(
+                state.tracks["layer_1"],
+                active_preset_list_index=1,
+            )
+        },
+    )
+    key_active_after = row_render_key(
+        switched,
+        active_index,
+        font,
+        cache=cache,
+        max_content_width=max_w,
+        line_h=line_h,
+    )
+    key_idle_after = row_render_key(
+        switched,
+        idle_index,
+        font,
+        cache=cache,
+        max_content_width=max_w,
+        line_h=line_h,
+    )
+    assert key_active_before != key_active_after
+    assert key_idle_before != key_idle_after
+    assert key_active_before.color_state != key_active_after.color_state
+    assert key_idle_before.color_state != key_idle_after.color_state
+    assert key_active_before.display_text == key_active_after.display_text
+    assert key_idle_before.display_text == key_idle_after.display_text
 
 
 def test_solo_change_invalidates_track_header_row_key() -> None:
@@ -458,11 +584,39 @@ def test_row_cache_hits_on_full_recompose_with_warm_cache() -> None:
     assert counters.row_cache_misses > 0
 
 
-def test_expand_collapse_invalidates_row_cache() -> None:
+def test_retain_row_surfaces_keeps_only_requested_keys() -> None:
+    pygame.init()
+    overlay = TuningOverlay()
+    font = overlay._font_get()
+    cache = TuningPanelCache()
+    state = _minimal_view_state()
+    line_h = font.get_linesize()
+    indices = [
+        i
+        for i in state.layout.visible_indices(state)
+        if state.layout.kind(i) != RowKind.TRANSPORT
+    ][:2]
+    assert len(indices) == 2
+    for index in indices:
+        ensure_row_surface(
+            cache,
+            state,
+            index,
+            font,
+            overlay._build_row_at_index,
+            max_content_width=300,
+            line_h=line_h,
+        )
+    assert len(cache.row_surfaces) == 2
+    keep = {next(iter(cache.row_surfaces))}
+    cache.retain_row_surfaces(keep)
+    assert set(cache.row_surfaces.keys()) == keep
+
+
+def test_expand_collapse_incrementally_evicts_row_cache() -> None:
     pygame.init()
     overlay = TuningOverlay()
     overlay.notify_input()
-    font = overlay._font_get()
     cache = overlay._panel_cache
 
     collapsed = _minimal_view_state(
@@ -499,15 +653,19 @@ def test_expand_collapse_invalidates_row_cache() -> None:
         viewport_width=1280,
         viewport_height=720,
     )
-    assert len(cache.row_surfaces) > 0
+    keys_collapsed = set(cache.row_surfaces.keys())
+    assert keys_collapsed
 
     overlay.compose_panel(
         expanded,
         viewport_width=1280,
         viewport_height=720,
     )
+    keys_expanded = set(cache.row_surfaces.keys())
     assert cache.row_cache_structure == tuple(expanded.layout.visible_indices(expanded))
-    assert len(cache.row_surfaces) > 0
+    assert keys_expanded
+    # Shared viewport rows keep content-keyed surfaces across structure change.
+    assert keys_collapsed & keys_expanded
 
 
 def test_ensure_row_surface_cache_hit_miss_counters() -> None:

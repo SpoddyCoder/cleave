@@ -1226,12 +1226,13 @@ def test_write_session_snapshot_persists_timeline_disabled_without_cues(
             "cue_snap": "none",
             "song_marker_snap": None,
             "timeline_cuts": "by marker",
-            "reshuffle": False,
+            "repopulate": "no",
             "conductor": False,
         },
         "limiter": {
             "enabled": True,
             "threshold": 0.65,
+            "ratio": 3.0,
             "release": 0.45,
         },
     }
@@ -1245,7 +1246,7 @@ def test_write_session_snapshot_round_trips_timeline_preset(tmp_path: Path) -> N
     session.timeline.timeline_preset_cue_snap = "beats"
     session.timeline.timeline_preset_song_marker_snap = 5.0
     session.timeline.timeline_preset_timeline_cuts = "all soft"
-    session.timeline.timeline_preset_reshuffle = True
+    session.timeline.timeline_preset_repopulate = "directory random"
     session.timeline.timeline_preset_conductor = True
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
@@ -1257,7 +1258,7 @@ def test_write_session_snapshot_round_trips_timeline_preset(tmp_path: Path) -> N
         "cue_snap": "beats",
         "song_marker_snap": 5.0,
         "timeline_cuts": "all soft",
-        "reshuffle": True,
+        "repopulate": "directory random",
         "conductor": True,
     }
 
@@ -1283,7 +1284,7 @@ def test_write_session_snapshot_round_trips_timeline_preset(tmp_path: Path) -> N
     assert session2.timeline.timeline_preset_cue_snap == "beats"
     assert session2.timeline.timeline_preset_song_marker_snap == 5.0
     assert session2.timeline.timeline_preset_timeline_cuts == "all soft"
-    assert session2.timeline.timeline_preset_reshuffle is True
+    assert session2.timeline.timeline_preset_repopulate == "directory random"
     assert session2.timeline.timeline_preset_conductor is True
 
 

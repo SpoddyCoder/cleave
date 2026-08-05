@@ -96,6 +96,23 @@ class PresetCurationIndex:
             roles=roles,
         )
 
+    @property
+    def curation_stamp(self) -> str:
+        """Cheap identity for label caches; changes when curation sets mutate."""
+        role_pairs = tuple(
+            sorted(
+                (name, role)
+                for name, role_set in self.roles.items()
+                for role in role_set
+            )
+        )
+        payload = (
+            tuple(sorted(self.favourites)),
+            tuple(sorted(self.blacklist)),
+            role_pairs,
+        )
+        return repr(payload)
+
     def marker(self, name: str, *, user: bool = False) -> str:
         letters = ""
         if name in self.favourites:
@@ -309,18 +326,18 @@ def _unique_relocate_dest(dest_dir: Path, filename: str) -> Path:
 
 
 def scrub_user_preset_paths(layers: Mapping[str, object], removed: Path) -> list[str]:
-    """Remove ``removed`` from layer user preset lists; return affected slot names."""
+    """Remove ``removed`` from layer preset lists; return affected slot names."""
     removed_resolved = removed.resolve()
     affected: list[str] = []
     for slot, layer in layers.items():
-        user_presets: list[str] = layer.user_presets  # type: ignore[attr-defined]
+        preset_list: list[str] = layer.preset_list  # type: ignore[attr-defined]
         filtered = [
             path
-            for path in user_presets
+            for path in preset_list
             if Path(path).resolve() != removed_resolved
         ]
-        if len(filtered) != len(user_presets):
-            user_presets[:] = filtered
+        if len(filtered) != len(preset_list):
+            preset_list[:] = filtered
             affected.append(slot)
     return affected
 
@@ -330,16 +347,16 @@ def rewrite_user_preset_paths(
     old: Path,
     new: Path,
 ) -> list[str]:
-    """Rewrite ``old`` to ``new`` in layer user preset lists; return affected slots."""
+    """Rewrite ``old`` to ``new`` in layer preset lists; return affected slots."""
     old_resolved = old.resolve()
     new_str = str(new)
     affected: list[str] = []
     for slot, layer in layers.items():
-        user_presets: list[str] = layer.user_presets  # type: ignore[attr-defined]
+        preset_list: list[str] = layer.preset_list  # type: ignore[attr-defined]
         changed = False
-        for index, path in enumerate(user_presets):
+        for index, path in enumerate(preset_list):
             if Path(path).resolve() == old_resolved:
-                user_presets[index] = new_str
+                preset_list[index] = new_str
                 changed = True
         if changed:
             affected.append(slot)
