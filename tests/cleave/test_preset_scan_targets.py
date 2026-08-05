@@ -29,17 +29,15 @@ def _layer_config(
     *,
     stem: str = "drums",
     enabled: bool = True,
-    preset_switching: str = "projectm",
-    preset_switching_rotation_set: str = "directory",
-    preset_switching_presets: list[Path] | None = None,
+    preset_switching: str = "on",
+    preset_switching_list: list[Path] | None = None,
 ) -> LayerConfig:
     return LayerConfig(
         preset=preset,
         stem=stem,  # type: ignore[arg-type]
         enabled=enabled,
         preset_switching=preset_switching,  # type: ignore[arg-type]
-        preset_switching_rotation_set=preset_switching_rotation_set,  # type: ignore[arg-type]
-        preset_switching_presets=preset_switching_presets or [],
+        preset_switching_list=preset_switching_list or [],
     )
 
 
@@ -80,7 +78,7 @@ def test_project_targets_include_sibling_presets_non_recursive() -> None:
         cfg = _project_cfg(
             root,
             layers={
-                "layer_1": _layer_config(anchor, preset_switching="projectm"),
+                "layer_1": _layer_config(anchor, preset_switching="on"),
             },
         )
         targets = build_project_targets(cfg)
@@ -105,7 +103,7 @@ def test_project_targets_include_anchor_dir_when_preset_switching_none() -> None
         cfg = _project_cfg(
             root,
             layers={
-                "layer_1": _layer_config(locked, preset_switching="none"),
+                "layer_1": _layer_config(locked, preset_switching="off"),
             },
         )
         targets = build_project_targets(cfg)
@@ -154,9 +152,8 @@ def test_project_targets_user_defined_adds_rotation_presets() -> None:
             layers={
                 "layer_1": _layer_config(
                     anchor,
-                    preset_switching="projectm",
-                    preset_switching_rotation_set="user_defined",
-                    preset_switching_presets=[extra],
+                    preset_switching="on",
+                    preset_switching_list=[extra],
                 ),
             },
         )
@@ -190,12 +187,12 @@ def test_project_targets_dedup_presets_across_layers() -> None:
                 "layer_1": _layer_config(
                     shared,
                     stem="drums",
-                    preset_switching="none",
+                    preset_switching="off",
                 ),
                 "layer_2": _layer_config(
                     other,
                     stem="bass",
-                    preset_switching="none",
+                    preset_switching="off",
                 ),
             },
             layer_z_order=["layer_1", "layer_2"],
@@ -219,7 +216,7 @@ def test_project_targets_respect_layer_z_order_slots() -> None:
             layers[slot] = _layer_config(
                 preset,
                 stem=STEM_NAMES[index],
-                preset_switching="none",
+                preset_switching="off",
             )
 
         cfg = _project_cfg(
@@ -294,7 +291,7 @@ def test_project_targets_include_role_pool_presets() -> None:
         cfg = _project_cfg(
             root,
             layers={
-                "layer_1": _layer_config(anchor, preset_switching="timeline"),
+                "layer_1": _layer_config(anchor, preset_switching="on"),
             },
         )
         targets = build_project_targets(cfg)

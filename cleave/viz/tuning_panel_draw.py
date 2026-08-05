@@ -30,10 +30,10 @@ from cleave.viz.row_fields import (
     row_expand_subheader_display_text,
     row_full_line_display_text,
     row_labeled_display_text,
+    tree_branch_leading_spaces,
 )
 from cleave.extract import stem_overlay_header
 from cleave.viz.row_sections import (
-    PRESET_SWITCHING_CHILD_KINDS,
     RENDER_OVERLAY_SECTION_KINDS,
     RENDER_POST_FX_SECTION_KINDS,
     RENDER_TIMELINE_SECTION_KINDS,
@@ -122,6 +122,7 @@ from cleave.viz.overlay_upload import (
 from cleave.viz.tuning_panel_cache import (
     PanelSignature,
     RowRenderEntry,
+    RowRenderKey,
     TuningPanelCache,
     ensure_row_surface,
     live_upload_signature,
@@ -456,12 +457,16 @@ def track_header_prefix_width(font: pygame.font.Font) -> int:
     return icon_w + ROW_ICON_SUFFIX_GAP
 
 
-def tree_branch_prefix_width(font: pygame.font.Font) -> int:
-    return font.size(TREE_BRANCH)[0]
+def tree_branch_prefix_width(font: pygame.font.Font, *, depth: int = 1) -> int:
+    return font.size(tree_branch_leading_spaces(depth) + TREE_BRANCH)[0]
 
 
-def preset_row_prefix_width(font: pygame.font.Font, line_height: int) -> int:
-    return tree_branch_prefix_width(font) + row_icon_prefix_width(line_height)
+def preset_row_prefix_width(
+    font: pygame.font.Font, line_height: int, *, depth: int = 1
+) -> int:
+    return tree_branch_prefix_width(font, depth=depth) + row_icon_prefix_width(
+        line_height
+    )
 
 
 def _render_preset_row_prefix(
@@ -470,9 +475,11 @@ def _render_preset_row_prefix(
     glyph: str,
     icon_color: tuple[int, int, int],
     line_height: int,
+    depth: int = 1,
     counters: OverlayDrawCounters | None = None,
 ) -> pygame.Surface:
-    tree_surf = _render_text(font, TREE_BRANCH, True, LABEL, counters=counters)
+    branch = tree_branch_leading_spaces(depth) + TREE_BRANCH
+    tree_surf = _render_text(font, branch, True, LABEL, counters=counters)
     icon_surf = render_glyph(glyph, color=icon_color, line_height=line_height)
     total_w = tree_surf.get_width() + icon_surf.get_width()
     surf = _compose_surface((total_w, line_height), counters=counters)
@@ -586,7 +593,9 @@ def fit_row_text(
                 text,
                 budget - icon_w - suffix_w - enter_w,
             )
-        prefix_w = preset_row_prefix_width(font, line_h)
+        prefix_w = preset_row_prefix_width(
+            font, line_h, depth=row_tree_indent_depth(kind)
+        )
         return _fit("counter", fit_counter_label_to_width, text, budget - prefix_w)
     if kind == RowKind.TRACK_HEADER:
         stem = state.layout.slot(index)
@@ -617,7 +626,8 @@ def fit_row_text(
         if kind in {
             RowKind.LAYER_MANAGEMENT_ADD,
             RowKind.LAYER_MANAGEMENT_DELETE,
-            RowKind.TRACK_USER_PRESET_ADD,
+            RowKind.TRACK_PRESET_LIST_ADD,
+            RowKind.TRACK_PRESET_LIST_POPULATE,
         }:
             return _row_text(state, index)
     if field is not None and field.present_style == RowPresentStyle.COMPOSITE_HEADER:
@@ -703,20 +713,12 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
         if not state.render_timeline.enabled:
             return DISABLED
 
-    if kind in PRESET_SWITCHING_CHILD_KINDS:
-        stem_for_switching = state.layout.slot(index)
-        if (
-            stem_for_switching is not None
-            and state.tracks[stem_for_switching].preset_switching == "timeline"
-            and not state.render_timeline.enabled
-        ):
-            return DISABLED
-
     if kind in {
         RowKind.CONFIG_HEADER,
         RowKind.LAYER_MANAGEMENT_ADD,
         RowKind.LAYER_MANAGEMENT_DELETE,
-        RowKind.TRACK_USER_PRESET_ADD,
+        RowKind.TRACK_PRESET_LIST_ADD,
+        RowKind.TRACK_PRESET_LIST_POPULATE,
         RowKind.TIMELINE_PRESETS,
         RowKind.TIMELINE_RESET,
         RowKind.TIMELINE_SNAP_TO_BEATS,
@@ -756,7 +758,7 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
     ):
         return DISABLED
 
-    if stem is not None and state.move_mode_slot == stem:
+    if _row_in_move_mode(state, index):
         return MOVE_MODE
 
     if _row_has_tree_focus(state, index):
@@ -768,12 +770,36 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
     if stem is not None and _track_disabled(state, stem):
         return DISABLED
 
+    if (
+        kind == RowKind.TRACK_PRESET_LIST_ITEM
+        and stem is not None
+        and desc.preset_index is not None
+        and state.tracks[stem].active_preset_list_index == desc.preset_index
+    ):
+        # HIGHLIGHT yellow; color_state is part of RowRenderKey so only the
+        # previous/next active rows miss the row-surface cache on switch.
+        return HIGHLIGHT
+
     return VALUE
 
 
-def _row_bg_color(state: TuningViewState, index: int) -> tuple[int, int, int] | None:
+def _row_in_move_mode(state: TuningViewState, index: int) -> bool:
     stem = state.layout.slot(index)
     if stem is not None and state.move_mode_slot == stem:
+        return True
+    move = state.move_mode_preset
+    if move is None:
+        return False
+    desc = state.layout.descriptor(index)
+    return (
+        desc.kind == RowKind.TRACK_PRESET_LIST_ITEM
+        and desc.slot == move[0]
+        and desc.preset_index == move[1]
+    )
+
+
+def _row_bg_color(state: TuningViewState, index: int) -> tuple[int, int, int] | None:
+    if _row_in_move_mode(state, index):
         return MOVE_MODE
     if _row_has_tree_focus(state, index):
         return HIGHLIGHT
@@ -1058,170 +1084,6 @@ def _transport_icons_width(line_h: int) -> int:
 def _glyph_icon_width(glyph: str, line_h: int) -> int:
     icon_h = line_h + 1
     return material_font(icon_h).size(glyph)[0]
-
-
-def _estimate_row_content_width(
-    *,
-    padding: int,
-    font: pygame.font.Font,
-    state: TuningViewState,
-    index: int,
-    max_content_width: int,
-    line_h: int,
-) -> int:
-    width = _estimate_row_content_width_base(
-        padding=padding,
-        font=font,
-        state=state,
-        index=index,
-        max_content_width=max_content_width,
-        line_h=line_h,
-    )
-    if _row_shows_enter_icon(state, index):
-        width += action_enter_icon_suffix_width(line_h)
-    return width
-
-
-def _estimate_row_content_width_base(
-    *,
-    padding: int,
-    font: pygame.font.Font,
-    state: TuningViewState,
-    index: int,
-    max_content_width: int,
-    line_h: int,
-) -> int:
-    indent = padding + _row_indent(state, index)
-    kind = state.layout.kind(index)
-
-    if kind == RowKind.TRANSPORT:
-        time_text = f" [{format_mmss(state.position_sec)}]"
-        return indent + _transport_icons_width(line_h) + font.size(time_text)[0]
-
-    if kind == RowKind.TRACK_HEADER:
-        stem = state.layout.slot(index)
-        desc = RowDescriptor(RowKind.TRACK_HEADER, slot=stem)
-        locked = section_locked(state, desc)
-        prefix_w = visibility_icon_slot_width(line_h)
-        layer_prefix = composite_header_prefix_part(state, desc)
-        stem_text = _fit_track_header_stem(
-            font, state, index, max_content_width=max_content_width
-        )
-        expand_arrow = (
-            format_composite_header_expand_value(state, desc)
-            if stem is not None
-            else expand_arrow_glyph(False)
-        )
-        label_w = (
-            font.size(layer_prefix)[0]
-            + font.size(stem_text)[0]
-            + font.size(f" {expand_arrow}")[0]
-        )
-        if locked:
-            label_w += track_header_lock_suffix_width(line_h)
-        return indent + prefix_w + label_w
-
-    if kind == RowKind.SETTINGS_HEADER:
-        desc = state.layout.descriptor(index)
-        icon_w = _glyph_icon_width(SETTINGS_GLYPH, line_h)
-        prefix = composite_header_prefix_part(state, desc)
-        value = format_composite_header_expand_value(state, desc)
-        return indent + icon_w + font.size(prefix)[0] + font.size(value)[0]
-
-    if kind in {
-        RowKind.RENDER_OVERLAYS_HEADER,
-        RowKind.RENDER_POST_FX_HEADER,
-        RowKind.RENDER_TIMELINE_HEADER,
-    }:
-        desc = state.layout.descriptor(index)
-        prefix_w = visibility_icon_slot_width(line_h)
-        layer_prefix = composite_header_prefix_part(state, desc)
-        stem_text = composite_header_suffix_part(state, desc)
-        expand_arrow = format_composite_header_expand_value(state, desc)
-        label_w = (
-            font.size(layer_prefix)[0]
-            + font.size(stem_text)[0]
-            + font.size(f" {expand_arrow}")[0]
-        )
-        if section_locked(state, desc):
-            label_w += track_header_lock_suffix_width(line_h)
-        return indent + prefix_w + label_w
-
-    if kind == RowKind.RENDER_SECTION_GAP:
-        return indent + 1
-
-    if (
-        ROW_FIELDS.get(kind) is not None
-        and ROW_FIELDS[kind].present_style == RowPresentStyle.PATH_ICON
-    ):
-        if kind == RowKind.TRACK_PRESET_DIR:
-            prefix_w = preset_row_prefix_width(font, line_h)
-        elif kind in {RowKind.TRACK_PRESET, RowKind.TRACK_USER_PRESET_ITEM}:
-            prefix_w = preset_row_prefix_width(font, line_h)
-        else:
-            prefix_w = tree_branch_prefix_width(font) + _glyph_icon_width(
-                FILE_GLYPH, line_h
-            )
-        if kind == RowKind.CONFIG_HEADER:
-            path = fit_row_text(
-                font, state, index, max_content_width=max_content_width
-            )
-            suffix_w = font.size("*")[0] if state.config_dirty else 0
-            return indent + prefix_w + font.size(path)[0] + suffix_w
-        label = fit_row_text(
-            font, state, index, max_content_width=max_content_width
-        )
-        return indent + prefix_w + font.size(label)[0]
-
-    if (
-        ROW_FIELDS.get(kind) is not None
-        and ROW_FIELDS[kind].present_style == RowPresentStyle.EXPAND_SUBHEADER
-    ):
-        desc = state.layout.descriptor(index)
-        prefix = expand_subheader_prefix(kind)
-        value = format_expand_subheader_value(state, desc)
-        return indent + font.size(prefix)[0] + font.size(value)[0]
-
-    if _is_action_parameter_style(kind):
-        prefix = _action_parameter_row_prefix(kind)
-        value = _fit_action_parameter_row_value(
-            font,
-            state,
-            index,
-            max_content_width=max_content_width,
-        )
-        return indent + font.size(prefix)[0] + font.size(value)[0]
-
-    if kind in LABELED_SUB_ROW_KINDS:
-        prefix = _labeled_sub_row_prefix(state, index)
-        value = _fit_labeled_sub_row_value(
-            font, state, index, max_content_width=max_content_width
-        )
-        return indent + font.size(prefix)[0] + font.size(value)[0]
-
-    if (
-        ROW_FIELDS.get(kind) is not None
-        and ROW_FIELDS[kind].present_style == RowPresentStyle.FULL_LINE
-        and kind
-        in {
-            RowKind.LAYER_MANAGEMENT_ADD,
-            RowKind.LAYER_MANAGEMENT_DELETE,
-            RowKind.TRACK_USER_PRESET_ADD,
-            RowKind.TIMELINE_PRESETS,
-            RowKind.TIMELINE_RESET,
-            RowKind.TIMELINE_SNAP_TO_BEATS,
-            RowKind.TIMELINE_SNAP_TO_BARS,
-            RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
-            RowKind.TIMELINE_APPLY_SOFT_CUTS,
-            RowKind.TIMELINE_APPLY_HARD_CUTS,
-            RowKind.SETTINGS_MEASURE_LATENCY,
-        }
-    ):
-        label = _row_text(state, index)
-        return indent + font.size(label)[0]
-
-    text = fit_row_text(font, state, index, max_content_width=max_content_width)
-    return indent + font.size(text)[0]
 
 
 def _scrollable_row_in_viewport(
@@ -1690,6 +1552,7 @@ class TuningOverlay:
             ROW_FIELDS.get(kind) is not None
             and ROW_FIELDS[kind].present_style == RowPresentStyle.PATH_ICON
         ):
+            depth = row_tree_indent_depth(kind)
             if kind == RowKind.TRACK_PRESET_DIR:
                 glyph = FOLDER_GLYPH
                 icon_color = PRESET_ICON
@@ -1698,9 +1561,10 @@ class TuningOverlay:
                     glyph=glyph,
                     icon_color=icon_color,
                     line_height=line_h,
+                    depth=depth,
                     counters=counters,
                 )
-            elif kind in {RowKind.TRACK_PRESET, RowKind.TRACK_USER_PRESET_ITEM}:
+            elif kind in {RowKind.TRACK_PRESET, RowKind.TRACK_PRESET_LIST_ITEM}:
                 glyph = FILE_GLYPH
                 icon_color = PRESET_FILE_ICON
                 icon_surf = _render_preset_row_prefix(
@@ -1708,6 +1572,7 @@ class TuningOverlay:
                     glyph=glyph,
                     icon_color=icon_color,
                     line_height=line_h,
+                    depth=depth,
                     counters=counters,
                 )
             else:
@@ -1817,7 +1682,8 @@ class TuningOverlay:
             in {
                 RowKind.LAYER_MANAGEMENT_ADD,
                 RowKind.LAYER_MANAGEMENT_DELETE,
-                RowKind.TRACK_USER_PRESET_ADD,
+                RowKind.TRACK_PRESET_LIST_ADD,
+                RowKind.TRACK_PRESET_LIST_POPULATE,
                 RowKind.TIMELINE_PRESETS,
                 RowKind.TIMELINE_RESET,
                 RowKind.TIMELINE_SNAP_TO_BEATS,
@@ -2206,9 +2072,13 @@ class TuningOverlay:
         scrollable_indices = frozenset(metrics.scrollable_indices)
         panel_max_width = panel_content_max_width_px(state.settings.ui_width)
         vis_tuple = tuple(visible_indices)
+        # Stable order matching layout; viewport rows only for the static signature.
+        raster_tuple = tuple(i for i in vis_tuple if i in raster_indices)
         cache = self._panel_cache
-        if cache.row_cache_structure != vis_tuple:
-            cache.clear_rows()
+        structure_changed = cache.row_cache_structure != vis_tuple
+        if structure_changed:
+            # Content-keyed surfaces stay valid across expand/collapse; prune
+            # unused entries after the full compose below instead of clear_rows().
             cache.row_cache_structure = vis_tuple
 
         def max_content_width_for(index: int) -> int:
@@ -2223,7 +2093,7 @@ class TuningOverlay:
             state,
             font=font,
             cache=cache,
-            visible_indices=vis_tuple,
+            indices=raster_tuple,
             max_content_width_for_index=max_content_width_for,
             line_h=line_h,
         )
@@ -2314,32 +2184,23 @@ class TuningOverlay:
 
         built_rows: dict[int, RowRenderEntry] = {}
         row_widths: list[int] = []
-        for index in visible_indices:
+        used_row_keys: set[RowRenderKey] = set()
+        # Width from viewport rows only; off-screen estimates are skipped.
+        for index in raster_tuple:
             max_content_width = max_content_width_for(index)
-            if index in raster_indices:
-                entry = ensure_row_surface(
-                    cache,
-                    state,
-                    index,
-                    font,
-                    self._build_row_at_index,
-                    max_content_width=max_content_width,
-                    line_h=line_h,
-                    counters=counters,
-                )
-                built_rows[index] = entry
-                row_widths.append(entry.content_width)
-            else:
-                row_widths.append(
-                    _estimate_row_content_width(
-                        padding=self._padding,
-                        font=font,
-                        state=state,
-                        index=index,
-                        max_content_width=max_content_width,
-                        line_h=line_h,
-                    )
-                )
+            entry = ensure_row_surface(
+                cache,
+                state,
+                index,
+                font,
+                self._build_row_at_index,
+                max_content_width=max_content_width,
+                line_h=line_h,
+                counters=counters,
+                used_keys=used_row_keys,
+            )
+            built_rows[index] = entry
+            row_widths.append(entry.content_width)
 
         content_w = max(row_widths) if row_widths else 0
         if state.settings.ui_width_mode == "fixed":
@@ -2383,7 +2244,11 @@ class TuningOverlay:
                     max_content_width=bottom_max,
                     line_h=line_h,
                     counters=counters,
+                    used_keys=used_row_keys,
                 )
+
+        if structure_changed:
+            cache.retain_row_surfaces(used_row_keys)
 
         alpha = int(BACKGROUND_ALPHA * self._visibility)
         if alpha < 2:

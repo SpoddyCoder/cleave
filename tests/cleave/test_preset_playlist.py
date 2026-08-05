@@ -11,6 +11,7 @@ from cleave.config_schema import DEFAULT_LAYER_SLOTS
 from cleave.preset_playlist import (
     directory_display,
     list_navigable_dirs,
+    path_under_preset_root,
     playlist_at_dir,
     preset_browse_floor,
     preset_filename_display,
@@ -261,6 +262,19 @@ def test_directory_display_clamps_sibling_parent_at_preset_root() -> None:
         playlist = scan_preset_playlist(root)
         label = directory_display(playlist, root)
         assert label == "[▼]./ (1/2)"
+
+
+def test_directory_display_label_outside_preset_root() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "presets"
+        outside = Path(tmp) / "user-presets"
+        root.mkdir()
+        outside.mkdir()
+        _write_milk(outside / "a.milk")
+        playlist = playlist_at_dir(outside)
+        label = playlist.directory_display_label(root)
+        assert outside.resolve().as_posix() in label
+        assert not path_under_preset_root(outside, root)
 
 
 def test_directory_display_label_caches_on_repeated_calls() -> None:

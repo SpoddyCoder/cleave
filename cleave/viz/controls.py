@@ -12,24 +12,22 @@ import pygame
 from cleave.config import CleaveConfig, clamp_beat_sensitivity, clamp_effect_pct
 from cleave.config_schema import clamp_easter_egg
 from cleave.config_schema import (
-    CAST_ROLES_TIMELINE_BEHAVIOURS,
     PRESET_SWITCHING_MODES,
-    PRESET_SWITCHING_ROTATION_SETS,
+    PRESET_SWITCHING_TRIGGERS,
 )
 from cleave.blend_modes import BLEND_MODES, BlendMode
-from cleave.cue_roles import CUE_ROLES, role_pool_paths
 from cleave.extract import STEM_SOURCES
 from cleave.signals import Signals
 from cleave.song_markers import format_marker_time, place_marker
 from cleave.preset_curation import PresetCurationIndex
-from cleave.preset_playlist import is_top_level_browse_dir
+from cleave.preset_playlist import is_top_level_browse_dir, milk_files_in_dir
 from cleave.timeline import snap_placement_time
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.editor_mode_controls import EditorModeController, is_preset_curation_mode
 from cleave.viz.post_fx import sync_live_compositor_format
 from cleave.viz.preset_curation_controls import PresetCurationController
 from cleave.viz.key_repeat import KeyRepeatController, add_current_preset_key_pressed, delete_key_pressed, mod_ctrl, mod_shift
-from cleave.viz.modal import ModalHost
+from cleave.viz.modal import ModalHost, ModalOption
 from cleave.viz.panel_notification import PanelNotificationHost
 from cleave.viz.playback import PlaybackState, current_sec, seek, seek_to, toggle_pause
 from cleave.viz.live_layer_bindings import LiveLayerBindings
@@ -39,13 +37,19 @@ from cleave.viz.render_post_fx_controls import RenderPostFxControls
 from cleave.viz.settings_controls import SettingsControls
 from cleave.viz.tap_sync_controls import TapSyncControls, TapSyncUiSnapshot
 from cleave.viz.timeline_phase_controls import TimelinePhaseController
-from cleave.viz.preset_seed_controls import PresetSeedController
 from cleave.viz.timeline_preset_controls import TimelinePresetController
+from cleave.viz.preset_list_populate import (
+    needed_preset_count,
+    on_segment_populate_count,
+    populate_from_cue_marker_roles,
+    populate_from_directory,
+    repopulate_preset_lists,
+)
 from cleave.viz.timeline_cut_controls import TimelineCutController
 from cleave.viz.timeline_snap_controls import TimelineSnapController
 from cleave.viz.user_presets import (
     resolve_user_preset_dest,
-    user_preset_item_display_name,
+    preset_list_item_display_name,
     user_preset_referenced_on_disk,
 )
 from cleave.viz.focus_nav import (
@@ -81,8 +85,8 @@ if TYPE_CHECKING:
 
 NOTIFICATION_TIMELINE_ENABLED_TEXT = "Timeline controls layer visibility"
 NOTIFICATION_TIMELINE_DISABLED_TEXT = "Layer panel controls visibility"
-NOTIFICATION_TIMELINE_PRESET_SWITCHING_TEXT = (
-    "Enable timeline for timeline preset switching"
+NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT = (
+    "Timeline is disabled; enable Render: TIMELINE to switch presets"
 )
 NOTIFICATION_RESIDUAL_LATENCY_UNCHANGED_TEXT = (
     "Existing marker and cue times unchanged"
@@ -138,6 +142,8 @@ class TuningControls:
         )
         self.move_mode_slot: str | None = None
         self._move_mode_original_z_order: list[str] | None = None
+        self.move_mode_preset: tuple[str, int] | None = None
+        self._move_mode_original_preset_list: list[str] | None = None
         self._notification_host = PanelNotificationHost()
         self._key_repeat = KeyRepeatController()
         self._hide_overlay_requested = False
@@ -168,18 +174,6 @@ class TuningControls:
         layers_by_slot = (
             layer_manager.layers_by_slot if layer_manager is not None else {}
         )
-        on_switching = (
-            None
-            if layer_bindings is None
-            else layer_bindings.on_preset_switching_change
-        )
-        self._preset_seed = PresetSeedController(
-            session,
-            self._modal_host,
-            layers_by_slot,
-            preset_root=preset_root,
-            on_preset_switching_change=on_switching,
-        )
         self._timeline_presets = TimelinePresetController(
             session,
             self._modal_host,
@@ -187,7 +181,7 @@ class TuningControls:
             bar_times,
             signals=signals,
             on_notification=self.show_notification,
-            on_reshuffle=self._preset_seed.reroll_all,
+            on_repopulate=self._repopulate_preset_lists,
         )
         self._timeline_phase = TimelinePhaseController(
             session,
@@ -214,6 +208,7 @@ class TuningControls:
             curation_index,
             get_focus_cursor=lambda: self.focus_cursor,
             get_move_mode_slot=lambda: self.move_mode_slot,
+            get_move_mode_preset=lambda: self.move_mode_preset,
             config_save=self._config_save,
             get_notification=self._notification_host.active,
             layers_by_slot=layers_by_slot,
@@ -371,7 +366,7 @@ class TuningControls:
             return True
 
         if event.key == pygame.K_t:
-            if self.move_mode_slot is not None:
+            if self.move_mode_slot is not None or self.move_mode_preset is not None:
                 return True
             tl = self.session.timeline
             if tl.panel_open:
@@ -380,15 +375,21 @@ class TuningControls:
                 self._open_timeline_panel(enter_submenu=True)
             return True
 
-        if self.move_mode_slot is not None:
+        if self.move_mode_slot is not None or self.move_mode_preset is not None:
             if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
                 self._cancel_move_mode()
                 return True
             if event.key == pygame.K_UP:
-                self._swap_stem_in_z_order(self.move_mode_slot, -1)
+                if self.move_mode_preset is not None:
+                    self._swap_preset_list_item(-1)
+                else:
+                    self._swap_stem_in_z_order(self.move_mode_slot, -1)
                 return True
             if event.key == pygame.K_DOWN:
-                self._swap_stem_in_z_order(self.move_mode_slot, 1)
+                if self.move_mode_preset is not None:
+                    self._swap_preset_list_item(1)
+                else:
+                    self._swap_stem_in_z_order(self.move_mode_slot, 1)
                 return True
             if event.key == pygame.K_m:
                 self._confirm_move_mode()
@@ -459,7 +460,7 @@ class TuningControls:
                         return True
                     self._delete_song_marker(desc.marker_index)
                 return True
-            if kind == RowKind.TRACK_USER_PRESET_ITEM:
+            if kind == RowKind.TRACK_PRESET_LIST_ITEM:
                 slot = self.focus_descriptor.slot
                 desc = self.focus_descriptor
                 if slot is not None and desc.preset_index is not None:
@@ -467,7 +468,7 @@ class TuningControls:
                         self.session, self.focus_descriptor
                     ):
                         return True
-                    self._delete_user_preset(slot, desc.preset_index)
+                    self._delete_preset_list_item(slot, desc.preset_index)
                 return True
             if row_triggers_layer_delete(kind):
                 slot = self.focus_descriptor.slot
@@ -489,6 +490,16 @@ class TuningControls:
                         self.session.layer_z_order
                     )
                     self.move_mode_slot = slot
+                return True
+            if kind == RowKind.TRACK_PRESET_LIST_ITEM:
+                slot = self.focus_descriptor.slot
+                index = self.focus_descriptor.preset_index
+                if slot is not None and index is not None:
+                    if section_lock_blocks_mutation(
+                        self.session, self.focus_descriptor
+                    ):
+                        return True
+                    self._enter_preset_list_move_mode(slot, index)
                 return True
 
         if event.key == pygame.K_l:
@@ -513,9 +524,8 @@ class TuningControls:
             slot = self.focus_descriptor.slot
             if (
                 slot is not None
-                and kind in {RowKind.TRACK_PRESET_DIR, RowKind.TRACK_PRESET}
-                and self.session.layers[slot].preset_switching_rotation_set
-                == "user_defined"
+                and self.session.layers[slot].preset_switching == "on"
+                and row_behavior(kind).parent_group == "track"
             ):
                 if section_lock_blocks_mutation(
                     self.session, self.focus_descriptor
@@ -541,7 +551,7 @@ class TuningControls:
                     self._preset_curation.prompt_blacklist(
                         slot,
                         src,
-                        from_user_preset=(kind == RowKind.TRACK_USER_PRESET_ITEM),
+                        from_user_preset=(kind == RowKind.TRACK_PRESET_LIST_ITEM),
                         user_preset_index=self.focus_descriptor.preset_index,
                     )
                 elif event.key == pygame.K_c:
@@ -569,7 +579,7 @@ class TuningControls:
                     if 0 <= desc.marker_index < len(times):
                         self.seek_to(times[desc.marker_index])
                 return True
-            if kind == RowKind.TRACK_USER_PRESET_ADD:
+            if kind == RowKind.TRACK_PRESET_LIST_ADD:
                 slot = self.focus_descriptor.slot
                 if slot is not None:
                     if section_lock_blocks_mutation(
@@ -577,6 +587,15 @@ class TuningControls:
                     ):
                         return True
                     self._add_current_preset(slot)
+                return True
+            if kind == RowKind.TRACK_PRESET_LIST_POPULATE:
+                slot = self.focus_descriptor.slot
+                if slot is not None:
+                    if section_lock_blocks_mutation(
+                        self.session, self.focus_descriptor
+                    ):
+                        return True
+                    self._prompt_populate_presets(slot)
                 return True
             if kind == RowKind.LAYER_MANAGEMENT_ADD:
                 self._add_layer()
@@ -591,15 +610,6 @@ class TuningControls:
                 return True
             if kind == RowKind.TIMELINE_RESET:
                 self._timeline_presets.prompt_reset()
-                return True
-            if kind == RowKind.TRACK_PRESET_SWITCHING_SEED:
-                slot = self.focus_descriptor.slot
-                if slot is not None:
-                    if section_lock_blocks_mutation(
-                        self.session, self.focus_descriptor
-                    ):
-                        return True
-                    self._preset_seed.prompt(slot)
                 return True
             if kind == RowKind.TIMELINE_SNAP_TO_BEATS:
                 self._timeline_snap.prompt_beats()
@@ -709,7 +719,7 @@ class TuningControls:
                     self._preset_curation.prompt_blacklist(
                         slot,
                         src,
-                        from_user_preset=(kind == RowKind.TRACK_USER_PRESET_ITEM),
+                        from_user_preset=(kind == RowKind.TRACK_PRESET_LIST_ITEM),
                         user_preset_index=self.focus_descriptor.preset_index,
                     )
                 elif event.key == pygame.K_c:
@@ -736,7 +746,6 @@ class TuningControls:
     def tick(self, dt_sec: float) -> None:
         self._key_repeat.tick(dt_sec)
         self._notification_host.clear_expired()
-        self._sync_cast_roles_pool_notification()
 
     def build_view_state(
         self,
@@ -745,23 +754,9 @@ class TuningControls:
         position_sec: float | None = None,
         fps: float | None = None,
     ) -> TuningViewState:
-        self._sync_cast_roles_pool_notification()
         return self._view_state.build(
             paused=paused, position_sec=position_sec, fps=fps
         )
-
-    def _sync_cast_roles_pool_notification(self) -> None:
-        for slot in self.session.layer_z_order:
-            layer = self.session.layers[slot]
-            if layer.preset_switching_rotation_set != "cast_roles":
-                continue
-            role = layer.cast_roles_default_role
-            if not role_pool_paths(self.preset_root, role):
-                self._notification_host.set_persistent(
-                    f"No presets in {role} roles folder"
-                )
-                return
-        self._notification_host.set_persistent(None)
 
     @property
     def focus_descriptor(self) -> RowDescriptor:
@@ -881,9 +876,15 @@ class TuningControls:
     def _confirm_move_mode(self) -> None:
         self.move_mode_slot = None
         self._move_mode_original_z_order = None
+        if self.move_mode_preset is not None:
+            slot, _index = self.move_mode_preset
+            self.move_mode_preset = None
+            self._move_mode_original_preset_list = None
+            if self._layer_bindings is not None:
+                self._layer_bindings.on_preset_switching_change(slot)
 
     def _rebuild_view(self) -> None:
-        if self.move_mode_slot is not None:
+        if self.move_mode_slot is not None or self.move_mode_preset is not None:
             self._confirm_move_mode()
 
     def _add_layer(self) -> None:
@@ -948,10 +949,10 @@ class TuningControls:
             return None
         return self.project_dir / "user-presets"
 
-    def _user_preset_path_referenced(self, path: str) -> bool:
+    def _preset_list_path_referenced(self, path: str) -> bool:
         target = Path(path).resolve()
         for layer in self.session.layers.values():
-            for other in layer.user_presets:
+            for other in layer.preset_list:
                 if Path(other).resolve() == target:
                     return True
         return False
@@ -966,11 +967,11 @@ class TuningControls:
         layer = self.session.layers[slot]
         if kind == RowKind.TRACK_PRESET:
             return layer.playlist.current
-        if kind == RowKind.TRACK_USER_PRESET_ITEM:
+        if kind == RowKind.TRACK_PRESET_LIST_ITEM:
             index = desc.preset_index
-            if index is None or index < 0 or index >= len(layer.user_presets):
+            if index is None or index < 0 or index >= len(layer.preset_list):
                 return None
-            return Path(layer.user_presets[index])
+            return Path(layer.preset_list[index])
         return None
 
     def _add_current_preset(self, slot: str) -> None:
@@ -995,17 +996,17 @@ class TuningControls:
             dest_path, needs_copy = resolve_user_preset_dest(dest_dir, src_path)
             if needs_copy:
                 shutil.copy2(src_path, dest_path)
-            self.session.layers[slot].user_presets.append(str(dest_path.resolve()))
+            self.session.layers[slot].preset_list.append(str(dest_path.resolve()))
             if self._layer_bindings is not None:
                 self._layer_bindings.on_preset_switching_change(slot)
         finally:
             self._unlock_preset_after_modal(slot)
 
-    def _delete_user_preset(self, slot: str, index: int) -> None:
+    def _delete_preset_list_item(self, slot: str, index: int) -> None:
         layer = self.session.layers[slot]
-        if index < 0 or index >= len(layer.user_presets):
+        if index < 0 or index >= len(layer.preset_list):
             return
-        label = user_preset_item_display_name(layer.user_presets, index)
+        label = preset_list_item_display_name(layer.preset_list, index)
         self._modal_host.prompt_yes_no(
             f"Remove preset: {label}?",
             on_confirm=lambda: self._confirm_delete_preset(slot, index),
@@ -1013,9 +1014,9 @@ class TuningControls:
 
     def _confirm_delete_preset(self, slot: str, index: int) -> None:
         layer = self.session.layers[slot]
-        if index < 0 or index >= len(layer.user_presets):
+        if index < 0 or index >= len(layer.preset_list):
             return
-        removed = layer.user_presets.pop(index)
+        removed = layer.preset_list.pop(index)
         removed_path = Path(removed).resolve()
         presets_dir = self._user_presets_dir()
         if presets_dir is not None:
@@ -1024,7 +1025,7 @@ class TuningControls:
             except ValueError:
                 pass
             else:
-                still_needed = self._user_preset_path_referenced(removed)
+                still_needed = self._preset_list_path_referenced(removed)
                 if not still_needed and self.project_dir is not None:
                     still_needed = user_preset_referenced_on_disk(
                         self.project_dir,
@@ -1040,8 +1041,160 @@ class TuningControls:
         if self._move_mode_original_z_order is not None:
             self.session.layer_z_order[:] = self._move_mode_original_z_order
             self._apply_preview_resolutions()
+        if (
+            self.move_mode_preset is not None
+            and self._move_mode_original_preset_list is not None
+        ):
+            slot, _index = self.move_mode_preset
+            self.session.layers[slot].preset_list[:] = (
+                self._move_mode_original_preset_list
+            )
         self.move_mode_slot = None
         self._move_mode_original_z_order = None
+        self.move_mode_preset = None
+        self._move_mode_original_preset_list = None
+
+    def _enter_preset_list_move_mode(self, slot: str, index: int) -> None:
+        layer = self.session.layers[slot]
+        if index < 0 or index >= len(layer.preset_list):
+            return
+        self._move_mode_original_preset_list = list(layer.preset_list)
+        self.move_mode_preset = (slot, index)
+
+    def _swap_preset_list_item(self, direction: int) -> None:
+        if self.move_mode_preset is None:
+            return
+        slot, index = self.move_mode_preset
+        presets = self.session.layers[slot].preset_list
+        target = index + direction
+        if target < 0 or target >= len(presets):
+            return
+        presets[index], presets[target] = presets[target], presets[index]
+        self.move_mode_preset = (slot, target)
+        self._apply_focus_cursor(
+            MainFocus(
+                RowDescriptor(
+                    RowKind.TRACK_PRESET_LIST_ITEM,
+                    slot=slot,
+                    preset_index=target,
+                )
+            )
+        )
+
+    def _repopulate_preset_lists(self) -> None:
+        if self.project_dir is None:
+            return
+        repopulate_preset_lists(
+            self.session,
+            mode=self.session.timeline.timeline_preset_repopulate,
+            project_dir=self.project_dir,
+            preset_root=self.preset_root,
+        )
+        if self._layer_bindings is None:
+            return
+        for slot in self.session.layer_z_order:
+            if self.session.layers[slot].preset_switching == "on":
+                self._layer_bindings.on_preset_switching_change(slot)
+
+    def _prompt_populate_presets(self, slot: str) -> None:
+        if self.project_dir is None:
+            return
+        if self._layer_bindings is not None:
+            self._layer_bindings.lock_preset_for_modal(slot)
+        options: list[ModalOption] = []
+        layer = self.session.layers[slot]
+        timeline_trigger = layer.preset_switching_trigger == "timeline"
+        if timeline_trigger:
+            populate_count = on_segment_populate_count(self.session, slot)
+            options.append(
+                ModalOption(
+                    "Using Cue Marker Roles (random)",
+                    action=lambda: self._confirm_populate(slot, "cue_roles"),
+                )
+            )
+        else:
+            needed = needed_preset_count(
+                song_duration_sec=self.duration_sec,
+                preset_duration=layer.preset_duration,
+                trigger=layer.preset_switching_trigger,
+            )
+            available = len(milk_files_in_dir(layer.playlist.current_dir))
+            populate_count = min(needed, available)
+        options.extend(
+            [
+                ModalOption(
+                    "From Current Directory (random)",
+                    action=lambda: self._confirm_populate(
+                        slot, "directory_random"
+                    ),
+                ),
+                ModalOption(
+                    "From Current Directory (sequential)",
+                    action=lambda: self._confirm_populate(
+                        slot, "directory_sequential"
+                    ),
+                ),
+            ]
+        )
+        options.append(
+            ModalOption(
+                "Cancel",
+                action=lambda: self._unlock_preset_after_modal(slot),
+            )
+        )
+        self._modal_host.prompt_choice(
+            f"Populate the preset list with {populate_count} presets?",
+            options,
+            on_dismiss=lambda: self._unlock_preset_after_modal(slot),
+        )
+
+    def _confirm_populate(self, slot: str, mode: str) -> None:
+        try:
+            if self.project_dir is None:
+                return
+            layer = self.session.layers[slot]
+            timeline_trigger_disabled = (
+                layer.preset_switching_trigger == "timeline"
+                and not self.session.timeline.enabled
+            )
+            if mode in ("directory_random", "directory_sequential"):
+                max_count: int | None = None
+                if layer.preset_switching_trigger != "timeline":
+                    max_count = needed_preset_count(
+                        song_duration_sec=self.duration_sec,
+                        preset_duration=layer.preset_duration,
+                        trigger=layer.preset_switching_trigger,
+                    )
+                order = (
+                    "sequential" if mode == "directory_sequential" else "random"
+                )
+                populate_from_directory(
+                    self.session,
+                    slot,
+                    project_dir=self.project_dir,
+                    max_count=max_count,
+                    order=order,
+                )
+            else:
+                populate_from_cue_marker_roles(
+                    self.session,
+                    slot,
+                    project_dir=self.project_dir,
+                    preset_root=self.preset_root,
+                )
+            layer.preset_list_expanded = True
+            if self._layer_bindings is not None:
+                self._layer_bindings.on_preset_switching_change(slot)
+            count = len(layer.preset_list)
+            if timeline_trigger_disabled:
+                self.show_notification(
+                    f"Populated {count} presets; "
+                    "enable Render: TIMELINE to switch"
+                )
+            else:
+                self.show_notification(f"Populated {count} presets")
+        finally:
+            self._unlock_preset_after_modal(slot)
 
     def _apply_horizontal(self, key: int, mod: int, kind: RowKind) -> None:
         ctrl = mod_ctrl(mod)
@@ -1108,6 +1261,17 @@ class TuningControls:
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_change(slot, playlist)
 
+    def _warn_if_timeline_trigger_disabled(self, slot: str) -> bool:
+        layer = self.session.layers[slot]
+        if (
+            layer.preset_switching == "on"
+            and layer.preset_switching_trigger == "timeline"
+            and not self.session.timeline.enabled
+        ):
+            self.show_notification(NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT)
+            return True
+        return False
+
     def _cycle_preset_switching(self, slot: str, *, forward: bool) -> None:
         layer = self.session.layers[slot]
         modes = PRESET_SWITCHING_MODES
@@ -1119,74 +1283,25 @@ class TuningControls:
             layer.preset_switching = modes[(index + 1) % len(modes)]
         else:
             layer.preset_switching = modes[(index - 1) % len(modes)]
-        if (
-            layer.preset_switching != "timeline"
-            and layer.preset_switching_rotation_set == "cast_roles"
-        ):
-            layer.preset_switching_rotation_set = "directory"
-        if (
-            layer.preset_switching == "timeline"
-            and not self.session.timeline.enabled
-        ):
-            self.show_notification(NOTIFICATION_TIMELINE_PRESET_SWITCHING_TEXT)
+        if layer.preset_switching == "on":
+            layer.preset_list_expanded = True
+        self._warn_if_timeline_trigger_disabled(slot)
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)
 
-    def _cycle_preset_switching_rotation_set(self, slot: str, *, forward: bool) -> None:
+    def _cycle_preset_switching_trigger(self, slot: str, *, forward: bool) -> None:
         layer = self.session.layers[slot]
-        rotation_sets = tuple(
-            value
-            for value in PRESET_SWITCHING_ROTATION_SETS
-            if value != "cast_roles" or layer.preset_switching == "timeline"
-        )
+        options = PRESET_SWITCHING_TRIGGERS
         try:
-            index = rotation_sets.index(layer.preset_switching_rotation_set)
+            index = options.index(layer.preset_switching_trigger)
         except ValueError:
             index = 0
         if forward:
-            layer.preset_switching_rotation_set = rotation_sets[
-                (index + 1) % len(rotation_sets)
-            ]
+            layer.preset_switching_trigger = options[(index + 1) % len(options)]
         else:
-            layer.preset_switching_rotation_set = rotation_sets[
-                (index - 1) % len(rotation_sets)
-            ]
-        if layer.preset_switching_rotation_set == "user_defined":
-            layer.user_presets_expanded = True
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_preset_switching_change(slot)
-
-    def _cycle_cast_roles_timeline_behaviour(
-        self, slot: str, *, forward: bool
-    ) -> None:
-        layer = self.session.layers[slot]
-        options = CAST_ROLES_TIMELINE_BEHAVIOURS
-        try:
-            index = options.index(layer.cast_roles_timeline_behaviour)
-        except ValueError:
-            index = 0
-        if forward:
-            layer.cast_roles_timeline_behaviour = options[
-                (index + 1) % len(options)
-            ]
-        else:
-            layer.cast_roles_timeline_behaviour = options[
-                (index - 1) % len(options)
-            ]
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_preset_switching_change(slot)
-
-    def _cycle_cast_roles_default_role(self, slot: str, *, forward: bool) -> None:
-        layer = self.session.layers[slot]
-        options = CUE_ROLES
-        try:
-            index = options.index(layer.cast_roles_default_role)
-        except ValueError:
-            index = 0
-        if forward:
-            layer.cast_roles_default_role = options[(index + 1) % len(options)]
-        else:
-            layer.cast_roles_default_role = options[(index - 1) % len(options)]
+            layer.preset_switching_trigger = options[(index - 1) % len(options)]
+        if not self._warn_if_timeline_trigger_disabled(slot) and layer.preset_list:
+            self.show_notification("Preset list may need adjusting")
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)
 
@@ -1197,6 +1312,17 @@ class TuningControls:
         step = 10.0 if ctrl else 1.0
         delta = step if forward else -step
         layer.preset_duration = max(5.0, min(300.0, layer.preset_duration + delta))
+        if (
+            layer.preset_switching_trigger != "timeline"
+            and layer.preset_list
+            and len(layer.preset_list)
+            < needed_preset_count(
+                song_duration_sec=self.duration_sec,
+                preset_duration=layer.preset_duration,
+                trigger=layer.preset_switching_trigger,
+            )
+        ):
+            self.show_notification("Preset list may need more presets")
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)
 
@@ -1232,12 +1358,6 @@ class TuningControls:
         if self._layer_bindings is not None:
             self._layer_bindings.on_preset_switching_change(slot)
 
-    def _cycle_preset_switching_shuffle(self, slot: str, *, forward: bool) -> None:
-        del forward
-        layer = self.session.layers[slot]
-        layer.preset_switching_shuffle = not layer.preset_switching_shuffle
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_preset_switching_change(slot)
 
     def _step_hard_cut_duration(
         self, slot: str, *, forward: bool, ctrl: bool = False
@@ -1375,11 +1495,11 @@ class TuningControls:
             return
         layer.effects_expanded = expanded
 
-    def _set_user_presets_expanded(self, slot: str, expanded: bool) -> None:
+    def _set_preset_list_expanded(self, slot: str, expanded: bool) -> None:
         layer = self.session.layers[slot]
-        if layer.user_presets_expanded == expanded:
+        if layer.preset_list_expanded == expanded:
             return
-        layer.user_presets_expanded = expanded
+        layer.preset_list_expanded = expanded
 
     def _set_song_markers_expanded(self, expanded: bool) -> None:
         markers = self.session.song_markers

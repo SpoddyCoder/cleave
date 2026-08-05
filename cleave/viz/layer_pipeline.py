@@ -226,9 +226,9 @@ class LayerFramePipeline:
         apply_preset_switching(
             layer,
             mode=layer_cfg.preset_switching,
-            rotation_set=layer_cfg.preset_switching_rotation_set,
-            user_presets=[
-                str(path) for path in layer_cfg.preset_switching_presets
+            trigger=layer_cfg.preset_switching_trigger,
+            preset_list=[
+                str(path) for path in layer_cfg.preset_switching_list
             ],
             preset_duration=layer_cfg.preset_duration,
             soft_cut_duration=layer_cfg.soft_cut_duration,
@@ -237,11 +237,6 @@ class LayerFramePipeline:
             hard_cut_enabled=layer_cfg.hard_cut_enabled,
             hard_cut_duration=layer_cfg.hard_cut_duration,
             hard_cut_sensitivity=layer_cfg.hard_cut_sensitivity,
-            shuffle=layer_cfg.preset_switching_shuffle,
-            shuffle_salt=layer_cfg.preset_switching_shuffle_salt,
-            cast_roles_default_role=layer_cfg.cast_roles_default_role,
-            cast_roles_timeline_behaviour=layer_cfg.cast_roles_timeline_behaviour,
-            preset_root=preset_root,
         )
         return layer
 

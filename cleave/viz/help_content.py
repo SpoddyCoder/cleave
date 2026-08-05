@@ -132,32 +132,33 @@ _PRESET_SECTION = HelpSection(
     ),
 )
 
-_USER_PRESET_ADD_SHORTCUT = ("U", "add current preset to user-defined list")
+_USER_PRESET_ADD_SHORTCUT = ("P", "add current preset to switching list")
 
-_USER_PRESET_ITEM_SECTION = HelpSection(
+_PRESET_LIST_ITEM_SECTION = HelpSection(
     "Edit",
     (
+        ("M", "reorder in list"),
         ("Delete", "remove preset"),
         *_PRESET_CURATION_SHORTCUTS,
     ),
 )
 
-_USER_PRESET_ADD_SECTION = HelpSection(
+_PRESET_LIST_ADD_SECTION = HelpSection(
     "Add Current Preset",
     (("Enter", "add current preset"),),
 )
 
 
-def _preset_dir_section(*, user_defined: bool = False) -> HelpSection:
+def _preset_dir_section(*, switching_on: bool = False) -> HelpSection:
     entries = list(_PRESET_DIR_SECTION.entries)
-    if user_defined:
+    if switching_on:
         entries.append(_USER_PRESET_ADD_SHORTCUT)
     return HelpSection(_PRESET_DIR_SECTION.title, tuple(entries))
 
 
-def _preset_section(*, user_defined: bool = False) -> HelpSection:
+def _preset_section(*, switching_on: bool = False) -> HelpSection:
     entries = list(_PRESET_SECTION.entries)
-    if user_defined:
+    if switching_on:
         entries.append(_USER_PRESET_ADD_SHORTCUT)
     return HelpSection(_PRESET_SECTION.title, tuple(entries))
 
@@ -299,7 +300,7 @@ def sections_for(
     paused: bool = False,
     timeline_recording: bool = False,
     timeline_override_active: bool = False,
-    preset_switching_rotation_set: str | None = None,
+    preset_switching: str | None = None,
     preset_curation: bool = False,
 ) -> tuple[HelpContent, ...]:
     nav = navigation_section(preset_curation=preset_curation)
@@ -346,17 +347,17 @@ def sections_for(
         primary = _value_step_section(row_kind)
     elif behavior.affordance == RowAffordance.ACTION_PARAMETER:
         primary = _value_step_section(row_kind)
-    elif row_kind == RowKind.TRACK_USER_PRESET_ITEM:
-        primary = _USER_PRESET_ITEM_SECTION
-    elif row_kind == RowKind.TRACK_USER_PRESET_ADD:
-        primary = _USER_PRESET_ADD_SECTION
+    elif row_kind == RowKind.TRACK_PRESET_LIST_ITEM:
+        primary = _PRESET_LIST_ITEM_SECTION
+    elif row_kind == RowKind.TRACK_PRESET_LIST_ADD:
+        primary = _PRESET_LIST_ADD_SECTION
     elif behavior.affordance == RowAffordance.PATH_DIR:
         primary = _preset_dir_section(
-            user_defined=preset_switching_rotation_set == "user_defined"
+            switching_on=preset_switching == "on"
         )
     elif behavior.affordance == RowAffordance.PATH_PRESET:
         primary = _preset_section(
-            user_defined=preset_switching_rotation_set == "user_defined"
+            switching_on=preset_switching == "on"
         )
     elif behavior.affordance == RowAffordance.SEEK:
         primary = _TRANSPORT_SECTION

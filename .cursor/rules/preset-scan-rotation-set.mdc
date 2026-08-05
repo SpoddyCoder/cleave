@@ -1,14 +1,15 @@
 ---
-description: Keep cleave scan preset derivation aligned with preset_switching_rotation_set
-globs: cleave/config_schema.py,cleave/viz/preset_switching.py,cleave/preset_scan*.py,cleave/cli.py
+description: Keep cleave scan targets aligned with live preset switching lists
+globs:
+  - cleave/preset_scan*.py
+  - cleave/viz/preset_switching.py
+  - cleave/config_schema.py
 alwaysApply: false
 ---
 
-# Preset scan and rotation set
+# Preset scan and switching list
 
-When changing `PresetSwitchingRotationSet`, `PRESET_SWITCHING_ROTATION_SETS`, or how [cleave/viz/preset_switching.py](cleave/viz/preset_switching.py) builds the projectM playlist (`add_path` recurse flag, directory vs user-defined list), also update **scan set derivation** for `cleave scan`.
-
-Plan: [docs/legacy-plans/presets-scan-plan.md](docs/legacy-plans/presets-scan-plan.md).
+When changing how [cleave/viz/preset_switching.py](cleave/viz/preset_switching.py) builds the live switching list, also update **scan set derivation** for `cleave scan`.
 
 ## Experimental / low trust
 
@@ -16,18 +17,16 @@ Plan: [docs/legacy-plans/presets-scan-plan.md](docs/legacy-plans/presets-scan-pl
 
 ## Current contract
 
-- Mode (`preset_switching`): `none` | `projectm` | `timeline`.
-- Rotation set (`preset_switching_rotation_set`): `directory` | `user_defined` (used when mode is `projectm` or `timeline`).
-- **directory** live rotation: immediate `*.milk` siblings in `playlist.current_dir`, **non-recursive** (`recurse=False`), then `sort()`.
-- **user_defined** live rotation: `preset_switching_presets` via `add_presets(..., allow_duplicates=True)` (no sort).
-- Project scan includes the anchor directory for **every** layer (even `preset_switching: none` or `enabled: false`), plus `preset_switching_presets` when `preset_switching_rotation_set` is `user_defined`, plus non-recursive `*.milk` in each `preset_root/roles/<role>/` pool (`bed`, `pulse`, `lead`, `accent`). Role pools are part of the live rotation surface: timeline cues with a `role` cast from those directories via `role_rotations` in [cleave/viz/preset_switching.py](cleave/viz/preset_switching.py), so scan must enumerate the same files.
+- Mode (`preset_switching`): `off` | `on`.
+- Trigger (`preset_switching_trigger`): `timer` | `projectm` | `timeline`.
+- Live switching always uses the explicit ordered `preset_switching_list` (session `preset_list`).
+- Project scan includes the anchor directory for **every** layer, plus every path in `preset_switching_list`, plus non-recursive `*.milk` in each `preset_root/roles/<role>/` pool (`bed`, `pulse`, `lead`, `accent`). Role pools feed populate-from-role actions; scan should still enumerate them.
 - Bulk mode uses `--presets-dir` with optional `--recursive`; project mode does not recurse into subfolders.
 
-## When rotation set expands
+## When the live list source changes
 
 1. Mirror the new live rule in the scan-target builder (same module family as [cleave/preset_scan.py](cleave/preset_scan.py)).
 2. Extend JSON report `layers` / metadata if attribution changes.
 3. Add or adjust unit tests for target enumeration (no GL required).
-4. Update [docs/legacy-plans/presets-scan-plan.md](docs/legacy-plans/presets-scan-plan.md) scan set section.
 
-Do not let play and scan disagree on which presets are in rotation.
+Do not let play and scan disagree on which presets are in the switching surface.

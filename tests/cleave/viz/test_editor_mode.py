@@ -192,7 +192,7 @@ def test_enter_curation_defaults_full_mix_and_disables_rotation() -> None:
     controls.session.settings.expanded = True
     controls.session.solo_slot = "layer_2"
     controls.session.layers["layer_1"].stem = "drums"
-    controls.session.layers["layer_1"].preset_switching = "projectm"
+    controls.session.layers["layer_1"].preset_switching = "on"
     controls._config_save.clear_config_dirty()
     controls.focus_cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
     mock_bindings = MagicMock()
@@ -207,7 +207,7 @@ def test_enter_curation_defaults_full_mix_and_disables_rotation() -> None:
     assert controls.session.solo_slot is None
     assert controls.session.layers["layer_1"].stem == "full_mix"
     # Session YAML mode is left intact; live apply is forced to none via bindings.
-    assert controls.session.layers["layer_1"].preset_switching == "projectm"
+    assert controls.session.layers["layer_1"].preset_switching == "on"
     assert mock_bindings.on_preset_switching_change.call_args_list == [
         (("layer_1",), {}),
         (("layer_2",), {}),

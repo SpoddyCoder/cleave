@@ -12,7 +12,7 @@ from cleave.projectm_health import (
     drain_stem_layers_preset_failures,
 )
 from cleave.viz.layer import StemLayer
-from cleave.viz.preset_switching import EMPTY_ROTATION_NOTIFICATION
+from cleave.viz.preset_switching import EMPTY_PRESET_LIST_NOTIFICATION
 
 
 def _layer_with_failures(*failures: PresetLoadFailure) -> StemLayer:
@@ -63,4 +63,4 @@ def test_drain_notifies_exhausted_rotation() -> None:
     )
     notify = MagicMock()
     drain_stem_layers_preset_failures([layer], on_notification=notify)
-    notify.assert_called_once_with(EMPTY_ROTATION_NOTIFICATION)
+    notify.assert_called_once_with(EMPTY_PRESET_LIST_NOTIFICATION)

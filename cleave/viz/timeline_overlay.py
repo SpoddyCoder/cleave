@@ -142,7 +142,6 @@ class TimelineViewState:
     soft_cut_fades: TimelineFadeGroup = field(default_factory=TimelineFadeGroup)
     selected_cue_t: dict[str, float] = field(default_factory=dict)
     selected_cue_flash_start_ms: int | None = None
-    slot_rotation_sets: dict[str, str] = field(default_factory=dict)
 
 
 def cue_times_for_stem(
@@ -1154,8 +1153,6 @@ class TimelineOverlay:
                 layout.bar_width,
                 max(1, row_h - BAR_VERTICAL_INSET * 2),
             )
-            if state.slot_rotation_sets.get(slot) != "cast_roles":
-                continue
             for cue in bar_cues_for_row(state, slot):
                 if cue.role is None or cue.level <= LEVEL_EPS:
                     continue
@@ -1530,10 +1527,7 @@ class TimelineOverlay:
             if 0 <= state.focus_row < len(state.layer_z_order)
             else None
         )
-        show_role = (
-            focused_slot is not None
-            and state.slot_rotation_sets.get(focused_slot) == "cast_roles"
-        )
+        show_role = focused_slot is not None
         cue_readout = (
             render_selected_cue_readout(font, selected_cue, show_role=show_role)
             if selected_cue is not None

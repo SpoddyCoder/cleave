@@ -5,14 +5,12 @@ from __future__ import annotations
 from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES, BLEND_MODES
 from cleave.cue_roles import CUE_ROLE_MARKER_HELP_ENTRIES
 from cleave.config_schema import (
-    CAST_ROLES_DEFAULT_ROLE_HELP_ENTRIES,
-    CAST_ROLES_TIMELINE_BEHAVIOUR_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_APPLY_MODES,
     HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_CURVES,
     PRESET_SWITCHING_MODE_HELP_ENTRIES,
-    PRESET_SWITCHING_ROTATION_SET_HELP_ENTRIES,
+    PRESET_SWITCHING_TRIGGER_HELP_ENTRIES,
     EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
 )
 from cleave.timeline_presets import TIMELINE_PRESET_HELP_ENTRIES
@@ -169,13 +167,13 @@ def test_preset_dir_help_titles() -> None:
     assert "Shift + +" not in entries
 
 
-def test_preset_dir_help_includes_add_shortcut_in_user_defined_rotation_set() -> None:
+def test_preset_dir_help_includes_add_shortcut_when_switching_on() -> None:
     sections = sections_for(
         RowKind.TRACK_PRESET_DIR,
-        preset_switching_rotation_set="user_defined",
+        preset_switching="on",
     )
     entries = dict(_keyboard_section(sections).entries)
-    assert entries["U"] == "add current preset to user-defined list"
+    assert entries["P"] == "add current preset to switching list"
 
 
 def test_preset_file_help_titles() -> None:
@@ -206,13 +204,13 @@ def test_preset_file_help_titles() -> None:
     assert "Shift + +" not in entries
 
 
-def test_preset_file_help_includes_add_shortcut_in_user_defined_rotation_set() -> None:
+def test_preset_file_help_includes_add_shortcut_when_switching_on() -> None:
     sections = sections_for(
         RowKind.TRACK_PRESET,
-        preset_switching_rotation_set="user_defined",
+        preset_switching="on",
     )
     entries = dict(_keyboard_section(sections).entries)
-    assert entries["U"] == "add current preset to user-defined list"
+    assert entries["P"] == "add current preset to switching list"
 
 
 def test_blend_mode_help_lists_modes() -> None:
@@ -233,47 +231,13 @@ def test_switching_mode_help_lists_modes() -> None:
     assert description is not None
     assert description.title == "Preset switching"
     assert description.lines == (
-        "Controls how and when presets change during playback.",
+        "When on, advances through this layer's ordered preset list.",
+        "The trigger chooses timer, projectM, or timeline on-transitions.",
     )
     assert description.entries == PRESET_SWITCHING_MODE_HELP_ENTRIES
     modes = [mode for mode, _ in description.entries]
-    assert modes == ["none", "projectm", "timeline"]
-    timeline_help = dict(description.entries)["timeline"]
-    assert "timeline on-transition" in timeline_help
+    assert modes == ["off", "on"]
 
-
-def test_rotation_set_help_lists_rotation_sets() -> None:
-    description = _description_section(
-        sections_for(RowKind.TRACK_PRESET_SWITCHING_ROTATION_SET)
-    )
-    assert description is not None
-    assert description.title == "Rotation set"
-    assert description.lines == ()
-    assert description.entries == PRESET_SWITCHING_ROTATION_SET_HELP_ENTRIES
-    modes = [mode for mode, _ in description.entries]
-    assert modes == ["directory", "user_defined", "cast_roles"]
-
-
-def test_cast_roles_timeline_behaviour_help_lists_options() -> None:
-    description = _description_section(
-        sections_for(RowKind.TRACK_CAST_ROLES_TIMELINE_BEHAVIOUR)
-    )
-    assert description is not None
-    assert description.title == "Timeline behaviour"
-    assert description.entries == CAST_ROLES_TIMELINE_BEHAVIOUR_HELP_ENTRIES
-    assert [mode for mode, _ in description.entries] == [
-        "hold_current",
-        "on_transition",
-    ]
-
-
-def test_cast_roles_default_role_help_lists_roles() -> None:
-    description = _description_section(
-        sections_for(RowKind.TRACK_CAST_ROLES_DEFAULT_ROLE)
-    )
-    assert description is not None
-    assert description.title == "Default role"
-    assert description.entries == CAST_ROLES_DEFAULT_ROLE_HELP_ENTRIES
 
 
 def test_timeline_presets_help_lists_characters() -> None:
@@ -310,29 +274,6 @@ def test_timeline_reset_help_lists_choices() -> None:
     assert keyboard.entries == (("Enter", "reset timeline"),)
 
 
-def test_shuffle_help_describes_fixed_order() -> None:
-    sections = sections_for(RowKind.TRACK_PRESET_SWITCHING_SHUFFLE)
-    description = _description_section(sections)
-    assert description is not None
-    assert description.title == "Shuffle"
-    joined = " ".join(description.lines)
-    assert "fixed shuffled order" in joined
-    assert "seed row" in joined
-    keyboard = _keyboard_section(sections)
-    assert keyboard.entries == (("Left/Right", "off / on"),)
-
-
-def test_seed_help_describes_generate_action() -> None:
-    sections = sections_for(RowKind.TRACK_PRESET_SWITCHING_SEED)
-    description = _description_section(sections)
-    assert description is not None
-    assert description.title == "Seed"
-    joined = " ".join(description.lines)
-    assert "shuffle seed" in joined
-    assert "new seed" in joined
-    keyboard = _keyboard_section(sections)
-    assert keyboard.entries == (("Enter", "generate a new seed"),)
-
 
 def test_preview_quality_help_lists_modes() -> None:
     description = _description_section(sections_for(RowKind.SETTINGS_PREVIEW_QUALITY))
@@ -340,6 +281,53 @@ def test_preview_quality_help_lists_modes() -> None:
     assert description.title == "Preview quality"
     assert "live view only" in " ".join(description.lines)
     assert description.entries == EDITOR_PREVIEW_QUALITY_HELP_ENTRIES
+
+
+
+def test_preset_switching_trigger_help_lists_options() -> None:
+    sections = sections_for(RowKind.TRACK_PRESET_SWITCHING_TRIGGER)
+    description = next(s for s in sections if isinstance(s, DescriptionSection))
+    assert description.entries == PRESET_SWITCHING_TRIGGER_HELP_ENTRIES
+
+
+def test_preset_list_help() -> None:
+    sections = sections_for(RowKind.TRACK_PRESET_LIST)
+    description = _description_section(sections)
+    keyboard = _keyboard_section(sections)
+    assert description is not None
+    assert description.title == "preset list"
+    assert description.lines == (
+        "Ordered presets used for automatic switching on this layer.",
+        "Expand to reorder, delete, or add the current browse preset.",
+    )
+    assert not description.entries
+    assert keyboard.title == KEYBOARD_CONTROLS_SECTION_TITLE
+    assert dict(keyboard.entries) == {"Left/Right": "expand/collapse"}
+
+
+def test_preset_list_entry_help() -> None:
+    sections = sections_for(RowKind.TRACK_PRESET_LIST_ITEM)
+    description = _description_section(sections)
+    keyboard = _keyboard_section(sections)
+    assert description is not None
+    assert description.title == "preset list entry"
+    assert description.lines == (
+        "Preset in this layer's switching list.",
+        "[F/B] indicates favourited/blacklisted.",
+        "[R:X] indicates the chosen role.",
+    )
+    assert description.entries == CUE_ROLE_MARKER_HELP_ENTRIES
+    assert "Delete" not in " ".join(description.lines)
+    assert keyboard.title == KEYBOARD_CONTROLS_SECTION_TITLE
+    entries = dict(keyboard.entries)
+    assert entries == {
+        "M": "reorder in list",
+        "Delete": "remove preset",
+        "F": "favourite preset",
+        "B": "blacklist preset",
+        "C": "cast preset (bed/pulse/lead/accent)",
+        "R": "remove favourite / restore blacklist / remove cast",
+    }
 
 
 def test_highlight_rolloff_mode_help_lists_modes() -> None:
@@ -457,46 +445,6 @@ def test_layer_management_delete_help() -> None:
     assert "" not in entries
     assert description is not None
     assert "At least one layer must remain." in description.lines
-
-
-def test_user_presets_help() -> None:
-    sections = sections_for(RowKind.TRACK_USER_PRESETS)
-    description = _description_section(sections)
-    keyboard = _keyboard_section(sections)
-    assert description is not None
-    assert description.title == "user presets"
-    assert "user-defined switching" in " ".join(description.lines)
-    assert dict(keyboard.entries)["Left/Right"] == "expand/collapse"
-
-
-def test_user_preset_item_help() -> None:
-    sections = sections_for(RowKind.TRACK_USER_PRESET_ITEM)
-    description = _description_section(sections)
-    keyboard = _keyboard_section(sections)
-    assert description is not None
-    assert description.title == "user preset entry"
-    assert description.lines == (
-        "Preset in the user-defined rotation set for this layer.",
-        "[F/B] indicates favourited/blacklisted.",
-        "[R:X] indicates the chosen role.",
-    )
-    assert description.entries == CUE_ROLE_MARKER_HELP_ENTRIES
-    entries = dict(keyboard.entries)
-    assert entries["Delete"] == "remove preset"
-    assert entries["F"] == "favourite preset"
-    assert entries["B"] == "blacklist preset"
-    assert entries["C"] == "cast preset (bed/pulse/lead/accent)"
-    assert entries["R"] == "remove favourite / restore blacklist / remove cast"
-
-
-def test_user_preset_add_help() -> None:
-    sections = sections_for(RowKind.TRACK_USER_PRESET_ADD)
-    description = _description_section(sections)
-    keyboard = _keyboard_section(sections)
-    assert description is not None
-    assert description.title == "Add Current Preset"
-    assert dict(keyboard.entries)["Enter"] == "add current preset"
-    assert any("U" in line and "preset dir" in line for line in description.lines)
 
 
 def test_navigable_row_kinds_have_help_sections() -> None:

@@ -1,10 +1,12 @@
-"""Helpers for per-layer user-defined preset lists."""
+"""Helpers for per-layer preset switching lists (project user-presets copies)."""
 
 from __future__ import annotations
 
 import filecmp
+import hashlib
 import os
 import shutil
+from collections.abc import Sequence
 from pathlib import Path
 
 import yaml
@@ -15,20 +17,40 @@ from cleave.project import PROJECT_FILENAME
 USER_PRESETS_DIRNAME = "user-presets"
 
 
-def user_preset_item_display_name(paths: list[str], index: int) -> str:
-    """Format a user preset row label, numbering duplicate paths in the list."""
-    path = paths[index]
-    resolved = Path(path).resolve()
-    name = Path(path).name
-    matching = [
-        position
-        for position, candidate in enumerate(paths)
-        if Path(candidate).resolve() == resolved
-    ]
-    if len(matching) <= 1:
-        return name
-    instance = matching.index(index) + 1
-    return f"{name} ({instance})"
+def path_list_digest(paths: Sequence[str]) -> str:
+    """Stable digest for ordered path strings (empty list -> empty digest)."""
+    if not paths:
+        return ""
+    return hashlib.sha1("\0".join(paths).encode()).hexdigest()
+
+
+def path_list_identity(paths: Sequence[str]) -> dict[str, int | str]:
+    """Compact structure-signature identity for an ordered path list."""
+    return {"len": len(paths), "digest": path_list_digest(paths)}
+
+
+def preset_list_display_names(paths: list[str]) -> list[str]:
+    """Format preset-list row labels, numbering duplicate paths in the list."""
+    if not paths:
+        return []
+    resolved = [Path(path).resolve() for path in paths]
+    by_resolved: dict[Path, list[int]] = {}
+    for index, path in enumerate(resolved):
+        by_resolved.setdefault(path, []).append(index)
+    labels = [""] * len(paths)
+    for indices in by_resolved.values():
+        if len(indices) == 1:
+            index = indices[0]
+            labels[index] = Path(paths[index]).name
+            continue
+        for instance, index in enumerate(indices, start=1):
+            labels[index] = f"{Path(paths[index]).name} ({instance})"
+    return labels
+
+
+def preset_list_item_display_name(paths: list[str], index: int) -> str:
+    """Format a preset-list row label, numbering duplicate paths in the list."""
+    return preset_list_display_names(paths)[index]
 
 
 def copy_with_dedup(dest_dir: Path, src_path: Path) -> Path:
@@ -147,7 +169,7 @@ def _preset_refs_from_viz_yaml(path: Path) -> set[Path]:
     for layer_raw in layers.values():
         if not isinstance(layer_raw, dict):
             continue
-        raw = layer_raw.get("preset_switching_presets")
+        raw = layer_raw.get("preset_switching_list")
         if not isinstance(raw, list):
             continue
         for entry in raw:

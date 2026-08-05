@@ -39,14 +39,13 @@ from cleave.viz.layer_pipeline import LayerFramePipeline, apply_effect_modifiers
 from cleave.viz.layer_visibility import apply_layer_visibility, effective_layer_enabled
 from cleave.viz.mix_player import MixPlayer
 from cleave.viz.preset_switching import (
-    EMPTY_ROTATION_NOTIFICATION,
-    EMPTY_USER_PRESETS_NOTIFICATION,
+    EMPTY_PRESET_LIST_NOTIFICATION,
     apply_preset_switching,
     load_manual_preset_clean,
-    reanchor_timeline_preset_after_browse,
+    reanchor_list_preset_after_browse,
     reapply_projectm_preset_switching,
     resync_timeline_preset_switching,
-    sync_manual_browse_with_user_defined_rotation,
+    sync_manual_browse_with_list,
 )
 from cleave.stem_pcm import StemPcmBank
 from cleave.viz.playback import current_sec, seek
@@ -185,19 +184,16 @@ def make_tuning_controls(
 ) -> TuningControls:
     def _effective_preset_switching(slot: str) -> str:
         if not preset_switching_active(session):
-            return "none"
+            return "off"
         return session.layers[slot].preset_switching
 
-    def _empty_rotation_notify(slot: str) -> Callable[[], None]:
+    def _empty_list_notify() -> Callable[[], None]:
         def on_empty() -> None:
             if not preset_switching_active(session):
                 return
             notify = notification_sink.get("fn")
             if notify is not None:
-                if session.layers[slot].preset_switching_rotation_set == "user_defined":
-                    notify(EMPTY_USER_PRESETS_NOTIFICATION)
-                else:
-                    notify(EMPTY_ROTATION_NOTIFICATION)
+                notify(EMPTY_PRESET_LIST_NOTIFICATION)
 
         return on_empty
 
@@ -206,16 +202,19 @@ def make_tuning_controls(
         layer.playlist = playlist
         runtime = session.layers[slot]
         mode = _effective_preset_switching(slot)
-        rotation_set = runtime.preset_switching_rotation_set
-        if mode == "projectm" and rotation_set == "directory":
+        projectm_trigger = (
+            mode == "on"
+            and runtime.preset_switching_trigger == "projectm"
+        )
+        if projectm_trigger:
             current = playlist.current
             if current is not None:
                 layer.auto_preset_path = current.resolve()
             apply_preset_switching(
                 layer,
                 mode=mode,
-                rotation_set=runtime.preset_switching_rotation_set,
-                user_presets=runtime.user_presets,
+                trigger=runtime.preset_switching_trigger,
+                preset_list=runtime.preset_list,
                 preset_duration=runtime.preset_duration,
                 soft_cut_duration=runtime.soft_cut_duration,
                 easter_egg=runtime.easter_egg,
@@ -223,12 +222,7 @@ def make_tuning_controls(
                 hard_cut_enabled=runtime.hard_cut_enabled,
                 hard_cut_duration=runtime.hard_cut_duration,
                 hard_cut_sensitivity=runtime.hard_cut_sensitivity,
-                shuffle=runtime.preset_switching_shuffle,
-                shuffle_salt=runtime.preset_switching_shuffle_salt,
-                cast_roles_default_role=runtime.cast_roles_default_role,
-                cast_roles_timeline_behaviour=runtime.cast_roles_timeline_behaviour,
-                preset_root=preset_root,
-                on_empty=_empty_rotation_notify(slot),
+                on_empty=_empty_list_notify(),
                 session=session,
             )
             return
@@ -237,24 +231,19 @@ def make_tuning_controls(
         load_manual_preset_clean(
             layer, preset_start_clean=runtime.preset_start_clean
         )
-        if mode == "none":
+        if mode != "on":
             layer.pm.lock_preset(True)
             return
-        if mode == "timeline":
-            reanchor_timeline_preset_after_browse(
+        if runtime.preset_switching_trigger in ("timer", "timeline"):
+            reanchor_list_preset_after_browse(
                 layer,
                 session,
                 current_sec(playback, duration_sec),
-                rotation_set=runtime.preset_switching_rotation_set,
-                user_presets=runtime.user_presets,
-                shuffle=runtime.preset_switching_shuffle,
-                shuffle_salt=runtime.preset_switching_shuffle_salt,
-                cast_roles_default_role=runtime.cast_roles_default_role,
-                preset_root=preset_root,
+                preset_list=runtime.preset_list,
             )
             return
         layer.pm.lock_preset(False)
-        sync_manual_browse_with_user_defined_rotation(layer)
+        sync_manual_browse_with_list(layer)
 
     def on_preset_switching_change(slot: str) -> None:
         layer = layers_by_slot[slot]
@@ -262,8 +251,8 @@ def make_tuning_controls(
         apply_preset_switching(
             layer,
             mode=_effective_preset_switching(slot),
-            rotation_set=runtime.preset_switching_rotation_set,
-            user_presets=runtime.user_presets,
+            trigger=runtime.preset_switching_trigger,
+            preset_list=runtime.preset_list,
             preset_duration=runtime.preset_duration,
             soft_cut_duration=runtime.soft_cut_duration,
             easter_egg=runtime.easter_egg,
@@ -271,12 +260,7 @@ def make_tuning_controls(
             hard_cut_enabled=runtime.hard_cut_enabled,
             hard_cut_duration=runtime.hard_cut_duration,
             hard_cut_sensitivity=runtime.hard_cut_sensitivity,
-            shuffle=runtime.preset_switching_shuffle,
-            shuffle_salt=runtime.preset_switching_shuffle_salt,
-            cast_roles_default_role=runtime.cast_roles_default_role,
-            cast_roles_timeline_behaviour=runtime.cast_roles_timeline_behaviour,
-            preset_root=preset_root,
-            on_empty=_empty_rotation_notify(slot),
+            on_empty=_empty_list_notify(),
             session=session,
         )
 
@@ -285,10 +269,15 @@ def make_tuning_controls(
 
     def unlock_preset_after_modal(slot: str) -> None:
         mode = _effective_preset_switching(slot)
-        if mode in ("none", "timeline"):
-            layers_by_slot[slot].pm.lock_preset(True)
-        else:
+        runtime = session.layers[slot]
+        projectm_trigger = (
+            mode == "on"
+            and runtime.preset_switching_trigger == "projectm"
+        )
+        if projectm_trigger:
             layers_by_slot[slot].pm.lock_preset(False)
+        else:
+            layers_by_slot[slot].pm.lock_preset(True)
 
     notification_sink: dict[str, Callable[[str], None] | None] = {"fn": None}
 
