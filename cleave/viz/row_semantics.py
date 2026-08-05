@@ -1327,11 +1327,13 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Song marker",
         help_entries=(
             ("Enter", "seek to marker"),
+            ("Left / Right", "cycle marker type"),
             ("Delete", "confirm remove"),
         ),
         help_description=(
-            "A song marker time. Enter seeks the playhead;",
-            "Delete asks to remove the marker.",
+            "A song marker time and type (-, crescendo,",
+            "diminuendo). Enter seeks the playhead; Left/Right",
+            "cycles type; Delete asks to remove the marker.",
         ),
     ),
     RowKind.SETTINGS_HEADER: RowBehavior(

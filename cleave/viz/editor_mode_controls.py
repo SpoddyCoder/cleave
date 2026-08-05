@@ -247,7 +247,7 @@ class EditorModeController:
             panel_open=panel_open,
         )
         if self._project_dir is not None:
-            self.session.song_markers.times = list(
+            self.session.song_markers.markers = list(
                 load_manifest(self._project_dir).song_markers
             )
         if self._layer_manager is not None:

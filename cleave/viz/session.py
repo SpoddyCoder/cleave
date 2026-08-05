@@ -51,6 +51,7 @@ from cleave.config_schema import (
 from cleave.extract import StemSource
 from cleave.preset_playlist import PresetPlaylist, preset_browse_floor
 from cleave.projectm_health import PresetSkipNotifyTracker, ProjectMLogNotifyTracker
+from cleave.song_markers import SongMarker
 from cleave.timeline import SlotCue, TimelineLane, copy_lane, empty_lane
 from cleave.blend_modes import BlendMode
 from cleave.timeline_presets.characters import DEFAULT_TIMELINE_PRESET_KIND
@@ -313,9 +314,18 @@ def default_timeline_runtime() -> TimelineRuntime:
 class SongMarkerRuntime:
     """Project-scoped song markers held live; not part of viz YAML."""
 
-    times: list[float] = field(default_factory=list)
+    markers: list[SongMarker] = field(default_factory=list)
     selected_index: int | None = None
     expanded: bool = False
+
+    @property
+    def times(self) -> list[float]:
+        return [m.time for m in self.markers]
+
+    @times.setter
+    def times(self, values: list[float]) -> None:
+        """Replace markers with standard-typed times (tests and simple loaders)."""
+        self.markers = [SongMarker(float(t)) for t in values]
 
 
 def default_song_marker_runtime() -> SongMarkerRuntime:

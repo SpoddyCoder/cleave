@@ -263,6 +263,7 @@ class RenderTimelineBlock:
     locked: bool = False
     song_markers_expanded: bool = False
     song_marker_times: tuple[float, ...] = ()
+    song_marker_types: tuple[str, ...] = ()
 
 
 @dataclass
@@ -775,6 +776,9 @@ class TuningViewStateBuilder:
             ),
             song_markers_expanded=self.session.song_markers.expanded,
             song_marker_times=tuple(self.session.song_markers.times),
+            song_marker_types=tuple(
+                m.marker_type for m in self.session.song_markers.markers
+            ),
         )
         layout_state = TuningViewState(
             layer_z_order=layer_z_order,
@@ -1023,6 +1027,9 @@ class TuningViewStateBuilder:
                 locked=tl.locked,
                 song_markers_expanded=self.session.song_markers.expanded,
                 song_marker_times=tuple(self.session.song_markers.times),
+                song_marker_types=tuple(
+                    m.marker_type for m in self.session.song_markers.markers
+                ),
             ),
             settings=replace(
                 structure.settings,

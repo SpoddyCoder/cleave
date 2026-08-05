@@ -32,7 +32,13 @@ from cleave.config_schema import (
     ui_fade_display,
 )
 from cleave.extract import stem_control_label, stem_overlay_header
-from cleave.song_markers import format_marker_time
+from cleave.song_markers import (
+    DEFAULT_SONG_MARKER_TYPE,
+    SongMarker,
+    cycle_song_marker_type,
+    format_marker_time,
+    parse_song_marker_type,
+)
 from cleave.timeline_presets.characters import (
     cycle_timeline_preset_kind,
     timeline_preset_kind_display,
@@ -1523,10 +1529,46 @@ def _format_song_markers_count(state: TuningViewState, _desc: RowDescriptor) -> 
     return f"({len(state.render_timeline.song_marker_times)})"
 
 
+def _song_marker_type_display(marker_type: str) -> str:
+    if marker_type == DEFAULT_SONG_MARKER_TYPE:
+        return "-"
+    return marker_type
+
+
 def _format_song_marker_item(state: TuningViewState, desc: RowDescriptor) -> str:
     assert desc.marker_index is not None
+    index = desc.marker_index
     times = state.render_timeline.song_marker_times
-    return f"[{format_marker_time(times[desc.marker_index])}]"
+    types = state.render_timeline.song_marker_types
+    marker_type = (
+        types[index]
+        if 0 <= index < len(types)
+        else DEFAULT_SONG_MARKER_TYPE
+    )
+    return (
+        f"[{format_marker_time(times[index])}] "
+        f"{_song_marker_type_display(marker_type)}"
+    )
+
+
+def _apply_song_marker_type(
+    controls: TuningControls,
+    desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    assert desc.marker_index is not None
+    markers = controls.session.song_markers
+    index = desc.marker_index
+    if index < 0 or index >= len(markers.markers):
+        return
+    current = markers.markers[index]
+    next_type = cycle_song_marker_type(
+        parse_song_marker_type(current.marker_type),
+        forward=forward,
+    )
+    markers.markers[index] = SongMarker(current.time, next_type)
 
 
 def _format_transport(_state: TuningViewState, _desc: RowDescriptor) -> str:
@@ -2312,6 +2354,7 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         panel_label="",
         present_style=RowPresentStyle.FULL_LINE,
         format_value=_format_song_marker_item,
+        apply_horizontal=_apply_song_marker_type,
     ),
     RowKind.PANEL_NOTIFICATION: RowFieldDef(
         panel_label="",
