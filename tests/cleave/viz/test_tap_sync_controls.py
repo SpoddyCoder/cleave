@@ -435,3 +435,16 @@ def test_accent_times_from_schedule_match_calibration() -> None:
     assert metronome_accent_times(schedule) == pytest.approx(expected)
     assert expected[1] - expected[0] == pytest.approx(bar_sec)
     assert CONSISTENCY_WINDOW == 4
+
+
+def test_enter_records_tap_space_does_not() -> None:
+    controls, playback, modal, _notifications, ui_log = _make_controls(duration_sec=8.0)
+    accent_times = _start_calibration(controls, modal, ui_log)
+    playback.player.seek(accent_times[0] + 0.2)
+
+    assert controls.handle_keydown(keydown(pygame.K_SPACE)) is False
+    assert controls.progress_view().streak == 0
+
+    assert controls.handle_keydown(keydown(pygame.K_RETURN)) is True
+    assert controls.progress_view().streak == 1
+    assert "Enter" in _TAP_SYNC_CONFIRM_MESSAGE
