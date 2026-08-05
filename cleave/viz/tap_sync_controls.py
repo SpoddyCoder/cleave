@@ -25,7 +25,7 @@ from cleave.viz.transport_clock import MAX_RESIDUAL_LATENCY_SEC
 _TAP_SYNC_CONFIRM_MESSAGE = (
     "Measure Latency: "
     "A 140 BPM click track will play. "
-    "Tap Space on each bar beat (beat 1) until the latency is detected."
+    "Tap Enter on each bar beat (beat 1) until the latency is detected."
 )
 
 
@@ -222,7 +222,7 @@ class TapSyncControls:
         if event.key == pygame.K_ESCAPE:
             self.cancel()
             return True
-        if event.key == pygame.K_SPACE:
+        if event.key == pygame.K_RETURN:
             self.record_tap()
             return True
         return False

@@ -249,7 +249,7 @@ def test_long_message_wraps_to_half_screen_width() -> None:
     message = (
         "Song and visuals pause for calibration. A 140 BPM click track plays: "
         "a loud click on beat 1 of each bar and quieter clicks on beats 2 to 4. "
-        "Tap Space in time with each click until the delay is detected automatically. "
+        "Tap Enter in time with each click until the delay is detected automatically. "
         "Esc cancels."
     )
     view = ModalViewState(
@@ -413,7 +413,7 @@ def test_info_panel_sections_include_blank_line_gaps() -> None:
     line_gap = 3
     line_h = font.get_linesize()
     state = modal_overlay.InfoPanelViewState(
-        title_lines=("Detection in progress", "Tap Space on each bar beat"),
+        title_lines=("Detection in progress", "Tap Enter on each bar beat"),
         body_lines=(
             "Streak: 2/4",
             "Spread: 10 ms",

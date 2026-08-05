@@ -1454,8 +1454,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         parent_group="settings_latency_compensation",
         help_title="Measure latency",
         help_entries=(
-            ("Enter", "start calibration"),
-            ("Space", "tap on each bar beat"),
+            ("Enter", "start calibration / tap on each bar beat"),
             ("Esc", "cancel"),
         ),
         help_description=(

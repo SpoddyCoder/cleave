@@ -19,12 +19,16 @@ else:
 FREQUENCY_HZ = 44100
 NUM_CHANNELS = 2
 DEFAULT_CHUNKSIZE = 4096
-CLICK_DURATION_SEC = 0.005
+CLICK_DURATION_SEC = 0.05
+CLICK_ACCENT_DURATION_SEC = 0.18
 CLICK_AMPLITUDE = 0.5
-CLICK_ACCENT_AMPLITUDE = 0.85
-CLICK_QUIET_AMPLITUDE = 0.28
+CLICK_ACCENT_AMPLITUDE = 1.0
+CLICK_QUIET_AMPLITUDE = 0.75
 CLICK_QUIET_FREQ_HZ = 900.0
-CLICK_ACCENT_FREQ_HZ = 3200.0
+# Middle C (C4).
+CLICK_ACCENT_FREQ_HZ = 261.63
+CLICK_ENVELOPE_DECAY = 70.0
+CLICK_ACCENT_ENVELOPE_DECAY = 18.0
 
 
 def _make_click_sample(
@@ -33,10 +37,11 @@ def _make_click_sample(
     *,
     amplitude: float = CLICK_AMPLITUDE,
     frequency_hz: float = 1000.0,
+    envelope_decay: float = CLICK_ENVELOPE_DECAY,
 ) -> np.ndarray:
     n = max(1, int(sample_rate * duration_sec))
     t = np.arange(n, dtype=np.float32) / sample_rate
-    envelope = np.exp(-t * 800.0, dtype=np.float32)
+    envelope = np.exp(-t * envelope_decay, dtype=np.float32)
     tone = np.sin(2.0 * np.pi * frequency_hz * t, dtype=np.float32)
     return (amplitude * tone * envelope).astype(np.float32)
 
@@ -44,21 +49,21 @@ def _make_click_sample(
 def _make_quiet_click_sample(sample_rate: int) -> np.ndarray:
     return _make_click_sample(
         sample_rate,
+        CLICK_DURATION_SEC,
         amplitude=CLICK_QUIET_AMPLITUDE,
         frequency_hz=CLICK_QUIET_FREQ_HZ,
+        envelope_decay=CLICK_ENVELOPE_DECAY,
     )
 
 
 def _make_accent_click_sample(sample_rate: int) -> np.ndarray:
-    n = max(1, int(sample_rate * CLICK_DURATION_SEC))
-    t = np.arange(n, dtype=np.float32) / sample_rate
-    envelope = np.exp(-t * 1400.0, dtype=np.float32)
-    ding = np.sin(2.0 * np.pi * CLICK_ACCENT_FREQ_HZ * t, dtype=np.float32)
-    shimmer = np.sin(2.0 * np.pi * 73.0 * t, dtype=np.float32) * np.sin(
-        2.0 * np.pi * 211.0 * t, dtype=np.float32
+    return _make_click_sample(
+        sample_rate,
+        CLICK_ACCENT_DURATION_SEC,
+        amplitude=CLICK_ACCENT_AMPLITUDE,
+        frequency_hz=CLICK_ACCENT_FREQ_HZ,
+        envelope_decay=CLICK_ACCENT_ENVELOPE_DECAY,
     )
-    tone = ding + 0.45 * shimmer
-    return (CLICK_ACCENT_AMPLITUDE * tone * envelope).astype(np.float32)
 
 
 def _mix_click_into_stereo(
@@ -66,20 +71,44 @@ def _mix_click_into_stereo(
     click: np.ndarray,
     *,
     offset_frames: int,
-) -> None:
+) -> np.ndarray | None:
+    """Mix mono *click* into interleaved stereo *out* at *offset_frames*.
+
+    Returns any unmixed tail when *click* extends past the end of *out*.
+    """
+    if len(click) == 0:
+        return None
     if offset_frames < 0:
-        return
+        return click
     sample_offset = offset_frames * 2
     if sample_offset >= len(out):
-        return
+        return click
     click_samples = min(len(click), (len(out) - sample_offset) // 2)
     if click_samples <= 0:
-        return
+        return click
     for i in range(click_samples):
         sample = float(click[i])
         idx = sample_offset + i * 2
         out[idx] = min(1.0, max(-1.0, out[idx] + sample))
         out[idx + 1] = min(1.0, max(-1.0, out[idx + 1] + sample))
+    if click_samples < len(click):
+        return click[click_samples:]
+    return None
+
+
+def _merge_click_tails(
+    existing: np.ndarray | None,
+    tail: np.ndarray | None,
+) -> np.ndarray | None:
+    if tail is None or len(tail) == 0:
+        return existing
+    if existing is None or len(existing) == 0:
+        return np.asarray(tail, dtype=np.float32).copy()
+    n = max(len(existing), len(tail))
+    merged = np.zeros(n, dtype=np.float32)
+    merged[: len(existing)] += existing
+    merged[: len(tail)] += tail
+    return merged
 
 
 def estimate_output_latency_frames(
@@ -180,6 +209,7 @@ class MixPlayer:
         self._click_accent_sample = _make_accent_click_sample(sample_rate)
         self._click_quiet_sample = _make_quiet_click_sample(sample_rate)
         self._next_click_index = 0
+        self._click_tail: np.ndarray | None = None
 
     def set_residual_latency_sec(self, sec: float) -> None:
         with self._lock:
@@ -193,11 +223,13 @@ class MixPlayer:
             if schedule is None:
                 self._click_schedule = None
                 self._next_click_index = 0
+                self._click_tail = None
                 return
             self._click_schedule = tuple(
                 (float(time_sec), bool(accented)) for time_sec, accented in schedule
             )
             self._next_click_index = 0
+            self._click_tail = None
 
     def set_click_only(self, on: bool) -> None:
         with self._lock:
@@ -211,8 +243,16 @@ class MixPlayer:
         frames_written: int,
         click_only: bool,
     ) -> None:
+        if frames_written <= 0:
+            return
+        if self._click_tail is not None:
+            self._click_tail = _mix_click_into_stereo(
+                out,
+                self._click_tail,
+                offset_frames=0,
+            )
         click_schedule = self._click_schedule
-        if click_schedule is None or frames_written <= 0:
+        if click_schedule is None:
             return
         chunk_start_sec = read_index / self._sample_rate
         chunk_end_sec = (read_index + frames_written) / self._sample_rate
@@ -232,11 +272,12 @@ class MixPlayer:
                 offset_frames = int(
                     round((click_sec - chunk_start_sec) * self._sample_rate)
                 )
-                _mix_click_into_stereo(
+                tail = _mix_click_into_stereo(
                     out,
                     click,
                     offset_frames=offset_frames,
                 )
+                self._click_tail = _merge_click_tails(self._click_tail, tail)
             self._next_click_index += 1
 
     def _fill_output_buffer(self, out: np.ndarray) -> None:
@@ -342,6 +383,7 @@ class MixPlayer:
         with self._lock:
             self._read_index = frame
             self._clock.reanchor(frame)
+            self._click_tail = None
 
     def file_position_sec(self) -> float:
         with self._lock:

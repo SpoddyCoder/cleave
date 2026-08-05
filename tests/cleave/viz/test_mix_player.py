@@ -263,10 +263,10 @@ def test_mix_player_accent_and_quiet_click_samples_differ() -> None:
     player = MixPlayer(mix, FREQUENCY_HZ)
     accent = player._click_accent_sample
     quiet = player._click_quiet_sample
-    assert accent.shape == quiet.shape
-    assert not np.allclose(accent, quiet)
-    ratio = accent / np.where(quiet == 0.0, 1.0, quiet)
-    assert not np.allclose(ratio, ratio[0])
+    assert len(accent) > len(quiet)
+    assert not np.allclose(accent[: len(quiet)], quiet)
+    assert np.max(np.abs(accent)) == pytest.approx(1.0, abs=0.05)
+    assert np.max(np.abs(quiet)) < np.max(np.abs(accent))
 
 
 def test_mix_player_click_only_ignores_solo_stem() -> None:
@@ -292,3 +292,39 @@ def test_mix_player_click_only_advances_transport_without_audible_mix() -> None:
     player._fill_output_buffer(out)
     assert player._read_index == 256
     assert player.file_position_sec() == pytest.approx(256 / FREQUENCY_HZ)
+
+
+def test_mix_player_click_carries_across_chunk_boundary() -> None:
+    """Accent must keep ringing when it starts near the end of a short chunk."""
+    from cleave.viz.mix_player import CLICK_ACCENT_DURATION_SEC
+
+    chunk_frames = 256
+    mix = np.zeros(FREQUENCY_HZ * 4, dtype=np.float32)
+    player = MixPlayer(mix, FREQUENCY_HZ, chunksize=chunk_frames)
+    player.set_click_only(True)
+    # Start accent 64 frames before chunk end so most of it spills into later chunks.
+    click_sec = (chunk_frames - 64) / FREQUENCY_HZ
+    player.set_click_schedule(((click_sec, True),))
+
+    first = np.zeros(chunk_frames * 2, dtype=np.float32)
+    player._fill_output_buffer(first)
+    assert np.max(np.abs(first)) > 0.2
+    assert player._click_tail is not None
+    assert len(player._click_tail) > 0
+
+    collected = [first.copy()]
+    accent_frames = int(CLICK_ACCENT_DURATION_SEC * FREQUENCY_HZ)
+    frames_needed = accent_frames - 64
+    while frames_needed > 0:
+        chunk = np.zeros(chunk_frames * 2, dtype=np.float32)
+        player._fill_output_buffer(chunk)
+        collected.append(chunk.copy())
+        frames_needed -= chunk_frames
+
+    stitched = np.concatenate(collected)
+    # Left channel only; energy should persist well past the first chunk.
+    left = stitched[0::2]
+    spill_start = chunk_frames
+    spill_end = chunk_frames + int(0.1 * FREQUENCY_HZ)
+    assert np.max(np.abs(left[spill_start:spill_end])) > 0.1
+    assert player._click_tail is None or len(player._click_tail) == 0
