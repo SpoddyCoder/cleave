@@ -1572,18 +1572,20 @@ class TuningControls:
         prior_selected_time: float | None = None
         if (
             markers.selected_index is not None
-            and 0 <= markers.selected_index < len(markers.times)
+            and 0 <= markers.selected_index < len(markers.markers)
         ):
-            prior_selected_time = markers.times[markers.selected_index]
-        new_times, replaced_index, replaced_time = place_marker(markers.times, t)
-        markers.times = list(new_times)
+            prior_selected_time = markers.markers[markers.selected_index].time
+        new_markers, replaced_index, replaced_time = place_marker(
+            markers.markers, t
+        )
+        markers.markers = list(new_markers)
         markers.expanded = True
         self.session.timeline.panel_open = True
         # Never activate the newly placed marker; keep prior selection by time.
         if prior_selected_time is None:
             if markers.selected_index is not None and (
                 markers.selected_index < 0
-                or markers.selected_index >= len(markers.times)
+                or markers.selected_index >= len(markers.markers)
             ):
                 markers.selected_index = None
         elif (
@@ -1594,24 +1596,28 @@ class TuningControls:
             markers.selected_index = replaced_index
         else:
             try:
-                markers.selected_index = new_times.index(prior_selected_time)
-            except ValueError:
+                markers.selected_index = next(
+                    i
+                    for i, m in enumerate(new_markers)
+                    if m.time == prior_selected_time
+                )
+            except StopIteration:
                 markers.selected_index = None
         if replaced_index is not None:
             assert replaced_time is not None
             self.show_notification(
                 f"Song marker replaced "
                 f"{format_marker_time(replaced_time)} -> "
-                f"{format_marker_time(new_times[replaced_index])}"
+                f"{format_marker_time(new_markers[replaced_index].time)}"
             )
         else:
             self.show_notification(f"Song marker {format_marker_time(t)}")
 
     def _delete_song_marker(self, index: int) -> None:
         markers = self.session.song_markers
-        if index < 0 or index >= len(markers.times):
+        if index < 0 or index >= len(markers.markers):
             return
-        label = format_marker_time(markers.times[index])
+        label = format_marker_time(markers.markers[index].time)
         self._modal_host.prompt_yes_no(
             f"Remove song marker {label}?",
             on_confirm=lambda: self._confirm_delete_song_marker(index),
@@ -1619,19 +1625,19 @@ class TuningControls:
 
     def _confirm_delete_song_marker(self, index: int) -> None:
         markers = self.session.song_markers
-        if index < 0 or index >= len(markers.times):
+        if index < 0 or index >= len(markers.markers):
             return
-        removed = markers.times.pop(index)
-        if not markers.times:
+        removed = markers.markers.pop(index)
+        if not markers.markers:
             markers.selected_index = None
         elif markers.selected_index is None:
             pass
         elif markers.selected_index == index:
-            markers.selected_index = min(index, len(markers.times) - 1)
+            markers.selected_index = min(index, len(markers.markers) - 1)
         elif markers.selected_index > index:
             markers.selected_index -= 1
         self.show_notification(
-            f"Song marker removed {format_marker_time(removed)}"
+            f"Song marker removed {format_marker_time(removed.time)}"
         )
         if markers.selected_index is not None:
             self._apply_focus_cursor(

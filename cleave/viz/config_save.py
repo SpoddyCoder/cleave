@@ -56,7 +56,7 @@ class ConfigSaveController:
         self._move_mode_signature = move_mode_signature
 
         self._saved_signature = self._persisted_signature()
-        self._saved_song_markers = tuple(session.song_markers.times)
+        self._saved_song_markers = tuple(session.song_markers.markers)
         self._pending_exit = False
         self._quit_after_save = False
         self._on_commit_save: list[Callable[[], None]] = []
@@ -73,17 +73,17 @@ class ConfigSaveController:
     def config_dirty(self) -> bool:
         return (
             self._persisted_signature() != self._saved_signature
-            or tuple(self.session.song_markers.times) != self._saved_song_markers
+            or tuple(self.session.song_markers.markers) != self._saved_song_markers
         )
 
     def clear_config_dirty(self) -> None:
         self._saved_signature = self._persisted_signature()
-        self._saved_song_markers = tuple(self.session.song_markers.times)
+        self._saved_song_markers = tuple(self.session.song_markers.markers)
 
     def _flush_song_markers(self) -> None:
         if self._project_dir is None:
             return
-        save_song_markers(self._project_dir, self.session.song_markers.times)
+        save_song_markers(self._project_dir, self.session.song_markers.markers)
 
     def _commit_save(self) -> None:
         """Flush project song markers (when available) and clear dirty baselines."""
