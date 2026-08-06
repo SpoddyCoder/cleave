@@ -1221,7 +1221,6 @@ def test_write_session_snapshot_persists_timeline_disabled_without_cues(
             },
         "preset": {
             "character": "breathing",
-            "crescendo": None,
             "density": "normal",
             "cue_snap": "none",
             "song_marker_snap": None,
@@ -1241,7 +1240,6 @@ def test_write_session_snapshot_persists_timeline_disabled_without_cues(
 def test_write_session_snapshot_round_trips_timeline_preset(tmp_path: Path) -> None:
     cfg, session, out_path = _snapshot_fixture(tmp_path)
     session.timeline.timeline_preset_kind = "arc"
-    session.timeline.timeline_preset_crescendo = "last"
     session.timeline.timeline_preset_density = "dense"
     session.timeline.timeline_preset_cue_snap = "beats"
     session.timeline.timeline_preset_song_marker_snap = 5.0
@@ -1253,7 +1251,6 @@ def test_write_session_snapshot_round_trips_timeline_preset(tmp_path: Path) -> N
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
     assert data["timeline"]["preset"] == {
         "character": "arc",
-        "crescendo": "last",
         "density": "dense",
         "cue_snap": "beats",
         "song_marker_snap": 5.0,
@@ -1279,7 +1276,6 @@ def test_write_session_snapshot_round_trips_timeline_preset(tmp_path: Path) -> N
     )
     session2 = session_from_cfg(cfg_with_timeline, playlists)
     assert session2.timeline.timeline_preset_kind == "arc"
-    assert session2.timeline.timeline_preset_crescendo == "last"
     assert session2.timeline.timeline_preset_density == "dense"
     assert session2.timeline.timeline_preset_cue_snap == "beats"
     assert session2.timeline.timeline_preset_song_marker_snap == 5.0

@@ -1636,7 +1636,6 @@ def _choose_modal_option(controls: TuningControls, label: str) -> None:
 def test_timeline_presets_enter_opens_yes_cancel_modal() -> None:
     controls = _make_controls(("layer_1", "layer_2", "layer_3", "layer_4"))
     controls.session.timeline.timeline_preset_kind = "arc"
-    controls.session.timeline.timeline_preset_crescendo = "last"
     controls.session.timeline.timeline_preset_conductor = True
     _focus_timeline_presets(controls)
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
@@ -1647,7 +1646,6 @@ def test_timeline_presets_enter_opens_yes_cancel_modal() -> None:
     assert modal_view.message == "Apply timeline preset?"
     assert modal_view.labeled_lines == (
         ModalLabeledLine("character", "arc"),
-        ModalLabeledLine("crescendo", "last song marker"),
         ModalLabeledLine("density", "normal"),
         ModalLabeledLine("cue snap", "none"),
         ModalLabeledLine("song marker snap", "none"),
@@ -1741,7 +1739,6 @@ def test_timeline_presets_cuts_none_keeps_cut_none() -> None:
         bar_times=bars,
     )
     controls.session.timeline.timeline_preset_kind = "breathing"
-    controls.session.timeline.timeline_preset_crescendo = None
     controls.session.timeline.timeline_preset_timeline_cuts = "none"
     _focus_timeline_presets(controls)
     _confirm_timeline_preset(controls)
@@ -1761,7 +1758,6 @@ def test_timeline_presets_by_marker_cuts_assign_soft_or_hard() -> None:
     )
     controls.session.song_markers.times = [30.0, 90.0, 150.0]
     controls.session.timeline.timeline_preset_kind = "breathing"
-    controls.session.timeline.timeline_preset_crescendo = None
     controls.session.timeline.timeline_preset_timeline_cuts = "by marker"
     _focus_timeline_presets(controls)
     _confirm_timeline_preset(controls)
@@ -1815,7 +1811,6 @@ def test_timeline_presets_breathing_clears_and_applies() -> None:
     controls.session.timeline.recording = True
     controls.session.timeline.armed_slots.add("layer_1")
     controls.session.timeline.timeline_preset_kind = "breathing"
-    controls.session.timeline.timeline_preset_crescendo = None
     _focus_timeline_presets(controls)
     _confirm_timeline_preset(controls)
     assert not controls.modal_host.active
@@ -1843,7 +1838,6 @@ def test_timeline_presets_arc_clears_and_applies() -> None:
     controls.session.timeline.lanes = {"layer_1": _lane(True, (5.0, False))}
     controls.session.timeline.enabled = False
     controls.session.timeline.timeline_preset_kind = "arc"
-    controls.session.timeline.timeline_preset_crescendo = None
     _focus_timeline_presets(controls)
     _confirm_timeline_preset(controls)
     assert not controls.modal_host.active
@@ -1854,7 +1848,9 @@ def test_timeline_presets_arc_clears_and_applies() -> None:
     assert all(lane.baseline is not None for lane in lanes.values())
 
 
-def test_timeline_presets_crescendo_when_enough_markers() -> None:
+def test_timeline_presets_crescendo_when_typed_marker() -> None:
+    from cleave.song_markers import SongMarker
+
     beats = tuple(float(i) for i in range(241))
     bars = tuple(float(i) for i in range(0, 241, 4))
     controls = _make_controls(
@@ -1863,9 +1859,13 @@ def test_timeline_presets_crescendo_when_enough_markers() -> None:
         bar_times=bars,
         duration_sec=240.0,
     )
-    controls.session.song_markers.times = [30.0, 90.0, 150.0, 200.0]
+    controls.session.song_markers.markers = [
+        SongMarker(30.0),
+        SongMarker(90.0),
+        SongMarker(150.0),
+        SongMarker(200.0, "crescendo"),
+    ]
     controls.session.timeline.timeline_preset_kind = "breathing"
-    controls.session.timeline.timeline_preset_crescendo = "last"
     _focus_timeline_presets(controls)
     _confirm_timeline_preset(controls)
     assert not controls.modal_host.active
@@ -1873,7 +1873,7 @@ def test_timeline_presets_crescendo_when_enough_markers() -> None:
     assert view.notification_message == "Applied Breathing timeline preset (crescendo)"
 
 
-def test_timeline_presets_skips_crescendo_without_enough_markers() -> None:
+def test_timeline_presets_skips_crescendo_without_typed_marker() -> None:
     beats = tuple(float(i) for i in range(241))
     bars = tuple(float(i) for i in range(0, 241, 4))
     controls = _make_controls(
@@ -1882,9 +1882,8 @@ def test_timeline_presets_skips_crescendo_without_enough_markers() -> None:
         bar_times=bars,
         duration_sec=240.0,
     )
-    controls.session.song_markers.times = [30.0, 90.0]
+    controls.session.song_markers.times = [30.0, 90.0, 150.0, 200.0]
     controls.session.timeline.timeline_preset_kind = "pulse"
-    controls.session.timeline.timeline_preset_crescendo = "last"
     _focus_timeline_presets(controls)
     _confirm_timeline_preset(controls)
     assert not controls.modal_host.active
@@ -3067,7 +3066,6 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
         RowKind.TIMELINE_APPLY_HARD_CUTS,
         RowKind.TIMELINE_PRESETS_HEADER,
         RowKind.TIMELINE_PRESET_CHARACTER,
-        RowKind.TIMELINE_PRESET_CRESCENDO,
         RowKind.TIMELINE_PRESET_DENSITY,
         RowKind.TIMELINE_PRESET_CUE_SNAP,
         RowKind.TIMELINE_PRESET_SONG_MARKER_SNAP,

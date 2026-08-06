@@ -21,7 +21,6 @@ from cleave.timeline_presets.characters import (
     TIMELINE_PRESET_KIND_OPTIONS,
 )
 from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
-from cleave.timeline_presets.crescendo import CrescendoTarget
 from cleave.timeline_presets.cue_snap import (
     DEFAULT_TIMELINE_PRESET_CUE_SNAP,
     TIMELINE_PRESET_CUE_SNAP_OPTIONS,
@@ -455,15 +454,6 @@ def parse_timeline_preset_character(raw: Any, label: str) -> str:
         allowed = ", ".join(TIMELINE_PRESET_KIND_OPTIONS)
         raise ValueError(f"{label} must be one of: {allowed}")
     return value
-
-
-def parse_timeline_preset_crescendo(raw: Any, label: str) -> CrescendoTarget | None:
-    if raw is None:
-        return None
-    value = str(raw)
-    if value not in ("last", "penultimate"):
-        raise ValueError(f"{label} must be one of: last, penultimate, or null")
-    return value  # type: ignore[return-value]
 
 
 def parse_timeline_preset_density(raw: Any, label: str) -> TimelinePresetDensity:
@@ -2333,10 +2323,6 @@ def _parse_timeline_preset(raw: Any) -> Any:
             preset_map.get("character", DEFAULT_TIMELINE_PRESET_KIND),
             "timeline.preset.character",
         ),
-        crescendo=parse_timeline_preset_crescendo(
-            preset_map.get("crescendo"),
-            "timeline.preset.crescendo",
-        ),
         density=parse_timeline_preset_density(
             preset_map.get("density", DEFAULT_TIMELINE_PRESET_DENSITY),
             "timeline.preset.density",
@@ -2550,7 +2536,6 @@ def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
         },
         "preset": {
             "character": runtime.timeline_preset_kind,
-            "crescendo": runtime.timeline_preset_crescendo,
             "density": runtime.timeline_preset_density,
             "cue_snap": runtime.timeline_preset_cue_snap,
             "song_marker_snap": runtime.timeline_preset_song_marker_snap,

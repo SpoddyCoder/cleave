@@ -32,6 +32,7 @@ from cleave.timeline_presets.conductor import (
     support_floor_for,
     timeline_preset_conductor_display,
 )
+from cleave.song_markers import SongMarker
 from cleave.timeline_presets.crescendo import (
     apply_crescendo,
     resolve_crescendo_window,
@@ -856,8 +857,13 @@ def test_arranger_conductor_crescendo_preserves_prefix_levels() -> None:
             "full_mix": {"onset_strength": mix_onset, "rms": mix_rms},
         },
     )
-    markers = [20.0, 50.0, 80.0, 100.0]
-    window = resolve_crescendo_window(markers, duration_sec, "last")
+    markers = [
+        SongMarker(20.0),
+        SongMarker(50.0),
+        SongMarker(80.0),
+        SongMarker(100.0, "crescendo"),
+    ]
+    window = resolve_crescendo_window(markers, duration_sec)
     assert window is not None
     base = build_breathing_cues(
         slots,
@@ -872,8 +878,7 @@ def test_arranger_conductor_crescendo_preserves_prefix_levels() -> None:
         slots,
         duration_sec=duration_sec,
         bar_times=bars,
-        song_marker_times=markers,
-        target="last",
+        song_markers=markers,
         rng=random.Random(6),
     )
     t = 0.0
@@ -906,8 +911,13 @@ def test_arranger_conductor_crescendo_preserves_prefix_roles() -> None:
             "full_mix": {"onset_strength": mix_onset, "rms": mix_rms},
         },
     )
-    markers = [20.0, 50.0, 80.0, 100.0]
-    window = resolve_crescendo_window(markers, duration_sec, "last")
+    markers = [
+        SongMarker(20.0),
+        SongMarker(50.0),
+        SongMarker(80.0),
+        SongMarker(100.0, "crescendo"),
+    ]
+    window = resolve_crescendo_window(markers, duration_sec)
     assert window is not None
     base = build_breathing_cues(
         slots,
@@ -931,8 +941,7 @@ def test_arranger_conductor_crescendo_preserves_prefix_roles() -> None:
         slots,
         duration_sec=duration_sec,
         bar_times=bars,
-        song_marker_times=markers,
-        target="last",
+        song_markers=markers,
         rng=random.Random(6),
     )
     after_prefix_on = [
@@ -962,7 +971,12 @@ def test_apply_crescendo_without_roles_stays_role_free() -> None:
     slots = ["layer_1", "layer_2", "layer_3", "layer_4"]
     duration_sec = 120.0
     bars = _bar_times(duration_sec)
-    markers = [20.0, 50.0, 80.0, 100.0]
+    markers = [
+        SongMarker(20.0),
+        SongMarker(50.0),
+        SongMarker(80.0),
+        SongMarker(100.0, "crescendo"),
+    ]
     base = build_breathing_cues(
         slots, duration_sec, random.Random(1), bar_times=bars
     )
@@ -972,8 +986,7 @@ def test_apply_crescendo_without_roles_stays_role_free() -> None:
         slots,
         duration_sec=duration_sec,
         bar_times=bars,
-        song_marker_times=markers,
-        target="last",
+        song_markers=markers,
         rng=random.Random(2),
     )
     assert all(cue.role is None for lane in after.values() for cue in lane.cues)

@@ -106,12 +106,13 @@ When song markers exist, applying a timeline preset (Breathing / Dialogue / Arc 
 
 1. **Section-driven phrases.** Markers are hard section walls. Phrases never cross a marker; each marker starts a new phrase (then the usual 4–8 bar / minimum-duration partitioning fills each section). Empty or out-of-range markers leave bar-only partitioning unchanged.
 2. **Soft latch.** Planned motif switches still prefer the bar grid. If an unclaimed marker lies within **5.0s** of a planned switch and min switch gaps still hold, that switch moves onto the marker (exclusive: each marker claimed at most once). Soft latch does **not** invent extra transitions solely to hit a marker.
+3. **Crescendo markers.** Each in-range marker typed `crescendo` that has at least one prior marker gets a crescendo post-pass (ramp from earlier markers, full stack at the previous marker, solo from the crescendo marker through song end, or until a later crescendo overwrites). `diminuendo` is ignored for generation.
 
 No new panel knobs. Phase 2 **snap to song markers** remains a separate manual polish step and is not run automatically after apply.
 
 ### Phase 3 deliverable
 
-Preset apply reads `session.song_markers.times` and threads them into `compose_timeline`. Tests cover section walls, exclusive soft latch, and gap veto.
+Preset apply reads `session.song_markers` (times for section walls / soft latch; types for crescendo) and threads them into `compose_timeline` plus `apply_crescendo`. Tests cover section walls, exclusive soft latch, gap veto, and typed crescendo windows.
 
 ---
 
