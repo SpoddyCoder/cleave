@@ -1279,7 +1279,6 @@ def test_persist_timeline_preset_round_trip() -> None:
         timeline=TimelineRuntime(
             enabled=True,
             timeline_preset_kind="arc",
-            timeline_preset_crescendo="penultimate",
             timeline_preset_density="very dense",
             timeline_preset_cue_snap="bars",
             timeline_preset_song_marker_snap=2.0,
@@ -1299,7 +1298,6 @@ def test_persist_timeline_preset_round_trip() -> None:
     payload = persist_timeline(PersistCtx(cfg=cfg, session=session, cfg_dir=None))
     assert payload["preset"] == {
         "character": "arc",
-        "crescendo": "penultimate",
         "density": "very dense",
         "cue_snap": "bars",
         "song_marker_snap": 2.0,
@@ -1314,7 +1312,6 @@ def test_persist_timeline_preset_round_trip() -> None:
     assert round_trip is not None
     assert round_trip.preset == TimelinePresetConfig(
         character="arc",
-        crescendo="penultimate",
         density="very dense",
         cue_snap="bars",
         song_marker_snap=2.0,
@@ -1330,7 +1327,6 @@ def test_parse_timeline_reads_preset() -> None:
             "timeline": {
                 "preset": {
                     "character": "pulse",
-                    "crescendo": "last",
                     "density": "sparse",
                     "cue_snap": "beats",
                     "song_marker_snap": 1.0,
@@ -1345,7 +1341,6 @@ def test_parse_timeline_reads_preset() -> None:
     assert timeline is not None
     assert timeline.preset == TimelinePresetConfig(
         character="pulse",
-        crescendo="last",
         density="sparse",
         cue_snap="beats",
         song_marker_snap=1.0,
@@ -1355,14 +1350,13 @@ def test_parse_timeline_reads_preset() -> None:
     )
 
 
-def test_parse_timeline_preset_null_crescendo() -> None:
+def test_parse_timeline_preset_defaults() -> None:
     timeline = parse_timeline_section(
-        {"timeline": {"preset": {"character": "dialogue", "crescendo": None}}},
+        {"timeline": {"preset": {"character": "dialogue"}}},
         _timeline_parse_ctx(),
     )
     assert timeline is not None
     assert timeline.preset.character == "dialogue"
-    assert timeline.preset.crescendo is None
     assert timeline.preset.density == "normal"
     assert timeline.preset.cue_snap == "none"
     assert timeline.preset.song_marker_snap is None

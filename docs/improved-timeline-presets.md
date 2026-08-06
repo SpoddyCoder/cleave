@@ -12,7 +12,7 @@ Naming: **cue** remains a per-lane transition. **Song markers** remain project-s
 
 What works today:
 
-- Generative characters (Breathing, Dialogue, Arc, Pulse) in [cleave/timeline_presets/](../cleave/timeline_presets/) arrange layer levels with phrase grids, motif voice-leading, density bias, and optional crescendo.
+- Generative characters (Breathing, Dialogue, Arc, Pulse) in [cleave/timeline_presets/](../cleave/timeline_presets/) arrange layer levels with phrase grids, motif voice-leading, density bias, and crescendos driven by song markers typed `crescendo`.
 - Beat This! downbeats in `signals.json` drive the bar grid; manual song markers act as hard section walls and soft latch (~5s) at generation time.
 - Each layer is its own projectM instance fed stem PCM; black-key (and other) blends stack them in [cleave/gl_compositor.py](../cleave/gl_compositor.py).
 - Cue levels drive continuous opacity: `lane_level_breakpoints` / `lane_level_envelope` in [cleave/timeline.py](../cleave/timeline.py) feed `layer.timeline_level` via `apply_layer_visibility` in [cleave/viz/layer_visibility.py](../cleave/viz/layer_visibility.py). The strip draws the same breakpoints as variable-height bars.

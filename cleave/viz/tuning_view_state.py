@@ -50,7 +50,6 @@ from cleave.preset_playlist import (
 )
 from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
 from cleave.viz.panel_notification import PanelNotificationActive
-from cleave.timeline_presets.crescendo import CrescendoTarget
 from cleave.timeline_presets.cue_snap import (
     DEFAULT_TIMELINE_PRESET_CUE_SNAP,
     TimelinePresetCueSnap,
@@ -240,7 +239,6 @@ class RenderTimelineBlock:
     cuts_expanded: bool = False
     timeline_presets_expanded: bool = False
     timeline_preset_kind: str = "breathing"
-    timeline_preset_crescendo: CrescendoTarget | None = None
     timeline_preset_density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
     timeline_preset_cue_snap: TimelinePresetCueSnap = DEFAULT_TIMELINE_PRESET_CUE_SNAP
     timeline_preset_song_marker_snap: TimelinePresetSongMarkerSnap = (
@@ -749,7 +747,6 @@ class TuningViewStateBuilder:
             cuts_expanded=tl.cuts_expanded,
             timeline_presets_expanded=tl.timeline_presets_expanded,
             timeline_preset_kind=tl.timeline_preset_kind,
-            timeline_preset_crescendo=tl.timeline_preset_crescendo,
             timeline_preset_density=tl.timeline_preset_density,
             timeline_preset_cue_snap=tl.timeline_preset_cue_snap,
             timeline_preset_song_marker_snap=tl.timeline_preset_song_marker_snap,
@@ -999,7 +996,6 @@ class TuningViewStateBuilder:
                 cuts_expanded=tl.cuts_expanded,
                 timeline_presets_expanded=tl.timeline_presets_expanded,
                 timeline_preset_kind=tl.timeline_preset_kind,
-                timeline_preset_crescendo=tl.timeline_preset_crescendo,
                 timeline_preset_density=tl.timeline_preset_density,
                 timeline_preset_cue_snap=tl.timeline_preset_cue_snap,
                 timeline_preset_song_marker_snap=tl.timeline_preset_song_marker_snap,

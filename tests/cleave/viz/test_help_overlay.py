@@ -247,7 +247,7 @@ def test_timeline_presets_help_lists_characters() -> None:
     assert description.title == "Character"
     assert description.lines == (
         "Procedural timeline character used when applying a preset.",
-        "If song markers are present, they are favoured for cue placement.",
+        "Song markers favour cue placement; crescendo types build crescendos.",
     )
     assert description.entries == TIMELINE_PRESET_HELP_ENTRIES
     assert [name for name, _ in description.entries] == [

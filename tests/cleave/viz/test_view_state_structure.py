@@ -147,7 +147,6 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     view_closed = builder.build(paused=False)
     presets_header = RowDescriptor(RowKind.TIMELINE_PRESETS_HEADER)
     preset_character = RowDescriptor(RowKind.TIMELINE_PRESET_CHARACTER)
-    preset_crescendo = RowDescriptor(RowKind.TIMELINE_PRESET_CRESCENDO)
     preset_density = RowDescriptor(RowKind.TIMELINE_PRESET_DENSITY)
     preset_cue_snap = RowDescriptor(RowKind.TIMELINE_PRESET_CUE_SNAP)
     preset_song_marker_snap = RowDescriptor(RowKind.TIMELINE_PRESET_SONG_MARKER_SNAP)
@@ -200,7 +199,6 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert view_open.layout is not view_closed.layout
     assert presets_header in view_open.layout.rows
     assert preset_character not in view_open.layout.rows
-    assert preset_crescendo not in view_open.layout.rows
     assert preset_density not in view_open.layout.rows
     assert preset_cue_snap not in view_open.layout.rows
     assert preset_song_marker_snap not in view_open.layout.rows
@@ -323,49 +321,45 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert view_presets_expanded.layout.rows.index(preset_character) == (
         presets_header_idx + 1
     )
-    assert view_presets_expanded.layout.rows.index(preset_crescendo) == (
+    assert view_presets_expanded.layout.rows.index(preset_density) == (
         presets_header_idx + 2
     )
-    assert view_presets_expanded.layout.rows.index(preset_density) == (
+    assert view_presets_expanded.layout.rows.index(preset_cue_snap) == (
         presets_header_idx + 3
     )
-    assert view_presets_expanded.layout.rows.index(preset_cue_snap) == (
+    assert view_presets_expanded.layout.rows.index(preset_song_marker_snap) == (
         presets_header_idx + 4
     )
-    assert view_presets_expanded.layout.rows.index(preset_song_marker_snap) == (
+    assert view_presets_expanded.layout.rows.index(preset_timeline_cuts) == (
         presets_header_idx + 5
     )
-    assert view_presets_expanded.layout.rows.index(preset_timeline_cuts) == (
+    assert view_presets_expanded.layout.rows.index(preset_repopulate) == (
         presets_header_idx + 6
     )
-    assert view_presets_expanded.layout.rows.index(preset_repopulate) == (
+    assert view_presets_expanded.layout.rows.index(preset_conductor) == (
         presets_header_idx + 7
     )
-    assert view_presets_expanded.layout.rows.index(preset_conductor) == (
+    assert view_presets_expanded.layout.rows.index(presets_apply) == (
         presets_header_idx + 8
     )
-    assert view_presets_expanded.layout.rows.index(presets_apply) == (
+    assert view_presets_expanded.layout.rows.index(limiter_header) == (
         presets_header_idx + 9
     )
-    assert view_presets_expanded.layout.rows.index(limiter_header) == (
+    assert view_presets_expanded.layout.rows.index(limiter_threshold) == (
         presets_header_idx + 10
     )
-    assert view_presets_expanded.layout.rows.index(limiter_threshold) == (
+    assert view_presets_expanded.layout.rows.index(limiter_ratio) == (
         presets_header_idx + 11
     )
-    assert view_presets_expanded.layout.rows.index(limiter_ratio) == (
+    assert view_presets_expanded.layout.rows.index(limiter_release) == (
         presets_header_idx + 12
     )
-    assert view_presets_expanded.layout.rows.index(limiter_release) == (
-        presets_header_idx + 13
-    )
-    assert view_presets_expanded.layout.rows.index(reset) == presets_header_idx + 14
+    assert view_presets_expanded.layout.rows.index(reset) == presets_header_idx + 13
 
     session.timeline.timeline_presets_expanded = False
     view_presets_collapsed = builder.build(paused=False)
     assert view_presets_collapsed.layout is not view_presets_expanded.layout
     assert preset_character not in view_presets_collapsed.layout.rows
-    assert preset_crescendo not in view_presets_collapsed.layout.rows
     assert preset_density not in view_presets_collapsed.layout.rows
     assert preset_cue_snap not in view_presets_collapsed.layout.rows
     assert preset_song_marker_snap not in view_presets_collapsed.layout.rows

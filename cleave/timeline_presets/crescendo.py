@@ -1,14 +1,18 @@
-"""Optional song-marker crescendo overlay for timeline presets."""
+"""Song-marker crescendo overlay for timeline presets.
+
+Builds crescendos to each in-range song marker typed ``crescendo``.
+``diminuendo`` markers are ignored.
+"""
 
 from __future__ import annotations
 
 import random
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Literal
 
 from cleave.blend_modes import BlendMode
 from cleave.cue_roles import CUE_ROLE_BLEND, CueRole
+from cleave.song_markers import SongMarker
 from cleave.timeline import (
     LEVEL_EPS,
     LEVEL_QUANTUM,
@@ -23,46 +27,15 @@ from cleave.timeline import (
 from cleave.timeline_presets.chords import MAX_CONCURRENT_LAYERS
 from cleave.timeline_presets.emit import cues_from_states
 
-CrescendoTarget = Literal["last", "penultimate"]
-
-CRESCENDO_MIN_MARKERS = 3
 _FALLBACK_START_FRACTION = 0.20
 # An entrant appears at the dimmest visible level and climbs to full by t_full.
 CRESCENDO_ENTRY_LEVEL = LEVEL_QUANTUM
 # Enough steps for a lane to climb through every quantised level on the way up.
 CRESCENDO_RAMP_STEPS = int(round(1.0 / LEVEL_QUANTUM))
 
-TIMELINE_PRESET_CRESCENDO_OPTIONS: tuple[CrescendoTarget | None, ...] = (
-    None,
-    "last",
-    "penultimate",
-)
-
-_CRESCENDO_DISPLAY: dict[CrescendoTarget | None, str] = {
-    None: "no",
-    "last": "last song marker",
-    "penultimate": "penultimate song marker",
-}
-
 
 def _lerp(a: float, b: float, t: float) -> float:
     return a + (b - a) * float(t)
-
-
-def timeline_preset_crescendo_display(target: CrescendoTarget | None) -> str:
-    return _CRESCENDO_DISPLAY.get(target, _CRESCENDO_DISPLAY[None])
-
-
-def cycle_timeline_preset_crescendo(
-    value: CrescendoTarget | None, *, forward: bool
-) -> CrescendoTarget | None:
-    options = TIMELINE_PRESET_CRESCENDO_OPTIONS
-    try:
-        index = options.index(value)
-    except ValueError:
-        index = 0
-    delta = 1 if forward else -1
-    return options[(index + delta) % len(options)]
 
 
 @dataclass(frozen=True)
@@ -75,35 +48,74 @@ class CrescendoWindow:
 
 
 def normalize_crescendo_markers(
-    song_marker_times: Sequence[float],
+    song_markers: Sequence[SongMarker],
     duration_sec: float,
-) -> list[float]:
-    """Sorted unique markers strictly inside ``(0, duration_sec)``."""
-    return sorted(
-        {
-            float(t)
-            for t in song_marker_times
-            if 0.0 < float(t) < duration_sec
-        }
-    )
+) -> list[SongMarker]:
+    """Sorted unique markers strictly inside ``(0, duration_sec)``.
+
+    On duplicate times, the first occurrence wins.
+    """
+    by_time: dict[float, SongMarker] = {}
+    for marker in song_markers:
+        t = float(marker.time)
+        if 0.0 < t < duration_sec and t not in by_time:
+            by_time[t] = SongMarker(t, marker.marker_type)
+    return [by_time[t] for t in sorted(by_time)]
+
+
+def resolve_crescendo_windows(
+    song_markers: Sequence[SongMarker],
+    duration_sec: float,
+) -> list[CrescendoWindow]:
+    """Resolve one window per crescendo-typed marker that has a prior marker."""
+    markers = normalize_crescendo_markers(song_markers, duration_sec)
+    if duration_sec <= 0.0 or not markers:
+        return []
+    windows: list[CrescendoWindow] = []
+    for selected_idx, marker in enumerate(markers):
+        if marker.marker_type != "crescendo":
+            continue
+        window = _window_at_index(markers, selected_idx, duration_sec)
+        if window is not None:
+            windows.append(window)
+    return windows
 
 
 def resolve_crescendo_window(
-    song_marker_times: Sequence[float],
+    song_markers: Sequence[SongMarker],
     duration_sec: float,
-    target: CrescendoTarget,
+    *,
+    peak_time: float | None = None,
 ) -> CrescendoWindow | None:
-    """Resolve crescendo times for ``last`` / ``penultimate`` marker targets."""
-    markers = normalize_crescendo_markers(song_marker_times, duration_sec)
-    if len(markers) < CRESCENDO_MIN_MARKERS or duration_sec <= 0.0:
+    """Resolve a single crescendo window.
+
+    When ``peak_time`` is set, resolve the window for that crescendo marker.
+    Otherwise return the earliest resolved crescendo window, or ``None``.
+    """
+    if peak_time is not None:
+        markers = normalize_crescendo_markers(song_markers, duration_sec)
+        peak = float(peak_time)
+        for selected_idx, marker in enumerate(markers):
+            if marker.marker_type != "crescendo":
+                continue
+            if abs(marker.time - peak) < 1e-9:
+                return _window_at_index(markers, selected_idx, duration_sec)
         return None
-    selected_idx = len(markers) - 1 if target == "last" else len(markers) - 2
-    if selected_idx < 1:
+    windows = resolve_crescendo_windows(song_markers, duration_sec)
+    return windows[0] if windows else None
+
+
+def _window_at_index(
+    markers: Sequence[SongMarker],
+    selected_idx: int,
+    duration_sec: float,
+) -> CrescendoWindow | None:
+    if selected_idx < 1 or duration_sec <= 0.0:
         return None
-    t_peak_end = markers[selected_idx]
-    t_full = markers[selected_idx - 1]
+    t_peak_end = float(markers[selected_idx].time)
+    t_full = float(markers[selected_idx - 1].time)
     if selected_idx >= 2:
-        t_start = markers[selected_idx - 2]
+        t_start = float(markers[selected_idx - 2].time)
     else:
         t_start = max(0.0, t_peak_end - _FALLBACK_START_FRACTION * duration_sec)
     if t_start > t_full:
@@ -119,26 +131,48 @@ def apply_crescendo(
     *,
     duration_sec: float,
     bar_times: Sequence[float],
-    song_marker_times: Sequence[float],
-    target: CrescendoTarget,
+    song_markers: Sequence[SongMarker],
     rng: random.Random,
 ) -> dict[str, TimelineLane]:
-    """Rewrite ``lanes`` from the crescendo window through song end.
+    """Rewrite ``lanes`` for each crescendo-typed song marker through song end.
 
-    When the source lanes carry cast roles (e.g. conductor Apply), the prefix
-    keeps those held role/blend values and the crescendo ramp assigns a simple
-    lead/bed cast so ``cues_from_states`` does not strip them.
+    Windows are applied earliest-first so a later crescendo overwrites from its
+    ramp start. When the source lanes carry cast roles (e.g. conductor Apply),
+    the prefix keeps those held role/blend values and each crescendo ramp
+    assigns a simple lead/bed cast so ``cues_from_states`` does not strip them.
     """
     slot_list = list(slots)
     if not slot_list or duration_sec <= 0.0:
         return lanes
-    window = resolve_crescendo_window(song_marker_times, duration_sec, target)
-    if window is None:
+    windows = resolve_crescendo_windows(song_markers, duration_sec)
+    if not windows:
         return lanes
 
-    prefix = _states_before(lanes, slot_list, window.t_start)
+    result = lanes
+    for window in windows:
+        result = _apply_crescendo_window(
+            result,
+            slot_list,
+            window,
+            duration_sec=duration_sec,
+            bar_times=bar_times,
+            rng=rng,
+        )
+    return result
+
+
+def _apply_crescendo_window(
+    lanes: dict[str, TimelineLane],
+    slots: Sequence[str],
+    window: CrescendoWindow,
+    *,
+    duration_sec: float,
+    bar_times: Sequence[float],
+    rng: random.Random,
+) -> dict[str, TimelineLane]:
+    prefix = _states_before(lanes, slots, window.t_start)
     crescendo = _crescendo_states(
-        slot_list,
+        slots,
         window,
         duration_sec=duration_sec,
         bar_times=bar_times,
@@ -150,10 +184,10 @@ def apply_crescendo(
     casts = None
     if _lanes_have_roles(lanes):
         casts = _casts_for_merged(
-            lanes, slot_list, merged, t_start=window.t_start
+            lanes, slots, merged, t_start=window.t_start
         )
     return cues_from_states(
-        slot_list,
+        list(slots),
         merged,
         casts,
     )

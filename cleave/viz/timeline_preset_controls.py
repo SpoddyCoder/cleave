@@ -22,13 +22,7 @@ from cleave.timeline_presets import (
 )
 from cleave.timeline_presets.characters import timeline_preset_kind_display
 from cleave.timeline_presets.conductor import timeline_preset_conductor_display
-from cleave.timeline_presets.crescendo import (
-    CRESCENDO_MIN_MARKERS,
-    CrescendoTarget,
-    apply_crescendo,
-    normalize_crescendo_markers,
-    timeline_preset_crescendo_display,
-)
+from cleave.timeline_presets.crescendo import apply_crescendo
 from cleave.timeline_presets.cue_snap import timeline_preset_cue_snap_display
 from cleave.timeline_presets.density import (
     density_bias_for,
@@ -99,10 +93,6 @@ class TimelinePresetController:
                 "character", timeline_preset_kind_display(tl.timeline_preset_kind)
             ),
             ModalLabeledLine(
-                "crescendo",
-                timeline_preset_crescendo_display(tl.timeline_preset_crescendo),
-            ),
-            ModalLabeledLine(
                 "density", timeline_preset_density_display(tl.timeline_preset_density)
             ),
             ModalLabeledLine(
@@ -141,24 +131,12 @@ class TimelinePresetController:
         self._modal.prompt_choice(_RESET_PROMPT_MESSAGE, options, on_dismiss=dismiss)
 
     def _confirm_apply(self, duration_sec: float) -> None:
-        tl = self.session.timeline
-        kind = tl.timeline_preset_kind
-        crescendo = tl.timeline_preset_crescendo
-        if crescendo is not None:
-            markers = normalize_crescendo_markers(
-                self.session.song_markers.times,
-                duration_sec,
-            )
-            if len(markers) < CRESCENDO_MIN_MARKERS:
-                crescendo = None
-        self._apply(kind, duration_sec, crescendo=crescendo)
+        self._apply(self.session.timeline.timeline_preset_kind, duration_sec)
 
     def _apply(
         self,
         kind: str,
         duration_sec: float,
-        *,
-        crescendo: CrescendoTarget | None,
     ) -> None:
         if not self._bar_times:
             self._notify("No bars available; re-run separate")
@@ -179,11 +157,12 @@ class TimelinePresetController:
         tl = self.session.timeline
         tl.enabled = True
         slots = list(self.session.layer_z_order)
-        markers = list(self.session.song_markers.times)
+        markers = list(self.session.song_markers.markers)
+        marker_times = [m.time for m in markers]
         rng = random.Random()
         builder_kwargs: dict = {
             "bar_times": grid,
-            "song_marker_times": markers,
+            "song_marker_times": marker_times,
             "density_bias": density_bias_for(tl.timeline_preset_density),
         }
         conductor_skipped = False
@@ -201,23 +180,23 @@ class TimelinePresetController:
             rng,
             **builder_kwargs,
         )
-        if crescendo is not None:
-            built = apply_crescendo(
-                built,
-                slots,
-                duration_sec=duration_sec,
-                bar_times=grid,
-                song_marker_times=markers,
-                target=crescendo,
-                rng=rng,
-            )
+        after_crescendo = apply_crescendo(
+            built,
+            slots,
+            duration_sec=duration_sec,
+            bar_times=grid,
+            song_markers=markers,
+            rng=rng,
+        )
+        if after_crescendo is not built:
+            built = after_crescendo
             message = f"{message} (crescendo)"
         built = {
             slot: copy_lane(built.get(slot, empty_lane())) for slot in slots
         }
         self._apply_cue_snap(built, grid)
-        self._apply_song_marker_snap(built, markers, slots)
-        self._apply_timeline_cuts(built, markers, tl.timeline_preset_timeline_cuts)
+        self._apply_song_marker_snap(built, marker_times, slots)
+        self._apply_timeline_cuts(built, marker_times, tl.timeline_preset_timeline_cuts)
         for slot in slots:
             tl.lanes[slot] = built[slot]
         if (
