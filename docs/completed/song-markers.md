@@ -40,13 +40,13 @@ Build UI and editing only. No preset generation or beat-phase logic yet.
 
 - First expandable child under **Render: Timeline**: header label `song markers (N)` with expand arrow (e.g. `song markers (4)`).
 - When expanded: list of marker rows as `[mm:ss.cc] <type>` (e.g. `[00:26.02] -`), then **snap to song markers** as the last row (green action row; no expand arrow).
-- Marker types: `standard` (shown as `-`), `crescendo`, `diminuendo`. New drops default to `standard`.
+- Marker types: `standard` (shown as `-`), `begin`, `sustain`, `crescendo`, `diminuendo`. New drops default to `standard`.
 
 ### List interaction
 
 - Focus on a song-marker list row highlights that row and the matching strip tick. Drop/replace does **not** move focus onto the new marker; if a marker row was already focused, that selection is remapped by time when the list shifts. Do **not** auto-follow the playhead.
 - **Enter** on a focused song marker seeks the playhead to that time (audition / verify placement). Timeline row arm uses **a**, so **Enter** is free for seek-to-marker.
-- **Left** / **Right** cycles the focused marker's type (`standard` -> `crescendo` -> `diminuendo` -> …).
+- **Left** / **Right** cycles the focused marker's type (`standard` -> `begin` -> `sustain` -> `crescendo` -> `diminuendo` -> …). Invalid gesture structure (orphan `begin`/`sustain`, peak with no prior marker) shows a warn-only toast; the type change still applies. Cycling to `diminuendo` also toasts that generation is not implemented yet.
 - **Delete** prompts a confirm modal, then removes the focused song marker.
 - No nudge in v1 — delete and re-drop at the playhead is enough, with **Enter** to verify.
 
@@ -106,7 +106,7 @@ When song markers exist, applying a timeline preset (Breathing / Dialogue / Arc 
 
 1. **Section-driven phrases.** Markers are hard section walls. Phrases never cross a marker; each marker starts a new phrase (then the usual 4–8 bar / minimum-duration partitioning fills each section). Empty or out-of-range markers leave bar-only partitioning unchanged.
 2. **Soft latch.** Planned motif switches still prefer the bar grid. If an unclaimed marker lies within **5.0s** of a planned switch and min switch gaps still hold, that switch moves onto the marker (exclusive: each marker claimed at most once). Soft latch does **not** invent extra transitions solely to hit a marker.
-3. **Crescendo markers.** Each in-range marker typed `crescendo` that has at least one prior marker gets a crescendo post-pass (ramp from earlier markers, full stack at the previous marker, solo from the crescendo marker through song end, or until a later crescendo overwrites). `diminuendo` is ignored for generation.
+3. **Crescendo markers.** Each in-range marker typed `crescendo` that has at least one prior marker gets a crescendo post-pass. Optional `begin` sets where the rise starts and optional `sustain` sets where the full stack is reached and held until the peak; both are scoped between the previous peak (`crescendo` or `diminuendo`) and this one. Without those anchors, rise starts two markers before the peak (or a duration fraction when only one prior marker exists) and full stack is one marker before. Solo runs from the crescendo marker through song end, or until a later crescendo overwrites. `diminuendo` is ignored for generation but still ends a gesture for scoping.
 
 No new panel knobs. Phase 2 **snap to song markers** remains a separate manual polish step and is not run automatically after apply.
 
