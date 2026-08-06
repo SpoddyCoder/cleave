@@ -10,6 +10,7 @@ from cleave.song_markers import (
     format_marker_time,
     nearest_index,
     place_marker,
+    song_marker_gesture_warning,
 )
 
 
@@ -92,8 +93,76 @@ def test_format_marker_time() -> None:
 
 
 def test_cycle_song_marker_type() -> None:
-    assert cycle_song_marker_type("standard", forward=True) == "crescendo"
+    assert cycle_song_marker_type("standard", forward=True) == "begin"
+    assert cycle_song_marker_type("begin", forward=True) == "sustain"
+    assert cycle_song_marker_type("sustain", forward=True) == "crescendo"
     assert cycle_song_marker_type("crescendo", forward=True) == "diminuendo"
     assert cycle_song_marker_type("diminuendo", forward=True) == "standard"
     assert cycle_song_marker_type("standard", forward=False) == "diminuendo"
-    assert cycle_song_marker_type("crescendo", forward=False) == "standard"
+    assert cycle_song_marker_type("begin", forward=False) == "standard"
+    assert cycle_song_marker_type("crescendo", forward=False) == "sustain"
+
+
+def test_song_marker_gesture_warning_orphan_begin() -> None:
+    markers = [SongMarker(10.0, "begin"), SongMarker(20.0)]
+    assert (
+        song_marker_gesture_warning(markers, 0)
+        == "begin has no crescendo/diminuendo after it"
+    )
+
+
+def test_song_marker_gesture_warning_orphan_sustain() -> None:
+    markers = [
+        SongMarker(10.0, "crescendo"),
+        SongMarker(20.0, "sustain"),
+        SongMarker(30.0),
+    ]
+    assert (
+        song_marker_gesture_warning(markers, 1)
+        == "sustain has no crescendo/diminuendo after it"
+    )
+
+
+def test_song_marker_gesture_warning_sustain_before_begin() -> None:
+    markers = [
+        SongMarker(10.0, "sustain"),
+        SongMarker(20.0, "begin"),
+        SongMarker(30.0, "crescendo"),
+    ]
+    assert (
+        song_marker_gesture_warning(markers, 0)
+        == "sustain has no crescendo/diminuendo after it"
+    )
+    assert song_marker_gesture_warning(markers, 1) is None
+
+
+def test_song_marker_gesture_warning_peak_first() -> None:
+    markers = [SongMarker(10.0, "crescendo"), SongMarker(20.0)]
+    assert (
+        song_marker_gesture_warning(markers, 0)
+        == "crescendo has no marker before it to rise from"
+    )
+    markers[0] = SongMarker(10.0, "diminuendo")
+    assert (
+        song_marker_gesture_warning(markers, 0)
+        == "diminuendo has no marker before it to rise from"
+    )
+
+
+def test_song_marker_gesture_warning_valid_gesture() -> None:
+    markers = [
+        SongMarker(10.0, "begin"),
+        SongMarker(20.0, "sustain"),
+        SongMarker(30.0, "crescendo"),
+    ]
+    assert song_marker_gesture_warning(markers, 0) is None
+    assert song_marker_gesture_warning(markers, 1) is None
+    assert song_marker_gesture_warning(markers, 2) is None
+
+
+def test_song_marker_gesture_warning_diminuendo_info() -> None:
+    markers = [SongMarker(10.0), SongMarker(20.0, "diminuendo")]
+    assert (
+        song_marker_gesture_warning(markers, 1)
+        == "diminuendo is not generated yet"
+    )

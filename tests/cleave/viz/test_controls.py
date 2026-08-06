@@ -5259,17 +5259,56 @@ def test_song_marker_left_right_cycles_type() -> None:
     assert "[00:26.02] -" in _row_text(view, row)
 
     assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
-    assert markers.markers[0].marker_type == "crescendo"
+    assert markers.markers[0].marker_type == "begin"
     assert controls.config_dirty
     view = controls.build_view_state(paused=False)
-    assert "[00:26.02] crescendo" in _row_text(view, row)
+    row = view.layout.find_descriptor(controls.focus_descriptor)
+    assert "[00:26.02] begin" in _row_text(view, row)
 
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert markers.markers[0].marker_type == "sustain"
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert markers.markers[0].marker_type == "crescendo"
     assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
     assert markers.markers[0].marker_type == "diminuendo"
     assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
     assert markers.markers[0].marker_type == "standard"
     assert controls.handle_keydown(_keydown(pygame.K_LEFT)) is True
     assert markers.markers[0].marker_type == "diminuendo"
+
+
+def test_song_marker_type_cycle_toasts_orphan_begin() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.timeline.panel_open = True
+    markers = controls.session.song_markers
+    markers.markers = [SongMarker(10.0, "standard"), SongMarker(20.0)]
+    markers.expanded = True
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.SONG_MARKER_ITEM, marker_index=0
+    )
+    noted: list[str] = []
+    controls.show_notification = noted.append  # type: ignore[method-assign]
+
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert markers.markers[0].marker_type == "begin"
+    assert noted == ["begin has no crescendo/diminuendo after it"]
+
+
+def test_song_marker_type_cycle_toasts_orphan_sustain() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.timeline.panel_open = True
+    markers = controls.session.song_markers
+    markers.markers = [SongMarker(10.0, "begin"), SongMarker(20.0)]
+    markers.expanded = True
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.SONG_MARKER_ITEM, marker_index=0
+    )
+    noted: list[str] = []
+    controls.show_notification = noted.append  # type: ignore[method-assign]
+
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert markers.markers[0].marker_type == "sustain"
+    assert noted == ["sustain has no crescendo/diminuendo after it"]
 
 
 def test_drop_song_marker_insert_preserves_prior_selection_by_time() -> None:

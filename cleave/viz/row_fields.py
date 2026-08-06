@@ -38,6 +38,7 @@ from cleave.song_markers import (
     cycle_song_marker_type,
     format_marker_time,
     parse_song_marker_type,
+    song_marker_gesture_warning,
 )
 from cleave.timeline_presets.characters import (
     cycle_timeline_preset_kind,
@@ -1543,6 +1544,9 @@ def _apply_song_marker_type(
         forward=forward,
     )
     markers.markers[index] = SongMarker(current.time, next_type)
+    warning = song_marker_gesture_warning(markers.markers, index)
+    if warning is not None:
+        controls.show_notification(warning)
 
 
 def _format_transport(_state: TuningViewState, _desc: RowDescriptor) -> str:

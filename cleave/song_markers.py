@@ -6,15 +6,21 @@ import bisect
 from dataclasses import dataclass
 from typing import Literal, Sequence
 
-SongMarkerType = Literal["standard", "crescendo", "diminuendo"]
+SongMarkerType = Literal[
+    "standard", "begin", "sustain", "crescendo", "diminuendo"
+]
 
 DEFAULT_SONG_MARKER_TYPE: SongMarkerType = "standard"
 
 SONG_MARKER_TYPES: tuple[SongMarkerType, ...] = (
     "standard",
+    "begin",
+    "sustain",
     "crescendo",
     "diminuendo",
 )
+
+_GESTURE_PEAK_TYPES = frozenset({"crescendo", "diminuendo"})
 
 
 @dataclass(frozen=True)
@@ -41,6 +47,34 @@ def parse_song_marker_type(raw: object) -> SongMarkerType:
         return raw  # type: ignore[return-value]
     raise ValueError(f"invalid song marker type: {raw!r}")
 
+
+def song_marker_gesture_warning(
+    markers: Sequence[SongMarker],
+    changed_index: int,
+) -> str | None:
+    """Return a warn-only message when the edited marker is structurally invalid.
+
+    Peak types are ``crescendo`` and ``diminuendo``. A ``begin`` / ``sustain``
+    binds forward to the first peak; a later ``begin`` starts a fresh gesture.
+    """
+    if changed_index < 0 or changed_index >= len(markers):
+        return None
+    marker_type = markers[changed_index].marker_type
+    if marker_type in _GESTURE_PEAK_TYPES:
+        if changed_index == 0:
+            return f"{marker_type} has no marker before it to rise from"
+        if marker_type == "diminuendo":
+            return "diminuendo is not generated yet"
+        return None
+    if marker_type not in ("begin", "sustain"):
+        return None
+    for j in range(changed_index + 1, len(markers)):
+        other = markers[j].marker_type
+        if other == "begin":
+            break
+        if other in _GESTURE_PEAK_TYPES:
+            return None
+    return f"{marker_type} has no crescendo/diminuendo after it"
 
 def nearest_index(times: Sequence[float], t: float) -> int:
     """Return the index of the song marker nearest to ``t``.

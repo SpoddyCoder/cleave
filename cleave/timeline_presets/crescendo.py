@@ -1,7 +1,9 @@
 """Song-marker crescendo overlay for timeline presets.
 
 Builds crescendos to each in-range song marker typed ``crescendo``.
-``diminuendo`` markers are ignored.
+Optional ``begin`` / ``sustain`` anchors set the rise window; absent anchors
+fall back to the prior two markers. ``diminuendo`` is ignored for generation
+but still scopes gesture search as a peak.
 """
 
 from __future__ import annotations
@@ -32,6 +34,7 @@ _FALLBACK_START_FRACTION = 0.20
 CRESCENDO_ENTRY_LEVEL = LEVEL_QUANTUM
 # Enough steps for a lane to climb through every quantised level on the way up.
 CRESCENDO_RAMP_STEPS = int(round(1.0 / LEVEL_QUANTUM))
+_GESTURE_PEAK_TYPES = frozenset({"crescendo", "diminuendo"})
 
 
 def _lerp(a: float, b: float, t: float) -> float:
@@ -112,15 +115,42 @@ def _window_at_index(
 ) -> CrescendoWindow | None:
     if selected_idx < 1 or duration_sec <= 0.0:
         return None
+    prev_peak_idx = -1
+    for i in range(selected_idx - 1, -1, -1):
+        if markers[i].marker_type in _GESTURE_PEAK_TYPES:
+            prev_peak_idx = i
+            break
+    # Anchors strictly between the previous peak and this crescendo.
+    scope = range(prev_peak_idx + 1, selected_idx)
     t_peak_end = float(markers[selected_idx].time)
-    t_full = float(markers[selected_idx - 1].time)
-    if selected_idx >= 2:
-        t_start = float(markers[selected_idx - 2].time)
-    else:
-        t_start = max(0.0, t_peak_end - _FALLBACK_START_FRACTION * duration_sec)
-    if t_start > t_full:
-        t_start = max(0.0, t_full - _FALLBACK_START_FRACTION * duration_sec)
-    if t_full > t_peak_end:
+
+    t_full: float | None = None
+    for i in scope:
+        if markers[i].marker_type == "sustain":
+            t_full = float(markers[i].time)
+    if t_full is None:
+        t_full = float(markers[selected_idx - 1].time)
+
+    t_start: float | None = None
+    for i in scope:
+        if markers[i].marker_type == "begin":
+            begin_t = float(markers[i].time)
+            if begin_t < t_full:
+                t_start = begin_t
+    if t_start is None:
+        if selected_idx >= 2:
+            t_start = float(markers[selected_idx - 2].time)
+        else:
+            t_start = max(
+                0.0, t_peak_end - _FALLBACK_START_FRACTION * duration_sec
+            )
+        if prev_peak_idx >= 0:
+            t_start = max(t_start, float(markers[prev_peak_idx].time))
+
+    if t_start >= t_full:
+        # Collapse the hold: pure rise from t_start to the peak.
+        t_full = t_peak_end
+    if t_full > t_peak_end or t_start >= t_peak_end:
         return None
     return CrescendoWindow(t_start=t_start, t_full=t_full, t_peak_end=t_peak_end)
 
