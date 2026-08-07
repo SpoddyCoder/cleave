@@ -40,6 +40,7 @@ class SlotCue:
     blend: BlendMode | None = None
     role: CueRole | None = None
     cut: CutType | None = None
+    anchor: bool = False
 
 
 @dataclass
@@ -159,6 +160,7 @@ def canonicalize(
             current_level is not None
             and levels_equal(cue.level, current_level)
             and cue.blend == current_blend
+            and not cue.anchor
         ):
             continue
         result.append(cue)

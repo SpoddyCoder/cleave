@@ -544,7 +544,9 @@ def test_curation_navigation_omits_disabled_global_hotkeys() -> None:
 
 
 def test_timeline_strip_help_paused() -> None:
-    section = timeline_strip_section(paused=True, recording=False, override_active=False)
+    section = timeline_strip_section(
+        paused=True, recording=False, override_active=False, layer_count=4
+    )
     keys = [key for key, _ in section.entries]
     assert keys.index("Shift + Enter") + 1 == keys.index("1-4")
     entries = dict(section.entries)
@@ -562,13 +564,23 @@ def test_timeline_strip_help_paused() -> None:
     assert "Left/Right" in entries
 
 
+def test_timeline_strip_help_single_layer() -> None:
+    entries = dict(
+        timeline_strip_section(
+            paused=True, recording=False, override_active=False, layer_count=1
+        ).entries
+    )
+    assert entries["1"] == "toggle layer visibility"
+    assert "1-4" not in entries
+
+
 def test_timeline_strip_help_playing_without_override() -> None:
     keys = _timeline_keys(paused=False, timeline_recording=False, timeline_override_active=False)
     assert "1-4" not in keys
     assert "Shift + Enter" in keys
     assert dict(
         timeline_strip_section(
-            paused=False, recording=False, override_active=False
+            paused=False, recording=False, override_active=False, layer_count=4
         ).entries
     )["Space"] == "pause"
 
@@ -576,18 +588,21 @@ def test_timeline_strip_help_playing_without_override() -> None:
 def test_timeline_strip_help_playing_with_override() -> None:
     entries = dict(
         timeline_strip_section(
-            paused=False, recording=False, override_active=True
+            paused=False, recording=False, override_active=True, layer_count=6
         ).entries
     )
-    assert entries["1-4"] == "toggle layer visibility"
+    assert entries["1-6"] == "toggle layer visibility"
 
 
 def test_timeline_strip_help_recording_while_playing() -> None:
     entries = dict(
-        timeline_strip_section(paused=False, recording=True, override_active=False).entries
+        timeline_strip_section(
+            paused=False, recording=True, override_active=False, layer_count=4
+        ).entries
     )
     assert "Ctrl + Enter" not in entries
     assert entries["1-4"] == "toggle layer visibility"
+    assert entries["Ctrl + 1-4"] == "drop cue (keep level)"
     assert "Shift + Enter" not in entries
     assert entries["Left/Right"] == "skip 10s, fills range"
     assert entries["Shift + Left/Right"] == "skip 2s, fills range"

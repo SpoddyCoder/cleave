@@ -304,6 +304,7 @@ class HelpOverlay:
         timeline_override_active: bool = False,
         preset_switching: str | None = None,
         preset_curation: bool = False,
+        layer_count: int = 4,
     ) -> ComposedHelpPanel | None:
         self._panel_rect = None
         font = self._font_get()
@@ -316,6 +317,7 @@ class HelpOverlay:
             timeline_override_active=timeline_override_active,
             preset_switching=preset_switching,
             preset_curation=preset_curation,
+            layer_count=layer_count,
         )
         sections = sections_for(
             focus.kind,
@@ -327,6 +329,7 @@ class HelpOverlay:
             timeline_override_active=timeline_override_active,
             preset_switching=preset_switching,
             preset_curation=preset_curation,
+            layer_count=layer_count,
         )
         panel_w, panel_h = compute_help_panel_size(
             font,

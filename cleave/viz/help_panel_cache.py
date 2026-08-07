@@ -31,6 +31,7 @@ class HelpContentSignature:
     timeline_override_active: bool
     preset_switching: str | None
     preset_curation: bool = False
+    layer_count: int = 4
 
 
 @dataclass
@@ -51,6 +52,7 @@ def help_content_signature(
     timeline_override_active: bool,
     preset_switching: str | None,
     preset_curation: bool = False,
+    layer_count: int = 4,
 ) -> HelpContentSignature:
     return HelpContentSignature(
         kind=focus.kind,
@@ -62,6 +64,7 @@ def help_content_signature(
         timeline_override_active=timeline_override_active,
         preset_switching=preset_switching,
         preset_curation=preset_curation,
+        layer_count=layer_count,
     )
 
 
@@ -250,6 +253,7 @@ def help_panel_max_dimensions(
                         row_kind,
                         effect_id=effect_id,
                         preset_switching=preset_switching,
+                        layer_count=8,
                         **flags,
                     )
                     panel_w, panel_h = compute_help_panel_size(

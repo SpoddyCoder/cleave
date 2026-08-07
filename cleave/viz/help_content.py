@@ -180,21 +180,30 @@ _RENDER_TIMELINE_SECTION = HelpSection(
 )
 
 
+def _layer_key_range_label(layer_count: int) -> str:
+    if layer_count <= 1:
+        return "1"
+    return f"1-{layer_count}"
+
+
 def timeline_strip_section(
     *,
     paused: bool,
     recording: bool,
     override_active: bool,
+    layer_count: int = 4,
 ) -> HelpSection:
+    layer_keys = _layer_key_range_label(layer_count)
     entries: list[tuple[str, str]] = [("A", "toggle arm track")]
 
     if not recording:
         entries.append(("Shift + Enter", "toggle override"))
         if paused or override_active:
-            entries.append(("1-4", "toggle layer visibility"))
+            entries.append((layer_keys, "toggle layer visibility"))
 
     if recording:
-        entries.append(("1-4", "toggle layer visibility"))
+        entries.append((layer_keys, "toggle layer visibility"))
+        entries.append((f"Ctrl + {layer_keys}", "drop cue (keep level)"))
 
     if recording:
         entries.append(("R", "stop record"))
@@ -302,6 +311,7 @@ def sections_for(
     timeline_override_active: bool = False,
     preset_switching: str | None = None,
     preset_curation: bool = False,
+    layer_count: int = 4,
 ) -> tuple[HelpContent, ...]:
     nav = navigation_section(preset_curation=preset_curation)
     if timeline_submenu_focused:
@@ -309,6 +319,7 @@ def sections_for(
             paused=paused,
             recording=timeline_recording,
             override_active=timeline_override_active,
+            layer_count=layer_count,
         )
         description = _description_section(RowKind.RENDER_TIMELINE_HEADER)
         if description is not None:
