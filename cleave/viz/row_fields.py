@@ -32,7 +32,14 @@ from cleave.config_schema import (
     ui_fade_display,
 )
 from cleave.extract import stem_control_label, stem_overlay_header
-from cleave.song_markers import format_marker_time
+from cleave.song_markers import (
+    DEFAULT_SONG_MARKER_TYPE,
+    SongMarker,
+    cycle_song_marker_type,
+    format_marker_time,
+    parse_song_marker_type,
+    song_marker_gesture_warning,
+)
 from cleave.timeline_presets.characters import (
     cycle_timeline_preset_kind,
     timeline_preset_kind_display,
@@ -44,10 +51,6 @@ from cleave.timeline_presets.conductor import (
 from cleave.timeline_presets.repopulate import (
     cycle_timeline_preset_repopulate,
     timeline_preset_repopulate_display,
-)
-from cleave.timeline_presets.crescendo import (
-    cycle_timeline_preset_crescendo,
-    timeline_preset_crescendo_display,
 )
 from cleave.timeline_presets.cue_snap import (
     cycle_timeline_preset_cue_snap,
@@ -233,28 +236,6 @@ def _apply_timeline_preset_character(
     tl = controls.session.timeline
     tl.timeline_preset_kind = cycle_timeline_preset_kind(
         tl.timeline_preset_kind,
-        forward=forward,
-    )
-
-
-def _format_timeline_preset_crescendo(
-    state: TuningViewState, _desc: RowDescriptor
-) -> str:
-    return timeline_preset_crescendo_display(
-        state.render_timeline.timeline_preset_crescendo
-    )
-
-
-def _apply_timeline_preset_crescendo(
-    controls: TuningControls,
-    _desc: RowDescriptor,
-    forward: bool,
-    _ctrl: bool,
-    _shift: bool,
-) -> None:
-    tl = controls.session.timeline
-    tl.timeline_preset_crescendo = cycle_timeline_preset_crescendo(
-        tl.timeline_preset_crescendo,
         forward=forward,
     )
 
@@ -1523,10 +1504,49 @@ def _format_song_markers_count(state: TuningViewState, _desc: RowDescriptor) -> 
     return f"({len(state.render_timeline.song_marker_times)})"
 
 
+def _song_marker_type_display(marker_type: str) -> str:
+    if marker_type == DEFAULT_SONG_MARKER_TYPE:
+        return "-"
+    return marker_type
+
+
 def _format_song_marker_item(state: TuningViewState, desc: RowDescriptor) -> str:
     assert desc.marker_index is not None
+    index = desc.marker_index
     times = state.render_timeline.song_marker_times
-    return f"[{format_marker_time(times[desc.marker_index])}]"
+    types = state.render_timeline.song_marker_types
+    marker_type = (
+        types[index]
+        if 0 <= index < len(types)
+        else DEFAULT_SONG_MARKER_TYPE
+    )
+    return (
+        f"[{format_marker_time(times[index])}] "
+        f"{_song_marker_type_display(marker_type)}"
+    )
+
+
+def _apply_song_marker_type(
+    controls: TuningControls,
+    desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    assert desc.marker_index is not None
+    markers = controls.session.song_markers
+    index = desc.marker_index
+    if index < 0 or index >= len(markers.markers):
+        return
+    current = markers.markers[index]
+    next_type = cycle_song_marker_type(
+        parse_song_marker_type(current.marker_type),
+        forward=forward,
+    )
+    markers.markers[index] = SongMarker(current.time, next_type)
+    warning = song_marker_gesture_warning(markers.markers, index)
+    if warning is not None:
+        controls.show_notification(warning)
 
 
 def _format_transport(_state: TuningViewState, _desc: RowDescriptor) -> str:
@@ -2127,12 +2147,6 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         format_value=_format_timeline_preset_character,
         apply_horizontal=_apply_timeline_preset_character,
     ),
-    RowKind.TIMELINE_PRESET_CRESCENDO: RowFieldDef(
-        panel_label="crescendo",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_timeline_preset_crescendo,
-        apply_horizontal=_apply_timeline_preset_crescendo,
-    ),
     RowKind.TIMELINE_PRESET_DENSITY: RowFieldDef(
         panel_label="density",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -2312,6 +2326,7 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         panel_label="",
         present_style=RowPresentStyle.FULL_LINE,
         format_value=_format_song_marker_item,
+        apply_horizontal=_apply_song_marker_type,
     ),
     RowKind.PANEL_NOTIFICATION: RowFieldDef(
         panel_label="",

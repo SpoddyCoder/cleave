@@ -154,6 +154,15 @@ class TimelineControls:
 
         if event.key in _LAYER_KEY_INDEX:
             tl = self.session.timeline
+            if mod_ctrl(event.mod):
+                if tl.recording:
+                    slot = self._slot_for_layer_index(_LAYER_KEY_INDEX[event.key])
+                    if slot is not None:
+                        self._drop_hold_cue_at(
+                            slot, current_sec(self.playback, self.duration_sec)
+                        )
+                return True
+
             if tl.recording:
                 slot = self._slot_for_layer_index(_LAYER_KEY_INDEX[event.key])
                 if slot is not None:
@@ -580,6 +589,23 @@ class TimelineControls:
         snapped = self._snap_placement(t_sec)
         tl.record_buffer.setdefault(slot, []).append(
             SlotCue(t=snapped, level=0.0 if current_on else 1.0)
+        )
+        self._last_toggle_t[slot] = t_sec
+
+        if self._on_visibility_change is not None:
+            self._on_visibility_change()
+
+    def _drop_hold_cue_at(self, slot: str, t_sec: float) -> None:
+        tl = self.session.timeline
+        if slot not in tl.armed_slots or slot not in tl.record_baseline:
+            return
+        if not should_accept_toggle(self._last_toggle_t.get(slot), t_sec):
+            return
+
+        level = armed_recording_level(self.session, slot, t_sec)
+        snapped = self._snap_placement(t_sec)
+        tl.record_buffer.setdefault(slot, []).append(
+            SlotCue(t=snapped, level=level, anchor=True)
         )
         self._last_toggle_t[slot] = t_sec
 

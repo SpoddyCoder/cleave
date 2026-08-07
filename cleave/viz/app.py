@@ -120,7 +120,7 @@ def build_runtime_base(
 ) -> VisualizerSeed:
     pcm_bank = load_stem_pcm(project_dir)
     session = session_from_cfg(cfg, playlists)
-    session.song_markers.times = list(load_manifest(project_dir).song_markers)
+    session.song_markers.markers = list(load_manifest(project_dir).song_markers)
     return VisualizerSeed(
         project_dir=project_dir,
         audio_path=audio_path,

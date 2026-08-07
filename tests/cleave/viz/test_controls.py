@@ -26,6 +26,7 @@ from cleave.preset_playlist import (
 )
 from cleave.timeline import SlotCue, TimelineLane, canonicalize, lane_level_at
 from cleave.project import load_manifest, write_manifest
+from cleave.song_markers import SongMarker
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.key_repeat import mod_shift
 from cleave.viz.playback import format_mmss
@@ -1635,7 +1636,6 @@ def _choose_modal_option(controls: TuningControls, label: str) -> None:
 def test_timeline_presets_enter_opens_yes_cancel_modal() -> None:
     controls = _make_controls(("layer_1", "layer_2", "layer_3", "layer_4"))
     controls.session.timeline.timeline_preset_kind = "arc"
-    controls.session.timeline.timeline_preset_crescendo = "last"
     controls.session.timeline.timeline_preset_conductor = True
     _focus_timeline_presets(controls)
     assert controls.handle_keydown(_keydown(pygame.K_RETURN)) is True
@@ -1646,7 +1646,6 @@ def test_timeline_presets_enter_opens_yes_cancel_modal() -> None:
     assert modal_view.message == "Apply timeline preset?"
     assert modal_view.labeled_lines == (
         ModalLabeledLine("character", "arc"),
-        ModalLabeledLine("crescendo", "last song marker"),
         ModalLabeledLine("density", "normal"),
         ModalLabeledLine("cue snap", "none"),
         ModalLabeledLine("song marker snap", "none"),
@@ -1740,7 +1739,6 @@ def test_timeline_presets_cuts_none_keeps_cut_none() -> None:
         bar_times=bars,
     )
     controls.session.timeline.timeline_preset_kind = "breathing"
-    controls.session.timeline.timeline_preset_crescendo = None
     controls.session.timeline.timeline_preset_timeline_cuts = "none"
     _focus_timeline_presets(controls)
     _confirm_timeline_preset(controls)
@@ -1760,7 +1758,6 @@ def test_timeline_presets_by_marker_cuts_assign_soft_or_hard() -> None:
     )
     controls.session.song_markers.times = [30.0, 90.0, 150.0]
     controls.session.timeline.timeline_preset_kind = "breathing"
-    controls.session.timeline.timeline_preset_crescendo = None
     controls.session.timeline.timeline_preset_timeline_cuts = "by marker"
     _focus_timeline_presets(controls)
     _confirm_timeline_preset(controls)
@@ -1814,7 +1811,6 @@ def test_timeline_presets_breathing_clears_and_applies() -> None:
     controls.session.timeline.recording = True
     controls.session.timeline.armed_slots.add("layer_1")
     controls.session.timeline.timeline_preset_kind = "breathing"
-    controls.session.timeline.timeline_preset_crescendo = None
     _focus_timeline_presets(controls)
     _confirm_timeline_preset(controls)
     assert not controls.modal_host.active
@@ -1842,7 +1838,6 @@ def test_timeline_presets_arc_clears_and_applies() -> None:
     controls.session.timeline.lanes = {"layer_1": _lane(True, (5.0, False))}
     controls.session.timeline.enabled = False
     controls.session.timeline.timeline_preset_kind = "arc"
-    controls.session.timeline.timeline_preset_crescendo = None
     _focus_timeline_presets(controls)
     _confirm_timeline_preset(controls)
     assert not controls.modal_host.active
@@ -1853,7 +1848,9 @@ def test_timeline_presets_arc_clears_and_applies() -> None:
     assert all(lane.baseline is not None for lane in lanes.values())
 
 
-def test_timeline_presets_crescendo_when_enough_markers() -> None:
+def test_timeline_presets_crescendo_when_typed_marker() -> None:
+    from cleave.song_markers import SongMarker
+
     beats = tuple(float(i) for i in range(241))
     bars = tuple(float(i) for i in range(0, 241, 4))
     controls = _make_controls(
@@ -1862,9 +1859,13 @@ def test_timeline_presets_crescendo_when_enough_markers() -> None:
         bar_times=bars,
         duration_sec=240.0,
     )
-    controls.session.song_markers.times = [30.0, 90.0, 150.0, 200.0]
+    controls.session.song_markers.markers = [
+        SongMarker(30.0),
+        SongMarker(90.0),
+        SongMarker(150.0),
+        SongMarker(200.0, "crescendo"),
+    ]
     controls.session.timeline.timeline_preset_kind = "breathing"
-    controls.session.timeline.timeline_preset_crescendo = "last"
     _focus_timeline_presets(controls)
     _confirm_timeline_preset(controls)
     assert not controls.modal_host.active
@@ -1872,7 +1873,7 @@ def test_timeline_presets_crescendo_when_enough_markers() -> None:
     assert view.notification_message == "Applied Breathing timeline preset (crescendo)"
 
 
-def test_timeline_presets_skips_crescendo_without_enough_markers() -> None:
+def test_timeline_presets_skips_crescendo_without_typed_marker() -> None:
     beats = tuple(float(i) for i in range(241))
     bars = tuple(float(i) for i in range(0, 241, 4))
     controls = _make_controls(
@@ -1881,9 +1882,8 @@ def test_timeline_presets_skips_crescendo_without_enough_markers() -> None:
         bar_times=bars,
         duration_sec=240.0,
     )
-    controls.session.song_markers.times = [30.0, 90.0]
+    controls.session.song_markers.times = [30.0, 90.0, 150.0, 200.0]
     controls.session.timeline.timeline_preset_kind = "pulse"
-    controls.session.timeline.timeline_preset_crescendo = "last"
     _focus_timeline_presets(controls)
     _confirm_timeline_preset(controls)
     assert not controls.modal_host.active
@@ -3066,7 +3066,6 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
         RowKind.TIMELINE_APPLY_HARD_CUTS,
         RowKind.TIMELINE_PRESETS_HEADER,
         RowKind.TIMELINE_PRESET_CHARACTER,
-        RowKind.TIMELINE_PRESET_CRESCENDO,
         RowKind.TIMELINE_PRESET_DENSITY,
         RowKind.TIMELINE_PRESET_CUE_SNAP,
         RowKind.TIMELINE_PRESET_SONG_MARKER_SNAP,
@@ -5235,12 +5234,81 @@ def test_drop_song_marker_does_not_select_or_steal_focus() -> None:
     controls.drop_song_marker()
     markers = controls.session.song_markers
     assert markers.times == [15.0]
+    assert markers.markers == [SongMarker(15.0, "standard")]
     assert markers.selected_index is None
     assert markers.expanded is True
     assert controls.session.timeline.panel_open is True
     assert controls.focus_descriptor == prior_focus
     view = controls.build_view_state(paused=False)
     assert RowDescriptor(RowKind.SONG_MARKER_ITEM, marker_index=0) in view.layout.rows
+
+
+def test_song_marker_left_right_cycles_type() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.timeline.panel_open = True
+    markers = controls.session.song_markers
+    markers.markers = [SongMarker(26.02, "standard")]
+    markers.expanded = True
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.SONG_MARKER_ITEM, marker_index=0
+    )
+    controls.clear_config_dirty()
+
+    view = controls.build_view_state(paused=False)
+    row = view.layout.find_descriptor(controls.focus_descriptor)
+    assert "[00:26.02] -" in _row_text(view, row)
+
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert markers.markers[0].marker_type == "begin"
+    assert controls.config_dirty
+    view = controls.build_view_state(paused=False)
+    row = view.layout.find_descriptor(controls.focus_descriptor)
+    assert "[00:26.02] begin" in _row_text(view, row)
+
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert markers.markers[0].marker_type == "sustain"
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert markers.markers[0].marker_type == "crescendo"
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert markers.markers[0].marker_type == "diminuendo"
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert markers.markers[0].marker_type == "standard"
+    assert controls.handle_keydown(_keydown(pygame.K_LEFT)) is True
+    assert markers.markers[0].marker_type == "diminuendo"
+
+
+def test_song_marker_type_cycle_toasts_orphan_begin() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.timeline.panel_open = True
+    markers = controls.session.song_markers
+    markers.markers = [SongMarker(10.0, "standard"), SongMarker(20.0)]
+    markers.expanded = True
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.SONG_MARKER_ITEM, marker_index=0
+    )
+    noted: list[str] = []
+    controls.show_notification = noted.append  # type: ignore[method-assign]
+
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert markers.markers[0].marker_type == "begin"
+    assert noted == ["begin has no crescendo/diminuendo after it"]
+
+
+def test_song_marker_type_cycle_toasts_orphan_sustain() -> None:
+    controls = _make_controls(("layer_1",))
+    controls.session.timeline.panel_open = True
+    markers = controls.session.song_markers
+    markers.markers = [SongMarker(10.0, "begin"), SongMarker(20.0)]
+    markers.expanded = True
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.SONG_MARKER_ITEM, marker_index=0
+    )
+    noted: list[str] = []
+    controls.show_notification = noted.append  # type: ignore[method-assign]
+
+    assert controls.handle_keydown(_keydown(pygame.K_RIGHT)) is True
+    assert markers.markers[0].marker_type == "sustain"
+    assert noted == ["sustain has no crescendo/diminuendo after it"]
 
 
 def test_drop_song_marker_insert_preserves_prior_selection_by_time() -> None:
@@ -5372,6 +5440,10 @@ def test_up_down_syncs_song_marker_selected_index() -> None:
     assert markers.selected_index == 0
 
 
+def _song_markers(*times: float) -> tuple[SongMarker, ...]:
+    return tuple(SongMarker(t) for t in times)
+
+
 def _project_with_markers(tmp_path: Path, markers: tuple[float, ...] = ()) -> Path:
     project = tmp_path / "song"
     project.mkdir()
@@ -5383,7 +5455,7 @@ def _project_with_markers(tmp_path: Path, markers: tuple[float, ...] = ()) -> Pa
         demucs_model="htdemucs",
         song_markers=markers,
     )
-    assert load_manifest(project).song_markers == markers
+    assert load_manifest(project).song_markers == _song_markers(*markers)
     return project
 
 
@@ -5395,7 +5467,7 @@ def test_drop_song_marker_does_not_write_project_yaml(tmp_path: Path) -> None:
     controls.playback.player.seek(25.0)
     controls.drop_song_marker()
     assert controls.session.song_markers.times == [10.0, 25.0]
-    assert load_manifest(project).song_markers == (10.0,)
+    assert load_manifest(project).song_markers == _song_markers(10.0)
     assert controls.config_dirty
 
 
@@ -5414,7 +5486,7 @@ def test_delete_song_marker_does_not_write_project_yaml(tmp_path: Path) -> None:
     assert controls.handle_keydown(_keydown(pygame.K_DELETE)) is True
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
     assert markers.times == [5.0, 25.0]
-    assert load_manifest(project).song_markers == (5.0, 15.0, 25.0)
+    assert load_manifest(project).song_markers == _song_markers(5.0, 15.0, 25.0)
     assert controls.config_dirty
 
 
@@ -5435,7 +5507,7 @@ def test_marker_only_edit_marks_dirty_and_save_clears(tmp_path: Path) -> None:
     _choose_save_as_new(controls)
 
     assert not controls.config_dirty
-    assert load_manifest(project).song_markers == (12.5,)
+    assert load_manifest(project).song_markers == _song_markers(12.5)
 
 
 def test_overwrite_save_flushes_song_markers(tmp_path: Path) -> None:
@@ -5457,7 +5529,7 @@ def test_overwrite_save_flushes_song_markers(tmp_path: Path) -> None:
     controls.playback.player.seek(40.0)
     controls.drop_song_marker()
     assert controls.config_dirty
-    assert load_manifest(project).song_markers == (8.0,)
+    assert load_manifest(project).song_markers == _song_markers(8.0)
 
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = _desc(view, _config_header_row(view))
@@ -5465,7 +5537,7 @@ def test_overwrite_save_flushes_song_markers(tmp_path: Path) -> None:
     controls.handle_keydown(_keydown(pygame.K_RETURN))
 
     assert writes == [launch]
-    assert load_manifest(project).song_markers == (8.0, 40.0)
+    assert load_manifest(project).song_markers == _song_markers(8.0, 40.0)
     assert not controls.config_dirty
 
 
@@ -5486,7 +5558,7 @@ def test_quit_discard_leaves_project_markers_unchanged(tmp_path: Path) -> None:
     controls.handle_modal_keydown(_keydown(pygame.K_RIGHT))
     controls.handle_modal_keydown(_keydown(pygame.K_RETURN))
     assert controls.consume_pending_exit() is True
-    assert load_manifest(project).song_markers == (10.0, 20.0)
+    assert load_manifest(project).song_markers == _song_markers(10.0, 20.0)
 
 
 def test_save_as_new_flushes_markers_to_same_project_yaml(tmp_path: Path) -> None:
@@ -5501,7 +5573,7 @@ def test_save_as_new_flushes_markers_to_same_project_yaml(tmp_path: Path) -> Non
     controls.focus_descriptor = _desc(view, _config_header_row(view))
     _choose_save_as_new(controls)
 
-    assert load_manifest(project).song_markers == (3.0,)
+    assert load_manifest(project).song_markers == _song_markers(3.0)
     assert controls._config_save.active_config_path == new_yaml
     assert not controls.config_dirty
 

@@ -167,6 +167,21 @@ def test_canonicalize_drops_redundant_transitions() -> None:
     assert cues == [SlotCue(t=2.0, level=1.0)]
 
 
+def test_canonicalize_keeps_anchored_same_level_cue() -> None:
+    cues = canonicalize(
+        1.0,
+        [
+            SlotCue(t=5.0, level=1.0),
+            SlotCue(t=10.0, level=1.0, anchor=True),
+            SlotCue(t=15.0, level=0.75),
+        ],
+    )
+    assert cues == [
+        SlotCue(t=10.0, level=1.0, anchor=True),
+        SlotCue(t=15.0, level=0.75),
+    ]
+
+
 def test_canonicalize_keeps_blend_only_change() -> None:
     cues = canonicalize(
         0.0,

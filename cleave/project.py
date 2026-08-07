@@ -10,7 +10,43 @@ from typing import Sequence
 
 import yaml
 
+from cleave.song_markers import (
+    DEFAULT_SONG_MARKER_TYPE,
+    SongMarker,
+    parse_song_marker_type,
+)
+
 PROJECT_FILENAME = "project.yaml"
+
+
+def _parse_song_markers(raw_markers: object) -> tuple[SongMarker, ...]:
+    if raw_markers is None:
+        return ()
+    if not isinstance(raw_markers, list):
+        raise ValueError("invalid project manifest: song-markers")
+    markers: list[SongMarker] = []
+    for item in raw_markers:
+        if isinstance(item, (int, float)):
+            markers.append(SongMarker(float(item)))
+            continue
+        if not isinstance(item, dict):
+            raise ValueError("invalid project manifest: song-markers entry")
+        if "time" not in item:
+            raise ValueError("invalid project manifest: song-markers entry time")
+        marker_type = (
+            DEFAULT_SONG_MARKER_TYPE
+            if "type" not in item
+            else parse_song_marker_type(item["type"])
+        )
+        markers.append(SongMarker(float(item["time"]), marker_type))
+    return tuple(markers)
+
+
+def _song_markers_to_yaml(markers: Sequence[SongMarker]) -> list[dict]:
+    return [
+        {"time": float(m.time), "type": m.marker_type}
+        for m in markers
+    ]
 
 
 @dataclass(frozen=True)
@@ -22,7 +58,7 @@ class ProjectManifest:
     separated_at: str
     demucs_model: str
     restored_from: str | None = None
-    song_markers: tuple[float, ...] = ()
+    song_markers: tuple[SongMarker, ...] = ()
 
     @classmethod
     def from_dict(cls, data: dict) -> ProjectManifest:
@@ -35,13 +71,6 @@ class ProjectManifest:
             raise ValueError("invalid project manifest: mix.filename")
         restored = data.get("restored-from")
         restored_from = None if restored is None else str(restored)
-        raw_markers = data.get("song-markers")
-        if raw_markers is None:
-            song_markers: tuple[float, ...] = ()
-        elif isinstance(raw_markers, list):
-            song_markers = tuple(float(x) for x in raw_markers)
-        else:
-            raise ValueError("invalid project manifest: song-markers")
         return cls(
             version=int(data["version"]),
             slug=str(data["slug"]),
@@ -50,7 +79,7 @@ class ProjectManifest:
             separated_at=str(ingest["separated_at"]),
             demucs_model=str(ingest["demucs_model"]),
             restored_from=restored_from,
-            song_markers=song_markers,
+            song_markers=_parse_song_markers(data.get("song-markers")),
         )
 
     def to_dict(self) -> dict:
@@ -67,7 +96,7 @@ class ProjectManifest:
         if self.restored_from is not None:
             data["restored-from"] = self.restored_from
         if self.song_markers:
-            data["song-markers"] = [float(t) for t in self.song_markers]
+            data["song-markers"] = _song_markers_to_yaml(self.song_markers)
         return data
 
 
@@ -101,6 +130,20 @@ def load_manifest(project_dir: Path) -> ProjectManifest:
     return ProjectManifest.from_dict(data)
 
 
+def coerce_song_markers(
+    markers: Sequence[SongMarker | float] | None,
+) -> tuple[SongMarker, ...]:
+    if markers is None:
+        return ()
+    out: list[SongMarker] = []
+    for item in markers:
+        if isinstance(item, SongMarker):
+            out.append(item)
+        else:
+            out.append(SongMarker(float(item)))
+    return tuple(out)
+
+
 def write_manifest(
     project_dir: Path,
     *,
@@ -109,7 +152,7 @@ def write_manifest(
     original_path: Path,
     demucs_model: str,
     separated_at: datetime | None = None,
-    song_markers: Sequence[float] | None = None,
+    song_markers: Sequence[SongMarker | float] | None = None,
 ) -> Path:
     """Create or update ``project.yaml`` mix and ingest fields.
 
@@ -124,7 +167,7 @@ def write_manifest(
     if path.is_file():
         existing = load_manifest(project_dir)
         markers = (
-            tuple(float(t) for t in song_markers)
+            coerce_song_markers(song_markers)
             if song_markers is not None
             else existing.song_markers
         )
@@ -145,17 +188,19 @@ def write_manifest(
             original_path=original,
             separated_at=separated,
             demucs_model=demucs_model,
-            song_markers=tuple(float(t) for t in (song_markers or ())),
+            song_markers=coerce_song_markers(song_markers),
         )
     with path.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(manifest.to_dict(), handle, sort_keys=False)
     return path
 
 
-def save_song_markers(project_dir: Path, markers: Sequence[float]) -> Path:
+def save_song_markers(
+    project_dir: Path, markers: Sequence[SongMarker | float]
+) -> Path:
     """Replace ``song-markers`` in ``project.yaml``, preserving ingest and provenance."""
     manifest = load_manifest(project_dir)
-    updated = replace(manifest, song_markers=tuple(float(t) for t in markers))
+    updated = replace(manifest, song_markers=coerce_song_markers(markers))
     path = manifest_path(project_dir)
     with path.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(updated.to_dict(), handle, sort_keys=False)
