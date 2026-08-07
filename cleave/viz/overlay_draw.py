@@ -109,6 +109,7 @@ def _help_compose_kwargs(view_state: TuningViewState) -> dict[str, object]:
         "timeline_override_active": view_state.timeline_override_active,
         "preset_switching": preset_switching,
         "preset_curation": view_state.settings.editor_mode == "preset_curation",
+        "layer_count": len(view_state.layer_z_order),
     }
 
 

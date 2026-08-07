@@ -554,7 +554,8 @@ def test_run_separate_force_preserves_song_markers(
         run_separate("song", force=True)
 
     manifest = load_manifest(project)
-    assert manifest.song_markers == (12.5, 64.0, 120.0)
+    assert [m.time for m in manifest.song_markers] == [12.5, 64.0, 120.0]
+    assert all(m.marker_type == "standard" for m in manifest.song_markers)
     assert manifest.restored_from == "archived-slug"
     assert manifest.demucs_model == "htdemucs"
     assert manifest.mix_filename == "song.flac"

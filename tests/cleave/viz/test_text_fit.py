@@ -231,7 +231,6 @@ def test_wrap_text_to_width_preserves_explicit_newlines() -> None:
     text = (
         "Apply timeline preset?\n"
         "character: arc\n"
-        "crescendo: no\n"
         "density: normal\n"
         "conductor: off"
     )
@@ -239,7 +238,6 @@ def test_wrap_text_to_width_preserves_explicit_newlines() -> None:
     assert wrap_text_to_width(font, text, max_px) == [
         "Apply timeline preset?",
         "character: arc",
-        "crescendo: no",
         "density: normal",
         "conductor: off",
     ]

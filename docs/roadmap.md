@@ -23,6 +23,22 @@ Side effect: louder PCM also affects hard-cut detection, so the beat-sensitivity
 
 Watch upstream: if libprojectM wires beat sensitivity back into the audio path, drop the PCM pre-scale and rely on the native API again. Until then, keep the workaround.
 
+## Named hardcut profiles
+
+Inspired by [MilkDrop3](https://github.com/milkdrop2077/MilkDrop3) hardcut modes: named profiles (bass/treb thresholds, minimum delay, load-next vs inject-effect) instead of only continuous `hard_cut_sensitivity`. Would sit beside existing projectM preset switching and stem-driven hard cuts.
+
+## Geometric transition wipes
+
+Layer-local wipe shaders (plasma, checkerboard, curtain, and similar) when a layer changes preset, beyond projectM's soft crossfade. Implement in the OpenGL compositor during A-to-B preset changes.
+
+## Preset rotation history
+
+Never-repeat (or short cooldown) in shuffle/random rotation, plus a "previous preset" step for browsing. Small UX win for long live sessions and offline renders.
+
+## Pattern-mask dual blend
+
+Spatial mask blends between two presets or layers (plasma, checker, radial), as a Cleave-native take on MilkDrop3 `.milk2` double-presets. Complements black-key / add; stronger with stem-driven layers than same-audio mashups.
+
 ## Web / browser port
 
 Port playback and compositing to the browser. `signals.json` is already portable JSON; [Butterchurn](https://github.com/jberg/butterchurn) is a JS Milkdrop renderer that could replace libprojectM for a shareable viewer.

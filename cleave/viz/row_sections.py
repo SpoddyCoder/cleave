@@ -884,7 +884,6 @@ TIMELINE_PRESETS_SECTION = ExpandSectionDef(
     toggle=_toggle_timeline_presets,
     children=(
         SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_CHARACTER),
-        SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_CRESCENDO),
         SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_DENSITY),
         SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_CUE_SNAP),
         SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_SONG_MARKER_SNAP),
@@ -1065,7 +1064,6 @@ RENDER_TIMELINE_SECTION_KINDS = frozenset(
         RowKind.SONG_MARKER_ITEM,
         RowKind.TIMELINE_PRESETS_HEADER,
         RowKind.TIMELINE_PRESET_CHARACTER,
-        RowKind.TIMELINE_PRESET_CRESCENDO,
         RowKind.TIMELINE_PRESET_DENSITY,
         RowKind.TIMELINE_PRESET_CUE_SNAP,
         RowKind.TIMELINE_PRESET_SONG_MARKER_SNAP,

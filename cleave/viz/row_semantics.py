@@ -102,7 +102,6 @@ class RowKind(Enum):
     RENDER_TIMELINE_HEADER = auto()
     TIMELINE_PRESETS_HEADER = auto()
     TIMELINE_PRESET_CHARACTER = auto()
-    TIMELINE_PRESET_CRESCENDO = auto()
     TIMELINE_PRESET_DENSITY = auto()
     TIMELINE_PRESET_CUE_SNAP = auto()
     TIMELINE_PRESET_SONG_MARKER_SNAP = auto()
@@ -924,7 +923,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         is_sub_header=True,
         help_title="Timeline preset",
         help_description=(
-            "Stage character, crescendo, density, re-populate, and conductor, then",
+            "Stage character, density, re-populate, and conductor, then",
             "apply a randomly generated timeline preset. Overwrites the current timeline.",
         ),
     ),
@@ -936,20 +935,9 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_entries=(("Left/Right", "cycle character"),),
         help_description=(
             "Procedural timeline character used when applying a preset.",
-            "If song markers are present, they are favoured for cue placement.",
+            "Song markers favour cue placement; crescendo types build crescendos.",
         ),
         help_mode_entries=TIMELINE_PRESET_HELP_ENTRIES,
-    ),
-    RowKind.TIMELINE_PRESET_CRESCENDO: RowBehavior(
-        RowAffordance.VALUE_STEP,
-        navigable=True,
-        blocked_by_section_lock=True,
-        help_title="Crescendo",
-        help_entries=(("Left/Right", "cycle crescendo target"),),
-        help_description=(
-            "Optional build to a crescendo at a song marker.",
-            "Requires three or more song markers; otherwise apply skips crescendo.",
-        ),
     ),
     RowKind.TIMELINE_PRESET_DENSITY: RowBehavior(
         RowAffordance.VALUE_STEP,
@@ -1025,8 +1013,8 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Apply timeline preset",
         help_entries=(("Enter", "apply timeline preset"),),
         help_description=(
-            "Apply the staged character, crescendo, density, snaps, cuts,",
-            "re-populate, and conductor. This overwrites the current timeline.",
+            "Apply the staged character, density, snaps, cuts, re-populate,",
+            "and conductor. Crescendo song markers build crescendos. Overwrites the timeline.",
         ),
     ),
     RowKind.TIMELINE_VISUAL_LIMITER_HEADER: RowBehavior(
@@ -1327,11 +1315,13 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Song marker",
         help_entries=(
             ("Enter", "seek to marker"),
+            ("Left / Right", "cycle marker type"),
             ("Delete", "confirm remove"),
         ),
         help_description=(
-            "A song marker time. Enter seeks the playhead;",
-            "Delete asks to remove the marker.",
+            "A song marker time and type (-, crescendo,",
+            "diminuendo). Crescendo markers build crescendos on",
+            "timeline preset apply. Enter seeks; Left/Right cycles type.",
         ),
     ),
     RowKind.SETTINGS_HEADER: RowBehavior(

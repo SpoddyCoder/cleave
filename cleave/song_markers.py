@@ -3,8 +3,78 @@
 from __future__ import annotations
 
 import bisect
-from typing import Sequence
+from dataclasses import dataclass
+from typing import Literal, Sequence
 
+SongMarkerType = Literal[
+    "standard", "begin", "sustain", "crescendo", "diminuendo"
+]
+
+DEFAULT_SONG_MARKER_TYPE: SongMarkerType = "standard"
+
+SONG_MARKER_TYPES: tuple[SongMarkerType, ...] = (
+    "standard",
+    "begin",
+    "sustain",
+    "crescendo",
+    "diminuendo",
+)
+
+_GESTURE_PEAK_TYPES = frozenset({"crescendo", "diminuendo"})
+
+
+@dataclass(frozen=True)
+class SongMarker:
+    """One project-scoped song marker (time plus structural type)."""
+
+    time: float
+    marker_type: SongMarkerType = DEFAULT_SONG_MARKER_TYPE
+
+
+def cycle_song_marker_type(
+    value: SongMarkerType, *, forward: bool
+) -> SongMarkerType:
+    try:
+        index = SONG_MARKER_TYPES.index(value)
+    except ValueError:
+        index = 0
+    delta = 1 if forward else -1
+    return SONG_MARKER_TYPES[(index + delta) % len(SONG_MARKER_TYPES)]
+
+
+def parse_song_marker_type(raw: object) -> SongMarkerType:
+    if raw in SONG_MARKER_TYPES:
+        return raw  # type: ignore[return-value]
+    raise ValueError(f"invalid song marker type: {raw!r}")
+
+
+def song_marker_gesture_warning(
+    markers: Sequence[SongMarker],
+    changed_index: int,
+) -> str | None:
+    """Return a warn-only message when the edited marker is structurally invalid.
+
+    Peak types are ``crescendo`` and ``diminuendo``. A ``begin`` / ``sustain``
+    binds forward to the first peak; a later ``begin`` starts a fresh gesture.
+    """
+    if changed_index < 0 or changed_index >= len(markers):
+        return None
+    marker_type = markers[changed_index].marker_type
+    if marker_type in _GESTURE_PEAK_TYPES:
+        if changed_index == 0:
+            return f"{marker_type} has no marker before it to rise from"
+        if marker_type == "diminuendo":
+            return "diminuendo is not generated yet"
+        return None
+    if marker_type not in ("begin", "sustain"):
+        return None
+    for j in range(changed_index + 1, len(markers)):
+        other = markers[j].marker_type
+        if other == "begin":
+            break
+        if other in _GESTURE_PEAK_TYPES:
+            return None
+    return f"{marker_type} has no crescendo/diminuendo after it"
 
 def nearest_index(times: Sequence[float], t: float) -> int:
     """Return the index of the song marker nearest to ``t``.
@@ -24,34 +94,36 @@ def nearest_index(times: Sequence[float], t: float) -> int:
 
 
 def place_marker(
-    times: Sequence[float],
+    markers: Sequence[SongMarker],
     t: float,
     window: float = 2.0,
-) -> tuple[tuple[float, ...], int | None, float | None]:
+) -> tuple[tuple[SongMarker, ...], int | None, float | None]:
     """Insert ``t`` into sorted song markers, or replace within ``window`` seconds.
 
     If any existing marker lies within ``window`` of ``t``, the nearest one is
-    replaced (earlier marker on a tie). Otherwise ``t`` is inserted in sorted
-    order.
+    replaced (earlier marker on a tie). The replaced marker keeps its type.
+    Otherwise ``t`` is inserted as a standard marker in sorted order.
 
-    Returns ``(new_times, replaced_index, replaced_time)``. On replace,
-    ``replaced_index`` is the index of the new marker in ``new_times`` and
+    Returns ``(new_markers, replaced_index, replaced_time)``. On replace,
+    ``replaced_index`` is the index of the new marker in ``new_markers`` and
     ``replaced_time`` is the previous time. On insert, both are ``None``.
     """
-    if not times:
-        return (float(t),), None, None
+    t = float(t)
+    if not markers:
+        return (SongMarker(t),), None, None
 
+    times = [m.time for m in markers]
     idx = nearest_index(times, t)
     if abs(times[idx] - t) <= window:
-        old = float(times[idx])
-        updated = [float(x) for x in times]
-        updated[idx] = float(t)
-        updated.sort()
-        new_idx = updated.index(float(t))
+        old = float(markers[idx].time)
+        updated = list(markers)
+        updated[idx] = SongMarker(t, markers[idx].marker_type)
+        updated.sort(key=lambda m: m.time)
+        new_idx = next(i for i, m in enumerate(updated) if m.time == t)
         return tuple(updated), new_idx, old
 
-    updated = [float(x) for x in times]
-    bisect.insort(updated, float(t))
+    updated = list(markers)
+    bisect.insort(updated, SongMarker(t), key=lambda m: m.time)
     return tuple(updated), None, None
 
 

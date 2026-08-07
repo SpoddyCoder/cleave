@@ -19,6 +19,7 @@ from cleave.project import (
     save_song_markers,
     write_manifest,
 )
+from cleave.song_markers import SongMarker
 
 
 def test_write_and_load_manifest(tmp_path: Path) -> None:
@@ -193,7 +194,7 @@ def test_rewrite_manifest_slug_updates_slug_and_restored_from(tmp_path: Path) ->
     assert manifest.slug == "new-slug"
     assert manifest.restored_from == "old-slug"
     assert manifest.mix_filename == "old-slug.flac"
-    assert manifest.song_markers == (12.5, 64.0)
+    assert [m.time for m in manifest.song_markers] == [12.5, 64.0]
 
 
 def test_manifest_round_trip_without_song_markers(tmp_path: Path) -> None:
@@ -225,7 +226,11 @@ def test_manifest_round_trip_with_song_markers(tmp_path: Path) -> None:
         separated_at="2026-06-08T20:15:00+00:00",
         demucs_model="htdemucs",
         restored_from="original-slug",
-        song_markers=(8.25, 64.5, 120.0),
+        song_markers=(
+            SongMarker(8.25, "standard"),
+            SongMarker(64.5, "crescendo"),
+            SongMarker(120.0, "diminuendo"),
+        ),
     )
     with (project / PROJECT_FILENAME).open("w", encoding="utf-8") as handle:
         yaml.safe_dump(manifest.to_dict(), handle, sort_keys=False)
@@ -236,9 +241,38 @@ def test_manifest_round_trip_with_song_markers(tmp_path: Path) -> None:
     with (project / PROJECT_FILENAME).open(encoding="utf-8") as handle:
         data = yaml.safe_load(handle)
     assert data["version"] == 1
-    assert data["song-markers"] == [8.25, 64.5, 120.0]
+    assert data["song-markers"] == [
+        {"time": 8.25, "type": "standard"},
+        {"time": 64.5, "type": "crescendo"},
+        {"time": 120.0, "type": "diminuendo"},
+    ]
     assert data["restored-from"] == "original-slug"
     assert data["ingest"]["demucs_model"] == "htdemucs"
+
+
+def test_manifest_loads_bare_float_song_markers_as_standard(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+    with (project / PROJECT_FILENAME).open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "slug": "song",
+                "mix": {"filename": "song.flac"},
+                "ingest": {
+                    "original_path": "/tmp/source.flac",
+                    "separated_at": "2026-06-08T20:15:00+00:00",
+                    "demucs_model": "htdemucs",
+                },
+                "song-markers": [8.25, 64.5],
+            },
+            handle,
+            sort_keys=False,
+        )
+
+    loaded = load_manifest(project)
+    assert loaded.song_markers == (SongMarker(8.25), SongMarker(64.5))
+
 
 
 def test_write_manifest_update_preserves_song_markers_and_restored_from(
@@ -277,7 +311,7 @@ def test_write_manifest_update_preserves_song_markers_and_restored_from(
     assert manifest.original_path == str(new_original.resolve())
     assert manifest.separated_at == "2026-07-22T12:00:00+00:00"
     assert manifest.demucs_model == "htdemucs_ft"
-    assert manifest.song_markers == (10.0, 42.5)
+    assert manifest.song_markers == (SongMarker(10.0), SongMarker(42.5))
     assert manifest.restored_from == "archived-slug"
     assert manifest.version == 1
 
@@ -298,10 +332,16 @@ def test_save_song_markers_preserves_ingest(tmp_path: Path) -> None:
     )
     rewrite_manifest_slug(project, "song", restored_from="archived-slug")
 
-    save_song_markers(project, (10.0, 42.5))
+    save_song_markers(
+        project,
+        (SongMarker(10.0, "crescendo"), SongMarker(42.5, "diminuendo")),
+    )
 
     manifest = load_manifest(project)
-    assert manifest.song_markers == (10.0, 42.5)
+    assert manifest.song_markers == (
+        SongMarker(10.0, "crescendo"),
+        SongMarker(42.5, "diminuendo"),
+    )
     assert manifest.slug == "song"
     assert manifest.mix_filename == "song.flac"
     assert manifest.original_path == str(original.resolve())
@@ -318,4 +358,7 @@ def test_save_song_markers_preserves_ingest(tmp_path: Path) -> None:
         "demucs_model": "htdemucs_ft",
     }
     assert data["restored-from"] == "archived-slug"
-    assert data["song-markers"] == [10.0, 42.5]
+    assert data["song-markers"] == [
+        {"time": 10.0, "type": "crescendo"},
+        {"time": 42.5, "type": "diminuendo"},
+    ]

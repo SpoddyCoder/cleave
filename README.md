@@ -147,13 +147,31 @@ When enabled, the standard layer visibility controls are disabled, the timeline 
 * These can be used as snap points and are also used by the `timeline preset` as anchor points for generation.
 
 ##### `Beat / Bar Grid`
-* Powered by Beat This! which uses AI to try to detect beats and bars in the song.
+
+* Powered by Beat This! an AI beat detection library.
 * By default it will use the full-mix stem for analysis.
   * Choose a different stem with the `--beat-detection-stem` switch.
 * You can snap cues to the grid either on record or after record.
 
 ##### `Timeline Presets`
-* TODO: Document
+
+* This makes it easy to generate a complete layered visualisation of a song.
+* For best results you should curate presets into Roles.
+* If song markers are available, they will be used to drive the preset generation (do this for best results).
+* There are multiple song marker types:
+  * `-` standard song marker, no special behaviour.
+  * `crescendo` - used to denote where the visual intensity should build t, before crashing off to low intensity.
+  * `dimininuendo` - used to denote where the visual intensity should  reduce to, before returning to normal intensity.
+  * `begin` - used to denote where crescendo or dimininuendo ramp should begin.
+  * `sustain` - used to denote where crescendo or dimininuendo should hit maximum / minimum intensity.
+
+```
+CRESCENDO:   thin ↗↗↗ FULL ──── FULL ──── ► solo
+             begin   sustain         crescendo
+
+DIMINUENDO:  FULL ↘↘↘ thin ──── thin ──── ► restore
+             begin   sustain         diminuendo
+```
 
 ### Project Directory
 
