@@ -578,6 +578,65 @@ def test_layer_keys_only_affect_armed_stems() -> None:
     assert session.timeline.record_buffer == {"layer_1": [SlotCue(t=2.0, level=0.0)]}
 
 
+def test_ctrl_layer_key_drops_anchored_hold_cue() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=5.0,
+        lanes={"layer_1": _lane(True)},
+    )
+    session.layers["layer_1"].enabled = True
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.handle_keydown(keydown(pygame.K_1, mod=pygame.KMOD_CTRL))
+
+    assert session.timeline.record_buffer == {
+        "layer_1": [SlotCue(t=5.0, level=1.0, anchor=True)]
+    }
+
+
+def test_ctrl_layer_key_ignored_when_unarmed() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=5.0,
+    )
+    session.layers["layer_1"].enabled = True
+    session.layers["layer_2"].enabled = True
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.handle_keydown(keydown(pygame.K_2, mod=pygame.KMOD_CTRL))
+
+    assert session.timeline.record_buffer == {}
+
+
+def test_ctrl_layer_key_noop_when_not_recording() -> None:
+    controls, session, visibility_calls, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=5.0,
+    )
+    session.layers["layer_1"].enabled = True
+
+    controls.handle_keydown(keydown(pygame.K_1, mod=pygame.KMOD_CTRL))
+
+    assert session.timeline.record_buffer == {}
+    assert visibility_calls == []
+
+
+def test_stop_record_preserves_anchored_hold_cue() -> None:
+    controls, session, _, _, _, _ = _make_timeline_controls(
+        armed_slots={"layer_1"},
+        position_sec=5.0,
+        lanes={"layer_1": _lane(True)},
+    )
+    session.layers["layer_1"].enabled = True
+
+    controls.handle_keydown(keydown(pygame.K_r))
+    controls.handle_keydown(keydown(pygame.K_1, mod=pygame.KMOD_CTRL))
+    controls.handle_keydown(keydown(pygame.K_r))
+
+    lane = session.timeline.lanes["layer_1"]
+    assert any(cue.anchor and cue.t == 5.0 and cue.level == 1.0 for cue in lane.cues)
+
+
 def test_numpad_layer_keys_work_while_recording() -> None:
     controls, session, _, _, _, _ = _make_timeline_controls(
         armed_slots={"layer_1"},
