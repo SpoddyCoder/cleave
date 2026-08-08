@@ -6,6 +6,8 @@ projects
 projects/*
 presets
 presets/*
+textures
+textures/*
 
 ####################################
 # Project Ignores
