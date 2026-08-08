@@ -240,10 +240,7 @@ def timeline_strip_section(
                 ("Ctrl + , / .", "nudge cue opacity -/+ 10%"),
                 ("B", "cycle cue blend"),
                 ("C", "cycle cue cut type"),
-                (
-                    "O",
-                    "cycle cue role (requires cast roles rotation set)",
-                ),
+                ("O", "cycle cue role"),
             )
         )
 
