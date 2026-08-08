@@ -558,7 +558,7 @@ def test_timeline_strip_help_paused() -> None:
     assert entries["Ctrl + Space / R"] == "start record"
     assert entries["B"] == "cycle cue blend"
     assert entries["C"] == "cycle cue cut type"
-    assert entries["O"] == "cycle cue role (requires cast roles rotation set)"
+    assert entries["O"] == "cycle cue role"
     keys = [key for key, _ in section.entries]
     assert keys.index("Ctrl + Space / R") + 1 == keys.index("Space")
     assert "Left/Right" in entries
