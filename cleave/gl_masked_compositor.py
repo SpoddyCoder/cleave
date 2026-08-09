@@ -21,7 +21,6 @@ from cleave.pattern_mask import (
     PatternMaskParams,
     generate_hard_mask,
     generate_soft_weights,
-    mask_generation_resolution,
     upload_mask_r8_texture,
 )
 from OpenGL.GL import (
@@ -894,9 +893,7 @@ class GlMaskedCompositor:
     ) -> None:
         if layer_count <= 0:
             return
-        gen_width, gen_height = mask_generation_resolution(
-            self.content_width, self.content_height
-        )
+        gen_width, gen_height = self.content_width, self.content_height
         cache_key = _mask_cache_key(
             params,
             gen_width=gen_width,

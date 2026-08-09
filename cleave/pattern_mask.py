@@ -60,11 +60,6 @@ class PatternMaskParams:
     seed: int
 
 
-def mask_generation_resolution(width: int, height: int) -> tuple[int, int]:
-    """Quarter-resolution mask generation size (minimum 1x1)."""
-    return max(1, int(width) // 4), max(1, int(height) // 4)
-
-
 def timeline_preset_pattern_mask_display(pattern_mask: bool) -> str:
     return "on" if pattern_mask else "off"
 
