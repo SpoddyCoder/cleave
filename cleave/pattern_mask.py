@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 
 import numpy as np
 from OpenGL.GL import (
@@ -31,6 +32,37 @@ from OpenGL.GL import (
 )
 
 DEFAULT_TIMELINE_PRESET_PATTERN_MASK = False
+
+# Value-noise plasma (shared by CPU generators and GPU shader port).
+PLASMA_HASH_X_MULT = 374_761_393
+PLASMA_HASH_Y_MULT = 668_265_263
+PLASMA_HASH_SEED_MULT = 1_274_126_177
+PLASMA_HASH_MIX_MULT = 1_274_126_177
+PLASMA_LAYER_SEED_STEP = 97_331
+PLASMA_LAYER_BLEND_SEED_OFFSET = 224_682
+PLASMA_LAYER_FREQ_SCALE = 0.17
+PLASMA_LAYER_BLEND_PRIMARY = 0.65
+PLASMA_LAYER_BLEND_SECONDARY = 0.35
+PLASMA_FREQ_BASE = 2.0
+PLASMA_FREQ_DENSITY_SCALE = 12.0
+PLASMA_FREQ_MIN = 0.25
+PLASMA_HASH_DIVISOR = 4_294_967_295.0
+
+
+@dataclass(frozen=True)
+class PatternMaskParams:
+    """Pattern mask settings passed into the masked compositor."""
+
+    mask_type: str
+    mode: str
+    density: float
+    invert: bool
+    seed: int
+
+
+def mask_generation_resolution(width: int, height: int) -> tuple[int, int]:
+    """Quarter-resolution mask generation size (minimum 1x1)."""
+    return max(1, int(width) // 4), max(1, int(height) // 4)
 
 
 def timeline_preset_pattern_mask_display(pattern_mask: bool) -> str:
@@ -103,6 +135,22 @@ def _subdivision_count(layer_count: int, density: float) -> int:
         layer_count,
         int(round(layer_count + density * layer_count * 3)),
     )
+
+
+def _checker_grid_dims(
+    width: int, height: int, layer_count: int, density: float
+) -> tuple[int, int]:
+    """Column and row tile counts for checker patterns at *width* x *height*."""
+    tile_count = _subdivision_count(layer_count, density)
+    aspect = float(width) / float(height)
+    cols = max(1, int(round(math.sqrt(tile_count * aspect))))
+    rows = max(1, int(math.ceil(tile_count / cols)))
+    return cols, rows
+
+
+def _checker_tile_layer(row: int, col: int, layer_count: int) -> int:
+    """Layer index for a checker tile; alternates in 2D (not row-major striping)."""
+    return (int(row) + int(col)) % int(layer_count)
 
 
 def _apply_invert(region: np.ndarray, layer_count: int, invert: bool) -> np.ndarray:
@@ -185,26 +233,24 @@ def generate_checker_mask(
     width = int(width)
     height = int(height)
     layer_count = int(layer_count)
-    tile_count = _subdivision_count(layer_count, density)
-    cols = max(1, int(math.ceil(math.sqrt(tile_count))))
-    rows = max(1, int(math.ceil(tile_count / cols)))
+    cols, rows = _checker_grid_dims(width, height, layer_count, density)
     xs = np.arange(width, dtype=np.int64)
     ys = np.arange(height, dtype=np.int64)
     col = np.minimum((xs * cols) // width, cols - 1)
     row = np.minimum((ys * rows) // height, rows - 1)
     xx, yy = np.meshgrid(col, row)
-    region = ((yy * cols + xx) % layer_count).astype(np.uint8)
+    region = ((yy + xx) % layer_count).astype(np.uint8)
     return _apply_invert(region, layer_count, invert)
 
 
 def _hash_u32(x: np.ndarray, y: np.ndarray, seed: int) -> np.ndarray:
     """Deterministic 32-bit hash of integer lattice points."""
     n = (
-        x.astype(np.int64) * 374761393
-        + y.astype(np.int64) * 668265263
-        + int(seed) * 1274126177
+        x.astype(np.int64) * PLASMA_HASH_X_MULT
+        + y.astype(np.int64) * PLASMA_HASH_Y_MULT
+        + int(seed) * PLASMA_HASH_SEED_MULT
     ) & np.int64(0xFFFFFFFF)
-    n = (n ^ (n >> 13)) * np.int64(1274126177)
+    n = (n ^ (n >> 13)) * np.int64(PLASMA_HASH_MIX_MULT)
     return (n & np.int64(0xFFFFFFFF)).astype(np.uint32)
 
 
@@ -216,7 +262,7 @@ def _value_noise_2d(
     seed: int,
 ) -> np.ndarray:
     """Bilinear value noise in [0, 1), shape (H, W). Row 0 = GL bottom."""
-    frequency = max(0.25, float(frequency))
+    frequency = max(PLASMA_FREQ_MIN, float(frequency))
     xs = (np.arange(width, dtype=np.float64) + 0.5) / width * frequency
     ys = (np.arange(height, dtype=np.float64) + 0.5) / height * frequency
     xx, yy = np.meshgrid(xs, ys)
@@ -229,7 +275,7 @@ def _value_noise_2d(
     uy = fy * fy * (3.0 - 2.0 * fy)
 
     def lattice(ix: np.ndarray, iy: np.ndarray) -> np.ndarray:
-        return _hash_u32(ix, iy, seed).astype(np.float64) / 4294967295.0
+        return _hash_u32(ix, iy, seed).astype(np.float64) / PLASMA_HASH_DIVISOR
 
     v00 = lattice(x0, y0)
     v10 = lattice(x0 + 1, y0)
@@ -251,22 +297,26 @@ def _plasma_fields(
     """Return (N, H, W) float plasma fields in [0, 1). Row 0 = GL bottom."""
     density = _clamp_density(density)
     # density 0 -> coarse (~2 features across), density 1 -> finer (~14).
-    frequency = 2.0 + density * 12.0
+    frequency = PLASMA_FREQ_BASE + density * PLASMA_FREQ_DENSITY_SCALE
     fields = np.empty((layer_count, height, width), dtype=np.float64)
     for index in range(layer_count):
         fields[index] = _value_noise_2d(
             width,
             height,
             frequency=frequency,
-            seed=int(seed) + index * 97_331,
+            seed=int(seed) + index * PLASMA_LAYER_SEED_STEP,
         )
         # Slight frequency offset per layer so regions stay distinct.
         if index > 0:
-            fields[index] = 0.65 * fields[index] + 0.35 * _value_noise_2d(
-                width,
-                height,
-                frequency=frequency * (1.0 + 0.17 * index),
-                seed=int(seed) + index * 224_682 + 17,
+            fields[index] = (
+                PLASMA_LAYER_BLEND_PRIMARY * fields[index]
+                + PLASMA_LAYER_BLEND_SECONDARY
+                * _value_noise_2d(
+                    width,
+                    height,
+                    frequency=frequency * (1.0 + PLASMA_LAYER_FREQ_SCALE * index),
+                    seed=int(seed) + index * PLASMA_LAYER_BLEND_SEED_OFFSET + 17,
+                )
             )
     return fields
 
@@ -389,8 +439,7 @@ def generate_checker_weights(
     height = int(height)
     layer_count = int(layer_count)
     tile_count = _subdivision_count(layer_count, density)
-    cols = max(1, int(math.ceil(math.sqrt(tile_count))))
-    rows = max(1, int(math.ceil(tile_count / cols)))
+    cols, rows = _checker_grid_dims(width, height, layer_count, density)
     xs = (np.arange(width, dtype=np.float64) + 0.5) / width * cols
     ys = (np.arange(height, dtype=np.float64) + 0.5) / height * rows
     xx, yy = np.meshgrid(xs, ys)
@@ -400,7 +449,7 @@ def generate_checker_weights(
             tile = row * cols + col
             if tile >= tile_count:
                 break
-            layer = tile % layer_count
+            layer = _checker_tile_layer(row, col, layer_count)
             dx = np.abs(xx - (col + 0.5))
             dy = np.abs(yy - (row + 0.5))
             fields[layer] += np.maximum(0.0, 1.0 - np.maximum(dx, dy))

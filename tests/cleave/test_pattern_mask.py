@@ -39,6 +39,7 @@ from cleave.pattern_mask import (
     generate_soft_weights,
     generate_strips_mask,
     generate_strips_weights,
+    mask_generation_resolution,
     timeline_preset_pattern_mask_display,
 )
 from cleave.viz.session import (
@@ -55,6 +56,12 @@ def _assert_valid_hard_mask(
     assert mask.dtype == np.uint8
     assert int(mask.min()) >= 0
     assert int(mask.max()) < layer_count
+
+
+def test_mask_generation_resolution_quarters_size() -> None:
+    assert mask_generation_resolution(1280, 720) == (320, 180)
+    assert mask_generation_resolution(3, 2) == (1, 1)
+    assert mask_generation_resolution(1, 1) == (1, 1)
 
 
 def test_generate_strips_mask_shape_and_dtype() -> None:
@@ -116,6 +123,41 @@ def test_generate_checker_mask_density_adds_tiles() -> None:
     low_v = int(np.sum(low[1:, 0] != low[:-1, 0]))
     high_v = int(np.sum(high[1:, 0] != high[:-1, 0]))
     assert high_h + high_v > low_h + low_v
+
+
+def test_generate_checker_mask_quarter_res_has_2d_variation() -> None:
+    """At live-play gen size, checker must vary in both axes (not vertical strips)."""
+    w, h = mask_generation_resolution(1280, 720)
+    mask = generate_checker_mask(w, h, layer_count=4, density=0.5)
+    rows_identical = all(np.array_equal(mask[i], mask[0]) for i in range(h))
+    cols_identical = all(np.array_equal(mask[:, i], mask[:, 0]) for i in range(w))
+    assert not rows_identical
+    assert not cols_identical
+
+
+def test_generate_checker_mask_quarter_res_density_changes_grid() -> None:
+    w, h = mask_generation_resolution(1280, 720)
+    low = generate_checker_mask(w, h, layer_count=4, density=0.0)
+    high = generate_checker_mask(w, h, layer_count=4, density=1.0)
+    low_trans = int(np.sum(low[:, 1:] != low[:, :-1])) + int(
+        np.sum(low[1:, :] != low[:-1, :])
+    )
+    high_trans = int(np.sum(high[:, 1:] != high[:, :-1])) + int(
+        np.sum(high[1:, :] != high[:-1, :])
+    )
+    assert high_trans > low_trans
+
+
+def test_generate_checker_weights_quarter_res_has_2d_variation() -> None:
+    w, h = mask_generation_resolution(1280, 720)
+    weights = generate_checker_weights(w, h, layer_count=4, density=0.5)
+    dominant = np.argmax(weights, axis=2)
+    rows_identical = all(np.array_equal(dominant[i], dominant[0]) for i in range(h))
+    cols_identical = all(
+        np.array_equal(dominant[:, i], dominant[:, 0]) for i in range(w)
+    )
+    assert not rows_identical
+    assert not cols_identical
 
 
 def test_generate_plasma_mask_shape_bounds_and_seed() -> None:

@@ -6,15 +6,12 @@ from pathlib import Path
 
 from collections.abc import Callable
 
-import numpy as np
-
 from cleave.config import CleaveConfig, LayerConfig
 from cleave.milk_textures import project_texture_search_paths
 from cleave.effects.runtime import EffectRuntime
 from cleave.gl_compositor import GlCompositor
 from cleave.gl_masked_compositor import GlMaskedCompositor
 from cleave.gl_post_process import GlPostProcess
-from cleave.pattern_mask import generate_hard_mask, generate_soft_weights
 from cleave.preset_playlist import PresetPlaylist
 from cleave.projectm import ProjectM, pcm_max_samples_per_channel
 from cleave.projectm_health import (
@@ -501,45 +498,17 @@ class LayerFramePipeline:
             assert masked_compositor is not None
             width = compositor.content_width
             height = compositor.content_height
-            active = [fbo for fbo in fbos if fbo.enabled and fbo.opacity > 0.0]
             masked_compositor.set_content_size(width, height)
             masked_compositor.set_color_format(compositor.color_format)
-            if pm.mode == "soft":
-                if active:
-                    weights = generate_soft_weights(
-                        pm.type,
-                        width,
-                        height,
-                        len(active),
-                        density=pm.density,
-                        invert=pm.invert,
-                        seed=pm.seed,
-                    )
-                else:
-                    weights = np.zeros((height, width, 0), dtype=np.uint8)
-                masked_compositor.composite_soft(
-                    compositor.content_fbo_id,
-                    fbos,
-                    weights,
-                )
-            else:
-                if active:
-                    mask = generate_hard_mask(
-                        pm.type,
-                        width,
-                        height,
-                        len(active),
-                        density=pm.density,
-                        invert=pm.invert,
-                        seed=pm.seed,
-                    )
-                else:
-                    mask = np.zeros((height, width), dtype=np.uint8)
-                masked_compositor.composite_masked(
-                    compositor.content_fbo_id,
-                    fbos,
-                    mask,
-                )
+            masked_compositor.composite(
+                compositor.content_fbo_id,
+                fbos,
+                mask_type=pm.type,
+                mode=pm.mode,
+                density=pm.density,
+                invert=pm.invert,
+                seed=pm.seed,
+            )
         else:
             compositor.composite(fbos)
 

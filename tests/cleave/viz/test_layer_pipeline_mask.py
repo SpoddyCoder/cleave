@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import numpy as np
+from unittest.mock import MagicMock
 
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.layer import StemLayer
@@ -71,29 +69,24 @@ def test_composite_uses_masked_path_when_enabled() -> None:
     compositor.color_format = object()
     masked = MagicMock()
 
-    with patch(
-        "cleave.viz.layer_pipeline.generate_hard_mask",
-        return_value=np.zeros((720, 1280), dtype=np.uint8),
-    ) as gen:
-        LayerFramePipeline.composite(
-            compositor,
-            layers_by_slot,
-            session,
-            masked_compositor=masked,
-        )
+    LayerFramePipeline.composite(
+        compositor,
+        layers_by_slot,
+        session,
+        masked_compositor=masked,
+    )
 
     compositor.composite.assert_not_called()
-    gen.assert_called_once()
-    assert gen.call_args.args[0] == "radial"
-    assert gen.call_args.args[1] == 1280
-    assert gen.call_args.args[2] == 720
-    assert gen.call_args.args[3] == 2
-    assert gen.call_args.kwargs["density"] == 0.25
-    assert gen.call_args.kwargs["invert"] is True
-    assert gen.call_args.kwargs["seed"] == 11
-    masked.composite_masked.assert_called_once()
-    assert masked.composite_masked.call_args.args[0] == 7
-    masked.composite_soft.assert_not_called()
+    masked.set_content_size.assert_called_once_with(1280, 720)
+    masked.set_color_format.assert_called_once_with(compositor.color_format)
+    masked.composite.assert_called_once()
+    call = masked.composite.call_args
+    assert call.args[0] == 7
+    assert call.kwargs["mask_type"] == "radial"
+    assert call.kwargs["mode"] == "hard"
+    assert call.kwargs["density"] == 0.25
+    assert call.kwargs["invert"] is True
+    assert call.kwargs["seed"] == 11
 
 
 def test_composite_uses_soft_path_when_mode_soft() -> None:
@@ -114,30 +107,21 @@ def test_composite_uses_soft_path_when_mode_soft() -> None:
     compositor.content_fbo_id = 9
     compositor.color_format = object()
     masked = MagicMock()
-    weights = np.zeros((48, 64, 2), dtype=np.uint8)
 
-    with patch(
-        "cleave.viz.layer_pipeline.generate_soft_weights",
-        return_value=weights,
-    ) as gen, patch(
-        "cleave.viz.layer_pipeline.generate_hard_mask",
-    ) as hard:
-        LayerFramePipeline.composite(
-            compositor,
-            layers_by_slot,
-            session,
-            masked_compositor=masked,
-        )
+    LayerFramePipeline.composite(
+        compositor,
+        layers_by_slot,
+        session,
+        masked_compositor=masked,
+    )
 
     compositor.composite.assert_not_called()
-    hard.assert_not_called()
-    gen.assert_called_once()
-    assert gen.call_args.args[0] == "plasma"
-    assert gen.call_args.kwargs["seed"] == 42
-    masked.composite_soft.assert_called_once()
-    assert masked.composite_soft.call_args.args[0] == 9
-    assert masked.composite_soft.call_args.args[2] is weights
-    masked.composite_masked.assert_not_called()
+    masked.composite.assert_called_once()
+    call = masked.composite.call_args
+    assert call.args[0] == 9
+    assert call.kwargs["mask_type"] == "plasma"
+    assert call.kwargs["mode"] == "soft"
+    assert call.kwargs["seed"] == 42
 
 
 def test_composite_uses_fixed_path_when_disabled() -> None:
@@ -159,7 +143,7 @@ def test_composite_uses_fixed_path_when_disabled() -> None:
     )
 
     compositor.composite.assert_called_once()
-    masked.composite_masked.assert_not_called()
+    masked.composite.assert_not_called()
 
 
 def test_composite_enabled_false_skips_mask_even_with_compositor() -> None:
@@ -173,17 +157,15 @@ def test_composite_enabled_false_skips_mask_even_with_compositor() -> None:
     compositor = MagicMock()
     masked = MagicMock()
 
-    with patch("cleave.viz.layer_pipeline.generate_hard_mask") as gen:
-        LayerFramePipeline.composite(
-            compositor,
-            layers_by_slot,
-            session,
-            masked_compositor=masked,
-        )
+    LayerFramePipeline.composite(
+        compositor,
+        layers_by_slot,
+        session,
+        masked_compositor=masked,
+    )
 
-    gen.assert_not_called()
     compositor.composite.assert_called_once()
-    masked.composite_masked.assert_not_called()
+    masked.composite.assert_not_called()
 
 
 def test_composite_skips_mask_in_preset_curation_mode() -> None:
@@ -194,14 +176,12 @@ def test_composite_skips_mask_in_preset_curation_mode() -> None:
     compositor = MagicMock()
     masked = MagicMock()
 
-    with patch("cleave.viz.layer_pipeline.generate_hard_mask") as gen:
-        LayerFramePipeline.composite(
-            compositor,
-            layers_by_slot,
-            session,
-            masked_compositor=masked,
-        )
+    LayerFramePipeline.composite(
+        compositor,
+        layers_by_slot,
+        session,
+        masked_compositor=masked,
+    )
 
-    gen.assert_not_called()
     compositor.composite.assert_called_once()
-    masked.composite_masked.assert_not_called()
+    masked.composite.assert_not_called()
