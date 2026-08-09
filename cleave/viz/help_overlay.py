@@ -420,6 +420,7 @@ class HelpOverlay:
         timeline_override_active: bool = False,
         preset_switching: str | None = None,
         preset_curation: bool = False,
+        layer_count: int = 4,
     ) -> None:
         composed = self.compose_panel(
             focus,
@@ -432,6 +433,7 @@ class HelpOverlay:
             timeline_override_active=timeline_override_active,
             preset_switching=preset_switching,
             preset_curation=preset_curation,
+            layer_count=layer_count,
         )
         if composed is None:
             self._panel_rect = None
