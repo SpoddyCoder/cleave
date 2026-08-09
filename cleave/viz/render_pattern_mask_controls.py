@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import random
+
 from cleave.config_schema import (
+    PATTERN_MASK_MODES,
     PATTERN_MASK_TYPES,
+    PatternMaskMode,
     PatternMaskType,
     clamp_pattern_mask_density,
 )
-from cleave.pattern_mask import cycle_pattern_mask_invert
+from cleave.pattern_mask import cycle_pattern_mask_invert, cycle_pattern_mask_mode
 from cleave.viz.session import TuningSession
 
 
@@ -55,6 +59,21 @@ class RenderPatternMaskControls:
         if mask_type not in PATTERN_MASK_TYPES:
             raise ValueError(f"unknown pattern mask type: {mask_type!r}")
         self.session.render_pattern_mask.type = mask_type
+
+    def cycle_mode(self, *, forward: bool) -> None:
+        pm = self.session.render_pattern_mask
+        pm.mode = cycle_pattern_mask_mode(pm.mode, forward=forward)  # type: ignore[assignment]
+
+    def set_mode(self, mode: PatternMaskMode) -> None:
+        if mode not in PATTERN_MASK_MODES:
+            raise ValueError(f"unknown pattern mask mode: {mode!r}")
+        self.session.render_pattern_mask.mode = mode
+
+    def set_seed(self, seed: int) -> None:
+        self.session.render_pattern_mask.seed = int(seed)
+
+    def respin_seed(self) -> None:
+        self.session.render_pattern_mask.seed = random.randint(0, 2_147_483_647)
 
     def toggle_locked(self) -> None:
         pm = self.session.render_pattern_mask

@@ -285,14 +285,23 @@ DEFAULT_RENDER_POST_FX_FADE_OUT = 4.0
 
 # --- Render pattern mask defaults ---
 
-PatternMaskType = Literal["strips"]
+PatternMaskType = Literal["strips", "radial", "checker", "plasma"]
+PatternMaskMode = Literal["hard", "soft"]
 
-PATTERN_MASK_TYPES: tuple[PatternMaskType, ...] = ("strips",)
+PATTERN_MASK_TYPES: tuple[PatternMaskType, ...] = (
+    "strips",
+    "radial",
+    "checker",
+    "plasma",
+)
+PATTERN_MASK_MODES: tuple[PatternMaskMode, ...] = ("hard", "soft")
 
 DEFAULT_RENDER_PATTERN_MASK_ENABLED = False
 DEFAULT_RENDER_PATTERN_MASK_TYPE: PatternMaskType = "strips"
+DEFAULT_RENDER_PATTERN_MASK_MODE: PatternMaskMode = "hard"
 DEFAULT_RENDER_PATTERN_MASK_DENSITY = 0.5
 DEFAULT_RENDER_PATTERN_MASK_INVERT = False
+DEFAULT_RENDER_PATTERN_MASK_SEED = 0
 DEFAULT_RENDER_PATTERN_MASK_LOCKED = False
 
 HighlightRolloffApplyMode = Literal["off", "per_layer", "composite"]
@@ -643,6 +652,30 @@ def _parse_pattern_mask_type(
         allowed = ", ".join(f"'{item}'" for item in PATTERN_MASK_TYPES)
         raise ValueError(f"{label} must be one of: {allowed}")
     return value  # type: ignore[return-value]
+
+
+def _parse_pattern_mask_mode(
+    value: Any,
+    _ctx: ParseCtx,
+    label: str = "render.pattern_mask.mode",
+) -> PatternMaskMode:
+    if not isinstance(value, str):
+        raise ValueError(f"{label} must be a string")
+    if value not in PATTERN_MASK_MODES:
+        allowed = ", ".join(f"'{item}'" for item in PATTERN_MASK_MODES)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return value  # type: ignore[return-value]
+
+
+def _parse_pattern_mask_seed(
+    value: Any,
+    _ctx: ParseCtx,
+    label: str = "render.pattern_mask.seed",
+) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{label} must be an integer") from exc
 
 
 def _parse_chroma_boost_apply_mode(
@@ -1710,6 +1743,13 @@ RENDER_PATTERN_MASK_FIELDS: tuple[SchemaField, ...] = (
         _dump_scalar,
     ),
     FieldDescriptor(
+        "mode",
+        DEFAULT_RENDER_PATTERN_MASK_MODE,
+        "session",
+        _parse_pattern_mask_mode,
+        _dump_scalar,
+    ),
+    FieldDescriptor(
         "density",
         DEFAULT_RENDER_PATTERN_MASK_DENSITY,
         "session",
@@ -1723,6 +1763,13 @@ RENDER_PATTERN_MASK_FIELDS: tuple[SchemaField, ...] = (
         DEFAULT_RENDER_PATTERN_MASK_INVERT,
         "session",
         lambda raw, _ctx, _label: bool(raw),
+        _dump_scalar,
+    ),
+    FieldDescriptor(
+        "seed",
+        DEFAULT_RENDER_PATTERN_MASK_SEED,
+        "session",
+        _parse_pattern_mask_seed,
         _dump_scalar,
     ),
 )
@@ -2386,8 +2433,10 @@ def persist_render(ctx: PersistCtx) -> dict[str, Any]:
         "enabled": runtime_pm.enabled,
         "locked": runtime_pm.locked,
         "type": runtime_pm.type,
+        "mode": runtime_pm.mode,
         "density": runtime_pm.density,
         "invert": runtime_pm.invert,
+        "seed": runtime_pm.seed,
     }
     pattern_mask = _dump_overlay_fields(
         RENDER_PATTERN_MASK_FIELDS, pattern_mask_values, ctx
@@ -2803,8 +2852,10 @@ def default_render_pattern_mask_runtime_values() -> dict[str, Any]:
         "enabled": DEFAULT_RENDER_PATTERN_MASK_ENABLED,
         "expanded": False,
         "type": DEFAULT_RENDER_PATTERN_MASK_TYPE,
+        "mode": DEFAULT_RENDER_PATTERN_MASK_MODE,
         "density": DEFAULT_RENDER_PATTERN_MASK_DENSITY,
         "invert": DEFAULT_RENDER_PATTERN_MASK_INVERT,
+        "seed": DEFAULT_RENDER_PATTERN_MASK_SEED,
         "locked": DEFAULT_RENDER_PATTERN_MASK_LOCKED,
     }
 

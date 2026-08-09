@@ -96,6 +96,7 @@ from cleave.config_schema import (
     ChromaBoostVariant,
     HighlightRolloffApplyMode,
     HighlightRolloffCurve,
+    PatternMaskMode,
     PatternMaskType,
     RenderOverlayAnimationType,
     RenderOverlayPosition,
@@ -279,8 +280,10 @@ class RenderPostFxConfig:
 class RenderPatternMaskConfig:
     enabled: bool
     type: PatternMaskType
+    mode: PatternMaskMode
     density: float
     invert: bool
+    seed: int
     locked: bool = False
 
 

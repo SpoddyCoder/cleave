@@ -41,6 +41,7 @@ from cleave.config_schema import (
     default_render_overlays_runtime_values,
     default_render_pattern_mask_runtime_values,
     default_render_post_fx_runtime_values,
+    PatternMaskMode,
     PatternMaskType,
 )
 from cleave.extract import StemSource
@@ -220,8 +221,10 @@ class RenderPatternMaskBlock:
     enabled: bool = _RO_PATTERN_MASK_DEFAULTS["enabled"]
     expanded: bool = _RO_PATTERN_MASK_DEFAULTS["expanded"]
     type: PatternMaskType = _RO_PATTERN_MASK_DEFAULTS["type"]
+    mode: PatternMaskMode = _RO_PATTERN_MASK_DEFAULTS["mode"]
     density: float = _RO_PATTERN_MASK_DEFAULTS["density"]
     invert: bool = _RO_PATTERN_MASK_DEFAULTS["invert"]
+    seed: int = _RO_PATTERN_MASK_DEFAULTS["seed"]
     locked: bool = False
 
 
@@ -480,6 +483,8 @@ def view_state_structure_signature(
         },
         "render_pattern_mask": {
             "expanded": pm.expanded,
+            # type gates the plasma-only seed row in the panel layout.
+            "type": pm.type,
         },
         "render_timeline": {
             "enabled": tl.enabled,
@@ -764,8 +769,10 @@ class TuningViewStateBuilder:
             enabled=pm.enabled,
             expanded=pm.expanded,
             type=pm.type,
+            mode=pm.mode,
             density=pm.density,
             invert=pm.invert,
+            seed=pm.seed,
             locked=pm.locked,
         )
         render_timeline = RenderTimelineBlock(
@@ -1026,8 +1033,10 @@ class TuningViewStateBuilder:
                 enabled=pm.enabled,
                 expanded=pm.expanded,
                 type=pm.type,
+                mode=pm.mode,
                 density=pm.density,
                 invert=pm.invert,
+                seed=pm.seed,
                 locked=pm.locked,
             ),
             render_timeline=replace(

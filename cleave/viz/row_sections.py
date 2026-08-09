@@ -698,6 +698,14 @@ RENDER_POST_FX_SECTION = ExpandSectionDef(
     ),
 )
 
+RENDER_PATTERN_MASK_PLASMA_SEED = ConditionalRowsDef(
+    name="pattern_mask_plasma_seed",
+    predicate=lambda state, _desc: state.render_pattern_mask.type == "plasma",
+    children=(
+        SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_SEED),
+    ),
+)
+
 RENDER_PATTERN_MASK_SECTION = ExpandSectionDef(
     header_kind=RowKind.RENDER_PATTERN_MASK_HEADER,
     context="global",
@@ -705,8 +713,10 @@ RENDER_PATTERN_MASK_SECTION = ExpandSectionDef(
     toggle=_toggle_render_pattern_mask,
     children=(
         SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_TYPE),
+        SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_MODE),
         SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_DENSITY),
         SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_INVERT),
+        SectionNode(conditional=RENDER_PATTERN_MASK_PLASMA_SEED),
     ),
 )
 
