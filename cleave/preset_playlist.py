@@ -194,7 +194,7 @@ class PresetPlaylist:
         try:
             rel = to_config_relative(self.current_dir, preset_root).rstrip("/") + "/"
         except ValueError:
-            # Project user-presets (and other off-root copies) are not under
+            # Project presets (and other off-root copies) are not under
             # preset_root; show an absolute path instead of crashing the panel.
             rel = self.current_dir.resolve().as_posix().rstrip("/") + "/"
         siblings = list_browse_siblings(self.current_dir, preset_root)

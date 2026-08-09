@@ -94,14 +94,14 @@ def test_parse_layers_accepts_timeline_trigger() -> None:
 
 
 def test_parse_preset_switching_list_relative_to_cfg_dir(tmp_path: Path) -> None:
-    milk = tmp_path / "user-presets" / "a.milk"
-    milk.parent.mkdir()
+    milk = tmp_path / "presets" / "a.milk"
+    milk.parent.mkdir(parents=True)
     milk.write_text("MILK")
-    preset_root = tmp_path / "presets"
+    preset_root = tmp_path / "preset-root"
     preset_root.mkdir()
     data = {"layers": _layer_yaml()}
     data["layers"]["layer_1"]["preset_switching"] = "on"
-    data["layers"]["layer_1"]["preset_switching_list"] = ["user-presets/a.milk"]
+    data["layers"]["layer_1"]["preset_switching_list"] = ["presets/a.milk"]
     layers = parse_layers_section(
         data, ParseCtx(preset_root=preset_root, cfg_dir=tmp_path)
     )
@@ -147,7 +147,7 @@ def test_persist_omits_defaults() -> None:
 
 
 def test_persist_writes_non_defaults(tmp_path: Path) -> None:
-    milk = tmp_path / "user-presets" / "a.milk"
+    milk = tmp_path / "presets" / "a.milk"
     milk.parent.mkdir()
     milk.write_text("MILK")
     cfg = CleaveConfig(
@@ -187,7 +187,7 @@ def test_persist_writes_non_defaults(tmp_path: Path) -> None:
     layer_out = out["layer_1"]
     assert layer_out["preset_switching"] == "on"
     assert layer_out["preset_switching_trigger"] == "projectm"
-    assert layer_out["preset_switching_list"] == ["user-presets/a.milk"]
+    assert layer_out["preset_switching_list"] == ["presets/a.milk"]
 
 
 def test_persist_list_outside_cfg_dir_keeps_absolute() -> None:
@@ -231,19 +231,19 @@ def test_persist_list_outside_cfg_dir_keeps_absolute() -> None:
 
 
 def test_round_trip_snapshot(tmp_path: Path) -> None:
-    presets = tmp_path / "presets" / "drums"
-    presets.mkdir(parents=True)
-    milk = presets / "a.milk"
+    browse = tmp_path / "preset-root" / "drums"
+    browse.mkdir(parents=True)
+    milk = browse / "a.milk"
     milk.write_text("MILK")
-    user = tmp_path / "user-presets"
-    user.mkdir()
-    copied = user / "b.milk"
+    project_presets = tmp_path / "presets"
+    project_presets.mkdir()
+    copied = project_presets / "b.milk"
     copied.write_text("MILK2")
     cfg_path = tmp_path / "unnamed-1.yaml"
     cfg_path.write_text("layers:\n  layer_1: {}\n", encoding="utf-8")
     cfg = CleaveConfig(
         paths=PathsConfig(
-            preset_root=tmp_path / "presets",
+            preset_root=tmp_path / "preset-root",
             texture_paths=(tmp_path / "textures",),
         ),
         layers={
@@ -265,9 +265,9 @@ def test_round_trip_snapshot(tmp_path: Path) -> None:
         layers={
             "layer_1": LayerRuntime(
                 playlist=PresetPlaylist(
-                    current_dir=presets, paths=(milk,), index=0
+                    current_dir=browse, paths=(milk,), index=0
                 ),
-                browse_floor=presets,
+                browse_floor=browse,
                 stem="drums",
                 preset_switching="on",
                 preset_switching_trigger="timer",
@@ -279,5 +279,5 @@ def test_round_trip_snapshot(tmp_path: Path) -> None:
     loaded = yaml.safe_load(cfg_path.read_text())
     assert loaded["layers"]["layer_1"]["preset_switching"] == "on"
     assert loaded["layers"]["layer_1"]["preset_switching_list"] == [
-        "user-presets/b.milk"
+        "presets/b.milk"
     ]

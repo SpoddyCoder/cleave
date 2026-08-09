@@ -298,7 +298,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Add Current Preset",
         help_description=(
             "Add the layer's current browse preset to the end of the list.",
-            "Copies the preset file into the project user-presets folder.",
+            "Copies the preset file into the project presets folder.",
             "U on any row in the layer is the same action.",
         ),
     ),

@@ -7,6 +7,7 @@ from pathlib import Path
 from collections.abc import Callable
 
 from cleave.config import CleaveConfig, LayerConfig
+from cleave.milk_textures import project_texture_search_paths
 from cleave.effects.runtime import EffectRuntime
 from cleave.gl_compositor import GlCompositor
 from cleave.gl_post_process import GlPostProcess
@@ -264,8 +265,11 @@ class LayerFramePipeline:
         preview_resolutions: bool = True,
         session: TuningSession | None = None,
         viz_quality: bool = False,
+        project_dir: Path | None = None,
     ) -> tuple[list[StemLayer], dict[str, StemLayer]]:
         texture_paths = list(cfg.paths.texture_paths)
+        if project_dir is not None:
+            texture_paths = project_texture_search_paths(project_dir, texture_paths)
         runtimes: list[StemLayer] = []
 
         if preview_resolutions:

@@ -52,6 +52,7 @@ from cleave.viz.input_dispatch import (
     dispatch_keyup,
     dispatch_should_notify_overlay,
 )
+from cleave.milk_textures import project_texture_search_paths
 from cleave.viz.user_presets import cleanup_unreferenced_user_presets
 from cleave.viz.visual_limiter import VisualLimiterState, apply_visual_limiter_gains
 from cleave.viz.wiring import LayerManager, make_timeline_controls, make_tuning_controls
@@ -205,6 +206,7 @@ def init_gl_resources_heavy(
         projectm_fps=LIVE_PROJECTM_FPS,
         preview_resolutions=True,
         session=seed.session,
+        project_dir=seed.project_dir,
     )
 
     mix_pcm, sample_rate = load_mix_pcm(seed.audio_path)
@@ -222,7 +224,9 @@ def init_gl_resources_heavy(
         preset_root=seed.preset_root,
         project_dir=seed.project_dir,
         projectm_fps=LIVE_PROJECTM_FPS,
-        texture_paths=list(seed.cfg.paths.texture_paths),
+        texture_paths=project_texture_search_paths(
+            seed.project_dir, seed.cfg.paths.texture_paths
+        ),
     )
     controls = make_tuning_controls(
         session=seed.session,
@@ -313,6 +317,7 @@ def init_gl_resources_render(
         projectm_fps=render_fps(seed.cfg),
         preview_resolutions=False,
         viz_quality=viz_quality,
+        project_dir=seed.project_dir,
     )
 
     return RenderVisualizerRuntime(

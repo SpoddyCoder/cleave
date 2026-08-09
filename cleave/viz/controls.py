@@ -48,6 +48,7 @@ from cleave.viz.preset_list_populate import (
 from cleave.viz.timeline_cut_controls import TimelineCutController
 from cleave.viz.timeline_snap_controls import TimelineSnapController
 from cleave.viz.user_presets import (
+    USER_PRESETS_DIRNAME,
     resolve_user_preset_dest,
     preset_list_item_display_name,
     user_preset_referenced_on_disk,
@@ -948,7 +949,7 @@ class TuningControls:
     def _user_presets_dir(self) -> Path | None:
         if self.project_dir is None:
             return None
-        return self.project_dir / "user-presets"
+        return self.project_dir / USER_PRESETS_DIRNAME
 
     def _preset_list_path_referenced(self, path: str) -> bool:
         target = Path(path).resolve()

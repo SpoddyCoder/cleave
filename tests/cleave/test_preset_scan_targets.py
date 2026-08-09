@@ -308,7 +308,7 @@ def test_project_targets_include_role_pool_presets() -> None:
 def test_build_project_targets_uses_user_config_preset_root(tmp_path: Path) -> None:
     import yaml
 
-    user_preset = tmp_path / "user-presets"
+    user_preset = tmp_path / "presets"
     user_texture = tmp_path / "user-textures"
     user_texture.mkdir(parents=True)
 
