@@ -1324,6 +1324,7 @@ def test_persist_timeline_preset_round_trip() -> None:
         "timeline_cuts": "all hard",
         "repopulate": "cue roles",
         "conductor": True,
+        "pattern_mask": False,
     }
     round_trip = parse_timeline_section(
         {"timeline": payload},
@@ -1383,6 +1384,7 @@ def test_parse_timeline_preset_defaults() -> None:
     assert timeline.preset.timeline_cuts == "by marker"
     assert timeline.preset.repopulate == "no"
     assert timeline.preset.conductor is False
+    assert timeline.preset.pattern_mask is False
 
 
 def test_parse_timeline_rejects_invalid_placement_snap() -> None:

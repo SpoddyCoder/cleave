@@ -47,6 +47,8 @@ from cleave.config_schema import (
     default_highlight_rolloff_runtime_values,
     default_chroma_boost_runtime_values,
     default_render_post_fx_runtime_values,
+    default_render_pattern_mask_runtime_values,
+    PatternMaskType,
 )
 from cleave.extract import StemSource
 from cleave.preset_playlist import PresetPlaylist, preset_browse_floor
@@ -56,6 +58,7 @@ from cleave.timeline import SlotCue, TimelineLane, copy_lane, empty_lane
 from cleave.blend_modes import BlendMode
 from cleave.timeline_presets.characters import DEFAULT_TIMELINE_PRESET_KIND
 from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
+from cleave.pattern_mask import DEFAULT_TIMELINE_PRESET_PATTERN_MASK
 from cleave.timeline_presets.cue_snap import (
     DEFAULT_TIMELINE_PRESET_CUE_SNAP,
     TimelinePresetCueSnap,
@@ -231,6 +234,20 @@ def default_render_post_fx_runtime() -> RenderPostFxRuntime:
 
 
 @dataclass
+class RenderPatternMaskRuntime:
+    enabled: bool
+    expanded: bool
+    type: PatternMaskType
+    density: float
+    invert: bool
+    locked: bool = False
+
+
+def default_render_pattern_mask_runtime() -> RenderPatternMaskRuntime:
+    return RenderPatternMaskRuntime(**default_render_pattern_mask_runtime_values())
+
+
+@dataclass
 class TimelineFadeGroupRuntime:
     enabled: bool = DEFAULT_TIMELINE_FADES_ENABLED
     fade_in: float = DEFAULT_TIMELINE_FADE_IN
@@ -295,6 +312,7 @@ class TimelineRuntime:
         DEFAULT_TIMELINE_PRESET_REPOPULATE
     )
     timeline_preset_conductor: bool = DEFAULT_TIMELINE_PRESET_CONDUCTOR
+    timeline_preset_pattern_mask: bool = DEFAULT_TIMELINE_PRESET_PATTERN_MASK
     hard_cut_fades: TimelineFadeGroupRuntime = field(
         default_factory=default_timeline_fade_group_runtime
     )
@@ -391,6 +409,9 @@ class TuningSession:
         default_factory=default_render_post_fx_runtime
     )
     render_post_fx_solo: bool = False
+    render_pattern_mask: RenderPatternMaskRuntime = field(
+        default_factory=default_render_pattern_mask_runtime
+    )
     timeline: TimelineRuntime = field(default_factory=default_timeline_runtime)
     song_markers: SongMarkerRuntime = field(default_factory=default_song_marker_runtime)
     settings: SettingsRuntime = field(default_factory=SettingsRuntime)
@@ -485,6 +506,22 @@ def render_post_fx_runtime_from_cfg(
     return default_render_post_fx_runtime()
 
 
+def render_pattern_mask_runtime_from_cfg(
+    cfg: CleaveConfig,
+) -> RenderPatternMaskRuntime:
+    pattern_mask = cfg.render.pattern_mask if cfg.render is not None else None
+    if pattern_mask is not None:
+        return replace(
+            default_render_pattern_mask_runtime(),
+            enabled=pattern_mask.enabled,
+            locked=pattern_mask.locked,
+            type=pattern_mask.type,
+            density=pattern_mask.density,
+            invert=pattern_mask.invert,
+        )
+    return default_render_pattern_mask_runtime()
+
+
 def _fade_group_runtime_from_cfg(
     group: TimelineFadeGroupConfig | None,
 ) -> TimelineFadeGroupRuntime:
@@ -551,6 +588,11 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
     preset_conductor = (
         DEFAULT_TIMELINE_PRESET_CONDUCTOR if preset is None else preset.conductor
     )
+    preset_pattern_mask = (
+        DEFAULT_TIMELINE_PRESET_PATTERN_MASK
+        if preset is None
+        else preset.pattern_mask
+    )
     lanes: dict[str, TimelineLane] = {}
     for slot in cfg.layer_z_order:
         if slot in source_lanes:
@@ -571,6 +613,7 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
             timeline_preset_timeline_cuts=preset_timeline_cuts,
             timeline_preset_repopulate=preset_repopulate,
             timeline_preset_conductor=preset_conductor,
+            timeline_preset_pattern_mask=preset_pattern_mask,
             limiter=limiter,
         )
     return TimelineRuntime(
@@ -585,6 +628,7 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
         timeline_preset_timeline_cuts=preset_timeline_cuts,
         timeline_preset_repopulate=preset_repopulate,
         timeline_preset_conductor=preset_conductor,
+        timeline_preset_pattern_mask=preset_pattern_mask,
         hard_cut_fades=_fade_group_runtime_from_cfg(cuts.hard),
         soft_cut_fades=_fade_group_runtime_from_cfg(cuts.soft),
         limiter=limiter,
@@ -607,6 +651,7 @@ def session_from_cfg(
         layer_z_order=list(cfg.layer_z_order),
         render_overlays=render_overlays_runtime_from_cfg(cfg),
         render_post_fx=render_post_fx_runtime_from_cfg(cfg),
+        render_pattern_mask=render_pattern_mask_runtime_from_cfg(cfg),
         timeline=timeline_runtime_from_cfg(cfg),
         layers={
             slot: LayerRuntime(

@@ -32,6 +32,7 @@ from cleave.viz.panel_notification import PanelNotificationHost
 from cleave.viz.playback import PlaybackState, current_sec, seek, seek_to, toggle_pause
 from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.render_overlay_controls import RenderOverlaysControls
+from cleave.viz.render_pattern_mask_controls import RenderPatternMaskControls
 from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
 from cleave.viz.render_post_fx_controls import RenderPostFxControls
 from cleave.viz.settings_controls import SettingsControls
@@ -81,6 +82,7 @@ from cleave.viz.tuning_view_state import TuningViewState, TuningViewStateBuilder
 
 if TYPE_CHECKING:
     from cleave.gl_compositor import GlCompositor
+    from cleave.gl_masked_compositor import GlMaskedCompositor
     from cleave.gl_post_process import GlPostProcess
     from cleave.viz.wiring import LayerManager
 
@@ -119,6 +121,7 @@ class TuningControls:
         layer_manager: LayerManager | None = None,
         compositor: GlCompositor | None = None,
         post_process: GlPostProcess | None = None,
+        masked_compositor: GlMaskedCompositor | None = None,
         beat_times: Sequence[float] = (),
         bar_times: Sequence[float] = (),
         signals: Signals | None = None,
@@ -136,6 +139,7 @@ class TuningControls:
         self._layer_manager = layer_manager
         self._compositor = compositor
         self._post_process = post_process
+        self._masked_compositor = masked_compositor
         self._modal_host = modal_host if modal_host is not None else ModalHost()
 
         self._focus_cursor: FocusCursor = MainFocus(
@@ -218,6 +222,7 @@ class TuningControls:
         self._render_post_fx = RenderPostFxControls(
             session, bindings=render_post_fx_bindings
         )
+        self._render_pattern_mask = RenderPatternMaskControls(session)
         self._settings = SettingsControls(session, cfg)
         self._tap_sync = TapSyncControls(
             cfg,
@@ -516,6 +521,9 @@ class TuningControls:
                 return True
             if kind == RowKind.RENDER_POST_FX_HEADER:
                 self._toggle_render_post_fx_locked()
+                return True
+            if kind == RowKind.RENDER_PATTERN_MASK_HEADER:
+                self._toggle_render_pattern_mask_locked()
                 return True
             if kind == RowKind.RENDER_TIMELINE_HEADER:
                 self._toggle_render_timeline_locked()
@@ -825,6 +833,7 @@ class TuningControls:
             self.session,
             self._compositor,
             self._post_process,
+            masked_compositor=self._masked_compositor,
         )
 
     def _normalize_focus_cursor(self) -> None:
@@ -1412,6 +1421,9 @@ class TuningControls:
     def _toggle_render_post_fx_locked(self) -> None:
         post_fx = self.session.render_post_fx
         post_fx.locked = not post_fx.locked
+
+    def _toggle_render_pattern_mask_locked(self) -> None:
+        self._render_pattern_mask.toggle_locked()
 
     def _toggle_render_timeline_locked(self) -> None:
         timeline = self.session.timeline

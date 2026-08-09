@@ -83,6 +83,9 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.RENDER_POST_FX_CHROMA_BOOST_MODE,
         RowKind.RENDER_POST_FX_CHROMA_BOOST_VARIANT,
         RowKind.RENDER_POST_FX_CHROMA_BOOST_AMOUNT,
+        RowKind.RENDER_PATTERN_MASK_TYPE,
+        RowKind.RENDER_PATTERN_MASK_DENSITY,
+        RowKind.RENDER_PATTERN_MASK_INVERT,
         RowKind.SETTINGS_PREVIEW_QUALITY,
         RowKind.SETTINGS_EDITOR_MODE,
         RowKind.SETTINGS_UI_WIDTH_MODE,
@@ -318,6 +321,7 @@ def test_render_value_children_blocked_by_section_lock() -> None:
     assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_TIMELINE_CUTS) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_REPOPULATE) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_CONDUCTOR) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_PATTERN_MASK) is True
     assert row_blocked_by_section_lock(RowKind.TRACK_PRESET_LIST_POPULATE) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_BAR_PHASE) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_TO_BEATS) is True

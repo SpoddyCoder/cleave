@@ -6,11 +6,15 @@ from pathlib import Path
 
 from collections.abc import Callable
 
+import numpy as np
+
 from cleave.config import CleaveConfig, LayerConfig
 from cleave.milk_textures import project_texture_search_paths
 from cleave.effects.runtime import EffectRuntime
 from cleave.gl_compositor import GlCompositor
+from cleave.gl_masked_compositor import GlMaskedCompositor
 from cleave.gl_post_process import GlPostProcess
+from cleave.pattern_mask import generate_strips_mask
 from cleave.preset_playlist import PresetPlaylist
 from cleave.projectm import ProjectM, pcm_max_samples_per_channel
 from cleave.projectm_health import (
@@ -482,9 +486,40 @@ class LayerFramePipeline:
         compositor: GlCompositor,
         layers_by_slot: dict[str, StemLayer],
         session: TuningSession,
+        *,
+        masked_compositor: GlMaskedCompositor | None = None,
     ) -> None:
         ordered = [layers_by_slot[name] for name in reversed(session.layer_z_order)]
-        compositor.composite([layer.fbo for layer in ordered])
+        fbos = [layer.fbo for layer in ordered]
+        pm = session.render_pattern_mask
+        use_mask = (
+            render_sections_active(session)
+            and pm.enabled
+            and masked_compositor is not None
+        )
+        if use_mask:
+            assert masked_compositor is not None
+            active = [fbo for fbo in fbos if fbo.enabled and fbo.opacity > 0.0]
+            if active:
+                mask = generate_strips_mask(
+                    compositor.content_width,
+                    len(active),
+                    density=pm.density,
+                    invert=pm.invert,
+                )
+            else:
+                mask = np.zeros(compositor.content_width, dtype=np.uint8)
+            masked_compositor.set_content_size(
+                compositor.content_width, compositor.content_height
+            )
+            masked_compositor.set_color_format(compositor.color_format)
+            masked_compositor.composite_masked(
+                compositor.content_fbo_id,
+                fbos,
+                mask,
+            )
+        else:
+            compositor.composite(fbos)
 
     @staticmethod
     def destroy(layers: list[StemLayer]) -> None:

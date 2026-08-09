@@ -22,6 +22,7 @@ from cleave.timeline_presets import (
 )
 from cleave.timeline_presets.characters import timeline_preset_kind_display
 from cleave.timeline_presets.conductor import timeline_preset_conductor_display
+from cleave.pattern_mask import timeline_preset_pattern_mask_display
 from cleave.timeline_presets.accent import apply_accent
 from cleave.timeline_presets.crescendo import apply_crescendo
 from cleave.timeline_presets.cue_snap import timeline_preset_cue_snap_display
@@ -117,6 +118,10 @@ class TimelinePresetController:
             ModalLabeledLine(
                 "conductor",
                 timeline_preset_conductor_display(tl.timeline_preset_conductor),
+            ),
+            ModalLabeledLine(
+                "pattern mask",
+                timeline_preset_pattern_mask_display(tl.timeline_preset_pattern_mask),
             ),
         )
 
@@ -222,6 +227,9 @@ class TimelinePresetController:
             and self._on_repopulate is not None
         ):
             self._on_repopulate()
+        if tl.timeline_preset_pattern_mask:
+            self.session.render_pattern_mask.enabled = True
+            self.session.render_pattern_mask.type = "strips"
         if conductor_skipped:
             self._notify("No signals; conductor skipped")
         else:

@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from cleave.config_schema import (
+    PATTERN_MASK_DENSITY_STEP,
+    PATTERN_MASK_DENSITY_STEP_LARGE,
     TIMELINE_FADE_DURATION_STEP,
     VISUAL_LIMITER_RATIO_STEP,
     VISUAL_LIMITER_RELEASE_STEP,
@@ -32,6 +34,11 @@ from cleave.config_schema import (
     ui_fade_display,
 )
 from cleave.extract import stem_control_label, stem_overlay_header
+from cleave.pattern_mask import (
+    cycle_timeline_preset_pattern_mask,
+    pattern_mask_invert_display,
+    timeline_preset_pattern_mask_display,
+)
 from cleave.song_markers import (
     DEFAULT_SONG_MARKER_TYPE,
     SongMarker,
@@ -368,6 +375,28 @@ def _apply_timeline_preset_conductor(
     tl = controls.session.timeline
     tl.timeline_preset_conductor = cycle_timeline_preset_conductor(
         tl.timeline_preset_conductor,
+        forward=forward,
+    )
+
+
+def _format_timeline_preset_pattern_mask(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return timeline_preset_pattern_mask_display(
+        state.render_timeline.timeline_preset_pattern_mask
+    )
+
+
+def _apply_timeline_preset_pattern_mask(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    tl = controls.session.timeline
+    tl.timeline_preset_pattern_mask = cycle_timeline_preset_pattern_mask(
+        tl.timeline_preset_pattern_mask,
         forward=forward,
     )
 
@@ -1450,6 +1479,76 @@ def _apply_render_post_fx_header(
     apply_expand_toggle(controls, desc.kind, desc.slot, forward)
 
 
+def _format_render_pattern_mask_type(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return state.render_pattern_mask.type
+
+
+def _format_render_pattern_mask_density(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return f"{int(round(state.render_pattern_mask.density * 100))}%"
+
+
+def _format_render_pattern_mask_invert(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return pattern_mask_invert_display(state.render_pattern_mask.invert)
+
+
+def _apply_render_pattern_mask_header(
+    controls: TuningControls,
+    desc: RowDescriptor,
+    forward: bool,
+    ctrl: bool,
+    _shift: bool,
+) -> None:
+    if ctrl:
+        if (
+            controls.session.render_pattern_mask.locked
+            and row_behavior(desc.kind).can_enable_disable
+        ):
+            return
+        controls._render_pattern_mask.set_enabled(forward)
+        return
+    apply_expand_toggle(controls, desc.kind, desc.slot, forward)
+
+
+def _apply_render_pattern_mask_type(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls._render_pattern_mask.cycle_type(forward=forward)
+
+
+def _apply_render_pattern_mask_density(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    ctrl: bool,
+    _shift: bool,
+) -> None:
+    step = PATTERN_MASK_DENSITY_STEP_LARGE if ctrl else PATTERN_MASK_DENSITY_STEP
+    delta = step if forward else -step
+    controls._render_pattern_mask.set_density(
+        controls.session.render_pattern_mask.density + delta
+    )
+
+
+def _apply_render_pattern_mask_invert(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls._render_pattern_mask.cycle_invert(forward=forward)
+
+
 def _apply_render_timeline_header(
     controls: TuningControls,
     desc: RowDescriptor,
@@ -2092,6 +2191,31 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         format_value=_format_render_post_fx_chroma_boost_amount,
         apply_horizontal=_apply_render_post_fx_chroma_boost_amount,
     ),
+    RowKind.RENDER_PATTERN_MASK_HEADER: RowFieldDef(
+        panel_label="PATTERN MASK",
+        present_style=RowPresentStyle.COMPOSITE_HEADER,
+        header_prefix="Render: ",
+        header_suffix="PATTERN MASK",
+        apply_horizontal=_apply_render_pattern_mask_header,
+    ),
+    RowKind.RENDER_PATTERN_MASK_TYPE: RowFieldDef(
+        panel_label="type",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_pattern_mask_type,
+        apply_horizontal=_apply_render_pattern_mask_type,
+    ),
+    RowKind.RENDER_PATTERN_MASK_DENSITY: RowFieldDef(
+        panel_label="density",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_pattern_mask_density,
+        apply_horizontal=_apply_render_pattern_mask_density,
+    ),
+    RowKind.RENDER_PATTERN_MASK_INVERT: RowFieldDef(
+        panel_label="invert",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_pattern_mask_invert,
+        apply_horizontal=_apply_render_pattern_mask_invert,
+    ),
     RowKind.RENDER_TIMELINE_HEADER: RowFieldDef(
         panel_label="TIMELINE",
         present_style=RowPresentStyle.COMPOSITE_HEADER,
@@ -2176,6 +2300,12 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_timeline_preset_conductor,
         apply_horizontal=_apply_timeline_preset_conductor,
+    ),
+    RowKind.TIMELINE_PRESET_PATTERN_MASK: RowFieldDef(
+        panel_label="pattern mask",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_timeline_preset_pattern_mask,
+        apply_horizontal=_apply_timeline_preset_pattern_mask,
     ),
     RowKind.TIMELINE_PRESETS: RowFieldDef(
         panel_label="apply timeline preset",
