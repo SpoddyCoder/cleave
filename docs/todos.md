@@ -24,6 +24,7 @@ Rich cue levels, per-cue blend/role, and manual timeline-opacity nudges are ship
 
 ## Architecture
 
+- **Preview quality drives pattern-mask resolution.** Hard-mode masks look soft or blocky when generated below content size, but full-res generation still costs when params change (especially plasma / soft). Tie Settings -> preview quality to the mask gen size (full for `full-quality`, scaled down for `balanced` / `performance` / `ultra-performance`) so live editing can trade sharpness for speed without a separate control. Offline render stays full-res.
 
 ### projectM
 

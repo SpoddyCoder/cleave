@@ -18,7 +18,6 @@ from OpenGL.GL import (  # noqa: E402
 
 from cleave.gl_compositor import GlCompositor  # noqa: E402
 from cleave.gl_masked_compositor import GlMaskedCompositor, PatternMaskParams  # noqa: E402
-from cleave.pattern_mask import mask_generation_resolution  # noqa: E402
 
 W, H = 64, 32
 
@@ -125,7 +124,7 @@ def test_plasma_hard_gpu_restores_full_viewport(gl_context) -> None:
     comp, masked = gl_context
     assert masked._ctx is not None
     masked._ctx.viewport = (0, 0, W, H)
-    gen_w, gen_h = mask_generation_resolution(W, H)
+    gen_w, gen_h = W, H
     params = PatternMaskParams(
         mask_type="plasma",
         mode="hard",
