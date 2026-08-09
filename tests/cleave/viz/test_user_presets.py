@@ -32,15 +32,15 @@ def _write_viz_yaml(path: Path, preset_relpaths: list[str]) -> None:
 
 
 def test_preset_list_item_display_name_single() -> None:
-    paths = ["/tmp/user-presets/foo.milk"]
+    paths = ["/tmp/presets/foo.milk"]
     assert preset_list_item_display_name(paths, 0) == "foo.milk"
 
 
 def test_preset_list_item_display_name_duplicates() -> None:
     paths = [
-        "/tmp/user-presets/foo.milk",
-        "/tmp/user-presets/foo.milk",
-        "/tmp/user-presets/bar.milk",
+        "/tmp/presets/foo.milk",
+        "/tmp/presets/foo.milk",
+        "/tmp/presets/bar.milk",
     ]
     assert preset_list_item_display_name(paths, 0) == "foo.milk (1)"
     assert preset_list_item_display_name(paths, 1) == "foo.milk (2)"
@@ -48,15 +48,15 @@ def test_preset_list_item_display_name_duplicates() -> None:
 
 
 def test_preset_list_display_names_single() -> None:
-    paths = ["/tmp/user-presets/foo.milk"]
+    paths = ["/tmp/presets/foo.milk"]
     assert preset_list_display_names(paths) == ["foo.milk"]
 
 
 def test_preset_list_display_names_duplicates() -> None:
     paths = [
-        "/tmp/user-presets/foo.milk",
-        "/tmp/user-presets/foo.milk",
-        "/tmp/user-presets/bar.milk",
+        "/tmp/presets/foo.milk",
+        "/tmp/presets/foo.milk",
+        "/tmp/presets/bar.milk",
     ]
     assert preset_list_display_names(paths) == [
         "foo.milk (1)",
@@ -103,7 +103,7 @@ def test_resolve_user_preset_dest_creates_canonical_path(tmp_path: Path) -> None
     src = tmp_path / "src" / "preset.milk"
     src.parent.mkdir()
     src.write_text("preset", encoding="utf-8")
-    dest_dir = tmp_path / "user-presets"
+    dest_dir = tmp_path / "presets"
 
     dest, needs_copy = resolve_user_preset_dest(dest_dir, src)
 
@@ -115,7 +115,7 @@ def test_resolve_user_preset_dest_reuses_existing_copy(tmp_path: Path) -> None:
     src = tmp_path / "src" / "preset.milk"
     src.parent.mkdir()
     src.write_text("preset", encoding="utf-8")
-    dest_dir = tmp_path / "user-presets"
+    dest_dir = tmp_path / "presets"
     dest_dir.mkdir()
     existing = dest_dir / "preset.milk"
     existing.write_text("preset", encoding="utf-8")
@@ -130,7 +130,7 @@ def test_resolve_user_preset_dest_same_name_different_content(tmp_path: Path) ->
     src = tmp_path / "src" / "preset.milk"
     src.parent.mkdir()
     src.write_text("new", encoding="utf-8")
-    dest_dir = tmp_path / "user-presets"
+    dest_dir = tmp_path / "presets"
     dest_dir.mkdir()
     (dest_dir / "preset.milk").write_text("old", encoding="utf-8")
 
@@ -141,7 +141,7 @@ def test_resolve_user_preset_dest_same_name_different_content(tmp_path: Path) ->
 
 
 def test_cleanup_deletes_orphan_milk(tmp_path: Path) -> None:
-    presets = tmp_path / "user-presets"
+    presets = tmp_path / "presets"
     presets.mkdir()
     orphan = presets / "orphan.milk"
     orphan.write_text("x", encoding="utf-8")
@@ -154,11 +154,11 @@ def test_cleanup_deletes_orphan_milk(tmp_path: Path) -> None:
 
 
 def test_cleanup_keeps_milk_referenced_by_cleave_viz(tmp_path: Path) -> None:
-    presets = tmp_path / "user-presets"
+    presets = tmp_path / "presets"
     presets.mkdir()
     kept = presets / "kept.milk"
     kept.write_text("x", encoding="utf-8")
-    _write_viz_yaml(tmp_path / "cleave-viz.yaml", ["user-presets/kept.milk"])
+    _write_viz_yaml(tmp_path / "cleave-viz.yaml", ["presets/kept.milk"])
 
     removed = cleanup_unreferenced_user_presets(tmp_path)
 
@@ -167,14 +167,14 @@ def test_cleanup_keeps_milk_referenced_by_cleave_viz(tmp_path: Path) -> None:
 
 
 def test_cleanup_keeps_milk_referenced_only_by_unnamed_yaml(tmp_path: Path) -> None:
-    presets = tmp_path / "user-presets"
+    presets = tmp_path / "presets"
     presets.mkdir()
     kept = presets / "kept.milk"
     kept.write_text("x", encoding="utf-8")
     orphan = presets / "orphan.milk"
     orphan.write_text("y", encoding="utf-8")
     _write_viz_yaml(tmp_path / "cleave-viz.yaml", [])
-    _write_viz_yaml(tmp_path / "unnamed-1.yaml", ["user-presets/kept.milk"])
+    _write_viz_yaml(tmp_path / "unnamed-1.yaml", ["presets/kept.milk"])
 
     removed = cleanup_unreferenced_user_presets(tmp_path)
 
@@ -184,7 +184,7 @@ def test_cleanup_keeps_milk_referenced_only_by_unnamed_yaml(tmp_path: Path) -> N
 
 
 def test_cleanup_ignores_project_yaml_and_non_viz_yaml(tmp_path: Path) -> None:
-    presets = tmp_path / "user-presets"
+    presets = tmp_path / "presets"
     presets.mkdir()
     orphan = presets / "orphan.milk"
     orphan.write_text("x", encoding="utf-8")
@@ -196,7 +196,7 @@ def test_cleanup_ignores_project_yaml_and_non_viz_yaml(tmp_path: Path) -> None:
         "layers:\n"
         "  layer_1:\n"
         "    preset_switching_list:\n"
-        "      - user-presets/orphan.milk\n",
+        "      - presets/orphan.milk\n",
         encoding="utf-8",
     )
     (tmp_path / "notes.yaml").write_text("title: hello\n", encoding="utf-8")
@@ -212,7 +212,7 @@ def test_cleanup_ignores_project_yaml_and_non_viz_yaml(tmp_path: Path) -> None:
 
 
 def test_cleanup_does_not_delete_outside_user_presets(tmp_path: Path) -> None:
-    presets = tmp_path / "user-presets"
+    presets = tmp_path / "presets"
     presets.mkdir()
     outside = tmp_path / "outside.milk"
     outside.write_text("x", encoding="utf-8")
@@ -224,14 +224,14 @@ def test_cleanup_does_not_delete_outside_user_presets(tmp_path: Path) -> None:
 
 
 def test_user_preset_referenced_on_disk_skip_config(tmp_path: Path) -> None:
-    presets = tmp_path / "user-presets"
+    presets = tmp_path / "presets"
     presets.mkdir()
     milk = presets / "shared.milk"
     milk.write_text("x", encoding="utf-8")
     active = tmp_path / "cleave-viz.yaml"
     other = tmp_path / "unnamed-1.yaml"
-    _write_viz_yaml(active, ["user-presets/shared.milk"])
-    _write_viz_yaml(other, ["user-presets/shared.milk"])
+    _write_viz_yaml(active, ["presets/shared.milk"])
+    _write_viz_yaml(other, ["presets/shared.milk"])
 
     assert user_preset_referenced_on_disk(tmp_path, milk, skip_config=active) is True
     _write_viz_yaml(other, [])

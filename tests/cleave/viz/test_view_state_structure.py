@@ -574,7 +574,7 @@ def test_builder_shows_auto_preset_in_file_row_only() -> None:
 def test_builder_shows_off_root_auto_preset_without_crashing(
     tmp_path: Path,
 ) -> None:
-    """Playing a project user-presets copy must not break directory display."""
+    """Playing an off-root preset copy must not break directory display."""
     controls = _make_controls(("layer_1",))
     session = controls.session
     layer = session.layers["layer_1"]
@@ -583,7 +583,7 @@ def test_builder_shows_off_root_auto_preset_without_crashing(
         "layer_1"
     ].preset_dir_label
 
-    user_dir = tmp_path / "user-presets"
+    user_dir = tmp_path / "presets"
     user_dir.mkdir()
     playing = user_dir / "copied.milk"
     playing.write_text("milk", encoding="utf-8")

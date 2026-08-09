@@ -267,7 +267,7 @@ def test_directory_display_clamps_sibling_parent_at_preset_root() -> None:
 def test_directory_display_label_outside_preset_root() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / "presets"
-        outside = Path(tmp) / "user-presets"
+        outside = Path(tmp) / "project-presets"
         root.mkdir()
         outside.mkdir()
         _write_milk(outside / "a.milk")

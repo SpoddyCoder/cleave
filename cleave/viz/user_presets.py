@@ -1,4 +1,4 @@
-"""Helpers for per-layer preset switching lists (project user-presets copies)."""
+"""Helpers for per-layer preset switching lists (project presets copies)."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ import yaml
 from cleave.config_schema import resolve_user_preset
 from cleave.project import PROJECT_FILENAME
 
-USER_PRESETS_DIRNAME = "user-presets"
+USER_PRESETS_DIRNAME = "presets"
 
 
 def path_list_digest(paths: Sequence[str]) -> str:
@@ -123,7 +123,7 @@ def user_preset_referenced_on_disk(
 
 
 def cleanup_unreferenced_user_presets(project_dir: Path) -> list[Path]:
-    """Remove ``*.milk`` under ``user-presets/`` not referenced by any viz YAML.
+    """Remove ``*.milk`` under ``presets/`` not referenced by any viz YAML.
 
     Returns resolved paths that were unlinked. Failures are ignored.
     """

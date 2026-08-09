@@ -184,7 +184,7 @@ The project directory stores all files required in a self-contained bundle...
 * `mysong.wav` - original source audio is copied into the project directory
 * `stems/` - separated audio stems
 * `renders/` - final output renders
-* `user-presets/` - presets used by the project are copied into the project directory
+* `presets/` - presets used by the project are copied into the project directory
 
 ### Configuration
 Cleave uses the XDG standard for user data and configuration, default locations...

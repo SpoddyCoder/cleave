@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from cleave.config import CleaveConfig
+from cleave.config import CleaveConfig, VIZ_CONFIG_FILENAME
 from cleave.config_schema import (
     MAX_LAYER_COUNT,
     MIN_LAYER_COUNT,
@@ -14,6 +14,7 @@ from cleave.config_schema import (
     next_layer_slot,
 )
 from cleave.config_snapshot import next_unnamed_path, write_session_snapshot
+from cleave.milk_textures import sync_project_textures
 from cleave.effects.runtime import EffectRuntime
 from cleave.extract import STEM_NAMES, STEM_SOURCES
 from cleave.gl_compositor import GlCompositor
@@ -49,7 +50,7 @@ from cleave.viz.preset_switching import (
 )
 from cleave.stem_pcm import StemPcmBank
 from cleave.viz.playback import current_sec, seek
-from cleave.config import VIZ_CONFIG_FILENAME
+from cleave.viz.user_presets import USER_PRESETS_DIRNAME
 
 
 def _discard_timeline_slot(session: TuningSession, slot: str) -> None:
@@ -469,13 +470,22 @@ def make_tuning_controls(
     if modal_host is not None:
         kwargs["modal_host"] = modal_host
 
+    def _sync_project_textures() -> None:
+        presets_dir = project_dir / USER_PRESETS_DIRNAME
+        milk_paths = (
+            sorted(presets_dir.glob("*.milk")) if presets_dir.is_dir() else []
+        )
+        sync_project_textures(project_dir, milk_paths, cfg.paths.texture_paths)
+
     def on_save_new_config() -> Path:
         out_path = next_unnamed_path(project_dir)
         write_session_snapshot(out_path, cfg=cfg, session=session)
+        _sync_project_textures()
         return out_path
 
     def on_overwrite_config(path: Path) -> str:
         write_session_snapshot(path, cfg=cfg, session=session)
+        _sync_project_textures()
         return path.name
 
     kwargs.update(
