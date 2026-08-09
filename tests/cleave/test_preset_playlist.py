@@ -481,6 +481,38 @@ def test_scan_all_layers_uses_slot_keys(minimal_project: Path) -> None:
         assert len(playlists[slot].paths) >= 1
 
 
+def test_scan_preset_playlist_missing_dir_returns_empty() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        missing = root / "pack" / "gone"
+        playlist = scan_preset_playlist(missing)
+        assert playlist.current is None
+        assert playlist.paths == ()
+        assert playlist.current_dir == missing.resolve()
+        assert preset_filename_display(playlist) == "NO PRESETS FOUND"
+
+
+def test_scan_preset_playlist_missing_milk_returns_empty() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        pack = root / "pack"
+        pack.mkdir()
+        missing = pack / "gone.milk"
+        playlist = scan_preset_playlist(missing)
+        assert playlist.current is None
+        assert playlist.paths == ()
+        assert playlist.current_dir == pack.resolve()
+
+
+def test_preset_browse_floor_missing_milk_uses_parent() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        pack = root / "pack"
+        pack.mkdir()
+        missing = pack / "gone.milk"
+        assert preset_browse_floor(missing, root) == pack.resolve()
+
+
 def test_scan_single_layer_picks_from_available_presets() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)

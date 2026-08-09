@@ -459,14 +459,40 @@ def _parse_paths(data: dict[str, Any], user_cfg: UserConfig) -> PathsConfig:
     return PathsConfig(preset_root=preset_root, texture_paths=texture_paths)
 
 
+def missing_preset_anchors(
+    layers: dict[str, LayerConfig],
+) -> list[tuple[str, Path]]:
+    """Layer slots whose ``preset`` path does not exist under ``preset_root``."""
+    return [
+        (name, layer.preset)
+        for name, layer in layers.items()
+        if not layer.preset.exists()
+    ]
+
+
+def missing_preset_anchor_notification(
+    layers: dict[str, LayerConfig],
+) -> str | None:
+    """Short panel/stderr message when one or more layer preset anchors are missing."""
+    missing = missing_preset_anchors(layers)
+    if not missing:
+        return None
+    slots = ", ".join(name for name, _ in missing)
+    noun = "anchor" if len(missing) == 1 else "anchors"
+    return f"Missing preset {noun}: {slots}"
+
+
 def _validate_presets(layers: dict[str, LayerConfig]) -> None:
-    missing: list[str] = []
+    """Reject existing anchors that are neither a directory nor a ``.milk`` file.
+
+    Missing anchors are allowed (restored projects may lack browse packs); callers
+    surface them via :func:`missing_preset_anchor_notification`.
+    """
     invalid: list[str] = []
 
     for name, layer in layers.items():
         preset = layer.preset
         if not preset.exists():
-            missing.append(f"{name}: {preset}")
             continue
         if preset.is_dir():
             continue
@@ -476,10 +502,6 @@ def _validate_presets(layers: dict[str, LayerConfig]) -> None:
             continue
         invalid.append(f"{name}: {preset}")
 
-    if missing:
-        raise FileNotFoundError(
-            "missing preset anchor(s):\n  " + "\n  ".join(missing)
-        )
     if invalid:
         raise ValueError(
             "preset must be a .milk file or directory:\n  "

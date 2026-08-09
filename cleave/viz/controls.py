@@ -238,6 +238,7 @@ class TuningControls:
             layer_bindings=layer_bindings,
             layer_manager=layer_manager,
             on_mode_changed=self._on_editor_mode_changed,
+            on_notification=self.show_notification,
         )
         if session.timeline.enabled:
             self.show_notification(NOTIFICATION_TIMELINE_ENABLED_TEXT)
