@@ -10,7 +10,12 @@ from pathlib import Path
 
 import pygame
 
-from cleave.config import CleaveConfig, render_fps, render_hdr_compositing
+from cleave.config import (
+    CleaveConfig,
+    missing_preset_anchor_notification,
+    render_fps,
+    render_hdr_compositing,
+)
 from cleave.user_config import persist_editor_settings
 from cleave.effects.runtime import EffectRuntime
 from cleave.gl_color_format import GlColorFormat, resolve_live_compositor_format
@@ -250,6 +255,10 @@ def init_gl_resources_heavy(
         on_notification=controls.show_notification,
         tuning_controls=controls,
     )
+
+    missing_anchor = missing_preset_anchor_notification(seed.cfg.layers)
+    if missing_anchor is not None:
+        controls.show_notification(missing_anchor)
 
     runtime = LiveVisualizerRuntime(
         seed=seed,

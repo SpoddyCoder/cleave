@@ -6,7 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from cleave.config import CleaveConfig, load_config
+from cleave.config import CleaveConfig, load_config, missing_preset_anchor_notification
 from cleave.preset_playlist import PresetPlaylist, scan_all_layers
 from cleave.project import load_manifest
 from cleave.viz.config_save import ConfigSaveController
@@ -114,6 +114,7 @@ class EditorModeController:
         layer_bindings: LiveLayerBindings | None = None,
         layer_manager: LayerManager | None = None,
         on_mode_changed: Callable[[], None] | None = None,
+        on_notification: Callable[[str], None] | None = None,
     ) -> None:
         self.session = session
         self.cfg = cfg
@@ -123,6 +124,7 @@ class EditorModeController:
         self._layer_bindings = layer_bindings
         self._layer_manager = layer_manager
         self._on_mode_changed = on_mode_changed
+        self._on_notification = on_notification
         self._enter_curation_after_save = False
         self._config_save.add_on_commit_save(self._on_config_committed)
 
@@ -254,6 +256,9 @@ class EditorModeController:
             self._layer_manager.playlists.clear()
             self._layer_manager.playlists.update(playlists)
         self._sync_live_layers(playlists)
+        missing_anchor = missing_preset_anchor_notification(self.cfg.layers)
+        if missing_anchor is not None and self._on_notification is not None:
+            self._on_notification(missing_anchor)
 
     def _sync_live_layers(self, playlists: dict[str, PresetPlaylist]) -> None:
         bindings = self._layer_bindings

@@ -62,11 +62,18 @@ def path_under_preset_root(path: Path, preset_root: Path) -> bool:
     return _path_at_or_below(path, preset_root)
 
 
+def _anchor_directory(anchor: Path) -> Path:
+    """Directory for browse/playlist when *anchor* is a file or missing ``.milk``."""
+    resolved = anchor.resolve()
+    if resolved.is_file() or resolved.suffix.lower() == ".milk":
+        return resolved.parent
+    return resolved
+
+
 def preset_browse_floor(anchor: Path, preset_root: Path) -> Path:
     """Lowest directory this layer may ascend to when browsing presets."""
     resolved_root = preset_root.resolve()
-    resolved = anchor.resolve()
-    base = resolved.parent if resolved.is_file() else resolved
+    base = _anchor_directory(anchor)
     if not _path_at_or_below(base, resolved_root):
         return resolved_root
     try:
@@ -348,10 +355,18 @@ def scan_single_layer(
 
 
 def scan_preset_playlist(anchor: Path) -> PresetPlaylist:
-    """Build a playlist from a .milk file or a directory of presets."""
+    """Build a playlist from a .milk file or a directory of presets.
+
+    Missing anchors yield an empty playlist at the intended directory so play and
+    render can still open when browse packs are absent (e.g. after restore).
+    """
     resolved = anchor.resolve()
     if not resolved.exists():
-        raise FileNotFoundError(f"preset anchor not found: {resolved}")
+        return PresetPlaylist(
+            current_dir=_anchor_directory(anchor),
+            paths=(),
+            index=0,
+        )
 
     if resolved.is_file():
         if resolved.suffix.lower() != ".milk":

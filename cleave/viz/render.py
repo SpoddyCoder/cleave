@@ -15,6 +15,7 @@ import pygame
 from cleave.config import (
     VIZ_CONFIG_FILENAME,
     load_config,
+    missing_preset_anchor_notification,
     render_fps,
     render_output_size,
 )
@@ -185,6 +186,9 @@ def render(
     project = validate_render_project(project_dir, config=config)
     config_path = _resolve_render_config_path(config, project)
     cfg = load_config(config_path, repo_root())
+    missing_anchor = missing_preset_anchor_notification(cfg.layers)
+    if missing_anchor is not None:
+        print(f"warning: {missing_anchor}", file=sys.stderr)
 
     if output is not None:
         output_path = Path(output).expanduser()

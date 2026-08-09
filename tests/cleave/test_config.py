@@ -35,6 +35,7 @@ from cleave.config import (
     ensure_project_viz_config,
     find_config_path,
     load_config,
+    missing_preset_anchor_notification,
     project_viz_config_path,
     render_output_size,
     render_hdr_compositing,
@@ -1080,8 +1081,27 @@ def test_load_config_missing_preset_file(tmp_path: Path) -> None:
         "drums/drums.milk", "drums/missing.milk"
     )
     cfg_path.write_text(text, encoding="utf-8")
-    with pytest.raises(FileNotFoundError, match="missing preset"):
-        load_config(project_root=project_dir)
+    cfg = load_config(project_root=project_dir)
+    assert not cfg.layers["layer_1"].preset.exists()
+    assert missing_preset_anchor_notification(cfg.layers) == (
+        "Missing preset anchor: layer_1"
+    )
+
+
+def test_missing_preset_anchor_notification_plural(tmp_path: Path) -> None:
+    from cleave.config import missing_preset_anchors
+
+    layers = {
+        "layer_1": LayerConfig(preset=tmp_path / "a.milk", stem="drums"),
+        "layer_2": LayerConfig(preset=tmp_path / "b.milk", stem="bass"),
+    }
+    assert missing_preset_anchors(layers) == [
+        ("layer_1", layers["layer_1"].preset),
+        ("layer_2", layers["layer_2"].preset),
+    ]
+    assert missing_preset_anchor_notification(layers) == (
+        "Missing preset anchors: layer_1, layer_2"
+    )
 
 
 def test_parse_timeline_defaults_enabled_true() -> None:
