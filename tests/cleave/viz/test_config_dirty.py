@@ -486,12 +486,6 @@ def _mutate_render_post_fx_expanded(controls: TuningControls) -> None:
     _expand_render_post_fx(controls)
 
 
-def _mutate_render_post_fx_solo(controls: TuningControls) -> None:
-    view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_POST_FX_HEADER)
-    controls.handle_keydown(_keydown(pygame.K_RIGHT, mod=pygame.KMOD_SHIFT))
-
-
 def _mutate_move_mode_without_confirm(controls: TuningControls) -> None:
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_2", RowKind.TRACK_HEADER))
@@ -566,7 +560,6 @@ _SESSION_ONLY_MUTATIONS: list[tuple[str, Callable[[TuningControls], None], tuple
     ("render_overlay.expanded", _mutate_render_overlay_expanded, ("layer_1",)),
     ("render_overlay.solo", _mutate_render_overlay_solo, ("layer_1",)),
     ("render_post_fx.expanded", _mutate_render_post_fx_expanded, ("layer_1",)),
-    ("render_post_fx.solo", _mutate_render_post_fx_solo, ("layer_1",)),
     ("move_mode.swap", _mutate_move_mode_without_confirm, ("layer_1", "layer_2")),
     ("help_visible", _mutate_help_visible, ("layer_1",)),
     ("settings.preview_quality", _mutate_settings_preview_quality, ("layer_1",)),

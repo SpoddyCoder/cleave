@@ -115,7 +115,7 @@ class TrackBlock:
     preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN
     preset_list: list[str] = field(default_factory=list)
     preset_list_labels: list[str] = field(default_factory=list)
-    preset_list_expanded: bool = False
+    preset_list_expanded: bool = True
     # Index into preset_list of the currently playing preset, when present.
     # Baked at structure build (signature includes auto_preset_path / playlist).
     active_preset_list_index: int | None = None
