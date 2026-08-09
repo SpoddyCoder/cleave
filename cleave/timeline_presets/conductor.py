@@ -257,7 +257,8 @@ class StemConductor:
         Near-silent phrases cast every active slot as bed. Otherwise drums with
         non-trivial activity become pulse; the highest-activity non-pulse slot
         is lead (solo states are always lead); remaining slots are bed. At most
-        one lead; accent is never assigned.
+        one lead. Accent is not assigned here; the accent post-pass writes
+        ``role="accent"`` at standard song markers.
         """
         if not active:
             return {}

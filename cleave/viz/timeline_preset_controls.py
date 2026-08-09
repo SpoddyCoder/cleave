@@ -22,6 +22,7 @@ from cleave.timeline_presets import (
 )
 from cleave.timeline_presets.characters import timeline_preset_kind_display
 from cleave.timeline_presets.conductor import timeline_preset_conductor_display
+from cleave.timeline_presets.accent import apply_accent
 from cleave.timeline_presets.crescendo import apply_crescendo
 from cleave.timeline_presets.cue_snap import timeline_preset_cue_snap_display
 from cleave.timeline_presets.density import (
@@ -191,6 +192,23 @@ class TimelinePresetController:
         if after_crescendo is not built:
             built = after_crescendo
             message = f"{message} (crescendo)"
+        if tl.timeline_preset_conductor and self._signals is not None:
+            after_accent = apply_accent(
+                built,
+                slots,
+                duration_sec=duration_sec,
+                bar_times=grid,
+                song_markers=markers,
+                signals=self._signals,
+                slot_stems={
+                    slot: self.session.layers[slot].stem for slot in slots
+                },
+                density_bias=density_bias_for(tl.timeline_preset_density),
+                rng=rng,
+            )
+            if after_accent is not built:
+                built = after_accent
+                message = f"{message} (accent)"
         built = {
             slot: copy_lane(built.get(slot, empty_lane())) for slot in slots
         }
