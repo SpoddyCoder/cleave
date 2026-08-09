@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import numpy as np
 import pytest
 
 pygame = pytest.importorskip("pygame")
@@ -18,8 +17,8 @@ from OpenGL.GL import (  # noqa: E402
 )
 
 from cleave.gl_compositor import GlCompositor  # noqa: E402
-from cleave.gl_masked_compositor import GlMaskedCompositor  # noqa: E402
-from cleave.pattern_mask import generate_soft_weights  # noqa: E402
+from cleave.gl_masked_compositor import GlMaskedCompositor, PatternMaskParams  # noqa: E402
+from cleave.pattern_mask import mask_generation_resolution  # noqa: E402
 
 W, H = 64, 32
 
@@ -61,19 +60,20 @@ def _read_content_pixel(
     return tuple(raw)
 
 
-def test_soft_composite_mixes_layers_by_weight(gl_context) -> None:
+def test_hard_composite_splits_layers_by_strips(gl_context) -> None:
     comp, masked = gl_context
     left = comp.create_layer_fbo("left", W, H, opacity=1.0, blend_mode="black-key")
     right = comp.create_layer_fbo("right", W, H, opacity=1.0, blend_mode="black-key")
     _fill_layer(left, (1.0, 0.0, 0.0))
     _fill_layer(right, (0.0, 0.0, 1.0))
 
-    # Left half fully left-layer; right half fully right-layer.
-    weights = np.zeros((H, W, 2), dtype=np.uint8)
-    weights[:, : W // 2, 0] = 255
-    weights[:, W // 2 :, 1] = 255
-
-    masked.composite_soft(comp.content_fbo_id, [left, right], weights)
+    masked.composite(
+        comp.content_fbo_id,
+        [left, right],
+        mask_type="strips",
+        mode="hard",
+        density=0.0,
+    )
 
     left_px = _read_content_pixel(comp, W // 4, H // 2)
     right_px = _read_content_pixel(comp, 3 * W // 4, H // 2)
@@ -88,9 +88,103 @@ def test_soft_composite_accepts_generated_strips_weights(gl_context) -> None:
     _fill_layer(a, (1.0, 1.0, 0.0))
     _fill_layer(b, (0.0, 1.0, 1.0))
 
-    weights = generate_soft_weights("strips", W, H, 2, density=0.0)
-    masked.composite_soft(comp.content_fbo_id, [a, b], weights)
+    masked.composite(
+        comp.content_fbo_id,
+        [a, b],
+        mask_type="strips",
+        mode="soft",
+        density=0.0,
+    )
 
     mid = _read_content_pixel(comp, W // 2, H // 2)
     # Soft strips with density 0 still light the frame (not all black).
     assert max(mid[:3]) > 20, f"mid={mid}"
+
+
+def test_soft_plasma_composite_does_not_crash(gl_context) -> None:
+    comp, masked = gl_context
+    a = comp.create_layer_fbo("a", W, H, opacity=1.0, blend_mode="black-key")
+    b = comp.create_layer_fbo("b", W, H, opacity=1.0, blend_mode="black-key")
+    _fill_layer(a, (1.0, 0.0, 0.0))
+    _fill_layer(b, (0.0, 0.0, 1.0))
+
+    masked.composite(
+        comp.content_fbo_id,
+        [a, b],
+        mask_type="plasma",
+        mode="soft",
+        density=0.5,
+        seed=7,
+    )
+
+    px = _read_content_pixel(comp, W // 2, H // 2)
+    assert max(px[:3]) > 10, f"plasma soft composite produced black frame: {px}"
+
+
+def test_plasma_hard_gpu_restores_full_viewport(gl_context) -> None:
+    comp, masked = gl_context
+    assert masked._ctx is not None
+    masked._ctx.viewport = (0, 0, W, H)
+    gen_w, gen_h = mask_generation_resolution(W, H)
+    params = PatternMaskParams(
+        mask_type="plasma",
+        mode="hard",
+        density=0.5,
+        invert=False,
+        seed=3,
+    )
+
+    masked._generate_plasma_hard_gpu(
+        gen_width=gen_w,
+        gen_height=gen_h,
+        layer_count=2,
+        params=params,
+    )
+
+    assert masked._ctx.viewport == (0, 0, W, H)
+
+
+def test_plasma_hard_composite_fills_content_frame(gl_context) -> None:
+    comp, masked = gl_context
+    left = comp.create_layer_fbo("left", W, H, opacity=1.0, blend_mode="black-key")
+    right = comp.create_layer_fbo("right", W, H, opacity=1.0, blend_mode="black-key")
+    _fill_layer(left, (1.0, 0.0, 0.0))
+    _fill_layer(right, (0.0, 0.0, 1.0))
+
+    masked.composite(
+        comp.content_fbo_id,
+        [left, right],
+        mask_type="plasma",
+        mode="hard",
+        density=0.5,
+        seed=5,
+    )
+
+    corner = _read_content_pixel(comp, W - 2, H - 2)
+    assert max(corner[:3]) > 10, f"plasma hard left content corner black: {corner}"
+
+
+def test_mask_cache_skips_regeneration(gl_context) -> None:
+    comp, masked = gl_context
+    layer = comp.create_layer_fbo("solo", W, H, opacity=1.0, blend_mode="black-key")
+    _fill_layer(layer, (1.0, 0.0, 0.0))
+
+    masked.composite(
+        comp.content_fbo_id,
+        [layer],
+        mask_type="strips",
+        mode="hard",
+        density=0.5,
+        seed=1,
+    )
+    first_key = masked._mask_cache_key
+
+    masked.composite(
+        comp.content_fbo_id,
+        [layer],
+        mask_type="strips",
+        mode="hard",
+        density=0.5,
+        seed=1,
+    )
+    assert masked._mask_cache_key is first_key
