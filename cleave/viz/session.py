@@ -372,7 +372,7 @@ class LayerRuntime:
     easter_egg: float = DEFAULT_EASTER_EGG
     preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN
     preset_list: list[str] = field(default_factory=list)  # absolute paths
-    preset_list_expanded: bool = False
+    preset_list_expanded: bool = True
     # Playing auto-switch preset (panel display); not persisted. Mirrored from
     # StemLayer.auto_preset_path while the live layer map is available.
     auto_preset_path: Path | None = None

@@ -755,7 +755,6 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
     RowKind.RENDER_POST_FX_HEADER: RowBehavior(
         RowAffordance.EXPAND,
         can_enable_disable=True,
-        can_solo=True,
         help_title="Post FX",
         help_description=(
             "Post-processing effects applied during final compositing.",

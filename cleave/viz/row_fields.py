@@ -1437,14 +1437,8 @@ def _apply_render_post_fx_header(
     desc: RowDescriptor,
     forward: bool,
     ctrl: bool,
-    shift: bool,
+    _shift: bool,
 ) -> None:
-    if shift:
-        if forward:
-            controls._render_post_fx.enter_solo()
-        else:
-            controls._render_post_fx.exit_solo()
-        return
     if ctrl:
         if (
             controls.session.render_post_fx.locked
