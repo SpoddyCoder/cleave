@@ -35,9 +35,9 @@ Layer-local wipe shaders (plasma, checkerboard, curtain, and similar) when a lay
 
 Never-repeat (or short cooldown) in shuffle/random rotation, plus a "previous preset" step for browsing. Small UX win for long live sessions and offline renders.
 
-## Pattern-mask dual blend
+## Pattern mask (stem territories)
 
-Spatial mask blends between two presets or layers (plasma, checker, radial), as a Cleave-native take on MilkDrop3 `.milk2` double-presets. Complements black-key / add; stronger with stem-driven layers than same-audio mashups.
+Spatial territories for the multi-layer stack (strips, radial, checker, plasma): where each stem-driven layer may own the frame, complementary to black-key / add. Not a MilkDrop3 `.milk2` dual-preset clone; see [pattern-mask.md](pattern-mask.md).
 
 ## Web / browser port
 

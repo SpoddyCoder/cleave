@@ -35,6 +35,7 @@ from cleave.viz.row_fields import (
 from cleave.extract import stem_overlay_header
 from cleave.viz.row_sections import (
     RENDER_OVERLAY_SECTION_KINDS,
+    RENDER_PATTERN_MASK_SECTION_KINDS,
     RENDER_POST_FX_SECTION_KINDS,
     RENDER_TIMELINE_SECTION_KINDS,
     expand_arrow_glyph,
@@ -419,6 +420,9 @@ def row_visibility_icon_key(
     if kind == RowKind.RENDER_POST_FX_HEADER:
         block = state.render_post_fx
         return (block.enabled, block.solo)
+    if kind == RowKind.RENDER_PATTERN_MASK_HEADER:
+        block = state.render_pattern_mask
+        return (block.enabled, False)
     if kind == RowKind.RENDER_TIMELINE_HEADER:
         return (state.render_timeline.enabled, False)
     return None
@@ -659,6 +663,7 @@ def _row_indent(state: TuningViewState, index: int) -> int:
         RowKind.TRACK_HEADER,
         RowKind.RENDER_OVERLAYS_HEADER,
         RowKind.RENDER_POST_FX_HEADER,
+        RowKind.RENDER_PATTERN_MASK_HEADER,
         RowKind.RENDER_TIMELINE_HEADER,
     }:
         return 0
@@ -749,6 +754,10 @@ def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]
 
     if kind in RENDER_POST_FX_SECTION_KINDS:
         if not state.render_post_fx.enabled:
+            return DISABLED
+
+    if kind in RENDER_PATTERN_MASK_SECTION_KINDS:
+        if not state.render_pattern_mask.enabled:
             return DISABLED
 
     if (
@@ -1365,10 +1374,15 @@ class TuningOverlay:
         indent = self._padding + _row_indent(state, index)
         if text_alpha >= 2:
             surf.set_alpha(text_alpha)
-            panel.blit(surf, (indent, y))
-            if time_surf is not None:
-                time_surf.set_alpha(text_alpha)
-                panel.blit(time_surf, (indent + surf.get_width(), y))
+            old_clip = panel.get_clip()
+            panel.set_clip(pygame.Rect(*row_rect))
+            try:
+                panel.blit(surf, (indent, y))
+                if time_surf is not None:
+                    time_surf.set_alpha(text_alpha)
+                    panel.blit(time_surf, (indent + surf.get_width(), y))
+            finally:
+                panel.set_clip(old_clip)
 
     def _draw_scrollbar(
         self,
@@ -1501,6 +1515,7 @@ class TuningOverlay:
         if kind in {
             RowKind.RENDER_OVERLAYS_HEADER,
             RowKind.RENDER_POST_FX_HEADER,
+            RowKind.RENDER_PATTERN_MASK_HEADER,
             RowKind.RENDER_TIMELINE_HEADER,
         }:
             desc = state.layout.descriptor(index)
@@ -1521,6 +1536,14 @@ class TuningOverlay:
                 prefix_surf = render_visibility_icon(
                     enabled=block_pp.enabled,
                     solo=block_pp.solo,
+                    line_height=line_h,
+                )
+            elif kind == RowKind.RENDER_PATTERN_MASK_HEADER:
+                block_pm = state.render_pattern_mask
+                header_locked = block_pm.locked
+                prefix_surf = render_visibility_icon(
+                    enabled=block_pm.enabled,
+                    solo=False,
                     line_height=line_h,
                 )
             else:

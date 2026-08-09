@@ -20,6 +20,7 @@ from cleave.user_config import persist_editor_settings
 from cleave.effects.runtime import EffectRuntime
 from cleave.gl_color_format import GlColorFormat, resolve_live_compositor_format
 from cleave.gl_compositor import GlCompositor
+from cleave.gl_masked_compositor import GlMaskedCompositor
 from cleave.gl_post_process import GlPostProcess
 from cleave.preset_playlist import PresetPlaylist
 from cleave.signals import Signals
@@ -89,6 +90,7 @@ class VisualizerCore:
     layers_by_slot: dict[str, StemLayer]
     compositor: GlCompositor
     post_process: GlPostProcess
+    masked_compositor: GlMaskedCompositor
     visual_limiter: VisualLimiterState = field(
         default_factory=VisualLimiterState, kw_only=True
     )
@@ -169,28 +171,43 @@ def _make_compositor(seed: VisualizerSeed) -> GlCompositor:
     return c
 
 
+def _make_masked_compositor(seed: VisualizerSeed) -> GlMaskedCompositor:
+    color_format = _compositor_color_format(seed)
+    c = GlMaskedCompositor(
+        seed.width,
+        seed.height,
+        color_format=color_format,
+    )
+    c.init()
+    return c
+
+
 def _init_compositor_and_post(
     seed: VisualizerSeed,
-) -> tuple[GlCompositor, GlPostProcess]:
+) -> tuple[GlCompositor, GlPostProcess, GlMaskedCompositor]:
     color_format = _compositor_color_format(seed)
     compositor = _make_compositor(seed)
     post_process = GlPostProcess(color_format=color_format)
     post_process.init()
-    return compositor, post_process
+    masked_compositor = _make_masked_compositor(seed)
+    return compositor, post_process, masked_compositor
 
 
-def init_gl_resources_cheap(seed: VisualizerSeed) -> tuple[GlCompositor, GlPostProcess, pygame.Surface]:
-    compositor, post_process = _init_compositor_and_post(seed)
+def init_gl_resources_cheap(
+    seed: VisualizerSeed,
+) -> tuple[GlCompositor, GlPostProcess, GlMaskedCompositor, pygame.Surface]:
+    compositor, post_process, masked_compositor = _init_compositor_and_post(seed)
     overlay_surface = pygame.Surface(
         (seed.display_width, seed.display_height), pygame.SRCALPHA
     )
-    return compositor, post_process, overlay_surface
+    return compositor, post_process, masked_compositor, overlay_surface
 
 
 def init_gl_resources_heavy(
     seed: VisualizerSeed,
     compositor: GlCompositor,
     post_process: GlPostProcess,
+    masked_compositor: GlMaskedCompositor,
     overlay_surface: pygame.Surface,
     on_progress: Callable[[str], None] | None = None,
 ) -> LiveVisualizerRuntime:
@@ -245,6 +262,7 @@ def init_gl_resources_heavy(
         layer_manager=layer_manager,
         compositor=compositor,
         post_process=post_process,
+        masked_compositor=masked_compositor,
     )
     timeline_controls = make_timeline_controls(
         session=seed.session,
@@ -270,6 +288,7 @@ def init_gl_resources_heavy(
         layers_by_slot=layers_by_slot,
         compositor=compositor,
         post_process=post_process,
+        masked_compositor=masked_compositor,
         controls=controls,
         timeline_controls=timeline_controls,
         modal_host=modal_host,
@@ -310,6 +329,12 @@ def init_gl_resources_render(
     compositor.init()
     post_process = GlPostProcess(color_format=color_format)
     post_process.init()
+    masked_compositor = GlMaskedCompositor(
+        seed.width,
+        seed.height,
+        color_format=color_format,
+    )
+    masked_compositor.init()
     layers, layers_by_slot = LayerFramePipeline.build(
         seed.cfg,
         compositor,
@@ -326,6 +351,7 @@ def init_gl_resources_render(
         layers_by_slot=layers_by_slot,
         compositor=compositor,
         post_process=post_process,
+        masked_compositor=masked_compositor,
     )
 
 
@@ -421,7 +447,10 @@ def tick_frame_core(
         )
 
         LayerFramePipeline.composite(
-            runtime.compositor, runtime.layers_by_slot, runtime.seed.session
+            runtime.compositor,
+            runtime.layers_by_slot,
+            runtime.seed.session,
+            masked_compositor=runtime.masked_compositor,
         )
     return was_paused
 
@@ -605,7 +634,9 @@ class VisualizerApp:
 
         rt: LiveVisualizerRuntime | None = None
         try:
-            compositor, post_process, overlay_surface = init_gl_resources_cheap(seed)
+            compositor, post_process, masked_compositor, overlay_surface = (
+                init_gl_resources_cheap(seed)
+            )
             draw_loading_screen(
                 compositor, "Loading...", seed.display_width, seed.display_height
             )
@@ -623,7 +654,12 @@ class VisualizerApp:
                 )
 
             rt = init_gl_resources_heavy(
-                seed, compositor, post_process, overlay_surface, on_progress=on_progress
+                seed,
+                compositor,
+                post_process,
+                masked_compositor,
+                overlay_surface,
+                on_progress=on_progress,
             )
             self._runtime = rt
             if quit_during_load:
@@ -696,6 +732,7 @@ class VisualizerApp:
                 LayerFramePipeline.destroy(rt.layers)
                 rt.compositor.destroy()
                 rt.post_process.destroy()
+                rt.masked_compositor.release()
                 rt.mix_player.stop()
                 cleanup_unreferenced_user_presets(rt.seed.project_dir)
             pygame.quit()

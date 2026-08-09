@@ -18,6 +18,7 @@ from cleave.milk_textures import sync_project_textures
 from cleave.effects.runtime import EffectRuntime
 from cleave.extract import STEM_NAMES, STEM_SOURCES
 from cleave.gl_compositor import GlCompositor
+from cleave.gl_masked_compositor import GlMaskedCompositor
 from cleave.gl_post_process import GlPostProcess
 from cleave.paths import repo_root
 from cleave.preset_playlist import PresetPlaylist, preset_browse_floor, scan_single_layer
@@ -182,6 +183,7 @@ def make_tuning_controls(
     layer_manager: LayerManager | None = None,
     compositor: GlCompositor | None = None,
     post_process: GlPostProcess | None = None,
+    masked_compositor: GlMaskedCompositor | None = None,
 ) -> TuningControls:
     def _effective_preset_switching(slot: str) -> str:
         if not preset_switching_active(session):
@@ -463,6 +465,7 @@ def make_tuning_controls(
         "layer_manager": layer_manager,
         "compositor": compositor,
         "post_process": post_process,
+        "masked_compositor": masked_compositor,
         "beat_times": beat_times,
         "bar_times": bar_times,
         "signals": signals,

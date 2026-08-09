@@ -513,6 +513,10 @@ def test_re_enable_without_expanding() -> None:
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_descriptor == _desc(view, render_post_fx_row)
 
+    render_pattern_mask_row = view.layout.find_by_kind(RowKind.RENDER_PATTERN_MASK_HEADER)
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_descriptor == _desc(view, render_pattern_mask_row)
+
     controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_descriptor == _desc(view, render_timeline_row)
 
@@ -1049,7 +1053,7 @@ def test_navigable_rows_without_overwrite() -> None:
     )
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is False
-    assert len(view.layout) == 18
+    assert len(view.layout) == 19
     assert RowDescriptor(RowKind.TIMELINE_PRESETS) not in view.layout.rows
 
     kinds = {view.layout.kind(i) for i in range(len(view.layout))}
@@ -1071,7 +1075,7 @@ def test_navigable_rows_with_overwrite() -> None:
     controls = _make_controls(("layer_1",))
     view = controls.build_view_state(paused=False)
     assert view.allow_overwrite is True
-    assert len(view.layout) == 18
+    assert len(view.layout) == 19
     assert RowDescriptor(RowKind.TIMELINE_PRESETS) not in view.layout.rows
 
     config_row = _config_header_row(view)
@@ -1652,6 +1656,7 @@ def test_timeline_presets_enter_opens_yes_cancel_modal() -> None:
         ModalLabeledLine("timeline cuts", "by marker"),
         ModalLabeledLine("re-populate preset lists", "no"),
         ModalLabeledLine("conductor", "on"),
+        ModalLabeledLine("pattern mask", "off"),
     )
 
 
@@ -3072,6 +3077,7 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
         RowKind.TIMELINE_PRESET_TIMELINE_CUTS,
         RowKind.TIMELINE_PRESET_REPOPULATE,
         RowKind.TIMELINE_PRESET_CONDUCTOR,
+        RowKind.TIMELINE_PRESET_PATTERN_MASK,
         RowKind.TIMELINE_PRESETS,
         RowKind.TIMELINE_RESET,
     ):

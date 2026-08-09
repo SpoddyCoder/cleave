@@ -69,6 +69,7 @@ def _minimal_runtime(compositor: MagicMock, *, upscale: float = 2.0) -> LiveVisu
         layers_by_slot={},
         compositor=compositor,
         post_process=MagicMock(),
+        masked_compositor=MagicMock(),
         controls=controls,
         timeline_controls=MagicMock(),
         modal_host=modal_host,
@@ -168,6 +169,7 @@ def _heavy_init_side_effect(
     seed: VisualizerSeed,
     compositor: MagicMock,
     post_process: MagicMock,
+    masked_compositor: MagicMock,
     overlay_surface: pygame.Surface,
     on_progress=None,
 ) -> LiveVisualizerRuntime:
@@ -190,6 +192,7 @@ def _heavy_init_side_effect(
         layers_by_slot={},
         compositor=compositor,
         post_process=post_process,
+        masked_compositor=masked_compositor,
         controls=controls,
         timeline_controls=timeline_controls,
         modal_host=modal_host,
@@ -222,18 +225,21 @@ def test_run_boot_order_audio_starts_after_first_frame(
     call_order: list[str] = []
     overlay_surface = pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA)
 
-    def cheap_side_effect(rt: VisualizerSeed) -> tuple[MagicMock, MagicMock, pygame.Surface]:
+    def cheap_side_effect(
+        rt: VisualizerSeed,
+    ) -> tuple[MagicMock, MagicMock, MagicMock, pygame.Surface]:
         call_order.append("init_cheap")
-        return compositor, MagicMock(), overlay_surface
+        return compositor, MagicMock(), MagicMock(), overlay_surface
 
     def heavy_with_start(
         rt: VisualizerSeed,
         comp: MagicMock,
         post: MagicMock,
+        masked: MagicMock,
         surface: pygame.Surface,
         on_progress=None,
     ) -> LiveVisualizerRuntime:
-        live = _heavy_init_side_effect(rt, comp, post, surface, on_progress)
+        live = _heavy_init_side_effect(rt, comp, post, masked, surface, on_progress)
         live.mix_player.start.side_effect = lambda: call_order.append("mix_start")
         return live
 
@@ -287,6 +293,7 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
     mock_init_cheap.side_effect = lambda rt: (
         compositor,
         MagicMock(),
+        MagicMock(),
         pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
     )
     controls = MagicMock()
@@ -300,10 +307,11 @@ def test_run_pygame_quit_clean_exits_via_try_quit(
         rt: VisualizerSeed,
         comp: MagicMock,
         post: MagicMock,
+        masked: MagicMock,
         surface: pygame.Surface,
         on_progress=None,
     ) -> LiveVisualizerRuntime:
-        live = _heavy_init_side_effect(rt, comp, post, surface, on_progress)
+        live = _heavy_init_side_effect(rt, comp, post, masked, surface, on_progress)
         live.controls = controls
         return live
 
@@ -345,6 +353,7 @@ def test_run_ctrl_q_clean_exits(
     mock_init_cheap.side_effect = lambda rt: (
         compositor,
         MagicMock(),
+        MagicMock(),
         pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
     )
     controls = MagicMock()
@@ -358,10 +367,11 @@ def test_run_ctrl_q_clean_exits(
         rt: VisualizerSeed,
         comp: MagicMock,
         post: MagicMock,
+        masked: MagicMock,
         surface: pygame.Surface,
         on_progress=None,
     ) -> LiveVisualizerRuntime:
-        live = _heavy_init_side_effect(rt, comp, post, surface, on_progress)
+        live = _heavy_init_side_effect(rt, comp, post, masked, surface, on_progress)
         live.controls = controls
         return live
 
@@ -403,6 +413,7 @@ def test_run_pygame_quit_dirty_stays_open(
     mock_init_cheap.side_effect = lambda rt: (
         compositor,
         MagicMock(),
+        MagicMock(),
         pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
     )
     controls = MagicMock()
@@ -416,10 +427,11 @@ def test_run_pygame_quit_dirty_stays_open(
         rt: VisualizerSeed,
         comp: MagicMock,
         post: MagicMock,
+        masked: MagicMock,
         surface: pygame.Surface,
         on_progress=None,
     ) -> LiveVisualizerRuntime:
-        live = _heavy_init_side_effect(rt, comp, post, surface, on_progress)
+        live = _heavy_init_side_effect(rt, comp, post, masked, surface, on_progress)
         live.controls = controls
         return live
 
@@ -465,6 +477,7 @@ def test_run_main_loop_stays_open_without_quit_event(
     mock_init_cheap.side_effect = lambda rt: (
         compositor,
         MagicMock(),
+        MagicMock(),
         pygame.Surface((seed.display_width, seed.display_height), pygame.SRCALPHA),
     )
     controls = MagicMock()
@@ -478,10 +491,11 @@ def test_run_main_loop_stays_open_without_quit_event(
         rt: VisualizerSeed,
         comp: MagicMock,
         post: MagicMock,
+        masked: MagicMock,
         surface: pygame.Surface,
         on_progress=None,
     ) -> LiveVisualizerRuntime:
-        live = _heavy_init_side_effect(rt, comp, post, surface, on_progress)
+        live = _heavy_init_side_effect(rt, comp, post, masked, surface, on_progress)
         live.controls = controls
         return live
 

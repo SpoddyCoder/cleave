@@ -1227,6 +1227,7 @@ def test_write_session_snapshot_persists_timeline_disabled_without_cues(
             "timeline_cuts": "by marker",
             "repopulate": "no",
             "conductor": False,
+            "pattern_mask": False,
         },
         "limiter": {
             "enabled": True,
@@ -1246,6 +1247,7 @@ def test_write_session_snapshot_round_trips_timeline_preset(tmp_path: Path) -> N
     session.timeline.timeline_preset_timeline_cuts = "all soft"
     session.timeline.timeline_preset_repopulate = "directory random"
     session.timeline.timeline_preset_conductor = True
+    session.timeline.timeline_preset_pattern_mask = True
     write_session_snapshot(out_path, cfg=cfg, session=session)
 
     data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
@@ -1257,6 +1259,7 @@ def test_write_session_snapshot_round_trips_timeline_preset(tmp_path: Path) -> N
         "timeline_cuts": "all soft",
         "repopulate": "directory random",
         "conductor": True,
+        "pattern_mask": True,
     }
 
     timeline = parse_timeline_section(
@@ -1282,6 +1285,7 @@ def test_write_session_snapshot_round_trips_timeline_preset(tmp_path: Path) -> N
     assert session2.timeline.timeline_preset_timeline_cuts == "all soft"
     assert session2.timeline.timeline_preset_repopulate == "directory random"
     assert session2.timeline.timeline_preset_conductor is True
+    assert session2.timeline.timeline_preset_pattern_mask is True
 
 
 def _round_trip_preset_dirs(root: Path) -> Path:

@@ -21,6 +21,7 @@ from cleave.timeline_presets.characters import (
     TIMELINE_PRESET_KIND_OPTIONS,
 )
 from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
+from cleave.pattern_mask import DEFAULT_TIMELINE_PRESET_PATTERN_MASK
 from cleave.timeline_presets.cue_snap import (
     DEFAULT_TIMELINE_PRESET_CUE_SNAP,
     TIMELINE_PRESET_CUE_SNAP_OPTIONS,
@@ -282,6 +283,18 @@ DEFAULT_RENDER_OVERLAY_BORDER_WIDTH = 4
 DEFAULT_RENDER_POST_FX_FADE_IN = 30.0
 DEFAULT_RENDER_POST_FX_FADE_OUT = 4.0
 
+# --- Render pattern mask defaults ---
+
+PatternMaskType = Literal["strips"]
+
+PATTERN_MASK_TYPES: tuple[PatternMaskType, ...] = ("strips",)
+
+DEFAULT_RENDER_PATTERN_MASK_ENABLED = False
+DEFAULT_RENDER_PATTERN_MASK_TYPE: PatternMaskType = "strips"
+DEFAULT_RENDER_PATTERN_MASK_DENSITY = 0.5
+DEFAULT_RENDER_PATTERN_MASK_INVERT = False
+DEFAULT_RENDER_PATTERN_MASK_LOCKED = False
+
 HighlightRolloffApplyMode = Literal["off", "per_layer", "composite"]
 
 HIGHLIGHT_ROLLOFF_APPLY_MODES: tuple[HighlightRolloffApplyMode, ...] = (
@@ -522,6 +535,12 @@ def parse_timeline_preset_conductor(raw: Any, label: str) -> bool:
     return raw
 
 
+def parse_timeline_preset_pattern_mask(raw: Any, label: str) -> bool:
+    if not isinstance(raw, bool):
+        raise ValueError(f"{label} must be true or false")
+    return raw
+
+
 FieldSource = Literal["cfg", "session", "both"]
 T = TypeVar("T")
 
@@ -603,6 +622,27 @@ def clamp_chroma_boost_amount_pct(value: int) -> int:
         CHROMA_BOOST_AMOUNT_PCT_MIN,
         min(CHROMA_BOOST_AMOUNT_PCT_MAX, int(value)),
     )
+
+
+PATTERN_MASK_DENSITY_STEP = 0.01
+PATTERN_MASK_DENSITY_STEP_LARGE = 0.1
+
+
+def clamp_pattern_mask_density(value: float) -> float:
+    return max(0.0, min(1.0, float(value)))
+
+
+def _parse_pattern_mask_type(
+    value: Any,
+    _ctx: ParseCtx,
+    label: str = "render.pattern_mask.type",
+) -> PatternMaskType:
+    if not isinstance(value, str):
+        raise ValueError(f"{label} must be a string")
+    if value not in PATTERN_MASK_TYPES:
+        allowed = ", ".join(f"'{item}'" for item in PATTERN_MASK_TYPES)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return value  # type: ignore[return-value]
 
 
 def _parse_chroma_boost_apply_mode(
@@ -1647,6 +1687,47 @@ RENDER_POST_FX_FIELDS: tuple[SchemaField, ...] = (
 )
 
 
+RENDER_PATTERN_MASK_FIELDS: tuple[SchemaField, ...] = (
+    FieldDescriptor(
+        "enabled",
+        DEFAULT_RENDER_PATTERN_MASK_ENABLED,
+        "session",
+        lambda raw, _ctx, _label: bool(raw),
+        _dump_scalar,
+    ),
+    FieldDescriptor(
+        "locked",
+        DEFAULT_RENDER_PATTERN_MASK_LOCKED,
+        "session",
+        lambda raw, _ctx, _label: bool(raw),
+        _dump_scalar,
+    ),
+    FieldDescriptor(
+        "type",
+        DEFAULT_RENDER_PATTERN_MASK_TYPE,
+        "session",
+        _parse_pattern_mask_type,
+        _dump_scalar,
+    ),
+    FieldDescriptor(
+        "density",
+        DEFAULT_RENDER_PATTERN_MASK_DENSITY,
+        "session",
+        lambda raw, _ctx, label: clamp_pattern_mask_density(
+            float(require_non_negative_number(raw, label))
+        ),
+        _dump_scalar,
+    ),
+    FieldDescriptor(
+        "invert",
+        DEFAULT_RENDER_PATTERN_MASK_INVERT,
+        "session",
+        lambda raw, _ctx, _label: bool(raw),
+        _dump_scalar,
+    ),
+)
+
+
 def _parse_field(
     parent: dict[str, Any],
     field: FieldDescriptor,
@@ -2136,6 +2217,22 @@ def _parse_render_post_fx_section(post_fx_map: dict[str, Any]) -> Any:
     return _build_render_post_fx_config(parsed)
 
 
+def _build_render_pattern_mask_config(parsed: dict[str, Any]) -> Any:
+    from cleave.config import RenderPatternMaskConfig
+
+    return RenderPatternMaskConfig(**parsed)
+
+
+def _parse_render_pattern_mask_section(pattern_mask_map: dict[str, Any]) -> Any:
+    parsed = _parse_overlay_fields(
+        pattern_mask_map,
+        RENDER_PATTERN_MASK_FIELDS,
+        ParseCtx(),
+        "render.pattern_mask",
+    )
+    return _build_render_pattern_mask_config(parsed)
+
+
 def parse_render_section(data: dict[str, Any]) -> Any | None:
     from cleave.config import RenderConfig
 
@@ -2151,6 +2248,7 @@ def parse_render_section(data: dict[str, Any]) -> Any | None:
     height = DEFAULT_RENDER_HEIGHT if height_raw is None else int(height_raw)
     overlays_raw = render_map.get("overlays")
     post_fx_raw = render_map.get("post_fx")
+    pattern_mask_raw = render_map.get("pattern_mask")
     overlays = (
         _parse_render_overlays_section(as_mapping(overlays_raw, "render.overlays"))
         if overlays_raw is not None
@@ -2159,6 +2257,13 @@ def parse_render_section(data: dict[str, Any]) -> Any | None:
     post_fx = (
         _parse_render_post_fx_section(as_mapping(post_fx_raw, "render.post_fx"))
         if post_fx_raw is not None
+        else None
+    )
+    pattern_mask = (
+        _parse_render_pattern_mask_section(
+            as_mapping(pattern_mask_raw, "render.pattern_mask")
+        )
+        if pattern_mask_raw is not None
         else None
     )
     hdr_raw = render_map.get("hdr_compositing")
@@ -2172,6 +2277,7 @@ def parse_render_section(data: dict[str, Any]) -> Any | None:
         hdr_compositing=hdr_compositing,
         overlays=overlays,
         post_fx=post_fx,
+        pattern_mask=pattern_mask,
     )
 
 
@@ -2249,6 +2355,7 @@ def _overlays_persist_values(ctx: PersistCtx) -> dict[str, Any]:
 
 def persist_render(ctx: PersistCtx) -> dict[str, Any]:
     runtime_pp = ctx.session.render_post_fx
+    runtime_pm = ctx.session.render_pattern_mask
     overlays = _dump_overlay_fields(
         RENDER_OVERLAYS_FIELDS,
         _overlays_persist_values(ctx),
@@ -2275,6 +2382,16 @@ def persist_render(ctx: PersistCtx) -> dict[str, Any]:
         },
     }
     post_fx = _dump_overlay_fields(RENDER_POST_FX_FIELDS, post_fx_values, ctx)
+    pattern_mask_values = {
+        "enabled": runtime_pm.enabled,
+        "locked": runtime_pm.locked,
+        "type": runtime_pm.type,
+        "density": runtime_pm.density,
+        "invert": runtime_pm.invert,
+    }
+    pattern_mask = _dump_overlay_fields(
+        RENDER_PATTERN_MASK_FIELDS, pattern_mask_values, ctx
+    )
     from cleave.config import render_fps, render_hdr_compositing, render_output_size
 
     width, height = render_output_size(ctx.cfg)
@@ -2285,6 +2402,7 @@ def persist_render(ctx: PersistCtx) -> dict[str, Any]:
         "hdr_compositing": render_hdr_compositing(ctx.cfg),
         "overlays": overlays,
         "post_fx": post_fx,
+        "pattern_mask": pattern_mask,
     }
 
 
@@ -2350,6 +2468,10 @@ def _parse_timeline_preset(raw: Any) -> Any:
         conductor=parse_timeline_preset_conductor(
             preset_map.get("conductor", DEFAULT_TIMELINE_PRESET_CONDUCTOR),
             "timeline.preset.conductor",
+        ),
+        pattern_mask=parse_timeline_preset_pattern_mask(
+            preset_map.get("pattern_mask", DEFAULT_TIMELINE_PRESET_PATTERN_MASK),
+            "timeline.preset.pattern_mask",
         ),
     )
 
@@ -2544,6 +2666,7 @@ def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
             "timeline_cuts": runtime.timeline_preset_timeline_cuts,
             "repopulate": runtime.timeline_preset_repopulate,
             "conductor": runtime.timeline_preset_conductor,
+            "pattern_mask": runtime.timeline_preset_pattern_mask,
         },
         "limiter": _persist_timeline_limiter(runtime.limiter),
     }
@@ -2672,6 +2795,17 @@ def default_render_post_fx_runtime_values() -> dict[str, Any]:
         "highlight_rolloff_expanded": False,
         "chroma_boost": default_chroma_boost_runtime_values(),
         "chroma_boost_expanded": False,
+    }
+
+
+def default_render_pattern_mask_runtime_values() -> dict[str, Any]:
+    return {
+        "enabled": DEFAULT_RENDER_PATTERN_MASK_ENABLED,
+        "expanded": False,
+        "type": DEFAULT_RENDER_PATTERN_MASK_TYPE,
+        "density": DEFAULT_RENDER_PATTERN_MASK_DENSITY,
+        "invert": DEFAULT_RENDER_PATTERN_MASK_INVERT,
+        "locked": DEFAULT_RENDER_PATTERN_MASK_LOCKED,
     }
 
 

@@ -96,6 +96,7 @@ from cleave.config_schema import (
     ChromaBoostVariant,
     HighlightRolloffApplyMode,
     HighlightRolloffCurve,
+    PatternMaskType,
     RenderOverlayAnimationType,
     RenderOverlayPosition,
     RenderOverlaySlideDirection,
@@ -112,6 +113,7 @@ from cleave.config_schema import (
     require_non_negative_number,
 )
 from cleave.timeline import TimelineLane
+from cleave.pattern_mask import DEFAULT_TIMELINE_PRESET_PATTERN_MASK
 from cleave.timeline_presets.characters import DEFAULT_TIMELINE_PRESET_KIND
 from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
 from cleave.timeline_presets.cue_snap import (
@@ -274,6 +276,15 @@ class RenderPostFxConfig:
 
 
 @dataclass(frozen=True)
+class RenderPatternMaskConfig:
+    enabled: bool
+    type: PatternMaskType
+    density: float
+    invert: bool
+    locked: bool = False
+
+
+@dataclass(frozen=True)
 class RenderConfig:
     fps: int = DEFAULT_RENDER_FPS
     width: int = DEFAULT_RENDER_WIDTH
@@ -281,6 +292,7 @@ class RenderConfig:
     hdr_compositing: bool = DEFAULT_HDR_COMPOSITING
     overlays: RenderOverlaysConfig | None = None
     post_fx: RenderPostFxConfig | None = None
+    pattern_mask: RenderPatternMaskConfig | None = None
 
 
 @dataclass(frozen=True)
@@ -310,6 +322,7 @@ class TimelinePresetConfig:
     timeline_cuts: TimelinePresetTimelineCuts = DEFAULT_TIMELINE_PRESET_TIMELINE_CUTS
     repopulate: TimelinePresetRepopulate = DEFAULT_TIMELINE_PRESET_REPOPULATE
     conductor: bool = DEFAULT_TIMELINE_PRESET_CONDUCTOR
+    pattern_mask: bool = DEFAULT_TIMELINE_PRESET_PATTERN_MASK
 
 
 @dataclass(frozen=True)

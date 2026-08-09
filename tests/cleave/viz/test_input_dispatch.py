@@ -82,6 +82,7 @@ def _make_runtime(
         layers_by_slot={},
         compositor=compositor,
         post_process=MagicMock(),
+        masked_compositor=MagicMock(),
         overlay=TuningOverlay(),
         help_overlay=MagicMock(),
         timeline_overlay=MagicMock(),
