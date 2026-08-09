@@ -1,8 +1,11 @@
-"""Shader-based hard-mode masked layer composite via moderngl (texture array).
+"""Shader-based masked layer composite via moderngl (hard and soft modes).
 
 Hard mode against a cleared black background: only one layer wins per pixel, so
 per-layer blend modes (black-key, add, etc.) collapse to writing the winning
-layer colour scaled by opacity. Soft mode will need full blend algebra later.
+layer colour scaled by opacity.
+
+Soft mode draws one pass per layer: spatial weights modulate opacity before the
+layer's existing GL blend mode (same channel mapping as GlCompositor).
 """
 
 from __future__ import annotations
@@ -13,7 +16,7 @@ import moderngl
 import numpy as np
 from cleave.config_schema import MAX_LAYER_COUNT
 from cleave.gl_color_format import RGBA8, GlColorFormat
-from cleave.gl_compositor import LayerFbo
+from cleave.gl_compositor import GlCompositor, LayerFbo
 from OpenGL.GL import (
     GL_ACTIVE_TEXTURE,
     GL_BLEND,
@@ -61,7 +64,7 @@ except ImportError:  # pragma: no cover - PyOpenGL without VAO entry points
     GL_VERTEX_ARRAY_BINDING = None  # type: ignore[misc, assignment]
     glBindVertexArray = None  # type: ignore[misc, assignment]
 
-from cleave.pattern_mask import upload_mask_r8_texture
+from cleave.pattern_mask import upload_mask_r8_texture, upload_mask_weight_textures
 
 _QUAD_VERT = """
 #version 330
@@ -84,7 +87,7 @@ in vec2 uv;
 out vec4 fragColor;
 
 void main() {
-    float r = texture(mask, vec2(uv.x, 0.5)).r;
+    float r = texture(mask, uv).r;
     int idx = int(r * 255.0 + 0.5);
     idx = clamp(idx, 0, max(layer_count - 1, 0));
     vec4 color = texture(layers, vec3(uv, float(idx)));
@@ -94,12 +97,43 @@ void main() {
 }
 """
 
+_SOFT_FRAG = """
+#version 330
+uniform sampler2D layer_tex;
+uniform sampler2D weight_tex;
+uniform float layer_opacity;
+uniform int opacity_in_alpha;
+in vec2 uv;
+out vec4 fragColor;
+
+void main() {
+    vec4 color = texture(layer_tex, uv);
+    float w = texture(weight_tex, uv).r;
+    float op = layer_opacity * w;
+    if (opacity_in_alpha != 0) {
+        // Match GlCompositor add mode: opacity lives in fragment alpha.
+        fragColor = vec4(color.rgb, op);
+    } else {
+        // Black-key and other SRC_COLOR-weighted modes bake opacity into RGB.
+        fragColor = vec4(color.rgb * op, 1.0);
+    }
+}
+"""
+
 
 def _ensure_moderngl_draw_state() -> None:
     """Leave fixed-function GL state compatible with moderngl fullscreen draws."""
     glColorMask(True, True, True, True)
     glDisable(GL_SCISSOR_TEST)
     glDisable(GL_BLEND)
+    glDisable(GL_DEPTH_TEST)
+
+
+def _ensure_soft_draw_state() -> None:
+    """Soft multi-pass draws need blend enabled; blend func is set per layer."""
+    glColorMask(True, True, True, True)
+    glDisable(GL_SCISSOR_TEST)
+    glEnable(GL_BLEND)
     glDisable(GL_DEPTH_TEST)
 
 
@@ -215,7 +249,7 @@ def _prepare_fixed_function_gl() -> None:
 
 
 class GlMaskedCompositor:
-    """Hard-mode pattern-mask composite into an existing content FBO."""
+    """Pattern-mask composite into an existing content FBO (hard and soft)."""
 
     def __init__(
         self,
@@ -229,13 +263,22 @@ class GlMaskedCompositor:
         self._ctx: moderngl.Context | None = None
         self._quad_buffer: moderngl.Buffer | None = None
         self._quad_vao: moderngl.VertexArray | None = None
+        self._soft_quad_vao: moderngl.VertexArray | None = None
         self._masked_prog: moderngl.Program | None = None
+        self._soft_prog: moderngl.Program | None = None
         self._layer_array_id: int = 0
         self._layer_array_mgl: moderngl.TextureArray | None = None
         self._mask_texture_id: int = 0
         self._mask_width: int = 0
+        self._mask_height: int = 0
         self._mask_owned: bool = False
         self._mask_mgl: moderngl.Texture | None = None
+        self._weight_texture_ids: list[int] = []
+        self._weight_width: int = 0
+        self._weight_height: int = 0
+        self._weight_layer_count: int = 0
+        self._weight_mgl: list[moderngl.Texture] = []
+        self._layer_tex_mgl: dict[int, moderngl.Texture] = {}
         self._dest_fbos: dict[int, moderngl.Framebuffer] = {}
         self._bg: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
 
@@ -248,6 +291,7 @@ class GlMaskedCompositor:
             return
         self._color_format = color_format
         self._release_layer_array()
+        self._release_layer_tex_cache()
 
     def set_content_size(self, width: int, height: int) -> None:
         width = int(width)
@@ -257,6 +301,8 @@ class GlMaskedCompositor:
         self.content_width = width
         self.content_height = height
         self._release_layer_array()
+        self._release_layer_tex_cache()
+        self._release_weight_textures()
 
     def init(self) -> None:
         """Attach to the current pygame OpenGL context."""
@@ -264,6 +310,10 @@ class GlMaskedCompositor:
         self._masked_prog = self._ctx.program(
             vertex_shader=_QUAD_VERT,
             fragment_shader=_MASKED_FRAG,
+        )
+        self._soft_prog = self._ctx.program(
+            vertex_shader=_QUAD_VERT,
+            fragment_shader=_SOFT_FRAG,
         )
         # Binary float32 quad: (x, y, u, v) per vertex covering NDC [-1,1] x [-1,1].
         self._quad_buffer = self._ctx.buffer(
@@ -281,6 +331,10 @@ class GlMaskedCompositor:
             self._masked_prog,
             [(self._quad_buffer, "2f 2f", "in_vert", "in_uv")],
         )
+        self._soft_quad_vao = self._ctx.vertex_array(
+            self._soft_prog,
+            [(self._quad_buffer, "2f 2f", "in_vert", "in_uv")],
+        )
         self._ensure_layer_array()
 
     def _ensure_init(self) -> None:
@@ -294,6 +348,11 @@ class GlMaskedCompositor:
         if self._layer_array_id:
             # Owned by moderngl when wrapped; only delete if we created via PyOpenGL.
             self._layer_array_id = 0
+
+    def _release_layer_tex_cache(self) -> None:
+        for tex in self._layer_tex_mgl.values():
+            tex.release()
+        self._layer_tex_mgl.clear()
 
     def _ensure_layer_array(self) -> None:
         self._ensure_init()
@@ -330,15 +389,50 @@ class GlMaskedCompositor:
             glDeleteTextures(1, [self._mask_texture_id])
         self._mask_texture_id = 0
         self._mask_width = 0
+        self._mask_height = 0
         self._mask_owned = False
 
-    def _ensure_mask_texture(self, width: int) -> None:
-        if self._mask_owned and self._mask_texture_id and self._mask_width == width:
+    def _release_weight_textures(self) -> None:
+        for tex in self._weight_mgl:
+            tex.release()
+        self._weight_mgl.clear()
+        if self._weight_texture_ids:
+            glDeleteTextures(len(self._weight_texture_ids), self._weight_texture_ids)
+        self._weight_texture_ids = []
+        self._weight_width = 0
+        self._weight_height = 0
+        self._weight_layer_count = 0
+
+    def _ensure_mask_texture(self, width: int, height: int) -> None:
+        if (
+            self._mask_owned
+            and self._mask_texture_id
+            and self._mask_width == width
+            and self._mask_height == height
+        ):
             return
         self._release_mask_texture()
-        self._mask_texture_id = upload_mask_r8_texture(np.zeros(width, dtype=np.uint8))
+        self._mask_texture_id = upload_mask_r8_texture(
+            np.zeros((height, width), dtype=np.uint8)
+        )
         self._mask_width = width
+        self._mask_height = height
         self._mask_owned = True
+
+    def _ensure_weight_textures(self, width: int, height: int, layer_count: int) -> None:
+        if (
+            self._weight_texture_ids
+            and self._weight_width == width
+            and self._weight_height == height
+            and self._weight_layer_count == layer_count
+        ):
+            return
+        self._release_weight_textures()
+        zeros = np.zeros((height, width, layer_count), dtype=np.uint8)
+        self._weight_texture_ids = upload_mask_weight_textures(zeros)
+        self._weight_width = width
+        self._weight_height = height
+        self._weight_layer_count = layer_count
 
     def _bind_mask_mgl(self) -> moderngl.Texture:
         self._ensure_init()
@@ -349,7 +443,7 @@ class GlMaskedCompositor:
             self._mask_mgl.release()
         tex = self._ctx.external_texture(
             self._mask_texture_id,
-            (self._mask_width, 1),
+            (self._mask_width, self._mask_height),
             1,
             0,
             "f1",
@@ -358,6 +452,57 @@ class GlMaskedCompositor:
         tex.repeat_x = False
         tex.repeat_y = False
         self._mask_mgl = tex
+        return tex
+
+    def _bind_weight_mgl(self, index: int) -> moderngl.Texture:
+        self._ensure_init()
+        assert self._ctx is not None
+        texture_id = self._weight_texture_ids[index]
+        if index < len(self._weight_mgl):
+            cached = self._weight_mgl[index]
+            if cached.glo == texture_id:
+                return cached
+            cached.release()
+            self._weight_mgl[index] = self._make_weight_mgl(texture_id)
+            return self._weight_mgl[index]
+        while len(self._weight_mgl) < index:
+            # Should not happen if ensure matched layer_count; keep list aligned.
+            self._weight_mgl.append(self._make_weight_mgl(self._weight_texture_ids[len(self._weight_mgl)]))
+        self._weight_mgl.append(self._make_weight_mgl(texture_id))
+        return self._weight_mgl[index]
+
+    def _make_weight_mgl(self, texture_id: int) -> moderngl.Texture:
+        assert self._ctx is not None
+        tex = self._ctx.external_texture(
+            texture_id,
+            (self._weight_width, self._weight_height),
+            1,
+            0,
+            "f1",
+        )
+        tex.filter = (moderngl.NEAREST, moderngl.NEAREST)
+        tex.repeat_x = False
+        tex.repeat_y = False
+        return tex
+
+    def _bind_layer_tex_mgl(self, layer: LayerFbo) -> moderngl.Texture:
+        self._ensure_init()
+        assert self._ctx is not None
+        cached = self._layer_tex_mgl.get(layer.texture_id)
+        if cached is not None:
+            return cached
+        dtype = self._color_format.moderngl_external_dtype
+        tex = self._ctx.external_texture(
+            layer.texture_id,
+            (layer.width, layer.height),
+            4,
+            0,
+            dtype,
+        )
+        tex.filter = (moderngl.LINEAR, moderngl.LINEAR)
+        tex.repeat_x = False
+        tex.repeat_y = False
+        self._layer_tex_mgl[layer.texture_id] = tex
         return tex
 
     def _copy_layers_into_array(self, layers: list[LayerFbo]) -> list[float]:
@@ -402,8 +547,8 @@ class GlMaskedCompositor:
     ) -> None:
         """Clear *content_fbo_id* and composite *layers* through a hard mask.
 
-        *mask* is either a 1D uint8 region-index array (length = content width) or
-        an existing GL texture id (R8, width x 1, NEAREST).
+        *mask* is either a 2D uint8 region-index array (H x W, matching content
+        size) or an existing GL texture id (R8, width x height, NEAREST).
         """
         self._ensure_init()
         assert self._ctx is not None
@@ -423,13 +568,17 @@ class GlMaskedCompositor:
                 return
 
             if isinstance(mask, np.ndarray):
-                if mask.ndim != 1 or mask.dtype != np.uint8:
-                    raise ValueError("mask array must be 1D uint8")
-                if int(mask.shape[0]) != self.content_width:
+                if mask.ndim != 2 or mask.dtype != np.uint8:
+                    raise ValueError("mask array must be 2D uint8")
+                if (
+                    int(mask.shape[0]) != self.content_height
+                    or int(mask.shape[1]) != self.content_width
+                ):
                     raise ValueError(
-                        f"mask width {mask.shape[0]} != content width {self.content_width}"
+                        f"mask shape {mask.shape} != "
+                        f"({self.content_height}, {self.content_width})"
                     )
-                self._ensure_mask_texture(self.content_width)
+                self._ensure_mask_texture(self.content_width, self.content_height)
                 upload_mask_r8_texture(mask, texture_id=self._mask_texture_id)
                 mask_tex_id = self._mask_texture_id
             else:
@@ -440,6 +589,7 @@ class GlMaskedCompositor:
                     self._release_mask_texture()
                     self._mask_texture_id = mask_tex_id
                     self._mask_width = self.content_width
+                    self._mask_height = self.content_height
                     self._mask_owned = False
 
             opacities = self._copy_layers_into_array(active)
@@ -461,17 +611,98 @@ class GlMaskedCompositor:
             _restore_gl_state(saved)
             _prepare_fixed_function_gl()
 
+    def composite_soft(
+        self,
+        content_fbo_id: int,
+        layers: list[LayerFbo],
+        weights: np.ndarray,
+    ) -> None:
+        """Clear *content_fbo_id* and composite *layers* with soft weight textures.
+
+        *weights* is (H, W, N) uint8 with N equal to the number of enabled layers
+        that have opacity > 0. Per-pixel weights should sum to approximately 255.
+        Each layer is drawn in its own pass with weight-modulated opacity and the
+        layer's existing GL blend mode.
+        """
+        self._ensure_init()
+        assert self._ctx is not None
+        assert self._soft_prog is not None
+        assert self._soft_quad_vao is not None
+
+        active = [layer for layer in layers if layer.enabled and layer.opacity > 0.0]
+        layer_count = len(active)
+        saved = _save_gl_state()
+        try:
+            glBindFramebuffer(GL_FRAMEBUFFER, content_fbo_id)
+            glViewport(0, 0, self.content_width, self.content_height)
+            glClearColor(*self._bg)
+            glClear(GL_COLOR_BUFFER_BIT)
+
+            if layer_count <= 0:
+                return
+
+            if weights.ndim != 3 or weights.dtype != np.uint8:
+                raise ValueError("weights must be a 3D uint8 array (H, W, N)")
+            if (
+                int(weights.shape[0]) != self.content_height
+                or int(weights.shape[1]) != self.content_width
+                or int(weights.shape[2]) != layer_count
+            ):
+                raise ValueError(
+                    f"weights shape {weights.shape} != "
+                    f"({self.content_height}, {self.content_width}, {layer_count})"
+                )
+
+            self._ensure_weight_textures(
+                self.content_width, self.content_height, layer_count
+            )
+            upload_mask_weight_textures(
+                weights, texture_ids=self._weight_texture_ids
+            )
+            for tex in self._weight_mgl:
+                tex.release()
+            self._weight_mgl = []
+
+            dest = self._dest_fbo_for(content_fbo_id)
+            _ensure_soft_draw_state()
+            dest.use()
+            self._soft_prog["layer_tex"].value = 0
+            self._soft_prog["weight_tex"].value = 1
+
+            for index, layer in enumerate(active):
+                GlCompositor._apply_layer_blend_mode(layer.blend_mode)
+                layer_tex = self._bind_layer_tex_mgl(layer)
+                weight_tex = self._bind_weight_mgl(index)
+                layer_tex.use(0)
+                weight_tex.use(1)
+                self._soft_prog["layer_opacity"].value = float(layer.opacity)
+                self._soft_prog["opacity_in_alpha"].value = (
+                    1 if layer.blend_mode == "add" else 0
+                )
+                self._soft_quad_vao.render(moderngl.TRIANGLE_STRIP)
+        finally:
+            _restore_gl_state(saved)
+            _prepare_fixed_function_gl()
+
     def release(self) -> None:
         # detect_framebuffer wraps are references; do not GL-delete them.
         self._dest_fbos.clear()
         self._release_mask_texture()
+        self._release_weight_textures()
+        self._release_layer_tex_cache()
         self._release_layer_array()
+        if self._soft_quad_vao is not None:
+            self._soft_quad_vao.release()
+            self._soft_quad_vao = None
         if self._quad_vao is not None:
             self._quad_vao.release()
             self._quad_vao = None
         if self._quad_buffer is not None:
             self._quad_buffer.release()
             self._quad_buffer = None
+        if self._soft_prog is not None:
+            self._soft_prog.release()
+            self._soft_prog = None
         if self._masked_prog is not None:
             self._masked_prog.release()
             self._masked_prog = None

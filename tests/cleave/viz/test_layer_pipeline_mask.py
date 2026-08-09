@@ -55,8 +55,11 @@ def _session(slots: tuple[str, ...]) -> TuningSession:
 def test_composite_uses_masked_path_when_enabled() -> None:
     session = _session(("layer_1", "layer_2"))
     session.render_pattern_mask.enabled = True
+    session.render_pattern_mask.mode = "hard"
+    session.render_pattern_mask.type = "radial"
     session.render_pattern_mask.density = 0.25
     session.render_pattern_mask.invert = True
+    session.render_pattern_mask.seed = 11
     layers_by_slot = {
         "layer_1": _stem_layer("layer_1"),
         "layer_2": _stem_layer("layer_2"),
@@ -69,8 +72,8 @@ def test_composite_uses_masked_path_when_enabled() -> None:
     masked = MagicMock()
 
     with patch(
-        "cleave.viz.layer_pipeline.generate_strips_mask",
-        return_value=np.zeros(1280, dtype=np.uint8),
+        "cleave.viz.layer_pipeline.generate_hard_mask",
+        return_value=np.zeros((720, 1280), dtype=np.uint8),
     ) as gen:
         LayerFramePipeline.composite(
             compositor,
@@ -81,12 +84,60 @@ def test_composite_uses_masked_path_when_enabled() -> None:
 
     compositor.composite.assert_not_called()
     gen.assert_called_once()
-    assert gen.call_args.args[0] == 1280
-    assert gen.call_args.args[1] == 2
+    assert gen.call_args.args[0] == "radial"
+    assert gen.call_args.args[1] == 1280
+    assert gen.call_args.args[2] == 720
+    assert gen.call_args.args[3] == 2
     assert gen.call_args.kwargs["density"] == 0.25
     assert gen.call_args.kwargs["invert"] is True
+    assert gen.call_args.kwargs["seed"] == 11
     masked.composite_masked.assert_called_once()
     assert masked.composite_masked.call_args.args[0] == 7
+    masked.composite_soft.assert_not_called()
+
+
+def test_composite_uses_soft_path_when_mode_soft() -> None:
+    session = _session(("layer_1", "layer_2"))
+    session.render_pattern_mask.enabled = True
+    session.render_pattern_mask.mode = "soft"
+    session.render_pattern_mask.type = "plasma"
+    session.render_pattern_mask.density = 0.5
+    session.render_pattern_mask.invert = False
+    session.render_pattern_mask.seed = 42
+    layers_by_slot = {
+        "layer_1": _stem_layer("layer_1"),
+        "layer_2": _stem_layer("layer_2"),
+    }
+    compositor = MagicMock()
+    compositor.content_width = 64
+    compositor.content_height = 48
+    compositor.content_fbo_id = 9
+    compositor.color_format = object()
+    masked = MagicMock()
+    weights = np.zeros((48, 64, 2), dtype=np.uint8)
+
+    with patch(
+        "cleave.viz.layer_pipeline.generate_soft_weights",
+        return_value=weights,
+    ) as gen, patch(
+        "cleave.viz.layer_pipeline.generate_hard_mask",
+    ) as hard:
+        LayerFramePipeline.composite(
+            compositor,
+            layers_by_slot,
+            session,
+            masked_compositor=masked,
+        )
+
+    compositor.composite.assert_not_called()
+    hard.assert_not_called()
+    gen.assert_called_once()
+    assert gen.call_args.args[0] == "plasma"
+    assert gen.call_args.kwargs["seed"] == 42
+    masked.composite_soft.assert_called_once()
+    assert masked.composite_soft.call_args.args[0] == 9
+    assert masked.composite_soft.call_args.args[2] is weights
+    masked.composite_masked.assert_not_called()
 
 
 def test_composite_uses_fixed_path_when_disabled() -> None:
@@ -122,7 +173,7 @@ def test_composite_enabled_false_skips_mask_even_with_compositor() -> None:
     compositor = MagicMock()
     masked = MagicMock()
 
-    with patch("cleave.viz.layer_pipeline.generate_strips_mask") as gen:
+    with patch("cleave.viz.layer_pipeline.generate_hard_mask") as gen:
         LayerFramePipeline.composite(
             compositor,
             layers_by_slot,
@@ -143,7 +194,7 @@ def test_composite_skips_mask_in_preset_curation_mode() -> None:
     compositor = MagicMock()
     masked = MagicMock()
 
-    with patch("cleave.viz.layer_pipeline.generate_strips_mask") as gen:
+    with patch("cleave.viz.layer_pipeline.generate_hard_mask") as gen:
         LayerFramePipeline.composite(
             compositor,
             layers_by_slot,

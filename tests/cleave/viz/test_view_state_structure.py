@@ -735,6 +735,41 @@ def test_structure_signature_invalidates_on_pattern_mask_expanded() -> None:
     assert sig_before != sig_after
 
 
+def test_structure_signature_invalidates_on_pattern_mask_type() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.render_pattern_mask.type = "strips"
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.render_pattern_mask.type = "plasma"
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_pattern_mask_seed_row_only_for_plasma() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    session.render_pattern_mask.expanded = True
+    session.render_pattern_mask.type = "strips"
+    builder = controls._view_state
+
+    view_strips = builder.build(paused=False)
+    seed = RowDescriptor(RowKind.RENDER_PATTERN_MASK_SEED)
+    mode = RowDescriptor(RowKind.RENDER_PATTERN_MASK_MODE)
+    assert mode in view_strips.layout.rows
+    assert seed not in view_strips.layout.rows
+
+    session.render_pattern_mask.type = "plasma"
+    view_plasma = builder.build(paused=False)
+    assert view_plasma.layout is not view_strips.layout
+    assert seed in view_plasma.layout.rows
+    assert mode in view_plasma.layout.rows
+
+
 def test_structure_signature_invalidates_on_hard_cut_fades_enabled() -> None:
     controls = _make_controls(("layer_1",))
     session = controls.session

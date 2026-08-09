@@ -48,6 +48,7 @@ from cleave.config_schema import (
     default_chroma_boost_runtime_values,
     default_render_post_fx_runtime_values,
     default_render_pattern_mask_runtime_values,
+    PatternMaskMode,
     PatternMaskType,
 )
 from cleave.extract import StemSource
@@ -238,8 +239,10 @@ class RenderPatternMaskRuntime:
     enabled: bool
     expanded: bool
     type: PatternMaskType
+    mode: PatternMaskMode
     density: float
     invert: bool
+    seed: int
     locked: bool = False
 
 
@@ -516,8 +519,10 @@ def render_pattern_mask_runtime_from_cfg(
             enabled=pattern_mask.enabled,
             locked=pattern_mask.locked,
             type=pattern_mask.type,
+            mode=pattern_mask.mode,
             density=pattern_mask.density,
             invert=pattern_mask.invert,
+            seed=pattern_mask.seed,
         )
     return default_render_pattern_mask_runtime()
 

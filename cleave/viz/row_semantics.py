@@ -101,8 +101,10 @@ class RowKind(Enum):
     RENDER_POST_FX_CHROMA_BOOST_AMOUNT = auto()
     RENDER_PATTERN_MASK_HEADER = auto()
     RENDER_PATTERN_MASK_TYPE = auto()
+    RENDER_PATTERN_MASK_MODE = auto()
     RENDER_PATTERN_MASK_DENSITY = auto()
     RENDER_PATTERN_MASK_INVERT = auto()
+    RENDER_PATTERN_MASK_SEED = auto()
     RENDER_TIMELINE_HEADER = auto()
     TIMELINE_PRESETS_HEADER = auto()
     TIMELINE_PRESET_CHARACTER = auto()
@@ -917,7 +919,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Pattern mask",
         help_description=(
             "Spatial territories for visible layers during composite.",
-            "Hard strips assign each screen region to one layer.",
+            "Hard mode assigns each pixel to one layer; soft weights opacity.",
         ),
         quick_nav_target=True,
     ),
@@ -928,6 +930,17 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Type",
         help_entries=(("Left/Right", "cycle pattern type"),),
         help_description=("Pattern geometry used to partition the frame.",),
+    ),
+    RowKind.RENDER_PATTERN_MASK_MODE: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="render_pattern_mask",
+        help_title="Mode",
+        help_entries=(("Left/Right", "cycle hard/soft"),),
+        help_description=(
+            "Hard: one layer wins per pixel.",
+            "Soft: weights modulate opacity before each layer blend mode.",
+        ),
     ),
     RowKind.RENDER_PATTERN_MASK_DENSITY: RowBehavior(
         RowAffordance.VALUE_STEP,
@@ -946,6 +959,17 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Invert",
         help_entries=(("Left/Right", "toggle invert on/off"),),
         help_description=("Reverse layer assignment order across the pattern.",),
+    ),
+    RowKind.RENDER_PATTERN_MASK_SEED: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="render_pattern_mask",
+        help_title="Seed",
+        help_entries=(("Left/Right", "respin seed"),),
+        help_description=(
+            "Persisted seed for plasma patterns.",
+            "Left/Right picks a new random seed for a different field.",
+        ),
     ),
     RowKind.RENDER_TIMELINE_HEADER: RowBehavior(
         RowAffordance.EXPAND,

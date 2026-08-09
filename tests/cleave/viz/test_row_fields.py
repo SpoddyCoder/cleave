@@ -338,7 +338,7 @@ def test_apply_field_horizontal_track_header_solo_and_expand() -> None:
 
 
 def test_row_fields_count() -> None:
-    assert len(ROW_FIELDS) == 126
+    assert len(ROW_FIELDS) == 128
 
 
 def test_row_kinds_requiring_fields_registry_complete() -> None:

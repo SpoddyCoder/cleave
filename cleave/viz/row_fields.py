@@ -37,6 +37,7 @@ from cleave.extract import stem_control_label, stem_overlay_header
 from cleave.pattern_mask import (
     cycle_timeline_preset_pattern_mask,
     pattern_mask_invert_display,
+    pattern_mask_mode_display,
     timeline_preset_pattern_mask_display,
 )
 from cleave.song_markers import (
@@ -1485,6 +1486,12 @@ def _format_render_pattern_mask_type(
     return state.render_pattern_mask.type
 
 
+def _format_render_pattern_mask_mode(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return pattern_mask_mode_display(state.render_pattern_mask.mode)
+
+
 def _format_render_pattern_mask_density(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
@@ -1495,6 +1502,12 @@ def _format_render_pattern_mask_invert(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
     return pattern_mask_invert_display(state.render_pattern_mask.invert)
+
+
+def _format_render_pattern_mask_seed(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return str(state.render_pattern_mask.seed)
 
 
 def _apply_render_pattern_mask_header(
@@ -1525,6 +1538,16 @@ def _apply_render_pattern_mask_type(
     controls._render_pattern_mask.cycle_type(forward=forward)
 
 
+def _apply_render_pattern_mask_mode(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls._render_pattern_mask.cycle_mode(forward=forward)
+
+
 def _apply_render_pattern_mask_density(
     controls: TuningControls,
     _desc: RowDescriptor,
@@ -1547,6 +1570,16 @@ def _apply_render_pattern_mask_invert(
     _shift: bool,
 ) -> None:
     controls._render_pattern_mask.cycle_invert(forward=forward)
+
+
+def _apply_render_pattern_mask_seed(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    _forward: bool,
+    _ctrl: bool,
+    _shift: bool,
+) -> None:
+    controls._render_pattern_mask.respin_seed()
 
 
 def _apply_render_timeline_header(
@@ -2204,6 +2237,12 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         format_value=_format_render_pattern_mask_type,
         apply_horizontal=_apply_render_pattern_mask_type,
     ),
+    RowKind.RENDER_PATTERN_MASK_MODE: RowFieldDef(
+        panel_label="mode",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_pattern_mask_mode,
+        apply_horizontal=_apply_render_pattern_mask_mode,
+    ),
     RowKind.RENDER_PATTERN_MASK_DENSITY: RowFieldDef(
         panel_label="density",
         present_style=RowPresentStyle.LABELED_VALUE,
@@ -2215,6 +2254,12 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_render_pattern_mask_invert,
         apply_horizontal=_apply_render_pattern_mask_invert,
+    ),
+    RowKind.RENDER_PATTERN_MASK_SEED: RowFieldDef(
+        panel_label="seed",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_pattern_mask_seed,
+        apply_horizontal=_apply_render_pattern_mask_seed,
     ),
     RowKind.RENDER_TIMELINE_HEADER: RowFieldDef(
         panel_label="TIMELINE",
