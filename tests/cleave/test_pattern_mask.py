@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import numpy as np
@@ -102,6 +103,91 @@ def test_generate_radial_mask_invert() -> None:
     base = generate_radial_mask(32, 32, layer_count=3, density=1.5, invert=False)
     inverted = generate_radial_mask(32, 32, layer_count=3, density=1.5, invert=True)
     assert np.array_equal(inverted, (2 - base.astype(np.int64)).astype(np.uint8))
+
+
+def _radial_sample(mask: np.ndarray, *, dx: float, dy: float) -> int:
+    """Sample mask at pixel-space offset from center (dy up, row 0 = bottom)."""
+    height, width = mask.shape
+    col = int(round(width * 0.5 + dx - 0.5))
+    row = int(round(height * 0.5 + dy - 0.5))
+    return int(mask[row, col])
+
+
+def test_generate_radial_two_wedges_are_diagonal() -> None:
+    """Two wedges use a 45 deg default rotation (not a flat top/bottom split)."""
+    mask = generate_radial_mask(128, 128, layer_count=2, density=1.0)
+    r = 40.0
+    up = _radial_sample(mask, dx=0.0, dy=r)
+    down = _radial_sample(mask, dx=0.0, dy=-r)
+    left = _radial_sample(mask, dx=-r, dy=0.0)
+    right = _radial_sample(mask, dx=r, dy=0.0)
+    assert up == right
+    assert down == left
+    assert up != down
+
+
+def test_generate_radial_four_wedges_are_diagonal() -> None:
+    """Four wedges use a 45 deg default rotation (diamond, not axis-aligned plus)."""
+    mask = generate_radial_mask(128, 128, layer_count=4, density=1.0)
+    r = 40.0
+    up = _radial_sample(mask, dx=0.0, dy=r)
+    down = _radial_sample(mask, dx=0.0, dy=-r)
+    left = _radial_sample(mask, dx=-r, dy=0.0)
+    right = _radial_sample(mask, dx=r, dy=0.0)
+    # Cardinals are wedge centers after 45 deg rotation; each owns a distinct layer.
+    assert len({up, down, left, right}) == 4
+    # Near-45 deg sample sits on the boundary between up and right.
+    ne = _radial_sample(
+        mask, dx=r * math.cos(math.pi / 4), dy=r * math.sin(math.pi / 4)
+    )
+    assert ne in (up, right)
+
+
+def test_generate_radial_screen_angles_aspect_invariant() -> None:
+    """Same screen-space ray maps to the same wedge on square and widescreen."""
+    for wedge_count in (3, 5):
+        square = generate_radial_mask(512, 512, layer_count=wedge_count, density=1.0)
+        wide = generate_radial_mask(1280, 720, layer_count=wedge_count, density=1.0)
+        for deg in range(5, 360, 10):
+            rad = math.radians(deg)
+            sq = _radial_sample(
+                square, dx=180.0 * math.cos(rad), dy=180.0 * math.sin(rad)
+            )
+            wd = _radial_sample(
+                wide, dx=280.0 * math.cos(rad), dy=280.0 * math.sin(rad)
+            )
+            assert sq == wd, f"n={wedge_count} deg={deg}: square={sq} wide={wd}"
+
+
+def test_generate_radial_wedge_spans_equal_on_widescreen() -> None:
+    """Each wedge spans ~360/n degrees in screen space on a 16:9 frame."""
+    width, height = 1280, 720
+    for wedge_count in (3, 5):
+        mask = generate_radial_mask(
+            width, height, layer_count=wedge_count, density=1.0
+        )
+        radius = min(width, height) * 0.4
+        labels = [
+            _radial_sample(
+                mask,
+                dx=radius * math.cos(math.radians(deg)),
+                dy=radius * math.sin(math.radians(deg)),
+            )
+            for deg in range(360)
+        ]
+        transitions = [
+            i for i in range(360) if labels[i] != labels[(i - 1) % 360]
+        ]
+        assert len(transitions) == wedge_count, (
+            f"n={wedge_count} transitions={transitions}"
+        )
+        spans = [
+            (transitions[(i + 1) % wedge_count] - transitions[i]) % 360
+            for i in range(wedge_count)
+        ]
+        expected = 360 / wedge_count
+        for span in spans:
+            assert abs(span - expected) <= 2, f"n={wedge_count} spans={spans}"
 
 
 def test_generate_checker_mask_shape_and_bounds() -> None:
