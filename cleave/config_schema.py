@@ -302,9 +302,14 @@ DEFAULT_RENDER_PATTERN_MASK_MODE: PatternMaskMode = "hard"
 DEFAULT_RENDER_PATTERN_MASK_DENSITY = 1.0
 DEFAULT_RENDER_PATTERN_MASK_INVERT = False
 DEFAULT_RENDER_PATTERN_MASK_SEED = 0
+DEFAULT_RENDER_PATTERN_MASK_TRANSITION = 0.0
 DEFAULT_RENDER_PATTERN_MASK_LOCKED = False
 PATTERN_MASK_DENSITY_MIN = 1.0
 PATTERN_MASK_DENSITY_MAX = 10.0
+PATTERN_MASK_TRANSITION_MIN = 0.0
+PATTERN_MASK_TRANSITION_MAX = 5.0
+PATTERN_MASK_TRANSITION_STEP = 0.1
+PATTERN_MASK_TRANSITION_STEP_LARGE = 1.0
 
 HighlightRolloffApplyMode = Literal["off", "per_layer", "composite"]
 
@@ -642,6 +647,16 @@ PATTERN_MASK_DENSITY_STEP_LARGE = 1.0
 def clamp_pattern_mask_density(value: float) -> float:
     return round(
         max(PATTERN_MASK_DENSITY_MIN, min(PATTERN_MASK_DENSITY_MAX, float(value))),
+        1,
+    )
+
+
+def clamp_pattern_mask_transition(value: float) -> float:
+    return round(
+        max(
+            PATTERN_MASK_TRANSITION_MIN,
+            min(PATTERN_MASK_TRANSITION_MAX, float(value)),
+        ),
         1,
     )
 
@@ -1771,6 +1786,15 @@ RENDER_PATTERN_MASK_FIELDS: tuple[SchemaField, ...] = (
         _dump_scalar,
     ),
     FieldDescriptor(
+        "transition",
+        DEFAULT_RENDER_PATTERN_MASK_TRANSITION,
+        "session",
+        lambda raw, _ctx, label: clamp_pattern_mask_transition(
+            float(require_non_negative_number(raw, label))
+        ),
+        _dump_scalar,
+    ),
+    FieldDescriptor(
         "seed",
         DEFAULT_RENDER_PATTERN_MASK_SEED,
         "session",
@@ -2441,6 +2465,7 @@ def persist_render(ctx: PersistCtx) -> dict[str, Any]:
         "density": runtime_pm.density,
         "mode": runtime_pm.mode,
         "invert": runtime_pm.invert,
+        "transition": runtime_pm.transition,
         "seed": runtime_pm.seed,
     }
     pattern_mask = _dump_overlay_fields(
@@ -2860,6 +2885,7 @@ def default_render_pattern_mask_runtime_values() -> dict[str, Any]:
         "density": DEFAULT_RENDER_PATTERN_MASK_DENSITY,
         "mode": DEFAULT_RENDER_PATTERN_MASK_MODE,
         "invert": DEFAULT_RENDER_PATTERN_MASK_INVERT,
+        "transition": DEFAULT_RENDER_PATTERN_MASK_TRANSITION,
         "seed": DEFAULT_RENDER_PATTERN_MASK_SEED,
         "locked": DEFAULT_RENDER_PATTERN_MASK_LOCKED,
     }

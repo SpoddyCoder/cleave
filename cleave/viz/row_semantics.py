@@ -104,6 +104,7 @@ class RowKind(Enum):
     RENDER_PATTERN_MASK_DENSITY = auto()
     RENDER_PATTERN_MASK_MODE = auto()
     RENDER_PATTERN_MASK_INVERT = auto()
+    RENDER_PATTERN_MASK_TRANSITION = auto()
     RENDER_PATTERN_MASK_SEED = auto()
     RENDER_TIMELINE_HEADER = auto()
     TIMELINE_PRESETS_HEADER = auto()
@@ -959,6 +960,16 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Invert",
         help_entries=(("Left/Right", "toggle invert on/off"),),
         help_description=("Reverse layer assignment order across the pattern.",),
+    ),
+    RowKind.RENDER_PATTERN_MASK_TRANSITION: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="render_pattern_mask",
+        help_title="Transition",
+        help_description=(
+            "Seconds to morph mask territories when layers toggle.",
+            "0.0s applies the new partition instantly.",
+        ),
     ),
     RowKind.RENDER_PATTERN_MASK_SEED: RowBehavior(
         RowAffordance.VALUE_STEP,

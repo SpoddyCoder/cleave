@@ -87,6 +87,41 @@ def test_composite_uses_masked_path_when_enabled() -> None:
     assert call.kwargs["density"] == 2.5
     assert call.kwargs["invert"] is True
     assert call.kwargs["seed"] == 11
+    assert call.kwargs["slot_names"] == ["layer_1", "layer_2"]
+    assert call.kwargs["active_slots"] == [True, True]
+    assert call.kwargs["song_time_sec"] == 0.0
+    assert call.kwargs["transition_duration"] == 0.0
+
+
+def test_composite_passes_transition_and_inactive_slots() -> None:
+    session = _session(("layer_1", "layer_2", "layer_3"))
+    session.render_pattern_mask.enabled = True
+    session.render_pattern_mask.transition = 1.2
+    layers_by_slot = {
+        "layer_1": _stem_layer("layer_1"),
+        "layer_2": _stem_layer("layer_2", enabled=False),
+        "layer_3": _stem_layer("layer_3", opacity=0.0),
+    }
+    compositor = MagicMock()
+    compositor.content_width = 1280
+    compositor.content_height = 720
+    compositor.content_fbo_id = 7
+    compositor.color_format = object()
+    masked = MagicMock()
+
+    LayerFramePipeline.composite(
+        compositor,
+        layers_by_slot,
+        session,
+        masked_compositor=masked,
+        song_time_sec=3.5,
+    )
+
+    call = masked.composite.call_args
+    assert call.kwargs["slot_names"] == ["layer_1", "layer_2", "layer_3"]
+    assert call.kwargs["active_slots"] == [True, False, False]
+    assert call.kwargs["song_time_sec"] == 3.5
+    assert call.kwargs["transition_duration"] == 1.2
 
 
 def test_composite_uses_soft_path_when_mode_soft() -> None:

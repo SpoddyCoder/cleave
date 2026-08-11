@@ -485,9 +485,14 @@ class LayerFramePipeline:
         session: TuningSession,
         *,
         masked_compositor: GlMaskedCompositor | None = None,
+        song_time_sec: float = 0.0,
     ) -> None:
-        ordered = [layers_by_slot[name] for name in reversed(session.layer_z_order)]
+        slot_names = list(session.layer_z_order)
+        ordered = [layers_by_slot[name] for name in slot_names]
         fbos = [layer.fbo for layer in ordered]
+        active_slots = [
+            bool(layer.fbo.enabled and layer.fbo.opacity > 0.0) for layer in ordered
+        ]
         pm = session.render_pattern_mask
         use_mask = (
             render_sections_active(session)
@@ -508,9 +513,14 @@ class LayerFramePipeline:
                 density=pm.density,
                 invert=pm.invert,
                 seed=pm.seed,
+                slot_names=slot_names,
+                active_slots=active_slots,
+                song_time_sec=song_time_sec,
+                transition_duration=pm.transition,
             )
         else:
-            compositor.composite(fbos)
+            # Fixed composite still stacks bottom-up (reversed z-order).
+            compositor.composite(list(reversed(fbos)))
 
     @staticmethod
     def destroy(layers: list[StemLayer]) -> None:

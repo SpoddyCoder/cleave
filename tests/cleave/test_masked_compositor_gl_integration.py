@@ -187,3 +187,105 @@ def test_mask_cache_skips_regeneration(gl_context) -> None:
         seed=1,
     )
     assert masked._mask_cache_key is first_key
+
+
+def test_transition_blends_weights_over_song_time(gl_context) -> None:
+    comp, masked = gl_context
+    a = comp.create_layer_fbo("a", W, H, opacity=1.0, blend_mode="black-key")
+    b = comp.create_layer_fbo("b", W, H, opacity=1.0, blend_mode="black-key")
+    _fill_layer(a, (1.0, 0.0, 0.0))
+    _fill_layer(b, (0.0, 0.0, 1.0))
+
+    masked.composite(
+        comp.content_fbo_id,
+        [a, b],
+        mask_type="strips",
+        mode="hard",
+        density=1.0,
+        active_slots=[True, True],
+        song_time_sec=0.0,
+        transition_duration=1.0,
+    )
+    assert masked._transition_old_weights is None
+
+    b.enabled = False
+    masked.composite(
+        comp.content_fbo_id,
+        [a, b],
+        mask_type="strips",
+        mode="hard",
+        density=1.0,
+        active_slots=[True, False],
+        song_time_sec=0.0,
+        transition_duration=1.0,
+    )
+    assert masked._transition_old_weights is not None
+    assert masked._transition_target_weights is not None
+    mid = masked._blended_transition_weights(0.5)
+    assert mid.shape == masked._transition_old_weights.shape
+    old_b = float(masked._transition_old_weights[1].mean())
+    target_b = float(masked._transition_target_weights[1].mean())
+    mid_b = float(mid[1].mean())
+    assert min(old_b, target_b) <= mid_b <= max(old_b, target_b)
+
+    masked.composite(
+        comp.content_fbo_id,
+        [a, b],
+        mask_type="strips",
+        mode="hard",
+        density=1.0,
+        active_slots=[True, False],
+        song_time_sec=1.0,
+        transition_duration=1.0,
+    )
+    assert masked._transition_old_weights is None
+    left_px = _read_content_pixel(comp, W // 4, H // 2)
+    assert left_px[0] > 200, f"after transition left={left_px}"
+
+
+def test_mid_transition_retarget_snapshots_blend(gl_context) -> None:
+    import numpy as np
+
+    comp, masked = gl_context
+    a = comp.create_layer_fbo("a", W, H, opacity=1.0, blend_mode="black-key")
+    b = comp.create_layer_fbo("b", W, H, opacity=1.0, blend_mode="black-key")
+    c = comp.create_layer_fbo("c", W, H, opacity=1.0, blend_mode="black-key")
+    _fill_layer(a, (1.0, 0.0, 0.0))
+    _fill_layer(b, (0.0, 1.0, 0.0))
+    _fill_layer(c, (0.0, 0.0, 1.0))
+
+    masked.composite(
+        comp.content_fbo_id,
+        [a, b, c],
+        mask_type="strips",
+        mode="soft",
+        density=1.0,
+        active_slots=[True, True, True],
+        song_time_sec=0.0,
+        transition_duration=2.0,
+    )
+    b.enabled = False
+    masked.composite(
+        comp.content_fbo_id,
+        [a, b, c],
+        mask_type="strips",
+        mode="soft",
+        density=1.0,
+        active_slots=[True, False, True],
+        song_time_sec=0.0,
+        transition_duration=2.0,
+    )
+    first_old = masked._transition_old_weights.copy()
+    c.enabled = False
+    masked.composite(
+        comp.content_fbo_id,
+        [a, b, c],
+        mask_type="strips",
+        mode="soft",
+        density=1.0,
+        active_slots=[True, False, False],
+        song_time_sec=0.5,
+        transition_duration=2.0,
+    )
+    assert masked._transition_start == 0.5
+    assert not np.array_equal(masked._transition_old_weights, first_old)

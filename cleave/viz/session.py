@@ -243,6 +243,7 @@ class RenderPatternMaskRuntime:
     mode: PatternMaskMode
     invert: bool
     seed: int
+    transition: float = 0.0
     locked: bool = False
 
 
@@ -522,6 +523,7 @@ def render_pattern_mask_runtime_from_cfg(
             mode=pattern_mask.mode,
             density=pattern_mask.density,
             invert=pattern_mask.invert,
+            transition=pattern_mask.transition,
             seed=pattern_mask.seed,
         )
     return default_render_pattern_mask_runtime()

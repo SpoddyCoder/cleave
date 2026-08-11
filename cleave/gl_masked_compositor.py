@@ -20,7 +20,9 @@ from cleave.gl_compositor import GlCompositor, LayerFbo
 from cleave.pattern_mask import (
     PatternMaskParams,
     generate_hard_mask,
-    generate_soft_weights,
+    generate_soft_weight_fields,
+    hard_mask_from_weight_fields,
+    u8_weights_from_fields,
     upload_mask_r8_texture,
 )
 from OpenGL.GL import (
@@ -289,6 +291,7 @@ class _MaskCacheKey:
     width: int
     height: int
     layer_count: int
+    active_slots: tuple[bool, ...]
     density: float
     invert: bool
     seed: int
@@ -408,6 +411,7 @@ def _mask_cache_key(
     gen_width: int,
     gen_height: int,
     layer_count: int,
+    active_slots: tuple[bool, ...],
 ) -> _MaskCacheKey:
     return _MaskCacheKey(
         mask_type=params.mask_type,
@@ -415,6 +419,7 @@ def _mask_cache_key(
         width=int(gen_width),
         height=int(gen_height),
         layer_count=int(layer_count),
+        active_slots=tuple(bool(flag) for flag in active_slots),
         density=float(params.density),
         invert=bool(params.invert),
         seed=int(params.seed),
@@ -463,6 +468,13 @@ class GlMaskedCompositor:
         self._dest_fbos: dict[int, moderngl.Framebuffer] = {}
         self._bg: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
         self._mask_cache_key: _MaskCacheKey | None = None
+        self._transition_old_weights: np.ndarray | None = None
+        self._transition_target_weights: np.ndarray | None = None
+        self._transition_start: float = 0.0
+        self._transition_duration: float = 0.0
+        self._transition_active_slots: tuple[bool, ...] | None = None
+        self._current_weight_fields: np.ndarray | None = None
+        self._last_active_slots: tuple[bool, ...] | None = None
 
     @property
     def color_format(self) -> GlColorFormat:
@@ -488,6 +500,34 @@ class GlMaskedCompositor:
         self._release_weight_array()
         self._release_plasma_gen_targets()
         self._mask_cache_key = None
+        self._clear_transition_state()
+        self._current_weight_fields = None
+        self._last_active_slots = None
+
+    def _clear_transition_state(self) -> None:
+        self._transition_old_weights = None
+        self._transition_target_weights = None
+        self._transition_start = 0.0
+        self._transition_duration = 0.0
+        self._transition_active_slots = None
+
+    def _transition_in_progress(self, song_time_sec: float) -> bool:
+        if self._transition_old_weights is None or self._transition_target_weights is None:
+            return False
+        if self._transition_duration <= 0.0:
+            return False
+        return float(song_time_sec) < self._transition_start + self._transition_duration
+
+    def _blended_transition_weights(self, song_time_sec: float) -> np.ndarray:
+        assert self._transition_old_weights is not None
+        assert self._transition_target_weights is not None
+        duration = max(self._transition_duration, 1e-9)
+        t = (float(song_time_sec) - self._transition_start) / duration
+        t = max(0.0, min(1.0, t))
+        return (
+            self._transition_old_weights * (1.0 - t)
+            + self._transition_target_weights * t
+        )
 
     def init(self) -> None:
         """Attach to the current pygame OpenGL context."""
@@ -858,19 +898,54 @@ class GlMaskedCompositor:
         gen_height: int,
         layer_count: int,
         params: PatternMaskParams,
-    ) -> None:
-        if params.mode == "soft":
-            weights = generate_soft_weights(
-                params.mask_type,
-                gen_width,
-                gen_height,
-                layer_count,
-                density=params.density,
-                invert=params.invert,
-                seed=params.seed,
-            )
-            self._upload_weight_array_cpu(weights)
+        active_slots: tuple[bool, ...],
+    ) -> np.ndarray:
+        """Generate and upload mask textures; return (N, H, W) float weight fields."""
+        fields = generate_soft_weight_fields(
+            params.mask_type,
+            gen_width,
+            gen_height,
+            layer_count,
+            density=params.density,
+            invert=params.invert,
+            seed=params.seed,
+            active_flags=active_slots,
+        )
+        self._upload_weight_fields(fields, params.mode)
+        return fields
+
+    def _upload_weight_fields(self, fields: np.ndarray, mode: str) -> None:
+        if mode == "soft":
+            self._upload_weight_array_cpu(u8_weights_from_fields(fields))
             return
+        mask = hard_mask_from_weight_fields(fields)
+        height, width = int(mask.shape[0]), int(mask.shape[1])
+        self._ensure_mask_texture(width, height)
+        upload_mask_r8_texture(mask, texture_id=self._mask_texture_id)
+        if self._mask_mgl is not None:
+            self._mask_mgl.release()
+            self._mask_mgl = None
+
+    def _generate_mask_cpu_hard_direct(
+        self,
+        *,
+        gen_width: int,
+        gen_height: int,
+        layer_count: int,
+        params: PatternMaskParams,
+        active_slots: tuple[bool, ...],
+    ) -> np.ndarray:
+        """CPU hard mask via pattern generators; also return soft fields for cache."""
+        fields = generate_soft_weight_fields(
+            params.mask_type,
+            gen_width,
+            gen_height,
+            layer_count,
+            density=params.density,
+            invert=params.invert,
+            seed=params.seed,
+            active_flags=active_slots,
+        )
         mask = generate_hard_mask(
             params.mask_type,
             gen_width,
@@ -879,30 +954,126 @@ class GlMaskedCompositor:
             density=params.density,
             invert=params.invert,
             seed=params.seed,
+            active_flags=active_slots,
         )
         self._ensure_mask_texture(gen_width, gen_height)
         upload_mask_r8_texture(mask, texture_id=self._mask_texture_id)
         if self._mask_mgl is not None:
             self._mask_mgl.release()
             self._mask_mgl = None
+        return fields
+
+    def _all_slots_active(self, active_slots: tuple[bool, ...]) -> bool:
+        return bool(active_slots) and all(active_slots)
 
     def _ensure_mask_textures(
         self,
         layer_count: int,
         params: PatternMaskParams,
+        *,
+        active_slots: tuple[bool, ...],
+        song_time_sec: float,
+        transition_duration: float,
     ) -> None:
         if layer_count <= 0:
             return
         gen_width, gen_height = self.content_width, self.content_height
+        active_slots = tuple(bool(flag) for flag in active_slots)
+        if len(active_slots) != layer_count:
+            raise ValueError(
+                f"active_slots length {len(active_slots)} != layer_count {layer_count}"
+            )
+
+        slots_changed = (
+            self._last_active_slots is not None
+            and active_slots != self._last_active_slots
+        )
+        duration = max(0.0, float(transition_duration))
+
+        if slots_changed and duration > 0.0:
+            if self._transition_in_progress(song_time_sec):
+                old_fields = self._blended_transition_weights(song_time_sec)
+            elif self._current_weight_fields is not None:
+                old_fields = self._current_weight_fields
+            else:
+                old_fields = generate_soft_weight_fields(
+                    params.mask_type,
+                    gen_width,
+                    gen_height,
+                    layer_count,
+                    density=params.density,
+                    invert=params.invert,
+                    seed=params.seed,
+                    active_flags=self._last_active_slots,
+                )
+            target_fields = generate_soft_weight_fields(
+                params.mask_type,
+                gen_width,
+                gen_height,
+                layer_count,
+                density=params.density,
+                invert=params.invert,
+                seed=params.seed,
+                active_flags=active_slots,
+            )
+            # Pad/truncate if layer count changed with z-order edits.
+            if old_fields.shape[0] != target_fields.shape[0]:
+                n = target_fields.shape[0]
+                padded = np.zeros_like(target_fields)
+                copy_n = min(old_fields.shape[0], n)
+                padded[:copy_n] = old_fields[:copy_n]
+                old_fields = padded
+            self._transition_old_weights = old_fields.astype(np.float64, copy=False)
+            self._transition_target_weights = target_fields
+            self._transition_start = float(song_time_sec)
+            self._transition_duration = duration
+            self._transition_active_slots = active_slots
+            self._mask_cache_key = None
+        elif slots_changed and duration <= 0.0:
+            self._clear_transition_state()
+
+        if self._transition_in_progress(song_time_sec):
+            blended = self._blended_transition_weights(song_time_sec)
+            self._upload_weight_fields(blended, params.mode)
+            self._current_weight_fields = blended
+            self._last_active_slots = active_slots
+            self._mask_cache_key = None
+            return
+
+        if (
+            self._transition_old_weights is not None
+            and self._transition_target_weights is not None
+        ):
+            # Transition finished this frame: settle on target.
+            fields = self._transition_target_weights
+            self._upload_weight_fields(fields, params.mode)
+            self._current_weight_fields = fields
+            self._last_active_slots = active_slots
+            self._clear_transition_state()
+            self._mask_cache_key = _mask_cache_key(
+                params,
+                gen_width=gen_width,
+                gen_height=gen_height,
+                layer_count=layer_count,
+                active_slots=active_slots,
+            )
+            return
+
         cache_key = _mask_cache_key(
             params,
             gen_width=gen_width,
             gen_height=gen_height,
             layer_count=layer_count,
+            active_slots=active_slots,
         )
-        if self._mask_cache_key == cache_key:
+        if self._mask_cache_key == cache_key and self._current_weight_fields is not None:
+            self._last_active_slots = active_slots
             return
-        if params.mask_type == "plasma":
+
+        use_gpu_plasma = (
+            params.mask_type == "plasma" and self._all_slots_active(active_slots)
+        )
+        if use_gpu_plasma:
             if params.mode == "soft":
                 self._generate_plasma_soft_gpu(
                     gen_width=gen_width,
@@ -917,19 +1088,49 @@ class GlMaskedCompositor:
                     layer_count=layer_count,
                     params=params,
                 )
-        else:
-            self._generate_mask_cpu(
+            # Keep float fields for transition snapshots.
+            fields = generate_soft_weight_fields(
+                params.mask_type,
+                gen_width,
+                gen_height,
+                layer_count,
+                density=params.density,
+                invert=params.invert,
+                seed=params.seed,
+                active_flags=active_slots,
+            )
+        elif params.mode == "hard" and params.mask_type != "plasma":
+            fields = self._generate_mask_cpu_hard_direct(
                 gen_width=gen_width,
                 gen_height=gen_height,
                 layer_count=layer_count,
                 params=params,
+                active_slots=active_slots,
             )
+        else:
+            fields = self._generate_mask_cpu(
+                gen_width=gen_width,
+                gen_height=gen_height,
+                layer_count=layer_count,
+                params=params,
+                active_slots=active_slots,
+            )
+        self._current_weight_fields = fields
+        self._last_active_slots = active_slots
         self._mask_cache_key = cache_key
 
-    def _copy_layers_into_array(self, layers: list[LayerFbo]) -> list[float]:
+    def _copy_layers_into_array(
+        self,
+        layers: list[LayerFbo],
+        *,
+        keep_disabled_visible: bool = False,
+    ) -> list[float]:
         """Copy each layer colour attachment into a texture-array slice.
 
         Returns the opacity uniform list (length MAX_LAYER_COUNT, unused slots 0).
+        Disabled slots keep a black slice and opacity 0, unless
+        *keep_disabled_visible* (mid-transition) copies their last frame at full
+        opacity so weight morphs can shrink territory without popping to black.
         """
         self._ensure_layer_array()
         assert self._layer_array_id
@@ -939,9 +1140,16 @@ class GlMaskedCompositor:
         for index, layer in enumerate(layers):
             if index >= MAX_LAYER_COUNT:
                 break
-            opacities[index] = float(layer.opacity)
-            if layer.fbo_id == 0:
-                continue
+            active = bool(layer.enabled and layer.opacity > 0.0 and layer.fbo_id != 0)
+            if not active:
+                if not keep_disabled_visible or layer.fbo_id == 0:
+                    opacities[index] = 0.0
+                    continue
+                opacities[index] = (
+                    float(layer.opacity) if layer.opacity > 0.0 else 1.0
+                )
+            else:
+                opacities[index] = float(layer.opacity)
             glBindFramebuffer(GL_READ_FRAMEBUFFER, layer.fbo_id)
             glReadBuffer(GL_COLOR_ATTACHMENT0)
             glBindTexture(GL_TEXTURE_2D_ARRAY, self._layer_array_id)
@@ -970,8 +1178,18 @@ class GlMaskedCompositor:
         density: float = 1.0,
         invert: bool = False,
         seed: int = 0,
+        slot_names: list[str] | None = None,
+        active_slots: list[bool] | None = None,
+        song_time_sec: float = 0.0,
+        transition_duration: float = 0.0,
     ) -> None:
-        """Clear *content_fbo_id* and composite *layers* through a pattern mask."""
+        """Clear *content_fbo_id* and composite *layers* through a pattern mask.
+
+        *layers* are slot-keyed in z-order (stable channel indices). When
+        *active_slots* is omitted, activity is derived from each layer's enabled
+        flag and opacity. *slot_names* is accepted for API completeness.
+        """
+        del slot_names  # Reserved for callers / debugging; indices follow *layers*.
         params = PatternMaskParams(
             mask_type=mask_type,
             mode=mode,
@@ -979,24 +1197,47 @@ class GlMaskedCompositor:
             invert=invert,
             seed=seed,
         )
-        if mode == "soft":
-            self._composite_soft(content_fbo_id, layers, params)
+        if active_slots is None:
+            resolved_active = tuple(
+                bool(layer.enabled and layer.opacity > 0.0) for layer in layers
+            )
         else:
-            self._composite_hard(content_fbo_id, layers, params)
+            resolved_active = tuple(bool(flag) for flag in active_slots)
+        if mode == "soft":
+            self._composite_soft(
+                content_fbo_id,
+                layers,
+                params,
+                active_slots=resolved_active,
+                song_time_sec=song_time_sec,
+                transition_duration=transition_duration,
+            )
+        else:
+            self._composite_hard(
+                content_fbo_id,
+                layers,
+                params,
+                active_slots=resolved_active,
+                song_time_sec=song_time_sec,
+                transition_duration=transition_duration,
+            )
 
     def _composite_hard(
         self,
         content_fbo_id: int,
         layers: list[LayerFbo],
         params: PatternMaskParams,
+        *,
+        active_slots: tuple[bool, ...],
+        song_time_sec: float,
+        transition_duration: float,
     ) -> None:
         self._ensure_init()
         assert self._ctx is not None
         assert self._masked_prog is not None
         assert self._quad_vao is not None
 
-        active = [layer for layer in layers if layer.enabled and layer.opacity > 0.0]
-        layer_count = len(active)
+        layer_count = len(layers)
         saved = _save_gl_state()
         try:
             glBindFramebuffer(GL_FRAMEBUFFER, content_fbo_id)
@@ -1004,11 +1245,22 @@ class GlMaskedCompositor:
             glClearColor(*self._bg)
             glClear(GL_COLOR_BUFFER_BIT)
 
-            if layer_count <= 0:
-                return
+            if layer_count <= 0 or not any(active_slots):
+                if not self._transition_in_progress(song_time_sec):
+                    self._last_active_slots = active_slots
+                    return
 
-            self._ensure_mask_textures(layer_count, params)
-            opacities = self._copy_layers_into_array(active)
+            self._ensure_mask_textures(
+                layer_count,
+                params,
+                active_slots=active_slots,
+                song_time_sec=song_time_sec,
+                transition_duration=transition_duration,
+            )
+            opacities = self._copy_layers_into_array(
+                layers,
+                keep_disabled_visible=self._transition_in_progress(song_time_sec),
+            )
             dest = self._dest_fbo_for(content_fbo_id)
             mask_tex = self._bind_mask_mgl(linear_filter=False)
             layer_array = self._layer_array_mgl
@@ -1033,14 +1285,17 @@ class GlMaskedCompositor:
         content_fbo_id: int,
         layers: list[LayerFbo],
         params: PatternMaskParams,
+        *,
+        active_slots: tuple[bool, ...],
+        song_time_sec: float,
+        transition_duration: float,
     ) -> None:
         self._ensure_init()
         assert self._ctx is not None
         assert self._soft_prog is not None
         assert self._soft_quad_vao is not None
 
-        active = [layer for layer in layers if layer.enabled and layer.opacity > 0.0]
-        layer_count = len(active)
+        layer_count = len(layers)
         saved = _save_gl_state()
         try:
             glBindFramebuffer(GL_FRAMEBUFFER, content_fbo_id)
@@ -1049,9 +1304,19 @@ class GlMaskedCompositor:
             glClear(GL_COLOR_BUFFER_BIT)
 
             if layer_count <= 0:
+                self._last_active_slots = active_slots
+                return
+            if not any(active_slots) and not self._transition_in_progress(song_time_sec):
+                self._last_active_slots = active_slots
                 return
 
-            self._ensure_mask_textures(layer_count, params)
+            self._ensure_mask_textures(
+                layer_count,
+                params,
+                active_slots=active_slots,
+                song_time_sec=song_time_sec,
+                transition_duration=transition_duration,
+            )
             dest = self._dest_fbo_for(content_fbo_id)
             weight_array = self._bind_weight_array_mgl()
             _ensure_soft_draw_state()
@@ -1060,13 +1325,25 @@ class GlMaskedCompositor:
             self._soft_prog["layer_tex"].value = 0
             self._soft_prog["weight_array"].value = 1
 
-            for index, layer in enumerate(active):
+            for index, layer in enumerate(layers):
+                if index >= MAX_LAYER_COUNT:
+                    break
+                transitioning = self._transition_in_progress(song_time_sec)
+                active = bool(layer.enabled and layer.opacity > 0.0)
+                if not active and not transitioning:
+                    continue
                 GlCompositor._apply_layer_blend_mode(layer.blend_mode)
                 layer_tex = self._bind_layer_tex_mgl(layer)
                 layer_tex.use(0)
                 weight_array.use(1)
                 self._soft_prog["layer_index"].value = index
-                self._soft_prog["layer_opacity"].value = float(layer.opacity)
+                if active:
+                    opacity = float(layer.opacity)
+                elif transitioning:
+                    opacity = float(layer.opacity) if layer.opacity > 0.0 else 1.0
+                else:
+                    opacity = 0.0
+                self._soft_prog["layer_opacity"].value = opacity
                 self._soft_prog["opacity_in_alpha"].value = (
                     1 if layer.blend_mode == "add" else 0
                 )
@@ -1112,3 +1389,6 @@ class GlMaskedCompositor:
             self._masked_prog = None
         self._ctx = None
         self._mask_cache_key = None
+        self._clear_transition_state()
+        self._current_weight_fields = None
+        self._last_active_slots = None
