@@ -71,7 +71,7 @@ def test_hard_composite_splits_layers_by_strips(gl_context) -> None:
         [left, right],
         mask_type="strips",
         mode="hard",
-        density=0.0,
+        density=1.0,
     )
 
     left_px = _read_content_pixel(comp, W // 4, H // 2)
@@ -92,11 +92,11 @@ def test_soft_composite_accepts_generated_strips_weights(gl_context) -> None:
         [a, b],
         mask_type="strips",
         mode="soft",
-        density=0.0,
+        density=1.0,
     )
 
     mid = _read_content_pixel(comp, W // 2, H // 2)
-    # Soft strips with density 0 still light the frame (not all black).
+    # Soft strips with density 1.0x still light the frame (not all black).
     assert max(mid[:3]) > 20, f"mid={mid}"
 
 
@@ -112,7 +112,7 @@ def test_soft_plasma_composite_does_not_crash(gl_context) -> None:
         [a, b],
         mask_type="plasma",
         mode="soft",
-        density=0.5,
+        density=2.0,
         seed=7,
     )
 
@@ -128,7 +128,7 @@ def test_plasma_hard_gpu_restores_full_viewport(gl_context) -> None:
     params = PatternMaskParams(
         mask_type="plasma",
         mode="hard",
-        density=0.5,
+        density=2.0,
         invert=False,
         seed=3,
     )
@@ -155,7 +155,7 @@ def test_plasma_hard_composite_fills_content_frame(gl_context) -> None:
         [left, right],
         mask_type="plasma",
         mode="hard",
-        density=0.5,
+        density=2.0,
         seed=5,
     )
 
@@ -173,7 +173,7 @@ def test_mask_cache_skips_regeneration(gl_context) -> None:
         [layer],
         mask_type="strips",
         mode="hard",
-        density=0.5,
+        density=2.0,
         seed=1,
     )
     first_key = masked._mask_cache_key
@@ -183,7 +183,7 @@ def test_mask_cache_skips_regeneration(gl_context) -> None:
         [layer],
         mask_type="strips",
         mode="hard",
-        density=0.5,
+        density=2.0,
         seed=1,
     )
     assert masked._mask_cache_key is first_key

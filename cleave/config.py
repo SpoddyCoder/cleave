@@ -280,8 +280,8 @@ class RenderPostFxConfig:
 class RenderPatternMaskConfig:
     enabled: bool
     type: PatternMaskType
-    mode: PatternMaskMode
     density: float
+    mode: PatternMaskMode
     invert: bool
     seed: int
     locked: bool = False

@@ -161,7 +161,7 @@ float value_noise(vec2 coords, int hash_seed) {
 }
 
 float plasma_frequency() {
-    return max(0.25, 2.0 + density * 12.0);
+    return max(0.25, 2.0 * density);
 }
 
 vec2 plasma_coords() {
@@ -967,7 +967,7 @@ class GlMaskedCompositor:
         *,
         mask_type: str,
         mode: str,
-        density: float = 0.5,
+        density: float = 1.0,
         invert: bool = False,
         seed: int = 0,
     ) -> None:

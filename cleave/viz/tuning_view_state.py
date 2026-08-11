@@ -221,8 +221,8 @@ class RenderPatternMaskBlock:
     enabled: bool = _RO_PATTERN_MASK_DEFAULTS["enabled"]
     expanded: bool = _RO_PATTERN_MASK_DEFAULTS["expanded"]
     type: PatternMaskType = _RO_PATTERN_MASK_DEFAULTS["type"]
-    mode: PatternMaskMode = _RO_PATTERN_MASK_DEFAULTS["mode"]
     density: float = _RO_PATTERN_MASK_DEFAULTS["density"]
+    mode: PatternMaskMode = _RO_PATTERN_MASK_DEFAULTS["mode"]
     invert: bool = _RO_PATTERN_MASK_DEFAULTS["invert"]
     seed: int = _RO_PATTERN_MASK_DEFAULTS["seed"]
     locked: bool = False

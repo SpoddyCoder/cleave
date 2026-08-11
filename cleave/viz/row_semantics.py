@@ -101,8 +101,8 @@ class RowKind(Enum):
     RENDER_POST_FX_CHROMA_BOOST_AMOUNT = auto()
     RENDER_PATTERN_MASK_HEADER = auto()
     RENDER_PATTERN_MASK_TYPE = auto()
-    RENDER_PATTERN_MASK_MODE = auto()
     RENDER_PATTERN_MASK_DENSITY = auto()
+    RENDER_PATTERN_MASK_MODE = auto()
     RENDER_PATTERN_MASK_INVERT = auto()
     RENDER_PATTERN_MASK_SEED = auto()
     RENDER_TIMELINE_HEADER = auto()
@@ -931,6 +931,16 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_entries=(("Left/Right", "cycle pattern type"),),
         help_description=("Pattern geometry used to partition the frame.",),
     ),
+    RowKind.RENDER_PATTERN_MASK_DENSITY: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="render_pattern_mask",
+        help_title="Density",
+        help_description=(
+            "Segments per active layer (1.0x = one strip/wedge/tile per layer).",
+            "Higher multiplies how many segments cycle through visible layers.",
+        ),
+    ),
     RowKind.RENDER_PATTERN_MASK_MODE: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
@@ -940,16 +950,6 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_description=(
             "Hard: one layer wins per pixel.",
             "Soft: weights modulate opacity before each layer blend mode.",
-        ),
-    ),
-    RowKind.RENDER_PATTERN_MASK_DENSITY: RowBehavior(
-        RowAffordance.VALUE_STEP,
-        repeatable=True,
-        parent_group="render_pattern_mask",
-        help_title="Density",
-        help_description=(
-            "Geometry density for the pattern (strip count above layer count).",
-            "Higher = more strips cycling through visible layers.",
         ),
     ),
     RowKind.RENDER_PATTERN_MASK_INVERT: RowBehavior(

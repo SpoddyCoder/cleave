@@ -1495,7 +1495,7 @@ def _format_render_pattern_mask_mode(
 def _format_render_pattern_mask_density(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return f"{int(round(state.render_pattern_mask.density * 100))}%"
+    return f"{state.render_pattern_mask.density:.1f}x"
 
 
 def _format_render_pattern_mask_invert(
@@ -2237,17 +2237,17 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         format_value=_format_render_pattern_mask_type,
         apply_horizontal=_apply_render_pattern_mask_type,
     ),
-    RowKind.RENDER_PATTERN_MASK_MODE: RowFieldDef(
-        panel_label="mode",
-        present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_pattern_mask_mode,
-        apply_horizontal=_apply_render_pattern_mask_mode,
-    ),
     RowKind.RENDER_PATTERN_MASK_DENSITY: RowFieldDef(
         panel_label="density",
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_render_pattern_mask_density,
         apply_horizontal=_apply_render_pattern_mask_density,
+    ),
+    RowKind.RENDER_PATTERN_MASK_MODE: RowFieldDef(
+        panel_label="mode",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_pattern_mask_mode,
+        apply_horizontal=_apply_render_pattern_mask_mode,
     ),
     RowKind.RENDER_PATTERN_MASK_INVERT: RowFieldDef(
         panel_label="invert",
