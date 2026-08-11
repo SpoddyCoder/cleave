@@ -193,21 +193,31 @@ _PLASMA_HARD_FRAG = (
     _PLASMA_GEN_COMMON
     + """
 uniform int invert;
+uniform int active_flags[8];
 in vec2 uv;
 out vec4 fragColor;
 
 void main() {
     float best = -1.0;
     int best_i = 0;
+    bool any_active = false;
     for (int i = 0; i < 8; i++) {
         if (i >= layer_count) {
             break;
         }
+        if (active_flags[i] == 0) {
+            continue;
+        }
         float f = plasma_field(i);
-        if (f > best) {
+        if (f > best || !any_active) {
             best = f;
             best_i = i;
+            any_active = true;
         }
+    }
+    if (!any_active) {
+        fragColor = vec4(0.0, 0.0, 0.0, 1.0);
+        return;
     }
     if (invert != 0) {
         best_i = layer_count - 1 - best_i;
@@ -222,40 +232,34 @@ _PLASMA_SOFT_FRAG = (
     + """
 uniform int invert;
 uniform int output_layer;
+uniform int active_flags[8];
 in vec2 uv;
 out vec4 fragColor;
 
 void main() {
+    int src_layer = output_layer;
+    if (invert != 0) {
+        src_layer = layer_count - 1 - output_layer;
+    }
+    if (active_flags[src_layer] == 0) {
+        fragColor = vec4(0.0, 0.0, 0.0, 1.0);
+        return;
+    }
     float fields[8];
     float total = 0.0;
+    int active_count = 0;
     for (int i = 0; i < 8; i++) {
-        if (i >= layer_count) {
+        if (i >= layer_count || active_flags[i] == 0) {
             fields[i] = 0.0;
             continue;
         }
         fields[i] = plasma_field(i);
         total += fields[i];
+        active_count++;
     }
-    float inv_n = 1.0 / max(float(layer_count), 1.0);
-    float weights[8];
-    int max_i = 0;
-    float max_f = -1.0;
-    for (int i = 0; i < 8; i++) {
-        if (i >= layer_count) {
-            weights[i] = 0.0;
-            continue;
-        }
-        weights[i] = total > 0.0 ? fields[i] / total : inv_n;
-        if (fields[i] > max_f) {
-            max_f = fields[i];
-            max_i = i;
-        }
-    }
-    int src_layer = output_layer;
-    if (invert != 0) {
-        src_layer = layer_count - 1 - output_layer;
-    }
-    float scaled = weights[src_layer] * 255.0;
+    float inv_n = 1.0 / max(float(active_count), 1.0);
+    float w = total > 0.0 ? fields[src_layer] / total : inv_n;
+    float scaled = w * 255.0;
     int u8 = int(floor(scaled + 0.5));
     u8 = clamp(u8, 0, 255);
     fragColor = vec4(float(u8) / 255.0, 0.0, 0.0, 1.0);
@@ -940,12 +944,18 @@ class GlMaskedCompositor:
         gen_height: int,
         layer_count: int,
         params: PatternMaskParams,
+        active_flags: tuple[bool, ...] | None = None,
     ) -> None:
         program["resolution"].value = (float(gen_width), float(gen_height))
         program["density"].value = float(params.density)
         program["seed"].value = int(params.seed)
         program["layer_count"].value = int(layer_count)
         program["invert"].value = 1 if params.invert else 0
+        flags = [0] * MAX_LAYER_COUNT
+        for i in range(layer_count):
+            if active_flags is None or (i < len(active_flags) and active_flags[i]):
+                flags[i] = 1
+        program["active_flags"].value = flags
 
     def _generate_plasma_hard_gpu(
         self,
@@ -954,6 +964,7 @@ class GlMaskedCompositor:
         gen_height: int,
         layer_count: int,
         params: PatternMaskParams,
+        active_flags: tuple[bool, ...] | None = None,
     ) -> None:
         self._ensure_init()
         assert self._ctx is not None
@@ -971,6 +982,7 @@ class GlMaskedCompositor:
                 gen_height=gen_height,
                 layer_count=layer_count,
                 params=params,
+                active_flags=active_flags,
             )
             self._plasma_hard_vao.render(moderngl.TRIANGLE_STRIP)
         finally:
@@ -983,6 +995,7 @@ class GlMaskedCompositor:
         gen_height: int,
         layer_count: int,
         params: PatternMaskParams,
+        active_flags: tuple[bool, ...] | None = None,
     ) -> None:
         self._ensure_init()
         assert self._ctx is not None
@@ -1003,6 +1016,7 @@ class GlMaskedCompositor:
                 gen_height=gen_height,
                 layer_count=layer_count,
                 params=params,
+                active_flags=active_flags,
             )
             for index in range(layer_count):
                 slice_fbo.use()
@@ -1014,6 +1028,49 @@ class GlMaskedCompositor:
                 )
         finally:
             _restore_gl_state(saved, self._ctx)
+
+    def _generate_plasma_fields_gpu(
+        self,
+        *,
+        gen_width: int,
+        gen_height: int,
+        layer_count: int,
+        params: PatternMaskParams,
+        active_flags: tuple[bool, ...] | None = None,
+    ) -> np.ndarray:
+        """Render plasma weights on GPU and read back as (N, H, W) float64 fields."""
+        self._ensure_init()
+        assert self._ctx is not None
+        assert self._plasma_soft_prog is not None
+        assert self._plasma_soft_vao is not None
+        slice_fbo, slice_tex = self._ensure_plasma_soft_slice_target(
+            gen_width, gen_height
+        )
+        saved = _save_gl_state()
+        try:
+            _ensure_moderngl_draw_state()
+            self._ctx.viewport = (0, 0, gen_width, gen_height)
+            self._set_plasma_uniforms(
+                self._plasma_soft_prog,
+                gen_width=gen_width,
+                gen_height=gen_height,
+                layer_count=layer_count,
+                params=params,
+                active_flags=active_flags,
+            )
+            fields = np.empty((layer_count, gen_height, gen_width), dtype=np.float64)
+            for index in range(layer_count):
+                slice_fbo.use()
+                self._plasma_soft_prog["output_layer"].value = index
+                self._plasma_soft_vao.render(moderngl.TRIANGLE_STRIP)
+                raw = slice_tex.read(alignment=1)
+                layer_u8 = np.frombuffer(raw, dtype=np.uint8).reshape(
+                    gen_height, gen_width
+                )
+                fields[index] = layer_u8.astype(np.float64) / 255.0
+        finally:
+            _restore_gl_state(saved, self._ctx)
+        return fields
 
     def _generate_mask_cpu(
         self,
@@ -1119,6 +1176,16 @@ class GlMaskedCompositor:
             trans_h = max(1, gen_height // _TRANSITION_GEN_DIVISOR)
             if self._transition_in_progress(song_time_sec):
                 old_fields = self._blended_transition_weights(song_time_sec)
+            elif params.mask_type == "plasma":
+                old_fields = self._generate_plasma_fields_gpu(
+                    gen_width=trans_w,
+                    gen_height=trans_h,
+                    layer_count=layer_count,
+                    params=params,
+                    active_flags=self._last_active_slots
+                    if self._last_active_slots is not None
+                    else active_slots,
+                )
             else:
                 old_fields = generate_soft_weight_fields(
                     params.mask_type,
@@ -1132,16 +1199,25 @@ class GlMaskedCompositor:
                     if self._last_active_slots is not None
                     else active_slots,
                 )
-            target_fields = generate_soft_weight_fields(
-                params.mask_type,
-                trans_w,
-                trans_h,
-                layer_count,
-                density=params.density,
-                invert=params.invert,
-                seed=params.seed,
-                active_flags=active_slots,
-            )
+            if params.mask_type == "plasma":
+                target_fields = self._generate_plasma_fields_gpu(
+                    gen_width=trans_w,
+                    gen_height=trans_h,
+                    layer_count=layer_count,
+                    params=params,
+                    active_flags=active_slots,
+                )
+            else:
+                target_fields = generate_soft_weight_fields(
+                    params.mask_type,
+                    trans_w,
+                    trans_h,
+                    layer_count,
+                    density=params.density,
+                    invert=params.invert,
+                    seed=params.seed,
+                    active_flags=active_slots,
+                )
             if old_fields.shape[0] != target_fields.shape[0]:
                 n = target_fields.shape[0]
                 padded = np.zeros_like(target_fields)
@@ -1167,19 +1243,42 @@ class GlMaskedCompositor:
             self._transition_old_weights is not None
             and self._transition_target_weights is not None
         ):
-            # Transition finished: regenerate at full resolution for the
-            # settled cache (transition fields were at reduced resolution).
-            fields = generate_soft_weight_fields(
-                params.mask_type,
-                gen_width,
-                gen_height,
-                layer_count,
-                density=params.density,
-                invert=params.invert,
-                seed=params.seed,
-                active_flags=active_slots,
-            )
-            self._upload_weight_fields(fields, params.mode)
+            if params.mask_type == "plasma":
+                fields = self._generate_plasma_fields_gpu(
+                    gen_width=gen_width,
+                    gen_height=gen_height,
+                    layer_count=layer_count,
+                    params=params,
+                    active_flags=active_slots,
+                )
+                if params.mode == "soft":
+                    self._generate_plasma_soft_gpu(
+                        gen_width=gen_width,
+                        gen_height=gen_height,
+                        layer_count=layer_count,
+                        params=params,
+                        active_flags=active_slots,
+                    )
+                else:
+                    self._generate_plasma_hard_gpu(
+                        gen_width=gen_width,
+                        gen_height=gen_height,
+                        layer_count=layer_count,
+                        params=params,
+                        active_flags=active_slots,
+                    )
+            else:
+                fields = generate_soft_weight_fields(
+                    params.mask_type,
+                    gen_width,
+                    gen_height,
+                    layer_count,
+                    density=params.density,
+                    invert=params.invert,
+                    seed=params.seed,
+                    active_flags=active_slots,
+                )
+                self._upload_weight_fields(fields, params.mode)
             self._current_weight_fields = fields
             self._last_active_slots = active_slots
             self._clear_transition_state()
@@ -1203,9 +1302,7 @@ class GlMaskedCompositor:
             self._last_active_slots = active_slots
             return
 
-        use_gpu_plasma = (
-            params.mask_type == "plasma" and self._all_slots_active(active_slots)
-        )
+        use_gpu_plasma = params.mask_type == "plasma"
         if use_gpu_plasma:
             if params.mode == "soft":
                 self._generate_plasma_soft_gpu(
@@ -1213,6 +1310,7 @@ class GlMaskedCompositor:
                     gen_height=gen_height,
                     layer_count=layer_count,
                     params=params,
+                    active_flags=active_slots,
                 )
             else:
                 self._generate_plasma_hard_gpu(
@@ -1220,16 +1318,13 @@ class GlMaskedCompositor:
                     gen_height=gen_height,
                     layer_count=layer_count,
                     params=params,
+                    active_flags=active_slots,
                 )
-            # Keep float fields for transition snapshots.
-            fields = generate_soft_weight_fields(
-                params.mask_type,
-                gen_width,
-                gen_height,
-                layer_count,
-                density=params.density,
-                invert=params.invert,
-                seed=params.seed,
+            fields = self._generate_plasma_fields_gpu(
+                gen_width=gen_width,
+                gen_height=gen_height,
+                layer_count=layer_count,
+                params=params,
                 active_flags=active_slots,
             )
         elif params.mode == "hard" and params.mask_type != "plasma":
