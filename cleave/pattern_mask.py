@@ -121,6 +121,23 @@ def _validate_mask_dims(width: int, height: int, layer_count: int) -> None:
         raise ValueError("layer_count must be positive")
 
 
+def _resolve_active_flags(
+    layer_count: int,
+    active_flags: tuple[bool, ...] | None,
+) -> tuple[bool, ...]:
+    if active_flags is None:
+        return tuple(True for _ in range(layer_count))
+    if len(active_flags) != layer_count:
+        raise ValueError(
+            f"active_flags length {len(active_flags)} != layer_count {layer_count}"
+        )
+    return tuple(bool(flag) for flag in active_flags)
+
+
+def _active_layer_indices(active_flags: tuple[bool, ...]) -> list[int]:
+    return [index for index, flag in enumerate(active_flags) if flag]
+
+
 def _clamp_density(density: float) -> float:
     return max(PATTERN_MASK_DENSITY_MIN, min(PATTERN_MASK_DENSITY_MAX, float(density)))
 
@@ -156,30 +173,51 @@ def _apply_invert(region: np.ndarray, layer_count: int, invert: bool) -> np.ndar
     return (layer_count - 1 - region.astype(np.int64)).astype(np.uint8)
 
 
+def _zero_inactive_fields(
+    fields: np.ndarray, active_flags: tuple[bool, ...]
+) -> np.ndarray:
+    """Zero weight fields for inactive slots (caller renormalizes)."""
+    out = fields
+    for index, flag in enumerate(active_flags):
+        if not flag:
+            if out is fields:
+                out = fields.copy()
+            out[index] = 0.0
+    return out
+
+
 def generate_strips_mask(
     width: int,
     height: int,
     layer_count: int,
     density: float = DEFAULT_PATTERN_MASK_DENSITY,
     invert: bool = False,
+    active_flags: tuple[bool, ...] | None = None,
 ) -> np.ndarray:
     """Return a (H, W) uint8 region-index mask of vertical strips.
 
     Each element is a layer index in ``0 .. layer_count-1``. Density is a
-    multiplier of segments per layer (1.0x = one strip per layer); indices
-    cycle through layers. Invert reverses assignment order. Every row is identical.
+    multiplier of segments per active layer (1.0x = one strip per active
+    layer); inactive slots are omitted and neighbors widen. Invert reverses
+    assignment order. Every row is identical.
     """
     _validate_mask_dims(width, height, layer_count)
     width = int(width)
     height = int(height)
     layer_count = int(layer_count)
-    strip_count = _subdivision_count(layer_count, density)
+    flags = _resolve_active_flags(layer_count, active_flags)
+    active = _active_layer_indices(flags)
+    if not active:
+        return np.zeros((height, width), dtype=np.uint8)
+    n_active = len(active)
+    strip_count = _subdivision_count(n_active, density)
     xs = np.arange(width, dtype=np.int64)
     strip_index = np.minimum(
         (xs * strip_count) // width,
         strip_count - 1,
     )
-    row = (strip_index % layer_count).astype(np.uint8)
+    active_arr = np.asarray(active, dtype=np.uint8)
+    row = active_arr[strip_index % n_active]
     row = _apply_invert(row, layer_count, invert)
     return np.broadcast_to(row, (height, width)).copy()
 
@@ -222,25 +260,33 @@ def generate_radial_mask(
     layer_count: int,
     density: float = DEFAULT_PATTERN_MASK_DENSITY,
     invert: bool = False,
+    active_flags: tuple[bool, ...] | None = None,
 ) -> np.ndarray:
     """Return a (H, W) uint8 mask of angular wedges from the frame center.
 
-    Density is a multiplier of wedges per layer (1.0x = one wedge per layer).
-    Wedge angles are computed in screen pixel space (aspect-correct) with a
-    default rotation so low segment counts are diagonal rather than flat splits.
+    Density is a multiplier of wedges per active layer (1.0x = one wedge per
+    active layer). Inactive slots are omitted and neighbors widen. Wedge
+    angles are computed in screen pixel space (aspect-correct) with a default
+    rotation so low segment counts are diagonal rather than flat splits.
     Row 0 is the GL bottom edge (uv.y = 0).
     """
     _validate_mask_dims(width, height, layer_count)
     width = int(width)
     height = int(height)
     layer_count = int(layer_count)
-    wedge_count = _subdivision_count(layer_count, density)
+    flags = _resolve_active_flags(layer_count, active_flags)
+    active = _active_layer_indices(flags)
+    if not active:
+        return np.zeros((height, width), dtype=np.uint8)
+    n_active = len(active)
+    wedge_count = _subdivision_count(n_active, density)
     angle = _radial_normalized_angle(width, height, wedge_count)
     wedge_index = np.minimum(
         (angle * wedge_count).astype(np.int64),
         wedge_count - 1,
     )
-    region = (wedge_index % layer_count).astype(np.uint8)
+    active_arr = np.asarray(active, dtype=np.uint8)
+    region = active_arr[wedge_index % n_active]
     return _apply_invert(region, layer_count, invert)
 
 
@@ -250,23 +296,31 @@ def generate_checker_mask(
     layer_count: int,
     density: float = DEFAULT_PATTERN_MASK_DENSITY,
     invert: bool = False,
+    active_flags: tuple[bool, ...] | None = None,
 ) -> np.ndarray:
     """Return a (H, W) uint8 mask of grid tiles cycling layers row-major.
 
     Density is a multiplier of tiles per layer (1.0x = one tile per layer).
-    Row 0 is the GL bottom edge (uv.y = 0).
+    Inactive slots keep a channel index of 0 weight after soft renormalize;
+    hard mode maps tiles onto active slots only. Row 0 is the GL bottom edge.
     """
     _validate_mask_dims(width, height, layer_count)
     width = int(width)
     height = int(height)
     layer_count = int(layer_count)
-    cols, rows = _checker_grid_dims(width, height, layer_count, density)
+    flags = _resolve_active_flags(layer_count, active_flags)
+    active = _active_layer_indices(flags)
+    if not active:
+        return np.zeros((height, width), dtype=np.uint8)
+    n_active = len(active)
+    cols, rows = _checker_grid_dims(width, height, n_active, density)
     xs = np.arange(width, dtype=np.int64)
     ys = np.arange(height, dtype=np.int64)
     col = np.minimum((xs * cols) // width, cols - 1)
     row = np.minimum((ys * rows) // height, rows - 1)
     xx, yy = np.meshgrid(col, row)
-    region = ((yy + xx) % layer_count).astype(np.uint8)
+    active_arr = np.asarray(active, dtype=np.uint8)
+    region = active_arr[((yy + xx) % n_active)]
     return _apply_invert(region, layer_count, invert)
 
 
@@ -358,11 +412,23 @@ def _fields_to_u8_weights(fields: np.ndarray) -> np.ndarray:
     total = np.sum(fields, axis=0, keepdims=True)
     safe = np.maximum(total, 1e-12)
     norm = fields / safe
-    equal = np.full_like(fields, 1.0 / n)
+    # Pixels with no mass: equal-split among channels that have any mass elsewhere.
+    # All-zero channels (inactive slots) stay zero.
+    channel_active = np.any(fields > 0.0, axis=(1, 2))
+    n_active = int(np.count_nonzero(channel_active))
+    if n_active <= 0:
+        height, width = int(fields.shape[1]), int(fields.shape[2])
+        return np.zeros((height, width, n), dtype=np.uint8)
+    equal = np.zeros_like(fields)
+    equal[channel_active] = 1.0 / float(n_active)
     norm = np.where(total > 0.0, norm, equal)
     scaled = np.rint(norm * 255.0).astype(np.int64)
     residual = 255 - scaled.sum(axis=0)
     max_i = np.argmax(fields, axis=0)
+    # Prefer an active channel when all fields are zero at a pixel.
+    if n_active < n:
+        fallback = int(np.flatnonzero(channel_active)[0])
+        max_i = np.where(np.max(fields, axis=0) > 0.0, max_i, fallback)
     height, width = residual.shape
     ys, xs = np.indices((height, width))
     scaled[max_i, ys, xs] = np.clip(scaled[max_i, ys, xs] + residual, 0, 255)
@@ -383,85 +449,84 @@ def generate_plasma_mask(
     density: float = DEFAULT_PATTERN_MASK_DENSITY,
     seed: int = 0,
     invert: bool = False,
+    active_flags: tuple[bool, ...] | None = None,
 ) -> np.ndarray:
     """Return a (H, W) uint8 hard-mode plasma mask (argmax of seeded noise).
 
     Density scales noise frequency (1.0x coarse, 10.0x finer). Same *seed*
-    yields the same mask. Row 0 is the GL bottom edge (uv.y = 0).
+    yields the same mask. Inactive slots are zeroed before argmax.
+    Row 0 is the GL bottom edge (uv.y = 0).
     """
     _validate_mask_dims(width, height, layer_count)
     width = int(width)
     height = int(height)
     layer_count = int(layer_count)
+    flags = _resolve_active_flags(layer_count, active_flags)
     fields = _plasma_fields(
         width, height, layer_count, density=density, seed=seed
     )
+    fields = _zero_inactive_fields(fields, flags)
+    if not any(flags):
+        return np.zeros((height, width), dtype=np.uint8)
     region = np.argmax(fields, axis=0).astype(np.uint8)
     return _apply_invert(region, layer_count, invert)
 
 
-def generate_strips_weights(
+def _strips_weight_fields(
     width: int,
     height: int,
     layer_count: int,
-    density: float = DEFAULT_PATTERN_MASK_DENSITY,
-    invert: bool = False,
+    density: float,
+    active_flags: tuple[bool, ...],
 ) -> np.ndarray:
-    """Return (H, W, N) uint8 soft strip weights (sum ~255 per pixel)."""
-    _validate_mask_dims(width, height, layer_count)
-    width = int(width)
-    height = int(height)
-    layer_count = int(layer_count)
-    strip_count = _subdivision_count(layer_count, density)
-    xs = (np.arange(width, dtype=np.float64) + 0.5) / width * strip_count
+    """Return (N, H, W) float strip weight fields; inactive slots stay 0."""
+    active = _active_layer_indices(active_flags)
     fields = np.zeros((layer_count, height, width), dtype=np.float64)
+    if not active:
+        return fields
+    n_active = len(active)
+    strip_count = _subdivision_count(n_active, density)
+    xs = (np.arange(width, dtype=np.float64) + 0.5) / width * strip_count
     for strip in range(strip_count):
-        layer = strip % layer_count
+        layer = active[strip % n_active]
         center = strip + 0.5
         row = np.maximum(0.0, 1.0 - np.abs(xs - center))
         fields[layer] += row
-    weights = _fields_to_u8_weights(fields)
-    return _invert_weight_layers(weights, invert)
+    return fields
 
 
-def generate_radial_weights(
+def _radial_weight_fields(
     width: int,
     height: int,
     layer_count: int,
-    density: float = DEFAULT_PATTERN_MASK_DENSITY,
-    invert: bool = False,
+    density: float,
+    active_flags: tuple[bool, ...],
 ) -> np.ndarray:
-    """Return (H, W, N) uint8 soft wedge weights (sum ~255 per pixel)."""
-    _validate_mask_dims(width, height, layer_count)
-    width = int(width)
-    height = int(height)
-    layer_count = int(layer_count)
-    wedge_count = _subdivision_count(layer_count, density)
-    angle = _radial_normalized_angle(width, height, wedge_count) * wedge_count
+    """Return (N, H, W) float wedge weight fields; inactive slots stay 0."""
+    active = _active_layer_indices(active_flags)
     fields = np.zeros((layer_count, height, width), dtype=np.float64)
+    if not active:
+        return fields
+    n_active = len(active)
+    wedge_count = _subdivision_count(n_active, density)
+    angle = _radial_normalized_angle(width, height, wedge_count) * wedge_count
     for wedge in range(wedge_count):
-        layer = wedge % layer_count
+        layer = active[wedge % n_active]
         center = wedge + 0.5
         delta = np.abs(angle - center)
-        # Circular wrap so the first and last wedges blend across 0.
         delta = np.minimum(delta, float(wedge_count) - delta)
         fields[layer] += np.maximum(0.0, 1.0 - delta)
-    weights = _fields_to_u8_weights(fields)
-    return _invert_weight_layers(weights, invert)
+    return fields
 
 
-def generate_checker_weights(
+def _checker_weight_fields(
     width: int,
     height: int,
     layer_count: int,
-    density: float = DEFAULT_PATTERN_MASK_DENSITY,
-    invert: bool = False,
+    density: float,
+    active_flags: tuple[bool, ...],
 ) -> np.ndarray:
-    """Return (H, W, N) uint8 soft checker weights (sum ~255 per pixel)."""
-    _validate_mask_dims(width, height, layer_count)
-    width = int(width)
-    height = int(height)
-    layer_count = int(layer_count)
+    """Return (N, H, W) float checker fields; inactive zeroed then renormalized."""
     tile_count = _subdivision_count(layer_count, density)
     cols, rows = _checker_grid_dims(width, height, layer_count, density)
     xs = (np.arange(width, dtype=np.float64) + 0.5) / width * cols
@@ -477,6 +542,62 @@ def generate_checker_weights(
             dx = np.abs(xx - (col + 0.5))
             dy = np.abs(yy - (row + 0.5))
             fields[layer] += np.maximum(0.0, 1.0 - np.maximum(dx, dy))
+    return _zero_inactive_fields(fields, active_flags)
+
+
+def generate_strips_weights(
+    width: int,
+    height: int,
+    layer_count: int,
+    density: float = DEFAULT_PATTERN_MASK_DENSITY,
+    invert: bool = False,
+    active_flags: tuple[bool, ...] | None = None,
+) -> np.ndarray:
+    """Return (H, W, N) uint8 soft strip weights (sum ~255 per pixel)."""
+    _validate_mask_dims(width, height, layer_count)
+    width = int(width)
+    height = int(height)
+    layer_count = int(layer_count)
+    flags = _resolve_active_flags(layer_count, active_flags)
+    fields = _strips_weight_fields(width, height, layer_count, density, flags)
+    weights = _fields_to_u8_weights(fields)
+    return _invert_weight_layers(weights, invert)
+
+
+def generate_radial_weights(
+    width: int,
+    height: int,
+    layer_count: int,
+    density: float = DEFAULT_PATTERN_MASK_DENSITY,
+    invert: bool = False,
+    active_flags: tuple[bool, ...] | None = None,
+) -> np.ndarray:
+    """Return (H, W, N) uint8 soft wedge weights (sum ~255 per pixel)."""
+    _validate_mask_dims(width, height, layer_count)
+    width = int(width)
+    height = int(height)
+    layer_count = int(layer_count)
+    flags = _resolve_active_flags(layer_count, active_flags)
+    fields = _radial_weight_fields(width, height, layer_count, density, flags)
+    weights = _fields_to_u8_weights(fields)
+    return _invert_weight_layers(weights, invert)
+
+
+def generate_checker_weights(
+    width: int,
+    height: int,
+    layer_count: int,
+    density: float = DEFAULT_PATTERN_MASK_DENSITY,
+    invert: bool = False,
+    active_flags: tuple[bool, ...] | None = None,
+) -> np.ndarray:
+    """Return (H, W, N) uint8 soft checker weights (sum ~255 per pixel)."""
+    _validate_mask_dims(width, height, layer_count)
+    width = int(width)
+    height = int(height)
+    layer_count = int(layer_count)
+    flags = _resolve_active_flags(layer_count, active_flags)
+    fields = _checker_weight_fields(width, height, layer_count, density, flags)
     weights = _fields_to_u8_weights(fields)
     return _invert_weight_layers(weights, invert)
 
@@ -488,17 +609,74 @@ def generate_plasma_weights(
     density: float = DEFAULT_PATTERN_MASK_DENSITY,
     seed: int = 0,
     invert: bool = False,
+    active_flags: tuple[bool, ...] | None = None,
 ) -> np.ndarray:
     """Return (H, W, N) uint8 soft plasma weights (sum ~255 per pixel)."""
     _validate_mask_dims(width, height, layer_count)
     width = int(width)
     height = int(height)
     layer_count = int(layer_count)
+    flags = _resolve_active_flags(layer_count, active_flags)
     fields = _plasma_fields(
         width, height, layer_count, density=density, seed=seed
     )
+    fields = _zero_inactive_fields(fields, flags)
     weights = _fields_to_u8_weights(fields)
     return _invert_weight_layers(weights, invert)
+
+
+def generate_soft_weight_fields(
+    mask_type: str,
+    width: int,
+    height: int,
+    layer_count: int,
+    *,
+    density: float = DEFAULT_PATTERN_MASK_DENSITY,
+    invert: bool = False,
+    seed: int = 0,
+    active_flags: tuple[bool, ...] | None = None,
+) -> np.ndarray:
+    """Return (N, H, W) float64 soft weight fields for *mask_type*.
+
+    Inactive slots are weight 0. Fields are non-negative and suitable for
+    linear blending during mask transitions; callers convert to uint8 or
+    derive hard masks via argmax.
+    """
+    _validate_mask_dims(width, height, layer_count)
+    width = int(width)
+    height = int(height)
+    layer_count = int(layer_count)
+    flags = _resolve_active_flags(layer_count, active_flags)
+    if mask_type == "strips":
+        fields = _strips_weight_fields(width, height, layer_count, density, flags)
+    elif mask_type == "radial":
+        fields = _radial_weight_fields(width, height, layer_count, density, flags)
+    elif mask_type == "checker":
+        fields = _checker_weight_fields(width, height, layer_count, density, flags)
+    elif mask_type == "plasma":
+        fields = _plasma_fields(
+            width, height, layer_count, density=density, seed=seed
+        )
+        fields = _zero_inactive_fields(fields, flags)
+    else:
+        raise ValueError(f"unknown pattern mask type: {mask_type!r}")
+    if invert:
+        fields = fields[::-1].copy()
+    return fields
+
+
+def hard_mask_from_weight_fields(fields: np.ndarray) -> np.ndarray:
+    """Derive a (H, W) uint8 hard mask via argmax over (N, H, W) *fields*."""
+    if fields.ndim != 3:
+        raise ValueError("fields must be (N, H, W)")
+    if fields.shape[0] <= 0:
+        raise ValueError("layer_count must be positive")
+    return np.argmax(fields, axis=0).astype(np.uint8)
+
+
+def u8_weights_from_fields(fields: np.ndarray) -> np.ndarray:
+    """Normalize (N, H, W) fields to (H, W, N) uint8 soft weights."""
+    return _fields_to_u8_weights(fields)
 
 
 def generate_hard_mask(
@@ -510,19 +688,35 @@ def generate_hard_mask(
     density: float = DEFAULT_PATTERN_MASK_DENSITY,
     invert: bool = False,
     seed: int = 0,
+    active_flags: tuple[bool, ...] | None = None,
 ) -> np.ndarray:
     """Dispatch hard-mode mask generation by pattern *mask_type*."""
     if mask_type == "strips":
         return generate_strips_mask(
-            width, height, layer_count, density=density, invert=invert
+            width,
+            height,
+            layer_count,
+            density=density,
+            invert=invert,
+            active_flags=active_flags,
         )
     if mask_type == "radial":
         return generate_radial_mask(
-            width, height, layer_count, density=density, invert=invert
+            width,
+            height,
+            layer_count,
+            density=density,
+            invert=invert,
+            active_flags=active_flags,
         )
     if mask_type == "checker":
         return generate_checker_mask(
-            width, height, layer_count, density=density, invert=invert
+            width,
+            height,
+            layer_count,
+            density=density,
+            invert=invert,
+            active_flags=active_flags,
         )
     if mask_type == "plasma":
         return generate_plasma_mask(
@@ -532,6 +726,7 @@ def generate_hard_mask(
             density=density,
             seed=seed,
             invert=invert,
+            active_flags=active_flags,
         )
     raise ValueError(f"unknown pattern mask type: {mask_type!r}")
 
@@ -545,6 +740,7 @@ def generate_soft_weights(
     density: float = DEFAULT_PATTERN_MASK_DENSITY,
     invert: bool = False,
     seed: int = 0,
+    active_flags: tuple[bool, ...] | None = None,
 ) -> np.ndarray:
     """Dispatch soft-mode weight generation by pattern *mask_type*.
 
@@ -553,15 +749,30 @@ def generate_soft_weights(
     """
     if mask_type == "strips":
         return generate_strips_weights(
-            width, height, layer_count, density=density, invert=invert
+            width,
+            height,
+            layer_count,
+            density=density,
+            invert=invert,
+            active_flags=active_flags,
         )
     if mask_type == "radial":
         return generate_radial_weights(
-            width, height, layer_count, density=density, invert=invert
+            width,
+            height,
+            layer_count,
+            density=density,
+            invert=invert,
+            active_flags=active_flags,
         )
     if mask_type == "checker":
         return generate_checker_weights(
-            width, height, layer_count, density=density, invert=invert
+            width,
+            height,
+            layer_count,
+            density=density,
+            invert=invert,
+            active_flags=active_flags,
         )
     if mask_type == "plasma":
         return generate_plasma_weights(
@@ -571,6 +782,7 @@ def generate_soft_weights(
             density=density,
             seed=seed,
             invert=invert,
+            active_flags=active_flags,
         )
     raise ValueError(f"unknown pattern mask type: {mask_type!r}")
 

@@ -224,6 +224,7 @@ class RenderPatternMaskBlock:
     density: float = _RO_PATTERN_MASK_DEFAULTS["density"]
     mode: PatternMaskMode = _RO_PATTERN_MASK_DEFAULTS["mode"]
     invert: bool = _RO_PATTERN_MASK_DEFAULTS["invert"]
+    transition: float = _RO_PATTERN_MASK_DEFAULTS["transition"]
     seed: int = _RO_PATTERN_MASK_DEFAULTS["seed"]
     locked: bool = False
 
@@ -772,6 +773,7 @@ class TuningViewStateBuilder:
             mode=pm.mode,
             density=pm.density,
             invert=pm.invert,
+            transition=pm.transition,
             seed=pm.seed,
             locked=pm.locked,
         )
@@ -1036,6 +1038,7 @@ class TuningViewStateBuilder:
                 mode=pm.mode,
                 density=pm.density,
                 invert=pm.invert,
+                transition=pm.transition,
                 seed=pm.seed,
                 locked=pm.locked,
             ),

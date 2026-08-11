@@ -10,6 +10,7 @@ from cleave.config_schema import (
     PatternMaskMode,
     PatternMaskType,
     clamp_pattern_mask_density,
+    clamp_pattern_mask_transition,
 )
 from cleave.pattern_mask import cycle_pattern_mask_invert, cycle_pattern_mask_mode
 from cleave.viz.session import TuningSession
@@ -40,6 +41,11 @@ class RenderPatternMaskControls:
 
     def set_invert(self, invert: bool) -> None:
         self.session.render_pattern_mask.invert = bool(invert)
+
+    def set_transition(self, transition: float) -> None:
+        self.session.render_pattern_mask.transition = clamp_pattern_mask_transition(
+            transition
+        )
 
     def cycle_invert(self, *, forward: bool) -> None:
         pm = self.session.render_pattern_mask

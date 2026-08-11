@@ -451,6 +451,7 @@ def tick_frame_core(
             runtime.layers_by_slot,
             runtime.seed.session,
             masked_compositor=runtime.masked_compositor,
+            song_time_sec=t_sec,
         )
     return was_paused
 

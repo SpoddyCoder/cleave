@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING
 from cleave.config_schema import (
     PATTERN_MASK_DENSITY_STEP,
     PATTERN_MASK_DENSITY_STEP_LARGE,
+    PATTERN_MASK_TRANSITION_STEP,
+    PATTERN_MASK_TRANSITION_STEP_LARGE,
     TIMELINE_FADE_DURATION_STEP,
     VISUAL_LIMITER_RATIO_STEP,
     VISUAL_LIMITER_RELEASE_STEP,
@@ -1504,6 +1506,12 @@ def _format_render_pattern_mask_invert(
     return pattern_mask_invert_display(state.render_pattern_mask.invert)
 
 
+def _format_render_pattern_mask_transition(
+    state: TuningViewState, _desc: RowDescriptor
+) -> str:
+    return f"{state.render_pattern_mask.transition:.1f}s"
+
+
 def _format_render_pattern_mask_seed(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
@@ -1570,6 +1578,22 @@ def _apply_render_pattern_mask_invert(
     _shift: bool,
 ) -> None:
     controls._render_pattern_mask.cycle_invert(forward=forward)
+
+
+def _apply_render_pattern_mask_transition(
+    controls: TuningControls,
+    _desc: RowDescriptor,
+    forward: bool,
+    ctrl: bool,
+    _shift: bool,
+) -> None:
+    step = (
+        PATTERN_MASK_TRANSITION_STEP_LARGE if ctrl else PATTERN_MASK_TRANSITION_STEP
+    )
+    delta = step if forward else -step
+    controls._render_pattern_mask.set_transition(
+        controls.session.render_pattern_mask.transition + delta
+    )
 
 
 def _apply_render_pattern_mask_seed(
@@ -2254,6 +2278,12 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_render_pattern_mask_invert,
         apply_horizontal=_apply_render_pattern_mask_invert,
+    ),
+    RowKind.RENDER_PATTERN_MASK_TRANSITION: RowFieldDef(
+        panel_label="transition",
+        present_style=RowPresentStyle.LABELED_VALUE,
+        format_value=_format_render_pattern_mask_transition,
+        apply_horizontal=_apply_render_pattern_mask_transition,
     ),
     RowKind.RENDER_PATTERN_MASK_SEED: RowFieldDef(
         panel_label="seed",

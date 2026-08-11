@@ -21,6 +21,7 @@ from cleave.config_schema import (
     DEFAULT_RENDER_PATTERN_MASK_INVERT,
     DEFAULT_RENDER_PATTERN_MASK_MODE,
     DEFAULT_RENDER_PATTERN_MASK_SEED,
+    DEFAULT_RENDER_PATTERN_MASK_TRANSITION,
     DEFAULT_RENDER_PATTERN_MASK_TYPE,
     PATTERN_MASK_TYPES,
     PersistCtx,
@@ -37,9 +38,11 @@ from cleave.pattern_mask import (
     generate_plasma_weights,
     generate_radial_mask,
     generate_radial_weights,
+    generate_soft_weight_fields,
     generate_soft_weights,
     generate_strips_mask,
     generate_strips_weights,
+    hard_mask_from_weight_fields,
     timeline_preset_pattern_mask_display,
 )
 from cleave.viz.session import (
@@ -91,6 +94,62 @@ def test_generate_strips_mask_rejects_invalid_args() -> None:
         generate_strips_mask(16, 0, layer_count=2)
     with pytest.raises(ValueError, match="layer_count"):
         generate_strips_mask(16, 16, layer_count=0)
+
+
+def test_strips_active_flags_omit_inactive_slot() -> None:
+    """Inactive strip channels stay unused; neighbors widen to fill the frame."""
+    flags = (True, False, True)
+    mask = generate_strips_mask(
+        90, 20, layer_count=3, density=1.0, active_flags=flags
+    )
+    used = set(int(v) for v in np.unique(mask))
+    assert used == {0, 2}
+    assert 1 not in used
+    # Two strips for two active slots: left = slot 0, right = slot 2.
+    assert int(mask[0, 15]) == 0
+    assert int(mask[0, 75]) == 2
+
+
+def test_strips_soft_weights_zero_inactive_channel() -> None:
+    flags = (True, False, True)
+    weights = generate_strips_weights(
+        64, 16, layer_count=3, density=1.0, active_flags=flags
+    )
+    assert weights.shape == (16, 64, 3)
+    assert int(weights[:, :, 1].max()) == 0
+    assert int(weights[:, :, 0].max()) > 0
+    assert int(weights[:, :, 2].max()) > 0
+
+
+def test_radial_active_flags_omit_inactive_wedge() -> None:
+    flags = (True, False, True, True)
+    mask = generate_radial_mask(
+        64, 64, layer_count=4, density=1.0, active_flags=flags
+    )
+    used = set(int(v) for v in np.unique(mask))
+    assert 1 not in used
+    assert used.issubset({0, 2, 3})
+
+
+def test_plasma_active_flags_zero_inactive_before_argmax() -> None:
+    flags = (True, False, True)
+    fields = generate_soft_weight_fields(
+        "plasma", 32, 24, 3, density=2.0, seed=7, active_flags=flags
+    )
+    assert fields.shape == (3, 24, 32)
+    assert float(fields[1].max()) == 0.0
+    mask = hard_mask_from_weight_fields(fields)
+    assert set(int(v) for v in np.unique(mask)).issubset({0, 2})
+
+
+def test_checker_soft_weights_renormalize_inactive() -> None:
+    flags = (True, False, True, True)
+    weights = generate_checker_weights(
+        48, 48, layer_count=4, density=2.0, active_flags=flags
+    )
+    assert int(weights[:, :, 1].max()) == 0
+    # Remaining channels still cover the frame.
+    assert int(weights.sum(axis=2).min()) > 0
 
 
 def test_generate_radial_mask_shape_and_bounds() -> None:
@@ -330,6 +389,7 @@ def test_parse_render_pattern_mask_defaults() -> None:
     assert render.pattern_mask.mode == DEFAULT_RENDER_PATTERN_MASK_MODE
     assert render.pattern_mask.density == DEFAULT_RENDER_PATTERN_MASK_DENSITY
     assert render.pattern_mask.invert is DEFAULT_RENDER_PATTERN_MASK_INVERT
+    assert render.pattern_mask.transition == DEFAULT_RENDER_PATTERN_MASK_TRANSITION
     assert render.pattern_mask.seed == DEFAULT_RENDER_PATTERN_MASK_SEED
     assert render.pattern_mask.locked is False
 
@@ -344,6 +404,7 @@ def test_parse_render_pattern_mask_explicit() -> None:
                     "mode": "soft",
                     "density": 2.5,
                     "invert": True,
+                    "transition": 1.5,
                     "seed": 42,
                     "locked": True,
                 }
@@ -357,6 +418,7 @@ def test_parse_render_pattern_mask_explicit() -> None:
     assert render.pattern_mask.mode == "soft"
     assert render.pattern_mask.density == 2.5
     assert render.pattern_mask.invert is True
+    assert render.pattern_mask.transition == 1.5
     assert render.pattern_mask.seed == 42
     assert render.pattern_mask.locked is True
 
@@ -374,6 +436,19 @@ def test_parse_render_pattern_mask_clamps_density() -> None:
     assert low is not None
     assert low.pattern_mask is not None
     assert low.pattern_mask.density == 1.0
+
+
+def test_parse_render_pattern_mask_clamps_transition() -> None:
+    high = parse_render_section(
+        {"render": {"pattern_mask": {"transition": 9.0}}}
+    )
+    assert high is not None
+    assert high.pattern_mask is not None
+    assert high.pattern_mask.transition == 5.0
+    with pytest.raises(ValueError, match="non-negative"):
+        parse_render_section(
+            {"render": {"pattern_mask": {"transition": -1.0}}}
+        )
 
 
 def test_parse_render_pattern_mask_accepts_all_types() -> None:
@@ -407,6 +482,7 @@ def test_persist_render_pattern_mask_round_trip() -> None:
                     "mode": "hard",
                     "density": 2.5,
                     "invert": True,
+                    "transition": 0.8,
                     "seed": 99,
                     "locked": True,
                 },
@@ -432,6 +508,7 @@ def test_persist_render_pattern_mask_round_trip() -> None:
         "density": 2.5,
         "mode": "hard",
         "invert": True,
+        "transition": 0.8,
         "seed": 99,
     }
     round_trip = parse_render_section({"render": payload})
@@ -443,6 +520,7 @@ def test_persist_render_pattern_mask_round_trip() -> None:
         mode="hard",
         invert=True,
         seed=99,
+        transition=0.8,
         locked=True,
     )
 

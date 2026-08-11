@@ -284,6 +284,7 @@ class RenderPatternMaskConfig:
     mode: PatternMaskMode
     invert: bool
     seed: int
+    transition: float = 0.0
     locked: bool = False
 
 

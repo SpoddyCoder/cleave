@@ -716,6 +716,7 @@ RENDER_PATTERN_MASK_SECTION = ExpandSectionDef(
         SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_DENSITY),
         SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_MODE),
         SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_INVERT),
+        SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_TRANSITION),
         SectionNode(conditional=RENDER_PATTERN_MASK_PLASMA_SEED),
     ),
 )
