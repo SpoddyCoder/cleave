@@ -55,7 +55,7 @@ def test_composite_uses_masked_path_when_enabled() -> None:
     session.render_pattern_mask.enabled = True
     session.render_pattern_mask.mode = "hard"
     session.render_pattern_mask.type = "radial"
-    session.render_pattern_mask.density = 0.25
+    session.render_pattern_mask.density = 2.5
     session.render_pattern_mask.invert = True
     session.render_pattern_mask.seed = 11
     layers_by_slot = {
@@ -84,7 +84,7 @@ def test_composite_uses_masked_path_when_enabled() -> None:
     assert call.args[0] == 7
     assert call.kwargs["mask_type"] == "radial"
     assert call.kwargs["mode"] == "hard"
-    assert call.kwargs["density"] == 0.25
+    assert call.kwargs["density"] == 2.5
     assert call.kwargs["invert"] is True
     assert call.kwargs["seed"] == 11
 
@@ -94,7 +94,7 @@ def test_composite_uses_soft_path_when_mode_soft() -> None:
     session.render_pattern_mask.enabled = True
     session.render_pattern_mask.mode = "soft"
     session.render_pattern_mask.type = "plasma"
-    session.render_pattern_mask.density = 0.5
+    session.render_pattern_mask.density = 2.0
     session.render_pattern_mask.invert = False
     session.render_pattern_mask.seed = 42
     layers_by_slot = {

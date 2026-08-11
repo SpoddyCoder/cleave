@@ -22,7 +22,7 @@ Complements existing compositing: black-key / add (and other [blend modes](../cl
 - A mask field `w_i(x, y)` per layer. In hard mode one layer wins per pixel; in soft mode weights form a soft partition (ideally summing to about 1).
 - Composite still happens in the OpenGL compositor. Layer opacity, timeline level, and blend mode apply inside each layer's contribution; the mask gates or weights that contribution spatially.
 
-Layer count is not a mask parameter. It comes from the session. Geometry knobs (density) control how the map is subdivided, then regions are assigned to layers. Region count equals visible layer count; density controls the geometry within that constraint (strip width, feathering).
+Layer count is not a mask parameter. It comes from the session. Geometry knobs (density) control how the map is subdivided, then regions are assigned to layers. Region count equals visible layer count; density is a multiplier of segments per layer (1.0x = one segment per active layer).
 
 ---
 
@@ -48,7 +48,7 @@ Shared mask shaders should later feed [geometric transition wipes](roadmap.md) (
 RENDER > PATTERN MASK
   enabled
   type: off | strips | radial | checker | plasma
-  density             # geometry (e.g. strip count, checker tiles), not layer count
+  density             # multiplier: 1.0x = 1 segment/layer, 10.0x = 10/layer
   mode: hard | soft
   layer order         # default: visible stack order; optional mix special-case
   invert

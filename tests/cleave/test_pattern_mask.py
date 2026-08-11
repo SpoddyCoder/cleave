@@ -58,25 +58,28 @@ def _assert_valid_hard_mask(
 
 
 def test_generate_strips_mask_shape_and_dtype() -> None:
-    mask = generate_strips_mask(128, 72, layer_count=4, density=0.5, invert=False)
+    mask = generate_strips_mask(128, 72, layer_count=4, density=2.0, invert=False)
     _assert_valid_hard_mask(mask, height=72, width=128, layer_count=4)
     # Vertical strips: every row identical.
     assert np.array_equal(mask, np.broadcast_to(mask[0], mask.shape))
 
 
 def test_generate_strips_mask_density_controls_strip_count() -> None:
-    low = generate_strips_mask(100, 40, layer_count=4, density=0.0)
-    high = generate_strips_mask(100, 40, layer_count=4, density=1.0)
+    low = generate_strips_mask(100, 40, layer_count=4, density=1.0)
+    high = generate_strips_mask(100, 40, layer_count=4, density=10.0)
     assert len(np.unique(low)) == 4
     assert len(np.unique(high)) == 4
     low_transitions = int(np.sum(low[0, 1:] != low[0, :-1]))
     high_transitions = int(np.sum(high[0, 1:] != high[0, :-1]))
     assert high_transitions > low_transitions
+    # 1.0x = one segment per layer; 10.0x = ten segments per layer.
+    assert low_transitions == 3  # 4 strips -> 3 boundaries
+    assert high_transitions == 39  # 40 strips -> 39 boundaries
 
 
 def test_generate_strips_mask_invert_reverses_assignment() -> None:
-    base = generate_strips_mask(64, 32, layer_count=4, density=0.5, invert=False)
-    inverted = generate_strips_mask(64, 32, layer_count=4, density=0.5, invert=True)
+    base = generate_strips_mask(64, 32, layer_count=4, density=2.0, invert=False)
+    inverted = generate_strips_mask(64, 32, layer_count=4, density=2.0, invert=True)
     assert np.array_equal(inverted, (3 - base.astype(np.int64)).astype(np.uint8))
 
 
@@ -90,26 +93,26 @@ def test_generate_strips_mask_rejects_invalid_args() -> None:
 
 
 def test_generate_radial_mask_shape_and_bounds() -> None:
-    mask = generate_radial_mask(64, 48, layer_count=4, density=0.5, invert=False)
+    mask = generate_radial_mask(64, 48, layer_count=4, density=2.0, invert=False)
     _assert_valid_hard_mask(mask, height=48, width=64, layer_count=4)
     assert len(np.unique(mask)) == 4
 
 
 def test_generate_radial_mask_invert() -> None:
-    base = generate_radial_mask(32, 32, layer_count=3, density=0.25, invert=False)
-    inverted = generate_radial_mask(32, 32, layer_count=3, density=0.25, invert=True)
+    base = generate_radial_mask(32, 32, layer_count=3, density=1.5, invert=False)
+    inverted = generate_radial_mask(32, 32, layer_count=3, density=1.5, invert=True)
     assert np.array_equal(inverted, (2 - base.astype(np.int64)).astype(np.uint8))
 
 
 def test_generate_checker_mask_shape_and_bounds() -> None:
-    mask = generate_checker_mask(80, 60, layer_count=4, density=0.5, invert=False)
+    mask = generate_checker_mask(80, 60, layer_count=4, density=2.0, invert=False)
     _assert_valid_hard_mask(mask, height=60, width=80, layer_count=4)
     assert len(np.unique(mask)) == 4
 
 
 def test_generate_checker_mask_density_adds_tiles() -> None:
-    low = generate_checker_mask(64, 64, layer_count=4, density=0.0)
-    high = generate_checker_mask(64, 64, layer_count=4, density=1.0)
+    low = generate_checker_mask(64, 64, layer_count=4, density=1.0)
+    high = generate_checker_mask(64, 64, layer_count=4, density=10.0)
     # Higher density should create more spatial transitions.
     low_h = int(np.sum(low[0, 1:] != low[0, :-1]))
     high_h = int(np.sum(high[0, 1:] != high[0, :-1]))
@@ -121,7 +124,7 @@ def test_generate_checker_mask_density_adds_tiles() -> None:
 def test_generate_checker_mask_has_2d_variation() -> None:
     """Checker must vary in both axes (not vertical strips)."""
     w, h = 1280, 720
-    mask = generate_checker_mask(w, h, layer_count=4, density=0.5)
+    mask = generate_checker_mask(w, h, layer_count=4, density=2.0)
     rows_identical = all(np.array_equal(mask[i], mask[0]) for i in range(h))
     cols_identical = all(np.array_equal(mask[:, i], mask[:, 0]) for i in range(w))
     assert not rows_identical
@@ -130,8 +133,8 @@ def test_generate_checker_mask_has_2d_variation() -> None:
 
 def test_generate_checker_mask_density_changes_grid() -> None:
     w, h = 1280, 720
-    low = generate_checker_mask(w, h, layer_count=4, density=0.0)
-    high = generate_checker_mask(w, h, layer_count=4, density=1.0)
+    low = generate_checker_mask(w, h, layer_count=4, density=1.0)
+    high = generate_checker_mask(w, h, layer_count=4, density=10.0)
     low_trans = int(np.sum(low[:, 1:] != low[:, :-1])) + int(
         np.sum(low[1:, :] != low[:-1, :])
     )
@@ -143,7 +146,7 @@ def test_generate_checker_mask_density_changes_grid() -> None:
 
 def test_generate_checker_weights_has_2d_variation() -> None:
     w, h = 1280, 720
-    weights = generate_checker_weights(w, h, layer_count=4, density=0.5)
+    weights = generate_checker_weights(w, h, layer_count=4, density=2.0)
     dominant = np.argmax(weights, axis=2)
     rows_identical = all(np.array_equal(dominant[i], dominant[0]) for i in range(h))
     cols_identical = all(
@@ -154,9 +157,9 @@ def test_generate_checker_weights_has_2d_variation() -> None:
 
 
 def test_generate_plasma_mask_shape_bounds_and_seed() -> None:
-    a = generate_plasma_mask(48, 36, layer_count=4, density=0.5, seed=7, invert=False)
-    b = generate_plasma_mask(48, 36, layer_count=4, density=0.5, seed=7, invert=False)
-    c = generate_plasma_mask(48, 36, layer_count=4, density=0.5, seed=8, invert=False)
+    a = generate_plasma_mask(48, 36, layer_count=4, density=2.0, seed=7, invert=False)
+    b = generate_plasma_mask(48, 36, layer_count=4, density=2.0, seed=7, invert=False)
+    c = generate_plasma_mask(48, 36, layer_count=4, density=2.0, seed=8, invert=False)
     _assert_valid_hard_mask(a, height=36, width=48, layer_count=4)
     assert np.array_equal(a, b)
     assert not np.array_equal(a, c)
@@ -166,7 +169,7 @@ def test_generate_plasma_mask_shape_bounds_and_seed() -> None:
 def test_generate_hard_mask_dispatches_types() -> None:
     for mask_type in PATTERN_MASK_TYPES:
         mask = generate_hard_mask(
-            mask_type, 32, 24, 3, density=0.4, invert=False, seed=1
+            mask_type, 32, 24, 3, density=1.5, invert=False, seed=1
         )
         _assert_valid_hard_mask(mask, height=24, width=32, layer_count=3)
 
@@ -188,26 +191,26 @@ def _assert_valid_soft_weights(
 
 
 def test_generate_strips_weights_shape_and_sum() -> None:
-    weights = generate_strips_weights(64, 32, layer_count=4, density=0.5)
+    weights = generate_strips_weights(64, 32, layer_count=4, density=2.0)
     _assert_valid_soft_weights(weights, height=32, width=64, layer_count=4)
     # Vertical strips: every row identical.
     assert np.array_equal(weights, np.broadcast_to(weights[0], weights.shape))
 
 
 def test_generate_radial_weights_shape_and_sum() -> None:
-    weights = generate_radial_weights(48, 36, layer_count=3, density=0.4)
+    weights = generate_radial_weights(48, 36, layer_count=3, density=1.5)
     _assert_valid_soft_weights(weights, height=36, width=48, layer_count=3)
 
 
 def test_generate_checker_weights_shape_and_sum() -> None:
-    weights = generate_checker_weights(40, 40, layer_count=4, density=0.6)
+    weights = generate_checker_weights(40, 40, layer_count=4, density=2.5)
     _assert_valid_soft_weights(weights, height=40, width=40, layer_count=4)
 
 
 def test_generate_plasma_weights_shape_sum_and_seed() -> None:
-    a = generate_plasma_weights(32, 24, layer_count=4, density=0.5, seed=3)
-    b = generate_plasma_weights(32, 24, layer_count=4, density=0.5, seed=3)
-    c = generate_plasma_weights(32, 24, layer_count=4, density=0.5, seed=4)
+    a = generate_plasma_weights(32, 24, layer_count=4, density=2.0, seed=3)
+    b = generate_plasma_weights(32, 24, layer_count=4, density=2.0, seed=3)
+    c = generate_plasma_weights(32, 24, layer_count=4, density=2.0, seed=4)
     _assert_valid_soft_weights(a, height=24, width=32, layer_count=4)
     assert np.array_equal(a, b)
     assert not np.array_equal(a, c)
@@ -216,14 +219,14 @@ def test_generate_plasma_weights_shape_sum_and_seed() -> None:
 def test_generate_soft_weights_dispatches_types() -> None:
     for mask_type in PATTERN_MASK_TYPES:
         weights = generate_soft_weights(
-            mask_type, 24, 16, 3, density=0.3, invert=False, seed=2
+            mask_type, 24, 16, 3, density=1.5, invert=False, seed=2
         )
         _assert_valid_soft_weights(weights, height=16, width=24, layer_count=3)
 
 
 def test_generate_soft_weights_invert_reverses_layers() -> None:
-    base = generate_strips_weights(32, 16, layer_count=4, density=0.5, invert=False)
-    inverted = generate_strips_weights(32, 16, layer_count=4, density=0.5, invert=True)
+    base = generate_strips_weights(32, 16, layer_count=4, density=2.0, invert=False)
+    inverted = generate_strips_weights(32, 16, layer_count=4, density=2.0, invert=True)
     assert np.array_equal(inverted, base[:, :, ::-1])
 
 
@@ -253,7 +256,7 @@ def test_parse_render_pattern_mask_explicit() -> None:
                     "enabled": True,
                     "type": "plasma",
                     "mode": "soft",
-                    "density": 0.75,
+                    "density": 2.5,
                     "invert": True,
                     "seed": 42,
                     "locked": True,
@@ -266,19 +269,25 @@ def test_parse_render_pattern_mask_explicit() -> None:
     assert render.pattern_mask.enabled is True
     assert render.pattern_mask.type == "plasma"
     assert render.pattern_mask.mode == "soft"
-    assert render.pattern_mask.density == 0.75
+    assert render.pattern_mask.density == 2.5
     assert render.pattern_mask.invert is True
     assert render.pattern_mask.seed == 42
     assert render.pattern_mask.locked is True
 
 
 def test_parse_render_pattern_mask_clamps_density() -> None:
-    render = parse_render_section(
-        {"render": {"pattern_mask": {"density": 2.5}}}
+    high = parse_render_section(
+        {"render": {"pattern_mask": {"density": 12.0}}}
     )
-    assert render is not None
-    assert render.pattern_mask is not None
-    assert render.pattern_mask.density == 1.0
+    assert high is not None
+    assert high.pattern_mask is not None
+    assert high.pattern_mask.density == 10.0
+    low = parse_render_section(
+        {"render": {"pattern_mask": {"density": 0.5}}}
+    )
+    assert low is not None
+    assert low.pattern_mask is not None
+    assert low.pattern_mask.density == 1.0
 
 
 def test_parse_render_pattern_mask_accepts_all_types() -> None:
@@ -310,7 +319,7 @@ def test_persist_render_pattern_mask_round_trip() -> None:
                     "enabled": True,
                     "type": "radial",
                     "mode": "hard",
-                    "density": 0.25,
+                    "density": 2.5,
                     "invert": True,
                     "seed": 99,
                     "locked": True,
@@ -334,8 +343,8 @@ def test_persist_render_pattern_mask_round_trip() -> None:
         "enabled": True,
         "locked": True,
         "type": "radial",
+        "density": 2.5,
         "mode": "hard",
-        "density": 0.25,
         "invert": True,
         "seed": 99,
     }
@@ -344,8 +353,8 @@ def test_persist_render_pattern_mask_round_trip() -> None:
     assert round_trip.pattern_mask == RenderPatternMaskConfig(
         enabled=True,
         type="radial",
+        density=2.5,
         mode="hard",
-        density=0.25,
         invert=True,
         seed=99,
         locked=True,
@@ -366,6 +375,7 @@ def test_render_pattern_mask_runtime_from_cfg_defaults() -> None:
     assert runtime.enabled is False
     assert runtime.type == "strips"
     assert runtime.mode == "hard"
+    assert runtime.density == DEFAULT_RENDER_PATTERN_MASK_DENSITY
     assert runtime.seed == 0
     assert runtime.expanded is False
 

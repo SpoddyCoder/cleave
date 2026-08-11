@@ -299,10 +299,12 @@ PATTERN_MASK_MODES: tuple[PatternMaskMode, ...] = ("hard", "soft")
 DEFAULT_RENDER_PATTERN_MASK_ENABLED = False
 DEFAULT_RENDER_PATTERN_MASK_TYPE: PatternMaskType = "strips"
 DEFAULT_RENDER_PATTERN_MASK_MODE: PatternMaskMode = "hard"
-DEFAULT_RENDER_PATTERN_MASK_DENSITY = 0.5
+DEFAULT_RENDER_PATTERN_MASK_DENSITY = 1.0
 DEFAULT_RENDER_PATTERN_MASK_INVERT = False
 DEFAULT_RENDER_PATTERN_MASK_SEED = 0
 DEFAULT_RENDER_PATTERN_MASK_LOCKED = False
+PATTERN_MASK_DENSITY_MIN = 1.0
+PATTERN_MASK_DENSITY_MAX = 10.0
 
 HighlightRolloffApplyMode = Literal["off", "per_layer", "composite"]
 
@@ -633,12 +635,15 @@ def clamp_chroma_boost_amount_pct(value: int) -> int:
     )
 
 
-PATTERN_MASK_DENSITY_STEP = 0.01
-PATTERN_MASK_DENSITY_STEP_LARGE = 0.1
+PATTERN_MASK_DENSITY_STEP = 0.1
+PATTERN_MASK_DENSITY_STEP_LARGE = 1.0
 
 
 def clamp_pattern_mask_density(value: float) -> float:
-    return max(0.0, min(1.0, float(value)))
+    return round(
+        max(PATTERN_MASK_DENSITY_MIN, min(PATTERN_MASK_DENSITY_MAX, float(value))),
+        1,
+    )
 
 
 def _parse_pattern_mask_type(
@@ -1743,19 +1748,19 @@ RENDER_PATTERN_MASK_FIELDS: tuple[SchemaField, ...] = (
         _dump_scalar,
     ),
     FieldDescriptor(
-        "mode",
-        DEFAULT_RENDER_PATTERN_MASK_MODE,
-        "session",
-        _parse_pattern_mask_mode,
-        _dump_scalar,
-    ),
-    FieldDescriptor(
         "density",
         DEFAULT_RENDER_PATTERN_MASK_DENSITY,
         "session",
         lambda raw, _ctx, label: clamp_pattern_mask_density(
             float(require_non_negative_number(raw, label))
         ),
+        _dump_scalar,
+    ),
+    FieldDescriptor(
+        "mode",
+        DEFAULT_RENDER_PATTERN_MASK_MODE,
+        "session",
+        _parse_pattern_mask_mode,
         _dump_scalar,
     ),
     FieldDescriptor(
@@ -2433,8 +2438,8 @@ def persist_render(ctx: PersistCtx) -> dict[str, Any]:
         "enabled": runtime_pm.enabled,
         "locked": runtime_pm.locked,
         "type": runtime_pm.type,
-        "mode": runtime_pm.mode,
         "density": runtime_pm.density,
+        "mode": runtime_pm.mode,
         "invert": runtime_pm.invert,
         "seed": runtime_pm.seed,
     }
@@ -2852,8 +2857,8 @@ def default_render_pattern_mask_runtime_values() -> dict[str, Any]:
         "enabled": DEFAULT_RENDER_PATTERN_MASK_ENABLED,
         "expanded": False,
         "type": DEFAULT_RENDER_PATTERN_MASK_TYPE,
-        "mode": DEFAULT_RENDER_PATTERN_MASK_MODE,
         "density": DEFAULT_RENDER_PATTERN_MASK_DENSITY,
+        "mode": DEFAULT_RENDER_PATTERN_MASK_MODE,
         "invert": DEFAULT_RENDER_PATTERN_MASK_INVERT,
         "seed": DEFAULT_RENDER_PATTERN_MASK_SEED,
         "locked": DEFAULT_RENDER_PATTERN_MASK_LOCKED,

@@ -44,9 +44,11 @@ PLASMA_LAYER_FREQ_SCALE = 0.17
 PLASMA_LAYER_BLEND_PRIMARY = 0.65
 PLASMA_LAYER_BLEND_SECONDARY = 0.35
 PLASMA_FREQ_BASE = 2.0
-PLASMA_FREQ_DENSITY_SCALE = 12.0
 PLASMA_FREQ_MIN = 0.25
 PLASMA_HASH_DIVISOR = 4_294_967_295.0
+PATTERN_MASK_DENSITY_MIN = 1.0
+PATTERN_MASK_DENSITY_MAX = 10.0
+DEFAULT_PATTERN_MASK_DENSITY = 1.0
 
 
 @dataclass(frozen=True)
@@ -120,16 +122,16 @@ def _validate_mask_dims(width: int, height: int, layer_count: int) -> None:
 
 
 def _clamp_density(density: float) -> float:
-    return max(0.0, min(1.0, float(density)))
+    return max(PATTERN_MASK_DENSITY_MIN, min(PATTERN_MASK_DENSITY_MAX, float(density)))
 
 
 def _subdivision_count(layer_count: int, density: float) -> int:
-    """Geometric subdivision count; minimum equals *layer_count*."""
+    """Segment count = round(layer_count * density); minimum equals *layer_count*.
+
+    Density is a multiplier: 1.0x = one segment per layer, 10.0x = ten per layer.
+    """
     density = _clamp_density(density)
-    return max(
-        layer_count,
-        int(round(layer_count + density * layer_count * 3)),
-    )
+    return max(layer_count, int(round(layer_count * density)))
 
 
 def _checker_grid_dims(
@@ -158,13 +160,13 @@ def generate_strips_mask(
     width: int,
     height: int,
     layer_count: int,
-    density: float = 0.5,
+    density: float = DEFAULT_PATTERN_MASK_DENSITY,
     invert: bool = False,
 ) -> np.ndarray:
     """Return a (H, W) uint8 region-index mask of vertical strips.
 
-    Each element is a layer index in ``0 .. layer_count-1``. Density controls how
-    many vertical strips subdivide the frame (minimum = layer_count); indices
+    Each element is a layer index in ``0 .. layer_count-1``. Density is a
+    multiplier of segments per layer (1.0x = one strip per layer); indices
     cycle through layers. Invert reverses assignment order. Every row is identical.
     """
     _validate_mask_dims(width, height, layer_count)
@@ -186,13 +188,13 @@ def generate_radial_mask(
     width: int,
     height: int,
     layer_count: int,
-    density: float = 0.5,
+    density: float = DEFAULT_PATTERN_MASK_DENSITY,
     invert: bool = False,
 ) -> np.ndarray:
     """Return a (H, W) uint8 mask of angular wedges from the frame center.
 
-    Density controls wedge count (minimum = layer_count). Row 0 is the GL
-    bottom edge (uv.y = 0).
+    Density is a multiplier of wedges per layer (1.0x = one wedge per layer).
+    Row 0 is the GL bottom edge (uv.y = 0).
     """
     _validate_mask_dims(width, height, layer_count)
     width = int(width)
@@ -216,13 +218,13 @@ def generate_checker_mask(
     width: int,
     height: int,
     layer_count: int,
-    density: float = 0.5,
+    density: float = DEFAULT_PATTERN_MASK_DENSITY,
     invert: bool = False,
 ) -> np.ndarray:
     """Return a (H, W) uint8 mask of grid tiles cycling layers row-major.
 
-    Density controls tile count (minimum = layer_count). Row 0 is the GL
-    bottom edge (uv.y = 0).
+    Density is a multiplier of tiles per layer (1.0x = one tile per layer).
+    Row 0 is the GL bottom edge (uv.y = 0).
     """
     _validate_mask_dims(width, height, layer_count)
     width = int(width)
@@ -291,8 +293,8 @@ def _plasma_fields(
 ) -> np.ndarray:
     """Return (N, H, W) float plasma fields in [0, 1). Row 0 = GL bottom."""
     density = _clamp_density(density)
-    # density 0 -> coarse (~2 features across), density 1 -> finer (~14).
-    frequency = PLASMA_FREQ_BASE + density * PLASMA_FREQ_DENSITY_SCALE
+    # 1.0x -> coarse (~2 features across), 10.0x -> finer (~20).
+    frequency = PLASMA_FREQ_BASE * density
     fields = np.empty((layer_count, height, width), dtype=np.float64)
     for index in range(layer_count):
         fields[index] = _value_noise_2d(
@@ -348,14 +350,14 @@ def generate_plasma_mask(
     width: int,
     height: int,
     layer_count: int,
-    density: float = 0.5,
+    density: float = DEFAULT_PATTERN_MASK_DENSITY,
     seed: int = 0,
     invert: bool = False,
 ) -> np.ndarray:
     """Return a (H, W) uint8 hard-mode plasma mask (argmax of seeded noise).
 
-    Density controls noise frequency (feature size). Same *seed* yields the same
-    mask. Row 0 is the GL bottom edge (uv.y = 0).
+    Density scales noise frequency (1.0x coarse, 10.0x finer). Same *seed*
+    yields the same mask. Row 0 is the GL bottom edge (uv.y = 0).
     """
     _validate_mask_dims(width, height, layer_count)
     width = int(width)
@@ -372,7 +374,7 @@ def generate_strips_weights(
     width: int,
     height: int,
     layer_count: int,
-    density: float = 0.5,
+    density: float = DEFAULT_PATTERN_MASK_DENSITY,
     invert: bool = False,
 ) -> np.ndarray:
     """Return (H, W, N) uint8 soft strip weights (sum ~255 per pixel)."""
@@ -396,7 +398,7 @@ def generate_radial_weights(
     width: int,
     height: int,
     layer_count: int,
-    density: float = 0.5,
+    density: float = DEFAULT_PATTERN_MASK_DENSITY,
     invert: bool = False,
 ) -> np.ndarray:
     """Return (H, W, N) uint8 soft wedge weights (sum ~255 per pixel)."""
@@ -425,7 +427,7 @@ def generate_checker_weights(
     width: int,
     height: int,
     layer_count: int,
-    density: float = 0.5,
+    density: float = DEFAULT_PATTERN_MASK_DENSITY,
     invert: bool = False,
 ) -> np.ndarray:
     """Return (H, W, N) uint8 soft checker weights (sum ~255 per pixel)."""
@@ -456,7 +458,7 @@ def generate_plasma_weights(
     width: int,
     height: int,
     layer_count: int,
-    density: float = 0.5,
+    density: float = DEFAULT_PATTERN_MASK_DENSITY,
     seed: int = 0,
     invert: bool = False,
 ) -> np.ndarray:
@@ -478,7 +480,7 @@ def generate_hard_mask(
     height: int,
     layer_count: int,
     *,
-    density: float = 0.5,
+    density: float = DEFAULT_PATTERN_MASK_DENSITY,
     invert: bool = False,
     seed: int = 0,
 ) -> np.ndarray:
@@ -513,7 +515,7 @@ def generate_soft_weights(
     height: int,
     layer_count: int,
     *,
-    density: float = 0.5,
+    density: float = DEFAULT_PATTERN_MASK_DENSITY,
     invert: bool = False,
     seed: int = 0,
 ) -> np.ndarray:
