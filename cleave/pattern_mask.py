@@ -184,6 +184,38 @@ def generate_strips_mask(
     return np.broadcast_to(row, (height, width)).copy()
 
 
+def _radial_default_rotation_radians(wedge_count: int) -> float:
+    """Sensible default rotation so wedges avoid flat axis-aligned splits.
+
+    Without an offset, 2 wedges are a horizontal split and 4 form a plus.
+    ``pi / max(n, 4)`` yields 45 deg for n <= 4 and half a wedge thereafter,
+    keeping boundaries off the cardinal axes for typical densities.
+    """
+    return math.pi / max(int(wedge_count), 4)
+
+
+def _radial_normalized_angle(
+    width: int,
+    height: int,
+    wedge_count: int,
+) -> np.ndarray:
+    """Return (H, W) angle in [0, 1) from screen-space atan2 plus default rotation.
+
+    Coordinates use equal pixel units on X and Y so wedge angles are true on
+    any aspect ratio (not skewed by normalizing each axis independently).
+    Row 0 is the GL bottom edge.
+    """
+    xs = (np.arange(width, dtype=np.float64) + 0.5) - width * 0.5
+    ys = (np.arange(height, dtype=np.float64) + 0.5) - height * 0.5
+    xx, yy = np.meshgrid(xs, ys)
+    rotation = _radial_default_rotation_radians(wedge_count)
+    # atan2 range (-pi, pi]; shift, rotate, wrap into [0, 1).
+    return np.mod(
+        (np.arctan2(yy, xx) + math.pi + rotation) / (2.0 * math.pi),
+        1.0,
+    )
+
+
 def generate_radial_mask(
     width: int,
     height: int,
@@ -194,6 +226,8 @@ def generate_radial_mask(
     """Return a (H, W) uint8 mask of angular wedges from the frame center.
 
     Density is a multiplier of wedges per layer (1.0x = one wedge per layer).
+    Wedge angles are computed in screen pixel space (aspect-correct) with a
+    default rotation so low segment counts are diagonal rather than flat splits.
     Row 0 is the GL bottom edge (uv.y = 0).
     """
     _validate_mask_dims(width, height, layer_count)
@@ -201,11 +235,7 @@ def generate_radial_mask(
     height = int(height)
     layer_count = int(layer_count)
     wedge_count = _subdivision_count(layer_count, density)
-    xs = (np.arange(width, dtype=np.float64) + 0.5) / width - 0.5
-    ys = (np.arange(height, dtype=np.float64) + 0.5) / height - 0.5
-    xx, yy = np.meshgrid(xs, ys)
-    # atan2 range (-pi, pi]; map to [0, 1).
-    angle = (np.arctan2(yy, xx) + math.pi) / (2.0 * math.pi)
+    angle = _radial_normalized_angle(width, height, wedge_count)
     wedge_index = np.minimum(
         (angle * wedge_count).astype(np.int64),
         wedge_count - 1,
@@ -407,10 +437,7 @@ def generate_radial_weights(
     height = int(height)
     layer_count = int(layer_count)
     wedge_count = _subdivision_count(layer_count, density)
-    xs = (np.arange(width, dtype=np.float64) + 0.5) / width - 0.5
-    ys = (np.arange(height, dtype=np.float64) + 0.5) / height - 0.5
-    xx, yy = np.meshgrid(xs, ys)
-    angle = (np.arctan2(yy, xx) + math.pi) / (2.0 * math.pi) * wedge_count
+    angle = _radial_normalized_angle(width, height, wedge_count) * wedge_count
     fields = np.zeros((layer_count, height, width), dtype=np.float64)
     for wedge in range(wedge_count):
         layer = wedge % layer_count
