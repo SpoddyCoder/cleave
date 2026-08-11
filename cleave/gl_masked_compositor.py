@@ -260,6 +260,63 @@ void main() {
 )
 
 
+_HARD_TRANSITION_FRAG = """
+#version 330
+uniform sampler2DArray layers;
+uniform sampler2DArray old_weights;
+uniform sampler2DArray new_weights;
+uniform int layer_count;
+uniform float opacities[8];
+uniform float transition_t;
+in vec2 uv;
+out vec4 fragColor;
+
+void main() {
+    float best = -1.0;
+    int best_i = 0;
+    for (int i = 0; i < 8; i++) {
+        if (i >= layer_count) break;
+        float w_old = texture(old_weights, vec3(uv, float(i))).r;
+        float w_new = texture(new_weights, vec3(uv, float(i))).r;
+        float w = mix(w_old, w_new, transition_t);
+        if (w > best) {
+            best = w;
+            best_i = i;
+        }
+    }
+    vec4 color = texture(layers, vec3(uv, float(best_i)));
+    float opacity = opacities[best_i];
+    fragColor = vec4(color.rgb * opacity, 1.0);
+}
+"""
+
+_SOFT_TRANSITION_FRAG = """
+#version 330
+uniform sampler2D layer_tex;
+uniform sampler2DArray old_weight_array;
+uniform sampler2DArray new_weight_array;
+uniform int layer_index;
+uniform float layer_opacity;
+uniform int opacity_in_alpha;
+uniform float transition_t;
+in vec2 uv;
+out vec4 fragColor;
+
+void main() {
+    vec4 color = texture(layer_tex, uv);
+    float w_old = texture(old_weight_array, vec3(uv, float(layer_index))).r;
+    float w_new = texture(new_weight_array, vec3(uv, float(layer_index))).r;
+    float w = mix(w_old, w_new, transition_t);
+    float op = layer_opacity * w;
+    if (opacity_in_alpha != 0) {
+        fragColor = vec4(color.rgb, op);
+    } else {
+        fragColor = vec4(color.rgb * op, 1.0);
+    }
+}
+"""
+
+
 def _ensure_moderngl_draw_state() -> None:
     """Leave fixed-function GL state compatible with moderngl fullscreen draws."""
     glColorMask(True, True, True, True)
@@ -475,6 +532,13 @@ class GlMaskedCompositor:
         self._transition_active_slots: tuple[bool, ...] | None = None
         self._current_weight_fields: np.ndarray | None = None
         self._last_active_slots: tuple[bool, ...] | None = None
+        self._hard_transition_prog: moderngl.Program | None = None
+        self._soft_transition_prog: moderngl.Program | None = None
+        self._hard_transition_vao: moderngl.VertexArray | None = None
+        self._soft_transition_vao: moderngl.VertexArray | None = None
+        self._transition_old_tex: moderngl.TextureArray | None = None
+        self._transition_target_tex: moderngl.TextureArray | None = None
+        self._transition_gpu_ready: bool = False
 
     @property
     def color_format(self) -> GlColorFormat:
@@ -510,6 +574,46 @@ class GlMaskedCompositor:
         self._transition_start = 0.0
         self._transition_duration = 0.0
         self._transition_active_slots = None
+        self._release_transition_textures()
+
+    def _release_transition_textures(self) -> None:
+        if self._transition_old_tex is not None:
+            self._transition_old_tex.release()
+            self._transition_old_tex = None
+        if self._transition_target_tex is not None:
+            self._transition_target_tex.release()
+            self._transition_target_tex = None
+        self._transition_gpu_ready = False
+
+    def _upload_transition_textures(
+        self, old_fields: np.ndarray, target_fields: np.ndarray
+    ) -> None:
+        """Convert weight fields to uint8 and upload as GPU texture arrays (once)."""
+        self._ensure_init()
+        assert self._ctx is not None
+        old_u8 = u8_weights_from_fields(old_fields)
+        target_u8 = u8_weights_from_fields(target_fields)
+        height, width, layer_count = (
+            int(old_u8.shape[0]),
+            int(old_u8.shape[1]),
+            int(old_u8.shape[2]),
+        )
+        old_data = np.ascontiguousarray(np.transpose(old_u8, (2, 0, 1)))
+        target_data = np.ascontiguousarray(np.transpose(target_u8, (2, 0, 1)))
+        self._release_transition_textures()
+        for data, attr in (
+            (old_data, "_transition_old_tex"),
+            (target_data, "_transition_target_tex"),
+        ):
+            tex = self._ctx.texture_array(
+                (width, height, layer_count), 1, dtype="f1",
+            )
+            tex.filter = (moderngl.LINEAR, moderngl.LINEAR)
+            tex.repeat_x = False
+            tex.repeat_y = False
+            tex.write(data.tobytes())
+            setattr(self, attr, tex)
+        self._transition_gpu_ready = True
 
     def _transition_in_progress(self, song_time_sec: float) -> bool:
         if self._transition_old_weights is None or self._transition_target_weights is None:
@@ -574,6 +678,22 @@ class GlMaskedCompositor:
         )
         self._plasma_soft_vao = self._ctx.vertex_array(
             self._plasma_soft_prog,
+            [(self._quad_buffer, "2f 2f", "in_vert", "in_uv")],
+        )
+        self._hard_transition_prog = self._ctx.program(
+            vertex_shader=_QUAD_VERT,
+            fragment_shader=_HARD_TRANSITION_FRAG,
+        )
+        self._soft_transition_prog = self._ctx.program(
+            vertex_shader=_QUAD_VERT,
+            fragment_shader=_SOFT_TRANSITION_FRAG,
+        )
+        self._hard_transition_vao = self._ctx.vertex_array(
+            self._hard_transition_prog,
+            [(self._quad_buffer, "2f 2f", "in_vert", "in_uv")],
+        )
+        self._soft_transition_vao = self._ctx.vertex_array(
+            self._soft_transition_prog,
             [(self._quad_buffer, "2f 2f", "in_vert", "in_uv")],
         )
         self._ensure_layer_array()
@@ -1029,13 +1149,11 @@ class GlMaskedCompositor:
             self._transition_duration = duration
             self._transition_active_slots = active_slots
             self._mask_cache_key = None
+            self._upload_transition_textures(old_fields, target_fields)
         elif slots_changed and duration <= 0.0:
             self._clear_transition_state()
 
         if self._transition_in_progress(song_time_sec):
-            blended = self._blended_transition_weights(song_time_sec)
-            self._upload_weight_fields(blended, params.mode)
-            self._current_weight_fields = blended
             self._last_active_slots = active_slots
             self._mask_cache_key = None
             return
@@ -1257,12 +1375,15 @@ class GlMaskedCompositor:
                 song_time_sec=song_time_sec,
                 transition_duration=transition_duration,
             )
+            transitioning = (
+                self._transition_gpu_ready
+                and self._transition_in_progress(song_time_sec)
+            )
             opacities = self._copy_layers_into_array(
                 layers,
-                keep_disabled_visible=self._transition_in_progress(song_time_sec),
+                keep_disabled_visible=transitioning,
             )
             dest = self._dest_fbo_for(content_fbo_id)
-            mask_tex = self._bind_mask_mgl(linear_filter=False)
             layer_array = self._layer_array_mgl
             assert layer_array is not None
 
@@ -1270,12 +1391,33 @@ class GlMaskedCompositor:
             dest.use()
             self._ctx.viewport = (0, 0, self.content_width, self.content_height)
             layer_array.use(0)
-            mask_tex.use(1)
-            self._masked_prog["layers"].value = 0
-            self._masked_prog["mask"].value = 1
-            self._masked_prog["layer_count"].value = layer_count
-            self._masked_prog["opacities"].value = tuple(opacities)
-            self._quad_vao.render(moderngl.TRIANGLE_STRIP)
+
+            if transitioning:
+                assert self._hard_transition_prog is not None
+                assert self._hard_transition_vao is not None
+                assert self._transition_old_tex is not None
+                assert self._transition_target_tex is not None
+                self._transition_old_tex.use(1)
+                self._transition_target_tex.use(2)
+                self._hard_transition_prog["layers"].value = 0
+                self._hard_transition_prog["old_weights"].value = 1
+                self._hard_transition_prog["new_weights"].value = 2
+                self._hard_transition_prog["layer_count"].value = layer_count
+                self._hard_transition_prog["opacities"].value = tuple(opacities)
+                duration = max(self._transition_duration, 1e-9)
+                t = (float(song_time_sec) - self._transition_start) / duration
+                self._hard_transition_prog["transition_t"].value = max(
+                    0.0, min(1.0, t)
+                )
+                self._hard_transition_vao.render(moderngl.TRIANGLE_STRIP)
+            else:
+                mask_tex = self._bind_mask_mgl(linear_filter=False)
+                mask_tex.use(1)
+                self._masked_prog["layers"].value = 0
+                self._masked_prog["mask"].value = 1
+                self._masked_prog["layer_count"].value = layer_count
+                self._masked_prog["opacities"].value = tuple(opacities)
+                self._quad_vao.render(moderngl.TRIANGLE_STRIP)
         finally:
             _restore_gl_state(saved, self._ctx)
             _prepare_fixed_function_gl()
@@ -1317,37 +1459,62 @@ class GlMaskedCompositor:
                 song_time_sec=song_time_sec,
                 transition_duration=transition_duration,
             )
+            transitioning = (
+                self._transition_gpu_ready
+                and self._transition_in_progress(song_time_sec)
+            )
             dest = self._dest_fbo_for(content_fbo_id)
-            weight_array = self._bind_weight_array_mgl()
             _ensure_soft_draw_state()
             dest.use()
             self._ctx.viewport = (0, 0, self.content_width, self.content_height)
-            self._soft_prog["layer_tex"].value = 0
-            self._soft_prog["weight_array"].value = 1
+
+            if transitioning:
+                prog = self._soft_transition_prog
+                vao = self._soft_transition_vao
+                assert prog is not None and vao is not None
+                assert self._transition_old_tex is not None
+                assert self._transition_target_tex is not None
+                duration = max(self._transition_duration, 1e-9)
+                t = (float(song_time_sec) - self._transition_start) / duration
+                t = max(0.0, min(1.0, t))
+                prog["layer_tex"].value = 0
+                prog["old_weight_array"].value = 1
+                prog["new_weight_array"].value = 2
+                prog["transition_t"].value = t
+            else:
+                prog = self._soft_prog
+                vao = self._soft_quad_vao
+                assert prog is not None and vao is not None
+                weight_array = self._bind_weight_array_mgl()
+                prog["layer_tex"].value = 0
+                prog["weight_array"].value = 1
 
             for index, layer in enumerate(layers):
                 if index >= MAX_LAYER_COUNT:
                     break
-                transitioning = self._transition_in_progress(song_time_sec)
                 active = bool(layer.enabled and layer.opacity > 0.0)
                 if not active and not transitioning:
                     continue
                 GlCompositor._apply_layer_blend_mode(layer.blend_mode)
                 layer_tex = self._bind_layer_tex_mgl(layer)
                 layer_tex.use(0)
-                weight_array.use(1)
-                self._soft_prog["layer_index"].value = index
+                if transitioning:
+                    self._transition_old_tex.use(1)
+                    self._transition_target_tex.use(2)
+                else:
+                    weight_array.use(1)
+                prog["layer_index"].value = index
                 if active:
                     opacity = float(layer.opacity)
                 elif transitioning:
                     opacity = float(layer.opacity) if layer.opacity > 0.0 else 1.0
                 else:
                     opacity = 0.0
-                self._soft_prog["layer_opacity"].value = opacity
-                self._soft_prog["opacity_in_alpha"].value = (
+                prog["layer_opacity"].value = opacity
+                prog["opacity_in_alpha"].value = (
                     1 if layer.blend_mode == "add" else 0
                 )
-                self._soft_quad_vao.render(moderngl.TRIANGLE_STRIP)
+                vao.render(moderngl.TRIANGLE_STRIP)
         finally:
             _restore_gl_state(saved, self._ctx)
             _prepare_fixed_function_gl()
@@ -1358,35 +1525,36 @@ class GlMaskedCompositor:
         self._release_mask_texture()
         self._release_weight_array()
         self._release_plasma_gen_targets()
+        self._release_transition_textures()
         self._release_layer_tex_cache()
         self._release_layer_array()
-        if self._plasma_soft_vao is not None:
-            self._plasma_soft_vao.release()
-            self._plasma_soft_vao = None
-        if self._plasma_hard_vao is not None:
-            self._plasma_hard_vao.release()
-            self._plasma_hard_vao = None
-        if self._soft_quad_vao is not None:
-            self._soft_quad_vao.release()
-            self._soft_quad_vao = None
-        if self._quad_vao is not None:
-            self._quad_vao.release()
-            self._quad_vao = None
+        for attr in (
+            "_soft_transition_vao",
+            "_hard_transition_vao",
+            "_plasma_soft_vao",
+            "_plasma_hard_vao",
+            "_soft_quad_vao",
+            "_quad_vao",
+        ):
+            obj = getattr(self, attr, None)
+            if obj is not None:
+                obj.release()
+                setattr(self, attr, None)
         if self._quad_buffer is not None:
             self._quad_buffer.release()
             self._quad_buffer = None
-        if self._plasma_soft_prog is not None:
-            self._plasma_soft_prog.release()
-            self._plasma_soft_prog = None
-        if self._plasma_hard_prog is not None:
-            self._plasma_hard_prog.release()
-            self._plasma_hard_prog = None
-        if self._soft_prog is not None:
-            self._soft_prog.release()
-            self._soft_prog = None
-        if self._masked_prog is not None:
-            self._masked_prog.release()
-            self._masked_prog = None
+        for attr in (
+            "_soft_transition_prog",
+            "_hard_transition_prog",
+            "_plasma_soft_prog",
+            "_plasma_hard_prog",
+            "_soft_prog",
+            "_masked_prog",
+        ):
+            obj = getattr(self, attr, None)
+            if obj is not None:
+                obj.release()
+                setattr(self, attr, None)
         self._ctx = None
         self._mask_cache_key = None
         self._clear_transition_state()
