@@ -72,6 +72,10 @@ except ImportError:  # pragma: no cover - PyOpenGL without VAO entry points
     GL_VERTEX_ARRAY_BINDING = None  # type: ignore[misc, assignment]
     glBindVertexArray = None  # type: ignore[misc, assignment]
 
+# Transition weight fields are generated at 1/N of content resolution to avoid
+# a stutter on the first frame.  GPU LINEAR filtering upscales transparently.
+_TRANSITION_GEN_DIVISOR: int = 4
+
 _QUAD_VERT = """
 #version 330
 in vec2 in_vert;
@@ -1111,32 +1115,33 @@ class GlMaskedCompositor:
         duration = max(0.0, float(transition_duration))
 
         if slots_changed and duration > 0.0:
+            trans_w = max(1, gen_width // _TRANSITION_GEN_DIVISOR)
+            trans_h = max(1, gen_height // _TRANSITION_GEN_DIVISOR)
             if self._transition_in_progress(song_time_sec):
                 old_fields = self._blended_transition_weights(song_time_sec)
-            elif self._current_weight_fields is not None:
-                old_fields = self._current_weight_fields
             else:
                 old_fields = generate_soft_weight_fields(
                     params.mask_type,
-                    gen_width,
-                    gen_height,
+                    trans_w,
+                    trans_h,
                     layer_count,
                     density=params.density,
                     invert=params.invert,
                     seed=params.seed,
-                    active_flags=self._last_active_slots,
+                    active_flags=self._last_active_slots
+                    if self._last_active_slots is not None
+                    else active_slots,
                 )
             target_fields = generate_soft_weight_fields(
                 params.mask_type,
-                gen_width,
-                gen_height,
+                trans_w,
+                trans_h,
                 layer_count,
                 density=params.density,
                 invert=params.invert,
                 seed=params.seed,
                 active_flags=active_slots,
             )
-            # Pad/truncate if layer count changed with z-order edits.
             if old_fields.shape[0] != target_fields.shape[0]:
                 n = target_fields.shape[0]
                 padded = np.zeros_like(target_fields)
@@ -1162,8 +1167,18 @@ class GlMaskedCompositor:
             self._transition_old_weights is not None
             and self._transition_target_weights is not None
         ):
-            # Transition finished this frame: settle on target.
-            fields = self._transition_target_weights
+            # Transition finished: regenerate at full resolution for the
+            # settled cache (transition fields were at reduced resolution).
+            fields = generate_soft_weight_fields(
+                params.mask_type,
+                gen_width,
+                gen_height,
+                layer_count,
+                density=params.density,
+                invert=params.invert,
+                seed=params.seed,
+                active_flags=active_slots,
+            )
             self._upload_weight_fields(fields, params.mode)
             self._current_weight_fields = fields
             self._last_active_slots = active_slots
