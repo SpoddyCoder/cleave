@@ -115,7 +115,7 @@ class RowKind(Enum):
     TIMELINE_PRESET_TIMELINE_CUTS = auto()
     TIMELINE_PRESET_REPOPULATE = auto()
     TIMELINE_PRESET_CONDUCTOR = auto()
-    TIMELINE_PRESET_PATTERN_MASK = auto()
+    TIMELINE_PRESET_MODE = auto()
     TIMELINE_PRESETS = auto()
     TIMELINE_VISUAL_LIMITER_HEADER = auto()
     TIMELINE_VISUAL_LIMITER_THRESHOLD = auto()
@@ -998,7 +998,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         is_sub_header=True,
         help_title="Timeline preset",
         help_description=(
-            "Stage character, density, re-populate, conductor, and pattern mask,",
+            "Stage character, density, re-populate, conductor, and mode,",
             "then apply a randomly generated timeline preset. Overwrites the current timeline.",
         ),
     ),
@@ -1081,15 +1081,15 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "Requires project signals; otherwise apply skips the conductor.",
         ),
     ),
-    RowKind.TIMELINE_PRESET_PATTERN_MASK: RowBehavior(
+    RowKind.TIMELINE_PRESET_MODE: RowBehavior(
         RowAffordance.VALUE_STEP,
         navigable=True,
         blocked_by_section_lock=True,
-        help_title="Pattern mask",
-        help_entries=(("Left/Right", "toggle pattern mask on/off"),),
+        help_title="Mode",
+        help_entries=(("Left/Right", "cycle layers / pattern mask"),),
         help_description=(
-            "When on, Apply enables render pattern mask with strips.",
-            "Tune density and invert under Render: PATTERN MASK.",
+            "Layers uses the stacked timeline. Pattern mask enables",
+            "render pattern mask with strips on Apply.",
         ),
     ),
     RowKind.TIMELINE_PRESETS: RowBehavior(
@@ -1100,7 +1100,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_entries=(("Enter", "apply timeline preset"),),
         help_description=(
             "Apply the staged character, density, snaps, cuts, re-populate,",
-            "conductor, and pattern mask. Crescendo song markers build crescendos.",
+            "conductor, and mode. Crescendo song markers build crescendos.",
             "Overwrites the timeline.",
         ),
     ),

@@ -21,7 +21,11 @@ from cleave.timeline_presets.characters import (
     TIMELINE_PRESET_KIND_OPTIONS,
 )
 from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
-from cleave.pattern_mask import DEFAULT_TIMELINE_PRESET_PATTERN_MASK
+from cleave.timeline_presets.mode import (
+    DEFAULT_TIMELINE_PRESET_MODE,
+    TIMELINE_PRESET_MODE_OPTIONS,
+    TimelinePresetMode,
+)
 from cleave.timeline_presets.cue_snap import (
     DEFAULT_TIMELINE_PRESET_CUE_SNAP,
     TIMELINE_PRESET_CUE_SNAP_OPTIONS,
@@ -551,10 +555,12 @@ def parse_timeline_preset_conductor(raw: Any, label: str) -> bool:
     return raw
 
 
-def parse_timeline_preset_pattern_mask(raw: Any, label: str) -> bool:
-    if not isinstance(raw, bool):
-        raise ValueError(f"{label} must be true or false")
-    return raw
+def parse_timeline_preset_mode(raw: Any, label: str) -> TimelinePresetMode:
+    value = str(raw)
+    if value not in TIMELINE_PRESET_MODE_OPTIONS:
+        allowed = ", ".join(TIMELINE_PRESET_MODE_OPTIONS)
+        raise ValueError(f"{label} must be one of: {allowed}")
+    return value  # type: ignore[return-value]
 
 
 FieldSource = Literal["cfg", "session", "both"]
@@ -2548,9 +2554,9 @@ def _parse_timeline_preset(raw: Any) -> Any:
             preset_map.get("conductor", DEFAULT_TIMELINE_PRESET_CONDUCTOR),
             "timeline.preset.conductor",
         ),
-        pattern_mask=parse_timeline_preset_pattern_mask(
-            preset_map.get("pattern_mask", DEFAULT_TIMELINE_PRESET_PATTERN_MASK),
-            "timeline.preset.pattern_mask",
+        mode=parse_timeline_preset_mode(
+            preset_map.get("mode", DEFAULT_TIMELINE_PRESET_MODE),
+            "timeline.preset.mode",
         ),
     )
 
@@ -2745,7 +2751,7 @@ def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
             "timeline_cuts": runtime.timeline_preset_timeline_cuts,
             "repopulate": runtime.timeline_preset_repopulate,
             "conductor": runtime.timeline_preset_conductor,
-            "pattern_mask": runtime.timeline_preset_pattern_mask,
+            "mode": runtime.timeline_preset_mode,
         },
         "limiter": _persist_timeline_limiter(runtime.limiter),
     }

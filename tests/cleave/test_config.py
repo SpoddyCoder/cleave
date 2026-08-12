@@ -1324,7 +1324,7 @@ def test_persist_timeline_preset_round_trip() -> None:
         "timeline_cuts": "all hard",
         "repopulate": "cue roles",
         "conductor": True,
-        "pattern_mask": False,
+        "mode": "layers",
     }
     round_trip = parse_timeline_section(
         {"timeline": payload},
@@ -1354,6 +1354,7 @@ def test_parse_timeline_reads_preset() -> None:
                     "timeline_cuts": "none",
                     "repopulate": "directory sequential",
                     "conductor": True,
+                    "mode": "pattern_mask",
                 }
             }
         },
@@ -1368,6 +1369,7 @@ def test_parse_timeline_reads_preset() -> None:
         timeline_cuts="none",
         repopulate="directory sequential",
         conductor=True,
+        mode="pattern_mask",
     )
 
 
@@ -1384,7 +1386,7 @@ def test_parse_timeline_preset_defaults() -> None:
     assert timeline.preset.timeline_cuts == "by marker"
     assert timeline.preset.repopulate == "no"
     assert timeline.preset.conductor is False
-    assert timeline.preset.pattern_mask is False
+    assert timeline.preset.mode == "layers"
 
 
 def test_parse_timeline_rejects_invalid_placement_snap() -> None:
@@ -1447,6 +1449,14 @@ def test_parse_timeline_rejects_invalid_preset_conductor() -> None:
     with pytest.raises(ValueError, match="conductor"):
         parse_timeline_section(
             {"timeline": {"preset": {"conductor": "on"}}},
+            _timeline_parse_ctx(),
+        )
+
+
+def test_parse_timeline_rejects_invalid_preset_mode() -> None:
+    with pytest.raises(ValueError, match="mode"):
+        parse_timeline_section(
+            {"timeline": {"preset": {"mode": "dual"}}},
             _timeline_parse_ctx(),
         )
 

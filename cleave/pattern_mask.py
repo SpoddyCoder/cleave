@@ -31,8 +31,6 @@ from OpenGL.GL import (
     GL_UNPACK_ALIGNMENT,
 )
 
-DEFAULT_TIMELINE_PRESET_PATTERN_MASK = False
-
 # Value-noise plasma (shared by CPU generators and GPU shader port).
 PLASMA_HASH_X_MULT = 374_761_393
 PLASMA_HASH_Y_MULT = 668_265_263
@@ -60,20 +58,6 @@ class PatternMaskParams:
     density: float
     invert: bool
     seed: int
-
-
-def timeline_preset_pattern_mask_display(pattern_mask: bool) -> str:
-    return "on" if pattern_mask else "off"
-
-
-def cycle_timeline_preset_pattern_mask(value: bool, *, forward: bool) -> bool:
-    options = (False, True)
-    try:
-        index = options.index(bool(value))
-    except ValueError:
-        index = options.index(DEFAULT_TIMELINE_PRESET_PATTERN_MASK)
-    delta = 1 if forward else -1
-    return options[(index + delta) % len(options)]
 
 
 def pattern_mask_invert_display(invert: bool) -> str:

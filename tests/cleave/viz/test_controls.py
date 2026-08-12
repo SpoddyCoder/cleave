@@ -1656,7 +1656,7 @@ def test_timeline_presets_enter_opens_yes_cancel_modal() -> None:
         ModalLabeledLine("timeline cuts", "by marker"),
         ModalLabeledLine("re-populate preset lists", "no"),
         ModalLabeledLine("conductor", "on"),
-        ModalLabeledLine("pattern mask", "off"),
+        ModalLabeledLine("mode", "layers"),
     )
 
 
@@ -3077,7 +3077,7 @@ def test_render_timeline_sub_rows_dim_when_disabled() -> None:
         RowKind.TIMELINE_PRESET_TIMELINE_CUTS,
         RowKind.TIMELINE_PRESET_REPOPULATE,
         RowKind.TIMELINE_PRESET_CONDUCTOR,
-        RowKind.TIMELINE_PRESET_PATTERN_MASK,
+        RowKind.TIMELINE_PRESET_MODE,
         RowKind.TIMELINE_PRESETS,
         RowKind.TIMELINE_RESET,
     ):

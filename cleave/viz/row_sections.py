@@ -924,7 +924,7 @@ TIMELINE_PRESETS_SECTION = ExpandSectionDef(
         SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_TIMELINE_CUTS),
         SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_REPOPULATE),
         SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_CONDUCTOR),
-        SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_PATTERN_MASK),
+        SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_MODE),
         SectionNode(leaf_kind=RowKind.TIMELINE_PRESETS),
     ),
 )
@@ -1106,7 +1106,7 @@ RENDER_TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_PRESET_TIMELINE_CUTS,
         RowKind.TIMELINE_PRESET_REPOPULATE,
         RowKind.TIMELINE_PRESET_CONDUCTOR,
-        RowKind.TIMELINE_PRESET_PATTERN_MASK,
+        RowKind.TIMELINE_PRESET_MODE,
         RowKind.TIMELINE_PRESETS,
         RowKind.TIMELINE_VISUAL_LIMITER_HEADER,
         RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD,

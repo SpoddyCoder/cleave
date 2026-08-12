@@ -114,9 +114,12 @@ from cleave.config_schema import (
     require_non_negative_number,
 )
 from cleave.timeline import TimelineLane
-from cleave.pattern_mask import DEFAULT_TIMELINE_PRESET_PATTERN_MASK
 from cleave.timeline_presets.characters import DEFAULT_TIMELINE_PRESET_KIND
 from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
+from cleave.timeline_presets.mode import (
+    DEFAULT_TIMELINE_PRESET_MODE,
+    TimelinePresetMode,
+)
 from cleave.timeline_presets.cue_snap import (
     DEFAULT_TIMELINE_PRESET_CUE_SNAP,
     TimelinePresetCueSnap,
@@ -326,7 +329,7 @@ class TimelinePresetConfig:
     timeline_cuts: TimelinePresetTimelineCuts = DEFAULT_TIMELINE_PRESET_TIMELINE_CUTS
     repopulate: TimelinePresetRepopulate = DEFAULT_TIMELINE_PRESET_REPOPULATE
     conductor: bool = DEFAULT_TIMELINE_PRESET_CONDUCTOR
-    pattern_mask: bool = DEFAULT_TIMELINE_PRESET_PATTERN_MASK
+    mode: TimelinePresetMode = DEFAULT_TIMELINE_PRESET_MODE
 
 
 @dataclass(frozen=True)

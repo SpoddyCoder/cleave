@@ -37,10 +37,8 @@ from cleave.config_schema import (
 )
 from cleave.extract import stem_control_label, stem_overlay_header
 from cleave.pattern_mask import (
-    cycle_timeline_preset_pattern_mask,
     pattern_mask_invert_display,
     pattern_mask_mode_display,
-    timeline_preset_pattern_mask_display,
 )
 from cleave.song_markers import (
     DEFAULT_SONG_MARKER_TYPE,
@@ -57,6 +55,10 @@ from cleave.timeline_presets.characters import (
 from cleave.timeline_presets.conductor import (
     cycle_timeline_preset_conductor,
     timeline_preset_conductor_display,
+)
+from cleave.timeline_presets.mode import (
+    cycle_timeline_preset_mode,
+    timeline_preset_mode_display,
 )
 from cleave.timeline_presets.repopulate import (
     cycle_timeline_preset_repopulate,
@@ -382,15 +384,13 @@ def _apply_timeline_preset_conductor(
     )
 
 
-def _format_timeline_preset_pattern_mask(
+def _format_timeline_preset_mode(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return timeline_preset_pattern_mask_display(
-        state.render_timeline.timeline_preset_pattern_mask
-    )
+    return timeline_preset_mode_display(state.render_timeline.timeline_preset_mode)
 
 
-def _apply_timeline_preset_pattern_mask(
+def _apply_timeline_preset_mode(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
@@ -398,8 +398,8 @@ def _apply_timeline_preset_pattern_mask(
     _shift: bool,
 ) -> None:
     tl = controls.session.timeline
-    tl.timeline_preset_pattern_mask = cycle_timeline_preset_pattern_mask(
-        tl.timeline_preset_pattern_mask,
+    tl.timeline_preset_mode = cycle_timeline_preset_mode(
+        tl.timeline_preset_mode,
         forward=forward,
     )
 
@@ -2376,11 +2376,11 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         format_value=_format_timeline_preset_conductor,
         apply_horizontal=_apply_timeline_preset_conductor,
     ),
-    RowKind.TIMELINE_PRESET_PATTERN_MASK: RowFieldDef(
-        panel_label="pattern mask",
+    RowKind.TIMELINE_PRESET_MODE: RowFieldDef(
+        panel_label="mode",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_timeline_preset_pattern_mask,
-        apply_horizontal=_apply_timeline_preset_pattern_mask,
+        format_value=_format_timeline_preset_mode,
+        apply_horizontal=_apply_timeline_preset_mode,
     ),
     RowKind.TIMELINE_PRESETS: RowFieldDef(
         panel_label="apply timeline preset",

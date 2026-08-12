@@ -153,7 +153,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     preset_timeline_cuts = RowDescriptor(RowKind.TIMELINE_PRESET_TIMELINE_CUTS)
     preset_repopulate = RowDescriptor(RowKind.TIMELINE_PRESET_REPOPULATE)
     preset_conductor = RowDescriptor(RowKind.TIMELINE_PRESET_CONDUCTOR)
-    preset_pattern_mask = RowDescriptor(RowKind.TIMELINE_PRESET_PATTERN_MASK)
+    preset_mode = RowDescriptor(RowKind.TIMELINE_PRESET_MODE)
     presets_apply = RowDescriptor(RowKind.TIMELINE_PRESETS)
     reset = RowDescriptor(RowKind.TIMELINE_RESET)
     beat_bar_header = RowDescriptor(RowKind.TIMELINE_BEAT_BAR_GRID_HEADER)
@@ -206,7 +206,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert preset_timeline_cuts not in view_open.layout.rows
     assert preset_repopulate not in view_open.layout.rows
     assert preset_conductor not in view_open.layout.rows
-    assert preset_pattern_mask not in view_open.layout.rows
+    assert preset_mode not in view_open.layout.rows
     assert presets_apply not in view_open.layout.rows
     assert reset in view_open.layout.rows
     assert beat_bar_header in view_open.layout.rows
@@ -341,7 +341,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert view_presets_expanded.layout.rows.index(preset_conductor) == (
         presets_header_idx + 7
     )
-    assert view_presets_expanded.layout.rows.index(preset_pattern_mask) == (
+    assert view_presets_expanded.layout.rows.index(preset_mode) == (
         presets_header_idx + 8
     )
     assert view_presets_expanded.layout.rows.index(presets_apply) == (
@@ -371,7 +371,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert preset_timeline_cuts not in view_presets_collapsed.layout.rows
     assert preset_repopulate not in view_presets_collapsed.layout.rows
     assert preset_conductor not in view_presets_collapsed.layout.rows
-    assert preset_pattern_mask not in view_presets_collapsed.layout.rows
+    assert preset_mode not in view_presets_collapsed.layout.rows
     assert presets_apply not in view_presets_collapsed.layout.rows
     assert presets_header in view_presets_collapsed.layout.rows
 
