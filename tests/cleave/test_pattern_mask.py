@@ -29,8 +29,6 @@ from cleave.config_schema import (
     persist_render,
 )
 from cleave.pattern_mask import (
-    DEFAULT_TIMELINE_PRESET_PATTERN_MASK,
-    cycle_timeline_preset_pattern_mask,
     generate_checker_mask,
     generate_checker_weights,
     generate_hard_mask,
@@ -43,7 +41,6 @@ from cleave.pattern_mask import (
     generate_strips_mask,
     generate_strips_weights,
     hard_mask_from_weight_fields,
-    timeline_preset_pattern_mask_display,
 )
 from cleave.viz.session import (
     TuningSession,
@@ -542,13 +539,3 @@ def test_render_pattern_mask_runtime_from_cfg_defaults() -> None:
     assert runtime.density == DEFAULT_RENDER_PATTERN_MASK_DENSITY
     assert runtime.seed == 0
     assert runtime.expanded is False
-
-
-def test_timeline_preset_pattern_mask_cycle_and_display() -> None:
-    assert DEFAULT_TIMELINE_PRESET_PATTERN_MASK is False
-    assert timeline_preset_pattern_mask_display(False) == "off"
-    assert timeline_preset_pattern_mask_display(True) == "on"
-    assert cycle_timeline_preset_pattern_mask(False, forward=True) is True
-    assert cycle_timeline_preset_pattern_mask(True, forward=True) is False
-    assert cycle_timeline_preset_pattern_mask(False, forward=False) is True
-    assert cycle_timeline_preset_pattern_mask(True, forward=False) is False

@@ -86,9 +86,11 @@ Hard mode gives clean "territories." Soft mode gives MD3-like plasma blends with
 
 ## Conductor integration
 
-The stem conductor ([cleave/timeline_presets/conductor.py](../cleave/timeline_presets/conductor.py)) gains a boolean toggle: `timeline.preset.pattern_mask` (like the existing `timeline.preset.conductor`). When on, generative Apply sets `render.pattern_mask.enabled: true` with a sensible default type (strips). The conductor does not pick pattern type or density; the user tunes those in the panel if desired.
+The timeline preset ([cleave/timeline_presets/mode.py](../cleave/timeline_presets/mode.py)) stages `timeline.preset.mode` (`layers` or `pattern_mask`).
 
-v1: static for the song. The conductor turns pattern mask on globally; pattern params stay fixed across phrases. Per-phrase pattern variation (e.g. strips in a verse, radial in a chorus) is appealing but adds significant complexity; defer until the static version is validated.
+When `pattern_mask`, generative Apply uses [cleave/timeline_presets/pattern_mask_arrange.py](../cleave/timeline_presets/pattern_mask_arrange.py) instead of the character builders, and sets `render.pattern_mask.enabled: true`, `type: strips`, `mode: hard`, and `transition: 1.0`. Density, invert, and seed stay user-tuned in the panel. Crescendo and diminuendo song markers shape layer count inside that arranger; the layers-mode crescendo/accent post-passes are skipped.
+
+When `layers`, Apply keeps the character builders and post-passes; pattern mask is left as the user set it.
 
 ---
 
@@ -103,7 +105,7 @@ Prove the architecture. One pattern, hard mode only.
 3. Hard mode only (one layer wins per pixel).
 4. Panel: `RENDER > PATTERN MASK` with `enabled`, `type: strips`, `density`, `invert`. Seed not needed yet (strips are deterministic).
 5. YAML schema: `render.pattern_mask` section with `enabled`, `type`, `density`, `invert`.
-6. Conductor toggle: `timeline.preset.pattern_mask` boolean; Apply sets `enabled: true`, `type: strips`.
+6. Timeline preset mode: `timeline.preset.mode` (`layers` | `pattern_mask`); Apply with `pattern_mask` uses the pattern-mask arranger and sets `enabled: true`, `type: strips`, `mode: hard`, `transition: 1.0`.
 
 ### Phase 2: pattern library and soft mode
 

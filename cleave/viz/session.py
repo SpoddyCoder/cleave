@@ -59,7 +59,10 @@ from cleave.timeline import SlotCue, TimelineLane, copy_lane, empty_lane
 from cleave.blend_modes import BlendMode
 from cleave.timeline_presets.characters import DEFAULT_TIMELINE_PRESET_KIND
 from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
-from cleave.pattern_mask import DEFAULT_TIMELINE_PRESET_PATTERN_MASK
+from cleave.timeline_presets.mode import (
+    DEFAULT_TIMELINE_PRESET_MODE,
+    TimelinePresetMode,
+)
 from cleave.timeline_presets.cue_snap import (
     DEFAULT_TIMELINE_PRESET_CUE_SNAP,
     TimelinePresetCueSnap,
@@ -316,7 +319,7 @@ class TimelineRuntime:
         DEFAULT_TIMELINE_PRESET_REPOPULATE
     )
     timeline_preset_conductor: bool = DEFAULT_TIMELINE_PRESET_CONDUCTOR
-    timeline_preset_pattern_mask: bool = DEFAULT_TIMELINE_PRESET_PATTERN_MASK
+    timeline_preset_mode: TimelinePresetMode = DEFAULT_TIMELINE_PRESET_MODE
     hard_cut_fades: TimelineFadeGroupRuntime = field(
         default_factory=default_timeline_fade_group_runtime
     )
@@ -595,10 +598,8 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
     preset_conductor = (
         DEFAULT_TIMELINE_PRESET_CONDUCTOR if preset is None else preset.conductor
     )
-    preset_pattern_mask = (
-        DEFAULT_TIMELINE_PRESET_PATTERN_MASK
-        if preset is None
-        else preset.pattern_mask
+    preset_mode = (
+        DEFAULT_TIMELINE_PRESET_MODE if preset is None else preset.mode
     )
     lanes: dict[str, TimelineLane] = {}
     for slot in cfg.layer_z_order:
@@ -620,7 +621,7 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
             timeline_preset_timeline_cuts=preset_timeline_cuts,
             timeline_preset_repopulate=preset_repopulate,
             timeline_preset_conductor=preset_conductor,
-            timeline_preset_pattern_mask=preset_pattern_mask,
+            timeline_preset_mode=preset_mode,
             limiter=limiter,
         )
     return TimelineRuntime(
@@ -635,7 +636,7 @@ def timeline_runtime_from_cfg(cfg: CleaveConfig) -> TimelineRuntime:
         timeline_preset_timeline_cuts=preset_timeline_cuts,
         timeline_preset_repopulate=preset_repopulate,
         timeline_preset_conductor=preset_conductor,
-        timeline_preset_pattern_mask=preset_pattern_mask,
+        timeline_preset_mode=preset_mode,
         hard_cut_fades=_fade_group_runtime_from_cfg(cuts.hard),
         soft_cut_fades=_fade_group_runtime_from_cfg(cuts.soft),
         limiter=limiter,

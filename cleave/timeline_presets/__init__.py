@@ -9,6 +9,13 @@ from cleave.extract import StemSource
 from cleave.signals import Signals
 from cleave.timeline import TimelineLane
 from cleave.timeline_presets.arrange import PHRASE_SEC_MIN, compose_timeline
+from cleave.timeline_presets.pattern_mask_arrange import (
+    SECTION_BARS_MAX,
+    SECTION_BARS_MIN,
+    SECTION_SEC_MIN,
+    compose_pattern_mask_timeline,
+    partition_pattern_mask_sections,
+)
 from cleave.timeline_presets.characters import (
     ARC,
     BREATHING,
@@ -36,6 +43,9 @@ __all__ = (
     "MIN_SWITCH_GAP_BARS",
     "MIN_SWITCH_GAP_SEC",
     "PHRASE_SEC_MIN",
+    "SECTION_BARS_MAX",
+    "SECTION_BARS_MIN",
+    "SECTION_SEC_MIN",
     "SOFT_LATCH_PROXIMITY_SEC",
     "TIMELINE_PRESET_HELP_ENTRIES",
     "TIMELINE_RESET_HELP_ENTRIES",
@@ -43,6 +53,8 @@ __all__ = (
     "build_breathing_cues",
     "build_dialogue_cues",
     "build_pulse_cues",
+    "compose_pattern_mask_timeline",
+    "partition_pattern_mask_sections",
 )
 
 

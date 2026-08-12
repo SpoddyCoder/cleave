@@ -45,7 +45,6 @@ from cleave.config_schema import (
     PatternMaskType,
 )
 from cleave.extract import StemSource
-from cleave.pattern_mask import DEFAULT_TIMELINE_PRESET_PATTERN_MASK
 from cleave.preset_curation import PresetCurationIndex
 from cleave.preset_playlist import (
     PresetPlaylist,
@@ -53,6 +52,10 @@ from cleave.preset_playlist import (
     scan_preset_playlist,
 )
 from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
+from cleave.timeline_presets.mode import (
+    DEFAULT_TIMELINE_PRESET_MODE,
+    TimelinePresetMode,
+)
 from cleave.viz.panel_notification import PanelNotificationActive
 from cleave.timeline_presets.cue_snap import (
     DEFAULT_TIMELINE_PRESET_CUE_SNAP,
@@ -269,7 +272,7 @@ class RenderTimelineBlock:
         DEFAULT_TIMELINE_PRESET_REPOPULATE
     )
     timeline_preset_conductor: bool = DEFAULT_TIMELINE_PRESET_CONDUCTOR
-    timeline_preset_pattern_mask: bool = DEFAULT_TIMELINE_PRESET_PATTERN_MASK
+    timeline_preset_mode: TimelinePresetMode = DEFAULT_TIMELINE_PRESET_MODE
     hard_cut_fades: TimelineFadeGroupBlock = field(
         default_factory=TimelineFadeGroupBlock
     )
@@ -794,7 +797,7 @@ class TuningViewStateBuilder:
             timeline_preset_timeline_cuts=tl.timeline_preset_timeline_cuts,
             timeline_preset_repopulate=tl.timeline_preset_repopulate,
             timeline_preset_conductor=tl.timeline_preset_conductor,
-            timeline_preset_pattern_mask=tl.timeline_preset_pattern_mask,
+            timeline_preset_mode=tl.timeline_preset_mode,
             hard_cut_fades=TimelineFadeGroupBlock(
                 enabled=tl.hard_cut_fades.enabled,
                 fade_in=tl.hard_cut_fades.fade_in,
@@ -1059,7 +1062,7 @@ class TuningViewStateBuilder:
                 timeline_preset_timeline_cuts=tl.timeline_preset_timeline_cuts,
                 timeline_preset_repopulate=tl.timeline_preset_repopulate,
                 timeline_preset_conductor=tl.timeline_preset_conductor,
-                timeline_preset_pattern_mask=tl.timeline_preset_pattern_mask,
+                timeline_preset_mode=tl.timeline_preset_mode,
                 hard_cut_fades=TimelineFadeGroupBlock(
                     enabled=tl.hard_cut_fades.enabled,
                     fade_in=tl.hard_cut_fades.fade_in,
