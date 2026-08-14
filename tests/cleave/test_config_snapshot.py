@@ -979,6 +979,133 @@ def test_write_session_snapshot_persists_highlight_rolloff_curve(tmp_path: Path)
     assert round_trip.post_fx.highlight_rolloff.curve == "aces_fit"
 
 
+def test_write_session_snapshot_persists_render_pattern_mask(tmp_path: Path) -> None:
+    cfg, session, out_path = _snapshot_fixture(tmp_path)
+    pm = session.render_pattern_mask
+    pm.enabled = True
+    pm.locked = True
+    pm.type = "plasma"
+    pm.density = 3.5
+    pm.mode = "soft"
+    pm.invert = True
+    pm.transition = 1.2
+    pm.seed = 77
+    write_session_snapshot(out_path, cfg=cfg, session=session)
+
+    data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    pattern_mask = data["render"]["pattern_mask"]
+    assert pattern_mask == {
+        "enabled": True,
+        "locked": True,
+        "type": "plasma",
+        "density": 3.5,
+        "mode": "soft",
+        "invert": True,
+        "transition": 1.2,
+        "seed": 77,
+    }
+
+    round_trip = parse_render_section(data)
+    assert round_trip is not None
+    assert round_trip.pattern_mask is not None
+    assert round_trip.pattern_mask.enabled is True
+    assert round_trip.pattern_mask.locked is True
+    assert round_trip.pattern_mask.type == "plasma"
+    assert round_trip.pattern_mask.density == 3.5
+    assert round_trip.pattern_mask.mode == "soft"
+    assert round_trip.pattern_mask.invert is True
+    assert round_trip.pattern_mask.transition == 1.2
+    assert round_trip.pattern_mask.seed == 77
+
+
+def test_write_session_snapshot_persists_pattern_mask_disabled(tmp_path: Path) -> None:
+    cfg, session, out_path = _snapshot_fixture(tmp_path)
+    session.render_pattern_mask.enabled = False
+    session.render_pattern_mask.density = 4.0
+    write_session_snapshot(out_path, cfg=cfg, session=session)
+
+    data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    pattern_mask = data["render"]["pattern_mask"]
+    assert pattern_mask["enabled"] is False
+    assert pattern_mask["density"] == 4.0
+
+
+def test_write_session_snapshot_overwrites_stale_pattern_mask(tmp_path: Path) -> None:
+    cfg, session, out_path = _snapshot_fixture(tmp_path)
+    config_path = tmp_path / "cleave.config.yaml"
+    data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    data["render"]["pattern_mask"] = {
+        "enabled": True,
+        "type": "radial",
+        "density": 8.0,
+        "mode": "soft",
+        "invert": True,
+        "transition": 2.0,
+        "seed": 1,
+        "locked": True,
+    }
+    config_path.write_text(yaml.safe_dump(data), encoding="utf-8")
+
+    session.render_pattern_mask.enabled = False
+    session.render_pattern_mask.type = "strips"
+    session.render_pattern_mask.density = 1.5
+    session.render_pattern_mask.mode = "hard"
+    session.render_pattern_mask.invert = False
+    session.render_pattern_mask.transition = 0.0
+    session.render_pattern_mask.seed = 0
+    session.render_pattern_mask.locked = False
+    write_session_snapshot(out_path, cfg=cfg, session=session)
+
+    snapshot = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    assert snapshot["render"]["pattern_mask"] == {
+        "enabled": False,
+        "locked": False,
+        "type": "strips",
+        "density": 1.5,
+        "mode": "hard",
+        "invert": False,
+        "transition": 0.0,
+        "seed": 0,
+    }
+
+
+def test_write_session_snapshot_persists_full_render_payload(tmp_path: Path) -> None:
+    cfg, session, out_path = _snapshot_fixture(tmp_path)
+    session.render_overlays.locked = True
+    session.render_post_fx.locked = True
+    session.render_post_fx.highlight_rolloff.ceiling_pct = 40
+    session.render_post_fx.highlight_rolloff.desaturation_pct = 55
+    write_session_snapshot(out_path, cfg=cfg, session=session)
+
+    data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    assert data["render"]["overlays"]["locked"] is True
+    assert data["render"]["post_fx"]["locked"] is True
+    hr = data["render"]["post_fx"]["highlight_rolloff"]
+    assert hr["ceiling_pct"] == 40
+    assert hr["desaturation_pct"] == 55
+
+    round_trip = parse_render_section(data)
+    assert round_trip is not None
+    assert round_trip.overlays is not None
+    assert round_trip.overlays.locked is True
+    assert round_trip.post_fx is not None
+    assert round_trip.post_fx.locked is True
+    assert round_trip.post_fx.highlight_rolloff.ceiling_pct == 40
+    assert round_trip.post_fx.highlight_rolloff.desaturation_pct == 55
+
+
+def test_write_session_snapshot_preserves_unknown_render_keys(tmp_path: Path) -> None:
+    cfg, session, out_path = _snapshot_fixture(tmp_path)
+    config_path = tmp_path / "cleave.config.yaml"
+    data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    data["render"]["experimental_flag"] = True
+    config_path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    write_session_snapshot(out_path, cfg=cfg, session=session)
+
+    snapshot = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    assert snapshot["render"]["experimental_flag"] is True
+
+
 def test_write_session_snapshot_render_post_fx_solo_does_not_affect_enabled(
     tmp_path: Path,
 ) -> None:

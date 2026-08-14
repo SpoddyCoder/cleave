@@ -35,114 +35,45 @@ def _load_original_dict(cfg: CleaveConfig) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
-def _merge_overlay_card(
-    orig_card: dict[str, Any],
-    card_payload: dict[str, Any],
+_LEGACY_RENDER_KEYS = ("overlay",)
+_LEGACY_OVERLAY_CARD_KEYS = ("font", "start_delay", "display_time")
+
+
+def _deep_merge_dicts(
+    original: dict[str, Any],
+    payload: dict[str, Any],
 ) -> dict[str, Any]:
-    card: dict[str, Any] = dict(orig_card)
-    card["enabled"] = card_payload["enabled"]
-    card["title"] = card_payload["title"]
-    card["body"] = card_payload["body"]
-    card["animation"] = card_payload["animation"]
-    card["position"] = card_payload["position"]
-
-    background = orig_card.get("background")
-    background_out: dict[str, Any] = (
-        dict(background) if isinstance(background, dict) else {}
-    )
-    bg_payload = card_payload["background"]
-    background_out["margin"] = bg_payload["margin"]
-    background_out["padding"] = bg_payload["padding"]
-    background_out["colour"] = bg_payload["colour"]
-    background_out["opacity"] = bg_payload["opacity"]
-
-    border = background_out.get("border")
-    border_out: dict[str, Any] = dict(border) if isinstance(border, dict) else {}
-    border_payload = bg_payload["border"]
-    border_out["colour"] = border_payload["colour"]
-    border_out["width"] = border_payload["width"]
-    background_out["border"] = border_out
-    card["background"] = background_out
-    card.pop("font", None)
-    card.pop("start_delay", None)
-    card.pop("display_time", None)
-    return card
+    merged: dict[str, Any] = dict(original)
+    for key, value in payload.items():
+        existing = merged.get(key)
+        if isinstance(value, dict) and isinstance(existing, dict):
+            merged[key] = _deep_merge_dicts(existing, value)
+        else:
+            merged[key] = value
+    return merged
 
 
-def _snapshot_render_overlays(
-    cfg: CleaveConfig,
-    session: TuningSession,
+def _strip_legacy_overlay_card_keys(render_out: dict[str, Any]) -> None:
+    overlays = render_out.get("overlays")
+    if not isinstance(overlays, dict):
+        return
+    for card_key in ("opening-card", "closing-card"):
+        card = overlays.get(card_key)
+        if isinstance(card, dict):
+            for legacy_key in _LEGACY_OVERLAY_CARD_KEYS:
+                card.pop(legacy_key, None)
+
+
+def _snapshot_render(
+    render_payload: dict[str, Any],
     original: dict[str, Any],
 ) -> dict[str, Any]:
-    payload = persisted_session_payload(cfg, session)
-    overlays_payload = payload["render"]["overlays"]
-    post_fx_payload = payload["render"]["post_fx"]
-
     orig_render = original.get("render")
-    orig_overlays: dict[str, Any] = {}
-    if isinstance(orig_render, dict):
-        orig_overlays_raw = orig_render.get("overlays")
-        if isinstance(orig_overlays_raw, dict):
-            orig_overlays = dict(orig_overlays_raw)
-
-    orig_opening = orig_overlays.get("opening-card")
-    orig_closing = orig_overlays.get("closing-card")
-    overlays: dict[str, Any] = {
-        "locked": overlays_payload["locked"],
-        "opening-card": _merge_overlay_card(
-            dict(orig_opening) if isinstance(orig_opening, dict) else {},
-            overlays_payload["opening-card"],
-        ),
-        "closing-card": _merge_overlay_card(
-            dict(orig_closing) if isinstance(orig_closing, dict) else {},
-            overlays_payload["closing-card"],
-        ),
-    }
-
-    orig_pp: dict[str, Any] = {}
-    if isinstance(orig_render, dict):
-        orig_pp_raw = orig_render.get("post_fx")
-        if isinstance(orig_pp_raw, dict):
-            orig_pp = dict(orig_pp_raw)
-
-    post_fx: dict[str, Any] = dict(orig_pp)
-    post_fx["enabled"] = post_fx_payload["enabled"]
-    post_fx["fade_in"] = post_fx_payload["fade_in"]
-    post_fx["fade_out"] = post_fx_payload["fade_out"]
-    hr_payload = post_fx_payload["highlight_rolloff"]
-    hr_orig = post_fx.get("highlight_rolloff")
-    highlight_rolloff: dict[str, Any] = (
-        dict(hr_orig) if isinstance(hr_orig, dict) else {}
-    )
-    highlight_rolloff["mode"] = hr_payload["mode"]
-    highlight_rolloff["curve"] = hr_payload["curve"]
-    highlight_rolloff["threshold_pct"] = hr_payload["threshold_pct"]
-    highlight_rolloff["strength_pct"] = hr_payload["strength_pct"]
-    highlight_rolloff["softness_pct"] = hr_payload["softness_pct"]
-    post_fx["highlight_rolloff"] = highlight_rolloff
-    cb_payload = post_fx_payload["chroma_boost"]
-    cb_orig = post_fx.get("chroma_boost")
-    chroma_boost: dict[str, Any] = (
-        dict(cb_orig) if isinstance(cb_orig, dict) else {}
-    )
-    chroma_boost["mode"] = cb_payload["mode"]
-    chroma_boost["variant"] = cb_payload["variant"]
-    chroma_boost["amount_pct"] = cb_payload["amount_pct"]
-    post_fx["chroma_boost"] = chroma_boost
-
-    render_out: dict[str, Any] = {}
-    if isinstance(orig_render, dict):
-        render_out = {
-            key: value
-            for key, value in orig_render.items()
-            if key not in ("overlay", "overlays", "post_fx")
-        }
-    render_payload = payload["render"]
-    render_out["fps"] = render_payload["fps"]
-    render_out["width"] = render_payload["width"]
-    render_out["height"] = render_payload["height"]
-    render_out["overlays"] = overlays
-    render_out["post_fx"] = post_fx
+    orig: dict[str, Any] = dict(orig_render) if isinstance(orig_render, dict) else {}
+    for legacy_key in _LEGACY_RENDER_KEYS:
+        orig.pop(legacy_key, None)
+    render_out = _deep_merge_dicts(orig, render_payload)
+    _strip_legacy_overlay_card_keys(render_out)
     return render_out
 
 
@@ -175,7 +106,7 @@ def write_session_snapshot(
         "editor": editor_out,
         "layer_z_order": payload["layer_z_order"],
         "layers": payload["layers"],
-        "render": _snapshot_render_overlays(cfg, session, original),
+        "render": _snapshot_render(payload["render"], original),
         "timeline": payload["timeline"],
     }
 
