@@ -2,7 +2,7 @@
 
 High-level proposal. Aspirational; not scheduled.
 
-Related: [roadmap.md](roadmap.md) (Pattern mask; Geometric transition wipes), [cleave/gl_compositor.py](../cleave/gl_compositor.py), [cleave/blend_modes.py](../cleave/blend_modes.py).
+Related: [roadmap.md](roadmap.md) (Pattern mask; Geometric transition wipes), [pattern-mask-transition-fragility.md](pattern-mask-transition-fragility.md), [cleave/gl_compositor.py](../cleave/gl_compositor.py), [cleave/blend_modes.py](../cleave/blend_modes.py).
 
 ---
 
@@ -88,7 +88,7 @@ Feather 0% gives clean territories. Feather 100% gives MD3-like plasma blends wi
 
 The timeline preset ([cleave/timeline_presets/mode.py](../cleave/timeline_presets/mode.py)) stages `timeline.preset.mode` (`layers` or `pattern_mask`).
 
-When `pattern_mask`, generative Apply uses [cleave/timeline_presets/pattern_mask_arrange.py](../cleave/timeline_presets/pattern_mask_arrange.py) instead of the character builders, and sets `render.pattern_mask.enabled: true`, `type: strips`, `feather_pct: 0`, and `transition: 1.0`. Density, invert, and seed stay user-tuned in the panel. Crescendo and diminuendo song markers shape layer count inside that arranger; the layers-mode crescendo/accent post-passes are skipped.
+When `pattern_mask`, generative Apply uses [cleave/timeline_presets/pattern_mask_arrange.py](../cleave/timeline_presets/pattern_mask_arrange.py) instead of the character builders, and sets `render.pattern_mask.enabled: true`, `type: strips`, `feather_pct: 0`, and `transition: 1.0`. Density, invert, and seed stay user-tuned in the panel. Crescendo and diminuendo song markers shape layer count inside that arranger; the layers-mode crescendo/accent post-passes are skipped. Slot-set changes packed inside the 1.0s compositor window are a suspected visual-breakage source; see [pattern-mask-transition-fragility.md](pattern-mask-transition-fragility.md).
 
 When `layers`, Apply keeps the character builders and post-passes; pattern mask is left as the user set it.
 
