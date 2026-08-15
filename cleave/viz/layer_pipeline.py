@@ -509,7 +509,7 @@ class LayerFramePipeline:
                 compositor.content_fbo_id,
                 fbos,
                 mask_type=pm.type,
-                mode=pm.mode,
+                feather_pct=pm.feather_pct,
                 density=pm.density,
                 invert=pm.invert,
                 seed=pm.seed,

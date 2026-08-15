@@ -759,15 +759,15 @@ def test_pattern_mask_seed_row_only_for_plasma() -> None:
 
     view_strips = builder.build(paused=False)
     seed = RowDescriptor(RowKind.RENDER_PATTERN_MASK_SEED)
-    mode = RowDescriptor(RowKind.RENDER_PATTERN_MASK_MODE)
-    assert mode in view_strips.layout.rows
+    feather = RowDescriptor(RowKind.RENDER_PATTERN_MASK_FEATHER)
+    assert feather in view_strips.layout.rows
     assert seed not in view_strips.layout.rows
 
     session.render_pattern_mask.type = "plasma"
     view_plasma = builder.build(paused=False)
     assert view_plasma.layout is not view_strips.layout
     assert seed in view_plasma.layout.rows
-    assert mode in view_plasma.layout.rows
+    assert feather in view_plasma.layout.rows
 
 
 def test_structure_signature_invalidates_on_hard_cut_fades_enabled() -> None:

@@ -19,7 +19,7 @@ Complements existing compositing: black-key / add (and other [blend modes](../cl
 ## Mental model
 
 - Inputs: the N currently visible layers (session order, or an explicit role mapping).
-- A mask field `w_i(x, y)` per layer. In hard mode one layer wins per pixel; in soft mode weights form a soft partition (ideally summing to about 1).
+- A mask field `w_i(x, y)` per layer. At feather 0% one layer wins per pixel; at 100% weights form a soft partition (ideally summing to about 1). In-between values widen the blend zone.
 - Composite still happens in the OpenGL compositor. Layer opacity, timeline level, and blend mode apply inside each layer's contribution; the mask gates or weights that contribution spatially.
 
 Layer count is not a mask parameter. It comes from the session. Geometry knobs (density) control how the map is subdivided, then regions are assigned to layers. Region count equals visible layer count; density is a multiplier of segments per layer (1.0x = one segment per active layer).
@@ -49,7 +49,7 @@ RENDER > PATTERN MASK
   enabled
   type: off | strips | radial | checker | plasma
   density             # multiplier: 1.0x = 1 segment/layer, 10.0x = 10/layer
-  mode: hard | soft
+  feather               # 0-100%; 0% hard territories, 100% maximum overlap
   layer order         # default: visible stack order; optional mix special-case
   invert
   seed                # persisted in YAML; respin action in panel
@@ -72,7 +72,7 @@ Optional later: explicit stem-role mapping (which region family the mix owns), t
 | Checker / tiled | Cycle visible layers through tiles; density = tile count |
 | Plasma / soft field | Continuous soft assignment; seedable |
 
-Hard mode gives clean "territories." Soft mode gives MD3-like plasma blends without locking to two sources.
+Feather 0% gives clean territories. Feather 100% gives MD3-like plasma blends without locking to two sources.
 
 ---
 
@@ -88,7 +88,7 @@ Hard mode gives clean "territories." Soft mode gives MD3-like plasma blends with
 
 The timeline preset ([cleave/timeline_presets/mode.py](../cleave/timeline_presets/mode.py)) stages `timeline.preset.mode` (`layers` or `pattern_mask`).
 
-When `pattern_mask`, generative Apply uses [cleave/timeline_presets/pattern_mask_arrange.py](../cleave/timeline_presets/pattern_mask_arrange.py) instead of the character builders, and sets `render.pattern_mask.enabled: true`, `type: strips`, `mode: hard`, and `transition: 1.0`. Density, invert, and seed stay user-tuned in the panel. Crescendo and diminuendo song markers shape layer count inside that arranger; the layers-mode crescendo/accent post-passes are skipped.
+When `pattern_mask`, generative Apply uses [cleave/timeline_presets/pattern_mask_arrange.py](../cleave/timeline_presets/pattern_mask_arrange.py) instead of the character builders, and sets `render.pattern_mask.enabled: true`, `type: strips`, `feather_pct: 0`, and `transition: 1.0`. Density, invert, and seed stay user-tuned in the panel. Crescendo and diminuendo song markers shape layer count inside that arranger; the layers-mode crescendo/accent post-passes are skipped.
 
 When `layers`, Apply keeps the character builders and post-passes; pattern mask is left as the user set it.
 
@@ -98,24 +98,24 @@ When `layers`, Apply keeps the character builders and post-passes; pattern mask 
 
 ### Phase 1: shader composite and strips
 
-Prove the architecture. One pattern, hard mode only.
+Prove the architecture. One pattern, hard territories only.
 
 1. Add a moderngl shader composite path alongside the existing fixed-function compositor. Unmasked layers continue through fixed-function; masked layers use the shader path with a 1D mask texture.
 2. Strips pattern generator: vertical bands, one per visible layer. Density controls strip count (minimum = layer count). Region count equals visible layer count.
-3. Hard mode only (one layer wins per pixel).
+3. Hard territories only (one layer wins per pixel).
 4. Panel: `RENDER > PATTERN MASK` with `enabled`, `type: strips`, `density`, `invert`. Seed not needed yet (strips are deterministic).
 5. YAML schema: `render.pattern_mask` section with `enabled`, `type`, `density`, `invert`.
-6. Timeline preset mode: `timeline.preset.mode` (`layers` | `pattern_mask`); Apply with `pattern_mask` uses the pattern-mask arranger and sets `enabled: true`, `type: strips`, `mode: hard`, `transition: 1.0`.
+6. Timeline preset mode: `timeline.preset.mode` (`layers` | `pattern_mask`); Apply with `pattern_mask` uses the pattern-mask arranger and sets `enabled: true`, `type: strips`, `feather_pct: 0`, `transition: 1.0`.
 
-### Phase 2: pattern library and soft mode
+### Phase 2: pattern library and feather
 
 Expand the pattern set and add weighted compositing.
 
 1. Radial pattern (wedges / rings; mix-in-center option).
 2. Checker / tiled pattern (cycle layers through tiles).
-3. Soft mode: mask weights form a soft partition. Weights apply as opacity modulation before the existing per-layer blend mode (not a separate color lerp), so interaction with black-key / add / multiply stays predictable.
+3. Feather: mask weights form a soft partition. Weights apply as opacity modulation before the existing per-layer blend mode (not a separate color lerp), so interaction with black-key / add / multiply stays predictable. 0% is hard territories; 100% is maximum overlap.
 4. Plasma / soft field pattern with persisted seed and respin.
-5. Panel: `mode: hard | soft`, `seed`, respin action.
+5. Panel: `feather` (0-100%), `seed`, respin action.
 
 ### Phase 3: dynamic masks and transition wipes
 
@@ -133,4 +133,4 @@ Make patterns song-aware and reuse the mask library for preset transitions.
 - **Region count = visible layer count.** Decoupling them (repeat, omit, merge when they differ) is phase 3 scope at earliest.
 - **Seed is persisted in YAML.** Offline render determinism requires it; random-per-session is not acceptable.
 - **Panel placement:** RENDER sibling, not a POST FX child or layer-tree subsection.
-- **Soft mode blend interaction:** weights modulate opacity before the layer's existing blend mode. No new compositing algebra.
+- **Feather blend interaction:** weights modulate opacity before the layer's existing blend mode. No new compositing algebra.

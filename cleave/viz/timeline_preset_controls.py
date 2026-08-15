@@ -250,7 +250,7 @@ class TimelinePresetController:
         pm = self.session.render_pattern_mask
         pm.enabled = True
         pm.type = "strips"
-        pm.mode = "hard"
+        pm.feather_pct = 0
         pm.transition = _PATTERN_MASK_TRANSITION_SEC
 
     def _apply_cue_snap(

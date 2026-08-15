@@ -290,7 +290,6 @@ DEFAULT_RENDER_POST_FX_FADE_OUT = 4.0
 # --- Render pattern mask defaults ---
 
 PatternMaskType = Literal["strips", "radial", "checker", "plasma"]
-PatternMaskMode = Literal["hard", "soft"]
 
 PATTERN_MASK_TYPES: tuple[PatternMaskType, ...] = (
     "strips",
@@ -298,11 +297,10 @@ PATTERN_MASK_TYPES: tuple[PatternMaskType, ...] = (
     "checker",
     "plasma",
 )
-PATTERN_MASK_MODES: tuple[PatternMaskMode, ...] = ("hard", "soft")
 
 DEFAULT_RENDER_PATTERN_MASK_ENABLED = False
 DEFAULT_RENDER_PATTERN_MASK_TYPE: PatternMaskType = "strips"
-DEFAULT_RENDER_PATTERN_MASK_MODE: PatternMaskMode = "hard"
+DEFAULT_RENDER_PATTERN_MASK_FEATHER_PCT = 0
 DEFAULT_RENDER_PATTERN_MASK_DENSITY = 1.0
 DEFAULT_RENDER_PATTERN_MASK_INVERT = False
 DEFAULT_RENDER_PATTERN_MASK_SEED = 0
@@ -314,6 +312,10 @@ PATTERN_MASK_TRANSITION_MIN = 0.0
 PATTERN_MASK_TRANSITION_MAX = 5.0
 PATTERN_MASK_TRANSITION_STEP = 0.1
 PATTERN_MASK_TRANSITION_STEP_LARGE = 1.0
+PATTERN_MASK_FEATHER_PCT_MIN = 0
+PATTERN_MASK_FEATHER_PCT_MAX = 100
+PATTERN_MASK_FEATHER_PCT_STEP = 1
+PATTERN_MASK_FEATHER_PCT_STEP_LARGE = 10
 
 HighlightRolloffApplyMode = Literal["off", "per_layer", "composite"]
 
@@ -667,6 +669,13 @@ def clamp_pattern_mask_transition(value: float) -> float:
     )
 
 
+def clamp_pattern_mask_feather_pct(value: int) -> int:
+    return max(
+        PATTERN_MASK_FEATHER_PCT_MIN,
+        min(PATTERN_MASK_FEATHER_PCT_MAX, int(value)),
+    )
+
+
 def _parse_pattern_mask_type(
     value: Any,
     _ctx: ParseCtx,
@@ -676,19 +685,6 @@ def _parse_pattern_mask_type(
         raise ValueError(f"{label} must be a string")
     if value not in PATTERN_MASK_TYPES:
         allowed = ", ".join(f"'{item}'" for item in PATTERN_MASK_TYPES)
-        raise ValueError(f"{label} must be one of: {allowed}")
-    return value  # type: ignore[return-value]
-
-
-def _parse_pattern_mask_mode(
-    value: Any,
-    _ctx: ParseCtx,
-    label: str = "render.pattern_mask.mode",
-) -> PatternMaskMode:
-    if not isinstance(value, str):
-        raise ValueError(f"{label} must be a string")
-    if value not in PATTERN_MASK_MODES:
-        allowed = ", ".join(f"'{item}'" for item in PATTERN_MASK_MODES)
         raise ValueError(f"{label} must be one of: {allowed}")
     return value  # type: ignore[return-value]
 
@@ -1778,10 +1774,10 @@ RENDER_PATTERN_MASK_FIELDS: tuple[SchemaField, ...] = (
         _dump_scalar,
     ),
     FieldDescriptor(
-        "mode",
-        DEFAULT_RENDER_PATTERN_MASK_MODE,
+        "feather_pct",
+        DEFAULT_RENDER_PATTERN_MASK_FEATHER_PCT,
         "session",
-        _parse_pattern_mask_mode,
+        lambda raw, _ctx, _label: clamp_pattern_mask_feather_pct(int(float(raw))),
         _dump_scalar,
     ),
     FieldDescriptor(
@@ -2469,7 +2465,7 @@ def persist_render(ctx: PersistCtx) -> dict[str, Any]:
         "locked": runtime_pm.locked,
         "type": runtime_pm.type,
         "density": runtime_pm.density,
-        "mode": runtime_pm.mode,
+        "feather_pct": runtime_pm.feather_pct,
         "invert": runtime_pm.invert,
         "transition": runtime_pm.transition,
         "seed": runtime_pm.seed,
@@ -2889,7 +2885,7 @@ def default_render_pattern_mask_runtime_values() -> dict[str, Any]:
         "expanded": False,
         "type": DEFAULT_RENDER_PATTERN_MASK_TYPE,
         "density": DEFAULT_RENDER_PATTERN_MASK_DENSITY,
-        "mode": DEFAULT_RENDER_PATTERN_MASK_MODE,
+        "feather_pct": DEFAULT_RENDER_PATTERN_MASK_FEATHER_PCT,
         "invert": DEFAULT_RENDER_PATTERN_MASK_INVERT,
         "transition": DEFAULT_RENDER_PATTERN_MASK_TRANSITION,
         "seed": DEFAULT_RENDER_PATTERN_MASK_SEED,
