@@ -986,7 +986,7 @@ def test_write_session_snapshot_persists_render_pattern_mask(tmp_path: Path) -> 
     pm.locked = True
     pm.type = "plasma"
     pm.density = 3.5
-    pm.mode = "soft"
+    pm.feather_pct = 100
     pm.invert = True
     pm.transition = 1.2
     pm.seed = 77
@@ -999,7 +999,7 @@ def test_write_session_snapshot_persists_render_pattern_mask(tmp_path: Path) -> 
         "locked": True,
         "type": "plasma",
         "density": 3.5,
-        "mode": "soft",
+        "feather_pct": 100,
         "invert": True,
         "transition": 1.2,
         "seed": 77,
@@ -1012,7 +1012,7 @@ def test_write_session_snapshot_persists_render_pattern_mask(tmp_path: Path) -> 
     assert round_trip.pattern_mask.locked is True
     assert round_trip.pattern_mask.type == "plasma"
     assert round_trip.pattern_mask.density == 3.5
-    assert round_trip.pattern_mask.mode == "soft"
+    assert round_trip.pattern_mask.feather_pct == 100
     assert round_trip.pattern_mask.invert is True
     assert round_trip.pattern_mask.transition == 1.2
     assert round_trip.pattern_mask.seed == 77
@@ -1038,7 +1038,7 @@ def test_write_session_snapshot_overwrites_stale_pattern_mask(tmp_path: Path) ->
         "enabled": True,
         "type": "radial",
         "density": 8.0,
-        "mode": "soft",
+        "feather_pct": 100,
         "invert": True,
         "transition": 2.0,
         "seed": 1,
@@ -1049,7 +1049,7 @@ def test_write_session_snapshot_overwrites_stale_pattern_mask(tmp_path: Path) ->
     session.render_pattern_mask.enabled = False
     session.render_pattern_mask.type = "strips"
     session.render_pattern_mask.density = 1.5
-    session.render_pattern_mask.mode = "hard"
+    session.render_pattern_mask.feather_pct = 0
     session.render_pattern_mask.invert = False
     session.render_pattern_mask.transition = 0.0
     session.render_pattern_mask.seed = 0
@@ -1062,7 +1062,7 @@ def test_write_session_snapshot_overwrites_stale_pattern_mask(tmp_path: Path) ->
         "locked": False,
         "type": "strips",
         "density": 1.5,
-        "mode": "hard",
+        "feather_pct": 0,
         "invert": False,
         "transition": 0.0,
         "seed": 0,

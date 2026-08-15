@@ -1,4 +1,4 @@
-"""Pattern mask generators and GL upload helpers (hard and soft modes)."""
+"""Pattern mask generators and GL upload helpers (hard and feathered weights)."""
 
 from __future__ import annotations
 
@@ -54,7 +54,7 @@ class PatternMaskParams:
     """Pattern mask settings passed into the masked compositor."""
 
     mask_type: str
-    mode: str
+    feather_pct: int
     density: float
     invert: bool
     seed: int
@@ -74,18 +74,18 @@ def cycle_pattern_mask_invert(value: bool, *, forward: bool) -> bool:
     return options[(index + delta) % len(options)]
 
 
-def pattern_mask_mode_display(mode: str) -> str:
-    return str(mode)
+def pattern_mask_feather_half_width(feather_pct: int) -> float:
+    """Tent half-width: 0.5 at 0% (no overlap) to 1.0 at 100% (current soft)."""
+    pct = max(0, min(100, int(feather_pct)))
+    return 0.5 + 0.5 * (pct / 100.0)
 
 
-def cycle_pattern_mask_mode(value: str, *, forward: bool) -> str:
-    options = ("hard", "soft")
-    try:
-        index = options.index(value)
-    except ValueError:
-        index = 0
-    delta = 1 if forward else -1
-    return options[(index + delta) % len(options)]
+def pattern_mask_plasma_power(feather_pct: int) -> float:
+    """Plasma field exponent: 1.0 at 100%; higher as feather approaches 0."""
+    pct = max(0, min(100, int(feather_pct)))
+    if pct <= 0:
+        return 1.0
+    return 100.0 / float(pct)
 
 
 def _gl_name(gen_fn, count: int = 1) -> int:
@@ -155,6 +155,19 @@ def _apply_invert(region: np.ndarray, layer_count: int, invert: bool) -> np.ndar
     if not invert:
         return region.astype(np.uint8, copy=False)
     return (layer_count - 1 - region.astype(np.int64)).astype(np.uint8)
+
+
+def _cover_zero_mass(fields: np.ndarray, winner: np.ndarray) -> np.ndarray:
+    """Assign weight 1 to *winner* where every channel is 0 (exact boundaries)."""
+    total = np.sum(fields, axis=0)
+    uncovered = total <= 0.0
+    if not np.any(uncovered):
+        return fields
+    out = fields.copy()
+    ys, xs = np.nonzero(uncovered)
+    out[:, ys, xs] = 0.0
+    out[winner[ys, xs].astype(np.int64), ys, xs] = 1.0
+    return out
 
 
 def _zero_inactive_fields(
@@ -462,6 +475,7 @@ def _strips_weight_fields(
     layer_count: int,
     density: float,
     active_flags: tuple[bool, ...],
+    feather_pct: int = 100,
 ) -> np.ndarray:
     """Return (N, H, W) float strip weight fields; inactive slots stay 0."""
     active = _active_layer_indices(active_flags)
@@ -470,13 +484,17 @@ def _strips_weight_fields(
         return fields
     n_active = len(active)
     strip_count = _subdivision_count(n_active, density)
+    half_width = pattern_mask_feather_half_width(feather_pct)
     xs = (np.arange(width, dtype=np.float64) + 0.5) / width * strip_count
     for strip in range(strip_count):
         layer = active[strip % n_active]
         center = strip + 0.5
-        row = np.maximum(0.0, 1.0 - np.abs(xs - center))
+        row = np.maximum(0.0, 1.0 - np.abs(xs - center) / half_width)
         fields[layer] += row
-    return fields
+    strip_index = np.minimum(xs.astype(np.int64), strip_count - 1)
+    active_arr = np.asarray(active, dtype=np.int64)
+    winner = np.broadcast_to(active_arr[strip_index % n_active], (height, width))
+    return _cover_zero_mass(fields, winner)
 
 
 def _radial_weight_fields(
@@ -485,6 +503,7 @@ def _radial_weight_fields(
     layer_count: int,
     density: float,
     active_flags: tuple[bool, ...],
+    feather_pct: int = 100,
 ) -> np.ndarray:
     """Return (N, H, W) float wedge weight fields; inactive slots stay 0."""
     active = _active_layer_indices(active_flags)
@@ -493,14 +512,18 @@ def _radial_weight_fields(
         return fields
     n_active = len(active)
     wedge_count = _subdivision_count(n_active, density)
+    half_width = pattern_mask_feather_half_width(feather_pct)
     angle = _radial_normalized_angle(width, height, wedge_count) * wedge_count
     for wedge in range(wedge_count):
         layer = active[wedge % n_active]
         center = wedge + 0.5
         delta = np.abs(angle - center)
         delta = np.minimum(delta, float(wedge_count) - delta)
-        fields[layer] += np.maximum(0.0, 1.0 - delta)
-    return fields
+        fields[layer] += np.maximum(0.0, 1.0 - delta / half_width)
+    wedge_index = np.minimum(angle.astype(np.int64), wedge_count - 1)
+    active_arr = np.asarray(active, dtype=np.int64)
+    winner = active_arr[wedge_index % n_active]
+    return _cover_zero_mass(fields, winner)
 
 
 def _checker_weight_fields(
@@ -509,10 +532,12 @@ def _checker_weight_fields(
     layer_count: int,
     density: float,
     active_flags: tuple[bool, ...],
+    feather_pct: int = 100,
 ) -> np.ndarray:
     """Return (N, H, W) float checker fields; inactive zeroed then renormalized."""
     tile_count = _subdivision_count(layer_count, density)
     cols, rows = _checker_grid_dims(width, height, layer_count, density)
+    half_width = pattern_mask_feather_half_width(feather_pct)
     xs = (np.arange(width, dtype=np.float64) + 0.5) / width * cols
     ys = (np.arange(height, dtype=np.float64) + 0.5) / height * rows
     xx, yy = np.meshgrid(xs, ys)
@@ -525,8 +550,19 @@ def _checker_weight_fields(
             layer = _checker_tile_layer(row, col, layer_count)
             dx = np.abs(xx - (col + 0.5))
             dy = np.abs(yy - (row + 0.5))
-            fields[layer] += np.maximum(0.0, 1.0 - np.maximum(dx, dy))
-    return _zero_inactive_fields(fields, active_flags)
+            fields[layer] += np.maximum(
+                0.0, 1.0 - np.maximum(dx, dy) / half_width
+            )
+    fields = _zero_inactive_fields(fields, active_flags)
+    col_i = np.minimum(xx.astype(np.int64), cols - 1)
+    row_i = np.minimum(yy.astype(np.int64), rows - 1)
+    winner = (row_i + col_i) % layer_count
+    if any(not flag for flag in active_flags):
+        active = _active_layer_indices(active_flags)
+        if active:
+            active_arr = np.asarray(active, dtype=np.int64)
+            winner = active_arr[winner % len(active)]
+    return _cover_zero_mass(fields, winner)
 
 
 def generate_strips_weights(
@@ -536,6 +572,7 @@ def generate_strips_weights(
     density: float = DEFAULT_PATTERN_MASK_DENSITY,
     invert: bool = False,
     active_flags: tuple[bool, ...] | None = None,
+    feather_pct: int = 100,
 ) -> np.ndarray:
     """Return (H, W, N) uint8 soft strip weights (sum ~255 per pixel)."""
     _validate_mask_dims(width, height, layer_count)
@@ -543,7 +580,9 @@ def generate_strips_weights(
     height = int(height)
     layer_count = int(layer_count)
     flags = _resolve_active_flags(layer_count, active_flags)
-    fields = _strips_weight_fields(width, height, layer_count, density, flags)
+    fields = _strips_weight_fields(
+        width, height, layer_count, density, flags, feather_pct=feather_pct
+    )
     weights = _fields_to_u8_weights(fields)
     return _invert_weight_layers(weights, invert)
 
@@ -555,6 +594,7 @@ def generate_radial_weights(
     density: float = DEFAULT_PATTERN_MASK_DENSITY,
     invert: bool = False,
     active_flags: tuple[bool, ...] | None = None,
+    feather_pct: int = 100,
 ) -> np.ndarray:
     """Return (H, W, N) uint8 soft wedge weights (sum ~255 per pixel)."""
     _validate_mask_dims(width, height, layer_count)
@@ -562,7 +602,9 @@ def generate_radial_weights(
     height = int(height)
     layer_count = int(layer_count)
     flags = _resolve_active_flags(layer_count, active_flags)
-    fields = _radial_weight_fields(width, height, layer_count, density, flags)
+    fields = _radial_weight_fields(
+        width, height, layer_count, density, flags, feather_pct=feather_pct
+    )
     weights = _fields_to_u8_weights(fields)
     return _invert_weight_layers(weights, invert)
 
@@ -574,6 +616,7 @@ def generate_checker_weights(
     density: float = DEFAULT_PATTERN_MASK_DENSITY,
     invert: bool = False,
     active_flags: tuple[bool, ...] | None = None,
+    feather_pct: int = 100,
 ) -> np.ndarray:
     """Return (H, W, N) uint8 soft checker weights (sum ~255 per pixel)."""
     _validate_mask_dims(width, height, layer_count)
@@ -581,9 +624,19 @@ def generate_checker_weights(
     height = int(height)
     layer_count = int(layer_count)
     flags = _resolve_active_flags(layer_count, active_flags)
-    fields = _checker_weight_fields(width, height, layer_count, density, flags)
+    fields = _checker_weight_fields(
+        width, height, layer_count, density, flags, feather_pct=feather_pct
+    )
     weights = _fields_to_u8_weights(fields)
     return _invert_weight_layers(weights, invert)
+
+
+def _apply_plasma_feather(fields: np.ndarray, feather_pct: int) -> np.ndarray:
+    """Raise plasma fields to 100/feather_pct; 100% is identity."""
+    power = pattern_mask_plasma_power(feather_pct)
+    if power == 1.0:
+        return fields
+    return np.power(np.maximum(fields, 0.0), power)
 
 
 def generate_plasma_weights(
@@ -594,6 +647,7 @@ def generate_plasma_weights(
     seed: int = 0,
     invert: bool = False,
     active_flags: tuple[bool, ...] | None = None,
+    feather_pct: int = 100,
 ) -> np.ndarray:
     """Return (H, W, N) uint8 soft plasma weights (sum ~255 per pixel)."""
     _validate_mask_dims(width, height, layer_count)
@@ -605,6 +659,7 @@ def generate_plasma_weights(
         width, height, layer_count, density=density, seed=seed
     )
     fields = _zero_inactive_fields(fields, flags)
+    fields = _apply_plasma_feather(fields, feather_pct)
     weights = _fields_to_u8_weights(fields)
     return _invert_weight_layers(weights, invert)
 
@@ -619,12 +674,14 @@ def generate_soft_weight_fields(
     invert: bool = False,
     seed: int = 0,
     active_flags: tuple[bool, ...] | None = None,
+    feather_pct: int = 100,
 ) -> np.ndarray:
     """Return (N, H, W) float64 soft weight fields for *mask_type*.
 
     Inactive slots are weight 0. Fields are non-negative and suitable for
     linear blending during mask transitions; callers convert to uint8 or
-    derive hard masks via argmax.
+    derive hard masks via argmax. *feather_pct* 100 matches full overlap;
+    0 uses tent half-width 0.5 (geometric) or unpowered plasma fields.
     """
     _validate_mask_dims(width, height, layer_count)
     width = int(width)
@@ -632,16 +689,23 @@ def generate_soft_weight_fields(
     layer_count = int(layer_count)
     flags = _resolve_active_flags(layer_count, active_flags)
     if mask_type == "strips":
-        fields = _strips_weight_fields(width, height, layer_count, density, flags)
+        fields = _strips_weight_fields(
+            width, height, layer_count, density, flags, feather_pct=feather_pct
+        )
     elif mask_type == "radial":
-        fields = _radial_weight_fields(width, height, layer_count, density, flags)
+        fields = _radial_weight_fields(
+            width, height, layer_count, density, flags, feather_pct=feather_pct
+        )
     elif mask_type == "checker":
-        fields = _checker_weight_fields(width, height, layer_count, density, flags)
+        fields = _checker_weight_fields(
+            width, height, layer_count, density, flags, feather_pct=feather_pct
+        )
     elif mask_type == "plasma":
         fields = _plasma_fields(
             width, height, layer_count, density=density, seed=seed
         )
         fields = _zero_inactive_fields(fields, flags)
+        fields = _apply_plasma_feather(fields, feather_pct)
     else:
         raise ValueError(f"unknown pattern mask type: {mask_type!r}")
     if invert:
@@ -725,11 +789,12 @@ def generate_soft_weights(
     invert: bool = False,
     seed: int = 0,
     active_flags: tuple[bool, ...] | None = None,
+    feather_pct: int = 100,
 ) -> np.ndarray:
-    """Dispatch soft-mode weight generation by pattern *mask_type*.
+    """Dispatch feathered weight generation by pattern *mask_type*.
 
     Returns an (H, W, N) uint8 array whose per-pixel layer weights sum to
-    approximately 255.
+    approximately 255. *feather_pct* 100 is maximum overlap.
     """
     if mask_type == "strips":
         return generate_strips_weights(
@@ -739,6 +804,7 @@ def generate_soft_weights(
             density=density,
             invert=invert,
             active_flags=active_flags,
+            feather_pct=feather_pct,
         )
     if mask_type == "radial":
         return generate_radial_weights(
@@ -748,6 +814,7 @@ def generate_soft_weights(
             density=density,
             invert=invert,
             active_flags=active_flags,
+            feather_pct=feather_pct,
         )
     if mask_type == "checker":
         return generate_checker_weights(
@@ -757,6 +824,7 @@ def generate_soft_weights(
             density=density,
             invert=invert,
             active_flags=active_flags,
+            feather_pct=feather_pct,
         )
     if mask_type == "plasma":
         return generate_plasma_weights(
@@ -767,6 +835,7 @@ def generate_soft_weights(
             seed=seed,
             invert=invert,
             active_flags=active_flags,
+            feather_pct=feather_pct,
         )
     raise ValueError(f"unknown pattern mask type: {mask_type!r}")
 

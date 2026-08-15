@@ -41,7 +41,6 @@ from cleave.config_schema import (
     default_render_overlays_runtime_values,
     default_render_pattern_mask_runtime_values,
     default_render_post_fx_runtime_values,
-    PatternMaskMode,
     PatternMaskType,
 )
 from cleave.extract import StemSource
@@ -225,7 +224,7 @@ class RenderPatternMaskBlock:
     expanded: bool = _RO_PATTERN_MASK_DEFAULTS["expanded"]
     type: PatternMaskType = _RO_PATTERN_MASK_DEFAULTS["type"]
     density: float = _RO_PATTERN_MASK_DEFAULTS["density"]
-    mode: PatternMaskMode = _RO_PATTERN_MASK_DEFAULTS["mode"]
+    feather_pct: int = _RO_PATTERN_MASK_DEFAULTS["feather_pct"]
     invert: bool = _RO_PATTERN_MASK_DEFAULTS["invert"]
     transition: float = _RO_PATTERN_MASK_DEFAULTS["transition"]
     seed: int = _RO_PATTERN_MASK_DEFAULTS["seed"]
@@ -773,7 +772,7 @@ class TuningViewStateBuilder:
             enabled=pm.enabled,
             expanded=pm.expanded,
             type=pm.type,
-            mode=pm.mode,
+            feather_pct=pm.feather_pct,
             density=pm.density,
             invert=pm.invert,
             transition=pm.transition,
@@ -1038,7 +1037,7 @@ class TuningViewStateBuilder:
                 enabled=pm.enabled,
                 expanded=pm.expanded,
                 type=pm.type,
-                mode=pm.mode,
+                feather_pct=pm.feather_pct,
                 density=pm.density,
                 invert=pm.invert,
                 transition=pm.transition,

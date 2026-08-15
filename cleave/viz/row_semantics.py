@@ -102,7 +102,7 @@ class RowKind(Enum):
     RENDER_PATTERN_MASK_HEADER = auto()
     RENDER_PATTERN_MASK_TYPE = auto()
     RENDER_PATTERN_MASK_DENSITY = auto()
-    RENDER_PATTERN_MASK_MODE = auto()
+    RENDER_PATTERN_MASK_FEATHER = auto()
     RENDER_PATTERN_MASK_INVERT = auto()
     RENDER_PATTERN_MASK_TRANSITION = auto()
     RENDER_PATTERN_MASK_SEED = auto()
@@ -920,7 +920,7 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_title="Pattern mask",
         help_description=(
             "Spatial territories for visible layers during composite.",
-            "Hard mode assigns each pixel to one layer; soft weights opacity.",
+            "Feather 0% assigns each pixel to one layer; 100% blends at edges.",
         ),
         quick_nav_target=True,
     ),
@@ -942,15 +942,18 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "Higher multiplies how many segments cycle through visible layers.",
         ),
     ),
-    RowKind.RENDER_PATTERN_MASK_MODE: RowBehavior(
+    RowKind.RENDER_PATTERN_MASK_FEATHER: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
         parent_group="render_pattern_mask",
-        help_title="Mode",
-        help_entries=(("Left/Right", "cycle hard/soft"),),
+        help_title="Feather",
+        help_entries=(
+            ("Left/Right", "+/- 1%"),
+            ("Ctrl+Left/Right", "+/- 10%"),
+        ),
         help_description=(
-            "Hard: one layer wins per pixel.",
-            "Soft: weights modulate opacity before each layer blend mode.",
+            "0% hard territories (one layer per pixel).",
+            "100% maximum segment overlap.",
         ),
     ),
     RowKind.RENDER_PATTERN_MASK_INVERT: RowBehavior(

@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING
 from cleave.config_schema import (
     PATTERN_MASK_DENSITY_STEP,
     PATTERN_MASK_DENSITY_STEP_LARGE,
+    PATTERN_MASK_FEATHER_PCT_STEP,
+    PATTERN_MASK_FEATHER_PCT_STEP_LARGE,
     PATTERN_MASK_TRANSITION_STEP,
     PATTERN_MASK_TRANSITION_STEP_LARGE,
     TIMELINE_FADE_DURATION_STEP,
@@ -38,7 +40,6 @@ from cleave.config_schema import (
 from cleave.extract import stem_control_label, stem_overlay_header
 from cleave.pattern_mask import (
     pattern_mask_invert_display,
-    pattern_mask_mode_display,
 )
 from cleave.song_markers import (
     DEFAULT_SONG_MARKER_TYPE,
@@ -1488,10 +1489,10 @@ def _format_render_pattern_mask_type(
     return state.render_pattern_mask.type
 
 
-def _format_render_pattern_mask_mode(
+def _format_render_pattern_mask_feather(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return pattern_mask_mode_display(state.render_pattern_mask.mode)
+    return f"{state.render_pattern_mask.feather_pct}%"
 
 
 def _format_render_pattern_mask_density(
@@ -1546,14 +1547,20 @@ def _apply_render_pattern_mask_type(
     controls._render_pattern_mask.cycle_type(forward=forward)
 
 
-def _apply_render_pattern_mask_mode(
+def _apply_render_pattern_mask_feather(
     controls: TuningControls,
     _desc: RowDescriptor,
     forward: bool,
-    _ctrl: bool,
+    ctrl: bool,
     _shift: bool,
 ) -> None:
-    controls._render_pattern_mask.cycle_mode(forward=forward)
+    step = (
+        PATTERN_MASK_FEATHER_PCT_STEP_LARGE if ctrl else PATTERN_MASK_FEATHER_PCT_STEP
+    )
+    delta = step if forward else -step
+    controls._render_pattern_mask.set_feather_pct(
+        controls.session.render_pattern_mask.feather_pct + delta
+    )
 
 
 def _apply_render_pattern_mask_density(
@@ -2267,11 +2274,11 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         format_value=_format_render_pattern_mask_density,
         apply_horizontal=_apply_render_pattern_mask_density,
     ),
-    RowKind.RENDER_PATTERN_MASK_MODE: RowFieldDef(
-        panel_label="mode",
+    RowKind.RENDER_PATTERN_MASK_FEATHER: RowFieldDef(
+        panel_label="feather",
         present_style=RowPresentStyle.LABELED_VALUE,
-        format_value=_format_render_pattern_mask_mode,
-        apply_horizontal=_apply_render_pattern_mask_mode,
+        format_value=_format_render_pattern_mask_feather,
+        apply_horizontal=_apply_render_pattern_mask_feather,
     ),
     RowKind.RENDER_PATTERN_MASK_INVERT: RowFieldDef(
         panel_label="invert",

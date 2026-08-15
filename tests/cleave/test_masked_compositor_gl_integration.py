@@ -70,7 +70,7 @@ def test_hard_composite_splits_layers_by_strips(gl_context) -> None:
         comp.content_fbo_id,
         [left, right],
         mask_type="strips",
-        mode="hard",
+        feather_pct=0,
         density=1.0,
     )
 
@@ -91,7 +91,7 @@ def test_soft_composite_accepts_generated_strips_weights(gl_context) -> None:
         comp.content_fbo_id,
         [a, b],
         mask_type="strips",
-        mode="soft",
+        feather_pct=100,
         density=1.0,
     )
 
@@ -111,7 +111,7 @@ def test_soft_plasma_composite_does_not_crash(gl_context) -> None:
         comp.content_fbo_id,
         [a, b],
         mask_type="plasma",
-        mode="soft",
+        feather_pct=100,
         density=2.0,
         seed=7,
     )
@@ -127,7 +127,7 @@ def test_plasma_hard_gpu_restores_full_viewport(gl_context) -> None:
     gen_w, gen_h = W, H
     params = PatternMaskParams(
         mask_type="plasma",
-        mode="hard",
+        feather_pct=0,
         density=2.0,
         invert=False,
         seed=3,
@@ -154,7 +154,7 @@ def test_plasma_hard_composite_fills_content_frame(gl_context) -> None:
         comp.content_fbo_id,
         [left, right],
         mask_type="plasma",
-        mode="hard",
+        feather_pct=0,
         density=2.0,
         seed=5,
     )
@@ -172,7 +172,7 @@ def test_mask_cache_skips_regeneration(gl_context) -> None:
         comp.content_fbo_id,
         [layer],
         mask_type="strips",
-        mode="hard",
+        feather_pct=0,
         density=2.0,
         seed=1,
     )
@@ -182,7 +182,7 @@ def test_mask_cache_skips_regeneration(gl_context) -> None:
         comp.content_fbo_id,
         [layer],
         mask_type="strips",
-        mode="hard",
+        feather_pct=0,
         density=2.0,
         seed=1,
     )
@@ -200,7 +200,7 @@ def test_transition_blends_weights_over_song_time(gl_context) -> None:
         comp.content_fbo_id,
         [a, b],
         mask_type="strips",
-        mode="hard",
+        feather_pct=0,
         density=1.0,
         active_slots=[True, True],
         song_time_sec=0.0,
@@ -213,7 +213,7 @@ def test_transition_blends_weights_over_song_time(gl_context) -> None:
         comp.content_fbo_id,
         [a, b],
         mask_type="strips",
-        mode="hard",
+        feather_pct=0,
         density=1.0,
         active_slots=[True, False],
         song_time_sec=0.0,
@@ -232,7 +232,7 @@ def test_transition_blends_weights_over_song_time(gl_context) -> None:
         comp.content_fbo_id,
         [a, b],
         mask_type="strips",
-        mode="hard",
+        feather_pct=0,
         density=1.0,
         active_slots=[True, False],
         song_time_sec=1.0,
@@ -258,7 +258,7 @@ def test_mid_transition_retarget_snapshots_blend(gl_context) -> None:
         comp.content_fbo_id,
         [a, b, c],
         mask_type="strips",
-        mode="soft",
+        feather_pct=100,
         density=1.0,
         active_slots=[True, True, True],
         song_time_sec=0.0,
@@ -269,7 +269,7 @@ def test_mid_transition_retarget_snapshots_blend(gl_context) -> None:
         comp.content_fbo_id,
         [a, b, c],
         mask_type="strips",
-        mode="soft",
+        feather_pct=100,
         density=1.0,
         active_slots=[True, False, True],
         song_time_sec=0.0,
@@ -281,7 +281,7 @@ def test_mid_transition_retarget_snapshots_blend(gl_context) -> None:
         comp.content_fbo_id,
         [a, b, c],
         mask_type="strips",
-        mode="soft",
+        feather_pct=100,
         density=1.0,
         active_slots=[True, False, False],
         song_time_sec=0.5,

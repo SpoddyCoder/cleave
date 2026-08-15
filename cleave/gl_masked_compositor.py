@@ -1,11 +1,11 @@
-"""Shader-based masked layer composite via moderngl (hard and soft modes).
+"""Shader-based masked layer composite via moderngl (hard and feathered).
 
-Hard mode against a cleared black background: only one layer wins per pixel, so
+Feather 0% against a cleared black background: only one layer wins per pixel, so
 per-layer blend modes (black-key, add, etc.) collapse to writing the winning
 layer colour scaled by opacity.
 
-Soft mode draws one pass per layer: spatial weights modulate opacity before the
-layer's existing GL blend mode (same channel mapping as GlCompositor).
+Feather above 0% draws one pass per layer: spatial weights modulate opacity
+before the layer's existing GL blend mode (same channel mapping as GlCompositor).
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from cleave.pattern_mask import (
     generate_hard_mask,
     generate_soft_weight_fields,
     hard_mask_from_weight_fields,
+    pattern_mask_plasma_power,
     u8_weights_from_fields,
     upload_mask_r8_texture,
 )
@@ -102,7 +103,7 @@ void main() {
     idx = clamp(idx, 0, max(layer_count - 1, 0));
     vec4 color = texture(layers, vec3(uv, float(idx)));
     float opacity = opacities[idx];
-    // Hard mode vs cleared black: blend modes are identity; scale by opacity.
+    // Feather 0% vs cleared black: blend modes are identity; scale by opacity.
     fragColor = vec4(color.rgb * opacity, 1.0);
 }
 """
@@ -233,6 +234,7 @@ _PLASMA_SOFT_FRAG = (
 uniform int invert;
 uniform int output_layer;
 uniform int active_flags[8];
+uniform float feather_power;
 in vec2 uv;
 out vec4 fragColor;
 
@@ -253,7 +255,11 @@ void main() {
             fields[i] = 0.0;
             continue;
         }
-        fields[i] = plasma_field(i);
+        float f = plasma_field(i);
+        if (feather_power != 1.0) {
+            f = pow(max(f, 0.0), feather_power);
+        }
+        fields[i] = f;
         total += fields[i];
         active_count++;
     }
@@ -352,7 +358,7 @@ def _gl_int(param: int) -> int:
 @dataclass(frozen=True)
 class _MaskCacheKey:
     mask_type: str
-    mode: str
+    feather_pct: int
     width: int
     height: int
     layer_count: int
@@ -480,7 +486,7 @@ def _mask_cache_key(
 ) -> _MaskCacheKey:
     return _MaskCacheKey(
         mask_type=params.mask_type,
-        mode=params.mode,
+        feather_pct=int(params.feather_pct),
         width=int(gen_width),
         height=int(gen_height),
         layer_count=int(layer_count),
@@ -492,7 +498,7 @@ def _mask_cache_key(
 
 
 class GlMaskedCompositor:
-    """Pattern-mask composite into an existing content FBO (hard and soft)."""
+    """Pattern-mask composite into an existing content FBO (hard and feathered)."""
 
     def __init__(
         self,
@@ -1018,6 +1024,9 @@ class GlMaskedCompositor:
                 params=params,
                 active_flags=active_flags,
             )
+            self._plasma_soft_prog["feather_power"].value = (
+                pattern_mask_plasma_power(params.feather_pct)
+            )
             for index in range(layer_count):
                 slice_fbo.use()
                 self._plasma_soft_prog["output_layer"].value = index
@@ -1058,6 +1067,9 @@ class GlMaskedCompositor:
                 params=params,
                 active_flags=active_flags,
             )
+            self._plasma_soft_prog["feather_power"].value = (
+                pattern_mask_plasma_power(params.feather_pct)
+            )
             fields = np.empty((layer_count, gen_height, gen_width), dtype=np.float64)
             for index in range(layer_count):
                 slice_fbo.use()
@@ -1091,12 +1103,13 @@ class GlMaskedCompositor:
             invert=params.invert,
             seed=params.seed,
             active_flags=active_slots,
+            feather_pct=params.feather_pct,
         )
-        self._upload_weight_fields(fields, params.mode)
+        self._upload_weight_fields(fields, params.feather_pct)
         return fields
 
-    def _upload_weight_fields(self, fields: np.ndarray, mode: str) -> None:
-        if mode == "soft":
+    def _upload_weight_fields(self, fields: np.ndarray, feather_pct: int) -> None:
+        if feather_pct > 0:
             self._upload_weight_array_cpu(u8_weights_from_fields(fields))
             return
         mask = hard_mask_from_weight_fields(fields)
@@ -1126,6 +1139,7 @@ class GlMaskedCompositor:
             invert=params.invert,
             seed=params.seed,
             active_flags=active_slots,
+            feather_pct=params.feather_pct,
         )
         mask = generate_hard_mask(
             params.mask_type,
@@ -1198,6 +1212,7 @@ class GlMaskedCompositor:
                     active_flags=self._last_active_slots
                     if self._last_active_slots is not None
                     else active_slots,
+                    feather_pct=params.feather_pct,
                 )
             if params.mask_type == "plasma":
                 target_fields = self._generate_plasma_fields_gpu(
@@ -1217,6 +1232,7 @@ class GlMaskedCompositor:
                     invert=params.invert,
                     seed=params.seed,
                     active_flags=active_slots,
+                    feather_pct=params.feather_pct,
                 )
             if old_fields.shape[0] != target_fields.shape[0]:
                 n = target_fields.shape[0]
@@ -1251,7 +1267,7 @@ class GlMaskedCompositor:
                     params=params,
                     active_flags=active_slots,
                 )
-                if params.mode == "soft":
+                if params.feather_pct > 0:
                     self._generate_plasma_soft_gpu(
                         gen_width=gen_width,
                         gen_height=gen_height,
@@ -1277,8 +1293,9 @@ class GlMaskedCompositor:
                     invert=params.invert,
                     seed=params.seed,
                     active_flags=active_slots,
+                    feather_pct=params.feather_pct,
                 )
-                self._upload_weight_fields(fields, params.mode)
+                self._upload_weight_fields(fields, params.feather_pct)
             self._current_weight_fields = fields
             self._last_active_slots = active_slots
             self._clear_transition_state()
@@ -1304,7 +1321,7 @@ class GlMaskedCompositor:
 
         use_gpu_plasma = params.mask_type == "plasma"
         if use_gpu_plasma:
-            if params.mode == "soft":
+            if params.feather_pct > 0:
                 self._generate_plasma_soft_gpu(
                     gen_width=gen_width,
                     gen_height=gen_height,
@@ -1327,7 +1344,7 @@ class GlMaskedCompositor:
                 params=params,
                 active_flags=active_slots,
             )
-        elif params.mode == "hard" and params.mask_type != "plasma":
+        elif params.feather_pct == 0 and params.mask_type != "plasma":
             fields = self._generate_mask_cpu_hard_direct(
                 gen_width=gen_width,
                 gen_height=gen_height,
@@ -1402,7 +1419,7 @@ class GlMaskedCompositor:
         layers: list[LayerFbo],
         *,
         mask_type: str,
-        mode: str,
+        feather_pct: int = 0,
         density: float = 1.0,
         invert: bool = False,
         seed: int = 0,
@@ -1420,7 +1437,7 @@ class GlMaskedCompositor:
         del slot_names  # Reserved for callers / debugging; indices follow *layers*.
         params = PatternMaskParams(
             mask_type=mask_type,
-            mode=mode,
+            feather_pct=int(feather_pct),
             density=density,
             invert=invert,
             seed=seed,
@@ -1431,7 +1448,7 @@ class GlMaskedCompositor:
             )
         else:
             resolved_active = tuple(bool(flag) for flag in active_slots)
-        if mode == "soft":
+        if feather_pct > 0:
             self._composite_soft(
                 content_fbo_id,
                 layers,

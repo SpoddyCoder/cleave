@@ -377,7 +377,7 @@ def test_apply_pattern_mask_calls_builder_and_enables_mask() -> None:
     mock_breath.assert_not_called()
     assert session.render_pattern_mask.enabled is True
     assert session.render_pattern_mask.type == "strips"
-    assert session.render_pattern_mask.mode == "hard"
+    assert session.render_pattern_mask.feather_pct == 0
     assert session.render_pattern_mask.transition == 1.0
     assert notes == ["Applied pattern mask timeline"]
 

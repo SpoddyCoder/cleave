@@ -53,7 +53,7 @@ def _session(slots: tuple[str, ...]) -> TuningSession:
 def test_composite_uses_masked_path_when_enabled() -> None:
     session = _session(("layer_1", "layer_2"))
     session.render_pattern_mask.enabled = True
-    session.render_pattern_mask.mode = "hard"
+    session.render_pattern_mask.feather_pct = 0
     session.render_pattern_mask.type = "radial"
     session.render_pattern_mask.density = 2.5
     session.render_pattern_mask.invert = True
@@ -83,7 +83,7 @@ def test_composite_uses_masked_path_when_enabled() -> None:
     call = masked.composite.call_args
     assert call.args[0] == 7
     assert call.kwargs["mask_type"] == "radial"
-    assert call.kwargs["mode"] == "hard"
+    assert call.kwargs["feather_pct"] == 0
     assert call.kwargs["density"] == 2.5
     assert call.kwargs["invert"] is True
     assert call.kwargs["seed"] == 11
@@ -124,10 +124,10 @@ def test_composite_passes_transition_and_inactive_slots() -> None:
     assert call.kwargs["transition_duration"] == 1.2
 
 
-def test_composite_uses_soft_path_when_mode_soft() -> None:
+def test_composite_uses_soft_path_when_feather_above_zero() -> None:
     session = _session(("layer_1", "layer_2"))
     session.render_pattern_mask.enabled = True
-    session.render_pattern_mask.mode = "soft"
+    session.render_pattern_mask.feather_pct = 100
     session.render_pattern_mask.type = "plasma"
     session.render_pattern_mask.density = 2.0
     session.render_pattern_mask.invert = False
@@ -155,7 +155,7 @@ def test_composite_uses_soft_path_when_mode_soft() -> None:
     call = masked.composite.call_args
     assert call.args[0] == 9
     assert call.kwargs["mask_type"] == "plasma"
-    assert call.kwargs["mode"] == "soft"
+    assert call.kwargs["feather_pct"] == 100
     assert call.kwargs["seed"] == 42
 
 

@@ -19,7 +19,7 @@ from cleave.config_schema import (
     DEFAULT_RENDER_PATTERN_MASK_DENSITY,
     DEFAULT_RENDER_PATTERN_MASK_ENABLED,
     DEFAULT_RENDER_PATTERN_MASK_INVERT,
-    DEFAULT_RENDER_PATTERN_MASK_MODE,
+    DEFAULT_RENDER_PATTERN_MASK_FEATHER_PCT,
     DEFAULT_RENDER_PATTERN_MASK_SEED,
     DEFAULT_RENDER_PATTERN_MASK_TRANSITION,
     DEFAULT_RENDER_PATTERN_MASK_TYPE,
@@ -383,7 +383,7 @@ def test_parse_render_pattern_mask_defaults() -> None:
     assert render.pattern_mask is not None
     assert render.pattern_mask.enabled is DEFAULT_RENDER_PATTERN_MASK_ENABLED
     assert render.pattern_mask.type == DEFAULT_RENDER_PATTERN_MASK_TYPE
-    assert render.pattern_mask.mode == DEFAULT_RENDER_PATTERN_MASK_MODE
+    assert render.pattern_mask.feather_pct == DEFAULT_RENDER_PATTERN_MASK_FEATHER_PCT
     assert render.pattern_mask.density == DEFAULT_RENDER_PATTERN_MASK_DENSITY
     assert render.pattern_mask.invert is DEFAULT_RENDER_PATTERN_MASK_INVERT
     assert render.pattern_mask.transition == DEFAULT_RENDER_PATTERN_MASK_TRANSITION
@@ -398,7 +398,7 @@ def test_parse_render_pattern_mask_explicit() -> None:
                 "pattern_mask": {
                     "enabled": True,
                     "type": "plasma",
-                    "mode": "soft",
+                    "feather_pct": 100,
                     "density": 2.5,
                     "invert": True,
                     "transition": 1.5,
@@ -412,7 +412,7 @@ def test_parse_render_pattern_mask_explicit() -> None:
     assert render.pattern_mask is not None
     assert render.pattern_mask.enabled is True
     assert render.pattern_mask.type == "plasma"
-    assert render.pattern_mask.mode == "soft"
+    assert render.pattern_mask.feather_pct == 100
     assert render.pattern_mask.density == 2.5
     assert render.pattern_mask.invert is True
     assert render.pattern_mask.transition == 1.5
@@ -463,9 +463,28 @@ def test_parse_render_pattern_mask_rejects_unknown_type() -> None:
         parse_render_section({"render": {"pattern_mask": {"type": "spiral"}}})
 
 
-def test_parse_render_pattern_mask_rejects_unknown_mode() -> None:
-    with pytest.raises(ValueError, match="pattern_mask.mode"):
-        parse_render_section({"render": {"pattern_mask": {"mode": "fuzzy"}}})
+def test_parse_render_pattern_mask_ignores_leftover_mode() -> None:
+    render = parse_render_section(
+        {"render": {"pattern_mask": {"mode": "soft", "feather_pct": 40}}}
+    )
+    assert render is not None
+    assert render.pattern_mask is not None
+    assert render.pattern_mask.feather_pct == 40
+
+
+def test_parse_render_pattern_mask_clamps_feather() -> None:
+    high = parse_render_section(
+        {"render": {"pattern_mask": {"feather_pct": 140}}}
+    )
+    assert high is not None
+    assert high.pattern_mask is not None
+    assert high.pattern_mask.feather_pct == 100
+    low = parse_render_section(
+        {"render": {"pattern_mask": {"feather_pct": -10}}}
+    )
+    assert low is not None
+    assert low.pattern_mask is not None
+    assert low.pattern_mask.feather_pct == 0
 
 
 def test_persist_render_pattern_mask_round_trip() -> None:
@@ -476,7 +495,7 @@ def test_persist_render_pattern_mask_round_trip() -> None:
                 "pattern_mask": {
                     "enabled": True,
                     "type": "radial",
-                    "mode": "hard",
+                    "feather_pct": 0,
                     "density": 2.5,
                     "invert": True,
                     "transition": 0.8,
@@ -503,7 +522,7 @@ def test_persist_render_pattern_mask_round_trip() -> None:
         "locked": True,
         "type": "radial",
         "density": 2.5,
-        "mode": "hard",
+        "feather_pct": 0,
         "invert": True,
         "transition": 0.8,
         "seed": 99,
@@ -514,7 +533,7 @@ def test_persist_render_pattern_mask_round_trip() -> None:
         enabled=True,
         type="radial",
         density=2.5,
-        mode="hard",
+        feather_pct=0,
         invert=True,
         seed=99,
         transition=0.8,
@@ -535,7 +554,75 @@ def test_render_pattern_mask_runtime_from_cfg_defaults() -> None:
     assert runtime == default_render_pattern_mask_runtime()
     assert runtime.enabled is False
     assert runtime.type == "strips"
-    assert runtime.mode == "hard"
+    assert runtime.feather_pct == 0
     assert runtime.density == DEFAULT_RENDER_PATTERN_MASK_DENSITY
     assert runtime.seed == 0
     assert runtime.expanded is False
+
+
+def _overlap_pixel_count(weights: np.ndarray) -> int:
+    """Count pixels where more than one layer has a non-zero weight."""
+    return int(np.sum(np.count_nonzero(weights, axis=2) > 1))
+
+
+def test_strips_feather_zero_has_no_two_layer_mix() -> None:
+    weights = generate_strips_weights(
+        80, 16, layer_count=2, density=1.0, feather_pct=0
+    )
+    _assert_valid_soft_weights(weights, height=16, width=80, layer_count=2)
+    assert _overlap_pixel_count(weights) == 0
+
+
+def test_strips_feather_100_matches_default_soft() -> None:
+    current = generate_strips_weights(64, 16, layer_count=2, density=1.0)
+    full = generate_strips_weights(
+        64, 16, layer_count=2, density=1.0, feather_pct=100
+    )
+    assert np.array_equal(current, full)
+    assert _overlap_pixel_count(full) > 0
+
+
+def test_strips_feather_mid_narrower_overlap_than_100() -> None:
+    mid = generate_strips_weights(
+        80, 16, layer_count=2, density=1.0, feather_pct=50
+    )
+    full = generate_strips_weights(
+        80, 16, layer_count=2, density=1.0, feather_pct=100
+    )
+    mid_overlap = _overlap_pixel_count(mid)
+    full_overlap = _overlap_pixel_count(full)
+    assert mid_overlap > 0
+    assert mid_overlap < full_overlap
+
+
+def test_radial_feather_zero_has_no_two_layer_mix() -> None:
+    weights = generate_radial_weights(
+        48, 48, layer_count=2, density=1.0, feather_pct=0
+    )
+    _assert_valid_soft_weights(weights, height=48, width=48, layer_count=2)
+    assert _overlap_pixel_count(weights) == 0
+
+
+def test_checker_feather_zero_has_no_two_layer_mix() -> None:
+    weights = generate_checker_weights(
+        40, 40, layer_count=2, density=1.0, feather_pct=0
+    )
+    _assert_valid_soft_weights(weights, height=40, width=40, layer_count=2)
+    assert _overlap_pixel_count(weights) == 0
+
+
+def test_plasma_feather_100_matches_default_soft() -> None:
+    current = generate_plasma_weights(32, 24, layer_count=3, density=2.0, seed=5)
+    full = generate_plasma_weights(
+        32, 24, layer_count=3, density=2.0, seed=5, feather_pct=100
+    )
+    assert np.array_equal(current, full)
+
+
+def test_plasma_feather_low_approaches_argmax() -> None:
+    hard = generate_plasma_mask(32, 24, layer_count=3, density=2.0, seed=5)
+    low = generate_plasma_weights(
+        32, 24, layer_count=3, density=2.0, seed=5, feather_pct=1
+    )
+    winner = np.argmax(low, axis=2).astype(np.uint8)
+    assert float(np.mean(winner == hard)) > 0.95
