@@ -44,6 +44,7 @@ from cleave.pattern_mask import (
     hard_mask_from_weight_fields,
     lerp_hard_layout_1d,
     rasterize_hard_layout_1d,
+    rasterize_soft_layout_1d,
 )
 from cleave.viz.session import (
     TuningSession,
@@ -850,3 +851,103 @@ def test_hard_layout_identity_swap_shrinks_then_grows() -> None:
     assert int(at_0[0, 115]) == 1
     assert _strip_run_count(at_25[0], 1) == 1
     assert _strip_run_count(at_25[0], 2) == 1
+
+
+def _soft_layout_lerp_fields(
+    mask_type: str,
+    old_flags: tuple[bool, ...],
+    new_flags: tuple[bool, ...],
+    t: float,
+    *,
+    width: int,
+    height: int,
+    density: float = 1.0,
+    invert: bool = False,
+    feather_pct: int = 50,
+) -> np.ndarray:
+    old = hard_layout_1d(mask_type, old_flags, density, invert)
+    new = hard_layout_1d(mask_type, new_flags, density, invert)
+    return rasterize_soft_layout_1d(
+        lerp_hard_layout_1d(old, new, t),
+        width,
+        height,
+        len(old_flags),
+        feather_pct,
+    )
+
+
+def test_soft_layout_endpoints_match_generators() -> None:
+    cases = (
+        ("strips", (True, True, False), (True, True, True), 1.0, False, 50),
+        ("strips", (True, True, False), (True, True, True), 1.0, True, 100),
+        ("strips", (True, True, False), (True, True, True), 2.0, False, 100),
+        ("radial", (True, True, False), (True, True, True), 1.0, False, 50),
+        ("radial", (True, True, False), (True, True, True), 1.0, True, 100),
+        ("radial", (True, False, True, True), (True, True, True, True), 2.0, False, 100),
+    )
+    width, height = 64, 48
+    for mask_type, old_flags, new_flags, density, invert, feather_pct in cases:
+        layer_count = len(old_flags)
+        expected_old = generate_soft_weight_fields(
+            mask_type,
+            width,
+            height,
+            layer_count,
+            density=density,
+            invert=invert,
+            active_flags=old_flags,
+            feather_pct=feather_pct,
+        )
+        expected_new = generate_soft_weight_fields(
+            mask_type,
+            width,
+            height,
+            layer_count,
+            density=density,
+            invert=invert,
+            active_flags=new_flags,
+            feather_pct=feather_pct,
+        )
+        at_0 = _soft_layout_lerp_fields(
+            mask_type,
+            old_flags,
+            new_flags,
+            0.0,
+            width=width,
+            height=height,
+            density=density,
+            invert=invert,
+            feather_pct=feather_pct,
+        )
+        at_1 = _soft_layout_lerp_fields(
+            mask_type,
+            old_flags,
+            new_flags,
+            1.0,
+            width=width,
+            height=height,
+            density=density,
+            invert=invert,
+            feather_pct=feather_pct,
+        )
+        np.testing.assert_allclose(at_0, expected_old, atol=1e-12, rtol=1e-12)
+        np.testing.assert_allclose(at_1, expected_new, atol=1e-12, rtol=1e-12)
+
+
+def test_soft_layout_strips_two_to_three_moves_before_half() -> None:
+    old_flags = (True, True, False)
+    new_flags = (True, True, True)
+    width, height = 120, 16
+    at_0 = _soft_layout_lerp_fields(
+        "strips", old_flags, new_flags, 0.0, width=width, height=height, feather_pct=50
+    )
+    at_25 = _soft_layout_lerp_fields(
+        "strips", old_flags, new_flags, 0.25, width=width, height=height, feather_pct=50
+    )
+    # Right-hand band is the arriving third strip; it must already dominate.
+    assert at_25[2, 0, -1] > at_0[2, 0, -1]
+    assert at_25[2, 0, -1] > at_25[1, 0, -1]
+    # Not a global mix: left stays layer 0, layer 2 has not leaked into it.
+    assert at_25[0, 0, 0] > at_25[2, 0, 0]
+    assert at_25[2, 0, width // 6] < at_25[0, 0, width // 6]
+    assert not np.allclose(at_25, at_0)
