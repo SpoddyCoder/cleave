@@ -2674,6 +2674,7 @@ def test_render_timeline_down_enters_submenu() -> None:
     controls.session.song_markers.expanded = True
     controls.session.timeline.beat_bar_grid_expanded = True
     controls.session.timeline.snap_cues_expanded = True
+    controls.session.timeline.visual_limiter_expanded = True
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_TIMELINE_HEADER)
     markers_row = view.layout.find_by_kind(RowKind.SONG_MARKERS_HEADER)
@@ -2689,6 +2690,9 @@ def test_render_timeline_down_enters_submenu() -> None:
     presets_header_row = view.layout.find_by_kind(RowKind.TIMELINE_PRESETS_HEADER)
     limiter_header_row = view.layout.find_by_kind(
         RowKind.TIMELINE_VISUAL_LIMITER_HEADER
+    )
+    limiter_enabled_row = view.layout.find_by_kind(
+        RowKind.TIMELINE_VISUAL_LIMITER_ENABLED
     )
     limiter_threshold_row = view.layout.find_by_kind(
         RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD
@@ -2752,6 +2756,10 @@ def test_render_timeline_down_enters_submenu() -> None:
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
     controls.handle_keydown(_keydown(pygame.K_DOWN))
+    assert controls.focus_descriptor == _desc(view, limiter_enabled_row)
+    assert not isinstance(controls.focus_cursor, TimelineFocus)
+
+    controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert controls.focus_descriptor == _desc(view, limiter_threshold_row)
     assert not isinstance(controls.focus_cursor, TimelineFocus)
 
@@ -2773,29 +2781,69 @@ def test_render_timeline_down_enters_submenu() -> None:
     assert controls.focus_descriptor == _desc(view, header_row)
 
 
-def test_visual_limiter_left_right_couples_enabled_and_children() -> None:
+def test_visual_limiter_left_right_expands_and_enabled_gates_children() -> None:
     controls = _make_controls(timeline_enabled=True)
     controls.session.timeline.panel_open = True
     view = controls.build_view_state(paused=False)
     limiter_header = view.layout.find_by_kind(
         RowKind.TIMELINE_VISUAL_LIMITER_HEADER
     )
+    enabled_row = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_ENABLED)
     threshold_row = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD)
 
     assert controls.session.timeline.limiter.enabled is True
-    assert threshold_row in view.layout.rows
+    assert enabled_row not in view.layout.rows
+    assert threshold_row not in view.layout.rows
 
     controls.focus_descriptor = _desc(view, limiter_header)
+    controls.handle_keydown(_keydown(pygame.K_RIGHT))
+
+    assert controls.session.timeline.visual_limiter_expanded is True
+    assert controls.session.timeline.limiter.enabled is True
+    view_expanded = controls.build_view_state(paused=False)
+    assert enabled_row in view_expanded.layout.rows
+    assert threshold_row in view_expanded.layout.rows
+
+    enabled_idx = view_expanded.layout.find_by_kind(
+        RowKind.TIMELINE_VISUAL_LIMITER_ENABLED
+    )
+    controls.focus_descriptor = _desc(view_expanded, enabled_idx)
     controls.handle_keydown(_keydown(pygame.K_LEFT))
 
     assert controls.session.timeline.limiter.enabled is False
+    assert controls.session.timeline.visual_limiter_expanded is True
     view_disabled = controls.build_view_state(paused=False)
+    assert enabled_row in view_disabled.layout.rows
     assert threshold_row not in view_disabled.layout.rows
 
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.timeline.limiter.enabled is True
     view_enabled = controls.build_view_state(paused=False)
     assert threshold_row in view_enabled.layout.rows
+
+    controls.focus_descriptor = _desc(
+        view_enabled,
+        view_enabled.layout.find_by_kind(RowKind.TIMELINE_VISUAL_LIMITER_HEADER),
+    )
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.timeline.visual_limiter_expanded is False
+    assert controls.session.timeline.limiter.enabled is True
+    view_collapsed = controls.build_view_state(paused=False)
+    assert enabled_row not in view_collapsed.layout.rows
+    assert threshold_row not in view_collapsed.layout.rows
+
+
+def test_visual_limiter_enabled_blocked_when_timeline_locked() -> None:
+    controls = _make_controls(timeline_enabled=True)
+    controls.session.timeline.panel_open = True
+    controls.session.timeline.visual_limiter_expanded = True
+    controls.session.timeline.locked = True
+    view = controls.build_view_state(paused=False)
+    enabled_idx = view.layout.find_by_kind(RowKind.TIMELINE_VISUAL_LIMITER_ENABLED)
+    controls.focus_descriptor = _desc(view, enabled_idx)
+
+    controls.handle_keydown(_keydown(pygame.K_LEFT))
+    assert controls.session.timeline.limiter.enabled is True
 
 
 def test_render_timeline_down_enters_submenu_and_routes_keys() -> None:
@@ -2807,7 +2855,7 @@ def test_render_timeline_down_enters_submenu_and_routes_keys() -> None:
     controls.focus_descriptor = _desc(view, header_row)
     controls.session.timeline.focus_row = 2
 
-    for _ in range(14):
+    for _ in range(11):
         controls.handle_keydown(_keydown(pygame.K_DOWN))
     assert isinstance(controls.focus_cursor, TimelineFocus)
     assert controls.session.timeline.focus_row == 0

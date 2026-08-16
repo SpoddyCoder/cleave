@@ -223,12 +223,14 @@ Sibling expandable section after **timeline preset** (before **reset timeline**)
 ```
 Render: TIMELINE
   ...
-  └─ visual limiter: enabled / disabled
+  └─ visual limiter
+       └─ enabled: on / off
        └─ threshold
+       └─ ratio
        └─ release
 ```
 
-**Right** enables and expands (threshold and release visible). **Left** disables and collapses. Expand follows `timeline.limiter.enabled` (no separate flag). Header value shows enabled/disabled. Locked with the timeline section.
+**Left/Right** on the header expands and collapses (`visual_limiter_expanded`, session-only). The **enabled** child is on/off; threshold, ratio, and release hide when off. Locked with the timeline section.
 
 | Knob | YAML | Default | Range / display |
 | --- | --- | --- | --- |

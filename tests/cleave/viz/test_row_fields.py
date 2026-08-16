@@ -338,7 +338,7 @@ def test_apply_field_horizontal_track_header_solo_and_expand() -> None:
 
 
 def test_row_fields_count() -> None:
-    assert len(ROW_FIELDS) == 129
+    assert len(ROW_FIELDS) == 130
 
 
 def test_row_kinds_requiring_fields_registry_complete() -> None:
@@ -412,10 +412,10 @@ def test_full_line_delete_layer_prefix() -> None:
     assert row_panel_label(RowKind.LAYER_MANAGEMENT_ADD) == "Add Layer"
 
 
-def test_apply_field_horizontal_visual_limiter_couples_enabled() -> None:
+def test_apply_field_horizontal_visual_limiter_enabled() -> None:
     controls = _make_controls(timeline_enabled=True)
     controls.session.timeline.limiter.enabled = True
-    desc = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_HEADER)
+    desc = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_ENABLED)
 
     apply_field_horizontal(controls, desc, False, False)
     assert controls.session.timeline.limiter.enabled is False
@@ -424,13 +424,17 @@ def test_apply_field_horizontal_visual_limiter_couples_enabled() -> None:
     assert controls.session.timeline.limiter.enabled is True
 
 
-def test_apply_field_horizontal_visual_limiter_blocked_when_timeline_locked() -> None:
+def test_apply_field_horizontal_visual_limiter_header_expands() -> None:
     controls = _make_controls(timeline_enabled=True)
-    controls.session.timeline.limiter.enabled = True
-    controls.session.timeline.locked = True
+    controls.session.timeline.visual_limiter_expanded = False
     desc = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_HEADER)
 
+    apply_field_horizontal(controls, desc, True, False)
+    assert controls.session.timeline.visual_limiter_expanded is True
+    assert controls.session.timeline.limiter.enabled is True
+
     apply_field_horizontal(controls, desc, False, False)
+    assert controls.session.timeline.visual_limiter_expanded is False
     assert controls.session.timeline.limiter.enabled is True
 
 

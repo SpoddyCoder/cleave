@@ -176,6 +176,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     apply_soft_cuts = RowDescriptor(RowKind.TIMELINE_APPLY_SOFT_CUTS)
     apply_hard_cuts = RowDescriptor(RowKind.TIMELINE_APPLY_HARD_CUTS)
     limiter_header = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_HEADER)
+    limiter_enabled = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_ENABLED)
     limiter_threshold = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD)
     limiter_ratio = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_RATIO)
     limiter_release = RowDescriptor(RowKind.TIMELINE_VISUAL_LIMITER_RELEASE)
@@ -220,9 +221,10 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert cuts_header in view_open.layout.rows
     assert hard_cut_fades not in view_open.layout.rows
     assert limiter_header in view_open.layout.rows
-    assert limiter_threshold in view_open.layout.rows
-    assert limiter_ratio in view_open.layout.rows
-    assert limiter_release in view_open.layout.rows
+    assert limiter_enabled not in view_open.layout.rows
+    assert limiter_threshold not in view_open.layout.rows
+    assert limiter_ratio not in view_open.layout.rows
+    assert limiter_release not in view_open.layout.rows
     assert markers_header in view_open.layout.rows
     markers_idx = view_open.layout.rows.index(markers_header)
     beat_bar_idx = view_open.layout.rows.index(beat_bar_header)
@@ -236,10 +238,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert cuts_idx == snap_cues_idx + 1
     assert presets_header_idx == cuts_idx + 1
     assert limiter_header_idx == presets_header_idx + 1
-    assert view_open.layout.rows.index(limiter_threshold) == limiter_header_idx + 1
-    assert view_open.layout.rows.index(limiter_ratio) == limiter_header_idx + 2
-    assert view_open.layout.rows.index(limiter_release) == limiter_header_idx + 3
-    assert reset_idx == limiter_header_idx + 4
+    assert reset_idx == limiter_header_idx + 1
 
     session.song_markers.expanded = True
     view_markers_expanded = builder.build(paused=False)
@@ -269,10 +268,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert soft_cut_fades not in view_beat_expanded.layout.rows
     assert view_beat_expanded.layout.rows.index(presets_header) == cuts_idx + 1
     assert view_beat_expanded.layout.rows.index(limiter_header) == cuts_idx + 2
-    assert view_beat_expanded.layout.rows.index(limiter_threshold) == cuts_idx + 3
-    assert view_beat_expanded.layout.rows.index(limiter_ratio) == cuts_idx + 4
-    assert view_beat_expanded.layout.rows.index(limiter_release) == cuts_idx + 5
-    assert view_beat_expanded.layout.rows.index(reset) == cuts_idx + 6
+    assert view_beat_expanded.layout.rows.index(reset) == cuts_idx + 3
 
     session.timeline.snap_cues_expanded = True
     view_snap_expanded = builder.build(paused=False)
@@ -350,16 +346,37 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert view_presets_expanded.layout.rows.index(limiter_header) == (
         presets_header_idx + 10
     )
-    assert view_presets_expanded.layout.rows.index(limiter_threshold) == (
-        presets_header_idx + 11
+    assert view_presets_expanded.layout.rows.index(reset) == presets_header_idx + 11
+
+    session.timeline.visual_limiter_expanded = True
+    view_limiter_expanded = builder.build(paused=False)
+    assert view_limiter_expanded.layout is not view_presets_expanded.layout
+    limiter_header_idx = view_limiter_expanded.layout.rows.index(limiter_header)
+    assert view_limiter_expanded.layout.rows.index(limiter_enabled) == (
+        limiter_header_idx + 1
     )
-    assert view_presets_expanded.layout.rows.index(limiter_ratio) == (
-        presets_header_idx + 12
+    assert view_limiter_expanded.layout.rows.index(limiter_threshold) == (
+        limiter_header_idx + 2
     )
-    assert view_presets_expanded.layout.rows.index(limiter_release) == (
-        presets_header_idx + 13
+    assert view_limiter_expanded.layout.rows.index(limiter_ratio) == (
+        limiter_header_idx + 3
     )
-    assert view_presets_expanded.layout.rows.index(reset) == presets_header_idx + 14
+    assert view_limiter_expanded.layout.rows.index(limiter_release) == (
+        limiter_header_idx + 4
+    )
+    assert view_limiter_expanded.layout.rows.index(reset) == limiter_header_idx + 5
+
+    session.timeline.limiter.enabled = False
+    view_limiter_disabled = builder.build(paused=False)
+    assert view_limiter_disabled.layout is not view_limiter_expanded.layout
+    limiter_header_idx = view_limiter_disabled.layout.rows.index(limiter_header)
+    assert view_limiter_disabled.layout.rows.index(limiter_enabled) == (
+        limiter_header_idx + 1
+    )
+    assert limiter_threshold not in view_limiter_disabled.layout.rows
+    assert limiter_ratio not in view_limiter_disabled.layout.rows
+    assert limiter_release not in view_limiter_disabled.layout.rows
+    assert view_limiter_disabled.layout.rows.index(reset) == limiter_header_idx + 2
 
     session.timeline.timeline_presets_expanded = False
     view_presets_collapsed = builder.build(paused=False)
@@ -794,6 +811,21 @@ def test_structure_signature_invalidates_on_soft_cut_fades_enabled() -> None:
         session, config_save, notification_active=False
     )
     session.timeline.soft_cut_fades.enabled = True
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_structure_signature_invalidates_on_visual_limiter_expanded() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.timeline.visual_limiter_expanded = False
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.timeline.visual_limiter_expanded = True
     sig_after = view_state_structure_signature(
         session, config_save, notification_active=False
     )
