@@ -41,6 +41,7 @@ class SlotCue:
     role: CueRole | None = None
     cut: CutType | None = None
     anchor: bool = False
+    recast: bool = False
 
 
 @dataclass
@@ -138,8 +139,9 @@ def canonicalize(
     Returns strictly increasing ``t`` cues where each changes level and/or
     blend from the previous state (``baseline`` with blend inherit ``None``,
     or the prior cue when baseline is None). Role and cut are not part of the
-    comparison. Off cues (``level <= LEVEL_EPS``) always have ``blend`` and
-    ``role`` cleared before compare and emit; ``cut`` is preserved.
+    comparison. Same-level ``anchor`` and ``recast`` cues are kept. Off cues
+    (``level <= LEVEL_EPS``) always have ``blend`` and ``role`` cleared before
+    compare and emit; ``cut`` is preserved.
     """
     if not cues:
         return []
@@ -161,6 +163,7 @@ def canonicalize(
             and levels_equal(cue.level, current_level)
             and cue.blend == current_blend
             and not cue.anchor
+            and not cue.recast
         ):
             continue
         result.append(cue)
@@ -438,19 +441,26 @@ def lane_on_transition_cues(
     hard_cut_fades: TimelineFadeGroup,
     soft_cut_fades: TimelineFadeGroup,
 ) -> list[tuple[float, SlotCue]]:
-    """Preset-switch ``(trigger_t, cue)`` pairs for each rise from zero.
+    """Preset-switch ``(trigger_t, cue)`` pairs for rises and recasts.
 
     Fires when ``previous <= LEVEL_EPS < cue.level``, with ``previous`` from
-    ``baseline`` or ``0.0`` when baseline is None. Trigger is ``cue.t - ramp``
-    using the on-cue's cut type to select the fade group, where ``ramp`` is
-    ``fade_in * cue.level``. With ``crossfade`` enabled, trigger is
-    ``cue.t - ramp/2`` (visual onset). When cut is ``none`` / unset, the group
-    is disabled, or ``fade_in`` is 0, the trigger is ``cue.t``.
+    ``baseline`` or ``0.0`` when baseline is None. Also fires when
+    ``cue.recast`` and the slot is already on (``previous > LEVEL_EPS`` and
+    ``cue.level > LEVEL_EPS``). A same-level ``anchor`` hold does not fire.
+    Trigger is ``cue.t - ramp`` using the on-cue's cut type to select the fade
+    group, where ``ramp`` is ``fade_in * cue.level``. With ``crossfade``
+    enabled, trigger is ``cue.t - ramp/2`` (visual onset). When cut is
+    ``none`` / unset, the group is disabled, or ``fade_in`` is 0, the trigger
+    is ``cue.t``.
     """
     results: list[tuple[float, SlotCue]] = []
     previous = 0.0 if lane.baseline is None else float(lane.baseline)
     for cue in lane.cues:
-        if previous <= LEVEL_EPS < cue.level:
+        rise = previous <= LEVEL_EPS < cue.level
+        recast_on = (
+            cue.recast and previous > LEVEL_EPS and cue.level > LEVEL_EPS
+        )
+        if rise or recast_on:
             group = _fade_group_for_edge(
                 cue,
                 hard_cut_fades=hard_cut_fades,
@@ -473,7 +483,7 @@ def lane_on_transition_trigger_times(
     hard_cut_fades: TimelineFadeGroup,
     soft_cut_fades: TimelineFadeGroup,
 ) -> list[float]:
-    """Preset-switch trigger times for each rise from zero."""
+    """Preset-switch trigger times for each rise from zero or on-recast."""
     return [
         trigger
         for trigger, _cue in lane_on_transition_cues(

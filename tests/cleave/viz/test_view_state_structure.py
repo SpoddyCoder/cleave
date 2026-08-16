@@ -153,6 +153,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     preset_timeline_cuts = RowDescriptor(RowKind.TIMELINE_PRESET_TIMELINE_CUTS)
     preset_repopulate = RowDescriptor(RowKind.TIMELINE_PRESET_REPOPULATE)
     preset_conductor = RowDescriptor(RowKind.TIMELINE_PRESET_CONDUCTOR)
+    preset_mode = RowDescriptor(RowKind.TIMELINE_PRESET_MODE)
     presets_apply = RowDescriptor(RowKind.TIMELINE_PRESETS)
     reset = RowDescriptor(RowKind.TIMELINE_RESET)
     beat_bar_header = RowDescriptor(RowKind.TIMELINE_BEAT_BAR_GRID_HEADER)
@@ -205,6 +206,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert preset_timeline_cuts not in view_open.layout.rows
     assert preset_repopulate not in view_open.layout.rows
     assert preset_conductor not in view_open.layout.rows
+    assert preset_mode not in view_open.layout.rows
     assert presets_apply not in view_open.layout.rows
     assert reset in view_open.layout.rows
     assert beat_bar_header in view_open.layout.rows
@@ -339,22 +341,25 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert view_presets_expanded.layout.rows.index(preset_conductor) == (
         presets_header_idx + 7
     )
-    assert view_presets_expanded.layout.rows.index(presets_apply) == (
+    assert view_presets_expanded.layout.rows.index(preset_mode) == (
         presets_header_idx + 8
     )
-    assert view_presets_expanded.layout.rows.index(limiter_header) == (
+    assert view_presets_expanded.layout.rows.index(presets_apply) == (
         presets_header_idx + 9
     )
-    assert view_presets_expanded.layout.rows.index(limiter_threshold) == (
+    assert view_presets_expanded.layout.rows.index(limiter_header) == (
         presets_header_idx + 10
     )
-    assert view_presets_expanded.layout.rows.index(limiter_ratio) == (
+    assert view_presets_expanded.layout.rows.index(limiter_threshold) == (
         presets_header_idx + 11
     )
-    assert view_presets_expanded.layout.rows.index(limiter_release) == (
+    assert view_presets_expanded.layout.rows.index(limiter_ratio) == (
         presets_header_idx + 12
     )
-    assert view_presets_expanded.layout.rows.index(reset) == presets_header_idx + 13
+    assert view_presets_expanded.layout.rows.index(limiter_release) == (
+        presets_header_idx + 13
+    )
+    assert view_presets_expanded.layout.rows.index(reset) == presets_header_idx + 14
 
     session.timeline.timeline_presets_expanded = False
     view_presets_collapsed = builder.build(paused=False)
@@ -366,6 +371,7 @@ def test_builder_rebuilds_layout_when_timeline_panel_open_changes() -> None:
     assert preset_timeline_cuts not in view_presets_collapsed.layout.rows
     assert preset_repopulate not in view_presets_collapsed.layout.rows
     assert preset_conductor not in view_presets_collapsed.layout.rows
+    assert preset_mode not in view_presets_collapsed.layout.rows
     assert presets_apply not in view_presets_collapsed.layout.rows
     assert presets_header in view_presets_collapsed.layout.rows
 
@@ -712,6 +718,56 @@ def test_structure_signature_invalidates_on_timeline_presets_expanded() -> None:
         session, config_save, notification_active=False
     )
     assert sig_before != sig_after
+
+
+def test_structure_signature_invalidates_on_pattern_mask_expanded() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.render_pattern_mask.expanded = False
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.render_pattern_mask.expanded = True
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_structure_signature_invalidates_on_pattern_mask_type() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    config_save = controls._config_save
+    session.render_pattern_mask.type = "strips"
+    sig_before = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    session.render_pattern_mask.type = "plasma"
+    sig_after = view_state_structure_signature(
+        session, config_save, notification_active=False
+    )
+    assert sig_before != sig_after
+
+
+def test_pattern_mask_seed_row_only_for_plasma() -> None:
+    controls = _make_controls(("layer_1",))
+    session = controls.session
+    session.render_pattern_mask.expanded = True
+    session.render_pattern_mask.type = "strips"
+    builder = controls._view_state
+
+    view_strips = builder.build(paused=False)
+    seed = RowDescriptor(RowKind.RENDER_PATTERN_MASK_SEED)
+    feather = RowDescriptor(RowKind.RENDER_PATTERN_MASK_FEATHER)
+    assert feather in view_strips.layout.rows
+    assert seed not in view_strips.layout.rows
+
+    session.render_pattern_mask.type = "plasma"
+    view_plasma = builder.build(paused=False)
+    assert view_plasma.layout is not view_strips.layout
+    assert seed in view_plasma.layout.rows
+    assert feather in view_plasma.layout.rows
 
 
 def test_structure_signature_invalidates_on_hard_cut_fades_enabled() -> None:

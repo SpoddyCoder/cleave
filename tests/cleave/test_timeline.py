@@ -182,6 +182,21 @@ def test_canonicalize_keeps_anchored_same_level_cue() -> None:
     ]
 
 
+def test_canonicalize_keeps_recast_same_level_cue() -> None:
+    cues = canonicalize(
+        1.0,
+        [
+            SlotCue(t=5.0, level=1.0),
+            SlotCue(t=10.0, level=1.0, recast=True),
+            SlotCue(t=15.0, level=0.75),
+        ],
+    )
+    assert cues == [
+        SlotCue(t=10.0, level=1.0, recast=True),
+        SlotCue(t=15.0, level=0.75),
+    ]
+
+
 def test_canonicalize_keeps_blend_only_change() -> None:
     cues = canonicalize(
         0.0,
@@ -397,6 +412,27 @@ def test_lane_on_transition_cues_returns_cue_per_trigger() -> None:
         hard_cut_fades=_OFF,
         soft_cut_fades=_std(fade_in=2.0, fade_out=2.0),
     ) == [8.0, 28.0]
+
+
+def test_lane_on_transition_cues_counts_recast_while_on_not_anchor() -> None:
+    lane = TimelineLane(
+        baseline=1.0,
+        cues=[
+            SlotCue(t=10.0, level=1.0, recast=True),
+            SlotCue(t=20.0, level=1.0, anchor=True),
+            SlotCue(t=30.0, level=0.0),
+            SlotCue(t=40.0, level=1.0),
+        ],
+    )
+    pairs = lane_on_transition_cues(
+        lane,
+        hard_cut_fades=_OFF,
+        soft_cut_fades=_OFF,
+    )
+    assert [(t, cue.t, cue.recast, cue.anchor) for t, cue in pairs] == [
+        (10.0, 10.0, True, False),
+        (40.0, 40.0, False, False),
+    ]
 
 
 def test_punch_lane_replaces_cues_in_range() -> None:

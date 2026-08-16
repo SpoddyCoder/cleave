@@ -19,9 +19,11 @@ from cleave.timeline_presets import (
     build_breathing_cues,
     build_dialogue_cues,
     build_pulse_cues,
+    compose_pattern_mask_timeline,
 )
 from cleave.timeline_presets.characters import timeline_preset_kind_display
 from cleave.timeline_presets.conductor import timeline_preset_conductor_display
+from cleave.timeline_presets.mode import timeline_preset_mode_display
 from cleave.timeline_presets.accent import apply_accent
 from cleave.timeline_presets.crescendo import apply_crescendo
 from cleave.timeline_presets.cue_snap import timeline_preset_cue_snap_display
@@ -44,6 +46,7 @@ from cleave.viz.timeline_cut_controls import apply_cut_to_lanes
 _CANCEL_LABEL = "Cancel"
 _APPLY_PROMPT_TITLE = "Apply timeline preset?"
 _RESET_PROMPT_MESSAGE = "Reset timeline?"
+_PATTERN_MASK_TRANSITION_SEC = 1.0
 
 _KIND_BUILDERS = {
     "breathing": (build_breathing_cues, "Applied Breathing timeline preset"),
@@ -118,6 +121,10 @@ class TimelinePresetController:
                 "conductor",
                 timeline_preset_conductor_display(tl.timeline_preset_conductor),
             ),
+            ModalLabeledLine(
+                "mode",
+                timeline_preset_mode_display(tl.timeline_preset_mode),
+            ),
         )
 
     def prompt_reset(self) -> None:
@@ -175,40 +182,53 @@ class TimelinePresetController:
                 builder_kwargs["slot_stems"] = {
                     slot: self.session.layers[slot].stem for slot in slots
                 }
-        built = builder(
-            slots,
-            duration_sec,
-            rng,
-            **builder_kwargs,
-        )
-        after_crescendo = apply_crescendo(
-            built,
-            slots,
-            duration_sec=duration_sec,
-            bar_times=grid,
-            song_markers=markers,
-            rng=rng,
-        )
-        if after_crescendo is not built:
-            built = after_crescendo
-            message = f"{message} (crescendo)"
-        if tl.timeline_preset_conductor and self._signals is not None:
-            after_accent = apply_accent(
+        if tl.timeline_preset_mode == "pattern_mask":
+            self._enable_pattern_mask()
+            built = compose_pattern_mask_timeline(
+                slots,
+                duration_sec,
+                rng,
+                song_markers=markers,
+                beat_times=self._beat_times,
+                transition_duration=self.session.render_pattern_mask.transition,
+                **builder_kwargs,
+            )
+            message = "Applied pattern mask timeline"
+        else:
+            built = builder(
+                slots,
+                duration_sec,
+                rng,
+                **builder_kwargs,
+            )
+            after_crescendo = apply_crescendo(
                 built,
                 slots,
                 duration_sec=duration_sec,
                 bar_times=grid,
                 song_markers=markers,
-                signals=self._signals,
-                slot_stems={
-                    slot: self.session.layers[slot].stem for slot in slots
-                },
-                density_bias=density_bias_for(tl.timeline_preset_density),
                 rng=rng,
             )
-            if after_accent is not built:
-                built = after_accent
-                message = f"{message} (accent)"
+            if after_crescendo is not built:
+                built = after_crescendo
+                message = f"{message} (crescendo)"
+            if tl.timeline_preset_conductor and self._signals is not None:
+                after_accent = apply_accent(
+                    built,
+                    slots,
+                    duration_sec=duration_sec,
+                    bar_times=grid,
+                    song_markers=markers,
+                    signals=self._signals,
+                    slot_stems={
+                        slot: self.session.layers[slot].stem for slot in slots
+                    },
+                    density_bias=density_bias_for(tl.timeline_preset_density),
+                    rng=rng,
+                )
+                if after_accent is not built:
+                    built = after_accent
+                    message = f"{message} (accent)"
         built = {
             slot: copy_lane(built.get(slot, empty_lane())) for slot in slots
         }
@@ -226,6 +246,13 @@ class TimelinePresetController:
             self._notify("No signals; conductor skipped")
         else:
             self._notify(message)
+
+    def _enable_pattern_mask(self) -> None:
+        pm = self.session.render_pattern_mask
+        pm.enabled = True
+        pm.type = "strips"
+        pm.feather_pct = 0
+        pm.transition = _PATTERN_MASK_TRANSITION_SEC
 
     def _apply_cue_snap(
         self,

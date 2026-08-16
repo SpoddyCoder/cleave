@@ -107,6 +107,7 @@ def test_track_layout_conditional_rows_when_predicates_pass() -> None:
         preset_switching="on",
         preset_switching_trigger="timeline",
         effects_expanded=False,
+        preset_list_expanded=False,
     )
     assert RowKind.TRACK_PRESET_SWITCHING_TRIGGER in timeline_kinds
     assert RowKind.TRACK_PRESET_DURATION not in timeline_kinds

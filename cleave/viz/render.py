@@ -324,6 +324,7 @@ def render(
             LayerFramePipeline.destroy(runtime.layers)
             runtime.compositor.destroy()
             runtime.post_process.destroy()
+            runtime.masked_compositor.release()
         if proc is not None and proc.stdin is not None:
             proc.stdin.close()
             proc.kill()

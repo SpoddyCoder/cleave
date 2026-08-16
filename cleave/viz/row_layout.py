@@ -56,6 +56,8 @@ def _quick_nav_section_open(state: TuningViewState, desc: RowDescriptor) -> bool
         return state.tracks[desc.slot].expanded
     if desc.kind == RowKind.RENDER_POST_FX_HEADER:
         return state.render_post_fx.expanded
+    if desc.kind == RowKind.RENDER_PATTERN_MASK_HEADER:
+        return state.render_pattern_mask.expanded
     if desc.kind == RowKind.RENDER_TIMELINE_HEADER:
         return state.render_timeline.expanded
     return True

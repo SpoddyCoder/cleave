@@ -10,6 +10,7 @@ from cleave.config import CleaveConfig, LayerConfig
 from cleave.milk_textures import project_texture_search_paths
 from cleave.effects.runtime import EffectRuntime
 from cleave.gl_compositor import GlCompositor
+from cleave.gl_masked_compositor import GlMaskedCompositor
 from cleave.gl_post_process import GlPostProcess
 from cleave.preset_playlist import PresetPlaylist
 from cleave.projectm import ProjectM, pcm_max_samples_per_channel
@@ -83,6 +84,42 @@ def apply_effect_modifiers(
         layer.fbo.hue_mix = mod.hue_mix
         layer.fbo.grit_strength = mod.grit_strength
         layer.fbo.aberration_px = mod.aberration_px
+
+
+def _pattern_mask_live_slots(
+    session: TuningSession,
+    layers_by_slot: dict[str, StemLayer],
+    masked_compositor: GlMaskedCompositor | None,
+    song_time_sec: float,
+) -> dict[str, bool] | None:
+    if masked_compositor is None:
+        return None
+    if not render_sections_active(session):
+        return None
+    pm = session.render_pattern_mask
+    if not pm.enabled:
+        return None
+    slot_names = list(session.layer_z_order)
+    active_slots = tuple(
+        bool(
+            layers_by_slot[name].fbo.enabled and layers_by_slot[name].fbo.opacity > 0.0
+        )
+        for name in slot_names
+    )
+    flags = masked_compositor.live_slots(
+        active_slots, song_time_sec, pm.transition
+    )
+    return {name: flags[index] for index, name in enumerate(slot_names)}
+
+
+def _slot_should_render(
+    layer: StemLayer, live_by_slot: dict[str, bool] | None
+) -> bool:
+    if layer.fbo.enabled:
+        return True
+    if live_by_slot is None:
+        return False
+    return bool(live_by_slot.get(layer.slot, False))
 
 
 def _beat_sensitivity(cfg: CleaveConfig, slot: str) -> float:
@@ -378,6 +415,7 @@ class LayerFramePipeline:
         paused: bool,
         pm_time_sec: float,
         compositor: GlCompositor | None = None,
+        masked_compositor: GlMaskedCompositor | None = None,
         on_panel_notification: Callable[[str], None] | None = None,
     ) -> None:
         notify = (
@@ -395,9 +433,13 @@ class LayerFramePipeline:
             log_notify_tracker=session.projectm_log_notify_tracker,
         )
 
+        live_by_slot = _pattern_mask_live_slots(
+            session, layers_by_slot, masked_compositor, t_sec
+        )
+
         if not paused:
             for layer in layers:
-                if not layer.fbo.enabled:
+                if not _slot_should_render(layer, live_by_slot):
                     continue
                 stem = session.layers[layer.slot].stem
                 pcm = pcm_bank.slice_pcm(stem, t_sec, n_pcm)
@@ -437,7 +479,7 @@ class LayerFramePipeline:
 
         if not paused:
             for layer in layers:
-                if layer.fbo.enabled:
+                if _slot_should_render(layer, live_by_slot):
                     _render_layer_fbo(layer, layer.pm)
                     _apply_layer_bloom(layer, post_process)
                     _apply_layer_grit(layer, post_process)
@@ -466,13 +508,13 @@ class LayerFramePipeline:
         else:
             if per_layer_rolloff:
                 for layer in layers:
-                    if layer.fbo.enabled:
+                    if _slot_should_render(layer, live_by_slot):
                         _apply_layer_highlight_rolloff(
                             layer, post_process, compositor, hr
                         )
             if per_layer_chroma:
                 for layer in layers:
-                    if layer.fbo.enabled:
+                    if _slot_should_render(layer, live_by_slot):
                         _apply_layer_chroma_boost(
                             layer, post_process, compositor, cb
                         )
@@ -482,9 +524,44 @@ class LayerFramePipeline:
         compositor: GlCompositor,
         layers_by_slot: dict[str, StemLayer],
         session: TuningSession,
+        *,
+        masked_compositor: GlMaskedCompositor | None = None,
+        song_time_sec: float = 0.0,
     ) -> None:
-        ordered = [layers_by_slot[name] for name in reversed(session.layer_z_order)]
-        compositor.composite([layer.fbo for layer in ordered])
+        slot_names = list(session.layer_z_order)
+        ordered = [layers_by_slot[name] for name in slot_names]
+        fbos = [layer.fbo for layer in ordered]
+        active_slots = [
+            bool(layer.fbo.enabled and layer.fbo.opacity > 0.0) for layer in ordered
+        ]
+        pm = session.render_pattern_mask
+        use_mask = (
+            render_sections_active(session)
+            and pm.enabled
+            and masked_compositor is not None
+        )
+        if use_mask:
+            assert masked_compositor is not None
+            width = compositor.content_width
+            height = compositor.content_height
+            masked_compositor.set_content_size(width, height)
+            masked_compositor.set_color_format(compositor.color_format)
+            masked_compositor.composite(
+                compositor.content_fbo_id,
+                fbos,
+                mask_type=pm.type,
+                feather_pct=pm.feather_pct,
+                density=pm.density,
+                invert=pm.invert,
+                seed=pm.seed,
+                slot_names=slot_names,
+                active_slots=active_slots,
+                song_time_sec=song_time_sec,
+                transition_duration=pm.transition,
+            )
+        else:
+            # Fixed composite still stacks bottom-up (reversed z-order).
+            compositor.composite(list(reversed(fbos)))
 
     @staticmethod
     def destroy(layers: list[StemLayer]) -> None:

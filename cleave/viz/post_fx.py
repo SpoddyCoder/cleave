@@ -14,6 +14,7 @@ from cleave.viz.session import RenderPostFxRuntime, TuningSession
 
 if TYPE_CHECKING:
     from cleave.gl_compositor import GlCompositor
+    from cleave.gl_masked_compositor import GlMaskedCompositor
     from cleave.gl_post_process import GlPostProcess
 
 ACES_AT_ONE = 2.54 / 3.16
@@ -247,6 +248,8 @@ def sync_live_compositor_format(
     session: TuningSession,
     compositor: GlCompositor,
     post_process: GlPostProcess,
+    *,
+    masked_compositor: GlMaskedCompositor | None = None,
 ) -> None:
     """Match compositor/post-process attachments to editor mode (8-bit in curation)."""
     from cleave.viz.editor_mode_controls import is_preset_curation_mode
@@ -257,6 +260,8 @@ def sync_live_compositor_format(
     )
     compositor.set_color_format(fmt)
     post_process.set_color_format(fmt)
+    if masked_compositor is not None:
+        masked_compositor.set_color_format(fmt)
 
 
 def apply_hdr_display_shoulder(
