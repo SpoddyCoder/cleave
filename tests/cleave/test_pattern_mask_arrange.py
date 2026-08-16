@@ -264,12 +264,13 @@ def test_count_distribution_two_three_mode() -> None:
         lanes = _compose(slots, seed=seed)
         for n in _sample_counts(lanes, slots, _DUR):
             histogram[n] += 1
-            assert n >= 2, f"active count {n} dropped below 2"
+            assert n >= 1, f"active count {n} dropped below 1"
             assert n <= 4
     two_three = histogram[2] + histogram[3]
     assert two_three > histogram[4]
+    assert two_three > histogram[1]
     assert histogram[2] > 0 and histogram[3] > 0
-    mode = max((2, 3, 4), key=lambda k: histogram[k])
+    mode = max((1, 2, 3, 4), key=lambda k: histogram[k])
     assert mode in (2, 3)
 
 
@@ -280,10 +281,70 @@ def test_five_plus_rare_without_crescendo() -> None:
         lanes = _compose(slots, seed=seed)
         for n in _sample_counts(lanes, slots, _DUR, step=1.0):
             histogram[n] += 1
-            assert n >= 2
+            assert n >= 1
     five_plus = sum(histogram[k] for k in histogram if k >= 5)
     two_three = histogram[2] + histogram[3]
+    assert two_three > histogram[1]
     assert five_plus < two_three * 0.35
+
+
+def test_unmarked_one_layer_is_rare_minority() -> None:
+    slots = _slots(4)
+    ones = 0
+    total = 0
+    saw_one = False
+    for seed in range(30):
+        lanes = _compose(slots, seed=seed)
+        counts = _sample_counts(lanes, slots, _DUR)
+        if 1 in counts:
+            saw_one = True
+        ones += sum(1 for n in counts if n == 1)
+        total += len(counts)
+    assert saw_one, "expected at least one 1-layer sample across unmarked seeds"
+    assert ones < total * 0.5, "1-layer samples should be the minority"
+
+
+def test_interior_markers_change_slot_set_at_marker_time() -> None:
+    slots = _slots(4)
+    markers = [
+        SongMarker(12.0, "standard"),
+        SongMarker(36.0, "sustain"),
+        SongMarker(60.0, "diminuendo"),
+    ]
+    for seed in range(15):
+        lanes = _compose(slots, seed=seed, song_markers=markers)
+        changes = _slot_set_change_times(lanes, slots)
+        for marker in markers:
+            prev = _active_at(lanes, slots, marker.time - 1e-6)
+            after = _active_at(lanes, slots, marker.time + 1e-6)
+            assert prev != after, (
+                f"seed={seed} marker {marker.marker_type}@{marker.time} "
+                "had no slot-set change"
+            )
+            assert any(abs(t - marker.time) <= 1e-6 for t in changes), (
+                f"seed={seed} marker {marker.time} mutation was not on the marker"
+            )
+
+
+def test_begin_section_starts_at_one_layer() -> None:
+    slots = _slots(4)
+    markers = [SongMarker(16.0, "begin"), SongMarker(48.0, "crescendo")]
+    for seed in range(15):
+        lanes = _compose(slots, seed=seed, song_markers=markers)
+        assert len(_active_at(lanes, slots, 16.0 + 1e-6)) == 1, f"seed={seed}"
+
+
+def test_crescendo_drops_from_multiple_to_one() -> None:
+    slots = _slots(4)
+    markers = [SongMarker(20.0, "begin"), SongMarker(40.0, "crescendo")]
+    for seed in range(15):
+        lanes = _compose(slots, seed=seed, song_markers=markers)
+        before = _active_at(lanes, slots, 40.0 - 1e-6)
+        after = _active_at(lanes, slots, 40.0 + 1e-6)
+        assert len(before) >= 2, f"seed={seed} pre-crescendo count {len(before)}"
+        assert len(after) == 1, f"seed={seed} crescendo count {len(after)}"
+        changes = _slot_set_change_times(lanes, slots)
+        assert any(abs(t - 40.0) <= 1e-6 for t in changes), f"seed={seed}"
 
 
 def test_role_bias_lead_then_pulse_then_accent_bed() -> None:
