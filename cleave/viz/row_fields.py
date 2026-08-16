@@ -408,22 +408,18 @@ def _apply_timeline_preset_mode(
 def _format_visual_limiter_enabled(
     state: TuningViewState, _desc: RowDescriptor
 ) -> str:
-    return hard_cut_enabled_display(state.render_timeline.limiter.enabled)
+    return timeline_crossfade_display(state.render_timeline.limiter.enabled)
 
 
-def _apply_visual_limiter_header(
+def _apply_visual_limiter_enabled(
     controls: TuningControls,
-    desc: RowDescriptor,
+    _desc: RowDescriptor,
     forward: bool,
     _ctrl: bool,
     _shift: bool,
 ) -> None:
-    if (
-        controls.session.timeline.locked
-        and row_behavior(desc.kind).can_enable_disable
-    ):
-        return
-    apply_expand_toggle(controls, desc.kind, desc.slot, forward)
+    del _ctrl, _shift
+    controls._set_visual_limiter_enabled(forward)
 
 
 def _format_visual_limiter_threshold(
@@ -2396,8 +2392,13 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
     RowKind.TIMELINE_VISUAL_LIMITER_HEADER: RowFieldDef(
         panel_label="visual limiter",
         present_style=RowPresentStyle.EXPAND_SUBHEADER,
+        apply_horizontal=_apply_expand_subheader,
+    ),
+    RowKind.TIMELINE_VISUAL_LIMITER_ENABLED: RowFieldDef(
+        panel_label="enabled",
+        present_style=RowPresentStyle.LABELED_VALUE,
         format_value=_format_visual_limiter_enabled,
-        apply_horizontal=_apply_visual_limiter_header,
+        apply_horizontal=_apply_visual_limiter_enabled,
     ),
     RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD: RowFieldDef(
         panel_label="threshold",

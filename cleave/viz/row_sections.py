@@ -176,11 +176,11 @@ def _timeline_presets_expanded(state: TuningViewState, _slot: str | None) -> boo
 def _toggle_visual_limiter(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
-    controls._set_visual_limiter_enabled(forward)
+    controls._set_visual_limiter_expanded(forward)
 
 
 def _visual_limiter_expanded(state: TuningViewState, _slot: str | None) -> bool:
-    return state.render_timeline.limiter.enabled
+    return state.render_timeline.visual_limiter_expanded
 
 
 def _open_timeline_panel(controls: TuningControls, forward: bool) -> None:
@@ -952,6 +952,7 @@ TIMELINE_VISUAL_LIMITER_SECTION = ExpandSectionDef(
     read_expanded=_visual_limiter_expanded,
     toggle=_toggle_visual_limiter,
     children=(
+        SectionNode(leaf_kind=RowKind.TIMELINE_VISUAL_LIMITER_ENABLED),
         SectionNode(conditional=TIMELINE_VISUAL_LIMITER_ACTIVE),
     ),
 )
@@ -1109,6 +1110,7 @@ RENDER_TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_PRESET_MODE,
         RowKind.TIMELINE_PRESETS,
         RowKind.TIMELINE_VISUAL_LIMITER_HEADER,
+        RowKind.TIMELINE_VISUAL_LIMITER_ENABLED,
         RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD,
         RowKind.TIMELINE_VISUAL_LIMITER_RATIO,
         RowKind.TIMELINE_VISUAL_LIMITER_RELEASE,
@@ -1191,9 +1193,6 @@ def _build_row_tree_indent_depth() -> dict[RowKind, int]:
     depths[RowKind.TIMELINE_SOFT_CUT_FADE_IN] = 3
     depths[RowKind.TIMELINE_SOFT_CUT_FADE_OUT] = 3
     depths[RowKind.TIMELINE_SOFT_CUT_CROSSFADE] = 3
-    depths[RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD] = 2
-    depths[RowKind.TIMELINE_VISUAL_LIMITER_RATIO] = 2
-    depths[RowKind.TIMELINE_VISUAL_LIMITER_RELEASE] = 2
     return depths
 
 

@@ -118,6 +118,7 @@ class RowKind(Enum):
     TIMELINE_PRESET_MODE = auto()
     TIMELINE_PRESETS = auto()
     TIMELINE_VISUAL_LIMITER_HEADER = auto()
+    TIMELINE_VISUAL_LIMITER_ENABLED = auto()
     TIMELINE_VISUAL_LIMITER_THRESHOLD = auto()
     TIMELINE_VISUAL_LIMITER_RATIO = auto()
     TIMELINE_VISUAL_LIMITER_RELEASE = auto()
@@ -1110,12 +1111,20 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
     RowKind.TIMELINE_VISUAL_LIMITER_HEADER: RowBehavior(
         RowAffordance.EXPAND,
         is_sub_header=True,
-        can_enable_disable=True,
         help_title="Visual limiter",
-        help_entries=(("Left/Right", "disable / enable"),),
         help_description=(
             "Duck busy stacked layers using post-composite busyness.",
-            "When enabled, threshold, ratio, and release rows appear below.",
+            "Expand for enabled, threshold, ratio, and release.",
+        ),
+    ),
+    RowKind.TIMELINE_VISUAL_LIMITER_ENABLED: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        blocked_by_section_lock=True,
+        help_title="Visual limiter enabled",
+        help_entries=(("Left/Right", "off / on"),),
+        help_description=(
+            "When off, the limiter is idle and remaining knobs hide.",
         ),
     ),
     RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD: RowBehavior(

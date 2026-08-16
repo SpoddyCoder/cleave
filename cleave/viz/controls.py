@@ -1545,6 +1545,12 @@ class TuningControls:
             return
         tl.timeline_presets_expanded = expanded
 
+    def _set_visual_limiter_expanded(self, expanded: bool) -> None:
+        tl = self.session.timeline
+        if tl.visual_limiter_expanded == expanded:
+            return
+        tl.visual_limiter_expanded = expanded
+
     def _set_visual_limiter_enabled(self, enabled: bool) -> None:
         lim = self.session.timeline.limiter
         if lim.enabled == enabled:

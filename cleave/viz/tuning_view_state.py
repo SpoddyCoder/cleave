@@ -258,6 +258,7 @@ class RenderTimelineBlock:
     placement_snap: str = "beat"
     cuts_expanded: bool = False
     timeline_presets_expanded: bool = False
+    visual_limiter_expanded: bool = False
     timeline_preset_kind: str = "breathing"
     timeline_preset_density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
     timeline_preset_cue_snap: TimelinePresetCueSnap = DEFAULT_TIMELINE_PRESET_CUE_SNAP
@@ -498,6 +499,7 @@ def view_state_structure_signature(
             "snap_cues_expanded": tl.snap_cues_expanded,
             "cuts_expanded": tl.cuts_expanded,
             "timeline_presets_expanded": tl.timeline_presets_expanded,
+            "visual_limiter_expanded": tl.visual_limiter_expanded,
             "hard_cut_fades_enabled": tl.hard_cut_fades.enabled,
             "soft_cut_fades_enabled": tl.soft_cut_fades.enabled,
             "visual_limiter_enabled": tl.limiter.enabled,
@@ -789,6 +791,7 @@ class TuningViewStateBuilder:
             placement_snap=tl.placement_snap,
             cuts_expanded=tl.cuts_expanded,
             timeline_presets_expanded=tl.timeline_presets_expanded,
+            visual_limiter_expanded=tl.visual_limiter_expanded,
             timeline_preset_kind=tl.timeline_preset_kind,
             timeline_preset_density=tl.timeline_preset_density,
             timeline_preset_cue_snap=tl.timeline_preset_cue_snap,
@@ -1054,6 +1057,7 @@ class TuningViewStateBuilder:
                 placement_snap=tl.placement_snap,
                 cuts_expanded=tl.cuts_expanded,
                 timeline_presets_expanded=tl.timeline_presets_expanded,
+                visual_limiter_expanded=tl.visual_limiter_expanded,
                 timeline_preset_kind=tl.timeline_preset_kind,
                 timeline_preset_density=tl.timeline_preset_density,
                 timeline_preset_cue_snap=tl.timeline_preset_cue_snap,
