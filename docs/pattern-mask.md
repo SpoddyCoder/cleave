@@ -88,7 +88,9 @@ Feather 0% gives clean territories. Feather 100% gives MD3-like plasma blends wi
 
 The timeline preset ([cleave/timeline_presets/mode.py](../cleave/timeline_presets/mode.py)) stages `timeline.preset.mode` (`layers` or `pattern_mask`).
 
-When `pattern_mask`, generative Apply uses [cleave/timeline_presets/pattern_mask_arrange.py](../cleave/timeline_presets/pattern_mask_arrange.py) instead of the character builders, and sets `render.pattern_mask.enabled: true`, `type: strips`, `feather_pct: 0`, and `transition: 1.0`. Density, invert, and seed stay user-tuned in the panel. Crescendo and diminuendo song markers shape layer count inside that arranger; the layers-mode crescendo/accent post-passes are skipped. Slot-set changes packed inside the 1.0s compositor window are a suspected visual-breakage source; see [pattern-mask-transition-fragility.md](pattern-mask-transition-fragility.md).
+When `pattern_mask`, generative Apply uses [cleave/timeline_presets/pattern_mask_arrange.py](../cleave/timeline_presets/pattern_mask_arrange.py) instead of the character builders, and sets `render.pattern_mask.enabled: true`, `type: strips`, `feather_pct: 0`, and `transition: 1.0`. Density, invert, and seed stay user-tuned in the panel. Crescendo and diminuendo song markers shape layer count inside that arranger; the layers-mode crescendo/accent post-passes are skipped.
+
+Hard strips and radial wipe by interpolating 1D cuts so territories slide. Hard checker and plasma dissolve for the morph only; static frames stay hard. Soft (`feather` above 0%) stays a dissolve. Apply enables the mask and passes that 1.0s `transition` into `compose_pattern_mask_timeline` as `transition_duration` before compose runs. Add-then-remove overlap is kept only when `t_remove - t_add` is at least one wipe plus one beat; otherwise the section swaps in one step. Isolated add-only and remove-only timing is unchanged. See [pattern-mask-transition-fragility.md](pattern-mask-transition-fragility.md).
 
 When `layers`, Apply keeps the character builders and post-passes; pattern mask is left as the user set it.
 

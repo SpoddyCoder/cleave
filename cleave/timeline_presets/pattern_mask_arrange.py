@@ -1,8 +1,10 @@
 """Short-section pattern-mask timeline arranger.
 
-Self-contained parallel to the layers arranger. Frequent add/remove with
-1-2 beat overlap is the point: the masked compositor sees a slot-set change
-and runs its spatial transition. Character profiles are not used.
+Self-contained parallel to the layers arranger. Frequent add/remove is the
+point: the masked compositor sees a slot-set change and runs its spatial
+transition. Add-then-remove overlap is kept only when it spans at least
+transition_duration plus one beat; otherwise the section swaps in one step.
+Character profiles are not used.
 """
 
 from __future__ import annotations
@@ -55,6 +57,7 @@ def compose_pattern_mask_timeline(
     signals: Signals | None = None,
     slot_stems: Mapping[str, StemSource] | None = None,
     beat_times: Sequence[float] = (),
+    transition_duration: float = 0.0,
 ) -> dict[str, TimelineLane]:
     slot_list = list(slots)
     if not slot_list or duration_sec <= 0.0:
@@ -176,6 +179,7 @@ def compose_pattern_mask_timeline(
             rng,
             beat_times,
             beat_period,
+            transition_duration=transition_duration,
         ):
             _emit(t, active, new_slots=new_slots)
 
@@ -622,6 +626,7 @@ def _overlap_states(
     rng: random.Random,
     beat_times: Sequence[float],
     beat_period: float,
+    transition_duration: float = 0.0,
 ) -> list[tuple[float, frozenset[str], frozenset[str]]]:
     """Return (t, active, newly_on) states for a section-boundary mutation."""
     if not added and not removed:
@@ -629,6 +634,7 @@ def _overlap_states(
     t_lo = last_t + _MIN_STATE_GAP
     t_hi = end - _MIN_STATE_GAP
     if added and removed:
+        min_span = max(0.0, float(transition_duration)) + beat_period
         t_add = _offset_time(
             start,
             rng.choice((1, 2)),
@@ -647,14 +653,14 @@ def _overlap_states(
             t_lo,
             t_hi,
         )
-        if t_add < t_remove - _MIN_STATE_GAP:
+        if t_add < t_remove - _MIN_STATE_GAP and (t_remove - t_add) >= min_span:
             return [
                 (t_add, current | added, added),
                 (t_remove, settled, frozenset()),
             ]
         t_add = max(t_lo, start - beat_period)
         t_remove = min(t_hi, start + beat_period)
-        if t_add < t_remove - _MIN_STATE_GAP:
+        if t_add < t_remove - _MIN_STATE_GAP and (t_remove - t_add) >= min_span:
             return [
                 (t_add, current | added, added),
                 (t_remove, settled, frozenset()),

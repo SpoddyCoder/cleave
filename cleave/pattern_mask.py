@@ -229,12 +229,8 @@ def _radial_default_rotation_radians(wedge_count: int) -> float:
     return math.pi / max(int(wedge_count), 4)
 
 
-def _radial_normalized_angle(
-    width: int,
-    height: int,
-    wedge_count: int,
-) -> np.ndarray:
-    """Return (H, W) angle in [0, 1) from screen-space atan2 plus default rotation.
+def _radial_screen_angle(width: int, height: int, rotation: float) -> np.ndarray:
+    """Return (H, W) angle in [0, 1) from screen-space atan2 plus *rotation*.
 
     Coordinates use equal pixel units on X and Y so wedge angles are true on
     any aspect ratio (not skewed by normalizing each axis independently).
@@ -243,11 +239,21 @@ def _radial_normalized_angle(
     xs = (np.arange(width, dtype=np.float64) + 0.5) - width * 0.5
     ys = (np.arange(height, dtype=np.float64) + 0.5) - height * 0.5
     xx, yy = np.meshgrid(xs, ys)
-    rotation = _radial_default_rotation_radians(wedge_count)
     # atan2 range (-pi, pi]; shift, rotate, wrap into [0, 1).
     return np.mod(
-        (np.arctan2(yy, xx) + math.pi + rotation) / (2.0 * math.pi),
+        (np.arctan2(yy, xx) + math.pi + float(rotation)) / (2.0 * math.pi),
         1.0,
+    )
+
+
+def _radial_normalized_angle(
+    width: int,
+    height: int,
+    wedge_count: int,
+) -> np.ndarray:
+    """Return (H, W) angle in [0, 1) from screen-space atan2 plus default rotation."""
+    return _radial_screen_angle(
+        width, height, _radial_default_rotation_radians(wedge_count)
     )
 
 
@@ -285,6 +291,249 @@ def generate_radial_mask(
     active_arr = np.asarray(active, dtype=np.uint8)
     region = active_arr[wedge_index % n_active]
     return _apply_invert(region, layer_count, invert)
+
+
+_HARD_LAYOUT_1D_TYPES = frozenset({"strips", "radial"})
+
+
+@dataclass(frozen=True)
+class HardLayout1D:
+    """1D territories for a hard strips or radial frame.
+
+    *cuts* is monotonic and includes 0 and 1. *layers[i]* owns
+    ``[cuts[i], cuts[i + 1])``. Zero-width intervals are kept (arriving or
+    departing) and receive no pixels when rasterized. *rotation* is the
+    radial screen-space offset in radians; strips store 0.0.
+    """
+
+    cuts: tuple[float, ...]
+    layers: tuple[int, ...]
+    rotation: float
+    mask_type: str
+
+    def occupied_slots(self) -> frozenset[int]:
+        """Slot indices that own a positive-width interval."""
+        return frozenset(
+            int(layer)
+            for index, layer in enumerate(self.layers)
+            if self.cuts[index + 1] > self.cuts[index]
+        )
+
+
+def _hard_1d_layer_sequence(
+    active_flags: tuple[bool, ...],
+    density: float,
+    invert: bool,
+) -> list[int]:
+    flags = _resolve_active_flags(len(active_flags), active_flags)
+    active = _active_layer_indices(flags)
+    if not active:
+        return [0]
+    n_active = len(active)
+    count = _subdivision_count(n_active, density)
+    sequence = np.asarray(
+        [active[index % n_active] for index in range(count)],
+        dtype=np.uint8,
+    )
+    sequence = _apply_invert(sequence, len(flags), invert)
+    return [int(layer) for layer in sequence]
+
+
+def _equal_width_cuts(count: int) -> tuple[float, ...]:
+    return tuple(index / count for index in range(count + 1))
+
+
+def _interval_widths(layout: HardLayout1D) -> tuple[float, ...]:
+    return tuple(
+        layout.cuts[index + 1] - layout.cuts[index]
+        for index in range(len(layout.layers))
+    )
+
+
+def _align_interval_sequences(
+    old_layers: tuple[int, ...],
+    old_widths: tuple[float, ...],
+    new_layers: tuple[int, ...],
+    new_widths: tuple[float, ...],
+) -> list[tuple[int, float, float]]:
+    """Align intervals by layer identity in cycle order.
+
+    Shared occurrences keep a slot (widths lerp). Unmatched new layers
+    arrive at width 0; unmatched old layers depart to width 0.
+    """
+    aligned: list[tuple[int, float, float]] = []
+    old_index = 0
+    new_index = 0
+    old_count = len(old_layers)
+    new_count = len(new_layers)
+    while old_index < old_count or new_index < new_count:
+        if old_index < old_count and new_index < new_count:
+            old_layer = old_layers[old_index]
+            new_layer = new_layers[new_index]
+            if old_layer == new_layer:
+                aligned.append(
+                    (old_layer, old_widths[old_index], new_widths[new_index])
+                )
+                old_index += 1
+                new_index += 1
+                continue
+            # Depart when the old head is absent from the remaining new
+            # sequence; otherwise spawn the new head at this cut.
+            if old_layer not in new_layers[new_index:]:
+                aligned.append((old_layer, old_widths[old_index], 0.0))
+                old_index += 1
+                continue
+            if new_layer not in old_layers[old_index:]:
+                aligned.append((new_layer, 0.0, new_widths[new_index]))
+                new_index += 1
+                continue
+            aligned.append((old_layer, old_widths[old_index], 0.0))
+            old_index += 1
+            continue
+        if old_index < old_count:
+            aligned.append((old_layers[old_index], old_widths[old_index], 0.0))
+            old_index += 1
+            continue
+        aligned.append((new_layers[new_index], 0.0, new_widths[new_index]))
+        new_index += 1
+    return aligned
+
+
+def _cuts_from_widths(widths: list[float]) -> tuple[float, ...]:
+    total = float(sum(widths))
+    if total <= 0.0:
+        return (0.0, 1.0)
+    cuts = [0.0]
+    acc = 0.0
+    for width in widths:
+        acc += width
+        cuts.append(acc / total)
+    cuts[-1] = 1.0
+    return tuple(cuts)
+
+
+def hard_layout_1d(
+    mask_type: str,
+    active_flags: tuple[bool, ...],
+    density: float,
+    invert: bool,
+) -> HardLayout1D:
+    """Return equal-width 1D intervals for a static hard strips or radial frame.
+
+    Layer indices match ``generate_strips_mask`` / ``generate_radial_mask``
+    (invert is applied here). All-inactive flags yield one full-width
+    interval of layer 0. Radial rotation matches those generators for the
+    same segment count.
+    """
+    if mask_type not in _HARD_LAYOUT_1D_TYPES:
+        raise ValueError(
+            f"hard 1D layout requires strips or radial, got {mask_type!r}"
+        )
+    flags = tuple(bool(flag) for flag in active_flags)
+    if not flags:
+        raise ValueError("active_flags must be non-empty")
+    layers = tuple(_hard_1d_layer_sequence(flags, density, invert))
+    cuts = _equal_width_cuts(len(layers))
+    rotation = 0.0
+    if mask_type == "radial" and any(flags):
+        rotation = _radial_default_rotation_radians(len(layers))
+    return HardLayout1D(
+        cuts=cuts,
+        layers=layers,
+        rotation=rotation,
+        mask_type=mask_type,
+    )
+
+
+def lerp_hard_layout_1d(
+    old: HardLayout1D,
+    new: HardLayout1D,
+    t: float,
+) -> HardLayout1D:
+    """Lerp interval widths (and radial rotation) from *old* toward *new*.
+
+    Alignment is by layer identity in cycle order, not by mixing weight
+    fields. Arriving intervals start at width 0 beside the adjacent cut;
+    departing intervals shrink to 0. Zero-width slots are retained.
+    """
+    if old.mask_type != new.mask_type:
+        raise ValueError(
+            f"cannot lerp {old.mask_type!r} layout with {new.mask_type!r}"
+        )
+    if old.mask_type not in _HARD_LAYOUT_1D_TYPES:
+        raise ValueError(
+            f"hard 1D layout requires strips or radial, got {old.mask_type!r}"
+        )
+    amount = min(1.0, max(0.0, float(t)))
+    aligned = _align_interval_sequences(
+        old.layers,
+        _interval_widths(old),
+        new.layers,
+        _interval_widths(new),
+    )
+    if not aligned:
+        return HardLayout1D(
+            cuts=(0.0, 1.0),
+            layers=(0,),
+            rotation=(1.0 - amount) * old.rotation + amount * new.rotation,
+            mask_type=old.mask_type,
+        )
+    layers = tuple(layer for layer, _old_w, _new_w in aligned)
+    widths = [
+        (1.0 - amount) * old_w + amount * new_w
+        for _layer, old_w, new_w in aligned
+    ]
+    return HardLayout1D(
+        cuts=_cuts_from_widths(widths),
+        layers=layers,
+        rotation=(1.0 - amount) * old.rotation + amount * new.rotation,
+        mask_type=old.mask_type,
+    )
+
+
+def rasterize_hard_layout_1d(
+    layout: HardLayout1D,
+    width: int,
+    height: int,
+    mask_type: str,
+) -> np.ndarray:
+    """Rasterize *layout* to a (H, W) uint8 layer-index mask.
+
+    Strips are a 1-row broadcast (pixel *x* uses the left edge *x / width*).
+    Radial compares screen-space atan2 against *layout.cuts* using
+    *layout.rotation*. Zero-width intervals receive no pixels.
+    """
+    if mask_type not in _HARD_LAYOUT_1D_TYPES:
+        raise ValueError(
+            f"hard 1D layout requires strips or radial, got {mask_type!r}"
+        )
+    if mask_type != layout.mask_type:
+        raise ValueError(
+            f"mask_type {mask_type!r} does not match layout {layout.mask_type!r}"
+        )
+    width = int(width)
+    height = int(height)
+    if width <= 0:
+        raise ValueError("width must be positive")
+    if height <= 0:
+        raise ValueError("height must be positive")
+    if not layout.layers:
+        return np.zeros((height, width), dtype=np.uint8)
+    cuts = np.asarray(layout.cuts, dtype=np.float64)
+    layers = np.asarray(layout.layers, dtype=np.uint8)
+    if not np.any(np.diff(cuts) > 0.0):
+        return np.zeros((height, width), dtype=np.uint8)
+
+    def assign(positions: np.ndarray) -> np.ndarray:
+        index = np.searchsorted(cuts, positions, side="right") - 1
+        return layers[np.clip(index, 0, len(layers) - 1)]
+
+    if mask_type == "strips":
+        xs = np.arange(width, dtype=np.float64)
+        row = assign(xs / float(width))
+        return np.broadcast_to(row, (height, width)).copy()
+    angle = _radial_screen_angle(width, height, layout.rotation)
+    return assign(angle)
 
 
 def generate_checker_mask(

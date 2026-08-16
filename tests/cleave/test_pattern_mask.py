@@ -40,7 +40,10 @@ from cleave.pattern_mask import (
     generate_soft_weights,
     generate_strips_mask,
     generate_strips_weights,
+    hard_layout_1d,
     hard_mask_from_weight_fields,
+    lerp_hard_layout_1d,
+    rasterize_hard_layout_1d,
 )
 from cleave.viz.session import (
     TuningSession,
@@ -626,3 +629,167 @@ def test_plasma_feather_low_approaches_argmax() -> None:
     )
     winner = np.argmax(low, axis=2).astype(np.uint8)
     assert float(np.mean(winner == hard)) > 0.95
+
+
+def _rasterize_lerp(
+    mask_type: str,
+    old_flags: tuple[bool, ...],
+    new_flags: tuple[bool, ...],
+    t: float,
+    *,
+    width: int,
+    height: int,
+    density: float = 1.0,
+    invert: bool = False,
+) -> np.ndarray:
+    old = hard_layout_1d(mask_type, old_flags, density, invert)
+    new = hard_layout_1d(mask_type, new_flags, density, invert)
+    return rasterize_hard_layout_1d(
+        lerp_hard_layout_1d(old, new, t), width, height, mask_type
+    )
+
+
+def _strip_run_count(row: np.ndarray, layer: int) -> int:
+    on = row == layer
+    entered = int(on[0]) + int(np.sum(on[1:] & ~on[:-1]))
+    return entered
+
+
+def test_hard_layout_strips_two_to_three_moves_before_half() -> None:
+    old_flags = (True, True, False)
+    new_flags = (True, True, True)
+    width, height = 120, 16
+    at_0 = _rasterize_lerp(
+        "strips", old_flags, new_flags, 0.0, width=width, height=height
+    )
+    at_25 = _rasterize_lerp(
+        "strips", old_flags, new_flags, 0.25, width=width, height=height
+    )
+    # Rightmost band is the arriving third strip; it must already differ.
+    assert not np.array_equal(at_25, at_0)
+    assert int(at_0[0, -1]) == 1
+    assert int(at_25[0, -1]) == 2
+    assert 2 in set(int(v) for v in np.unique(at_25))
+
+
+def test_hard_layout_strips_territories_stay_contiguous() -> None:
+    old_flags = (True, True, False)
+    new_flags = (True, True, True)
+    for density in (1.0, 2.0):
+        old = hard_layout_1d("strips", old_flags, density, False)
+        new = hard_layout_1d("strips", new_flags, density, False)
+        layout = lerp_hard_layout_1d(old, new, 0.25)
+        mask = rasterize_hard_layout_1d(layout, 120, 12, "strips")
+        row = mask[0]
+        assert np.array_equal(mask, np.broadcast_to(row, mask.shape))
+        for layer in (0, 1, 2):
+            interval_count = sum(
+                1
+                for index, owner in enumerate(layout.layers)
+                if owner == layer and layout.cuts[index + 1] > layout.cuts[index]
+            )
+            assert _strip_run_count(row, layer) == interval_count
+
+
+def test_hard_layout_endpoints_match_generators() -> None:
+    cases = (
+        ("strips", (True, True, False), (True, True, True), 1.0, False),
+        ("strips", (True, True, False), (True, True, True), 1.0, True),
+        ("strips", (True, True, False), (True, True, True), 2.0, False),
+        ("radial", (True, True, False), (True, True, True), 1.0, False),
+        ("radial", (True, True, False), (True, True, True), 1.0, True),
+        ("radial", (True, False, True, True), (True, True, True, True), 2.0, False),
+    )
+    width, height = 64, 48
+    generators = {"strips": generate_strips_mask, "radial": generate_radial_mask}
+    for mask_type, old_flags, new_flags, density, invert in cases:
+        layer_count = len(old_flags)
+        generate = generators[mask_type]
+        expected_old = generate(
+            width,
+            height,
+            layer_count,
+            density=density,
+            invert=invert,
+            active_flags=old_flags,
+        )
+        expected_new = generate(
+            width,
+            height,
+            layer_count,
+            density=density,
+            invert=invert,
+            active_flags=new_flags,
+        )
+        at_0 = _rasterize_lerp(
+            mask_type,
+            old_flags,
+            new_flags,
+            0.0,
+            width=width,
+            height=height,
+            density=density,
+            invert=invert,
+        )
+        at_1 = _rasterize_lerp(
+            mask_type,
+            old_flags,
+            new_flags,
+            1.0,
+            width=width,
+            height=height,
+            density=density,
+            invert=invert,
+        )
+        static_old = rasterize_hard_layout_1d(
+            hard_layout_1d(mask_type, old_flags, density, invert),
+            width,
+            height,
+            mask_type,
+        )
+        static_new = rasterize_hard_layout_1d(
+            hard_layout_1d(mask_type, new_flags, density, invert),
+            width,
+            height,
+            mask_type,
+        )
+        assert np.array_equal(static_old, expected_old)
+        assert np.array_equal(static_new, expected_new)
+        assert np.array_equal(at_0, expected_old)
+        assert np.array_equal(at_1, expected_new)
+
+
+def test_hard_layout_identity_swap_shrinks_then_grows() -> None:
+    """Same-count swap 0,1 -> 0,2: B shrinks and C grows in that band."""
+    old_flags = (True, True, False)
+    new_flags = (True, False, True)
+    width, height = 120, 8
+    at_0 = _rasterize_lerp(
+        "strips", old_flags, new_flags, 0.0, width=width, height=height
+    )
+    at_25 = _rasterize_lerp(
+        "strips", old_flags, new_flags, 0.25, width=width, height=height
+    )
+    at_1 = _rasterize_lerp(
+        "strips", old_flags, new_flags, 1.0, width=width, height=height
+    )
+    assert np.array_equal(
+        at_0,
+        generate_strips_mask(
+            width, height, 3, density=1.0, active_flags=old_flags
+        ),
+    )
+    assert np.array_equal(
+        at_1,
+        generate_strips_mask(
+            width, height, 3, density=1.0, active_flags=new_flags
+        ),
+    )
+    # Left half stays layer 0. Right band: B still owns the interior,
+    # C has already taken a sliver at the right edge.
+    assert int(at_25[0, 20]) == 0
+    assert int(at_25[0, 70]) == 1
+    assert int(at_25[0, 115]) == 2
+    assert int(at_0[0, 115]) == 1
+    assert _strip_run_count(at_25[0], 1) == 1
+    assert _strip_run_count(at_25[0], 2) == 1

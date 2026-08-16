@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline
 from cleave.viz.session import LayerRuntime, TuningSession
-from tests.support.config import TEST_LAYER_STEMS
+from tests.support.config import TEST_LAYER_STEMS, default_render_post_fx_runtime
 
 
 def _stem_layer(slot: str, *, enabled: bool = True, opacity: float = 1.0) -> StemLayer:
@@ -19,6 +19,9 @@ def _stem_layer(slot: str, *, enabled: bool = True, opacity: float = 1.0) -> Ste
     fbo.opacity = opacity
     fbo.width = 1280
     fbo.height = 720
+    fbo.bloom_strength = 0.0
+    fbo.grit_strength = 0.0
+    fbo.aberration_px = 0.0
     return StemLayer(
         slot=slot,
         pm=MagicMock(),
@@ -220,3 +223,100 @@ def test_composite_skips_mask_in_preset_curation_mode() -> None:
 
     compositor.composite.assert_called_once()
     masked.composite.assert_not_called()
+
+
+def _effect_runtime_for(slots: tuple[str, ...]) -> MagicMock:
+    effect_runtime = MagicMock()
+    effect_runtime.modifiers.return_value = {
+        slot: MagicMock(
+            opacity=1.0,
+            flash_alpha=0.0,
+            bloom_strength=0.0,
+            hue_rgb=(1, 1, 1),
+            hue_mix=0.0,
+            grit_strength=0.0,
+            aberration_px=0.0,
+        )
+        for slot in slots
+    }
+    return effect_runtime
+
+
+def test_render_frame_feeds_pcm_for_live_disabled_slot() -> None:
+    session = _session(("layer_1", "layer_2"))
+    session.render_pattern_mask.enabled = True
+    session.render_pattern_mask.transition = 1.0
+    session.render_post_fx = default_render_post_fx_runtime(enabled=False)
+    live = _stem_layer("layer_1")
+    departing = _stem_layer("layer_2", enabled=False)
+    pcm_bank = MagicMock()
+    pcm_bank.slice_pcm.return_value = b""
+    pcm_bank.channels.return_value = 2
+    masked = MagicMock()
+    masked.live_slots.return_value = (True, True)
+
+    with (
+        patch("cleave.viz.layer_pipeline._render_layer_fbo") as render_fbo,
+        patch(
+            "cleave.viz.layer_pipeline.pcm_max_samples_per_channel",
+            return_value=2048,
+        ),
+    ):
+        LayerFramePipeline.render_frame(
+            session,
+            [live, departing],
+            {"layer_1": live, "layer_2": departing},
+            pcm_bank,
+            512,
+            MagicMock(),
+            _effect_runtime_for(("layer_1", "layer_2")),
+            None,
+            2.5,
+            paused=False,
+            pm_time_sec=1.0,
+            masked_compositor=masked,
+        )
+
+    masked.live_slots.assert_called_once_with((True, False), 2.5, 1.0)
+    assert pcm_bank.slice_pcm.call_count == 2
+    assert render_fbo.call_count == 2
+    render_fbo.assert_any_call(departing, departing.pm)
+
+
+def test_render_frame_skips_disabled_slot_that_is_not_live() -> None:
+    session = _session(("layer_1", "layer_2"))
+    session.render_pattern_mask.enabled = True
+    session.render_pattern_mask.transition = 1.0
+    session.render_post_fx = default_render_post_fx_runtime(enabled=False)
+    live = _stem_layer("layer_1")
+    idle = _stem_layer("layer_2", enabled=False)
+    pcm_bank = MagicMock()
+    pcm_bank.slice_pcm.return_value = b""
+    pcm_bank.channels.return_value = 2
+    masked = MagicMock()
+    masked.live_slots.return_value = (True, False)
+
+    with (
+        patch("cleave.viz.layer_pipeline._render_layer_fbo") as render_fbo,
+        patch(
+            "cleave.viz.layer_pipeline.pcm_max_samples_per_channel",
+            return_value=2048,
+        ),
+    ):
+        LayerFramePipeline.render_frame(
+            session,
+            [live, idle],
+            {"layer_1": live, "layer_2": idle},
+            pcm_bank,
+            512,
+            MagicMock(),
+            _effect_runtime_for(("layer_1", "layer_2")),
+            None,
+            2.5,
+            paused=False,
+            pm_time_sec=1.0,
+            masked_compositor=masked,
+        )
+
+    assert pcm_bank.slice_pcm.call_count == 1
+    render_fbo.assert_called_once_with(live, live.pm)

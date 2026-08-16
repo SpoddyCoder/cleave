@@ -62,6 +62,7 @@ def _compose(
     song_markers: list[SongMarker] | None = None,
     signals: Signals | None = None,
     slot_stems: dict[str, StemSource] | None = None,
+    transition_duration: float = 0.0,
 ) -> dict[str, TimelineLane]:
     return compose_pattern_mask_timeline(
         slots,
@@ -74,6 +75,7 @@ def _compose(
         signals=signals,
         slot_stems=slot_stems,
         beat_times=_beat_times(duration_sec),
+        transition_duration=transition_duration,
     )
 
 
@@ -129,32 +131,122 @@ def test_empty_slots_or_duration_returns_empty() -> None:
     assert compose_pattern_mask_timeline(_slots(4), 0.0, random.Random(0), [0.0]) == {}
 
 
+def _slot_set_change_times(
+    lanes: dict[str, TimelineLane], slots: list[str]
+) -> list[float]:
+    times = sorted({0.0, *_all_cue_times(lanes)})
+    changes: list[float] = []
+    prev: frozenset[str] | None = None
+    for t in times:
+        active = _active_at(lanes, slots, t + 1e-6 if t > 0.0 else 0.0)
+        if prev is not None and active != prev:
+            changes.append(t)
+        prev = active
+    return changes
+
+
+def _mutation_events(
+    lanes: dict[str, TimelineLane], slots: list[str]
+) -> list[tuple[float, frozenset[str], frozenset[str]]]:
+    events: list[tuple[float, frozenset[str], frozenset[str]]] = []
+    for t in _slot_set_change_times(lanes, slots):
+        prev = _active_at(lanes, slots, t - 1e-6)
+        after = _active_at(lanes, slots, t + 1e-6)
+        events.append((t, after - prev, prev - after))
+    return events
+
+
+def _isolated_add_remove_times(
+    lanes: dict[str, TimelineLane], slots: list[str]
+) -> list[tuple[float, frozenset[str], frozenset[str]]]:
+    events = _mutation_events(lanes, slots)
+    isolated: list[tuple[float, frozenset[str], frozenset[str]]] = []
+    for index, (t, added, removed) in enumerate(events):
+        if added and removed:
+            continue
+        if added and not removed:
+            if index + 1 < len(events):
+                _t2, added2, removed2 = events[index + 1]
+                if removed2 and not added2 and added.isdisjoint(removed2):
+                    continue
+            isolated.append((t, added, removed))
+            continue
+        if removed and not added:
+            if index > 0:
+                _t1, added1, removed1 = events[index - 1]
+                if added1 and not removed1 and added1.isdisjoint(removed):
+                    continue
+            isolated.append((t, added, removed))
+    return isolated
+
+
+def _overlap_pairs(
+    lanes: dict[str, TimelineLane], slots: list[str]
+) -> list[tuple[float, float]]:
+    events = _mutation_events(lanes, slots)
+    pairs: list[tuple[float, float]] = []
+    for index, (t_on, added, removed) in enumerate(events):
+        if not added or removed:
+            continue
+        for t_off, added2, removed2 in events[index + 1 :]:
+            if added2:
+                break
+            if removed2 and added.isdisjoint(removed2):
+                mid = _active_at(lanes, slots, (t_on + t_off) * 0.5)
+                if added <= mid:
+                    pairs.append((t_on, t_off))
+                break
+    return pairs
+
+
 def test_overlap_when_add_then_remove() -> None:
+    """With no wipe duration, 1-2 beat add-then-remove windows still appear."""
     slots = _slots(4)
     found = False
     for seed in range(20):
-        lanes = _compose(slots, seed=seed)
-        times = [t for t in _all_cue_times(lanes) if t > 1e-9]
-        for i, t_on in enumerate(times[:-1]):
-            prev = _active_at(lanes, slots, t_on - 1e-6)
-            active_on = _active_at(lanes, slots, t_on + 1e-6)
-            added = active_on - prev
-            if not added:
-                continue
-            for t_off in times[i + 1 :]:
-                if not (0.05 < (t_off - t_on) <= 3.0):
-                    continue
-                active_mid = _active_at(lanes, slots, (t_on + t_off) * 0.5)
-                after = _active_at(lanes, slots, t_off + 1e-6)
-                removed = active_mid - after
-                if added <= active_mid and (removed - added):
-                    found = True
-                    break
-            if found:
-                break
-        if found:
+        lanes = _compose(slots, seed=seed, transition_duration=0.0)
+        if _overlap_pairs(lanes, slots):
+            found = True
             break
     assert found, "expected a 1-2 beat window where an added layer overlaps a departing one"
+
+
+def test_transition_duration_keeps_consecutive_changes_apart() -> None:
+    slots = _slots(4)
+    duration = 1.0
+    for seed in range(20):
+        lanes = _compose(slots, seed=seed, transition_duration=duration)
+        times = _slot_set_change_times(lanes, slots)
+        for t0, t1 in zip(times, times[1:]):
+            assert t1 - t0 >= duration - 1e-9, (
+                f"seed={seed} gap {t1 - t0:.4f}s inside transition_duration"
+            )
+
+
+def test_transition_duration_overlap_has_wipe_plus_hold() -> None:
+    slots = _slots(4)
+    duration = 1.0
+    hold = _BEAT_SEC
+    saw_overlap = False
+    for seed in range(30):
+        lanes = _compose(slots, seed=seed, transition_duration=duration)
+        for t_on, t_off in _overlap_pairs(lanes, slots):
+            saw_overlap = True
+            assert t_off - t_on >= duration + hold - 1e-9, (
+                f"seed={seed} overlap {t_off - t_on:.4f}s shorter than "
+                f"transition plus one beat"
+            )
+    assert saw_overlap, "expected at least one add-then-remove that still fits"
+
+
+def test_isolated_add_remove_times_ignore_transition_duration() -> None:
+    slots = _slots(4)
+    for seed in range(12):
+        zero = _compose(slots, seed=seed, transition_duration=0.0)
+        wipe = _compose(slots, seed=seed, transition_duration=1.0)
+        assert _isolated_add_remove_times(zero, slots) == _isolated_add_remove_times(
+            wipe, slots
+        )
 
 
 def test_count_distribution_two_three_mode() -> None:
@@ -372,6 +464,7 @@ def test_apply_pattern_mask_calls_builder_and_enables_mask() -> None:
     kwargs = mock_pm.call_args.kwargs
     assert "song_markers" in kwargs
     assert "beat_times" in kwargs
+    assert kwargs["transition_duration"] == 1.0
     mock_cresc.assert_not_called()
     mock_accent.assert_not_called()
     mock_breath.assert_not_called()
