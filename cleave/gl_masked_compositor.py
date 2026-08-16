@@ -25,6 +25,7 @@ from cleave.pattern_mask import (
     hard_layout_1d,
     hard_mask_from_weight_fields,
     lerp_hard_layout_1d,
+    one_hot_weight_fields,
     pattern_mask_plasma_power,
     rasterize_hard_layout_1d,
     u8_weights_from_fields,
@@ -1181,24 +1182,28 @@ class GlMaskedCompositor:
         active_flags: tuple[bool, ...],
     ) -> np.ndarray:
         if params.mask_type == "plasma":
-            return self._generate_plasma_fields_gpu(
+            fields = self._generate_plasma_fields_gpu(
                 gen_width=gen_width,
                 gen_height=gen_height,
                 layer_count=layer_count,
                 params=params,
                 active_flags=active_flags,
             )
-        return generate_soft_weight_fields(
-            params.mask_type,
-            gen_width,
-            gen_height,
-            layer_count,
-            density=params.density,
-            invert=params.invert,
-            seed=params.seed,
-            active_flags=active_flags,
-            feather_pct=params.feather_pct,
-        )
+        else:
+            fields = generate_soft_weight_fields(
+                params.mask_type,
+                gen_width,
+                gen_height,
+                layer_count,
+                density=params.density,
+                invert=params.invert,
+                seed=params.seed,
+                active_flags=active_flags,
+                feather_pct=params.feather_pct,
+            )
+        if int(params.feather_pct) == 0:
+            return one_hot_weight_fields(fields)
+        return fields
 
     def _begin_hard_layout_transition(
         self,
@@ -1663,11 +1668,14 @@ class GlMaskedCompositor:
             dest.use()
             self._ctx.viewport = (0, 0, self.content_width, self.content_height)
 
-            if (
-                transitioning
-                and self._has_weight_field_transition()
-                and self._transition_gpu_ready
-            ):
+            if transitioning and self._has_weight_field_transition():
+                if not self._transition_gpu_ready:
+                    assert self._transition_old_weights is not None
+                    assert self._transition_target_weights is not None
+                    self._upload_transition_textures(
+                        self._transition_old_weights,
+                        self._transition_target_weights,
+                    )
                 _ensure_soft_draw_state()
                 self._draw_soft_layer_passes(
                     layers,
