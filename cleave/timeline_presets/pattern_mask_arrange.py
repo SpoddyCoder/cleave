@@ -20,7 +20,7 @@ from cleave.blend_modes import BlendMode
 from cleave.cue_roles import CUE_ROLE_BLEND, CueRole
 from cleave.extract import StemSource
 from cleave.signals import Signals
-from cleave.song_markers import SongMarker
+from cleave.song_markers import SongMarker, SongMarkerType
 from cleave.timeline import (
     LEVEL_EPS,
     SlotCue,
@@ -96,7 +96,7 @@ def compose_pattern_mask_timeline(
         bars, duration_sec, rng, marker_times
     )
     if not sections:
-        opening = frozenset(slot_list[: min(2, len(slot_list))])
+        opening = frozenset(slot_list[:1])
         return cues_from_states(
             slot_list,
             [(0.0, levels_from_active(opening))],
@@ -125,10 +125,15 @@ def compose_pattern_mask_timeline(
         active: frozenset[str],
         *,
         new_slots: frozenset[str],
+        force_t: bool = False,
     ) -> None:
         nonlocal last_t
         cue_t = 0.0 if not levels else float(t)
-        if levels and cue_t <= last_t + _MIN_STATE_GAP * 0.5:
+        if (
+            not force_t
+            and levels
+            and cue_t <= last_t + _MIN_STATE_GAP * 0.5
+        ):
             cue_t = last_t + _MIN_STATE_GAP
         if cue_t >= duration_sec:
             return
@@ -146,19 +151,28 @@ def compose_pattern_mask_timeline(
         weights = None if conductor is None else conductor.phrase_at(midpoint)
         budget_gain = 1.0 if weights is None else weights.budget_gain
         high_energy = budget_gain >= _HIGH_ENERGY_GAIN
-        gesture = _gesture_at(start, markers)
+        marker_type = _marker_type_at(start, markers)
         next_start = sections[index + 1][0] if index + 1 < len(sections) else None
-        next_gesture = (
-            _gesture_at(next_start, markers) if next_start is not None else None
+        next_marker = (
+            _marker_type_at(next_start, markers) if next_start is not None else None
         )
-        near_crescendo = gesture == "crescendo" or next_gesture == "crescendo"
-        near_diminuendo = gesture == "diminuendo" or next_gesture == "diminuendo"
-        allow_five = near_crescendo or high_energy or density_bias >= 2
+        at_begin = marker_type == "begin"
+        at_crescendo = marker_type == "crescendo"
+        next_crescendo = next_marker == "crescendo"
+        near_diminuendo = (
+            marker_type == "diminuendo" or next_marker == "diminuendo"
+        )
+        at_marker = marker_type is not None
+        allow_five = (
+            next_crescendo or at_crescendo or high_energy or density_bias >= 2
+        )
         target = _pick_target_count(
             rng,
             n_slots,
             density_bias=density_bias,
-            near_crescendo=near_crescendo,
+            at_begin=at_begin,
+            at_crescendo=at_crescendo,
+            next_crescendo=next_crescendo,
             near_diminuendo=near_diminuendo,
             allow_five=allow_five,
             budget_gain=budget_gain,
@@ -191,7 +205,14 @@ def compose_pattern_mask_timeline(
             _accumulate_airtime(airtime, current, end - start)
             continue
 
-        action = _pick_action(rng, len(current), target, n_slots)
+        action = _pick_action(
+            rng,
+            len(current),
+            target,
+            n_slots,
+            at_marker=at_marker,
+            next_crescendo=next_crescendo,
+        )
         added, removed = _resolve_mutation(
             rng,
             current,
@@ -201,12 +222,12 @@ def compose_pattern_mask_timeline(
             weights,
             airtime,
             allow_five=allow_five,
+            at_marker=at_marker,
+            drop_to_one=at_begin or at_crescendo,
         )
+        if at_marker and not added and not removed:
+            added, removed = _swap_one(rng, current, order, weights, airtime)
         settled = (current | added) - removed
-        if len(settled) < 2:
-            settled = current if len(current) >= 2 else frozenset(order[:2])
-            added = settled - current
-            removed = current - settled
 
         for t, active, new_slots in _overlap_states(
             start,
@@ -220,8 +241,9 @@ def compose_pattern_mask_timeline(
             beat_times,
             beat_period,
             transition_duration=transition_duration,
+            at_marker=at_marker,
         ):
-            _emit(t, active, new_slots=new_slots)
+            _emit(t, active, new_slots=new_slots, force_t=at_marker)
 
         current = settled
         _schedule_section_recasts(
@@ -239,7 +261,7 @@ def compose_pattern_mask_timeline(
         _accumulate_airtime(airtime, current, max(0.0, end - start))
 
     if not levels:
-        opening = frozenset(order[: min(2, n_slots)])
+        opening = frozenset(order[:1])
         return cues_from_states(
             slot_list,
             [(0.0, levels_from_active(opening))],
@@ -299,16 +321,14 @@ def _normalized_markers(
     return [by_time[t] for t in sorted(by_time)]
 
 
-def _gesture_at(
+def _marker_type_at(
     t: float | None, markers: Sequence[SongMarker]
-) -> str | None:
+) -> SongMarkerType | None:
     if t is None:
         return None
     for marker in markers:
         if abs(marker.time - t) <= 1e-6:
-            if marker.marker_type in ("crescendo", "diminuendo"):
-                return marker.marker_type
-            return None
+            return marker.marker_type
     return None
 
 
@@ -458,7 +478,9 @@ def _pick_target_count(
     n_slots: int,
     *,
     density_bias: int,
-    near_crescendo: bool,
+    at_begin: bool,
+    at_crescendo: bool,
+    next_crescendo: bool,
     near_diminuendo: bool,
     allow_five: bool,
     budget_gain: float,
@@ -466,7 +488,9 @@ def _pick_target_count(
 ) -> int:
     if n_slots <= 1:
         return 1
-    w2, w3, w4, w5 = 0.45, 0.35, 0.15, 0.05
+    if at_begin or at_crescendo:
+        return 1
+    w1, w2, w3, w4, w5 = 0.08, 0.45, 0.35, 0.15, 0.05
     if density_bias > 0:
         shift = 0.06 * density_bias
         w2 = max(0.05, w2 - shift)
@@ -480,32 +504,34 @@ def _pick_target_count(
     if not allow_five:
         w4 += w5
         w5 = 0.0
-    if near_crescendo:
+    if next_crescendo:
+        w1 = 0.0
         w2 *= 0.15
         w3 *= 0.4
         w4 *= 2.2
         if n_slots >= 5:
             w5 = max(w5, 0.2) * 2.5
     if near_diminuendo:
-        w2, w3, w4, w5 = 0.75, 0.25, 0.0, 0.0
+        w1, w2, w3, w4, w5 = 0.20, 0.60, 0.20, 0.0, 0.0
     if near_silent:
-        w2, w3, w4, w5 = 0.85, 0.15, 0.0, 0.0
+        w1, w2, w3, w4, w5 = 0.30, 0.60, 0.10, 0.0, 0.0
     folded: dict[int, float] = {}
-    for count, weight in ((2, w2), (3, w3), (4, w4), (5, w5)):
+    for count, weight in ((1, w1), (2, w2), (3, w3), (4, w4), (5, w5)):
         if weight <= 0.0:
             continue
-        clamped = min(max(count, 2), n_slots)
+        clamped = min(max(count, 1), n_slots)
         folded[clamped] = folded.get(clamped, 0.0) + weight
     if not folded:
-        return min(2, n_slots)
+        return 1
     picked = _weighted_choice(rng, tuple(folded.items()))
     if budget_gain >= 1.2 and not near_diminuendo:
         picked = min(n_slots, picked + 1)
         if picked >= 5 and not allow_five:
             picked = min(4, n_slots)
     elif budget_gain <= 0.8:
-        picked = max(2, picked - 1)
-    return max(2, min(n_slots, picked))
+        picked = max(2 if next_crescendo else 1, picked - 1)
+    floor = 2 if next_crescendo else 1
+    return max(floor, min(n_slots, picked))
 
 
 def _pick_action(
@@ -513,11 +539,14 @@ def _pick_action(
     current_n: int,
     target_n: int,
     n_slots: int,
+    *,
+    at_marker: bool = False,
+    next_crescendo: bool = False,
 ) -> _Action:
     add_one, remove_one, add_two, hold = 0.50, 0.30, 0.10, 0.10
     can_add_one = current_n < n_slots
     can_add_two = current_n + 2 <= n_slots
-    can_remove = current_n > 2
+    can_remove = current_n > 1
     if current_n >= target_n:
         remove_one *= 2.5
         add_one *= 0.35
@@ -536,8 +565,11 @@ def _pick_action(
         add_two = 0.0
     if not can_remove:
         remove_one = 0.0
-    if current_n < 2 and can_add_one:
-        return "add_one"
+    if at_marker:
+        hold = 0.0
+    if next_crescendo and current_n < 2:
+        hold = 0.0
+        remove_one = 0.0
     return _weighted_choice(
         rng,
         (
@@ -547,6 +579,36 @@ def _pick_action(
             ("hold", hold),
         ),
     )
+
+
+def _swap_one(
+    rng: random.Random,
+    current: frozenset[str],
+    order: Sequence[str],
+    weights: PhraseWeights | None,
+    airtime: Mapping[str, float],
+) -> tuple[frozenset[str], frozenset[str]]:
+    inactive = [slot for slot in order if slot not in current]
+    active = [slot for slot in order if slot in current]
+    if inactive and active:
+        added = frozenset(
+            _pick_slots(rng, inactive, 1, weights, airtime, prefer_busy=True)
+        )
+        removed = frozenset(
+            _pick_slots(rng, active, 1, weights, airtime, prefer_busy=False)
+        )
+        return added, removed
+    if len(active) > 1:
+        removed = frozenset(
+            _pick_slots(rng, active, 1, weights, airtime, prefer_busy=False)
+        )
+        return frozenset(), removed
+    if inactive:
+        added = frozenset(
+            _pick_slots(rng, inactive, 1, weights, airtime, prefer_busy=True)
+        )
+        return added, frozenset()
+    return frozenset(), frozenset()
 
 
 def _resolve_mutation(
@@ -559,6 +621,8 @@ def _resolve_mutation(
     airtime: Mapping[str, float],
     *,
     allow_five: bool,
+    at_marker: bool = False,
+    drop_to_one: bool = False,
 ) -> tuple[frozenset[str], frozenset[str]]:
     current_n = len(current)
     n_slots = len(order)
@@ -571,12 +635,23 @@ def _resolve_mutation(
         )
 
     def _remove(k: int) -> frozenset[str]:
-        cap = max(0, current_n - 2)
+        cap = max(0, current_n - 1)
         return frozenset(
             _pick_slots(
                 rng, active, min(k, cap), weights, airtime, prefer_busy=False
             )
         )
+
+    if drop_to_one:
+        if current_n <= 1:
+            return _swap_one(rng, current, order, weights, airtime)
+        keep = frozenset(
+            _pick_slots(rng, active, 1, weights, airtime, prefer_busy=True)
+        )
+        return frozenset(), current - keep
+
+    if at_marker and current_n == target:
+        return _swap_one(rng, current, order, weights, airtime)
 
     if action == "hold":
         return frozenset(), frozenset()
@@ -595,17 +670,17 @@ def _resolve_mutation(
     if action == "add_one":
         if inactive and current_n < target:
             return _add(1), frozenset()
-        if inactive and current_n >= 2:
+        if inactive and current_n >= 1:
             return _add(1), _remove(1)
-        if current_n > 2:
+        if current_n > 1:
             return frozenset(), _remove(1)
         return frozenset(), frozenset()
 
-    if current_n > max(2, target):
+    if current_n > max(1, target):
         return frozenset(), _remove(1)
-    if current_n > 2 and current_n >= target:
+    if current_n > 1 and current_n >= target:
         return frozenset(), _remove(1)
-    if inactive and current_n >= 2:
+    if inactive and current_n >= 1:
         return _add(1), _remove(1)
     return frozenset(), frozenset()
 
@@ -827,12 +902,15 @@ def _overlap_states(
     beat_times: Sequence[float],
     beat_period: float,
     transition_duration: float = 0.0,
+    at_marker: bool = False,
 ) -> list[tuple[float, frozenset[str], frozenset[str]]]:
     """Return (t, active, newly_on) states for a section-boundary mutation."""
     if not added and not removed:
         return []
     t_lo = last_t + _MIN_STATE_GAP
     t_hi = end - _MIN_STATE_GAP
+    if at_marker:
+        return [(start, settled, added)]
     if added and removed:
         min_span = max(0.0, float(transition_duration)) + beat_period
         t_add = _offset_time(
