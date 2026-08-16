@@ -425,3 +425,105 @@ def test_live_slots_departing_hard_layout_until_width_zero(gl_context) -> None:
         transition_duration=1.0,
     )
     assert masked.live_slots((True, True, False), 1.0, 1.0) == (True, True, False)
+
+
+def _four_solid_layers(comp):
+    layers = []
+    colors = (
+        (1.0, 0.0, 0.0),
+        (0.0, 1.0, 0.0),
+        (0.0, 0.0, 1.0),
+        (1.0, 1.0, 0.0),
+    )
+    for name, rgb in zip(("a", "b", "c", "d"), colors, strict=True):
+        layer = comp.create_layer_fbo(name, W, H, opacity=1.0, blend_mode="black-key")
+        _fill_layer(layer, rgb)
+        layers.append(layer)
+    return layers
+
+
+def _assert_hard_weight_field_mid_morph(
+    comp,
+    masked,
+    layers,
+    *,
+    mask_type: str,
+    seed: int = 0,
+) -> None:
+    import numpy as np
+
+    two = [True, True, False, False]
+    three = [True, True, True, False]
+    common = dict(
+        mask_type=mask_type,
+        feather_pct=0,
+        density=1.0,
+        seed=seed,
+        transition_duration=1.0,
+    )
+    masked.composite(
+        comp.content_fbo_id,
+        layers,
+        active_slots=two,
+        song_time_sec=0.0,
+        **common,
+    )
+    assert masked._transition_old_weights is None
+    layers[2].enabled = True
+    masked.composite(
+        comp.content_fbo_id,
+        layers,
+        active_slots=three,
+        song_time_sec=0.0,
+        **common,
+    )
+    assert masked._transition_old_weights is not None
+    assert masked._transition_target_weights is not None
+    old_winners = np.argmax(masked._transition_old_weights, axis=0)
+    new_winners = np.argmax(masked._transition_target_weights, axis=0)
+    ys, xs = np.nonzero(old_winners != new_winners)
+    assert ys.size > 0, f"{mask_type} old and target fields are identical"
+    field_y = int(ys[ys.size // 2])
+    field_x = int(xs[xs.size // 2])
+    gen_h = int(old_winners.shape[0])
+    gen_w = int(old_winners.shape[1])
+    sample_x = min(W - 1, int((field_x + 0.5) * W / gen_w))
+    sample_y = min(H - 1, int((field_y + 0.5) * H / gen_h))
+    assert masked._transition_in_progress(0.25)
+    masked.composite(
+        comp.content_fbo_id,
+        layers,
+        active_slots=three,
+        song_time_sec=0.25,
+        **common,
+    )
+    assert masked._transition_in_progress(0.25)
+    blended = masked._blended_transition_weights(0.25)
+    assert not np.array_equal(blended, masked._transition_target_weights)
+    mid_px = _read_content_pixel(comp, sample_x, sample_y)
+    masked.composite(
+        comp.content_fbo_id,
+        layers,
+        active_slots=three,
+        song_time_sec=1.0,
+        **common,
+    )
+    assert masked._transition_old_weights is None
+    settled_px = _read_content_pixel(comp, sample_x, sample_y)
+    assert mid_px != settled_px, (
+        f"{mask_type} t=0.25 already settled at ({sample_x},{sample_y}): {mid_px}"
+    )
+
+
+def test_hard_checker_slot_change_is_mid_morph_at_quarter(gl_context) -> None:
+    comp, masked = gl_context
+    _assert_hard_weight_field_mid_morph(
+        comp, masked, _four_solid_layers(comp), mask_type="checker"
+    )
+
+
+def test_hard_plasma_slot_change_is_mid_morph_at_quarter(gl_context) -> None:
+    comp, masked = gl_context
+    _assert_hard_weight_field_mid_morph(
+        comp, masked, _four_solid_layers(comp), mask_type="plasma", seed=7
+    )

@@ -783,34 +783,29 @@ def _checker_weight_fields(
     active_flags: tuple[bool, ...],
     feather_pct: int = 100,
 ) -> np.ndarray:
-    """Return (N, H, W) float checker fields; inactive zeroed then renormalized."""
-    tile_count = _subdivision_count(layer_count, density)
-    cols, rows = _checker_grid_dims(width, height, layer_count, density)
+    """Return (N, H, W) float checker fields; inactive omitted like hard checker."""
+    active = _active_layer_indices(active_flags)
+    fields = np.zeros((layer_count, height, width), dtype=np.float64)
+    if not active:
+        return fields
+    n_active = len(active)
+    cols, rows = _checker_grid_dims(width, height, n_active, density)
     half_width = pattern_mask_feather_half_width(feather_pct)
     xs = (np.arange(width, dtype=np.float64) + 0.5) / width * cols
     ys = (np.arange(height, dtype=np.float64) + 0.5) / height * rows
     xx, yy = np.meshgrid(xs, ys)
-    fields = np.zeros((layer_count, height, width), dtype=np.float64)
     for row in range(rows):
         for col in range(cols):
-            tile = row * cols + col
-            if tile >= tile_count:
-                break
-            layer = _checker_tile_layer(row, col, layer_count)
+            layer = active[_checker_tile_layer(row, col, n_active)]
             dx = np.abs(xx - (col + 0.5))
             dy = np.abs(yy - (row + 0.5))
             fields[layer] += np.maximum(
                 0.0, 1.0 - np.maximum(dx, dy) / half_width
             )
-    fields = _zero_inactive_fields(fields, active_flags)
     col_i = np.minimum(xx.astype(np.int64), cols - 1)
     row_i = np.minimum(yy.astype(np.int64), rows - 1)
-    winner = (row_i + col_i) % layer_count
-    if any(not flag for flag in active_flags):
-        active = _active_layer_indices(active_flags)
-        if active:
-            active_arr = np.asarray(active, dtype=np.int64)
-            winner = active_arr[winner % len(active)]
+    active_arr = np.asarray(active, dtype=np.int64)
+    winner = active_arr[(row_i + col_i) % n_active]
     return _cover_zero_mass(fields, winner)
 
 
@@ -969,6 +964,20 @@ def hard_mask_from_weight_fields(fields: np.ndarray) -> np.ndarray:
     if fields.shape[0] <= 0:
         raise ValueError("layer_count must be positive")
     return np.argmax(fields, axis=0).astype(np.uint8)
+
+
+def one_hot_weight_fields(fields: np.ndarray) -> np.ndarray:
+    """Return (N, H, W) fields with weight 1 on the argmax channel per pixel."""
+    if fields.ndim != 3:
+        raise ValueError("fields must be (N, H, W)")
+    if fields.shape[0] <= 0:
+        raise ValueError("layer_count must be positive")
+    winner = np.argmax(fields, axis=0)
+    out = np.zeros_like(fields)
+    height, width = int(fields.shape[1]), int(fields.shape[2])
+    ys, xs = np.indices((height, width))
+    out[winner, ys, xs] = 1.0
+    return out
 
 
 def u8_weights_from_fields(fields: np.ndarray) -> np.ndarray:

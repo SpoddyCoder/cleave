@@ -301,6 +301,63 @@ def test_generate_checker_weights_has_2d_variation() -> None:
     assert not cols_identical
 
 
+def _checker_owner_set(mask: np.ndarray) -> set[int]:
+    return {int(value) for value in np.unique(mask)}
+
+
+def test_checker_subdivision_follows_n_active_not_layer_count() -> None:
+    """Density 1.0x: tile owners equal active count; 2 -> 3 -> 2 is not sticky."""
+    width, height = 128, 72
+    two_flags = (True, True, False, False)
+    three_flags = (True, True, True, False)
+    two = generate_checker_mask(
+        width, height, layer_count=4, density=1.0, active_flags=two_flags
+    )
+    three = generate_checker_mask(
+        width, height, layer_count=4, density=1.0, active_flags=three_flags
+    )
+    two_again = generate_checker_mask(
+        width, height, layer_count=4, density=1.0, active_flags=two_flags
+    )
+    all_four = generate_checker_mask(width, height, layer_count=4, density=1.0)
+    assert _checker_owner_set(two) == {0, 1}
+    assert _checker_owner_set(three) == {0, 1, 2}
+    assert _checker_owner_set(all_four) == {0, 1, 2, 3}
+    assert np.array_equal(two, two_again)
+    assert not np.array_equal(three, all_four)
+    fields_two = generate_soft_weight_fields(
+        "checker",
+        width,
+        height,
+        4,
+        density=1.0,
+        active_flags=two_flags,
+        feather_pct=0,
+    )
+    fields_three = generate_soft_weight_fields(
+        "checker",
+        width,
+        height,
+        4,
+        density=1.0,
+        active_flags=three_flags,
+        feather_pct=0,
+    )
+    fields_two_again = generate_soft_weight_fields(
+        "checker",
+        width,
+        height,
+        4,
+        density=1.0,
+        active_flags=two_flags,
+        feather_pct=0,
+    )
+    assert np.array_equal(hard_mask_from_weight_fields(fields_two), two)
+    assert np.array_equal(hard_mask_from_weight_fields(fields_three), three)
+    assert np.array_equal(hard_mask_from_weight_fields(fields_two_again), two)
+    assert _checker_owner_set(hard_mask_from_weight_fields(fields_three)) == {0, 1, 2}
+
+
 def test_generate_plasma_mask_shape_bounds_and_seed() -> None:
     a = generate_plasma_mask(48, 36, layer_count=4, density=2.0, seed=7, invert=False)
     b = generate_plasma_mask(48, 36, layer_count=4, density=2.0, seed=7, invert=False)
