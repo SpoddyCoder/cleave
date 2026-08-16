@@ -99,6 +99,13 @@ class RowKind(Enum):
     RENDER_POST_FX_CHROMA_BOOST_MODE = auto()
     RENDER_POST_FX_CHROMA_BOOST_VARIANT = auto()
     RENDER_POST_FX_CHROMA_BOOST_AMOUNT = auto()
+    RENDER_PATTERN_MASK_HEADER = auto()
+    RENDER_PATTERN_MASK_TYPE = auto()
+    RENDER_PATTERN_MASK_DENSITY = auto()
+    RENDER_PATTERN_MASK_FEATHER = auto()
+    RENDER_PATTERN_MASK_INVERT = auto()
+    RENDER_PATTERN_MASK_TRANSITION = auto()
+    RENDER_PATTERN_MASK_SEED = auto()
     RENDER_TIMELINE_HEADER = auto()
     TIMELINE_PRESETS_HEADER = auto()
     TIMELINE_PRESET_CHARACTER = auto()
@@ -108,6 +115,7 @@ class RowKind(Enum):
     TIMELINE_PRESET_TIMELINE_CUTS = auto()
     TIMELINE_PRESET_REPOPULATE = auto()
     TIMELINE_PRESET_CONDUCTOR = auto()
+    TIMELINE_PRESET_MODE = auto()
     TIMELINE_PRESETS = auto()
     TIMELINE_VISUAL_LIMITER_HEADER = auto()
     TIMELINE_VISUAL_LIMITER_THRESHOLD = auto()
@@ -906,6 +914,77 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "0% disables the pass even when mode is not off.",
         ),
     ),
+    RowKind.RENDER_PATTERN_MASK_HEADER: RowBehavior(
+        RowAffordance.EXPAND,
+        can_enable_disable=True,
+        help_title="Pattern mask",
+        help_description=(
+            "Spatial territories for visible layers during composite.",
+            "Feather 0% assigns each pixel to one layer; 100% blends at edges.",
+        ),
+        quick_nav_target=True,
+    ),
+    RowKind.RENDER_PATTERN_MASK_TYPE: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="render_pattern_mask",
+        help_title="Type",
+        help_entries=(("Left/Right", "cycle pattern type"),),
+        help_description=("Pattern geometry used to partition the frame.",),
+    ),
+    RowKind.RENDER_PATTERN_MASK_DENSITY: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="render_pattern_mask",
+        help_title="Density",
+        help_description=(
+            "Segments per active layer (1.0x = one strip/wedge/tile per layer).",
+            "Higher multiplies how many segments cycle through visible layers.",
+        ),
+    ),
+    RowKind.RENDER_PATTERN_MASK_FEATHER: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="render_pattern_mask",
+        help_title="Feather",
+        help_entries=(
+            ("Left/Right", "+/- 1%"),
+            ("Ctrl+Left/Right", "+/- 10%"),
+        ),
+        help_description=(
+            "0% hard territories (one layer per pixel).",
+            "100% maximum segment overlap.",
+        ),
+    ),
+    RowKind.RENDER_PATTERN_MASK_INVERT: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="render_pattern_mask",
+        help_title="Invert",
+        help_entries=(("Left/Right", "toggle invert on/off"),),
+        help_description=("Reverse layer assignment order across the pattern.",),
+    ),
+    RowKind.RENDER_PATTERN_MASK_TRANSITION: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="render_pattern_mask",
+        help_title="Transition",
+        help_description=(
+            "Seconds to morph mask territories when layers toggle.",
+            "0.0s applies the new partition instantly.",
+        ),
+    ),
+    RowKind.RENDER_PATTERN_MASK_SEED: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        repeatable=True,
+        parent_group="render_pattern_mask",
+        help_title="Seed",
+        help_entries=(("Left/Right", "respin seed"),),
+        help_description=(
+            "Persisted seed for plasma patterns.",
+            "Left/Right picks a new random seed for a different field.",
+        ),
+    ),
     RowKind.RENDER_TIMELINE_HEADER: RowBehavior(
         RowAffordance.EXPAND,
         can_enable_disable=True,
@@ -922,8 +1001,8 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         is_sub_header=True,
         help_title="Timeline preset",
         help_description=(
-            "Stage character, density, re-populate, and conductor, then",
-            "apply a randomly generated timeline preset. Overwrites the current timeline.",
+            "Stage character, density, re-populate, conductor, and mode,",
+            "then apply a randomly generated timeline preset. Overwrites the current timeline.",
         ),
     ),
     RowKind.TIMELINE_PRESET_CHARACTER: RowBehavior(
@@ -1005,6 +1084,17 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
             "Requires project signals; otherwise apply skips the conductor.",
         ),
     ),
+    RowKind.TIMELINE_PRESET_MODE: RowBehavior(
+        RowAffordance.VALUE_STEP,
+        navigable=True,
+        blocked_by_section_lock=True,
+        help_title="Mode",
+        help_entries=(("Left/Right", "cycle layers / pattern mask"),),
+        help_description=(
+            "Layers uses the stacked timeline. Pattern mask enables",
+            "render pattern mask with strips on Apply.",
+        ),
+    ),
     RowKind.TIMELINE_PRESETS: RowBehavior(
         RowAffordance.ACTION,
         navigable=True,
@@ -1013,7 +1103,8 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         help_entries=(("Enter", "apply timeline preset"),),
         help_description=(
             "Apply the staged character, density, snaps, cuts, re-populate,",
-            "and conductor. Crescendo song markers build crescendos. Overwrites the timeline.",
+            "conductor, and mode. Crescendo song markers build crescendos.",
+            "Overwrites the timeline.",
         ),
     ),
     RowKind.TIMELINE_VISUAL_LIMITER_HEADER: RowBehavior(
@@ -1502,6 +1593,7 @@ def _in_lockable_group(parent_group: str | None) -> bool:
         parent_group == "track"
         or parent_group.startswith("render_overlay")
         or parent_group.startswith("render_post_fx")
+        or parent_group.startswith("render_pattern_mask")
     )
 
 
@@ -1568,6 +1660,8 @@ def _row_lock_section(kind: RowKind) -> str | None:
         return "render_overlay"
     if kind in RENDER_POST_FX_SECTION_KINDS:
         return "render_post_fx"
+    if kind in RENDER_PATTERN_MASK_SECTION_KINDS:
+        return "render_pattern_mask"
     if kind in RENDER_TIMELINE_SECTION_KINDS:
         return "timeline"
     return None
@@ -1599,6 +1693,8 @@ def section_locked(state: object, desc: RowDescriptor) -> bool:
         return bool(state.render_overlays.locked)
     if section == "render_post_fx":
         return bool(state.render_post_fx.locked)
+    if section == "render_pattern_mask":
+        return bool(state.render_pattern_mask.locked)
     if section == "timeline":
         return _state_timeline_locked(state)
     return False
@@ -1617,6 +1713,7 @@ def row_triggers_layer_delete(kind: RowKind) -> bool:
 
 from cleave.viz.row_sections import (
     RENDER_OVERLAY_SECTION_KINDS,
+    RENDER_PATTERN_MASK_SECTION_KINDS,
     RENDER_POST_FX_SECTION_KINDS,
     RENDER_TIMELINE_SECTION_KINDS,
     section_header_from_section_tree,

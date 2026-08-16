@@ -39,7 +39,9 @@ from cleave.config_schema import (
     DEFAULT_VISUAL_LIMITER_RELEASE,
     default_render_overlay_card_runtime_values,
     default_render_overlays_runtime_values,
+    default_render_pattern_mask_runtime_values,
     default_render_post_fx_runtime_values,
+    PatternMaskType,
 )
 from cleave.extract import StemSource
 from cleave.preset_curation import PresetCurationIndex
@@ -49,6 +51,10 @@ from cleave.preset_playlist import (
     scan_preset_playlist,
 )
 from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
+from cleave.timeline_presets.mode import (
+    DEFAULT_TIMELINE_PRESET_MODE,
+    TimelinePresetMode,
+)
 from cleave.viz.panel_notification import PanelNotificationActive
 from cleave.timeline_presets.cue_snap import (
     DEFAULT_TIMELINE_PRESET_CUE_SNAP,
@@ -87,6 +93,7 @@ if TYPE_CHECKING:
 _RO_CARD_DEFAULTS = default_render_overlay_card_runtime_values(closing=False)
 _RO_OVERLAYS_DEFAULTS = default_render_overlays_runtime_values()
 _RO_POST_FX_DEFAULTS = default_render_post_fx_runtime_values()
+_RO_PATTERN_MASK_DEFAULTS = default_render_pattern_mask_runtime_values()
 
 
 @dataclass
@@ -212,6 +219,19 @@ class RenderPostFxBlock:
 
 
 @dataclass
+class RenderPatternMaskBlock:
+    enabled: bool = _RO_PATTERN_MASK_DEFAULTS["enabled"]
+    expanded: bool = _RO_PATTERN_MASK_DEFAULTS["expanded"]
+    type: PatternMaskType = _RO_PATTERN_MASK_DEFAULTS["type"]
+    density: float = _RO_PATTERN_MASK_DEFAULTS["density"]
+    feather_pct: int = _RO_PATTERN_MASK_DEFAULTS["feather_pct"]
+    invert: bool = _RO_PATTERN_MASK_DEFAULTS["invert"]
+    transition: float = _RO_PATTERN_MASK_DEFAULTS["transition"]
+    seed: int = _RO_PATTERN_MASK_DEFAULTS["seed"]
+    locked: bool = False
+
+
+@dataclass
 class TimelineFadeGroupBlock:
     enabled: bool = False
     fade_in: float = 2.0
@@ -251,6 +271,7 @@ class RenderTimelineBlock:
         DEFAULT_TIMELINE_PRESET_REPOPULATE
     )
     timeline_preset_conductor: bool = DEFAULT_TIMELINE_PRESET_CONDUCTOR
+    timeline_preset_mode: TimelinePresetMode = DEFAULT_TIMELINE_PRESET_MODE
     hard_cut_fades: TimelineFadeGroupBlock = field(
         default_factory=TimelineFadeGroupBlock
     )
@@ -300,6 +321,9 @@ class TuningViewState:
     render_overlays: RenderOverlaysBlock = field(default_factory=RenderOverlaysBlock)
     render_post_fx: RenderPostFxBlock = field(
         default_factory=RenderPostFxBlock
+    )
+    render_pattern_mask: RenderPatternMaskBlock = field(
+        default_factory=RenderPatternMaskBlock
     )
     render_timeline: RenderTimelineBlock = field(
         default_factory=RenderTimelineBlock
@@ -420,6 +444,7 @@ def view_state_structure_signature(
         }
     ro = session.render_overlays
     pp = session.render_post_fx
+    pm = session.render_pattern_mask
     tl = session.timeline
     payload = {
         "layer_z_order": list(session.layer_z_order),
@@ -459,6 +484,11 @@ def view_state_structure_signature(
             "chroma_boost_expanded": pp.chroma_boost_expanded,
             "chroma_boost_mode": pp.chroma_boost.mode,
         },
+        "render_pattern_mask": {
+            "expanded": pm.expanded,
+            # type gates the plasma-only seed row in the panel layout.
+            "type": pm.type,
+        },
         "render_timeline": {
             "enabled": tl.enabled,
             "panel_open": tl.panel_open,
@@ -485,6 +515,7 @@ class _ViewStateStructure:
     settings: SettingsBlock
     render_overlays: RenderOverlaysBlock
     render_post_fx: RenderPostFxBlock
+    render_pattern_mask: RenderPatternMaskBlock
     render_timeline: RenderTimelineBlock
     layout: RowLayout
 
@@ -702,6 +733,7 @@ class TuningViewStateBuilder:
 
         ro = self.session.render_overlays
         pp = self.session.render_post_fx
+        pm = self.session.render_pattern_mask
         tl = self.session.timeline
         settings = SettingsBlock(
             expanded=self.session.settings.expanded,
@@ -736,6 +768,17 @@ class TuningViewStateBuilder:
                 amount_pct=pp.chroma_boost.amount_pct,
             ),
         )
+        render_pattern_mask = RenderPatternMaskBlock(
+            enabled=pm.enabled,
+            expanded=pm.expanded,
+            type=pm.type,
+            feather_pct=pm.feather_pct,
+            density=pm.density,
+            invert=pm.invert,
+            transition=pm.transition,
+            seed=pm.seed,
+            locked=pm.locked,
+        )
         render_timeline = RenderTimelineBlock(
             enabled=tl.enabled,
             expanded=tl.panel_open,
@@ -753,6 +796,7 @@ class TuningViewStateBuilder:
             timeline_preset_timeline_cuts=tl.timeline_preset_timeline_cuts,
             timeline_preset_repopulate=tl.timeline_preset_repopulate,
             timeline_preset_conductor=tl.timeline_preset_conductor,
+            timeline_preset_mode=tl.timeline_preset_mode,
             hard_cut_fades=TimelineFadeGroupBlock(
                 enabled=tl.hard_cut_fades.enabled,
                 fade_in=tl.hard_cut_fades.fade_in,
@@ -791,6 +835,7 @@ class TuningViewStateBuilder:
             notification_remaining_sec=1.0 if notification_active else 0.0,
             render_overlays=render_overlays,
             render_post_fx=render_post_fx,
+            render_pattern_mask=render_pattern_mask,
             render_timeline=render_timeline,
             settings=settings,
         )
@@ -803,6 +848,7 @@ class TuningViewStateBuilder:
             settings=settings,
             render_overlays=render_overlays,
             render_post_fx=render_post_fx,
+            render_pattern_mask=render_pattern_mask,
             render_timeline=render_timeline,
             layout=layout,
         )
@@ -883,6 +929,7 @@ class TuningViewStateBuilder:
 
         ro = self.session.render_overlays
         pp = self.session.render_post_fx
+        pm = self.session.render_pattern_mask
         tl = self.session.timeline
         opening = ro.opening_card
         closing = ro.closing_card
@@ -985,6 +1032,18 @@ class TuningViewStateBuilder:
                 solo=self.session.render_post_fx_solo,
                 locked=pp.locked,
             ),
+            render_pattern_mask=replace(
+                structure.render_pattern_mask,
+                enabled=pm.enabled,
+                expanded=pm.expanded,
+                type=pm.type,
+                feather_pct=pm.feather_pct,
+                density=pm.density,
+                invert=pm.invert,
+                transition=pm.transition,
+                seed=pm.seed,
+                locked=pm.locked,
+            ),
             render_timeline=replace(
                 structure.render_timeline,
                 expanded=tl.panel_open,
@@ -1002,6 +1061,7 @@ class TuningViewStateBuilder:
                 timeline_preset_timeline_cuts=tl.timeline_preset_timeline_cuts,
                 timeline_preset_repopulate=tl.timeline_preset_repopulate,
                 timeline_preset_conductor=tl.timeline_preset_conductor,
+                timeline_preset_mode=tl.timeline_preset_mode,
                 hard_cut_fades=TimelineFadeGroupBlock(
                     enabled=tl.hard_cut_fades.enabled,
                     fade_in=tl.hard_cut_fades.fade_in,

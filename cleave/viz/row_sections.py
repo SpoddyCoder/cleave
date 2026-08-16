@@ -95,6 +95,12 @@ def _toggle_render_post_fx(controls: TuningControls, _slot: str | None, forward:
     controls._render_post_fx.set_expanded(forward)
 
 
+def _toggle_render_pattern_mask(
+    controls: TuningControls, _slot: str | None, forward: bool
+) -> None:
+    controls._render_pattern_mask.set_expanded(forward)
+
+
 def _toggle_render_post_fx_highlight_rolloff(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
@@ -336,6 +342,10 @@ def _render_overlay_closing_animation_expanded(
 
 def _render_post_fx_expanded(state: TuningViewState, _slot: str | None) -> bool:
     return state.render_post_fx.expanded
+
+
+def _render_pattern_mask_expanded(state: TuningViewState, _slot: str | None) -> bool:
+    return state.render_pattern_mask.expanded
 
 
 def _render_post_fx_highlight_rolloff_expanded(
@@ -688,6 +698,29 @@ RENDER_POST_FX_SECTION = ExpandSectionDef(
     ),
 )
 
+RENDER_PATTERN_MASK_PLASMA_SEED = ConditionalRowsDef(
+    name="pattern_mask_plasma_seed",
+    predicate=lambda state, _desc: state.render_pattern_mask.type == "plasma",
+    children=(
+        SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_SEED),
+    ),
+)
+
+RENDER_PATTERN_MASK_SECTION = ExpandSectionDef(
+    header_kind=RowKind.RENDER_PATTERN_MASK_HEADER,
+    context="global",
+    read_expanded=_render_pattern_mask_expanded,
+    toggle=_toggle_render_pattern_mask,
+    children=(
+        SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_TYPE),
+        SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_DENSITY),
+        SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_FEATHER),
+        SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_INVERT),
+        SectionNode(leaf_kind=RowKind.RENDER_PATTERN_MASK_TRANSITION),
+        SectionNode(conditional=RENDER_PATTERN_MASK_PLASMA_SEED),
+    ),
+)
+
 def _preset_switching_projectm_trigger(
     state: TuningViewState, desc: RowDescriptor
 ) -> bool:
@@ -793,6 +826,7 @@ ROOT_SECTION_NODES: tuple[SectionNode, ...] = (SectionNode(expand=SETTINGS_SECTI
 RENDER_SECTION_NODES: tuple[SectionNode, ...] = (
     SectionNode(expand=RENDER_OVERLAYS_SECTION),
     SectionNode(expand=RENDER_POST_FX_SECTION),
+    SectionNode(expand=RENDER_PATTERN_MASK_SECTION),
     SectionNode(panel_anchor=TIMELINE_PANEL_ANCHOR),
 )
 
@@ -890,6 +924,7 @@ TIMELINE_PRESETS_SECTION = ExpandSectionDef(
         SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_TIMELINE_CUTS),
         SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_REPOPULATE),
         SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_CONDUCTOR),
+        SectionNode(leaf_kind=RowKind.TIMELINE_PRESET_MODE),
         SectionNode(leaf_kind=RowKind.TIMELINE_PRESETS),
     ),
 )
@@ -1048,6 +1083,7 @@ def kinds_in_expand_section(section: ExpandSectionDef) -> frozenset[RowKind]:
 
 RENDER_OVERLAY_SECTION_KINDS = kinds_in_expand_section(RENDER_OVERLAYS_SECTION)
 RENDER_POST_FX_SECTION_KINDS = kinds_in_expand_section(RENDER_POST_FX_SECTION)
+RENDER_PATTERN_MASK_SECTION_KINDS = kinds_in_expand_section(RENDER_PATTERN_MASK_SECTION)
 PRESET_SWITCHING_CHILD_KINDS = frozenset(
     kinds_in_expand_section(TRACK_PRESET_SWITCHING_SECTION)
     - {RowKind.TRACK_PRESET_SWITCHING}
@@ -1070,6 +1106,7 @@ RENDER_TIMELINE_SECTION_KINDS = frozenset(
         RowKind.TIMELINE_PRESET_TIMELINE_CUTS,
         RowKind.TIMELINE_PRESET_REPOPULATE,
         RowKind.TIMELINE_PRESET_CONDUCTOR,
+        RowKind.TIMELINE_PRESET_MODE,
         RowKind.TIMELINE_PRESETS,
         RowKind.TIMELINE_VISUAL_LIMITER_HEADER,
         RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD,
