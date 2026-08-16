@@ -2686,6 +2686,7 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
                     path=f"timeline.lanes.{slot}.cues[{index}].cut",
                 )
             anchor = bool(cue_map.get("anchor", False))
+            recast = bool(cue_map.get("recast", False))
             cues.append(
                 SlotCue(
                     t=t,
@@ -2694,6 +2695,7 @@ def parse_timeline_section(data: dict[str, Any], ctx: ParseCtx) -> Any | None:
                     role=role,
                     cut=cut,
                     anchor=anchor,
+                    recast=recast,
                 )
             )
         lanes[str(slot)] = TimelineLane(
@@ -2771,6 +2773,8 @@ def persist_timeline(ctx: PersistCtx) -> dict[str, Any]:
                     cue_out["cut"] = cue.cut
                 if cue.anchor:
                     cue_out["anchor"] = True
+                if cue.recast:
+                    cue_out["recast"] = True
                 cues_out.append(cue_out)
             entry["cues"] = cues_out
         lanes_out[slot] = entry
