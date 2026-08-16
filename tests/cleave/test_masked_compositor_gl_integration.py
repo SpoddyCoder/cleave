@@ -269,8 +269,7 @@ def test_transition_blends_weights_over_song_time(gl_context) -> None:
 
 
 def test_mid_transition_retarget_snapshots_blend(gl_context) -> None:
-    import numpy as np
-
+    """A slot change during a feathered strips wipe snapshots the lerped cuts."""
     comp, masked = gl_context
     a = comp.create_layer_fbo("a", W, H, opacity=1.0, blend_mode="black-key")
     b = comp.create_layer_fbo("b", W, H, opacity=1.0, blend_mode="black-key")
@@ -300,7 +299,11 @@ def test_mid_transition_retarget_snapshots_blend(gl_context) -> None:
         song_time_sec=0.0,
         transition_duration=2.0,
     )
-    first_old = masked._transition_old_weights.copy()
+    first_old = masked._transition_old_layout
+    first_target = masked._transition_target_layout
+    assert first_old is not None
+    assert first_target is not None
+    assert masked._transition_old_weights is None
     c.enabled = False
     masked.composite(
         comp.content_fbo_id,
@@ -313,7 +316,9 @@ def test_mid_transition_retarget_snapshots_blend(gl_context) -> None:
         transition_duration=2.0,
     )
     assert masked._transition_start == 0.5
-    assert not np.array_equal(masked._transition_old_weights, first_old)
+    expected_old = lerp_hard_layout_1d(first_old, first_target, 0.5 / 2.0)
+    assert masked._transition_old_layout == expected_old
+    assert masked._transition_old_weights is None
 
 
 def test_hard_path_retarget_continues_from_inflight_cuts(gl_context) -> None:
@@ -425,6 +430,97 @@ def test_live_slots_departing_hard_layout_until_width_zero(gl_context) -> None:
         transition_duration=1.0,
     )
     assert masked.live_slots((True, True, False), 1.0, 1.0) == (True, True, False)
+
+
+def test_live_slots_departing_feathered_hard_layout(gl_context) -> None:
+    comp, masked = gl_context
+    a = comp.create_layer_fbo("a", W, H, opacity=1.0, blend_mode="black-key")
+    b = comp.create_layer_fbo("b", W, H, opacity=1.0, blend_mode="black-key")
+    c = comp.create_layer_fbo("c", W, H, opacity=1.0, blend_mode="black-key")
+    _fill_layer(a, (1.0, 0.0, 0.0))
+    _fill_layer(b, (0.0, 1.0, 0.0))
+    _fill_layer(c, (0.0, 0.0, 1.0))
+
+    masked.composite(
+        comp.content_fbo_id,
+        [a, b, c],
+        mask_type="strips",
+        feather_pct=50,
+        density=1.0,
+        active_slots=[True, True, True],
+        song_time_sec=0.0,
+        transition_duration=1.0,
+    )
+    c.enabled = False
+    masked.composite(
+        comp.content_fbo_id,
+        [a, b, c],
+        mask_type="strips",
+        feather_pct=50,
+        density=1.0,
+        active_slots=[True, True, False],
+        song_time_sec=0.0,
+        transition_duration=1.0,
+    )
+    assert masked._transition_old_layout is not None
+    assert masked._transition_old_weights is None
+    assert masked.live_slots((True, True, False), 0.25, 1.0) == (True, True, True)
+    assert masked.live_slots((True, True, False), 1.0, 1.0) == (True, True, False)
+
+
+def test_feathered_strips_two_to_three_grows_right_edge(gl_context) -> None:
+    """Feathered 2-to-3 strips uses 1D layout morph; right edge grows the new color."""
+    comp, masked = gl_context
+    a = comp.create_layer_fbo("a", W, H, opacity=1.0, blend_mode="black-key")
+    b = comp.create_layer_fbo("b", W, H, opacity=1.0, blend_mode="black-key")
+    c = comp.create_layer_fbo("c", W, H, opacity=1.0, blend_mode="black-key")
+    _fill_layer(a, (1.0, 0.0, 0.0))
+    _fill_layer(b, (0.0, 1.0, 0.0))
+    _fill_layer(c, (0.0, 0.0, 1.0))
+
+    masked.composite(
+        comp.content_fbo_id,
+        [a, b, c],
+        mask_type="strips",
+        feather_pct=50,
+        density=1.0,
+        active_slots=[True, True, False],
+        song_time_sec=0.0,
+        transition_duration=1.0,
+    )
+    assert masked._transition_old_layout is None
+    assert masked._transition_old_weights is None
+    right_before = _read_content_pixel(comp, W - 2, H // 2)
+    assert right_before[1] > right_before[2], f"t0 right={right_before}"
+
+    c.enabled = True
+    masked.composite(
+        comp.content_fbo_id,
+        [a, b, c],
+        mask_type="strips",
+        feather_pct=50,
+        density=1.0,
+        active_slots=[True, True, True],
+        song_time_sec=0.0,
+        transition_duration=1.0,
+    )
+    assert masked._transition_old_layout is not None
+    assert masked._transition_target_layout is not None
+    assert masked._transition_old_weights is None
+
+    masked.composite(
+        comp.content_fbo_id,
+        [a, b, c],
+        mask_type="strips",
+        feather_pct=50,
+        density=1.0,
+        active_slots=[True, True, True],
+        song_time_sec=0.25,
+        transition_duration=1.0,
+    )
+    right_t25 = _read_content_pixel(comp, W - 2, H // 2)
+    assert right_t25[2] > right_t25[1], f"t=0.25 right={right_t25}"
+    assert right_t25 != right_before
 
 
 def _four_solid_layers(comp):

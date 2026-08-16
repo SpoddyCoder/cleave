@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 import moderngl
 import numpy as np
-from cleave.config_schema import MAX_LAYER_COUNT
+from cleave.config_schema import MAX_LAYER_COUNT, PATTERN_MASK_DENSITY_MAX
 from cleave.gl_color_format import RGBA8, GlColorFormat
 from cleave.gl_compositor import GlCompositor, LayerFbo
 from cleave.pattern_mask import (
@@ -26,6 +26,7 @@ from cleave.pattern_mask import (
     hard_mask_from_weight_fields,
     lerp_hard_layout_1d,
     one_hot_weight_fields,
+    pattern_mask_feather_half_width,
     pattern_mask_plasma_power,
     rasterize_hard_layout_1d,
     u8_weights_from_fields,
@@ -280,6 +281,7 @@ void main() {
 
 
 _HARD_LAYOUT_MASK_TYPES = frozenset({"strips", "radial"})
+_MAX_LAYOUT_INTERVALS = MAX_LAYER_COUNT * int(PATTERN_MASK_DENSITY_MAX)
 
 _SOFT_TRANSITION_FRAG = """
 #version 330
@@ -306,6 +308,77 @@ void main() {
     }
 }
 """
+
+
+_LAYOUT_SOFT_FRAG = """
+#version 330
+const int MAX_INTERVALS = %(max_intervals)d;
+uniform sampler2D layer_tex;
+uniform int layer_index;
+uniform float layer_opacity;
+uniform int opacity_in_alpha;
+uniform vec2 resolution;
+uniform float cuts[%(cuts)d];
+uniform int layers[%(max_intervals)d];
+uniform int interval_count;
+uniform float feather_half;
+uniform float rotation;
+uniform int is_radial;
+in vec2 uv;
+out vec4 fragColor;
+
+float layout_coord() {
+    if (is_radial != 0) {
+        vec2 p = gl_FragCoord.xy - 0.5 * resolution;
+        float angle = atan(p.y, p.x);
+        return mod((angle + 3.141592653589793 + rotation) * 0.15915494309189535, 1.0);
+    }
+    return gl_FragCoord.x / resolution.x;
+}
+
+void main() {
+    vec4 color = texture(layer_tex, uv);
+    float coord = layout_coord();
+    float my_mass = 0.0;
+    float total = 0.0;
+    int winner = 0;
+    for (int i = 0; i < MAX_INTERVALS; i++) {
+        if (i >= interval_count) {
+            break;
+        }
+        float left = cuts[i];
+        if (left <= coord) {
+            winner = layers[i];
+        }
+        float w = cuts[i + 1] - left;
+        if (w <= 0.0) {
+            continue;
+        }
+        float center = left + 0.5 * w;
+        float tent_half = w * feather_half;
+        float delta = abs(coord - center);
+        if (is_radial != 0) {
+            delta = min(delta, 1.0 - delta);
+        }
+        float tent = max(0.0, 1.0 - delta / tent_half);
+        total += tent;
+        if (layers[i] == layer_index) {
+            my_mass += tent;
+        }
+    }
+    float weight = total > 0.0 ? my_mass / total
+        : (winner == layer_index ? 1.0 : 0.0);
+    float op = layer_opacity * weight;
+    if (opacity_in_alpha != 0) {
+        fragColor = vec4(color.rgb, op);
+    } else {
+        fragColor = vec4(color.rgb * op, 1.0);
+    }
+}
+""" % {
+    "max_intervals": _MAX_LAYOUT_INTERVALS,
+    "cuts": _MAX_LAYOUT_INTERVALS + 1,
+}
 
 
 def _ensure_moderngl_draw_state() -> None:
@@ -475,8 +548,8 @@ def _mask_cache_key(
 
 
 def _uses_hard_layout_morph(params: PatternMaskParams) -> bool:
-    """Strips/radial at feather 0 lerp 1D cuts; checker/plasma dissolve instead."""
-    return int(params.feather_pct) == 0 and params.mask_type in _HARD_LAYOUT_MASK_TYPES
+    """Strips/radial lerp 1D cuts; checker/plasma dissolve instead."""
+    return params.mask_type in _HARD_LAYOUT_MASK_TYPES
 
 
 class GlMaskedCompositor:
@@ -533,6 +606,8 @@ class GlMaskedCompositor:
         self._last_active_slots: tuple[bool, ...] | None = None
         self._soft_transition_prog: moderngl.Program | None = None
         self._soft_transition_vao: moderngl.VertexArray | None = None
+        self._layout_soft_prog: moderngl.Program | None = None
+        self._layout_soft_vao: moderngl.VertexArray | None = None
         self._transition_old_tex: moderngl.TextureArray | None = None
         self._transition_target_tex: moderngl.TextureArray | None = None
         self._transition_gpu_ready: bool = False
@@ -719,6 +794,14 @@ class GlMaskedCompositor:
         )
         self._soft_transition_vao = self._ctx.vertex_array(
             self._soft_transition_prog,
+            [(self._quad_buffer, "2f 2f", "in_vert", "in_uv")],
+        )
+        self._layout_soft_prog = self._ctx.program(
+            vertex_shader=_QUAD_VERT,
+            fragment_shader=_LAYOUT_SOFT_FRAG,
+        )
+        self._layout_soft_vao = self._ctx.vertex_array(
+            self._layout_soft_prog,
             [(self._quad_buffer, "2f 2f", "in_vert", "in_uv")],
         )
         self._ensure_layer_array()
@@ -1364,7 +1447,7 @@ class GlMaskedCompositor:
             self._clear_transition_state()
 
         if self._transition_in_progress(song_time_sec):
-            if self._has_hard_layout_transition():
+            if self._has_hard_layout_transition() and int(params.feather_pct) == 0:
                 self._upload_lerped_hard_mask(song_time_sec)
             self._last_active_slots = active_slots
             self._mask_cache_key = None
@@ -1747,18 +1830,57 @@ class GlMaskedCompositor:
                 self._transition_gpu_ready
                 and self._transition_in_progress(song_time_sec)
             )
+            layout_morphing = (
+                self._has_hard_layout_transition()
+                and self._transition_in_progress(song_time_sec)
+            )
             dest = self._dest_fbo_for(content_fbo_id)
             _ensure_soft_draw_state()
             dest.use()
             self._ctx.viewport = (0, 0, self.content_width, self.content_height)
             self._draw_soft_layer_passes(
                 layers,
-                transitioning=transitioning,
+                transitioning=transitioning or layout_morphing,
                 song_time_sec=song_time_sec,
+                layout_morph=layout_morphing,
+                params=params,
             )
         finally:
             _restore_gl_state(saved, self._ctx)
             _prepare_fixed_function_gl()
+
+    def _set_layout_soft_uniforms(
+        self,
+        program: moderngl.Program,
+        params: PatternMaskParams,
+        song_time_sec: float,
+    ) -> None:
+        assert self._transition_old_layout is not None
+        assert self._transition_target_layout is not None
+        layout = lerp_hard_layout_1d(
+            self._transition_old_layout,
+            self._transition_target_layout,
+            self._transition_amount(song_time_sec),
+        )
+        cuts = [0.0] * (_MAX_LAYOUT_INTERVALS + 1)
+        layer_ids = [0] * _MAX_LAYOUT_INTERVALS
+        interval_count = min(len(layout.layers), _MAX_LAYOUT_INTERVALS)
+        for index in range(interval_count):
+            layer_ids[index] = int(layout.layers[index])
+            cuts[index] = float(layout.cuts[index])
+        cuts[interval_count] = float(layout.cuts[interval_count])
+        program["cuts"].value = tuple(cuts)
+        program["layers"].value = tuple(layer_ids)
+        program["interval_count"].value = interval_count
+        program["feather_half"].value = pattern_mask_feather_half_width(
+            params.feather_pct
+        )
+        program["rotation"].value = float(layout.rotation)
+        program["is_radial"].value = 1 if layout.mask_type == "radial" else 0
+        program["resolution"].value = (
+            float(self.content_width),
+            float(self.content_height),
+        )
 
     def _draw_soft_layer_passes(
         self,
@@ -1766,9 +1888,18 @@ class GlMaskedCompositor:
         *,
         transitioning: bool,
         song_time_sec: float,
+        layout_morph: bool = False,
+        params: PatternMaskParams | None = None,
     ) -> None:
         weight_array = None
-        if transitioning:
+        if layout_morph:
+            prog = self._layout_soft_prog
+            vao = self._layout_soft_vao
+            assert prog is not None and vao is not None
+            assert params is not None
+            self._set_layout_soft_uniforms(prog, params, song_time_sec)
+            prog["layer_tex"].value = 0
+        elif transitioning:
             prog = self._soft_transition_prog
             vao = self._soft_transition_vao
             assert prog is not None and vao is not None
@@ -1795,10 +1926,10 @@ class GlMaskedCompositor:
             GlCompositor._apply_layer_blend_mode(layer.blend_mode)
             layer_tex = self._bind_layer_tex_mgl(layer)
             layer_tex.use(0)
-            if transitioning:
+            if transitioning and not layout_morph:
                 self._transition_old_tex.use(1)
                 self._transition_target_tex.use(2)
-            else:
+            elif not transitioning:
                 assert weight_array is not None
                 weight_array.use(1)
             prog["layer_index"].value = index
@@ -1824,6 +1955,7 @@ class GlMaskedCompositor:
         self._release_layer_tex_cache()
         self._release_layer_array()
         for attr in (
+            "_layout_soft_vao",
             "_soft_transition_vao",
             "_plasma_soft_vao",
             "_plasma_hard_vao",
@@ -1838,6 +1970,7 @@ class GlMaskedCompositor:
             self._quad_buffer.release()
             self._quad_buffer = None
         for attr in (
+            "_layout_soft_prog",
             "_soft_transition_prog",
             "_plasma_soft_prog",
             "_plasma_hard_prog",

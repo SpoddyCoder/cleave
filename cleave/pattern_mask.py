@@ -519,21 +519,100 @@ def rasterize_hard_layout_1d(
         raise ValueError("height must be positive")
     if not layout.layers:
         return np.zeros((height, width), dtype=np.uint8)
-    cuts = np.asarray(layout.cuts, dtype=np.float64)
-    layers = np.asarray(layout.layers, dtype=np.uint8)
-    if not np.any(np.diff(cuts) > 0.0):
+    if not np.any(np.diff(layout.cuts) > 0.0):
         return np.zeros((height, width), dtype=np.uint8)
-
-    def assign(positions: np.ndarray) -> np.ndarray:
-        index = np.searchsorted(cuts, positions, side="right") - 1
-        return layers[np.clip(index, 0, len(layers) - 1)]
 
     if mask_type == "strips":
         xs = np.arange(width, dtype=np.float64)
-        row = assign(xs / float(width))
+        row = _assign_hard_layout_layers(layout, xs / float(width))
         return np.broadcast_to(row, (height, width)).copy()
     angle = _radial_screen_angle(width, height, layout.rotation)
-    return assign(angle)
+    return _assign_hard_layout_layers(layout, angle)
+
+
+def _assign_hard_layout_layers(
+    layout: HardLayout1D, positions: np.ndarray
+) -> np.ndarray:
+    cuts = np.asarray(layout.cuts, dtype=np.float64)
+    layers = np.asarray(layout.layers, dtype=np.uint8)
+    index = np.searchsorted(cuts, positions, side="right") - 1
+    return layers[np.clip(index, 0, len(layers) - 1)]
+
+
+def _soft_layout_interval_fields(
+    layout: HardLayout1D,
+    positions: np.ndarray,
+    layer_count: int,
+    feather_pct: int,
+    *,
+    wrap: bool,
+) -> np.ndarray:
+    """Accumulate 1D tents at *positions*; shape ``(layer_count, *positions)``."""
+    half_scale = pattern_mask_feather_half_width(feather_pct)
+    fields = np.zeros((layer_count,) + positions.shape, dtype=np.float64)
+    for index, layer in enumerate(layout.layers):
+        width = layout.cuts[index + 1] - layout.cuts[index]
+        if width <= 0.0:
+            continue
+        center = 0.5 * (layout.cuts[index] + layout.cuts[index + 1])
+        half = width * half_scale
+        delta = np.abs(positions - center)
+        if wrap:
+            delta = np.minimum(delta, 1.0 - delta)
+        fields[int(layer)] += np.maximum(0.0, 1.0 - delta / half)
+    return fields
+
+
+def rasterize_soft_layout_1d(
+    layout: HardLayout1D,
+    width: int,
+    height: int,
+    layer_count: int,
+    feather_pct: int,
+) -> np.ndarray:
+    """Rasterize *layout* to (N, H, W) float tent weights.
+
+    Interval ``i`` owns ``[cuts[i], cuts[i + 1])`` with tent half-width
+    ``w * pattern_mask_feather_half_width(feather_pct)``. Zero-width
+    arriving or departing intervals contribute no mass. Pixels with zero
+    total mass take the hard winner from *cuts*. Strips are a 1-row
+    broadcast. Radial uses screen-space atan2 and wraps in [0, 1).
+    Equal-width layouts match ``generate_soft_weight_fields`` for the same
+    feather.
+    """
+    if layout.mask_type not in _HARD_LAYOUT_1D_TYPES:
+        raise ValueError(
+            f"soft 1D layout requires strips or radial, got {layout.mask_type!r}"
+        )
+    width = int(width)
+    height = int(height)
+    layer_count = int(layer_count)
+    if width <= 0:
+        raise ValueError("width must be positive")
+    if height <= 0:
+        raise ValueError("height must be positive")
+    if layer_count <= 0:
+        raise ValueError("layer_count must be positive")
+    if not layout.layers or not np.any(np.diff(layout.cuts) > 0.0):
+        return np.zeros((layer_count, height, width), dtype=np.float64)
+
+    if layout.mask_type == "strips":
+        xs = (np.arange(width, dtype=np.float64) + 0.5) / float(width)
+        row = _soft_layout_interval_fields(
+            layout, xs, layer_count, feather_pct, wrap=False
+        )
+        fields = np.broadcast_to(row[:, None, :], (layer_count, height, width)).copy()
+        winner = np.broadcast_to(
+            _assign_hard_layout_layers(layout, xs), (height, width)
+        )
+        return _cover_zero_mass(fields, winner)
+
+    angle = _radial_screen_angle(width, height, layout.rotation)
+    fields = _soft_layout_interval_fields(
+        layout, angle, layer_count, feather_pct, wrap=True
+    )
+    winner = _assign_hard_layout_layers(layout, angle)
+    return _cover_zero_mass(fields, winner)
 
 
 def generate_checker_mask(
