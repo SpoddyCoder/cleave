@@ -18,6 +18,7 @@ from OpenGL.GL import (  # noqa: E402
 
 from cleave.gl_compositor import GlCompositor  # noqa: E402
 from cleave.gl_masked_compositor import GlMaskedCompositor, PatternMaskParams  # noqa: E402
+from cleave.pattern_mask import lerp_hard_layout_1d  # noqa: E402
 
 W, H = 64, 32
 
@@ -189,57 +190,81 @@ def test_mask_cache_skips_regeneration(gl_context) -> None:
     assert masked._mask_cache_key is first_key
 
 
+def _is_hard_primary(px: tuple[int, ...]) -> bool:
+    highs = sum(1 for channel in px[:3] if channel > 200)
+    lows = sum(1 for channel in px[:3] if channel < 40)
+    return highs == 1 and lows == 2
+
+
 def test_transition_blends_weights_over_song_time(gl_context) -> None:
+    """Hard 2-to-3 strips: disputed band moves before t=0.5; one winner per pixel."""
     comp, masked = gl_context
     a = comp.create_layer_fbo("a", W, H, opacity=1.0, blend_mode="black-key")
     b = comp.create_layer_fbo("b", W, H, opacity=1.0, blend_mode="black-key")
+    c = comp.create_layer_fbo("c", W, H, opacity=1.0, blend_mode="black-key")
     _fill_layer(a, (1.0, 0.0, 0.0))
-    _fill_layer(b, (0.0, 0.0, 1.0))
+    _fill_layer(b, (0.0, 1.0, 0.0))
+    _fill_layer(c, (0.0, 0.0, 1.0))
 
     masked.composite(
         comp.content_fbo_id,
-        [a, b],
+        [a, b, c],
         mask_type="strips",
         feather_pct=0,
         density=1.0,
-        active_slots=[True, True],
+        active_slots=[True, True, False],
         song_time_sec=0.0,
         transition_duration=1.0,
     )
-    assert masked._transition_old_weights is None
+    assert masked._transition_old_layout is None
+    right_before = _read_content_pixel(comp, W - 2, H // 2)
+    assert right_before[1] > 200 and right_before[0] < 40, f"t0 right={right_before}"
 
-    b.enabled = False
+    c.enabled = True
     masked.composite(
         comp.content_fbo_id,
-        [a, b],
+        [a, b, c],
         mask_type="strips",
         feather_pct=0,
         density=1.0,
-        active_slots=[True, False],
+        active_slots=[True, True, True],
         song_time_sec=0.0,
         transition_duration=1.0,
     )
-    assert masked._transition_old_weights is not None
-    assert masked._transition_target_weights is not None
-    mid = masked._blended_transition_weights(0.5)
-    assert mid.shape == masked._transition_old_weights.shape
-    old_b = float(masked._transition_old_weights[1].mean())
-    target_b = float(masked._transition_target_weights[1].mean())
-    mid_b = float(mid[1].mean())
-    assert min(old_b, target_b) <= mid_b <= max(old_b, target_b)
+    assert masked._transition_old_layout is not None
+    assert masked._transition_target_layout is not None
+    right_t0 = _read_content_pixel(comp, W - 2, H // 2)
+    assert right_t0[1] > 200 and right_t0[2] < 40, f"morph t=0 right={right_t0}"
 
     masked.composite(
         comp.content_fbo_id,
-        [a, b],
+        [a, b, c],
         mask_type="strips",
         feather_pct=0,
         density=1.0,
-        active_slots=[True, False],
+        active_slots=[True, True, True],
+        song_time_sec=0.25,
+        transition_duration=1.0,
+    )
+    right_t25 = _read_content_pixel(comp, W - 2, H // 2)
+    assert right_t25[2] > 200 and right_t25[1] < 40, f"t=0.25 right={right_t25}"
+    assert right_t25 != right_t0
+    for x in (W // 8, W // 2, W - 2):
+        px = _read_content_pixel(comp, x, H // 2)
+        assert _is_hard_primary(px), f"mixed pixel at x={x}: {px}"
+
+    masked.composite(
+        comp.content_fbo_id,
+        [a, b, c],
+        mask_type="strips",
+        feather_pct=0,
+        density=1.0,
+        active_slots=[True, True, True],
         song_time_sec=1.0,
         transition_duration=1.0,
     )
-    assert masked._transition_old_weights is None
-    left_px = _read_content_pixel(comp, W // 4, H // 2)
+    assert masked._transition_old_layout is None
+    left_px = _read_content_pixel(comp, W // 6, H // 2)
     assert left_px[0] > 200, f"after transition left={left_px}"
 
 
@@ -289,3 +314,114 @@ def test_mid_transition_retarget_snapshots_blend(gl_context) -> None:
     )
     assert masked._transition_start == 0.5
     assert not np.array_equal(masked._transition_old_weights, first_old)
+
+
+def test_hard_path_retarget_continues_from_inflight_cuts(gl_context) -> None:
+    """A slot change during a hard wipe snapshots the lerped cuts as the new old."""
+    comp, masked = gl_context
+    a = comp.create_layer_fbo("a", W, H, opacity=1.0, blend_mode="black-key")
+    b = comp.create_layer_fbo("b", W, H, opacity=1.0, blend_mode="black-key")
+    c = comp.create_layer_fbo("c", W, H, opacity=1.0, blend_mode="black-key")
+    _fill_layer(a, (1.0, 0.0, 0.0))
+    _fill_layer(b, (0.0, 1.0, 0.0))
+    _fill_layer(c, (0.0, 0.0, 1.0))
+
+    masked.composite(
+        comp.content_fbo_id,
+        [a, b, c],
+        mask_type="strips",
+        feather_pct=0,
+        density=1.0,
+        active_slots=[True, True, True],
+        song_time_sec=0.0,
+        transition_duration=2.0,
+    )
+    b.enabled = False
+    masked.composite(
+        comp.content_fbo_id,
+        [a, b, c],
+        mask_type="strips",
+        feather_pct=0,
+        density=1.0,
+        active_slots=[True, False, True],
+        song_time_sec=0.0,
+        transition_duration=2.0,
+    )
+    first_old = masked._transition_old_layout
+    first_target = masked._transition_target_layout
+    assert first_old is not None
+    assert first_target is not None
+
+    c.enabled = False
+    masked.composite(
+        comp.content_fbo_id,
+        [a, b, c],
+        mask_type="strips",
+        feather_pct=0,
+        density=1.0,
+        active_slots=[True, False, False],
+        song_time_sec=0.25,
+        transition_duration=2.0,
+    )
+    assert masked._transition_start == 0.25
+    expected_old = lerp_hard_layout_1d(first_old, first_target, 0.25 / 2.0)
+    assert masked._transition_old_layout == expected_old
+    # Static 1-active would be all red; in-flight cuts still own the right band.
+    right_px = _read_content_pixel(comp, 3 * W // 4, H // 2)
+    assert right_px[0] < 200, f"retarget jumped to target: right={right_px}"
+    assert _is_hard_primary(right_px), f"retarget mixed pixel: {right_px}"
+
+
+def test_live_slots_matches_active_when_idle() -> None:
+    masked = GlMaskedCompositor(W, H)
+    assert masked.live_slots((True, False, True), 0.0, 1.0) == (True, False, True)
+    assert masked.live_slots((False, False), 0.5, 0.0) == (False, False)
+
+
+def test_live_slots_departing_hard_layout_until_width_zero(gl_context) -> None:
+    comp, masked = gl_context
+    a = comp.create_layer_fbo("a", W, H, opacity=1.0, blend_mode="black-key")
+    b = comp.create_layer_fbo("b", W, H, opacity=1.0, blend_mode="black-key")
+    c = comp.create_layer_fbo("c", W, H, opacity=1.0, blend_mode="black-key")
+    _fill_layer(a, (1.0, 0.0, 0.0))
+    _fill_layer(b, (0.0, 1.0, 0.0))
+    _fill_layer(c, (0.0, 0.0, 1.0))
+
+    masked.composite(
+        comp.content_fbo_id,
+        [a, b, c],
+        mask_type="strips",
+        feather_pct=0,
+        density=1.0,
+        active_slots=[True, True, True],
+        song_time_sec=0.0,
+        transition_duration=1.0,
+    )
+    assert masked.live_slots((True, True, True), 0.0, 1.0) == (True, True, True)
+    assert masked.live_slots((True, True, False), 0.0, 1.0) == (True, True, True)
+
+    c.enabled = False
+    masked.composite(
+        comp.content_fbo_id,
+        [a, b, c],
+        mask_type="strips",
+        feather_pct=0,
+        density=1.0,
+        active_slots=[True, True, False],
+        song_time_sec=0.0,
+        transition_duration=1.0,
+    )
+    assert masked.live_slots((True, True, False), 0.25, 1.0) == (True, True, True)
+    assert masked.live_slots((True, True, False), 1.0, 1.0) == (True, True, False)
+
+    masked.composite(
+        comp.content_fbo_id,
+        [a, b, c],
+        mask_type="strips",
+        feather_pct=0,
+        density=1.0,
+        active_slots=[True, True, False],
+        song_time_sec=1.0,
+        transition_duration=1.0,
+    )
+    assert masked.live_slots((True, True, False), 1.0, 1.0) == (True, True, False)

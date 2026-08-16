@@ -183,16 +183,17 @@ class TimelinePresetController:
                     slot: self.session.layers[slot].stem for slot in slots
                 }
         if tl.timeline_preset_mode == "pattern_mask":
+            self._enable_pattern_mask()
             built = compose_pattern_mask_timeline(
                 slots,
                 duration_sec,
                 rng,
                 song_markers=markers,
                 beat_times=self._beat_times,
+                transition_duration=self.session.render_pattern_mask.transition,
                 **builder_kwargs,
             )
             message = "Applied pattern mask timeline"
-            self._enable_pattern_mask()
         else:
             built = builder(
                 slots,

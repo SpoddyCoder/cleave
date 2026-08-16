@@ -443,6 +443,7 @@ def tick_frame_core(
             paused=paused,
             pm_time_sec=pm_time_sec,
             compositor=runtime.compositor,
+            masked_compositor=runtime.masked_compositor,
             on_panel_notification=on_panel_notification,
         )
 
