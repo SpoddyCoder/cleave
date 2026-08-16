@@ -13,11 +13,19 @@ from cleave.extract import StemSource
 from cleave.preset_playlist import PresetPlaylist
 from cleave.signals import Signals
 from cleave.song_markers import SongMarker
-from cleave.timeline import LEVEL_EPS, TimelineLane, empty_lane, lane_level_at
+from cleave.timeline import (
+    LEVEL_EPS,
+    TimelineFadeGroup,
+    TimelineLane,
+    empty_lane,
+    lane_level_at,
+    lane_on_transition_cues,
+)
 from cleave.timeline_presets.arrange import PHRASE_BARS_MIN, PHRASE_BARS_MAX
 from cleave.timeline_presets.pattern_mask_arrange import (
     SECTION_BARS_MAX,
-    SECTION_BARS_MIN,
+    SECTION_LONG_BARS_MAX,
+    SECTION_LONG_BARS_MIN,
     compose_pattern_mask_timeline,
     partition_pattern_mask_sections,
 )
@@ -212,14 +220,14 @@ def test_overlap_when_add_then_remove() -> None:
 
 
 def test_transition_duration_keeps_consecutive_changes_apart() -> None:
+    """Add-then-remove overlap stays at least one wipe; isolated gaps may be closer."""
     slots = _slots(4)
     duration = 1.0
     for seed in range(20):
         lanes = _compose(slots, seed=seed, transition_duration=duration)
-        times = _slot_set_change_times(lanes, slots)
-        for t0, t1 in zip(times, times[1:]):
-            assert t1 - t0 >= duration - 1e-9, (
-                f"seed={seed} gap {t1 - t0:.4f}s inside transition_duration"
+        for t_on, t_off in _overlap_pairs(lanes, slots):
+            assert t_off - t_on >= duration - 1e-9, (
+                f"seed={seed} overlap {t_off - t_on:.4f}s inside transition_duration"
             )
 
 
@@ -278,7 +286,7 @@ def test_five_plus_rare_without_crescendo() -> None:
     assert five_plus < two_three * 0.35
 
 
-def test_role_bias_lead_then_accent_then_pulse_bed() -> None:
+def test_role_bias_lead_then_pulse_then_accent_bed() -> None:
     slots = _slots(4)
     roles: Counter[str] = Counter()
     for seed in range(25):
@@ -287,7 +295,7 @@ def test_role_bias_lead_then_accent_then_pulse_bed() -> None:
             for cue in lane.cues:
                 if cue.level > LEVEL_EPS and cue.role is not None:
                     roles[cue.role] += 1
-    assert roles["lead"] > roles["accent"] > roles["pulse"] > roles["bed"]
+    assert roles["lead"] > roles["pulse"] > roles["accent"] > roles["bed"]
     assert roles["bed"] > 0
 
 
@@ -298,6 +306,42 @@ def test_active_levels_are_full() -> None:
         for level in _level_at(lanes, slots, t).values():
             if level > LEVEL_EPS:
                 assert abs(level - 1.0) <= LEVEL_EPS
+
+
+def test_continuing_slot_recast_is_on_transition() -> None:
+    slots = _slots(4)
+    fade_off = TimelineFadeGroup(enabled=False)
+    found = 0
+    for seed in range(40):
+        lanes = _compose(slots, seed=seed)
+        for slot, lane in lanes.items():
+            pairs = lane_on_transition_cues(
+                lane, hard_cut_fades=fade_off, soft_cut_fades=fade_off
+            )
+            on_transition_times = {cue.t for _t, cue in pairs if cue.recast}
+            for cue in lane.cues:
+                if not cue.recast:
+                    continue
+                assert abs(cue.level - 1.0) <= LEVEL_EPS
+                prev = lane_level_at(lane, cue.t - 1e-6, inherit=0.0)
+                after = lane_level_at(lane, cue.t + 1e-6, inherit=0.0)
+                assert prev > LEVEL_EPS
+                assert after > LEVEL_EPS
+                assert slot in _active_at(lanes, slots, cue.t - 1e-6)
+                assert slot in _active_at(lanes, slots, cue.t + 1e-6)
+                cues_at_t = [
+                    other
+                    for other_lane in lanes.values()
+                    for other in other_lane.cues
+                    if abs(other.t - cue.t) <= 1e-9
+                ]
+                if cues_at_t and all(other.recast for other in cues_at_t):
+                    assert _active_at(lanes, slots, cue.t - 1e-6) == _active_at(
+                        lanes, slots, cue.t + 1e-6
+                    )
+                assert cue.t in on_transition_times
+                found += 1
+    assert found > 0, "expected recast cues on continuing slots"
 
 
 def _envelope(duration_sec: float, sr: float, quiet: float, loud: float) -> np.ndarray:
@@ -375,19 +419,36 @@ def test_conductor_biases_busy_stems() -> None:
     assert vocals_second > drums_second
 
 
+def _section_bar_counts(
+    sections: list[tuple[float, float]], bars: list[float]
+) -> list[int]:
+    return [sum(1 for b in bars if start <= b < end) for start, end in sections]
+
+
 def test_sections_shorter_than_layers_phrases() -> None:
     bars = _bar_times()
     rng = random.Random(4)
     sections = partition_pattern_mask_sections(bars, _DUR, rng, ())
     assert sections
-    bar_counts = [
-        sum(1 for b in bars if start <= b < end) for start, end in sections
-    ]
+    bar_counts = _section_bar_counts(sections, bars)
     core = bar_counts[:-1]
     assert core
-    assert all(SECTION_BARS_MIN <= n <= SECTION_BARS_MAX for n in core)
+    short = sum(1 for n in core if n <= 2)
+    assert short > len(core) - short
+    assert sum(1 for n in bar_counts if SECTION_LONG_BARS_MIN <= n <= SECTION_LONG_BARS_MAX) <= 1
     assert sum(core) / len(core) < PHRASE_BARS_MIN
     assert SECTION_BARS_MAX < PHRASE_BARS_MAX
+    for seed in range(40):
+        seeded = partition_pattern_mask_sections(
+            bars, _DUR, random.Random(seed), ()
+        )
+        counts = _section_bar_counts(seeded, bars)
+        long_n = sum(
+            1
+            for n in counts
+            if SECTION_LONG_BARS_MIN <= n <= SECTION_LONG_BARS_MAX
+        )
+        assert long_n <= 1, f"seed={seed} had {long_n} long sections"
 
 
 def test_song_markers_start_sections() -> None:

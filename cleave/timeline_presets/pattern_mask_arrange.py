@@ -4,7 +4,9 @@ Self-contained parallel to the layers arranger. Frequent add/remove is the
 point: the masked compositor sees a slot-set change and runs its spatial
 transition. Add-then-remove overlap is kept only when it spans at least
 transition_duration plus one beat; otherwise the section swaps in one step.
-Character profiles are not used.
+Mid-section ``SlotCue.recast`` may switch the Milkdrop preset on a
+continuing slot (already on; not an add/remove). Character profiles are
+not used.
 """
 
 from __future__ import annotations
@@ -19,7 +21,13 @@ from cleave.cue_roles import CUE_ROLE_BLEND, CueRole
 from cleave.extract import StemSource
 from cleave.signals import Signals
 from cleave.song_markers import SongMarker
-from cleave.timeline import TimelineLane
+from cleave.timeline import (
+    LEVEL_EPS,
+    SlotCue,
+    TimelineLane,
+    canonicalize,
+    lane_level_at,
+)
 from cleave.timeline_presets.conductor import (
     AIRTIME_PENALTY,
     CONDUCTOR_ACTIVITY_MIDPOINT,
@@ -29,9 +37,18 @@ from cleave.timeline_presets.conductor import (
 from cleave.timeline_presets.emit import cues_from_states, levels_from_active
 from cleave.timeline_presets.grid import thin_bar_times_for_arrange
 
-SECTION_BARS_MIN = 2
+SECTION_BARS_MIN = 1
 SECTION_BARS_MAX = 4
-SECTION_SEC_MIN = 4.0
+SECTION_LONG_BARS_MIN = 6
+SECTION_LONG_BARS_MAX = 8
+SECTION_SEC_MIN = 2.0
+SECTION_BARS_WEIGHTS: tuple[tuple[int, float], ...] = (
+    (1, 0.50),
+    (2, 0.32),
+    (3, 0.12),
+    (4, 0.06),
+)
+SECTION_LONG_WEIGHT = 0.08
 
 _MIN_STATE_GAP = 1e-3
 _HIGH_ENERGY_GAIN = 1.15
@@ -39,11 +56,14 @@ _HIGH_ENERGY_GAIN = 1.15
 _Action = Literal["add_one", "remove_one", "add_two", "hold"]
 
 _ROLE_WEIGHTS: tuple[tuple[CueRole, float], ...] = (
-    ("lead", 0.50),
-    ("accent", 0.25),
-    ("pulse", 0.15),
-    ("bed", 0.10),
+    ("lead", 0.52),
+    ("pulse", 0.28),
+    ("accent", 0.15),
+    ("bed", 0.05),
 )
+_RECAST_P = 0.45
+_RECAST_LONG_P = 0.80
+_RECAST_KEEP_ROLE_P = 0.40
 
 
 def compose_pattern_mask_timeline(
@@ -90,11 +110,14 @@ def compose_pattern_mask_timeline(
     n_slots = len(slot_list)
     order = list(slot_list)
     rng.shuffle(order)
+    recast_rng = random.Random(rng.getrandbits(64))
 
     airtime = {slot: 0.0 for slot in order}
     current: frozenset[str] = frozenset()
+    current_roles: dict[str, CueRole] = {}
     levels: list[tuple[float, dict[str, float]]] = []
     casts: list[dict[str, tuple[CueRole, BlendMode]]] = []
+    recasts: list[tuple[str, float, CueRole]] = []
     last_t = -1.0
 
     def _emit(
@@ -110,7 +133,12 @@ def compose_pattern_mask_timeline(
         if cue_t >= duration_sec:
             return
         levels.append((cue_t, levels_from_active(active, 1.0)))
-        casts.append(_cast_for_slots(new_slots, rng))
+        cast = _cast_for_slots(new_slots, rng)
+        casts.append(cast)
+        for slot, (role, _blend) in cast.items():
+            current_roles[slot] = role
+        for slot in [s for s in current_roles if s not in active]:
+            del current_roles[slot]
         last_t = cue_t
 
     for index, (start, end) in enumerate(sections):
@@ -148,6 +176,18 @@ def compose_pattern_mask_timeline(
             )
             current = frozenset(picked)
             _emit(0.0, current, new_slots=current)
+            _schedule_section_recasts(
+                recast_rng,
+                start,
+                end,
+                last_t,
+                current,
+                current_roles,
+                recasts,
+                bars,
+                beat_times,
+                beat_period,
+            )
             _accumulate_airtime(airtime, current, end - start)
             continue
 
@@ -184,6 +224,18 @@ def compose_pattern_mask_timeline(
             _emit(t, active, new_slots=new_slots)
 
         current = settled
+        _schedule_section_recasts(
+            recast_rng,
+            start,
+            end,
+            last_t,
+            settled - added,
+            current_roles,
+            recasts,
+            bars,
+            beat_times,
+            beat_period,
+        )
         _accumulate_airtime(airtime, current, max(0.0, end - start))
 
     if not levels:
@@ -193,7 +245,7 @@ def compose_pattern_mask_timeline(
             [(0.0, levels_from_active(opening))],
             [_cast_for_slots(opening, rng)],
         )
-    return cues_from_states(slot_list, levels, casts)
+    return _apply_recasts(cues_from_states(slot_list, levels, casts), recasts)
 
 
 def partition_pattern_mask_sections(
@@ -202,19 +254,28 @@ def partition_pattern_mask_sections(
     rng: random.Random,
     song_marker_times: Sequence[float] = (),
 ) -> list[tuple[float, float]]:
-    """Split the song into 2-4 bar sections; song markers always cut."""
+    """Split the song into short sections; song markers always cut.
+
+    Common lengths are 1-2 bars, with occasional 3-4. At most one section
+    per song may be 6-8 bars.
+    """
     markers = [
         float(t) for t in song_marker_times if 0.0 < float(t) < duration_sec
     ]
+    long_used = False
     if not markers:
-        return _partition_on_bars(bars, duration_sec, rng)
+        sections, _long_used = _partition_on_bars(
+            bars, duration_sec, rng, long_used
+        )
+        return sections
 
     sections: list[tuple[float, float]] = []
     for sec_start, sec_end in _section_bounds(markers, duration_sec):
         section_bars = [t for t in bars if sec_start <= t < sec_end]
-        sections.extend(
-            _partition_in_section(section_bars, sec_start, sec_end, rng)
+        chunk, long_used = _partition_in_section(
+            section_bars, sec_start, sec_end, rng, long_used
         )
+        sections.extend(chunk)
     return sections
 
 
@@ -267,40 +328,60 @@ def _partition_in_section(
     sec_start: float,
     sec_end: float,
     rng: random.Random,
-) -> list[tuple[float, float]]:
+    long_used: bool,
+) -> tuple[list[tuple[float, float]], bool]:
     if sec_end - sec_start < 1e-6:
-        return []
+        return [], long_used
     if not section_bars:
-        return [(sec_start, sec_end)]
-    raw = _partition_on_bars(section_bars, sec_end, rng)
+        return [(sec_start, sec_end)], long_used
+    raw, long_used = _partition_on_bars(
+        section_bars, sec_end, rng, long_used
+    )
     if not raw:
-        return [(sec_start, sec_end)]
+        return [(sec_start, sec_end)], long_used
     adjusted: list[tuple[float, float]] = []
     for i, (ps, pe) in enumerate(raw):
         start = sec_start if i == 0 else ps
         end = sec_end if i == len(raw) - 1 else pe
         if end - start > 1e-6:
             adjusted.append((start, end))
-    return adjusted if adjusted else [(sec_start, sec_end)]
+    if not adjusted:
+        return [(sec_start, sec_end)], long_used
+    return adjusted, long_used
+
+
+def _pick_section_bars(
+    rng: random.Random,
+    remaining: int,
+    *,
+    long_used: bool,
+) -> tuple[int, bool]:
+    if remaining <= SECTION_BARS_MAX:
+        return remaining, long_used
+    can_long = (
+        not long_used and remaining >= SECTION_LONG_BARS_MIN
+    )
+    if can_long and rng.random() < SECTION_LONG_WEIGHT:
+        hi = min(SECTION_LONG_BARS_MAX, remaining)
+        return rng.randint(SECTION_LONG_BARS_MIN, hi), True
+    target = _weighted_choice(rng, SECTION_BARS_WEIGHTS)
+    return max(SECTION_BARS_MIN, min(target, remaining)), long_used
 
 
 def _partition_on_bars(
     bars: Sequence[float],
     duration_sec: float,
     rng: random.Random,
-) -> list[tuple[float, float]]:
+    long_used: bool,
+) -> tuple[list[tuple[float, float]], bool]:
     sections: list[tuple[float, float]] = []
     i = 0
     n = len(bars)
     while i < n:
         remaining = n - i
-        if remaining <= SECTION_BARS_MAX:
-            target = remaining
-        else:
-            target = rng.randint(SECTION_BARS_MIN, SECTION_BARS_MAX)
-            leftover = remaining - target
-            if 0 < leftover < SECTION_BARS_MIN:
-                target = remaining
+        target, long_used = _pick_section_bars(
+            rng, remaining, long_used=long_used
+        )
         start = bars[i]
         end_i = i + target
         end = bars[end_i] if end_i < n else duration_sec
@@ -313,7 +394,7 @@ def _partition_on_bars(
         i = end_i
         if end >= duration_sec - 1e-6:
             break
-    return sections
+    return sections, long_used
 
 
 def _beat_period(
@@ -604,15 +685,134 @@ def _accumulate_airtime(
         airtime[slot] = airtime.get(slot, 0.0) + duration
 
 
+def _pick_role(rng: random.Random, *, exclude: CueRole | None = None) -> CueRole:
+    pool = tuple((role, w) for role, w in _ROLE_WEIGHTS if role != exclude)
+    return _weighted_choice(rng, pool)
+
+
+def _recast_role(rng: random.Random, current: CueRole) -> CueRole:
+    if rng.random() < _RECAST_KEEP_ROLE_P:
+        return current
+    return _pick_role(rng, exclude=current)
+
+
 def _cast_for_slots(
     slots: Sequence[str] | frozenset[str], rng: random.Random
 ) -> dict[str, tuple[CueRole, BlendMode]]:
-    roles, weights = zip(*_ROLE_WEIGHTS)
     cast: dict[str, tuple[CueRole, BlendMode]] = {}
     for slot in slots:
-        role: CueRole = rng.choices(list(roles), weights=list(weights), k=1)[0]
+        role = _pick_role(rng)
         cast[slot] = (role, CUE_ROLE_BLEND[role])
     return cast
+
+
+def _section_is_long(start: float, end: float, bars: Sequence[float]) -> bool:
+    n_bars = sum(1 for b in bars if start <= b < end)
+    return SECTION_LONG_BARS_MIN <= n_bars <= SECTION_LONG_BARS_MAX
+
+
+def _pick_recast_time(
+    rng: random.Random,
+    ref_t: float,
+    section_end: float,
+    beat_times: Sequence[float],
+    beat_period: float,
+    *,
+    after: float | None = None,
+) -> float | None:
+    t_lo = ref_t + beat_period
+    if after is not None:
+        t_lo = max(t_lo, after + beat_period)
+    t_hi = section_end - beat_period
+    if t_hi <= t_lo:
+        return None
+    n_max = max(1, int((t_hi - ref_t) / beat_period) + 2)
+    choices: list[float] = []
+    seen: set[float] = set()
+    for n in range(1, n_max + 1):
+        cand = _offset_time(ref_t, n, 1, beat_times, beat_period, t_lo, t_hi)
+        if cand < t_lo - 1e-9 or cand > t_hi + 1e-9:
+            continue
+        key = round(cand, 9)
+        if key in seen:
+            continue
+        seen.add(key)
+        choices.append(cand)
+    if not choices:
+        return None
+    return rng.choice(choices)
+
+
+def _schedule_section_recasts(
+    rng: random.Random,
+    start: float,
+    end: float,
+    last_t: float,
+    continuing: frozenset[str],
+    current_roles: dict[str, CueRole],
+    recasts: list[tuple[str, float, CueRole]],
+    bars: Sequence[float],
+    beat_times: Sequence[float],
+    beat_period: float,
+) -> None:
+    pool = [slot for slot in continuing if slot in current_roles]
+    if not pool:
+        return
+    ref_t = max(last_t, start)
+    long_section = _section_is_long(start, end, bars)
+    p = _RECAST_LONG_P if long_section else _RECAST_P
+    t = _pick_recast_time(rng, ref_t, end, beat_times, beat_period)
+    if t is None:
+        return
+    if rng.random() >= p:
+        return
+    slot = rng.choice(pool)
+    role = _recast_role(rng, current_roles[slot])
+    recasts.append((slot, t, role))
+    current_roles[slot] = role
+    if not long_section:
+        return
+    pool2 = [s for s in pool if s != slot]
+    if not pool2:
+        return
+    t2 = _pick_recast_time(rng, ref_t, end, beat_times, beat_period, after=t)
+    if t2 is None:
+        return
+    slot2 = rng.choice(pool2)
+    role2 = _recast_role(rng, current_roles[slot2])
+    recasts.append((slot2, t2, role2))
+    current_roles[slot2] = role2
+
+
+def _apply_recasts(
+    lanes: dict[str, TimelineLane],
+    recasts: Sequence[tuple[str, float, CueRole]],
+) -> dict[str, TimelineLane]:
+    if not recasts:
+        return lanes
+    out = dict(lanes)
+    for slot, t, role in recasts:
+        lane = out.get(slot)
+        if lane is None:
+            continue
+        if any(abs(cue.t - t) <= _MIN_STATE_GAP for cue in lane.cues):
+            continue
+        if lane_level_at(lane, t - _MIN_STATE_GAP, inherit=0.0) <= LEVEL_EPS:
+            continue
+        cue = SlotCue(
+            t=t,
+            level=1.0,
+            blend=CUE_ROLE_BLEND[role],
+            role=role,
+            cut="none",
+            recast=True,
+            anchor=True,
+        )
+        out[slot] = TimelineLane(
+            baseline=lane.baseline,
+            cues=canonicalize(lane.baseline, [*lane.cues, cue]),
+        )
+    return out
 
 
 def _overlap_states(

@@ -1606,6 +1606,67 @@ def test_parse_timeline_reads_cue_blend_role_and_cut() -> None:
     ]
 
 
+def test_persist_timeline_cue_anchor_and_recast_round_trip() -> None:
+    from cleave.viz.session import TimelineRuntime
+
+    session = TuningSession(
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
+        timeline=TimelineRuntime(
+            enabled=True,
+            lanes={
+                "layer_1": TimelineLane(
+                    baseline=1.0,
+                    cues=[
+                        SlotCue(t=4.0, level=1.0, recast=True),
+                        SlotCue(t=8.0, level=1.0, anchor=True),
+                    ],
+                ),
+            },
+        ),
+    )
+    cfg = CleaveConfig(
+        paths=PathsConfig(preset_root=Path("/tmp"), texture_paths=()),
+        layers={},
+        editor=EditorConfig(),
+        config_path=Path("/tmp/cleave-viz.yaml"),
+        user_config_path=Path("/tmp/user.yaml"),
+        layer_z_order=list(DEFAULT_LAYER_SLOTS),
+    )
+    payload = persist_timeline(PersistCtx(cfg=cfg, session=session, cfg_dir=None))
+    assert payload["lanes"]["layer_1"]["cues"] == [
+        {"t": 4.0, "level": 1.0, "recast": True},
+        {"t": 8.0, "level": 1.0, "anchor": True},
+    ]
+    round_trip = parse_timeline_section(
+        {"timeline": payload},
+        _timeline_parse_ctx(),
+    )
+    assert round_trip is not None
+    assert round_trip.lanes["layer_1"] == session.timeline.lanes["layer_1"]
+
+
+def test_parse_timeline_reads_cue_recast() -> None:
+    timeline = parse_timeline_section(
+        {
+            "timeline": {
+                "lanes": {
+                    "layer_1": {
+                        "baseline": 1.0,
+                        "cues": [
+                            {"t": 2.0, "level": 1.0, "recast": True},
+                        ],
+                    },
+                },
+            }
+        },
+        _timeline_parse_ctx(),
+    )
+    assert timeline is not None
+    assert timeline.lanes["layer_1"].cues == [
+        SlotCue(t=2.0, level=1.0, recast=True),
+    ]
+
+
 def test_parse_timeline_rejects_invalid_cue_blend() -> None:
     with pytest.raises(ValueError, match="blend must be one of"):
         parse_timeline_section(
