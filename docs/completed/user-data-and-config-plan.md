@@ -76,7 +76,7 @@ Ships with Cleave. Never written at runtime.
 
 - Python package, shaders, fonts
 - Default config template ([cleave-viz.yaml](../cleave-viz.yaml))
-- Bundled preset submodules under [assets/milkdrop-presets/](../assets/milkdrop-presets/) for tests, golden scan, and optional seed content
+- Bundled preset submodules under [assets/milkdrop-presets/](../assets/milkdrop-presets/) for tests and optional seed content
 
 Runtime preset browsing should use the user's preset tree (`paths.preset_root`), not mutate files under `assets/`.
 
@@ -161,7 +161,6 @@ Pick one scheme and document it. Centralized under `data_dir()` keeps all Cleave
 **Behavior:**
 
 - Move (or copy + delete) the `.milk` file; update playlist state if the quarantined file was current.
-- Exclude quarantine paths from `cleave scan` targets the same way live rotation excludes them.
 - Optional later: metadata file (original path, timestamp) for restore / un-quarantine.
 
 ---
@@ -174,7 +173,7 @@ Read-only install directory plus writable user dirs on first run:
 2. Create `~/.local/share/cleave/projects/` (and presets dir if bundled seed is offered).
 3. First-run or CLI prompts: "Where are your Milkdrop presets?" (default `~/.local/share/cleave/presets`).
 
-Bundled submodule packs remain useful for CI and `cleave scan-golden`, not as the default runtime preset root.
+Bundled submodule packs remain useful for CI, not as the default runtime preset root.
 
 Dev checkout: document `CLEAVE_DATA=./data` for co-located test projects; do not default the main code path to repo-root `projects/`.
 
@@ -201,7 +200,7 @@ Ordered for incremental delivery; each phase can land independently.
 ### Phase 3: Quarantine
 
 - Add `quarantine_dir()` (or per-root helper) in [cleave/paths.py](../cleave/paths.py).
-- Hotkey handler in live tuning; playlist / scan exclusion.
+- Hotkey handler in live tuning; playlist exclusion.
 - Tests for move + rotation skip (no GL).
 
 ### Phase 4: Polish

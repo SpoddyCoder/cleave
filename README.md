@@ -109,7 +109,6 @@ Available commands...
 * `render` accepts a project slug or path (not a source audio file).
 * `backup` archives a full project directory (mix, stems, configs, renders etc.) to a `.cleave-tar.gz` file.
 * `restore` unpacks a `.cleave-tar.gz` archive into `projects/<slug>/` (slug from `project.yaml`).
-* `scan` (experimental, WIP) classifies Milkdrop presets for load failures and output quality.
 
 Note: use `--help` on any command for options.
 
@@ -229,18 +228,6 @@ Signal-driven compositor modifiers on top of each layer. Tune depths (0-100%).
 
 ### Post-processing
 * TODO: Document
-
----
-
-## Preset Scanning (Experimental, WIP)
-
-For day-to-day curation while browsing presets, use **f** / **b** in the editor (see Preset curation above). `cleave scan` remains an experimental batch classifier; its `--quarantine` flag is separate from editor favourites/blacklist.
-
-Clone with submodules so preset packs are available for `cleave scan-golden --probe` and other preset work:
-
-```bash
-git submodule update --init --recursive
-```
 
 ---
 
