@@ -2,7 +2,7 @@
 
 Audit of exported libprojectM 4.x symbols vs [cleave/projectm.py](../cleave/projectm.py) and [cleave/projectm_playlist.py](../cleave/projectm_playlist.py). Status values: **bound** (ctypes argtypes/restype), **used** (called from Cleave), **ignored** (deliberately unused), **future** (candidate for later work).
 
-Related: [legacy-plans/presets-scan-plan.md](legacy-plans/presets-scan-plan.md) (experimental / low confidence), [todos.md](todos.md) (projectM robustness item).
+Related: [todos.md](todos.md) (projectM robustness item).
 
 ## Core library (`libprojectM-4`)
 
@@ -12,7 +12,7 @@ Related: [legacy-plans/presets-scan-plan.md](legacy-plans/presets-scan-plan.md) 
 | `projectm_create_with_opengl_load_proc` | ignored | Cleave uses default resolver after pygame GL context |
 | `projectm_destroy` | bound, used | `ProjectM.destroy` |
 | `projectm_load_preset_file` | bound, used | Manual browse and timer restart |
-| `projectm_load_preset_data` | future | In-memory presets for scan or network sources |
+| `projectm_load_preset_data` | future | In-memory presets for network sources |
 | `projectm_reset_textures` | future | After texture path changes without recreate |
 | `projectm_set_window_size` | bound, used | Layer FBO resize |
 | `projectm_get_window_size` | future | Diagnostics |
@@ -64,7 +64,7 @@ Related: [legacy-plans/presets-scan-plan.md](legacy-plans/presets-scan-plan.md) 
 | `projectm_alloc_string` | ignored | Internal helper |
 | `projectm_touch` / `projectm_touch_drag` / `projectm_touch_destroy*` | ignored | No touch input in Cleave |
 | `projectm_sprite_*` | ignored | No user sprites |
-| `projectm_write_debug_image_on_next_frame` | future | Offline scan / debug captures |
+| `projectm_write_debug_image_on_next_frame` | future | Offline debug captures |
 
 ## Playlist library (`libprojectM-4-playlist`)
 
