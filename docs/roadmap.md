@@ -11,6 +11,81 @@ Session undo/redo for timeline and config edits.
 
 Extend cues beyond visibility toggles so timeline events can control more layer and render parameters.
 
+## Preset reactivity fingerprints
+
+Classify presets by how they **respond** to audio, not only by how they look, then cast presets to the stem driving that slot. A preset that erupts on kick drums is a great drums layer and a dead bass bed; a static luma histogram cannot tell those apart.
+
+From [completed/improved-timeline-presets.md](completed/improved-timeline-presets.md). Ship fingerprints first, then automatic casting.
+
+### Intent
+
+- Stop three dense presets from lighting at once under black-key (or any) blend.
+- Make `preset_switching: timeline` content-aware instead of a shuffled bag.
+- Know which presets can sit at low opacity as a bed without looking inert (needs a motion floor, not a brightness average).
+- Reuse curation (`favourites/`) rather than asking users to tag files.
+- Fill `preset_root/roles/<role>/` pools from fingerprints instead of hand curation; extend the generative arranger with automatic blend/role assignment on Apply.
+
+### Design sketch
+
+Classify each preset by how it responds to audio (silence, bass, transients, sustained tone) into a small vector: bass response, transient response, motion floor under silence, brightness, screen coverage, busyness. Derive pools from that vector, favourites first, then directory:
+
+| Role | Vector signature | Casting rule |
+| --- | --- | --- |
+| Bed | low busyness, non-zero motion floor, mostly black | bass or other foundation slots |
+| Pulse | high transient response, mid coverage | drums slots |
+| Lead | high busyness or brightness | at most one hot at a time |
+| Accent | short bright bursts, high delta | chorus hits, marker edges |
+
+Cast on each on-transition in [cleave/viz/preset_switching.py](../cleave/viz/preset_switching.py) through the cue `role` field: when set, index `role_rotations[role]` by per-role occurrence; when unset or the pool is empty, use the main rotation.
+
+Timeline rotation advance already keys off committed on-transitions.
+
+Optional: CLIP or similar embeddings on short clips if heuristics mislabel calm versus chaotic too often.
+
+### User effort
+
+Curate favourites once. Casting is automatic on Apply and playback.
+
+## Reprise and auto form
+
+Detect song form automatically, and when the song repeats, bring back the **same** arrangement: same cast, same milk files, same blend plan, with one thing escalated. Recognition is what makes a video read as composed; random-but-musical still reads as random.
+
+From [completed/improved-timeline-presets.md](completed/improved-timeline-presets.md). Can ship in halves: suggested markers first (useful alone), cluster reprise second.
+
+### Intent
+
+- Close the structure gap without asking the user to drop every marker by hand.
+- Give section-scale drama (breakdown solo, chorus lift) that bar-only partitioning cannot invent.
+- Make the visuals have motifs at song scale, not only at phrase scale.
+- Bias the stem conductor curve by section role (intro, verse, chorus, bridge, and similar) rather than replacing it.
+
+### Design sketch
+
+1. At analyse time in [cleave/extract.py](../cleave/extract.py) and [cleave/analyse.py](../cleave/analyse.py), compute a beat-synchronous self-similarity matrix from chroma plus MFCC (librosa, no new heavy dependency), and write segment boundaries plus similarity cluster ids into `signals.json` (schema version bump).
+2. Boundaries become **suggested song markers**, shown as today's red ticks and saved to `project.yaml` under the same deferred-write model as [completed/song-markers.md](completed/song-markers.md). The user corrects a few if needed.
+3. `compose_timeline` generates one arrangement **per cluster**, not per section, and replays it at each recurrence with a deterministic variation seeded by occurrence index: add a layer, raise the lead, tighten switch rate.
+4. Non-repeating material (bridge, breakdown) is identifiable precisely because it is unlike everything else in the matrix, so it gets the contrast treatment: solo one stem, or cut to black and re-enter on the next bar.
+5. Section roles bias the conductor curve rather than replacing it:
+
+| Section | Visual role |
+| --- | --- |
+| Intro / outro | single calm foundation layer |
+| Verse | two layers, slow switches |
+| Pre-chorus | rising weight toward the next wall |
+| Chorus | peak weight, still under the busyness cap |
+| Bridge / breakdown | solo one stem, others ducked |
+| Drop | hard cut to black, re-entry on the next bar |
+
+6. Hard walls, soft latch, and exclusive marker claiming stay as today; auto markers simply feed the same walls.
+
+### Libraries
+
+librosa first (chroma, MFCC, `segment.recurrence_matrix`, `agglomerative`). Escalate only if that misfires: [all-in-one](https://github.com/mir-aidj/all-in-one) (structure plus beats), [msaf](https://github.com/urinieto/msaf), or Essentia. Prefer one analyse-time dependency writing into the existing marker list rather than a parallel timeline format.
+
+### User effort
+
+Run `separate`, glance at suggested markers, Apply. Manual drop remains for stubborn tracks.
+
 ## MIDI out
 
 Emit MIDI notes or CC from drum onsets (and other signals in `signals.json`) to drive hardware lighting, drum pads, or synths during playback or export.
