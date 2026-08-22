@@ -24,7 +24,7 @@ The compositor still starts a wipe from an `active_slots` diff in `_ensure_mask_
 
 ## Remaining polish
 
-Weight-field transitions (checker/plasma, hard morphs and soft) still generate at 1/4 content resolution (`_TRANSITION_GEN_DIVISOR`). After settle, the static full-res mask can sharpen edges. Whether that gen should follow preview quality is an architecture note in [todos.md](todos.md); this file does not track that work.
+Weight-field transitions (checker/plasma, hard morphs and soft) still generate at 1/4 content resolution (`_TRANSITION_GEN_DIVISOR`). After settle, the static full-res mask can sharpen edges. Whether that gen should follow preview quality is noted under pattern mask follow-ups in [roadmap.md](../roadmap.md).
 
 ## Key code
 
