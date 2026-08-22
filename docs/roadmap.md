@@ -104,15 +104,33 @@ Inspired by [MilkDrop3](https://github.com/milkdrop2077/MilkDrop3) hardcut modes
 
 ## Geometric transition wipes
 
-Layer-local wipe shaders (plasma, checkerboard, curtain, and similar) when a layer changes preset, beyond projectM's soft crossfade. Implement in the OpenGL compositor during A-to-B preset changes.
+Layer-local wipe shaders (plasma, checkerboard, curtain, and similar) when a layer changes preset, beyond projectM's soft crossfade. Implement in the OpenGL compositor during A-to-B preset changes. Reuse the pattern-mask shader library ([cleave/gl_masked_compositor.py](../cleave/gl_masked_compositor.py), [cleave/pattern_mask.py](../cleave/pattern_mask.py)); same generators, different trigger (preset change on one layer vs territory layout across the stack). See [completed/pattern-mask.md](completed/pattern-mask.md).
 
 ## Preset rotation history
 
 Never-repeat (or short cooldown) in shuffle/random rotation, plus a "previous preset" step for browsing. Small UX win for long live sessions and offline renders.
 
-## Pattern mask (stem territories)
+## Pattern mask follow-ups
 
-Spatial territories for the multi-layer stack (strips, radial, checker, plasma): where each stem-driven layer may own the frame, complementary to black-key / add. Not a MilkDrop3 `.milk2` dual-preset clone; see [pattern-mask.md](pattern-mask.md).
+Core v1 is shipped: shader composite, four patterns (strips, radial, checker, plasma), feather, seed, conductor `pattern_mask` mode, and slot-set transition wipes. See [completed/pattern-mask.md](completed/pattern-mask.md).
+
+### Dynamic masks
+
+- Per-phrase pattern variation via conductor (pattern type and density as cue properties).
+- Timeline automation of pattern type.
+- Audio-reactive region weights from per-stem energy envelopes.
+
+### Layout and mapping
+
+- Explicit stem-role mapping (which region family the mix owns).
+- Layer order control (visible stack order vs mix special-case).
+- Radial mix-in-center option.
+
+### Polish
+
+- Tie Settings preview quality to mask generation resolution (full for `full-quality`, scaled for `balanced` / `performance` / `ultra-performance`; offline render stays full-res).
+- Cache transition weight fields on mask param changes so layer visibility toggles reuse ready old/target weights when type/density/seed are unchanged.
+- Weight-field morphs still generate at 1/4 content resolution during transitions; consider aligning with preview quality after settle.
 
 ## Web / browser port
 
