@@ -14,10 +14,9 @@ Outstanding bugs and issues.
 
 ## Timeline follow-ups
 
-Rich cue levels, per-cue blend/role, and manual timeline-opacity nudges are shipped (see [improved-timeline-presets.md](improved-timeline-presets.md) Idea 1). Remaining mix-cue work:
+Rich cue levels, per-cue blend/role, stem conductor, visual limiter, and manual timeline-opacity nudges are shipped (see [completed/improved-timeline-presets.md](completed/improved-timeline-presets.md)).
 
 - **Record still writes 0/1.** Armed record toggles punch full on/off only; partial opacities stay Apply or `Shift`/`Ctrl` + `,`/`.` on a selected cue.
-- **Automatic blend/role assignment** from the generative arranger once reactivity fingerprints exist (Idea 3).
 
 ---
 
