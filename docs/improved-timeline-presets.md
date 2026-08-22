@@ -138,16 +138,11 @@ Classify presets by how they **respond** to audio, not only by how they look, th
 - Stop three dense presets from lighting at once under black-key (or any) blend.
 - Make `preset_switching: timeline` content-aware instead of a shuffled bag.
 - Know which presets can sit at low opacity as a bed without looking inert (needs a motion floor, not a brightness average).
-- Reuse curation (`favourites/`) and the existing scan harness rather than asking users to tag files.
+- Reuse curation (`favourites/`) rather than asking users to tag files.
 
 ### Design sketch
 
-The probe harness is most of the way there already. [cleave/preset_scan.py](../cleave/preset_scan.py) boots headless projectM into a 480x270 FBO, feeds PCM per frame, and reads back per-frame metrics with a warmup window and a metrics cache.
-
-1. Replace the single constant probe (`_synthetic_pcm_burst`, a sine plus noise that is never silent) with a **probe set**: silence baseline, sub-bass sine, kick impulse train at fixed tempo, hi-hat noise bursts, sustained vocal-band tone.
-2. Extend `FrameMetrics` in [cleave/preset_scan_metrics.py](../cleave/preset_scan_metrics.py) beyond luma and coverage with temporal frame delta and an edge or high-frequency energy proxy. Bump the metrics cache version.
-3. Reduce to a per-preset vector: response to bass, response to transients, motion floor under silence, brightness, screen coverage, busyness.
-4. Derive pools from that vector, favourites first, then directory:
+Classify each preset by how it responds to audio (silence, bass, transients, sustained tone) into a small vector: bass response, transient response, motion floor under silence, brightness, screen coverage, busyness. Derive pools from that vector, favourites first, then directory:
 
 | Role | Vector signature | Casting rule |
 | --- | --- | --- |
@@ -156,20 +151,19 @@ The probe harness is most of the way there already. [cleave/preset_scan.py](../c
 | Lead | high busyness or brightness | at most one hot at a time |
 | Accent | short bright bursts, high delta | chorus hits, marker edges |
 
-5. Cast on each on-transition in [cleave/viz/preset_switching.py](../cleave/viz/preset_switching.py) through the cue `role` field (Idea 1b): when set, index `role_rotations[role]` by per-role occurrence; when unset or the pool is empty, use the main rotation. Idea 3 fills those role pools from fingerprints instead of hand curation. Keep play and scan in agreement on the rotation set (see [.cursor/rules/preset-scan-rotation-set.mdc](../.cursor/rules/preset-scan-rotation-set.mdc)).
+Cast on each on-transition in [cleave/viz/preset_switching.py](../cleave/viz/preset_switching.py) through the cue `role` field (Idea 1b): when set, index `role_rotations[role]` by per-role occurrence; when unset or the pool is empty, use the main rotation. Idea 3 fills those role pools from fingerprints instead of hand curation.
 
 ### Fits existing code
 
-- Scan CLI, golden set, and threshold tuning: [completed/presets-check-proposal.md](completed/presets-check-proposal.md), [completed/presets-scan-plan.md](completed/presets-scan-plan.md).
 - Timeline rotation advance already keys off committed on-transitions.
 
 ### Libraries
 
-Heuristic frame stats inside the existing harness should be enough. Optional: CLIP or similar embeddings on short clips if heuristics mislabel calm versus chaotic too often.
+Optional: CLIP or similar embeddings on short clips if heuristics mislabel calm versus chaotic too often.
 
 ### User effort
 
-Curate favourites once, run the scan once per pack (cached). Casting is automatic on Apply and playback.
+Curate favourites once. Casting is automatic on Apply and playback.
 
 ---
 
@@ -284,13 +278,13 @@ Breathing / Dialogue / Arc / Pulse remain character profiles that bias switch ra
 | 1b | Rich cues: blend and role (Idea 1, shipped) | Completes the mix vision; casting uses the cue role field | Medium | Done |
 | 2 | Stem conductor (Idea 2, shipped) | Uses data already in `signals.json`; first thing that makes lanes song-tied | High | Done |
 | 3 | Closed-loop limiter (companion, shipped) | Cheap once levels exist; buys headroom before casting lands | Medium | Done |
-| 4 | Reactivity fingerprints and casting (Idea 3) | Probe harness exists; fixes busy-on-busy at the milk level | High | High (probe set, metrics, pools, casting) |
+| 4 | Reactivity fingerprints and casting (Idea 3) | Fixes busy-on-busy at the milk level | High | High |
 | 5 | Reprise and auto form (Idea 4) | Highest ceiling, most analysis risk; benefits from 1 to 4 being in place | High | High (analyse dependency, marker suggestions, arranger restructure) |
 
 Sequencing notes:
 
 - Levels (1) and stem conductor (2) are shipped and together cover most of the "feels tied to the song" goal.
-- Step 4 can ship in halves: fingerprints and a scan report first, casting second.
+- Step 4 can ship in halves: fingerprints first, casting second.
 - Step 5 can ship in halves: suggested markers first (useful alone), cluster reprise second.
 
 ---
