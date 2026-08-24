@@ -51,9 +51,9 @@ These items are no longer the right targets.
 
 **Uncached full-panel redraw.** Structure signatures, `TuningPanelCache`, and incremental compose are in place (see [ui-performance-improvements.md](completed/ui-performance-improvements.md)). Remaining draw cost is special-case chrome, not the old every-frame rebuild.
 
-**Layer live authority.** `TuningSession` is the only live store for creative layer state (opacity, blend, stem, beat, enabled, locked, effects, preset switching, z-order). `CleaveConfig.layers` is YAML bootstrap for `session_from_cfg` and `scan_all_layers`. GPU objects are copies pushed from session. Persist (`persist_layers`, `persist_layer_z_order`) reads session only. Overlay card title/body text and colours stay on cfg because they are never live-edited. Editor prefs and `project.yaml` song markers remain separate documents.
+**Layer live authority.** `TuningSession` is the only live store for creative layer state (opacity, blend, stem, beat, enabled, locked, effects, preset switching, z-order). `CleaveConfig.layers` is YAML bootstrap for `session_from_cfg` and `scan_all_layers`. GPU objects are copies pushed from session. Persist (`persist_layers`, `persist_layer_z_order`) reads session only. Overlay card title/body text and colours stay on cfg because they are never live-edited. Editor prefs and `project.yaml` song markers remain separate documents. Detail: [Appendix: P0 work](#appendix-p0-work).
 
-**Layer composite contract.** Both GPU compositors implement [layer_composite.py](../cleave/layer_composite.py) `LayerCompositor` against one `LayerCompositeRequest`. Blend, opacity-in-alpha, and HDR format live in [layer_blend.py](../cleave/layer_blend.py) and [gl_color_format.py](../cleave/gl_color_format.py). [layer_pipeline.py](../cleave/viz/layer_pipeline.py) `LayerFramePipeline.composite` is the layer choke point (mask on/off only selects the implementation). Wipes are an explicit `MaskTransition`. Hard composite (feather 0%) still ignores per-layer blend, hue, and flash by design; the soft path applies them. [frame_finish.py](../cleave/viz/frame_finish.py) remains the post-composite choke point.
+**Layer composite contract.** Both GPU compositors implement [layer_composite.py](../cleave/layer_composite.py) `LayerCompositor` against one `LayerCompositeRequest`. Blend, opacity-in-alpha, and HDR format live in [layer_blend.py](../cleave/layer_blend.py) and [gl_color_format.py](../cleave/gl_color_format.py). [layer_pipeline.py](../cleave/viz/layer_pipeline.py) `LayerFramePipeline.composite` is the layer choke point (mask on/off only selects the implementation). Wipes are an explicit `MaskTransition`. Hard composite (feather 0%) still ignores per-layer blend, hue, and flash by design; the soft path applies them. [frame_finish.py](../cleave/viz/frame_finish.py) remains the post-composite choke point. Detail: [Appendix: P0 work](#appendix-p0-work).
 
 ---
 
@@ -162,3 +162,38 @@ Keep the package boundary. The compose/compositor contract (duration, overlap, r
 ## 4. Bottom line
 
 The architecture principles still match what the code is aiming for. Layer creative state lives on session after bootstrap. Both layer compositors share one request contract, blend/opacity/HDR helpers, and an explicit wipe command. Incomplete descriptor coverage on the draw path remains the main tax on every new panel row.
+
+---
+
+## Appendix: P0 work
+
+The two P0 items from this review. Invariants also live in [architecture principles](../.cursor/rules/architecture-principles.mdc).
+
+### Phase 1: session as live layer authority
+
+`TuningSession` is the only live store for creative layer state after `session_from_cfg`. `CleaveConfig.layers` is YAML bootstrap for that builder and for [preset_playlist.py](../cleave/preset_playlist.py) `scan_all_layers` (playlists exist before session). Editor prefs, paths, sizes, and overlay card title/body text and colours stay on cfg because they are never live-edited. `project.yaml` song markers remain a separate document.
+
+| Path | Change |
+| --- | --- |
+| [layer_pipeline.py](../cleave/viz/layer_pipeline.py) | `build` / `build_single` take `LayerRuntime` and `session.layer_z_order`. GPU opacity, blend, enabled, beat, and preset switching seed from session. |
+| [session.py](../cleave/viz/session.py) | `new_layer_runtime` builds an add-layer runtime. No `LayerConfig` on the live add path. |
+| [wiring.py](../cleave/viz/wiring.py) | `LayerManager` add/remove mutates session, playlists, and GPU only. |
+| [config_schema.py](../cleave/config_schema.py) | `persist_layers` and `persist_layer_z_order` read session only. |
+| [layer_preview_resolution.py](../cleave/viz/layer_preview_resolution.py) | `offline_layer_sizes` takes an explicit z-order. |
+| [app.py](../cleave/viz/app.py), [render.py](../cleave/viz/render.py), [editor_mode_controls.py](../cleave/viz/editor_mode_controls.py) | Missing-preset checks use session playlists. |
+
+[test_layer_authority.py](../tests/cleave/viz/test_layer_authority.py) poisons `cfg.layers` after live edits and asserts persist, GPU seed, and add-then-save still follow session.
+
+### Phase 2: shared layer-composite contract
+
+Both GPU compositors implement [layer_composite.py](../cleave/layer_composite.py) `LayerCompositor` against one `LayerCompositeRequest` (`target_fbo_id`, layers in session z-order with first = topmost, `color_format`, optional `mask`, `active_slots`, `song_time_sec`, optional `MaskTransition`). [layer_pipeline.py](../cleave/viz/layer_pipeline.py) `LayerFramePipeline.composite` builds that request and only branches to pick the implementation. [frame_finish.py](../cleave/viz/frame_finish.py) stays the post-composite choke point.
+
+| Path | Change |
+| --- | --- |
+| [layer_blend.py](../cleave/layer_blend.py) | Public `apply_layer_blend_mode` and `opacity_in_alpha` (add uses opacity in alpha; other modes bake opacity into RGB). |
+| [gl_color_format.py](../cleave/gl_color_format.py) | Shared RGBA16F probe; both compositors fail the same way when HDR is unsupported. |
+| [pattern_mask_transition.py](../cleave/pattern_mask_transition.py) | `PatternMaskTransitionTracker` holds the previous active set. Pipeline `peek`s a `MaskTransition` (`hard_layout` / `weight_field` / `clear`) and `commit`s. Compositors do not infer wipes from slot diffs. `live_slots` uses the same pending command plus in-flight morph territory. |
+| [gl_masked_compositor.py](../cleave/gl_masked_compositor.py) | Soft path applies hue and flash. Hard path (feather 0%) ignores blend, hue, and flash by design. |
+| [pattern_mask_arrange.py](../cleave/timeline_presets/pattern_mask_arrange.py) | Compose/compositor contract (duration, overlap, recast vs slot-set change, hard-path exemption) lives next to the emit code. |
+
+[test_layer_composite.py](../tests/cleave/test_layer_composite.py) asserts both classes satisfy the protocol. [test_compositor_parity.py](../tests/cleave/test_compositor_parity.py) compares soft full-coverage mask-on vs unmasked output across blend modes and colour formats.
