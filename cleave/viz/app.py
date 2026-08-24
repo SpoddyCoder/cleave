@@ -220,9 +220,9 @@ def init_gl_resources_heavy(
         seed.cfg,
         compositor,
         seed.playlists,
+        seed.session,
         projectm_fps=LIVE_PROJECTM_FPS,
         preview_resolutions=True,
-        session=seed.session,
         project_dir=seed.project_dir,
     )
 
@@ -278,7 +278,9 @@ def init_gl_resources_heavy(
         tuning_controls=controls,
     )
 
-    missing_anchor = missing_preset_anchor_notification(seed.cfg.layers)
+    missing_anchor = missing_preset_anchor_notification(
+        {slot: layer.playlist.current for slot, layer in seed.session.layers.items()}
+    )
     if missing_anchor is not None:
         controls.show_notification(missing_anchor)
 
@@ -339,6 +341,7 @@ def init_gl_resources_render(
         seed.cfg,
         compositor,
         seed.playlists,
+        seed.session,
         projectm_fps=render_fps(seed.cfg),
         preview_resolutions=False,
         viz_quality=viz_quality,

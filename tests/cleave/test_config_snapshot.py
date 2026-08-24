@@ -478,8 +478,9 @@ def test_write_session_snapshot_uses_session_z_order_when_valid() -> None:
         assert data["layer_z_order"] == session_order
 
 
-def test_write_session_snapshot_falls_back_to_cfg_z_order_when_invalid() -> None:
+def test_write_session_snapshot_uses_session_z_order_when_membership_diverges() -> None:
     cfg_order = ["layer_1", "layer_3", "layer_2", "layer_4"]
+    session_order = ["layer_1", "layer_2"]
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         preset_root = root / "presets"
@@ -504,7 +505,7 @@ def test_write_session_snapshot_falls_back_to_cfg_z_order_when_invalid() -> None
         )
 
         session = TuningSession(
-            layer_z_order=["layer_1", "layer_2"],
+            layer_z_order=session_order,
             layers={
                 slot: LayerRuntime(
                     stem=TEST_LAYER_STEMS[slot],
@@ -513,7 +514,7 @@ def test_write_session_snapshot_falls_back_to_cfg_z_order_when_invalid() -> None
                     ),
                     browse_floor=preset_root / TEST_LAYER_STEMS[slot],
                 )
-                for slot in DEFAULT_LAYER_SLOTS
+                for slot in session_order
             },
         )
 
@@ -521,7 +522,7 @@ def test_write_session_snapshot_falls_back_to_cfg_z_order_when_invalid() -> None
         write_session_snapshot(out_path, cfg=cfg, session=session)
 
         data = yaml.safe_load(out_path.read_text(encoding="utf-8"))
-        assert data["layer_z_order"] == list(cfg_order)
+        assert data["layer_z_order"] == session_order
 
 
 def test_write_session_snapshot_includes_upscale() -> None:

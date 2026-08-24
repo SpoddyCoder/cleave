@@ -1,4 +1,9 @@
-"""Single source of truth for Cleave YAML parse, serialize, and defaults."""
+"""Single source of truth for Cleave YAML parse, serialize, and defaults.
+
+Layer creative state persists from session only. Overlay card persist reads
+never-live-edited title/body text and colours from cfg
+(`_overlay_card_persist_values`). Editor prefs and paths also stay on cfg.
+"""
 
 from __future__ import annotations
 
@@ -172,21 +177,6 @@ def next_layer_slot(existing_slots: list[str]) -> str:
             return candidate
     raise ValueError(f"Maximum {MAX_LAYER_COUNT} layers already present")
 
-
-def new_layer_config(slot: str, preset: Path, preset_root: Path) -> Any:
-    from cleave.config import LayerConfig
-
-    return LayerConfig(
-        preset=preset,
-        stem=DEFAULT_NEW_LAYER_STEM,
-        enabled=True,
-        opacity=1.0,
-        blend_mode=DEFAULT_BLEND_MODE[DEFAULT_NEW_LAYER_STEM],
-        locked=False,
-        preset_switching=DEFAULT_PRESET_SWITCHING,
-        preset_switching_trigger=DEFAULT_PRESET_SWITCHING_TRIGGER,
-        preset_switching_list=[],
-    )
 
 DEFAULT_BLEND_MODE: dict[StemSource, BlendMode] = {
     "drums": "add",
@@ -565,7 +555,6 @@ def parse_timeline_preset_mode(raw: Any, label: str) -> TimelinePresetMode:
     return value  # type: ignore[return-value]
 
 
-FieldSource = Literal["cfg", "session", "both"]
 T = TypeVar("T")
 
 
@@ -778,11 +767,10 @@ def preset_switching_trigger_display(trigger: PresetSwitchingTrigger) -> str:
 
 @dataclass(frozen=True)
 class FieldDescriptor:
-    """Leaf field: YAML key, default, parse/dump, and persistence source."""
+    """Leaf field: YAML key, default, parse, and dump."""
 
     yaml_key: str
     default: Any
-    source: FieldSource
     parse: Callable[[Any, "ParseCtx", str], Any]
     dump: Callable[[Any, "PersistCtx"], Any]
     yaml_alt_keys: tuple[str, ...] = ()
@@ -1159,21 +1147,18 @@ def _overlay_text_block_fields(
         FieldDescriptor(
             "content",
             content_default,
-            "cfg",
             _parse_overlay_content,
             _dump_overlay_content,
         ),
         FieldDescriptor(
             "font",
             DEFAULT_RENDER_OVERLAY_FONT,
-            "cfg",
             _parse_overlay_font,
             _dump_scalar,
         ),
         FieldDescriptor(
             "font-size",
             font_size_default,
-            "session",
             _parse_non_negative_int,
             _dump_scalar,
             attr_key="font_size",
@@ -1181,7 +1166,6 @@ def _overlay_text_block_fields(
         FieldDescriptor(
             colour_yaml_key,
             DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
-            "cfg",
             lambda raw, ctx, label: parse_hex_colour(raw, label),
             _dump_hex_colour,
             yaml_alt_keys=colour_alt_keys,
@@ -1190,7 +1174,6 @@ def _overlay_text_block_fields(
         FieldDescriptor(
             "background-colour",
             None,
-            "cfg",
             _parse_optional_background_colour,
             _dump_hex_colour,
             attr_key="background_colour",
@@ -1199,7 +1182,6 @@ def _overlay_text_block_fields(
         FieldDescriptor(
             "margin-bottom",
             margin_bottom_default,
-            "cfg",
             _parse_non_negative_int,
             _dump_scalar,
             attr_key="margin_bottom",
@@ -1250,7 +1232,6 @@ RENDER_OVERLAY_BORDER_SECTION = SectionDescriptor(
         FieldDescriptor(
             "colour",
             DEFAULT_RENDER_OVERLAY_BORDER_COLOUR,
-            "cfg",
             lambda raw, ctx, label: parse_hex_colour(
                 "#ffffff" if raw is None else raw, label
             ),
@@ -1259,7 +1240,6 @@ RENDER_OVERLAY_BORDER_SECTION = SectionDescriptor(
         FieldDescriptor(
             "width",
             DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
-            "session",
             _parse_non_negative_int,
             _dump_scalar,
         ),
@@ -1273,21 +1253,18 @@ RENDER_OVERLAY_BACKGROUND_SECTION = SectionDescriptor(
         FieldDescriptor(
             "margin",
             DEFAULT_RENDER_OVERLAY_BACKGROUND_MARGIN,
-            "cfg",
             _parse_non_negative_int,
             _dump_scalar,
         ),
         FieldDescriptor(
             "padding",
             DEFAULT_RENDER_OVERLAY_BACKGROUND_PADDING,
-            "cfg",
             _parse_non_negative_int,
             _dump_scalar,
         ),
         FieldDescriptor(
             "colour",
             DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR,
-            "cfg",
             lambda raw, ctx, label: parse_hex_colour(
                 "#000000" if raw is None else raw, label
             ),
@@ -1296,7 +1273,6 @@ RENDER_OVERLAY_BACKGROUND_SECTION = SectionDescriptor(
         FieldDescriptor(
             "opacity",
             DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
-            "session",
             _parse_non_negative_float,
             _dump_scalar,
         ),
@@ -1310,14 +1286,12 @@ def _render_overlay_animation_shared_fields() -> tuple[FieldDescriptor, ...]:
         FieldDescriptor(
             "type",
             DEFAULT_RENDER_OVERLAY_ANIMATION_TYPE,
-            "session",
             _parse_render_overlay_animation_type,
             _dump_scalar,
         ),
         FieldDescriptor(
             "slide-direction",
             DEFAULT_RENDER_OVERLAY_SLIDE_DIRECTION,
-            "session",
             _parse_render_overlay_slide_direction,
             _dump_scalar,
             attr_key="slide_direction",
@@ -1329,7 +1303,6 @@ def _render_overlay_display_time_field() -> FieldDescriptor:
     return FieldDescriptor(
         "display-time",
         DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
-        "session",
         _parse_non_negative_float,
         _dump_scalar,
         attr_key="display_time",
@@ -1343,7 +1316,6 @@ RENDER_OVERLAY_OPENING_ANIMATION_SECTION = SectionDescriptor(
         FieldDescriptor(
             "appear-at",
             DEFAULT_RENDER_OVERLAY_APPEAR_AT,
-            "session",
             _parse_non_negative_float,
             _dump_scalar,
             attr_key="appear_at",
@@ -1364,7 +1336,6 @@ RENDER_OVERLAY_CLOSING_ANIMATION_SECTION = SectionDescriptor(
         FieldDescriptor(
             "disappear-at",
             DEFAULT_RENDER_OVERLAY_DISAPPEAR_AT,
-            "session",
             _parse_non_negative_float,
             _dump_scalar,
             attr_key="disappear_at",
@@ -1386,7 +1357,6 @@ def _render_overlay_card_fields(
         FieldDescriptor(
             "enabled",
             True,
-            "session",
             lambda raw, _ctx, _label: bool(raw),
             _dump_scalar,
         ),
@@ -1396,7 +1366,6 @@ def _render_overlay_card_fields(
         FieldDescriptor(
             "position",
             DEFAULT_RENDER_OVERLAY_POSITION,
-            "session",
             _parse_render_overlay_position,
             _dump_scalar,
         ),
@@ -1448,7 +1417,6 @@ RENDER_OVERLAYS_FIELDS: tuple[SchemaField, ...] = (
     FieldDescriptor(
         "locked",
         False,
-        "session",
         lambda raw, _ctx, _label: bool(raw),
         _dump_scalar,
     ),
@@ -1490,28 +1458,24 @@ EDITOR_PROJECT_FIELDS: tuple[FieldDescriptor, ...] = (
     FieldDescriptor(
         "width",
         DEFAULT_EDITOR_WIDTH,
-        "cfg",
         lambda raw, _ctx, _label: int(raw),
         _dump_scalar,
     ),
     FieldDescriptor(
         "height",
         DEFAULT_EDITOR_HEIGHT,
-        "cfg",
         lambda raw, _ctx, _label: int(raw),
         _dump_scalar,
     ),
     FieldDescriptor(
         "upscale",
         DEFAULT_EDITOR_UPSCALE,
-        "cfg",
         _parse_upscale,
         lambda value, _ctx: clamp_upscale(value),
     ),
     FieldDescriptor(
         "beat_sensitivity",
         DEFAULT_BEAT_SENSITIVITY,
-        "cfg",
         _parse_beat_sensitivity,
         lambda value, _ctx: clamp_beat_sensitivity(value),
     ),
@@ -1521,21 +1485,18 @@ EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
     FieldDescriptor(
         "preview_quality",
         DEFAULT_EDITOR_PREVIEW_QUALITY,
-        "cfg",
         _parse_editor_preview_quality,
         _dump_scalar,
     ),
     FieldDescriptor(
         "ui_width_mode",
         DEFAULT_UI_WIDTH_MODE,
-        "cfg",
         _parse_ui_width_mode,
         _dump_scalar,
     ),
     FieldDescriptor(
         "ui_width",
         DEFAULT_UI_WIDTH,
-        "cfg",
         lambda raw, ctx, label: clamp_ui_width(
             int(require_non_negative_number(raw, label, as_int=True))
         ),
@@ -1544,7 +1505,6 @@ EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
     FieldDescriptor(
         "ui_fade",
         DEFAULT_UI_FADE_SEC,
-        "cfg",
         lambda raw, ctx, label: clamp_ui_fade(
             float(require_non_negative_number(raw, label))
         ),
@@ -1553,7 +1513,6 @@ EDITOR_FIELDS: tuple[FieldDescriptor, ...] = (
     FieldDescriptor(
         "residual_latency_ms",
         DEFAULT_RESIDUAL_LATENCY_MS,
-        "cfg",
         lambda raw, ctx, label: clamp_residual_latency_ms(
             int(require_non_negative_number(raw, label, as_int=True))
         ),
@@ -1598,21 +1557,18 @@ CHROMA_BOOST_SECTION = SectionDescriptor(
         FieldDescriptor(
             "mode",
             DEFAULT_CHROMA_BOOST_APPLY_MODE,
-            "session",
             _parse_chroma_boost_apply_mode,
             _dump_scalar,
         ),
         FieldDescriptor(
             "variant",
             DEFAULT_CHROMA_BOOST_VARIANT,
-            "session",
             _parse_chroma_boost_variant,
             _dump_scalar,
         ),
         FieldDescriptor(
             "amount_pct",
             DEFAULT_CHROMA_BOOST_AMOUNT_PCT,
-            "session",
             lambda raw, _ctx, _label: clamp_chroma_boost_amount_pct(int(float(raw))),
             _dump_scalar,
         ),
@@ -1635,21 +1591,18 @@ HIGHLIGHT_ROLLOFF_SECTION = SectionDescriptor(
         FieldDescriptor(
             "mode",
             DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
-            "session",
             _parse_highlight_rolloff_apply_mode,
             _dump_scalar,
         ),
         FieldDescriptor(
             "curve",
             DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
-            "session",
             _parse_highlight_rolloff_curve,
             _dump_scalar,
         ),
         FieldDescriptor(
             "threshold_pct",
             DEFAULT_HIGHLIGHT_ROLLOFF_THRESHOLD_PCT,
-            "session",
             lambda raw, _ctx, _label: clamp_highlight_rolloff_threshold_pct(
                 int(float(raw))
             ),
@@ -1658,7 +1611,6 @@ HIGHLIGHT_ROLLOFF_SECTION = SectionDescriptor(
         FieldDescriptor(
             "ceiling_pct",
             DEFAULT_HIGHLIGHT_ROLLOFF_CEILING_PCT,
-            "session",
             lambda raw, _ctx, _label: clamp_highlight_rolloff_ceiling_pct(
                 int(float(raw))
             ),
@@ -1667,7 +1619,6 @@ HIGHLIGHT_ROLLOFF_SECTION = SectionDescriptor(
         FieldDescriptor(
             "strength_pct",
             DEFAULT_HIGHLIGHT_ROLLOFF_STRENGTH_PCT,
-            "session",
             lambda raw, _ctx, _label: clamp_highlight_rolloff_strength_pct(
                 int(float(raw))
             ),
@@ -1676,7 +1627,6 @@ HIGHLIGHT_ROLLOFF_SECTION = SectionDescriptor(
         FieldDescriptor(
             "softness_pct",
             DEFAULT_HIGHLIGHT_ROLLOFF_SOFTNESS_PCT,
-            "session",
             lambda raw, _ctx, _label: clamp_highlight_rolloff_softness_pct(
                 int(float(raw))
             ),
@@ -1685,7 +1635,6 @@ HIGHLIGHT_ROLLOFF_SECTION = SectionDescriptor(
         FieldDescriptor(
             "desaturation_pct",
             DEFAULT_HIGHLIGHT_ROLLOFF_DESATURATION_PCT,
-            "session",
             lambda raw, _ctx, _label: clamp_highlight_rolloff_desaturation_pct(
                 int(float(raw))
             ),
@@ -1712,28 +1661,24 @@ RENDER_POST_FX_FIELDS: tuple[SchemaField, ...] = (
     FieldDescriptor(
         "enabled",
         True,
-        "session",
         lambda raw, _ctx, _label: bool(raw),
         _dump_scalar,
     ),
     FieldDescriptor(
         "locked",
         False,
-        "session",
         lambda raw, _ctx, _label: bool(raw),
         _dump_scalar,
     ),
     FieldDescriptor(
         "fade_in",
         DEFAULT_RENDER_POST_FX_FADE_IN,
-        "session",
         lambda raw, ctx, label: float(require_non_negative_number(raw, label)),
         _dump_scalar,
     ),
     FieldDescriptor(
         "fade_out",
         DEFAULT_RENDER_POST_FX_FADE_OUT,
-        "session",
         lambda raw, ctx, label: float(require_non_negative_number(raw, label)),
         _dump_scalar,
     ),
@@ -1746,28 +1691,24 @@ RENDER_PATTERN_MASK_FIELDS: tuple[SchemaField, ...] = (
     FieldDescriptor(
         "enabled",
         DEFAULT_RENDER_PATTERN_MASK_ENABLED,
-        "session",
         lambda raw, _ctx, _label: bool(raw),
         _dump_scalar,
     ),
     FieldDescriptor(
         "locked",
         DEFAULT_RENDER_PATTERN_MASK_LOCKED,
-        "session",
         lambda raw, _ctx, _label: bool(raw),
         _dump_scalar,
     ),
     FieldDescriptor(
         "type",
         DEFAULT_RENDER_PATTERN_MASK_TYPE,
-        "session",
         _parse_pattern_mask_type,
         _dump_scalar,
     ),
     FieldDescriptor(
         "density",
         DEFAULT_RENDER_PATTERN_MASK_DENSITY,
-        "session",
         lambda raw, _ctx, label: clamp_pattern_mask_density(
             float(require_non_negative_number(raw, label))
         ),
@@ -1776,21 +1717,18 @@ RENDER_PATTERN_MASK_FIELDS: tuple[SchemaField, ...] = (
     FieldDescriptor(
         "feather_pct",
         DEFAULT_RENDER_PATTERN_MASK_FEATHER_PCT,
-        "session",
         lambda raw, _ctx, _label: clamp_pattern_mask_feather_pct(int(float(raw))),
         _dump_scalar,
     ),
     FieldDescriptor(
         "invert",
         DEFAULT_RENDER_PATTERN_MASK_INVERT,
-        "session",
         lambda raw, _ctx, _label: bool(raw),
         _dump_scalar,
     ),
     FieldDescriptor(
         "transition",
         DEFAULT_RENDER_PATTERN_MASK_TRANSITION,
-        "session",
         lambda raw, _ctx, label: clamp_pattern_mask_transition(
             float(require_non_negative_number(raw, label))
         ),
@@ -1799,7 +1737,6 @@ RENDER_PATTERN_MASK_FIELDS: tuple[SchemaField, ...] = (
     FieldDescriptor(
         "seed",
         DEFAULT_RENDER_PATTERN_MASK_SEED,
-        "session",
         _parse_pattern_mask_seed,
         _dump_scalar,
     ),
@@ -1990,11 +1927,7 @@ def parse_layer_z_order_section(data: dict[str, Any], ctx: ParseCtx) -> list[str
 
 
 def persist_layer_z_order(ctx: PersistCtx) -> list[str]:
-    order = ctx.session.layer_z_order
-    cfg_order = list(ctx.cfg.layer_z_order)
-    if len(order) == len(cfg_order) and set(order) == set(cfg_order):
-        return list(order)
-    return cfg_order
+    return list(ctx.session.layer_z_order)
 
 
 def validate_blend_mode(raw: Any, *, path: str) -> BlendMode:
@@ -2170,57 +2103,30 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
 
 
 def persist_layers(ctx: PersistCtx) -> dict[str, dict[str, Any]]:
-    from cleave.preset_playlist import to_config_relative
-
     preset_root = ctx.cfg.paths.preset_root
     layers_out: dict[str, dict[str, Any]] = {}
     global_beat = ctx.cfg.editor.beat_sensitivity
 
     for slot in ctx.session.layer_z_order:
-        layer_cfg = ctx.cfg.layers[slot]
-        stem = layer_cfg.stem
-        if slot in ctx.session.layers:
-            runtime = ctx.session.layers[slot]
-            preset = runtime.playlist.config_preset_path(preset_root)
-            opacity = runtime.opacity_pct / 100.0
-            enabled = runtime.enabled
-            blend_mode = runtime.blend_mode
-            beat = runtime.beat_sensitivity
-            effects = runtime.effects
-            locked = runtime.locked
-            preset_switching = runtime.preset_switching
-            preset_switching_trigger = runtime.preset_switching_trigger
-            preset_duration = runtime.preset_duration
-            soft_cut_duration = runtime.soft_cut_duration
-            hard_cut_duration = runtime.hard_cut_duration
-            hard_cut_sensitivity = runtime.hard_cut_sensitivity
-            hard_cut_enabled = runtime.hard_cut_enabled
-            easter_egg = runtime.easter_egg
-            preset_start_clean = runtime.preset_start_clean
-            preset_switching_list = [Path(path) for path in runtime.preset_list]
-            stem = getattr(runtime, "stem", stem)
-        else:
-            preset = to_config_relative(layer_cfg.preset, preset_root)
-            opacity = layer_cfg.opacity
-            enabled = layer_cfg.enabled
-            blend_mode = layer_cfg.blend_mode
-            locked = layer_cfg.locked
-            preset_switching = layer_cfg.preset_switching
-            preset_switching_trigger = layer_cfg.preset_switching_trigger
-            preset_duration = layer_cfg.preset_duration
-            soft_cut_duration = layer_cfg.soft_cut_duration
-            hard_cut_duration = layer_cfg.hard_cut_duration
-            hard_cut_sensitivity = layer_cfg.hard_cut_sensitivity
-            hard_cut_enabled = layer_cfg.hard_cut_enabled
-            easter_egg = layer_cfg.easter_egg
-            preset_start_clean = layer_cfg.preset_start_clean
-            preset_switching_list = list(layer_cfg.preset_switching_list)
-            effects = layer_cfg.effects
-            beat = (
-                layer_cfg.beat_sensitivity
-                if layer_cfg.beat_sensitivity is not None
-                else global_beat
-            )
+        runtime = ctx.session.layers[slot]
+        stem = runtime.stem
+        preset = runtime.playlist.config_preset_path(preset_root)
+        opacity = runtime.opacity_pct / 100.0
+        enabled = runtime.enabled
+        blend_mode = runtime.blend_mode
+        beat = runtime.beat_sensitivity
+        effects = runtime.effects
+        locked = runtime.locked
+        preset_switching = runtime.preset_switching
+        preset_switching_trigger = runtime.preset_switching_trigger
+        preset_duration = runtime.preset_duration
+        soft_cut_duration = runtime.soft_cut_duration
+        hard_cut_duration = runtime.hard_cut_duration
+        hard_cut_sensitivity = runtime.hard_cut_sensitivity
+        hard_cut_enabled = runtime.hard_cut_enabled
+        easter_egg = runtime.easter_egg
+        preset_start_clean = runtime.preset_start_clean
+        preset_switching_list = [Path(path) for path in runtime.preset_list]
 
         layer_out: dict[str, Any] = {
             "stem": stem,

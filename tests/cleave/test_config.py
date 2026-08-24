@@ -1083,7 +1083,9 @@ def test_load_config_missing_preset_file(tmp_path: Path) -> None:
     cfg_path.write_text(text, encoding="utf-8")
     cfg = load_config(project_root=project_dir)
     assert not cfg.layers["layer_1"].preset.exists()
-    assert missing_preset_anchor_notification(cfg.layers) == (
+    assert missing_preset_anchor_notification(
+        {slot: layer.preset for slot, layer in cfg.layers.items()}
+    ) == (
         "Missing preset anchor: layer_1"
     )
 
@@ -1095,11 +1097,12 @@ def test_missing_preset_anchor_notification_plural(tmp_path: Path) -> None:
         "layer_1": LayerConfig(preset=tmp_path / "a.milk", stem="drums"),
         "layer_2": LayerConfig(preset=tmp_path / "b.milk", stem="bass"),
     }
-    assert missing_preset_anchors(layers) == [
+    paths = {slot: layer.preset for slot, layer in layers.items()}
+    assert missing_preset_anchors(paths) == [
         ("layer_1", layers["layer_1"].preset),
         ("layer_2", layers["layer_2"].preset),
     ]
-    assert missing_preset_anchor_notification(layers) == (
+    assert missing_preset_anchor_notification(paths) == (
         "Missing preset anchors: layer_1, layer_2"
     )
 

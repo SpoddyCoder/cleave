@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, TextIO
@@ -479,21 +480,21 @@ def _parse_paths(data: dict[str, Any], user_cfg: UserConfig) -> PathsConfig:
 
 
 def missing_preset_anchors(
-    layers: dict[str, LayerConfig],
-) -> list[tuple[str, Path]]:
-    """Layer slots whose ``preset`` path does not exist under ``preset_root``."""
+    preset_by_slot: Mapping[str, Path | None],
+) -> list[tuple[str, Path | None]]:
+    """Layer slots whose current playlist preset is missing on disk."""
     return [
-        (name, layer.preset)
-        for name, layer in layers.items()
-        if not layer.preset.exists()
+        (slot, path)
+        for slot, path in preset_by_slot.items()
+        if path is None or not path.exists()
     ]
 
 
 def missing_preset_anchor_notification(
-    layers: dict[str, LayerConfig],
+    preset_by_slot: Mapping[str, Path | None],
 ) -> str | None:
     """Short panel/stderr message when one or more layer preset anchors are missing."""
-    missing = missing_preset_anchors(layers)
+    missing = missing_preset_anchors(preset_by_slot)
     if not missing:
         return None
     slots = ", ".join(name for name, _ in missing)
