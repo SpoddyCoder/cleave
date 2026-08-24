@@ -10,6 +10,7 @@ from cleave.config import CleaveConfig, render_hdr_compositing
 from cleave.config_schema import DEFAULT_HIGHLIGHT_ROLLOFF_CURVE, HighlightRolloffCurve
 from cleave.easing import fade_alpha
 from cleave.gl_color_format import resolve_live_compositor_format
+from cleave.layer_composite import apply_color_format
 from cleave.viz.session import RenderPostFxRuntime, TuningSession
 
 if TYPE_CHECKING:
@@ -258,10 +259,7 @@ def sync_live_compositor_format(
         render_hdr_compositing(cfg),
         preset_curation=is_preset_curation_mode(session),
     )
-    compositor.set_color_format(fmt)
-    post_process.set_color_format(fmt)
-    if masked_compositor is not None:
-        masked_compositor.set_color_format(fmt)
+    apply_color_format(fmt, compositor, post_process, masked_compositor)
 
 
 def apply_hdr_display_shoulder(

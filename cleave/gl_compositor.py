@@ -10,11 +10,17 @@ import pygame
 from cleave.blend_modes import BlendMode
 from cleave.gl_color_format import (
     RGBA8,
-    RGBA16F,
     GlColorFormat,
-    probe_rgba16f_framebuffer,
+    require_supported_color_format,
 )
 from cleave.gl_post_process import GlPostProcess
+from cleave.layer_blend import (
+    LAYER_FLASH_MIN_ALPHA,
+    LAYER_FLASH_RGB,
+    apply_layer_blend_mode,
+    opacity_in_alpha,
+)
+from cleave.layer_composite import LayerCompositeRequest
 from OpenGL.GL import (
     GL_BLEND,
     GL_BLEND_EQUATION_RGB,
@@ -24,19 +30,12 @@ from OpenGL.GL import (
     GL_DEPTH_ATTACHMENT,
     GL_DEPTH_COMPONENT24,
     GL_DEPTH_TEST,
-    GL_DST_COLOR,
     GL_FRAMEBUFFER,
     GL_FRAMEBUFFER_COMPLETE,
     GL_FUNC_ADD,
-    GL_FUNC_REVERSE_SUBTRACT,
-    GL_FUNC_SUBTRACT,
     GL_LINEAR,
-    GL_MAX,
     GL_MODELVIEW,
-    GL_ONE,
-    GL_ONE_MINUS_DST_COLOR,
     GL_ONE_MINUS_SRC_ALPHA,
-    GL_ONE_MINUS_SRC_COLOR,
     GL_PROJECTION,
     GL_QUADS,
     GL_RGBA,
@@ -194,13 +193,15 @@ class LayerFbo:
 
 
 class GlCompositor:
-    """Stack tiered layer FBO textures into a content FBO, then present to display.
+    """Unmasked layer stack into a content FBO, then present to display.
 
-    Layer blend mode ``black-key`` treats each pixel's RGB as its compositing
-    weight (black is fully transparent). Stem composite and post-FX always render
-    into the content FBO; ``present_content()`` blits to the default framebuffer
-    at display size (1:1 when upscale is 1.0). The tuning overlay uses SRCALPHA
-    blending on the display framebuffer after present.
+    Implements ``LayerCompositor``. ``composite`` takes layers in z-order
+    (first = topmost) and draws bottom-to-top. Layer blend mode ``black-key``
+    treats each pixel's RGB as its compositing weight (black is fully
+    transparent). Stem composite and post-FX always render into the content FBO;
+    ``present_content()`` blits to the default framebuffer at display size
+    (1:1 when upscale is 1.0). The tuning overlay uses SRCALPHA blending on the
+    display framebuffer after present.
     """
 
     def __init__(
@@ -235,13 +236,9 @@ class GlCompositor:
 
     def init(self) -> None:
         """Initialize GL state after a pygame OPENGL context exists."""
-        if self._color_format is RGBA16F and not probe_rgba16f_framebuffer(
-            self.content_width, self.content_height
-        ):
-            raise RuntimeError(
-                "HDR compositing requires RGBA16F framebuffer support; "
-                "set render.hdr_compositing: false to use 8-bit compositing"
-            )
+        require_supported_color_format(
+            self._color_format, self.content_width, self.content_height
+        )
         self.setup_gl_state()
         self._allocate_content_fbo()
         self._initialized = True
@@ -324,40 +321,6 @@ class GlCompositor:
     def content_fbo_id(self) -> int:
         """Read-only GL framebuffer id for the composited content target."""
         return self._content_fbo_id
-
-    @staticmethod
-    def _apply_layer_blend_mode(mode: BlendMode) -> None:
-        """Configure GL blend for stacking layer FBOs onto the output framebuffer."""
-        if mode == "black-key":
-            glBlendEquation(GL_FUNC_ADD)
-            glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_COLOR)
-        elif mode == "add":
-            glBlendEquation(GL_FUNC_ADD)
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE)
-        elif mode == "multiply":
-            glBlendEquation(GL_FUNC_ADD)
-            glBlendFunc(GL_DST_COLOR, GL_ZERO)
-        elif mode == "screen":
-            glBlendEquation(GL_FUNC_ADD)
-            glBlendFunc(GL_ONE, GL_ONE_MINUS_DST_COLOR)
-        elif mode == "subtract":
-            glBlendEquation(GL_FUNC_SUBTRACT)
-            glBlendFunc(GL_ONE, GL_ONE)
-        elif mode == "difference":
-            glBlendEquation(GL_FUNC_REVERSE_SUBTRACT)
-            glBlendFunc(GL_ONE, GL_ONE)
-        elif mode == "exclusion":
-            glBlendEquation(GL_FUNC_ADD)
-            glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_COLOR)
-        elif mode == "max":
-            glBlendEquation(GL_MAX)
-            glBlendFunc(GL_ONE, GL_ONE)
-        elif mode == "pure-add":
-            glBlendEquation(GL_FUNC_ADD)
-            glBlendFunc(GL_ONE, GL_ONE)
-        else:
-            glBlendEquation(GL_FUNC_ADD)
-            glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_COLOR)
 
     @staticmethod
     def _apply_src_alpha_blend() -> None:
@@ -466,13 +429,9 @@ class GlCompositor:
         """Switch content/layer attachment format; no-op when unchanged."""
         if color_format is self._color_format:
             return
-        if color_format is RGBA16F and not probe_rgba16f_framebuffer(
-            self.content_width, self.content_height
-        ):
-            raise RuntimeError(
-                "HDR compositing requires RGBA16F framebuffer support; "
-                "set render.hdr_compositing: false to use 8-bit compositing"
-            )
+        require_supported_color_format(
+            color_format, self.content_width, self.content_height
+        )
         self._color_format = color_format
         if not self._initialized:
             return
@@ -704,7 +663,7 @@ class GlCompositor:
         affects fragment alpha. Modes that blend on SRC_COLOR need opacity baked
         into RGB. ``add`` uses GL_SRC_ALPHA and keeps opacity in the alpha channel.
         """
-        if blend_mode == "add":
+        if opacity_in_alpha(blend_mode):
             return (tint_rgb[0], tint_rgb[1], tint_rgb[2], opacity)
         scaled = tuple(c * opacity for c in tint_rgb)
         return (scaled[0], scaled[1], scaled[2], 1.0)
@@ -786,13 +745,13 @@ class GlCompositor:
     def draw_layer(self, layer: LayerFbo) -> None:
         if not layer.enabled:
             return
-        if layer.opacity <= 0.0 and layer.flash_alpha < 0.01:
+        if layer.opacity <= 0.0 and layer.flash_alpha < LAYER_FLASH_MIN_ALPHA:
             return
         self._ensure_init()
         self._bind_content_fbo()
         if layer.opacity > 0.0:
             glEnable(GL_BLEND)
-            self._apply_layer_blend_mode(layer.blend_mode)
+            apply_layer_blend_mode(layer.blend_mode)
             tint_rgb = self._lerp_tint_rgb(layer.hue_rgb, layer.hue_mix)
             rgba = self._layer_gl_color(tint_rgb, layer.opacity, layer.blend_mode)
             self._draw_textured_quad(
@@ -803,19 +762,19 @@ class GlCompositor:
                 self.content_height,
                 rgba,
             )
-        if layer.flash_alpha >= 0.01:
+        if layer.flash_alpha >= LAYER_FLASH_MIN_ALPHA:
             blend_enabled, blend_src, blend_dst, blend_equation = (
                 self._push_blend_state()
             )
             try:
                 glEnable(GL_BLEND)
-                self._apply_layer_blend_mode("add")
+                apply_layer_blend_mode("add")
                 self._draw_solid_quad(
                     0.0,
                     0.0,
                     self.content_width,
                     self.content_height,
-                    (240 / 255.0, 235 / 255.0, 230 / 255.0, layer.flash_alpha),
+                    (*LAYER_FLASH_RGB, layer.flash_alpha),
                 )
             finally:
                 self._pop_blend_state(
@@ -823,13 +782,15 @@ class GlCompositor:
                 )
                 glColor4f(1.0, 1.0, 1.0, 1.0)
 
-    def composite(self, layers: list[LayerFbo]) -> None:
-        """Clear to background and stack *layers* bottom-to-top."""
+    def composite(self, request: LayerCompositeRequest) -> None:
+        """Clear to background and stack ``request.layers`` (z-order, top first)."""
         self._ensure_init()
+        if request.color_format is not self._color_format:
+            self.set_color_format(request.color_format)
         self._bind_content_fbo()
         glClearColor(*self.bg)
         glClear(GL_COLOR_BUFFER_BIT)
-        for layer in layers:
+        for layer in reversed(request.layers):
             self.draw_layer(layer)
 
     def apply_frame_fade(self, alpha: float) -> None:

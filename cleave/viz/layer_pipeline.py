@@ -12,6 +12,8 @@ from cleave.effects.runtime import EffectRuntime
 from cleave.gl_compositor import GlCompositor
 from cleave.gl_masked_compositor import GlMaskedCompositor
 from cleave.gl_post_process import GlPostProcess
+from cleave.layer_composite import LayerCompositeRequest
+from cleave.pattern_mask import PatternMaskParams
 from cleave.preset_playlist import PresetPlaylist
 from cleave.projectm import ProjectM, pcm_max_samples_per_channel
 from cleave.projectm_health import (
@@ -111,8 +113,14 @@ def _pattern_mask_live_slots(
         )
         for name in slot_names
     )
+    transition = masked_compositor.transitions.peek(
+        active_slots,
+        song_time_sec=song_time_sec,
+        duration=pm.transition,
+        mask_type=pm.type,
+    )
     flags = masked_compositor.live_slots(
-        active_slots, song_time_sec, pm.transition
+        active_slots, song_time_sec, transition
     )
     return {name: flags[index] for index, name in enumerate(slot_names)}
 
@@ -523,37 +531,50 @@ class LayerFramePipeline:
         slot_names = list(session.layer_z_order)
         ordered = [layers_by_slot[name] for name in slot_names]
         fbos = [layer.fbo for layer in ordered]
-        active_slots = [
+        active_slots = tuple(
             bool(layer.fbo.enabled and layer.fbo.opacity > 0.0) for layer in ordered
-        ]
+        )
         pm = session.render_pattern_mask
         use_mask = (
             render_sections_active(session)
             and pm.enabled
             and masked_compositor is not None
         )
+        mask = None
+        transition = None
         if use_mask:
             assert masked_compositor is not None
             width = compositor.content_width
             height = compositor.content_height
             masked_compositor.set_content_size(width, height)
-            masked_compositor.set_color_format(compositor.color_format)
-            masked_compositor.composite(
-                compositor.content_fbo_id,
-                fbos,
+            mask = PatternMaskParams(
                 mask_type=pm.type,
                 feather_pct=pm.feather_pct,
                 density=pm.density,
                 invert=pm.invert,
                 seed=pm.seed,
-                slot_names=slot_names,
-                active_slots=active_slots,
-                song_time_sec=song_time_sec,
-                transition_duration=pm.transition,
             )
+            transition = masked_compositor.transitions.peek(
+                active_slots,
+                song_time_sec=song_time_sec,
+                duration=pm.transition,
+                mask_type=pm.type,
+            )
+        request = LayerCompositeRequest(
+            target_fbo_id=compositor.content_fbo_id,
+            layers=fbos,
+            color_format=compositor.color_format,
+            mask=mask,
+            active_slots=active_slots,
+            song_time_sec=song_time_sec,
+            transition=transition,
+        )
+        if use_mask:
+            assert masked_compositor is not None
+            masked_compositor.composite(request)
+            masked_compositor.transitions.commit(active_slots)
         else:
-            # Fixed composite still stacks bottom-up (reversed z-order).
-            compositor.composite(list(reversed(fbos)))
+            compositor.composite(request)
 
     @staticmethod
     def destroy(layers: list[StemLayer]) -> None:

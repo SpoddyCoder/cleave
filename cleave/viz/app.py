@@ -20,6 +20,7 @@ from cleave.user_config import persist_editor_settings
 from cleave.effects.runtime import EffectRuntime
 from cleave.gl_color_format import GlColorFormat, resolve_live_compositor_format
 from cleave.gl_compositor import GlCompositor
+from cleave.layer_composite import LayerCompositeRequest
 from cleave.gl_masked_compositor import GlMaskedCompositor
 from cleave.gl_post_process import GlPostProcess
 from cleave.preset_playlist import PresetPlaylist
@@ -431,7 +432,13 @@ def tick_frame_core(
         on_panel_notification = runtime.controls.show_notification
 
     if blank_visualizers:
-        runtime.compositor.composite([])
+        runtime.compositor.composite(
+            LayerCompositeRequest(
+                target_fbo_id=runtime.compositor.content_fbo_id,
+                layers=(),
+                color_format=runtime.compositor.color_format,
+            )
+        )
     else:
         LayerFramePipeline.render_frame(
             runtime.seed.session,
