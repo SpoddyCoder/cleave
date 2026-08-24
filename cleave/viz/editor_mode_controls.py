@@ -256,7 +256,12 @@ class EditorModeController:
             self._layer_manager.playlists.clear()
             self._layer_manager.playlists.update(playlists)
         self._sync_live_layers(playlists)
-        missing_anchor = missing_preset_anchor_notification(self.cfg.layers)
+        missing_anchor = missing_preset_anchor_notification(
+            {
+                slot: layer.playlist.current
+                for slot, layer in self.session.layers.items()
+            }
+        )
         if missing_anchor is not None and self._on_notification is not None:
             self._on_notification(missing_anchor)
 

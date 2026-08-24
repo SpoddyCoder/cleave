@@ -9,8 +9,6 @@ from cleave.config import CleaveConfig, VIZ_CONFIG_FILENAME
 from cleave.config_schema import (
     MAX_LAYER_COUNT,
     MIN_LAYER_COUNT,
-    DEFAULT_NEW_LAYER_STEM,
-    new_layer_config,
     next_layer_slot,
 )
 from cleave.config_snapshot import next_unnamed_path, write_session_snapshot
@@ -21,7 +19,7 @@ from cleave.gl_compositor import GlCompositor
 from cleave.gl_masked_compositor import GlMaskedCompositor
 from cleave.gl_post_process import GlPostProcess
 from cleave.paths import repo_root
-from cleave.preset_playlist import PresetPlaylist, preset_browse_floor, scan_single_layer
+from cleave.preset_playlist import PresetPlaylist, scan_single_layer
 from cleave.signals import Signals
 from cleave.viz.controls import TuningControls
 from cleave.viz.editor_mode_controls import preset_switching_active
@@ -30,9 +28,9 @@ from cleave.viz.live_layer_bindings import LiveLayerBindings
 from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
 from cleave.viz.modal import ModalHost
 from cleave.viz.session import (
-    LayerRuntime,
     TuningSession,
     add_layer_to_session,
+    new_layer_runtime,
     remove_layer_from_session,
 )
 from cleave.viz.timeline_controls import TimelineControls
@@ -101,9 +99,12 @@ class LayerManager:
     def add_layer(self) -> str:
         slot = next_layer_slot(self.session.layer_z_order)
         playlist = scan_single_layer(slot, self.preset_root, self.project_dir)
-        preset = playlist.current if playlist.current is not None else self.preset_root
-        layer_cfg = new_layer_config(slot, preset, self.preset_root)
-        self.cfg.layers[slot] = layer_cfg
+        runtime = new_layer_runtime(
+            slot,
+            playlist,
+            self.preset_root,
+            self.cfg.editor.beat_sensitivity,
+        )
         z_index = len(self.session.layer_z_order)
         width, height = preview_layer_size(
             self.cfg.editor.preview_quality,
@@ -112,12 +113,11 @@ class LayerManager:
         )
         stem_layer = LayerFramePipeline.build_single(
             slot,
-            layer_cfg,
+            runtime,
             self.compositor,
             playlist,
             self.projectm_fps,
             self.texture_paths,
-            beat_sensitivity=self.cfg.editor.beat_sensitivity,
             width=width,
             height=height,
             preset_root=self.preset_root,
@@ -125,14 +125,7 @@ class LayerManager:
         self.layers.append(stem_layer)
         self.layers_by_slot[slot] = stem_layer
         self.playlists[slot] = playlist
-        runtime = LayerRuntime(
-            playlist=playlist,
-            browse_floor=preset_browse_floor(layer_cfg.preset, self.preset_root),
-            stem=DEFAULT_NEW_LAYER_STEM,
-            beat_sensitivity=self.cfg.editor.beat_sensitivity,
-        )
         add_layer_to_session(self.session, slot, runtime)
-        self.cfg.layer_z_order.append(slot)
         self.apply_preview_resolutions()
         return slot
 
@@ -149,8 +142,6 @@ class LayerManager:
         LayerFramePipeline.destroy_single(
             slot, self.layers, self.layers_by_slot, self.compositor
         )
-        del self.cfg.layers[slot]
-        self.cfg.layer_z_order.remove(slot)
         del self.playlists[slot]
         remove_layer_from_session(self.session, slot)
 

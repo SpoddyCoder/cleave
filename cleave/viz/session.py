@@ -17,6 +17,8 @@ from cleave.config import (
 )
 from cleave.config_schema import (
     DEFAULT_BEAT_SENSITIVITY,
+    DEFAULT_BLEND_MODE,
+    DEFAULT_NEW_LAYER_STEM,
     DEFAULT_PRESET_SWITCHING,
     DEFAULT_PRESET_SWITCHING_TRIGGER,
     DEFAULT_PRESET_DURATION,
@@ -703,6 +705,24 @@ def add_layer_to_session(
     session.layers[slot] = runtime
     session.layer_z_order.append(slot)
     session.timeline.lanes[slot] = empty_lane()
+
+
+def new_layer_runtime(
+    slot: str,
+    playlist: PresetPlaylist,
+    preset_root: Path,
+    beat_sensitivity: float,
+) -> LayerRuntime:
+    """Session runtime for a newly added layer (not YAML LayerConfig)."""
+    del slot
+    preset = playlist.current if playlist.current is not None else preset_root
+    return LayerRuntime(
+        playlist=playlist,
+        browse_floor=preset_browse_floor(preset, preset_root),
+        stem=DEFAULT_NEW_LAYER_STEM,
+        beat_sensitivity=beat_sensitivity,
+        blend_mode=DEFAULT_BLEND_MODE[DEFAULT_NEW_LAYER_STEM],
+    )
 
 
 def remove_layer_from_session(session: TuningSession, slot: str) -> None:

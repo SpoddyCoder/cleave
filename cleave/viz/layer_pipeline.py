@@ -6,7 +6,7 @@ from pathlib import Path
 
 from collections.abc import Callable
 
-from cleave.config import CleaveConfig, LayerConfig
+from cleave.config import CleaveConfig
 from cleave.milk_textures import project_texture_search_paths
 from cleave.effects.runtime import EffectRuntime
 from cleave.gl_compositor import GlCompositor
@@ -38,7 +38,12 @@ from cleave.viz.post_fx import (
     highlight_rolloff_curve_index,
 )
 from cleave.viz.preset_switching import apply_preset_switching
-from cleave.viz.session import ChromaBoostRuntime, HighlightRolloffRuntime, TuningSession
+from cleave.viz.session import (
+    ChromaBoostRuntime,
+    HighlightRolloffRuntime,
+    LayerRuntime,
+    TuningSession,
+)
 from OpenGL.GL import GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, glClear, glClearColor, glViewport
 
 
@@ -120,13 +125,6 @@ def _slot_should_render(
     if live_by_slot is None:
         return False
     return bool(live_by_slot.get(layer.slot, False))
-
-
-def _beat_sensitivity(cfg: CleaveConfig, slot: str) -> float:
-    layer = cfg.layers[slot]
-    if layer.beat_sensitivity is not None:
-        return layer.beat_sensitivity
-    return cfg.editor.beat_sensitivity
 
 
 def _render_layer_fbo(layer: StemLayer, pm: ProjectM) -> None:
@@ -226,12 +224,11 @@ class LayerFramePipeline:
     @staticmethod
     def build_single(
         slot: str,
-        layer_cfg: LayerConfig,
+        runtime: LayerRuntime,
         compositor: GlCompositor,
         playlist: PresetPlaylist,
         fps: int,
         texture_paths: list[Path],
-        beat_sensitivity: float,
         *,
         width: int,
         height: int,
@@ -245,16 +242,16 @@ class LayerFramePipeline:
             pm.set_texture_paths(texture_paths)
         playlist.load_into(pm)
         pm.set_fps(fps)
-        pm.set_beat_sensitivity(beat_sensitivity)
+        pm.set_beat_sensitivity(runtime.beat_sensitivity)
 
         fbo = compositor.create_layer_fbo(
             slot,
             w,
             h,
-            opacity=layer_cfg.opacity,
-            blend_mode=layer_cfg.blend_mode,
+            opacity=runtime.opacity_pct / 100.0,
+            blend_mode=runtime.blend_mode,
         )
-        fbo.enabled = layer_cfg.enabled
+        fbo.enabled = runtime.enabled
         layer = StemLayer(
             slot=slot,
             pm=pm,
@@ -263,18 +260,16 @@ class LayerFramePipeline:
         )
         apply_preset_switching(
             layer,
-            mode=layer_cfg.preset_switching,
-            trigger=layer_cfg.preset_switching_trigger,
-            preset_list=[
-                str(path) for path in layer_cfg.preset_switching_list
-            ],
-            preset_duration=layer_cfg.preset_duration,
-            soft_cut_duration=layer_cfg.soft_cut_duration,
-            easter_egg=layer_cfg.easter_egg,
-            preset_start_clean=layer_cfg.preset_start_clean,
-            hard_cut_enabled=layer_cfg.hard_cut_enabled,
-            hard_cut_duration=layer_cfg.hard_cut_duration,
-            hard_cut_sensitivity=layer_cfg.hard_cut_sensitivity,
+            mode=runtime.preset_switching,
+            trigger=runtime.preset_switching_trigger,
+            preset_list=runtime.preset_list,
+            preset_duration=runtime.preset_duration,
+            soft_cut_duration=runtime.soft_cut_duration,
+            easter_egg=runtime.easter_egg,
+            preset_start_clean=runtime.preset_start_clean,
+            hard_cut_enabled=runtime.hard_cut_enabled,
+            hard_cut_duration=runtime.hard_cut_duration,
+            hard_cut_sensitivity=runtime.hard_cut_sensitivity,
         )
         return layer
 
@@ -297,10 +292,10 @@ class LayerFramePipeline:
         cfg: CleaveConfig,
         compositor: GlCompositor,
         playlists: dict[str, PresetPlaylist],
+        session: TuningSession,
         *,
         projectm_fps: int,
         preview_resolutions: bool = True,
-        session: TuningSession | None = None,
         viz_quality: bool = False,
         project_dir: Path | None = None,
     ) -> tuple[list[StemLayer], dict[str, StemLayer]]:
@@ -308,11 +303,9 @@ class LayerFramePipeline:
         if project_dir is not None:
             texture_paths = project_texture_search_paths(project_dir, texture_paths)
         runtimes: list[StemLayer] = []
+        z_order = session.layer_z_order
 
         if preview_resolutions:
-            if session is None:
-                raise ValueError("session is required when preview_resolutions=True")
-            z_order = session.layer_z_order
             preview_quality = cfg.editor.preview_quality
             visualizer = cfg.editor
 
@@ -320,24 +313,23 @@ class LayerFramePipeline:
                 z_index = z_order.index(slot)
                 return preview_layer_size(preview_quality, z_index, visualizer)
         else:
-            z_order = cfg.layer_z_order
 
             def layer_size(slot: str) -> tuple[int, int]:
                 z_index = z_order.index(slot)
                 return render_layer_size(cfg, z_index, viz_quality=viz_quality)
 
         preset_root = cfg.paths.preset_root
-        for slot, layer_cfg in cfg.layers_in_z_order():
+        for slot in z_order:
+            runtime = session.layers[slot]
             width, height = layer_size(slot)
             runtimes.append(
                 LayerFramePipeline.build_single(
                     slot,
-                    layer_cfg,
+                    runtime,
                     compositor,
                     playlists[slot],
                     projectm_fps,
                     texture_paths,
-                    _beat_sensitivity(cfg, slot),
                     width=width,
                     height=height,
                     preset_root=preset_root,

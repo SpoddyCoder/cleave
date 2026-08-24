@@ -85,11 +85,13 @@ def test_can_add_and_can_remove_respect_limits() -> None:
 
 @patch("cleave.viz.wiring.LayerFramePipeline.build_single")
 @patch("cleave.viz.wiring.scan_single_layer")
-def test_add_layer_updates_cfg_session_and_collections(
+def test_add_layer_updates_session_and_collections_not_cfg(
     scan_single_layer: MagicMock,
     build_single: MagicMock,
 ) -> None:
     manager, compositor = _manager(("layer_1",))
+    cfg_layers_before = dict(manager.cfg.layers)
+    cfg_order_before = list(manager.cfg.layer_z_order)
     playlist = PresetPlaylist(
         current_dir=Path("/tmp/presets/new"),
         paths=(Path("/tmp/presets/new/preset.milk"),),
@@ -107,32 +109,35 @@ def test_add_layer_updates_cfg_session_and_collections(
     slot = manager.add_layer()
 
     assert slot == "layer_2"
-    assert "layer_2" in manager.cfg.layers
-    assert manager.cfg.layer_z_order == ["layer_1", "layer_2"]
+    assert manager.cfg.layers == cfg_layers_before
+    assert manager.cfg.layer_z_order == cfg_order_before
     assert manager.session.layer_z_order == ["layer_1", "layer_2"]
     assert manager.session.layers["layer_2"].stem == "full_mix"
     assert manager.layers_by_slot["layer_2"] is stem_layer
     assert manager.playlists["layer_2"] is playlist
     assert stem_layer in manager.layers
     build_single.assert_called_once()
-    assert build_single.call_args.kwargs["beat_sensitivity"] == manager.cfg.editor.beat_sensitivity
+    runtime = build_single.call_args.args[1]
+    assert runtime.beat_sensitivity == manager.cfg.editor.beat_sensitivity
     compositor.resize_layer_fbo.assert_called()
 
 
 @patch("cleave.viz.wiring.LayerFramePipeline.destroy_single")
-def test_remove_layer_updates_cfg_session_and_collections(
+def test_remove_layer_updates_session_and_collections_not_cfg(
     destroy_single: MagicMock,
 ) -> None:
     manager, compositor = _manager(("layer_1", "layer_2"))
     manager.session.solo_slot = "layer_2"
+    cfg_layers_before = dict(manager.cfg.layers)
+    cfg_order_before = list(manager.cfg.layer_z_order)
 
     manager.remove_layer("layer_2")
 
     destroy_single.assert_called_once_with(
         "layer_2", manager.layers, manager.layers_by_slot, compositor
     )
-    assert "layer_2" not in manager.cfg.layers
-    assert manager.cfg.layer_z_order == ["layer_1"]
+    assert manager.cfg.layers == cfg_layers_before
+    assert manager.cfg.layer_z_order == cfg_order_before
     assert manager.session.layer_z_order == ["layer_1"]
     assert "layer_2" not in manager.session.layers
     assert manager.session.solo_slot is None

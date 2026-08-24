@@ -51,29 +51,13 @@ These items are no longer the right targets.
 
 **Uncached full-panel redraw.** Structure signatures, `TuningPanelCache`, and incremental compose are in place (see [ui-performance-improvements.md](completed/ui-performance-improvements.md)). Remaining draw cost is special-case chrome, not the old every-frame rebuild.
 
+**Layer live authority.** `TuningSession` is the only live store for creative layer state (opacity, blend, stem, beat, enabled, locked, effects, preset switching, z-order). `CleaveConfig.layers` is YAML bootstrap for `session_from_cfg` and `scan_all_layers`. GPU objects are copies pushed from session. Persist (`persist_layers`, `persist_layer_z_order`) reads session only. Overlay card title/body text and colours stay on cfg because they are never live-edited. Editor prefs and `project.yaml` song markers remain separate documents.
+
 ---
 
 ## 1. Flaws to address (long-term brittleness)
 
 These will lead to silent bugs, divergent behavior, or escalating change cost if left unaddressed.
-
-### Triple live authority: `CleaveConfig`, `TuningSession`, GPU objects
-
-Live edits still split across three stores:
-
-1. **`cfg`** is live for editor prefs (`preview_quality`, UI width/fade, residual latency) via [settings_controls.py](../cleave/viz/settings_controls.py), and for layer *structure* (add/remove mutates `cfg.layers` and `cfg.layer_z_order` in [wiring.py](../cleave/viz/wiring.py)).
-2. **`session`** is live for layer fields (opacity, stem, preset switching, effects), render overlays, post-FX, pattern mask, and timeline.
-3. **`StemLayer` / `LayerFbo` / `ProjectM`** hold GPU and libprojectM copies, pushed through [LiveLayerBindings](../cleave/viz/live_layer_bindings.py) closures in [wiring.py](../cleave/viz/wiring.py).
-
-`persist_layers` reads session when the slot exists, else falls back to `cfg.layers[slot]`. Layer *construction* in [layer_pipeline.py](../cleave/viz/layer_pipeline.py) still seeds from `cfg.layers` (opacity, blend, preset switching, beat). After play starts, `cfg.layers[slot].opacity` is stale; the live values are `session.layers[slot].opacity_pct` and `layer.fbo.opacity`.
-
-This works because persistence and bindings are careful, but it is a convention, not enforced by types. New frame-path or CLI code that reads `cfg.layers` (or skips a binding) silently uses bootstrap data. `FieldSource` (`cfg` / `session` / `both`) helps at save time only.
-
-`persist_layer_z_order` prefers `cfg.layer_z_order` when membership diverges from session. Add/delete currently updates both; a missed `cfg` write would drop the new slot on save while `persist_layers` still iterates `session.layer_z_order` and KeyErrors on `cfg.layers[slot]`.
-
-Editor prefs are a deliberate second persist ([user_config.py](../cleave/user_config.py), flushed on quit). Song markers are a third ([project.yaml](../cleave/project.py) via [config_save.py](../cleave/viz/config_save.py)). Those splits are fine; the layer/render split is not.
-
-**Recommended direction:** make session the single live authority for creative state; treat `cfg` as bootstrap plus immutable paths. Push to GPU objects from session (or a small live-layer adapter), never from leftover `cfg.layers` fields. Keep user-config and `project.yaml` as separate documents.
 
 ### Dual GPU composite path (pattern mask)
 
@@ -174,7 +158,6 @@ Keep the package boundary. Document the compose/compositor contract next to the 
 
 | Priority | Item | Why |
 | --- | --- | --- |
-| **P0** | Session as single live authority for creative state (or strict sync) | Prevents silent stale-`cfg` bugs as layers, mask, and post-FX grow |
 | **P0** | Shared layer-composite contract for `GlCompositor` and `GlMaskedCompositor` | Mask on/off and HDR/blend changes otherwise diverge without a type error |
 | **P1** | Finish draw-side descriptor migration (or extract `PresentStyle` renderers); public mutation API for `row_fields` | Cuts multi-file tax per new row; stops underscore coupling |
 | **P1** | Collapse four setting copies (especially overlay card kinds and `TrackBlock`) | Same tax as draw migration, on the data side |
@@ -187,4 +170,4 @@ Keep the package boundary. Document the compose/compositor contract next to the 
 
 ## 4. Bottom line
 
-The architecture principles still match what the code is aiming for. The highest-risk debt is no longer dual snapshot serializers; it is **multiple live sources of truth** (cfg / session / GPU) and **two layer compositors** that must be edited in lockstep. Incomplete descriptor coverage on the draw path remains the main tax on every new panel row. Fixing those three areas gives the best return before polishing module sizes.
+The architecture principles still match what the code is aiming for. Layer creative state lives on session after bootstrap. The highest-risk remaining debt is **two layer compositors** that must be edited in lockstep. Incomplete descriptor coverage on the draw path remains the main tax on every new panel row.
