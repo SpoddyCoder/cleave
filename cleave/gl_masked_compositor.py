@@ -1,11 +1,23 @@
 """Shader-based masked layer composite via moderngl (hard and feathered).
 
-Feather 0% against a cleared black background: only one layer wins per pixel, so
-per-layer blend modes (black-key, add, etc.) collapse to writing the winning
-layer colour scaled by opacity.
+Implements ``LayerCompositor``. ``composite`` takes layers in z-order
+(first = topmost) and uses those indices as mask channels (no reverse).
 
-Feather above 0% draws one pass per layer: spatial weights modulate opacity
-before the layer's existing GL blend mode (same channel mapping as GlCompositor).
+Compose/compositor contract: ``LayerFramePipeline`` issues an explicit
+``MaskTransition`` when the active slot set changes. This compositor applies
+that command; it does not infer wipes from slot diffs. Recast
+(``SlotCue.recast``) is a preset switch on a continuing slot, not a wipe.
+Overlap duration is a compose concern (transition_duration plus one beat).
+Departing morph slots stay live (PCM/render) until interval width or
+weight-field mass is 0.
+
+Hard path (feather 0%): one winner per pixel against a cleared black
+background. Per-layer blend modes, hue, and flash are not applied; the
+winning colour is scaled by opacity only.
+
+Soft path (feather above 0%): one pass per layer. Spatial weights modulate
+opacity, then the layer's GL blend mode, hue tint, and flash (same contract
+as ``GlCompositor.draw_layer``).
 """
 
 from __future__ import annotations
@@ -15,8 +27,20 @@ from dataclasses import dataclass
 import moderngl
 import numpy as np
 from cleave.config_schema import MAX_LAYER_COUNT, PATTERN_MASK_DENSITY_MAX
-from cleave.gl_color_format import RGBA8, GlColorFormat
-from cleave.gl_compositor import GlCompositor, LayerFbo
+from cleave.gl_color_format import RGBA8, GlColorFormat, require_supported_color_format
+from cleave.gl_compositor import LayerFbo
+from cleave.layer_blend import (
+    LAYER_FLASH_MIN_ALPHA,
+    LAYER_FLASH_RGB,
+    apply_layer_blend_mode,
+    opacity_in_alpha,
+)
+from cleave.layer_composite import LayerCompositeRequest
+from cleave.pattern_mask_transition import (
+    MaskTransition,
+    PatternMaskTransitionTracker,
+    uses_hard_layout_morph,
+)
 from cleave.pattern_mask import (
     HardLayout1D,
     PatternMaskParams,
@@ -121,19 +145,28 @@ uniform sampler2DArray weight_array;
 uniform int layer_index;
 uniform float layer_opacity;
 uniform int opacity_in_alpha;
+uniform vec3 hue_rgb;
+uniform float hue_mix;
+uniform int flash_only;
+uniform vec3 flash_rgb;
+uniform float flash_alpha;
 in vec2 uv;
 out vec4 fragColor;
 
 void main() {
     vec4 color = texture(layer_tex, uv);
     float w = texture(weight_array, vec3(uv, float(layer_index))).r;
+    if (flash_only != 0) {
+        fragColor = vec4(flash_rgb, flash_alpha * w);
+        return;
+    }
+    vec3 tint = mix(vec3(1.0), hue_rgb, hue_mix);
+    vec3 tinted = color.rgb * tint;
     float op = layer_opacity * w;
     if (opacity_in_alpha != 0) {
-        // Match GlCompositor add mode: opacity lives in fragment alpha.
-        fragColor = vec4(color.rgb, op);
+        fragColor = vec4(tinted, op);
     } else {
-        // Black-key and other SRC_COLOR-weighted modes bake opacity into RGB.
-        fragColor = vec4(color.rgb * op, 1.0);
+        fragColor = vec4(tinted * op, 1.0);
     }
 }
 """
@@ -280,7 +313,6 @@ void main() {
 )
 
 
-_HARD_LAYOUT_MASK_TYPES = frozenset({"strips", "radial"})
 _MAX_LAYOUT_INTERVALS = MAX_LAYER_COUNT * int(PATTERN_MASK_DENSITY_MAX)
 
 _SOFT_TRANSITION_FRAG = """
@@ -292,6 +324,11 @@ uniform int layer_index;
 uniform float layer_opacity;
 uniform int opacity_in_alpha;
 uniform float transition_t;
+uniform vec3 hue_rgb;
+uniform float hue_mix;
+uniform int flash_only;
+uniform vec3 flash_rgb;
+uniform float flash_alpha;
 in vec2 uv;
 out vec4 fragColor;
 
@@ -300,11 +337,17 @@ void main() {
     float w_old = texture(old_weight_array, vec3(uv, float(layer_index))).r;
     float w_new = texture(new_weight_array, vec3(uv, float(layer_index))).r;
     float w = mix(w_old, w_new, transition_t);
+    if (flash_only != 0) {
+        fragColor = vec4(flash_rgb, flash_alpha * w);
+        return;
+    }
+    vec3 tint = mix(vec3(1.0), hue_rgb, hue_mix);
+    vec3 tinted = color.rgb * tint;
     float op = layer_opacity * w;
     if (opacity_in_alpha != 0) {
-        fragColor = vec4(color.rgb, op);
+        fragColor = vec4(tinted, op);
     } else {
-        fragColor = vec4(color.rgb * op, 1.0);
+        fragColor = vec4(tinted * op, 1.0);
     }
 }
 """
@@ -317,6 +360,11 @@ uniform sampler2D layer_tex;
 uniform int layer_index;
 uniform float layer_opacity;
 uniform int opacity_in_alpha;
+uniform vec3 hue_rgb;
+uniform float hue_mix;
+uniform int flash_only;
+uniform vec3 flash_rgb;
+uniform float flash_alpha;
 uniform vec2 resolution;
 uniform float cuts[%(cuts)d];
 uniform int layers[%(max_intervals)d];
@@ -368,11 +416,17 @@ void main() {
     }
     float weight = total > 0.0 ? my_mass / total
         : (winner == layer_index ? 1.0 : 0.0);
+    if (flash_only != 0) {
+        fragColor = vec4(flash_rgb, flash_alpha * weight);
+        return;
+    }
+    vec3 tint = mix(vec3(1.0), hue_rgb, hue_mix);
+    vec3 tinted = color.rgb * tint;
     float op = layer_opacity * weight;
     if (opacity_in_alpha != 0) {
-        fragColor = vec4(color.rgb, op);
+        fragColor = vec4(tinted, op);
     } else {
-        fragColor = vec4(color.rgb * op, 1.0);
+        fragColor = vec4(tinted * op, 1.0);
     }
 }
 """ % {
@@ -547,11 +601,6 @@ def _mask_cache_key(
     )
 
 
-def _uses_hard_layout_morph(params: PatternMaskParams) -> bool:
-    """Strips/radial lerp 1D cuts; checker/plasma dissolve instead."""
-    return params.mask_type in _HARD_LAYOUT_MASK_TYPES
-
-
 class GlMaskedCompositor:
     """Pattern-mask composite into an existing content FBO (hard and feathered)."""
 
@@ -603,7 +652,7 @@ class GlMaskedCompositor:
         self._transition_duration: float = 0.0
         self._transition_active_slots: tuple[bool, ...] | None = None
         self._current_weight_fields: np.ndarray | None = None
-        self._last_active_slots: tuple[bool, ...] | None = None
+        self.transitions = PatternMaskTransitionTracker()
         self._soft_transition_prog: moderngl.Program | None = None
         self._soft_transition_vao: moderngl.VertexArray | None = None
         self._layout_soft_prog: moderngl.Program | None = None
@@ -619,6 +668,9 @@ class GlMaskedCompositor:
     def set_color_format(self, color_format: GlColorFormat) -> None:
         if color_format is self._color_format:
             return
+        require_supported_color_format(
+            color_format, self.content_width, self.content_height
+        )
         self._color_format = color_format
         self._release_layer_array()
         self._release_layer_tex_cache()
@@ -638,7 +690,7 @@ class GlMaskedCompositor:
         self._mask_cache_key = None
         self._clear_transition_state()
         self._current_weight_fields = None
-        self._last_active_slots = None
+        self.transitions.reset()
 
     def _clear_transition_state(self) -> None:
         self._transition_old_weights = None
@@ -726,7 +778,7 @@ class GlMaskedCompositor:
             or int(stored.seed) != int(params.seed)
         ):
             return False
-        if _uses_hard_layout_morph(params):
+        if uses_hard_layout_morph(params.mask_type):
             return self._has_hard_layout_transition()
         return self._has_weight_field_transition()
 
@@ -743,6 +795,9 @@ class GlMaskedCompositor:
 
     def init(self) -> None:
         """Attach to the current pygame OpenGL context."""
+        require_supported_color_format(
+            self._color_format, self.content_width, self.content_height
+        )
         self._ctx = moderngl.create_context(require=330)
         self._masked_prog = self._ctx.program(
             vertex_shader=_QUAD_VERT,
@@ -1293,6 +1348,7 @@ class GlMaskedCompositor:
         params: PatternMaskParams,
         *,
         active_slots: tuple[bool, ...],
+        from_slots: tuple[bool, ...],
         song_time_sec: float,
         duration: float,
     ) -> None:
@@ -1307,11 +1363,6 @@ class GlMaskedCompositor:
                 self._transition_amount(song_time_sec),
             )
         else:
-            from_slots = (
-                self._last_active_slots
-                if self._last_active_slots is not None
-                else active_slots
-            )
             old = hard_layout_1d(
                 params.mask_type, from_slots, params.density, params.invert
             )
@@ -1335,16 +1386,12 @@ class GlMaskedCompositor:
         params: PatternMaskParams,
         *,
         active_slots: tuple[bool, ...],
+        from_slots: tuple[bool, ...],
         song_time_sec: float,
         duration: float,
     ) -> None:
         trans_w = max(1, self.content_width // _TRANSITION_GEN_DIVISOR)
         trans_h = max(1, self.content_height // _TRANSITION_GEN_DIVISOR)
-        from_slots = (
-            self._last_active_slots
-            if self._last_active_slots is not None
-            else active_slots
-        )
         if self._has_weight_field_transition() and self._transition_in_progress(
             song_time_sec
         ):
@@ -1405,7 +1452,7 @@ class GlMaskedCompositor:
         *,
         active_slots: tuple[bool, ...],
         song_time_sec: float,
-        transition_duration: float,
+        transition: MaskTransition | None,
     ) -> None:
         if layer_count <= 0:
             return
@@ -1421,35 +1468,30 @@ class GlMaskedCompositor:
         ):
             self._clear_transition_state()
 
-        slots_changed = (
-            self._last_active_slots is not None
-            and active_slots != self._last_active_slots
-        )
-        duration = max(0.0, float(transition_duration))
-
-        if slots_changed and duration > 0.0:
-            if _uses_hard_layout_morph(params):
+        if transition is not None:
+            if transition.kind == "clear" or transition.duration <= 0.0:
+                self._clear_transition_state()
+            elif transition.kind == "hard_layout":
                 self._begin_hard_layout_transition(
                     params,
                     active_slots=active_slots,
-                    song_time_sec=song_time_sec,
-                    duration=duration,
+                    from_slots=transition.from_slots,
+                    song_time_sec=transition.start_sec,
+                    duration=transition.duration,
                 )
             else:
                 self._begin_weight_field_transition(
                     layer_count,
                     params,
                     active_slots=active_slots,
-                    song_time_sec=song_time_sec,
-                    duration=duration,
+                    from_slots=transition.from_slots,
+                    song_time_sec=transition.start_sec,
+                    duration=transition.duration,
                 )
-        elif slots_changed and duration <= 0.0:
-            self._clear_transition_state()
 
         if self._transition_in_progress(song_time_sec):
             if self._has_hard_layout_transition() and int(params.feather_pct) == 0:
                 self._upload_lerped_hard_mask(song_time_sec)
-            self._last_active_slots = active_slots
             self._mask_cache_key = None
             return
 
@@ -1492,7 +1534,6 @@ class GlMaskedCompositor:
                 )
                 self._upload_weight_fields(fields, params.feather_pct)
             self._current_weight_fields = fields
-            self._last_active_slots = active_slots
             self._clear_transition_state()
             self._mask_cache_key = _mask_cache_key(
                 params,
@@ -1511,7 +1552,6 @@ class GlMaskedCompositor:
             active_slots=active_slots,
         )
         if self._mask_cache_key == cache_key and self._current_weight_fields is not None:
-            self._last_active_slots = active_slots
             return
 
         use_gpu_plasma = params.mask_type == "plasma"
@@ -1556,7 +1596,6 @@ class GlMaskedCompositor:
                 active_slots=active_slots,
             )
         self._current_weight_fields = fields
-        self._last_active_slots = active_slots
         self._mask_cache_key = cache_key
 
     def _copy_layers_into_array(
@@ -1612,24 +1651,21 @@ class GlMaskedCompositor:
         self,
         active_slots: tuple[bool, ...] | list[bool],
         song_time_sec: float,
-        transition_duration: float,
+        transition: MaskTransition | None = None,
     ) -> tuple[bool, ...]:
         """Slots that are active or still have territory in the current morph.
 
         Call before the layer render loop. A departing slot stays True while
         its hard-layout interval has width or its weight field has mass, and
-        turns False when the morph ends (width/mass 0). If *active_slots*
-        differs from the last composite and *transition_duration* is positive,
-        slots that will be in that morph are included even before composite
-        stores the new layouts.
+        turns False when the morph ends (width/mass 0). When *transition* is a
+        pending wipe (issued before this frame's composite), ``from_slots``
+        are included so departing layers still receive PCM/render.
         """
         flags = tuple(bool(flag) for flag in active_slots)
         live = [bool(flag) for flag in flags]
         n = len(live)
-        duration = max(0.0, float(transition_duration))
-        last = self._last_active_slots
-        if last is not None and flags != last and duration > 0.0:
-            for index, flag in enumerate(last):
+        if transition is not None and transition.duration > 0.0:
+            for index, flag in enumerate(transition.from_slots):
                 if index < n and flag:
                     live[index] = True
         if self._transition_in_progress(song_time_sec):
@@ -1657,58 +1693,42 @@ class GlMaskedCompositor:
                             live[index] = True
         return tuple(live)
 
-    def composite(
-        self,
-        content_fbo_id: int,
-        layers: list[LayerFbo],
-        *,
-        mask_type: str,
-        feather_pct: int = 0,
-        density: float = 1.0,
-        invert: bool = False,
-        seed: int = 0,
-        slot_names: list[str] | None = None,
-        active_slots: list[bool] | None = None,
-        song_time_sec: float = 0.0,
-        transition_duration: float = 0.0,
-    ) -> None:
-        """Clear *content_fbo_id* and composite *layers* through a pattern mask.
+    def composite(self, request: LayerCompositeRequest) -> None:
+        """Clear the target FBO and composite ``request.layers`` through a mask.
 
-        *layers* are slot-keyed in z-order (stable channel indices). When
-        *active_slots* is omitted, activity is derived from each layer's enabled
-        flag and opacity. *slot_names* is accepted for API completeness.
+        Layers are in z-order (first = topmost); channel indices follow that
+        order. When ``request.active_slots`` is omitted, activity is derived
+        from each layer's enabled flag and opacity.
         """
-        del slot_names  # Reserved for callers / debugging; indices follow *layers*.
-        params = PatternMaskParams(
-            mask_type=mask_type,
-            feather_pct=int(feather_pct),
-            density=density,
-            invert=invert,
-            seed=seed,
-        )
-        if active_slots is None:
+        if request.mask is None:
+            raise ValueError("GlMaskedCompositor.composite requires request.mask")
+        if request.color_format is not self._color_format:
+            self.set_color_format(request.color_format)
+        params = request.mask
+        layers = list(request.layers)
+        if request.active_slots is None:
             resolved_active = tuple(
                 bool(layer.enabled and layer.opacity > 0.0) for layer in layers
             )
         else:
-            resolved_active = tuple(bool(flag) for flag in active_slots)
-        if feather_pct > 0:
+            resolved_active = tuple(bool(flag) for flag in request.active_slots)
+        if params.feather_pct > 0:
             self._composite_soft(
-                content_fbo_id,
+                request.target_fbo_id,
                 layers,
                 params,
                 active_slots=resolved_active,
-                song_time_sec=song_time_sec,
-                transition_duration=transition_duration,
+                song_time_sec=request.song_time_sec,
+                transition=request.transition,
             )
         else:
             self._composite_hard(
-                content_fbo_id,
+                request.target_fbo_id,
                 layers,
                 params,
                 active_slots=resolved_active,
-                song_time_sec=song_time_sec,
-                transition_duration=transition_duration,
+                song_time_sec=request.song_time_sec,
+                transition=request.transition,
             )
 
     def _composite_hard(
@@ -1719,7 +1739,7 @@ class GlMaskedCompositor:
         *,
         active_slots: tuple[bool, ...],
         song_time_sec: float,
-        transition_duration: float,
+        transition: MaskTransition | None,
     ) -> None:
         self._ensure_init()
         assert self._ctx is not None
@@ -1734,17 +1754,21 @@ class GlMaskedCompositor:
             glClearColor(*self._bg)
             glClear(GL_COLOR_BUFFER_BIT)
 
-            if layer_count <= 0 or not any(active_slots):
-                if not self._transition_in_progress(song_time_sec):
-                    self._last_active_slots = active_slots
-                    return
+            if layer_count <= 0:
+                return
+            if (
+                not any(active_slots)
+                and transition is None
+                and not self._transition_in_progress(song_time_sec)
+            ):
+                return
 
             self._ensure_mask_textures(
                 layer_count,
                 params,
                 active_slots=active_slots,
                 song_time_sec=song_time_sec,
-                transition_duration=transition_duration,
+                transition=transition,
             )
             transitioning = self._transition_in_progress(song_time_sec)
             dest = self._dest_fbo_for(content_fbo_id)
@@ -1797,7 +1821,7 @@ class GlMaskedCompositor:
         *,
         active_slots: tuple[bool, ...],
         song_time_sec: float,
-        transition_duration: float,
+        transition: MaskTransition | None,
     ) -> None:
         self._ensure_init()
         assert self._ctx is not None
@@ -1813,10 +1837,12 @@ class GlMaskedCompositor:
             glClear(GL_COLOR_BUFFER_BIT)
 
             if layer_count <= 0:
-                self._last_active_slots = active_slots
                 return
-            if not any(active_slots) and not self._transition_in_progress(song_time_sec):
-                self._last_active_slots = active_slots
+            if (
+                not any(active_slots)
+                and transition is None
+                and not self._transition_in_progress(song_time_sec)
+            ):
                 return
 
             self._ensure_mask_textures(
@@ -1824,7 +1850,7 @@ class GlMaskedCompositor:
                 params,
                 active_slots=active_slots,
                 song_time_sec=song_time_sec,
-                transition_duration=transition_duration,
+                transition=transition,
             )
             transitioning = (
                 self._transition_gpu_ready
@@ -1923,7 +1949,7 @@ class GlMaskedCompositor:
             active = bool(layer.enabled and layer.opacity > 0.0)
             if not active and not transitioning:
                 continue
-            GlCompositor._apply_layer_blend_mode(layer.blend_mode)
+            apply_layer_blend_mode(layer.blend_mode)
             layer_tex = self._bind_layer_tex_mgl(layer)
             layer_tex.use(0)
             if transitioning and not layout_morph:
@@ -1940,10 +1966,18 @@ class GlMaskedCompositor:
             else:
                 opacity = 0.0
             prog["layer_opacity"].value = opacity
-            prog["opacity_in_alpha"].value = (
-                1 if layer.blend_mode == "add" else 0
-            )
+            prog["opacity_in_alpha"].value = 1 if opacity_in_alpha(layer.blend_mode) else 0
+            prog["hue_rgb"].value = layer.hue_rgb
+            prog["hue_mix"].value = float(layer.hue_mix)
+            prog["flash_only"].value = 0
+            prog["flash_rgb"].value = LAYER_FLASH_RGB
+            prog["flash_alpha"].value = 0.0
             vao.render(moderngl.TRIANGLE_STRIP)
+            if layer.flash_alpha >= LAYER_FLASH_MIN_ALPHA:
+                apply_layer_blend_mode("add")
+                prog["flash_only"].value = 1
+                prog["flash_alpha"].value = float(layer.flash_alpha)
+                vao.render(moderngl.TRIANGLE_STRIP)
 
     def release(self) -> None:
         # detect_framebuffer wraps are references; do not GL-delete them.
@@ -1985,4 +2019,4 @@ class GlMaskedCompositor:
         self._mask_cache_key = None
         self._clear_transition_state()
         self._current_weight_fields = None
-        self._last_active_slots = None
+        self.transitions.reset()

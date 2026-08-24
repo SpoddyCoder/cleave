@@ -22,6 +22,7 @@ from OpenGL.GL import (  # noqa: E402
 from cleave.gl_color_format import RGBA16F, RGBA8  # noqa: E402
 from cleave.gl_compositor import GlCompositor, LayerFbo  # noqa: E402
 from cleave.gl_post_process import GlPostProcess  # noqa: E402
+from cleave.layer_composite import LayerCompositeRequest  # noqa: E402
 
 W, H = 64, 64
 CENTER = (W // 2, H // 2)
@@ -61,6 +62,17 @@ def _read_content_pixel_float(
     glBindFramebuffer(GL_FRAMEBUFFER, 0)
     r, g, b, _a = struct.unpack("4f", bytes(raw))
     return (r, g, b)
+
+
+def _composite(comp: GlCompositor, layers: list[LayerFbo]) -> None:
+    """Stack *layers* in the given draw order via the z-order contract."""
+    comp.composite(
+        LayerCompositeRequest(
+            target_fbo_id=comp.content_fbo_id,
+            layers=list(reversed(layers)),
+            color_format=comp.color_format,
+        )
+    )
 
 
 def _make_bright_layers(comp: GlCompositor) -> list[LayerFbo]:
@@ -126,7 +138,7 @@ def test_float_compositor_layer_fbo_end_to_end(gl_context_float) -> None:
     """Float layer FBOs accept glClear fills and composite without error."""
     comp, _pp = gl_context_float
     layers = _make_bright_layers(comp)
-    comp.composite(layers)
+    _composite(comp, layers)
     rgb = _read_content_pixel_float(comp, *CENTER)
     assert _channel_spread(rgb) > 0.1
     assert max(rgb) > 1.0
@@ -134,7 +146,7 @@ def test_float_compositor_layer_fbo_end_to_end(gl_context_float) -> None:
 
 def test_stack_bright_layers_8bit_clamps_to_white(gl_context_8bit) -> None:
     comp, _pp = gl_context_8bit
-    comp.composite(_make_bright_layers(comp))
+    _composite(comp, _make_bright_layers(comp))
     rgb = _read_content_pixel_u8(comp, *CENTER)
     assert _channel_spread(rgb) == pytest.approx(0.0, abs=1e-6)
     assert rgb == pytest.approx((1.0, 1.0, 1.0), abs=1.0 / 255.0)
@@ -142,14 +154,14 @@ def test_stack_bright_layers_8bit_clamps_to_white(gl_context_8bit) -> None:
 
 def test_stack_bright_layers_float_retains_chroma(gl_context_float) -> None:
     comp, _pp = gl_context_float
-    comp.composite(_make_bright_layers(comp))
+    _composite(comp, _make_bright_layers(comp))
     rgb = _read_content_pixel_float(comp, *CENTER)
     assert _channel_spread(rgb) > 0.1
 
 
 def test_display_shoulder_maps_hdr_with_hue(gl_context_float) -> None:
     comp, pp = gl_context_float
-    comp.composite(_make_bright_layers(comp))
+    _composite(comp, _make_bright_layers(comp))
     before = _read_content_pixel_float(comp, *CENTER)
     assert _channel_spread(before) > 0.1
     assert max(before) > 1.0
@@ -168,7 +180,7 @@ def test_display_shoulder_present_not_flat_white(gl_context_float) -> None:
     comp, pp = gl_context_float
     layer = comp.create_layer_fbo("moderate_hdr", W, H, opacity=1.0, blend_mode="black-key")
     _fill_layer_fbo(layer, (1.05, 1.0, 0.95, 1.0))
-    comp.composite([layer])
+    _composite(comp, [layer])
 
     from cleave.viz.post_fx import apply_hdr_display_shoulder
 
@@ -187,7 +199,7 @@ def test_display_shoulder_present_not_flat_white(gl_context_float) -> None:
 
 def test_composite_rolloff_maps_hdr_with_hue(gl_context_float) -> None:
     comp, pp = gl_context_float
-    comp.composite(_make_bright_layers(comp))
+    _composite(comp, _make_bright_layers(comp))
     before = _read_content_pixel_float(comp, *CENTER)
     assert _channel_spread(before) > 0.1
     assert max(before) > 1.0
@@ -250,7 +262,7 @@ def _read_content_pixel_u8_from_layer(layer: LayerFbo) -> tuple[float, float, fl
 def test_present_then_read_rgba_frame_uses_default_framebuffer(gl_context_8bit) -> None:
     """Offline render reads 8-bit default FB after present (tone-mapped blit)."""
     comp, _pp = gl_context_8bit
-    comp.composite(_make_bright_layers(comp))
+    _composite(comp, _make_bright_layers(comp))
     comp.present_content()
     frame = comp.read_rgba_frame()
     assert len(frame) == comp.display_width * comp.display_height * 4

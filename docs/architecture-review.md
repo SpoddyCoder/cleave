@@ -53,21 +53,13 @@ These items are no longer the right targets.
 
 **Layer live authority.** `TuningSession` is the only live store for creative layer state (opacity, blend, stem, beat, enabled, locked, effects, preset switching, z-order). `CleaveConfig.layers` is YAML bootstrap for `session_from_cfg` and `scan_all_layers`. GPU objects are copies pushed from session. Persist (`persist_layers`, `persist_layer_z_order`) reads session only. Overlay card title/body text and colours stay on cfg because they are never live-edited. Editor prefs and `project.yaml` song markers remain separate documents.
 
+**Layer composite contract.** Both GPU compositors implement [layer_composite.py](../cleave/layer_composite.py) `LayerCompositor` against one `LayerCompositeRequest`. Blend, opacity-in-alpha, and HDR format live in [layer_blend.py](../cleave/layer_blend.py) and [gl_color_format.py](../cleave/gl_color_format.py). [layer_pipeline.py](../cleave/viz/layer_pipeline.py) `LayerFramePipeline.composite` is the layer choke point (mask on/off only selects the implementation). Wipes are an explicit `MaskTransition`. Hard composite (feather 0%) still ignores per-layer blend, hue, and flash by design; the soft path applies them. [frame_finish.py](../cleave/viz/frame_finish.py) remains the post-composite choke point.
+
 ---
 
 ## 1. Flaws to address (long-term brittleness)
 
 These will lead to silent bugs, divergent behavior, or escalating change cost if left unaddressed.
-
-### Dual GPU composite path (pattern mask)
-
-Unmasked stacks use [gl_compositor.py](../cleave/gl_compositor.py) (~1,114 lines, fixed-function blend). Masked stacks use [gl_masked_compositor.py](../cleave/gl_masked_compositor.py) (~1,988 lines, several shaders, 1D layout lerps, weight-field morphs, `live_slots`). [layer_pipeline.py](../cleave/viz/layer_pipeline.py) `composite()` branches on `session.render_pattern_mask.enabled`.
-
-The two paths must stay aligned on blend modes, opacity-in-alpha vs RGB, HDR (`GL_RGBA16F`), and which layers still receive PCM while timeline-disabled but morphing out. The masked compositor already calls `GlCompositor._apply_layer_blend_mode` (cross-module private). Transition start is an `active_slots` diff inside `_ensure_mask_textures`, not an explicit event type ([pattern-mask-transition-fragility.md](completed/pattern-mask-transition-fragility.md)).
-
-This is the highest-risk new concentration. A post-FX or blend change that only lands on one compositor will show up as live/offline or mask-on/mask-off divergence, not a type error.
-
-**Recommended direction:** keep [frame_finish.py](../cleave/viz/frame_finish.py) as the post-composite choke point (already true). Treat `LayerFramePipeline.composite` as the *layer* choke point: one function that both compositors implement against a shared blend/opacity/HDR contract. Promote blend application to a public helper. Prefer an explicit transition command over inferring wipes from slot diffs.
 
 ### Four copies of the same settings
 
@@ -146,11 +138,11 @@ GL upload and dirty rects moved to [overlay_upload.py](../cleave/viz/overlay_upl
 
 [timeline_presets/](../cleave/timeline_presets/) is well isolated from viz. [pattern_mask_arrange.py](../cleave/timeline_presets/pattern_mask_arrange.py) alone is ~967 lines of overlap emit, recast, and wipe constraints that must match compositor behavior. Drift between compose and [gl_masked_compositor.py](../cleave/gl_masked_compositor.py) is a product bug, not just a tidy issue.
 
-Keep the package boundary. Document the compose/compositor contract next to the code (duration, overlap, recast vs slot-set change) rather than only in completed notes.
+Keep the package boundary. The compose/compositor contract (duration, overlap, recast vs slot-set change, hard-path blend exemption) lives next to the code in [pattern_mask_arrange.py](../cleave/timeline_presets/pattern_mask_arrange.py) and [gl_masked_compositor.py](../cleave/gl_masked_compositor.py).
 
 ### Test gaps on draw chrome
 
-[test_controls.py](../tests/cleave/viz/test_controls.py) and [test_row_fields.py](../tests/cleave/viz/test_row_fields.py) cover input. Cache, overlay, and editor-mode tests import some draw helpers. There is still no `test_tuning_panel_draw.py`. Masked compositing has [test_masked_compositor_gl_integration.py](../tests/cleave/test_masked_compositor_gl_integration.py) plus pattern-mask unit tests; shader-path vs fixed-function parity is not systematically asserted.
+[test_controls.py](../tests/cleave/viz/test_controls.py) and [test_row_fields.py](../tests/cleave/viz/test_row_fields.py) cover input. Cache, overlay, and editor-mode tests import some draw helpers. There is still no `test_tuning_panel_draw.py`. Masked compositing has [test_masked_compositor_gl_integration.py](../tests/cleave/test_masked_compositor_gl_integration.py), [test_compositor_parity.py](../tests/cleave/test_compositor_parity.py) (soft full-coverage vs unmasked), and pattern-mask unit tests.
 
 ---
 
@@ -158,16 +150,15 @@ Keep the package boundary. Document the compose/compositor contract next to the 
 
 | Priority | Item | Why |
 | --- | --- | --- |
-| **P0** | Shared layer-composite contract for `GlCompositor` and `GlMaskedCompositor` | Mask on/off and HDR/blend changes otherwise diverge without a type error |
 | **P1** | Finish draw-side descriptor migration (or extract `PresentStyle` renderers); public mutation API for `row_fields` | Cuts multi-file tax per new row; stops underscore coupling |
 | **P1** | Collapse four setting copies (especially overlay card kinds and `TrackBlock`) | Same tax as draw migration, on the data side |
 | **P2** | Decouple effects (and frame helpers) from `TuningSession` | Unblocks reuse and cleaner module boundaries |
 | **P2** | Split `config_schema` by domain | Low risk, improves reviewability |
 | **P3** | Shared overlay primitives for timeline and tuning panel | Pays off when timeline chrome grows |
-| **P3** | Direct draw tests; compositor parity tests for mask on vs off | Cheap insurance on the largest untested draw module and dual GPU path |
+| **P3** | Direct draw tests | Cheap insurance on the largest untested draw module |
 
 ---
 
 ## 4. Bottom line
 
-The architecture principles still match what the code is aiming for. Layer creative state lives on session after bootstrap. The highest-risk remaining debt is **two layer compositors** that must be edited in lockstep. Incomplete descriptor coverage on the draw path remains the main tax on every new panel row.
+The architecture principles still match what the code is aiming for. Layer creative state lives on session after bootstrap. Both layer compositors share one request contract, blend/opacity/HDR helpers, and an explicit wipe command. Incomplete descriptor coverage on the draw path remains the main tax on every new panel row.
