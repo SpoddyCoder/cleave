@@ -1458,7 +1458,7 @@ def test_render_overlay_collapse_refocuses_from_title_font_row() -> None:
     font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT_SIZE)
     font_desc = _desc(view, font_row)
     controls.focus_descriptor = font_desc
-    controls._render_overlays.set_expanded(False)
+    controls.render_overlays.set_expanded(False)
     assert controls.focus_descriptor == font_desc
     view = controls.build_view_state(paused=False)
     assert view.layout.resolve_navigable(
@@ -1475,7 +1475,7 @@ def test_render_overlay_title_collapse_refocuses_from_font_row() -> None:
     title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER)
     font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT_SIZE)
     controls.focus_descriptor = _desc(view, font_row)
-    controls._render_overlays.opening_card.set_title_expanded(False)
+    controls.render_overlays.opening_card.set_title_expanded(False)
     view = controls.build_view_state(paused=False)
     assert view.layout.resolve_navigable(
         controls.focus_descriptor, view
@@ -1535,10 +1535,10 @@ def test_transport_icons_play_vs_pause() -> None:
 def test_render_post_fx_highlight_rolloff_mode_off_keeps_section_expanded() -> None:
     controls = _make_controls()
     controls.session.render_post_fx.expanded = True
-    controls._render_post_fx.set_highlight_rolloff_expanded(True)
+    controls.render_post_fx.set_highlight_rolloff_expanded(True)
     controls.session.render_post_fx.highlight_rolloff.mode = "composite"
 
-    controls._render_post_fx.cycle_highlight_rolloff_mode(forward=True)
+    controls.render_post_fx.cycle_highlight_rolloff_mode(forward=True)
 
     assert controls.session.render_post_fx.highlight_rolloff.mode == "off"
     assert controls.session.render_post_fx.highlight_rolloff_expanded is True
@@ -4753,7 +4753,7 @@ def test_settings_collapse_from_sub_row_refocuses_header() -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
-    controls._settings.set_expanded(False)
+    controls.settings.set_expanded(False)
     view = controls.build_view_state(paused=False)
     assert view.layout.resolve_navigable(
         controls.focus_descriptor, view
@@ -5755,7 +5755,7 @@ def test_timeline_trigger_hides_duration_row() -> None:
 
 
 def test_timeline_trigger_while_disabled_shows_warning() -> None:
-    from cleave.viz.controls import NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT
+    from cleave.viz.layer_mutations import NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT
     from tests.support.viz import make_controls, keydown, noop_layer_bindings
     import pygame
     from cleave.viz.row_semantics import RowDescriptor, RowKind
@@ -5823,7 +5823,7 @@ def test_step_preset_duration_toasts_when_list_too_short() -> None:
     layer.preset_list = ["a.milk", "b.milk", "c.milk", "d.milk"]
     noted: list[str] = []
     controls.show_notification = noted.append  # type: ignore[method-assign]
-    controls._step_preset_duration("layer_1", forward=False)
+    controls.layer_mutations.step_preset_duration("layer_1", forward=False)
     assert layer.preset_duration == 29.0
     assert noted == ["Preset list may need more presets"]
 
@@ -5836,13 +5836,13 @@ def test_cycle_preset_switching_trigger_toasts_when_list_nonempty() -> None:
     layer.preset_list = ["a.milk"]
     noted: list[str] = []
     controls.show_notification = noted.append  # type: ignore[method-assign]
-    controls._cycle_preset_switching_trigger("layer_1", forward=True)
+    controls.layer_mutations.cycle_preset_switching_trigger("layer_1", forward=True)
     assert layer.preset_switching_trigger != "timer"
     assert noted == ["Preset list may need adjusting"]
 
 
 def test_cycle_preset_switching_trigger_skips_list_toast_for_timeline_disabled() -> None:
-    from cleave.viz.controls import NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT
+    from cleave.viz.layer_mutations import NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT
 
     controls = _make_controls(("layer_1",))
     layer = controls.session.layers["layer_1"]
@@ -5852,6 +5852,6 @@ def test_cycle_preset_switching_trigger_skips_list_toast_for_timeline_disabled()
     controls.session.timeline.enabled = False
     noted: list[str] = []
     controls.show_notification = noted.append  # type: ignore[method-assign]
-    controls._cycle_preset_switching_trigger("layer_1", forward=True)
+    controls.layer_mutations.cycle_preset_switching_trigger("layer_1", forward=True)
     assert layer.preset_switching_trigger == "timeline"
     assert noted == [NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT]

@@ -24,125 +24,125 @@ PanelAnchorToggleFn = Callable[["TuningControls", bool], None]
 
 
 def _toggle_settings(controls: TuningControls, _slot: str | None, forward: bool) -> None:
-    controls._settings.set_expanded(forward)
+    controls.settings.set_expanded(forward)
 
 
 def _toggle_settings_ui(controls: TuningControls, _slot: str | None, forward: bool) -> None:
-    controls._settings.set_ui_expanded(forward)
+    controls.settings.set_ui_expanded(forward)
 
 
 def _toggle_settings_latency_compensation(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
-    controls._settings.set_latency_compensation_expanded(forward)
+    controls.settings.set_latency_compensation_expanded(forward)
 
 
 def _toggle_render_overlays(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
-    controls._render_overlays.set_expanded(forward)
+    controls.render_overlays.set_expanded(forward)
 
 
 def _toggle_render_overlay_opening_card(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
-    controls._render_overlays.opening_card.set_expanded(forward)
+    controls.render_overlays.opening_card.set_expanded(forward)
 
 
 def _toggle_render_overlay_closing_card(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
-    controls._render_overlays.closing_card.set_expanded(forward)
+    controls.render_overlays.closing_card.set_expanded(forward)
 
 
 def _toggle_render_overlay_opening_title(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
-    controls._render_overlays.opening_card.set_title_expanded(forward)
+    controls.render_overlays.opening_card.set_title_expanded(forward)
 
 
 def _toggle_render_overlay_closing_title(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
-    controls._render_overlays.closing_card.set_title_expanded(forward)
+    controls.render_overlays.closing_card.set_title_expanded(forward)
 
 
 def _toggle_render_overlay_opening_body(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
-    controls._render_overlays.opening_card.set_body_expanded(forward)
+    controls.render_overlays.opening_card.set_body_expanded(forward)
 
 
 def _toggle_render_overlay_closing_body(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
-    controls._render_overlays.closing_card.set_body_expanded(forward)
+    controls.render_overlays.closing_card.set_body_expanded(forward)
 
 
 def _toggle_render_overlay_opening_animation(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
-    controls._render_overlays.opening_card.set_animation_expanded(forward)
+    controls.render_overlays.opening_card.set_animation_expanded(forward)
 
 
 def _toggle_render_overlay_closing_animation(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
-    controls._render_overlays.closing_card.set_animation_expanded(forward)
+    controls.render_overlays.closing_card.set_animation_expanded(forward)
 
 
 def _toggle_render_post_fx(controls: TuningControls, _slot: str | None, forward: bool) -> None:
-    controls._render_post_fx.set_expanded(forward)
+    controls.render_post_fx.set_expanded(forward)
 
 
 def _toggle_render_pattern_mask(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
-    controls._render_pattern_mask.set_expanded(forward)
+    controls.render_pattern_mask.set_expanded(forward)
 
 
 def _toggle_render_post_fx_highlight_rolloff(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
-    controls._render_post_fx.set_highlight_rolloff_expanded(forward)
+    controls.render_post_fx.set_highlight_rolloff_expanded(forward)
 
 
 def _toggle_render_post_fx_chroma_boost(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
-    controls._render_post_fx.set_chroma_boost_expanded(forward)
+    controls.render_post_fx.set_chroma_boost_expanded(forward)
 
 
 def _toggle_track_header(controls: TuningControls, slot: str | None, forward: bool) -> None:
     if slot is None:
         return
-    controls._set_expanded(slot, forward)
+    controls.set_expanded(slot, forward)
 
 
 def _toggle_preset_switching(controls: TuningControls, slot: str | None, forward: bool) -> None:
     if slot is None:
         return
-    controls._cycle_preset_switching(slot, forward=forward)
+    controls.layer_mutations.cycle_preset_switching(slot, forward=forward)
 
 
 def _toggle_effects_header(controls: TuningControls, slot: str | None, forward: bool) -> None:
     if slot is None:
         return
-    controls._set_effects_expanded(slot, forward)
+    controls.set_effects_expanded(slot, forward)
 
 
 def _toggle_preset_list(controls: TuningControls, slot: str | None, forward: bool) -> None:
     if slot is None:
         return
-    controls._set_preset_list_expanded(slot, forward)
+    controls.set_preset_list_expanded(slot, forward)
 
 
 def _toggle_song_markers(controls: TuningControls, _slot: str | None, forward: bool) -> None:
-    controls._set_song_markers_expanded(forward)
+    controls.set_song_markers_expanded(forward)
 
 
 def _toggle_beat_bar_grid(controls: TuningControls, _slot: str | None, forward: bool) -> None:
-    controls._set_beat_bar_grid_expanded(forward)
+    controls.set_beat_bar_grid_expanded(forward)
 
 
 def _beat_bar_grid_expanded(state: TuningViewState, _slot: str | None) -> bool:
@@ -150,7 +150,7 @@ def _beat_bar_grid_expanded(state: TuningViewState, _slot: str | None) -> bool:
 
 
 def _toggle_snap_cues(controls: TuningControls, _slot: str | None, forward: bool) -> None:
-    controls._set_snap_cues_expanded(forward)
+    controls.set_snap_cues_expanded(forward)
 
 
 def _snap_cues_expanded(state: TuningViewState, _slot: str | None) -> bool:
@@ -158,7 +158,7 @@ def _snap_cues_expanded(state: TuningViewState, _slot: str | None) -> bool:
 
 
 def _toggle_timeline_cuts(controls: TuningControls, _slot: str | None, forward: bool) -> None:
-    controls._set_timeline_cuts_expanded(forward)
+    controls.set_timeline_cuts_expanded(forward)
 
 
 def _timeline_cuts_expanded(state: TuningViewState, _slot: str | None) -> bool:
@@ -166,7 +166,7 @@ def _timeline_cuts_expanded(state: TuningViewState, _slot: str | None) -> bool:
 
 
 def _toggle_timeline_presets(controls: TuningControls, _slot: str | None, forward: bool) -> None:
-    controls._set_timeline_presets_expanded(forward)
+    controls.set_timeline_presets_expanded(forward)
 
 
 def _timeline_presets_expanded(state: TuningViewState, _slot: str | None) -> bool:
@@ -176,7 +176,7 @@ def _timeline_presets_expanded(state: TuningViewState, _slot: str | None) -> boo
 def _toggle_visual_limiter(
     controls: TuningControls, _slot: str | None, forward: bool
 ) -> None:
-    controls._set_visual_limiter_expanded(forward)
+    controls.set_visual_limiter_expanded(forward)
 
 
 def _visual_limiter_expanded(state: TuningViewState, _slot: str | None) -> bool:
@@ -185,7 +185,7 @@ def _visual_limiter_expanded(state: TuningViewState, _slot: str | None) -> bool:
 
 def _open_timeline_panel(controls: TuningControls, forward: bool) -> None:
     if forward:
-        controls._open_timeline_panel()
+        controls.open_timeline_panel()
     else:
         controls.close_timeline_panel()
 

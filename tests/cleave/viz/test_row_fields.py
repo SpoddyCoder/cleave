@@ -338,13 +338,13 @@ def test_apply_field_horizontal_track_header_solo_and_expand() -> None:
 
 
 def test_row_fields_count() -> None:
-    assert len(ROW_FIELDS) == 130
+    assert len(ROW_FIELDS) == len(RowKind)
 
 
 def test_row_kinds_requiring_fields_registry_complete() -> None:
     required = row_kinds_requiring_fields()
     assert required == frozenset(ROW_FIELDS.keys())
-    assert RowKind.RENDER_SECTION_GAP not in ROW_FIELDS
+    assert RowKind.RENDER_SECTION_GAP in ROW_FIELDS
 
 
 def test_row_field_apply_horizontal_signatures_match_field_mutator() -> None:
@@ -464,3 +464,100 @@ def test_apply_field_horizontal_transport_seeks() -> None:
         SEEK_LONG,
         -SEEK_LONG,
     ]
+
+
+class _RecordingControls:
+    """Stub that records private attribute access from RowFieldDef callbacks."""
+
+    def __init__(self, accessed_private: list[str] | None = None) -> None:
+        object.__setattr__(
+            self, "_accessed_private", accessed_private if accessed_private is not None else []
+        )
+
+    def __getattr__(self, name: str) -> _RecordingControls:
+        if name.startswith("_") and not name.startswith("__"):
+            self._accessed_private.append(name)
+        child = _RecordingControls(self._accessed_private)
+        object.__setattr__(self, name, child)
+        return child
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if name.startswith("_") and not name.startswith("__"):
+            self._accessed_private.append(name)
+        object.__setattr__(self, name, value)
+
+    def __bool__(self) -> bool:
+        return True
+
+    def __call__(self, *args: object, **kwargs: object) -> _RecordingControls:
+        del args, kwargs
+        return self
+
+    def __getitem__(self, key: object) -> _RecordingControls:
+        del key
+        return self
+
+    def __setitem__(self, key: object, value: object) -> None:
+        del key, value
+
+    def get(self, *args: object, **kwargs: object) -> _RecordingControls:
+        del args, kwargs
+        return self
+
+    def __len__(self) -> int:
+        return 0
+
+    def __iter__(self):
+        return iter(())
+
+    def __contains__(self, item: object) -> bool:
+        del item
+        return False
+
+    def __int__(self) -> int:
+        return 0
+
+    def __float__(self) -> float:
+        return 0.0
+
+    def __index__(self) -> int:
+        return 0
+
+    def __add__(self, other: object) -> object:
+        return 0 if not isinstance(other, _RecordingControls) else other
+
+    def __radd__(self, other: object) -> object:
+        return other
+
+    def __sub__(self, other: object) -> object:
+        del other
+        return 0
+
+    def __rsub__(self, other: object) -> object:
+        return other
+
+
+def test_row_field_callbacks_use_public_controls_api() -> None:
+    accessed: list[str] = []
+    controls = _RecordingControls(accessed)
+    for kind, field in ROW_FIELDS.items():
+        if field.apply_horizontal is None:
+            continue
+        desc = RowDescriptor(
+            kind,
+            slot="layer_1",
+            effect_id="pulse",
+            driver_slug="onset",
+            marker_index=0,
+            preset_index=0,
+        )
+        for forward, ctrl, shift in (
+            (True, False, False),
+            (True, True, False),
+            (True, False, True),
+        ):
+            try:
+                field.apply_horizontal(controls, desc, forward, ctrl, shift)
+            except Exception:
+                continue
+    assert accessed == []
