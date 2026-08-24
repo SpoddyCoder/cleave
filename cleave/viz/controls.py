@@ -9,20 +9,14 @@ from typing import TYPE_CHECKING
 
 import pygame
 
-from cleave.config import CleaveConfig, clamp_beat_sensitivity, clamp_effect_pct
-from cleave.config_schema import clamp_easter_egg
-from cleave.config_schema import (
-    PRESET_SWITCHING_MODES,
-    PRESET_SWITCHING_TRIGGERS,
-)
-from cleave.blend_modes import BLEND_MODES, BlendMode
-from cleave.extract import STEM_SOURCES
+from cleave.config import CleaveConfig
 from cleave.signals import Signals
 from cleave.song_markers import format_marker_time, place_marker
 from cleave.preset_curation import PresetCurationIndex
-from cleave.preset_playlist import is_top_level_browse_dir, milk_files_in_dir
+from cleave.preset_playlist import milk_files_in_dir
 from cleave.timeline import snap_placement_time
 from cleave.viz.config_save import ConfigSaveController
+from cleave.viz.layer_mutations import LayerMutations
 from cleave.viz.editor_mode_controls import EditorModeController, is_preset_curation_mode
 from cleave.viz.post_fx import sync_live_compositor_format
 from cleave.viz.preset_curation_controls import PresetCurationController
@@ -88,9 +82,6 @@ if TYPE_CHECKING:
 
 NOTIFICATION_TIMELINE_ENABLED_TEXT = "Timeline controls layer visibility"
 NOTIFICATION_TIMELINE_DISABLED_TEXT = "Layer panel controls visibility"
-NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT = (
-    "Timeline is disabled; enable Render: TIMELINE to switch presets"
-)
 NOTIFICATION_RESIDUAL_LATENCY_UNCHANGED_TEXT = (
     "Existing marker and cue times unchanged"
 )
@@ -188,7 +179,7 @@ class TuningControls:
             on_notification=self.show_notification,
             on_repopulate=self._repopulate_preset_lists,
         )
-        self._timeline_phase = TimelinePhaseController(
+        self.timeline_phase = TimelinePhaseController(
             session,
             beat_times,
             on_notification=self.show_notification,
@@ -218,12 +209,19 @@ class TuningControls:
             get_notification=self._notification_host.active,
             layers_by_slot=layers_by_slot,
         )
-        self._render_overlays = RenderOverlaysControls(session)
-        self._render_post_fx = RenderPostFxControls(
+        self.render_overlays = RenderOverlaysControls(session)
+        self.render_post_fx = RenderPostFxControls(
             session, bindings=render_post_fx_bindings
         )
-        self._render_pattern_mask = RenderPatternMaskControls(session)
-        self._settings = SettingsControls(session, cfg)
+        self.render_pattern_mask = RenderPatternMaskControls(session)
+        self.settings = SettingsControls(session, cfg)
+        self.layer_mutations = LayerMutations(
+            session,
+            preset_root=preset_root,
+            duration_sec=duration_sec,
+            get_layer_bindings=lambda: self._layer_bindings,
+            on_notification=lambda message: self.show_notification(message),
+        )
         self._tap_sync = TapSyncControls(
             cfg,
             playback,
@@ -235,7 +233,7 @@ class TuningControls:
             on_calibration_ui_restore=self._restore_tap_sync_calibration_ui,
         )
         self._apply_residual_latency()
-        self._editor_mode = EditorModeController(
+        self.editor_mode = EditorModeController(
             session,
             cfg,
             self._config_save,
@@ -297,7 +295,7 @@ class TuningControls:
         latency_sec = self.cfg.editor.residual_latency_ms / 1000.0
         self.playback.player.set_residual_latency_sec(latency_sec)
 
-    def _on_residual_latency_changed(self) -> None:
+    def on_residual_latency_changed(self) -> None:
         self._apply_residual_latency()
         if self._project_has_markers_or_cues():
             self.show_notification(NOTIFICATION_RESIDUAL_LATENCY_UNCHANGED_TEXT)
@@ -379,7 +377,7 @@ class TuningControls:
             if tl.panel_open:
                 self.close_timeline_panel()
             else:
-                self._open_timeline_panel(enter_submenu=True)
+                self.open_timeline_panel(enter_submenu=True)
             return True
 
         if self.move_mode_slot is not None or self.move_mode_preset is not None:
@@ -453,7 +451,7 @@ class TuningControls:
                         self.session, self.focus_descriptor
                     ):
                         return True
-                    self._parent_directory(slot)
+                    self.layer_mutations.parent_directory(slot)
                 return True
 
         if delete_key_pressed(event):
@@ -573,7 +571,7 @@ class TuningControls:
         if event.key == pygame.K_RETURN:
             kind = self.focus_descriptor.kind
             if kind == RowKind.SETTINGS_EDITOR_MODE:
-                self._editor_mode.confirm_editor_mode_selection()
+                self.editor_mode.confirm_editor_mode_selection()
                 return True
             if kind == RowKind.SETTINGS_MEASURE_LATENCY:
                 self._tap_sync.prompt_start()
@@ -643,7 +641,7 @@ class TuningControls:
                         self.session, self.focus_descriptor
                     ):
                         return True
-                    self._enter_directory(slot)
+                    self.layer_mutations.enter_directory(slot)
                 return True
             if kind == RowKind.TRANSPORT:
                 toggle_pause(self.playback, self.duration_sec)
@@ -740,7 +738,7 @@ class TuningControls:
 
         if event.key == pygame.K_RETURN:
             if self.focus_descriptor.kind == RowKind.SETTINGS_EDITOR_MODE:
-                self._editor_mode.confirm_editor_mode_selection()
+                self.editor_mode.confirm_editor_mode_selection()
                 return True
 
         return True
@@ -794,7 +792,7 @@ class TuningControls:
             )
         )
         if leaving_editor_mode:
-            self._editor_mode.sync_selection_to_mode()
+            self.editor_mode.sync_selection_to_mode()
         self._focus_cursor = cursor
         if isinstance(cursor, TimelineFocus):
             tl = self.session.timeline
@@ -878,9 +876,9 @@ class TuningControls:
         if target < 0 or target >= len(order):
             return
         order[index], order[target] = order[target], order[index]
-        self._apply_preview_resolutions()
+        self.apply_preview_resolutions()
 
-    def _apply_preview_resolutions(self) -> None:
+    def apply_preview_resolutions(self) -> None:
         if self._layer_manager is not None:
             self._layer_manager.apply_preview_resolutions()
 
@@ -1051,7 +1049,7 @@ class TuningControls:
     def _cancel_move_mode(self) -> None:
         if self._move_mode_original_z_order is not None:
             self.session.layer_z_order[:] = self._move_mode_original_z_order
-            self._apply_preview_resolutions()
+            self.apply_preview_resolutions()
         if (
             self.move_mode_preset is not None
             and self._move_mode_original_preset_list is not None
@@ -1230,200 +1228,19 @@ class TuningControls:
             self, self.focus_descriptor, forward, ctrl, shift
         )
 
-    def _step_directory(self, slot: str, *, forward: bool) -> None:
-        layer = self.session.layers[slot]
-        playlist = layer.playlist
-        delta = 1 if forward else -1
-        if playlist.step_sibling(delta, preset_root=self.preset_root):
-            # Pack hop at preset_root: move the ascent floor with the playlist
-            # so Ctrl+Left still works after diving into the new pack.
-            if is_top_level_browse_dir(playlist.current_dir, self.preset_root):
-                layer.browse_floor = playlist.current_dir.resolve()
-            if self._layer_bindings is not None:
-                self._layer_bindings.on_preset_change(slot, playlist)
-
-    def _enter_directory(self, slot: str) -> None:
-        layer = self.session.layers[slot]
-        playlist = layer.playlist
-        if playlist.enter_child(self.preset_root):
-            if self._layer_bindings is not None:
-                self._layer_bindings.on_preset_change(slot, playlist)
-
-    def _parent_directory(self, slot: str) -> None:
-        layer = self.session.layers[slot]
-        playlist = layer.playlist
-        if playlist.go_parent(
-            self.preset_root, browse_floor=layer.browse_floor
-        ):
-            if self._layer_bindings is not None:
-                self._layer_bindings.on_preset_change(slot, playlist)
-
-    def _step_preset(self, slot: str, *, forward: bool, ctrl: bool) -> None:
-        layer = self.session.layers[slot]
-        playlist = layer.playlist
-        if not playlist.paths:
-            return
-        if ctrl:
-            playlist.step_by(10 if forward else -10)
-        elif forward:
-            playlist.next()
-        else:
-            playlist.prev()
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_preset_change(slot, playlist)
-
-    def _warn_if_timeline_trigger_disabled(self, slot: str) -> bool:
-        layer = self.session.layers[slot]
-        if (
-            layer.preset_switching == "on"
-            and layer.preset_switching_trigger == "timeline"
-            and not self.session.timeline.enabled
-        ):
-            self.show_notification(NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT)
-            return True
-        return False
-
-    def _cycle_preset_switching(self, slot: str, *, forward: bool) -> None:
-        layer = self.session.layers[slot]
-        modes = PRESET_SWITCHING_MODES
-        try:
-            index = modes.index(layer.preset_switching)
-        except ValueError:
-            index = 0
-        if forward:
-            layer.preset_switching = modes[(index + 1) % len(modes)]
-        else:
-            layer.preset_switching = modes[(index - 1) % len(modes)]
-        if layer.preset_switching == "on":
-            layer.preset_list_expanded = True
-        self._warn_if_timeline_trigger_disabled(slot)
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_preset_switching_change(slot)
-
-    def _cycle_preset_switching_trigger(self, slot: str, *, forward: bool) -> None:
-        layer = self.session.layers[slot]
-        options = PRESET_SWITCHING_TRIGGERS
-        try:
-            index = options.index(layer.preset_switching_trigger)
-        except ValueError:
-            index = 0
-        if forward:
-            layer.preset_switching_trigger = options[(index + 1) % len(options)]
-        else:
-            layer.preset_switching_trigger = options[(index - 1) % len(options)]
-        if not self._warn_if_timeline_trigger_disabled(slot) and layer.preset_list:
-            self.show_notification("Preset list may need adjusting")
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_preset_switching_change(slot)
-
-    def _step_preset_duration(
-        self, slot: str, *, forward: bool, ctrl: bool = False
-    ) -> None:
-        layer = self.session.layers[slot]
-        step = 10.0 if ctrl else 1.0
-        delta = step if forward else -step
-        layer.preset_duration = max(5.0, min(300.0, layer.preset_duration + delta))
-        if (
-            layer.preset_switching_trigger != "timeline"
-            and layer.preset_list
-            and len(layer.preset_list)
-            < needed_preset_count(
-                song_duration_sec=self.duration_sec,
-                preset_duration=layer.preset_duration,
-                trigger=layer.preset_switching_trigger,
-            )
-        ):
-            self.show_notification("Preset list may need more presets")
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_preset_switching_change(slot)
-
-    def _step_soft_cut_duration(
-        self, slot: str, *, forward: bool, ctrl: bool = False
-    ) -> None:
-        layer = self.session.layers[slot]
-        step = 10.0 if ctrl else 1.0
-        delta = step if forward else -step
-        layer.soft_cut_duration = max(0.0, min(60.0, layer.soft_cut_duration + delta))
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_preset_switching_change(slot)
-
-    def _step_easter_egg(self, slot: str, *, forward: bool, ctrl: bool = False) -> None:
-        layer = self.session.layers[slot]
-        step = 0.1 if ctrl else 0.01
-        delta = step if forward else -step
-        layer.easter_egg = clamp_easter_egg(layer.easter_egg + delta)
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_preset_switching_change(slot)
-
-    def _cycle_preset_start_clean(self, slot: str, *, forward: bool) -> None:
-        del forward
-        layer = self.session.layers[slot]
-        layer.preset_start_clean = not layer.preset_start_clean
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_preset_switching_change(slot)
-
-    def _cycle_hard_cut_enabled(self, slot: str, *, forward: bool) -> None:
-        del forward
-        layer = self.session.layers[slot]
-        layer.hard_cut_enabled = not layer.hard_cut_enabled
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_preset_switching_change(slot)
-
-
-    def _step_hard_cut_duration(
-        self, slot: str, *, forward: bool, ctrl: bool = False
-    ) -> None:
-        layer = self.session.layers[slot]
-        step = 10.0 if ctrl else 1.0
-        delta = step if forward else -step
-        layer.hard_cut_duration = max(5.0, min(300.0, layer.hard_cut_duration + delta))
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_preset_switching_change(slot)
-
-    def _set_hard_cut_sensitivity(self, slot: str, value: float) -> None:
-        layer = self.session.layers[slot]
-        layer.hard_cut_sensitivity = max(0.1, min(2.0, float(value)))
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_preset_switching_change(slot)
-
-    def _cycle_blend(self, slot: str, *, forward: bool) -> None:
-        layer = self.session.layers[slot]
-        try:
-            index = BLEND_MODES.index(layer.blend_mode)
-        except ValueError:
-            index = 0
-        if forward:
-            layer.blend_mode = BLEND_MODES[(index + 1) % len(BLEND_MODES)]
-        else:
-            layer.blend_mode = BLEND_MODES[(index - 1) % len(BLEND_MODES)]
-
-    def _cycle_stem(self, slot: str, *, forward: bool) -> None:
-        layer = self.session.layers[slot]
-        try:
-            index = STEM_SOURCES.index(layer.stem)
-        except ValueError:
-            index = 0
-        if forward:
-            layer.stem = STEM_SOURCES[(index + 1) % len(STEM_SOURCES)]
-        else:
-            layer.stem = STEM_SOURCES[(index - 1) % len(STEM_SOURCES)]
-        layer.effects = {}
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_stem_change(slot, layer.stem)
-
     def _toggle_locked(self, slot: str) -> None:
         layer = self.session.layers[slot]
         layer.locked = not layer.locked
 
     def _toggle_render_overlay_locked(self) -> None:
-        self._render_overlays.toggle_locked()
+        self.render_overlays.toggle_locked()
 
     def _toggle_render_post_fx_locked(self) -> None:
         post_fx = self.session.render_post_fx
         post_fx.locked = not post_fx.locked
 
     def _toggle_render_pattern_mask_locked(self) -> None:
-        self._render_pattern_mask.toggle_locked()
+        self.render_pattern_mask.toggle_locked()
 
     def _toggle_render_timeline_locked(self) -> None:
         timeline = self.session.timeline
@@ -1431,19 +1248,19 @@ class TuningControls:
             return
         timeline.locked = not timeline.locked
 
-    def _set_expanded(self, slot: str, expanded: bool) -> None:
+    def set_expanded(self, slot: str, expanded: bool) -> None:
         layer = self.session.layers[slot]
         if layer.expanded == expanded:
             return
         layer.expanded = expanded
 
-    def _set_render_timeline_enabled(self, enabled: bool) -> None:
+    def set_render_timeline_enabled(self, enabled: bool) -> None:
         tl = self.session.timeline
         if tl.enabled == enabled:
             return
         tl.enabled = enabled
         if enabled:
-            self._open_timeline_panel()
+            self.open_timeline_panel()
         else:
             self.close_timeline_panel()
         if self._layer_bindings is not None:
@@ -1454,116 +1271,61 @@ class TuningControls:
             else NOTIFICATION_TIMELINE_DISABLED_TEXT
         )
 
-    def _enter_solo(self, slot: str) -> None:
-        if self.session.solo_slot == slot:
-            return
-        self.session.solo_slot = slot
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_solo_change()
-
-    def _exit_solo(self, slot: str) -> None:
-        if self.session.solo_slot != slot:
-            return
-        self.session.solo_slot = None
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_solo_change()
-
-    def _set_enabled(self, slot: str, enabled: bool) -> None:
-        if self.session.timeline.enabled:
-            self.show_notification("Timeline controls layer visibility")
-            return
-        layer = self.session.layers[slot]
-        if layer.enabled == enabled:
-            return
-        layer.enabled = enabled
-        if not enabled:
-            layer.expanded = False
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_layer_enabled_change(slot, layer.enabled)
-
-    def _set_opacity(self, slot: str, pct: int) -> None:
-        layer = self.session.layers[slot]
-        layer.opacity_pct = max(0, min(100, pct))
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_opacity_change(slot, layer.opacity_pct)
-
-    def _set_effect(
-        self, slot: str, effect_id: str, driver_slug: str, pct: int
-    ) -> None:
-        layer = self.session.layers[slot]
-        clamped = clamp_effect_pct(pct)
-        if clamped == 0:
-            drivers = layer.effects.get(effect_id)
-            if drivers is not None:
-                drivers.pop(driver_slug, None)
-                if not drivers:
-                    layer.effects.pop(effect_id, None)
-        else:
-            layer.effects.setdefault(effect_id, {})[driver_slug] = clamped
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_opacity_change(slot, layer.opacity_pct)
-
-    def _set_effects_expanded(self, slot: str, expanded: bool) -> None:
+    def set_effects_expanded(self, slot: str, expanded: bool) -> None:
         layer = self.session.layers[slot]
         if layer.effects_expanded == expanded:
             return
         layer.effects_expanded = expanded
 
-    def _set_preset_list_expanded(self, slot: str, expanded: bool) -> None:
+    def set_preset_list_expanded(self, slot: str, expanded: bool) -> None:
         layer = self.session.layers[slot]
         if layer.preset_list_expanded == expanded:
             return
         layer.preset_list_expanded = expanded
 
-    def _set_song_markers_expanded(self, expanded: bool) -> None:
+    def set_song_markers_expanded(self, expanded: bool) -> None:
         markers = self.session.song_markers
         if markers.expanded == expanded:
             return
         markers.expanded = expanded
 
-    def _set_beat_bar_grid_expanded(self, expanded: bool) -> None:
+    def set_beat_bar_grid_expanded(self, expanded: bool) -> None:
         tl = self.session.timeline
         if tl.beat_bar_grid_expanded == expanded:
             return
         tl.beat_bar_grid_expanded = expanded
 
-    def _set_snap_cues_expanded(self, expanded: bool) -> None:
+    def set_snap_cues_expanded(self, expanded: bool) -> None:
         tl = self.session.timeline
         if tl.snap_cues_expanded == expanded:
             return
         tl.snap_cues_expanded = expanded
 
-    def _set_timeline_cuts_expanded(self, expanded: bool) -> None:
+    def set_timeline_cuts_expanded(self, expanded: bool) -> None:
         tl = self.session.timeline
         if tl.cuts_expanded == expanded:
             return
         tl.cuts_expanded = expanded
 
-    def _set_timeline_presets_expanded(self, expanded: bool) -> None:
+    def set_timeline_presets_expanded(self, expanded: bool) -> None:
         tl = self.session.timeline
         if tl.timeline_presets_expanded == expanded:
             return
         tl.timeline_presets_expanded = expanded
 
-    def _set_visual_limiter_expanded(self, expanded: bool) -> None:
+    def set_visual_limiter_expanded(self, expanded: bool) -> None:
         tl = self.session.timeline
         if tl.visual_limiter_expanded == expanded:
             return
         tl.visual_limiter_expanded = expanded
 
-    def _set_visual_limiter_enabled(self, enabled: bool) -> None:
+    def set_visual_limiter_enabled(self, enabled: bool) -> None:
         lim = self.session.timeline.limiter
         if lim.enabled == enabled:
             return
         lim.enabled = enabled
 
-    def _set_beat(self, slot: str, value: float) -> None:
-        layer = self.session.layers[slot]
-        layer.beat_sensitivity = clamp_beat_sensitivity(value)
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_beat_change(slot, layer.beat_sensitivity)
-
-    def _do_seek(self, delta_sec: float) -> None:
+    def do_seek(self, delta_sec: float) -> None:
         if self._layer_bindings is not None:
             self._layer_bindings.on_seek(delta_sec)
         else:
@@ -1676,7 +1438,7 @@ class TuningControls:
     def show_notification(self, message: str) -> None:
         self._notification_host.show(message)
 
-    def _open_timeline_panel(self, *, enter_submenu: bool = False) -> None:
+    def open_timeline_panel(self, *, enter_submenu: bool = False) -> None:
         tl = self.session.timeline
         tl.panel_open = True
         if enter_submenu:

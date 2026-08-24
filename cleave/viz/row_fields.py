@@ -8,7 +8,7 @@ row_sections.py; affordance and help stay in row_semantics.py.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum, auto
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -82,6 +82,13 @@ from cleave.timeline_presets.timeline_cuts import (
     timeline_preset_timeline_cuts_display,
 )
 from cleave.viz.fonts import render_overlay_font_display
+from cleave.viz.row_semantics import (
+    ACTION_ROW_KINDS,
+    RowAffordance,
+    RowDescriptor,
+    RowKind,
+    row_behavior,
+)
 from cleave.viz.row_sections import (
     apply_expand_toggle,
     apply_panel_anchor_toggle,
@@ -89,7 +96,6 @@ from cleave.viz.row_sections import (
     expand_arrow_glyph,
     row_tree_indent_depth,
 )
-from cleave.viz.row_semantics import RowDescriptor, RowKind, row_behavior
 from cleave.viz.tuning_view_state import TrackBlock, TuningViewState
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
@@ -103,9 +109,20 @@ class RowPresentStyle(Enum):
     PATH_ICON = auto()
     FULL_LINE = auto()
     DYNAMIC = auto()
+    TRACK_HEADER = auto()
+    NOTIFICATION = auto()
+    SPACER = auto()
+
+
+class FitStrategy(Enum):
+    PLAIN = auto()
+    COUNTER_LABEL = auto()
+    PATH = auto()
+    NONE = auto()
 
 
 FieldMutator = Callable[["TuningControls", RowDescriptor, bool, bool, bool], None]
+VisibilityIconFn = Callable[[TuningViewState, RowDescriptor], tuple[bool, bool]]
 
 
 @dataclass(frozen=True)
@@ -116,6 +133,9 @@ class RowFieldDef:
     apply_horizontal: FieldMutator | None = None
     header_prefix: str | None = None
     header_suffix: str | None = None
+    fit_strategy: FitStrategy = FitStrategy.PLAIN
+    visibility_icon: VisibilityIconFn | None = None
+    shows_enter_icon: bool = False
 
 
 def tree_branch_leading_spaces(depth: int) -> str:
@@ -194,7 +214,7 @@ def _apply_timeline_bar_phase(
     _ctrl: bool,
     _shift: bool,
 ) -> None:
-    controls._timeline_phase.nudge(forward=forward)
+    controls.timeline_phase.nudge(forward=forward)
 
 
 def _format_timeline_bar_grid(
@@ -419,7 +439,7 @@ def _apply_visual_limiter_enabled(
     _shift: bool,
 ) -> None:
     del _ctrl, _shift
-    controls._set_visual_limiter_enabled(forward)
+    controls.set_visual_limiter_enabled(forward)
 
 
 def _format_visual_limiter_threshold(
@@ -628,7 +648,7 @@ def _apply_settings_editor_mode(
     _ctrl: bool,
     _shift: bool,
 ) -> None:
-    controls._editor_mode.cycle_editor_mode_selection(forward=forward)
+    controls.editor_mode.cycle_editor_mode_selection(forward=forward)
 
 
 def _apply_settings_preview_quality(
@@ -638,29 +658,29 @@ def _apply_settings_preview_quality(
     _ctrl: bool,
     _shift: bool,
 ) -> None:
-    controls._settings.cycle_preview_quality(forward=forward)
-    controls._apply_preview_resolutions()
+    controls.settings.cycle_preview_quality(forward=forward)
+    controls.apply_preview_resolutions()
 
 
 def _apply_settings_ui_width_mode(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
     _shift: bool,
 ) -> None:
-    controls._settings.cycle_ui_width_mode(forward=forward)
+    controls.settings.cycle_ui_width_mode(forward=forward)
 
 
 def _apply_settings_ui_width(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
     _shift: bool,
 ) -> None:
-    controls._settings.adjust_ui_width(forward=forward, ctrl=ctrl)
+    controls.settings.adjust_ui_width(forward=forward, ctrl=ctrl)
 
 
 def _apply_settings_ui_fade(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, ctrl: bool,
     _shift: bool,
 ) -> None:
-    controls._settings.adjust_ui_fade(forward=forward, ctrl=ctrl)
+    controls.settings.adjust_ui_fade(forward=forward, ctrl=ctrl)
 
 
 def _apply_settings_residual_latency_ms(
@@ -670,8 +690,8 @@ def _apply_settings_residual_latency_ms(
     ctrl: bool,
     _shift: bool,
 ) -> None:
-    controls._settings.adjust_residual_latency_ms(forward=forward, ctrl=ctrl)
-    controls._on_residual_latency_changed()
+    controls.settings.adjust_residual_latency_ms(forward=forward, ctrl=ctrl)
+    controls.on_residual_latency_changed()
 
 
 def _track_block(state: TuningViewState, desc: RowDescriptor) -> TrackBlock:
@@ -924,7 +944,7 @@ def _apply_track_stem(
 ) -> None:
     if desc.slot is None:
         return
-    controls._cycle_stem(desc.slot, forward=forward)
+    controls.layer_mutations.cycle_stem(desc.slot, forward=forward)
 
 
 def _apply_track_blend(
@@ -933,7 +953,7 @@ def _apply_track_blend(
 ) -> None:
     if desc.slot is None:
         return
-    controls._cycle_blend(desc.slot, forward=forward)
+    controls.layer_mutations.cycle_blend(desc.slot, forward=forward)
 
 
 def _apply_track_opacity(
@@ -944,7 +964,7 @@ def _apply_track_opacity(
         return
     step = 10 if ctrl else 1
     delta = step if forward else -step
-    controls._set_opacity(
+    controls.layer_mutations.set_opacity(
         desc.slot, controls.session.layers[desc.slot].opacity_pct + delta
     )
 
@@ -957,7 +977,7 @@ def _apply_track_beat(
         return
     step = 0.1 if ctrl else 0.01
     delta = step if forward else -step
-    controls._set_beat(
+    controls.layer_mutations.set_beat(
         desc.slot, controls.session.layers[desc.slot].beat_sensitivity + delta
     )
 
@@ -968,7 +988,7 @@ def _apply_track_preset_switching_mode(
 ) -> None:
     if desc.slot is None:
         return
-    controls._cycle_preset_switching(desc.slot, forward=forward)
+    controls.layer_mutations.cycle_preset_switching(desc.slot, forward=forward)
 
 
 def _apply_track_preset_switching_trigger(
@@ -980,7 +1000,7 @@ def _apply_track_preset_switching_trigger(
 ) -> None:
     if desc.slot is None:
         return
-    controls._cycle_preset_switching_trigger(desc.slot, forward=forward)
+    controls.layer_mutations.cycle_preset_switching_trigger(desc.slot, forward=forward)
 
 
 def _apply_track_preset_duration(
@@ -989,7 +1009,7 @@ def _apply_track_preset_duration(
 ) -> None:
     if desc.slot is None:
         return
-    controls._step_preset_duration(desc.slot, forward=forward, ctrl=ctrl)
+    controls.layer_mutations.step_preset_duration(desc.slot, forward=forward, ctrl=ctrl)
 
 
 def _apply_track_soft_cut_duration(
@@ -998,7 +1018,7 @@ def _apply_track_soft_cut_duration(
 ) -> None:
     if desc.slot is None:
         return
-    controls._step_soft_cut_duration(desc.slot, forward=forward, ctrl=ctrl)
+    controls.layer_mutations.step_soft_cut_duration(desc.slot, forward=forward, ctrl=ctrl)
 
 
 def _apply_track_easter_egg(
@@ -1007,7 +1027,7 @@ def _apply_track_easter_egg(
 ) -> None:
     if desc.slot is None:
         return
-    controls._step_easter_egg(desc.slot, forward=forward, ctrl=ctrl)
+    controls.layer_mutations.step_easter_egg(desc.slot, forward=forward, ctrl=ctrl)
 
 
 def _apply_track_preset_start_clean(
@@ -1016,7 +1036,7 @@ def _apply_track_preset_start_clean(
 ) -> None:
     if desc.slot is None:
         return
-    controls._cycle_preset_start_clean(desc.slot, forward=forward)
+    controls.layer_mutations.cycle_preset_start_clean(desc.slot, forward=forward)
 
 
 def _apply_track_hard_cut_enabled(
@@ -1025,7 +1045,7 @@ def _apply_track_hard_cut_enabled(
 ) -> None:
     if desc.slot is None:
         return
-    controls._cycle_hard_cut_enabled(desc.slot, forward=forward)
+    controls.layer_mutations.cycle_hard_cut_enabled(desc.slot, forward=forward)
 
 
 def _apply_track_hard_cut_duration(
@@ -1034,7 +1054,7 @@ def _apply_track_hard_cut_duration(
 ) -> None:
     if desc.slot is None:
         return
-    controls._step_hard_cut_duration(desc.slot, forward=forward, ctrl=ctrl)
+    controls.layer_mutations.step_hard_cut_duration(desc.slot, forward=forward, ctrl=ctrl)
 
 
 def _apply_track_hard_cut_sensitivity(
@@ -1045,13 +1065,13 @@ def _apply_track_hard_cut_sensitivity(
         return
     step = 0.1 if ctrl else 0.01
     delta = step if forward else -step
-    controls._set_hard_cut_sensitivity(
+    controls.layer_mutations.set_hard_cut_sensitivity(
         desc.slot, controls.session.layers[desc.slot].hard_cut_sensitivity + delta
     )
 
 
 def _card_controls(controls: TuningControls, card_name: str):
-    return getattr(controls._render_overlays, card_name)
+    return getattr(controls.render_overlays, card_name)
 
 
 def _apply_overlay_card_position(card_name: str):
@@ -1188,7 +1208,7 @@ def _apply_overlay_card_appear_at(
     step = 30.0 if ctrl else 1.0
     delta = step if forward else -step
     anim = controls.session.render_overlays.opening_card.animation
-    controls._render_overlays.opening_card.set_appear_at(
+    controls.render_overlays.opening_card.set_appear_at(
         getattr(anim, "appear_at", 0.0) + delta
     )
 
@@ -1200,7 +1220,7 @@ def _apply_overlay_card_disappear_at(
     step = 30.0 if ctrl else 1.0
     delta = step if forward else -step
     anim = controls.session.render_overlays.closing_card.animation
-    controls._render_overlays.closing_card.set_disappear_at(
+    controls.render_overlays.closing_card.set_disappear_at(
         getattr(anim, "disappear_at", 0.0) + delta
     )
 
@@ -1255,7 +1275,7 @@ def _apply_render_post_fx_fade_in(
 ) -> None:
     step = 10.0 if ctrl else 1.0
     delta = step if forward else -step
-    controls._render_post_fx.set_fade_in(
+    controls.render_post_fx.set_fade_in(
         controls.session.render_post_fx.fade_in + delta
     )
 
@@ -1266,7 +1286,7 @@ def _apply_render_post_fx_fade_out(
 ) -> None:
     step = 10.0 if ctrl else 1.0
     delta = step if forward else -step
-    controls._render_post_fx.set_fade_out(
+    controls.render_post_fx.set_fade_out(
         controls.session.render_post_fx.fade_out + delta
     )
 
@@ -1275,14 +1295,14 @@ def _apply_render_post_fx_highlight_rolloff_mode(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
     _shift: bool,
 ) -> None:
-    controls._render_post_fx.cycle_highlight_rolloff_mode(forward=forward)
+    controls.render_post_fx.cycle_highlight_rolloff_mode(forward=forward)
 
 
 def _apply_render_post_fx_highlight_rolloff_curve(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
     _shift: bool,
 ) -> None:
-    controls._render_post_fx.cycle_highlight_rolloff_curve(forward=forward)
+    controls.render_post_fx.cycle_highlight_rolloff_curve(forward=forward)
 
 
 def _apply_render_post_fx_highlight_rolloff_threshold(
@@ -1292,7 +1312,7 @@ def _apply_render_post_fx_highlight_rolloff_threshold(
     step = 10 if ctrl else 1
     delta = step if forward else -step
     hr = controls.session.render_post_fx.highlight_rolloff
-    controls._render_post_fx.set_highlight_rolloff_threshold_pct(
+    controls.render_post_fx.set_highlight_rolloff_threshold_pct(
         hr.threshold_pct + delta
     )
 
@@ -1304,7 +1324,7 @@ def _apply_render_post_fx_highlight_rolloff_ceiling(
     step = 10 if ctrl else 1
     delta = step if forward else -step
     hr = controls.session.render_post_fx.highlight_rolloff
-    controls._render_post_fx.set_highlight_rolloff_ceiling_pct(
+    controls.render_post_fx.set_highlight_rolloff_ceiling_pct(
         hr.ceiling_pct + delta
     )
 
@@ -1316,7 +1336,7 @@ def _apply_render_post_fx_highlight_rolloff_strength(
     step = 10 if ctrl else 1
     delta = step if forward else -step
     hr = controls.session.render_post_fx.highlight_rolloff
-    controls._render_post_fx.set_highlight_rolloff_strength_pct(
+    controls.render_post_fx.set_highlight_rolloff_strength_pct(
         hr.strength_pct + delta
     )
 
@@ -1328,7 +1348,7 @@ def _apply_render_post_fx_highlight_rolloff_softness(
     step = 10 if ctrl else 1
     delta = step if forward else -step
     hr = controls.session.render_post_fx.highlight_rolloff
-    controls._render_post_fx.set_highlight_rolloff_softness_pct(
+    controls.render_post_fx.set_highlight_rolloff_softness_pct(
         hr.softness_pct + delta
     )
 
@@ -1340,7 +1360,7 @@ def _apply_render_post_fx_highlight_rolloff_desaturation(
     step = 10 if ctrl else 1
     delta = step if forward else -step
     hr = controls.session.render_post_fx.highlight_rolloff
-    controls._render_post_fx.set_highlight_rolloff_desaturation_pct(
+    controls.render_post_fx.set_highlight_rolloff_desaturation_pct(
         hr.desaturation_pct + delta
     )
 
@@ -1349,14 +1369,14 @@ def _apply_render_post_fx_chroma_boost_mode(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
     _shift: bool,
 ) -> None:
-    controls._render_post_fx.cycle_chroma_boost_mode(forward=forward)
+    controls.render_post_fx.cycle_chroma_boost_mode(forward=forward)
 
 
 def _apply_render_post_fx_chroma_boost_variant(
     controls: TuningControls, _desc: RowDescriptor, forward: bool, _ctrl: bool,
     _shift: bool,
 ) -> None:
-    controls._render_post_fx.cycle_chroma_boost_variant(forward=forward)
+    controls.render_post_fx.cycle_chroma_boost_variant(forward=forward)
 
 
 def _apply_render_post_fx_chroma_boost_amount(
@@ -1366,7 +1386,7 @@ def _apply_render_post_fx_chroma_boost_amount(
     step = 10 if ctrl else 1
     delta = step if forward else -step
     cb = controls.session.render_post_fx.chroma_boost
-    controls._render_post_fx.set_chroma_boost_amount_pct(cb.amount_pct + delta)
+    controls.render_post_fx.set_chroma_boost_amount_pct(cb.amount_pct + delta)
 
 
 def _apply_expand_subheader(
@@ -1401,9 +1421,9 @@ def _apply_track_header(
         return
     if shift:
         if forward:
-            controls._enter_solo(slot)
+            controls.layer_mutations.enter_solo(slot)
         else:
-            controls._exit_solo(slot)
+            controls.layer_mutations.exit_solo(slot)
         return
     if ctrl:
         if (
@@ -1411,7 +1431,7 @@ def _apply_track_header(
             and row_behavior(desc.kind).can_enable_disable
         ):
             return
-        controls._set_enabled(slot, forward)
+        controls.layer_mutations.set_enabled(slot, forward)
         return
     apply_expand_toggle(controls, desc.kind, slot, forward)
 
@@ -1425,9 +1445,9 @@ def _apply_render_overlays_header(
 ) -> None:
     if shift:
         if forward:
-            controls._render_overlays.enter_solo()
+            controls.render_overlays.enter_solo()
         else:
-            controls._render_overlays.exit_solo()
+            controls.render_overlays.exit_solo()
         return
     if ctrl:
         if (
@@ -1435,7 +1455,7 @@ def _apply_render_overlays_header(
             and row_behavior(desc.kind).can_enable_disable
         ):
             return
-        controls._render_overlays.set_enabled(forward)
+        controls.render_overlays.set_enabled(forward)
         return
     apply_expand_toggle(controls, desc.kind, desc.slot, forward)
 
@@ -1474,7 +1494,7 @@ def _apply_render_post_fx_header(
             and row_behavior(desc.kind).can_enable_disable
         ):
             return
-        controls._render_post_fx.set_enabled(forward)
+        controls.render_post_fx.set_enabled(forward)
         return
     apply_expand_toggle(controls, desc.kind, desc.slot, forward)
 
@@ -1528,7 +1548,7 @@ def _apply_render_pattern_mask_header(
             and row_behavior(desc.kind).can_enable_disable
         ):
             return
-        controls._render_pattern_mask.set_enabled(forward)
+        controls.render_pattern_mask.set_enabled(forward)
         return
     apply_expand_toggle(controls, desc.kind, desc.slot, forward)
 
@@ -1540,7 +1560,7 @@ def _apply_render_pattern_mask_type(
     _ctrl: bool,
     _shift: bool,
 ) -> None:
-    controls._render_pattern_mask.cycle_type(forward=forward)
+    controls.render_pattern_mask.cycle_type(forward=forward)
 
 
 def _apply_render_pattern_mask_feather(
@@ -1554,7 +1574,7 @@ def _apply_render_pattern_mask_feather(
         PATTERN_MASK_FEATHER_PCT_STEP_LARGE if ctrl else PATTERN_MASK_FEATHER_PCT_STEP
     )
     delta = step if forward else -step
-    controls._render_pattern_mask.set_feather_pct(
+    controls.render_pattern_mask.set_feather_pct(
         controls.session.render_pattern_mask.feather_pct + delta
     )
 
@@ -1568,7 +1588,7 @@ def _apply_render_pattern_mask_density(
 ) -> None:
     step = PATTERN_MASK_DENSITY_STEP_LARGE if ctrl else PATTERN_MASK_DENSITY_STEP
     delta = step if forward else -step
-    controls._render_pattern_mask.set_density(
+    controls.render_pattern_mask.set_density(
         controls.session.render_pattern_mask.density + delta
     )
 
@@ -1580,7 +1600,7 @@ def _apply_render_pattern_mask_invert(
     _ctrl: bool,
     _shift: bool,
 ) -> None:
-    controls._render_pattern_mask.cycle_invert(forward=forward)
+    controls.render_pattern_mask.cycle_invert(forward=forward)
 
 
 def _apply_render_pattern_mask_transition(
@@ -1594,7 +1614,7 @@ def _apply_render_pattern_mask_transition(
         PATTERN_MASK_TRANSITION_STEP_LARGE if ctrl else PATTERN_MASK_TRANSITION_STEP
     )
     delta = step if forward else -step
-    controls._render_pattern_mask.set_transition(
+    controls.render_pattern_mask.set_transition(
         controls.session.render_pattern_mask.transition + delta
     )
 
@@ -1606,7 +1626,7 @@ def _apply_render_pattern_mask_seed(
     _ctrl: bool,
     _shift: bool,
 ) -> None:
-    controls._render_pattern_mask.respin_seed()
+    controls.render_pattern_mask.respin_seed()
 
 
 def _apply_render_timeline_header(
@@ -1622,7 +1642,7 @@ def _apply_render_timeline_header(
             and row_behavior(desc.kind).can_enable_disable
         ):
             return
-        controls._set_render_timeline_enabled(forward)
+        controls.set_render_timeline_enabled(forward)
         return
     apply_panel_anchor_toggle(controls, desc.kind, forward)
 
@@ -1732,11 +1752,11 @@ def _apply_track_preset_dir(
         return
     if ctrl:
         if forward:
-            controls._enter_directory(slot)
+            controls.layer_mutations.enter_directory(slot)
         else:
-            controls._parent_directory(slot)
+            controls.layer_mutations.parent_directory(slot)
         return
-    controls._step_directory(slot, forward=forward)
+    controls.layer_mutations.step_directory(slot, forward=forward)
 
 
 def _apply_track_preset(
@@ -1749,7 +1769,7 @@ def _apply_track_preset(
     slot = desc.slot
     if slot is None:
         return
-    controls._step_preset(slot, forward=forward, ctrl=ctrl)
+    controls.layer_mutations.step_preset(slot, forward=forward, ctrl=ctrl)
 
 
 def _noop_horizontal(
@@ -1781,7 +1801,7 @@ def _apply_track_effect(
     current = controls.session.layers[slot].effects.get(effect_id, {}).get(
         driver_slug, 0
     )
-    controls._set_effect(slot, effect_id, driver_slug, current + delta)
+    controls.layer_mutations.set_effect(slot, effect_id, driver_slug, current + delta)
 
 
 def _apply_transport(
@@ -1801,7 +1821,42 @@ def _apply_transport(
         delta_sec = SEEK_SHORT
     if not forward:
         delta_sec = -delta_sec
-    controls._do_seek(delta_sec)
+    controls.do_seek(delta_sec)
+
+
+def _visibility_track(
+    state: TuningViewState, desc: RowDescriptor
+) -> tuple[bool, bool]:
+    assert desc.slot is not None
+    block = state.tracks[desc.slot]
+    return (block.visible, state.solo_slot == desc.slot)
+
+
+def _visibility_overlays(
+    state: TuningViewState, _desc: RowDescriptor
+) -> tuple[bool, bool]:
+    block = state.render_overlays
+    any_enabled = block.opening_card.enabled or block.closing_card.enabled
+    return (any_enabled, block.solo)
+
+
+def _visibility_post_fx(
+    state: TuningViewState, _desc: RowDescriptor
+) -> tuple[bool, bool]:
+    block = state.render_post_fx
+    return (block.enabled, block.solo)
+
+
+def _visibility_pattern_mask(
+    state: TuningViewState, _desc: RowDescriptor
+) -> tuple[bool, bool]:
+    return (state.render_pattern_mask.enabled, False)
+
+
+def _visibility_timeline(
+    state: TuningViewState, _desc: RowDescriptor
+) -> tuple[bool, bool]:
+    return (state.render_timeline.enabled, False)
 
 
 ROW_FIELDS: dict[RowKind, RowFieldDef] = {
@@ -1863,8 +1918,10 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
     ),
     RowKind.TRACK_HEADER: RowFieldDef(
         panel_label="Layer",
-        present_style=RowPresentStyle.COMPOSITE_HEADER,
+        present_style=RowPresentStyle.TRACK_HEADER,
         apply_horizontal=_apply_track_header,
+        fit_strategy=FitStrategy.NONE,
+        visibility_icon=_visibility_track,
     ),
     RowKind.TRACK_PRESET_SWITCHING: RowFieldDef(
         panel_label="preset switching",
@@ -1977,6 +2034,8 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         header_prefix="Render: ",
         header_suffix="OVERLAYS",
         apply_horizontal=_apply_render_overlays_header,
+        fit_strategy=FitStrategy.NONE,
+        visibility_icon=_visibility_overlays,
     ),
     RowKind.RENDER_OVERLAY_OPENING_CARD_HEADER: RowFieldDef(
         panel_label="opening card",
@@ -2174,6 +2233,8 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         header_prefix="Render: ",
         header_suffix="POST FX",
         apply_horizontal=_apply_render_post_fx_header,
+        fit_strategy=FitStrategy.NONE,
+        visibility_icon=_visibility_post_fx,
     ),
     RowKind.RENDER_POST_FX_FADE_OUT: RowFieldDef(
         panel_label="fade out",
@@ -2257,6 +2318,8 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         header_prefix="Render: ",
         header_suffix="PATTERN MASK",
         apply_horizontal=_apply_render_pattern_mask_header,
+        fit_strategy=FitStrategy.NONE,
+        visibility_icon=_visibility_pattern_mask,
     ),
     RowKind.RENDER_PATTERN_MASK_TYPE: RowFieldDef(
         panel_label="type",
@@ -2300,11 +2363,15 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         header_prefix="Render: ",
         header_suffix="TIMELINE",
         apply_horizontal=_apply_render_timeline_header,
+        fit_strategy=FitStrategy.NONE,
+        visibility_icon=_visibility_timeline,
     ),
     RowKind.CONFIG_HEADER: RowFieldDef(
         panel_label="",
         present_style=RowPresentStyle.PATH_ICON,
         format_value=_format_config_header,
+        fit_strategy=FitStrategy.PATH,
+        shows_enter_icon=True,
     ),
     RowKind.TRACK_PRESET_DIR: RowFieldDef(
         panel_label="preset directory",
@@ -2537,8 +2604,13 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
     ),
     RowKind.PANEL_NOTIFICATION: RowFieldDef(
         panel_label="",
-        present_style=RowPresentStyle.FULL_LINE,
+        present_style=RowPresentStyle.NOTIFICATION,
         format_value=_format_panel_notification,
+    ),
+    RowKind.RENDER_SECTION_GAP: RowFieldDef(
+        panel_label="",
+        present_style=RowPresentStyle.SPACER,
+        fit_strategy=FitStrategy.NONE,
     ),
     RowKind.TRACK_EFFECT: RowFieldDef(
         panel_label="",
@@ -2547,6 +2619,52 @@ ROW_FIELDS: dict[RowKind, RowFieldDef] = {
         apply_horizontal=_apply_track_effect,
     ),
 }
+
+_COUNTER_LABEL_KINDS = frozenset(
+    {
+        RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT,
+        RowKind.RENDER_OVERLAY_OPENING_BODY_FONT,
+        RowKind.RENDER_OVERLAY_CLOSING_TITLE_FONT,
+        RowKind.RENDER_OVERLAY_CLOSING_BODY_FONT,
+    }
+)
+_NONE_FIT_STYLES = frozenset(
+    {
+        RowPresentStyle.COMPOSITE_HEADER,
+        RowPresentStyle.EXPAND_SUBHEADER,
+        RowPresentStyle.TRACK_HEADER,
+        RowPresentStyle.SPACER,
+    }
+)
+
+
+def _finalize_row_fields(
+    fields: dict[RowKind, RowFieldDef],
+) -> dict[RowKind, RowFieldDef]:
+    finalized: dict[RowKind, RowFieldDef] = {}
+    for kind, field in fields.items():
+        updates: dict[str, object] = {}
+        if kind in ACTION_ROW_KINDS or kind == RowKind.SETTINGS_EDITOR_MODE:
+            updates["shows_enter_icon"] = True
+        if field.fit_strategy == FitStrategy.PLAIN:
+            if field.present_style in _NONE_FIT_STYLES:
+                updates["fit_strategy"] = FitStrategy.NONE
+            elif field.present_style == RowPresentStyle.PATH_ICON:
+                updates["fit_strategy"] = FitStrategy.COUNTER_LABEL
+            elif kind in _COUNTER_LABEL_KINDS:
+                updates["fit_strategy"] = FitStrategy.COUNTER_LABEL
+            elif (
+                field.present_style == RowPresentStyle.FULL_LINE
+                and row_behavior(kind).affordance == RowAffordance.ACTION
+            ):
+                updates["fit_strategy"] = FitStrategy.NONE
+        if updates:
+            field = replace(field, **updates)
+        finalized[kind] = field
+    return finalized
+
+
+ROW_FIELDS = _finalize_row_fields(ROW_FIELDS)
 
 
 def row_field_def(kind: RowKind) -> RowFieldDef:
@@ -2620,7 +2738,7 @@ def composite_header_prefix_part(
     state: TuningViewState, desc: RowDescriptor
 ) -> str:
     field = row_field_def(desc.kind)
-    if desc.kind == RowKind.TRACK_HEADER:
+    if field.present_style == RowPresentStyle.TRACK_HEADER:
         assert desc.slot is not None
         return _track_header_layer_prefix(state, desc.slot)
     if desc.kind == RowKind.SETTINGS_HEADER:
@@ -2636,7 +2754,7 @@ def composite_header_suffix_part(
     field = row_field_def(desc.kind)
     if desc.kind == RowKind.SETTINGS_HEADER:
         return ""
-    if desc.kind == RowKind.TRACK_HEADER:
+    if field.present_style == RowPresentStyle.TRACK_HEADER:
         assert desc.slot is not None
         return stem_overlay_header(state.tracks[desc.slot].stem)
     assert field.header_suffix is not None
@@ -2662,7 +2780,7 @@ def row_composite_header_display_text(
 
 
 def row_kinds_requiring_fields() -> frozenset[RowKind]:
-    return frozenset(k for k in RowKind if k != RowKind.RENDER_SECTION_GAP)
+    return frozenset(RowKind)
 
 
 def row_dynamic_panel_label(desc: RowDescriptor) -> str:
@@ -2683,7 +2801,7 @@ def full_line_prefix(kind: RowKind) -> str:
 
 def row_full_line_display_text(state: TuningViewState, desc: RowDescriptor) -> str:
     field = row_field_def(desc.kind)
-    if desc.kind == RowKind.PANEL_NOTIFICATION:
+    if field.present_style == RowPresentStyle.NOTIFICATION:
         assert field.format_value is not None
         return field.format_value(state, desc)
     if desc.kind == RowKind.TRANSPORT:

@@ -196,7 +196,7 @@ def test_enter_curation_defaults_full_mix_and_disables_rotation() -> None:
     controls._config_save.clear_config_dirty()
     controls.focus_cursor = MainFocus(RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))
     mock_bindings = MagicMock()
-    controls._editor_mode._layer_bindings = mock_bindings
+    controls.editor_mode._layer_bindings = mock_bindings
     controls._layer_bindings = mock_bindings
 
     controls.handle_keydown(keydown(pygame.K_RIGHT))

@@ -40,7 +40,7 @@ def test_cycle_blend_wraps_forward() -> None:
     layer = controls.session.layers["layer_1"]
     layer.blend_mode = "pure-add"
 
-    controls._cycle_blend("layer_1", forward=True)
+    controls.layer_mutations.cycle_blend("layer_1", forward=True)
     assert layer.blend_mode == "black-key"
 
 
@@ -49,7 +49,7 @@ def test_cycle_blend_steps_backward() -> None:
     layer = controls.session.layers["layer_1"]
     layer.blend_mode = "add"
 
-    controls._cycle_blend("layer_1", forward=False)
+    controls.layer_mutations.cycle_blend("layer_1", forward=False)
     assert layer.blend_mode == "black-key"
 
 
@@ -58,5 +58,5 @@ def test_cycle_blend_recovers_from_unknown_mode() -> None:
     layer = controls.session.layers["layer_1"]
     layer.blend_mode = "legacy"  # type: ignore[assignment]
 
-    controls._cycle_blend("layer_1", forward=True)
+    controls.layer_mutations.cycle_blend("layer_1", forward=True)
     assert layer.blend_mode == "add"
