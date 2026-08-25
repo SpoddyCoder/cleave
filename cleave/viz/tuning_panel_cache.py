@@ -7,6 +7,7 @@ from typing import Callable, Protocol
 
 import pygame
 
+from cleave.viz.overlay_primitives import visibility_bucket
 from cleave.viz.overlay_profiler import OverlayDrawCounters
 from cleave.viz.overlay_upload import OverlayGpuState, UploadSignature
 from cleave.viz.row_semantics import RowKind, section_locked
@@ -142,12 +143,6 @@ class TuningPanelCache:
         result = fit_fn(font, text, max_px)
         self.text_fit[key] = result
         return result
-
-
-def visibility_bucket(visibility: float) -> int:
-    if visibility <= 0.01:
-        return 0
-    return min(255, int(visibility * 255))
 
 
 def row_render_key(

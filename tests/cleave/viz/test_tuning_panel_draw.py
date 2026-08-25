@@ -98,3 +98,31 @@ def test_tuning_panel_draw_has_no_rowkind_comparisons() -> None:
         encoding="utf-8"
     )
     assert "RowKind" not in source
+
+
+_OVERLAY_MODULES_WITHOUT_TUNING_DRAW = (
+    "timeline_overlay.py",
+    "help_overlay.py",
+    "modal_overlay.py",
+)
+
+
+def test_peer_overlays_do_not_import_tuning_panel_draw() -> None:
+    viz_dir = repo_root() / "cleave" / "viz"
+    offenders: list[str] = []
+    for name in _OVERLAY_MODULES_WITHOUT_TUNING_DRAW:
+        path = viz_dir / name
+        for lineno, line in enumerate(
+            path.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            stripped = line.lstrip()
+            if stripped.startswith("#"):
+                continue
+            if not (stripped.startswith("import ") or stripped.startswith("from ")):
+                continue
+            if "tuning_panel_draw" in stripped:
+                offenders.append(f"{name}:{lineno}: {stripped}")
+    assert offenders == [], (
+        "peer overlays must not import tuning_panel_draw: "
+        + "; ".join(offenders)
+    )

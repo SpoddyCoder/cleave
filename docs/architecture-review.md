@@ -20,6 +20,7 @@ The earlier refactor direction is still sound and has been extended:
 - Focus as `FocusCursor` in [cleave/viz/focus_nav.py](../cleave/viz/focus_nav.py); `RowLayout` built once per structure signature
 - User editor prefs in [cleave/user_config.py](../cleave/user_config.py); project editor size/beat stay on viz YAML
 - Panel caches ([cleave/viz/tuning_panel_cache.py](../cleave/viz/tuning_panel_cache.py), [cleave/viz/timeline_panel_cache.py](../cleave/viz/timeline_panel_cache.py)) and overlay upload in [cleave/viz/overlay_upload.py](../cleave/viz/overlay_upload.py)
+- Shared overlay primitives in [cleave/viz/overlay_primitives.py](../cleave/viz/overlay_primitives.py)
 
 What remains is complexity debt in a few hotspots: parallel UI registries that still require coordinated edits per new row, plus the four-copy settings path (YAML descriptors, config dataclasses, session runtimes, panel rows).
 
@@ -65,6 +66,8 @@ These items are no longer the right targets.
 
 **config_schema package.** Parse, dump, persist, and defaults live in [cleave/config_schema/](../cleave/config_schema/) section modules. `persisted_session_payload` in [persist.py](../cleave/config_schema/persist.py) is the persist choke point. Importers use submodule paths. Detail: [Appendix: P2 work](#appendix-p2-work).
 
+**Shared overlay primitives.** Clip, font, panel chrome, `ComposedPanel`, and `visibility_bucket` live in [overlay_primitives.py](../cleave/viz/overlay_primitives.py). Timeline, help, and modal do not import [tuning_panel_draw.py](../cleave/viz/tuning_panel_draw.py). `render_visibility_icon` stays in [row_present_renderers.py](../cleave/viz/row_present_renderers.py). Detail: [Appendix: P3 work](#appendix-p3-work).
+
 ---
 
 ## 1. Flaws to address (long-term brittleness)
@@ -106,9 +109,11 @@ Feature controllers exist ([settings_controls.py](../cleave/viz/settings_control
 
 ### `timeline_overlay.py` is still a second UI stack (~1,766 lines)
 
-GL upload and dirty rects moved to [overlay_upload.py](../cleave/viz/overlay_upload.py) and [overlay_draw.py](../cleave/viz/overlay_draw.py). The strip still reimplements panel drawing, caching, and input-adjacent view construction, and imports `clip_rect_to_bounds` / `render_visibility_icon` from [tuning_panel_draw.py](../cleave/viz/tuning_panel_draw.py). Help ([help_overlay.py](../cleave/viz/help_overlay.py)) and modals ([modal_overlay.py](../cleave/viz/modal_overlay.py)) are further stacks but smaller.
+Clip, font, panel chrome, `ComposedPanel`, and `visibility_bucket` live in [overlay_primitives.py](../cleave/viz/overlay_primitives.py). Timeline, help, and modal do not import [tuning_panel_draw.py](../cleave/viz/tuning_panel_draw.py). `render_visibility_icon` is imported from [row_present_renderers.py](../cleave/viz/row_present_renderers.py). GL upload and dirty rects live in [overlay_upload.py](../cleave/viz/overlay_upload.py) and [overlay_draw.py](../cleave/viz/overlay_draw.py).
 
-**Pragmatic wins:** extract shared overlay primitives (icon render, clip, upload cache interface) into a small module both panels use. Do not fold the timeline strip into `RowLayout` (it is a panel anchor by design).
+The strip still owns its own compose, cache, and live-patch domain (bars, cues, glyphs). Help ([help_overlay.py](../cleave/viz/help_overlay.py)) and modals ([modal_overlay.py](../cleave/viz/modal_overlay.py)) are further stacks but smaller.
+
+Do not fold the timeline strip into `RowLayout` (it is a panel anchor by design).
 
 ### Generative timeline is a second domain (~4,300 lines)
 
@@ -124,17 +129,13 @@ Keep the package boundary. The compose/compositor contract (duration, overlap, r
 
 ## 3. Suggested priority
 
-P0 through P2 are done (see appendices). Remaining:
-
-| Priority | Item | Why |
-| --- | --- | --- |
-| **P3** | Shared overlay primitives for timeline and tuning panel | Pays off when timeline chrome grows |
+P0 through P3 are done (see appendices). Remaining tax is unprioritized: four copies of the same settings, four UI registries, and the controls/wiring hubs.
 
 ---
 
 ## 4. Bottom line
 
-The architecture principles match the code. Layer creative state lives on session after bootstrap. Effects consume `LayerEffectState` and do not import viz. Config schema is a package of section modules with one persist payload. Both layer compositors share one request contract, blend/opacity/HDR helpers, and an explicit wipe command. The tuning panel is descriptor-driven end to end: overlay cards are one kind set plus a card key, `TrackBlock` is a thin projection over `LayerRuntime`, and draw has no per-`RowKind` branches. Remaining tax is YAML/config/session/panel for new persisted knobs, coordinated edits across the four UI registries, and shared overlay primitives.
+The architecture principles match the code. Layer creative state lives on session after bootstrap. Effects consume `LayerEffectState` and do not import viz. Config schema is a package of section modules with one persist payload. Both layer compositors share one request contract, blend/opacity/HDR helpers, and an explicit wipe command. The tuning panel is descriptor-driven end to end: overlay cards are one kind set plus a card key, `TrackBlock` is a thin projection over `LayerRuntime`, and draw has no per-`RowKind` branches. Overlay clip, font, chrome, `ComposedPanel`, and `visibility_bucket` live in [overlay_primitives.py](../cleave/viz/overlay_primitives.py). Remaining tax is YAML/config/session/panel for new persisted knobs, coordinated edits across the four UI registries, and the controls/wiring hubs.
 
 ---
 
@@ -254,3 +255,22 @@ Parse, dump, persist, and defaults live in [cleave/config_schema/](../cleave/con
 Descriptor-driven sections remain `editor`, `render.post_fx`, and `render.overlays`. Layers and timeline stay bespoke (nested per-stem layers; per-slot lanes). Function-local imports of [config.py](../cleave/config.py) and [user_config.py](../cleave/user_config.py) dataclasses avoid cycles. Session and view defaults import constants from these submodules.
 
 [test_config.py](../tests/cleave/test_config.py) and [test_config_snapshot.py](../tests/cleave/test_config_snapshot.py) import the submodules.
+
+## Appendix: P3 work
+
+The P3 item from this review. Invariants also live in [architecture principles](../.cursor/rules/architecture-principles.mdc).
+
+Clip, font, panel chrome, `ComposedPanel`, and `visibility_bucket` live in [overlay_primitives.py](../cleave/viz/overlay_primitives.py). Timeline, help, and modal do not import [tuning_panel_draw.py](../cleave/viz/tuning_panel_draw.py). `render_visibility_icon` stays in [row_present_renderers.py](../cleave/viz/row_present_renderers.py); timeline imports it from there. Help size and draw share `entry_gap` / `max_key_width` / `entry_width` / `section_content_width` on [help_panel_cache.py](../cleave/viz/help_panel_cache.py).
+
+| Path | Change |
+| --- | --- |
+| [overlay_primitives.py](../cleave/viz/overlay_primitives.py) | `clip_rect_to_bounds` / `clip_rect_to_surface`, `overlay_font(size, *, bold=False)`, `overlay_panel_surface(..., fill_alpha=)`, `draw_panel_border(..., alpha=)`, `visibility_bucket`, `ComposedPanel` |
+| [tuning_panel_draw.py](../cleave/viz/tuning_panel_draw.py) | Clip, font, border, `ComposedPanel` from primitives. Retained-surface fill stays local (counters). |
+| [timeline_overlay.py](../cleave/viz/timeline_overlay.py) | Clip, font (including bold), panel surface/border, `ComposedPanel` from primitives. `render_visibility_icon` from [row_present_renderers.py](../cleave/viz/row_present_renderers.py). |
+| [help_overlay.py](../cleave/viz/help_overlay.py) | Clip, font, panel surface/border, `ComposedPanel` from primitives. Metrics from [help_panel_cache.py](../cleave/viz/help_panel_cache.py). |
+| [modal_overlay.py](../cleave/viz/modal_overlay.py) | Panel surface/border from primitives. Scrim is not panel chrome. |
+| [tuning_panel_cache.py](../cleave/viz/tuning_panel_cache.py) | `visibility_bucket` from primitives |
+| [timeline_panel_cache.py](../cleave/viz/timeline_panel_cache.py) | `overlay_font` and `visibility_bucket` from primitives |
+| [help_panel_cache.py](../cleave/viz/help_panel_cache.py) | `overlay_font`; `entry_gap` / `max_key_width` / `entry_width` / `section_content_width` for size and draw |
+
+[test_tuning_panel_draw.py](../tests/cleave/viz/test_tuning_panel_draw.py) `test_peer_overlays_do_not_import_tuning_panel_draw` source-scans timeline, help, and modal. Do not fold the timeline strip into `RowLayout`.

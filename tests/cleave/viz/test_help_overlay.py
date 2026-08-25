@@ -27,6 +27,7 @@ from cleave.viz.help_content import (
     timeline_strip_section,
 )
 from cleave.viz.help_overlay import HelpOverlay
+from cleave.viz.help_panel_cache import entry_gap, entry_width, max_key_width
 from cleave.viz.theme import LABEL, VALUE
 from cleave.viz.row_semantics import ROW_BEHAVIORS, RowKind
 
@@ -69,8 +70,8 @@ def test_help_entry_columns_align_to_widest_key() -> None:
         entries=BLEND_MODE_HELP_ENTRIES,
     )
     sections = (NAVIGATION_SECTION, layer_section(timeline_enabled=False), mode_description)
-    key_column_width = overlay._max_key_width(font, sections)
-    entry_gap = overlay._entry_gap(font)
+    key_column_width = max_key_width(font, sections)
+    gap = entry_gap(font)
 
     all_keys = [
         key
@@ -91,13 +92,13 @@ def test_help_entry_columns_align_to_widest_key() -> None:
         if not isinstance(section, (HelpSection, DescriptionSection)):
             continue
         for key, description in section.entries:
-            assert overlay._entry_width(
+            assert entry_width(
                 font,
                 key,
                 description,
                 key_column_width=key_column_width,
-                entry_gap=entry_gap,
-            ) == key_column_width + entry_gap + font.render(
+                entry_gap=gap,
+            ) == key_column_width + gap + font.render(
                 description, True, VALUE
             ).get_width()
 
