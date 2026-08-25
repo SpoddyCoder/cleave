@@ -420,8 +420,8 @@ def test_visual_limiter_header_help_expand_collapse() -> None:
 
 def test_render_overlay_sub_header_help_expand_collapse() -> None:
     for row_kind in (
-        RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER,
-        RowKind.RENDER_OVERLAY_OPENING_BODY_HEADER,
+        RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER,
+        RowKind.RENDER_OVERLAY_CARD_BODY_HEADER,
     ):
         section = _keyboard_section(sections_for(row_kind))
         entries = dict(section.entries)

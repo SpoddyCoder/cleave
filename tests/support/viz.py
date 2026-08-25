@@ -14,9 +14,14 @@ from tests.support.config import TEST_LAYER_STEMS
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.controls import TuningControls
 from cleave.viz.live_layer_bindings import LiveLayerBindings
-from cleave.viz.session import LayerRuntime, TuningSession
+from cleave.viz.session import (
+    LayerRuntime,
+    TuningSession,
+    default_render_overlay_card_runtime,
+)
 from cleave.viz.playback import PlaybackState
 from cleave.viz.theme import TuningUiMetrics, tuning_ui_metrics
+from cleave.viz.tuning_view_state import RenderOverlayCardBlock, TrackBlock
 
 
 def baseline_tuning_ui_metrics() -> TuningUiMetrics:
@@ -83,6 +88,62 @@ def make_playlist(name: str, count: int = 3) -> PresetPlaylist:
     current_dir = Path(f"/tmp/presets/{name}")
     paths = tuple(current_dir / f"preset-{i}.milk" for i in range(count))
     return PresetPlaylist(current_dir=current_dir, paths=paths, index=0)
+
+
+_TRACK_DERIVED_KEYS = frozenset(
+    {
+        "preset_dir_label",
+        "preset_label",
+        "preset_list_labels",
+        "preset_empty",
+        "visible",
+        "active_preset_list_index",
+    }
+)
+
+
+def make_track_block(**kwargs) -> TrackBlock:
+    """Build a TrackBlock for tests from LayerRuntime fields plus derived labels."""
+    derived = {
+        key: kwargs.pop(key) for key in list(kwargs) if key in _TRACK_DERIVED_KEYS
+    }
+    playlist = kwargs.pop("playlist", None)
+    browse_floor = kwargs.pop("browse_floor", None)
+    stem = kwargs.pop("stem", "drums")
+    runtime = LayerRuntime(
+        playlist=playlist if playlist is not None else make_playlist("layer"),
+        browse_floor=(
+            browse_floor if browse_floor is not None else Path("/tmp/presets/layer")
+        ),
+        stem=stem,
+        **kwargs,
+    )
+    visible = derived.get("visible")
+    if visible is None:
+        visible = runtime.enabled
+    return TrackBlock(
+        runtime=runtime,
+        preset_dir_label=derived.get("preset_dir_label", "dir"),
+        preset_label=derived.get("preset_label", "preset.milk"),
+        preset_list_labels=derived.get("preset_list_labels") or [],
+        preset_empty=derived.get("preset_empty", False),
+        visible=visible,
+        active_preset_list_index=derived.get("active_preset_list_index"),
+    )
+
+
+def make_overlay_card_block(*, closing: bool = False, **kwargs) -> RenderOverlayCardBlock:
+    """Build an overlay card view block wrapping a session runtime."""
+    runtime = default_render_overlay_card_runtime(closing=closing)
+    animation_type = kwargs.pop("animation_type", None)
+    animation_expanded = kwargs.pop("animation_expanded", None)
+    if animation_type is not None:
+        runtime.animation.type = animation_type
+    if animation_expanded is not None:
+        runtime.animation_expanded = animation_expanded
+    for key, value in kwargs.items():
+        setattr(runtime, key, value)
+    return RenderOverlayCardBlock(runtime=runtime)
 
 
 def stub_playback_state() -> PlaybackState:

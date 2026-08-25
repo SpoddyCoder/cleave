@@ -14,7 +14,7 @@ from cleave.viz.focus_nav import (
     resolve_cursor,
     timeline_strip_in_ring,
 )
-from cleave.viz.tuning_view_state import RenderTimelineBlock, TrackBlock, TuningViewState
+from cleave.viz.tuning_view_state import RenderTimelineBlock, TuningViewState
 from cleave.viz.row_semantics import RowDescriptor, RowKind
 from tests.cleave.viz.test_controls import (
     _desc,
@@ -22,13 +22,14 @@ from tests.cleave.viz.test_controls import (
     _make_controls,
 )
 from tests.cleave.viz.test_overlay import _minimal_view_state
+from tests.support.viz import make_track_block
 
 
 def _timeline_open_state(
     slots: tuple[str, ...] = ("layer_1", "layer_2"),
 ) -> TuningViewState:
     tracks = {
-        slot: TrackBlock(
+        slot: make_track_block(
             stem="drums",
             preset_dir_label="dir",
             preset_label="preset.milk",

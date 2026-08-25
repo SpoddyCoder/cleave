@@ -53,7 +53,7 @@ def _quick_nav_section_open(state: TuningViewState, desc: RowDescriptor) -> bool
     if desc.kind == RowKind.TRACK_HEADER:
         if desc.slot is None:
             return False
-        return state.tracks[desc.slot].expanded
+        return state.tracks[desc.slot].runtime.expanded
     if desc.kind == RowKind.RENDER_POST_FX_HEADER:
         return state.render_post_fx.expanded
     if desc.kind == RowKind.RENDER_PATTERN_MASK_HEADER:
@@ -201,26 +201,36 @@ class RowLayout:
 
     def find(
         self,
-        slot: str,
+        slot: str | None,
         kind: RowKind,
         *,
         effect_id: str | None = None,
         driver_slug: str | None = None,
+        card: str | None = None,
     ) -> int:
         for index, desc in enumerate(self.rows):
-            if desc.kind != kind or desc.slot != slot:
+            if desc.kind != kind:
+                continue
+            if slot is not None and desc.slot != slot:
+                continue
+            if card is not None and desc.card != card:
                 continue
             if kind == RowKind.TRACK_EFFECT:
                 if desc.effect_id != effect_id or desc.driver_slug != driver_slug:
                     continue
             return index
-        raise ValueError(f"no row for slot={slot!r} kind={kind!r}")
+        raise ValueError(
+            f"no row for slot={slot!r} kind={kind!r} card={card!r}"
+        )
 
-    def find_by_kind(self, kind: RowKind) -> int:
+    def find_by_kind(self, kind: RowKind, *, card: str | None = None) -> int:
         for index, desc in enumerate(self.rows):
-            if desc.kind == kind:
-                return index
-        raise ValueError(f"no row for kind={kind!r}")
+            if desc.kind != kind:
+                continue
+            if card is not None and desc.card != card:
+                continue
+            return index
+        raise ValueError(f"no row for kind={kind!r} card={card!r}")
 
     def find_descriptor(self, desc: RowDescriptor) -> int:
         if self.descriptor_index:

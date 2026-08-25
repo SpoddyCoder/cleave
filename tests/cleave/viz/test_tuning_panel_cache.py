@@ -29,12 +29,13 @@ from cleave.viz.tuning_panel_cache import (
     tuning_upload_signature,
 )
 from cleave.viz.tuning_panel_draw import TuningOverlay, tuning_panel_max_dimensions
-from cleave.viz.tuning_view_state import TrackBlock, TuningViewState
+from cleave.viz.tuning_view_state import TuningViewState
 from tests.cleave.viz.test_overlay import (
     _effects_expanded_view_state,
     _minimal_view_state,
     _panel_scroll_metrics,
 )
+from tests.support.viz import make_track_block
 
 
 def _static_keys(
@@ -155,7 +156,7 @@ def test_active_preset_list_index_changes_row_render_color_state() -> None:
     font = overlay._font_get()
     cache = TuningPanelCache()
     tracks = {
-        "layer_1": TrackBlock(
+        "layer_1": make_track_block(
             stem="drums",
             preset_dir_label="dir",
             preset_label="preset.milk",
@@ -439,7 +440,10 @@ def test_lock_change_invalidates_track_header_row_key() -> None:
     state_locked = replace(
         state,
         tracks={
-            "layer_1": replace(state.tracks["layer_1"], locked=True),
+            "layer_1": replace(
+                state.tracks["layer_1"],
+                runtime=replace(state.tracks["layer_1"].runtime, locked=True),
+            ),
             "layer_2": state.tracks["layer_2"],
         },
     )
@@ -507,7 +511,10 @@ def test_lock_change_misses_warm_row_cache_for_track_header() -> None:
     state_locked = replace(
         state,
         tracks={
-            "layer_1": replace(state.tracks["layer_1"], locked=True),
+            "layer_1": replace(
+                state.tracks["layer_1"],
+                runtime=replace(state.tracks["layer_1"].runtime, locked=True),
+            ),
             "layer_2": state.tracks["layer_2"],
         },
     )
@@ -621,7 +628,7 @@ def test_expand_collapse_incrementally_evicts_row_cache() -> None:
 
     collapsed = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -635,7 +642,7 @@ def test_expand_collapse_incrementally_evicts_row_cache() -> None:
     )
     expanded = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -711,7 +718,7 @@ def _two_layer_view_state(
     return _minimal_view_state(
         layer_z_order=("layer_1", "layer_2"),
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -721,7 +728,7 @@ def _two_layer_view_state(
                 effects={},
                 expanded=True,
             ),
-            "layer_2": TrackBlock(
+            "layer_2": make_track_block(
                 stem="bass",
                 preset_dir_label="dir",
                 preset_label="preset.milk",

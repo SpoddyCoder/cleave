@@ -156,6 +156,9 @@ MIN_LAYER_COUNT = 1
 DEFAULT_LAYER_SLOTS = ("layer_1", "layer_2", "layer_3", "layer_4")
 DEFAULT_LAYER_Z_ORDER: list[str] = list(DEFAULT_LAYER_SLOTS)
 DEFAULT_NEW_LAYER_STEM: StemSource = "full_mix"
+DEFAULT_LAYER_ENABLED = True
+DEFAULT_LAYER_OPACITY = 1.0
+DEFAULT_LAYER_LOCKED = False
 
 _SLOT_RE = re.compile(r"^layer_(\d+)$")
 
@@ -2080,14 +2083,14 @@ def parse_layers_section(data: dict[str, Any], ctx: ParseCtx) -> dict[str, Any]:
         layers[slot] = LayerConfig(
             preset=_resolve_preset(preset_raw, preset_root),
             stem=stem,
-            enabled=bool(layer_raw.get("enabled", True)),
-            opacity=float(layer_raw.get("opacity", 1.0)),
+            enabled=bool(layer_raw.get("enabled", DEFAULT_LAYER_ENABLED)),
+            opacity=float(layer_raw.get("opacity", DEFAULT_LAYER_OPACITY)),
             beat_sensitivity=clamp_beat_sensitivity(beat_raw)
             if beat_raw is not None
             else None,
             effects=_parse_effects(slot, stem, layer_raw),
             blend_mode=parse_blend_mode(slot, stem, layer_raw),
-            locked=bool(layer_raw.get("locked", False)),
+            locked=bool(layer_raw.get("locked", DEFAULT_LAYER_LOCKED)),
             preset_switching=preset_switching,
             preset_switching_trigger=preset_switching_trigger,
             preset_duration=preset_duration,
@@ -2820,7 +2823,7 @@ def template_layer_entry(
     return {
         "stem": stem,
         "preset": f"presets/{stem}/",
-        "enabled": True,
-        "opacity": 1.0,
+        "enabled": DEFAULT_LAYER_ENABLED,
+        "opacity": DEFAULT_LAYER_OPACITY,
         "blend_mode": DEFAULT_BLEND_MODE[stem],
     }

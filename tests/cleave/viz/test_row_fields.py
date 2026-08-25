@@ -31,20 +31,18 @@ from cleave.viz.row_fields import (
 )
 from cleave.viz.row_semantics import RowDescriptor, RowKind
 from cleave.viz.tuning_view_state import (
-    RenderOverlayCardBlock,
     RenderOverlaysBlock,
     RenderPostFxBlock,
     SettingsBlock,
-    TrackBlock,
 )
 from tests.cleave.viz.test_controls import (
     _keydown,
     _make_controls,
     _make_controls_with_manager,
 )
-from tests.support.config import TEST_LAYER_STEMS
-from tests.support.viz import noop_layer_bindings
 from tests.cleave.viz.test_overlay import _minimal_view_state
+from tests.support.config import TEST_LAYER_STEMS
+from tests.support.viz import make_overlay_card_block, make_track_block, noop_layer_bindings
 
 
 def test_tree_branch_prefix() -> None:
@@ -106,7 +104,7 @@ def test_format_row_value_settings() -> None:
 def test_format_row_value_track_and_render() -> None:
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem=TEST_LAYER_STEMS["layer_1"],
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -119,7 +117,7 @@ def test_format_row_value_track_and_render() -> None:
             )
         },
         render_overlays=RenderOverlaysBlock(
-            opening_card=RenderOverlayCardBlock(
+            opening_card=make_overlay_card_block(
                 position="top-left", opacity_pct=80
             ),
         ),
@@ -131,11 +129,18 @@ def test_format_row_value_track_and_render() -> None:
     assert format_row_value(state, mode_desc) == "on"
     duration_desc = RowDescriptor(RowKind.TRACK_PRESET_DURATION, slot="layer_1")
     assert format_row_value(state, duration_desc) == "45s"
-    assert format_row_value(state, RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_POSITION)) == (
+    assert format_row_value(
+        state,
+        RowDescriptor(RowKind.RENDER_OVERLAY_CARD_POSITION, card="opening_card"),
+    ) == (
         "top-left"
     )
     assert (
-        format_row_value(state, RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_OPACITY)) == "80%"
+        format_row_value(
+            state,
+            RowDescriptor(RowKind.RENDER_OVERLAY_CARD_OPACITY, card="opening_card"),
+        )
+        == "80%"
     )
     assert format_row_value(state, RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN)) == (
         "2.5s"
@@ -200,11 +205,43 @@ def test_apply_field_horizontal_track_blend() -> None:
 
 def test_apply_field_horizontal_render_overlay_opacity() -> None:
     controls = _make_controls()
-    desc = RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_OPACITY)
+    desc = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_OPACITY, card="opening_card")
     before = controls.session.render_overlays.opening_card.opacity_pct
 
     assert apply_field_horizontal(controls, desc, True, False) is True
     assert controls.session.render_overlays.opening_card.opacity_pct == before + 1
+
+
+def test_overlay_cards_share_kinds_and_isolate_runtime() -> None:
+    controls = _make_controls()
+    controls.session.render_overlays.expanded = True
+    controls.session.render_overlays.opening_card.expanded = True
+    controls.session.render_overlays.closing_card.expanded = True
+    view = controls.build_view_state(paused=False)
+    opening_pos = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_POSITION, card="opening_card"
+    )
+    closing_pos = view.layout.find_by_kind(
+        RowKind.RENDER_OVERLAY_CARD_POSITION, card="closing_card"
+    )
+    opening_desc = view.layout.descriptor(opening_pos)
+    closing_desc = view.layout.descriptor(closing_pos)
+    assert opening_desc.kind == RowKind.RENDER_OVERLAY_CARD_POSITION
+    assert closing_desc.kind == RowKind.RENDER_OVERLAY_CARD_POSITION
+    assert opening_desc.card == "opening_card"
+    assert closing_desc.card == "closing_card"
+    assert opening_pos != closing_pos
+    navigable = view.layout.navigable_indices(view)
+    assert opening_pos in navigable
+    assert closing_pos in navigable
+
+    opening_before = controls.session.render_overlays.opening_card.position
+    closing_before = controls.session.render_overlays.closing_card.position
+    assert apply_field_horizontal(controls, opening_desc, True, False) is True
+    assert controls.session.render_overlays.opening_card.position != opening_before
+    assert controls.session.render_overlays.closing_card.position == closing_before
+    assert apply_field_horizontal(controls, closing_desc, True, False) is True
+    assert controls.session.render_overlays.closing_card.position != closing_before
 
 
 def test_apply_field_horizontal_adjusts_ui_fade() -> None:
@@ -238,7 +275,7 @@ def test_expand_subheader_prefix_preset_switching() -> None:
         expand_subheader_prefix(RowKind.TRACK_PRESET_SWITCHING)
         == "└─ preset switching"
     )
-    assert expand_subheader_prefix(RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER) == (
+    assert expand_subheader_prefix(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER) == (
         "  └─ title "
     )
     assert (
@@ -365,7 +402,7 @@ def test_format_row_value_path_icon() -> None:
     state = _minimal_view_state(
         active_config_label="projects/demo/cleave-viz.yaml",
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem=TEST_LAYER_STEMS["layer_1"],
                 preset_dir_label="presets/wave",
                 preset_label="foo.milk",
@@ -389,7 +426,7 @@ def test_format_row_value_path_icon() -> None:
 def test_track_effect_dynamic_label_and_prefix() -> None:
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem=TEST_LAYER_STEMS["layer_1"],
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -546,6 +583,7 @@ def test_row_field_callbacks_use_public_controls_api() -> None:
         desc = RowDescriptor(
             kind,
             slot="layer_1",
+            card="opening_card",
             effect_id="pulse",
             driver_slug="onset",
             marker_index=0,

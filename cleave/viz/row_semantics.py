@@ -52,38 +52,22 @@ class RowKind(Enum):
     PANEL_NOTIFICATION = auto()
     RENDER_SECTION_GAP = auto()
     RENDER_OVERLAYS_HEADER = auto()
-    RENDER_OVERLAY_OPENING_CARD_HEADER = auto()
-    RENDER_OVERLAY_CLOSING_CARD_HEADER = auto()
-    RENDER_OVERLAY_OPENING_ANIMATION_HEADER = auto()
-    RENDER_OVERLAY_CLOSING_ANIMATION_HEADER = auto()
-    RENDER_OVERLAY_OPENING_ANIMATION_TYPE = auto()
-    RENDER_OVERLAY_CLOSING_ANIMATION_TYPE = auto()
-    RENDER_OVERLAY_OPENING_ANIMATION_SLIDE_DIRECTION = auto()
-    RENDER_OVERLAY_CLOSING_ANIMATION_SLIDE_DIRECTION = auto()
-    RENDER_OVERLAY_OPENING_POSITION = auto()
-    RENDER_OVERLAY_CLOSING_POSITION = auto()
-    RENDER_OVERLAY_OPENING_TITLE_HEADER = auto()
-    RENDER_OVERLAY_CLOSING_TITLE_HEADER = auto()
-    RENDER_OVERLAY_OPENING_TITLE_FONT_SIZE = auto()
-    RENDER_OVERLAY_CLOSING_TITLE_FONT_SIZE = auto()
-    RENDER_OVERLAY_OPENING_TITLE_FONT = auto()
-    RENDER_OVERLAY_CLOSING_TITLE_FONT = auto()
-    RENDER_OVERLAY_OPENING_TITLE_MARGIN_BOTTOM = auto()
-    RENDER_OVERLAY_CLOSING_TITLE_MARGIN_BOTTOM = auto()
-    RENDER_OVERLAY_OPENING_BODY_HEADER = auto()
-    RENDER_OVERLAY_CLOSING_BODY_HEADER = auto()
-    RENDER_OVERLAY_OPENING_BODY_FONT_SIZE = auto()
-    RENDER_OVERLAY_CLOSING_BODY_FONT_SIZE = auto()
-    RENDER_OVERLAY_OPENING_BODY_FONT = auto()
-    RENDER_OVERLAY_CLOSING_BODY_FONT = auto()
-    RENDER_OVERLAY_OPENING_OPACITY = auto()
-    RENDER_OVERLAY_CLOSING_OPACITY = auto()
-    RENDER_OVERLAY_OPENING_BORDER_WIDTH = auto()
-    RENDER_OVERLAY_CLOSING_BORDER_WIDTH = auto()
-    RENDER_OVERLAY_OPENING_APPEAR_AT = auto()
-    RENDER_OVERLAY_CLOSING_DISAPPEAR_AT = auto()
-    RENDER_OVERLAY_OPENING_DISPLAY_TIME = auto()
-    RENDER_OVERLAY_CLOSING_DISPLAY_TIME = auto()
+    RENDER_OVERLAY_CARD_HEADER = auto()
+    RENDER_OVERLAY_CARD_ANIMATION_HEADER = auto()
+    RENDER_OVERLAY_CARD_ANIMATION_TYPE = auto()
+    RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION = auto()
+    RENDER_OVERLAY_CARD_POSITION = auto()
+    RENDER_OVERLAY_CARD_TITLE_HEADER = auto()
+    RENDER_OVERLAY_CARD_TITLE_FONT_SIZE = auto()
+    RENDER_OVERLAY_CARD_TITLE_FONT = auto()
+    RENDER_OVERLAY_CARD_TITLE_MARGIN_BOTTOM = auto()
+    RENDER_OVERLAY_CARD_BODY_HEADER = auto()
+    RENDER_OVERLAY_CARD_BODY_FONT_SIZE = auto()
+    RENDER_OVERLAY_CARD_BODY_FONT = auto()
+    RENDER_OVERLAY_CARD_OPACITY = auto()
+    RENDER_OVERLAY_CARD_BORDER_WIDTH = auto()
+    RENDER_OVERLAY_CARD_TIME = auto()
+    RENDER_OVERLAY_CARD_DISPLAY_TIME = auto()
     RENDER_POST_FX_HEADER = auto()
     RENDER_POST_FX_FADE_IN = auto()
     RENDER_POST_FX_FADE_OUT = auto()
@@ -162,6 +146,7 @@ class RowKind(Enum):
 class RowDescriptor:
     kind: RowKind
     slot: str | None = None
+    card: str | None = None
     effect_id: str | None = None
     driver_slug: str | None = None
     preset_index: int | None = None
@@ -497,270 +482,142 @@ ROW_BEHAVIORS: dict[RowKind, RowBehavior] = {
         quick_nav_target=True,
         quick_nav_always=True,
     ),
-    RowKind.RENDER_OVERLAY_OPENING_CARD_HEADER: RowBehavior(
+    RowKind.RENDER_OVERLAY_CARD_HEADER: RowBehavior(
         RowAffordance.EXPAND,
         can_enable_disable=True,
         is_sub_header=True,
         parent_group="render_overlay",
-        help_title="Opening card",
-        help_description=("Credits card at the start of the song.",),
+        help_title="Credits card",
+        help_description=(
+            "Opening card at the start of the song, or closing card near the end.",
+        ),
     ),
-    RowKind.RENDER_OVERLAY_CLOSING_CARD_HEADER: RowBehavior(
+    RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER: RowBehavior(
         RowAffordance.EXPAND,
-        can_enable_disable=True,
         is_sub_header=True,
         parent_group="render_overlay",
-        help_title="Closing card",
-        help_description=("Credits card near the end of the song.",),
-    ),
-    RowKind.RENDER_OVERLAY_OPENING_ANIMATION_HEADER: RowBehavior(
-        RowAffordance.EXPAND,
-        is_sub_header=True,
-        parent_group="render_overlay_opening",
-        help_title="Opening card animation",
+        help_title="Card animation",
         help_description=(
-            "Entrance and exit motion for the opening credits card.",
+            "Entrance and exit motion for this credits card.",
         ),
     ),
-    RowKind.RENDER_OVERLAY_CLOSING_ANIMATION_HEADER: RowBehavior(
-        RowAffordance.EXPAND,
-        is_sub_header=True,
-        parent_group="render_overlay_closing",
-        help_title="Closing card animation",
-        help_description=(
-            "Entrance and exit motion for the closing credits card.",
-        ),
-    ),
-    RowKind.RENDER_OVERLAY_OPENING_ANIMATION_TYPE: RowBehavior(
+    RowKind.RENDER_OVERLAY_CARD_ANIMATION_TYPE: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
-        parent_group="render_overlay_opening_animation",
+        parent_group="render_overlay_animation",
         help_title="Animation type",
         help_entries=(("Left/Right", "cycle type"),),
-        help_description=("How the opening card enters and leaves the screen.",),
+        help_description=("How this credits card enters and leaves the screen.",),
         help_mode_entries=RENDER_OVERLAY_ANIMATION_TYPE_HELP_ENTRIES,
     ),
-    RowKind.RENDER_OVERLAY_CLOSING_ANIMATION_TYPE: RowBehavior(
+    RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
-        parent_group="render_overlay_closing_animation",
-        help_title="Animation type",
-        help_entries=(("Left/Right", "cycle type"),),
-        help_description=("How the closing card enters and leaves the screen.",),
-        help_mode_entries=RENDER_OVERLAY_ANIMATION_TYPE_HELP_ENTRIES,
-    ),
-    RowKind.RENDER_OVERLAY_OPENING_ANIMATION_SLIDE_DIRECTION: RowBehavior(
-        RowAffordance.VALUE_STEP,
-        repeatable=True,
-        parent_group="render_overlay_opening_animation",
+        parent_group="render_overlay_animation",
         help_title="Slide direction",
         help_entries=(("Left/Right", "cycle direction"),),
         help_description=(
-            "Edge the opening card travels from on entrance (reverse on exit).",
+            "Edge this credits card travels from on entrance (reverse on exit).",
         ),
         help_mode_entries=RENDER_OVERLAY_SLIDE_DIRECTION_HELP_ENTRIES,
     ),
-    RowKind.RENDER_OVERLAY_CLOSING_ANIMATION_SLIDE_DIRECTION: RowBehavior(
+    RowKind.RENDER_OVERLAY_CARD_POSITION: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
-        parent_group="render_overlay_closing_animation",
-        help_title="Slide direction",
-        help_entries=(("Left/Right", "cycle direction"),),
-        help_description=(
-            "Edge the closing card travels from on entrance (reverse on exit).",
-        ),
-        help_mode_entries=RENDER_OVERLAY_SLIDE_DIRECTION_HELP_ENTRIES,
-    ),
-    RowKind.RENDER_OVERLAY_OPENING_POSITION: RowBehavior(
-        RowAffordance.VALUE_STEP,
-        repeatable=True,
-        parent_group="render_overlay_opening",
+        parent_group="render_overlay",
         help_title="Position",
         help_description=(
-            "Screen corner where the opening credits card appears.",
+            "Screen corner where this credits card appears.",
         ),
     ),
-    RowKind.RENDER_OVERLAY_CLOSING_POSITION: RowBehavior(
-        RowAffordance.VALUE_STEP,
-        repeatable=True,
-        parent_group="render_overlay_closing",
-        help_title="Position",
-        help_description=(
-            "Screen corner where the closing credits card appears.",
-        ),
-    ),
-    RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER: RowBehavior(
+    RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER: RowBehavior(
         RowAffordance.EXPAND,
         is_sub_header=True,
-        help_title="Opening card title",
-        help_description=("Title line of the opening credits card.",),
-        parent_group="render_overlay_opening",
+        help_title="Card title",
+        help_description=("Title line of this credits card.",),
+        parent_group="render_overlay",
     ),
-    RowKind.RENDER_OVERLAY_CLOSING_TITLE_HEADER: RowBehavior(
-        RowAffordance.EXPAND,
-        is_sub_header=True,
-        help_title="Closing card title",
-        help_description=("Title line of the closing credits card.",),
-        parent_group="render_overlay_closing",
-    ),
-    RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT_SIZE: RowBehavior(
+    RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
-        parent_group="render_overlay_opening_title",
+        parent_group="render_overlay_title",
         help_title="Title font size",
-        help_description=("Font size of the opening card title.",),
+        help_description=("Font size of this credits card title.",),
     ),
-    RowKind.RENDER_OVERLAY_CLOSING_TITLE_FONT_SIZE: RowBehavior(
+    RowKind.RENDER_OVERLAY_CARD_TITLE_FONT: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
-        parent_group="render_overlay_closing_title",
-        help_title="Title font size",
-        help_description=("Font size of the closing card title.",),
-    ),
-    RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT: RowBehavior(
-        RowAffordance.VALUE_STEP,
-        repeatable=True,
-        parent_group="render_overlay_opening_title",
+        parent_group="render_overlay_title",
         help_title="Title font",
-        help_description=("Font used for the opening card title.",),
+        help_description=("Font used for this credits card title.",),
     ),
-    RowKind.RENDER_OVERLAY_CLOSING_TITLE_FONT: RowBehavior(
+    RowKind.RENDER_OVERLAY_CARD_TITLE_MARGIN_BOTTOM: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
-        parent_group="render_overlay_closing_title",
-        help_title="Title font",
-        help_description=("Font used for the closing card title.",),
-    ),
-    RowKind.RENDER_OVERLAY_OPENING_TITLE_MARGIN_BOTTOM: RowBehavior(
-        RowAffordance.VALUE_STEP,
-        repeatable=True,
-        parent_group="render_overlay_opening_title",
+        parent_group="render_overlay_title",
         help_title="Title margin bottom",
         help_description=(
-            "Gap between the title and body in the opening card box.",
+            "Gap between the title and body in this credits card box.",
         ),
     ),
-    RowKind.RENDER_OVERLAY_CLOSING_TITLE_MARGIN_BOTTOM: RowBehavior(
-        RowAffordance.VALUE_STEP,
-        repeatable=True,
-        parent_group="render_overlay_closing_title",
-        help_title="Title margin bottom",
-        help_description=(
-            "Gap between the title and body in the closing card box.",
-        ),
-    ),
-    RowKind.RENDER_OVERLAY_OPENING_BODY_HEADER: RowBehavior(
+    RowKind.RENDER_OVERLAY_CARD_BODY_HEADER: RowBehavior(
         RowAffordance.EXPAND,
         is_sub_header=True,
-        help_title="Opening card body",
-        help_description=("Body block of the opening credits card.",),
-        parent_group="render_overlay_opening",
+        help_title="Card body",
+        help_description=("Body block of this credits card.",),
+        parent_group="render_overlay",
     ),
-    RowKind.RENDER_OVERLAY_CLOSING_BODY_HEADER: RowBehavior(
-        RowAffordance.EXPAND,
-        is_sub_header=True,
-        help_title="Closing card body",
-        help_description=("Body block of the closing credits card.",),
-        parent_group="render_overlay_closing",
-    ),
-    RowKind.RENDER_OVERLAY_OPENING_BODY_FONT_SIZE: RowBehavior(
+    RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
-        parent_group="render_overlay_opening_body",
+        parent_group="render_overlay_body",
         help_title="Body font size",
-        help_description=("Font size of the opening card body.",),
+        help_description=("Font size of this credits card body.",),
     ),
-    RowKind.RENDER_OVERLAY_CLOSING_BODY_FONT_SIZE: RowBehavior(
+    RowKind.RENDER_OVERLAY_CARD_BODY_FONT: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
-        parent_group="render_overlay_closing_body",
-        help_title="Body font size",
-        help_description=("Font size of the closing card body.",),
-    ),
-    RowKind.RENDER_OVERLAY_OPENING_BODY_FONT: RowBehavior(
-        RowAffordance.VALUE_STEP,
-        repeatable=True,
-        parent_group="render_overlay_opening_body",
+        parent_group="render_overlay_body",
         help_title="Body font",
-        help_description=("Font used for the opening card body.",),
+        help_description=("Font used for this credits card body.",),
     ),
-    RowKind.RENDER_OVERLAY_CLOSING_BODY_FONT: RowBehavior(
+    RowKind.RENDER_OVERLAY_CARD_OPACITY: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
-        parent_group="render_overlay_closing_body",
-        help_title="Body font",
-        help_description=("Font used for the closing card body.",),
-    ),
-    RowKind.RENDER_OVERLAY_OPENING_OPACITY: RowBehavior(
-        RowAffordance.VALUE_STEP,
-        repeatable=True,
-        parent_group="render_overlay_opening",
+        parent_group="render_overlay",
         help_title="Background opacity",
-        help_description=("Background opacity of the opening credits card box.",),
+        help_description=("Background opacity of this credits card box.",),
     ),
-    RowKind.RENDER_OVERLAY_CLOSING_OPACITY: RowBehavior(
+    RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
-        parent_group="render_overlay_closing",
-        help_title="Background opacity",
-        help_description=("Background opacity of the closing credits card box.",),
-    ),
-    RowKind.RENDER_OVERLAY_OPENING_BORDER_WIDTH: RowBehavior(
-        RowAffordance.VALUE_STEP,
-        repeatable=True,
-        parent_group="render_overlay_opening",
+        parent_group="render_overlay",
         help_title="Border width",
         help_description=(
-            "Width of the border drawn around the opening credits card box.",
+            "Width of the border drawn around this credits card box.",
         ),
     ),
-    RowKind.RENDER_OVERLAY_CLOSING_BORDER_WIDTH: RowBehavior(
+    RowKind.RENDER_OVERLAY_CARD_TIME: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
-        parent_group="render_overlay_closing",
-        help_title="Border width",
+        parent_group="render_overlay_animation",
+        help_title="Card time",
         help_description=(
-            "Width of the border drawn around the closing credits card box.",
+            "Opening card: seconds after the song starts (appear at).",
+            "Closing card: seconds before the song ends (disappear at).",
         ),
     ),
-    RowKind.RENDER_OVERLAY_OPENING_APPEAR_AT: RowBehavior(
+    RowKind.RENDER_OVERLAY_CARD_DISPLAY_TIME: RowBehavior(
         RowAffordance.VALUE_STEP,
         repeatable=True,
-        parent_group="render_overlay_opening_animation",
-        help_title="Appear at",
-        help_description=(
-            "The opening card appears this many seconds after the song starts.",
-        ),
-    ),
-    RowKind.RENDER_OVERLAY_CLOSING_DISAPPEAR_AT: RowBehavior(
-        RowAffordance.VALUE_STEP,
-        repeatable=True,
-        parent_group="render_overlay_closing_animation",
-        help_title="Disappear at",
-        help_description=(
-            "The closing card disappears this many seconds before the song ends.",
-        ),
-    ),
-    RowKind.RENDER_OVERLAY_OPENING_DISPLAY_TIME: RowBehavior(
-        RowAffordance.VALUE_STEP,
-        repeatable=True,
-        parent_group="render_overlay_opening_animation",
+        parent_group="render_overlay_animation",
         help_title="Display time",
         help_description=(
-            "Duration the opening card stays on screen including entrance and exit.",
+            "Duration this credits card stays on screen including entrance and exit.",
             "0 = stays on.",
         ),
     ),
-    RowKind.RENDER_OVERLAY_CLOSING_DISPLAY_TIME: RowBehavior(
-        RowAffordance.VALUE_STEP,
-        repeatable=True,
-        parent_group="render_overlay_closing_animation",
-        help_title="Display time",
-        help_description=(
-            "Duration the closing card stays on screen including entrance and exit.",
-            "0 = stays on.",
-        ),
-    ),
+
     RowKind.RENDER_POST_FX_HEADER: RowBehavior(
         RowAffordance.EXPAND,
         can_enable_disable=True,
@@ -1651,7 +1508,11 @@ def row_navigable_when_section_locked(kind: RowKind) -> bool:
 def _state_track_locked(state: object, slot: str) -> bool:
     tracks = getattr(state, "tracks", None)
     if tracks is not None:
-        return bool(tracks[slot].locked)
+        track = tracks[slot]
+        runtime = getattr(track, "runtime", None)
+        if runtime is not None:
+            return bool(runtime.locked)
+        return bool(track.locked)
     return bool(state.layers[slot].locked)
 
 

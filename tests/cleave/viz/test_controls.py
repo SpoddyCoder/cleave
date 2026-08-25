@@ -30,7 +30,13 @@ from cleave.song_markers import SongMarker
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.key_repeat import mod_shift
 from cleave.viz.playback import format_mmss
-from tests.support.viz import make_test_cfg, noop_layer_bindings, stub_playback_state
+from tests.support.viz import (
+    baseline_tuning_ui_metrics,
+    make_test_cfg,
+    make_track_block,
+    noop_layer_bindings,
+    stub_playback_state,
+)
 from cleave.viz.controls import (
     NOTIFICATION_TIMELINE_DISABLED_TEXT,
     NOTIFICATION_TIMELINE_ENABLED_TEXT,
@@ -82,7 +88,7 @@ from cleave.viz.tuning_panel_draw import (
     render_visibility_icon,
     track_header_prefix_width,
 )
-from cleave.viz.tuning_view_state import TrackBlock, TuningViewState
+from cleave.viz.tuning_view_state import TuningViewState
 from tests.support.viz import baseline_tuning_ui_metrics
 
 
@@ -608,7 +614,7 @@ def test_disabled_render_overlay_can_expand_sub_rows() -> None:
     assert controls.session.render_overlays.expanded is True
 
     view = controls.build_view_state(paused=False)
-    opening_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_CARD_HEADER)
+    opening_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_HEADER)
     assert opening_row in view.layout.visible_indices(view)
     assert opening_row in view.layout.navigable_indices(view)
 
@@ -863,7 +869,7 @@ def test_preset_row_truncates_long_filenames() -> None:
     view = TuningViewState(
         layer_z_order=("layer_1",),
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="short (1/1)",
                 preset_label=long_name,
@@ -906,7 +912,7 @@ def test_fit_row_text_config_and_preset_share_panel_width() -> None:
     controls = _make_controls(("layer_1",))
     controls._config_save._active_config_path = long_path
     view = controls.build_view_state(paused=False)
-    view.tracks["layer_1"] = TrackBlock(
+    view.tracks["layer_1"] = make_track_block(
         stem="layer_1",
         preset_dir_label="short (1/1)",
         preset_label=long_name,
@@ -1305,12 +1311,12 @@ def test_render_overlay_title_header_expand_arrow() -> None:
     controls.session.render_overlays.expanded = True
     controls.session.render_overlays.opening_card.expanded = True
     view = controls.build_view_state(paused=False)
-    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER)
+    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER)
     assert _row_text(view, title_header) == "  └─ title ▶"
 
     controls.session.render_overlays.opening_card.title_expanded = True
     view = controls.build_view_state(paused=False)
-    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER)
+    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER)
     assert _row_text(view, title_header) == "  └─ title ▼"
 
 
@@ -1319,12 +1325,12 @@ def test_render_overlay_body_header_expand_arrow() -> None:
     controls.session.render_overlays.expanded = True
     controls.session.render_overlays.opening_card.expanded = True
     view = controls.build_view_state(paused=False)
-    body_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_BODY_HEADER)
+    body_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_HEADER)
     assert _row_text(view, body_header) == "  └─ body ▶"
 
     controls.session.render_overlays.opening_card.body_expanded = True
     view = controls.build_view_state(paused=False)
-    body_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_BODY_HEADER)
+    body_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_HEADER)
     assert _row_text(view, body_header) == "  └─ body ▼"
 
 
@@ -1342,7 +1348,7 @@ def test_render_overlay_title_font_row(_mock_fonts) -> None:
     controls.session.render_overlays.opening_card.title_expanded = True
     controls.session.render_overlays.opening_card.title_font = "alpha"
     view = controls.build_view_state(paused=False)
-    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT)
+    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT)
     assert _row_text(view, font_row) == "    └─ font: alpha (1/3)"
 
     controls.focus_descriptor = _desc(view, font_row)
@@ -1361,7 +1367,7 @@ def test_render_overlay_body_font_row(_mock_fonts) -> None:
     controls.session.render_overlays.opening_card.body_expanded = True
     controls.session.render_overlays.opening_card.body_font = "bravo"
     view = controls.build_view_state(paused=False)
-    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_BODY_FONT)
+    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_FONT)
     assert _row_text(view, font_row) == "    └─ font: bravo (2/3)"
 
     controls.focus_descriptor = _desc(view, font_row)
@@ -1376,7 +1382,7 @@ def test_render_overlay_title_font_size_row() -> None:
     controls.session.render_overlays.opening_card.title_expanded = True
     controls.session.render_overlays.opening_card.title_font_size = 12
     view = controls.build_view_state(paused=False)
-    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT_SIZE)
+    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE)
     assert _row_text(view, font_row) == "    └─ font size: 12px"
 
     controls.focus_descriptor = _desc(view, font_row)
@@ -1391,7 +1397,7 @@ def test_render_overlay_title_margin_bottom_row() -> None:
     controls.session.render_overlays.opening_card.title_expanded = True
     controls.session.render_overlays.opening_card.title_margin_bottom = 10
     view = controls.build_view_state(paused=False)
-    margin_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_MARGIN_BOTTOM)
+    margin_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_MARGIN_BOTTOM)
     assert _row_text(view, margin_row) == "    └─ margin bottom: 10px"
 
     controls.focus_descriptor = _desc(view, margin_row)
@@ -1406,7 +1412,7 @@ def test_render_overlay_body_font_size_row() -> None:
     controls.session.render_overlays.opening_card.body_expanded = True
     controls.session.render_overlays.opening_card.body_font_size = 18
     view = controls.build_view_state(paused=False)
-    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_BODY_FONT_SIZE)
+    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE)
     assert _row_text(view, font_row) == "    └─ font size: 18px"
 
     controls.focus_descriptor = _desc(view, font_row)
@@ -1421,12 +1427,12 @@ def test_render_overlay_font_rows_nested_indent() -> None:
     controls.session.render_overlays.opening_card.title_expanded = True
     controls.session.render_overlays.opening_card.body_expanded = True
     view = controls.build_view_state(paused=False)
-    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER)
-    title_font_size = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT_SIZE)
-    title_font = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT)
-    body_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_BODY_HEADER)
-    body_font_size = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_BODY_FONT_SIZE)
-    body_font = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_BODY_FONT)
+    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER)
+    title_font_size = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE)
+    title_font = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT)
+    body_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_HEADER)
+    body_font_size = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE)
+    body_font = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_FONT)
     assert _row_indent(view, title_header) == TREE_INDENT * 2
     assert _row_indent(view, title_font_size) == TREE_INDENT * 3
     assert _row_indent(view, title_font) == TREE_INDENT * 3
@@ -1440,7 +1446,7 @@ def test_render_overlay_title_header_toggles_expansion() -> None:
     controls.session.render_overlays.expanded = True
     controls.session.render_overlays.opening_card.expanded = True
     view = controls.build_view_state(paused=False)
-    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER)
+    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER)
     controls.focus_descriptor = _desc(view, title_header)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.render_overlays.opening_card.title_expanded is True
@@ -1455,7 +1461,7 @@ def test_render_overlay_collapse_refocuses_from_title_font_row() -> None:
     controls.session.render_overlays.opening_card.expanded = True
     controls.session.render_overlays.opening_card.title_expanded = True
     view = controls.build_view_state(paused=False)
-    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT_SIZE)
+    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE)
     font_desc = _desc(view, font_row)
     controls.focus_descriptor = font_desc
     controls.render_overlays.set_expanded(False)
@@ -1472,14 +1478,16 @@ def test_render_overlay_title_collapse_refocuses_from_font_row() -> None:
     controls.session.render_overlays.opening_card.expanded = True
     controls.session.render_overlays.opening_card.title_expanded = True
     view = controls.build_view_state(paused=False)
-    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER)
-    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT_SIZE)
+    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER)
+    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE)
     controls.focus_descriptor = _desc(view, font_row)
     controls.render_overlays.opening_card.set_title_expanded(False)
     view = controls.build_view_state(paused=False)
     assert view.layout.resolve_navigable(
         controls.focus_descriptor, view
-    ) == RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER)
+    ) == RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER, card="opening_card"
+    )
 
 
 def test_track_header_visibility_icon_color() -> None:
@@ -3151,7 +3159,7 @@ def test_track_header_visible_uses_layer_enabled_when_timeline_off() -> None:
     controls.session.layers["layer_1"].enabled = False
     view = controls.build_view_state(paused=False, position_sec=10.0)
     assert view.tracks["layer_1"].visible is False
-    assert view.tracks["layer_1"].enabled is False
+    assert view.tracks["layer_1"].runtime.enabled is False
 
 
 def test_solo_marks_non_solo_tracks_not_visible_when_timeline_off() -> None:
@@ -3946,7 +3954,7 @@ def test_row_value_color_dim_for_focused_empty_preset() -> None:
     state = TuningViewState(
         layer_z_order=("layer_1",),
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="empty (1/1)",
                 preset_label="NO PRESETS FOUND",
@@ -4114,7 +4122,7 @@ def test_render_overlay_locked_skips_children_in_nav() -> None:
     controls.session.render_overlays.opening_card.expanded = True
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAYS_HEADER)
-    position_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_POSITION)
+    position_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_POSITION)
     navigable = view.layout.navigable_indices(view)
     visible = view.layout.visible_indices(view)
     assert header_row in navigable

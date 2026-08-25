@@ -8,28 +8,26 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from cleave.config import (
-    RenderOverlayAnimationType,
-    RenderOverlayPosition,
-    RenderOverlaySlideDirection,
-)
 from cleave.config_schema import (
-            DEFAULT_CHROMA_BOOST_APPLY_MODE,
+    DEFAULT_CHROMA_BOOST_APPLY_MODE,
     DEFAULT_CHROMA_BOOST_VARIANT,
+    DEFAULT_CHROMA_BOOST_AMOUNT_PCT,
     DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
     DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
-    DEFAULT_HARD_CUT_DURATION,
-    DEFAULT_HARD_CUT_SENSITIVITY,
-    DEFAULT_HARD_CUT_ENABLED,
-    DEFAULT_EASTER_EGG,
-    DEFAULT_PRESET_START_CLEAN,
-    DEFAULT_PRESET_DURATION,
-            DEFAULT_RENDER_OVERLAY_ANIMATION_TYPE,
-    DEFAULT_RENDER_OVERLAY_APPEAR_AT,
-    DEFAULT_RENDER_OVERLAY_DISAPPEAR_AT,
-    DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
-    DEFAULT_RENDER_OVERLAY_SLIDE_DIRECTION,
-    DEFAULT_SOFT_CUT_DURATION,
+    DEFAULT_HIGHLIGHT_ROLLOFF_THRESHOLD_PCT,
+    DEFAULT_HIGHLIGHT_ROLLOFF_CEILING_PCT,
+    DEFAULT_HIGHLIGHT_ROLLOFF_STRENGTH_PCT,
+    DEFAULT_HIGHLIGHT_ROLLOFF_SOFTNESS_PCT,
+    DEFAULT_HIGHLIGHT_ROLLOFF_DESATURATION_PCT,
+    DEFAULT_EDITOR_PREVIEW_QUALITY,
+    DEFAULT_RESIDUAL_LATENCY_MS,
+    DEFAULT_TIMELINE_ENABLED,
+    DEFAULT_TIMELINE_FADES_ENABLED,
+    DEFAULT_TIMELINE_FADE_IN,
+    DEFAULT_TIMELINE_FADE_OUT,
+    DEFAULT_TIMELINE_CROSSFADE,
+    DEFAULT_TIMELINE_LOCKED,
+    DEFAULT_TIMELINE_PLACEMENT_SNAP,
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
@@ -37,19 +35,18 @@ from cleave.config_schema import (
     DEFAULT_VISUAL_LIMITER_THRESHOLD,
     DEFAULT_VISUAL_LIMITER_RATIO,
     DEFAULT_VISUAL_LIMITER_RELEASE,
-    default_render_overlay_card_runtime_values,
     default_render_overlays_runtime_values,
     default_render_pattern_mask_runtime_values,
     default_render_post_fx_runtime_values,
     PatternMaskType,
 )
-from cleave.extract import StemSource
 from cleave.preset_curation import PresetCurationIndex
 from cleave.preset_playlist import (
     PresetPlaylist,
     preset_filename_display,
     scan_preset_playlist,
 )
+from cleave.timeline_presets.characters import DEFAULT_TIMELINE_PRESET_KIND
 from cleave.timeline_presets.conductor import DEFAULT_TIMELINE_PRESET_CONDUCTOR
 from cleave.timeline_presets.mode import (
     DEFAULT_TIMELINE_PRESET_MODE,
@@ -79,7 +76,13 @@ from cleave.timeline_presets.timeline_cuts import (
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.playback import PlaybackState, current_sec
 from cleave.viz.row_semantics import RowDescriptor, RowKind
-from cleave.viz.session import LayerRuntime, TuningSession, config_path_display
+from cleave.viz.session import (
+    LayerRuntime,
+    RenderOverlayCardRuntime,
+    TuningSession,
+    config_path_display,
+    default_render_overlay_card_runtime,
+)
 from cleave.viz.user_presets import (
     path_list_identity,
     preset_list_display_names,
@@ -90,7 +93,6 @@ if TYPE_CHECKING:
     from cleave.viz.layer import StemLayer
     from cleave.viz.row_layout import RowLayout, RowLayoutFrame
 
-_RO_CARD_DEFAULTS = default_render_overlay_card_runtime_values(closing=False)
 _RO_OVERLAYS_DEFAULTS = default_render_overlays_runtime_values()
 _RO_POST_FX_DEFAULTS = default_render_post_fx_runtime_values()
 _RO_PATTERN_MASK_DEFAULTS = default_render_pattern_mask_runtime_values()
@@ -98,74 +100,21 @@ _RO_PATTERN_MASK_DEFAULTS = default_render_pattern_mask_runtime_values()
 
 @dataclass
 class TrackBlock:
-    stem: StemSource
+    runtime: LayerRuntime
     preset_dir_label: str
     preset_label: str
-    blend_mode: str
-    opacity_pct: int
-    beat_sensitivity: float
-    effects: dict[str, dict[str, int]]
-    effects_expanded: bool = False
-    enabled: bool = True
-    visible: bool = True
-    expanded: bool = False
-    locked: bool = False
-    preset_empty: bool = False
-    preset_switching: str = "off"
-    preset_switching_trigger: str = "timer"
-    preset_duration: float = DEFAULT_PRESET_DURATION
-    soft_cut_duration: float = DEFAULT_SOFT_CUT_DURATION
-    hard_cut_duration: float = DEFAULT_HARD_CUT_DURATION
-    hard_cut_sensitivity: float = DEFAULT_HARD_CUT_SENSITIVITY
-    hard_cut_enabled: bool = DEFAULT_HARD_CUT_ENABLED
-    easter_egg: float = DEFAULT_EASTER_EGG
-    preset_start_clean: bool = DEFAULT_PRESET_START_CLEAN
-    preset_list: list[str] = field(default_factory=list)
     preset_list_labels: list[str] = field(default_factory=list)
-    preset_list_expanded: bool = True
-    # Index into preset_list of the currently playing preset, when present.
+    preset_empty: bool = False
+    visible: bool = True
+    # Index into runtime.preset_list of the currently playing preset, when present.
     # Baked at structure build (signature includes auto_preset_path / playlist).
     active_preset_list_index: int | None = None
 
 
 @dataclass
-class RenderOverlayAnimationBlock:
-    expanded: bool = False
-    type: RenderOverlayAnimationType = DEFAULT_RENDER_OVERLAY_ANIMATION_TYPE
-    slide_direction: RenderOverlaySlideDirection = (
-        DEFAULT_RENDER_OVERLAY_SLIDE_DIRECTION
-    )
-    appear_at: float = DEFAULT_RENDER_OVERLAY_APPEAR_AT
-    display_time: float = DEFAULT_RENDER_OVERLAY_DISPLAY_TIME
-
-
-@dataclass
-class RenderOverlayClosingAnimationBlock:
-    expanded: bool = False
-    type: RenderOverlayAnimationType = DEFAULT_RENDER_OVERLAY_ANIMATION_TYPE
-    slide_direction: RenderOverlaySlideDirection = (
-        DEFAULT_RENDER_OVERLAY_SLIDE_DIRECTION
-    )
-    disappear_at: float = DEFAULT_RENDER_OVERLAY_DISAPPEAR_AT
-    display_time: float = DEFAULT_RENDER_OVERLAY_DISPLAY_TIME
-
-
-@dataclass
 class RenderOverlayCardBlock:
-    enabled: bool = _RO_CARD_DEFAULTS["enabled"]
-    expanded: bool = _RO_CARD_DEFAULTS["expanded"]
-    position: RenderOverlayPosition = _RO_CARD_DEFAULTS["position"]
-    title_expanded: bool = _RO_CARD_DEFAULTS["title_expanded"]
-    body_expanded: bool = _RO_CARD_DEFAULTS["body_expanded"]
-    title_font_size: int = _RO_CARD_DEFAULTS["title_font_size"]
-    title_font: str = _RO_CARD_DEFAULTS["title_font"]
-    title_margin_bottom: int = _RO_CARD_DEFAULTS["title_margin_bottom"]
-    body_font_size: int = _RO_CARD_DEFAULTS["body_font_size"]
-    body_font: str = _RO_CARD_DEFAULTS["body_font"]
-    opacity_pct: int = _RO_CARD_DEFAULTS["opacity_pct"]
-    border_width: int = _RO_CARD_DEFAULTS["border_width"]
-    animation: RenderOverlayAnimationBlock | RenderOverlayClosingAnimationBlock = field(
-        default_factory=RenderOverlayAnimationBlock
+    runtime: RenderOverlayCardRuntime = field(
+        default_factory=default_render_overlay_card_runtime
     )
 
 
@@ -177,7 +126,7 @@ class RenderOverlaysBlock:
     )
     closing_card: RenderOverlayCardBlock = field(
         default_factory=lambda: RenderOverlayCardBlock(
-            animation=RenderOverlayClosingAnimationBlock()
+            runtime=default_render_overlay_card_runtime(closing=True)
         )
     )
     solo: bool = False
@@ -189,11 +138,11 @@ class HighlightRolloffBlock:
     expanded: bool = False
     mode: str = DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE
     curve: str = DEFAULT_HIGHLIGHT_ROLLOFF_CURVE
-    threshold_pct: int = 78
-    ceiling_pct: int = 65
-    strength_pct: int = 70
-    softness_pct: int = 40
-    desaturation_pct: int = 30
+    threshold_pct: int = DEFAULT_HIGHLIGHT_ROLLOFF_THRESHOLD_PCT
+    ceiling_pct: int = DEFAULT_HIGHLIGHT_ROLLOFF_CEILING_PCT
+    strength_pct: int = DEFAULT_HIGHLIGHT_ROLLOFF_STRENGTH_PCT
+    softness_pct: int = DEFAULT_HIGHLIGHT_ROLLOFF_SOFTNESS_PCT
+    desaturation_pct: int = DEFAULT_HIGHLIGHT_ROLLOFF_DESATURATION_PCT
 
 
 @dataclass
@@ -201,7 +150,7 @@ class ChromaBoostBlock:
     expanded: bool = False
     mode: str = DEFAULT_CHROMA_BOOST_APPLY_MODE
     variant: str = DEFAULT_CHROMA_BOOST_VARIANT
-    amount_pct: int = 25
+    amount_pct: int = DEFAULT_CHROMA_BOOST_AMOUNT_PCT
 
 
 @dataclass
@@ -233,10 +182,10 @@ class RenderPatternMaskBlock:
 
 @dataclass
 class TimelineFadeGroupBlock:
-    enabled: bool = False
-    fade_in: float = 2.0
-    fade_out: float = 2.0
-    crossfade: bool = False
+    enabled: bool = DEFAULT_TIMELINE_FADES_ENABLED
+    fade_in: float = DEFAULT_TIMELINE_FADE_IN
+    fade_out: float = DEFAULT_TIMELINE_FADE_OUT
+    crossfade: bool = DEFAULT_TIMELINE_CROSSFADE
 
 
 @dataclass
@@ -249,17 +198,17 @@ class VisualLimiterBlock:
 
 @dataclass
 class RenderTimelineBlock:
-    enabled: bool = False
+    enabled: bool = DEFAULT_TIMELINE_ENABLED
     expanded: bool = False
     bar_phase_offset: int = 0
     show_bar_grid: bool = False
     beat_bar_grid_expanded: bool = False
     snap_cues_expanded: bool = False
-    placement_snap: str = "beat"
+    placement_snap: str = DEFAULT_TIMELINE_PLACEMENT_SNAP
     cuts_expanded: bool = False
     timeline_presets_expanded: bool = False
     visual_limiter_expanded: bool = False
-    timeline_preset_kind: str = "breathing"
+    timeline_preset_kind: str = DEFAULT_TIMELINE_PRESET_KIND
     timeline_preset_density: TimelinePresetDensity = DEFAULT_TIMELINE_PRESET_DENSITY
     timeline_preset_cue_snap: TimelinePresetCueSnap = DEFAULT_TIMELINE_PRESET_CUE_SNAP
     timeline_preset_song_marker_snap: TimelinePresetSongMarkerSnap = (
@@ -280,7 +229,7 @@ class RenderTimelineBlock:
         default_factory=TimelineFadeGroupBlock
     )
     limiter: VisualLimiterBlock = field(default_factory=VisualLimiterBlock)
-    locked: bool = False
+    locked: bool = DEFAULT_TIMELINE_LOCKED
     song_markers_expanded: bool = False
     song_marker_times: tuple[float, ...] = ()
     song_marker_types: tuple[str, ...] = ()
@@ -293,11 +242,11 @@ class SettingsBlock:
     latency_compensation_expanded: bool = False
     editor_mode: str = "visualizer"
     editor_mode_selection: str = "visualizer"
-    preview_quality: str = "balanced"
+    preview_quality: str = DEFAULT_EDITOR_PREVIEW_QUALITY
     ui_width_mode: str = DEFAULT_UI_WIDTH_MODE
     ui_width: int = DEFAULT_UI_WIDTH
     ui_fade: float = DEFAULT_UI_FADE_SEC
-    residual_latency_ms: int = 0
+    residual_latency_ms: int = DEFAULT_RESIDUAL_LATENCY_MS
 
 
 @dataclass
@@ -522,27 +471,8 @@ class _ViewStateStructure:
     layout: RowLayout
 
 
-def _card_block_from_runtime(card, *, closing: bool) -> RenderOverlayCardBlock:
-    anim = card.animation
-    if closing:
-        animation: RenderOverlayAnimationBlock | RenderOverlayClosingAnimationBlock = (
-            RenderOverlayClosingAnimationBlock(
-                expanded=card.animation_expanded,
-                type=anim.type,
-            )
-        )
-    else:
-        animation = RenderOverlayAnimationBlock(
-            expanded=card.animation_expanded,
-            type=anim.type,
-        )
-    return RenderOverlayCardBlock(
-        enabled=card.enabled,
-        expanded=card.expanded,
-        title_expanded=card.title_expanded,
-        body_expanded=card.body_expanded,
-        animation=animation,
-    )
+def _card_block_from_runtime(card: RenderOverlayCardRuntime) -> RenderOverlayCardBlock:
+    return RenderOverlayCardBlock(runtime=card)
 
 
 class TuningViewStateBuilder:
@@ -700,7 +630,7 @@ class TuningViewStateBuilder:
             # The file row alone follows auto_preset_path when switching plays
             # a cast/list preset outside the browse directory.
             tracks[slot] = TrackBlock(
-                stem=layer.stem,
+                runtime=layer,
                 preset_dir_label=layer.playlist.directory_display_label(
                     self.preset_root,
                     browse_floor=layer.browse_floor,
@@ -708,28 +638,9 @@ class TuningViewStateBuilder:
                 preset_label=self._preset_label(
                     display, user_names=user_names
                 ),
-                blend_mode=layer.blend_mode,
-                opacity_pct=layer.opacity_pct,
-                effects=dict(layer.effects),
-                effects_expanded=layer.effects_expanded,
-                beat_sensitivity=layer.beat_sensitivity,
-                enabled=layer.enabled,
-                visible=layer.enabled,
-                expanded=layer.expanded,
-                locked=layer.locked,
                 preset_empty=not display.paths,
-                preset_switching=layer.preset_switching,
-                preset_switching_trigger=layer.preset_switching_trigger,
-                preset_duration=layer.preset_duration,
-                soft_cut_duration=layer.soft_cut_duration,
-                hard_cut_duration=layer.hard_cut_duration,
-                hard_cut_sensitivity=layer.hard_cut_sensitivity,
-                hard_cut_enabled=layer.hard_cut_enabled,
-                easter_egg=layer.easter_egg,
-                preset_start_clean=layer.preset_start_clean,
-                preset_list=list(layer.preset_list),
+                visible=layer.enabled,
                 preset_list_labels=self._preset_list_labels(list(layer.preset_list)),
-                preset_list_expanded=layer.preset_list_expanded,
                 active_preset_list_index=self._active_preset_list_index(layer),
             )
 
@@ -746,8 +657,8 @@ class TuningViewStateBuilder:
         )
         render_overlays = RenderOverlaysBlock(
             expanded=ro.expanded,
-            opening_card=_card_block_from_runtime(ro.opening_card, closing=False),
-            closing_card=_card_block_from_runtime(ro.closing_card, closing=True),
+            opening_card=_card_block_from_runtime(ro.opening_card),
+            closing_card=_card_block_from_runtime(ro.closing_card),
             locked=ro.locked,
         )
         render_post_fx = RenderPostFxBlock(
@@ -873,18 +784,11 @@ class TuningViewStateBuilder:
             visible = effective_layer_enabled(self.session, slot, position_sec)
             tracks[slot] = replace(
                 base,
-                stem=layer.stem,
-                enabled=layer.enabled,
                 visible=visible,
-                locked=layer.locked,
-                blend_mode=layer.blend_mode,
-                opacity_pct=layer.opacity_pct,
-                beat_sensitivity=layer.beat_sensitivity,
                 preset_label=self._preset_label(
                     display, user_names=user_names
                 ),
                 preset_list_labels=self._preset_list_labels(list(layer.preset_list)),
-                effects=dict(layer.effects),
             )
         return tracks
 
@@ -934,8 +838,6 @@ class TuningViewStateBuilder:
         pp = self.session.render_post_fx
         pm = self.session.render_pattern_mask
         tl = self.session.timeline
-        opening = ro.opening_card
-        closing = ro.closing_card
         state = TuningViewState(
             layer_z_order=structure.layer_z_order,
             tracks=tracks,
@@ -959,54 +861,6 @@ class TuningViewStateBuilder:
             render_overlays=replace(
                 structure.render_overlays,
                 expanded=ro.expanded,
-                opening_card=replace(
-                    structure.render_overlays.opening_card,
-                    enabled=opening.enabled,
-                    expanded=opening.expanded,
-                    position=opening.position,
-                    title_expanded=opening.title_expanded,
-                    body_expanded=opening.body_expanded,
-                    title_font_size=opening.title_font_size,
-                    title_font=opening.title_font,
-                    title_margin_bottom=opening.title_margin_bottom,
-                    body_font_size=opening.body_font_size,
-                    body_font=opening.body_font,
-                    opacity_pct=opening.opacity_pct,
-                    border_width=opening.border_width,
-                    animation=replace(
-                        structure.render_overlays.opening_card.animation,
-                        expanded=opening.animation_expanded,
-                        type=opening.animation.type,
-                        slide_direction=opening.animation.slide_direction,
-                        appear_at=getattr(opening.animation, "appear_at", 0.0),
-                        display_time=opening.animation.display_time,
-                    ),
-                ),
-                closing_card=replace(
-                    structure.render_overlays.closing_card,
-                    enabled=closing.enabled,
-                    expanded=closing.expanded,
-                    position=closing.position,
-                    title_expanded=closing.title_expanded,
-                    body_expanded=closing.body_expanded,
-                    title_font_size=closing.title_font_size,
-                    title_font=closing.title_font,
-                    title_margin_bottom=closing.title_margin_bottom,
-                    body_font_size=closing.body_font_size,
-                    body_font=closing.body_font,
-                    opacity_pct=closing.opacity_pct,
-                    border_width=closing.border_width,
-                    animation=replace(
-                        structure.render_overlays.closing_card.animation,
-                        expanded=closing.animation_expanded,
-                        type=closing.animation.type,
-                        slide_direction=closing.animation.slide_direction,
-                        disappear_at=getattr(
-                            closing.animation, "disappear_at", 0.0
-                        ),
-                        display_time=closing.animation.display_time,
-                    ),
-                ),
                 solo=self.session.render_overlay_solo,
                 locked=ro.locked,
             ),

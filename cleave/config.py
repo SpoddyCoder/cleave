@@ -21,6 +21,9 @@ from cleave.effects.constants import clamp_effect_pct
 from cleave.extract import StemSource
 from cleave.config_schema import (
     DEFAULT_BLEND_MODE,
+    DEFAULT_LAYER_ENABLED,
+    DEFAULT_LAYER_LOCKED,
+    DEFAULT_LAYER_OPACITY,
     BEAT_SENSITIVITY_MAX,
     BEAT_SENSITIVITY_MIN,
     DEFAULT_BEAT_SENSITIVITY,
@@ -154,12 +157,12 @@ class PathsConfig:
 class LayerConfig:
     preset: Path
     stem: StemSource
-    enabled: bool = True
-    opacity: float = 1.0
+    enabled: bool = DEFAULT_LAYER_ENABLED
+    opacity: float = DEFAULT_LAYER_OPACITY
     beat_sensitivity: float | None = None
     effects: dict[str, dict[str, int]] = field(default_factory=dict)
     blend_mode: BlendMode = "black-key"
-    locked: bool = False
+    locked: bool = DEFAULT_LAYER_LOCKED
     preset_switching: PresetSwitchingMode = DEFAULT_PRESET_SWITCHING
     preset_switching_trigger: PresetSwitchingTrigger = DEFAULT_PRESET_SWITCHING_TRIGGER
     preset_duration: float = DEFAULT_PRESET_DURATION

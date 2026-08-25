@@ -373,7 +373,7 @@ def _fit_track_header_stem(
     budget -= font.size(_track_header_expand_suffix(state, index))[0]
     if locked:
         budget -= track_header_lock_suffix_width(font.get_linesize())
-    stem_text = stem_overlay_header(block.stem)
+    stem_text = stem_overlay_header(block.runtime.stem)
     if cache is None:
         return fit_text_to_width(font, stem_text, budget)
     return cache.fit_text_cached("text", fit_text_to_width, font, stem_text, budget)
@@ -444,7 +444,7 @@ def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
     if field is None:
         return ""
     if field.present_style == RowPresentStyle.LABELED_VALUE:
-        return labeled_row_prefix(kind)
+        return labeled_row_prefix(kind, state.layout.descriptor(index))
     if field.present_style == RowPresentStyle.DYNAMIC:
         return row_dynamic_labeled_prefix(state.layout.descriptor(index))
     return ""
@@ -491,7 +491,7 @@ def _fit_action_parameter_row_value(
     if state.settings.ui_width_mode == "flexible":
         return value
     budget = max_content_width - row_indent(state, index)
-    budget -= font.size(labeled_row_prefix(kind))[0]
+    budget -= font.size(labeled_row_prefix(kind, state.layout.descriptor(index)))[0]
     if row_shows_enter_icon(state, index):
         budget -= action_enter_icon_suffix_width(font.get_linesize())
     return _fit_value(font, value, budget, FitStrategy.PLAIN, cache=cache)
@@ -555,7 +555,7 @@ def fit_row_text(
     if field.present_style == RowPresentStyle.EXPAND_SUBHEADER:
         return row_expand_subheader_display_text(state, state.layout.descriptor(index))
     if field.present_style == RowPresentStyle.ACTION_PARAMETER:
-        return labeled_row_prefix(kind) + _fit_action_parameter_row_value(
+        return labeled_row_prefix(kind, state.layout.descriptor(index)) + _fit_action_parameter_row_value(
             font,
             state,
             index,
@@ -653,7 +653,8 @@ def row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
     if kind in RENDER_OVERLAY_SECTION_KINDS:
         overlays = state.render_overlays
         if not (
-            overlays.opening_card.enabled or overlays.closing_card.enabled
+            overlays.opening_card.runtime.enabled
+            or overlays.closing_card.runtime.enabled
         ):
             return DISABLED
 
@@ -942,7 +943,7 @@ def _paint_expand_subheader(
 ) -> tuple[pygame.Surface, pygame.Surface | None, int]:
     surf = render_label_value_row(
         ctx.font,
-        prefix=expand_subheader_prefix(ctx.kind),
+        prefix=expand_subheader_prefix(ctx.kind, ctx.desc),
         value=format_expand_subheader_value(ctx.state, ctx.desc),
         value_color=ctx.color,
         line_height=ctx.line_h,
@@ -954,7 +955,7 @@ def _paint_expand_subheader(
 def _paint_action_parameter(
     ctx: RowPresentContext,
 ) -> tuple[pygame.Surface, pygame.Surface | None, int]:
-    prefix = labeled_row_prefix(ctx.kind)
+    prefix = labeled_row_prefix(ctx.kind, ctx.desc)
     value = _fit_action_parameter_row_value(
         ctx.font,
         ctx.state,
