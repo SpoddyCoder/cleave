@@ -22,7 +22,7 @@ from cleave.timeline import (
     shift_bars_by_beats,
     strip_lane_range,
 )
-from cleave.viz.session import TimelineFadeGroupRuntime, TuningSession
+from cleave.viz.editor_mode_controls import is_preset_curation_mode
 from cleave.viz.focus_nav import (
     FocusCursor,
     MainFocus,
@@ -30,6 +30,7 @@ from cleave.viz.focus_nav import (
     cursor_timeline_submenu_focused,
 )
 from cleave.viz.row_semantics import RowKind
+from cleave.viz.session import TimelineFadeGroupRuntime, TuningSession
 from cleave.viz.timeline_overlay import (
     TimelineViewState,
     prune_expired_arm_flashes,
@@ -38,6 +39,7 @@ from cleave.viz.timeline_overlay import (
 
 if TYPE_CHECKING:
     from cleave.viz.layer import StemLayer
+    from cleave.viz.visual_limiter import LimiterFrameState
 
 
 def focused_song_marker_index(focus_cursor: FocusCursor | None) -> int | None:
@@ -221,15 +223,13 @@ def _as_fade_group(group: TimelineFadeGroupRuntime) -> TimelineFadeGroup:
     )
 
 
-def timeline_levels_apply(session: TuningSession, slot: str) -> bool:
+def timeline_levels_apply(frame: LimiterFrameState, slot: str) -> bool:
     """True when the timeline level envelope drives FBO enable/opacity for *slot*."""
-    from cleave.viz.editor_mode_controls import is_preset_curation_mode
-
-    if session.solo_slot is not None:
+    if frame.solo_slot is not None:
         return False
-    if is_preset_curation_mode(session):
+    if is_preset_curation_mode(frame.editor_mode):
         return False
-    tl = session.timeline
+    tl = frame.timeline
     if not tl.enabled:
         return False
     if tl.recording or tl.preview_active:
@@ -275,8 +275,11 @@ def apply_layer_visibility(
     layers_by_slot: dict[str, StemLayer],
     t_sec: float,
 ) -> None:
+    from cleave.viz.visual_limiter import LimiterFrameState
+
+    frame = LimiterFrameState.from_session(session)
     for slot, layer in layers_by_slot.items():
-        if timeline_levels_apply(session, slot):
+        if timeline_levels_apply(frame, slot):
             level = timeline_level_multiplier(session, slot, t_sec)
             layer.timeline_level = level
             layer.fbo.enabled = level > LEVEL_EPS

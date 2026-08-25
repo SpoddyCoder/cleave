@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import pygame
 
-from cleave.config_schema import MAX_LAYER_COUNT
+from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.timeline import SlotCue, TimelineLane
 from cleave.viz.overlay_upload import OverlayGpuState, UploadSignature
 from cleave.viz.playback import format_mmss

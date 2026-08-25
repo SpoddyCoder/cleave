@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pygame
 
-from cleave.config_schema import DEFAULT_LAYER_SLOTS
+from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
 from cleave.stem_pcm import LIVE_PROJECTM_FPS, samples_per_frame

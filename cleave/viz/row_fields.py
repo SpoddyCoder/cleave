@@ -13,13 +13,22 @@ from enum import Enum, auto
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from cleave.config_schema import (
+from cleave.config_schema.editor import ui_fade_display
+from cleave.config_schema.layers import (
+    hard_cut_enabled_display,
+    preset_start_clean_display,
+    preset_switching_display,
+    preset_switching_trigger_display,
+)
+from cleave.config_schema.render import (
     PATTERN_MASK_DENSITY_STEP,
     PATTERN_MASK_DENSITY_STEP_LARGE,
     PATTERN_MASK_FEATHER_PCT_STEP,
     PATTERN_MASK_FEATHER_PCT_STEP_LARGE,
     PATTERN_MASK_TRANSITION_STEP,
     PATTERN_MASK_TRANSITION_STEP_LARGE,
+)
+from cleave.config_schema.timeline import (
     TIMELINE_FADE_DURATION_STEP,
     VISUAL_LIMITER_RATIO_STEP,
     VISUAL_LIMITER_RELEASE_STEP,
@@ -28,14 +37,9 @@ from cleave.config_schema import (
     clamp_visual_limiter_ratio,
     clamp_visual_limiter_release,
     clamp_visual_limiter_threshold,
-    cycle_timeline_placement_snap,
     cycle_timeline_crossfade,
-    hard_cut_enabled_display,
-    preset_start_clean_display,
-    preset_switching_display,
-    preset_switching_trigger_display,
+    cycle_timeline_placement_snap,
     timeline_crossfade_display,
-    ui_fade_display,
 )
 from cleave.extract import stem_control_label, stem_overlay_header
 from cleave.pattern_mask import (

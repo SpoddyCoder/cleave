@@ -8,7 +8,11 @@ import pytest
 import yaml
 
 from cleave.config import CleaveConfig, LayerConfig, PathsConfig, EditorConfig
-from cleave.config_schema import (
+from cleave.config_schema.descriptors import (
+    ParseCtx,
+    PersistCtx,
+)
+from cleave.config_schema.layers import (
     DEFAULT_EASTER_EGG,
     DEFAULT_HARD_CUT_DURATION,
     DEFAULT_HARD_CUT_ENABLED,
@@ -18,10 +22,8 @@ from cleave.config_schema import (
     DEFAULT_PRESET_SWITCHING,
     DEFAULT_PRESET_SWITCHING_TRIGGER,
     DEFAULT_SOFT_CUT_DURATION,
-    ParseCtx,
     parse_layers_section,
     persist_layers,
-    PersistCtx,
     template_layer_entry,
 )
 from cleave.config_snapshot import write_session_snapshot

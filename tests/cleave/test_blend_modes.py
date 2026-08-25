@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from cleave.config_schema import parse_blend_mode
+from cleave.config_schema.validators import parse_blend_mode
 from cleave.blend_modes import BLEND_MODES
 from tests.support.viz import make_controls
 

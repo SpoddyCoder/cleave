@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from cleave.config_schema import (
+from cleave.config_schema.render import (
     CHROMA_BOOST_APPLY_MODES,
     CHROMA_BOOST_VARIANTS,
     HIGHLIGHT_ROLLOFF_APPLY_MODES,

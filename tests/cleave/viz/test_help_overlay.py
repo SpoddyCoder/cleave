@@ -4,14 +4,16 @@ from __future__ import annotations
 
 from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES, BLEND_MODES
 from cleave.cue_roles import CUE_ROLE_MARKER_HELP_ENTRIES
-from cleave.config_schema import (
+from cleave.config_schema.editor import EDITOR_PREVIEW_QUALITY_HELP_ENTRIES
+from cleave.config_schema.layers import (
+    PRESET_SWITCHING_MODE_HELP_ENTRIES,
+    PRESET_SWITCHING_TRIGGER_HELP_ENTRIES,
+)
+from cleave.config_schema.render import (
     HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_APPLY_MODES,
     HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_CURVES,
-    PRESET_SWITCHING_MODE_HELP_ENTRIES,
-    PRESET_SWITCHING_TRIGGER_HELP_ENTRIES,
-    EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
 )
 from cleave.timeline_presets import TIMELINE_PRESET_HELP_ENTRIES
 from cleave.viz.help_content import (

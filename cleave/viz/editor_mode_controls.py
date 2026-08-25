@@ -27,28 +27,28 @@ _ENTER_CURATION_DIRTY_MESSAGE = (
 )
 
 
-def is_preset_curation_mode(session: TuningSession) -> bool:
-    return session.settings.editor_mode == "preset_curation"
+def is_preset_curation_mode(editor_mode: str) -> bool:
+    return editor_mode == "preset_curation"
 
 
-def render_sections_active(session: TuningSession) -> bool:
+def render_sections_active(editor_mode: str) -> bool:
     """False in preset curation: overlay, post-FX, and timeline must not affect output."""
-    return not is_preset_curation_mode(session)
+    return not is_preset_curation_mode(editor_mode)
 
 
-def preset_switching_active(session: TuningSession) -> bool:
+def preset_switching_active(editor_mode: str) -> bool:
     """False in preset curation: auto rotation must not run or notify."""
-    return not is_preset_curation_mode(session)
+    return not is_preset_curation_mode(editor_mode)
 
 
-def projectm_notifications_active(session: TuningSession) -> bool:
+def projectm_notifications_active(editor_mode: str) -> bool:
     """False in preset curation: skip/log toasts must not interrupt browsing."""
-    return not is_preset_curation_mode(session)
+    return not is_preset_curation_mode(editor_mode)
 
 
 def curation_focus_slot(session: TuningSession) -> str | None:
     """Layer under curation (first in z-order), or None when not curating."""
-    if not is_preset_curation_mode(session) or not session.layer_z_order:
+    if not is_preset_curation_mode(session.settings.editor_mode) or not session.layer_z_order:
         return None
     return session.layer_z_order[0]
 
@@ -151,7 +151,7 @@ class EditorModeController:
             self.request_exit_to_visualizer()
 
     def request_enter_curation(self) -> None:
-        if is_preset_curation_mode(self.session):
+        if is_preset_curation_mode(self.session.settings.editor_mode):
             return
         if self._config_save.config_dirty:
             self._modal.prompt_choice(
@@ -167,7 +167,7 @@ class EditorModeController:
         self._enter_curation_mode()
 
     def request_exit_to_visualizer(self) -> None:
-        if not is_preset_curation_mode(self.session):
+        if not is_preset_curation_mode(self.session.settings.editor_mode):
             return
         self._reload_active_config(editor_mode="visualizer")
         self._config_save.clear_config_dirty()
@@ -196,7 +196,7 @@ class EditorModeController:
         if not self._enter_curation_after_save:
             return
         self._enter_curation_after_save = False
-        if is_preset_curation_mode(self.session):
+        if is_preset_curation_mode(self.session.settings.editor_mode):
             return
         self._enter_curation_mode()
 

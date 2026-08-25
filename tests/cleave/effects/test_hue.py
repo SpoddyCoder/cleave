@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -24,15 +25,7 @@ from cleave.effects.hue import (
 )
 from cleave.effects.registry import EffectDef
 from cleave.effects.runtime import EffectRuntime
-from cleave.preset_playlist import playlist_at_dir
 from cleave.signals import Signals
-from cleave.viz.session import LayerRuntime, TuningSession
-from pathlib import Path
-
-from cleave.config_schema import DEFAULT_LAYER_SLOTS
-from tests.support.config import TEST_LAYER_STEMS
-
-SLOT_FOR_STEM = {v: k for k, v in TEST_LAYER_STEMS.items()}
 
 
 def _signals_with_pitch(values: list[float]) -> Signals:
@@ -45,16 +38,8 @@ def _signals_with_pitch(values: list[float]) -> Signals:
     )
 
 
-def _layer_runtime(stem: str, *, opacity_pct: int = 50, effects: dict | None = None) -> LayerRuntime:
-    slot = SLOT_FOR_STEM.get(stem, stem)
-    audio = TEST_LAYER_STEMS.get(slot, stem)
-    return LayerRuntime(
-        playlist=playlist_at_dir(Path(f"/tmp/presets/{slot}"), index=0),
-        browse_floor=Path(f"/tmp/presets/{slot}"),
-        stem=audio,
-        opacity_pct=opacity_pct,
-        effects=effects or {},
-    )
+def _layer(stem: str, *, opacity_pct: int = 50, effects: dict | None = None) -> SimpleNamespace:
+    return SimpleNamespace(stem=stem, opacity_pct=opacity_pct, effects=effects or {})
 
 
 def test_pitch_to_hue_min_max_mid() -> None:
@@ -139,16 +124,13 @@ def test_hue_mix_pct_scales_depth() -> None:
 
 def test_effect_runtime_hue_vocals_only() -> None:
     signals = _signals_with_pitch([200.0, 600.0])
-    session = TuningSession(
-        layer_z_order=["layer_3", "layer_1"],
-        layers={
-            "layer_3": _layer_runtime("vocals", effects={"hue": {"pitch": 100}}),
-            "layer_1": _layer_runtime("drums", effects={"hue": {"pitch": 100}}),
-        },
-    )
+    layers = {
+            "layer_3": _layer("vocals", effects={"hue": {"pitch": 100}}),
+            "layer_1": _layer("drums", effects={"hue": {"pitch": 100}}),
+        }
     runtime = EffectRuntime()
-    mods_low = runtime.tick(session, signals, 0.0)
-    mods_high = runtime.tick(session, signals, 0.01)
+    mods_low = runtime.tick(layers, signals, 0.0)
+    mods_high = runtime.tick(layers, signals, 0.01)
     assert mods_low["layer_3"].hue_mix == pytest.approx(1.0)
     assert mods_high["layer_3"].hue_mix == pytest.approx(1.0)
     assert mods_low["layer_3"].hue_rgb != mods_high["layer_3"].hue_rgb
@@ -158,11 +140,8 @@ def test_effect_runtime_hue_vocals_only() -> None:
 
 def test_effect_runtime_hue_zero_depth_is_noop() -> None:
     signals = _signals_with_pitch([440.0, 440.0])
-    session = TuningSession(
-        layer_z_order=["layer_3"],
-        layers={"layer_3": _layer_runtime("vocals", effects={"hue": {"pitch": 0}})},
-    )
+    layers = {"layer_3": _layer("vocals", effects={"hue": {"pitch": 0}})}
     runtime = EffectRuntime()
-    mods = runtime.tick(session, signals, 0.0)
+    mods = runtime.tick(layers, signals, 0.0)
     assert mods["layer_3"].hue_mix == 0.0
     assert mods["layer_3"].hue_rgb == (1.0, 1.0, 1.0)

@@ -14,7 +14,10 @@ import pytest
 
 _MOVE_MODE_KEY = pygame.K_m
 
-from cleave.config_schema import DEFAULT_LAYER_SLOTS, MAX_LAYER_COUNT
+from cleave.config_schema.layers import (
+    DEFAULT_LAYER_SLOTS,
+    MAX_LAYER_COUNT,
+)
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.preset_playlist import (
     PresetPlaylist,
@@ -2957,7 +2960,7 @@ def test_key_repeat_armed_while_navigation_key_held() -> None:
 
 
 def test_held_key_repeat_keeps_overlay_visible() -> None:
-    from cleave.config_schema import DEFAULT_UI_FADE_SEC
+    from cleave.config_schema.editor import DEFAULT_UI_FADE_SEC
     from cleave.viz.tuning_panel_draw import TuningOverlay
     from cleave.viz.theme import FADE_DURATION_SEC
 

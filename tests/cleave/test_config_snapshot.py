@@ -25,15 +25,19 @@ from cleave.config import (
     _parse_layers,
     load_config,
 )
-from cleave.config_schema import (
-    DEFAULT_LAYER_SLOTS,
-    DEFAULT_RENDER_HEIGHT,
-    DEFAULT_RENDER_WIDTH,
+from cleave.config_schema.descriptors import (
     ParseCtx,
-    parse_render_section,
-    parse_timeline_section,
+)
+from cleave.config_schema.layers import (
+    DEFAULT_LAYER_SLOTS,
     template_layer_entry,
 )
+from cleave.config_schema.render import (
+    DEFAULT_RENDER_HEIGHT,
+    DEFAULT_RENDER_WIDTH,
+    parse_render_section,
+)
+from cleave.config_schema.timeline import parse_timeline_section
 from tests.support.config import (
     TEST_LAYER_STEMS,
     default_render_post_fx_config,

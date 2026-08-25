@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from cleave.config_schema import MAX_LAYER_COUNT
+from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.viz.row_sections import (
     CURATION_LAYER_SECTION,
     SETTINGS_SECTION,

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from cleave.config_schema import (
+from cleave.config_schema.editor import (
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,

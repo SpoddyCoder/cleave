@@ -5,7 +5,10 @@ from __future__ import annotations
 import pygame
 import pytest
 
-from cleave.config_schema import DEFAULT_LAYER_SLOTS, MAX_LAYER_COUNT
+from cleave.config_schema.layers import (
+    DEFAULT_LAYER_SLOTS,
+    MAX_LAYER_COUNT,
+)
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
 from cleave.viz.frame_rate import FPS_DISPLAY_LABEL
@@ -49,7 +52,7 @@ from cleave.viz.tuning_view_state import (
     RenderTimelineBlock,
     TuningViewState,
 )
-from cleave.config_schema import DEFAULT_UI_FADE_SEC
+from cleave.config_schema.editor import DEFAULT_UI_FADE_SEC
 from cleave.viz.theme import (
     ACTION,
     BACKGROUND,

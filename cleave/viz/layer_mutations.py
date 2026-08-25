@@ -7,7 +7,7 @@ from pathlib import Path
 
 from cleave.blend_modes import BLEND_MODES
 from cleave.config import clamp_beat_sensitivity, clamp_effect_pct
-from cleave.config_schema import (
+from cleave.config_schema.layers import (
     PRESET_SWITCHING_MODES,
     PRESET_SWITCHING_TRIGGERS,
     clamp_easter_egg,

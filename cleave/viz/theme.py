@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from cleave.config_schema import DEFAULT_UI_WIDTH
+from cleave.config_schema.editor import DEFAULT_UI_WIDTH
 
 BASE_UI_FONT_SIZE: int = 14
 UI_WIDTH_PX_FACTOR: int = 4

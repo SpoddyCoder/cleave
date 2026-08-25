@@ -11,8 +11,8 @@ Related: [architecture principles](../.cursor/rules/architecture-principles.mdc)
 The earlier refactor direction is still sound and has been extended:
 
 - Typed runtimes (`VisualizerSeed`, `VisualizerCore`, `LiveVisualizerRuntime`, `RenderVisualizerRuntime`) in [cleave/viz/app.py](../cleave/viz/app.py)
-- Descriptor-driven parse, dump, and persist in [cleave/config_schema.py](../cleave/config_schema.py)
-- Computed dirty tracking via `persisted_session_signature` in [cleave/config_snapshot.py](../cleave/config_snapshot.py); snapshot writes go through `persisted_session_payload`
+- Descriptor-driven parse, dump, and persist in [cleave/config_schema/](../cleave/config_schema/) (`editor`, `layers`, `render`, `timeline`, `persist`); [__init__.py](../cleave/config_schema/__init__.py) has no re-exports
+- Computed dirty tracking via `persisted_session_signature` in [cleave/config_snapshot.py](../cleave/config_snapshot.py); snapshot writes go through `persisted_session_payload` in [persist.py](../cleave/config_schema/persist.py)
 - Registry-based effect dispatch in [cleave/effects/handlers.py](../cleave/effects/handlers.py)
 - Shared live/offline frame finish in [cleave/viz/frame_finish.py](../cleave/viz/frame_finish.py)
 - Panel field manifest (`RowFieldDef`, `present_style`, `fit_strategy`, `visibility_icon`) in [cleave/viz/row_fields.py](../cleave/viz/row_fields.py); draw through [row_present_renderers.py](../cleave/viz/row_present_renderers.py); mutations through [layer_mutations.py](../cleave/viz/layer_mutations.py)
@@ -21,13 +21,12 @@ The earlier refactor direction is still sound and has been extended:
 - User editor prefs in [cleave/user_config.py](../cleave/user_config.py); project editor size/beat stay on viz YAML
 - Panel caches ([cleave/viz/tuning_panel_cache.py](../cleave/viz/tuning_panel_cache.py), [cleave/viz/timeline_panel_cache.py](../cleave/viz/timeline_panel_cache.py)) and overlay upload in [cleave/viz/overlay_upload.py](../cleave/viz/overlay_upload.py)
 
-What remains is complexity debt in a few hotspots: the `config_schema` monolith, effects coupled to `TuningSession`, and parallel UI registries that still require coordinated edits per new row.
+What remains is complexity debt in a few hotspots: parallel UI registries that still require coordinated edits per new row, plus the four-copy settings path (YAML descriptors, config dataclasses, session runtimes, panel rows).
 
 Approximate sizes of the largest modules:
 
 | Module | Lines |
 | --- | --- |
-| [config_schema.py](../cleave/config_schema.py) | 2,829 |
 | [row_fields.py](../cleave/viz/row_fields.py) | 2,721 |
 | [row_semantics.py](../cleave/viz/row_semantics.py) | 1,605 |
 | [gl_masked_compositor.py](../cleave/gl_masked_compositor.py) | 2,022 |
@@ -60,7 +59,11 @@ These items are no longer the right targets.
 
 **Card-parameterized overlay kinds.** Opening and closing cards share 16 card-neutral `RowKind` values instanced by `RowDescriptor.card` (same pattern as `slot`). `RowFieldDef` callbacks take the descriptor and resolve the card through `controls.render_overlays.card(...)`. Asymmetric appear/disappear times are one `RENDER_OVERLAY_CARD_TIME` kind whose label comes from the card key.
 
-**TrackBlock as a thin projection.** [tuning_view_state.py](../cleave/viz/tuning_view_state.py) `TrackBlock` holds a `LayerRuntime` reference plus derived labels and visibility (`preset_dir_label`, `preset_label`, `preset_list_labels`, `preset_empty`, `visible`, `active_preset_list_index`). `RenderOverlayCardBlock` holds a `RenderOverlayCardRuntime` reference. Formatters and draw read `block.runtime.*`. Overlay card title/body text and colours stay on cfg. Session and view dataclass defaults import constants from [config_schema.py](../cleave/config_schema.py).
+**TrackBlock as a thin projection.** [tuning_view_state.py](../cleave/viz/tuning_view_state.py) `TrackBlock` holds a `LayerRuntime` reference plus derived labels and visibility (`preset_dir_label`, `preset_label`, `preset_list_labels`, `preset_empty`, `visible`, `active_preset_list_index`). `RenderOverlayCardBlock` holds a `RenderOverlayCardRuntime` reference. Formatters and draw read `block.runtime.*`. Overlay card title/body text and colours stay on cfg. Session and view dataclass defaults import constants from [cleave/config_schema/](../cleave/config_schema/) submodules.
+
+**Effects consume `LayerEffectState`.** [cleave/effects/](../cleave/effects/) takes `Mapping[str, LayerEffectState]` (`stem`, `effects`, `opacity_pct`) and does not import viz. Editor-mode predicates take `editor_mode: str`. HDR helpers take `(cfg, editor_mode)` because HDR compositing lives on `cfg.render`. The limiter uses `LimiterFrameState`. [frame_finish.py](../cleave/viz/frame_finish.py) and [layer_pipeline.py](../cleave/viz/layer_pipeline.py) unpack session into those slices. Detail: [Appendix: P2 work](#appendix-p2-work).
+
+**config_schema package.** Parse, dump, persist, and defaults live in [cleave/config_schema/](../cleave/config_schema/) section modules. `persisted_session_payload` in [persist.py](../cleave/config_schema/persist.py) is the persist choke point. Importers use submodule paths. Detail: [Appendix: P2 work](#appendix-p2-work).
 
 ---
 
@@ -72,29 +75,13 @@ These will lead to silent bugs, divergent behavior, or escalating change cost if
 
 Adding a persisted knob still touches YAML descriptors, config dataclasses, session runtimes, and a panel row (`RowKind` + `RowFieldDef` + section tree + structure signature). View blocks are thin projections over session (`TrackBlock.runtime`, `RenderOverlayCardBlock.runtime`) plus derived labels; overlay opening/closing duplication is gone (one kind set plus `RowDescriptor.card`).
 
-**Recommended direction:** keep view blocks as projections; stop adding parallel default literals outside `config_schema`.
-
-### Domain layering: effects (and the frame path) depend on viz
-
-[cleave/effects/runtime.py](../cleave/effects/runtime.py) still imports `TuningSession`. Core effect logic is coupled to the editor session model. The same type now threads through [layer_pipeline.py](../cleave/viz/layer_pipeline.py), [post_fx.py](../cleave/viz/post_fx.py), [visual_limiter.py](../cleave/viz/visual_limiter.py), and [frame_finish.py](../cleave/viz/frame_finish.py). Adding effects or a headless composite from CLI/tests without the viz stack stays harder than it should be.
-
-[timeline_presets/](../cleave/timeline_presets/) does *not* import viz (good). Apply still lives in [timeline_preset_controls.py](../cleave/viz/timeline_preset_controls.py) and reaches into pattern-mask session fields.
-
-**Recommended direction:** extract a small neutral type (for example `LayerEffectState`) in a non-viz module that session and effects both use. Frame-path helpers should take the slices they need (post-FX runtime, pattern-mask runtime), not the whole `TuningSession`, unless they are genuinely UI.
+**Recommended direction:** keep view blocks as projections; stop adding parallel default literals outside the [config_schema](../cleave/config_schema/) package.
 
 ---
 
 ## 2. Weaknesses worth addressing (maintainability)
 
 These will make the codebase easier to work in but are lower risk than the flaws above.
-
-### `config_schema.py` monolith (~2,829 lines)
-
-The module holds defaults, parse, dump, persist, display helpers, and section descriptors for editor, layers, render (overlays, post-FX, pattern mask), and timeline. It is the right abstraction, but at this size it is hard to review and easy to break cross-section. Function-local imports back to [config.py](../cleave/config.py) and [user_config.py](../cleave/user_config.py) still exist to avoid cycles.
-
-Layers and timeline remain bespoke parse/persist (called out in the architecture principles). That is reasonable for nested lanes and per-slot layers; it does mean new timeline cue fields have no descriptor checklist.
-
-**Pragmatic split:** `config_schema/editor.py`, `layers.py`, `render.py`, `timeline.py` with a thin re-export, or keep one package but extract section descriptor tables. Do not add a second persist function.
 
 ### Four parallel UI registries, still growing
 
@@ -137,17 +124,17 @@ Keep the package boundary. The compose/compositor contract (duration, overlap, r
 
 ## 3. Suggested priority
 
+P0 through P2 are done (see appendices). Remaining:
+
 | Priority | Item | Why |
 | --- | --- | --- |
-| **P2** | Decouple effects (and frame helpers) from `TuningSession` | Unblocks reuse and cleaner module boundaries |
-| **P2** | Split `config_schema` by domain | Low risk, improves reviewability |
 | **P3** | Shared overlay primitives for timeline and tuning panel | Pays off when timeline chrome grows |
 
 ---
 
 ## 4. Bottom line
 
-The architecture principles still match what the code is aiming for. Layer creative state lives on session after bootstrap. Both layer compositors share one request contract, blend/opacity/HDR helpers, and an explicit wipe command. The tuning panel is descriptor-driven end to end: overlay cards are one kind set plus a card key, `TrackBlock` is a thin projection over `LayerRuntime`, and draw has no per-`RowKind` branches. Remaining tax is YAML/config/session for new persisted knobs and coordinated edits across the four UI registries.
+The architecture principles match the code. Layer creative state lives on session after bootstrap. Effects consume `LayerEffectState` and do not import viz. Config schema is a package of section modules with one persist payload. Both layer compositors share one request contract, blend/opacity/HDR helpers, and an explicit wipe command. The tuning panel is descriptor-driven end to end: overlay cards are one kind set plus a card key, `TrackBlock` is a thin projection over `LayerRuntime`, and draw has no per-`RowKind` branches. Remaining tax is YAML/config/session/panel for new persisted knobs, coordinated edits across the four UI registries, and shared overlay primitives.
 
 ---
 
@@ -164,7 +151,7 @@ The two P0 items from this review. Invariants also live in [architecture princip
 | [layer_pipeline.py](../cleave/viz/layer_pipeline.py) | `build` / `build_single` take `LayerRuntime` and `session.layer_z_order`. GPU opacity, blend, enabled, beat, and preset switching seed from session. |
 | [session.py](../cleave/viz/session.py) | `new_layer_runtime` builds an add-layer runtime. No `LayerConfig` on the live add path. |
 | [wiring.py](../cleave/viz/wiring.py) | `LayerManager` add/remove mutates session, playlists, and GPU only. |
-| [config_schema.py](../cleave/config_schema.py) | `persist_layers` and `persist_layer_z_order` read session only. |
+| [layers.py](../cleave/config_schema/layers.py) | `persist_layers` and `persist_layer_z_order` read session only. |
 | [layer_preview_resolution.py](../cleave/viz/layer_preview_resolution.py) | `offline_layer_sizes` takes an explicit z-order. |
 | [app.py](../cleave/viz/app.py), [render.py](../cleave/viz/render.py), [editor_mode_controls.py](../cleave/viz/editor_mode_controls.py) | Missing-preset checks use session playlists. |
 
@@ -225,6 +212,45 @@ Draw dispatches on `RowPresentStyle` only. `RowFieldDef` carries `fit_strategy`,
 
 ### Phase 4: thin view projections
 
-`TrackBlock` holds `runtime: LayerRuntime` plus derived labels and visibility. `RenderOverlayCardBlock` holds `runtime: RenderOverlayCardRuntime`. Formatters and draw read `block.runtime.*`. Layer defaults (`DEFAULT_LAYER_ENABLED`, `DEFAULT_LAYER_OPACITY`, `DEFAULT_LAYER_LOCKED`) live in [config_schema.py](../cleave/config_schema.py) and are imported by session and config types.
+`TrackBlock` holds `runtime: LayerRuntime` plus derived labels and visibility. `RenderOverlayCardBlock` holds `runtime: RenderOverlayCardRuntime`. Formatters and draw read `block.runtime.*`. Layer defaults (`DEFAULT_LAYER_ENABLED`, `DEFAULT_LAYER_OPACITY`, `DEFAULT_LAYER_LOCKED`) live in [layers.py](../cleave/config_schema/layers.py) and are imported by session and config types.
 
 [test_layer_authority.py](../tests/cleave/viz/test_layer_authority.py) and view-state tests assert session mutations flow through projections without block-side writes.
+
+## Appendix: P2 work
+
+The two P2 items from this review. Invariants also live in [architecture principles](../.cursor/rules/architecture-principles.mdc).
+
+### Phase 1: effects and frame helpers without TuningSession
+
+`cleave.effects` consumes [state.py](../cleave/effects/state.py) `LayerEffectState` (`stem`, `effects`, `opacity_pct`). `EffectRuntime.update` / `modifiers` / `tick` take `layers: Mapping[str, LayerEffectState]`. The package does not import viz. `LayerRuntime` satisfies the protocol.
+
+Frame-path helpers take the slices they need. [frame_finish.py](../cleave/viz/frame_finish.py) and [layer_pipeline.py](../cleave/viz/layer_pipeline.py) remain session-aware choke points that unpack those slices.
+
+| Path | Change |
+| --- | --- |
+| [state.py](../cleave/effects/state.py) | `LayerEffectState` Protocol |
+| [runtime.py](../cleave/effects/runtime.py) | `update` / `modifiers` / `tick` take `Mapping[str, LayerEffectState]` |
+| [editor_mode_controls.py](../cleave/viz/editor_mode_controls.py) | `is_preset_curation_mode`, `render_sections_active`, `preset_switching_active`, `projectm_notifications_active` take `editor_mode: str`. `curation_focus_slot` still takes session. |
+| [post_fx.py](../cleave/viz/post_fx.py) | HDR helpers take `(cfg, editor_mode)`. HDR compositing lives on `cfg.render`, not `RenderPostFxRuntime`. |
+| [visual_limiter.py](../cleave/viz/visual_limiter.py) | `LimiterFrameState` (`timeline`, `solo_slot`, `editor_mode`, `layer_z_order`) with `from_session`; used by `visual_limiter_active`, `collect_hot_layers`, `observe_frame_busyness` |
+| [layer_visibility.py](../cleave/viz/layer_visibility.py) | `timeline_levels_apply` takes `LimiterFrameState` |
+
+[test_imports.py](../tests/cleave/effects/test_imports.py) asserts `cleave/effects/` does not import viz. [test_post_fx.py](../tests/cleave/viz/test_post_fx.py) covers HDR gating by editor mode. [test_visual_limiter.py](../tests/cleave/viz/test_visual_limiter.py) builds `LimiterFrameState` from session.
+
+### Phase 2: config_schema package
+
+Parse, dump, persist, and defaults live in [cleave/config_schema/](../cleave/config_schema/). [__init__.py](../cleave/config_schema/__init__.py) is a package docstring only (no re-exports). Importers use submodule paths (`cleave.config_schema.editor`, `.layers`, `.render`, `.timeline`, `.persist`, `.descriptors`, `.validators`).
+
+| Path | Change |
+| --- | --- |
+| [descriptors.py](../cleave/config_schema/descriptors.py) | Field and section descriptors; `parse_section_fields` / `dump_section_fields` |
+| [validators.py](../cleave/config_schema/validators.py) | Shared parsers (`parse_blend_mode`, cue role, cut type) |
+| [editor.py](../cleave/config_schema/editor.py) | `editor` section parse, dump, and defaults |
+| [layers.py](../cleave/config_schema/layers.py) | Layers, preset switching, hard/soft cut, easter egg; `persist_layers` / `persist_layer_z_order` |
+| [persist.py](../cleave/config_schema/persist.py) | `persisted_session_payload` |
+| [timeline.py](../cleave/config_schema/timeline.py) | `timeline` parse and persist |
+| [render/](../cleave/config_schema/render/) | `parse_render_section`, `persist_render`, fps/size/HDR; overlays, post-FX, pattern mask |
+
+Descriptor-driven sections remain `editor`, `render.post_fx`, and `render.overlays`. Layers and timeline stay bespoke (nested per-stem layers; per-slot lanes). Function-local imports of [config.py](../cleave/config.py) and [user_config.py](../cleave/user_config.py) dataclasses avoid cycles. Session and view defaults import constants from these submodules.
+
+[test_config.py](../tests/cleave/test_config.py) and [test_config_snapshot.py](../tests/cleave/test_config_snapshot.py) import the submodules.

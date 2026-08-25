@@ -7,11 +7,15 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from cleave.config import CleaveConfig, render_hdr_compositing
-from cleave.config_schema import DEFAULT_HIGHLIGHT_ROLLOFF_CURVE, HighlightRolloffCurve
+from cleave.config_schema.render import (
+    DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
+    HighlightRolloffCurve,
+)
 from cleave.easing import fade_alpha
 from cleave.gl_color_format import resolve_live_compositor_format
 from cleave.layer_composite import apply_color_format
-from cleave.viz.session import RenderPostFxRuntime, TuningSession
+from cleave.viz.editor_mode_controls import is_preset_curation_mode
+from cleave.viz.session import RenderPostFxRuntime
 
 if TYPE_CHECKING:
     from cleave.gl_compositor import GlCompositor
@@ -224,40 +228,29 @@ def apply_highlight_rolloff_rgba(
     return out.tobytes()
 
 
-def effective_hdr_compositing(
-    cfg: CleaveConfig,
-    session: TuningSession | None = None,
-) -> bool:
+def effective_hdr_compositing(cfg: CleaveConfig, editor_mode: str) -> bool:
     """True when the live/offline path should use RGBA16F compositing."""
-    if session is not None:
-        from cleave.viz.editor_mode_controls import is_preset_curation_mode
-
-        if is_preset_curation_mode(session):
-            return False
+    if is_preset_curation_mode(editor_mode):
+        return False
     return render_hdr_compositing(cfg)
 
 
-def hdr_display_shoulder_active(
-    cfg: CleaveConfig,
-    session: TuningSession | None = None,
-) -> bool:
-    return effective_hdr_compositing(cfg, session)
+def hdr_display_shoulder_active(cfg: CleaveConfig, editor_mode: str) -> bool:
+    return effective_hdr_compositing(cfg, editor_mode)
 
 
 def sync_live_compositor_format(
     cfg: CleaveConfig,
-    session: TuningSession,
+    editor_mode: str,
     compositor: GlCompositor,
     post_process: GlPostProcess,
     *,
     masked_compositor: GlMaskedCompositor | None = None,
 ) -> None:
     """Match compositor/post-process attachments to editor mode (8-bit in curation)."""
-    from cleave.viz.editor_mode_controls import is_preset_curation_mode
-
     fmt = resolve_live_compositor_format(
         render_hdr_compositing(cfg),
-        preset_curation=is_preset_curation_mode(session),
+        preset_curation=is_preset_curation_mode(editor_mode),
     )
     apply_color_format(fmt, compositor, post_process, masked_compositor)
 

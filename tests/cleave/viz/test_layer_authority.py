@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from cleave.config import LayerConfig
-from cleave.config_schema import persisted_session_payload
+from cleave.config_schema.persist import persisted_session_payload
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline

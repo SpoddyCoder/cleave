@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from cleave.config import CleaveConfig, LayerConfig, PathsConfig, RenderConfig, EditorConfig
-from cleave.config_schema import DEFAULT_LAYER_SLOTS
+from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from cleave.viz.layer_preview_resolution import (
     PREVIEW_MIN_VIZ_SCALE,
     offline_layer_sizes,

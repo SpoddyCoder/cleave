@@ -26,7 +26,8 @@ from dataclasses import dataclass
 
 import moderngl
 import numpy as np
-from cleave.config_schema import MAX_LAYER_COUNT, PATTERN_MASK_DENSITY_MAX
+from cleave.config_schema.layers import MAX_LAYER_COUNT
+from cleave.config_schema.render import PATTERN_MASK_DENSITY_MAX
 from cleave.gl_color_format import RGBA8, GlColorFormat, require_supported_color_format
 from cleave.gl_compositor import LayerFbo
 from cleave.layer_blend import (

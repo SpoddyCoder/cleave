@@ -11,7 +11,7 @@ from typing import Literal
 
 import pygame
 
-from cleave.config_schema import DEFAULT_UI_FADE_SEC
+from cleave.config_schema.editor import DEFAULT_UI_FADE_SEC
 from cleave.viz.row_semantics import (
     row_is_pinned,
 )
