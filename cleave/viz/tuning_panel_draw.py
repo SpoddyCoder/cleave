@@ -54,7 +54,6 @@ from cleave.viz.ui_tint import draw_opaque_row_background
 from cleave.viz.theme import (
     BACKGROUND,
     BACKGROUND_ALPHA,
-    BORDER_COLOR,
     BORDER_WIDTH,
     FADE_DURATION_SEC,
     FOCUS_ROW_BG_ALPHA,
@@ -69,11 +68,15 @@ from cleave.viz.theme import (
     VALUE,
     tuning_ui_metrics,
 )
+from cleave.viz.overlay_primitives import (
+    ComposedPanel,
+    clip_rect_to_bounds,
+    draw_panel_border,
+    overlay_font,
+)
 from cleave.viz.overlay_profiler import OverlayDrawCounters
 from cleave.viz.overlay_upload import (
     OverlayGpuState,
-    UploadPlan,
-    UploadSignature,
     clip_dirty_rects,
     upload_plan_for_signature,
 )
@@ -287,16 +290,6 @@ def tuning_panel_max_dimensions(
     return max_panel_w, max_panel_h
 
 
-@dataclass(frozen=True)
-class ComposedTuningPanel:
-    upload_surface: pygame.Surface
-    panel_size: tuple[int, int]
-    screen_rect: tuple[int, int, int, int]
-    upload_plan: UploadPlan
-    upload_signature: UploadSignature
-    capacity: tuple[int, int]
-
-
 def scroll_metrics(
     *,
     visible_indices: list[int],
@@ -406,34 +399,6 @@ def _scrollable_row_in_viewport(
     return y + line_h > scroll_top and y < scroll_bottom
 
 
-def clip_rect_to_surface(
-    rect: tuple[int, int, int, int],
-    surface: pygame.Surface,
-) -> tuple[int, int, int, int] | None:
-    """Intersection of rect with surface bounds (for subsurface-safe panel_rect)."""
-    return clip_rect_to_bounds(rect, surface.get_width(), surface.get_height())
-
-
-def clip_rect_to_bounds(
-    rect: tuple[int, int, int, int],
-    bounds_w: int,
-    bounds_h: int,
-) -> tuple[int, int, int, int] | None:
-    """Intersection of rect with a width/height viewport."""
-    x, y, w, h = rect
-    if w <= 0 or h <= 0:
-        return None
-    left = max(x, 0)
-    top = max(y, 0)
-    right = min(x + w, bounds_w)
-    bottom = min(y + h, bounds_h)
-    clip_w = right - left
-    clip_h = bottom - top
-    if clip_w <= 0 or clip_h <= 0:
-        return None
-    return (left, top, clip_w, clip_h)
-
-
 class TuningOverlay:
     """Tree-style live tuning panel; holds visible after input, then fades out."""
 
@@ -467,7 +432,6 @@ class TuningOverlay:
         self._fade_duration_sec = FADE_DURATION_SEC
         self._idle_sec = self._hold_idle_sec + self._fade_duration_sec + 1.0
         self._visibility = 0.0
-        self._font: pygame.font.Font | None = None
         self._panel_rect: tuple[int, int, int, int] | None = None
         self._panel_scratch: pygame.Surface | None = None
         self._scroll_y = 0
@@ -551,9 +515,7 @@ class TuningOverlay:
             self._visibility = 0.0
 
     def _font_get(self) -> pygame.font.Font:
-        if self._font is None:
-            self._font = pygame.font.SysFont("monospace", self._font_size)
-        return self._font
+        return overlay_font(self._font_size)
 
     @property
     def panel_rect(self) -> tuple[int, int, int, int] | None:
@@ -1019,14 +981,7 @@ class TuningOverlay:
             )
             panel.blit(help_hint, (hint_layout.x, hint_layout.y))
 
-        border_alpha = int(255 * self._visibility)
-        if border_alpha >= 2 and BORDER_WIDTH > 0:
-            pygame.draw.rect(
-                panel,
-                (*BORDER_COLOR, border_alpha),
-                panel.get_rect(),
-                width=BORDER_WIDTH,
-            )
+        draw_panel_border(panel, alpha=int(255 * self._visibility))
 
     def compose_panel(
         self,
@@ -1036,7 +991,7 @@ class TuningOverlay:
         viewport_height: int,
         timeline_panel_open: bool = False,
         counters: OverlayDrawCounters | None = None,
-    ) -> ComposedTuningPanel | None:
+    ) -> ComposedPanel | None:
         self._panel_rect = None
         if self._visibility <= 0.01 or len(state.layout) == 0:
             return None
@@ -1397,7 +1352,7 @@ class TuningOverlay:
         state: TuningViewState,
         capacity: tuple[int, int],
         incremental: bool,
-    ) -> ComposedTuningPanel:
+    ) -> ComposedPanel:
         cache = self._panel_cache
         screen_rect, src_offset = placement
         live_sig = live_upload_signature(state)
@@ -1442,7 +1397,7 @@ class TuningOverlay:
                 )
 
         cache.last_live_signature = live_sig
-        return ComposedTuningPanel(
+        return ComposedPanel(
             upload_surface=panel,
             panel_size=panel_size,
             screen_rect=screen_rect,

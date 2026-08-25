@@ -9,11 +9,11 @@ import pygame
 from cleave.gl_compositor import OverlayTextureSlot
 from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.overlay_draw import OverlayDrawer
+from cleave.viz.overlay_primitives import ComposedPanel
 from cleave.viz.overlay_profiler import OverlayProfiler
 from cleave.viz.overlay_upload import OverlayGpuState, UploadPlan, UploadSignature
 from cleave.viz.row_semantics import RowDescriptor, RowKind
-from cleave.viz.tuning_panel_draw import ComposedTuningPanel
-from cleave.viz.timeline_overlay import ComposedTimelinePanel, TimelineViewState
+from cleave.viz.timeline_overlay import TimelineViewState
 from tests.support.compositor_mock import recording_compositor
 
 
@@ -41,7 +41,7 @@ def _mock_tuning_compose(
         active_size=(pw, ph),
         screen_rect=screen_rect,
     )
-    overlay.compose_panel.return_value = ComposedTuningPanel(
+    overlay.compose_panel.return_value = ComposedPanel(
         upload_surface=panel_surf,
         panel_size=(pw, ph),
         screen_rect=screen_rect,
@@ -203,7 +203,7 @@ def _mock_timeline_compose(
         active_size=(pw, ph),
         screen_rect=screen_rect,
     )
-    overlay.compose_panel.return_value = ComposedTimelinePanel(
+    overlay.compose_panel.return_value = ComposedPanel(
         upload_surface=panel_surf,
         panel_size=(pw, ph - 20),
         screen_rect=screen_rect,
@@ -310,7 +310,7 @@ def test_draw_tuning_overlay_notes_upload_plan_on_profiler() -> None:
         active_size=(pw, ph),
         screen_rect=screen_rect,
     )
-    overlay.compose_panel.return_value = ComposedTuningPanel(
+    overlay.compose_panel.return_value = ComposedPanel(
         upload_surface=panel_surf,
         panel_size=(pw, ph),
         screen_rect=screen_rect,
