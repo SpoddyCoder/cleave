@@ -39,7 +39,7 @@ def _expand_render_overlay(controls: TuningControls) -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(
-        RowKind.RENDER_OVERLAY_OPENING_CARD_HEADER
+        RowKind.RENDER_OVERLAY_CARD_HEADER, card="opening_card"
     )
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
@@ -144,7 +144,9 @@ def _mutate_timeline_locked(controls: TuningControls) -> None:
 def _mutate_render_overlay_position(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_POSITION)
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_POSITION, card="opening_card"
+    )
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -152,7 +154,9 @@ def _mutate_render_overlay_title_font_size(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     controls.session.render_overlays.opening_card.title_expanded = True
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT_SIZE)
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE, card="opening_card"
+    )
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -160,7 +164,9 @@ def _mutate_render_overlay_title_font(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     controls.session.render_overlays.opening_card.title_expanded = True
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT)
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_TITLE_FONT, card="opening_card"
+    )
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -168,7 +174,9 @@ def _mutate_render_overlay_title_margin_bottom(controls: TuningControls) -> None
     _expand_render_overlay(controls)
     controls.session.render_overlays.opening_card.title_expanded = True
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_TITLE_MARGIN_BOTTOM)
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_TITLE_MARGIN_BOTTOM, card="opening_card"
+    )
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -176,7 +184,9 @@ def _mutate_render_overlay_body_font_size(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     controls.session.render_overlays.opening_card.body_expanded = True
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_BODY_FONT_SIZE)
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE, card="opening_card"
+    )
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -184,21 +194,27 @@ def _mutate_render_overlay_body_font(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     controls.session.render_overlays.opening_card.body_expanded = True
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_BODY_FONT)
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_BODY_FONT, card="opening_card"
+    )
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_render_overlay_opacity(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_OPACITY)
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_OPACITY, card="opening_card"
+    )
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
 def _mutate_render_overlay_border_width(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_BORDER_WIDTH)
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH, card="opening_card"
+    )
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -206,7 +222,9 @@ def _mutate_render_overlay_start_delay(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     controls.session.render_overlays.opening_card.animation_expanded = True
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_APPEAR_AT)
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_TIME, card="opening_card"
+    )
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 
@@ -214,7 +232,9 @@ def _mutate_render_overlay_display_time(controls: TuningControls) -> None:
     _expand_render_overlay(controls)
     controls.session.render_overlays.opening_card.animation_expanded = True
     view = controls.build_view_state(paused=False)
-    controls.focus_descriptor = RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_DISPLAY_TIME)
+    controls.focus_descriptor = RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_DISPLAY_TIME, card="opening_card"
+    )
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
 
 

@@ -150,6 +150,13 @@ class RenderOverlaysControls:
         self.opening_card = RenderOverlayCardControls(session, "opening_card")
         self.closing_card = RenderOverlayCardControls(session, "closing_card")
 
+    def card(self, name: str) -> RenderOverlayCardControls:
+        if name == "opening_card":
+            return self.opening_card
+        if name == "closing_card":
+            return self.closing_card
+        raise ValueError(f"unknown overlay card {name!r}")
+
     def set_expanded(self, expanded: bool) -> None:
         overlays = self.session.render_overlays
         if overlays.expanded == expanded:

@@ -109,7 +109,7 @@ _action_parameter_label_color = action_parameter_label_color
 
 
 def track_sub_rows_visible(state: TuningViewState, slot: str) -> bool:
-    return state.tracks[slot].expanded
+    return state.tracks[slot].runtime.expanded
 
 
 @dataclass(frozen=True)

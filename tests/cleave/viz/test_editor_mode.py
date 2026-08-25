@@ -10,10 +10,10 @@ from cleave.config_schema import persisted_session_payload
 from cleave.viz.focus_nav import MainFocus
 from cleave.viz.modal import ModalKind
 from cleave.viz.row_semantics import RowDescriptor, RowKind
-from cleave.viz.tuning_view_state import SettingsBlock, TrackBlock, TuningViewState, view_state_structure_signature
+from cleave.viz.tuning_view_state import SettingsBlock, TuningViewState, view_state_structure_signature
 from tests.cleave.viz.test_controls import _make_controls, _mutate_dirty
 from tests.cleave.viz.test_overlay import _minimal_view_state
-from tests.support.viz import keydown, make_playlist, make_test_cfg
+from tests.support.viz import keydown, make_playlist, make_test_cfg, make_track_block
 
 
 def _curation_view_state(**kwargs: object) -> TuningViewState:
@@ -21,7 +21,7 @@ def _curation_view_state(**kwargs: object) -> TuningViewState:
         "settings": SettingsBlock(expanded=True, editor_mode="preset_curation"),
         "layer_z_order": ("layer_1", "layer_2"),
         "tracks": {
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -31,7 +31,7 @@ def _curation_view_state(**kwargs: object) -> TuningViewState:
                 effects={},
                 expanded=True,
             ),
-            "layer_2": TrackBlock(
+            "layer_2": make_track_block(
                 stem="bass",
                 preset_dir_label="dir2",
                 preset_label="preset2.milk",
@@ -253,7 +253,7 @@ def test_curation_ignores_layer_lock() -> None:
     preset = RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1")
     assert section_locked(view, header) is False
     assert section_locked(controls.session, preset) is False
-    assert view.tracks["layer_1"].locked is True
+    assert view.tracks["layer_1"].runtime.locked is True
     assert row_navigable(view, preset) is True
     preset_index = view.layout.find_descriptor(preset)
     assert _row_value_color(view, preset_index) == VALUE
@@ -376,7 +376,7 @@ def test_flexible_mode_expands_for_editor_mode_confirm_suffix() -> None:
     from cleave.viz.material_icons import action_enter_icon_suffix_width
     from cleave.viz.theme import panel_content_max_width_px
     from cleave.viz.tuning_panel_draw import TuningOverlay, fit_row_text
-    from cleave.viz.tuning_view_state import SettingsBlock, TrackBlock
+    from cleave.viz.tuning_view_state import SettingsBlock
     from tests.cleave.viz.test_overlay import _minimal_view_state
 
     pygame.init()
@@ -385,7 +385,7 @@ def test_flexible_mode_expands_for_editor_mode_confirm_suffix() -> None:
         "Some Extremely Long Preset Name That Forces Max Width.milk"
     )
     tracks = {
-        "layer_1": TrackBlock(
+        "layer_1": make_track_block(
             stem="drums",
             preset_dir_label="dir",
             preset_label=long_preset,

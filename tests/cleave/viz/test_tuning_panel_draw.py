@@ -6,16 +6,16 @@ from cleave.paths import repo_root
 from cleave.viz.row_fields import ROW_FIELDS, RowPresentStyle
 from cleave.viz.row_semantics import RowDescriptor, RowKind
 from cleave.viz.tuning_panel_draw import _row_text, fit_row_text
-from cleave.viz.tuning_view_state import SettingsBlock, TrackBlock, TuningViewState
+from cleave.viz.tuning_view_state import SettingsBlock, TuningViewState
 from tests.cleave.viz.test_overlay import _minimal_view_state
-from tests.support.viz import overlay_font
+from tests.support.viz import make_track_block, overlay_font
 
 
 def _present_style_view_state() -> TuningViewState:
     return _minimal_view_state(
         settings=SettingsBlock(expanded=True),
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",

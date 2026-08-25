@@ -55,6 +55,12 @@ These items are no longer the right targets.
 
 **Layer composite contract.** Both GPU compositors implement [layer_composite.py](../cleave/layer_composite.py) `LayerCompositor` against one `LayerCompositeRequest`. Blend, opacity-in-alpha, and HDR format live in [layer_blend.py](../cleave/layer_blend.py) and [gl_color_format.py](../cleave/gl_color_format.py). [layer_pipeline.py](../cleave/viz/layer_pipeline.py) `LayerFramePipeline.composite` is the layer choke point (mask on/off only selects the implementation). Wipes are an explicit `MaskTransition`. Hard composite (feather 0%) still ignores per-layer blend, hue, and flash by design; the soft path applies them. [frame_finish.py](../cleave/viz/frame_finish.py) remains the post-composite choke point. Detail: [Appendix: P0 work](#appendix-p0-work).
 
+**Panel present-style draw and public mutation API.** Labeled/value rows draw through `RowPresentStyle` renderers in [row_present_renderers.py](../cleave/viz/row_present_renderers.py). [row_fields.py](../cleave/viz/row_fields.py) mutates via public `LayerMutations` and public sub-controllers (`settings`, `render_overlays`, `render_post_fx`, and the rest). [tuning_panel_draw.py](../cleave/viz/tuning_panel_draw.py) still has `RowKind` chrome for track headers, render eyes, transport, notifications, config dirty, and preset icons.
+
+**Card-parameterized overlay kinds.** Opening and closing cards share 16 card-neutral `RowKind` values instanced by `RowDescriptor.card` (same pattern as `slot`). `RowFieldDef` callbacks take the descriptor and resolve the card through `controls.render_overlays.card(...)`. Asymmetric appear/disappear times are one `RENDER_OVERLAY_CARD_TIME` kind whose label comes from the card key.
+
+**TrackBlock as a thin projection.** [tuning_view_state.py](../cleave/viz/tuning_view_state.py) `TrackBlock` holds a `LayerRuntime` reference plus derived labels and visibility (`preset_dir_label`, `preset_label`, `preset_list_labels`, `preset_empty`, `visible`, `active_preset_list_index`). `RenderOverlayCardBlock` holds a `RenderOverlayCardRuntime` reference. Formatters and draw read `block.runtime.*`. Overlay card title/body text and colours stay on cfg. Session and view dataclass defaults import constants from [config_schema.py](../cleave/config_schema.py).
+
 ---
 
 ## 1. Flaws to address (long-term brittleness)
@@ -63,27 +69,15 @@ These will lead to silent bugs, divergent behavior, or escalating change cost if
 
 ### Four copies of the same settings
 
-Adding a persisted knob still touches:
+Adding a persisted knob still touches YAML descriptors, config dataclasses, session runtimes, and a panel row (`RowKind` + `RowFieldDef` + section tree + structure signature). View blocks are thin projections over session (`TrackBlock.runtime`, `RenderOverlayCardBlock.runtime`) plus derived labels; do not add mirrored creative fields on the block.
 
-| Layer | Example |
-| --- | --- |
-| YAML descriptors / parse | [config_schema.py](../cleave/config_schema.py) |
-| Config dataclasses | [config.py](../cleave/config.py) (`CleaveConfig`, `LayerConfig`, overlay/post-FX types) |
-| Session runtimes | [session.py](../cleave/viz/session.py) (`LayerRuntime`, `RenderPostFxRuntime`, ...) |
-| View blocks | [tuning_view_state.py](../cleave/viz/tuning_view_state.py) (`TrackBlock`, `RenderOverlayCardBlock`, ...) |
-| Panel row | `RowKind` + `RowFieldDef` + section tree + structure signature |
+**Recommended direction:** keep view blocks as projections; stop adding parallel default literals outside `config_schema`.
 
-`TrackBlock` still mirrors `LayerRuntime` field-for-field. Overlay opening and closing cards duplicate ~30 `RowKind` values that differ only by card name. Defaults are intended to live once in `config_schema`, but session and view dataclasses restate many of them.
+### Residual draw chrome still branches on RowKind
 
-**Recommended direction:** generate view blocks as thin projections (or read session through formatters); parameterize opening/closing overlay rows as one kind plus a card key; stop adding parallel default literals outside `config_schema`.
+Input is descriptor-driven (`ROW_FIELDS`, [row_sections.py](../cleave/viz/row_sections.py), `apply_field_horizontal`). Labeled/value drawing goes through `RowPresentStyle` in [row_present_renderers.py](../cleave/viz/row_present_renderers.py). [tuning_panel_draw.py](../cleave/viz/tuning_panel_draw.py) still branches on `RowKind` for track headers, render eyes, transport, notifications, config dirty, and preset icons. New chrome of that kind still needs a draw special case.
 
-### Panel manifest migration is incomplete on the draw side
-
-Input is largely descriptor-driven (`ROW_FIELDS`, [row_sections.py](../cleave/viz/row_sections.py), `apply_field_horizontal`). Drawing has `RowPresentStyle` dispatch for labeled value, action parameter, expand subheader, path icon, and similar, but [tuning_panel_draw.py](../cleave/viz/tuning_panel_draw.py) (~2,494 lines) still branches on `RowKind` for track headers, render eyes, transport, notifications, config dirty, and preset icons. New rows still require coordinated edits across `row_semantics`, `row_fields`, `row_sections`, `view_state_structure_signature`, and draw special cases.
-
-[row_fields.py](../cleave/viz/row_fields.py) mutates through `controls._settings`, `controls._set_opacity`, and other underscore methods, which violates the public-API rule in the architecture principles.
-
-The architecture rules say not to add per-`RowKind` label or mutation branches in draw or controls; residual branches and private callbacks are the leak.
+The architecture rules say not to add per-`RowKind` label or mutation branches in draw or controls; leftover header/icon chrome is the remaining leak.
 
 ### Domain layering: effects (and the frame path) depend on viz
 
@@ -116,17 +110,17 @@ Layers and timeline remain bespoke parse/persist (called out in the architecture
 | [row_sections.py](../cleave/viz/row_sections.py) | Tree composition, conditionals | 1,391 |
 | [tuning_view_state.py](../cleave/viz/tuning_view_state.py) | Session to `TrackBlock` / render blocks | 1,113 |
 
-Adding a panel row touches three to four files plus structure-signature tests. Opening/closing overlay duplication multiplies that tax.
+Adding a panel row touches three to four files plus structure-signature tests.
 
-**Pragmatic wins:** co-locate semantics and field def per row (or generate from one table); card-parameterized overlay kinds; reduce `TrackBlock` to thin views over session.
+**Pragmatic wins:** co-locate semantics and field def per row (or generate from one table).
 
 ### `controls.py` and `wiring.py` remain integration hubs
 
-Feature controllers exist ([settings_controls.py](../cleave/viz/settings_controls.py), [render_overlay_controls.py](../cleave/viz/render_overlay_controls.py), [render_post_fx_controls.py](../cleave/viz/render_post_fx_controls.py), [render_pattern_mask_controls.py](../cleave/viz/render_pattern_mask_controls.py), [preset_curation_controls.py](../cleave/viz/preset_curation_controls.py), timeline snap/cut/preset/phase). [TuningControls](../cleave/viz/controls.py) still grew to ~1,699 lines: preset browsing, user-preset file I/O, layer add/delete, move mode, solo, song markers, and dozens of `_set_*` / `_cycle_*` methods that `row_fields` calls.
+Feature controllers exist ([settings_controls.py](../cleave/viz/settings_controls.py), [render_overlay_controls.py](../cleave/viz/render_overlay_controls.py), [render_post_fx_controls.py](../cleave/viz/render_post_fx_controls.py), [render_pattern_mask_controls.py](../cleave/viz/render_pattern_mask_controls.py), [preset_curation_controls.py](../cleave/viz/preset_curation_controls.py), timeline snap/cut/preset/phase). [TuningControls](../cleave/viz/controls.py) still grew to ~1,699 lines: preset browsing, user-preset file I/O, layer add/delete, move mode, solo, and song markers.
 
 [wiring.py](../cleave/viz/wiring.py) (~582 lines) is still a factory of inline closures (`LiveLayerBindings`, `RenderPostFxBindings`). Typed dataclasses of callables are better than a lambda dict, but they are still a bag of side effects rather than a layer service.
 
-**Pragmatic wins:** move preset-browser and user-preset flows into dedicated controllers; expose a public mutation API that `row_fields` can call without underscores; shrink `make_tuning_controls` to wiring only.
+**Pragmatic wins:** move preset-browser and user-preset flows into dedicated controllers; shrink `make_tuning_controls` to wiring only.
 
 ### `timeline_overlay.py` is still a second UI stack (~1,766 lines)
 
@@ -142,7 +136,7 @@ Keep the package boundary. The compose/compositor contract (duration, overlap, r
 
 ### Test gaps on draw chrome
 
-[test_controls.py](../tests/cleave/viz/test_controls.py) and [test_row_fields.py](../tests/cleave/viz/test_row_fields.py) cover input. Cache, overlay, and editor-mode tests import some draw helpers. There is still no `test_tuning_panel_draw.py`. Masked compositing has [test_masked_compositor_gl_integration.py](../tests/cleave/test_masked_compositor_gl_integration.py), [test_compositor_parity.py](../tests/cleave/test_compositor_parity.py) (soft full-coverage vs unmasked), and pattern-mask unit tests.
+[test_controls.py](../tests/cleave/viz/test_controls.py) and [test_row_fields.py](../tests/cleave/viz/test_row_fields.py) cover input. [test_tuning_panel_draw.py](../tests/cleave/viz/test_tuning_panel_draw.py) covers present-style text/fit guards. Cache, overlay, and editor-mode tests import some draw helpers. Masked compositing has [test_masked_compositor_gl_integration.py](../tests/cleave/test_masked_compositor_gl_integration.py), [test_compositor_parity.py](../tests/cleave/test_compositor_parity.py) (soft full-coverage vs unmasked), and pattern-mask unit tests.
 
 ---
 
@@ -150,18 +144,16 @@ Keep the package boundary. The compose/compositor contract (duration, overlap, r
 
 | Priority | Item | Why |
 | --- | --- | --- |
-| **P1** | Finish draw-side descriptor migration (or extract `PresentStyle` renderers); public mutation API for `row_fields` | Cuts multi-file tax per new row; stops underscore coupling |
-| **P1** | Collapse four setting copies (especially overlay card kinds and `TrackBlock`) | Same tax as draw migration, on the data side |
 | **P2** | Decouple effects (and frame helpers) from `TuningSession` | Unblocks reuse and cleaner module boundaries |
 | **P2** | Split `config_schema` by domain | Low risk, improves reviewability |
 | **P3** | Shared overlay primitives for timeline and tuning panel | Pays off when timeline chrome grows |
-| **P3** | Direct draw tests | Cheap insurance on the largest untested draw module |
+| **P3** | Direct draw tests for remaining header/icon chrome | Cheap insurance on the largest draw module |
 
 ---
 
 ## 4. Bottom line
 
-The architecture principles still match what the code is aiming for. Layer creative state lives on session after bootstrap. Both layer compositors share one request contract, blend/opacity/HDR helpers, and an explicit wipe command. Incomplete descriptor coverage on the draw path remains the main tax on every new panel row.
+The architecture principles still match what the code is aiming for. Layer creative state lives on session after bootstrap. Both layer compositors share one request contract, blend/opacity/HDR helpers, and an explicit wipe command. Overlay cards are one kind set plus a card key. `TrackBlock` is a thin projection over `LayerRuntime`. Remaining tax is YAML/config/session plus residual header/icon chrome in draw.
 
 ---
 

@@ -43,12 +43,10 @@ from cleave.viz.ui_tint import composite_row_background
 from cleave.viz.controls import (
     NOTIFICATION_TIMELINE_ENABLED_TEXT,
 )
+from tests.support.viz import make_overlay_card_block, make_track_block
 from cleave.viz.tuning_view_state import (
-    RenderOverlayAnimationBlock,
-    RenderOverlayCardBlock,
     RenderOverlaysBlock,
     RenderTimelineBlock,
-    TrackBlock,
     TuningViewState,
 )
 from cleave.config_schema import DEFAULT_UI_FADE_SEC
@@ -74,7 +72,7 @@ from cleave.viz.timeline_overlay import timeline_viewport_reserve_px
 
 def _effects_expanded_view_state() -> TuningViewState:
     tracks = {
-        slot: TrackBlock(
+        slot: make_track_block(
             stem=TEST_LAYER_STEMS[slot],
             preset_dir_label=f"{slot}/dir",
             preset_label=f"{slot}/preset.milk",
@@ -345,7 +343,7 @@ def test_cached_compose_matches_collapsed_panel_pixels() -> None:
     pygame.init()
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -369,7 +367,7 @@ def test_cached_compose_matches_one_layer_expanded_panel_pixels() -> None:
     pygame.init()
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -555,7 +553,7 @@ def test_bottom_row_highlight_stops_before_help_hint() -> None:
     overlay = TuningOverlay()
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -616,7 +614,7 @@ def test_bottom_row_rebuilt_with_help_hint_content_width() -> None:
     overlay = TuningOverlay()
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -840,7 +838,7 @@ def _minimal_view_state(**kwargs: object) -> TuningViewState:
     defaults: dict[str, object] = {
         "layer_z_order": ("layer_1",),
         "tracks": {
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -864,7 +862,7 @@ def _minimal_view_state(**kwargs: object) -> TuningViewState:
 def test_track_header_uses_stem_display_not_slot_key() -> None:
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -884,7 +882,7 @@ def test_track_header_uses_stem_display_not_slot_key() -> None:
 def test_track_header_full_mix_shows_mix() -> None:
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="full_mix",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -904,7 +902,7 @@ def test_track_header_full_mix_shows_mix() -> None:
 def test_track_stem_row_text() -> None:
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="full_mix",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -923,7 +921,7 @@ def test_track_stem_row_text() -> None:
 def test_locked_stem_row_not_navigable_and_uses_locked_color() -> None:
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -1032,7 +1030,7 @@ def test_build_row_layout_includes_add_before_render_gap() -> None:
 def test_build_row_layout_omits_add_at_max_layers() -> None:
     slots = tuple(f"layer_{i}" for i in range(1, MAX_LAYER_COUNT + 1))
     tracks = {
-        slot: TrackBlock(
+        slot: make_track_block(
             stem="drums",
             preset_dir_label="dir",
             preset_label="preset.milk",
@@ -1051,7 +1049,7 @@ def test_build_row_layout_omits_add_at_max_layers() -> None:
 def test_delete_row_after_effects_when_expanded() -> None:
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -1080,7 +1078,7 @@ def test_delete_row_after_effects_when_expanded() -> None:
 def test_delete_row_omitted_when_track_collapsed() -> None:
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -1099,7 +1097,7 @@ def test_delete_row_omitted_when_track_collapsed() -> None:
 def test_delete_row_navigable_when_locked() -> None:
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -1119,7 +1117,7 @@ def test_delete_row_navigable_when_locked() -> None:
 def test_add_row_always_navigable() -> None:
     collapsed = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -1133,7 +1131,7 @@ def test_add_row_always_navigable() -> None:
     )
     expanded = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -1153,7 +1151,7 @@ def test_add_row_always_navigable() -> None:
 def test_delete_row_disabled_color_single_layer() -> None:
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -1172,7 +1170,7 @@ def test_delete_row_disabled_color_single_layer() -> None:
 def test_delete_layer_row_text_has_tree_prefix() -> None:
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -1191,7 +1189,7 @@ def test_delete_layer_row_text_has_tree_prefix() -> None:
 def test_action_row_value_color() -> None:
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -1201,7 +1199,7 @@ def test_action_row_value_color() -> None:
                 effects={},
                 expanded=True,
             ),
-            "layer_2": TrackBlock(
+            "layer_2": make_track_block(
                 stem="bass",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -1295,7 +1293,7 @@ def test_action_parameter_row_value_color() -> None:
 def test_preset_list_populate_uses_full_line_action_colors() -> None:
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -1322,7 +1320,7 @@ def test_focused_action_row_shows_enter_hint() -> None:
     pygame.init()
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -1332,7 +1330,7 @@ def test_focused_action_row_shows_enter_hint() -> None:
                 effects={},
                 expanded=True,
             ),
-            "layer_2": TrackBlock(
+            "layer_2": make_track_block(
                 stem="bass",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -1386,7 +1384,7 @@ def test_focused_action_row_shows_enter_hint() -> None:
 def test_disabled_action_row_hides_enter_hint() -> None:
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -1411,7 +1409,7 @@ def test_draw_layer_management_rows_without_error() -> None:
     overlay = TuningOverlay()
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -1438,23 +1436,27 @@ def test_render_overlay_row_layout_includes_header_and_sub_rows_when_expanded() 
     state = _minimal_view_state(
         render_overlays=RenderOverlaysBlock(
             expanded=True,
-            opening_card=RenderOverlayCardBlock(expanded=True),
+            opening_card=make_overlay_card_block(expanded=True),
         ),
     )
     kinds = [row.kind for row in state.layout.rows]
+    cards = [
+        row.card
+        for row in state.layout.rows
+        if row.kind == RowKind.RENDER_OVERLAY_CARD_HEADER
+    ]
     assert RowKind.RENDER_OVERLAYS_HEADER in kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_CARD_HEADER in kinds
-    assert RowKind.RENDER_OVERLAY_CLOSING_CARD_HEADER in kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_ANIMATION_HEADER in kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_POSITION in kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER in kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_BODY_HEADER in kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_OPACITY in kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_BORDER_WIDTH in kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_APPEAR_AT not in kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_DISPLAY_TIME not in kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT_SIZE not in kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_BODY_FONT_SIZE not in kinds
+    assert set(cards) == {"opening_card", "closing_card"}
+    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_POSITION in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_BODY_HEADER in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_OPACITY in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_TIME not in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_DISPLAY_TIME not in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE not in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE not in kinds
     header_idx = state.layout.find_by_kind(RowKind.RENDER_OVERLAYS_HEADER)
     config_idx = state.layout.find_by_kind(RowKind.CONFIG_HEADER)
     assert config_idx < header_idx
@@ -1464,41 +1466,43 @@ def test_render_overlay_animation_rows_when_expanded() -> None:
     state = _minimal_view_state(
         render_overlays=RenderOverlaysBlock(
             expanded=True,
-            opening_card=RenderOverlayCardBlock(
+            opening_card=make_overlay_card_block(
                 expanded=True,
-                animation=RenderOverlayAnimationBlock(expanded=True, type="slide"),
+                animation_expanded=True,
+                animation_type="slide",
             ),
         ),
     )
     kinds = [row.kind for row in state.layout.rows]
-    assert RowKind.RENDER_OVERLAY_OPENING_ANIMATION_TYPE in kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_ANIMATION_SLIDE_DIRECTION in kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_APPEAR_AT in kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_DISPLAY_TIME in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_TYPE in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_TIME in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_DISPLAY_TIME in kinds
 
 
 def test_render_overlay_animation_hides_slide_direction_for_fade() -> None:
     state = _minimal_view_state(
         render_overlays=RenderOverlaysBlock(
             expanded=True,
-            opening_card=RenderOverlayCardBlock(
+            opening_card=make_overlay_card_block(
                 expanded=True,
-                animation=RenderOverlayAnimationBlock(expanded=True, type="fade"),
+                animation_expanded=True,
+                animation_type="fade",
             ),
         ),
     )
     kinds = [row.kind for row in state.layout.rows]
-    assert RowKind.RENDER_OVERLAY_OPENING_ANIMATION_TYPE in kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_ANIMATION_SLIDE_DIRECTION not in kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_APPEAR_AT in kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_DISPLAY_TIME in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_TYPE in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_TIME in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_DISPLAY_TIME in kinds
 
 
 def test_render_overlay_title_and_body_font_rows_when_expanded() -> None:
     state = _minimal_view_state(
         render_overlays=RenderOverlaysBlock(
             expanded=True,
-            opening_card=RenderOverlayCardBlock(
+            opening_card=make_overlay_card_block(
                 expanded=True,
                 title_expanded=True,
                 body_expanded=True,
@@ -1506,11 +1510,11 @@ def test_render_overlay_title_and_body_font_rows_when_expanded() -> None:
         ),
     )
     kinds = [row.kind for row in state.layout.rows]
-    assert RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT_SIZE in kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT in kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_TITLE_MARGIN_BOTTOM in kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_BODY_FONT_SIZE in kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_BODY_FONT in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_TITLE_FONT in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_TITLE_MARGIN_BOTTOM in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE in kinds
+    assert RowKind.RENDER_OVERLAY_CARD_BODY_FONT in kinds
 
 
 def test_render_overlay_collapsed_hides_sub_rows() -> None:
@@ -1523,10 +1527,14 @@ def test_render_overlay_collapsed_hides_sub_rows() -> None:
     collapsed_kinds = {row.kind for row in collapsed.layout.rows}
     expanded_kinds = {row.kind for row in expanded.layout.rows}
     assert RowKind.RENDER_OVERLAYS_HEADER in collapsed_kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_CARD_HEADER not in collapsed_kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_CARD_HEADER in expanded_kinds
-    assert RowKind.RENDER_OVERLAY_CLOSING_CARD_HEADER in expanded_kinds
-    assert RowKind.RENDER_OVERLAY_OPENING_POSITION not in collapsed_kinds
+    assert RowKind.RENDER_OVERLAY_CARD_HEADER not in collapsed_kinds
+    assert RowKind.RENDER_OVERLAY_CARD_HEADER in expanded_kinds
+    assert {
+        row.card
+        for row in expanded.layout.rows
+        if row.kind == RowKind.RENDER_OVERLAY_CARD_HEADER
+    } == {"opening_card", "closing_card"}
+    assert RowKind.RENDER_OVERLAY_CARD_POSITION not in collapsed_kinds
     assert len(collapsed.layout.visible_indices(collapsed)) + 2 == len(
         expanded.layout.visible_indices(expanded)
     )
@@ -1555,7 +1563,7 @@ def test_draw_track_header_with_solo_eye() -> None:
     state = TuningViewState(
         layer_z_order=("layer_1",),
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -1593,7 +1601,7 @@ def test_draw_track_header_with_solo_eye() -> None:
 def test_disabled_track_focus_uses_standard_highlight() -> None:
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",

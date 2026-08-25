@@ -43,52 +43,41 @@ def _toggle_render_overlays(
     controls.render_overlays.set_expanded(forward)
 
 
-def _toggle_render_overlay_opening_card(
-    controls: TuningControls, _slot: str | None, forward: bool
+def _overlay_card_runtime(state: TuningViewState, card: str | None):
+    assert card is not None
+    return getattr(state.render_overlays, card)
+
+
+def _toggle_overlay_card(
+    controls: TuningControls, card: str | None, forward: bool
 ) -> None:
-    controls.render_overlays.opening_card.set_expanded(forward)
+    if card is None:
+        return
+    controls.render_overlays.card(card).set_expanded(forward)
 
 
-def _toggle_render_overlay_closing_card(
-    controls: TuningControls, _slot: str | None, forward: bool
+def _toggle_overlay_card_title(
+    controls: TuningControls, card: str | None, forward: bool
 ) -> None:
-    controls.render_overlays.closing_card.set_expanded(forward)
+    if card is None:
+        return
+    controls.render_overlays.card(card).set_title_expanded(forward)
 
 
-def _toggle_render_overlay_opening_title(
-    controls: TuningControls, _slot: str | None, forward: bool
+def _toggle_overlay_card_body(
+    controls: TuningControls, card: str | None, forward: bool
 ) -> None:
-    controls.render_overlays.opening_card.set_title_expanded(forward)
+    if card is None:
+        return
+    controls.render_overlays.card(card).set_body_expanded(forward)
 
 
-def _toggle_render_overlay_closing_title(
-    controls: TuningControls, _slot: str | None, forward: bool
+def _toggle_overlay_card_animation(
+    controls: TuningControls, card: str | None, forward: bool
 ) -> None:
-    controls.render_overlays.closing_card.set_title_expanded(forward)
-
-
-def _toggle_render_overlay_opening_body(
-    controls: TuningControls, _slot: str | None, forward: bool
-) -> None:
-    controls.render_overlays.opening_card.set_body_expanded(forward)
-
-
-def _toggle_render_overlay_closing_body(
-    controls: TuningControls, _slot: str | None, forward: bool
-) -> None:
-    controls.render_overlays.closing_card.set_body_expanded(forward)
-
-
-def _toggle_render_overlay_opening_animation(
-    controls: TuningControls, _slot: str | None, forward: bool
-) -> None:
-    controls.render_overlays.opening_card.set_animation_expanded(forward)
-
-
-def _toggle_render_overlay_closing_animation(
-    controls: TuningControls, _slot: str | None, forward: bool
-) -> None:
-    controls.render_overlays.closing_card.set_animation_expanded(forward)
+    if card is None:
+        return
+    controls.render_overlays.card(card).set_animation_expanded(forward)
 
 
 def _toggle_render_post_fx(controls: TuningControls, _slot: str | None, forward: bool) -> None:
@@ -255,6 +244,7 @@ class ExpandSectionDef:
     toggle: ExpandToggleFn
     children: tuple[SectionNode, ...] = ()
     append_dynamic_children: AppendDynamicChildrenFn | None = None
+    card: str | None = None
 
 
 TIMELINE_PANEL_ANCHOR = PanelAnchorDef(
@@ -292,52 +282,26 @@ def _render_overlays_expanded(state: TuningViewState, _slot: str | None) -> bool
     return state.render_overlays.expanded
 
 
-def _render_overlay_opening_card_expanded(
-    state: TuningViewState, _slot: str | None
+def _read_overlay_card_expanded(state: TuningViewState, card: str | None) -> bool:
+    return _overlay_card_runtime(state, card).runtime.expanded
+
+
+def _read_overlay_card_title_expanded(
+    state: TuningViewState, card: str | None
 ) -> bool:
-    return state.render_overlays.opening_card.expanded
+    return _overlay_card_runtime(state, card).runtime.title_expanded
 
 
-def _render_overlay_closing_card_expanded(
-    state: TuningViewState, _slot: str | None
+def _read_overlay_card_body_expanded(
+    state: TuningViewState, card: str | None
 ) -> bool:
-    return state.render_overlays.closing_card.expanded
+    return _overlay_card_runtime(state, card).runtime.body_expanded
 
 
-def _render_overlay_opening_title_expanded(
-    state: TuningViewState, _slot: str | None
+def _read_overlay_card_animation_expanded(
+    state: TuningViewState, card: str | None
 ) -> bool:
-    return state.render_overlays.opening_card.title_expanded
-
-
-def _render_overlay_closing_title_expanded(
-    state: TuningViewState, _slot: str | None
-) -> bool:
-    return state.render_overlays.closing_card.title_expanded
-
-
-def _render_overlay_opening_body_expanded(
-    state: TuningViewState, _slot: str | None
-) -> bool:
-    return state.render_overlays.opening_card.body_expanded
-
-
-def _render_overlay_closing_body_expanded(
-    state: TuningViewState, _slot: str | None
-) -> bool:
-    return state.render_overlays.closing_card.body_expanded
-
-
-def _render_overlay_opening_animation_expanded(
-    state: TuningViewState, _slot: str | None
-) -> bool:
-    return state.render_overlays.opening_card.animation.expanded
-
-
-def _render_overlay_closing_animation_expanded(
-    state: TuningViewState, _slot: str | None
-) -> bool:
-    return state.render_overlays.closing_card.animation.expanded
+    return _overlay_card_runtime(state, card).runtime.animation_expanded
 
 
 def _render_post_fx_expanded(state: TuningViewState, _slot: str | None) -> bool:
@@ -363,25 +327,25 @@ def _render_post_fx_chroma_boost_expanded(
 def _track_header_expanded(state: TuningViewState, slot: str | None) -> bool:
     if slot is None:
         return True
-    return state.tracks[slot].expanded
+    return state.tracks[slot].runtime.expanded
 
 
 def _track_preset_switching_expanded(state: TuningViewState, slot: str | None) -> bool:
     if slot is None:
         return True
-    return state.tracks[slot].preset_switching == "on"
+    return state.tracks[slot].runtime.preset_switching == "on"
 
 
 def _track_effects_expanded(state: TuningViewState, slot: str | None) -> bool:
     if slot is None:
         return True
-    return state.tracks[slot].effects_expanded
+    return state.tracks[slot].runtime.effects_expanded
 
 
 def _preset_list_expanded(state: TuningViewState, slot: str | None) -> bool:
     if slot is None:
         return True
-    return state.tracks[slot].preset_list_expanded
+    return state.tracks[slot].runtime.preset_list_expanded
 
 
 def _song_markers_expanded(state: TuningViewState, _slot: str | None) -> bool:
@@ -396,7 +360,7 @@ def _append_track_effect_rows(
     if slot is None:
         return
     block = state.tracks[slot]
-    for effect_def in effect_roster(block.stem):
+    for effect_def in effect_roster(block.runtime.stem):
         row_list.append(
             RowDescriptor(
                 RowKind.TRACK_EFFECT,
@@ -415,7 +379,7 @@ def _append_preset_list_rows(
     if slot is None:
         return
     block = state.tracks[slot]
-    for index, _path in enumerate(block.preset_list):
+    for index, _path in enumerate(block.runtime.preset_list):
         row_list.append(
             RowDescriptor(
                 RowKind.TRACK_PRESET_LIST_ITEM,
@@ -487,87 +451,68 @@ CURATION_LAYER_SECTION = ExpandSectionDef(
     ),
 )
 
-def _build_render_overlay_card_section(
-    *,
-    card_attr: Literal["opening_card", "closing_card"],
-    card_header: RowKind,
-    animation_header: RowKind,
-    animation_type: RowKind,
-    slide_direction: RowKind,
-    timing_kind: RowKind,
-    display_time: RowKind,
-    position: RowKind,
-    opacity: RowKind,
-    border_width: RowKind,
-    title_header: RowKind,
-    title_font: RowKind,
-    title_font_size: RowKind,
-    title_margin_bottom: RowKind,
-    body_header: RowKind,
-    body_font: RowKind,
-    body_font_size: RowKind,
-    read_card_expanded: Callable[["TuningViewState", str | None], bool],
-    toggle_card: ExpandToggleFn,
-    read_title_expanded: Callable[["TuningViewState", str | None], bool],
-    toggle_title: ExpandToggleFn,
-    read_body_expanded: Callable[["TuningViewState", str | None], bool],
-    toggle_body: ExpandToggleFn,
-    read_animation_expanded: Callable[["TuningViewState", str | None], bool],
-    toggle_animation: ExpandToggleFn,
-) -> ExpandSectionDef:
+def _build_render_overlay_card_section(card: str) -> ExpandSectionDef:
     title_section = ExpandSectionDef(
-        header_kind=title_header,
+        header_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER,
         context="global",
-        read_expanded=read_title_expanded,
-        toggle=toggle_title,
+        card=card,
+        read_expanded=_read_overlay_card_title_expanded,
+        toggle=_toggle_overlay_card_title,
         children=(
-            SectionNode(leaf_kind=title_font),
-            SectionNode(leaf_kind=title_font_size),
-            SectionNode(leaf_kind=title_margin_bottom),
+            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_FONT),
+            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE),
+            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TITLE_MARGIN_BOTTOM),
         ),
     )
     body_section = ExpandSectionDef(
-        header_kind=body_header,
+        header_kind=RowKind.RENDER_OVERLAY_CARD_BODY_HEADER,
         context="global",
-        read_expanded=read_body_expanded,
-        toggle=toggle_body,
+        card=card,
+        read_expanded=_read_overlay_card_body_expanded,
+        toggle=_toggle_overlay_card_body,
         children=(
-            SectionNode(leaf_kind=body_font),
-            SectionNode(leaf_kind=body_font_size),
+            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BODY_FONT),
+            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE),
         ),
     )
     slide_conditional = ConditionalRowsDef(
-        name=f"overlay_{card_attr}_animation_slide_direction",
+        name=f"overlay_{card}_animation_slide_direction",
         predicate=(
-            lambda state, _desc, attr=card_attr: getattr(
-                state.render_overlays, attr
-            ).animation.type
+            lambda state, _desc, card=card: getattr(
+                state.render_overlays, card
+            ).runtime.animation.type
             != "fade"
         ),
-        children=(SectionNode(leaf_kind=slide_direction),),
+        children=(
+            SectionNode(
+                leaf_kind=RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION
+            ),
+        ),
     )
     animation_section = ExpandSectionDef(
-        header_kind=animation_header,
+        header_kind=RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER,
         context="global",
-        read_expanded=read_animation_expanded,
-        toggle=toggle_animation,
+        card=card,
+        read_expanded=_read_overlay_card_animation_expanded,
+        toggle=_toggle_overlay_card_animation,
         children=(
-            SectionNode(leaf_kind=animation_type),
+            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_ANIMATION_TYPE),
             SectionNode(conditional=slide_conditional),
-            SectionNode(leaf_kind=timing_kind),
-            SectionNode(leaf_kind=display_time),
+            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_TIME),
+            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_DISPLAY_TIME),
         ),
     )
     return ExpandSectionDef(
-        header_kind=card_header,
+        header_kind=RowKind.RENDER_OVERLAY_CARD_HEADER,
         context="global",
-        read_expanded=read_card_expanded,
-        toggle=toggle_card,
+        card=card,
+        read_expanded=_read_overlay_card_expanded,
+        toggle=_toggle_overlay_card,
         children=(
             SectionNode(expand=animation_section),
-            SectionNode(leaf_kind=position),
-            SectionNode(leaf_kind=opacity),
-            SectionNode(leaf_kind=border_width),
+            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_POSITION),
+            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_OPACITY),
+            SectionNode(leaf_kind=RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH),
             SectionNode(expand=title_section),
             SectionNode(expand=body_section),
         ),
@@ -575,59 +520,10 @@ def _build_render_overlay_card_section(
 
 
 RENDER_OVERLAY_OPENING_CARD_SECTION = _build_render_overlay_card_section(
-    card_attr="opening_card",
-    card_header=RowKind.RENDER_OVERLAY_OPENING_CARD_HEADER,
-    animation_header=RowKind.RENDER_OVERLAY_OPENING_ANIMATION_HEADER,
-    animation_type=RowKind.RENDER_OVERLAY_OPENING_ANIMATION_TYPE,
-    slide_direction=RowKind.RENDER_OVERLAY_OPENING_ANIMATION_SLIDE_DIRECTION,
-    timing_kind=RowKind.RENDER_OVERLAY_OPENING_APPEAR_AT,
-    display_time=RowKind.RENDER_OVERLAY_OPENING_DISPLAY_TIME,
-    position=RowKind.RENDER_OVERLAY_OPENING_POSITION,
-    opacity=RowKind.RENDER_OVERLAY_OPENING_OPACITY,
-    border_width=RowKind.RENDER_OVERLAY_OPENING_BORDER_WIDTH,
-    title_header=RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER,
-    title_font=RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT,
-    title_font_size=RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT_SIZE,
-    title_margin_bottom=RowKind.RENDER_OVERLAY_OPENING_TITLE_MARGIN_BOTTOM,
-    body_header=RowKind.RENDER_OVERLAY_OPENING_BODY_HEADER,
-    body_font=RowKind.RENDER_OVERLAY_OPENING_BODY_FONT,
-    body_font_size=RowKind.RENDER_OVERLAY_OPENING_BODY_FONT_SIZE,
-    read_card_expanded=_render_overlay_opening_card_expanded,
-    toggle_card=_toggle_render_overlay_opening_card,
-    read_title_expanded=_render_overlay_opening_title_expanded,
-    toggle_title=_toggle_render_overlay_opening_title,
-    read_body_expanded=_render_overlay_opening_body_expanded,
-    toggle_body=_toggle_render_overlay_opening_body,
-    read_animation_expanded=_render_overlay_opening_animation_expanded,
-    toggle_animation=_toggle_render_overlay_opening_animation,
+    "opening_card"
 )
-
 RENDER_OVERLAY_CLOSING_CARD_SECTION = _build_render_overlay_card_section(
-    card_attr="closing_card",
-    card_header=RowKind.RENDER_OVERLAY_CLOSING_CARD_HEADER,
-    animation_header=RowKind.RENDER_OVERLAY_CLOSING_ANIMATION_HEADER,
-    animation_type=RowKind.RENDER_OVERLAY_CLOSING_ANIMATION_TYPE,
-    slide_direction=RowKind.RENDER_OVERLAY_CLOSING_ANIMATION_SLIDE_DIRECTION,
-    timing_kind=RowKind.RENDER_OVERLAY_CLOSING_DISAPPEAR_AT,
-    display_time=RowKind.RENDER_OVERLAY_CLOSING_DISPLAY_TIME,
-    position=RowKind.RENDER_OVERLAY_CLOSING_POSITION,
-    opacity=RowKind.RENDER_OVERLAY_CLOSING_OPACITY,
-    border_width=RowKind.RENDER_OVERLAY_CLOSING_BORDER_WIDTH,
-    title_header=RowKind.RENDER_OVERLAY_CLOSING_TITLE_HEADER,
-    title_font=RowKind.RENDER_OVERLAY_CLOSING_TITLE_FONT,
-    title_font_size=RowKind.RENDER_OVERLAY_CLOSING_TITLE_FONT_SIZE,
-    title_margin_bottom=RowKind.RENDER_OVERLAY_CLOSING_TITLE_MARGIN_BOTTOM,
-    body_header=RowKind.RENDER_OVERLAY_CLOSING_BODY_HEADER,
-    body_font=RowKind.RENDER_OVERLAY_CLOSING_BODY_FONT,
-    body_font_size=RowKind.RENDER_OVERLAY_CLOSING_BODY_FONT_SIZE,
-    read_card_expanded=_render_overlay_closing_card_expanded,
-    toggle_card=_toggle_render_overlay_closing_card,
-    read_title_expanded=_render_overlay_closing_title_expanded,
-    toggle_title=_toggle_render_overlay_closing_title,
-    read_body_expanded=_render_overlay_closing_body_expanded,
-    toggle_body=_toggle_render_overlay_closing_body,
-    read_animation_expanded=_render_overlay_closing_animation_expanded,
-    toggle_animation=_toggle_render_overlay_closing_animation,
+    "closing_card"
 )
 
 RENDER_OVERLAYS_SECTION = ExpandSectionDef(
@@ -726,7 +622,7 @@ def _preset_switching_projectm_trigger(
 ) -> bool:
     if desc.slot is None:
         return False
-    return state.tracks[desc.slot].preset_switching_trigger == "projectm"
+    return state.tracks[desc.slot].runtime.preset_switching_trigger == "projectm"
 
 
 def _preset_switching_uses_duration(
@@ -734,13 +630,13 @@ def _preset_switching_uses_duration(
 ) -> bool:
     if desc.slot is None:
         return False
-    return state.tracks[desc.slot].preset_switching_trigger != "timeline"
+    return state.tracks[desc.slot].runtime.preset_switching_trigger != "timeline"
 
 
 def _hard_cut_enabled(state: TuningViewState, desc: RowDescriptor) -> bool:
     if desc.slot is None:
         return False
-    return state.tracks[desc.slot].hard_cut_enabled
+    return state.tracks[desc.slot].runtime.hard_cut_enabled
 
 
 HARD_CUT_ENABLED = ConditionalRowsDef(
@@ -1013,11 +909,13 @@ def apply_expand_toggle(
     header_kind: RowKind,
     slot: str | None,
     forward: bool,
+    card: str | None = None,
 ) -> bool:
     section = EXPAND_SECTION_BY_HEADER.get(header_kind)
     if section is None:
         return False
-    section.toggle(controls, slot, forward)
+    instance_key = card if card is not None else slot
+    section.toggle(controls, instance_key, forward)
     return True
 
 
@@ -1040,10 +938,14 @@ def expand_arrow_for_header(
     state: TuningViewState,
     kind: RowKind,
     slot: str | None = None,
+    card: str | None = None,
 ) -> str:
     section = EXPAND_SECTION_BY_HEADER[kind]
-    section_slot = slot if section.context == "per_slot" else None
-    return expand_arrow_glyph(expand_section_expanded(state, section, section_slot))
+    if section.card is not None:
+        instance_key = card
+    else:
+        instance_key = slot if section.context == "per_slot" else None
+    return expand_arrow_glyph(expand_section_expanded(state, section, instance_key))
 
 
 def leaf_kinds_in_expand_section(section: ExpandSectionDef) -> frozenset[RowKind]:
@@ -1207,8 +1109,11 @@ def row_tree_indent_depth(kind: RowKind) -> int:
 def _expand_path_to_kind(
     section: ExpandSectionDef,
     kind: RowKind,
+    card: str | None = None,
 ) -> list[ExpandSectionDef] | None:
     """Expand sections from *section* (inclusive) down to the owner of *kind*."""
+    if section.card is not None and card is not None and section.card != card:
+        return None
     if kind == section.header_kind:
         return [section]
     for child in section.children:
@@ -1220,8 +1125,14 @@ def _expand_path_to_kind(
             return [section]
         if child.expand is not None:
             if child.expand.header_kind == kind:
+                if (
+                    child.expand.card is not None
+                    and card is not None
+                    and child.expand.card != card
+                ):
+                    continue
                 return [section]
-            nested = _expand_path_to_kind(child.expand, kind)
+            nested = _expand_path_to_kind(child.expand, kind, card)
             if nested is not None:
                 return [section, *nested]
     return None
@@ -1234,15 +1145,22 @@ def expand_section_sub_row_visible(
 ) -> bool | None:
     kind = desc.kind
     if kind == section.header_kind:
+        if (
+            section.card is not None
+            and desc.card is not None
+            and section.card != desc.card
+        ):
+            return None
         return True
     slot = desc.slot if section.context == "per_slot" else None
     if kind not in leaf_kinds_in_expand_section(section):
         return None
-    path = _expand_path_to_kind(section, kind)
+    path = _expand_path_to_kind(section, kind, card=desc.card)
     if path is None:
         return None
     for ancestor in path:
-        if not expand_section_expanded(state, ancestor, slot):
+        key = ancestor.card if ancestor.card is not None else slot
+        if not expand_section_expanded(state, ancestor, key):
             return False
     return True
 
@@ -1265,17 +1183,29 @@ def _append_section_nodes(
     state: TuningViewState,
     slot: str | None,
     section_slot: str | None,
+    section_card: str | None,
 ) -> None:
-    probe = RowDescriptor(RowKind.TRACK_HEADER, slot=section_slot)
+    probe = RowDescriptor(
+        RowKind.TRACK_HEADER, slot=section_slot, card=section_card
+    )
     for child in nodes:
         if child.leaf_kind is not None:
-            row_list.append(RowDescriptor(child.leaf_kind, slot=section_slot))
+            row_list.append(
+                RowDescriptor(
+                    child.leaf_kind, slot=section_slot, card=section_card
+                )
+            )
         elif child.expand is not None:
             append_expand_section_rows(row_list, child.expand, state, slot)
         elif child.conditional is not None:
             if child.conditional.predicate(state, probe):
                 _append_section_nodes(
-                    row_list, child.conditional.children, state, slot, section_slot
+                    row_list,
+                    child.conditional.children,
+                    state,
+                    slot,
+                    section_slot,
+                    section_card,
                 )
         elif child.panel_anchor is not None:
             row_list.append(RowDescriptor(child.panel_anchor.header_kind))
@@ -1288,10 +1218,16 @@ def append_expand_section_rows(
     slot: str | None = None,
 ) -> None:
     section_slot = slot if section.context == "per_slot" else None
-    row_list.append(RowDescriptor(section.header_kind, slot=section_slot))
-    if not expand_section_expanded(state, section, slot):
+    section_card = section.card
+    row_list.append(
+        RowDescriptor(section.header_kind, slot=section_slot, card=section_card)
+    )
+    instance_key = section_card if section_card is not None else slot
+    if not expand_section_expanded(state, section, instance_key):
         return
-    _append_section_nodes(row_list, section.children, state, slot, section_slot)
+    _append_section_nodes(
+        row_list, section.children, state, slot, section_slot, section_card
+    )
     if section.append_dynamic_children is not None:
         section.append_dynamic_children(row_list, state, slot)
 
@@ -1333,6 +1269,14 @@ _PER_SLOT_SECTION_HEADERS = frozenset(
         RowKind.TRACK_HEADER,
         RowKind.TRACK_PRESET_SWITCHING,
         RowKind.TRACK_EFFECTS_HEADER,
+    }
+)
+_PER_CARD_SECTION_HEADERS = frozenset(
+    {
+        RowKind.RENDER_OVERLAY_CARD_HEADER,
+        RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER,
+        RowKind.RENDER_OVERLAY_CARD_BODY_HEADER,
+        RowKind.RENDER_OVERLAY_CARD_ANIMATION_HEADER,
     }
 )
 
@@ -1388,4 +1332,6 @@ def section_header_from_section_tree(desc: RowDescriptor) -> RowDescriptor | Non
         return None
     if parent_kind in _PER_SLOT_SECTION_HEADERS:
         return RowDescriptor(parent_kind, slot=desc.slot)
+    if parent_kind in _PER_CARD_SECTION_HEADERS:
+        return RowDescriptor(parent_kind, card=desc.card)
     return RowDescriptor(parent_kind)

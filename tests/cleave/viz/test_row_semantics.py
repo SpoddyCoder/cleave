@@ -47,30 +47,18 @@ _EXPECTED_REPEAT_ROW_KINDS = frozenset(
         RowKind.TRACK_OPACITY,
         RowKind.TRACK_BEAT,
         RowKind.TRACK_EFFECT,
-        RowKind.RENDER_OVERLAY_OPENING_POSITION,
-        RowKind.RENDER_OVERLAY_OPENING_ANIMATION_TYPE,
-        RowKind.RENDER_OVERLAY_OPENING_ANIMATION_SLIDE_DIRECTION,
-        RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT_SIZE,
-        RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT,
-        RowKind.RENDER_OVERLAY_OPENING_TITLE_MARGIN_BOTTOM,
-        RowKind.RENDER_OVERLAY_OPENING_BODY_FONT_SIZE,
-        RowKind.RENDER_OVERLAY_OPENING_BODY_FONT,
-        RowKind.RENDER_OVERLAY_OPENING_OPACITY,
-        RowKind.RENDER_OVERLAY_OPENING_BORDER_WIDTH,
-        RowKind.RENDER_OVERLAY_OPENING_APPEAR_AT,
-        RowKind.RENDER_OVERLAY_OPENING_DISPLAY_TIME,
-        RowKind.RENDER_OVERLAY_CLOSING_POSITION,
-        RowKind.RENDER_OVERLAY_CLOSING_ANIMATION_TYPE,
-        RowKind.RENDER_OVERLAY_CLOSING_ANIMATION_SLIDE_DIRECTION,
-        RowKind.RENDER_OVERLAY_CLOSING_TITLE_FONT_SIZE,
-        RowKind.RENDER_OVERLAY_CLOSING_TITLE_FONT,
-        RowKind.RENDER_OVERLAY_CLOSING_TITLE_MARGIN_BOTTOM,
-        RowKind.RENDER_OVERLAY_CLOSING_BODY_FONT_SIZE,
-        RowKind.RENDER_OVERLAY_CLOSING_BODY_FONT,
-        RowKind.RENDER_OVERLAY_CLOSING_OPACITY,
-        RowKind.RENDER_OVERLAY_CLOSING_BORDER_WIDTH,
-        RowKind.RENDER_OVERLAY_CLOSING_DISAPPEAR_AT,
-        RowKind.RENDER_OVERLAY_CLOSING_DISPLAY_TIME,
+        RowKind.RENDER_OVERLAY_CARD_POSITION,
+        RowKind.RENDER_OVERLAY_CARD_ANIMATION_TYPE,
+        RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION,
+        RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_CARD_TITLE_FONT,
+        RowKind.RENDER_OVERLAY_CARD_TITLE_MARGIN_BOTTOM,
+        RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_CARD_BODY_FONT,
+        RowKind.RENDER_OVERLAY_CARD_OPACITY,
+        RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH,
+        RowKind.RENDER_OVERLAY_CARD_TIME,
+        RowKind.RENDER_OVERLAY_CARD_DISPLAY_TIME,
         RowKind.RENDER_POST_FX_FADE_IN,
         RowKind.RENDER_POST_FX_FADE_OUT,
         RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE,
@@ -155,8 +143,8 @@ def test_repeat_row_kinds() -> None:
 
 
 def test_render_overlay_sub_headers_expand() -> None:
-    title = row_behavior(RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER)
-    body = row_behavior(RowKind.RENDER_OVERLAY_OPENING_BODY_HEADER)
+    title = row_behavior(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER)
+    body = row_behavior(RowKind.RENDER_OVERLAY_CARD_BODY_HEADER)
     assert title.affordance == RowAffordance.EXPAND
     assert title.is_sub_header is True
     assert body.affordance == RowAffordance.EXPAND
@@ -176,14 +164,14 @@ def test_expandable_row_kinds() -> None:
 
 def test_parent_group_on_row_behaviors() -> None:
     assert row_behavior(RowKind.TRACK_STEM).parent_group == "track"
-    assert row_behavior(RowKind.RENDER_OVERLAY_OPENING_POSITION).parent_group == (
-        "render_overlay_opening"
+    assert row_behavior(RowKind.RENDER_OVERLAY_CARD_POSITION).parent_group == (
+        "render_overlay"
     )
-    assert row_behavior(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT).parent_group == (
-        "render_overlay_opening_title"
+    assert row_behavior(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT).parent_group == (
+        "render_overlay_title"
     )
-    assert row_behavior(RowKind.RENDER_OVERLAY_OPENING_BODY_FONT).parent_group == (
-        "render_overlay_opening_body"
+    assert row_behavior(RowKind.RENDER_OVERLAY_CARD_BODY_FONT).parent_group == (
+        "render_overlay_body"
     )
     assert row_behavior(RowKind.RENDER_POST_FX_FADE_IN).parent_group == "render_post_fx"
     assert row_behavior(RowKind.SETTINGS_PREVIEW_QUALITY).parent_group == "settings"
@@ -312,8 +300,8 @@ def _render_lock_state(
 
 
 def test_render_value_children_blocked_by_section_lock() -> None:
-    assert row_blocked_by_section_lock(RowKind.RENDER_OVERLAY_OPENING_POSITION) is True
-    assert row_blocked_by_section_lock(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT) is True
+    assert row_blocked_by_section_lock(RowKind.RENDER_OVERLAY_CARD_POSITION) is True
+    assert row_blocked_by_section_lock(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT) is True
     assert row_blocked_by_section_lock(RowKind.RENDER_POST_FX_FADE_IN) is True
     assert row_blocked_by_section_lock(RowKind.RENDER_POST_FX_CHROMA_BOOST_AMOUNT) is True
     assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESETS) is True
@@ -341,14 +329,14 @@ def test_render_headers_navigable_when_section_locked() -> None:
         RowKind.RENDER_OVERLAYS_HEADER,
         RowKind.RENDER_POST_FX_HEADER,
         RowKind.RENDER_TIMELINE_HEADER,
-        RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER,
+        RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER,
         RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER,
         RowKind.SONG_MARKERS_HEADER,
         RowKind.TIMELINE_SNAP_CUES_HEADER,
         RowKind.TIMELINE_PRESETS_HEADER,
     ):
         assert row_navigable_when_section_locked(kind) is True
-    assert row_navigable_when_section_locked(RowKind.RENDER_OVERLAY_OPENING_POSITION) is False
+    assert row_navigable_when_section_locked(RowKind.RENDER_OVERLAY_CARD_POSITION) is False
     assert row_navigable_when_section_locked(RowKind.TIMELINE_PRESETS) is False
     assert row_navigable_when_section_locked(RowKind.TIMELINE_PRESET_CHARACTER) is False
     assert row_navigable_when_section_locked(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS) is False
@@ -356,7 +344,7 @@ def test_render_headers_navigable_when_section_locked() -> None:
 
 
 def test_section_locked_resolves_render_sections() -> None:
-    overlay_desc = RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_POSITION)
+    overlay_desc = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_POSITION)
     post_fx_desc = RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN)
     timeline_desc = RowDescriptor(RowKind.TIMELINE_PRESETS)
     from cleave.viz.row_semantics import section_locked
@@ -393,7 +381,7 @@ def test_section_locked_ignored_in_preset_curation() -> None:
         is False
     )
     assert (
-        section_locked(state, RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_POSITION)) is False
+        section_locked(state, RowDescriptor(RowKind.RENDER_OVERLAY_CARD_POSITION)) is False
     )
 
 

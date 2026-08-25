@@ -18,6 +18,9 @@ from cleave.config import (
 from cleave.config_schema import (
     DEFAULT_BEAT_SENSITIVITY,
     DEFAULT_BLEND_MODE,
+    DEFAULT_LAYER_ENABLED,
+    DEFAULT_LAYER_LOCKED,
+    DEFAULT_LAYER_OPACITY,
     DEFAULT_NEW_LAYER_STEM,
     DEFAULT_PRESET_SWITCHING,
     DEFAULT_PRESET_SWITCHING_TRIGGER,
@@ -381,14 +384,14 @@ class LayerRuntime:
     playlist: PresetPlaylist
     browse_floor: Path
     stem: StemSource
-    opacity_pct: int = 100
+    opacity_pct: int = int(round(DEFAULT_LAYER_OPACITY * 100))
     effects: dict[str, dict[str, int]] = field(default_factory=dict)
     effects_expanded: bool = False
     blend_mode: BlendMode = "black-key"
     beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
-    enabled: bool = True
+    enabled: bool = DEFAULT_LAYER_ENABLED
     expanded: bool = False
-    locked: bool = False
+    locked: bool = DEFAULT_LAYER_LOCKED
     preset_switching: PresetSwitchingMode = DEFAULT_PRESET_SWITCHING
     preset_switching_trigger: PresetSwitchingTrigger = DEFAULT_PRESET_SWITCHING_TRIGGER
     preset_duration: float = DEFAULT_PRESET_DURATION
