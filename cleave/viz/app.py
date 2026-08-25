@@ -155,7 +155,7 @@ def _compositor_color_format(seed: VisualizerSeed) -> GlColorFormat:
 
     return resolve_live_compositor_format(
         render_hdr_compositing(seed.cfg),
-        preset_curation=is_preset_curation_mode(seed.session),
+        preset_curation=is_preset_curation_mode(seed.session.settings.editor_mode),
     )
 
 

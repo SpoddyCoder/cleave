@@ -9,7 +9,7 @@ from pathlib import Path
 import pygame
 
 from cleave.config import CleaveConfig, LayerConfig, PathsConfig, EditorConfig
-from cleave.config_schema import DEFAULT_LAYER_SLOTS
+from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.controls import TuningControls

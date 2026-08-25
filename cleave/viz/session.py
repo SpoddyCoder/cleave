@@ -15,8 +15,8 @@ from cleave.config import (
     TimelineLimiterConfig,
     VIZ_CONFIG_FILENAME,
 )
-from cleave.config_schema import (
-    DEFAULT_BEAT_SENSITIVITY,
+from cleave.config_schema.editor import DEFAULT_BEAT_SENSITIVITY
+from cleave.config_schema.layers import (
     DEFAULT_BLEND_MODE,
     DEFAULT_LAYER_ENABLED,
     DEFAULT_LAYER_LOCKED,
@@ -31,29 +31,33 @@ from cleave.config_schema import (
     DEFAULT_HARD_CUT_ENABLED,
     DEFAULT_EASTER_EGG,
     DEFAULT_PRESET_START_CLEAN,
-    DEFAULT_TIMELINE_FADES_ENABLED,
-    DEFAULT_TIMELINE_FADE_IN,
-    DEFAULT_TIMELINE_FADE_OUT,
-    DEFAULT_TIMELINE_CROSSFADE,
-    DEFAULT_TIMELINE_PLACEMENT_SNAP,
-    DEFAULT_VISUAL_LIMITER_ENABLED,
-    DEFAULT_VISUAL_LIMITER_THRESHOLD,
-    DEFAULT_VISUAL_LIMITER_RATIO,
-    DEFAULT_VISUAL_LIMITER_RELEASE,
-    HighlightRolloffApplyMode,
-    HighlightRolloffCurve,
     PresetSwitchingMode,
     PresetSwitchingTrigger,
-    TimelinePlacementSnap,
-    default_render_overlay_animation_runtime_values,
-    default_render_overlay_closing_animation_runtime_values,
-    default_render_overlay_card_runtime_values,
-    default_render_overlays_runtime_values,
-    default_highlight_rolloff_runtime_values,
-    default_chroma_boost_runtime_values,
-    default_render_post_fx_runtime_values,
-    default_render_pattern_mask_runtime_values,
+)
+from cleave.config_schema.render import (
+    HighlightRolloffApplyMode,
+    HighlightRolloffCurve,
     PatternMaskType,
+    default_chroma_boost_runtime_values,
+    default_highlight_rolloff_runtime_values,
+    default_render_overlay_animation_runtime_values,
+    default_render_overlay_card_runtime_values,
+    default_render_overlay_closing_animation_runtime_values,
+    default_render_overlays_runtime_values,
+    default_render_pattern_mask_runtime_values,
+    default_render_post_fx_runtime_values,
+)
+from cleave.config_schema.timeline import (
+    DEFAULT_TIMELINE_CROSSFADE,
+    DEFAULT_TIMELINE_FADE_IN,
+    DEFAULT_TIMELINE_FADE_OUT,
+    DEFAULT_TIMELINE_FADES_ENABLED,
+    DEFAULT_TIMELINE_PLACEMENT_SNAP,
+    DEFAULT_VISUAL_LIMITER_ENABLED,
+    DEFAULT_VISUAL_LIMITER_RATIO,
+    DEFAULT_VISUAL_LIMITER_RELEASE,
+    DEFAULT_VISUAL_LIMITER_THRESHOLD,
+    TimelinePlacementSnap,
 )
 from cleave.extract import StemSource
 from cleave.preset_playlist import PresetPlaylist, preset_browse_floor

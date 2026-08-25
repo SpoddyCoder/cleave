@@ -74,12 +74,12 @@ def apply_effect_modifiers(
     *,
     update: bool = True,
 ) -> None:
-    if is_preset_curation_mode(session):
+    if is_preset_curation_mode(session.settings.editor_mode):
         _apply_curation_layer_modifiers(layers_by_slot)
         return
     if update:
-        effect_runtime.update(session, signals, t_sec)
-    modifiers = effect_runtime.modifiers(session)
+        effect_runtime.update(session.layers, signals, t_sec)
+    modifiers = effect_runtime.modifiers(session.layers)
     for slot, layer in layers_by_slot.items():
         if not layer.fbo.enabled:
             continue
@@ -101,7 +101,7 @@ def _pattern_mask_live_slots(
 ) -> dict[str, bool] | None:
     if masked_compositor is None:
         return None
-    if not render_sections_active(session):
+    if not render_sections_active(session.settings.editor_mode):
         return None
     pm = session.render_pattern_mask
     if not pm.enabled:
@@ -420,7 +420,7 @@ class LayerFramePipeline:
     ) -> None:
         notify = (
             on_panel_notification
-            if projectm_notifications_active(session)
+            if projectm_notifications_active(session.settings.editor_mode)
             else None
         )
         drain_stem_layers_preset_failures(
@@ -461,7 +461,7 @@ class LayerFramePipeline:
         )
 
         pp = session.render_post_fx
-        sections_on = render_sections_active(session)
+        sections_on = render_sections_active(session.settings.editor_mode)
         hr = pp.highlight_rolloff
         cb = pp.chroma_boost
         per_layer_rolloff = (
@@ -536,7 +536,7 @@ class LayerFramePipeline:
         )
         pm = session.render_pattern_mask
         use_mask = (
-            render_sections_active(session)
+            render_sections_active(session.settings.editor_mode)
             and pm.enabled
             and masked_compositor is not None
         )

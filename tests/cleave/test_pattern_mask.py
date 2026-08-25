@@ -15,7 +15,10 @@ from cleave.config import (
     RenderConfig,
     RenderPatternMaskConfig,
 )
-from cleave.config_schema import (
+from cleave.config_schema.descriptors import (
+    PersistCtx,
+)
+from cleave.config_schema.render import (
     DEFAULT_RENDER_PATTERN_MASK_DENSITY,
     DEFAULT_RENDER_PATTERN_MASK_ENABLED,
     DEFAULT_RENDER_PATTERN_MASK_INVERT,
@@ -24,7 +27,6 @@ from cleave.config_schema import (
     DEFAULT_RENDER_PATTERN_MASK_TRANSITION,
     DEFAULT_RENDER_PATTERN_MASK_TYPE,
     PATTERN_MASK_TYPES,
-    PersistCtx,
     parse_render_section,
     persist_render,
 )

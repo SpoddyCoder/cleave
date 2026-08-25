@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from cleave.config_schema import DEFAULT_LAYER_SLOTS
+from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from cleave.cue_roles import CueRole
 from cleave.preset_playlist import PresetPlaylist
 from cleave.timeline import SlotCue, TimelineLane, empty_lane
@@ -23,6 +23,7 @@ from cleave.viz.visual_limiter import (
     GRID_HEIGHT,
     GRID_WIDTH,
     HotLayerRef,
+    LimiterFrameState,
     VisualLimiterParams,
     VisualLimiterState,
     apply_visual_limiter_gains,
@@ -287,7 +288,7 @@ def test_collect_hot_layers_uses_role_and_level() -> None:
         "layer_3": _stem("layer_3", timeline_level=0.0),
         "layer_4": _stem("layer_4", timeline_level=0.0),
     }
-    hot = collect_hot_layers(session, layers, 1.0)
+    hot = collect_hot_layers(LimiterFrameState.from_session(session), layers, 1.0)
     assert [h.slot for h in hot] == ["layer_1", "layer_2"]
 
 
@@ -321,9 +322,9 @@ def test_apply_effect_modifiers_includes_limiter_gain() -> None:
 
 def test_visual_limiter_inactive_when_disabled() -> None:
     session = _session(timeline_enabled=True)
-    assert visual_limiter_active(session) is True
+    assert visual_limiter_active(LimiterFrameState.from_session(session)) is True
     session.timeline.limiter.enabled = False
-    assert visual_limiter_active(session) is False
+    assert visual_limiter_active(LimiterFrameState.from_session(session)) is False
 
 
 def test_apply_visual_limiter_gains_resets_when_disabled() -> None:

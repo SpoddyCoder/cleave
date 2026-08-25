@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from cleave.config import CleaveConfig
-from cleave.config_schema import (
+from cleave.config_schema.editor import (
     UI_WIDTH_MODES,
     EDITOR_PREVIEW_QUALITIES,
     clamp_residual_latency_ms,

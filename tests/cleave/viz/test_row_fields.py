@@ -6,7 +6,7 @@ import inspect
 
 import pygame
 
-from cleave.config_schema import ui_fade_display
+from cleave.config_schema.editor import ui_fade_display
 from cleave.viz.row_fields import (
     ROW_FIELDS,
     RowPresentStyle,

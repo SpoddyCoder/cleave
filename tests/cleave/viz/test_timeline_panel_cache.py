@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pygame
 
-from cleave.config_schema import MAX_LAYER_COUNT
+from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.timeline import SlotCue, TimelineLane, canonicalize
 from cleave.viz.overlay_upload import upload_plan_for_signature
 from cleave.viz.timeline_overlay import TimelineOverlay, TimelineViewState, timeline_live_signature

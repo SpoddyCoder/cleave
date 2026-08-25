@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from cleave.effects.handlers import handler_for
 from cleave.effects.registry import effect_roster
+from cleave.effects.state import LayerEffectState
 from cleave.signals import Signals
-from cleave.viz.session import TuningSession
 
 
 @dataclass
@@ -33,11 +34,16 @@ class EffectRuntime:
             self._states[key] = handler_for(effect_id).state_factory()
         return self._states[key]
 
-    def update(self, session: TuningSession, signals: Signals | None, t_sec: float) -> None:
+    def update(
+        self,
+        layers: Mapping[str, LayerEffectState],
+        signals: Signals | None,
+        t_sec: float,
+    ) -> None:
         """Advance envelope state from signals (call once per frame)."""
         if signals is None:
             return
-        for slot, layer in session.layers.items():
+        for slot, layer in layers.items():
             for row in effect_roster(layer.stem):
                 pct = layer.effects.get(row.effect_id, {}).get(row.driver_slug, 0)
                 if pct <= 0:
@@ -46,9 +52,11 @@ class EffectRuntime:
                 state = self._state(slot, row.effect_id, row.driver_slug)
                 handler.update(state, signals, row, t_sec)
 
-    def modifiers(self, session: TuningSession) -> dict[str, LayerModifiers]:
+    def modifiers(
+        self, layers: Mapping[str, LayerEffectState]
+    ) -> dict[str, LayerModifiers]:
         out: dict[str, LayerModifiers] = {}
-        for slot, layer in session.layers.items():
+        for slot, layer in layers.items():
             mod = LayerModifiers(opacity=layer.opacity_pct / 100.0)
             for row in effect_roster(layer.stem):
                 pct = layer.effects.get(row.effect_id, {}).get(row.driver_slug, 0)
@@ -62,9 +70,9 @@ class EffectRuntime:
 
     def tick(
         self,
-        session: TuningSession,
+        layers: Mapping[str, LayerEffectState],
         signals: Signals | None,
         t_sec: float,
     ) -> dict[str, LayerModifiers]:
-        self.update(session, signals, t_sec)
-        return self.modifiers(session)
+        self.update(layers, signals, t_sec)
+        return self.modifiers(layers)

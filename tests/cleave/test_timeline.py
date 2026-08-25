@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from cleave.config_schema import DEFAULT_LAYER_SLOTS
+from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from cleave.easing import smoothstep
 from cleave.timeline import (
     LEVEL_EPS,

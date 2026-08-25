@@ -360,7 +360,7 @@ class TuningControls:
         if self.handle_modal_keydown(event):
             return True
 
-        if is_preset_curation_mode(self.session):
+        if is_preset_curation_mode(self.session.settings.editor_mode):
             return self._handle_curation_keydown(event)
 
         if self._tap_sync.active:
@@ -828,7 +828,7 @@ class TuningControls:
             return
         sync_live_compositor_format(
             self.cfg,
-            self.session,
+            self.session.settings.editor_mode,
             self._compositor,
             self._post_process,
             masked_compositor=self._masked_compositor,
@@ -842,7 +842,7 @@ class TuningControls:
             if not timeline_strip_in_ring(view):
                 fallback_kind = (
                     RowKind.TRANSPORT
-                    if is_preset_curation_mode(self.session)
+                    if is_preset_curation_mode(self.session.settings.editor_mode)
                     else RowKind.RENDER_TIMELINE_HEADER
                 )
                 self._apply_focus_cursor(MainFocus(RowDescriptor(fallback_kind)))

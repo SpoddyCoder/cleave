@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pygame
 
-from cleave.config_schema import persisted_session_payload
+from cleave.config_schema.persist import persisted_session_payload
 from cleave.viz.focus_nav import MainFocus
 from cleave.viz.modal import ModalKind
 from cleave.viz.row_semantics import RowDescriptor, RowKind

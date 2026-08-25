@@ -6,13 +6,15 @@ from pathlib import Path
 
 from cleave.config import ChromaBoostConfig, HighlightRolloffConfig, LayerConfig, RenderPostFxConfig, VIZ_CONFIG_FILENAME, dump_yaml
 from cleave.user_config import EditorSettings
-from cleave.config_schema import (
+from cleave.config_schema.editor import template_project_editor_section
+from cleave.config_schema.layers import (
     DEFAULT_LAYER_SLOTS,
     DEFAULT_LAYER_Z_ORDER,
+    template_layer_entry,
+)
+from cleave.config_schema.render import (
     default_chroma_boost_runtime_values,
     default_highlight_rolloff_runtime_values,
-    template_layer_entry,
-    template_project_editor_section,
 )
 from cleave.extract import STEM_NAMES, StemSource
 from cleave.paths import repo_root

@@ -6,7 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from cleave.config import CleaveConfig, VIZ_CONFIG_FILENAME
-from cleave.config_schema import (
+from cleave.config_schema.layers import (
     MAX_LAYER_COUNT,
     MIN_LAYER_COUNT,
     next_layer_slot,
@@ -177,13 +177,13 @@ def make_tuning_controls(
     masked_compositor: GlMaskedCompositor | None = None,
 ) -> TuningControls:
     def _effective_preset_switching(slot: str) -> str:
-        if not preset_switching_active(session):
+        if not preset_switching_active(session.settings.editor_mode):
             return "off"
         return session.layers[slot].preset_switching
 
     def _empty_list_notify() -> Callable[[], None]:
         def on_empty() -> None:
-            if not preset_switching_active(session):
+            if not preset_switching_active(session.settings.editor_mode):
                 return
             notify = notification_sink.get("fn")
             if notify is not None:

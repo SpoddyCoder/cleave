@@ -42,29 +42,34 @@ from cleave.config import (
     _parse_layers,
 )
 from tests.support.config import default_highlight_rolloff_config, default_render_post_fx_config
-from cleave.config_schema import (
-    DEFAULT_HDR_COMPOSITING,
-    DEFAULT_LAYER_SLOTS,
-    DEFAULT_RENDER_HEIGHT,
-    DEFAULT_RENDER_WIDTH,
+from cleave.config_schema.descriptors import (
+    ParseCtx,
+    PersistCtx,
+    parse_hex_colour,
+)
+from cleave.config_schema.editor import (
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
     DEFAULT_EDITOR_PREVIEW_QUALITY,
-    MAX_LAYER_COUNT,
-    ParseCtx,
-    PersistCtx,
-    next_layer_slot,
-    parse_hex_colour,
-    parse_render_section,
-    parse_timeline_section,
     parse_project_editor_section,
-    persist_render,
-    persist_timeline,
     persist_project_editor_section,
-    template_layer_entry,
     template_project_editor_section,
 )
+from cleave.config_schema.layers import (
+    DEFAULT_LAYER_SLOTS,
+    MAX_LAYER_COUNT,
+    next_layer_slot,
+    template_layer_entry,
+)
+from cleave.config_schema.render import (
+    DEFAULT_HDR_COMPOSITING,
+    DEFAULT_RENDER_HEIGHT,
+    DEFAULT_RENDER_WIDTH,
+    parse_render_section,
+    persist_render,
+)
+from cleave.config_schema.timeline import parse_timeline_section, persist_timeline
 from cleave.user_config import EditorSettings
 from cleave.viz.session import TuningSession
 from cleave.paths import repo_root

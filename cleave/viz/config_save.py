@@ -10,7 +10,7 @@ from pathlib import Path
 import pygame
 
 from cleave.config import VIZ_CONFIG_FILENAME, CleaveConfig
-from cleave.config_schema import persisted_session_payload
+from cleave.config_schema.persist import persisted_session_payload
 from cleave.project import save_song_markers
 from cleave.viz.modal import ModalHost, ModalKind
 from cleave.viz.session import TuningSession, allow_overwrite_for_path

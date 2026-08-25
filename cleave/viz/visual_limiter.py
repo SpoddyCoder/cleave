@@ -10,12 +10,13 @@ compensated envelope follower with ratio-based gain reduction, and multiplies
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import numpy as np
 
-from cleave.config_schema import (
+from cleave.config_schema.timeline import (
     DEFAULT_VISUAL_LIMITER_RATIO,
     DEFAULT_VISUAL_LIMITER_RELEASE,
     DEFAULT_VISUAL_LIMITER_THRESHOLD,
@@ -30,7 +31,7 @@ if TYPE_CHECKING:
     from cleave.gl_post_process import GlPostProcess
     from cleave.viz.app import VisualizerCore
     from cleave.viz.layer import StemLayer
-    from cleave.viz.session import TuningSession, VisualLimiterRuntime
+    from cleave.viz.session import TimelineRuntime, TuningSession, VisualLimiterRuntime
 
 # Busyness = mean_luma + DELTA_WEIGHT * mean_abs_delta (both in [0, 1]).
 DEFAULT_THRESHOLD = DEFAULT_VISUAL_LIMITER_THRESHOLD
@@ -52,6 +53,23 @@ _ROLE_RANK: dict[CueRole, int] = {
 }
 _DEFAULT_ROLE_RANK = _ROLE_RANK["pulse"]
 _PRIORITY_WEIGHT_BY_RANK: tuple[float, ...] = (1.0, 0.7, 0.4, 0.15)
+
+
+@dataclass(frozen=True)
+class LimiterFrameState:
+    timeline: TimelineRuntime
+    solo_slot: str | None
+    editor_mode: str
+    layer_z_order: Sequence[str]
+
+    @classmethod
+    def from_session(cls, session: TuningSession) -> LimiterFrameState:
+        return cls(
+            timeline=session.timeline,
+            solo_slot=session.solo_slot,
+            editor_mode=session.settings.editor_mode,
+            layer_z_order=session.layer_z_order,
+        )
 
 
 @dataclass(frozen=True)
@@ -104,13 +122,13 @@ class VisualLimiterState:
             layer.limiter_gain = 1.0
 
 
-def visual_limiter_active(session: TuningSession) -> bool:
+def visual_limiter_active(frame: LimiterFrameState) -> bool:
     """True when the limiter may duck layers (timeline levels driving opacity)."""
-    if is_preset_curation_mode(session):
+    if is_preset_curation_mode(frame.editor_mode):
         return False
-    if session.solo_slot is not None:
+    if frame.solo_slot is not None:
         return False
-    tl = session.timeline
+    tl = frame.timeline
     if not tl.enabled:
         return False
     if not tl.limiter.enabled:
@@ -183,18 +201,18 @@ def distribute_gain(
 
 
 def collect_hot_layers(
-    session: TuningSession,
+    frame: LimiterFrameState,
     layers_by_slot: dict[str, StemLayer],
     t_sec: float,
 ) -> list[HotLayerRef]:
     hot: list[HotLayerRef] = []
-    for z_index, slot in enumerate(session.layer_z_order):
-        if not timeline_levels_apply(session, slot):
+    for z_index, slot in enumerate(frame.layer_z_order):
+        if not timeline_levels_apply(frame, slot):
             continue
         layer = layers_by_slot.get(slot)
         if layer is None or layer.timeline_level <= LEVEL_EPS:
             continue
-        lane = session.timeline.lanes.get(slot) or empty_lane()
+        lane = frame.timeline.lanes.get(slot) or empty_lane()
         role = lane_role_at(lane, t_sec)
         hot.append(
             HotLayerRef(
@@ -301,8 +319,8 @@ def apply_visual_limiter_gains(
     state = runtime.visual_limiter
     if not isinstance(state, VisualLimiterState):
         return
-    session = runtime.seed.session
-    if blank_visualizers or not visual_limiter_active(session):
+    frame = LimiterFrameState.from_session(runtime.seed.session)
+    if blank_visualizers or not visual_limiter_active(frame):
         state.reset()
         state.clear_layer_gains(runtime.layers_by_slot)
         return
@@ -312,12 +330,12 @@ def apply_visual_limiter_gains(
 def observe_frame_busyness(
     core: VisualizerCore,
     t_sec: float,
-    session: TuningSession,
+    frame: LimiterFrameState,
     *,
     blank_visualizers: bool = False,
 ) -> None:
     """Sample content FBO and update limiter state for the next frame."""
-    if blank_visualizers or not visual_limiter_active(session):
+    if blank_visualizers or not visual_limiter_active(frame):
         return
     state = core.visual_limiter
     if not isinstance(state, VisualLimiterState):
@@ -331,12 +349,12 @@ def observe_frame_busyness(
     reset_if_seek(state, t_sec)
     luma_grid = read_luma_grid(core.compositor, core.post_process)
     mean_luma, mean_abs_delta = metrics_from_grid(state, luma_grid)
-    hot = collect_hot_layers(session, core.layers_by_slot, t_sec)
+    hot = collect_hot_layers(frame, core.layers_by_slot, t_sec)
     update_limiter_state(
         state,
         mean_luma=mean_luma,
         mean_abs_delta=mean_abs_delta,
         t_sec=t_sec,
         hot=hot,
-        params=VisualLimiterParams.from_runtime(session.timeline.limiter),
+        params=VisualLimiterParams.from_runtime(frame.timeline.limiter),
     )

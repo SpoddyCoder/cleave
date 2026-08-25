@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 
-from cleave.config_schema import (
+from cleave.config_schema.render import (
     PATTERN_MASK_TYPES,
     PatternMaskType,
     clamp_pattern_mask_density,

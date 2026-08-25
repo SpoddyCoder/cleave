@@ -5,7 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from cleave.config_schema import MAX_LAYER_COUNT, MIN_LAYER_COUNT
+from cleave.config_schema.layers import (
+    MAX_LAYER_COUNT,
+    MIN_LAYER_COUNT,
+)
 from cleave.preset_playlist import PresetPlaylist
 from cleave.timeline import SlotCue
 from cleave.viz.layer import StemLayer
