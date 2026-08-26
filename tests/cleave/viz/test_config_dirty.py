@@ -12,7 +12,7 @@ import pytest
 
 from cleave.viz.controls import TuningControls
 from cleave.viz.timeline_controls import TimelineControls
-from cleave.viz.row_semantics import RowDescriptor, RowKind
+from cleave.viz.row_kinds import RowDescriptor, RowKind
 from tests.cleave.viz.test_controls import (
     _choose_save_as_new,
     _config_header_row,

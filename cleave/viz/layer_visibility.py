@@ -29,7 +29,7 @@ from cleave.viz.focus_nav import (
     cursor_timeline_row,
     cursor_timeline_submenu_focused,
 )
-from cleave.viz.row_semantics import RowKind
+from cleave.viz.row_kinds import RowKind
 from cleave.viz.session import TimelineFadeGroupRuntime, TuningSession
 from cleave.viz.timeline_overlay import (
     TimelineViewState,

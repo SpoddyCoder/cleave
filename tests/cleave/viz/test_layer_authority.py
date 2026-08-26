@@ -172,8 +172,8 @@ def test_add_layer_save_round_trip_leaves_cfg_layers_untouched(
 def test_view_state_reflects_session_mutation_without_block_writes() -> None:
     from dataclasses import fields
 
-    from cleave.viz.row_fields import format_row_value
-    from cleave.viz.row_semantics import RowDescriptor, RowKind
+    from cleave.viz.row_kinds import RowDescriptor, RowKind
+    from cleave.viz.row_spec import format_row_value
     from cleave.viz.tuning_view_state import RenderOverlayCardBlock, TrackBlock
     from tests.support.viz import make_controls
 

@@ -49,6 +49,7 @@ from cleave.config_schema.layers import (
     DEFAULT_LAYER_LOCKED,
     DEFAULT_LAYER_OPACITY,
     DEFAULT_LAYER_Z_ORDER,
+    DEFAULT_NEW_LAYER_STEM,
     DEFAULT_PRESET_SWITCHING,
     DEFAULT_PRESET_SWITCHING_TRIGGER,
     DEFAULT_PRESET_DURATION,
@@ -91,8 +92,12 @@ from cleave.config_schema.render import (
     DEFAULT_RENDER_OVERLAY_TITLE,
     DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
     DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
+    DEFAULT_RENDER_OVERLAYS_LOCKED,
+    DEFAULT_RENDER_PATTERN_MASK_LOCKED,
+    DEFAULT_RENDER_PATTERN_MASK_TRANSITION,
     DEFAULT_RENDER_POST_FX_FADE_IN,
     DEFAULT_RENDER_POST_FX_FADE_OUT,
+    DEFAULT_RENDER_POST_FX_LOCKED,
     DEFAULT_RENDER_WIDTH,
     DEFAULT_TEXTURE_PATHS,
     HIGHLIGHT_ROLLOFF_APPLY_MODES,
@@ -116,6 +121,7 @@ from cleave.config_schema.timeline import (
     DEFAULT_TIMELINE_FADE_IN,
     DEFAULT_TIMELINE_FADE_OUT,
     DEFAULT_TIMELINE_FADES_ENABLED,
+    DEFAULT_TIMELINE_LOCKED,
     DEFAULT_TIMELINE_PLACEMENT_SNAP,
     DEFAULT_VISUAL_LIMITER_ENABLED,
     DEFAULT_VISUAL_LIMITER_RATIO,
@@ -169,7 +175,7 @@ class LayerConfig:
     opacity: float = DEFAULT_LAYER_OPACITY
     beat_sensitivity: float | None = None
     effects: dict[str, dict[str, int]] = field(default_factory=dict)
-    blend_mode: BlendMode = "black-key"
+    blend_mode: BlendMode = DEFAULT_BLEND_MODE[DEFAULT_NEW_LAYER_STEM]
     locked: bool = DEFAULT_LAYER_LOCKED
     preset_switching: PresetSwitchingMode = DEFAULT_PRESET_SWITCHING
     preset_switching_trigger: PresetSwitchingTrigger = DEFAULT_PRESET_SWITCHING_TRIGGER
@@ -259,7 +265,7 @@ class RenderOverlayCardConfig:
 class RenderOverlaysConfig:
     opening_card: RenderOverlayCardConfig
     closing_card: RenderOverlayCardConfig
-    locked: bool = False
+    locked: bool = DEFAULT_RENDER_OVERLAYS_LOCKED
 
 
 @dataclass(frozen=True)
@@ -287,7 +293,7 @@ class RenderPostFxConfig:
     fade_out: float
     highlight_rolloff: HighlightRolloffConfig
     chroma_boost: ChromaBoostConfig
-    locked: bool = False
+    locked: bool = DEFAULT_RENDER_POST_FX_LOCKED
 
 
 @dataclass(frozen=True)
@@ -298,8 +304,8 @@ class RenderPatternMaskConfig:
     feather_pct: int
     invert: bool
     seed: int
-    transition: float = 0.0
-    locked: bool = False
+    transition: float = DEFAULT_RENDER_PATTERN_MASK_TRANSITION
+    locked: bool = DEFAULT_RENDER_PATTERN_MASK_LOCKED
 
 
 @dataclass(frozen=True)
@@ -357,7 +363,7 @@ class TimelineLimiterConfig:
 class TimelineConfig:
     enabled: bool
     lanes: dict[str, TimelineLane]
-    locked: bool = False
+    locked: bool = DEFAULT_TIMELINE_LOCKED
     cuts: TimelineCutsConfig = field(default_factory=TimelineCutsConfig)
     placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
     preset: TimelinePresetConfig = field(default_factory=TimelinePresetConfig)

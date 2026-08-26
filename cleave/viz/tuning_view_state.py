@@ -79,7 +79,7 @@ from cleave.timeline_presets.timeline_cuts import (
 )
 from cleave.viz.config_save import ConfigSaveController
 from cleave.viz.playback import PlaybackState, current_sec
-from cleave.viz.row_semantics import RowDescriptor, RowKind
+from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.session import (
     LayerRuntime,
     RenderOverlayCardRuntime,
@@ -134,7 +134,7 @@ class RenderOverlaysBlock:
         )
     )
     solo: bool = False
-    locked: bool = False
+    locked: bool = _RO_OVERLAYS_DEFAULTS["locked"]
 
 
 @dataclass
@@ -168,7 +168,7 @@ class RenderPostFxBlock:
     )
     chroma_boost: ChromaBoostBlock = field(default_factory=ChromaBoostBlock)
     solo: bool = False
-    locked: bool = False
+    locked: bool = _RO_POST_FX_DEFAULTS["locked"]
 
 
 @dataclass
@@ -181,7 +181,7 @@ class RenderPatternMaskBlock:
     invert: bool = _RO_PATTERN_MASK_DEFAULTS["invert"]
     transition: float = _RO_PATTERN_MASK_DEFAULTS["transition"]
     seed: int = _RO_PATTERN_MASK_DEFAULTS["seed"]
-    locked: bool = False
+    locked: bool = _RO_PATTERN_MASK_DEFAULTS["locked"]
 
 
 @dataclass

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
 from cleave.effects.registry import effect_roster
-from cleave.viz.row_semantics import RowDescriptor, RowKind
+from cleave.viz.row_kinds import RowDescriptor, RowKind
 
 if TYPE_CHECKING:
     from cleave.viz.controls import TuningControls
@@ -127,7 +127,7 @@ def _toggle_preset_list(controls: TuningControls, slot: str | None, forward: boo
 
 
 def _toggle_song_markers(controls: TuningControls, _slot: str | None, forward: bool) -> None:
-    controls.set_song_markers_expanded(forward)
+    controls.song_markers.set_expanded(forward)
 
 
 def _toggle_beat_bar_grid(controls: TuningControls, _slot: str | None, forward: bool) -> None:

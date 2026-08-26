@@ -29,7 +29,8 @@ from cleave.viz.help_content import (
 from cleave.viz.help_overlay import HelpOverlay
 from cleave.viz.help_panel_cache import entry_gap, entry_width, max_key_width
 from cleave.viz.theme import LABEL, VALUE
-from cleave.viz.row_semantics import ROW_BEHAVIORS, RowKind
+from cleave.viz.row_kinds import RowKind
+from cleave.viz.row_spec import ROW_SPECS
 
 
 def _is_navigation_section(section: object) -> bool:
@@ -451,7 +452,7 @@ def test_layer_management_delete_help() -> None:
 
 
 def test_navigable_row_kinds_have_help_sections() -> None:
-    for row_kind, behavior in ROW_BEHAVIORS.items():
+    for row_kind, behavior in ROW_SPECS.items():
         if not behavior.navigable:
             continue
         sections = sections_for(row_kind)
@@ -469,7 +470,7 @@ def test_navigable_row_kinds_have_help_sections() -> None:
 
 
 def test_navigable_row_kinds_with_description_use_keyboard_controls_title() -> None:
-    for row_kind, behavior in ROW_BEHAVIORS.items():
+    for row_kind, behavior in ROW_SPECS.items():
         if not behavior.navigable:
             continue
         if behavior.help_description is None and behavior.help_mode_entries is None:
@@ -481,7 +482,7 @@ def test_navigable_row_kinds_with_description_use_keyboard_controls_title() -> N
 
 
 def test_navigable_row_kinds_with_description_have_three_sections() -> None:
-    for row_kind, behavior in ROW_BEHAVIORS.items():
+    for row_kind, behavior in ROW_SPECS.items():
         if not behavior.navigable:
             continue
         if behavior.help_description is None and behavior.help_mode_entries is None:
@@ -494,7 +495,7 @@ def test_navigable_row_kinds_with_description_have_three_sections() -> None:
 
 
 def test_description_sections_use_control_name_not_about() -> None:
-    for row_kind, behavior in ROW_BEHAVIORS.items():
+    for row_kind, behavior in ROW_SPECS.items():
         if not behavior.navigable:
             continue
         if behavior.help_description is None and behavior.help_mode_entries is None:

@@ -14,7 +14,8 @@ from cleave.viz.row_sections import (
     section_header_from_section_tree,
     sub_row_expand_visible,
 )
-from cleave.viz.row_semantics import RowDescriptor, RowKind, section_header_descriptor
+from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.row_spec import section_header_descriptor
 from cleave.viz.tuning_view_state import (
     HighlightRolloffBlock,
     RenderOverlaysBlock,

@@ -7,7 +7,8 @@ from dataclasses import replace
 import pygame
 
 from cleave.viz.overlay_profiler import OverlayDrawCounters
-from cleave.viz.row_semantics import RowDescriptor, RowKind, row_is_pinned
+from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.row_spec import row_is_pinned
 from cleave.viz.theme import (
     BORDER_COLOR,
     BORDER_WIDTH,

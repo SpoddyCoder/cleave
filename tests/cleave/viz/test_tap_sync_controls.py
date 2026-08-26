@@ -10,7 +10,7 @@ from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.modal import ModalHost
 from cleave.viz.mix_player import FREQUENCY_HZ, NUM_CHANNELS, MixPlayer
 from cleave.viz.playback import PlaybackState
-from cleave.viz.row_semantics import RowDescriptor, RowKind
+from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.tap_sync import CONSISTENCY_WINDOW, METRONOME_BPM, metronome_accent_times
 from cleave.viz.tap_sync_controls import (
     TapSyncControls,

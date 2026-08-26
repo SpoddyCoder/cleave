@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from cleave.viz.tuning_view_state import TuningViewState
-from cleave.viz.row_semantics import RowDescriptor, RowKind
+from cleave.viz.row_kinds import RowDescriptor, RowKind
 
 
 @dataclass(frozen=True)

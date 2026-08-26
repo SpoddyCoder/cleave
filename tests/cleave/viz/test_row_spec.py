@@ -1,35 +1,47 @@
-"""Tests for row_fields panel manifest."""
+"""Tests for the unified RowSpec panel registry."""
 
 from __future__ import annotations
 
 import inspect
+from types import SimpleNamespace
 
 import pygame
 
 from cleave.config_schema.editor import ui_fade_display
-from cleave.viz.row_fields import (
-    ROW_FIELDS,
+from cleave.viz.row_kinds import RowAffordance, RowDescriptor, RowKind
+from cleave.viz.row_spec import (
+    ACTION_ROW_KINDS,
+    HEADER_ROW_KINDS,
+    LABELED_SUB_ROW_KINDS,
+    REPEAT_ROW_KINDS,
+    ROW_SPECS,
+    TRACK_EFFECT_SUB_ROW_KINDS,
+    TRACK_SUB_ROW_KINDS,
     RowPresentStyle,
     apply_field_horizontal,
     composite_header_prefix_part,
     composite_header_suffix_part,
     expand_subheader_prefix,
+    expandable_row_kinds,
     format_row_value,
     full_line_prefix,
     labeled_row_prefix,
-    row_action_parameter_display_text,
+    row_blocked_by_section_lock,
     row_composite_header_display_text,
     row_dynamic_labeled_display_text,
     row_dynamic_labeled_prefix,
     row_expand_subheader_display_text,
-    row_field_def,
-    row_full_line_display_text,
-    row_kinds_requiring_fields,
+    row_is_pinned,
     row_labeled_display_text,
+    row_navigable_when_section_locked,
     row_panel_label,
+    row_spec,
+    row_triggers_layer_delete,
+    section_lock_blocks_mutation,
+    section_locked,
+    tree_branch_leading_spaces,
     tree_branch_prefix,
 )
-from cleave.viz.row_semantics import RowDescriptor, RowKind
 from cleave.viz.tuning_view_state import (
     RenderOverlaysBlock,
     RenderPostFxBlock,
@@ -45,6 +57,367 @@ from tests.support.config import TEST_LAYER_STEMS
 from tests.support.viz import make_overlay_card_block, make_track_block, noop_layer_bindings
 
 
+def _track_lock_state(locked: bool) -> SimpleNamespace:
+    return SimpleNamespace(tracks={"layer_1": SimpleNamespace(locked=locked)})
+
+_EXPECTED_REPEAT_ROW_KINDS = frozenset(
+    {
+        RowKind.TRANSPORT,
+        RowKind.TRACK_PRESET_DIR,
+        RowKind.TRACK_PRESET,
+        RowKind.TRACK_PRESET_SWITCHING,
+        RowKind.TRACK_PRESET_SWITCHING_TRIGGER,
+                        RowKind.TRACK_PRESET_DURATION,
+        RowKind.TRACK_SOFT_CUT_DURATION,
+        RowKind.TRACK_EASTER_EGG,
+        RowKind.TRACK_PRESET_START_CLEAN,
+                RowKind.TRACK_HARD_CUT_ENABLED,
+        RowKind.TRACK_HARD_CUT_DURATION,
+        RowKind.TRACK_HARD_CUT_SENSITIVITY,
+        RowKind.TRACK_STEM,
+        RowKind.TRACK_BLEND,
+        RowKind.TRACK_OPACITY,
+        RowKind.TRACK_BEAT,
+        RowKind.TRACK_EFFECT,
+        RowKind.RENDER_OVERLAY_CARD_POSITION,
+        RowKind.RENDER_OVERLAY_CARD_ANIMATION_TYPE,
+        RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION,
+        RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_CARD_TITLE_FONT,
+        RowKind.RENDER_OVERLAY_CARD_TITLE_MARGIN_BOTTOM,
+        RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE,
+        RowKind.RENDER_OVERLAY_CARD_BODY_FONT,
+        RowKind.RENDER_OVERLAY_CARD_OPACITY,
+        RowKind.RENDER_OVERLAY_CARD_BORDER_WIDTH,
+        RowKind.RENDER_OVERLAY_CARD_TIME,
+        RowKind.RENDER_OVERLAY_CARD_DISPLAY_TIME,
+        RowKind.RENDER_POST_FX_FADE_IN,
+        RowKind.RENDER_POST_FX_FADE_OUT,
+        RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_MODE,
+        RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CURVE,
+        RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_THRESHOLD,
+        RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_CEILING,
+        RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_STRENGTH,
+        RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_SOFTNESS,
+        RowKind.RENDER_POST_FX_HIGHLIGHT_ROLLOFF_DESATURATION,
+        RowKind.RENDER_POST_FX_CHROMA_BOOST_MODE,
+        RowKind.RENDER_POST_FX_CHROMA_BOOST_VARIANT,
+        RowKind.RENDER_POST_FX_CHROMA_BOOST_AMOUNT,
+        RowKind.RENDER_PATTERN_MASK_TYPE,
+        RowKind.RENDER_PATTERN_MASK_DENSITY,
+        RowKind.RENDER_PATTERN_MASK_FEATHER,
+        RowKind.RENDER_PATTERN_MASK_INVERT,
+        RowKind.RENDER_PATTERN_MASK_TRANSITION,
+        RowKind.RENDER_PATTERN_MASK_SEED,
+        RowKind.SETTINGS_PREVIEW_QUALITY,
+        RowKind.SETTINGS_EDITOR_MODE,
+        RowKind.SETTINGS_UI_WIDTH_MODE,
+        RowKind.SETTINGS_UI_WIDTH,
+        RowKind.SETTINGS_UI_FADE,
+        RowKind.SETTINGS_RESIDUAL_LATENCY_MS,
+        RowKind.TIMELINE_BAR_PHASE,
+        RowKind.TIMELINE_HARD_CUTS,
+        RowKind.TIMELINE_HARD_CUT_FADE_IN,
+        RowKind.TIMELINE_HARD_CUT_FADE_OUT,
+        RowKind.TIMELINE_HARD_CUT_CROSSFADE,
+        RowKind.TIMELINE_SOFT_CUTS,
+        RowKind.TIMELINE_SOFT_CUT_FADE_IN,
+        RowKind.TIMELINE_SOFT_CUT_FADE_OUT,
+        RowKind.TIMELINE_SOFT_CUT_CROSSFADE,
+        RowKind.TIMELINE_VISUAL_LIMITER_THRESHOLD,
+        RowKind.TIMELINE_VISUAL_LIMITER_RATIO,
+        RowKind.TIMELINE_VISUAL_LIMITER_RELEASE,
+    }
+)
+
+
+def test_every_row_kind_has_spec() -> None:
+    for kind in RowKind:
+        assert kind in ROW_SPECS
+        assert row_spec(kind) is ROW_SPECS[kind]
+
+
+def test_header_row_kinds() -> None:
+    assert HEADER_ROW_KINDS == frozenset(
+        {
+            RowKind.TRANSPORT,
+            RowKind.CONFIG_HEADER,
+            RowKind.SETTINGS_HEADER,
+        }
+    )
+
+
+def test_action_row_kinds_match_affordance() -> None:
+    assert ACTION_ROW_KINDS == frozenset(
+        k for k, b in ROW_SPECS.items() if b.affordance == RowAffordance.ACTION
+    )
+    assert RowKind.LAYER_MANAGEMENT_ADD in ACTION_ROW_KINDS
+    assert RowKind.CONFIG_HEADER in ACTION_ROW_KINDS
+    assert RowKind.SETTINGS_EDITOR_MODE not in ACTION_ROW_KINDS
+
+
+def test_row_is_pinned() -> None:
+    assert row_is_pinned(RowKind.TRANSPORT) is True
+    assert row_is_pinned(RowKind.CONFIG_HEADER) is True
+    assert row_is_pinned(RowKind.SETTINGS_HEADER) is True
+    assert row_is_pinned(RowKind.SETTINGS_PREVIEW_QUALITY) is True
+    assert row_is_pinned(RowKind.SETTINGS_EDITOR_MODE) is True
+    assert row_is_pinned(RowKind.SETTINGS_UI_HEADER) is True
+    assert row_is_pinned(RowKind.SETTINGS_UI_FADE) is True
+    assert row_is_pinned(RowKind.SETTINGS_UI_WIDTH_MODE) is True
+    assert row_is_pinned(RowKind.SETTINGS_UI_WIDTH) is True
+    assert row_is_pinned(RowKind.TRACK_HEADER) is False
+    assert row_is_pinned(RowKind.RENDER_OVERLAYS_HEADER) is False
+
+
+def test_repeat_row_kinds() -> None:
+    assert REPEAT_ROW_KINDS == _EXPECTED_REPEAT_ROW_KINDS
+
+
+def test_render_overlay_sub_headers_expand() -> None:
+    title = row_spec(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER)
+    body = row_spec(RowKind.RENDER_OVERLAY_CARD_BODY_HEADER)
+    assert title.affordance == RowAffordance.EXPAND
+    assert title.is_sub_header is True
+    assert body.affordance == RowAffordance.EXPAND
+    assert body.is_sub_header is True
+
+
+def test_track_effects_header_expands() -> None:
+    behavior = row_spec(RowKind.TRACK_EFFECTS_HEADER)
+    assert behavior.affordance == RowAffordance.EXPAND
+
+
+def test_expandable_row_kinds() -> None:
+    assert expandable_row_kinds() == frozenset(
+        k for k, b in ROW_SPECS.items() if b.affordance == RowAffordance.EXPAND
+    )
+
+
+def test_parent_group_on_row_specs() -> None:
+    assert row_spec(RowKind.TRACK_STEM).parent_group == "track"
+    assert row_spec(RowKind.RENDER_OVERLAY_CARD_POSITION).parent_group == (
+        "render_overlay"
+    )
+    assert row_spec(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT).parent_group == (
+        "render_overlay_title"
+    )
+    assert row_spec(RowKind.RENDER_OVERLAY_CARD_BODY_FONT).parent_group == (
+        "render_overlay_body"
+    )
+    assert row_spec(RowKind.RENDER_POST_FX_FADE_IN).parent_group == "render_post_fx"
+    assert row_spec(RowKind.SETTINGS_PREVIEW_QUALITY).parent_group == "settings"
+    assert row_spec(RowKind.SETTINGS_UI_WIDTH_MODE).parent_group == "settings_ui"
+
+
+def test_track_sub_row_kinds() -> None:
+    assert TRACK_SUB_ROW_KINDS == frozenset(
+        {
+            RowKind.TRACK_PRESET_DIR,
+            RowKind.TRACK_PRESET,
+            RowKind.TRACK_PRESET_SWITCHING,
+            RowKind.TRACK_PRESET_SWITCHING_TRIGGER,
+            RowKind.TRACK_PRESET_LIST,
+            RowKind.TRACK_PRESET_LIST_ITEM,
+            RowKind.TRACK_PRESET_LIST_ADD,
+            RowKind.TRACK_PRESET_LIST_POPULATE,
+            RowKind.TRACK_PRESET_DURATION,
+            RowKind.TRACK_SOFT_CUT_DURATION,
+            RowKind.TRACK_EASTER_EGG,
+            RowKind.TRACK_PRESET_START_CLEAN,
+            RowKind.TRACK_HARD_CUT_ENABLED,
+            RowKind.TRACK_HARD_CUT_DURATION,
+            RowKind.TRACK_HARD_CUT_SENSITIVITY,
+            RowKind.TRACK_STEM,
+            RowKind.TRACK_BLEND,
+            RowKind.TRACK_OPACITY,
+            RowKind.TRACK_BEAT,
+            RowKind.TRACK_EFFECTS_HEADER,
+            RowKind.TRACK_EFFECT,
+            RowKind.LAYER_MANAGEMENT_DELETE,
+        }
+    )
+
+
+def test_track_effect_sub_row_kinds() -> None:
+    assert TRACK_EFFECT_SUB_ROW_KINDS == frozenset({RowKind.TRACK_EFFECT})
+
+
+def test_locked_navigable_sub_row_kinds() -> None:
+    navigable = frozenset(
+        k for k in TRACK_SUB_ROW_KINDS if row_navigable_when_section_locked(k)
+    )
+    assert navigable == frozenset(
+        {
+            RowKind.TRACK_PRESET_LIST,
+            RowKind.TRACK_EFFECTS_HEADER,
+            RowKind.LAYER_MANAGEMENT_DELETE,
+        }
+    )
+
+
+def test_track_value_rows_blocked_by_section_lock() -> None:
+    blocked = frozenset(
+        k for k in TRACK_SUB_ROW_KINDS if row_blocked_by_section_lock(k)
+    )
+    assert blocked == frozenset(
+        {
+            RowKind.TRACK_PRESET_DIR,
+            RowKind.TRACK_PRESET,
+            RowKind.TRACK_PRESET_SWITCHING,
+            RowKind.TRACK_PRESET_SWITCHING_TRIGGER,
+            RowKind.TRACK_PRESET_DURATION,
+            RowKind.TRACK_SOFT_CUT_DURATION,
+            RowKind.TRACK_EASTER_EGG,
+            RowKind.TRACK_PRESET_START_CLEAN,
+            RowKind.TRACK_HARD_CUT_ENABLED,
+            RowKind.TRACK_HARD_CUT_DURATION,
+            RowKind.TRACK_HARD_CUT_SENSITIVITY,
+            RowKind.TRACK_STEM,
+            RowKind.TRACK_BLEND,
+            RowKind.TRACK_OPACITY,
+            RowKind.TRACK_BEAT,
+            RowKind.TRACK_EFFECT,
+            RowKind.TRACK_PRESET_LIST_ITEM,
+            RowKind.TRACK_PRESET_LIST_ADD,
+            RowKind.TRACK_PRESET_LIST_POPULATE,
+        }
+    )
+    for kind in blocked:
+        desc = RowDescriptor(kind, slot="layer_1")
+        assert section_lock_blocks_mutation(_track_lock_state(True), desc) is True
+        assert section_lock_blocks_mutation(_track_lock_state(False), desc) is False
+
+
+def test_only_effects_header_navigable_when_section_locked() -> None:
+    navigable_when_locked = {
+        RowKind.TRACK_PRESET_LIST,
+        RowKind.TRACK_EFFECTS_HEADER,
+        RowKind.LAYER_MANAGEMENT_DELETE,
+    }
+    for kind in TRACK_SUB_ROW_KINDS:
+        assert row_navigable_when_section_locked(kind) == (kind in navigable_when_locked)
+
+
+def test_labeled_sub_row_kinds_exclude_headers() -> None:
+    assert LABELED_SUB_ROW_KINDS.isdisjoint(HEADER_ROW_KINDS)
+    for kind in LABELED_SUB_ROW_KINDS:
+        behavior = row_spec(kind)
+        assert behavior.affordance in {
+            RowAffordance.VALUE_STEP,
+            RowAffordance.PATH_DIR,
+            RowAffordance.PATH_PRESET,
+        }
+        assert not behavior.is_header
+
+
+def test_preset_list_actions_are_action_rows() -> None:
+    for kind in (
+        RowKind.TRACK_PRESET_LIST_POPULATE,
+        RowKind.TRACK_PRESET_LIST_ADD,
+    ):
+        assert kind in ACTION_ROW_KINDS
+        assert kind not in LABELED_SUB_ROW_KINDS
+        assert row_spec(kind).affordance == RowAffordance.ACTION
+
+
+def _render_lock_state(
+    *, overlay: bool = False, post_fx: bool = False, timeline: bool = False
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        render_overlays=SimpleNamespace(locked=overlay),
+        render_post_fx=SimpleNamespace(locked=post_fx),
+        render_timeline=SimpleNamespace(locked=timeline),
+    )
+
+
+def test_render_value_children_blocked_by_section_lock() -> None:
+    assert row_blocked_by_section_lock(RowKind.RENDER_OVERLAY_CARD_POSITION) is True
+    assert row_blocked_by_section_lock(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT) is True
+    assert row_blocked_by_section_lock(RowKind.RENDER_POST_FX_FADE_IN) is True
+    assert row_blocked_by_section_lock(RowKind.RENDER_POST_FX_CHROMA_BOOST_AMOUNT) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESETS) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_CHARACTER) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_DENSITY) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_CUE_SNAP) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_SONG_MARKER_SNAP) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_TIMELINE_CUTS) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_REPOPULATE) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_CONDUCTOR) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESET_MODE) is True
+    assert row_blocked_by_section_lock(RowKind.TRACK_PRESET_LIST_POPULATE) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_BAR_PHASE) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_TO_BEATS) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_TO_BARS) is True
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS) is True
+    assert row_blocked_by_section_lock(RowKind.SONG_MARKER_ITEM) is True
+    assert row_blocked_by_section_lock(RowKind.SONG_MARKERS_HEADER) is False
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_SNAP_CUES_HEADER) is False
+    assert row_blocked_by_section_lock(RowKind.TIMELINE_PRESETS_HEADER) is False
+
+
+def test_render_headers_navigable_when_section_locked() -> None:
+    for kind in (
+        RowKind.RENDER_OVERLAYS_HEADER,
+        RowKind.RENDER_POST_FX_HEADER,
+        RowKind.RENDER_TIMELINE_HEADER,
+        RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER,
+        RowKind.RENDER_POST_FX_CHROMA_BOOST_HEADER,
+        RowKind.SONG_MARKERS_HEADER,
+        RowKind.TIMELINE_SNAP_CUES_HEADER,
+        RowKind.TIMELINE_PRESETS_HEADER,
+    ):
+        assert row_navigable_when_section_locked(kind) is True
+    assert row_navigable_when_section_locked(RowKind.RENDER_OVERLAY_CARD_POSITION) is False
+    assert row_navigable_when_section_locked(RowKind.TIMELINE_PRESETS) is False
+    assert row_navigable_when_section_locked(RowKind.TIMELINE_PRESET_CHARACTER) is False
+    assert row_navigable_when_section_locked(RowKind.TIMELINE_SNAP_TO_SONG_MARKERS) is False
+    assert row_navigable_when_section_locked(RowKind.SONG_MARKER_ITEM) is False
+
+
+def test_section_locked_resolves_render_sections() -> None:
+    overlay_desc = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_POSITION)
+    post_fx_desc = RowDescriptor(RowKind.RENDER_POST_FX_FADE_IN)
+    timeline_desc = RowDescriptor(RowKind.TIMELINE_PRESETS)
+    assert section_locked(_render_lock_state(overlay=True), overlay_desc) is True
+    assert section_locked(_render_lock_state(), overlay_desc) is False
+    assert section_locked(_render_lock_state(post_fx=True), post_fx_desc) is True
+    assert section_locked(_render_lock_state(timeline=True), timeline_desc) is True
+
+
+def test_section_locked_reads_session_timeline_attribute() -> None:
+    session_like = SimpleNamespace(
+        render_overlays=SimpleNamespace(locked=False),
+        render_post_fx=SimpleNamespace(locked=False),
+        timeline=SimpleNamespace(locked=True),
+    )
+    assert section_locked(session_like, RowDescriptor(RowKind.TIMELINE_PRESETS)) is True
+
+
+def test_section_locked_ignored_in_preset_curation() -> None:
+    state = SimpleNamespace(
+        settings=SimpleNamespace(editor_mode="preset_curation"),
+        tracks={"layer_1": SimpleNamespace(locked=True)},
+        render_overlays=SimpleNamespace(locked=True),
+        render_post_fx=SimpleNamespace(locked=True),
+        render_timeline=SimpleNamespace(locked=True),
+    )
+    assert (
+        section_locked(state, RowDescriptor(RowKind.TRACK_PRESET, slot="layer_1"))
+        is False
+    )
+    assert (
+        section_locked(state, RowDescriptor(RowKind.RENDER_OVERLAY_CARD_POSITION)) is False
+    )
+
+
+def test_row_triggers_layer_delete_for_track_rows_only() -> None:
+    assert row_triggers_layer_delete(RowKind.TRACK_HEADER) is True
+    assert row_triggers_layer_delete(RowKind.LAYER_MANAGEMENT_DELETE) is True
+    assert row_triggers_layer_delete(RowKind.LAYER_MANAGEMENT_ADD) is False
+    assert row_triggers_layer_delete(RowKind.TRANSPORT) is False
+
+
 def test_tree_branch_prefix() -> None:
     assert tree_branch_prefix(0) == ""
     assert tree_branch_prefix(1) == "└─ "
@@ -53,8 +426,6 @@ def test_tree_branch_prefix() -> None:
 
 
 def test_tree_branch_leading_spaces() -> None:
-    from cleave.viz.row_fields import tree_branch_leading_spaces
-
     assert tree_branch_leading_spaces(0) == ""
     assert tree_branch_leading_spaces(1) == ""
     assert tree_branch_leading_spaces(2) == "  "
@@ -309,7 +680,7 @@ def test_song_markers_expand_subheader_includes_count() -> None:
 
 
 def test_composite_header_render_overlay_metadata() -> None:
-    field = row_field_def(RowKind.RENDER_OVERLAYS_HEADER)
+    field = row_spec(RowKind.RENDER_OVERLAYS_HEADER)
     assert field.present_style == RowPresentStyle.COMPOSITE_HEADER
     assert field.header_prefix == "Render: "
     assert field.header_suffix == "OVERLAYS"
@@ -322,10 +693,10 @@ def test_composite_header_render_overlay_metadata() -> None:
 
 
 def test_preset_list_populate_is_full_line_action() -> None:
-    field = row_field_def(RowKind.TRACK_PRESET_LIST_POPULATE)
+    field = row_spec(RowKind.TRACK_PRESET_LIST_POPULATE)
     assert field.present_style == RowPresentStyle.FULL_LINE
     assert field.panel_label == "populate presets"
-    add_field = row_field_def(RowKind.TRACK_PRESET_LIST_ADD)
+    add_field = row_spec(RowKind.TRACK_PRESET_LIST_ADD)
     assert add_field.present_style == RowPresentStyle.FULL_LINE
     assert add_field.panel_label == "add current preset"
 
@@ -374,19 +745,18 @@ def test_apply_field_horizontal_track_header_solo_and_expand() -> None:
     assert controls.session.layers["layer_1"].expanded is True
 
 
-def test_row_fields_count() -> None:
-    assert len(ROW_FIELDS) == len(RowKind)
+def test_row_specs_total_over_row_kind() -> None:
+    assert set(ROW_SPECS) == set(RowKind)
+    assert len(ROW_SPECS) == len(RowKind)
 
 
-def test_row_kinds_requiring_fields_registry_complete() -> None:
-    required = row_kinds_requiring_fields()
-    assert required == frozenset(ROW_FIELDS.keys())
-    assert RowKind.RENDER_SECTION_GAP in ROW_FIELDS
+def test_spacer_kind_is_registered() -> None:
+    assert RowKind.RENDER_SECTION_GAP in ROW_SPECS
 
 
-def test_row_field_apply_horizontal_signatures_match_field_mutator() -> None:
+def test_row_spec_apply_horizontal_signatures_match_field_mutator() -> None:
     mismatches: list[str] = []
-    for kind, field in ROW_FIELDS.items():
+    for kind, field in ROW_SPECS.items():
         handler = field.apply_horizontal
         if handler is None:
             continue
@@ -395,7 +765,7 @@ def test_row_field_apply_horizontal_signatures_match_field_mutator() -> None:
             mismatches.append(
                 f"{kind.name} ({handler.__name__}): {param_count} params, expected 5"
             )
-    assert not mismatches, "FieldMutator arity mismatches:\n" + "\n".join(mismatches)
+    assert not mismatches, "RowSpec apply_horizontal arity mismatches:\n" + "\n".join(mismatches)
 
 
 def test_format_row_value_path_icon() -> None:
@@ -504,7 +874,7 @@ def test_apply_field_horizontal_transport_seeks() -> None:
 
 
 class _RecordingControls:
-    """Stub that records private attribute access from RowFieldDef callbacks."""
+    """Stub that records private attribute access from RowSpec callbacks."""
 
     def __init__(self, accessed_private: list[str] | None = None) -> None:
         object.__setattr__(
@@ -574,10 +944,10 @@ class _RecordingControls:
         return other
 
 
-def test_row_field_callbacks_use_public_controls_api() -> None:
+def test_row_spec_callbacks_use_public_controls_api() -> None:
     accessed: list[str] = []
     controls = _RecordingControls(accessed)
-    for kind, field in ROW_FIELDS.items():
+    for kind, field in ROW_SPECS.items():
         if field.apply_horizontal is None:
             continue
         desc = RowDescriptor(
