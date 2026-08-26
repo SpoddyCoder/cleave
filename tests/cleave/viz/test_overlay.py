@@ -13,7 +13,8 @@ from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
 from cleave.viz.frame_rate import FPS_DISPLAY_LABEL
 from cleave.viz.focus_nav import MainFocus
-from cleave.viz.row_semantics import RowDescriptor, RowKind, row_is_pinned
+from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.row_spec import row_is_pinned
 from cleave.viz.material_icons import (
     RETURN_ARROW_GLYPH,
     action_enter_icon_suffix_width,

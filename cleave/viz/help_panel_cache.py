@@ -15,7 +15,7 @@ from cleave.viz.help_content import (
 )
 from cleave.viz.overlay_primitives import overlay_font
 from cleave.viz.overlay_upload import OverlayGpuState, UploadSignature
-from cleave.viz.row_semantics import RowDescriptor, RowKind
+from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.theme import HIGHLIGHT, LABEL, VALUE
 
 

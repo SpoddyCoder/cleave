@@ -21,7 +21,7 @@ from cleave.viz.app import (
 )
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.input_dispatch import key_handler_for_runtime
-from cleave.viz.row_semantics import RowDescriptor, RowKind
+from cleave.viz.row_kinds import RowDescriptor, RowKind
 from tests.support.config import default_render_post_fx_runtime
 from cleave.viz.session import LayerRuntime, TuningSession
 from tests.support.config import default_render_post_fx_runtime

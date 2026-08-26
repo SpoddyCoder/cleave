@@ -15,6 +15,8 @@ from cleave.config_schema.descriptors import (
     require_non_negative_number,
 )
 
+DEFAULT_RENDER_POST_FX_ENABLED = True
+DEFAULT_RENDER_POST_FX_LOCKED = False
 DEFAULT_RENDER_POST_FX_FADE_IN = 30.0
 DEFAULT_RENDER_POST_FX_FADE_OUT = 4.0
 
@@ -325,13 +327,13 @@ HIGHLIGHT_ROLLOFF_SECTION = SectionDescriptor(
 RENDER_POST_FX_FIELDS: tuple[SchemaField, ...] = (
     FieldDescriptor(
         "enabled",
-        True,
+        DEFAULT_RENDER_POST_FX_ENABLED,
         lambda raw, _ctx, _label: bool(raw),
         dump_scalar,
     ),
     FieldDescriptor(
         "locked",
-        False,
+        DEFAULT_RENDER_POST_FX_LOCKED,
         lambda raw, _ctx, _label: bool(raw),
         dump_scalar,
     ),
@@ -414,7 +416,7 @@ def default_chroma_boost_runtime_values() -> dict[str, Any]:
 
 def default_render_post_fx_runtime_values() -> dict[str, Any]:
     return {
-        "enabled": True,
+        "enabled": DEFAULT_RENDER_POST_FX_ENABLED,
         "expanded": False,
         "fade_in": DEFAULT_RENDER_POST_FX_FADE_IN,
         "fade_out": DEFAULT_RENDER_POST_FX_FADE_OUT,
@@ -422,4 +424,5 @@ def default_render_post_fx_runtime_values() -> dict[str, Any]:
         "highlight_rolloff_expanded": False,
         "chroma_boost": default_chroma_boost_runtime_values(),
         "chroma_boost_expanded": False,
+        "locked": DEFAULT_RENDER_POST_FX_LOCKED,
     }

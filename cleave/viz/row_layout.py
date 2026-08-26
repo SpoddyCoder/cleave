@@ -14,12 +14,11 @@ from cleave.viz.row_sections import (
     append_track_section_rows,
     sub_row_expand_visible,
 )
-from cleave.viz.row_semantics import (
-    RowDescriptor,
-    RowKind,
-    row_behavior,
+from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.row_spec import (
     row_is_pinned,
     row_navigable_when_section_locked,
+    row_spec,
     section_header_descriptor,
     section_locked,
 )
@@ -39,7 +38,7 @@ def row_draw_visible(state: TuningViewState, desc: RowDescriptor) -> bool:
 
 
 def row_navigable(state: TuningViewState, desc: RowDescriptor) -> bool:
-    if not row_behavior(desc.kind).navigable:
+    if not row_spec(desc.kind).navigable:
         return False
     if not _sub_row_expanded(state, desc):
         return False
@@ -69,10 +68,10 @@ def quick_nav_stop_included(state: TuningViewState, desc: RowDescriptor) -> bool
     Section tops (Settings, Transport, Layer 1, Render: OVERLAY) always stop.
     Other quick-nav headers stop only when open.
     """
-    behavior = row_behavior(desc.kind)
-    if not behavior.quick_nav_target:
+    spec = row_spec(desc.kind)
+    if not spec.quick_nav_target:
         return False
-    if behavior.quick_nav_always:
+    if spec.quick_nav_always:
         return True
     if (
         desc.kind == RowKind.TRACK_HEADER

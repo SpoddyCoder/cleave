@@ -15,7 +15,7 @@ from cleave.viz.focus_nav import (
     timeline_strip_in_ring,
 )
 from cleave.viz.tuning_view_state import RenderTimelineBlock, TuningViewState
-from cleave.viz.row_semantics import RowDescriptor, RowKind
+from cleave.viz.row_kinds import RowDescriptor, RowKind
 from tests.cleave.viz.test_controls import (
     _desc,
     _keydown,

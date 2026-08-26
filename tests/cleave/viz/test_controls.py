@@ -58,7 +58,7 @@ from cleave.viz.session import (
     allow_overwrite_for_path,
     config_path_display,
 )
-from cleave.viz.row_semantics import REPEAT_ROW_KINDS
+from cleave.viz.row_spec import REPEAT_ROW_KINDS
 from cleave.viz.theme import (
     DISABLED,
     HIGHLIGHT,
@@ -79,7 +79,7 @@ from cleave.viz.material_icons import (
     track_header_lock_suffix_width,
     visibility_icon_prefix_width,
 )
-from cleave.viz.row_semantics import RowDescriptor, RowKind
+from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.tuning_panel_draw import (
     TREE_INDENT,
     _row_bg_color,
@@ -341,7 +341,7 @@ def test_delete_layer_clamps_timeline_focus_row() -> None:
         del controls.session.layers[slot]
 
     manager.remove_layer.side_effect = remove_layer
-    controls._confirm_delete_layer("layer_4")
+    controls.layer_lifecycle.confirm_delete("layer_4")
 
     manager.remove_layer.assert_called_once_with("layer_4")
     assert len(controls.session.layer_z_order) == 3
@@ -360,12 +360,12 @@ def test_delete_layer_exits_move_mode() -> None:
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_HEADER))
     controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
-    assert controls.move_mode_slot == "layer_1"
+    assert controls.layer_lifecycle.move_mode_slot == "layer_1"
 
-    controls._delete_layer("layer_2")
+    controls.layer_lifecycle.prompt_delete("layer_2")
     controls.handle_keydown(_keydown(pygame.K_RETURN))
 
-    assert controls.move_mode_slot is None
+    assert controls.layer_lifecycle.move_mode_slot is None
     manager.remove_layer.assert_called_once_with("layer_2")
 
 
@@ -722,13 +722,13 @@ def test_move_mode_swaps_z_order() -> None:
     )
     controls.focus_descriptor = _desc(view, header_row)
     assert controls.handle_keydown(_keydown(_MOVE_MODE_KEY)) is True
-    assert controls.move_mode_slot == "layer_2"
+    assert controls.layer_lifecycle.move_mode_slot == "layer_2"
 
     assert controls.handle_keydown(_keydown(pygame.K_UP)) is True
     assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
 
     assert controls.handle_keydown(_keydown(_MOVE_MODE_KEY)) is True
-    assert controls.move_mode_slot is None
+    assert controls.layer_lifecycle.move_mode_slot is None
     assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
     assert controls.config_dirty
 
@@ -748,7 +748,7 @@ def test_move_mode_esc_cancels_without_applying() -> None:
     assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
 
     assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
-    assert controls.move_mode_slot is None
+    assert controls.layer_lifecycle.move_mode_slot is None
     assert controls.session.layer_z_order == ["layer_1", "layer_2", "layer_3"]
     assert not controls.config_dirty
 
@@ -768,7 +768,7 @@ def test_move_mode_backspace_cancels_without_applying() -> None:
     assert controls.session.layer_z_order == ["layer_1", "layer_3", "layer_2"]
 
     assert controls.handle_keydown(_keydown(pygame.K_BACKSPACE)) is True
-    assert controls.move_mode_slot is None
+    assert controls.layer_lifecycle.move_mode_slot is None
     assert controls.session.layer_z_order == ["layer_1", "layer_2", "layer_3"]
     assert not controls.config_dirty
 
@@ -1235,9 +1235,9 @@ def test_esc_in_move_mode_does_not_request_overlay_hide() -> None:
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
-    assert controls.move_mode_slot == "layer_1"
+    assert controls.layer_lifecycle.move_mode_slot == "layer_1"
     assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
-    assert controls.move_mode_slot is None
+    assert controls.layer_lifecycle.move_mode_slot is None
     assert controls.consume_hide_overlay() is False
 
 
@@ -3263,7 +3263,7 @@ def test_t_ignored_during_move_mode() -> None:
     header_row = view.layout.find_by_kind(RowKind.TRACK_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
-    assert controls.move_mode_slot == "layer_1"
+    assert controls.layer_lifecycle.move_mode_slot == "layer_1"
 
     controls.handle_keydown(_keydown(pygame.K_t))
     assert controls.session.timeline.panel_open is False
@@ -3906,7 +3906,7 @@ def test_move_mode_colors_preset_list_item() -> None:
     )
     controls.focus_descriptor = _desc(view, item_row)
     assert controls.handle_keydown(_keydown(_MOVE_MODE_KEY)) is True
-    assert controls.move_mode_preset == ("layer_1", 0)
+    assert controls.preset_list.move_mode_preset == ("layer_1", 0)
 
     view = controls.build_view_state(paused=False)
     assert _row_value_color(view, item_row) == MOVE_MODE
@@ -4195,7 +4195,7 @@ def test_locked_blocks_move_mode() -> None:
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
-    assert controls.move_mode_slot is None
+    assert controls.layer_lifecycle.move_mode_slot is None
 
 
 def test_locked_header_still_expands() -> None:
@@ -4292,7 +4292,7 @@ def test_locked_not_toggleable_during_move_mode() -> None:
     assert controls.session.layers["layer_2"].locked is False
 
     controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
-    assert controls.move_mode_slot == "layer_2"
+    assert controls.layer_lifecycle.move_mode_slot == "layer_2"
 
     controls.handle_keydown(_keydown(pygame.K_l))
     assert controls.session.layers["layer_2"].locked is False
@@ -4308,7 +4308,7 @@ def test_ctrl_quick_nav_blocked_during_move_mode() -> None:
     )
     controls.focus_descriptor = _desc(view, bass_header)
     controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
-    assert controls.move_mode_slot == "layer_2"
+    assert controls.layer_lifecycle.move_mode_slot == "layer_2"
 
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
     assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
@@ -5296,7 +5296,7 @@ def test_drop_song_marker_does_not_select_or_steal_focus() -> None:
     prior_focus = RowDescriptor(RowKind.SETTINGS_HEADER)
     controls.focus_descriptor = prior_focus
     controls.playback.player.seek(15.0)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     markers = controls.session.song_markers
     assert markers.times == [15.0]
     assert markers.markers == [SongMarker(15.0, "standard")]
@@ -5383,7 +5383,7 @@ def test_drop_song_marker_insert_preserves_prior_selection_by_time() -> None:
     markers.times = [20.0, 40.0]
     markers.selected_index = 1
     controls.playback.player.seek(10.0)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     assert markers.times == [10.0, 20.0, 40.0]
     # Prior selection was 40.0 at index 1; after insert it is index 2.
     assert markers.selected_index == 2
@@ -5395,7 +5395,7 @@ def test_drop_song_marker_replace_non_selected_does_not_select_replaced() -> Non
     markers.times = [10.0, 40.0]
     markers.selected_index = 0
     controls.playback.player.seek(41.0)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     assert markers.times == [10.0, 41.0]
     assert markers.selected_index == 0
 
@@ -5406,7 +5406,7 @@ def test_drop_song_marker_replace_selected_keeps_that_slot() -> None:
     markers.times = [10.0, 40.0]
     markers.selected_index = 1
     controls.playback.player.seek(41.0)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     assert markers.times == [10.0, 41.0]
     assert markers.selected_index == 1
 
@@ -5530,7 +5530,7 @@ def test_drop_song_marker_does_not_write_project_yaml(tmp_path: Path) -> None:
     controls.session.song_markers.times = [10.0]
     controls.clear_config_dirty()
     controls.playback.player.seek(25.0)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     assert controls.session.song_markers.times == [10.0, 25.0]
     assert load_manifest(project).song_markers == _song_markers(10.0)
     assert controls.config_dirty
@@ -5563,7 +5563,7 @@ def test_marker_only_edit_marks_dirty_and_save_clears(tmp_path: Path) -> None:
     assert not controls.config_dirty
 
     controls.playback.player.seek(12.5)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     assert controls.config_dirty
     assert load_manifest(project).song_markers == ()
 
@@ -5592,7 +5592,7 @@ def test_overwrite_save_flushes_song_markers(tmp_path: Path) -> None:
     )
 
     controls.playback.player.seek(40.0)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     assert controls.config_dirty
     assert load_manifest(project).song_markers == _song_markers(8.0)
 
@@ -5613,7 +5613,7 @@ def test_quit_discard_leaves_project_markers_unchanged(tmp_path: Path) -> None:
     controls.clear_config_dirty()
 
     controls.playback.player.seek(55.0)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     assert controls.config_dirty
 
     assert controls.try_quit() is False
@@ -5633,7 +5633,7 @@ def test_save_as_new_flushes_markers_to_same_project_yaml(tmp_path: Path) -> Non
     controls._config_save._on_save_new_config = lambda: new_yaml
 
     controls.playback.player.seek(3.0)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = _desc(view, _config_header_row(view))
     _choose_save_as_new(controls)
@@ -5653,7 +5653,7 @@ def test_song_markers_expanded_does_not_mark_dirty() -> None:
 def test_no_project_dir_marker_edit_still_marks_dirty() -> None:
     controls = _make_controls(("layer_1",), project_dir=None)
     controls.playback.player.seek(1.0)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     assert controls.config_dirty
     controls.clear_config_dirty()
     assert not controls.config_dirty
@@ -5667,7 +5667,7 @@ def test_drop_song_marker_snaps_to_beat_by_default() -> None:
     )
     assert controls.session.timeline.placement_snap == "beat"
     controls.playback.player.seek(0.6)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     assert controls.session.song_markers.times == [1.0]
 
 
@@ -5678,7 +5678,7 @@ def test_drop_song_marker_placement_snap_off_keeps_audible_time() -> None:
     )
     controls.session.timeline.placement_snap = "off"
     controls.playback.player.seek(0.6)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     assert controls.session.song_markers.times == [0.6]
 
 
@@ -5690,7 +5690,7 @@ def test_drop_song_marker_snaps_to_bar() -> None:
     )
     controls.session.timeline.placement_snap = "bar"
     controls.playback.player.seek(1.5)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     assert controls.session.song_markers.times == [0.0]
 
 
@@ -5715,7 +5715,7 @@ def test_placement_snap_row_cycles() -> None:
 def test_preset_switching_row_cycles_off_on() -> None:
     from tests.support.viz import make_controls, keydown, noop_layer_bindings
     import pygame
-    from cleave.viz.row_semantics import RowDescriptor, RowKind
+    from cleave.viz.row_kinds import RowDescriptor, RowKind
     from cleave.viz.focus_nav import MainFocus
 
     switched: list[str] = []
@@ -5737,7 +5737,7 @@ def test_preset_switching_row_cycles_off_on() -> None:
 def test_preset_switching_trigger_cycles() -> None:
     from tests.support.viz import make_controls, keydown
     import pygame
-    from cleave.viz.row_semantics import RowDescriptor, RowKind
+    from cleave.viz.row_kinds import RowDescriptor, RowKind
     from cleave.viz.focus_nav import MainFocus
 
     controls = make_controls(("layer_1",))
@@ -5769,7 +5769,7 @@ def test_timeline_trigger_while_disabled_shows_warning() -> None:
     from cleave.viz.layer_mutations import NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT
     from tests.support.viz import make_controls, keydown, noop_layer_bindings
     import pygame
-    from cleave.viz.row_semantics import RowDescriptor, RowKind
+    from cleave.viz.row_kinds import RowDescriptor, RowKind
     from cleave.viz.focus_nav import MainFocus
 
     controls = make_controls(("layer_1",))
@@ -5798,8 +5798,8 @@ def test_populate_modal_options_keyed_by_timeline_trigger() -> None:
         prompted.append((title, [opt.label for opt in options]))
 
     controls._modal_host.prompt_choice = capture_prompt  # type: ignore[method-assign]
-    controls.project_dir = Path("/tmp/project")
-    controls._prompt_populate_presets("layer_1")
+    controls.preset_list.project_dir = Path("/tmp/project")
+    controls.preset_list.prompt_populate("layer_1")
     assert prompted
     assert prompted[0][0] == "Populate the preset list with 1 presets?"
     labels = prompted[0][1]
@@ -5813,7 +5813,7 @@ def test_populate_modal_options_keyed_by_timeline_trigger() -> None:
     prompted.clear()
     controls.session.layers["layer_1"].preset_switching_trigger = "timer"
     controls.session.timeline.enabled = True
-    controls._prompt_populate_presets("layer_1")
+    controls.preset_list.prompt_populate("layer_1")
     # 120s song / 30s duration = 4 needed; fixture browse dir has 1 milk
     assert prompted[0][0] == "Populate the preset list with 1 presets?"
     labels = prompted[0][1]

@@ -27,7 +27,7 @@ from cleave.viz.overlay_primitives import (
     overlay_panel_surface,
 )
 from cleave.viz.overlay_upload import OverlayGpuState, upload_plan_for_signature
-from cleave.viz.row_semantics import RowDescriptor
+from cleave.viz.row_kinds import RowDescriptor
 from cleave.viz.theme import (
     DISABLED,
     HIGHLIGHT,

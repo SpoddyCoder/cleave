@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import shutil
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -11,17 +10,16 @@ import pygame
 
 from cleave.config import CleaveConfig
 from cleave.signals import Signals
-from cleave.song_markers import format_marker_time, place_marker
 from cleave.preset_curation import PresetCurationIndex
-from cleave.preset_playlist import milk_files_in_dir
-from cleave.timeline import snap_placement_time
 from cleave.viz.config_save import ConfigSaveController
+from cleave.viz.layer_lifecycle_controls import LayerLifecycleController
 from cleave.viz.layer_mutations import LayerMutations
 from cleave.viz.editor_mode_controls import EditorModeController, is_preset_curation_mode
 from cleave.viz.post_fx import sync_live_compositor_format
 from cleave.viz.preset_curation_controls import PresetCurationController
+from cleave.viz.preset_list_controls import PresetListController
 from cleave.viz.key_repeat import KeyRepeatController, add_current_preset_key_pressed, delete_key_pressed, mod_ctrl, mod_shift
-from cleave.viz.modal import ModalHost, ModalOption
+from cleave.viz.modal import ModalHost
 from cleave.viz.panel_notification import PanelNotificationHost
 from cleave.viz.playback import PlaybackState, current_sec, seek, seek_to, toggle_pause
 from cleave.viz.live_layer_bindings import LiveLayerBindings
@@ -30,24 +28,12 @@ from cleave.viz.render_pattern_mask_controls import RenderPatternMaskControls
 from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
 from cleave.viz.render_post_fx_controls import RenderPostFxControls
 from cleave.viz.settings_controls import SettingsControls
+from cleave.viz.song_marker_controls import SongMarkerController
 from cleave.viz.tap_sync_controls import TapSyncControls, TapSyncUiSnapshot
 from cleave.viz.timeline_phase_controls import TimelinePhaseController
 from cleave.viz.timeline_preset_controls import TimelinePresetController
-from cleave.viz.preset_list_populate import (
-    needed_preset_count,
-    on_segment_populate_count,
-    populate_from_cue_marker_roles,
-    populate_from_directory,
-    repopulate_preset_lists,
-)
 from cleave.viz.timeline_cut_controls import TimelineCutController
 from cleave.viz.timeline_snap_controls import TimelineSnapController
-from cleave.viz.user_presets import (
-    USER_PRESETS_DIRNAME,
-    resolve_user_preset_dest,
-    preset_list_item_display_name,
-    user_preset_referenced_on_disk,
-)
 from cleave.viz.focus_nav import (
     FocusCursor,
     MainFocus,
@@ -57,17 +43,14 @@ from cleave.viz.focus_nav import (
     move_quick_focus,
     timeline_strip_in_ring,
 )
-from cleave.viz.row_fields import (
-    RowPresentStyle,
-    ROW_FIELDS,
-    apply_field_horizontal,
-)
-from cleave.viz.row_semantics import (
+from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.row_spec import (
     PRESET_FILE_ROW_KINDS,
     REPEAT_ROW_KINDS,
-    RowDescriptor,
-    RowKind,
-    row_behavior,
+    ROW_SPECS,
+    RowPresentStyle,
+    apply_field_horizontal,
+    row_spec,
     row_triggers_layer_delete,
     section_lock_blocks_mutation,
 )
@@ -123,11 +106,8 @@ class TuningControls:
         self.project_dir = project_dir
         self.playback = playback
         self.duration_sec = duration_sec
-        self._beat_times = tuple(beat_times)
-        self._bar_times = tuple(bar_times)
         self._layer_bindings = layer_bindings
         self._render_post_fx_bindings = render_post_fx_bindings
-        self._layer_manager = layer_manager
         self._compositor = compositor
         self._post_process = post_process
         self._masked_compositor = masked_compositor
@@ -136,10 +116,6 @@ class TuningControls:
         self._focus_cursor: FocusCursor = MainFocus(
             RowDescriptor(RowKind.TRANSPORT)
         )
-        self.move_mode_slot: str | None = None
-        self._move_mode_original_z_order: list[str] | None = None
-        self.move_mode_preset: tuple[str, int] | None = None
-        self._move_mode_original_preset_list: list[str] | None = None
         self._notification_host = PanelNotificationHost()
         self._key_repeat = KeyRepeatController()
         self._hide_overlay_requested = False
@@ -147,6 +123,27 @@ class TuningControls:
         self._overlay_hide: Callable[[], None] | None = None
         self._overlay_show: Callable[[], None] | None = None
 
+        self.layer_lifecycle = LayerLifecycleController(
+            session,
+            layer_manager,
+            self._modal_host,
+            layer_bindings,
+            on_rebuild_view=self._rebuild_view,
+            on_notification=self.show_notification,
+            on_focus_after_add=self._focus_after_add_layer,
+            on_capture_delete_nav=self._capture_delete_nav_pos,
+            on_restore_delete_focus=self._restore_delete_focus,
+        )
+        self.song_markers = SongMarkerController(
+            session,
+            self._modal_host,
+            beat_times,
+            bar_times,
+            playback,
+            duration_sec,
+            on_notification=self.show_notification,
+            on_focus_marker=self._focus_song_marker,
+        )
         self._config_save = ConfigSaveController(
             session,
             cfg,
@@ -157,7 +154,18 @@ class TuningControls:
             on_save_new_config=on_save_new_config,
             on_overwrite_config=on_overwrite_config,
             on_notification=self.show_notification,
-            move_mode_signature=self._move_mode_signature_payload,
+            move_mode_signature=self.layer_lifecycle.signature_payload,
+        )
+        self.preset_list = PresetListController(
+            session,
+            preset_root,
+            project_dir,
+            duration_sec,
+            self._modal_host,
+            layer_bindings,
+            on_notification=self.show_notification,
+            get_active_config_path=lambda: self._config_save.active_config_path,
+            on_focus_preset_item=self._focus_preset_list_item,
         )
         curation_index = PresetCurationIndex.build(preset_root)
         self._preset_curation = PresetCurationController(
@@ -177,7 +185,7 @@ class TuningControls:
             bar_times,
             signals=signals,
             on_notification=self.show_notification,
-            on_repopulate=self._repopulate_preset_lists,
+            on_repopulate=self.preset_list.repopulate,
         )
         self.timeline_phase = TimelinePhaseController(
             session,
@@ -203,8 +211,8 @@ class TuningControls:
             preset_root,
             curation_index,
             get_focus_cursor=lambda: self.focus_cursor,
-            get_move_mode_slot=lambda: self.move_mode_slot,
-            get_move_mode_preset=lambda: self.move_mode_preset,
+            get_move_mode_slot=lambda: self.layer_lifecycle.move_mode_slot,
+            get_move_mode_preset=lambda: self.preset_list.move_mode_preset,
             config_save=self._config_save,
             get_notification=self._notification_host.active,
             layers_by_slot=layers_by_slot,
@@ -308,10 +316,12 @@ class TuningControls:
                 return True
         return False
 
-    def _move_mode_signature_payload(self) -> dict[str, list[str]] | None:
-        if self.move_mode_slot is not None and self._move_mode_original_z_order is not None:
-            return {"layer_z_order": list(self._move_mode_original_z_order)}
-        return None
+    @property
+    def _in_move_mode(self) -> bool:
+        return (
+            self.layer_lifecycle.move_mode_slot is not None
+            or self.preset_list.move_mode_preset is not None
+        )
 
     @property
     def config_dirty(self) -> bool:
@@ -371,7 +381,7 @@ class TuningControls:
             return True
 
         if event.key == pygame.K_t:
-            if self.move_mode_slot is not None or self.move_mode_preset is not None:
+            if self._in_move_mode:
                 return True
             tl = self.session.timeline
             if tl.panel_open:
@@ -380,21 +390,15 @@ class TuningControls:
                 self.open_timeline_panel(enter_submenu=True)
             return True
 
-        if self.move_mode_slot is not None or self.move_mode_preset is not None:
+        if self._in_move_mode:
             if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
                 self._cancel_move_mode()
                 return True
             if event.key == pygame.K_UP:
-                if self.move_mode_preset is not None:
-                    self._swap_preset_list_item(-1)
-                else:
-                    self._swap_stem_in_z_order(self.move_mode_slot, -1)
+                self._nudge_move_mode(-1)
                 return True
             if event.key == pygame.K_DOWN:
-                if self.move_mode_preset is not None:
-                    self._swap_preset_list_item(1)
-                else:
-                    self._swap_stem_in_z_order(self.move_mode_slot, 1)
+                self._nudge_move_mode(1)
                 return True
             if event.key == pygame.K_m:
                 self._confirm_move_mode()
@@ -463,7 +467,7 @@ class TuningControls:
                         self.session, self.focus_descriptor
                     ):
                         return True
-                    self._delete_song_marker(desc.marker_index)
+                    self.song_markers.prompt_delete(desc.marker_index)
                 return True
             if kind == RowKind.TRACK_PRESET_LIST_ITEM:
                 slot = self.focus_descriptor.slot
@@ -473,12 +477,12 @@ class TuningControls:
                         self.session, self.focus_descriptor
                     ):
                         return True
-                    self._delete_preset_list_item(slot, desc.preset_index)
+                    self.preset_list.prompt_delete(slot, desc.preset_index)
                 return True
             if row_triggers_layer_delete(kind):
                 slot = self.focus_descriptor.slot
                 if slot is not None:
-                    self._delete_layer(slot)
+                    self.layer_lifecycle.prompt_delete(slot)
                 return True
 
         if event.key == pygame.K_m:
@@ -488,13 +492,10 @@ class TuningControls:
                 if slot is not None:
                     if (
                         self.session.layers[slot].locked
-                        and row_behavior(kind).can_enter_move_mode
+                        and row_spec(kind).can_enter_move_mode
                     ):
                         return True
-                    self._move_mode_original_z_order = list(
-                        self.session.layer_z_order
-                    )
-                    self.move_mode_slot = slot
+                    self.layer_lifecycle.enter_move_mode(slot)
                 return True
             if kind == RowKind.TRACK_PRESET_LIST_ITEM:
                 slot = self.focus_descriptor.slot
@@ -504,7 +505,7 @@ class TuningControls:
                         self.session, self.focus_descriptor
                     ):
                         return True
-                    self._enter_preset_list_move_mode(slot, index)
+                    self.preset_list.enter_move_mode(slot, index)
                 return True
 
         if event.key == pygame.K_l:
@@ -533,13 +534,13 @@ class TuningControls:
             if (
                 slot is not None
                 and self.session.layers[slot].preset_switching == "on"
-                and row_behavior(kind).parent_group == "track"
+                and row_spec(kind).parent_group == "track"
             ):
                 if section_lock_blocks_mutation(
                     self.session, self.focus_descriptor
                 ):
                     return True
-                self._add_current_preset(slot)
+                self.preset_list.add_current(slot)
                 return True
 
         if event.key in (pygame.K_f, pygame.K_b, pygame.K_r, pygame.K_c):
@@ -550,7 +551,9 @@ class TuningControls:
                     self.session, self.focus_descriptor
                 ):
                     return True
-                src = self._resolve_preset_file_path(slot, kind, self.focus_descriptor)
+                src = self.preset_list.resolve_file_path(
+                    slot, kind, self.focus_descriptor
+                )
                 if src is None or not src.is_file():
                     return True
                 if event.key == pygame.K_f:
@@ -594,7 +597,7 @@ class TuningControls:
                         self.session, self.focus_descriptor
                     ):
                         return True
-                    self._add_current_preset(slot)
+                    self.preset_list.add_current(slot)
                 return True
             if kind == RowKind.TRACK_PRESET_LIST_POPULATE:
                 slot = self.focus_descriptor.slot
@@ -603,15 +606,15 @@ class TuningControls:
                         self.session, self.focus_descriptor
                     ):
                         return True
-                    self._prompt_populate_presets(slot)
+                    self.preset_list.prompt_populate(slot)
                 return True
             if kind == RowKind.LAYER_MANAGEMENT_ADD:
-                self._add_layer()
+                self.layer_lifecycle.prompt_add()
                 return True
             if kind == RowKind.LAYER_MANAGEMENT_DELETE:
                 slot = self.focus_descriptor.slot
                 if slot is not None:
-                    self._delete_layer(slot)
+                    self.layer_lifecycle.prompt_delete(slot)
                 return True
             if kind == RowKind.TIMELINE_PRESETS:
                 self._timeline_presets.prompt(self.duration_sec)
@@ -718,7 +721,9 @@ class TuningControls:
                     self.session, self.focus_descriptor
                 ):
                     return True
-                src = self._resolve_preset_file_path(slot, kind, self.focus_descriptor)
+                src = self.preset_list.resolve_file_path(
+                    slot, kind, self.focus_descriptor
+                )
                 if src is None or not src.is_file():
                     return True
                 if event.key == pygame.K_f:
@@ -803,12 +808,7 @@ class TuningControls:
             tl.focus_row = cursor.row
             return
         if isinstance(cursor, MainFocus):
-            desc = cursor.descriptor
-            if (
-                desc.kind == RowKind.SONG_MARKER_ITEM
-                and desc.marker_index is not None
-            ):
-                self.session.song_markers.selected_index = desc.marker_index
+            self.song_markers.sync_focus(cursor.descriptor)
 
     def _on_editor_mode_changed(self) -> None:
         self._sync_live_compositor_format()
@@ -866,51 +866,26 @@ class TuningControls:
         view = self.build_view_state(paused=self.playback.paused)
         self._apply_focus_cursor(move_quick_focus(self.focus_cursor, delta, view))
 
-    def _swap_stem_in_z_order(self, stem: str, direction: int) -> None:
-        order = self.session.layer_z_order
-        try:
-            index = order.index(stem)
-        except ValueError:
+    def _nudge_move_mode(self, direction: int) -> None:
+        if self.preset_list.move_mode_preset is not None:
+            self.preset_list.swap_item(direction)
             return
-        target = index + direction
-        if target < 0 or target >= len(order):
-            return
-        order[index], order[target] = order[target], order[index]
-        self.apply_preview_resolutions()
-
-    def apply_preview_resolutions(self) -> None:
-        if self._layer_manager is not None:
-            self._layer_manager.apply_preview_resolutions()
+        slot = self.layer_lifecycle.move_mode_slot
+        if slot is not None:
+            self.layer_lifecycle.swap_stem_in_z_order(slot, direction)
 
     def _confirm_move_mode(self) -> None:
-        self.move_mode_slot = None
-        self._move_mode_original_z_order = None
-        if self.move_mode_preset is not None:
-            slot, _index = self.move_mode_preset
-            self.move_mode_preset = None
-            self._move_mode_original_preset_list = None
-            if self._layer_bindings is not None:
-                self._layer_bindings.on_preset_switching_change(slot)
+        self.layer_lifecycle.confirm_move_mode()
+        self.preset_list.confirm_move_mode()
+
+    def _cancel_move_mode(self) -> None:
+        self.layer_lifecycle.cancel_move_mode()
+        self.preset_list.cancel_move_mode()
 
     def _rebuild_view(self) -> None:
-        if self.move_mode_slot is not None or self.move_mode_preset is not None:
-            self._confirm_move_mode()
+        self._confirm_move_mode()
 
-    def _add_layer(self) -> None:
-        if self._layer_manager is None:
-            return
-        if not self._layer_manager.can_add():
-            return
-        self._modal_host.prompt_yes_no(
-            "Add new Milkdrop visualisation layer?",
-            on_confirm=self._confirm_add_layer,
-        )
-
-    def _confirm_add_layer(self) -> None:
-        if self._layer_manager is None:
-            return
-        self._layer_manager.add_layer()
-        self._rebuild_view()
+    def _focus_after_add_layer(self) -> None:
         view_after = self.build_view_state(paused=self.playback.paused)
         if (
             self.focus_descriptor.kind == RowKind.LAYER_MANAGEMENT_ADD
@@ -920,29 +895,16 @@ class TuningControls:
                 MainFocus(RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER))
             )
 
-    def _delete_layer(self, slot: str) -> None:
-        if self._layer_manager is None:
-            return
-        if not self._layer_manager.can_remove():
-            self.show_notification("Must have at least 1 layer")
-            return
-        self._modal_host.prompt_yes_no(
-            "Delete this Milkdrop visualisation layer?",
-            on_confirm=lambda: self._confirm_delete_layer(slot),
-        )
-
-    def _confirm_delete_layer(self, slot: str) -> None:
-        if self._layer_manager is None:
-            return
+    def _capture_delete_nav_pos(self) -> int:
         view = self.build_view_state(paused=self.playback.paused)
         navigable = view.layout.navigable_descriptors(view)
         current = view.layout.resolve_navigable(self.focus_descriptor, view)
         try:
-            nav_pos = navigable.index(current)
+            return navigable.index(current)
         except ValueError:
-            nav_pos = 0
-        self._layer_manager.remove_layer(slot)
-        self._rebuild_view()
+            return 0
+
+    def _restore_delete_focus(self, nav_pos: int) -> None:
         view_after = self.build_view_state(paused=self.playback.paused)
         navigable_after = view_after.layout.navigable_descriptors(view_after)
         if navigable_after:
@@ -953,264 +915,38 @@ class TuningControls:
             )
         self._normalize_focus_cursor()
 
-    def _user_presets_dir(self) -> Path | None:
-        if self.project_dir is None:
-            return None
-        return self.project_dir / USER_PRESETS_DIRNAME
-
-    def _preset_list_path_referenced(self, path: str) -> bool:
-        target = Path(path).resolve()
-        for layer in self.session.layers.values():
-            for other in layer.preset_list:
-                if Path(other).resolve() == target:
-                    return True
-        return False
-
-    def _unlock_preset_after_modal(self, slot: str) -> None:
-        if self._layer_bindings is not None:
-            self._layer_bindings.unlock_preset_after_modal(slot)
-
-    def _resolve_preset_file_path(
-        self, slot: str, kind: RowKind, desc: RowDescriptor
-    ) -> Path | None:
-        layer = self.session.layers[slot]
-        if kind == RowKind.TRACK_PRESET:
-            return layer.playlist.current
-        if kind == RowKind.TRACK_PRESET_LIST_ITEM:
-            index = desc.preset_index
-            if index is None or index < 0 or index >= len(layer.preset_list):
-                return None
-            return Path(layer.preset_list[index])
-        return None
-
-    def _add_current_preset(self, slot: str) -> None:
-        playlist = self.session.layers[slot].playlist
-        if playlist.current is None:
-            return
-        src_path = playlist.current
-        if self._layer_bindings is not None:
-            self._layer_bindings.lock_preset_for_modal(slot)
-        self._modal_host.prompt_yes_no(
-            f"Add preset: {src_path.name}?",
-            on_confirm=lambda: self._confirm_add_preset(slot, src_path),
-            on_cancel=lambda: self._unlock_preset_after_modal(slot),
-        )
-
-    def _confirm_add_preset(self, slot: str, src_path: Path) -> None:
-        try:
-            dest_dir = self._user_presets_dir()
-            if dest_dir is None:
-                return
-            dest_dir.mkdir(parents=True, exist_ok=True)
-            dest_path, needs_copy = resolve_user_preset_dest(dest_dir, src_path)
-            if needs_copy:
-                shutil.copy2(src_path, dest_path)
-            self.session.layers[slot].preset_list.append(str(dest_path.resolve()))
-            if self._layer_bindings is not None:
-                self._layer_bindings.on_preset_switching_change(slot)
-        finally:
-            self._unlock_preset_after_modal(slot)
-
-    def _delete_preset_list_item(self, slot: str, index: int) -> None:
-        layer = self.session.layers[slot]
-        if index < 0 or index >= len(layer.preset_list):
-            return
-        label = preset_list_item_display_name(layer.preset_list, index)
-        self._modal_host.prompt_yes_no(
-            f"Remove preset: {label}?",
-            on_confirm=lambda: self._confirm_delete_preset(slot, index),
-        )
-
-    def _confirm_delete_preset(self, slot: str, index: int) -> None:
-        layer = self.session.layers[slot]
-        if index < 0 or index >= len(layer.preset_list):
-            return
-        removed = layer.preset_list.pop(index)
-        removed_path = Path(removed).resolve()
-        presets_dir = self._user_presets_dir()
-        if presets_dir is not None:
-            try:
-                removed_path.relative_to(presets_dir.resolve())
-            except ValueError:
-                pass
-            else:
-                still_needed = self._preset_list_path_referenced(removed)
-                if not still_needed and self.project_dir is not None:
-                    still_needed = user_preset_referenced_on_disk(
-                        self.project_dir,
-                        removed_path,
-                        skip_config=self._config_save.active_config_path,
-                    )
-                if not still_needed:
-                    removed_path.unlink(missing_ok=True)
-        if self._layer_bindings is not None:
-            self._layer_bindings.on_preset_switching_change(slot)
-
-    def _cancel_move_mode(self) -> None:
-        if self._move_mode_original_z_order is not None:
-            self.session.layer_z_order[:] = self._move_mode_original_z_order
-            self.apply_preview_resolutions()
-        if (
-            self.move_mode_preset is not None
-            and self._move_mode_original_preset_list is not None
-        ):
-            slot, _index = self.move_mode_preset
-            self.session.layers[slot].preset_list[:] = (
-                self._move_mode_original_preset_list
-            )
-        self.move_mode_slot = None
-        self._move_mode_original_z_order = None
-        self.move_mode_preset = None
-        self._move_mode_original_preset_list = None
-
-    def _enter_preset_list_move_mode(self, slot: str, index: int) -> None:
-        layer = self.session.layers[slot]
-        if index < 0 or index >= len(layer.preset_list):
-            return
-        self._move_mode_original_preset_list = list(layer.preset_list)
-        self.move_mode_preset = (slot, index)
-
-    def _swap_preset_list_item(self, direction: int) -> None:
-        if self.move_mode_preset is None:
-            return
-        slot, index = self.move_mode_preset
-        presets = self.session.layers[slot].preset_list
-        target = index + direction
-        if target < 0 or target >= len(presets):
-            return
-        presets[index], presets[target] = presets[target], presets[index]
-        self.move_mode_preset = (slot, target)
+    def _focus_preset_list_item(self, slot: str, index: int) -> None:
         self._apply_focus_cursor(
             MainFocus(
                 RowDescriptor(
                     RowKind.TRACK_PRESET_LIST_ITEM,
                     slot=slot,
-                    preset_index=target,
+                    preset_index=index,
                 )
             )
         )
 
-    def _repopulate_preset_lists(self) -> None:
-        if self.project_dir is None:
-            return
-        repopulate_preset_lists(
-            self.session,
-            mode=self.session.timeline.timeline_preset_repopulate,
-            project_dir=self.project_dir,
-            preset_root=self.preset_root,
-        )
-        if self._layer_bindings is None:
-            return
-        for slot in self.session.layer_z_order:
-            if self.session.layers[slot].preset_switching == "on":
-                self._layer_bindings.on_preset_switching_change(slot)
-
-    def _prompt_populate_presets(self, slot: str) -> None:
-        if self.project_dir is None:
-            return
-        if self._layer_bindings is not None:
-            self._layer_bindings.lock_preset_for_modal(slot)
-        options: list[ModalOption] = []
-        layer = self.session.layers[slot]
-        timeline_trigger = layer.preset_switching_trigger == "timeline"
-        if timeline_trigger:
-            populate_count = on_segment_populate_count(self.session, slot)
-            options.append(
-                ModalOption(
-                    "Using Cue Marker Roles (random)",
-                    action=lambda: self._confirm_populate(slot, "cue_roles"),
-                )
-            )
-        else:
-            needed = needed_preset_count(
-                song_duration_sec=self.duration_sec,
-                preset_duration=layer.preset_duration,
-                trigger=layer.preset_switching_trigger,
-            )
-            available = len(milk_files_in_dir(layer.playlist.current_dir))
-            populate_count = min(needed, available)
-        options.extend(
-            [
-                ModalOption(
-                    "From Current Directory (random)",
-                    action=lambda: self._confirm_populate(
-                        slot, "directory_random"
-                    ),
-                ),
-                ModalOption(
-                    "From Current Directory (sequential)",
-                    action=lambda: self._confirm_populate(
-                        slot, "directory_sequential"
-                    ),
-                ),
-            ]
-        )
-        options.append(
-            ModalOption(
-                "Cancel",
-                action=lambda: self._unlock_preset_after_modal(slot),
-            )
-        )
-        self._modal_host.prompt_choice(
-            f"Populate the preset list with {populate_count} presets?",
-            options,
-            on_dismiss=lambda: self._unlock_preset_after_modal(slot),
-        )
-
-    def _confirm_populate(self, slot: str, mode: str) -> None:
-        try:
-            if self.project_dir is None:
-                return
-            layer = self.session.layers[slot]
-            timeline_trigger_disabled = (
-                layer.preset_switching_trigger == "timeline"
-                and not self.session.timeline.enabled
-            )
-            if mode in ("directory_random", "directory_sequential"):
-                max_count: int | None = None
-                if layer.preset_switching_trigger != "timeline":
-                    max_count = needed_preset_count(
-                        song_duration_sec=self.duration_sec,
-                        preset_duration=layer.preset_duration,
-                        trigger=layer.preset_switching_trigger,
+    def _focus_song_marker(self, marker_index: int | None) -> None:
+        if marker_index is not None:
+            self._apply_focus_cursor(
+                MainFocus(
+                    RowDescriptor(
+                        RowKind.SONG_MARKER_ITEM,
+                        marker_index=marker_index,
                     )
-                order = (
-                    "sequential" if mode == "directory_sequential" else "random"
                 )
-                populate_from_directory(
-                    self.session,
-                    slot,
-                    project_dir=self.project_dir,
-                    max_count=max_count,
-                    order=order,
-                )
-            else:
-                populate_from_cue_marker_roles(
-                    self.session,
-                    slot,
-                    project_dir=self.project_dir,
-                    preset_root=self.preset_root,
-                )
-            layer.preset_list_expanded = True
-            if self._layer_bindings is not None:
-                self._layer_bindings.on_preset_switching_change(slot)
-            count = len(layer.preset_list)
-            if timeline_trigger_disabled:
-                self.show_notification(
-                    f"Populated {count} presets; "
-                    "enable Render: TIMELINE to switch"
-                )
-            else:
-                self.show_notification(f"Populated {count} presets")
-        finally:
-            self._unlock_preset_after_modal(slot)
+            )
+            return
+        self._apply_focus_cursor(
+            MainFocus(RowDescriptor(RowKind.SONG_MARKERS_HEADER))
+        )
 
     def _apply_horizontal(self, key: int, mod: int, kind: RowKind) -> None:
         ctrl = mod_ctrl(mod)
         shift = mod_shift(mod)
         forward = key == pygame.K_RIGHT
 
-        field = ROW_FIELDS.get(kind)
+        field = ROW_SPECS.get(kind)
         if (
             field is not None
             and field.present_style == RowPresentStyle.EXPAND_SUBHEADER
@@ -1283,12 +1019,6 @@ class TuningControls:
             return
         layer.preset_list_expanded = expanded
 
-    def set_song_markers_expanded(self, expanded: bool) -> None:
-        markers = self.session.song_markers
-        if markers.expanded == expanded:
-            return
-        markers.expanded = expanded
-
     def set_beat_bar_grid_expanded(self, expanded: bool) -> None:
         tl = self.session.timeline
         if tl.beat_bar_grid_expanded == expanded:
@@ -1339,101 +1069,6 @@ class TuningControls:
             self._layer_bindings.on_seek(target - current)
         else:
             seek_to(self.playback, target, self.duration_sec)
-
-    def drop_song_marker(self) -> None:
-        """Drop or replace a song marker at the playhead (session until Save)."""
-        if self.session.timeline.recording:
-            return
-        t = snap_placement_time(
-            current_sec(self.playback, self.duration_sec),
-            self.session.timeline.placement_snap,
-            beat_times=self._beat_times,
-            bar_times=self._bar_times,
-        )
-        markers = self.session.song_markers
-        prior_selected_time: float | None = None
-        if (
-            markers.selected_index is not None
-            and 0 <= markers.selected_index < len(markers.markers)
-        ):
-            prior_selected_time = markers.markers[markers.selected_index].time
-        new_markers, replaced_index, replaced_time = place_marker(
-            markers.markers, t
-        )
-        markers.markers = list(new_markers)
-        markers.expanded = True
-        self.session.timeline.panel_open = True
-        # Never activate the newly placed marker; keep prior selection by time.
-        if prior_selected_time is None:
-            if markers.selected_index is not None and (
-                markers.selected_index < 0
-                or markers.selected_index >= len(markers.markers)
-            ):
-                markers.selected_index = None
-        elif (
-            replaced_time is not None
-            and replaced_time == prior_selected_time
-            and replaced_index is not None
-        ):
-            markers.selected_index = replaced_index
-        else:
-            try:
-                markers.selected_index = next(
-                    i
-                    for i, m in enumerate(new_markers)
-                    if m.time == prior_selected_time
-                )
-            except StopIteration:
-                markers.selected_index = None
-        if replaced_index is not None:
-            assert replaced_time is not None
-            self.show_notification(
-                f"Song marker replaced "
-                f"{format_marker_time(replaced_time)} -> "
-                f"{format_marker_time(new_markers[replaced_index].time)}"
-            )
-        else:
-            self.show_notification(f"Song marker {format_marker_time(t)}")
-
-    def _delete_song_marker(self, index: int) -> None:
-        markers = self.session.song_markers
-        if index < 0 or index >= len(markers.markers):
-            return
-        label = format_marker_time(markers.markers[index].time)
-        self._modal_host.prompt_yes_no(
-            f"Remove song marker {label}?",
-            on_confirm=lambda: self._confirm_delete_song_marker(index),
-        )
-
-    def _confirm_delete_song_marker(self, index: int) -> None:
-        markers = self.session.song_markers
-        if index < 0 or index >= len(markers.markers):
-            return
-        removed = markers.markers.pop(index)
-        if not markers.markers:
-            markers.selected_index = None
-        elif markers.selected_index is None:
-            pass
-        elif markers.selected_index == index:
-            markers.selected_index = min(index, len(markers.markers) - 1)
-        elif markers.selected_index > index:
-            markers.selected_index -= 1
-        self.show_notification(
-            f"Song marker removed {format_marker_time(removed.time)}"
-        )
-        if markers.selected_index is not None:
-            self._apply_focus_cursor(
-                MainFocus(
-                    RowDescriptor(
-                        RowKind.SONG_MARKER_ITEM,
-                        marker_index=markers.selected_index,
-                    )
-                )
-            )
-        else:
-            self._apply_focus_cursor(
-                MainFocus(RowDescriptor(RowKind.SONG_MARKERS_HEADER))
-            )
 
     def show_notification(self, message: str) -> None:
         self._notification_host.show(message)

@@ -10,7 +10,8 @@ import pygame
 from cleave.viz.overlay_primitives import visibility_bucket
 from cleave.viz.overlay_profiler import OverlayDrawCounters
 from cleave.viz.overlay_upload import OverlayGpuState, UploadSignature
-from cleave.viz.row_semantics import RowKind, section_locked
+from cleave.viz.row_kinds import RowKind
+from cleave.viz.row_spec import section_locked
 from cleave.viz.tuning_view_state import TuningViewState
 
 TextFitter = Callable[[pygame.font.Font, str, int], str]

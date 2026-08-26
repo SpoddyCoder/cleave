@@ -99,6 +99,8 @@ DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR = (0, 0, 0)
 DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY = 0.7
 DEFAULT_RENDER_OVERLAY_BORDER_COLOUR = (255, 255, 255)
 DEFAULT_RENDER_OVERLAY_BORDER_WIDTH = 4
+DEFAULT_RENDER_OVERLAY_CARD_ENABLED = True
+DEFAULT_RENDER_OVERLAYS_LOCKED = False
 
 
 def _parse_render_overlay_position(
@@ -469,7 +471,7 @@ def _render_overlay_card_fields(
     return (
         FieldDescriptor(
             "enabled",
-            True,
+            DEFAULT_RENDER_OVERLAY_CARD_ENABLED,
             lambda raw, _ctx, _label: bool(raw),
             dump_scalar,
         ),
@@ -529,7 +531,7 @@ RENDER_OVERLAY_CLOSING_CARD_SECTION = SectionDescriptor(
 RENDER_OVERLAYS_FIELDS: tuple[SchemaField, ...] = (
     FieldDescriptor(
         "locked",
-        False,
+        DEFAULT_RENDER_OVERLAYS_LOCKED,
         lambda raw, _ctx, _label: bool(raw),
         dump_scalar,
     ),
@@ -648,7 +650,7 @@ def default_render_overlay_card_runtime_values(
         else default_render_overlay_animation_runtime_values()
     )
     return {
-        "enabled": True,
+        "enabled": DEFAULT_RENDER_OVERLAY_CARD_ENABLED,
         "expanded": False,
         "position": DEFAULT_RENDER_OVERLAY_POSITION,
         "title_expanded": False,
@@ -670,5 +672,5 @@ def default_render_overlays_runtime_values() -> dict[str, Any]:
         "expanded": False,
         "opening_card": default_render_overlay_card_runtime_values(closing=False),
         "closing_card": default_render_overlay_card_runtime_values(closing=True),
-        "locked": False,
+        "locked": DEFAULT_RENDER_OVERLAYS_LOCKED,
     }

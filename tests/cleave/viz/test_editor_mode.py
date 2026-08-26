@@ -9,7 +9,7 @@ import pygame
 from cleave.config_schema.persist import persisted_session_payload
 from cleave.viz.focus_nav import MainFocus
 from cleave.viz.modal import ModalKind
-from cleave.viz.row_semantics import RowDescriptor, RowKind
+from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.tuning_view_state import SettingsBlock, TuningViewState, view_state_structure_signature
 from tests.cleave.viz.test_controls import _make_controls, _mutate_dirty
 from tests.cleave.viz.test_overlay import _minimal_view_state
@@ -111,7 +111,7 @@ def test_curation_ignores_non_allowlisted_keys() -> None:
     assert layer.locked is False
 
     controls.handle_keydown(keydown(pygame.K_m))
-    assert controls.move_mode_slot is None
+    assert controls.layer_lifecycle.move_mode_slot is None
 
     controls.handle_keydown(keydown(pygame.K_DELETE))
     assert "layer_1" in controls.session.layers
@@ -237,7 +237,7 @@ def test_curation_allowlisted_keys_still_work() -> None:
 
 def test_curation_ignores_layer_lock() -> None:
     from cleave.viz.row_layout import row_navigable
-    from cleave.viz.row_semantics import section_locked
+    from cleave.viz.row_spec import section_locked
     from cleave.viz.theme import VALUE
     from cleave.viz.tuning_panel_draw import _row_value_color
 
@@ -339,7 +339,7 @@ def test_horizontal_only_stages_editor_mode() -> None:
     assert not controls.modal_host.active
     state = controls.build_view_state(paused=True)
     assert state.settings.editor_mode_selection == "preset_curation"
-    from cleave.viz.row_fields import editor_mode_confirm_pending, format_row_value
+    from cleave.viz.row_spec import editor_mode_confirm_pending, format_row_value
 
     assert (
         format_row_value(state, RowDescriptor(RowKind.SETTINGS_EDITOR_MODE))

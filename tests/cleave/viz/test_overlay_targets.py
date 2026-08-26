@@ -12,7 +12,7 @@ from cleave.viz.overlay_draw import OverlayDrawer
 from cleave.viz.overlay_primitives import ComposedPanel
 from cleave.viz.overlay_profiler import OverlayProfiler
 from cleave.viz.overlay_upload import OverlayGpuState, UploadPlan, UploadSignature
-from cleave.viz.row_semantics import RowDescriptor, RowKind
+from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.timeline_overlay import TimelineViewState
 from tests.support.compositor_mock import recording_compositor
 

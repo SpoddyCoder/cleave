@@ -35,6 +35,10 @@ from cleave.config_schema.layers import (
     PresetSwitchingTrigger,
 )
 from cleave.config_schema.render import (
+    DEFAULT_RENDER_OVERLAYS_LOCKED,
+    DEFAULT_RENDER_PATTERN_MASK_LOCKED,
+    DEFAULT_RENDER_PATTERN_MASK_TRANSITION,
+    DEFAULT_RENDER_POST_FX_LOCKED,
     HighlightRolloffApplyMode,
     HighlightRolloffCurve,
     PatternMaskType,
@@ -49,9 +53,11 @@ from cleave.config_schema.render import (
 )
 from cleave.config_schema.timeline import (
     DEFAULT_TIMELINE_CROSSFADE,
+    DEFAULT_TIMELINE_ENABLED,
     DEFAULT_TIMELINE_FADE_IN,
     DEFAULT_TIMELINE_FADE_OUT,
     DEFAULT_TIMELINE_FADES_ENABLED,
+    DEFAULT_TIMELINE_LOCKED,
     DEFAULT_TIMELINE_PLACEMENT_SNAP,
     DEFAULT_VISUAL_LIMITER_ENABLED,
     DEFAULT_VISUAL_LIMITER_RATIO,
@@ -162,7 +168,7 @@ class RenderOverlaysRuntime:
     expanded: bool
     opening_card: RenderOverlayCardRuntime
     closing_card: RenderOverlayCardRuntime
-    locked: bool = False
+    locked: bool = DEFAULT_RENDER_OVERLAYS_LOCKED
 
 
 def _card_runtime_from_values(values: dict[str, Any]) -> RenderOverlayCardRuntime:
@@ -231,7 +237,7 @@ class RenderPostFxRuntime:
     highlight_rolloff_expanded: bool = False
     chroma_boost: ChromaBoostRuntime = field(default_factory=default_chroma_boost_runtime)
     chroma_boost_expanded: bool = False
-    locked: bool = False
+    locked: bool = DEFAULT_RENDER_POST_FX_LOCKED
 
 
 def default_render_post_fx_runtime() -> RenderPostFxRuntime:
@@ -254,8 +260,8 @@ class RenderPatternMaskRuntime:
     feather_pct: int
     invert: bool
     seed: int
-    transition: float = 0.0
-    locked: bool = False
+    transition: float = DEFAULT_RENDER_PATTERN_MASK_TRANSITION
+    locked: bool = DEFAULT_RENDER_PATTERN_MASK_LOCKED
 
 
 def default_render_pattern_mask_runtime() -> RenderPatternMaskRuntime:
@@ -288,8 +294,8 @@ def default_visual_limiter_runtime() -> VisualLimiterRuntime:
 
 @dataclass
 class TimelineRuntime:
-    enabled: bool = True
-    locked: bool = False
+    enabled: bool = DEFAULT_TIMELINE_ENABLED
+    locked: bool = DEFAULT_TIMELINE_LOCKED
     lanes: dict[str, TimelineLane] = field(default_factory=dict)
     panel_open: bool = False
     focus_row: int = 0
@@ -391,7 +397,7 @@ class LayerRuntime:
     opacity_pct: int = int(round(DEFAULT_LAYER_OPACITY * 100))
     effects: dict[str, dict[str, int]] = field(default_factory=dict)
     effects_expanded: bool = False
-    blend_mode: BlendMode = "black-key"
+    blend_mode: BlendMode = DEFAULT_BLEND_MODE[DEFAULT_NEW_LAYER_STEM]
     beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
     enabled: bool = DEFAULT_LAYER_ENABLED
     expanded: bool = False

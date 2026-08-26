@@ -70,7 +70,7 @@ def _handle_global_keydown(
     if event.key == pygame.K_RETURN and mod_ctrl(event.mod):
         if runtime.seed.session.timeline.recording:
             return True
-        runtime.controls.drop_song_marker()
+        runtime.controls.song_markers.drop()
         return True
 
     if event.key == pygame.K_h:

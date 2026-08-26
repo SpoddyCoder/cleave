@@ -17,7 +17,8 @@ from cleave.viz.row_layout import (
     row_draw_visible,
     row_navigable,
 )
-from cleave.viz.row_semantics import RowDescriptor, RowKind, section_header_descriptor
+from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.row_spec import section_header_descriptor
 from tests.cleave.viz.test_overlay import _minimal_view_state
 
 

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from cleave.paths import repo_root
-from cleave.viz.row_fields import ROW_FIELDS, RowPresentStyle
-from cleave.viz.row_semantics import RowDescriptor, RowKind
+from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.row_spec import ROW_SPECS, RowPresentStyle
 from cleave.viz.tuning_panel_draw import _row_text, fit_row_text
 from cleave.viz.tuning_view_state import SettingsBlock, TuningViewState
 from tests.cleave.viz.test_overlay import _minimal_view_state
@@ -83,7 +83,7 @@ def test_each_present_style_row_text_and_fit() -> None:
     covered: set[RowPresentStyle] = set()
     for style in RowPresentStyle:
         index, expected = _row_for_style(state, style)
-        field = ROW_FIELDS[state.layout.kind(index)]
+        field = ROW_SPECS[state.layout.kind(index)]
         assert field.present_style == style
         text = _row_text(state, index)
         assert text == expected

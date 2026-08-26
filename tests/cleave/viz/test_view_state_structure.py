@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cleave.viz.row_semantics import RowDescriptor, RowKind
+from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.tuning_view_state import view_state_structure_signature
 from tests.cleave.viz.test_controls import _make_controls
 from tests.cleave.viz.test_overlay import _minimal_view_state

@@ -27,25 +27,12 @@ from cleave.viz.material_icons import (
 from cleave.viz.overlay_profiler import OverlayDrawCounters
 from cleave.viz.panel_notification import notification_attention
 from cleave.viz.playback import format_mmss
-from cleave.viz.row_semantics import (
-    RowAffordance,
-    row_blocked_by_section_lock,
-    row_behavior,
-    section_locked,
-)
-from cleave.viz.row_sections import (
-    RENDER_OVERLAY_SECTION_KINDS,
-    RENDER_PATTERN_MASK_SECTION_KINDS,
-    RENDER_POST_FX_SECTION_KINDS,
-    RENDER_TIMELINE_SECTION_KINDS,
-    expand_arrow_glyph,
-    row_tree_indent_depth,
-)
-from cleave.viz.row_fields import (
-    ROW_FIELDS,
+from cleave.viz.row_kinds import RowAffordance
+from cleave.viz.row_spec import (
     FitStrategy,
-    RowFieldDef,
+    ROW_SPECS,
     RowPresentStyle,
+    RowSpec,
     composite_header_prefix_part,
     composite_header_suffix_part,
     editor_mode_confirm_pending,
@@ -55,13 +42,24 @@ from cleave.viz.row_fields import (
     format_row_value,
     labeled_row_prefix,
     row_action_parameter_display_text,
+    row_blocked_by_section_lock,
     row_composite_header_display_text,
     row_dynamic_labeled_display_text,
     row_dynamic_labeled_prefix,
     row_expand_subheader_display_text,
     row_full_line_display_text,
     row_labeled_display_text,
+    row_spec,
+    section_locked,
     tree_branch_leading_spaces,
+)
+from cleave.viz.row_sections import (
+    RENDER_OVERLAY_SECTION_KINDS,
+    RENDER_PATTERN_MASK_SECTION_KINDS,
+    RENDER_POST_FX_SECTION_KINDS,
+    RENDER_TIMELINE_SECTION_KINDS,
+    expand_arrow_glyph,
+    row_tree_indent_depth,
 )
 from cleave.viz.text_fit import (
     fit_counter_label_to_width,
@@ -122,8 +120,8 @@ def compose_surface(
     return pygame.Surface(size, flags)
 
 
-def field_for_index(state: TuningViewState, index: int) -> RowFieldDef | None:
-    return ROW_FIELDS.get(state.layout.kind(index))
+def field_for_index(state: TuningViewState, index: int) -> RowSpec | None:
+    return ROW_SPECS.get(state.layout.kind(index))
 
 
 def row_has_tree_focus(state: TuningViewState, index: int) -> bool:
@@ -440,7 +438,7 @@ def _fit_value(
 
 def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
     kind = state.layout.kind(index)
-    field = ROW_FIELDS.get(kind)
+    field = ROW_SPECS.get(kind)
     if field is None:
         return ""
     if field.present_style == RowPresentStyle.LABELED_VALUE:
@@ -509,7 +507,7 @@ def fit_row_text(
     kind = state.layout.kind(index)
     indent = row_indent(state, index)
     budget = max_content_width - indent
-    field = ROW_FIELDS.get(kind)
+    field = ROW_SPECS.get(kind)
     if field is None:
         return ""
     if field.present_style == RowPresentStyle.SPACER:
@@ -613,7 +611,7 @@ def row_in_move_mode(state: TuningViewState, index: int) -> bool:
 def row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
     """Return the VALUE-role color for a row (before label/value split rendering)."""
     kind = state.layout.kind(index)
-    field = ROW_FIELDS.get(kind)
+    field = ROW_SPECS.get(kind)
     desc = state.layout.descriptor(index)
     if field is not None and field.present_style == RowPresentStyle.NOTIFICATION:
         accent = notification_accent(desc.marker_index)
@@ -625,7 +623,7 @@ def row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
         return accent
 
     locked_blocked = section_locked(state, desc) and row_blocked_by_section_lock(kind)
-    affordance = row_behavior(kind).affordance
+    affordance = row_spec(kind).affordance
 
     if kind in RENDER_TIMELINE_SECTION_KINDS:
         if not state.render_timeline.enabled:
@@ -723,7 +721,7 @@ def is_transport_row(state: TuningViewState, index: int) -> bool:
     field = field_for_index(state, index)
     if field is None or field.present_style != RowPresentStyle.FULL_LINE:
         return False
-    return row_behavior(state.layout.kind(index)).affordance == RowAffordance.SEEK
+    return row_spec(state.layout.kind(index)).affordance == RowAffordance.SEEK
 
 
 def is_settings_header_row(state: TuningViewState, index: int) -> bool:
@@ -760,8 +758,8 @@ class RowPresentContext:
         return self.state.layout.descriptor(self.index)
 
     @property
-    def field(self) -> RowFieldDef | None:
-        return ROW_FIELDS.get(self.kind)
+    def field(self) -> RowSpec | None:
+        return ROW_SPECS.get(self.kind)
 
     @property
     def indent(self) -> int:
@@ -883,7 +881,7 @@ def _paint_path_icon(
     assert field is not None
     kind = ctx.kind
     depth = row_tree_indent_depth(kind)
-    affordance = row_behavior(kind).affordance
+    affordance = row_spec(kind).affordance
     if affordance == RowAffordance.PATH_DIR:
         icon_surf = _render_preset_row_prefix(
             ctx.font,
