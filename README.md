@@ -65,6 +65,10 @@ pip install -r requirements.txt
 pip install -r requirements-dev.txt
 ```
 
+### Releases
+
+GitHub Releases are tagged source archives (`vX.Y.Z`). Pick a tag, unpack it, and follow Setup above (plus [Get Some Milkdrop Presets](#get-some-milkdrop-presets)). System deps (Python 3.10+, FFmpeg, libprojectM 4.2+) are not bundled. `cleave --version` reports the running version.
+
 ## Quick Start
 
 ### Get Some Milkdrop Presets
