@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
+from cleave import __version__
 from cleave.cli import (
     _format_elapsed,
     build_parser,
@@ -19,6 +20,7 @@ from cleave.cli import (
     cmd_render,
     cmd_restore,
     cmd_separate,
+    main,
 )
 from cleave.viz.render import RenderResult
 from cleave.extract import STEM_NAMES, stems_dir
@@ -67,6 +69,15 @@ if heavy:
         cwd=str(repo_root),
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_cli_version_prints_and_exits_zero(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as exc:
+        main(["--version"])
+    assert exc.value.code == 0
+    assert capsys.readouterr().out.strip() == f"cleave {__version__}"
 
 
 def test_separate_parser_uses_target_arg() -> None:

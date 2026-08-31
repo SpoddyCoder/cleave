@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    uses: ./.github/workflows/tests.yml
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Verify tag matches cleave.__version__
+        run: |
+          python - <<'PY'
+          import os
+          import sys
+
+          sys.path.insert(0, ".")
+          import cleave
+
+          tag = os.environ["GITHUB_REF_NAME"]
+          if not tag.startswith("v"):
+              raise SystemExit(f"tag {tag!r} does not start with 'v'")
+          expected = tag[1:]
+          if cleave.__version__ != expected:
+              raise SystemExit(
+                  f"tag {tag!r} does not match cleave.__version__={cleave.__version__!r}"
+              )
+          print(f"tag {tag} matches cleave.__version__={cleave.__version__}")
+          PY
+
+      - name: Extract changelog notes
+        run: python scripts/changelog_section.py "$GITHUB_REF_NAME" > release-notes.md
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md
