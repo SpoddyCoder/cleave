@@ -7,6 +7,8 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from cleave import __version__
+
 if TYPE_CHECKING:
     from cleave.extract import StemSource
     from cleave.viz.render import RenderSegment
@@ -233,6 +235,7 @@ def build_parser() -> argparse.ArgumentParser:
         usage="%(prog)s [-h] <command> target",
         formatter_class=_CleaveHelpFormatter,
     )
+    parser.add_argument("--version", action="version", version=f"cleave {__version__}")
     subparsers = parser.add_subparsers(
         dest="command", required=True, title="commands"
     )
