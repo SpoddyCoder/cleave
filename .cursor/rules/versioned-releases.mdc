@@ -1,0 +1,28 @@
+---
+description: Trunk-based releases; changelog on main; version only at tag time
+alwaysApply: true
+---
+
+# Versioned releases
+
+`main` is the integration trunk. Tags (`vX.Y.Z`) are frozen snapshots. Cutting a tag: [docs/structured-releases.md](docs/structured-releases.md). Changelog: [CHANGELOG.md](CHANGELOG.md) (Keep a Changelog).
+
+## Every user-visible change
+
+- Land on `main` (short feature branches are fine; merge to `main`, not to a release branch).
+- Add a bullet under `## [Unreleased]` in the same change (Added / Changed / Fixed / Removed as appropriate).
+- Do not bump `cleave.__version__` in [cleave/__init__.py](cleave/__init__.py).
+- Do not create a dated `## [X.Y.Z]` section, git tag, or GitHub Release unless the user asked to cut a release.
+
+Skip the changelog for internal refactors, tests, and docs that do not change user-facing behaviour.
+
+## Do not introduce
+
+- A long-lived `develop` or `release/*` branch as the place work accumulates.
+- GitFlow, dual trunks, or holding features off `main` until a milestone.
+- Version bumps on ordinary changes, a calendar cadence, or reconstructing changelog notes after the fact.
+- A version string that tracks Unreleased work (`__version__` is last-shipped until a cut).
+
+## Short-lived freeze (only when asked)
+
+A `release/X.Y` branch from `main` is for a freeze window (binary QA) or a patch of an already-shipped tag. Tag from that branch, then merge back to `main`. Do not open one unless the user asks or a later release phase requires it.
