@@ -6,19 +6,19 @@ import pytest
 
 from cleave.viz.tuning_view_state import (
     HighlightRolloffBlock,
-    RenderOverlayCardBlock,
     RenderOverlaysBlock,
     RenderPostFxBlock,
     SettingsBlock,
-    TrackBlock,
     TuningViewState,
 )
+from tests.support.viz import make_overlay_card_block, make_track_block
 from cleave.viz.row_layout import (
     build_layout_frame,
     row_draw_visible,
     row_navigable,
 )
-from cleave.viz.row_semantics import RowDescriptor, RowKind, section_header_descriptor
+from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.row_spec import section_header_descriptor
 from tests.cleave.viz.test_overlay import _minimal_view_state
 
 
@@ -58,7 +58,7 @@ def _legacy_focus_index(state: TuningViewState) -> int:
 def test_layout_frame_matches_legacy_indices() -> None:
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -119,7 +119,7 @@ def test_find_descriptor_raises_when_missing() -> None:
 def test_navigable_descriptors_matches_indices() -> None:
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -163,7 +163,7 @@ def test_resolve_navigable_track_sub_row_collapsed_block() -> None:
 def test_resolve_navigable_track_effect_collapsed_effects() -> None:
     state = _minimal_view_state(
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="dir",
                 preset_label="preset.milk",
@@ -187,7 +187,9 @@ def test_resolve_navigable_track_effect_collapsed_effects() -> None:
 
 def test_resolve_navigable_render_overlay_sub_row_collapsed() -> None:
     state = _minimal_view_state(render_overlays=RenderOverlaysBlock(expanded=False))
-    opacity = RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_OPACITY)
+    opacity = RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_OPACITY, card="opening_card"
+    )
     assert opacity not in state.layout.rows
     assert state.layout.resolve_navigable(opacity, state) == RowDescriptor(
         RowKind.RENDER_OVERLAYS_HEADER
@@ -198,14 +200,18 @@ def test_resolve_navigable_render_overlay_title_nested_collapsed() -> None:
     state = _minimal_view_state(
         render_overlays=RenderOverlaysBlock(
             expanded=True,
-            opening_card=RenderOverlayCardBlock(
+            opening_card=make_overlay_card_block(
                 expanded=True, title_expanded=False
             ),
         ),
     )
-    font = RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT)
+    font = RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_TITLE_FONT, card="opening_card"
+    )
     assert font not in state.layout.rows
-    title_header = RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER)
+    title_header = RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER, card="opening_card"
+    )
     assert state.layout.resolve_navigable(font, state) == title_header
 
 
@@ -249,17 +255,17 @@ def test_section_header_descriptor_mappings() -> None:
         RowKind.SETTINGS_HEADER
     )
     assert section_header_descriptor(
-        RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_OPACITY)
-    ) == RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_CARD_HEADER)
+        RowDescriptor(RowKind.RENDER_OVERLAY_CARD_OPACITY)
+    ) == RowDescriptor(RowKind.RENDER_OVERLAY_CARD_HEADER)
     assert section_header_descriptor(
-        RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_CARD_HEADER)
+        RowDescriptor(RowKind.RENDER_OVERLAY_CARD_HEADER)
     ) == RowDescriptor(RowKind.RENDER_OVERLAYS_HEADER)
     assert section_header_descriptor(
-        RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT)
-    ) == RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER)
+        RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT)
+    ) == RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER)
     assert section_header_descriptor(
-        RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_BODY_FONT)
-    ) == RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_BODY_HEADER)
+        RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_FONT)
+    ) == RowDescriptor(RowKind.RENDER_OVERLAY_CARD_BODY_HEADER)
     assert section_header_descriptor(RowDescriptor(RowKind.RENDER_POST_FX_FADE_OUT)) == RowDescriptor(
         RowKind.RENDER_POST_FX_HEADER
     )

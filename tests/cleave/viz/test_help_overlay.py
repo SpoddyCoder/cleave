@@ -4,14 +4,16 @@ from __future__ import annotations
 
 from cleave.blend_modes import BLEND_MODE_HELP_ENTRIES, BLEND_MODES
 from cleave.cue_roles import CUE_ROLE_MARKER_HELP_ENTRIES
-from cleave.config_schema import (
+from cleave.config_schema.editor import EDITOR_PREVIEW_QUALITY_HELP_ENTRIES
+from cleave.config_schema.layers import (
+    PRESET_SWITCHING_MODE_HELP_ENTRIES,
+    PRESET_SWITCHING_TRIGGER_HELP_ENTRIES,
+)
+from cleave.config_schema.render import (
     HIGHLIGHT_ROLLOFF_APPLY_MODE_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_APPLY_MODES,
     HIGHLIGHT_ROLLOFF_CURVE_HELP_ENTRIES,
     HIGHLIGHT_ROLLOFF_CURVES,
-    PRESET_SWITCHING_MODE_HELP_ENTRIES,
-    PRESET_SWITCHING_TRIGGER_HELP_ENTRIES,
-    EDITOR_PREVIEW_QUALITY_HELP_ENTRIES,
 )
 from cleave.timeline_presets import TIMELINE_PRESET_HELP_ENTRIES
 from cleave.viz.help_content import (
@@ -25,8 +27,10 @@ from cleave.viz.help_content import (
     timeline_strip_section,
 )
 from cleave.viz.help_overlay import HelpOverlay
+from cleave.viz.help_panel_cache import entry_gap, entry_width, max_key_width
 from cleave.viz.theme import LABEL, VALUE
-from cleave.viz.row_semantics import ROW_BEHAVIORS, RowKind
+from cleave.viz.row_kinds import RowKind
+from cleave.viz.row_spec import ROW_SPECS
 
 
 def _is_navigation_section(section: object) -> bool:
@@ -67,8 +71,8 @@ def test_help_entry_columns_align_to_widest_key() -> None:
         entries=BLEND_MODE_HELP_ENTRIES,
     )
     sections = (NAVIGATION_SECTION, layer_section(timeline_enabled=False), mode_description)
-    key_column_width = overlay._max_key_width(font, sections)
-    entry_gap = overlay._entry_gap(font)
+    key_column_width = max_key_width(font, sections)
+    gap = entry_gap(font)
 
     all_keys = [
         key
@@ -89,13 +93,13 @@ def test_help_entry_columns_align_to_widest_key() -> None:
         if not isinstance(section, (HelpSection, DescriptionSection)):
             continue
         for key, description in section.entries:
-            assert overlay._entry_width(
+            assert entry_width(
                 font,
                 key,
                 description,
                 key_column_width=key_column_width,
-                entry_gap=entry_gap,
-            ) == key_column_width + entry_gap + font.render(
+                entry_gap=gap,
+            ) == key_column_width + gap + font.render(
                 description, True, VALUE
             ).get_width()
 
@@ -420,8 +424,8 @@ def test_visual_limiter_header_help_expand_collapse() -> None:
 
 def test_render_overlay_sub_header_help_expand_collapse() -> None:
     for row_kind in (
-        RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER,
-        RowKind.RENDER_OVERLAY_OPENING_BODY_HEADER,
+        RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER,
+        RowKind.RENDER_OVERLAY_CARD_BODY_HEADER,
     ):
         section = _keyboard_section(sections_for(row_kind))
         entries = dict(section.entries)
@@ -448,7 +452,7 @@ def test_layer_management_delete_help() -> None:
 
 
 def test_navigable_row_kinds_have_help_sections() -> None:
-    for row_kind, behavior in ROW_BEHAVIORS.items():
+    for row_kind, behavior in ROW_SPECS.items():
         if not behavior.navigable:
             continue
         sections = sections_for(row_kind)
@@ -466,7 +470,7 @@ def test_navigable_row_kinds_have_help_sections() -> None:
 
 
 def test_navigable_row_kinds_with_description_use_keyboard_controls_title() -> None:
-    for row_kind, behavior in ROW_BEHAVIORS.items():
+    for row_kind, behavior in ROW_SPECS.items():
         if not behavior.navigable:
             continue
         if behavior.help_description is None and behavior.help_mode_entries is None:
@@ -478,7 +482,7 @@ def test_navigable_row_kinds_with_description_use_keyboard_controls_title() -> N
 
 
 def test_navigable_row_kinds_with_description_have_three_sections() -> None:
-    for row_kind, behavior in ROW_BEHAVIORS.items():
+    for row_kind, behavior in ROW_SPECS.items():
         if not behavior.navigable:
             continue
         if behavior.help_description is None and behavior.help_mode_entries is None:
@@ -491,7 +495,7 @@ def test_navigable_row_kinds_with_description_have_three_sections() -> None:
 
 
 def test_description_sections_use_control_name_not_about() -> None:
-    for row_kind, behavior in ROW_BEHAVIORS.items():
+    for row_kind, behavior in ROW_SPECS.items():
         if not behavior.navigable:
             continue
         if behavior.help_description is None and behavior.help_mode_entries is None:

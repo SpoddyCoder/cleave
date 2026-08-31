@@ -13,9 +13,10 @@ from cleave.viz.help_content import (
     HelpContent,
     sections_for,
 )
+from cleave.viz.overlay_primitives import overlay_font
 from cleave.viz.overlay_upload import OverlayGpuState, UploadSignature
-from cleave.viz.row_semantics import RowDescriptor, RowKind
-from cleave.viz.theme import LABEL, VALUE
+from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.theme import HIGHLIGHT, LABEL, VALUE
 
 
 @dataclass(frozen=True)
@@ -81,11 +82,11 @@ def help_upload_signature(
     )
 
 
-def _entry_gap(font: pygame.font.Font) -> int:
+def entry_gap(font: pygame.font.Font) -> int:
     return font.size("  ")[0]
 
 
-def _max_key_width(
+def max_key_width(
     font: pygame.font.Font, sections: tuple[HelpContent, ...]
 ) -> int:
     return max(
@@ -98,7 +99,7 @@ def _max_key_width(
     )
 
 
-def _entry_width(
+def entry_width(
     font: pygame.font.Font,
     key: str,
     description: str,
@@ -114,20 +115,18 @@ def _line_width(font: pygame.font.Font, text: str) -> int:
     return font.render(text, True, VALUE).get_width()
 
 
-def _section_content_width(
+def section_content_width(
     font: pygame.font.Font,
     section: HelpContent,
     *,
     key_column_width: int,
     entry_gap: int,
 ) -> int:
-    from cleave.viz.theme import HIGHLIGHT
-
     title_w = font.render(section.title, True, HIGHLIGHT).get_width()
     if isinstance(section, DescriptionSection):
         line_widths = tuple(_line_width(font, line) for line in section.lines)
         entry_widths = tuple(
-            _entry_width(
+            entry_width(
                 font,
                 key,
                 description,
@@ -141,7 +140,7 @@ def _section_content_width(
             return title_w
         return max(title_w, *content_widths)
     entry_widths = tuple(
-        _entry_width(
+        entry_width(
             font,
             key,
             description,
@@ -171,15 +170,15 @@ def compute_help_panel_size(
     line_gap: int,
 ) -> tuple[int, int]:
     """Return (panel_w, panel_h) for a section list."""
-    entry_gap = _entry_gap(font)
-    key_column_width = _max_key_width(font, sections)
+    gap = entry_gap(font)
+    key_column_width = max_key_width(font, sections)
     content_w = max(
         (
-            _section_content_width(
+            section_content_width(
                 font,
                 section,
                 key_column_width=key_column_width,
-                entry_gap=entry_gap,
+                entry_gap=gap,
             )
             for section in sections
         ),
@@ -239,7 +238,7 @@ def help_panel_max_dimensions(
     cached = _CAPACITY_CACHE.get(cache_key)
     if cached is not None:
         return cached
-    font = pygame.font.SysFont("monospace", font_size)
+    font = overlay_font(font_size)
     max_w = 0
     max_h = 0
     for row_kind in RowKind:

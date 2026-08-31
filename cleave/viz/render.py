@@ -186,9 +186,6 @@ def render(
     project = validate_render_project(project_dir, config=config)
     config_path = _resolve_render_config_path(config, project)
     cfg = load_config(config_path, repo_root())
-    missing_anchor = missing_preset_anchor_notification(cfg.layers)
-    if missing_anchor is not None:
-        print(f"warning: {missing_anchor}", file=sys.stderr)
 
     if output is not None:
         output_path = Path(output).expanduser()
@@ -202,6 +199,11 @@ def render(
     audio_path = mix_path(project)
     playlists = scan_all_layers(cfg)
     seed = build_runtime_base(cfg, project, audio_path, playlists)
+    missing_anchor = missing_preset_anchor_notification(
+        {slot: layer.playlist.current for slot, layer in seed.session.layers.items()}
+    )
+    if missing_anchor is not None:
+        print(f"warning: {missing_anchor}", file=sys.stderr)
 
     output_width, output_height = render_output_size(cfg)
 

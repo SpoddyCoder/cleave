@@ -14,7 +14,10 @@ import pytest
 
 _MOVE_MODE_KEY = pygame.K_m
 
-from cleave.config_schema import DEFAULT_LAYER_SLOTS, MAX_LAYER_COUNT
+from cleave.config_schema.layers import (
+    DEFAULT_LAYER_SLOTS,
+    MAX_LAYER_COUNT,
+)
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.preset_playlist import (
     PresetPlaylist,
@@ -30,7 +33,13 @@ from cleave.song_markers import SongMarker
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.key_repeat import mod_shift
 from cleave.viz.playback import format_mmss
-from tests.support.viz import make_test_cfg, noop_layer_bindings, stub_playback_state
+from tests.support.viz import (
+    baseline_tuning_ui_metrics,
+    make_test_cfg,
+    make_track_block,
+    noop_layer_bindings,
+    stub_playback_state,
+)
 from cleave.viz.controls import (
     NOTIFICATION_TIMELINE_DISABLED_TEXT,
     NOTIFICATION_TIMELINE_ENABLED_TEXT,
@@ -49,7 +58,7 @@ from cleave.viz.session import (
     allow_overwrite_for_path,
     config_path_display,
 )
-from cleave.viz.row_semantics import REPEAT_ROW_KINDS
+from cleave.viz.row_spec import REPEAT_ROW_KINDS
 from cleave.viz.theme import (
     DISABLED,
     HIGHLIGHT,
@@ -70,7 +79,7 @@ from cleave.viz.material_icons import (
     track_header_lock_suffix_width,
     visibility_icon_prefix_width,
 )
-from cleave.viz.row_semantics import RowDescriptor, RowKind
+from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.tuning_panel_draw import (
     TREE_INDENT,
     _row_bg_color,
@@ -82,7 +91,7 @@ from cleave.viz.tuning_panel_draw import (
     render_visibility_icon,
     track_header_prefix_width,
 )
-from cleave.viz.tuning_view_state import TrackBlock, TuningViewState
+from cleave.viz.tuning_view_state import TuningViewState
 from tests.support.viz import baseline_tuning_ui_metrics
 
 
@@ -332,7 +341,7 @@ def test_delete_layer_clamps_timeline_focus_row() -> None:
         del controls.session.layers[slot]
 
     manager.remove_layer.side_effect = remove_layer
-    controls._confirm_delete_layer("layer_4")
+    controls.layer_lifecycle.confirm_delete("layer_4")
 
     manager.remove_layer.assert_called_once_with("layer_4")
     assert len(controls.session.layer_z_order) == 3
@@ -351,12 +360,12 @@ def test_delete_layer_exits_move_mode() -> None:
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = view.layout.descriptor(_row(view, "layer_1", RowKind.TRACK_HEADER))
     controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
-    assert controls.move_mode_slot == "layer_1"
+    assert controls.layer_lifecycle.move_mode_slot == "layer_1"
 
-    controls._delete_layer("layer_2")
+    controls.layer_lifecycle.prompt_delete("layer_2")
     controls.handle_keydown(_keydown(pygame.K_RETURN))
 
-    assert controls.move_mode_slot is None
+    assert controls.layer_lifecycle.move_mode_slot is None
     manager.remove_layer.assert_called_once_with("layer_2")
 
 
@@ -608,7 +617,7 @@ def test_disabled_render_overlay_can_expand_sub_rows() -> None:
     assert controls.session.render_overlays.expanded is True
 
     view = controls.build_view_state(paused=False)
-    opening_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_CARD_HEADER)
+    opening_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_HEADER)
     assert opening_row in view.layout.visible_indices(view)
     assert opening_row in view.layout.navigable_indices(view)
 
@@ -713,13 +722,13 @@ def test_move_mode_swaps_z_order() -> None:
     )
     controls.focus_descriptor = _desc(view, header_row)
     assert controls.handle_keydown(_keydown(_MOVE_MODE_KEY)) is True
-    assert controls.move_mode_slot == "layer_2"
+    assert controls.layer_lifecycle.move_mode_slot == "layer_2"
 
     assert controls.handle_keydown(_keydown(pygame.K_UP)) is True
     assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
 
     assert controls.handle_keydown(_keydown(_MOVE_MODE_KEY)) is True
-    assert controls.move_mode_slot is None
+    assert controls.layer_lifecycle.move_mode_slot is None
     assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
     assert controls.config_dirty
 
@@ -739,7 +748,7 @@ def test_move_mode_esc_cancels_without_applying() -> None:
     assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
 
     assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
-    assert controls.move_mode_slot is None
+    assert controls.layer_lifecycle.move_mode_slot is None
     assert controls.session.layer_z_order == ["layer_1", "layer_2", "layer_3"]
     assert not controls.config_dirty
 
@@ -759,7 +768,7 @@ def test_move_mode_backspace_cancels_without_applying() -> None:
     assert controls.session.layer_z_order == ["layer_1", "layer_3", "layer_2"]
 
     assert controls.handle_keydown(_keydown(pygame.K_BACKSPACE)) is True
-    assert controls.move_mode_slot is None
+    assert controls.layer_lifecycle.move_mode_slot is None
     assert controls.session.layer_z_order == ["layer_1", "layer_2", "layer_3"]
     assert not controls.config_dirty
 
@@ -863,7 +872,7 @@ def test_preset_row_truncates_long_filenames() -> None:
     view = TuningViewState(
         layer_z_order=("layer_1",),
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="short (1/1)",
                 preset_label=long_name,
@@ -906,7 +915,7 @@ def test_fit_row_text_config_and_preset_share_panel_width() -> None:
     controls = _make_controls(("layer_1",))
     controls._config_save._active_config_path = long_path
     view = controls.build_view_state(paused=False)
-    view.tracks["layer_1"] = TrackBlock(
+    view.tracks["layer_1"] = make_track_block(
         stem="layer_1",
         preset_dir_label="short (1/1)",
         preset_label=long_name,
@@ -1226,9 +1235,9 @@ def test_esc_in_move_mode_does_not_request_overlay_hide() -> None:
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
-    assert controls.move_mode_slot == "layer_1"
+    assert controls.layer_lifecycle.move_mode_slot == "layer_1"
     assert controls.handle_keydown(_keydown(pygame.K_ESCAPE)) is True
-    assert controls.move_mode_slot is None
+    assert controls.layer_lifecycle.move_mode_slot is None
     assert controls.consume_hide_overlay() is False
 
 
@@ -1305,12 +1314,12 @@ def test_render_overlay_title_header_expand_arrow() -> None:
     controls.session.render_overlays.expanded = True
     controls.session.render_overlays.opening_card.expanded = True
     view = controls.build_view_state(paused=False)
-    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER)
+    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER)
     assert _row_text(view, title_header) == "  └─ title ▶"
 
     controls.session.render_overlays.opening_card.title_expanded = True
     view = controls.build_view_state(paused=False)
-    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER)
+    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER)
     assert _row_text(view, title_header) == "  └─ title ▼"
 
 
@@ -1319,12 +1328,12 @@ def test_render_overlay_body_header_expand_arrow() -> None:
     controls.session.render_overlays.expanded = True
     controls.session.render_overlays.opening_card.expanded = True
     view = controls.build_view_state(paused=False)
-    body_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_BODY_HEADER)
+    body_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_HEADER)
     assert _row_text(view, body_header) == "  └─ body ▶"
 
     controls.session.render_overlays.opening_card.body_expanded = True
     view = controls.build_view_state(paused=False)
-    body_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_BODY_HEADER)
+    body_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_HEADER)
     assert _row_text(view, body_header) == "  └─ body ▼"
 
 
@@ -1342,7 +1351,7 @@ def test_render_overlay_title_font_row(_mock_fonts) -> None:
     controls.session.render_overlays.opening_card.title_expanded = True
     controls.session.render_overlays.opening_card.title_font = "alpha"
     view = controls.build_view_state(paused=False)
-    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT)
+    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT)
     assert _row_text(view, font_row) == "    └─ font: alpha (1/3)"
 
     controls.focus_descriptor = _desc(view, font_row)
@@ -1361,7 +1370,7 @@ def test_render_overlay_body_font_row(_mock_fonts) -> None:
     controls.session.render_overlays.opening_card.body_expanded = True
     controls.session.render_overlays.opening_card.body_font = "bravo"
     view = controls.build_view_state(paused=False)
-    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_BODY_FONT)
+    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_FONT)
     assert _row_text(view, font_row) == "    └─ font: bravo (2/3)"
 
     controls.focus_descriptor = _desc(view, font_row)
@@ -1376,7 +1385,7 @@ def test_render_overlay_title_font_size_row() -> None:
     controls.session.render_overlays.opening_card.title_expanded = True
     controls.session.render_overlays.opening_card.title_font_size = 12
     view = controls.build_view_state(paused=False)
-    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT_SIZE)
+    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE)
     assert _row_text(view, font_row) == "    └─ font size: 12px"
 
     controls.focus_descriptor = _desc(view, font_row)
@@ -1391,7 +1400,7 @@ def test_render_overlay_title_margin_bottom_row() -> None:
     controls.session.render_overlays.opening_card.title_expanded = True
     controls.session.render_overlays.opening_card.title_margin_bottom = 10
     view = controls.build_view_state(paused=False)
-    margin_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_MARGIN_BOTTOM)
+    margin_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_MARGIN_BOTTOM)
     assert _row_text(view, margin_row) == "    └─ margin bottom: 10px"
 
     controls.focus_descriptor = _desc(view, margin_row)
@@ -1406,7 +1415,7 @@ def test_render_overlay_body_font_size_row() -> None:
     controls.session.render_overlays.opening_card.body_expanded = True
     controls.session.render_overlays.opening_card.body_font_size = 18
     view = controls.build_view_state(paused=False)
-    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_BODY_FONT_SIZE)
+    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE)
     assert _row_text(view, font_row) == "    └─ font size: 18px"
 
     controls.focus_descriptor = _desc(view, font_row)
@@ -1421,12 +1430,12 @@ def test_render_overlay_font_rows_nested_indent() -> None:
     controls.session.render_overlays.opening_card.title_expanded = True
     controls.session.render_overlays.opening_card.body_expanded = True
     view = controls.build_view_state(paused=False)
-    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER)
-    title_font_size = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT_SIZE)
-    title_font = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT)
-    body_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_BODY_HEADER)
-    body_font_size = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_BODY_FONT_SIZE)
-    body_font = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_BODY_FONT)
+    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER)
+    title_font_size = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE)
+    title_font = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT)
+    body_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_HEADER)
+    body_font_size = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_FONT_SIZE)
+    body_font = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_BODY_FONT)
     assert _row_indent(view, title_header) == TREE_INDENT * 2
     assert _row_indent(view, title_font_size) == TREE_INDENT * 3
     assert _row_indent(view, title_font) == TREE_INDENT * 3
@@ -1440,7 +1449,7 @@ def test_render_overlay_title_header_toggles_expansion() -> None:
     controls.session.render_overlays.expanded = True
     controls.session.render_overlays.opening_card.expanded = True
     view = controls.build_view_state(paused=False)
-    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER)
+    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER)
     controls.focus_descriptor = _desc(view, title_header)
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     assert controls.session.render_overlays.opening_card.title_expanded is True
@@ -1455,10 +1464,10 @@ def test_render_overlay_collapse_refocuses_from_title_font_row() -> None:
     controls.session.render_overlays.opening_card.expanded = True
     controls.session.render_overlays.opening_card.title_expanded = True
     view = controls.build_view_state(paused=False)
-    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT_SIZE)
+    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE)
     font_desc = _desc(view, font_row)
     controls.focus_descriptor = font_desc
-    controls._render_overlays.set_expanded(False)
+    controls.render_overlays.set_expanded(False)
     assert controls.focus_descriptor == font_desc
     view = controls.build_view_state(paused=False)
     assert view.layout.resolve_navigable(
@@ -1472,14 +1481,16 @@ def test_render_overlay_title_collapse_refocuses_from_font_row() -> None:
     controls.session.render_overlays.opening_card.expanded = True
     controls.session.render_overlays.opening_card.title_expanded = True
     view = controls.build_view_state(paused=False)
-    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER)
-    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT_SIZE)
+    title_header = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER)
+    font_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT_SIZE)
     controls.focus_descriptor = _desc(view, font_row)
-    controls._render_overlays.opening_card.set_title_expanded(False)
+    controls.render_overlays.opening_card.set_title_expanded(False)
     view = controls.build_view_state(paused=False)
     assert view.layout.resolve_navigable(
         controls.focus_descriptor, view
-    ) == RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER)
+    ) == RowDescriptor(
+        RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER, card="opening_card"
+    )
 
 
 def test_track_header_visibility_icon_color() -> None:
@@ -1535,10 +1546,10 @@ def test_transport_icons_play_vs_pause() -> None:
 def test_render_post_fx_highlight_rolloff_mode_off_keeps_section_expanded() -> None:
     controls = _make_controls()
     controls.session.render_post_fx.expanded = True
-    controls._render_post_fx.set_highlight_rolloff_expanded(True)
+    controls.render_post_fx.set_highlight_rolloff_expanded(True)
     controls.session.render_post_fx.highlight_rolloff.mode = "composite"
 
-    controls._render_post_fx.cycle_highlight_rolloff_mode(forward=True)
+    controls.render_post_fx.cycle_highlight_rolloff_mode(forward=True)
 
     assert controls.session.render_post_fx.highlight_rolloff.mode == "off"
     assert controls.session.render_post_fx.highlight_rolloff_expanded is True
@@ -2949,7 +2960,7 @@ def test_key_repeat_armed_while_navigation_key_held() -> None:
 
 
 def test_held_key_repeat_keeps_overlay_visible() -> None:
-    from cleave.config_schema import DEFAULT_UI_FADE_SEC
+    from cleave.config_schema.editor import DEFAULT_UI_FADE_SEC
     from cleave.viz.tuning_panel_draw import TuningOverlay
     from cleave.viz.theme import FADE_DURATION_SEC
 
@@ -3151,7 +3162,7 @@ def test_track_header_visible_uses_layer_enabled_when_timeline_off() -> None:
     controls.session.layers["layer_1"].enabled = False
     view = controls.build_view_state(paused=False, position_sec=10.0)
     assert view.tracks["layer_1"].visible is False
-    assert view.tracks["layer_1"].enabled is False
+    assert view.tracks["layer_1"].runtime.enabled is False
 
 
 def test_solo_marks_non_solo_tracks_not_visible_when_timeline_off() -> None:
@@ -3252,7 +3263,7 @@ def test_t_ignored_during_move_mode() -> None:
     header_row = view.layout.find_by_kind(RowKind.TRACK_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
-    assert controls.move_mode_slot == "layer_1"
+    assert controls.layer_lifecycle.move_mode_slot == "layer_1"
 
     controls.handle_keydown(_keydown(pygame.K_t))
     assert controls.session.timeline.panel_open is False
@@ -3895,7 +3906,7 @@ def test_move_mode_colors_preset_list_item() -> None:
     )
     controls.focus_descriptor = _desc(view, item_row)
     assert controls.handle_keydown(_keydown(_MOVE_MODE_KEY)) is True
-    assert controls.move_mode_preset == ("layer_1", 0)
+    assert controls.preset_list.move_mode_preset == ("layer_1", 0)
 
     view = controls.build_view_state(paused=False)
     assert _row_value_color(view, item_row) == MOVE_MODE
@@ -3946,7 +3957,7 @@ def test_row_value_color_dim_for_focused_empty_preset() -> None:
     state = TuningViewState(
         layer_z_order=("layer_1",),
         tracks={
-            "layer_1": TrackBlock(
+            "layer_1": make_track_block(
                 stem="drums",
                 preset_dir_label="empty (1/1)",
                 preset_label="NO PRESETS FOUND",
@@ -4114,7 +4125,7 @@ def test_render_overlay_locked_skips_children_in_nav() -> None:
     controls.session.render_overlays.opening_card.expanded = True
     view = controls.build_view_state(paused=False)
     header_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAYS_HEADER)
-    position_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_OPENING_POSITION)
+    position_row = view.layout.find_by_kind(RowKind.RENDER_OVERLAY_CARD_POSITION)
     navigable = view.layout.navigable_indices(view)
     visible = view.layout.visible_indices(view)
     assert header_row in navigable
@@ -4184,7 +4195,7 @@ def test_locked_blocks_move_mode() -> None:
     header_row = _row(view, "layer_1", RowKind.TRACK_HEADER)
     controls.focus_descriptor = _desc(view, header_row)
     controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
-    assert controls.move_mode_slot is None
+    assert controls.layer_lifecycle.move_mode_slot is None
 
 
 def test_locked_header_still_expands() -> None:
@@ -4281,7 +4292,7 @@ def test_locked_not_toggleable_during_move_mode() -> None:
     assert controls.session.layers["layer_2"].locked is False
 
     controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
-    assert controls.move_mode_slot == "layer_2"
+    assert controls.layer_lifecycle.move_mode_slot == "layer_2"
 
     controls.handle_keydown(_keydown(pygame.K_l))
     assert controls.session.layers["layer_2"].locked is False
@@ -4297,7 +4308,7 @@ def test_ctrl_quick_nav_blocked_during_move_mode() -> None:
     )
     controls.focus_descriptor = _desc(view, bass_header)
     controls.handle_keydown(_keydown(_MOVE_MODE_KEY))
-    assert controls.move_mode_slot == "layer_2"
+    assert controls.layer_lifecycle.move_mode_slot == "layer_2"
 
     controls.handle_keydown(_keydown(pygame.K_UP, mod=pygame.KMOD_CTRL))
     assert controls.session.layer_z_order == ["layer_2", "layer_1", "layer_3"]
@@ -4753,7 +4764,7 @@ def test_settings_collapse_from_sub_row_refocuses_header() -> None:
     controls.handle_keydown(_keydown(pygame.K_RIGHT))
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = RowDescriptor(RowKind.SETTINGS_PREVIEW_QUALITY)
-    controls._settings.set_expanded(False)
+    controls.settings.set_expanded(False)
     view = controls.build_view_state(paused=False)
     assert view.layout.resolve_navigable(
         controls.focus_descriptor, view
@@ -5285,7 +5296,7 @@ def test_drop_song_marker_does_not_select_or_steal_focus() -> None:
     prior_focus = RowDescriptor(RowKind.SETTINGS_HEADER)
     controls.focus_descriptor = prior_focus
     controls.playback.player.seek(15.0)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     markers = controls.session.song_markers
     assert markers.times == [15.0]
     assert markers.markers == [SongMarker(15.0, "standard")]
@@ -5372,7 +5383,7 @@ def test_drop_song_marker_insert_preserves_prior_selection_by_time() -> None:
     markers.times = [20.0, 40.0]
     markers.selected_index = 1
     controls.playback.player.seek(10.0)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     assert markers.times == [10.0, 20.0, 40.0]
     # Prior selection was 40.0 at index 1; after insert it is index 2.
     assert markers.selected_index == 2
@@ -5384,7 +5395,7 @@ def test_drop_song_marker_replace_non_selected_does_not_select_replaced() -> Non
     markers.times = [10.0, 40.0]
     markers.selected_index = 0
     controls.playback.player.seek(41.0)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     assert markers.times == [10.0, 41.0]
     assert markers.selected_index == 0
 
@@ -5395,7 +5406,7 @@ def test_drop_song_marker_replace_selected_keeps_that_slot() -> None:
     markers.times = [10.0, 40.0]
     markers.selected_index = 1
     controls.playback.player.seek(41.0)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     assert markers.times == [10.0, 41.0]
     assert markers.selected_index == 1
 
@@ -5519,7 +5530,7 @@ def test_drop_song_marker_does_not_write_project_yaml(tmp_path: Path) -> None:
     controls.session.song_markers.times = [10.0]
     controls.clear_config_dirty()
     controls.playback.player.seek(25.0)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     assert controls.session.song_markers.times == [10.0, 25.0]
     assert load_manifest(project).song_markers == _song_markers(10.0)
     assert controls.config_dirty
@@ -5552,7 +5563,7 @@ def test_marker_only_edit_marks_dirty_and_save_clears(tmp_path: Path) -> None:
     assert not controls.config_dirty
 
     controls.playback.player.seek(12.5)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     assert controls.config_dirty
     assert load_manifest(project).song_markers == ()
 
@@ -5581,7 +5592,7 @@ def test_overwrite_save_flushes_song_markers(tmp_path: Path) -> None:
     )
 
     controls.playback.player.seek(40.0)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     assert controls.config_dirty
     assert load_manifest(project).song_markers == _song_markers(8.0)
 
@@ -5602,7 +5613,7 @@ def test_quit_discard_leaves_project_markers_unchanged(tmp_path: Path) -> None:
     controls.clear_config_dirty()
 
     controls.playback.player.seek(55.0)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     assert controls.config_dirty
 
     assert controls.try_quit() is False
@@ -5622,7 +5633,7 @@ def test_save_as_new_flushes_markers_to_same_project_yaml(tmp_path: Path) -> Non
     controls._config_save._on_save_new_config = lambda: new_yaml
 
     controls.playback.player.seek(3.0)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     view = controls.build_view_state(paused=False)
     controls.focus_descriptor = _desc(view, _config_header_row(view))
     _choose_save_as_new(controls)
@@ -5642,7 +5653,7 @@ def test_song_markers_expanded_does_not_mark_dirty() -> None:
 def test_no_project_dir_marker_edit_still_marks_dirty() -> None:
     controls = _make_controls(("layer_1",), project_dir=None)
     controls.playback.player.seek(1.0)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     assert controls.config_dirty
     controls.clear_config_dirty()
     assert not controls.config_dirty
@@ -5656,7 +5667,7 @@ def test_drop_song_marker_snaps_to_beat_by_default() -> None:
     )
     assert controls.session.timeline.placement_snap == "beat"
     controls.playback.player.seek(0.6)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     assert controls.session.song_markers.times == [1.0]
 
 
@@ -5667,7 +5678,7 @@ def test_drop_song_marker_placement_snap_off_keeps_audible_time() -> None:
     )
     controls.session.timeline.placement_snap = "off"
     controls.playback.player.seek(0.6)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     assert controls.session.song_markers.times == [0.6]
 
 
@@ -5679,7 +5690,7 @@ def test_drop_song_marker_snaps_to_bar() -> None:
     )
     controls.session.timeline.placement_snap = "bar"
     controls.playback.player.seek(1.5)
-    controls.drop_song_marker()
+    controls.song_markers.drop()
     assert controls.session.song_markers.times == [0.0]
 
 
@@ -5704,7 +5715,7 @@ def test_placement_snap_row_cycles() -> None:
 def test_preset_switching_row_cycles_off_on() -> None:
     from tests.support.viz import make_controls, keydown, noop_layer_bindings
     import pygame
-    from cleave.viz.row_semantics import RowDescriptor, RowKind
+    from cleave.viz.row_kinds import RowDescriptor, RowKind
     from cleave.viz.focus_nav import MainFocus
 
     switched: list[str] = []
@@ -5726,7 +5737,7 @@ def test_preset_switching_row_cycles_off_on() -> None:
 def test_preset_switching_trigger_cycles() -> None:
     from tests.support.viz import make_controls, keydown
     import pygame
-    from cleave.viz.row_semantics import RowDescriptor, RowKind
+    from cleave.viz.row_kinds import RowDescriptor, RowKind
     from cleave.viz.focus_nav import MainFocus
 
     controls = make_controls(("layer_1",))
@@ -5755,10 +5766,10 @@ def test_timeline_trigger_hides_duration_row() -> None:
 
 
 def test_timeline_trigger_while_disabled_shows_warning() -> None:
-    from cleave.viz.controls import NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT
+    from cleave.viz.layer_mutations import NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT
     from tests.support.viz import make_controls, keydown, noop_layer_bindings
     import pygame
-    from cleave.viz.row_semantics import RowDescriptor, RowKind
+    from cleave.viz.row_kinds import RowDescriptor, RowKind
     from cleave.viz.focus_nav import MainFocus
 
     controls = make_controls(("layer_1",))
@@ -5787,8 +5798,8 @@ def test_populate_modal_options_keyed_by_timeline_trigger() -> None:
         prompted.append((title, [opt.label for opt in options]))
 
     controls._modal_host.prompt_choice = capture_prompt  # type: ignore[method-assign]
-    controls.project_dir = Path("/tmp/project")
-    controls._prompt_populate_presets("layer_1")
+    controls.preset_list.project_dir = Path("/tmp/project")
+    controls.preset_list.prompt_populate("layer_1")
     assert prompted
     assert prompted[0][0] == "Populate the preset list with 1 presets?"
     labels = prompted[0][1]
@@ -5802,7 +5813,7 @@ def test_populate_modal_options_keyed_by_timeline_trigger() -> None:
     prompted.clear()
     controls.session.layers["layer_1"].preset_switching_trigger = "timer"
     controls.session.timeline.enabled = True
-    controls._prompt_populate_presets("layer_1")
+    controls.preset_list.prompt_populate("layer_1")
     # 120s song / 30s duration = 4 needed; fixture browse dir has 1 milk
     assert prompted[0][0] == "Populate the preset list with 1 presets?"
     labels = prompted[0][1]
@@ -5823,7 +5834,7 @@ def test_step_preset_duration_toasts_when_list_too_short() -> None:
     layer.preset_list = ["a.milk", "b.milk", "c.milk", "d.milk"]
     noted: list[str] = []
     controls.show_notification = noted.append  # type: ignore[method-assign]
-    controls._step_preset_duration("layer_1", forward=False)
+    controls.layer_mutations.step_preset_duration("layer_1", forward=False)
     assert layer.preset_duration == 29.0
     assert noted == ["Preset list may need more presets"]
 
@@ -5836,13 +5847,13 @@ def test_cycle_preset_switching_trigger_toasts_when_list_nonempty() -> None:
     layer.preset_list = ["a.milk"]
     noted: list[str] = []
     controls.show_notification = noted.append  # type: ignore[method-assign]
-    controls._cycle_preset_switching_trigger("layer_1", forward=True)
+    controls.layer_mutations.cycle_preset_switching_trigger("layer_1", forward=True)
     assert layer.preset_switching_trigger != "timer"
     assert noted == ["Preset list may need adjusting"]
 
 
 def test_cycle_preset_switching_trigger_skips_list_toast_for_timeline_disabled() -> None:
-    from cleave.viz.controls import NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT
+    from cleave.viz.layer_mutations import NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT
 
     controls = _make_controls(("layer_1",))
     layer = controls.session.layers["layer_1"]
@@ -5852,6 +5863,6 @@ def test_cycle_preset_switching_trigger_skips_list_toast_for_timeline_disabled()
     controls.session.timeline.enabled = False
     noted: list[str] = []
     controls.show_notification = noted.append  # type: ignore[method-assign]
-    controls._cycle_preset_switching_trigger("layer_1", forward=True)
+    controls.layer_mutations.cycle_preset_switching_trigger("layer_1", forward=True)
     assert layer.preset_switching_trigger == "timeline"
     assert noted == [NOTIFICATION_TIMELINE_TRIGGER_DISABLED_TEXT]

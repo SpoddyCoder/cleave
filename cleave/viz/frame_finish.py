@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Literal
 import pygame
 
 from cleave.config import CleaveConfig, RenderOverlayCardConfig
-from cleave.config_schema import render_overlays_base
+from cleave.config_schema.render import render_overlays_base
 
 if TYPE_CHECKING:
     from cleave.viz.app import VisualizerCore
@@ -44,7 +44,7 @@ from cleave.viz.render_overlay import (
     panel_surface_key,
 )
 from cleave.viz.session import TuningSession
-from cleave.viz.visual_limiter import observe_frame_busyness
+from cleave.viz.visual_limiter import LimiterFrameState, observe_frame_busyness
 
 OverlayCardName = Literal["opening", "closing"]
 
@@ -150,7 +150,7 @@ def _composite_render_overlay(
     song_duration: float | None,
 ) -> None:
     opening_cfg, closing_cfg = resolve_overlay_configs(core.seed.cfg, session)
-    sections_on = render_sections_active(session)
+    sections_on = render_sections_active(session.settings.editor_mode)
     overlays = session.render_overlays
     opening_cache = None if panel_cache is None else panel_cache.opening
     closing_cache = None if panel_cache is None else panel_cache.closing
@@ -189,7 +189,8 @@ def finish_content_frame(
     duration_sec = core.seed.duration_sec if duration_sec is None else duration_sec
 
     compositor = core.compositor
-    if hdr_display_shoulder_active(core.seed.cfg, session):
+    editor_mode = session.settings.editor_mode
+    if hdr_display_shoulder_active(core.seed.cfg, editor_mode):
         apply_hdr_display_shoulder(
             core.post_process,
             compositor.content_texture_id,
@@ -197,10 +198,10 @@ def finish_content_frame(
             compositor.content_height,
         )
 
-    observe_frame_busyness(core, t_sec, session)
+    observe_frame_busyness(core, t_sec, LimiterFrameState.from_session(session))
 
     pp = session.render_post_fx
-    sections_on = render_sections_active(session)
+    sections_on = render_sections_active(session.settings.editor_mode)
     hr = pp.highlight_rolloff
     if (
         sections_on

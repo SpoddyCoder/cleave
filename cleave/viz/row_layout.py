@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from cleave.config_schema import MAX_LAYER_COUNT
+from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.viz.row_sections import (
     CURATION_LAYER_SECTION,
     SETTINGS_SECTION,
@@ -14,12 +14,11 @@ from cleave.viz.row_sections import (
     append_track_section_rows,
     sub_row_expand_visible,
 )
-from cleave.viz.row_semantics import (
-    RowDescriptor,
-    RowKind,
-    row_behavior,
+from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.row_spec import (
     row_is_pinned,
     row_navigable_when_section_locked,
+    row_spec,
     section_header_descriptor,
     section_locked,
 )
@@ -39,7 +38,7 @@ def row_draw_visible(state: TuningViewState, desc: RowDescriptor) -> bool:
 
 
 def row_navigable(state: TuningViewState, desc: RowDescriptor) -> bool:
-    if not row_behavior(desc.kind).navigable:
+    if not row_spec(desc.kind).navigable:
         return False
     if not _sub_row_expanded(state, desc):
         return False
@@ -53,7 +52,7 @@ def _quick_nav_section_open(state: TuningViewState, desc: RowDescriptor) -> bool
     if desc.kind == RowKind.TRACK_HEADER:
         if desc.slot is None:
             return False
-        return state.tracks[desc.slot].expanded
+        return state.tracks[desc.slot].runtime.expanded
     if desc.kind == RowKind.RENDER_POST_FX_HEADER:
         return state.render_post_fx.expanded
     if desc.kind == RowKind.RENDER_PATTERN_MASK_HEADER:
@@ -69,10 +68,10 @@ def quick_nav_stop_included(state: TuningViewState, desc: RowDescriptor) -> bool
     Section tops (Settings, Transport, Layer 1, Render: OVERLAY) always stop.
     Other quick-nav headers stop only when open.
     """
-    behavior = row_behavior(desc.kind)
-    if not behavior.quick_nav_target:
+    spec = row_spec(desc.kind)
+    if not spec.quick_nav_target:
         return False
-    if behavior.quick_nav_always:
+    if spec.quick_nav_always:
         return True
     if (
         desc.kind == RowKind.TRACK_HEADER
@@ -201,26 +200,36 @@ class RowLayout:
 
     def find(
         self,
-        slot: str,
+        slot: str | None,
         kind: RowKind,
         *,
         effect_id: str | None = None,
         driver_slug: str | None = None,
+        card: str | None = None,
     ) -> int:
         for index, desc in enumerate(self.rows):
-            if desc.kind != kind or desc.slot != slot:
+            if desc.kind != kind:
+                continue
+            if slot is not None and desc.slot != slot:
+                continue
+            if card is not None and desc.card != card:
                 continue
             if kind == RowKind.TRACK_EFFECT:
                 if desc.effect_id != effect_id or desc.driver_slug != driver_slug:
                     continue
             return index
-        raise ValueError(f"no row for slot={slot!r} kind={kind!r}")
+        raise ValueError(
+            f"no row for slot={slot!r} kind={kind!r} card={card!r}"
+        )
 
-    def find_by_kind(self, kind: RowKind) -> int:
+    def find_by_kind(self, kind: RowKind, *, card: str | None = None) -> int:
         for index, desc in enumerate(self.rows):
-            if desc.kind == kind:
-                return index
-        raise ValueError(f"no row for kind={kind!r}")
+            if desc.kind != kind:
+                continue
+            if card is not None and desc.card != card:
+                continue
+            return index
+        raise ValueError(f"no row for kind={kind!r} card={card!r}")
 
     def find_descriptor(self, desc: RowDescriptor) -> int:
         if self.descriptor_index:

@@ -6,7 +6,7 @@ import math
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
-from cleave.config_schema import (
+from cleave.config_schema.layers import (
     DEFAULT_EASTER_EGG,
     DEFAULT_HARD_CUT_DURATION,
     DEFAULT_HARD_CUT_ENABLED,
@@ -82,7 +82,7 @@ def reapply_projectm_preset_switching(
     del preset_root
     from cleave.viz.editor_mode_controls import preset_switching_active
 
-    if not preset_switching_active(session):
+    if not preset_switching_active(session.settings.editor_mode):
         return
     for slot, layer in layers_by_slot.items():
         runtime = session.layers[slot]
@@ -279,7 +279,7 @@ def advance_preset_switching(
     """Advance list-indexed switching (timeline on-transitions or timer)."""
     from cleave.viz.editor_mode_controls import preset_switching_active
 
-    if not preset_switching_active(session):
+    if not preset_switching_active(session.settings.editor_mode):
         return
 
     _advance_timeline_indexed(session, layers_by_slot, t_sec)

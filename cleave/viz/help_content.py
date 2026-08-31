@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from cleave.viz.row_semantics import RowAffordance, RowKind, row_behavior
+from cleave.viz.row_kinds import RowAffordance, RowKind
+from cleave.viz.row_spec import row_spec
 
 HelpEntry = tuple[str, str]
 
@@ -258,7 +259,7 @@ _SAVE_SECTION = HelpSection(
 
 
 def _value_step_section(row_kind: RowKind) -> HelpSection:
-    behavior = row_behavior(row_kind)
+    behavior = row_spec(row_kind)
     if behavior.help_entries is not None:
         return HelpSection(behavior.help_title or "Edit", behavior.help_entries)
     if row_kind == RowKind.TRACK_EFFECT:
@@ -283,7 +284,7 @@ def _description_section(
         if lines is not None:
             return DescriptionSection(effect_help_title(effect_id), lines)
 
-    behavior = row_behavior(row_kind)
+    behavior = row_spec(row_kind)
     if behavior.help_description is None and behavior.help_mode_entries is None:
         return None
     return description_section(
@@ -323,7 +324,7 @@ def sections_for(
             return (description, _keyboard_section(strip), nav)
         return (strip, nav)
 
-    behavior = row_behavior(row_kind)
+    behavior = row_spec(row_kind)
 
     if not behavior.navigable or behavior.affordance == RowAffordance.DISPLAY:
         return (nav,)

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import pygame
 
 from cleave.viz.help_content import (
@@ -14,34 +12,29 @@ from cleave.viz.help_content import (
 from cleave.viz.help_panel_cache import (
     HelpPanelCache,
     compute_help_panel_size,
+    entry_gap,
     help_content_signature,
     help_panel_max_dimensions,
     help_upload_signature,
+    max_key_width,
+    section_content_width,
 )
-from cleave.viz.overlay_upload import OverlayGpuState, UploadPlan, UploadSignature, upload_plan_for_signature
-from cleave.viz.row_semantics import RowDescriptor
-from cleave.viz.tuning_panel_draw import clip_rect_to_bounds
+from cleave.viz.overlay_primitives import (
+    ComposedPanel,
+    clip_rect_to_bounds,
+    draw_panel_border,
+    overlay_font,
+    overlay_panel_surface,
+)
+from cleave.viz.overlay_upload import OverlayGpuState, upload_plan_for_signature
+from cleave.viz.row_kinds import RowDescriptor
 from cleave.viz.theme import (
-    BACKGROUND,
-    BACKGROUND_ALPHA,
-    BORDER_COLOR,
-    BORDER_WIDTH,
     DISABLED,
     HIGHLIGHT,
     LABEL,
     VALUE,
     tuning_ui_metrics,
 )
-
-
-@dataclass(frozen=True)
-class ComposedHelpPanel:
-    upload_surface: pygame.Surface
-    panel_size: tuple[int, int]
-    screen_rect: tuple[int, int, int, int]
-    upload_plan: UploadPlan
-    upload_signature: UploadSignature
-    capacity: tuple[int, int]
 
 
 class HelpOverlay:
@@ -68,7 +61,6 @@ class HelpOverlay:
         self._padding = padding
         self._line_gap = line_gap
         self._font_size = font_size
-        self._font: pygame.font.Font | None = None
         self._panel_rect: tuple[int, int, int, int] | None = None
         self._cache = HelpPanelCache()
 
@@ -81,88 +73,7 @@ class HelpOverlay:
         return self._cache.gpu
 
     def _font_get(self) -> pygame.font.Font:
-        if self._font is None:
-            self._font = pygame.font.SysFont("monospace", self._font_size)
-        return self._font
-
-    def _entry_gap(self, font: pygame.font.Font) -> int:
-        return font.size("  ")[0]
-
-    def _section_entries(self, section: HelpContent) -> tuple[tuple[str, str], ...]:
-        return section.entries
-
-    def _max_key_width(
-        self, font: pygame.font.Font, sections: tuple[HelpContent, ...]
-    ) -> int:
-        return max(
-            (
-                font.render(key, True, LABEL).get_width()
-                for section in sections
-                for key, _ in self._section_entries(section)
-            ),
-            default=0,
-        )
-
-    def _entry_width(
-        self,
-        font: pygame.font.Font,
-        key: str,
-        description: str,
-        *,
-        key_column_width: int,
-        entry_gap: int,
-    ) -> int:
-        desc_w = font.render(description, True, VALUE).get_width()
-        return key_column_width + entry_gap + desc_w
-
-    def _line_width(self, font: pygame.font.Font, text: str) -> int:
-        return font.render(text, True, VALUE).get_width()
-
-    def _section_content_width(
-        self,
-        font: pygame.font.Font,
-        section: HelpContent,
-        *,
-        key_column_width: int,
-        entry_gap: int,
-    ) -> int:
-        title_w = font.render(section.title, True, HIGHLIGHT).get_width()
-        if isinstance(section, DescriptionSection):
-            line_widths = tuple(self._line_width(font, line) for line in section.lines)
-            entry_widths = tuple(
-                self._entry_width(
-                    font,
-                    key,
-                    description,
-                    key_column_width=key_column_width,
-                    entry_gap=entry_gap,
-                )
-                for key, description in section.entries
-            )
-            content_widths = line_widths + entry_widths
-            if not content_widths:
-                return title_w
-            return max(title_w, *content_widths)
-        entry_widths = tuple(
-            self._entry_width(
-                font,
-                key,
-                description,
-                key_column_width=key_column_width,
-                entry_gap=entry_gap,
-            )
-            for key, description in section.entries
-        )
-        if not entry_widths:
-            return title_w
-        return max(title_w, *entry_widths)
-
-    def _section_line_count(self, section: HelpContent) -> int:
-        if isinstance(section, DescriptionSection):
-            body_lines = len(section.lines) + len(section.entries)
-        else:
-            body_lines = len(section.entries)
-        return 2 + body_lines
+        return overlay_font(self._font_size)
 
     def _dash_separator(self, font: pygame.font.Font, width: int) -> pygame.Surface:
         dash_w = font.render("-", True, DISABLED).get_width()
@@ -247,15 +158,15 @@ class HelpOverlay:
         panel_w: int,
         panel_h: int,
     ) -> pygame.Surface:
-        entry_gap = self._entry_gap(font)
-        key_column_width = self._max_key_width(font, sections)
+        gap = entry_gap(font)
+        key_column_width = max_key_width(font, sections)
         content_w = max(
             (
-                self._section_content_width(
+                section_content_width(
                     font,
                     section,
                     key_column_width=key_column_width,
-                    entry_gap=entry_gap,
+                    entry_gap=gap,
                 )
                 for section in sections
             ),
@@ -264,8 +175,7 @@ class HelpOverlay:
         line_h = font.get_linesize()
         row_stride = line_h + self._line_gap
 
-        panel = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
-        panel.fill((*BACKGROUND, BACKGROUND_ALPHA))
+        panel = overlay_panel_surface((panel_w, panel_h))
 
         y = self._padding
         for section_index, section in enumerate(sections):
@@ -276,19 +186,13 @@ class HelpOverlay:
                 y,
                 content_w=content_w,
                 key_column_width=key_column_width,
-                entry_gap=entry_gap,
+                entry_gap=gap,
                 row_stride=row_stride,
             )
             if section_index < len(sections) - 1:
                 y += row_stride
 
-        if BORDER_WIDTH > 0:
-            pygame.draw.rect(
-                panel,
-                (*BORDER_COLOR, 255),
-                panel.get_rect(),
-                width=BORDER_WIDTH,
-            )
+        draw_panel_border(panel)
         return panel
 
     def compose_panel(
@@ -305,7 +209,7 @@ class HelpOverlay:
         preset_switching: str | None = None,
         preset_curation: bool = False,
         layer_count: int = 4,
-    ) -> ComposedHelpPanel | None:
+    ) -> ComposedPanel | None:
         self._panel_rect = None
         font = self._font_get()
         content_sig = help_content_signature(
@@ -399,7 +303,7 @@ class HelpOverlay:
                 cache.gpu.last_signature,
             )
 
-        return ComposedHelpPanel(
+        return ComposedPanel(
             upload_surface=panel,
             panel_size=panel_size,
             screen_rect=bounds,

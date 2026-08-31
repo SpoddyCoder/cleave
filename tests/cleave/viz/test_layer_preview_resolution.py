@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from cleave.config import CleaveConfig, LayerConfig, PathsConfig, RenderConfig, EditorConfig
-from cleave.config_schema import DEFAULT_LAYER_SLOTS
+from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from cleave.viz.layer_preview_resolution import (
     PREVIEW_MIN_VIZ_SCALE,
     offline_layer_sizes,
@@ -166,9 +166,9 @@ def test_preview_sizes_for_session_follows_cfg_preview_quality() -> None:
     assert sizes["layer_1"] == (960, 540)
 
 
-def test_offline_layer_sizes_uses_cfg_layer_z_order() -> None:
-    cfg = _cfg(preview_quality="balanced", slots=("layer_2", "layer_1"))
-    sizes = offline_layer_sizes(cfg)
+def test_offline_layer_sizes_uses_passed_layer_z_order() -> None:
+    cfg = _cfg(preview_quality="balanced", slots=("layer_1", "layer_2"))
+    sizes = offline_layer_sizes(cfg, ("layer_2", "layer_1"))
 
     assert set(sizes) == {"layer_2", "layer_1"}
     assert sizes["layer_2"] == preview_layer_size("balanced", 0, cfg.editor)

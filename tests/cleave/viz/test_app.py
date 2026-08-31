@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pygame
 
-from cleave.config_schema import DEFAULT_LAYER_SLOTS
+from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
 from cleave.stem_pcm import LIVE_PROJECTM_FPS, samples_per_frame
@@ -21,7 +21,7 @@ from cleave.viz.app import (
 )
 from cleave.viz.focus_nav import MainFocus, TimelineFocus
 from cleave.viz.input_dispatch import key_handler_for_runtime
-from cleave.viz.row_semantics import RowDescriptor, RowKind
+from cleave.viz.row_kinds import RowDescriptor, RowKind
 from tests.support.config import default_render_post_fx_runtime
 from cleave.viz.session import LayerRuntime, TuningSession
 from tests.support.config import default_render_post_fx_runtime

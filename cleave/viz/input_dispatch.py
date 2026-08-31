@@ -51,7 +51,7 @@ def _handle_global_keydown(
     event: pygame.event.Event, runtime: LiveVisualizerRuntime
 ) -> bool | None:
     """Global shortcuts. True = handled, False = quit, None = pass through."""
-    if is_preset_curation_mode(runtime.seed.session):
+    if is_preset_curation_mode(runtime.seed.session.settings.editor_mode):
         if event.key == pygame.K_q and mod_ctrl(event.mod):
             return not runtime.controls.try_quit()
         if event.key == pygame.K_h:
@@ -70,7 +70,7 @@ def _handle_global_keydown(
     if event.key == pygame.K_RETURN and mod_ctrl(event.mod):
         if runtime.seed.session.timeline.recording:
             return True
-        runtime.controls.drop_song_marker()
+        runtime.controls.song_markers.drop()
         return True
 
     if event.key == pygame.K_h:

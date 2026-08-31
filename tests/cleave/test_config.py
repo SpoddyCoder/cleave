@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import io
 from pathlib import Path
 
@@ -42,29 +43,34 @@ from cleave.config import (
     _parse_layers,
 )
 from tests.support.config import default_highlight_rolloff_config, default_render_post_fx_config
-from cleave.config_schema import (
-    DEFAULT_HDR_COMPOSITING,
-    DEFAULT_LAYER_SLOTS,
-    DEFAULT_RENDER_HEIGHT,
-    DEFAULT_RENDER_WIDTH,
+from cleave.config_schema.descriptors import (
+    ParseCtx,
+    PersistCtx,
+    parse_hex_colour,
+)
+from cleave.config_schema.editor import (
     DEFAULT_UI_FADE_SEC,
     DEFAULT_UI_WIDTH,
     DEFAULT_UI_WIDTH_MODE,
     DEFAULT_EDITOR_PREVIEW_QUALITY,
-    MAX_LAYER_COUNT,
-    ParseCtx,
-    PersistCtx,
-    next_layer_slot,
-    parse_hex_colour,
-    parse_render_section,
-    parse_timeline_section,
     parse_project_editor_section,
-    persist_render,
-    persist_timeline,
     persist_project_editor_section,
-    template_layer_entry,
     template_project_editor_section,
 )
+from cleave.config_schema.layers import (
+    DEFAULT_LAYER_SLOTS,
+    MAX_LAYER_COUNT,
+    next_layer_slot,
+    template_layer_entry,
+)
+from cleave.config_schema.render import (
+    DEFAULT_HDR_COMPOSITING,
+    DEFAULT_RENDER_HEIGHT,
+    DEFAULT_RENDER_WIDTH,
+    parse_render_section,
+    persist_render,
+)
+from cleave.config_schema.timeline import parse_timeline_section, persist_timeline
 from cleave.user_config import EditorSettings
 from cleave.viz.session import TuningSession
 from cleave.paths import repo_root
@@ -1083,7 +1089,9 @@ def test_load_config_missing_preset_file(tmp_path: Path) -> None:
     cfg_path.write_text(text, encoding="utf-8")
     cfg = load_config(project_root=project_dir)
     assert not cfg.layers["layer_1"].preset.exists()
-    assert missing_preset_anchor_notification(cfg.layers) == (
+    assert missing_preset_anchor_notification(
+        {slot: layer.preset for slot, layer in cfg.layers.items()}
+    ) == (
         "Missing preset anchor: layer_1"
     )
 
@@ -1095,11 +1103,12 @@ def test_missing_preset_anchor_notification_plural(tmp_path: Path) -> None:
         "layer_1": LayerConfig(preset=tmp_path / "a.milk", stem="drums"),
         "layer_2": LayerConfig(preset=tmp_path / "b.milk", stem="bass"),
     }
-    assert missing_preset_anchors(layers) == [
+    paths = {slot: layer.preset for slot, layer in layers.items()}
+    assert missing_preset_anchors(paths) == [
         ("layer_1", layers["layer_1"].preset),
         ("layer_2", layers["layer_2"].preset),
     ]
-    assert missing_preset_anchor_notification(layers) == (
+    assert missing_preset_anchor_notification(paths) == (
         "Missing preset anchors: layer_1, layer_2"
     )
 
@@ -1866,4 +1875,132 @@ def test_cleave_config_layer_z_order_defaults_to_list() -> None:
     assert isinstance(cfg.layer_z_order, list)
     cfg.layer_z_order.append("layer_5")
     assert "layer_5" in cfg.layer_z_order
+
+
+_LITERAL_DEFAULT_TYPES = (bool, int, float, str)
+
+# UI / session-only dataclass fields may keep literal defaults. Persisted knobs
+# on TuningSession runtimes and view blocks must import config_schema constants.
+_UI_ONLY_LITERAL_DEFAULTS = frozenset(
+    {
+        ("RenderOverlayCardRuntime", "animation_expanded"),
+        ("RenderPostFxRuntime", "highlight_rolloff_expanded"),
+        ("RenderPostFxRuntime", "chroma_boost_expanded"),
+        ("TimelineRuntime", "panel_open"),
+        ("TimelineRuntime", "focus_row"),
+        ("TimelineRuntime", "recording"),
+        ("TimelineRuntime", "preview_active"),
+        ("TimelineRuntime", "bar_phase_offset"),
+        ("TimelineRuntime", "show_bar_grid"),
+        ("TimelineRuntime", "beat_bar_grid_expanded"),
+        ("TimelineRuntime", "snap_cues_expanded"),
+        ("TimelineRuntime", "cuts_expanded"),
+        ("TimelineRuntime", "timeline_presets_expanded"),
+        ("TimelineRuntime", "visual_limiter_expanded"),
+        ("SongMarkerRuntime", "expanded"),
+        ("SettingsRuntime", "expanded"),
+        ("SettingsRuntime", "ui_expanded"),
+        ("SettingsRuntime", "latency_compensation_expanded"),
+        ("SettingsRuntime", "editor_mode"),
+        ("SettingsRuntime", "editor_mode_selection"),
+        ("LayerRuntime", "effects_expanded"),
+        ("LayerRuntime", "expanded"),
+        ("LayerRuntime", "preset_list_expanded"),
+        ("TuningSession", "render_overlay_solo"),
+        ("TuningSession", "render_post_fx_solo"),
+        ("TuningSession", "help_visible"),
+        ("TrackBlock", "preset_empty"),
+        ("TrackBlock", "visible"),
+        ("RenderOverlaysBlock", "solo"),
+        ("HighlightRolloffBlock", "expanded"),
+        ("ChromaBoostBlock", "expanded"),
+        ("RenderPostFxBlock", "solo"),
+        ("RenderTimelineBlock", "expanded"),
+        ("RenderTimelineBlock", "bar_phase_offset"),
+        ("RenderTimelineBlock", "show_bar_grid"),
+        ("RenderTimelineBlock", "beat_bar_grid_expanded"),
+        ("RenderTimelineBlock", "snap_cues_expanded"),
+        ("RenderTimelineBlock", "cuts_expanded"),
+        ("RenderTimelineBlock", "timeline_presets_expanded"),
+        ("RenderTimelineBlock", "visual_limiter_expanded"),
+        ("RenderTimelineBlock", "song_markers_expanded"),
+        ("SettingsBlock", "expanded"),
+        ("SettingsBlock", "ui_expanded"),
+        ("SettingsBlock", "latency_compensation_expanded"),
+        ("SettingsBlock", "editor_mode"),
+        ("SettingsBlock", "editor_mode_selection"),
+        ("TuningViewState", "persistent_notification_elapsed_sec"),
+        ("TuningViewState", "notification_remaining_sec"),
+        ("TuningViewState", "notification_elapsed_sec"),
+        ("TuningViewState", "allow_overwrite"),
+        ("TuningViewState", "active_config_label"),
+        ("TuningViewState", "config_dirty"),
+        ("TuningViewState", "solo_active"),
+        ("TuningViewState", "timeline_recording"),
+        ("TuningViewState", "timeline_override_active"),
+        ("TuningViewState", "help_visible"),
+    }
+)
+
+
+def _unwrap_field_literal(node: ast.AST) -> object | None:
+    if isinstance(node, ast.Constant) and type(node.value) in _LITERAL_DEFAULT_TYPES:
+        return node.value
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+        inner = _unwrap_field_literal(node.operand)
+        if isinstance(inner, (int, float)) and not isinstance(inner, bool):
+            return -inner
+        return None
+    if isinstance(node, ast.Call):
+        func = node.func
+        name = (
+            func.id
+            if isinstance(func, ast.Name)
+            else func.attr if isinstance(func, ast.Attribute) else None
+        )
+        if name == "field":
+            for kw in node.keywords:
+                if kw.arg == "default":
+                    return _unwrap_field_literal(kw.value)
+    return None
+
+
+def _dataclass_literal_defaults(source: str) -> list[tuple[str, str, object]]:
+    found: list[tuple[str, str, object]] = []
+    tree = ast.parse(source)
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef):
+            continue
+        for stmt in node.body:
+            if not isinstance(stmt, ast.AnnAssign) or stmt.value is None:
+                continue
+            if not isinstance(stmt.target, ast.Name):
+                continue
+            lit = _unwrap_field_literal(stmt.value)
+            if lit is None:
+                continue
+            found.append((node.name, stmt.target.id, lit))
+    return found
+
+
+def test_session_and_view_state_persisted_fields_import_default_constants() -> None:
+    viz = repo_root() / "cleave" / "viz"
+    offenders: list[str] = []
+    seen: set[tuple[str, str]] = set()
+    for name in ("session.py", "tuning_view_state.py"):
+        source = (viz / name).read_text(encoding="utf-8")
+        for cls, field, lit in _dataclass_literal_defaults(source):
+            key = (cls, field)
+            seen.add(key)
+            if key not in _UI_ONLY_LITERAL_DEFAULTS:
+                offenders.append(f"{name}:{cls}.{field} = {lit!r}")
+    assert offenders == [], (
+        "persisted session/view defaults must import config_schema constants: "
+        + "; ".join(offenders)
+    )
+    unused = sorted(_UI_ONLY_LITERAL_DEFAULTS - seen)
+    assert unused == [], (
+        "UI-only literal allowlist entries no longer present: "
+        + ", ".join(f"{cls}.{field}" for cls, field in unused)
+    )
 

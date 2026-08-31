@@ -23,12 +23,12 @@ from cleave.viz.session import (
 )
 from tests.support.config import TEST_LAYER_STEMS, default_render_post_fx_runtime
 from cleave.paths import repo_root
-from cleave.config_schema import (
-    DEFAULT_LAYER_SLOTS,
+from cleave.config_schema.editor import template_project_editor_section
+from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
+from cleave.config_schema.render import (
     DEFAULT_RENDER_FPS,
     DEFAULT_RENDER_HEIGHT,
     DEFAULT_RENDER_WIDTH,
-    template_project_editor_section,
 )
 from cleave.extract import STEM_NAMES, stems_dir
 from cleave.project import write_manifest

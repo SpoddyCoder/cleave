@@ -6,7 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 
 from cleave.config import CleaveConfig
-from cleave.config_schema import clamp_residual_latency_ms
+from cleave.config_schema.editor import clamp_residual_latency_ms
 from cleave.user_config import persist_editor_settings
 from cleave.viz.focus_nav import FocusCursor
 from cleave.viz.modal import ModalHost

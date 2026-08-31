@@ -74,6 +74,22 @@ def resolve_live_compositor_format(
     return resolve_compositor_format(hdr_compositing)
 
 
+HDR_UNSUPPORTED_MESSAGE = (
+    "HDR compositing requires RGBA16F framebuffer support; "
+    "set render.hdr_compositing: false to use 8-bit compositing"
+)
+
+
+def require_supported_color_format(
+    color_format: GlColorFormat,
+    width: int,
+    height: int,
+) -> None:
+    """Raise if *color_format* cannot be allocated at *width* x *height*."""
+    if color_format is RGBA16F and not probe_rgba16f_framebuffer(width, height):
+        raise RuntimeError(HDR_UNSUPPORTED_MESSAGE)
+
+
 def probe_rgba16f_framebuffer(width: int = 1, height: int = 1) -> bool:
     """Return True when a throwaway RGBA16F color attachment is framebuffer-complete."""
     texture_id = _gl_name(glGenTextures)

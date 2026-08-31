@@ -20,7 +20,7 @@ Soft checker and plasma (`feather` above 0%): dissolve via the existing weight-f
 
 [compose_pattern_mask_timeline](../cleave/timeline_presets/pattern_mask_arrange.py) takes `transition_duration`. Apply enables the mask (`transition = 1.0`) first, then passes that duration in. For add-then-remove, `t_remove - t_add` must be at least `transition_duration` plus one beat; if the section cannot fit that, the existing simultaneous-swap fallback runs. Isolated add-only and remove-only gaps are unchanged. Pattern-mask compose may emit `SlotCue.recast` on a continuing slot; that is a preset switch, not a mask wipe or slot-set change.
 
-The compositor still starts a wipe from an `active_slots` diff in `_ensure_mask_textures`. There is no `TransitionEvent` type.
+`LayerFramePipeline` emits an explicit `MaskTransition` when the active slot set changes. The compositor applies that command and does not infer wipes from slot diffs. Recast is a preset switch, not a wipe.
 
 ## Remaining polish
 
