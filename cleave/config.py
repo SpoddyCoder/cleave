@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, TextIO
@@ -18,12 +19,37 @@ _YAML_DUMP_WIDTH = 2**31 - 1
 from cleave.blend_modes import BlendMode
 from cleave.effects.constants import clamp_effect_pct
 from cleave.extract import StemSource
-from cleave.config_schema import (
-    DEFAULT_BLEND_MODE,
+from cleave.config_schema.descriptors import (
+    as_mapping,
+    require_non_negative_number,
+)
+from cleave.config_schema.editor import (
     BEAT_SENSITIVITY_MAX,
     BEAT_SENSITIVITY_MIN,
     DEFAULT_BEAT_SENSITIVITY,
+    DEFAULT_EDITOR_HEIGHT,
+    DEFAULT_UI_FADE_SEC,
+    DEFAULT_RESIDUAL_LATENCY_MS,
+    DEFAULT_UI_WIDTH,
+    DEFAULT_UI_WIDTH_MODE,
+    DEFAULT_EDITOR_PREVIEW_QUALITY,
+    DEFAULT_EDITOR_UPSCALE,
+    DEFAULT_EDITOR_WIDTH,
+    UPSCALE_MIN,
+    EDITOR_PREVIEW_QUALITIES,
+    UiWidthMode,
+    EditorPreviewQuality,
+    clamp_beat_sensitivity,
+    clamp_upscale,
+    parse_project_editor_section,
+)
+from cleave.config_schema.layers import (
+    DEFAULT_BLEND_MODE,
+    DEFAULT_LAYER_ENABLED,
+    DEFAULT_LAYER_LOCKED,
+    DEFAULT_LAYER_OPACITY,
     DEFAULT_LAYER_Z_ORDER,
+    DEFAULT_NEW_LAYER_STEM,
     DEFAULT_PRESET_SWITCHING,
     DEFAULT_PRESET_SWITCHING_TRIGGER,
     DEFAULT_PRESET_DURATION,
@@ -33,9 +59,22 @@ from cleave.config_schema import (
     DEFAULT_HARD_CUT_ENABLED,
     DEFAULT_EASTER_EGG,
     DEFAULT_PRESET_START_CLEAN,
-    DEFAULT_PRESET_ROOT,
     PresetSwitchingMode,
     PresetSwitchingTrigger,
+    parse_layer_z_order_section,
+    parse_layers_section,
+)
+from cleave.config_schema.render import (
+    CHROMA_BOOST_APPLY_MODES,
+    CHROMA_BOOST_VARIANTS,
+    DEFAULT_HDR_COMPOSITING,
+    DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
+    DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
+    DEFAULT_PRESET_ROOT,
+    DEFAULT_RENDER_FPS,
+    DEFAULT_RENDER_HEIGHT,
+    DEFAULT_RENDER_OVERLAY_ANIMATION_TYPE,
+    DEFAULT_RENDER_OVERLAY_APPEAR_AT,
     DEFAULT_RENDER_OVERLAY_BACKGROUND_COLOUR,
     DEFAULT_RENDER_OVERLAY_BACKGROUND_MARGIN,
     DEFAULT_RENDER_OVERLAY_BACKGROUND_OPACITY,
@@ -44,54 +83,28 @@ from cleave.config_schema import (
     DEFAULT_RENDER_OVERLAY_BODY_FONT_SIZE,
     DEFAULT_RENDER_OVERLAY_BORDER_COLOUR,
     DEFAULT_RENDER_OVERLAY_BORDER_WIDTH,
+    DEFAULT_RENDER_OVERLAY_DISAPPEAR_AT,
     DEFAULT_RENDER_OVERLAY_DISPLAY_TIME,
     DEFAULT_RENDER_OVERLAY_FONT,
     DEFAULT_RENDER_OVERLAY_POSITION,
     DEFAULT_RENDER_OVERLAY_SLIDE_DIRECTION,
-    DEFAULT_RENDER_OVERLAY_APPEAR_AT,
-    DEFAULT_RENDER_OVERLAY_DISAPPEAR_AT,
     DEFAULT_RENDER_OVERLAY_TEXT_COLOUR,
     DEFAULT_RENDER_OVERLAY_TITLE,
     DEFAULT_RENDER_OVERLAY_TITLE_FONT_SIZE,
     DEFAULT_RENDER_OVERLAY_TITLE_MARGIN_BOTTOM,
-    DEFAULT_RENDER_OVERLAY_ANIMATION_TYPE,
+    DEFAULT_RENDER_OVERLAYS_LOCKED,
+    DEFAULT_RENDER_PATTERN_MASK_LOCKED,
+    DEFAULT_RENDER_PATTERN_MASK_TRANSITION,
     DEFAULT_RENDER_POST_FX_FADE_IN,
     DEFAULT_RENDER_POST_FX_FADE_OUT,
-    DEFAULT_TEXTURE_PATHS,
-    DEFAULT_TIMELINE_ENABLED,
-    DEFAULT_TIMELINE_FADES_ENABLED,
-    DEFAULT_TIMELINE_FADE_IN,
-    DEFAULT_TIMELINE_FADE_OUT,
-    DEFAULT_TIMELINE_CROSSFADE,
-    DEFAULT_TIMELINE_PLACEMENT_SNAP,
-    DEFAULT_VISUAL_LIMITER_ENABLED,
-    DEFAULT_VISUAL_LIMITER_THRESHOLD,
-    DEFAULT_VISUAL_LIMITER_RATIO,
-    DEFAULT_VISUAL_LIMITER_RELEASE,
-    TimelinePlacementSnap,
-    DEFAULT_HDR_COMPOSITING,
-    DEFAULT_RENDER_FPS,
-    DEFAULT_RENDER_HEIGHT,
+    DEFAULT_RENDER_POST_FX_LOCKED,
     DEFAULT_RENDER_WIDTH,
-    DEFAULT_EDITOR_HEIGHT,
-    DEFAULT_UI_FADE_SEC,
-    DEFAULT_RESIDUAL_LATENCY_MS,
-    DEFAULT_UI_WIDTH,
-    DEFAULT_UI_WIDTH_MODE,
-    DEFAULT_HIGHLIGHT_ROLLOFF_APPLY_MODE,
-    DEFAULT_HIGHLIGHT_ROLLOFF_CURVE,
-    DEFAULT_EDITOR_PREVIEW_QUALITY,
-    DEFAULT_EDITOR_UPSCALE,
-    DEFAULT_EDITOR_WIDTH,
-    CHROMA_BOOST_APPLY_MODES,
-    CHROMA_BOOST_VARIANTS,
+    DEFAULT_TEXTURE_PATHS,
     HIGHLIGHT_ROLLOFF_APPLY_MODES,
     HIGHLIGHT_ROLLOFF_CURVES,
     RENDER_OVERLAY_ANIMATION_TYPES,
     RENDER_OVERLAY_POSITIONS,
     RENDER_OVERLAY_SLIDE_DIRECTIONS,
-    UPSCALE_MIN,
-    EDITOR_PREVIEW_QUALITIES,
     ChromaBoostApplyMode,
     ChromaBoostVariant,
     HighlightRolloffApplyMode,
@@ -100,17 +113,22 @@ from cleave.config_schema import (
     RenderOverlayAnimationType,
     RenderOverlayPosition,
     RenderOverlaySlideDirection,
-    UiWidthMode,
-    EditorPreviewQuality,
-    as_mapping,
-    clamp_beat_sensitivity,
-    clamp_upscale,
-    parse_layer_z_order_section,
-    parse_layers_section,
     parse_render_section,
+)
+from cleave.config_schema.timeline import (
+    DEFAULT_TIMELINE_CROSSFADE,
+    DEFAULT_TIMELINE_ENABLED,
+    DEFAULT_TIMELINE_FADE_IN,
+    DEFAULT_TIMELINE_FADE_OUT,
+    DEFAULT_TIMELINE_FADES_ENABLED,
+    DEFAULT_TIMELINE_LOCKED,
+    DEFAULT_TIMELINE_PLACEMENT_SNAP,
+    DEFAULT_VISUAL_LIMITER_ENABLED,
+    DEFAULT_VISUAL_LIMITER_RATIO,
+    DEFAULT_VISUAL_LIMITER_RELEASE,
+    DEFAULT_VISUAL_LIMITER_THRESHOLD,
+    TimelinePlacementSnap,
     parse_timeline_section,
-    parse_project_editor_section,
-    require_non_negative_number,
 )
 from cleave.timeline import TimelineLane
 from cleave.timeline_presets.characters import DEFAULT_TIMELINE_PRESET_KIND
@@ -153,12 +171,12 @@ class PathsConfig:
 class LayerConfig:
     preset: Path
     stem: StemSource
-    enabled: bool = True
-    opacity: float = 1.0
+    enabled: bool = DEFAULT_LAYER_ENABLED
+    opacity: float = DEFAULT_LAYER_OPACITY
     beat_sensitivity: float | None = None
     effects: dict[str, dict[str, int]] = field(default_factory=dict)
-    blend_mode: BlendMode = "black-key"
-    locked: bool = False
+    blend_mode: BlendMode = DEFAULT_BLEND_MODE[DEFAULT_NEW_LAYER_STEM]
+    locked: bool = DEFAULT_LAYER_LOCKED
     preset_switching: PresetSwitchingMode = DEFAULT_PRESET_SWITCHING
     preset_switching_trigger: PresetSwitchingTrigger = DEFAULT_PRESET_SWITCHING_TRIGGER
     preset_duration: float = DEFAULT_PRESET_DURATION
@@ -247,7 +265,7 @@ class RenderOverlayCardConfig:
 class RenderOverlaysConfig:
     opening_card: RenderOverlayCardConfig
     closing_card: RenderOverlayCardConfig
-    locked: bool = False
+    locked: bool = DEFAULT_RENDER_OVERLAYS_LOCKED
 
 
 @dataclass(frozen=True)
@@ -275,7 +293,7 @@ class RenderPostFxConfig:
     fade_out: float
     highlight_rolloff: HighlightRolloffConfig
     chroma_boost: ChromaBoostConfig
-    locked: bool = False
+    locked: bool = DEFAULT_RENDER_POST_FX_LOCKED
 
 
 @dataclass(frozen=True)
@@ -286,8 +304,8 @@ class RenderPatternMaskConfig:
     feather_pct: int
     invert: bool
     seed: int
-    transition: float = 0.0
-    locked: bool = False
+    transition: float = DEFAULT_RENDER_PATTERN_MASK_TRANSITION
+    locked: bool = DEFAULT_RENDER_PATTERN_MASK_LOCKED
 
 
 @dataclass(frozen=True)
@@ -345,7 +363,7 @@ class TimelineLimiterConfig:
 class TimelineConfig:
     enabled: bool
     lanes: dict[str, TimelineLane]
-    locked: bool = False
+    locked: bool = DEFAULT_TIMELINE_LOCKED
     cuts: TimelineCutsConfig = field(default_factory=TimelineCutsConfig)
     placement_snap: TimelinePlacementSnap = DEFAULT_TIMELINE_PLACEMENT_SNAP
     preset: TimelinePresetConfig = field(default_factory=TimelinePresetConfig)
@@ -479,21 +497,21 @@ def _parse_paths(data: dict[str, Any], user_cfg: UserConfig) -> PathsConfig:
 
 
 def missing_preset_anchors(
-    layers: dict[str, LayerConfig],
-) -> list[tuple[str, Path]]:
-    """Layer slots whose ``preset`` path does not exist under ``preset_root``."""
+    preset_by_slot: Mapping[str, Path | None],
+) -> list[tuple[str, Path | None]]:
+    """Layer slots whose current playlist preset is missing on disk."""
     return [
-        (name, layer.preset)
-        for name, layer in layers.items()
-        if not layer.preset.exists()
+        (slot, path)
+        for slot, path in preset_by_slot.items()
+        if path is None or not path.exists()
     ]
 
 
 def missing_preset_anchor_notification(
-    layers: dict[str, LayerConfig],
+    preset_by_slot: Mapping[str, Path | None],
 ) -> str | None:
     """Short panel/stderr message when one or more layer preset anchors are missing."""
-    missing = missing_preset_anchors(layers)
+    missing = missing_preset_anchors(preset_by_slot)
     if not missing:
         return None
     slots = ", ".join(name for name, _ in missing)
@@ -531,7 +549,7 @@ def _validate_presets(layers: dict[str, LayerConfig]) -> None:
 def _parse_layers(
     data: dict[str, Any], preset_root: Path, cfg_dir: Path | None = None
 ) -> tuple[dict[str, LayerConfig], "ParseCtx"]:
-    from cleave.config_schema import ParseCtx
+    from cleave.config_schema.descriptors import ParseCtx
 
     ctx = ParseCtx(preset_root=preset_root, cfg_dir=cfg_dir)
     layers = parse_layers_section(data, ctx)

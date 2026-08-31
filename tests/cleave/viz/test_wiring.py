@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 from cleave.preset_playlist import PresetPlaylist
 from cleave.projectm import ProjectM
 from cleave.viz.layer import StemLayer
+from cleave.viz.preset_switching import EMPTY_PRESET_LIST_NOTIFICATION
 from cleave.viz.session import LayerRuntime, TimelineRuntime, TuningSession
 from cleave.viz.wiring import make_tuning_controls
 from tests.support.viz import make_test_cfg, stub_playback_state
@@ -16,6 +17,8 @@ _MILK = (
     Path("/tmp/presets/layer_1/a.milk"),
     Path("/tmp/presets/layer_1/b.milk"),
 )
+
+_FACTORY = "cleave.viz.live_layer_binding_factory"
 
 
 def _session(
@@ -39,7 +42,11 @@ def _session(
                 stem="drums",
                 preset_switching=mode,  # type: ignore[arg-type]
                 preset_switching_trigger=trigger,  # type: ignore[arg-type]
-                preset_list=list(preset_list or [str(p) for p in _MILK]),
+                preset_list=list(
+                    preset_list
+                    if preset_list is not None
+                    else [str(p) for p in _MILK]
+                ),
             )
         },
         timeline=TimelineRuntime(enabled=timeline_enabled),
@@ -83,7 +90,7 @@ def test_on_preset_change_forces_off_in_curation_mode() -> None:
     session.settings.editor_mode = "preset_curation"
     layer = _layer(session)
     playlist = session.layers["layer_1"].playlist
-    with patch("cleave.viz.wiring.apply_preset_switching") as mock_apply:
+    with patch(f"{_FACTORY}.apply_preset_switching") as mock_apply:
         controls = _make_controls(session, layer)
         bindings = controls._layer_bindings
         assert bindings is not None
@@ -98,7 +105,7 @@ def test_on_preset_switching_change_forces_off_in_curation_mode() -> None:
     session = _session(mode="on", trigger="projectm")
     session.settings.editor_mode = "preset_curation"
     layer = _layer(session)
-    with patch("cleave.viz.wiring.apply_preset_switching") as mock_apply:
+    with patch(f"{_FACTORY}.apply_preset_switching") as mock_apply:
         controls = _make_controls(session, layer)
         bindings = controls._layer_bindings
         assert bindings is not None
@@ -110,7 +117,7 @@ def test_reapply_projectm_preset_switching_noop_in_curation_mode() -> None:
     session = _session(mode="on", trigger="projectm")
     session.settings.editor_mode = "preset_curation"
     layer = _layer(session)
-    with patch("cleave.viz.wiring.apply_preset_switching") as mock_apply:
+    with patch(f"{_FACTORY}.apply_preset_switching") as mock_apply:
         controls = _make_controls(session, layer)
         bindings = controls._layer_bindings
         assert bindings is not None
@@ -122,7 +129,7 @@ def test_on_preset_change_rebuilds_projectm_playlist() -> None:
     session = _session(mode="on", trigger="projectm", timeline_enabled=False)
     layer = _layer(session)
     playlist = session.layers["layer_1"].playlist
-    with patch("cleave.viz.wiring.apply_preset_switching") as mock_apply:
+    with patch(f"{_FACTORY}.apply_preset_switching") as mock_apply:
         controls = _make_controls(session, layer)
         bindings = controls._layer_bindings
         assert bindings is not None
@@ -136,8 +143,8 @@ def test_on_preset_change_forces_clean_boot_for_timer() -> None:
     session = _session(mode="on", trigger="timer", timeline_enabled=False)
     layer = _layer(session)
     playlist = session.layers["layer_1"].playlist
-    with patch("cleave.viz.wiring.apply_preset_switching") as mock_apply:
-        with patch("cleave.viz.wiring.reanchor_list_preset_after_browse") as mock_reanchor:
+    with patch(f"{_FACTORY}.apply_preset_switching") as mock_apply:
+        with patch(f"{_FACTORY}.reanchor_list_preset_after_browse") as mock_reanchor:
             controls = _make_controls(session, layer)
             bindings = controls._layer_bindings
             assert bindings is not None
@@ -152,8 +159,8 @@ def test_on_seek_reapplies_projectm_preset_switching() -> None:
     session = _session(mode="on", trigger="projectm", timeline_enabled=False)
     layer = _layer(session)
     layer.projectm_playlist = MagicMock()
-    with patch("cleave.viz.wiring.reapply_projectm_preset_switching") as mock_reapply:
-        with patch("cleave.viz.wiring.resync_timeline_preset_switching"):
+    with patch(f"{_FACTORY}.reapply_projectm_preset_switching") as mock_reapply:
+        with patch(f"{_FACTORY}.resync_timeline_preset_switching"):
             controls = _make_controls(session, layer)
             bindings = controls._layer_bindings
             assert bindings is not None
@@ -166,7 +173,7 @@ def test_on_preset_change_timeline_trigger_reanchors_and_stays_locked() -> None:
     layer = _layer(session)
     playlist = session.layers["layer_1"].playlist
     with patch(
-        "cleave.viz.wiring.reanchor_list_preset_after_browse",
+        f"{_FACTORY}.reanchor_list_preset_after_browse",
         side_effect=lambda *args, **kwargs: layer.pm.lock_preset(True),
     ) as mock_reanchor:
         controls = _make_controls(session, layer)
@@ -182,8 +189,8 @@ def test_on_preset_change_timer_reanchors_with_timeline_enabled() -> None:
     session = _session(mode="on", trigger="timer", timeline_enabled=True)
     layer = _layer(session)
     playlist = session.layers["layer_1"].playlist
-    with patch("cleave.viz.wiring.apply_preset_switching") as mock_apply:
-        with patch("cleave.viz.wiring.reanchor_list_preset_after_browse") as mock_reanchor:
+    with patch(f"{_FACTORY}.apply_preset_switching") as mock_apply:
+        with patch(f"{_FACTORY}.reanchor_list_preset_after_browse") as mock_reanchor:
             controls = _make_controls(session, layer)
             bindings = controls._layer_bindings
             assert bindings is not None
@@ -202,3 +209,13 @@ def test_unlock_preset_after_modal_keeps_indexed_locked() -> None:
     layer.pm.lock_preset.reset_mock()
     bindings.unlock_preset_after_modal("layer_1")
     layer.pm.lock_preset.assert_called_with(True)
+
+
+def test_make_tuning_controls_binds_notification_sink() -> None:
+    session = _session(mode="on", trigger="projectm", preset_list=[])
+    layer = _layer(session)
+    controls = _make_controls(session, layer)
+    bindings = controls._layer_bindings
+    assert bindings is not None
+    bindings.on_preset_switching_change("layer_1")
+    assert controls._notification_host.active().message == EMPTY_PRESET_LIST_NOTIFICATION

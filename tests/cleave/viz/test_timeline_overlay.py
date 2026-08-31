@@ -5,7 +5,7 @@ from __future__ import annotations
 import pygame
 import pytest
 
-from cleave.config_schema import DEFAULT_LAYER_SLOTS
+from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.extract import STEM_NAMES
 from cleave.timeline import (
@@ -19,7 +19,7 @@ from cleave.timeline import (
     stem_abbreviation,
 )
 from cleave.viz.material_icons import visibility_icon_slot_width
-from cleave.viz.tuning_panel_draw import render_visibility_icon
+from cleave.viz.row_present_renderers import render_visibility_icon
 from cleave.viz.theme import (
     ARMED_BG,
     DISABLED,

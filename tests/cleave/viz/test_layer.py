@@ -8,12 +8,12 @@ from unittest.mock import MagicMock, patch
 import pygame
 import pytest
 
-from cleave.config_schema import DEFAULT_LAYER_SLOTS
+from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from tests.support.config import TEST_LAYER_STEMS
 from cleave.preset_playlist import PresetPlaylist
 from cleave.timeline import SlotCue, TimelineLane, canonicalize
 from cleave.viz.session import LayerRuntime, TimelineRuntime, TuningSession
-from cleave.viz.row_semantics import RowDescriptor, RowKind
+from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_visibility import (
     apply_layer_visibility,

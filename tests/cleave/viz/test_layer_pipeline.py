@@ -125,6 +125,7 @@ def test_build_preview_resolutions_false_uses_render_output_size(
         cfg,
         compositor,
         {slot: playlist},
+        _session((slot,)),
         projectm_fps=30,
         preview_resolutions=False,
     )
@@ -158,6 +159,7 @@ def test_build_preview_resolutions_false_viz_quality_uses_preview_sizes(
         cfg,
         compositor,
         {slot: playlist},
+        _session((slot,)),
         projectm_fps=30,
         preview_resolutions=False,
         viz_quality=True,
@@ -187,9 +189,9 @@ def test_build_preview_resolutions_true_builds_at_preview_size(
         cfg,
         compositor,
         {slot: playlist},
+        session,
         projectm_fps=30,
         preview_resolutions=True,
-        session=session,
     )
 
     build_single.assert_called_once()

@@ -6,12 +6,14 @@ from pathlib import Path
 
 from collections.abc import Callable
 
-from cleave.config import CleaveConfig, LayerConfig
+from cleave.config import CleaveConfig
 from cleave.milk_textures import project_texture_search_paths
 from cleave.effects.runtime import EffectRuntime
 from cleave.gl_compositor import GlCompositor
 from cleave.gl_masked_compositor import GlMaskedCompositor
 from cleave.gl_post_process import GlPostProcess
+from cleave.layer_composite import LayerCompositeRequest
+from cleave.pattern_mask import PatternMaskParams
 from cleave.preset_playlist import PresetPlaylist
 from cleave.projectm import ProjectM, pcm_max_samples_per_channel
 from cleave.projectm_health import (
@@ -38,7 +40,12 @@ from cleave.viz.post_fx import (
     highlight_rolloff_curve_index,
 )
 from cleave.viz.preset_switching import apply_preset_switching
-from cleave.viz.session import ChromaBoostRuntime, HighlightRolloffRuntime, TuningSession
+from cleave.viz.session import (
+    ChromaBoostRuntime,
+    HighlightRolloffRuntime,
+    LayerRuntime,
+    TuningSession,
+)
 from OpenGL.GL import GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, glClear, glClearColor, glViewport
 
 
@@ -67,12 +74,12 @@ def apply_effect_modifiers(
     *,
     update: bool = True,
 ) -> None:
-    if is_preset_curation_mode(session):
+    if is_preset_curation_mode(session.settings.editor_mode):
         _apply_curation_layer_modifiers(layers_by_slot)
         return
     if update:
-        effect_runtime.update(session, signals, t_sec)
-    modifiers = effect_runtime.modifiers(session)
+        effect_runtime.update(session.layers, signals, t_sec)
+    modifiers = effect_runtime.modifiers(session.layers)
     for slot, layer in layers_by_slot.items():
         if not layer.fbo.enabled:
             continue
@@ -94,7 +101,7 @@ def _pattern_mask_live_slots(
 ) -> dict[str, bool] | None:
     if masked_compositor is None:
         return None
-    if not render_sections_active(session):
+    if not render_sections_active(session.settings.editor_mode):
         return None
     pm = session.render_pattern_mask
     if not pm.enabled:
@@ -106,8 +113,14 @@ def _pattern_mask_live_slots(
         )
         for name in slot_names
     )
+    transition = masked_compositor.transitions.peek(
+        active_slots,
+        song_time_sec=song_time_sec,
+        duration=pm.transition,
+        mask_type=pm.type,
+    )
     flags = masked_compositor.live_slots(
-        active_slots, song_time_sec, pm.transition
+        active_slots, song_time_sec, transition
     )
     return {name: flags[index] for index, name in enumerate(slot_names)}
 
@@ -120,13 +133,6 @@ def _slot_should_render(
     if live_by_slot is None:
         return False
     return bool(live_by_slot.get(layer.slot, False))
-
-
-def _beat_sensitivity(cfg: CleaveConfig, slot: str) -> float:
-    layer = cfg.layers[slot]
-    if layer.beat_sensitivity is not None:
-        return layer.beat_sensitivity
-    return cfg.editor.beat_sensitivity
 
 
 def _render_layer_fbo(layer: StemLayer, pm: ProjectM) -> None:
@@ -226,12 +232,11 @@ class LayerFramePipeline:
     @staticmethod
     def build_single(
         slot: str,
-        layer_cfg: LayerConfig,
+        runtime: LayerRuntime,
         compositor: GlCompositor,
         playlist: PresetPlaylist,
         fps: int,
         texture_paths: list[Path],
-        beat_sensitivity: float,
         *,
         width: int,
         height: int,
@@ -245,16 +250,16 @@ class LayerFramePipeline:
             pm.set_texture_paths(texture_paths)
         playlist.load_into(pm)
         pm.set_fps(fps)
-        pm.set_beat_sensitivity(beat_sensitivity)
+        pm.set_beat_sensitivity(runtime.beat_sensitivity)
 
         fbo = compositor.create_layer_fbo(
             slot,
             w,
             h,
-            opacity=layer_cfg.opacity,
-            blend_mode=layer_cfg.blend_mode,
+            opacity=runtime.opacity_pct / 100.0,
+            blend_mode=runtime.blend_mode,
         )
-        fbo.enabled = layer_cfg.enabled
+        fbo.enabled = runtime.enabled
         layer = StemLayer(
             slot=slot,
             pm=pm,
@@ -263,18 +268,16 @@ class LayerFramePipeline:
         )
         apply_preset_switching(
             layer,
-            mode=layer_cfg.preset_switching,
-            trigger=layer_cfg.preset_switching_trigger,
-            preset_list=[
-                str(path) for path in layer_cfg.preset_switching_list
-            ],
-            preset_duration=layer_cfg.preset_duration,
-            soft_cut_duration=layer_cfg.soft_cut_duration,
-            easter_egg=layer_cfg.easter_egg,
-            preset_start_clean=layer_cfg.preset_start_clean,
-            hard_cut_enabled=layer_cfg.hard_cut_enabled,
-            hard_cut_duration=layer_cfg.hard_cut_duration,
-            hard_cut_sensitivity=layer_cfg.hard_cut_sensitivity,
+            mode=runtime.preset_switching,
+            trigger=runtime.preset_switching_trigger,
+            preset_list=runtime.preset_list,
+            preset_duration=runtime.preset_duration,
+            soft_cut_duration=runtime.soft_cut_duration,
+            easter_egg=runtime.easter_egg,
+            preset_start_clean=runtime.preset_start_clean,
+            hard_cut_enabled=runtime.hard_cut_enabled,
+            hard_cut_duration=runtime.hard_cut_duration,
+            hard_cut_sensitivity=runtime.hard_cut_sensitivity,
         )
         return layer
 
@@ -297,10 +300,10 @@ class LayerFramePipeline:
         cfg: CleaveConfig,
         compositor: GlCompositor,
         playlists: dict[str, PresetPlaylist],
+        session: TuningSession,
         *,
         projectm_fps: int,
         preview_resolutions: bool = True,
-        session: TuningSession | None = None,
         viz_quality: bool = False,
         project_dir: Path | None = None,
     ) -> tuple[list[StemLayer], dict[str, StemLayer]]:
@@ -308,11 +311,9 @@ class LayerFramePipeline:
         if project_dir is not None:
             texture_paths = project_texture_search_paths(project_dir, texture_paths)
         runtimes: list[StemLayer] = []
+        z_order = session.layer_z_order
 
         if preview_resolutions:
-            if session is None:
-                raise ValueError("session is required when preview_resolutions=True")
-            z_order = session.layer_z_order
             preview_quality = cfg.editor.preview_quality
             visualizer = cfg.editor
 
@@ -320,24 +321,23 @@ class LayerFramePipeline:
                 z_index = z_order.index(slot)
                 return preview_layer_size(preview_quality, z_index, visualizer)
         else:
-            z_order = cfg.layer_z_order
 
             def layer_size(slot: str) -> tuple[int, int]:
                 z_index = z_order.index(slot)
                 return render_layer_size(cfg, z_index, viz_quality=viz_quality)
 
         preset_root = cfg.paths.preset_root
-        for slot, layer_cfg in cfg.layers_in_z_order():
+        for slot in z_order:
+            runtime = session.layers[slot]
             width, height = layer_size(slot)
             runtimes.append(
                 LayerFramePipeline.build_single(
                     slot,
-                    layer_cfg,
+                    runtime,
                     compositor,
                     playlists[slot],
                     projectm_fps,
                     texture_paths,
-                    _beat_sensitivity(cfg, slot),
                     width=width,
                     height=height,
                     preset_root=preset_root,
@@ -420,7 +420,7 @@ class LayerFramePipeline:
     ) -> None:
         notify = (
             on_panel_notification
-            if projectm_notifications_active(session)
+            if projectm_notifications_active(session.settings.editor_mode)
             else None
         )
         drain_stem_layers_preset_failures(
@@ -461,7 +461,7 @@ class LayerFramePipeline:
         )
 
         pp = session.render_post_fx
-        sections_on = render_sections_active(session)
+        sections_on = render_sections_active(session.settings.editor_mode)
         hr = pp.highlight_rolloff
         cb = pp.chroma_boost
         per_layer_rolloff = (
@@ -531,37 +531,50 @@ class LayerFramePipeline:
         slot_names = list(session.layer_z_order)
         ordered = [layers_by_slot[name] for name in slot_names]
         fbos = [layer.fbo for layer in ordered]
-        active_slots = [
+        active_slots = tuple(
             bool(layer.fbo.enabled and layer.fbo.opacity > 0.0) for layer in ordered
-        ]
+        )
         pm = session.render_pattern_mask
         use_mask = (
-            render_sections_active(session)
+            render_sections_active(session.settings.editor_mode)
             and pm.enabled
             and masked_compositor is not None
         )
+        mask = None
+        transition = None
         if use_mask:
             assert masked_compositor is not None
             width = compositor.content_width
             height = compositor.content_height
             masked_compositor.set_content_size(width, height)
-            masked_compositor.set_color_format(compositor.color_format)
-            masked_compositor.composite(
-                compositor.content_fbo_id,
-                fbos,
+            mask = PatternMaskParams(
                 mask_type=pm.type,
                 feather_pct=pm.feather_pct,
                 density=pm.density,
                 invert=pm.invert,
                 seed=pm.seed,
-                slot_names=slot_names,
-                active_slots=active_slots,
-                song_time_sec=song_time_sec,
-                transition_duration=pm.transition,
             )
+            transition = masked_compositor.transitions.peek(
+                active_slots,
+                song_time_sec=song_time_sec,
+                duration=pm.transition,
+                mask_type=pm.type,
+            )
+        request = LayerCompositeRequest(
+            target_fbo_id=compositor.content_fbo_id,
+            layers=fbos,
+            color_format=compositor.color_format,
+            mask=mask,
+            active_slots=active_slots,
+            song_time_sec=song_time_sec,
+            transition=transition,
+        )
+        if use_mask:
+            assert masked_compositor is not None
+            masked_compositor.composite(request)
+            masked_compositor.transitions.commit(active_slots)
         else:
-            # Fixed composite still stacks bottom-up (reversed z-order).
-            compositor.composite(list(reversed(fbos)))
+            compositor.composite(request)
 
     @staticmethod
     def destroy(layers: list[StemLayer]) -> None:

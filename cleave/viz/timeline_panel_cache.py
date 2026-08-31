@@ -7,8 +7,9 @@ from typing import TYPE_CHECKING
 
 import pygame
 
-from cleave.config_schema import MAX_LAYER_COUNT
+from cleave.config_schema.layers import MAX_LAYER_COUNT
 from cleave.timeline import SlotCue, TimelineLane
+from cleave.viz.overlay_primitives import overlay_font, visibility_bucket
 from cleave.viz.overlay_upload import OverlayGpuState, UploadSignature
 from cleave.viz.playback import format_mmss
 from cleave.viz.theme import timeline_panel_height_px, timeline_ui_metrics
@@ -83,12 +84,6 @@ class TimelinePanelCache:
     last_badge_rect: tuple[int, int, int, int] | None = None
     last_flash_rects: tuple[tuple[int, int, int, int], ...] = ()
     last_glyph_rects: tuple[tuple[int, int, int, int], ...] = ()
-
-
-def visibility_bucket(visibility: float) -> int:
-    if visibility <= 0.01:
-        return 0
-    return min(255, int(visibility * 255))
 
 
 def _slot_cues_fingerprint(
@@ -194,7 +189,7 @@ def timeline_badge_reserve_px(*, font_size: int | None = None) -> int:
     metrics = timeline_ui_metrics()
     if font_size is None:
         font_size = metrics.font_size
-    font = pygame.font.SysFont("monospace", font_size)
+    font = overlay_font(font_size)
     sample = font.render(f"[{format_mmss(0.0)}]", True, (255, 255, 255))
     badge_h = sample.get_height() + metrics.rec_badge_pad_y * 2
     return badge_h + metrics.rec_badge_gap

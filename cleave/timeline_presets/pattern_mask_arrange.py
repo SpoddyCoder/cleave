@@ -1,12 +1,27 @@
 """Short-section pattern-mask timeline arranger.
 
 Self-contained parallel to the layers arranger. Frequent add/remove is the
-point: the masked compositor sees a slot-set change and runs its spatial
-transition. Add-then-remove overlap is kept only when it spans at least
-transition_duration plus one beat; otherwise the section swaps in one step.
-Mid-section ``SlotCue.recast`` may switch the Milkdrop preset on a
-continuing slot (already on; not an add/remove). Character profiles are
-not used.
+point. Character profiles are not used.
+
+Compose/compositor contract
+---------------------------
+This module emits ``SlotCue`` on/off (slot-set changes) and optional
+``SlotCue.recast`` (preset switch on a continuing slot). Recast is not a
+wipe and is not a slot-set change.
+
+Add-then-remove overlap is kept only when ``t_remove - t_add`` spans at
+least ``transition_duration`` plus one beat; otherwise the section swaps
+in one step. Isolated add-only and remove-only gaps are unchanged.
+
+``LayerFramePipeline.composite`` turns a slot-set change into an explicit
+``MaskTransition`` (``hard_layout`` for strips/radial, ``weight_field`` for
+checker/plasma, or ``clear`` when duration is 0). The masked compositor
+applies that command; it does not infer wipes from slot diffs.
+
+Hard composite (feather 0%): one winner per pixel. Per-layer blend modes,
+hue, and flash are not applied. Soft composite applies blend, hue, and
+flash. Departing slots stay live (PCM and render) until morph width or
+weight-field mass is 0.
 """
 
 from __future__ import annotations

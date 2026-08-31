@@ -6,52 +6,44 @@ from collections.abc import Callable
 from pathlib import Path
 
 from cleave.config import CleaveConfig, VIZ_CONFIG_FILENAME
-from cleave.config_schema import (
+from cleave.config_schema.layers import (
     MAX_LAYER_COUNT,
     MIN_LAYER_COUNT,
-    DEFAULT_NEW_LAYER_STEM,
-    new_layer_config,
     next_layer_slot,
 )
-from cleave.config_snapshot import next_unnamed_path, write_session_snapshot
-from cleave.milk_textures import sync_project_textures
 from cleave.effects.runtime import EffectRuntime
-from cleave.extract import STEM_NAMES, STEM_SOURCES
+from cleave.extract import STEM_SOURCES
 from cleave.gl_compositor import GlCompositor
 from cleave.gl_masked_compositor import GlMaskedCompositor
 from cleave.gl_post_process import GlPostProcess
 from cleave.paths import repo_root
-from cleave.preset_playlist import PresetPlaylist, preset_browse_floor, scan_single_layer
+from cleave.preset_playlist import PresetPlaylist, scan_single_layer
 from cleave.signals import Signals
 from cleave.viz.controls import TuningControls
-from cleave.viz.editor_mode_controls import preset_switching_active
 from cleave.viz.layer_preview_resolution import preview_layer_size
-from cleave.viz.live_layer_bindings import LiveLayerBindings
-from cleave.viz.render_post_fx_bindings import RenderPostFxBindings
+from cleave.viz.live_layer_binding_factory import (
+    LiveLayerBindingContext,
+    LiveLayerBindingsFactory,
+    sync_mix_player_solo,
+)
 from cleave.viz.modal import ModalHost
 from cleave.viz.session import (
-    LayerRuntime,
     TuningSession,
     add_layer_to_session,
+    new_layer_runtime,
     remove_layer_from_session,
 )
 from cleave.viz.timeline_controls import TimelineControls
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline, apply_effect_modifiers
-from cleave.viz.layer_visibility import apply_layer_visibility, effective_layer_enabled
+from cleave.viz.layer_visibility import apply_layer_visibility
 from cleave.viz.mix_player import MixPlayer
 from cleave.viz.preset_switching import (
-    EMPTY_PRESET_LIST_NOTIFICATION,
-    apply_preset_switching,
-    load_manual_preset_clean,
-    reanchor_list_preset_after_browse,
     reapply_projectm_preset_switching,
     resync_timeline_preset_switching,
-    sync_manual_browse_with_list,
 )
 from cleave.stem_pcm import StemPcmBank
-from cleave.viz.playback import current_sec, seek
-from cleave.viz.user_presets import USER_PRESETS_DIRNAME
+from cleave.viz.playback import PlaybackState, current_sec, seek
 
 
 def _discard_timeline_slot(session: TuningSession, slot: str) -> None:
@@ -101,9 +93,12 @@ class LayerManager:
     def add_layer(self) -> str:
         slot = next_layer_slot(self.session.layer_z_order)
         playlist = scan_single_layer(slot, self.preset_root, self.project_dir)
-        preset = playlist.current if playlist.current is not None else self.preset_root
-        layer_cfg = new_layer_config(slot, preset, self.preset_root)
-        self.cfg.layers[slot] = layer_cfg
+        runtime = new_layer_runtime(
+            slot,
+            playlist,
+            self.preset_root,
+            self.cfg.editor.beat_sensitivity,
+        )
         z_index = len(self.session.layer_z_order)
         width, height = preview_layer_size(
             self.cfg.editor.preview_quality,
@@ -112,12 +107,11 @@ class LayerManager:
         )
         stem_layer = LayerFramePipeline.build_single(
             slot,
-            layer_cfg,
+            runtime,
             self.compositor,
             playlist,
             self.projectm_fps,
             self.texture_paths,
-            beat_sensitivity=self.cfg.editor.beat_sensitivity,
             width=width,
             height=height,
             preset_root=self.preset_root,
@@ -125,14 +119,7 @@ class LayerManager:
         self.layers.append(stem_layer)
         self.layers_by_slot[slot] = stem_layer
         self.playlists[slot] = playlist
-        runtime = LayerRuntime(
-            playlist=playlist,
-            browse_floor=preset_browse_floor(layer_cfg.preset, self.preset_root),
-            stem=DEFAULT_NEW_LAYER_STEM,
-            beat_sensitivity=self.cfg.editor.beat_sensitivity,
-        )
         add_layer_to_session(self.session, slot, runtime)
-        self.cfg.layer_z_order.append(slot)
         self.apply_preview_resolutions()
         return slot
 
@@ -149,20 +136,8 @@ class LayerManager:
         LayerFramePipeline.destroy_single(
             slot, self.layers, self.layers_by_slot, self.compositor
         )
-        del self.cfg.layers[slot]
-        self.cfg.layer_z_order.remove(slot)
         del self.playlists[slot]
         remove_layer_from_session(self.session, slot)
-
-
-def _solo_audio_source(session: TuningSession) -> str | None:
-    if session.solo_slot is None:
-        return None
-    return session.layers[session.solo_slot].stem
-
-
-def _sync_mix_player_solo(session: TuningSession, mix_player: MixPlayer) -> None:
-    mix_player.set_solo_source(_solo_audio_source(session))
 
 
 def make_tuning_controls(
@@ -173,7 +148,7 @@ def make_tuning_controls(
     project_dir: Path,
     layers_by_slot: dict[str, StemLayer],
     layers: list[StemLayer],
-    playback,
+    playback: PlaybackState,
     duration_sec: float,
     signals: Signals | None,
     effect_runtime: EffectRuntime,
@@ -185,267 +160,22 @@ def make_tuning_controls(
     post_process: GlPostProcess | None = None,
     masked_compositor: GlMaskedCompositor | None = None,
 ) -> TuningControls:
-    def _effective_preset_switching(slot: str) -> str:
-        if not preset_switching_active(session):
-            return "off"
-        return session.layers[slot].preset_switching
-
-    def _empty_list_notify() -> Callable[[], None]:
-        def on_empty() -> None:
-            if not preset_switching_active(session):
-                return
-            notify = notification_sink.get("fn")
-            if notify is not None:
-                notify(EMPTY_PRESET_LIST_NOTIFICATION)
-
-        return on_empty
-
-    def on_preset_change(slot: str, playlist: PresetPlaylist) -> None:
-        layer = layers_by_slot[slot]
-        layer.playlist = playlist
-        runtime = session.layers[slot]
-        mode = _effective_preset_switching(slot)
-        projectm_trigger = (
-            mode == "on"
-            and runtime.preset_switching_trigger == "projectm"
-        )
-        if projectm_trigger:
-            current = playlist.current
-            if current is not None:
-                layer.auto_preset_path = current.resolve()
-            apply_preset_switching(
-                layer,
-                mode=mode,
-                trigger=runtime.preset_switching_trigger,
-                preset_list=runtime.preset_list,
-                preset_duration=runtime.preset_duration,
-                soft_cut_duration=runtime.soft_cut_duration,
-                easter_egg=runtime.easter_egg,
-                preset_start_clean=runtime.preset_start_clean,
-                hard_cut_enabled=runtime.hard_cut_enabled,
-                hard_cut_duration=runtime.hard_cut_duration,
-                hard_cut_sensitivity=runtime.hard_cut_sensitivity,
-                on_empty=_empty_list_notify(),
-                session=session,
-            )
-            return
-        if playlist.current is None:
-            return
-        load_manual_preset_clean(
-            layer, preset_start_clean=runtime.preset_start_clean
-        )
-        if mode != "on":
-            layer.pm.lock_preset(True)
-            return
-        if runtime.preset_switching_trigger in ("timer", "timeline"):
-            reanchor_list_preset_after_browse(
-                layer,
-                session,
-                current_sec(playback, duration_sec),
-                preset_list=runtime.preset_list,
-            )
-            return
-        layer.pm.lock_preset(False)
-        sync_manual_browse_with_list(layer)
-
-    def on_preset_switching_change(slot: str) -> None:
-        layer = layers_by_slot[slot]
-        runtime = session.layers[slot]
-        apply_preset_switching(
-            layer,
-            mode=_effective_preset_switching(slot),
-            trigger=runtime.preset_switching_trigger,
-            preset_list=runtime.preset_list,
-            preset_duration=runtime.preset_duration,
-            soft_cut_duration=runtime.soft_cut_duration,
-            easter_egg=runtime.easter_egg,
-            preset_start_clean=runtime.preset_start_clean,
-            hard_cut_enabled=runtime.hard_cut_enabled,
-            hard_cut_duration=runtime.hard_cut_duration,
-            hard_cut_sensitivity=runtime.hard_cut_sensitivity,
-            on_empty=_empty_list_notify(),
-            session=session,
-        )
-
-    def lock_preset_for_modal(slot: str) -> None:
-        layers_by_slot[slot].pm.lock_preset(True)
-
-    def unlock_preset_after_modal(slot: str) -> None:
-        mode = _effective_preset_switching(slot)
-        runtime = session.layers[slot]
-        projectm_trigger = (
-            mode == "on"
-            and runtime.preset_switching_trigger == "projectm"
-        )
-        if projectm_trigger:
-            layers_by_slot[slot].pm.lock_preset(False)
-        else:
-            layers_by_slot[slot].pm.lock_preset(True)
-
-    notification_sink: dict[str, Callable[[str], None] | None] = {"fn": None}
-
-    def on_stem_change(slot: str, stem) -> None:
-        LayerFramePipeline.flush_pcm(layers)
-        if mix_player is not None:
-            _sync_mix_player_solo(session, mix_player)
-        apply_effect_modifiers(
-            session,
-            layers_by_slot,
-            effect_runtime,
-            signals,
-            current_sec(playback, duration_sec),
-            update=False,
-        )
-
-    def on_opacity_change(slot: str, pct: int) -> None:
-        apply_effect_modifiers(
-            session,
-            layers_by_slot,
-            effect_runtime,
-            signals,
-            current_sec(playback, duration_sec),
-            update=False,
-        )
-
-    def on_layer_enabled_change(slot: str, enabled: bool) -> None:
-        t_sec = current_sec(playback, duration_sec)
-        apply_layer_visibility(session, layers_by_slot, t_sec)
-        LayerFramePipeline.flush_pcm(layers)
-        if effective_layer_enabled(session, slot, t_sec):
-            apply_effect_modifiers(
-                session,
-                layers_by_slot,
-                effect_runtime,
-                signals,
-                current_sec(playback, duration_sec),
-                update=False,
-            )
-
-    def on_timeline_enabled_change() -> None:
-        t_sec = current_sec(playback, duration_sec)
-        apply_layer_visibility(session, layers_by_slot, t_sec)
-        LayerFramePipeline.flush_pcm(layers)
-        apply_effect_modifiers(
-            session,
-            layers_by_slot,
-            effect_runtime,
-            signals,
-            current_sec(playback, duration_sec),
-            update=False,
-        )
-
-    def on_solo_change() -> None:
-        t_sec = current_sec(playback, duration_sec)
-        apply_layer_visibility(session, layers_by_slot, t_sec)
-        if mix_player is not None:
-            _sync_mix_player_solo(session, mix_player)
-        LayerFramePipeline.flush_pcm(layers)
-        apply_effect_modifiers(
-            session,
-            layers_by_slot,
-            effect_runtime,
-            signals,
-            current_sec(playback, duration_sec),
-            update=False,
-        )
-
-    def on_beat_change(slot: str, beat: float) -> None:
-        layers_by_slot[slot].pm.set_beat_sensitivity(beat)
-
-    def on_seek(delta_sec: float) -> None:
-        seek(playback, delta_sec, duration_sec)
-        LayerFramePipeline.flush_pcm(layers)
-        reapply_projectm_preset_switching(
-            session,
-            layers_by_slot,
-            preset_root=preset_root,
-            delta_sec=delta_sec,
-        )
-        resync_timeline_preset_switching(
-            session,
-            layers_by_slot,
-            current_sec(playback, duration_sec),
-        )
-
-    def on_highlight_rolloff_apply_mode_change(old_mode: str, new_mode: str) -> None:
-        if compositor is None or post_process is None:
-            return
-        if session.render_post_fx_solo:
-            return
-        hr = session.render_post_fx.highlight_rolloff
-        for layer in layers:
-            if not layer.fbo.enabled:
-                continue
-            fbo = layer.fbo
-            if new_mode == "per_layer" and old_mode in ("composite", "off"):
-                compositor.copy_layer_to_rolloff_source(
-                    post_process,
-                    layer.slot,
-                    fbo.texture_id,
-                    fbo.width,
-                    fbo.height,
-                )
-                LayerFramePipeline.apply_layer_highlight_rolloff(
-                    layer, post_process, compositor, hr
-                )
-            elif old_mode == "per_layer" and new_mode in ("composite", "off"):
-                compositor.restore_layer_from_rolloff_source(
-                    post_process,
-                    layer.slot,
-                    fbo.texture_id,
-                    fbo.width,
-                    fbo.height,
-                )
-
-    def on_chroma_boost_apply_mode_change(old_mode: str, new_mode: str) -> None:
-        if compositor is None or post_process is None:
-            return
-        if session.render_post_fx_solo:
-            return
-        cb = session.render_post_fx.chroma_boost
-        for layer in layers:
-            if not layer.fbo.enabled:
-                continue
-            fbo = layer.fbo
-            if new_mode == "per_layer" and old_mode in ("composite", "off"):
-                compositor.copy_layer_to_chroma_source(
-                    post_process,
-                    layer.slot,
-                    fbo.texture_id,
-                    fbo.width,
-                    fbo.height,
-                )
-                LayerFramePipeline.apply_layer_chroma_boost(
-                    layer, post_process, compositor, cb
-                )
-            elif old_mode == "per_layer" and new_mode in ("composite", "off"):
-                compositor.restore_layer_from_chroma_source(
-                    post_process,
-                    layer.slot,
-                    fbo.texture_id,
-                    fbo.width,
-                    fbo.height,
-                )
-
-    render_post_fx_bindings = RenderPostFxBindings(
-        on_highlight_rolloff_apply_mode_change=on_highlight_rolloff_apply_mode_change,
-        on_chroma_boost_apply_mode_change=on_chroma_boost_apply_mode_change,
-        is_paused=lambda: playback.paused,
+    ctx = LiveLayerBindingContext(
+        session=session,
+        cfg=cfg,
+        preset_root=preset_root,
+        project_dir=project_dir,
+        layers_by_slot=layers_by_slot,
+        layers=layers,
+        playback=playback,
+        duration_sec=duration_sec,
+        signals=signals,
+        effect_runtime=effect_runtime,
+        mix_player=mix_player,
+        compositor=compositor,
+        post_process=post_process,
     )
-
-    layer_bindings = LiveLayerBindings(
-        on_preset_change=on_preset_change,
-        on_preset_switching_change=on_preset_switching_change,
-        lock_preset_for_modal=lock_preset_for_modal,
-        unlock_preset_after_modal=unlock_preset_after_modal,
-        on_stem_change=on_stem_change,
-        on_opacity_change=on_opacity_change,
-        on_layer_enabled_change=on_layer_enabled_change,
-        on_timeline_enabled_change=on_timeline_enabled_change,
-        on_solo_change=on_solo_change,
-        on_beat_change=on_beat_change,
-        on_seek=on_seek,
-    )
+    factory = LiveLayerBindingsFactory(ctx)
 
     beat_times: list[float] = []
     bar_times: list[float] = []
@@ -460,8 +190,8 @@ def make_tuning_controls(
         "project_dir": project_dir,
         "playback": playback,
         "duration_sec": duration_sec,
-        "layer_bindings": layer_bindings,
-        "render_post_fx_bindings": render_post_fx_bindings,
+        "layer_bindings": factory.layer_bindings(),
+        "render_post_fx_bindings": factory.render_post_fx_bindings(),
         "layer_manager": layer_manager,
         "compositor": compositor,
         "post_process": post_process,
@@ -469,37 +199,16 @@ def make_tuning_controls(
         "beat_times": beat_times,
         "bar_times": bar_times,
         "signals": signals,
+        "on_save_new_config": factory.on_save_new_config,
+        "on_overwrite_config": factory.on_overwrite_config,
+        "launch_config_path": cfg.config_path,
+        "repo_root_example": repo_root() / VIZ_CONFIG_FILENAME,
     }
     if modal_host is not None:
         kwargs["modal_host"] = modal_host
 
-    def _sync_project_textures() -> None:
-        presets_dir = project_dir / USER_PRESETS_DIRNAME
-        milk_paths = (
-            sorted(presets_dir.glob("*.milk")) if presets_dir.is_dir() else []
-        )
-        sync_project_textures(project_dir, milk_paths, cfg.paths.texture_paths)
-
-    def on_save_new_config() -> Path:
-        out_path = next_unnamed_path(project_dir)
-        write_session_snapshot(out_path, cfg=cfg, session=session)
-        _sync_project_textures()
-        return out_path
-
-    def on_overwrite_config(path: Path) -> str:
-        write_session_snapshot(path, cfg=cfg, session=session)
-        _sync_project_textures()
-        return path.name
-
-    kwargs.update(
-        on_save_new_config=on_save_new_config,
-        on_overwrite_config=on_overwrite_config,
-        launch_config_path=cfg.config_path,
-        repo_root_example=repo_root() / VIZ_CONFIG_FILENAME,
-    )
-
     controls = TuningControls(**kwargs)
-    notification_sink["fn"] = controls.show_notification
+    ctx.notification_sink = controls.show_notification
     if pcm_bank is not None and mix_player is not None:
         mix_player.set_stem_pcm(
             {
@@ -512,7 +221,7 @@ def make_tuning_controls(
             layers_by_slot,
             current_sec(playback, duration_sec),
         )
-        _sync_mix_player_solo(session, mix_player)
+        sync_mix_player_solo(session, mix_player)
     return controls
 
 

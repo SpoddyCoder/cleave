@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from cleave.config import load_config
-from cleave.config_schema import DEFAULT_LAYER_SLOTS
+from cleave.config_schema.layers import DEFAULT_LAYER_SLOTS
 from cleave.preset_playlist import (
     directory_display,
     list_navigable_dirs,

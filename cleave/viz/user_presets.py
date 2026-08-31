@@ -11,7 +11,7 @@ from pathlib import Path
 
 import yaml
 
-from cleave.config_schema import resolve_user_preset
+from cleave.config_schema.layers import resolve_user_preset
 from cleave.project import PROJECT_FILENAME
 
 USER_PRESETS_DIRNAME = "presets"

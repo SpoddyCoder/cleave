@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from cleave.pattern_mask_transition import PatternMaskTransitionTracker
 from cleave.preset_playlist import PresetPlaylist
 from cleave.viz.layer import StemLayer
 from cleave.viz.layer_pipeline import LayerFramePipeline
@@ -71,6 +72,7 @@ def test_composite_uses_masked_path_when_enabled() -> None:
     compositor.content_fbo_id = 7
     compositor.color_format = object()
     masked = MagicMock()
+    masked.transitions = PatternMaskTransitionTracker()
 
     LayerFramePipeline.composite(
         compositor,
@@ -81,19 +83,20 @@ def test_composite_uses_masked_path_when_enabled() -> None:
 
     compositor.composite.assert_not_called()
     masked.set_content_size.assert_called_once_with(1280, 720)
-    masked.set_color_format.assert_called_once_with(compositor.color_format)
     masked.composite.assert_called_once()
-    call = masked.composite.call_args
-    assert call.args[0] == 7
-    assert call.kwargs["mask_type"] == "radial"
-    assert call.kwargs["feather_pct"] == 0
-    assert call.kwargs["density"] == 2.5
-    assert call.kwargs["invert"] is True
-    assert call.kwargs["seed"] == 11
-    assert call.kwargs["slot_names"] == ["layer_1", "layer_2"]
-    assert call.kwargs["active_slots"] == [True, True]
-    assert call.kwargs["song_time_sec"] == 0.0
-    assert call.kwargs["transition_duration"] == 0.0
+    request = masked.composite.call_args.args[0]
+    assert request.target_fbo_id == 7
+    assert request.color_format is compositor.color_format
+    assert request.mask is not None
+    assert request.mask.mask_type == "radial"
+    assert request.mask.feather_pct == 0
+    assert request.mask.density == 2.5
+    assert request.mask.invert is True
+    assert request.mask.seed == 11
+    assert request.active_slots == (True, True)
+    assert request.song_time_sec == 0.0
+    assert request.transition is None
+    assert masked.transitions.last_active_slots == (True, True)
 
 
 def test_composite_passes_transition_and_inactive_slots() -> None:
@@ -111,6 +114,8 @@ def test_composite_passes_transition_and_inactive_slots() -> None:
     compositor.content_fbo_id = 7
     compositor.color_format = object()
     masked = MagicMock()
+    masked.transitions = PatternMaskTransitionTracker()
+    masked.transitions.commit((True, True, True))
 
     LayerFramePipeline.composite(
         compositor,
@@ -120,11 +125,14 @@ def test_composite_passes_transition_and_inactive_slots() -> None:
         song_time_sec=3.5,
     )
 
-    call = masked.composite.call_args
-    assert call.kwargs["slot_names"] == ["layer_1", "layer_2", "layer_3"]
-    assert call.kwargs["active_slots"] == [True, False, False]
-    assert call.kwargs["song_time_sec"] == 3.5
-    assert call.kwargs["transition_duration"] == 1.2
+    request = masked.composite.call_args.args[0]
+    assert request.active_slots == (True, False, False)
+    assert request.song_time_sec == 3.5
+    assert request.transition is not None
+    assert request.transition.kind == "hard_layout"
+    assert request.transition.duration == 1.2
+    assert request.transition.from_slots == (True, True, True)
+    assert masked.transitions.last_active_slots == (True, False, False)
 
 
 def test_composite_uses_soft_path_when_feather_above_zero() -> None:
@@ -145,6 +153,7 @@ def test_composite_uses_soft_path_when_feather_above_zero() -> None:
     compositor.content_fbo_id = 9
     compositor.color_format = object()
     masked = MagicMock()
+    masked.transitions = PatternMaskTransitionTracker()
 
     LayerFramePipeline.composite(
         compositor,
@@ -155,11 +164,12 @@ def test_composite_uses_soft_path_when_feather_above_zero() -> None:
 
     compositor.composite.assert_not_called()
     masked.composite.assert_called_once()
-    call = masked.composite.call_args
-    assert call.args[0] == 9
-    assert call.kwargs["mask_type"] == "plasma"
-    assert call.kwargs["feather_pct"] == 100
-    assert call.kwargs["seed"] == 42
+    request = masked.composite.call_args.args[0]
+    assert request.target_fbo_id == 9
+    assert request.mask is not None
+    assert request.mask.mask_type == "plasma"
+    assert request.mask.feather_pct == 100
+    assert request.mask.seed == 42
 
 
 def test_composite_uses_fixed_path_when_disabled() -> None:
@@ -277,7 +287,15 @@ def test_render_frame_feeds_pcm_for_live_disabled_slot() -> None:
             masked_compositor=masked,
         )
 
-    masked.live_slots.assert_called_once_with((True, False), 2.5, 1.0)
+    masked.transitions.peek.assert_called_once_with(
+        (True, False),
+        song_time_sec=2.5,
+        duration=1.0,
+        mask_type=session.render_pattern_mask.type,
+    )
+    masked.live_slots.assert_called_once_with(
+        (True, False), 2.5, masked.transitions.peek.return_value
+    )
     assert pcm_bank.slice_pcm.call_count == 2
     assert render_fbo.call_count == 2
     render_fbo.assert_any_call(departing, departing.pm)

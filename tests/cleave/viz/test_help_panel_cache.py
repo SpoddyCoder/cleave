@@ -13,7 +13,7 @@ from cleave.viz.help_panel_cache import (
     help_upload_signature,
 )
 from cleave.viz.overlay_upload import OverlayGpuState, upload_plan_for_signature
-from cleave.viz.row_semantics import RowDescriptor, RowKind
+from cleave.viz.row_kinds import RowDescriptor, RowKind
 
 
 def test_help_content_signature_stable_for_same_inputs() -> None:

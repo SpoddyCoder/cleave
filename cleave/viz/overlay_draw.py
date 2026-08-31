@@ -99,7 +99,7 @@ def _help_compose_kwargs(view_state: TuningViewState) -> dict[str, object]:
     if focus.slot is not None:
         track = view_state.tracks.get(focus.slot)
         if track is not None:
-            preset_switching = track.preset_switching
+            preset_switching = track.runtime.preset_switching
     return {
         "focus": focus,
         "timeline_enabled": view_state.render_timeline.enabled,

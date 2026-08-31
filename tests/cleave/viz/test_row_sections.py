@@ -14,16 +14,17 @@ from cleave.viz.row_sections import (
     section_header_from_section_tree,
     sub_row_expand_visible,
 )
-from cleave.viz.row_semantics import RowDescriptor, RowKind, section_header_descriptor
+from cleave.viz.row_kinds import RowDescriptor, RowKind
+from cleave.viz.row_spec import section_header_descriptor
 from cleave.viz.tuning_view_state import (
     HighlightRolloffBlock,
-    RenderOverlayCardBlock,
     RenderOverlaysBlock,
     RenderPostFxBlock,
     SettingsBlock,
     TrackBlock,
 )
 from tests.cleave.viz.test_overlay import _minimal_view_state
+from tests.support.viz import make_overlay_card_block, make_track_block
 
 
 def _track_block(**overrides: object) -> TrackBlock:
@@ -40,7 +41,7 @@ def _track_block(**overrides: object) -> TrackBlock:
         hard_cut_enabled=True,
     )
     base.update(overrides)
-    return TrackBlock(**base)  # type: ignore[arg-type]
+    return make_track_block(**base)  # type: ignore[arg-type]
 
 
 def _track_row_kinds(**overrides: object) -> list[RowKind]:
@@ -200,11 +201,11 @@ def test_expand_section_respects_expanded_when_block_disabled() -> None:
     disabled_overlay = _minimal_view_state(
         render_overlays=RenderOverlaysBlock(
             expanded=True,
-            opening_card=RenderOverlayCardBlock(enabled=False, expanded=True),
+            opening_card=make_overlay_card_block(enabled=False, expanded=True),
         ),
     )
     assert expand_section_expanded(disabled_overlay, RENDER_OVERLAYS_SECTION, None) is True
-    opacity = RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_OPACITY)
+    opacity = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_OPACITY)
     assert sub_row_expand_visible(disabled_overlay, opacity) is True
 
     disabled_post_fx = _minimal_view_state(
@@ -225,18 +226,18 @@ def test_sub_row_expand_visible_nested_sections() -> None:
     collapsed_overlay = _minimal_view_state(
         render_overlays=RenderOverlaysBlock(expanded=False),
     )
-    opacity = RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_OPACITY)
+    opacity = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_OPACITY)
     assert sub_row_expand_visible(collapsed_overlay, opacity) is False
 
     title_collapsed = _minimal_view_state(
         render_overlays=RenderOverlaysBlock(
             expanded=True,
-            opening_card=RenderOverlayCardBlock(
+            opening_card=make_overlay_card_block(
                 expanded=True, title_expanded=False
             ),
         ),
     )
-    title_font = RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT)
+    title_font = RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT)
     assert sub_row_expand_visible(title_collapsed, title_font) is False
 
     highlight_collapsed = _minimal_view_state(
@@ -310,8 +311,8 @@ def test_section_header_descriptor_uses_tree_and_effect_fallback() -> None:
         )
     ) == RowDescriptor(RowKind.TRACK_EFFECTS_HEADER, slot="layer_1")
     assert section_header_descriptor(
-        RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT)
-    ) == RowDescriptor(RowKind.RENDER_OVERLAY_OPENING_TITLE_HEADER)
+        RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_FONT)
+    ) == RowDescriptor(RowKind.RENDER_OVERLAY_CARD_TITLE_HEADER)
     assert section_header_descriptor(
         RowDescriptor(RowKind.SETTINGS_UI_FADE)
     ) == RowDescriptor(RowKind.SETTINGS_UI_HEADER)
@@ -319,5 +320,5 @@ def test_section_header_descriptor_uses_tree_and_effect_fallback() -> None:
 
 def test_render_overlay_section_kinds_from_tree() -> None:
     assert RowKind.RENDER_OVERLAYS_HEADER in RENDER_OVERLAY_SECTION_KINDS
-    assert RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT in RENDER_OVERLAY_SECTION_KINDS
-    assert RowKind.RENDER_OVERLAY_OPENING_BODY_FONT in RENDER_OVERLAY_SECTION_KINDS
+    assert RowKind.RENDER_OVERLAY_CARD_TITLE_FONT in RENDER_OVERLAY_SECTION_KINDS
+    assert RowKind.RENDER_OVERLAY_CARD_BODY_FONT in RENDER_OVERLAY_SECTION_KINDS

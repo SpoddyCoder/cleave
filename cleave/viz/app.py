@@ -20,6 +20,7 @@ from cleave.user_config import persist_editor_settings
 from cleave.effects.runtime import EffectRuntime
 from cleave.gl_color_format import GlColorFormat, resolve_live_compositor_format
 from cleave.gl_compositor import GlCompositor
+from cleave.layer_composite import LayerCompositeRequest
 from cleave.gl_masked_compositor import GlMaskedCompositor
 from cleave.gl_post_process import GlPostProcess
 from cleave.preset_playlist import PresetPlaylist
@@ -154,7 +155,7 @@ def _compositor_color_format(seed: VisualizerSeed) -> GlColorFormat:
 
     return resolve_live_compositor_format(
         render_hdr_compositing(seed.cfg),
-        preset_curation=is_preset_curation_mode(seed.session),
+        preset_curation=is_preset_curation_mode(seed.session.settings.editor_mode),
     )
 
 
@@ -220,9 +221,9 @@ def init_gl_resources_heavy(
         seed.cfg,
         compositor,
         seed.playlists,
+        seed.session,
         projectm_fps=LIVE_PROJECTM_FPS,
         preview_resolutions=True,
-        session=seed.session,
         project_dir=seed.project_dir,
     )
 
@@ -278,7 +279,9 @@ def init_gl_resources_heavy(
         tuning_controls=controls,
     )
 
-    missing_anchor = missing_preset_anchor_notification(seed.cfg.layers)
+    missing_anchor = missing_preset_anchor_notification(
+        {slot: layer.playlist.current for slot, layer in seed.session.layers.items()}
+    )
     if missing_anchor is not None:
         controls.show_notification(missing_anchor)
 
@@ -339,6 +342,7 @@ def init_gl_resources_render(
         seed.cfg,
         compositor,
         seed.playlists,
+        seed.session,
         projectm_fps=render_fps(seed.cfg),
         preview_resolutions=False,
         viz_quality=viz_quality,
@@ -428,7 +432,13 @@ def tick_frame_core(
         on_panel_notification = runtime.controls.show_notification
 
     if blank_visualizers:
-        runtime.compositor.composite([])
+        runtime.compositor.composite(
+            LayerCompositeRequest(
+                target_fbo_id=runtime.compositor.content_fbo_id,
+                layers=(),
+                color_format=runtime.compositor.color_format,
+            )
+        )
     else:
         LayerFramePipeline.render_frame(
             runtime.seed.session,

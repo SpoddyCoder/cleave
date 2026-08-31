@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cleave.viz.row_semantics import RowDescriptor, RowKind
+from cleave.viz.row_kinds import RowDescriptor, RowKind
 from cleave.viz.tuning_view_state import view_state_structure_signature
 from tests.cleave.viz.test_controls import _make_controls
 from tests.cleave.viz.test_overlay import _minimal_view_state
@@ -447,12 +447,12 @@ def test_builder_rebuilds_layout_when_animation_type_changes() -> None:
     session.render_overlays.opening_card.animation.type = "fade"
     view_fade = controls.build_view_state(paused=False)
     kinds_fade = [row.kind for row in view_fade.layout.rows]
-    assert RowKind.RENDER_OVERLAY_OPENING_ANIMATION_SLIDE_DIRECTION not in kinds_fade
+    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION not in kinds_fade
 
     session.render_overlays.opening_card.animation.type = "slide"
     view_slide = controls.build_view_state(paused=False)
     kinds_slide = [row.kind for row in view_slide.layout.rows]
-    assert RowKind.RENDER_OVERLAY_OPENING_ANIMATION_SLIDE_DIRECTION in kinds_slide
+    assert RowKind.RENDER_OVERLAY_CARD_ANIMATION_SLIDE_DIRECTION in kinds_slide
 
 
 def test_structure_signature_invalidates_on_opening_card_expanded() -> None:
@@ -1100,3 +1100,14 @@ def test_collapsed_preset_list_omits_item_rows() -> None:
     assert RowKind.TRACK_PRESET_LIST in kinds
     assert RowKind.TRACK_PRESET_LIST_ITEM not in kinds
     assert RowKind.TRACK_PRESET_LIST_ADD not in kinds
+
+
+def test_session_mutation_visible_on_next_view_state() -> None:
+    controls = _make_controls(("layer_1",))
+    runtime = controls.session.layers["layer_1"]
+    first = controls.build_view_state(paused=False)
+    assert first.tracks["layer_1"].runtime is runtime
+    runtime.opacity_pct = 22
+    second = controls.build_view_state(paused=False)
+    assert second.tracks["layer_1"].runtime is runtime
+    assert second.tracks["layer_1"].runtime.opacity_pct == 22

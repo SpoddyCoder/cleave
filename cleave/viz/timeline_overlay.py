@@ -23,12 +23,18 @@ from cleave.timeline import (
     stem_abbreviation,
 )
 from cleave.viz.material_icons import visibility_icon_slot_width
+from cleave.viz.overlay_primitives import (
+    ComposedPanel,
+    clip_rect_to_bounds,
+    draw_panel_border,
+    overlay_font,
+    overlay_panel_surface,
+)
 from cleave.viz.overlay_upload import (
-    UploadPlan,
-    UploadSignature,
     clip_dirty_rects,
     upload_plan_for_signature,
 )
+from cleave.viz.row_present_renderers import render_visibility_icon
 from cleave.viz.timeline_panel_cache import (
     TimelinePanelCache,
     timeline_badge_reserve_px,
@@ -36,15 +42,11 @@ from cleave.viz.timeline_panel_cache import (
     timeline_static_signature,
     timeline_upload_signature,
 )
-from cleave.viz.tuning_panel_draw import clip_rect_to_bounds, clip_rect_to_surface, render_visibility_icon
 from cleave.viz.playback import format_mmss
 from cleave.viz.theme import (
     ARMED_BG,
     BACKGROUND,
-    BACKGROUND_ALPHA,
     BAR_GRID,
-    BORDER_COLOR,
-    BORDER_WIDTH,
     HIGHLIGHT,
     LABEL,
     PLAYHEAD,
@@ -830,16 +832,6 @@ class _TimelineLayout:
     bar_bottom: int
 
 
-@dataclass(frozen=True)
-class ComposedTimelinePanel:
-    upload_surface: pygame.Surface
-    panel_size: tuple[int, int]
-    screen_rect: tuple[int, int, int, int]
-    upload_plan: UploadPlan
-    upload_signature: UploadSignature
-    capacity: tuple[int, int]
-
-
 class TimelineOverlay:
     """Bottom-anchored timeline panel drawn over the composited frame."""
 
@@ -864,8 +856,6 @@ class TimelineOverlay:
         self._font_size = font_size
         self._padding = padding
         self._row_gap = row_gap
-        self._font: pygame.font.Font | None = None
-        self._bold_font: pygame.font.Font | None = None
         self._panel_rect: tuple[int, int, int, int] | None = None
         self._header_badge_rect: tuple[int, int, int, int] | None = None
         self._layer_num_width: int = 0
@@ -878,16 +868,10 @@ class TimelineOverlay:
         self._blit_src: tuple[int, int] = (0, 0)
 
     def _font_get(self) -> pygame.font.Font:
-        if self._font is None:
-            self._font = pygame.font.SysFont("monospace", self._font_size)
-        return self._font
+        return overlay_font(self._font_size)
 
     def _bold_font_get(self) -> pygame.font.Font:
-        if self._bold_font is None:
-            self._bold_font = pygame.font.SysFont(
-                "monospace", self._font_size, bold=True
-            )
-        return self._bold_font
+        return overlay_font(self._font_size, bold=True)
 
     @property
     def gpu_state(self):
@@ -978,8 +962,7 @@ class TimelineOverlay:
         bar_width = layout.bar_width
         timeline_eye_x = layout.timeline_eye_x
 
-        panel = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
-        panel.fill((*BACKGROUND, BACKGROUND_ALPHA))
+        panel = overlay_panel_surface((panel_w, panel_h))
         font = self._font_get()
         self._row_layout = []
 
@@ -1124,13 +1107,7 @@ class TimelineOverlay:
                 4 if selected else 2,
             )
 
-        if BORDER_WIDTH > 0:
-            pygame.draw.rect(
-                panel,
-                (*BORDER_COLOR, 255),
-                panel.get_rect(),
-                width=BORDER_WIDTH,
-            )
+        draw_panel_border(panel)
         return panel
 
     def _draw_role_glyphs(
@@ -1576,7 +1553,7 @@ class TimelineOverlay:
         viewport_width: int,
         viewport_height: int,
         visibility: float = 1.0,
-    ) -> ComposedTimelinePanel | None:
+    ) -> ComposedPanel | None:
         self._visibility = visibility
         self._panel_rect = None
         self._header_badge_rect = None
@@ -1736,7 +1713,7 @@ class TimelineOverlay:
         cache.last_live_signature = live_sig
         self._blit_src = (src_x, src_y)
 
-        return ComposedTimelinePanel(
+        return ComposedPanel(
             upload_surface=upload,
             panel_size=(panel_w, panel_h),
             screen_rect=screen_bounds,

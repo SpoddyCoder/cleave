@@ -7,13 +7,10 @@ from dataclasses import dataclass
 import pygame
 
 from cleave.viz.modal import ModalLabeledLine, ModalViewState
+from cleave.viz.overlay_primitives import draw_panel_border, overlay_panel_surface
 from cleave.viz.text_fit import wrap_text_to_width
 from cleave.viz.theme import (
     ACTION,
-    BACKGROUND,
-    BACKGROUND_ALPHA,
-    BORDER_COLOR,
-    BORDER_WIDTH,
     FOCUS_ROW_BG_ALPHA,
     HIGHLIGHT,
     LABEL,
@@ -27,26 +24,6 @@ from cleave.viz.ui_tint import blit_tint
 _MESSAGE_MAX_SCREEN_FRACTION = 0.5
 # Modal panel minimum width as a fraction of the viewport.
 _PANEL_MIN_SCREEN_FRACTION = 0.2
-
-
-def draw_rect(
-    rect: tuple[int, int, int, int],
-    surface: pygame.Surface,
-) -> tuple[int, int, int, int] | None:
-    """Intersection of rect with surface bounds (same as overlay.clip_rect_to_surface)."""
-    x, y, w, h = rect
-    if w <= 0 or h <= 0:
-        return None
-    sw, sh = surface.get_width(), surface.get_height()
-    left = max(x, 0)
-    top = max(y, 0)
-    right = min(x + w, sw)
-    bottom = min(y + h, sh)
-    clip_w = right - left
-    clip_h = bottom - top
-    if clip_w <= 0 or clip_h <= 0:
-        return None
-    return (left, top, clip_w, clip_h)
 
 
 _tuning_ui = tuning_ui_metrics()
@@ -92,8 +69,7 @@ def draw(
     )
     panel_x = (sw - panel_w) // 2
     panel_y = (sh - panel_h) // 2
-    panel = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
-    panel.fill((*BACKGROUND, BACKGROUND_ALPHA))
+    panel = overlay_panel_surface((panel_w, panel_h))
 
     cur_y = _PANEL_PAD_Y
     line_h = font.get_linesize()
@@ -139,15 +115,7 @@ def draw(
             line_gap=line_gap,
         )
 
-    if BORDER_WIDTH > 0:
-        border_alpha = int(255 * text_alpha / 255)
-        if border_alpha >= 2:
-            pygame.draw.rect(
-                panel,
-                (*BORDER_COLOR, border_alpha),
-                (0, 0, panel_w, panel_h),
-                BORDER_WIDTH,
-            )
+    draw_panel_border(panel, alpha=int(255 * text_alpha / 255))
 
     surface.blit(panel, (panel_x, panel_y))
 
@@ -219,8 +187,7 @@ def draw_info(
     )
     panel_x = (sw - panel_w) // 2
     panel_y = (sh - panel_h) // 2
-    panel = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
-    panel.fill((*BACKGROUND, BACKGROUND_ALPHA))
+    panel = overlay_panel_surface((panel_w, panel_h))
 
     cur_y = _PANEL_PAD_Y
     line_h = font.get_linesize()
@@ -246,15 +213,7 @@ def draw_info(
         footer_surf.set_alpha(text_alpha)
         panel.blit(footer_surf, (_PANEL_PAD_X, cur_y))
 
-    if BORDER_WIDTH > 0:
-        border_alpha = int(255 * text_alpha / 255)
-        if border_alpha >= 2:
-            pygame.draw.rect(
-                panel,
-                (*BORDER_COLOR, border_alpha),
-                (0, 0, panel_w, panel_h),
-                BORDER_WIDTH,
-            )
+    draw_panel_border(panel, alpha=int(255 * text_alpha / 255))
 
     surface.blit(panel, (panel_x, panel_y))
 

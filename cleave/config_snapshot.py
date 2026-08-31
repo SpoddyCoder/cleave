@@ -10,7 +10,7 @@ from typing import Any
 import yaml
 
 from cleave.config import CleaveConfig, dump_yaml
-from cleave.config_schema import persisted_session_payload
+from cleave.config_schema.persist import persisted_session_payload
 from cleave.viz.session import TuningSession
 
 _UNNAMED_PATTERN = re.compile(r"^unnamed-(\d+)\.yaml$")

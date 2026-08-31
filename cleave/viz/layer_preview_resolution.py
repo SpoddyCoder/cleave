@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from cleave.config import (
     CleaveConfig,
     EditorConfig,
@@ -54,12 +56,15 @@ def preview_layer_size(
     return w, h
 
 
-def offline_layer_sizes(cfg: CleaveConfig) -> dict[str, tuple[int, int]]:
+def offline_layer_sizes(
+    cfg: CleaveConfig,
+    layer_z_order: Sequence[str],
+) -> dict[str, tuple[int, int]]:
     preview_quality = cfg.editor.preview_quality
     visualizer = cfg.editor
     return {
         slot: preview_layer_size(preview_quality, z_index, visualizer)
-        for z_index, slot in enumerate(cfg.layer_z_order)
+        for z_index, slot in enumerate(layer_z_order)
     }
 
 

@@ -15,8 +15,13 @@ from cleave.config import (
     TimelineLimiterConfig,
     VIZ_CONFIG_FILENAME,
 )
-from cleave.config_schema import (
-    DEFAULT_BEAT_SENSITIVITY,
+from cleave.config_schema.editor import DEFAULT_BEAT_SENSITIVITY
+from cleave.config_schema.layers import (
+    DEFAULT_BLEND_MODE,
+    DEFAULT_LAYER_ENABLED,
+    DEFAULT_LAYER_LOCKED,
+    DEFAULT_LAYER_OPACITY,
+    DEFAULT_NEW_LAYER_STEM,
     DEFAULT_PRESET_SWITCHING,
     DEFAULT_PRESET_SWITCHING_TRIGGER,
     DEFAULT_PRESET_DURATION,
@@ -26,29 +31,39 @@ from cleave.config_schema import (
     DEFAULT_HARD_CUT_ENABLED,
     DEFAULT_EASTER_EGG,
     DEFAULT_PRESET_START_CLEAN,
-    DEFAULT_TIMELINE_FADES_ENABLED,
-    DEFAULT_TIMELINE_FADE_IN,
-    DEFAULT_TIMELINE_FADE_OUT,
-    DEFAULT_TIMELINE_CROSSFADE,
-    DEFAULT_TIMELINE_PLACEMENT_SNAP,
-    DEFAULT_VISUAL_LIMITER_ENABLED,
-    DEFAULT_VISUAL_LIMITER_THRESHOLD,
-    DEFAULT_VISUAL_LIMITER_RATIO,
-    DEFAULT_VISUAL_LIMITER_RELEASE,
-    HighlightRolloffApplyMode,
-    HighlightRolloffCurve,
     PresetSwitchingMode,
     PresetSwitchingTrigger,
-    TimelinePlacementSnap,
-    default_render_overlay_animation_runtime_values,
-    default_render_overlay_closing_animation_runtime_values,
-    default_render_overlay_card_runtime_values,
-    default_render_overlays_runtime_values,
-    default_highlight_rolloff_runtime_values,
-    default_chroma_boost_runtime_values,
-    default_render_post_fx_runtime_values,
-    default_render_pattern_mask_runtime_values,
+)
+from cleave.config_schema.render import (
+    DEFAULT_RENDER_OVERLAYS_LOCKED,
+    DEFAULT_RENDER_PATTERN_MASK_LOCKED,
+    DEFAULT_RENDER_PATTERN_MASK_TRANSITION,
+    DEFAULT_RENDER_POST_FX_LOCKED,
+    HighlightRolloffApplyMode,
+    HighlightRolloffCurve,
     PatternMaskType,
+    default_chroma_boost_runtime_values,
+    default_highlight_rolloff_runtime_values,
+    default_render_overlay_animation_runtime_values,
+    default_render_overlay_card_runtime_values,
+    default_render_overlay_closing_animation_runtime_values,
+    default_render_overlays_runtime_values,
+    default_render_pattern_mask_runtime_values,
+    default_render_post_fx_runtime_values,
+)
+from cleave.config_schema.timeline import (
+    DEFAULT_TIMELINE_CROSSFADE,
+    DEFAULT_TIMELINE_ENABLED,
+    DEFAULT_TIMELINE_FADE_IN,
+    DEFAULT_TIMELINE_FADE_OUT,
+    DEFAULT_TIMELINE_FADES_ENABLED,
+    DEFAULT_TIMELINE_LOCKED,
+    DEFAULT_TIMELINE_PLACEMENT_SNAP,
+    DEFAULT_VISUAL_LIMITER_ENABLED,
+    DEFAULT_VISUAL_LIMITER_RATIO,
+    DEFAULT_VISUAL_LIMITER_RELEASE,
+    DEFAULT_VISUAL_LIMITER_THRESHOLD,
+    TimelinePlacementSnap,
 )
 from cleave.extract import StemSource
 from cleave.preset_playlist import PresetPlaylist, preset_browse_floor
@@ -153,7 +168,7 @@ class RenderOverlaysRuntime:
     expanded: bool
     opening_card: RenderOverlayCardRuntime
     closing_card: RenderOverlayCardRuntime
-    locked: bool = False
+    locked: bool = DEFAULT_RENDER_OVERLAYS_LOCKED
 
 
 def _card_runtime_from_values(values: dict[str, Any]) -> RenderOverlayCardRuntime:
@@ -222,7 +237,7 @@ class RenderPostFxRuntime:
     highlight_rolloff_expanded: bool = False
     chroma_boost: ChromaBoostRuntime = field(default_factory=default_chroma_boost_runtime)
     chroma_boost_expanded: bool = False
-    locked: bool = False
+    locked: bool = DEFAULT_RENDER_POST_FX_LOCKED
 
 
 def default_render_post_fx_runtime() -> RenderPostFxRuntime:
@@ -245,8 +260,8 @@ class RenderPatternMaskRuntime:
     feather_pct: int
     invert: bool
     seed: int
-    transition: float = 0.0
-    locked: bool = False
+    transition: float = DEFAULT_RENDER_PATTERN_MASK_TRANSITION
+    locked: bool = DEFAULT_RENDER_PATTERN_MASK_LOCKED
 
 
 def default_render_pattern_mask_runtime() -> RenderPatternMaskRuntime:
@@ -279,8 +294,8 @@ def default_visual_limiter_runtime() -> VisualLimiterRuntime:
 
 @dataclass
 class TimelineRuntime:
-    enabled: bool = True
-    locked: bool = False
+    enabled: bool = DEFAULT_TIMELINE_ENABLED
+    locked: bool = DEFAULT_TIMELINE_LOCKED
     lanes: dict[str, TimelineLane] = field(default_factory=dict)
     panel_open: bool = False
     focus_row: int = 0
@@ -379,14 +394,14 @@ class LayerRuntime:
     playlist: PresetPlaylist
     browse_floor: Path
     stem: StemSource
-    opacity_pct: int = 100
+    opacity_pct: int = int(round(DEFAULT_LAYER_OPACITY * 100))
     effects: dict[str, dict[str, int]] = field(default_factory=dict)
     effects_expanded: bool = False
-    blend_mode: BlendMode = "black-key"
+    blend_mode: BlendMode = DEFAULT_BLEND_MODE[DEFAULT_NEW_LAYER_STEM]
     beat_sensitivity: float = DEFAULT_BEAT_SENSITIVITY
-    enabled: bool = True
+    enabled: bool = DEFAULT_LAYER_ENABLED
     expanded: bool = False
-    locked: bool = False
+    locked: bool = DEFAULT_LAYER_LOCKED
     preset_switching: PresetSwitchingMode = DEFAULT_PRESET_SWITCHING
     preset_switching_trigger: PresetSwitchingTrigger = DEFAULT_PRESET_SWITCHING_TRIGGER
     preset_duration: float = DEFAULT_PRESET_DURATION
@@ -703,6 +718,24 @@ def add_layer_to_session(
     session.layers[slot] = runtime
     session.layer_z_order.append(slot)
     session.timeline.lanes[slot] = empty_lane()
+
+
+def new_layer_runtime(
+    slot: str,
+    playlist: PresetPlaylist,
+    preset_root: Path,
+    beat_sensitivity: float,
+) -> LayerRuntime:
+    """Session runtime for a newly added layer (not YAML LayerConfig)."""
+    del slot
+    preset = playlist.current if playlist.current is not None else preset_root
+    return LayerRuntime(
+        playlist=playlist,
+        browse_floor=preset_browse_floor(preset, preset_root),
+        stem=DEFAULT_NEW_LAYER_STEM,
+        beat_sensitivity=beat_sensitivity,
+        blend_mode=DEFAULT_BLEND_MODE[DEFAULT_NEW_LAYER_STEM],
+    )
 
 
 def remove_layer_from_session(session: TuningSession, slot: str) -> None:

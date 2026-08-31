@@ -7,116 +7,74 @@ See cleave/viz/theme.py and .cursor/rules/live-tuning-ui.mdc.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Literal
+from typing import Literal
 
 import pygame
 
-from cleave.config_schema import DEFAULT_UI_FADE_SEC
-from cleave.viz.row_fields import (
-    ROW_FIELDS,
-    RowPresentStyle,
-    composite_header_prefix_part,
-    composite_header_suffix_part,
-    editor_mode_confirm_pending,
-    expand_subheader_prefix,
-    format_composite_header_expand_value,
-    format_expand_subheader_value,
-    format_row_value,
-    labeled_row_prefix,
-    row_action_parameter_display_text,
-    row_composite_header_display_text,
-    row_dynamic_labeled_display_text,
-    row_dynamic_labeled_prefix,
-    row_expand_subheader_display_text,
-    row_full_line_display_text,
-    row_labeled_display_text,
-    tree_branch_leading_spaces,
-)
-from cleave.extract import stem_overlay_header
-from cleave.viz.row_sections import (
-    RENDER_OVERLAY_SECTION_KINDS,
-    RENDER_PATTERN_MASK_SECTION_KINDS,
-    RENDER_POST_FX_SECTION_KINDS,
-    RENDER_TIMELINE_SECTION_KINDS,
-    expand_arrow_glyph,
-    row_tree_indent_depth,
-)
-from cleave.viz.row_semantics import (
-    ACTION_ROW_KINDS,
-    LABELED_SUB_ROW_KINDS,
-    RowDescriptor,
-    RowKind,
-    row_blocked_by_section_lock,
-    row_is_pinned,
-    section_locked,
-)
-from cleave.viz.fonts import render_overlay_font_display
-from cleave.viz.text_fit import (
-    fit_counter_label_to_width,
-    fit_path_label_to_width,
-    fit_text_to_width,
+from cleave.config_schema.editor import DEFAULT_UI_FADE_SEC
+from cleave.viz.row_spec import row_is_pinned
+from cleave.viz.row_present_renderers import (
+    TREE_INDENT,
+    RowPresentContext,
+    action_parameter_label_color,
+    compose_surface,
+    fit_row_text,
+    is_notification_row,
+    is_settings_header_row,
+    is_transport_row,
+    notification_accent,
+    notification_elapsed,
+    preset_row_prefix_width,
+    render_label_value_row,
+    render_present_row,
+    render_text,
+    render_visibility_icon,
+    row_bg_color,
+    row_has_tree_focus,
+    row_indent,
+    row_shows_action_enter_hint,
+    row_shows_enter_icon,
+    row_text,
+    row_value_color,
+    row_visibility_icon_key,
+    track_header_prefix_width,
+    tree_branch_prefix_width,
 )
 from cleave.viz.frame_rate import (
     FPS_DISPLAY_LABEL,
     format_fps_value,
 )
-from cleave.viz.playback import format_mmss
 from cleave.viz.material_icons import (
-    FILE_GLYPH,
-    FOLDER_GLYPH,
-    LOCK_GLYPH,
-    SETTINGS_GLYPH,
-    VISIBILITY_GLYPH,
-    VISIBILITY_OFF_GLYPH,
-    VISIBILITY_ICON_PAD_X,
-    action_enter_icon_suffix_width,
     material_font,
-    render_action_enter_icon,
-    render_glyph,
-    render_transport_icons,
-    row_icon_prefix_width,
-    track_header_lock_suffix_width,
-    visibility_icon_slot_width,
 )
 from cleave.viz.panel_notification import notification_attention
 from cleave.viz.ui_tint import draw_opaque_row_background
 from cleave.viz.theme import (
-    ACTION,
     BACKGROUND,
     BACKGROUND_ALPHA,
-    BORDER_COLOR,
     BORDER_WIDTH,
-    DISABLED,
-    ERROR_NOTIFICATION,
     FADE_DURATION_SEC,
     FOCUS_ROW_BG_ALPHA,
     HIGHLIGHT,
     LABEL,
-    LOCKED,
-    LOCK_ICON,
-    MOVE_MODE,
-    NOTIFICATION_ON_FILL,
     PANEL_CONTENT_MAX_WIDTH,
     panel_content_max_width_px,
-    PRESET_FILE_ICON,
-    PRESET_ICON,
-    OVERRIDE_BG,
-    OVERRIDE_GLYPH,
-    OVERRIDE_GLYPH_OFF,
-    CONFIG_DIRTY,
     SCROLLBAR_CONTENT_GAP,
     SCROLLBAR_THUMB,
     SCROLLBAR_TRACK,
     SCROLLBAR_WIDTH,
-    SOLO_BG,
     VALUE,
     tuning_ui_metrics,
+)
+from cleave.viz.overlay_primitives import (
+    ComposedPanel,
+    clip_rect_to_bounds,
+    draw_panel_border,
+    overlay_font,
 )
 from cleave.viz.overlay_profiler import OverlayDrawCounters
 from cleave.viz.overlay_upload import (
     OverlayGpuState,
-    UploadPlan,
-    UploadSignature,
     clip_dirty_rects,
     upload_plan_for_signature,
 )
@@ -135,684 +93,24 @@ from cleave.viz.tuning_view_state import TuningViewState
 
 Anchor = Literal["topleft", "bottomleft"]
 
-
-def _render_text(
-    font: pygame.font.Font,
-    text: str,
-    antialias: bool,
-    color: tuple[int, int, int],
-    *,
-    counters: OverlayDrawCounters | None = None,
-) -> pygame.Surface:
-    if counters is not None:
-        counters.font_renders += 1
-    return font.render(text, antialias, color)
-
-
-def _compose_surface(
-    size: tuple[int, int],
-    *,
-    counters: OverlayDrawCounters | None = None,
-    flags: int = pygame.SRCALPHA,
-) -> pygame.Surface:
-    if counters is not None:
-        counters.surface_builds += 1
-    return pygame.Surface(size, flags)
-
-
-_tuning_ui = tuning_ui_metrics()
-TREE_INDENT = _tuning_ui.tree_indent
-TREE_BRANCH = "└"
-ROW_ICON_SUFFIX_GAP = _tuning_ui.row_icon_suffix_gap
-
-
-def _row_shows_action_enter_hint(state: TuningViewState, index: int) -> bool:
-    """Focused ACTION rows that are activatable show a return-corner suffix."""
-    kind = state.layout.kind(index)
-    if kind not in ACTION_ROW_KINDS:
-        return False
-    if not _row_has_tree_focus(state, index):
-        return False
-    return _row_value_color(state, index) == HIGHLIGHT
-
-
-def _row_shows_enter_icon(state: TuningViewState, index: int) -> bool:
-    """Return-corner suffix for ACTION rows or staged editor-mode confirm."""
-    if _row_shows_action_enter_hint(state, index):
-        return True
-    kind = state.layout.kind(index)
-    return kind == RowKind.SETTINGS_EDITOR_MODE and editor_mode_confirm_pending(state)
-
-
-def _append_action_enter_icon(
-    surf: pygame.Surface,
-    *,
-    color: tuple[int, int, int],
-    line_height: int,
-    counters: OverlayDrawCounters | None = None,
-) -> pygame.Surface:
-    icon = render_action_enter_icon(color=color, line_height=line_height)
-    gap = ROW_ICON_SUFFIX_GAP
-    out = _compose_surface(
-        (surf.get_width() + gap + icon.get_width(), line_height),
-        counters=counters,
-    )
-    out.blit(surf, (0, 0))
-    out.blit(icon, (surf.get_width() + gap, 0))
-    return out
-
-
-def _with_action_enter_hint(
-    primary: pygame.Surface,
-    secondary: pygame.Surface | None,
-    width: int,
-    *,
-    state: TuningViewState,
-    index: int,
-    indent: int,
-    line_h: int,
-    counters: OverlayDrawCounters | None = None,
-) -> tuple[pygame.Surface, pygame.Surface | None, int]:
-    if not _row_shows_action_enter_hint(state, index):
-        return primary, secondary, width
-    color = _row_value_color(state, index)
-    if secondary is not None:
-        secondary = _append_action_enter_icon(
-            secondary, color=color, line_height=line_h, counters=counters
-        )
-        return primary, secondary, indent + primary.get_width() + secondary.get_width()
-    primary = _append_action_enter_icon(
-        primary, color=color, line_height=line_h, counters=counters
-    )
-    return primary, None, indent + primary.get_width()
+# Test-facing aliases for the extracted present-style helpers.
+_row_text = row_text
+_row_value_color = row_value_color
+_row_indent = row_indent
+_row_has_tree_focus = row_has_tree_focus
+_row_bg_color = row_bg_color
+_render_text = render_text
+_compose_surface = compose_surface
+_render_label_value_row = render_label_value_row
+_notification_elapsed = notification_elapsed
+_notification_accent = notification_accent
+_row_shows_action_enter_hint = row_shows_action_enter_hint
+_row_shows_enter_icon = row_shows_enter_icon
+_action_parameter_label_color = action_parameter_label_color
 
 
 def track_sub_rows_visible(state: TuningViewState, slot: str) -> bool:
-    return state.tracks[slot].expanded
-
-
-def _row_text(state: TuningViewState, index: int) -> str:
-    kind = state.layout.kind(index)
-    if kind == RowKind.RENDER_SECTION_GAP:
-        return ""
-
-    desc = state.layout.descriptor(index)
-    field = ROW_FIELDS.get(kind)
-    if field is not None:
-        if field.present_style == RowPresentStyle.LABELED_VALUE:
-            return row_labeled_display_text(state, desc)
-        if field.present_style == RowPresentStyle.ACTION_PARAMETER:
-            return row_action_parameter_display_text(state, desc)
-        if field.present_style == RowPresentStyle.EXPAND_SUBHEADER:
-            return row_expand_subheader_display_text(state, desc)
-        if field.present_style == RowPresentStyle.COMPOSITE_HEADER:
-            return row_composite_header_display_text(state, desc)
-        if field.present_style == RowPresentStyle.PATH_ICON:
-            return format_row_value(state, desc)
-        if field.present_style == RowPresentStyle.FULL_LINE:
-            return row_full_line_display_text(state, desc)
-        if field.present_style == RowPresentStyle.DYNAMIC:
-            return row_dynamic_labeled_display_text(state, desc)
-    return ""
-
-
-def _is_action_parameter_style(kind: RowKind) -> bool:
-    field = ROW_FIELDS.get(kind)
-    return field is not None and field.present_style == RowPresentStyle.ACTION_PARAMETER
-
-
-def _action_parameter_row_prefix(kind: RowKind) -> str:
-    return labeled_row_prefix(kind)
-
-
-def _action_parameter_row_value(state: TuningViewState, index: int) -> str:
-    return format_row_value(state, state.layout.descriptor(index))
-
-
-def _action_parameter_label_color(
-    state: TuningViewState, index: int
-) -> tuple[int, int, int]:
-    """ACTION green label prefix for action-parameter rows (e.g. editor mode)."""
-    kind = state.layout.kind(index)
-    desc = state.layout.descriptor(index)
-    locked_blocked = section_locked(state, desc) and row_blocked_by_section_lock(kind)
-
-    if locked_blocked:
-        return LOCKED
-
-    if _row_has_tree_focus(state, index):
-        return HIGHLIGHT
-
-    return ACTION
-
-
-def _fit_action_parameter_row_value(
-    font: pygame.font.Font,
-    state: TuningViewState,
-    index: int,
-    *,
-    max_content_width: int = PANEL_CONTENT_MAX_WIDTH,
-    cache: TuningPanelCache | None = None,
-) -> str:
-    value = _action_parameter_row_value(state, index)
-    # Flexible mode sizes the panel to content; keep the full value so chrome like
-    # the editor-mode return-corner icon can widen the panel past ui_width max.
-    if state.settings.ui_width_mode == "flexible":
-        return value
-    budget = max_content_width - _row_indent(state, index)
-    budget -= font.size(_action_parameter_row_prefix(state.layout.kind(index)))[0]
-    if _row_shows_enter_icon(state, index):
-        budget -= action_enter_icon_suffix_width(font.get_linesize())
-    if cache is None:
-        return fit_text_to_width(font, value, budget)
-    return cache.fit_text_cached("text", fit_text_to_width, font, value, budget)
-
-
-def _labeled_sub_row_prefix(state: TuningViewState, index: int) -> str:
-    kind = state.layout.kind(index)
-    field = ROW_FIELDS.get(kind)
-    if field is not None:
-        if field.present_style == RowPresentStyle.LABELED_VALUE:
-            return labeled_row_prefix(kind)
-        if field.present_style == RowPresentStyle.DYNAMIC:
-            return row_dynamic_labeled_prefix(state.layout.descriptor(index))
-    return ""
-
-
-def _labeled_sub_row_value(state: TuningViewState, index: int) -> str:
-    kind = state.layout.kind(index)
-    field = ROW_FIELDS.get(kind)
-    if field is not None:
-        if field.present_style == RowPresentStyle.LABELED_VALUE:
-            return format_row_value(state, state.layout.descriptor(index))
-        if field.present_style == RowPresentStyle.DYNAMIC:
-            return format_row_value(state, state.layout.descriptor(index))
-    return ""
-
-
-def _fit_labeled_sub_row_value(
-    font: pygame.font.Font,
-    state: TuningViewState,
-    index: int,
-    *,
-    max_content_width: int = PANEL_CONTENT_MAX_WIDTH,
-    cache: TuningPanelCache | None = None,
-) -> str:
-    kind = state.layout.kind(index)
-    budget = max_content_width - _row_indent(state, index)
-    budget -= font.size(_labeled_sub_row_prefix(state, index))[0]
-    value = _labeled_sub_row_value(state, index)
-    if kind in {
-        RowKind.RENDER_OVERLAY_OPENING_TITLE_FONT,
-        RowKind.RENDER_OVERLAY_OPENING_BODY_FONT,
-        RowKind.RENDER_OVERLAY_CLOSING_TITLE_FONT,
-        RowKind.RENDER_OVERLAY_CLOSING_BODY_FONT,
-    }:
-        if cache is None:
-            return fit_counter_label_to_width(font, value, budget)
-        return cache.fit_text_cached(
-            "counter", fit_counter_label_to_width, font, value, budget
-        )
-    if cache is None:
-        return fit_text_to_width(font, value, budget)
-    return cache.fit_text_cached("text", fit_text_to_width, font, value, budget)
-
-
-def _render_label_value_row(
-    font: pygame.font.Font,
-    *,
-    prefix: str,
-    value: str,
-    value_color: tuple[int, int, int],
-    line_height: int,
-    prefix_color: tuple[int, int, int] | None = None,
-    suffix_surf: pygame.Surface | None = None,
-    suffix_gap: int = 0,
-    counters: OverlayDrawCounters | None = None,
-) -> pygame.Surface:
-    prefix_surf = _render_text(
-        font, prefix, True, prefix_color if prefix_color is not None else LABEL, counters=counters
-    )
-    value_surf = _render_text(font, value, True, value_color, counters=counters)
-    label_w = prefix_surf.get_width() + value_surf.get_width()
-    if suffix_surf is not None:
-        label_w += suffix_gap + suffix_surf.get_width()
-
-    label_surf = _compose_surface((label_w, line_height), counters=counters)
-    x = 0
-    label_surf.blit(prefix_surf, (x, 0))
-    x += prefix_surf.get_width()
-    label_surf.blit(value_surf, (x, 0))
-    if suffix_surf is not None:
-        x += value_surf.get_width() + suffix_gap
-        label_surf.blit(suffix_surf, (x, 0))
-    return label_surf
-
-
-def _track_header_layer_prefix(state: TuningViewState, index: int) -> str:
-    stem = state.layout.slot(index)
-    assert stem is not None
-    layer_num = state.layer_z_order.index(stem) + 1
-    return f"Layer {layer_num}: "
-
-
-def _track_header_expand_suffix(state: TuningViewState, desc: RowDescriptor) -> str:
-    return f" {format_composite_header_expand_value(state, desc)}"
-
-
-def row_visibility_icon_key(
-    state: TuningViewState, index: int
-) -> tuple[bool, bool] | None:
-    """Return ``(enabled, solo)`` for rows with a visibility eye, else ``None``."""
-    kind = state.layout.kind(index)
-    stem = state.layout.slot(index)
-    if kind == RowKind.TRACK_HEADER:
-        if stem is None:
-            return None
-        block = state.tracks[stem]
-        return (block.visible, state.solo_slot == stem)
-    if kind == RowKind.RENDER_OVERLAYS_HEADER:
-        block = state.render_overlays
-        any_enabled = (
-            block.opening_card.enabled or block.closing_card.enabled
-        )
-        return (any_enabled, block.solo)
-    if kind == RowKind.RENDER_POST_FX_HEADER:
-        block = state.render_post_fx
-        return (block.enabled, block.solo)
-    if kind == RowKind.RENDER_PATTERN_MASK_HEADER:
-        block = state.render_pattern_mask
-        return (block.enabled, False)
-    if kind == RowKind.RENDER_TIMELINE_HEADER:
-        return (state.render_timeline.enabled, False)
-    return None
-
-
-def render_visibility_icon(
-    *,
-    enabled: bool,
-    solo: bool = False,
-    override: bool = False,
-    line_height: int,
-) -> pygame.Surface:
-    glyph = VISIBILITY_GLYPH if enabled else VISIBILITY_OFF_GLYPH
-    if override:
-        color = OVERRIDE_GLYPH if enabled else OVERRIDE_GLYPH_OFF
-    elif enabled or solo:
-        color = VALUE
-    else:
-        color = DISABLED
-    glyph_surf = render_glyph(glyph, color=color, line_height=line_height)
-    slot_w = visibility_icon_slot_width(line_height)
-    surf = pygame.Surface((slot_w, line_height), pygame.SRCALPHA)
-    if solo:
-        pygame.draw.rect(surf, SOLO_BG, (0, 0, slot_w, line_height))
-    elif override:
-        pygame.draw.rect(surf, OVERRIDE_BG, (0, 0, slot_w, line_height))
-    surf.blit(glyph_surf, (VISIBILITY_ICON_PAD_X, 0))
-    return surf
-
-
-def track_header_prefix_width(font: pygame.font.Font) -> int:
-    line_h = font.get_linesize()
-    icon_w = render_visibility_icon(
-        enabled=True, solo=False, line_height=line_h
-    ).get_width()
-    return icon_w + ROW_ICON_SUFFIX_GAP
-
-
-def tree_branch_prefix_width(font: pygame.font.Font, *, depth: int = 1) -> int:
-    return font.size(tree_branch_leading_spaces(depth) + TREE_BRANCH)[0]
-
-
-def preset_row_prefix_width(
-    font: pygame.font.Font, line_height: int, *, depth: int = 1
-) -> int:
-    return tree_branch_prefix_width(font, depth=depth) + row_icon_prefix_width(
-        line_height
-    )
-
-
-def _render_preset_row_prefix(
-    font: pygame.font.Font,
-    *,
-    glyph: str,
-    icon_color: tuple[int, int, int],
-    line_height: int,
-    depth: int = 1,
-    counters: OverlayDrawCounters | None = None,
-) -> pygame.Surface:
-    branch = tree_branch_leading_spaces(depth) + TREE_BRANCH
-    tree_surf = _render_text(font, branch, True, LABEL, counters=counters)
-    icon_surf = render_glyph(glyph, color=icon_color, line_height=line_height)
-    total_w = tree_surf.get_width() + icon_surf.get_width()
-    surf = _compose_surface((total_w, line_height), counters=counters)
-    surf.blit(tree_surf, (0, 0))
-    surf.blit(icon_surf, (tree_surf.get_width(), 0))
-    return surf
-
-
-def _fit_track_header_stem(
-    font: pygame.font.Font,
-    state: TuningViewState,
-    index: int,
-    *,
-    max_content_width: int = PANEL_CONTENT_MAX_WIDTH,
-    cache: TuningPanelCache | None = None,
-) -> str:
-    stem = state.layout.slot(index)
-    assert stem is not None
-    block = state.tracks[stem]
-    desc = RowDescriptor(RowKind.TRACK_HEADER, slot=stem)
-    locked = section_locked(state, desc)
-    budget = max_content_width - _row_indent(state, index)
-    budget -= track_header_prefix_width(font)
-    budget -= font.size(_track_header_layer_prefix(state, index))[0]
-    budget -= font.size(_track_header_expand_suffix(state, desc))[0]
-    if locked:
-        budget -= track_header_lock_suffix_width(font.get_linesize())
-    stem_text = stem_overlay_header(block.stem)
-    if cache is None:
-        return fit_text_to_width(font, stem_text, budget)
-    return cache.fit_text_cached("text", fit_text_to_width, font, stem_text, budget)
-
-
-def _render_track_header_label(
-    font: pygame.font.Font,
-    *,
-    layer_prefix: str,
-    stem_text: str,
-    value_color: tuple[int, int, int],
-    expand_arrow: str,
-    locked: bool,
-    line_height: int,
-    counters: OverlayDrawCounters | None = None,
-) -> pygame.Surface:
-    arrow = f" {expand_arrow}"
-    prefix_surf = _render_text(font, layer_prefix, True, LABEL, counters=counters)
-    stem_surf = _render_text(font, stem_text, True, value_color, counters=counters)
-    arrow_surf = _render_text(font, arrow, True, value_color, counters=counters)
-    lock_surf = (
-        render_glyph(LOCK_GLYPH, color=LOCK_ICON, line_height=line_height)
-        if locked
-        else None
-    )
-
-    label_w = prefix_surf.get_width() + stem_surf.get_width() + arrow_surf.get_width()
-    if lock_surf is not None:
-        label_w += ROW_ICON_SUFFIX_GAP + lock_surf.get_width()
-
-    label_surf = _compose_surface((label_w, line_height), counters=counters)
-    x = 0
-    label_surf.blit(prefix_surf, (x, 0))
-    x += prefix_surf.get_width()
-    label_surf.blit(stem_surf, (x, 0))
-    x += stem_surf.get_width()
-    label_surf.blit(arrow_surf, (x, 0))
-    if lock_surf is not None:
-        x += arrow_surf.get_width() + ROW_ICON_SUFFIX_GAP
-        label_surf.blit(lock_surf, (x, 0))
-    return label_surf
-
-
-def fit_row_text(
-    font: pygame.font.Font,
-    state: TuningViewState,
-    index: int,
-    *,
-    max_content_width: int = PANEL_CONTENT_MAX_WIDTH,
-    cache: TuningPanelCache | None = None,
-) -> str:
-    """Fit row label to the shared panel content width (pixels)."""
-
-    def _fit(
-        fitter: str,
-        fit_fn: Callable[[pygame.font.Font, str, int], str],
-        text: str,
-        budget: int,
-    ) -> str:
-        if cache is None:
-            return fit_fn(font, text, budget)
-        return cache.fit_text_cached(fitter, fit_fn, font, text, budget)
-
-    kind = state.layout.kind(index)
-    indent = _row_indent(state, index)
-    budget = max_content_width - indent
-    text = _row_text(state, index)
-
-    field = ROW_FIELDS.get(kind)
-    if field is not None and field.present_style == RowPresentStyle.PATH_ICON:
-        line_h = font.get_linesize()
-        if kind == RowKind.CONFIG_HEADER:
-            icon_w = row_icon_prefix_width(line_h)
-            suffix_w = font.size("*")[0] if state.config_dirty else 0
-            enter_w = (
-                action_enter_icon_suffix_width(line_h)
-                if _row_shows_action_enter_hint(state, index)
-                else 0
-            )
-            return _fit(
-                "path",
-                fit_path_label_to_width,
-                text,
-                budget - icon_w - suffix_w - enter_w,
-            )
-        prefix_w = preset_row_prefix_width(
-            font, line_h, depth=row_tree_indent_depth(kind)
-        )
-        return _fit("counter", fit_counter_label_to_width, text, budget - prefix_w)
-    if kind == RowKind.TRACK_HEADER:
-        stem = state.layout.slot(index)
-        assert stem is not None
-        desc = RowDescriptor(RowKind.TRACK_HEADER, slot=stem)
-        return (
-            _track_header_layer_prefix(state, index)
-            + _fit_track_header_stem(
-                font,
-                state,
-                index,
-                max_content_width=max_content_width,
-                cache=cache,
-            )
-            + _track_header_expand_suffix(state, desc)
-        )
-    if kind == RowKind.RENDER_SECTION_GAP:
-        return ""
-    if kind == RowKind.PANEL_NOTIFICATION:
-        desc = state.layout.descriptor(index)
-        if desc.marker_index == 0:
-            text = state.persistent_notification_message or ""
-        else:
-            text = state.notification_message or ""
-        return _fit("text", fit_text_to_width, text, budget)
-    field = ROW_FIELDS.get(kind)
-    if field is not None and field.present_style == RowPresentStyle.FULL_LINE:
-        if kind in {
-            RowKind.LAYER_MANAGEMENT_ADD,
-            RowKind.LAYER_MANAGEMENT_DELETE,
-            RowKind.TRACK_PRESET_LIST_ADD,
-            RowKind.TRACK_PRESET_LIST_POPULATE,
-        }:
-            return _row_text(state, index)
-    if field is not None and field.present_style == RowPresentStyle.COMPOSITE_HEADER:
-        return row_composite_header_display_text(state, state.layout.descriptor(index))
-    if field is not None and field.present_style == RowPresentStyle.EXPAND_SUBHEADER:
-        return row_expand_subheader_display_text(state, state.layout.descriptor(index))
-    if _is_action_parameter_style(kind):
-        return _action_parameter_row_prefix(kind) + _fit_action_parameter_row_value(
-            font,
-            state,
-            index,
-            max_content_width=max_content_width,
-            cache=cache,
-        )
-    if kind in LABELED_SUB_ROW_KINDS:
-        return _labeled_sub_row_prefix(state, index) + _fit_labeled_sub_row_value(
-            font,
-            state,
-            index,
-            max_content_width=max_content_width,
-            cache=cache,
-        )
-    return _fit("text", fit_text_to_width, text, budget)
-
-
-def _row_indent(state: TuningViewState, index: int) -> int:
-    kind = state.layout.kind(index)
-    if kind in {
-        RowKind.TRACK_HEADER,
-        RowKind.RENDER_OVERLAYS_HEADER,
-        RowKind.RENDER_POST_FX_HEADER,
-        RowKind.RENDER_PATTERN_MASK_HEADER,
-        RowKind.RENDER_TIMELINE_HEADER,
-    }:
-        return 0
-    if kind == RowKind.RENDER_SECTION_GAP:
-        return 0
-    if kind == RowKind.PANEL_NOTIFICATION:
-        return 0
-    if kind == RowKind.LAYER_MANAGEMENT_ADD:
-        return 0
-    return TREE_INDENT * row_tree_indent_depth(kind)
-
-
-def _track_disabled(state: TuningViewState, slot: str) -> bool:
-    return not state.tracks[slot].visible
-
-
-def _row_has_tree_focus(state: TuningViewState, index: int) -> bool:
-    if state.timeline_submenu_focused:
-        return False
-    return index == state.focus_index
-
-
-def _notification_elapsed(state: TuningViewState, marker_index: int | None) -> float:
-    if marker_index == 0:
-        return state.persistent_notification_elapsed_sec
-    return state.notification_elapsed_sec
-
-
-def _notification_accent(marker_index: int | None) -> tuple[int, int, int]:
-    if marker_index == 0:
-        return ERROR_NOTIFICATION
-    return HIGHLIGHT
-
-
-def _row_value_color(state: TuningViewState, index: int) -> tuple[int, int, int]:
-    """Return the VALUE-role color for a row (before label/value split rendering)."""
-    kind = state.layout.kind(index)
-    if kind == RowKind.PANEL_NOTIFICATION:
-        desc = state.layout.descriptor(index)
-        accent = _notification_accent(desc.marker_index)
-        attention = notification_attention(
-            _notification_elapsed(state, desc.marker_index)
-        )
-        if attention.text_on_fill:
-            return NOTIFICATION_ON_FILL
-        return accent
-
-    desc = state.layout.descriptor(index)
-    locked_blocked = section_locked(state, desc) and row_blocked_by_section_lock(kind)
-
-    if kind in RENDER_TIMELINE_SECTION_KINDS:
-        if not state.render_timeline.enabled:
-            return DISABLED
-
-    if kind in {
-        RowKind.CONFIG_HEADER,
-        RowKind.LAYER_MANAGEMENT_ADD,
-        RowKind.LAYER_MANAGEMENT_DELETE,
-        RowKind.TRACK_PRESET_LIST_ADD,
-        RowKind.TRACK_PRESET_LIST_POPULATE,
-        RowKind.TIMELINE_PRESETS,
-        RowKind.TIMELINE_RESET,
-        RowKind.TIMELINE_SNAP_TO_BEATS,
-        RowKind.TIMELINE_SNAP_TO_BARS,
-        RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
-        RowKind.TIMELINE_APPLY_SOFT_CUTS,
-        RowKind.TIMELINE_APPLY_HARD_CUTS,
-        RowKind.SETTINGS_MEASURE_LATENCY,
-    }:
-        if kind == RowKind.CONFIG_HEADER and state.solo_active:
-            return DISABLED
-        if kind == RowKind.LAYER_MANAGEMENT_DELETE and len(state.layer_z_order) == 1:
-            return DISABLED
-        if locked_blocked:
-            return LOCKED
-        if _row_has_tree_focus(state, index):
-            return HIGHLIGHT
-        return ACTION
-
-    stem = state.layout.slot(index)
-
-    if kind in RENDER_OVERLAY_SECTION_KINDS:
-        overlays = state.render_overlays
-        if not (
-            overlays.opening_card.enabled or overlays.closing_card.enabled
-        ):
-            return DISABLED
-
-    if kind in RENDER_POST_FX_SECTION_KINDS:
-        if not state.render_post_fx.enabled:
-            return DISABLED
-
-    if kind in RENDER_PATTERN_MASK_SECTION_KINDS:
-        if not state.render_pattern_mask.enabled:
-            return DISABLED
-
-    if (
-        kind == RowKind.TRACK_PRESET
-        and stem is not None
-        and state.tracks[stem].preset_empty
-    ):
-        return DISABLED
-
-    if _row_in_move_mode(state, index):
-        return MOVE_MODE
-
-    if _row_has_tree_focus(state, index):
-        return HIGHLIGHT
-
-    if locked_blocked:
-        return LOCKED
-
-    if stem is not None and _track_disabled(state, stem):
-        return DISABLED
-
-    if (
-        kind == RowKind.TRACK_PRESET_LIST_ITEM
-        and stem is not None
-        and desc.preset_index is not None
-        and state.tracks[stem].active_preset_list_index == desc.preset_index
-    ):
-        # HIGHLIGHT yellow; color_state is part of RowRenderKey so only the
-        # previous/next active rows miss the row-surface cache on switch.
-        return HIGHLIGHT
-
-    return VALUE
-
-
-def _row_in_move_mode(state: TuningViewState, index: int) -> bool:
-    stem = state.layout.slot(index)
-    if stem is not None and state.move_mode_slot == stem:
-        return True
-    move = state.move_mode_preset
-    if move is None:
-        return False
-    desc = state.layout.descriptor(index)
-    return (
-        desc.kind == RowKind.TRACK_PRESET_LIST_ITEM
-        and desc.slot == move[0]
-        and desc.preset_index == move[1]
-    )
-
-
-def _row_bg_color(state: TuningViewState, index: int) -> tuple[int, int, int] | None:
-    if _row_in_move_mode(state, index):
-        return MOVE_MODE
-    if _row_has_tree_focus(state, index):
-        return HIGHLIGHT
-    return None
+    return state.tracks[slot].runtime.expanded
 
 
 @dataclass(frozen=True)
@@ -990,16 +288,6 @@ def tuning_panel_max_dimensions(
     return max_panel_w, max_panel_h
 
 
-@dataclass(frozen=True)
-class ComposedTuningPanel:
-    upload_surface: pygame.Surface
-    panel_size: tuple[int, int]
-    screen_rect: tuple[int, int, int, int]
-    upload_plan: UploadPlan
-    upload_signature: UploadSignature
-    capacity: tuple[int, int]
-
-
 def scroll_metrics(
     *,
     visible_indices: list[int],
@@ -1109,34 +397,6 @@ def _scrollable_row_in_viewport(
     return y + line_h > scroll_top and y < scroll_bottom
 
 
-def clip_rect_to_surface(
-    rect: tuple[int, int, int, int],
-    surface: pygame.Surface,
-) -> tuple[int, int, int, int] | None:
-    """Intersection of rect with surface bounds (for subsurface-safe panel_rect)."""
-    return clip_rect_to_bounds(rect, surface.get_width(), surface.get_height())
-
-
-def clip_rect_to_bounds(
-    rect: tuple[int, int, int, int],
-    bounds_w: int,
-    bounds_h: int,
-) -> tuple[int, int, int, int] | None:
-    """Intersection of rect with a width/height viewport."""
-    x, y, w, h = rect
-    if w <= 0 or h <= 0:
-        return None
-    left = max(x, 0)
-    top = max(y, 0)
-    right = min(x + w, bounds_w)
-    bottom = min(y + h, bounds_h)
-    clip_w = right - left
-    clip_h = bottom - top
-    if clip_w <= 0 or clip_h <= 0:
-        return None
-    return (left, top, clip_w, clip_h)
-
-
 class TuningOverlay:
     """Tree-style live tuning panel; holds visible after input, then fades out."""
 
@@ -1170,7 +430,6 @@ class TuningOverlay:
         self._fade_duration_sec = FADE_DURATION_SEC
         self._idle_sec = self._hold_idle_sec + self._fade_duration_sec + 1.0
         self._visibility = 0.0
-        self._font: pygame.font.Font | None = None
         self._panel_rect: tuple[int, int, int, int] | None = None
         self._panel_scratch: pygame.Surface | None = None
         self._scroll_y = 0
@@ -1254,9 +513,7 @@ class TuningOverlay:
             self._visibility = 0.0
 
     def _font_get(self) -> pygame.font.Font:
-        if self._font is None:
-            self._font = pygame.font.SysFont("monospace", self._font_size)
-        return self._font
+        return overlay_font(self._font_size)
 
     @property
     def panel_rect(self) -> tuple[int, int, int, int] | None:
@@ -1289,7 +546,7 @@ class TuningOverlay:
     ) -> None:
         desc = state.layout.descriptor(index)
         attention = notification_attention(
-            _notification_elapsed(state, desc.marker_index)
+            notification_elapsed(state, desc.marker_index)
         )
         if attention.fill_progress <= 0.001:
             return
@@ -1302,7 +559,7 @@ class TuningOverlay:
             fill_x = x
         else:
             fill_x = x + max(0, row_w - fill_w)
-        accent = _notification_accent(desc.marker_index)
+        accent = notification_accent(desc.marker_index)
         fill_alpha = int(255 * self._visibility)
         if fill_alpha < 2:
             return
@@ -1340,7 +597,7 @@ class TuningOverlay:
             )
         elif (
             bg is not None
-            and state.layout.kind(index) == RowKind.SETTINGS_HEADER
+            and is_settings_header_row(state, index)
             and state.fps is not None
             and font is not None
         ):
@@ -1363,7 +620,7 @@ class TuningOverlay:
             bg,
             tint_alpha=tint_alpha,
         )
-        if state.layout.kind(index) == RowKind.PANEL_NOTIFICATION:
+        if is_notification_row(state, index):
             self._draw_notification_attention_fill(
                 panel,
                 state=state,
@@ -1430,303 +687,17 @@ class TuningOverlay:
         counters: OverlayDrawCounters | None = None,
         cache: TuningPanelCache | None = None,
     ) -> tuple[pygame.Surface, pygame.Surface | None, int]:
-        kind = state.layout.kind(index)
-        indent = self._padding + _row_indent(state, index)
-        color = _row_value_color(state, index)
-
-        def _finish(
-            primary: pygame.Surface,
-            secondary: pygame.Surface | None,
-            width: int,
-        ) -> tuple[pygame.Surface, pygame.Surface | None, int]:
-            return _with_action_enter_hint(
-                primary,
-                secondary,
-                width,
-                state=state,
-                index=index,
-                indent=indent,
-                line_h=line_h,
-                counters=counters,
-            )
-
-        if kind == RowKind.TRANSPORT:
-            icons_surf = render_transport_icons(
-                color=color,
-                line_height=line_h,
-                paused=state.paused,
-            )
-            time_text = f" [{format_mmss(state.position_sec)}]"
-            time_surf = _render_text(font, time_text, True, color, counters=counters)
-            width = indent + icons_surf.get_width() + time_surf.get_width()
-            return _finish(icons_surf, time_surf, width)
-
-        if kind == RowKind.TRACK_HEADER:
-            stem = state.layout.slot(index)
-            block = state.tracks[stem] if stem is not None else None
-            enabled = block.visible if block is not None else True
-            solo = stem is not None and state.solo_slot == stem
-            desc = RowDescriptor(RowKind.TRACK_HEADER, slot=stem)
-            locked = section_locked(state, desc)
-            prefix_surf = render_visibility_icon(
-                enabled=enabled, solo=solo, line_height=line_h
-            )
-            layer_prefix = composite_header_prefix_part(state, desc)
-            stem_text = _fit_track_header_stem(
-                font,
-                state,
-                index,
-                max_content_width=max_content_width,
-                cache=cache,
-            )
-            expand_arrow = (
-                format_composite_header_expand_value(state, desc)
-                if stem is not None
-                else expand_arrow_glyph(False)
-            )
-            label_surf = _render_track_header_label(
-                font,
-                layer_prefix=layer_prefix,
-                stem_text=stem_text,
-                value_color=color,
-                expand_arrow=expand_arrow,
-                locked=locked,
-                line_height=line_h,
-                counters=counters,
-            )
-            width = indent + prefix_surf.get_width() + label_surf.get_width()
-            return _finish(prefix_surf, label_surf, width)
-
-        if kind == RowKind.SETTINGS_HEADER:
-            desc = state.layout.descriptor(index)
-            icon_surf = render_glyph(SETTINGS_GLYPH, color=VALUE, line_height=line_h)
-            label_surf = _render_label_value_row(
-                font,
-                prefix=composite_header_prefix_part(state, desc),
-                value=format_composite_header_expand_value(state, desc),
-                value_color=color,
-                prefix_color=LABEL,
-                line_height=line_h,
-                counters=counters,
-            )
-            width = indent + icon_surf.get_width() + label_surf.get_width()
-            return _finish(icon_surf, label_surf, width)
-
-        if kind in {
-            RowKind.RENDER_OVERLAYS_HEADER,
-            RowKind.RENDER_POST_FX_HEADER,
-            RowKind.RENDER_PATTERN_MASK_HEADER,
-            RowKind.RENDER_TIMELINE_HEADER,
-        }:
-            desc = state.layout.descriptor(index)
-            if kind == RowKind.RENDER_OVERLAYS_HEADER:
-                block_ro = state.render_overlays
-                header_locked = block_ro.locked
-                prefix_surf = render_visibility_icon(
-                    enabled=(
-                        block_ro.opening_card.enabled
-                        or block_ro.closing_card.enabled
-                    ),
-                    solo=block_ro.solo,
-                    line_height=line_h,
-                )
-            elif kind == RowKind.RENDER_POST_FX_HEADER:
-                block_pp = state.render_post_fx
-                header_locked = block_pp.locked
-                prefix_surf = render_visibility_icon(
-                    enabled=block_pp.enabled,
-                    solo=block_pp.solo,
-                    line_height=line_h,
-                )
-            elif kind == RowKind.RENDER_PATTERN_MASK_HEADER:
-                block_pm = state.render_pattern_mask
-                header_locked = block_pm.locked
-                prefix_surf = render_visibility_icon(
-                    enabled=block_pm.enabled,
-                    solo=False,
-                    line_height=line_h,
-                )
-            else:
-                block_tl = state.render_timeline
-                header_locked = block_tl.locked
-                prefix_surf = render_visibility_icon(
-                    enabled=block_tl.enabled,
-                    solo=False,
-                    line_height=line_h,
-                )
-            label_surf = _render_track_header_label(
-                font,
-                layer_prefix=composite_header_prefix_part(state, desc),
-                stem_text=composite_header_suffix_part(state, desc),
-                value_color=color,
-                expand_arrow=format_composite_header_expand_value(state, desc),
-                locked=header_locked,
-                line_height=line_h,
-                counters=counters,
-            )
-            width = indent + prefix_surf.get_width() + label_surf.get_width()
-            return _finish(prefix_surf, label_surf, width)
-
-        if kind == RowKind.RENDER_SECTION_GAP:
-            gap_surf = _compose_surface((1, line_h), counters=counters)
-            return _finish(gap_surf, None, indent + gap_surf.get_width())
-
-        if (
-            ROW_FIELDS.get(kind) is not None
-            and ROW_FIELDS[kind].present_style == RowPresentStyle.PATH_ICON
-        ):
-            depth = row_tree_indent_depth(kind)
-            if kind == RowKind.TRACK_PRESET_DIR:
-                glyph = FOLDER_GLYPH
-                icon_color = PRESET_ICON
-                icon_surf = _render_preset_row_prefix(
-                    font,
-                    glyph=glyph,
-                    icon_color=icon_color,
-                    line_height=line_h,
-                    depth=depth,
-                    counters=counters,
-                )
-            elif kind in {RowKind.TRACK_PRESET, RowKind.TRACK_PRESET_LIST_ITEM}:
-                glyph = FILE_GLYPH
-                icon_color = PRESET_FILE_ICON
-                icon_surf = _render_preset_row_prefix(
-                    font,
-                    glyph=glyph,
-                    icon_color=icon_color,
-                    line_height=line_h,
-                    depth=depth,
-                    counters=counters,
-                )
-            else:
-                icon_surf = render_glyph(
-                    FILE_GLYPH, color=PRESET_FILE_ICON, line_height=line_h
-                )
-            if kind == RowKind.CONFIG_HEADER:
-                path = fit_row_text(
-                    font,
-                    state,
-                    index,
-                    max_content_width=max_content_width,
-                    cache=cache,
-                )
-                label_surf = _render_label_value_row(
-                    font,
-                    prefix=path,
-                    value="*" if state.config_dirty else "",
-                    value_color=CONFIG_DIRTY,
-                    prefix_color=color,
-                    line_height=line_h,
-                    counters=counters,
-                )
-            else:
-                label = fit_row_text(
-                    font,
-                    state,
-                    index,
-                    max_content_width=max_content_width,
-                    cache=cache,
-                )
-                label_surf = _render_text(font, label, True, color, counters=counters)
-            width = indent + icon_surf.get_width() + label_surf.get_width()
-            return _finish(icon_surf, label_surf, width)
-
-        if (
-            ROW_FIELDS.get(kind) is not None
-            and ROW_FIELDS[kind].present_style == RowPresentStyle.EXPAND_SUBHEADER
-        ):
-            desc = state.layout.descriptor(index)
-            surf = _render_label_value_row(
-                font,
-                prefix=expand_subheader_prefix(kind),
-                value=format_expand_subheader_value(state, desc),
-                value_color=color,
-                line_height=line_h,
-                counters=counters,
-            )
-            return _finish(surf, None, indent + surf.get_width())
-
-        if _is_action_parameter_style(kind):
-            prefix = _action_parameter_row_prefix(kind)
-            value = _fit_action_parameter_row_value(
-                font,
-                state,
-                index,
-                max_content_width=max_content_width,
-                cache=cache,
-            )
-            value_color = _row_value_color(state, index)
-            suffix_surf = None
-            suffix_gap = 0
-            if (
-                kind == RowKind.SETTINGS_EDITOR_MODE
-                and editor_mode_confirm_pending(state)
-            ):
-                suffix_surf = render_action_enter_icon(
-                    color=value_color, line_height=line_h
-                )
-                suffix_gap = ROW_ICON_SUFFIX_GAP
-            surf = _render_label_value_row(
-                font,
-                prefix=prefix,
-                value=value,
-                value_color=value_color,
-                prefix_color=_action_parameter_label_color(state, index),
-                line_height=line_h,
-                suffix_surf=suffix_surf,
-                suffix_gap=suffix_gap,
-                counters=counters,
-            )
-            return _finish(surf, None, indent + surf.get_width())
-
-        if kind in LABELED_SUB_ROW_KINDS:
-            prefix = _labeled_sub_row_prefix(state, index)
-            value = _fit_labeled_sub_row_value(
-                font,
-                state,
-                index,
-                max_content_width=max_content_width,
-                cache=cache,
-            )
-            surf = _render_label_value_row(
-                font,
-                prefix=prefix,
-                value=value,
-                value_color=color,
-                line_height=line_h,
-                counters=counters,
-            )
-            return _finish(surf, None, indent + surf.get_width())
-
-        if (
-            ROW_FIELDS.get(kind) is not None
-            and ROW_FIELDS[kind].present_style == RowPresentStyle.FULL_LINE
-            and kind
-            in {
-                RowKind.LAYER_MANAGEMENT_ADD,
-                RowKind.LAYER_MANAGEMENT_DELETE,
-                RowKind.TRACK_PRESET_LIST_ADD,
-                RowKind.TRACK_PRESET_LIST_POPULATE,
-                RowKind.TIMELINE_PRESETS,
-                RowKind.TIMELINE_RESET,
-                RowKind.TIMELINE_SNAP_TO_BEATS,
-                RowKind.TIMELINE_SNAP_TO_BARS,
-                RowKind.TIMELINE_SNAP_TO_SONG_MARKERS,
-                RowKind.TIMELINE_APPLY_SOFT_CUTS,
-                RowKind.TIMELINE_APPLY_HARD_CUTS,
-                RowKind.SETTINGS_MEASURE_LATENCY,
-            }
-        ):
-            label = _row_text(state, index)
-            label_color = _row_value_color(state, index)
-            surf = _render_text(font, label, True, label_color, counters=counters)
-            return _finish(surf, None, indent + surf.get_width())
-
-        text = fit_row_text(
-            font, state, index, max_content_width=max_content_width, cache=cache
+        ctx = RowPresentContext(
+            font=font,
+            state=state,
+            index=index,
+            padding=self._padding,
+            line_h=line_h,
+            max_content_width=max_content_width,
+            counters=counters,
+            cache=cache,
         )
-        surf = _render_text(font, text, True, color, counters=counters)
-        return _finish(surf, None, indent + surf.get_width())
+        return render_present_row(ctx)
 
     def _max_content_width(
         self,
@@ -2008,14 +979,7 @@ class TuningOverlay:
             )
             panel.blit(help_hint, (hint_layout.x, hint_layout.y))
 
-        border_alpha = int(255 * self._visibility)
-        if border_alpha >= 2 and BORDER_WIDTH > 0:
-            pygame.draw.rect(
-                panel,
-                (*BORDER_COLOR, border_alpha),
-                panel.get_rect(),
-                width=BORDER_WIDTH,
-            )
+        draw_panel_border(panel, alpha=int(255 * self._visibility))
 
     def compose_panel(
         self,
@@ -2025,7 +989,7 @@ class TuningOverlay:
         viewport_height: int,
         timeline_panel_open: bool = False,
         counters: OverlayDrawCounters | None = None,
-    ) -> ComposedTuningPanel | None:
+    ) -> ComposedPanel | None:
         self._panel_rect = None
         if self._visibility <= 0.01 or len(state.layout) == 0:
             return None
@@ -2150,7 +1114,7 @@ class TuningOverlay:
             (
                 index
                 for index in visible_indices
-                if state.layout.kind(index) == RowKind.TRANSPORT
+                if is_transport_row(state, index)
             ),
             None,
         )
@@ -2386,7 +1350,7 @@ class TuningOverlay:
         state: TuningViewState,
         capacity: tuple[int, int],
         incremental: bool,
-    ) -> ComposedTuningPanel:
+    ) -> ComposedPanel:
         cache = self._panel_cache
         screen_rect, src_offset = placement
         live_sig = live_upload_signature(state)
@@ -2431,7 +1395,7 @@ class TuningOverlay:
                 )
 
         cache.last_live_signature = live_sig
-        return ComposedTuningPanel(
+        return ComposedPanel(
             upload_surface=panel,
             panel_size=panel_size,
             screen_rect=screen_rect,
